@@ -2,11 +2,30 @@
  * Market Ticker Search — shared helpers for validating and resolving Kalshi market tickers.
  */
 
+import { extractKalshiMarketTiming } from "@/lib/kalshiLive/kalshiMarketTiming";
+
+export {
+  aggregateKalshiMarketTiming,
+  extractKalshiMarketTiming,
+  formatKalshiMarketDate,
+  formatKalshiMarketDateRange,
+  formatKalshiMarketStatusLabel,
+  isKalshiMarketLiveStatus,
+} from "@/lib/kalshiLive/kalshiMarketTiming";
+
 /** Strict ticker token: letters, digits, hyphens (Kalshi market tickers). */
 export const MARKET_TICKER_TOKEN_RE = /^[A-Z0-9][A-Z0-9-]{0,63}$/i;
 
 /**
- * @typedef {{ ticker: string; title: string; subtitle?: string; eventTicker?: string }} MarketTickerSelection
+ * @typedef {{
+ *   ticker: string;
+ *   title: string;
+ *   subtitle?: string;
+ *   eventTicker?: string;
+ *   status?: string;
+ *   openTime?: string;
+ *   closeTime?: string;
+ * }} MarketTickerSelection
  */
 
 /**
@@ -98,8 +117,17 @@ export async function resolveMarketTickers(tickers, opts = {}) {
         String(m?.title || m?.subtitle || m?.yes_sub_title || "").trim() || ticker;
       const subtitle = String(m?.yes_sub_title || m?.event_ticker || "").trim() || undefined;
       const eventTicker = String(m?.event_ticker || "").trim() || undefined;
+      const timing = extractKalshiMarketTiming(m);
       if (!found.some((f) => f.ticker === ticker)) {
-        found.push({ ticker, title, subtitle, eventTicker });
+        found.push({
+          ticker,
+          title,
+          subtitle,
+          eventTicker,
+          status: timing.status,
+          openTime: timing.openTime,
+          closeTime: timing.closeTime,
+        });
       }
     }
     for (const t of chunk) {
@@ -139,11 +167,15 @@ export function normalizeSeriesMarketsForPicker(markets) {
     const title =
       String(row.yes_subtitle || row.yes_sub_title || row.title || row.subtitle || "").trim() ||
       ticker;
+    const timing = extractKalshiMarketTiming(row);
     out.push({
       ticker,
       title,
       subtitle: String(row.event_ticker || "").trim() || undefined,
       eventTicker: String(row.event_ticker || "").trim() || undefined,
+      status: timing.status,
+      openTime: timing.openTime,
+      closeTime: timing.closeTime,
     });
   }
   return out;

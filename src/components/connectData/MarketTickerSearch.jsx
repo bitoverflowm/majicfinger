@@ -22,7 +22,11 @@ import {
 } from "@/components/ui/tooltip";
 import { isKalshiEmbeddingSearchEligible } from "@/lib/kalshiLive/kalshiLiveEmbeddingSearch";
 import {
+  aggregateKalshiMarketTiming,
+  formatKalshiMarketDateRange,
+  formatKalshiMarketStatusLabel,
   getMarketTickerSearchSegment,
+  isKalshiMarketLiveStatus,
   isTickerLikeSegment,
   isValidMarketTickerToken,
   normalizeSeriesMarketsForPicker,
@@ -40,6 +44,9 @@ import { cn } from "@/lib/utils";
  *   ticker: string;
  *   title: string;
  *   subtitle?: string;
+ *   status?: string;
+ *   openTime?: string;
+ *   closeTime?: string;
  * }} MarketSuggestion
  *
  * @typedef {{
@@ -54,6 +61,40 @@ import { cn } from "@/lib/utils";
  */
 
 const MAX_TICKERS = 100;
+
+/**
+ * @param {{ status?: string; openTime?: string; closeTime?: string }} meta
+ */
+function SuggestionMetaRow({ status, openTime, closeTime }) {
+  const live = isKalshiMarketLiveStatus(status);
+  const statusLabel = formatKalshiMarketStatusLabel(status);
+  const dateRange = formatKalshiMarketDateRange(openTime, closeTime);
+  if (!statusLabel && !dateRange) return null;
+
+  return (
+    <span className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[10px] text-muted-foreground">
+      {statusLabel ? (
+        <span className="inline-flex items-center gap-1.5">
+          {live ? (
+            <span
+              className="h-2 w-2 shrink-0 rounded-full bg-green-500 animate-pulse"
+              aria-hidden
+            />
+          ) : (
+            <span
+              className="h-2 w-2 shrink-0 rounded-full bg-slate-400 dark:bg-slate-500"
+              aria-hidden
+            />
+          )}
+          <span className={cn(live ? "text-emerald-700 dark:text-emerald-300" : "")}>
+            {statusLabel}
+          </span>
+        </span>
+      ) : null}
+      {dateRange ? <span className="tabular-nums">{dateRange}</span> : null}
+    </span>
+  );
+}
 
 /**
  * Independent Market Ticker Search.
@@ -136,6 +177,9 @@ export function MarketTickerSearch({
             title: String(item?.title || ticker).trim() || ticker,
             subtitle: item?.subtitle,
             eventTicker: item?.eventTicker,
+            status: item?.status,
+            openTime: item?.openTime,
+            closeTime: item?.closeTime,
           });
         }
         const next = [...map.values()];
@@ -213,7 +257,9 @@ export function MarketTickerSearch({
     setSuggestLoading(true);
     try {
       /** @type {TickerSearchSuggestion[]} */
-      const next = [];
+      const marketHits = [];
+      /** @type {TickerSearchSuggestion[]} */
+      const seriesHits = [];
       const tickerLike = isTickerLikeSegment(trimmed);
 
       const tasks = [];
@@ -232,55 +278,61 @@ export function MarketTickerSearch({
           },
         ).then(async (res) => {
           const data = await res.json().catch(() => ({}));
-          if (!res.ok) return;
+          if (!res.ok || ac.signal.aborted) return;
           const list = Array.isArray(data?.suggestions) ? data.suggestions : [];
           for (const s of list) {
             const ticker = String(s?.ticker || "").trim().toUpperCase();
             if (!ticker) continue;
-            next.push({
+            marketHits.push({
               kind: "market",
               ticker,
               title: String(s?.title || ticker).trim() || ticker,
               subtitle: String(s?.subtitle || "").trim() || undefined,
+              status: String(s?.status || "").trim() || undefined,
+              openTime: String(s?.openTime || "").trim() || undefined,
+              closeTime: String(s?.closeTime || "").trim() || undefined,
             });
           }
         }),
       );
 
-      // Semantic / embedding search for natural language (and ticker fallback)
-      if (isKalshiEmbeddingSearchEligible(trimmed) || !tickerLike) {
-        if (isKalshiEmbeddingSearchEligible(trimmed)) {
-          tasks.push(
-            fetch(
-              `/api/integrations/kalshi-live/search/embedding-suggestions?${new URLSearchParams({
-                q: trimmed,
-              })}`,
-              {
-                headers: { Accept: "application/json" },
-                credentials: "same-origin",
-                signal: ac.signal,
-              },
-            ).then(async (res) => {
-              const data = await res.json().catch(() => ({}));
-              if (!res.ok) return;
-              const list = Array.isArray(data?.suggestions) ? data.suggestions : [];
-              for (const s of list) {
-                const markets = normalizeSeriesMarketsForPicker(s?.markets);
-                next.push({
-                  kind: "series",
-                  ticker: String(s?.ticker || "").trim().toUpperCase(),
-                  title: String(s?.title || s?.ticker || "Series").trim(),
-                  subtitle: String(s?.subtitle || "").trim() || undefined,
-                  markets,
-                });
-              }
-            }),
-          );
-        }
+      // Semantic / embedding search for natural language
+      if (isKalshiEmbeddingSearchEligible(trimmed)) {
+        tasks.push(
+          fetch(
+            `/api/integrations/kalshi-live/search/embedding-suggestions?${new URLSearchParams({
+              q: trimmed,
+            })}`,
+            {
+              headers: { Accept: "application/json" },
+              credentials: "same-origin",
+              signal: ac.signal,
+            },
+          ).then(async (res) => {
+            const data = await res.json().catch(() => ({}));
+            if (!res.ok || ac.signal.aborted) return;
+            const list = Array.isArray(data?.suggestions) ? data.suggestions : [];
+            for (const s of list) {
+              const ticker = String(s?.ticker || "").trim().toUpperCase();
+              if (!ticker) continue;
+              const markets = normalizeSeriesMarketsForPicker(s?.markets);
+              seriesHits.push({
+                kind: "series",
+                ticker,
+                title: String(s?.title || s?.ticker || "Series").trim(),
+                subtitle: String(s?.subtitle || "").trim() || undefined,
+                markets,
+              });
+            }
+          }),
+        );
       }
 
       await Promise.allSettled(tasks);
-      if (mySeq !== suggestSeqRef.current) return;
+      if (mySeq !== suggestSeqRef.current || ac.signal.aborted) return;
+
+      /** @type {TickerSearchSuggestion[]} */
+      const next = [...seriesHits, ...marketHits];
 
       // Exact ticker match first; for natural language prefer series (semantic)
       // over the live market text scan, which is a weaker heuristic.
@@ -308,11 +360,12 @@ export function MarketTickerSearch({
       }
 
       setSuggestions(deduped.slice(0, 24));
-      setSuggestOpen(true);
+      setSuggestOpen(deduped.length > 0);
     } catch (e) {
       if (e instanceof DOMException && e.name === "AbortError") return;
       if (mySeq !== suggestSeqRef.current) return;
       setSuggestions([]);
+      setSuggestOpen(false);
     } finally {
       if (mySeq === suggestSeqRef.current) setSuggestLoading(false);
     }
@@ -458,12 +511,16 @@ export function MarketTickerSearch({
                 role="listbox"
                 className="absolute left-0 right-0 top-full z-50 mt-1 max-h-72 overflow-auto rounded-lg border border-border bg-popover py-1 shadow-md"
               >
-                {suggestions.map((s) => (
+                {suggestions.map((s) => {
+                  const marketCount = Array.isArray(s.markets) ? s.markets.length : 0;
+                  const seriesTiming =
+                    s.kind === "series" ? aggregateKalshiMarketTiming(s.markets) : null;
+                  return (
                   <li
                     key={
                       s.kind === "market"
                         ? `m:${s.ticker}`
-                        : `s:${s.ticker}:${s.markets.length}`
+                        : `s:${s.ticker}:${marketCount}`
                     }
                     role="option"
                   >
@@ -485,6 +542,19 @@ export function MarketTickerSearch({
                           {s.subtitle}
                         </span>
                       ) : null}
+                      {s.kind === "market" ? (
+                        <SuggestionMetaRow
+                          status={s.status}
+                          openTime={s.openTime}
+                          closeTime={s.closeTime}
+                        />
+                      ) : seriesTiming ? (
+                        <SuggestionMetaRow
+                          status={seriesTiming.status}
+                          openTime={seriesTiming.openTime}
+                          closeTime={seriesTiming.closeTime}
+                        />
+                      ) : null}
                       <span className="text-xs text-muted-foreground">
                         <span
                           className={cn(
@@ -497,13 +567,14 @@ export function MarketTickerSearch({
                           {s.kind === "market" ? "Market" : "Series"}
                         </span>
                         {s.ticker ? ` · ${s.ticker}` : ""}
-                        {s.kind === "series" && s.markets.length
-                          ? ` · ${s.markets.length} markets`
+                        {s.kind === "series" && marketCount
+                          ? ` · ${marketCount} markets`
                           : ""}
                       </span>
                     </button>
                   </li>
-                ))}
+                  );
+                })}
               </motion.ul>
             ) : null}
           </AnimatePresence>
@@ -650,11 +721,16 @@ export function MarketTickerSearch({
                       >
                         {checked ? <Check className="h-2.5 w-2.5" strokeWidth={3} /> : null}
                       </span>
-                      <span className="min-w-0 flex-1">
+                      <span className="min-w-0 flex-1 space-y-0.5">
                         <span className="block text-xs font-medium text-foreground">
                           {m.title || m.ticker}
                         </span>
-                        <span className="mt-0.5 block font-mono text-[10px] text-muted-foreground">
+                        <SuggestionMetaRow
+                          status={m.status}
+                          openTime={m.openTime}
+                          closeTime={m.closeTime}
+                        />
+                        <span className="block font-mono text-[10px] text-muted-foreground">
                           {m.ticker}
                         </span>
                       </span>

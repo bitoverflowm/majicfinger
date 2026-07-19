@@ -3,8 +3,18 @@
  * paginated GET /events?with_nested_markets=true (Kalshi has no text query param).
  */
 import { kalshiLiveUrl } from "@/lib/kalshiLive/kalshiLiveApiBase";
+import { extractKalshiMarketTiming } from "@/lib/kalshiLive/kalshiMarketTiming";
 
-/** @typedef {{ entity: "market"; ticker: string; title: string; eventTicker?: string; status?: string; subtitle?: string }} KalshiLiveSearchSuggestion */
+/** @typedef {{
+ *   entity: "market";
+ *   ticker: string;
+ *   title: string;
+ *   eventTicker?: string;
+ *   status?: string;
+ *   openTime?: string;
+ *   closeTime?: string;
+ *   subtitle?: string;
+ * }} KalshiLiveSearchSuggestion */
 
 const SUGGESTION_LIMIT = 12;
 const EVENTS_PAGE_LIMIT = 200;
@@ -142,13 +152,16 @@ function toSuggestion(event, market, score) {
   if (!ticker) return null;
 
   const { title, subtitle, eventTicker } = buildSuggestionDisplay(event, market);
+  const timing = extractKalshiMarketTiming(market);
 
   return {
     entity: "market",
     ticker,
     title,
     eventTicker: eventTicker || undefined,
-    status: String(market?.status || ""),
+    status: timing.status,
+    openTime: timing.openTime,
+    closeTime: timing.closeTime,
     subtitle,
     score,
   };
@@ -189,6 +202,7 @@ async function searchByTicker(q, tokens) {
     const ticker = String(m?.ticker || "").trim();
     if (!ticker) continue;
     const { title, subtitle, eventTicker } = buildSuggestionDisplay({}, m);
+    const timing = extractKalshiMarketTiming(m);
     const exact = ticker.toLowerCase() === q.toLowerCase();
     const score = exact
       ? 120
@@ -204,7 +218,9 @@ async function searchByTicker(q, tokens) {
       ticker,
       title,
       eventTicker: eventTicker || undefined,
-      status: String(m?.status || ""),
+      status: timing.status,
+      openTime: timing.openTime,
+      closeTime: timing.closeTime,
       subtitle,
       score,
     });
@@ -270,7 +286,7 @@ export async function fetchKalshiLiveSearchSuggestions(q) {
     return { suggestions: [] };
   }
 
-  const cacheKey = `v2:${tokens.join(" ")}`;
+  const cacheKey = `v3:${tokens.join(" ")}`;
   const cached = suggestionCache.get(cacheKey);
   if (cached && Date.now() - cached.at < CACHE_TTL_MS) {
     return { suggestions: cached.suggestions };
