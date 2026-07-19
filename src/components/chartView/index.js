@@ -12,6 +12,8 @@ import { rainbowBarFillFromPalette } from "@/components/chartView/rainbowBarFill
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Square, Radio } from 'lucide-react';
 import { Liveline } from 'liveline';
+import { CandlestickChartView } from '@/components/chartView/CandlestickChart';
+import { mapRowsToCandlestickSeriesData } from '@/lib/chartCandlestick';
 
 import { useMyStateV2 } from '@/context/stateContextV2';
 import ChartControls from '@/components/chartView/ChartControls';
@@ -877,6 +879,8 @@ export function ChartBuilderProvider({ demo, children, initialBuilderSnapshot, e
   const [livelineBadge, setLivelineBadge] = useState(true);
   const [livelineBadgeVariant, setLivelineBadgeVariant] = useState('default');
   const [livelineColorChoice, setLivelineColorChoice] = useState('__palette__');
+  /** Prefer price / yes_bid / yes_ask / generic, or auto. */
+  const [candlestickOhlcSetId, setCandlestickOhlcSetId] = useState('auto');
 
   const [chartFilterColumn, setChartFilterColumn] = useState(null);
   const [chartFilterConfig, setChartFilterConfig] = useState({});
@@ -958,6 +962,7 @@ export function ChartBuilderProvider({ demo, children, initialBuilderSnapshot, e
       if (s.yAxisTickColor !== undefined) setYAxisTickColor(s.yAxisTickColor);
       if (s.chartConfig && typeof s.chartConfig === "object") setChartConfig(s.chartConfig);
       if (s.livelineColorChoice != null) setLivelineColorChoice(s.livelineColorChoice);
+      if (s.candlestickOhlcSetId != null) setCandlestickOhlcSetId(String(s.candlestickOhlcSetId) || "auto");
     }
     const rows = Array.isArray(effectiveData) ? effectiveData : [];
     const anySheetRows = Object.values(contextStateV2?.dataSheets || {}).some(
@@ -1064,6 +1069,7 @@ export function ChartBuilderProvider({ demo, children, initialBuilderSnapshot, e
     if (s.livelineBadge !== undefined) setLivelineBadge(!!s.livelineBadge);
     if (s.livelineBadgeVariant != null) setLivelineBadgeVariant(s.livelineBadgeVariant);
     if (s.livelineColorChoice != null) setLivelineColorChoice(s.livelineColorChoice);
+    if (s.candlestickOhlcSetId != null) setCandlestickOhlcSetId(String(s.candlestickOhlcSetId) || "auto");
     if (s.chartFilterColumn !== undefined) setChartFilterColumn(s.chartFilterColumn);
     if (s.chartFilterConfig && typeof s.chartFilterConfig === "object") setChartFilterConfig(s.chartFilterConfig);
     if (Array.isArray(s.chartLineFilters)) {
@@ -1449,6 +1455,14 @@ export function ChartBuilderProvider({ demo, children, initialBuilderSnapshot, e
       .filter((p) => p.value != null && Number.isFinite(p.value));
   }, [chartData, selX, selY]);
 
+  const candlestickMapped = useMemo(
+    () =>
+      mapRowsToCandlestickSeriesData(chartData || [], {
+        ohlcSetId: candlestickOhlcSetId,
+      }),
+    [chartData, candlestickOhlcSetId],
+  );
+
   /**
    * IMPORTANT: when X is sheet-scoped (e.g. `sheet-3::day`), `chartData` may point at the *active*
    * (unscoped) sheet while the plotted rows come from another sheet. If we infer temporality from
@@ -1732,6 +1746,7 @@ export function ChartBuilderProvider({ demo, children, initialBuilderSnapshot, e
     livelineBadge,
     livelineBadgeVariant,
     livelineColorChoice,
+    candlestickOhlcSetId,
     chartFilterColumn,
     chartFilterConfig,
     chartLineFilters,
@@ -1946,6 +1961,9 @@ export function ChartBuilderProvider({ demo, children, initialBuilderSnapshot, e
     livelineColorChoice,
     setLivelineColorChoice,
     LIVELINE_COLOR_OPTIONS,
+    candlestickOhlcSetId,
+    setCandlestickOhlcSetId,
+    candlestickMapped,
 
     chartFilterColumn,
     setChartFilterColumn,
@@ -2088,6 +2106,7 @@ export function ChartBuilderProvider({ demo, children, initialBuilderSnapshot, e
     setBodyContent,
 
     livelineData,
+    candlestickMapped,
     xAxisRange: null,
     chartRef,
 
@@ -2154,6 +2173,7 @@ export function ChartCanvas() {
     livelineDegen,
     livelineBadge,
     livelineBadgeVariant,
+    candlestickMapped,
     chartConfig,
     tooltipShowXValue,
     tooltipExtraColumns,
@@ -2257,7 +2277,11 @@ export function ChartCanvas() {
     (selChartType === "line" || scopedKeysInUse || barUsesCrossSheetData ? lineChartData : chartData) || [];
   const yKeys = Array.isArray(selY) ? selY.filter(Boolean) : [];
   /** Demo sample mode pre-seeds axes; with real integration rows, require X + Y like the dashboard. */
-  const axesConfigured = usingSampleFallback || (!!selX && yKeys.length > 0);
+  const axesConfigured =
+    usingSampleFallback ||
+    (!!selX && yKeys.length > 0) ||
+    (selChartType === "candlestick" &&
+      (!!candlestickMapped?.ok || (candlestickMapped?.available?.length ?? 0) > 0));
   const xKey = selX || "month";
   const xIsCategoricalLabel = selX ? isCategoricalLabelColumn(stripSheetScopedColumnKey(xKey)) : false;
   const xAxisType = selX ? getAxisType(xKey, dataTypes, rawData) : "string";
@@ -2807,7 +2831,20 @@ export function ChartCanvas() {
               >
                 {!axesConfigured ? (
                   <div className="flex min-h-[200px] w-full flex-1 flex-col items-center justify-center px-4 text-center text-sm text-muted-foreground">
-                    Select an X axis and at least one Y column under Data to plot your sheet.
+                    {selChartType === "candlestick"
+                      ? "Candlestick charts need sheet rows with end_period_ts and a full OHLC set (price_*, yes_bid_*, or yes_ask_* dollars)."
+                      : "Select an X axis and at least one Y column under Data to plot your sheet."}
+                  </div>
+                ) : selChartType === "candlestick" ? (
+                  <div className="flex min-h-[220px] w-full flex-1 flex-col">
+                    {candlestickMapped?.ok && candlestickMapped.data.length > 0 ? (
+                      <CandlestickChartView data={candlestickMapped.data} dark={!!dark} />
+                    ) : (
+                      <div className="flex flex-1 items-center justify-center px-4 text-center text-xs text-muted-foreground">
+                        No valid candlestick bars found. Each bar needs finite open, high, low, and close
+                        values (null trade prices are skipped — try YES bid / YES ask OHLC).
+                      </div>
+                    )}
                   </div>
                 ) : selChartType === "liveline" ? (
                   <div className="flex min-h-[180px] w-full flex-1 flex-col items-center justify-center">

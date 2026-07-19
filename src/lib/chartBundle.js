@@ -55,7 +55,7 @@ export function normalizeBuilderSnapshot(snapshot, rows, dataSheets = {}) {
     return fallback;
   }
 
-  const allowedTypes = new Set(["area", "bar", "line", "pie", "treemap", "liveline"]);
+  const allowedTypes = new Set(["area", "bar", "line", "pie", "treemap", "liveline", "candlestick"]);
   const type = String(s.selChartType || "").trim();
   s.selChartType = allowedTypes.has(type) ? type : fallback.selChartType;
 

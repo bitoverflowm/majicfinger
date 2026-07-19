@@ -10,7 +10,7 @@ import { PiChartBarHorizontalLight, PiChartDonut, PiChartLine, PiChartLineThin }
 import { MdOutlineAreaChart, MdStackedBarChart } from "react-icons/md";
 import { GoDotFill } from "react-icons/go";
 import { AiOutlineRadarChart } from "react-icons/ai";
-import { CircleDot, CircleHelp, Expand, LogIn, Tag, LayoutGrid, Shuffle, ChevronUp, ChevronDown, Calendar as CalendarIcon } from "lucide-react";
+import { CircleDot, CircleHelp, Expand, LogIn, Tag, LayoutGrid, Shuffle, ChevronUp, ChevronDown, Calendar as CalendarIcon, CandlestickChart } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -203,6 +203,9 @@ export default function ChartControls() {
     livelineColorChoice,
     setLivelineColorChoice,
     LIVELINE_COLOR_OPTIONS,
+    candlestickOhlcSetId,
+    setCandlestickOhlcSetId,
+    candlestickMapped,
 
     chartLineFilters,
     setChartLineFilters,
@@ -332,11 +335,13 @@ export default function ChartControls() {
   const chartTypeLabel =
     selChartType === "liveline"
       ? "Liveline"
-      : selChartType === "treemap"
-        ? "Treemap"
-        : selChartType
-          ? selChartType.charAt(0).toUpperCase() + selChartType.slice(1)
-          : "—";
+      : selChartType === "candlestick"
+        ? "Candlestick"
+        : selChartType === "treemap"
+          ? "Treemap"
+          : selChartType
+            ? selChartType.charAt(0).toUpperCase() + selChartType.slice(1)
+            : "—";
 
   /** Selected chart type uses the same color users see on hover (works for light/dark). */
   const chartTypeSelectedClass = "bg-slate-100 text-slate-900 dark:bg-slate-800 dark:text-slate-50";
@@ -1349,6 +1354,21 @@ export default function ChartControls() {
                         <Tooltip>
                           <TooltipTrigger asChild>
                             <ToggleGroupItem
+                              value="candlestick"
+                              aria-label="Candlestick chart"
+                              className={chartTypeItemClassName("candlestick")}
+                            >
+                              <CandlestickChart className={chartTypeIconClass} />
+                            </ToggleGroupItem>
+                          </TooltipTrigger>
+                          <TooltipContent side="bottom" className="max-w-[280px] text-xs">
+                            Candlestick — TradingView Lightweight Charts. Requires Kalshi-style rows with
+                            end_period_ts and a full OHLC set (trade price, YES bid, or YES ask).
+                          </TooltipContent>
+                        </Tooltip>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <ToggleGroupItem
                               value="liveline"
                               aria-label="Liveline chart"
                               className={chartTypeItemClassName("liveline")}
@@ -1374,7 +1394,59 @@ export default function ChartControls() {
                   Data
                 </AccordionTrigger>
                 <AccordionContent>
-                  {selChartType === "line" ? (
+                  {selChartType === "candlestick" ? (
+                    <div className="space-y-3 py-2">
+                      <p className={`text-[11px] leading-snug ${dark ? "text-slate-300" : "text-muted-foreground"}`}>
+                        Candlesticks auto-map from Kalshi-style columns:{" "}
+                        <span className="font-mono text-[10px]">end_period_ts</span> plus a full OHLC
+                        quartet. Bars missing any open/high/low/close value are skipped.
+                      </p>
+                      {candlestickMapped?.available?.length ? (
+                        <div className="space-y-1.5">
+                          <Label className="text-[11px] font-medium text-muted-foreground">
+                            OHLC series
+                          </Label>
+                          <Select
+                            value={candlestickOhlcSetId || "auto"}
+                            onValueChange={(v) => setCandlestickOhlcSetId(v || "auto")}
+                          >
+                            <SelectTrigger className="h-8 text-xs">
+                              <SelectValue placeholder="OHLC set" />
+                            </SelectTrigger>
+                            <SelectContent className="text-xs">
+                              <SelectItem value="auto" className="text-xs">
+                                Auto (most valid bars)
+                              </SelectItem>
+                              {candlestickMapped.available.map((set) => (
+                                <SelectItem key={set.id} value={set.id} className="text-xs">
+                                  {set.label}
+                                  {set.open ? ` · ${set.open.replace(/_dollars$/, "")}` : ""}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          {candlestickMapped.ok ? (
+                            <p className="text-[10px] text-muted-foreground">
+                              Using {candlestickMapped.ohlc?.label || "OHLC"} ·{" "}
+                              {candlestickMapped.data.length.toLocaleString()} bars
+                              {candlestickMapped.skipped
+                                ? ` · ${candlestickMapped.skipped.toLocaleString()} skipped`
+                                : ""}
+                            </p>
+                          ) : (
+                            <p className="text-[10px] text-amber-700 dark:text-amber-300">
+                              Columns found, but no bars have all four OHLC values filled in.
+                            </p>
+                          )}
+                        </div>
+                      ) : (
+                        <p className="text-[11px] text-amber-700 dark:text-amber-300">
+                          This sheet does not match the candlestick shape. Pull Get Market Candlesticks
+                          (or provide end_period_ts + price_/yes_bid_/yes_ask_ OHLC columns).
+                        </p>
+                      )}
+                    </div>
+                  ) : selChartType === "line" ? (
                     <>
                       <div className="py-2 space-y-2">
                         <div className="flex min-w-0 items-center gap-2 text-foreground">
@@ -1853,7 +1925,7 @@ export default function ChartControls() {
                     </>
                   )}
 
-                  {selChartType !== "pie" && selChartType !== "scatter" && selChartType !== "liveline" && selChartType !== "line" && selChartType !== "treemap" && !(selChartType === "bar" && barSeriesColumn) && (
+                  {selChartType !== "pie" && selChartType !== "scatter" && selChartType !== "liveline" && selChartType !== "candlestick" && selChartType !== "line" && selChartType !== "treemap" && !(selChartType === "bar" && barSeriesColumn) && (
                     <Button
                       type="button"
                       variant="secondary"
