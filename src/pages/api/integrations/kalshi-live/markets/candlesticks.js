@@ -1,4 +1,9 @@
 import {
+  estimateKalshiCandlestickCount,
+  KALSHI_CANDLESTICK_MAX_CANDLES,
+  maxKalshiCandlestickRangeSec,
+} from "@/lib/kalshiLive/candlestickCompose";
+import {
   fetchKalshiLiveCandlesticksBatchUpstream,
   fetchKalshiLiveCandlesticksSingleUpstream,
   inferSeriesTickerFromMarket,
@@ -54,6 +59,21 @@ export default async function handler(req, res) {
     return res.status(400).json({
       error: "period_interval must be 1, 60, or 1440",
       code: "BAD_REQUEST",
+    });
+  }
+
+  const estimatedCandles = estimateKalshiCandlestickCount(startTs, endTs, periodInterval);
+  if (Number.isFinite(estimatedCandles) && estimatedCandles > KALSHI_CANDLESTICK_MAX_CANDLES) {
+    const maxSec = maxKalshiCandlestickRangeSec(periodInterval);
+    const maxDays = (maxSec / 86400).toFixed(periodInterval === 1 ? 1 : 0);
+    return res.status(400).json({
+      error:
+        `Date range is too wide for period_interval=${periodInterval} ` +
+        `(~${estimatedCandles.toLocaleString()} candles; Kalshi max is ${KALSHI_CANDLESTICK_MAX_CANDLES.toLocaleString()}, ` +
+        `about ${maxDays} days). Narrow start_ts/end_ts or use a coarser interval.`,
+      code: "CANDLE_WINDOW_TOO_LARGE",
+      estimated_candles: estimatedCandles,
+      max_candles: KALSHI_CANDLESTICK_MAX_CANDLES,
     });
   }
 

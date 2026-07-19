@@ -6,6 +6,91 @@ import { parseKalshiLiveMarketTickersInput } from "@/lib/kalshiLive/candlesticks
 const DEFAULT_PERIOD_INTERVAL = 60;
 const DEFAULT_RANGE_SEC = 24 * 60 * 60;
 
+/** Kalshi rejects windows that would return more than this many candles (opaque 400). */
+export const KALSHI_CANDLESTICK_MAX_CANDLES = 5000;
+
+/**
+ * Estimated candle count Kalshi will try to return for a window.
+ * Uses ceil — Kalshi counts a partial trailing period.
+ *
+ * @param {number} startTs
+ * @param {number} endTs
+ * @param {number} periodIntervalMinutes
+ */
+export function estimateKalshiCandlestickCount(startTs, endTs, periodIntervalMinutes) {
+  const start = Math.floor(Number(startTs));
+  const end = Math.floor(Number(endTs));
+  const period = Math.floor(Number(periodIntervalMinutes));
+  if (!Number.isFinite(start) || !Number.isFinite(end) || ![1, 60, 1440].includes(period)) {
+    return NaN;
+  }
+  const spanSec = Math.max(0, end - start);
+  const periodSec = period * 60;
+  if (periodSec <= 0) return NaN;
+  return Math.ceil(spanSec / periodSec);
+}
+
+/**
+ * Max (end_ts - start_ts) in seconds that stays within Kalshi's candle cap.
+ *
+ * @param {number} periodIntervalMinutes
+ */
+export function maxKalshiCandlestickRangeSec(periodIntervalMinutes) {
+  const period = Math.floor(Number(periodIntervalMinutes));
+  if (![1, 60, 1440].includes(period)) return NaN;
+  return KALSHI_CANDLESTICK_MAX_CANDLES * period * 60;
+}
+
+/**
+ * Clamp start_ts so the window fits under Kalshi's 5000-candle cap (keeps end_ts).
+ *
+ * @param {number} startTs
+ * @param {number} endTs
+ * @param {number} periodIntervalMinutes
+ * @returns {{ start_ts: number; end_ts: number; clamped: boolean }}
+ */
+export function clampCandlestickWindowToKalshiCap(startTs, endTs, periodIntervalMinutes) {
+  let start = Math.floor(Number(startTs));
+  let end = Math.floor(Number(endTs));
+  if (!Number.isFinite(start) || !Number.isFinite(end)) {
+    return { start_ts: start, end_ts: end, clamped: false };
+  }
+  if (start > end) {
+    const tmp = start;
+    start = end;
+    end = tmp;
+  }
+  const maxSpan = maxKalshiCandlestickRangeSec(periodIntervalMinutes);
+  if (!Number.isFinite(maxSpan)) {
+    return { start_ts: start, end_ts: end, clamped: false };
+  }
+  const minStart = end - maxSpan;
+  if (start < minStart) {
+    return { start_ts: minStart, end_ts: end, clamped: true };
+  }
+  return { start_ts: start, end_ts: end, clamped: false };
+}
+
+/**
+ * Human-readable max window for a period (for UI hints).
+ *
+ * @param {number} periodIntervalMinutes
+ */
+export function formatKalshiCandlestickMaxRangeHint(periodIntervalMinutes) {
+  const period = Math.floor(Number(periodIntervalMinutes));
+  const maxSec = maxKalshiCandlestickRangeSec(period);
+  if (!Number.isFinite(maxSec)) return "";
+  if (period === 1) {
+    const days = maxSec / 86400;
+    return `Kalshi allows at most ${KALSHI_CANDLESTICK_MAX_CANDLES.toLocaleString()} candles (~${days.toFixed(1)} days at 1 min).`;
+  }
+  if (period === 60) {
+    const days = Math.floor(maxSec / 86400);
+    return `Kalshi allows at most ${KALSHI_CANDLESTICK_MAX_CANDLES.toLocaleString()} candles (~${days} days at 1 hour).`;
+  }
+  return `Kalshi allows at most ${KALSHI_CANDLESTICK_MAX_CANDLES.toLocaleString()} candles (~${Math.floor(maxSec / 86400)} days at 1 day).`;
+}
+
 /**
  * @param {KalshiLiveWhereFilter[]} whereFilters
  */
@@ -77,6 +162,23 @@ export function validateKalshiLiveCandlestickPull(tickersRaw, whereFilters) {
   }
   if (!Number.isFinite(Number(apiParams.start_ts)) || !Number.isFinite(Number(apiParams.end_ts))) {
     return "Add Where filters for start_ts and end_ts (timestamps), or use defaults from a time range.";
+  }
+
+  const count = estimateKalshiCandlestickCount(
+    apiParams.start_ts,
+    apiParams.end_ts,
+    apiParams.period_interval,
+  );
+  if (Number.isFinite(count) && count > KALSHI_CANDLESTICK_MAX_CANDLES) {
+    const period = Number(apiParams.period_interval);
+    const maxSec = maxKalshiCandlestickRangeSec(period);
+    const maxDays = (maxSec / 86400).toFixed(period === 1 ? 1 : 0);
+    const periodLabel = period === 1 ? "1 min" : period === 60 ? "1 hour" : "1 day";
+    return (
+      `Date range is too wide for ${periodLabel} candles ` +
+      `(~${count.toLocaleString()} candles; Kalshi max is ${KALSHI_CANDLESTICK_MAX_CANDLES.toLocaleString()}, ` +
+      `about ${maxDays} days). Narrow the range or pick a coarser interval.`
+    );
   }
   return null;
 }

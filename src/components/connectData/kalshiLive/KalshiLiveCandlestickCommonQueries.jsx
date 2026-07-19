@@ -15,6 +15,10 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useMyStateV2 } from "@/context/stateContextV2";
+import {
+  clampCandlestickWindowToKalshiCap,
+  formatKalshiCandlestickMaxRangeHint,
+} from "@/lib/kalshiLive/candlestickCompose";
 import { KALSHI_LIVE_CANDLESTICK_PERIOD_OPTIONS } from "@/lib/kalshiLive/candlesticksColumns";
 import { cn } from "@/lib/utils";
 
@@ -109,6 +113,7 @@ export function KalshiLiveCandlestickCommonQueries({ className, disabled = false
 
   const [cutoffDate, setCutoffDate] = useState(/** @type {Date | null} */ (null));
   const [rangeOpen, setRangeOpen] = useState(false);
+  const [clampedNotice, setClampedNotice] = useState(/** @type {string | null} */ (null));
 
   const startTs = Number(readFilterValue(connectKalshiLiveWhereFilters, "start_ts"));
   const endTs = Number(readFilterValue(connectKalshiLiveWhereFilters, "end_ts"));
@@ -178,9 +183,44 @@ export function KalshiLiveCandlestickCommonQueries({ className, disabled = false
     }
   }, [cutoffDate, startTs, setConnectKalshiLiveWhereFilters]);
 
-  const setFilter = useCallback(
-    (column, value) => {
-      setConnectKalshiLiveWhereFilters?.((prev) => upsertApiFilter(prev, column, value));
+  // Keep window under Kalshi's 5000-candle cap when period/range would exceed it.
+  useEffect(() => {
+    if (!setConnectKalshiLiveWhereFilters) return;
+    if (![1, 60, 1440].includes(periodInterval)) return;
+    if (!Number.isFinite(startTs) || !Number.isFinite(endTs)) return;
+    const { start_ts: nextStart, clamped } = clampCandlestickWindowToKalshiCap(
+      startTs,
+      endTs,
+      periodInterval,
+    );
+    if (!clamped || nextStart === startTs) return;
+    setConnectKalshiLiveWhereFilters((prev) => upsertApiFilter(prev, "start_ts", nextStart));
+    setClampedNotice(formatKalshiCandlestickMaxRangeHint(periodInterval));
+  }, [startTs, endTs, periodInterval, setConnectKalshiLiveWhereFilters]);
+
+  const handlePeriodChange = useCallback(
+    (raw) => {
+      const period = Number(raw);
+      if (![1, 60, 1440].includes(period)) return;
+      setConnectKalshiLiveWhereFilters?.((prev) => {
+        let next = upsertApiFilter(prev, "period_interval", period);
+        const start = Number(readFilterValue(next, "start_ts"));
+        const end = Number(readFilterValue(next, "end_ts"));
+        if (Number.isFinite(start) && Number.isFinite(end)) {
+          const { start_ts: nextStart, clamped } = clampCandlestickWindowToKalshiCap(
+            start,
+            end,
+            period,
+          );
+          if (clamped) {
+            next = upsertApiFilter(next, "start_ts", nextStart);
+            setClampedNotice(formatKalshiCandlestickMaxRangeHint(period));
+          } else {
+            setClampedNotice(null);
+          }
+        }
+        return next;
+      });
     },
     [setConnectKalshiLiveWhereFilters],
   );
@@ -201,15 +241,31 @@ export function KalshiLiveCandlestickCommonQueries({ className, disabled = false
       const now = new Date();
       if (to && to > now) to = now;
 
-      const fromSec = unixFromDate(from);
-      const toSec = unixFromDate(to);
-      if (fromSec != null) setFilter("start_ts", fromSec);
-      if (toSec != null) setFilter("end_ts", toSec);
+      let fromSec = unixFromDate(from);
+      let toSec = unixFromDate(to);
+      const period = [1, 60, 1440].includes(periodInterval) ? periodInterval : DEFAULT_PERIOD;
+      let didClamp = false;
+
+      if (fromSec != null && toSec != null) {
+        const clamped = clampCandlestickWindowToKalshiCap(fromSec, toSec, period);
+        fromSec = clamped.start_ts;
+        toSec = clamped.end_ts;
+        didClamp = clamped.clamped;
+      }
+
+      setConnectKalshiLiveWhereFilters?.((prev) => {
+        let nextFilters = Array.isArray(prev) ? prev : [];
+        if (fromSec != null) nextFilters = upsertApiFilter(nextFilters, "start_ts", fromSec);
+        if (toSec != null) nextFilters = upsertApiFilter(nextFilters, "end_ts", toSec);
+        return nextFilters;
+      });
+      setClampedNotice(didClamp ? formatKalshiCandlestickMaxRangeHint(period) : null);
     },
-    [cutoffDate, setFilter],
+    [cutoffDate, periodInterval, setConnectKalshiLiveWhereFilters],
   );
 
   const periodValue = [1, 60, 1440].includes(periodInterval) ? String(periodInterval) : String(DEFAULT_PERIOD);
+  const maxRangeHint = formatKalshiCandlestickMaxRangeHint(Number(periodValue));
 
   return (
     <div className={cn("space-y-2", className)}>
@@ -274,11 +330,7 @@ export function KalshiLiveCandlestickCommonQueries({ className, disabled = false
 
         <div className="space-y-1.5">
           <Label className="text-[11px] font-medium text-muted-foreground">Period interval</Label>
-          <Select
-            value={periodValue}
-            disabled={disabled}
-            onValueChange={(v) => setFilter("period_interval", Number(v))}
-          >
+          <Select value={periodValue} disabled={disabled} onValueChange={handlePeriodChange}>
             <SelectTrigger className="h-9 text-xs">
               <SelectValue placeholder="Interval" />
             </SelectTrigger>
@@ -292,6 +344,14 @@ export function KalshiLiveCandlestickCommonQueries({ className, disabled = false
           </Select>
         </div>
       </div>
+
+      {clampedNotice || maxRangeHint ? (
+        <p className="text-[10px] leading-snug text-muted-foreground">
+          {clampedNotice
+            ? `Range narrowed to Kalshi's limit. ${clampedNotice}`
+            : maxRangeHint}
+        </p>
+      ) : null}
     </div>
   );
 }
