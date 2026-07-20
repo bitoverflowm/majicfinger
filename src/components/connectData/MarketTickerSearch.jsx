@@ -444,9 +444,7 @@ export function MarketTickerSearch({
             {resolveLoading ? (
               <Loader2 className="h-3 w-3 animate-spin text-primary" aria-hidden />
             ) : null}
-            {selections.length > 0
-              ? `${selections.length} selected · max ${maxTickers}`
-              : `Required · max ${maxTickers}`}
+            {selections.length > 0 ? `${selections.length} selected` : "Required"}
           </span>
         </div>
 
