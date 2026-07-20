@@ -31,6 +31,8 @@ export function KalshiLiveTradesTickerField({ value, onChange, className, disabl
           value={value}
           onChange={onChange}
           disabled={disabled}
+          dataSource="live"
+          historyEntity="trades"
           onSelectionsChange={(selections) => {
             const next = {};
             for (const s of selections || []) {

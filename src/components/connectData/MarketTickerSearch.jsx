@@ -5,6 +5,7 @@ import { AnimatePresence, motion } from "framer-motion";
 import { Check, Loader2, Search, X } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
+import { MarketTickerSearchCutoffNotes } from "@/components/connectData/MarketTickerSearchCutoffNotes";
 import {
   Dialog,
   DialogContent,
@@ -37,6 +38,7 @@ import {
 import { cn } from "@/lib/utils";
 
 /** @typedef {import("@/lib/kalshiLive/marketTickerSearch").MarketTickerSelection} MarketTickerSelection */
+/** @typedef {import("@/lib/kalshiLive/marketTickerSearch").KalshiTickerSearchDataSource} KalshiTickerSearchDataSource */
 
 /**
  * @typedef {{
@@ -118,6 +120,8 @@ function SuggestionMetaRow({ status, openTime, closeTime, className }) {
  *   className?: string;
  *   maxTickers?: number;
  *   label?: string;
+ *   dataSource?: KalshiTickerSearchDataSource;
+ *   historyEntity?: "trades" | "candlesticks" | "data";
  * }} props
  */
 export function MarketTickerSearch({
@@ -128,6 +132,8 @@ export function MarketTickerSearch({
   className,
   maxTickers = MAX_TICKERS,
   label = "Market tickers",
+  dataSource = "live",
+  historyEntity = "data",
 }) {
   const debounceRef = useRef(null);
   const suggestAbortRef = useRef(/** @type {AbortController | null} */ (null));
@@ -619,6 +625,12 @@ export function MarketTickerSearch({
             ))}
           </div>
         ) : null}
+
+        <MarketTickerSearchCutoffNotes
+          selections={selections}
+          dataSource={dataSource}
+          historyEntity={historyEntity}
+        />
 
         {missingTickers.length > 0 ? (
           <div className="flex flex-wrap gap-1.5">

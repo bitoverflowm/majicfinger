@@ -31,6 +31,8 @@ export function KalshiLiveCandlestickTickersField({ value, onChange, className, 
           value={value}
           onChange={onChange}
           disabled={disabled}
+          dataSource="live"
+          historyEntity="candlesticks"
           onSelectionsChange={(selections) => {
             const next = {};
             for (const s of selections || []) {

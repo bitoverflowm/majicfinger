@@ -180,3 +180,73 @@ export function normalizeSeriesMarketsForPicker(markets) {
   }
   return out;
 }
+
+/**
+ * Which Kalshi surface owns the Market Ticker Search instance.
+ * Historical search is not wired yet — keep `"historical"` for future inverse messaging.
+ *
+ * @typedef {"live" | "historical"} KalshiTickerSearchDataSource
+ */
+
+/**
+ * @typedef {"ended_before_cutoff" | "spans_cutoff" | "fully_after_cutoff" | "unknown"} MarketCutoffRelation
+ */
+
+/**
+ * @param {string | undefined | null} cutoffIso
+ * @returns {number}
+ */
+export function parseKalshiHistoricalCutoffMs(cutoffIso) {
+  const ms = Date.parse(String(cutoffIso || "").trim());
+  return Number.isFinite(ms) ? ms : NaN;
+}
+
+/**
+ * Classify a selected market against the live/historical cutoff.
+ * Suggestions stay visible either way; this only drives post-select notes.
+ *
+ * @param {{ openTime?: string; closeTime?: string } | null | undefined} selection
+ * @param {number} cutoffMs
+ * @returns {MarketCutoffRelation}
+ */
+export function classifyMarketVsHistoricalCutoff(selection, cutoffMs) {
+  if (!Number.isFinite(cutoffMs)) return "unknown";
+  const openMs = selection?.openTime ? Date.parse(selection.openTime) : NaN;
+  const closeMs = selection?.closeTime ? Date.parse(selection.closeTime) : NaN;
+
+  if (Number.isFinite(closeMs) && closeMs < cutoffMs) {
+    return "ended_before_cutoff";
+  }
+  if (
+    Number.isFinite(openMs) &&
+    openMs < cutoffMs &&
+    (!Number.isFinite(closeMs) || closeMs >= cutoffMs)
+  ) {
+    return "spans_cutoff";
+  }
+  if (Number.isFinite(openMs) && openMs >= cutoffMs) {
+    return "fully_after_cutoff";
+  }
+  return "unknown";
+}
+
+/**
+ * @param {string | undefined | null} iso
+ * @param {{ withTime?: boolean }} [opts]
+ * @returns {string}
+ */
+export function formatKalshiCutoffDisplay(iso, opts = {}) {
+  const raw = String(iso || "").trim();
+  if (!raw) return "";
+  const d = new Date(raw);
+  if (Number.isNaN(d.getTime())) return raw;
+  try {
+    if (opts.withTime) {
+      return d.toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" });
+    }
+    return d.toLocaleDateString(undefined, { dateStyle: "medium" });
+  } catch {
+    return opts.withTime ? d.toLocaleString() : d.toLocaleDateString();
+  }
+}
+
