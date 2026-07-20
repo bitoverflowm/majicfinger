@@ -255,12 +255,6 @@ export function KalshiLiveTradesCommonQueries({ className, disabled = false }) {
 
   return (
     <div className={cn("space-y-2", className)}>
-      <h2 className="text-xs font-semibold tracking-tight text-foreground">Common queries</h2>
-      <p className="text-[11px] leading-snug text-muted-foreground">
-        Set the trade start and end dates for this pull. One range applies to all selected markets;
-        dates before the live data cutoff are unavailable here.
-      </p>
-
       <div className="grid gap-3 sm:grid-cols-2">
         <div className="space-y-1.5 sm:col-span-2">
           <Label className="text-[11px] font-medium text-muted-foreground">Date range</Label>
