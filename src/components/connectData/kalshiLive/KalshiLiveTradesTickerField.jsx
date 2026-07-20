@@ -26,11 +26,16 @@ export function KalshiLiveTradesTickerField({ value, onChange, className, disabl
       )}
     >
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <Label className="text-xs font-medium text-foreground">Market ticker</Label>
+        <Label className="text-xs font-medium text-foreground">
+          Add market tickers using the search below
+        </Label>
         <span className="text-[10px] text-muted-foreground">
           {ticker ? "Ready" : "Required"}
         </span>
       </div>
+      <p className="text-[11px] leading-snug text-muted-foreground">
+        You can pull multiple market trades at once (each will auto populate into its own sheet).
+      </p>
       <Input
         className="font-mono text-xs"
         placeholder="e.g. KXELONMARS-99"
@@ -38,10 +43,6 @@ export function KalshiLiveTradesTickerField({ value, onChange, className, disabl
         disabled={disabled}
         onChange={(e) => onChange(e.target.value.toUpperCase())}
       />
-      <p className="text-[10px] leading-snug text-muted-foreground">
-        Trades are fetched for one market. Use Where filters for min_ts / max_ts to narrow the time
-        range. Results are paginated (up to 1,000 per API page).
-      </p>
     </div>
   );
 }

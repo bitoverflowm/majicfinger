@@ -120,6 +120,23 @@ export function KalshiLiveCandlestickHistoricalCutoffNote({ className }) {
 }
 
 /**
+ * Note under Get Trades: same cutoff timestamp as candlesticks + link to Kalshi Historical.
+ *
+ * @param {{ className?: string }} props
+ */
+export function KalshiLiveTradesHistoricalCutoffNote({ className }) {
+  return (
+    <KalshiCandlestickCutoffNote
+      className={className}
+      direction="before"
+      targetIntegration="kalshiHistorical"
+      targetLabel="Kalshi Historical"
+      dataLabel="trade data"
+    />
+  );
+}
+
+/**
  * Note on Kalshi Historical hub: cutoff + link to Kalshi Live.
  *
  * @param {{ className?: string }} props

@@ -27,7 +27,7 @@ import {
 } from "@/components/connectData/ConnectHomeIntegrationWorkflow";
 import { KalshiLiveCandlestickTickersField } from "@/components/connectData/kalshiLive/KalshiLiveCandlestickTickersField";
 import { KalshiLiveCandlestickCommonQueries } from "@/components/connectData/kalshiLive/KalshiLiveCandlestickCommonQueries";
-import { KalshiLiveCandlestickHistoricalCutoffNote } from "@/components/connectData/kalshiLive/KalshiLiveCandlestickHistoricalCutoffNote";
+import { KalshiLiveCandlestickHistoricalCutoffNote, KalshiLiveTradesHistoricalCutoffNote } from "@/components/connectData/kalshiLive/KalshiLiveCandlestickHistoricalCutoffNote";
 import { KalshiLiveTradesTickerField } from "@/components/connectData/kalshiLive/KalshiLiveTradesTickerField";
 import { KalshiLiveOrderbookTickerField } from "@/components/connectData/kalshiLive/KalshiLiveOrderbookTickerField";
 import { KalshiLiveComposeOperationPanel } from "@/components/connectData/kalshiLive/KalshiLiveComposeOperationPanel";
@@ -814,6 +814,16 @@ export function KalshiLiveIntegrationsCore({ onRunPull, className }) {
               </p>
               {selectedId === "candlesticks" ? (
                 <KalshiLiveCandlestickHistoricalCutoffNote className="mt-1.5 max-w-xl" />
+              ) : null}
+              {selectedId === "trades" ? (
+                <>
+                  <p className="mt-1.5 max-w-xl text-[11px] leading-snug text-muted-foreground">
+                    Getting all trades for all markets. A trade represents a completed transaction
+                    between two users on a specific market. Each trade includes the market ticker,
+                    price, quantity, and timestamp information.
+                  </p>
+                  <KalshiLiveTradesHistoricalCutoffNote className="mt-1.5 max-w-xl" />
+                </>
               ) : null}
             </div>
             <Button
