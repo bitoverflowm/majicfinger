@@ -7,14 +7,58 @@ import {
   projectKalshiLiveTradeRows,
 } from "@/lib/kalshiLive/normalizeTradeRow";
 import {
+  KALSHI_LIVE_TRADES_DEFAULT_LIMIT,
+  KALSHI_LIVE_TRADES_PAGE_LIMIT_MAX,
+  KALSHI_LIVE_TRADES_ROW_LIMIT_MAX,
   partitionTradesApiParams,
   summarizeKalshiLiveTradesRequest,
 } from "@/lib/kalshiLive/tradeCompose";
 import { parseKalshiLiveTradesTickersInput } from "@/lib/kalshiLive/tradesColumns";
 
+function sleep(ms, signal) {
+  return new Promise((resolve, reject) => {
+    if (signal?.aborted) {
+      reject(new DOMException("Aborted", "AbortError"));
+      return;
+    }
+    const t = setTimeout(() => {
+      signal?.removeEventListener?.("abort", onAbort);
+      resolve();
+    }, ms);
+    const onAbort = () => {
+      clearTimeout(t);
+      reject(new DOMException("Aborted", "AbortError"));
+    };
+    signal?.addEventListener?.("abort", onAbort, { once: true });
+  });
+}
+
+/**
+ * @param {Response} res
+ * @param {Record<string, unknown>} body
+ */
+function isRateLimited(res, body) {
+  if (res.status === 429) return true;
+  const err = String(body?.error || body?.message || "").toLowerCase();
+  return err.includes("rate limit") || err.includes("too many requests");
+}
+
+/**
+ * @param {Response} res
+ * @param {number} attempt
+ */
+function rateLimitWaitMs(res, attempt) {
+  const retryAfter = Number(res.headers.get("retry-after"));
+  if (Number.isFinite(retryAfter) && retryAfter > 0) {
+    return Math.min(60_000, Math.max(1000, retryAfter * 1000));
+  }
+  return Math.min(30_000, 1000 * 2 ** Math.min(attempt, 4));
+}
+
 /**
  * Paginated client fetch for Kalshi Live trades (via same-origin proxy).
  * Fetches one market at a time so each ticker can land in its own sheet.
+ * Paginated with cursor until the Refine row limit is reached (or the market is exhausted).
  *
  * @param {{
  *   marketTickers?: string;
@@ -44,7 +88,13 @@ export async function fetchKalshiLiveTradesPull(opts) {
   const whereFilters = Array.isArray(opts.whereFilters) ? opts.whereFilters : [];
   const sortClauses = Array.isArray(opts.sortClauses) ? opts.sortClauses : [];
   const { apiParams, clientWhere } = partitionTradesApiParams(whereFilters);
-  const maxPerTicker = Math.max(1, Math.min(10_000, Math.floor(Number(opts.limit) || 100)));
+  const maxPerTicker = Math.max(
+    1,
+    Math.min(
+      KALSHI_LIVE_TRADES_ROW_LIMIT_MAX,
+      Math.floor(Number(opts.limit) || KALSHI_LIVE_TRADES_DEFAULT_LIMIT),
+    ),
+  );
 
   /** @type {{ ticker: string; raw: Record<string, unknown>[]; rows: Record<string, unknown>[] }[]} */
   const byTicker = [];
@@ -63,7 +113,7 @@ export async function fetchKalshiLiveTradesPull(opts) {
       if (opts.signal?.aborted) throw new DOMException("Aborted", "AbortError");
 
       const remaining = maxPerTicker - all.length;
-      const pageLimit = Math.min(1000, remaining);
+      const pageLimit = Math.min(KALSHI_LIVE_TRADES_PAGE_LIMIT_MAX, remaining);
 
       const qs = new URLSearchParams({
         ticker,
@@ -77,16 +127,26 @@ export async function fetchKalshiLiveTradesPull(opts) {
         qs.set("max_ts", String(apiParams.max_ts));
       }
 
-      const res = await fetch(
-        `/api/integrations/kalshi-live/markets/trades?${qs.toString()}`,
-        {
+      let res;
+      let body = {};
+      let rateAttempts = 0;
+      for (;;) {
+        res = await fetch(`/api/integrations/kalshi-live/markets/trades?${qs.toString()}`, {
           credentials: "same-origin",
           headers: { Accept: "application/json" },
           signal: opts.signal,
-        },
-      );
-      const body = await res.json().catch(() => ({}));
-      if (opts.signal?.aborted) throw new DOMException("Aborted", "AbortError");
+        });
+        body = await res.json().catch(() => ({}));
+        if (opts.signal?.aborted) throw new DOMException("Aborted", "AbortError");
+
+        if (isRateLimited(res, body) && rateAttempts < 6) {
+          rateAttempts += 1;
+          await sleep(rateLimitWaitMs(res, rateAttempts), opts.signal);
+          continue;
+        }
+        break;
+      }
+
       if (!res.ok) {
         throw new Error(
           typeof body?.error === "string"
@@ -116,6 +176,11 @@ export async function fetchKalshiLiveTradesPull(opts) {
     const sorted = applyKalshiLiveClientSort(filtered, sortClauses, "trades");
     const rows = projectKalshiLiveTradeRows(sorted, opts.selectedColumns);
     byTicker.push({ ticker, raw: sorted, rows });
+
+    // Brief pause between markets to reduce rate-limit pressure.
+    if (i < tickers.length - 1) {
+      await sleep(150, opts.signal);
+    }
   }
 
   const raw = byTicker.flatMap((g) => g.raw);

@@ -24,10 +24,14 @@ export const KALSHI_LIVE_TRADES_COLUMNS = [
   { name: "created_time", type: "timestamp", description: "When the trade was executed (ISO 8601)" },
 ];
 
-/** API-bound compose columns (set via Where, not sheet columns). */
+/** API-bound compose columns (set via Common queries / Where, not sheet columns). */
 export const KALSHI_LIVE_TRADES_API_FILTER_COLUMNS = new Set(["min_ts", "max_ts"]);
 
-const TRADES_API_WHERE_COLUMN_LIST = ["min_ts", "max_ts"];
+/**
+ * Where-picker extras for trades. Date range is owned by Common queries (min_ts / max_ts),
+ * so those fields are not listed here.
+ */
+const TRADES_API_WHERE_COLUMN_LIST = [];
 
 export { TRADES_API_WHERE_COLUMN_LIST };
 

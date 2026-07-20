@@ -49,7 +49,7 @@ export const KALSHI_LIVE_CONNECT_ENDPOINTS = [
     id: "trades",
     title: "Trades",
     description:
-      "Completed transactions for one market — price, size, and direction. Enter a market ticker; optional time filters via Where.",
+      "Completed transactions for one or more markets — price, size, and direction. Search tickers; set a shared date range in Common queries.",
   },
   {
     id: "orderbook",

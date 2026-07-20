@@ -5,6 +5,15 @@ import { parseKalshiLiveTradesTickersInput } from "@/lib/kalshiLive/tradesColumn
 
 const MAX_TRADES_TICKERS = 100;
 
+/** Default row cap per market in Refine (paginated via cursor up to this many). */
+export const KALSHI_LIVE_TRADES_DEFAULT_LIMIT = 1000;
+
+/** Max rows per market across cursor pages. */
+export const KALSHI_LIVE_TRADES_ROW_LIMIT_MAX = 10_000;
+
+/** Max `limit` query param per Kalshi trades page. */
+export const KALSHI_LIVE_TRADES_PAGE_LIMIT_MAX = 1000;
+
 /**
  * @param {KalshiLiveWhereFilter[]} whereFilters
  */
@@ -44,13 +53,19 @@ export function partitionTradesApiParams(whereFilters) {
 
 /**
  * @param {string} tickersRaw
+ * @param {KalshiLiveWhereFilter[]} [whereFilters]
  * @returns {string | null}
  */
-export function validateKalshiLiveTradesPull(tickersRaw) {
+export function validateKalshiLiveTradesPull(tickersRaw, whereFilters) {
   const tickers = parseKalshiLiveTradesTickersInput(tickersRaw);
   if (!tickers.length) return "Enter at least one market ticker.";
   if (tickers.length > MAX_TRADES_TICKERS) {
     return `Maximum ${MAX_TRADES_TICKERS} market tickers per pull.`;
+  }
+
+  const { apiParams } = partitionTradesApiParams(whereFilters || []);
+  if (!Number.isFinite(Number(apiParams.min_ts)) || !Number.isFinite(Number(apiParams.max_ts))) {
+    return "Set a start and end date in Common queries.";
   }
   return null;
 }

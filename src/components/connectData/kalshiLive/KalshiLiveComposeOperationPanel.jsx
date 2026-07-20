@@ -32,7 +32,11 @@ import {
 import { CONNECT_COMPOSE_OPERATIONS } from "@/lib/connectComposeOperations";
 import { operatorSymbol } from "@/lib/dataLakeComposeHelpers";
 import { validateKalshiLiveCandlestickPull } from "@/lib/kalshiLive/candlestickCompose";
-import { validateKalshiLiveTradesPull } from "@/lib/kalshiLive/tradeCompose";
+import {
+  KALSHI_LIVE_TRADES_DEFAULT_LIMIT,
+  KALSHI_LIVE_TRADES_ROW_LIMIT_MAX,
+  validateKalshiLiveTradesPull,
+} from "@/lib/kalshiLive/tradeCompose";
 import { validateKalshiLiveOrderbookPull } from "@/lib/kalshiLive/orderbookCompose";
 import { KALSHI_LIVE_CANDLESTICK_PERIOD_OPTIONS } from "@/lib/kalshiLive/candlesticksColumns";
 import {
@@ -43,6 +47,10 @@ import {
 import { KALSHI_LIVE_MARKET_STATUS_OPTIONS } from "@/lib/kalshiLive/marketsColumns";
 import { useDemoProGate } from "@/hooks/useDemoProGate";
 import { cn } from "@/lib/utils";
+
+function defaultRowLimit(endpointId) {
+  return endpointId === "trades" ? KALSHI_LIVE_TRADES_DEFAULT_LIMIT : KALSHI_LIVE_DEFAULT_LIMIT;
+}
 
 function genId(prefix) {
   return `${prefix}-${Date.now()}-${Math.random().toString(16).slice(2, 8)}`;
@@ -243,10 +251,11 @@ export function KalshiLiveComposeOperationPanel({
   const handleRestart = useCallback(() => {
     setConnectKalshiLiveWhereFilters?.([]);
     setConnectKalshiLiveSortClauses?.([]);
-    setConnectKalshiLiveLimit?.(KALSHI_LIVE_DEFAULT_LIMIT);
+    setConnectKalshiLiveLimit?.(defaultRowLimit(endpointId));
     setConnectActiveComposeOps?.([]);
     setFilterError?.(null);
   }, [
+    endpointId,
     setConnectKalshiLiveWhereFilters,
     setConnectKalshiLiveSortClauses,
     setConnectKalshiLiveLimit,
@@ -288,7 +297,10 @@ export function KalshiLiveComposeOperationPanel({
     }
 
     if (endpointId === "trades") {
-      const tradesErr = validateKalshiLiveTradesPull(connectKalshiLiveTradesTicker);
+      const tradesErr = validateKalshiLiveTradesPull(
+        connectKalshiLiveTradesTicker,
+        connectKalshiLiveWhereFilters,
+      );
       if (tradesErr) {
         setFilterError?.(tradesErr);
         return;
@@ -320,13 +332,14 @@ export function KalshiLiveComposeOperationPanel({
     onRunPull,
   ]);
 
-  const TRADES_ROW_LIMIT_MAX = 10_000;
   const rowLimitMax =
     endpointId === "candlesticks"
       ? CANDLESTICK_ROW_LIMIT_MAX
       : endpointId === "trades"
-        ? TRADES_ROW_LIMIT_MAX
+        ? KALSHI_LIVE_TRADES_ROW_LIMIT_MAX
         : 1000;
+
+  const rowLimitDefault = defaultRowLimit(endpointId);
 
   const renderWhereValueInput = (f) => {
     if (endpointId === "candlesticks" && f.column === "period_interval") {
@@ -496,7 +509,7 @@ export function KalshiLiveComposeOperationPanel({
             {endpointId === "candlesticks"
               ? "start_ts, end_ts, and period_interval are sent to Kalshi. Other columns filter on our side after the pull."
               : endpointId === "trades"
-                ? "min_ts and max_ts are sent to Kalshi. Other columns filter on our side after the pull."
+                ? "Date range is set in Common queries above. Other columns filter on our side after the pull."
                 : endpointId === "orderbook"
                   ? "Optional depth (0–100) is sent to Kalshi. Other columns filter on our side after the pull."
                   : "Filters on category, tags, and updated time use Kalshi API params when possible. Other columns are filtered on our side after the pull. Category → Other matches custom text or non-standard categories."}
@@ -583,7 +596,7 @@ export function KalshiLiveComposeOperationPanel({
                 setConnectKalshiLiveLimit?.(
                   Number.isFinite(n)
                     ? Math.min(rowLimitMax, Math.max(1, n))
-                    : KALSHI_LIVE_DEFAULT_LIMIT,
+                    : rowLimitDefault,
                 );
               }}
             />
@@ -592,16 +605,16 @@ export function KalshiLiveComposeOperationPanel({
               variant="ghost"
               size="sm"
               className="h-8 text-[11px]"
-              onClick={() => setConnectKalshiLiveLimit?.(KALSHI_LIVE_DEFAULT_LIMIT)}
+              onClick={() => setConnectKalshiLiveLimit?.(rowLimitDefault)}
             >
-              Reset to {KALSHI_LIVE_DEFAULT_LIMIT}
+              Reset to {rowLimitDefault}
             </Button>
           </div>
           <p className="text-[10px] leading-snug text-muted-foreground">
             {endpointId === "candlesticks"
               ? "Max 10,000 candle rows total across all tickers (Kalshi batch cap). Applied after fetch, filters, and sort."
               : endpointId === "trades"
-                ? "Max 10,000 trades per market (paginated, 1,000 per API page). Applied after fetch, filters, and sort."
+                ? "Max 10,000 trades per market. Each API page requests up to 1,000; we follow the cursor until your row limit is reached or the market is exhausted."
                 : "Applied after API fetch, client filters, and sort."}
           </p>
         </div>
@@ -643,7 +656,7 @@ export function KalshiLiveComposeOperationPanel({
       {!openComposeOps.length && endpointId !== "candlesticks" ? (
         <p className="text-[10px] leading-snug text-muted-foreground">
           {endpointId === "trades"
-            ? "Refine is optional — Run pull uses your row limit and optional min_ts / max_ts Where filters."
+            ? "Refine is optional — Run pull uses your row limit (per market). Date range is set in Common queries."
             : "Refine is optional — open Where, Sort, or limit above, or run with your column selection."}
         </p>
       ) : null}

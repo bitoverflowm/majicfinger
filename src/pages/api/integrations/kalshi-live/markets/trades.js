@@ -29,7 +29,7 @@ export default async function handler(req, res) {
     return res.status(400).json({ error: "ticker is required", code: "BAD_REQUEST" });
   }
 
-  const limit = Number.isFinite(limitRaw) ? Math.min(1000, Math.max(1, limitRaw)) : 100;
+  const limit = Number.isFinite(limitRaw) ? Math.min(1000, Math.max(1, limitRaw)) : 1000;
 
   const qs = new URLSearchParams({ limit: String(limit), ticker });
   if (cursor) qs.set("cursor", cursor);
@@ -46,6 +46,8 @@ export default async function handler(req, res) {
     });
     const body = await upstream.json().catch(() => ({}));
     if (!upstream.ok) {
+      const retryAfter = upstream.headers.get("retry-after");
+      if (retryAfter) res.setHeader("Retry-After", retryAfter);
       return res.status(upstream.status >= 400 ? upstream.status : 502).json({
         error:
           typeof body?.message === "string"
