@@ -5,7 +5,6 @@ import { CalendarIcon } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
-import { Label } from "@/components/ui/label";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { useMyStateV2 } from "@/context/stateContextV2";
 import { cn } from "@/lib/utils";
@@ -257,7 +256,7 @@ export function KalshiLiveTradesCommonQueries({ className, disabled = false }) {
     <div className={cn("space-y-2", className)}>
       <div className="grid gap-3 sm:grid-cols-2">
         <div className="space-y-1.5 sm:col-span-2">
-          <Label className="text-[11px] font-medium text-muted-foreground">Date range</Label>
+          <h2 className="text-xs font-semibold tracking-tight text-foreground">Date range</h2>
           <Popover open={rangeOpen} onOpenChange={handleRangeOpenChange}>
             <PopoverTrigger asChild>
               <Button
