@@ -1,7 +1,9 @@
 import { KALSHI_LIVE_TRADES_API_FILTER_COLUMNS } from "@/lib/kalshiLive/tradesColumns";
-import { parseKalshiLiveTradesTickerInput } from "@/lib/kalshiLive/tradesColumns";
+import { parseKalshiLiveTradesTickersInput } from "@/lib/kalshiLive/tradesColumns";
 
 /** @typedef {import("@/lib/kalshiLive/kalshiLiveCompose").KalshiLiveWhereFilter} KalshiLiveWhereFilter */
+
+const MAX_TRADES_TICKERS = 100;
 
 /**
  * @param {KalshiLiveWhereFilter[]} whereFilters
@@ -41,30 +43,27 @@ export function partitionTradesApiParams(whereFilters) {
 }
 
 /**
- * @param {string} tickerRaw
+ * @param {string} tickersRaw
  * @returns {string | null}
  */
-export function validateKalshiLiveTradesPull(tickerRaw) {
-  const ticker = parseKalshiLiveTradesTickerInput(tickerRaw);
-  if (!ticker) return "Enter a market ticker.";
-  const multi = String(tickerRaw || "")
-    .split(/[\s,]+/)
-    .map((t) => t.trim())
-    .filter(Boolean);
-  if (multi.length > 1) {
-    return "Trades pulls one market at a time — enter a single ticker.";
+export function validateKalshiLiveTradesPull(tickersRaw) {
+  const tickers = parseKalshiLiveTradesTickersInput(tickersRaw);
+  if (!tickers.length) return "Enter at least one market ticker.";
+  if (tickers.length > MAX_TRADES_TICKERS) {
+    return `Maximum ${MAX_TRADES_TICKERS} market tickers per pull.`;
   }
   return null;
 }
 
 /**
- * @param {string} ticker
+ * @param {string | string[]} tickers
  * @param {Record<string, number>} apiParams
  * @param {{ limit?: number }} [opts]
  */
-export function summarizeKalshiLiveTradesRequest(ticker, apiParams, opts = {}) {
+export function summarizeKalshiLiveTradesRequest(tickers, apiParams, opts = {}) {
+  const list = Array.isArray(tickers) ? tickers : [tickers].filter(Boolean);
   const parts = ["GET /markets/trades"];
-  parts.push(`ticker=${ticker}`);
+  parts.push(list.length === 1 ? `ticker=${list[0]}` : `tickers=${list.join(",")}`);
   if (Number.isFinite(Number(apiParams.min_ts))) parts.push(`min_ts=${apiParams.min_ts}`);
   if (Number.isFinite(Number(apiParams.max_ts))) parts.push(`max_ts=${apiParams.max_ts}`);
   if (opts.limit != null) parts.push(`limit=${opts.limit}`);

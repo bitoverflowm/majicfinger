@@ -139,6 +139,7 @@ export function KalshiLiveComposeOperationPanel({
     connectKalshiLiveCandlestickTickers = "",
     connectKalshiLiveCandlestickTickerMeta = {},
     connectKalshiLiveTradesTicker = "",
+    connectKalshiLiveTradesTickerMeta = {},
     connectKalshiLiveOrderbookTicker = "",
   } = ctx;
 
@@ -158,6 +159,21 @@ export function KalshiLiveComposeOperationPanel({
     connectKalshiLiveCandlestickTickers,
     connectKalshiLiveCandlestickTickerMeta,
   ]);
+
+  const tradesAutoSheets = useMemo(() => {
+    if (endpointId !== "trades") return null;
+    const tickers = String(connectKalshiLiveTradesTicker || "")
+      .split(/[\s,]+/)
+      .map((t) => t.trim().toUpperCase())
+      .filter(Boolean);
+    const unique = [...new Set(tickers)];
+    return unique.map((ticker) => ({
+      name: ticker,
+      title: connectKalshiLiveTradesTickerMeta?.[ticker] || ticker,
+    }));
+  }, [endpointId, connectKalshiLiveTradesTicker, connectKalshiLiveTradesTickerMeta]);
+
+  const autoNamedSheets = candlestickAutoSheets || tradesAutoSheets;
 
   const allColumns = useMemo(() => getKalshiLiveAllColumnNames(endpointId), [endpointId]);
 
@@ -585,7 +601,7 @@ export function KalshiLiveComposeOperationPanel({
             {endpointId === "candlesticks"
               ? "Max 10,000 candle rows total across all tickers (Kalshi batch cap). Applied after fetch, filters, and sort."
               : endpointId === "trades"
-                ? "Max 10,000 trades total (paginated, 1,000 per API page). Applied after fetch, filters, and sort."
+                ? "Max 10,000 trades per market (paginated, 1,000 per API page). Applied after fetch, filters, and sort."
                 : "Applied after API fetch, client filters, and sort."}
           </p>
         </div>
@@ -647,11 +663,13 @@ export function KalshiLiveComposeOperationPanel({
         <ConnectHomeSheetPullFields
           sheetNameInputId="connect-home-kalshi-live-sheet-name"
           className="flex-1 min-w-0"
-          autoNamedSheets={candlestickAutoSheets}
+          autoNamedSheets={autoNamedSheets}
           autoNamedSheetsMessage={
             candlestickAutoSheets
               ? "For convenience each market candlestick data will be filled into a separate sheet. Each sheet is named by the ticker; you can change this later."
-              : undefined
+              : tradesAutoSheets
+                ? "For convenience each market's trades will be filled into a separate sheet. Each sheet is named by the ticker; you can change this later."
+                : undefined
           }
         />
         <Button

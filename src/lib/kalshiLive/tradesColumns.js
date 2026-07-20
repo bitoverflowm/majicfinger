@@ -39,15 +39,26 @@ export function getKalshiLiveTradeColumnLabel(col) {
 }
 
 /**
- * Parse a single market ticker for GET /markets/trades (required).
+ * Parse user input into unique market tickers (comma, newline, or whitespace separated).
+ * Same shape as candlestick market-ticker input; used for multi-market trades pulls.
+ *
+ * @param {string} raw
+ * @returns {string[]}
+ */
+export function parseKalshiLiveTradesTickersInput(raw) {
+  const parts = String(raw || "")
+    .split(/[\s,]+/)
+    .map((t) => t.trim().toUpperCase())
+    .filter(Boolean);
+  return [...new Set(parts)];
+}
+
+/**
+ * Parse a single market ticker for GET /markets/trades (API proxy; one ticker per request).
  *
  * @param {string} raw
  * @returns {string}
  */
 export function parseKalshiLiveTradesTickerInput(raw) {
-  const parts = String(raw || "")
-    .split(/[\s,]+/)
-    .map((t) => t.trim().toUpperCase())
-    .filter(Boolean);
-  return parts[0] || "";
+  return parseKalshiLiveTradesTickersInput(raw)[0] || "";
 }

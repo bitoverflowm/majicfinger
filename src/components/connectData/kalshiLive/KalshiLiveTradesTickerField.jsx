@@ -1,12 +1,11 @@
 "use client";
 
-import { Label } from "@/components/ui/label";
-import { Input } from "@/components/ui/input";
-import { parseKalshiLiveTradesTickerInput } from "@/lib/kalshiLive/tradesColumns";
+import { MarketTickerSearch } from "@/components/connectData/MarketTickerSearch";
+import { useMyStateV2 } from "@/context/stateContextV2";
 import { cn } from "@/lib/utils";
 
 /**
- * Single market ticker for GET /markets/trades (required).
+ * Trades wrapper around the shared Market Ticker Search (same control as candlesticks).
  *
  * @param {{
  *   value: string;
@@ -16,33 +15,33 @@ import { cn } from "@/lib/utils";
  * }} props
  */
 export function KalshiLiveTradesTickerField({ value, onChange, className, disabled }) {
-  const ticker = parseKalshiLiveTradesTickerInput(value);
+  const ctx = useMyStateV2() ?? {};
+  const setMeta = ctx.setConnectKalshiLiveTradesTickerMeta;
 
   return (
-    <div
-      className={cn(
-        "space-y-2 rounded-lg border border-border/50 bg-muted/10 p-3",
-        className,
-      )}
-    >
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <Label className="text-xs font-medium text-foreground">
-          Add market tickers using the search below
-        </Label>
-        <span className="text-[10px] text-muted-foreground">
-          {ticker ? "Ready" : "Required"}
-        </span>
-      </div>
+    <div className={cn("space-y-2", className)}>
+      <h2 className="text-xs font-semibold tracking-tight text-foreground">
+        Add market tickers using the search below
+      </h2>
       <p className="text-[11px] leading-snug text-muted-foreground">
         You can pull multiple market trades at once (each will auto populate into its own sheet).
       </p>
-      <Input
-        className="font-mono text-xs"
-        placeholder="e.g. KXELONMARS-99"
-        value={value}
-        disabled={disabled}
-        onChange={(e) => onChange(e.target.value.toUpperCase())}
-      />
+      <div className="space-y-2 rounded-lg bg-muted/10 p-3">
+        <MarketTickerSearch
+          value={value}
+          onChange={onChange}
+          disabled={disabled}
+          onSelectionsChange={(selections) => {
+            const next = {};
+            for (const s of selections || []) {
+              const ticker = String(s?.ticker || "").trim().toUpperCase();
+              if (!ticker) continue;
+              next[ticker] = String(s?.title || ticker).trim() || ticker;
+            }
+            setMeta?.(next);
+          }}
+        />
+      </div>
     </div>
   );
 }

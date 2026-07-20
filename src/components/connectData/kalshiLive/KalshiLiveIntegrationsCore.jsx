@@ -361,6 +361,7 @@ export function KalshiLiveIntegrationsCore({ onRunPull, className }) {
     setConnectKalshiLiveCandlestickTickerMeta,
     connectKalshiLiveTradesTicker = "",
     setConnectKalshiLiveTradesTicker,
+    setConnectKalshiLiveTradesTickerMeta,
     connectKalshiLiveOrderbookTicker = "",
     setConnectKalshiLiveOrderbookTicker,
     setConnectActiveComposeOps,
@@ -461,7 +462,10 @@ export function KalshiLiveIntegrationsCore({ onRunPull, className }) {
         setConnectKalshiLiveCandlestickTickers?.("");
         setConnectKalshiLiveCandlestickTickerMeta?.({});
       }
-      if (id !== "trades") setConnectKalshiLiveTradesTicker?.("");
+      if (id !== "trades") {
+        setConnectKalshiLiveTradesTicker?.("");
+        setConnectKalshiLiveTradesTickerMeta?.({});
+      }
       if (id !== "orderbook") setConnectKalshiLiveOrderbookTicker?.("");
       setFilterError(null);
       setHoveredEndpointId("");
@@ -475,6 +479,7 @@ export function KalshiLiveIntegrationsCore({ onRunPull, className }) {
       setConnectKalshiLiveCandlestickTickers,
       setConnectKalshiLiveCandlestickTickerMeta,
       setConnectKalshiLiveTradesTicker,
+      setConnectKalshiLiveTradesTickerMeta,
       setConnectKalshiLiveOrderbookTicker,
       kalshiLivePingState,
       pingKalshiLiveExchange,
@@ -489,6 +494,7 @@ export function KalshiLiveIntegrationsCore({ onRunPull, className }) {
     setConnectKalshiLiveCandlestickTickers?.("");
     setConnectKalshiLiveCandlestickTickerMeta?.({});
     setConnectKalshiLiveTradesTicker?.("");
+    setConnectKalshiLiveTradesTickerMeta?.({});
     setConnectKalshiLiveOrderbookTicker?.("");
     setSearchExpanded(false);
     setFilterError(null);
@@ -500,6 +506,7 @@ export function KalshiLiveIntegrationsCore({ onRunPull, className }) {
     setConnectKalshiLiveCandlestickTickers,
     setConnectKalshiLiveCandlestickTickerMeta,
     setConnectKalshiLiveTradesTicker,
+    setConnectKalshiLiveTradesTickerMeta,
     setConnectKalshiLiveOrderbookTicker,
   ]);
 
@@ -801,40 +808,29 @@ export function KalshiLiveIntegrationsCore({ onRunPull, className }) {
         </div>
       ) : (
         <div className="space-y-3">
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <div className="min-w-0">
-              <Label className="text-[0.6875rem] font-medium uppercase tracking-wider text-muted-foreground">
-                Source
-              </Label>
-              <p className="text-sm font-semibold tracking-tight text-foreground">
-                {(() => {
-                  const ep = endpoints.find((e) => e.id === selectedId);
-                  return ep?.selectedTitle ?? ep?.title ?? selectedId;
-                })()}
-              </p>
-              {selectedId === "candlesticks" ? (
-                <KalshiLiveCandlestickHistoricalCutoffNote className="mt-1.5 max-w-xl" />
-              ) : null}
-              {selectedId === "trades" ? (
-                <>
-                  <p className="mt-1.5 max-w-xl text-[11px] leading-snug text-muted-foreground">
-                    Getting all trades for all markets. A trade represents a completed transaction
-                    between two users on a specific market. Each trade includes the market ticker,
-                    price, quantity, and timestamp information.
-                  </p>
-                  <KalshiLiveTradesHistoricalCutoffNote className="mt-1.5 max-w-xl" />
-                </>
-              ) : null}
-            </div>
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              className="h-6 px-2 text-[0.6875rem]"
-              onClick={handleClearEndpoint}
-            >
-              Cancel
-            </Button>
+          <div className="min-w-0">
+            <Label className="text-[0.6875rem] font-medium uppercase tracking-wider text-muted-foreground">
+              Source
+            </Label>
+            <p className="text-sm font-semibold tracking-tight text-foreground">
+              {(() => {
+                const ep = endpoints.find((e) => e.id === selectedId);
+                return ep?.selectedTitle ?? ep?.title ?? selectedId;
+              })()}
+            </p>
+            {selectedId === "candlesticks" ? (
+              <KalshiLiveCandlestickHistoricalCutoffNote className="mt-1.5 max-w-xl" />
+            ) : null}
+            {selectedId === "trades" ? (
+              <>
+                <p className="mt-1.5 max-w-xl text-[11px] leading-snug text-muted-foreground">
+                  Get all trades for all markets. A trade represents a completed transaction
+                  between two users on a specific market. Each trade includes the market ticker,
+                  price, quantity, and timestamp information.
+                </p>
+                <KalshiLiveTradesHistoricalCutoffNote className="mt-1.5 max-w-xl" />
+              </>
+            ) : null}
           </div>
 
           <AnimatePresence>
