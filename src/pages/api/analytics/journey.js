@@ -1,6 +1,6 @@
 import dbConnect from "@/lib/dbConnect";
 import VisitorEvent from "@/models/VisitorEvent";
-import { sendTelegramMessage } from "@/lib/telegram/notify";
+import { isTelegramConfigured, sendTelegramMessage } from "@/lib/telegram/notify";
 import { incrementTelegramEventCounter } from "@/lib/telegram/trackEvent";
 import {
   buildAuthSessionChainTelegramMessage,
@@ -81,6 +81,21 @@ async function incrementCounterSafe(eventKey) {
 async function deliverSessionStartTelegram(doc, auth, now, opts = {}) {
   if (doc.start_telegram_sent || doc.start_telegram_skip_reason) {
     return { delivered: false, reason: "already_handled" };
+  }
+
+  // Dev-only short-circuit. Production always uses the normal delivery path below
+  // (isTelegramConfigured already keeps prod sends on when credentials are set).
+  if (process.env.NODE_ENV !== "production" && !isTelegramConfigured()) {
+    await VisitorSession.updateOne(
+      { session_id: doc.session_id },
+      {
+        $set: {
+          start_telegram_skip_reason: "notifications_disabled",
+          start_telegram_sent: false,
+        },
+      },
+    );
+    return { delivered: false, skipped: true };
   }
 
   const claim = await VisitorSession.updateOne(

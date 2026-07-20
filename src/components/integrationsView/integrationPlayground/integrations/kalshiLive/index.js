@@ -487,6 +487,7 @@ export default function KalshiLive({ setConnectedData, connectHomePullBridge = f
         ? connectKalshiLiveSortClauses
         : [];
       const limit = Number(connectKalshiLiveLimit) || 1000;
+      const marketTickers = String(connectKalshiLiveTradesTicker || "").trim();
       const requestStartMs =
         typeof performance !== "undefined" && performance?.now ? performance.now() : Date.now();
 

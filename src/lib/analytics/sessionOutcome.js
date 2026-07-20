@@ -51,5 +51,9 @@ export function hasMeaningfulVisitorOutcome(events = []) {
 
 /** @param {string | undefined | null} reason */
 export function wasVisitorStartTelegramSuppressed(reason) {
-  return reason === "start_dedupe" || reason === "ip_dedupe";
+  return (
+    reason === "start_dedupe" ||
+    reason === "ip_dedupe" ||
+    reason === "notifications_disabled"
+  );
 }
