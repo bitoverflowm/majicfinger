@@ -45,6 +45,8 @@ export default async function handler(req, res) {
     });
     const body = await upstream.json().catch(() => ({}));
     if (!upstream.ok) {
+      const retryAfter = upstream.headers.get("retry-after");
+      if (retryAfter) res.setHeader("Retry-After", retryAfter);
       return res.status(upstream.status >= 400 ? upstream.status : 502).json({
         error:
           typeof body?.message === "string"

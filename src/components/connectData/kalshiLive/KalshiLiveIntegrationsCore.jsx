@@ -31,6 +31,7 @@ import { KalshiLiveTradesCommonQueries } from "@/components/connectData/kalshiLi
 import { KalshiLiveCandlestickHistoricalCutoffNote, KalshiLiveTradesHistoricalCutoffNote } from "@/components/connectData/kalshiLive/KalshiLiveCandlestickHistoricalCutoffNote";
 import { KalshiLiveTradesTickerField } from "@/components/connectData/kalshiLive/KalshiLiveTradesTickerField";
 import { KalshiLiveOrderbookTickerField } from "@/components/connectData/kalshiLive/KalshiLiveOrderbookTickerField";
+import { KalshiLiveOrderbookCommonQueries } from "@/components/connectData/kalshiLive/KalshiLiveOrderbookCommonQueries";
 import { KalshiLiveComposeOperationPanel } from "@/components/connectData/kalshiLive/KalshiLiveComposeOperationPanel";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
@@ -879,12 +880,15 @@ export function KalshiLiveIntegrationsCore({ onRunPull, className }) {
               </>
             ) : null}
             {selectedId === "orderbook" ? (
-              <KalshiLiveOrderbookTickerField
-                className="mt-4"
-                value={connectKalshiLiveOrderbookTicker}
-                onChange={(v) => setConnectKalshiLiveOrderbookTicker?.(v)}
-                disabled={pullLoading}
-              />
+              <>
+                <KalshiLiveOrderbookTickerField
+                  className="mt-4"
+                  value={connectKalshiLiveOrderbookTicker}
+                  onChange={(v) => setConnectKalshiLiveOrderbookTicker?.(v)}
+                  disabled={pullLoading}
+                />
+                <KalshiLiveOrderbookCommonQueries className="mt-4" disabled={pullLoading} />
+              </>
             ) : null}
             <ColumnPicker
               key={selectedId}

@@ -28,10 +28,11 @@ export const KALSHI_LIVE_ORDERBOOK_COLUMNS = [
   },
 ];
 
-/** Optional API query params exposed via Where (none required for first cut). */
+/** API query params controlled by the endpoint-specific query UI. */
 export const KALSHI_LIVE_ORDERBOOK_API_FILTER_COLUMNS = new Set(["depth"]);
 
-const ORDERBOOK_API_WHERE_COLUMN_LIST = ["depth"];
+/** Depth is owned by Orderbook depth above column selection, not the generic Where picker. */
+const ORDERBOOK_API_WHERE_COLUMN_LIST = [];
 
 export { ORDERBOOK_API_WHERE_COLUMN_LIST };
 
