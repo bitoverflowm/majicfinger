@@ -33,6 +33,7 @@ export function KalshiLiveOrderbookTickerField({ value, onChange, className, dis
           onChange={onChange}
           disabled={disabled}
           dataSource="live"
+          showCutoffNotes={false}
           onSelectionsChange={(selections) => {
             const next = {};
             for (const s of selections || []) {

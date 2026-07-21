@@ -335,6 +335,7 @@ function SelectionChipsRow({ selections, busy, onRemove }) {
  *   maxTickers?: number;
  *   dataSource?: KalshiTickerSearchDataSource;
  *   historyEntity?: "trades" | "candlesticks" | "data";
+ *   showCutoffNotes?: boolean;
  * }} props
  */
 export function MarketTickerSearch({
@@ -346,6 +347,9 @@ export function MarketTickerSearch({
   maxTickers = MAX_TICKERS,
   dataSource = "live",
   historyEntity = "data",
+  // Snapshot-style pulls (e.g. orderbook) have no historical range, so the
+  // cutoff notes are irrelevant and can be turned off by the wrapper.
+  showCutoffNotes = true,
 }) {
   const debounceRef = useRef(null);
   const suggestAbortRef = useRef(/** @type {AbortController | null} */ (null));
@@ -815,11 +819,13 @@ export function MarketTickerSearch({
           <SelectionChipsRow selections={selections} busy={busy} onRemove={removeSelection} />
         ) : null}
 
-        <MarketTickerSearchCutoffNotes
-          selections={selections}
-          dataSource={dataSource}
-          historyEntity={historyEntity}
-        />
+        {showCutoffNotes ? (
+          <MarketTickerSearchCutoffNotes
+            selections={selections}
+            dataSource={dataSource}
+            historyEntity={historyEntity}
+          />
+        ) : null}
 
         {missingTickers.length > 0 ? (
           <div className="flex flex-wrap gap-1.5">
