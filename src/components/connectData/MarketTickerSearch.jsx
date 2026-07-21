@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { Check, Loader2, Search, X } from "lucide-react";
 
@@ -14,7 +14,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Label } from "@/components/ui/label";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import {
   Tooltip,
   TooltipContent,
@@ -109,6 +109,220 @@ function SuggestionMetaRow({ status, openTime, closeTime, className }) {
 }
 
 /**
+ * Basic market info shown when hovering a selected ticker chip (and in the "+N" popover).
+ *
+ * @param {{ selection: MarketTickerSelection }} props
+ */
+function SelectionHoverDetails({ selection }) {
+  return (
+    <div className="space-y-1">
+      <p className="text-xs font-medium leading-snug text-foreground">
+        {selection.title || selection.ticker}
+      </p>
+      <p className="font-mono text-[10px] text-muted-foreground">{selection.ticker}</p>
+      {selection.eventTicker && selection.eventTicker !== selection.ticker ? (
+        <p className="text-[10px] text-muted-foreground">
+          Event: <span className="font-mono">{selection.eventTicker}</span>
+        </p>
+      ) : null}
+      <SuggestionMetaRow
+        status={selection.status}
+        openTime={selection.openTime}
+        closeTime={selection.closeTime}
+        className="justify-start text-left"
+      />
+    </div>
+  );
+}
+
+/**
+ * @param {{
+ *   selection: MarketTickerSelection;
+ *   busy: boolean;
+ *   onRemove: (ticker: string) => void;
+ * }} props
+ */
+function SelectionChip({ selection, busy, onRemove }) {
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <span className="inline-flex max-w-full items-center gap-0.5 rounded-full border border-emerald-600/25 bg-emerald-500/10 py-px pl-1.5 pr-0.5 text-[10px] font-medium leading-4 text-emerald-900 dark:text-emerald-100">
+          <span className="truncate font-mono">{selection.ticker}</span>
+          <button
+            type="button"
+            disabled={busy}
+            aria-label={`Remove ${selection.ticker}`}
+            className="rounded-full p-0.5 text-emerald-800/70 hover:bg-emerald-500/20 hover:text-emerald-950 dark:text-emerald-100/80"
+            onClick={() => onRemove(selection.ticker)}
+          >
+            <X className="h-2.5 w-2.5" aria-hidden />
+          </button>
+        </span>
+      </TooltipTrigger>
+      <TooltipContent side="bottom" className="max-w-xs text-pretty">
+        <SelectionHoverDetails selection={selection} />
+      </TooltipContent>
+    </Tooltip>
+  );
+}
+
+/**
+ * Selected-ticker chips capped at two visual rows. Overflow collapses into a
+ * "+N" chip whose hover popover lists every selected market for inspection.
+ *
+ * @param {{
+ *   selections: MarketTickerSelection[];
+ *   busy: boolean;
+ *   onRemove: (ticker: string) => void;
+ * }} props
+ */
+function SelectionChipsRow({ selections, busy, onRemove }) {
+  const containerRef = useRef(/** @type {HTMLDivElement | null} */ (null));
+  const [measure, setMeasure] = useState(
+    /** @type {{ key: string; count: number | null }} */ ({ key: "", count: null }),
+  );
+  const [overflowOpen, setOverflowOpen] = useState(false);
+  const closeTimerRef = useRef(/** @type {ReturnType<typeof setTimeout> | null} */ (null));
+
+  const selectionsKey = useMemo(
+    () => selections.map((s) => s.ticker).join(","),
+    [selections],
+  );
+
+  // Render-phase reset: when the chip set changes, invalidate the previous
+  // measurement synchronously so we never paint a stale layout.
+  if (measure.key !== selectionsKey) {
+    setMeasure({ key: selectionsKey, count: null });
+  }
+
+  const visibleCount = measure.key === selectionsKey ? measure.count : null;
+
+  // Re-measure when the container width changes (e.g. panel resize).
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el || typeof ResizeObserver === "undefined") return;
+    let lastWidth = el.offsetWidth;
+    const ro = new ResizeObserver(() => {
+      // Ignore scrollbar-sized jitter so measuring cannot loop forever.
+      if (Math.abs(el.offsetWidth - lastWidth) > 24) {
+        lastWidth = el.offsetWidth;
+        setMeasure((prev) => (prev.count === null ? prev : { ...prev, count: null }));
+      }
+    });
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+
+  // Runs after every commit; only acts while unmeasured, so it cannot get
+  // stuck the way a dependency-gated effect can.
+  useLayoutEffect(() => {
+    if (visibleCount !== null) return;
+    const el = containerRef.current;
+    if (!el) return;
+    const chips = Array.from(el.children);
+    if (!chips.length) return;
+
+    /** @type {number[]} */
+    const rowTops = [];
+    let fitCount = chips.length;
+    for (let i = 0; i < chips.length; i++) {
+      const top = /** @type {HTMLElement} */ (chips[i]).offsetTop;
+      if (!rowTops.some((t) => Math.abs(t - top) < 2)) rowTops.push(top);
+      if (rowTops.length > 2) {
+        fitCount = i;
+        break;
+      }
+    }
+
+    const count =
+      fitCount >= selections.length
+        ? selections.length
+        : // Drop one more chip so the "+N" chip has room on the second row.
+          Math.max(1, fitCount - 1);
+    setMeasure({ key: selectionsKey, count });
+  });
+
+  const measuring = visibleCount === null;
+  const shown = measuring ? selections : selections.slice(0, visibleCount);
+  const hiddenCount = measuring ? 0 : selections.length - shown.length;
+
+  const cancelClose = () => {
+    if (closeTimerRef.current) {
+      clearTimeout(closeTimerRef.current);
+      closeTimerRef.current = null;
+    }
+  };
+  const scheduleClose = () => {
+    cancelClose();
+    closeTimerRef.current = setTimeout(() => setOverflowOpen(false), 150);
+  };
+
+  return (
+    <div
+      ref={containerRef}
+      className={cn(
+        "flex flex-wrap gap-1 pt-0.5",
+        // While measuring, hide chips and cap the height to ~2 rows so the
+        // page height (and scrollbar) stays stable during re-measures.
+        measuring && "invisible max-h-14 overflow-hidden",
+      )}
+    >
+      {shown.map((s) => (
+        <SelectionChip key={s.ticker} selection={s} busy={busy} onRemove={onRemove} />
+      ))}
+      {hiddenCount > 0 ? (
+        <Popover open={overflowOpen} onOpenChange={setOverflowOpen}>
+          <PopoverTrigger asChild>
+            <button
+              type="button"
+              className="inline-flex items-center rounded-full border border-emerald-600/25 bg-emerald-500/15 px-2 py-px text-[10px] font-semibold leading-4 text-emerald-900 hover:bg-emerald-500/25 dark:text-emerald-100"
+              onMouseEnter={() => {
+                cancelClose();
+                setOverflowOpen(true);
+              }}
+              onMouseLeave={scheduleClose}
+              onClick={() => setOverflowOpen((v) => !v)}
+            >
+              +{hiddenCount}
+            </button>
+          </PopoverTrigger>
+          <PopoverContent
+            side="bottom"
+            align="start"
+            className="max-h-80 w-96 max-w-[calc(100vw-2rem)] overflow-y-auto p-2"
+            onMouseEnter={cancelClose}
+            onMouseLeave={scheduleClose}
+          >
+            <p className="px-1 pb-1.5 text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
+              {selections.length} markets selected
+            </p>
+            <ul className="space-y-0.5">
+              {selections.map((s) => (
+                <li
+                  key={s.ticker}
+                  className="flex items-start justify-between gap-2 rounded-md px-1.5 py-1.5 hover:bg-muted/60"
+                >
+                  <SelectionHoverDetails selection={s} />
+                  <button
+                    type="button"
+                    disabled={busy}
+                    aria-label={`Remove ${s.ticker}`}
+                    className="mt-0.5 shrink-0 rounded-full p-1 text-muted-foreground hover:bg-muted hover:text-foreground"
+                    onClick={() => onRemove(s.ticker)}
+                  >
+                    <X className="h-3 w-3" aria-hidden />
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </PopoverContent>
+        </Popover>
+      ) : null}
+    </div>
+  );
+}
+
+/**
  * Independent Market Ticker Search.
  * Emits a comma-separated ticker string via onChange for Kalshi endpoint params.
  *
@@ -119,7 +333,6 @@ function SuggestionMetaRow({ status, openTime, closeTime, className }) {
  *   disabled?: boolean;
  *   className?: string;
  *   maxTickers?: number;
- *   label?: string;
  *   dataSource?: KalshiTickerSearchDataSource;
  *   historyEntity?: "trades" | "candlesticks" | "data";
  * }} props
@@ -131,7 +344,6 @@ export function MarketTickerSearch({
   disabled = false,
   className,
   maxTickers = MAX_TICKERS,
-  label = "Market tickers",
   dataSource = "live",
   historyEntity = "data",
 }) {
@@ -444,8 +656,7 @@ export function MarketTickerSearch({
   return (
     <TooltipProvider delayDuration={200}>
       <div className={cn("space-y-2", className)}>
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <Label className="text-xs font-medium text-foreground">{label}</Label>
+        <div className="flex flex-wrap items-center justify-end gap-2">
           <span className="flex items-center gap-1.5 text-[10px] text-muted-foreground">
             {resolveLoading ? (
               <Loader2 className="h-3 w-3 animate-spin text-primary" aria-hidden />
@@ -601,29 +812,7 @@ export function MarketTickerSearch({
         </p>
 
         {selections.length > 0 ? (
-          <div className="flex flex-wrap gap-1.5 pt-0.5">
-            {selections.map((s) => (
-              <Tooltip key={s.ticker}>
-                <TooltipTrigger asChild>
-                  <span className="inline-flex max-w-full items-center gap-1 rounded-full border border-emerald-600/25 bg-emerald-500/10 py-0.5 pl-2 pr-1 text-[11px] font-medium text-emerald-900 dark:text-emerald-100">
-                    <span className="truncate font-mono">{s.ticker}</span>
-                    <button
-                      type="button"
-                      disabled={busy}
-                      aria-label={`Remove ${s.ticker}`}
-                      className="rounded-full p-0.5 text-emerald-800/70 hover:bg-emerald-500/20 hover:text-emerald-950 dark:text-emerald-100/80"
-                      onClick={() => removeSelection(s.ticker)}
-                    >
-                      <X className="h-3 w-3" aria-hidden />
-                    </button>
-                  </span>
-                </TooltipTrigger>
-                <TooltipContent side="bottom" className="max-w-xs text-pretty">
-                  {s.title || s.ticker}
-                </TooltipContent>
-              </Tooltip>
-            ))}
-          </div>
+          <SelectionChipsRow selections={selections} busy={busy} onRemove={removeSelection} />
         ) : null}
 
         <MarketTickerSearchCutoffNotes
