@@ -1,9 +1,11 @@
 import {
   KALSHI_LIVE_ORDERBOOK_API_FILTER_COLUMNS,
-  parseKalshiLiveOrderbookTickerInput,
+  parseKalshiLiveOrderbookTickersInput,
 } from "@/lib/kalshiLive/orderbookColumns";
 
 /** @typedef {import("@/lib/kalshiLive/kalshiLiveCompose").KalshiLiveWhereFilter} KalshiLiveWhereFilter */
+
+const MAX_ORDERBOOK_TICKERS = 100;
 
 /**
  * @param {KalshiLiveWhereFilter[]} whereFilters
@@ -30,28 +32,28 @@ export function partitionOrderbookApiParams(whereFilters) {
 }
 
 /**
- * @param {string} tickerRaw
+ * @param {string} tickersRaw
  * @returns {string | null}
  */
-export function validateKalshiLiveOrderbookPull(tickerRaw) {
-  const ticker = parseKalshiLiveOrderbookTickerInput(tickerRaw);
-  if (!ticker) return "Enter a market ticker.";
-  const multi = String(tickerRaw || "")
-    .split(/[\s,]+/)
-    .map((t) => t.trim())
-    .filter(Boolean);
-  if (multi.length > 1) {
-    return "Orderbook pulls one market at a time — enter a single ticker.";
+export function validateKalshiLiveOrderbookPull(tickersRaw) {
+  const tickers = parseKalshiLiveOrderbookTickersInput(tickersRaw);
+  if (!tickers.length) return "Enter at least one market ticker.";
+  if (tickers.length > MAX_ORDERBOOK_TICKERS) {
+    return `Maximum ${MAX_ORDERBOOK_TICKERS} market tickers per pull.`;
   }
   return null;
 }
 
 /**
- * @param {string} ticker
+ * @param {string | string[]} tickers
  * @param {Record<string, number>} apiParams
  */
-export function summarizeKalshiLiveOrderbookRequest(ticker, apiParams) {
-  const parts = [`GET /markets/${ticker}/orderbook`];
+export function summarizeKalshiLiveOrderbookRequest(tickers, apiParams) {
+  const list = Array.isArray(tickers) ? tickers : [tickers].filter(Boolean);
+  const parts =
+    list.length === 1
+      ? [`GET /markets/${list[0]}/orderbook`]
+      : [`GET /markets/{ticker}/orderbook`, `tickers=${list.join(",")}`];
   if (Number.isFinite(Number(apiParams.depth))) parts.push(`depth=${apiParams.depth}`);
   return parts.join(" · ");
 }

@@ -149,6 +149,7 @@ export function KalshiLiveComposeOperationPanel({
     connectKalshiLiveTradesTicker = "",
     connectKalshiLiveTradesTickerMeta = {},
     connectKalshiLiveOrderbookTicker = "",
+    connectKalshiLiveOrderbookTickerMeta = {},
   } = ctx;
 
   const candlestickAutoSheets = useMemo(() => {
@@ -181,7 +182,20 @@ export function KalshiLiveComposeOperationPanel({
     }));
   }, [endpointId, connectKalshiLiveTradesTicker, connectKalshiLiveTradesTickerMeta]);
 
-  const autoNamedSheets = candlestickAutoSheets || tradesAutoSheets;
+  const orderbookAutoSheets = useMemo(() => {
+    if (endpointId !== "orderbook") return null;
+    const tickers = String(connectKalshiLiveOrderbookTicker || "")
+      .split(/[\s,]+/)
+      .map((t) => t.trim().toUpperCase())
+      .filter(Boolean);
+    const unique = [...new Set(tickers)];
+    return unique.map((ticker) => ({
+      name: ticker,
+      title: connectKalshiLiveOrderbookTickerMeta?.[ticker] || ticker,
+    }));
+  }, [endpointId, connectKalshiLiveOrderbookTicker, connectKalshiLiveOrderbookTickerMeta]);
+
+  const autoNamedSheets = candlestickAutoSheets || tradesAutoSheets || orderbookAutoSheets;
 
   const allColumns = useMemo(() => getKalshiLiveAllColumnNames(endpointId), [endpointId]);
 
@@ -682,7 +696,9 @@ export function KalshiLiveComposeOperationPanel({
               ? "For convenience each market candlestick data will be filled into a separate sheet. Each sheet is named by the ticker; you can change this later."
               : tradesAutoSheets
                 ? "For convenience each market's trades will be filled into a separate sheet. Each sheet is named by the ticker; you can change this later."
-                : undefined
+                : orderbookAutoSheets
+                  ? "For convenience each market's orderbook will be filled into a separate sheet. Each sheet is named by the ticker; you can change this later."
+                  : undefined
           }
         />
         <Button

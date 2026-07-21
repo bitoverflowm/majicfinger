@@ -367,6 +367,7 @@ export function KalshiLiveIntegrationsCore({ onRunPull, className }) {
     setConnectKalshiLiveTradesTickerMeta,
     connectKalshiLiveOrderbookTicker = "",
     setConnectKalshiLiveOrderbookTicker,
+    setConnectKalshiLiveOrderbookTickerMeta,
     setConnectActiveComposeOps,
     kalshiLivePingState = "idle",
     pingKalshiLiveExchange,
@@ -469,7 +470,10 @@ export function KalshiLiveIntegrationsCore({ onRunPull, className }) {
         setConnectKalshiLiveTradesTicker?.("");
         setConnectKalshiLiveTradesTickerMeta?.({});
       }
-      if (id !== "orderbook") setConnectKalshiLiveOrderbookTicker?.("");
+      if (id !== "orderbook") {
+        setConnectKalshiLiveOrderbookTicker?.("");
+        setConnectKalshiLiveOrderbookTickerMeta?.({});
+      }
       if (id === "trades") {
         setConnectKalshiLiveLimit?.(KALSHI_LIVE_TRADES_DEFAULT_LIMIT);
       }
@@ -488,6 +492,7 @@ export function KalshiLiveIntegrationsCore({ onRunPull, className }) {
       setConnectKalshiLiveTradesTicker,
       setConnectKalshiLiveTradesTickerMeta,
       setConnectKalshiLiveOrderbookTicker,
+      setConnectKalshiLiveOrderbookTickerMeta,
       kalshiLivePingState,
       pingKalshiLiveExchange,
     ],
@@ -503,6 +508,7 @@ export function KalshiLiveIntegrationsCore({ onRunPull, className }) {
     setConnectKalshiLiveTradesTicker?.("");
     setConnectKalshiLiveTradesTickerMeta?.({});
     setConnectKalshiLiveOrderbookTicker?.("");
+    setConnectKalshiLiveOrderbookTickerMeta?.({});
     setSearchExpanded(false);
     setFilterError(null);
   }, [
@@ -515,6 +521,7 @@ export function KalshiLiveIntegrationsCore({ onRunPull, className }) {
     setConnectKalshiLiveTradesTicker,
     setConnectKalshiLiveTradesTickerMeta,
     setConnectKalshiLiveOrderbookTicker,
+    setConnectKalshiLiveOrderbookTickerMeta,
   ]);
 
   useEffect(() => {
