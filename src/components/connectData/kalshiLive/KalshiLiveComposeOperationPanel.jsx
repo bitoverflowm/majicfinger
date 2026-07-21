@@ -526,7 +526,9 @@ export function KalshiLiveComposeOperationPanel({
                 ? "Date range is set in Common queries above. Other columns filter on our side after the pull."
                 : endpointId === "orderbook"
                   ? "Optional depth (0–100) is sent to Kalshi. Other columns filter on our side after the pull."
-                  : "Filters on category, tags, and updated time use Kalshi API params when possible. Other columns are filtered on our side after the pull. Category → Other matches custom text or non-standard categories."}
+                  : endpointId === "series"
+                    ? "Add ticker equals your series ticker. That value is sent to Kalshi as the path param."
+                    : "status and time bounds use Kalshi API params when possible. Other columns filter on our side after the pull."}
           </p>
         </div>
       );
@@ -667,11 +669,10 @@ export function KalshiLiveComposeOperationPanel({
         ))}
       </AnimatePresence>
 
-      {!openComposeOps.length && endpointId !== "candlesticks" ? (
+      {!openComposeOps.length && endpointId === "trades" ? (
         <p className="text-[10px] leading-snug text-muted-foreground">
-          {endpointId === "trades"
-            ? "Refine is optional — Run pull uses your row limit (per market). Date range is set in Common queries."
-            : "Refine is optional — open Where, Sort, or limit above, or run with your column selection."}
+          Refine is optional — Run pull uses your row limit (per market). Date range is set in
+          Common queries.
         </p>
       ) : null}
 
@@ -689,7 +690,7 @@ export function KalshiLiveComposeOperationPanel({
       >
         <ConnectHomeSheetPullFields
           sheetNameInputId="connect-home-kalshi-live-sheet-name"
-          className="flex-1 min-w-0"
+          className={autoNamedSheets ? "w-full" : "flex-1 min-w-0"}
           autoNamedSheets={autoNamedSheets}
           autoNamedSheetsMessage={
             candlestickAutoSheets
@@ -705,7 +706,7 @@ export function KalshiLiveComposeOperationPanel({
           type="button"
           size="sm"
           variant="outline"
-          className="h-8 shrink-0 border-border bg-card text-xs text-foreground"
+          className="ml-auto h-8 shrink-0 border-border bg-card text-xs text-foreground"
           onClick={handleRestart}
         >
           Start Over

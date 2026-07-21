@@ -82,9 +82,9 @@ function IntegrationWorkflowHeader({ name, description, compact = false, onGoBac
         variant="ghost"
         size="sm"
         onClick={onGoBack}
-        className="-ml-2 h-8 gap-1.5 px-2 text-muted-foreground hover:text-foreground"
+        className="-ml-2 h-7 gap-1 px-2 text-xs text-muted-foreground hover:text-foreground [&_svg]:size-3.5"
       >
-        <ArrowLeft className="h-4 w-4 shrink-0" aria-hidden />
+        <ArrowLeft className="shrink-0" aria-hidden />
         Go back
       </Button>
       {name || description ? (

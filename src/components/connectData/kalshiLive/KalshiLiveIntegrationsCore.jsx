@@ -61,10 +61,6 @@ const LIVE_SOURCE_PRESENTATION = {
     icon: RefreshCw,
     accent: "emerald",
   },
-  seriesList: {
-    icon: List,
-    accent: "secondary",
-  },
   candlesticks: {
     icon: CandlestickChart,
     accent: "emerald",

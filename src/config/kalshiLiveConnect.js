@@ -30,13 +30,7 @@ export const KALSHI_LIVE_CONNECT_ENDPOINTS = [
     id: "series",
     title: "Series",
     description:
-      "Template for recurring events (e.g. weekly jobs report). Pull one series by ticker — parent of related markets.",
-  },
-  {
-    id: "seriesList",
-    title: "Series List",
-    description:
-      "Browse many series templates with category/tags filters. Sort by volume on our side when the API has no sort param.",
+      "Search a specific series or discover series based on series characteristics",
   },
   {
     id: "candlesticks",
@@ -71,7 +65,7 @@ export function getKalshiLiveColumnsForEndpoint(endpointId) {
   if (endpointId === "candlesticks") return KALSHI_LIVE_CANDLESTICK_COLUMNS;
   if (endpointId === "trades") return KALSHI_LIVE_TRADES_COLUMNS;
   if (endpointId === "orderbook") return KALSHI_LIVE_ORDERBOOK_COLUMNS;
-  if (endpointId === "series" || endpointId === "seriesList") return KALSHI_LIVE_SERIES_COLUMNS;
+  if (endpointId === "series") return KALSHI_LIVE_SERIES_COLUMNS;
   return KALSHI_LIVE_MARKETS_COLUMNS;
 }
 
@@ -80,7 +74,7 @@ export function getKalshiLiveColumnDisplayLabelForEndpoint(endpointId, col) {
   if (endpointId === "candlesticks") return getKalshiLiveCandlestickColumnLabel(col);
   if (endpointId === "trades") return getKalshiLiveTradeColumnLabel(col);
   if (endpointId === "orderbook") return getKalshiLiveOrderbookColumnLabel(col);
-  if (endpointId === "series" || endpointId === "seriesList") {
+  if (endpointId === "series") {
     return getKalshiLiveSeriesColumnLabel(col);
   }
   return getKalshiLiveMarketColumnLabel(col);

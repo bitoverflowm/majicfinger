@@ -16,11 +16,9 @@ import { KALSHI_LIVE_MARKETS_COLUMNS } from "@/lib/kalshiLive/marketsColumns";
 import { validateKalshiLiveMarketFilters } from "@/lib/kalshiLive/marketFilterRules";
 import { KALSHI_LIVE_SERIES_COLUMNS } from "@/lib/kalshiLive/seriesColumns";
 import {
-  isKalshiLiveKnownCategory,
   KALSHI_LIVE_CATEGORY_OTHER,
   KALSHI_LIVE_KNOWN_CATEGORY_VALUES,
 } from "@/lib/kalshiLive/kalshiLiveCategories";
-import { validateKalshiLiveSeriesListFilters } from "@/lib/kalshiLive/seriesListFilterRules";
 
 /** @typedef {{ id: string; column: string; op: string; value?: string | number; categoryOtherText?: string }} KalshiLiveWhereFilter */
 
@@ -67,7 +65,7 @@ export function getKalshiLiveAllColumnNames(endpointId) {
   const cols =
     endpointId === "markets"
       ? KALSHI_LIVE_MARKETS_COLUMNS
-      : endpointId === "series" || endpointId === "seriesList"
+      : endpointId === "series"
         ? KALSHI_LIVE_SERIES_COLUMNS
         : [];
   return cols.map((c) => c.name);
@@ -124,11 +122,6 @@ export function validateKalshiLiveWhereFilters(endpointId, whereFilters) {
     return validateKalshiLiveMarketFilters(apiFilters);
   }
 
-  if (endpointId === "seriesList") {
-    const { apiFilters } = partitionSeriesListWhere(list);
-    return validateKalshiLiveSeriesListFilters(apiFilters);
-  }
-
   if (endpointId === "candlesticks" || endpointId === "trades" || endpointId === "orderbook") {
     return null;
   }
@@ -171,47 +164,6 @@ function marketApiFiltersFromWhere(whereFilters) {
 }
 
 /**
- * @param {KalshiLiveWhereFilter[]} whereFilters
- */
-function partitionSeriesListWhere(whereFilters) {
-  /** @type {import("@/lib/kalshiLive/seriesListFilterRules").KalshiLiveSeriesListFilter[]} */
-  const apiFilters = [];
-  /** @type {KalshiLiveWhereFilter[]} */
-  const clientFilters = [];
-
-  for (const f of whereFilters || []) {
-    if (f.column === "category") {
-      const preset = String(f.value ?? "").trim();
-      if (preset && preset !== KALSHI_LIVE_CATEGORY_OTHER && isKalshiLiveKnownCategory(preset)) {
-        apiFilters.push({ id: f.id, kind: "category", field: "category", value: preset });
-      } else {
-        clientFilters.push(f);
-      }
-      continue;
-    }
-    if (f.column === "tags" && f.op === "eq") {
-      const v = String(f.value ?? "").trim();
-      if (v) {
-        apiFilters.push({ id: f.id, kind: "tags", field: "tags", value: v });
-        continue;
-      }
-    }
-    if (f.column === "last_updated_ts" && f.op === "gt" && Number.isFinite(Number(f.value))) {
-      apiFilters.push({
-        id: f.id,
-        kind: "min_updated_ts",
-        field: "min_updated_ts",
-        value: Math.floor(Number(f.value)),
-      });
-      continue;
-    }
-    clientFilters.push(f);
-  }
-
-  return { apiFilters, clientFilters };
-}
-
-/**
  * @param {string} endpointId
  * @param {KalshiLiveWhereFilter[]} whereFilters
  */
@@ -223,7 +175,6 @@ export function partitionKalshiLiveCompose(endpointId, whereFilters) {
       marketApiFilters: [],
       marketTickers: "",
       seriesTicker: String(list.find((f) => f.column === "ticker")?.value ?? "").trim().toUpperCase(),
-      seriesListApiFilters: [],
       clientWhere: [],
     };
   }
@@ -233,7 +184,6 @@ export function partitionKalshiLiveCompose(endpointId, whereFilters) {
       marketApiFilters: marketApiFiltersFromWhere(list),
       marketTickers: marketTickersFromWhere(list),
       seriesTicker: "",
-      seriesListApiFilters: [],
       clientWhere: list.filter((f) => {
         if (f.column === "ticker") return false;
         if (f.column === "status" && f.op === "eq" && String(f.value ?? "").trim()) return false;
@@ -248,22 +198,10 @@ export function partitionKalshiLiveCompose(endpointId, whereFilters) {
     };
   }
 
-  if (endpointId === "seriesList") {
-    const { apiFilters, clientFilters } = partitionSeriesListWhere(list);
-    return {
-      marketApiFilters: [],
-      marketTickers: "",
-      seriesTicker: "",
-      seriesListApiFilters: apiFilters,
-      clientWhere: clientFilters,
-    };
-  }
-
   return {
     marketApiFilters: [],
     marketTickers: "",
     seriesTicker: "",
-    seriesListApiFilters: [],
     clientWhere: [],
   };
 }
@@ -376,7 +314,7 @@ export function applyKalshiLiveClientWhere(rows, clientWhere) {
  * @param {Record<string, unknown>[]} rows
  * @param {KalshiLiveSortClause[]} sortClauses
  */
-export function applyKalshiLiveClientSort(rows, sortClauses, endpointId = "seriesList") {
+export function applyKalshiLiveClientSort(rows, sortClauses, endpointId = "markets") {
   const clauses = Array.isArray(sortClauses) ? sortClauses.filter((s) => s.column) : [];
   if (!clauses.length) return rows;
   const list = [...(Array.isArray(rows) ? rows : [])];
@@ -408,7 +346,7 @@ export function applyKalshiLiveClientSort(rows, sortClauses, endpointId = "serie
  */
 export function summarizeKalshiLiveComposeRequest(endpointId, whereFilters, sortClauses, opts = {}) {
   const parts = [`Kalshi Live · ${endpointId}`];
-  const { marketApiFilters, marketTickers, seriesTicker, seriesListApiFilters, clientWhere } =
+  const { marketApiFilters, marketTickers, seriesTicker, clientWhere } =
     partitionKalshiLiveCompose(endpointId, whereFilters);
 
   if (endpointId === "markets") {
@@ -420,14 +358,6 @@ export function summarizeKalshiLiveComposeRequest(endpointId, whereFilters, sort
     }
   } else if (endpointId === "series") {
     parts[0] = `GET /series/${seriesTicker || "?"}`;
-  } else if (endpointId === "seriesList") {
-    parts[0] = "GET /series";
-    for (const f of seriesListApiFilters) {
-      if (f.kind === "category") parts.push(`category=${f.value}`);
-      if (f.kind === "tags") parts.push(`tags=${f.value}`);
-      if (f.kind === "min_updated_ts") parts.push(`min_updated_ts=${f.value}`);
-    }
-    parts.push("include_volume=true");
   }
 
   if (clientWhere.length) parts.push(`clientWhere=${clientWhere.length}`);

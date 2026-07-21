@@ -58,7 +58,9 @@ export function ConnectHomeSheetPullFields({
   return (
     <div className={cn("flex flex-wrap items-end gap-x-4 gap-y-3", className)}>
       {useAutoNames ? (
-        <div className={cn("flex min-w-[12rem] max-w-full flex-1 flex-col gap-1.5", nameFieldClassName)}>
+        // Full-width row so the chips can flow horizontally instead of
+        // stacking into a narrow column next to the other controls.
+        <div className={cn("flex w-full flex-col gap-1.5", nameFieldClassName)}>
           {autoNamedSheetsMessage ? (
             <p className="text-[11px] leading-snug text-muted-foreground">{autoNamedSheetsMessage}</p>
           ) : (
