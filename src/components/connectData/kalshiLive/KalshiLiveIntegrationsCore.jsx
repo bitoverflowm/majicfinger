@@ -804,7 +804,15 @@ export function KalshiLiveIntegrationsCore({ onRunPull, className }) {
                       getDisplayLabel={(col) =>
                         KALSHI_LIVE_CONNECT_CONFIG.getColumnDisplayLabel(hoveredEndpointId, col)
                       }
-                      title={`${hoveredSourceLabel} columns (${hoverPreviewColumns.length})`}
+                      title={
+                        <>
+                          Data properties available for{" "}
+                          <span className="font-mono normal-case text-foreground">
+                            {hoveredSourceLabel}
+                          </span>{" "}
+                          ({hoverPreviewColumns.length})
+                        </>
+                      }
                       className="h-full"
                     />
                   ) : null}

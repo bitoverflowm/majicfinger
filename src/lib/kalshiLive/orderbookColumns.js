@@ -43,15 +43,26 @@ export function getKalshiLiveOrderbookColumnLabel(col) {
 }
 
 /**
- * Parse a single market ticker for GET /markets/{ticker}/orderbook (required).
+ * Parse user input into unique market tickers (comma, newline, or whitespace separated).
+ * Same shape as trades/candlesticks input; used for multi-market orderbook pulls.
+ *
+ * @param {string} raw
+ * @returns {string[]}
+ */
+export function parseKalshiLiveOrderbookTickersInput(raw) {
+  const parts = String(raw || "")
+    .split(/[\s,]+/)
+    .map((t) => t.trim().toUpperCase())
+    .filter(Boolean);
+  return [...new Set(parts)];
+}
+
+/**
+ * Parse a single market ticker for GET /markets/{ticker}/orderbook (API proxy; one per request).
  *
  * @param {string} raw
  * @returns {string}
  */
 export function parseKalshiLiveOrderbookTickerInput(raw) {
-  const parts = String(raw || "")
-    .split(/[\s,]+/)
-    .map((t) => t.trim().toUpperCase())
-    .filter(Boolean);
-  return parts[0] || "";
+  return parseKalshiLiveOrderbookTickersInput(raw)[0] || "";
 }
