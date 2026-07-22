@@ -7,12 +7,15 @@ import { useMyStateV2 } from "@/context/stateContextV2";
 import { applyAthenaPullToSheetPatch } from "@/lib/dataLake/applyAthenaPullToSheet";
 import { fetchAllKalshiLiveMarketsPages } from "@/lib/kalshiLive/fetchKalshiLiveMarkets";
 import { fetchKalshiLiveSeriesPull } from "@/lib/kalshiLive/fetchKalshiLiveSeriesPull";
+import { fetchKalshiLiveSeriesDiscoveryPull } from "@/lib/kalshiLive/fetchKalshiLiveSeriesDiscoveryPull";
 import {
   KALSHI_LIVE_SERIES_SHEET_MODE_COMBINED,
   normalizeKalshiLiveSeriesSheetMode,
+  summarizeKalshiLiveSeriesDiscoveryRequest,
   summarizeKalshiLiveSeriesPullRequest,
 } from "@/lib/kalshiLive/seriesCompose";
 import { ingestKalshiLiveAsView } from "@/lib/kalshiLive/ingestKalshiLiveAsView";
+import { kalshiLiveSeriesWantsIncludeVolume } from "@/lib/kalshiLive/seriesColumns";
 import { fetchKalshiLiveCandlesticksPull } from "@/lib/kalshiLive/fetchKalshiLiveCandlesticksPull";
 import { fetchKalshiLiveTradesPull } from "@/lib/kalshiLive/fetchKalshiLiveTradesPull";
 import { fetchKalshiLiveOrderbookPull } from "@/lib/kalshiLive/fetchKalshiLiveOrderbookPull";
@@ -72,6 +75,11 @@ export default function KalshiLive({ setConnectedData, connectHomePullBridge = f
     connectKalshiLiveOrderbookTicker,
     connectKalshiLiveSeriesTicker,
     connectKalshiLiveSeriesSheetMode,
+    connectKalshiLiveSeriesDiscoveryMode,
+    connectKalshiLiveSeriesDiscoveryCategory,
+    connectKalshiLiveSeriesDiscoveryTag,
+    connectKalshiLiveSeriesDiscoveryIncludeProductMetadata,
+    connectKalshiLiveSeriesDiscoveryMinUpdatedTs,
     setConnectDataLakePullState,
     setDataSheets,
     activeSheetId,
@@ -186,18 +194,81 @@ export default function KalshiLive({ setConnectedData, connectHomePullBridge = f
 
   const runSeriesPull = useCallback(
     async (ac, sheetId, cols) => {
-      const seriesTickers = String(connectKalshiLiveSeriesTicker || "").trim();
-      const sheetMode = normalizeKalshiLiveSeriesSheetMode(connectKalshiLiveSeriesSheetMode);
+      const discoveryMode = !!connectKalshiLiveSeriesDiscoveryMode;
       const requestStartMs =
         typeof performance !== "undefined" && performance?.now ? performance.now() : Date.now();
 
       setConnectDataLakePullState?.((prev) => ({
         ...prev,
         loading: true,
-        label: "Fetching Kalshi Live series…",
+        label: discoveryMode
+          ? "Discovering Kalshi Live series…"
+          : "Fetching Kalshi Live series…",
         progress: 8,
         error: null,
       }));
+
+      if (discoveryMode) {
+        const { raw, rows: accumulated, querySummary, includeVolume, includeProductMetadata } =
+          await fetchKalshiLiveSeriesDiscoveryPull({
+            category: connectKalshiLiveSeriesDiscoveryCategory,
+            tag: connectKalshiLiveSeriesDiscoveryTag,
+            includeProductMetadata: !!connectKalshiLiveSeriesDiscoveryIncludeProductMetadata,
+            minUpdatedTs: connectKalshiLiveSeriesDiscoveryMinUpdatedTs,
+            selectedColumns: cols,
+            signal: ac.signal,
+          });
+
+        if (setRows) setRows(accumulated);
+
+        await ingestKalshiLiveAsView({
+          endpointId: "series",
+          series: raw,
+          selectedColumns: cols,
+        });
+
+        const elapsedMs =
+          (typeof performance !== "undefined" && performance?.now
+            ? performance.now()
+            : Date.now()) - requestStartMs;
+
+        const requestCard = {
+          id: genRequestCardId(),
+          createdAt: Date.now(),
+          elapsedMs,
+          lake: "kalshi-live",
+          table: "series",
+          sheetId: sheetId || null,
+          querySummary,
+          loadedRowCount: accumulated.length,
+        };
+
+        if (sheetId && setDataSheets) {
+          setDataSheets((prev) =>
+            applyAthenaPullToSheetPatch(prev, sheetId, accumulated, {
+              provenance: {
+                source: "kalshi-live",
+                endpoint: "series",
+                discovery: true,
+                category: connectKalshiLiveSeriesDiscoveryCategory,
+                tag: connectKalshiLiveSeriesDiscoveryTag,
+                includeVolume,
+                includeProductMetadata,
+                minUpdatedTs: connectKalshiLiveSeriesDiscoveryMinUpdatedTs,
+                querySummary,
+              },
+              requestCards: [requestCard],
+            }),
+          );
+        }
+
+        applyConnectHomePullData(ctx, accumulated);
+        if (ctx?.requestConnectAnalyzeScroll) ctx.requestConnectAnalyzeScroll();
+        return accumulated.length;
+      }
+
+      const seriesTickers = String(connectKalshiLiveSeriesTicker || "").trim();
+      const sheetMode = normalizeKalshiLiveSeriesSheetMode(connectKalshiLiveSeriesSheetMode);
 
       const {
         byTicker,
@@ -293,9 +364,6 @@ export default function KalshiLive({ setConnectedData, connectHomePullBridge = f
             return next;
           });
 
-          // Do NOT call applyConnectHomePullData with the combined rows — that
-          // would overwrite sheet 1 with every series after we already wrote
-          // one series per sheet.
           if (firstSheetId && ctx?.setActiveSheetId) {
             ctx.setActiveSheetId(firstSheetId);
           }
@@ -344,6 +412,11 @@ export default function KalshiLive({ setConnectedData, connectHomePullBridge = f
     [
       connectKalshiLiveSeriesTicker,
       connectKalshiLiveSeriesSheetMode,
+      connectKalshiLiveSeriesDiscoveryMode,
+      connectKalshiLiveSeriesDiscoveryCategory,
+      connectKalshiLiveSeriesDiscoveryTag,
+      connectKalshiLiveSeriesDiscoveryIncludeProductMetadata,
+      connectKalshiLiveSeriesDiscoveryMinUpdatedTs,
       setConnectDataLakePullState,
       setDataSheets,
       setRows,
@@ -824,9 +897,21 @@ export default function KalshiLive({ setConnectedData, connectHomePullBridge = f
       endpoint: endpointId,
       querySummary:
         endpointId === "series"
-          ? summarizeKalshiLiveSeriesPullRequest(connectKalshiLiveSeriesTicker || "", {
-              sheetMode: normalizeKalshiLiveSeriesSheetMode(connectKalshiLiveSeriesSheetMode),
-            })
+          ? connectKalshiLiveSeriesDiscoveryMode
+            ? summarizeKalshiLiveSeriesDiscoveryRequest({
+                category: connectKalshiLiveSeriesDiscoveryCategory,
+                tag: connectKalshiLiveSeriesDiscoveryTag,
+                includeVolume: kalshiLiveSeriesWantsIncludeVolume(cols),
+                includeProductMetadata: !!connectKalshiLiveSeriesDiscoveryIncludeProductMetadata,
+                minUpdatedTs:
+                  connectKalshiLiveSeriesDiscoveryMinUpdatedTs === ""
+                    ? null
+                    : Number(connectKalshiLiveSeriesDiscoveryMinUpdatedTs),
+              })
+            : summarizeKalshiLiveSeriesPullRequest(connectKalshiLiveSeriesTicker || "", {
+                sheetMode: normalizeKalshiLiveSeriesSheetMode(connectKalshiLiveSeriesSheetMode),
+                includeVolume: kalshiLiveSeriesWantsIncludeVolume(cols),
+              })
           : endpointId === "markets"
             ? summarizeKalshiLiveComposeRequest(
                 "markets",
@@ -911,6 +996,13 @@ export default function KalshiLive({ setConnectedData, connectHomePullBridge = f
     connectKalshiLiveWhereFilters,
     connectKalshiLiveSortClauses,
     connectKalshiLiveLimit,
+    connectKalshiLiveSeriesTicker,
+    connectKalshiLiveSeriesSheetMode,
+    connectKalshiLiveSeriesDiscoveryMode,
+    connectKalshiLiveSeriesDiscoveryCategory,
+    connectKalshiLiveSeriesDiscoveryTag,
+    connectKalshiLiveSeriesDiscoveryIncludeProductMetadata,
+    connectKalshiLiveSeriesDiscoveryMinUpdatedTs,
     activeSheetId,
     runMarketsPull,
     runSeriesPull,

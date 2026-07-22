@@ -43,6 +43,17 @@ export function validateKalshiLiveSeriesPull(tickersRaw) {
 }
 
 /**
+ * Discovery mode: category is required; tag is optional (one max).
+ * @param {{ category?: string; tag?: string }} opts
+ * @returns {string | null}
+ */
+export function validateKalshiLiveSeriesDiscoveryPull(opts) {
+  const category = String(opts?.category || "").trim();
+  if (!category) return "Select a category to discover series.";
+  return null;
+}
+
+/**
  * @param {string | string[]} tickers
  * @param {{ includeVolume?: boolean; sheetMode?: KalshiLiveSeriesSheetMode }} [opts]
  */
@@ -55,6 +66,7 @@ export function summarizeKalshiLiveSeriesPullRequest(tickers, opts = {}) {
       ? [`GET /series/${list[0]}`]
       : [`GET /series/{series_ticker}`, `series=${list.join(",")}`];
   if (opts.includeVolume) parts.push("include_volume=true");
+  else parts.push("include_volume=false");
   if (list.length > 1) {
     parts.push(
       opts.sheetMode === KALSHI_LIVE_SERIES_SHEET_MODE_COMBINED
@@ -62,5 +74,27 @@ export function summarizeKalshiLiveSeriesPullRequest(tickers, opts = {}) {
         : "sheets=per_series",
     );
   }
+  return parts.join(" · ");
+}
+
+/**
+ * @param {{
+ *   category?: string;
+ *   tag?: string;
+ *   includeVolume?: boolean;
+ *   includeProductMetadata?: boolean;
+ *   minUpdatedTs?: number | null;
+ * }} opts
+ */
+export function summarizeKalshiLiveSeriesDiscoveryRequest(opts = {}) {
+  const parts = ["GET /series"];
+  if (opts.category) parts.push(`category=${opts.category}`);
+  if (opts.tag) parts.push(`tags=${opts.tag}`);
+  parts.push(`include_volume=${opts.includeVolume ? "true" : "false"}`);
+  parts.push(`include_product_metadata=${opts.includeProductMetadata ? "true" : "false"}`);
+  if (opts.minUpdatedTs != null && Number.isFinite(Number(opts.minUpdatedTs))) {
+    parts.push(`min_updated_ts=${Math.floor(Number(opts.minUpdatedTs))}`);
+  }
+  parts.push("sheets=combined");
   return parts.join(" · ");
 }

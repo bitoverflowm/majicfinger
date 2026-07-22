@@ -370,6 +370,11 @@ export function KalshiLiveIntegrationsCore({ onRunPull, className }) {
     setConnectKalshiLiveSeriesTicker,
     setConnectKalshiLiveSeriesTickerMeta,
     setConnectKalshiLiveSeriesSheetMode,
+    setConnectKalshiLiveSeriesDiscoveryMode,
+    setConnectKalshiLiveSeriesDiscoveryCategory,
+    setConnectKalshiLiveSeriesDiscoveryTag,
+    setConnectKalshiLiveSeriesDiscoveryIncludeProductMetadata,
+    setConnectKalshiLiveSeriesDiscoveryMinUpdatedTs,
     setConnectActiveComposeOps,
     kalshiLivePingState = "idle",
     pingKalshiLiveExchange,
@@ -480,6 +485,11 @@ export function KalshiLiveIntegrationsCore({ onRunPull, className }) {
         setConnectKalshiLiveSeriesTicker?.("");
         setConnectKalshiLiveSeriesTickerMeta?.({});
         setConnectKalshiLiveSeriesSheetMode?.("per_series");
+        setConnectKalshiLiveSeriesDiscoveryMode?.(false);
+        setConnectKalshiLiveSeriesDiscoveryCategory?.("");
+        setConnectKalshiLiveSeriesDiscoveryTag?.("");
+        setConnectKalshiLiveSeriesDiscoveryIncludeProductMetadata?.(false);
+        setConnectKalshiLiveSeriesDiscoveryMinUpdatedTs?.("");
       }
       if (id === "trades") {
         setConnectKalshiLiveLimit?.(KALSHI_LIVE_TRADES_DEFAULT_LIMIT);
@@ -503,6 +513,11 @@ export function KalshiLiveIntegrationsCore({ onRunPull, className }) {
       setConnectKalshiLiveSeriesTicker,
       setConnectKalshiLiveSeriesTickerMeta,
       setConnectKalshiLiveSeriesSheetMode,
+      setConnectKalshiLiveSeriesDiscoveryMode,
+      setConnectKalshiLiveSeriesDiscoveryCategory,
+      setConnectKalshiLiveSeriesDiscoveryTag,
+      setConnectKalshiLiveSeriesDiscoveryIncludeProductMetadata,
+      setConnectKalshiLiveSeriesDiscoveryMinUpdatedTs,
       kalshiLivePingState,
       pingKalshiLiveExchange,
     ],
@@ -522,6 +537,11 @@ export function KalshiLiveIntegrationsCore({ onRunPull, className }) {
     setConnectKalshiLiveSeriesTicker?.("");
     setConnectKalshiLiveSeriesTickerMeta?.({});
     setConnectKalshiLiveSeriesSheetMode?.("per_series");
+    setConnectKalshiLiveSeriesDiscoveryMode?.(false);
+    setConnectKalshiLiveSeriesDiscoveryCategory?.("");
+    setConnectKalshiLiveSeriesDiscoveryTag?.("");
+    setConnectKalshiLiveSeriesDiscoveryIncludeProductMetadata?.(false);
+    setConnectKalshiLiveSeriesDiscoveryMinUpdatedTs?.("");
     setSearchExpanded(false);
     setFilterError(null);
   }, [
@@ -538,6 +558,11 @@ export function KalshiLiveIntegrationsCore({ onRunPull, className }) {
     setConnectKalshiLiveSeriesTicker,
     setConnectKalshiLiveSeriesTickerMeta,
     setConnectKalshiLiveSeriesSheetMode,
+    setConnectKalshiLiveSeriesDiscoveryMode,
+    setConnectKalshiLiveSeriesDiscoveryCategory,
+    setConnectKalshiLiveSeriesDiscoveryTag,
+    setConnectKalshiLiveSeriesDiscoveryIncludeProductMetadata,
+    setConnectKalshiLiveSeriesDiscoveryMinUpdatedTs,
   ]);
 
   useEffect(() => {

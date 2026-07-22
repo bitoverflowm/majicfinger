@@ -43,6 +43,7 @@ import {
   KALSHI_LIVE_SERIES_SHEET_MODE_PER_SERIES,
   normalizeKalshiLiveSeriesSheetMode,
   parseKalshiLiveSeriesTickersInput,
+  validateKalshiLiveSeriesDiscoveryPull,
   validateKalshiLiveSeriesPull,
 } from "@/lib/kalshiLive/seriesCompose";
 import { KALSHI_LIVE_CANDLESTICK_PERIOD_OPTIONS } from "@/lib/kalshiLive/candlesticksColumns";
@@ -162,6 +163,9 @@ export function KalshiLiveComposeOperationPanel({
     connectKalshiLiveSeriesTickerMeta = {},
     connectKalshiLiveSeriesSheetMode = KALSHI_LIVE_SERIES_SHEET_MODE_PER_SERIES,
     setConnectKalshiLiveSeriesSheetMode,
+    connectKalshiLiveSeriesDiscoveryMode = false,
+    connectKalshiLiveSeriesDiscoveryCategory = "",
+    connectKalshiLiveSeriesDiscoveryTag = "",
   } = ctx;
 
   const candlestickAutoSheets = useMemo(() => {
@@ -216,6 +220,7 @@ export function KalshiLiveComposeOperationPanel({
 
   const seriesAutoSheets = useMemo(() => {
     if (endpointId !== "series") return null;
+    if (connectKalshiLiveSeriesDiscoveryMode) return null;
     if (seriesSheetMode !== KALSHI_LIVE_SERIES_SHEET_MODE_PER_SERIES) return null;
     if (seriesTickerList.length < 2) return null;
     return seriesTickerList.map((ticker) => ({
@@ -224,6 +229,7 @@ export function KalshiLiveComposeOperationPanel({
     }));
   }, [
     endpointId,
+    connectKalshiLiveSeriesDiscoveryMode,
     seriesSheetMode,
     seriesTickerList,
     connectKalshiLiveSeriesTickerMeta,
@@ -365,7 +371,12 @@ export function KalshiLiveComposeOperationPanel({
     }
 
     if (endpointId === "series") {
-      const seriesErr = validateKalshiLiveSeriesPull(connectKalshiLiveSeriesTicker);
+      const seriesErr = connectKalshiLiveSeriesDiscoveryMode
+        ? validateKalshiLiveSeriesDiscoveryPull({
+            category: connectKalshiLiveSeriesDiscoveryCategory,
+            tag: connectKalshiLiveSeriesDiscoveryTag,
+          })
+        : validateKalshiLiveSeriesPull(connectKalshiLiveSeriesTicker);
       if (seriesErr) {
         setFilterError?.(seriesErr);
         return;
@@ -388,6 +399,9 @@ export function KalshiLiveComposeOperationPanel({
     setFilterError,
     onRunPull,
     connectKalshiLiveSeriesTicker,
+    connectKalshiLiveSeriesDiscoveryMode,
+    connectKalshiLiveSeriesDiscoveryCategory,
+    connectKalshiLiveSeriesDiscoveryTag,
   ]);
 
   const rowLimitMax =
@@ -571,7 +585,9 @@ export function KalshiLiveComposeOperationPanel({
                 : endpointId === "orderbook"
                   ? "Optional depth (0–100) is sent to Kalshi. Other columns filter on our side after the pull."
                   : endpointId === "series"
-                    ? "Series tickers are set in the search above. Optional Where filters run on our side after the pull."
+                    ? connectKalshiLiveSeriesDiscoveryMode
+                      ? "Discovery uses category / tag filters on GET /series. Volume is controlled by the Volume column."
+                      : "Series tickers are set in the search above. Optional Where filters run on our side after the pull."
                     : "status and time bounds use Kalshi API params when possible. Other columns filter on our side after the pull."}
           </p>
         </div>
@@ -726,7 +742,9 @@ export function KalshiLiveComposeOperationPanel({
         </p>
       ) : null}
 
-      {endpointId === "series" && seriesTickerList.length >= 2 ? (
+      {endpointId === "series" &&
+      !connectKalshiLiveSeriesDiscoveryMode &&
+      seriesTickerList.length >= 2 ? (
         <div className="space-y-1.5">
           <Label className="text-[11px] font-medium text-muted-foreground">
             How should we organize sheets?

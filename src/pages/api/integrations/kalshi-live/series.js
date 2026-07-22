@@ -21,8 +21,9 @@ export default async function handler(req, res) {
 
   const includeVolume = parseBool(req.query.include_volume);
   const qs = new URLSearchParams();
-  if (includeVolume) qs.set("include_volume", "true");
-  const suffix = qs.toString() ? `?${qs.toString()}` : "";
+  // Always forward include_volume so Kalshi gets an explicit true/false.
+  qs.set("include_volume", includeVolume ? "true" : "false");
+  const suffix = `?${qs.toString()}`;
   const encoded = encodeURIComponent(seriesTicker);
   const url = `${kalshiLiveUrl(`series/${encoded}`)}${suffix}`;
 

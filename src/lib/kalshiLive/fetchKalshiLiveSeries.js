@@ -7,8 +7,12 @@ export async function fetchKalshiLiveSeries(opts) {
   const ticker = String(opts.seriesTicker || "").trim();
   if (!ticker) throw new Error("Series ticker is required.");
 
-  const qs = new URLSearchParams({ series_ticker: ticker });
-  if (opts.includeVolume) qs.set("include_volume", "true");
+  const qs = new URLSearchParams({
+    series_ticker: ticker,
+    // Volume column selection drives this; Kalshi defaults to false when omitted,
+    // but we always send the flag so the request matches the UI checkbox.
+    include_volume: opts.includeVolume ? "true" : "false",
+  });
 
   const res = await fetch(`/api/integrations/kalshi-live/series?${qs.toString()}`, {
     credentials: "same-origin",
@@ -37,7 +41,9 @@ export async function fetchKalshiLiveSeries(opts) {
  * @param {{ seriesTicker: string; includeVolume?: boolean }} opts
  */
 export function summarizeKalshiLiveSeriesRequest(opts) {
-  const parts = [`GET /series/${opts.seriesTicker}`];
-  if (opts.includeVolume) parts.push("include_volume=true");
+  const parts = [
+    `GET /series/${opts.seriesTicker}`,
+    `include_volume=${opts.includeVolume ? "true" : "false"}`,
+  ];
   return parts.join(" · ");
 }
