@@ -52,15 +52,10 @@ export function KalshiLiveSeriesTickersField({ value, onChange, className, disab
           : "Search for series only (markets are hidden). You can pull multiple series at once — choose one sheet or a sheet per series below."}
       </p>
 
-      <div className="flex items-center justify-between gap-3 rounded-lg border border-border/50 bg-muted/10 px-3 py-2">
-        <div className="min-w-0 space-y-0.5">
-          <Label htmlFor="series-discovery-mode" className="text-[11px] font-medium text-foreground">
-            Toggle discovery mode
-          </Label>
-          <p className="text-[10px] leading-snug text-muted-foreground">
-            Switch from semantic series search to structured category / tag discovery.
-          </p>
-        </div>
+      <div className="flex items-center gap-2">
+        <Label htmlFor="series-discovery-mode" className="text-[11px] font-medium text-foreground">
+          Toggle discovery mode
+        </Label>
         <Switch
           id="series-discovery-mode"
           checked={!!connectKalshiLiveSeriesDiscoveryMode}
