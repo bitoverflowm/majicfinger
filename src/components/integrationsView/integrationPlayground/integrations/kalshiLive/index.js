@@ -240,6 +240,11 @@ export default function KalshiLive({ setConnectedData, connectHomePullBridge = f
 
       if (useSeparateSheets && setDataSheets) {
         let firstSheetId = sheetId || ctx?.activeSheetId || null;
+        const totalRows = byTicker.reduce(
+          (sum, g) => sum + (Array.isArray(g.rows) ? g.rows.length : 0),
+          0,
+        );
+
         flushSync(() => {
           setDataSheets((prev) => {
             let next = { ...(prev || {}) };
@@ -284,14 +289,26 @@ export default function KalshiLive({ setConnectedData, connectHomePullBridge = f
               });
             }
 
-            if (writtenIds[0]) {
-              firstSheetId = writtenIds[0];
-            }
+            firstSheetId = writtenIds[0] || firstSheetId;
             return next;
           });
+
+          // Do NOT call applyConnectHomePullData with the combined rows — that
+          // would overwrite sheet 1 with every series after we already wrote
+          // one series per sheet.
+          if (firstSheetId && ctx?.setActiveSheetId) {
+            ctx.setActiveSheetId(firstSheetId);
+          }
+          const firstRows = Array.isArray(byTicker[0]?.rows) ? byTicker[0].rows : [];
+          if (setRows) setRows(firstRows);
+          ctx?.setConnectHomeAnalyzeActive?.(true);
         });
-        applyConnectHomePullData(ctx, accumulated);
-        return accumulated.length;
+
+        if (ctx?.requestConnectAnalyzeScroll) {
+          ctx.requestConnectAnalyzeScroll();
+        }
+
+        return totalRows;
       }
 
       const requestCard = {
