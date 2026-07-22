@@ -38,6 +38,13 @@ import {
   validateKalshiLiveTradesPull,
 } from "@/lib/kalshiLive/tradeCompose";
 import { validateKalshiLiveOrderbookPull } from "@/lib/kalshiLive/orderbookCompose";
+import {
+  KALSHI_LIVE_SERIES_SHEET_MODE_COMBINED,
+  KALSHI_LIVE_SERIES_SHEET_MODE_PER_SERIES,
+  normalizeKalshiLiveSeriesSheetMode,
+  parseKalshiLiveSeriesTickersInput,
+  validateKalshiLiveSeriesPull,
+} from "@/lib/kalshiLive/seriesCompose";
 import { KALSHI_LIVE_CANDLESTICK_PERIOD_OPTIONS } from "@/lib/kalshiLive/candlesticksColumns";
 import {
   getKalshiLiveAllColumnNames,
@@ -45,6 +52,7 @@ import {
   validateKalshiLiveWhereFilters,
 } from "@/lib/kalshiLive/kalshiLiveCompose";
 import { KALSHI_LIVE_MARKET_STATUS_OPTIONS } from "@/lib/kalshiLive/marketsColumns";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { useDemoProGate } from "@/hooks/useDemoProGate";
 import { cn } from "@/lib/utils";
 
@@ -150,6 +158,10 @@ export function KalshiLiveComposeOperationPanel({
     connectKalshiLiveTradesTickerMeta = {},
     connectKalshiLiveOrderbookTicker = "",
     connectKalshiLiveOrderbookTickerMeta = {},
+    connectKalshiLiveSeriesTicker = "",
+    connectKalshiLiveSeriesTickerMeta = {},
+    connectKalshiLiveSeriesSheetMode = KALSHI_LIVE_SERIES_SHEET_MODE_PER_SERIES,
+    setConnectKalshiLiveSeriesSheetMode,
   } = ctx;
 
   const candlestickAutoSheets = useMemo(() => {
@@ -195,7 +207,30 @@ export function KalshiLiveComposeOperationPanel({
     }));
   }, [endpointId, connectKalshiLiveOrderbookTicker, connectKalshiLiveOrderbookTickerMeta]);
 
-  const autoNamedSheets = candlestickAutoSheets || tradesAutoSheets || orderbookAutoSheets;
+  const seriesSheetMode = normalizeKalshiLiveSeriesSheetMode(connectKalshiLiveSeriesSheetMode);
+  const seriesTickerList = useMemo(
+    () =>
+      endpointId === "series" ? parseKalshiLiveSeriesTickersInput(connectKalshiLiveSeriesTicker) : [],
+    [endpointId, connectKalshiLiveSeriesTicker],
+  );
+
+  const seriesAutoSheets = useMemo(() => {
+    if (endpointId !== "series") return null;
+    if (seriesSheetMode !== KALSHI_LIVE_SERIES_SHEET_MODE_PER_SERIES) return null;
+    if (seriesTickerList.length < 2) return null;
+    return seriesTickerList.map((ticker) => ({
+      name: ticker,
+      title: connectKalshiLiveSeriesTickerMeta?.[ticker] || ticker,
+    }));
+  }, [
+    endpointId,
+    seriesSheetMode,
+    seriesTickerList,
+    connectKalshiLiveSeriesTickerMeta,
+  ]);
+
+  const autoNamedSheets =
+    candlestickAutoSheets || tradesAutoSheets || orderbookAutoSheets || seriesAutoSheets;
 
   const allColumns = useMemo(() => getKalshiLiveAllColumnNames(endpointId), [endpointId]);
 
@@ -329,6 +364,14 @@ export function KalshiLiveComposeOperationPanel({
       }
     }
 
+    if (endpointId === "series") {
+      const seriesErr = validateKalshiLiveSeriesPull(connectKalshiLiveSeriesTicker);
+      if (seriesErr) {
+        setFilterError?.(seriesErr);
+        return;
+      }
+    }
+
     setFilterError?.(null);
     flushSync(() => {
       onRunPull?.();
@@ -344,6 +387,7 @@ export function KalshiLiveComposeOperationPanel({
     connectKalshiLiveOrderbookTicker,
     setFilterError,
     onRunPull,
+    connectKalshiLiveSeriesTicker,
   ]);
 
   const rowLimitMax =
@@ -527,7 +571,7 @@ export function KalshiLiveComposeOperationPanel({
                 : endpointId === "orderbook"
                   ? "Optional depth (0–100) is sent to Kalshi. Other columns filter on our side after the pull."
                   : endpointId === "series"
-                    ? "Add ticker equals your series ticker. That value is sent to Kalshi as the path param."
+                    ? "Series tickers are set in the search above. Optional Where filters run on our side after the pull."
                     : "status and time bounds use Kalshi API params when possible. Other columns filter on our side after the pull."}
           </p>
         </div>
@@ -682,6 +726,43 @@ export function KalshiLiveComposeOperationPanel({
         </p>
       ) : null}
 
+      {endpointId === "series" && seriesTickerList.length >= 2 ? (
+        <div className="space-y-1.5">
+          <Label className="text-[11px] font-medium text-muted-foreground">
+            How should we organize sheets?
+          </Label>
+          <ToggleGroup
+            type="single"
+            variant="outline"
+            size="sm"
+            value={seriesSheetMode}
+            onValueChange={(value) => {
+              if (!value) return;
+              setConnectKalshiLiveSeriesSheetMode?.(normalizeKalshiLiveSeriesSheetMode(value));
+            }}
+            className="h-8 flex-wrap justify-start"
+            aria-label="Series sheet organization"
+          >
+            <ToggleGroupItem
+              value={KALSHI_LIVE_SERIES_SHEET_MODE_COMBINED}
+              className="h-8 px-2.5 text-[11px]"
+            >
+              All series in one sheet
+            </ToggleGroupItem>
+            <ToggleGroupItem
+              value={KALSHI_LIVE_SERIES_SHEET_MODE_PER_SERIES}
+              className="h-8 px-2.5 text-[11px]"
+            >
+              Separate sheet per series
+            </ToggleGroupItem>
+          </ToggleGroup>
+          <p className="text-[10px] leading-snug text-muted-foreground">
+            Series pulls return metadata (one row per series). Separate sheets keep each ticker
+            isolated; one sheet is better for side-by-side comparison.
+          </p>
+        </div>
+      ) : null}
+
       <motion.div
         initial={{ opacity: 0, y: 4 }}
         animate={{ opacity: 1, y: 0 }}
@@ -699,7 +780,9 @@ export function KalshiLiveComposeOperationPanel({
                 ? "For convenience each market's trades will be filled into a separate sheet. Each sheet is named by the ticker; you can change this later."
                 : orderbookAutoSheets
                   ? "For convenience each market's orderbook will be filled into a separate sheet. Each sheet is named by the ticker; you can change this later."
-                  : undefined
+                  : seriesAutoSheets
+                    ? "For convenience each series will be filled into a separate sheet. Each sheet is named by the series ticker; you can change this later."
+                    : undefined
           }
         />
         <Button

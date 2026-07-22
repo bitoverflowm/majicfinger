@@ -33,6 +33,7 @@ import {
   normalizeSeriesMarketsForPicker,
   parseMarketTickerList,
   resolveMarketTickers,
+  resolveSeriesTickers,
   serializeMarketTickerSelections,
 } from "@/lib/kalshiLive/marketTickerSearch";
 import { cn } from "@/lib/utils";
@@ -336,6 +337,7 @@ function SelectionChipsRow({ selections, busy, onRemove }) {
  *   dataSource?: KalshiTickerSearchDataSource;
  *   historyEntity?: "trades" | "candlesticks" | "data";
  *   showCutoffNotes?: boolean;
+ *   searchScope?: "markets" | "series";
  * }} props
  */
 export function MarketTickerSearch({
@@ -350,7 +352,10 @@ export function MarketTickerSearch({
   // Snapshot-style pulls (e.g. orderbook) have no historical range, so the
   // cutoff notes are irrelevant and can be turned off by the wrapper.
   showCutoffNotes = true,
+  // "series" = series suggestions only (no markets, selecting a series adds that series ticker).
+  searchScope = "markets",
 }) {
+  const seriesOnly = searchScope === "series";
   const debounceRef = useRef(null);
   const suggestAbortRef = useRef(/** @type {AbortController | null} */ (null));
   const resolveAbortRef = useRef(/** @type {AbortController | null} */ (null));
@@ -452,14 +457,16 @@ export function MarketTickerSearch({
       setResolveLoading(true);
       setError(null);
       try {
-        const { found, missing } = await resolveMarketTickers(tokens, { signal: ac.signal });
+        const { found, missing } = seriesOnly
+          ? await resolveSeriesTickers(tokens, { signal: ac.signal })
+          : await resolveMarketTickers(tokens, { signal: ac.signal });
         if (ac.signal.aborted) return;
         if (found.length) addSelections(found);
         if (missing.length) {
           setMissingTickers((prev) => [...new Set([...prev, ...missing])]);
           setError(
             missing.length === 1
-              ? `Market ticker not found: ${missing[0]}`
+              ? `${seriesOnly ? "Series" : "Market"} ticker not found: ${missing[0]}`
               : `${missing.length} tickers were not found`,
           );
         }
@@ -470,7 +477,7 @@ export function MarketTickerSearch({
         if (!ac.signal.aborted) setResolveLoading(false);
       }
     },
-    [addSelections],
+    [addSelections, seriesOnly],
   );
 
   const fetchSuggestions = useCallback(async (segment) => {
@@ -496,39 +503,70 @@ export function MarketTickerSearch({
 
       const tasks = [];
 
-      // Market search (reliable for exact tickers + short queries)
-      tasks.push(
-        fetch(
-          `/api/integrations/kalshi-live/search/suggestions?${new URLSearchParams({
-            q: trimmed,
-            mode: "market_search",
-          })}`,
-          {
-            headers: { Accept: "application/json" },
-            credentials: "same-origin",
-            signal: ac.signal,
-          },
-        ).then(async (res) => {
-          const data = await res.json().catch(() => ({}));
-          if (!res.ok || ac.signal.aborted) return;
-          const list = Array.isArray(data?.suggestions) ? data.suggestions : [];
-          for (const s of list) {
-            const ticker = String(s?.ticker || "").trim().toUpperCase();
-            if (!ticker) continue;
-            marketHits.push({
-              kind: "market",
-              ticker,
-              title: String(s?.title || ticker).trim() || ticker,
-              subtitle: String(s?.subtitle || "").trim() || undefined,
-              status: String(s?.status || "").trim() || undefined,
-              openTime: String(s?.openTime || "").trim() || undefined,
-              closeTime: String(s?.closeTime || "").trim() || undefined,
-            });
-          }
-        }),
-      );
+      if (seriesOnly) {
+        // Series text / category / tags search (no markets).
+        tasks.push(
+          fetch(
+            `/api/integrations/kalshi-live/search/series-suggestions?${new URLSearchParams({
+              q: trimmed,
+            })}`,
+            {
+              headers: { Accept: "application/json" },
+              credentials: "same-origin",
+              signal: ac.signal,
+            },
+          ).then(async (res) => {
+            const data = await res.json().catch(() => ({}));
+            if (!res.ok || ac.signal.aborted) return;
+            const list = Array.isArray(data?.suggestions) ? data.suggestions : [];
+            for (const s of list) {
+              const ticker = String(s?.ticker || "").trim().toUpperCase();
+              if (!ticker) continue;
+              seriesHits.push({
+                kind: "series",
+                ticker,
+                title: String(s?.title || ticker).trim() || ticker,
+                subtitle: String(s?.subtitle || "").trim() || undefined,
+                markets: [],
+              });
+            }
+          }),
+        );
+      } else {
+        // Market search (reliable for exact tickers + short queries)
+        tasks.push(
+          fetch(
+            `/api/integrations/kalshi-live/search/suggestions?${new URLSearchParams({
+              q: trimmed,
+              mode: "market_search",
+            })}`,
+            {
+              headers: { Accept: "application/json" },
+              credentials: "same-origin",
+              signal: ac.signal,
+            },
+          ).then(async (res) => {
+            const data = await res.json().catch(() => ({}));
+            if (!res.ok || ac.signal.aborted) return;
+            const list = Array.isArray(data?.suggestions) ? data.suggestions : [];
+            for (const s of list) {
+              const ticker = String(s?.ticker || "").trim().toUpperCase();
+              if (!ticker) continue;
+              marketHits.push({
+                kind: "market",
+                ticker,
+                title: String(s?.title || ticker).trim() || ticker,
+                subtitle: String(s?.subtitle || "").trim() || undefined,
+                status: String(s?.status || "").trim() || undefined,
+                openTime: String(s?.openTime || "").trim() || undefined,
+                closeTime: String(s?.closeTime || "").trim() || undefined,
+              });
+            }
+          }),
+        );
+      }
 
-      // Semantic / embedding search for natural language
+      // Semantic / embedding search for natural language (series hits).
       if (isKalshiEmbeddingSearchEligible(trimmed)) {
         tasks.push(
           fetch(
@@ -547,14 +585,25 @@ export function MarketTickerSearch({
             for (const s of list) {
               const ticker = String(s?.ticker || "").trim().toUpperCase();
               if (!ticker) continue;
-              const markets = normalizeSeriesMarketsForPicker(s?.markets);
-              seriesHits.push({
-                kind: "series",
-                ticker,
-                title: String(s?.title || s?.ticker || "Series").trim(),
-                subtitle: String(s?.subtitle || "").trim() || undefined,
-                markets,
-              });
+              if (seriesOnly) {
+                // Select the series itself — do not expand nested markets.
+                seriesHits.push({
+                  kind: "series",
+                  ticker,
+                  title: String(s?.title || s?.ticker || "Series").trim(),
+                  subtitle: String(s?.subtitle || "").trim() || undefined,
+                  markets: [],
+                });
+              } else {
+                const markets = normalizeSeriesMarketsForPicker(s?.markets);
+                seriesHits.push({
+                  kind: "series",
+                  ticker,
+                  title: String(s?.title || s?.ticker || "Series").trim(),
+                  subtitle: String(s?.subtitle || "").trim() || undefined,
+                  markets,
+                });
+              }
             }
           }),
         );
@@ -564,12 +613,17 @@ export function MarketTickerSearch({
       if (mySeq !== suggestSeqRef.current || ac.signal.aborted) return;
 
       /** @type {TickerSearchSuggestion[]} */
-      const next = [...seriesHits, ...marketHits];
+      const next = seriesOnly ? [...seriesHits] : [...seriesHits, ...marketHits];
 
       // Exact ticker match first; for natural language prefer series (semantic)
       // over the live market text scan, which is a weaker heuristic.
       const upper = trimmed.toUpperCase();
       next.sort((a, b) => {
+        if (seriesOnly) {
+          const aExact = a.ticker === upper ? 0 : 1;
+          const bExact = b.ticker === upper ? 0 : 1;
+          return aExact - bExact;
+        }
         const aExact = a.kind === "market" && a.ticker === upper ? 0 : 1;
         const bExact = b.kind === "market" && b.ticker === upper ? 0 : 1;
         if (aExact !== bExact) return aExact - bExact;
@@ -580,13 +634,17 @@ export function MarketTickerSearch({
         return 0;
       });
 
-      // Dedupe markets by ticker; keep series separately
+      // Dedupe by ticker within each kind
       const seenMarkets = new Set();
+      const seenSeries = new Set();
       const deduped = [];
       for (const s of next) {
         if (s.kind === "market") {
           if (seenMarkets.has(s.ticker)) continue;
           seenMarkets.add(s.ticker);
+        } else {
+          if (seenSeries.has(s.ticker)) continue;
+          seenSeries.add(s.ticker);
         }
         deduped.push(s);
       }
@@ -601,7 +659,7 @@ export function MarketTickerSearch({
     } finally {
       if (mySeq === suggestSeqRef.current) setSuggestLoading(false);
     }
-  }, []);
+  }, [seriesOnly]);
 
   useEffect(() => {
     if (debounceRef.current) clearTimeout(debounceRef.current);
@@ -622,11 +680,15 @@ export function MarketTickerSearch({
       return;
     }
     if (!isTickerLikeSegment(segment)) {
-      setError("Enter a market ticker, or pick a suggestion from the list.");
+      setError(
+        seriesOnly
+          ? "Enter a series ticker, or pick a suggestion from the list."
+          : "Enter a market ticker, or pick a suggestion from the list.",
+      );
       return;
     }
     await resolveAndAddTickers([segment]);
-  }, [draft, resolveAndAddTickers]);
+  }, [draft, resolveAndAddTickers, seriesOnly]);
 
   const handlePaste = useCallback(
     (e) => {
@@ -682,7 +744,11 @@ export function MarketTickerSearch({
             type="text"
             value={draft}
             disabled={busy || atCap}
-            placeholder="Add one or more tickers here, e.g. KXHIGHNY-25JAN01-T77; multiple tickers separated by commas: TICKER1, TICKER2"
+            placeholder={
+              seriesOnly
+                ? "Add one or more series tickers here, e.g. KXHIGHNY; multiple tickers separated by commas: SERIES1, SERIES2"
+                : "Add one or more tickers here, e.g. KXHIGHNY-25JAN01-T77; multiple tickers separated by commas: TICKER1, TICKER2"
+            }
             onChange={(e) => {
               setDraft(e.target.value);
               setError(null);
@@ -696,8 +762,14 @@ export function MarketTickerSearch({
                 e.preventDefault();
                 const first = suggestions[0];
                 if (suggestOpen && first) {
-                  if (first.kind === "market") {
-                    addSelections([first]);
+                  if (first.kind === "market" || seriesOnly) {
+                    addSelections([
+                      {
+                        ticker: first.ticker,
+                        title: first.title,
+                        subtitle: first.subtitle,
+                      },
+                    ]);
                   } else {
                     openSeriesModal(first);
                   }
@@ -727,7 +799,7 @@ export function MarketTickerSearch({
               "flex h-9 w-full rounded-md border border-input bg-background py-2 pl-9 pr-3 text-xs text-foreground shadow-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
               (busy || atCap) && "opacity-70",
             )}
-            aria-label="Market ticker search"
+            aria-label={seriesOnly ? "Series ticker search" : "Market ticker search"}
           />
 
           <AnimatePresence>
@@ -759,8 +831,17 @@ export function MarketTickerSearch({
                         className="flex w-full items-start gap-3 px-3 py-2 text-left text-sm transition-colors hover:bg-slate-100 dark:hover:bg-slate-800 disabled:opacity-50"
                         onMouseDown={(e) => e.preventDefault()}
                         onClick={() => {
-                          if (s.kind === "market") addSelections([s]);
-                          else openSeriesModal(s);
+                          if (s.kind === "market" || seriesOnly) {
+                            addSelections([
+                              {
+                                ticker: s.ticker,
+                                title: s.title,
+                                subtitle: s.subtitle,
+                              },
+                            ]);
+                          } else {
+                            openSeriesModal(s);
+                          }
                         }}
                       >
                         <span className="min-w-0 flex-1 space-y-0.5">
@@ -784,7 +865,7 @@ export function MarketTickerSearch({
                               {s.kind === "market" ? "Market" : "Series"}
                             </span>
                             {s.ticker ? ` · ${s.ticker}` : ""}
-                            {s.kind === "series" && marketCount
+                            {s.kind === "series" && !seriesOnly && marketCount
                               ? ` · ${marketCount} markets`
                               : ""}
                           </span>

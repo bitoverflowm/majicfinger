@@ -111,14 +111,12 @@ export function validateKalshiLiveWhereFilters(endpointId, whereFilters) {
   const list = Array.isArray(whereFilters) ? whereFilters : [];
 
   if (endpointId === "series") {
-    const ticker = list.find((f) => f.column === "ticker" && String(f.value ?? "").trim());
-    if (!ticker) return "Add a Where filter: ticker equals your series ticker.";
+    // Series tickers come from the series search field, not Where.
     return null;
   }
 
   if (endpointId === "markets") {
     const apiFilters = marketApiFiltersFromWhere(list);
-    const tickers = marketTickersFromWhere(list);
     return validateKalshiLiveMarketFilters(apiFilters);
   }
 

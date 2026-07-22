@@ -32,6 +32,7 @@ import { KalshiLiveCandlestickHistoricalCutoffNote, KalshiLiveTradesHistoricalCu
 import { KalshiLiveTradesTickerField } from "@/components/connectData/kalshiLive/KalshiLiveTradesTickerField";
 import { KalshiLiveOrderbookTickerField } from "@/components/connectData/kalshiLive/KalshiLiveOrderbookTickerField";
 import { KalshiLiveOrderbookCommonQueries } from "@/components/connectData/kalshiLive/KalshiLiveOrderbookCommonQueries";
+import { KalshiLiveSeriesTickersField } from "@/components/connectData/kalshiLive/KalshiLiveSeriesTickersField";
 import { KalshiLiveComposeOperationPanel } from "@/components/connectData/kalshiLive/KalshiLiveComposeOperationPanel";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
@@ -365,6 +366,10 @@ export function KalshiLiveIntegrationsCore({ onRunPull, className }) {
     connectKalshiLiveOrderbookTicker = "",
     setConnectKalshiLiveOrderbookTicker,
     setConnectKalshiLiveOrderbookTickerMeta,
+    connectKalshiLiveSeriesTicker = "",
+    setConnectKalshiLiveSeriesTicker,
+    setConnectKalshiLiveSeriesTickerMeta,
+    setConnectKalshiLiveSeriesSheetMode,
     setConnectActiveComposeOps,
     kalshiLivePingState = "idle",
     pingKalshiLiveExchange,
@@ -471,6 +476,11 @@ export function KalshiLiveIntegrationsCore({ onRunPull, className }) {
         setConnectKalshiLiveOrderbookTicker?.("");
         setConnectKalshiLiveOrderbookTickerMeta?.({});
       }
+      if (id !== "series") {
+        setConnectKalshiLiveSeriesTicker?.("");
+        setConnectKalshiLiveSeriesTickerMeta?.({});
+        setConnectKalshiLiveSeriesSheetMode?.("per_series");
+      }
       if (id === "trades") {
         setConnectKalshiLiveLimit?.(KALSHI_LIVE_TRADES_DEFAULT_LIMIT);
       }
@@ -490,6 +500,9 @@ export function KalshiLiveIntegrationsCore({ onRunPull, className }) {
       setConnectKalshiLiveTradesTickerMeta,
       setConnectKalshiLiveOrderbookTicker,
       setConnectKalshiLiveOrderbookTickerMeta,
+      setConnectKalshiLiveSeriesTicker,
+      setConnectKalshiLiveSeriesTickerMeta,
+      setConnectKalshiLiveSeriesSheetMode,
       kalshiLivePingState,
       pingKalshiLiveExchange,
     ],
@@ -506,6 +519,9 @@ export function KalshiLiveIntegrationsCore({ onRunPull, className }) {
     setConnectKalshiLiveTradesTickerMeta?.({});
     setConnectKalshiLiveOrderbookTicker?.("");
     setConnectKalshiLiveOrderbookTickerMeta?.({});
+    setConnectKalshiLiveSeriesTicker?.("");
+    setConnectKalshiLiveSeriesTickerMeta?.({});
+    setConnectKalshiLiveSeriesSheetMode?.("per_series");
     setSearchExpanded(false);
     setFilterError(null);
   }, [
@@ -519,6 +535,9 @@ export function KalshiLiveIntegrationsCore({ onRunPull, className }) {
     setConnectKalshiLiveTradesTickerMeta,
     setConnectKalshiLiveOrderbookTicker,
     setConnectKalshiLiveOrderbookTickerMeta,
+    setConnectKalshiLiveSeriesTicker,
+    setConnectKalshiLiveSeriesTickerMeta,
+    setConnectKalshiLiveSeriesSheetMode,
   ]);
 
   useEffect(() => {
@@ -885,6 +904,14 @@ export function KalshiLiveIntegrationsCore({ onRunPull, className }) {
                 />
                 <KalshiLiveOrderbookCommonQueries className="mt-4" disabled={pullLoading} />
               </>
+            ) : null}
+            {selectedId === "series" ? (
+              <KalshiLiveSeriesTickersField
+                className="mt-4"
+                value={connectKalshiLiveSeriesTicker}
+                onChange={(v) => setConnectKalshiLiveSeriesTicker?.(v)}
+                disabled={pullLoading}
+              />
             ) : null}
             <ColumnPicker
               key={selectedId}

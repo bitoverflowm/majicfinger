@@ -6,10 +6,12 @@ import { flushSync } from "react-dom";
 import { useMyStateV2 } from "@/context/stateContextV2";
 import { applyAthenaPullToSheetPatch } from "@/lib/dataLake/applyAthenaPullToSheet";
 import { fetchAllKalshiLiveMarketsPages } from "@/lib/kalshiLive/fetchKalshiLiveMarkets";
+import { fetchKalshiLiveSeriesPull } from "@/lib/kalshiLive/fetchKalshiLiveSeriesPull";
 import {
-  fetchKalshiLiveSeries,
-  summarizeKalshiLiveSeriesRequest,
-} from "@/lib/kalshiLive/fetchKalshiLiveSeries";
+  KALSHI_LIVE_SERIES_SHEET_MODE_COMBINED,
+  normalizeKalshiLiveSeriesSheetMode,
+  summarizeKalshiLiveSeriesPullRequest,
+} from "@/lib/kalshiLive/seriesCompose";
 import { ingestKalshiLiveAsView } from "@/lib/kalshiLive/ingestKalshiLiveAsView";
 import { fetchKalshiLiveCandlesticksPull } from "@/lib/kalshiLive/fetchKalshiLiveCandlesticksPull";
 import { fetchKalshiLiveTradesPull } from "@/lib/kalshiLive/fetchKalshiLiveTradesPull";
@@ -21,7 +23,6 @@ import {
   summarizeKalshiLiveComposeRequest,
 } from "@/lib/kalshiLive/kalshiLiveCompose";
 import { projectKalshiLiveMarketRows } from "@/lib/kalshiLive/normalizeMarketRow";
-import { kalshiLiveSeriesWantsIncludeVolume } from "@/lib/kalshiLive/seriesColumns";
 import { applyConnectHomePullData } from "@/lib/connectHomePullDestination";
 import { trackDataPullComplete, trackDataPullError, trackDataPullStart } from "@/lib/analytics/trackDataPull";
 
@@ -69,6 +70,8 @@ export default function KalshiLive({ setConnectedData, connectHomePullBridge = f
     connectKalshiLiveCandlestickTickers,
     connectKalshiLiveTradesTicker,
     connectKalshiLiveOrderbookTicker,
+    connectKalshiLiveSeriesTicker,
+    connectKalshiLiveSeriesSheetMode,
     setConnectDataLakePullState,
     setDataSheets,
     activeSheetId,
@@ -183,35 +186,113 @@ export default function KalshiLive({ setConnectedData, connectHomePullBridge = f
 
   const runSeriesPull = useCallback(
     async (ac, sheetId, cols) => {
-      const whereFilters = Array.isArray(connectKalshiLiveWhereFilters)
-        ? connectKalshiLiveWhereFilters
-        : [];
-      const { seriesTicker } = partitionKalshiLiveCompose("series", whereFilters);
-      const includeVolume = kalshiLiveSeriesWantsIncludeVolume(cols);
-      const querySummary = summarizeKalshiLiveComposeRequest("series", whereFilters, [], {
-        limit: 1,
-      });
+      const seriesTickers = String(connectKalshiLiveSeriesTicker || "").trim();
+      const sheetMode = normalizeKalshiLiveSeriesSheetMode(connectKalshiLiveSeriesSheetMode);
       const requestStartMs =
         typeof performance !== "undefined" && performance?.now ? performance.now() : Date.now();
 
-      const series = await fetchKalshiLiveSeries({
-        seriesTicker,
-        includeVolume,
-        signal: ac.signal,
-      });
+      setConnectDataLakePullState?.((prev) => ({
+        ...prev,
+        loading: true,
+        label: "Fetching Kalshi Live series…",
+        progress: 8,
+        error: null,
+      }));
 
-      const { rows: accumulated } = await ingestKalshiLiveAsView({
-        endpointId: "series",
-        series,
+      const {
+        byTicker,
+        raw,
+        rows: accumulated,
+        querySummary,
+        includeVolume,
+      } = await fetchKalshiLiveSeriesPull({
+        seriesTickers,
         selectedColumns: cols,
+        sheetMode,
+        signal: ac.signal,
+        onTickerProgress: ({ ticker, index, total }) => {
+          const pct = Math.min(90, 8 + Math.round(((index + 1) / Math.max(1, total)) * 80));
+          setConnectDataLakePullState?.((prev) => ({
+            ...prev,
+            loading: true,
+            label: `Fetching ${ticker} (${index + 1}/${total})…`,
+            progress: pct,
+            error: null,
+          }));
+        },
       });
 
       if (setRows) setRows(accumulated);
+
+      await ingestKalshiLiveAsView({
+        endpointId: "series",
+        series: raw,
+        selectedColumns: cols,
+      });
 
       const elapsedMs =
         (typeof performance !== "undefined" && performance?.now
           ? performance.now()
           : Date.now()) - requestStartMs;
+
+      const useSeparateSheets =
+        sheetMode !== KALSHI_LIVE_SERIES_SHEET_MODE_COMBINED && byTicker.length > 1;
+
+      if (useSeparateSheets && setDataSheets) {
+        let firstSheetId = sheetId || ctx?.activeSheetId || null;
+        flushSync(() => {
+          setDataSheets((prev) => {
+            let next = { ...(prev || {}) };
+            /** @type {string[]} */
+            const writtenIds = [];
+
+            for (let i = 0; i < byTicker.length; i++) {
+              const group = byTicker[i];
+              const tickerName = String(group.ticker || `series-${i + 1}`).trim().slice(0, 80);
+              const rows = Array.isArray(group.rows) ? group.rows : [];
+
+              let targetSheetId;
+              if (i === 0 && firstSheetId) {
+                targetSheetId = firstSheetId;
+              } else {
+                targetSheetId = allocateNextSheetId(next);
+              }
+              writtenIds.push(targetSheetId);
+
+              const requestCard = {
+                id: genRequestCardId(),
+                createdAt: Date.now(),
+                elapsedMs,
+                lake: "kalshi-live",
+                table: "series",
+                sheetId: targetSheetId,
+                querySummary,
+                loadedRowCount: rows.length,
+              };
+
+              next = applyAthenaPullToSheetPatch(next, targetSheetId, rows, {
+                name: tickerName,
+                provenance: {
+                  source: "kalshi-live",
+                  endpoint: "series",
+                  seriesTicker: tickerName,
+                  includeVolume,
+                  sheetMode,
+                  querySummary,
+                },
+                requestCards: [requestCard],
+              });
+            }
+
+            if (writtenIds[0]) {
+              firstSheetId = writtenIds[0];
+            }
+            return next;
+          });
+        });
+        applyConnectHomePullData(ctx, accumulated);
+        return accumulated.length;
+      }
 
       const requestCard = {
         id: genRequestCardId(),
@@ -230,8 +311,9 @@ export default function KalshiLive({ setConnectedData, connectHomePullBridge = f
             provenance: {
               source: "kalshi-live",
               endpoint: "series",
-              seriesTicker,
+              seriesTickers,
               includeVolume,
+              sheetMode,
               querySummary,
             },
             requestCards: [requestCard],
@@ -242,7 +324,14 @@ export default function KalshiLive({ setConnectedData, connectHomePullBridge = f
       applyConnectHomePullData(ctx, accumulated);
       return accumulated.length;
     },
-    [connectKalshiLiveWhereFilters, setConnectDataLakePullState, setDataSheets, setRows, ctx],
+    [
+      connectKalshiLiveSeriesTicker,
+      connectKalshiLiveSeriesSheetMode,
+      setConnectDataLakePullState,
+      setDataSheets,
+      setRows,
+      ctx,
+    ],
   );
 
   const runCandlesticksPull = useCallback(
@@ -718,7 +807,9 @@ export default function KalshiLive({ setConnectedData, connectHomePullBridge = f
       endpoint: endpointId,
       querySummary:
         endpointId === "series"
-          ? summarizeKalshiLiveComposeRequest("series", connectKalshiLiveWhereFilters || [], [], { limit: 1 })
+          ? summarizeKalshiLiveSeriesPullRequest(connectKalshiLiveSeriesTicker || "", {
+              sheetMode: normalizeKalshiLiveSeriesSheetMode(connectKalshiLiveSeriesSheetMode),
+            })
           : endpointId === "markets"
             ? summarizeKalshiLiveComposeRequest(
                 "markets",

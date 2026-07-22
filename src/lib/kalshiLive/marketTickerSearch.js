@@ -139,6 +139,59 @@ export async function resolveMarketTickers(tickers, opts = {}) {
 }
 
 /**
+ * Resolve series tickers via GET /series/{ticker} (one request each).
+ * @param {string[]} tickers
+ * @param {{ signal?: AbortSignal }} [opts]
+ * @returns {Promise<{ found: MarketTickerSelection[]; missing: string[] }>}
+ */
+export async function resolveSeriesTickers(tickers, opts = {}) {
+  const unique = [
+    ...new Set((tickers || []).map((t) => String(t).trim().toUpperCase()).filter(Boolean)),
+  ];
+  if (!unique.length) return { found: [], missing: [] };
+
+  const invalid = unique.filter((t) => !isValidMarketTickerToken(t));
+  const valid = unique.filter((t) => isValidMarketTickerToken(t));
+  /** @type {MarketTickerSelection[]} */
+  const found = [];
+  /** @type {string[]} */
+  const missing = [...invalid];
+
+  for (const ticker of valid) {
+    if (opts.signal?.aborted) break;
+    try {
+      const params = new URLSearchParams({ series_ticker: ticker });
+      const res = await fetch(`/api/integrations/kalshi-live/series?${params.toString()}`, {
+        headers: { Accept: "application/json" },
+        credentials: "same-origin",
+        signal: opts.signal,
+      });
+      const body = await res.json().catch(() => ({}));
+      const series = body?.series;
+      if (!res.ok || !series || typeof series !== "object") {
+        missing.push(ticker);
+        continue;
+      }
+      const title = String(series.title || series.ticker || ticker).trim() || ticker;
+      const subtitle = [series.category, series.frequency]
+        .map((x) => String(x || "").trim())
+        .filter(Boolean)
+        .join(" · ");
+      found.push({
+        ticker: String(series.ticker || ticker).trim().toUpperCase() || ticker,
+        title,
+        subtitle: subtitle || undefined,
+      });
+    } catch (e) {
+      if (e instanceof DOMException && e.name === "AbortError") throw e;
+      missing.push(ticker);
+    }
+  }
+
+  return { found, missing };
+}
+
+/**
  * Serialize selections to the comma-separated string stored in connect state.
  * @param {MarketTickerSelection[]} selections
  */

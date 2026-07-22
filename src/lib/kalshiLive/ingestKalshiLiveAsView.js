@@ -31,7 +31,7 @@ function viewNameFor(key) {
  * @param {{
  *   endpointId: string;
  *   markets?: unknown[];
- *   series?: Record<string, unknown> | null;
+ *   series?: Record<string, unknown> | Record<string, unknown>[] | null;
  *   candlesticks?: unknown[];
  *   trades?: unknown[];
  *   orderbook?: unknown[];
@@ -60,7 +60,11 @@ export async function ingestKalshiLiveAsView(opts) {
     sheetRows = projectKalshiLiveMarketRows(opts.markets, opts.selectedColumns);
   } else if (endpointId === "series") {
     sheetRows = projectKalshiLiveSeriesRows(
-      opts.series ? [opts.series] : [],
+      Array.isArray(opts.series)
+        ? opts.series
+        : opts.series
+          ? [opts.series]
+          : [],
       opts.selectedColumns,
     );
   } else {
