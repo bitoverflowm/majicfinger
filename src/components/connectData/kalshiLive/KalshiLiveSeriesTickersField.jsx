@@ -5,7 +5,6 @@ import { KalshiLiveSeriesDiscoveryFields } from "@/components/connectData/kalshi
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { useMyStateV2 } from "@/context/stateContextV2";
-import { kalshiLiveSeriesWantsIncludeVolume } from "@/lib/kalshiLive/seriesColumns";
 import { cn } from "@/lib/utils";
 
 /**
@@ -32,12 +31,7 @@ export function KalshiLiveSeriesTickersField({ value, onChange, className, disab
     setConnectKalshiLiveSeriesDiscoveryIncludeProductMetadata,
     connectKalshiLiveSeriesDiscoveryMinUpdatedTs = "",
     setConnectKalshiLiveSeriesDiscoveryMinUpdatedTs,
-    connectKalshiLiveColumnSelections = {},
   } = ctx;
-
-  const includeVolumeFromColumns = kalshiLiveSeriesWantsIncludeVolume(
-    connectKalshiLiveColumnSelections?.series,
-  );
 
   return (
     <div className={cn("space-y-2", className)}>
@@ -82,7 +76,6 @@ export function KalshiLiveSeriesTickersField({ value, onChange, className, disab
                 : Number(connectKalshiLiveSeriesDiscoveryMinUpdatedTs)
             }
             onMinUpdatedTsChange={(v) => setConnectKalshiLiveSeriesDiscoveryMinUpdatedTs?.(v)}
-            includeVolumeFromColumns={includeVolumeFromColumns}
             disabled={disabled}
           />
         ) : (
