@@ -94,16 +94,16 @@ function DiscoveryDateRangeField({
   }, [minTs, maxTs]);
 
   return (
-    <div className={cn("space-y-1.5", disabled && "opacity-60")}>
+    <div className={cn("flex h-full flex-col space-y-1.5", disabled && "opacity-60")}>
       <Label className="text-[11px] font-medium text-foreground">{label}</Label>
-      <p className="text-[10px] leading-snug text-muted-foreground">{description}</p>
+      <p className="min-h-[2.5rem] text-[10px] leading-snug text-muted-foreground">{description}</p>
       <Popover>
         <PopoverTrigger asChild>
           <Button
             type="button"
             variant="outline"
             disabled={disabled}
-            className="h-8 w-full max-w-md justify-start px-2 text-left text-[11px] font-normal"
+            className="mt-auto h-8 w-full justify-start px-2 text-left text-[11px] font-normal"
           >
             <CalendarIcon className="mr-1.5 h-3.5 w-3.5 shrink-0 opacity-70" />
             <span
@@ -143,6 +143,40 @@ function DiscoveryDateRangeField({
           ) : null}
         </PopoverContent>
       </Popover>
+    </div>
+  );
+}
+
+/**
+ * @param {{
+ *   label: string;
+ *   description: string;
+ *   value: number | "";
+ *   onChange: (unix: number | "") => void;
+ *   disabled?: boolean;
+ *   fromDate?: Date | null;
+ * }} props
+ */
+function DiscoverySingleDateField({
+  label,
+  description,
+  value,
+  onChange,
+  disabled = false,
+  fromDate = null,
+}) {
+  return (
+    <div className={cn("flex h-full flex-col space-y-1.5", disabled && "opacity-60")}>
+      <Label className="text-[11px] font-medium text-foreground">{label}</Label>
+      <p className="min-h-[2.5rem] text-[10px] leading-snug text-muted-foreground">{description}</p>
+      <KalshiLiveTimestampPicker
+        value={value}
+        onChange={onChange}
+        disabled={disabled}
+        fromDate={fromDate || undefined}
+        placeholder="Pick a date"
+        className="mt-auto h-8 w-full"
+      />
     </div>
   );
 }
@@ -208,15 +242,18 @@ export function KalshiLiveMarketsDiscoveryFields({ value, onChange, disabled = f
       ) : null}
 
       {/* Status + Multivariate Events */}
-      <div className="flex flex-wrap items-start gap-4">
-        <div className={cn("w-[9.5rem] shrink-0 space-y-1.5", locks.disableStatus && "opacity-60")}>
+      <div className="mt-2 grid grid-cols-1 gap-4 sm:grid-cols-2">
+        <div className={cn("flex flex-col space-y-1.5", locks.disableStatus && "opacity-60")}>
           <Label className="text-[11px] font-medium text-foreground">Status</Label>
+          <p className="min-h-[2.5rem] text-[10px] leading-snug text-muted-foreground">
+            Filter by market status.
+          </p>
           <Select
             value={value.status || "__any__"}
             disabled={disabled || locks.disableStatus}
             onValueChange={(v) => patch({ status: v === "__any__" ? "" : v })}
           >
-            <SelectTrigger className="h-9 w-full text-xs">
+            <SelectTrigger className="mt-auto h-9 w-full text-xs">
               <SelectValue placeholder="Any status" />
             </SelectTrigger>
             <SelectContent>
@@ -232,11 +269,11 @@ export function KalshiLiveMarketsDiscoveryFields({ value, onChange, disabled = f
           </Select>
         </div>
 
-        <div className={cn("min-w-[12rem] flex-1 space-y-1.5", locks.disableMve && "opacity-60")}>
+        <div className={cn("flex flex-col space-y-1.5", locks.disableMve && "opacity-60")}>
           <Label className="text-[11px] font-medium text-foreground">Multivariate Events</Label>
-          <p className="text-[10px] leading-snug text-muted-foreground">
-            Filter by multivariate events (combos). &apos;only&apos; returns only multivariate events,
-            &apos;exclude&apos; excludes multivariate events.
+          <p className="min-h-[2.5rem] text-[10px] leading-snug text-muted-foreground">
+            &apos;only&apos; returns only multivariate events, &apos;exclude&apos; excludes multivariate
+            events.
           </p>
           <Select
             value={normalizeKalshiLiveMveFilter(value.mveFilter)}
@@ -250,7 +287,7 @@ export function KalshiLiveMarketsDiscoveryFields({ value, onChange, disabled = f
               })
             }
           >
-            <SelectTrigger className="h-9 w-full max-w-xs text-xs">
+            <SelectTrigger className="mt-auto h-9 w-full text-xs">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -289,17 +326,16 @@ export function KalshiLiveMarketsDiscoveryFields({ value, onChange, disabled = f
         <p className="text-[10px] leading-snug text-muted-foreground">
           Series ticker to filter by.
         </p>
-        <div className="rounded-lg border border-border/50 bg-background/60 p-2">
-          <MarketTickerSearch
-            value={value.seriesTicker || ""}
-            onChange={(v) => patch({ seriesTicker: v })}
-            disabled={disabled || locks.disableSeriesTicker}
-            dataSource="live"
-            searchScope="series"
-            showCutoffNotes={false}
-            maxTickers={1}
-          />
-        </div>
+        <MarketTickerSearch
+          value={value.seriesTicker || ""}
+          onChange={(v) => patch({ seriesTicker: v })}
+          disabled={disabled || locks.disableSeriesTicker}
+          dataSource="live"
+          searchScope="series"
+          showCutoffNotes={false}
+          maxTickers={1}
+          required={false}
+        />
       </div>
 
       {/* Market tickers */}
@@ -308,61 +344,53 @@ export function KalshiLiveMarketsDiscoveryFields({ value, onChange, disabled = f
         <p className="text-[10px] leading-snug text-muted-foreground">
           Filter by specific market tickers. Comma-separated list of market tickers to retrieve.
         </p>
-        <div className="rounded-lg border border-border/50 bg-background/60 p-2">
-          <MarketTickerSearch
-            value={value.tickers || ""}
-            onChange={(v) => patch({ tickers: v })}
-            disabled={disabled || locks.disableTickers}
-            dataSource="live"
-            showCutoffNotes={false}
-          />
-        </div>
-      </div>
-
-      <DiscoveryDateRangeField
-        label="Created Date"
-        description="Filter markets created within this date range."
-        minTs={value.minCreatedTs ?? ""}
-        maxTs={value.maxCreatedTs ?? ""}
-        onRangeChange={(min, max) => patch({ minCreatedTs: min, maxCreatedTs: max })}
-        disabled={disabled || locks.disableCreated}
-        fromDate={cutoffDate}
-      />
-
-      <div className={cn("space-y-1.5", locks.disableUpdated && "opacity-60")}>
-        <Label className="text-[11px] font-medium text-foreground">Updated After</Label>
-        <p className="text-[10px] leading-snug text-muted-foreground">
-          Return markets with metadata updated later than this Unix timestamp. Tracks non-trading
-          changes only.
-        </p>
-        <KalshiLiveTimestampPicker
-          value={value.minUpdatedTs ?? ""}
-          onChange={setUpdatedAfter}
-          disabled={disabled || locks.disableUpdated}
-          fromDate={cutoffDate || undefined}
-          className="max-w-xs"
+        <MarketTickerSearch
+          value={value.tickers || ""}
+          onChange={(v) => patch({ tickers: v })}
+          disabled={disabled || locks.disableTickers}
+          dataSource="live"
+          showCutoffNotes={false}
+          required={false}
         />
       </div>
 
-      <DiscoveryDateRangeField
-        label="Close Date"
-        description="Filter items that closed within this date range"
-        minTs={value.minCloseTs ?? ""}
-        maxTs={value.maxCloseTs ?? ""}
-        onRangeChange={(min, max) => patch({ minCloseTs: min, maxCloseTs: max })}
-        disabled={disabled || locks.disableClose}
-        fromDate={cutoffDate}
-      />
-
-      <DiscoveryDateRangeField
-        label="Settled Date"
-        description="Filter items that settled within this date range"
-        minTs={value.minSettledTs ?? ""}
-        maxTs={value.maxSettledTs ?? ""}
-        onRangeChange={(min, max) => patch({ minSettledTs: min, maxSettledTs: max })}
-        disabled={disabled || locks.disableSettled}
-        fromDate={cutoffDate}
-      />
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+        <DiscoveryDateRangeField
+          label="Created Date"
+          description="Filter markets created within this date range."
+          minTs={value.minCreatedTs ?? ""}
+          maxTs={value.maxCreatedTs ?? ""}
+          onRangeChange={(min, max) => patch({ minCreatedTs: min, maxCreatedTs: max })}
+          disabled={disabled || locks.disableCreated}
+          fromDate={cutoffDate}
+        />
+        <DiscoverySingleDateField
+          label="Updated After"
+          description="Return markets with metadata updated later than this Unix timestamp. Tracks non-trading changes only."
+          value={value.minUpdatedTs ?? ""}
+          onChange={setUpdatedAfter}
+          disabled={disabled || locks.disableUpdated}
+          fromDate={cutoffDate}
+        />
+        <DiscoveryDateRangeField
+          label="Close Date"
+          description="Filter items that closed within this date range"
+          minTs={value.minCloseTs ?? ""}
+          maxTs={value.maxCloseTs ?? ""}
+          onRangeChange={(min, max) => patch({ minCloseTs: min, maxCloseTs: max })}
+          disabled={disabled || locks.disableClose}
+          fromDate={cutoffDate}
+        />
+        <DiscoveryDateRangeField
+          label="Settled Date"
+          description="Filter items that settled within this date range"
+          minTs={value.minSettledTs ?? ""}
+          maxTs={value.maxSettledTs ?? ""}
+          onRangeChange={(min, max) => patch({ minSettledTs: min, maxSettledTs: max })}
+          disabled={disabled || locks.disableSettled}
+          fromDate={cutoffDate}
+        />
+      </div>
     </div>
   );
 }

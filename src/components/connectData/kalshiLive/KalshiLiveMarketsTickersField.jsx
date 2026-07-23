@@ -113,6 +113,7 @@ export function KalshiLiveMarketsTickersField({ value, onChange, className, disa
         id="markets-discovery-mode"
         checked={!!connectKalshiLiveMarketsDiscoveryMode}
         disabled={disabled}
+        className="h-4 w-7 [&>span]:h-3 [&>span]:w-3 [&>span]:data-[state=checked]:translate-x-3"
         onCheckedChange={(checked) => {
           setConnectKalshiLiveMarketsDiscoveryMode?.(!!checked);
           if (checked) {
@@ -147,7 +148,7 @@ export function KalshiLiveMarketsTickersField({ value, onChange, className, disa
       <div className="space-y-2 rounded-lg bg-muted/10 p-3">
         {connectKalshiLiveMarketsDiscoveryMode ? (
           <div className="space-y-2">
-            <div className="flex flex-wrap items-center justify-between gap-2">
+            <div className="flex flex-wrap items-center justify-between gap-2 pb-6">
               {discoveryToggle}
             </div>
             <KalshiLiveMarketsDiscoveryFields

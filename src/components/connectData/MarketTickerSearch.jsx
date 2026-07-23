@@ -356,6 +356,8 @@ export function MarketTickerSearch({
   searchScope = "markets",
   /** Optional leading content for the status row (e.g. discovery mode toggle). */
   headerStart = null,
+  /** When false, empty state shows "Optional" instead of "Required". */
+  required = true,
 }) {
   const seriesOnly = searchScope === "series";
   const debounceRef = useRef(null);
@@ -721,23 +723,35 @@ export function MarketTickerSearch({
     [seriesModal],
   );
 
+  const statusLabel =
+    selections.length > 0
+      ? `${selections.length} selected`
+      : required
+        ? "Required"
+        : null;
+  const showStatusRow = !!headerStart || !!statusLabel || resolveLoading;
+
   return (
     <TooltipProvider delayDuration={200}>
       <div className={cn("space-y-2", className)}>
-        <div
-          className={cn(
-            "flex flex-wrap items-center gap-2",
-            headerStart ? "justify-between" : "justify-end",
-          )}
-        >
-          {headerStart ? <div className="min-w-0">{headerStart}</div> : null}
-          <span className="flex items-center gap-1.5 text-[10px] text-muted-foreground">
-            {resolveLoading ? (
-              <Loader2 className="h-3 w-3 animate-spin text-primary" aria-hidden />
+        {showStatusRow ? (
+          <div
+            className={cn(
+              "flex flex-wrap items-center gap-2",
+              headerStart ? "justify-between" : "justify-end",
+            )}
+          >
+            {headerStart ? <div className="min-w-0">{headerStart}</div> : null}
+            {statusLabel || resolveLoading ? (
+              <span className="flex items-center gap-1.5 text-[10px] text-muted-foreground">
+                {resolveLoading ? (
+                  <Loader2 className="h-3 w-3 animate-spin text-primary" aria-hidden />
+                ) : null}
+                {statusLabel}
+              </span>
             ) : null}
-            {selections.length > 0 ? `${selections.length} selected` : "Required"}
-          </span>
-        </div>
+          </div>
+        ) : null}
 
         <div className="relative">
           <span className="pointer-events-none absolute left-3 top-1/2 z-[1] flex h-4 w-4 -translate-y-1/2 items-center justify-center text-muted-foreground">
