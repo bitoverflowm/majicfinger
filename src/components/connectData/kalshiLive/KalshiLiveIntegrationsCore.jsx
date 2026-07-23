@@ -760,9 +760,6 @@ export function KalshiLiveIntegrationsCore({ onRunPull, className, stepBackRef }
                     badge="The Latest Data"
                     description="Choose what you want to track, then narrow it to the exact markets, fields, and time range you need."
                   >
-                    <p className={cn("font-medium text-muted-foreground", density.label)}>
-                      Choose a data source
-                    </p>
                     <div className={density.listGap}>
                       {endpoints.map((endpoint) => (
                         <LiveSourceOption
