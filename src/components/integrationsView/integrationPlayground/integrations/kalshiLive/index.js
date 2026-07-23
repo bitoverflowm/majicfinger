@@ -5,9 +5,14 @@ import { flushSync } from "react-dom";
 
 import { useMyStateV2 } from "@/context/stateContextV2";
 import { applyAthenaPullToSheetPatch } from "@/lib/dataLake/applyAthenaPullToSheet";
-import { fetchAllKalshiLiveMarketsPages } from "@/lib/kalshiLive/fetchKalshiLiveMarkets";
+import { fetchKalshiLiveMarketsTickerPull } from "@/lib/kalshiLive/fetchKalshiLiveMarketsTickerPull";
 import { fetchKalshiLiveSeriesPull } from "@/lib/kalshiLive/fetchKalshiLiveSeriesPull";
 import { fetchKalshiLiveSeriesDiscoveryPull } from "@/lib/kalshiLive/fetchKalshiLiveSeriesDiscoveryPull";
+import {
+  KALSHI_LIVE_MARKETS_SHEET_MODE_COMBINED,
+  normalizeKalshiLiveMarketsSheetMode,
+  summarizeKalshiLiveMarketsTickerPullRequest,
+} from "@/lib/kalshiLive/marketCompose";
 import {
   KALSHI_LIVE_SERIES_SHEET_MODE_COMBINED,
   normalizeKalshiLiveSeriesSheetMode,
@@ -19,13 +24,6 @@ import { kalshiLiveSeriesWantsIncludeVolume } from "@/lib/kalshiLive/seriesColum
 import { fetchKalshiLiveCandlesticksPull } from "@/lib/kalshiLive/fetchKalshiLiveCandlesticksPull";
 import { fetchKalshiLiveTradesPull } from "@/lib/kalshiLive/fetchKalshiLiveTradesPull";
 import { fetchKalshiLiveOrderbookPull } from "@/lib/kalshiLive/fetchKalshiLiveOrderbookPull";
-import {
-  applyKalshiLiveClientSort,
-  applyKalshiLiveClientWhere,
-  partitionKalshiLiveCompose,
-  summarizeKalshiLiveComposeRequest,
-} from "@/lib/kalshiLive/kalshiLiveCompose";
-import { projectKalshiLiveMarketRows } from "@/lib/kalshiLive/normalizeMarketRow";
 import { applyConnectHomePullData } from "@/lib/connectHomePullDestination";
 import { trackDataPullComplete, trackDataPullError, trackDataPullStart } from "@/lib/analytics/trackDataPull";
 
@@ -70,6 +68,8 @@ export default function KalshiLive({ setConnectedData, connectHomePullBridge = f
     connectKalshiLiveLimit,
     connectKalshiLiveWhereFilters,
     connectKalshiLiveSortClauses,
+    connectKalshiLiveTickers,
+    connectKalshiLiveMarketsSheetMode,
     connectKalshiLiveCandlestickTickers,
     connectKalshiLiveTradesTicker,
     connectKalshiLiveOrderbookTicker,
@@ -96,53 +96,48 @@ export default function KalshiLive({ setConnectedData, connectHomePullBridge = f
       const sortClauses = Array.isArray(connectKalshiLiveSortClauses)
         ? connectKalshiLiveSortClauses
         : [];
-      const limit = Number(connectKalshiLiveLimit) || 100;
-      const { marketApiFilters, marketTickers, clientWhere } = partitionKalshiLiveCompose(
-        "markets",
-        whereFilters,
-      );
-      const hasClient = clientWhere.length > 0 || sortClauses.length > 0;
-      const fetchLimit = hasClient ? 1000 : limit;
-      const querySummary = summarizeKalshiLiveComposeRequest(
-        "markets",
-        whereFilters,
-        sortClauses,
-        { limit },
-      );
+      const marketTickers = String(connectKalshiLiveTickers || "").trim();
+      const sheetMode = normalizeKalshiLiveMarketsSheetMode(connectKalshiLiveMarketsSheetMode);
       const requestStartMs =
         typeof performance !== "undefined" && performance?.now ? performance.now() : Date.now();
 
-      let rawMarkets = [];
+      setConnectDataLakePullState?.((prev) => ({
+        ...prev,
+        loading: true,
+        label: "Fetching Kalshi Live markets…",
+        progress: 8,
+        error: null,
+      }));
 
-      await fetchAllKalshiLiveMarketsPages({
-        filters: marketApiFilters,
-        limit: fetchLimit,
-        tickers: marketTickers,
+      const {
+        byTicker,
+        raw,
+        rows: accumulated,
+        querySummary,
+      } = await fetchKalshiLiveMarketsTickerPull({
+        marketTickers,
+        selectedColumns: cols,
+        whereFilters,
+        sortClauses,
+        sheetMode,
         signal: ac.signal,
-        onPage: async ({ page, rows }) => {
-          const batch = Array.isArray(rows) ? rows : [];
-          rawMarkets = rawMarkets.concat(batch);
-          const pct = Math.min(92, 8 + page * 12);
+        onTickerProgress: ({ ticker, index, total }) => {
+          const pct = Math.min(90, 8 + Math.round(((index + 1) / Math.max(1, total)) * 80));
           setConnectDataLakePullState?.((prev) => ({
             ...prev,
             loading: true,
-            label: `Loaded ${rawMarkets.length} markets (page ${page})…`,
+            label: `Fetching ${ticker} (${index + 1}/${total})…`,
             progress: pct,
             error: null,
           }));
         },
       });
 
-      const filtered = applyKalshiLiveClientWhere(rawMarkets, clientWhere);
-      const sorted = applyKalshiLiveClientSort(filtered, sortClauses, "markets");
-      const sliced = sorted.slice(0, limit);
-      const accumulated = projectKalshiLiveMarketRows(sliced, cols);
-
       if (setRows) setRows(accumulated);
 
       await ingestKalshiLiveAsView({
         endpointId: "markets",
-        markets: sliced,
+        markets: raw,
         selectedColumns: cols,
       });
 
@@ -150,6 +145,78 @@ export default function KalshiLive({ setConnectedData, connectHomePullBridge = f
         (typeof performance !== "undefined" && performance?.now
           ? performance.now()
           : Date.now()) - requestStartMs;
+
+      const useSeparateSheets =
+        sheetMode !== KALSHI_LIVE_MARKETS_SHEET_MODE_COMBINED && byTicker.length > 1;
+
+      if (useSeparateSheets && setDataSheets) {
+        let firstSheetId = sheetId || ctx?.activeSheetId || null;
+        const totalRows = byTicker.reduce(
+          (sum, g) => sum + (Array.isArray(g.rows) ? g.rows.length : 0),
+          0,
+        );
+
+        flushSync(() => {
+          setDataSheets((prev) => {
+            let next = { ...(prev || {}) };
+            /** @type {string[]} */
+            const writtenIds = [];
+
+            for (let i = 0; i < byTicker.length; i++) {
+              const group = byTicker[i];
+              const tickerName = String(group.ticker || `market-${i + 1}`).trim().slice(0, 80);
+              const rows = Array.isArray(group.rows) ? group.rows : [];
+
+              let targetSheetId;
+              if (i === 0 && firstSheetId) {
+                targetSheetId = firstSheetId;
+              } else {
+                targetSheetId = allocateNextSheetId(next);
+              }
+              writtenIds.push(targetSheetId);
+
+              const requestCard = {
+                id: genRequestCardId(),
+                createdAt: Date.now(),
+                elapsedMs,
+                lake: "kalshi-live",
+                table: "markets",
+                sheetId: targetSheetId,
+                querySummary,
+                loadedRowCount: rows.length,
+              };
+
+              next = applyAthenaPullToSheetPatch(next, targetSheetId, rows, {
+                name: tickerName,
+                provenance: {
+                  source: "kalshi-live",
+                  endpoint: "markets",
+                  marketTicker: tickerName,
+                  sheetMode,
+                  querySummary,
+                },
+                requestCards: [requestCard],
+              });
+            }
+
+            firstSheetId = writtenIds[0] || firstSheetId;
+            return next;
+          });
+
+          if (firstSheetId && ctx?.setActiveSheetId) {
+            ctx.setActiveSheetId(firstSheetId);
+          }
+          const firstRows = Array.isArray(byTicker[0]?.rows) ? byTicker[0].rows : [];
+          if (setRows) setRows(firstRows);
+          ctx?.setConnectHomeAnalyzeActive?.(true);
+        });
+
+        if (ctx?.requestConnectAnalyzeScroll) {
+          ctx.requestConnectAnalyzeScroll();
+        }
+
+        return totalRows;
+      }
 
       const requestCard = {
         id: genRequestCardId(),
@@ -170,7 +237,7 @@ export default function KalshiLive({ setConnectedData, connectHomePullBridge = f
               endpoint: "markets",
               whereFilters,
               sortClauses,
-              limit,
+              sheetMode,
               querySummary,
             },
             requestCards: [requestCard],
@@ -179,12 +246,14 @@ export default function KalshiLive({ setConnectedData, connectHomePullBridge = f
       }
 
       applyConnectHomePullData(ctx, accumulated);
+      if (ctx?.requestConnectAnalyzeScroll) ctx.requestConnectAnalyzeScroll();
       return accumulated.length;
     },
     [
       connectKalshiLiveWhereFilters,
       connectKalshiLiveSortClauses,
-      connectKalshiLiveLimit,
+      connectKalshiLiveTickers,
+      connectKalshiLiveMarketsSheetMode,
       setConnectDataLakePullState,
       setDataSheets,
       setRows,
@@ -913,12 +982,9 @@ export default function KalshiLive({ setConnectedData, connectHomePullBridge = f
                 includeVolume: kalshiLiveSeriesWantsIncludeVolume(cols),
               })
           : endpointId === "markets"
-            ? summarizeKalshiLiveComposeRequest(
-                "markets",
-                connectKalshiLiveWhereFilters || [],
-                connectKalshiLiveSortClauses || [],
-                { limit: Number(connectKalshiLiveLimit) || 100 },
-              )
+            ? summarizeKalshiLiveMarketsTickerPullRequest(connectKalshiLiveTickers || "", {
+                sheetMode: normalizeKalshiLiveMarketsSheetMode(connectKalshiLiveMarketsSheetMode),
+              })
             : endpointId,
     });
 
@@ -996,6 +1062,8 @@ export default function KalshiLive({ setConnectedData, connectHomePullBridge = f
     connectKalshiLiveWhereFilters,
     connectKalshiLiveSortClauses,
     connectKalshiLiveLimit,
+    connectKalshiLiveTickers,
+    connectKalshiLiveMarketsSheetMode,
     connectKalshiLiveSeriesTicker,
     connectKalshiLiveSeriesSheetMode,
     connectKalshiLiveSeriesDiscoveryMode,

@@ -39,6 +39,13 @@ import {
 } from "@/lib/kalshiLive/tradeCompose";
 import { validateKalshiLiveOrderbookPull } from "@/lib/kalshiLive/orderbookCompose";
 import {
+  KALSHI_LIVE_MARKETS_SHEET_MODE_COMBINED,
+  KALSHI_LIVE_MARKETS_SHEET_MODE_PER_MARKET,
+  normalizeKalshiLiveMarketsSheetMode,
+  parseKalshiLiveMarketsTickersInput,
+  validateKalshiLiveMarketsPull,
+} from "@/lib/kalshiLive/marketCompose";
+import {
   KALSHI_LIVE_SERIES_SHEET_MODE_COMBINED,
   KALSHI_LIVE_SERIES_SHEET_MODE_PER_SERIES,
   normalizeKalshiLiveSeriesSheetMode,
@@ -155,6 +162,10 @@ export function KalshiLiveComposeOperationPanel({
     connectKalshiLiveColumnSelections = {},
     connectKalshiLiveCandlestickTickers = "",
     connectKalshiLiveCandlestickTickerMeta = {},
+    connectKalshiLiveTickers = "",
+    connectKalshiLiveMarketsTickerMeta = {},
+    connectKalshiLiveMarketsSheetMode = KALSHI_LIVE_MARKETS_SHEET_MODE_PER_MARKET,
+    setConnectKalshiLiveMarketsSheetMode,
     connectKalshiLiveTradesTicker = "",
     connectKalshiLiveTradesTickerMeta = {},
     connectKalshiLiveOrderbookTicker = "",
@@ -211,6 +222,28 @@ export function KalshiLiveComposeOperationPanel({
     }));
   }, [endpointId, connectKalshiLiveOrderbookTicker, connectKalshiLiveOrderbookTickerMeta]);
 
+  const marketsSheetMode = normalizeKalshiLiveMarketsSheetMode(connectKalshiLiveMarketsSheetMode);
+  const marketsTickerList = useMemo(
+    () =>
+      endpointId === "markets" ? parseKalshiLiveMarketsTickersInput(connectKalshiLiveTickers) : [],
+    [endpointId, connectKalshiLiveTickers],
+  );
+
+  const marketsAutoSheets = useMemo(() => {
+    if (endpointId !== "markets") return null;
+    if (marketsSheetMode !== KALSHI_LIVE_MARKETS_SHEET_MODE_PER_MARKET) return null;
+    if (marketsTickerList.length < 2) return null;
+    return marketsTickerList.map((ticker) => ({
+      name: ticker,
+      title: connectKalshiLiveMarketsTickerMeta?.[ticker] || ticker,
+    }));
+  }, [
+    endpointId,
+    marketsSheetMode,
+    marketsTickerList,
+    connectKalshiLiveMarketsTickerMeta,
+  ]);
+
   const seriesSheetMode = normalizeKalshiLiveSeriesSheetMode(connectKalshiLiveSeriesSheetMode);
   const seriesTickerList = useMemo(
     () =>
@@ -236,7 +269,11 @@ export function KalshiLiveComposeOperationPanel({
   ]);
 
   const autoNamedSheets =
-    candlestickAutoSheets || tradesAutoSheets || orderbookAutoSheets || seriesAutoSheets;
+    candlestickAutoSheets ||
+    tradesAutoSheets ||
+    orderbookAutoSheets ||
+    marketsAutoSheets ||
+    seriesAutoSheets;
 
   const allColumns = useMemo(() => getKalshiLiveAllColumnNames(endpointId), [endpointId]);
 
@@ -370,6 +407,14 @@ export function KalshiLiveComposeOperationPanel({
       }
     }
 
+    if (endpointId === "markets") {
+      const marketsErr = validateKalshiLiveMarketsPull(connectKalshiLiveTickers);
+      if (marketsErr) {
+        setFilterError?.(marketsErr);
+        return;
+      }
+    }
+
     if (endpointId === "series") {
       const seriesErr = connectKalshiLiveSeriesDiscoveryMode
         ? validateKalshiLiveSeriesDiscoveryPull({
@@ -394,6 +439,7 @@ export function KalshiLiveComposeOperationPanel({
     endpointId,
     connectKalshiLiveWhereFilters,
     connectKalshiLiveCandlestickTickers,
+    connectKalshiLiveTickers,
     connectKalshiLiveTradesTicker,
     connectKalshiLiveOrderbookTicker,
     setFilterError,
@@ -742,6 +788,43 @@ export function KalshiLiveComposeOperationPanel({
         </p>
       ) : null}
 
+      {endpointId === "markets" && marketsTickerList.length >= 2 ? (
+        <div className="space-y-1.5">
+          <Label className="text-[11px] font-medium text-muted-foreground">
+            How should we organize sheets?
+          </Label>
+          <ToggleGroup
+            type="single"
+            variant="outline"
+            size="sm"
+            value={marketsSheetMode}
+            onValueChange={(value) => {
+              if (!value) return;
+              setConnectKalshiLiveMarketsSheetMode?.(normalizeKalshiLiveMarketsSheetMode(value));
+            }}
+            className="h-8 flex-wrap justify-start"
+            aria-label="Markets sheet organization"
+          >
+            <ToggleGroupItem
+              value={KALSHI_LIVE_MARKETS_SHEET_MODE_COMBINED}
+              className="h-8 px-2.5 text-[11px]"
+            >
+              All markets in one sheet
+            </ToggleGroupItem>
+            <ToggleGroupItem
+              value={KALSHI_LIVE_MARKETS_SHEET_MODE_PER_MARKET}
+              className="h-8 px-2.5 text-[11px]"
+            >
+              Separate sheet per market
+            </ToggleGroupItem>
+          </ToggleGroup>
+          <p className="text-[10px] leading-snug text-muted-foreground">
+            Each market pull returns one metadata row. Separate sheets keep each ticker isolated;
+            one sheet is better for side-by-side comparison.
+          </p>
+        </div>
+      ) : null}
+
       {endpointId === "series" &&
       !connectKalshiLiveSeriesDiscoveryMode &&
       seriesTickerList.length >= 2 ? (
@@ -798,9 +881,11 @@ export function KalshiLiveComposeOperationPanel({
                 ? "For convenience each market's trades will be filled into a separate sheet. Each sheet is named by the ticker; you can change this later."
                 : orderbookAutoSheets
                   ? "For convenience each market's orderbook will be filled into a separate sheet. Each sheet is named by the ticker; you can change this later."
-                  : seriesAutoSheets
-                    ? "For convenience each series will be filled into a separate sheet. Each sheet is named by the series ticker; you can change this later."
-                    : undefined
+                  : marketsAutoSheets
+                    ? "For convenience each market will be filled into a separate sheet. Each sheet is named by the ticker; you can change this later."
+                    : seriesAutoSheets
+                      ? "For convenience each series will be filled into a separate sheet. Each sheet is named by the series ticker; you can change this later."
+                      : undefined
           }
         />
         <Button

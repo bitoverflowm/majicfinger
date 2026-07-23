@@ -22,6 +22,8 @@ import { KALSHI_LIVE_SERIES_COLUMNS } from "@/lib/kalshiLive/seriesColumns";
 export function applyKalshiLivePowerSearchSelection(ctx, suggestion) {
   const endpointId = "markets";
   const columns = KALSHI_LIVE_MARKETS_COLUMNS.map((c) => c.name);
+  const ticker = String(suggestion.ticker || "").trim().toUpperCase();
+  const title = String(suggestion.title || ticker).trim() || ticker;
 
   flushSync(() => {
     ctx.setConnectKalshiLiveEndpointId?.(endpointId);
@@ -29,16 +31,12 @@ export function applyKalshiLivePowerSearchSelection(ctx, suggestion) {
       ...(prev || {}),
       [endpointId]: columns,
     }));
-    ctx.setConnectKalshiLiveWhereFilters?.([
-      {
-        id: `klw-${Date.now()}`,
-        column: "ticker",
-        op: "eq",
-        value: String(suggestion.ticker || "").trim(),
-      },
-    ]);
+    ctx.setConnectKalshiLiveTickers?.(ticker);
+    ctx.setConnectKalshiLiveMarketsTickerMeta?.(ticker ? { [ticker]: title } : {});
+    ctx.setConnectKalshiLiveMarketsSheetMode?.("per_market");
+    ctx.setConnectKalshiLiveWhereFilters?.([]);
     ctx.setConnectKalshiLiveSortClauses?.([]);
-    ctx.setConnectActiveComposeOps?.(["where"]);
+    ctx.setConnectActiveComposeOps?.([]);
   });
 
   prepareConnectHomePullSheet(ctx);

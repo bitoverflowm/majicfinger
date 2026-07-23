@@ -32,6 +32,7 @@ import { KalshiLiveCandlestickHistoricalCutoffNote, KalshiLiveTradesHistoricalCu
 import { KalshiLiveTradesTickerField } from "@/components/connectData/kalshiLive/KalshiLiveTradesTickerField";
 import { KalshiLiveOrderbookTickerField } from "@/components/connectData/kalshiLive/KalshiLiveOrderbookTickerField";
 import { KalshiLiveOrderbookCommonQueries } from "@/components/connectData/kalshiLive/KalshiLiveOrderbookCommonQueries";
+import { KalshiLiveMarketsTickersField } from "@/components/connectData/kalshiLive/KalshiLiveMarketsTickersField";
 import { KalshiLiveSeriesTickersField } from "@/components/connectData/kalshiLive/KalshiLiveSeriesTickersField";
 import { KalshiLiveComposeOperationPanel } from "@/components/connectData/kalshiLive/KalshiLiveComposeOperationPanel";
 import { Button } from "@/components/ui/button";
@@ -357,6 +358,10 @@ export function KalshiLiveIntegrationsCore({ onRunPull, className, stepBackRef }
     setConnectKalshiLiveWhereFilters,
     setConnectKalshiLiveSortClauses,
     setConnectKalshiLiveLimit,
+    connectKalshiLiveTickers = "",
+    setConnectKalshiLiveTickers,
+    setConnectKalshiLiveMarketsTickerMeta,
+    setConnectKalshiLiveMarketsSheetMode,
     connectKalshiLiveCandlestickTickers = "",
     setConnectKalshiLiveCandlestickTickers,
     setConnectKalshiLiveCandlestickTickerMeta,
@@ -469,6 +474,11 @@ export function KalshiLiveIntegrationsCore({ onRunPull, className, stepBackRef }
       setConnectActiveComposeOps?.([]);
       setConnectKalshiLiveWhereFilters?.([]);
       setConnectKalshiLiveSortClauses?.([]);
+      if (id !== "markets") {
+        setConnectKalshiLiveTickers?.("");
+        setConnectKalshiLiveMarketsTickerMeta?.({});
+        setConnectKalshiLiveMarketsSheetMode?.("per_market");
+      }
       if (id !== "candlesticks") {
         setConnectKalshiLiveCandlestickTickers?.("");
         setConnectKalshiLiveCandlestickTickerMeta?.({});
@@ -504,6 +514,9 @@ export function KalshiLiveIntegrationsCore({ onRunPull, className, stepBackRef }
       setConnectKalshiLiveWhereFilters,
       setConnectKalshiLiveSortClauses,
       setConnectKalshiLiveLimit,
+      setConnectKalshiLiveTickers,
+      setConnectKalshiLiveMarketsTickerMeta,
+      setConnectKalshiLiveMarketsSheetMode,
       setConnectKalshiLiveCandlestickTickers,
       setConnectKalshiLiveCandlestickTickerMeta,
       setConnectKalshiLiveTradesTicker,
@@ -528,6 +541,9 @@ export function KalshiLiveIntegrationsCore({ onRunPull, className, stepBackRef }
     setConnectActiveComposeOps?.([]);
     setConnectKalshiLiveWhereFilters?.([]);
     setConnectKalshiLiveSortClauses?.([]);
+    setConnectKalshiLiveTickers?.("");
+    setConnectKalshiLiveMarketsTickerMeta?.({});
+    setConnectKalshiLiveMarketsSheetMode?.("per_market");
     setConnectKalshiLiveCandlestickTickers?.("");
     setConnectKalshiLiveCandlestickTickerMeta?.({});
     setConnectKalshiLiveTradesTicker?.("");
@@ -549,6 +565,9 @@ export function KalshiLiveIntegrationsCore({ onRunPull, className, stepBackRef }
     setConnectActiveComposeOps,
     setConnectKalshiLiveWhereFilters,
     setConnectKalshiLiveSortClauses,
+    setConnectKalshiLiveTickers,
+    setConnectKalshiLiveMarketsTickerMeta,
+    setConnectKalshiLiveMarketsSheetMode,
     setConnectKalshiLiveCandlestickTickers,
     setConnectKalshiLiveCandlestickTickerMeta,
     setConnectKalshiLiveTradesTicker,
@@ -909,6 +928,14 @@ export function KalshiLiveIntegrationsCore({ onRunPull, className, stepBackRef }
           </div>
 
           <AnimatePresence>
+            {selectedId === "markets" ? (
+              <KalshiLiveMarketsTickersField
+                className="mt-4"
+                value={connectKalshiLiveTickers}
+                onChange={(v) => setConnectKalshiLiveTickers?.(v)}
+                disabled={pullLoading}
+              />
+            ) : null}
             {selectedId === "candlesticks" ? (
               <>
                 <KalshiLiveCandlestickTickersField

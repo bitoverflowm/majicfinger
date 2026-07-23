@@ -24,7 +24,8 @@ export const KALSHI_LIVE_CONNECT_ENDPOINTS = [
   {
     id: "markets",
     title: "Markets",
-    description: "Live market metadata, prices, and status from the Kalshi trade API.",
+    description:
+      "Live market metadata, prices, and status. Search tickers (or pick markets from a series); pull one or many via GET /markets/{ticker}.",
   },
   {
     id: "series",
