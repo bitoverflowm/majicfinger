@@ -354,6 +354,8 @@ export function MarketTickerSearch({
   showCutoffNotes = true,
   // "series" = series suggestions only (no markets, selecting a series adds that series ticker).
   searchScope = "markets",
+  /** Optional leading content for the status row (e.g. discovery mode toggle). */
+  headerStart = null,
 }) {
   const seriesOnly = searchScope === "series";
   const debounceRef = useRef(null);
@@ -722,7 +724,13 @@ export function MarketTickerSearch({
   return (
     <TooltipProvider delayDuration={200}>
       <div className={cn("space-y-2", className)}>
-        <div className="flex flex-wrap items-center justify-end gap-2">
+        <div
+          className={cn(
+            "flex flex-wrap items-center gap-2",
+            headerStart ? "justify-between" : "justify-end",
+          )}
+        >
+          {headerStart ? <div className="min-w-0">{headerStart}</div> : null}
           <span className="flex items-center gap-1.5 text-[10px] text-muted-foreground">
             {resolveLoading ? (
               <Loader2 className="h-3 w-3 animate-spin text-primary" aria-hidden />

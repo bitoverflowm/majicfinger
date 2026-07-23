@@ -33,6 +33,20 @@ export function KalshiLiveSeriesTickersField({ value, onChange, className, disab
     setConnectKalshiLiveSeriesDiscoveryMinUpdatedTs,
   } = ctx;
 
+  const discoveryToggle = (
+    <div className="flex items-center gap-2">
+      <Label htmlFor="series-discovery-mode" className="text-[11px] font-medium text-foreground">
+        Toggle discovery mode
+      </Label>
+      <Switch
+        id="series-discovery-mode"
+        checked={!!connectKalshiLiveSeriesDiscoveryMode}
+        disabled={disabled}
+        onCheckedChange={(checked) => setConnectKalshiLiveSeriesDiscoveryMode?.(!!checked)}
+      />
+    </div>
+  );
+
   return (
     <div className={cn("space-y-2", className)}>
       <h2 className="text-xs font-semibold tracking-tight text-foreground">
@@ -46,38 +60,31 @@ export function KalshiLiveSeriesTickersField({ value, onChange, className, disab
           : "Search for series only (markets are hidden). You can pull multiple series at once — choose one sheet or a sheet per series below."}
       </p>
 
-      <div className="flex items-center gap-2">
-        <Label htmlFor="series-discovery-mode" className="text-[11px] font-medium text-foreground">
-          Toggle discovery mode
-        </Label>
-        <Switch
-          id="series-discovery-mode"
-          checked={!!connectKalshiLiveSeriesDiscoveryMode}
-          disabled={disabled}
-          onCheckedChange={(checked) => setConnectKalshiLiveSeriesDiscoveryMode?.(!!checked)}
-        />
-      </div>
-
       <div className="space-y-2 rounded-lg bg-muted/10 p-3">
         {connectKalshiLiveSeriesDiscoveryMode ? (
-          <KalshiLiveSeriesDiscoveryFields
-            category={connectKalshiLiveSeriesDiscoveryCategory}
-            onCategoryChange={(v) => setConnectKalshiLiveSeriesDiscoveryCategory?.(v)}
-            tag={connectKalshiLiveSeriesDiscoveryTag}
-            onTagChange={(v) => setConnectKalshiLiveSeriesDiscoveryTag?.(v)}
-            includeProductMetadata={!!connectKalshiLiveSeriesDiscoveryIncludeProductMetadata}
-            onIncludeProductMetadataChange={(v) =>
-              setConnectKalshiLiveSeriesDiscoveryIncludeProductMetadata?.(v)
-            }
-            minUpdatedTs={
-              connectKalshiLiveSeriesDiscoveryMinUpdatedTs === "" ||
-              connectKalshiLiveSeriesDiscoveryMinUpdatedTs == null
-                ? ""
-                : Number(connectKalshiLiveSeriesDiscoveryMinUpdatedTs)
-            }
-            onMinUpdatedTsChange={(v) => setConnectKalshiLiveSeriesDiscoveryMinUpdatedTs?.(v)}
-            disabled={disabled}
-          />
+          <div className="space-y-2">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              {discoveryToggle}
+            </div>
+            <KalshiLiveSeriesDiscoveryFields
+              category={connectKalshiLiveSeriesDiscoveryCategory}
+              onCategoryChange={(v) => setConnectKalshiLiveSeriesDiscoveryCategory?.(v)}
+              tag={connectKalshiLiveSeriesDiscoveryTag}
+              onTagChange={(v) => setConnectKalshiLiveSeriesDiscoveryTag?.(v)}
+              includeProductMetadata={!!connectKalshiLiveSeriesDiscoveryIncludeProductMetadata}
+              onIncludeProductMetadataChange={(v) =>
+                setConnectKalshiLiveSeriesDiscoveryIncludeProductMetadata?.(v)
+              }
+              minUpdatedTs={
+                connectKalshiLiveSeriesDiscoveryMinUpdatedTs === "" ||
+                connectKalshiLiveSeriesDiscoveryMinUpdatedTs == null
+                  ? ""
+                  : Number(connectKalshiLiveSeriesDiscoveryMinUpdatedTs)
+              }
+              onMinUpdatedTsChange={(v) => setConnectKalshiLiveSeriesDiscoveryMinUpdatedTs?.(v)}
+              disabled={disabled}
+            />
+          </div>
         ) : (
           <MarketTickerSearch
             value={value}
@@ -86,6 +93,7 @@ export function KalshiLiveSeriesTickersField({ value, onChange, className, disab
             dataSource="live"
             searchScope="series"
             showCutoffNotes={false}
+            headerStart={discoveryToggle}
             onSelectionsChange={(selections) => {
               const next = {};
               for (const s of selections || []) {
