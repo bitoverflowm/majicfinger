@@ -329,7 +329,7 @@ function ColumnDefinitionsPanel({ columns, getDisplayLabel, title, className }) 
  * Kalshi Live compose UI — same starting layout as Kalshi Historical
  * (browse sources | search | guided workflows), then column picker + refine ops.
  */
-export function KalshiLiveIntegrationsCore({ onRunPull, className }) {
+export function KalshiLiveIntegrationsCore({ onRunPull, className, stepBackRef }) {
   const ctx = useMyStateV2() ?? {};
   const { workspaceWriteLocked, requestProUpgrade, dialog: demoProDialog } = useDemoProGate();
   const density = hubEmbedDensity();
@@ -569,6 +569,18 @@ export function KalshiLiveIntegrationsCore({ onRunPull, className }) {
     if (!selectedId || !KALSHI_LIVE_UNDER_CONSTRUCTION_ENDPOINT_IDS.has(selectedId)) return;
     handleClearEndpoint();
   }, [selectedId, handleClearEndpoint]);
+
+  useEffect(() => {
+    if (!stepBackRef) return undefined;
+    stepBackRef.current = () => {
+      if (!selectedId) return false;
+      handleClearEndpoint();
+      return true;
+    };
+    return () => {
+      stepBackRef.current = null;
+    };
+  }, [stepBackRef, selectedId, handleClearEndpoint]);
 
   const patchColumns = useCallback(
     (sampleId, updater) => {

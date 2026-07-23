@@ -401,6 +401,7 @@ function ColumnDefinitionsPanel({
  *   embedded?: boolean;
  *   mockup?: boolean;
  *   connectHome?: boolean;
+ *   stepBackRef?: React.MutableRefObject<(() => boolean) | null>;
  * }} props
  * `connectHome` — dashboard / demo Kalshi Historical workspace: same starting layout,
  * but Run applies the draft in-place and triggers the existing Athena pull bridge.
@@ -409,12 +410,14 @@ export function HubKalshiQueryBuilder({
   embedded = false,
   mockup = false,
   connectHome = false,
+  stepBackRef,
 }) {
   return (
     <HubKalshiQueryBuilderInner
       embedded={embedded}
       mockup={mockup}
       connectHome={connectHome}
+      stepBackRef={stepBackRef}
     />
   );
 }
@@ -423,6 +426,7 @@ function HubKalshiQueryBuilderInner({
   embedded = false,
   mockup = false,
   connectHome = false,
+  stepBackRef,
 }) {
   const { data: user, isLoading: userLoading } = useSWR("/api/user", userSwrFetcher);
   const isLoggedIn = !!user;
@@ -603,6 +607,18 @@ function HubKalshiQueryBuilderInner({
     setSheetName("");
     setError(null);
   }, []);
+
+  useEffect(() => {
+    if (!stepBackRef || !connectHome) return undefined;
+    stepBackRef.current = () => {
+      if (!sampleId) return false;
+      cancelToStartingView();
+      return true;
+    };
+    return () => {
+      stepBackRef.current = null;
+    };
+  }, [stepBackRef, connectHome, sampleId, cancelToStartingView]);
 
   const buildDraft = useCallback(() => {
     const sourceHubPath =

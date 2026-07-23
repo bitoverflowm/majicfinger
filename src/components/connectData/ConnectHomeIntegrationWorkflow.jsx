@@ -778,10 +778,39 @@ export function ConnectHomeIntegrationWorkflow({ integrationId, className }) {
   const apiDisplayLabel = useCallback((col) => col.name, []);
   const liveDisplayLabel = useCallback((col) => col.name, []);
 
-  const handleGoBackToIntegrations = useCallback(() => {
+  /** Child hubs (Kalshi Live / Historical) register a step-back that clears nested source. */
+  const stepBackRef = useRef(null);
+
+  const handleGoBack = useCallback(() => {
+    if (typeof stepBackRef.current === "function" && stepBackRef.current()) {
+      return;
+    }
+    if (isDataLake && connectDataLakeSampleId) {
+      handleClearLakeSource();
+      return;
+    }
+    if (isApi && connectApiEndpointId) {
+      setConnectApiEndpointId?.("");
+      return;
+    }
+    if (isLive && connectLiveSourceId) {
+      setConnectLiveSourceId?.("");
+      return;
+    }
     requestConnectWorkspace?.(null);
     scheduleConnectHomeHubScroll();
-  }, [requestConnectWorkspace]);
+  }, [
+    isDataLake,
+    connectDataLakeSampleId,
+    handleClearLakeSource,
+    isApi,
+    connectApiEndpointId,
+    setConnectApiEndpointId,
+    isLive,
+    connectLiveSourceId,
+    setConnectLiveSourceId,
+    requestConnectWorkspace,
+  ]);
 
   const handleRunIntegrationPull = useCallback(() => {
     if (isDemo && isDemoGatedHistoricalIntegration(integrationId)) {
@@ -808,7 +837,7 @@ export function ConnectHomeIntegrationWorkflow({ integrationId, className }) {
             name={name}
             description={description}
             compact={false}
-            onGoBack={handleGoBackToIntegrations}
+            onGoBack={handleGoBack}
           />
           <p className="mt-10 text-[11px] font-medium uppercase tracking-[0.14em] text-muted-foreground">
             Use the panel on the right to connect and pull data
@@ -850,18 +879,21 @@ export function ConnectHomeIntegrationWorkflow({ integrationId, className }) {
           name={isKalshiHistorical || isKalshiLive ? undefined : name}
           description={isKalshiHistorical || isKalshiLive ? undefined : description}
           compact={hasComposeUi || isKalshiHistorical || isKalshiLive}
-          onGoBack={handleGoBackToIntegrations}
+          onGoBack={handleGoBack}
         />
 
         {isKalshiLive ? (
           <div className="mt-4 sm:mt-5">
-            <KalshiLiveIntegrationsCore onRunPull={handleRunIntegrationPull} />
+            <KalshiLiveIntegrationsCore
+              onRunPull={handleRunIntegrationPull}
+              stepBackRef={stepBackRef}
+            />
           </div>
         ) : null}
 
         {isKalshiHistorical ? (
           <div className="mt-4 sm:mt-5">
-            <HubKalshiQueryBuilder connectHome />
+            <HubKalshiQueryBuilder connectHome stepBackRef={stepBackRef} />
           </div>
         ) : null}
 
