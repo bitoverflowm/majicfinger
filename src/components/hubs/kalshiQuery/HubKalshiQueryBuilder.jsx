@@ -1003,8 +1003,11 @@ function HubKalshiQueryBuilderInner({
               {...{ [GUIDED_TARGET_ATTR]: KALSHI_GUIDED_TARGETS.columnsPanel }}
             >
               <div className="flex flex-wrap items-center justify-between gap-2">
-                <Label className="text-[0.6875rem] font-medium uppercase tracking-wider text-muted-foreground">
-                  Columns
+                <Label className="text-xs font-semibold tracking-tight text-foreground">
+                  {`What data parameters are you interested in pulling for your ${
+                    KALSHI_CONNECT_DATA_SOURCES.find((s) => s.sampleId === sampleId)?.title ||
+                    sampleId
+                  }`}
                 </Label>
                 <div className="flex gap-0.5">
                   <Button type="button" variant="ghost" size="sm" className="h-6 px-2 text-[0.6875rem]" onClick={selectAllColumns}>

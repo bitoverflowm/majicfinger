@@ -182,6 +182,7 @@ function PolymarketLegacyTradesReference({ intro, columns, getDisplayLabel }) {
 
 export function ColumnPicker({
   sourceId,
+  sourceName,
   columns,
   getDisplayLabel,
   lake,
@@ -271,7 +272,9 @@ export function ColumnPicker({
         )}
       >
         <h2 className="text-xs font-semibold tracking-tight text-foreground">
-          Select which columns you are interested in pulling
+          {sourceName
+            ? `What data parameters are you interested in pulling for your ${sourceName}`
+            : "What data parameters are you interested in pulling"}
         </h2>
         <motion.div className="flex shrink-0 items-center gap-0.5">
           <Button type="button" variant="ghost" size="sm" className="h-7 px-2 text-[11px] font-normal" onClick={onSelectAll} disabled={allSelected}>
@@ -518,6 +521,10 @@ function DataLakeSourceCards({
             <ColumnPicker
               key={selectedSampleId}
               sourceId={selectedSampleId}
+              sourceName={
+                lakeConfig?.connectSources?.find((s) => s.sampleId === selectedSampleId)?.title ||
+                selectedSampleId
+              }
               columns={lakeConfig.getColumnsForSample(selectedSampleId)}
               getDisplayLabel={lakeConfig.getColumnDisplayLabel}
               lake={lakeConfig.lake}
@@ -614,6 +621,9 @@ function GenericSourceCards({
             <ColumnPicker
               key={selectedId}
               sourceId={selectedId}
+              sourceName={
+                sources.find((s) => (s.sampleId || s.id) === selectedId)?.title || selectedId
+              }
               columns={getColumnsForSource(selectedId)}
               getDisplayLabel={getDisplayLabel}
               lake={null}

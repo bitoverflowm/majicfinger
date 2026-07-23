@@ -953,6 +953,9 @@ export function KalshiLiveIntegrationsCore({ onRunPull, className, stepBackRef }
             <ColumnPicker
               key={selectedId}
               sourceId={selectedId}
+              sourceName={
+                endpoints.find((e) => e.id === selectedId)?.title || selectedId
+              }
               columns={KALSHI_LIVE_CONNECT_CONFIG.getColumnsForEndpoint(selectedId)}
               getDisplayLabel={getDisplayLabel}
               lake={null}
