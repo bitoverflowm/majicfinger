@@ -94,16 +94,16 @@ function DiscoveryDateRangeField({
   }, [minTs, maxTs]);
 
   return (
-    <div className={cn("flex h-full flex-col space-y-1.5", disabled && "opacity-60")}>
+    <div className={cn("flex h-full flex-col gap-1", disabled && "opacity-60")}>
       <Label className="text-[11px] font-medium text-foreground">{label}</Label>
-      <p className="min-h-[2.5rem] text-[10px] leading-snug text-muted-foreground">{description}</p>
+      <p className="text-[10px] leading-snug text-muted-foreground">{description}</p>
       <Popover>
         <PopoverTrigger asChild>
           <Button
             type="button"
             variant="outline"
             disabled={disabled}
-            className="mt-auto h-8 w-full justify-start px-2 text-left text-[11px] font-normal"
+            className="h-8 w-full justify-start px-2 text-left text-[11px] font-normal"
           >
             <CalendarIcon className="mr-1.5 h-3.5 w-3.5 shrink-0 opacity-70" />
             <span
@@ -166,16 +166,16 @@ function DiscoverySingleDateField({
   fromDate = null,
 }) {
   return (
-    <div className={cn("flex h-full flex-col space-y-1.5", disabled && "opacity-60")}>
+    <div className={cn("flex h-full flex-col gap-1", disabled && "opacity-60")}>
       <Label className="text-[11px] font-medium text-foreground">{label}</Label>
-      <p className="min-h-[2.5rem] text-[10px] leading-snug text-muted-foreground">{description}</p>
+      <p className="text-[10px] leading-snug text-muted-foreground">{description}</p>
       <KalshiLiveTimestampPicker
         value={value}
         onChange={onChange}
         disabled={disabled}
         fromDate={fromDate || undefined}
         placeholder="Pick a date"
-        className="mt-auto h-8 w-full"
+        className="h-8 w-full"
       />
     </div>
   );
