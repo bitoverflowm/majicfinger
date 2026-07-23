@@ -141,6 +141,55 @@ export const StateProviderV2 = ({children, initialSettings}) => {
     const [connectKalshiLiveMarketsSheetMode, setConnectKalshiLiveMarketsSheetMode] = useState(
       /** @type {"combined" | "per_market"} */ ("per_market"),
     );
+    /** Markets discovery mode: GET /markets list filters instead of per-ticker GET. */
+    const [connectKalshiLiveMarketsDiscoveryMode, setConnectKalshiLiveMarketsDiscoveryMode] =
+      useState(false);
+    const [connectKalshiLiveMarketsDiscoveryStatus, setConnectKalshiLiveMarketsDiscoveryStatus] =
+      useState("");
+    const [
+      connectKalshiLiveMarketsDiscoveryMveFilter,
+      setConnectKalshiLiveMarketsDiscoveryMveFilter,
+    ] = useState(/** @type {"only" | "exclude"} */ ("exclude"));
+    const [
+      connectKalshiLiveMarketsDiscoveryEventTicker,
+      setConnectKalshiLiveMarketsDiscoveryEventTicker,
+    ] = useState("");
+    const [
+      connectKalshiLiveMarketsDiscoverySeriesTicker,
+      setConnectKalshiLiveMarketsDiscoverySeriesTicker,
+    ] = useState("");
+    const [
+      connectKalshiLiveMarketsDiscoveryTickers,
+      setConnectKalshiLiveMarketsDiscoveryTickers,
+    ] = useState("");
+    const [
+      connectKalshiLiveMarketsDiscoveryMinCreatedTs,
+      setConnectKalshiLiveMarketsDiscoveryMinCreatedTs,
+    ] = useState(/** @type {number | ""} */ (""));
+    const [
+      connectKalshiLiveMarketsDiscoveryMaxCreatedTs,
+      setConnectKalshiLiveMarketsDiscoveryMaxCreatedTs,
+    ] = useState(/** @type {number | ""} */ (""));
+    const [
+      connectKalshiLiveMarketsDiscoveryMinUpdatedTs,
+      setConnectKalshiLiveMarketsDiscoveryMinUpdatedTs,
+    ] = useState(/** @type {number | ""} */ (""));
+    const [
+      connectKalshiLiveMarketsDiscoveryMinCloseTs,
+      setConnectKalshiLiveMarketsDiscoveryMinCloseTs,
+    ] = useState(/** @type {number | ""} */ (""));
+    const [
+      connectKalshiLiveMarketsDiscoveryMaxCloseTs,
+      setConnectKalshiLiveMarketsDiscoveryMaxCloseTs,
+    ] = useState(/** @type {number | ""} */ (""));
+    const [
+      connectKalshiLiveMarketsDiscoveryMinSettledTs,
+      setConnectKalshiLiveMarketsDiscoveryMinSettledTs,
+    ] = useState(/** @type {number | ""} */ (""));
+    const [
+      connectKalshiLiveMarketsDiscoveryMaxSettledTs,
+      setConnectKalshiLiveMarketsDiscoveryMaxSettledTs,
+    ] = useState(/** @type {number | ""} */ (""));
     /** Kalshi Live candlesticks: market ticker(s), comma/newline separated (1–100). */
     const [connectKalshiLiveCandlestickTickers, setConnectKalshiLiveCandlestickTickers] = useState("");
     /** Kalshi Live candlesticks: ticker → market title (for sheet name hover). */
@@ -671,6 +720,19 @@ export const StateProviderV2 = ({children, initialSettings}) => {
         setConnectKalshiLiveTickers("");
         setConnectKalshiLiveMarketsTickerMeta({});
         setConnectKalshiLiveMarketsSheetMode("per_market");
+        setConnectKalshiLiveMarketsDiscoveryMode(false);
+        setConnectKalshiLiveMarketsDiscoveryStatus("");
+        setConnectKalshiLiveMarketsDiscoveryMveFilter("exclude");
+        setConnectKalshiLiveMarketsDiscoveryEventTicker("");
+        setConnectKalshiLiveMarketsDiscoverySeriesTicker("");
+        setConnectKalshiLiveMarketsDiscoveryTickers("");
+        setConnectKalshiLiveMarketsDiscoveryMinCreatedTs("");
+        setConnectKalshiLiveMarketsDiscoveryMaxCreatedTs("");
+        setConnectKalshiLiveMarketsDiscoveryMinUpdatedTs("");
+        setConnectKalshiLiveMarketsDiscoveryMinCloseTs("");
+        setConnectKalshiLiveMarketsDiscoveryMaxCloseTs("");
+        setConnectKalshiLiveMarketsDiscoveryMinSettledTs("");
+        setConnectKalshiLiveMarketsDiscoveryMaxSettledTs("");
         setConnectKalshiLiveCandlestickTickers("");
         setConnectKalshiLiveCandlestickTickerMeta({});
         setConnectKalshiLiveTradesTicker("");
@@ -727,6 +789,19 @@ export const StateProviderV2 = ({children, initialSettings}) => {
       setConnectKalshiLiveTickers("");
       setConnectKalshiLiveMarketsTickerMeta({});
       setConnectKalshiLiveMarketsSheetMode("per_market");
+      setConnectKalshiLiveMarketsDiscoveryMode(false);
+      setConnectKalshiLiveMarketsDiscoveryStatus("");
+      setConnectKalshiLiveMarketsDiscoveryMveFilter("exclude");
+      setConnectKalshiLiveMarketsDiscoveryEventTicker("");
+      setConnectKalshiLiveMarketsDiscoverySeriesTicker("");
+      setConnectKalshiLiveMarketsDiscoveryTickers("");
+      setConnectKalshiLiveMarketsDiscoveryMinCreatedTs("");
+      setConnectKalshiLiveMarketsDiscoveryMaxCreatedTs("");
+      setConnectKalshiLiveMarketsDiscoveryMinUpdatedTs("");
+      setConnectKalshiLiveMarketsDiscoveryMinCloseTs("");
+      setConnectKalshiLiveMarketsDiscoveryMaxCloseTs("");
+      setConnectKalshiLiveMarketsDiscoveryMinSettledTs("");
+      setConnectKalshiLiveMarketsDiscoveryMaxSettledTs("");
       setConnectKalshiLiveCandlestickTickers("");
       setConnectKalshiLiveCandlestickTickerMeta({});
       setConnectKalshiLiveTradesTicker("");
@@ -1011,7 +1086,7 @@ export const StateProviderV2 = ({children, initialSettings}) => {
 
 
     return (
-        <StateContextV2.Provider value={{providerValue, isDemo, setIsDemo, guidedWorkflowPull, setGuidedWorkflowPull, guidedWorkflowPullRequested, setGuidedWorkflowPullRequested, guidedWorkflowHubDraftRef, connectHomeGuidedSession, setConnectHomeGuidedSession, runYourselfLocked, setRunYourselfLocked, runYourselfSessionActive, setRunYourselfSessionActive, workspaceWriteLocked, setWorkspaceWriteLocked, dashData, setDashData, bentoContainer, setBentoContainer, viewing, setViewing, integrationSidebar, setIntegrationSidebar, rightPanelOpen, setRightPanelOpen, rightPanelTab, setRightPanelTab, connectWorkspace, setConnectWorkspace, connectWorkspaceScrollTick, requestConnectWorkspace, connectComposeScrollTick, requestConnectComposeScroll, connectDataLakePullTick, requestConnectDataLakePull, connectHomeLeftNavOpen, setConnectHomeLeftNavOpen, connectHomeFlowStepsOpen, setConnectHomeFlowStepsOpen, connectHomeAnalyzeActive, setConnectHomeAnalyzeActive, connectHomeCenterView, setConnectHomeCenterView, connectAnalyzeScrollTick, requestConnectAnalyzeScroll, connectDataLakePullState, setConnectDataLakePullState, connectLargePullApplyRef, connectDataLakePullAbortRef, connectDataLakePullConsumedTickRef, connectProjectLoadState, setConnectProjectLoadState, connectDataLakeSampleId, setConnectDataLakeSampleId, connectDataLakeColumnSelections, setConnectDataLakeColumnSelections, connectApiEndpointId, setConnectApiEndpointId, connectApiColumnSelections, setConnectApiColumnSelections, connectLiveSourceId, setConnectLiveSourceId, connectLiveColumnSelections, setConnectLiveColumnSelections, connectKalshiLiveEndpointId, setConnectKalshiLiveEndpointId, connectKalshiLiveColumnSelections, setConnectKalshiLiveColumnSelections, connectKalshiLiveFilters, setConnectKalshiLiveFilters, connectKalshiLiveLimit, setConnectKalshiLiveLimit, connectKalshiLiveTickers, setConnectKalshiLiveTickers, connectKalshiLiveMarketsTickerMeta, setConnectKalshiLiveMarketsTickerMeta, connectKalshiLiveMarketsSheetMode, setConnectKalshiLiveMarketsSheetMode, connectKalshiLiveCandlestickTickers, setConnectKalshiLiveCandlestickTickers, connectKalshiLiveCandlestickTickerMeta, setConnectKalshiLiveCandlestickTickerMeta, connectKalshiLiveTradesTicker, setConnectKalshiLiveTradesTicker, connectKalshiLiveTradesTickerMeta, setConnectKalshiLiveTradesTickerMeta, connectKalshiLiveOrderbookTicker, setConnectKalshiLiveOrderbookTicker, connectKalshiLiveOrderbookTickerMeta, setConnectKalshiLiveOrderbookTickerMeta, connectKalshiLiveSeriesTicker, setConnectKalshiLiveSeriesTicker, connectKalshiLiveSeriesTickerMeta, setConnectKalshiLiveSeriesTickerMeta, connectKalshiLiveSeriesSheetMode, setConnectKalshiLiveSeriesSheetMode, connectKalshiLiveSeriesDiscoveryMode, setConnectKalshiLiveSeriesDiscoveryMode, connectKalshiLiveSeriesDiscoveryCategory, setConnectKalshiLiveSeriesDiscoveryCategory, connectKalshiLiveSeriesDiscoveryTag, setConnectKalshiLiveSeriesDiscoveryTag, connectKalshiLiveSeriesDiscoveryIncludeProductMetadata, setConnectKalshiLiveSeriesDiscoveryIncludeProductMetadata, connectKalshiLiveSeriesDiscoveryMinUpdatedTs, setConnectKalshiLiveSeriesDiscoveryMinUpdatedTs, connectKalshiLiveWhereFilters, setConnectKalshiLiveWhereFilters, connectKalshiLiveSortClauses, setConnectKalshiLiveSortClauses, kalshiLivePingState, setKalshiLivePingState, pingKalshiLiveExchange: pingKalshiLiveExchangeStatus, connectIntegrationPullTick, requestConnectIntegrationPull, cancelConnectDataFeedPull, connectHomePendingSheetName, setConnectHomePendingSheetName, connectHomePullDestination, setConnectHomePullDestination, athenaPingBySampleId, setAthenaPingBySampleId, pingAthenaLakeSample, connectActiveComposeOps, setConnectActiveComposeOps, dataLakeColumnComposeItems, setDataLakeColumnComposeItems, dataLakeComposeOrderBy, setDataLakeComposeOrderBy, dataLakeComposeLimitOpen, setDataLakeComposeLimitOpen, dataLakeComposeLimitValue, setDataLakeComposeLimitValue, dataLakeComposeLimitScope, setDataLakeComposeLimitScope, dataLakeComposeWhereFilters, setDataLakeComposeWhereFilters, dataLakeComposeHavingFilters, setDataLakeComposeHavingFilters, dataLakeComposeJoins, setDataLakeComposeJoins, connectedData, setConnectedData, dataConnected, setDataConnected, tempData, setTempData, connectedCols, setConnectedCols, dataSetName, setDataSetName, savedDataSets, setSavedDataSets, loadedDataMeta, setLoadedDataMeta, savedCharts, setSavedCharts, loadedChartMeta, setLoadedChartMeta, savedChartDashboards, setSavedChartDashboards, activeChartDashboardId, setActiveChartDashboardId, chartDashboardDraft, setChartDashboardDraft, selectedDashboardCard, setSelectedDashboardCard, refetchChartDashboardsTick, setRefetchChartDashboardsTick, saveProjectDialogNonce, requestSaveProjectDialog, pageFormatDockTarget, setPageFormatDockTarget, chartComposerDock, setChartComposerDock, cardGridComposerDock, setCardGridComposerDock, chartPickerEmphasis, setChartPickerEmphasis, dashboardComposerLayoutActions, setDashboardComposerLayoutActions, pageTitleFormatDockOpen, setPageTitleFormatDockOpen, savedPresentations, setSavedPresentations, loadedPresentationMeta, setLoadedPresentationMeta, connectedPresentation, setConnectedPresentation, refetchData, setRefetchData, refetchChart, setRefetchChart, refetchPresentations, setRefetchPresentations, loadedDataId ,setLoadedDataId, dataTypes, setDataTypes, dataTypeMismatch, setDataTypeMismatch, userHandle, setUserHandle, profilePic, setProfilePic, isLifeTimeMember, setIsLifeTimeMember, summarizationTables, setSummarizationTables, chartDataOverride, setChartDataOverride, chartDataOverrideMeta, setChartDataOverrideMeta, loadedChartBuilderSnapshot, setLoadedChartBuilderSnapshot, chartSheets, setChartSheets, activeChartSheetId, setActiveChartSheetId, addNewChartAndActivate, chartSnapshotFlusher, setChartSnapshotFlusher, polymarketWsState, setPolymarketWsState, chainlinkWsState, setChainlinkWsState, liveStreamState, setLiveStreamState, liveStreamActions, setLiveStreamActions, dataSheets, setDataSheets, activeSheetId, setActiveSheetId, addNewSheetAndActivate, replaceCurrentSheetData, setSheetData}}>
+        <StateContextV2.Provider value={{providerValue, isDemo, setIsDemo, guidedWorkflowPull, setGuidedWorkflowPull, guidedWorkflowPullRequested, setGuidedWorkflowPullRequested, guidedWorkflowHubDraftRef, connectHomeGuidedSession, setConnectHomeGuidedSession, runYourselfLocked, setRunYourselfLocked, runYourselfSessionActive, setRunYourselfSessionActive, workspaceWriteLocked, setWorkspaceWriteLocked, dashData, setDashData, bentoContainer, setBentoContainer, viewing, setViewing, integrationSidebar, setIntegrationSidebar, rightPanelOpen, setRightPanelOpen, rightPanelTab, setRightPanelTab, connectWorkspace, setConnectWorkspace, connectWorkspaceScrollTick, requestConnectWorkspace, connectComposeScrollTick, requestConnectComposeScroll, connectDataLakePullTick, requestConnectDataLakePull, connectHomeLeftNavOpen, setConnectHomeLeftNavOpen, connectHomeFlowStepsOpen, setConnectHomeFlowStepsOpen, connectHomeAnalyzeActive, setConnectHomeAnalyzeActive, connectHomeCenterView, setConnectHomeCenterView, connectAnalyzeScrollTick, requestConnectAnalyzeScroll, connectDataLakePullState, setConnectDataLakePullState, connectLargePullApplyRef, connectDataLakePullAbortRef, connectDataLakePullConsumedTickRef, connectProjectLoadState, setConnectProjectLoadState, connectDataLakeSampleId, setConnectDataLakeSampleId, connectDataLakeColumnSelections, setConnectDataLakeColumnSelections, connectApiEndpointId, setConnectApiEndpointId, connectApiColumnSelections, setConnectApiColumnSelections, connectLiveSourceId, setConnectLiveSourceId, connectLiveColumnSelections, setConnectLiveColumnSelections, connectKalshiLiveEndpointId, setConnectKalshiLiveEndpointId, connectKalshiLiveColumnSelections, setConnectKalshiLiveColumnSelections, connectKalshiLiveFilters, setConnectKalshiLiveFilters, connectKalshiLiveLimit, setConnectKalshiLiveLimit, connectKalshiLiveTickers, setConnectKalshiLiveTickers, connectKalshiLiveMarketsTickerMeta, setConnectKalshiLiveMarketsTickerMeta, connectKalshiLiveMarketsSheetMode, setConnectKalshiLiveMarketsSheetMode, connectKalshiLiveMarketsDiscoveryMode, setConnectKalshiLiveMarketsDiscoveryMode, connectKalshiLiveMarketsDiscoveryStatus, setConnectKalshiLiveMarketsDiscoveryStatus, connectKalshiLiveMarketsDiscoveryMveFilter, setConnectKalshiLiveMarketsDiscoveryMveFilter, connectKalshiLiveMarketsDiscoveryEventTicker, setConnectKalshiLiveMarketsDiscoveryEventTicker, connectKalshiLiveMarketsDiscoverySeriesTicker, setConnectKalshiLiveMarketsDiscoverySeriesTicker, connectKalshiLiveMarketsDiscoveryTickers, setConnectKalshiLiveMarketsDiscoveryTickers, connectKalshiLiveMarketsDiscoveryMinCreatedTs, setConnectKalshiLiveMarketsDiscoveryMinCreatedTs, connectKalshiLiveMarketsDiscoveryMaxCreatedTs, setConnectKalshiLiveMarketsDiscoveryMaxCreatedTs, connectKalshiLiveMarketsDiscoveryMinUpdatedTs, setConnectKalshiLiveMarketsDiscoveryMinUpdatedTs, connectKalshiLiveMarketsDiscoveryMinCloseTs, setConnectKalshiLiveMarketsDiscoveryMinCloseTs, connectKalshiLiveMarketsDiscoveryMaxCloseTs, setConnectKalshiLiveMarketsDiscoveryMaxCloseTs, connectKalshiLiveMarketsDiscoveryMinSettledTs, setConnectKalshiLiveMarketsDiscoveryMinSettledTs, connectKalshiLiveMarketsDiscoveryMaxSettledTs, setConnectKalshiLiveMarketsDiscoveryMaxSettledTs, connectKalshiLiveCandlestickTickers, setConnectKalshiLiveCandlestickTickers, connectKalshiLiveCandlestickTickerMeta, setConnectKalshiLiveCandlestickTickerMeta, connectKalshiLiveTradesTicker, setConnectKalshiLiveTradesTicker, connectKalshiLiveTradesTickerMeta, setConnectKalshiLiveTradesTickerMeta, connectKalshiLiveOrderbookTicker, setConnectKalshiLiveOrderbookTicker, connectKalshiLiveOrderbookTickerMeta, setConnectKalshiLiveOrderbookTickerMeta, connectKalshiLiveSeriesTicker, setConnectKalshiLiveSeriesTicker, connectKalshiLiveSeriesTickerMeta, setConnectKalshiLiveSeriesTickerMeta, connectKalshiLiveSeriesSheetMode, setConnectKalshiLiveSeriesSheetMode, connectKalshiLiveSeriesDiscoveryMode, setConnectKalshiLiveSeriesDiscoveryMode, connectKalshiLiveSeriesDiscoveryCategory, setConnectKalshiLiveSeriesDiscoveryCategory, connectKalshiLiveSeriesDiscoveryTag, setConnectKalshiLiveSeriesDiscoveryTag, connectKalshiLiveSeriesDiscoveryIncludeProductMetadata, setConnectKalshiLiveSeriesDiscoveryIncludeProductMetadata, connectKalshiLiveSeriesDiscoveryMinUpdatedTs, setConnectKalshiLiveSeriesDiscoveryMinUpdatedTs, connectKalshiLiveWhereFilters, setConnectKalshiLiveWhereFilters, connectKalshiLiveSortClauses, setConnectKalshiLiveSortClauses, kalshiLivePingState, setKalshiLivePingState, pingKalshiLiveExchange: pingKalshiLiveExchangeStatus, connectIntegrationPullTick, requestConnectIntegrationPull, cancelConnectDataFeedPull, connectHomePendingSheetName, setConnectHomePendingSheetName, connectHomePullDestination, setConnectHomePullDestination, athenaPingBySampleId, setAthenaPingBySampleId, pingAthenaLakeSample, connectActiveComposeOps, setConnectActiveComposeOps, dataLakeColumnComposeItems, setDataLakeColumnComposeItems, dataLakeComposeOrderBy, setDataLakeComposeOrderBy, dataLakeComposeLimitOpen, setDataLakeComposeLimitOpen, dataLakeComposeLimitValue, setDataLakeComposeLimitValue, dataLakeComposeLimitScope, setDataLakeComposeLimitScope, dataLakeComposeWhereFilters, setDataLakeComposeWhereFilters, dataLakeComposeHavingFilters, setDataLakeComposeHavingFilters, dataLakeComposeJoins, setDataLakeComposeJoins, connectedData, setConnectedData, dataConnected, setDataConnected, tempData, setTempData, connectedCols, setConnectedCols, dataSetName, setDataSetName, savedDataSets, setSavedDataSets, loadedDataMeta, setLoadedDataMeta, savedCharts, setSavedCharts, loadedChartMeta, setLoadedChartMeta, savedChartDashboards, setSavedChartDashboards, activeChartDashboardId, setActiveChartDashboardId, chartDashboardDraft, setChartDashboardDraft, selectedDashboardCard, setSelectedDashboardCard, refetchChartDashboardsTick, setRefetchChartDashboardsTick, saveProjectDialogNonce, requestSaveProjectDialog, pageFormatDockTarget, setPageFormatDockTarget, chartComposerDock, setChartComposerDock, cardGridComposerDock, setCardGridComposerDock, chartPickerEmphasis, setChartPickerEmphasis, dashboardComposerLayoutActions, setDashboardComposerLayoutActions, pageTitleFormatDockOpen, setPageTitleFormatDockOpen, savedPresentations, setSavedPresentations, loadedPresentationMeta, setLoadedPresentationMeta, connectedPresentation, setConnectedPresentation, refetchData, setRefetchData, refetchChart, setRefetchChart, refetchPresentations, setRefetchPresentations, loadedDataId ,setLoadedDataId, dataTypes, setDataTypes, dataTypeMismatch, setDataTypeMismatch, userHandle, setUserHandle, profilePic, setProfilePic, isLifeTimeMember, setIsLifeTimeMember, summarizationTables, setSummarizationTables, chartDataOverride, setChartDataOverride, chartDataOverrideMeta, setChartDataOverrideMeta, loadedChartBuilderSnapshot, setLoadedChartBuilderSnapshot, chartSheets, setChartSheets, activeChartSheetId, setActiveChartSheetId, addNewChartAndActivate, chartSnapshotFlusher, setChartSnapshotFlusher, polymarketWsState, setPolymarketWsState, chainlinkWsState, setChainlinkWsState, liveStreamState, setLiveStreamState, liveStreamActions, setLiveStreamActions, dataSheets, setDataSheets, activeSheetId, setActiveSheetId, addNewSheetAndActivate, replaceCurrentSheetData, setSheetData}}>
             {children}
         </StateContextV2.Provider>
     )

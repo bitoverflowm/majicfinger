@@ -34,6 +34,7 @@ export function applyKalshiLivePowerSearchSelection(ctx, suggestion) {
     ctx.setConnectKalshiLiveTickers?.(ticker);
     ctx.setConnectKalshiLiveMarketsTickerMeta?.(ticker ? { [ticker]: title } : {});
     ctx.setConnectKalshiLiveMarketsSheetMode?.("per_market");
+    ctx.setConnectKalshiLiveMarketsDiscoveryMode?.(false);
     ctx.setConnectKalshiLiveWhereFilters?.([]);
     ctx.setConnectKalshiLiveSortClauses?.([]);
     ctx.setConnectActiveComposeOps?.([]);

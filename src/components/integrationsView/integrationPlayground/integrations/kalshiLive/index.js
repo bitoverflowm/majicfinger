@@ -6,6 +6,7 @@ import { flushSync } from "react-dom";
 import { useMyStateV2 } from "@/context/stateContextV2";
 import { applyAthenaPullToSheetPatch } from "@/lib/dataLake/applyAthenaPullToSheet";
 import { fetchKalshiLiveMarketsTickerPull } from "@/lib/kalshiLive/fetchKalshiLiveMarketsTickerPull";
+import { fetchKalshiLiveMarketsDiscoveryPull } from "@/lib/kalshiLive/fetchKalshiLiveMarketsDiscoveryPull";
 import { fetchKalshiLiveSeriesPull } from "@/lib/kalshiLive/fetchKalshiLiveSeriesPull";
 import { fetchKalshiLiveSeriesDiscoveryPull } from "@/lib/kalshiLive/fetchKalshiLiveSeriesDiscoveryPull";
 import {
@@ -13,6 +14,10 @@ import {
   normalizeKalshiLiveMarketsSheetMode,
   summarizeKalshiLiveMarketsTickerPullRequest,
 } from "@/lib/kalshiLive/marketCompose";
+import {
+  KALSHI_LIVE_MVE_FILTER_EXCLUDE,
+  summarizeKalshiLiveMarketsDiscoveryRequest,
+} from "@/lib/kalshiLive/marketDiscovery";
 import {
   KALSHI_LIVE_SERIES_SHEET_MODE_COMBINED,
   normalizeKalshiLiveSeriesSheetMode,
@@ -70,6 +75,19 @@ export default function KalshiLive({ setConnectedData, connectHomePullBridge = f
     connectKalshiLiveSortClauses,
     connectKalshiLiveTickers,
     connectKalshiLiveMarketsSheetMode,
+    connectKalshiLiveMarketsDiscoveryMode,
+    connectKalshiLiveMarketsDiscoveryStatus,
+    connectKalshiLiveMarketsDiscoveryMveFilter,
+    connectKalshiLiveMarketsDiscoveryEventTicker,
+    connectKalshiLiveMarketsDiscoverySeriesTicker,
+    connectKalshiLiveMarketsDiscoveryTickers,
+    connectKalshiLiveMarketsDiscoveryMinCreatedTs,
+    connectKalshiLiveMarketsDiscoveryMaxCreatedTs,
+    connectKalshiLiveMarketsDiscoveryMinUpdatedTs,
+    connectKalshiLiveMarketsDiscoveryMinCloseTs,
+    connectKalshiLiveMarketsDiscoveryMaxCloseTs,
+    connectKalshiLiveMarketsDiscoveryMinSettledTs,
+    connectKalshiLiveMarketsDiscoveryMaxSettledTs,
     connectKalshiLiveCandlestickTickers,
     connectKalshiLiveTradesTicker,
     connectKalshiLiveOrderbookTicker,
@@ -90,6 +108,96 @@ export default function KalshiLive({ setConnectedData, connectHomePullBridge = f
 
   const runMarketsPull = useCallback(
     async (ac, sheetId, cols) => {
+      const discoveryMode = !!connectKalshiLiveMarketsDiscoveryMode;
+      const requestStartMs =
+        typeof performance !== "undefined" && performance?.now ? performance.now() : Date.now();
+
+      setConnectDataLakePullState?.((prev) => ({
+        ...prev,
+        loading: true,
+        label: discoveryMode
+          ? "Discovering Kalshi Live markets…"
+          : "Fetching Kalshi Live markets…",
+        progress: 8,
+        error: null,
+      }));
+
+      if (discoveryMode) {
+        const discoveryParams = {
+          status: connectKalshiLiveMarketsDiscoveryStatus,
+          mveFilter: connectKalshiLiveMarketsDiscoveryMveFilter || KALSHI_LIVE_MVE_FILTER_EXCLUDE,
+          eventTicker: connectKalshiLiveMarketsDiscoveryEventTicker,
+          seriesTicker: connectKalshiLiveMarketsDiscoverySeriesTicker,
+          tickers: connectKalshiLiveMarketsDiscoveryTickers,
+          minCreatedTs: connectKalshiLiveMarketsDiscoveryMinCreatedTs,
+          maxCreatedTs: connectKalshiLiveMarketsDiscoveryMaxCreatedTs,
+          minUpdatedTs: connectKalshiLiveMarketsDiscoveryMinUpdatedTs,
+          minCloseTs: connectKalshiLiveMarketsDiscoveryMinCloseTs,
+          maxCloseTs: connectKalshiLiveMarketsDiscoveryMaxCloseTs,
+          minSettledTs: connectKalshiLiveMarketsDiscoveryMinSettledTs,
+          maxSettledTs: connectKalshiLiveMarketsDiscoveryMaxSettledTs,
+        };
+
+        const { raw, rows: accumulated, querySummary } = await fetchKalshiLiveMarketsDiscoveryPull({
+          params: discoveryParams,
+          selectedColumns: cols,
+          signal: ac.signal,
+          onPage: ({ page, totalLoaded }) => {
+            const pct = Math.min(92, 8 + page * 6);
+            setConnectDataLakePullState?.((prev) => ({
+              ...prev,
+              loading: true,
+              label: `Loaded ${totalLoaded} markets (page ${page})…`,
+              progress: pct,
+              error: null,
+            }));
+          },
+        });
+
+        if (setRows) setRows(accumulated);
+
+        await ingestKalshiLiveAsView({
+          endpointId: "markets",
+          markets: raw,
+          selectedColumns: cols,
+        });
+
+        const elapsedMs =
+          (typeof performance !== "undefined" && performance?.now
+            ? performance.now()
+            : Date.now()) - requestStartMs;
+
+        const requestCard = {
+          id: genRequestCardId(),
+          createdAt: Date.now(),
+          elapsedMs,
+          lake: "kalshi-live",
+          table: "markets",
+          sheetId: sheetId || null,
+          querySummary,
+          loadedRowCount: accumulated.length,
+        };
+
+        if (sheetId && setDataSheets) {
+          setDataSheets((prev) =>
+            applyAthenaPullToSheetPatch(prev, sheetId, accumulated, {
+              provenance: {
+                source: "kalshi-live",
+                endpoint: "markets",
+                discovery: true,
+                ...discoveryParams,
+                querySummary,
+              },
+              requestCards: [requestCard],
+            }),
+          );
+        }
+
+        applyConnectHomePullData(ctx, accumulated);
+        if (ctx?.requestConnectAnalyzeScroll) ctx.requestConnectAnalyzeScroll();
+        return accumulated.length;
+      }
+
       const whereFilters = Array.isArray(connectKalshiLiveWhereFilters)
         ? connectKalshiLiveWhereFilters
         : [];
@@ -98,16 +206,6 @@ export default function KalshiLive({ setConnectedData, connectHomePullBridge = f
         : [];
       const marketTickers = String(connectKalshiLiveTickers || "").trim();
       const sheetMode = normalizeKalshiLiveMarketsSheetMode(connectKalshiLiveMarketsSheetMode);
-      const requestStartMs =
-        typeof performance !== "undefined" && performance?.now ? performance.now() : Date.now();
-
-      setConnectDataLakePullState?.((prev) => ({
-        ...prev,
-        loading: true,
-        label: "Fetching Kalshi Live markets…",
-        progress: 8,
-        error: null,
-      }));
 
       const {
         byTicker,
@@ -254,6 +352,19 @@ export default function KalshiLive({ setConnectedData, connectHomePullBridge = f
       connectKalshiLiveSortClauses,
       connectKalshiLiveTickers,
       connectKalshiLiveMarketsSheetMode,
+      connectKalshiLiveMarketsDiscoveryMode,
+      connectKalshiLiveMarketsDiscoveryStatus,
+      connectKalshiLiveMarketsDiscoveryMveFilter,
+      connectKalshiLiveMarketsDiscoveryEventTicker,
+      connectKalshiLiveMarketsDiscoverySeriesTicker,
+      connectKalshiLiveMarketsDiscoveryTickers,
+      connectKalshiLiveMarketsDiscoveryMinCreatedTs,
+      connectKalshiLiveMarketsDiscoveryMaxCreatedTs,
+      connectKalshiLiveMarketsDiscoveryMinUpdatedTs,
+      connectKalshiLiveMarketsDiscoveryMinCloseTs,
+      connectKalshiLiveMarketsDiscoveryMaxCloseTs,
+      connectKalshiLiveMarketsDiscoveryMinSettledTs,
+      connectKalshiLiveMarketsDiscoveryMaxSettledTs,
       setConnectDataLakePullState,
       setDataSheets,
       setRows,
@@ -982,9 +1093,25 @@ export default function KalshiLive({ setConnectedData, connectHomePullBridge = f
                 includeVolume: kalshiLiveSeriesWantsIncludeVolume(cols),
               })
           : endpointId === "markets"
-            ? summarizeKalshiLiveMarketsTickerPullRequest(connectKalshiLiveTickers || "", {
-                sheetMode: normalizeKalshiLiveMarketsSheetMode(connectKalshiLiveMarketsSheetMode),
-              })
+            ? connectKalshiLiveMarketsDiscoveryMode
+              ? summarizeKalshiLiveMarketsDiscoveryRequest({
+                  status: connectKalshiLiveMarketsDiscoveryStatus,
+                  mveFilter:
+                    connectKalshiLiveMarketsDiscoveryMveFilter || KALSHI_LIVE_MVE_FILTER_EXCLUDE,
+                  eventTicker: connectKalshiLiveMarketsDiscoveryEventTicker,
+                  seriesTicker: connectKalshiLiveMarketsDiscoverySeriesTicker,
+                  tickers: connectKalshiLiveMarketsDiscoveryTickers,
+                  minCreatedTs: connectKalshiLiveMarketsDiscoveryMinCreatedTs,
+                  maxCreatedTs: connectKalshiLiveMarketsDiscoveryMaxCreatedTs,
+                  minUpdatedTs: connectKalshiLiveMarketsDiscoveryMinUpdatedTs,
+                  minCloseTs: connectKalshiLiveMarketsDiscoveryMinCloseTs,
+                  maxCloseTs: connectKalshiLiveMarketsDiscoveryMaxCloseTs,
+                  minSettledTs: connectKalshiLiveMarketsDiscoveryMinSettledTs,
+                  maxSettledTs: connectKalshiLiveMarketsDiscoveryMaxSettledTs,
+                })
+              : summarizeKalshiLiveMarketsTickerPullRequest(connectKalshiLiveTickers || "", {
+                  sheetMode: normalizeKalshiLiveMarketsSheetMode(connectKalshiLiveMarketsSheetMode),
+                })
             : endpointId,
     });
 
@@ -1064,6 +1191,19 @@ export default function KalshiLive({ setConnectedData, connectHomePullBridge = f
     connectKalshiLiveLimit,
     connectKalshiLiveTickers,
     connectKalshiLiveMarketsSheetMode,
+    connectKalshiLiveMarketsDiscoveryMode,
+    connectKalshiLiveMarketsDiscoveryStatus,
+    connectKalshiLiveMarketsDiscoveryMveFilter,
+    connectKalshiLiveMarketsDiscoveryEventTicker,
+    connectKalshiLiveMarketsDiscoverySeriesTicker,
+    connectKalshiLiveMarketsDiscoveryTickers,
+    connectKalshiLiveMarketsDiscoveryMinCreatedTs,
+    connectKalshiLiveMarketsDiscoveryMaxCreatedTs,
+    connectKalshiLiveMarketsDiscoveryMinUpdatedTs,
+    connectKalshiLiveMarketsDiscoveryMinCloseTs,
+    connectKalshiLiveMarketsDiscoveryMaxCloseTs,
+    connectKalshiLiveMarketsDiscoveryMinSettledTs,
+    connectKalshiLiveMarketsDiscoveryMaxSettledTs,
     connectKalshiLiveSeriesTicker,
     connectKalshiLiveSeriesSheetMode,
     connectKalshiLiveSeriesDiscoveryMode,

@@ -362,6 +362,19 @@ export function KalshiLiveIntegrationsCore({ onRunPull, className, stepBackRef }
     setConnectKalshiLiveTickers,
     setConnectKalshiLiveMarketsTickerMeta,
     setConnectKalshiLiveMarketsSheetMode,
+    setConnectKalshiLiveMarketsDiscoveryMode,
+    setConnectKalshiLiveMarketsDiscoveryStatus,
+    setConnectKalshiLiveMarketsDiscoveryMveFilter,
+    setConnectKalshiLiveMarketsDiscoveryEventTicker,
+    setConnectKalshiLiveMarketsDiscoverySeriesTicker,
+    setConnectKalshiLiveMarketsDiscoveryTickers,
+    setConnectKalshiLiveMarketsDiscoveryMinCreatedTs,
+    setConnectKalshiLiveMarketsDiscoveryMaxCreatedTs,
+    setConnectKalshiLiveMarketsDiscoveryMinUpdatedTs,
+    setConnectKalshiLiveMarketsDiscoveryMinCloseTs,
+    setConnectKalshiLiveMarketsDiscoveryMaxCloseTs,
+    setConnectKalshiLiveMarketsDiscoveryMinSettledTs,
+    setConnectKalshiLiveMarketsDiscoveryMaxSettledTs,
     connectKalshiLiveCandlestickTickers = "",
     setConnectKalshiLiveCandlestickTickers,
     setConnectKalshiLiveCandlestickTickerMeta,
@@ -478,6 +491,19 @@ export function KalshiLiveIntegrationsCore({ onRunPull, className, stepBackRef }
         setConnectKalshiLiveTickers?.("");
         setConnectKalshiLiveMarketsTickerMeta?.({});
         setConnectKalshiLiveMarketsSheetMode?.("per_market");
+        setConnectKalshiLiveMarketsDiscoveryMode?.(false);
+        setConnectKalshiLiveMarketsDiscoveryStatus?.("");
+        setConnectKalshiLiveMarketsDiscoveryMveFilter?.("exclude");
+        setConnectKalshiLiveMarketsDiscoveryEventTicker?.("");
+        setConnectKalshiLiveMarketsDiscoverySeriesTicker?.("");
+        setConnectKalshiLiveMarketsDiscoveryTickers?.("");
+        setConnectKalshiLiveMarketsDiscoveryMinCreatedTs?.("");
+        setConnectKalshiLiveMarketsDiscoveryMaxCreatedTs?.("");
+        setConnectKalshiLiveMarketsDiscoveryMinUpdatedTs?.("");
+        setConnectKalshiLiveMarketsDiscoveryMinCloseTs?.("");
+        setConnectKalshiLiveMarketsDiscoveryMaxCloseTs?.("");
+        setConnectKalshiLiveMarketsDiscoveryMinSettledTs?.("");
+        setConnectKalshiLiveMarketsDiscoveryMaxSettledTs?.("");
       }
       if (id !== "candlesticks") {
         setConnectKalshiLiveCandlestickTickers?.("");
@@ -517,6 +543,19 @@ export function KalshiLiveIntegrationsCore({ onRunPull, className, stepBackRef }
       setConnectKalshiLiveTickers,
       setConnectKalshiLiveMarketsTickerMeta,
       setConnectKalshiLiveMarketsSheetMode,
+      setConnectKalshiLiveMarketsDiscoveryMode,
+      setConnectKalshiLiveMarketsDiscoveryStatus,
+      setConnectKalshiLiveMarketsDiscoveryMveFilter,
+      setConnectKalshiLiveMarketsDiscoveryEventTicker,
+      setConnectKalshiLiveMarketsDiscoverySeriesTicker,
+      setConnectKalshiLiveMarketsDiscoveryTickers,
+      setConnectKalshiLiveMarketsDiscoveryMinCreatedTs,
+      setConnectKalshiLiveMarketsDiscoveryMaxCreatedTs,
+      setConnectKalshiLiveMarketsDiscoveryMinUpdatedTs,
+      setConnectKalshiLiveMarketsDiscoveryMinCloseTs,
+      setConnectKalshiLiveMarketsDiscoveryMaxCloseTs,
+      setConnectKalshiLiveMarketsDiscoveryMinSettledTs,
+      setConnectKalshiLiveMarketsDiscoveryMaxSettledTs,
       setConnectKalshiLiveCandlestickTickers,
       setConnectKalshiLiveCandlestickTickerMeta,
       setConnectKalshiLiveTradesTicker,
@@ -544,6 +583,19 @@ export function KalshiLiveIntegrationsCore({ onRunPull, className, stepBackRef }
     setConnectKalshiLiveTickers?.("");
     setConnectKalshiLiveMarketsTickerMeta?.({});
     setConnectKalshiLiveMarketsSheetMode?.("per_market");
+    setConnectKalshiLiveMarketsDiscoveryMode?.(false);
+    setConnectKalshiLiveMarketsDiscoveryStatus?.("");
+    setConnectKalshiLiveMarketsDiscoveryMveFilter?.("exclude");
+    setConnectKalshiLiveMarketsDiscoveryEventTicker?.("");
+    setConnectKalshiLiveMarketsDiscoverySeriesTicker?.("");
+    setConnectKalshiLiveMarketsDiscoveryTickers?.("");
+    setConnectKalshiLiveMarketsDiscoveryMinCreatedTs?.("");
+    setConnectKalshiLiveMarketsDiscoveryMaxCreatedTs?.("");
+    setConnectKalshiLiveMarketsDiscoveryMinUpdatedTs?.("");
+    setConnectKalshiLiveMarketsDiscoveryMinCloseTs?.("");
+    setConnectKalshiLiveMarketsDiscoveryMaxCloseTs?.("");
+    setConnectKalshiLiveMarketsDiscoveryMinSettledTs?.("");
+    setConnectKalshiLiveMarketsDiscoveryMaxSettledTs?.("");
     setConnectKalshiLiveCandlestickTickers?.("");
     setConnectKalshiLiveCandlestickTickerMeta?.({});
     setConnectKalshiLiveTradesTicker?.("");
@@ -568,6 +620,24 @@ export function KalshiLiveIntegrationsCore({ onRunPull, className, stepBackRef }
     setConnectKalshiLiveTickers,
     setConnectKalshiLiveMarketsTickerMeta,
     setConnectKalshiLiveMarketsSheetMode,
+    setConnectKalshiLiveSeriesDiscoveryMode,
+    setConnectKalshiLiveSeriesDiscoveryCategory,
+    setConnectKalshiLiveSeriesDiscoveryTag,
+    setConnectKalshiLiveSeriesDiscoveryIncludeProductMetadata,
+    setConnectKalshiLiveSeriesDiscoveryMinUpdatedTs,
+    setConnectKalshiLiveMarketsDiscoveryMode,
+    setConnectKalshiLiveMarketsDiscoveryStatus,
+    setConnectKalshiLiveMarketsDiscoveryMveFilter,
+    setConnectKalshiLiveMarketsDiscoveryEventTicker,
+    setConnectKalshiLiveMarketsDiscoverySeriesTicker,
+    setConnectKalshiLiveMarketsDiscoveryTickers,
+    setConnectKalshiLiveMarketsDiscoveryMinCreatedTs,
+    setConnectKalshiLiveMarketsDiscoveryMaxCreatedTs,
+    setConnectKalshiLiveMarketsDiscoveryMinUpdatedTs,
+    setConnectKalshiLiveMarketsDiscoveryMinCloseTs,
+    setConnectKalshiLiveMarketsDiscoveryMaxCloseTs,
+    setConnectKalshiLiveMarketsDiscoveryMinSettledTs,
+    setConnectKalshiLiveMarketsDiscoveryMaxSettledTs,
     setConnectKalshiLiveCandlestickTickers,
     setConnectKalshiLiveCandlestickTickerMeta,
     setConnectKalshiLiveTradesTicker,

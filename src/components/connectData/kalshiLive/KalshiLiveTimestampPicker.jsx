@@ -31,21 +31,31 @@ function unixToDateAndTime(unix) {
  *   value: number | string;
  *   onChange: (unixSeconds: number | "") => void;
  *   className?: string;
+ *   disabled?: boolean;
+ *   fromDate?: Date;
+ *   placeholder?: string;
  * }} props
  */
-export function KalshiLiveTimestampPicker({ value, onChange, className }) {
+export function KalshiLiveTimestampPicker({
+  value,
+  onChange,
+  className,
+  disabled = false,
+  fromDate,
+  placeholder = "Pick date & time",
+}) {
   const parsed = useMemo(() => unixToDateAndTime(value), [value]);
   const [date, setDate] = useState(parsed.date);
   const [time, setTime] = useState(parsed.time);
 
   const label = useMemo(() => {
     const sec = Number(value);
-    if (!Number.isFinite(sec) || sec <= 0) return "Pick date & time";
+    if (!Number.isFinite(sec) || sec <= 0) return placeholder;
     return new Date(sec * 1000).toLocaleString(undefined, {
       dateStyle: "medium",
       timeStyle: "short",
     });
-  }, [value]);
+  }, [value, placeholder]);
 
   const commit = (nextDate, nextTime) => {
     const sec = wallTimeToUnixSeconds(nextDate, nextTime);
@@ -58,6 +68,7 @@ export function KalshiLiveTimestampPicker({ value, onChange, className }) {
         <Button
           type="button"
           variant="outline"
+          disabled={disabled}
           className={cn(
             "h-8 w-full min-w-[10rem] justify-start px-2 text-left text-[11px] font-normal",
             className,
@@ -73,6 +84,8 @@ export function KalshiLiveTimestampPicker({ value, onChange, className }) {
         <Calendar
           mode="single"
           selected={date}
+          fromDate={fromDate}
+          disabled={fromDate ? [{ before: fromDate }] : undefined}
           onSelect={(d) => {
             setDate(d);
             commit(d, time);
@@ -84,12 +97,29 @@ export function KalshiLiveTimestampPicker({ value, onChange, className }) {
             type="time"
             className="h-8 flex-1 text-xs"
             value={time}
+            disabled={disabled}
             onChange={(e) => {
               const t = e.target.value;
               setTime(t);
               commit(date, t);
             }}
           />
+          {Number(value) > 0 ? (
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              className="h-8 px-2 text-[10px]"
+              disabled={disabled}
+              onClick={() => {
+                setDate(undefined);
+                setTime("00:00");
+                onChange("");
+              }}
+            >
+              Clear
+            </Button>
+          ) : null}
         </div>
       </PopoverContent>
     </Popover>

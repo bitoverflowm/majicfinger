@@ -46,6 +46,10 @@ import {
   validateKalshiLiveMarketsPull,
 } from "@/lib/kalshiLive/marketCompose";
 import {
+  KALSHI_LIVE_MVE_FILTER_EXCLUDE,
+  validateKalshiLiveMarketsDiscoveryPull,
+} from "@/lib/kalshiLive/marketDiscovery";
+import {
   KALSHI_LIVE_SERIES_SHEET_MODE_COMBINED,
   KALSHI_LIVE_SERIES_SHEET_MODE_PER_SERIES,
   normalizeKalshiLiveSeriesSheetMode,
@@ -166,6 +170,19 @@ export function KalshiLiveComposeOperationPanel({
     connectKalshiLiveMarketsTickerMeta = {},
     connectKalshiLiveMarketsSheetMode = KALSHI_LIVE_MARKETS_SHEET_MODE_PER_MARKET,
     setConnectKalshiLiveMarketsSheetMode,
+    connectKalshiLiveMarketsDiscoveryMode = false,
+    connectKalshiLiveMarketsDiscoveryStatus = "",
+    connectKalshiLiveMarketsDiscoveryMveFilter = KALSHI_LIVE_MVE_FILTER_EXCLUDE,
+    connectKalshiLiveMarketsDiscoveryEventTicker = "",
+    connectKalshiLiveMarketsDiscoverySeriesTicker = "",
+    connectKalshiLiveMarketsDiscoveryTickers = "",
+    connectKalshiLiveMarketsDiscoveryMinCreatedTs = "",
+    connectKalshiLiveMarketsDiscoveryMaxCreatedTs = "",
+    connectKalshiLiveMarketsDiscoveryMinUpdatedTs = "",
+    connectKalshiLiveMarketsDiscoveryMinCloseTs = "",
+    connectKalshiLiveMarketsDiscoveryMaxCloseTs = "",
+    connectKalshiLiveMarketsDiscoveryMinSettledTs = "",
+    connectKalshiLiveMarketsDiscoveryMaxSettledTs = "",
     connectKalshiLiveTradesTicker = "",
     connectKalshiLiveTradesTickerMeta = {},
     connectKalshiLiveOrderbookTicker = "",
@@ -231,6 +248,7 @@ export function KalshiLiveComposeOperationPanel({
 
   const marketsAutoSheets = useMemo(() => {
     if (endpointId !== "markets") return null;
+    if (connectKalshiLiveMarketsDiscoveryMode) return null;
     if (marketsSheetMode !== KALSHI_LIVE_MARKETS_SHEET_MODE_PER_MARKET) return null;
     if (marketsTickerList.length < 2) return null;
     return marketsTickerList.map((ticker) => ({
@@ -239,6 +257,7 @@ export function KalshiLiveComposeOperationPanel({
     }));
   }, [
     endpointId,
+    connectKalshiLiveMarketsDiscoveryMode,
     marketsSheetMode,
     marketsTickerList,
     connectKalshiLiveMarketsTickerMeta,
@@ -408,7 +427,22 @@ export function KalshiLiveComposeOperationPanel({
     }
 
     if (endpointId === "markets") {
-      const marketsErr = validateKalshiLiveMarketsPull(connectKalshiLiveTickers);
+      const marketsErr = connectKalshiLiveMarketsDiscoveryMode
+        ? validateKalshiLiveMarketsDiscoveryPull({
+            status: connectKalshiLiveMarketsDiscoveryStatus,
+            mveFilter: connectKalshiLiveMarketsDiscoveryMveFilter,
+            eventTicker: connectKalshiLiveMarketsDiscoveryEventTicker,
+            seriesTicker: connectKalshiLiveMarketsDiscoverySeriesTicker,
+            tickers: connectKalshiLiveMarketsDiscoveryTickers,
+            minCreatedTs: connectKalshiLiveMarketsDiscoveryMinCreatedTs,
+            maxCreatedTs: connectKalshiLiveMarketsDiscoveryMaxCreatedTs,
+            minUpdatedTs: connectKalshiLiveMarketsDiscoveryMinUpdatedTs,
+            minCloseTs: connectKalshiLiveMarketsDiscoveryMinCloseTs,
+            maxCloseTs: connectKalshiLiveMarketsDiscoveryMaxCloseTs,
+            minSettledTs: connectKalshiLiveMarketsDiscoveryMinSettledTs,
+            maxSettledTs: connectKalshiLiveMarketsDiscoveryMaxSettledTs,
+          })
+        : validateKalshiLiveMarketsPull(connectKalshiLiveTickers);
       if (marketsErr) {
         setFilterError?.(marketsErr);
         return;
@@ -440,6 +474,19 @@ export function KalshiLiveComposeOperationPanel({
     connectKalshiLiveWhereFilters,
     connectKalshiLiveCandlestickTickers,
     connectKalshiLiveTickers,
+    connectKalshiLiveMarketsDiscoveryMode,
+    connectKalshiLiveMarketsDiscoveryStatus,
+    connectKalshiLiveMarketsDiscoveryMveFilter,
+    connectKalshiLiveMarketsDiscoveryEventTicker,
+    connectKalshiLiveMarketsDiscoverySeriesTicker,
+    connectKalshiLiveMarketsDiscoveryTickers,
+    connectKalshiLiveMarketsDiscoveryMinCreatedTs,
+    connectKalshiLiveMarketsDiscoveryMaxCreatedTs,
+    connectKalshiLiveMarketsDiscoveryMinUpdatedTs,
+    connectKalshiLiveMarketsDiscoveryMinCloseTs,
+    connectKalshiLiveMarketsDiscoveryMaxCloseTs,
+    connectKalshiLiveMarketsDiscoveryMinSettledTs,
+    connectKalshiLiveMarketsDiscoveryMaxSettledTs,
     connectKalshiLiveTradesTicker,
     connectKalshiLiveOrderbookTicker,
     setFilterError,
@@ -788,7 +835,9 @@ export function KalshiLiveComposeOperationPanel({
         </p>
       ) : null}
 
-      {endpointId === "markets" && marketsTickerList.length >= 2 ? (
+      {endpointId === "markets" &&
+      !connectKalshiLiveMarketsDiscoveryMode &&
+      marketsTickerList.length >= 2 ? (
         <div className="space-y-1.5">
           <Label className="text-[11px] font-medium text-muted-foreground">
             How should we organize sheets?
