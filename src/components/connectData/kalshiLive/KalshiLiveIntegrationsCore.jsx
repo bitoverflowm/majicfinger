@@ -40,8 +40,11 @@ import { Label } from "@/components/ui/label";
 import { useMyStateV2 } from "@/context/stateContextV2";
 import {
   KALSHI_LIVE_CONNECT_CONFIG,
+  KALSHI_LIVE_DEFAULT_ENDPOINT_CATEGORY,
+  KALSHI_LIVE_ENDPOINT_CATEGORIES,
   KALSHI_LIVE_UNDER_CONSTRUCTION_ENDPOINT_IDS,
   getKalshiLiveComposeOperationIds,
+  getKalshiLiveEndpointsForCategory,
 } from "@/config/kalshiLiveConnect";
 import { KALSHI_LIVE_TRADES_DEFAULT_LIMIT } from "@/lib/kalshiLive/tradeCompose";
 import { CONNECT_COMPOSE_OPERATIONS } from "@/lib/connectComposeOperations";
@@ -156,6 +159,7 @@ function HubStartingPointColumn({
   children,
   id,
   headerAction = null,
+  headerBelow = null,
   className,
 }) {
   return (
@@ -183,8 +187,36 @@ function HubStartingPointColumn({
           </div>
           {headerAction ? <div className="shrink-0">{headerAction}</div> : null}
         </div>
+        {headerBelow}
       </div>
       <div className="flex min-h-0 flex-1 flex-col gap-2">{children}</div>
+    </div>
+  );
+}
+
+function HubEndpointCategoryTags({ categories, value, onChange }) {
+  return (
+    <div className="flex flex-wrap items-center gap-1.5" role="tablist" aria-label="Endpoint category">
+      {categories.map((cat) => {
+        const selected = value === cat.id;
+        return (
+          <button
+            key={cat.id}
+            type="button"
+            role="tab"
+            aria-selected={selected}
+            onClick={() => onChange(cat.id)}
+            className={cn(
+              "inline-flex rounded-full border px-2 py-0.5 text-[0.625rem] font-medium leading-tight transition-colors",
+              selected
+                ? "border-secondary/25 bg-secondary/10 text-secondary dark:text-secondary"
+                : "border-border/60 bg-background/80 text-muted-foreground hover:border-border hover:text-foreground",
+            )}
+          >
+            {cat.label}
+          </button>
+        );
+      })}
     </div>
   );
 }
@@ -405,10 +437,17 @@ export function KalshiLiveIntegrationsCore({ onRunPull, className, stepBackRef }
   const [marketSearchKey, setMarketSearchKey] = useState(0);
   const [searchExpanded, setSearchExpanded] = useState(false);
   const [startingGridHeight, setStartingGridHeight] = useState(null);
+  const [endpointCategory, setEndpointCategory] = useState(
+    KALSHI_LIVE_DEFAULT_ENDPOINT_CATEGORY,
+  );
   const clearHoverTimeoutRef = useRef(null);
   const startingGridRef = useRef(null);
 
   const endpoints = KALSHI_LIVE_CONNECT_CONFIG.endpoints;
+  const categoryEndpoints = useMemo(
+    () => getKalshiLiveEndpointsForCategory(endpointCategory),
+    [endpointCategory],
+  );
   const selectedId = connectKalshiLiveEndpointId;
   const selectedColumns = connectKalshiLiveColumnSelections[selectedId] || [];
   const pullLoading = !!connectDataLakePullState?.loading;
@@ -759,19 +798,35 @@ export function KalshiLiveIntegrationsCore({ onRunPull, className, stepBackRef }
                     title="Live Data Straight from Kalshi"
                     badge="The Latest Data"
                     description="Choose what you want to track, then narrow it to the exact markets, fields, and time range you need."
+                    headerBelow={
+                      <HubEndpointCategoryTags
+                        categories={KALSHI_LIVE_ENDPOINT_CATEGORIES}
+                        value={endpointCategory}
+                        onChange={(next) => {
+                          setEndpointCategory(next);
+                          setHoveredEndpointId("");
+                        }}
+                      />
+                    }
                   >
-                    <div className={density.listGap}>
-                      {endpoints.map((endpoint) => (
-                        <LiveSourceOption
-                          key={endpoint.id}
-                          endpoint={endpoint}
-                          isSelected={selectedId === endpoint.id}
-                          onSelect={handleSelectEndpoint}
-                          onHover={handleSourceHover}
-                          onLeave={handleSourceLeave}
-                        />
-                      ))}
-                    </div>
+                    {categoryEndpoints.length > 0 ? (
+                      <div className={density.listGap}>
+                        {categoryEndpoints.map((endpoint) => (
+                          <LiveSourceOption
+                            key={endpoint.id}
+                            endpoint={endpoint}
+                            isSelected={selectedId === endpoint.id}
+                            onSelect={handleSelectEndpoint}
+                            onHover={handleSourceHover}
+                            onLeave={handleSourceLeave}
+                          />
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="text-[11px] leading-snug text-muted-foreground">
+                        No endpoints in this category yet.
+                      </p>
+                    )}
                   </HubStartingPointColumn>
                 </motion.div>
               ) : null}
