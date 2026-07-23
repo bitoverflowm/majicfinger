@@ -207,61 +207,62 @@ export function KalshiLiveMarketsDiscoveryFields({ value, onChange, disabled = f
         </p>
       ) : null}
 
-      {/* Status — first */}
-      <div className={cn("space-y-1.5", locks.disableStatus && "opacity-60")}>
-        <Label className="text-[11px] font-medium text-foreground">Status</Label>
-        <Select
-          value={value.status || "__any__"}
-          disabled={disabled || locks.disableStatus}
-          onValueChange={(v) => patch({ status: v === "__any__" ? "" : v })}
-        >
-          <SelectTrigger className="h-9 max-w-xs text-xs">
-            <SelectValue placeholder="Any status" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="__any__" className="text-xs text-muted-foreground">
-              Any status
-            </SelectItem>
-            {statusChoices.map((s) => (
-              <SelectItem key={s} value={s} className="text-xs">
-                {s}
+      {/* Status + Multivariate Events */}
+      <div className="flex flex-wrap items-start gap-4">
+        <div className={cn("w-[9.5rem] shrink-0 space-y-1.5", locks.disableStatus && "opacity-60")}>
+          <Label className="text-[11px] font-medium text-foreground">Status</Label>
+          <Select
+            value={value.status || "__any__"}
+            disabled={disabled || locks.disableStatus}
+            onValueChange={(v) => patch({ status: v === "__any__" ? "" : v })}
+          >
+            <SelectTrigger className="h-9 w-full text-xs">
+              <SelectValue placeholder="Any status" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="__any__" className="text-xs text-muted-foreground">
+                Any status
               </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </div>
+              {statusChoices.map((s) => (
+                <SelectItem key={s} value={s} className="text-xs">
+                  {s}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
 
-      {/* Multivariate Events */}
-      <div className={cn("space-y-1.5", locks.disableMve && "opacity-60")}>
-        <Label className="text-[11px] font-medium text-foreground">Multivariate Events</Label>
-        <p className="text-[10px] leading-snug text-muted-foreground">
-          Filter by multivariate events (combos). &apos;only&apos; returns only multivariate events,
-          &apos;exclude&apos; excludes multivariate events.
-        </p>
-        <Select
-          value={normalizeKalshiLiveMveFilter(value.mveFilter)}
-          disabled={disabled || locks.disableMve}
-          onValueChange={(v) =>
-            patch({
-              mveFilter:
-                v === KALSHI_LIVE_MVE_FILTER_ONLY
-                  ? KALSHI_LIVE_MVE_FILTER_ONLY
-                  : KALSHI_LIVE_MVE_FILTER_EXCLUDE,
-            })
-          }
-        >
-          <SelectTrigger className="h-9 max-w-xs text-xs">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value={KALSHI_LIVE_MVE_FILTER_EXCLUDE} className="text-xs">
-              Exclude
-            </SelectItem>
-            <SelectItem value={KALSHI_LIVE_MVE_FILTER_ONLY} className="text-xs">
-              only
-            </SelectItem>
-          </SelectContent>
-        </Select>
+        <div className={cn("min-w-[12rem] flex-1 space-y-1.5", locks.disableMve && "opacity-60")}>
+          <Label className="text-[11px] font-medium text-foreground">Multivariate Events</Label>
+          <p className="text-[10px] leading-snug text-muted-foreground">
+            Filter by multivariate events (combos). &apos;only&apos; returns only multivariate events,
+            &apos;exclude&apos; excludes multivariate events.
+          </p>
+          <Select
+            value={normalizeKalshiLiveMveFilter(value.mveFilter)}
+            disabled={disabled || locks.disableMve}
+            onValueChange={(v) =>
+              patch({
+                mveFilter:
+                  v === KALSHI_LIVE_MVE_FILTER_ONLY
+                    ? KALSHI_LIVE_MVE_FILTER_ONLY
+                    : KALSHI_LIVE_MVE_FILTER_EXCLUDE,
+              })
+            }
+          >
+            <SelectTrigger className="h-9 w-full max-w-xs text-xs">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value={KALSHI_LIVE_MVE_FILTER_EXCLUDE} className="text-xs">
+                Exclude
+              </SelectItem>
+              <SelectItem value={KALSHI_LIVE_MVE_FILTER_ONLY} className="text-xs">
+                only
+              </SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
       </div>
 
       {/* Event Ticker */}
