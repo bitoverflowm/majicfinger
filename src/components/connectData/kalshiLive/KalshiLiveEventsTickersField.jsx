@@ -108,7 +108,7 @@ export function KalshiLiveEventsTickersField({ value, onChange, className, disab
   );
 
   const marketsOptions = (
-    <div className="space-y-3 rounded-md border border-border/50 bg-background/60 p-3">
+    <div className="space-y-3 p-3">
       <div className="flex items-start gap-2">
         <Checkbox
           id="events-include-markets"
