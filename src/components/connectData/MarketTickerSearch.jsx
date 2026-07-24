@@ -337,7 +337,7 @@ function SelectionChipsRow({ selections, busy, onRemove }) {
  *   dataSource?: KalshiTickerSearchDataSource;
  *   historyEntity?: "trades" | "candlesticks" | "data";
  *   showCutoffNotes?: boolean;
- *   searchScope?: "markets" | "series";
+ *   searchScope?: "markets" | "series" | "events";
  * }} props
  */
 export function MarketTickerSearch({
@@ -353,6 +353,7 @@ export function MarketTickerSearch({
   // cutoff notes are irrelevant and can be turned off by the wrapper.
   showCutoffNotes = true,
   // "series" = series suggestions only (no markets, selecting a series adds that series ticker).
+  // "events" = manual event tickers only (no semantic search / resolve).
   searchScope = "markets",
   /** Optional leading content for the status row (e.g. discovery mode toggle). */
   headerStart = null,
@@ -360,6 +361,8 @@ export function MarketTickerSearch({
   required = true,
 }) {
   const seriesOnly = searchScope === "series";
+  const eventsOnly = searchScope === "events";
+  const manualOnly = eventsOnly;
   const debounceRef = useRef(null);
   const suggestAbortRef = useRef(/** @type {AbortController | null} */ (null));
   const resolveAbortRef = useRef(/** @type {AbortController | null} */ (null));
@@ -455,6 +458,11 @@ export function MarketTickerSearch({
       const tokens = [...new Set(rawTokens.map((t) => String(t).trim().toUpperCase()).filter(Boolean))];
       if (!tokens.length) return;
 
+      if (manualOnly) {
+        addSelections(tokens.map((ticker) => ({ ticker, title: ticker })));
+        return;
+      }
+
       resolveAbortRef.current?.abort();
       const ac = new AbortController();
       resolveAbortRef.current = ac;
@@ -481,10 +489,16 @@ export function MarketTickerSearch({
         if (!ac.signal.aborted) setResolveLoading(false);
       }
     },
-    [addSelections, seriesOnly],
+    [addSelections, seriesOnly, manualOnly],
   );
 
   const fetchSuggestions = useCallback(async (segment) => {
+    if (manualOnly) {
+      setSuggestions([]);
+      setSuggestOpen(false);
+      setSuggestLoading(false);
+      return;
+    }
     const mySeq = ++suggestSeqRef.current;
     suggestAbortRef.current?.abort();
     const trimmed = String(segment || "").trim();
@@ -663,7 +677,7 @@ export function MarketTickerSearch({
     } finally {
       if (mySeq === suggestSeqRef.current) setSuggestLoading(false);
     }
-  }, [seriesOnly]);
+  }, [seriesOnly, manualOnly]);
 
   useEffect(() => {
     if (debounceRef.current) clearTimeout(debounceRef.current);
@@ -685,14 +699,16 @@ export function MarketTickerSearch({
     }
     if (!isTickerLikeSegment(segment)) {
       setError(
-        seriesOnly
-          ? "Enter a series ticker, or pick a suggestion from the list."
-          : "Enter a market ticker, or pick a suggestion from the list.",
+        eventsOnly
+          ? "Enter an event ticker (e.g. KXHIGHNY-25JAN01)."
+          : seriesOnly
+            ? "Enter a series ticker, or pick a suggestion from the list."
+            : "Enter a market ticker, or pick a suggestion from the list.",
       );
       return;
     }
     await resolveAndAddTickers([segment]);
-  }, [draft, resolveAndAddTickers, seriesOnly]);
+  }, [draft, resolveAndAddTickers, seriesOnly, eventsOnly]);
 
   const handlePaste = useCallback(
     (e) => {
@@ -821,7 +837,13 @@ export function MarketTickerSearch({
               "flex h-9 w-full rounded-md border border-input bg-background py-2 pl-9 pr-3 text-xs text-foreground shadow-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
               (busy || atCap) && "opacity-70",
             )}
-            aria-label={seriesOnly ? "Series ticker search" : "Market ticker search"}
+            aria-label={
+              eventsOnly
+                ? "Event ticker search"
+                : seriesOnly
+                  ? "Series ticker search"
+                  : "Market ticker search"
+            }
           />
 
           <AnimatePresence>

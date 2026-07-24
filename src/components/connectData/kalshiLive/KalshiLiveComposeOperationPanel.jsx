@@ -50,6 +50,14 @@ import {
   validateKalshiLiveMarketsDiscoveryPull,
 } from "@/lib/kalshiLive/marketDiscovery";
 import {
+  KALSHI_LIVE_EVENTS_SHEET_MODE_COMBINED,
+  KALSHI_LIVE_EVENTS_SHEET_MODE_PER_EVENT,
+  normalizeKalshiLiveEventsSheetMode,
+  parseKalshiLiveEventsTickersInput,
+  validateKalshiLiveEventsPull,
+} from "@/lib/kalshiLive/eventCompose";
+import { validateKalshiLiveEventsDiscoveryPull } from "@/lib/kalshiLive/eventDiscovery";
+import {
   KALSHI_LIVE_SERIES_SHEET_MODE_COMBINED,
   KALSHI_LIVE_SERIES_SHEET_MODE_PER_SERIES,
   normalizeKalshiLiveSeriesSheetMode,
@@ -183,6 +191,16 @@ export function KalshiLiveComposeOperationPanel({
     connectKalshiLiveMarketsDiscoveryMaxCloseTs = "",
     connectKalshiLiveMarketsDiscoveryMinSettledTs = "",
     connectKalshiLiveMarketsDiscoveryMaxSettledTs = "",
+    connectKalshiLiveEventsTickers = "",
+    connectKalshiLiveEventsTickerMeta = {},
+    connectKalshiLiveEventsSheetMode = KALSHI_LIVE_EVENTS_SHEET_MODE_PER_EVENT,
+    setConnectKalshiLiveEventsSheetMode,
+    connectKalshiLiveEventsDiscoveryMode = false,
+    connectKalshiLiveEventsDiscoveryStatus = "",
+    connectKalshiLiveEventsDiscoverySeriesTicker = "",
+    connectKalshiLiveEventsDiscoveryTickers = "",
+    connectKalshiLiveEventsDiscoveryMinCloseTs = "",
+    connectKalshiLiveEventsDiscoveryMinUpdatedTs = "",
     connectKalshiLiveTradesTicker = "",
     connectKalshiLiveTradesTickerMeta = {},
     connectKalshiLiveOrderbookTicker = "",
@@ -263,6 +281,30 @@ export function KalshiLiveComposeOperationPanel({
     connectKalshiLiveMarketsTickerMeta,
   ]);
 
+  const eventsSheetMode = normalizeKalshiLiveEventsSheetMode(connectKalshiLiveEventsSheetMode);
+  const eventsTickerList = useMemo(
+    () =>
+      endpointId === "events" ? parseKalshiLiveEventsTickersInput(connectKalshiLiveEventsTickers) : [],
+    [endpointId, connectKalshiLiveEventsTickers],
+  );
+
+  const eventsAutoSheets = useMemo(() => {
+    if (endpointId !== "events") return null;
+    if (connectKalshiLiveEventsDiscoveryMode) return null;
+    if (eventsSheetMode !== KALSHI_LIVE_EVENTS_SHEET_MODE_PER_EVENT) return null;
+    if (eventsTickerList.length < 2) return null;
+    return eventsTickerList.map((ticker) => ({
+      name: ticker,
+      title: connectKalshiLiveEventsTickerMeta?.[ticker] || ticker,
+    }));
+  }, [
+    endpointId,
+    connectKalshiLiveEventsDiscoveryMode,
+    eventsSheetMode,
+    eventsTickerList,
+    connectKalshiLiveEventsTickerMeta,
+  ]);
+
   const seriesSheetMode = normalizeKalshiLiveSeriesSheetMode(connectKalshiLiveSeriesSheetMode);
   const seriesTickerList = useMemo(
     () =>
@@ -292,6 +334,7 @@ export function KalshiLiveComposeOperationPanel({
     tradesAutoSheets ||
     orderbookAutoSheets ||
     marketsAutoSheets ||
+    eventsAutoSheets ||
     seriesAutoSheets;
 
   const allColumns = useMemo(() => getKalshiLiveAllColumnNames(endpointId), [endpointId]);
@@ -449,6 +492,22 @@ export function KalshiLiveComposeOperationPanel({
       }
     }
 
+    if (endpointId === "events") {
+      const eventsErr = connectKalshiLiveEventsDiscoveryMode
+        ? validateKalshiLiveEventsDiscoveryPull({
+            status: connectKalshiLiveEventsDiscoveryStatus,
+            seriesTicker: connectKalshiLiveEventsDiscoverySeriesTicker,
+            tickers: connectKalshiLiveEventsDiscoveryTickers,
+            minCloseTs: connectKalshiLiveEventsDiscoveryMinCloseTs,
+            minUpdatedTs: connectKalshiLiveEventsDiscoveryMinUpdatedTs,
+          })
+        : validateKalshiLiveEventsPull(connectKalshiLiveEventsTickers);
+      if (eventsErr) {
+        setFilterError?.(eventsErr);
+        return;
+      }
+    }
+
     if (endpointId === "series") {
       const seriesErr = connectKalshiLiveSeriesDiscoveryMode
         ? validateKalshiLiveSeriesDiscoveryPull({
@@ -487,6 +546,13 @@ export function KalshiLiveComposeOperationPanel({
     connectKalshiLiveMarketsDiscoveryMaxCloseTs,
     connectKalshiLiveMarketsDiscoveryMinSettledTs,
     connectKalshiLiveMarketsDiscoveryMaxSettledTs,
+    connectKalshiLiveEventsTickers,
+    connectKalshiLiveEventsDiscoveryMode,
+    connectKalshiLiveEventsDiscoveryStatus,
+    connectKalshiLiveEventsDiscoverySeriesTicker,
+    connectKalshiLiveEventsDiscoveryTickers,
+    connectKalshiLiveEventsDiscoveryMinCloseTs,
+    connectKalshiLiveEventsDiscoveryMinUpdatedTs,
     connectKalshiLiveTradesTicker,
     connectKalshiLiveOrderbookTicker,
     setFilterError,
@@ -870,6 +936,45 @@ export function KalshiLiveComposeOperationPanel({
           <p className="text-[10px] leading-snug text-muted-foreground">
             Each market pull returns one metadata row. Separate sheets keep each ticker isolated;
             one sheet is better for side-by-side comparison.
+          </p>
+        </div>
+      ) : null}
+
+      {endpointId === "events" &&
+      !connectKalshiLiveEventsDiscoveryMode &&
+      eventsTickerList.length >= 2 ? (
+        <div className="space-y-1.5">
+          <Label className="text-[11px] font-medium text-muted-foreground">
+            How should we organize sheets?
+          </Label>
+          <ToggleGroup
+            type="single"
+            variant="outline"
+            size="sm"
+            value={eventsSheetMode}
+            onValueChange={(value) => {
+              if (!value) return;
+              setConnectKalshiLiveEventsSheetMode?.(normalizeKalshiLiveEventsSheetMode(value));
+            }}
+            className="h-8 flex-wrap justify-start"
+            aria-label="Events sheet organization"
+          >
+            <ToggleGroupItem
+              value={KALSHI_LIVE_EVENTS_SHEET_MODE_COMBINED}
+              className="h-8 px-2.5 text-[11px]"
+            >
+              All events in one sheet
+            </ToggleGroupItem>
+            <ToggleGroupItem
+              value={KALSHI_LIVE_EVENTS_SHEET_MODE_PER_EVENT}
+              className="h-8 px-2.5 text-[11px]"
+            >
+              Separate sheet per event
+            </ToggleGroupItem>
+          </ToggleGroup>
+          <p className="text-[10px] leading-snug text-muted-foreground">
+            Separate sheets are named by event ticker; one sheet is better for side-by-side
+            comparison.
           </p>
         </div>
       ) : null}

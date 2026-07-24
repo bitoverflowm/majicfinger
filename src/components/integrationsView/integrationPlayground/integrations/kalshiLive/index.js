@@ -7,6 +7,8 @@ import { useMyStateV2 } from "@/context/stateContextV2";
 import { applyAthenaPullToSheetPatch } from "@/lib/dataLake/applyAthenaPullToSheet";
 import { fetchKalshiLiveMarketsTickerPull } from "@/lib/kalshiLive/fetchKalshiLiveMarketsTickerPull";
 import { fetchKalshiLiveMarketsDiscoveryPull } from "@/lib/kalshiLive/fetchKalshiLiveMarketsDiscoveryPull";
+import { fetchKalshiLiveEventsTickerPull } from "@/lib/kalshiLive/fetchKalshiLiveEventsTickerPull";
+import { fetchKalshiLiveEventsDiscoveryPull } from "@/lib/kalshiLive/fetchKalshiLiveEventsDiscoveryPull";
 import { fetchKalshiLiveSeriesPull } from "@/lib/kalshiLive/fetchKalshiLiveSeriesPull";
 import { fetchKalshiLiveSeriesDiscoveryPull } from "@/lib/kalshiLive/fetchKalshiLiveSeriesDiscoveryPull";
 import {
@@ -18,6 +20,13 @@ import {
   KALSHI_LIVE_MVE_FILTER_EXCLUDE,
   summarizeKalshiLiveMarketsDiscoveryRequest,
 } from "@/lib/kalshiLive/marketDiscovery";
+import {
+  KALSHI_LIVE_EVENTS_SHEET_MODE_COMBINED,
+  normalizeKalshiLiveEventsRowMode,
+  normalizeKalshiLiveEventsSheetMode,
+  summarizeKalshiLiveEventsTickerPullRequest,
+} from "@/lib/kalshiLive/eventCompose";
+import { summarizeKalshiLiveEventsDiscoveryRequest } from "@/lib/kalshiLive/eventDiscovery";
 import {
   KALSHI_LIVE_SERIES_SHEET_MODE_COMBINED,
   normalizeKalshiLiveSeriesSheetMode,
@@ -88,6 +97,16 @@ export default function KalshiLive({ setConnectedData, connectHomePullBridge = f
     connectKalshiLiveMarketsDiscoveryMaxCloseTs,
     connectKalshiLiveMarketsDiscoveryMinSettledTs,
     connectKalshiLiveMarketsDiscoveryMaxSettledTs,
+    connectKalshiLiveEventsTickers,
+    connectKalshiLiveEventsSheetMode,
+    connectKalshiLiveEventsIncludeMarkets,
+    connectKalshiLiveEventsRowMode,
+    connectKalshiLiveEventsDiscoveryMode,
+    connectKalshiLiveEventsDiscoveryStatus,
+    connectKalshiLiveEventsDiscoverySeriesTicker,
+    connectKalshiLiveEventsDiscoveryTickers,
+    connectKalshiLiveEventsDiscoveryMinCloseTs,
+    connectKalshiLiveEventsDiscoveryMinUpdatedTs,
     connectKalshiLiveCandlestickTickers,
     connectKalshiLiveTradesTicker,
     connectKalshiLiveOrderbookTicker,
@@ -365,6 +384,264 @@ export default function KalshiLive({ setConnectedData, connectHomePullBridge = f
       connectKalshiLiveMarketsDiscoveryMaxCloseTs,
       connectKalshiLiveMarketsDiscoveryMinSettledTs,
       connectKalshiLiveMarketsDiscoveryMaxSettledTs,
+      setConnectDataLakePullState,
+      setDataSheets,
+      setRows,
+      ctx,
+    ],
+  );
+
+  const runEventsPull = useCallback(
+    async (ac, sheetId, cols) => {
+      const discoveryMode = !!connectKalshiLiveEventsDiscoveryMode;
+      const includeMarkets = !!connectKalshiLiveEventsIncludeMarkets;
+      const rowMode = normalizeKalshiLiveEventsRowMode(connectKalshiLiveEventsRowMode);
+      const requestStartMs =
+        typeof performance !== "undefined" && performance?.now ? performance.now() : Date.now();
+
+      setConnectDataLakePullState?.((prev) => ({
+        ...prev,
+        loading: true,
+        label: discoveryMode
+          ? "Discovering Kalshi Live events…"
+          : "Fetching Kalshi Live events…",
+        progress: 8,
+        error: null,
+      }));
+
+      if (discoveryMode) {
+        const discoveryParams = {
+          status: connectKalshiLiveEventsDiscoveryStatus,
+          seriesTicker: connectKalshiLiveEventsDiscoverySeriesTicker,
+          tickers: connectKalshiLiveEventsDiscoveryTickers,
+          minCloseTs: connectKalshiLiveEventsDiscoveryMinCloseTs,
+          minUpdatedTs: connectKalshiLiveEventsDiscoveryMinUpdatedTs,
+        };
+
+        const { raw, rows: accumulated, querySummary } = await fetchKalshiLiveEventsDiscoveryPull({
+          params: discoveryParams,
+          selectedColumns: cols,
+          includeMarkets,
+          rowMode,
+          signal: ac.signal,
+          onPage: ({ page, totalLoaded }) => {
+            const pct = Math.min(92, 8 + page * 6);
+            setConnectDataLakePullState?.((prev) => ({
+              ...prev,
+              loading: true,
+              label: `Loaded ${totalLoaded} event rows (page ${page})…`,
+              progress: pct,
+              error: null,
+            }));
+          },
+        });
+
+        if (setRows) setRows(accumulated);
+
+        await ingestKalshiLiveAsView({
+          endpointId: "events",
+          events: raw,
+          selectedColumns: cols,
+          includeMarkets,
+          rowMode,
+        });
+
+        const elapsedMs =
+          (typeof performance !== "undefined" && performance?.now
+            ? performance.now()
+            : Date.now()) - requestStartMs;
+
+        const requestCard = {
+          id: genRequestCardId(),
+          createdAt: Date.now(),
+          elapsedMs,
+          lake: "kalshi-live",
+          table: "events",
+          sheetId: sheetId || null,
+          querySummary,
+          loadedRowCount: accumulated.length,
+        };
+
+        if (sheetId && setDataSheets) {
+          setDataSheets((prev) =>
+            applyAthenaPullToSheetPatch(prev, sheetId, accumulated, {
+              provenance: {
+                source: "kalshi-live",
+                endpoint: "events",
+                discovery: true,
+                includeMarkets,
+                rowMode,
+                ...discoveryParams,
+                querySummary,
+              },
+              requestCards: [requestCard],
+            }),
+          );
+        }
+
+        applyConnectHomePullData(ctx, accumulated);
+        if (ctx?.requestConnectAnalyzeScroll) ctx.requestConnectAnalyzeScroll();
+        return accumulated.length;
+      }
+
+      const eventTickers = String(connectKalshiLiveEventsTickers || "").trim();
+      const sheetMode = normalizeKalshiLiveEventsSheetMode(connectKalshiLiveEventsSheetMode);
+
+      const {
+        byTicker,
+        raw,
+        rows: accumulated,
+        querySummary,
+      } = await fetchKalshiLiveEventsTickerPull({
+        eventTickers,
+        selectedColumns: cols,
+        includeMarkets,
+        rowMode,
+        sheetMode,
+        signal: ac.signal,
+        onTickerProgress: ({ ticker, index, total }) => {
+          const pct = Math.min(90, 8 + Math.round(((index + 1) / Math.max(1, total)) * 80));
+          setConnectDataLakePullState?.((prev) => ({
+            ...prev,
+            loading: true,
+            label: `Fetching ${ticker} (${index + 1}/${total})…`,
+            progress: pct,
+            error: null,
+          }));
+        },
+      });
+
+      if (setRows) setRows(accumulated);
+
+      await ingestKalshiLiveAsView({
+        endpointId: "events",
+        events: raw,
+        selectedColumns: cols,
+        includeMarkets,
+        rowMode,
+      });
+
+      const elapsedMs =
+        (typeof performance !== "undefined" && performance?.now
+          ? performance.now()
+          : Date.now()) - requestStartMs;
+
+      const useSeparateSheets =
+        sheetMode !== KALSHI_LIVE_EVENTS_SHEET_MODE_COMBINED && byTicker.length > 1;
+
+      if (useSeparateSheets && setDataSheets) {
+        let firstSheetId = sheetId || ctx?.activeSheetId || null;
+        const totalRows = byTicker.reduce(
+          (sum, g) => sum + (Array.isArray(g.rows) ? g.rows.length : 0),
+          0,
+        );
+
+        flushSync(() => {
+          setDataSheets((prev) => {
+            let next = { ...(prev || {}) };
+            /** @type {string[]} */
+            const writtenIds = [];
+
+            for (let i = 0; i < byTicker.length; i++) {
+              const group = byTicker[i];
+              const tickerName = String(group.ticker || `event-${i + 1}`).trim().slice(0, 80);
+              const rows = Array.isArray(group.rows) ? group.rows : [];
+
+              let targetSheetId;
+              if (i === 0 && firstSheetId) {
+                targetSheetId = firstSheetId;
+              } else {
+                targetSheetId = allocateNextSheetId(next);
+              }
+              writtenIds.push(targetSheetId);
+
+              const requestCard = {
+                id: genRequestCardId(),
+                createdAt: Date.now(),
+                elapsedMs,
+                lake: "kalshi-live",
+                table: "events",
+                sheetId: targetSheetId,
+                querySummary,
+                loadedRowCount: rows.length,
+              };
+
+              next = applyAthenaPullToSheetPatch(next, targetSheetId, rows, {
+                name: tickerName,
+                provenance: {
+                  source: "kalshi-live",
+                  endpoint: "events",
+                  eventTicker: tickerName,
+                  sheetMode,
+                  includeMarkets,
+                  rowMode,
+                  querySummary,
+                },
+                requestCards: [requestCard],
+              });
+            }
+
+            firstSheetId = writtenIds[0] || firstSheetId;
+            return next;
+          });
+
+          if (firstSheetId && ctx?.setActiveSheetId) {
+            ctx.setActiveSheetId(firstSheetId);
+          }
+          const firstRows = Array.isArray(byTicker[0]?.rows) ? byTicker[0].rows : [];
+          if (setRows) setRows(firstRows);
+          ctx?.setConnectHomeAnalyzeActive?.(true);
+        });
+
+        if (ctx?.requestConnectAnalyzeScroll) {
+          ctx.requestConnectAnalyzeScroll();
+        }
+
+        return totalRows;
+      }
+
+      const requestCard = {
+        id: genRequestCardId(),
+        createdAt: Date.now(),
+        elapsedMs,
+        lake: "kalshi-live",
+        table: "events",
+        sheetId: sheetId || null,
+        querySummary,
+        loadedRowCount: accumulated.length,
+      };
+
+      if (sheetId && setDataSheets) {
+        setDataSheets((prev) =>
+          applyAthenaPullToSheetPatch(prev, sheetId, accumulated, {
+            provenance: {
+              source: "kalshi-live",
+              endpoint: "events",
+              sheetMode,
+              includeMarkets,
+              rowMode,
+              querySummary,
+            },
+            requestCards: [requestCard],
+          }),
+        );
+      }
+
+      applyConnectHomePullData(ctx, accumulated);
+      if (ctx?.requestConnectAnalyzeScroll) ctx.requestConnectAnalyzeScroll();
+      return accumulated.length;
+    },
+    [
+      connectKalshiLiveEventsTickers,
+      connectKalshiLiveEventsSheetMode,
+      connectKalshiLiveEventsIncludeMarkets,
+      connectKalshiLiveEventsRowMode,
+      connectKalshiLiveEventsDiscoveryMode,
+      connectKalshiLiveEventsDiscoveryStatus,
+      connectKalshiLiveEventsDiscoverySeriesTicker,
+      connectKalshiLiveEventsDiscoveryTickers,
+      connectKalshiLiveEventsDiscoveryMinCloseTs,
+      connectKalshiLiveEventsDiscoveryMinUpdatedTs,
       setConnectDataLakePullState,
       setDataSheets,
       setRows,
@@ -1112,7 +1389,24 @@ export default function KalshiLive({ setConnectedData, connectHomePullBridge = f
               : summarizeKalshiLiveMarketsTickerPullRequest(connectKalshiLiveTickers || "", {
                   sheetMode: normalizeKalshiLiveMarketsSheetMode(connectKalshiLiveMarketsSheetMode),
                 })
-            : endpointId,
+            : endpointId === "events"
+              ? connectKalshiLiveEventsDiscoveryMode
+                ? summarizeKalshiLiveEventsDiscoveryRequest({
+                    status: connectKalshiLiveEventsDiscoveryStatus,
+                    seriesTicker: connectKalshiLiveEventsDiscoverySeriesTicker,
+                    tickers: connectKalshiLiveEventsDiscoveryTickers,
+                    minCloseTs: connectKalshiLiveEventsDiscoveryMinCloseTs,
+                    minUpdatedTs: connectKalshiLiveEventsDiscoveryMinUpdatedTs,
+                  }, {
+                    includeMarkets: !!connectKalshiLiveEventsIncludeMarkets,
+                    rowMode: normalizeKalshiLiveEventsRowMode(connectKalshiLiveEventsRowMode),
+                  })
+                : summarizeKalshiLiveEventsTickerPullRequest(connectKalshiLiveEventsTickers || "", {
+                    sheetMode: normalizeKalshiLiveEventsSheetMode(connectKalshiLiveEventsSheetMode),
+                    includeMarkets: !!connectKalshiLiveEventsIncludeMarkets,
+                    rowMode: normalizeKalshiLiveEventsRowMode(connectKalshiLiveEventsRowMode),
+                  })
+              : endpointId,
     });
 
     const pullStartMs =
@@ -1124,13 +1418,15 @@ export default function KalshiLive({ setConnectedData, connectHomePullBridge = f
       label:
         endpointId === "series"
           ? "Fetching Kalshi Live series…"
-          : endpointId === "candlesticks"
-            ? "Fetching Kalshi Live candlesticks…"
-            : endpointId === "trades"
-              ? "Fetching Kalshi Live trades…"
-              : endpointId === "orderbook"
-                ? "Fetching Kalshi Live orderbook…"
-                : "Fetching Kalshi Live markets…",
+          : endpointId === "events"
+            ? "Fetching Kalshi Live events…"
+            : endpointId === "candlesticks"
+              ? "Fetching Kalshi Live candlesticks…"
+              : endpointId === "trades"
+                ? "Fetching Kalshi Live trades…"
+                : endpointId === "orderbook"
+                  ? "Fetching Kalshi Live orderbook…"
+                  : "Fetching Kalshi Live markets…",
       progress: 5,
     });
 
@@ -1138,6 +1434,8 @@ export default function KalshiLive({ setConnectedData, connectHomePullBridge = f
       let rowCount = 0;
       if (endpointId === "series") {
         rowCount = (await runSeriesPull(ac, sheetId, cols)) || 0;
+      } else if (endpointId === "events") {
+        rowCount = (await runEventsPull(ac, sheetId, cols)) || 0;
       } else if (endpointId === "markets") {
         rowCount = (await runMarketsPull(ac, sheetId, cols)) || 0;
       } else if (endpointId === "candlesticks") {
@@ -1213,6 +1511,7 @@ export default function KalshiLive({ setConnectedData, connectHomePullBridge = f
     connectKalshiLiveSeriesDiscoveryMinUpdatedTs,
     activeSheetId,
     runMarketsPull,
+    runEventsPull,
     runSeriesPull,
     runCandlesticksPull,
     runTradesPull,

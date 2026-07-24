@@ -33,6 +33,7 @@ import { KalshiLiveTradesTickerField } from "@/components/connectData/kalshiLive
 import { KalshiLiveOrderbookTickerField } from "@/components/connectData/kalshiLive/KalshiLiveOrderbookTickerField";
 import { KalshiLiveOrderbookCommonQueries } from "@/components/connectData/kalshiLive/KalshiLiveOrderbookCommonQueries";
 import { KalshiLiveMarketsTickersField } from "@/components/connectData/kalshiLive/KalshiLiveMarketsTickersField";
+import { KalshiLiveEventsTickersField } from "@/components/connectData/kalshiLive/KalshiLiveEventsTickersField";
 import { KalshiLiveSeriesTickersField } from "@/components/connectData/kalshiLive/KalshiLiveSeriesTickersField";
 import { KalshiLiveComposeOperationPanel } from "@/components/connectData/kalshiLive/KalshiLiveComposeOperationPanel";
 import { Button } from "@/components/ui/button";
@@ -60,6 +61,10 @@ import { cn } from "@/lib/utils";
 const LIVE_SOURCE_PRESENTATION = {
   markets: {
     icon: Layers,
+    accent: "secondary",
+  },
+  events: {
+    icon: Vote,
     accent: "secondary",
   },
   series: {
@@ -407,6 +412,10 @@ export function KalshiLiveIntegrationsCore({ onRunPull, className, stepBackRef }
     setConnectKalshiLiveMarketsDiscoveryMaxCloseTs,
     setConnectKalshiLiveMarketsDiscoveryMinSettledTs,
     setConnectKalshiLiveMarketsDiscoveryMaxSettledTs,
+    connectKalshiLiveEventsTickers = "",
+    setConnectKalshiLiveEventsTickers,
+    connectKalshiLiveEventsIncludeMarkets = false,
+    connectKalshiLiveEventsRowMode = "nested",
     connectKalshiLiveCandlestickTickers = "",
     setConnectKalshiLiveCandlestickTickers,
     setConnectKalshiLiveCandlestickTickerMeta,
@@ -750,9 +759,22 @@ export function KalshiLiveIntegrationsCore({ onRunPull, className, stepBackRef }
     [ctx, runKalshiLiveAction],
   );
 
+  const eventsColumnOpts = useMemo(
+    () => ({
+      includeMarkets: !!connectKalshiLiveEventsIncludeMarkets,
+      rowMode: connectKalshiLiveEventsRowMode,
+    }),
+    [connectKalshiLiveEventsIncludeMarkets, connectKalshiLiveEventsRowMode],
+  );
+
   const getDisplayLabel = useCallback(
-    (col) => KALSHI_LIVE_CONNECT_CONFIG.getColumnDisplayLabel(selectedId, col),
-    [selectedId],
+    (col) =>
+      KALSHI_LIVE_CONNECT_CONFIG.getColumnDisplayLabel(
+        selectedId,
+        col,
+        selectedId === "events" ? eventsColumnOpts : undefined,
+      ),
+    [selectedId, eventsColumnOpts],
   );
 
   return (
@@ -1058,6 +1080,14 @@ export function KalshiLiveIntegrationsCore({ onRunPull, className, stepBackRef }
                 disabled={pullLoading}
               />
             ) : null}
+            {selectedId === "events" ? (
+              <KalshiLiveEventsTickersField
+                className="mt-4"
+                value={connectKalshiLiveEventsTickers}
+                onChange={(v) => setConnectKalshiLiveEventsTickers?.(v)}
+                disabled={pullLoading}
+              />
+            ) : null}
             {selectedId === "candlesticks" ? (
               <>
                 <KalshiLiveCandlestickTickersField
@@ -1100,12 +1130,15 @@ export function KalshiLiveIntegrationsCore({ onRunPull, className, stepBackRef }
               />
             ) : null}
             <ColumnPicker
-              key={selectedId}
+              key={`${selectedId}:${connectKalshiLiveEventsIncludeMarkets}:${connectKalshiLiveEventsRowMode}`}
               sourceId={selectedId}
               sourceName={
                 endpoints.find((e) => e.id === selectedId)?.title || selectedId
               }
-              columns={KALSHI_LIVE_CONNECT_CONFIG.getColumnsForEndpoint(selectedId)}
+              columns={KALSHI_LIVE_CONNECT_CONFIG.getColumnsForEndpoint(
+                selectedId,
+                selectedId === "events" ? eventsColumnOpts : undefined,
+              )}
               getDisplayLabel={getDisplayLabel}
               lake={null}
               table={null}
@@ -1119,7 +1152,10 @@ export function KalshiLiveIntegrationsCore({ onRunPull, className, stepBackRef }
               }
               onSelectAll={() =>
                 patchColumns(selectedId, () =>
-                  KALSHI_LIVE_CONNECT_CONFIG.getColumnsForEndpoint(selectedId).map((c) => c.name),
+                  KALSHI_LIVE_CONNECT_CONFIG.getColumnsForEndpoint(
+                    selectedId,
+                    selectedId === "events" ? eventsColumnOpts : undefined,
+                  ).map((c) => c.name),
                 )
               }
               onDeselectAll={() => patchColumns(selectedId, () => [])}

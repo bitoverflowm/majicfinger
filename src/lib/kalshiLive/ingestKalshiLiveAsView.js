@@ -3,6 +3,7 @@ import { projectKalshiLiveCandlestickRows } from "@/lib/kalshiLive/normalizeCand
 import { projectKalshiLiveTradeRows } from "@/lib/kalshiLive/normalizeTradeRow";
 import { projectKalshiLiveOrderbookRows } from "@/lib/kalshiLive/normalizeOrderbookRow";
 import { projectKalshiLiveMarketRows } from "@/lib/kalshiLive/normalizeMarketRow";
+import { projectKalshiLiveEventPayloads } from "@/lib/kalshiLive/normalizeEventRow";
 import { projectKalshiLiveSeriesRows } from "@/lib/kalshiLive/normalizeSeriesRow";
 
 /** @type {Map<string, { virtualFileName: string; viewName: string }>} */
@@ -31,11 +32,14 @@ function viewNameFor(key) {
  * @param {{
  *   endpointId: string;
  *   markets?: unknown[];
+ *   events?: Array<{ event: Record<string, unknown>; markets?: unknown[]; milestones?: unknown }>;
  *   series?: Record<string, unknown> | Record<string, unknown>[] | null;
  *   candlesticks?: unknown[];
  *   trades?: unknown[];
  *   orderbook?: unknown[];
  *   selectedColumns?: string[];
+ *   includeMarkets?: boolean;
+ *   rowMode?: string;
  * }} opts
  */
 export async function ingestKalshiLiveAsView(opts) {
@@ -58,6 +62,15 @@ export async function ingestKalshiLiveAsView(opts) {
     );
   } else if (endpointId === "markets") {
     sheetRows = projectKalshiLiveMarketRows(opts.markets, opts.selectedColumns);
+  } else if (endpointId === "events") {
+    sheetRows = projectKalshiLiveEventPayloads(
+      Array.isArray(opts.events) ? opts.events : [],
+      opts.selectedColumns,
+      {
+        includeMarkets: !!opts.includeMarkets,
+        rowMode: opts.rowMode,
+      },
+    );
   } else if (endpointId === "series") {
     sheetRows = projectKalshiLiveSeriesRows(
       Array.isArray(opts.series)

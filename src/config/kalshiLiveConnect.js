@@ -3,6 +3,10 @@ import {
   KALSHI_LIVE_CANDLESTICK_COLUMNS,
 } from "@/lib/kalshiLive/candlesticksColumns";
 import {
+  getKalshiLiveEventColumnLabel,
+  KALSHI_LIVE_EVENTS_COLUMNS,
+} from "@/lib/kalshiLive/eventsColumns";
+import {
   getKalshiLiveMarketColumnLabel,
   KALSHI_LIVE_MARKETS_COLUMNS,
 } from "@/lib/kalshiLive/marketsColumns";
@@ -18,6 +22,10 @@ import {
   getKalshiLiveTradeColumnLabel,
   KALSHI_LIVE_TRADES_COLUMNS,
 } from "@/lib/kalshiLive/tradesColumns";
+import {
+  KALSHI_LIVE_EVENTS_ROW_MODE_PER_MARKET,
+  normalizeKalshiLiveEventsRowMode,
+} from "@/lib/kalshiLive/eventCompose";
 
 /**
  * Top-level Kalshi Live endpoint groups (hub column tags).
@@ -68,6 +76,13 @@ export const KALSHI_LIVE_CONNECT_ENDPOINTS = [
     description:
       "Current yes/no bid levels for one market. Enter a ticker; each price level becomes a row. Asks are implied as 1 − opposite bid.",
   },
+  {
+    id: "events",
+    category: "events",
+    title: "Events",
+    description:
+      "Live event metadata (and optional nested markets). Search by event ticker or discover events with status, series, and date filters.",
+  },
 ];
 
 /** @param {string} categoryId */
@@ -83,22 +98,43 @@ export const KALSHI_LIVE_UNDER_CONSTRUCTION_ENDPOINT_IDS = new Set(
 
 export const KALSHI_LIVE_DEFAULT_LIMIT = 100;
 
-/** @param {string} endpointId */
-export function getKalshiLiveColumnsForEndpoint(endpointId) {
+/**
+ * @param {string} endpointId
+ * @param {{ includeMarkets?: boolean; rowMode?: string }} [opts]
+ */
+export function getKalshiLiveColumnsForEndpoint(endpointId, opts = {}) {
   if (endpointId === "candlesticks") return KALSHI_LIVE_CANDLESTICK_COLUMNS;
   if (endpointId === "trades") return KALSHI_LIVE_TRADES_COLUMNS;
   if (endpointId === "orderbook") return KALSHI_LIVE_ORDERBOOK_COLUMNS;
   if (endpointId === "series") return KALSHI_LIVE_SERIES_COLUMNS;
+  if (endpointId === "events") {
+    const rowMode = normalizeKalshiLiveEventsRowMode(opts.rowMode);
+    if (opts.includeMarkets && rowMode === KALSHI_LIVE_EVENTS_ROW_MODE_PER_MARKET) {
+      return KALSHI_LIVE_MARKETS_COLUMNS;
+    }
+    return KALSHI_LIVE_EVENTS_COLUMNS;
+  }
   return KALSHI_LIVE_MARKETS_COLUMNS;
 }
 
-/** @param {string} endpointId */
-export function getKalshiLiveColumnDisplayLabelForEndpoint(endpointId, col) {
+/**
+ * @param {string} endpointId
+ * @param {import("@/lib/kalshiLive/marketsColumns").KalshiLiveMarketColumn | string} col
+ * @param {{ includeMarkets?: boolean; rowMode?: string }} [opts]
+ */
+export function getKalshiLiveColumnDisplayLabelForEndpoint(endpointId, col, opts = {}) {
   if (endpointId === "candlesticks") return getKalshiLiveCandlestickColumnLabel(col);
   if (endpointId === "trades") return getKalshiLiveTradeColumnLabel(col);
   if (endpointId === "orderbook") return getKalshiLiveOrderbookColumnLabel(col);
   if (endpointId === "series") {
     return getKalshiLiveSeriesColumnLabel(col);
+  }
+  if (endpointId === "events") {
+    const rowMode = normalizeKalshiLiveEventsRowMode(opts.rowMode);
+    if (opts.includeMarkets && rowMode === KALSHI_LIVE_EVENTS_ROW_MODE_PER_MARKET) {
+      return getKalshiLiveMarketColumnLabel(col);
+    }
+    return getKalshiLiveEventColumnLabel(col);
   }
   return getKalshiLiveMarketColumnLabel(col);
 }
