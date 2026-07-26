@@ -17,6 +17,11 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
 import { mapSavedChartsToPickerOptions } from "@/lib/dashboardChartPickerLabels";
+import {
+  getLocalDashboardChart,
+  isDevLocalDashboardChartsEnabled,
+  isLocalDashboardChartId,
+} from "@/lib/localDashboardCharts";
 
 function DataSheetsLoader({ rows, dataSheets }) {
   const { setDataSheets, setActiveSheetId, setConnectedData } = useMyStateV2();
@@ -87,6 +92,19 @@ export function IsolatedChartPreview({
     setErr(null);
     appliedBundleSigRef.current = "";
 
+    // Dev-only: `local:` ids resolve from the in-memory registry (power move
+    // preview without sign-in / DB). Production ids never carry this prefix.
+    if (isLocalDashboardChartId(chartId)) {
+      if (isDevLocalDashboardChartsEnabled()) {
+        const localChart = getLocalDashboardChart(chartId);
+        if (localChart) setChartLean(localChart);
+        else setErr("Local chart expired — rerun the power move.");
+      } else {
+        setErr("Chart not found");
+      }
+      return undefined;
+    }
+
     (async () => {
       try {
         const cr = await fetch(`/api/charts/chart/${chartId}`);
@@ -133,6 +151,12 @@ export function IsolatedChartPreview({
       } catch {
         if (!cancelled) setErr("Failed to load chart data");
       }
+      return undefined;
+    }
+
+    // Local charts only exist client-side — never fall back to the bundle API.
+    if (isLocalDashboardChartId(chartId)) {
+      setErr("Local chart needs workspace data — rerun the power move.");
       return undefined;
     }
 

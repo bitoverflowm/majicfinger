@@ -16,6 +16,10 @@ import {
   mergeCreatedChartDashboardDraft,
   persistChartDashboardDraft,
 } from "@/lib/persistChartDashboardDraft";
+import {
+  isDevLocalDashboardChartsEnabled,
+  registerLocalDashboardChart,
+} from "@/lib/localDashboardCharts";
 
 /** Three charts per row on the 12-col dashboard grid. */
 export const EVENT_CANDLES_DASH_COL_SPAN = 4;
@@ -295,11 +299,16 @@ export async function createEventCandlestickChart(opts) {
  * Waterfall: create dashboard → navigate → plot each market chart and stream
  * cards onto the layout so the user sees the master view populate live.
  *
+ * `localOnly` (dev builds only): no sign-in and zero DB writes — charts are
+ * registered in the in-memory local registry (`local:` ids) and the dashboard
+ * draft stays a client-side draft that is never persisted.
+ *
  * @param {{
  *   dataSheets: Record<string, unknown>;
  *   userId: string;
  *   dataSetId?: string | null;
  *   tickerMetaTitle?: string | null;
+ *   localOnly?: boolean;
  *   signal?: AbortSignal;
  *   setChartDashboardDraft: Function;
  *   setActiveChartDashboardId?: Function;
@@ -312,6 +321,8 @@ export async function createEventCandlestickChart(opts) {
  * }} ctx
  */
 export async function runEventCandlesticksDashboardPowerMove(ctx) {
+  // Hard gate: local mode never runs in production builds.
+  const localOnly = !!ctx.localOnly && isDevLocalDashboardChartsEnabled();
   const collected = collectEventCandlestickMarketSheets(ctx.dataSheets);
   if (!collected.markets.length) {
     throw new Error("No event candlestick market sheets found. Pull Events Candlesticks first.");
@@ -337,20 +348,29 @@ export async function runEventCandlesticksDashboardPowerMove(ctx) {
     total: marketCount,
   });
 
-  const { dataSetId, created: createdProject } = await ensurePowerMoveDataSetId({
-    dataSetId: ctx.dataSetId,
-    userId: ctx.userId,
-    projectName: eventTitle,
-  });
-
-  if (createdProject) {
-    ctx.setSavedDataSets?.((prev) => {
-      const list = Array.isArray(prev) ? prev : [];
-      if (list.some((d) => String(d?._id) === dataSetId)) return list;
-      return [createdProject, ...list];
+  /** @type {string} */
+  let dataSetId = "";
+  if (localOnly) {
+    // Dev local mode: no project, nothing persisted.
+    dataSetId = "";
+  } else {
+    const ensured = await ensurePowerMoveDataSetId({
+      dataSetId: ctx.dataSetId,
+      userId: ctx.userId,
+      projectName: eventTitle,
     });
-    ctx.setLoadedDataMeta?.(createdProject);
-    ctx.setLoadedDataId?.(dataSetId);
+    dataSetId = ensured.dataSetId;
+    const createdProject = ensured.created;
+
+    if (createdProject) {
+      ctx.setSavedDataSets?.((prev) => {
+        const list = Array.isArray(prev) ? prev : [];
+        if (list.some((d) => String(d?._id) === dataSetId)) return list;
+        return [createdProject, ...list];
+      });
+      ctx.setLoadedDataMeta?.(createdProject);
+      ctx.setLoadedDataId?.(dataSetId);
+    }
   }
 
   if (ctx.signal?.aborted) throw new DOMException("Aborted", "AbortError");
@@ -380,21 +400,23 @@ export async function runEventCandlesticksDashboardPowerMove(ctx) {
   ctx.setActiveChartDashboardId?.(null);
   ctx.setChartDashboardDraft?.(draftSeed);
 
-  // Persist early so autosave has an _id; layout grows via waterfall updates.
-  const initialPersist = await persistChartDashboardDraft({
-    draft: draftSeed,
-    userId: ctx.userId,
-  });
-  if (!initialPersist.ok) {
-    throw new Error(initialPersist.message || "Could not create dashboard.");
-  }
-  if (initialPersist.created) {
-    // Stamp `_id` on the draft for subsequent PUTs, but do NOT set
-    // `activeChartDashboardId` yet — that triggers a full dashboard/project
-    // reload which would clobber the live waterfall layout and workspace sheets.
-    ctx.setChartDashboardDraft?.((prev) =>
-      mergeCreatedChartDashboardDraft(prev || draftSeed, initialPersist.created),
-    );
+  if (!localOnly) {
+    // Persist early so autosave has an _id; layout grows via waterfall updates.
+    const initialPersist = await persistChartDashboardDraft({
+      draft: draftSeed,
+      userId: ctx.userId,
+    });
+    if (!initialPersist.ok) {
+      throw new Error(initialPersist.message || "Could not create dashboard.");
+    }
+    if (initialPersist.created) {
+      // Stamp `_id` on the draft for subsequent PUTs, but do NOT set
+      // `activeChartDashboardId` yet — that triggers a full dashboard/project
+      // reload which would clobber the live waterfall layout and workspace sheets.
+      ctx.setChartDashboardDraft?.((prev) =>
+        mergeCreatedChartDashboardDraft(prev || draftSeed, initialPersist.created),
+      );
+    }
   }
 
   await yieldToUi();
@@ -424,36 +446,60 @@ export async function runEventCandlesticksDashboardPowerMove(ctx) {
       title,
     });
 
-    const saved = await createEventCandlestickChart({
-      chartName,
-      snapshot,
-      userId: ctx.userId,
-      dataSetId,
-    });
-    createdCharts.push(saved);
-
-    const mongoId = String(saved._id);
-
-    // Local workspace chart tab (optional) — keep snapshots for Save Project.
-    ctx.setChartSheets?.((prev) => {
-      const sheets = { ...(prev || {}) };
-      let n = Object.keys(sheets).length + 1;
-      let localId = `chart-${n}`;
-      while (sheets[localId]) {
-        n += 1;
-        localId = `chart-${n}`;
-      }
-      sheets[localId] = {
-        name: chartName,
+    /** @type {string} */
+    let cardChartId;
+    if (localOnly) {
+      // In-memory only — IsolatedChartPreview resolves `local:` ids from the registry.
+      cardChartId = registerLocalDashboardChart({ chartName, snapshot });
+      ctx.setChartSheets?.((prev) => {
+        const sheets = { ...(prev || {}) };
+        let n = Object.keys(sheets).length + 1;
+        let localId = `chart-${n}`;
+        while (sheets[localId]) {
+          n += 1;
+          localId = `chart-${n}`;
+        }
+        // chartMeta stays null so a later Save Project creates real charts
+        // instead of PUTting to a non-Mongo `local:` id.
+        sheets[localId] = {
+          name: chartName,
+          snapshot,
+          chartMeta: null,
+          userCreated: true,
+        };
+        return sheets;
+      });
+    } else {
+      const saved = await createEventCandlestickChart({
+        chartName,
         snapshot,
-        chartMeta: saved,
-        userCreated: true,
-      };
-      return sheets;
-    });
+        userId: ctx.userId,
+        dataSetId,
+      });
+      createdCharts.push(saved);
+      cardChartId = String(saved._id);
+
+      // Local workspace chart tab (optional) — keep snapshots for Save Project.
+      ctx.setChartSheets?.((prev) => {
+        const sheets = { ...(prev || {}) };
+        let n = Object.keys(sheets).length + 1;
+        let localId = `chart-${n}`;
+        while (sheets[localId]) {
+          n += 1;
+          localId = `chart-${n}`;
+        }
+        sheets[localId] = {
+          name: chartName,
+          snapshot,
+          chartMeta: saved,
+          userCreated: true,
+        };
+        return sheets;
+      });
+    }
 
     layout = appendEventCandlestickChartToLayout(layout, {
-      chartId: mongoId,
+      chartId: cardChartId,
       h2: title,
       caption,
       microtext: market.marketTicker,
@@ -490,7 +536,7 @@ export async function runEventCandlesticksDashboardPowerMove(ctx) {
   }
 
   ctx.onProgress?.({
-    label: "Saving dashboard…",
+    label: localOnly ? "Finishing dashboard (dev, not saved)…" : "Saving dashboard…",
     progress: 98,
     done: marketCount,
     total: marketCount,
@@ -519,7 +565,7 @@ export async function runEventCandlesticksDashboardPowerMove(ctx) {
     });
   });
 
-  if (draftForPersist) {
+  if (!localOnly && draftForPersist) {
     const result = await persistChartDashboardDraft({
       draft: draftForPersist,
       userId: ctx.userId,
@@ -536,7 +582,9 @@ export async function runEventCandlesticksDashboardPowerMove(ctx) {
   }
 
   ctx.onProgress?.({
-    label: `Dashboard ready — ${marketCount} charts`,
+    label: localOnly
+      ? `Dashboard ready — ${marketCount} charts (dev preview, not saved)`
+      : `Dashboard ready — ${marketCount} charts`,
     progress: 100,
     done: marketCount,
     total: marketCount,
@@ -547,5 +595,6 @@ export async function runEventCandlesticksDashboardPowerMove(ctx) {
     eventTitle,
     eventTicker,
     dataSetId,
+    localOnly,
   };
 }

@@ -676,13 +676,19 @@ export default function DataSheetWithIntegration({
 
   const handleEventCandlesticksPowerMove = useCallback(async () => {
     if (connectPowerMoveBuild?.active) return;
-    if (isDemo) {
-      toast.error("Sign up to use power moves.");
-      return;
-    }
-    if (!hasDbBackedUserId) {
-      toast.error("Sign in to plot candlesticks on a dashboard.");
-      return;
+    // Dev-only escape hatch: plot locally without sign-in or DB writes.
+    // `NODE_ENV` is inlined at build time, so this is always false in production.
+    const devLocalPowerMove =
+      process.env.NODE_ENV !== "production" && (isDemo || !hasDbBackedUserId);
+    if (!devLocalPowerMove) {
+      if (isDemo) {
+        toast.error("Sign up to use power moves.");
+        return;
+      }
+      if (!hasDbBackedUserId) {
+        toast.error("Sign in to plot candlesticks on a dashboard.");
+        return;
+      }
     }
 
     powerMoveBuildAbortRef.current?.abort();
@@ -723,9 +729,10 @@ export default function DataSheetWithIntegration({
     try {
       const result = await runEventCandlesticksDashboardPowerMove({
         dataSheets,
-        userId: user.userId,
-        dataSetId: dataSetId || null,
+        userId: devLocalPowerMove ? String(user?.userId || "dev-local") : user.userId,
+        dataSetId: devLocalPowerMove ? null : dataSetId || null,
         tickerMetaTitle,
+        localOnly: devLocalPowerMove,
         signal: ac.signal,
         setChartDashboardDraft,
         setActiveChartDashboardId,
@@ -748,12 +755,20 @@ export default function DataSheetWithIntegration({
 
       setConnectPowerMoveBuild?.({
         active: false,
-        label: `Dashboard ready — ${result.marketCount} charts`,
+        label: result.localOnly
+          ? `Dashboard ready — ${result.marketCount} charts (dev preview, not saved)`
+          : `Dashboard ready — ${result.marketCount} charts`,
         progress: 100,
         error: null,
       });
-      setRefetchChartDashboardsTick?.((n) => (Number(n) || 0) + 1);
-      toast.success(`Plotted ${result.marketCount} candlestick charts on “${result.eventTitle}”.`);
+      if (!result.localOnly) {
+        setRefetchChartDashboardsTick?.((n) => (Number(n) || 0) + 1);
+      }
+      toast.success(
+        result.localOnly
+          ? `Plotted ${result.marketCount} candlestick charts (dev preview — nothing saved).`
+          : `Plotted ${result.marketCount} candlestick charts on “${result.eventTitle}”.`,
+      );
     } catch (e) {
       if (e?.name === "AbortError" || ac.signal.aborted) return;
       const message = e instanceof Error ? e.message : "Failed to build dashboard.";
