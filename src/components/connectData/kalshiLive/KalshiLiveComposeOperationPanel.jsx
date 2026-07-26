@@ -32,6 +32,7 @@ import {
 import { CONNECT_COMPOSE_OPERATIONS } from "@/lib/connectComposeOperations";
 import { operatorSymbol } from "@/lib/dataLakeComposeHelpers";
 import { validateKalshiLiveCandlestickPull } from "@/lib/kalshiLive/candlestickCompose";
+import { validateKalshiLiveEventCandlesticksPull } from "@/lib/kalshiLive/eventCandlesticksCompose";
 import {
   KALSHI_LIVE_TRADES_DEFAULT_LIMIT,
   KALSHI_LIVE_TRADES_ROW_LIMIT_MAX,
@@ -86,10 +87,16 @@ function genId(prefix) {
 
 /** @param {string} endpointId @param {string} column */
 function operatorsForColumn(endpointId, column) {
-  if (endpointId === "candlesticks" && column === "period_interval") {
+  if (
+    (endpointId === "candlesticks" || endpointId === "event_candlesticks") &&
+    column === "period_interval"
+  ) {
     return [{ id: "eq", label: "is equal to" }];
   }
-  if (endpointId === "candlesticks" && column === "include_latest_before_start") {
+  if (
+    (endpointId === "candlesticks" || endpointId === "event_candlesticks") &&
+    column === "include_latest_before_start"
+  ) {
     return [{ id: "eq", label: "is equal to" }];
   }
   if (column === "category") return [{ id: "eq", label: "is equal to" }];
@@ -119,7 +126,7 @@ function operatorsForColumn(endpointId, column) {
 
 /** @param {string} endpointId @param {string} column */
 function defaultWhereValue(endpointId, column) {
-  if (endpointId === "candlesticks") {
+  if (endpointId === "candlesticks" || endpointId === "event_candlesticks") {
     const now = Math.floor(Date.now() / 1000);
     if (column === "start_ts") return now - 24 * 60 * 60;
     if (column === "end_ts") return now;
@@ -174,6 +181,8 @@ export function KalshiLiveComposeOperationPanel({
     connectKalshiLiveColumnSelections = {},
     connectKalshiLiveCandlestickTickers = "",
     connectKalshiLiveCandlestickTickerMeta = {},
+    connectKalshiLiveEventCandlesticksEventTicker = "",
+    connectKalshiLiveEventCandlesticksSeriesTicker = "",
     connectKalshiLiveTickers = "",
     connectKalshiLiveMarketsTickerMeta = {},
     connectKalshiLiveMarketsSheetMode = KALSHI_LIVE_MARKETS_SHEET_MODE_PER_MARKET,
@@ -450,6 +459,18 @@ export function KalshiLiveComposeOperationPanel({
       }
     }
 
+    if (endpointId === "event_candlesticks") {
+      const eventCandleErr = validateKalshiLiveEventCandlesticksPull(
+        connectKalshiLiveEventCandlesticksEventTicker,
+        connectKalshiLiveEventCandlesticksSeriesTicker,
+        connectKalshiLiveWhereFilters,
+      );
+      if (eventCandleErr) {
+        setFilterError?.(eventCandleErr);
+        return;
+      }
+    }
+
     if (endpointId === "trades") {
       const tradesErr = validateKalshiLiveTradesPull(
         connectKalshiLiveTradesTicker,
@@ -532,6 +553,8 @@ export function KalshiLiveComposeOperationPanel({
     endpointId,
     connectKalshiLiveWhereFilters,
     connectKalshiLiveCandlestickTickers,
+    connectKalshiLiveEventCandlesticksEventTicker,
+    connectKalshiLiveEventCandlesticksSeriesTicker,
     connectKalshiLiveTickers,
     connectKalshiLiveMarketsDiscoveryMode,
     connectKalshiLiveMarketsDiscoveryStatus,
@@ -573,7 +596,10 @@ export function KalshiLiveComposeOperationPanel({
   const rowLimitDefault = defaultRowLimit(endpointId);
 
   const renderWhereValueInput = (f) => {
-    if (endpointId === "candlesticks" && f.column === "period_interval") {
+    if (
+      (endpointId === "candlesticks" || endpointId === "event_candlesticks") &&
+      f.column === "period_interval"
+    ) {
       return (
         <Select
           value={String(f.value ?? 60)}
@@ -737,7 +763,7 @@ export function KalshiLiveComposeOperationPanel({
             </DropdownMenuContent>
           </DropdownMenu>
           <p className="text-[10px] leading-snug text-muted-foreground">
-            {endpointId === "candlesticks"
+            {endpointId === "candlesticks" || endpointId === "event_candlesticks"
               ? "start_ts, end_ts, and period_interval are sent to Kalshi. Other columns filter on our side after the pull."
               : endpointId === "trades"
                 ? "Date range is set in Common queries above. Other columns filter on our side after the pull."

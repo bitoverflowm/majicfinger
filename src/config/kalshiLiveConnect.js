@@ -83,6 +83,14 @@ export const KALSHI_LIVE_CONNECT_ENDPOINTS = [
     description:
       "Live event metadata (and optional nested markets). Search by event ticker or discover events with status, series, and date filters.",
   },
+  {
+    id: "event_candlesticks",
+    category: "events",
+    title: "Events Candlesticks",
+    selectedTitle: "Get Event Candlesticks",
+    description:
+      "OHLC price, bid/ask, and volume for every market in a single event. The first sheet lists all market metadata; each remaining sheet holds one market's candlesticks.",
+  },
 ];
 
 /** @param {string} categoryId */
@@ -104,6 +112,7 @@ export const KALSHI_LIVE_DEFAULT_LIMIT = 100;
  */
 export function getKalshiLiveColumnsForEndpoint(endpointId, opts = {}) {
   if (endpointId === "candlesticks") return KALSHI_LIVE_CANDLESTICK_COLUMNS;
+  if (endpointId === "event_candlesticks") return KALSHI_LIVE_CANDLESTICK_COLUMNS;
   if (endpointId === "trades") return KALSHI_LIVE_TRADES_COLUMNS;
   if (endpointId === "orderbook") return KALSHI_LIVE_ORDERBOOK_COLUMNS;
   if (endpointId === "series") return KALSHI_LIVE_SERIES_COLUMNS;
@@ -124,6 +133,7 @@ export function getKalshiLiveColumnsForEndpoint(endpointId, opts = {}) {
  */
 export function getKalshiLiveColumnDisplayLabelForEndpoint(endpointId, col, opts = {}) {
   if (endpointId === "candlesticks") return getKalshiLiveCandlestickColumnLabel(col);
+  if (endpointId === "event_candlesticks") return getKalshiLiveCandlestickColumnLabel(col);
   if (endpointId === "trades") return getKalshiLiveTradeColumnLabel(col);
   if (endpointId === "orderbook") return getKalshiLiveOrderbookColumnLabel(col);
   if (endpointId === "series") {

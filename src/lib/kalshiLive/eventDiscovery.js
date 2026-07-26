@@ -16,7 +16,7 @@ import {
  * }} KalshiLiveEventsDiscoveryParams
  */
 
-export const KALSHI_LIVE_EVENTS_DISCOVERY_MAX_ROWS = 50_000;
+export const KALSHI_LIVE_EVENTS_DISCOVERY_MAX_ROWS = 20_000;
 
 /**
  * @returns {KalshiLiveEventsDiscoveryParams}

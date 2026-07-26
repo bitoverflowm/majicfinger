@@ -41,7 +41,7 @@ export const KALSHI_LIVE_MVE_FILTER_EXCLUDE = /** @type {KalshiLiveMveFilter} */
 export const KALSHI_LIVE_MVE_FILTER_ONLY = /** @type {KalshiLiveMveFilter} */ ("only");
 
 /** Safety cap while paginating all discovery pages (API max page size is 1000). */
-export const KALSHI_LIVE_MARKETS_DISCOVERY_MAX_ROWS = 50_000;
+export const KALSHI_LIVE_MARKETS_DISCOVERY_MAX_ROWS = 20_000;
 
 const STATUS_FOR_CREATED = new Set(["unopened", "open", ""]);
 const STATUS_FOR_CLOSE = new Set(["closed", ""]);

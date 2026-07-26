@@ -5,6 +5,9 @@ import {
 } from "@/lib/kalshiLive/seriesCompose";
 import { kalshiLiveSeriesWantsIncludeVolume } from "@/lib/kalshiLive/seriesColumns";
 
+/** Safety cap so a huge series list can't crash the sheet UI. */
+export const KALSHI_LIVE_SERIES_DISCOVERY_MAX_ROWS = 20_000;
+
 /**
  * Fetch series via GET /series (list / discovery filters).
  *
@@ -59,7 +62,8 @@ export async function fetchKalshiLiveSeriesDiscoveryPull(opts) {
     throw new Error(msg);
   }
 
-  const raw = Array.isArray(body?.series) ? body.series : [];
+  const rawAll = Array.isArray(body?.series) ? body.series : [];
+  const raw = rawAll.slice(0, KALSHI_LIVE_SERIES_DISCOVERY_MAX_ROWS);
   const rows = projectKalshiLiveSeriesRows(raw, opts.selectedColumns);
 
   return {
@@ -68,5 +72,6 @@ export async function fetchKalshiLiveSeriesDiscoveryPull(opts) {
     querySummary,
     includeVolume,
     includeProductMetadata,
+    truncated: rawAll.length > raw.length,
   };
 }

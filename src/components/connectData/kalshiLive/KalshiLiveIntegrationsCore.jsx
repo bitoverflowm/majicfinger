@@ -34,6 +34,7 @@ import { KalshiLiveOrderbookTickerField } from "@/components/connectData/kalshiL
 import { KalshiLiveOrderbookCommonQueries } from "@/components/connectData/kalshiLive/KalshiLiveOrderbookCommonQueries";
 import { KalshiLiveMarketsTickersField } from "@/components/connectData/kalshiLive/KalshiLiveMarketsTickersField";
 import { KalshiLiveEventsTickersField } from "@/components/connectData/kalshiLive/KalshiLiveEventsTickersField";
+import { KalshiLiveEventCandlesticksField } from "@/components/connectData/kalshiLive/KalshiLiveEventCandlesticksField";
 import { KalshiLiveSeriesTickersField } from "@/components/connectData/kalshiLive/KalshiLiveSeriesTickersField";
 import { KalshiLiveComposeOperationPanel } from "@/components/connectData/kalshiLive/KalshiLiveComposeOperationPanel";
 import { Button } from "@/components/ui/button";
@@ -65,6 +66,10 @@ const LIVE_SOURCE_PRESENTATION = {
   },
   events: {
     icon: Vote,
+    accent: "secondary",
+  },
+  event_candlesticks: {
+    icon: CandlestickChart,
     accent: "secondary",
   },
   series: {
@@ -419,6 +424,9 @@ export function KalshiLiveIntegrationsCore({ onRunPull, className, stepBackRef }
     connectKalshiLiveCandlestickTickers = "",
     setConnectKalshiLiveCandlestickTickers,
     setConnectKalshiLiveCandlestickTickerMeta,
+    setConnectKalshiLiveEventCandlesticksEventTicker,
+    setConnectKalshiLiveEventCandlesticksSeriesTicker,
+    setConnectKalshiLiveEventCandlesticksTickerMeta,
     connectKalshiLiveTradesTicker = "",
     setConnectKalshiLiveTradesTicker,
     setConnectKalshiLiveTradesTickerMeta,
@@ -557,6 +565,11 @@ export function KalshiLiveIntegrationsCore({ onRunPull, className, stepBackRef }
         setConnectKalshiLiveCandlestickTickers?.("");
         setConnectKalshiLiveCandlestickTickerMeta?.({});
       }
+      if (id !== "event_candlesticks") {
+        setConnectKalshiLiveEventCandlesticksEventTicker?.("");
+        setConnectKalshiLiveEventCandlesticksSeriesTicker?.("");
+        setConnectKalshiLiveEventCandlesticksTickerMeta?.({});
+      }
       if (id !== "trades") {
         setConnectKalshiLiveTradesTicker?.("");
         setConnectKalshiLiveTradesTickerMeta?.({});
@@ -606,6 +619,9 @@ export function KalshiLiveIntegrationsCore({ onRunPull, className, stepBackRef }
       setConnectKalshiLiveMarketsDiscoveryMaxSettledTs,
       setConnectKalshiLiveCandlestickTickers,
       setConnectKalshiLiveCandlestickTickerMeta,
+      setConnectKalshiLiveEventCandlesticksEventTicker,
+      setConnectKalshiLiveEventCandlesticksSeriesTicker,
+      setConnectKalshiLiveEventCandlesticksTickerMeta,
       setConnectKalshiLiveTradesTicker,
       setConnectKalshiLiveTradesTickerMeta,
       setConnectKalshiLiveOrderbookTicker,
@@ -646,6 +662,9 @@ export function KalshiLiveIntegrationsCore({ onRunPull, className, stepBackRef }
     setConnectKalshiLiveMarketsDiscoveryMaxSettledTs?.("");
     setConnectKalshiLiveCandlestickTickers?.("");
     setConnectKalshiLiveCandlestickTickerMeta?.({});
+    setConnectKalshiLiveEventCandlesticksEventTicker?.("");
+    setConnectKalshiLiveEventCandlesticksSeriesTicker?.("");
+    setConnectKalshiLiveEventCandlesticksTickerMeta?.({});
     setConnectKalshiLiveTradesTicker?.("");
     setConnectKalshiLiveTradesTickerMeta?.({});
     setConnectKalshiLiveOrderbookTicker?.("");
@@ -688,6 +707,9 @@ export function KalshiLiveIntegrationsCore({ onRunPull, className, stepBackRef }
     setConnectKalshiLiveMarketsDiscoveryMaxSettledTs,
     setConnectKalshiLiveCandlestickTickers,
     setConnectKalshiLiveCandlestickTickerMeta,
+    setConnectKalshiLiveEventCandlesticksEventTicker,
+    setConnectKalshiLiveEventCandlesticksSeriesTicker,
+    setConnectKalshiLiveEventCandlesticksTickerMeta,
     setConnectKalshiLiveTradesTicker,
     setConnectKalshiLiveTradesTickerMeta,
     setConnectKalshiLiveOrderbookTicker,
@@ -1056,7 +1078,7 @@ export function KalshiLiveIntegrationsCore({ onRunPull, className, stepBackRef }
                 return ep?.selectedTitle ?? ep?.title ?? selectedId;
               })()}
             </p>
-            {selectedId === "candlesticks" ? (
+            {selectedId === "candlesticks" || selectedId === "event_candlesticks" ? (
               <KalshiLiveCandlestickHistoricalCutoffNote className="mt-1.5 max-w-xl" />
             ) : null}
             {selectedId === "trades" ? (
@@ -1096,6 +1118,12 @@ export function KalshiLiveIntegrationsCore({ onRunPull, className, stepBackRef }
                   onChange={(v) => setConnectKalshiLiveCandlestickTickers?.(v)}
                   disabled={pullLoading}
                 />
+                <KalshiLiveCandlestickCommonQueries className="mt-4" disabled={pullLoading} />
+              </>
+            ) : null}
+            {selectedId === "event_candlesticks" ? (
+              <>
+                <KalshiLiveEventCandlesticksField className="mt-4" disabled={pullLoading} />
                 <KalshiLiveCandlestickCommonQueries className="mt-4" disabled={pullLoading} />
               </>
             ) : null}

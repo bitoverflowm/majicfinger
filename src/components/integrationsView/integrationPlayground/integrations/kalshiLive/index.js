@@ -36,6 +36,7 @@ import {
 import { ingestKalshiLiveAsView } from "@/lib/kalshiLive/ingestKalshiLiveAsView";
 import { kalshiLiveSeriesWantsIncludeVolume } from "@/lib/kalshiLive/seriesColumns";
 import { fetchKalshiLiveCandlesticksPull } from "@/lib/kalshiLive/fetchKalshiLiveCandlesticksPull";
+import { fetchKalshiLiveEventCandlesticksPull } from "@/lib/kalshiLive/fetchKalshiLiveEventCandlesticksPull";
 import { fetchKalshiLiveTradesPull } from "@/lib/kalshiLive/fetchKalshiLiveTradesPull";
 import { fetchKalshiLiveOrderbookPull } from "@/lib/kalshiLive/fetchKalshiLiveOrderbookPull";
 import { applyConnectHomePullData } from "@/lib/connectHomePullDestination";
@@ -108,6 +109,8 @@ export default function KalshiLive({ setConnectedData, connectHomePullBridge = f
     connectKalshiLiveEventsDiscoveryMinCloseTs,
     connectKalshiLiveEventsDiscoveryMinUpdatedTs,
     connectKalshiLiveCandlestickTickers,
+    connectKalshiLiveEventCandlesticksEventTicker,
+    connectKalshiLiveEventCandlesticksSeriesTicker,
     connectKalshiLiveTradesTicker,
     connectKalshiLiveOrderbookTicker,
     connectKalshiLiveSeriesTicker,
@@ -1025,6 +1028,138 @@ export default function KalshiLive({ setConnectedData, connectHomePullBridge = f
     ],
   );
 
+  const runEventCandlesticksPull = useCallback(
+    async (ac, sheetId, cols) => {
+      const whereFilters = Array.isArray(connectKalshiLiveWhereFilters)
+        ? connectKalshiLiveWhereFilters
+        : [];
+      const eventTicker = String(connectKalshiLiveEventCandlesticksEventTicker || "").trim();
+      const seriesTicker = String(connectKalshiLiveEventCandlesticksSeriesTicker || "").trim();
+      const requestStartMs =
+        typeof performance !== "undefined" && performance?.now ? performance.now() : Date.now();
+
+      setConnectDataLakePullState?.((prev) => ({
+        ...prev,
+        loading: true,
+        label: "Fetching Kalshi Live event candlesticks…",
+        progress: 8,
+        error: null,
+      }));
+
+      const { metaRows, byMarket, querySummary } = await fetchKalshiLiveEventCandlesticksPull({
+        eventTicker,
+        seriesTicker,
+        whereFilters,
+        selectedColumns: cols,
+        signal: ac.signal,
+        onProgress: ({ label, progress }) => {
+          setConnectDataLakePullState?.((prev) => ({
+            ...prev,
+            loading: true,
+            label,
+            progress,
+            error: null,
+          }));
+        },
+      });
+
+      const elapsedMs =
+        (typeof performance !== "undefined" && performance?.now
+          ? performance.now()
+          : Date.now()) - requestStartMs;
+
+      // Sheet 1 = market metadata; sheets 2..N = one market's candlesticks each.
+      const metaSheetName = `${eventTicker || "event"} · markets`.slice(0, 80);
+      const groups = [
+        { ticker: metaSheetName, rows: Array.isArray(metaRows) ? metaRows : [], isMeta: true },
+        ...byMarket.map((m) => ({ ticker: m.ticker, rows: m.rows, isMeta: false })),
+      ];
+
+      let firstSheetId = sheetId || ctx?.activeSheetId || null;
+      const totalRows = groups.reduce(
+        (sum, g) => sum + (Array.isArray(g.rows) ? g.rows.length : 0),
+        0,
+      );
+
+      if (setDataSheets) {
+        flushSync(() => {
+          setDataSheets((prev) => {
+            let next = { ...(prev || {}) };
+            /** @type {string[]} */
+            const writtenIds = [];
+
+            for (let i = 0; i < groups.length; i++) {
+              const group = groups[i];
+              const sheetName = String(group.ticker || `market-${i + 1}`).trim().slice(0, 80);
+              const rows = Array.isArray(group.rows) ? group.rows : [];
+
+              let targetSheetId;
+              if (i === 0 && firstSheetId) {
+                targetSheetId = firstSheetId;
+              } else {
+                targetSheetId = allocateNextSheetId(next);
+              }
+              writtenIds.push(targetSheetId);
+
+              const requestCard = {
+                id: genRequestCardId(),
+                createdAt: Date.now(),
+                elapsedMs,
+                lake: "kalshi-live",
+                table: "event_candlesticks",
+                sheetId: targetSheetId,
+                querySummary,
+                loadedRowCount: rows.length,
+              };
+
+              next = applyAthenaPullToSheetPatch(next, targetSheetId, rows, {
+                name: sheetName,
+                provenance: {
+                  source: "kalshi-live",
+                  endpoint: "event_candlesticks",
+                  eventTicker,
+                  seriesTicker,
+                  sheetKind: group.isMeta ? "markets_metadata" : "market_candlesticks",
+                  marketTicker: group.isMeta ? undefined : sheetName,
+                  whereFilters,
+                  querySummary,
+                },
+                requestCards: [requestCard],
+              });
+            }
+
+            firstSheetId = writtenIds[0] || firstSheetId;
+            return next;
+          });
+
+          if (firstSheetId && ctx?.setActiveSheetId) {
+            ctx.setActiveSheetId(firstSheetId);
+          }
+          const firstRows = Array.isArray(groups[0]?.rows) ? groups[0].rows : [];
+          if (setRows) setRows(firstRows);
+          ctx?.setConnectHomeAnalyzeActive?.(true);
+        });
+      } else {
+        applyConnectHomePullData(ctx, Array.isArray(metaRows) ? metaRows : []);
+      }
+
+      if (ctx?.requestConnectAnalyzeScroll) {
+        ctx.requestConnectAnalyzeScroll();
+      }
+
+      return totalRows;
+    },
+    [
+      connectKalshiLiveWhereFilters,
+      connectKalshiLiveEventCandlesticksEventTicker,
+      connectKalshiLiveEventCandlesticksSeriesTicker,
+      setConnectDataLakePullState,
+      setDataSheets,
+      setRows,
+      ctx,
+    ],
+  );
+
   const runTradesPull = useCallback(
     async (ac, sheetId, cols) => {
       const whereFilters = Array.isArray(connectKalshiLiveWhereFilters)
@@ -1422,7 +1557,9 @@ export default function KalshiLive({ setConnectedData, connectHomePullBridge = f
             ? "Fetching Kalshi Live events…"
             : endpointId === "candlesticks"
               ? "Fetching Kalshi Live candlesticks…"
-              : endpointId === "trades"
+              : endpointId === "event_candlesticks"
+                ? "Fetching Kalshi Live event candlesticks…"
+                : endpointId === "trades"
                 ? "Fetching Kalshi Live trades…"
                 : endpointId === "orderbook"
                   ? "Fetching Kalshi Live orderbook…"
@@ -1440,6 +1577,8 @@ export default function KalshiLive({ setConnectedData, connectHomePullBridge = f
         rowCount = (await runMarketsPull(ac, sheetId, cols)) || 0;
       } else if (endpointId === "candlesticks") {
         rowCount = (await runCandlesticksPull(ac, sheetId, cols)) || 0;
+      } else if (endpointId === "event_candlesticks") {
+        rowCount = (await runEventCandlesticksPull(ac, sheetId, cols)) || 0;
       } else if (endpointId === "trades") {
         rowCount = (await runTradesPull(ac, sheetId, cols)) || 0;
       } else if (endpointId === "orderbook") {
@@ -1509,11 +1648,14 @@ export default function KalshiLive({ setConnectedData, connectHomePullBridge = f
     connectKalshiLiveSeriesDiscoveryTag,
     connectKalshiLiveSeriesDiscoveryIncludeProductMetadata,
     connectKalshiLiveSeriesDiscoveryMinUpdatedTs,
+    connectKalshiLiveEventCandlesticksEventTicker,
+    connectKalshiLiveEventCandlesticksSeriesTicker,
     activeSheetId,
     runMarketsPull,
     runEventsPull,
     runSeriesPull,
     runCandlesticksPull,
+    runEventCandlesticksPull,
     runTradesPull,
     runOrderbookPull,
     setConnectDataLakePullState,

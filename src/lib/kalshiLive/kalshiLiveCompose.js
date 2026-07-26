@@ -48,7 +48,7 @@ const CANDLESTICK_API_WHERE_COLUMNS = [
 
 /** @param {string} endpointId */
 export function getKalshiLiveAllColumnNames(endpointId) {
-  if (endpointId === "candlesticks") {
+  if (endpointId === "candlesticks" || endpointId === "event_candlesticks") {
     const sheet = KALSHI_LIVE_CANDLESTICK_COLUMNS.map((c) => c.name);
     const api = CANDLESTICK_API_WHERE_COLUMNS.filter((c) => !sheet.includes(c));
     return [...api, ...sheet];
@@ -76,7 +76,7 @@ export function getKalshiLiveAllColumnNames(endpointId) {
 
 /** @param {string} endpointId */
 export function getKalshiLiveColumnType(endpointId, column) {
-  if (endpointId === "candlesticks") {
+  if (endpointId === "candlesticks" || endpointId === "event_candlesticks") {
     if (KALSHI_LIVE_CANDLESTICK_API_FILTER_COLUMNS.has(column)) {
       if (column === "period_interval") return "number";
       if (column === "include_latest_before_start") return "boolean";
@@ -125,7 +125,12 @@ export function validateKalshiLiveWhereFilters(endpointId, whereFilters) {
     return validateKalshiLiveMarketFilters(apiFilters);
   }
 
-  if (endpointId === "candlesticks" || endpointId === "trades" || endpointId === "orderbook") {
+  if (
+    endpointId === "candlesticks" ||
+    endpointId === "event_candlesticks" ||
+    endpointId === "trades" ||
+    endpointId === "orderbook"
+  ) {
     return null;
   }
 
