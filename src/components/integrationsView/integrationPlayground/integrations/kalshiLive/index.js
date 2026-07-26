@@ -1482,6 +1482,9 @@ export default function KalshiLive({ setConnectedData, connectHomePullBridge = f
       return;
     }
 
+    // Clear any stale power move; it is re-granted only on a clean qualifying pull.
+    ctx?.setConnectPowerMove?.(null);
+
     const sheetId = activeSheetId;
 
     trackDataPullStart({
@@ -1599,6 +1602,11 @@ export default function KalshiLive({ setConnectedData, connectHomePullBridge = f
         rowCount,
         elapsedMs,
       });
+
+      // Power moves are only offered after a clean Event Candlesticks pull for now.
+      ctx?.setConnectPowerMove?.(
+        endpointId === "event_candlesticks" && rowCount > 0 ? "event_candlesticks" : null,
+      );
 
       setConnectDataLakePullState?.({
         loading: false,

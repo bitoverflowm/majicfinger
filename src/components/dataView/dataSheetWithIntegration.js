@@ -37,6 +37,7 @@ import {
   ChevronDown,
   LayoutDashboard,
   Share2,
+  Zap,
   X,
   Plus,
   Info,
@@ -162,6 +163,7 @@ function pageFormatDockTargetKey(t) {
 const RIGHT_PANEL_TAB_ITEMS = [
   { value: "requestHistory", label: "Request history", Icon: History },
   { value: "integrations", label: "Integrations", Icon: Cable },
+  { value: "powerMoves", label: "Power moves", Icon: Zap },
   { value: "charts", label: "Charts", Icon: BarChart3 },
   { value: "dashboard", label: "Dashboard", Icon: LayoutDashboard },
   { value: "export", label: "Export", Icon: Share2 },
@@ -251,6 +253,7 @@ export default function DataSheetWithIntegration({
   const setRightPanelOpen = contextStateV2?.setRightPanelOpen;
   const rightPanelTab = contextStateV2?.rightPanelTab;
   const setRightPanelTab = contextStateV2?.setRightPanelTab;
+  const connectPowerMove = contextStateV2?.connectPowerMove ?? null;
   const connectHomeCenterView = normalizeConnectHomeCenterView(
     contextStateV2?.connectHomeCenterView,
   );
@@ -537,7 +540,14 @@ export default function DataSheetWithIntegration({
 
   useEffect(() => {
     if (!setRightPanelTab) return;
-    const valid = new Set(["integrations", "requestHistory", "charts", "dashboard", "export"]);
+    const valid = new Set([
+      "integrations",
+      "requestHistory",
+      "powerMoves",
+      "charts",
+      "dashboard",
+      "export",
+    ]);
     if (rightPanelTab != null && rightPanelTab !== "" && !valid.has(rightPanelTab)) {
       setRightPanelTab("integrations");
     }
@@ -868,6 +878,7 @@ export default function DataSheetWithIntegration({
   const connectHomeSidebarTab =
     rightPanelTab === "integrations" ||
     rightPanelTab === "requestHistory" ||
+    rightPanelTab === "powerMoves" ||
     rightPanelTab === "export";
   const connectHomeInAnalyzeContext = connectHomeAnalyzeActive || hasConnectSheetData;
   const connectHomeDrawerAllowed =
@@ -1460,6 +1471,11 @@ export default function DataSheetWithIntegration({
                         >
                           {RIGHT_PANEL_TAB_ITEMS.map(({ value, label, Icon }) => {
                             const iconOnly = !drawerExpanded;
+                            // Gradual flash to surface an available power move until the tab is opened.
+                            const flashPowerMove =
+                              value === "powerMoves" &&
+                              !!connectPowerMove &&
+                              rightPanelTab !== "powerMoves";
                             return (
                               <TabsTrigger
                                 key={value}
@@ -1468,6 +1484,8 @@ export default function DataSheetWithIntegration({
                                 className={cn(
                                   "shrink-0 gap-1.5 text-xs transition-colors aria-selected:z-[1] aria-selected:bg-white aria-selected:text-slate-950 aria-selected:shadow-sm dark:aria-selected:bg-slate-950 dark:aria-selected:text-slate-50",
                                   iconOnly ? "px-2" : "px-2.5",
+                                  flashPowerMove &&
+                                    "animate-pulse bg-amber-400/20 text-amber-600 dark:bg-amber-400/15 dark:text-amber-400",
                                 )}
                                 aria-label={label}
                               >
@@ -1581,6 +1599,34 @@ export default function DataSheetWithIntegration({
                         className="m-0 h-full w-full min-w-0 max-w-full overflow-auto"
                       >
                         <ConnectHomeRequestHistory />
+                      </TabsContent>
+
+                      <TabsContent
+                        value="powerMoves"
+                        className="m-0 h-full w-full min-w-0 max-w-full overflow-auto"
+                      >
+                        <div className="flex w-full min-w-0 flex-col gap-2 p-2">
+                          {connectPowerMove === "event_candlesticks" ? (
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              className="h-auto w-full justify-start gap-2 whitespace-normal px-2.5 py-2 text-left text-xs"
+                            >
+                              <Zap
+                                className="h-3.5 w-3.5 shrink-0 text-amber-500"
+                                aria-hidden
+                              />
+                              <span className="min-w-0">
+                                One click plot all candlesticks on dashboard
+                              </span>
+                            </Button>
+                          ) : (
+                            <p className="px-1 py-2 text-xs text-muted-foreground">
+                              No power moves available yet.
+                            </p>
+                          )}
+                        </div>
                       </TabsContent>
 
                       <TabsContent value="charts" className="m-0 h-full min-w-0 w-full max-w-full">
