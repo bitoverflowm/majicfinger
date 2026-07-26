@@ -59,6 +59,11 @@ import {
 } from "@/lib/kalshiLive/eventCompose";
 import { validateKalshiLiveEventsDiscoveryPull } from "@/lib/kalshiLive/eventDiscovery";
 import {
+  KALSHI_LIVE_MULTIVARIATE_EVENTS_PAGE_LIMIT_DEFAULT,
+  KALSHI_LIVE_MULTIVARIATE_EVENTS_PAGE_LIMIT_MAX,
+  validateKalshiLiveMultivariateEventsDiscoveryPull,
+} from "@/lib/kalshiLive/multivariateEventsDiscovery";
+import {
   KALSHI_LIVE_SERIES_SHEET_MODE_COMBINED,
   KALSHI_LIVE_SERIES_SHEET_MODE_PER_SERIES,
   normalizeKalshiLiveSeriesSheetMode,
@@ -78,7 +83,9 @@ import { useDemoProGate } from "@/hooks/useDemoProGate";
 import { cn } from "@/lib/utils";
 
 function defaultRowLimit(endpointId) {
-  return endpointId === "trades" ? KALSHI_LIVE_TRADES_DEFAULT_LIMIT : KALSHI_LIVE_DEFAULT_LIMIT;
+  if (endpointId === "trades") return KALSHI_LIVE_TRADES_DEFAULT_LIMIT;
+  if (endpointId === "multivariate_events") return KALSHI_LIVE_MULTIVARIATE_EVENTS_PAGE_LIMIT_DEFAULT;
+  return KALSHI_LIVE_DEFAULT_LIMIT;
 }
 
 function genId(prefix) {
@@ -210,6 +217,8 @@ export function KalshiLiveComposeOperationPanel({
     connectKalshiLiveEventsDiscoveryTickers = "",
     connectKalshiLiveEventsDiscoveryMinCloseTs = "",
     connectKalshiLiveEventsDiscoveryMinUpdatedTs = "",
+    connectKalshiLiveMultivariateEventsSeriesTicker = "",
+    connectKalshiLiveMultivariateEventsCollectionTicker = "",
     connectKalshiLiveTradesTicker = "",
     connectKalshiLiveTradesTickerMeta = {},
     connectKalshiLiveOrderbookTicker = "",
@@ -529,6 +538,17 @@ export function KalshiLiveComposeOperationPanel({
       }
     }
 
+    if (endpointId === "multivariate_events") {
+      const mveErr = validateKalshiLiveMultivariateEventsDiscoveryPull({
+        seriesTicker: connectKalshiLiveMultivariateEventsSeriesTicker,
+        collectionTicker: connectKalshiLiveMultivariateEventsCollectionTicker,
+      });
+      if (mveErr) {
+        setFilterError?.(mveErr);
+        return;
+      }
+    }
+
     if (endpointId === "series") {
       const seriesErr = connectKalshiLiveSeriesDiscoveryMode
         ? validateKalshiLiveSeriesDiscoveryPull({
@@ -576,6 +596,8 @@ export function KalshiLiveComposeOperationPanel({
     connectKalshiLiveEventsDiscoveryTickers,
     connectKalshiLiveEventsDiscoveryMinCloseTs,
     connectKalshiLiveEventsDiscoveryMinUpdatedTs,
+    connectKalshiLiveMultivariateEventsSeriesTicker,
+    connectKalshiLiveMultivariateEventsCollectionTicker,
     connectKalshiLiveTradesTicker,
     connectKalshiLiveOrderbookTicker,
     setFilterError,
@@ -591,7 +613,9 @@ export function KalshiLiveComposeOperationPanel({
       ? CANDLESTICK_ROW_LIMIT_MAX
       : endpointId === "trades"
         ? KALSHI_LIVE_TRADES_ROW_LIMIT_MAX
-        : 1000;
+        : endpointId === "multivariate_events"
+          ? KALSHI_LIVE_MULTIVARIATE_EVENTS_PAGE_LIMIT_MAX
+          : 1000;
 
   const rowLimitDefault = defaultRowLimit(endpointId);
 
@@ -876,7 +900,9 @@ export function KalshiLiveComposeOperationPanel({
               ? "Max 10,000 candle rows total across all tickers (Kalshi batch cap). Applied after fetch, filters, and sort."
               : endpointId === "trades"
                 ? "Max 10,000 trades per market. Each API page requests up to 1,000; we follow the cursor until your row limit is reached or the market is exhausted."
-                : "Applied after API fetch, client filters, and sort."}
+                : endpointId === "multivariate_events"
+                  ? "Page size for each multivariate events request (max 100). We follow the cursor across pages until results are exhausted or 20,000 rows are loaded."
+                  : "Applied after API fetch, client filters, and sort."}
           </p>
         </div>
       );

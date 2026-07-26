@@ -13,7 +13,7 @@ import {
   ORDERBOOK_API_WHERE_COLUMN_LIST,
 } from "@/lib/kalshiLive/orderbookColumns";
 import { KALSHI_LIVE_MARKETS_COLUMNS } from "@/lib/kalshiLive/marketsColumns";
-import { KALSHI_LIVE_EVENTS_COLUMNS } from "@/lib/kalshiLive/eventsColumns";
+import { KALSHI_LIVE_EVENTS_COLUMNS, KALSHI_LIVE_MULTIVARIATE_EVENTS_COLUMNS } from "@/lib/kalshiLive/eventsColumns";
 import { validateKalshiLiveMarketFilters } from "@/lib/kalshiLive/marketFilterRules";
 import { KALSHI_LIVE_SERIES_COLUMNS } from "@/lib/kalshiLive/seriesColumns";
 import {
@@ -68,9 +68,11 @@ export function getKalshiLiveAllColumnNames(endpointId) {
       ? KALSHI_LIVE_MARKETS_COLUMNS
       : endpointId === "events"
         ? KALSHI_LIVE_EVENTS_COLUMNS
-        : endpointId === "series"
-          ? KALSHI_LIVE_SERIES_COLUMNS
-          : [];
+        : endpointId === "multivariate_events"
+          ? KALSHI_LIVE_MULTIVARIATE_EVENTS_COLUMNS
+          : endpointId === "series"
+            ? KALSHI_LIVE_SERIES_COLUMNS
+            : [];
   return cols.map((c) => c.name);
 }
 
@@ -102,7 +104,9 @@ export function getKalshiLiveColumnType(endpointId, column) {
       ? KALSHI_LIVE_MARKETS_COLUMNS
       : endpointId === "events"
         ? KALSHI_LIVE_EVENTS_COLUMNS
-        : KALSHI_LIVE_SERIES_COLUMNS;
+        : endpointId === "multivariate_events"
+          ? KALSHI_LIVE_MULTIVARIATE_EVENTS_COLUMNS
+          : KALSHI_LIVE_SERIES_COLUMNS;
   const row = cols.find((c) => c.name === column);
   return row?.type || "string";
 }
@@ -115,7 +119,7 @@ export function getKalshiLiveColumnType(endpointId, column) {
 export function validateKalshiLiveWhereFilters(endpointId, whereFilters) {
   const list = Array.isArray(whereFilters) ? whereFilters : [];
 
-  if (endpointId === "series" || endpointId === "events") {
+  if (endpointId === "series" || endpointId === "events" || endpointId === "multivariate_events") {
     // Tickers / discovery filters come from dedicated fields, not Where.
     return null;
   }

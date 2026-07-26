@@ -34,6 +34,7 @@ import { KalshiLiveOrderbookTickerField } from "@/components/connectData/kalshiL
 import { KalshiLiveOrderbookCommonQueries } from "@/components/connectData/kalshiLive/KalshiLiveOrderbookCommonQueries";
 import { KalshiLiveMarketsTickersField } from "@/components/connectData/kalshiLive/KalshiLiveMarketsTickersField";
 import { KalshiLiveEventsTickersField } from "@/components/connectData/kalshiLive/KalshiLiveEventsTickersField";
+import { KalshiLiveMultivariateEventsFields } from "@/components/connectData/kalshiLive/KalshiLiveMultivariateEventsFields";
 import { KalshiLiveEventCandlesticksField } from "@/components/connectData/kalshiLive/KalshiLiveEventCandlesticksField";
 import { KalshiLiveSeriesTickersField } from "@/components/connectData/kalshiLive/KalshiLiveSeriesTickersField";
 import { KalshiLiveComposeOperationPanel } from "@/components/connectData/kalshiLive/KalshiLiveComposeOperationPanel";
@@ -70,6 +71,10 @@ const LIVE_SOURCE_PRESENTATION = {
   },
   event_candlesticks: {
     icon: CandlestickChart,
+    accent: "secondary",
+  },
+  multivariate_events: {
+    icon: Sparkles,
     accent: "secondary",
   },
   series: {
@@ -421,6 +426,8 @@ export function KalshiLiveIntegrationsCore({ onRunPull, className, stepBackRef }
     setConnectKalshiLiveEventsTickers,
     connectKalshiLiveEventsIncludeMarkets = false,
     connectKalshiLiveEventsRowMode = "nested",
+    connectKalshiLiveMultivariateEventsIncludeMarkets = false,
+    connectKalshiLiveMultivariateEventsRowMode = "nested",
     connectKalshiLiveCandlestickTickers = "",
     setConnectKalshiLiveCandlestickTickers,
     setConnectKalshiLiveCandlestickTickerMeta,
@@ -590,6 +597,8 @@ export function KalshiLiveIntegrationsCore({ onRunPull, className, stepBackRef }
       }
       if (id === "trades") {
         setConnectKalshiLiveLimit?.(KALSHI_LIVE_TRADES_DEFAULT_LIMIT);
+      } else if (id === "multivariate_events") {
+        setConnectKalshiLiveLimit?.(100);
       }
       setFilterError(null);
       setHoveredEndpointId("");
@@ -789,14 +798,32 @@ export function KalshiLiveIntegrationsCore({ onRunPull, className, stepBackRef }
     [connectKalshiLiveEventsIncludeMarkets, connectKalshiLiveEventsRowMode],
   );
 
+  const multivariateEventsColumnOpts = useMemo(
+    () => ({
+      includeMarkets: !!connectKalshiLiveMultivariateEventsIncludeMarkets,
+      rowMode: connectKalshiLiveMultivariateEventsRowMode,
+    }),
+    [
+      connectKalshiLiveMultivariateEventsIncludeMarkets,
+      connectKalshiLiveMultivariateEventsRowMode,
+    ],
+  );
+
+  const endpointColumnOpts =
+    selectedId === "events"
+      ? eventsColumnOpts
+      : selectedId === "multivariate_events"
+        ? multivariateEventsColumnOpts
+        : undefined;
+
   const getDisplayLabel = useCallback(
     (col) =>
       KALSHI_LIVE_CONNECT_CONFIG.getColumnDisplayLabel(
         selectedId,
         col,
-        selectedId === "events" ? eventsColumnOpts : undefined,
+        endpointColumnOpts,
       ),
-    [selectedId, eventsColumnOpts],
+    [selectedId, endpointColumnOpts],
   );
 
   return (
@@ -1110,6 +1137,12 @@ export function KalshiLiveIntegrationsCore({ onRunPull, className, stepBackRef }
                 disabled={pullLoading}
               />
             ) : null}
+            {selectedId === "multivariate_events" ? (
+              <KalshiLiveMultivariateEventsFields
+                className="mt-4"
+                disabled={pullLoading}
+              />
+            ) : null}
             {selectedId === "candlesticks" ? (
               <>
                 <KalshiLiveCandlestickTickersField
@@ -1158,14 +1191,14 @@ export function KalshiLiveIntegrationsCore({ onRunPull, className, stepBackRef }
               />
             ) : null}
             <ColumnPicker
-              key={`${selectedId}:${connectKalshiLiveEventsIncludeMarkets}:${connectKalshiLiveEventsRowMode}`}
+              key={`${selectedId}:${connectKalshiLiveEventsIncludeMarkets}:${connectKalshiLiveEventsRowMode}:${connectKalshiLiveMultivariateEventsIncludeMarkets}:${connectKalshiLiveMultivariateEventsRowMode}`}
               sourceId={selectedId}
               sourceName={
                 endpoints.find((e) => e.id === selectedId)?.title || selectedId
               }
               columns={KALSHI_LIVE_CONNECT_CONFIG.getColumnsForEndpoint(
                 selectedId,
-                selectedId === "events" ? eventsColumnOpts : undefined,
+                endpointColumnOpts,
               )}
               getDisplayLabel={getDisplayLabel}
               lake={null}
@@ -1182,7 +1215,7 @@ export function KalshiLiveIntegrationsCore({ onRunPull, className, stepBackRef }
                 patchColumns(selectedId, () =>
                   KALSHI_LIVE_CONNECT_CONFIG.getColumnsForEndpoint(
                     selectedId,
-                    selectedId === "events" ? eventsColumnOpts : undefined,
+                    endpointColumnOpts,
                   ).map((c) => c.name),
                 )
               }

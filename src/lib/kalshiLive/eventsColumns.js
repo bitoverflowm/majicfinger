@@ -79,6 +79,19 @@ export function getKalshiLiveEventColumnLabel(col) {
   return fromCol || name;
 }
 
+/**
+ * GET /events/multivariate response columns (EventData). Same shape as Events,
+ * but no milestones (that query param is not offered on this endpoint).
+ */
+export const KALSHI_LIVE_MULTIVARIATE_EVENTS_COLUMNS = KALSHI_LIVE_EVENTS_COLUMNS.filter(
+  (c) => c.name !== "milestones",
+);
+
+/** @param {KalshiLiveEventColumn | string} col */
+export function getKalshiLiveMultivariateEventColumnLabel(col) {
+  return getKalshiLiveEventColumnLabel(col);
+}
+
 /** Discovery status filter for GET /events. */
 export const KALSHI_LIVE_EVENT_STATUS_OPTIONS = ["unopened", "open", "closed", "settled"];
 

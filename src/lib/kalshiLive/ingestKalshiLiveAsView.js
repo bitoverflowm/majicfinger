@@ -62,7 +62,7 @@ export async function ingestKalshiLiveAsView(opts) {
     );
   } else if (endpointId === "markets") {
     sheetRows = projectKalshiLiveMarketRows(opts.markets, opts.selectedColumns);
-  } else if (endpointId === "events") {
+  } else if (endpointId === "events" || endpointId === "multivariate_events") {
     sheetRows = projectKalshiLiveEventPayloads(
       Array.isArray(opts.events) ? opts.events : [],
       opts.selectedColumns,

@@ -4,7 +4,9 @@ import {
 } from "@/lib/kalshiLive/candlesticksColumns";
 import {
   getKalshiLiveEventColumnLabel,
+  getKalshiLiveMultivariateEventColumnLabel,
   KALSHI_LIVE_EVENTS_COLUMNS,
+  KALSHI_LIVE_MULTIVARIATE_EVENTS_COLUMNS,
 } from "@/lib/kalshiLive/eventsColumns";
 import {
   getKalshiLiveMarketColumnLabel,
@@ -91,6 +93,13 @@ export const KALSHI_LIVE_CONNECT_ENDPOINTS = [
     description:
       "OHLC price, bid/ask, and volume for every market in a single event. The first sheet lists all market metadata; each remaining sheet holds one market's candlesticks.",
   },
+  {
+    id: "multivariate_events",
+    category: "events",
+    title: "Multivariate Events",
+    description:
+      "Discover multivariate (combo) events. Filter by series or collection ticker, optionally include nested markets. Paginated exploration into one sheet.",
+  },
 ];
 
 /** @param {string} categoryId */
@@ -123,6 +132,13 @@ export function getKalshiLiveColumnsForEndpoint(endpointId, opts = {}) {
     }
     return KALSHI_LIVE_EVENTS_COLUMNS;
   }
+  if (endpointId === "multivariate_events") {
+    const rowMode = normalizeKalshiLiveEventsRowMode(opts.rowMode);
+    if (opts.includeMarkets && rowMode === KALSHI_LIVE_EVENTS_ROW_MODE_PER_MARKET) {
+      return KALSHI_LIVE_MARKETS_COLUMNS;
+    }
+    return KALSHI_LIVE_MULTIVARIATE_EVENTS_COLUMNS;
+  }
   return KALSHI_LIVE_MARKETS_COLUMNS;
 }
 
@@ -145,6 +161,13 @@ export function getKalshiLiveColumnDisplayLabelForEndpoint(endpointId, col, opts
       return getKalshiLiveMarketColumnLabel(col);
     }
     return getKalshiLiveEventColumnLabel(col);
+  }
+  if (endpointId === "multivariate_events") {
+    const rowMode = normalizeKalshiLiveEventsRowMode(opts.rowMode);
+    if (opts.includeMarkets && rowMode === KALSHI_LIVE_EVENTS_ROW_MODE_PER_MARKET) {
+      return getKalshiLiveMarketColumnLabel(col);
+    }
+    return getKalshiLiveMultivariateEventColumnLabel(col);
   }
   return getKalshiLiveMarketColumnLabel(col);
 }

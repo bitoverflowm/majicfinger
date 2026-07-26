@@ -9,6 +9,7 @@ import { fetchKalshiLiveMarketsTickerPull } from "@/lib/kalshiLive/fetchKalshiLi
 import { fetchKalshiLiveMarketsDiscoveryPull } from "@/lib/kalshiLive/fetchKalshiLiveMarketsDiscoveryPull";
 import { fetchKalshiLiveEventsTickerPull } from "@/lib/kalshiLive/fetchKalshiLiveEventsTickerPull";
 import { fetchKalshiLiveEventsDiscoveryPull } from "@/lib/kalshiLive/fetchKalshiLiveEventsDiscoveryPull";
+import { fetchKalshiLiveMultivariateEventsPull } from "@/lib/kalshiLive/fetchKalshiLiveMultivariateEventsPull";
 import { fetchKalshiLiveSeriesPull } from "@/lib/kalshiLive/fetchKalshiLiveSeriesPull";
 import { fetchKalshiLiveSeriesDiscoveryPull } from "@/lib/kalshiLive/fetchKalshiLiveSeriesDiscoveryPull";
 import {
@@ -27,6 +28,7 @@ import {
   summarizeKalshiLiveEventsTickerPullRequest,
 } from "@/lib/kalshiLive/eventCompose";
 import { summarizeKalshiLiveEventsDiscoveryRequest } from "@/lib/kalshiLive/eventDiscovery";
+import { summarizeKalshiLiveMultivariateEventsDiscoveryRequest } from "@/lib/kalshiLive/multivariateEventsDiscovery";
 import {
   KALSHI_LIVE_SERIES_SHEET_MODE_COMBINED,
   normalizeKalshiLiveSeriesSheetMode,
@@ -108,6 +110,10 @@ export default function KalshiLive({ setConnectedData, connectHomePullBridge = f
     connectKalshiLiveEventsDiscoveryTickers,
     connectKalshiLiveEventsDiscoveryMinCloseTs,
     connectKalshiLiveEventsDiscoveryMinUpdatedTs,
+    connectKalshiLiveMultivariateEventsSeriesTicker,
+    connectKalshiLiveMultivariateEventsCollectionTicker,
+    connectKalshiLiveMultivariateEventsIncludeMarkets,
+    connectKalshiLiveMultivariateEventsRowMode,
     connectKalshiLiveCandlestickTickers,
     connectKalshiLiveEventCandlesticksEventTicker,
     connectKalshiLiveEventCandlesticksSeriesTicker,
@@ -645,6 +651,107 @@ export default function KalshiLive({ setConnectedData, connectHomePullBridge = f
       connectKalshiLiveEventsDiscoveryTickers,
       connectKalshiLiveEventsDiscoveryMinCloseTs,
       connectKalshiLiveEventsDiscoveryMinUpdatedTs,
+      setConnectDataLakePullState,
+      setDataSheets,
+      setRows,
+      ctx,
+    ],
+  );
+
+  const runMultivariateEventsPull = useCallback(
+    async (ac, sheetId, cols) => {
+      const includeMarkets = !!connectKalshiLiveMultivariateEventsIncludeMarkets;
+      const rowMode = normalizeKalshiLiveEventsRowMode(
+        connectKalshiLiveMultivariateEventsRowMode,
+      );
+      const requestStartMs =
+        typeof performance !== "undefined" && performance?.now ? performance.now() : Date.now();
+
+      const discoveryParams = {
+        seriesTicker: connectKalshiLiveMultivariateEventsSeriesTicker,
+        collectionTicker: connectKalshiLiveMultivariateEventsCollectionTicker,
+      };
+
+      setConnectDataLakePullState?.((prev) => ({
+        ...prev,
+        loading: true,
+        label: "Discovering Kalshi Live multivariate events…",
+        progress: 8,
+        error: null,
+      }));
+
+      const { raw, rows: accumulated, querySummary } = await fetchKalshiLiveMultivariateEventsPull({
+        params: discoveryParams,
+        selectedColumns: cols,
+        includeMarkets,
+        rowMode,
+        pageLimit: connectKalshiLiveLimit,
+        signal: ac.signal,
+        onPage: ({ page, totalLoaded }) => {
+          const pct = Math.min(92, 8 + page * 6);
+          setConnectDataLakePullState?.((prev) => ({
+            ...prev,
+            loading: true,
+            label: `Loaded ${totalLoaded} multivariate event rows (page ${page})…`,
+            progress: pct,
+            error: null,
+          }));
+        },
+      });
+
+      if (setRows) setRows(accumulated);
+
+      await ingestKalshiLiveAsView({
+        endpointId: "multivariate_events",
+        events: raw,
+        selectedColumns: cols,
+        includeMarkets,
+        rowMode,
+      });
+
+      const elapsedMs =
+        (typeof performance !== "undefined" && performance?.now
+          ? performance.now()
+          : Date.now()) - requestStartMs;
+
+      const requestCard = {
+        id: genRequestCardId(),
+        createdAt: Date.now(),
+        elapsedMs,
+        lake: "kalshi-live",
+        table: "multivariate_events",
+        sheetId: sheetId || null,
+        querySummary,
+        loadedRowCount: accumulated.length,
+      };
+
+      if (sheetId && setDataSheets) {
+        setDataSheets((prev) =>
+          applyAthenaPullToSheetPatch(prev, sheetId, accumulated, {
+            provenance: {
+              source: "kalshi-live",
+              endpoint: "multivariate_events",
+              discovery: true,
+              includeMarkets,
+              rowMode,
+              ...discoveryParams,
+              querySummary,
+            },
+            requestCards: [requestCard],
+          }),
+        );
+      }
+
+      applyConnectHomePullData(ctx, accumulated);
+      if (ctx?.requestConnectAnalyzeScroll) ctx.requestConnectAnalyzeScroll();
+      return accumulated.length;
+    },
+    [
+      connectKalshiLiveMultivariateEventsSeriesTicker,
+      connectKalshiLiveMultivariateEventsCollectionTicker,
+      connectKalshiLiveMultivariateEventsIncludeMarkets,
+      connectKalshiLiveMultivariateEventsRowMode,
+      connectKalshiLiveLimit,
       setConnectDataLakePullState,
       setDataSheets,
       setRows,
@@ -1554,7 +1661,21 @@ export default function KalshiLive({ setConnectedData, connectHomePullBridge = f
                     includeMarkets: !!connectKalshiLiveEventsIncludeMarkets,
                     rowMode: normalizeKalshiLiveEventsRowMode(connectKalshiLiveEventsRowMode),
                   })
-              : endpointId,
+              : endpointId === "multivariate_events"
+                ? summarizeKalshiLiveMultivariateEventsDiscoveryRequest(
+                    {
+                      seriesTicker: connectKalshiLiveMultivariateEventsSeriesTicker,
+                      collectionTicker: connectKalshiLiveMultivariateEventsCollectionTicker,
+                    },
+                    {
+                      includeMarkets: !!connectKalshiLiveMultivariateEventsIncludeMarkets,
+                      rowMode: normalizeKalshiLiveEventsRowMode(
+                        connectKalshiLiveMultivariateEventsRowMode,
+                      ),
+                      pageLimit: connectKalshiLiveLimit,
+                    },
+                  )
+                : endpointId,
     });
 
     const pullStartMs =
@@ -1568,6 +1689,8 @@ export default function KalshiLive({ setConnectedData, connectHomePullBridge = f
           ? "Fetching Kalshi Live series…"
           : endpointId === "events"
             ? "Fetching Kalshi Live events…"
+            : endpointId === "multivariate_events"
+              ? "Discovering Kalshi Live multivariate events…"
             : endpointId === "candlesticks"
               ? "Fetching Kalshi Live candlesticks…"
               : endpointId === "event_candlesticks"
@@ -1586,6 +1709,8 @@ export default function KalshiLive({ setConnectedData, connectHomePullBridge = f
         rowCount = (await runSeriesPull(ac, sheetId, cols)) || 0;
       } else if (endpointId === "events") {
         rowCount = (await runEventsPull(ac, sheetId, cols)) || 0;
+      } else if (endpointId === "multivariate_events") {
+        rowCount = (await runMultivariateEventsPull(ac, sheetId, cols)) || 0;
       } else if (endpointId === "markets") {
         rowCount = (await runMarketsPull(ac, sheetId, cols)) || 0;
       } else if (endpointId === "candlesticks") {
@@ -1671,6 +1796,7 @@ export default function KalshiLive({ setConnectedData, connectHomePullBridge = f
     activeSheetId,
     runMarketsPull,
     runEventsPull,
+    runMultivariateEventsPull,
     runSeriesPull,
     runCandlesticksPull,
     runEventCandlesticksPull,
