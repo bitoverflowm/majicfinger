@@ -676,19 +676,11 @@ export default function DataSheetWithIntegration({
 
   const handleEventCandlesticksPowerMove = useCallback(async () => {
     if (connectPowerMoveBuild?.active) return;
-    // Dev-only escape hatch: plot locally without sign-in or DB writes.
-    // `NODE_ENV` is inlined at build time, so this is always false in production.
-    const devLocalPowerMove =
-      process.env.NODE_ENV !== "production" && (isDemo || !hasDbBackedUserId);
-    if (!devLocalPowerMove) {
-      if (isDemo) {
-        toast.error("Sign up to use power moves.");
-        return;
-      }
-      if (!hasDbBackedUserId) {
-        toast.error("Sign in to plot candlesticks on a dashboard.");
-        return;
-      }
+    // Plotting is entirely in-memory, so no sign-in is needed to preview. Demo
+    // still can't compose dashboards in production.
+    if (isDemo && process.env.NODE_ENV === "production") {
+      toast.error("Sign up to use power moves.");
+      return;
     }
 
     powerMoveBuildAbortRef.current?.abort();
@@ -699,12 +691,6 @@ export default function DataSheetWithIntegration({
     const tickerMetaTitle = eventTicker
       ? String(connectKalshiLiveEventCandlesticksTickerMeta?.[eventTicker] || "").trim()
       : "";
-
-    const dataSetId =
-      String(chartDashboardDraft?.data_set_id || loadedDataMeta?._id || "").trim() ||
-      (Array.isArray(savedDataSets) && savedDataSets[0]?._id
-        ? String(savedDataSets[0]._id)
-        : "");
 
     setConnectPowerMoveBuild?.({
       active: true,
@@ -729,18 +715,10 @@ export default function DataSheetWithIntegration({
     try {
       const result = await runEventCandlesticksDashboardPowerMove({
         dataSheets,
-        userId: devLocalPowerMove ? String(user?.userId || "dev-local") : user.userId,
-        dataSetId: devLocalPowerMove ? null : dataSetId || null,
         tickerMetaTitle,
-        localOnly: devLocalPowerMove,
         signal: ac.signal,
         setChartDashboardDraft,
         setActiveChartDashboardId,
-        setChartSheets,
-        setSavedCharts,
-        setSavedDataSets,
-        setLoadedDataMeta,
-        setLoadedDataId,
         onProgress: ({ label, progress }) => {
           setConnectPowerMoveBuild?.({
             active: true,
@@ -755,19 +733,12 @@ export default function DataSheetWithIntegration({
 
       setConnectPowerMoveBuild?.({
         active: false,
-        label: result.localOnly
-          ? `Dashboard ready — ${result.marketCount} charts (dev preview, not saved)`
-          : `Dashboard ready — ${result.marketCount} charts`,
+        label: `Dashboard ready — ${result.marketCount} charts (not saved yet)`,
         progress: 100,
         error: null,
       });
-      if (!result.localOnly) {
-        setRefetchChartDashboardsTick?.((n) => (Number(n) || 0) + 1);
-      }
       toast.success(
-        result.localOnly
-          ? `Plotted ${result.marketCount} candlestick charts (dev preview — nothing saved).`
-          : `Plotted ${result.marketCount} candlestick charts on “${result.eventTitle}”.`,
+        `Plotted ${result.marketCount} candlestick charts on “${result.eventTitle}”. Nothing is saved until you save the dashboard.`,
       );
     } catch (e) {
       if (e?.name === "AbortError" || ac.signal.aborted) return;
@@ -781,34 +752,23 @@ export default function DataSheetWithIntegration({
       toast.error(message);
     }
   }, [
-    chartDashboardDraft?.data_set_id,
     connectHomeMode,
     connectKalshiLiveEventCandlesticksEventTicker,
     connectKalshiLiveEventCandlesticksTickerMeta,
     connectPowerMoveBuild?.active,
     dataSheets,
-    hasDbBackedUserId,
     isDemo,
-    loadedDataMeta?._id,
-    savedDataSets,
     setActiveChartDashboardId,
     setCardGridComposerDock,
     setChartComposerDock,
     setChartDashboardDraft,
-    setChartSheets,
     setConnectHomeAnalyzeActive,
     setConnectHomeCenterView,
     setConnectPowerMoveBuild,
-    setLoadedDataId,
-    setLoadedDataMeta,
-    setRefetchChartDashboardsTick,
     setRightPanelOpen,
     setRightPanelTab,
-    setSavedCharts,
-    setSavedDataSets,
     setSelectedDashboardCard,
     setViewing,
-    user?.userId,
   ]);
 
   const handleOpenApiPanelFromTab = useCallback(() => {
@@ -1783,22 +1743,28 @@ export default function DataSheetWithIntegration({
                           ) : null}
 
                           {connectPowerMove === "event_candlesticks" ? (
-                            <Button
-                              type="button"
-                              variant="outline"
-                              size="sm"
-                              disabled={!!connectPowerMoveBuild?.active}
-                              className="h-auto w-full justify-start gap-2 whitespace-normal px-2.5 py-2 text-left text-xs"
-                              onClick={handleEventCandlesticksPowerMove}
-                            >
-                              <Zap
-                                className="h-3.5 w-3.5 shrink-0 text-amber-500"
-                                aria-hidden
-                              />
-                              <span className="min-w-0">
-                                One click plot all candlesticks on dashboard
-                              </span>
-                            </Button>
+                            <>
+                              <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                disabled={!!connectPowerMoveBuild?.active}
+                                className="h-auto w-full justify-start gap-2 whitespace-normal px-2.5 py-2 text-left text-xs"
+                                onClick={handleEventCandlesticksPowerMove}
+                              >
+                                <Zap
+                                  className="h-3.5 w-3.5 shrink-0 text-amber-500"
+                                  aria-hidden
+                                />
+                                <span className="min-w-0">
+                                  One click plot all candlesticks on dashboard
+                                </span>
+                              </Button>
+                              <p className="px-1 text-[11px] leading-snug text-muted-foreground">
+                                Plots from the data already in memory, ordered by current chance.
+                                Save the project to keep the charts and candles.
+                              </p>
+                            </>
                           ) : (
                             <p className="px-1 py-2 text-xs text-muted-foreground">
                               No power moves available yet.

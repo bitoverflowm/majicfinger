@@ -1,5 +1,6 @@
 import { createEmptyDashboardLayout } from "@/lib/dashboardLayoutDefaults";
 import { isValidChartEmbedSlug, normalizeChartEmbedSlug } from "@/lib/chartEmbedSlug";
+import { materializeLocalDashboardCharts } from "@/lib/localDashboardCharts";
 
 /**
  * Persist dashboard draft (POST if new, PUT if existing). Used by composer auto-save and Save Project.
@@ -21,6 +22,23 @@ export async function persistChartDashboardDraft({ draft, userId, includePublish
   }
 
   try {
+    // Power-move charts live in memory until the first real save; create their
+    // chart docs now so the stored layout never references `local:` ids.
+    let layout = draft.layout;
+    try {
+      const materialized = await materializeLocalDashboardCharts({
+        layout,
+        userId,
+        dataSetId: String(draft.data_set_id || ""),
+      });
+      layout = materialized.layout;
+    } catch (e) {
+      return {
+        ok: false,
+        message: e instanceof Error ? e.message : "Failed to save dashboard charts.",
+      };
+    }
+
     if (draft._id) {
       const base = {
         dashboard_name: draft.dashboard_name,
@@ -29,7 +47,7 @@ export async function persistChartDashboardDraft({ draft, userId, includePublish
         keywords: Array.isArray(draft.keywords) ? draft.keywords : [],
         page_heading: draft.page_heading,
         page_subheading: draft.page_subheading,
-        layout: draft.layout,
+        layout,
         theme: draft.theme,
         data_set_id: draft.data_set_id,
       };
@@ -80,7 +98,7 @@ export async function persistChartDashboardDraft({ draft, userId, includePublish
         keywords: Array.isArray(draft.keywords) ? draft.keywords : [],
         page_heading: draft.page_heading || "",
         page_subheading: draft.page_subheading || "",
-        layout: draft.layout && typeof draft.layout === "object" ? draft.layout : createEmptyDashboardLayout(),
+        layout: layout && typeof layout === "object" ? layout : createEmptyDashboardLayout(),
         theme:
           draft.theme && typeof draft.theme === "object"
             ? draft.theme

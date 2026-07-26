@@ -17,11 +17,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
 import { mapSavedChartsToPickerOptions } from "@/lib/dashboardChartPickerLabels";
-import {
-  getLocalDashboardChart,
-  isDevLocalDashboardChartsEnabled,
-  isLocalDashboardChartId,
-} from "@/lib/localDashboardCharts";
+import { getLocalDashboardChart, isLocalDashboardChartId } from "@/lib/localDashboardCharts";
 
 function DataSheetsLoader({ rows, dataSheets }) {
   const { setDataSheets, setActiveSheetId, setConnectedData } = useMyStateV2();
@@ -92,16 +88,12 @@ export function IsolatedChartPreview({
     setErr(null);
     appliedBundleSigRef.current = "";
 
-    // Dev-only: `local:` ids resolve from the in-memory registry (power move
-    // preview without sign-in / DB). Production ids never carry this prefix.
+    // `local:` ids belong to charts that have not been saved yet (power move
+    // previews); they resolve from the in-memory registry, never from the API.
     if (isLocalDashboardChartId(chartId)) {
-      if (isDevLocalDashboardChartsEnabled()) {
-        const localChart = getLocalDashboardChart(chartId);
-        if (localChart) setChartLean(localChart);
-        else setErr("Local chart expired — rerun the power move.");
-      } else {
-        setErr("Chart not found");
-      }
+      const localChart = getLocalDashboardChart(chartId);
+      if (localChart) setChartLean(localChart);
+      else setErr("Chart is no longer in memory — rerun the power move.");
       return undefined;
     }
 
@@ -156,7 +148,7 @@ export function IsolatedChartPreview({
 
     // Local charts only exist client-side — never fall back to the bundle API.
     if (isLocalDashboardChartId(chartId)) {
-      setErr("Local chart needs workspace data — rerun the power move.");
+      setErr("Chart needs its workspace sheet — rerun the power move.");
       return undefined;
     }
 
@@ -260,7 +252,12 @@ export function IsolatedChartPreview({
     <StateProviderV2 initialSettings={{ viewing: "charts", demo: false, rightPanelOpen: false }}>
       <div className="flex min-h-0 w-full flex-1 flex-col overflow-hidden">
         <DataSheetsLoader rows={bundle.rows} dataSheets={bundle.dataSheets} />
-        <ChartBuilderProvider demo={false} embedCompact initialBuilderSnapshot={chartSnapshot}>
+        <ChartBuilderProvider
+          demo={false}
+          embedCompact
+          embedChromeless
+          initialBuilderSnapshot={chartSnapshot}
+        >
           <div className={CHART_SLOT_INNER}>
             <ChartCanvas />
           </div>

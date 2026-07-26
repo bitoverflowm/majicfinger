@@ -6,26 +6,83 @@
  * - Waterfall chart creation so the UI can paint between cards
  * - 3-across (colSpan 4) master grid without cloning candle row payloads
  * - Charts reference sheet ids in snapshots — data stays in workspace sheets
+ * - Nothing is written to the database until the user saves the dashboard
  */
 
 import {
   createEmptyDashboardLayout,
   DEFAULT_CHART_CARD_ROW_SPAN,
 } from "@/lib/dashboardLayoutDefaults";
-import {
-  mergeCreatedChartDashboardDraft,
-  persistChartDashboardDraft,
-} from "@/lib/persistChartDashboardDraft";
-import {
-  isDevLocalDashboardChartsEnabled,
-  registerLocalDashboardChart,
-} from "@/lib/localDashboardCharts";
+import { registerLocalDashboardChart } from "@/lib/localDashboardCharts";
 
 /** Three charts per row on the 12-col dashboard grid. */
 export const EVENT_CANDLES_DASH_COL_SPAN = 4;
 
 /** Slightly shorter than default so a 3×N master view stays scannable. */
 export const EVENT_CANDLES_DASH_ROW_SPAN = Math.min(2, DEFAULT_CHART_CARD_ROW_SPAN);
+
+/** Compact card text so three-across headings don't dominate the grid. */
+const EVENT_CANDLES_CARD_TEXT_THEME = {
+  chartHeadingTheme: { fontSize: "sm" },
+  chartSubheadingTheme: { fontSize: "xs" },
+  chartMicrotextTheme: { fontSize: "xs" },
+};
+
+/**
+ * @param {unknown} v
+ * @returns {number | null}
+ */
+function num(v) {
+  if (v == null || v === "") return null;
+  const n = typeof v === "number" ? v : Number(String(v).trim());
+  return Number.isFinite(n) ? n : null;
+}
+
+/**
+ * Implied probability (%) the market assigns to YES. Prefers the last trade,
+ * falling back to the bid/ask midpoint, then whichever side is quoted.
+ *
+ * @param {Record<string, unknown>} row
+ * @returns {number | null}
+ */
+export function impliedChancePctFromMarketRow(row) {
+  const last = num(row?.last_price_dollars);
+  const bid = num(row?.yes_bid_dollars);
+  const ask = num(row?.yes_ask_dollars);
+  let price = null;
+  if (last != null && last > 0) price = last;
+  else if (bid != null && bid > 0 && ask != null && ask > 0) price = (bid + ask) / 2;
+  else if (bid != null && bid > 0) price = bid;
+  else if (ask != null && ask > 0) price = ask;
+  if (price == null) return null;
+  // Binary contracts settle at $1, so dollars map directly to probability.
+  // Scalar markets can quote outside [0,1] — treat those as "no percentage".
+  if (price < 0 || price > 1) return null;
+  return price * 100;
+}
+
+/**
+ * @param {number | null} n
+ * @returns {string}
+ */
+function compactNumber(n) {
+  if (n == null || !Number.isFinite(n)) return "";
+  const abs = Math.abs(n);
+  if (abs >= 1_000_000_000) return `${(n / 1_000_000_000).toFixed(1)}B`;
+  if (abs >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
+  if (abs >= 1_000) return `${(n / 1_000).toFixed(1)}K`;
+  return String(Math.round(n));
+}
+
+/**
+ * @param {number | null} pct
+ * @returns {string}
+ */
+function formatChancePct(pct) {
+  if (pct == null || !Number.isFinite(pct)) return "";
+  if (pct > 0 && pct < 1) return `${pct.toFixed(1)}%`;
+  return `${Math.round(pct)}%`;
+}
 
 /**
  * Yield to the browser so React can paint newly-added dashboard cards.
@@ -63,6 +120,7 @@ function rid(prefix = "id") {
  *   seriesTicker: string;
  *   eventTitle: string;
  *   eventSubTitle: string;
+ *   querySummary: string;
  * }}
  */
 export function collectEventCandlestickMarketSheets(dataSheets) {
@@ -74,6 +132,7 @@ export function collectEventCandlestickMarketSheets(dataSheets) {
   let seriesTicker = "";
   let eventTitle = "";
   let eventSubTitle = "";
+  let querySummary = "";
   let order = 0;
 
   for (const [sheetId, sheet] of Object.entries(sheets)) {
@@ -86,6 +145,7 @@ export function collectEventCandlestickMarketSheets(dataSheets) {
     if (!seriesTicker && prov.seriesTicker) seriesTicker = String(prov.seriesTicker).trim();
     if (!eventTitle && prov.eventTitle) eventTitle = String(prov.eventTitle).trim();
     if (!eventSubTitle && prov.eventSubTitle) eventSubTitle = String(prov.eventSubTitle).trim();
+    if (!querySummary && prov.querySummary) querySummary = String(prov.querySummary).trim();
 
     const kind = String(prov.sheetKind || "");
     if (kind === "markets_metadata") {
@@ -115,18 +175,33 @@ export function collectEventCandlestickMarketSheets(dataSheets) {
     seriesTicker,
     eventTitle,
     eventSubTitle,
+    querySummary,
   };
 }
 
 /**
- * Index market display labels from the metadata sheet in one pass — O(m).
- * Prefers yes_sub_title, then ticker.
+ * @typedef {{
+ *   title: string;
+ *   noSubTitle: string;
+ *   chancePct: number | null;
+ *   volume: number | null;
+ *   volume24h: number | null;
+ *   openInterest: number | null;
+ *   status: string;
+ *   closeTime: string;
+ *   lastPrice: number | null;
+ * }} MarketMetaEntry
+ */
+
+/**
+ * Index market metadata from the metadata sheet in one pass — O(m).
+ * Carries the implied chance and volume stats used for ranking and captions.
  *
  * @param {Record<string, unknown> | null | undefined} metaSheet
- * @returns {Map<string, { title: string; caption: string }>}
+ * @returns {Map<string, MarketMetaEntry>}
  */
 export function indexMarketLabelsFromMetaSheet(metaSheet) {
-  /** @type {Map<string, { title: string; caption: string }>} */
+  /** @type {Map<string, MarketMetaEntry>} */
   const map = new Map();
   const rows = Array.isArray(metaSheet?.data) ? metaSheet.data : [];
   for (const row of rows) {
@@ -134,12 +209,100 @@ export function indexMarketLabelsFromMetaSheet(metaSheet) {
     const ticker = String(row.ticker || "").trim();
     if (!ticker) continue;
     const yes = String(row.yes_sub_title || "").trim();
-    const no = String(row.no_sub_title || "").trim();
-    const title = yes || ticker;
-    const caption = [ticker, no && no !== yes ? `No: ${no}` : ""].filter(Boolean).join(" · ");
-    map.set(ticker.toUpperCase(), { title, caption });
+    map.set(ticker.toUpperCase(), {
+      title: yes || ticker,
+      noSubTitle: String(row.no_sub_title || "").trim(),
+      chancePct: impliedChancePctFromMarketRow(row),
+      volume: num(row.volume_fp),
+      volume24h: num(row.volume_24h_fp),
+      openInterest: num(row.open_interest_fp),
+      status: String(row.status || "").trim(),
+      closeTime: String(row.close_time || "").trim(),
+      lastPrice: num(row.last_price_dollars),
+    });
   }
   return map;
+}
+
+/**
+ * Rank markets most-likely-to-win first so cell 1 holds the favourite.
+ * Markets without a quoted price keep their pull order at the end.
+ *
+ * @template {{ marketTicker: string }} T
+ * @param {T[]} markets
+ * @param {Map<string, MarketMetaEntry>} labelIndex
+ * @returns {(T & { chancePct: number | null })[]}
+ */
+export function rankMarketsByChance(markets, labelIndex) {
+  const list = (Array.isArray(markets) ? markets : []).map((m, idx) => ({
+    ...m,
+    chancePct: labelIndex.get(String(m.marketTicker || "").toUpperCase())?.chancePct ?? null,
+    __order: idx,
+  }));
+  list.sort((a, b) => {
+    if (a.chancePct == null && b.chancePct == null) return a.__order - b.__order;
+    if (a.chancePct == null) return 1;
+    if (b.chancePct == null) return -1;
+    if (b.chancePct !== a.chancePct) return b.chancePct - a.chancePct;
+    return a.__order - b.__order;
+  });
+  return list.map(({ __order, ...rest }) => rest);
+}
+
+/**
+ * Card sub-heading: implied chance plus whatever liquidity metadata exists.
+ *
+ * @param {MarketMetaEntry | undefined} meta
+ * @param {number | null} chancePct
+ * @returns {string}
+ */
+export function buildMarketCardCaption(meta, chancePct) {
+  const parts = [];
+  const pct = formatChancePct(chancePct ?? meta?.chancePct ?? null);
+  if (pct) parts.push(`${pct} chance`);
+  const vol = compactNumber(meta?.volume ?? null);
+  if (vol) parts.push(`Vol ${vol}`);
+  const vol24 = compactNumber(meta?.volume24h ?? null);
+  if (vol24) parts.push(`24h ${vol24}`);
+  const oi = compactNumber(meta?.openInterest ?? null);
+  if (oi) parts.push(`OI ${oi}`);
+  if (meta?.status) parts.push(meta.status);
+  return parts.join(" · ");
+}
+
+/**
+ * Aggregate liquidity across every market in the event for the page subheading.
+ *
+ * @param {Map<string, MarketMetaEntry>} labelIndex
+ * @returns {{ volume: number | null; volume24h: number | null; openInterest: number | null }}
+ */
+export function aggregateEventMetadata(labelIndex) {
+  let volume = null;
+  let volume24h = null;
+  let openInterest = null;
+  for (const meta of labelIndex.values()) {
+    if (meta.volume != null) volume = (volume ?? 0) + meta.volume;
+    if (meta.volume24h != null) volume24h = (volume24h ?? 0) + meta.volume24h;
+    if (meta.openInterest != null) openInterest = (openInterest ?? 0) + meta.openInterest;
+  }
+  return { volume, volume24h, openInterest };
+}
+
+/**
+ * Human-readable candle interval from the pull's query summary
+ * (e.g. "period_interval=60" → "1h candles").
+ *
+ * @param {string} querySummary
+ * @returns {string}
+ */
+export function describeCandleInterval(querySummary) {
+  const m = /period_interval=(\d+)/.exec(String(querySummary || ""));
+  const minutes = m ? Number(m[1]) : NaN;
+  if (!Number.isFinite(minutes)) return "";
+  if (minutes === 1) return "1m candles";
+  if (minutes === 60) return "1h candles";
+  if (minutes === 1440) return "1d candles";
+  return `${minutes}m candles`;
 }
 
 /**
@@ -154,7 +317,9 @@ export function buildEventCandlestickChartSnapshot({ sheetId, title }) {
     candlestickSheetId: String(sheetId || ""),
     candlestickOhlcSetId: "auto",
     title: String(title || "Candlesticks").slice(0, 120),
-    titleHidden: false,
+    // The dashboard card heading already names the market — a second title
+    // inside the chart just eats plot height in a 3-across grid.
+    titleHidden: true,
     subTitleHidden: true,
     selX: null,
     selY: [],
@@ -174,6 +339,7 @@ export function emptyDashboardChartColumn(overrides = {}) {
     caption: "",
     microtext: "",
     link: { mode: "none", url: "" },
+    ...EVENT_CANDLES_CARD_TEXT_THEME,
     ...overrides,
   };
 }
@@ -227,102 +393,53 @@ export function appendEventCandlestickChartToLayout(layout, card) {
 }
 
 /**
- * Ensure a project exists to hang charts / dashboard under. Prefer the loaded
- * project; otherwise create a lightweight named DataSet (no candle row upload).
+ * Dashboard sub-heading: series, market count, candle interval and aggregate
+ * liquidity for the whole event.
  *
  * @param {{
- *   dataSetId?: string | null;
- *   userId: string;
- *   projectName: string;
+ *   seriesTicker: string;
+ *   marketCount: number;
+ *   querySummary: string;
+ *   totals: { volume: number | null; volume24h: number | null; openInterest: number | null };
+ *   eventSubTitle?: string;
  * }} opts
- * @returns {Promise<{ dataSetId: string; created?: object }>}
+ * @returns {string}
  */
-export async function ensurePowerMoveDataSetId(opts) {
-  const existing = String(opts.dataSetId || "").trim();
-  if (existing) return { dataSetId: existing };
-
-  const name = String(opts.projectName || "Event candlesticks").trim().slice(0, 120);
-  const res = await fetch("/api/dataSets", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    credentials: "include",
-    body: JSON.stringify({
-      data_set_name: name,
-      data: [],
-      data_sheets: {},
-      created_date: new Date(),
-      last_saved_date: new Date(),
-      labels: ["power-move", "kalshi-live", "event-candlesticks"],
-      source: "kalshi-live-power-move",
-    }),
-  });
-  const json = await res.json().catch(() => ({}));
-  if (!json?.success || !json?.data?._id) {
-    throw new Error(json?.message || "Could not create a project for this dashboard.");
-  }
-  return { dataSetId: String(json.data._id), created: json.data };
+export function buildEventPageSubheading(opts) {
+  const parts = [];
+  if (opts.eventSubTitle) parts.push(opts.eventSubTitle);
+  if (opts.seriesTicker) parts.push(opts.seriesTicker);
+  parts.push(`${opts.marketCount} market${opts.marketCount === 1 ? "" : "s"}`);
+  const interval = describeCandleInterval(opts.querySummary);
+  parts.push(interval || "candlesticks");
+  const vol = compactNumber(opts.totals.volume);
+  if (vol) parts.push(`Volume ${vol}`);
+  const vol24 = compactNumber(opts.totals.volume24h);
+  if (vol24) parts.push(`24h volume ${vol24}`);
+  const oi = compactNumber(opts.totals.openInterest);
+  if (oi) parts.push(`Open interest ${oi}`);
+  return parts.join(" · ");
 }
 
 /**
- * Persist one candlestick chart document. Snapshot only — no row payload.
+ * Waterfall: seed the dashboard draft → navigate → plot each market chart and
+ * stream cards onto the layout so the user sees the master view populate live.
  *
- * @param {{
- *   chartName: string;
- *   snapshot: object;
- *   userId: string;
- *   dataSetId: string;
- * }} opts
- */
-export async function createEventCandlestickChart(opts) {
-  const res = await fetch("/api/charts", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    credentials: "include",
-    body: JSON.stringify({
-      chart_name: opts.chartName,
-      chart_properties: [{ title: opts.chartName, rechartsBuilder: opts.snapshot }],
-      created_date: new Date(),
-      last_saved_date: new Date(),
-      labels: ["power-move", "kalshi-live", "event-candlesticks", "candlestick"],
-      user_id: opts.userId,
-      data_set_id: opts.dataSetId,
-    }),
-  });
-  const json = await res.json().catch(() => ({}));
-  if (!json?.success || !json?.data?._id) {
-    throw new Error(json?.message || "Failed to save candlestick chart.");
-  }
-  return json.data;
-}
-
-/**
- * Waterfall: create dashboard → navigate → plot each market chart and stream
- * cards onto the layout so the user sees the master view populate live.
- *
- * `localOnly` (dev builds only): no sign-in and zero DB writes — charts are
- * registered in the in-memory local registry (`local:` ids) and the dashboard
- * draft stays a client-side draft that is never persisted.
+ * Nothing is written to the database here. Charts live in the in-memory local
+ * registry (`local:` ids) and the candle rows stay in workspace sheets; the
+ * first real dashboard save materializes both. Markets are ordered by implied
+ * chance so the favourite lands in the first cell.
  *
  * @param {{
  *   dataSheets: Record<string, unknown>;
- *   userId: string;
- *   dataSetId?: string | null;
  *   tickerMetaTitle?: string | null;
- *   localOnly?: boolean;
  *   signal?: AbortSignal;
  *   setChartDashboardDraft: Function;
  *   setActiveChartDashboardId?: Function;
- *   setChartSheets?: Function;
- *   setSavedCharts?: Function;
- *   setSavedDataSets?: Function;
- *   setLoadedDataMeta?: Function;
- *   setLoadedDataId?: Function;
  *   onProgress?: (info: { label: string; progress: number; done?: number; total?: number }) => void;
  * }} ctx
  */
 export async function runEventCandlesticksDashboardPowerMove(ctx) {
-  // Hard gate: local mode never runs in production builds.
-  const localOnly = !!ctx.localOnly && isDevLocalDashboardChartsEnabled();
   const collected = collectEventCandlestickMarketSheets(ctx.dataSheets);
   if (!collected.markets.length) {
     throw new Error("No event candlestick market sheets found. Pull Events Candlesticks first.");
@@ -340,6 +457,7 @@ export async function runEventCandlesticksDashboardPowerMove(ctx) {
   const labelIndex = indexMarketLabelsFromMetaSheet(
     collected.metaSheetId ? ctx.dataSheets?.[collected.metaSheetId] : null,
   );
+  const rankedMarkets = rankMarketsByChance(collected.markets, labelIndex);
 
   ctx.onProgress?.({
     label: "Preparing dashboard…",
@@ -348,40 +466,15 @@ export async function runEventCandlesticksDashboardPowerMove(ctx) {
     total: marketCount,
   });
 
-  /** @type {string} */
-  let dataSetId = "";
-  if (localOnly) {
-    // Dev local mode: no project, nothing persisted.
-    dataSetId = "";
-  } else {
-    const ensured = await ensurePowerMoveDataSetId({
-      dataSetId: ctx.dataSetId,
-      userId: ctx.userId,
-      projectName: eventTitle,
-    });
-    dataSetId = ensured.dataSetId;
-    const createdProject = ensured.created;
-
-    if (createdProject) {
-      ctx.setSavedDataSets?.((prev) => {
-        const list = Array.isArray(prev) ? prev : [];
-        if (list.some((d) => String(d?._id) === dataSetId)) return list;
-        return [createdProject, ...list];
-      });
-      ctx.setLoadedDataMeta?.(createdProject);
-      ctx.setLoadedDataId?.(dataSetId);
-    }
-  }
-
   if (ctx.signal?.aborted) throw new DOMException("Aborted", "AbortError");
 
-  const pageSubheading = [
-    seriesTicker || null,
-    `${marketCount} market${marketCount === 1 ? "" : "s"}`,
-    "candlesticks",
-  ]
-    .filter(Boolean)
-    .join(" · ");
+  const pageSubheading = buildEventPageSubheading({
+    seriesTicker,
+    marketCount,
+    querySummary: collected.querySummary,
+    totals: aggregateEventMetadata(labelIndex),
+    eventSubTitle: collected.eventSubTitle,
+  });
 
   const draftSeed = {
     dashboard_name: eventTitle.slice(0, 120),
@@ -392,7 +485,9 @@ export async function runEventCandlesticksDashboardPowerMove(ctx) {
     page_subheading: pageSubheading.slice(0, 240),
     layout: createEmptyDashboardLayout(),
     theme: { background: "none", background_color: "" },
-    data_set_id: dataSetId,
+    // Left blank on purpose: autosave stays inert until the user picks a
+    // project, which is what turns this preview into a saved dashboard.
+    data_set_id: "",
     public_slug: "",
     is_public: false,
   };
@@ -400,39 +495,19 @@ export async function runEventCandlesticksDashboardPowerMove(ctx) {
   ctx.setActiveChartDashboardId?.(null);
   ctx.setChartDashboardDraft?.(draftSeed);
 
-  if (!localOnly) {
-    // Persist early so autosave has an _id; layout grows via waterfall updates.
-    const initialPersist = await persistChartDashboardDraft({
-      draft: draftSeed,
-      userId: ctx.userId,
-    });
-    if (!initialPersist.ok) {
-      throw new Error(initialPersist.message || "Could not create dashboard.");
-    }
-    if (initialPersist.created) {
-      // Stamp `_id` on the draft for subsequent PUTs, but do NOT set
-      // `activeChartDashboardId` yet — that triggers a full dashboard/project
-      // reload which would clobber the live waterfall layout and workspace sheets.
-      ctx.setChartDashboardDraft?.((prev) =>
-        mergeCreatedChartDashboardDraft(prev || draftSeed, initialPersist.created),
-      );
-    }
-  }
-
   await yieldToUi();
 
   let layout = createEmptyDashboardLayout();
-  /** @type {object[]} */
-  const createdCharts = [];
 
   for (let i = 0; i < marketCount; i++) {
     if (ctx.signal?.aborted) throw new DOMException("Aborted", "AbortError");
 
-    const market = collected.markets[i];
-    const labels = labelIndex.get(market.marketTicker.toUpperCase());
-    const title = labels?.title || market.marketTicker;
-    const caption = labels?.caption || market.marketTicker;
-    const chartName = `${title}`.slice(0, 100);
+    const market = rankedMarkets[i];
+    const meta = labelIndex.get(market.marketTicker.toUpperCase());
+    const title = meta?.title || market.marketTicker;
+    const pct = formatChancePct(market.chancePct);
+    const caption = buildMarketCardCaption(meta, market.chancePct) || market.marketTicker;
+    const chartName = (pct ? `${title} — ${pct}` : title).slice(0, 100);
 
     ctx.onProgress?.({
       label: `Plotting ${title} (${i + 1}/${marketCount})…`,
@@ -443,66 +518,18 @@ export async function runEventCandlesticksDashboardPowerMove(ctx) {
 
     const snapshot = buildEventCandlestickChartSnapshot({
       sheetId: market.sheetId,
-      title,
+      title: chartName,
     });
 
-    /** @type {string} */
-    let cardChartId;
-    if (localOnly) {
-      // In-memory only — IsolatedChartPreview resolves `local:` ids from the registry.
-      cardChartId = registerLocalDashboardChart({ chartName, snapshot });
-      ctx.setChartSheets?.((prev) => {
-        const sheets = { ...(prev || {}) };
-        let n = Object.keys(sheets).length + 1;
-        let localId = `chart-${n}`;
-        while (sheets[localId]) {
-          n += 1;
-          localId = `chart-${n}`;
-        }
-        // chartMeta stays null so a later Save Project creates real charts
-        // instead of PUTting to a non-Mongo `local:` id.
-        sheets[localId] = {
-          name: chartName,
-          snapshot,
-          chartMeta: null,
-          userCreated: true,
-        };
-        return sheets;
-      });
-    } else {
-      const saved = await createEventCandlestickChart({
-        chartName,
-        snapshot,
-        userId: ctx.userId,
-        dataSetId,
-      });
-      createdCharts.push(saved);
-      cardChartId = String(saved._id);
-
-      // Local workspace chart tab (optional) — keep snapshots for Save Project.
-      ctx.setChartSheets?.((prev) => {
-        const sheets = { ...(prev || {}) };
-        let n = Object.keys(sheets).length + 1;
-        let localId = `chart-${n}`;
-        while (sheets[localId]) {
-          n += 1;
-          localId = `chart-${n}`;
-        }
-        sheets[localId] = {
-          name: chartName,
-          snapshot,
-          chartMeta: saved,
-          userCreated: true,
-        };
-        return sheets;
-      });
-    }
+    const cardChartId = registerLocalDashboardChart({ chartName, snapshot });
 
     layout = appendEventCandlestickChartToLayout(layout, {
       chartId: cardChartId,
-      h2: title,
+      h2: chartName,
       caption,
-      microtext: market.marketTicker,
+      microtext: [market.marketTicker, meta?.noSubTitle ? `No: ${meta.noSubTitle}` : ""]
+        .filter(Boolean)
+        .join(" · "),
     });
 
     // Stream the card into the live draft so the dashboard paints as we go.
@@ -514,36 +541,6 @@ export async function runEventCandlesticksDashboardPowerMove(ctx) {
     await yieldToUi();
   }
 
-  if (createdCharts.length) {
-    ctx.setSavedCharts?.((prev) => {
-      const list = Array.isArray(prev) ? [...prev] : [];
-      const seen = new Set(list.map((c) => String(c?._id || "")));
-      for (const c of createdCharts) {
-        const id = String(c?._id || "");
-        if (!id || seen.has(id)) continue;
-        seen.add(id);
-        list.unshift({
-          _id: c._id,
-          chart_name: c.chart_name,
-          last_saved_date: c.last_saved_date,
-          labels: c.labels,
-          user_id: c.user_id,
-          data_set_id: c.data_set_id,
-        });
-      }
-      return list;
-    });
-  }
-
-  ctx.onProgress?.({
-    label: localOnly ? "Finishing dashboard (dev, not saved)…" : "Saving dashboard…",
-    progress: 98,
-    done: marketCount,
-    total: marketCount,
-  });
-
-  /** @type {object | null} */
-  let draftForPersist = null;
   await new Promise((resolve) => {
     if (typeof ctx.setChartDashboardDraft !== "function") {
       resolve(null);
@@ -551,40 +548,19 @@ export async function runEventCandlesticksDashboardPowerMove(ctx) {
     }
     ctx.setChartDashboardDraft((prev) => {
       const base = prev || draftSeed;
-      const next = {
+      resolve(null);
+      return {
         ...base,
         layout,
         dashboard_name: base.dashboard_name || draftSeed.dashboard_name,
         page_heading: base.page_heading || draftSeed.page_heading,
         page_subheading: base.page_subheading || draftSeed.page_subheading,
-        data_set_id: base.data_set_id || dataSetId,
       };
-      draftForPersist = next;
-      resolve(null);
-      return next;
     });
   });
 
-  if (!localOnly && draftForPersist) {
-    const result = await persistChartDashboardDraft({
-      draft: draftForPersist,
-      userId: ctx.userId,
-    });
-    if (result.ok && result.created) {
-      ctx.setChartDashboardDraft?.((p) =>
-        mergeCreatedChartDashboardDraft(p || draftForPersist, result.created),
-      );
-    }
-    // Activate only after the complete layout is on the server. Skip
-    // `setActiveChartDashboardId` so DashboardComposerPage does not re-fetch
-    // and call `loadFullProjectFromApi` (which would replace live candle sheets).
-    // The draft already carries `_id` for autosave / further edits.
-  }
-
   ctx.onProgress?.({
-    label: localOnly
-      ? `Dashboard ready — ${marketCount} charts (dev preview, not saved)`
-      : `Dashboard ready — ${marketCount} charts`,
+    label: `Dashboard ready — ${marketCount} charts (not saved yet)`,
     progress: 100,
     done: marketCount,
     total: marketCount,
@@ -594,7 +570,5 @@ export async function runEventCandlesticksDashboardPowerMove(ctx) {
     marketCount,
     eventTitle,
     eventTicker,
-    dataSetId,
-    localOnly,
   };
 }
