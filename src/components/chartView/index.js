@@ -14,6 +14,7 @@ import { Square, Radio } from 'lucide-react';
 import { Liveline } from 'liveline';
 import { CandlestickChartView } from '@/components/chartView/CandlestickChart';
 import { mapRowsToCandlestickSeriesData } from '@/lib/chartCandlestick';
+import { useHtmlDarkClass } from '@/hooks/use-html-dark-class';
 
 import { useMyStateV2 } from '@/context/stateContextV2';
 import ChartControls from '@/components/chartView/ChartControls';
@@ -2173,6 +2174,9 @@ export function ChartBuilderProvider({ demo, children, initialBuilderSnapshot, e
 }
 
 export function ChartCanvas() {
+  // App theme toggle (`AnimatedThemeToggler`) flips `<html class="dark">`.
+  // Candlesticks follow that so dashboard / embed panes adapt with the shell.
+  const htmlDark = useHtmlDarkClass();
   const {
     demo,
     embedCompact,
@@ -2846,7 +2850,11 @@ export function ChartCanvas() {
               )}
               style={{
                 backgroundColor:
-                  innerBoxColor || activePalette?.[2] || (dark ? "#000000" : "#ffffff"),
+                  innerBoxColor ||
+                  activePalette?.[2] ||
+                  ((selChartType === "candlestick" ? htmlDark : dark)
+                    ? "#000000"
+                    : "#ffffff"),
               }}
             >
               {!titleHidden || !subTitleHidden ? (
@@ -2875,7 +2883,7 @@ export function ChartCanvas() {
                 ) : selChartType === "candlestick" ? (
                   <div className="flex min-h-[220px] w-full flex-1 flex-col">
                     {candlestickMapped?.ok && candlestickMapped.data.length > 0 ? (
-                      <CandlestickChartView data={candlestickMapped.data} dark={!!dark} />
+                      <CandlestickChartView data={candlestickMapped.data} dark={!!htmlDark} />
                     ) : (
                       <div className="flex flex-1 items-center justify-center px-4 text-center text-xs text-muted-foreground">
                         No valid candlestick bars found. Each bar needs finite open, high, low, and close

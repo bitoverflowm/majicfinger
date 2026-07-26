@@ -6,6 +6,24 @@ import { CandlestickSeries, ColorType, createChart } from "lightweight-charts";
 import { cn } from "@/lib/utils";
 
 /**
+ * @param {boolean} dark
+ */
+function themeOptions(dark) {
+  return {
+    layout: {
+      background: { type: ColorType.Solid, color: dark ? "#020617" : "#ffffff" },
+      textColor: dark ? "#e2e8f0" : "#0f172a",
+      fontSize: 11,
+      attributionLogo: false,
+    },
+    grid: {
+      vertLines: { color: dark ? "rgba(148,163,184,0.12)" : "rgba(148,163,184,0.25)" },
+      horzLines: { color: dark ? "rgba(148,163,184,0.12)" : "rgba(148,163,184,0.25)" },
+    },
+  };
+}
+
+/**
  * Lightweight Charts candlestick pane (open-source library; no on-chart TV logo).
  *
  * @param {{
@@ -18,6 +36,8 @@ export function CandlestickChartView({ data, dark = false, className }) {
   const containerRef = useRef(/** @type {HTMLDivElement | null} */ (null));
   const chartRef = useRef(/** @type {import("lightweight-charts").IChartApi | null} */ (null));
   const seriesRef = useRef(/** @type {import("lightweight-charts").ISeriesApi<"Candlestick"> | null} */ (null));
+  const darkRef = useRef(dark);
+  darkRef.current = dark;
 
   useEffect(() => {
     const el = containerRef.current;
@@ -25,16 +45,7 @@ export function CandlestickChartView({ data, dark = false, className }) {
 
     const chart = createChart(el, {
       autoSize: true,
-      layout: {
-        background: { type: ColorType.Solid, color: dark ? "#020617" : "#ffffff" },
-        textColor: dark ? "#e2e8f0" : "#0f172a",
-        fontSize: 11,
-        attributionLogo: false,
-      },
-      grid: {
-        vertLines: { color: dark ? "rgba(148,163,184,0.12)" : "rgba(148,163,184,0.25)" },
-        horzLines: { color: dark ? "rgba(148,163,184,0.12)" : "rgba(148,163,184,0.25)" },
-      },
+      ...themeOptions(!!darkRef.current),
       rightPriceScale: {
         borderVisible: false,
       },
@@ -90,6 +101,12 @@ export function CandlestickChartView({ data, dark = false, className }) {
       chartRef.current = null;
       seriesRef.current = null;
     };
+  }, []);
+
+  useEffect(() => {
+    const chart = chartRef.current;
+    if (!chart) return;
+    chart.applyOptions(themeOptions(!!dark));
   }, [dark]);
 
   useEffect(() => {
