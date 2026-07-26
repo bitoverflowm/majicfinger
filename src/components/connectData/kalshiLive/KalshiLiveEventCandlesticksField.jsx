@@ -6,16 +6,13 @@ import { MarketTickerSearch } from "@/components/connectData/MarketTickerSearch"
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useMyStateV2 } from "@/context/stateContextV2";
-import {
-  deriveEventTickerFromMarket,
-  inferSeriesTickerFromEvent,
-} from "@/lib/kalshiLive/eventCandlesticksCompose";
+import { inferSeriesTickerFromEvent } from "@/lib/kalshiLive/eventCandlesticksCompose";
 import { cn } from "@/lib/utils";
 
 /**
- * Event Candlesticks — pick one event (semantic search over its markets, or type a
- * ticker) and confirm the parent series. Candlesticks are pulled for every market
- * in that event.
+ * Event Candlesticks — series-style semantic search that resolves to one event.
+ * Embedding hits with an event_ticker fill both path params directly; pure series
+ * hits open an event picker. Candlesticks are pulled for every market in that event.
  *
  * @param {{ className?: string; disabled?: boolean }} props
  */
@@ -29,26 +26,35 @@ export function KalshiLiveEventCandlesticksField({ className, disabled }) {
     setConnectKalshiLiveEventCandlesticksTickerMeta,
   } = ctx;
 
-  const [marketSearch, setMarketSearch] = useState("");
+  const [searchValue, setSearchValue] = useState("");
 
   const applySelections = useCallback(
     (selections) => {
       const s = (selections || [])[0];
-      if (!s) return;
-      const marketTicker = String(s.ticker || "").trim().toUpperCase();
-      const eventTicker = String(
-        s.eventTicker || deriveEventTickerFromMarket(marketTicker),
-      )
+      if (!s) {
+        setConnectKalshiLiveEventCandlesticksEventTicker?.("");
+        setConnectKalshiLiveEventCandlesticksSeriesTicker?.("");
+        setConnectKalshiLiveEventCandlesticksTickerMeta?.({});
+        return;
+      }
+
+      const eventTicker = String(s.eventTicker || s.ticker || "")
         .trim()
         .toUpperCase();
       if (!eventTicker) return;
 
-      const series = inferSeriesTickerFromEvent(eventTicker);
+      const series =
+        String(s.seriesTicker || "").trim().toUpperCase() ||
+        inferSeriesTickerFromEvent(eventTicker);
+
       setConnectKalshiLiveEventCandlesticksEventTicker?.(eventTicker);
       if (series) setConnectKalshiLiveEventCandlesticksSeriesTicker?.(series);
       setConnectKalshiLiveEventCandlesticksTickerMeta?.({
         [eventTicker]: String(s.title || eventTicker).trim() || eventTicker,
       });
+      // Clear the search chips after path params are filled — the inputs below
+      // are the source of truth for the pull.
+      setSearchValue("");
     },
     [
       setConnectKalshiLiveEventCandlesticksEventTicker,
@@ -80,19 +86,20 @@ export function KalshiLiveEventCandlesticksField({ className, disabled }) {
         Which event are you looking for?
       </h2>
       <p className="text-[11px] leading-snug text-muted-foreground">
-        Search for the event (by title, market, or ticker) and we&apos;ll pull candlesticks for
-        every market in it — one metadata sheet, then a sheet per market. Only one event per pull.
+        Use the same semantic search as Series — we&apos;ll resolve to one event and fill the
+        path parameters. Candlesticks land as one metadata sheet, then a sheet per market.
       </p>
 
       <div className="space-y-3 rounded-lg bg-muted/10 p-3">
         <MarketTickerSearch
-          value={marketSearch}
-          onChange={setMarketSearch}
+          value={searchValue}
+          onChange={setSearchValue}
           disabled={disabled}
           dataSource="live"
-          searchScope="markets"
+          searchScope="events_semantic"
           maxTickers={1}
           showCutoffNotes={false}
+          required={false}
           onSelectionsChange={applySelections}
         />
 
@@ -123,8 +130,11 @@ export function KalshiLiveEventCandlesticksField({ className, disabled }) {
           </div>
         </div>
         <p className="text-[10px] leading-snug text-muted-foreground">
-          The series ticker is deduced from the event automatically. Override it here if you already
-          know it.
+          Path params for{" "}
+          <span className="font-mono text-[10px]">
+            /series/{"{series_ticker}"}/events/{"{ticker}"}/candlesticks
+          </span>
+          . Series is filled from the search hit when available; override if needed.
         </p>
       </div>
     </div>

@@ -32,8 +32,10 @@ import {
   isValidMarketTickerToken,
   normalizeSeriesMarketsForPicker,
   parseMarketTickerList,
+  resolveEventTickers,
   resolveMarketTickers,
   resolveSeriesTickers,
+  fetchEventsForSeries,
   serializeMarketTickerSelections,
 } from "@/lib/kalshiLive/marketTickerSearch";
 import { cn } from "@/lib/utils";
@@ -60,7 +62,15 @@ import { cn } from "@/lib/utils";
  *   markets: MarketTickerSelection[];
  * }} SeriesSuggestion
  *
- * @typedef {MarketSuggestion | SeriesSuggestion} TickerSearchSuggestion
+ * @typedef {{
+ *   kind: "event";
+ *   ticker: string;
+ *   title: string;
+ *   subtitle?: string;
+ *   seriesTicker: string;
+ * }} EventSuggestion
+ *
+ * @typedef {MarketSuggestion | SeriesSuggestion | EventSuggestion} TickerSearchSuggestion
  */
 
 const MAX_TICKERS = 100;
@@ -337,7 +347,7 @@ function SelectionChipsRow({ selections, busy, onRemove }) {
  *   dataSource?: KalshiTickerSearchDataSource;
  *   historyEntity?: "trades" | "candlesticks" | "data";
  *   showCutoffNotes?: boolean;
- *   searchScope?: "markets" | "series" | "events";
+ *   searchScope?: "markets" | "series" | "events" | "events_semantic";
  * }} props
  */
 export function MarketTickerSearch({
@@ -354,6 +364,8 @@ export function MarketTickerSearch({
   showCutoffNotes = true,
   // "series" = series suggestions only (no markets, selecting a series adds that series ticker).
   // "events" = manual event tickers only (no semantic search / resolve).
+  // "events_semantic" = series-style semantic search that resolves to an event ticker
+  //   (embedding hits with event_ticker select the event; pure series opens an event picker).
   searchScope = "markets",
   /** Optional leading content for the status row (e.g. discovery mode toggle). */
   headerStart = null,
@@ -362,6 +374,7 @@ export function MarketTickerSearch({
 }) {
   const seriesOnly = searchScope === "series";
   const eventsOnly = searchScope === "events";
+  const eventsSemantic = searchScope === "events_semantic";
   const manualOnly = eventsOnly;
   const debounceRef = useRef(null);
   const suggestAbortRef = useRef(/** @type {AbortController | null} */ (null));
@@ -382,6 +395,15 @@ export function MarketTickerSearch({
     /** @type {{ title: string; markets: MarketTickerSelection[]; selected: Set<string> } | null} */ (
       null
     ),
+  );
+  const [eventsModal, setEventsModal] = useState(
+    /** @type {{
+     *   seriesTicker: string;
+     *   title: string;
+     *   events: MarketTickerSelection[];
+     *   loading: boolean;
+     *   error: string | null;
+     * } | null} */ (null),
   );
 
   const emitChange = useCallback(
@@ -421,6 +443,7 @@ export function MarketTickerSearch({
             title: String(item?.title || ticker).trim() || ticker,
             subtitle: item?.subtitle,
             eventTicker: item?.eventTicker,
+            seriesTicker: item?.seriesTicker,
             status: item?.status,
             openTime: item?.openTime,
             closeTime: item?.closeTime,
@@ -469,16 +492,18 @@ export function MarketTickerSearch({
       setResolveLoading(true);
       setError(null);
       try {
-        const { found, missing } = seriesOnly
-          ? await resolveSeriesTickers(tokens, { signal: ac.signal })
-          : await resolveMarketTickers(tokens, { signal: ac.signal });
+        const { found, missing } = eventsSemantic
+          ? await resolveEventTickers(tokens, { signal: ac.signal })
+          : seriesOnly
+            ? await resolveSeriesTickers(tokens, { signal: ac.signal })
+            : await resolveMarketTickers(tokens, { signal: ac.signal });
         if (ac.signal.aborted) return;
         if (found.length) addSelections(found);
         if (missing.length) {
           setMissingTickers((prev) => [...new Set([...prev, ...missing])]);
           setError(
             missing.length === 1
-              ? `${seriesOnly ? "Series" : "Market"} ticker not found: ${missing[0]}`
+              ? `${eventsSemantic ? "Event" : seriesOnly ? "Series" : "Market"} ticker not found: ${missing[0]}`
               : `${missing.length} tickers were not found`,
           );
         }
@@ -489,7 +514,7 @@ export function MarketTickerSearch({
         if (!ac.signal.aborted) setResolveLoading(false);
       }
     },
-    [addSelections, seriesOnly, manualOnly],
+    [addSelections, seriesOnly, manualOnly, eventsSemantic],
   );
 
   const fetchSuggestions = useCallback(async (segment) => {
@@ -517,11 +542,13 @@ export function MarketTickerSearch({
       const marketHits = [];
       /** @type {TickerSearchSuggestion[]} */
       const seriesHits = [];
+      /** @type {TickerSearchSuggestion[]} */
+      const eventHits = [];
       const tickerLike = isTickerLikeSegment(trimmed);
 
       const tasks = [];
 
-      if (seriesOnly) {
+      if (seriesOnly || eventsSemantic) {
         // Series text / category / tags search (no markets).
         tasks.push(
           fetch(
@@ -601,13 +628,35 @@ export function MarketTickerSearch({
             if (!res.ok || ac.signal.aborted) return;
             const list = Array.isArray(data?.suggestions) ? data.suggestions : [];
             for (const s of list) {
-              const ticker = String(s?.ticker || "").trim().toUpperCase();
-              if (!ticker) continue;
-              if (seriesOnly) {
+              const seriesTicker = String(s?.ticker || "").trim().toUpperCase();
+              if (!seriesTicker) continue;
+              const eventTicker = String(s?.eventTicker || "").trim().toUpperCase();
+
+              if (eventsSemantic && eventTicker) {
+                // Prefer the concrete event from the embedding hit.
+                const eventTitle = String(
+                  s?.raw?.event_title || s?.title || eventTicker,
+                ).trim();
+                const seriesTitle = String(s?.title || seriesTicker).trim();
+                eventHits.push({
+                  kind: "event",
+                  ticker: eventTicker,
+                  title: eventTitle || eventTicker,
+                  subtitle:
+                    [seriesTitle !== eventTitle ? seriesTitle : "", seriesTicker]
+                      .filter(Boolean)
+                      .join(" · ") || undefined,
+                  seriesTicker,
+                });
+                continue;
+              }
+
+              if (seriesOnly || eventsSemantic) {
                 // Select the series itself — do not expand nested markets.
+                // For events_semantic, clicking opens an event picker.
                 seriesHits.push({
                   kind: "series",
-                  ticker,
+                  ticker: seriesTicker,
                   title: String(s?.title || s?.ticker || "Series").trim(),
                   subtitle: String(s?.subtitle || "").trim() || undefined,
                   markets: [],
@@ -616,7 +665,7 @@ export function MarketTickerSearch({
                 const markets = normalizeSeriesMarketsForPicker(s?.markets);
                 seriesHits.push({
                   kind: "series",
-                  ticker,
+                  ticker: seriesTicker,
                   title: String(s?.title || s?.ticker || "Series").trim(),
                   subtitle: String(s?.subtitle || "").trim() || undefined,
                   markets,
@@ -631,12 +680,26 @@ export function MarketTickerSearch({
       if (mySeq !== suggestSeqRef.current || ac.signal.aborted) return;
 
       /** @type {TickerSearchSuggestion[]} */
-      const next = seriesOnly ? [...seriesHits] : [...seriesHits, ...marketHits];
+      const next = eventsSemantic
+        ? [...eventHits, ...seriesHits]
+        : seriesOnly
+          ? [...seriesHits]
+          : [...seriesHits, ...marketHits];
 
-      // Exact ticker match first; for natural language prefer series (semantic)
+      // Exact ticker match first; for natural language prefer series/event (semantic)
       // over the live market text scan, which is a weaker heuristic.
       const upper = trimmed.toUpperCase();
       next.sort((a, b) => {
+        if (eventsSemantic) {
+          const aExact =
+            (a.kind === "event" || a.kind === "series") && a.ticker === upper ? 0 : 1;
+          const bExact =
+            (b.kind === "event" || b.kind === "series") && b.ticker === upper ? 0 : 1;
+          if (aExact !== bExact) return aExact - bExact;
+          // Prefer concrete events over series that still need a picker.
+          if (a.kind !== b.kind) return a.kind === "event" ? -1 : 1;
+          return 0;
+        }
         if (seriesOnly) {
           const aExact = a.ticker === upper ? 0 : 1;
           const bExact = b.ticker === upper ? 0 : 1;
@@ -655,11 +718,15 @@ export function MarketTickerSearch({
       // Dedupe by ticker within each kind
       const seenMarkets = new Set();
       const seenSeries = new Set();
+      const seenEvents = new Set();
       const deduped = [];
       for (const s of next) {
         if (s.kind === "market") {
           if (seenMarkets.has(s.ticker)) continue;
           seenMarkets.add(s.ticker);
+        } else if (s.kind === "event") {
+          if (seenEvents.has(s.ticker)) continue;
+          seenEvents.add(s.ticker);
         } else {
           if (seenSeries.has(s.ticker)) continue;
           seenSeries.add(s.ticker);
@@ -677,7 +744,7 @@ export function MarketTickerSearch({
     } finally {
       if (mySeq === suggestSeqRef.current) setSuggestLoading(false);
     }
-  }, [seriesOnly, manualOnly]);
+  }, [seriesOnly, manualOnly, eventsSemantic]);
 
   useEffect(() => {
     if (debounceRef.current) clearTimeout(debounceRef.current);
@@ -699,16 +766,18 @@ export function MarketTickerSearch({
     }
     if (!isTickerLikeSegment(segment)) {
       setError(
-        eventsOnly
-          ? "Enter an event ticker (e.g. KXHIGHNY-25JAN01)."
-          : seriesOnly
-            ? "Enter a series ticker, or pick a suggestion from the list."
-            : "Enter a market ticker, or pick a suggestion from the list.",
+        eventsSemantic
+          ? "Enter an event ticker, or pick a suggestion from the list."
+          : eventsOnly
+            ? "Enter an event ticker (e.g. KXHIGHNY-25JAN01)."
+            : seriesOnly
+              ? "Enter a series ticker, or pick a suggestion from the list."
+              : "Enter a market ticker, or pick a suggestion from the list.",
       );
       return;
     }
     await resolveAndAddTickers([segment]);
-  }, [draft, resolveAndAddTickers, seriesOnly, eventsOnly]);
+  }, [draft, resolveAndAddTickers, seriesOnly, eventsOnly, eventsSemantic]);
 
   const handlePaste = useCallback(
     (e) => {
@@ -730,6 +799,54 @@ export function MarketTickerSearch({
     });
     setSuggestOpen(false);
   }, []);
+
+  const openEventsModal = useCallback(async (series) => {
+    const seriesTicker = String(series?.ticker || "").trim().toUpperCase();
+    if (!seriesTicker) return;
+    setSuggestOpen(false);
+    setEventsModal({
+      seriesTicker,
+      title: series.title || seriesTicker,
+      events: [],
+      loading: true,
+      error: null,
+    });
+    try {
+      const events = await fetchEventsForSeries(seriesTicker);
+      setEventsModal((prev) =>
+        prev && prev.seriesTicker === seriesTicker
+          ? { ...prev, events, loading: false, error: null }
+          : prev,
+      );
+    } catch (e) {
+      setEventsModal((prev) =>
+        prev && prev.seriesTicker === seriesTicker
+          ? {
+              ...prev,
+              loading: false,
+              error: e instanceof Error ? e.message : "Failed to load events",
+            }
+          : prev,
+      );
+    }
+  }, []);
+
+  const selectEventSuggestion = useCallback(
+    (event) => {
+      const eventTicker = String(event?.ticker || "").trim().toUpperCase();
+      if (!eventTicker) return;
+      addSelections([
+        {
+          ticker: eventTicker,
+          title: String(event?.title || eventTicker).trim() || eventTicker,
+          subtitle: event?.subtitle,
+          eventTicker,
+          seriesTicker: String(event?.seriesTicker || "").trim().toUpperCase() || undefined,
+        },
+      ]);
+    },
+    [addSelections],
+  );
 
   const busy = disabled || resolveLoading;
   const atCap = selections.length >= maxTickers;
@@ -783,9 +900,11 @@ export function MarketTickerSearch({
             value={draft}
             disabled={busy || atCap}
             placeholder={
-              seriesOnly
-                ? "Add one or more series tickers here, e.g. KXHIGHNY; multiple tickers separated by commas: SERIES1, SERIES2"
-                : "Add one or more tickers here, e.g. KXHIGHNY-25JAN01-T77; multiple tickers separated by commas: TICKER1, TICKER2"
+              eventsSemantic
+                ? "Search for an event (e.g. NYC high temp, Fed rate) or type an event ticker"
+                : seriesOnly
+                  ? "Add one or more series tickers here, e.g. KXHIGHNY; multiple tickers separated by commas: SERIES1, SERIES2"
+                  : "Add one or more tickers here, e.g. KXHIGHNY-25JAN01-T77; multiple tickers separated by commas: TICKER1, TICKER2"
             }
             onChange={(e) => {
               setDraft(e.target.value);
@@ -800,6 +919,10 @@ export function MarketTickerSearch({
                 e.preventDefault();
                 const first = suggestions[0];
                 if (suggestOpen && first) {
+                  if (first.kind === "event") {
+                    selectEventSuggestion(first);
+                    return;
+                  }
                   if (first.kind === "market" || seriesOnly) {
                     addSelections([
                       {
@@ -808,6 +931,8 @@ export function MarketTickerSearch({
                         subtitle: first.subtitle,
                       },
                     ]);
+                  } else if (eventsSemantic) {
+                    void openEventsModal(first);
                   } else {
                     openSeriesModal(first);
                   }
@@ -838,11 +963,13 @@ export function MarketTickerSearch({
               (busy || atCap) && "opacity-70",
             )}
             aria-label={
-              eventsOnly
-                ? "Event ticker search"
-                : seriesOnly
-                  ? "Series ticker search"
-                  : "Market ticker search"
+              eventsSemantic
+                ? "Event semantic search"
+                : eventsOnly
+                  ? "Event ticker search"
+                  : seriesOnly
+                    ? "Series ticker search"
+                    : "Market ticker search"
             }
           />
 
@@ -860,21 +987,32 @@ export function MarketTickerSearch({
                   const marketCount = Array.isArray(s.markets) ? s.markets.length : 0;
                   const seriesTiming =
                     s.kind === "series" ? aggregateKalshiMarketTiming(s.markets) : null;
+                  const kindKey =
+                    s.kind === "market"
+                      ? `m:${s.ticker}`
+                      : s.kind === "event"
+                        ? `e:${s.ticker}`
+                        : `s:${s.ticker}:${marketCount}`;
+                  const kindLabel =
+                    s.kind === "market" ? "Market" : s.kind === "event" ? "Event" : "Series";
+                  const kindBadgeClass =
+                    s.kind === "market"
+                      ? "bg-emerald-500/15 text-emerald-900 ring-emerald-600/25 dark:bg-emerald-400/15 dark:text-emerald-100 dark:ring-emerald-400/35"
+                      : s.kind === "event"
+                        ? "bg-sky-500/15 text-sky-900 ring-sky-600/25 dark:bg-sky-400/15 dark:text-sky-100 dark:ring-sky-400/35"
+                        : "bg-violet-500/15 text-violet-900 ring-violet-600/25 dark:bg-violet-400/15 dark:text-violet-100 dark:ring-violet-400/35";
                   return (
-                    <li
-                      key={
-                        s.kind === "market"
-                          ? `m:${s.ticker}`
-                          : `s:${s.ticker}:${marketCount}`
-                      }
-                      role="option"
-                    >
+                    <li key={kindKey} role="option">
                       <button
                         type="button"
                         disabled={busy}
                         className="flex w-full items-start gap-3 px-3 py-2 text-left text-sm transition-colors hover:bg-slate-100 dark:hover:bg-slate-800 disabled:opacity-50"
                         onMouseDown={(e) => e.preventDefault()}
                         onClick={() => {
+                          if (s.kind === "event") {
+                            selectEventSuggestion(s);
+                            return;
+                          }
                           if (s.kind === "market" || seriesOnly) {
                             addSelections([
                               {
@@ -883,6 +1021,8 @@ export function MarketTickerSearch({
                                 subtitle: s.subtitle,
                               },
                             ]);
+                          } else if (eventsSemantic) {
+                            void openEventsModal(s);
                           } else {
                             openSeriesModal(s);
                           }
@@ -901,15 +1041,19 @@ export function MarketTickerSearch({
                             <span
                               className={cn(
                                 "rounded px-1.5 py-0.5 font-mono text-[0.65rem] font-medium tracking-wide ring-1",
-                                s.kind === "market"
-                                  ? "bg-emerald-500/15 text-emerald-900 ring-emerald-600/25 dark:bg-emerald-400/15 dark:text-emerald-100 dark:ring-emerald-400/35"
-                                  : "bg-violet-500/15 text-violet-900 ring-violet-600/25 dark:bg-violet-400/15 dark:text-violet-100 dark:ring-violet-400/35",
+                                kindBadgeClass,
                               )}
                             >
-                              {s.kind === "market" ? "Market" : "Series"}
+                              {kindLabel}
                             </span>
                             {s.ticker ? ` · ${s.ticker}` : ""}
-                            {s.kind === "series" && !seriesOnly && marketCount
+                            {s.kind === "event" && s.seriesTicker
+                              ? ` · ${s.seriesTicker}`
+                              : ""}
+                            {s.kind === "series" && eventsSemantic
+                              ? " · pick an event"
+                              : ""}
+                            {s.kind === "series" && !seriesOnly && !eventsSemantic && marketCount
                               ? ` · ${marketCount} markets`
                               : ""}
                           </span>
@@ -937,7 +1081,9 @@ export function MarketTickerSearch({
         </div>
 
         <p className="text-[10px] leading-snug text-muted-foreground">
-          If you don&apos;t know your ticker, search anything and suggestions will populate.
+          {eventsSemantic
+            ? "Semantic search finds events (and their series). If a result is a series only, pick which event to use."
+            : "If you don't know your ticker, search anything and suggestions will populate."}
         </p>
 
         {selections.length > 0 ? (
@@ -1103,6 +1249,84 @@ export function MarketTickerSearch({
               >
                 Add {seriesSelectedCount > 0 ? `${seriesSelectedCount} ` : ""}market
                 {seriesSelectedCount === 1 ? "" : "s"}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        <Dialog
+          open={!!eventsModal}
+          onOpenChange={(open) => {
+            if (!open) setEventsModal(null);
+          }}
+        >
+          <DialogContent className="max-h-[85vh] max-w-lg overflow-hidden sm:max-w-xl">
+            <DialogHeader>
+              <DialogTitle className="pr-6 text-base">
+                {eventsModal?.title
+                  ? `Pick an event in ${eventsModal.title}`
+                  : "Pick an event"}
+              </DialogTitle>
+              <DialogDescription>
+                Event Candlesticks needs one event ticker. Choose which event under{" "}
+                <span className="font-mono text-[11px]">
+                  {eventsModal?.seriesTicker || "this series"}
+                </span>{" "}
+                to pull.
+              </DialogDescription>
+            </DialogHeader>
+
+            <div className="max-h-[min(24rem,50vh)] space-y-1 overflow-auto pr-1">
+              {eventsModal?.loading ? (
+                <p className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden />
+                  Loading events…
+                </p>
+              ) : eventsModal?.error ? (
+                <p className="text-sm text-destructive">{eventsModal.error}</p>
+              ) : (eventsModal?.events || []).length === 0 ? (
+                <p className="text-sm text-muted-foreground">
+                  No events found for this series.
+                </p>
+              ) : (
+                (eventsModal?.events || []).map((ev) => (
+                  <button
+                    key={ev.ticker}
+                    type="button"
+                    className="flex w-full items-start gap-2 rounded-md border border-border/60 bg-background px-2.5 py-2 text-left transition-colors hover:bg-muted/30"
+                    onClick={() => {
+                      selectEventSuggestion({
+                        kind: "event",
+                        ticker: ev.ticker,
+                        title: ev.title,
+                        subtitle: ev.subtitle,
+                        seriesTicker:
+                          ev.seriesTicker || eventsModal?.seriesTicker || "",
+                      });
+                      setEventsModal(null);
+                    }}
+                  >
+                    <span className="min-w-0 flex-1 space-y-0.5">
+                      <span className="block text-xs font-medium text-foreground">
+                        {ev.title || ev.ticker}
+                      </span>
+                      {ev.subtitle ? (
+                        <span className="block text-[10px] text-muted-foreground line-clamp-1">
+                          {ev.subtitle}
+                        </span>
+                      ) : null}
+                      <span className="block font-mono text-[10px] text-muted-foreground">
+                        {ev.ticker}
+                      </span>
+                    </span>
+                  </button>
+                ))
+              )}
+            </div>
+
+            <DialogFooter className="gap-2 sm:gap-0">
+              <Button type="button" variant="ghost" size="sm" onClick={() => setEventsModal(null)}>
+                Cancel
               </Button>
             </DialogFooter>
           </DialogContent>

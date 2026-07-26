@@ -22,6 +22,7 @@ export const MARKET_TICKER_TOKEN_RE = /^[A-Z0-9][A-Z0-9-]{0,63}$/i;
  *   title: string;
  *   subtitle?: string;
  *   eventTicker?: string;
+ *   seriesTicker?: string;
  *   status?: string;
  *   openTime?: string;
  *   closeTime?: string;
@@ -189,6 +190,119 @@ export async function resolveSeriesTickers(tickers, opts = {}) {
   }
 
   return { found, missing };
+}
+
+/**
+ * Resolve event tickers via GET /events/{event_ticker} (one request each).
+ * @param {string[]} tickers
+ * @param {{ signal?: AbortSignal }} [opts]
+ * @returns {Promise<{ found: MarketTickerSelection[]; missing: string[] }>}
+ */
+export async function resolveEventTickers(tickers, opts = {}) {
+  const unique = [
+    ...new Set((tickers || []).map((t) => String(t).trim().toUpperCase()).filter(Boolean)),
+  ];
+  if (!unique.length) return { found: [], missing: [] };
+
+  const invalid = unique.filter((t) => !isValidMarketTickerToken(t));
+  const valid = unique.filter((t) => isValidMarketTickerToken(t));
+  /** @type {MarketTickerSelection[]} */
+  const found = [];
+  /** @type {string[]} */
+  const missing = [...invalid];
+
+  for (const ticker of valid) {
+    if (opts.signal?.aborted) break;
+    try {
+      const params = new URLSearchParams({ ticker });
+      const res = await fetch(`/api/integrations/kalshi-live/events/get?${params.toString()}`, {
+        headers: { Accept: "application/json" },
+        credentials: "same-origin",
+        signal: opts.signal,
+      });
+      const body = await res.json().catch(() => ({}));
+      const event = body?.event;
+      if (!res.ok || !event || typeof event !== "object") {
+        missing.push(ticker);
+        continue;
+      }
+      const eventTicker =
+        String(event.event_ticker || ticker).trim().toUpperCase() || ticker;
+      const seriesTicker = String(event.series_ticker || "").trim().toUpperCase() || undefined;
+      const title =
+        String(event.title || event.sub_title || eventTicker).trim() || eventTicker;
+      const subtitle = [event.sub_title, seriesTicker]
+        .map((x) => String(x || "").trim())
+        .filter((x) => x && x !== title)
+        .join(" · ");
+      found.push({
+        ticker: eventTicker,
+        title,
+        subtitle: subtitle || undefined,
+        eventTicker,
+        seriesTicker,
+      });
+    } catch (e) {
+      if (e instanceof DOMException && e.name === "AbortError") throw e;
+      missing.push(ticker);
+    }
+  }
+
+  return { found, missing };
+}
+
+/**
+ * List events under a series for the event-picker fallback.
+ * @param {string} seriesTicker
+ * @param {{ signal?: AbortSignal; limit?: number }} [opts]
+ * @returns {Promise<MarketTickerSelection[]>}
+ */
+export async function fetchEventsForSeries(seriesTicker, opts = {}) {
+  const series = String(seriesTicker || "").trim().toUpperCase();
+  if (!series) return [];
+
+  const limit = Math.min(200, Math.max(1, Math.floor(Number(opts.limit) || 100)));
+  const params = new URLSearchParams({
+    series_ticker: series,
+    limit: String(limit),
+    discovery: "1",
+  });
+  const res = await fetch(`/api/integrations/kalshi-live/events?${params.toString()}`, {
+    headers: { Accept: "application/json" },
+    credentials: "same-origin",
+    signal: opts.signal,
+  });
+  const body = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    throw new Error(
+      typeof body?.error === "string"
+        ? body.error
+        : typeof body?.message === "string"
+          ? body.message
+          : "Failed to load events for series",
+    );
+  }
+
+  const events = Array.isArray(body?.events) ? body.events : [];
+  /** @type {MarketTickerSelection[]} */
+  const out = [];
+  for (const raw of events) {
+    if (!raw || typeof raw !== "object") continue;
+    const e = /** @type {Record<string, unknown>} */ (raw);
+    const eventTicker = String(e.event_ticker || "").trim().toUpperCase();
+    if (!eventTicker || !isValidMarketTickerToken(eventTicker)) continue;
+    if (out.some((x) => x.ticker === eventTicker)) continue;
+    const title = String(e.title || e.sub_title || eventTicker).trim() || eventTicker;
+    const subtitle = String(e.sub_title || "").trim();
+    out.push({
+      ticker: eventTicker,
+      title,
+      subtitle: subtitle && subtitle !== title ? subtitle : series,
+      eventTicker,
+      seriesTicker: String(e.series_ticker || series).trim().toUpperCase() || series,
+    });
+  }
+  return out;
 }
 
 /**
