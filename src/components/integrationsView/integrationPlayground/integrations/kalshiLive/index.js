@@ -1046,7 +1046,7 @@ export default function KalshiLive({ setConnectedData, connectHomePullBridge = f
         error: null,
       }));
 
-      const { metaRows, byMarket, querySummary } = await fetchKalshiLiveEventCandlesticksPull({
+      const { metaRows, byMarket, querySummary, eventMeta } = await fetchKalshiLiveEventCandlesticksPull({
         eventTicker,
         seriesTicker,
         whereFilters,
@@ -1062,6 +1062,14 @@ export default function KalshiLive({ setConnectedData, connectHomePullBridge = f
           }));
         },
       });
+
+      const resolvedEventTitle =
+        String(eventMeta?.title || "").trim() ||
+        String(ctx?.connectKalshiLiveEventCandlesticksTickerMeta?.[eventTicker] || "").trim() ||
+        eventTicker;
+      const resolvedSeriesTicker =
+        String(eventMeta?.seriesTicker || seriesTicker || "").trim();
+      const resolvedSubTitle = String(eventMeta?.subTitle || "").trim();
 
       const elapsedMs =
         (typeof performance !== "undefined" && performance?.now
@@ -1118,7 +1126,9 @@ export default function KalshiLive({ setConnectedData, connectHomePullBridge = f
                   source: "kalshi-live",
                   endpoint: "event_candlesticks",
                   eventTicker,
-                  seriesTicker,
+                  seriesTicker: resolvedSeriesTicker || seriesTicker,
+                  eventTitle: resolvedEventTitle,
+                  eventSubTitle: resolvedSubTitle || undefined,
                   sheetKind: group.isMeta ? "markets_metadata" : "market_candlesticks",
                   marketTicker: group.isMeta ? undefined : sheetName,
                   whereFilters,

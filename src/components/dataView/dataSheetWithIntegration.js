@@ -112,6 +112,8 @@ import {
   removeDashboardLayoutRowFromDraft,
 } from "@/lib/removeDashboardChartSlot";
 import { patchChartDashboardColumn } from "@/lib/patchChartDashboardColumn";
+import { runEventCandlesticksDashboardPowerMove } from "@/lib/kalshiLive/eventCandlesticksPowerMove";
+import { ConnectProgressWithLabel } from "@/components/integrationsView/integrationPlayground/integrations/polymarketHistorical/ConnectProgressWithLabel";
 import {
   flattenDashboardLayers,
   findRowIdForColumn,
@@ -254,6 +256,8 @@ export default function DataSheetWithIntegration({
   const rightPanelTab = contextStateV2?.rightPanelTab;
   const setRightPanelTab = contextStateV2?.setRightPanelTab;
   const connectPowerMove = contextStateV2?.connectPowerMove ?? null;
+  const connectPowerMoveBuild = contextStateV2?.connectPowerMoveBuild;
+  const setConnectPowerMoveBuild = contextStateV2?.setConnectPowerMoveBuild;
   const connectHomeCenterView = normalizeConnectHomeCenterView(
     contextStateV2?.connectHomeCenterView,
   );
@@ -348,8 +352,17 @@ export default function DataSheetWithIntegration({
   const chartPickerEmphasis = contextStateV2?.chartPickerEmphasis;
   const setChartPickerEmphasis = contextStateV2?.setChartPickerEmphasis;
   const savedCharts = contextStateV2?.savedCharts;
+  const setSavedCharts = contextStateV2?.setSavedCharts;
   const savedDataSets = contextStateV2?.savedDataSets ?? [];
+  const setSavedDataSets = contextStateV2?.setSavedDataSets;
   const loadedDataMeta = contextStateV2?.loadedDataMeta;
+  const setLoadedDataMeta = contextStateV2?.setLoadedDataMeta;
+  const setLoadedDataId = contextStateV2?.setLoadedDataId;
+  const connectKalshiLiveEventCandlesticksEventTicker =
+    contextStateV2?.connectKalshiLiveEventCandlesticksEventTicker || "";
+  const connectKalshiLiveEventCandlesticksTickerMeta =
+    contextStateV2?.connectKalshiLiveEventCandlesticksTickerMeta || {};
+  const powerMoveBuildAbortRef = useRef(/** @type {AbortController | null} */ (null));
 
   const [isPanelClosing, setIsPanelClosing] = useState(false);
   const [replaceOrNewSheetOpen, setReplaceOrNewSheetOpen] = useState(false);
@@ -660,6 +673,128 @@ export default function DataSheetWithIntegration({
       setRightPanelTab,
     ],
   );
+
+  const handleEventCandlesticksPowerMove = useCallback(async () => {
+    if (connectPowerMoveBuild?.active) return;
+    if (isDemo) {
+      toast.error("Sign up to use power moves.");
+      return;
+    }
+    if (!hasDbBackedUserId) {
+      toast.error("Sign in to plot candlesticks on a dashboard.");
+      return;
+    }
+
+    powerMoveBuildAbortRef.current?.abort();
+    const ac = new AbortController();
+    powerMoveBuildAbortRef.current = ac;
+
+    const eventTicker = String(connectKalshiLiveEventCandlesticksEventTicker || "").trim();
+    const tickerMetaTitle = eventTicker
+      ? String(connectKalshiLiveEventCandlesticksTickerMeta?.[eventTicker] || "").trim()
+      : "";
+
+    const dataSetId =
+      String(chartDashboardDraft?.data_set_id || loadedDataMeta?._id || "").trim() ||
+      (Array.isArray(savedDataSets) && savedDataSets[0]?._id
+        ? String(savedDataSets[0]._id)
+        : "");
+
+    setConnectPowerMoveBuild?.({
+      active: true,
+      label: "Preparing dashboard…",
+      progress: 2,
+      error: null,
+    });
+
+    // Navigate first so the user watches charts stream into the composer.
+    setSelectedDashboardCard?.(null);
+    setChartComposerDock?.(null);
+    setCardGridComposerDock?.(null);
+    setConnectHomeAnalyzeActive?.(true);
+    if (connectHomeMode) {
+      setConnectHomeCenterView?.(CONNECT_HOME_CENTER_VIEW.DASHBOARD);
+    } else {
+      setViewing?.("dashboardComposer");
+    }
+    setRightPanelTab?.("dashboard");
+    setRightPanelOpen?.(true);
+
+    try {
+      const result = await runEventCandlesticksDashboardPowerMove({
+        dataSheets,
+        userId: user.userId,
+        dataSetId: dataSetId || null,
+        tickerMetaTitle,
+        signal: ac.signal,
+        setChartDashboardDraft,
+        setActiveChartDashboardId,
+        setChartSheets,
+        setSavedCharts,
+        setSavedDataSets,
+        setLoadedDataMeta,
+        setLoadedDataId,
+        onProgress: ({ label, progress }) => {
+          setConnectPowerMoveBuild?.({
+            active: true,
+            label,
+            progress,
+            error: null,
+          });
+        },
+      });
+
+      if (ac.signal.aborted) return;
+
+      setConnectPowerMoveBuild?.({
+        active: false,
+        label: `Dashboard ready — ${result.marketCount} charts`,
+        progress: 100,
+        error: null,
+      });
+      setRefetchChartDashboardsTick?.((n) => (Number(n) || 0) + 1);
+      toast.success(`Plotted ${result.marketCount} candlestick charts on “${result.eventTitle}”.`);
+    } catch (e) {
+      if (e?.name === "AbortError" || ac.signal.aborted) return;
+      const message = e instanceof Error ? e.message : "Failed to build dashboard.";
+      setConnectPowerMoveBuild?.({
+        active: false,
+        label: "",
+        progress: 0,
+        error: message,
+      });
+      toast.error(message);
+    }
+  }, [
+    chartDashboardDraft?.data_set_id,
+    connectHomeMode,
+    connectKalshiLiveEventCandlesticksEventTicker,
+    connectKalshiLiveEventCandlesticksTickerMeta,
+    connectPowerMoveBuild?.active,
+    dataSheets,
+    hasDbBackedUserId,
+    isDemo,
+    loadedDataMeta?._id,
+    savedDataSets,
+    setActiveChartDashboardId,
+    setCardGridComposerDock,
+    setChartComposerDock,
+    setChartDashboardDraft,
+    setChartSheets,
+    setConnectHomeAnalyzeActive,
+    setConnectHomeCenterView,
+    setConnectPowerMoveBuild,
+    setLoadedDataId,
+    setLoadedDataMeta,
+    setRefetchChartDashboardsTick,
+    setRightPanelOpen,
+    setRightPanelTab,
+    setSavedCharts,
+    setSavedDataSets,
+    setSelectedDashboardCard,
+    setViewing,
+    user?.userId,
+  ]);
 
   const handleOpenApiPanelFromTab = useCallback(() => {
     if (effectiveDashboardMode) {
@@ -1275,6 +1410,14 @@ export default function DataSheetWithIntegration({
               )}
             >
               {connectWorkspaceNav}
+              {connectPowerMoveBuild?.active ? (
+                <div className="shrink-0 border-b border-amber-500/30 bg-amber-50/80 px-3 py-2 dark:bg-amber-950/40">
+                  <ConnectProgressWithLabel
+                    label={connectPowerMoveBuild.label || "Constructing dashboard…"}
+                    progress={connectPowerMoveBuild.progress ?? 0}
+                  />
+                </div>
+              ) : null}
               <div className="flex min-h-0 min-w-0 flex-1 flex-col">
                 <DashboardComposerPage user={user} />
               </div>
@@ -1606,12 +1749,32 @@ export default function DataSheetWithIntegration({
                         className="m-0 h-full w-full min-w-0 max-w-full overflow-auto"
                       >
                         <div className="flex w-full min-w-0 flex-col gap-2 p-2">
+                          {connectPowerMoveBuild?.active ||
+                          (connectPowerMoveBuild?.progress === 100 &&
+                            !connectPowerMoveBuild?.error) ||
+                          connectPowerMoveBuild?.error ? (
+                            <div className="space-y-2 rounded-md border border-border/60 bg-muted/20 p-2">
+                              {connectPowerMoveBuild?.error ? (
+                                <p className="text-xs text-destructive">{connectPowerMoveBuild.error}</p>
+                              ) : (
+                                <ConnectProgressWithLabel
+                                  label={
+                                    connectPowerMoveBuild?.label || "Constructing dashboard…"
+                                  }
+                                  progress={connectPowerMoveBuild?.progress ?? 0}
+                                />
+                              )}
+                            </div>
+                          ) : null}
+
                           {connectPowerMove === "event_candlesticks" ? (
                             <Button
                               type="button"
                               variant="outline"
                               size="sm"
+                              disabled={!!connectPowerMoveBuild?.active}
                               className="h-auto w-full justify-start gap-2 whitespace-normal px-2.5 py-2 text-left text-xs"
+                              onClick={handleEventCandlesticksPowerMove}
                             >
                               <Zap
                                 className="h-3.5 w-3.5 shrink-0 text-amber-500"

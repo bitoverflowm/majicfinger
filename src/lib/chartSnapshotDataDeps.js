@@ -50,6 +50,8 @@ export function primarySheetIdForChartSnapshot(dataSheets, snapshot) {
     const sid = pickScoped(snapshot.barSeriesColumn);
     if (sid && dataSheets?.[sid]) return sid;
   }
+  const candleSheet = String(snapshot.candlestickSheetId || "").trim();
+  if (candleSheet && dataSheets?.[candleSheet]) return candleSheet;
 
   const colsBySheet = collectChartSnapshotColumnsBySheetId(snapshot, defaultId);
   for (const sid of colsBySheet.keys()) {
@@ -188,6 +190,14 @@ export function collectChartSnapshotColumnsBySheetId(snapshot, defaultSheetId, d
   if (s.chartFilterColumn) add(s.chartFilterColumn);
   if (s.rainbowLegendLabelColumn) add(s.rainbowLegendLabelColumn);
   for (const c of Array.isArray(s.tooltipExtraColumns) ? s.tooltipExtraColumns : []) add(c);
+
+  // Candlestick charts reference a sheet id without axis keys — still register the sheet
+  // so dashboard / embed dependency checks hydrate the correct OHLC rows.
+  const candleSheet = String(s.candlestickSheetId || "").trim();
+  if (candleSheet) {
+    const sid = targetSheetId(candleSheet);
+    if (!bySheet.has(sid)) bySheet.set(sid, new Set());
+  }
 
   if (s.chartConfig && typeof s.chartConfig === "object") {
     for (const k of Object.keys(s.chartConfig)) add(k);

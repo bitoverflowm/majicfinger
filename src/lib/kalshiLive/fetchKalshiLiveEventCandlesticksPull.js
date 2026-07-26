@@ -130,6 +130,17 @@ export async function fetchKalshiLiveEventCandlesticksPull(opts) {
       : [];
   const metaRows = projectKalshiLiveMarketRows(eventMarkets, ALL_MARKET_COLUMN_NAMES);
 
+  const eventObj =
+    eventPayload?.event && typeof eventPayload.event === "object" ? eventPayload.event : null;
+  const eventMeta = {
+    eventTicker,
+    seriesTicker:
+      String(eventObj?.series_ticker || seriesTicker || "").trim() || seriesTicker,
+    title: String(eventObj?.title || "").trim(),
+    subTitle: String(eventObj?.sub_title || "").trim(),
+    category: String(eventObj?.category || "").trim(),
+  };
+
   // Sheets 2..N — candlesticks per market (merge adjusted_end_ts windows).
   /** @type {Map<string, { candles: unknown[]; seen: Set<number>; order: number }>} */
   const byMarketMap = new Map();
@@ -204,6 +215,7 @@ export async function fetchKalshiLiveEventCandlesticksPull(opts) {
     metaRows,
     byMarket,
     marketTickers,
+    eventMeta,
     querySummary: summarizeKalshiLiveEventCandlesticksRequest(
       eventTicker,
       seriesTicker,
