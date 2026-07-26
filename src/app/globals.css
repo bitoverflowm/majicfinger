@@ -352,3 +352,26 @@ body {
     transform: translateX(0.1rem);
   }
 }
+/*
+ * Dashboard cards grid — responsive spans via container queries.
+ * The grid stays 12 columns; each card carries its authored span in
+ * --dash-card-span (and a 2-across cap in --dash-card-span-md). As the grid
+ * itself narrows (sidebar open, split panes, small screens) cards collapse to
+ * 2 per row, then 1 per row. Container width, not viewport, drives this.
+ */
+.dash-cards-grid {
+  container-type: inline-size;
+}
+.dash-cards-grid > .dash-card-cell {
+  grid-column: span 12;
+}
+@container (min-width: 640px) {
+  .dash-cards-grid > .dash-card-cell {
+    grid-column: span var(--dash-card-span-md, 12);
+  }
+}
+@container (min-width: 960px) {
+  .dash-cards-grid > .dash-card-cell {
+    grid-column: span var(--dash-card-span, 12);
+  }
+}

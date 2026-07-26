@@ -27,6 +27,31 @@ export const CHART_CARDS_GRID_STYLE = {
   gridAutoRows: `${CHART_CARDS_GRID_ROW_PX}px`,
 };
 
+/**
+ * Container-query classes that make card grids responsive: cards collapse to
+ * 2-across and then 1-across as the grid itself narrows (see globals.css).
+ * The grid element gets DASH_CARDS_GRID_CLASS; each card cell gets
+ * DASH_CARD_CELL_CLASS plus the span variables from chartCardResponsiveSpanStyle.
+ */
+export const DASH_CARDS_GRID_CLASS = "dash-cards-grid";
+export const DASH_CARD_CELL_CLASS = "dash-card-cell";
+
+/**
+ * Span variables consumed by the `.dash-card-cell` container-query CSS.
+ * Wide panes use the authored colSpan; medium panes cap at 2-across
+ * (half-width cards); narrow panes always render 1 card per row.
+ *
+ * @param {unknown} colSpan
+ * @returns {Record<string, string>}
+ */
+export function chartCardResponsiveSpanStyle(colSpan) {
+  const span = Math.min(12, Math.max(1, Number(colSpan) || 12));
+  return {
+    "--dash-card-span": String(span),
+    "--dash-card-span-md": String(span <= 6 ? 6 : 12),
+  };
+}
+
 /** @returns {{ version: 1, rows: object[] }} */
 export function createEmptyDashboardLayout() {
   return {

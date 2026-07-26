@@ -16,8 +16,11 @@ import {
 import { cn } from "@/lib/utils";
 import {
   CHART_CARDS_GRID_STYLE,
+  chartCardResponsiveSpanStyle,
   clampChartCardRowSpan,
   createEmptyDashboardLayout,
+  DASH_CARD_CELL_CLASS,
+  DASH_CARDS_GRID_CLASS,
   DEFAULT_CHART_CARD_ROW_SPAN,
 } from "@/lib/dashboardLayoutDefaults";
 import {
@@ -769,7 +772,11 @@ export default function DashboardComposerPage({ user }) {
             if (row.type === "cards" && Array.isArray(row.columns)) {
               const cols = row.columns || [];
               return (
-                <div key={row.id} className="grid gap-4" style={CHART_CARDS_GRID_STYLE}>
+                <div
+                  key={row.id}
+                  className={cn("grid gap-4", DASH_CARDS_GRID_CLASS)}
+                  style={CHART_CARDS_GRID_STYLE}
+                >
                   {cols.map((col) => {
                       return (
                         <div
@@ -777,7 +784,7 @@ export default function DashboardComposerPage({ user }) {
                           role="button"
                           tabIndex={0}
                           style={{
-                            gridColumn: `span ${Math.min(12, Math.max(1, col.colSpan ?? 12))}`,
+                            ...chartCardResponsiveSpanStyle(col.colSpan),
                             gridRow: `span ${clampChartCardRowSpan(col.rowSpan)}`,
                           }}
                           onClick={() => {
@@ -794,7 +801,10 @@ export default function DashboardComposerPage({ user }) {
                               setChartComposerDock?.({ rowId: row.id, colId: col.id });
                             }
                           }}
-                          className="flex h-full min-h-0 min-w-0 flex-col gap-2 overflow-hidden py-1 transition-colors outline-none focus-visible:outline-none focus-visible:ring-0 focus-visible:ring-offset-0"
+                          className={cn(
+                            DASH_CARD_CELL_CLASS,
+                            "flex h-full min-h-0 min-w-0 flex-col gap-2 overflow-hidden py-1 transition-colors outline-none focus-visible:outline-none focus-visible:ring-0 focus-visible:ring-offset-0",
+                          )}
                         >
                           <input
                             type="text"

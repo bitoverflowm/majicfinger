@@ -3,7 +3,13 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import DotPattern from "@/components/magicui/dot-pattern";
-import { CHART_CARDS_GRID_STYLE, clampChartCardRowSpan } from "@/lib/dashboardLayoutDefaults";
+import {
+  CHART_CARDS_GRID_STYLE,
+  chartCardResponsiveSpanStyle,
+  clampChartCardRowSpan,
+  DASH_CARD_CELL_CLASS,
+  DASH_CARDS_GRID_CLASS,
+} from "@/lib/dashboardLayoutDefaults";
 import { cn } from "@/lib/utils";
 import { PublicDashboardChartBlock } from "@/components/dashboardComposer/PublicDashboardChartBlock";
 import { LazyPublicDashboardChart } from "@/components/publicEmbed/LazyPublicDashboardChart";
@@ -427,10 +433,13 @@ export default function PublicDashboardEmbedClient({
             }
             if (row.type !== "cards" || !Array.isArray(row.columns)) return null;
             return (
-              <div key={row.id || "cards"} className="grid gap-4" style={CHART_CARDS_GRID_STYLE}>
+              <div
+                key={row.id || "cards"}
+                className={cn("grid gap-4", DASH_CARDS_GRID_CLASS)}
+                style={CHART_CARDS_GRID_STYLE}
+              >
                 {row.columns.map((col) => {
                   const href = resolveCardHref(col, ownerHandle);
-                  const span = Math.min(12, Math.max(1, col.colSpan ?? 12));
                   const rSpan = clampChartCardRowSpan(col.rowSpan);
                   const inner = (
                     <div className="flex h-full min-h-0 min-w-0 flex-col gap-2 overflow-y-auto rounded-lg bg-background/80 p-4 backdrop-blur-sm">
@@ -493,8 +502,11 @@ export default function PublicDashboardEmbedClient({
                   return (
                     <div
                       key={col.id || String(col.chart_id)}
-                      style={{ gridColumn: `span ${span}`, gridRow: `span ${rSpan}` }}
-                      className="min-h-0 min-w-0 h-full"
+                      style={{
+                        ...chartCardResponsiveSpanStyle(col.colSpan),
+                        gridRow: `span ${rSpan}`,
+                      }}
+                      className={cn(DASH_CARD_CELL_CLASS, "min-h-0 min-w-0 h-full")}
                     >
                       {href ? (
                         <a href={href} className="block h-full min-h-0 rounded-lg no-underline hover:opacity-95">
