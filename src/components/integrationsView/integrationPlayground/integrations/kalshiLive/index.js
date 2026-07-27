@@ -39,6 +39,14 @@ import { ingestKalshiLiveAsView } from "@/lib/kalshiLive/ingestKalshiLiveAsView"
 import { kalshiLiveSeriesWantsIncludeVolume } from "@/lib/kalshiLive/seriesColumns";
 import { fetchKalshiLiveCandlesticksPull } from "@/lib/kalshiLive/fetchKalshiLiveCandlesticksPull";
 import { fetchKalshiLiveEventCandlesticksPull } from "@/lib/kalshiLive/fetchKalshiLiveEventCandlesticksPull";
+import { fetchKalshiLiveEventForecastPull } from "@/lib/kalshiLive/fetchKalshiLiveEventForecastPull";
+import {
+  partitionEventForecastApiParams,
+  parseKalshiLiveEventForecastTicker,
+  resolveForecastApiPercentilesFromDisplay,
+  summarizeKalshiLiveEventForecastRequest,
+} from "@/lib/kalshiLive/eventForecastCompose";
+import { inferSeriesTickerFromEvent } from "@/lib/kalshiLive/eventCandlesticksCompose";
 import { fetchKalshiLiveTradesPull } from "@/lib/kalshiLive/fetchKalshiLiveTradesPull";
 import { fetchKalshiLiveOrderbookPull } from "@/lib/kalshiLive/fetchKalshiLiveOrderbookPull";
 import { applyConnectHomePullData } from "@/lib/connectHomePullDestination";
@@ -117,6 +125,9 @@ export default function KalshiLive({ setConnectedData, connectHomePullBridge = f
     connectKalshiLiveCandlestickTickers,
     connectKalshiLiveEventCandlesticksEventTicker,
     connectKalshiLiveEventCandlesticksSeriesTicker,
+    connectKalshiLiveEventForecastEventTicker,
+    connectKalshiLiveEventForecastSeriesTicker,
+    connectKalshiLiveEventForecastPercentilePcts,
     connectKalshiLiveTradesTicker,
     connectKalshiLiveOrderbookTicker,
     connectKalshiLiveSeriesTicker,
@@ -1277,6 +1288,128 @@ export default function KalshiLive({ setConnectedData, connectHomePullBridge = f
     ],
   );
 
+  const runEventForecastPull = useCallback(
+    async (ac, sheetId, cols) => {
+      const whereFilters = Array.isArray(connectKalshiLiveWhereFilters)
+        ? connectKalshiLiveWhereFilters
+        : [];
+      const eventTicker = String(connectKalshiLiveEventForecastEventTicker || "").trim();
+      const seriesTicker = String(connectKalshiLiveEventForecastSeriesTicker || "").trim();
+      const percentilePcts = connectKalshiLiveEventForecastPercentilePcts;
+      const requestStartMs =
+        typeof performance !== "undefined" && performance?.now ? performance.now() : Date.now();
+
+      setConnectDataLakePullState?.((prev) => ({
+        ...prev,
+        loading: true,
+        label: "Fetching Kalshi Live event forecast…",
+        progress: 8,
+        error: null,
+      }));
+
+      const { raw, rows, querySummary, eventTicker: resolvedEvent, seriesTicker: resolvedSeries } =
+        await fetchKalshiLiveEventForecastPull({
+          eventTicker,
+          seriesTicker,
+          whereFilters,
+          percentilePcts,
+          selectedColumns: cols,
+          signal: ac.signal,
+          onProgress: ({ label, progress }) => {
+            setConnectDataLakePullState?.((prev) => ({
+              ...prev,
+              loading: true,
+              label,
+              progress,
+              error: null,
+            }));
+          },
+        });
+
+      if (setRows) setRows(rows);
+
+      await ingestKalshiLiveAsView({
+        endpointId: "event_forecast",
+        forecastHistory: raw,
+        selectedColumns: cols,
+      });
+
+      const elapsedMs =
+        (typeof performance !== "undefined" && performance?.now
+          ? performance.now()
+          : Date.now()) - requestStartMs;
+
+      const sheetName = `${resolvedEvent || eventTicker || "event"} · forecast`.slice(0, 80);
+      const title =
+        String(ctx?.connectKalshiLiveEventForecastTickerMeta?.[resolvedEvent] || "").trim() ||
+        sheetName;
+
+      let firstSheetId = sheetId || ctx?.activeSheetId || null;
+      const totalRows = Array.isArray(rows) ? rows.length : 0;
+
+      if (setDataSheets) {
+        flushSync(() => {
+          setDataSheets((prev) => {
+            let next = { ...(prev || {}) };
+            const targetSheetId = firstSheetId || allocateNextSheetId(next);
+            firstSheetId = targetSheetId;
+
+            const requestCard = {
+              id: genRequestCardId(),
+              createdAt: Date.now(),
+              elapsedMs,
+              lake: "kalshi-live",
+              table: "event_forecast",
+              sheetId: targetSheetId,
+              querySummary,
+              loadedRowCount: totalRows,
+            };
+
+            next = applyAthenaPullToSheetPatch(next, targetSheetId, rows, {
+              name: sheetName,
+              provenance: {
+                source: "kalshi-live",
+                endpoint: "event_forecast",
+                eventTicker: resolvedEvent || eventTicker,
+                seriesTicker: resolvedSeries || seriesTicker,
+                eventTitle: title,
+                whereFilters,
+                percentilePcts,
+                querySummary,
+              },
+              requestCards: [requestCard],
+            });
+
+            return next;
+          });
+
+          if (firstSheetId && ctx?.setActiveSheetId) {
+            ctx.setActiveSheetId(firstSheetId);
+          }
+          ctx?.setConnectHomeAnalyzeActive?.(true);
+        });
+      } else {
+        applyConnectHomePullData(ctx, rows);
+      }
+
+      if (ctx?.requestConnectAnalyzeScroll) {
+        ctx.requestConnectAnalyzeScroll();
+      }
+
+      return totalRows;
+    },
+    [
+      connectKalshiLiveWhereFilters,
+      connectKalshiLiveEventForecastEventTicker,
+      connectKalshiLiveEventForecastSeriesTicker,
+      connectKalshiLiveEventForecastPercentilePcts,
+      setConnectDataLakePullState,
+      setDataSheets,
+      setRows,
+      ctx,
+    ],
+  );
+
   const runTradesPull = useCallback(
     async (ac, sheetId, cols) => {
       const whereFilters = Array.isArray(connectKalshiLiveWhereFilters)
@@ -1675,6 +1808,29 @@ export default function KalshiLive({ setConnectedData, connectHomePullBridge = f
                       pageLimit: connectKalshiLiveLimit,
                     },
                   )
+                : endpointId === "event_forecast"
+                  ? (() => {
+                      const eventTicker = parseKalshiLiveEventForecastTicker(
+                        connectKalshiLiveEventForecastEventTicker || "",
+                      );
+                      const seriesTicker =
+                        parseKalshiLiveEventForecastTicker(
+                          connectKalshiLiveEventForecastSeriesTicker || "",
+                        ) || inferSeriesTickerFromEvent(eventTicker);
+                      const whereFilters = Array.isArray(connectKalshiLiveWhereFilters)
+                        ? connectKalshiLiveWhereFilters
+                        : [];
+                      const { apiParams } = partitionEventForecastApiParams(whereFilters);
+                      const percentiles = resolveForecastApiPercentilesFromDisplay(
+                        connectKalshiLiveEventForecastPercentilePcts,
+                      );
+                      return summarizeKalshiLiveEventForecastRequest(
+                        eventTicker || "?",
+                        seriesTicker || "?",
+                        apiParams,
+                        percentiles,
+                      );
+                    })()
                 : endpointId,
     });
 
@@ -1695,6 +1851,8 @@ export default function KalshiLive({ setConnectedData, connectHomePullBridge = f
               ? "Fetching Kalshi Live candlesticks…"
               : endpointId === "event_candlesticks"
                 ? "Fetching Kalshi Live event candlesticks…"
+                : endpointId === "event_forecast"
+                  ? "Fetching Kalshi Live event forecast…"
                 : endpointId === "trades"
                 ? "Fetching Kalshi Live trades…"
                 : endpointId === "orderbook"
@@ -1717,6 +1875,8 @@ export default function KalshiLive({ setConnectedData, connectHomePullBridge = f
         rowCount = (await runCandlesticksPull(ac, sheetId, cols)) || 0;
       } else if (endpointId === "event_candlesticks") {
         rowCount = (await runEventCandlesticksPull(ac, sheetId, cols)) || 0;
+      } else if (endpointId === "event_forecast") {
+        rowCount = (await runEventForecastPull(ac, sheetId, cols)) || 0;
       } else if (endpointId === "trades") {
         rowCount = (await runTradesPull(ac, sheetId, cols)) || 0;
       } else if (endpointId === "orderbook") {
@@ -1793,6 +1953,9 @@ export default function KalshiLive({ setConnectedData, connectHomePullBridge = f
     connectKalshiLiveSeriesDiscoveryMinUpdatedTs,
     connectKalshiLiveEventCandlesticksEventTicker,
     connectKalshiLiveEventCandlesticksSeriesTicker,
+    connectKalshiLiveEventForecastEventTicker,
+    connectKalshiLiveEventForecastSeriesTicker,
+    connectKalshiLiveEventForecastPercentilePcts,
     activeSheetId,
     runMarketsPull,
     runEventsPull,
@@ -1800,6 +1963,7 @@ export default function KalshiLive({ setConnectedData, connectHomePullBridge = f
     runSeriesPull,
     runCandlesticksPull,
     runEventCandlesticksPull,
+    runEventForecastPull,
     runTradesPull,
     runOrderbookPull,
     setConnectDataLakePullState,

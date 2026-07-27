@@ -33,6 +33,8 @@ import { CONNECT_COMPOSE_OPERATIONS } from "@/lib/connectComposeOperations";
 import { operatorSymbol } from "@/lib/dataLakeComposeHelpers";
 import { validateKalshiLiveCandlestickPull } from "@/lib/kalshiLive/candlestickCompose";
 import { validateKalshiLiveEventCandlesticksPull } from "@/lib/kalshiLive/eventCandlesticksCompose";
+import { validateKalshiLiveEventForecastPull } from "@/lib/kalshiLive/eventForecastCompose";
+import { KALSHI_LIVE_EVENT_FORECAST_PERIOD_OPTIONS } from "@/lib/kalshiLive/eventForecastColumns";
 import {
   KALSHI_LIVE_TRADES_DEFAULT_LIMIT,
   KALSHI_LIVE_TRADES_ROW_LIMIT_MAX,
@@ -100,6 +102,9 @@ function operatorsForColumn(endpointId, column) {
   ) {
     return [{ id: "eq", label: "is equal to" }];
   }
+  if (endpointId === "event_forecast" && column === "period_interval") {
+    return [{ id: "eq", label: "is equal to" }];
+  }
   if (
     (endpointId === "candlesticks" || endpointId === "event_candlesticks") &&
     column === "include_latest_before_start"
@@ -139,6 +144,12 @@ function defaultWhereValue(endpointId, column) {
     if (column === "end_ts") return now;
     if (column === "period_interval") return 60;
     if (column === "include_latest_before_start") return false;
+  }
+  if (endpointId === "event_forecast") {
+    const now = Math.floor(Date.now() / 1000);
+    if (column === "start_ts") return now - 24 * 60 * 60;
+    if (column === "end_ts") return now;
+    if (column === "period_interval") return 60;
   }
   if (endpointId === "trades") {
     const now = Math.floor(Date.now() / 1000);
@@ -190,6 +201,9 @@ export function KalshiLiveComposeOperationPanel({
     connectKalshiLiveCandlestickTickerMeta = {},
     connectKalshiLiveEventCandlesticksEventTicker = "",
     connectKalshiLiveEventCandlesticksSeriesTicker = "",
+    connectKalshiLiveEventForecastEventTicker = "",
+    connectKalshiLiveEventForecastSeriesTicker = "",
+    connectKalshiLiveEventForecastPercentilePcts,
     connectKalshiLiveTickers = "",
     connectKalshiLiveMarketsTickerMeta = {},
     connectKalshiLiveMarketsSheetMode = KALSHI_LIVE_MARKETS_SHEET_MODE_PER_MARKET,
@@ -480,6 +494,19 @@ export function KalshiLiveComposeOperationPanel({
       }
     }
 
+    if (endpointId === "event_forecast") {
+      const forecastErr = validateKalshiLiveEventForecastPull(
+        connectKalshiLiveEventForecastEventTicker,
+        connectKalshiLiveEventForecastSeriesTicker,
+        connectKalshiLiveWhereFilters,
+        connectKalshiLiveEventForecastPercentilePcts,
+      );
+      if (forecastErr) {
+        setFilterError?.(forecastErr);
+        return;
+      }
+    }
+
     if (endpointId === "trades") {
       const tradesErr = validateKalshiLiveTradesPull(
         connectKalshiLiveTradesTicker,
@@ -575,6 +602,9 @@ export function KalshiLiveComposeOperationPanel({
     connectKalshiLiveCandlestickTickers,
     connectKalshiLiveEventCandlesticksEventTicker,
     connectKalshiLiveEventCandlesticksSeriesTicker,
+    connectKalshiLiveEventForecastEventTicker,
+    connectKalshiLiveEventForecastSeriesTicker,
+    connectKalshiLiveEventForecastPercentilePcts,
     connectKalshiLiveTickers,
     connectKalshiLiveMarketsDiscoveryMode,
     connectKalshiLiveMarketsDiscoveryStatus,
@@ -634,6 +664,25 @@ export function KalshiLiveComposeOperationPanel({
           </SelectTrigger>
           <SelectContent>
             {KALSHI_LIVE_CANDLESTICK_PERIOD_OPTIONS.map((opt) => (
+              <SelectItem key={opt.value} value={String(opt.value)} className="text-xs">
+                {opt.label}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      );
+    }
+    if (endpointId === "event_forecast" && f.column === "period_interval") {
+      return (
+        <Select
+          value={String(f.value ?? 60)}
+          onValueChange={(v) => updateWhereFilter(f.id, { value: Number(v) })}
+        >
+          <SelectTrigger className="h-7 min-w-[6rem] flex-1 text-[11px]">
+            <SelectValue placeholder="Interval" />
+          </SelectTrigger>
+          <SelectContent>
+            {KALSHI_LIVE_EVENT_FORECAST_PERIOD_OPTIONS.map((opt) => (
               <SelectItem key={opt.value} value={String(opt.value)} className="text-xs">
                 {opt.label}
               </SelectItem>
@@ -789,6 +838,8 @@ export function KalshiLiveComposeOperationPanel({
           <p className="text-[10px] leading-snug text-muted-foreground">
             {endpointId === "candlesticks" || endpointId === "event_candlesticks"
               ? "start_ts, end_ts, and period_interval are sent to Kalshi. Other columns filter on our side after the pull."
+              : endpointId === "event_forecast"
+                ? "Date range, period interval, and percentiles are set above. Other columns filter on our side after the pull."
               : endpointId === "trades"
                 ? "Date range is set in Common queries above. Other columns filter on our side after the pull."
                 : endpointId === "orderbook"

@@ -3,6 +3,9 @@ import {
   KALSHI_LIVE_CANDLESTICK_COLUMNS,
 } from "@/lib/kalshiLive/candlesticksColumns";
 import {
+  KALSHI_LIVE_EVENT_FORECAST_COLUMNS,
+} from "@/lib/kalshiLive/eventForecastColumns";
+import {
   KALSHI_LIVE_TRADES_API_FILTER_COLUMNS,
   KALSHI_LIVE_TRADES_COLUMNS,
   TRADES_API_WHERE_COLUMN_LIST,
@@ -46,11 +49,18 @@ const CANDLESTICK_API_WHERE_COLUMNS = [
   "include_latest_before_start",
 ];
 
+const EVENT_FORECAST_API_WHERE_COLUMNS = ["start_ts", "end_ts", "period_interval"];
+
 /** @param {string} endpointId */
 export function getKalshiLiveAllColumnNames(endpointId) {
   if (endpointId === "candlesticks" || endpointId === "event_candlesticks") {
     const sheet = KALSHI_LIVE_CANDLESTICK_COLUMNS.map((c) => c.name);
     const api = CANDLESTICK_API_WHERE_COLUMNS.filter((c) => !sheet.includes(c));
+    return [...api, ...sheet];
+  }
+  if (endpointId === "event_forecast") {
+    const sheet = KALSHI_LIVE_EVENT_FORECAST_COLUMNS.map((c) => c.name);
+    const api = EVENT_FORECAST_API_WHERE_COLUMNS.filter((c) => !sheet.includes(c));
     return [...api, ...sheet];
   }
   if (endpointId === "trades") {
@@ -87,6 +97,15 @@ export function getKalshiLiveColumnType(endpointId, column) {
     }
     const row = KALSHI_LIVE_CANDLESTICK_COLUMNS.find((c) => c.name === column);
     if (row?.type === "nullable_number") return "number";
+    return row?.type || "string";
+  }
+  if (endpointId === "event_forecast") {
+    if (EVENT_FORECAST_API_WHERE_COLUMNS.includes(column)) {
+      if (column === "period_interval") return "number";
+      if (column.endsWith("_ts")) return "timestamp";
+      return "string";
+    }
+    const row = KALSHI_LIVE_EVENT_FORECAST_COLUMNS.find((c) => c.name === column);
     return row?.type || "string";
   }
   if (endpointId === "trades") {
@@ -132,6 +151,7 @@ export function validateKalshiLiveWhereFilters(endpointId, whereFilters) {
   if (
     endpointId === "candlesticks" ||
     endpointId === "event_candlesticks" ||
+    endpointId === "event_forecast" ||
     endpointId === "trades" ||
     endpointId === "orderbook"
   ) {

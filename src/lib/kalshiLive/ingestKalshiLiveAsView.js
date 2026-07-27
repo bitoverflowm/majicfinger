@@ -1,5 +1,6 @@
 import { warmDuckDbWasm } from "@/lib/duckdb/duckdbWasmClient";
 import { projectKalshiLiveCandlestickRows } from "@/lib/kalshiLive/normalizeCandlestickRow";
+import { projectKalshiLiveEventForecastRows } from "@/lib/kalshiLive/normalizeEventForecastRow";
 import { projectKalshiLiveTradeRows } from "@/lib/kalshiLive/normalizeTradeRow";
 import { projectKalshiLiveOrderbookRows } from "@/lib/kalshiLive/normalizeOrderbookRow";
 import { projectKalshiLiveMarketRows } from "@/lib/kalshiLive/normalizeMarketRow";
@@ -35,6 +36,7 @@ function viewNameFor(key) {
  *   events?: Array<{ event: Record<string, unknown>; markets?: unknown[]; milestones?: unknown }>;
  *   series?: Record<string, unknown> | Record<string, unknown>[] | null;
  *   candlesticks?: unknown[];
+ *   forecastHistory?: unknown[];
  *   trades?: unknown[];
  *   orderbook?: unknown[];
  *   selectedColumns?: string[];
@@ -48,6 +50,11 @@ export async function ingestKalshiLiveAsView(opts) {
   if (endpointId === "candlesticks") {
     sheetRows = projectKalshiLiveCandlestickRows(
       Array.isArray(opts.candlesticks) ? opts.candlesticks : [],
+      opts.selectedColumns,
+    );
+  } else if (endpointId === "event_forecast") {
+    sheetRows = projectKalshiLiveEventForecastRows(
+      Array.isArray(opts.forecastHistory) ? opts.forecastHistory : [],
       opts.selectedColumns,
     );
   } else if (endpointId === "trades") {

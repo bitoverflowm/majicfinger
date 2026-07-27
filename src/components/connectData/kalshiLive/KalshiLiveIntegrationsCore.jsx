@@ -36,6 +36,8 @@ import { KalshiLiveMarketsTickersField } from "@/components/connectData/kalshiLi
 import { KalshiLiveEventsTickersField } from "@/components/connectData/kalshiLive/KalshiLiveEventsTickersField";
 import { KalshiLiveMultivariateEventsFields } from "@/components/connectData/kalshiLive/KalshiLiveMultivariateEventsFields";
 import { KalshiLiveEventCandlesticksField } from "@/components/connectData/kalshiLive/KalshiLiveEventCandlesticksField";
+import { KalshiLiveEventForecastField } from "@/components/connectData/kalshiLive/KalshiLiveEventForecastField";
+import { KalshiLiveEventForecastCommonQueries } from "@/components/connectData/kalshiLive/KalshiLiveEventForecastCommonQueries";
 import { KalshiLiveSeriesTickersField } from "@/components/connectData/kalshiLive/KalshiLiveSeriesTickersField";
 import { KalshiLiveComposeOperationPanel } from "@/components/connectData/kalshiLive/KalshiLiveComposeOperationPanel";
 import { Button } from "@/components/ui/button";
@@ -75,6 +77,10 @@ const LIVE_SOURCE_PRESENTATION = {
   },
   multivariate_events: {
     icon: Sparkles,
+    accent: "secondary",
+  },
+  event_forecast: {
+    icon: LineChart,
     accent: "secondary",
   },
   series: {
@@ -434,6 +440,10 @@ export function KalshiLiveIntegrationsCore({ onRunPull, className, stepBackRef }
     setConnectKalshiLiveEventCandlesticksEventTicker,
     setConnectKalshiLiveEventCandlesticksSeriesTicker,
     setConnectKalshiLiveEventCandlesticksTickerMeta,
+    setConnectKalshiLiveEventForecastEventTicker,
+    setConnectKalshiLiveEventForecastSeriesTicker,
+    setConnectKalshiLiveEventForecastTickerMeta,
+    setConnectKalshiLiveEventForecastPercentilePcts,
     connectKalshiLiveTradesTicker = "",
     setConnectKalshiLiveTradesTicker,
     setConnectKalshiLiveTradesTickerMeta,
@@ -577,6 +587,12 @@ export function KalshiLiveIntegrationsCore({ onRunPull, className, stepBackRef }
         setConnectKalshiLiveEventCandlesticksSeriesTicker?.("");
         setConnectKalshiLiveEventCandlesticksTickerMeta?.({});
       }
+      if (id !== "event_forecast") {
+        setConnectKalshiLiveEventForecastEventTicker?.("");
+        setConnectKalshiLiveEventForecastSeriesTicker?.("");
+        setConnectKalshiLiveEventForecastTickerMeta?.({});
+        setConnectKalshiLiveEventForecastPercentilePcts?.([10, 25, 50, 75, 90]);
+      }
       if (id !== "trades") {
         setConnectKalshiLiveTradesTicker?.("");
         setConnectKalshiLiveTradesTickerMeta?.({});
@@ -631,6 +647,10 @@ export function KalshiLiveIntegrationsCore({ onRunPull, className, stepBackRef }
       setConnectKalshiLiveEventCandlesticksEventTicker,
       setConnectKalshiLiveEventCandlesticksSeriesTicker,
       setConnectKalshiLiveEventCandlesticksTickerMeta,
+      setConnectKalshiLiveEventForecastEventTicker,
+      setConnectKalshiLiveEventForecastSeriesTicker,
+      setConnectKalshiLiveEventForecastTickerMeta,
+      setConnectKalshiLiveEventForecastPercentilePcts,
       setConnectKalshiLiveTradesTicker,
       setConnectKalshiLiveTradesTickerMeta,
       setConnectKalshiLiveOrderbookTicker,
@@ -674,6 +694,10 @@ export function KalshiLiveIntegrationsCore({ onRunPull, className, stepBackRef }
     setConnectKalshiLiveEventCandlesticksEventTicker?.("");
     setConnectKalshiLiveEventCandlesticksSeriesTicker?.("");
     setConnectKalshiLiveEventCandlesticksTickerMeta?.({});
+    setConnectKalshiLiveEventForecastEventTicker?.("");
+    setConnectKalshiLiveEventForecastSeriesTicker?.("");
+    setConnectKalshiLiveEventForecastTickerMeta?.({});
+    setConnectKalshiLiveEventForecastPercentilePcts?.([10, 25, 50, 75, 90]);
     setConnectKalshiLiveTradesTicker?.("");
     setConnectKalshiLiveTradesTickerMeta?.({});
     setConnectKalshiLiveOrderbookTicker?.("");
@@ -719,6 +743,10 @@ export function KalshiLiveIntegrationsCore({ onRunPull, className, stepBackRef }
     setConnectKalshiLiveEventCandlesticksEventTicker,
     setConnectKalshiLiveEventCandlesticksSeriesTicker,
     setConnectKalshiLiveEventCandlesticksTickerMeta,
+    setConnectKalshiLiveEventForecastEventTicker,
+    setConnectKalshiLiveEventForecastSeriesTicker,
+    setConnectKalshiLiveEventForecastTickerMeta,
+    setConnectKalshiLiveEventForecastPercentilePcts,
     setConnectKalshiLiveTradesTicker,
     setConnectKalshiLiveTradesTickerMeta,
     setConnectKalshiLiveOrderbookTicker,
@@ -1158,6 +1186,12 @@ export function KalshiLiveIntegrationsCore({ onRunPull, className, stepBackRef }
               <>
                 <KalshiLiveEventCandlesticksField className="mt-4" disabled={pullLoading} />
                 <KalshiLiveCandlestickCommonQueries className="mt-4" disabled={pullLoading} />
+              </>
+            ) : null}
+            {selectedId === "event_forecast" ? (
+              <>
+                <KalshiLiveEventForecastField className="mt-4" disabled={pullLoading} />
+                <KalshiLiveEventForecastCommonQueries className="mt-4" disabled={pullLoading} />
               </>
             ) : null}
             {selectedId === "trades" ? (

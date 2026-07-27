@@ -3,6 +3,10 @@ import {
   KALSHI_LIVE_CANDLESTICK_COLUMNS,
 } from "@/lib/kalshiLive/candlesticksColumns";
 import {
+  getKalshiLiveEventForecastColumnLabel,
+  KALSHI_LIVE_EVENT_FORECAST_COLUMNS,
+} from "@/lib/kalshiLive/eventForecastColumns";
+import {
   getKalshiLiveEventColumnLabel,
   getKalshiLiveMultivariateEventColumnLabel,
   KALSHI_LIVE_EVENTS_COLUMNS,
@@ -100,6 +104,14 @@ export const KALSHI_LIVE_CONNECT_ENDPOINTS = [
     description:
       "Discover multivariate (combo) events. Filter by series or collection ticker, optionally include nested markets. Paginated exploration into one sheet.",
   },
+  {
+    id: "event_forecast",
+    category: "events",
+    title: "Event Forecast",
+    selectedTitle: "Get Event Forecast",
+    description:
+      "What the market is predicting for outcomes over time — forecast percentiles for an event.",
+  },
 ];
 
 /** @param {string} categoryId */
@@ -122,6 +134,7 @@ export const KALSHI_LIVE_DEFAULT_LIMIT = 100;
 export function getKalshiLiveColumnsForEndpoint(endpointId, opts = {}) {
   if (endpointId === "candlesticks") return KALSHI_LIVE_CANDLESTICK_COLUMNS;
   if (endpointId === "event_candlesticks") return KALSHI_LIVE_CANDLESTICK_COLUMNS;
+  if (endpointId === "event_forecast") return KALSHI_LIVE_EVENT_FORECAST_COLUMNS;
   if (endpointId === "trades") return KALSHI_LIVE_TRADES_COLUMNS;
   if (endpointId === "orderbook") return KALSHI_LIVE_ORDERBOOK_COLUMNS;
   if (endpointId === "series") return KALSHI_LIVE_SERIES_COLUMNS;
@@ -150,6 +163,7 @@ export function getKalshiLiveColumnsForEndpoint(endpointId, opts = {}) {
 export function getKalshiLiveColumnDisplayLabelForEndpoint(endpointId, col, opts = {}) {
   if (endpointId === "candlesticks") return getKalshiLiveCandlestickColumnLabel(col);
   if (endpointId === "event_candlesticks") return getKalshiLiveCandlestickColumnLabel(col);
+  if (endpointId === "event_forecast") return getKalshiLiveEventForecastColumnLabel(col);
   if (endpointId === "trades") return getKalshiLiveTradeColumnLabel(col);
   if (endpointId === "orderbook") return getKalshiLiveOrderbookColumnLabel(col);
   if (endpointId === "series") {
