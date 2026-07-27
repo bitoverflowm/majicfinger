@@ -2,6 +2,7 @@ import { warmDuckDbWasm } from "@/lib/duckdb/duckdbWasmClient";
 import { projectKalshiLiveCandlestickRows } from "@/lib/kalshiLive/normalizeCandlestickRow";
 import { projectKalshiLiveEventForecastRows } from "@/lib/kalshiLive/normalizeEventForecastRow";
 import { projectKalshiLiveLeaderboardRows } from "@/lib/kalshiLive/normalizeLeaderboardRow";
+import { projectKalshiLiveHolderProfileRows } from "@/lib/kalshiLive/normalizeHolderProfileRow";
 import { projectKalshiLiveTradeRows } from "@/lib/kalshiLive/normalizeTradeRow";
 import { projectKalshiLiveOrderbookRows } from "@/lib/kalshiLive/normalizeOrderbookRow";
 import { projectKalshiLiveMarketRows } from "@/lib/kalshiLive/normalizeMarketRow";
@@ -40,6 +41,7 @@ function viewNameFor(key) {
  *   forecastHistory?: unknown[];
  *   rankList?: unknown[];
  *   leaderboardContext?: { metricName?: string; timePeriod?: string; category?: string };
+ *   holderProfile?: { social_profile?: unknown; inner_circle?: unknown } | null;
  *   trades?: unknown[];
  *   orderbook?: unknown[];
  *   selectedColumns?: string[];
@@ -66,6 +68,8 @@ export async function ingestKalshiLiveAsView(opts) {
       opts.selectedColumns,
       opts.leaderboardContext || {},
     );
+  } else if (endpointId === "holder_profile") {
+    sheetRows = projectKalshiLiveHolderProfileRows(opts.holderProfile, opts.selectedColumns);
   } else if (endpointId === "trades") {
     sheetRows = projectKalshiLiveTradeRows(
       Array.isArray(opts.trades) ? opts.trades : [],

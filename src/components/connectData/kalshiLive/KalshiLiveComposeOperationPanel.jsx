@@ -38,6 +38,7 @@ import { KALSHI_LIVE_EVENT_FORECAST_PERIOD_OPTIONS } from "@/lib/kalshiLive/even
 import {
   validateKalshiLiveLeaderboardPull,
 } from "@/lib/kalshiLive/leaderboardCompose";
+import { validateKalshiLiveHolderProfilePull } from "@/lib/kalshiLive/holderProfileCompose";
 import {
   KALSHI_LIVE_LEADERBOARD_LIMIT_DEFAULT,
   KALSHI_LIVE_LEADERBOARD_LIMIT_MAX,
@@ -216,6 +217,7 @@ export function KalshiLiveComposeOperationPanel({
     connectKalshiLiveLeaderboardTimePeriod = "weekly",
     connectKalshiLiveLeaderboardCategory = "",
     connectKalshiLiveLeaderboardCategoryOther = "",
+    connectKalshiLiveHolderProfileNickname = "",
     connectKalshiLiveTickers = "",
     connectKalshiLiveMarketsTickerMeta = {},
     connectKalshiLiveMarketsSheetMode = KALSHI_LIVE_MARKETS_SHEET_MODE_PER_MARKET,
@@ -533,6 +535,16 @@ export function KalshiLiveComposeOperationPanel({
       }
     }
 
+    if (endpointId === "holder_profile") {
+      const profileErr = validateKalshiLiveHolderProfilePull({
+        nickname: connectKalshiLiveHolderProfileNickname,
+      });
+      if (profileErr) {
+        setFilterError?.(profileErr);
+        return;
+      }
+    }
+
     if (endpointId === "trades") {
       const tradesErr = validateKalshiLiveTradesPull(
         connectKalshiLiveTradesTicker,
@@ -635,6 +647,7 @@ export function KalshiLiveComposeOperationPanel({
     connectKalshiLiveLeaderboardTimePeriod,
     connectKalshiLiveLeaderboardCategory,
     connectKalshiLiveLeaderboardCategoryOther,
+    connectKalshiLiveHolderProfileNickname,
     connectKalshiLiveLimit,
     connectKalshiLiveTickers,
     connectKalshiLiveMarketsDiscoveryMode,
@@ -875,6 +888,8 @@ export function KalshiLiveComposeOperationPanel({
                 ? "Date range, period interval, and percentiles are set above. Other columns filter on our side after the pull."
               : endpointId === "leaderboard"
                 ? "Rank order, time period, and category are set above. Limit is below. Other columns filter on our side after the pull."
+              : endpointId === "holder_profile"
+                ? "Nickname is set above. Other columns filter on our side after the pull."
               : endpointId === "trades"
                 ? "Date range is set in Common queries above. Other columns filter on our side after the pull."
                 : endpointId === "orderbook"

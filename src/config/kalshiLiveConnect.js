@@ -11,6 +11,10 @@ import {
   KALSHI_LIVE_LEADERBOARD_COLUMNS,
 } from "@/lib/kalshiLive/leaderboardColumns";
 import {
+  getKalshiLiveHolderProfileColumnLabel,
+  KALSHI_LIVE_HOLDER_PROFILE_COLUMNS,
+} from "@/lib/kalshiLive/holderProfileColumns";
+import {
   getKalshiLiveEventColumnLabel,
   getKalshiLiveMultivariateEventColumnLabel,
   KALSHI_LIVE_EVENTS_COLUMNS,
@@ -125,6 +129,14 @@ export const KALSHI_LIVE_CONNECT_ENDPOINTS = [
     description:
       "Social leaderboard rankings — rank users by PnL, volume, ROI, or markets traded.",
   },
+  {
+    id: "holder_profile",
+    category: "holders",
+    title: "Holder Profile",
+    selectedTitle: "Get Holder Profile",
+    description:
+      "Public social profile for a Kalshi nickname — followers, bio, join date, and categories.",
+  },
 ];
 
 /** @param {string} categoryId */
@@ -149,6 +161,7 @@ export function getKalshiLiveColumnsForEndpoint(endpointId, opts = {}) {
   if (endpointId === "event_candlesticks") return KALSHI_LIVE_CANDLESTICK_COLUMNS;
   if (endpointId === "event_forecast") return KALSHI_LIVE_EVENT_FORECAST_COLUMNS;
   if (endpointId === "leaderboard") return KALSHI_LIVE_LEADERBOARD_COLUMNS;
+  if (endpointId === "holder_profile") return KALSHI_LIVE_HOLDER_PROFILE_COLUMNS;
   if (endpointId === "trades") return KALSHI_LIVE_TRADES_COLUMNS;
   if (endpointId === "orderbook") return KALSHI_LIVE_ORDERBOOK_COLUMNS;
   if (endpointId === "series") return KALSHI_LIVE_SERIES_COLUMNS;
@@ -179,6 +192,7 @@ export function getKalshiLiveColumnDisplayLabelForEndpoint(endpointId, col, opts
   if (endpointId === "event_candlesticks") return getKalshiLiveCandlestickColumnLabel(col);
   if (endpointId === "event_forecast") return getKalshiLiveEventForecastColumnLabel(col);
   if (endpointId === "leaderboard") return getKalshiLiveLeaderboardColumnLabel(col);
+  if (endpointId === "holder_profile") return getKalshiLiveHolderProfileColumnLabel(col);
   if (endpointId === "trades") return getKalshiLiveTradeColumnLabel(col);
   if (endpointId === "orderbook") return getKalshiLiveOrderbookColumnLabel(col);
   if (endpointId === "series") {

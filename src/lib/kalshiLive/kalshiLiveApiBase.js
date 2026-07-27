@@ -4,8 +4,8 @@ export const KALSHI_LIVE_API_BASE =
   "https://external-api.kalshi.com/trade-api/v2";
 
 /**
- * Social / undocumented v1 host (leaderboard, etc.).
- * Elections shared API serves GET /v1/social/leaderboard.
+ * Social / undocumented v1 host (leaderboard, profile, etc.).
+ * Elections shared API serves GET /v1/social/leaderboard and /v1/social/profile.
  */
 export const KALSHI_LIVE_SOCIAL_API_BASE =
   (typeof process !== "undefined" && process.env.KALSHI_LIVE_SOCIAL_API_URL?.trim()) ||

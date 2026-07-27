@@ -14,6 +14,7 @@ import {
   Search,
   Sparkles,
   Trophy,
+  UserRound,
   Vote,
   Wand2,
   CircleDollarSign,
@@ -40,6 +41,7 @@ import { KalshiLiveEventCandlesticksField } from "@/components/connectData/kalsh
 import { KalshiLiveEventForecastField } from "@/components/connectData/kalshiLive/KalshiLiveEventForecastField";
 import { KalshiLiveEventForecastCommonQueries } from "@/components/connectData/kalshiLive/KalshiLiveEventForecastCommonQueries";
 import { KalshiLiveLeaderboardFields } from "@/components/connectData/kalshiLive/KalshiLiveLeaderboardFields";
+import { KalshiLiveHolderProfileFields } from "@/components/connectData/kalshiLive/KalshiLiveHolderProfileFields";
 import { KalshiLiveSeriesTickersField } from "@/components/connectData/kalshiLive/KalshiLiveSeriesTickersField";
 import { KalshiLiveComposeOperationPanel } from "@/components/connectData/kalshiLive/KalshiLiveComposeOperationPanel";
 import { Button } from "@/components/ui/button";
@@ -90,6 +92,10 @@ const LIVE_SOURCE_PRESENTATION = {
   },
   leaderboard: {
     icon: Trophy,
+    accent: "secondary",
+  },
+  holder_profile: {
+    icon: UserRound,
     accent: "secondary",
   },
   series: {
@@ -457,6 +463,7 @@ export function KalshiLiveIntegrationsCore({ onRunPull, className, stepBackRef }
     setConnectKalshiLiveLeaderboardTimePeriod,
     setConnectKalshiLiveLeaderboardCategory,
     setConnectKalshiLiveLeaderboardCategoryOther,
+    setConnectKalshiLiveHolderProfileNickname,
     connectKalshiLiveTradesTicker = "",
     setConnectKalshiLiveTradesTicker,
     setConnectKalshiLiveTradesTickerMeta,
@@ -612,6 +619,9 @@ export function KalshiLiveIntegrationsCore({ onRunPull, className, stepBackRef }
         setConnectKalshiLiveLeaderboardCategory?.("");
         setConnectKalshiLiveLeaderboardCategoryOther?.("");
       }
+      if (id !== "holder_profile") {
+        setConnectKalshiLiveHolderProfileNickname?.("");
+      }
       if (id !== "trades") {
         setConnectKalshiLiveTradesTicker?.("");
         setConnectKalshiLiveTradesTickerMeta?.({});
@@ -676,6 +686,7 @@ export function KalshiLiveIntegrationsCore({ onRunPull, className, stepBackRef }
       setConnectKalshiLiveLeaderboardTimePeriod,
       setConnectKalshiLiveLeaderboardCategory,
       setConnectKalshiLiveLeaderboardCategoryOther,
+      setConnectKalshiLiveHolderProfileNickname,
       setConnectKalshiLiveTradesTicker,
       setConnectKalshiLiveTradesTickerMeta,
       setConnectKalshiLiveOrderbookTicker,
@@ -727,6 +738,7 @@ export function KalshiLiveIntegrationsCore({ onRunPull, className, stepBackRef }
     setConnectKalshiLiveLeaderboardTimePeriod?.("weekly");
     setConnectKalshiLiveLeaderboardCategory?.("");
     setConnectKalshiLiveLeaderboardCategoryOther?.("");
+    setConnectKalshiLiveHolderProfileNickname?.("");
     setConnectKalshiLiveTradesTicker?.("");
     setConnectKalshiLiveTradesTickerMeta?.({});
     setConnectKalshiLiveOrderbookTicker?.("");
@@ -780,6 +792,7 @@ export function KalshiLiveIntegrationsCore({ onRunPull, className, stepBackRef }
     setConnectKalshiLiveLeaderboardTimePeriod,
     setConnectKalshiLiveLeaderboardCategory,
     setConnectKalshiLiveLeaderboardCategoryOther,
+    setConnectKalshiLiveHolderProfileNickname,
     setConnectKalshiLiveTradesTicker,
     setConnectKalshiLiveTradesTickerMeta,
     setConnectKalshiLiveOrderbookTicker,
@@ -1229,6 +1242,9 @@ export function KalshiLiveIntegrationsCore({ onRunPull, className, stepBackRef }
             ) : null}
             {selectedId === "leaderboard" ? (
               <KalshiLiveLeaderboardFields className="mt-4" disabled={pullLoading} />
+            ) : null}
+            {selectedId === "holder_profile" ? (
+              <KalshiLiveHolderProfileFields className="mt-4" disabled={pullLoading} />
             ) : null}
             {selectedId === "trades" ? (
               <>
