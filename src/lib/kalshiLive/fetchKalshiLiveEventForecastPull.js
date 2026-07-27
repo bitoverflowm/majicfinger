@@ -64,16 +64,27 @@ export async function fetchKalshiLiveEventForecastPull(opts) {
   );
   const body = await res.json().catch(() => ({}));
   if (!res.ok) {
+    const nested =
+      body?.error && typeof body.error === "object" ? body.error.message : null;
     throw new Error(
       typeof body?.error === "string"
         ? body.error
-        : typeof body?.message === "string"
-          ? body.message
-          : res.statusText || "Event forecast request failed",
+        : typeof nested === "string"
+          ? nested
+          : typeof body?.message === "string"
+            ? body.message
+            : res.statusText || "Event forecast request failed",
     );
   }
 
   const history = Array.isArray(body?.forecast_history) ? body.forecast_history : [];
+  const adjustedEndTs = Number(body?.adjusted_end_ts);
+  const effectiveApiParams = {
+    ...apiParams,
+    ...(Number.isFinite(adjustedEndTs) && adjustedEndTs > 0
+      ? { end_ts: Math.floor(adjustedEndTs) }
+      : {}),
+  };
   opts.onProgress?.({ label: "Projecting forecast rows…", progress: 80 });
 
   const rows = projectKalshiLiveEventForecastRows(history, opts.selectedColumns);
@@ -84,12 +95,20 @@ export async function fetchKalshiLiveEventForecastPull(opts) {
     percentiles,
     eventTicker,
     seriesTicker,
+    adjustedEndTs: Number.isFinite(adjustedEndTs) && adjustedEndTs > 0 ? adjustedEndTs : null,
     querySummary: summarizeKalshiLiveEventForecastRequest(
       eventTicker,
       seriesTicker,
-      apiParams,
+      effectiveApiParams,
       percentiles,
-      { loadedRowCount: rows.length },
+      {
+        loadedRowCount: rows.length,
+        ...(Number.isFinite(adjustedEndTs) &&
+        adjustedEndTs > 0 &&
+        Math.floor(adjustedEndTs) !== Math.floor(Number(apiParams.end_ts))
+          ? { adjustedEndTs: Math.floor(adjustedEndTs) }
+          : {}),
+      },
     ),
   };
 }

@@ -1,5 +1,6 @@
 import { kalshiLiveUrl } from "@/lib/kalshiLive/kalshiLiveApiBase";
 import { normalizeForecastApiPercentiles } from "@/lib/kalshiLive/eventForecastColumns";
+import { forecastPeriodIntervalSeconds } from "@/lib/kalshiLive/eventForecastCompose";
 
 function queryParam(req, name) {
   const raw = req.query[name];
@@ -23,6 +24,123 @@ function parsePercentiles(req) {
       ? raw.split(/[,\s]+/)
       : [];
   return normalizeForecastApiPercentiles(list);
+}
+
+/**
+ * @param {unknown} body
+ */
+function upstreamErrorMessage(body) {
+  if (!body || typeof body !== "object") return "";
+  const err = /** @type {Record<string, unknown>} */ (body).error;
+  if (typeof err === "string" && err.trim()) return err.trim();
+  if (err && typeof err === "object") {
+    const nested = /** @type {Record<string, unknown>} */ (err).message;
+    if (typeof nested === "string" && nested.trim()) return nested.trim();
+  }
+  const msg = /** @type {Record<string, unknown>} */ (body).message;
+  if (typeof msg === "string" && msg.trim()) return msg.trim();
+  const msg2 = /** @type {Record<string, unknown>} */ (body).msg;
+  if (typeof msg2 === "string" && msg2.trim()) return msg2.trim();
+  return "";
+}
+
+/**
+ * Kalshi often returns opaque `{error:{code:"bad_request"}}` when the window
+ * extends past available forecast history (unlike candlesticks' adjusted_end_ts).
+ * @param {unknown} body
+ * @param {number} status
+ */
+function isOpaqueForecastBadRequest(body, status) {
+  if (status !== 400) return false;
+  const msg = upstreamErrorMessage(body).toLowerCase();
+  if (!msg || msg === "bad request") return true;
+  const err = body && typeof body === "object" ? /** @type {any} */ (body).error : null;
+  return err && typeof err === "object" && String(err.code || "") === "bad_request";
+}
+
+/**
+ * @param {{
+ *   seriesTicker: string;
+ *   ticker: string;
+ *   startTs: number;
+ *   endTs: number;
+ *   periodInterval: number;
+ *   percentiles: number[];
+ * }} params
+ */
+function buildUpstreamUrl(params) {
+  const qs = new URLSearchParams({
+    start_ts: String(params.startTs),
+    end_ts: String(params.endTs),
+    period_interval: String(params.periodInterval),
+  });
+  for (const p of params.percentiles) {
+    qs.append("percentiles", String(p));
+  }
+  const path = `series/${encodeURIComponent(params.seriesTicker)}/events/${encodeURIComponent(
+    params.ticker,
+  )}/forecast_percentile_history`;
+  return `${kalshiLiveUrl(path)}?${qs.toString()}`;
+}
+
+/**
+ * @param {string} url
+ */
+async function fetchUpstream(url) {
+  const upstream = await fetch(url, {
+    method: "GET",
+    headers: { Accept: "application/json" },
+    cache: "no-store",
+  });
+  const body = await upstream.json().catch(() => ({}));
+  return { status: upstream.status, body, retryAfter: upstream.headers.get("retry-after") };
+}
+
+/**
+ * Binary-search the latest end_ts Kalshi will accept for this window.
+ * @returns {Promise<{ ok: true; endTs: number; body: any } | { ok: false; last: { status: number; body: any; retryAfter: string | null } }>}
+ */
+async function findLatestValidEndTs(base) {
+  const periodSec = forecastPeriodIntervalSeconds(base.periodInterval);
+  const step = Number.isFinite(periodSec) ? periodSec : 60;
+  let low = base.startTs + step;
+  let high = base.endTs;
+  if (!(low < high)) {
+    return { ok: false, last: { status: 400, body: { error: "bad request" }, retryAfter: null } };
+  }
+
+  /** @type {{ status: number; body: any; retryAfter: string | null } | null} */
+  let lastFail = null;
+  /** @type {{ endTs: number; body: any } | null} */
+  let best = null;
+
+  // 12 probes ≈ hour resolution over multi-day spans without hammering Kalshi.
+  for (let i = 0; i < 12; i++) {
+    const mid = Math.floor((low + high) / 2);
+    const aligned = Math.max(low, Math.floor(mid / step) * step);
+    const endTs = Math.min(high, Math.max(base.startTs + step, aligned));
+    const result = await fetchUpstream(
+      buildUpstreamUrl({ ...base, startTs: base.startTs, endTs }),
+    );
+    if (result.status >= 200 && result.status < 300) {
+      best = { endTs, body: result.body };
+      low = endTs + step;
+      if (low > high) break;
+      continue;
+    }
+    lastFail = result;
+    if (!isOpaqueForecastBadRequest(result.body, result.status)) {
+      return { ok: false, last: result };
+    }
+    high = endTs - step;
+    if (high < base.startTs + step) break;
+  }
+
+  if (best) return { ok: true, endTs: best.endTs, body: best.body };
+  return {
+    ok: false,
+    last: lastFail || { status: 400, body: { error: "bad request" }, retryAfter: null },
+  };
 }
 
 /**
@@ -65,41 +183,53 @@ export default async function handler(req, res) {
     });
   }
 
-  const qs = new URLSearchParams({
-    start_ts: String(startTs),
-    end_ts: String(endTs),
-    period_interval: String(periodInterval),
-  });
-  for (const p of percentiles) {
-    qs.append("percentiles", String(p));
-  }
-
-  const path = `series/${encodeURIComponent(seriesTicker)}/events/${encodeURIComponent(
+  const base = {
+    seriesTicker,
     ticker,
-  )}/forecast_percentile_history`;
-  const url = `${kalshiLiveUrl(path)}?${qs.toString()}`;
+    startTs,
+    endTs: Math.max(startTs + 1, endTs),
+    periodInterval,
+    percentiles,
+  };
 
   try {
-    const upstream = await fetch(url, {
-      method: "GET",
-      headers: { Accept: "application/json" },
-      cache: "no-store",
-    });
-    const body = await upstream.json().catch(() => ({}));
-    if (!upstream.ok) {
-      const retryAfter = upstream.headers.get("retry-after");
-      if (retryAfter) res.setHeader("Retry-After", retryAfter);
-      return res.status(upstream.status >= 400 ? upstream.status : 502).json({
+    const first = await fetchUpstream(buildUpstreamUrl(base));
+    if (first.status >= 200 && first.status < 300) {
+      return res.status(200).json(first.body);
+    }
+
+    // Candlesticks return adjusted_end_ts; forecast returns opaque 400 instead.
+    // Probe for the latest end_ts that still has forecast coverage.
+    if (isOpaqueForecastBadRequest(first.body, first.status)) {
+      const recovered = await findLatestValidEndTs(base);
+      if (recovered.ok) {
+        return res.status(200).json({
+          ...recovered.body,
+          adjusted_end_ts: recovered.endTs,
+          requested_end_ts: base.endTs,
+        });
+      }
+      if (recovered.last.retryAfter) {
+        res.setHeader("Retry-After", recovered.last.retryAfter);
+      }
+      const detail = upstreamErrorMessage(recovered.last.body);
+      return res.status(400).json({
+        code: "FORECAST_WINDOW_UNAVAILABLE",
         error:
-          typeof body?.message === "string"
-            ? body.message
-            : typeof body?.error === "string"
-              ? body.error
-              : upstream.statusText || "Kalshi event forecast request failed",
-        ...body,
+          "No forecast percentile history in this range. Kalshi often returns a generic bad request when end_ts is past available forecast data (or the event has none yet) — try an earlier end date.",
+        upstream: detail || undefined,
       });
     }
-    return res.status(200).json(body);
+
+    if (first.retryAfter) res.setHeader("Retry-After", first.retryAfter);
+    const detail = upstreamErrorMessage(first.body);
+    return res.status(first.status >= 400 ? first.status : 502).json({
+      error: detail || "Kalshi event forecast request failed",
+      code:
+        first.body && typeof first.body === "object" && first.body.error?.code
+          ? first.body.error.code
+          : undefined,
+    });
   } catch (e) {
     return res.status(502).json({
       error: e instanceof Error ? e.message : "Failed to reach Kalshi event forecast API",

@@ -234,5 +234,8 @@ export function summarizeKalshiLiveEventForecastRequest(
   if (typeof opts.loadedRowCount === "number") {
     parts.push(`rows=${opts.loadedRowCount}`);
   }
+  if (typeof opts.adjustedEndTs === "number") {
+    parts.push(`adjusted_end_ts=${opts.adjustedEndTs}`);
+  }
   return parts.join(" · ");
 }
