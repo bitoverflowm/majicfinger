@@ -36,6 +36,13 @@ import { validateKalshiLiveEventCandlesticksPull } from "@/lib/kalshiLive/eventC
 import { validateKalshiLiveEventForecastPull } from "@/lib/kalshiLive/eventForecastCompose";
 import { KALSHI_LIVE_EVENT_FORECAST_PERIOD_OPTIONS } from "@/lib/kalshiLive/eventForecastColumns";
 import {
+  validateKalshiLiveLeaderboardPull,
+} from "@/lib/kalshiLive/leaderboardCompose";
+import {
+  KALSHI_LIVE_LEADERBOARD_LIMIT_DEFAULT,
+  KALSHI_LIVE_LEADERBOARD_LIMIT_MAX,
+} from "@/lib/kalshiLive/leaderboardColumns";
+import {
   KALSHI_LIVE_TRADES_DEFAULT_LIMIT,
   KALSHI_LIVE_TRADES_ROW_LIMIT_MAX,
   validateKalshiLiveTradesPull,
@@ -87,6 +94,7 @@ import { cn } from "@/lib/utils";
 function defaultRowLimit(endpointId) {
   if (endpointId === "trades") return KALSHI_LIVE_TRADES_DEFAULT_LIMIT;
   if (endpointId === "multivariate_events") return KALSHI_LIVE_MULTIVARIATE_EVENTS_PAGE_LIMIT_DEFAULT;
+  if (endpointId === "leaderboard") return KALSHI_LIVE_LEADERBOARD_LIMIT_DEFAULT;
   return KALSHI_LIVE_DEFAULT_LIMIT;
 }
 
@@ -204,6 +212,10 @@ export function KalshiLiveComposeOperationPanel({
     connectKalshiLiveEventForecastEventTicker = "",
     connectKalshiLiveEventForecastSeriesTicker = "",
     connectKalshiLiveEventForecastPercentilePcts,
+    connectKalshiLiveLeaderboardMetricName = "projected_pnl",
+    connectKalshiLiveLeaderboardTimePeriod = "weekly",
+    connectKalshiLiveLeaderboardCategory = "",
+    connectKalshiLiveLeaderboardCategoryOther = "",
     connectKalshiLiveTickers = "",
     connectKalshiLiveMarketsTickerMeta = {},
     connectKalshiLiveMarketsSheetMode = KALSHI_LIVE_MARKETS_SHEET_MODE_PER_MARKET,
@@ -507,6 +519,20 @@ export function KalshiLiveComposeOperationPanel({
       }
     }
 
+    if (endpointId === "leaderboard") {
+      const leaderboardErr = validateKalshiLiveLeaderboardPull({
+        metricName: connectKalshiLiveLeaderboardMetricName,
+        timePeriod: connectKalshiLiveLeaderboardTimePeriod,
+        category: connectKalshiLiveLeaderboardCategory,
+        categoryOther: connectKalshiLiveLeaderboardCategoryOther,
+        limit: connectKalshiLiveLimit,
+      });
+      if (leaderboardErr) {
+        setFilterError?.(leaderboardErr);
+        return;
+      }
+    }
+
     if (endpointId === "trades") {
       const tradesErr = validateKalshiLiveTradesPull(
         connectKalshiLiveTradesTicker,
@@ -605,6 +631,11 @@ export function KalshiLiveComposeOperationPanel({
     connectKalshiLiveEventForecastEventTicker,
     connectKalshiLiveEventForecastSeriesTicker,
     connectKalshiLiveEventForecastPercentilePcts,
+    connectKalshiLiveLeaderboardMetricName,
+    connectKalshiLiveLeaderboardTimePeriod,
+    connectKalshiLiveLeaderboardCategory,
+    connectKalshiLiveLeaderboardCategoryOther,
+    connectKalshiLiveLimit,
     connectKalshiLiveTickers,
     connectKalshiLiveMarketsDiscoveryMode,
     connectKalshiLiveMarketsDiscoveryStatus,
@@ -645,7 +676,9 @@ export function KalshiLiveComposeOperationPanel({
         ? KALSHI_LIVE_TRADES_ROW_LIMIT_MAX
         : endpointId === "multivariate_events"
           ? KALSHI_LIVE_MULTIVARIATE_EVENTS_PAGE_LIMIT_MAX
-          : 1000;
+          : endpointId === "leaderboard"
+            ? KALSHI_LIVE_LEADERBOARD_LIMIT_MAX
+            : 1000;
 
   const rowLimitDefault = defaultRowLimit(endpointId);
 
@@ -840,6 +873,8 @@ export function KalshiLiveComposeOperationPanel({
               ? "start_ts, end_ts, and period_interval are sent to Kalshi. Other columns filter on our side after the pull."
               : endpointId === "event_forecast"
                 ? "Date range, period interval, and percentiles are set above. Other columns filter on our side after the pull."
+              : endpointId === "leaderboard"
+                ? "Rank order, time period, and category are set above. Limit is below. Other columns filter on our side after the pull."
               : endpointId === "trades"
                 ? "Date range is set in Common queries above. Other columns filter on our side after the pull."
                 : endpointId === "orderbook"

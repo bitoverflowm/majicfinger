@@ -40,12 +40,17 @@ import { kalshiLiveSeriesWantsIncludeVolume } from "@/lib/kalshiLive/seriesColum
 import { fetchKalshiLiveCandlesticksPull } from "@/lib/kalshiLive/fetchKalshiLiveCandlesticksPull";
 import { fetchKalshiLiveEventCandlesticksPull } from "@/lib/kalshiLive/fetchKalshiLiveEventCandlesticksPull";
 import { fetchKalshiLiveEventForecastPull } from "@/lib/kalshiLive/fetchKalshiLiveEventForecastPull";
+import { fetchKalshiLiveLeaderboardPull } from "@/lib/kalshiLive/fetchKalshiLiveLeaderboardPull";
 import {
   partitionEventForecastApiParams,
   parseKalshiLiveEventForecastTicker,
   resolveForecastApiPercentilesFromDisplay,
   summarizeKalshiLiveEventForecastRequest,
 } from "@/lib/kalshiLive/eventForecastCompose";
+import {
+  resolveKalshiLiveLeaderboardCategory,
+  summarizeKalshiLiveLeaderboardRequest,
+} from "@/lib/kalshiLive/leaderboardCompose";
 import { inferSeriesTickerFromEvent } from "@/lib/kalshiLive/eventCandlesticksCompose";
 import { fetchKalshiLiveTradesPull } from "@/lib/kalshiLive/fetchKalshiLiveTradesPull";
 import { fetchKalshiLiveOrderbookPull } from "@/lib/kalshiLive/fetchKalshiLiveOrderbookPull";
@@ -128,6 +133,10 @@ export default function KalshiLive({ setConnectedData, connectHomePullBridge = f
     connectKalshiLiveEventForecastEventTicker,
     connectKalshiLiveEventForecastSeriesTicker,
     connectKalshiLiveEventForecastPercentilePcts,
+    connectKalshiLiveLeaderboardMetricName,
+    connectKalshiLiveLeaderboardTimePeriod,
+    connectKalshiLiveLeaderboardCategory,
+    connectKalshiLiveLeaderboardCategoryOther,
     connectKalshiLiveTradesTicker,
     connectKalshiLiveOrderbookTicker,
     connectKalshiLiveSeriesTicker,
@@ -1410,6 +1419,129 @@ export default function KalshiLive({ setConnectedData, connectHomePullBridge = f
     ],
   );
 
+  const runLeaderboardPull = useCallback(
+    async (ac, sheetId, cols) => {
+      const metricName = connectKalshiLiveLeaderboardMetricName;
+      const timePeriod = connectKalshiLiveLeaderboardTimePeriod;
+      const category = connectKalshiLiveLeaderboardCategory;
+      const categoryOther = connectKalshiLiveLeaderboardCategoryOther;
+      const limit = Number(connectKalshiLiveLimit) || 25;
+      const requestStartMs =
+        typeof performance !== "undefined" && performance?.now ? performance.now() : Date.now();
+
+      setConnectDataLakePullState?.((prev) => ({
+        ...prev,
+        loading: true,
+        label: "Fetching Kalshi Live leaderboard…",
+        progress: 8,
+        error: null,
+      }));
+
+      const { raw, rows, querySummary, metricName: resolvedMetric, timePeriod: resolvedPeriod, category: resolvedCategory, limit: resolvedLimit } =
+        await fetchKalshiLiveLeaderboardPull({
+          metricName,
+          timePeriod,
+          category,
+          categoryOther,
+          limit,
+          selectedColumns: cols,
+          signal: ac.signal,
+          onProgress: ({ label, progress }) => {
+            setConnectDataLakePullState?.((prev) => ({
+              ...prev,
+              loading: true,
+              label,
+              progress,
+              error: null,
+            }));
+          },
+        });
+
+      if (setRows) setRows(rows);
+
+      await ingestKalshiLiveAsView({
+        endpointId: "leaderboard",
+        rankList: raw,
+        leaderboardContext: {
+          metricName: resolvedMetric,
+          timePeriod: resolvedPeriod,
+          category: resolvedCategory,
+        },
+        selectedColumns: cols,
+      });
+
+      const elapsedMs =
+        (typeof performance !== "undefined" && performance?.now
+          ? performance.now()
+          : Date.now()) - requestStartMs;
+
+      const sheetName = `leaderboard · ${resolvedMetric}`.slice(0, 80);
+      let firstSheetId = sheetId || ctx?.activeSheetId || null;
+      const totalRows = Array.isArray(rows) ? rows.length : 0;
+
+      if (setDataSheets) {
+        flushSync(() => {
+          setDataSheets((prev) => {
+            let next = { ...(prev || {}) };
+            const targetSheetId = firstSheetId || allocateNextSheetId(next);
+            firstSheetId = targetSheetId;
+
+            const requestCard = {
+              id: genRequestCardId(),
+              createdAt: Date.now(),
+              elapsedMs,
+              lake: "kalshi-live",
+              table: "leaderboard",
+              sheetId: targetSheetId,
+              querySummary,
+              loadedRowCount: totalRows,
+            };
+
+            next = applyAthenaPullToSheetPatch(next, targetSheetId, rows, {
+              name: sheetName,
+              provenance: {
+                source: "kalshi-live",
+                endpoint: "leaderboard",
+                metricName: resolvedMetric,
+                timePeriod: resolvedPeriod,
+                category: resolvedCategory || undefined,
+                limit: resolvedLimit,
+                querySummary,
+              },
+              requestCards: [requestCard],
+            });
+
+            return next;
+          });
+
+          if (firstSheetId && ctx?.setActiveSheetId) {
+            ctx.setActiveSheetId(firstSheetId);
+          }
+          ctx?.setConnectHomeAnalyzeActive?.(true);
+        });
+      } else {
+        applyConnectHomePullData(ctx, rows);
+      }
+
+      if (ctx?.requestConnectAnalyzeScroll) {
+        ctx.requestConnectAnalyzeScroll();
+      }
+
+      return totalRows;
+    },
+    [
+      connectKalshiLiveLeaderboardMetricName,
+      connectKalshiLiveLeaderboardTimePeriod,
+      connectKalshiLiveLeaderboardCategory,
+      connectKalshiLiveLeaderboardCategoryOther,
+      connectKalshiLiveLimit,
+      setConnectDataLakePullState,
+      setDataSheets,
+      setRows,
+      ctx,
+    ],
+  );
+
   const runTradesPull = useCallback(
     async (ac, sheetId, cols) => {
       const whereFilters = Array.isArray(connectKalshiLiveWhereFilters)
@@ -1831,6 +1963,16 @@ export default function KalshiLive({ setConnectedData, connectHomePullBridge = f
                         percentiles,
                       );
                     })()
+                : endpointId === "leaderboard"
+                  ? summarizeKalshiLiveLeaderboardRequest({
+                      metricName: connectKalshiLiveLeaderboardMetricName,
+                      timePeriod: connectKalshiLiveLeaderboardTimePeriod,
+                      category: resolveKalshiLiveLeaderboardCategory(
+                        connectKalshiLiveLeaderboardCategory,
+                        connectKalshiLiveLeaderboardCategoryOther,
+                      ),
+                      limit: connectKalshiLiveLimit,
+                    })
                 : endpointId,
     });
 
@@ -1853,6 +1995,8 @@ export default function KalshiLive({ setConnectedData, connectHomePullBridge = f
                 ? "Fetching Kalshi Live event candlesticks…"
                 : endpointId === "event_forecast"
                   ? "Fetching Kalshi Live event forecast…"
+                : endpointId === "leaderboard"
+                  ? "Fetching Kalshi Live leaderboard…"
                 : endpointId === "trades"
                 ? "Fetching Kalshi Live trades…"
                 : endpointId === "orderbook"
@@ -1877,6 +2021,8 @@ export default function KalshiLive({ setConnectedData, connectHomePullBridge = f
         rowCount = (await runEventCandlesticksPull(ac, sheetId, cols)) || 0;
       } else if (endpointId === "event_forecast") {
         rowCount = (await runEventForecastPull(ac, sheetId, cols)) || 0;
+      } else if (endpointId === "leaderboard") {
+        rowCount = (await runLeaderboardPull(ac, sheetId, cols)) || 0;
       } else if (endpointId === "trades") {
         rowCount = (await runTradesPull(ac, sheetId, cols)) || 0;
       } else if (endpointId === "orderbook") {
@@ -1956,6 +2102,10 @@ export default function KalshiLive({ setConnectedData, connectHomePullBridge = f
     connectKalshiLiveEventForecastEventTicker,
     connectKalshiLiveEventForecastSeriesTicker,
     connectKalshiLiveEventForecastPercentilePcts,
+    connectKalshiLiveLeaderboardMetricName,
+    connectKalshiLiveLeaderboardTimePeriod,
+    connectKalshiLiveLeaderboardCategory,
+    connectKalshiLiveLeaderboardCategoryOther,
     activeSheetId,
     runMarketsPull,
     runEventsPull,
@@ -1964,6 +2114,7 @@ export default function KalshiLive({ setConnectedData, connectHomePullBridge = f
     runCandlesticksPull,
     runEventCandlesticksPull,
     runEventForecastPull,
+    runLeaderboardPull,
     runTradesPull,
     runOrderbookPull,
     setConnectDataLakePullState,

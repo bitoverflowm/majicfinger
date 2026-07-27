@@ -5,6 +5,7 @@ import {
 import {
   KALSHI_LIVE_EVENT_FORECAST_COLUMNS,
 } from "@/lib/kalshiLive/eventForecastColumns";
+import { KALSHI_LIVE_LEADERBOARD_COLUMNS } from "@/lib/kalshiLive/leaderboardColumns";
 import {
   KALSHI_LIVE_TRADES_API_FILTER_COLUMNS,
   KALSHI_LIVE_TRADES_COLUMNS,
@@ -63,6 +64,9 @@ export function getKalshiLiveAllColumnNames(endpointId) {
     const api = EVENT_FORECAST_API_WHERE_COLUMNS.filter((c) => !sheet.includes(c));
     return [...api, ...sheet];
   }
+  if (endpointId === "leaderboard") {
+    return KALSHI_LIVE_LEADERBOARD_COLUMNS.map((c) => c.name);
+  }
   if (endpointId === "trades") {
     const sheet = KALSHI_LIVE_TRADES_COLUMNS.map((c) => c.name);
     const api = TRADES_API_WHERE_COLUMN_LIST.filter((c) => !sheet.includes(c));
@@ -106,6 +110,10 @@ export function getKalshiLiveColumnType(endpointId, column) {
       return "string";
     }
     const row = KALSHI_LIVE_EVENT_FORECAST_COLUMNS.find((c) => c.name === column);
+    return row?.type || "string";
+  }
+  if (endpointId === "leaderboard") {
+    const row = KALSHI_LIVE_LEADERBOARD_COLUMNS.find((c) => c.name === column);
     return row?.type || "string";
   }
   if (endpointId === "trades") {
@@ -152,6 +160,7 @@ export function validateKalshiLiveWhereFilters(endpointId, whereFilters) {
     endpointId === "candlesticks" ||
     endpointId === "event_candlesticks" ||
     endpointId === "event_forecast" ||
+    endpointId === "leaderboard" ||
     endpointId === "trades" ||
     endpointId === "orderbook"
   ) {

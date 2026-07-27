@@ -7,6 +7,10 @@ import {
   KALSHI_LIVE_EVENT_FORECAST_COLUMNS,
 } from "@/lib/kalshiLive/eventForecastColumns";
 import {
+  getKalshiLiveLeaderboardColumnLabel,
+  KALSHI_LIVE_LEADERBOARD_COLUMNS,
+} from "@/lib/kalshiLive/leaderboardColumns";
+import {
   getKalshiLiveEventColumnLabel,
   getKalshiLiveMultivariateEventColumnLabel,
   KALSHI_LIVE_EVENTS_COLUMNS,
@@ -40,6 +44,7 @@ import {
 export const KALSHI_LIVE_ENDPOINT_CATEGORIES = [
   { id: "markets", label: "Markets" },
   { id: "events", label: "Events" },
+  { id: "holders", label: "Holders" },
 ];
 
 export const KALSHI_LIVE_DEFAULT_ENDPOINT_CATEGORY = "markets";
@@ -112,6 +117,14 @@ export const KALSHI_LIVE_CONNECT_ENDPOINTS = [
     description:
       "What the market is predicting for outcomes over time — forecast percentiles for an event.",
   },
+  {
+    id: "leaderboard",
+    category: "holders",
+    title: "Leaderboard",
+    selectedTitle: "Get Leaderboard",
+    description:
+      "Social leaderboard rankings — rank users by PnL, volume, ROI, or markets traded.",
+  },
 ];
 
 /** @param {string} categoryId */
@@ -135,6 +148,7 @@ export function getKalshiLiveColumnsForEndpoint(endpointId, opts = {}) {
   if (endpointId === "candlesticks") return KALSHI_LIVE_CANDLESTICK_COLUMNS;
   if (endpointId === "event_candlesticks") return KALSHI_LIVE_CANDLESTICK_COLUMNS;
   if (endpointId === "event_forecast") return KALSHI_LIVE_EVENT_FORECAST_COLUMNS;
+  if (endpointId === "leaderboard") return KALSHI_LIVE_LEADERBOARD_COLUMNS;
   if (endpointId === "trades") return KALSHI_LIVE_TRADES_COLUMNS;
   if (endpointId === "orderbook") return KALSHI_LIVE_ORDERBOOK_COLUMNS;
   if (endpointId === "series") return KALSHI_LIVE_SERIES_COLUMNS;
@@ -164,6 +178,7 @@ export function getKalshiLiveColumnDisplayLabelForEndpoint(endpointId, col, opts
   if (endpointId === "candlesticks") return getKalshiLiveCandlestickColumnLabel(col);
   if (endpointId === "event_candlesticks") return getKalshiLiveCandlestickColumnLabel(col);
   if (endpointId === "event_forecast") return getKalshiLiveEventForecastColumnLabel(col);
+  if (endpointId === "leaderboard") return getKalshiLiveLeaderboardColumnLabel(col);
   if (endpointId === "trades") return getKalshiLiveTradeColumnLabel(col);
   if (endpointId === "orderbook") return getKalshiLiveOrderbookColumnLabel(col);
   if (endpointId === "series") {

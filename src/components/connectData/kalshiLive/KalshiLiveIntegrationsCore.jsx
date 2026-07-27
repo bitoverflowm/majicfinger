@@ -13,6 +13,7 @@ import {
   RefreshCw,
   Search,
   Sparkles,
+  Trophy,
   Vote,
   Wand2,
   CircleDollarSign,
@@ -38,6 +39,7 @@ import { KalshiLiveMultivariateEventsFields } from "@/components/connectData/kal
 import { KalshiLiveEventCandlesticksField } from "@/components/connectData/kalshiLive/KalshiLiveEventCandlesticksField";
 import { KalshiLiveEventForecastField } from "@/components/connectData/kalshiLive/KalshiLiveEventForecastField";
 import { KalshiLiveEventForecastCommonQueries } from "@/components/connectData/kalshiLive/KalshiLiveEventForecastCommonQueries";
+import { KalshiLiveLeaderboardFields } from "@/components/connectData/kalshiLive/KalshiLiveLeaderboardFields";
 import { KalshiLiveSeriesTickersField } from "@/components/connectData/kalshiLive/KalshiLiveSeriesTickersField";
 import { KalshiLiveComposeOperationPanel } from "@/components/connectData/kalshiLive/KalshiLiveComposeOperationPanel";
 import { Button } from "@/components/ui/button";
@@ -52,6 +54,9 @@ import {
   getKalshiLiveEndpointsForCategory,
 } from "@/config/kalshiLiveConnect";
 import { KALSHI_LIVE_TRADES_DEFAULT_LIMIT } from "@/lib/kalshiLive/tradeCompose";
+import {
+  KALSHI_LIVE_LEADERBOARD_LIMIT_DEFAULT,
+} from "@/lib/kalshiLive/leaderboardColumns";
 import { CONNECT_COMPOSE_OPERATIONS } from "@/lib/connectComposeOperations";
 import {
   applyKalshiLivePowerSearchSelection,
@@ -81,6 +86,10 @@ const LIVE_SOURCE_PRESENTATION = {
   },
   event_forecast: {
     icon: LineChart,
+    accent: "secondary",
+  },
+  leaderboard: {
+    icon: Trophy,
     accent: "secondary",
   },
   series: {
@@ -444,6 +453,10 @@ export function KalshiLiveIntegrationsCore({ onRunPull, className, stepBackRef }
     setConnectKalshiLiveEventForecastSeriesTicker,
     setConnectKalshiLiveEventForecastTickerMeta,
     setConnectKalshiLiveEventForecastPercentilePcts,
+    setConnectKalshiLiveLeaderboardMetricName,
+    setConnectKalshiLiveLeaderboardTimePeriod,
+    setConnectKalshiLiveLeaderboardCategory,
+    setConnectKalshiLiveLeaderboardCategoryOther,
     connectKalshiLiveTradesTicker = "",
     setConnectKalshiLiveTradesTicker,
     setConnectKalshiLiveTradesTickerMeta,
@@ -593,6 +606,12 @@ export function KalshiLiveIntegrationsCore({ onRunPull, className, stepBackRef }
         setConnectKalshiLiveEventForecastTickerMeta?.({});
         setConnectKalshiLiveEventForecastPercentilePcts?.([10, 25, 50, 75, 90]);
       }
+      if (id !== "leaderboard") {
+        setConnectKalshiLiveLeaderboardMetricName?.("projected_pnl");
+        setConnectKalshiLiveLeaderboardTimePeriod?.("weekly");
+        setConnectKalshiLiveLeaderboardCategory?.("");
+        setConnectKalshiLiveLeaderboardCategoryOther?.("");
+      }
       if (id !== "trades") {
         setConnectKalshiLiveTradesTicker?.("");
         setConnectKalshiLiveTradesTickerMeta?.({});
@@ -615,6 +634,8 @@ export function KalshiLiveIntegrationsCore({ onRunPull, className, stepBackRef }
         setConnectKalshiLiveLimit?.(KALSHI_LIVE_TRADES_DEFAULT_LIMIT);
       } else if (id === "multivariate_events") {
         setConnectKalshiLiveLimit?.(100);
+      } else if (id === "leaderboard") {
+        setConnectKalshiLiveLimit?.(KALSHI_LIVE_LEADERBOARD_LIMIT_DEFAULT);
       }
       setFilterError(null);
       setHoveredEndpointId("");
@@ -651,6 +672,10 @@ export function KalshiLiveIntegrationsCore({ onRunPull, className, stepBackRef }
       setConnectKalshiLiveEventForecastSeriesTicker,
       setConnectKalshiLiveEventForecastTickerMeta,
       setConnectKalshiLiveEventForecastPercentilePcts,
+      setConnectKalshiLiveLeaderboardMetricName,
+      setConnectKalshiLiveLeaderboardTimePeriod,
+      setConnectKalshiLiveLeaderboardCategory,
+      setConnectKalshiLiveLeaderboardCategoryOther,
       setConnectKalshiLiveTradesTicker,
       setConnectKalshiLiveTradesTickerMeta,
       setConnectKalshiLiveOrderbookTicker,
@@ -698,6 +723,10 @@ export function KalshiLiveIntegrationsCore({ onRunPull, className, stepBackRef }
     setConnectKalshiLiveEventForecastSeriesTicker?.("");
     setConnectKalshiLiveEventForecastTickerMeta?.({});
     setConnectKalshiLiveEventForecastPercentilePcts?.([10, 25, 50, 75, 90]);
+    setConnectKalshiLiveLeaderboardMetricName?.("projected_pnl");
+    setConnectKalshiLiveLeaderboardTimePeriod?.("weekly");
+    setConnectKalshiLiveLeaderboardCategory?.("");
+    setConnectKalshiLiveLeaderboardCategoryOther?.("");
     setConnectKalshiLiveTradesTicker?.("");
     setConnectKalshiLiveTradesTickerMeta?.({});
     setConnectKalshiLiveOrderbookTicker?.("");
@@ -747,6 +776,10 @@ export function KalshiLiveIntegrationsCore({ onRunPull, className, stepBackRef }
     setConnectKalshiLiveEventForecastSeriesTicker,
     setConnectKalshiLiveEventForecastTickerMeta,
     setConnectKalshiLiveEventForecastPercentilePcts,
+    setConnectKalshiLiveLeaderboardMetricName,
+    setConnectKalshiLiveLeaderboardTimePeriod,
+    setConnectKalshiLiveLeaderboardCategory,
+    setConnectKalshiLiveLeaderboardCategoryOther,
     setConnectKalshiLiveTradesTicker,
     setConnectKalshiLiveTradesTickerMeta,
     setConnectKalshiLiveOrderbookTicker,
@@ -1193,6 +1226,9 @@ export function KalshiLiveIntegrationsCore({ onRunPull, className, stepBackRef }
                 <KalshiLiveEventForecastField className="mt-4" disabled={pullLoading} />
                 <KalshiLiveEventForecastCommonQueries className="mt-4" disabled={pullLoading} />
               </>
+            ) : null}
+            {selectedId === "leaderboard" ? (
+              <KalshiLiveLeaderboardFields className="mt-4" disabled={pullLoading} />
             ) : null}
             {selectedId === "trades" ? (
               <>
