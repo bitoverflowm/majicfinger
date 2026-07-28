@@ -23,7 +23,7 @@ export async function fetchKalshiLiveHolderProfilePull(opts) {
 
   if (opts.signal?.aborted) throw new DOMException("Aborted", "AbortError");
 
-  opts.onProgress?.({ label: "Fetching Kalshi holder profile…", progress: 20 });
+  opts.onProgress?.({ label: "Fetching Kalshi trader profile…", progress: 20 });
 
   const qs = new URLSearchParams({ nickname });
   const res = await fetch(
@@ -46,11 +46,11 @@ export async function fetchKalshiLiveHolderProfilePull(opts) {
           ? nested
           : typeof body?.message === "string"
             ? body.message
-            : res.statusText || "Holder profile request failed";
+            : res.statusText || "Trader profile request failed";
     throw new Error(details ? `${base} (${details})` : base);
   }
 
-  opts.onProgress?.({ label: "Projecting holder profile row…", progress: 80 });
+  opts.onProgress?.({ label: "Projecting trader profile row…", progress: 80 });
 
   const raw = {
     social_profile: body?.social_profile || null,

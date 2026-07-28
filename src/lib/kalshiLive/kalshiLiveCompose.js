@@ -7,6 +7,7 @@ import {
 } from "@/lib/kalshiLive/eventForecastColumns";
 import { KALSHI_LIVE_LEADERBOARD_COLUMNS } from "@/lib/kalshiLive/leaderboardColumns";
 import { KALSHI_LIVE_HOLDER_PROFILE_COLUMNS } from "@/lib/kalshiLive/holderProfileColumns";
+import { KALSHI_LIVE_HOLDER_TRADES_COLUMNS } from "@/lib/kalshiLive/holderTradesColumns";
 import {
   KALSHI_LIVE_TRADES_API_FILTER_COLUMNS,
   KALSHI_LIVE_TRADES_COLUMNS,
@@ -71,6 +72,9 @@ export function getKalshiLiveAllColumnNames(endpointId) {
   if (endpointId === "holder_profile") {
     return KALSHI_LIVE_HOLDER_PROFILE_COLUMNS.map((c) => c.name);
   }
+  if (endpointId === "trades_by_holder") {
+    return KALSHI_LIVE_HOLDER_TRADES_COLUMNS.map((c) => c.name);
+  }
   if (endpointId === "trades") {
     const sheet = KALSHI_LIVE_TRADES_COLUMNS.map((c) => c.name);
     const api = TRADES_API_WHERE_COLUMN_LIST.filter((c) => !sheet.includes(c));
@@ -124,6 +128,10 @@ export function getKalshiLiveColumnType(endpointId, column) {
     const row = KALSHI_LIVE_HOLDER_PROFILE_COLUMNS.find((c) => c.name === column);
     return row?.type || "string";
   }
+  if (endpointId === "trades_by_holder") {
+    const row = KALSHI_LIVE_HOLDER_TRADES_COLUMNS.find((c) => c.name === column);
+    return row?.type || "string";
+  }
   if (endpointId === "trades") {
     if (KALSHI_LIVE_TRADES_API_FILTER_COLUMNS.has(column)) return "timestamp";
     const row = KALSHI_LIVE_TRADES_COLUMNS.find((c) => c.name === column);
@@ -170,6 +178,7 @@ export function validateKalshiLiveWhereFilters(endpointId, whereFilters) {
     endpointId === "event_forecast" ||
     endpointId === "leaderboard" ||
     endpointId === "holder_profile" ||
+    endpointId === "trades_by_holder" ||
     endpointId === "trades" ||
     endpointId === "orderbook"
   ) {

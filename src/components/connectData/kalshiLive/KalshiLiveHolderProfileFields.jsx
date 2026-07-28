@@ -20,7 +20,7 @@ export function KalshiLiveHolderProfileFields({ className, disabled = false }) {
   return (
     <div className={cn("space-y-3", className)}>
       <div className="space-y-2">
-        <h2 className="text-xs font-semibold tracking-tight text-foreground">Holder profile</h2>
+        <h2 className="text-xs font-semibold tracking-tight text-foreground">Trader profile</h2>
         <p className="text-[11px] leading-snug text-muted-foreground">
           Public social profile for a Kalshi nickname — followers, bio, join date, and top
           categories. Use a nickname from the Leaderboard (or any known handle).

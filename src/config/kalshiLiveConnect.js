@@ -15,6 +15,10 @@ import {
   KALSHI_LIVE_HOLDER_PROFILE_COLUMNS,
 } from "@/lib/kalshiLive/holderProfileColumns";
 import {
+  getKalshiLiveHolderTradesColumnLabel,
+  KALSHI_LIVE_HOLDER_TRADES_COLUMNS,
+} from "@/lib/kalshiLive/holderTradesColumns";
+import {
   getKalshiLiveEventColumnLabel,
   getKalshiLiveMultivariateEventColumnLabel,
   KALSHI_LIVE_EVENTS_COLUMNS,
@@ -132,10 +136,18 @@ export const KALSHI_LIVE_CONNECT_ENDPOINTS = [
   {
     id: "holder_profile",
     category: "holders",
-    title: "Holder Profile",
-    selectedTitle: "Get Holder Profile",
+    title: "Trader Profile",
+    selectedTitle: "Get Trader Profile",
     description:
       "Public social profile for a Kalshi nickname — followers, bio, join date, and categories.",
+  },
+  {
+    id: "trades_by_holder",
+    category: "holders",
+    title: "Trades by Trader",
+    selectedTitle: "Get Trades by Trader",
+    description:
+      "Public social trade activity — optionally filter by nickname, series, event, or minimum amount.",
   },
 ];
 
@@ -162,6 +174,7 @@ export function getKalshiLiveColumnsForEndpoint(endpointId, opts = {}) {
   if (endpointId === "event_forecast") return KALSHI_LIVE_EVENT_FORECAST_COLUMNS;
   if (endpointId === "leaderboard") return KALSHI_LIVE_LEADERBOARD_COLUMNS;
   if (endpointId === "holder_profile") return KALSHI_LIVE_HOLDER_PROFILE_COLUMNS;
+  if (endpointId === "trades_by_holder") return KALSHI_LIVE_HOLDER_TRADES_COLUMNS;
   if (endpointId === "trades") return KALSHI_LIVE_TRADES_COLUMNS;
   if (endpointId === "orderbook") return KALSHI_LIVE_ORDERBOOK_COLUMNS;
   if (endpointId === "series") return KALSHI_LIVE_SERIES_COLUMNS;
@@ -193,6 +206,7 @@ export function getKalshiLiveColumnDisplayLabelForEndpoint(endpointId, col, opts
   if (endpointId === "event_forecast") return getKalshiLiveEventForecastColumnLabel(col);
   if (endpointId === "leaderboard") return getKalshiLiveLeaderboardColumnLabel(col);
   if (endpointId === "holder_profile") return getKalshiLiveHolderProfileColumnLabel(col);
+  if (endpointId === "trades_by_holder") return getKalshiLiveHolderTradesColumnLabel(col);
   if (endpointId === "trades") return getKalshiLiveTradeColumnLabel(col);
   if (endpointId === "orderbook") return getKalshiLiveOrderbookColumnLabel(col);
   if (endpointId === "series") {
