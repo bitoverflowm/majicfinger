@@ -52,7 +52,7 @@ import {
 export const KALSHI_LIVE_ENDPOINT_CATEGORIES = [
   { id: "markets", label: "Markets" },
   { id: "events", label: "Events" },
-  { id: "holders", label: "Holders" },
+  { id: "holders", label: "Traders" },
 ];
 
 export const KALSHI_LIVE_DEFAULT_ENDPOINT_CATEGORY = "markets";
