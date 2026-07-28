@@ -490,6 +490,7 @@ export function KalshiLiveIntegrationsCore({ onRunPull, className, stepBackRef }
     connectKalshiLiveSearchTradersIncludeHoldings = false,
     setConnectKalshiLiveSearchTradersIncludeHoldings,
     setConnectKalshiLiveSearchTradersQuery,
+    setConnectKalshiLiveSearchTradersSelectedNickname,
     connectKalshiLiveTradesTicker = "",
     setConnectKalshiLiveTradesTicker,
     setConnectKalshiLiveTradesTickerMeta,
@@ -658,6 +659,7 @@ export function KalshiLiveIntegrationsCore({ onRunPull, className, stepBackRef }
         setConnectKalshiLiveSearchTradersQuery?.("");
         setConnectKalshiLiveSearchTradersIncludeMetrics?.(false);
         setConnectKalshiLiveSearchTradersIncludeHoldings?.(false);
+        setConnectKalshiLiveSearchTradersSelectedNickname?.("");
       }
       if (id !== "trades") {
         setConnectKalshiLiveTradesTicker?.("");
@@ -735,6 +737,7 @@ export function KalshiLiveIntegrationsCore({ onRunPull, className, stepBackRef }
       setConnectKalshiLiveSearchTradersQuery,
       setConnectKalshiLiveSearchTradersIncludeMetrics,
       setConnectKalshiLiveSearchTradersIncludeHoldings,
+      setConnectKalshiLiveSearchTradersSelectedNickname,
       setConnectKalshiLiveTradesTicker,
       setConnectKalshiLiveTradesTickerMeta,
       setConnectKalshiLiveOrderbookTicker,
@@ -794,6 +797,7 @@ export function KalshiLiveIntegrationsCore({ onRunPull, className, stepBackRef }
     setConnectKalshiLiveSearchTradersQuery?.("");
     setConnectKalshiLiveSearchTradersIncludeMetrics?.(false);
     setConnectKalshiLiveSearchTradersIncludeHoldings?.(false);
+    setConnectKalshiLiveSearchTradersSelectedNickname?.("");
     setConnectKalshiLiveTradesTicker?.("");
     setConnectKalshiLiveTradesTickerMeta?.({});
     setConnectKalshiLiveOrderbookTicker?.("");
@@ -855,6 +859,7 @@ export function KalshiLiveIntegrationsCore({ onRunPull, className, stepBackRef }
     setConnectKalshiLiveSearchTradersQuery,
     setConnectKalshiLiveSearchTradersIncludeMetrics,
     setConnectKalshiLiveSearchTradersIncludeHoldings,
+    setConnectKalshiLiveSearchTradersSelectedNickname,
     setConnectKalshiLiveTradesTicker,
     setConnectKalshiLiveTradesTickerMeta,
     setConnectKalshiLiveOrderbookTicker,

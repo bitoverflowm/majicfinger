@@ -235,6 +235,7 @@ export function KalshiLiveComposeOperationPanel({
     connectKalshiLiveHolderTradesEventTicker = "",
     connectKalshiLiveHolderTradesMinAmount = "",
     connectKalshiLiveSearchTradersQuery = "",
+    connectKalshiLiveSearchTradersSelectedNickname = "",
     connectKalshiLiveSearchTradersIncludeMetrics = false,
     connectKalshiLiveSearchTradersIncludeHoldings = false,
     connectKalshiLiveTickers = "",
@@ -580,7 +581,9 @@ export function KalshiLiveComposeOperationPanel({
 
     if (endpointId === "search_traders") {
       const searchErr = validateKalshiLiveSearchTradersPull({
-        query: connectKalshiLiveSearchTradersQuery,
+        query:
+          connectKalshiLiveSearchTradersSelectedNickname ||
+          connectKalshiLiveSearchTradersQuery,
         limit: connectKalshiLiveLimit,
         includeMetrics: connectKalshiLiveSearchTradersIncludeMetrics,
         includeHoldings: connectKalshiLiveSearchTradersIncludeHoldings,
@@ -699,6 +702,7 @@ export function KalshiLiveComposeOperationPanel({
     connectKalshiLiveHolderTradesEventTicker,
     connectKalshiLiveHolderTradesMinAmount,
     connectKalshiLiveSearchTradersQuery,
+    connectKalshiLiveSearchTradersSelectedNickname,
     connectKalshiLiveSearchTradersIncludeMetrics,
     connectKalshiLiveSearchTradersIncludeHoldings,
     connectKalshiLiveLimit,
@@ -950,7 +954,7 @@ export function KalshiLiveComposeOperationPanel({
               : endpointId === "trades_by_holder"
                 ? "Nickname, series, event, and min amount are set above. Limit (cursor pages) is below. Other columns filter on our side after the pull."
               : endpointId === "search_traders"
-                ? "Nickname search and optional metrics/holdings are set above. Limit is max traders from search. Other columns filter on our side after the pull."
+                ? "Pick a suggested trader for an exact pull, or leave a prefix to match many nicknames (one sheet each). Optional metrics/holdings are set above."
               : endpointId === "trades"
                 ? "Date range is set in Common queries above. Other columns filter on our side after the pull."
                 : endpointId === "orderbook"

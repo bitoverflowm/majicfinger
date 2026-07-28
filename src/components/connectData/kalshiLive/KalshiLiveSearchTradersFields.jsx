@@ -1,8 +1,8 @@
 "use client";
 
 import { Checkbox } from "@/components/ui/checkbox";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { TraderNicknameSearch } from "@/components/connectData/kalshiLive/TraderNicknameSearch";
 import { useMyStateV2 } from "@/context/stateContextV2";
 import { cn } from "@/lib/utils";
 
@@ -16,6 +16,8 @@ export function KalshiLiveSearchTradersFields({ className, disabled = false }) {
   const {
     connectKalshiLiveSearchTradersQuery = "",
     setConnectKalshiLiveSearchTradersQuery,
+    connectKalshiLiveSearchTradersSelectedNickname = "",
+    setConnectKalshiLiveSearchTradersSelectedNickname,
     connectKalshiLiveSearchTradersIncludeMetrics = false,
     setConnectKalshiLiveSearchTradersIncludeMetrics,
     connectKalshiLiveSearchTradersIncludeHoldings = false,
@@ -40,8 +42,8 @@ export function KalshiLiveSearchTradersFields({ className, disabled = false }) {
           Search by trader nickname
         </h2>
         <p className="text-[11px] leading-snug text-muted-foreground">
-          Find public trader profiles by nickname prefix. Optionally attach shared metrics and
-          holdings when those are public.
+          Type a nickname prefix for suggestions (volume / PnL when public), or pick an exact
+          trader. A general match without a selection pulls all matches — one sheet per nickname.
         </p>
       </div>
 
@@ -49,17 +51,19 @@ export function KalshiLiveSearchTradersFields({ className, disabled = false }) {
         <Label className="text-[11px] font-medium text-muted-foreground">
           Search by trader nickname
         </Label>
-        <Input
-          className="h-9 max-w-md text-xs"
+        <TraderNicknameSearch
           disabled={disabled}
-          placeholder="e.g. citadel"
           value={connectKalshiLiveSearchTradersQuery}
-          onChange={(e) => setConnectKalshiLiveSearchTradersQuery?.(e.target.value)}
-          autoComplete="off"
-          spellCheck={false}
+          selectedNickname={connectKalshiLiveSearchTradersSelectedNickname}
+          onChange={(v) => setConnectKalshiLiveSearchTradersQuery?.(v)}
+          onSelectNickname={(nick) => {
+            setConnectKalshiLiveSearchTradersSelectedNickname?.(nick);
+            setConnectKalshiLiveSearchTradersQuery?.(nick);
+          }}
+          onClearSelection={() => setConnectKalshiLiveSearchTradersSelectedNickname?.("")}
         />
         <p className="text-[10px] leading-snug text-muted-foreground">
-          Nickname prefix search (case-insensitive). Use at least 2 characters, no spaces.
+          Suggestions load in ~2–3s (search + public metrics). At least 2 characters, no spaces.
         </p>
       </div>
 

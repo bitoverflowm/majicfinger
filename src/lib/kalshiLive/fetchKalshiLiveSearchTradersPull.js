@@ -109,9 +109,11 @@ function throwIfNotOk(res, body, fallback) {
 
 /**
  * Search traders by nickname prefix; optionally enrich with metrics / holdings.
+ * When `selectedNickname` is set, skips prefix search and pulls that trader only.
  *
  * @param {{
  *   query?: string;
+ *   selectedNickname?: string;
  *   limit?: number;
  *   includeMetrics?: boolean;
  *   includeHoldings?: boolean;
@@ -124,7 +126,8 @@ function throwIfNotOk(res, body, fallback) {
  * }} opts
  */
 export async function fetchKalshiLiveSearchTradersPull(opts) {
-  const query = normalizeKalshiLiveSearchTradersQuery(opts.query);
+  const selectedNickname = normalizeKalshiLiveSearchTradersQuery(opts.selectedNickname);
+  const query = selectedNickname || normalizeKalshiLiveSearchTradersQuery(opts.query);
   const limit = normalizeKalshiLiveSearchTradersLimit(
     opts.limit ?? KALSHI_LIVE_SEARCH_TRADERS_LIMIT_DEFAULT,
   );
@@ -145,52 +148,57 @@ export async function fetchKalshiLiveSearchTradersPull(opts) {
   if (opts.signal?.aborted) throw new DOMException("Aborted", "AbortError");
 
   /** @type {Record<string, unknown>[]} */
-  const profiles = [];
+  let profiles = [];
   let cursor = "";
   let page = 0;
 
-  opts.onProgress?.({ label: "Searching Kalshi traders…", progress: 10 });
+  if (selectedNickname) {
+    opts.onProgress?.({ label: `Loading trader ${selectedNickname}…`, progress: 12 });
+    profiles = [{ nickname: selectedNickname, profile_image_path: "" }];
+  } else {
+    opts.onProgress?.({ label: "Searching Kalshi traders…", progress: 10 });
 
-  while (profiles.length < limit) {
-    if (opts.signal?.aborted) throw new DOMException("Aborted", "AbortError");
+    while (profiles.length < limit) {
+      if (opts.signal?.aborted) throw new DOMException("Aborted", "AbortError");
 
-    const pageSize = Math.min(
-      KALSHI_LIVE_SEARCH_TRADERS_PAGE_SIZE_MAX,
-      limit - profiles.length,
-    );
-    if (pageSize < 1) break;
+      const pageSize = Math.min(
+        KALSHI_LIVE_SEARCH_TRADERS_PAGE_SIZE_MAX,
+        limit - profiles.length,
+      );
+      if (pageSize < 1) break;
 
-    const qs = new URLSearchParams({
-      query,
-      limit: String(pageSize),
-    });
-    if (cursor) qs.set("cursor", cursor);
+      const qs = new URLSearchParams({
+        query,
+        limit: String(pageSize),
+      });
+      if (cursor) qs.set("cursor", cursor);
 
-    const { res, body } = await fetchJsonWithRetry(
-      `/api/integrations/kalshi-live/search/social-profiles?${qs.toString()}`,
-      opts.signal,
-      opts.onProgress,
-      Math.min(70, 10 + page * 8),
-    );
-    throwIfNotOk(res, body, "Trader search request failed");
+      const { res, body } = await fetchJsonWithRetry(
+        `/api/integrations/kalshi-live/search/social-profiles?${qs.toString()}`,
+        opts.signal,
+        opts.onProgress,
+        Math.min(70, 10 + page * 8),
+      );
+      throwIfNotOk(res, body, "Trader search request failed");
 
-    const batch = Array.isArray(body?.profiles) ? body.profiles : [];
-    for (const p of batch) {
-      if (profiles.length >= limit) break;
-      if (p && typeof p === "object") {
-        profiles.push(/** @type {Record<string, unknown>} */ (p));
+      const batch = Array.isArray(body?.profiles) ? body.profiles : [];
+      for (const p of batch) {
+        if (profiles.length >= limit) break;
+        if (p && typeof p === "object") {
+          profiles.push(/** @type {Record<string, unknown>} */ (p));
+        }
       }
+
+      page += 1;
+      const nextCursor = String(body?.cursor || "").trim();
+      opts.onProgress?.({
+        label: `Found ${profiles.length} trader${profiles.length === 1 ? "" : "s"}…`,
+        progress: Math.min(55, 10 + page * 10),
+      });
+
+      if (!nextCursor || batch.length === 0 || profiles.length >= limit) break;
+      cursor = nextCursor;
     }
-
-    page += 1;
-    const nextCursor = String(body?.cursor || "").trim();
-    opts.onProgress?.({
-      label: `Found ${profiles.length} trader${profiles.length === 1 ? "" : "s"}…`,
-      progress: Math.min(55, 10 + page * 10),
-    });
-
-    if (!nextCursor || batch.length === 0 || profiles.length >= limit) break;
-    cursor = nextCursor;
   }
 
   /** @type {Array<{ profile: Record<string, unknown>; metrics?: Record<string, unknown> | null; holdingsPayload?: Record<string, unknown> | null }>} */
@@ -286,18 +294,44 @@ export async function fetchKalshiLiveSearchTradersPull(opts) {
 
   opts.onProgress?.({ label: "Projecting trader search rows…", progress: 92 });
 
-  let rows = projectKalshiLiveSearchTradersRows(enriched, opts.selectedColumns, {
+  const projectOpts = {
     includeMetrics,
     includeHoldings,
     closedPositions,
-  });
+  };
+
+  let rows = projectKalshiLiveSearchTradersRows(enriched, opts.selectedColumns, projectOpts);
   rows = applyKalshiLiveClientWhere(rows, whereFilters);
   rows = applyKalshiLiveClientSort(rows, sortClauses);
+
+  /** @type {Map<string, typeof enriched>} */
+  const enrichedByNick = new Map();
+  for (const item of enriched) {
+    const nick = String(item?.profile?.nickname || "").trim() || "unknown";
+    const list = enrichedByNick.get(nick) || [];
+    list.push(item);
+    enrichedByNick.set(nick, list);
+  }
+
+  /** @type {Array<{ nickname: string; raw: typeof enriched; rows: Record<string, unknown>[] }>} */
+  const byNickname = [];
+  for (const [nickname, group] of enrichedByNick) {
+    let groupRows = projectKalshiLiveSearchTradersRows(
+      group,
+      opts.selectedColumns,
+      projectOpts,
+    );
+    groupRows = applyKalshiLiveClientWhere(groupRows, whereFilters);
+    groupRows = applyKalshiLiveClientSort(groupRows, sortClauses);
+    byNickname.push({ nickname, raw: group, rows: groupRows });
+  }
 
   return {
     raw: enriched,
     rows,
+    byNickname,
     query,
+    selectedNickname: selectedNickname || "",
     limit,
     includeMetrics,
     includeHoldings,

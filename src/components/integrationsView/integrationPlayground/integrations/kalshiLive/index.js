@@ -149,6 +149,7 @@ export default function KalshiLive({ setConnectedData, connectHomePullBridge = f
     connectKalshiLiveHolderTradesEventTicker,
     connectKalshiLiveHolderTradesMinAmount,
     connectKalshiLiveSearchTradersQuery,
+    connectKalshiLiveSearchTradersSelectedNickname,
     connectKalshiLiveSearchTradersIncludeMetrics,
     connectKalshiLiveSearchTradersIncludeHoldings,
     connectKalshiLiveTradesTicker,
@@ -1805,6 +1806,7 @@ export default function KalshiLive({ setConnectedData, connectHomePullBridge = f
   const runSearchTradersPull = useCallback(
     async (ac, sheetId, cols) => {
       const query = connectKalshiLiveSearchTradersQuery;
+      const selectedNickname = connectKalshiLiveSearchTradersSelectedNickname;
       const includeMetrics = !!connectKalshiLiveSearchTradersIncludeMetrics;
       const includeHoldings = !!connectKalshiLiveSearchTradersIncludeHoldings;
       const limit = Number(connectKalshiLiveLimit) || 25;
@@ -1828,14 +1830,17 @@ export default function KalshiLive({ setConnectedData, connectHomePullBridge = f
       const {
         raw,
         rows,
+        byNickname,
         querySummary,
         query: resolvedQuery,
         limit: resolvedLimit,
         includeMetrics: resolvedMetrics,
         includeHoldings: resolvedHoldings,
         profileCount,
+        selectedNickname: resolvedSelected,
       } = await fetchKalshiLiveSearchTradersPull({
         query,
+        selectedNickname,
         limit,
         includeMetrics,
         includeHoldings,
@@ -1872,11 +1877,74 @@ export default function KalshiLive({ setConnectedData, connectHomePullBridge = f
           ? performance.now()
           : Date.now()) - requestStartMs;
 
-      const sheetName = `trader search · ${resolvedQuery}`.slice(0, 80);
-      let firstSheetId = sheetId || ctx?.activeSheetId || null;
+      const groups = Array.isArray(byNickname) ? byNickname : [];
+      const useSeparateSheets = !resolvedSelected && groups.length > 1;
       const totalRows = Array.isArray(rows) ? rows.length : 0;
 
-      if (setDataSheets) {
+      if (useSeparateSheets && setDataSheets) {
+        let firstSheetId = sheetId || ctx?.activeSheetId || null;
+
+        flushSync(() => {
+          setDataSheets((prev) => {
+            let next = { ...(prev || {}) };
+            /** @type {string[]} */
+            const writtenIds = [];
+
+            for (let i = 0; i < groups.length; i++) {
+              const group = groups[i];
+              const nickName = String(group.nickname || `trader-${i + 1}`).trim().slice(0, 80);
+              const groupRows = Array.isArray(group.rows) ? group.rows : [];
+
+              let targetSheetId;
+              if (i === 0 && firstSheetId) {
+                targetSheetId = firstSheetId;
+              } else {
+                targetSheetId = allocateNextSheetId(next);
+              }
+              writtenIds.push(targetSheetId);
+
+              const requestCard = {
+                id: genRequestCardId(),
+                createdAt: Date.now(),
+                elapsedMs,
+                lake: "kalshi-live",
+                table: "search_traders",
+                sheetId: targetSheetId,
+                querySummary,
+                loadedRowCount: groupRows.length,
+              };
+
+              next = applyAthenaPullToSheetPatch(next, targetSheetId, groupRows, {
+                name: nickName,
+                provenance: {
+                  source: "kalshi-live",
+                  endpoint: "search_traders",
+                  query: resolvedQuery,
+                  nickname: nickName,
+                  limit: resolvedLimit,
+                  includeMetrics: resolvedMetrics,
+                  includeHoldings: resolvedHoldings,
+                  profileCount,
+                  querySummary,
+                },
+                requestCards: [requestCard],
+              });
+            }
+
+            firstSheetId = writtenIds[0] || firstSheetId;
+            return next;
+          });
+
+          if (firstSheetId && ctx?.setActiveSheetId) {
+            ctx.setActiveSheetId(firstSheetId);
+          }
+          ctx?.setConnectHomeAnalyzeActive?.(true);
+        });
+      } else if (setDataSheets) {
+        const sheetLabel = resolvedSelected || resolvedQuery || "traders";
+        const sheetName = `trader · ${sheetLabel}`.slice(0, 80);
+        let firstSheetId = sheetId || ctx?.activeSheetId || null;
+
         flushSync(() => {
           setDataSheets((prev) => {
             let next = { ...(prev || {}) };
@@ -1900,6 +1968,7 @@ export default function KalshiLive({ setConnectedData, connectHomePullBridge = f
                 source: "kalshi-live",
                 endpoint: "search_traders",
                 query: resolvedQuery,
+                nickname: resolvedSelected || undefined,
                 limit: resolvedLimit,
                 includeMetrics: resolvedMetrics,
                 includeHoldings: resolvedHoldings,
@@ -1929,6 +1998,7 @@ export default function KalshiLive({ setConnectedData, connectHomePullBridge = f
     },
     [
       connectKalshiLiveSearchTradersQuery,
+      connectKalshiLiveSearchTradersSelectedNickname,
       connectKalshiLiveSearchTradersIncludeMetrics,
       connectKalshiLiveSearchTradersIncludeHoldings,
       connectKalshiLiveLimit,
@@ -2386,7 +2456,9 @@ export default function KalshiLive({ setConnectedData, connectHomePullBridge = f
                     })
                 : endpointId === "search_traders"
                   ? summarizeKalshiLiveSearchTradersRequest({
-                      query: connectKalshiLiveSearchTradersQuery,
+                      query:
+                        connectKalshiLiveSearchTradersSelectedNickname ||
+                        connectKalshiLiveSearchTradersQuery,
                       limit: connectKalshiLiveLimit,
                       includeMetrics: connectKalshiLiveSearchTradersIncludeMetrics,
                       includeHoldings: connectKalshiLiveSearchTradersIncludeHoldings,
@@ -2542,6 +2614,7 @@ export default function KalshiLive({ setConnectedData, connectHomePullBridge = f
     connectKalshiLiveHolderTradesEventTicker,
     connectKalshiLiveHolderTradesMinAmount,
     connectKalshiLiveSearchTradersQuery,
+    connectKalshiLiveSearchTradersSelectedNickname,
     connectKalshiLiveSearchTradersIncludeMetrics,
     connectKalshiLiveSearchTradersIncludeHoldings,
     activeSheetId,
