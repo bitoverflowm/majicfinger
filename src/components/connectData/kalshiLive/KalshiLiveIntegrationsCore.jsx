@@ -44,6 +44,7 @@ import { KalshiLiveEventForecastCommonQueries } from "@/components/connectData/k
 import { KalshiLiveLeaderboardFields } from "@/components/connectData/kalshiLive/KalshiLiveLeaderboardFields";
 import { KalshiLiveHolderProfileFields } from "@/components/connectData/kalshiLive/KalshiLiveHolderProfileFields";
 import { KalshiLiveHolderTradesFields } from "@/components/connectData/kalshiLive/KalshiLiveHolderTradesFields";
+import { KalshiLiveSearchTradersFields } from "@/components/connectData/kalshiLive/KalshiLiveSearchTradersFields";
 import { KalshiLiveSeriesTickersField } from "@/components/connectData/kalshiLive/KalshiLiveSeriesTickersField";
 import { KalshiLiveComposeOperationPanel } from "@/components/connectData/kalshiLive/KalshiLiveComposeOperationPanel";
 import { Button } from "@/components/ui/button";
@@ -64,6 +65,9 @@ import {
 import {
   KALSHI_LIVE_HOLDER_TRADES_LIMIT_DEFAULT,
 } from "@/lib/kalshiLive/holderTradesColumns";
+import {
+  KALSHI_LIVE_SEARCH_TRADERS_LIMIT_DEFAULT,
+} from "@/lib/kalshiLive/searchTradersColumns";
 import { CONNECT_COMPOSE_OPERATIONS } from "@/lib/connectComposeOperations";
 import {
   applyKalshiLivePowerSearchSelection,
@@ -105,6 +109,10 @@ const LIVE_SOURCE_PRESENTATION = {
   },
   trades_by_holder: {
     icon: ArrowLeftRight,
+    accent: "secondary",
+  },
+  search_traders: {
+    icon: Search,
     accent: "secondary",
   },
   series: {
@@ -477,6 +485,11 @@ export function KalshiLiveIntegrationsCore({ onRunPull, className, stepBackRef }
     setConnectKalshiLiveHolderTradesSeriesTicker,
     setConnectKalshiLiveHolderTradesEventTicker,
     setConnectKalshiLiveHolderTradesMinAmount,
+    connectKalshiLiveSearchTradersIncludeMetrics = false,
+    setConnectKalshiLiveSearchTradersIncludeMetrics,
+    connectKalshiLiveSearchTradersIncludeHoldings = false,
+    setConnectKalshiLiveSearchTradersIncludeHoldings,
+    setConnectKalshiLiveSearchTradersQuery,
     connectKalshiLiveTradesTicker = "",
     setConnectKalshiLiveTradesTicker,
     setConnectKalshiLiveTradesTickerMeta,
@@ -641,6 +654,11 @@ export function KalshiLiveIntegrationsCore({ onRunPull, className, stepBackRef }
         setConnectKalshiLiveHolderTradesEventTicker?.("");
         setConnectKalshiLiveHolderTradesMinAmount?.("");
       }
+      if (id !== "search_traders") {
+        setConnectKalshiLiveSearchTradersQuery?.("");
+        setConnectKalshiLiveSearchTradersIncludeMetrics?.(false);
+        setConnectKalshiLiveSearchTradersIncludeHoldings?.(false);
+      }
       if (id !== "trades") {
         setConnectKalshiLiveTradesTicker?.("");
         setConnectKalshiLiveTradesTickerMeta?.({});
@@ -667,6 +685,8 @@ export function KalshiLiveIntegrationsCore({ onRunPull, className, stepBackRef }
         setConnectKalshiLiveLimit?.(KALSHI_LIVE_LEADERBOARD_LIMIT_DEFAULT);
       } else if (id === "trades_by_holder") {
         setConnectKalshiLiveLimit?.(KALSHI_LIVE_HOLDER_TRADES_LIMIT_DEFAULT);
+      } else if (id === "search_traders") {
+        setConnectKalshiLiveLimit?.(KALSHI_LIVE_SEARCH_TRADERS_LIMIT_DEFAULT);
       }
       setFilterError(null);
       setHoveredEndpointId("");
@@ -712,6 +732,9 @@ export function KalshiLiveIntegrationsCore({ onRunPull, className, stepBackRef }
       setConnectKalshiLiveHolderTradesSeriesTicker,
       setConnectKalshiLiveHolderTradesEventTicker,
       setConnectKalshiLiveHolderTradesMinAmount,
+      setConnectKalshiLiveSearchTradersQuery,
+      setConnectKalshiLiveSearchTradersIncludeMetrics,
+      setConnectKalshiLiveSearchTradersIncludeHoldings,
       setConnectKalshiLiveTradesTicker,
       setConnectKalshiLiveTradesTickerMeta,
       setConnectKalshiLiveOrderbookTicker,
@@ -768,6 +791,9 @@ export function KalshiLiveIntegrationsCore({ onRunPull, className, stepBackRef }
     setConnectKalshiLiveHolderTradesSeriesTicker?.("");
     setConnectKalshiLiveHolderTradesEventTicker?.("");
     setConnectKalshiLiveHolderTradesMinAmount?.("");
+    setConnectKalshiLiveSearchTradersQuery?.("");
+    setConnectKalshiLiveSearchTradersIncludeMetrics?.(false);
+    setConnectKalshiLiveSearchTradersIncludeHoldings?.(false);
     setConnectKalshiLiveTradesTicker?.("");
     setConnectKalshiLiveTradesTickerMeta?.({});
     setConnectKalshiLiveOrderbookTicker?.("");
@@ -826,6 +852,9 @@ export function KalshiLiveIntegrationsCore({ onRunPull, className, stepBackRef }
     setConnectKalshiLiveHolderTradesSeriesTicker,
     setConnectKalshiLiveHolderTradesEventTicker,
     setConnectKalshiLiveHolderTradesMinAmount,
+    setConnectKalshiLiveSearchTradersQuery,
+    setConnectKalshiLiveSearchTradersIncludeMetrics,
+    setConnectKalshiLiveSearchTradersIncludeHoldings,
     setConnectKalshiLiveTradesTicker,
     setConnectKalshiLiveTradesTickerMeta,
     setConnectKalshiLiveOrderbookTicker,
@@ -916,12 +945,25 @@ export function KalshiLiveIntegrationsCore({ onRunPull, className, stepBackRef }
     ],
   );
 
+  const searchTradersColumnOpts = useMemo(
+    () => ({
+      includeMetrics: !!connectKalshiLiveSearchTradersIncludeMetrics,
+      includeHoldings: !!connectKalshiLiveSearchTradersIncludeHoldings,
+    }),
+    [
+      connectKalshiLiveSearchTradersIncludeMetrics,
+      connectKalshiLiveSearchTradersIncludeHoldings,
+    ],
+  );
+
   const endpointColumnOpts =
     selectedId === "events"
       ? eventsColumnOpts
       : selectedId === "multivariate_events"
         ? multivariateEventsColumnOpts
-        : undefined;
+        : selectedId === "search_traders"
+          ? searchTradersColumnOpts
+          : undefined;
 
   const getDisplayLabel = useCallback(
     (col) =>
@@ -1282,6 +1324,9 @@ export function KalshiLiveIntegrationsCore({ onRunPull, className, stepBackRef }
             {selectedId === "trades_by_holder" ? (
               <KalshiLiveHolderTradesFields className="mt-4" disabled={pullLoading} />
             ) : null}
+            {selectedId === "search_traders" ? (
+              <KalshiLiveSearchTradersFields className="mt-4" disabled={pullLoading} />
+            ) : null}
             {selectedId === "trades" ? (
               <>
                 <KalshiLiveTradesTickerField
@@ -1313,7 +1358,7 @@ export function KalshiLiveIntegrationsCore({ onRunPull, className, stepBackRef }
               />
             ) : null}
             <ColumnPicker
-              key={`${selectedId}:${connectKalshiLiveEventsIncludeMarkets}:${connectKalshiLiveEventsRowMode}:${connectKalshiLiveMultivariateEventsIncludeMarkets}:${connectKalshiLiveMultivariateEventsRowMode}`}
+              key={`${selectedId}:${connectKalshiLiveEventsIncludeMarkets}:${connectKalshiLiveEventsRowMode}:${connectKalshiLiveMultivariateEventsIncludeMarkets}:${connectKalshiLiveMultivariateEventsRowMode}:${connectKalshiLiveSearchTradersIncludeMetrics}:${connectKalshiLiveSearchTradersIncludeHoldings}`}
               sourceId={selectedId}
               sourceName={
                 endpoints.find((e) => e.id === selectedId)?.title || selectedId

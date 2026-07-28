@@ -4,6 +4,7 @@ import { projectKalshiLiveEventForecastRows } from "@/lib/kalshiLive/normalizeEv
 import { projectKalshiLiveLeaderboardRows } from "@/lib/kalshiLive/normalizeLeaderboardRow";
 import { projectKalshiLiveHolderProfileRows } from "@/lib/kalshiLive/normalizeHolderProfileRow";
 import { projectKalshiLiveHolderTradeRows } from "@/lib/kalshiLive/normalizeHolderTradeRow";
+import { projectKalshiLiveSearchTradersRows } from "@/lib/kalshiLive/normalizeSearchTradersRow";
 import { projectKalshiLiveTradeRows } from "@/lib/kalshiLive/normalizeTradeRow";
 import { projectKalshiLiveOrderbookRows } from "@/lib/kalshiLive/normalizeOrderbookRow";
 import { projectKalshiLiveMarketRows } from "@/lib/kalshiLive/normalizeMarketRow";
@@ -44,6 +45,12 @@ function viewNameFor(key) {
  *   leaderboardContext?: { metricName?: string; timePeriod?: string; category?: string };
  *   holderProfile?: { social_profile?: unknown; inner_circle?: unknown } | null;
  *   holderTrades?: unknown[];
+ *   searchTraders?: Array<{
+ *     profile: Record<string, unknown>;
+ *     metrics?: Record<string, unknown> | null;
+ *     holdingsPayload?: Record<string, unknown> | null;
+ *   }>;
+ *   searchTradersOpts?: { includeMetrics?: boolean; includeHoldings?: boolean; closedPositions?: boolean };
  *   trades?: unknown[];
  *   orderbook?: unknown[];
  *   selectedColumns?: string[];
@@ -76,6 +83,12 @@ export async function ingestKalshiLiveAsView(opts) {
     sheetRows = projectKalshiLiveHolderTradeRows(
       Array.isArray(opts.holderTrades) ? opts.holderTrades : [],
       opts.selectedColumns,
+    );
+  } else if (endpointId === "search_traders") {
+    sheetRows = projectKalshiLiveSearchTradersRows(
+      Array.isArray(opts.searchTraders) ? opts.searchTraders : [],
+      opts.selectedColumns,
+      opts.searchTradersOpts || {},
     );
   } else if (endpointId === "trades") {
     sheetRows = projectKalshiLiveTradeRows(

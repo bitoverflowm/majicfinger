@@ -43,6 +43,7 @@ import { fetchKalshiLiveEventForecastPull } from "@/lib/kalshiLive/fetchKalshiLi
 import { fetchKalshiLiveLeaderboardPull } from "@/lib/kalshiLive/fetchKalshiLiveLeaderboardPull";
 import { fetchKalshiLiveHolderProfilePull } from "@/lib/kalshiLive/fetchKalshiLiveHolderProfilePull";
 import { fetchKalshiLiveHolderTradesPull } from "@/lib/kalshiLive/fetchKalshiLiveHolderTradesPull";
+import { fetchKalshiLiveSearchTradersPull } from "@/lib/kalshiLive/fetchKalshiLiveSearchTradersPull";
 import {
   partitionEventForecastApiParams,
   parseKalshiLiveEventForecastTicker,
@@ -55,6 +56,7 @@ import {
 } from "@/lib/kalshiLive/leaderboardCompose";
 import { summarizeKalshiLiveHolderProfileRequest } from "@/lib/kalshiLive/holderProfileCompose";
 import { summarizeKalshiLiveHolderTradesRequest } from "@/lib/kalshiLive/holderTradesCompose";
+import { summarizeKalshiLiveSearchTradersRequest } from "@/lib/kalshiLive/searchTradersCompose";
 import { inferSeriesTickerFromEvent } from "@/lib/kalshiLive/eventCandlesticksCompose";
 import { fetchKalshiLiveTradesPull } from "@/lib/kalshiLive/fetchKalshiLiveTradesPull";
 import { fetchKalshiLiveOrderbookPull } from "@/lib/kalshiLive/fetchKalshiLiveOrderbookPull";
@@ -146,6 +148,9 @@ export default function KalshiLive({ setConnectedData, connectHomePullBridge = f
     connectKalshiLiveHolderTradesSeriesTicker,
     connectKalshiLiveHolderTradesEventTicker,
     connectKalshiLiveHolderTradesMinAmount,
+    connectKalshiLiveSearchTradersQuery,
+    connectKalshiLiveSearchTradersIncludeMetrics,
+    connectKalshiLiveSearchTradersIncludeHoldings,
     connectKalshiLiveTradesTicker,
     connectKalshiLiveOrderbookTicker,
     connectKalshiLiveSeriesTicker,
@@ -1797,6 +1802,145 @@ export default function KalshiLive({ setConnectedData, connectHomePullBridge = f
     ],
   );
 
+  const runSearchTradersPull = useCallback(
+    async (ac, sheetId, cols) => {
+      const query = connectKalshiLiveSearchTradersQuery;
+      const includeMetrics = !!connectKalshiLiveSearchTradersIncludeMetrics;
+      const includeHoldings = !!connectKalshiLiveSearchTradersIncludeHoldings;
+      const limit = Number(connectKalshiLiveLimit) || 25;
+      const whereFilters = Array.isArray(connectKalshiLiveWhereFilters)
+        ? connectKalshiLiveWhereFilters
+        : [];
+      const sortClauses = Array.isArray(connectKalshiLiveSortClauses)
+        ? connectKalshiLiveSortClauses
+        : [];
+      const requestStartMs =
+        typeof performance !== "undefined" && performance?.now ? performance.now() : Date.now();
+
+      setConnectDataLakePullState?.((prev) => ({
+        ...prev,
+        loading: true,
+        label: "Searching Kalshi Live traders…",
+        progress: 8,
+        error: null,
+      }));
+
+      const {
+        raw,
+        rows,
+        querySummary,
+        query: resolvedQuery,
+        limit: resolvedLimit,
+        includeMetrics: resolvedMetrics,
+        includeHoldings: resolvedHoldings,
+        profileCount,
+      } = await fetchKalshiLiveSearchTradersPull({
+        query,
+        limit,
+        includeMetrics,
+        includeHoldings,
+        whereFilters,
+        sortClauses,
+        selectedColumns: cols,
+        signal: ac.signal,
+        onProgress: ({ label, progress }) => {
+          setConnectDataLakePullState?.((prev) => ({
+            ...prev,
+            loading: true,
+            label,
+            progress,
+            error: null,
+          }));
+        },
+      });
+
+      if (setRows) setRows(rows);
+
+      await ingestKalshiLiveAsView({
+        endpointId: "search_traders",
+        searchTraders: raw,
+        searchTradersOpts: {
+          includeMetrics: resolvedMetrics,
+          includeHoldings: resolvedHoldings,
+          closedPositions: true,
+        },
+        selectedColumns: cols,
+      });
+
+      const elapsedMs =
+        (typeof performance !== "undefined" && performance?.now
+          ? performance.now()
+          : Date.now()) - requestStartMs;
+
+      const sheetName = `trader search · ${resolvedQuery}`.slice(0, 80);
+      let firstSheetId = sheetId || ctx?.activeSheetId || null;
+      const totalRows = Array.isArray(rows) ? rows.length : 0;
+
+      if (setDataSheets) {
+        flushSync(() => {
+          setDataSheets((prev) => {
+            let next = { ...(prev || {}) };
+            const targetSheetId = firstSheetId || allocateNextSheetId(next);
+            firstSheetId = targetSheetId;
+
+            const requestCard = {
+              id: genRequestCardId(),
+              createdAt: Date.now(),
+              elapsedMs,
+              lake: "kalshi-live",
+              table: "search_traders",
+              sheetId: targetSheetId,
+              querySummary,
+              loadedRowCount: totalRows,
+            };
+
+            next = applyAthenaPullToSheetPatch(next, targetSheetId, rows, {
+              name: sheetName,
+              provenance: {
+                source: "kalshi-live",
+                endpoint: "search_traders",
+                query: resolvedQuery,
+                limit: resolvedLimit,
+                includeMetrics: resolvedMetrics,
+                includeHoldings: resolvedHoldings,
+                profileCount,
+                querySummary,
+              },
+              requestCards: [requestCard],
+            });
+
+            return next;
+          });
+
+          if (firstSheetId && ctx?.setActiveSheetId) {
+            ctx.setActiveSheetId(firstSheetId);
+          }
+          ctx?.setConnectHomeAnalyzeActive?.(true);
+        });
+      } else {
+        applyConnectHomePullData(ctx, rows);
+      }
+
+      if (ctx?.requestConnectAnalyzeScroll) {
+        ctx.requestConnectAnalyzeScroll();
+      }
+
+      return totalRows;
+    },
+    [
+      connectKalshiLiveSearchTradersQuery,
+      connectKalshiLiveSearchTradersIncludeMetrics,
+      connectKalshiLiveSearchTradersIncludeHoldings,
+      connectKalshiLiveLimit,
+      connectKalshiLiveWhereFilters,
+      connectKalshiLiveSortClauses,
+      setConnectDataLakePullState,
+      setDataSheets,
+      setRows,
+      ctx,
+    ],
+  );
+
   const runTradesPull = useCallback(
     async (ac, sheetId, cols) => {
       const whereFilters = Array.isArray(connectKalshiLiveWhereFilters)
@@ -2240,6 +2384,13 @@ export default function KalshiLive({ setConnectedData, connectHomePullBridge = f
                       minAmount: connectKalshiLiveHolderTradesMinAmount,
                       limit: connectKalshiLiveLimit,
                     })
+                : endpointId === "search_traders"
+                  ? summarizeKalshiLiveSearchTradersRequest({
+                      query: connectKalshiLiveSearchTradersQuery,
+                      limit: connectKalshiLiveLimit,
+                      includeMetrics: connectKalshiLiveSearchTradersIncludeMetrics,
+                      includeHoldings: connectKalshiLiveSearchTradersIncludeHoldings,
+                    })
                 : endpointId,
     });
 
@@ -2268,6 +2419,8 @@ export default function KalshiLive({ setConnectedData, connectHomePullBridge = f
                   ? "Fetching Kalshi Live trader profile…"
                 : endpointId === "trades_by_holder"
                   ? "Fetching Kalshi Live trades by trader…"
+                : endpointId === "search_traders"
+                  ? "Searching Kalshi Live traders…"
                 : endpointId === "trades"
                 ? "Fetching Kalshi Live trades…"
                 : endpointId === "orderbook"
@@ -2298,6 +2451,8 @@ export default function KalshiLive({ setConnectedData, connectHomePullBridge = f
         rowCount = (await runHolderProfilePull(ac, sheetId, cols)) || 0;
       } else if (endpointId === "trades_by_holder") {
         rowCount = (await runHolderTradesPull(ac, sheetId, cols)) || 0;
+      } else if (endpointId === "search_traders") {
+        rowCount = (await runSearchTradersPull(ac, sheetId, cols)) || 0;
       } else if (endpointId === "trades") {
         rowCount = (await runTradesPull(ac, sheetId, cols)) || 0;
       } else if (endpointId === "orderbook") {
@@ -2386,6 +2541,9 @@ export default function KalshiLive({ setConnectedData, connectHomePullBridge = f
     connectKalshiLiveHolderTradesSeriesTicker,
     connectKalshiLiveHolderTradesEventTicker,
     connectKalshiLiveHolderTradesMinAmount,
+    connectKalshiLiveSearchTradersQuery,
+    connectKalshiLiveSearchTradersIncludeMetrics,
+    connectKalshiLiveSearchTradersIncludeHoldings,
     activeSheetId,
     runMarketsPull,
     runEventsPull,
@@ -2397,6 +2555,7 @@ export default function KalshiLive({ setConnectedData, connectHomePullBridge = f
     runLeaderboardPull,
     runHolderProfilePull,
     runHolderTradesPull,
+    runSearchTradersPull,
     runTradesPull,
     runOrderbookPull,
     setConnectDataLakePullState,

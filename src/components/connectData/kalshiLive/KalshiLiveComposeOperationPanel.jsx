@@ -40,6 +40,7 @@ import {
 } from "@/lib/kalshiLive/leaderboardCompose";
 import { validateKalshiLiveHolderProfilePull } from "@/lib/kalshiLive/holderProfileCompose";
 import { validateKalshiLiveHolderTradesPull } from "@/lib/kalshiLive/holderTradesCompose";
+import { validateKalshiLiveSearchTradersPull } from "@/lib/kalshiLive/searchTradersCompose";
 import {
   KALSHI_LIVE_LEADERBOARD_LIMIT_DEFAULT,
   KALSHI_LIVE_LEADERBOARD_LIMIT_MAX,
@@ -48,6 +49,10 @@ import {
   KALSHI_LIVE_HOLDER_TRADES_LIMIT_DEFAULT,
   KALSHI_LIVE_HOLDER_TRADES_LIMIT_MAX,
 } from "@/lib/kalshiLive/holderTradesColumns";
+import {
+  KALSHI_LIVE_SEARCH_TRADERS_LIMIT_DEFAULT,
+  KALSHI_LIVE_SEARCH_TRADERS_LIMIT_MAX,
+} from "@/lib/kalshiLive/searchTradersColumns";
 import {
   KALSHI_LIVE_TRADES_DEFAULT_LIMIT,
   KALSHI_LIVE_TRADES_ROW_LIMIT_MAX,
@@ -102,6 +107,7 @@ function defaultRowLimit(endpointId) {
   if (endpointId === "multivariate_events") return KALSHI_LIVE_MULTIVARIATE_EVENTS_PAGE_LIMIT_DEFAULT;
   if (endpointId === "leaderboard") return KALSHI_LIVE_LEADERBOARD_LIMIT_DEFAULT;
   if (endpointId === "trades_by_holder") return KALSHI_LIVE_HOLDER_TRADES_LIMIT_DEFAULT;
+  if (endpointId === "search_traders") return KALSHI_LIVE_SEARCH_TRADERS_LIMIT_DEFAULT;
   return KALSHI_LIVE_DEFAULT_LIMIT;
 }
 
@@ -228,6 +234,9 @@ export function KalshiLiveComposeOperationPanel({
     connectKalshiLiveHolderTradesSeriesTicker = "",
     connectKalshiLiveHolderTradesEventTicker = "",
     connectKalshiLiveHolderTradesMinAmount = "",
+    connectKalshiLiveSearchTradersQuery = "",
+    connectKalshiLiveSearchTradersIncludeMetrics = false,
+    connectKalshiLiveSearchTradersIncludeHoldings = false,
     connectKalshiLiveTickers = "",
     connectKalshiLiveMarketsTickerMeta = {},
     connectKalshiLiveMarketsSheetMode = KALSHI_LIVE_MARKETS_SHEET_MODE_PER_MARKET,
@@ -569,6 +578,19 @@ export function KalshiLiveComposeOperationPanel({
       }
     }
 
+    if (endpointId === "search_traders") {
+      const searchErr = validateKalshiLiveSearchTradersPull({
+        query: connectKalshiLiveSearchTradersQuery,
+        limit: connectKalshiLiveLimit,
+        includeMetrics: connectKalshiLiveSearchTradersIncludeMetrics,
+        includeHoldings: connectKalshiLiveSearchTradersIncludeHoldings,
+      });
+      if (searchErr) {
+        setFilterError?.(searchErr);
+        return;
+      }
+    }
+
     if (endpointId === "trades") {
       const tradesErr = validateKalshiLiveTradesPull(
         connectKalshiLiveTradesTicker,
@@ -676,6 +698,9 @@ export function KalshiLiveComposeOperationPanel({
     connectKalshiLiveHolderTradesSeriesTicker,
     connectKalshiLiveHolderTradesEventTicker,
     connectKalshiLiveHolderTradesMinAmount,
+    connectKalshiLiveSearchTradersQuery,
+    connectKalshiLiveSearchTradersIncludeMetrics,
+    connectKalshiLiveSearchTradersIncludeHoldings,
     connectKalshiLiveLimit,
     connectKalshiLiveTickers,
     connectKalshiLiveMarketsDiscoveryMode,
@@ -721,6 +746,8 @@ export function KalshiLiveComposeOperationPanel({
             ? KALSHI_LIVE_LEADERBOARD_LIMIT_MAX
             : endpointId === "trades_by_holder"
               ? KALSHI_LIVE_HOLDER_TRADES_LIMIT_MAX
+              : endpointId === "search_traders"
+                ? KALSHI_LIVE_SEARCH_TRADERS_LIMIT_MAX
               : 1000;
 
   const rowLimitDefault = defaultRowLimit(endpointId);
@@ -922,6 +949,8 @@ export function KalshiLiveComposeOperationPanel({
                 ? "Nickname is set above. Other columns filter on our side after the pull."
               : endpointId === "trades_by_holder"
                 ? "Nickname, series, event, and min amount are set above. Limit (cursor pages) is below. Other columns filter on our side after the pull."
+              : endpointId === "search_traders"
+                ? "Nickname search and optional metrics/holdings are set above. Limit is max traders from search. Other columns filter on our side after the pull."
               : endpointId === "trades"
                 ? "Date range is set in Common queries above. Other columns filter on our side after the pull."
                 : endpointId === "orderbook"
@@ -1035,6 +1064,8 @@ export function KalshiLiveComposeOperationPanel({
                 ? "Max 10,000 trades per market. Each API page requests up to 1,000; we follow the cursor until your row limit is reached or the market is exhausted."
                 : endpointId === "trades_by_holder"
                   ? "Max 5,000 rows. Each API page requests up to 200 (page_size); we follow the cursor until your row limit is reached or results are exhausted."
+                : endpointId === "search_traders"
+                  ? "Max 500 traders from nickname search (pages of up to 100). Optional metrics/holdings are fetched per trader afterward."
                 : endpointId === "multivariate_events"
                   ? "Page size for each multivariate events request (max 100). We follow the cursor across pages until results are exhausted or 20,000 rows are loaded."
                   : "Applied after API fetch, client filters, and sort."}
