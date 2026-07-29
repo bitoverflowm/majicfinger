@@ -33,6 +33,7 @@ function unixToDateAndTime(unix) {
  *   className?: string;
  *   disabled?: boolean;
  *   fromDate?: Date;
+ *   toDate?: Date;
  *   placeholder?: string;
  * }} props
  */
@@ -42,6 +43,7 @@ export function KalshiLiveTimestampPicker({
   className,
   disabled = false,
   fromDate,
+  toDate,
   placeholder = "Pick date & time",
 }) {
   const parsed = useMemo(() => unixToDateAndTime(value), [value]);
@@ -85,7 +87,15 @@ export function KalshiLiveTimestampPicker({
           mode="single"
           selected={date}
           fromDate={fromDate}
-          disabled={fromDate ? [{ before: fromDate }] : undefined}
+          toDate={toDate}
+          disabled={
+            fromDate || toDate
+              ? [
+                  ...(fromDate ? [{ before: fromDate }] : []),
+                  ...(toDate ? [{ after: toDate }] : []),
+                ]
+              : undefined
+          }
           onSelect={(d) => {
             setDate(d);
             commit(d, time);

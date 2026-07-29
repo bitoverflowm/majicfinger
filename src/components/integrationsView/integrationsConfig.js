@@ -7,6 +7,7 @@ export const API_INTEGRATIONS = [
   "polymarket",
   "polymarketHistorical",
   "kalshiHistorical",
+  "kalshiHistoricalV2",
   "kalshiLive",
   "coinGecko",
   "twitter",
@@ -107,8 +108,8 @@ export const integrations_list = [
       "Kalshi's more recent historical market data up to the live/historical cutoff.",
     /** Dynamic caption filled from GET /historical/cutoff in picker / hub UI. */
     listCaptionKey: "kalshiHistoricalCutoff",
-    tags: ["featured", "crypto", "finance", "trading", "prediction", "coming soon"],
-    live: false,
+    tags: ["featured", "crypto", "finance", "trading", "prediction"],
+    live: true,
   },
   {
     color: "#28CC95",

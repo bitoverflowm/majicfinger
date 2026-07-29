@@ -350,7 +350,7 @@ export function normalizeSeriesMarketsForPicker(markets) {
 
 /**
  * Which Kalshi surface owns the Market Ticker Search instance.
- * Historical search is not wired yet — keep `"historical"` for future inverse messaging.
+ * Drives cutoff notes: live warns for pre-cutoff markets; historical warns for post-cutoff.
  *
  * @typedef {"live" | "historical"} KalshiTickerSearchDataSource
  */

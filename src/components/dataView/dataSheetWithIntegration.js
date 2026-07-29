@@ -9,6 +9,7 @@ import Polymarket from "@/components/integrationsView/integrationPlayground/inte
 import PolymarketHistorical from "@/components/integrationsView/integrationPlayground/integrations/polymarketHistorical";
 import KalshiHistorical from "@/components/integrationsView/integrationPlayground/integrations/kalshiHistorical";
 import KalshiLive from "@/components/integrationsView/integrationPlayground/integrations/kalshiLive";
+import KalshiHistoricalV2 from "@/components/integrationsView/integrationPlayground/integrations/kalshiHistoricalV2";
 import CoinGecko from "@/components/integrationsView/integrationPlayground/integrations/coinGecko";
 import Twitter from "@/components/integrationsView/integrationPlayground/integrations/twitter";
 import WallStreetBets from "@/components/integrationsView/integrationPlayground/integrations/wallStreetBets";
@@ -231,6 +232,7 @@ export default function DataSheetWithIntegration({
   const connectHomeIntegrationPullBridge =
     connectHomeMode &&
     (connectWorkspace === "polymarket" ||
+      connectWorkspace === "kalshiHistoricalV2" ||
       connectWorkspace === "kalshiLive" ||
       connectWorkspace === "chainlink" ||
       connectWorkspace === "binance");
@@ -1305,6 +1307,8 @@ export default function DataSheetWithIntegration({
                 requestSheetDestination={requestSheetDestination}
                 connectHomePullBridge
               />
+            ) : connectWorkspace === "kalshiHistoricalV2" ? (
+              <KalshiHistoricalV2 setConnectedData={setConnectedDataRaw} connectHomePullBridge />
             ) : connectWorkspace === "kalshiLive" ? (
               <KalshiLive setConnectedData={setConnectedDataRaw} connectHomePullBridge />
             ) : connectWorkspace === "chainlink" ? (

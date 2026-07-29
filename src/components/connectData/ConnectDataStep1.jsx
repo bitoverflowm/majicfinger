@@ -248,6 +248,7 @@ function PillButton({
   icon,
   label,
   caption,
+  captionLoading = false,
   title,
   onClick,
   disabled,
@@ -259,8 +260,8 @@ function PillButton({
   compact = false,
 }) {
   const surface = compact
-    ? cn(demoPillClass, caption && "min-h-[1.75rem] py-0.5", className)
-    : cn(pillClass, caption && "min-h-[2.75rem] py-1", className);
+    ? cn(demoPillClass, (caption || captionLoading) && "min-h-[1.75rem] py-0.5", className)
+    : cn(pillClass, (caption || captionLoading) && "min-h-[2.75rem] py-1", className);
   const iconBox = compact
     ? cn(demoIconSlotClass, iconClassName)
     : cn(iconSlotClassName || iconSlotClass, iconClassName);
@@ -273,7 +274,11 @@ function PillButton({
         <span className={iconBox}>{icon}</span>
         <span className="min-w-0 flex-1">
           <span className={labelCls}>{label}</span>
-          {caption ? (
+          {captionLoading ? (
+            <span className="mt-0.5 block text-[8px] font-normal leading-tight text-muted-foreground sm:text-[8.5px]">
+              <Skeleton className="h-3 w-[9rem] bg-muted-foreground/20" />
+            </span>
+          ) : caption ? (
             <span className="mt-0.5 block text-[8px] font-normal leading-tight text-muted-foreground sm:text-[8.5px]">
               {caption}
             </span>
@@ -304,6 +309,7 @@ function PillButtonSoon({
   icon,
   label,
   caption,
+  captionLoading = false,
   className,
   iconClassName,
   iconSlotClassName,
@@ -317,14 +323,14 @@ function PillButtonSoon({
         demoPillClass,
         className,
         "cursor-not-allowed opacity-45",
-        caption && "min-h-[1.75rem] py-0.5",
+        (caption || captionLoading) && "min-h-[1.75rem] py-0.5",
         showDemoTierBadges && "justify-between gap-1 pr-1",
       )
     : cn(
         pillClass,
         className,
         "cursor-not-allowed opacity-45",
-        caption && "min-h-[2.75rem] py-1",
+        (caption || captionLoading) && "min-h-[2.75rem] py-1",
         showDemoTierBadges && "justify-between gap-2 pr-1.5",
       );
   const iconBox = compact
@@ -339,7 +345,11 @@ function PillButtonSoon({
         <span className={iconBox}>{icon}</span>
         <span className="min-w-0 flex-1">
           <span className={labelCls}>{label}</span>
-          {caption ? (
+          {captionLoading ? (
+            <span className="mt-0.5 block text-[8px] font-normal leading-tight text-muted-foreground sm:text-[8.5px]">
+              <Skeleton className="h-3 w-[9rem] bg-muted-foreground/20" />
+            </span>
+          ) : caption ? (
             <span className="mt-0.5 block text-[8px] font-normal leading-tight text-muted-foreground sm:text-[8.5px]">
               {caption}
             </span>
@@ -552,7 +562,8 @@ export default function ConnectDataStep1({
 
   const kalshiHistoricalConnect = useBeckerHistoricalWarmIntegrationsConnect(navigateKalshiHistorical);
 
-  const { cutoffLabel: kalshiCutoffLabel } = useKalshiHistoricalCutoffDisplay();
+  const { cutoffLabel: kalshiCutoffLabel, loading: kalshiCutoffLoading } =
+    useKalshiHistoricalCutoffDisplay();
 
   const openIntegrationPlayground = useCallback(
     (clickHandlerId) => {
@@ -596,8 +607,10 @@ export default function ConnectDataStep1({
             ? kalshiHistoricalConnect
             : null;
       let caption = row.listCaption || null;
+      let captionLoading = false;
       if (row.listCaptionKey === "kalshiHistoricalCutoff") {
-        caption = kalshiHistoricalV2Caption(kalshiCutoffLabel);
+        captionLoading = kalshiCutoffLoading;
+        caption = kalshiCutoffLoading ? null : kalshiHistoricalV2Caption(kalshiCutoffLabel);
       } else if (id === "kalshiHistorical") {
         caption = row.listCaption || KALSHI_HISTORICAL_DEEP_CAPTION;
       }
@@ -606,6 +619,7 @@ export default function ConnectDataStep1({
         name: row.name,
         description: row.description,
         caption,
+        captionLoading,
         icon: row.icon,
         live: !!row.live && !(row.tags || []).includes("coming soon"),
         warmConnect,
@@ -615,6 +629,7 @@ export default function ConnectDataStep1({
   }, [
     integrationByHandler,
     kalshiCutoffLabel,
+    kalshiCutoffLoading,
     kalshiHistoricalConnect,
     polymarketHistoricalConnect,
   ]);
@@ -1022,6 +1037,7 @@ export default function ConnectDataStep1({
                       }
                       label={row.name}
                       caption={row.caption}
+                      captionLoading={row.captionLoading}
                       title={row.description}
                       onClick={() => onIntegrationRowClick(row)}
                       iconClassName={connectIntegrationIconClass(row.key)}
@@ -1038,6 +1054,7 @@ export default function ConnectDataStep1({
                       }
                       label={row.name}
                       caption={row.caption}
+                      captionLoading={row.captionLoading}
                       showDemoTierBadges={embeddedDemo}
                       iconClassName={connectIntegrationIconClass(row.key)}
                       iconSlotClassName={embeddedDemo ? undefined : connectHubIconSlotResponsive}

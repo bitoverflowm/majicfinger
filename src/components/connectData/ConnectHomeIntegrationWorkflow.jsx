@@ -8,6 +8,7 @@ import { ArrowLeft, Check } from "lucide-react";
 import { AthenaConnectionStatusDot } from "@/components/connectData/AthenaConnectionStatusDot";
 import { KalshiPowerToolsSearch } from "@/components/connectData/KalshiPowerToolsSearch";
 import { KalshiLiveIntegrationsCore } from "@/components/connectData/kalshiLive/KalshiLiveIntegrationsCore";
+import { KalshiHistoricalV2IntegrationsCore } from "@/components/connectData/kalshiHistoricalV2/KalshiHistoricalV2IntegrationsCore";
 import { integrations_list } from "@/components/integrationsView/integrationsConfig";
 import { Button } from "@/components/ui/button";
 import { useMyStateV2 } from "@/context/stateContextV2";
@@ -682,6 +683,7 @@ export function ConnectHomeIntegrationWorkflow({ integrationId, className }) {
   const isDataLake = isConnectDataLakeIntegration(integrationId);
   const isApi = integrationId === "polymarket";
   const isKalshiLive = integrationId === "kalshiLive";
+  const isKalshiHistoricalV2 = integrationId === "kalshiHistoricalV2";
   const isLive = !!liveConfig;
 
   const sampleById = useMemo(() => sampleByIdForConfig(lakeConfig), [lakeConfig]);
@@ -860,6 +862,7 @@ export function ConnectHomeIntegrationWorkflow({ integrationId, className }) {
   const { name, description } = getIntegrationMeta(integrationId);
   const connectKalshiLiveEndpointId = ctx.connectKalshiLiveEndpointId;
   const isKalshiHistorical = integrationId === "kalshiHistorical";
+  const isWideKalshiCompose = isKalshiHistorical || isKalshiLive || isKalshiHistoricalV2;
 
   const hasComposeUi =
     (isDataLake && !!connectDataLakeSampleId) ||
@@ -873,7 +876,7 @@ export function ConnectHomeIntegrationWorkflow({ integrationId, className }) {
       className={cn(
         "flex flex-col px-4 sm:px-6 md:px-10 lg:px-14",
         connectWorkspaceScrollInsetClass,
-        hasComposeUi || isKalshiHistorical || isKalshiLive
+        hasComposeUi || isWideKalshiCompose
           ? "min-h-0 justify-start py-4 sm:py-5"
           : "min-h-0 justify-start pb-10 pt-16 sm:pb-12 sm:pt-20 md:pt-24",
         className,
@@ -882,13 +885,13 @@ export function ConnectHomeIntegrationWorkflow({ integrationId, className }) {
       <div
         className={cn(
           "mx-auto w-full",
-          isKalshiHistorical || isKalshiLive ? "max-w-6xl" : "max-w-2xl",
+          isWideKalshiCompose ? "max-w-6xl" : "max-w-2xl",
         )}
       >
         <IntegrationWorkflowHeader
-          name={isKalshiHistorical || isKalshiLive ? undefined : name}
-          description={isKalshiHistorical || isKalshiLive ? undefined : description}
-          compact={hasComposeUi || isKalshiHistorical || isKalshiLive}
+          name={isWideKalshiCompose ? undefined : name}
+          description={isWideKalshiCompose ? undefined : description}
+          compact={hasComposeUi || isWideKalshiCompose}
           onGoBack={handleGoBack}
         />
 
@@ -898,6 +901,12 @@ export function ConnectHomeIntegrationWorkflow({ integrationId, className }) {
               onRunPull={handleRunIntegrationPull}
               stepBackRef={stepBackRef}
             />
+          </div>
+        ) : null}
+
+        {isKalshiHistoricalV2 ? (
+          <div className="mt-4 sm:mt-5">
+            <KalshiHistoricalV2IntegrationsCore stepBackRef={stepBackRef} onRunPull={handleRunIntegrationPull} />
           </div>
         ) : null}
 

@@ -25,6 +25,7 @@ import {
 } from "@/hooks/useKalshiHistoricalCutoffDisplay";
 import { cn } from "@/lib/utils";
 import { trackAuthEvent } from "@/lib/analytics/authJourneyClient";
+import { Skeleton } from "@/components/ui/skeleton";
 
 /** Brand fills for sidebar integration avatars (matches Connect home hub pills). */
 const INTEGRATION_LOGO_BG = {
@@ -111,7 +112,7 @@ export function ConnectIntegrationsPickerList({
   const requestConnectWorkspace = ctx.requestConnectWorkspace;
 
   const [search, setSearch] = useState("");
-  const { cutoffLabel } = useKalshiHistoricalCutoffDisplay();
+  const { cutoffLabel, loading: cutoffLoading } = useKalshiHistoricalCutoffDisplay();
 
   const rows = useMemo(() => buildIntegrationPickerRows(), []);
   const filtered = useMemo(
@@ -203,7 +204,11 @@ export function ConnectIntegrationsPickerList({
                               <span className="block truncate text-[11px] font-normal leading-tight text-foreground">
                                 {row.name}
                               </span>
-                              {caption ? (
+                              {row.listCaptionKey === "kalshiHistoricalCutoff" && cutoffLoading ? (
+                                <span className="mt-0.5 block text-[8px] font-normal leading-tight text-muted-foreground">
+                                  <Skeleton className="h-3 w-[9.5rem] bg-muted-foreground/20" />
+                                </span>
+                              ) : caption ? (
                                 <span className="mt-0.5 block text-[8px] font-normal leading-tight text-muted-foreground">
                                   {caption}
                                 </span>

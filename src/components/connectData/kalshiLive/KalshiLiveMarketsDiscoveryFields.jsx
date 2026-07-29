@@ -26,6 +26,7 @@ import {
 } from "@/lib/kalshiLive/marketDiscovery";
 import { KALSHI_LIVE_MARKET_STATUS_OPTIONS } from "@/lib/kalshiLive/marketsColumns";
 import { cn } from "@/lib/utils";
+import { useKalshiHistoricalCutoffDisplay } from "@/hooks/useKalshiHistoricalCutoffDisplay";
 
 function startOfLocalDay(d) {
   const x = new Date(d);
@@ -85,6 +86,7 @@ function DiscoveryDateRangeField({
   onRangeChange,
   disabled = false,
   fromDate = null,
+  toDate = null,
 }) {
   const selected = useMemo(() => {
     const from = dateFromUnix(minTs);
@@ -122,7 +124,15 @@ function DiscoveryDateRangeField({
             numberOfMonths={1}
             selected={selected}
             fromDate={fromDate || undefined}
-            disabled={fromDate ? [{ before: fromDate }] : undefined}
+            toDate={toDate || undefined}
+            disabled={
+              fromDate || toDate
+                ? [
+                    ...(fromDate ? [{ before: fromDate }] : []),
+                    ...(toDate ? [{ after: toDate }] : []),
+                  ]
+                : undefined
+            }
             onSelect={(range) => {
               const from = range?.from ? unixFromDate(range.from, false) : "";
               const to = range?.to ? unixFromDate(range.to, true) : "";
@@ -164,6 +174,7 @@ function DiscoverySingleDateField({
   onChange,
   disabled = false,
   fromDate = null,
+  toDate = null,
 }) {
   return (
     <div className={cn("flex h-full flex-col gap-1", disabled && "opacity-60")}>
@@ -174,6 +185,7 @@ function DiscoverySingleDateField({
         onChange={onChange}
         disabled={disabled}
         fromDate={fromDate || undefined}
+        toDate={toDate || undefined}
         placeholder="Pick a date"
         className="h-8 w-full"
       />
@@ -192,28 +204,23 @@ function DiscoverySingleDateField({
  *   className?: string;
  * }} props
  */
-export function KalshiLiveMarketsDiscoveryFields({ value, onChange, disabled = false, className }) {
+export function KalshiLiveMarketsDiscoveryFields({
+  value,
+  onChange,
+  disabled = false,
+  className,
+  cutoffMode = "live",
+}) {
   const [cutoffDate, setCutoffDate] = useState(/** @type {Date | null} */ (null));
 
+  const { cutoffIso } = useKalshiHistoricalCutoffDisplay();
+
   useEffect(() => {
-    const ac = new AbortController();
-    void (async () => {
-      try {
-        const res = await fetch("/api/integrations/kalshi-live/historical/cutoff", {
-          headers: { Accept: "application/json" },
-          credentials: "same-origin",
-          signal: ac.signal,
-        });
-        const data = await res.json().catch(() => ({}));
-        if (ac.signal.aborted || !res.ok) return;
-        const d = new Date(String(data?.market_settled_ts || "").trim());
-        if (!Number.isNaN(d.getTime())) setCutoffDate(startOfLocalDay(d));
-      } catch (e) {
-        if (e instanceof DOMException && e.name === "AbortError") return;
-      }
-    })();
-    return () => ac.abort();
-  }, []);
+    if (!cutoffIso) return;
+    const d = new Date(String(cutoffIso).trim());
+    if (Number.isNaN(d.getTime())) return;
+    setCutoffDate(startOfLocalDay(d));
+  }, [cutoffIso]);
 
   const locks = useMemo(() => getKalshiLiveMarketsDiscoveryFieldLocks(value), [value]);
 
@@ -362,7 +369,8 @@ export function KalshiLiveMarketsDiscoveryFields({ value, onChange, disabled = f
           maxTs={value.maxCreatedTs ?? ""}
           onRangeChange={(min, max) => patch({ minCreatedTs: min, maxCreatedTs: max })}
           disabled={disabled || locks.disableCreated}
-          fromDate={cutoffDate}
+          fromDate={cutoffMode === "live" ? cutoffDate : null}
+          toDate={cutoffMode === "historical" ? cutoffDate : null}
         />
         <DiscoverySingleDateField
           label="Updated After"
@@ -370,7 +378,8 @@ export function KalshiLiveMarketsDiscoveryFields({ value, onChange, disabled = f
           value={value.minUpdatedTs ?? ""}
           onChange={setUpdatedAfter}
           disabled={disabled || locks.disableUpdated}
-          fromDate={cutoffDate}
+          fromDate={cutoffMode === "live" ? cutoffDate : null}
+          toDate={cutoffMode === "historical" ? cutoffDate : null}
         />
         <DiscoveryDateRangeField
           label="Close Date"
@@ -379,7 +388,8 @@ export function KalshiLiveMarketsDiscoveryFields({ value, onChange, disabled = f
           maxTs={value.maxCloseTs ?? ""}
           onRangeChange={(min, max) => patch({ minCloseTs: min, maxCloseTs: max })}
           disabled={disabled || locks.disableClose}
-          fromDate={cutoffDate}
+          fromDate={cutoffMode === "live" ? cutoffDate : null}
+          toDate={cutoffMode === "historical" ? cutoffDate : null}
         />
         <DiscoveryDateRangeField
           label="Settled Date"
@@ -388,7 +398,8 @@ export function KalshiLiveMarketsDiscoveryFields({ value, onChange, disabled = f
           maxTs={value.maxSettledTs ?? ""}
           onRangeChange={(min, max) => patch({ minSettledTs: min, maxSettledTs: max })}
           disabled={disabled || locks.disableSettled}
-          fromDate={cutoffDate}
+          fromDate={cutoffMode === "live" ? cutoffDate : null}
+          toDate={cutoffMode === "historical" ? cutoffDate : null}
         />
       </div>
     </div>

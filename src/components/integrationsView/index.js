@@ -9,6 +9,7 @@ import { ExternalLink } from "lucide-react";
 import { Card, CardContent, CardFooter, CardHeader } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Skeleton } from "@/components/ui/skeleton";
 import { BorderBeam } from "@/components/magicui/border-beam";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
@@ -74,7 +75,8 @@ const IntegrationsView = () => {
   ]);
 
   const kalshiHistoricalConnect = useBeckerHistoricalWarmIntegrationsConnect(navigateKalshiHistorical);
-  const { cutoffLabel: kalshiCutoffLabel } = useKalshiHistoricalCutoffDisplay();
+  const { cutoffLabel: kalshiCutoffLabel, loading: cutoffLoading } =
+    useKalshiHistoricalCutoffDisplay();
 
   const clickHandler = (clickHandlerId) => {
     if (API_INTEGRATIONS.includes(clickHandlerId)) {
@@ -221,9 +223,16 @@ const IntegrationsView = () => {
                     {(() => {
                       let caption = integration.listCaption || null;
                       if (integration.listCaptionKey === "kalshiHistoricalCutoff") {
-                        caption = kalshiHistoricalV2Caption(kalshiCutoffLabel);
+                        caption = cutoffLoading ? null : kalshiHistoricalV2Caption(kalshiCutoffLabel);
                       } else if (integration.clickHandler === "kalshiHistorical") {
                         caption = integration.listCaption || KALSHI_HISTORICAL_DEEP_CAPTION;
+                      }
+                      if (integration.listCaptionKey === "kalshiHistoricalCutoff" && cutoffLoading) {
+                        return (
+                          <p className="pt-1 text-[10px] leading-snug text-muted-foreground">
+                            <Skeleton className="h-4 w-[10.5rem] bg-muted-foreground/20" />
+                          </p>
+                        );
                       }
                       return caption ? (
                         <p className="pt-1 text-[10px] leading-snug text-muted-foreground">{caption}</p>

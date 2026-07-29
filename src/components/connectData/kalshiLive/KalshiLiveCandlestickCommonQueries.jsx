@@ -22,6 +22,7 @@ import {
 } from "@/lib/kalshiLive/candlestickCompose";
 import { KALSHI_LIVE_CANDLESTICK_PERIOD_OPTIONS } from "@/lib/kalshiLive/candlesticksColumns";
 import { cn } from "@/lib/utils";
+import { useKalshiHistoricalCutoffDisplay } from "@/hooks/useKalshiHistoricalCutoffDisplay";
 
 const DEFAULT_RANGE_SEC = 24 * 60 * 60;
 const DEFAULT_PERIOD = 60;
@@ -124,6 +125,8 @@ export function KalshiLiveCandlestickCommonQueries({ className, disabled = false
     /** @type {{ from?: Date; to?: Date } | undefined} */ (undefined),
   );
 
+  const { cutoffIso } = useKalshiHistoricalCutoffDisplay();
+
   const startTs = Number(readFilterValue(connectKalshiLiveWhereFilters, "start_ts"));
   const endTs = Number(readFilterValue(connectKalshiLiveWhereFilters, "end_ts"));
   const periodInterval = Number(readFilterValue(connectKalshiLiveWhereFilters, "period_interval"));
@@ -169,26 +172,11 @@ export function KalshiLiveCandlestickCommonQueries({ className, disabled = false
 
   // Historical cutoff — live data cannot start before this.
   useEffect(() => {
-    const ac = new AbortController();
-    void (async () => {
-      try {
-        const res = await fetch("/api/integrations/kalshi-live/historical/cutoff", {
-          headers: { Accept: "application/json" },
-          credentials: "same-origin",
-          signal: ac.signal,
-        });
-        const data = await res.json().catch(() => ({}));
-        if (ac.signal.aborted || !res.ok) return;
-        const d = new Date(String(data?.market_settled_ts || "").trim());
-        if (!Number.isNaN(d.getTime())) {
-          setCutoffDate(startOfLocalDay(d));
-        }
-      } catch (e) {
-        if (e instanceof DOMException && e.name === "AbortError") return;
-      }
-    })();
-    return () => ac.abort();
-  }, []);
+    if (!cutoffIso) return;
+    const d = new Date(String(cutoffIso).trim());
+    if (Number.isNaN(d.getTime())) return;
+    setCutoffDate(startOfLocalDay(d));
+  }, [cutoffIso]);
 
   // If a stored start is before cutoff, clamp it.
   useEffect(() => {

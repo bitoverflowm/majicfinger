@@ -1,24 +1,11 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback } from "react";
 
 import { useMyStateV2 } from "@/context/stateContextV2";
+import { useKalshiHistoricalCutoffDisplay } from "@/hooks/useKalshiHistoricalCutoffDisplay";
 import { cn } from "@/lib/utils";
-
-/**
- * @param {string | undefined} iso
- * @returns {string | null}
- */
-function formatCutoffLocal(iso) {
-  const raw = String(iso || "").trim();
-  if (!raw) return null;
-  const d = new Date(raw);
-  if (Number.isNaN(d.getTime())) return null;
-  return d.toLocaleString(undefined, {
-    dateStyle: "medium",
-    timeStyle: "short",
-  });
-}
+import { Skeleton } from "@/components/ui/skeleton";
 
 /**
  * Live vs historical candlestick cutoff note.
@@ -41,35 +28,7 @@ export function KalshiCandlestickCutoffNote({
   const ctx = useMyStateV2() ?? {};
   const { requestConnectWorkspace, setIntegrationSidebar, setRightPanelTab } = ctx;
 
-  const [localDate, setLocalDate] = useState(/** @type {string | null} */ (null));
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    const ac = new AbortController();
-    setLoading(true);
-    void (async () => {
-      try {
-        const res = await fetch("/api/integrations/kalshi-live/historical/cutoff", {
-          headers: { Accept: "application/json" },
-          credentials: "same-origin",
-          signal: ac.signal,
-        });
-        const data = await res.json().catch(() => ({}));
-        if (ac.signal.aborted) return;
-        if (!res.ok) {
-          setLocalDate(null);
-          return;
-        }
-        setLocalDate(formatCutoffLocal(data?.market_settled_ts));
-      } catch (e) {
-        if (e instanceof DOMException && e.name === "AbortError") return;
-        setLocalDate(null);
-      } finally {
-        if (!ac.signal.aborted) setLoading(false);
-      }
-    })();
-    return () => ac.abort();
-  }, []);
+  const { cutoffLabelWithTime, loading } = useKalshiHistoricalCutoffDisplay();
 
   const goToTarget = useCallback(() => {
     setRightPanelTab?.("integrations");
@@ -79,18 +38,18 @@ export function KalshiCandlestickCutoffNote({
 
   if (loading) {
     return (
-      <p className={cn("text-[11px] leading-snug text-muted-foreground", className)}>
-        Checking historical data cutoff…
-      </p>
+      <div className={cn("flex items-center gap-2", className)}>
+        <Skeleton className="h-4 w-[10rem] bg-muted-foreground/20" />
+      </div>
     );
   }
 
-  if (!localDate) return null;
+  if (!cutoffLabelWithTime) return null;
 
   return (
     <p className={cn("text-[11px] leading-snug text-muted-foreground", className)}>
       Note: if you are looking for {dataLabel} {direction}{" "}
-      <span className="font-medium text-foreground">{localDate}</span>, go{" "}
+      <span className="font-medium text-foreground">{cutoffLabelWithTime}</span>, go{" "}
       <button
         type="button"
         onClick={goToTarget}
