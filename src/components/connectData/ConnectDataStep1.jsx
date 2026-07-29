@@ -52,10 +52,16 @@ import {
 } from "@/components/ui/tooltip";
 import { ProfilePictureUploader } from "@/components/profile/ProfilePictureUploader";
 import { useDemoProGate } from "@/hooks/useDemoProGate";
+import {
+  KALSHI_HISTORICAL_DEEP_CAPTION,
+  kalshiHistoricalV2Caption,
+  useKalshiHistoricalCutoffDisplay,
+} from "@/hooks/useKalshiHistoricalCutoffDisplay";
 
 /** Wireframe order + News API (platform integration roadmap). */
 const CONNECT_INTEGRATION_ORDER = [
   "kalshiHistorical",
+  "kalshiHistoricalV2",
   "kalshiLive",
   "polymarket",
   "polymarketHistorical",
@@ -94,6 +100,7 @@ const DEMO_CONNECT_EXAMPLE_CHIPS = [
 /** Solid icon-tile backgrounds on Connect home (match Kalshi / Chainlink pill style). */
 const CONNECT_INTEGRATION_ICON_BG = {
   kalshiHistorical: "bg-[#28CC95]",
+  kalshiHistoricalV2: "bg-[#28CC95]",
   kalshiLive: "bg-[#28CC95]",
   polymarket: "bg-[#2E5CFF]",
   polymarketHistorical: "bg-[#2E5CFF]",
@@ -240,6 +247,7 @@ function IntegrationIconWrap({ children, compact = false, className }) {
 function PillButton({
   icon,
   label,
+  caption,
   title,
   onClick,
   disabled,
@@ -250,16 +258,27 @@ function PillButton({
   tooltipSide,
   compact = false,
 }) {
-  const surface = compact ? cn(demoPillClass, className) : cn(pillClass, className);
+  const surface = compact
+    ? cn(demoPillClass, caption && "min-h-[1.75rem] py-0.5", className)
+    : cn(pillClass, caption && "min-h-[2.75rem] py-1", className);
   const iconBox = compact
     ? cn(demoIconSlotClass, iconClassName)
     : cn(iconSlotClassName || iconSlotClass, iconClassName);
-  const labelCls = compact ? demoPillLabelClass : cn(pillLabelClass, labelClassName);
+  const labelCls = compact
+    ? cn(demoPillLabelClass, "block truncate")
+    : cn(pillLabelClass, labelClassName, "block flex-none truncate");
   return (
     <ConnectPillTooltip content={title || label} side={tooltipSide}>
       <button type="button" disabled={disabled} onClick={onClick} className={surface}>
         <span className={iconBox}>{icon}</span>
-        <span className={labelCls}>{label}</span>
+        <span className="min-w-0 flex-1">
+          <span className={labelCls}>{label}</span>
+          {caption ? (
+            <span className="mt-0.5 block text-[8px] font-normal leading-tight text-muted-foreground sm:text-[8.5px]">
+              {caption}
+            </span>
+          ) : null}
+        </span>
       </button>
     </ConnectPillTooltip>
   );
@@ -284,6 +303,7 @@ function DemoTierBadges() {
 function PillButtonSoon({
   icon,
   label,
+  caption,
   className,
   iconClassName,
   iconSlotClassName,
@@ -293,19 +313,38 @@ function PillButtonSoon({
   showDemoTierBadges = false,
 }) {
   const surface = compact
-    ? cn(demoPillClass, className, "cursor-not-allowed opacity-45", showDemoTierBadges && "justify-between gap-1 pr-1")
-    : cn(pillClass, className, "cursor-not-allowed opacity-45", showDemoTierBadges && "justify-between gap-2 pr-1.5");
+    ? cn(
+        demoPillClass,
+        className,
+        "cursor-not-allowed opacity-45",
+        caption && "min-h-[1.75rem] py-0.5",
+        showDemoTierBadges && "justify-between gap-1 pr-1",
+      )
+    : cn(
+        pillClass,
+        className,
+        "cursor-not-allowed opacity-45",
+        caption && "min-h-[2.75rem] py-1",
+        showDemoTierBadges && "justify-between gap-2 pr-1.5",
+      );
   const iconBox = compact
     ? cn(demoIconSlotClass, iconClassName)
     : cn(iconSlotClassName || iconSlotClass, iconClassName);
   const labelCls = compact
-    ? cn(demoPillLabelClass, showDemoTierBadges && "min-w-0 flex-1")
-    : cn(pillLabelClass, labelClassName, showDemoTierBadges && "min-w-0 flex-1");
+    ? cn(demoPillLabelClass, "block truncate")
+    : cn(pillLabelClass, labelClassName, "block flex-none truncate");
   return (
     <ConnectPillTooltip content={tooltip}>
       <button type="button" disabled className={surface} aria-disabled>
         <span className={iconBox}>{icon}</span>
-        <span className={labelCls}>{label}</span>
+        <span className="min-w-0 flex-1">
+          <span className={labelCls}>{label}</span>
+          {caption ? (
+            <span className="mt-0.5 block text-[8px] font-normal leading-tight text-muted-foreground sm:text-[8.5px]">
+              {caption}
+            </span>
+          ) : null}
+        </span>
         {showDemoTierBadges ? <DemoTierBadges /> : null}
       </button>
     </ConnectPillTooltip>
@@ -513,6 +552,8 @@ export default function ConnectDataStep1({
 
   const kalshiHistoricalConnect = useBeckerHistoricalWarmIntegrationsConnect(navigateKalshiHistorical);
 
+  const { cutoffLabel: kalshiCutoffLabel } = useKalshiHistoricalCutoffDisplay();
+
   const openIntegrationPlayground = useCallback(
     (clickHandlerId) => {
       if (!API_INTEGRATIONS.includes(clickHandlerId)) {
@@ -539,6 +580,7 @@ export default function ConnectDataStep1({
           key: "newsApi",
           name: "News API",
           description: "Headlines and articles for research dashboards.",
+          caption: null,
           icon: <Newspaper className="h-3.5 w-3.5" strokeWidth={iconStroke} />,
           live: false,
           warmConnect: null,
@@ -553,17 +595,29 @@ export default function ConnectDataStep1({
           : id === "kalshiHistorical"
             ? kalshiHistoricalConnect
             : null;
+      let caption = row.listCaption || null;
+      if (row.listCaptionKey === "kalshiHistoricalCutoff") {
+        caption = kalshiHistoricalV2Caption(kalshiCutoffLabel);
+      } else if (id === "kalshiHistorical") {
+        caption = row.listCaption || KALSHI_HISTORICAL_DEEP_CAPTION;
+      }
       return {
         key: id,
         name: row.name,
         description: row.description,
+        caption,
         icon: row.icon,
         live: !!row.live && !(row.tags || []).includes("coming soon"),
         warmConnect,
         clickHandler: row.clickHandler,
       };
     }).filter(Boolean);
-  }, [integrationByHandler, kalshiHistoricalConnect, polymarketHistoricalConnect]);
+  }, [
+    integrationByHandler,
+    kalshiCutoffLabel,
+    kalshiHistoricalConnect,
+    polymarketHistoricalConnect,
+  ]);
 
   const latestWorkLoading = hasDbBackedUserId && savedDataSets === undefined;
 
@@ -967,6 +1021,7 @@ export default function ConnectDataStep1({
                         </IntegrationIconWrap>
                       }
                       label={row.name}
+                      caption={row.caption}
                       title={row.description}
                       onClick={() => onIntegrationRowClick(row)}
                       iconClassName={connectIntegrationIconClass(row.key)}
@@ -982,6 +1037,7 @@ export default function ConnectDataStep1({
                         </IntegrationIconWrap>
                       }
                       label={row.name}
+                      caption={row.caption}
                       showDemoTierBadges={embeddedDemo}
                       iconClassName={connectIntegrationIconClass(row.key)}
                       iconSlotClassName={embeddedDemo ? undefined : connectHubIconSlotResponsive}

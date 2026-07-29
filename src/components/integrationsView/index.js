@@ -17,6 +17,11 @@ import { API_INTEGRATIONS, integrations_list } from "./integrationsConfig";
 import { ConnectProgressWithLabel } from "./integrationPlayground/integrations/polymarketHistorical/ConnectProgressWithLabel";
 import { useBeckerHistoricalWarmIntegrationsConnect } from "./integrationPlayground/integrations/polymarketHistorical/useBeckerHistoricalWarmIntegrationsConnect";
 import { DemoSignUpBadge } from "@/components/demo/DemoSignUpBadge";
+import {
+  KALSHI_HISTORICAL_DEEP_CAPTION,
+  kalshiHistoricalV2Caption,
+  useKalshiHistoricalCutoffDisplay,
+} from "@/hooks/useKalshiHistoricalCutoffDisplay";
 
 // Extract tags categories
 const tags_categories = [...new Set(integrations_list.flatMap(integration => integration.tags))];
@@ -69,6 +74,7 @@ const IntegrationsView = () => {
   ]);
 
   const kalshiHistoricalConnect = useBeckerHistoricalWarmIntegrationsConnect(navigateKalshiHistorical);
+  const { cutoffLabel: kalshiCutoffLabel } = useKalshiHistoricalCutoffDisplay();
 
   const clickHandler = (clickHandlerId) => {
     if (API_INTEGRATIONS.includes(clickHandlerId)) {
@@ -212,6 +218,17 @@ const IntegrationsView = () => {
                   </CardHeader>
                   <CardContent className="py-4 grow">
                     <small className="text-sm font-medium leading-none">{integration.name}</small>
+                    {(() => {
+                      let caption = integration.listCaption || null;
+                      if (integration.listCaptionKey === "kalshiHistoricalCutoff") {
+                        caption = kalshiHistoricalV2Caption(kalshiCutoffLabel);
+                      } else if (integration.clickHandler === "kalshiHistorical") {
+                        caption = integration.listCaption || KALSHI_HISTORICAL_DEEP_CAPTION;
+                      }
+                      return caption ? (
+                        <p className="pt-1 text-[10px] leading-snug text-muted-foreground">{caption}</p>
+                      ) : null;
+                    })()}
                     <Tooltip>
                       <TooltipTrigger asChild>
                         <p className="text-sm pt-1 text-muted-foreground pb-2 line-clamp-2 cursor-help">

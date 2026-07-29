@@ -9,6 +9,7 @@ export const INTEGRATION_LOGO_BY_HANDLER = {
   polymarket: "/polymarket.png",
   polymarketHistorical: "/polymarket.png",
   kalshiHistorical: "/kalshi.png",
+  kalshiHistoricalV2: "/kalshi.png",
   kalshiLive: "/kalshi.png",
   twitter: "/x.png",
   wallStreetBets: "/wallStreetBets.png",
@@ -40,6 +41,8 @@ export function buildIntegrationPickerRows() {
         id,
         name: item.name,
         description: item.description,
+        listCaption: item.listCaption ?? null,
+        listCaptionKey: item.listCaptionKey ?? null,
         logoPath: INTEGRATION_LOGO_BY_HANDLER[id] ?? null,
         icon: item.icon,
         available,
@@ -59,7 +62,7 @@ export function filterIntegrationPickerRows(rows, query) {
     .toLowerCase();
   if (!q) return rows;
   return rows.filter((row) => {
-    const hay = `${row.name} ${row.id}`.toLowerCase();
+    const hay = `${row.name} ${row.id} ${row.listCaption || ""}`.toLowerCase();
     return hay.includes(q);
   });
 }

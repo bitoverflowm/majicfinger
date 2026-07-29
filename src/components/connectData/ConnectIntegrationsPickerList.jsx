@@ -18,13 +18,18 @@ import {
 } from "@/lib/connectIntegrationPickerRows";
 import { isConnectIntegrationWorkspace } from "@/lib/connectHomeWorkspace";
 import { useMyStateV2 } from "@/context/stateContextV2";
-import { useDemoProGate } from "@/hooks/useDemoProGate";
+import {
+  KALSHI_HISTORICAL_DEEP_CAPTION,
+  kalshiHistoricalV2Caption,
+  useKalshiHistoricalCutoffDisplay,
+} from "@/hooks/useKalshiHistoricalCutoffDisplay";
 import { cn } from "@/lib/utils";
 import { trackAuthEvent } from "@/lib/analytics/authJourneyClient";
 
 /** Brand fills for sidebar integration avatars (matches Connect home hub pills). */
 const INTEGRATION_LOGO_BG = {
   kalshiHistorical: "bg-[#28CC95] ring-[#28CC95]/50",
+  kalshiHistoricalV2: "bg-[#28CC95] ring-[#28CC95]/50",
   kalshiLive: "bg-[#28CC95] ring-[#28CC95]/50",
   chainlink: "bg-[#375BD2] ring-[#375BD2]/50",
 };
@@ -41,9 +46,27 @@ function integrationTooltipContent(row) {
   return desc || row.name;
 }
 
+/**
+ * @param {{ id?: string; listCaption?: string | null; listCaptionKey?: string | null }} row
+ * @param {string | null} cutoffLabel
+ */
+function resolveListCaption(row, cutoffLabel) {
+  if (row.listCaptionKey === "kalshiHistoricalCutoff") {
+    return kalshiHistoricalV2Caption(cutoffLabel);
+  }
+  if (row.id === "kalshiHistorical") {
+    return row.listCaption || KALSHI_HISTORICAL_DEEP_CAPTION;
+  }
+  return row.listCaption || null;
+}
+
 function IntegrationRowIcon({ row }) {
   if (row.logoPath) {
-    const branded = row.id === "kalshiHistorical" || row.id === "kalshiLive" || row.id === "chainlink";
+    const branded =
+      row.id === "kalshiHistorical" ||
+      row.id === "kalshiHistoricalV2" ||
+      row.id === "kalshiLive" ||
+      row.id === "chainlink";
     return (
       <span
         className={cn(
@@ -82,14 +105,13 @@ export function ConnectIntegrationsPickerList({
   onAfterSelect,
 }) {
   const ctx = useMyStateV2() ?? {};
-  const isDemo = !!ctx.isDemo;
-  const { requestHistoricalProUpgrade, dialog: demoProDialog } = useDemoProGate();
   const integrationSidebar = ctx.integrationSidebar;
   const setIntegrationSidebar = ctx.setIntegrationSidebar;
   const setRightPanelTab = ctx.setRightPanelTab;
   const requestConnectWorkspace = ctx.requestConnectWorkspace;
 
   const [search, setSearch] = useState("");
+  const { cutoffLabel } = useKalshiHistoricalCutoffDisplay();
 
   const rows = useMemo(() => buildIntegrationPickerRows(), []);
   const filtered = useMemo(
@@ -154,6 +176,7 @@ export function ConnectIntegrationsPickerList({
               {filtered.map((row) => {
                 const selected = integrationSidebar === row.id;
                 const tip = integrationTooltipContent(row);
+                const caption = resolveListCaption(row, cutoffLabel);
                 return (
                   <li key={row.id}>
                     <Tooltip>
@@ -176,8 +199,15 @@ export function ConnectIntegrationsPickerList({
                             )}
                           >
                             <IntegrationRowIcon row={row} />
-                            <span className="min-w-0 flex-1 truncate text-[11px] font-normal leading-tight text-foreground">
-                              {row.name}
+                            <span className="min-w-0 flex-1">
+                              <span className="block truncate text-[11px] font-normal leading-tight text-foreground">
+                                {row.name}
+                              </span>
+                              {caption ? (
+                                <span className="mt-0.5 block text-[8px] font-normal leading-tight text-muted-foreground">
+                                  {caption}
+                                </span>
+                              ) : null}
                             </span>
                             {row.badge ? (
                               <span className="shrink-0 rounded border border-border/60 bg-muted/80 px-1 py-px text-[8px] font-medium uppercase tracking-wide text-muted-foreground">

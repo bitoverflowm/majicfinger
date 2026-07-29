@@ -79,6 +79,7 @@ export const integrations_list = [
     clickHandler: "kalshiHistorical",
     name: "Kalshi Historical",
     description: "Access and analyze Kalshi historical data — download order book and trade history for backtesting and real-time trading dashboards.",
+    listCaption: "Deep historical data: Kalshi Launch - Dec 2025",
     guide: {
       href: "/guides/kalshi-historical-data",
       title: "Kalshi Historical Data Step-by-Step Guide",
@@ -86,6 +87,28 @@ export const integrations_list = [
     },
     tags: ["featured", "crypto", "finance", "trading", "prediction", "data lake"],
     live: true,
+  },
+  {
+    color: "#28CC95",
+    icon: (
+      <div className="integration-logo-avatar relative mx-auto flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-full bg-[var(--integration-card-bg)] shadow-md">
+        <Image
+          src="/kalshi.png"
+          alt=""
+          fill
+          className="object-contain p-1.5"
+          sizes={`${LOGO_PX}px`}
+        />
+      </div>
+    ),
+    clickHandler: "kalshiHistoricalV2",
+    name: "Kalshi Historical v2",
+    description:
+      "Kalshi's more recent historical market data up to the live/historical cutoff.",
+    /** Dynamic caption filled from GET /historical/cutoff in picker / hub UI. */
+    listCaptionKey: "kalshiHistoricalCutoff",
+    tags: ["featured", "crypto", "finance", "trading", "prediction", "coming soon"],
+    live: false,
   },
   {
     color: "#28CC95",
