@@ -41,6 +41,7 @@ export default async function handler(req, res) {
       const limit = rawLimit ? Number(rawLimit) : 1000;
       params = buildKalshiHistoricalV2MarketsDiscoveryQueryParams(
         {
+          tickerScope: queryParam(req, "ticker_scope") || "event",
           mveFilter: queryParam(req, "mve_filter") || "exclude",
           eventTicker: queryParam(req, "event_ticker"),
           seriesTicker: queryParam(req, "series_ticker"),

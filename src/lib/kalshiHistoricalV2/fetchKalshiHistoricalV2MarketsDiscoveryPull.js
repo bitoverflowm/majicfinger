@@ -1,6 +1,7 @@
 import {
   buildKalshiHistoricalV2MarketsDiscoveryQueryParams,
   KALSHI_HISTORICAL_V2_MARKETS_DISCOVERY_MAX_ROWS,
+  normalizeKalshiHistoricalV2MarketsDiscoveryScope,
   summarizeKalshiHistoricalV2MarketsDiscoveryRequest,
   validateKalshiHistoricalV2MarketsDiscoveryPull,
 } from "@/lib/kalshiHistoricalV2/historicalMarketsDiscovery";
@@ -27,6 +28,8 @@ export async function fetchKalshiHistoricalV2MarketsDiscoveryPull(opts) {
   const err = validateKalshiHistoricalV2MarketsDiscoveryPull(params);
   if (err) throw new Error(err);
 
+  const tickerScope = normalizeKalshiHistoricalV2MarketsDiscoveryScope(params.tickerScope);
+
   /** @type {Record<string, unknown>[]} */
   const raw = [];
   let cursor = "";
@@ -42,7 +45,11 @@ export async function fetchKalshiHistoricalV2MarketsDiscoveryPull(opts) {
     const built = buildKalshiHistoricalV2MarketsDiscoveryQueryParams(params, {
       limit: pageLimit,
     });
-    const qs = new URLSearchParams({ ...built, discovery: "1" });
+    const qs = new URLSearchParams({
+      ...built,
+      discovery: "1",
+      ticker_scope: tickerScope,
+    });
     if (cursor) qs.set("cursor", cursor);
 
     const res = await fetch(`/api/integrations/kalshi-live/historical/markets?${qs.toString()}`, {

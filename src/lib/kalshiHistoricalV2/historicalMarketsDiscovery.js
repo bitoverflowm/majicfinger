@@ -9,7 +9,10 @@ import { parseMarketTickerList } from "@/lib/kalshiLive/marketTickerSearch";
  * limit, cursor, tickers, event_ticker, series_ticker, mve_filter (=exclude).
  * Live-only filters (status, created/close/settled/updated timestamps) are not supported.
  *
+ * @typedef {"event" | "series" | "markets" | "general"} KalshiHistoricalV2MarketsDiscoveryScope
+ *
  * @typedef {{
+ *   tickerScope?: KalshiHistoricalV2MarketsDiscoveryScope;
  *   mveFilter?: import("@/lib/kalshiLive/marketDiscovery").KalshiLiveMveFilter | "";
  *   eventTicker?: string;
  *   seriesTicker?: string;
@@ -21,43 +24,58 @@ import { parseMarketTickerList } from "@/lib/kalshiLive/marketTickerSearch";
 export const KALSHI_HISTORICAL_V2_MARKETS_DISCOVERY_MAX_ROWS = 5_000;
 
 /**
+ * @param {unknown} raw
+ * @returns {KalshiHistoricalV2MarketsDiscoveryScope}
+ */
+export function normalizeKalshiHistoricalV2MarketsDiscoveryScope(raw) {
+  if (raw === "series" || raw === "markets" || raw === "general") return raw;
+  return "event";
+}
+
+/**
  * @param {KalshiHistoricalV2MarketsDiscoveryParams | Record<string, unknown>} params
  * @returns {string | null}
  */
 export function validateKalshiHistoricalV2MarketsDiscoveryPull(params) {
-  const eventTicker = String(params?.eventTicker || "").trim();
-  if (eventTicker.includes(",") || eventTicker.includes(" ")) {
-    return "Event Ticker accepts only a single ticker.";
-  }
-
-  const seriesTickers = parseMarketTickerList(params?.seriesTicker);
-  if (seriesTickers.length > 1) {
-    return "Series Ticker accepts only a single series ticker.";
-  }
-
-  const marketTickers = parseMarketTickerList(params?.tickers);
-  if (marketTickers.length > 100) {
-    return "Maximum 100 market tickers in the Tickers filter.";
-  }
+  const scope = normalizeKalshiHistoricalV2MarketsDiscoveryScope(params?.tickerScope);
 
   const mve = normalizeKalshiLiveMveFilter(params?.mveFilter);
   if (mve !== KALSHI_LIVE_MVE_FILTER_EXCLUDE) {
     return "Historical markets discovery only supports Multivariate Events = Exclude.";
   }
 
-  const scopes = [
-    eventTicker ? "event" : null,
-    seriesTickers[0] ? "series" : null,
-    marketTickers.length ? "tickers" : null,
-  ].filter(Boolean);
-
-  if (scopes.length === 0) {
-    return "Add an event ticker, series ticker, or market tickers before discovering historical markets.";
-  }
-  if (scopes.length > 1) {
-    return "Historical markets filters are mutually exclusive — use only one of Event Ticker, Series Ticker, or Tickers.";
+  if (scope === "general") {
+    return null;
   }
 
+  if (scope === "event") {
+    const eventTicker = String(params?.eventTicker || "").trim();
+    if (!eventTicker) return "Enter an event ticker, or switch to General pull without ticker.";
+    if (eventTicker.includes(",") || /\s/.test(eventTicker)) {
+      return "Event Ticker accepts only a single ticker.";
+    }
+    return null;
+  }
+
+  if (scope === "series") {
+    const seriesTickers = parseMarketTickerList(params?.seriesTicker);
+    if (!seriesTickers.length) {
+      return "Enter a series ticker, or switch to General pull without ticker.";
+    }
+    if (seriesTickers.length > 1) {
+      return "Series Ticker accepts only a single series ticker.";
+    }
+    return null;
+  }
+
+  // markets
+  const marketTickers = parseMarketTickerList(params?.tickers);
+  if (!marketTickers.length) {
+    return "Enter one or more market tickers, or switch to General pull without ticker.";
+  }
+  if (marketTickers.length > 100) {
+    return "Maximum 100 market tickers in the Tickers filter.";
+  }
   return null;
 }
 
@@ -72,19 +90,24 @@ export function buildKalshiHistoricalV2MarketsDiscoveryQueryParams(params, opts 
   const err = validateKalshiHistoricalV2MarketsDiscoveryPull(params);
   if (err) throw new Error(err);
 
+  const scope = normalizeKalshiHistoricalV2MarketsDiscoveryScope(params?.tickerScope);
+
   /** @type {Record<string, string>} */
   const out = {
     mve_filter: KALSHI_LIVE_MVE_FILTER_EXCLUDE,
   };
 
-  const eventTicker = String(params?.eventTicker || "").trim().toUpperCase();
-  if (eventTicker) out.event_ticker = eventTicker;
-
-  const seriesTickers = parseMarketTickerList(params?.seriesTicker);
-  if (seriesTickers[0]) out.series_ticker = seriesTickers[0];
-
-  const marketTickers = parseMarketTickerList(params?.tickers);
-  if (marketTickers.length) out.tickers = marketTickers.join(",");
+  if (scope === "event") {
+    const eventTicker = String(params?.eventTicker || "").trim().toUpperCase();
+    if (eventTicker) out.event_ticker = eventTicker;
+  } else if (scope === "series") {
+    const seriesTickers = parseMarketTickerList(params?.seriesTicker);
+    if (seriesTickers[0]) out.series_ticker = seriesTickers[0];
+  } else if (scope === "markets") {
+    const marketTickers = parseMarketTickerList(params?.tickers);
+    if (marketTickers.length) out.tickers = marketTickers.join(",");
+  }
+  // general → no ticker params
 
   const limit = Math.min(1000, Math.max(1, Math.floor(Number(opts.limit) || 1000)));
   out.limit = String(limit);
@@ -96,7 +119,8 @@ export function buildKalshiHistoricalV2MarketsDiscoveryQueryParams(params, opts 
  * @param {{ loadedRowCount?: number }} [opts]
  */
 export function summarizeKalshiHistoricalV2MarketsDiscoveryRequest(params, opts = {}) {
-  const parts = ["GET /historical/markets", "discovery", "sheets=combined"];
+  const scope = normalizeKalshiHistoricalV2MarketsDiscoveryScope(params?.tickerScope);
+  const parts = ["GET /historical/markets", "discovery", `scope=${scope}`, "sheets=combined"];
   try {
     const qs = buildKalshiHistoricalV2MarketsDiscoveryQueryParams(params, { limit: 1000 });
     for (const [k, v] of Object.entries(qs)) {

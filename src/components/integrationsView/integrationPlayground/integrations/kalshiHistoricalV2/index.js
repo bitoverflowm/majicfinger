@@ -67,6 +67,7 @@ export default function KalshiHistoricalV2({
     connectKalshiLiveMarketsDiscoveryEventTicker,
     connectKalshiLiveMarketsDiscoverySeriesTicker,
     connectKalshiLiveMarketsDiscoveryTickers,
+    connectKalshiHistoricalV2MarketsDiscoveryScope,
     setConnectDataLakePullState,
     setDataSheets,
     activeSheetId,
@@ -104,6 +105,7 @@ export default function KalshiHistoricalV2({
 
       if (discoveryMode) {
         const discoveryParams = {
+          tickerScope: connectKalshiHistoricalV2MarketsDiscoveryScope || "event",
           mveFilter: connectKalshiLiveMarketsDiscoveryMveFilter || KALSHI_LIVE_MVE_FILTER_EXCLUDE,
           eventTicker: connectKalshiLiveMarketsDiscoveryEventTicker,
           seriesTicker: connectKalshiLiveMarketsDiscoverySeriesTicker,
@@ -269,6 +271,7 @@ export default function KalshiHistoricalV2({
       connectKalshiLiveMarketsDiscoveryEventTicker,
       connectKalshiLiveMarketsDiscoverySeriesTicker,
       connectKalshiLiveMarketsDiscoveryTickers,
+      connectKalshiHistoricalV2MarketsDiscoveryScope,
       connectKalshiLiveWhereFilters,
       connectKalshiLiveSortClauses,
       connectKalshiLiveTickers,

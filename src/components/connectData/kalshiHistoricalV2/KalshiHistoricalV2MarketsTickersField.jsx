@@ -11,6 +11,7 @@ import {
   emptyKalshiLiveMarketsDiscoveryParams,
   KALSHI_LIVE_MVE_FILTER_EXCLUDE,
 } from "@/lib/kalshiLive/marketDiscovery";
+import { normalizeKalshiHistoricalV2MarketsDiscoveryScope } from "@/lib/kalshiHistoricalV2/historicalMarketsDiscovery";
 import { cn } from "@/lib/utils";
 
 /**
@@ -56,12 +57,17 @@ export function KalshiHistoricalV2MarketsTickersField({ value, onChange, classNa
     setConnectKalshiLiveMarketsDiscoveryMinSettledTs,
     connectKalshiLiveMarketsDiscoveryMaxSettledTs = "",
     setConnectKalshiLiveMarketsDiscoveryMaxSettledTs,
+    connectKalshiHistoricalV2MarketsDiscoveryScope = "event",
+    setConnectKalshiHistoricalV2MarketsDiscoveryScope,
   } = ctx;
 
   const discoveryMode = connectKalshiLiveMarketsDiscoveryMode !== false;
 
   const discoveryValue = useMemo(
     () => ({
+      tickerScope: normalizeKalshiHistoricalV2MarketsDiscoveryScope(
+        connectKalshiHistoricalV2MarketsDiscoveryScope,
+      ),
       status: connectKalshiLiveMarketsDiscoveryStatus,
       mveFilter: connectKalshiLiveMarketsDiscoveryMveFilter,
       eventTicker: connectKalshiLiveMarketsDiscoveryEventTicker,
@@ -76,6 +82,7 @@ export function KalshiHistoricalV2MarketsTickersField({ value, onChange, classNa
       maxSettledTs: connectKalshiLiveMarketsDiscoveryMaxSettledTs,
     }),
     [
+      connectKalshiHistoricalV2MarketsDiscoveryScope,
       connectKalshiLiveMarketsDiscoveryStatus,
       connectKalshiLiveMarketsDiscoveryMveFilter,
       connectKalshiLiveMarketsDiscoveryEventTicker,
@@ -92,6 +99,11 @@ export function KalshiHistoricalV2MarketsTickersField({ value, onChange, classNa
   );
 
   const setDiscoveryValue = (next) => {
+    if (next.tickerScope != null) {
+      setConnectKalshiHistoricalV2MarketsDiscoveryScope?.(
+        normalizeKalshiHistoricalV2MarketsDiscoveryScope(next.tickerScope),
+      );
+    }
     setConnectKalshiLiveMarketsDiscoveryStatus?.(next.status ?? "");
     setConnectKalshiLiveMarketsDiscoveryMveFilter?.(
       next.mveFilter ?? KALSHI_LIVE_MVE_FILTER_EXCLUDE,
@@ -126,6 +138,7 @@ export function KalshiHistoricalV2MarketsTickersField({ value, onChange, classNa
             setDiscoveryValue({
               ...empty,
               mveFilter: KALSHI_LIVE_MVE_FILTER_EXCLUDE,
+              tickerScope: "event",
             });
           }
         }}
@@ -146,6 +159,12 @@ export function KalshiHistoricalV2MarketsTickersField({ value, onChange, classNa
           ? "Browse Kalshi’s historical markets with an event ticker, series ticker, or market tickers filter. Matching pages are pulled into one sheet."
           : "Search for markets (or open a series from semantic search). You can pull multiple markets at once — choose one sheet or a sheet per market below."}
       </p>
+      {discoveryMode ? (
+        <p className="text-[11px] leading-snug text-muted-foreground">
+          Note: historical v2 only supports ticker search due to recency and dynamic nature of this
+          data archive. Category and advanced filter support coming soon
+        </p>
+      ) : null}
 
       <div className="space-y-2 rounded-lg bg-muted/10 p-3">
         {discoveryMode ? (

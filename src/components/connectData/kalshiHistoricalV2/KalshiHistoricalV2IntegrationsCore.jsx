@@ -268,6 +268,7 @@ export function KalshiHistoricalV2IntegrationsCore({ className, stepBackRef, onR
     setConnectKalshiLiveMarketsDiscoveryMaxCloseTs,
     setConnectKalshiLiveMarketsDiscoveryMinSettledTs,
     setConnectKalshiLiveMarketsDiscoveryMaxSettledTs,
+    setConnectKalshiHistoricalV2MarketsDiscoveryScope,
   } = ctx;
 
   const selectedId = connectKalshiLiveEndpointId;
@@ -297,6 +298,7 @@ export function KalshiHistoricalV2IntegrationsCore({ className, stepBackRef, onR
     setConnectKalshiLiveMarketsDiscoveryMaxCloseTs?.("");
     setConnectKalshiLiveMarketsDiscoveryMinSettledTs?.("");
     setConnectKalshiLiveMarketsDiscoveryMaxSettledTs?.("");
+    setConnectKalshiHistoricalV2MarketsDiscoveryScope?.("event");
 
     setFilterError(null);
   }, [
@@ -320,6 +322,7 @@ export function KalshiHistoricalV2IntegrationsCore({ className, stepBackRef, onR
     setConnectKalshiLiveMarketsDiscoveryMaxCloseTs,
     setConnectKalshiLiveMarketsDiscoveryMinSettledTs,
     setConnectKalshiLiveMarketsDiscoveryMaxSettledTs,
+    setConnectKalshiHistoricalV2MarketsDiscoveryScope,
   ]);
 
   const handleSelectEndpoint = useCallback(
@@ -347,6 +350,7 @@ export function KalshiHistoricalV2IntegrationsCore({ className, stepBackRef, onR
       setConnectKalshiLiveMarketsDiscoveryMaxCloseTs?.("");
       setConnectKalshiLiveMarketsDiscoveryMinSettledTs?.("");
       setConnectKalshiLiveMarketsDiscoveryMaxSettledTs?.("");
+      setConnectKalshiHistoricalV2MarketsDiscoveryScope?.("event");
 
       setFilterError(null);
     },
@@ -371,6 +375,7 @@ export function KalshiHistoricalV2IntegrationsCore({ className, stepBackRef, onR
       setConnectKalshiLiveMarketsDiscoveryMaxCloseTs,
       setConnectKalshiLiveMarketsDiscoveryMinSettledTs,
       setConnectKalshiLiveMarketsDiscoveryMaxSettledTs,
+      setConnectKalshiHistoricalV2MarketsDiscoveryScope,
     ],
   );
 

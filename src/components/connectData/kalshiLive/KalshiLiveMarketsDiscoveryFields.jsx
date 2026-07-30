@@ -24,9 +24,19 @@ import {
   KALSHI_LIVE_MVE_FILTER_ONLY,
   normalizeKalshiLiveMveFilter,
 } from "@/lib/kalshiLive/marketDiscovery";
+import {
+  normalizeKalshiHistoricalV2MarketsDiscoveryScope,
+} from "@/lib/kalshiHistoricalV2/historicalMarketsDiscovery";
 import { KALSHI_LIVE_MARKET_STATUS_OPTIONS } from "@/lib/kalshiLive/marketsColumns";
 import { cn } from "@/lib/utils";
 import { useKalshiHistoricalCutoffDisplay } from "@/hooks/useKalshiHistoricalCutoffDisplay";
+
+const HISTORICAL_TICKER_SCOPE_OPTIONS = [
+  { id: "event", label: "Events" },
+  { id: "series", label: "Series" },
+  { id: "markets", label: "Markets" },
+  { id: "general", label: "General pull without ticker" },
+];
 
 function startOfLocalDay(d) {
   const x = new Date(d);
@@ -201,8 +211,12 @@ function DiscoverySingleDateField({
  * are shown (event/series/tickers + mve exclude). Status and date filters are live-only.
  *
  * @param {{
- *   value: import("@/lib/kalshiLive/marketDiscovery").KalshiLiveMarketsDiscoveryParams;
- *   onChange: (next: import("@/lib/kalshiLive/marketDiscovery").KalshiLiveMarketsDiscoveryParams) => void;
+ *   value: import("@/lib/kalshiLive/marketDiscovery").KalshiLiveMarketsDiscoveryParams & {
+ *     tickerScope?: import("@/lib/kalshiHistoricalV2/historicalMarketsDiscovery").KalshiHistoricalV2MarketsDiscoveryScope;
+ *   };
+ *   onChange: (next: import("@/lib/kalshiLive/marketDiscovery").KalshiLiveMarketsDiscoveryParams & {
+ *     tickerScope?: import("@/lib/kalshiHistoricalV2/historicalMarketsDiscovery").KalshiHistoricalV2MarketsDiscoveryScope;
+ *   }) => void;
  *   disabled?: boolean;
  *   className?: string;
  *   cutoffMode?: "live" | "historical";
@@ -253,9 +267,9 @@ export function KalshiLiveMarketsDiscoveryFields({
         </p>
       ) : null}
 
-      {/* Status + Multivariate Events */}
-      <div className="mt-2 grid grid-cols-1 gap-4 sm:grid-cols-2">
-        {!historical ? (
+      {/* Status + Multivariate Events (live only at top). Historical places MVE last. */}
+      {!historical ? (
+        <div className="mt-2 grid grid-cols-1 gap-4 sm:grid-cols-2">
           <div className={cn("flex flex-col space-y-1.5", locks.disableStatus && "opacity-60")}>
             <Label className="text-[11px] font-medium text-foreground">Status</Label>
             <p className="min-h-[2.5rem] text-[10px] leading-snug text-muted-foreground">
@@ -281,95 +295,210 @@ export function KalshiLiveMarketsDiscoveryFields({
               </SelectContent>
             </Select>
           </div>
-        ) : null}
 
-        <div className={cn("flex flex-col space-y-1.5", locks.disableMve && "opacity-60")}>
-          <Label className="text-[11px] font-medium text-foreground">Multivariate Events</Label>
-          <p className="min-h-[2.5rem] text-[10px] leading-snug text-muted-foreground">
-            {historical
-              ? "Historical discovery excludes multivariate events."
-              : "'only' returns only multivariate events, 'exclude' excludes multivariate events."}
-          </p>
-          <Select
-            value={normalizeKalshiLiveMveFilter(value.mveFilter)}
-            disabled={disabled || locks.disableMve || historical}
-            onValueChange={(v) =>
-              patch({
-                mveFilter:
-                  v === KALSHI_LIVE_MVE_FILTER_ONLY
-                    ? KALSHI_LIVE_MVE_FILTER_ONLY
-                    : KALSHI_LIVE_MVE_FILTER_EXCLUDE,
-              })
-            }
-          >
-            <SelectTrigger className="mt-auto h-9 w-full text-xs">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value={KALSHI_LIVE_MVE_FILTER_EXCLUDE} className="text-xs">
-                Exclude
-              </SelectItem>
-              {!historical ? (
+          <div className={cn("flex flex-col space-y-1.5", locks.disableMve && "opacity-60")}>
+            <Label className="text-[11px] font-medium text-foreground">Multivariate Events</Label>
+            <p className="min-h-[2.5rem] text-[10px] leading-snug text-muted-foreground">
+              &apos;only&apos; returns only multivariate events, &apos;exclude&apos; excludes multivariate
+              events.
+            </p>
+            <Select
+              value={normalizeKalshiLiveMveFilter(value.mveFilter)}
+              disabled={disabled || locks.disableMve}
+              onValueChange={(v) =>
+                patch({
+                  mveFilter:
+                    v === KALSHI_LIVE_MVE_FILTER_ONLY
+                      ? KALSHI_LIVE_MVE_FILTER_ONLY
+                      : KALSHI_LIVE_MVE_FILTER_EXCLUDE,
+                })
+              }
+            >
+              <SelectTrigger className="mt-auto h-9 w-full text-xs">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value={KALSHI_LIVE_MVE_FILTER_EXCLUDE} className="text-xs">
+                  Exclude
+                </SelectItem>
                 <SelectItem value={KALSHI_LIVE_MVE_FILTER_ONLY} className="text-xs">
                   only
                 </SelectItem>
-              ) : null}
-            </SelectContent>
-          </Select>
+              </SelectContent>
+            </Select>
+          </div>
         </div>
-      </div>
+      ) : null}
 
-      {/* Event Ticker */}
-      <div className={cn("space-y-1.5", locks.disableEventTicker && "opacity-60")}>
-        <Label htmlFor="markets-discovery-event-ticker" className="text-[11px] font-medium text-foreground">
-          Event Ticker
-        </Label>
-        <p className="text-[10px] leading-snug text-muted-foreground">
-          Event ticker to filter by. Only a single ticker allowed.
-        </p>
-        <Input
-          id="markets-discovery-event-ticker"
-          value={value.eventTicker || ""}
-          disabled={disabled || locks.disableEventTicker}
-          placeholder="Optional — e.g. KXHIGHNY-25JAN01"
-          className="h-9 max-w-md text-xs"
-          onChange={(e) => patch({ eventTicker: e.target.value })}
-        />
-      </div>
+      {/* Historical: single ticker input + scope dropdown. Live: separate fields below. */}
+      {historical ? (
+        <div className="space-y-1.5">
+          <Label className="text-[11px] font-medium text-foreground">Ticker filter</Label>
+          <p className="text-[10px] leading-snug text-muted-foreground">
+            {(() => {
+              const scope = normalizeKalshiHistoricalV2MarketsDiscoveryScope(value.tickerScope);
+              if (scope === "general") {
+                return "Pull historical markets with no ticker filter (paginated list).";
+              }
+              if (scope === "series") {
+                return "Filter by a single series ticker.";
+              }
+              if (scope === "markets") {
+                return "Filter by one or more market tickers (comma-separated).";
+              }
+              return "Filter by a single event ticker.";
+            })()}
+          </p>
+          <div className="flex max-w-xl">
+            <Input
+              value={(() => {
+                const scope = normalizeKalshiHistoricalV2MarketsDiscoveryScope(value.tickerScope);
+                if (scope === "series") return value.seriesTicker || "";
+                if (scope === "markets") return value.tickers || "";
+                if (scope === "general") return "";
+                return value.eventTicker || "";
+              })()}
+              disabled={
+                disabled ||
+                normalizeKalshiHistoricalV2MarketsDiscoveryScope(value.tickerScope) === "general"
+              }
+              placeholder={(() => {
+                const scope = normalizeKalshiHistoricalV2MarketsDiscoveryScope(value.tickerScope);
+                if (scope === "series") return "e.g. KXHIGHNY";
+                if (scope === "markets") return "e.g. TICKER1, TICKER2";
+                if (scope === "general") return "No ticker required";
+                return "e.g. KXHIGHNY-25JAN01";
+              })()}
+              className="h-9 min-w-0 flex-1 rounded-r-none border-r-0 text-xs focus-visible:z-10"
+              onChange={(e) => {
+                const scope = normalizeKalshiHistoricalV2MarketsDiscoveryScope(value.tickerScope);
+                const next = e.target.value;
+                if (scope === "series") {
+                  patch({ seriesTicker: next, eventTicker: "", tickers: "" });
+                } else if (scope === "markets") {
+                  patch({ tickers: next, eventTicker: "", seriesTicker: "" });
+                } else if (scope === "general") {
+                  patch({ eventTicker: "", seriesTicker: "", tickers: "" });
+                } else {
+                  patch({ eventTicker: next, seriesTicker: "", tickers: "" });
+                }
+              }}
+            />
+            <Select
+              value={normalizeKalshiHistoricalV2MarketsDiscoveryScope(value.tickerScope)}
+              disabled={disabled}
+              onValueChange={(v) => {
+                const scope = normalizeKalshiHistoricalV2MarketsDiscoveryScope(v);
+                const currentText = (() => {
+                  const prev = normalizeKalshiHistoricalV2MarketsDiscoveryScope(value.tickerScope);
+                  if (prev === "series") return value.seriesTicker || "";
+                  if (prev === "markets") return value.tickers || "";
+                  if (prev === "general") return "";
+                  return value.eventTicker || "";
+                })();
+                if (scope === "general") {
+                  patch({
+                    tickerScope: scope,
+                    eventTicker: "",
+                    seriesTicker: "",
+                    tickers: "",
+                  });
+                  return;
+                }
+                if (scope === "series") {
+                  patch({
+                    tickerScope: scope,
+                    seriesTicker: currentText,
+                    eventTicker: "",
+                    tickers: "",
+                  });
+                  return;
+                }
+                if (scope === "markets") {
+                  patch({
+                    tickerScope: scope,
+                    tickers: currentText,
+                    eventTicker: "",
+                    seriesTicker: "",
+                  });
+                  return;
+                }
+                patch({
+                  tickerScope: scope,
+                  eventTicker: currentText,
+                  seriesTicker: "",
+                  tickers: "",
+                });
+              }}
+            >
+              <SelectTrigger className="h-9 w-[13.5rem] shrink-0 rounded-l-none text-xs">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {HISTORICAL_TICKER_SCOPE_OPTIONS.map((opt) => (
+                  <SelectItem key={opt.id} value={opt.id} className="text-xs">
+                    {opt.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+      ) : (
+        <>
+          {/* Event Ticker */}
+          <div className={cn("space-y-1.5", locks.disableEventTicker && "opacity-60")}>
+            <Label htmlFor="markets-discovery-event-ticker" className="text-[11px] font-medium text-foreground">
+              Event Ticker
+            </Label>
+            <p className="text-[10px] leading-snug text-muted-foreground">
+              Event ticker to filter by. Only a single ticker allowed.
+            </p>
+            <Input
+              id="markets-discovery-event-ticker"
+              value={value.eventTicker || ""}
+              disabled={disabled || locks.disableEventTicker}
+              placeholder="Optional — e.g. KXHIGHNY-25JAN01"
+              className="h-9 max-w-md text-xs"
+              onChange={(e) => patch({ eventTicker: e.target.value })}
+            />
+          </div>
 
-      {/* Series Ticker */}
-      <div className={cn("space-y-1.5", locks.disableSeriesTicker && "opacity-60")}>
-        <Label className="text-[11px] font-medium text-foreground">Series Ticker</Label>
-        <p className="text-[10px] leading-snug text-muted-foreground">
-          Series ticker to filter by.
-        </p>
-        <MarketTickerSearch
-          value={value.seriesTicker || ""}
-          onChange={(v) => patch({ seriesTicker: v })}
-          disabled={disabled || locks.disableSeriesTicker}
-          dataSource={historical ? "historical" : "live"}
-          searchScope="series"
-          showCutoffNotes={false}
-          maxTickers={1}
-          required={false}
-        />
-      </div>
+          {/* Series Ticker */}
+          <div className={cn("space-y-1.5", locks.disableSeriesTicker && "opacity-60")}>
+            <Label className="text-[11px] font-medium text-foreground">Series Ticker</Label>
+            <p className="text-[10px] leading-snug text-muted-foreground">
+              Series ticker to filter by.
+            </p>
+            <MarketTickerSearch
+              value={value.seriesTicker || ""}
+              onChange={(v) => patch({ seriesTicker: v })}
+              disabled={disabled || locks.disableSeriesTicker}
+              dataSource="live"
+              searchScope="series"
+              showCutoffNotes={false}
+              maxTickers={1}
+              required={false}
+            />
+          </div>
 
-      {/* Market tickers */}
-      <div className={cn("space-y-1.5", locks.disableTickers && "opacity-60")}>
-        <Label className="text-[11px] font-medium text-foreground">Tickers</Label>
-        <p className="text-[10px] leading-snug text-muted-foreground">
-          Filter by specific market tickers. Comma-separated list of market tickers to retrieve.
-        </p>
-        <MarketTickerSearch
-          value={value.tickers || ""}
-          onChange={(v) => patch({ tickers: v })}
-          disabled={disabled || locks.disableTickers}
-          dataSource={historical ? "historical" : "live"}
-          showCutoffNotes={false}
-          required={false}
-        />
-      </div>
+          {/* Market tickers */}
+          <div className={cn("space-y-1.5", locks.disableTickers && "opacity-60")}>
+            <Label className="text-[11px] font-medium text-foreground">Tickers</Label>
+            <p className="text-[10px] leading-snug text-muted-foreground">
+              Filter by specific market tickers. Comma-separated list of market tickers to retrieve.
+            </p>
+            <MarketTickerSearch
+              value={value.tickers || ""}
+              onChange={(v) => patch({ tickers: v })}
+              disabled={disabled || locks.disableTickers}
+              dataSource="live"
+              showCutoffNotes={false}
+              required={false}
+            />
+          </div>
+        </>
+      )}
 
       {!historical ? (
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
@@ -413,7 +542,35 @@ export function KalshiLiveMarketsDiscoveryFields({
             toDate={cutoffMode === "historical" ? cutoffDate : null}
           />
         </div>
-      ) : null}
+      ) : (
+        <div className={cn("flex max-w-md flex-col space-y-1.5", locks.disableMve && "opacity-60")}>
+          <Label className="text-[11px] font-medium text-foreground">Multivariate Events</Label>
+          <p className="min-h-[2.5rem] text-[10px] leading-snug text-muted-foreground">
+            Historical discovery excludes multivariate events.
+          </p>
+          <Select
+            value={normalizeKalshiLiveMveFilter(value.mveFilter)}
+            disabled={disabled || locks.disableMve || historical}
+            onValueChange={(v) =>
+              patch({
+                mveFilter:
+                  v === KALSHI_LIVE_MVE_FILTER_ONLY
+                    ? KALSHI_LIVE_MVE_FILTER_ONLY
+                    : KALSHI_LIVE_MVE_FILTER_EXCLUDE,
+              })
+            }
+          >
+            <SelectTrigger className="mt-auto h-9 w-full text-xs">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value={KALSHI_LIVE_MVE_FILTER_EXCLUDE} className="text-xs">
+                Exclude
+              </SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+      )}
     </div>
   );
 }
