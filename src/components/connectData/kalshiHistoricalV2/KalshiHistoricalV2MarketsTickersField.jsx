@@ -2,20 +2,14 @@
 
 import { useMemo } from "react";
 
-import { MarketTickerSearch } from "@/components/connectData/MarketTickerSearch";
 import { KalshiLiveMarketsDiscoveryFields } from "@/components/connectData/kalshiLive/KalshiLiveMarketsDiscoveryFields";
-import { Label } from "@/components/ui/label";
-import { Switch } from "@/components/ui/switch";
 import { useMyStateV2 } from "@/context/stateContextV2";
-import {
-  emptyKalshiLiveMarketsDiscoveryParams,
-  KALSHI_LIVE_MVE_FILTER_EXCLUDE,
-} from "@/lib/kalshiLive/marketDiscovery";
+import { KALSHI_LIVE_MVE_FILTER_EXCLUDE } from "@/lib/kalshiLive/marketDiscovery";
 import { normalizeKalshiHistoricalV2MarketsDiscoveryScope } from "@/lib/kalshiHistoricalV2/historicalMarketsDiscovery";
 import { cn } from "@/lib/utils";
 
 /**
- * Historical v2 markets: discovery filters first, semantic search as secondary.
+ * Historical v2 markets: discovery filters only (semantic search deferred).
  *
  * Uses the shared connectKalshiLive* state keys so we can reuse the existing
  * markets compose operation panel.
@@ -27,12 +21,9 @@ import { cn } from "@/lib/utils";
  *   disabled?: boolean;
  * }} props
  */
-export function KalshiHistoricalV2MarketsTickersField({ value, onChange, className, disabled }) {
+export function KalshiHistoricalV2MarketsTickersField({ value: _value, onChange: _onChange, className, disabled }) {
   const ctx = useMyStateV2() ?? {};
   const {
-    setConnectKalshiLiveMarketsTickerMeta,
-    connectKalshiLiveMarketsDiscoveryMode = true,
-    setConnectKalshiLiveMarketsDiscoveryMode,
     connectKalshiLiveMarketsDiscoveryStatus = "",
     setConnectKalshiLiveMarketsDiscoveryStatus,
     connectKalshiLiveMarketsDiscoveryMveFilter = KALSHI_LIVE_MVE_FILTER_EXCLUDE,
@@ -60,8 +51,6 @@ export function KalshiHistoricalV2MarketsTickersField({ value, onChange, classNa
     connectKalshiHistoricalV2MarketsDiscoveryScope = "event",
     setConnectKalshiHistoricalV2MarketsDiscoveryScope,
   } = ctx;
-
-  const discoveryMode = connectKalshiLiveMarketsDiscoveryMode !== false;
 
   const discoveryValue = useMemo(
     () => ({
@@ -120,84 +109,29 @@ export function KalshiHistoricalV2MarketsTickersField({ value, onChange, classNa
     setConnectKalshiLiveMarketsDiscoveryMaxSettledTs?.(next.maxSettledTs ?? "");
   };
 
-  const modeToggle = (
-    <div className="flex items-center gap-2">
-      <Label htmlFor="markets-semantic-search-mode" className="text-[11px] font-medium text-foreground">
-        Use semantic search
-      </Label>
-      <Switch
-        id="markets-semantic-search-mode"
-        checked={!discoveryMode}
-        disabled={disabled}
-        className="h-4 w-7 [&>span]:h-3 [&>span]:w-3 [&>span]:data-[state=checked]:translate-x-3"
-        onCheckedChange={(checked) => {
-          // checked = semantic search → discovery mode off
-          setConnectKalshiLiveMarketsDiscoveryMode?.(!checked);
-          if (!checked) {
-            const empty = emptyKalshiLiveMarketsDiscoveryParams();
-            setDiscoveryValue({
-              ...empty,
-              mveFilter: KALSHI_LIVE_MVE_FILTER_EXCLUDE,
-              tickerScope: "event",
-            });
-          }
-        }}
-      />
-    </div>
-  );
-
   return (
     <div className={cn("space-y-2", className)}>
       <h2 className="text-xs font-semibold tracking-tight text-foreground">
-        {discoveryMode
-          ? "Discover or Explore Kalshi Historical Markets"
-          : "Add market tickers using the search below"}
+        Discover or Explore Kalshi Historical Markets
       </h2>
 
       <p className="text-[11px] leading-snug text-muted-foreground">
-        {discoveryMode
-          ? "Browse Kalshi’s historical markets with an event ticker, series ticker, or market tickers filter. Matching pages are pulled into one sheet."
-          : "Search for markets (or open a series from semantic search). You can pull multiple markets at once — choose one sheet or a sheet per market below."}
+        Browse Kalshi’s historical markets with an event ticker, series ticker, or market tickers
+        filter. Matching pages are pulled into one sheet.
       </p>
-      {discoveryMode ? (
-        <p className="text-[11px] leading-snug text-muted-foreground">
-          Note: historical v2 only supports ticker search due to recency and dynamic nature of this
-          data archive. Category and advanced filter support coming soon
-        </p>
-      ) : null}
+      <p className="text-[11px] leading-snug text-muted-foreground">
+        Note: historical v2 only supports ticker search due to recency and dynamic nature of this
+        data archive. Category and advanced filter support coming soon
+      </p>
 
       <div className="space-y-2 rounded-lg bg-muted/10 p-3">
-        {discoveryMode ? (
-          <div className="space-y-2">
-            <div className="flex flex-wrap items-center justify-between gap-2 pb-6">{modeToggle}</div>
-            <KalshiLiveMarketsDiscoveryFields
-              value={discoveryValue}
-              onChange={setDiscoveryValue}
-              disabled={disabled}
-              cutoffMode="historical"
-            />
-          </div>
-        ) : (
-          <MarketTickerSearch
-            value={value}
-            onChange={onChange}
-            disabled={disabled}
-            dataSource="historical"
-            showCutoffNotes
-            headerStart={modeToggle}
-            onSelectionsChange={(selections) => {
-              const next = {};
-              for (const s of selections || []) {
-                const ticker = String(s?.ticker || "").trim().toUpperCase();
-                if (!ticker) continue;
-                next[ticker] = String(s?.title || ticker).trim() || ticker;
-              }
-              setConnectKalshiLiveMarketsTickerMeta?.(next);
-            }}
-          />
-        )}
+        <KalshiLiveMarketsDiscoveryFields
+          value={discoveryValue}
+          onChange={setDiscoveryValue}
+          disabled={disabled}
+          cutoffMode="historical"
+        />
       </div>
     </div>
   );
 }
-

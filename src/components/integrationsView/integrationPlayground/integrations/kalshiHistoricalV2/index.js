@@ -1,21 +1,12 @@
 "use client";
 
 import { useCallback, useEffect, useRef } from "react";
-import { flushSync } from "react-dom";
 
 import { useMyStateV2 } from "@/context/stateContextV2";
 import { applyAthenaPullToSheetPatch } from "@/lib/dataLake/applyAthenaPullToSheet";
 import { applyConnectHomePullData } from "@/lib/connectHomePullDestination";
 import { ingestKalshiLiveAsView } from "@/lib/kalshiLive/ingestKalshiLiveAsView";
-import {
-  KALSHI_LIVE_MARKETS_SHEET_MODE_COMBINED,
-  normalizeKalshiLiveMarketsSheetMode,
-} from "@/lib/kalshiLive/marketCompose";
-import {
-  KALSHI_LIVE_MVE_FILTER_EXCLUDE,
-} from "@/lib/kalshiLive/marketDiscovery";
-
-import { fetchKalshiHistoricalV2MarketsTickerPull } from "@/lib/kalshiHistoricalV2/fetchKalshiHistoricalV2MarketsTickerPull";
+import { KALSHI_LIVE_MVE_FILTER_EXCLUDE } from "@/lib/kalshiLive/marketDiscovery";
 import { fetchKalshiHistoricalV2MarketsDiscoveryPull } from "@/lib/kalshiHistoricalV2/fetchKalshiHistoricalV2MarketsDiscoveryPull";
 
 function genRequestCardId() {
@@ -29,19 +20,9 @@ function isAbortError(err) {
   );
 }
 
-/** Next `sheet-N` id that does not collide with keys in `sheets`. */
-function allocateNextSheetId(sheets) {
-  const keys = Object.keys(sheets || {});
-  const nextNum =
-    keys.reduce((max, k) => {
-      const n = parseInt(String(k).replace(/\D/g, ""), 10) || 0;
-      return Math.max(max, n);
-    }, 0) + 1;
-  return `sheet-${nextNum}`;
-}
-
 /**
  * Hidden bridge: runs Kalshi Historical v2 pulls when Connect home requests integration pull.
+ * Markets is discovery-only for now (semantic ticker search deferred).
  */
 export default function KalshiHistoricalV2({
   setConnectedData,
@@ -58,11 +39,6 @@ export default function KalshiHistoricalV2({
   const {
     connectKalshiLiveEndpointId,
     connectKalshiLiveColumnSelections,
-    connectKalshiLiveWhereFilters,
-    connectKalshiLiveSortClauses,
-    connectKalshiLiveTickers,
-    connectKalshiLiveMarketsSheetMode,
-    connectKalshiLiveMarketsDiscoveryMode,
     connectKalshiLiveMarketsDiscoveryMveFilter,
     connectKalshiLiveMarketsDiscoveryEventTicker,
     connectKalshiLiveMarketsDiscoverySeriesTicker,
@@ -72,8 +48,6 @@ export default function KalshiHistoricalV2({
     setDataSheets,
     activeSheetId,
     setConnectedData: setConnectedFromCtx,
-    requestConnectAnalyzeScroll,
-    setConnectHomeAnalyzeActive,
   } = ctx;
 
   const setRows = setConnectedData || setConnectedFromCtx;
@@ -93,98 +67,32 @@ export default function KalshiHistoricalV2({
 
   const runMarketsPull = useCallback(
     async (ac, sheetId, cols) => {
-      const discoveryMode = !!connectKalshiLiveMarketsDiscoveryMode;
-
       setConnectDataLakePullState?.((prev) => ({
         ...prev,
         loading: true,
-        label: discoveryMode ? "Discovering Kalshi Historical v2 markets…" : "Fetching Kalshi Historical v2 markets…",
+        label: "Discovering Kalshi Historical v2 markets…",
         progress: 8,
         error: null,
       }));
 
-      if (discoveryMode) {
-        const discoveryParams = {
-          tickerScope: connectKalshiHistoricalV2MarketsDiscoveryScope || "event",
-          mveFilter: connectKalshiLiveMarketsDiscoveryMveFilter ?? KALSHI_LIVE_MVE_FILTER_EXCLUDE,
-          eventTicker: connectKalshiLiveMarketsDiscoveryEventTicker,
-          seriesTicker: connectKalshiLiveMarketsDiscoverySeriesTicker,
-          tickers: connectKalshiLiveMarketsDiscoveryTickers,
-        };
+      const discoveryParams = {
+        tickerScope: connectKalshiHistoricalV2MarketsDiscoveryScope || "event",
+        mveFilter: connectKalshiLiveMarketsDiscoveryMveFilter ?? KALSHI_LIVE_MVE_FILTER_EXCLUDE,
+        eventTicker: connectKalshiLiveMarketsDiscoveryEventTicker,
+        seriesTicker: connectKalshiLiveMarketsDiscoverySeriesTicker,
+        tickers: connectKalshiLiveMarketsDiscoveryTickers,
+      };
 
-        const { raw, rows: accumulated, querySummary } = await fetchKalshiHistoricalV2MarketsDiscoveryPull({
-          params: discoveryParams,
-          selectedColumns: cols,
-          signal: ac.signal,
-          onPage: ({ page, totalLoaded }) => {
-            const pct = Math.min(92, 8 + page * 6);
-            setConnectDataLakePullState?.((prev) => ({
-              ...prev,
-              loading: true,
-              label: `Loaded ${totalLoaded} historical markets (page ${page})…`,
-              progress: pct,
-              error: null,
-            }));
-          },
-        });
-
-        if (setRows) setRows(accumulated);
-
-        await ingestKalshiLiveAsView({
-          endpointId: "historical_v2_markets",
-          markets: raw,
-          selectedColumns: cols,
-        });
-
-        const requestCard = {
-          id: genRequestCardId(),
-          createdAt: Date.now(),
-          elapsedMs: 0,
-          lake: "kalshi-historical-v2",
-          table: "markets",
-          sheetId: sheetId || null,
-          querySummary,
-          loadedRowCount: accumulated.length,
-        };
-
-        if (sheetId && setDataSheets) {
-          setDataSheets((prev) =>
-            applyAthenaPullToSheetPatch(prev, sheetId, accumulated, {
-              provenance: {
-                source: "kalshi-historical-v2",
-                endpoint: "markets",
-                discovery: true,
-                ...discoveryParams,
-                querySummary,
-              },
-              requestCards: [requestCard],
-            }),
-          );
-        }
-
-        applyConnectHomePullData(ctx, accumulated);
-        if (ctx?.requestConnectAnalyzeScroll) ctx.requestConnectAnalyzeScroll();
-        return accumulated.length;
-      }
-
-      const whereFilters = Array.isArray(connectKalshiLiveWhereFilters) ? connectKalshiLiveWhereFilters : [];
-      const sortClauses = Array.isArray(connectKalshiLiveSortClauses) ? connectKalshiLiveSortClauses : [];
-      const marketTickers = String(connectKalshiLiveTickers || "").trim();
-      const sheetMode = normalizeKalshiLiveMarketsSheetMode(connectKalshiLiveMarketsSheetMode);
-
-      const { byTicker, raw, rows: accumulated, querySummary } = await fetchKalshiHistoricalV2MarketsTickerPull({
-        marketTickers,
+      const { raw, rows: accumulated, querySummary } = await fetchKalshiHistoricalV2MarketsDiscoveryPull({
+        params: discoveryParams,
         selectedColumns: cols,
-        whereFilters,
-        sortClauses,
-        sheetMode,
         signal: ac.signal,
-        onTickerProgress: ({ ticker, index, total }) => {
-          const pct = Math.min(90, 8 + Math.round(((index + 1) / Math.max(1, total)) * 80));
+        onPage: ({ page, totalLoaded }) => {
+          const pct = Math.min(92, 8 + page * 6);
           setConnectDataLakePullState?.((prev) => ({
             ...prev,
             loading: true,
-            label: `Fetching ${ticker} (${index + 1}/${total})…`,
+            label: `Loaded ${totalLoaded} historical markets (page ${page})…`,
             progress: pct,
             error: null,
           }));
@@ -199,66 +107,30 @@ export default function KalshiHistoricalV2({
         selectedColumns: cols,
       });
 
-      const useSeparateSheets = sheetMode !== KALSHI_LIVE_MARKETS_SHEET_MODE_COMBINED && byTicker.length > 1;
-      if (useSeparateSheets && setDataSheets) {
-        let firstSheetId = sheetId || ctx?.activeSheetId || null;
-        const totalRows = byTicker.reduce((sum, g) => sum + (Array.isArray(g.rows) ? g.rows.length : 0), 0);
+      const requestCard = {
+        id: genRequestCardId(),
+        createdAt: Date.now(),
+        elapsedMs: 0,
+        lake: "kalshi-historical-v2",
+        table: "markets",
+        sheetId: sheetId || null,
+        querySummary,
+        loadedRowCount: accumulated.length,
+      };
 
-        flushSync(() => {
-          setDataSheets((prev) => {
-            let next = { ...(prev || {}) };
-            /** @type {string[]} */
-            const writtenIds = [];
-
-            for (let i = 0; i < byTicker.length; i++) {
-              const group = byTicker[i];
-              const tickerName = String(group.ticker || `market-${i + 1}`).trim().slice(0, 80);
-              const rows = Array.isArray(group.rows) ? group.rows : [];
-
-              let targetSheetId;
-              if (i === 0 && firstSheetId) targetSheetId = firstSheetId;
-              else targetSheetId = allocateNextSheetId(next);
-
-              writtenIds.push(targetSheetId);
-
-              const requestCard = {
-                id: genRequestCardId(),
-                createdAt: Date.now(),
-                elapsedMs: 0,
-                lake: "kalshi-historical-v2",
-                table: "markets",
-                sheetId: targetSheetId,
-                querySummary,
-                loadedRowCount: rows.length,
-              };
-
-              next = applyAthenaPullToSheetPatch(next, targetSheetId, rows, {
-                name: tickerName,
-                provenance: {
-                  source: "kalshi-historical-v2",
-                  endpoint: "markets",
-                  marketTicker: tickerName,
-                  sheetMode,
-                  querySummary,
-                },
-                requestCards: [requestCard],
-              });
-            }
-
-            firstSheetId = writtenIds[0] || firstSheetId;
-            return next;
-          });
-
-          if (firstSheetId && ctx?.setActiveSheetId) {
-            ctx.setActiveSheetId(firstSheetId);
-          }
-          const firstRows = Array.isArray(byTicker[0]?.rows) ? byTicker[0].rows : [];
-          if (setRows) setRows(firstRows);
-          setConnectHomeAnalyzeActive?.(true);
-        });
-
-        if (requestConnectAnalyzeScroll) requestConnectAnalyzeScroll();
-        return totalRows;
+      if (sheetId && setDataSheets) {
+        setDataSheets((prev) =>
+          applyAthenaPullToSheetPatch(prev, sheetId, accumulated, {
+            provenance: {
+              source: "kalshi-historical-v2",
+              endpoint: "markets",
+              discovery: true,
+              ...discoveryParams,
+              querySummary,
+            },
+            requestCards: [requestCard],
+          }),
+        );
       }
 
       applyConnectHomePullData(ctx, accumulated);
@@ -266,22 +138,15 @@ export default function KalshiHistoricalV2({
       return accumulated.length;
     },
     [
-      connectKalshiLiveMarketsDiscoveryMode,
       connectKalshiLiveMarketsDiscoveryMveFilter,
       connectKalshiLiveMarketsDiscoveryEventTicker,
       connectKalshiLiveMarketsDiscoverySeriesTicker,
       connectKalshiLiveMarketsDiscoveryTickers,
       connectKalshiHistoricalV2MarketsDiscoveryScope,
-      connectKalshiLiveWhereFilters,
-      connectKalshiLiveSortClauses,
-      connectKalshiLiveTickers,
-      connectKalshiLiveMarketsSheetMode,
       setConnectDataLakePullState,
       setDataSheets,
       setRows,
       ctx,
-      requestConnectAnalyzeScroll,
-      setConnectHomeAnalyzeActive,
     ],
   );
 
@@ -358,4 +223,3 @@ export default function KalshiHistoricalV2({
 
   return null;
 }
-
