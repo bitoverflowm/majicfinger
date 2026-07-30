@@ -9,9 +9,9 @@ import {
   isConnectIntegrationWorkspace,
   isConnectSavedProjectWorkspace,
 } from "@/lib/connectHomeWorkspace";
-import { deriveConnectFlowStep, isConnectHomeDesignPanelTab } from "@/lib/connectHomeFlow";
+import { deriveConnectFlowStep, isConnectHomeDesignPanelTab, CONNECT_HOME_CENTER_VIEW } from "@/lib/connectHomeFlow";
 import { collectRequestCardEntries } from "@/lib/connectHomeRequestCards";
-import { isConnectUserDataPullActive } from "@/lib/connectHomePullDestination";
+import { connectHomeAnySheetHasData, isConnectUserDataPullActive } from "@/lib/connectHomePullDestination";
 import {
   connectDemoWorkspaceSectionClass,
   connectHubDemoLayoutClass,
@@ -113,10 +113,10 @@ export default function ConnectHomeShell({ user, userProfileFetchOk, startNew, s
     [dataSheets],
   );
 
-  const hasSheetData = useMemo(() => {
-    const sheets = dataSheets && typeof dataSheets === "object" ? Object.values(dataSheets) : [];
-    return sheets.some((s) => Array.isArray(s?.data) && s.data.length > 0);
-  }, [dataSheets]);
+  const hasSheetData = useMemo(
+    () => connectHomeAnySheetHasData(dataSheets, connectedData),
+    [dataSheets, connectedData],
+  );
 
   /** Step 2 grid visible: slide in app SideNav only after Run pull reaches analyze (not Step 1 compose). */
   const showConnectLeftNav =
@@ -352,6 +352,21 @@ export default function ConnectHomeShell({ user, userProfileFetchOk, startNew, s
     [context],
   );
 
+  const handleGoToWorkspace = useCallback(() => {
+    flushSync(() => {
+      // Hub can keep sheet rows after leaving a workspace; re-attach a host so the grid mounts.
+      if (!connectWorkspace) {
+        context?.requestConnectWorkspace?.(CONNECT_WORKSPACE.PROJECT, { scroll: false });
+      }
+      context?.setConnectHomeCenterView?.(CONNECT_HOME_CENTER_VIEW.SHEET);
+      context?.setConnectHomeAnalyzeActive?.(true);
+      setConnectHomeComposeOpen(false);
+    });
+    context?.requestConnectAnalyzeScroll?.();
+    // Prefer the analyze/sheet anchor — never send integrations back to the query builder.
+    scheduleConnectAnalyzeAnchorScroll(scrollRef);
+  }, [context, connectWorkspace]);
+
   const handleUploadParsed = useCallback(() => {
     flushSync(() => {
       context?.setConnectHomeAnalyzeActive?.(true);
@@ -444,6 +459,8 @@ export default function ConnectHomeShell({ user, userProfileFetchOk, startNew, s
               fixedRail
               expanded={connectHomeFlowStepsOpen}
               onExpandedChange={setConnectHomeFlowStepsOpen}
+              showGoToWorkspace={hasSheetData}
+              onGoToWorkspace={handleGoToWorkspace}
               className={cn(
                 connectHubFlowStepsViewportFixedClass,
                 !connectHomeFlowStepsOpen &&
@@ -468,6 +485,8 @@ export default function ConnectHomeShell({ user, userProfileFetchOk, startNew, s
               <ConnectHomeFlowSteps
                 currentStep={connectFlowStep}
                 sticky
+                showGoToWorkspace={hasSheetData}
+                onGoToWorkspace={handleGoToWorkspace}
                 className="sticky top-2 z-10 shrink-0 self-start"
               />
             ) : null}

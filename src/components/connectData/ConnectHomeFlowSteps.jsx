@@ -2,6 +2,7 @@
 
 import { X } from "lucide-react";
 
+import { Button } from "@/components/ui/button";
 import { CONNECT_FLOW_STEPS } from "@/lib/connectHomeFlow";
 import { connectHubFlowStepsCollapsedPeekClass } from "@/lib/connectHubLayout";
 import { cn } from "@/lib/utils";
@@ -20,6 +21,8 @@ const peekTabBaseClass =
  *   expanded?: boolean;
  *   onExpandedChange?: (open: boolean) => void;
  *   compact?: boolean;
+ *   showGoToWorkspace?: boolean;
+ *   onGoToWorkspace?: () => void;
  * }} props
  */
 export function ConnectHomeFlowSteps({
@@ -31,6 +34,8 @@ export function ConnectHomeFlowSteps({
   expanded = true,
   onExpandedChange,
   compact = false,
+  showGoToWorkspace = false,
+  onGoToWorkspace,
 }) {
   const isExpanded = !collapsible || expanded;
   const peekTabClass = cn(
@@ -123,6 +128,23 @@ export function ConnectHomeFlowSteps({
             );
           })}
         </ol>
+
+        {showGoToWorkspace && onGoToWorkspace ? (
+          <div className={cn(compact ? "mt-2 px-1" : "mt-4 px-2.5")}>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className={cn(
+                "h-auto w-full whitespace-normal px-2 py-1.5 text-left font-medium leading-snug",
+                compact ? "text-[9px]" : "text-[10px]",
+              )}
+              onClick={onGoToWorkspace}
+            >
+              Go to workspace
+            </Button>
+          </div>
+        ) : null}
       </div>
     </nav>
   );
