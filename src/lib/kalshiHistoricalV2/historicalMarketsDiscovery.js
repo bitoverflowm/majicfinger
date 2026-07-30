@@ -1,27 +1,41 @@
-import {
-  KALSHI_LIVE_MVE_FILTER_EXCLUDE,
-  normalizeKalshiLiveMveFilter,
-} from "@/lib/kalshiLive/marketDiscovery";
+import { KALSHI_LIVE_MVE_FILTER_EXCLUDE } from "@/lib/kalshiLive/marketDiscovery";
 import { parseMarketTickerList } from "@/lib/kalshiLive/marketTickerSearch";
 
 /**
  * Historical GET /historical/markets supports a small, mutually exclusive filter set:
- * limit, cursor, tickers, event_ticker, series_ticker, mve_filter (=exclude).
+ * limit, cursor, tickers, event_ticker, series_ticker, mve_filter (omit = include, exclude).
  * Live-only filters (status, created/close/settled/updated timestamps) are not supported.
  *
  * @typedef {"event" | "series" | "markets" | "general"} KalshiHistoricalV2MarketsDiscoveryScope
  *
  * @typedef {{
  *   tickerScope?: KalshiHistoricalV2MarketsDiscoveryScope;
- *   mveFilter?: import("@/lib/kalshiLive/marketDiscovery").KalshiLiveMveFilter | "";
+ *   mveFilter?: import("@/lib/kalshiLive/marketDiscovery").KalshiLiveMveFilter | "" | "include";
  *   eventTicker?: string;
  *   seriesTicker?: string;
  *   tickers?: string;
  * }} KalshiHistoricalV2MarketsDiscoveryParams
  */
 
-/** Safety cap while paginating historical discovery pages. */
+/** Safety cap while paginating filtered historical discovery pages. */
 export const KALSHI_HISTORICAL_V2_MARKETS_DISCOVERY_MAX_ROWS = 5_000;
+
+/**
+ * Unscoped (general) discovery: single probe page — do not paginate the full archive.
+ * Matches a basic docs-style pull: `?limit=100&mve_filter=exclude`.
+ */
+export const KALSHI_HISTORICAL_V2_MARKETS_DISCOVERY_GENERAL_LIMIT = 100;
+
+/**
+ * Historical mve_filter: omit param to include MVE markets; send "exclude" to drop them.
+ * @param {unknown} raw
+ * @returns {boolean}
+ */
+export function isKalshiHistoricalV2MveExcluded(raw) {
+  const s = String(raw ?? "").trim().toLowerCase();
+  if (!s || s === "include" || s === "null") return false;
+  return s === KALSHI_LIVE_MVE_FILTER_EXCLUDE;
+}
 
 /**
  * @param {unknown} raw
@@ -39,9 +53,9 @@ export function normalizeKalshiHistoricalV2MarketsDiscoveryScope(raw) {
 export function validateKalshiHistoricalV2MarketsDiscoveryPull(params) {
   const scope = normalizeKalshiHistoricalV2MarketsDiscoveryScope(params?.tickerScope);
 
-  const mve = normalizeKalshiLiveMveFilter(params?.mveFilter);
-  if (mve !== KALSHI_LIVE_MVE_FILTER_EXCLUDE) {
-    return "Historical markets discovery only supports Multivariate Events = Exclude.";
+  const mveRaw = String(params?.mveFilter ?? "").trim().toLowerCase();
+  if (mveRaw === "only") {
+    return "Historical markets discovery does not support Multivariate Events = only.";
   }
 
   if (scope === "general") {
@@ -93,9 +107,10 @@ export function buildKalshiHistoricalV2MarketsDiscoveryQueryParams(params, opts 
   const scope = normalizeKalshiHistoricalV2MarketsDiscoveryScope(params?.tickerScope);
 
   /** @type {Record<string, string>} */
-  const out = {
-    mve_filter: KALSHI_LIVE_MVE_FILTER_EXCLUDE,
-  };
+  const out = {};
+  if (isKalshiHistoricalV2MveExcluded(params?.mveFilter)) {
+    out.mve_filter = KALSHI_LIVE_MVE_FILTER_EXCLUDE;
+  }
 
   if (scope === "event") {
     const eventTicker = String(params?.eventTicker || "").trim().toUpperCase();
@@ -109,7 +124,12 @@ export function buildKalshiHistoricalV2MarketsDiscoveryQueryParams(params, opts 
   }
   // general → no ticker params
 
-  const limit = Math.min(1000, Math.max(1, Math.floor(Number(opts.limit) || 1000)));
+  const defaultLimit =
+    scope === "general" ? KALSHI_HISTORICAL_V2_MARKETS_DISCOVERY_GENERAL_LIMIT : 1000;
+  const limit = Math.min(
+    1000,
+    Math.max(1, Math.floor(Number(opts.limit) || defaultLimit)),
+  );
   out.limit = String(limit);
   return out;
 }
@@ -122,9 +142,11 @@ export function summarizeKalshiHistoricalV2MarketsDiscoveryRequest(params, opts 
   const scope = normalizeKalshiHistoricalV2MarketsDiscoveryScope(params?.tickerScope);
   const parts = ["GET /historical/markets", "discovery", `scope=${scope}`, "sheets=combined"];
   try {
-    const qs = buildKalshiHistoricalV2MarketsDiscoveryQueryParams(params, { limit: 1000 });
+    const qs = buildKalshiHistoricalV2MarketsDiscoveryQueryParams(params, {
+      limit:
+        scope === "general" ? KALSHI_HISTORICAL_V2_MARKETS_DISCOVERY_GENERAL_LIMIT : 1000,
+    });
     for (const [k, v] of Object.entries(qs)) {
-      if (k === "limit") continue;
       parts.push(`${k}=${v}`);
     }
   } catch {

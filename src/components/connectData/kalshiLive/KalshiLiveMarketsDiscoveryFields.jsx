@@ -7,6 +7,7 @@ import { MarketTickerSearch } from "@/components/connectData/MarketTickerSearch"
 import { KalshiLiveTimestampPicker } from "@/components/connectData/kalshiLive/KalshiLiveTimestampPicker";
 import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -25,6 +26,7 @@ import {
   normalizeKalshiLiveMveFilter,
 } from "@/lib/kalshiLive/marketDiscovery";
 import {
+  isKalshiHistoricalV2MveExcluded,
   normalizeKalshiHistoricalV2MarketsDiscoveryScope,
 } from "@/lib/kalshiHistoricalV2/historicalMarketsDiscovery";
 import { KALSHI_LIVE_MARKET_STATUS_OPTIONS } from "@/lib/kalshiLive/marketsColumns";
@@ -338,7 +340,7 @@ export function KalshiLiveMarketsDiscoveryFields({
             {(() => {
               const scope = normalizeKalshiHistoricalV2MarketsDiscoveryScope(value.tickerScope);
               if (scope === "general") {
-                return "Pull historical markets with no ticker filter (paginated list).";
+                return "Pull the first 100 historical markets with no ticker filter (single page).";
               }
               if (scope === "series") {
                 return "Filter by a single series ticker.";
@@ -543,32 +545,28 @@ export function KalshiLiveMarketsDiscoveryFields({
           />
         </div>
       ) : (
-        <div className={cn("flex max-w-md flex-col space-y-1.5", locks.disableMve && "opacity-60")}>
-          <Label className="text-[11px] font-medium text-foreground">Multivariate Events</Label>
-          <p className="min-h-[2.5rem] text-[10px] leading-snug text-muted-foreground">
-            Historical discovery excludes multivariate events.
-          </p>
-          <Select
-            value={normalizeKalshiLiveMveFilter(value.mveFilter)}
-            disabled={disabled || locks.disableMve || historical}
-            onValueChange={(v) =>
+        <div className="flex max-w-md items-start gap-2">
+          <Checkbox
+            id="historical-markets-mve-exclude"
+            checked={isKalshiHistoricalV2MveExcluded(value.mveFilter)}
+            disabled={disabled}
+            onCheckedChange={(checked) =>
               patch({
-                mveFilter:
-                  v === KALSHI_LIVE_MVE_FILTER_ONLY
-                    ? KALSHI_LIVE_MVE_FILTER_ONLY
-                    : KALSHI_LIVE_MVE_FILTER_EXCLUDE,
+                mveFilter: checked ? KALSHI_LIVE_MVE_FILTER_EXCLUDE : "include",
               })
             }
-          >
-            <SelectTrigger className="mt-auto h-9 w-full text-xs">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value={KALSHI_LIVE_MVE_FILTER_EXCLUDE} className="text-xs">
-                Exclude
-              </SelectItem>
-            </SelectContent>
-          </Select>
+          />
+          <div className="min-w-0 space-y-0.5">
+            <Label
+              htmlFor="historical-markets-mve-exclude"
+              className="text-[11px] font-medium leading-snug text-foreground"
+            >
+              Exclude multivariate events
+            </Label>
+            <p className="text-[10px] leading-snug text-muted-foreground">
+              Uncheck to include multivariate events. Checked excludes them from discovery.
+            </p>
+          </div>
         </div>
       )}
     </div>

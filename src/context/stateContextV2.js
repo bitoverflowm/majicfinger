@@ -155,7 +155,7 @@ export const StateProviderV2 = ({children, initialSettings}) => {
     const [
       connectKalshiLiveMarketsDiscoveryMveFilter,
       setConnectKalshiLiveMarketsDiscoveryMveFilter,
-    ] = useState(/** @type {"only" | "exclude"} */ ("exclude"));
+    ] = useState(/** @type {"only" | "exclude" | "include"} */ ("exclude"));
     const [
       connectKalshiLiveMarketsDiscoveryEventTicker,
       setConnectKalshiLiveMarketsDiscoveryEventTicker,

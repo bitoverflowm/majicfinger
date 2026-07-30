@@ -150,7 +150,7 @@ export function KalshiHistoricalV2MarketsTickersField({ value, onChange, classNa
     <div className={cn("space-y-2", className)}>
       <h2 className="text-xs font-semibold tracking-tight text-foreground">
         {discoveryMode
-          ? "Discover markets with filters"
+          ? "Discover or Explore Kalshi Historical Markets"
           : "Add market tickers using the search below"}
       </h2>
 
