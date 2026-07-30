@@ -14,7 +14,7 @@ import {
 import { cn } from "@/lib/utils";
 
 /**
- * Historical v2 markets: semantic market search + discovery filters.
+ * Historical v2 markets: discovery filters first, semantic search as secondary.
  *
  * Uses the shared connectKalshiLive* state keys so we can reuse the existing
  * markets compose operation panel.
@@ -30,7 +30,7 @@ export function KalshiHistoricalV2MarketsTickersField({ value, onChange, classNa
   const ctx = useMyStateV2() ?? {};
   const {
     setConnectKalshiLiveMarketsTickerMeta,
-    connectKalshiLiveMarketsDiscoveryMode = false,
+    connectKalshiLiveMarketsDiscoveryMode = true,
     setConnectKalshiLiveMarketsDiscoveryMode,
     connectKalshiLiveMarketsDiscoveryStatus = "",
     setConnectKalshiLiveMarketsDiscoveryStatus,
@@ -57,6 +57,8 @@ export function KalshiHistoricalV2MarketsTickersField({ value, onChange, classNa
     connectKalshiLiveMarketsDiscoveryMaxSettledTs = "",
     setConnectKalshiLiveMarketsDiscoveryMaxSettledTs,
   } = ctx;
+
+  const discoveryMode = connectKalshiLiveMarketsDiscoveryMode !== false;
 
   const discoveryValue = useMemo(
     () => ({
@@ -106,21 +108,25 @@ export function KalshiHistoricalV2MarketsTickersField({ value, onChange, classNa
     setConnectKalshiLiveMarketsDiscoveryMaxSettledTs?.(next.maxSettledTs ?? "");
   };
 
-  const discoveryToggle = (
+  const modeToggle = (
     <div className="flex items-center gap-2">
-      <Label htmlFor="markets-discovery-mode" className="text-[11px] font-medium text-foreground">
-        Toggle discovery mode
+      <Label htmlFor="markets-semantic-search-mode" className="text-[11px] font-medium text-foreground">
+        Use semantic search
       </Label>
       <Switch
-        id="markets-discovery-mode"
-        checked={!!connectKalshiLiveMarketsDiscoveryMode}
+        id="markets-semantic-search-mode"
+        checked={!discoveryMode}
         disabled={disabled}
         className="h-4 w-7 [&>span]:h-3 [&>span]:w-3 [&>span]:data-[state=checked]:translate-x-3"
         onCheckedChange={(checked) => {
-          setConnectKalshiLiveMarketsDiscoveryMode?.(!!checked);
-          if (checked) {
+          // checked = semantic search → discovery mode off
+          setConnectKalshiLiveMarketsDiscoveryMode?.(!checked);
+          if (!checked) {
             const empty = emptyKalshiLiveMarketsDiscoveryParams();
-            setDiscoveryValue(empty);
+            setDiscoveryValue({
+              ...empty,
+              mveFilter: KALSHI_LIVE_MVE_FILTER_EXCLUDE,
+            });
           }
         }}
       />
@@ -130,21 +136,21 @@ export function KalshiHistoricalV2MarketsTickersField({ value, onChange, classNa
   return (
     <div className={cn("space-y-2", className)}>
       <h2 className="text-xs font-semibold tracking-tight text-foreground">
-        {connectKalshiLiveMarketsDiscoveryMode
+        {discoveryMode
           ? "Discover markets with filters"
           : "Add market tickers using the search below"}
       </h2>
 
       <p className="text-[11px] leading-snug text-muted-foreground">
-        {connectKalshiLiveMarketsDiscoveryMode
-          ? "Browse Kalshi’s markets list with status, date, and ticker filters. All matching pages are pulled into one sheet."
+        {discoveryMode
+          ? "Browse Kalshi’s historical markets with an event ticker, series ticker, or market tickers filter. Matching pages are pulled into one sheet."
           : "Search for markets (or open a series from semantic search). You can pull multiple markets at once — choose one sheet or a sheet per market below."}
       </p>
 
       <div className="space-y-2 rounded-lg bg-muted/10 p-3">
-        {connectKalshiLiveMarketsDiscoveryMode ? (
+        {discoveryMode ? (
           <div className="space-y-2">
-            <div className="flex flex-wrap items-center justify-between gap-2 pb-6">{discoveryToggle}</div>
+            <div className="flex flex-wrap items-center justify-between gap-2 pb-6">{modeToggle}</div>
             <KalshiLiveMarketsDiscoveryFields
               value={discoveryValue}
               onChange={setDiscoveryValue}
@@ -159,7 +165,7 @@ export function KalshiHistoricalV2MarketsTickersField({ value, onChange, classNa
             disabled={disabled}
             dataSource="historical"
             showCutoffNotes
-            headerStart={discoveryToggle}
+            headerStart={modeToggle}
             onSelectionsChange={(selections) => {
               const next = {};
               for (const s of selections || []) {

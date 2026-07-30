@@ -14,7 +14,6 @@ import {
 import {
   KALSHI_LIVE_MVE_FILTER_EXCLUDE,
 } from "@/lib/kalshiLive/marketDiscovery";
-import { useKalshiHistoricalCutoffDisplay } from "@/hooks/useKalshiHistoricalCutoffDisplay";
 
 import { fetchKalshiHistoricalV2MarketsTickerPull } from "@/lib/kalshiHistoricalV2/fetchKalshiHistoricalV2MarketsTickerPull";
 import { fetchKalshiHistoricalV2MarketsDiscoveryPull } from "@/lib/kalshiHistoricalV2/fetchKalshiHistoricalV2MarketsDiscoveryPull";
@@ -41,13 +40,6 @@ function allocateNextSheetId(sheets) {
   return `sheet-${nextNum}`;
 }
 
-function clampToCutoffSec(value, cutoffSec, { isMax = false } = {}) {
-  if (value === "" || value == null) return isMax ? cutoffSec : "";
-  const n = Math.floor(Number(value));
-  if (!Number.isFinite(n) || n <= 0) return isMax ? cutoffSec : "";
-  return Math.min(n, cutoffSec);
-}
-
 /**
  * Hidden bridge: runs Kalshi Historical v2 pulls when Connect home requests integration pull.
  */
@@ -66,24 +58,15 @@ export default function KalshiHistoricalV2({
   const {
     connectKalshiLiveEndpointId,
     connectKalshiLiveColumnSelections,
-    connectKalshiLiveLimit,
     connectKalshiLiveWhereFilters,
     connectKalshiLiveSortClauses,
     connectKalshiLiveTickers,
     connectKalshiLiveMarketsSheetMode,
     connectKalshiLiveMarketsDiscoveryMode,
-    connectKalshiLiveMarketsDiscoveryStatus,
     connectKalshiLiveMarketsDiscoveryMveFilter,
     connectKalshiLiveMarketsDiscoveryEventTicker,
     connectKalshiLiveMarketsDiscoverySeriesTicker,
     connectKalshiLiveMarketsDiscoveryTickers,
-    connectKalshiLiveMarketsDiscoveryMinCreatedTs,
-    connectKalshiLiveMarketsDiscoveryMaxCreatedTs,
-    connectKalshiLiveMarketsDiscoveryMinUpdatedTs,
-    connectKalshiLiveMarketsDiscoveryMinCloseTs,
-    connectKalshiLiveMarketsDiscoveryMaxCloseTs,
-    connectKalshiLiveMarketsDiscoveryMinSettledTs,
-    connectKalshiLiveMarketsDiscoveryMaxSettledTs,
     setConnectDataLakePullState,
     setDataSheets,
     activeSheetId,
@@ -91,10 +74,6 @@ export default function KalshiHistoricalV2({
     requestConnectAnalyzeScroll,
     setConnectHomeAnalyzeActive,
   } = ctx;
-
-  const { cutoffIso, loading: cutoffLoading } = useKalshiHistoricalCutoffDisplay();
-  const cutoffMs = cutoffIso ? Date.parse(String(cutoffIso)) : NaN;
-  const cutoffSec = Number.isFinite(cutoffMs) ? Math.floor(cutoffMs / 1000) : null;
 
   const setRows = setConnectedData || setConnectedFromCtx;
 
@@ -124,23 +103,11 @@ export default function KalshiHistoricalV2({
       }));
 
       if (discoveryMode) {
-        if (cutoffSec == null) {
-          throw new Error(cutoffLoading ? "Loading cutoff date…" : "Missing cutoff date.");
-        }
-
         const discoveryParams = {
-          status: connectKalshiLiveMarketsDiscoveryStatus,
           mveFilter: connectKalshiLiveMarketsDiscoveryMveFilter || KALSHI_LIVE_MVE_FILTER_EXCLUDE,
           eventTicker: connectKalshiLiveMarketsDiscoveryEventTicker,
           seriesTicker: connectKalshiLiveMarketsDiscoverySeriesTicker,
           tickers: connectKalshiLiveMarketsDiscoveryTickers,
-          minCreatedTs: clampToCutoffSec(connectKalshiLiveMarketsDiscoveryMinCreatedTs, cutoffSec, { isMax: false }),
-          maxCreatedTs: clampToCutoffSec(connectKalshiLiveMarketsDiscoveryMaxCreatedTs, cutoffSec, { isMax: true }),
-          minUpdatedTs: clampToCutoffSec(connectKalshiLiveMarketsDiscoveryMinUpdatedTs, cutoffSec, { isMax: false }),
-          minCloseTs: clampToCutoffSec(connectKalshiLiveMarketsDiscoveryMinCloseTs, cutoffSec, { isMax: false }),
-          maxCloseTs: clampToCutoffSec(connectKalshiLiveMarketsDiscoveryMaxCloseTs, cutoffSec, { isMax: true }),
-          minSettledTs: clampToCutoffSec(connectKalshiLiveMarketsDiscoveryMinSettledTs, cutoffSec, { isMax: false }),
-          maxSettledTs: clampToCutoffSec(connectKalshiLiveMarketsDiscoveryMaxSettledTs, cutoffSec, { isMax: true }),
         };
 
         const { raw, rows: accumulated, querySummary } = await fetchKalshiHistoricalV2MarketsDiscoveryPull({
@@ -298,18 +265,10 @@ export default function KalshiHistoricalV2({
     },
     [
       connectKalshiLiveMarketsDiscoveryMode,
-      connectKalshiLiveMarketsDiscoveryStatus,
       connectKalshiLiveMarketsDiscoveryMveFilter,
       connectKalshiLiveMarketsDiscoveryEventTicker,
       connectKalshiLiveMarketsDiscoverySeriesTicker,
       connectKalshiLiveMarketsDiscoveryTickers,
-      connectKalshiLiveMarketsDiscoveryMinCreatedTs,
-      connectKalshiLiveMarketsDiscoveryMaxCreatedTs,
-      connectKalshiLiveMarketsDiscoveryMinUpdatedTs,
-      connectKalshiLiveMarketsDiscoveryMinCloseTs,
-      connectKalshiLiveMarketsDiscoveryMaxCloseTs,
-      connectKalshiLiveMarketsDiscoveryMinSettledTs,
-      connectKalshiLiveMarketsDiscoveryMaxSettledTs,
       connectKalshiLiveWhereFilters,
       connectKalshiLiveSortClauses,
       connectKalshiLiveTickers,
@@ -318,8 +277,6 @@ export default function KalshiHistoricalV2({
       setDataSheets,
       setRows,
       ctx,
-      cutoffSec,
-      cutoffLoading,
       requestConnectAnalyzeScroll,
       setConnectHomeAnalyzeActive,
     ],

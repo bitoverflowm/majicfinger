@@ -197,11 +197,15 @@ function DiscoverySingleDateField({
  * Reusable Kalshi Live markets discovery filters (GET /markets list).
  * Controlled — wire to any parent state (Connect home, hubs, etc.).
  *
+ * When `cutoffMode="historical"`, only filters supported by GET /historical/markets
+ * are shown (event/series/tickers + mve exclude). Status and date filters are live-only.
+ *
  * @param {{
  *   value: import("@/lib/kalshiLive/marketDiscovery").KalshiLiveMarketsDiscoveryParams;
  *   onChange: (next: import("@/lib/kalshiLive/marketDiscovery").KalshiLiveMarketsDiscoveryParams) => void;
  *   disabled?: boolean;
  *   className?: string;
+ *   cutoffMode?: "live" | "historical";
  * }} props
  */
 export function KalshiLiveMarketsDiscoveryFields({
@@ -211,6 +215,7 @@ export function KalshiLiveMarketsDiscoveryFields({
   className,
   cutoffMode = "live",
 }) {
+  const historical = cutoffMode === "historical";
   const [cutoffDate, setCutoffDate] = useState(/** @type {Date | null} */ (null));
 
   const { cutoffIso } = useKalshiHistoricalCutoffDisplay();
@@ -242,7 +247,7 @@ export function KalshiLiveMarketsDiscoveryFields({
 
   return (
     <div className={cn("space-y-4", className)}>
-      {locks.note ? (
+      {historical ? null : locks.note ? (
         <p className="rounded-md border border-border/60 bg-muted/20 px-2.5 py-2 text-[10px] leading-snug text-muted-foreground">
           {locks.note}
         </p>
@@ -250,41 +255,44 @@ export function KalshiLiveMarketsDiscoveryFields({
 
       {/* Status + Multivariate Events */}
       <div className="mt-2 grid grid-cols-1 gap-4 sm:grid-cols-2">
-        <div className={cn("flex flex-col space-y-1.5", locks.disableStatus && "opacity-60")}>
-          <Label className="text-[11px] font-medium text-foreground">Status</Label>
-          <p className="min-h-[2.5rem] text-[10px] leading-snug text-muted-foreground">
-            Filter by market status.
-          </p>
-          <Select
-            value={value.status || "__any__"}
-            disabled={disabled || locks.disableStatus}
-            onValueChange={(v) => patch({ status: v === "__any__" ? "" : v })}
-          >
-            <SelectTrigger className="mt-auto h-9 w-full text-xs">
-              <SelectValue placeholder="Any status" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="__any__" className="text-xs text-muted-foreground">
-                Any status
-              </SelectItem>
-              {statusChoices.map((s) => (
-                <SelectItem key={s} value={s} className="text-xs">
-                  {s}
+        {!historical ? (
+          <div className={cn("flex flex-col space-y-1.5", locks.disableStatus && "opacity-60")}>
+            <Label className="text-[11px] font-medium text-foreground">Status</Label>
+            <p className="min-h-[2.5rem] text-[10px] leading-snug text-muted-foreground">
+              Filter by market status.
+            </p>
+            <Select
+              value={value.status || "__any__"}
+              disabled={disabled || locks.disableStatus}
+              onValueChange={(v) => patch({ status: v === "__any__" ? "" : v })}
+            >
+              <SelectTrigger className="mt-auto h-9 w-full text-xs">
+                <SelectValue placeholder="Any status" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="__any__" className="text-xs text-muted-foreground">
+                  Any status
                 </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
+                {statusChoices.map((s) => (
+                  <SelectItem key={s} value={s} className="text-xs">
+                    {s}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        ) : null}
 
         <div className={cn("flex flex-col space-y-1.5", locks.disableMve && "opacity-60")}>
           <Label className="text-[11px] font-medium text-foreground">Multivariate Events</Label>
           <p className="min-h-[2.5rem] text-[10px] leading-snug text-muted-foreground">
-            &apos;only&apos; returns only multivariate events, &apos;exclude&apos; excludes multivariate
-            events.
+            {historical
+              ? "Historical discovery excludes multivariate events."
+              : "'only' returns only multivariate events, 'exclude' excludes multivariate events."}
           </p>
           <Select
             value={normalizeKalshiLiveMveFilter(value.mveFilter)}
-            disabled={disabled || locks.disableMve}
+            disabled={disabled || locks.disableMve || historical}
             onValueChange={(v) =>
               patch({
                 mveFilter:
@@ -301,9 +309,11 @@ export function KalshiLiveMarketsDiscoveryFields({
               <SelectItem value={KALSHI_LIVE_MVE_FILTER_EXCLUDE} className="text-xs">
                 Exclude
               </SelectItem>
-              <SelectItem value={KALSHI_LIVE_MVE_FILTER_ONLY} className="text-xs">
-                only
-              </SelectItem>
+              {!historical ? (
+                <SelectItem value={KALSHI_LIVE_MVE_FILTER_ONLY} className="text-xs">
+                  only
+                </SelectItem>
+              ) : null}
             </SelectContent>
           </Select>
         </div>
@@ -337,7 +347,7 @@ export function KalshiLiveMarketsDiscoveryFields({
           value={value.seriesTicker || ""}
           onChange={(v) => patch({ seriesTicker: v })}
           disabled={disabled || locks.disableSeriesTicker}
-          dataSource="live"
+          dataSource={historical ? "historical" : "live"}
           searchScope="series"
           showCutoffNotes={false}
           maxTickers={1}
@@ -355,53 +365,55 @@ export function KalshiLiveMarketsDiscoveryFields({
           value={value.tickers || ""}
           onChange={(v) => patch({ tickers: v })}
           disabled={disabled || locks.disableTickers}
-          dataSource="live"
+          dataSource={historical ? "historical" : "live"}
           showCutoffNotes={false}
           required={false}
         />
       </div>
 
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-        <DiscoveryDateRangeField
-          label="Created Date"
-          description="Filter markets created within this date range."
-          minTs={value.minCreatedTs ?? ""}
-          maxTs={value.maxCreatedTs ?? ""}
-          onRangeChange={(min, max) => patch({ minCreatedTs: min, maxCreatedTs: max })}
-          disabled={disabled || locks.disableCreated}
-          fromDate={cutoffMode === "live" ? cutoffDate : null}
-          toDate={cutoffMode === "historical" ? cutoffDate : null}
-        />
-        <DiscoverySingleDateField
-          label="Updated After"
-          description="Return markets with metadata updated later than this Unix timestamp. Tracks non-trading changes only."
-          value={value.minUpdatedTs ?? ""}
-          onChange={setUpdatedAfter}
-          disabled={disabled || locks.disableUpdated}
-          fromDate={cutoffMode === "live" ? cutoffDate : null}
-          toDate={cutoffMode === "historical" ? cutoffDate : null}
-        />
-        <DiscoveryDateRangeField
-          label="Close Date"
-          description="Filter items that closed within this date range"
-          minTs={value.minCloseTs ?? ""}
-          maxTs={value.maxCloseTs ?? ""}
-          onRangeChange={(min, max) => patch({ minCloseTs: min, maxCloseTs: max })}
-          disabled={disabled || locks.disableClose}
-          fromDate={cutoffMode === "live" ? cutoffDate : null}
-          toDate={cutoffMode === "historical" ? cutoffDate : null}
-        />
-        <DiscoveryDateRangeField
-          label="Settled Date"
-          description="Filter items that settled within this date range"
-          minTs={value.minSettledTs ?? ""}
-          maxTs={value.maxSettledTs ?? ""}
-          onRangeChange={(min, max) => patch({ minSettledTs: min, maxSettledTs: max })}
-          disabled={disabled || locks.disableSettled}
-          fromDate={cutoffMode === "live" ? cutoffDate : null}
-          toDate={cutoffMode === "historical" ? cutoffDate : null}
-        />
-      </div>
+      {!historical ? (
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <DiscoveryDateRangeField
+            label="Created Date"
+            description="Filter markets created within this date range."
+            minTs={value.minCreatedTs ?? ""}
+            maxTs={value.maxCreatedTs ?? ""}
+            onRangeChange={(min, max) => patch({ minCreatedTs: min, maxCreatedTs: max })}
+            disabled={disabled || locks.disableCreated}
+            fromDate={cutoffMode === "live" ? cutoffDate : null}
+            toDate={cutoffMode === "historical" ? cutoffDate : null}
+          />
+          <DiscoverySingleDateField
+            label="Updated After"
+            description="Return markets with metadata updated later than this Unix timestamp. Tracks non-trading changes only."
+            value={value.minUpdatedTs ?? ""}
+            onChange={setUpdatedAfter}
+            disabled={disabled || locks.disableUpdated}
+            fromDate={cutoffMode === "live" ? cutoffDate : null}
+            toDate={cutoffMode === "historical" ? cutoffDate : null}
+          />
+          <DiscoveryDateRangeField
+            label="Close Date"
+            description="Filter items that closed within this date range"
+            minTs={value.minCloseTs ?? ""}
+            maxTs={value.maxCloseTs ?? ""}
+            onRangeChange={(min, max) => patch({ minCloseTs: min, maxCloseTs: max })}
+            disabled={disabled || locks.disableClose}
+            fromDate={cutoffMode === "live" ? cutoffDate : null}
+            toDate={cutoffMode === "historical" ? cutoffDate : null}
+          />
+          <DiscoveryDateRangeField
+            label="Settled Date"
+            description="Filter items that settled within this date range"
+            minTs={value.minSettledTs ?? ""}
+            maxTs={value.maxSettledTs ?? ""}
+            onRangeChange={(min, max) => patch({ minSettledTs: min, maxSettledTs: max })}
+            disabled={disabled || locks.disableSettled}
+            fromDate={cutoffMode === "live" ? cutoffDate : null}
+            toDate={cutoffMode === "historical" ? cutoffDate : null}
+          />
+        </div>
+      ) : null}
     </div>
   );
 }

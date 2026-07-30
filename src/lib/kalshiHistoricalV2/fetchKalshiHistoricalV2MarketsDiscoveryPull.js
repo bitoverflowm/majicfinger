@@ -1,19 +1,17 @@
 import {
-  buildKalshiLiveMarketsDiscoveryQueryParams,
-  KALSHI_LIVE_MARKETS_DISCOVERY_MAX_ROWS,
-  summarizeKalshiLiveMarketsDiscoveryRequest,
-  validateKalshiLiveMarketsDiscoveryPull,
-} from "@/lib/kalshiLive/marketDiscovery";
+  buildKalshiHistoricalV2MarketsDiscoveryQueryParams,
+  KALSHI_HISTORICAL_V2_MARKETS_DISCOVERY_MAX_ROWS,
+  summarizeKalshiHistoricalV2MarketsDiscoveryRequest,
+  validateKalshiHistoricalV2MarketsDiscoveryPull,
+} from "@/lib/kalshiHistoricalV2/historicalMarketsDiscovery";
 import { projectKalshiLiveMarketRows } from "@/lib/kalshiLive/normalizeMarketRow";
 
 /**
- * Discovery pull: GET /historical/markets with filters, paginate until exhausted (or safety cap).
- *
- * Note: we reuse the live discovery query parameter builder/validator since the
- * query param names match the historical endpoint.
+ * Discovery pull: GET /historical/markets with supported filters, paginate until exhausted
+ * (or safety cap). Always intended for a single combined sheet.
  *
  * @param {{
- *   params: import("@/lib/kalshiLive/marketDiscovery").KalshiLiveMarketsDiscoveryParams;
+ *   params: import("@/lib/kalshiHistoricalV2/historicalMarketsDiscovery").KalshiHistoricalV2MarketsDiscoveryParams;
  *   selectedColumns?: string[];
  *   signal?: AbortSignal;
  *   onPage?: (info: {
@@ -26,24 +24,24 @@ import { projectKalshiLiveMarketRows } from "@/lib/kalshiLive/normalizeMarketRow
  */
 export async function fetchKalshiHistoricalV2MarketsDiscoveryPull(opts) {
   const params = opts.params || {};
-  const err = validateKalshiLiveMarketsDiscoveryPull(params);
+  const err = validateKalshiHistoricalV2MarketsDiscoveryPull(params);
   if (err) throw new Error(err);
-
-  const querySummary = summarizeKalshiLiveMarketsDiscoveryRequest(params);
 
   /** @type {Record<string, unknown>[]} */
   const raw = [];
   let cursor = "";
   let page = 0;
+  let lastCursor = "";
 
-  while (raw.length < KALSHI_LIVE_MARKETS_DISCOVERY_MAX_ROWS) {
+  while (raw.length < KALSHI_HISTORICAL_V2_MARKETS_DISCOVERY_MAX_ROWS) {
     if (opts.signal?.aborted) throw new DOMException("Aborted", "AbortError");
 
-    const remaining = KALSHI_LIVE_MARKETS_DISCOVERY_MAX_ROWS - raw.length;
+    const remaining = KALSHI_HISTORICAL_V2_MARKETS_DISCOVERY_MAX_ROWS - raw.length;
     const pageLimit = Math.min(1000, remaining);
 
-    const built = buildKalshiLiveMarketsDiscoveryQueryParams(params, { limit: pageLimit });
-    // discovery=1 is only used by our internal proxy route
+    const built = buildKalshiHistoricalV2MarketsDiscoveryQueryParams(params, {
+      limit: pageLimit,
+    });
     const qs = new URLSearchParams({ ...built, discovery: "1" });
     if (cursor) qs.set("cursor", cursor);
 
@@ -77,6 +75,9 @@ export async function fetchKalshiHistoricalV2MarketsDiscoveryPull(opts) {
     });
 
     if (!cursor || batch.length === 0) break;
+    // Guard against a stuck/repeating cursor that would loop forever.
+    if (cursor === lastCursor) break;
+    lastCursor = cursor;
   }
 
   const rows = projectKalshiLiveMarketRows(raw, opts.selectedColumns);
@@ -84,10 +85,9 @@ export async function fetchKalshiHistoricalV2MarketsDiscoveryPull(opts) {
   return {
     raw,
     rows,
-    querySummary: summarizeKalshiLiveMarketsDiscoveryRequest(params, {
+    querySummary: summarizeKalshiHistoricalV2MarketsDiscoveryRequest(params, {
       loadedRowCount: rows.length,
     }),
-    truncated: raw.length >= KALSHI_LIVE_MARKETS_DISCOVERY_MAX_ROWS && !!cursor,
+    truncated: raw.length >= KALSHI_HISTORICAL_V2_MARKETS_DISCOVERY_MAX_ROWS && !!cursor,
   };
 }
-

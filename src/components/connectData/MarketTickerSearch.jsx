@@ -27,6 +27,7 @@ import {
   formatKalshiMarketDateRange,
   formatKalshiMarketStatusLabel,
   getMarketTickerSearchSegment,
+  historicalCutoffSortRank,
   isKalshiMarketLiveStatus,
   isTickerLikeSegment,
   isValidMarketTickerToken,
@@ -37,7 +38,9 @@ import {
   resolveSeriesTickers,
   fetchEventsForSeries,
   serializeMarketTickerSelections,
+  sortMarketsByHistoricalCutoff,
 } from "@/lib/kalshiLive/marketTickerSearch";
+import { useKalshiHistoricalCutoffDisplay } from "@/hooks/useKalshiHistoricalCutoffDisplay";
 import { cn } from "@/lib/utils";
 
 /** @typedef {import("@/lib/kalshiLive/marketTickerSearch").MarketTickerSelection} MarketTickerSelection */
@@ -382,6 +385,10 @@ export function MarketTickerSearch({
   const suggestSeqRef = useRef(0);
   const inputRef = useRef(/** @type {HTMLInputElement | null} */ (null));
 
+  const { cutoffMs: cutoffMsRaw } = useKalshiHistoricalCutoffDisplay();
+  const cutoffMs =
+    dataSource === "historical" && cutoffMsRaw != null ? Number(cutoffMsRaw) : NaN;
+
   const [selections, setSelections] = useState(/** @type {MarketTickerSelection[]} */ ([]));
   const [draft, setDraft] = useState("");
   const [suggestions, setSuggestions] = useState(/** @type {TickerSearchSuggestion[]} */ ([]));
@@ -686,9 +693,11 @@ export function MarketTickerSearch({
           ? [...seriesHits]
           : [...seriesHits, ...marketHits];
 
-      // Exact ticker match first; for natural language prefer series/event (semantic)
-      // over the live market text scan, which is a weaker heuristic.
+      // Exact ticker match first.
+      // Historical: prefer items that existed before the cutoff (across series + markets).
+      // Live NL: prefer series over the weaker market text scan.
       const upper = trimmed.toUpperCase();
+      const preferHistorical = Number.isFinite(cutoffMs);
       next.sort((a, b) => {
         if (eventsSemantic) {
           const aExact =
@@ -708,6 +717,16 @@ export function MarketTickerSearch({
         const aExact = a.kind === "market" && a.ticker === upper ? 0 : 1;
         const bExact = b.kind === "market" && b.ticker === upper ? 0 : 1;
         if (aExact !== bExact) return aExact - bExact;
+
+        if (preferHistorical) {
+          const byCutoff =
+            historicalCutoffSortRank(a, cutoffMs) - historicalCutoffSortRank(b, cutoffMs);
+          if (byCutoff !== 0) return byCutoff;
+          // Tie-break: keep series ahead of markets for NL browsing.
+          if (a.kind !== b.kind) return a.kind === "series" ? -1 : 1;
+          return 0;
+        }
+
         if (a.kind !== b.kind) {
           if (tickerLike) return a.kind === "market" ? -1 : 1;
           return a.kind === "series" ? -1 : 1;
@@ -744,7 +763,7 @@ export function MarketTickerSearch({
     } finally {
       if (mySeq === suggestSeqRef.current) setSuggestLoading(false);
     }
-  }, [seriesOnly, manualOnly, eventsSemantic]);
+  }, [seriesOnly, manualOnly, eventsSemantic, cutoffMs]);
 
   useEffect(() => {
     if (debounceRef.current) clearTimeout(debounceRef.current);
@@ -794,11 +813,13 @@ export function MarketTickerSearch({
     const markets = Array.isArray(series.markets) ? series.markets : [];
     setSeriesModal({
       title: series.title || series.ticker || "Select markets",
-      markets,
+      markets: Number.isFinite(cutoffMs)
+        ? sortMarketsByHistoricalCutoff(markets, cutoffMs)
+        : markets,
       selected: new Set(),
     });
     setSuggestOpen(false);
-  }, []);
+  }, [cutoffMs]);
 
   const openEventsModal = useCallback(async (series) => {
     const seriesTicker = String(series?.ticker || "").trim().toUpperCase();

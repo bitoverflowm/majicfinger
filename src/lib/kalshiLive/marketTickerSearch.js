@@ -398,6 +398,59 @@ export function classifyMarketVsHistoricalCutoff(selection, cutoffMs) {
 }
 
 /**
+ * Lower rank = better for historical search ordering.
+ * Prefers markets/series that existed before the cutoff.
+ *
+ * @param {{
+ *   kind?: string;
+ *   openTime?: string;
+ *   closeTime?: string;
+ *   markets?: Array<{ openTime?: string; closeTime?: string }>;
+ * } | null | undefined} item
+ * @param {number} cutoffMs
+ * @returns {number}
+ */
+export function historicalCutoffSortRank(item, cutoffMs) {
+  if (!Number.isFinite(cutoffMs) || !item) return 2;
+
+  const rankForRelation = (rel) => {
+    if (rel === "ended_before_cutoff") return 0;
+    if (rel === "spans_cutoff") return 1;
+    if (rel === "unknown") return 2;
+    return 3; // fully_after_cutoff
+  };
+
+  if (item.kind === "series" || Array.isArray(item.markets)) {
+    const markets = Array.isArray(item.markets) ? item.markets : [];
+    if (!markets.length) return 2;
+    let best = 3;
+    for (const m of markets) {
+      best = Math.min(best, rankForRelation(classifyMarketVsHistoricalCutoff(m, cutoffMs)));
+    }
+    return best;
+  }
+
+  return rankForRelation(classifyMarketVsHistoricalCutoff(item, cutoffMs));
+}
+
+/**
+ * Sort markets so historical-eligible ones come first (stable for equal ranks).
+ *
+ * @template {{ openTime?: string; closeTime?: string }} T
+ * @param {T[]} markets
+ * @param {number} cutoffMs
+ * @returns {T[]}
+ */
+export function sortMarketsByHistoricalCutoff(markets, cutoffMs) {
+  const list = Array.isArray(markets) ? [...markets] : [];
+  if (!Number.isFinite(cutoffMs) || list.length < 2) return list;
+  return list.sort(
+    (a, b) =>
+      historicalCutoffSortRank(a, cutoffMs) - historicalCutoffSortRank(b, cutoffMs),
+  );
+}
+
+/**
  * @param {string | undefined | null} iso
  * @param {{ withTime?: boolean }} [opts]
  * @returns {string}

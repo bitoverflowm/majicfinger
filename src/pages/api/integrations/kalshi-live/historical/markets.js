@@ -1,6 +1,6 @@
 import {
-  buildKalshiLiveMarketsDiscoveryQueryParams,
-} from "@/lib/kalshiLive/marketDiscovery";
+  buildKalshiHistoricalV2MarketsDiscoveryQueryParams,
+} from "@/lib/kalshiHistoricalV2/historicalMarketsDiscovery";
 import { buildKalshiLiveMarketsQueryParams } from "@/lib/kalshiLive/marketFilterRules";
 import { kalshiLiveUrl } from "@/lib/kalshiLive/kalshiLiveApiBase";
 
@@ -19,19 +19,11 @@ function parseFiltersParam(raw) {
   }
 }
 
-function parseUnixParam(req, name) {
-  const raw = queryParam(req, name);
-  if (!raw) return "";
-  const n = Math.floor(Number(raw));
-  return Number.isFinite(n) && n > 0 ? n : "";
-}
-
 /**
  * Proxy GET /historical/markets (list).
  *
- * Supports the same discovery query param shapes as Kalshi Live:
- * - discovery=true/1: status, event_ticker, series_ticker, tickers, and timestamp filters
- * - legacy: filters JSON + tickers + limit + cursor
+ * Discovery mode only forwards filters the historical API supports:
+ * tickers, event_ticker, series_ticker, mve_filter, limit, cursor.
  */
 export default async function handler(req, res) {
   if (req.method !== "GET") {
@@ -47,20 +39,12 @@ export default async function handler(req, res) {
     if (discovery) {
       const rawLimit = queryParam(req, "limit");
       const limit = rawLimit ? Number(rawLimit) : 1000;
-      params = buildKalshiLiveMarketsDiscoveryQueryParams(
+      params = buildKalshiHistoricalV2MarketsDiscoveryQueryParams(
         {
-          status: queryParam(req, "status"),
           mveFilter: queryParam(req, "mve_filter") || "exclude",
           eventTicker: queryParam(req, "event_ticker"),
           seriesTicker: queryParam(req, "series_ticker"),
           tickers: queryParam(req, "tickers"),
-          minCreatedTs: parseUnixParam(req, "min_created_ts"),
-          maxCreatedTs: parseUnixParam(req, "max_created_ts"),
-          minUpdatedTs: parseUnixParam(req, "min_updated_ts"),
-          minCloseTs: parseUnixParam(req, "min_close_ts"),
-          maxCloseTs: parseUnixParam(req, "max_close_ts"),
-          minSettledTs: parseUnixParam(req, "min_settled_ts"),
-          maxSettledTs: parseUnixParam(req, "max_settled_ts"),
         },
         { limit },
       );
@@ -105,4 +89,3 @@ export default async function handler(req, res) {
     });
   }
 }
-

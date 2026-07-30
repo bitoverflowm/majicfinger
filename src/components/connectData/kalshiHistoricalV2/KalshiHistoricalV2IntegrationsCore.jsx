@@ -274,36 +274,53 @@ export function KalshiHistoricalV2IntegrationsCore({ className, stepBackRef, onR
   const pullLoading = !!connectDataLakePullState?.loading;
   const [filterError, setFilterError] = useState(null);
 
-  // No nested compose yet — back always leaves the workspace.
-  useEffect(() => {
-    if (!stepBackRef) return undefined;
-    stepBackRef.current = () => false;
-    return () => {
-      if (stepBackRef.current) stepBackRef.current = null;
-    };
-  }, [stepBackRef]);
+  const handleClearEndpoint = useCallback(() => {
+    setConnectKalshiLiveEndpointId?.("");
+    setConnectActiveComposeOps?.([]);
+    setConnectKalshiLiveWhereFilters?.([]);
+    setConnectKalshiLiveSortClauses?.([]);
 
-  const selectedColumns = selectedId ? connectKalshiLiveColumnSelections?.[selectedId] || [] : [];
+    setConnectKalshiLiveTickers?.("");
+    setConnectKalshiLiveMarketsTickerMeta?.({});
+    setConnectKalshiLiveMarketsSheetMode?.("per_market");
 
-  const composeOperations = useMemo(() => {
-    const allowed = new Set(getKalshiLiveComposeOperationIds(selectedId || "markets"));
-    return CONNECT_COMPOSE_OPERATIONS.filter((o) => allowed.has(o.id));
-  }, [selectedId]);
+    setConnectKalshiLiveMarketsDiscoveryMode?.(false);
+    setConnectKalshiLiveMarketsDiscoveryStatus?.("");
+    setConnectKalshiLiveMarketsDiscoveryMveFilter?.("exclude");
+    setConnectKalshiLiveMarketsDiscoveryEventTicker?.("");
+    setConnectKalshiLiveMarketsDiscoverySeriesTicker?.("");
+    setConnectKalshiLiveMarketsDiscoveryTickers?.("");
+    setConnectKalshiLiveMarketsDiscoveryMinCreatedTs?.("");
+    setConnectKalshiLiveMarketsDiscoveryMaxCreatedTs?.("");
+    setConnectKalshiLiveMarketsDiscoveryMinUpdatedTs?.("");
+    setConnectKalshiLiveMarketsDiscoveryMinCloseTs?.("");
+    setConnectKalshiLiveMarketsDiscoveryMaxCloseTs?.("");
+    setConnectKalshiLiveMarketsDiscoveryMinSettledTs?.("");
+    setConnectKalshiLiveMarketsDiscoveryMaxSettledTs?.("");
 
-  const getDisplayLabel = useMemo(() => {
-    return (col) =>
-      KALSHI_LIVE_CONNECT_CONFIG.getColumnDisplayLabel(selectedId || "markets", col);
-  }, [selectedId]);
-
-  const patchColumns = useCallback(
-    (endpointId, fn) => {
-      setConnectKalshiLiveColumnSelections?.((prev) => ({
-        ...(prev || {}),
-        [endpointId]: fn((prev || {})?.[endpointId] || []),
-      }));
-    },
-    [setConnectKalshiLiveColumnSelections],
-  );
+    setFilterError(null);
+  }, [
+    setConnectKalshiLiveEndpointId,
+    setConnectActiveComposeOps,
+    setConnectKalshiLiveWhereFilters,
+    setConnectKalshiLiveSortClauses,
+    setConnectKalshiLiveTickers,
+    setConnectKalshiLiveMarketsTickerMeta,
+    setConnectKalshiLiveMarketsSheetMode,
+    setConnectKalshiLiveMarketsDiscoveryMode,
+    setConnectKalshiLiveMarketsDiscoveryStatus,
+    setConnectKalshiLiveMarketsDiscoveryMveFilter,
+    setConnectKalshiLiveMarketsDiscoveryEventTicker,
+    setConnectKalshiLiveMarketsDiscoverySeriesTicker,
+    setConnectKalshiLiveMarketsDiscoveryTickers,
+    setConnectKalshiLiveMarketsDiscoveryMinCreatedTs,
+    setConnectKalshiLiveMarketsDiscoveryMaxCreatedTs,
+    setConnectKalshiLiveMarketsDiscoveryMinUpdatedTs,
+    setConnectKalshiLiveMarketsDiscoveryMinCloseTs,
+    setConnectKalshiLiveMarketsDiscoveryMaxCloseTs,
+    setConnectKalshiLiveMarketsDiscoveryMinSettledTs,
+    setConnectKalshiLiveMarketsDiscoveryMaxSettledTs,
+  ]);
 
   const handleSelectEndpoint = useCallback(
     (endpointId) => {
@@ -317,7 +334,7 @@ export function KalshiHistoricalV2IntegrationsCore({ className, stepBackRef, onR
       setConnectKalshiLiveMarketsTickerMeta?.({});
       setConnectKalshiLiveMarketsSheetMode?.("per_market");
 
-      setConnectKalshiLiveMarketsDiscoveryMode?.(false);
+      setConnectKalshiLiveMarketsDiscoveryMode?.(true);
       setConnectKalshiLiveMarketsDiscoveryStatus?.("");
       setConnectKalshiLiveMarketsDiscoveryMveFilter?.("exclude");
       setConnectKalshiLiveMarketsDiscoveryEventTicker?.("");
@@ -357,52 +374,99 @@ export function KalshiHistoricalV2IntegrationsCore({ className, stepBackRef, onR
     ],
   );
 
+  // Only Markets is live for Historical v2 — clear stale non-markets selections.
+  useEffect(() => {
+    if (selectedId && selectedId !== "markets") {
+      handleClearEndpoint();
+    }
+  }, [selectedId, handleClearEndpoint]);
+
+  useEffect(() => {
+    if (!stepBackRef) return undefined;
+    stepBackRef.current = () => {
+      if (!selectedId) return false;
+      handleClearEndpoint();
+      return true;
+    };
+    return () => {
+      stepBackRef.current = null;
+    };
+  }, [stepBackRef, selectedId, handleClearEndpoint]);
+
+  const selectedColumns = selectedId ? connectKalshiLiveColumnSelections?.[selectedId] || [] : [];
+
+  const composeOperations = useMemo(() => {
+    const allowed = new Set(getKalshiLiveComposeOperationIds(selectedId || "markets"));
+    return CONNECT_COMPOSE_OPERATIONS.filter((o) => allowed.has(o.id));
+  }, [selectedId]);
+
+  const getDisplayLabel = useMemo(() => {
+    return (col) =>
+      KALSHI_LIVE_CONNECT_CONFIG.getColumnDisplayLabel(selectedId || "markets", col);
+  }, [selectedId]);
+
+  const patchColumns = useCallback(
+    (endpointId, fn) => {
+      setConnectKalshiLiveColumnSelections?.((prev) => ({
+        ...(prev || {}),
+        [endpointId]: fn((prev || {})?.[endpointId] || []),
+      }));
+    },
+    [setConnectKalshiLiveColumnSelections],
+  );
+
+  const showHub = selectedId !== "markets";
+
   return (
     <div className={cn("space-y-3", className)}>
-      <GoToKalshiLiveCutoffNote />
+      {showHub ? (
+        <>
+          <GoToKalshiLiveCutoffNote />
 
-      <div className="grid grid-cols-1 items-stretch gap-3 sm:grid-cols-3">
-        <HubStartingPointColumn
-          icon={Layers}
-          title="Kalshi Historical Data v2"
-          badge="Up to live cutoff"
-          description="Choose Markets. Semantic search + discovery are enabled."
-        >
-          <div className="space-y-1.5">
-            {KALSHI_HISTORICAL_V2_CONNECT_ENDPOINTS.map((endpoint) => (
-              <SourceOption
-                key={endpoint.id}
-                endpoint={endpoint}
-                isSelected={selectedId === endpoint.id}
-                disabled={endpoint.id !== "markets"}
-                onSelect={handleSelectEndpoint}
-              />
-            ))}
+          <div className="grid grid-cols-1 items-stretch gap-3 sm:grid-cols-3">
+            <HubStartingPointColumn
+              icon={Layers}
+              title="Kalshi Historical Data v2"
+              badge="Up to live cutoff"
+              description="Choose Markets. Semantic search + discovery are enabled."
+            >
+              <div className="space-y-1.5">
+                {KALSHI_HISTORICAL_V2_CONNECT_ENDPOINTS.map((endpoint) => (
+                  <SourceOption
+                    key={endpoint.id}
+                    endpoint={endpoint}
+                    isSelected={selectedId === endpoint.id}
+                    disabled={endpoint.id !== "markets"}
+                    onSelect={handleSelectEndpoint}
+                  />
+                ))}
+              </div>
+            </HubStartingPointColumn>
+
+            <div
+              className="relative flex min-h-[12rem] flex-col rounded-xl border border-border/70 bg-muted/15 p-3"
+              aria-hidden
+            />
+
+            <HubStartingPointColumn
+              id="kalshi-historical-v2-guided-workflows"
+              icon={Wand2}
+              title="Use a guided workflow"
+              badge="Best for guided setup"
+              description="Follow a step-by-step walkthrough for common historical data tasks."
+            >
+              <div className="space-y-1.5">
+                {COMING_SOON_WORKFLOWS.map((workflow) => (
+                  <ComingSoonWorkflowOption key={workflow.id} workflow={workflow} />
+                ))}
+              </div>
+            </HubStartingPointColumn>
           </div>
-        </HubStartingPointColumn>
+        </>
+      ) : (
+        <div className="space-y-3">
+          <GoToKalshiLiveCutoffNote />
 
-        <div
-          className="relative flex min-h-[12rem] flex-col rounded-xl border border-border/70 bg-muted/15 p-3"
-          aria-hidden
-        />
-
-        <HubStartingPointColumn
-          id="kalshi-historical-v2-guided-workflows"
-          icon={Wand2}
-          title="Use a guided workflow"
-          badge="Best for guided setup"
-          description="Follow a step-by-step walkthrough for common historical data tasks."
-        >
-          <div className="space-y-1.5">
-            {COMING_SOON_WORKFLOWS.map((workflow) => (
-              <ComingSoonWorkflowOption key={workflow.id} workflow={workflow} />
-            ))}
-          </div>
-        </HubStartingPointColumn>
-      </div>
-
-      {selectedId === "markets" ? (
-        <div className="space-y-3 pt-2">
           <div className="min-w-0">
             <Label className="text-[0.6875rem] font-medium uppercase tracking-wider text-muted-foreground">
               Source
@@ -450,7 +514,7 @@ export function KalshiHistoricalV2IntegrationsCore({ className, stepBackRef, onR
             />
           </ColumnPicker>
         </div>
-      ) : null}
+      )}
     </div>
   );
 }
