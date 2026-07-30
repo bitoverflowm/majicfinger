@@ -210,7 +210,7 @@ function DiscoverySingleDateField({
  * Controlled — wire to any parent state (Connect home, hubs, etc.).
  *
  * When `cutoffMode="historical"`, only filters supported by GET /historical/markets
- * are shown (event/series/tickers + mve exclude). Status and date filters are live-only.
+ * are shown (event/series/tickers + mve exclude for general). Status and date filters are live-only.
  *
  * @param {{
  *   value: import("@/lib/kalshiLive/marketDiscovery").KalshiLiveMarketsDiscoveryParams & {

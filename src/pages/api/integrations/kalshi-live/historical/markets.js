@@ -39,11 +39,7 @@ export default async function handler(req, res) {
     if (discovery) {
       const rawLimit = queryParam(req, "limit");
       const scope = queryParam(req, "ticker_scope") || "event";
-      const limit = rawLimit
-        ? Number(rawLimit)
-        : scope === "general"
-          ? 100
-          : 1000;
+      const limit = rawLimit ? Number(rawLimit) : 1000;
       params = buildKalshiHistoricalV2MarketsDiscoveryQueryParams(
         {
           tickerScope: scope,

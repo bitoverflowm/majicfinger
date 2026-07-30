@@ -70,6 +70,7 @@ import {
   KALSHI_LIVE_MVE_FILTER_EXCLUDE,
   validateKalshiLiveMarketsDiscoveryPull,
 } from "@/lib/kalshiLive/marketDiscovery";
+import { validateKalshiHistoricalV2MarketsDiscoveryPull } from "@/lib/kalshiHistoricalV2/historicalMarketsDiscovery";
 import {
   KALSHI_LIVE_EVENTS_SHEET_MODE_COMBINED,
   KALSHI_LIVE_EVENTS_SHEET_MODE_PER_EVENT,
@@ -197,6 +198,7 @@ const CANDLESTICK_ROW_LIMIT_MAX = 10_000;
  *   filterError?: string | null;
  *   setFilterError?: (msg: string | null) => void;
  *   className?: string;
+ *   rowLimitMaxOverride?: number;
  * }} props
  */
 export function KalshiLiveComposeOperationPanel({
@@ -205,10 +207,12 @@ export function KalshiLiveComposeOperationPanel({
   filterError,
   setFilterError,
   className,
+  rowLimitMaxOverride,
 }) {
   const ctx = useMyStateV2() ?? {};
   const { workspaceWriteLocked, requestProUpgrade, dialog: demoProDialog } = useDemoProGate();
   const {
+    connectWorkspace,
     connectActiveComposeOps = [],
     setConnectActiveComposeOps,
     connectKalshiLiveWhereFilters = [],
@@ -278,6 +282,7 @@ export function KalshiLiveComposeOperationPanel({
     connectKalshiLiveSeriesDiscoveryMode = false,
     connectKalshiLiveSeriesDiscoveryCategory = "",
     connectKalshiLiveSeriesDiscoveryTag = "",
+    connectKalshiHistoricalV2MarketsDiscoveryScope = "event",
   } = ctx;
 
   const candlestickAutoSheets = useMemo(() => {
@@ -614,22 +619,31 @@ export function KalshiLiveComposeOperationPanel({
     }
 
     if (endpointId === "markets") {
-      const marketsErr = connectKalshiLiveMarketsDiscoveryMode
-        ? validateKalshiLiveMarketsDiscoveryPull({
-            status: connectKalshiLiveMarketsDiscoveryStatus,
-            mveFilter: connectKalshiLiveMarketsDiscoveryMveFilter,
-            eventTicker: connectKalshiLiveMarketsDiscoveryEventTicker,
-            seriesTicker: connectKalshiLiveMarketsDiscoverySeriesTicker,
-            tickers: connectKalshiLiveMarketsDiscoveryTickers,
-            minCreatedTs: connectKalshiLiveMarketsDiscoveryMinCreatedTs,
-            maxCreatedTs: connectKalshiLiveMarketsDiscoveryMaxCreatedTs,
-            minUpdatedTs: connectKalshiLiveMarketsDiscoveryMinUpdatedTs,
-            minCloseTs: connectKalshiLiveMarketsDiscoveryMinCloseTs,
-            maxCloseTs: connectKalshiLiveMarketsDiscoveryMaxCloseTs,
-            minSettledTs: connectKalshiLiveMarketsDiscoveryMinSettledTs,
-            maxSettledTs: connectKalshiLiveMarketsDiscoveryMaxSettledTs,
-          })
-        : validateKalshiLiveMarketsPull(connectKalshiLiveTickers);
+      const marketsErr =
+        connectWorkspace === "kalshiHistoricalV2"
+          ? validateKalshiHistoricalV2MarketsDiscoveryPull({
+              tickerScope: connectKalshiHistoricalV2MarketsDiscoveryScope,
+              mveFilter: connectKalshiLiveMarketsDiscoveryMveFilter,
+              eventTicker: connectKalshiLiveMarketsDiscoveryEventTicker,
+              seriesTicker: connectKalshiLiveMarketsDiscoverySeriesTicker,
+              tickers: connectKalshiLiveMarketsDiscoveryTickers,
+            })
+          : connectKalshiLiveMarketsDiscoveryMode
+            ? validateKalshiLiveMarketsDiscoveryPull({
+                status: connectKalshiLiveMarketsDiscoveryStatus,
+                mveFilter: connectKalshiLiveMarketsDiscoveryMveFilter,
+                eventTicker: connectKalshiLiveMarketsDiscoveryEventTicker,
+                seriesTicker: connectKalshiLiveMarketsDiscoverySeriesTicker,
+                tickers: connectKalshiLiveMarketsDiscoveryTickers,
+                minCreatedTs: connectKalshiLiveMarketsDiscoveryMinCreatedTs,
+                maxCreatedTs: connectKalshiLiveMarketsDiscoveryMaxCreatedTs,
+                minUpdatedTs: connectKalshiLiveMarketsDiscoveryMinUpdatedTs,
+                minCloseTs: connectKalshiLiveMarketsDiscoveryMinCloseTs,
+                maxCloseTs: connectKalshiLiveMarketsDiscoveryMaxCloseTs,
+                minSettledTs: connectKalshiLiveMarketsDiscoveryMinSettledTs,
+                maxSettledTs: connectKalshiLiveMarketsDiscoveryMaxSettledTs,
+              })
+            : validateKalshiLiveMarketsPull(connectKalshiLiveTickers);
       if (marketsErr) {
         setFilterError?.(marketsErr);
         return;
@@ -707,6 +721,8 @@ export function KalshiLiveComposeOperationPanel({
     connectKalshiLiveSearchTradersIncludeHoldings,
     connectKalshiLiveLimit,
     connectKalshiLiveTickers,
+    connectWorkspace,
+    connectKalshiHistoricalV2MarketsDiscoveryScope,
     connectKalshiLiveMarketsDiscoveryMode,
     connectKalshiLiveMarketsDiscoveryStatus,
     connectKalshiLiveMarketsDiscoveryMveFilter,
@@ -740,7 +756,9 @@ export function KalshiLiveComposeOperationPanel({
   ]);
 
   const rowLimitMax =
-    endpointId === "candlesticks"
+    Number.isFinite(Number(rowLimitMaxOverride)) && Number(rowLimitMaxOverride) > 0
+      ? Math.floor(Number(rowLimitMaxOverride))
+      : endpointId === "candlesticks"
       ? CANDLESTICK_ROW_LIMIT_MAX
       : endpointId === "trades"
         ? KALSHI_LIVE_TRADES_ROW_LIMIT_MAX
