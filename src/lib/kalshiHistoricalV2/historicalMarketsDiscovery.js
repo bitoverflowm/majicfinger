@@ -3,7 +3,8 @@ import { parseMarketTickerList } from "@/lib/kalshiLive/marketTickerSearch";
 
 /**
  * Historical GET /historical/markets supports a small, mutually exclusive filter set:
- * limit, cursor, tickers, event_ticker, series_ticker, mve_filter (omit = include, exclude).
+ * limit, cursor, tickers, event_ticker, series_ticker, mve_filter
+ * (general pull only; ticker-scoped pulls omit mve_filter = include).
  * Live-only filters (status, created/close/settled/updated timestamps) are not supported.
  *
  * @typedef {"event" | "series" | "markets" | "general"} KalshiHistoricalV2MarketsDiscoveryScope
@@ -108,7 +109,8 @@ export function buildKalshiHistoricalV2MarketsDiscoveryQueryParams(params, opts 
 
   /** @type {Record<string, string>} */
   const out = {};
-  if (isKalshiHistoricalV2MveExcluded(params?.mveFilter)) {
+  // Ticker-scoped pulls include MVEs (omit mve_filter). Only general pull exposes the filter.
+  if (scope === "general" && isKalshiHistoricalV2MveExcluded(params?.mveFilter)) {
     out.mve_filter = KALSHI_LIVE_MVE_FILTER_EXCLUDE;
   }
 

@@ -404,6 +404,7 @@ export function KalshiLiveMarketsDiscoveryFields({
                     eventTicker: "",
                     seriesTicker: "",
                     tickers: "",
+                    mveFilter: KALSHI_LIVE_MVE_FILTER_EXCLUDE,
                   });
                   return;
                 }
@@ -413,6 +414,7 @@ export function KalshiLiveMarketsDiscoveryFields({
                     seriesTicker: currentText,
                     eventTicker: "",
                     tickers: "",
+                    mveFilter: "include",
                   });
                   return;
                 }
@@ -422,6 +424,7 @@ export function KalshiLiveMarketsDiscoveryFields({
                     tickers: currentText,
                     eventTicker: "",
                     seriesTicker: "",
+                    mveFilter: "include",
                   });
                   return;
                 }
@@ -430,6 +433,7 @@ export function KalshiLiveMarketsDiscoveryFields({
                   eventTicker: currentText,
                   seriesTicker: "",
                   tickers: "",
+                  mveFilter: "include",
                 });
               }}
             >
@@ -544,7 +548,7 @@ export function KalshiLiveMarketsDiscoveryFields({
             toDate={cutoffMode === "historical" ? cutoffDate : null}
           />
         </div>
-      ) : (
+      ) : normalizeKalshiHistoricalV2MarketsDiscoveryScope(value.tickerScope) === "general" ? (
         <div className="flex max-w-md items-start gap-2">
           <Checkbox
             id="historical-markets-mve-exclude"
@@ -568,7 +572,7 @@ export function KalshiLiveMarketsDiscoveryFields({
             </p>
           </div>
         </div>
-      )}
+      ) : null}
     </div>
   );
 }

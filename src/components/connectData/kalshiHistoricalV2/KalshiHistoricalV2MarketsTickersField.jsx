@@ -4,7 +4,6 @@ import { useMemo } from "react";
 
 import { KalshiLiveMarketsDiscoveryFields } from "@/components/connectData/kalshiLive/KalshiLiveMarketsDiscoveryFields";
 import { useMyStateV2 } from "@/context/stateContextV2";
-import { KALSHI_LIVE_MVE_FILTER_EXCLUDE } from "@/lib/kalshiLive/marketDiscovery";
 import { normalizeKalshiHistoricalV2MarketsDiscoveryScope } from "@/lib/kalshiHistoricalV2/historicalMarketsDiscovery";
 import { cn } from "@/lib/utils";
 
@@ -26,7 +25,7 @@ export function KalshiHistoricalV2MarketsTickersField({ value: _value, onChange:
   const {
     connectKalshiLiveMarketsDiscoveryStatus = "",
     setConnectKalshiLiveMarketsDiscoveryStatus,
-    connectKalshiLiveMarketsDiscoveryMveFilter = KALSHI_LIVE_MVE_FILTER_EXCLUDE,
+    connectKalshiLiveMarketsDiscoveryMveFilter = "include",
     setConnectKalshiLiveMarketsDiscoveryMveFilter,
     connectKalshiLiveMarketsDiscoveryEventTicker = "",
     setConnectKalshiLiveMarketsDiscoveryEventTicker,
@@ -95,7 +94,7 @@ export function KalshiHistoricalV2MarketsTickersField({ value: _value, onChange:
     }
     setConnectKalshiLiveMarketsDiscoveryStatus?.(next.status ?? "");
     setConnectKalshiLiveMarketsDiscoveryMveFilter?.(
-      next.mveFilter ?? KALSHI_LIVE_MVE_FILTER_EXCLUDE,
+      next.mveFilter ?? "include",
     );
     setConnectKalshiLiveMarketsDiscoveryEventTicker?.(next.eventTicker ?? "");
     setConnectKalshiLiveMarketsDiscoverySeriesTicker?.(next.seriesTicker ?? "");

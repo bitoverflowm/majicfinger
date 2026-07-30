@@ -287,7 +287,7 @@ export function KalshiHistoricalV2IntegrationsCore({ className, stepBackRef, onR
 
     setConnectKalshiLiveMarketsDiscoveryMode?.(false);
     setConnectKalshiLiveMarketsDiscoveryStatus?.("");
-    setConnectKalshiLiveMarketsDiscoveryMveFilter?.("exclude");
+    setConnectKalshiLiveMarketsDiscoveryMveFilter?.("include");
     setConnectKalshiLiveMarketsDiscoveryEventTicker?.("");
     setConnectKalshiLiveMarketsDiscoverySeriesTicker?.("");
     setConnectKalshiLiveMarketsDiscoveryTickers?.("");
@@ -339,7 +339,7 @@ export function KalshiHistoricalV2IntegrationsCore({ className, stepBackRef, onR
 
       setConnectKalshiLiveMarketsDiscoveryMode?.(true);
       setConnectKalshiLiveMarketsDiscoveryStatus?.("");
-      setConnectKalshiLiveMarketsDiscoveryMveFilter?.("exclude");
+      setConnectKalshiLiveMarketsDiscoveryMveFilter?.("include");
       setConnectKalshiLiveMarketsDiscoveryEventTicker?.("");
       setConnectKalshiLiveMarketsDiscoverySeriesTicker?.("");
       setConnectKalshiLiveMarketsDiscoveryTickers?.("");
