@@ -6,6 +6,7 @@ import { projectKalshiLiveHolderProfileRows } from "@/lib/kalshiLive/normalizeHo
 import { projectKalshiLiveHolderTradeRows } from "@/lib/kalshiLive/normalizeHolderTradeRow";
 import { projectKalshiLiveSearchTradersRows } from "@/lib/kalshiLive/normalizeSearchTradersRow";
 import { projectKalshiLiveTradeRows } from "@/lib/kalshiLive/normalizeTradeRow";
+import { projectKalshiHistoricalV2TradeRows } from "@/lib/kalshiHistoricalV2/normalizeHistoricalTradeRow";
 import { projectKalshiLiveOrderbookRows } from "@/lib/kalshiLive/normalizeOrderbookRow";
 import { projectKalshiLiveMarketRows } from "@/lib/kalshiLive/normalizeMarketRow";
 import { projectKalshiLiveEventPayloads } from "@/lib/kalshiLive/normalizeEventRow";
@@ -90,11 +91,17 @@ export async function ingestKalshiLiveAsView(opts) {
       opts.selectedColumns,
       opts.searchTradersOpts || {},
     );
-  } else if (endpointId === "trades") {
-    sheetRows = projectKalshiLiveTradeRows(
-      Array.isArray(opts.trades) ? opts.trades : [],
-      opts.selectedColumns,
-    );
+  } else if (endpointId === "trades" || endpointId === "historical_v2_trades") {
+    sheetRows =
+      endpointId === "historical_v2_trades"
+        ? projectKalshiHistoricalV2TradeRows(
+            Array.isArray(opts.trades) ? opts.trades : [],
+            opts.selectedColumns,
+          )
+        : projectKalshiLiveTradeRows(
+            Array.isArray(opts.trades) ? opts.trades : [],
+            opts.selectedColumns,
+          );
   } else if (endpointId === "orderbook") {
     sheetRows = projectKalshiLiveOrderbookRows(
       Array.isArray(opts.orderbook) ? opts.orderbook : [],

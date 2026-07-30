@@ -5,15 +5,20 @@ import { CandlestickChart, Layers, LineChart, List, Wand2 } from "lucide-react";
 
 import { useMyStateV2 } from "@/context/stateContextV2";
 import { useKalshiHistoricalCutoffDisplay } from "@/hooks/useKalshiHistoricalCutoffDisplay";
-import { KALSHI_HISTORICAL_V2_CONNECT_ENDPOINTS } from "@/config/kalshiHistoricalV2Connect";
+import { KALSHI_HISTORICAL_V2_CONNECT_ENDPOINTS, KALSHI_HISTORICAL_V2_CONNECT_CONFIG } from "@/config/kalshiHistoricalV2Connect";
 import { ConnectDataOperationsSection } from "@/components/connectData/ConnectDataOperationsSection";
 import { ColumnPicker } from "@/components/connectData/ConnectHomeIntegrationWorkflow";
 import { KalshiLiveComposeOperationPanel } from "@/components/connectData/kalshiLive/KalshiLiveComposeOperationPanel";
 import { cn } from "@/lib/utils";
 import { Skeleton } from "@/components/ui/skeleton";
 import { CONNECT_COMPOSE_OPERATIONS } from "@/lib/connectComposeOperations";
-import { KALSHI_LIVE_CONNECT_CONFIG, getKalshiLiveComposeOperationIds } from "@/config/kalshiLiveConnect";
+import { getKalshiLiveComposeOperationIds } from "@/config/kalshiLiveConnect";
 import { KalshiHistoricalV2MarketsTickersField } from "@/components/connectData/kalshiHistoricalV2/KalshiHistoricalV2MarketsTickersField";
+import { KalshiHistoricalV2TradesFields } from "@/components/connectData/kalshiHistoricalV2/KalshiHistoricalV2TradesFields";
+import {
+  KALSHI_HISTORICAL_V2_TRADES_DEFAULT_LIMIT,
+  KALSHI_HISTORICAL_V2_TRADES_ROW_LIMIT_MAX,
+} from "@/lib/kalshiHistoricalV2/historicalTradesCompose";
 import { Label } from "@/components/ui/label";
 
 const SOURCE_PRESENTATION = {
@@ -269,6 +274,10 @@ export function KalshiHistoricalV2IntegrationsCore({ className, stepBackRef, onR
     setConnectKalshiLiveMarketsDiscoveryMinSettledTs,
     setConnectKalshiLiveMarketsDiscoveryMaxSettledTs,
     setConnectKalshiHistoricalV2MarketsDiscoveryScope,
+    setConnectKalshiLiveTradesTicker,
+    setConnectKalshiLiveTradesTickerMeta,
+    setConnectKalshiLiveLimit,
+    setConnectKalshiHistoricalV2TradesIncludeBlockTrades,
   } = ctx;
 
   const selectedId = connectKalshiLiveEndpointId;
@@ -299,6 +308,9 @@ export function KalshiHistoricalV2IntegrationsCore({ className, stepBackRef, onR
     setConnectKalshiLiveMarketsDiscoveryMinSettledTs?.("");
     setConnectKalshiLiveMarketsDiscoveryMaxSettledTs?.("");
     setConnectKalshiHistoricalV2MarketsDiscoveryScope?.("event");
+    setConnectKalshiLiveTradesTicker?.("");
+    setConnectKalshiLiveTradesTickerMeta?.({});
+    setConnectKalshiHistoricalV2TradesIncludeBlockTrades?.(true);
 
     setFilterError(null);
   }, [
@@ -323,11 +335,14 @@ export function KalshiHistoricalV2IntegrationsCore({ className, stepBackRef, onR
     setConnectKalshiLiveMarketsDiscoveryMinSettledTs,
     setConnectKalshiLiveMarketsDiscoveryMaxSettledTs,
     setConnectKalshiHistoricalV2MarketsDiscoveryScope,
+    setConnectKalshiLiveTradesTicker,
+    setConnectKalshiLiveTradesTickerMeta,
+    setConnectKalshiHistoricalV2TradesIncludeBlockTrades,
   ]);
 
   const handleSelectEndpoint = useCallback(
     (endpointId) => {
-      if (endpointId !== "markets") return;
+      if (endpointId !== "markets" && endpointId !== "trades") return;
       setConnectKalshiLiveEndpointId?.(endpointId);
       setConnectActiveComposeOps?.([]);
       setConnectKalshiLiveWhereFilters?.([]);
@@ -337,7 +352,7 @@ export function KalshiHistoricalV2IntegrationsCore({ className, stepBackRef, onR
       setConnectKalshiLiveMarketsTickerMeta?.({});
       setConnectKalshiLiveMarketsSheetMode?.("per_market");
 
-      setConnectKalshiLiveMarketsDiscoveryMode?.(true);
+      setConnectKalshiLiveMarketsDiscoveryMode?.(endpointId === "markets");
       setConnectKalshiLiveMarketsDiscoveryStatus?.("");
       setConnectKalshiLiveMarketsDiscoveryMveFilter?.("include");
       setConnectKalshiLiveMarketsDiscoveryEventTicker?.("");
@@ -351,6 +366,13 @@ export function KalshiHistoricalV2IntegrationsCore({ className, stepBackRef, onR
       setConnectKalshiLiveMarketsDiscoveryMinSettledTs?.("");
       setConnectKalshiLiveMarketsDiscoveryMaxSettledTs?.("");
       setConnectKalshiHistoricalV2MarketsDiscoveryScope?.("event");
+
+      setConnectKalshiLiveTradesTicker?.("");
+      setConnectKalshiLiveTradesTickerMeta?.({});
+      setConnectKalshiHistoricalV2TradesIncludeBlockTrades?.(true);
+      if (endpointId === "trades") {
+        setConnectKalshiLiveLimit?.(KALSHI_HISTORICAL_V2_TRADES_DEFAULT_LIMIT);
+      }
 
       setFilterError(null);
     },
@@ -376,12 +398,16 @@ export function KalshiHistoricalV2IntegrationsCore({ className, stepBackRef, onR
       setConnectKalshiLiveMarketsDiscoveryMinSettledTs,
       setConnectKalshiLiveMarketsDiscoveryMaxSettledTs,
       setConnectKalshiHistoricalV2MarketsDiscoveryScope,
+      setConnectKalshiLiveTradesTicker,
+      setConnectKalshiLiveTradesTickerMeta,
+      setConnectKalshiHistoricalV2TradesIncludeBlockTrades,
+      setConnectKalshiLiveLimit,
     ],
   );
 
-  // Only Markets is live for Historical v2 — clear stale non-markets selections.
+  // Only Markets + Trades are live for Historical v2 — clear stale selections.
   useEffect(() => {
-    if (selectedId && selectedId !== "markets") {
+    if (selectedId && selectedId !== "markets" && selectedId !== "trades") {
       handleClearEndpoint();
     }
   }, [selectedId, handleClearEndpoint]);
@@ -400,23 +426,6 @@ export function KalshiHistoricalV2IntegrationsCore({ className, stepBackRef, onR
 
   const selectedColumns = selectedId ? connectKalshiLiveColumnSelections?.[selectedId] || [] : [];
 
-  const composeOperations = useMemo(() => {
-    const allowed = new Set(getKalshiLiveComposeOperationIds(selectedId || "markets"));
-    return CONNECT_COMPOSE_OPERATIONS.filter((o) => allowed.has(o.id)).map((o) =>
-      o.id === "row_limit"
-        ? {
-            ...o,
-            description: "limit how many markets you would like to pull (e.g. 1000 rows)",
-          }
-        : o,
-    );
-  }, [selectedId]);
-
-  const getDisplayLabel = useMemo(() => {
-    return (col) =>
-      KALSHI_LIVE_CONNECT_CONFIG.getColumnDisplayLabel(selectedId || "markets", col);
-  }, [selectedId]);
-
   const patchColumns = useCallback(
     (endpointId, fn) => {
       setConnectKalshiLiveColumnSelections?.((prev) => ({
@@ -427,7 +436,35 @@ export function KalshiHistoricalV2IntegrationsCore({ className, stepBackRef, onR
     [setConnectKalshiLiveColumnSelections],
   );
 
-  const showHub = selectedId !== "markets";
+  const composeOperations = useMemo(() => {
+    const allowed = new Set(getKalshiLiveComposeOperationIds(selectedId || "markets"));
+    return CONNECT_COMPOSE_OPERATIONS.filter((o) => allowed.has(o.id)).map((o) => {
+      if (o.id !== "row_limit") return o;
+      if (selectedId === "trades") {
+        return {
+          ...o,
+          description:
+            "Max trades to pull (per market when tickers are set). Default paginates until exhausted or this cap. Unscoped pulls (no ticker/dates) are capped at 1,000.",
+        };
+      }
+      return {
+        ...o,
+        description: "limit how many markets you would like to pull (e.g. 1000 rows)",
+      };
+    });
+  }, [selectedId]);
+
+  const getDisplayLabel = useMemo(() => {
+    return (col) =>
+      KALSHI_HISTORICAL_V2_CONNECT_CONFIG.getColumnDisplayLabel(selectedId || "markets", col);
+  }, [selectedId]);
+
+  const endpointColumns = selectedId
+    ? KALSHI_HISTORICAL_V2_CONNECT_CONFIG.getColumnsForEndpoint(selectedId)
+    : [];
+
+  const showHub = selectedId !== "markets" && selectedId !== "trades";
+  const sourceTitle = selectedId === "trades" ? "Trades" : "Markets";
 
   return (
     <div className={cn("space-y-3", className)}>
@@ -440,7 +477,7 @@ export function KalshiHistoricalV2IntegrationsCore({ className, stepBackRef, onR
               icon={Layers}
               title="Kalshi Historical Data v2"
               badge="Up to live cutoff"
-              description="Choose Markets. Semantic search + discovery are enabled."
+              description="Choose Markets or Trades. Candlesticks coming soon."
             >
               <div className="space-y-1.5">
                 {KALSHI_HISTORICAL_V2_CONNECT_ENDPOINTS.map((endpoint) => (
@@ -448,7 +485,7 @@ export function KalshiHistoricalV2IntegrationsCore({ className, stepBackRef, onR
                     key={endpoint.id}
                     endpoint={endpoint}
                     isSelected={selectedId === endpoint.id}
-                    disabled={endpoint.id !== "markets"}
+                    disabled={endpoint.id !== "markets" && endpoint.id !== "trades"}
                     onSelect={handleSelectEndpoint}
                   />
                 ))}
@@ -483,21 +520,25 @@ export function KalshiHistoricalV2IntegrationsCore({ className, stepBackRef, onR
             <Label className="text-[0.6875rem] font-medium uppercase tracking-wider text-muted-foreground">
               Source
             </Label>
-            <p className="text-sm font-semibold tracking-tight text-foreground">Markets</p>
+            <p className="text-sm font-semibold tracking-tight text-foreground">{sourceTitle}</p>
           </div>
 
-          <KalshiHistoricalV2MarketsTickersField
-            className="mt-4"
-            value={connectKalshiLiveTickers}
-            onChange={(v) => setConnectKalshiLiveTickers?.(v)}
-            disabled={pullLoading}
-          />
+          {selectedId === "trades" ? (
+            <KalshiHistoricalV2TradesFields className="mt-4" disabled={pullLoading} />
+          ) : (
+            <KalshiHistoricalV2MarketsTickersField
+              className="mt-4"
+              value={connectKalshiLiveTickers}
+              onChange={(v) => setConnectKalshiLiveTickers?.(v)}
+              disabled={pullLoading}
+            />
+          )}
 
           <ColumnPicker
             key={`kalshi-historical-v2:${selectedId}:${selectedColumns.length}`}
             sourceId={selectedId}
-            sourceName="Markets"
-            columns={KALSHI_LIVE_CONNECT_CONFIG.getColumnsForEndpoint(selectedId)}
+            sourceName={sourceTitle}
+            columns={endpointColumns}
             getDisplayLabel={getDisplayLabel}
             lake={null}
             table={null}
@@ -510,9 +551,7 @@ export function KalshiHistoricalV2IntegrationsCore({ className, stepBackRef, onR
               patchColumns(selectedId, (cur) => cur.filter((c) => c !== col))
             }
             onSelectAll={() =>
-              patchColumns(selectedId, () =>
-                KALSHI_LIVE_CONNECT_CONFIG.getColumnsForEndpoint(selectedId).map((c) => c.name),
-              )
+              patchColumns(selectedId, () => endpointColumns.map((c) => c.name))
             }
             onDeselectAll={() => patchColumns(selectedId, () => [])}
             showComposeOperations={false}
@@ -523,6 +562,9 @@ export function KalshiHistoricalV2IntegrationsCore({ className, stepBackRef, onR
               onRunPull={() => onRunPull?.()}
               filterError={filterError}
               setFilterError={setFilterError}
+              rowLimitMaxOverride={
+                selectedId === "trades" ? KALSHI_HISTORICAL_V2_TRADES_ROW_LIMIT_MAX : undefined
+              }
             />
           </ColumnPicker>
         </div>

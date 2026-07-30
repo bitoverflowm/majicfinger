@@ -1,5 +1,5 @@
 import { parseKalshiFixedPointCount } from "@/lib/kalshiLive/kalshiFixedPoint";
-import { KALSHI_LIVE_TRADES_COLUMNS } from "@/lib/kalshiLive/tradesColumns";
+import { KALSHI_HISTORICAL_V2_TRADES_COLUMNS } from "@/lib/kalshiHistoricalV2/historicalTradesColumns";
 
 /** @param {unknown} v */
 function coerceDollars(v) {
@@ -19,11 +19,21 @@ function coerceTimestamp(v) {
   return Number.isFinite(n) ? n : null;
 }
 
+/** @param {unknown} v */
+function coerceBool(v) {
+  if (typeof v === "boolean") return v;
+  if (v == null || v === "") return null;
+  const s = String(v).trim().toLowerCase();
+  if (s === "true" || s === "1") return true;
+  if (s === "false" || s === "0") return false;
+  return null;
+}
+
 /**
  * @param {Record<string, unknown>} raw
  * @returns {Record<string, unknown>}
  */
-export function normalizeKalshiLiveTradeRow(raw) {
+export function normalizeKalshiHistoricalV2TradeRow(raw) {
   if (!raw || typeof raw !== "object") return {};
   const t = /** @type {Record<string, unknown>} */ (raw);
 
@@ -41,15 +51,8 @@ export function normalizeKalshiLiveTradeRow(raw) {
     no_price_dollars: coerceDollars(t.no_price_dollars),
     taker_outcome_side: str("taker_outcome_side"),
     taker_book_side: str("taker_book_side"),
-    taker_side: str("taker_side"),
     created_time: coerceTimestamp(t.created_time),
-    is_block_trade:
-      typeof t.is_block_trade === "boolean"
-        ? t.is_block_trade
-        : t.is_block_trade == null || t.is_block_trade === ""
-          ? null
-          : String(t.is_block_trade).trim().toLowerCase() === "true" ||
-              String(t.is_block_trade).trim() === "1",
+    is_block_trade: coerceBool(t.is_block_trade),
   };
 }
 
@@ -57,9 +60,9 @@ export function normalizeKalshiLiveTradeRow(raw) {
  * @param {unknown[]} trades
  * @returns {Record<string, unknown>[]}
  */
-export function normalizeKalshiLiveTrades(trades) {
+export function normalizeKalshiHistoricalV2Trades(trades) {
   return (Array.isArray(trades) ? trades : []).map((raw) =>
-    normalizeKalshiLiveTradeRow(/** @type {Record<string, unknown>} */ (raw)),
+    normalizeKalshiHistoricalV2TradeRow(/** @type {Record<string, unknown>} */ (raw)),
   );
 }
 
@@ -67,7 +70,7 @@ export function normalizeKalshiLiveTrades(trades) {
  * @param {Record<string, unknown>[]} rows
  * @param {string[] | undefined} selectedColumns
  */
-export function projectKalshiLiveTradeRows(rows, selectedColumns) {
+export function projectKalshiHistoricalV2TradeRows(rows, selectedColumns) {
   const cols = Array.isArray(selectedColumns) ? selectedColumns : [];
   const list = Array.isArray(rows) ? rows : [];
   if (!cols.length) return [];
@@ -78,7 +81,7 @@ export function projectKalshiLiveTradeRows(rows, selectedColumns) {
       if (Object.prototype.hasOwnProperty.call(raw, name)) {
         out[name] = raw[name];
       } else {
-        const col = KALSHI_LIVE_TRADES_COLUMNS.find((c) => c.name === name);
+        const col = KALSHI_HISTORICAL_V2_TRADES_COLUMNS.find((c) => c.name === name);
         const kind = col?.type;
         out[name] =
           kind === "number" || kind === "timestamp" || kind === "boolean" ? null : "";

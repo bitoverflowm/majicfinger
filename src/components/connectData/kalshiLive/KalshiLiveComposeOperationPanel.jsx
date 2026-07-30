@@ -72,6 +72,10 @@ import {
 } from "@/lib/kalshiLive/marketDiscovery";
 import { validateKalshiHistoricalV2MarketsDiscoveryPull } from "@/lib/kalshiHistoricalV2/historicalMarketsDiscovery";
 import {
+  KALSHI_HISTORICAL_V2_TRADES_DEFAULT_LIMIT,
+  validateKalshiHistoricalV2TradesPull,
+} from "@/lib/kalshiHistoricalV2/historicalTradesCompose";
+import {
   KALSHI_LIVE_EVENTS_SHEET_MODE_COMBINED,
   KALSHI_LIVE_EVENTS_SHEET_MODE_PER_EVENT,
   normalizeKalshiLiveEventsSheetMode,
@@ -600,10 +604,16 @@ export function KalshiLiveComposeOperationPanel({
     }
 
     if (endpointId === "trades") {
-      const tradesErr = validateKalshiLiveTradesPull(
-        connectKalshiLiveTradesTicker,
-        connectKalshiLiveWhereFilters,
-      );
+      const tradesErr =
+        connectWorkspace === "kalshiHistoricalV2"
+          ? validateKalshiHistoricalV2TradesPull(
+              connectKalshiLiveTradesTicker,
+              connectKalshiLiveWhereFilters,
+            )
+          : validateKalshiLiveTradesPull(
+              connectKalshiLiveTradesTicker,
+              connectKalshiLiveWhereFilters,
+            );
       if (tradesErr) {
         setFilterError?.(tradesErr);
         return;
@@ -772,7 +782,10 @@ export function KalshiLiveComposeOperationPanel({
                 ? KALSHI_LIVE_SEARCH_TRADERS_LIMIT_MAX
               : 1000;
 
-  const rowLimitDefault = defaultRowLimit(endpointId);
+  const rowLimitDefault =
+    connectWorkspace === "kalshiHistoricalV2" && endpointId === "trades"
+      ? KALSHI_HISTORICAL_V2_TRADES_DEFAULT_LIMIT
+      : defaultRowLimit(endpointId);
 
   const renderWhereValueInput = (f) => {
     if (
@@ -974,7 +987,9 @@ export function KalshiLiveComposeOperationPanel({
               : endpointId === "search_traders"
                 ? "Pick a suggested trader for an exact pull, or leave a prefix to match many nicknames (one sheet each). Optional metrics/holdings are set above."
               : endpointId === "trades"
-                ? "Date range is set in Common queries above. Other columns filter on our side after the pull."
+                ? connectWorkspace === "kalshiHistoricalV2"
+                  ? "Date range and block-trade flag are set above (optional). Other columns filter on our side after the pull."
+                  : "Date range is set in Common queries above. Other columns filter on our side after the pull."
                 : endpointId === "orderbook"
                   ? "Optional depth (0–100) is sent to Kalshi. Other columns filter on our side after the pull."
                   : endpointId === "series"
@@ -1083,7 +1098,9 @@ export function KalshiLiveComposeOperationPanel({
             {endpointId === "candlesticks"
               ? "Max 10,000 candle rows total across all tickers (Kalshi batch cap). Applied after fetch, filters, and sort."
               : endpointId === "trades"
-                ? "Max 10,000 trades per market. Each API page requests up to 1,000; we follow the cursor until your row limit is reached or the market is exhausted."
+                ? connectWorkspace === "kalshiHistoricalV2"
+                  ? "Paginate historical trades until this cap (per market when tickers are set). Unscoped pulls without tickers/dates are hard-capped at 1,000."
+                  : "Max 10,000 trades per market. Each API page requests up to 1,000; we follow the cursor until your row limit is reached or the market is exhausted."
                 : endpointId === "trades_by_holder"
                   ? "Max 5,000 rows. Each API page requests up to 200 (page_size); we follow the cursor until your row limit is reached or results are exhausted."
                 : endpointId === "search_traders"
@@ -1130,8 +1147,9 @@ export function KalshiLiveComposeOperationPanel({
 
       {!openComposeOps.length && endpointId === "trades" ? (
         <p className="text-[10px] leading-snug text-muted-foreground">
-          Refine is optional — Run pull uses your row limit (per market). Date range is set in
-          Common queries.
+          {connectWorkspace === "kalshiHistoricalV2"
+            ? "Refine is optional — Run pull paginates historical trades until exhausted or your row limit. Tickers and date range are optional."
+            : "Refine is optional — Run pull uses your row limit (per market). Date range is set in Common queries."}
         </p>
       ) : null}
 

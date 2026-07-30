@@ -22,6 +22,12 @@ export const KALSHI_LIVE_TRADES_COLUMNS = [
     description: "Legacy taker side (yes | no) — deprecated by Kalshi",
   },
   { name: "created_time", type: "timestamp", description: "When the trade was executed (ISO 8601)" },
+  {
+    name: "is_block_trade",
+    type: "boolean",
+    description:
+      "True if this trade was matched off-book as a block trade; false for standard order book fills",
+  },
 ];
 
 /** API-bound compose columns (set via Common queries / Where, not sheet columns). */
