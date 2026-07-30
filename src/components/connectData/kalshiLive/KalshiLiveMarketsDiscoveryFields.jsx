@@ -343,12 +343,12 @@ export function KalshiLiveMarketsDiscoveryFields({
                 return "Pull the first 100 historical markets with no ticker filter (single page).";
               }
               if (scope === "series") {
-                return "Filter by a single series ticker.";
+                return "Get markets by Series ticker";
               }
               if (scope === "markets") {
-                return "Filter by one or more market tickers (comma-separated).";
+                return "Get markets by Market ticker";
               }
-              return "Filter by a single event ticker.";
+              return "Get markets by Event ticker";
             })()}
           </p>
           <div className="flex max-w-xl">

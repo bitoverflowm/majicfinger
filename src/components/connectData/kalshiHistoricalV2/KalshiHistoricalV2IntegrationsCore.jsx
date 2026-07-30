@@ -402,7 +402,14 @@ export function KalshiHistoricalV2IntegrationsCore({ className, stepBackRef, onR
 
   const composeOperations = useMemo(() => {
     const allowed = new Set(getKalshiLiveComposeOperationIds(selectedId || "markets"));
-    return CONNECT_COMPOSE_OPERATIONS.filter((o) => allowed.has(o.id));
+    return CONNECT_COMPOSE_OPERATIONS.filter((o) => allowed.has(o.id)).map((o) =>
+      o.id === "row_limit"
+        ? {
+            ...o,
+            description: "limit how many markets you would like to pull (e.g. 1000 rows)",
+          }
+        : o,
+    );
   }, [selectedId]);
 
   const getDisplayLabel = useMemo(() => {
