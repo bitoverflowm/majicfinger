@@ -1,5 +1,6 @@
 import { warmDuckDbWasm } from "@/lib/duckdb/duckdbWasmClient";
 import { projectKalshiLiveCandlestickRows } from "@/lib/kalshiLive/normalizeCandlestickRow";
+import { projectKalshiHistoricalV2CandlestickRows } from "@/lib/kalshiHistoricalV2/normalizeHistoricalCandlestickRow";
 import { projectKalshiLiveEventForecastRows } from "@/lib/kalshiLive/normalizeEventForecastRow";
 import { projectKalshiLiveLeaderboardRows } from "@/lib/kalshiLive/normalizeLeaderboardRow";
 import { projectKalshiLiveHolderProfileRows } from "@/lib/kalshiLive/normalizeHolderProfileRow";
@@ -62,11 +63,17 @@ function viewNameFor(key) {
 export async function ingestKalshiLiveAsView(opts) {
   const endpointId = String(opts.endpointId || "markets").trim() || "markets";
   let sheetRows;
-  if (endpointId === "candlesticks") {
-    sheetRows = projectKalshiLiveCandlestickRows(
-      Array.isArray(opts.candlesticks) ? opts.candlesticks : [],
-      opts.selectedColumns,
-    );
+  if (endpointId === "candlesticks" || endpointId === "historical_v2_candlesticks") {
+    sheetRows =
+      endpointId === "historical_v2_candlesticks"
+        ? projectKalshiHistoricalV2CandlestickRows(
+            Array.isArray(opts.candlesticks) ? opts.candlesticks : [],
+            opts.selectedColumns,
+          )
+        : projectKalshiLiveCandlestickRows(
+            Array.isArray(opts.candlesticks) ? opts.candlesticks : [],
+            opts.selectedColumns,
+          );
   } else if (endpointId === "event_forecast") {
     sheetRows = projectKalshiLiveEventForecastRows(
       Array.isArray(opts.forecastHistory) ? opts.forecastHistory : [],

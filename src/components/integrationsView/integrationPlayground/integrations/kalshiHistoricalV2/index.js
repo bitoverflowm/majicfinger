@@ -10,6 +10,7 @@ import { ingestKalshiLiveAsView } from "@/lib/kalshiLive/ingestKalshiLiveAsView"
 import { KALSHI_LIVE_MVE_FILTER_EXCLUDE } from "@/lib/kalshiLive/marketDiscovery";
 import { fetchKalshiHistoricalV2MarketsDiscoveryPull } from "@/lib/kalshiHistoricalV2/fetchKalshiHistoricalV2MarketsDiscoveryPull";
 import { fetchKalshiHistoricalV2TradesPull } from "@/lib/kalshiHistoricalV2/fetchKalshiHistoricalV2TradesPull";
+import { fetchKalshiHistoricalV2CandlesticksPull } from "@/lib/kalshiHistoricalV2/fetchKalshiHistoricalV2CandlesticksPull";
 
 function genRequestCardId() {
   return `khv2-${Date.now()}-${Math.random().toString(16).slice(2, 8)}`;
@@ -52,6 +53,7 @@ export default function KalshiHistoricalV2({
     connectKalshiLiveSortClauses,
     connectKalshiLiveTradesTicker,
     connectKalshiHistoricalV2TradesIncludeBlockTrades,
+    connectKalshiLiveCandlestickTickers,
     connectKalshiLiveMarketsDiscoveryMveFilter,
     connectKalshiLiveMarketsDiscoveryEventTicker,
     connectKalshiLiveMarketsDiscoverySeriesTicker,
@@ -317,6 +319,148 @@ export default function KalshiHistoricalV2({
     ],
   );
 
+  const runCandlesticksPull = useCallback(
+    async (ac, sheetId, cols) => {
+      const whereFilters = Array.isArray(connectKalshiLiveWhereFilters)
+        ? connectKalshiLiveWhereFilters
+        : [];
+      const sortClauses = Array.isArray(connectKalshiLiveSortClauses)
+        ? connectKalshiLiveSortClauses
+        : [];
+      const limit = Number(connectKalshiLiveLimit) || 1000;
+      const marketTickers = String(connectKalshiLiveCandlestickTickers || "").trim();
+      const requestStartMs =
+        typeof performance !== "undefined" && performance?.now ? performance.now() : Date.now();
+
+      setConnectDataLakePullState?.((prev) => ({
+        ...prev,
+        loading: true,
+        label: "Fetching Kalshi Historical v2 candlesticks…",
+        progress: 8,
+        error: null,
+      }));
+
+      const { byTicker, raw, rows: accumulated, querySummary } =
+        await fetchKalshiHistoricalV2CandlesticksPull({
+          marketTickers,
+          whereFilters,
+          sortClauses,
+          limit,
+          selectedColumns: cols,
+          signal: ac.signal,
+          onTickerProgress: ({ ticker, index, total }) => {
+            const pct = Math.min(90, 8 + Math.round(((index + 1) / Math.max(1, total)) * 80));
+            setConnectDataLakePullState?.((prev) => ({
+              ...prev,
+              loading: true,
+              label: `Fetching ${ticker} candles (${index + 1}/${total})…`,
+              progress: pct,
+              error: null,
+            }));
+          },
+        });
+
+      if (setRows) setRows(accumulated);
+
+      await ingestKalshiLiveAsView({
+        endpointId: "historical_v2_candlesticks",
+        candlesticks: raw,
+        selectedColumns: cols,
+      });
+
+      const elapsedMs =
+        (typeof performance !== "undefined" && performance?.now
+          ? performance.now()
+          : Date.now()) - requestStartMs;
+
+      const groups =
+        Array.isArray(byTicker) && byTicker.length
+          ? byTicker
+          : [{ ticker: marketTickers || "candlesticks", raw, rows: accumulated }];
+
+      let firstSheetId = sheetId || ctx?.activeSheetId || null;
+      const totalRows = groups.reduce(
+        (sum, g) => sum + (Array.isArray(g.rows) ? g.rows.length : 0),
+        0,
+      );
+
+      if (setDataSheets) {
+        flushSync(() => {
+          setDataSheets((prev) => {
+            let next = { ...(prev || {}) };
+            /** @type {string[]} */
+            const writtenIds = [];
+
+            for (let i = 0; i < groups.length; i++) {
+              const group = groups[i];
+              const tickerName = String(group.ticker || `market-${i + 1}`).trim().slice(0, 80);
+              const rows = Array.isArray(group.rows) ? group.rows : [];
+
+              let targetSheetId;
+              if (i === 0 && firstSheetId) {
+                targetSheetId = firstSheetId;
+              } else {
+                targetSheetId = allocateNextSheetId(next);
+              }
+              writtenIds.push(targetSheetId);
+
+              const requestCard = {
+                id: genRequestCardId(),
+                createdAt: Date.now(),
+                elapsedMs,
+                lake: "kalshi-historical-v2",
+                table: "candlesticks",
+                sheetId: targetSheetId,
+                querySummary,
+                loadedRowCount: rows.length,
+              };
+
+              next = applyAthenaPullToSheetPatch(next, targetSheetId, rows, {
+                name: tickerName,
+                provenance: {
+                  source: "kalshi-historical-v2",
+                  endpoint: "candlesticks",
+                  marketTickers: tickerName,
+                  whereFilters,
+                  sortClauses,
+                  limit,
+                  querySummary,
+                },
+                requestCards: [requestCard],
+              });
+            }
+
+            firstSheetId = writtenIds[0] || firstSheetId;
+            return next;
+          });
+
+          if (firstSheetId && ctx?.setActiveSheetId) {
+            ctx.setActiveSheetId(firstSheetId);
+          }
+          ctx?.setConnectHomeAnalyzeActive?.(true);
+        });
+      } else {
+        applyConnectHomePullData(ctx, accumulated);
+      }
+
+      if (ctx?.requestConnectAnalyzeScroll) {
+        ctx.requestConnectAnalyzeScroll();
+      }
+
+      return totalRows;
+    },
+    [
+      connectKalshiLiveWhereFilters,
+      connectKalshiLiveSortClauses,
+      connectKalshiLiveLimit,
+      connectKalshiLiveCandlestickTickers,
+      setConnectDataLakePullState,
+      setDataSheets,
+      setRows,
+      ctx,
+    ],
+  );
+
   const runPull = useCallback(async () => {
     abortRef.current?.abort();
     const generation = (pullGenerationRef.current += 1);
@@ -327,10 +471,10 @@ export default function KalshiHistoricalV2({
     const endpointId = String(connectKalshiLiveEndpointId || "").trim();
     const cols = connectKalshiLiveColumnSelections?.[endpointId] || [];
 
-    if (endpointId !== "markets" && endpointId !== "trades") {
+    if (endpointId !== "markets" && endpointId !== "trades" && endpointId !== "candlesticks") {
       finishPullUi({
         loading: false,
-        error: "Select Markets or Trades first.",
+        error: "Select Markets, Trades, or Candlesticks first.",
         progress: 0,
       });
       return;
@@ -350,6 +494,8 @@ export default function KalshiHistoricalV2({
     try {
       if (endpointId === "trades") {
         await runTradesPull(ac, sheetId, cols);
+      } else if (endpointId === "candlesticks") {
+        await runCandlesticksPull(ac, sheetId, cols);
       } else {
         await runMarketsPull(ac, sheetId, cols);
       }
@@ -370,6 +516,7 @@ export default function KalshiHistoricalV2({
     finishPullUi,
     runMarketsPull,
     runTradesPull,
+    runCandlesticksPull,
   ]);
 
   runPullRef.current = runPull;

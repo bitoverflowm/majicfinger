@@ -32,6 +32,7 @@ import {
 import { CONNECT_COMPOSE_OPERATIONS } from "@/lib/connectComposeOperations";
 import { operatorSymbol } from "@/lib/dataLakeComposeHelpers";
 import { validateKalshiLiveCandlestickPull } from "@/lib/kalshiLive/candlestickCompose";
+import { validateKalshiHistoricalV2CandlestickPull } from "@/lib/kalshiHistoricalV2/historicalCandlestickCompose";
 import { validateKalshiLiveEventCandlesticksPull } from "@/lib/kalshiLive/eventCandlesticksCompose";
 import { validateKalshiLiveEventForecastPull } from "@/lib/kalshiLive/eventForecastCompose";
 import { KALSHI_LIVE_EVENT_FORECAST_PERIOD_OPTIONS } from "@/lib/kalshiLive/eventForecastColumns";
@@ -515,10 +516,16 @@ export function KalshiLiveComposeOperationPanel({
     }
 
     if (endpointId === "candlesticks") {
-      const candleErr = validateKalshiLiveCandlestickPull(
-        connectKalshiLiveCandlestickTickers,
-        connectKalshiLiveWhereFilters,
-      );
+      const candleErr =
+        connectWorkspace === "kalshiHistoricalV2"
+          ? validateKalshiHistoricalV2CandlestickPull(
+              connectKalshiLiveCandlestickTickers,
+              connectKalshiLiveWhereFilters,
+            )
+          : validateKalshiLiveCandlestickPull(
+              connectKalshiLiveCandlestickTickers,
+              connectKalshiLiveWhereFilters,
+            );
       if (candleErr) {
         setFilterError?.(candleErr);
         return;
