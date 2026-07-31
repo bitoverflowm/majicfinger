@@ -420,6 +420,8 @@ export default function KalshiHistoricalV2({
                 provenance: {
                   source: "kalshi-historical-v2",
                   endpoint: "candlesticks",
+                  sheetKind: "market_candlesticks",
+                  marketTicker: tickerName,
                   marketTickers: tickerName,
                   whereFilters,
                   sortClauses,
@@ -471,6 +473,8 @@ export default function KalshiHistoricalV2({
     const endpointId = String(connectKalshiLiveEndpointId || "").trim();
     const cols = connectKalshiLiveColumnSelections?.[endpointId] || [];
 
+    ctx?.setConnectPowerMove?.(null);
+
     if (endpointId !== "markets" && endpointId !== "trades" && endpointId !== "candlesticks") {
       finishPullUi({
         loading: false,
@@ -492,14 +496,20 @@ export default function KalshiHistoricalV2({
     const sheetId = activeSheetId;
 
     try {
+      let rowCount = 0;
       if (endpointId === "trades") {
-        await runTradesPull(ac, sheetId, cols);
+        rowCount = (await runTradesPull(ac, sheetId, cols)) || 0;
       } else if (endpointId === "candlesticks") {
-        await runCandlesticksPull(ac, sheetId, cols);
+        rowCount = (await runCandlesticksPull(ac, sheetId, cols)) || 0;
       } else {
-        await runMarketsPull(ac, sheetId, cols);
+        rowCount = (await runMarketsPull(ac, sheetId, cols)) || 0;
       }
       if (isStale() || ac.signal.aborted) return;
+
+      ctx?.setConnectPowerMove?.(
+        endpointId === "candlesticks" && rowCount > 0 ? "historical_v2_candlesticks" : null,
+      );
+
       finishPullUi({ error: null, label: "", progress: 100 });
     } catch (e) {
       if (isStale() || isAbortError(e) || ac.signal.aborted) {
@@ -517,6 +527,7 @@ export default function KalshiHistoricalV2({
     runMarketsPull,
     runTradesPull,
     runCandlesticksPull,
+    ctx,
   ]);
 
   runPullRef.current = runPull;

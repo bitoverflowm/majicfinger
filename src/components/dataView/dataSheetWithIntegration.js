@@ -114,6 +114,7 @@ import {
 } from "@/lib/removeDashboardChartSlot";
 import { patchChartDashboardColumn } from "@/lib/patchChartDashboardColumn";
 import { runEventCandlesticksDashboardPowerMove } from "@/lib/kalshiLive/eventCandlesticksPowerMove";
+import { runHistoricalV2CandlesticksDashboardPowerMove } from "@/lib/kalshiHistoricalV2/historicalCandlesticksPowerMove";
 import { ConnectProgressWithLabel } from "@/components/integrationsView/integrationPlayground/integrations/polymarketHistorical/ConnectProgressWithLabel";
 import {
   flattenDashboardLayers,
@@ -364,6 +365,8 @@ export default function DataSheetWithIntegration({
     contextStateV2?.connectKalshiLiveEventCandlesticksEventTicker || "";
   const connectKalshiLiveEventCandlesticksTickerMeta =
     contextStateV2?.connectKalshiLiveEventCandlesticksTickerMeta || {};
+  const connectKalshiLiveCandlestickTickerMeta =
+    contextStateV2?.connectKalshiLiveCandlestickTickerMeta || {};
   const powerMoveBuildAbortRef = useRef(/** @type {AbortController | null} */ (null));
 
   const [isPanelClosing, setIsPanelClosing] = useState(false);
@@ -757,6 +760,94 @@ export default function DataSheetWithIntegration({
     connectHomeMode,
     connectKalshiLiveEventCandlesticksEventTicker,
     connectKalshiLiveEventCandlesticksTickerMeta,
+    connectPowerMoveBuild?.active,
+    dataSheets,
+    isDemo,
+    setActiveChartDashboardId,
+    setCardGridComposerDock,
+    setChartComposerDock,
+    setChartDashboardDraft,
+    setConnectHomeAnalyzeActive,
+    setConnectHomeCenterView,
+    setConnectPowerMoveBuild,
+    setRightPanelOpen,
+    setRightPanelTab,
+    setSelectedDashboardCard,
+    setViewing,
+  ]);
+
+  const handleHistoricalV2CandlesticksPowerMove = useCallback(async () => {
+    if (connectPowerMoveBuild?.active) return;
+    if (isDemo && process.env.NODE_ENV === "production") {
+      toast.error("Sign up to use power moves.");
+      return;
+    }
+
+    powerMoveBuildAbortRef.current?.abort();
+    const ac = new AbortController();
+    powerMoveBuildAbortRef.current = ac;
+
+    setConnectPowerMoveBuild?.({
+      active: true,
+      label: "Preparing dashboard…",
+      progress: 2,
+      error: null,
+    });
+
+    setSelectedDashboardCard?.(null);
+    setChartComposerDock?.(null);
+    setCardGridComposerDock?.(null);
+    setConnectHomeAnalyzeActive?.(true);
+    if (connectHomeMode) {
+      setConnectHomeCenterView?.(CONNECT_HOME_CENTER_VIEW.DASHBOARD);
+    } else {
+      setViewing?.("dashboardComposer");
+    }
+    setRightPanelTab?.("dashboard");
+    setRightPanelOpen?.(true);
+
+    try {
+      const result = await runHistoricalV2CandlesticksDashboardPowerMove({
+        dataSheets,
+        tickerMeta: connectKalshiLiveCandlestickTickerMeta,
+        signal: ac.signal,
+        setChartDashboardDraft,
+        setActiveChartDashboardId,
+        onProgress: ({ label, progress }) => {
+          setConnectPowerMoveBuild?.({
+            active: true,
+            label,
+            progress,
+            error: null,
+          });
+        },
+      });
+
+      if (ac.signal.aborted) return;
+
+      setConnectPowerMoveBuild?.({
+        active: false,
+        label: `Dashboard ready — ${result.marketCount} charts (not saved yet)`,
+        progress: 100,
+        error: null,
+      });
+      toast.success(
+        `Plotted ${result.marketCount} candlestick charts on “${result.title}”. Nothing is saved until you save the dashboard.`,
+      );
+    } catch (e) {
+      if (e?.name === "AbortError" || ac.signal.aborted) return;
+      const message = e instanceof Error ? e.message : "Failed to build dashboard.";
+      setConnectPowerMoveBuild?.({
+        active: false,
+        label: "",
+        progress: 0,
+        error: message,
+      });
+      toast.error(message);
+    }
+  }, [
+    connectHomeMode,
+    connectKalshiLiveCandlestickTickerMeta,
     connectPowerMoveBuild?.active,
     dataSheets,
     isDemo,
@@ -1767,6 +1858,29 @@ export default function DataSheetWithIntegration({
                               <p className="px-1 text-[11px] leading-snug text-muted-foreground">
                                 Plots from the data already in memory, ordered by current chance.
                                 Save the project to keep the charts and candles.
+                              </p>
+                            </>
+                          ) : connectPowerMove === "historical_v2_candlesticks" ? (
+                            <>
+                              <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                disabled={!!connectPowerMoveBuild?.active}
+                                className="h-auto w-full justify-start gap-2 whitespace-normal px-2.5 py-2 text-left text-xs"
+                                onClick={handleHistoricalV2CandlesticksPowerMove}
+                              >
+                                <Zap
+                                  className="h-3.5 w-3.5 shrink-0 text-amber-500"
+                                  aria-hidden
+                                />
+                                <span className="min-w-0">
+                                  One click plot all candlesticks on dashboard
+                                </span>
+                              </Button>
+                              <p className="px-1 text-[11px] leading-snug text-muted-foreground">
+                                Plots every historical candlestick sheet already in memory onto one
+                                dashboard. Save the project to keep the charts and candles.
                               </p>
                             </>
                           ) : (
