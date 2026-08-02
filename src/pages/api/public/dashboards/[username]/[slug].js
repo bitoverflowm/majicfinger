@@ -33,9 +33,10 @@ export default async function handler(req, res) {
 
     const data = await buildPublicDashboardResponseData(dash, user);
     const cacheHit = !!data._cacheHit;
+    const liveBacked = !!data.live_backed;
     delete data._cacheHit;
 
-    res.setHeader("Cache-Control", publicDashboardCacheControl(cacheHit));
+    res.setHeader("Cache-Control", publicDashboardCacheControl(cacheHit, { liveBacked }));
     return res.status(200).json({ success: true, data });
   } catch (e) {
     return res.status(500).json({ success: false, message: e.message || "Server error" });

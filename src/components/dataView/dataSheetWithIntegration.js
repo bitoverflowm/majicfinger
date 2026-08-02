@@ -59,6 +59,7 @@ import { ConnectHomeRequestHistory } from "@/components/connectData/ConnectHomeR
 import { ConnectIntegrationsPickerList } from "@/components/connectData/ConnectIntegrationsPickerList";
 import { collectRequestCardEntries } from "@/lib/connectHomeRequestCards";
 import { connectHomeAnySheetHasData, isConnectUserDataPullActive } from "@/lib/connectHomePullDestination";
+import { EventCandlesticksLiveFeedControls } from "@/components/liveFeeds/EventCandlesticksLiveFeedControls";
 import { KALSHI_GUIDED_TARGETS } from "@/lib/guidedWorkflows/targets";
 import { GUIDED_TARGET_ATTR } from "@/lib/guidedWorkflows/types";
 import {
@@ -1839,6 +1840,7 @@ export default function DataSheetWithIntegration({
 
                           {connectPowerMove === "event_candlesticks" ? (
                             <>
+                              <EventCandlesticksLiveFeedControls />
                               <Button
                                 type="button"
                                 variant="outline"

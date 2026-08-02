@@ -38,6 +38,7 @@ import {
   rebuildDashboardPublishCache,
 } from "@/lib/dashboardPublishCache"
 import { buildProjectDeltaPayload, prepareProjectDataPayload, PROJECT_PREVIEW_ROW_LIMIT } from "@/lib/projectPersistence"
+import { solidifyLiveFeedsForSave } from "@/lib/liveFeeds/persistFeedsOnSave"
 import { isConnectIntegrationWorkspace } from "@/lib/connectHomeWorkspace"
 import { prepareLargeJsonBody } from "@/lib/gzipJsonTransport"
 import {
@@ -288,6 +289,8 @@ const Nav = () => {
   const setRightPanelOpen = contextStateV2?.setRightPanelOpen
   const connectWorkspace = contextStateV2?.connectWorkspace
   const connectedData = contextStateV2?.connectedData
+  const liveFeedState = contextStateV2?.liveFeedState
+  const liveFeedActions = contextStateV2?.liveFeedActions
   const dataSetName = contextStateV2?.dataSetName
   const setDataSetName = contextStateV2?.setDataSetName
   
@@ -761,14 +764,35 @@ const Nav = () => {
       bump(6, "Saving in progress…");
       await new Promise((r) => requestAnimationFrame(r));
 
+      const { dataSheets: sheetsForSave, persistedFeeds } = solidifyLiveFeedsForSave({
+        dataSheets,
+        liveFeedState,
+      });
+      if (persistedFeeds.length > 0 && typeof setDataSheets === "function") {
+        setDataSheets(sheetsForSave);
+      }
+
       const savePayloadResult = prepareProjectDataPayload({
         projectName,
         connectedData,
-        dataSheets,
+        dataSheets: sheetsForSave,
         baseFields: {
           last_saved_date: new Date(),
           labels: ['project'],
           source: 'project',
+          ...(persistedFeeds.length
+            ? {
+                save_meta: {
+                  liveFeeds: persistedFeeds.map((f) => ({
+                    id: f.id,
+                    integration: f.integration,
+                    endpoint: f.endpoint,
+                    status: f.status,
+                    pollIntervalMs: f.pollIntervalMs,
+                  })),
+                },
+              }
+            : {}),
         },
       });
       const dataPayload = savePayloadResult.payload;
@@ -860,6 +884,33 @@ const Nav = () => {
       if (!savedProject?._id) {
         toast.error("Failed to save project.");
         return;
+      }
+
+      if (persistedFeeds.length > 0) {
+        try {
+          const regRes = await fetch("/api/live-feeds/register", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              dataSetId: savedProject._id,
+              feeds: persistedFeeds,
+            }),
+          });
+          const regJson = await regRes.json().catch(() => ({}));
+          if (regRes.ok && regJson?.success) {
+            // Defer to server poller — stop browser ephemeral timers to avoid double-hitting Kalshi
+            for (const feed of persistedFeeds) {
+              liveFeedActions?.stop?.(feed.id);
+            }
+            toast.success(
+              `Live feed${persistedFeeds.length === 1 ? "" : "s"} saved — polling continues in the background.`,
+            );
+          } else {
+            toast.warning(regJson?.message || "Project saved, but live feed registration failed.");
+          }
+        } catch {
+          toast.warning("Project saved, but live feed registration failed.");
+        }
       }
 
       bump(48, "Saving charts…");

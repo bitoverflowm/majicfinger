@@ -6,6 +6,7 @@ import { StateProviderV2 } from "@/context/stateContextV2";
 
 import DashBody from "@/app/dashboard/dashBody";
 import LiveStreamManager from "@/app/dashboard/components/liveStreamManager";
+import RestLiveFeedManager from "@/app/dashboard/components/restLiveFeedManager";
 import { DemoWindowMockup } from "@/components/sections/demo-window-mockup";
 
 export function DashboardDemoSection() {
@@ -30,6 +31,7 @@ export function DashboardDemoSection() {
             }}
           >
             <LiveStreamManager />
+            <RestLiveFeedManager />
             <div className="flex h-full min-h-0 w-full flex-col overflow-hidden">
               <DashBody user={null} />
             </div>

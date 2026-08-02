@@ -61,7 +61,10 @@ const DashBody = ({ user }) => {
     const polymarketWsState = contextStateV2?.polymarketWsState
     const chainlinkWsState = contextStateV2?.chainlinkWsState
     const liveStreamState = contextStateV2?.liveStreamState
-    const hasAnyLiveStream = Object.values(liveStreamState?.streamsBySheetId || {}).some((s) => s?.isRunning)
+    const liveFeedState = contextStateV2?.liveFeedState
+    const hasAnyLiveStream =
+      Object.values(liveStreamState?.streamsBySheetId || {}).some((s) => s?.isRunning) ||
+      Object.values(liveFeedState?.feedsById || {}).some((s) => s?.isRunning)
     const setIsLifeTimeMember = contextStateV2?.setIsLifeTimeMember
     const isLifeTimeMember = contextStateV2?.isLifeTimeMember
 

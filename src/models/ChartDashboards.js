@@ -93,6 +93,15 @@ const ChartDashboardSchema = new mongoose.Schema({
   published_payload_built_at: {
     type: Date,
   },
+  /** True when linked DataSet has persisted REST live feeds (skip frozen snapshot path). */
+  live_backed: {
+    type: Boolean,
+    default: false,
+    index: true,
+  },
+  live_backed_at: {
+    type: Date,
+  },
 });
 
 // Only enforce uniqueness when a real embed slug exists. A *sparse* unique index still

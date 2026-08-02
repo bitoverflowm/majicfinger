@@ -102,6 +102,8 @@ type Payload = {
     owner_handle?: string;
     owner_profile_pic?: string | null;
     tags?: string[];
+    live_backed?: boolean;
+    live_poll_interval_ms?: number | null;
   };
   message?: string;
 };
@@ -190,6 +192,9 @@ export default function PublicDashboardEmbedClient({
             ...prev,
             data: {
               ...prev.data,
+              live_backed: j.data?.live_backed ?? prev.data.live_backed,
+              live_poll_interval_ms:
+                j.data?.live_poll_interval_ms ?? prev.data.live_poll_interval_ms,
               layout: { ...prev.data.layout, rows: nextRows },
             },
           };
@@ -203,6 +208,37 @@ export default function PublicDashboardEmbedClient({
       cancelled = true;
     };
   }, [username, slug, cardGridLoading]);
+
+  // Live-backed public dashboards: short-poll Lychee for fresh sheet/chart rows
+  useEffect(() => {
+    const live = !!payload?.data?.live_backed;
+    if (!live || !payload?.success) return;
+    const intervalMs = Math.max(
+      15_000,
+      Math.floor(Number(payload.data?.live_poll_interval_ms)) || 60_000,
+    );
+    let cancelled = false;
+    const tick = () => {
+      fetch(`/api/public/dashboards/${encodeURIComponent(username)}/${encodeURIComponent(slug)}`)
+        .then((r) => r.json())
+        .then((j: Payload) => {
+          if (cancelled || !j?.success || !j.data) return;
+          setPayload(j);
+        })
+        .catch(() => {});
+    };
+    const id = window.setInterval(tick, intervalMs);
+    return () => {
+      cancelled = true;
+      window.clearInterval(id);
+    };
+  }, [
+    username,
+    slug,
+    payload?.success,
+    payload?.data?.live_backed,
+    payload?.data?.live_poll_interval_ms,
+  ]);
 
   if (err) {
     return (
@@ -270,6 +306,15 @@ export default function PublicDashboardEmbedClient({
             >
               {d.page_heading?.trim() || d.dashboard_name?.trim() || slug.replace(/-/g, " ")}
             </h1>
+            {d.live_backed ? (
+              <p className="flex items-center gap-1.5 text-xs text-emerald-600 dark:text-emerald-400">
+                <span className="relative flex h-2 w-2">
+                  <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-60" />
+                  <span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-500" />
+                </span>
+                Live data updating
+              </p>
+            ) : null}
             {d.page_subheading?.trim() ? (
               <p
                 className={getPageTextBlockPublicClassName(d.theme, "pageSubheading")}

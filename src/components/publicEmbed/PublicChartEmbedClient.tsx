@@ -53,6 +53,8 @@ type PublicPayload = {
     owner_handle?: string;
     owner_name?: string | null;
     owner_profile_pic?: string | null;
+    live_backed?: boolean;
+    live_poll_interval_ms?: number | null;
   };
   message?: string;
 };
@@ -167,6 +169,37 @@ export default function PublicChartEmbedClient({
       cancelled = true;
     };
   }, [username, slug]);
+
+  // Live-backed chart embeds: short-poll Lychee for fresh rows
+  useEffect(() => {
+    const live = !!payload?.data?.live_backed;
+    if (!live || !payload?.success) return;
+    const intervalMs = Math.max(
+      15_000,
+      Math.floor(Number(payload.data?.live_poll_interval_ms)) || 60_000,
+    );
+    let cancelled = false;
+    const tick = () => {
+      fetch(`/api/public/charts/${encodeURIComponent(username)}/${encodeURIComponent(slug)}`)
+        .then((r) => r.json())
+        .then((j: PublicPayload) => {
+          if (cancelled || !j?.success || !j.data) return;
+          setPayload(j);
+        })
+        .catch(() => {});
+    };
+    const id = window.setInterval(tick, intervalMs);
+    return () => {
+      cancelled = true;
+      window.clearInterval(id);
+    };
+  }, [
+    username,
+    slug,
+    payload?.success,
+    payload?.data?.live_backed,
+    payload?.data?.live_poll_interval_ms,
+  ]);
 
   if (loading || !payload?.success || !payload.data) {
     if (err) {

@@ -11,6 +11,7 @@ import { StateProviderV2 } from '@/context/stateContextV2';
 
 import DashBody from './dashBody';
 import LiveStreamManager from './components/liveStreamManager';
+import RestLiveFeedManager from './components/restLiveFeedManager';
 import { RunYourselfLoaderGate } from './RunYourselfLoaderGate';
 import { HubQueryLoaderGate } from './HubQueryLoaderGate';
 
@@ -51,6 +52,7 @@ function DashboardInner() {
                 <StateProviderV2 initialSettings={{ viewing: "connectDataHome" }}>
                     <AuthenticatedJourneyInit user={user} />
                     <LiveStreamManager />
+                    <RestLiveFeedManager />
                     <Toaster />
                     <main className="flex min-h-svh flex-col">
                         <RunYourselfLoaderGate userId={user.userId} />

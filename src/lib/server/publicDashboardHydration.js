@@ -249,7 +249,9 @@ export async function resolvePublicDashboardCardGridSheets(dash, userId, { prefe
       const dataSet = await hydrateDataSetForPublicChartViewer(null, dataSetRaw);
       dataSheets =
         dataSet?.data_sheets && typeof dataSet.data_sheets === "object" ? dataSet.data_sheets : {};
-      applyCardGridSnapshotsToSheets(dataSheets, layout, snapshots);
+      if (!dash.live_backed) {
+        applyCardGridSnapshotsToSheets(dataSheets, layout, snapshots);
+      }
       await hydrateCardGridSheetsForPublicDashboard(dataSheets, layout, userId);
     }
   }
@@ -257,11 +259,36 @@ export async function resolvePublicDashboardCardGridSheets(dash, userId, { prefe
 }
 
 /**
+ * Infer a reasonable client poll interval from live-backed dataset sheets.
+ * @param {object} dash
+ * @returns {Promise<number>}
+ */
+async function resolveLivePollIntervalMs(dash) {
+  if (!dash?.live_backed || !dash?.data_set_id) return 60_000;
+  try {
+    const dataSet = await DataSet.findById(dash.data_set_id).select("data_sheets").lean();
+    const sheets = dataSet?.data_sheets && typeof dataSet.data_sheets === "object" ? dataSet.data_sheets : {};
+    let minMs = Number.POSITIVE_INFINITY;
+    for (const sheet of Object.values(sheets)) {
+      const lf = sheet?.liveFeed || sheet?.saveMeta?.liveFeed || sheet?.provenance?.liveFeed;
+      const ms = Math.floor(Number(lf?.pollIntervalMs));
+      if (Number.isFinite(ms) && ms >= 15_000) minMs = Math.min(minMs, ms);
+    }
+    return Number.isFinite(minMs) ? minMs : 60_000;
+  } catch {
+    return 60_000;
+  }
+}
+
+/**
  * Full public dashboard payload for API (cached bundles when available).
+ * Live-backed dashboards always read current DataSet rows (no frozen snapshot path).
  */
 export async function buildPublicDashboardResponseData(dash, user) {
   const chartIds = collectChartIdsFromLayout(dash.layout);
-  const useCache = publishedBundlesCoverAllCharts(chartIds, dash.published_chart_bundles);
+  const liveBacked = !!dash.live_backed;
+  const useCache =
+    !liveBacked && publishedBundlesCoverAllCharts(chartIds, dash.published_chart_bundles);
 
   let chartBundlesById;
   if (useCache) {
@@ -271,10 +298,14 @@ export async function buildPublicDashboardResponseData(dash, user) {
   }
 
   const dataSheets = await resolvePublicDashboardCardGridSheets(dash, user._id, {
-    preferSnapshots: !!dash.card_grid_snapshots && Object.keys(dash.card_grid_snapshots || {}).length > 0,
+    preferSnapshots:
+      !liveBacked &&
+      !!dash.card_grid_snapshots &&
+      Object.keys(dash.card_grid_snapshots || {}).length > 0,
   });
 
   const layoutOut = hydrateLayoutWithChartBundles(dash.layout, chartBundlesById, dataSheets);
+  const livePollIntervalMs = liveBacked ? await resolveLivePollIntervalMs(dash) : null;
 
   return {
     page_heading: dash.page_heading || "",
@@ -287,6 +318,8 @@ export async function buildPublicDashboardResponseData(dash, user) {
     tags: Array.isArray(dash.tags)
       ? dash.tags.map((t) => String(t || "").trim()).filter(Boolean)
       : [],
+    live_backed: liveBacked,
+    live_poll_interval_ms: livePollIntervalMs,
     _cacheHit: useCache,
   };
 }
@@ -305,45 +338,49 @@ export async function buildPublicDashboardChartBundle(dash, user, chartId) {
     return { success: false, message: "Chart not on this dashboard" };
   }
 
-  const chartDoc = await Chart.findById(cid).lean();
-  if (chartHasPublishedSnapshot(chartDoc)) {
-    const bundle = chartDoc.published_bundle;
-    return {
-      success: true,
-      data: {
-        chart_id: cid,
-        chartPayload: {
-          chart: bundle.chart,
-          rows: Array.isArray(bundle.rows) ? bundle.rows : [],
-          dataSheets: bundle.dataSheets && typeof bundle.dataSheets === "object" ? bundle.dataSheets : {},
-        },
-        chartLink:
-          chartDoc.is_public && chartDoc.public_slug
-            ? { mode: "chart_public", slug: chartDoc.public_slug }
-            : null,
-        _cacheHit: true,
-      },
-    };
-  }
+  const liveBacked = !!dash.live_backed;
 
-  const cached = dash.published_chart_bundles?.[cid];
-  if (cached?.chart) {
-    return {
-      success: true,
-      data: {
-        chart_id: cid,
-        chartPayload: {
-          chart: cached.chart,
-          rows: Array.isArray(cached.rows) ? cached.rows : [],
-          dataSheets: cached.dataSheets && typeof cached.dataSheets === "object" ? cached.dataSheets : {},
+  if (!liveBacked) {
+    const chartDoc = await Chart.findById(cid).lean();
+    if (chartHasPublishedSnapshot(chartDoc)) {
+      const bundle = chartDoc.published_bundle;
+      return {
+        success: true,
+        data: {
+          chart_id: cid,
+          chartPayload: {
+            chart: bundle.chart,
+            rows: Array.isArray(bundle.rows) ? bundle.rows : [],
+            dataSheets: bundle.dataSheets && typeof bundle.dataSheets === "object" ? bundle.dataSheets : {},
+          },
+          chartLink:
+            chartDoc.is_public && chartDoc.public_slug
+              ? { mode: "chart_public", slug: chartDoc.public_slug }
+              : null,
+          _cacheHit: true,
         },
-        chartLink:
-          cached.meta?.is_public && cached.meta?.public_slug
-            ? { mode: "chart_public", slug: cached.meta.public_slug }
-            : null,
-        _cacheHit: true,
-      },
-    };
+      };
+    }
+
+    const cached = dash.published_chart_bundles?.[cid];
+    if (cached?.chart) {
+      return {
+        success: true,
+        data: {
+          chart_id: cid,
+          chartPayload: {
+            chart: cached.chart,
+            rows: Array.isArray(cached.rows) ? cached.rows : [],
+            dataSheets: cached.dataSheets && typeof cached.dataSheets === "object" ? cached.dataSheets : {},
+          },
+          chartLink:
+            cached.meta?.is_public && cached.meta?.public_slug
+              ? { mode: "chart_public", slug: cached.meta.public_slug }
+              : null,
+          _cacheHit: true,
+        },
+      };
+    }
   }
 
   const map = await buildChartBundlesParallel(new Set([cid]), user._id);
@@ -370,7 +407,10 @@ export async function buildPublicDashboardChartBundle(dash, user, chartId) {
   };
 }
 
-export function publicDashboardCacheControl(cacheHit) {
+export function publicDashboardCacheControl(cacheHit, { liveBacked = false } = {}) {
+  if (liveBacked) {
+    return "public, s-maxage=15, stale-while-revalidate=30";
+  }
   if (cacheHit) {
     return "public, s-maxage=3600, stale-while-revalidate=86400";
   }

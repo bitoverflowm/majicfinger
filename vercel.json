@@ -1,6 +1,12 @@
 {
   "installCommand": "npm install --legacy-peer-deps",
   "framework": "nextjs",
+  "crons": [
+    {
+      "path": "/api/cron/live-feeds",
+      "schedule": "* * * * *"
+    }
+  ],
   "redirects": [
     {
       "source": "/:path*",

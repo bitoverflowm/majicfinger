@@ -61,6 +61,19 @@ export function LazyPublicDashboardChart({
   const containerRef = useRef<HTMLDivElement>(null);
   const fetchedRef = useRef(!!chartPayloadHasData(initialPayload));
 
+  // Keep in sync when parent live-polls and passes fresh chartPayload
+  useEffect(() => {
+    if (initialPayload && chartPayloadHasData(initialPayload)) {
+      setPayload(initialPayload);
+      setLoading(false);
+      fetchedRef.current = true;
+    }
+  }, [initialPayload]);
+
+  useEffect(() => {
+    if (initialChartSlug) setChartSlug(initialChartSlug);
+  }, [initialChartSlug]);
+
   useEffect(() => {
     if (fetchedRef.current || !chartId) return;
     const el = containerRef.current;
