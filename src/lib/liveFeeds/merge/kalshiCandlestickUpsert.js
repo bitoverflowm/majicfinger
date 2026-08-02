@@ -1,6 +1,120 @@
 /**
  * Upsert Kalshi candlestick rows by end_period_ts; upsert markets metadata by ticker.
+ * Also stamps `liveFlash` on updated sheets so the visible grid can purple-highlight
+ * new / changed cells when the user is looking at that sheet.
  */
+
+/**
+ * Stable row key for live flash matching (grid + upsert).
+ * @param {Record<string, unknown> | null | undefined} row
+ * @returns {string | null}
+ */
+export function liveSheetRowKey(row) {
+  if (!row || typeof row !== "object") return null;
+  const ts = Math.floor(Number(row.end_period_ts));
+  if (Number.isFinite(ts)) return `ts:${ts}`;
+  const ticker = String(row.ticker || row.market_ticker || "")
+    .trim()
+    .toUpperCase();
+  if (ticker) return `t:${ticker}`;
+  return null;
+}
+
+/**
+ * @param {unknown} a
+ * @param {unknown} b
+ */
+function liveCellEqual(a, b) {
+  if (a === b) return true;
+  if (a == null && b == null) return true;
+  if (a == null || b == null) return false;
+  if (typeof a === "number" || typeof b === "number") {
+    const na = Number(a);
+    const nb = Number(b);
+    if (Number.isFinite(na) && Number.isFinite(nb)) return na === nb;
+  }
+  return String(a) === String(b);
+}
+
+/**
+ * Diff incoming candle rows against existing for grid flash highlights.
+ * @param {Record<string, unknown>[]} existing
+ * @param {Record<string, unknown>[]} incoming
+ * @returns {Record<string, { isNew: boolean, columns?: string[] }>}
+ */
+export function buildCandlestickLiveFlashRows(existing, incoming) {
+  /** @type {Map<number, Record<string, unknown>>} */
+  const byTs = new Map();
+  for (const row of Array.isArray(existing) ? existing : []) {
+    const ts = Math.floor(Number(row?.end_period_ts));
+    if (Number.isFinite(ts)) byTs.set(ts, row);
+  }
+
+  /** @type {Record<string, { isNew: boolean, columns?: string[] }>} */
+  const rows = {};
+  for (const row of Array.isArray(incoming) ? incoming : []) {
+    const ts = Math.floor(Number(row?.end_period_ts));
+    if (!Number.isFinite(ts)) continue;
+    const key = `ts:${ts}`;
+    const prev = byTs.get(ts);
+    if (!prev) {
+      rows[key] = { isNew: true };
+      continue;
+    }
+    /** @type {string[]} */
+    const columns = [];
+    for (const [field, value] of Object.entries(row)) {
+      if (field === "end_period_ts" || field === "_origIndex") continue;
+      if (!liveCellEqual(prev[field], value)) columns.push(field);
+    }
+    if (columns.length) rows[key] = { isNew: false, columns };
+  }
+  return rows;
+}
+
+/**
+ * Diff incoming market meta rows against existing for grid flash highlights.
+ * @param {Record<string, unknown>[]} existing
+ * @param {Record<string, unknown>[]} incoming
+ * @param {{ tickerKey?: string }} [opts]
+ * @returns {Record<string, { isNew: boolean, columns?: string[] }>}
+ */
+export function buildMarketMetaLiveFlashRows(existing, incoming, opts = {}) {
+  const tickerKey = String(opts.tickerKey || "ticker").trim() || "ticker";
+  const keyOf = (row) => {
+    const a = String(row?.[tickerKey] || row?.market_ticker || row?.ticker || "")
+      .trim()
+      .toUpperCase();
+    return a ? `t:${a}` : null;
+  };
+
+  /** @type {Map<string, Record<string, unknown>>} */
+  const byKey = new Map();
+  for (const row of Array.isArray(existing) ? existing : []) {
+    const k = keyOf(row);
+    if (k) byKey.set(k, row);
+  }
+
+  /** @type {Record<string, { isNew: boolean, columns?: string[] }>} */
+  const rows = {};
+  for (const row of Array.isArray(incoming) ? incoming : []) {
+    const key = keyOf(row);
+    if (!key) continue;
+    const prev = byKey.get(key);
+    if (!prev) {
+      rows[key] = { isNew: true };
+      continue;
+    }
+    /** @type {string[]} */
+    const columns = [];
+    for (const [field, value] of Object.entries(row)) {
+      if (field === "_origIndex") continue;
+      if (!liveCellEqual(prev[field], value)) columns.push(field);
+    }
+    if (columns.length) rows[key] = { isNew: false, columns };
+  }
+  return rows;
+}
 
 /**
  * @param {Record<string, unknown>[]} existing
@@ -135,10 +249,13 @@ export function applyKalshiCandlestickUpsertToSheets(dataSheets, feed, tick, opt
   let metaUpdated = false;
   if (metaSheet && Array.isArray(tick.metaRows) && tick.metaRows.length) {
     const existing = Array.isArray(metaSheet.data) ? metaSheet.data : [];
+    const flashRows = buildMarketMetaLiveFlashRows(existing, tick.metaRows);
+    const hasFlash = Object.keys(flashRows).length > 0;
     next[metaId] = {
       ...metaSheet,
       data: upsertMarketMetaRowsByTicker(existing, tick.metaRows),
       liveDataRevision: revision,
+      liveFlash: hasFlash ? { revision, rows: flashRows } : null,
     };
     metaUpdated = true;
   }
@@ -170,10 +287,13 @@ export function applyKalshiCandlestickUpsertToSheets(dataSheets, feed, tick, opt
     if (diff.latestTs != null && (latestEndPeriodTs == null || diff.latestTs > latestEndPeriodTs)) {
       latestEndPeriodTs = diff.latestTs;
     }
+    const flashRows = buildCandlestickLiveFlashRows(existing, incoming);
+    const hasFlash = Object.keys(flashRows).length > 0;
     next[sheetId] = {
       ...sheet,
       data: upsertCandlestickRowsByEndPeriodTs(existing, incoming, { softRowCap }),
       liveDataRevision: revision,
+      liveFlash: hasFlash ? { revision, rows: flashRows } : null,
     };
   }
 

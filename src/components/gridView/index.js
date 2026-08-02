@@ -19,6 +19,7 @@ import {
 import { AgGridReact } from 'ag-grid-react'; // React Grid Logic
 import "ag-grid-community/styles/ag-grid.css"; // Core CSS
 import "ag-grid-community/styles/ag-theme-balham.css"; // Theme
+import { flashLiveSheetInGrid } from "@/lib/liveFeeds/flashLiveSheetInGrid";
 
 import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
 
@@ -2975,6 +2976,33 @@ const GridView = ({ startNew, fillViewport = false }) => {
         },
         [displayData, fillViewport],
     );
+
+    // Purple flash when live feed upserts land on the sheet the user is viewing.
+    const lastFlashedLiveKeyRef = useRef(null);
+    useEffect(() => {
+        const liveFlash = activeSheet?.liveFlash;
+        const revision = liveFlash?.revision;
+        if (!activeSheetId || revision == null || !liveFlash?.rows) return;
+        const flashKey = `${activeSheetId}:${revision}`;
+        if (lastFlashedLiveKeyRef.current === flashKey) return;
+
+        let cancelled = false;
+        let raf2 = 0;
+        const raf1 = requestAnimationFrame(() => {
+            raf2 = requestAnimationFrame(() => {
+                if (cancelled) return;
+                const api = gridApiRef.current;
+                if (!api) return;
+                lastFlashedLiveKeyRef.current = flashKey;
+                flashLiveSheetInGrid(api, liveFlash, { ensureVisible: true });
+            });
+        });
+        return () => {
+            cancelled = true;
+            cancelAnimationFrame(raf1);
+            if (raf2) cancelAnimationFrame(raf2);
+        };
+    }, [activeSheetId, activeSheet?.liveFlash, displayData]);
 
     const gridOptions = useMemo(
         () => ({

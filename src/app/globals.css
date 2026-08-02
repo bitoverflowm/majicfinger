@@ -375,3 +375,14 @@ body {
     grid-column: span var(--dash-card-span, 12);
   }
 }
+
+/* Live feed: brief violet flash on new / changed sheet cells (AG Grid flashCells). */
+.ag-theme-balham .ag-cell-data-changed,
+.ag-theme-balham-dark .ag-cell-data-changed {
+  background-color: color-mix(in oklch, var(--secondary) 42%, transparent) !important;
+}
+.ag-theme-balham .ag-cell-data-changed-animation,
+.ag-theme-balham-dark .ag-cell-data-changed-animation {
+  background-color: transparent !important;
+  transition: background-color 1s ease-out;
+}
