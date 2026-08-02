@@ -76,6 +76,33 @@ export function upsertMarketMetaRowsByTicker(existing, incoming, opts = {}) {
 }
 
 /**
+ * Diff candlestick upsert for tick diagnostics.
+ * @param {Record<string, unknown>[]} existing
+ * @param {Record<string, unknown>[]} incoming
+ */
+function countCandlestickUpsertChanges(existing, incoming) {
+  /** @type {Set<number>} */
+  const prevTs = new Set();
+  for (const row of Array.isArray(existing) ? existing : []) {
+    const ts = Math.floor(Number(row?.end_period_ts));
+    if (Number.isFinite(ts)) prevTs.add(ts);
+  }
+  let received = 0;
+  let added = 0;
+  let updated = 0;
+  let latestTs = null;
+  for (const row of Array.isArray(incoming) ? incoming : []) {
+    const ts = Math.floor(Number(row?.end_period_ts));
+    if (!Number.isFinite(ts)) continue;
+    received += 1;
+    if (prevTs.has(ts)) updated += 1;
+    else added += 1;
+    if (latestTs == null || ts > latestTs) latestTs = ts;
+  }
+  return { received, added, updated, latestTs };
+}
+
+/**
  * Apply an event-candlesticks incremental tick onto a dataSheets map.
  *
  * @param {Record<string, object>} dataSheets
@@ -85,33 +112,82 @@ export function upsertMarketMetaRowsByTicker(existing, incoming, opts = {}) {
  *   byMarket: { ticker: string; rows: Record<string, unknown>[] }[];
  * }} tick
  * @param {{ softRowCap?: number }} [opts]
- * @returns {Record<string, object>}
+ * @returns {{
+ *   dataSheets: Record<string, object>;
+ *   stats: {
+ *     marketsInTick: number;
+ *     marketsMatched: number;
+ *     marketsUnmatched: number;
+ *     candlesReceived: number;
+ *     candlesAdded: number;
+ *     candlesUpdated: number;
+ *     metaUpdated: boolean;
+ *     latestEndPeriodTs: number | null;
+ *   };
+ * }}
  */
 export function applyKalshiCandlestickUpsertToSheets(dataSheets, feed, tick, opts = {}) {
   const softRowCap = opts.softRowCap ?? 2000;
   const next = { ...(dataSheets || {}) };
+  const revision = Date.now();
   const metaId = feed.sheets.marketsMetadataSheetId;
   const metaSheet = next[metaId];
-  if (metaSheet && Array.isArray(tick.metaRows)) {
+  let metaUpdated = false;
+  if (metaSheet && Array.isArray(tick.metaRows) && tick.metaRows.length) {
     const existing = Array.isArray(metaSheet.data) ? metaSheet.data : [];
     next[metaId] = {
       ...metaSheet,
       data: upsertMarketMetaRowsByTicker(existing, tick.metaRows),
+      liveDataRevision: revision,
     };
+    metaUpdated = true;
   }
 
-  for (const market of Array.isArray(tick.byMarket) ? tick.byMarket : []) {
+  let marketsMatched = 0;
+  let marketsUnmatched = 0;
+  let candlesReceived = 0;
+  let candlesAdded = 0;
+  let candlesUpdated = 0;
+  /** @type {number | null} */
+  let latestEndPeriodTs = null;
+
+  const markets = Array.isArray(tick.byMarket) ? tick.byMarket : [];
+  for (const market of markets) {
     const ticker = String(market.ticker || "").trim().toUpperCase();
     const sheetId = feed.sheets.marketSheetIdsByTicker?.[ticker];
-    if (!sheetId) continue;
+    if (!sheetId || !next[sheetId]) {
+      marketsUnmatched += 1;
+      continue;
+    }
+    marketsMatched += 1;
     const sheet = next[sheetId];
-    if (!sheet) continue;
     const existing = Array.isArray(sheet.data) ? sheet.data : [];
+    const incoming = Array.isArray(market.rows) ? market.rows : [];
+    const diff = countCandlestickUpsertChanges(existing, incoming);
+    candlesReceived += diff.received;
+    candlesAdded += diff.added;
+    candlesUpdated += diff.updated;
+    if (diff.latestTs != null && (latestEndPeriodTs == null || diff.latestTs > latestEndPeriodTs)) {
+      latestEndPeriodTs = diff.latestTs;
+    }
     next[sheetId] = {
       ...sheet,
-      data: upsertCandlestickRowsByEndPeriodTs(existing, market.rows || [], { softRowCap }),
+      data: upsertCandlestickRowsByEndPeriodTs(existing, incoming, { softRowCap }),
+      liveDataRevision: revision,
     };
   }
 
-  return next;
+  return {
+    dataSheets: next,
+    stats: {
+      marketsInTick: markets.length,
+      marketsMatched,
+      marketsUnmatched,
+      candlesReceived,
+      candlesAdded,
+      candlesUpdated,
+      metaUpdated,
+      latestEndPeriodTs,
+    },
+  };
 }

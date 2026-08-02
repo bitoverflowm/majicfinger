@@ -82,6 +82,30 @@ export function pollIntervalMsForPeriod(periodIntervalMinutes) {
 }
 
 /**
+ * Human label for Kalshi candle period_interval (minutes).
+ * @param {number} periodIntervalMinutes
+ * @returns {string}
+ */
+export function describeCandlePeriod(periodIntervalMinutes) {
+  const m = Math.floor(Number(periodIntervalMinutes));
+  if (m === 1) return "1 minute";
+  if (m === 60) return "1 hour";
+  if (m === 1440) return "1 day";
+  return `${m} minute`;
+}
+
+/** How often the live feed may poll (independent of candle size). */
+export const LIVE_FEED_POLL_FREQUENCY_OPTIONS = [
+  { valueMs: 60_000, label: "Every 1 minute" },
+  { valueMs: 5 * 60_000, label: "Every 5 minutes" },
+  { valueMs: 15 * 60_000, label: "Every 15 minutes" },
+  { valueMs: 60 * 60_000, label: "Every 1 hour" },
+  { valueMs: 24 * 60 * 60_000, label: "Every 1 day" },
+  { valueMs: 7 * 24 * 60 * 60_000, label: "Every 1 week" },
+  { valueMs: 30 * 24 * 60 * 60_000, label: "Every 1 month" },
+];
+
+/**
  * Seconds covered by one period_interval candle.
  * @param {number} periodIntervalMinutes
  * @returns {number}

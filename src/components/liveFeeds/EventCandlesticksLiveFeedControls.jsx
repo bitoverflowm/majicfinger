@@ -17,13 +17,11 @@ import {
   createLiveFeedConfig,
   discoverEventCandlesticksFeedGroup,
 } from "@/lib/liveFeeds/feedConfig";
-import { pollIntervalMsForPeriod } from "@/lib/liveFeeds/registry";
-
-const PERIOD_OPTIONS = [
-  { value: "1", label: "1 minute candles" },
-  { value: "60", label: "1 hour candles" },
-  { value: "1440", label: "1 day candles" },
-];
+import {
+  describeCandlePeriod,
+  LIVE_FEED_POLL_FREQUENCY_OPTIONS,
+  pollIntervalMsForPeriod,
+} from "@/lib/liveFeeds/registry";
 
 /**
  * Conic ring that fills toward the next poll (same visual language as project rows ring).
@@ -84,6 +82,7 @@ function LiveFeedNextPullRing({ lastPolledAt, pollIntervalMs, paused }) {
 
 /**
  * Start / pause / stop live REST poll for Kalshi event candlesticks.
+ * Candle size is locked to the base pull; user only chooses poll frequency.
  */
 export function EventCandlesticksLiveFeedControls() {
   const ctx = useMyStateV2();
@@ -109,23 +108,32 @@ export function EventCandlesticksLiveFeedControls() {
     );
   }, [liveFeedState?.feedsById, group?.eventTicker]);
 
-  const [periodInterval, setPeriodInterval] = useState(() =>
-    String(group?.periodInterval || 1),
-  );
+  // Locked to whatever the Connect pull already fetched (1 | 60 | 1440).
+  const candlePeriod = Math.floor(Number(group?.periodInterval)) || 1;
+  const defaultPollMs = pollIntervalMsForPeriod(candlePeriod);
+
+  const [pollIntervalMs, setPollIntervalMs] = useState(() => String(defaultPollMs));
+
+  // Keep default poll frequency in sync if the underlying pull's candle size changes.
+  useEffect(() => {
+    setPollIntervalMs(String(pollIntervalMsForPeriod(candlePeriod)));
+  }, [candlePeriod]);
 
   if (!group) return null;
 
   const isRunning = !!activeFeed?.isRunning;
   const isPaused = !!activeFeed?.isPaused;
+  const candleLabel = describeCandlePeriod(candlePeriod);
 
   const handleStart = () => {
-    const period = Math.floor(Number(periodInterval)) || 1;
+    const period = candlePeriod;
+    const pollMs = Math.floor(Number(pollIntervalMs)) || defaultPollMs;
     const cfg = createLiveFeedConfig({
       integration: "kalshi-live",
       endpoint: "event_candlesticks",
       status: "ephemeral",
       periodInterval: period,
-      pollIntervalMs: pollIntervalMsForPeriod(period),
+      pollIntervalMs: pollMs,
       params: {
         eventTicker: group.eventTicker,
         seriesTicker: group.seriesTicker,
@@ -139,9 +147,10 @@ export function EventCandlesticksLiveFeedControls() {
     }
     const id = liveFeedActions?.start?.(cfg);
     if (id) {
-      toast.success(
-        `Live feed started · ${period === 1 ? "1m" : period === 60 ? "1h" : "1d"} candles`,
-      );
+      const freq =
+        LIVE_FEED_POLL_FREQUENCY_OPTIONS.find((o) => o.valueMs === pollMs)?.label ||
+        `every ${Math.round(pollMs / 60_000)}m`;
+      toast.success(`Live feed started · ${candleLabel} candles · ${freq.toLowerCase()}`);
     }
   };
 
@@ -165,18 +174,45 @@ export function EventCandlesticksLiveFeedControls() {
         ) : null}
       </div>
 
+      {isRunning && activeFeed?.lastTickStats ? (
+        <p className="px-0.5 text-[10px] leading-snug text-muted-foreground tabular-nums">
+          Pull #{Number(activeFeed.tickCount) || 1}
+          {" · "}
+          {activeFeed.lastTickStats.marketsMatched}/{activeFeed.lastTickStats.marketsInTick} markets
+          {" · "}
+          {activeFeed.lastTickStats.candlesReceived} candles
+          {activeFeed.lastTickStats.candlesAdded > 0
+            ? ` · +${activeFeed.lastTickStats.candlesAdded} new`
+            : ""}
+          {activeFeed.lastTickStats.candlesUpdated > 0
+            ? ` · ${activeFeed.lastTickStats.candlesUpdated} upserted`
+            : ""}
+          {activeFeed.lastTickStats.metaUpdated ? " · markets sheet updated" : ""}
+          {activeFeed.lastTickStats.marketsUnmatched > 0
+            ? ` · ${activeFeed.lastTickStats.marketsUnmatched} unmatched`
+            : ""}
+          {activeFeed.lastTickStats.latestEndPeriodTs
+            ? ` · latest ${new Date(activeFeed.lastTickStats.latestEndPeriodTs * 1000).toLocaleTimeString()}`
+            : ""}
+        </p>
+      ) : null}
+
       {!isRunning ? (
         <>
+          <p className="px-0.5 text-[11px] leading-snug text-muted-foreground">
+            Updating <span className="font-medium text-foreground">{candleLabel}</span> candles
+            from this pull. Candle size stays fixed.
+          </p>
           <div className="space-y-1">
-            <Label className="text-[11px] text-muted-foreground">Candle size &amp; poll</Label>
-            <Select value={periodInterval} onValueChange={setPeriodInterval}>
+            <Label className="text-[11px] text-muted-foreground">Pull frequency</Label>
+            <Select value={pollIntervalMs} onValueChange={setPollIntervalMs}>
               <SelectTrigger className="h-8 text-xs">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                {PERIOD_OPTIONS.map((o) => (
-                  <SelectItem key={o.value} value={o.value} className="text-xs">
-                    {o.label} · poll every {o.value === "1" ? "1m" : o.value === "60" ? "1h" : "1d"}
+                {LIVE_FEED_POLL_FREQUENCY_OPTIONS.map((o) => (
+                  <SelectItem key={o.valueMs} value={String(o.valueMs)} className="text-xs">
+                    {o.label}
                   </SelectItem>
                 ))}
               </SelectContent>

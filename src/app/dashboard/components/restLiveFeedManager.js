@@ -81,21 +81,43 @@ export default function RestLiveFeedManager() {
             signal: ac.signal,
           });
 
-          setDataSheets((prev) =>
-            applyKalshiCandlestickUpsertToSheets(prev, feed, tick, { softRowCap }),
-          );
+          let tickStats = null;
+          setDataSheets((prev) => {
+            const result = applyKalshiCandlestickUpsertToSheets(prev, feed, tick, { softRowCap });
+            tickStats = result.stats;
+            return result.dataSheets;
+          });
 
           const successAt = Date.now();
-          configByFeedIdRef.current[feedId] = {
+          const prevTickCount = Number(configByFeedIdRef.current[feedId]?.tickCount) || 0;
+          const tickCount = prevTickCount + 1;
+          let statusMessage = "Receiving live data…";
+          if (tickStats?.candlesReceived === 0) {
+            statusMessage = "Pull ok · empty candle window";
+          } else if (tickStats?.marketsMatched === 0) {
+            statusMessage = "Pull ok · no matching sheets";
+          } else if (tickStats?.candlesAdded > 0) {
+            statusMessage = `Receiving live data · +${tickStats.candlesAdded} new`;
+          } else if (tickStats?.candlesUpdated > 0) {
+            statusMessage = `Receiving live data · ${tickStats.candlesUpdated} updated`;
+          }
+
+          const nextCfg = {
             ...feed,
             lastPolledAt: now,
             lastSuccessAt: successAt,
             lastError: null,
+            tickCount,
+            lastTickStats: tickStats,
           };
+          configByFeedIdRef.current[feedId] = nextCfg;
           patchFeedState(feedId, {
             lastPolledAt: now,
             lastSuccessAt: successAt,
             lastError: null,
+            tickCount,
+            lastTickStats: tickStats,
+            statusMessage,
           });
         }
       } catch (e) {

@@ -108,7 +108,7 @@ export default async function handler(req, res) {
         }
 
         const nextSheets = applyKalshiCandlestickUpsertToSheets(sheets, cfg, tick, { softRowCap });
-        dataSet.data_sheets = nextSheets;
+        dataSet.data_sheets = nextSheets.dataSheets;
         dataSet.last_saved_date = new Date();
         dataSet.markModified("data_sheets");
         await dataSet.save();

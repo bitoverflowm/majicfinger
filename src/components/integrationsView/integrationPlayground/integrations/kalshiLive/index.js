@@ -1272,7 +1272,7 @@ export default function KalshiLive({ setConnectedData, connectHomePullBridge = f
                   eventTitle: resolvedEventTitle,
                   eventSubTitle: resolvedSubTitle || undefined,
                   sheetKind: group.isMeta ? "markets_metadata" : "market_candlesticks",
-                  marketTicker: group.isMeta ? undefined : sheetName,
+                  marketTicker: group.isMeta ? undefined : String(sheetName).trim().toUpperCase(),
                   whereFilters,
                   querySummary,
                 },

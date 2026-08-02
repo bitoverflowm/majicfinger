@@ -1,6 +1,7 @@
 import { kalshiLiveUrl } from "@/lib/kalshiLive/kalshiLiveApiBase";
 import { periodIntervalSec } from "@/lib/liveFeeds/registry";
 import { KALSHI_LIVE_MARKETS_COLUMNS } from "@/lib/kalshiLive/marketsColumns";
+import { KALSHI_LIVE_CANDLESTICK_COLUMNS } from "@/lib/kalshiLive/candlesticksColumns";
 import { projectKalshiLiveMarketRows } from "@/lib/kalshiLive/normalizeMarketRow";
 import {
   normalizeKalshiLiveCandlestickRow,
@@ -8,6 +9,7 @@ import {
 } from "@/lib/kalshiLive/normalizeCandlestickRow";
 
 const ALL_MARKET_COLUMN_NAMES = KALSHI_LIVE_MARKETS_COLUMNS.map((c) => c.name);
+const ALL_CANDLESTICK_COLUMN_NAMES = KALSHI_LIVE_CANDLESTICK_COLUMNS.map((c) => c.name);
 
 /**
  * Server-side incremental fetch for event candlesticks (direct upstream, no browser proxy).
@@ -117,7 +119,7 @@ export async function fetchKalshiLiveEventCandlesticksIncrementalServer(opts) {
     normalized.sort((a, b) => Number(a.end_period_ts) - Number(b.end_period_ts));
     byMarket.push({
       ticker,
-      rows: projectKalshiLiveCandlestickRows(normalized),
+      rows: projectKalshiLiveCandlestickRows(normalized, ALL_CANDLESTICK_COLUMN_NAMES),
     });
   }
 

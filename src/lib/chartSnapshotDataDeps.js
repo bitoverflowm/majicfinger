@@ -302,8 +302,33 @@ export function getChartWorkspaceDependencyState(chartLean, workspaceDataSheets)
     const status = String(sheet?.rehydrationStatus || "");
     const usable = sheetHasUsableChartRows(sheet);
     if (!usable) ready = false;
-    parts.push(`${sid}:${rows}:${full}:${status}:${usable ? 1 : 0}`);
+    // Include liveDataRevision so in-place live upserts (same row count) rebuild chart previews.
+    const rev =
+      sheet?.liveDataRevision != null
+        ? String(sheet.liveDataRevision)
+        : sheetFingerprintHint(sheet);
+    parts.push(`${sid}:${rows}:${full}:${status}:${usable ? 1 : 0}:${rev}`);
   }
 
   return { sheetIds, sig: parts.sort().join("|"), ready };
+}
+
+/**
+ * Cheap content hint when liveDataRevision is absent (last bar time + close).
+ * @param {object | null | undefined} sheet
+ */
+function sheetFingerprintHint(sheet) {
+  const data = Array.isArray(sheet?.data) ? sheet.data : [];
+  if (!data.length) return "0";
+  const last = data[data.length - 1];
+  if (!last || typeof last !== "object") return String(data.length);
+  const ts = last.end_period_ts ?? last.time ?? "";
+  const close =
+    last.price_close_dollars ??
+    last.yes_bid_close_dollars ??
+    last.close ??
+    last.volume_fp ??
+    last.last_price_dollars ??
+    "";
+  return `${ts}:${close}`;
 }
