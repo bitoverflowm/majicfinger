@@ -1,10 +1,16 @@
 import dbConnect from "@/lib/dbConnect";
 import LiveFeed from "@/models/LiveFeeds";
 import DataSet from "@/models/DataSets";
-import { createLiveFeedConfig } from "@/lib/liveFeeds/feedConfig";
+import { createLiveFeedConfig, extractPersistedLiveFeedsFromSheets } from "@/lib/liveFeeds/feedConfig";
 import { getLiveFeedEndpointDef, isLiveFeedAllowed } from "@/lib/liveFeeds/registry";
 import { fetchKalshiLiveEventCandlesticksIncrementalServer } from "@/lib/liveFeeds/fetchEventCandlesticksIncrementalServer";
 import { applyKalshiCandlestickUpsertToSheets } from "@/lib/liveFeeds/merge/kalshiCandlestickUpsert";
+import {
+  buildLiveFeedEndedStamp,
+  evaluateTrackedMarketsClosure,
+  stampLiveFeedEndedOnSheets,
+} from "@/lib/liveFeeds/marketClosure";
+import { markDashboardsLiveBacked } from "@/lib/liveFeeds/syncLiveFeedIndex";
 
 export const config = {
   maxDuration: 60,
@@ -50,6 +56,7 @@ export default async function handler(req, res) {
 
     let processed = 0;
     let updated = 0;
+    let ended = 0;
     let skipped = 0;
     let errors = 0;
 
@@ -108,7 +115,63 @@ export default async function handler(req, res) {
         }
 
         const nextSheets = applyKalshiCandlestickUpsertToSheets(sheets, cfg, tick, { softRowCap });
-        dataSet.data_sheets = nextSheets.dataSheets;
+        let dataSheetsOut = nextSheets.dataSheets;
+
+        const tracked = Object.keys(cfg.sheets?.marketSheetIdsByTicker || {});
+        const closure = evaluateTrackedMarketsClosure(tick.metaRows, tracked, Date.now());
+
+        if (closure.allClosed) {
+          const endedStamp = buildLiveFeedEndedStamp(cfg, {
+            reason: "markets_closed",
+            closedTickers: closure.closedTickers,
+          });
+          dataSheetsOut = stampLiveFeedEndedOnSheets(dataSheetsOut, cfg, endedStamp);
+          dataSet.data_sheets = dataSheetsOut;
+          dataSet.last_saved_date = new Date();
+          dataSet.markModified("data_sheets");
+          await dataSet.save();
+
+          await LiveFeed.updateOne(
+            { _id: doc._id },
+            {
+              $set: {
+                status: "ended",
+                last_polled_at: new Date(now),
+                last_success_at: new Date(now),
+                last_error: null,
+                config: {
+                  ...cfg,
+                  status: "ended",
+                  lastPolledAt: now,
+                  lastSuccessAt: now,
+                  lastError: null,
+                  endedReason: "markets_closed",
+                  liveFeedEnded: endedStamp,
+                },
+                updated_at: new Date(),
+              },
+            },
+          );
+
+          const stillLive = extractPersistedLiveFeedsFromSheets(dataSheetsOut).some(
+            (f) => f.status === "persisted",
+          );
+          if (!stillLive) {
+            try {
+              await markDashboardsLiveBacked({
+                dataSetId: String(doc.data_set_id),
+                liveBacked: false,
+              });
+            } catch (_) {
+              /* non-fatal */
+            }
+          }
+
+          ended += 1;
+          continue;
+        }
+
+        dataSet.data_sheets = dataSheetsOut;
         dataSet.last_saved_date = new Date();
         dataSet.markModified("data_sheets");
         await dataSet.save();
@@ -152,6 +215,7 @@ export default async function handler(req, res) {
       ok: true,
       processed,
       updated,
+      ended,
       skipped,
       errors,
       checked: due.length,

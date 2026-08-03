@@ -35,7 +35,7 @@ const LiveFeedSchema = new mongoose.Schema({
   },
   status: {
     type: String,
-    enum: ["persisted", "paused"],
+    enum: ["persisted", "paused", "ended"],
     default: "persisted",
     index: true,
   },

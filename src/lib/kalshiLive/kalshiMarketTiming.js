@@ -21,7 +21,9 @@ export function formatKalshiMarketStatusLabel(status) {
   if (s === "unopened") return "Unopened";
   if (s === "paused") return "Paused";
   if (s === "closed") return "Closed";
-  if (s === "settled") return "Settled";
+  if (s === "settled" || s === "determined" || s === "finalized") return "Settled";
+  if (s === "amended") return "Amended";
+  if (s === "disputed") return "Disputed";
   return s.charAt(0).toUpperCase() + s.slice(1);
 }
 

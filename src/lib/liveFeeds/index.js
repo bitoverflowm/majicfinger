@@ -30,3 +30,9 @@ export {
 } from "@/lib/liveFeeds/feedConfig";
 
 export { solidifyLiveFeedsForSave } from "@/lib/liveFeeds/persistFeedsOnSave";
+
+export {
+  evaluateTrackedMarketsClosure,
+  isKalshiMarketClosedStatus,
+  isKalshiMarketPastTrading,
+} from "@/lib/liveFeeds/marketClosure";

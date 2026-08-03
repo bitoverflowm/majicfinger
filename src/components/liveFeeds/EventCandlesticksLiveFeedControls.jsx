@@ -10,7 +10,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
-import { Radio, Pause, Play, Square } from "lucide-react";
+import { Radio, Pause, Play, Square, CircleOff } from "lucide-react";
 import { toast } from "sonner";
 import { useMyStateV2 } from "@/context/stateContextV2";
 import {
@@ -22,6 +22,7 @@ import {
   LIVE_FEED_POLL_FREQUENCY_OPTIONS,
   pollIntervalMsForPeriod,
 } from "@/lib/liveFeeds/registry";
+import { evaluateTrackedMarketsClosure } from "@/lib/liveFeeds/marketClosure";
 
 /**
  * Conic ring that fills toward the next poll (same visual language as project rows ring).
@@ -108,6 +109,31 @@ export function EventCandlesticksLiveFeedControls() {
     );
   }, [liveFeedState?.feedsById, group?.eventTicker]);
 
+  const marketsClosedInfo = useMemo(() => {
+    if (!group) return null;
+    const metaId = group.sheets?.marketsMetadataSheetId;
+    const metaSheet = metaId ? dataSheets?.[metaId] : null;
+    const ended = metaSheet?.liveFeedEnded;
+    if (ended?.reason === "markets_closed") {
+      return {
+        closed: true,
+        message: String(ended.message || "Markets closed · live feed stopped"),
+        closedTickers: Array.isArray(ended.closedTickers) ? ended.closedTickers : [],
+      };
+    }
+    const tracked = Object.keys(group.sheets?.marketSheetIdsByTicker || {});
+    const closure = evaluateTrackedMarketsClosure(metaSheet?.data, tracked);
+    if (!closure.allClosed) return null;
+    return {
+      closed: true,
+      message:
+        closure.closedTickers.length === 1
+          ? `Market ${closure.closedTickers[0]} closed`
+          : "Markets closed",
+      closedTickers: closure.closedTickers,
+    };
+  }, [group, dataSheets]);
+
   // Locked to whatever the Connect pull already fetched (1 | 60 | 1440).
   const candlePeriod = Math.floor(Number(group?.periodInterval)) || 1;
   const defaultPollMs = pollIntervalMsForPeriod(candlePeriod);
@@ -124,8 +150,13 @@ export function EventCandlesticksLiveFeedControls() {
   const isRunning = !!activeFeed?.isRunning;
   const isPaused = !!activeFeed?.isPaused;
   const candleLabel = describeCandlePeriod(candlePeriod);
+  const marketsClosed = !isRunning && !!marketsClosedInfo?.closed;
 
   const handleStart = () => {
+    if (marketsClosedInfo?.closed) {
+      toast.message(marketsClosedInfo.message || "Markets closed — nothing left to poll.");
+      return;
+    }
     const period = candlePeriod;
     const pollMs = Math.floor(Number(pollIntervalMs)) || defaultPollMs;
     const cfg = createLiveFeedConfig({
@@ -157,10 +188,14 @@ export function EventCandlesticksLiveFeedControls() {
   return (
     <div className="space-y-2 rounded-md border border-border/60 bg-muted/10 p-2">
       <div className="flex items-center gap-1.5 px-0.5">
-        <Radio
-          className={`h-3.5 w-3.5 shrink-0 ${isRunning && !isPaused ? "text-emerald-500" : "text-muted-foreground"}`}
-          aria-hidden
-        />
+        {marketsClosed ? (
+          <CircleOff className="h-3.5 w-3.5 shrink-0 text-muted-foreground" aria-hidden />
+        ) : (
+          <Radio
+            className={`h-3.5 w-3.5 shrink-0 ${isRunning && !isPaused ? "text-emerald-500" : "text-muted-foreground"}`}
+            aria-hidden
+          />
+        )}
         <span className="text-xs font-medium text-foreground">Live feed</span>
         {isRunning ? (
           <span className="ml-auto flex items-center gap-1.5 text-[10px] text-muted-foreground">
@@ -171,8 +206,19 @@ export function EventCandlesticksLiveFeedControls() {
             />
             <span>{isPaused ? "Paused" : activeFeed?.statusMessage || "Live"}</span>
           </span>
+        ) : marketsClosed ? (
+          <span className="ml-auto text-[10px] font-medium text-muted-foreground">Closed</span>
         ) : null}
       </div>
+
+      {marketsClosed ? (
+        <p className="px-0.5 text-[11px] leading-snug text-muted-foreground">
+          {marketsClosedInfo.message}.
+          {marketsClosedInfo.closedTickers?.length
+            ? " Candlestick polling has stopped."
+            : ""}
+        </p>
+      ) : null}
 
       {isRunning && activeFeed?.lastTickStats ? (
         <p className="px-0.5 text-[10px] leading-snug text-muted-foreground tabular-nums">
@@ -197,7 +243,7 @@ export function EventCandlesticksLiveFeedControls() {
         </p>
       ) : null}
 
-      {!isRunning ? (
+      {!isRunning && !marketsClosed ? (
         <>
           <p className="px-0.5 text-[11px] leading-snug text-muted-foreground">
             Updating <span className="font-medium text-foreground">{candleLabel}</span> candles
@@ -233,7 +279,9 @@ export function EventCandlesticksLiveFeedControls() {
             hit Save.
           </p>
         </>
-      ) : (
+      ) : null}
+
+      {isRunning ? (
         <div className="flex flex-wrap gap-1.5">
           {isPaused ? (
             <Button
@@ -272,7 +320,7 @@ export function EventCandlesticksLiveFeedControls() {
             Stop
           </Button>
         </div>
-      )}
+      ) : null}
       {activeFeed?.lastError ? (
         <p className="px-1 text-[11px] text-destructive">{activeFeed.lastError}</p>
       ) : null}

@@ -7,6 +7,12 @@ import { createLiveFeedConfig } from "@/lib/liveFeeds/feedConfig";
 import { getLiveFeedEndpointDef } from "@/lib/liveFeeds/registry";
 import { fetchKalshiLiveEventCandlesticksIncremental } from "@/lib/liveFeeds/fetchEventCandlesticksIncremental";
 import { applyKalshiCandlestickUpsertToSheets } from "@/lib/liveFeeds/merge/kalshiCandlestickUpsert";
+import {
+  buildLiveFeedEndedStamp,
+  clearLiveFeedEndedOnSheets,
+  evaluateTrackedMarketsClosure,
+  stampLiveFeedEndedOnSheets,
+} from "@/lib/liveFeeds/marketClosure";
 
 const noop = () => {};
 
@@ -37,8 +43,8 @@ export default function RestLiveFeedManager() {
       try {
         ac.abort();
       } catch (_) {}
-      delete abortByFeedIdRef.current[feedId];
     }
+    delete abortByFeedIdRef.current[feedId];
   }, []);
 
   const patchFeedState = useCallback(
@@ -54,12 +60,59 @@ export default function RestLiveFeedManager() {
     [setLiveFeedState],
   );
 
+  const stop = useCallback(
+    (feedId) => {
+      if (feedId != null) {
+        clearTimer(feedId);
+        delete configByFeedIdRef.current[feedId];
+        delete pausedByFeedIdRef.current[feedId];
+        delete inFlightByFeedIdRef.current[feedId];
+        setLiveFeedState?.((s) => {
+          const feedsById = { ...(s?.feedsById || {}) };
+          delete feedsById[feedId];
+          return { ...s, feedsById };
+        });
+      } else {
+        Object.keys(configByFeedIdRef.current).forEach((id) => stop(id));
+      }
+    },
+    [clearTimer, setLiveFeedState],
+  );
+
+  /**
+   * Stop polling after markets close; stamp sheets so UI can show closed state.
+   * @param {string} feedId
+   * @param {import("@/lib/liveFeeds/feedConfig").LiveFeedConfig} feed
+   * @param {ReturnType<typeof evaluateTrackedMarketsClosure>} closure
+   */
+  const endFeedMarketsClosed = useCallback(
+    (feedId, feed, closure) => {
+      const ended = buildLiveFeedEndedStamp(feed, {
+        reason: "markets_closed",
+        closedTickers: closure.closedTickers,
+      });
+      setDataSheets?.((prev) => stampLiveFeedEndedOnSheets(prev, feed, ended));
+      clearTimer(feedId);
+      delete configByFeedIdRef.current[feedId];
+      delete pausedByFeedIdRef.current[feedId];
+      delete inFlightByFeedIdRef.current[feedId];
+      setLiveFeedState?.((s) => {
+        const feedsById = { ...(s?.feedsById || {}) };
+        delete feedsById[feedId];
+        return { ...s, feedsById };
+      });
+      toast.message(ended.message);
+      return { ended: true, reason: "markets_closed", statusMessage: ended.message };
+    },
+    [setDataSheets, clearTimer, setLiveFeedState],
+  );
+
   const runTick = useCallback(
     async (feedId) => {
       const feed = configByFeedIdRef.current[feedId];
-      if (!feed || !setDataSheets) return;
-      if (pausedByFeedIdRef.current[feedId]) return;
-      if (inFlightByFeedIdRef.current[feedId]) return;
+      if (!feed || !setDataSheets) return { ended: false };
+      if (pausedByFeedIdRef.current[feedId]) return { ended: false };
+      if (inFlightByFeedIdRef.current[feedId]) return { ended: false };
 
       inFlightByFeedIdRef.current[feedId] = true;
       const ac = new AbortController();
@@ -81,12 +134,21 @@ export default function RestLiveFeedManager() {
             signal: ac.signal,
           });
 
+          // Feed may have been stopped while the request was in flight.
+          if (!configByFeedIdRef.current[feedId]) return { ended: true };
+
           let tickStats = null;
           setDataSheets((prev) => {
             const result = applyKalshiCandlestickUpsertToSheets(prev, feed, tick, { softRowCap });
             tickStats = result.stats;
             return result.dataSheets;
           });
+
+          const tracked = Object.keys(feed.sheets?.marketSheetIdsByTicker || {});
+          const closure = evaluateTrackedMarketsClosure(tick.metaRows, tracked, Date.now());
+          if (closure.allClosed) {
+            return endFeedMarketsClosed(feedId, feed, closure);
+          }
 
           const successAt = Date.now();
           const prevTickCount = Number(configByFeedIdRef.current[feedId]?.tickCount) || 0;
@@ -100,6 +162,10 @@ export default function RestLiveFeedManager() {
             statusMessage = `Receiving live data · +${tickStats.candlesAdded} new`;
           } else if (tickStats?.candlesUpdated > 0) {
             statusMessage = `Receiving live data · ${tickStats.candlesUpdated} updated`;
+          }
+          if (closure.anyClosed && closure.openTickers.length > 0) {
+            const n = closure.closedTickers.length;
+            statusMessage = `${statusMessage.replace(/…$/, "")} · ${n} market${n === 1 ? "" : "s"} closed`;
           }
 
           const nextCfg = {
@@ -119,40 +185,25 @@ export default function RestLiveFeedManager() {
             lastTickStats: tickStats,
             statusMessage,
           });
+          return { ended: false, statusMessage };
         }
+        return { ended: false };
       } catch (e) {
-        if (e?.name === "AbortError") return;
+        if (e?.name === "AbortError") return { ended: false };
         const msg = e instanceof Error ? e.message : "Live feed poll failed";
+        if (!configByFeedIdRef.current[feedId]) return { ended: true };
         configByFeedIdRef.current[feedId] = {
           ...feed,
           lastPolledAt: now,
           lastError: msg,
         };
         patchFeedState(feedId, { lastPolledAt: now, lastError: msg });
+        return { ended: false, error: msg };
       } finally {
         inFlightByFeedIdRef.current[feedId] = false;
       }
     },
-    [setDataSheets, patchFeedState],
-  );
-
-  const stop = useCallback(
-    (feedId) => {
-      if (feedId != null) {
-        clearTimer(feedId);
-        delete configByFeedIdRef.current[feedId];
-        delete pausedByFeedIdRef.current[feedId];
-        delete inFlightByFeedIdRef.current[feedId];
-        setLiveFeedState?.((s) => {
-          const feedsById = { ...(s?.feedsById || {}) };
-          delete feedsById[feedId];
-          return { ...s, feedsById };
-        });
-      } else {
-        Object.keys(configByFeedIdRef.current).forEach((id) => stop(id));
-      }
-    },
-    [clearTimer, setLiveFeedState],
+    [setDataSheets, patchFeedState, endFeedMarketsClosed],
   );
 
   const start = useCallback(
@@ -183,6 +234,9 @@ export default function RestLiveFeedManager() {
       pausedByFeedIdRef.current[cfg.id] = false;
       configByFeedIdRef.current[cfg.id] = cfg;
 
+      // Clear any prior "markets closed" stamp from a previous run.
+      setDataSheets?.((prev) => clearLiveFeedEndedOnSheets(prev, cfg));
+
       setLiveFeedState?.((s) => ({
         ...s,
         feedsById: {
@@ -197,22 +251,28 @@ export default function RestLiveFeedManager() {
         },
       }));
 
-      // Immediate first tick, then interval
-      void runTick(cfg.id).then(() => {
+      // Immediate first tick, then interval only if the feed is still running
+      // (markets may already be closed on the first pull).
+      void runTick(cfg.id).then((result) => {
+        if (!configByFeedIdRef.current[cfg.id] || result?.ended) {
+          clearTimer(cfg.id);
+          return;
+        }
         patchFeedState(cfg.id, {
           connecting: false,
-          statusMessage: "Receiving live data…",
+          statusMessage: result?.statusMessage || "Receiving live data…",
           isRunning: true,
         });
+        if (!timersByFeedIdRef.current[cfg.id]) {
+          timersByFeedIdRef.current[cfg.id] = setInterval(() => {
+            void runTick(cfg.id);
+          }, cfg.pollIntervalMs);
+        }
       });
-
-      timersByFeedIdRef.current[cfg.id] = setInterval(() => {
-        void runTick(cfg.id);
-      }, cfg.pollIntervalMs);
 
       return cfg.id;
     },
-    [clearTimer, setLiveFeedState, runTick, patchFeedState],
+    [clearTimer, setLiveFeedState, setDataSheets, runTick, patchFeedState],
   );
 
   const pause = useCallback(
