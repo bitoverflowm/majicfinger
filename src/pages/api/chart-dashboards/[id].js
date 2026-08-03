@@ -6,6 +6,10 @@ import mongoose from "mongoose";
 import { getLoginSession } from "@/lib/auth";
 import { isValidChartEmbedSlug, normalizeChartEmbedSlug } from "@/lib/chartEmbedSlug";
 import { validateDashboardPublishSeo } from "@/lib/dashboardPublishSeo";
+import {
+  datasetHasActivePersistedLiveFeeds,
+  liveBackedDashboardFields,
+} from "@/lib/liveFeeds/syncLiveFeedIndex";
 
 function collectChartIdsFromLayoutWithValidation(layout) {
   const ids = new Set();
@@ -101,12 +105,15 @@ export default async function handler(req, res) {
         if (req.body.layout && typeof req.body.layout === "object") $set.layout = req.body.layout;
         if (req.body.theme && typeof req.body.theme === "object") $set.theme = req.body.theme;
 
+        /** @type {object | null} */
+        let dataSetForLive = null;
         if (req.body.data_set_id && mongoose.Types.ObjectId.isValid(String(req.body.data_set_id))) {
           const ds = await DataSet.findById(req.body.data_set_id).lean();
           if (!ds || String(ds.user_id) !== String(session.userId)) {
             return res.status(400).json({ success: false, message: "Invalid data_set_id" });
           }
           $set.data_set_id = req.body.data_set_id;
+          dataSetForLive = ds;
         }
 
         const layoutForValidation = $set.layout !== undefined ? $set.layout : dash.layout;
@@ -119,6 +126,16 @@ export default async function handler(req, res) {
               message: `Chart ${cid} not found or not owned by you`,
             });
           }
+        }
+
+        // Keep public live polling in sync with the associated project's feeds
+        // (covers create-after-register and later data_set reassignment).
+        const liveDataSetId = String($set.data_set_id || dash.data_set_id || "").trim();
+        if (liveDataSetId) {
+          const liveBacked = await datasetHasActivePersistedLiveFeeds(liveDataSetId, {
+            dataSheets: dataSetForLive?.data_sheets,
+          });
+          Object.assign($set, liveBackedDashboardFields(liveBacked));
         }
 
         if (wantsEmbed) {

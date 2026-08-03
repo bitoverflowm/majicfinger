@@ -36,3 +36,8 @@ export {
   isKalshiMarketClosedStatus,
   isKalshiMarketPastTrading,
 } from "@/lib/liveFeeds/marketClosure";
+
+export {
+  datasetHasActivePersistedLiveFeeds,
+  markDashboardsLiveBacked,
+} from "@/lib/liveFeeds/syncLiveFeedIndex";

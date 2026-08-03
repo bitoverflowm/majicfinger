@@ -44,6 +44,53 @@ export async function upsertLiveFeedIndexDocs({ userId, dataSetId, feeds }) {
 }
 
 /**
+ * True when this dataset still has an actively persisted REST live feed.
+ * Prefers the LiveFeed index; falls back to sheet stamps (saveMeta/provenance).
+ * @param {string} dataSetId
+ * @param {{ dataSheets?: Record<string, object> | null }} [opts]
+ * @returns {Promise<boolean>}
+ */
+export async function datasetHasActivePersistedLiveFeeds(dataSetId, opts = {}) {
+  const id = String(dataSetId || "").trim();
+  if (!id) return false;
+
+  try {
+    const LiveFeed = (await import("@/models/LiveFeeds")).default;
+    const n = await LiveFeed.countDocuments({ data_set_id: id, status: "persisted" });
+    if (n > 0) return true;
+  } catch {
+    /* fall through to sheet stamps */
+  }
+
+  let sheets = opts.dataSheets;
+  if (!sheets || typeof sheets !== "object") {
+    try {
+      const DataSet = (await import("@/models/DataSets")).default;
+      const ds = await DataSet.findById(id).select("data_sheets").lean();
+      sheets = ds?.data_sheets && typeof ds.data_sheets === "object" ? ds.data_sheets : null;
+    } catch {
+      return false;
+    }
+  }
+  if (!sheets) return false;
+
+  const { extractPersistedLiveFeedsFromSheets } = await import("@/lib/liveFeeds/feedConfig");
+  return extractPersistedLiveFeedsFromSheets(sheets).some((f) => f.status === "persisted");
+}
+
+/**
+ * Fields to set on a ChartDashboard so public embeds stay in sync with live feeds.
+ * @param {boolean} liveBacked
+ */
+export function liveBackedDashboardFields(liveBacked) {
+  const on = !!liveBacked;
+  return {
+    live_backed: on,
+    ...(on ? { live_backed_at: new Date() } : {}),
+  };
+}
+
+/**
  * Mark ChartDashboards for a dataset as live-backed when feeds are persisted.
  * @param {{ dataSetId: string; liveBacked: boolean }} opts
  */
@@ -53,10 +100,7 @@ export async function markDashboardsLiveBacked({ dataSetId, liveBacked }) {
   const result = await ChartDashboard.updateMany(
     { data_set_id: dataSetId },
     {
-      $set: {
-        live_backed: !!liveBacked,
-        ...(liveBacked ? { live_backed_at: new Date() } : {}),
-      },
+      $set: liveBackedDashboardFields(liveBacked),
     },
   );
   return { modified: result?.modifiedCount ?? 0 };

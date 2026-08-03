@@ -4,6 +4,10 @@ import DataSet from "@/models/DataSets";
 import mongoose from "mongoose";
 import { getLoginSession } from "@/lib/auth";
 import { createEmptyDashboardLayout } from "@/lib/dashboardLayoutDefaults";
+import {
+  datasetHasActivePersistedLiveFeeds,
+  liveBackedDashboardFields,
+} from "@/lib/liveFeeds/syncLiveFeedIndex";
 
 export default async function handler(req, res) {
   const {
@@ -79,6 +83,9 @@ export default async function handler(req, res) {
         if (!ds || String(ds.user_id) !== String(session.userId)) {
           return res.status(400).json({ success: false, message: "Dataset not found or not yours" });
         }
+        const liveBacked = await datasetHasActivePersistedLiveFeeds(data_set_id, {
+          dataSheets: ds.data_sheets,
+        });
         const doc = await ChartDashboard.create({
           dashboard_name: dashboard_name || "Untitled dashboard",
           seo_title: typeof seo_title === "string" ? seo_title : "",
@@ -96,6 +103,7 @@ export default async function handler(req, res) {
           user_id: new mongoose.Types.ObjectId(user_id),
           data_set_id: new mongoose.Types.ObjectId(data_set_id),
           last_edited_date: new Date(),
+          ...liveBackedDashboardFields(liveBacked),
         });
         return res.status(201).json({ success: true, data: doc });
       } catch (e) {
