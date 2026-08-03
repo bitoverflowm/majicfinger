@@ -1,7 +1,9 @@
 import { describe, expect, it } from "vitest";
 import {
+  applyKalshiCandlestickUpsertToSheets,
   mergeLiveSheetRowPreserve,
   normalizeLiveEndPeriodTs,
+  sheetDataLooksLikeCandlesticks,
   shouldApplyLiveCell,
   upsertCandlestickRowsByEndPeriodTs,
 } from "./kalshiCandlestickUpsert.js";
@@ -78,5 +80,98 @@ describe("kalshiCandlestickUpsert null-safe merge", () => {
     expect(rows[1].price_close_dollars).toBe(0.5);
     expect(rows[1].yes_bid_close_dollars).toBe(0.51);
     expect(rows[2].end_period_ts).toBe(220);
+  });
+
+  it("never writes candles onto the markets metadata sheet id", () => {
+    const dataSheets = {
+      "sheet-1": {
+        name: "EVT · markets",
+        provenance: { sheetKind: "markets_metadata", source: "kalshi-live", endpoint: "event_candlesticks" },
+        data: [{ ticker: "KX-A", yes_sub_title: "range", last_price_dollars: "0.20" }],
+      },
+      "sheet-2": {
+        name: "KX-A",
+        provenance: {
+          sheetKind: "market_candlesticks",
+          marketTicker: "KX-A",
+          source: "kalshi-live",
+          endpoint: "event_candlesticks",
+        },
+        data: [],
+      },
+    };
+    const feed = {
+      sheets: {
+        marketsMetadataSheetId: "sheet-1",
+        // Collision: ticker wrongly points at markets sheet
+        marketSheetIdsByTicker: { "KX-A": "sheet-1" },
+      },
+    };
+    const tick = {
+      metaRows: [{ ticker: "KX-A", yes_sub_title: "range", last_price_dollars: "0.22" }],
+      byMarket: [
+        {
+          ticker: "KX-A",
+          rows: [
+            {
+              market_ticker: "KX-A",
+              end_period_ts: 100,
+              yes_bid_open_dollars: 0.1,
+              yes_bid_high_dollars: 0.2,
+              yes_bid_low_dollars: 0.05,
+              yes_bid_close_dollars: 0.15,
+            },
+          ],
+        },
+      ],
+    };
+    const { dataSheets: next, stats } = applyKalshiCandlestickUpsertToSheets(dataSheets, feed, tick);
+    expect(stats.marketsMatched).toBe(0);
+    expect(stats.marketsUnmatched).toBe(1);
+    expect(next["sheet-1"].data[0].ticker).toBe("KX-A");
+    expect(next["sheet-1"].data[0].yes_sub_title).toBe("range");
+    expect(next["sheet-1"].data[0].end_period_ts).toBeUndefined();
+    expect(next["sheet-1"].name).toBe("EVT · markets");
+  });
+
+  it("heals a markets sheet that was previously overwritten with OHLC", () => {
+    expect(
+      sheetDataLooksLikeCandlesticks([
+        { market_ticker: "KX-A", end_period_ts: 100, yes_bid_close_dollars: 0.2 },
+      ]),
+    ).toBe(true);
+
+    const dataSheets = {
+      "sheet-1": {
+        name: "EVT · markets",
+        provenance: { sheetKind: "markets_metadata" },
+        data: [{ market_ticker: "KX-A", end_period_ts: 100, yes_bid_close_dollars: 0.2 }],
+      },
+      "sheet-2": {
+        name: "KX-A",
+        provenance: { sheetKind: "market_candlesticks", marketTicker: "KX-A" },
+        data: [],
+      },
+    };
+    const feed = {
+      sheets: {
+        marketsMetadataSheetId: "sheet-1",
+        marketSheetIdsByTicker: { "KX-A": "sheet-2" },
+      },
+    };
+    const tick = {
+      metaRows: [{ ticker: "KX-A", yes_sub_title: "range", last_price_dollars: "0.22" }],
+      byMarket: [
+        {
+          ticker: "KX-A",
+          rows: [{ market_ticker: "KX-A", end_period_ts: 120, yes_bid_close_dollars: 0.25 }],
+        },
+      ],
+    };
+    const { dataSheets: next } = applyKalshiCandlestickUpsertToSheets(dataSheets, feed, tick);
+    expect(next["sheet-1"].data).toHaveLength(1);
+    expect(next["sheet-1"].data[0].ticker).toBe("KX-A");
+    expect(next["sheet-1"].data[0].yes_sub_title).toBe("range");
+    expect(next["sheet-2"].data[0].end_period_ts).toBe(120);
   });
 });

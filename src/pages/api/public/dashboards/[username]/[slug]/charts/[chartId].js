@@ -39,7 +39,10 @@ export default async function handler(req, res) {
     const cacheHit = !!result.data?._cacheHit;
     if (result.data) delete result.data._cacheHit;
 
-    res.setHeader("Cache-Control", publicDashboardCacheControl(cacheHit));
+    res.setHeader(
+      "Cache-Control",
+      publicDashboardCacheControl(cacheHit, { liveBacked: !!dash.live_backed }),
+    );
     return res.status(200).json(result);
   } catch (e) {
     return res.status(500).json({ success: false, message: e.message || "Server error" });

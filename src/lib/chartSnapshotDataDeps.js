@@ -2,7 +2,40 @@
  * Derive which sheet columns a saved Recharts builder snapshot may read.
  * Used to trim public embed / dashboard payloads after full lake rehydrate.
  */
+import {
+  CANDLESTICK_OHLC_SETS,
+  CANDLESTICK_TIME_KEYS,
+} from "@/lib/chartCandlestick";
 import { resolvePersistedFullRowCount } from "@/lib/projectPersistence";
+
+/** Extra Kalshi candle fields public embeds should keep when trimming columns. */
+const CANDLESTICK_EXTRA_COLUMNS = [
+  "market_ticker",
+  "volume_fp",
+  "open_interest_fp",
+  "price_mean_dollars",
+  "price_previous_dollars",
+  "price_min_dollars",
+  "price_max_dollars",
+];
+
+/**
+ * Columns required to render a candlestick sheet (time + every OHLC set + liquidity meta).
+ * @returns {string[]}
+ */
+export function candlestickProjectionColumnNames() {
+  /** @type {Set<string>} */
+  const cols = new Set();
+  for (const k of CANDLESTICK_TIME_KEYS) cols.add(k);
+  for (const ohlc of CANDLESTICK_OHLC_SETS) {
+    cols.add(ohlc.open);
+    cols.add(ohlc.high);
+    cols.add(ohlc.low);
+    cols.add(ohlc.close);
+  }
+  for (const k of CANDLESTICK_EXTRA_COLUMNS) cols.add(k);
+  return [...cols];
+}
 
 /**
  * @param {unknown} key
@@ -181,22 +214,48 @@ export function collectChartSnapshotColumnsBySheetId(snapshot, defaultSheetId, d
     bySheet.get(sheetId).add(col);
   };
 
-  if (s.selX) add(s.selX);
-  for (const y of Array.isArray(s.selY) ? s.selY : []) add(y);
-  if (s.selZ) add(s.selZ);
+  const isCandlestick = String(s.selChartType || "").trim() === "candlestick";
+  const candleSheet = String(s.candlestickSheetId || "").trim();
+  const candleSid = candleSheet ? targetSheetId(candleSheet) : "";
+
+  /**
+   * Candlestick cards often get polluted with markets-metadata axes
+   * (`yes_sub_title` / `last_price_dollars`) during normalize. Unscoped axis
+   * keys then resolve onto the candle sheet (defaultSheetId) and public
+   * hydration projects OHLC rows down to those two columns → empty `{}` bars.
+   * Only keep axes that are explicitly scoped to a *different* sheet.
+   */
+  const addAxisKey = (scopedKey) => {
+    if (!isCandlestick || !candleSid) {
+      add(scopedKey);
+      return;
+    }
+    const raw = String(scopedKey || "").trim();
+    if (!raw) return;
+    const idx = raw.indexOf("::");
+    if (idx < 0) return;
+    const sheetId = targetSheetId(raw.slice(0, idx).trim() || def);
+    if (sheetId === candleSid) return;
+    add(scopedKey);
+  };
+
+  if (s.selX) addAxisKey(s.selX);
+  for (const y of Array.isArray(s.selY) ? s.selY : []) addAxisKey(y);
+  if (s.selZ) addAxisKey(s.selZ);
   if (s.selColorCol) add(s.selColorCol);
-  if (s.lineSeriesColumn) add(s.lineSeriesColumn);
-  if (s.barSeriesColumn) add(s.barSeriesColumn);
+  if (s.lineSeriesColumn) addAxisKey(s.lineSeriesColumn);
+  if (s.barSeriesColumn) addAxisKey(s.barSeriesColumn);
   if (s.chartFilterColumn) add(s.chartFilterColumn);
   if (s.rainbowLegendLabelColumn) add(s.rainbowLegendLabelColumn);
   for (const c of Array.isArray(s.tooltipExtraColumns) ? s.tooltipExtraColumns : []) add(c);
 
-  // Candlestick charts reference a sheet id without axis keys — still register the sheet
-  // so dashboard / embed dependency checks hydrate the correct OHLC rows.
-  const candleSheet = String(s.candlestickSheetId || "").trim();
+  // Candlestick charts reference a sheet id without axis keys — register the sheet
+  // with full OHLC/time columns so public embeds never strip candle rows to {}.
   if (candleSheet) {
-    const sid = targetSheetId(candleSheet);
+    const sid = candleSid || targetSheetId(candleSheet);
     if (!bySheet.has(sid)) bySheet.set(sid, new Set());
+    const set = bySheet.get(sid);
+    for (const col of candlestickProjectionColumnNames()) set.add(col);
   }
 
   if (s.chartConfig && typeof s.chartConfig === "object") {

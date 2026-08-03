@@ -316,16 +316,18 @@ export function applyKalshiCandlestickUpsertToSheets(dataSheets, feed, tick, opt
   const softRowCap = opts.softRowCap ?? 50_000;
   const next = { ...(dataSheets || {}) };
   const revision = Date.now();
-  const metaId = feed.sheets.marketsMetadataSheetId;
-  const metaSheet = next[metaId];
+  const metaId = String(feed?.sheets?.marketsMetadataSheetId || "").trim();
+  const metaSheet = metaId ? next[metaId] : null;
   let metaUpdated = false;
-  if (metaSheet && Array.isArray(tick.metaRows) && tick.metaRows.length) {
+  if (metaId && metaSheet && Array.isArray(tick.metaRows) && tick.metaRows.length) {
     const existing = Array.isArray(metaSheet.data) ? metaSheet.data : [];
-    const flashRows = buildMarketMetaLiveFlashRows(existing, tick.metaRows);
+    // If a prior bad candle upsert wiped this tab, don't try to merge OHLC leftovers.
+    const base = sheetDataLooksLikeCandlesticks(existing) ? [] : existing;
+    const flashRows = buildMarketMetaLiveFlashRows(base, tick.metaRows);
     const hasFlash = Object.keys(flashRows).length > 0;
     next[metaId] = {
       ...metaSheet,
-      data: upsertMarketMetaRowsByTicker(existing, tick.metaRows),
+      data: upsertMarketMetaRowsByTicker(base, tick.metaRows),
       liveDataRevision: revision,
       liveFlash: hasFlash ? { revision, rows: flashRows } : null,
     };
@@ -343,13 +345,20 @@ export function applyKalshiCandlestickUpsertToSheets(dataSheets, feed, tick, opt
   const markets = Array.isArray(tick.byMarket) ? tick.byMarket : [];
   for (const market of markets) {
     const ticker = String(market.ticker || "").trim().toUpperCase();
-    const sheetId = feed.sheets.marketSheetIdsByTicker?.[ticker];
-    if (!sheetId || !next[sheetId]) {
+    const sheetId = String(feed?.sheets?.marketSheetIdsByTicker?.[ticker] || "").trim();
+    const sheet = sheetId ? next[sheetId] : null;
+    // Never write candles onto the markets metadata sheet — that leaves a tab
+    // named "… · markets" filled with OHLC after cron/save/reload.
+    if (
+      !sheetId ||
+      !sheet ||
+      (metaId && sheetId === metaId) ||
+      isMarketsMetadataSheet(sheet)
+    ) {
       marketsUnmatched += 1;
       continue;
     }
     marketsMatched += 1;
-    const sheet = next[sheetId];
     const existing = Array.isArray(sheet.data) ? sheet.data : [];
     const incoming = Array.isArray(market.rows) ? market.rows : [];
     const diff = countCandlestickUpsertChanges(existing, incoming);
@@ -382,4 +391,30 @@ export function applyKalshiCandlestickUpsertToSheets(dataSheets, feed, tick, opt
       latestEndPeriodTs,
     },
   };
+}
+
+/**
+ * @param {object | null | undefined} sheet
+ */
+function isMarketsMetadataSheet(sheet) {
+  return String(sheet?.provenance?.sheetKind || "") === "markets_metadata";
+}
+
+/**
+ * Detect a markets tab that was overwritten with OHLC rows.
+ * @param {Record<string, unknown>[]} rows
+ */
+export function sheetDataLooksLikeCandlesticks(rows) {
+  let candleish = 0;
+  let metish = 0;
+  const list = Array.isArray(rows) ? rows : [];
+  for (let i = 0; i < Math.min(list.length, 24); i += 1) {
+    const row = list[i];
+    if (!row || typeof row !== "object") continue;
+    if (row.end_period_ts != null) candleish += 1;
+    if (row.ticker != null && (row.yes_sub_title != null || row.last_price_dollars != null)) {
+      metish += 1;
+    }
+  }
+  return candleish > 0 && metish === 0;
 }

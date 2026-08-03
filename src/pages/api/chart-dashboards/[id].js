@@ -7,9 +7,9 @@ import { getLoginSession } from "@/lib/auth";
 import { isValidChartEmbedSlug, normalizeChartEmbedSlug } from "@/lib/chartEmbedSlug";
 import { validateDashboardPublishSeo } from "@/lib/dashboardPublishSeo";
 import {
-  datasetHasActivePersistedLiveFeeds,
+  resolveDatasetLiveBacked,
   liveBackedDashboardFields,
-} from "@/lib/liveFeeds/syncLiveFeedIndex";
+} from "@/lib/liveFeeds/publicLiveConfig";
 
 function collectChartIdsFromLayoutWithValidation(layout) {
   const ids = new Set();
@@ -128,11 +128,10 @@ export default async function handler(req, res) {
           }
         }
 
-        // Keep public live polling in sync with the associated project's feeds
-        // (covers create-after-register and later data_set reassignment).
+        // Public on-demand live when the linked project has event-candlesticks sheets.
         const liveDataSetId = String($set.data_set_id || dash.data_set_id || "").trim();
         if (liveDataSetId) {
-          const liveBacked = await datasetHasActivePersistedLiveFeeds(liveDataSetId, {
+          const liveBacked = await resolveDatasetLiveBacked(liveDataSetId, {
             dataSheets: dataSetForLive?.data_sheets,
           });
           Object.assign($set, liveBackedDashboardFields(liveBacked));

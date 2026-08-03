@@ -86,6 +86,32 @@ function allocateNextSheetId(sheets) {
 }
 
 /**
+ * Pick where event-candlesticks markets metadata should land.
+ * Never overwrite an existing per-market candle sheet — that is how a tab can
+ * keep a markets name while later live upserts fill it with OHLC.
+ *
+ * @param {Record<string, object>} sheets
+ * @param {string | null | undefined} preferredId
+ * @returns {string}
+ */
+function pickEventCandlesMetaTargetSheetId(sheets, preferredId) {
+  const preferred = String(preferredId || "").trim();
+  if (preferred && sheets?.[preferred]) {
+    const kind = String(sheets[preferred]?.provenance?.sheetKind || "");
+    if (kind !== "market_candlesticks") return preferred;
+  }
+  const s1 = sheets?.["sheet-1"];
+  if (s1) {
+    const kind = String(s1?.provenance?.sheetKind || "");
+    const rows = Array.isArray(s1.data) ? s1.data.length : 0;
+    if (kind !== "market_candlesticks" && (rows === 0 || kind === "markets_metadata" || !kind)) {
+      return "sheet-1";
+    }
+  }
+  return allocateNextSheetId(sheets);
+}
+
+/**
  * Hidden bridge: runs Kalshi Live pulls when Connect home requests integration pull.
  */
 export default function KalshiLive({ setConnectedData, connectHomePullBridge = false }) {
@@ -1244,8 +1270,8 @@ export default function KalshiLive({ setConnectedData, connectHomePullBridge = f
               const rows = Array.isArray(group.rows) ? group.rows : [];
 
               let targetSheetId;
-              if (i === 0 && firstSheetId) {
-                targetSheetId = firstSheetId;
+              if (i === 0) {
+                targetSheetId = pickEventCandlesMetaTargetSheetId(next, firstSheetId);
               } else {
                 targetSheetId = allocateNextSheetId(next);
               }
@@ -1287,8 +1313,9 @@ export default function KalshiLive({ setConnectedData, connectHomePullBridge = f
           if (firstSheetId && ctx?.setActiveSheetId) {
             ctx.setActiveSheetId(firstSheetId);
           }
-          const firstRows = Array.isArray(groups[0]?.rows) ? groups[0].rows : [];
-          if (setRows) setRows(firstRows);
+          // Do NOT call setConnectedData/setRows here — it closes over the *previous*
+          // activeSheetId and can overwrite an unrelated candle tab with meta rows
+          // (or leave markets/candle identity inconsistent for live upserts).
           ctx?.setConnectHomeAnalyzeActive?.(true);
         });
       } else {

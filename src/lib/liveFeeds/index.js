@@ -1,12 +1,8 @@
 /**
  * Live REST-poll feeds — public barrel.
  *
- * Expansion path (after event_candlesticks vertical slice):
- * 1. Add registry entry in registry.js (candlesticks / trades / markets / leaderboard)
- * 2. Add incremental fetch adapter (client + server)
- * 3. Add or reuse merge strategy
- * 4. Wire Start live UX for that endpoint
- * Same RestLiveFeedManager, persist, cron, and public poll paths apply.
+ * Editor: ephemeral browser poll via RestLiveFeedManager.
+ * Public dashboards: on-demand Kalshi via /api/public/.../live (cached), not cron.
  */
 
 export {
@@ -27,9 +23,9 @@ export {
   stampLiveFeedOntoSheets,
   liveFeedSheetIds,
   genLiveFeedId,
+  sanitizeLiveFeedSheetsMap,
+  resolveEventCandlesticksSheetsMap,
 } from "@/lib/liveFeeds/feedConfig";
-
-export { solidifyLiveFeedsForSave } from "@/lib/liveFeeds/persistFeedsOnSave";
 
 export {
   evaluateTrackedMarketsClosure,
@@ -38,8 +34,15 @@ export {
 } from "@/lib/liveFeeds/marketClosure";
 
 export {
-  datasetHasActivePersistedLiveFeeds,
-  markDashboardsLiveBacked,
-} from "@/lib/liveFeeds/syncLiveFeedIndex";
+  datasetHasEventCandlesticksLiveSource,
+  liveBackedDashboardFields,
+  resolveDatasetLiveBacked,
+  resolvePublicDashboardLiveConfig,
+} from "@/lib/liveFeeds/publicLiveConfig";
 
-export { managePersistedLiveFeed } from "@/lib/liveFeeds/managePersistedFeed";
+export {
+  getCachedPublicEventCandlesticks,
+  publicLiveCacheControl,
+  publicLiveLookbackPeriods,
+  PUBLIC_LIVE_CACHE_TTL_MS,
+} from "@/lib/liveFeeds/publicLiveKalshiCache";

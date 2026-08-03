@@ -65,21 +65,41 @@ export function normalizeBuilderSnapshot(snapshot, rows, dataSheets = {}) {
     return idx > -1 ? raw.slice(idx + 2) : raw;
   };
 
-  const normalizedX = deScope(s.selX);
-  if (String(s.selX || "").includes("::")) {
-    s.selX = String(s.selX);
-  } else {
-    s.selX = keys.includes(normalizedX) ? normalizedX : fallback.selX;
-  }
+  const isCandlestick =
+    s.selChartType === "candlestick" || !!String(s.candlestickSheetId || "").trim();
 
-  const rawY = Array.isArray(s.selY) ? s.selY : [];
-  const cleanY = rawY.filter((k) => {
-    const raw = String(k || "");
-    if (raw.includes("::")) return true;
-    return keys.includes(deScope(raw));
-  });
-  // Keep duplicate Y entries — same column with per-line filters (line:0, line:1, …).
-  s.selY = cleanY.length ? cleanY : fallback.selY;
+  if (isCandlestick) {
+    s.selChartType = "candlestick";
+    // Candlestick plots read OHLC via candlestickSheetId — bar/line axes are unused.
+    // Never fill them from inferDefault (that injects markets cols like yes_sub_title and
+    // later public hydration projects candle rows onto those columns → empty bars).
+    const keepScopedAxis = (key) => {
+      const raw = String(key || "").trim();
+      return raw.includes("::");
+    };
+    s.selX = keepScopedAxis(s.selX) ? String(s.selX) : null;
+    const rawY = Array.isArray(s.selY) ? s.selY : [];
+    s.selY = rawY.filter(keepScopedAxis);
+    if (s.candlestickOhlcSetId == null || s.candlestickOhlcSetId === "") {
+      s.candlestickOhlcSetId = "auto";
+    }
+  } else {
+    const normalizedX = deScope(s.selX);
+    if (String(s.selX || "").includes("::")) {
+      s.selX = String(s.selX);
+    } else {
+      s.selX = keys.includes(normalizedX) ? normalizedX : fallback.selX;
+    }
+
+    const rawY = Array.isArray(s.selY) ? s.selY : [];
+    const cleanY = rawY.filter((k) => {
+      const raw = String(k || "");
+      if (raw.includes("::")) return true;
+      return keys.includes(deScope(raw));
+    });
+    // Keep duplicate Y entries — same column with per-line filters (line:0, line:1, …).
+    s.selY = cleanY.length ? cleanY : fallback.selY;
+  }
 
   if (s.barSeriesColumn !== undefined && s.barSeriesColumn !== null) {
     const rawBar = String(s.barSeriesColumn || "");
@@ -181,8 +201,10 @@ export function normalizeBuilderSnapshot(snapshot, rows, dataSheets = {}) {
     s.chartConfig = nextCfg;
   }
 
-  if (!s.selX) s.selX = fallback.selX;
-  if (!Array.isArray(s.selY) || s.selY.length === 0) s.selY = fallback.selY;
+  if (!isCandlestick) {
+    if (!s.selX) s.selX = fallback.selX;
+    if (!Array.isArray(s.selY) || s.selY.length === 0) s.selY = fallback.selY;
+  }
   // Preserve saved chart type when axes were saved intentionally; only infer type when snapshot had none.
   if (!allowedTypes.has(type)) {
     s.selChartType = fallback.selChartType;

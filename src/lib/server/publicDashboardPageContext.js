@@ -61,10 +61,20 @@ export const getPublicDashboardPageContext = cache(async function getPublicDashb
     is_public: true,
   })
     .select(
-      "page_heading page_subheading dashboard_name seo_title tags keywords theme layout card_grid_snapshots published_at last_edited_date og_image_data",
+      "page_heading page_subheading dashboard_name seo_title tags keywords theme layout card_grid_snapshots published_at last_edited_date og_image_data live_backed data_set_id",
     )
     .lean();
   if (!dash) return null;
+
+  let liveBacked = !!dash.live_backed;
+  if (!liveBacked && dash.data_set_id) {
+    try {
+      const { resolveDatasetLiveBacked } = await import("@/lib/liveFeeds/publicLiveConfig");
+      liveBacked = await resolveDatasetLiveBacked(String(dash.data_set_id));
+    } catch {
+      liveBacked = false;
+    }
+  }
 
   const pageTitle = (dash.page_heading || dash.dashboard_name || "Dashboard").trim();
   const seoTitle = String(dash.seo_title || "").trim() || pageTitle;
@@ -83,6 +93,8 @@ export const getPublicDashboardPageContext = cache(async function getPublicDashb
       owner_handle: user.user_name,
       owner_profile_pic: user.profile_pic ? String(user.profile_pic) : null,
       tags: tags.map((t) => String(t || "").trim()).filter(Boolean),
+      live_backed: liveBacked,
+      live_poll_interval_ms: liveBacked ? 60_000 : null,
     },
   };
 

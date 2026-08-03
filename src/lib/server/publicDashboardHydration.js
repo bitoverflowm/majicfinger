@@ -265,22 +265,16 @@ export async function resolvePublicDashboardCardGridSheets(dash, userId, { prefe
 }
 
 /**
- * Infer a reasonable client poll interval from live-backed dataset sheets.
+ * Infer a reasonable client poll interval from live event-candlesticks provenance.
  * @param {object} dash
  * @returns {Promise<number>}
  */
 async function resolveLivePollIntervalMs(dash) {
   if (!dash?.live_backed || !dash?.data_set_id) return 60_000;
   try {
-    const dataSet = await DataSet.findById(dash.data_set_id).select("data_sheets").lean();
-    const sheets = dataSet?.data_sheets && typeof dataSet.data_sheets === "object" ? dataSet.data_sheets : {};
-    let minMs = Number.POSITIVE_INFINITY;
-    for (const sheet of Object.values(sheets)) {
-      const lf = sheet?.liveFeed || sheet?.saveMeta?.liveFeed || sheet?.provenance?.liveFeed;
-      const ms = Math.floor(Number(lf?.pollIntervalMs));
-      if (Number.isFinite(ms) && ms >= 15_000) minMs = Math.min(minMs, ms);
-    }
-    return Number.isFinite(minMs) ? minMs : 60_000;
+    const { resolvePublicDashboardLiveConfig } = await import("@/lib/liveFeeds/publicLiveConfig");
+    const cfg = await resolvePublicDashboardLiveConfig(dash);
+    return cfg?.pollIntervalMs || 60_000;
   } catch {
     return 60_000;
   }
@@ -288,28 +282,37 @@ async function resolveLivePollIntervalMs(dash) {
 
 /**
  * Full public dashboard payload for API (cached bundles when available).
- * Live-backed dashboards always read current DataSet rows (no frozen snapshot path).
+ * Live dashboards still use published chart structure; candle rows refresh via /live.
  */
 export async function buildPublicDashboardResponseData(dash, user) {
   const chartIds = collectChartIdsFromLayout(dash.layout);
-  const liveBacked = !!dash.live_backed;
-  const useCache =
-    !liveBacked && publishedBundlesCoverAllCharts(chartIds, dash.published_chart_bundles);
+  // Prefer stored flag; also detect event-candlesticks provenance so older
+  // publishes without cron registration still get on-demand live.
+  let liveBacked = !!dash.live_backed;
+  if (!liveBacked && dash.data_set_id) {
+    try {
+      const { resolveDatasetLiveBacked } = await import("@/lib/liveFeeds/publicLiveConfig");
+      liveBacked = await resolveDatasetLiveBacked(String(dash.data_set_id));
+    } catch {
+      liveBacked = false;
+    }
+  }
+  const useCache = publishedBundlesCoverAllCharts(chartIds, dash.published_chart_bundles);
 
   let chartBundlesById;
   if (useCache) {
     chartBundlesById = mapFromPublishedBundles(dash.published_chart_bundles, chartIds);
   } else {
+    // Prefer frozen publish snapshots for structure even when live_backed —
+    // near-real-time OHLC comes from GET .../live (not Mongo rematerialize).
     chartBundlesById = await buildChartBundlesParallel(chartIds, user._id, {
-      preferPublishedSnapshot: !liveBacked,
+      preferPublishedSnapshot: true,
     });
   }
 
   const dataSheets = await resolvePublicDashboardCardGridSheets(dash, user._id, {
     preferSnapshots:
-      !liveBacked &&
-      !!dash.card_grid_snapshots &&
-      Object.keys(dash.card_grid_snapshots || {}).length > 0,
+      !!dash.card_grid_snapshots && Object.keys(dash.card_grid_snapshots || {}).length > 0,
   });
 
   const layoutOut = hydrateLayoutWithChartBundles(dash.layout, chartBundlesById, dataSheets);
@@ -334,6 +337,7 @@ export async function buildPublicDashboardResponseData(dash, user) {
 
 /**
  * Single chart bundle for progressive client loading.
+ * Always prefer published snapshots for structure; live OHLC overlays via /live.
  */
 export async function buildPublicDashboardChartBundle(dash, user, chartId) {
   const cid = String(chartId || "").trim();
@@ -346,53 +350,49 @@ export async function buildPublicDashboardChartBundle(dash, user, chartId) {
     return { success: false, message: "Chart not on this dashboard" };
   }
 
-  const liveBacked = !!dash.live_backed;
-
-  if (!liveBacked) {
-    const chartDoc = await Chart.findById(cid).lean();
-    if (chartHasPublishedSnapshot(chartDoc)) {
-      const bundle = chartDoc.published_bundle;
-      return {
-        success: true,
-        data: {
-          chart_id: cid,
-          chartPayload: {
-            chart: bundle.chart,
-            rows: Array.isArray(bundle.rows) ? bundle.rows : [],
-            dataSheets: bundle.dataSheets && typeof bundle.dataSheets === "object" ? bundle.dataSheets : {},
-          },
-          chartLink:
-            chartDoc.is_public && chartDoc.public_slug
-              ? { mode: "chart_public", slug: chartDoc.public_slug }
-              : null,
-          _cacheHit: true,
+  const chartDoc = await Chart.findById(cid).lean();
+  if (chartHasPublishedSnapshot(chartDoc)) {
+    const bundle = chartDoc.published_bundle;
+    return {
+      success: true,
+      data: {
+        chart_id: cid,
+        chartPayload: {
+          chart: bundle.chart,
+          rows: Array.isArray(bundle.rows) ? bundle.rows : [],
+          dataSheets: bundle.dataSheets && typeof bundle.dataSheets === "object" ? bundle.dataSheets : {},
         },
-      };
-    }
+        chartLink:
+          chartDoc.is_public && chartDoc.public_slug
+            ? { mode: "chart_public", slug: chartDoc.public_slug }
+            : null,
+        _cacheHit: true,
+      },
+    };
+  }
 
-    const cached = dash.published_chart_bundles?.[cid];
-    if (cached?.chart) {
-      return {
-        success: true,
-        data: {
-          chart_id: cid,
-          chartPayload: {
-            chart: cached.chart,
-            rows: Array.isArray(cached.rows) ? cached.rows : [],
-            dataSheets: cached.dataSheets && typeof cached.dataSheets === "object" ? cached.dataSheets : {},
-          },
-          chartLink:
-            cached.meta?.is_public && cached.meta?.public_slug
-              ? { mode: "chart_public", slug: cached.meta.public_slug }
-              : null,
-          _cacheHit: true,
+  const cached = dash.published_chart_bundles?.[cid];
+  if (cached?.chart) {
+    return {
+      success: true,
+      data: {
+        chart_id: cid,
+        chartPayload: {
+          chart: cached.chart,
+          rows: Array.isArray(cached.rows) ? cached.rows : [],
+          dataSheets: cached.dataSheets && typeof cached.dataSheets === "object" ? cached.dataSheets : {},
         },
-      };
-    }
+        chartLink:
+          cached.meta?.is_public && cached.meta?.public_slug
+            ? { mode: "chart_public", slug: cached.meta.public_slug }
+            : null,
+        _cacheHit: true,
+      },
+    };
   }
 
   const map = await buildChartBundlesParallel(new Set([cid]), user._id, {
-    preferPublishedSnapshot: !liveBacked,
+    preferPublishedSnapshot: true,
   });
   const bundle = map.get(cid);
   if (!bundle) {
@@ -418,8 +418,9 @@ export async function buildPublicDashboardChartBundle(dash, user, chartId) {
 }
 
 export function publicDashboardCacheControl(cacheHit, { liveBacked = false } = {}) {
+  // Structure payloads can be cached longer; live OHLC is on /live with its own TTL.
   if (liveBacked) {
-    return "public, s-maxage=15, stale-while-revalidate=30";
+    return "public, s-maxage=120, stale-while-revalidate=600";
   }
   if (cacheHit) {
     return "public, s-maxage=3600, stale-while-revalidate=86400";

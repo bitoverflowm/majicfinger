@@ -150,6 +150,11 @@ export default function PublicDashboardEmbedClient({
   const [isEmbedded, setIsEmbedded] = useState(
     () => typeof window !== "undefined" && window.self !== window.top,
   );
+  const [liveTick, setLiveTick] = useState<{
+    charts: Record<string, { ticker: string; sheetId: string; rows: Record<string, unknown>[] }>;
+    pollIntervalMs: number;
+    fetchedAt: number | null;
+  }>({ charts: {}, pollIntervalMs: 60_000, fetchedAt: null });
 
   const dashboardName =
     payload?.data?.dashboard_name ||
@@ -209,28 +214,45 @@ export default function PublicDashboardEmbedClient({
     };
   }, [username, slug, cardGridLoading]);
 
-  // Live-backed public dashboards: short-poll Lychee for fresh sheet/chart rows
+  // On-demand Kalshi live: one shared Lychee→Kalshi fetch for all charts (server-cached).
   useEffect(() => {
     const live = !!payload?.data?.live_backed;
     if (!live || !payload?.success) return;
-    const intervalMs = Math.max(
-      15_000,
-      Math.floor(Number(payload.data?.live_poll_interval_ms)) || 60_000,
-    );
+
     let cancelled = false;
+    let timeoutId: number | null = null;
+
     const tick = () => {
-      fetch(`/api/public/dashboards/${encodeURIComponent(username)}/${encodeURIComponent(slug)}`)
+      fetch(`/api/public/dashboards/${encodeURIComponent(username)}/${encodeURIComponent(slug)}/live`)
         .then((r) => r.json())
-        .then((j: Payload) => {
-          if (cancelled || !j?.success || !j.data) return;
-          setPayload(j);
+        .then((j) => {
+          if (cancelled || !j?.success || !j.data?.charts) return;
+          const pollMs = Math.max(
+            15_000,
+            Math.floor(Number(j.data.pollIntervalMs)) ||
+              Math.floor(Number(payload.data?.live_poll_interval_ms)) ||
+              60_000,
+          );
+          setLiveTick({
+            charts: j.data.charts,
+            pollIntervalMs: pollMs,
+            fetchedAt: Number(j.data.fetchedAt) || Date.now(),
+          });
+          if (!cancelled) {
+            timeoutId = window.setTimeout(tick, pollMs);
+          }
         })
-        .catch(() => {});
+        .catch(() => {
+          if (!cancelled) {
+            timeoutId = window.setTimeout(tick, 60_000);
+          }
+        });
     };
-    const id = window.setInterval(tick, intervalMs);
+
+    tick();
     return () => {
       cancelled = true;
-      window.clearInterval(id);
+      if (timeoutId != null) window.clearTimeout(timeoutId);
     };
   }, [
     username,
@@ -313,6 +335,11 @@ export default function PublicDashboardEmbedClient({
                   <span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-500" />
                 </span>
                 Live data updating
+                {liveTick.fetchedAt ? (
+                  <span className="text-muted-foreground">
+                    · refreshed {new Date(liveTick.fetchedAt).toLocaleTimeString()}
+                  </span>
+                ) : null}
               </p>
             ) : null}
             {d.page_subheading?.trim() ? (
@@ -486,6 +513,14 @@ export default function PublicDashboardEmbedClient({
                 {row.columns.map((col) => {
                   const href = resolveCardHref(col, ownerHandle);
                   const rSpan = clampChartCardRowSpan(col.rowSpan);
+                  const chartId = col.chart_id ? String(col.chart_id) : "";
+                  const liveOverlay =
+                    chartId && liveTick.charts[chartId]
+                      ? {
+                          sheetId: liveTick.charts[chartId].sheetId,
+                          rows: liveTick.charts[chartId].rows,
+                        }
+                      : null;
                   const inner = (
                     <div className="flex h-full min-h-0 min-w-0 flex-col gap-2 overflow-y-auto rounded-lg bg-background/80 p-4 backdrop-blur-sm">
                       {col.h2 ? (
@@ -515,6 +550,7 @@ export default function PublicDashboardEmbedClient({
                             layoutColumnKey={col.id}
                             chartSlug={col.chartLink?.slug}
                             chartTitle={col.h2 || col.chartPayload?.chart?.chart_name}
+                            liveOverlay={liveOverlay}
                           />
                         </div>
                       ) : col.chartPayload ? (

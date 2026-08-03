@@ -5,9 +5,9 @@ import mongoose from "mongoose";
 import { getLoginSession } from "@/lib/auth";
 import { createEmptyDashboardLayout } from "@/lib/dashboardLayoutDefaults";
 import {
-  datasetHasActivePersistedLiveFeeds,
+  resolveDatasetLiveBacked,
   liveBackedDashboardFields,
-} from "@/lib/liveFeeds/syncLiveFeedIndex";
+} from "@/lib/liveFeeds/publicLiveConfig";
 
 export default async function handler(req, res) {
   const {
@@ -83,7 +83,7 @@ export default async function handler(req, res) {
         if (!ds || String(ds.user_id) !== String(session.userId)) {
           return res.status(400).json({ success: false, message: "Dataset not found or not yours" });
         }
-        const liveBacked = await datasetHasActivePersistedLiveFeeds(data_set_id, {
+        const liveBacked = await resolveDatasetLiveBacked(data_set_id, {
           dataSheets: ds.data_sheets,
         });
         const doc = await ChartDashboard.create({

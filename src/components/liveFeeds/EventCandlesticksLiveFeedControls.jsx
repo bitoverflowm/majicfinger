@@ -275,8 +275,9 @@ export function EventCandlesticksLiveFeedControls() {
             <span className="min-w-0">Start live</span>
           </Button>
           <p className="px-1 text-[11px] leading-snug text-muted-foreground">
-            Polls Kalshi while this tab is open. Stop or leave anytime — nothing is saved until you
-            hit Save.
+            Polls Kalshi in this browser while the tab is open. Leave or Stop anytime — no server
+            cron. Publish a dashboard from this project to share the same near-real-time view with
+            visitors.
           </p>
         </>
       ) : null}

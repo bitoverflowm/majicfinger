@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef } from "react";
 import { toast } from "sonner";
 import { useMyStateV2 } from "@/context/stateContextV2";
-import { createLiveFeedConfig } from "@/lib/liveFeeds/feedConfig";
+import { createLiveFeedConfig, resolveEventCandlesticksSheetsMap } from "@/lib/liveFeeds/feedConfig";
 import { getLiveFeedEndpointDef } from "@/lib/liveFeeds/registry";
 import { fetchKalshiLiveEventCandlesticksIncremental } from "@/lib/liveFeeds/fetchEventCandlesticksIncremental";
 import { applyKalshiCandlestickUpsertToSheets } from "@/lib/liveFeeds/merge/kalshiCandlestickUpsert";
@@ -139,12 +139,21 @@ export default function RestLiveFeedManager() {
 
           let tickStats = null;
           setDataSheets((prev) => {
-            const result = applyKalshiCandlestickUpsertToSheets(prev, feed, tick, { softRowCap });
+            const resolvedSheets = resolveEventCandlesticksSheetsMap(prev, feed) || feed.sheets;
+            const feedForTick = { ...feed, sheets: resolvedSheets };
+            // Keep the in-memory feed map fresh so later ticks don't reuse a stale collision.
+            configByFeedIdRef.current[feedId] = {
+              ...(configByFeedIdRef.current[feedId] || feed),
+              sheets: resolvedSheets,
+            };
+            const result = applyKalshiCandlestickUpsertToSheets(prev, feedForTick, tick, { softRowCap });
             tickStats = result.stats;
             return result.dataSheets;
           });
 
-          const tracked = Object.keys(feed.sheets?.marketSheetIdsByTicker || {});
+          const tracked = Object.keys(
+            (configByFeedIdRef.current[feedId] || feed).sheets?.marketSheetIdsByTicker || {},
+          );
           const closure = evaluateTrackedMarketsClosure(tick.metaRows, tracked, Date.now());
           if (closure.allClosed) {
             return endFeedMarketsClosed(feedId, feed, closure);

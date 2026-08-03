@@ -71,19 +71,8 @@ export function createLiveFeedConfig(input) {
     pollIntervalMs = Math.max(def.minPollIntervalMs, pollIntervalMsForPeriod(periodInterval));
   }
 
-  const metaId = String(input.sheets?.marketsMetadataSheetId || "").trim();
-  const byTicker =
-    input.sheets?.marketSheetIdsByTicker && typeof input.sheets.marketSheetIdsByTicker === "object"
-      ? input.sheets.marketSheetIdsByTicker
-      : {};
-  /** @type {Record<string, string>} */
-  const marketSheetIdsByTicker = {};
-  for (const [ticker, sheetId] of Object.entries(byTicker)) {
-    const t = String(ticker || "").trim().toUpperCase();
-    const sid = String(sheetId || "").trim();
-    if (t && sid) marketSheetIdsByTicker[t] = sid;
-  }
-  if (!metaId || Object.keys(marketSheetIdsByTicker).length === 0) return null;
+  const sanitizedSheets = sanitizeLiveFeedSheetsMap(input.sheets);
+  if (!sanitizedSheets) return null;
 
   return {
     id: String(input.id || "").trim() || genLiveFeedId(),
@@ -98,10 +87,7 @@ export function createLiveFeedConfig(input) {
       seriesTicker,
       periodInterval,
     },
-    sheets: {
-      marketsMetadataSheetId: metaId,
-      marketSheetIdsByTicker,
-    },
+    sheets: sanitizedSheets,
     merge: def.merge,
     lastPolledAt: input.lastPolledAt ?? null,
     lastSuccessAt: input.lastSuccessAt ?? null,
@@ -109,6 +95,51 @@ export function createLiveFeedConfig(input) {
     isRunning: !!input.isRunning,
     isPaused: !!input.isPaused,
   };
+}
+
+/**
+ * Drop ticker→sheet mappings that collide with the markets metadata sheet.
+ * Candle upserts on the meta sheet wipe yes_sub_title rows (no end_period_ts)
+ * and leave a tab still named "… · markets" filled with OHLC.
+ *
+ * @param {LiveFeedSheetsMap | null | undefined} sheets
+ * @returns {LiveFeedSheetsMap | null}
+ */
+export function sanitizeLiveFeedSheetsMap(sheets) {
+  const metaId = String(sheets?.marketsMetadataSheetId || "").trim();
+  const byTicker =
+    sheets?.marketSheetIdsByTicker && typeof sheets.marketSheetIdsByTicker === "object"
+      ? sheets.marketSheetIdsByTicker
+      : {};
+  /** @type {Record<string, string>} */
+  const marketSheetIdsByTicker = {};
+  for (const [ticker, sheetId] of Object.entries(byTicker)) {
+    const t = String(ticker || "").trim().toUpperCase();
+    const sid = String(sheetId || "").trim();
+    if (!t || !sid) continue;
+    if (metaId && sid === metaId) continue;
+    marketSheetIdsByTicker[t] = sid;
+  }
+  if (!metaId || Object.keys(marketSheetIdsByTicker).length === 0) return null;
+  return {
+    marketsMetadataSheetId: metaId,
+    marketSheetIdsByTicker,
+  };
+}
+
+/**
+ * Prefer a fresh provenance-derived sheet map over a frozen LiveFeed.config map.
+ * Stale maps after re-pull/delete are the main way candles get written onto markets.
+ *
+ * @param {Record<string, object>} dataSheets
+ * @param {Pick<LiveFeedConfig, "params" | "sheets"> | null | undefined} feed
+ * @returns {LiveFeedSheetsMap | null}
+ */
+export function resolveEventCandlesticksSheetsMap(dataSheets, feed) {
+  const discovered = discoverEventCandlesticksFeedGroup(dataSheets, {
+    eventTicker: feed?.params?.eventTicker,
+  });
+  return sanitizeLiveFeedSheetsMap(discovered?.sheets || feed?.sheets || null);
 }
 
 /**
@@ -163,14 +194,17 @@ export function discoverEventCandlesticksFeedGroup(dataSheets, opts = {}) {
     return null;
   }
 
+  const sheets = sanitizeLiveFeedSheetsMap({
+    marketsMetadataSheetId: metaSheetId,
+    marketSheetIdsByTicker,
+  });
+  if (!sheets) return null;
+
   return {
     eventTicker,
     seriesTicker,
     periodInterval,
-    sheets: {
-      marketsMetadataSheetId: metaSheetId,
-      marketSheetIdsByTicker,
-    },
+    sheets,
   };
 }
 

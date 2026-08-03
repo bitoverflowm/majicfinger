@@ -104,3 +104,37 @@ test("normalizeBuilderSnapshot keeps saved snapshot when row keys are not loaded
   assert.equal(out.selX, "title");
   assert.equal(out.chartLineFilters?.length, 1);
 });
+
+test("normalizeBuilderSnapshot does not inject markets axes onto candlestick charts", () => {
+  const candleRows = [
+    {
+      end_period_ts: 100,
+      yes_bid_open_dollars: 0.1,
+      yes_bid_high_dollars: 0.2,
+      yes_bid_low_dollars: 0.05,
+      yes_bid_close_dollars: 0.15,
+    },
+  ];
+  const dataSheets = {
+    "sheet-1": {
+      name: "markets",
+      data: [{ yes_sub_title: "7,400", last_price_dollars: "0.20" }],
+    },
+    "sheet-17": { name: "candles", data: candleRows },
+  };
+  const snapshot = {
+    v: 1,
+    selChartType: "candlestick",
+    candlestickSheetId: "sheet-17",
+    candlestickOhlcSetId: "auto",
+    selX: "yes_sub_title",
+    selY: ["last_price_dollars"],
+    titleHidden: true,
+  };
+  const out = normalizeBuilderSnapshot(snapshot, candleRows, dataSheets);
+  assert.equal(out.selChartType, "candlestick");
+  assert.equal(out.candlestickSheetId, "sheet-17");
+  assert.equal(out.candlestickOhlcSetId, "auto");
+  assert.equal(out.selX, null);
+  assert.deepEqual(out.selY, []);
+});
