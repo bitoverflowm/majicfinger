@@ -67,6 +67,7 @@ import {
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
 import { UserAvatar } from "@/components/ui/user-avatar"
 import { endAuthenticatedSession } from "@/lib/analytics/authJourneyClient"
+import { SavedLiveFeedsPanel } from "@/components/liveFeeds/SavedLiveFeedsPanel"
 
 function attachPublicAssetsToProjectRow(row) {
   row.publicCharts = (row.charts || []).filter((c) => c?.is_public && c?.public_slug)
@@ -1574,6 +1575,7 @@ const Nav = () => {
                               </div>
                             ) : (
                               <>
+                            <SavedLiveFeedsPanel open={isOpen} />
                             {!projectRows.length && (
                               <p className="py-6 text-sm text-muted-foreground">No saved projects yet.</p>
                             )}

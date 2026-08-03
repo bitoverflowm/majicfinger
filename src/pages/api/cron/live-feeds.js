@@ -87,7 +87,14 @@ export default async function handler(req, res) {
         if (!dataSet) {
           await LiveFeed.updateOne(
             { _id: doc._id },
-            { $set: { last_error: "DataSet not found", last_polled_at: new Date(), updated_at: new Date() } },
+            {
+              $set: {
+                last_error: "DataSet not found",
+                last_polled_at: new Date(),
+                updated_at: new Date(),
+              },
+              $inc: { poll_count: 1, error_count: 1 },
+            },
           );
           errors += 1;
           continue;
@@ -131,6 +138,7 @@ export default async function handler(req, res) {
           dataSet.markModified("data_sheets");
           await dataSet.save();
 
+          const tickStats = nextSheets.stats || null;
           await LiveFeed.updateOne(
             { _id: doc._id },
             {
@@ -139,6 +147,7 @@ export default async function handler(req, res) {
                 last_polled_at: new Date(now),
                 last_success_at: new Date(now),
                 last_error: null,
+                last_tick_stats: tickStats,
                 config: {
                   ...cfg,
                   status: "ended",
@@ -149,6 +158,13 @@ export default async function handler(req, res) {
                   liveFeedEnded: endedStamp,
                 },
                 updated_at: new Date(),
+              },
+              $inc: {
+                poll_count: 1,
+                success_count: 1,
+                candles_received_total: Math.max(0, Number(tickStats?.candlesReceived) || 0),
+                candles_added_total: Math.max(0, Number(tickStats?.candlesAdded) || 0),
+                candles_updated_total: Math.max(0, Number(tickStats?.candlesUpdated) || 0),
               },
             },
           );
@@ -176,6 +192,7 @@ export default async function handler(req, res) {
         dataSet.markModified("data_sheets");
         await dataSet.save();
 
+        const tickStats = nextSheets.stats || null;
         const stamped = {
           ...cfg,
           lastPolledAt: now,
@@ -189,8 +206,16 @@ export default async function handler(req, res) {
               last_polled_at: new Date(now),
               last_success_at: new Date(now),
               last_error: null,
+              last_tick_stats: tickStats,
               config: stamped,
               updated_at: new Date(),
+            },
+            $inc: {
+              poll_count: 1,
+              success_count: 1,
+              candles_received_total: Math.max(0, Number(tickStats?.candlesReceived) || 0),
+              candles_added_total: Math.max(0, Number(tickStats?.candlesAdded) || 0),
+              candles_updated_total: Math.max(0, Number(tickStats?.candlesUpdated) || 0),
             },
           },
         );
@@ -206,6 +231,7 @@ export default async function handler(req, res) {
               last_error: msg.slice(0, 500),
               updated_at: new Date(),
             },
+            $inc: { poll_count: 1, error_count: 1 },
           },
         );
       }

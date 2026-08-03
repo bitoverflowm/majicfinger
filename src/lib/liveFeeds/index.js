@@ -41,3 +41,5 @@ export {
   datasetHasActivePersistedLiveFeeds,
   markDashboardsLiveBacked,
 } from "@/lib/liveFeeds/syncLiveFeedIndex";
+
+export { managePersistedLiveFeed } from "@/lib/liveFeeds/managePersistedFeed";

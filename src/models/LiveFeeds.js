@@ -59,6 +59,35 @@ const LiveFeedSchema = new mongoose.Schema({
     type: String,
     default: null,
   },
+  /** Cumulative cron tick attempts (success + error). */
+  poll_count: {
+    type: Number,
+    default: 0,
+  },
+  success_count: {
+    type: Number,
+    default: 0,
+  },
+  error_count: {
+    type: Number,
+    default: 0,
+  },
+  candles_received_total: {
+    type: Number,
+    default: 0,
+  },
+  candles_added_total: {
+    type: Number,
+    default: 0,
+  },
+  candles_updated_total: {
+    type: Number,
+    default: 0,
+  },
+  last_tick_stats: {
+    type: Schema.Types.Mixed,
+    default: null,
+  },
   created_at: {
     type: Date,
     default: Date.now,
@@ -70,5 +99,6 @@ const LiveFeedSchema = new mongoose.Schema({
 });
 
 LiveFeedSchema.index({ status: 1, last_polled_at: 1 });
+LiveFeedSchema.index({ user_id: 1, status: 1, updated_at: -1 });
 
 export default mongoose.models.LiveFeed || mongoose.model("LiveFeed", LiveFeedSchema);
