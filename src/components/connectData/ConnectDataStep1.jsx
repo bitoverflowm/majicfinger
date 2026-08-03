@@ -834,7 +834,7 @@ export default function ConnectDataStep1({
                   <div className="relative">
                     <Input
                       id="connect-home-handle"
-                      placeholder="misterrpink"
+                      placeholder="yourhandle"
                       value={onboardingHandle}
                       onChange={onboardingHandleChange}
                       autoComplete="username"

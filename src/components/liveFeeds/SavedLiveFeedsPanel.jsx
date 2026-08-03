@@ -86,6 +86,48 @@ function formatWhen(raw) {
   return m.isValid() ? m.format("ddd MMM D h:mm a") : "—";
 }
 
+/** Hide infra / Mongo details from the UI. */
+function looksLikeInternalError(msg) {
+  const s = String(msg || "").toLowerCase();
+  if (!s) return false;
+  return /mongodb|mongo|mongoose|econnrefused|etimedout|enotfound|cluster|srv\b|tls|ssl|buffering timed out|topology|server selection|connection.*refused|could not connect/.test(
+    s,
+  );
+}
+
+/**
+ * @param {Response} res
+ * @param {{ message?: string; code?: string } | null | undefined} body
+ * @param {string} fallback
+ */
+function userFacingFeedError(res, body, fallback) {
+  if (typeof navigator !== "undefined" && navigator.onLine === false) {
+    return "Issue connecting to your data. Check your internet connection and try again.";
+  }
+  if (res.status === 401) return "Sign in to manage your live feeds.";
+  if (body?.code === "connection_error" || res.status >= 500) {
+    return "Issue connecting to your data. Check your internet connection and try again.";
+  }
+  const raw = String(body?.message || "").trim();
+  if (!raw || looksLikeInternalError(raw)) {
+    return fallback;
+  }
+  // Allow short, intentional API messages (e.g. "Stopped feeds must be restarted.")
+  if (raw.length > 140 || /at\s+\S+\s+\(|Error:|stack/i.test(raw)) {
+    return fallback;
+  }
+  return raw;
+}
+
+function userFacingFeedLastError(raw) {
+  if (!raw) return null;
+  if (looksLikeInternalError(raw)) {
+    return "Issue connecting to your data. Check your internet connection and try again.";
+  }
+  const s = String(raw).trim();
+  return s.length > 160 ? `${s.slice(0, 157)}…` : s;
+}
+
 /**
  * Background (cron) live feeds for Your Saved Work.
  * @param {{ open?: boolean }} props
@@ -94,21 +136,35 @@ export function SavedLiveFeedsPanel({ open = true }) {
   const [feeds, setFeeds] = useState(/** @type {SavedLiveFeedRow[]} */ ([]));
   const [counts, setCounts] = useState({ total: 0, live: 0, paused: 0, ended: 0 });
   const [loading, setLoading] = useState(false);
+  const [loadError, setLoadError] = useState(/** @type {string | null} */ (null));
   const [busyId, setBusyId] = useState(/** @type {string | null} */ (null));
   const [deleteTarget, setDeleteTarget] = useState(/** @type {SavedLiveFeedRow | null} */ (null));
 
   const load = useCallback(async () => {
     setLoading(true);
+    setLoadError(null);
     try {
       const res = await fetch("/api/live-feeds", { credentials: "include" });
       const j = await res.json().catch(() => ({}));
       if (!res.ok || !j?.success) {
-        throw new Error(j?.message || "Failed to load live feeds");
+        const msg = userFacingFeedError(
+          res,
+          j,
+          "Issue connecting to your data. Check your internet connection and try again.",
+        );
+        setFeeds([]);
+        setCounts({ total: 0, live: 0, paused: 0, ended: 0 });
+        setLoadError(msg);
+        return;
       }
       setFeeds(Array.isArray(j.feeds) ? j.feeds : []);
       setCounts(j.counts || { total: 0, live: 0, paused: 0, ended: 0 });
-    } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Failed to load live feeds");
+    } catch {
+      setFeeds([]);
+      setCounts({ total: 0, live: 0, paused: 0, ended: 0 });
+      setLoadError(
+        "Issue connecting to your data. Check your internet connection and try again.",
+      );
     } finally {
       setLoading(false);
     }
@@ -130,7 +186,10 @@ export function SavedLiveFeedsPanel({ open = true }) {
       });
       const j = await res.json().catch(() => ({}));
       if (!res.ok || !j?.success) {
-        throw new Error(j?.message || `Could not ${action} feed`);
+        toast.error(
+          userFacingFeedError(res, j, `Couldn't ${action} this live feed. Try again.`),
+        );
+        return;
       }
       if (action === "delete") {
         setFeeds((prev) => prev.filter((f) => f.id !== feed.id));
@@ -154,8 +213,8 @@ export function SavedLiveFeedsPanel({ open = true }) {
         );
         await load();
       }
-    } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Action failed");
+    } catch {
+      toast.error("Issue connecting to your data. Check your internet connection and try again.");
     } finally {
       setBusyId(null);
       setDeleteTarget(null);
@@ -214,11 +273,12 @@ export function SavedLiveFeedsPanel({ open = true }) {
         </div>
       ) : null}
 
-      {!loading && feeds.length === 0 ? (
-        <p className="py-2 text-xs text-muted-foreground">
-          No saved live feeds yet. Start live on a Kalshi pull, then Save Project to run it in the
-          background.
-        </p>
+      {!loading && loadError ? (
+        <p className="py-2 text-xs text-muted-foreground">{loadError}</p>
+      ) : null}
+
+      {!loading && !loadError && feeds.length === 0 ? (
+        <p className="py-2 text-xs text-muted-foreground">No feeds found.</p>
       ) : null}
 
       <ul className="space-y-2">
@@ -264,8 +324,10 @@ export function SavedLiveFeedsPanel({ open = true }) {
                     <span>Last ok: {formatWhen(feed.lastSuccessAt)}</span>
                     <span>Last poll: {formatWhen(feed.lastPolledAt)}</span>
                   </div>
-                  {feed.lastError ? (
-                    <p className="text-[11px] text-destructive">{feed.lastError}</p>
+                  {userFacingFeedLastError(feed.lastError) ? (
+                    <p className="text-[11px] text-destructive">
+                      {userFacingFeedLastError(feed.lastError)}
+                    </p>
                   ) : null}
                   {feed.status === "ended" && feed.endedReason ? (
                     <p className="text-[11px] text-muted-foreground">

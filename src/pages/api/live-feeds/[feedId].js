@@ -52,9 +52,11 @@ export default async function handler(req, res) {
       deleted: !!result.deleted,
     });
   } catch (e) {
+    console.error("[live-feeds] manage failed:", e);
     return res.status(500).json({
       success: false,
-      message: e instanceof Error ? e.message : "Failed to manage live feed",
+      code: "connection_error",
+      message: "Issue connecting to your data. Check your internet connection and try again.",
     });
   }
 }

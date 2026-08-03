@@ -87,9 +87,11 @@ export default async function handler(req, res) {
       },
     });
   } catch (e) {
+    console.error("[live-feeds] list failed:", e);
     return res.status(500).json({
       success: false,
-      message: e instanceof Error ? e.message : "Failed to list live feeds",
+      code: "connection_error",
+      message: "Issue connecting to your data. Check your internet connection and try again.",
     });
   }
 }
