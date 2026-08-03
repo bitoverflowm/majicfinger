@@ -76,9 +76,62 @@ export default async function handler(req, res) {
       };
     });
 
+    const now = Date.now();
+    const liveFeeds = feeds.filter((f) => f.status === "persisted");
+    /** @type {number | null} */
+    let newestSuccessMs = null;
+    /** @type {number | null} */
+    let newestPollMs = null;
+    for (const f of liveFeeds) {
+      const okMs = f.lastSuccessAt ? new Date(f.lastSuccessAt).getTime() : NaN;
+      const pollMs = f.lastPolledAt ? new Date(f.lastPolledAt).getTime() : NaN;
+      if (Number.isFinite(okMs) && (newestSuccessMs == null || okMs > newestSuccessMs)) {
+        newestSuccessMs = okMs;
+      }
+      if (Number.isFinite(pollMs) && (newestPollMs == null || pollMs > newestPollMs)) {
+        newestPollMs = pollMs;
+      }
+    }
+
+    const dueSoon = liveFeeds.some((f) => {
+      const interval = Math.floor(Number(f.pollIntervalMs)) || 60_000;
+      const last = f.lastPolledAt ? new Date(f.lastPolledAt).getTime() : 0;
+      if (!last) return true;
+      return now - last >= interval - 5_000;
+    });
+
+    const recentlyActive =
+      newestSuccessMs != null && now - newestSuccessMs < 3 * 60_000;
+
+    const cron = {
+      backendEnabled: true,
+      schedule: "* * * * *",
+      liveFeedCount: liveFeeds.length,
+      status:
+        liveFeeds.length === 0
+          ? "idle"
+          : recentlyActive
+            ? "running"
+            : dueSoon
+              ? "due"
+              : "waiting",
+      lastSuccessAt:
+        newestSuccessMs != null ? new Date(newestSuccessMs).toISOString() : null,
+      lastPolledAt: newestPollMs != null ? new Date(newestPollMs).toISOString() : null,
+      note:
+        liveFeeds.length === 0
+          ? "No active cron feeds. Save a live session to register one."
+          : recentlyActive
+            ? "Cron is polling your live feeds on the backend."
+            : dueSoon
+              ? "A feed is due — next Vercel cron minute should tick it."
+              : "Feeds registered; waiting for the next poll window.",
+    };
+
     return res.status(200).json({
       success: true,
       feeds,
+      cron,
       counts: {
         total: feeds.length,
         live: feeds.filter((f) => f.status === "persisted").length,

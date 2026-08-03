@@ -2,7 +2,72 @@
  * Upsert Kalshi candlestick rows by end_period_ts; upsert markets metadata by ticker.
  * Also stamps `liveFlash` on updated sheets so the visible grid can purple-highlight
  * new / changed cells when the user is looking at that sheet.
+ *
+ * Merge rule: never overwrite an existing finite / non-empty cell with null/undefined/"".
+ * Kalshi often re-sends quiet periods with null trade OHLC; blanking prior values was
+ * wiping charts after cron / live ticks.
  */
+
+/**
+ * Normalize candle period keys to unix seconds (never ms / Date).
+ * @param {unknown} raw
+ * @returns {number | null}
+ */
+export function normalizeLiveEndPeriodTs(raw) {
+  if (raw == null || raw === "") return null;
+  if (raw instanceof Date) {
+    const ms = raw.getTime();
+    if (!Number.isFinite(ms)) return null;
+    return Math.floor(ms / 1000);
+  }
+  const n = Number(raw);
+  if (!Number.isFinite(n)) return null;
+  // µs (rare) → sec
+  if (n > 1e14) return Math.floor(n / 1e6);
+  // ms → sec
+  if (n > 1e12) return Math.floor(n / 1000);
+  return Math.floor(n);
+}
+
+/**
+ * Whether an incoming cell should replace an existing one.
+ * Nullish / empty string never clobber a real prior value.
+ * @param {unknown} incoming
+ * @param {unknown} existing
+ */
+export function shouldApplyLiveCell(incoming, existing) {
+  if (incoming === undefined) return false;
+  if (incoming === null) {
+    // Allow explicitly clearing only when existing is already empty
+    return existing == null || existing === "";
+  }
+  if (typeof incoming === "string" && incoming.trim() === "") {
+    return existing == null || existing === "";
+  }
+  if (typeof incoming === "number" && !Number.isFinite(incoming)) {
+    return false;
+  }
+  return true;
+}
+
+/**
+ * Merge incoming row onto existing without null-wiping filled fields.
+ * @param {Record<string, unknown> | null | undefined} existing
+ * @param {Record<string, unknown>} incoming
+ * @returns {Record<string, unknown>}
+ */
+export function mergeLiveSheetRowPreserve(existing, incoming) {
+  const base =
+    existing && typeof existing === "object" ? { ...existing } : /** @type {Record<string, unknown>} */ ({});
+  if (!incoming || typeof incoming !== "object") return base;
+  for (const [key, value] of Object.entries(incoming)) {
+    if (key === "_origIndex") continue;
+    if (shouldApplyLiveCell(value, base[key])) {
+      base[key] = value;
+    }
+  }
+  return base;
+}
 
 /**
  * Stable row key for live flash matching (grid + upsert).
@@ -11,7 +76,7 @@
  */
 export function liveSheetRowKey(row) {
   if (!row || typeof row !== "object") return null;
-  const ts = Math.floor(Number(row.end_period_ts));
+  const ts = normalizeLiveEndPeriodTs(row.end_period_ts);
   if (Number.isFinite(ts)) return `ts:${ts}`;
   const ticker = String(row.ticker || row.market_ticker || "")
     .trim()
@@ -46,15 +111,15 @@ export function buildCandlestickLiveFlashRows(existing, incoming) {
   /** @type {Map<number, Record<string, unknown>>} */
   const byTs = new Map();
   for (const row of Array.isArray(existing) ? existing : []) {
-    const ts = Math.floor(Number(row?.end_period_ts));
-    if (Number.isFinite(ts)) byTs.set(ts, row);
+    const ts = normalizeLiveEndPeriodTs(row?.end_period_ts);
+    if (ts != null) byTs.set(ts, row);
   }
 
   /** @type {Record<string, { isNew: boolean, columns?: string[] }>} */
   const rows = {};
   for (const row of Array.isArray(incoming) ? incoming : []) {
-    const ts = Math.floor(Number(row?.end_period_ts));
-    if (!Number.isFinite(ts)) continue;
+    const ts = normalizeLiveEndPeriodTs(row?.end_period_ts);
+    if (ts == null) continue;
     const key = `ts:${ts}`;
     const prev = byTs.get(ts);
     if (!prev) {
@@ -65,6 +130,7 @@ export function buildCandlestickLiveFlashRows(existing, incoming) {
     const columns = [];
     for (const [field, value] of Object.entries(row)) {
       if (field === "end_period_ts" || field === "_origIndex") continue;
+      if (!shouldApplyLiveCell(value, prev[field])) continue;
       if (!liveCellEqual(prev[field], value)) columns.push(field);
     }
     if (columns.length) rows[key] = { isNew: false, columns };
@@ -109,6 +175,7 @@ export function buildMarketMetaLiveFlashRows(existing, incoming, opts = {}) {
     const columns = [];
     for (const [field, value] of Object.entries(row)) {
       if (field === "_origIndex") continue;
+      if (!shouldApplyLiveCell(value, prev[field])) continue;
       if (!liveCellEqual(prev[field], value)) columns.push(field);
     }
     if (columns.length) rows[key] = { isNew: false, columns };
@@ -123,29 +190,34 @@ export function buildMarketMetaLiveFlashRows(existing, incoming, opts = {}) {
  * @returns {Record<string, unknown>[]}
  */
 export function upsertCandlestickRowsByEndPeriodTs(existing, incoming, opts = {}) {
-  const softRowCap = Math.floor(Number(opts.softRowCap)) || 2000;
+  const softRowCap = Math.floor(Number(opts.softRowCap)) || 50_000;
   /** @type {Map<number, Record<string, unknown>>} */
   const byTs = new Map();
   /** @type {number[]} */
   const order = [];
 
   for (const row of Array.isArray(existing) ? existing : []) {
-    const ts = Math.floor(Number(row?.end_period_ts));
-    if (!Number.isFinite(ts)) continue;
+    const ts = normalizeLiveEndPeriodTs(row?.end_period_ts);
+    if (ts == null) continue;
     if (!byTs.has(ts)) order.push(ts);
-    byTs.set(ts, { ...row });
+    byTs.set(ts, { ...row, end_period_ts: ts });
   }
+  const priorCount = byTs.size;
 
   for (const row of Array.isArray(incoming) ? incoming : []) {
-    const ts = Math.floor(Number(row?.end_period_ts));
-    if (!Number.isFinite(ts)) continue;
+    const ts = normalizeLiveEndPeriodTs(row?.end_period_ts);
+    if (ts == null) continue;
     if (!byTs.has(ts)) order.push(ts);
-    byTs.set(ts, { ...(byTs.get(ts) || {}), ...row, end_period_ts: ts });
+    const merged = mergeLiveSheetRowPreserve(byTs.get(ts), row);
+    merged.end_period_ts = ts;
+    byTs.set(ts, merged);
   }
 
   order.sort((a, b) => a - b);
   let rows = order.map((ts) => byTs.get(ts)).filter(Boolean);
-  if (rows.length > softRowCap) {
+  // Never shrink below what was already on the sheet. Only trim runaway growth
+  // when prior history was already under the soft cap.
+  if (rows.length > softRowCap && priorCount < softRowCap) {
     rows = rows.slice(rows.length - softRowCap);
   }
   return /** @type {Record<string, unknown>[]} */ (rows);
@@ -183,7 +255,7 @@ export function upsertMarketMetaRowsByTicker(existing, incoming, opts = {}) {
     const k = keyOf(row);
     if (!k) continue;
     if (!byTicker.has(k)) order.push(k);
-    byTicker.set(k, { ...(byTicker.get(k) || {}), ...row });
+    byTicker.set(k, mergeLiveSheetRowPreserve(byTicker.get(k), row));
   }
 
   return order.map((k) => byTicker.get(k)).filter(Boolean);
@@ -198,16 +270,16 @@ function countCandlestickUpsertChanges(existing, incoming) {
   /** @type {Set<number>} */
   const prevTs = new Set();
   for (const row of Array.isArray(existing) ? existing : []) {
-    const ts = Math.floor(Number(row?.end_period_ts));
-    if (Number.isFinite(ts)) prevTs.add(ts);
+    const ts = normalizeLiveEndPeriodTs(row?.end_period_ts);
+    if (ts != null) prevTs.add(ts);
   }
   let received = 0;
   let added = 0;
   let updated = 0;
   let latestTs = null;
   for (const row of Array.isArray(incoming) ? incoming : []) {
-    const ts = Math.floor(Number(row?.end_period_ts));
-    if (!Number.isFinite(ts)) continue;
+    const ts = normalizeLiveEndPeriodTs(row?.end_period_ts);
+    if (ts == null) continue;
     received += 1;
     if (prevTs.has(ts)) updated += 1;
     else added += 1;
@@ -241,7 +313,7 @@ function countCandlestickUpsertChanges(existing, incoming) {
  * }}
  */
 export function applyKalshiCandlestickUpsertToSheets(dataSheets, feed, tick, opts = {}) {
-  const softRowCap = opts.softRowCap ?? 2000;
+  const softRowCap = opts.softRowCap ?? 50_000;
   const next = { ...(dataSheets || {}) };
   const revision = Date.now();
   const metaId = feed.sheets.marketsMetadataSheetId;

@@ -134,9 +134,15 @@ export function publishedBundlesCoverAllCharts(chartIds, publishedChartBundles) 
 
 /**
  * Build chart bundles in parallel with dataset hydration deduped by data_set_id.
+ * @param {Iterable<string> | Set<string>} chartIds
+ * @param {unknown} userId
+ * @param {{ preferPublishedSnapshot?: boolean }} [opts]
+ *   When preferPublishedSnapshot is false (live-backed dashboards), always rematerialize
+ *   from the current DataSet so cron updates show on public embeds.
  * @returns {Promise<Map<string, object>>}
  */
-export async function buildChartBundlesParallel(chartIds, userId) {
+export async function buildChartBundlesParallel(chartIds, userId, opts = {}) {
+  const preferPublishedSnapshot = opts.preferPublishedSnapshot !== false;
   const ids = [...chartIds];
   if (!ids.length) return new Map();
 
@@ -159,7 +165,7 @@ export async function buildChartBundlesParallel(chartIds, userId) {
       const chart = chartById.get(cid);
       if (!chart) return null;
 
-      if (chartHasPublishedSnapshot(chart)) {
+      if (preferPublishedSnapshot && chartHasPublishedSnapshot(chart)) {
         const bundle = chart.published_bundle;
         return {
           cid,
@@ -294,7 +300,9 @@ export async function buildPublicDashboardResponseData(dash, user) {
   if (useCache) {
     chartBundlesById = mapFromPublishedBundles(dash.published_chart_bundles, chartIds);
   } else {
-    chartBundlesById = await buildChartBundlesParallel(chartIds, user._id);
+    chartBundlesById = await buildChartBundlesParallel(chartIds, user._id, {
+      preferPublishedSnapshot: !liveBacked,
+    });
   }
 
   const dataSheets = await resolvePublicDashboardCardGridSheets(dash, user._id, {
@@ -383,7 +391,9 @@ export async function buildPublicDashboardChartBundle(dash, user, chartId) {
     }
   }
 
-  const map = await buildChartBundlesParallel(new Set([cid]), user._id);
+  const map = await buildChartBundlesParallel(new Set([cid]), user._id, {
+    preferPublishedSnapshot: !liveBacked,
+  });
   const bundle = map.get(cid);
   if (!bundle) {
     return { success: false, message: "Chart not found" };

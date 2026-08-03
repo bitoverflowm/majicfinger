@@ -36,7 +36,8 @@ export const LIVE_FEED_REGISTRY = {
     minPollIntervalMs: 15_000,
     lookbackPeriods: 3,
     maxConcurrentEphemeralPerTab: 2,
-    softRowCapPerSheet: 2000,
+    // Soft safety ceiling only — upsert never trims below already-stored history.
+    softRowCapPerSheet: 50_000,
   },
 };
 

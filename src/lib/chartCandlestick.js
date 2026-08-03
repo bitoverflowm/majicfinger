@@ -64,6 +64,11 @@ export function parseCandlestickNumber(v) {
  */
 export function parseCandlestickTimeSec(raw) {
   if (raw == null || raw === "") return null;
+  if (raw instanceof Date) {
+    const ms = raw.getTime();
+    if (!Number.isFinite(ms)) return null;
+    return Math.floor(ms / 1000);
+  }
   if (typeof raw === "number" && Number.isFinite(raw)) {
     // ms → sec
     if (raw > 1e12) return Math.floor(raw / 1000);

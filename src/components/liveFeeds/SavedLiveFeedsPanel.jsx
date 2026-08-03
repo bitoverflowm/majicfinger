@@ -12,6 +12,7 @@ import {
   Trash2,
   Radio,
   RefreshCw,
+  Server,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -53,12 +54,33 @@ import { describeCandlePeriod } from "@/lib/liveFeeds/registry";
  *   candlesReceivedTotal: number;
  *   candlesAddedTotal: number;
  *   candlesUpdatedTotal: number;
- *   lastTickStats: object | null;
+ *   lastTickStats: {
+ *     marketsInTick?: number;
+ *     marketsMatched?: number;
+ *     marketsUnmatched?: number;
+ *     candlesReceived?: number;
+ *     candlesAdded?: number;
+ *     candlesUpdated?: number;
+ *     metaUpdated?: boolean;
+ *     latestEndPeriodTs?: number | null;
+ *   } | null;
  *   eventTicker: string | null;
  *   seriesTicker: string | null;
  *   periodInterval: number | null;
  *   endedReason: string | null;
  * }} SavedLiveFeedRow
+ */
+
+/**
+ * @typedef {{
+ *   backendEnabled: boolean;
+ *   schedule: string;
+ *   liveFeedCount: number;
+ *   status: "idle" | "running" | "due" | "waiting";
+ *   lastSuccessAt: string | null;
+ *   lastPolledAt: string | null;
+ *   note: string;
+ * }} CronStatus
  */
 
 function formatPollInterval(ms) {
@@ -80,10 +102,46 @@ function statusBadge(status) {
   return <Badge variant="outline" className="h-5 px-1.5 text-[10px]">Stopped</Badge>;
 }
 
+function cronStatusBadge(status) {
+  if (status === "running") {
+    return (
+      <Badge className="h-5 bg-emerald-500/15 px-1.5 text-[10px] text-emerald-800 dark:text-emerald-200">
+        Cron active
+      </Badge>
+    );
+  }
+  if (status === "due") {
+    return (
+      <Badge className="h-5 bg-amber-500/15 px-1.5 text-[10px] text-amber-900 dark:text-amber-100">
+        Tick due
+      </Badge>
+    );
+  }
+  if (status === "waiting") {
+    return (
+      <Badge variant="secondary" className="h-5 px-1.5 text-[10px]">
+        Waiting
+      </Badge>
+    );
+  }
+  return (
+    <Badge variant="outline" className="h-5 px-1.5 text-[10px]">
+      Idle
+    </Badge>
+  );
+}
+
 function formatWhen(raw) {
   if (!raw) return "—";
   const m = moment(raw);
   return m.isValid() ? m.format("ddd MMM D h:mm a") : "—";
+}
+
+function formatUnixSec(sec) {
+  const n = Math.floor(Number(sec));
+  if (!Number.isFinite(n) || n <= 0) return null;
+  const m = moment.unix(n);
+  return m.isValid() ? m.format("MMM D h:mm:ss a") : null;
 }
 
 /** Hide infra / Mongo details from the UI. */
@@ -129,19 +187,48 @@ function userFacingFeedLastError(raw) {
 }
 
 /**
+ * @param {SavedLiveFeedRow["lastTickStats"]} stats
+ */
+function formatLastTickLine(stats) {
+  if (!stats || typeof stats !== "object") return null;
+  const parts = [];
+  const matched = Math.floor(Number(stats.marketsMatched));
+  const inTick = Math.floor(Number(stats.marketsInTick));
+  if (Number.isFinite(matched) && Number.isFinite(inTick) && inTick > 0) {
+    parts.push(`${matched}/${inTick} markets`);
+  }
+  const received = Math.floor(Number(stats.candlesReceived));
+  const added = Math.floor(Number(stats.candlesAdded));
+  const updated = Math.floor(Number(stats.candlesUpdated));
+  if (Number.isFinite(received) && received >= 0) {
+    parts.push(`${received} candles (${added} new / ${updated} upserted)`);
+  }
+  if (stats.metaUpdated) parts.push("meta updated");
+  const unmatched = Math.floor(Number(stats.marketsUnmatched));
+  if (Number.isFinite(unmatched) && unmatched > 0) {
+    parts.push(`${unmatched} unmatched`);
+  }
+  const latest = formatUnixSec(stats.latestEndPeriodTs);
+  if (latest) parts.push(`latest bar ${latest}`);
+  return parts.length ? parts.join(" · ") : null;
+}
+
+/**
  * Background (cron) live feeds for Your Saved Work.
  * @param {{ open?: boolean }} props
  */
 export function SavedLiveFeedsPanel({ open = true }) {
   const [feeds, setFeeds] = useState(/** @type {SavedLiveFeedRow[]} */ ([]));
+  const [cron, setCron] = useState(/** @type {CronStatus | null} */ (null));
   const [counts, setCounts] = useState({ total: 0, live: 0, paused: 0, ended: 0 });
   const [loading, setLoading] = useState(false);
   const [loadError, setLoadError] = useState(/** @type {string | null} */ (null));
   const [busyId, setBusyId] = useState(/** @type {string | null} */ (null));
   const [deleteTarget, setDeleteTarget] = useState(/** @type {SavedLiveFeedRow | null} */ (null));
 
-  const load = useCallback(async () => {
-    setLoading(true);
+  const load = useCallback(async (opts = {}) => {
+    const silent = !!opts.silent;
+    if (!silent) setLoading(true);
     setLoadError(null);
     try {
       const res = await fetch("/api/live-feeds", { credentials: "include" });
@@ -153,20 +240,23 @@ export function SavedLiveFeedsPanel({ open = true }) {
           "Issue connecting to your data. Check your internet connection and try again.",
         );
         setFeeds([]);
+        setCron(null);
         setCounts({ total: 0, live: 0, paused: 0, ended: 0 });
         setLoadError(msg);
         return;
       }
       setFeeds(Array.isArray(j.feeds) ? j.feeds : []);
+      setCron(j.cron && typeof j.cron === "object" ? j.cron : null);
       setCounts(j.counts || { total: 0, live: 0, paused: 0, ended: 0 });
     } catch {
       setFeeds([]);
+      setCron(null);
       setCounts({ total: 0, live: 0, paused: 0, ended: 0 });
       setLoadError(
         "Issue connecting to your data. Check your internet connection and try again.",
       );
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
   }, []);
 
@@ -174,6 +264,17 @@ export function SavedLiveFeedsPanel({ open = true }) {
     if (!open) return;
     void load();
   }, [open, load]);
+
+  // Auto-refresh while panel is open so cron ticks are visible without a manual refresh.
+  useEffect(() => {
+    if (!open) return;
+    const hasLive = counts.live > 0;
+    if (!hasLive) return;
+    const id = window.setInterval(() => {
+      void load({ silent: true });
+    }, 20_000);
+    return () => window.clearInterval(id);
+  }, [open, counts.live, load]);
 
   const runAction = async (feed, action) => {
     setBusyId(feed.id);
@@ -257,6 +358,25 @@ export function SavedLiveFeedsPanel({ open = true }) {
         </TooltipProvider>
       </div>
 
+      {cron ? (
+        <div className="flex flex-wrap items-start gap-2 rounded-md border border-border/70 bg-background/50 px-2.5 py-2 text-[11px]">
+          <Server className="mt-0.5 h-3.5 w-3.5 shrink-0 text-muted-foreground" aria-hidden />
+          <div className="min-w-0 flex-1 space-y-0.5">
+            <div className="flex flex-wrap items-center gap-1.5">
+              <span className="font-medium text-foreground">Backend cron</span>
+              {cronStatusBadge(cron.status)}
+              <span className="text-muted-foreground">({cron.schedule})</span>
+            </div>
+            <p className="text-muted-foreground">{cron.note}</p>
+            <div className="flex flex-wrap gap-x-3 gap-y-0.5 tabular-nums text-muted-foreground">
+              <span>{cron.liveFeedCount} live on cron</span>
+              <span>Last success: {formatWhen(cron.lastSuccessAt)}</span>
+              <span>Last poll: {formatWhen(cron.lastPolledAt)}</span>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
       {!loading && counts.total > 0 ? (
         <div className="flex flex-wrap gap-1.5 text-[10px] text-muted-foreground">
           <span>{counts.live} live</span>
@@ -289,6 +409,7 @@ export function SavedLiveFeedsPanel({ open = true }) {
           const title =
             feed.eventTicker ||
             `${feed.integration}/${feed.endpoint}`;
+          const lastTickLine = formatLastTickLine(feed.lastTickStats);
           return (
             <li
               key={feed.id}
@@ -324,6 +445,11 @@ export function SavedLiveFeedsPanel({ open = true }) {
                     <span>Last ok: {formatWhen(feed.lastSuccessAt)}</span>
                     <span>Last poll: {formatWhen(feed.lastPolledAt)}</span>
                   </div>
+                  {lastTickLine ? (
+                    <p className="text-[11px] text-muted-foreground">
+                      Last tick: {lastTickLine}
+                    </p>
+                  ) : null}
                   {userFacingFeedLastError(feed.lastError) ? (
                     <p className="text-[11px] text-destructive">
                       {userFacingFeedLastError(feed.lastError)}

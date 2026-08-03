@@ -103,7 +103,7 @@ export default async function handler(req, res) {
         const sheets =
           dataSet.data_sheets && typeof dataSet.data_sheets === "object" ? dataSet.data_sheets : {};
         const def = getLiveFeedEndpointDef(cfg.integration, cfg.endpoint);
-        const softRowCap = def?.softRowCapPerSheet ?? 2000;
+        const softRowCap = def?.softRowCapPerSheet ?? 50_000;
         const lookbackPeriods = def?.lookbackPeriods ?? 3;
 
         let tick = null;

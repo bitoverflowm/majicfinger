@@ -122,7 +122,7 @@ export default function RestLiveFeedManager() {
 
       try {
         const def = getLiveFeedEndpointDef(feed.integration, feed.endpoint);
-        const softRowCap = def?.softRowCapPerSheet ?? 2000;
+        const softRowCap = def?.softRowCapPerSheet ?? 50_000;
         const lookbackPeriods = def?.lookbackPeriods ?? 3;
 
         if (feed.integration === "kalshi-live" && feed.endpoint === "event_candlesticks") {

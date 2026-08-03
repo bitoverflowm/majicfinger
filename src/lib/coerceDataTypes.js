@@ -22,6 +22,40 @@ function isKalshiNullableTradePriceKey(key) {
   return typeof key === "string" && /^price_.*_dollars$/.test(key);
 }
 
+/** Keep candle period keys as unix seconds (never Date / ms). */
+function isUnixSecondsTimestampKey(key) {
+  if (!key || typeof key !== "string") return false;
+  const k = key.toLowerCase();
+  return (
+    k === "end_period_ts" ||
+    k === "start_period_ts" ||
+    k === "period_ts" ||
+    k === "settlement_ts" ||
+    k.endsWith("_period_ts")
+  );
+}
+
+/** @param {unknown} value */
+function coerceUnixSecondsCell(value) {
+  if (value == null || value === "") return null;
+  if (value instanceof Date) {
+    const ms = value.getTime();
+    return Number.isFinite(ms) ? Math.floor(ms / 1000) : null;
+  }
+  if (typeof value === "number") {
+    if (!Number.isFinite(value)) return null;
+    if (value > 1e14) return Math.floor(value / 1e6);
+    if (value > 1e12) return Math.floor(value / 1000);
+    return Math.floor(value);
+  }
+  const s = String(value).trim();
+  if (!s) return null;
+  if (/^\d+(\.\d+)?$/.test(s)) return coerceUnixSecondsCell(Number(s));
+  const ms = Date.parse(s);
+  if (!Number.isFinite(ms)) return null;
+  return Math.floor(ms / 1000);
+}
+
 /** Long digit-only strings (>15 chars) are token IDs - keep as string to avoid precision loss */
 function isLongTokenId(value) {
   const s = typeof value === "string" ? value.trim() : String(value);
@@ -38,6 +72,10 @@ function isLongTokenId(value) {
  */
 function coerceCell(value, key) {
   if (value === null || value === undefined) return value;
+
+  if (isUnixSecondsTimestampKey(key)) {
+    return coerceUnixSecondsCell(value);
+  }
 
   if (isLakeBigintColumnName(key)) {
     return normalizeLakeBigintCellValue(value);
