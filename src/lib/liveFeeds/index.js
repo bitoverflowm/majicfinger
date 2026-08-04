@@ -46,3 +46,5 @@ export {
   publicLiveLookbackPeriods,
   PUBLIC_LIVE_CACHE_TTL_MS,
 } from "@/lib/liveFeeds/publicLiveKalshiCache";
+
+export { applyLiveCandleOverlay } from "@/lib/liveFeeds/applyLiveCandleOverlay";

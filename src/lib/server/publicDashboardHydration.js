@@ -336,6 +336,38 @@ export async function buildPublicDashboardResponseData(dash, user) {
 }
 
 /**
+ * Live dashboards refresh OHLC via /live — return chart config only so progressive
+ * chart fetches stay small (active markets can have huge published snapshots).
+ * @param {{ chart?: object; rows?: unknown[]; dataSheets?: Record<string, object> }} payload
+ */
+export function structureOnlyLiveChartPayload(payload) {
+  if (!payload || typeof payload !== "object") return payload;
+  /** @type {Record<string, object>} */
+  const dataSheets = {};
+  for (const [sid, sheet] of Object.entries(payload.dataSheets || {})) {
+    if (!sheet || typeof sheet !== "object") continue;
+    dataSheets[sid] = {
+      ...sheet,
+      data: [],
+      rowCount: 0,
+      fullRowCount:
+        typeof sheet.fullRowCount === "number"
+          ? sheet.fullRowCount
+          : typeof sheet.rowCount === "number"
+            ? sheet.rowCount
+            : Array.isArray(sheet.data)
+              ? sheet.data.length
+              : 0,
+    };
+  }
+  return {
+    chart: payload.chart,
+    rows: [],
+    dataSheets,
+  };
+}
+
+/**
  * Single chart bundle for progressive client loading.
  * Always prefer published snapshots for structure; live OHLC overlays via /live.
  */
@@ -350,6 +382,19 @@ export async function buildPublicDashboardChartBundle(dash, user, chartId) {
     return { success: false, message: "Chart not on this dashboard" };
   }
 
+  let liveBacked = !!dash.live_backed;
+  if (!liveBacked && dash.data_set_id) {
+    try {
+      const { resolveDatasetLiveBacked } = await import("@/lib/liveFeeds/publicLiveConfig");
+      liveBacked = await resolveDatasetLiveBacked(String(dash.data_set_id));
+    } catch {
+      liveBacked = false;
+    }
+  }
+
+  const maybeStripLiveRows = (chartPayload) =>
+    liveBacked ? structureOnlyLiveChartPayload(chartPayload) : chartPayload;
+
   const chartDoc = await Chart.findById(cid).lean();
   if (chartHasPublishedSnapshot(chartDoc)) {
     const bundle = chartDoc.published_bundle;
@@ -357,11 +402,11 @@ export async function buildPublicDashboardChartBundle(dash, user, chartId) {
       success: true,
       data: {
         chart_id: cid,
-        chartPayload: {
+        chartPayload: maybeStripLiveRows({
           chart: bundle.chart,
           rows: Array.isArray(bundle.rows) ? bundle.rows : [],
           dataSheets: bundle.dataSheets && typeof bundle.dataSheets === "object" ? bundle.dataSheets : {},
-        },
+        }),
         chartLink:
           chartDoc.is_public && chartDoc.public_slug
             ? { mode: "chart_public", slug: chartDoc.public_slug }
@@ -377,11 +422,11 @@ export async function buildPublicDashboardChartBundle(dash, user, chartId) {
       success: true,
       data: {
         chart_id: cid,
-        chartPayload: {
+        chartPayload: maybeStripLiveRows({
           chart: cached.chart,
           rows: Array.isArray(cached.rows) ? cached.rows : [],
           dataSheets: cached.dataSheets && typeof cached.dataSheets === "object" ? cached.dataSheets : {},
-        },
+        }),
         chartLink:
           cached.meta?.is_public && cached.meta?.public_slug
             ? { mode: "chart_public", slug: cached.meta.public_slug }
@@ -403,11 +448,11 @@ export async function buildPublicDashboardChartBundle(dash, user, chartId) {
     success: true,
     data: {
       chart_id: cid,
-      chartPayload: {
+      chartPayload: maybeStripLiveRows({
         chart: bundle.chart,
         rows: bundle.rows,
         dataSheets: bundle.dataSheets,
-      },
+      }),
       chartLink:
         bundle.meta?.is_public && bundle.meta?.public_slug
           ? { mode: "chart_public", slug: bundle.meta.public_slug }
