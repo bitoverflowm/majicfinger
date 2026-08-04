@@ -8,6 +8,7 @@ import {
   setDataPullSurfaceContext,
   clearDataPullSurfaceContext,
 } from "@/lib/analytics/dataPullContext";
+import { isProdAnalyticsEnabled } from "@/lib/analytics/isProdAnalyticsEnabled";
 
 const JOURNEY_ENDPOINT = "/api/analytics/journey";
 
@@ -49,6 +50,7 @@ function enrichDataPullMeta(meta = {}) {
 
 function postDataPullNotify(phase, meta) {
   if (typeof window === "undefined") return;
+  if (!isProdAnalyticsEnabled()) return;
 
   const sessionId = getAuthSessionId() || getOrCreateAuthSessionId();
   if (!sessionId) return;

@@ -13,13 +13,9 @@ function formatFetchError(err) {
 }
 
 export function isTelegramConfigured() {
-  // Dev/local: off by default so unreachable Telegram API calls don't stall journey routes.
-  // Opt in with TELEGRAM_NOTIFICATIONS_ENABLED=true. Production: on unless explicitly set to false.
-  if (process.env.NODE_ENV !== "production") {
-    if (process.env.TELEGRAM_NOTIFICATIONS_ENABLED !== "true") return false;
-  } else if (process.env.TELEGRAM_NOTIFICATIONS_ENABLED === "false") {
-    return false;
-  }
+  // Production only. Local/dev must never send Telegram alerts.
+  if (process.env.NODE_ENV !== "production") return false;
+  if (process.env.TELEGRAM_NOTIFICATIONS_ENABLED === "false") return false;
   return !!(getBotToken() && getChatId());
 }
 

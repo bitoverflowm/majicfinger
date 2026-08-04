@@ -22,6 +22,7 @@ import {
   hasRecentVisitorStartTelegram,
 } from "@/lib/analytics/visitorDedupe";
 import { TELEGRAM_COUNTER_KEYS } from "@/lib/telegram/geoFormat";
+import { isProdAnalyticsEnabled } from "@/lib/analytics/isProdAnalyticsEnabled";
 import VisitorSession from "@/models/VisitorSession";
 
 function isAuthSession(sessionKind) {
@@ -550,6 +551,10 @@ async function recordDataPullNotify(sessionId, meta = {}, reqGeo = {}) {
 export default async function handler(req, res) {
   if (req.method !== "POST") {
     return res.status(405).json({ ok: false, message: "Method not allowed" });
+  }
+
+  if (!isProdAnalyticsEnabled()) {
+    return res.status(200).json({ ok: true, skipped: true, reason: "dev_disabled" });
   }
 
   let body = req.body;

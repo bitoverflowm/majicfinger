@@ -7,6 +7,7 @@ import {
   notifyPageView,
 } from "@/lib/telegram/trackEvent";
 import { extractClientMeta } from "@/lib/analytics/requestClientMeta";
+import { isProdAnalyticsEnabled } from "@/lib/analytics/isProdAnalyticsEnabled";
 
 const ALLOWED_EVENTS = new Set([
   "fork_click",
@@ -30,6 +31,10 @@ function parseJsonBody(req) {
 
 export default async function handler(req, res) {
   if (req.method !== "POST") return res.status(405).json({ ok: false, message: "Method not allowed" });
+
+  if (!isProdAnalyticsEnabled()) {
+    return res.status(200).json({ ok: true, skipped: true, reason: "dev_disabled" });
+  }
 
   let body;
   try {

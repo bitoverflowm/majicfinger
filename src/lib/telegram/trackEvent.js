@@ -107,6 +107,10 @@ function headlineWithGeoFlag(headline, geo = {}) {
  * @param {{ eventKey: TelegramEventKey; headline: string; fields?: Record<string, string | number | boolean | null | undefined>; geo?: TelegramGeoContext }} opts
  */
 export async function trackAndNotifyTelegramEvent({ eventKey, headline, fields = {}, geo = {} }) {
+  if (process.env.NODE_ENV !== "production") {
+    return { ok: true, skipped: true, reason: "dev_disabled" };
+  }
+
   const { count, monthCount, source, dbError } = await incrementTelegramEventCounter(eventKey);
   const rank = ordinal(count);
   const monthRank = monthCount ? ordinal(monthCount) : null;

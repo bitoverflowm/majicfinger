@@ -9,6 +9,7 @@ import {
   resetAuthSessionStorage,
 } from "@/lib/analytics/authSessionStorage";
 import { endVisitorSession } from "@/lib/analytics/journeyClient";
+import { isProdAnalyticsEnabled } from "@/lib/analytics/isProdAnalyticsEnabled";
 
 const FLUSH_INTERVAL_MS = 8000;
 const MAX_QUEUE_SIZE = 120;
@@ -24,6 +25,7 @@ let identityRef = { email: undefined, userId: undefined };
 
 function postJourney(body, { keepalive = false } = {}) {
   if (typeof window === "undefined") return;
+  if (!isProdAnalyticsEnabled()) return;
 
   const payload = JSON.stringify({ sessionKind: SESSION_KIND, ...body });
   try {
@@ -57,6 +59,7 @@ function scheduleFlush() {
  */
 export function trackAuthEvent(type, payload = {}) {
   if (typeof window === "undefined") return;
+  if (!isProdAnalyticsEnabled()) return;
   if (!hasAuthSessionStarted() || hasAuthSessionEnded()) return;
 
   const sessionId = getAuthSessionId();
@@ -211,6 +214,7 @@ export function resumeAuthSessionTracking() {
  */
 export function startAuthenticatedSession(identity = {}) {
   if (typeof window === "undefined") return;
+  if (!isProdAnalyticsEnabled()) return;
   if (hasAuthSessionStarted() && !hasAuthSessionEnded()) return;
 
   identityRef = { email: identity.email, userId: identity.userId };

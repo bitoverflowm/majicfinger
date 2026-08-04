@@ -7,6 +7,7 @@ import {
   markVisitorSessionStarted,
 } from "@/lib/analytics/visitorSession";
 import { buildSessionStartMeta } from "@/lib/analytics/sessionStartMeta";
+import { isProdAnalyticsEnabled } from "@/lib/analytics/isProdAnalyticsEnabled";
 
 const FLUSH_INTERVAL_MS = 8000;
 const MAX_QUEUE_SIZE = 80;
@@ -27,6 +28,7 @@ function scheduleFlush() {
 
 function postJourney(body, { keepalive = false, preferBeacon = false } = {}) {
   if (typeof window === "undefined") return;
+  if (!isProdAnalyticsEnabled()) return;
 
   const payload = JSON.stringify({ sessionKind: "visitor", ...body });
   try {
@@ -57,6 +59,7 @@ function postJourney(body, { keepalive = false, preferBeacon = false } = {}) {
  */
 export function trackJourneyEvent(type, payload = {}) {
   if (typeof window === "undefined") return;
+  if (!isProdAnalyticsEnabled()) return;
 
   const sessionId = getOrCreateVisitorSessionId();
   if (!sessionId) return;
@@ -118,6 +121,7 @@ export function flushJourneyQueue(endSession = false, identity = {}) {
 
 export function startVisitorSessionIfNeeded(identity = {}) {
   if (typeof window === "undefined") return;
+  if (!isProdAnalyticsEnabled()) return;
   if (hasVisitorSessionStarted()) return;
 
   const sessionId = getOrCreateVisitorSessionId();

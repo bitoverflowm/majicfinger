@@ -8,6 +8,8 @@
  */
 export function sendTelegramAnalyticsEvent(event, payload, opts = {}) {
   if (typeof window === "undefined") return;
+  // Client bundle: Next inlines NODE_ENV. Analytics only in production builds.
+  if (process.env.NODE_ENV !== "production") return;
 
   const body = JSON.stringify({
     event,
