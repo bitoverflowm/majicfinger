@@ -27,6 +27,7 @@ import { GUIDED_TARGET_ATTR } from "@/lib/guidedWorkflows/types";
 import { resolvePaletteSeedForNewChart } from "@/lib/chartPaletteSnapshot";
 import { CONNECT_HOME_CENTER_VIEW, normalizeConnectHomeCenterView } from "@/lib/connectHomeFlow";
 import { isConnectIntegrationWorkspace } from "@/lib/connectHomeWorkspace";
+import { projectHasLiveFeedSource } from "@/lib/liveFeeds/projectLiveFeedSource";
 import { cn } from "@/lib/utils";
 
 const WORKSPACE_ACTION_TOOLTIPS = {
@@ -52,12 +53,12 @@ const chipActiveDashboard =
 function LiveFeedPulseDot({ className }) {
   return (
     <span
-      className={cn("relative inline-flex h-1.5 w-1.5 shrink-0", className)}
+      className={cn("relative inline-flex h-2 w-2 shrink-0", className)}
       title="Live feed"
       aria-label="Live feed"
     >
-      <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-60" />
-      <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-emerald-500" />
+      <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75" />
+      <span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-500" />
     </span>
   );
 }
@@ -75,7 +76,7 @@ const MAX_VISIBLE_WORKSPACE_TABS = 2;
 
 function estimateChipWidth(label, compact, hasLiveDot = false) {
   const charW = compact ? 6.1 : 6.8;
-  const liveExtra = hasLiveDot ? 10 : 0;
+  const liveExtra = hasLiveDot ? 14 : 0;
   return Math.min(176, Math.ceil(String(label || "").length * charW) + 12 + liveExtra);
 }
 
@@ -284,13 +285,17 @@ function WorkspaceTabStrip({ items, compact, textSize, gapClass }) {
                     <DropdownMenuItem
                       key={item.key}
                       className={cn(
-                        "flex items-center gap-2",
+                        "flex w-full items-center justify-between gap-2",
                         item.isActive && "bg-accent",
                       )}
                       onClick={item.onSelect}
                     >
-                      <span className="min-w-0 flex-1 truncate">{item.label}</span>
-                      {item.hasLiveFeed ? <LiveFeedPulseDot /> : null}
+                      <span className="min-w-0 flex-1 truncate font-mono text-sm">
+                        {item.label}
+                      </span>
+                      {item.hasLiveFeed ? (
+                        <LiveFeedPulseDot className="ml-2" />
+                      ) : null}
                     </DropdownMenuItem>
                   ))}
                 </>
@@ -495,6 +500,12 @@ export function ConnectHomeWorkspaceNav({ className, compact = false, onPanelMan
     openIntegrationsPanel();
   }, [cancelConnectDataFeedPull, openIntegrationsPanel]);
 
+  const loadedDataMeta = ctx?.loadedDataMeta;
+  const projectIsLiveCapable = useMemo(
+    () => projectHasLiveFeedSource(loadedDataMeta, dataSheets),
+    [loadedDataMeta, dataSheets],
+  );
+
   const projectDashboardEntries = useMemo(() => {
     const projectId =
       loadedDataId != null && String(loadedDataId).trim() !== ""
@@ -514,7 +525,8 @@ export function ConnectHomeWorkspaceNav({ className, compact = false, onPanelMan
             String(dash.dashboard_name || "").trim() ||
             String(dash.page_heading || "").trim() ||
             "Untitled dashboard",
-          hasLiveFeed: !!dash.live_backed,
+          // Published on-demand live, or this project’s workbook is live-capable.
+          hasLiveFeed: !!dash.live_backed || projectIsLiveCapable,
         });
       }
     }
@@ -534,13 +546,17 @@ export function ConnectHomeWorkspaceNav({ className, compact = false, onPanelMan
             String(draft.page_heading || "").trim() ||
             existing?.label ||
             "Untitled dashboard",
-          hasLiveFeed: !!(draft.live_backed || existing?.hasLiveFeed),
+          hasLiveFeed: !!(
+            draft.live_backed ||
+            existing?.hasLiveFeed ||
+            projectIsLiveCapable
+          ),
         });
       }
     }
 
     return Array.from(byId.values());
-  }, [chartDashboardDraft, loadedDataId, savedChartDashboards]);
+  }, [chartDashboardDraft, loadedDataId, projectIsLiveCapable, savedChartDashboards]);
 
   const workspaceTabItems = useMemo(() => {
     const items = [];
