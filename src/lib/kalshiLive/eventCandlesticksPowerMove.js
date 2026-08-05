@@ -80,8 +80,11 @@ function compactNumber(n) {
  */
 function formatChancePct(pct) {
   if (pct == null || !Number.isFinite(pct)) return "";
-  if (pct > 0 && pct < 1) return `${pct.toFixed(1)}%`;
-  return `${Math.round(pct)}%`;
+  // Keep one decimal so live ticks (e.g. 9.6% → 10.2%) are visible; whole
+  // numbers stay clean (10 → 10%).
+  const rounded1 = Math.round(pct * 10) / 10;
+  if (Number.isInteger(rounded1)) return `${rounded1}%`;
+  return `${rounded1.toFixed(1)}%`;
 }
 
 /**
