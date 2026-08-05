@@ -588,7 +588,11 @@ const Nav = () => {
       liveStreamState,
     });
     if (hasProgress) {
-      setNewProjectSaveMode(loadedDataMeta?._id ? "save" : "saveAs");
+      const defaultSaveAs = !loadedDataMeta?._id;
+      setNewProjectSaveMode(defaultSaveAs ? "saveAs" : "save");
+      if (defaultSaveAs && !String(projectNameInput || "").trim()) {
+        setProjectNameInput("");
+      }
       setNewProjectPromptOpen(true);
       return;
     }
@@ -776,6 +780,7 @@ const Nav = () => {
       return false;
     }
     const forceOverwrite = options.forceOverwrite === true;
+    const forceSaveAs = options.forceSaveAs === true;
     const bump = (pct, msg) => {
       saveProjectProgressRef.current = pct;
       setSaveProjectProgress(pct);
@@ -803,7 +808,8 @@ const Nav = () => {
             }
           : chartSheets || {};
       const hasLoadedProject = !!loadedDataMeta?._id;
-      const shouldOverwrite = hasLoadedProject && (forceOverwrite || !!overwrite);
+      const shouldOverwrite =
+        hasLoadedProject && !forceSaveAs && (forceOverwrite || !!overwrite);
       const projectName = shouldOverwrite
         ? loadedDataMeta?.data_set_name
         : String(projectNameInput || "").trim();
@@ -1044,29 +1050,27 @@ const Nav = () => {
     handleSave();
   };
 
-  const openSaveAsThenNewProject = () => {
-    setNewProjectPromptOpen(false);
-    pendingNewProjectAfterSaveRef.current = true;
-    setOverwrite(false);
-    setSaveProjectBusy(false);
-    setSaveProjectProgress(0);
-    setSaveProjectMessage("");
-    setSaveIsOpen(true);
-  };
-
-  const saveThenNewProject = async () => {
-    setNewProjectPromptOpen(false);
-    if (loadedDataMeta?._id) {
-      pendingNewProjectAfterSaveRef.current = true;
-      setOverwrite(true);
-      setSaveIsOpen(true);
-      const ok = await handleSave({ forceOverwrite: true });
-      if (!ok) {
-        pendingNewProjectAfterSaveRef.current = false;
-      }
+  const runNewProjectSave = async () => {
+    const asNewCopy = newProjectSaveMode === "saveAs" || !loadedDataMeta?._id;
+    if (asNewCopy && !String(projectNameInput || "").trim()) {
+      toast.error("Name your project before saving.");
       return;
     }
-    openSaveAsThenNewProject();
+    if (
+      currentAdvancedStorageSummary.requiresAdvancedStorage &&
+      !canUseAdvancedDataStorage
+    ) {
+      openLargeProjectUpgradeDialog(currentAdvancedStorageSummary);
+      return;
+    }
+    pendingNewProjectAfterSaveRef.current = true;
+    setOverwrite(!asNewCopy && !!loadedDataMeta?._id);
+    const ok = await handleSave(
+      asNewCopy ? { forceSaveAs: true } : { forceOverwrite: true },
+    );
+    if (!ok) {
+      pendingNewProjectAfterSaveRef.current = false;
+    }
   };
 
   const hydrateProjectCharts = async (dataSetId, preferredChartId = null) =>
@@ -1501,76 +1505,121 @@ const Nav = () => {
                         New Project
                       </Button>
                   )}
-                  <AlertDialog open={newProjectPromptOpen} onOpenChange={setNewProjectPromptOpen}>
+                  <AlertDialog
+                    open={newProjectPromptOpen}
+                    onOpenChange={(open) => {
+                      if (!open && saveProjectBusy) return;
+                      setNewProjectPromptOpen(open);
+                    }}
+                  >
                     <AlertDialogContent className="pr-12">
                       <AlertDialogCancel
                         className="absolute right-4 top-4 mt-0 h-8 w-8 rounded-sm border-0 bg-transparent p-0 opacity-70 shadow-none hover:bg-transparent hover:opacity-100 focus:ring-2 focus:ring-ring focus:ring-offset-2 sm:mt-0"
                         aria-label="Close"
+                        disabled={saveProjectBusy}
                       >
                         <X className="h-4 w-4" />
                         <span className="sr-only">Close</span>
                       </AlertDialogCancel>
                       <AlertDialogHeader>
                         <AlertDialogTitle>Unsaved changes</AlertDialogTitle>
-                        <AlertDialogDescription>
+                        <AlertDialogDescription className={saveProjectBusy ? "sr-only" : "pb-2"}>
                           You currently have unsaved changes in{" "}
                           <span className="font-medium text-foreground">{currentProjectDisplayName}</span>.
                           All unsaved progress will be lost. Would you like to save before starting a
                           new project?
                         </AlertDialogDescription>
                       </AlertDialogHeader>
-                      <AlertDialogFooter className="flex-col-reverse gap-2 sm:flex-row sm:items-center sm:justify-between sm:space-x-0">
-                        <div className="flex w-full items-stretch sm:w-auto">
-                          <Button
-                            type="button"
-                            className="h-10 flex-1 rounded-r-none sm:flex-none"
-                            onClick={() => {
-                              if (newProjectSaveMode === "saveAs" || !loadedDataMeta?._id) {
-                                openSaveAsThenNewProject();
-                              } else {
-                                void saveThenNewProject();
-                              }
-                            }}
-                          >
-                            {newProjectSaveMode === "saveAs" || !loadedDataMeta?._id
-                              ? "Save as"
-                              : "Save"}
-                          </Button>
-                          <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
+                      {saveProjectBusy ? (
+                        <div className="grid gap-3 py-1">
+                          <p className="text-sm text-foreground" aria-live="polite">
+                            {saveProjectMessage || "Saving…"}
+                          </p>
+                          <Progress value={saveProjectProgress} className="h-2" />
+                          <p className="text-xs text-muted-foreground tabular-nums">
+                            {Math.min(100, Math.round(saveProjectProgress))}%
+                          </p>
+                        </div>
+                      ) : (
+                        <>
+                          {newProjectSaveMode === "saveAs" || !loadedDataMeta?._id ? (
+                            <div className="grid gap-2">
+                              <Label htmlFor="new-project-save-as-name">New project name</Label>
+                              <Input
+                                id="new-project-save-as-name"
+                                placeholder="myProject"
+                                value={projectNameInput}
+                                onChange={(e) => setProjectNameInput(e.target.value)}
+                                onKeyDown={(e) => {
+                                  if (e.key === "Enter") {
+                                    e.preventDefault();
+                                    void runNewProjectSave();
+                                  }
+                                }}
+                                autoFocus
+                              />
+                            </div>
+                          ) : null}
+                          <AlertDialogFooter className="flex-col-reverse gap-2 sm:flex-row sm:items-center sm:justify-between sm:space-x-0">
+                            <div className="flex w-full items-stretch sm:w-auto">
                               <Button
                                 type="button"
-                                className="h-10 rounded-l-none border-l border-primary-foreground/20 px-2"
-                                aria-label="Choose save option"
-                              >
-                                <ChevronDown className="h-4 w-4" />
-                              </Button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent align="start" className="min-w-[9rem]">
-                              <DropdownMenuItem
-                                disabled={!loadedDataMeta?._id}
-                                onSelect={() => setNewProjectSaveMode("save")}
+                                className="h-10 flex-1 rounded-r-none sm:flex-none"
+                                onClick={() => void runNewProjectSave()}
                               >
                                 Save
-                              </DropdownMenuItem>
-                              <DropdownMenuItem onSelect={() => setNewProjectSaveMode("saveAs")}>
-                                Save as
-                              </DropdownMenuItem>
-                            </DropdownMenuContent>
-                          </DropdownMenu>
-                        </div>
-                        <Button
-                          type="button"
-                          variant="outline"
-                          className="w-full sm:w-auto"
-                          onClick={() => {
-                            setNewProjectPromptOpen(false);
-                            performNewProjectWipe();
-                          }}
-                        >
-                          Continue without saving
-                        </Button>
-                      </AlertDialogFooter>
+                              </Button>
+                              <DropdownMenu>
+                                <DropdownMenuTrigger asChild>
+                                  <Button
+                                    type="button"
+                                    className="h-10 rounded-l-none border-l border-primary-foreground/20 px-2"
+                                    aria-label="Choose save option"
+                                  >
+                                    <ChevronDown className="h-4 w-4" />
+                                  </Button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent align="start" className="min-w-[9rem]">
+                                  <DropdownMenuItem
+                                    disabled={!loadedDataMeta?._id}
+                                    onSelect={() => {
+                                      setNewProjectSaveMode("save");
+                                      setProjectNameInput("");
+                                    }}
+                                  >
+                                    Save
+                                  </DropdownMenuItem>
+                                  <DropdownMenuItem
+                                    onSelect={() => {
+                                      setNewProjectSaveMode("saveAs");
+                                      if (!String(projectNameInput || "").trim()) {
+                                        const base =
+                                          loadedDataMeta?.data_set_name ||
+                                          currentProjectDisplayName ||
+                                          "project";
+                                        setProjectNameInput(`${base} copy`);
+                                      }
+                                    }}
+                                  >
+                                    Save as
+                                  </DropdownMenuItem>
+                                </DropdownMenuContent>
+                              </DropdownMenu>
+                            </div>
+                            <Button
+                              type="button"
+                              variant="outline"
+                              className="w-full sm:w-auto"
+                              onClick={() => {
+                                setNewProjectPromptOpen(false);
+                                performNewProjectWipe();
+                              }}
+                            >
+                              Continue without saving
+                            </Button>
+                          </AlertDialogFooter>
+                        </>
+                      )}
                     </AlertDialogContent>
                   </AlertDialog>
                   {showWorkspaceUsageIndicator && (
