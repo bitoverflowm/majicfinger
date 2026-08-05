@@ -52,7 +52,9 @@ const actionChipIdle =
 const actionChipActive = "bg-lychee_blue/30 text-foreground";
 
 const CHIP_GAP_PX = 4;
-const OVERFLOW_BTN_WIDTH_PX = 52;
+const OVERFLOW_BTN_WIDTH_PX = 56;
+/** Soft max chips in the strip — remaining go in "+N". Width may show fewer. */
+const MAX_VISIBLE_WORKSPACE_TABS = 2;
 
 function estimateChipWidth(label, compact) {
   const charW = compact ? 6.1 : 6.8;
@@ -60,45 +62,63 @@ function estimateChipWidth(label, compact) {
 }
 
 /**
+ * Fit as many tabs as the strip width allows (cap {@link MAX_VISIBLE_WORKSPACE_TABS}).
+ * Always keeps the active tab when possible; rest go in the overflow menu.
  * @param {Array<{ label: string; isActive: boolean }>} items
- * @param {number} availableWidth
+ * @param {number} availableWidth  Width for chips only (overflow btn already reserved)
  * @param {boolean} compact
  */
 function splitVisibleWorkspaceTabs(items, availableWidth, compact) {
   if (!items.length) return { visible: [], overflow: [] };
-  if (availableWidth <= 0) {
-    const activeIdx = items.findIndex((t) => t.isActive);
-    const activeOnly = activeIdx >= 0 ? [items[activeIdx]] : [items[0]];
-    return { visible: activeOnly, overflow: items.filter((t) => !activeOnly.includes(t)) };
-  }
 
   const widths = items.map((it) => estimateChipWidth(it.label, compact));
-  let count = 0;
-  let used = 0;
-
-  for (let i = 0; i < items.length; i++) {
-    const w = widths[i] + (count > 0 ? CHIP_GAP_PX : 0);
-    if (count > 0 && used + w > availableWidth) break;
-    used += w;
-    count++;
-  }
-
-  if (count >= items.length) {
-    return { visible: items, overflow: [] };
-  }
-
-  const visibleIndices = new Set();
-  for (let i = 0; i < count; i++) visibleIndices.add(i);
-
   const activeIdx = items.findIndex((t) => t.isActive);
-  if (activeIdx >= 0 && !visibleIndices.has(activeIdx)) {
-    const dropIdx = Math.max(...visibleIndices);
-    visibleIndices.delete(dropIdx);
-    visibleIndices.add(activeIdx);
+
+  // Try showing everything without an overflow chip.
+  if (items.length <= MAX_VISIBLE_WORKSPACE_TABS) {
+    let used = 0;
+    let fits = true;
+    for (let i = 0; i < items.length; i++) {
+      used += widths[i] + (i > 0 ? CHIP_GAP_PX : 0);
+      if (used > availableWidth) {
+        fits = false;
+        break;
+      }
+    }
+    if (fits) return { visible: items, overflow: [] };
   }
 
-  const ordered = [...visibleIndices].sort((a, b) => a - b);
-  const visible = ordered.map((i) => items[i]);
+  // Need overflow: pack up to MAX chips into availableWidth.
+  const maxSlots = Math.min(MAX_VISIBLE_WORKSPACE_TABS, items.length);
+  /** @type {number[]} */
+  const chosen = [];
+
+  const tryAdd = (idx) => {
+    if (idx < 0 || idx >= items.length || chosen.includes(idx)) return false;
+    const nextUsed =
+      chosen.reduce((sum, i, n) => sum + widths[i] + (n > 0 ? CHIP_GAP_PX : 0), 0) +
+      (chosen.length > 0 ? CHIP_GAP_PX : 0) +
+      widths[idx];
+    if (nextUsed > availableWidth && chosen.length > 0) return false;
+    chosen.push(idx);
+    return true;
+  };
+
+  // Prefer active first so it never disappears into the menu alone.
+  if (activeIdx >= 0) tryAdd(activeIdx);
+
+  for (let i = 0; i < items.length && chosen.length < maxSlots; i++) {
+    tryAdd(i);
+  }
+
+  // If even the active tab is wider than the strip, still show it (truncated via CSS).
+  if (!chosen.length && items.length) {
+    chosen.push(activeIdx >= 0 ? activeIdx : 0);
+  }
+
+  chosen.sort((a, b) => a - b);
+  const visibleIndices = new Set(chosen);
+  const visible = chosen.map((i) => items[i]);
   const overflow = items.filter((_, i) => !visibleIndices.has(i));
   return { visible, overflow };
 }
@@ -120,7 +140,9 @@ function WorkspaceTabChip({ item, textSize, onSelect }) {
 
 function WorkspaceTabStrip({ items, compact, textSize, gapClass }) {
   const stripRef = useRef(null);
-  const [{ visible, overflow }, setSplit] = useState({ visible: items, overflow: [] });
+  const [{ visible, overflow }, setSplit] = useState(() =>
+    splitVisibleWorkspaceTabs(items, Number.POSITIVE_INFINITY, compact),
+  );
 
   useLayoutEffect(() => {
     const el = stripRef.current;
@@ -128,8 +150,11 @@ function WorkspaceTabStrip({ items, compact, textSize, gapClass }) {
 
     const measure = () => {
       const width = el.clientWidth;
-      const reserveOverflow = items.length > 1 ? OVERFLOW_BTN_WIDTH_PX : 0;
-      const available = Math.max(0, width - reserveOverflow);
+      // Always reserve room for "+N" when there could be overflow, so it never
+      // gets clipped by the right-side Integration / Chart / Dashboard actions.
+      const needsOverflowSlot = items.length > 1;
+      const reserve = needsOverflowSlot ? OVERFLOW_BTN_WIDTH_PX + CHIP_GAP_PX : 0;
+      const available = Math.max(0, width - reserve);
       setSplit(splitVisibleWorkspaceTabs(items, available, compact));
     };
 
@@ -141,6 +166,8 @@ function WorkspaceTabStrip({ items, compact, textSize, gapClass }) {
 
   const overflowCount = overflow.length;
   const totalCount = items.length;
+  // If measurement said all fit but we still have many items, force menu when > max.
+  const showOverflow = overflowCount > 0;
 
   const sheetItems = items.filter((t) => t.kind === "sheet");
   const chartItems = items.filter((t) => t.kind === "chart");
@@ -148,72 +175,77 @@ function WorkspaceTabStrip({ items, compact, textSize, gapClass }) {
   return (
     <div
       ref={stripRef}
-      className={cn("flex min-w-0 flex-1 items-center overflow-hidden", gapClass)}
+      className={cn("flex min-w-0 flex-1 items-center justify-start", gapClass)}
       aria-label="Open sheets and charts"
     >
-      {visible.map((item) => (
-        <WorkspaceTabChip
-          key={item.key}
-          item={item}
-          textSize={textSize}
-          onSelect={item.onSelect}
-        />
-      ))}
-      {overflowCount > 0 ? (
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <button
-              type="button"
-              className={cn(chipBase, textSize, chipIdleSheet, "max-w-none shrink-0")}
-              title={`${totalCount} sheets and charts — open menu`}
+      {/* Pack chips + overflow flush-left; stripRef still spans full width for measure. */}
+      <div className={cn("flex min-w-0 max-w-full items-center", gapClass)}>
+        <div className={cn("flex min-w-0 items-center overflow-hidden", gapClass)}>
+          {visible.map((item) => (
+            <WorkspaceTabChip
+              key={item.key}
+              item={item}
+              textSize={textSize}
+              onSelect={item.onSelect}
+            />
+          ))}
+        </div>
+        {showOverflow ? (
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <button
+                type="button"
+                className={cn(chipBase, textSize, chipIdleSheet, "max-w-none shrink-0")}
+                title={`${overflowCount} more · ${totalCount} sheets and charts total`}
+              >
+                + {overflowCount}
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent
+              align="start"
+              className="max-h-[min(20rem,70dvh)] w-[min(20rem,90vw)] overflow-y-auto font-mono text-xs"
             >
-              + {totalCount}
-            </button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent
-            align="start"
-            className="max-h-[min(20rem,70dvh)] w-[min(20rem,90vw)] overflow-y-auto font-mono text-xs"
-          >
-            <DropdownMenuLabel className="text-[10px] uppercase tracking-wide text-muted-foreground">
-              Sheets & charts ({totalCount})
-            </DropdownMenuLabel>
-            <DropdownMenuSeparator />
-            {sheetItems.length > 0 ? (
-              <>
-                <DropdownMenuLabel className="py-1 text-[10px] text-muted-foreground">
-                  Sheets
-                </DropdownMenuLabel>
-                {sheetItems.map((item) => (
-                  <DropdownMenuItem
-                    key={item.key}
-                    className={cn("truncate", item.isActive && "bg-accent")}
-                    onClick={item.onSelect}
-                  >
-                    {item.label}
-                  </DropdownMenuItem>
-                ))}
-              </>
-            ) : null}
-            {chartItems.length > 0 ? (
-              <>
-                {sheetItems.length > 0 ? <DropdownMenuSeparator /> : null}
-                <DropdownMenuLabel className="py-1 text-[10px] text-muted-foreground">
-                  Charts
-                </DropdownMenuLabel>
-                {chartItems.map((item) => (
-                  <DropdownMenuItem
-                    key={item.key}
-                    className={cn("truncate", item.isActive && "bg-accent")}
-                    onClick={item.onSelect}
-                  >
-                    {item.label}
-                  </DropdownMenuItem>
-                ))}
-              </>
-            ) : null}
-          </DropdownMenuContent>
-        </DropdownMenu>
-      ) : null}
+              <DropdownMenuLabel className="text-[10px] uppercase tracking-wide text-muted-foreground">
+                Sheets & charts ({totalCount})
+              </DropdownMenuLabel>
+              <DropdownMenuSeparator />
+              {sheetItems.length > 0 ? (
+                <>
+                  <DropdownMenuLabel className="py-1 text-[10px] text-muted-foreground">
+                    Sheets
+                  </DropdownMenuLabel>
+                  {sheetItems.map((item) => (
+                    <DropdownMenuItem
+                      key={item.key}
+                      className={cn("truncate", item.isActive && "bg-accent")}
+                      onClick={item.onSelect}
+                    >
+                      {item.label}
+                    </DropdownMenuItem>
+                  ))}
+                </>
+              ) : null}
+              {chartItems.length > 0 ? (
+                <>
+                  {sheetItems.length > 0 ? <DropdownMenuSeparator /> : null}
+                  <DropdownMenuLabel className="py-1 text-[10px] text-muted-foreground">
+                    Charts
+                  </DropdownMenuLabel>
+                  {chartItems.map((item) => (
+                    <DropdownMenuItem
+                      key={item.key}
+                      className={cn("truncate", item.isActive && "bg-accent")}
+                      onClick={item.onSelect}
+                    >
+                      {item.label}
+                    </DropdownMenuItem>
+                  ))}
+                </>
+              ) : null}
+            </DropdownMenuContent>
+          </DropdownMenu>
+        ) : null}
+      </div>
     </div>
   );
 }
