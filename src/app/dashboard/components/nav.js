@@ -387,6 +387,7 @@ const Nav = () => {
   const effectiveStreamSheetId = selectedStreamSheetId && streamsBySheetId[selectedStreamSheetId] ? selectedStreamSheetId : (streamSheetIds[0] || null)
   const currentStreamState = effectiveStreamSheetId ? streamsBySheetId[effectiveStreamSheetId] : null
   const [newProjectPromptOpen, setNewProjectPromptOpen] = useState(false)
+  const [newProjectSaveMode, setNewProjectSaveMode] = useState(/** @type {"save" | "saveAs"} */ ("save"))
   const pendingNewProjectAfterSaveRef = useRef(false)
 
   const [isOpen, setIsOpen] = useState(false) 
@@ -587,6 +588,7 @@ const Nav = () => {
       liveStreamState,
     });
     if (hasProgress) {
+      setNewProjectSaveMode(loadedDataMeta?._id ? "save" : "saveAs");
       setNewProjectPromptOpen(true);
       return;
     }
@@ -1517,22 +1519,56 @@ const Nav = () => {
                           new project?
                         </AlertDialogDescription>
                       </AlertDialogHeader>
-                      <AlertDialogFooter className="flex-col gap-2 sm:flex-row sm:justify-end">
+                      <AlertDialogFooter className="flex-col-reverse gap-2 sm:flex-row sm:items-center sm:justify-between sm:space-x-0">
+                        <div className="flex w-full items-stretch sm:w-auto">
+                          <Button
+                            type="button"
+                            className="h-10 flex-1 rounded-r-none sm:flex-none"
+                            onClick={() => {
+                              if (newProjectSaveMode === "saveAs" || !loadedDataMeta?._id) {
+                                openSaveAsThenNewProject();
+                              } else {
+                                void saveThenNewProject();
+                              }
+                            }}
+                          >
+                            {newProjectSaveMode === "saveAs" || !loadedDataMeta?._id
+                              ? "Save as"
+                              : "Save"}
+                          </Button>
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button
+                                type="button"
+                                className="h-10 rounded-l-none border-l border-primary-foreground/20 px-2"
+                                aria-label="Choose save option"
+                              >
+                                <ChevronDown className="h-4 w-4" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="start" className="min-w-[9rem]">
+                              <DropdownMenuItem
+                                disabled={!loadedDataMeta?._id}
+                                onSelect={() => setNewProjectSaveMode("save")}
+                              >
+                                Save
+                              </DropdownMenuItem>
+                              <DropdownMenuItem onSelect={() => setNewProjectSaveMode("saveAs")}>
+                                Save as
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        </div>
                         <Button
                           type="button"
                           variant="outline"
+                          className="w-full sm:w-auto"
                           onClick={() => {
                             setNewProjectPromptOpen(false);
                             performNewProjectWipe();
                           }}
                         >
-                          Don&apos;t save
-                        </Button>
-                        <Button type="button" variant="outline" onClick={openSaveAsThenNewProject}>
-                          Save as
-                        </Button>
-                        <Button type="button" onClick={() => void saveThenNewProject()}>
-                          Save
+                          Continue without saving
                         </Button>
                       </AlertDialogFooter>
                     </AlertDialogContent>
