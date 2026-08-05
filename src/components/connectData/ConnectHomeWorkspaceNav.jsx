@@ -50,15 +50,25 @@ const chipIdleDashboard =
 const chipActiveDashboard =
   "bg-emerald-300/80 text-emerald-950 dark:bg-emerald-800/70 dark:text-emerald-50";
 
-function LiveFeedPulseDot({ className }) {
+function LiveFeedPulseDot({ className, paused = false }) {
   return (
     <span
       className={cn("relative inline-flex h-2 w-2 shrink-0", className)}
-      title="Live feed"
-      aria-label="Live feed"
+      title={paused ? "Live feed paused" : "Live feed"}
+      aria-label={paused ? "Live feed paused" : "Live feed"}
     >
-      <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75" />
-      <span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-500" />
+      <span
+        className={cn(
+          "absolute inline-flex h-full w-full rounded-full opacity-75",
+          paused ? "bg-amber-400 animate-pulse" : "animate-ping bg-emerald-400",
+        )}
+      />
+      <span
+        className={cn(
+          "relative inline-flex h-2 w-2 rounded-full",
+          paused ? "bg-amber-500" : "bg-emerald-500",
+        )}
+      />
     </span>
   );
 }
@@ -148,12 +158,17 @@ function chipStylesForKind(kind) {
   return { idle: chipIdleSheet, active: chipActiveSheet };
 }
 
-function WorkspaceTabChip({ item, textSize, onSelect }) {
+function WorkspaceTabChip({ item, textSize, onSelect, livePaused = false }) {
   const { idle, active } = chipStylesForKind(item.kind);
+  const liveTitle = item.hasLiveFeed
+    ? livePaused
+      ? `${item.label} · live feed paused`
+      : `${item.label} · live feed`
+    : item.label;
   return (
     <button
       type="button"
-      title={item.hasLiveFeed ? `${item.label} · live feed` : item.label}
+      title={liveTitle}
       className={cn(
         chipBase,
         textSize,
@@ -163,12 +178,12 @@ function WorkspaceTabChip({ item, textSize, onSelect }) {
       onClick={onSelect}
     >
       <span className="min-w-0 truncate">{item.label}</span>
-      {item.hasLiveFeed ? <LiveFeedPulseDot /> : null}
+      {item.hasLiveFeed ? <LiveFeedPulseDot paused={livePaused} /> : null}
     </button>
   );
 }
 
-function WorkspaceTabStrip({ items, compact, textSize, gapClass }) {
+function WorkspaceTabStrip({ items, compact, textSize, gapClass, livePaused = false }) {
   const stripRef = useRef(null);
   const [{ visible, overflow }, setSplit] = useState(() =>
     splitVisibleWorkspaceTabs(items, Number.POSITIVE_INFINITY, compact),
@@ -218,6 +233,7 @@ function WorkspaceTabStrip({ items, compact, textSize, gapClass }) {
               item={item}
               textSize={textSize}
               onSelect={item.onSelect}
+              livePaused={livePaused}
             />
           ))}
         </div>
@@ -257,7 +273,9 @@ function WorkspaceTabStrip({ items, compact, textSize, gapClass }) {
                       <span className="min-w-0 flex-1 truncate font-mono text-sm">
                         {item.label}
                       </span>
-                      {item.hasLiveFeed ? <LiveFeedPulseDot className="ml-2" /> : null}
+                      {item.hasLiveFeed ? (
+                        <LiveFeedPulseDot className="ml-2" paused={livePaused} />
+                      ) : null}
                     </DropdownMenuItem>
                   ))}
                 </>
@@ -280,7 +298,9 @@ function WorkspaceTabStrip({ items, compact, textSize, gapClass }) {
                       <span className="min-w-0 flex-1 truncate font-mono text-sm">
                         {item.label}
                       </span>
-                      {item.hasLiveFeed ? <LiveFeedPulseDot className="ml-2" /> : null}
+                      {item.hasLiveFeed ? (
+                        <LiveFeedPulseDot className="ml-2" paused={livePaused} />
+                      ) : null}
                     </DropdownMenuItem>
                   ))}
                 </>
@@ -305,7 +325,9 @@ function WorkspaceTabStrip({ items, compact, textSize, gapClass }) {
                       <span className="min-w-0 flex-1 truncate font-mono text-sm">
                         {item.label}
                       </span>
-                      {item.hasLiveFeed ? <LiveFeedPulseDot className="ml-2" /> : null}
+                      {item.hasLiveFeed ? (
+                        <LiveFeedPulseDot className="ml-2" paused={livePaused} />
+                      ) : null}
                     </DropdownMenuItem>
                   ))}
                 </>
@@ -511,10 +533,16 @@ export function ConnectHomeWorkspaceNav({ className, compact = false, onPanelMan
   }, [cancelConnectDataFeedPull, openIntegrationsPanel]);
 
   const loadedDataMeta = ctx?.loadedDataMeta;
+  const liveFeedState = ctx?.liveFeedState;
   const projectIsLiveCapable = useMemo(
     () => projectHasLiveFeedSource(loadedDataMeta, dataSheets),
     [loadedDataMeta, dataSheets],
   );
+  /** Yellow dots while an editor live feed for this workspace is paused. */
+  const projectLiveFeedPaused = useMemo(() => {
+    const feeds = Object.values(liveFeedState?.feedsById || {});
+    return feeds.some((f) => f?.isRunning && f?.isPaused);
+  }, [liveFeedState?.feedsById]);
 
   const projectDashboardEntries = useMemo(() => {
     const projectId =
@@ -679,6 +707,7 @@ export function ConnectHomeWorkspaceNav({ className, compact = false, onPanelMan
             compact={compact}
             textSize={textSize}
             gapClass={gapClass}
+            livePaused={projectLiveFeedPaused}
           />
         </div>
       </div>
