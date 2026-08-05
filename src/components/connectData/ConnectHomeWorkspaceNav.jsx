@@ -248,10 +248,16 @@ function WorkspaceTabStrip({ items, compact, textSize, gapClass }) {
                   {sheetItems.map((item) => (
                     <DropdownMenuItem
                       key={item.key}
-                      className={cn("truncate", item.isActive && "bg-accent")}
+                      className={cn(
+                        "flex w-full items-center justify-between gap-2",
+                        item.isActive && "bg-accent",
+                      )}
                       onClick={item.onSelect}
                     >
-                      {item.label}
+                      <span className="min-w-0 flex-1 truncate font-mono text-sm">
+                        {item.label}
+                      </span>
+                      {item.hasLiveFeed ? <LiveFeedPulseDot className="ml-2" /> : null}
                     </DropdownMenuItem>
                   ))}
                 </>
@@ -265,10 +271,16 @@ function WorkspaceTabStrip({ items, compact, textSize, gapClass }) {
                   {chartItems.map((item) => (
                     <DropdownMenuItem
                       key={item.key}
-                      className={cn("truncate", item.isActive && "bg-accent")}
+                      className={cn(
+                        "flex w-full items-center justify-between gap-2",
+                        item.isActive && "bg-accent",
+                      )}
                       onClick={item.onSelect}
                     >
-                      {item.label}
+                      <span className="min-w-0 flex-1 truncate font-mono text-sm">
+                        {item.label}
+                      </span>
+                      {item.hasLiveFeed ? <LiveFeedPulseDot className="ml-2" /> : null}
                     </DropdownMenuItem>
                   ))}
                 </>
@@ -293,9 +305,7 @@ function WorkspaceTabStrip({ items, compact, textSize, gapClass }) {
                       <span className="min-w-0 flex-1 truncate font-mono text-sm">
                         {item.label}
                       </span>
-                      {item.hasLiveFeed ? (
-                        <LiveFeedPulseDot className="ml-2" />
-                      ) : null}
+                      {item.hasLiveFeed ? <LiveFeedPulseDot className="ml-2" /> : null}
                     </DropdownMenuItem>
                   ))}
                 </>
@@ -565,6 +575,7 @@ export function ConnectHomeWorkspaceNav({ className, compact = false, onPanelMan
         key: `sheet-${id}`,
         kind: "sheet",
         label: dataSheets[id]?.name || id,
+        hasLiveFeed: projectIsLiveCapable,
         isActive: tableViewActive && id === activeSheetId,
         onSelect: () => selectSheet(id),
       });
@@ -574,6 +585,7 @@ export function ConnectHomeWorkspaceNav({ className, compact = false, onPanelMan
         key: `chart-${id}`,
         kind: "chart",
         label: chartSheets[id]?.name || id,
+        hasLiveFeed: projectIsLiveCapable,
         isActive: chartViewActive && id === activeChartSheetId,
         onSelect: () => selectChart(id),
       });
@@ -611,6 +623,7 @@ export function ConnectHomeWorkspaceNav({ className, compact = false, onPanelMan
     dataSheets,
     openDashboard,
     projectDashboardEntries,
+    projectIsLiveCapable,
     selectChart,
     selectDashboard,
     selectSheet,
