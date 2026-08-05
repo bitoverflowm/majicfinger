@@ -105,9 +105,15 @@ export function DashboardExportPanel() {
   };
 
   if (!draft?._id) {
+    const hasUnsavedDashboard =
+      !!draft &&
+      (Array.isArray(draft.layout?.rows) ||
+        !!String(draft.dashboard_name || draft.page_heading || "").trim());
     return (
       <div className="p-2 text-xs text-muted-foreground">
-        Create or load a dashboard from Your Work, then set a public slug here.
+        {hasUnsavedDashboard
+          ? "Save project to enable dashboard publishing."
+          : "Create or load a dashboard from Your Work, then set a public slug here."}
       </div>
     );
   }

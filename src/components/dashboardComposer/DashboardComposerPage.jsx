@@ -76,6 +76,13 @@ import {
   inferCardGridFieldMappings,
 } from "@/lib/dashboardCardGrid";
 import { DashboardCardGridSection } from "./DashboardCardGridSection";
+import {
+  collectEventCandlestickMarketSheets,
+  indexMarketLabelsFromMetaSheet,
+  inferLiveMetaTickerFromColumn,
+  resolveLiveEventPageSubheading,
+  resolveLiveMarketCardCopy,
+} from "@/lib/kalshiLive/eventCandlesticksPowerMove";
 
 function rid(prefix) {
   return `${prefix}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 9)}`;
@@ -207,6 +214,57 @@ export default function DashboardComposerPage({ user }) {
 
   const draft = chartDashboardDraft;
 
+  const eventCandlesCollected = useMemo(
+    () => collectEventCandlestickMarketSheets(dataSheets || {}),
+    [dataSheets],
+  );
+
+  const liveMetaSheetId = useMemo(() => {
+    return (
+      String(draft?.liveEventMeta?.metaSheetId || eventCandlesCollected?.metaSheetId || "").trim() ||
+      ""
+    );
+  }, [draft?.liveEventMeta?.metaSheetId, eventCandlesCollected?.metaSheetId]);
+
+  const liveMetaRevision =
+    liveMetaSheetId && dataSheets?.[liveMetaSheetId]
+      ? dataSheets[liveMetaSheetId].liveDataRevision ?? null
+      : null;
+
+  const liveMetaLabelIndex = useMemo(() => {
+    if (!liveMetaSheetId) return new Map();
+    return indexMarketLabelsFromMetaSheet(dataSheets?.[liveMetaSheetId]);
+  }, [dataSheets, liveMetaSheetId, liveMetaRevision]);
+
+  const livePageSubheading = useMemo(() => {
+    if (draft?.liveEventMetaLocked) return null;
+    const hasLiveHook =
+      !!draft?.liveEventMeta ||
+      (Array.isArray(draft?.tags) &&
+        draft.tags.some((t) => String(t).toLowerCase() === "event-candlesticks")) ||
+      !!eventCandlesCollected?.metaSheetId;
+    if (!hasLiveHook) return null;
+    return resolveLiveEventPageSubheading(
+      dataSheets,
+      draft?.liveEventMeta || {
+        metaSheetId: eventCandlesCollected?.metaSheetId,
+        seriesTicker: eventCandlesCollected?.seriesTicker,
+        eventSubTitle: eventCandlesCollected?.eventSubTitle,
+        querySummary: eventCandlesCollected?.querySummary,
+        marketCount: eventCandlesCollected?.markets?.length,
+      },
+    );
+  }, [
+    dataSheets,
+    draft?.liveEventMeta,
+    draft?.liveEventMetaLocked,
+    draft?.tags,
+    eventCandlesCollected,
+    liveMetaRevision,
+  ]);
+
+  const displayPageSubheading = livePageSubheading ?? draft?.page_subheading ?? "";
+
   const [dashboardLoadProgress, setDashboardLoadProgress] = useState(8);
   const [dashboardLoadStage, setDashboardLoadStage] = useState("Loading dashboard");
   /** Block autosave toasts / writes until dashboard + project hydration finish. */
@@ -232,7 +290,7 @@ export default function DashboardComposerPage({ user }) {
     const ro = new ResizeObserver(() => sync());
     ro.observe(el);
     return () => ro.disconnect();
-  }, [draft?.page_subheading, draft?.theme?.pageSubheading]);
+  }, [displayPageSubheading, draft?.theme?.pageSubheading]);
 
   useEffect(() => {
     if (!activeChartDashboardId || !hasDbUser) return;
@@ -720,12 +778,13 @@ export default function DashboardComposerPage({ user }) {
             autoComplete="off"
             spellCheck={false}
             rows={1}
-            value={draft.page_subheading ?? ""}
+            value={displayPageSubheading}
             placeholder={PAGE_SUBHEADING_PLACEHOLDER}
             onChange={(e) =>
               setDraft((d) => ({
                 ...d,
                 page_subheading: e.target.value,
+                liveEventMetaLocked: true,
               }))
             }
             onFocus={openPageSubheadingDock}
@@ -780,6 +839,22 @@ export default function DashboardComposerPage({ user }) {
                   style={CHART_CARDS_GRID_STYLE}
                 >
                   {cols.map((col) => {
+                      const liveTicker = inferLiveMetaTickerFromColumn(col);
+                      const liveUnlocked = liveTicker && !col.liveMetaLocked;
+                      const liveCopy = liveUnlocked
+                        ? resolveLiveMarketCardCopy({
+                            ticker: liveTicker,
+                            meta: liveMetaLabelIndex.get(liveTicker),
+                            fallback: {
+                              h2: col.h2,
+                              caption: col.caption,
+                              microtext: col.microtext,
+                            },
+                          })
+                        : null;
+                      const displayH2 = liveCopy?.h2 ?? col.h2 ?? "";
+                      const displayCaption = liveCopy?.caption ?? col.caption ?? "";
+                      const displayMicrotext = liveCopy?.microtext ?? col.microtext ?? "";
                       return (
                         <div
                           key={col.id}
@@ -813,12 +888,13 @@ export default function DashboardComposerPage({ user }) {
                             aria-label="Chart heading"
                             autoComplete="off"
                             spellCheck={false}
-                            value={col.h2 ?? ""}
+                            value={displayH2}
                             placeholder="Chart Heading"
                             onChange={(e) =>
                               updateColumn(row.id, col.id, (c) => ({
                                 ...c,
                                 h2: e.target.value,
+                                liveMetaLocked: true,
                               }))
                             }
                             onClick={(e) => e.stopPropagation()}
@@ -846,12 +922,13 @@ export default function DashboardComposerPage({ user }) {
                             autoComplete="off"
                             spellCheck={false}
                             rows={2}
-                            value={col.caption ?? ""}
+                            value={displayCaption}
                             placeholder="sub-heading"
                             onChange={(e) =>
                               updateColumn(row.id, col.id, (c) => ({
                                 ...c,
                                 caption: e.target.value,
+                                liveMetaLocked: true,
                               }))
                             }
                             onClick={(e) => e.stopPropagation()}
@@ -895,12 +972,13 @@ export default function DashboardComposerPage({ user }) {
                             autoComplete="off"
                             spellCheck={false}
                             rows={2}
-                            value={col.microtext ?? ""}
+                            value={displayMicrotext}
                             placeholder="Chart caption text, click to edit"
                             onChange={(e) =>
                               updateColumn(row.id, col.id, (c) => ({
                                 ...c,
                                 microtext: e.target.value,
+                                liveMetaLocked: true,
                               }))
                             }
                             onClick={(e) => e.stopPropagation()}

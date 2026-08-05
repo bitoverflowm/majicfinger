@@ -350,7 +350,14 @@ export function emptyDashboardChartColumn(overrides = {}) {
  * append (only touches the last cards row).
  *
  * @param {{ version?: number; rows?: object[] } | null | undefined} layout
- * @param {{ chartId: string; h2?: string; caption?: string; microtext?: string }} card
+ * @param {{
+ *   chartId: string;
+ *   h2?: string;
+ *   caption?: string;
+ *   microtext?: string;
+ *   liveMetaTicker?: string;
+ *   liveMetaSheetId?: string;
+ * }} card
  * @returns {{ version: 1; rows: object[] }}
  */
 export function appendEventCandlestickChartToLayout(layout, card) {
@@ -366,12 +373,21 @@ export function appendEventCandlestickChartToLayout(layout, card) {
     }
   }
 
+  const liveMetaTicker = String(card.liveMetaTicker || "").trim();
+  const liveMetaSheetId = String(card.liveMetaSheetId || "").trim();
   const nextCol = emptyDashboardChartColumn({
     chart_id: card.chartId,
     h2: String(card.h2 || "").slice(0, 160),
     caption: String(card.caption || "").slice(0, 240),
     microtext: String(card.microtext || "").slice(0, 160),
     colSpan,
+    ...(liveMetaTicker
+      ? {
+          liveMetaTicker,
+          ...(liveMetaSheetId ? { liveMetaSheetId } : {}),
+          liveMetaLocked: false,
+        }
+      : {}),
   });
 
   if (lastCardsIdx < 0) {
@@ -390,6 +406,95 @@ export function appendEventCandlestickChartToLayout(layout, card) {
   }
 
   return { version: 1, rows };
+}
+
+/**
+ * Infer market ticker for live caption binding (explicit field or microtext prefix).
+ * @param {{ liveMetaTicker?: string; microtext?: string } | null | undefined} col
+ * @returns {string} uppercase ticker or ""
+ */
+export function inferLiveMetaTickerFromColumn(col) {
+  const explicit = String(col?.liveMetaTicker || "").trim();
+  if (explicit) return explicit.toUpperCase();
+  const micro = String(col?.microtext || "").trim();
+  if (!micro) return "";
+  const first = micro.split("·")[0]?.trim() || "";
+  if (/^[A-Z0-9][A-Z0-9_-]{2,}$/i.test(first)) return first.toUpperCase();
+  return "";
+}
+
+/**
+ * Live h2 / caption / microtext for a chart card from markets metadata.
+ *
+ * @param {{
+ *   ticker: string;
+ *   meta: MarketMetaEntry | undefined;
+ *   fallback?: { h2?: string; caption?: string; microtext?: string };
+ * }} opts
+ */
+export function resolveLiveMarketCardCopy(opts) {
+  const ticker = String(opts.ticker || "").trim();
+  const meta = opts.meta;
+  const fallback = opts.fallback || {};
+  if (!meta) {
+    return {
+      h2: String(fallback.h2 || ticker || "").slice(0, 160),
+      caption: String(fallback.caption || "").slice(0, 240),
+      microtext: String(fallback.microtext || ticker || "").slice(0, 160),
+    };
+  }
+  const title = meta.title || ticker;
+  const pct = formatChancePct(meta.chancePct);
+  const h2 = (pct ? `${title} — ${pct}` : title).slice(0, 160);
+  const caption = (buildMarketCardCaption(meta, meta.chancePct) || ticker || "").slice(0, 240);
+  const microtext = [ticker, meta.noSubTitle ? `No: ${meta.noSubTitle}` : ""]
+    .filter(Boolean)
+    .join(" · ")
+    .slice(0, 160);
+  return { h2, caption, microtext };
+}
+
+/**
+ * Rebuild event page subheading from live meta sheet aggregates.
+ *
+ * @param {Record<string, object> | null | undefined} dataSheets
+ * @param {{
+ *   metaSheetId?: string;
+ *   seriesTicker?: string;
+ *   eventSubTitle?: string;
+ *   querySummary?: string;
+ *   marketCount?: number;
+ * } | null | undefined} liveEventMeta
+ * @returns {string | null}
+ */
+export function resolveLiveEventPageSubheading(dataSheets, liveEventMeta) {
+  const collected = collectEventCandlestickMarketSheets(dataSheets || {});
+  const metaSheetId =
+    String(liveEventMeta?.metaSheetId || collected?.metaSheetId || "").trim() || "";
+  const metaSheet = metaSheetId ? dataSheets?.[metaSheetId] : null;
+  if (!metaSheet) return null;
+  const labelIndex = indexMarketLabelsFromMetaSheet(metaSheet);
+  if (!labelIndex.size) return null;
+  const seriesTicker = String(
+    liveEventMeta?.seriesTicker || collected?.seriesTicker || "",
+  ).trim();
+  const eventSubTitle = String(
+    liveEventMeta?.eventSubTitle || collected?.eventSubTitle || "",
+  ).trim();
+  const querySummary = String(
+    liveEventMeta?.querySummary || collected?.querySummary || "",
+  ).trim();
+  const marketCount =
+    Math.floor(Number(liveEventMeta?.marketCount)) ||
+    collected?.markets?.length ||
+    labelIndex.size;
+  return buildEventPageSubheading({
+    seriesTicker,
+    marketCount,
+    querySummary,
+    totals: aggregateEventMetadata(labelIndex),
+    eventSubTitle,
+  }).slice(0, 240);
 }
 
 /**
@@ -490,6 +595,15 @@ export async function runEventCandlesticksDashboardPowerMove(ctx) {
     data_set_id: "",
     public_slug: "",
     is_public: false,
+    liveEventMeta: {
+      metaSheetId: collected.metaSheetId || "",
+      seriesTicker,
+      eventTicker,
+      eventSubTitle: collected.eventSubTitle || "",
+      querySummary: collected.querySummary || "",
+      marketCount,
+    },
+    liveEventMetaLocked: false,
   };
 
   ctx.setActiveChartDashboardId?.(null);
@@ -530,6 +644,8 @@ export async function runEventCandlesticksDashboardPowerMove(ctx) {
       microtext: [market.marketTicker, meta?.noSubTitle ? `No: ${meta.noSubTitle}` : ""]
         .filter(Boolean)
         .join(" · "),
+      liveMetaTicker: market.marketTicker,
+      liveMetaSheetId: collected.metaSheetId || "",
     });
 
     // Stream the card into the live draft so the dashboard paints as we go.
@@ -555,6 +671,8 @@ export async function runEventCandlesticksDashboardPowerMove(ctx) {
         dashboard_name: base.dashboard_name || draftSeed.dashboard_name,
         page_heading: base.page_heading || draftSeed.page_heading,
         page_subheading: base.page_subheading || draftSeed.page_subheading,
+        liveEventMeta: base.liveEventMeta || draftSeed.liveEventMeta,
+        liveEventMetaLocked: base.liveEventMetaLocked ?? false,
       };
     });
   });
