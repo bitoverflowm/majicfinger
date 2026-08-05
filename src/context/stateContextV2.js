@@ -1174,19 +1174,19 @@ export const StateProviderV2 = ({children, initialSettings}) => {
         largePullView: null,
       });
 
-      const streamsBySheetId = liveStreamState?.streamsBySheetId || {};
-      Object.entries(streamsBySheetId).forEach(([sheetId, stream]) => {
-        if (stream?.isRunning || stream?.connecting) {
-          liveStreamActions?.stop?.(sheetId);
-        }
-      });
-
       const feedsById = liveFeedState?.feedsById || {};
-      Object.entries(feedsById).forEach(([feedId, feed]) => {
-        if (feed?.isRunning || feed?.connecting) {
-          liveFeedActions?.stop?.(feedId);
-        }
+      Object.keys(feedsById).forEach((feedId) => {
+        liveFeedActions?.stop?.(feedId);
       });
+      liveFeedActions?.stop?.();
+      setLiveFeedState?.({ feedsById: {} });
+
+      const streamsBySheetId = liveStreamState?.streamsBySheetId || {};
+      Object.keys(streamsBySheetId).forEach((sheetId) => {
+        liveStreamActions?.stop?.(sheetId);
+      });
+      liveStreamActions?.stop?.();
+      setLiveStreamState?.({ streamsBySheetId: {} });
 
       const hasData = connectHomeAnySheetHasData(dataSheets, connectedData);
       if (!hasData) {
@@ -1200,6 +1200,8 @@ export const StateProviderV2 = ({children, initialSettings}) => {
       liveStreamState?.streamsBySheetId,
       liveFeedActions,
       liveFeedState?.feedsById,
+      setLiveFeedState,
+      setLiveStreamState,
     ]);
 
     const [chartSnapshotFlusher, setChartSnapshotFlusher] = useState(() => async () => null);

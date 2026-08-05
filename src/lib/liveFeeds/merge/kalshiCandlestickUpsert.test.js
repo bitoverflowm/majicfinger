@@ -174,4 +174,55 @@ describe("kalshiCandlestickUpsert null-safe merge", () => {
     expect(next["sheet-1"].data[0].yes_sub_title).toBe("range");
     expect(next["sheet-2"].data[0].end_period_ts).toBe(120);
   });
+
+  it("coerces market meta dollar strings so number cells stay valid", () => {
+    const dataSheets = {
+      "sheet-1": {
+        name: "EVT · markets",
+        provenance: {
+          sheetKind: "markets_metadata",
+          source: "kalshi-live",
+          endpoint: "event_candlesticks",
+        },
+        data: [
+          {
+            ticker: "KX-A",
+            yes_bid_dollars: 0.5,
+            last_price_dollars: 0.5,
+            updated_time: new Date("2026-08-05T04:00:00.000Z"),
+          },
+        ],
+      },
+    };
+    const feed = {
+      sheets: {
+        marketsMetadataSheetId: "sheet-1",
+        marketSheetIdsByTicker: {},
+      },
+    };
+    const tick = {
+      metaRows: [
+        {
+          ticker: "KX-A",
+          yes_bid_dollars: "0.5300",
+          yes_ask_dollars: "0.5500",
+          last_price_dollars: "0.5300",
+          notional_value_dollars: "1.0000",
+          previous_yes_bid_dollars: "0.0000",
+          updated_time: "2026-08-05T04:20:57.664296Z",
+          latest_expiration_time: "2026-08-19T03:00:00Z",
+        },
+      ],
+      byMarket: [],
+    };
+    const { dataSheets: next } = applyKalshiCandlestickUpsertToSheets(dataSheets, feed, tick);
+    const row = next["sheet-1"].data[0];
+    expect(row.yes_bid_dollars).toBe(0.53);
+    expect(row.yes_ask_dollars).toBe(0.55);
+    expect(row.last_price_dollars).toBe(0.53);
+    expect(row.notional_value_dollars).toBe(1);
+    expect(row.previous_yes_bid_dollars).toBe(0);
+    expect(row.updated_time).toBeInstanceOf(Date);
+    expect(row.latest_expiration_time).toBeInstanceOf(Date);
+  });
 });

@@ -24,6 +24,23 @@ function themeOptions(dark) {
 }
 
 /**
+ * True when `next` looks like a live refresh of `prev` (same series, bars appended/updated)
+ * rather than a different sheet / full replace — used to keep zoom/pan.
+ *
+ * @param {{ time: number }[] | null | undefined} prev
+ * @param {{ time: number }[] | null | undefined} next
+ */
+function isSameSeriesLiveUpdate(prev, next) {
+  if (!Array.isArray(prev) || !Array.isArray(next) || !prev.length || !next.length) return false;
+  if (prev[0]?.time !== next[0]?.time) return false;
+  const prevLast = prev[prev.length - 1]?.time;
+  if (prevLast == null) return false;
+  if (next.some((b) => b?.time === prevLast)) return true;
+  const nextLast = next[next.length - 1]?.time;
+  return nextLast != null && nextLast > prevLast && next.length >= prev.length;
+}
+
+/**
  * Lightweight Charts candlestick pane (open-source library; no on-chart TV logo).
  *
  * @param {{
@@ -37,6 +54,9 @@ export function CandlestickChartView({ data, dark = false, className }) {
   const chartRef = useRef(/** @type {import("lightweight-charts").IChartApi | null} */ (null));
   const seriesRef = useRef(/** @type {import("lightweight-charts").ISeriesApi<"Candlestick"> | null} */ (null));
   const darkRef = useRef(dark);
+  const prevDataRef = useRef(
+    /** @type {{ time: number; open: number; high: number; low: number; close: number }[]} */ ([]),
+  );
   darkRef.current = dark;
 
   useEffect(() => {
@@ -100,6 +120,7 @@ export function CandlestickChartView({ data, dark = false, className }) {
       chart.remove();
       chartRef.current = null;
       seriesRef.current = null;
+      prevDataRef.current = [];
     };
   }, []);
 
@@ -114,8 +135,37 @@ export function CandlestickChartView({ data, dark = false, className }) {
     const chart = chartRef.current;
     if (!series || !chart) return;
     const list = Array.isArray(data) ? data : [];
+    const timeScale = chart.timeScale();
+    const prev = prevDataRef.current;
+    const preserveZoom = isSameSeriesLiveUpdate(prev, list);
+
+    /** @type {{ from: number; to: number } | null} */
+    let savedLogical = null;
+    if (preserveZoom) {
+      try {
+        const range = timeScale.getVisibleLogicalRange();
+        if (range && Number.isFinite(range.from) && Number.isFinite(range.to)) {
+          savedLogical = { from: range.from, to: range.to };
+        }
+      } catch {
+        savedLogical = null;
+      }
+    }
+
     series.setData(list);
-    if (list.length) chart.timeScale().fitContent();
+    prevDataRef.current = list;
+
+    if (!list.length) return;
+
+    if (savedLogical) {
+      try {
+        timeScale.setVisibleLogicalRange(savedLogical);
+        return;
+      } catch {
+        // fall through to fit
+      }
+    }
+    timeScale.fitContent();
   }, [data]);
 
   return (

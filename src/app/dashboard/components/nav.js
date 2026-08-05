@@ -529,7 +529,6 @@ const Nav = () => {
       {
         setDataSheets,
         setActiveSheetId,
-        setConnectedData,
         setConnectedCols,
         setDataTypes,
         setChartSheets,
@@ -546,6 +545,7 @@ const Nav = () => {
         setConnectedPresentation,
         setDataSetName,
         setConnectHomeCenterView,
+        setConnectHomePullDestination: contextStateV2?.setConnectHomePullDestination,
         liveStreamActions,
         liveStreamState,
         liveFeedActions,
@@ -565,7 +565,9 @@ const Nav = () => {
     setIntegrationSidebar?.(null);
     setRightPanelOpen?.(false);
     // Clears Kalshi/live UI selections, power-move build, pull state, analyze flow.
+    // Note: this resets pull destination to new_sheet — re-assert replace after.
     requestConnectWorkspace?.(null);
+    contextStateV2?.setConnectHomePullDestination?.("replace");
     setViewing?.("connectDataHome");
 
     if (typeof window !== "undefined") {

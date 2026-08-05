@@ -61,6 +61,7 @@ import { inferSeriesTickerFromEvent } from "@/lib/kalshiLive/eventCandlesticksCo
 import { fetchKalshiLiveTradesPull } from "@/lib/kalshiLive/fetchKalshiLiveTradesPull";
 import { fetchKalshiLiveOrderbookPull } from "@/lib/kalshiLive/fetchKalshiLiveOrderbookPull";
 import { applyConnectHomePullData } from "@/lib/connectHomePullDestination";
+import { pruneEmptyDefaultNamedSheets } from "@/lib/resetProjectWorkspaceState";
 import { trackDataPullComplete, trackDataPullError, trackDataPullStart } from "@/lib/analytics/trackDataPull";
 
 function genRequestCardId() {
@@ -1307,7 +1308,7 @@ export default function KalshiLive({ setConnectedData, connectHomePullBridge = f
             }
 
             firstSheetId = writtenIds[0] || firstSheetId;
-            return next;
+            return pruneEmptyDefaultNamedSheets(next);
           });
 
           if (firstSheetId && ctx?.setActiveSheetId) {

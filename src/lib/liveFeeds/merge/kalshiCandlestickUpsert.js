@@ -6,7 +6,12 @@
  * Merge rule: never overwrite an existing finite / non-empty cell with null/undefined/"".
  * Kalshi often re-sends quiet periods with null trade OHLC; blanking prior values was
  * wiping charts after cron / live ticks.
+ *
+ * Incoming rows are coerced (same as initial pull) so dollar strings / ISO times match
+ * AG Grid `cellDataType: number|date` and do not show "Invalid Number".
  */
+
+import { coerceDataTypes } from "@/lib/coerceDataTypes";
 
 /**
  * Normalize candle period keys to unix seconds (never ms / Date).
@@ -323,11 +328,12 @@ export function applyKalshiCandlestickUpsertToSheets(dataSheets, feed, tick, opt
     const existing = Array.isArray(metaSheet.data) ? metaSheet.data : [];
     // If a prior bad candle upsert wiped this tab, don't try to merge OHLC leftovers.
     const base = sheetDataLooksLikeCandlesticks(existing) ? [] : existing;
-    const flashRows = buildMarketMetaLiveFlashRows(base, tick.metaRows);
+    const metaIncoming = coerceDataTypes(tick.metaRows);
+    const flashRows = buildMarketMetaLiveFlashRows(base, metaIncoming);
     const hasFlash = Object.keys(flashRows).length > 0;
     next[metaId] = {
       ...metaSheet,
-      data: upsertMarketMetaRowsByTicker(base, tick.metaRows),
+      data: upsertMarketMetaRowsByTicker(base, metaIncoming),
       liveDataRevision: revision,
       liveFlash: hasFlash ? { revision, rows: flashRows } : null,
     };
@@ -360,7 +366,7 @@ export function applyKalshiCandlestickUpsertToSheets(dataSheets, feed, tick, opt
     }
     marketsMatched += 1;
     const existing = Array.isArray(sheet.data) ? sheet.data : [];
-    const incoming = Array.isArray(market.rows) ? market.rows : [];
+    const incoming = coerceDataTypes(Array.isArray(market.rows) ? market.rows : []);
     const diff = countCandlestickUpsertChanges(existing, incoming);
     candlesReceived += diff.received;
     candlesAdded += diff.added;

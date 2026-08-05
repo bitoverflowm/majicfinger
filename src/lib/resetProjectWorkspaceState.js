@@ -3,19 +3,69 @@
  * or starting a brand-new project.
  */
 
-const BLANK_DATA_SHEETS = {
-  "sheet-1": {
-    name: "Sheet 1",
-    data: [],
-    provenance: null,
-    requestCards: [],
-    operationHistory: [],
-  },
-};
+import { flushSync } from "react-dom";
 
-const BLANK_CHART_SHEETS = {
-  "chart-1": { name: "Chart 1", snapshot: null, chartMeta: null },
-};
+import { isDefaultOrphanSheetName } from "@/lib/projectPersistence";
+
+/** Fresh blank starter — never reuse a module-level object (avoids shared mutation / React bailout). */
+export function createBlankDataSheets() {
+  return {
+    "sheet-1": {
+      name: "Sheet 1",
+      data: [],
+      provenance: null,
+      requestCards: [],
+      operationHistory: [],
+    },
+  };
+}
+
+export function createBlankChartSheets() {
+  return {
+    "chart-1": { name: "Chart 1", snapshot: null, chartMeta: null },
+  };
+}
+
+/**
+ * Drop empty default-named tabs ("Sheet 1", "Sheet 2", …) once real sheets exist.
+ * Prevents the New Project starter tab from lingering beside pulled market sheets.
+ *
+ * @param {Record<string, object> | null | undefined} dataSheets
+ * @returns {Record<string, object>}
+ */
+export function pruneEmptyDefaultNamedSheets(dataSheets) {
+  const sheets =
+    dataSheets && typeof dataSheets === "object" ? { ...dataSheets } : {};
+  const ids = Object.keys(sheets);
+  if (ids.length <= 1) return sheets;
+
+  const hasRealSheet = ids.some((id) => {
+    const s = sheets[id];
+    if (!s || typeof s !== "object") return false;
+    if (!isDefaultOrphanSheetName(s.name)) return true;
+    if (Array.isArray(s.data) && s.data.length > 0) return true;
+    if (s.provenance) return true;
+    if (Array.isArray(s.requestCards) && s.requestCards.length > 0) return true;
+    if (Array.isArray(s.operationHistory) && s.operationHistory.length > 0) return true;
+    return false;
+  });
+  if (!hasRealSheet) return sheets;
+
+  for (const id of ids) {
+    const s = sheets[id];
+    if (!s || typeof s !== "object") continue;
+    if (!isDefaultOrphanSheetName(s.name)) continue;
+    const rows = Array.isArray(s.data) ? s.data.length : 0;
+    if (rows > 0) continue;
+    if (s.provenance) continue;
+    if (Array.isArray(s.requestCards) && s.requestCards.length > 0) continue;
+    if (Array.isArray(s.operationHistory) && s.operationHistory.length > 0) continue;
+    delete sheets[id];
+  }
+
+  if (!Object.keys(sheets).length) return createBlankDataSheets();
+  return sheets;
+}
 
 /**
  * Stop WS streams + REST live polls and clear their React state.
@@ -55,7 +105,6 @@ export function resetProjectWorkspaceState(setters = {}, options = {}) {
   const {
     setDataSheets,
     setActiveSheetId,
-    setConnectedData,
     setConnectedCols,
     setDataTypes,
     setChartSheets,
@@ -73,6 +122,7 @@ export function resetProjectWorkspaceState(setters = {}, options = {}) {
     setConnectedPresentation,
     setDataSetName,
     setConnectHomeCenterView,
+    setConnectHomePullDestination,
     liveStreamActions,
     liveStreamState,
     liveFeedActions,
@@ -94,29 +144,40 @@ export function resetProjectWorkspaceState(setters = {}, options = {}) {
     cancelConnectDataFeedPull,
   });
 
-  setDataSheets?.(BLANK_DATA_SHEETS);
-  setActiveSheetId?.("sheet-1");
-  setConnectedData?.([]);
-  setConnectedCols?.([]);
-  setDataTypes?.({});
+  // flushSync so later setConnectedData / live ticks cannot merge into stale sheets.
+  // Do NOT call setConnectedData here — it is a sheet merge helper and can re-add tabs.
+  const applyBlankWorkspace = () => {
+    setDataSheets?.(createBlankDataSheets());
+    setActiveSheetId?.("sheet-1");
+    setConnectedCols?.([]);
+    setDataTypes?.({});
 
-  setChartSheets?.(BLANK_CHART_SHEETS);
-  setActiveChartSheetId?.("chart-1");
-  setLoadedChartMeta?.(null);
-  setLoadedChartBuilderSnapshot?.(null);
-  if (clearSavedChartsList) {
-    setSavedCharts?.([]);
+    setChartSheets?.(createBlankChartSheets());
+    setActiveChartSheetId?.("chart-1");
+    setLoadedChartMeta?.(null);
+    setLoadedChartBuilderSnapshot?.(null);
+    if (clearSavedChartsList) {
+      setSavedCharts?.([]);
+    }
+    setLoadedDataMeta?.(null);
+    setLoadedDataId?.(null);
+    setChartDataOverride?.(null);
+    setChartDataOverrideMeta?.(null);
+    setActiveChartDashboardId?.(null);
+    setChartDashboardDraft?.(null);
+    setLoadedPresentationMeta?.(null);
+    setConnectedPresentation?.(null);
+    setDataSetName?.("");
+    setConnectHomeCenterView?.("sheet");
+    // First pull after New Project should replace the blank starter, not add beside it.
+    setConnectHomePullDestination?.("replace");
+  };
+
+  if (typeof flushSync === "function") {
+    flushSync(applyBlankWorkspace);
+  } else {
+    applyBlankWorkspace();
   }
-  setLoadedDataMeta?.(null);
-  setLoadedDataId?.(null);
-  setChartDataOverride?.(null);
-  setChartDataOverrideMeta?.(null);
-  setActiveChartDashboardId?.(null);
-  setChartDashboardDraft?.(null);
-  setLoadedPresentationMeta?.(null);
-  setConnectedPresentation?.(null);
-  setDataSetName?.("");
-  setConnectHomeCenterView?.("sheet");
 }
 
 /**
