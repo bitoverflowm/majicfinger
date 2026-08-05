@@ -139,6 +139,13 @@ export async function runConnectProjectLoad({
   setConnectPowerMove,
   liveStreamActions,
   liveStreamState,
+  liveFeedActions,
+  liveFeedState,
+  setLiveStreamState,
+  setLiveFeedState,
+  cancelConnectDataFeedPull,
+  setActiveChartDashboardId,
+  setChartDashboardDraft,
   onAlreadyLoaded,
 }) {
   const { bump, startTicker, stopTicker } = createConnectProjectLoadTicker(setConnectProjectLoadState);
@@ -189,6 +196,14 @@ export async function runConnectProjectLoad({
       setChartDataOverrideMeta,
       liveStreamActions,
       liveStreamState,
+      liveFeedActions,
+      liveFeedState,
+      setLiveStreamState,
+      setLiveFeedState,
+      cancelConnectDataFeedPull,
+      setActiveChartDashboardId,
+      setChartDashboardDraft,
+      setConnectHomeCenterView,
     });
 
     bump(18, "Loading data sheets…");

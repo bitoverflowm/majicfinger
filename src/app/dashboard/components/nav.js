@@ -30,6 +30,10 @@ import {
 import { CONNECT_PROJECT_LOAD_IDLE, runConnectProjectLoad } from "@/lib/connectProjectLoad"
 import { CONNECT_HOME_SCROLL_ID } from "@/lib/connectHubScroll"
 import {
+  resetProjectWorkspaceState,
+  workspaceHasUnsavedProgress,
+} from "@/lib/resetProjectWorkspaceState"
+import {
   persistChartDashboardDraft,
   mergeCreatedChartDashboardDraft,
 } from "@/lib/persistChartDashboardDraft"
@@ -365,6 +369,11 @@ const Nav = () => {
   const liveStreamState = contextStateV2?.liveStreamState
   const liveStreamActions = contextStateV2?.liveStreamActions
   const liveFeedState = contextStateV2?.liveFeedState
+  const liveFeedActions = contextStateV2?.liveFeedActions
+  const setLiveStreamState = contextStateV2?.setLiveStreamState
+  const setLiveFeedState = contextStateV2?.setLiveFeedState
+  const cancelConnectDataFeedPull = contextStateV2?.cancelConnectDataFeedPull
+  const setConnectHomeCenterView = contextStateV2?.setConnectHomeCenterView
   const dataSheets = contextStateV2?.dataSheets
   const setDataSheets = contextStateV2?.setDataSheets
   const setActiveSheetId = contextStateV2?.setActiveSheetId
@@ -377,6 +386,8 @@ const Nav = () => {
   const hasAnyStream = streamSheetIds.length > 0
   const effectiveStreamSheetId = selectedStreamSheetId && streamsBySheetId[selectedStreamSheetId] ? selectedStreamSheetId : (streamSheetIds[0] || null)
   const currentStreamState = effectiveStreamSheetId ? streamsBySheetId[effectiveStreamSheetId] : null
+  const [newProjectPromptOpen, setNewProjectPromptOpen] = useState(false)
+  const pendingNewProjectAfterSaveRef = useRef(false)
 
   const [isOpen, setIsOpen] = useState(false) 
   const [saveIsOpen, setSaveIsOpen] = useState(false)
@@ -503,34 +514,56 @@ const Nav = () => {
     setViewing?.("pricing");
   };
 
-  const handleStartNewProject = () => {
-    const ok = window.confirm("Start a new project? This clears your current loaded workspace state.");
-    if (!ok) return;
+  const currentProjectDisplayName =
+    loadedDataMeta?.data_set_name ||
+    String(projectNameInput || "").trim() ||
+    dataSetName ||
+    "Untitled project";
 
-    const blankSheets = { "sheet-1": { name: "Sheet 1", data: [], provenance: null } };
-    const blankCharts = { "chart-1": { name: "Chart 1", snapshot: null, chartMeta: null } };
+  const performNewProjectWipe = () => {
+    pendingNewProjectAfterSaveRef.current = false;
+    setNewProjectPromptOpen(false);
 
-    setConnectedData?.([]);
-    setDataSheets?.(blankSheets);
-    setActiveSheetId?.("sheet-1");
-    setChartSheets?.(blankCharts);
-    setActiveChartSheetId?.("chart-1");
+    resetProjectWorkspaceState(
+      {
+        setDataSheets,
+        setActiveSheetId,
+        setConnectedData,
+        setConnectedCols,
+        setDataTypes,
+        setChartSheets,
+        setActiveChartSheetId,
+        setLoadedChartMeta,
+        setLoadedChartBuilderSnapshot,
+        setLoadedDataMeta,
+        setLoadedDataId,
+        setChartDataOverride,
+        setChartDataOverrideMeta,
+        setActiveChartDashboardId,
+        setChartDashboardDraft,
+        setLoadedPresentationMeta,
+        setConnectedPresentation,
+        setDataSetName,
+        setConnectHomeCenterView,
+        liveStreamActions,
+        liveStreamState,
+        liveFeedActions,
+        liveFeedState,
+        setLiveStreamState,
+        setLiveFeedState,
+        cancelConnectDataFeedPull,
+      },
+      { clearSavedChartsList: false },
+    );
 
-    setLoadedDataMeta?.(null);
-    setLoadedDataId?.(null);
-    setLoadedChartMeta?.(null);
-    setLoadedChartBuilderSnapshot?.(null);
-    setLoadedPresentationMeta?.(null);
-    setConnectedPresentation?.(null);
-    setChartDataOverride?.(null);
-    setChartDataOverrideMeta?.(null);
+    setSelectedStreamSheetId(null);
     setProjectNameInput("");
     setOverwrite(false);
-
     setConnectProjectLoadState?.(CONNECT_PROJECT_LOAD_IDLE);
     setDataConnected?.(false);
     setIntegrationSidebar?.(null);
     setRightPanelOpen?.(false);
+    // Clears Kalshi/live UI selections, power-move build, pull state, analyze flow.
     requestConnectWorkspace?.(null);
     setViewing?.("connectDataHome");
 
@@ -541,6 +574,23 @@ const Nav = () => {
     }
 
     toast.success("Ready to start a new project.");
+  };
+
+  const handleStartNewProject = () => {
+    const hasProgress = workspaceHasUnsavedProgress({
+      dataSheets,
+      chartSheets,
+      connectedData,
+      chartDashboardDraft,
+      loadedDataMeta,
+      liveFeedState,
+      liveStreamState,
+    });
+    if (hasProgress) {
+      setNewProjectPromptOpen(true);
+      return;
+    }
+    performNewProjectWipe();
   };
 
   const saveAllChartsForProject = async (dataSetId, forceCreate = false, chartSheetsForSave = chartSheets) => {
@@ -718,11 +768,12 @@ const Nav = () => {
     return !!(ogRes.ok && ogJson?.success);
   };
 
-  const handleSave = async () => {
+  const handleSave = async (options = {}) => {
     if (contextStateV2?.workspaceWriteLocked) {
       toast.error("Upgrade to Pro to save projects.");
-      return;
+      return false;
     }
+    const forceOverwrite = options.forceOverwrite === true;
     const bump = (pct, msg) => {
       saveProjectProgressRef.current = pct;
       setSaveProjectProgress(pct);
@@ -750,14 +801,14 @@ const Nav = () => {
             }
           : chartSheets || {};
       const hasLoadedProject = !!loadedDataMeta?._id;
-      const shouldOverwrite = hasLoadedProject && !!overwrite;
+      const shouldOverwrite = hasLoadedProject && (forceOverwrite || !!overwrite);
       const projectName = shouldOverwrite
         ? loadedDataMeta?.data_set_name
         : String(projectNameInput || "").trim();
 
       if (!projectName) {
         toast.error("Name your project before saving.");
-        return;
+        return false;
       }
 
       setSaveProjectBusy(true);
@@ -819,15 +870,15 @@ const Nav = () => {
         }
         if (updateRes.status === 409) {
           toast.error(updateJson?.message || "Project changed since you loaded it. Reload before saving.");
-          return;
+          return false;
         }
         if (updateRes.status === 413) {
           toast.error("Save payload too large for the hosting tier. Try trimming rows or contact support.");
-          return;
+          return false;
         }
         if (updateRes.status === 403 && updateJson?.code === "ADVANCED_DATA_STORAGE_REQUIRED") {
           openLargeProjectUpgradeDialog(updateJson.storageSummary || currentAdvancedStorageSummary);
-          return;
+          return false;
         }
         if (!updateRes.ok || !updateJson?.success) {
           throw new Error(updateJson?.message || "Failed to save project changes.");
@@ -857,11 +908,11 @@ const Nav = () => {
         }
         if (createRes.status === 413) {
           toast.error("Save payload too large for the hosting tier. Try trimming rows or contact support.");
-          return;
+          return false;
         }
         if (createRes.status === 403 && createJson?.code === "ADVANCED_DATA_STORAGE_REQUIRED") {
           openLargeProjectUpgradeDialog(createJson.storageSummary || currentAdvancedStorageSummary);
-          return;
+          return false;
         }
         if (!createRes.ok || !createJson?.success) {
           throw new Error(createJson?.message || "Failed to save project.");
@@ -875,7 +926,7 @@ const Nav = () => {
 
       if (!savedProject?._id) {
         toast.error("Failed to save project.");
-        return;
+        return false;
       }
 
       bump(48, "Saving charts…");
@@ -960,11 +1011,19 @@ const Nav = () => {
       bump(100, "Saved successfully.");
       toast.success(shouldOverwrite ? "Project overwritten." : "New project saved.");
       await new Promise((r) => setTimeout(r, 480));
+      const shouldStartNewProject = pendingNewProjectAfterSaveRef.current;
+      pendingNewProjectAfterSaveRef.current = false;
       setSaveIsOpen(false);
       setProjectNameInput("");
+      if (shouldStartNewProject) {
+        performNewProjectWipe();
+      }
+      return true;
     } catch (error) {
       console.error('Error saving project:', error);
       toast.error("Failed to save project.");
+      pendingNewProjectAfterSaveRef.current = false;
+      return false;
     } finally {
       setSaveProjectBusy(false);
       saveProjectProgressRef.current = 0;
@@ -981,6 +1040,31 @@ const Nav = () => {
       return;
     }
     handleSave();
+  };
+
+  const openSaveAsThenNewProject = () => {
+    setNewProjectPromptOpen(false);
+    pendingNewProjectAfterSaveRef.current = true;
+    setOverwrite(false);
+    setSaveProjectBusy(false);
+    setSaveProjectProgress(0);
+    setSaveProjectMessage("");
+    setSaveIsOpen(true);
+  };
+
+  const saveThenNewProject = async () => {
+    setNewProjectPromptOpen(false);
+    if (loadedDataMeta?._id) {
+      pendingNewProjectAfterSaveRef.current = true;
+      setOverwrite(true);
+      setSaveIsOpen(true);
+      const ok = await handleSave({ forceOverwrite: true });
+      if (!ok) {
+        pendingNewProjectAfterSaveRef.current = false;
+      }
+      return;
+    }
+    openSaveAsThenNewProject();
   };
 
   const hydrateProjectCharts = async (dataSetId, preferredChartId = null) =>
@@ -1027,6 +1111,14 @@ const Nav = () => {
         setChartDataOverrideMeta,
         liveStreamActions,
         liveStreamState,
+        liveFeedActions,
+        liveFeedState,
+        setLiveStreamState,
+        setLiveFeedState,
+        cancelConnectDataFeedPull,
+        setActiveChartDashboardId,
+        setChartDashboardDraft,
+        setConnectHomeCenterView,
         setConnectPowerMove,
       });
       toast.success(`Project: ${dataSet?.data_set_name || loadedDataMeta?.data_set_name || "Untitled"} loaded`, {
@@ -1407,6 +1499,38 @@ const Nav = () => {
                         New Project
                       </Button>
                   )}
+                  <AlertDialog open={newProjectPromptOpen} onOpenChange={setNewProjectPromptOpen}>
+                    <AlertDialogContent>
+                      <AlertDialogHeader>
+                        <AlertDialogTitle>Unsaved changes</AlertDialogTitle>
+                        <AlertDialogDescription>
+                          You currently have unsaved changes in{" "}
+                          <span className="font-medium text-foreground">{currentProjectDisplayName}</span>.
+                          All unsaved progress will be lost. Would you like to save before starting a
+                          new project?
+                        </AlertDialogDescription>
+                      </AlertDialogHeader>
+                      <AlertDialogFooter className="flex-col gap-2 sm:flex-row sm:justify-end">
+                        <AlertDialogCancel>Cancel</AlertDialogCancel>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          onClick={() => {
+                            setNewProjectPromptOpen(false);
+                            performNewProjectWipe();
+                          }}
+                        >
+                          Don&apos;t save
+                        </Button>
+                        <Button type="button" variant="outline" onClick={openSaveAsThenNewProject}>
+                          Save as
+                        </Button>
+                        <Button type="button" onClick={() => void saveThenNewProject()}>
+                          Save
+                        </Button>
+                      </AlertDialogFooter>
+                    </AlertDialogContent>
+                  </AlertDialog>
                   {showWorkspaceUsageIndicator && (
                     userGetsWorkspaceQuotaMeter(user) && !workspaceQuotaError ? (
                       <EliteWorkspaceUsageIndicator
@@ -1428,6 +1552,10 @@ const Nav = () => {
                             setSaveProjectBusy(false);
                             setSaveProjectProgress(0);
                             setSaveProjectMessage("");
+                          } else {
+                            // Dismissed without finishing save — cancel new-project chain.
+                            // Success path copies the flag before closing.
+                            pendingNewProjectAfterSaveRef.current = false;
                           }
                         }}
                       >
