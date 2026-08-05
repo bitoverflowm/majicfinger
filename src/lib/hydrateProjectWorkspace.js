@@ -269,6 +269,8 @@ export async function loadFullProjectFromApi({
         setActiveSheetId,
         setConnectedData,
       });
+      setRefetchChartDashboardsTick?.((t) => (t || 0) + 1);
+      return { dataSheets: workingSheets, dataSet: stripped };
     } catch (e) {
       console.warn("[loadFullProjectFromApi] Sheet replay failed:", e?.message || e);
       workingSheets = replayProjectDerivedSheets(workingSheets);
@@ -277,10 +279,16 @@ export async function loadFullProjectFromApi({
         setActiveSheetId,
         setConnectedData,
       });
+      setRefetchChartDashboardsTick?.((t) => (t || 0) + 1);
+      return { dataSheets: workingSheets, dataSet: stripped };
     }
   }
 
   setRefetchChartDashboardsTick?.((t) => (t || 0) + 1);
+  return {
+    dataSheets: incomingSheets && typeof incomingSheets === "object" ? incomingSheets : {},
+    dataSet: stripped,
+  };
 }
 
 /**
@@ -334,8 +342,10 @@ export async function openProjectInConnectHome({
   setRightPanelOpen,
   rightPanelTab = null,
   scroll = true,
+  liveFeedActions = null,
+  liveFeedState = null,
 }) {
-  await loadFullProjectFromApi({
+  const loadResult = await loadFullProjectFromApi({
     dataSetId,
     userId,
     setDataSheets,
@@ -360,4 +370,17 @@ export async function openProjectInConnectHome({
     rightPanelTab,
     scroll,
   });
+  if (liveFeedActions) {
+    const { maybeAutoStartPublishedProjectLiveFeed } = await import(
+      "@/lib/liveFeeds/startEventCandlesticksEditorLiveFeed"
+    );
+    await maybeAutoStartPublishedProjectLiveFeed({
+      userId,
+      dataSetId,
+      dataSheets: loadResult?.dataSheets,
+      liveFeedActions,
+      liveFeedState,
+    });
+  }
+  return loadResult;
 }

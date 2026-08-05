@@ -35,6 +35,10 @@ import {
   firstDashboardLayoutChartId,
   loadFullProjectFromApi,
 } from "@/lib/hydrateProjectWorkspace";
+import {
+  dashboardHasPublishedSlug,
+  startEventCandlesticksEditorLiveFeed,
+} from "@/lib/liveFeeds/startEventCandlesticksEditorLiveFeed";
 import { IsolatedChartPreview } from "./IsolatedChartPreview";
 import DotPattern from "@/components/magicui/dot-pattern";
 import { Plus } from "lucide-react";
@@ -197,6 +201,8 @@ export default function DashboardComposerPage({ user }) {
     cardGridComposerDock,
     setCardGridComposerDock,
     isDemo,
+    liveFeedActions,
+    liveFeedState,
   } = useMyStateV2() ?? {};
 
   const [demoDashboardDialogOpen, setDemoDashboardDialogOpen] = useState(false);
@@ -279,10 +285,11 @@ export default function DashboardComposerPage({ user }) {
         });
 
         const dataSetId = d.data_set_id ? String(d.data_set_id) : "";
+        let loadedSheets = null;
         if (dataSetId && user?.userId) {
           if (!cancelled) setDashboardLoadStage("Loading project data");
           try {
-            await loadFullProjectFromApi({
+            const loadResult = await loadFullProjectFromApi({
               dataSetId,
               userId: user.userId,
               preferredChartId: firstDashboardLayoutChartId(layout),
@@ -297,9 +304,25 @@ export default function DashboardComposerPage({ user }) {
               setLoadedChartMeta,
               setLoadedChartBuilderSnapshot,
             });
+            loadedSheets = loadResult?.dataSheets || null;
           } catch {
             if (!cancelled) toast.warning("Could not load the project linked to this dashboard.");
           }
+        }
+
+        // Published (private or public) dashboards auto-start the editor live feed.
+        if (
+          !cancelled &&
+          dashboardHasPublishedSlug(d) &&
+          loadedSheets &&
+          liveFeedActions
+        ) {
+          startEventCandlesticksEditorLiveFeed({
+            dataSheets: loadedSheets,
+            liveFeedActions,
+            liveFeedState,
+            reason: "published_dashboard",
+          });
         }
 
         if (!cancelled) setDashboardLoadProgress(100);
@@ -336,6 +359,8 @@ export default function DashboardComposerPage({ user }) {
     setActiveChartSheetId,
     setLoadedChartMeta,
     setLoadedChartBuilderSnapshot,
+    liveFeedActions,
+    liveFeedState,
   ]);
 
   const setDraft = useCallback(

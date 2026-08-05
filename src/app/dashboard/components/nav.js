@@ -362,6 +362,8 @@ const Nav = () => {
 
   const liveStreamState = contextStateV2?.liveStreamState
   const liveStreamActions = contextStateV2?.liveStreamActions
+  const liveFeedState = contextStateV2?.liveFeedState
+  const liveFeedActions = contextStateV2?.liveFeedActions
   const dataSheets = contextStateV2?.dataSheets
   const setDataSheets = contextStateV2?.setDataSheets
   const setActiveSheetId = contextStateV2?.setActiveSheetId
@@ -1012,6 +1014,9 @@ const Nav = () => {
         setChartDataOverrideMeta,
         liveStreamActions,
         liveStreamState,
+        liveFeedActions,
+        liveFeedState,
+        getDataSheets: () => dataSheets,
       });
       toast.success(`Project: ${dataSet?.data_set_name || loadedDataMeta?.data_set_name || "Untitled"} loaded`, {
         duration: 99999999,

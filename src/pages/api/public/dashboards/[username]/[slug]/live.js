@@ -1,17 +1,16 @@
-import dbConnect from "@/lib/dbConnect";
-import ChartDashboard from "@/models/ChartDashboards";
-import User from "@/models/Users";
 import { resolvePublicDashboardLiveConfig } from "@/lib/liveFeeds/publicLiveConfig";
 import {
   getCachedPublicEventCandlesticks,
   publicLiveCacheControl,
   publicLiveLookbackPeriods,
 } from "@/lib/liveFeeds/publicLiveKalshiCache";
+import { resolveDashboardByUsernameSlug } from "@/lib/server/resolveDashboardByUsernameSlug";
 
 /**
  * GET /api/public/dashboards/[username]/[slug]/live
  *
- * On-demand Kalshi event candlesticks for a published live dashboard.
+ * On-demand Kalshi event candlesticks for a published live dashboard
+ * (public world, or private published for the owner).
  * Shared short-TTL cache so many visitors → one upstream pull.
  */
 export default async function handler(req, res) {
@@ -23,24 +22,15 @@ export default async function handler(req, res) {
   }
 
   try {
-    await dbConnect();
-    const user = await User.findOne({ user_name: String(username || "").trim() }).lean();
-    if (!user) {
-      return res.status(404).json({ success: false, message: "User not found" });
-    }
-
-    const dash = await ChartDashboard.findOne({
-      user_id: user._id,
-      public_slug: String(slug || "").trim(),
-      is_public: true,
-    })
-      .select("layout data_set_id live_backed")
-      .lean();
-
-    if (!dash) {
+    const resolved = await resolveDashboardByUsernameSlug(username, slug, {
+      req,
+      select: "user_id layout data_set_id live_backed is_public public_slug",
+    });
+    if (!resolved) {
       return res.status(404).json({ success: false, message: "Dashboard not found" });
     }
 
+    const { dash, isPublic } = resolved;
     const liveConfig = await resolvePublicDashboardLiveConfig(dash);
     if (!liveConfig) {
       return res.status(400).json({
@@ -74,7 +64,7 @@ export default async function handler(req, res) {
       };
     }
 
-    res.setHeader("Cache-Control", publicLiveCacheControl());
+    res.setHeader("Cache-Control", isPublic ? publicLiveCacheControl() : "private, no-store");
     return res.status(200).json({
       success: true,
       data: {

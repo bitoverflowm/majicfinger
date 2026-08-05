@@ -1,6 +1,4 @@
-import dbConnect from "@/lib/dbConnect";
-import ChartDashboard from "@/models/ChartDashboards";
-import User from "@/models/Users";
+import { resolveDashboardByUsernameSlug } from "@/lib/server/resolveDashboardByUsernameSlug";
 
 function decodePngDataUrl(input) {
   if (typeof input !== "string") return null;
@@ -21,27 +19,24 @@ export default async function handler(req, res) {
   }
 
   try {
-    await dbConnect();
-    const user = await User.findOne({ user_name: String(username || "").trim() }).select("_id").lean();
-    if (!user) return res.status(404).end("User not found");
+    const resolved = await resolveDashboardByUsernameSlug(username, slug, {
+      req,
+      select: "user_id og_image_data is_public public_slug",
+    });
+    if (!resolved?.dash?.og_image_data) return res.status(404).end("OG image not found");
 
-    const dash = await ChartDashboard.findOne({
-      user_id: user._id,
-      public_slug: String(slug || "").trim(),
-      is_public: true,
-    })
-      .select("og_image_data")
-      .lean();
-    if (!dash?.og_image_data) return res.status(404).end("OG image not found");
-
-    const png = decodePngDataUrl(dash.og_image_data);
+    const png = decodePngDataUrl(resolved.dash.og_image_data);
     if (!png) return res.status(404).end("Invalid OG image");
 
     res.setHeader("Content-Type", "image/png");
-    res.setHeader("Cache-Control", "public, max-age=300, s-maxage=300, stale-while-revalidate=86400");
+    res.setHeader(
+      "Cache-Control",
+      resolved.isPublic
+        ? "public, max-age=300, s-maxage=300, stale-while-revalidate=86400"
+        : "private, no-store",
+    );
     return res.status(200).send(png);
   } catch (error) {
     return res.status(500).end(error?.message || "Server error");
   }
 }
-

@@ -73,7 +73,7 @@ export function DashboardExportPanel() {
       return { ...p, [kind]: next };
     });
 
-  const publicUrl = useMemo(() => {
+  const publishedUrl = useMemo(() => {
     const s = normalizeChartEmbedSlug(slugInput || draft?.public_slug || "");
     if (!userHandle || !isValidChartEmbedSlug(s)) return null;
     return `${String(SITE).replace(/\/$/, "")}/${encodeURIComponent(userHandle)}/dashboards/${encodeURIComponent(s)}`;
@@ -88,26 +88,46 @@ export function DashboardExportPanel() {
       toast.error("Load or create a dashboard first.");
       return;
     }
-    const raw = normalizeChartEmbedSlug(slugInput || draft?.dashboard_name || "");
-    if (pub && !isValidChartEmbedSlug(raw)) {
+    const raw = normalizeChartEmbedSlug(slugInput || "");
+    // Slug is required to publish (private or public). Empty slug unpublishes.
+    if (slugInput.trim() && !isValidChartEmbedSlug(raw)) {
       toast.error("Invalid slug (lowercase letters, numbers, hyphens).");
       return;
     }
     flushSync(() => {
       setDraft?.((prev) => ({
         ...(prev || {}),
-        is_public: pub,
-        public_slug: pub ? raw : "",
+        is_public: pub && !!raw,
+        public_slug: raw,
       }));
     });
     requestSaveProjectDialog?.();
     toast.info("Use Save Project in the header to save layout, data, charts, and publish settings.");
   };
 
+  const clearPublish = () => {
+    setSlugInput("");
+    setPub(false);
+    flushSync(() => {
+      setDraft?.((prev) => ({
+        ...(prev || {}),
+        is_public: false,
+        public_slug: "",
+      }));
+    });
+    toast.message("Publish cleared — Save Project to unpublish this dashboard.");
+  };
+
   if (!draft?._id) {
+    const hasUnsavedDashboard =
+      !!draft &&
+      (Array.isArray(draft.layout?.rows) ||
+        !!String(draft.dashboard_name || draft.page_heading || "").trim());
     return (
       <div className="p-2 text-xs text-muted-foreground">
-        Create or load a dashboard from Your Work, then set a public slug here.
+        {hasUnsavedDashboard
+          ? "Save project to enable dashboard publishing."
+          : "Create or load a dashboard from Your Work, then set a slug here."}
       </div>
     );
   }
@@ -117,13 +137,14 @@ export function DashboardExportPanel() {
       <div className="space-y-2">
         <p className="text-xs font-semibold text-muted-foreground">Publish dashboard</p>
         <p className="text-[11px] text-muted-foreground">
-          Set your slug and public toggle here, then use <span className="font-medium">Save Project</span> in the header to
-          persist the dashboard with your workbook and charts.
+          Set a slug to publish. Leave <span className="font-medium">Public</span> unchecked for a
+          private link (only you when signed in). Check Public to share with the world. Then use{" "}
+          <span className="font-medium">Save Project</span> in the header.
         </p>
       </div>
       <div className="grid gap-2">
         <Label htmlFor="dash-embed-slug" className="text-xs">
-          Public slug
+          Slug
         </Label>
         <Input
           id="dash-embed-slug"
@@ -140,21 +161,30 @@ export function DashboardExportPanel() {
         </Label>
         {isDemo ? (
           <span className="text-[11px] text-muted-foreground">(demo)</span>
-        ) : null}
+        ) : (
+          <span className="text-[11px] text-muted-foreground">
+            {pub ? "Anyone with the link" : "Owner only (signed in)"}
+          </span>
+        )}
       </div>
       <Button type="button" size="sm" className="w-full" onClick={openSaveProject} disabled={isDemo}>
         Save project
       </Button>
-      {publicUrl && pub ? (
+      {(draft?.public_slug || slugInput.trim()) && !isDemo ? (
+        <Button type="button" size="sm" variant="ghost" className="w-full text-xs" onClick={clearPublish}>
+          Clear slug (unpublish)
+        </Button>
+      ) : null}
+      {publishedUrl ? (
         <div className="rounded-md border bg-muted/40 p-2 text-xs">
-          <div className="mb-1 font-medium">Live URL</div>
+          <div className="mb-1 font-medium">{pub ? "Public URL" : "Private URL (owner only)"}</div>
           <Link
-            href={publicUrl}
+            href={publishedUrl}
             target="_blank"
             rel="noreferrer"
             className="inline-flex items-center gap-1 break-all text-primary underline underline-offset-2"
           >
-            {publicUrl}
+            {publishedUrl}
             <ExternalLink className="h-3 w-3 shrink-0" />
           </Link>
         </div>
@@ -183,7 +213,7 @@ export function DashboardExportPanel() {
                 placeholder="Defaults to Page title"
               />
               <p className="text-[11px] text-muted-foreground">
-                If blank, Lychee will use your Page title (H1).
+                If blank, Lychee will use your Page title (H1). SEO applies when Public is checked.
               </p>
             </div>
 

@@ -13,6 +13,8 @@ export type PublicDashboardMetaRecord = {
   published_at: Date | string | null;
   last_edited_date?: Date | string | null;
   has_og_image_data: boolean;
+  is_public?: boolean;
+  is_private_published?: boolean;
 };
 
 export type DashboardSeoSummary = {
@@ -116,6 +118,8 @@ export function buildDashboardMetadata(
   const publishedTime = toIsoDate(meta.published_at);
   const modifiedTime = toIsoDate(meta.last_edited_date || meta.published_at);
 
+  const allowIndex = meta.is_public !== false && !meta.is_private_published;
+
   return {
     metadataBase: new URL(SITE),
     title: { absolute: displayTitle },
@@ -131,17 +135,19 @@ export function buildDashboardMetadata(
       ...meta.keywords,
       ...(meta.seo_title ? [meta.seo_title] : []),
     ],
-    robots: {
-      index: true,
-      follow: true,
-      googleBot: {
-        index: true,
-        follow: true,
-        "max-image-preview": "large",
-        "max-snippet": -1,
-        "max-video-preview": -1,
-      },
-    },
+    robots: allowIndex
+      ? {
+          index: true,
+          follow: true,
+          googleBot: {
+            index: true,
+            follow: true,
+            "max-image-preview": "large",
+            "max-snippet": -1,
+            "max-video-preview": -1,
+          },
+        }
+      : { index: false, follow: false },
     openGraph: {
       title: displayTitle,
       description,

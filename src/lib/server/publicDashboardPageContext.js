@@ -1,8 +1,10 @@
 import dbConnect from "@/lib/dbConnect";
-import ChartDashboard from "@/models/ChartDashboards";
-import User from "@/models/Users";
 import { cache } from "react";
 import { clampCardGridRowLimit } from "@/lib/dashboardCardGrid";
+import {
+  getAppRouterViewerUserId,
+  resolveDashboardByUsernameSlug,
+} from "@/lib/server/resolveDashboardByUsernameSlug";
 
 function buildShellLayout(layout, cardGridSnapshots) {
   if (!layout || typeof layout !== "object") return { version: 1, rows: [] };
@@ -41,6 +43,7 @@ function buildShellLayout(layout, cardGridSnapshots) {
 
 /**
  * Single DB round-trip for published dashboard page (SSR shell + SEO meta).
+ * Public dashboards are world-readable; private published require owner session.
  * Wrapped in React cache() so generateMetadata + page share one query per request.
  */
 export const getPublicDashboardPageContext = cache(async function getPublicDashboardPageContext(
@@ -50,21 +53,15 @@ export const getPublicDashboardPageContext = cache(async function getPublicDashb
   if (!username || !slug) return null;
   await dbConnect();
 
-  const user = await User.findOne({ user_name: String(username).trim() })
-    .select("_id user_name profile_pic")
-    .lean();
-  if (!user?._id) return null;
+  const viewerUserId = await getAppRouterViewerUserId();
+  const resolved = await resolveDashboardByUsernameSlug(username, slug, {
+    viewerUserId,
+    select:
+      "user_id page_heading page_subheading dashboard_name seo_title tags keywords theme layout card_grid_snapshots published_at last_edited_date og_image_data live_backed data_set_id is_public public_slug",
+  });
+  if (!resolved) return null;
 
-  const dash = await ChartDashboard.findOne({
-    user_id: user._id,
-    public_slug: String(slug).trim(),
-    is_public: true,
-  })
-    .select(
-      "page_heading page_subheading dashboard_name seo_title tags keywords theme layout card_grid_snapshots published_at last_edited_date og_image_data live_backed data_set_id",
-    )
-    .lean();
-  if (!dash) return null;
+  const { user, dash, isPublic, isPrivatePublished } = resolved;
 
   let liveBacked = !!dash.live_backed;
   if (!liveBacked && dash.data_set_id) {
@@ -95,6 +92,8 @@ export const getPublicDashboardPageContext = cache(async function getPublicDashb
       tags: tags.map((t) => String(t || "").trim()).filter(Boolean),
       live_backed: liveBacked,
       live_poll_interval_ms: liveBacked ? 60_000 : null,
+      is_public: isPublic,
+      is_private_published: isPrivatePublished,
     },
   };
 
@@ -107,6 +106,8 @@ export const getPublicDashboardPageContext = cache(async function getPublicDashb
     published_at: dash.published_at || null,
     last_edited_date: dash.last_edited_date || null,
     has_og_image_data: !!dash.og_image_data,
+    is_public: isPublic,
+    is_private_published: isPrivatePublished,
   };
 
   return { shellPayload, meta, user, dash };

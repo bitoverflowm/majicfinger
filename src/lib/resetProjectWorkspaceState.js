@@ -20,6 +20,8 @@ export function resetProjectWorkspaceState(setters = {}) {
     setChartDataOverrideMeta,
     liveStreamActions,
     liveStreamState,
+    liveFeedActions,
+    liveFeedState,
   } = setters;
 
   const streamsBySheetId = liveStreamState?.streamsBySheetId || {};
@@ -28,6 +30,15 @@ export function resetProjectWorkspaceState(setters = {}) {
       liveStreamActions?.stop?.(sheetId);
     }
   });
+
+  const feedsById = liveFeedState?.feedsById || {};
+  Object.entries(feedsById).forEach(([feedId, feed]) => {
+    if (feed?.isRunning || feed?.connecting) {
+      liveFeedActions?.stop?.(feedId);
+    }
+  });
+  // Stop any remaining ephemeral feeds the state map missed.
+  liveFeedActions?.stop?.();
 
   setDataSheets?.({
     "sheet-1": {

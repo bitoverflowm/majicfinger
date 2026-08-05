@@ -178,7 +178,9 @@ export default function PublicDashboardEmbedClient({
   useEffect(() => {
     if (!cardGridLoading) return;
     let cancelled = false;
-    fetch(`/api/public/dashboards/${encodeURIComponent(username)}/${encodeURIComponent(slug)}`)
+    fetch(`/api/public/dashboards/${encodeURIComponent(username)}/${encodeURIComponent(slug)}`, {
+      credentials: "include",
+    })
       .then((r) => r.json())
       .then((j: Payload) => {
         if (cancelled || !j?.success || !j.data?.layout?.rows) return;
@@ -223,7 +225,9 @@ export default function PublicDashboardEmbedClient({
     let timeoutId: number | null = null;
 
     const tick = () => {
-      fetch(`/api/public/dashboards/${encodeURIComponent(username)}/${encodeURIComponent(slug)}/live`)
+      fetch(`/api/public/dashboards/${encodeURIComponent(username)}/${encodeURIComponent(slug)}/live`, {
+        credentials: "include",
+      })
         .then((r) => r.json())
         .then((j) => {
           if (cancelled || !j?.success || !j.data?.charts) return;

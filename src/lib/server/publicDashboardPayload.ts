@@ -1,6 +1,3 @@
-import dbConnect from "@/lib/dbConnect";
-import ChartDashboard from "@/models/ChartDashboards";
-import User from "@/models/Users";
 import {
   buildPublicDashboardResponseData,
   hydrateLayoutWithChartBundles,
@@ -95,18 +92,14 @@ export async function getPublicDashboardPayload(
   slug: string,
 ): Promise<PublicDashboardPayload> {
   if (!username || !slug) return { success: false, message: "Missing username or slug" };
-  await dbConnect();
-  const user = (await User.findOne({ user_name: String(username || "").trim() }).lean()) as any;
-  if (!user || !user._id) return { success: false, message: "User not found" };
+  const { getAppRouterViewerUserId, resolveDashboardByUsernameSlug } = await import(
+    "@/lib/server/resolveDashboardByUsernameSlug"
+  );
+  const viewerUserId = await getAppRouterViewerUserId();
+  const resolved = await resolveDashboardByUsernameSlug(username, slug, { viewerUserId });
+  if (!resolved) return { success: false, message: "Dashboard not found" };
 
-  const dash = (await ChartDashboard.findOne({
-    user_id: user._id as any,
-    public_slug: String(slug || "").trim(),
-    is_public: true,
-  }).lean()) as any;
-
-  if (!dash) return { success: false, message: "Dashboard not found" };
-
+  const { user, dash } = resolved;
   const data = await buildPublicDashboardResponseData(dash, user);
   delete (data as { _cacheHit?: boolean })._cacheHit;
 

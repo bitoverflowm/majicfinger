@@ -64,6 +64,9 @@ export function RunYourselfDashboardLoader({ userId }) {
           setChartDataOverrideMeta: ctx.setChartDataOverrideMeta,
           liveStreamActions: ctx.liveStreamActions,
           liveStreamState: ctx.liveStreamState,
+          liveFeedActions: ctx.liveFeedActions,
+          liveFeedState: ctx.liveFeedState,
+          getDataSheets: () => ctx.dataSheets,
         });
 
         router.replace("/dashboard", { scroll: false });

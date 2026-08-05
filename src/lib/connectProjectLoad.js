@@ -5,6 +5,7 @@ import {
 import { scheduleConnectProjectSheetScroll } from "@/lib/connectHubScroll";
 import { resetProjectWorkspaceState } from "@/lib/resetProjectWorkspaceState";
 import { CONNECT_WORKSPACE } from "@/lib/connectHomeWorkspace";
+import { maybeAutoStartPublishedProjectLiveFeed } from "@/lib/liveFeeds/startEventCandlesticksEditorLiveFeed";
 
 export const PROJECT_LOAD_PROGRESS_MESSAGES = [
   "Loading data sheets…",
@@ -138,6 +139,9 @@ export async function runConnectProjectLoad({
   setChartDataOverrideMeta,
   liveStreamActions,
   liveStreamState,
+  liveFeedActions = null,
+  liveFeedState = null,
+  getDataSheets = null,
   onAlreadyLoaded,
 }) {
   const { bump, startTicker, stopTicker } = createConnectProjectLoadTicker(setConnectProjectLoadState);
@@ -167,6 +171,17 @@ export async function runConnectProjectLoad({
         rightPanelTab: rightPanelTab || undefined,
       });
       if (connectHomeCenterView) setConnectHomeCenterView?.(connectHomeCenterView);
+      const sheets =
+        typeof getDataSheets === "function" ? getDataSheets() : null;
+      if (sheets && liveFeedActions) {
+        await maybeAutoStartPublishedProjectLiveFeed({
+          userId,
+          dataSetId,
+          dataSheets: sheets,
+          liveFeedActions,
+          liveFeedState,
+        });
+      }
       return;
     }
 
@@ -188,12 +203,14 @@ export async function runConnectProjectLoad({
       setChartDataOverrideMeta,
       liveStreamActions,
       liveStreamState,
+      liveFeedActions,
+      liveFeedState,
     });
 
     bump(18, "Loading data sheets…");
     startTicker({ min: 18, max: 64 });
 
-    await loadFullProjectFromApi({
+    const loadResult = await loadFullProjectFromApi({
       dataSetId,
       userId,
       preferredChartId: preferredChartId || null,
@@ -224,6 +241,16 @@ export async function runConnectProjectLoad({
       rightPanelTab: rightPanelTab || undefined,
     });
     if (connectHomeCenterView) setConnectHomeCenterView?.(connectHomeCenterView);
+
+    if (liveFeedActions) {
+      await maybeAutoStartPublishedProjectLiveFeed({
+        userId,
+        dataSetId,
+        dataSheets: loadResult?.dataSheets,
+        liveFeedActions,
+        liveFeedState,
+      });
+    }
 
     if (typeof window !== "undefined") {
       window.requestAnimationFrame(() => {

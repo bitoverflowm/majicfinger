@@ -116,6 +116,7 @@ export function LazyPublicDashboardChart({
       fetchedRef.current = true;
       fetch(
         `/api/public/dashboards/${encodeURIComponent(username)}/${encodeURIComponent(slug)}/charts/${encodeURIComponent(chartId)}`,
+        { credentials: "include" },
       )
         .then((r) => r.json())
         .then((j) => {

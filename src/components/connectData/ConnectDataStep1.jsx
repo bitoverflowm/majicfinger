@@ -494,6 +494,9 @@ export default function ConnectDataStep1({
   const setChartDataOverrideMeta = context?.setChartDataOverrideMeta;
   const liveStreamActions = context?.liveStreamActions;
   const liveStreamState = context?.liveStreamState;
+  const liveFeedActions = context?.liveFeedActions;
+  const liveFeedState = context?.liveFeedState;
+  const dataSheets = context?.dataSheets;
   const requestConnectWorkspace = context?.requestConnectWorkspace;
   const setConnectHomeAnalyzeActive = context?.setConnectHomeAnalyzeActive;
   const requestConnectAnalyzeScroll = context?.requestConnectAnalyzeScroll;
@@ -756,6 +759,9 @@ export default function ConnectDataStep1({
         setChartDataOverrideMeta,
         liveStreamActions,
         liveStreamState,
+        liveFeedActions,
+        liveFeedState,
+        getDataSheets: () => dataSheets,
       });
       toast.success("Project opened");
     } catch (e) {

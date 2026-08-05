@@ -1,10 +1,8 @@
-import dbConnect from "@/lib/dbConnect";
-import ChartDashboard from "@/models/ChartDashboards";
-import User from "@/models/Users";
 import {
   buildPublicDashboardChartBundle,
   publicDashboardCacheControl,
 } from "@/lib/server/publicDashboardHydration";
+import { resolveDashboardByUsernameSlug } from "@/lib/server/resolveDashboardByUsernameSlug";
 
 export default async function handler(req, res) {
   const { username, slug, chartId } = req.query;
@@ -15,22 +13,12 @@ export default async function handler(req, res) {
   }
 
   try {
-    await dbConnect();
-    const user = await User.findOne({ user_name: String(username || "").trim() }).lean();
-    if (!user) {
-      return res.status(404).json({ success: false, message: "User not found" });
-    }
-
-    const dash = await ChartDashboard.findOne({
-      user_id: user._id,
-      public_slug: String(slug || "").trim(),
-      is_public: true,
-    }).lean();
-
-    if (!dash) {
+    const resolved = await resolveDashboardByUsernameSlug(username, slug, { req });
+    if (!resolved) {
       return res.status(404).json({ success: false, message: "Dashboard not found" });
     }
 
+    const { user, dash, isPublic } = resolved;
     const result = await buildPublicDashboardChartBundle(dash, user, chartId);
     if (!result.success) {
       return res.status(result.message === "Chart not on this dashboard" ? 404 : 400).json(result);
@@ -41,7 +29,9 @@ export default async function handler(req, res) {
 
     res.setHeader(
       "Cache-Control",
-      publicDashboardCacheControl(cacheHit, { liveBacked: !!dash.live_backed }),
+      isPublic
+        ? publicDashboardCacheControl(cacheHit, { liveBacked: !!dash.live_backed })
+        : "private, no-store",
     );
     return res.status(200).json(result);
   } catch (e) {

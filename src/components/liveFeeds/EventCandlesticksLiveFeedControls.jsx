@@ -14,15 +14,13 @@ import { Radio, Pause, Play, Square, CircleOff } from "lucide-react";
 import { toast } from "sonner";
 import { useMyStateV2 } from "@/context/stateContextV2";
 import {
-  createLiveFeedConfig,
-  discoverEventCandlesticksFeedGroup,
-} from "@/lib/liveFeeds/feedConfig";
-import {
   describeCandlePeriod,
   LIVE_FEED_POLL_FREQUENCY_OPTIONS,
   pollIntervalMsForPeriod,
 } from "@/lib/liveFeeds/registry";
 import { evaluateTrackedMarketsClosure } from "@/lib/liveFeeds/marketClosure";
+import { startEventCandlesticksEditorLiveFeed } from "@/lib/liveFeeds/startEventCandlesticksEditorLiveFeed";
+import { discoverEventCandlesticksFeedGroup } from "@/lib/liveFeeds/feedConfig";
 
 /**
  * Conic ring that fills toward the next poll (same visual language as project rows ring).
@@ -157,31 +155,15 @@ export function EventCandlesticksLiveFeedControls() {
       toast.message(marketsClosedInfo.message || "Markets closed — nothing left to poll.");
       return;
     }
-    const period = candlePeriod;
-    const pollMs = Math.floor(Number(pollIntervalMs)) || defaultPollMs;
-    const cfg = createLiveFeedConfig({
-      integration: "kalshi-live",
-      endpoint: "event_candlesticks",
-      status: "ephemeral",
-      periodInterval: period,
-      pollIntervalMs: pollMs,
-      params: {
-        eventTicker: group.eventTicker,
-        seriesTicker: group.seriesTicker,
-        periodInterval: period,
-      },
-      sheets: group.sheets,
+    const result = startEventCandlesticksEditorLiveFeed({
+      dataSheets,
+      liveFeedActions,
+      liveFeedState,
+      pollIntervalMs: Math.floor(Number(pollIntervalMs)) || defaultPollMs,
+      reason: "manual",
     });
-    if (!cfg) {
+    if (result.skipped === "invalid_config" || result.skipped === "start_failed") {
       toast.error("Could not start live feed for this pull.");
-      return;
-    }
-    const id = liveFeedActions?.start?.(cfg);
-    if (id) {
-      const freq =
-        LIVE_FEED_POLL_FREQUENCY_OPTIONS.find((o) => o.valueMs === pollMs)?.label ||
-        `every ${Math.round(pollMs / 60_000)}m`;
-      toast.success(`Live feed started · ${candleLabel} candles · ${freq.toLowerCase()}`);
     }
   };
 
