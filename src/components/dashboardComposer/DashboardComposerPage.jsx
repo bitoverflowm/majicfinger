@@ -208,12 +208,9 @@ export default function DashboardComposerPage({ user }) {
     cardGridComposerDock,
     setCardGridComposerDock,
     isDemo,
-<<<<<<< HEAD
     setConnectPowerMove,
-=======
     liveFeedActions,
     liveFeedState,
->>>>>>> c9a151e6b6f99a668d347fec8189e0429eed0e36
   } = useMyStateV2() ?? {};
 
   const [demoDashboardDialogOpen, setDemoDashboardDialogOpen] = useState(false);

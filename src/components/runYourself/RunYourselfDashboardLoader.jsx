@@ -64,13 +64,10 @@ export function RunYourselfDashboardLoader({ userId }) {
           setChartDataOverrideMeta: ctx.setChartDataOverrideMeta,
           liveStreamActions: ctx.liveStreamActions,
           liveStreamState: ctx.liveStreamState,
-<<<<<<< HEAD
-          setConnectPowerMove: ctx.setConnectPowerMove,
-=======
           liveFeedActions: ctx.liveFeedActions,
           liveFeedState: ctx.liveFeedState,
           getDataSheets: () => ctx.dataSheets,
->>>>>>> c9a151e6b6f99a668d347fec8189e0429eed0e36
+          setConnectPowerMove: ctx.setConnectPowerMove,
         });
 
         router.replace("/dashboard", { scroll: false });

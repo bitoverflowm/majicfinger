@@ -127,11 +127,7 @@ export function DashboardExportPanel() {
       <div className="p-2 text-xs text-muted-foreground">
         {hasUnsavedDashboard
           ? "Save project to enable dashboard publishing."
-<<<<<<< HEAD
-          : "Create or load a dashboard from Your Work, then set a public slug here."}
-=======
           : "Create or load a dashboard from Your Work, then set a slug here."}
->>>>>>> c9a151e6b6f99a668d347fec8189e0429eed0e36
       </div>
     );
   }

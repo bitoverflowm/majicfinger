@@ -281,7 +281,7 @@ export async function loadFullProjectFromApi({
         setConnectedData,
       });
       setRefetchChartDashboardsTick?.((t) => (t || 0) + 1);
-      return { dataSheets: workingSheets, dataSet: stripped };
+      return { dataSheets: workingSheets, dataSet: stripped, liveFeedCapable };
     } catch (e) {
       console.warn("[loadFullProjectFromApi] Sheet replay failed:", e?.message || e);
       workingSheets = replayProjectDerivedSheets(workingSheets);
@@ -291,19 +291,16 @@ export async function loadFullProjectFromApi({
         setConnectedData,
       });
       setRefetchChartDashboardsTick?.((t) => (t || 0) + 1);
-      return { dataSheets: workingSheets, dataSet: stripped };
+      return { dataSheets: workingSheets, dataSet: stripped, liveFeedCapable };
     }
   }
 
   setRefetchChartDashboardsTick?.((t) => (t || 0) + 1);
-<<<<<<< HEAD
-  return { liveFeedCapable };
-=======
   return {
     dataSheets: incomingSheets && typeof incomingSheets === "object" ? incomingSheets : {},
     dataSet: stripped,
+    liveFeedCapable,
   };
->>>>>>> c9a151e6b6f99a668d347fec8189e0429eed0e36
 }
 
 /**

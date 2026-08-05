@@ -19,7 +19,6 @@ import {
   LIVE_FEED_POLL_FREQUENCY_OPTIONS,
   pollIntervalMsForPeriod,
 } from "@/lib/liveFeeds/registry";
-<<<<<<< HEAD
 import {
   closedMarketArchiveIntegrationLabel,
   evaluateTrackedMarketsClosure,
@@ -30,11 +29,8 @@ import { sanitizeProjectLiveFeedSource } from "@/lib/liveFeeds/sanitizeProjectLi
 import { refreshEventCandlesticksSnapshotIntoSheets } from "@/lib/liveFeeds/refreshEventCandlesticksSnapshot";
 import { useKalshiHistoricalCutoffDisplay } from "@/hooks/useKalshiHistoricalCutoffDisplay";
 import { formatKalshiCutoffDisplay } from "@/lib/kalshiLive/marketTickerSearch";
-=======
-import { evaluateTrackedMarketsClosure } from "@/lib/liveFeeds/marketClosure";
 import { startEventCandlesticksEditorLiveFeed } from "@/lib/liveFeeds/startEventCandlesticksEditorLiveFeed";
 import { discoverEventCandlesticksFeedGroup } from "@/lib/liveFeeds/feedConfig";
->>>>>>> c9a151e6b6f99a668d347fec8189e0429eed0e36
 
 /**
  * Conic ring that fills toward the next poll (same visual language as project rows ring).
@@ -234,20 +230,20 @@ export function EventCandlesticksLiveFeedControls() {
       );
       return;
     }
+    const pollMs = Math.floor(Number(pollIntervalMs)) || defaultPollMs;
     const result = startEventCandlesticksEditorLiveFeed({
       dataSheets,
       liveFeedActions,
       liveFeedState,
-      pollIntervalMs: Math.floor(Number(pollIntervalMs)) || defaultPollMs,
+      pollIntervalMs: pollMs,
       reason: "manual",
+      toastOnStart: false,
     });
     if (result.skipped === "invalid_config" || result.skipped === "start_failed") {
       toast.error("Could not start live feed for this pull.");
-<<<<<<< HEAD
       return;
     }
-    const id = liveFeedActions?.start?.(cfg);
-    if (id) {
+    if (result.started) {
       const freq =
         LIVE_FEED_POLL_FREQUENCY_OPTIONS.find((o) => o.valueMs === pollMs)?.label ||
         `every ${Math.round(pollMs / 60_000)}m`;
@@ -283,8 +279,6 @@ export function EventCandlesticksLiveFeedControls() {
       toast.error(e instanceof Error ? e.message : "Could not refresh snapshot");
     } finally {
       setRefreshBusy(false);
-=======
->>>>>>> c9a151e6b6f99a668d347fec8189e0429eed0e36
     }
   };
 

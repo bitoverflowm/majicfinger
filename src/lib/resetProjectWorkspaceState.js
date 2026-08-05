@@ -127,17 +127,13 @@ export function resetProjectWorkspaceState(setters = {}, options = {}) {
     liveStreamState,
     liveFeedActions,
     liveFeedState,
-<<<<<<< HEAD
     setLiveStreamState,
     setLiveFeedState,
     cancelConnectDataFeedPull,
-=======
->>>>>>> c9a151e6b6f99a668d347fec8189e0429eed0e36
   } = setters;
 
   const { clearSavedChartsList = true } = options;
 
-<<<<<<< HEAD
   stopAllLiveWorkspaceActivity({
     liveStreamActions,
     liveStreamState,
@@ -146,25 +142,6 @@ export function resetProjectWorkspaceState(setters = {}, options = {}) {
     setLiveStreamState,
     setLiveFeedState,
     cancelConnectDataFeedPull,
-=======
-  const feedsById = liveFeedState?.feedsById || {};
-  Object.entries(feedsById).forEach(([feedId, feed]) => {
-    if (feed?.isRunning || feed?.connecting) {
-      liveFeedActions?.stop?.(feedId);
-    }
-  });
-  // Stop any remaining ephemeral feeds the state map missed.
-  liveFeedActions?.stop?.();
-
-  setDataSheets?.({
-    "sheet-1": {
-      name: "Sheet 1",
-      data: [],
-      provenance: null,
-      requestCards: [],
-      operationHistory: [],
-    },
->>>>>>> c9a151e6b6f99a668d347fec8189e0429eed0e36
   });
 
   // flushSync so later setConnectedData / live ticks cannot merge into stale sheets.

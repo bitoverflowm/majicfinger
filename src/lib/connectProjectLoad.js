@@ -140,19 +140,14 @@ export async function runConnectProjectLoad({
   setConnectPowerMove,
   liveStreamActions,
   liveStreamState,
-<<<<<<< HEAD
-  liveFeedActions,
-  liveFeedState,
+  liveFeedActions = null,
+  liveFeedState = null,
+  getDataSheets = null,
   setLiveStreamState,
   setLiveFeedState,
   cancelConnectDataFeedPull,
   setActiveChartDashboardId,
   setChartDashboardDraft,
-=======
-  liveFeedActions = null,
-  liveFeedState = null,
-  getDataSheets = null,
->>>>>>> c9a151e6b6f99a668d347fec8189e0429eed0e36
   onAlreadyLoaded,
 }) {
   const { bump, startTicker, stopTicker } = createConnectProjectLoadTicker(setConnectProjectLoadState);
@@ -216,15 +211,12 @@ export async function runConnectProjectLoad({
       liveStreamState,
       liveFeedActions,
       liveFeedState,
-<<<<<<< HEAD
       setLiveStreamState,
       setLiveFeedState,
       cancelConnectDataFeedPull,
       setActiveChartDashboardId,
       setChartDashboardDraft,
       setConnectHomeCenterView,
-=======
->>>>>>> c9a151e6b6f99a668d347fec8189e0429eed0e36
     });
 
     bump(18, "Loading data sheets…");
