@@ -12,18 +12,25 @@ const ALL_MARKET_COLUMN_NAMES = KALSHI_LIVE_MARKETS_COLUMNS.map((c) => c.name);
 const ALL_CANDLESTICK_COLUMN_NAMES = KALSHI_LIVE_CANDLESTICK_COLUMNS.map((c) => c.name);
 
 /**
- * Incremental client tick for event candlesticks (short lookback window).
+ * Incremental client tick for event candlesticks.
+ * Default: short lookback window ending at now.
+ * Optional startTs/endTs: gap backfill after stop / project exit.
  *
  * @param {{
  *   eventTicker: string;
  *   seriesTicker: string;
  *   periodInterval: number;
  *   lookbackPeriods?: number;
+ *   startTs?: number;
+ *   endTs?: number;
  *   signal?: AbortSignal;
  * }} opts
  * @returns {Promise<{
  *   metaRows: Record<string, unknown>[];
  *   byMarket: { ticker: string; rows: Record<string, unknown>[] }[];
+ *   startTs: number;
+ *   endTs: number;
+ *   usedBackfillWindow: boolean;
  * }>}
  */
 export async function fetchKalshiLiveEventCandlesticksIncremental(opts) {
@@ -39,8 +46,22 @@ export async function fetchKalshiLiveEventCandlesticksIncremental(opts) {
     throw new Error("period_interval must be 1, 60, or 1440.");
   }
 
-  const endTs = Math.floor(Date.now() / 1000);
-  const startTs = endTs - lookbackPeriods * periodIntervalSec(periodInterval);
+  const endTs =
+    Number.isFinite(Number(opts.endTs)) && Number(opts.endTs) > 0
+      ? Math.floor(Number(opts.endTs))
+      : Math.floor(Date.now() / 1000);
+  const periodSec = periodIntervalSec(periodInterval);
+  const lookbackStart = endTs - lookbackPeriods * periodSec;
+  let usedBackfillWindow = false;
+  let startTs = lookbackStart;
+  if (Number.isFinite(Number(opts.startTs)) && Number(opts.startTs) > 0) {
+    startTs = Math.floor(Number(opts.startTs));
+    usedBackfillWindow = true;
+  }
+  if (startTs >= endTs) {
+    startTs = lookbackStart;
+    usedBackfillWindow = false;
+  }
 
   const eventPayload = await fetchKalshiLiveEvent({
     eventTicker,
@@ -102,5 +123,5 @@ export async function fetchKalshiLiveEventCandlesticksIncremental(opts) {
     });
   }
 
-  return { metaRows, byMarket };
+  return { metaRows, byMarket, startTs, endTs, usedBackfillWindow };
 }

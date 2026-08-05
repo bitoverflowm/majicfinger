@@ -36,7 +36,7 @@ export const LIVE_FEED_REGISTRY = {
     minPollIntervalMs: 15_000,
     lookbackPeriods: 3,
     maxConcurrentEphemeralPerTab: 2,
-    // Soft safety ceiling only — upsert never trims below already-stored history.
+    // Working window per market sheet — upsert drops oldest bars when over this cap.
     softRowCapPerSheet: 50_000,
   },
 };

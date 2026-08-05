@@ -434,9 +434,10 @@ export function EventCandlesticksLiveFeedControls() {
           <p className="text-[10px] leading-snug text-muted-foreground">
             <span className="font-medium text-foreground">Interactive live</span>
             {" — "}
-            Browser polls while this tab is open. Sheets keep a working window (soft cap ~
-            {softRowCap.toLocaleString()} bars/market) so the feed stays light — not a forever
-            archive. Published dashboards use on-demand live separately when visitors open them.
+            Browser polls while this tab is open. Sheets keep a working window (~
+            {softRowCap.toLocaleString()} bars/market): on restart we backfill from the last
+            stored candle, then drop the oldest bars if the window would overflow. Published
+            dashboards use on-demand live separately when visitors open them.
           </p>
         </div>
       </div>

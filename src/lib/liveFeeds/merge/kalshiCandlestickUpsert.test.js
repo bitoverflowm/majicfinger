@@ -45,7 +45,7 @@ describe("kalshiCandlestickUpsert null-safe merge", () => {
     expect(normalizeLiveEndPeriodTs(new Date(1_785_522_060 * 1000))).toBe(1_785_522_060);
   });
 
-  it("upsert preserves prior OHLC and never trims below prior row count", () => {
+  it("upsert trims oldest rows when over softRowCap so newest history wins", () => {
     const existing = [
       {
         market_ticker: "KX-A",
@@ -75,11 +75,28 @@ describe("kalshiCandlestickUpsert null-safe merge", () => {
       },
     ];
     const rows = upsertCandlestickRowsByEndPeriodTs(existing, incoming, { softRowCap: 2 });
-    // priorCount=2 >= softRowCap → do not trim; keep all 3
-    expect(rows).toHaveLength(3);
-    expect(rows[1].price_close_dollars).toBe(0.5);
-    expect(rows[1].yes_bid_close_dollars).toBe(0.51);
-    expect(rows[2].end_period_ts).toBe(220);
+    expect(rows).toHaveLength(2);
+    expect(rows[0].end_period_ts).toBe(160);
+    expect(rows[0].price_close_dollars).toBe(0.5);
+    expect(rows[0].yes_bid_close_dollars).toBe(0.51);
+    expect(rows[1].end_period_ts).toBe(220);
+  });
+
+  it("drops oldest history when backfill would exceed the working window", () => {
+    const existing = Array.from({ length: 5 }, (_, i) => ({
+      market_ticker: "KX-A",
+      end_period_ts: 100 + i * 60,
+      price_close_dollars: 0.1 + i * 0.01,
+    }));
+    const incoming = Array.from({ length: 3 }, (_, i) => ({
+      market_ticker: "KX-A",
+      end_period_ts: 400 + i * 60,
+      price_close_dollars: 0.9 + i * 0.01,
+    }));
+    // 5 existing (100..340) + 3 new (400..520) = 8 → keep newest 5
+    const rows = upsertCandlestickRowsByEndPeriodTs(existing, incoming, { softRowCap: 5 });
+    expect(rows).toHaveLength(5);
+    expect(rows.map((r) => r.end_period_ts)).toEqual([280, 340, 400, 460, 520]);
   });
 
   it("never writes candles onto the markets metadata sheet id", () => {

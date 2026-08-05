@@ -50,6 +50,53 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/component
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { temporalToMs } from "@/lib/temporalParse";
 
+/** e.g. sheet-2 + "Markets" → "Sheet 2: Markets" */
+function sheetGroupHeading(sheetId, sheetName, index = 0) {
+  const digits = String(sheetId || "").match(/(\d+)/);
+  const num = digits ? Number(digits[1]) : index + 1;
+  const name = sheetName || sheetId || `Sheet ${num}`;
+  return `Sheet ${num}: ${name}`;
+}
+
+function filterSheetColumnGroups(groups, { allowedValues, excludeValues } = {}) {
+  const allow = allowedValues != null ? new Set(allowedValues) : null;
+  const exclude = excludeValues?.length ? new Set(excludeValues) : null;
+  return (groups || [])
+    .map((group, index) => ({
+      ...group,
+      heading: sheetGroupHeading(group.sheetId, group.sheetName, index),
+      options: (group.options || []).filter((opt) => {
+        if (allow && !allow.has(opt.value)) return false;
+        if (exclude && exclude.has(opt.value)) return false;
+        return true;
+      }),
+    }))
+    .filter((group) => group.options.length > 0);
+}
+
+/** Column picks grouped under Sheet N: name (shared by all chart axis dropdowns). */
+function GroupedColumnSelectItems({
+  groups,
+  allowedValues,
+  excludeValues,
+  itemClassName = "text-xs",
+}) {
+  const filtered = filterSheetColumnGroups(groups, { allowedValues, excludeValues });
+  return filtered.map((group, groupIdx) => (
+    <SelectGroup key={group.sheetId || `group-${groupIdx}`}>
+      {groupIdx > 0 ? <SelectSeparator /> : null}
+      <SelectLabel className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+        {group.heading}
+      </SelectLabel>
+      {group.options.map((opt) => (
+        <SelectItem key={opt.value} value={opt.value} className={itemClassName}>
+          {opt.column}
+        </SelectItem>
+      ))}
+    </SelectGroup>
+  ));
+}
+
 function TimeseriesXAxisFormatSection({
   dark,
   canUseTimeSeriesX,
@@ -902,7 +949,7 @@ export default function ChartControls() {
                 <SelectGroup key={group.sheetId}>
                   {groupIdx > 0 ? <SelectSeparator /> : null}
                   <SelectLabel className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
-                    {group.sheetName}
+                    {sheetGroupHeading(group.sheetId, group.sheetName, groupIdx)}
                   </SelectLabel>
                   {group.options.map((opt) => (
                     <SelectItem key={opt.value} value={opt.value} className="text-xs">
@@ -1495,11 +1542,11 @@ export default function ChartControls() {
                               <SelectItem value={CHART_X_AXIS_NONE} className="text-xs font-normal">
                                 — Select X axis —
                               </SelectItem>
-                              {(xOptions || []).map((i) => (
-                                <SelectItem key={i} value={i} className="text-xs font-normal">
-                                  {formatColumnLabel(i)}
-                                </SelectItem>
-                              ))}
+                              <GroupedColumnSelectItems
+                                groups={lineSheetColumnGroups}
+                                allowedValues={xOptions}
+                                itemClassName="text-xs font-normal"
+                              />
                             </SelectContent>
                           </Select>
                         </div>
@@ -1566,12 +1613,10 @@ export default function ChartControls() {
                             <SelectItem value={CHART_X_AXIS_NONE} className="text-xs">
                               — Select X axis —
                             </SelectItem>
-                            {xOptions &&
-                              xOptions.map((i) => (
-                                <SelectItem key={i} value={i} className="text-xs">
-                                  {formatColumnLabel(i)}
-                                </SelectItem>
-                              ))}
+                            <GroupedColumnSelectItems
+                              groups={lineSheetColumnGroups}
+                              allowedValues={xOptions}
+                            />
                           </SelectContent>
                         </Select>
                       </div>
@@ -1588,12 +1633,10 @@ export default function ChartControls() {
                                   <SelectValue className="text-xs">{formatColumnLabel(yValue)}</SelectValue>
                                 </SelectTrigger>
                                 <SelectContent className="text-xs">
-                                  {availableYOptions &&
-                                    availableYOptions.map((i) => (
-                                      <SelectItem key={i} value={i} className="text-xs">
-                                        {formatColumnLabel(i)}
-                                      </SelectItem>
-                                    ))}
+                                  <GroupedColumnSelectItems
+                                    groups={lineSheetColumnGroups}
+                                    allowedValues={availableYOptions}
+                                  />
                                 </SelectContent>
                               </Select>
                               <ChartColorPalettePopover
@@ -1618,12 +1661,10 @@ export default function ChartControls() {
                                 <SelectValue placeholder="Y column" className="text-xs" />
                               </SelectTrigger>
                               <SelectContent className="text-xs">
-                                {availableYOptions &&
-                                  availableYOptions.map((i) => (
-                                    <SelectItem key={i} value={i} className="text-xs">
-                                      {formatColumnLabel(i)}
-                                    </SelectItem>
-                                  ))}
+                                <GroupedColumnSelectItems
+                                  groups={lineSheetColumnGroups}
+                                  allowedValues={availableYOptions}
+                                />
                               </SelectContent>
                             </Select>
                           </div>
@@ -1656,12 +1697,10 @@ export default function ChartControls() {
                             <SelectItem value={CHART_X_AXIS_NONE} className="text-xs">
                               — Select X axis —
                             </SelectItem>
-                            {xOptions &&
-                              xOptions.map((i) => (
-                                <SelectItem key={i} value={i} className="text-xs">
-                                  {formatColumnLabel(i)}
-                                </SelectItem>
-                              ))}
+                            <GroupedColumnSelectItems
+                              groups={lineSheetColumnGroups}
+                              allowedValues={xOptions}
+                            />
                           </SelectContent>
                         </Select>
                       </div>
@@ -1702,12 +1741,10 @@ export default function ChartControls() {
                                 <SelectValue className="text-xs">{formatColumnLabel(yValue)}</SelectValue>
                                 </SelectTrigger>
                                 <SelectContent className="text-xs">
-                                  {availableYOptions &&
-                                    availableYOptions.map((i) => (
-                                      <SelectItem key={i} value={i} className="text-xs">
-                                        {formatColumnLabel(i)}
-                                      </SelectItem>
-                                    ))}
+                                  <GroupedColumnSelectItems
+                                    groups={lineSheetColumnGroups}
+                                    allowedValues={availableYOptions}
+                                  />
                                 </SelectContent>
                               </Select>
                               {!(selY.length === 1) && (
@@ -1724,12 +1761,10 @@ export default function ChartControls() {
                                 <SelectValue placeholder="Y column" className="text-xs" />
                               </SelectTrigger>
                               <SelectContent className="text-xs">
-                                {availableYOptions &&
-                                  availableYOptions.map((i) => (
-                                    <SelectItem key={i} value={i} className="text-xs">
-                                      {formatColumnLabel(i)}
-                                    </SelectItem>
-                                  ))}
+                                <GroupedColumnSelectItems
+                                  groups={lineSheetColumnGroups}
+                                  allowedValues={availableYOptions}
+                                />
                               </SelectContent>
                             </Select>
                           </div>
@@ -1753,13 +1788,11 @@ export default function ChartControls() {
                                 <SelectItem value="__none__" className="text-xs">
                                   None (one bar per Y column)
                                 </SelectItem>
-                                {(xOptions || [])
-                                  .filter((k) => k !== selX && !(selY || []).includes(k))
-                                  .map((k) => (
-                                    <SelectItem key={k} value={k} className="text-xs">
-                                      {formatColumnLabel(k)}
-                                    </SelectItem>
-                                  ))}
+                                <GroupedColumnSelectItems
+                                  groups={lineSheetColumnGroups}
+                                  allowedValues={xOptions}
+                                  excludeValues={[selX, ...(selY || [])].filter(Boolean)}
+                                />
                               </SelectContent>
                             </Select>
                           </div>
@@ -1892,12 +1925,11 @@ export default function ChartControls() {
                               <SelectValue placeholder="Select Z column" className="text-xs" />
                             </SelectTrigger>
                             <SelectContent className="text-xs">
-                              {xOptions &&
-                                xOptions.filter((k) => k !== selX).map((i) => (
-                                  <SelectItem key={i} value={i} className="text-xs">
-                                    {formatColumnLabel(i)}
-                                  </SelectItem>
-                                ))}
+                              <GroupedColumnSelectItems
+                                groups={lineSheetColumnGroups}
+                                allowedValues={xOptions}
+                                excludeValues={selX ? [selX] : []}
+                              />
                             </SelectContent>
                           </Select>
                         ) : null}
@@ -1926,12 +1958,10 @@ export default function ChartControls() {
                               <SelectItem value="__none__" className="text-xs">
                                 None
                               </SelectItem>
-                              {xOptions &&
-                                xOptions.map((i) => (
-                                  <SelectItem key={i} value={i} className="text-xs">
-                                    {formatColumnLabel(i)}
-                                  </SelectItem>
-                                ))}
+                              <GroupedColumnSelectItems
+                                groups={lineSheetColumnGroups}
+                                allowedValues={xOptions}
+                              />
                             </SelectContent>
                           </Select>
                         ) : null}
@@ -2045,11 +2075,10 @@ export default function ChartControls() {
                           <SelectItem value="__x_axis__" className="text-xs">
                             Same as X axis
                           </SelectItem>
-                          {xOptions.map((k) => (
-                            <SelectItem key={k} value={k} className="text-xs">
-                              {formatColumnLabel(k)}
-                            </SelectItem>
-                          ))}
+                          <GroupedColumnSelectItems
+                            groups={lineSheetColumnGroups}
+                            allowedValues={xOptions}
+                          />
                         </SelectContent>
                       </Select>
                       <div className="mt-2 space-y-1">
@@ -2440,12 +2469,11 @@ export default function ChartControls() {
                           <SelectValue placeholder="Select Z column" className="text-xs" />
                         </SelectTrigger>
                         <SelectContent className="text-xs">
-                          {xOptions &&
-                            xOptions.filter((k) => k !== selX).map((i) => (
-                              <SelectItem key={i} value={i} className="text-xs">
-                                {formatColumnLabel(i)}
-                              </SelectItem>
-                            ))}
+                          <GroupedColumnSelectItems
+                            groups={lineSheetColumnGroups}
+                            allowedValues={xOptions}
+                            excludeValues={selX ? [selX] : []}
+                          />
                         </SelectContent>
                       </Select>
                     ) : null}
@@ -2474,12 +2502,10 @@ export default function ChartControls() {
                           <SelectItem value="__none__" className="text-xs">
                             None
                           </SelectItem>
-                          {xOptions &&
-                            xOptions.map((i) => (
-                              <SelectItem key={i} value={i} className="text-xs">
-                                {formatColumnLabel(i)}
-                              </SelectItem>
-                            ))}
+                          <GroupedColumnSelectItems
+                            groups={lineSheetColumnGroups}
+                            allowedValues={xOptions}
+                          />
                         </SelectContent>
                       </Select>
                     ) : null}
@@ -2625,13 +2651,11 @@ export default function ChartControls() {
                           <SelectValue placeholder="+ Add column to tooltip (not plotted)" />
                         </SelectTrigger>
                         <SelectContent className="z-[200] text-xs">
-                          {xOptions
-                            .filter((k) => !tooltipExtraColumns.includes(k))
-                            .map((k) => (
-                              <SelectItem key={k} value={k} className="text-xs">
-                                {formatColumnLabel(k)}
-                              </SelectItem>
-                            ))}
+                          <GroupedColumnSelectItems
+                            groups={lineSheetColumnGroups}
+                            allowedValues={xOptions}
+                            excludeValues={tooltipExtraColumns}
+                          />
                         </SelectContent>
                       </Select>
                       {tooltipExtraColumns.length > 0 ? (
@@ -2712,11 +2736,10 @@ export default function ChartControls() {
                                 <SelectValue placeholder="Column" />
                               </SelectTrigger>
                               <SelectContent className="text-xs">
-                                {xOptions.map((k) => (
-                                  <SelectItem key={k} value={k} className="text-xs">
-                                    {formatColumnLabel(k)}
-                                  </SelectItem>
-                                ))}
+                                <GroupedColumnSelectItems
+                                  groups={lineSheetColumnGroups}
+                                  allowedValues={xOptions}
+                                />
                               </SelectContent>
                             </Select>
                             {dateFilterColumn ? (

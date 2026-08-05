@@ -7,6 +7,7 @@ import { createLiveFeedConfig, resolveEventCandlesticksSheetsMap } from "@/lib/l
 import { getLiveFeedEndpointDef } from "@/lib/liveFeeds/registry";
 import { fetchKalshiLiveEventCandlesticksIncremental } from "@/lib/liveFeeds/fetchEventCandlesticksIncremental";
 import { applyKalshiCandlestickUpsertToSheets } from "@/lib/liveFeeds/merge/kalshiCandlestickUpsert";
+import { resolveCandlestickBackfillStartTs } from "@/lib/liveFeeds/candlestickBackfill";
 import {
   buildLiveFeedEndedStamp,
   clearLiveFeedEndedOnSheets,
@@ -23,6 +24,7 @@ const noop = () => {};
 export default function RestLiveFeedManager() {
   const ctx = useMyStateV2();
   const setDataSheets = ctx?.setDataSheets;
+  const dataSheets = ctx?.dataSheets;
   const setLiveFeedState = ctx?.setLiveFeedState;
   const setLiveFeedActions = ctx?.setLiveFeedActions;
 
@@ -31,6 +33,8 @@ export default function RestLiveFeedManager() {
   const configByFeedIdRef = useRef(/** @type {Record<string, import("@/lib/liveFeeds/feedConfig").LiveFeedConfig>} */ ({}));
   const pausedByFeedIdRef = useRef(/** @type {Record<string, boolean>} */ ({}));
   const inFlightByFeedIdRef = useRef(/** @type {Record<string, boolean>} */ ({}));
+  const dataSheetsRef = useRef(dataSheets);
+  dataSheetsRef.current = dataSheets;
 
   const clearTimer = useCallback((feedId) => {
     const t = timersByFeedIdRef.current[feedId];
@@ -126,11 +130,31 @@ export default function RestLiveFeedManager() {
         const lookbackPeriods = def?.lookbackPeriods ?? 3;
 
         if (feed.integration === "kalshi-live" && feed.endpoint === "event_candlesticks") {
+          const endTs = Math.floor(Date.now() / 1000);
+          const needsGapBackfill =
+            !!feed.needsGapBackfill || (Number(feed.tickCount) || 0) === 0;
+          let backfillStartTs = null;
+          if (needsGapBackfill) {
+            const sheetsNow = dataSheetsRef.current || {};
+            const resolvedForCutoff =
+              resolveEventCandlesticksSheetsMap(sheetsNow, feed) || feed.sheets;
+            backfillStartTs = resolveCandlestickBackfillStartTs({
+              dataSheets: sheetsNow,
+              feed: { ...feed, sheets: resolvedForCutoff },
+              endTs,
+              softRowCap,
+            });
+            if (backfillStartTs != null) {
+              patchFeedState(feedId, { statusMessage: "Backfilling gap since last stop…" });
+            }
+          }
+
           const tick = await fetchKalshiLiveEventCandlesticksIncremental({
             eventTicker: feed.params.eventTicker,
             seriesTicker: feed.params.seriesTicker,
             periodInterval: feed.params.periodInterval,
             lookbackPeriods,
+            ...(backfillStartTs != null ? { startTs: backfillStartTs, endTs } : {}),
             signal: ac.signal,
           });
 
@@ -163,7 +187,12 @@ export default function RestLiveFeedManager() {
           const prevTickCount = Number(configByFeedIdRef.current[feedId]?.tickCount) || 0;
           const tickCount = prevTickCount + 1;
           let statusMessage = "Receiving live data…";
-          if (tickStats?.candlesReceived === 0) {
+          if (tick.usedBackfillWindow && (tickStats?.candlesAdded > 0 || tickStats?.candlesUpdated > 0)) {
+            statusMessage =
+              tickStats?.candlesAdded > 0
+                ? `Backfilled · +${tickStats.candlesAdded} bars`
+                : `Backfilled · ${tickStats.candlesUpdated} updated`;
+          } else if (tickStats?.candlesReceived === 0) {
             statusMessage = "Pull ok · empty candle window";
           } else if (tickStats?.marketsMatched === 0) {
             statusMessage = "Pull ok · no matching sheets";
@@ -178,12 +207,13 @@ export default function RestLiveFeedManager() {
           }
 
           const nextCfg = {
-            ...feed,
+            ...(configByFeedIdRef.current[feedId] || feed),
             lastPolledAt: now,
             lastSuccessAt: successAt,
             lastError: null,
             tickCount,
             lastTickStats: tickStats,
+            needsGapBackfill: false,
           };
           configByFeedIdRef.current[feedId] = nextCfg;
           patchFeedState(feedId, {
@@ -193,6 +223,7 @@ export default function RestLiveFeedManager() {
             tickCount,
             lastTickStats: tickStats,
             statusMessage,
+            needsGapBackfill: false,
           });
           return { ended: false, statusMessage };
         }
@@ -241,7 +272,11 @@ export default function RestLiveFeedManager() {
       // Replace same feed id if restarting
       clearTimer(cfg.id);
       pausedByFeedIdRef.current[cfg.id] = false;
-      configByFeedIdRef.current[cfg.id] = cfg;
+      configByFeedIdRef.current[cfg.id] = {
+        ...cfg,
+        tickCount: 0,
+        needsGapBackfill: true,
+      };
 
       // Clear any prior "markets closed" stamp from a previous run.
       setDataSheets?.((prev) => clearLiveFeedEndedOnSheets(prev, cfg));
@@ -255,6 +290,8 @@ export default function RestLiveFeedManager() {
             isRunning: true,
             isPaused: false,
             connecting: true,
+            tickCount: 0,
+            needsGapBackfill: true,
             statusMessage: "Starting live feed…",
           },
         },
@@ -297,7 +334,15 @@ export default function RestLiveFeedManager() {
     (feedId) => {
       if (!feedId) return;
       pausedByFeedIdRef.current[feedId] = false;
-      patchFeedState(feedId, { isPaused: false, statusMessage: "Receiving live data…" });
+      const prev = configByFeedIdRef.current[feedId];
+      if (prev) {
+        configByFeedIdRef.current[feedId] = { ...prev, needsGapBackfill: true };
+      }
+      patchFeedState(feedId, {
+        isPaused: false,
+        needsGapBackfill: true,
+        statusMessage: "Resuming · backfilling gap…",
+      });
       void runTick(feedId);
     },
     [patchFeedState, runTick],

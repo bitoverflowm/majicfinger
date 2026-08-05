@@ -207,7 +207,6 @@ export function upsertCandlestickRowsByEndPeriodTs(existing, incoming, opts = {}
     if (!byTs.has(ts)) order.push(ts);
     byTs.set(ts, { ...row, end_period_ts: ts });
   }
-  const priorCount = byTs.size;
 
   for (const row of Array.isArray(incoming) ? incoming : []) {
     const ts = normalizeLiveEndPeriodTs(row?.end_period_ts);
@@ -220,9 +219,8 @@ export function upsertCandlestickRowsByEndPeriodTs(existing, incoming, opts = {}
 
   order.sort((a, b) => a - b);
   let rows = order.map((ts) => byTs.get(ts)).filter(Boolean);
-  // Never shrink below what was already on the sheet. Only trim runaway growth
-  // when prior history was already under the soft cap.
-  if (rows.length > softRowCap && priorCount < softRowCap) {
+  // Hard working window: keep the newest softRowCap bars (drop oldest when over cap).
+  if (rows.length > softRowCap) {
     rows = rows.slice(rows.length - softRowCap);
   }
   return /** @type {Record<string, unknown>[]} */ (rows);

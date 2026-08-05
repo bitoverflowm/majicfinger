@@ -19,10 +19,15 @@ const ALL_CANDLESTICK_COLUMN_NAMES = KALSHI_LIVE_CANDLESTICK_COLUMNS.map((c) => 
  *   seriesTicker: string;
  *   periodInterval: number;
  *   lookbackPeriods?: number;
+ *   startTs?: number;
+ *   endTs?: number;
  * }} opts
  * @returns {Promise<{
  *   metaRows: Record<string, unknown>[];
  *   byMarket: { ticker: string; rows: Record<string, unknown>[] }[];
+ *   startTs: number;
+ *   endTs: number;
+ *   usedBackfillWindow: boolean;
  * }>}
  */
 export async function fetchKalshiLiveEventCandlesticksIncrementalServer(opts) {
@@ -38,8 +43,22 @@ export async function fetchKalshiLiveEventCandlesticksIncrementalServer(opts) {
     throw new Error("period_interval must be 1, 60, or 1440.");
   }
 
-  const endTs = Math.floor(Date.now() / 1000);
-  const startTs = endTs - lookbackPeriods * periodIntervalSec(periodInterval);
+  const endTs =
+    Number.isFinite(Number(opts.endTs)) && Number(opts.endTs) > 0
+      ? Math.floor(Number(opts.endTs))
+      : Math.floor(Date.now() / 1000);
+  const periodSec = periodIntervalSec(periodInterval);
+  const lookbackStart = endTs - lookbackPeriods * periodSec;
+  let usedBackfillWindow = false;
+  let startTs = lookbackStart;
+  if (Number.isFinite(Number(opts.startTs)) && Number(opts.startTs) > 0) {
+    startTs = Math.floor(Number(opts.startTs));
+    usedBackfillWindow = true;
+  }
+  if (startTs >= endTs) {
+    startTs = lookbackStart;
+    usedBackfillWindow = false;
+  }
 
   const eventUrl = `${kalshiLiveUrl(`events/${encodeURIComponent(eventTicker)}`)}?with_nested_markets=true`;
   const eventRes = await fetch(eventUrl, {
@@ -123,5 +142,5 @@ export async function fetchKalshiLiveEventCandlesticksIncrementalServer(opts) {
     });
   }
 
-  return { metaRows, byMarket };
+  return { metaRows, byMarket, startTs, endTs, usedBackfillWindow };
 }
