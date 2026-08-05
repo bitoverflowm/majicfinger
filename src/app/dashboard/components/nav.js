@@ -19,7 +19,7 @@ import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTr
 import { toast } from "sonner"
 import { AnimatedThemeToggler } from "@/components/ui/animated-theme-toggler"
 import { Progress } from "@/components/ui/progress"
-import { Pause, Play, RotateCw, Square, ExternalLink, Loader2, ChevronDown, ChevronUp } from "lucide-react"
+import { Pause, Play, RotateCw, Square, ExternalLink, Loader2, ChevronDown, ChevronUp, X } from "lucide-react"
 import { inferDefaultBuilderSnapshot, isPlaceholderChartSheet } from "@/lib/inferDefaultBuilderSnapshot"
 import { normalizeBuilderSnapshot } from "@/lib/chartBundle"
 import {
@@ -1500,7 +1500,14 @@ const Nav = () => {
                       </Button>
                   )}
                   <AlertDialog open={newProjectPromptOpen} onOpenChange={setNewProjectPromptOpen}>
-                    <AlertDialogContent>
+                    <AlertDialogContent className="pr-12">
+                      <AlertDialogCancel
+                        className="absolute right-4 top-4 mt-0 h-8 w-8 rounded-sm border-0 bg-transparent p-0 opacity-70 shadow-none hover:bg-transparent hover:opacity-100 focus:ring-2 focus:ring-ring focus:ring-offset-2 sm:mt-0"
+                        aria-label="Close"
+                      >
+                        <X className="h-4 w-4" />
+                        <span className="sr-only">Close</span>
+                      </AlertDialogCancel>
                       <AlertDialogHeader>
                         <AlertDialogTitle>Unsaved changes</AlertDialogTitle>
                         <AlertDialogDescription>
@@ -1511,7 +1518,6 @@ const Nav = () => {
                         </AlertDialogDescription>
                       </AlertDialogHeader>
                       <AlertDialogFooter className="flex-col gap-2 sm:flex-row sm:justify-end">
-                        <AlertDialogCancel>Cancel</AlertDialogCancel>
                         <Button
                           type="button"
                           variant="outline"
