@@ -5,6 +5,7 @@ import {
 import { scheduleConnectProjectSheetScroll } from "@/lib/connectHubScroll";
 import { resetProjectWorkspaceState } from "@/lib/resetProjectWorkspaceState";
 import { CONNECT_WORKSPACE } from "@/lib/connectHomeWorkspace";
+import { maybeAutoStartPublishedProjectLiveFeed } from "@/lib/liveFeeds/startEventCandlesticksEditorLiveFeed";
 
 export const PROJECT_LOAD_PROGRESS_MESSAGES = [
   "Loading data sheets…",
@@ -139,6 +140,7 @@ export async function runConnectProjectLoad({
   setConnectPowerMove,
   liveStreamActions,
   liveStreamState,
+<<<<<<< HEAD
   liveFeedActions,
   liveFeedState,
   setLiveStreamState,
@@ -146,6 +148,11 @@ export async function runConnectProjectLoad({
   cancelConnectDataFeedPull,
   setActiveChartDashboardId,
   setChartDashboardDraft,
+=======
+  liveFeedActions = null,
+  liveFeedState = null,
+  getDataSheets = null,
+>>>>>>> c9a151e6b6f99a668d347fec8189e0429eed0e36
   onAlreadyLoaded,
 }) {
   const { bump, startTicker, stopTicker } = createConnectProjectLoadTicker(setConnectProjectLoadState);
@@ -175,6 +182,17 @@ export async function runConnectProjectLoad({
         rightPanelTab: rightPanelTab || undefined,
       });
       if (connectHomeCenterView) setConnectHomeCenterView?.(connectHomeCenterView);
+      const sheets =
+        typeof getDataSheets === "function" ? getDataSheets() : null;
+      if (sheets && liveFeedActions) {
+        await maybeAutoStartPublishedProjectLiveFeed({
+          userId,
+          dataSetId,
+          dataSheets: sheets,
+          liveFeedActions,
+          liveFeedState,
+        });
+      }
       return;
     }
 
@@ -198,12 +216,15 @@ export async function runConnectProjectLoad({
       liveStreamState,
       liveFeedActions,
       liveFeedState,
+<<<<<<< HEAD
       setLiveStreamState,
       setLiveFeedState,
       cancelConnectDataFeedPull,
       setActiveChartDashboardId,
       setChartDashboardDraft,
       setConnectHomeCenterView,
+=======
+>>>>>>> c9a151e6b6f99a668d347fec8189e0429eed0e36
     });
 
     bump(18, "Loading data sheets…");
@@ -243,6 +264,16 @@ export async function runConnectProjectLoad({
         (loadResult?.liveFeedCapable ? "powerMoves" : undefined),
     });
     if (connectHomeCenterView) setConnectHomeCenterView?.(connectHomeCenterView);
+
+    if (liveFeedActions) {
+      await maybeAutoStartPublishedProjectLiveFeed({
+        userId,
+        dataSetId,
+        dataSheets: loadResult?.dataSheets,
+        liveFeedActions,
+        liveFeedState,
+      });
+    }
 
     if (typeof window !== "undefined") {
       window.requestAnimationFrame(() => {

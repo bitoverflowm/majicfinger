@@ -14,15 +14,12 @@ import { Radio, Pause, Play, Square, CircleOff, RefreshCw, Archive, Activity } f
 import { toast } from "sonner";
 import { useMyStateV2 } from "@/context/stateContextV2";
 import {
-  createLiveFeedConfig,
-  discoverEventCandlesticksFeedGroup,
-} from "@/lib/liveFeeds/feedConfig";
-import {
   describeCandlePeriod,
   getLiveFeedEndpointDef,
   LIVE_FEED_POLL_FREQUENCY_OPTIONS,
   pollIntervalMsForPeriod,
 } from "@/lib/liveFeeds/registry";
+<<<<<<< HEAD
 import {
   closedMarketArchiveIntegrationLabel,
   evaluateTrackedMarketsClosure,
@@ -33,6 +30,11 @@ import { sanitizeProjectLiveFeedSource } from "@/lib/liveFeeds/sanitizeProjectLi
 import { refreshEventCandlesticksSnapshotIntoSheets } from "@/lib/liveFeeds/refreshEventCandlesticksSnapshot";
 import { useKalshiHistoricalCutoffDisplay } from "@/hooks/useKalshiHistoricalCutoffDisplay";
 import { formatKalshiCutoffDisplay } from "@/lib/kalshiLive/marketTickerSearch";
+=======
+import { evaluateTrackedMarketsClosure } from "@/lib/liveFeeds/marketClosure";
+import { startEventCandlesticksEditorLiveFeed } from "@/lib/liveFeeds/startEventCandlesticksEditorLiveFeed";
+import { discoverEventCandlesticksFeedGroup } from "@/lib/liveFeeds/feedConfig";
+>>>>>>> c9a151e6b6f99a668d347fec8189e0429eed0e36
 
 /**
  * Conic ring that fills toward the next poll (same visual language as project rows ring).
@@ -232,23 +234,16 @@ export function EventCandlesticksLiveFeedControls() {
       );
       return;
     }
-    const period = candlePeriod;
-    const pollMs = Math.floor(Number(pollIntervalMs)) || defaultPollMs;
-    const cfg = createLiveFeedConfig({
-      integration: "kalshi-live",
-      endpoint: "event_candlesticks",
-      status: "ephemeral",
-      periodInterval: period,
-      pollIntervalMs: pollMs,
-      params: {
-        eventTicker: group.eventTicker,
-        seriesTicker: group.seriesTicker,
-        periodInterval: period,
-      },
-      sheets: group.sheets,
+    const result = startEventCandlesticksEditorLiveFeed({
+      dataSheets,
+      liveFeedActions,
+      liveFeedState,
+      pollIntervalMs: Math.floor(Number(pollIntervalMs)) || defaultPollMs,
+      reason: "manual",
     });
-    if (!cfg) {
+    if (result.skipped === "invalid_config" || result.skipped === "start_failed") {
       toast.error("Could not start live feed for this pull.");
+<<<<<<< HEAD
       return;
     }
     const id = liveFeedActions?.start?.(cfg);
@@ -288,6 +283,8 @@ export function EventCandlesticksLiveFeedControls() {
       toast.error(e instanceof Error ? e.message : "Could not refresh snapshot");
     } finally {
       setRefreshBusy(false);
+=======
+>>>>>>> c9a151e6b6f99a668d347fec8189e0429eed0e36
     }
   };
 

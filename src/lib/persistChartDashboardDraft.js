@@ -54,17 +54,18 @@ export async function persistChartDashboardDraft({ draft, userId, includePublish
       const publish =
         includePublishFields &&
         (Object.prototype.hasOwnProperty.call(draft, "is_public") ||
-          (draft.public_slug != null && String(draft.public_slug).trim() !== ""))
+          Object.prototype.hasOwnProperty.call(draft, "public_slug"))
           ? (() => {
               const pub = !!draft.is_public;
-              if (!pub) {
-                return { is_public: false, public_slug: undefined };
+              const raw = normalizeChartEmbedSlug(String(draft.public_slug || "").trim());
+              // Empty slug unpublishes. Non-empty slug publishes (public or private).
+              if (!raw) {
+                return { is_public: false, public_slug: "" };
               }
-              const raw = normalizeChartEmbedSlug(String(draft.public_slug || draft.dashboard_name || ""));
               if (!isValidChartEmbedSlug(raw)) {
                 return { __invalidSlug: true };
               }
-              return { is_public: true, public_slug: raw };
+              return { is_public: pub, public_slug: raw };
             })()
           : null;
       if (publish?.__invalidSlug) {
@@ -111,9 +112,12 @@ export async function persistChartDashboardDraft({ draft, userId, includePublish
     }
 
     const createdId = String(j.data._id);
-    if (includePublishFields && draft.is_public) {
-      const raw = normalizeChartEmbedSlug(String(draft.public_slug || draft.dashboard_name || ""));
-      if (!isValidChartEmbedSlug(raw)) {
+    const rawPublishSlug =
+      includePublishFields && Object.prototype.hasOwnProperty.call(draft, "public_slug")
+        ? normalizeChartEmbedSlug(String(draft.public_slug || "").trim())
+        : "";
+    if (includePublishFields && rawPublishSlug) {
+      if (!isValidChartEmbedSlug(rawPublishSlug)) {
         return { ok: false, message: "Invalid public slug (use lowercase letters, numbers, hyphens)." };
       }
       const pubRes = await fetch(`/api/chart-dashboards/${createdId}`, {
@@ -125,8 +129,8 @@ export async function persistChartDashboardDraft({ draft, userId, includePublish
           layout: j.data.layout,
           theme: j.data.theme,
           data_set_id: j.data.data_set_id,
-          is_public: true,
-          public_slug: raw,
+          is_public: !!draft.is_public,
+          public_slug: rawPublishSlug,
         }),
       });
       const pubJson = await pubRes.json();

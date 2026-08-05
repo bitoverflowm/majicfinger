@@ -139,7 +139,30 @@ export default async function handler(req, res) {
 
         if (wantsEmbed) {
           const pub = !!req.body.is_public;
-          $set.is_public = pub;
+          const raw = normalizeChartEmbedSlug(
+            req.body.public_slug != null
+              ? String(req.body.public_slug)
+              : String(dash.public_slug || ""),
+          );
+
+          // Empty slug = unpublish (private draft). Slug + is_public false = private published.
+          if (!raw) {
+            $set.is_public = false;
+            const updated = await ChartDashboard.findByIdAndUpdate(
+              id,
+              { $set, $unset: { public_slug: "" } },
+              { new: true, runValidators: true },
+            );
+            return res.status(200).json({ success: true, data: updated });
+          }
+
+          if (!isValidChartEmbedSlug(raw)) {
+            return res.status(400).json({
+              success: false,
+              message: "Invalid public slug (use lowercase letters, numbers, hyphens).",
+            });
+          }
+
           if (pub) {
             const seoError = validateDashboardPublishSeo({
               layout: layoutForValidation,
@@ -151,37 +174,25 @@ export default async function handler(req, res) {
             if (seoError) {
               return res.status(400).json({ success: false, message: seoError });
             }
-            if (!dash.is_public && !dash.published_at) {
-              $set.published_at = new Date();
-            }
-            const raw = normalizeChartEmbedSlug(
-              req.body.public_slug || req.body.dashboard_name || "",
-            );
-            if (!isValidChartEmbedSlug(raw)) {
-              return res.status(400).json({
-                success: false,
-                message: "Invalid public slug (use lowercase letters, numbers, hyphens).",
-              });
-            }
-            const dup = await ChartDashboard.findOne({
-              user_id: dash.user_id,
-              public_slug: raw,
-              _id: { $ne: dash._id },
-            }).lean();
-            if (dup) {
-              return res.status(409).json({
-                success: false,
-                message: "That slug is already used for one of your dashboards.",
-              });
-            }
-            $set.public_slug = raw;
-          } else {
-            const updated = await ChartDashboard.findByIdAndUpdate(
-              id,
-              { $set, $unset: { public_slug: "" } },
-              { new: true, runValidators: true },
-            );
-            return res.status(200).json({ success: true, data: updated });
+          }
+
+          const dup = await ChartDashboard.findOne({
+            user_id: dash.user_id,
+            public_slug: raw,
+            _id: { $ne: dash._id },
+          }).lean();
+          if (dup) {
+            return res.status(409).json({
+              success: false,
+              message: "That slug is already used for one of your dashboards.",
+            });
+          }
+
+          $set.is_public = pub;
+          $set.public_slug = raw;
+          // First time a slug is assigned (private or public) stamps published_at.
+          if (!dash.published_at) {
+            $set.published_at = new Date();
           }
         }
 

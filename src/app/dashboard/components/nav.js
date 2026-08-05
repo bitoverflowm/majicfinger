@@ -370,10 +370,13 @@ const Nav = () => {
   const liveStreamActions = contextStateV2?.liveStreamActions
   const liveFeedState = contextStateV2?.liveFeedState
   const liveFeedActions = contextStateV2?.liveFeedActions
+<<<<<<< HEAD
   const setLiveStreamState = contextStateV2?.setLiveStreamState
   const setLiveFeedState = contextStateV2?.setLiveFeedState
   const cancelConnectDataFeedPull = contextStateV2?.cancelConnectDataFeedPull
   const setConnectHomeCenterView = contextStateV2?.setConnectHomeCenterView
+=======
+>>>>>>> c9a151e6b6f99a668d347fec8189e0429eed0e36
   const dataSheets = contextStateV2?.dataSheets
   const setDataSheets = contextStateV2?.setDataSheets
   const setActiveSheetId = contextStateV2?.setActiveSheetId
@@ -1121,6 +1124,7 @@ const Nav = () => {
         liveStreamState,
         liveFeedActions,
         liveFeedState,
+<<<<<<< HEAD
         setLiveStreamState,
         setLiveFeedState,
         cancelConnectDataFeedPull,
@@ -1128,6 +1132,9 @@ const Nav = () => {
         setChartDashboardDraft,
         setConnectHomeCenterView,
         setConnectPowerMove,
+=======
+        getDataSheets: () => dataSheets,
+>>>>>>> c9a151e6b6f99a668d347fec8189e0429eed0e36
       });
       toast.success(`Project: ${dataSet?.data_set_name || loadedDataMeta?.data_set_name || "Untitled"} loaded`, {
         duration: 99999999,

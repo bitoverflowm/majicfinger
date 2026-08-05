@@ -41,6 +41,14 @@ export {
 } from "@/lib/liveFeeds/publicLiveConfig";
 
 export {
+  startEventCandlesticksEditorLiveFeed,
+  maybeAutoStartPublishedProjectLiveFeed,
+  dashboardHasPublishedSlug,
+  projectHasPublishedLiveDashboard,
+  fetchProjectHasPublishedDashboard,
+} from "@/lib/liveFeeds/startEventCandlesticksEditorLiveFeed";
+
+export {
   getCachedPublicEventCandlesticks,
   publicLiveCacheControl,
   publicLiveLookbackPeriods,
