@@ -459,31 +459,45 @@ export function ConnectHomeWorkspaceNav({ className, compact = false, onPanelMan
       )}
       aria-label="Workspace navigation"
     >
-      <div className={cn("flex min-w-0 flex-1 items-end", gapClass)}>
-        {showCancelDataPull ? (
-          <TooltipProvider delayDuration={200}>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <span className="mb-[0.2rem] inline-flex shrink-0 self-center">
-                  <AmberCancelButton
-                    ariaLabel="Cancel data pull"
-                    title="Cancel data pull"
-                    onClick={handleCancelDataPull}
-                  />
-                </span>
-              </TooltipTrigger>
-              <TooltipContent side="bottom" className="max-w-[14rem] text-xs">
-                Cancel data pull and return to integrations with your selections
-              </TooltipContent>
-            </Tooltip>
-          </TooltipProvider>
-        ) : null}
-        <WorkspaceTabStrip
-          items={workspaceTabItems}
-          compact={compact}
-          textSize={textSize}
-          gapClass={gapClass}
-        />
+      <div
+        className="flex min-w-0 flex-1 flex-col items-start gap-0.5"
+        aria-labelledby="connect-workspace-tabs-label"
+      >
+        <span
+          id="connect-workspace-tabs-label"
+          className={cn(
+            "font-mono font-medium leading-none text-muted-foreground",
+            compact ? "text-[9px] tracking-wide" : "text-[10px] tracking-wide",
+          )}
+        >
+          Your sheets, charts and dashboards
+        </span>
+        <div className={cn("flex min-w-0 w-full items-end", gapClass)}>
+          {showCancelDataPull ? (
+            <TooltipProvider delayDuration={200}>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <span className="mb-[0.2rem] inline-flex shrink-0 self-center">
+                    <AmberCancelButton
+                      ariaLabel="Cancel data pull"
+                      title="Cancel data pull"
+                      onClick={handleCancelDataPull}
+                    />
+                  </span>
+                </TooltipTrigger>
+                <TooltipContent side="bottom" className="max-w-[14rem] text-xs">
+                  Cancel data pull and return to integrations with your selections
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+          ) : null}
+          <WorkspaceTabStrip
+            items={workspaceTabItems}
+            compact={compact}
+            textSize={textSize}
+            gapClass={gapClass}
+          />
+        </div>
       </div>
 
       <div
