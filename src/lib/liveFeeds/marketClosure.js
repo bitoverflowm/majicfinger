@@ -2,7 +2,11 @@
  * Detect when tracked Kalshi markets are past trading so live polls can stop.
  */
 
-import { extractKalshiMarketTiming } from "@/lib/kalshiLive/kalshiMarketTiming";
+import { extractKalshiMarketTiming, formatKalshiMarketDate } from "@/lib/kalshiLive/kalshiMarketTiming";
+import {
+  classifyMarketVsHistoricalCutoff,
+  formatKalshiCutoffDisplay,
+} from "@/lib/kalshiLive/marketTickerSearch";
 import { liveFeedSheetIds } from "@/lib/liveFeeds/feedConfig";
 
 /**
@@ -33,6 +37,120 @@ export function isKalshiMarketPastTrading(market, nowMs = Date.now()) {
   // Status can lag behind close_time; once close has passed, stop treating as live.
   if (Number.isFinite(closeMs) && nowMs > closeMs + 2000) return true;
   return false;
+}
+
+/**
+ * Latest close_time ISO among market rows (for closed-on display).
+ * @param {Record<string, unknown>[] | null | undefined} metaRows
+ * @param {Iterable<string> | null | undefined} tickers
+ * @returns {{ closeTimeIso: string | null; closeTimeMs: number | null; closeDateLabel: string }}
+ */
+export function latestCloseTimeAmongTickers(metaRows, tickers) {
+  const want = new Set(
+    [...(tickers || [])].map((t) => String(t || "").trim().toUpperCase()).filter(Boolean),
+  );
+  let bestIso = null;
+  let bestMs = null;
+  for (const row of Array.isArray(metaRows) ? metaRows : []) {
+    const t = String(row?.ticker || row?.market_ticker || "")
+      .trim()
+      .toUpperCase();
+    if (want.size && !want.has(t)) continue;
+    const timing = extractKalshiMarketTiming(row);
+    const iso = timing.closeTime || null;
+    if (!iso) continue;
+    const ms = Date.parse(iso);
+    if (!Number.isFinite(ms)) continue;
+    if (bestMs == null || ms > bestMs) {
+      bestMs = ms;
+      bestIso = iso;
+    }
+  }
+  return {
+    closeTimeIso: bestIso,
+    closeTimeMs: bestMs,
+    closeDateLabel: bestIso
+      ? formatKalshiMarketDate(bestIso) || formatKalshiCutoffDisplay(bestIso)
+      : "",
+  };
+}
+
+/**
+ * Where the full archive lives for a closed event, based on Kalshi live/historical cutoff.
+ * - ended before cutoff → Kalshi Historical v2
+ * - opened after cutoff (now closed) → Kalshi Live
+ * - spans cutoff → both
+ *
+ * @param {Record<string, unknown>[] | null | undefined} metaRows
+ * @param {Iterable<string> | null | undefined} trackedTickers
+ * @param {number | null | undefined} cutoffMs
+ * @returns {"historical_v2" | "live" | "both" | "unknown"}
+ */
+export function resolveClosedMarketArchiveIntegration(metaRows, trackedTickers, cutoffMs) {
+  if (!Number.isFinite(Number(cutoffMs))) return "unknown";
+  const ms = Number(cutoffMs);
+  const tracked = [
+    ...new Set(
+      [...(trackedTickers || [])]
+        .map((t) => String(t || "").trim().toUpperCase())
+        .filter(Boolean),
+    ),
+  ];
+  /** @type {Map<string, Record<string, unknown>>} */
+  const byTicker = new Map();
+  for (const row of Array.isArray(metaRows) ? metaRows : []) {
+    const t = String(row?.ticker || row?.market_ticker || "")
+      .trim()
+      .toUpperCase();
+    if (t) byTicker.set(t, row);
+  }
+
+  /** @type {Set<"historical_v2" | "live" | "both" | "unknown">} */
+  const targets = new Set();
+  const rows = tracked.length
+    ? tracked.map((t) => byTicker.get(t)).filter(Boolean)
+    : [...byTicker.values()];
+
+  for (const row of rows) {
+    const timing = extractKalshiMarketTiming(row);
+    const rel = classifyMarketVsHistoricalCutoff(
+      { openTime: timing.openTime, closeTime: timing.closeTime },
+      ms,
+    );
+    if (rel === "ended_before_cutoff") targets.add("historical_v2");
+    else if (rel === "fully_after_cutoff") targets.add("live");
+    else if (rel === "spans_cutoff") targets.add("both");
+    else {
+      const closeMs = timing.closeTime ? Date.parse(timing.closeTime) : NaN;
+      if (Number.isFinite(closeMs)) {
+        targets.add(closeMs < ms ? "historical_v2" : "live");
+      } else {
+        targets.add("unknown");
+      }
+    }
+  }
+
+  if (!targets.size) return "unknown";
+  if (targets.has("both") || (targets.has("historical_v2") && targets.has("live"))) {
+    return "both";
+  }
+  if (targets.has("historical_v2") && !targets.has("unknown")) return "historical_v2";
+  if (targets.has("live") && !targets.has("unknown")) return "live";
+  if (targets.has("historical_v2")) return "historical_v2";
+  if (targets.has("live")) return "live";
+  return "unknown";
+}
+
+/**
+ * Display labels for archive integrations.
+ * @param {"historical_v2" | "live" | "both" | "unknown"} target
+ * @returns {string}
+ */
+export function closedMarketArchiveIntegrationLabel(target) {
+  if (target === "historical_v2") return "Kalshi Historical v2";
+  if (target === "live") return "Kalshi Live";
+  if (target === "both") return "Kalshi Live and Kalshi Historical v2";
+  return "Kalshi Live or Kalshi Historical v2";
 }
 
 /**

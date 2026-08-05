@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import {
   Select,
@@ -23,9 +23,16 @@ import {
   LIVE_FEED_POLL_FREQUENCY_OPTIONS,
   pollIntervalMsForPeriod,
 } from "@/lib/liveFeeds/registry";
-import { evaluateTrackedMarketsClosure } from "@/lib/liveFeeds/marketClosure";
+import {
+  closedMarketArchiveIntegrationLabel,
+  evaluateTrackedMarketsClosure,
+  latestCloseTimeAmongTickers,
+  resolveClosedMarketArchiveIntegration,
+} from "@/lib/liveFeeds/marketClosure";
 import { sanitizeProjectLiveFeedSource } from "@/lib/liveFeeds/sanitizeProjectLiveFeedSource";
 import { refreshEventCandlesticksSnapshotIntoSheets } from "@/lib/liveFeeds/refreshEventCandlesticksSnapshot";
+import { useKalshiHistoricalCutoffDisplay } from "@/hooks/useKalshiHistoricalCutoffDisplay";
+import { formatKalshiCutoffDisplay } from "@/lib/kalshiLive/marketTickerSearch";
 
 /**
  * Conic ring that fills toward the next poll (same visual language as project rows ring).
@@ -95,8 +102,14 @@ export function EventCandlesticksLiveFeedControls() {
   const liveFeedState = ctx?.liveFeedState;
   const liveFeedActions = ctx?.liveFeedActions;
   const loadedDataMeta = ctx?.loadedDataMeta;
+  const requestConnectWorkspace = ctx?.requestConnectWorkspace;
+  const setIntegrationSidebar = ctx?.setIntegrationSidebar;
+  const setRightPanelTab = ctx?.setRightPanelTab;
   const softRowCap =
     getLiveFeedEndpointDef("kalshi-live", "event_candlesticks")?.softRowCapPerSheet ?? 50_000;
+
+  const { cutoffMs, cutoffLabelWithTime, loading: cutoffLoading } =
+    useKalshiHistoricalCutoffDisplay();
 
   const group = useMemo(
     () => discoverEventCandlesticksFeedGroup(dataSheets),
@@ -127,26 +140,63 @@ export function EventCandlesticksLiveFeedControls() {
     if (!group) return null;
     const metaId = group.sheets?.marketsMetadataSheetId;
     const metaSheet = metaId ? dataSheets?.[metaId] : null;
-    const ended = metaSheet?.liveFeedEnded;
-    if (ended?.reason === "markets_closed") {
-      return {
-        closed: true,
-        message: String(ended.message || "Markets closed · live feed stopped"),
-        closedTickers: Array.isArray(ended.closedTickers) ? ended.closedTickers : [],
-      };
-    }
+    const metaRows = Array.isArray(metaSheet?.data) ? metaSheet.data : [];
     const tracked = Object.keys(group.sheets?.marketSheetIdsByTicker || {});
-    const closure = evaluateTrackedMarketsClosure(metaSheet?.data, tracked);
-    if (!closure.allClosed) return null;
+    const ended = metaSheet?.liveFeedEnded;
+    const closure =
+      ended?.reason === "markets_closed"
+        ? {
+            allClosed: true,
+            closedTickers: Array.isArray(ended.closedTickers) ? ended.closedTickers : tracked,
+          }
+        : evaluateTrackedMarketsClosure(metaRows, tracked);
+    if (!closure.allClosed && ended?.reason !== "markets_closed") return null;
+
+    const closedTickers = Array.isArray(closure.closedTickers) ? closure.closedTickers : tracked;
+    const closeInfo = latestCloseTimeAmongTickers(metaRows, closedTickers);
+    let closeDateLabel = closeInfo.closeDateLabel;
+    if (!closeDateLabel && ended?.endedAt) {
+      closeDateLabel =
+        formatKalshiCutoffDisplay(new Date(Number(ended.endedAt)).toISOString(), {
+          withTime: false,
+        }) || "";
+    }
+    const archiveTarget = resolveClosedMarketArchiveIntegration(
+      metaRows,
+      closedTickers.length ? closedTickers : tracked,
+      cutoffMs,
+    );
+    const isSingle = closedTickers.length === 1;
+    const subject = isSingle ? "market" : "event";
+
     return {
       closed: true,
-      message:
-        closure.closedTickers.length === 1
-          ? `Market ${closure.closedTickers[0]} closed`
-          : "Markets closed",
-      closedTickers: closure.closedTickers,
+      subject,
+      headline: `This ${subject} is closed — no live feed available`,
+      closeDateLabel,
+      archiveTarget,
+      archiveLabel: closedMarketArchiveIntegrationLabel(archiveTarget),
+      closedTickers,
+      message: String(
+        ended?.message ||
+          (isSingle ? `Market ${closedTickers[0]} closed` : "Markets closed"),
+      ),
     };
-  }, [group, dataSheets]);
+  }, [group, dataSheets, cutoffMs]);
+
+  const goToArchiveIntegration = useCallback(
+    (target) => {
+      setRightPanelTab?.("integrations");
+      if (target === "historical_v2") {
+        setIntegrationSidebar?.("kalshiHistoricalV2");
+        requestConnectWorkspace?.("kalshiHistoricalV2");
+        return;
+      }
+      setIntegrationSidebar?.("kalshiLive");
+      requestConnectWorkspace?.("kalshiLive");
+    },
+    [requestConnectWorkspace, setIntegrationSidebar, setRightPanelTab],
+  );
 
   const candlePeriod = Math.floor(Number(group?.periodInterval)) || 1;
   const defaultPollMs =
@@ -176,7 +226,10 @@ export function EventCandlesticksLiveFeedControls() {
 
   const handleStart = () => {
     if (marketsClosedInfo?.closed) {
-      toast.message(marketsClosedInfo.message || "Markets closed — nothing left to poll.");
+      toast.message(
+        marketsClosedInfo.headline ||
+          "This market is closed — no live feed available.",
+      );
       return;
     }
     const period = candlePeriod;
@@ -260,7 +313,9 @@ export function EventCandlesticksLiveFeedControls() {
             <span>{isPaused ? "Paused" : activeFeed?.statusMessage || "Live"}</span>
           </span>
         ) : marketsClosed ? (
-          <span className="ml-auto text-[10px] font-medium text-muted-foreground">Closed</span>
+          <span className="ml-auto text-[10px] font-medium text-amber-700 dark:text-amber-300">
+            Closed · no live
+          </span>
         ) : null}
       </div>
 
@@ -275,7 +330,76 @@ export function EventCandlesticksLiveFeedControls() {
         {candleLabel}
       </p>
 
-      {isSavedSnapshot && !isRunning ? (
+      {marketsClosed ? (
+        <div
+          role="status"
+          className="space-y-1.5 rounded-md border border-amber-500/40 bg-amber-500/10 px-2 py-2"
+        >
+          <p className="text-[11px] font-semibold leading-snug text-amber-950 dark:text-amber-100">
+            {marketsClosedInfo.headline}
+          </p>
+          {marketsClosedInfo.closeDateLabel ? (
+            <p className="text-[10px] leading-snug text-amber-950/90 dark:text-amber-100/90">
+              This {marketsClosedInfo.subject} closed on{" "}
+              <span className="font-medium">{marketsClosedInfo.closeDateLabel}</span>.
+            </p>
+          ) : (
+            <p className="text-[10px] leading-snug text-amber-950/90 dark:text-amber-100/90">
+              Trading has ended for the markets in this pull.
+            </p>
+          )}
+          <p className="text-[10px] leading-snug text-amber-950/90 dark:text-amber-100/90">
+            The full data archive is available on{" "}
+            {marketsClosedInfo.archiveTarget === "both" ? (
+              <>
+                <button
+                  type="button"
+                  className="font-medium underline underline-offset-2 hover:opacity-80"
+                  onClick={() => goToArchiveIntegration("live")}
+                >
+                  Kalshi Live
+                </button>
+                {" and "}
+                <button
+                  type="button"
+                  className="font-medium underline underline-offset-2 hover:opacity-80"
+                  onClick={() => goToArchiveIntegration("historical_v2")}
+                >
+                  Kalshi Historical v2
+                </button>
+              </>
+            ) : marketsClosedInfo.archiveTarget === "historical_v2" ? (
+              <button
+                type="button"
+                className="font-medium underline underline-offset-2 hover:opacity-80"
+                onClick={() => goToArchiveIntegration("historical_v2")}
+              >
+                Kalshi Historical v2
+              </button>
+            ) : marketsClosedInfo.archiveTarget === "live" ? (
+              <button
+                type="button"
+                className="font-medium underline underline-offset-2 hover:opacity-80"
+                onClick={() => goToArchiveIntegration("live")}
+              >
+                Kalshi Live
+              </button>
+            ) : (
+              <span className="font-medium">{marketsClosedInfo.archiveLabel}</span>
+            )}
+            {cutoffLabelWithTime && !cutoffLoading ? (
+              <>
+                {" "}
+                (historical cutoff {cutoffLabelWithTime}).
+              </>
+            ) : (
+              "."
+            )}
+          </p>
+        </div>
+      ) : null}
+
+      {isSavedSnapshot && !isRunning && !marketsClosed ? (
         <div className="space-y-1.5 rounded-md border border-border/50 bg-background/60 px-2 py-1.5">
           <p className="text-[11px] leading-snug text-foreground">
             This is a snapshot of your data when you last saved your work.
@@ -286,15 +410,6 @@ export function EventCandlesticksLiveFeedControls() {
             change a published dashboard until you save and republish.
           </p>
         </div>
-      ) : null}
-
-      {marketsClosed ? (
-        <p className="px-0.5 text-[11px] leading-snug text-muted-foreground">
-          {marketsClosedInfo.message}.
-          {marketsClosedInfo.closedTickers?.length
-            ? " Candlestick polling has stopped."
-            : ""}
-        </p>
       ) : null}
 
       {isRunning && activeFeed?.lastTickStats ? (
@@ -425,21 +540,41 @@ export function EventCandlesticksLiveFeedControls() {
           <p className="text-[10px] leading-snug text-muted-foreground">
             <span className="font-medium text-foreground">Archive / analysis</span>
             {" — "}
-            For a complete history of this event, pull Kalshi Historical or a wide Live window and
-            save. Live refresh only merges recent bars into your existing sheets.
+            {marketsClosed ? (
+              <>
+                Pull the full history from{" "}
+                <span className="font-medium text-foreground">
+                  {marketsClosedInfo.archiveLabel}
+                </span>
+                {marketsClosedInfo.archiveTarget === "historical_v2"
+                  ? " (settled before the live/historical cutoff)."
+                  : marketsClosedInfo.archiveTarget === "live"
+                    ? " (settled after the live/historical cutoff)."
+                    : marketsClosedInfo.archiveTarget === "both"
+                      ? " — history before the cutoff is on Historical v2; after the cutoff use Live."
+                      : "."}
+              </>
+            ) : (
+              <>
+                For a complete history of this event, pull Kalshi Historical v2 or a wide Live window
+                and save. Live refresh only merges recent bars into your existing sheets.
+              </>
+            )}
           </p>
         </div>
-        <div className="flex gap-1.5 px-0.5">
-          <Activity className="mt-0.5 h-3 w-3 shrink-0 text-muted-foreground" aria-hidden />
-          <p className="text-[10px] leading-snug text-muted-foreground">
-            <span className="font-medium text-foreground">Interactive live</span>
-            {" — "}
-            Browser polls while this tab is open. Sheets keep a working window (~
-            {softRowCap.toLocaleString()} bars/market): on restart we backfill from the last
-            stored candle, then drop the oldest bars if the window would overflow. Published
-            dashboards use on-demand live separately when visitors open them.
-          </p>
-        </div>
+        {!marketsClosed ? (
+          <div className="flex gap-1.5 px-0.5">
+            <Activity className="mt-0.5 h-3 w-3 shrink-0 text-muted-foreground" aria-hidden />
+            <p className="text-[10px] leading-snug text-muted-foreground">
+              <span className="font-medium text-foreground">Interactive live</span>
+              {" — "}
+              Browser polls while this tab is open. Sheets keep a working window (~
+              {softRowCap.toLocaleString()} bars/market): on restart we backfill from the last
+              stored candle, then drop the oldest bars if the window would overflow. Published
+              dashboards use on-demand live separately when visitors open them.
+            </p>
+          </div>
+        ) : null}
       </div>
     </div>
   );
