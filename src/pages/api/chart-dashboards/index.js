@@ -38,7 +38,7 @@ export default async function handler(req, res) {
         }
         const list = await ChartDashboard.find({ user_id: uid })
           .select(
-            "dashboard_name page_heading data_set_id created_date last_edited_date public_slug is_public",
+            "dashboard_name page_heading data_set_id created_date last_edited_date public_slug is_public live_backed",
           )
           .sort({ last_edited_date: -1 })
           .lean();

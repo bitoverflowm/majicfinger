@@ -44,6 +44,23 @@ const chipActiveSheet = "bg-amber-300/80 text-amber-950 dark:bg-amber-800/70 dar
 const chipIdleChart =
   "bg-violet-100/70 text-violet-950 hover:bg-violet-200/90 dark:bg-violet-950/40 dark:text-violet-100 dark:hover:bg-violet-900/60";
 const chipActiveChart = "bg-violet-300/80 text-violet-950 dark:bg-violet-800/70 dark:text-violet-50";
+const chipIdleDashboard =
+  "bg-emerald-100/70 text-emerald-950 hover:bg-emerald-200/90 dark:bg-emerald-950/40 dark:text-emerald-100 dark:hover:bg-emerald-900/60";
+const chipActiveDashboard =
+  "bg-emerald-300/80 text-emerald-950 dark:bg-emerald-800/70 dark:text-emerald-50";
+
+function LiveFeedPulseDot({ className }) {
+  return (
+    <span
+      className={cn("relative inline-flex h-1.5 w-1.5 shrink-0", className)}
+      title="Live feed"
+      aria-label="Live feed"
+    >
+      <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-60" />
+      <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-emerald-500" />
+    </span>
+  );
+}
 
 const actionChipBase =
   "relative cursor-pointer rounded px-[0.35rem] py-[0.2rem] font-mono font-semibold leading-none transition-colors whitespace-nowrap";
@@ -56,9 +73,10 @@ const OVERFLOW_BTN_WIDTH_PX = 56;
 /** Soft max chips in the strip — remaining go in "+N". Width may show fewer. */
 const MAX_VISIBLE_WORKSPACE_TABS = 2;
 
-function estimateChipWidth(label, compact) {
+function estimateChipWidth(label, compact, hasLiveDot = false) {
   const charW = compact ? 6.1 : 6.8;
-  return Math.min(176, Math.ceil(String(label || "").length * charW) + 12);
+  const liveExtra = hasLiveDot ? 10 : 0;
+  return Math.min(176, Math.ceil(String(label || "").length * charW) + 12 + liveExtra);
 }
 
 /**
@@ -71,7 +89,7 @@ function estimateChipWidth(label, compact) {
 function splitVisibleWorkspaceTabs(items, availableWidth, compact) {
   if (!items.length) return { visible: [], overflow: [] };
 
-  const widths = items.map((it) => estimateChipWidth(it.label, compact));
+  const widths = items.map((it) => estimateChipWidth(it.label, compact, !!it.hasLiveFeed));
   const activeIdx = items.findIndex((t) => t.isActive);
 
   // Try showing everything without an overflow chip.
@@ -123,17 +141,28 @@ function splitVisibleWorkspaceTabs(items, availableWidth, compact) {
   return { visible, overflow };
 }
 
+function chipStylesForKind(kind) {
+  if (kind === "chart") return { idle: chipIdleChart, active: chipActiveChart };
+  if (kind === "dashboard") return { idle: chipIdleDashboard, active: chipActiveDashboard };
+  return { idle: chipIdleSheet, active: chipActiveSheet };
+}
+
 function WorkspaceTabChip({ item, textSize, onSelect }) {
-  const idle = item.kind === "chart" ? chipIdleChart : chipIdleSheet;
-  const active = item.kind === "chart" ? chipActiveChart : chipActiveSheet;
+  const { idle, active } = chipStylesForKind(item.kind);
   return (
     <button
       type="button"
-      title={item.label}
-      className={cn(chipBase, textSize, item.isActive ? active : idle)}
+      title={item.hasLiveFeed ? `${item.label} · live feed` : item.label}
+      className={cn(
+        chipBase,
+        textSize,
+        "inline-flex max-w-[11rem] items-center gap-1 truncate",
+        item.isActive ? active : idle,
+      )}
       onClick={onSelect}
     >
-      {item.label}
+      <span className="min-w-0 truncate">{item.label}</span>
+      {item.hasLiveFeed ? <LiveFeedPulseDot /> : null}
     </button>
   );
 }
@@ -171,12 +200,13 @@ function WorkspaceTabStrip({ items, compact, textSize, gapClass }) {
 
   const sheetItems = items.filter((t) => t.kind === "sheet");
   const chartItems = items.filter((t) => t.kind === "chart");
+  const dashboardItems = items.filter((t) => t.kind === "dashboard");
 
   return (
     <div
       ref={stripRef}
       className={cn("flex min-w-0 flex-1 items-center justify-start", gapClass)}
-      aria-label="Open sheets and charts"
+      aria-label="Open sheets, charts and dashboards"
     >
       {/* Pack chips + overflow flush-left; stripRef still spans full width for measure. */}
       <div className={cn("flex min-w-0 max-w-full items-center", gapClass)}>
@@ -196,7 +226,7 @@ function WorkspaceTabStrip({ items, compact, textSize, gapClass }) {
               <button
                 type="button"
                 className={cn(chipBase, textSize, chipIdleSheet, "max-w-none shrink-0")}
-                title={`${overflowCount} more · ${totalCount} sheets and charts total`}
+                title={`${overflowCount} more · ${totalCount} sheets, charts and dashboards total`}
               >
                 + {overflowCount}
               </button>
@@ -206,7 +236,7 @@ function WorkspaceTabStrip({ items, compact, textSize, gapClass }) {
               className="max-h-[min(20rem,70dvh)] w-[min(20rem,90vw)] overflow-y-auto font-mono text-xs"
             >
               <DropdownMenuLabel className="text-[10px] uppercase tracking-wide text-muted-foreground">
-                Sheets & charts ({totalCount})
+                Sheets, charts & dashboards ({totalCount})
               </DropdownMenuLabel>
               <DropdownMenuSeparator />
               {sheetItems.length > 0 ? (
@@ -242,6 +272,29 @@ function WorkspaceTabStrip({ items, compact, textSize, gapClass }) {
                   ))}
                 </>
               ) : null}
+              {dashboardItems.length > 0 ? (
+                <>
+                  {sheetItems.length > 0 || chartItems.length > 0 ? (
+                    <DropdownMenuSeparator />
+                  ) : null}
+                  <DropdownMenuLabel className="py-1 text-[10px] text-muted-foreground">
+                    Dashboards
+                  </DropdownMenuLabel>
+                  {dashboardItems.map((item) => (
+                    <DropdownMenuItem
+                      key={item.key}
+                      className={cn(
+                        "flex items-center gap-2",
+                        item.isActive && "bg-accent",
+                      )}
+                      onClick={item.onSelect}
+                    >
+                      <span className="min-w-0 flex-1 truncate">{item.label}</span>
+                      {item.hasLiveFeed ? <LiveFeedPulseDot /> : null}
+                    </DropdownMenuItem>
+                  ))}
+                </>
+              ) : null}
             </DropdownMenuContent>
           </DropdownMenu>
         ) : null}
@@ -259,6 +312,12 @@ export function ConnectHomeWorkspaceNav({ className, compact = false, onPanelMan
   const chartSheets = ctx?.chartSheets || {};
   const activeSheetId = ctx?.activeSheetId;
   const activeChartSheetId = ctx?.activeChartSheetId;
+  const activeChartDashboardId = ctx?.activeChartDashboardId;
+  const chartDashboardDraft = ctx?.chartDashboardDraft;
+  const savedChartDashboards = ctx?.savedChartDashboards;
+  const loadedDataId = ctx?.loadedDataId;
+  const setActiveChartDashboardId = ctx?.setActiveChartDashboardId;
+  const setChartDashboardDraft = ctx?.setChartDashboardDraft;
   const rightPanelTab = ctx?.rightPanelTab ?? "";
   const rightPanelOpen = !!ctx?.rightPanelOpen;
   const connectHomeCenterView = normalizeConnectHomeCenterView(ctx?.connectHomeCenterView);
@@ -402,6 +461,29 @@ export function ConnectHomeWorkspaceNav({ className, compact = false, onPanelMan
     setRightPanelOpen?.(true);
   }, [onPanelManualOpen, setConnectHomeCenterView, setRightPanelOpen, setRightPanelTab]);
 
+  const selectDashboard = useCallback(
+    (dashboardId) => {
+      if (dashboardId) {
+        if (
+          !(
+            activeChartDashboardId &&
+            String(dashboardId) === String(activeChartDashboardId)
+          )
+        ) {
+          setActiveChartDashboardId?.(String(dashboardId));
+          setChartDashboardDraft?.(null);
+        }
+      }
+      openDashboard();
+    },
+    [
+      activeChartDashboardId,
+      openDashboard,
+      setActiveChartDashboardId,
+      setChartDashboardDraft,
+    ],
+  );
+
   const openExport = useCallback(() => {
     onPanelManualOpen?.("export");
     setRightPanelTab?.("export");
@@ -412,6 +494,53 @@ export function ConnectHomeWorkspaceNav({ className, compact = false, onPanelMan
     cancelConnectDataFeedPull?.();
     openIntegrationsPanel();
   }, [cancelConnectDataFeedPull, openIntegrationsPanel]);
+
+  const projectDashboardEntries = useMemo(() => {
+    const projectId =
+      loadedDataId != null && String(loadedDataId).trim() !== ""
+        ? String(loadedDataId)
+        : "";
+    const list = Array.isArray(savedChartDashboards) ? savedChartDashboards : [];
+    /** @type {Map<string, { id: string; label: string; hasLiveFeed: boolean }>} */
+    const byId = new Map();
+
+    if (projectId) {
+      for (const dash of list) {
+        if (!dash?._id) continue;
+        if (String(dash.data_set_id || "") !== projectId) continue;
+        byId.set(String(dash._id), {
+          id: String(dash._id),
+          label:
+            String(dash.dashboard_name || "").trim() ||
+            String(dash.page_heading || "").trim() ||
+            "Untitled dashboard",
+          hasLiveFeed: !!dash.live_backed,
+        });
+      }
+    }
+
+    const draft = chartDashboardDraft;
+    if (draft) {
+      const draftProjectId = String(draft.data_set_id || "").trim();
+      const belongsToProject =
+        !projectId || !draftProjectId || draftProjectId === projectId;
+      if (belongsToProject) {
+        const draftId = draft._id ? String(draft._id) : "__draft__";
+        const existing = byId.get(draftId);
+        byId.set(draftId, {
+          id: draftId === "__draft__" ? "" : draftId,
+          label:
+            String(draft.dashboard_name || "").trim() ||
+            String(draft.page_heading || "").trim() ||
+            existing?.label ||
+            "Untitled dashboard",
+          hasLiveFeed: !!(draft.live_backed || existing?.hasLiveFeed),
+        });
+      }
+    }
+
+    return Array.from(byId.values());
+  }, [chartDashboardDraft, loadedDataId, savedChartDashboards]);
 
   const workspaceTabItems = useMemo(() => {
     const items = [];
@@ -433,16 +562,41 @@ export function ConnectHomeWorkspaceNav({ className, compact = false, onPanelMan
         onSelect: () => selectChart(id),
       });
     }
+    for (const dash of projectDashboardEntries) {
+      const keyId = dash.id || "draft";
+      const isActive =
+        dashboardViewActive &&
+        (dash.id
+          ? String(activeChartDashboardId || "") === String(dash.id)
+          : !activeChartDashboardId && !!chartDashboardDraft);
+      items.push({
+        key: `dashboard-${keyId}`,
+        kind: "dashboard",
+        label: dash.label,
+        hasLiveFeed: !!dash.hasLiveFeed,
+        isActive,
+        onSelect: () => {
+          if (dash.id) selectDashboard(dash.id);
+          else openDashboard();
+        },
+      });
+    }
     return items;
   }, [
+    activeChartDashboardId,
     activeChartSheetId,
     activeSheetId,
+    chartDashboardDraft,
     chartSheetIds,
     chartSheets,
     chartViewActive,
+    dashboardViewActive,
     dataSheetIds,
     dataSheets,
+    openDashboard,
+    projectDashboardEntries,
     selectChart,
+    selectDashboard,
     selectSheet,
     tableViewActive,
   ]);
