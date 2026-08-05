@@ -40,6 +40,15 @@ const DataSetSchema = new mongoose.Schema({
         type: Schema.Types.Mixed,
         default: {}
     },
+    /**
+     * When this project has Kalshi event-candlesticks (live-capable) sheets,
+     * records which integration/endpoint unlocked editor live + last poll preference.
+     * Editor-only — does not control public dashboard on-demand live.
+     */
+    live_feed_source: {
+        type: Schema.Types.Mixed,
+        default: null,
+    },
     user_id: {
         type: Schema.Types.ObjectId, // Defines the type as ObjectId
         ref: 'User', // References the User model

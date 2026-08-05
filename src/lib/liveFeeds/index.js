@@ -48,3 +48,9 @@ export {
 } from "@/lib/liveFeeds/publicLiveKalshiCache";
 
 export { applyLiveCandleOverlay } from "@/lib/liveFeeds/applyLiveCandleOverlay";
+
+export {
+  buildProjectLiveFeedSourceFromSheets,
+  projectHasLiveFeedSource,
+  sanitizeProjectLiveFeedSource,
+} from "@/lib/liveFeeds/projectLiveFeedSource";

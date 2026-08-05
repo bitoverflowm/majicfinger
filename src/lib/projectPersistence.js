@@ -82,7 +82,7 @@ export function buildProjectDeltaPayload({ baseProject, currentPayload }) {
   }
 
   const changedTopLevel = {};
-  for (const key of ["data_set_name", "labels", "source"]) {
+  for (const key of ["data_set_name", "labels", "source", "live_feed_source"]) {
     if (hashJson(baseProject?.[key]) !== hashJson(currentPayload?.[key])) {
       changedTopLevel[key] = currentPayload?.[key];
     }

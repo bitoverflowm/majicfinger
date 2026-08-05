@@ -58,7 +58,7 @@ export default async function handler(req, res) {
                 } catch (parseErr) {
                     return res.status(400).json({ success: false, message: parseErr?.message || "Invalid request body" });
                 }
-                const { data_set_name, data, data_sheets, created_date, last_saved_date, labels, source } = body || {};
+                const { data_set_name, data, data_sheets, created_date, last_saved_date, labels, source, live_feed_source } = body || {};
                 const ownerId = new mongoose.Types.ObjectId(String(session.userId));
                 const storageSummary = summarizeAdvancedDataStorage(data_sheets);
                 if (storageSummary.requiresAdvancedStorage) {
@@ -85,6 +85,7 @@ export default async function handler(req, res) {
                     last_saved_date: new Date(last_saved_date),
                     labels,
                     source,
+                    live_feed_source: live_feed_source && typeof live_feed_source === "object" ? live_feed_source : null,
                     save_revision: buildProjectRevision({ data_set_name, data_sheets, labels, source }),
                     save_meta: {
                         saveMode: "full",

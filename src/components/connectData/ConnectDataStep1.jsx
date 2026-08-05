@@ -756,6 +756,7 @@ export default function ConnectDataStep1({
         setChartDataOverrideMeta,
         liveStreamActions,
         liveStreamState,
+        setConnectPowerMove: context?.setConnectPowerMove,
       });
       toast.success("Project opened");
     } catch (e) {

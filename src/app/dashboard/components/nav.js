@@ -38,6 +38,7 @@ import {
   rebuildDashboardPublishCache,
 } from "@/lib/dashboardPublishCache"
 import { buildProjectDeltaPayload, prepareProjectDataPayload, PROJECT_PREVIEW_ROW_LIMIT } from "@/lib/projectPersistence"
+import { buildProjectLiveFeedSourceFromSheets } from "@/lib/liveFeeds/projectLiveFeedSource"
 import { isConnectIntegrationWorkspace } from "@/lib/connectHomeWorkspace"
 import { prepareLargeJsonBody } from "@/lib/gzipJsonTransport"
 import {
@@ -286,6 +287,7 @@ const Nav = () => {
   const requestConnectAnalyzeScroll = contextStateV2?.requestConnectAnalyzeScroll
   const setRightPanelTab = contextStateV2?.setRightPanelTab
   const setRightPanelOpen = contextStateV2?.setRightPanelOpen
+  const setConnectPowerMove = contextStateV2?.setConnectPowerMove
   const connectWorkspace = contextStateV2?.connectWorkspace
   const connectedData = contextStateV2?.connectedData
   const dataSetName = contextStateV2?.dataSetName
@@ -362,6 +364,7 @@ const Nav = () => {
 
   const liveStreamState = contextStateV2?.liveStreamState
   const liveStreamActions = contextStateV2?.liveStreamActions
+  const liveFeedState = contextStateV2?.liveFeedState
   const dataSheets = contextStateV2?.dataSheets
   const setDataSheets = contextStateV2?.setDataSheets
   const setActiveSheetId = contextStateV2?.setActiveSheetId
@@ -762,6 +765,17 @@ const Nav = () => {
       await new Promise((r) => requestAnimationFrame(r));
 
       const sheetsForSave = dataSheets;
+      const runningLiveFeed = Object.values(liveFeedState?.feedsById || {}).find(
+        (f) =>
+          f?.isRunning &&
+          f?.integration === "kalshi-live" &&
+          f?.endpoint === "event_candlesticks",
+      );
+      // Persist which Connect pull unlocked editor live (event candlesticks group).
+      const liveFeedSource = buildProjectLiveFeedSourceFromSheets(sheetsForSave, {
+        pollIntervalMs: runningLiveFeed?.pollIntervalMs ?? null,
+        previous: loadedDataMeta?.live_feed_source,
+      });
       const savePayloadResult = prepareProjectDataPayload({
         projectName,
         connectedData,
@@ -770,6 +784,7 @@ const Nav = () => {
           last_saved_date: new Date(),
           labels: ['project'],
           source: 'project',
+          live_feed_source: liveFeedSource,
         },
       });
       const dataPayload = savePayloadResult.payload;
@@ -1012,6 +1027,7 @@ const Nav = () => {
         setChartDataOverrideMeta,
         liveStreamActions,
         liveStreamState,
+        setConnectPowerMove,
       });
       toast.success(`Project: ${dataSet?.data_set_name || loadedDataMeta?.data_set_name || "Untitled"} loaded`, {
         duration: 99999999,

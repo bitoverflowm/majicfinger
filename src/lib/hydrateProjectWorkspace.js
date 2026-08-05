@@ -199,6 +199,7 @@ export async function loadFullProjectFromApi({
   setLoadedChartMeta,
   setLoadedChartBuilderSnapshot,
   setRefetchChartDashboardsTick,
+  setConnectPowerMove,
   onRehydrateProgress,
 }) {
   if (!dataSetId) throw new Error("Missing project id");
@@ -222,6 +223,16 @@ export async function loadFullProjectFromApi({
 
   const rid = stripped?._id ?? dataSetId;
   if (rid != null) setLoadedDataId?.(rid);
+
+  // Restore Power moves for live-capable projects (snapshot + re-enable live UX).
+  let liveFeedCapable = false;
+  try {
+    const { projectHasLiveFeedSource } = await import("@/lib/liveFeeds/projectLiveFeedSource");
+    liveFeedCapable = projectHasLiveFeedSource(stripped, incomingSheets);
+    setConnectPowerMove?.(liveFeedCapable ? "event_candlesticks" : null);
+  } catch {
+    setConnectPowerMove?.(null);
+  }
 
   await yieldToPaint();
 
@@ -281,6 +292,7 @@ export async function loadFullProjectFromApi({
   }
 
   setRefetchChartDashboardsTick?.((t) => (t || 0) + 1);
+  return { liveFeedCapable };
 }
 
 /**
@@ -326,6 +338,7 @@ export async function openProjectInConnectHome({
   setLoadedChartMeta,
   setLoadedChartBuilderSnapshot,
   setRefetchChartDashboardsTick,
+  setConnectPowerMove,
   setViewing,
   requestConnectWorkspace,
   setConnectHomeAnalyzeActive,
@@ -335,7 +348,7 @@ export async function openProjectInConnectHome({
   rightPanelTab = null,
   scroll = true,
 }) {
-  await loadFullProjectFromApi({
+  const loadResult = await loadFullProjectFromApi({
     dataSetId,
     userId,
     setDataSheets,
@@ -349,6 +362,7 @@ export async function openProjectInConnectHome({
     setLoadedChartMeta,
     setLoadedChartBuilderSnapshot,
     setRefetchChartDashboardsTick,
+    setConnectPowerMove,
   });
   finishConnectHomeProjectLoad({
     setViewing,
@@ -357,7 +371,8 @@ export async function openProjectInConnectHome({
     requestConnectAnalyzeScroll,
     setRightPanelTab,
     setRightPanelOpen,
-    rightPanelTab,
+    rightPanelTab:
+      rightPanelTab ?? (loadResult?.liveFeedCapable ? "powerMoves" : "requestHistory"),
     scroll,
   });
 }

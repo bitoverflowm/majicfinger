@@ -136,6 +136,7 @@ export async function runConnectProjectLoad({
   setRightPanelOpen,
   setChartDataOverride,
   setChartDataOverrideMeta,
+  setConnectPowerMove,
   liveStreamActions,
   liveStreamState,
   onAlreadyLoaded,
@@ -193,7 +194,7 @@ export async function runConnectProjectLoad({
     bump(18, "Loading data sheets…");
     startTicker({ min: 18, max: 64 });
 
-    await loadFullProjectFromApi({
+    const loadResult = await loadFullProjectFromApi({
       dataSetId,
       userId,
       preferredChartId: preferredChartId || null,
@@ -208,6 +209,7 @@ export async function runConnectProjectLoad({
       setLoadedChartMeta,
       setLoadedChartBuilderSnapshot,
       setRefetchChartDashboardsTick,
+      setConnectPowerMove,
       onRehydrateProgress: (message) => bump(72, message),
     });
 
@@ -221,7 +223,9 @@ export async function runConnectProjectLoad({
       requestConnectAnalyzeScroll,
       setRightPanelTab,
       setRightPanelOpen,
-      rightPanelTab: rightPanelTab || undefined,
+      rightPanelTab:
+        rightPanelTab ||
+        (loadResult?.liveFeedCapable ? "powerMoves" : undefined),
     });
     if (connectHomeCenterView) setConnectHomeCenterView?.(connectHomeCenterView);
 

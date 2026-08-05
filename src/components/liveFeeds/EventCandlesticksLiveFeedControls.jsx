@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import {
   Select,
@@ -10,7 +10,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
-import { Radio, Pause, Play, Square, CircleOff } from "lucide-react";
+import { Radio, Pause, Play, Square, CircleOff, RefreshCw, Archive, Activity } from "lucide-react";
 import { toast } from "sonner";
 import { useMyStateV2 } from "@/context/stateContextV2";
 import {
@@ -19,10 +19,13 @@ import {
 } from "@/lib/liveFeeds/feedConfig";
 import {
   describeCandlePeriod,
+  getLiveFeedEndpointDef,
   LIVE_FEED_POLL_FREQUENCY_OPTIONS,
   pollIntervalMsForPeriod,
 } from "@/lib/liveFeeds/registry";
 import { evaluateTrackedMarketsClosure } from "@/lib/liveFeeds/marketClosure";
+import { sanitizeProjectLiveFeedSource } from "@/lib/liveFeeds/sanitizeProjectLiveFeedSource";
+import { refreshEventCandlesticksSnapshotIntoSheets } from "@/lib/liveFeeds/refreshEventCandlesticksSnapshot";
 
 /**
  * Conic ring that fills toward the next poll (same visual language as project rows ring).
@@ -56,7 +59,7 @@ function LiveFeedNextPullRing({ lastPolledAt, pollIntervalMs, paused }) {
       ? Math.max(0, Math.ceil((intervalMs - elapsed) / 1000))
       : Math.ceil(intervalMs / 1000);
 
-  const color = paused ? "rgb(148 163 184)" : "rgb(16 185 129)"; // emerald-500
+  const color = paused ? "rgb(148 163 184)" : "rgb(16 185 129)";
   const track = "rgb(226 232 240)";
 
   return (
@@ -83,18 +86,29 @@ function LiveFeedNextPullRing({ lastPolledAt, pollIntervalMs, paused }) {
 
 /**
  * Start / pause / stop live REST poll for Kalshi event candlesticks.
- * Candle size is locked to the base pull; user only chooses poll frequency.
+ * On reopen of a saved live-capable project: snapshot callout + one-shot refresh + re-enable.
  */
 export function EventCandlesticksLiveFeedControls() {
   const ctx = useMyStateV2();
   const dataSheets = ctx?.dataSheets || {};
+  const setDataSheets = ctx?.setDataSheets;
   const liveFeedState = ctx?.liveFeedState;
   const liveFeedActions = ctx?.liveFeedActions;
+  const loadedDataMeta = ctx?.loadedDataMeta;
+  const softRowCap =
+    getLiveFeedEndpointDef("kalshi-live", "event_candlesticks")?.softRowCapPerSheet ?? 50_000;
 
   const group = useMemo(
     () => discoverEventCandlesticksFeedGroup(dataSheets),
     [dataSheets],
   );
+
+  const savedLiveSource = useMemo(
+    () => sanitizeProjectLiveFeedSource(loadedDataMeta?.live_feed_source),
+    [loadedDataMeta?.live_feed_source],
+  );
+
+  const isSavedSnapshot = !!loadedDataMeta?._id && (!!savedLiveSource || !!group);
 
   const activeFeed = useMemo(() => {
     const feeds = Object.values(liveFeedState?.feedsById || {});
@@ -134,16 +148,23 @@ export function EventCandlesticksLiveFeedControls() {
     };
   }, [group, dataSheets]);
 
-  // Locked to whatever the Connect pull already fetched (1 | 60 | 1440).
   const candlePeriod = Math.floor(Number(group?.periodInterval)) || 1;
-  const defaultPollMs = pollIntervalMsForPeriod(candlePeriod);
+  const defaultPollMs =
+    savedLiveSource?.pollIntervalMs || pollIntervalMsForPeriod(candlePeriod);
 
   const [pollIntervalMs, setPollIntervalMs] = useState(() => String(defaultPollMs));
+  const [refreshBusy, setRefreshBusy] = useState(false);
+  const refreshAbortRef = useRef(/** @type {AbortController | null} */ (null));
 
-  // Keep default poll frequency in sync if the underlying pull's candle size changes.
   useEffect(() => {
-    setPollIntervalMs(String(pollIntervalMsForPeriod(candlePeriod)));
-  }, [candlePeriod]);
+    setPollIntervalMs(String(defaultPollMs));
+  }, [defaultPollMs]);
+
+  useEffect(() => {
+    return () => {
+      refreshAbortRef.current?.abort();
+    };
+  }, []);
 
   if (!group) return null;
 
@@ -151,6 +172,7 @@ export function EventCandlesticksLiveFeedControls() {
   const isPaused = !!activeFeed?.isPaused;
   const candleLabel = describeCandlePeriod(candlePeriod);
   const marketsClosed = !isRunning && !!marketsClosedInfo?.closed;
+  const marketCount = Object.keys(group.sheets?.marketSheetIdsByTicker || {}).length;
 
   const handleStart = () => {
     if (marketsClosedInfo?.closed) {
@@ -181,7 +203,38 @@ export function EventCandlesticksLiveFeedControls() {
       const freq =
         LIVE_FEED_POLL_FREQUENCY_OPTIONS.find((o) => o.valueMs === pollMs)?.label ||
         `every ${Math.round(pollMs / 60_000)}m`;
-      toast.success(`Live feed started · ${candleLabel} candles · ${freq.toLowerCase()}`);
+      toast.success(
+        isSavedSnapshot
+          ? `Live feed re-enabled · ${candleLabel} candles · ${freq.toLowerCase()}`
+          : `Live feed started · ${candleLabel} candles · ${freq.toLowerCase()}`,
+      );
+    }
+  };
+
+  const handleRefreshOnce = async () => {
+    if (refreshBusy || !setDataSheets) return;
+    refreshAbortRef.current?.abort();
+    const ac = new AbortController();
+    refreshAbortRef.current = ac;
+    setRefreshBusy(true);
+    try {
+      const result = await refreshEventCandlesticksSnapshotIntoSheets(dataSheets, {
+        signal: ac.signal,
+      });
+      setDataSheets(result.dataSheets);
+      const stats = result.stats;
+      const added = Number(stats?.candlesAdded) || 0;
+      const updated = Number(stats?.candlesUpdated) || 0;
+      toast.success(
+        added || updated
+          ? `Snapshot refreshed · +${added} new · ${updated} updated across markets`
+          : "Snapshot refresh ok · no new candle bars in the lookback window",
+      );
+    } catch (e) {
+      if (e?.name === "AbortError") return;
+      toast.error(e instanceof Error ? e.message : "Could not refresh snapshot");
+    } finally {
+      setRefreshBusy(false);
     }
   };
 
@@ -210,6 +263,30 @@ export function EventCandlesticksLiveFeedControls() {
           <span className="ml-auto text-[10px] font-medium text-muted-foreground">Closed</span>
         ) : null}
       </div>
+
+      <p className="px-0.5 text-[10px] leading-snug text-muted-foreground">
+        <span className="font-medium text-foreground">Kalshi Live</span>
+        {" · "}
+        event candlesticks
+        {" · "}
+        {group.eventTicker}
+        {marketCount ? ` · ${marketCount} markets` : ""}
+        {" · "}
+        {candleLabel}
+      </p>
+
+      {isSavedSnapshot && !isRunning ? (
+        <div className="space-y-1.5 rounded-md border border-border/50 bg-background/60 px-2 py-1.5">
+          <p className="text-[11px] leading-snug text-foreground">
+            This is a snapshot of your data when you last saved your work.
+          </p>
+          <p className="text-[10px] leading-snug text-muted-foreground">
+            Sheets still hold the rows from that save. Re-enabling live only updates{" "}
+            <span className="font-medium text-foreground">this editor session</span> — it does not
+            change a published dashboard until you save and republish.
+          </p>
+        </div>
+      ) : null}
 
       {marketsClosed ? (
         <p className="px-0.5 text-[11px] leading-snug text-muted-foreground">
@@ -245,9 +322,29 @@ export function EventCandlesticksLiveFeedControls() {
 
       {!isRunning && !marketsClosed ? (
         <>
+          {isSavedSnapshot ? (
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              disabled={refreshBusy}
+              className="h-auto w-full justify-start gap-2 whitespace-normal px-2.5 py-2 text-left text-xs"
+              onClick={handleRefreshOnce}
+            >
+              <RefreshCw
+                className={`h-3.5 w-3.5 shrink-0 text-sky-500 ${refreshBusy ? "animate-spin" : ""}`}
+                aria-hidden
+              />
+              <span className="min-w-0">
+                {refreshBusy ? "Refreshing markets…" : "Refresh once (append latest candles)"}
+              </span>
+            </Button>
+          ) : null}
+
           <p className="px-0.5 text-[11px] leading-snug text-muted-foreground">
-            Updating <span className="font-medium text-foreground">{candleLabel}</span> candles
-            from this pull. Candle size stays fixed.
+            {isSavedSnapshot ? "Re-enable" : "Start"}{" "}
+            <span className="font-medium text-foreground">{candleLabel}</span> live polls from this
+            pull. Candle size stays fixed.
           </p>
           <div className="space-y-1">
             <Label className="text-[11px] text-muted-foreground">Pull frequency</Label>
@@ -272,13 +369,8 @@ export function EventCandlesticksLiveFeedControls() {
             onClick={handleStart}
           >
             <Play className="h-3.5 w-3.5 shrink-0 text-emerald-500" aria-hidden />
-            <span className="min-w-0">Start live</span>
+            <span className="min-w-0">{isSavedSnapshot ? "Re-enable live feed" : "Start live"}</span>
           </Button>
-          <p className="px-1 text-[11px] leading-snug text-muted-foreground">
-            Polls Kalshi in this browser while the tab is open. Leave or Stop anytime — no server
-            cron. Publish a dashboard from this project to share the same near-real-time view with
-            visitors.
-          </p>
         </>
       ) : null}
 
@@ -322,9 +414,32 @@ export function EventCandlesticksLiveFeedControls() {
           </Button>
         </div>
       ) : null}
+
       {activeFeed?.lastError ? (
         <p className="px-1 text-[11px] text-destructive">{activeFeed.lastError}</p>
       ) : null}
+
+      <div className="space-y-1.5 border-t border-border/40 pt-2">
+        <div className="flex gap-1.5 px-0.5">
+          <Archive className="mt-0.5 h-3 w-3 shrink-0 text-muted-foreground" aria-hidden />
+          <p className="text-[10px] leading-snug text-muted-foreground">
+            <span className="font-medium text-foreground">Archive / analysis</span>
+            {" — "}
+            For a complete history of this event, pull Kalshi Historical or a wide Live window and
+            save. Live refresh only merges recent bars into your existing sheets.
+          </p>
+        </div>
+        <div className="flex gap-1.5 px-0.5">
+          <Activity className="mt-0.5 h-3 w-3 shrink-0 text-muted-foreground" aria-hidden />
+          <p className="text-[10px] leading-snug text-muted-foreground">
+            <span className="font-medium text-foreground">Interactive live</span>
+            {" — "}
+            Browser polls while this tab is open. Sheets keep a working window (soft cap ~
+            {softRowCap.toLocaleString()} bars/market) so the feed stays light — not a forever
+            archive. Published dashboards use on-demand live separately when visitors open them.
+          </p>
+        </div>
+      </div>
     </div>
   );
 }

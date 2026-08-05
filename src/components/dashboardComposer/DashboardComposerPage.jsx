@@ -197,6 +197,7 @@ export default function DashboardComposerPage({ user }) {
     cardGridComposerDock,
     setCardGridComposerDock,
     isDemo,
+    setConnectPowerMove,
   } = useMyStateV2() ?? {};
 
   const [demoDashboardDialogOpen, setDemoDashboardDialogOpen] = useState(false);
@@ -296,6 +297,7 @@ export default function DashboardComposerPage({ user }) {
               setActiveChartSheetId,
               setLoadedChartMeta,
               setLoadedChartBuilderSnapshot,
+              setConnectPowerMove,
             });
           } catch {
             if (!cancelled) toast.warning("Could not load the project linked to this dashboard.");

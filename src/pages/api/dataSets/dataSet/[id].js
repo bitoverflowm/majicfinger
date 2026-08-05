@@ -100,6 +100,11 @@ export default async function handler(req, res) {
                             saveMode: "full",
                             savedAt: new Date().toISOString(),
                         },
+                        ...(body.live_feed_source && typeof body.live_feed_source === "object"
+                          ? { live_feed_source: body.live_feed_source }
+                          : Object.prototype.hasOwnProperty.call(body, "live_feed_source")
+                            ? { live_feed_source: null }
+                            : {}),
                     },
                 };
                 const updatedDataSet = await DataSet.findOneAndUpdate(
@@ -179,6 +184,13 @@ export default async function handler(req, res) {
                 existing.data_sheets = nextSheets;
                 existing.labels = nextProject.labels;
                 existing.source = nextProject.source;
+                if (Object.prototype.hasOwnProperty.call(patch, "live_feed_source")) {
+                    existing.live_feed_source =
+                        patch.live_feed_source && typeof patch.live_feed_source === "object"
+                            ? patch.live_feed_source
+                            : null;
+                    existing.markModified("live_feed_source");
+                }
                 existing.last_saved_date = new Date(patch.last_saved_date || Date.now());
                 existing.save_revision = nextRevision;
                 existing.save_meta = {
