@@ -1797,10 +1797,16 @@ export function ChartBuilderProvider({ demo, children, initialBuilderSnapshot, e
     onSnapshotGetterReady(getBuilderSnapshot);
   }, [onSnapshotGetterReady, getBuilderSnapshot]);
 
-  // Keep chartSheets.snapshot in sync when line filters change so save/publish paths that read
-  // chartSheets do not drop rules that only exist in React state.
+  // Once axes land on the canvas, register the sheet as a real chart (snapshot + userCreated)
+  // so Export/Share unlock without requiring "+ Chart". Tab-only empty Chart 1 stays unregistered.
   useEffect(() => {
     if (demo || !activeChartSheetId || typeof setChartSheets !== "function") return;
+    const yKeys = Array.isArray(selY) ? selY.filter(Boolean) : [];
+    const realAxesConfigured =
+      (!!selX && yKeys.length > 0) ||
+      (selChartType === "candlestick" &&
+        (!!candlestickMapped?.ok || (candlestickMapped?.available?.length ?? 0) > 0));
+    if (!realAxesConfigured) return;
     const timer = setTimeout(() => {
       const snap = getBuilderSnapshot();
       if (!snap) return;
@@ -1808,12 +1814,23 @@ export function ChartBuilderProvider({ demo, children, initialBuilderSnapshot, e
         const cur = prev?.[activeChartSheetId] || { name: "Chart", snapshot: null, chartMeta: null };
         return {
           ...(prev || {}),
-          [activeChartSheetId]: { ...cur, snapshot: snap },
+          [activeChartSheetId]: { ...cur, snapshot: snap, userCreated: true },
         };
       });
     }, 250);
     return () => clearTimeout(timer);
-  }, [demo, activeChartSheetId, setChartSheets, getBuilderSnapshot, chartLineFilters, referenceLines]);
+  }, [
+    demo,
+    activeChartSheetId,
+    setChartSheets,
+    getBuilderSnapshot,
+    selX,
+    selY,
+    selChartType,
+    candlestickMapped,
+    chartLineFilters,
+    referenceLines,
+  ]);
 
   const downloadChart = (format) => {
     const el = chartRef.current;

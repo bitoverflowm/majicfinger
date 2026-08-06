@@ -45,6 +45,7 @@ import {
   GripVertical,
 } from "lucide-react";
 import { resolvePaletteSeedForNewChart } from "@/lib/chartPaletteSnapshot";
+import { isPlottableBuilderSnapshot } from "@/lib/inferDefaultBuilderSnapshot";
 import { cn } from "@/lib/utils";
 import {
   Tooltip,
@@ -1231,9 +1232,14 @@ export default function DataSheetWithIntegration({
     if (!snap) return;
     setChartSheets?.((prev) => {
       const cur = prev?.[activeChartSheetId] || { name: "Chart", snapshot: null, chartMeta: null };
+      const markCreated = cur.userCreated === true || isPlottableBuilderSnapshot(snap);
       return {
         ...(prev || {}),
-        [activeChartSheetId]: { ...cur, snapshot: snap },
+        [activeChartSheetId]: {
+          ...cur,
+          snapshot: snap,
+          ...(markCreated ? { userCreated: true } : null),
+        },
       };
     });
   }, [activeChartSheetId, setChartSheets]);
@@ -1244,9 +1250,14 @@ export default function DataSheetWithIntegration({
     if (!snap) return null;
     setChartSheets?.((prev) => {
       const cur = prev?.[activeChartSheetId] || { name: "Chart", snapshot: null, chartMeta: null };
+      const markCreated = cur.userCreated === true || isPlottableBuilderSnapshot(snap);
       return {
         ...(prev || {}),
-        [activeChartSheetId]: { ...cur, snapshot: snap },
+        [activeChartSheetId]: {
+          ...cur,
+          snapshot: snap,
+          ...(markCreated ? { userCreated: true } : null),
+        },
       };
     });
     return snap;

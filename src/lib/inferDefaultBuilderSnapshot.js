@@ -119,6 +119,35 @@ export function coerceCategoricalBuilderAxes(snapshot, keys) {
 }
 
 /**
+ * True when a builder snapshot has enough axes to render on the chart canvas.
+ * Empty Chart-tab defaults (no X/Y) are not plottable — selecting the tab alone does not count.
+ *
+ * @param {object | null | undefined} snap
+ */
+export function isPlottableBuilderSnapshot(snap) {
+  if (!snap || typeof snap !== "object" || snap.v !== 1) return false;
+  if (snap.selChartType === "candlestick") return true;
+  const y = Array.isArray(snap.selY) ? snap.selY.filter(Boolean) : [];
+  return !!(snap.selX && y.length > 0);
+}
+
+/**
+ * True when the workbook chart sheet is real enough to export, share, or list in nav.
+ * Mere presence of an empty default `chart-1` tab does not qualify.
+ *
+ * @param {object | null | undefined} sheet
+ */
+export function chartSheetIsShareable(sheet) {
+  if (!sheet || typeof sheet !== "object") return false;
+  if (sheet.userCreated === true) return true;
+  if (sheet.chartMeta?._id) return true;
+  if (isPlottableBuilderSnapshot(sheet.snapshot)) return true;
+  const cp = sheet.chartMeta?.chart_properties;
+  const fromMeta = Array.isArray(cp) ? cp[0]?.rechartsBuilder : cp?.rechartsBuilder;
+  return isPlottableBuilderSnapshot(fromMeta);
+}
+
+/**
  * Default workspace chart tab ("Chart 1") before the user builds or saved a chart.
  *
  * @param {object | null | undefined} sheet
@@ -128,6 +157,7 @@ export function isPlaceholderChartSheet(sheet, index = 0) {
   if (!sheet || typeof sheet !== "object") return true;
   if (sheet.userCreated) return false;
   if (sheet.chartMeta?._id) return false;
+  if (isPlottableBuilderSnapshot(sheet.snapshot)) return false;
 
   const name = String(sheet.name || "").trim();
   const defaultName = `Chart ${index + 1}`;
@@ -135,7 +165,7 @@ export function isPlaceholderChartSheet(sheet, index = 0) {
 
   const cp = sheet.chartMeta?.chart_properties;
   const fromMeta = Array.isArray(cp) ? cp[0]?.rechartsBuilder : cp?.rechartsBuilder;
-  if (fromMeta?.v === 1 && (fromMeta.selX || fromMeta?.selY?.length)) return false;
+  if (isPlottableBuilderSnapshot(fromMeta)) return false;
 
   return true;
 }

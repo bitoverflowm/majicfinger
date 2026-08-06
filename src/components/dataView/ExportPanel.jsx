@@ -33,21 +33,13 @@ import {
   rebuildChartPublishCache,
 } from "@/lib/chartPublishCache";
 import { isPublishedChartBundleStale } from "@/lib/chartPublishStaleness";
+import { chartSheetIsShareable } from "@/lib/inferDefaultBuilderSnapshot";
 import { Progress } from "@/components/ui/progress";
 
 function getColKeys(connectedCols) {
   return (connectedCols || [])
     .map((c) => (c && typeof c === "object" && "field" in c ? c.field : c))
     .filter(Boolean);
-}
-
-/** True when the workbook has at least one chart the user can export or share. */
-function chartSheetIsShareable(sheet) {
-  if (!sheet || typeof sheet !== "object") return false;
-  if (sheet.userCreated === true) return true;
-  if (sheet.chartMeta?._id) return true;
-  if (sheet.snapshot) return true;
-  return false;
 }
 
 function useHasShareableChart() {

@@ -27,6 +27,7 @@ import { GUIDED_TARGET_ATTR } from "@/lib/guidedWorkflows/types";
 import { resolvePaletteSeedForNewChart } from "@/lib/chartPaletteSnapshot";
 import { CONNECT_HOME_CENTER_VIEW, normalizeConnectHomeCenterView } from "@/lib/connectHomeFlow";
 import { isConnectIntegrationWorkspace } from "@/lib/connectHomeWorkspace";
+import { chartSheetIsShareable } from "@/lib/inferDefaultBuilderSnapshot";
 import { projectHasLiveFeedSource } from "@/lib/liveFeeds/projectLiveFeedSource";
 import { cn } from "@/lib/utils";
 
@@ -395,10 +396,7 @@ export function ConnectHomeWorkspaceNav({ className, compact = false, onPanelMan
   const dataSheetIds = useMemo(() => Object.keys(dataSheets || {}), [dataSheets]);
   const chartSheetIds = useMemo(
     () =>
-      Object.keys(chartSheets || {}).filter((id) => {
-        const sheet = chartSheets[id];
-        return sheet?.userCreated === true || sheet?.chartMeta?._id || sheet?.snapshot;
-      }),
+      Object.keys(chartSheets || {}).filter((id) => chartSheetIsShareable(chartSheets[id])),
     [chartSheets],
   );
 
