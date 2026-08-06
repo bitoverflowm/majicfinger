@@ -60,7 +60,7 @@ import { ConnectIntegrationsPickerList } from "@/components/connectData/ConnectI
 import { collectRequestCardEntries } from "@/lib/connectHomeRequestCards";
 import { connectHomeAnySheetHasData, isConnectUserDataPullActive } from "@/lib/connectHomePullDestination";
 import { EventCandlesticksLiveFeedControls } from "@/components/liveFeeds/EventCandlesticksLiveFeedControls";
-import { discoverEventCandlesticksFeedGroup } from "@/lib/liveFeeds/feedConfig";
+import { discoverKalshiCandlesticksLiveGroup } from "@/lib/liveFeeds/feedConfig";
 import { KALSHI_GUIDED_TARGETS } from "@/lib/guidedWorkflows/targets";
 import { GUIDED_TARGET_ATTR } from "@/lib/guidedWorkflows/types";
 import {
@@ -274,12 +274,17 @@ export default function DataSheetWithIntegration({
     const sheets = dataSheets && typeof dataSheets === "object" ? Object.values(dataSheets) : [];
     return sheets.some((s) => Array.isArray(s?.data) && s.data.length > 0);
   }, [dataSheets]);
-  const hasEventCandlesticksLiveGroup = useMemo(
-    () => !!discoverEventCandlesticksFeedGroup(dataSheets),
+  const kalshiCandlesLiveGroup = useMemo(
+    () => discoverKalshiCandlesticksLiveGroup(dataSheets),
     [dataSheets],
   );
+  const hasEventCandlesticksLiveGroup = kalshiCandlesLiveGroup?.kind === "event";
+  const hasMarketCandlesticksLiveGroup = kalshiCandlesLiveGroup?.kind === "market";
   const showEventCandlesticksPowerMoves =
     connectPowerMove === "event_candlesticks" || hasEventCandlesticksLiveGroup;
+  const showMarketCandlesticksLiveControls = hasMarketCandlesticksLiveGroup;
+  const showKalshiCandlesticksLiveControls =
+    showEventCandlesticksPowerMoves || showMarketCandlesticksLiveControls;
   const hasAnySheetRows = useMemo(
     () => connectHomeAnySheetHasData(dataSheets, connectedData),
     [dataSheets, connectedData],
@@ -1695,7 +1700,9 @@ export default function DataSheetWithIntegration({
                             // Gradual flash to surface an available power move until the tab is opened.
                             const flashPowerMove =
                               value === "powerMoves" &&
-                              (!!connectPowerMove || hasEventCandlesticksLiveGroup) &&
+                              (!!connectPowerMove ||
+                                hasEventCandlesticksLiveGroup ||
+                                hasMarketCandlesticksLiveGroup) &&
                               rightPanelTab !== "powerMoves";
                             return (
                               <TabsTrigger
@@ -1845,9 +1852,11 @@ export default function DataSheetWithIntegration({
                             </div>
                           ) : null}
 
-                          {showEventCandlesticksPowerMoves ? (
+                          {showKalshiCandlesticksLiveControls ? (
                             <>
                               <EventCandlesticksLiveFeedControls />
+                              {showEventCandlesticksPowerMoves ? (
+                                <>
                               <Button
                                 type="button"
                                 variant="outline"
@@ -1868,6 +1877,8 @@ export default function DataSheetWithIntegration({
                                 Plots from the data already in memory, ordered by current chance.
                                 Save the project to keep the charts and candles.
                               </p>
+                                </>
+                              ) : null}
                             </>
                           ) : connectPowerMove === "historical_v2_candlesticks" ? (
                             <>

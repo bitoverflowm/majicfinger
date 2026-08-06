@@ -41,10 +41,13 @@ import { fetchKalshiLiveCandlesticksPull } from "@/lib/kalshiLive/fetchKalshiLiv
 import { fetchKalshiLiveEventCandlesticksPull } from "@/lib/kalshiLive/fetchKalshiLiveEventCandlesticksPull";
 import { fetchKalshiLiveEventForecastPull } from "@/lib/kalshiLive/fetchKalshiLiveEventForecastPull";
 import { startEventCandlesticksEditorLiveFeed } from "@/lib/liveFeeds/startEventCandlesticksEditorLiveFeed";
+import { startMarketCandlesticksEditorLiveFeed } from "@/lib/liveFeeds/startEventCandlesticksEditorLiveFeed";
 import {
   clampLiveFeedPollIntervalMs,
   pollIntervalMsForPeriod,
 } from "@/lib/liveFeeds/registry";
+import { inferSeriesTickerFromMarket } from "@/lib/kalshiLive/fetchKalshiLiveCandlesticksUpstream";
+import { kalshiCandlestickTickerMetaEntry } from "@/lib/kalshiLive/candlestickTickerMeta";
 import { fetchKalshiLiveLeaderboardPull } from "@/lib/kalshiLive/fetchKalshiLiveLeaderboardPull";
 import { fetchKalshiLiveHolderProfilePull } from "@/lib/kalshiLive/fetchKalshiLiveHolderProfilePull";
 import { fetchKalshiLiveHolderTradesPull } from "@/lib/kalshiLive/fetchKalshiLiveHolderTradesPull";
@@ -1125,6 +1128,9 @@ export default function KalshiLive({ setConnectedData, connectHomePullBridge = f
         0,
       );
 
+      /** @type {Record<string, unknown> | null} */
+      let writtenSheets = null;
+
       if (setDataSheets) {
         flushSync(() => {
           setDataSheets((prev) => {
@@ -1135,7 +1141,15 @@ export default function KalshiLive({ setConnectedData, connectHomePullBridge = f
             for (let i = 0; i < groups.length; i++) {
               const group = groups[i];
               const tickerName = String(group.ticker || `market-${i + 1}`).trim().slice(0, 80);
+              const marketTicker = tickerName.trim().toUpperCase();
               const rows = Array.isArray(group.rows) ? group.rows : [];
+              const metaEntry = kalshiCandlestickTickerMetaEntry(
+                ctx?.connectKalshiLiveCandlestickTickerMeta,
+                marketTicker,
+              );
+              const seriesTicker =
+                String(metaEntry?.seriesTicker || "").trim().toUpperCase() ||
+                inferSeriesTickerFromMarket(marketTicker);
 
               let targetSheetId;
               if (i === 0 && firstSheetId) {
@@ -1161,7 +1175,10 @@ export default function KalshiLive({ setConnectedData, connectHomePullBridge = f
                 provenance: {
                   source: "kalshi-live",
                   endpoint: "candlesticks",
-                  marketTickers: tickerName,
+                  sheetKind: "market_candlesticks",
+                  marketTicker,
+                  marketTickers: marketTicker,
+                  seriesTicker: seriesTicker || undefined,
                   whereFilters,
                   sortClauses,
                   limit,
@@ -1172,6 +1189,7 @@ export default function KalshiLive({ setConnectedData, connectHomePullBridge = f
             }
 
             firstSheetId = writtenIds[0] || firstSheetId;
+            writtenSheets = next;
             return next;
           });
 
@@ -1186,6 +1204,36 @@ export default function KalshiLive({ setConnectedData, connectHomePullBridge = f
 
       if (ctx?.requestConnectAnalyzeScroll) {
         ctx.requestConnectAnalyzeScroll();
+      }
+
+      if (
+        totalRows > 0 &&
+        writtenSheets &&
+        ctx?.connectKalshiLiveRealtimeFeedEnabled &&
+        typeof ctx?.liveFeedActions?.start === "function"
+      ) {
+        const periodFromFilters = (() => {
+          const f = whereFilters.find((row) => row?.column === "period_interval");
+          const n = Math.floor(Number(f?.value));
+          return [1, 60, 1440].includes(n) ? n : 1;
+        })();
+        const pollMs = clampLiveFeedPollIntervalMs(
+          ctx.connectKalshiLiveRealtimePollIntervalMs ??
+            pollIntervalMsForPeriod(periodFromFilters),
+          periodFromFilters,
+        );
+        const selectedLive = Array.isArray(ctx.connectKalshiLiveRealtimeMarketTickers)
+          ? ctx.connectKalshiLiveRealtimeMarketTickers
+          : [];
+        startMarketCandlesticksEditorLiveFeed({
+          dataSheets: writtenSheets,
+          liveFeedActions: ctx.liveFeedActions,
+          liveFeedState: ctx.liveFeedState,
+          marketTickers: selectedLive.length ? selectedLive : undefined,
+          pollIntervalMs: pollMs,
+          reason: "manual",
+          toastOnStart: true,
+        });
       }
 
       return totalRows;

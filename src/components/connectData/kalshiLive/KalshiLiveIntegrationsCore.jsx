@@ -31,6 +31,7 @@ import {
 import { KalshiLiveCandlestickTickersField } from "@/components/connectData/kalshiLive/KalshiLiveCandlestickTickersField";
 import { KalshiLiveCandlestickCommonQueries } from "@/components/connectData/kalshiLive/KalshiLiveCandlestickCommonQueries";
 import { KalshiLiveEventCandlesticksRealtimeFeed } from "@/components/connectData/kalshiLive/KalshiLiveEventCandlesticksRealtimeFeed";
+import { KalshiLiveMarketCandlesticksRealtimeFeed } from "@/components/connectData/kalshiLive/KalshiLiveMarketCandlesticksRealtimeFeed";
 import { KalshiLiveTradesCommonQueries } from "@/components/connectData/kalshiLive/KalshiLiveTradesCommonQueries";
 import { KalshiLiveCandlestickHistoricalCutoffNote, KalshiLiveTradesHistoricalCutoffNote } from "@/components/connectData/kalshiLive/KalshiLiveCandlestickHistoricalCutoffNote";
 import { KalshiLiveTradesTickerField } from "@/components/connectData/kalshiLive/KalshiLiveTradesTickerField";
@@ -475,6 +476,7 @@ export function KalshiLiveIntegrationsCore({ onRunPull, className, stepBackRef }
     setConnectKalshiLiveEventCandlesticksTickerMeta,
     setConnectKalshiLiveRealtimeFeedEnabled,
     setConnectKalshiLiveRealtimePollIntervalMs,
+    setConnectKalshiLiveRealtimeMarketTickers,
     setConnectKalshiLiveEventForecastEventTicker,
     setConnectKalshiLiveEventForecastSeriesTicker,
     setConnectKalshiLiveEventForecastTickerMeta,
@@ -631,11 +633,14 @@ export function KalshiLiveIntegrationsCore({ onRunPull, className, stepBackRef }
       if (id !== "candlesticks") {
         setConnectKalshiLiveCandlestickTickers?.("");
         setConnectKalshiLiveCandlestickTickerMeta?.({});
+        setConnectKalshiLiveRealtimeMarketTickers?.([]);
       }
       if (id !== "event_candlesticks") {
         setConnectKalshiLiveEventCandlesticksEventTicker?.("");
         setConnectKalshiLiveEventCandlesticksSeriesTicker?.("");
         setConnectKalshiLiveEventCandlesticksTickerMeta?.({});
+      }
+      if (id !== "candlesticks" && id !== "event_candlesticks") {
         setConnectKalshiLiveRealtimeFeedEnabled?.(false);
         setConnectKalshiLiveRealtimePollIntervalMs?.(null);
       }
@@ -728,6 +733,7 @@ export function KalshiLiveIntegrationsCore({ onRunPull, className, stepBackRef }
       setConnectKalshiLiveEventCandlesticksTickerMeta,
       setConnectKalshiLiveRealtimeFeedEnabled,
       setConnectKalshiLiveRealtimePollIntervalMs,
+      setConnectKalshiLiveRealtimeMarketTickers,
       setConnectKalshiLiveEventForecastEventTicker,
       setConnectKalshiLiveEventForecastSeriesTicker,
       setConnectKalshiLiveEventForecastTickerMeta,
@@ -790,6 +796,7 @@ export function KalshiLiveIntegrationsCore({ onRunPull, className, stepBackRef }
     setConnectKalshiLiveEventCandlesticksTickerMeta?.({});
     setConnectKalshiLiveRealtimeFeedEnabled?.(false);
     setConnectKalshiLiveRealtimePollIntervalMs?.(null);
+    setConnectKalshiLiveRealtimeMarketTickers?.([]);
     setConnectKalshiLiveEventForecastEventTicker?.("");
     setConnectKalshiLiveEventForecastSeriesTicker?.("");
     setConnectKalshiLiveEventForecastTickerMeta?.({});
@@ -854,6 +861,7 @@ export function KalshiLiveIntegrationsCore({ onRunPull, className, stepBackRef }
     setConnectKalshiLiveEventCandlesticksTickerMeta,
     setConnectKalshiLiveRealtimeFeedEnabled,
     setConnectKalshiLiveRealtimePollIntervalMs,
+    setConnectKalshiLiveRealtimeMarketTickers,
     setConnectKalshiLiveEventForecastEventTicker,
     setConnectKalshiLiveEventForecastSeriesTicker,
     setConnectKalshiLiveEventForecastTickerMeta,
@@ -1316,7 +1324,8 @@ export function KalshiLiveIntegrationsCore({ onRunPull, className, stepBackRef }
                   onChange={(v) => setConnectKalshiLiveCandlestickTickers?.(v)}
                   disabled={pullLoading}
                 />
-                <KalshiLiveCandlestickCommonQueries className="mt-4" disabled={pullLoading} />
+                <KalshiLiveCandlestickCommonQueries className="mt-4 pb-2" disabled={pullLoading} />
+                <KalshiLiveMarketCandlesticksRealtimeFeed className="mt-4" disabled={pullLoading} />
               </>
             ) : null}
             {selectedId === "event_candlesticks" ? (

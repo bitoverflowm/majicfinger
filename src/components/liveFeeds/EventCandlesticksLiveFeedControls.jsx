@@ -10,6 +10,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Radio, Pause, Play, Square, CircleOff, RefreshCw, Archive, Activity } from "lucide-react";
 import { toast } from "sonner";
 import { useMyStateV2 } from "@/context/stateContextV2";
@@ -31,8 +32,11 @@ import { sanitizeProjectLiveFeedSource } from "@/lib/liveFeeds/sanitizeProjectLi
 import { refreshEventCandlesticksSnapshotIntoSheets } from "@/lib/liveFeeds/refreshEventCandlesticksSnapshot";
 import { useKalshiHistoricalCutoffDisplay } from "@/hooks/useKalshiHistoricalCutoffDisplay";
 import { formatKalshiCutoffDisplay } from "@/lib/kalshiLive/marketTickerSearch";
-import { startEventCandlesticksEditorLiveFeed } from "@/lib/liveFeeds/startEventCandlesticksEditorLiveFeed";
-import { discoverEventCandlesticksFeedGroup } from "@/lib/liveFeeds/feedConfig";
+import {
+  startEventCandlesticksEditorLiveFeed,
+  startMarketCandlesticksEditorLiveFeed,
+} from "@/lib/liveFeeds/startEventCandlesticksEditorLiveFeed";
+import { discoverKalshiCandlesticksLiveGroup } from "@/lib/liveFeeds/feedConfig";
 
 /**
  * Conic ring that fills toward the next poll (same visual language as project rows ring).
@@ -105,16 +109,18 @@ export function EventCandlesticksLiveFeedControls() {
   const requestConnectWorkspace = ctx?.requestConnectWorkspace;
   const setIntegrationSidebar = ctx?.setIntegrationSidebar;
   const setRightPanelTab = ctx?.setRightPanelTab;
-  const softRowCap =
-    getLiveFeedEndpointDef("kalshi-live", "event_candlesticks")?.softRowCapPerSheet ?? 50_000;
 
   const { cutoffMs, cutoffLabelWithTime, loading: cutoffLoading } =
     useKalshiHistoricalCutoffDisplay();
 
   const group = useMemo(
-    () => discoverEventCandlesticksFeedGroup(dataSheets),
+    () => discoverKalshiCandlesticksLiveGroup(dataSheets),
     [dataSheets],
   );
+  const isMarketKind = group?.kind === "market";
+  const groupKindEndpoint = isMarketKind ? "candlesticks" : "event_candlesticks";
+  const softRowCap =
+    getLiveFeedEndpointDef("kalshi-live", groupKindEndpoint)?.softRowCapPerSheet ?? 50_000;
 
   const savedLiveSource = useMemo(
     () => sanitizeProjectLiveFeedSource(loadedDataMeta?.live_feed_source),
@@ -125,6 +131,20 @@ export function EventCandlesticksLiveFeedControls() {
 
   const activeFeed = useMemo(() => {
     const feeds = Object.values(liveFeedState?.feedsById || {});
+    if (isMarketKind) {
+      const want = new Set(
+        (group?.marketTickers || Object.keys(group?.sheets?.marketSheetIdsByTicker || {})).map(
+          (t) => String(t || "").toUpperCase(),
+        ),
+      );
+      return (
+        feeds.find((f) => {
+          if (f?.integration !== "kalshi-live" || f?.endpoint !== "candlesticks") return false;
+          const running = Array.isArray(f?.params?.marketTickers) ? f.params.marketTickers : [];
+          return running.some((t) => want.has(String(t || "").toUpperCase()));
+        }) || null
+      );
+    }
     return (
       feeds.find(
         (f) =>
@@ -134,7 +154,28 @@ export function EventCandlesticksLiveFeedControls() {
             String(group?.eventTicker || "").toUpperCase(),
       ) || null
     );
-  }, [liveFeedState?.feedsById, group?.eventTicker]);
+  }, [
+    liveFeedState?.feedsById,
+    group?.eventTicker,
+    group?.marketTickers,
+    group?.sheets?.marketSheetIdsByTicker,
+    isMarketKind,
+  ]);
+
+  const allGroupTickers = useMemo(
+    () => Object.keys(group?.sheets?.marketSheetIdsByTicker || {}),
+    [group?.sheets?.marketSheetIdsByTicker],
+  );
+
+  const [selectedMarketTickers, setSelectedMarketTickers] = useState(() => allGroupTickers);
+
+  useEffect(() => {
+    setSelectedMarketTickers((prev) => {
+      const next = (Array.isArray(prev) ? prev : []).filter((t) => allGroupTickers.includes(t));
+      if (next.length) return next;
+      return allGroupTickers;
+    });
+  }, [allGroupTickers]);
 
   const marketsClosedInfo = useMemo(() => {
     if (!group) return null;
@@ -142,7 +183,19 @@ export function EventCandlesticksLiveFeedControls() {
     const metaSheet = metaId ? dataSheets?.[metaId] : null;
     const metaRows = Array.isArray(metaSheet?.data) ? metaSheet.data : [];
     const tracked = Object.keys(group.sheets?.marketSheetIdsByTicker || {});
-    const ended = metaSheet?.liveFeedEnded;
+
+    let ended = metaSheet?.liveFeedEnded;
+    if (!ended && isMarketKind) {
+      for (const t of tracked) {
+        const sid = group.sheets.marketSheetIdsByTicker[t];
+        const sheet = sid ? dataSheets?.[sid] : null;
+        if (sheet?.liveFeedEnded?.reason === "markets_closed") {
+          ended = sheet.liveFeedEnded;
+          break;
+        }
+      }
+    }
+
     const closure =
       ended?.reason === "markets_closed"
         ? {
@@ -167,12 +220,12 @@ export function EventCandlesticksLiveFeedControls() {
       cutoffMs,
     );
     const isSingle = closedTickers.length === 1;
-    const subject = isSingle ? "market" : "event";
+    const subject = isSingle ? "market" : isMarketKind ? "markets" : "event";
 
     return {
       closed: true,
       subject,
-      headline: `This ${subject} is closed — no live feed available`,
+      headline: `This ${subject === "markets" ? "selection" : subject} is closed — no live feed available`,
       closeDateLabel,
       archiveTarget,
       archiveLabel: closedMarketArchiveIntegrationLabel(archiveTarget),
@@ -182,7 +235,7 @@ export function EventCandlesticksLiveFeedControls() {
           (isSingle ? `Market ${closedTickers[0]} closed` : "Markets closed"),
       ),
     };
-  }, [group, dataSheets, cutoffMs]);
+  }, [group, dataSheets, cutoffMs, isMarketKind]);
 
   const goToArchiveIntegration = useCallback(
     (target) => {
@@ -239,16 +292,31 @@ export function EventCandlesticksLiveFeedControls() {
       return;
     }
     const pollMs = Math.floor(Number(pollIntervalMs)) || defaultPollMs;
-    const result = startEventCandlesticksEditorLiveFeed({
-      dataSheets,
-      liveFeedActions,
-      liveFeedState,
-      pollIntervalMs: pollMs,
-      reason: "manual",
-      toastOnStart: false,
-    });
+    const result = isMarketKind
+      ? startMarketCandlesticksEditorLiveFeed({
+          dataSheets,
+          liveFeedActions,
+          liveFeedState,
+          marketTickers:
+            selectedMarketTickers.length > 0 ? selectedMarketTickers : allGroupTickers,
+          pollIntervalMs: pollMs,
+          reason: "manual",
+          toastOnStart: false,
+        })
+      : startEventCandlesticksEditorLiveFeed({
+          dataSheets,
+          liveFeedActions,
+          liveFeedState,
+          pollIntervalMs: pollMs,
+          reason: "manual",
+          toastOnStart: false,
+        });
     if (result.skipped === "invalid_config" || result.skipped === "start_failed") {
       toast.error("Could not start live feed for this pull.");
+      return;
+    }
+    if (result.skipped === "markets_closed") {
+      toast.message("Markets closed — no live feed available.");
       return;
     }
     if (result.started) {
@@ -264,7 +332,7 @@ export function EventCandlesticksLiveFeedControls() {
   };
 
   const handleRefreshOnce = async () => {
-    if (refreshBusy || !setDataSheets) return;
+    if (refreshBusy || !setDataSheets || isMarketKind) return;
     refreshAbortRef.current?.abort();
     const ac = new AbortController();
     refreshAbortRef.current = ac;
@@ -321,10 +389,17 @@ export function EventCandlesticksLiveFeedControls() {
       <p className="px-0.5 text-[10px] leading-snug text-muted-foreground">
         <span className="font-medium text-foreground">Kalshi Live</span>
         {" · "}
-        event candlesticks
+        {isMarketKind ? "market candlesticks" : "event candlesticks"}
         {" · "}
-        {group.eventTicker}
-        {marketCount ? ` · ${marketCount} markets` : ""}
+        {isMarketKind
+          ? selectedMarketTickers.length
+            ? selectedMarketTickers.slice(0, 3).join(", ") +
+              (selectedMarketTickers.length > 3
+                ? ` +${selectedMarketTickers.length - 3}`
+                : "")
+            : `${marketCount} markets`
+          : group.eventTicker}
+        {!isMarketKind && marketCount ? ` · ${marketCount} markets` : ""}
         {" · "}
         {candleLabel}
       </p>
@@ -436,7 +511,7 @@ export function EventCandlesticksLiveFeedControls() {
 
       {!isRunning && !marketsClosed ? (
         <>
-          {isSavedSnapshot ? (
+          {isSavedSnapshot && !isMarketKind ? (
             <Button
               type="button"
               variant="outline"
@@ -453,6 +528,39 @@ export function EventCandlesticksLiveFeedControls() {
                 {refreshBusy ? "Refreshing markets…" : "Refresh once (append latest candles)"}
               </span>
             </Button>
+          ) : null}
+
+          {isMarketKind && allGroupTickers.length > 1 ? (
+            <div className="space-y-1.5 px-0.5">
+              <Label className="text-[11px] text-muted-foreground">Markets to stream</Label>
+              <div className="max-h-36 space-y-1 overflow-y-auto">
+                {allGroupTickers.map((ticker) => {
+                  const checked = selectedMarketTickers.includes(ticker);
+                  return (
+                    <label
+                      key={ticker}
+                      className="flex cursor-pointer items-center gap-2 text-[11px] text-foreground"
+                    >
+                      <Checkbox
+                        checked={checked}
+                        onCheckedChange={(next) => {
+                          const on = !!next;
+                          setSelectedMarketTickers((prev) => {
+                            const list = Array.isArray(prev) ? [...prev] : [];
+                            if (on) {
+                              if (!list.includes(ticker)) list.push(ticker);
+                              return list;
+                            }
+                            return list.filter((t) => t !== ticker);
+                          });
+                        }}
+                      />
+                      <span className="font-mono text-[10px]">{ticker}</span>
+                    </label>
+                  );
+                })}
+              </div>
+            </div>
           ) : null}
 
           <p className="px-0.5 text-[11px] leading-snug text-muted-foreground">

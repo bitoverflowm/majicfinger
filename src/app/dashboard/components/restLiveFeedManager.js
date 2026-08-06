@@ -3,9 +3,10 @@
 import { useCallback, useEffect, useRef } from "react";
 import { toast } from "sonner";
 import { useMyStateV2 } from "@/context/stateContextV2";
-import { createLiveFeedConfig, resolveEventCandlesticksSheetsMap } from "@/lib/liveFeeds/feedConfig";
-import { getLiveFeedEndpointDef } from "@/lib/liveFeeds/registry";
+import { createLiveFeedConfig, resolveEventCandlesticksSheetsMap, resolveMarketCandlesticksSheetsMap } from "@/lib/liveFeeds/feedConfig";
+import { getLiveFeedEndpointDef, liveFeedRegistryKey } from "@/lib/liveFeeds/registry";
 import { fetchKalshiLiveEventCandlesticksIncremental } from "@/lib/liveFeeds/fetchEventCandlesticksIncremental";
+import { fetchKalshiLiveMarketCandlesticksIncremental } from "@/lib/liveFeeds/fetchMarketCandlesticksIncremental";
 import { applyKalshiCandlestickUpsertToSheets } from "@/lib/liveFeeds/merge/kalshiCandlestickUpsert";
 import { resolveCandlestickBackfillStartTs } from "@/lib/liveFeeds/candlestickBackfill";
 import {
@@ -128,106 +129,124 @@ export default function RestLiveFeedManager() {
         const def = getLiveFeedEndpointDef(feed.integration, feed.endpoint);
         const softRowCap = def?.softRowCapPerSheet ?? 50_000;
         const lookbackPeriods = def?.lookbackPeriods ?? 3;
+        const registryKey = liveFeedRegistryKey(feed.integration, feed.endpoint);
 
-        if (feed.integration === "kalshi-live" && feed.endpoint === "event_candlesticks") {
-          const endTs = Math.floor(Date.now() / 1000);
-          const needsGapBackfill =
-            !!feed.needsGapBackfill || (Number(feed.tickCount) || 0) === 0;
-          let backfillStartTs = null;
-          if (needsGapBackfill) {
-            const sheetsNow = dataSheetsRef.current || {};
-            const resolvedForCutoff =
-              resolveEventCandlesticksSheetsMap(sheetsNow, feed) || feed.sheets;
-            backfillStartTs = resolveCandlestickBackfillStartTs({
-              dataSheets: sheetsNow,
-              feed: { ...feed, sheets: resolvedForCutoff },
-              endTs,
-              softRowCap,
-            });
-            if (backfillStartTs != null) {
-              patchFeedState(feedId, { statusMessage: "Backfilling gap since last stop…" });
-            }
-          }
-
-          const tick = await fetchKalshiLiveEventCandlesticksIncremental({
-            eventTicker: feed.params.eventTicker,
-            seriesTicker: feed.params.seriesTicker,
-            periodInterval: feed.params.periodInterval,
-            lookbackPeriods,
-            ...(backfillStartTs != null ? { startTs: backfillStartTs, endTs } : {}),
-            signal: ac.signal,
-          });
-
-          // Feed may have been stopped while the request was in flight.
-          if (!configByFeedIdRef.current[feedId]) return { ended: true };
-
-          let tickStats = null;
-          setDataSheets((prev) => {
-            const resolvedSheets = resolveEventCandlesticksSheetsMap(prev, feed) || feed.sheets;
-            const feedForTick = { ...feed, sheets: resolvedSheets };
-            // Keep the in-memory feed map fresh so later ticks don't reuse a stale collision.
-            configByFeedIdRef.current[feedId] = {
-              ...(configByFeedIdRef.current[feedId] || feed),
-              sheets: resolvedSheets,
-            };
-            const result = applyKalshiCandlestickUpsertToSheets(prev, feedForTick, tick, { softRowCap });
-            tickStats = result.stats;
-            return result.dataSheets;
-          });
-
-          const tracked = Object.keys(
-            (configByFeedIdRef.current[feedId] || feed).sheets?.marketSheetIdsByTicker || {},
-          );
-          const closure = evaluateTrackedMarketsClosure(tick.metaRows, tracked, Date.now());
-          if (closure.allClosed) {
-            return endFeedMarketsClosed(feedId, feed, closure);
-          }
-
-          const successAt = Date.now();
-          const prevTickCount = Number(configByFeedIdRef.current[feedId]?.tickCount) || 0;
-          const tickCount = prevTickCount + 1;
-          let statusMessage = "Receiving live data…";
-          if (tick.usedBackfillWindow && (tickStats?.candlesAdded > 0 || tickStats?.candlesUpdated > 0)) {
-            statusMessage =
-              tickStats?.candlesAdded > 0
-                ? `Backfilled · +${tickStats.candlesAdded} bars`
-                : `Backfilled · ${tickStats.candlesUpdated} updated`;
-          } else if (tickStats?.candlesReceived === 0) {
-            statusMessage = "Pull ok · empty candle window";
-          } else if (tickStats?.marketsMatched === 0) {
-            statusMessage = "Pull ok · no matching sheets";
-          } else if (tickStats?.candlesAdded > 0) {
-            statusMessage = `Receiving live data · +${tickStats.candlesAdded} new`;
-          } else if (tickStats?.candlesUpdated > 0) {
-            statusMessage = `Receiving live data · ${tickStats.candlesUpdated} updated`;
-          }
-          if (closure.anyClosed && closure.openTickers.length > 0) {
-            const n = closure.closedTickers.length;
-            statusMessage = `${statusMessage.replace(/…$/, "")} · ${n} market${n === 1 ? "" : "s"} closed`;
-          }
-
-          const nextCfg = {
-            ...(configByFeedIdRef.current[feedId] || feed),
-            lastPolledAt: now,
-            lastSuccessAt: successAt,
-            lastError: null,
-            tickCount,
-            lastTickStats: tickStats,
-            needsGapBackfill: false,
-          };
-          configByFeedIdRef.current[feedId] = nextCfg;
-          patchFeedState(feedId, {
-            lastPolledAt: now,
-            lastSuccessAt: successAt,
-            lastError: null,
-            tickCount,
-            lastTickStats: tickStats,
-            statusMessage,
-            needsGapBackfill: false,
-          });
-          return { ended: false, statusMessage };
+        const isEventCandles = registryKey === "kalshi-live:event_candlesticks";
+        const isMarketCandles = registryKey === "kalshi-live:candlesticks";
+        if (!isEventCandles && !isMarketCandles) {
+          return { ended: false };
         }
-        return { ended: false };
+
+        const resolveSheets = isEventCandles
+          ? resolveEventCandlesticksSheetsMap
+          : resolveMarketCandlesticksSheetsMap;
+
+        const endTs = Math.floor(Date.now() / 1000);
+        const needsGapBackfill =
+          !!feed.needsGapBackfill || (Number(feed.tickCount) || 0) === 0;
+        let backfillStartTs = null;
+        if (needsGapBackfill) {
+          const sheetsNow = dataSheetsRef.current || {};
+          const resolvedForCutoff = resolveSheets(sheetsNow, feed) || feed.sheets;
+          backfillStartTs = resolveCandlestickBackfillStartTs({
+            dataSheets: sheetsNow,
+            feed: { ...feed, sheets: resolvedForCutoff },
+            endTs,
+            softRowCap,
+          });
+          if (backfillStartTs != null) {
+            patchFeedState(feedId, { statusMessage: "Backfilling gap since last stop…" });
+          }
+        }
+
+        const tick = isEventCandles
+          ? await fetchKalshiLiveEventCandlesticksIncremental({
+              eventTicker: String(feed.params.eventTicker || ""),
+              seriesTicker: String(feed.params.seriesTicker || ""),
+              periodInterval: Number(feed.params.periodInterval) || feed.periodInterval,
+              lookbackPeriods,
+              ...(backfillStartTs != null ? { startTs: backfillStartTs, endTs } : {}),
+              signal: ac.signal,
+            })
+          : await fetchKalshiLiveMarketCandlesticksIncremental({
+              marketTickers: Array.isArray(feed.params.marketTickers)
+                ? feed.params.marketTickers
+                : Object.keys(feed.sheets?.marketSheetIdsByTicker || {}),
+              periodInterval: Number(feed.params.periodInterval) || feed.periodInterval,
+              lookbackPeriods,
+              ...(backfillStartTs != null ? { startTs: backfillStartTs, endTs } : {}),
+              signal: ac.signal,
+            });
+
+        // Feed may have been stopped while the request was in flight.
+        if (!configByFeedIdRef.current[feedId]) return { ended: true };
+
+        let tickStats = null;
+        setDataSheets((prev) => {
+          const resolvedSheets = resolveSheets(prev, feed) || feed.sheets;
+          const feedForTick = { ...feed, sheets: resolvedSheets };
+          configByFeedIdRef.current[feedId] = {
+            ...(configByFeedIdRef.current[feedId] || feed),
+            sheets: resolvedSheets,
+          };
+          const result = applyKalshiCandlestickUpsertToSheets(prev, feedForTick, tick, {
+            softRowCap,
+          });
+          tickStats = result.stats;
+          return result.dataSheets;
+        });
+
+        const tracked = Object.keys(
+          (configByFeedIdRef.current[feedId] || feed).sheets?.marketSheetIdsByTicker || {},
+        );
+        const closure = evaluateTrackedMarketsClosure(tick.metaRows, tracked, Date.now());
+        if (closure.allClosed) {
+          return endFeedMarketsClosed(feedId, feed, closure);
+        }
+
+        const successAt = Date.now();
+        const prevTickCount = Number(configByFeedIdRef.current[feedId]?.tickCount) || 0;
+        const tickCount = prevTickCount + 1;
+        let statusMessage = "Receiving live data…";
+        if (tick.usedBackfillWindow && (tickStats?.candlesAdded > 0 || tickStats?.candlesUpdated > 0)) {
+          statusMessage =
+            tickStats?.candlesAdded > 0
+              ? `Backfilled · +${tickStats.candlesAdded} bars`
+              : `Backfilled · ${tickStats.candlesUpdated} updated`;
+        } else if (tickStats?.candlesReceived === 0) {
+          statusMessage = "Pull ok · empty candle window";
+        } else if (tickStats?.marketsMatched === 0) {
+          statusMessage = "Pull ok · no matching sheets";
+        } else if (tickStats?.candlesAdded > 0) {
+          statusMessage = `Receiving live data · +${tickStats.candlesAdded} new`;
+        } else if (tickStats?.candlesUpdated > 0) {
+          statusMessage = `Receiving live data · ${tickStats.candlesUpdated} updated`;
+        }
+        if (closure.anyClosed && closure.openTickers.length > 0) {
+          const n = closure.closedTickers.length;
+          statusMessage = `${statusMessage.replace(/…$/, "")} · ${n} market${n === 1 ? "" : "s"} closed`;
+        }
+
+        const nextCfg = {
+          ...(configByFeedIdRef.current[feedId] || feed),
+          lastPolledAt: now,
+          lastSuccessAt: successAt,
+          lastError: null,
+          tickCount,
+          lastTickStats: tickStats,
+          needsGapBackfill: false,
+        };
+        configByFeedIdRef.current[feedId] = nextCfg;
+        patchFeedState(feedId, {
+          lastPolledAt: now,
+          lastSuccessAt: successAt,
+          lastError: null,
+          tickCount,
+          lastTickStats: tickStats,
+          statusMessage,
+          needsGapBackfill: false,
+        });
+        return { ended: false, statusMessage };
       } catch (e) {
         if (e?.name === "AbortError") return { ended: false };
         const msg = e instanceof Error ? e.message : "Live feed poll failed";

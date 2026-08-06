@@ -28,4 +28,22 @@ describe("sanitizeProjectLiveFeedSource", () => {
       marketCount: 9,
     });
   });
+
+  it("normalizes market candlesticks source", () => {
+    const src = sanitizeProjectLiveFeedSource({
+      integration: "kalshi-live",
+      endpoint: "candlesticks",
+      marketTickers: ["abc-1", "def-2"],
+      periodInterval: 60,
+      pollIntervalMs: 3_600_000,
+    });
+    expect(src).toMatchObject({
+      enabled: true,
+      endpoint: "candlesticks",
+      marketTickers: ["ABC-1", "DEF-2"],
+      periodInterval: 60,
+      pollIntervalMs: 3_600_000,
+      marketCount: 2,
+    });
+  });
 });

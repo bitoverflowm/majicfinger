@@ -129,8 +129,14 @@ export async function runHistoricalV2CandlesticksDashboardPowerMove(ctx) {
     if (ctx.signal?.aborted) throw new DOMException("Aborted", "AbortError");
 
     const market = collected.markets[i];
+    const titleRaw =
+      tickerMeta[market.marketTicker] || tickerMeta[market.marketTicker.toUpperCase()] || "";
     const metaTitle = String(
-      tickerMeta[market.marketTicker] || tickerMeta[market.marketTicker.toUpperCase()] || "",
+      typeof titleRaw === "string"
+        ? titleRaw
+        : titleRaw && typeof titleRaw === "object"
+          ? titleRaw.title || ""
+          : "",
     ).trim();
     const title = metaTitle || market.marketTicker;
     const chartName = title.slice(0, 100);

@@ -7,7 +7,7 @@ import { partitionCandlestickApiParams } from "@/lib/kalshiLive/candlestickCompo
 
 /**
  * @typedef {object} LiveFeedSheetsMap
- * @property {string} marketsMetadataSheetId
+ * @property {string} [marketsMetadataSheetId]
  * @property {Record<string, string>} marketSheetIdsByTicker
  */
 
@@ -20,7 +20,7 @@ import { partitionCandlestickApiParams } from "@/lib/kalshiLive/candlestickCompo
  * @property {"ephemeral" | "persisted" | "paused"} status
  * @property {number} pollIntervalMs
  * @property {number} periodInterval
- * @property {{ eventTicker: string; seriesTicker: string; periodInterval: number }} params
+ * @property {Record<string, unknown>} params
  * @property {LiveFeedSheetsMap} sheets
  * @property {string} merge
  * @property {number | null} [lastPolledAt]
@@ -41,10 +41,26 @@ export function genLiveFeedId() {
 }
 
 /**
+ * @param {unknown} raw
+ * @returns {string[]}
+ */
+function normalizeMarketTickersParam(raw) {
+  if (Array.isArray(raw)) {
+    return [
+      ...new Set(
+        raw.map((t) => String(t || "").trim().toUpperCase()).filter(Boolean),
+      ),
+    ];
+  }
+  const single = String(raw || "").trim().toUpperCase();
+  return single ? [single] : [];
+}
+
+/**
  * @param {Partial<LiveFeedConfig> & {
  *   integration: string;
  *   endpoint: string;
- *   params: { eventTicker: string; seriesTicker: string; periodInterval?: number };
+ *   params?: Record<string, unknown>;
  *   sheets: LiveFeedSheetsMap;
  * }} input
  * @returns {LiveFeedConfig | null}
@@ -57,11 +73,9 @@ export function createLiveFeedConfig(input) {
   const def = getLiveFeedEndpointDef(integration, endpoint);
   if (!def) return null;
 
-  const eventTicker = String(input.params?.eventTicker || "").trim().toUpperCase();
-  const seriesTicker = String(input.params?.seriesTicker || "").trim().toUpperCase();
-  if (!eventTicker || !seriesTicker) return null;
-
-  let periodInterval = Math.floor(Number(input.params?.periodInterval ?? input.periodInterval ?? def.defaultPeriodInterval));
+  let periodInterval = Math.floor(
+    Number(input.params?.periodInterval ?? input.periodInterval ?? def.defaultPeriodInterval),
+  );
   if (!def.allowedPeriodIntervals.includes(periodInterval)) {
     periodInterval = def.defaultPeriodInterval;
   }
@@ -71,8 +85,35 @@ export function createLiveFeedConfig(input) {
     pollIntervalMs = Math.max(def.minPollIntervalMs, pollIntervalMsForPeriod(periodInterval));
   }
 
-  const sanitizedSheets = sanitizeLiveFeedSheetsMap(input.sheets);
+  const requireMeta = endpoint === "event_candlesticks";
+  const sanitizedSheets = sanitizeLiveFeedSheetsMap(input.sheets, { requireMeta });
   if (!sanitizedSheets) return null;
+
+  /** @type {Record<string, unknown>} */
+  let params = { periodInterval };
+
+  if (endpoint === "event_candlesticks") {
+    const eventTicker = String(input.params?.eventTicker || "").trim().toUpperCase();
+    const seriesTicker = String(input.params?.seriesTicker || "").trim().toUpperCase();
+    if (!eventTicker || !seriesTicker) return null;
+    params = { eventTicker, seriesTicker, periodInterval };
+  } else if (endpoint === "candlesticks") {
+    const fromParams = normalizeMarketTickersParam(input.params?.marketTickers);
+    const fromSheets = Object.keys(sanitizedSheets.marketSheetIdsByTicker || {});
+    const marketTickers = fromParams.length ? fromParams : fromSheets;
+    if (!marketTickers.length) return null;
+    // Restrict sheet map to the live-tracked subset when provided.
+    const filteredByTicker = {};
+    for (const t of marketTickers) {
+      const sid = sanitizedSheets.marketSheetIdsByTicker[t];
+      if (sid) filteredByTicker[t] = sid;
+    }
+    if (!Object.keys(filteredByTicker).length) return null;
+    sanitizedSheets.marketSheetIdsByTicker = filteredByTicker;
+    params = { marketTickers: Object.keys(filteredByTicker), periodInterval };
+  } else {
+    return null;
+  }
 
   return {
     id: String(input.id || "").trim() || genLiveFeedId(),
@@ -82,11 +123,7 @@ export function createLiveFeedConfig(input) {
     status: input.status === "persisted" || input.status === "paused" ? input.status : "ephemeral",
     pollIntervalMs,
     periodInterval,
-    params: {
-      eventTicker,
-      seriesTicker,
-      periodInterval,
-    },
+    params,
     sheets: sanitizedSheets,
     merge: def.merge,
     lastPolledAt: input.lastPolledAt ?? null,
@@ -103,9 +140,11 @@ export function createLiveFeedConfig(input) {
  * and leave a tab still named "… · markets" filled with OHLC.
  *
  * @param {LiveFeedSheetsMap | null | undefined} sheets
+ * @param {{ requireMeta?: boolean }} [opts]
  * @returns {LiveFeedSheetsMap | null}
  */
-export function sanitizeLiveFeedSheetsMap(sheets) {
+export function sanitizeLiveFeedSheetsMap(sheets, opts = {}) {
+  const requireMeta = opts.requireMeta !== false;
   const metaId = String(sheets?.marketsMetadataSheetId || "").trim();
   const byTicker =
     sheets?.marketSheetIdsByTicker && typeof sheets.marketSheetIdsByTicker === "object"
@@ -120,9 +159,10 @@ export function sanitizeLiveFeedSheetsMap(sheets) {
     if (metaId && sid === metaId) continue;
     marketSheetIdsByTicker[t] = sid;
   }
-  if (!metaId || Object.keys(marketSheetIdsByTicker).length === 0) return null;
+  if (Object.keys(marketSheetIdsByTicker).length === 0) return null;
+  if (requireMeta && !metaId) return null;
   return {
-    marketsMetadataSheetId: metaId,
+    ...(metaId ? { marketsMetadataSheetId: metaId } : {}),
     marketSheetIdsByTicker,
   };
 }
@@ -139,14 +179,51 @@ export function resolveEventCandlesticksSheetsMap(dataSheets, feed) {
   const discovered = discoverEventCandlesticksFeedGroup(dataSheets, {
     eventTicker: feed?.params?.eventTicker,
   });
-  return sanitizeLiveFeedSheetsMap(discovered?.sheets || feed?.sheets || null);
+  return sanitizeLiveFeedSheetsMap(discovered?.sheets || feed?.sheets || null, {
+    requireMeta: true,
+  });
+}
+
+/**
+ * @param {Record<string, object>} dataSheets
+ * @param {Pick<LiveFeedConfig, "params" | "sheets"> | null | undefined} feed
+ * @returns {LiveFeedSheetsMap | null}
+ */
+export function resolveMarketCandlesticksSheetsMap(dataSheets, feed) {
+  const discovered = discoverMarketCandlesticksFeedGroup(dataSheets, {
+    marketTickers: normalizeMarketTickersParam(feed?.params?.marketTickers),
+  });
+  const sheets = sanitizeLiveFeedSheetsMap(discovered?.sheets || feed?.sheets || null, {
+    requireMeta: false,
+  });
+  if (!sheets) return null;
+  const want = normalizeMarketTickersParam(feed?.params?.marketTickers);
+  if (!want.length) return sheets;
+  /** @type {Record<string, string>} */
+  const filtered = {};
+  for (const t of want) {
+    if (sheets.marketSheetIdsByTicker[t]) filtered[t] = sheets.marketSheetIdsByTicker[t];
+  }
+  if (!Object.keys(filtered).length) return null;
+  return {
+    ...(sheets.marketsMetadataSheetId
+      ? { marketsMetadataSheetId: sheets.marketsMetadataSheetId }
+      : {}),
+    marketSheetIdsByTicker: filtered,
+  };
 }
 
 /**
  * Discover an event-candlesticks sheet group from workbook provenance.
  * @param {Record<string, object>} dataSheets
  * @param {{ eventTicker?: string }} [opts]
- * @returns {{ eventTicker: string; seriesTicker: string; periodInterval: number; sheets: LiveFeedSheetsMap } | null}
+ * @returns {{
+ *   kind: "event";
+ *   eventTicker: string;
+ *   seriesTicker: string;
+ *   periodInterval: number;
+ *   sheets: LiveFeedSheetsMap;
+ * } | null}
  */
 export function discoverEventCandlesticksFeedGroup(dataSheets, opts = {}) {
   const wantEvent = String(opts.eventTicker || "").trim().toUpperCase();
@@ -194,18 +271,106 @@ export function discoverEventCandlesticksFeedGroup(dataSheets, opts = {}) {
     return null;
   }
 
-  const sheets = sanitizeLiveFeedSheetsMap({
-    marketsMetadataSheetId: metaSheetId,
-    marketSheetIdsByTicker,
-  });
+  const sheets = sanitizeLiveFeedSheetsMap(
+    {
+      marketsMetadataSheetId: metaSheetId,
+      marketSheetIdsByTicker,
+    },
+    { requireMeta: true },
+  );
   if (!sheets) return null;
 
   return {
+    kind: "event",
     eventTicker,
     seriesTicker,
     periodInterval,
     sheets,
   };
+}
+
+/**
+ * Discover a market-candlesticks sheet group from workbook provenance.
+ * @param {Record<string, object>} dataSheets
+ * @param {{ marketTickers?: string[] }} [opts]
+ * @returns {{
+ *   kind: "market";
+ *   marketTickers: string[];
+ *   periodInterval: number;
+ *   sheets: LiveFeedSheetsMap;
+ * } | null}
+ */
+export function discoverMarketCandlesticksFeedGroup(dataSheets, opts = {}) {
+  const want = new Set(
+    normalizeMarketTickersParam(opts.marketTickers).map((t) => t),
+  );
+  /** @type {Record<string, string>} */
+  const marketSheetIdsByTicker = {};
+  /** @type {string | null} */
+  let metaSheetId = null;
+  let periodInterval = 1;
+
+  for (const [sheetId, sheet] of Object.entries(dataSheets || {})) {
+    const prov = sheet?.provenance;
+    if (!prov || typeof prov !== "object") continue;
+    if (String(prov.source || "") !== "kalshi-live") continue;
+    if (String(prov.endpoint || "") !== "candlesticks") continue;
+
+    const kind = String(prov.sheetKind || "");
+    if (kind === "markets_metadata") {
+      metaSheetId = sheetId;
+      continue;
+    }
+
+    const mt = String(
+      prov.marketTicker ||
+        (typeof prov.marketTickers === "string" ? prov.marketTickers : "") ||
+        sheet?.name ||
+        "",
+    )
+      .trim()
+      .toUpperCase();
+    if (!mt) continue;
+    if (want.size && !want.has(mt)) continue;
+    // Prefer explicit market_candlesticks; accept legacy pulls without sheetKind.
+    if (kind && kind !== "market_candlesticks") continue;
+    marketSheetIdsByTicker[mt] = sheetId;
+
+    const filters = Array.isArray(prov.whereFilters) ? prov.whereFilters : [];
+    const { apiParams } = partitionCandlestickApiParams(filters);
+    const fromApi = Math.floor(Number(apiParams.period_interval));
+    if ([1, 60, 1440].includes(fromApi)) periodInterval = fromApi;
+  }
+
+  if (!Object.keys(marketSheetIdsByTicker).length) return null;
+
+  const sheets = sanitizeLiveFeedSheetsMap(
+    {
+      ...(metaSheetId ? { marketsMetadataSheetId: metaSheetId } : {}),
+      marketSheetIdsByTicker,
+    },
+    { requireMeta: false },
+  );
+  if (!sheets) return null;
+
+  return {
+    kind: "market",
+    marketTickers: Object.keys(sheets.marketSheetIdsByTicker),
+    periodInterval,
+    sheets,
+  };
+}
+
+/**
+ * Discover either Kalshi candlestick live group (event preferred when both exist).
+ * @param {Record<string, object>} dataSheets
+ * @returns {ReturnType<typeof discoverEventCandlesticksFeedGroup> | ReturnType<typeof discoverMarketCandlesticksFeedGroup>}
+ */
+export function discoverKalshiCandlesticksLiveGroup(dataSheets) {
+  return (
+    discoverEventCandlesticksFeedGroup(dataSheets) ||
+    discoverMarketCandlesticksFeedGroup(dataSheets)
+  );
 }
 
 /**

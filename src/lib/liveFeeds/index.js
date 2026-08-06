@@ -21,12 +21,15 @@ export {
 export {
   createLiveFeedConfig,
   discoverEventCandlesticksFeedGroup,
+  discoverMarketCandlesticksFeedGroup,
+  discoverKalshiCandlesticksLiveGroup,
   extractPersistedLiveFeedsFromSheets,
   stampLiveFeedOntoSheets,
   liveFeedSheetIds,
   genLiveFeedId,
   sanitizeLiveFeedSheetsMap,
   resolveEventCandlesticksSheetsMap,
+  resolveMarketCandlesticksSheetsMap,
 } from "@/lib/liveFeeds/feedConfig";
 
 export {
@@ -44,6 +47,7 @@ export {
 
 export {
   startEventCandlesticksEditorLiveFeed,
+  startMarketCandlesticksEditorLiveFeed,
   maybeAutoStartPublishedProjectLiveFeed,
   dashboardHasPublishedSlug,
   projectHasPublishedLiveDashboard,

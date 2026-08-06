@@ -224,12 +224,16 @@ export async function loadFullProjectFromApi({
   const rid = stripped?._id ?? dataSetId;
   if (rid != null) setLoadedDataId?.(rid);
 
-  // Restore Power moves for live-capable projects (snapshot + re-enable live UX).
+  // Restore Power moves / live controls for live-capable projects.
   let liveFeedCapable = false;
   try {
     const { projectHasLiveFeedSource } = await import("@/lib/liveFeeds/projectLiveFeedSource");
+    const { discoverEventCandlesticksFeedGroup } = await import("@/lib/liveFeeds/feedConfig");
     liveFeedCapable = projectHasLiveFeedSource(stripped, incomingSheets);
-    setConnectPowerMove?.(liveFeedCapable ? "event_candlesticks" : null);
+    // One-click dashboard power move is event-candlesticks only.
+    setConnectPowerMove?.(
+      discoverEventCandlesticksFeedGroup(incomingSheets || {}) ? "event_candlesticks" : null,
+    );
   } catch {
     setConnectPowerMove?.(null);
   }

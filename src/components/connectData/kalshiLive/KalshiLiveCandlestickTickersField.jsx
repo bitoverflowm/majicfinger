@@ -34,11 +34,18 @@ export function KalshiLiveCandlestickTickersField({ value, onChange, className, 
           dataSource="live"
           historyEntity="candlesticks"
           onSelectionsChange={(selections) => {
+            /** @type {Record<string, { title: string; status?: string; openTime?: string; closeTime?: string; seriesTicker?: string }>} */
             const next = {};
             for (const s of selections || []) {
               const ticker = String(s?.ticker || "").trim().toUpperCase();
               if (!ticker) continue;
-              next[ticker] = String(s?.title || ticker).trim() || ticker;
+              next[ticker] = {
+                title: String(s?.title || ticker).trim() || ticker,
+                status: String(s?.status || "").trim() || undefined,
+                openTime: String(s?.openTime || "").trim() || undefined,
+                closeTime: String(s?.closeTime || "").trim() || undefined,
+                seriesTicker: String(s?.seriesTicker || "").trim().toUpperCase() || undefined,
+              };
             }
             setMeta?.(next);
           }}

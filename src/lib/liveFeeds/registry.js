@@ -1,6 +1,6 @@
 /**
  * Live REST-poll feed registry.
- * v1 allowlist: kalshi-live / event_candlesticks only.
+ * Allowlist entries for Kalshi Live candlestick endpoints.
  * Add entries here when expanding to other endpoints / integrations.
  */
 
@@ -37,6 +37,19 @@ export const LIVE_FEED_REGISTRY = {
     lookbackPeriods: 3,
     maxConcurrentEphemeralPerTab: 2,
     // Working window per market sheet — upsert drops oldest bars when over this cap.
+    softRowCapPerSheet: 50_000,
+  },
+  "kalshi-live:candlesticks": {
+    integration: "kalshi-live",
+    endpoint: "candlesticks",
+    transport: "rest_poll",
+    merge: "kalshi_candlestick_upsert",
+    allowedPeriodIntervals: [1, 60, 1440],
+    defaultPeriodInterval: 1,
+    defaultPollIntervalMs: 60_000,
+    minPollIntervalMs: 15_000,
+    lookbackPeriods: 3,
+    maxConcurrentEphemeralPerTab: 2,
     softRowCapPerSheet: 50_000,
   },
 };

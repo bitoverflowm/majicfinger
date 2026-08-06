@@ -32,6 +32,7 @@ import {
 import { CONNECT_COMPOSE_OPERATIONS } from "@/lib/connectComposeOperations";
 import { operatorSymbol } from "@/lib/dataLakeComposeHelpers";
 import { validateKalshiLiveCandlestickPull } from "@/lib/kalshiLive/candlestickCompose";
+import { kalshiCandlestickTickerMetaTitle } from "@/lib/kalshiLive/candlestickTickerMeta";
 import { validateKalshiHistoricalV2CandlestickPull } from "@/lib/kalshiHistoricalV2/historicalCandlestickCompose";
 import { validateKalshiLiveEventCandlesticksPull } from "@/lib/kalshiLive/eventCandlesticksCompose";
 import { validateKalshiLiveEventForecastPull } from "@/lib/kalshiLive/eventForecastCompose";
@@ -299,7 +300,7 @@ export function KalshiLiveComposeOperationPanel({
     const unique = [...new Set(tickers)];
     return unique.map((ticker) => ({
       name: ticker,
-      title: connectKalshiLiveCandlestickTickerMeta?.[ticker] || ticker,
+      title: kalshiCandlestickTickerMetaTitle(connectKalshiLiveCandlestickTickerMeta, ticker),
     }));
   }, [
     endpointId,
