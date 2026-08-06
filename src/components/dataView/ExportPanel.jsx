@@ -23,7 +23,6 @@ import { toast } from "sonner";
 import * as XLSX from "xlsx";
 import { useUser } from "@/lib/hooks";
 import { isValidChartEmbedSlug, normalizeChartEmbedSlug } from "@/lib/chartEmbedSlug";
-import { prepareLargeJsonBody } from "@/lib/gzipJsonTransport";
 import { useDemoProGate } from "@/hooks/useDemoProGate";
 import { KALSHI_GUIDED_TARGETS } from "@/lib/guidedWorkflows/targets";
 import { GUIDED_TARGET_ATTR } from "@/lib/guidedWorkflows/types";
@@ -35,7 +34,6 @@ import {
 import { isPublishedChartBundleStale } from "@/lib/chartPublishStaleness";
 import { chartSheetIsShareable } from "@/lib/inferDefaultBuilderSnapshot";
 import {
-  checkEmbedSlugAvailability,
   embedSlugStatusMessage,
   useEmbedSlugAvailability,
 } from "@/hooks/useEmbedSlugAvailability";
@@ -52,30 +50,6 @@ function useHasShareableChart() {
   return useMemo(
     () => Object.values(chartSheets).some(chartSheetIsShareable),
     [chartSheets],
-  );
-}
-
-function SaveProjectSection({ runOrRequestPro }) {
-  const requestSaveProjectDialog = useMyStateV2()?.requestSaveProjectDialog;
-  return (
-    <div className="space-y-2 border-b border-border pb-3">
-      <p className="text-xs font-bold text-muted-foreground">Project</p>
-      <Button
-        type="button"
-        variant="default"
-        size="sm"
-        className="h-8 w-full px-2 text-[11px]"
-        onClick={() =>
-          runOrRequestPro?.(() => requestSaveProjectDialog?.(), "saving projects")
-        }
-      >
-        Save project
-      </Button>
-      <p className="text-[10px] text-muted-foreground">
-        Saves your workbook, all charts in this project, and the open dashboard (including publish settings) from the
-        header dialog.
-      </p>
-    </div>
   );
 }
 
@@ -128,7 +102,6 @@ function ShareEmbedSection({ runOrRequestPro }) {
   const user = useUser();
   const v2 = useMyStateV2();
   const userHandle = v2?.userHandle;
-  const connectedData = v2?.connectedData || [];
   const dataSheets = v2?.dataSheets || {};
   const loadedDataMeta = v2?.loadedDataMeta;
   const loadedChartMeta = v2?.loadedChartMeta;
@@ -139,6 +112,7 @@ function ShareEmbedSection({ runOrRequestPro }) {
   const activeChartSheetId = v2?.activeChartSheetId;
   const setRefetchChart = v2?.setRefetchChart;
   const chartSnapshotFlusher = v2?.chartSnapshotFlusher;
+  const requestSaveProjectDialog = v2?.requestSaveProjectDialog;
   const hasShareableChart = useHasShareableChart();
   const { getBuilderSnapshot, getChartOgImageDataUrl } = useChartBuilder();
   const activeChartMeta = activeChartSheetId ? (chartSheets?.[activeChartSheetId]?.chartMeta || loadedChartMeta) : loadedChartMeta;
@@ -189,10 +163,7 @@ function ShareEmbedSection({ runOrRequestPro }) {
   }, [getChartOgImageDataUrl]);
 
   const [slugInput, setSlugInput] = useState("");
-  const [showSavePublishDialog, setShowSavePublishDialog] = useState(false);
   const [showDeleteEmbedDialog, setShowDeleteEmbedDialog] = useState(false);
-  const [pendingChartName, setPendingChartName] = useState("");
-  const [isSavePublishing, setIsSavePublishing] = useState(false);
   const [isPublishingCache, setIsPublishingCache] = useState(false);
   const [publishCacheProgress, setPublishCacheProgress] = useState(0);
   const [publishCacheMessage, setPublishCacheMessage] = useState("");
@@ -203,10 +174,6 @@ function ShareEmbedSection({ runOrRequestPro }) {
     if (typeof window === "undefined") return;
     setRuntimeOrigin(window.location.origin);
   }, []);
-
-  useEffect(() => {
-    setPendingChartName(workbookChartName);
-  }, [activeChartSheetId, workbookChartName]);
 
   useEffect(() => {
     if (activeChartMeta?.public_slug) {
@@ -316,152 +283,67 @@ function ShareEmbedSection({ runOrRequestPro }) {
     }
   }, [dataSheets, isPublishingCache, publishCacheProgress, setLoadedChartMeta, syncActiveChartSheet]);
 
-  const pendingSlug = useMemo(
-    () => normalizeChartEmbedSlug((pendingChartName || "").trim() || "chart") || "chart",
-    [pendingChartName],
-  );
-
-  const saveAndPublish = useCallback(async () => {
-    if (isSavePublishing) return;
-    if (!user) {
-      toast.error("Sign in to create an embed link");
-      return;
-    }
-    if (!userHandle) {
-      toast.error("Set your user handle under Profile before publishing");
-      return;
-    }
-
-    const chartName = (workbookChartName || pendingChartName || "").trim();
-    if (!chartName) {
-      toast.error("Name your chart to proceed");
-      return;
-    }
-    if (!isValidChartEmbedSlug(pendingSlug)) {
-      toast.error("Chart name must produce a valid URL slug");
-      return;
-    }
-
-    const slugCheck = await checkEmbedSlugAvailability({
-      kind: "chart",
-      slug: pendingSlug,
-      excludeId: activeChartMeta?._id || null,
-    });
-    if (!slugCheck.available) {
-      toast.error(
-        slugCheck.reason === "taken"
-          ? "That slug is already used by another chart of yours."
-          : embedSlugStatusMessage(slugCheck.reason, "chart") || "Slug is not available.",
-      );
-      return;
-    }
-
-    try {
-      setIsSavePublishing(true);
-      const snapshot = await capturePublishSnapshot();
-
-      let dataSetId = loadedDataMeta?._id;
-      if (!dataSetId) {
-        if (!Array.isArray(connectedData) || connectedData.length === 0) {
-          toast.error("No data found. Add data before saving and publishing.");
-          return;
-        }
-        const dsPayload = await prepareLargeJsonBody({
-          data_set_name: `${chartName} dataset`,
-          data: connectedData,
-          ...(Object.keys(dataSheets).length ? { data_sheets: dataSheets } : {}),
-          created_date: new Date(),
-          last_saved_date: new Date(),
-          labels: ["embed"],
-          source: "userUpload",
-          user_id: user.userId,
-        });
-        const dsRes = await fetch("/api/dataSets", {
-          method: "POST",
-          headers: dsPayload.headers,
-          credentials: "include",
-          body: dsPayload.body,
-        });
-        const dsJson = await dsRes.json();
-        dataSetId = dsJson?.data?._id || dsJson?._id;
-        if (!dsRes.ok || !dataSetId) {
-          toast.error(dsJson?.message || "Failed to save dataset");
-          return;
-        }
+  const publishChartById = useCallback(
+    async (chartId, slug) => {
+      if (!chartId) {
+        toast.error("Could not find a saved chart to publish.");
+        return false;
       }
-
-      const chart_properties = [{ title: chartName, rechartsBuilder: snapshot }];
-      const createRes = await fetch("/api/charts", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
+      const chartRes = await fetch(`/api/charts/chart/${chartId}`, {
         credentials: "include",
-        body: JSON.stringify({
-          chart_name: chartName,
-          chart_properties,
-          created_date: new Date(),
-          last_saved_date: new Date(),
-          labels: ["embed"],
-          user_id: user.userId,
-          data_set_id: dataSetId,
-        }),
       });
-      const createJson = await createRes.json();
-      const chartId = createJson?.data?._id || createJson?._id;
-      if (!createRes.ok || !chartId) {
-        toast.error(createJson?.message || "Failed to save chart");
-        return;
+      const chartJson = await chartRes.json();
+      const full = chartJson?.data;
+      if (!full) {
+        toast.error("Could not load chart to publish");
+        return false;
       }
-
+      const prev0 =
+        Array.isArray(full.chart_properties) &&
+        full.chart_properties[0] &&
+        typeof full.chart_properties[0] === "object"
+          ? { ...full.chart_properties[0] }
+          : {};
+      const snapshot = await capturePublishSnapshot();
+      const publishChartName = (workbookChartName || full.chart_name || "").trim() || "Chart";
+      const chart_properties = [{ ...prev0, title: publishChartName, rechartsBuilder: snapshot }];
       const ogImageUrl = await uploadOgImage(chartId);
 
-      const publishRes = await fetch(`/api/charts/chart/${chartId}`, {
+      const putRes = await fetch(`/api/charts/chart/${chartId}`, {
         method: "PUT",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          chart_name: chartName,
+          chart_name: publishChartName,
           chart_properties,
-          labels: ["embed"],
-          public_slug: pendingSlug,
+          labels: full.labels?.length ? full.labels : ["export"],
+          public_slug: slug,
           is_public: true,
           ...(ogImageUrl ? { og_image_url: ogImageUrl } : {}),
         }),
       });
-      const publishJson = await publishRes.json();
-      if (!publishRes.ok || !publishJson?.success) {
-        toast.error(publishJson?.message || "Publish failed");
-        return;
+      const putJson = await putRes.json();
+      if (!putRes.ok || !putJson?.success) {
+        toast.error(putJson?.message || "Publish failed");
+        return false;
       }
-
-      setSlugInput(pendingSlug);
-      setLoadedChartMeta?.(publishJson?.data);
-      syncActiveChartSheet(publishJson?.data, snapshot);
+      setLoadedChartMeta?.(putJson?.data);
+      syncActiveChartSheet(putJson?.data, snapshot);
       setRefetchChart?.(1);
-      setShowSavePublishDialog(false);
       await runChartPublishCache(chartId);
-      toast.success("Chart saved and embed published");
-    } finally {
-      setIsSavePublishing(false);
-    }
-  }, [
-    connectedData,
-    dataSheets,
-    getBuilderSnapshot,
-    capturePublishSnapshot,
-    isSavePublishing,
-    loadedDataMeta?._id,
-    pendingChartName,
-    pendingSlug,
-    uploadOgImage,
-    workbookChartName,
-    setLoadedChartMeta,
-    setRefetchChart,
-    syncActiveChartSheet,
-    activeChartMeta?._id,
-    user,
-    userHandle,
-    runChartPublishCache,
-  ]);
+      toast.success("Embed link is live");
+      return true;
+    },
+    [
+      capturePublishSnapshot,
+      workbookChartName,
+      uploadOgImage,
+      setLoadedChartMeta,
+      syncActiveChartSheet,
+      setRefetchChart,
+      runChartPublishCache,
+    ],
+  );
 
   const publishEmbed = useCallback(async () => {
     if (!user) {
@@ -470,12 +352,6 @@ function ShareEmbedSection({ runOrRequestPro }) {
     }
     if (!userHandle) {
       toast.error("Set your user handle under Profile before publishing");
-      return;
-    }
-      if (!activeChartMeta?._id) {
-      const guessed = (workbookChartName || slugInput || pendingChartName || "").trim() || "chart";
-      setPendingChartName(guessed);
-      setShowSavePublishDialog(true);
       return;
     }
     const slug = normalizeChartEmbedSlug(slugInput);
@@ -494,62 +370,28 @@ function ShareEmbedSection({ runOrRequestPro }) {
       return;
     }
 
-    const chartRes = await fetch(`/api/charts/chart/${activeChartMeta._id}`, {
-      credentials: "include",
-    });
-    const chartJson = await chartRes.json();
-    const full = chartJson?.data;
-    if (!full) {
-      toast.error("Could not load chart to publish");
+    if (typeof requestSaveProjectDialog !== "function") {
+      toast.error("Save project is unavailable right now.");
       return;
     }
-    const prev0 =
-      Array.isArray(full.chart_properties) && full.chart_properties[0] && typeof full.chart_properties[0] === "object"
-        ? { ...full.chart_properties[0] }
-        : {};
-    const snapshot = await capturePublishSnapshot();
-    const publishChartName = (workbookChartName || full.chart_name || "").trim() || "Chart";
-    const chart_properties = [{ ...prev0, title: publishChartName, rechartsBuilder: snapshot }];
-    const ogImageUrl = await uploadOgImage(activeChartMeta._id);
 
-    const putRes = await fetch(`/api/charts/chart/${activeChartMeta._id}`, {
-      method: "PUT",
-      credentials: "include",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        chart_name: publishChartName,
-        chart_properties,
-        labels: full.labels?.length ? full.labels : ["export"],
-        public_slug: slug,
-        is_public: true,
-        ...(ogImageUrl ? { og_image_url: ogImageUrl } : {}),
-      }),
+    requestSaveProjectDialog({
+      intent: "publish-chart",
+      onSuccess: async ({ chartSheets: sheets, activeChartSheetId: sheetId } = {}) => {
+        const fromActive = sheetId ? sheets?.[sheetId]?.chartMeta : null;
+        const fromShareable = Object.values(sheets || {}).find((s) => s?.chartMeta?._id)?.chartMeta;
+        const chartId = fromActive?._id || fromShareable?._id || activeChartMeta?._id;
+        await publishChartById(chartId, slug);
+      },
     });
-    const putJson = await putRes.json();
-    if (!putRes.ok || !putJson?.success) {
-      toast.error(putJson?.message || "Publish failed");
-      return;
-    }
-    setLoadedChartMeta?.(putJson?.data);
-    syncActiveChartSheet(putJson?.data, snapshot);
-    setRefetchChart?.(1);
-    await runChartPublishCache(activeChartMeta._id);
-    toast.success("Embed link is live");
   }, [
     user,
     userHandle,
-    activeChartMeta,
-    pendingChartName,
-    workbookChartName,
     slugInput,
-    setLoadedChartMeta,
-    getBuilderSnapshot,
-    capturePublishSnapshot,
-    uploadOgImage,
-    setRefetchChart,
-    syncActiveChartSheet,
-    runChartPublishCache,
     checkSlugNow,
+    requestSaveProjectDialog,
+    publishChartById,
+    activeChartMeta?._id,
   ]);
 
   const republishEmbed = useCallback(async () => {
@@ -615,7 +457,7 @@ function ShareEmbedSection({ runOrRequestPro }) {
     <div className="space-y-2">
       <p className="text-xs font-bold text-muted-foreground">Share</p>
       <p className="text-[10px] text-muted-foreground">
-        Publish an interactive embed on lycheedata.com. Save the chart first, then pick a URL slug.
+        Pick a URL slug, then publish. We’ll save the project first (overwrite or new name), then publish the embed.
       </p>
       {isPublishingCache ? (
         <div className="space-y-1 rounded-md border border-border bg-muted/30 p-2">
@@ -819,44 +661,6 @@ function ShareEmbedSection({ runOrRequestPro }) {
           ) : null}
         </div>
       ) : null}
-      <AlertDialog open={showSavePublishDialog} onOpenChange={setShowSavePublishDialog}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Chart needs to be saved to proceed</AlertDialogTitle>
-            <AlertDialogDescription>
-              Name your chart and we will save your data, save the chart, and publish the embed in one step.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <div className="space-y-2">
-            <label className="text-xs font-medium text-muted-foreground" htmlFor="save-publish-chart-name">
-              Name chart
-            </label>
-            <Input
-              id="save-publish-chart-name"
-              value={pendingChartName}
-              onChange={(e) => setPendingChartName(e.target.value)}
-              placeholder="my-chart"
-            />
-            <p className="break-all text-xs text-muted-foreground">
-              {`${SITE.replace(/^https?:\/\//, "").replace(/\/$/, "")}/${
-                userHandle || "handle"
-              }/charts/${pendingSlug}`}
-            </p>
-          </div>
-          <AlertDialogFooter>
-            <AlertDialogCancel disabled={isSavePublishing}>Cancel</AlertDialogCancel>
-            <Button
-              type="button"
-              onClick={() =>
-                runOrRequestPro?.(() => saveAndPublish(), "publishing embeds")
-              }
-              disabled={isSavePublishing}
-            >
-              {isSavePublishing ? "Saving..." : "Save and publish"}
-            </Button>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
       <AlertDialog open={showDeleteEmbedDialog} onOpenChange={setShowDeleteEmbedDialog}>
         <AlertDialogContent>
           <AlertDialogHeader>
@@ -995,7 +799,6 @@ export default function ExportPanel() {
 
   return (
     <div className="flex min-w-0 flex-col gap-4 p-3">
-      <SaveProjectSection runOrRequestPro={runOrRequestPro} />
       <ExportChartSection />
       <ShareEmbedSection runOrRequestPro={runOrRequestPro} />
       <ExportDataSection runOrRequestPro={runOrRequestPro} />

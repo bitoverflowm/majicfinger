@@ -46,6 +46,12 @@ export function DashboardExportPanel() {
   const [keywordInput, setKeywordInput] = useState("");
   const [siteOrigin, setSiteOrigin] = useState(() => resolvePublishedSiteOrigin());
 
+  const hasDashboardDraft =
+    !!draft &&
+    (draft._id ||
+      Array.isArray(draft.layout?.rows) ||
+      !!String(draft.dashboard_name || draft.page_heading || "").trim());
+
   useEffect(() => {
     setSiteOrigin(resolvePublishedSiteOrigin());
   }, []);
@@ -64,11 +70,11 @@ export function DashboardExportPanel() {
     kind: "dashboard",
     slugInput,
     excludeId: draft?._id || null,
-    enabled: !!draft?._id && !isDemo && !!slugInput.trim(),
+    enabled: hasDashboardDraft && !isDemo && !!slugInput.trim(),
   });
 
   useEffect(() => {
-    if (!draft?._id) return;
+    if (!hasDashboardDraft) return;
     // Ensure arrays exist for the metadata UI.
     setDraft?.((prev) => {
       const p = prev || {};
@@ -77,7 +83,7 @@ export function DashboardExportPanel() {
       if (tags === p.tags && keywords === p.keywords) return prev;
       return { ...p, tags, keywords, seo_title: p.seo_title || "" };
     });
-  }, [draft?._id, setDraft]);
+  }, [hasDashboardDraft, draft?._id, setDraft]);
 
   const tags = Array.isArray(draft?.tags) ? draft.tags : [];
   const keywords = Array.isArray(draft?.keywords) ? draft.keywords : [];
@@ -108,31 +114,32 @@ export function DashboardExportPanel() {
     return `${String(siteOrigin).replace(/\/$/, "")}/${encodeURIComponent(userHandle)}/dashboards/${encodeURIComponent(s)}`;
   }, [slugInput, draft?.public_slug, userHandle, siteOrigin]);
 
-  const openSaveProject = async () => {
+  const publishDashboard = async () => {
     if (isDemo) {
       toast.error("Demo mode: publishing dashboards is disabled.");
       return;
     }
-    if (!draft?._id) {
-      toast.error("Load or create a dashboard first.");
+    if (!hasDashboardDraft) {
+      toast.error("Create a dashboard first.");
       return;
     }
     const raw = normalizeChartEmbedSlug(slugInput || "");
-    // Slug is required to publish (private or public). Empty slug unpublishes.
-    if (slugInput.trim() && !isValidChartEmbedSlug(raw)) {
+    if (!raw) {
+      toast.error("Enter a URL slug to publish.");
+      return;
+    }
+    if (!isValidChartEmbedSlug(raw)) {
       toast.error("Invalid slug (lowercase letters, numbers, hyphens).");
       return;
     }
-    if (raw) {
-      const slugCheck = await checkSlugNow();
-      if (!slugCheck.available) {
-        toast.error(
-          slugCheck.reason === "taken"
-            ? "That slug is already used by another dashboard of yours."
-            : embedSlugStatusMessage(slugCheck.reason, "dashboard") || "Slug is not available.",
-        );
-        return;
-      }
+    const slugCheck = await checkSlugNow();
+    if (!slugCheck.available) {
+      toast.error(
+        slugCheck.reason === "taken"
+          ? "That slug is already used by another dashboard of yours."
+          : embedSlugStatusMessage(slugCheck.reason, "dashboard") || "Slug is not available.",
+      );
+      return;
     }
     flushSync(() => {
       setDraft?.((prev) => ({
@@ -141,8 +148,11 @@ export function DashboardExportPanel() {
         public_slug: raw,
       }));
     });
-    requestSaveProjectDialog?.();
-    toast.info("Use Save Project in the header to save layout, data, charts, and publish settings.");
+    if (typeof requestSaveProjectDialog !== "function") {
+      toast.error("Save project is unavailable right now.");
+      return;
+    }
+    requestSaveProjectDialog({ intent: "publish-dashboard" });
   };
 
   const clearPublish = () => {
@@ -155,19 +165,13 @@ export function DashboardExportPanel() {
         public_slug: "",
       }));
     });
-    toast.message("Publish cleared — Save Project to unpublish this dashboard.");
+    toast.message("Publish cleared — use Publish (or Save Project) to unpublish this dashboard.");
   };
 
-  if (!draft?._id) {
-    const hasUnsavedDashboard =
-      !!draft &&
-      (Array.isArray(draft.layout?.rows) ||
-        !!String(draft.dashboard_name || draft.page_heading || "").trim());
+  if (!hasDashboardDraft) {
     return (
       <div className="p-2 text-xs text-muted-foreground">
-        {hasUnsavedDashboard
-          ? "Save project to enable dashboard publishing."
-          : "Create or load a dashboard from Your Work, then set a slug here."}
+        Create or load a dashboard from Your Work, then set a slug here to publish.
       </div>
     );
   }
@@ -177,9 +181,8 @@ export function DashboardExportPanel() {
       <div className="space-y-2">
         <p className="text-xs font-semibold text-muted-foreground">Publish dashboard</p>
         <p className="text-[11px] text-muted-foreground">
-          Set a slug to publish. Leave <span className="font-medium">Public</span> unchecked for a
-          private link (only you when signed in). Check Public to share with the world. Then use{" "}
-          <span className="font-medium">Save Project</span> in the header.
+          Set a slug, choose public or private, then publish. We’ll save the project first (overwrite or
+          new name), including layout and publish settings.
         </p>
       </div>
       <div className="grid gap-2">
@@ -225,13 +228,16 @@ export function DashboardExportPanel() {
         type="button"
         size="sm"
         className="w-full"
-        onClick={openSaveProject}
+        onClick={publishDashboard}
         disabled={
           isDemo ||
-          (!!slugInput.trim() && (slugChecking || slugTaken || slugStatus === "invalid"))
+          !slugInput.trim() ||
+          slugChecking ||
+          slugTaken ||
+          slugStatus === "invalid"
         }
       >
-        Save project
+        Publish
       </Button>
       {(draft?.public_slug || slugInput.trim()) && !isDemo ? (
         <Button type="button" size="sm" variant="ghost" className="w-full text-xs" onClick={clearPublish}>
@@ -265,99 +271,117 @@ export function DashboardExportPanel() {
               </Label>
               <Input
                 id="dash-seo-title"
-                className="h-9 text-sm"
+                className="h-8 text-sm"
                 value={draft?.seo_title || ""}
                 onChange={(e) =>
-                  setDraft?.((prev) => ({
-                    ...(prev || {}),
-                    seo_title: e.target.value,
-                  }))
+                  setDraft?.((prev) => ({ ...(prev || {}), seo_title: e.target.value }))
                 }
-                placeholder="Defaults to Page title"
+                placeholder="Shown in search / social previews"
               />
-              <p className="text-[11px] text-muted-foreground">
-                If blank, Lychee will use your Page title (H1). SEO applies when Public is checked.
-              </p>
             </div>
 
             <div className="space-y-1">
               <Label className="text-xs">Tags</Label>
-              <Input
-                className="h-9 text-sm"
-                value={tagInput}
-                onChange={(e) => setTagInput(e.target.value)}
-                placeholder="Type a tag and press Enter"
-                onKeyDown={(e) => {
-                  if (e.key !== "Enter") return;
-                  e.preventDefault();
-                  addChip("tags", tagInput);
-                  setTagInput("");
-                }}
-              />
-              {DASHBOARD_TAG_SUGGESTIONS?.length ? (
-                <div className="flex flex-wrap gap-1 pt-1">
-                  {DASHBOARD_TAG_SUGGESTIONS.slice(0, 18).map((t) => (
-                    <button
-                      key={`tag-suggest-${t}`}
+              <div className="flex flex-wrap gap-1">
+                {tags.map((t) => (
+                  <Badge
+                    key={t}
+                    variant="secondary"
+                    className="cursor-pointer gap-1 text-[10px]"
+                    onClick={() => removeChip("tags", t)}
+                    title="Remove"
+                  >
+                    {t} ×
+                  </Badge>
+                ))}
+              </div>
+              <div className="flex gap-1">
+                <Input
+                  className="h-8 text-sm"
+                  value={tagInput}
+                  onChange={(e) => setTagInput(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      e.preventDefault();
+                      addChip("tags", tagInput);
+                      setTagInput("");
+                    }
+                  }}
+                  placeholder="Add tag"
+                />
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  className="h-8"
+                  onClick={() => {
+                    addChip("tags", tagInput);
+                    setTagInput("");
+                  }}
+                >
+                  Add
+                </Button>
+              </div>
+              <div className="flex flex-wrap gap-1 pt-1">
+                {DASHBOARD_TAG_SUGGESTIONS.filter((s) => !tags.includes(s))
+                  .slice(0, 8)
+                  .map((s) => (
+                    <Button
+                      key={s}
                       type="button"
-                      className="rounded border px-1.5 py-0.5 text-[10px] text-muted-foreground hover:text-foreground"
-                      onClick={() => addChip("tags", t)}
+                      size="sm"
+                      variant="ghost"
+                      className="h-6 px-2 text-[10px]"
+                      onClick={() => addChip("tags", s)}
                     >
-                      {t}
-                    </button>
+                      + {s}
+                    </Button>
                   ))}
-                </div>
-              ) : null}
-              {tags.length ? (
-                <div className="flex flex-wrap gap-1 pt-2">
-                  {tags.map((t) => (
-                    <Badge key={`tag-${t}`} variant="secondary" className="gap-1 text-[11px]">
-                      <span>{t}</span>
-                      <button
-                        type="button"
-                        className="rounded px-1 hover:bg-muted-foreground/20"
-                        aria-label={`Remove tag ${t}`}
-                        onClick={() => removeChip("tags", t)}
-                      >
-                        x
-                      </button>
-                    </Badge>
-                  ))}
-                </div>
-              ) : null}
+              </div>
             </div>
 
             <div className="space-y-1">
               <Label className="text-xs">Keywords</Label>
-              <Input
-                className="h-9 text-sm"
-                value={keywordInput}
-                onChange={(e) => setKeywordInput(e.target.value)}
-                placeholder="Type a keyword and press Enter"
-                onKeyDown={(e) => {
-                  if (e.key !== "Enter") return;
-                  e.preventDefault();
-                  addChip("keywords", keywordInput);
-                  setKeywordInput("");
-                }}
-              />
-              {keywords.length ? (
-                <div className="flex flex-wrap gap-1 pt-2">
-                  {keywords.map((t) => (
-                    <Badge key={`kw-${t}`} variant="outline" className="gap-1 text-[11px]">
-                      <span>{t}</span>
-                      <button
-                        type="button"
-                        className="rounded px-1 hover:bg-muted-foreground/20"
-                        aria-label={`Remove keyword ${t}`}
-                        onClick={() => removeChip("keywords", t)}
-                      >
-                        x
-                      </button>
-                    </Badge>
-                  ))}
-                </div>
-              ) : null}
+              <div className="flex flex-wrap gap-1">
+                {keywords.map((t) => (
+                  <Badge
+                    key={t}
+                    variant="outline"
+                    className="cursor-pointer gap-1 text-[10px]"
+                    onClick={() => removeChip("keywords", t)}
+                    title="Remove"
+                  >
+                    {t} ×
+                  </Badge>
+                ))}
+              </div>
+              <div className="flex gap-1">
+                <Input
+                  className="h-8 text-sm"
+                  value={keywordInput}
+                  onChange={(e) => setKeywordInput(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      e.preventDefault();
+                      addChip("keywords", keywordInput);
+                      setKeywordInput("");
+                    }
+                  }}
+                  placeholder="Add keyword"
+                />
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  className="h-8"
+                  onClick={() => {
+                    addChip("keywords", keywordInput);
+                    setKeywordInput("");
+                  }}
+                >
+                  Add
+                </Button>
+              </div>
             </div>
           </AccordionContent>
         </AccordionItem>

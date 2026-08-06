@@ -1661,7 +1661,7 @@ const Nav = () => {
                       <ProjectDataUsageIndicator summary={currentProjectSizeSummary} />
                     )
                   )}
-                  {showProjectToolbar && (
+                  {(showProjectToolbar || saveIsOpen) && (
                       <Dialog
                         open={saveIsOpen}
                         onOpenChange={(open) => {
@@ -1682,11 +1682,13 @@ const Nav = () => {
                           }
                         }}
                       >
-                        <DialogTrigger asChild>
-                          <Button variant="outline" size="sm" className="h-7 gap-1 px-2 text-xs font-medium">
-                            Save Project
-                          </Button>
-                        </DialogTrigger>
+                        {showProjectToolbar ? (
+                          <DialogTrigger asChild>
+                            <Button variant="outline" size="sm" className="h-7 gap-1 px-2 text-xs font-medium">
+                              Save Project
+                            </Button>
+                          </DialogTrigger>
+                        ) : null}
                         <DialogContent className="sm:max-w-[425px]">
                           <DialogHeader>
                             <DialogTitle>
@@ -1746,7 +1748,12 @@ const Nav = () => {
                                 )}
                               </div>
                               <DialogFooter>
-                                <Button type="submit">Save Project</Button>
+                                <Button type="submit">
+                                  {saveProjectDialogIntent === "publish-chart" ||
+                                  saveProjectDialogIntent === "publish-dashboard"
+                                    ? "Save & publish"
+                                    : "Save Project"}
+                                </Button>
                               </DialogFooter>
                             </form>
                           )}
