@@ -496,7 +496,6 @@ export default function ConnectDataStep1({
   const liveStreamState = context?.liveStreamState;
   const liveFeedActions = context?.liveFeedActions;
   const liveFeedState = context?.liveFeedState;
-  const dataSheets = context?.dataSheets;
   const requestConnectWorkspace = context?.requestConnectWorkspace;
   const setConnectHomeAnalyzeActive = context?.setConnectHomeAnalyzeActive;
   const requestConnectAnalyzeScroll = context?.requestConnectAnalyzeScroll;

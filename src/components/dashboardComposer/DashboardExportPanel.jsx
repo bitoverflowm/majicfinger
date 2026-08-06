@@ -15,10 +15,18 @@ import { isValidChartEmbedSlug, normalizeChartEmbedSlug } from "@/lib/chartEmbed
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { DASHBOARD_TAG_SUGGESTIONS } from "@/lib/content/dashboardTagSuggestions";
 
-const SITE =
-  typeof process !== "undefined" && process.env.NEXT_PUBLIC_SITE_URL
-    ? process.env.NEXT_PUBLIC_SITE_URL
-    : "https://lycheedata.com";
+function resolvePublishedSiteOrigin() {
+  if (typeof process !== "undefined" && process.env.NODE_ENV === "development") {
+    if (typeof window !== "undefined" && window.location?.origin) {
+      return window.location.origin;
+    }
+    return "http://localhost:3000";
+  }
+  if (typeof process !== "undefined" && process.env.NEXT_PUBLIC_SITE_URL) {
+    return process.env.NEXT_PUBLIC_SITE_URL;
+  }
+  return "https://lycheedata.com";
+}
 
 export function DashboardExportPanel() {
   const v2 = useMyStateV2();
@@ -32,6 +40,11 @@ export function DashboardExportPanel() {
   const [pub, setPub] = useState(false);
   const [tagInput, setTagInput] = useState("");
   const [keywordInput, setKeywordInput] = useState("");
+  const [siteOrigin, setSiteOrigin] = useState(() => resolvePublishedSiteOrigin());
+
+  useEffect(() => {
+    setSiteOrigin(resolvePublishedSiteOrigin());
+  }, []);
 
   useEffect(() => {
     setSlugInput(draft?.public_slug || "");
@@ -76,8 +89,8 @@ export function DashboardExportPanel() {
   const publishedUrl = useMemo(() => {
     const s = normalizeChartEmbedSlug(slugInput || draft?.public_slug || "");
     if (!userHandle || !isValidChartEmbedSlug(s)) return null;
-    return `${String(SITE).replace(/\/$/, "")}/${encodeURIComponent(userHandle)}/dashboards/${encodeURIComponent(s)}`;
-  }, [slugInput, draft?.public_slug, userHandle]);
+    return `${String(siteOrigin).replace(/\/$/, "")}/${encodeURIComponent(userHandle)}/dashboards/${encodeURIComponent(s)}`;
+  }, [slugInput, draft?.public_slug, userHandle, siteOrigin]);
 
   const openSaveProject = () => {
     if (isDemo) {
