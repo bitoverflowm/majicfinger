@@ -20,3 +20,17 @@ export function isValidChartEmbedSlug(slug) {
   if (slug.length < 1 || slug.length > 120) return false;
   return /^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(slug);
 }
+
+/**
+ * @param {"idle"|"checking"|"available"|"taken"|"invalid"|"empty"|"error"|string} status
+ * @param {"chart"|"dashboard"} [kind]
+ */
+export function embedSlugStatusMessage(status, kind = "chart") {
+  const noun = kind === "dashboard" ? "dashboard" : "chart";
+  if (status === "taken") return `That slug is already used by another ${noun} of yours.`;
+  if (status === "invalid") return "Use lowercase letters, numbers, and hyphens only.";
+  if (status === "checking") return "Checking slug…";
+  if (status === "error") return "Could not verify slug. Try again.";
+  if (status === "available") return "Slug is available.";
+  return null;
+}

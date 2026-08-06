@@ -326,6 +326,9 @@ const Nav = () => {
   const activeChartDashboardId = contextStateV2?.activeChartDashboardId
   const setRefetchChartDashboardsTick = contextStateV2?.setRefetchChartDashboardsTick
   const saveProjectDialogNonce = contextStateV2?.saveProjectDialogNonce ?? 0
+  const saveProjectDialogIntent = contextStateV2?.saveProjectDialogIntent
+  const setSaveProjectDialogIntent = contextStateV2?.setSaveProjectDialogIntent
+  const pendingSaveProjectSuccessRef = contextStateV2?.pendingSaveProjectSuccessRef
   const prevSaveProjectNonceRef = useRef(0)
 
   const savedWorkCountLoading =
@@ -680,7 +683,9 @@ const Nav = () => {
       const active = nextSheets?.[activeChartSheetId] || Object.values(nextSheets)[0];
       setLoadedChartMeta?.(active?.chartMeta || null);
       setLoadedChartBuilderSnapshot?.(active?.snapshot || null);
+      return nextSheets;
     }
+    return chartSheetsForSave || {};
   };
 
   const generateDashboardOgImageDataUrl = (title, subtitle) => {
@@ -940,7 +945,11 @@ const Nav = () => {
       }
 
       bump(48, "Saving charts…");
-      await saveAllChartsForProject(savedProject._id, !shouldOverwrite, chartSheetsForSave);
+      const savedChartSheets = await saveAllChartsForProject(
+        savedProject._id,
+        !shouldOverwrite,
+        chartSheetsForSave,
+      );
 
       bump(68, "Indexing data…");
       await new Promise((r) => setTimeout(r, 280));
@@ -1023,16 +1032,32 @@ const Nav = () => {
       await new Promise((r) => setTimeout(r, 480));
       const shouldStartNewProject = pendingNewProjectAfterSaveRef.current;
       pendingNewProjectAfterSaveRef.current = false;
+      const pendingPublish = pendingSaveProjectSuccessRef?.current;
+      if (pendingSaveProjectSuccessRef) pendingSaveProjectSuccessRef.current = null;
+      setSaveProjectDialogIntent?.(null);
       setSaveIsOpen(false);
       setProjectNameInput("");
       if (shouldStartNewProject) {
         performNewProjectWipe();
+      } else if (typeof pendingPublish === "function") {
+        try {
+          await pendingPublish({
+            savedProject,
+            chartSheets: savedChartSheets,
+            activeChartSheetId,
+          });
+        } catch (publishErr) {
+          console.error("Post-save publish failed:", publishErr);
+          toast.error(publishErr?.message || "Saved, but publish failed.");
+        }
       }
       return true;
     } catch (error) {
       console.error('Error saving project:', error);
       toast.error("Failed to save project.");
       pendingNewProjectAfterSaveRef.current = false;
+      if (pendingSaveProjectSuccessRef) pendingSaveProjectSuccessRef.current = null;
+      setSaveProjectDialogIntent?.(null);
       return false;
     } finally {
       setSaveProjectBusy(false);
@@ -1647,9 +1672,13 @@ const Nav = () => {
                             setSaveProjectProgress(0);
                             setSaveProjectMessage("");
                           } else {
-                            // Dismissed without finishing save — cancel new-project chain.
+                            // Dismissed without finishing save — cancel new-project / publish chains.
                             // Success path copies the flag before closing.
                             pendingNewProjectAfterSaveRef.current = false;
+                            if (pendingSaveProjectSuccessRef) {
+                              pendingSaveProjectSuccessRef.current = null;
+                            }
+                            setSaveProjectDialogIntent?.(null);
                           }
                         }}
                       >
@@ -1660,10 +1689,18 @@ const Nav = () => {
                         </DialogTrigger>
                         <DialogContent className="sm:max-w-[425px]">
                           <DialogHeader>
-                            <DialogTitle>Save Project</DialogTitle>
+                            <DialogTitle>
+                              {saveProjectDialogIntent === "publish-chart" ||
+                              saveProjectDialogIntent === "publish-dashboard"
+                                ? "Save & publish"
+                                : "Save Project"}
+                            </DialogTitle>
                             <DialogDescription className={saveProjectBusy ? "sr-only" : ""}>
-                              Save all sheets and charts, and the open dashboard (layout plus publish settings if set)
-                              in one project. Overwrite updates the loaded project; otherwise enter a new name.
+                              {saveProjectDialogIntent === "publish-chart"
+                                ? "Save your project (overwrite or new name), then we’ll publish the chart embed."
+                                : saveProjectDialogIntent === "publish-dashboard"
+                                  ? "Save your project (overwrite or new name), then we’ll publish the dashboard."
+                                  : "Save all sheets and charts, and the open dashboard (layout plus publish settings if set) in one project. Overwrite updates the loaded project; otherwise enter a new name."}
                             </DialogDescription>
                           </DialogHeader>
                           {saveProjectBusy ? (

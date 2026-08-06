@@ -14,6 +14,10 @@ import { toast } from "sonner";
 import { isValidChartEmbedSlug, normalizeChartEmbedSlug } from "@/lib/chartEmbedSlug";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { DASHBOARD_TAG_SUGGESTIONS } from "@/lib/content/dashboardTagSuggestions";
+import {
+  embedSlugStatusMessage,
+  useEmbedSlugAvailability,
+} from "@/hooks/useEmbedSlugAvailability";
 
 function resolvePublishedSiteOrigin() {
   if (typeof process !== "undefined" && process.env.NODE_ENV === "development") {
@@ -50,6 +54,18 @@ export function DashboardExportPanel() {
     setSlugInput(draft?.public_slug || "");
     setPub(!!draft?.is_public);
   }, [draft?._id, draft?.public_slug, draft?.is_public]);
+
+  const {
+    status: slugStatus,
+    isTaken: slugTaken,
+    isChecking: slugChecking,
+    checkNow: checkSlugNow,
+  } = useEmbedSlugAvailability({
+    kind: "dashboard",
+    slugInput,
+    excludeId: draft?._id || null,
+    enabled: !!draft?._id && !isDemo && !!slugInput.trim(),
+  });
 
   useEffect(() => {
     if (!draft?._id) return;
@@ -92,7 +108,7 @@ export function DashboardExportPanel() {
     return `${String(siteOrigin).replace(/\/$/, "")}/${encodeURIComponent(userHandle)}/dashboards/${encodeURIComponent(s)}`;
   }, [slugInput, draft?.public_slug, userHandle, siteOrigin]);
 
-  const openSaveProject = () => {
+  const openSaveProject = async () => {
     if (isDemo) {
       toast.error("Demo mode: publishing dashboards is disabled.");
       return;
@@ -106,6 +122,17 @@ export function DashboardExportPanel() {
     if (slugInput.trim() && !isValidChartEmbedSlug(raw)) {
       toast.error("Invalid slug (lowercase letters, numbers, hyphens).");
       return;
+    }
+    if (raw) {
+      const slugCheck = await checkSlugNow();
+      if (!slugCheck.available) {
+        toast.error(
+          slugCheck.reason === "taken"
+            ? "That slug is already used by another dashboard of yours."
+            : embedSlugStatusMessage(slugCheck.reason, "dashboard") || "Slug is not available.",
+        );
+        return;
+      }
     }
     flushSync(() => {
       setDraft?.((prev) => ({
@@ -165,7 +192,21 @@ export function DashboardExportPanel() {
           value={slugInput}
           onChange={(e) => setSlugInput(e.target.value)}
           placeholder="my-dashboard"
+          aria-invalid={slugTaken || slugStatus === "invalid"}
         />
+        {slugInput.trim() && slugStatus !== "idle" && slugStatus !== "empty" ? (
+          <p
+            className={`text-[10px] ${
+              slugTaken || slugStatus === "invalid" || slugStatus === "error"
+                ? "text-destructive"
+                : slugStatus === "available"
+                  ? "text-emerald-600 dark:text-emerald-400"
+                  : "text-muted-foreground"
+            }`}
+          >
+            {embedSlugStatusMessage(slugStatus, "dashboard")}
+          </p>
+        ) : null}
       </div>
       <div className="flex items-center gap-2">
         <Checkbox id="dash-pub" checked={pub} onCheckedChange={(c) => setPub(!!c)} disabled={isDemo} />
@@ -180,7 +221,16 @@ export function DashboardExportPanel() {
           </span>
         )}
       </div>
-      <Button type="button" size="sm" className="w-full" onClick={openSaveProject} disabled={isDemo}>
+      <Button
+        type="button"
+        size="sm"
+        className="w-full"
+        onClick={openSaveProject}
+        disabled={
+          isDemo ||
+          (!!slugInput.trim() && (slugChecking || slugTaken || slugStatus === "invalid"))
+        }
+      >
         Save project
       </Button>
       {(draft?.public_slug || slugInput.trim()) && !isDemo ? (

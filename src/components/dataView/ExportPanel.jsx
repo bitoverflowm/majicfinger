@@ -34,6 +34,11 @@ import {
 } from "@/lib/chartPublishCache";
 import { isPublishedChartBundleStale } from "@/lib/chartPublishStaleness";
 import { chartSheetIsShareable } from "@/lib/inferDefaultBuilderSnapshot";
+import {
+  checkEmbedSlugAvailability,
+  embedSlugStatusMessage,
+  useEmbedSlugAvailability,
+} from "@/hooks/useEmbedSlugAvailability";
 import { Progress } from "@/components/ui/progress";
 
 function getColKeys(connectedCols) {
@@ -211,6 +216,19 @@ function ShareEmbedSection({ runOrRequestPro }) {
     setSlugInput(normalizeChartEmbedSlug(workbookChartName || activeChartMeta?.chart_name || "chart") || "chart");
   }, [activeChartMeta?._id, activeChartMeta?.chart_name, activeChartMeta?.public_slug, workbookChartName]);
 
+  const {
+    status: slugStatus,
+    isTaken: slugTaken,
+    isChecking: slugChecking,
+    canPublish: slugCanPublish,
+    checkNow: checkSlugNow,
+  } = useEmbedSlugAvailability({
+    kind: "chart",
+    slugInput,
+    excludeId: activeChartMeta?._id || null,
+    enabled: !!hasShareableChart && !!user,
+  });
+
   const publicUrl = useMemo(() => {
     const slug = normalizeChartEmbedSlug(slugInput);
     if (!userHandle || !isValidChartEmbedSlug(slug)) return "";
@@ -324,6 +342,20 @@ function ShareEmbedSection({ runOrRequestPro }) {
       return;
     }
 
+    const slugCheck = await checkEmbedSlugAvailability({
+      kind: "chart",
+      slug: pendingSlug,
+      excludeId: activeChartMeta?._id || null,
+    });
+    if (!slugCheck.available) {
+      toast.error(
+        slugCheck.reason === "taken"
+          ? "That slug is already used by another chart of yours."
+          : embedSlugStatusMessage(slugCheck.reason, "chart") || "Slug is not available.",
+      );
+      return;
+    }
+
     try {
       setIsSavePublishing(true);
       const snapshot = await capturePublishSnapshot();
@@ -413,6 +445,7 @@ function ShareEmbedSection({ runOrRequestPro }) {
     }
   }, [
     connectedData,
+    dataSheets,
     getBuilderSnapshot,
     capturePublishSnapshot,
     isSavePublishing,
@@ -423,6 +456,8 @@ function ShareEmbedSection({ runOrRequestPro }) {
     workbookChartName,
     setLoadedChartMeta,
     setRefetchChart,
+    syncActiveChartSheet,
+    activeChartMeta?._id,
     user,
     userHandle,
     runChartPublishCache,
@@ -446,6 +481,16 @@ function ShareEmbedSection({ runOrRequestPro }) {
     const slug = normalizeChartEmbedSlug(slugInput);
     if (!isValidChartEmbedSlug(slug)) {
       toast.error("Use a URL slug with lowercase letters, numbers, and hyphens only");
+      return;
+    }
+
+    const slugCheck = await checkSlugNow();
+    if (!slugCheck.available) {
+      toast.error(
+        slugCheck.reason === "taken"
+          ? "That slug is already used by another chart of yours."
+          : embedSlugStatusMessage(slugCheck.reason, "chart") || "Slug is not available.",
+      );
       return;
     }
 
@@ -504,6 +549,7 @@ function ShareEmbedSection({ runOrRequestPro }) {
     setRefetchChart,
     syncActiveChartSheet,
     runChartPublishCache,
+    checkSlugNow,
   ]);
 
   const republishEmbed = useCallback(async () => {
@@ -604,8 +650,22 @@ function ShareEmbedSection({ runOrRequestPro }) {
             onChange={(e) => setSlugInput(e.target.value)}
             placeholder="my-chart"
             disabled={!hasShareableChart}
+            aria-invalid={slugTaken || slugStatus === "invalid"}
           />
         </div>
+        {hasShareableChart && slugStatus !== "idle" && slugStatus !== "empty" ? (
+          <p
+            className={`text-[10px] ${
+              slugTaken || slugStatus === "invalid" || slugStatus === "error"
+                ? "text-destructive"
+                : slugStatus === "available"
+                  ? "text-emerald-600 dark:text-emerald-400"
+                  : "text-muted-foreground"
+            }`}
+          >
+            {embedSlugStatusMessage(slugStatus, "chart")}
+          </p>
+        ) : null}
       </div>
       <div className="flex flex-wrap gap-1">
         <TooltipProvider delayDuration={120}>
@@ -617,7 +677,12 @@ function ShareEmbedSection({ runOrRequestPro }) {
                   variant="outline"
                   size="sm"
                   className="h-8 px-2 text-[10px]"
-                  disabled={!hasShareableChart || isPublishingCache}
+                  disabled={
+                    !hasShareableChart ||
+                    isPublishingCache ||
+                    slugChecking ||
+                    !slugCanPublish
+                  }
                   onClick={() =>
                     runOrRequestPro?.(() => publishEmbed(), "publishing embeds")
                   }
@@ -629,6 +694,14 @@ function ShareEmbedSection({ runOrRequestPro }) {
             {!hasShareableChart ? (
               <TooltipContent side="top" className="text-xs">
                 Create a chart from the Chart tab first
+              </TooltipContent>
+            ) : slugTaken ? (
+              <TooltipContent side="top" className="text-xs">
+                That slug is already used by another chart of yours
+              </TooltipContent>
+            ) : slugChecking ? (
+              <TooltipContent side="top" className="text-xs">
+                Checking slug…
               </TooltipContent>
             ) : null}
           </Tooltip>
