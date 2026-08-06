@@ -7,6 +7,7 @@ import { evaluateTrackedMarketsClosure } from "@/lib/liveFeeds/marketClosure";
 import {
   describeCandlePeriod,
   LIVE_FEED_POLL_FREQUENCY_OPTIONS,
+  clampLiveFeedPollIntervalMs,
   pollIntervalMsForPeriod,
 } from "@/lib/liveFeeds/registry";
 
@@ -103,7 +104,10 @@ export function startEventCandlesticksEditorLiveFeed(opts = {}) {
 
   const period = Math.floor(Number(group.periodInterval)) || 1;
   const defaultPollMs = pollIntervalMsForPeriod(period);
-  const pollMs = Math.floor(Number(opts.pollIntervalMs)) || defaultPollMs;
+  const pollMs = clampLiveFeedPollIntervalMs(
+    Math.floor(Number(opts.pollIntervalMs)) || defaultPollMs,
+    period,
+  );
   const cfg = createLiveFeedConfig({
     integration: "kalshi-live",
     endpoint: "event_candlesticks",

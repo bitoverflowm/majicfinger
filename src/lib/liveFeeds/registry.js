@@ -107,6 +107,38 @@ export const LIVE_FEED_POLL_FREQUENCY_OPTIONS = [
 ];
 
 /**
+ * Poll options allowed for a candle period_interval.
+ * Refresh cannot be faster than one candle: 1m candles → any rate;
+ * 1h candles → ≥1h; 1d candles → ≥1d.
+ *
+ * @param {number} periodIntervalMinutes
+ * @returns {typeof LIVE_FEED_POLL_FREQUENCY_OPTIONS}
+ */
+export function filterLiveFeedPollOptionsForPeriod(periodIntervalMinutes) {
+  const minutes = Math.floor(Number(periodIntervalMinutes));
+  const periodMs =
+    Number.isFinite(minutes) && minutes > 0 ? minutes * 60_000 : 60_000;
+  return LIVE_FEED_POLL_FREQUENCY_OPTIONS.filter((o) => o.valueMs >= periodMs);
+}
+
+/**
+ * Clamp a poll interval to an allowed option for the candle period.
+ *
+ * @param {number | null | undefined} pollMs
+ * @param {number} periodIntervalMinutes
+ * @returns {number}
+ */
+export function clampLiveFeedPollIntervalMs(pollMs, periodIntervalMinutes) {
+  const options = filterLiveFeedPollOptionsForPeriod(periodIntervalMinutes);
+  if (!options.length) return pollIntervalMsForPeriod(periodIntervalMinutes);
+  const n = Math.floor(Number(pollMs));
+  if (Number.isFinite(n) && options.some((o) => o.valueMs === n)) return n;
+  const preferred = pollIntervalMsForPeriod(periodIntervalMinutes);
+  if (options.some((o) => o.valueMs === preferred)) return preferred;
+  return options[0].valueMs;
+}
+
+/**
  * Seconds covered by one period_interval candle.
  * @param {number} periodIntervalMinutes
  * @returns {number}

@@ -14,6 +14,8 @@ export {
   periodIntervalSec,
   describeCandlePeriod,
   LIVE_FEED_POLL_FREQUENCY_OPTIONS,
+  filterLiveFeedPollOptionsForPeriod,
+  clampLiveFeedPollIntervalMs,
 } from "@/lib/liveFeeds/registry";
 
 export {

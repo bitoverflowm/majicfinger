@@ -14,7 +14,9 @@ import { Radio, Pause, Play, Square, CircleOff, RefreshCw, Archive, Activity } f
 import { toast } from "sonner";
 import { useMyStateV2 } from "@/context/stateContextV2";
 import {
+  clampLiveFeedPollIntervalMs,
   describeCandlePeriod,
+  filterLiveFeedPollOptionsForPeriod,
   getLiveFeedEndpointDef,
   LIVE_FEED_POLL_FREQUENCY_OPTIONS,
   pollIntervalMsForPeriod,
@@ -199,14 +201,20 @@ export function EventCandlesticksLiveFeedControls() {
   const candlePeriod = Math.floor(Number(group?.periodInterval)) || 1;
   const defaultPollMs =
     savedLiveSource?.pollIntervalMs || pollIntervalMsForPeriod(candlePeriod);
+  const pollFrequencyOptions = useMemo(
+    () => filterLiveFeedPollOptionsForPeriod(candlePeriod),
+    [candlePeriod],
+  );
 
   const [pollIntervalMs, setPollIntervalMs] = useState(() => String(defaultPollMs));
   const [refreshBusy, setRefreshBusy] = useState(false);
   const refreshAbortRef = useRef(/** @type {AbortController | null} */ (null));
 
   useEffect(() => {
-    setPollIntervalMs(String(defaultPollMs));
-  }, [defaultPollMs]);
+    setPollIntervalMs(
+      String(clampLiveFeedPollIntervalMs(defaultPollMs, candlePeriod)),
+    );
+  }, [defaultPollMs, candlePeriod]);
 
   useEffect(() => {
     return () => {
@@ -459,7 +467,7 @@ export function EventCandlesticksLiveFeedControls() {
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                {LIVE_FEED_POLL_FREQUENCY_OPTIONS.map((o) => (
+                {pollFrequencyOptions.map((o) => (
                   <SelectItem key={o.valueMs} value={String(o.valueMs)} className="text-xs">
                     {o.label}
                   </SelectItem>

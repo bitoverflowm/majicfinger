@@ -129,13 +129,6 @@ export function KalshiLiveEventCandlesticksField({ className, disabled }) {
             />
           </div>
         </div>
-        <p className="text-[10px] leading-snug text-muted-foreground">
-          Path params for{" "}
-          <span className="font-mono text-[10px]">
-            /series/{"{series_ticker}"}/events/{"{ticker}"}/candlesticks
-          </span>
-          . Series is filled from the search hit when available; override if needed.
-        </p>
       </div>
     </div>
   );

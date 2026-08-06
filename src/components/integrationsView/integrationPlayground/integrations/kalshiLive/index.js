@@ -40,6 +40,11 @@ import { kalshiLiveSeriesWantsIncludeVolume } from "@/lib/kalshiLive/seriesColum
 import { fetchKalshiLiveCandlesticksPull } from "@/lib/kalshiLive/fetchKalshiLiveCandlesticksPull";
 import { fetchKalshiLiveEventCandlesticksPull } from "@/lib/kalshiLive/fetchKalshiLiveEventCandlesticksPull";
 import { fetchKalshiLiveEventForecastPull } from "@/lib/kalshiLive/fetchKalshiLiveEventForecastPull";
+import { startEventCandlesticksEditorLiveFeed } from "@/lib/liveFeeds/startEventCandlesticksEditorLiveFeed";
+import {
+  clampLiveFeedPollIntervalMs,
+  pollIntervalMsForPeriod,
+} from "@/lib/liveFeeds/registry";
 import { fetchKalshiLiveLeaderboardPull } from "@/lib/kalshiLive/fetchKalshiLiveLeaderboardPull";
 import { fetchKalshiLiveHolderProfilePull } from "@/lib/kalshiLive/fetchKalshiLiveHolderProfilePull";
 import { fetchKalshiLiveHolderTradesPull } from "@/lib/kalshiLive/fetchKalshiLiveHolderTradesPull";
@@ -1258,6 +1263,9 @@ export default function KalshiLive({ setConnectedData, connectHomePullBridge = f
         0,
       );
 
+      /** @type {Record<string, unknown> | null} */
+      let writtenSheets = null;
+
       if (setDataSheets) {
         flushSync(() => {
           setDataSheets((prev) => {
@@ -1308,7 +1316,8 @@ export default function KalshiLive({ setConnectedData, connectHomePullBridge = f
             }
 
             firstSheetId = writtenIds[0] || firstSheetId;
-            return pruneEmptyDefaultNamedSheets(next);
+            writtenSheets = pruneEmptyDefaultNamedSheets(next);
+            return writtenSheets;
           });
 
           if (firstSheetId && ctx?.setActiveSheetId) {
@@ -1325,6 +1334,33 @@ export default function KalshiLive({ setConnectedData, connectHomePullBridge = f
 
       if (ctx?.requestConnectAnalyzeScroll) {
         ctx.requestConnectAnalyzeScroll();
+      }
+
+      // Compose-time Real Time Feed: start ephemeral poll after a successful pull.
+      if (
+        totalRows > 0 &&
+        writtenSheets &&
+        ctx?.connectKalshiLiveRealtimeFeedEnabled &&
+        typeof ctx?.liveFeedActions?.start === "function"
+      ) {
+        const periodFromFilters = (() => {
+          const f = whereFilters.find((row) => row?.column === "period_interval");
+          const n = Math.floor(Number(f?.value));
+          return [1, 60, 1440].includes(n) ? n : 1;
+        })();
+        const pollMs = clampLiveFeedPollIntervalMs(
+          ctx.connectKalshiLiveRealtimePollIntervalMs ??
+            pollIntervalMsForPeriod(periodFromFilters),
+          periodFromFilters,
+        );
+        startEventCandlesticksEditorLiveFeed({
+          dataSheets: writtenSheets,
+          liveFeedActions: ctx.liveFeedActions,
+          liveFeedState: ctx.liveFeedState,
+          pollIntervalMs: pollMs,
+          reason: "manual",
+          toastOnStart: true,
+        });
       }
 
       return totalRows;
