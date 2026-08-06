@@ -48,18 +48,47 @@ import {
   KALSHI_LIVE_EVENTS_ROW_MODE_PER_MARKET,
   normalizeKalshiLiveEventsRowMode,
 } from "@/lib/kalshiLive/eventCompose";
+import { LIVE_FEED_REGISTRY } from "@/lib/liveFeeds/registry";
 
 /**
  * Top-level Kalshi Live endpoint groups (hub column tags).
  * Endpoints are filtered by `category` so Markets / Events / … stay organized.
+ * "Real-Time" lists endpoints that have an editor live-feed pull enabled
+ * (see LIVE_FEED_REGISTRY) — they still also appear under their primary category.
  */
 export const KALSHI_LIVE_ENDPOINT_CATEGORIES = [
   { id: "markets", label: "Markets" },
   { id: "events", label: "Events" },
   { id: "holders", label: "Traders" },
+  { id: "realtime", label: "Real-Time" },
 ];
 
 export const KALSHI_LIVE_DEFAULT_ENDPOINT_CATEGORY = "markets";
+
+/**
+ * Endpoint ids that support browser ephemeral live pulls (kalshi-live registry).
+ * @returns {Set<string>}
+ */
+export function getKalshiLiveRealtimeEndpointIds() {
+  /** @type {Set<string>} */
+  const ids = new Set();
+  for (const def of Object.values(LIVE_FEED_REGISTRY || {})) {
+    if (String(def?.integration || "") !== "kalshi-live") continue;
+    const endpoint = String(def?.endpoint || "").trim();
+    if (endpoint) ids.add(endpoint);
+  }
+  return ids;
+}
+
+/**
+ * @param {string} endpointId
+ * @returns {boolean}
+ */
+export function kalshiLiveEndpointHasRealtimeFeed(endpointId) {
+  const id = String(endpointId || "").trim();
+  if (!id) return false;
+  return getKalshiLiveRealtimeEndpointIds().has(id);
+}
 
 /** Connect home — Kalshi Live API endpoints (unauthenticated). */
 export const KALSHI_LIVE_CONNECT_ENDPOINTS = [
@@ -166,6 +195,10 @@ export const KALSHI_LIVE_CONNECT_ENDPOINTS = [
 /** @param {string} categoryId */
 export function getKalshiLiveEndpointsForCategory(categoryId) {
   const cat = String(categoryId || KALSHI_LIVE_DEFAULT_ENDPOINT_CATEGORY).trim();
+  if (cat === "realtime") {
+    const realtimeIds = getKalshiLiveRealtimeEndpointIds();
+    return KALSHI_LIVE_CONNECT_ENDPOINTS.filter((ep) => realtimeIds.has(ep.id));
+  }
   return KALSHI_LIVE_CONNECT_ENDPOINTS.filter((ep) => (ep.category || "markets") === cat);
 }
 
