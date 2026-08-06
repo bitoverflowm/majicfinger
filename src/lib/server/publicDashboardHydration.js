@@ -336,33 +336,44 @@ export async function buildPublicDashboardResponseData(dash, user) {
 }
 
 /**
- * Live dashboards refresh OHLC via /live — return chart config only so progressive
- * chart fetches stay small (active markets can have huge published snapshots).
+ * Live dashboards refresh OHLC via /live — keep chart config plus a capped seed of
+ * published history so cards are not empty before the first live tick lands.
  * @param {{ chart?: object; rows?: unknown[]; dataSheets?: Record<string, object> }} payload
+ * @param {{ seedRowCap?: number }} [opts]
  */
-export function structureOnlyLiveChartPayload(payload) {
+export function structureOnlyLiveChartPayload(payload, opts = {}) {
   if (!payload || typeof payload !== "object") return payload;
+  const seedRowCap = Math.max(0, Math.floor(Number(opts.seedRowCap)) || 360);
   /** @type {Record<string, object>} */
   const dataSheets = {};
+  let primarySeeded = [];
   for (const [sid, sheet] of Object.entries(payload.dataSheets || {})) {
     if (!sheet || typeof sheet !== "object") continue;
+    const all = Array.isArray(sheet.data) ? sheet.data : [];
+    const seeded = seedRowCap > 0 && all.length ? all.slice(-seedRowCap) : [];
+    if (!primarySeeded.length && seeded.length) primarySeeded = seeded;
     dataSheets[sid] = {
       ...sheet,
-      data: [],
-      rowCount: 0,
+      data: seeded,
+      rowCount: seeded.length,
       fullRowCount:
         typeof sheet.fullRowCount === "number"
           ? sheet.fullRowCount
           : typeof sheet.rowCount === "number"
             ? sheet.rowCount
-            : Array.isArray(sheet.data)
-              ? sheet.data.length
-              : 0,
+            : all.length,
     };
   }
+  const fallbackRows = Array.isArray(payload.rows) ? payload.rows : [];
+  const seededRows =
+    primarySeeded.length > 0
+      ? primarySeeded
+      : seedRowCap > 0 && fallbackRows.length
+        ? fallbackRows.slice(-seedRowCap)
+        : [];
   return {
     chart: payload.chart,
-    rows: [],
+    rows: seededRows,
     dataSheets,
   };
 }
@@ -392,8 +403,20 @@ export async function buildPublicDashboardChartBundle(dash, user, chartId) {
     }
   }
 
+  let seedRowCap = 360;
+  if (liveBacked) {
+    try {
+      const { resolvePublicDashboardLiveConfig } = await import("@/lib/liveFeeds/publicLiveConfig");
+      const { publicLiveSeedRowCap } = await import("@/lib/liveFeeds/publicLiveKalshiCache");
+      const cfg = await resolvePublicDashboardLiveConfig(dash);
+      seedRowCap = publicLiveSeedRowCap(cfg?.periodInterval);
+    } catch {
+      seedRowCap = 360;
+    }
+  }
+
   const maybeStripLiveRows = (chartPayload) =>
-    liveBacked ? structureOnlyLiveChartPayload(chartPayload) : chartPayload;
+    liveBacked ? structureOnlyLiveChartPayload(chartPayload, { seedRowCap }) : chartPayload;
 
   const chartDoc = await Chart.findById(cid).lean();
   if (chartHasPublishedSnapshot(chartDoc)) {

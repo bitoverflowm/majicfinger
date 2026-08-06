@@ -60,4 +60,38 @@ describe("applyLiveCandleOverlay", () => {
     expect(out.chart.rechartsBuilder.selChartType).toBe("candlestick");
     expect(out.rows).toHaveLength(1);
   });
+
+  it("merges live rows into existing seeded history by end_period_ts", () => {
+    const base = {
+      chart: {
+        chart_name: "Abdul El-Sayed",
+        rechartsBuilder: {
+          v: 1,
+          selChartType: "candlestick",
+          candlestickSheetId: "sheet-4",
+        },
+      },
+      rows: [],
+      dataSheets: {
+        "sheet-4": {
+          name: "AELS",
+          data: [
+            {
+              market_ticker: "KXSENATEMID-26-AELS",
+              end_period_ts: 1785825200,
+              price_close_dollars: 0.97,
+            },
+          ],
+        },
+      },
+    };
+    const out = applyLiveCandleOverlay(base, {
+      sheetId: "sheet-4",
+      rows: liveRows,
+      periodInterval: 1,
+    });
+    expect(out.dataSheets["sheet-4"].data).toHaveLength(2);
+    expect(out.dataSheets["sheet-4"].data[0].end_period_ts).toBe(1785825200);
+    expect(out.dataSheets["sheet-4"].data[1].end_period_ts).toBe(1785825300);
+  });
 });

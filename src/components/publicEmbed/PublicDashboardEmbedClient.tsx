@@ -153,8 +153,9 @@ export default function PublicDashboardEmbedClient({
   const [liveTick, setLiveTick] = useState<{
     charts: Record<string, { ticker: string; sheetId: string; rows: Record<string, unknown>[] }>;
     pollIntervalMs: number;
+    periodInterval: number;
     fetchedAt: number | null;
-  }>({ charts: {}, pollIntervalMs: 60_000, fetchedAt: null });
+  }>({ charts: {}, pollIntervalMs: 60_000, periodInterval: 1, fetchedAt: null });
 
   const dashboardName =
     payload?.data?.dashboard_name ||
@@ -240,6 +241,7 @@ export default function PublicDashboardEmbedClient({
           setLiveTick({
             charts: j.data.charts,
             pollIntervalMs: pollMs,
+            periodInterval: Math.floor(Number(j.data.periodInterval)) || 1,
             fetchedAt: Number(j.data.fetchedAt) || Date.now(),
           });
           if (!cancelled) {
@@ -523,6 +525,7 @@ export default function PublicDashboardEmbedClient({
                       ? {
                           sheetId: liveTick.charts[chartId].sheetId,
                           rows: liveTick.charts[chartId].rows,
+                          periodInterval: liveTick.periodInterval,
                         }
                       : null;
                   const inner = (

@@ -52,6 +52,7 @@ export {
   getCachedPublicEventCandlesticks,
   publicLiveCacheControl,
   publicLiveLookbackPeriods,
+  publicLiveSeedRowCap,
   PUBLIC_LIVE_CACHE_TTL_MS,
 } from "@/lib/liveFeeds/publicLiveKalshiCache";
 

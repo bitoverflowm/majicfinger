@@ -11,14 +11,20 @@ export const PUBLIC_LIVE_CACHE_TTL_MS = 15_000;
 
 /**
  * Candle periods to fetch for a public wall (not editor incremental lookback=3).
- * 1m → ~2h; 1h → ~5d; 1d → ~4mo.
+ * Sized so visitor charts paint with visible history instead of a flat tip.
+ * 1m → ~6h; 1h → ~7d; 1d → ~6mo.
  */
 export function publicLiveLookbackPeriods(periodIntervalMinutes) {
   const m = Math.floor(Number(periodIntervalMinutes)) || 1;
-  if (m === 1) return 120;
-  if (m === 60) return 120;
-  if (m === 1440) return 90;
-  return 120;
+  if (m === 1) return 360;
+  if (m === 60) return 168;
+  if (m === 1440) return 180;
+  return 360;
+}
+
+/** Max OHLC rows to keep on progressive chart payloads for live_backed dashboards. */
+export function publicLiveSeedRowCap(periodIntervalMinutes) {
+  return publicLiveLookbackPeriods(periodIntervalMinutes);
 }
 
 /**

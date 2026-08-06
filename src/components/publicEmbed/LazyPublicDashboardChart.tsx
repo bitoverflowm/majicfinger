@@ -37,6 +37,7 @@ type ChartLink = { mode?: string; slug?: string } | null;
 type LiveCandleOverlay = {
   sheetId: string;
   rows: Record<string, unknown>[];
+  periodInterval?: number;
 } | null;
 
 function chartPayloadHasData(chartPayload: ChartPayload | null | undefined): boolean {
