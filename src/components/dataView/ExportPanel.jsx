@@ -153,6 +153,7 @@ function ShareEmbedSection({ runOrRequestPro }) {
   const v2 = useMyStateV2();
   const userHandle = v2?.userHandle;
   const dataSheets = v2?.dataSheets || {};
+  const activeSheetId = v2?.activeSheetId;
   const loadedDataMeta = v2?.loadedDataMeta;
   const loadedChartMeta = v2?.loadedChartMeta;
   const setLoadedChartMeta = v2?.setLoadedChartMeta;
@@ -164,9 +165,13 @@ function ShareEmbedSection({ runOrRequestPro }) {
   const setRefetchChart = v2?.setRefetchChart;
   const chartSnapshotFlusher = v2?.chartSnapshotFlusher;
   const requestSaveProjectDialog = v2?.requestSaveProjectDialog;
+  const userId = user?.userId || user?._id || null;
+  const dataSetId = loadedDataMeta?._id || null;
   const hasShareableChart = useHasShareableChart();
   const { getBuilderSnapshot, getChartOgImageDataUrl } = useChartBuilder();
-  const activeChartMeta = activeChartSheetId ? (chartSheets?.[activeChartSheetId]?.chartMeta || loadedChartMeta) : loadedChartMeta;
+  const activeChartMeta = activeChartSheetId
+    ? (chartSheets?.[activeChartSheetId]?.chartMeta ?? null)
+    : loadedChartMeta;
   const activeChartSheet = activeChartSheetId ? chartSheets?.[activeChartSheetId] : null;
   const workbookChartName = useMemo(
     () => (activeChartSheet?.chartMeta?.chart_name || activeChartSheet?.name || "").trim(),
@@ -178,16 +183,17 @@ function ShareEmbedSection({ runOrRequestPro }) {
   );
 
   const publishedCharts = useMemo(() => {
-    const entries = [];
+    const byChartId = new Map();
     for (const [chartSheetId, sheet] of Object.entries(chartSheets || {})) {
       const meta = sheet?.chartMeta;
       const slug = normalizeChartEmbedSlug(meta?.public_slug || "");
       if (!meta?._id || !meta?.is_public || !slug) continue;
+      const chartId = String(meta._id);
       const sources = describeChartDataSources(sheet, dataSheets);
       const livePublish = meta.live_publish && typeof meta.live_publish === "object" ? meta.live_publish : null;
-      entries.push({
+      const entry = {
         chartSheetId,
-        chartId: String(meta._id),
+        chartId,
         name: String(meta.chart_name || sheet?.name || slug).trim() || slug,
         slug,
         live: !!meta.live_backed,
@@ -198,21 +204,30 @@ function ShareEmbedSection({ runOrRequestPro }) {
         pollIntervalMs: Math.floor(Number(livePublish?.pollIntervalMs)) || null,
         sources,
         isActive: chartSheetId === activeChartSheetId,
-        stale: isPublishedChartBundleStale(meta, loadedDataMeta),
-      });
+        stale: !meta.live_backed && isPublishedChartBundleStale(meta, loadedDataMeta),
+        liveBackedAt: meta.live_backed_at || null,
+        publishedAt: meta.published_bundle_built_at || meta.live_backed_at || null,
+      };
+      const prev = byChartId.get(chartId);
+      // One list row per Mongo chart doc. Prefer the active tab when duplicates exist.
+      if (!prev || entry.isActive) byChartId.set(chartId, entry);
     }
+    const entries = Array.from(byChartId.values());
     entries.sort((a, b) => a.name.localeCompare(b.name));
     return entries;
   }, [chartSheets, dataSheets, activeChartSheetId, loadedDataMeta]);
 
-  const syncActiveChartSheet = useCallback((chartMeta, snapshot = null) => {
-    if (!activeChartSheetId || !chartMeta) return;
-    if (snapshot) setLoadedChartBuilderSnapshot?.(snapshot);
+  const syncActiveChartSheet = useCallback((chartMeta, snapshot = null, targetSheetId = null) => {
+    const sheetId = targetSheetId || activeChartSheetId;
+    if (!sheetId || !chartMeta) return;
+    if (snapshot && (!targetSheetId || targetSheetId === activeChartSheetId)) {
+      setLoadedChartBuilderSnapshot?.(snapshot);
+    }
     setChartSheets?.((prev) => {
-      const cur = prev?.[activeChartSheetId] || { name: chartMeta.chart_name || "Chart", snapshot: null, chartMeta: null };
+      const cur = prev?.[sheetId] || { name: chartMeta.chart_name || "Chart", snapshot: null, chartMeta: null };
       return {
         ...(prev || {}),
-        [activeChartSheetId]: {
+        [sheetId]: {
           ...cur,
           name: chartMeta.chart_name || cur.name,
           chartMeta,
@@ -221,6 +236,58 @@ function ShareEmbedSection({ runOrRequestPro }) {
       };
     });
   }, [activeChartSheetId, setChartSheets, setLoadedChartBuilderSnapshot]);
+
+  /** Create a dedicated Chart document for a tab (never reuse another tab's _id). */
+  const ensureOwnChartDocument = useCallback(
+    async ({ sheetId, sheets, snapshot } = {}) => {
+      const id = sheetId || activeChartSheetId;
+      const sheet = id ? sheets?.[id] || chartSheets?.[id] : null;
+      const name =
+        String(sheet?.name || sheet?.chartMeta?.chart_name || workbookChartName || "Chart").trim() || "Chart";
+      const snap =
+        snapshot ||
+        sheet?.snapshot ||
+        (typeof getBuilderSnapshot === "function" ? getBuilderSnapshot() : null) ||
+        {};
+      if (!userId || !dataSetId) {
+        toast.error("Save the project before publishing this chart.");
+        return null;
+      }
+      const createRes = await fetch("/api/charts", {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          chart_name: name,
+          chart_properties: [{ title: name, rechartsBuilder: snap }],
+          created_date: new Date(),
+          last_saved_date: new Date(),
+          labels: ["export"],
+          user_id: userId,
+          data_set_id: dataSetId,
+        }),
+      });
+      const createJson = await createRes.json();
+      const saved = createJson?.data || null;
+      if (!createRes.ok || !saved?._id) {
+        toast.error(createJson?.message || "Could not create a chart document to publish.");
+        return null;
+      }
+      if (!id || id === activeChartSheetId) setLoadedChartMeta?.(saved);
+      syncActiveChartSheet(saved, snap, id);
+      return saved;
+    },
+    [
+      activeChartSheetId,
+      chartSheets,
+      workbookChartName,
+      getBuilderSnapshot,
+      userId,
+      dataSetId,
+      setLoadedChartMeta,
+      syncActiveChartSheet,
+    ],
+  );
 
   const capturePublishSnapshot = useCallback(async () => {
     if (typeof chartSnapshotFlusher === "function") {
@@ -284,6 +351,7 @@ function ShareEmbedSection({ runOrRequestPro }) {
       chart: activeChartMeta,
       dataSheets,
       liveFeedSource: loadedDataMeta?.live_feed_source,
+      preferredSheetId: activeSheetId,
     });
   }, [
     getBuilderSnapshot,
@@ -291,6 +359,7 @@ function ShareEmbedSection({ runOrRequestPro }) {
     activeChartMeta,
     dataSheets,
     loadedDataMeta?.live_feed_source,
+    activeSheetId,
     // Recompute when axes/type likely change via sheet registration
     activeChartSheetId,
     hasShareableChart,
@@ -425,8 +494,21 @@ function ShareEmbedSection({ runOrRequestPro }) {
           : {};
       const snapshotRaw = await capturePublishSnapshot();
       const snapshot =
-        stampChartSnapshotForLivePublish(snapshotRaw, dataSheets) || snapshotRaw || {};
+        stampChartSnapshotForLivePublish(snapshotRaw, dataSheets, {
+          preferredSheetId: activeSheetId,
+        }) ||
+        snapshotRaw ||
+        {};
       const publishChartName = (workbookChartName || full.chart_name || "").trim() || "Chart";
+      // Keep the on-canvas title when the user set one; fall back to chart/tab name.
+      const snapshotTitle = String(snapshot?.title || "").trim();
+      const defaultTitle = /^(your amazing title)?$/i.test(snapshotTitle);
+      if (!snapshotTitle || defaultTitle) {
+        snapshot.title = publishChartName;
+      }
+      if (snapshot.titleHidden == null || defaultTitle) {
+        snapshot.titleHidden = false;
+      }
       const chart_properties = [{ ...prev0, title: publishChartName, rechartsBuilder: snapshot }];
       const ogImageUrl = await uploadOgImage(chartId);
 
@@ -436,6 +518,7 @@ function ShareEmbedSection({ runOrRequestPro }) {
               snapshot,
               dataSheets,
               liveFeedSource: loadedDataMeta?.live_feed_source,
+              preferredSheetId: activeSheetId,
             })
           : { eligible: false, config: null };
       const livePublishConfig = livePublish || resolvedLive.config;
@@ -492,6 +575,7 @@ function ShareEmbedSection({ runOrRequestPro }) {
       runChartPublishCache,
       dataSheets,
       loadedDataMeta?.live_feed_source,
+      activeSheetId,
     ],
   );
 
@@ -534,9 +618,28 @@ function ShareEmbedSection({ runOrRequestPro }) {
     requestSaveProjectDialog({
       intent: "publish-chart",
       onSuccess: async ({ chartSheets: sheets, activeChartSheetId: sheetId } = {}) => {
-        const fromActive = sheetId ? sheets?.[sheetId]?.chartMeta : null;
-        const fromShareable = Object.values(sheets || {}).find((s) => s?.chartMeta?._id)?.chartMeta;
-        const chartId = fromActive?._id || fromShareable?._id || activeChartMeta?._id;
+        const id = sheetId || activeChartSheetId;
+        const fromActive = id ? sheets?.[id]?.chartMeta : null;
+        const activeDocId = fromActive?._id != null ? String(fromActive._id) : "";
+        // If another chart tab already owns this Mongo _id, create a new document.
+        const sharedWithOtherTab =
+          !!activeDocId &&
+          Object.entries(sheets || {}).some(
+            ([otherId, s]) =>
+              otherId !== id &&
+              s?.chartMeta?._id != null &&
+              String(s.chartMeta._id) === activeDocId,
+          );
+        let chartId = activeDocId && !sharedWithOtherTab ? activeDocId : null;
+        if (!chartId) {
+          const created = await ensureOwnChartDocument({
+            sheetId: id,
+            sheets,
+            snapshot: sheets?.[id]?.snapshot,
+          });
+          chartId = created?._id ? String(created._id) : null;
+        }
+        if (!chartId) return;
         await publishChartById(chartId, slug, {
           live: wantLive,
           livePublish: liveEligibility.config,
@@ -550,7 +653,8 @@ function ShareEmbedSection({ runOrRequestPro }) {
     checkSlugNow,
     requestSaveProjectDialog,
     publishChartById,
-    activeChartMeta?._id,
+    activeChartSheetId,
+    ensureOwnChartDocument,
     publishMode,
     liveEligibility,
   ]);
@@ -587,8 +691,25 @@ function ShareEmbedSection({ runOrRequestPro }) {
       return;
     }
 
+    const activeDocId = String(activeChartMeta._id);
+    const sharedWithOtherTab = Object.entries(chartSheets || {}).some(
+      ([otherId, s]) =>
+        otherId !== activeChartSheetId &&
+        s?.chartMeta?._id != null &&
+        String(s.chartMeta._id) === activeDocId,
+    );
+    let chartId = activeDocId;
+    if (sharedWithOtherTab) {
+      const created = await ensureOwnChartDocument({
+        sheetId: activeChartSheetId,
+        sheets: chartSheets,
+      });
+      if (!created?._id) return;
+      chartId = String(created._id);
+    }
+
     // Overwrite public flags (static ↔ live) and rebuild seed/snapshot.
-    await publishChartById(activeChartMeta._id, slug, {
+    await publishChartById(chartId, slug, {
       live: wantLive,
       livePublish: liveEligibility.config,
     });
@@ -602,6 +723,9 @@ function ShareEmbedSection({ runOrRequestPro }) {
     liveEligibility,
     checkSlugNow,
     publishChartById,
+    chartSheets,
+    activeChartSheetId,
+    ensureOwnChartDocument,
   ]);
 
   const copyText = useCallback(async (text, label) => {
@@ -615,7 +739,6 @@ function ShareEmbedSection({ runOrRequestPro }) {
 
   const deleteEmbed = useCallback(async () => {
     const chartId = deleteTarget?.chartId || activeChartMeta?._id;
-    const chartSheetId = deleteTarget?.chartSheetId || activeChartSheetId;
     if (!chartId) return;
     try {
       setIsDeletingEmbed(true);
@@ -644,22 +767,21 @@ function ShareEmbedSection({ runOrRequestPro }) {
               live_backed_at: undefined,
             }
           : meta;
-      if (String(activeChartMeta?._id || "") === String(chartId)) {
+      const chartIdStr = String(chartId);
+      if (String(activeChartMeta?._id || "") === chartIdStr) {
         setLoadedChartMeta?.((prev) => clearMeta(prev));
       }
-      if (chartSheetId) {
-        setChartSheets?.((prev) => {
-          const cur = prev?.[chartSheetId];
-          if (!cur?.chartMeta) return prev;
-          return {
-            ...(prev || {}),
-            [chartSheetId]: {
-              ...cur,
-              chartMeta: clearMeta(cur.chartMeta),
-            },
-          };
-        });
-      }
+      // Clear publish flags on every tab that pointed at this document.
+      setChartSheets?.((prev) => {
+        const next = { ...(prev || {}) };
+        let changed = false;
+        for (const [sid, cur] of Object.entries(next)) {
+          if (!cur?.chartMeta?._id || String(cur.chartMeta._id) !== chartIdStr) continue;
+          next[sid] = { ...cur, chartMeta: clearMeta(cur.chartMeta) };
+          changed = true;
+        }
+        return changed ? next : prev;
+      });
       setRefetchChart?.(1);
       setShowDeleteEmbedDialog(false);
       setDeleteTarget(null);
@@ -672,7 +794,6 @@ function ShareEmbedSection({ runOrRequestPro }) {
   }, [
     deleteTarget,
     activeChartMeta?._id,
-    activeChartSheetId,
     setChartSheets,
     setLoadedChartMeta,
     setRefetchChart,
@@ -681,10 +802,24 @@ function ShareEmbedSection({ runOrRequestPro }) {
   const focusPublishedChart = useCallback(
     (chartSheetId) => {
       if (!chartSheetId || chartSheetId === activeChartSheetId) return;
+      // Full activate (same as chart tab switch) so loadedChartMeta matches this tab.
+      if (typeof chartSnapshotFlusher === "function") {
+        void chartSnapshotFlusher();
+      }
+      const next = chartSheets?.[chartSheetId];
       setActiveChartSheetId?.(chartSheetId);
+      setLoadedChartBuilderSnapshot?.(next?.snapshot ?? null);
+      setLoadedChartMeta?.(next?.chartMeta ?? null);
       toast.message("Switched to that chart — edit publish settings below");
     },
-    [activeChartSheetId, setActiveChartSheetId],
+    [
+      activeChartSheetId,
+      chartSheets,
+      chartSnapshotFlusher,
+      setActiveChartSheetId,
+      setLoadedChartBuilderSnapshot,
+      setLoadedChartMeta,
+    ],
   );
 
   return (
@@ -782,9 +917,19 @@ function ShareEmbedSection({ runOrRequestPro }) {
           <Progress value={publishCacheProgress} className="h-1.5" />
         </div>
       ) : null}
-      {isPublishedForCurrentSlug && publishBundleStale ? (
+      {isPublishedForCurrentSlug && !activeChartMeta?.live_backed && publishBundleStale ? (
         <p className="text-[10px] font-medium text-amber-600 dark:text-amber-400">
           Project data changed since last publish — republish to update the public chart.
+        </p>
+      ) : null}
+      {isPublishedForCurrentSlug && activeChartMeta?.live_backed ? (
+        <p className="text-[10px] text-muted-foreground">
+          Live embed · visitors get fresh ticks on open
+          {activeChartMeta?.published_bundle_built_at || activeChartMeta?.live_backed_at
+            ? ` · seed published ${new Date(
+                activeChartMeta.published_bundle_built_at || activeChartMeta.live_backed_at,
+              ).toLocaleString()}`
+            : ""}
         </p>
       ) : null}
       {isPublishedForCurrentSlug && publishLiveLake ? (
@@ -805,7 +950,7 @@ function ShareEmbedSection({ runOrRequestPro }) {
           </p>
           <Input
             id="embed-slug"
-            className="h-8 w-[92px] shrink-0 text-xs"
+            className="h-8 min-w-0 flex-1 text-xs"
             value={slugInput}
             onChange={(e) => setSlugInput(e.target.value)}
             placeholder="my-chart"
@@ -837,7 +982,7 @@ function ShareEmbedSection({ runOrRequestPro }) {
                   <Button
                     type="button"
                     variant={
-                      publishBundleStale ||
+                      (!activeChartMeta?.live_backed && publishBundleStale) ||
                       publishMode !== (activeChartMeta?.live_backed ? "live" : "static")
                         ? "default"
                         : "outline"
@@ -1064,8 +1209,13 @@ function ShareEmbedSection({ runOrRequestPro }) {
                               {item.liveTickers.join(", ")}
                             </span>
                           ) : null}
+                          {item.live && item.publishedAt ? (
+                            <span className="ml-1 text-muted-foreground">
+                              · seed {new Date(item.publishedAt).toLocaleString()}
+                            </span>
+                          ) : null}
                           {item.stale ? (
-                            <span className="ml-1 text-amber-600 dark:text-amber-400">· stale</span>
+                            <span className="ml-1 text-amber-600 dark:text-amber-400">· republish</span>
                           ) : null}
                         </p>
                       </div>

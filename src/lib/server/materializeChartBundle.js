@@ -209,6 +209,8 @@ export async function materializeChartBundle({
 
 /**
  * Build a public API payload from a stored published bundle on a chart document.
+ * Prefers the live Chart document snapshot for structure (title, candle sheet id) so
+ * stale bundles cannot point the embed at the wrong market sheet.
  * @param {object} chartLean
  */
 export function publicPayloadFromPublishedBundle(chartLean) {
@@ -224,23 +226,57 @@ export function publicPayloadFromPublishedBundle(chartLean) {
     Object.values(dataSheets).some((s) => Array.isArray(s?.data) && s.data.length > 0);
   if (!hasData) return null;
 
-  const rb = bundle.rechartsBuilder || bundle.chart?.rechartsBuilder;
-  const scopedSheets = dataSheetsReferencedBySnapshot(dataSheets, rb);
-  const normalizedRb = normalizeBuilderSnapshot(rb, rows, scopedSheets);
+  const cp0 =
+    Array.isArray(chartLean?.chart_properties) && chartLean.chart_properties[0]
+      ? chartLean.chart_properties[0]
+      : null;
+  const docRb =
+    cp0?.rechartsBuilder && cp0.rechartsBuilder.v === 1 ? cp0.rechartsBuilder : null;
+  const bundleRb = bundle.rechartsBuilder || bundle.chart?.rechartsBuilder || null;
+  // Document snapshot wins for title / candle sheet / axes — bundle rows still provide data.
+  const rbMerged = docRb
+    ? { ...(bundleRb && typeof bundleRb === "object" ? bundleRb : {}), ...docRb }
+    : bundleRb;
+
+  const liveSheetIds = Array.isArray(chartLean?.live_publish?.params?.sheetIds)
+    ? chartLean.live_publish.params.sheetIds.map((s) => String(s || "").trim()).filter(Boolean)
+    : [];
+  const candleId = String(rbMerged?.candlestickSheetId || "").trim();
+  const requiredIds = [...new Set([...(candleId ? [candleId] : []), ...liveSheetIds])];
+  if (
+    chartLean?.live_backed &&
+    requiredIds.length &&
+    requiredIds.some((id) => !Array.isArray(dataSheets?.[id]?.data) || !dataSheets[id].data.length)
+  ) {
+    // Bundle was built against the wrong sheet (e.g. stamped to sheet-1 while chart uses sheet-2).
+    // Force rematerialize from the dataset instead of serving mismatched seed + live overlay.
+    return null;
+  }
+
+  const scopedSheets = dataSheetsReferencedBySnapshot(dataSheets, rbMerged);
+  const primaryRows =
+    (candleId && Array.isArray(scopedSheets?.[candleId]?.data) && scopedSheets[candleId].data) ||
+    rows;
+  const normalizedRb = normalizeBuilderSnapshot(rbMerged, primaryRows, scopedSheets);
 
   return {
     chart: {
       ...bundle.chart,
+      chart_name: chartLean.chart_name || bundle.chart.chart_name,
       rechartsBuilder: normalizedRb,
       chart_properties: Array.isArray(bundle.chart.chart_properties)
         ? bundle.chart.chart_properties.map((cp, idx) =>
             idx === 0 && cp && typeof cp === "object"
-              ? { ...cp, rechartsBuilder: normalizedRb }
+              ? {
+                  ...cp,
+                  ...(cp0 && typeof cp0 === "object" ? { title: cp0.title ?? cp.title } : {}),
+                  rechartsBuilder: normalizedRb,
+                }
               : cp,
           )
         : bundle.chart.chart_properties,
     },
-    rows,
+    rows: primaryRows,
     dataSheets: scopedSheets,
     _cacheHit: true,
   };

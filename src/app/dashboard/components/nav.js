@@ -607,11 +607,16 @@ const Nav = () => {
   const saveAllChartsForProject = async (dataSetId, forceCreate = false, chartSheetsForSave = chartSheets) => {
     const entries = Object.entries(chartSheetsForSave || {});
     const nextSheets = {};
+    // One Mongo chart document per workbook chart tab. If two tabs incorrectly share
+    // the same _id, only the first keeps it; the rest get new documents.
+    const claimedChartDocIds = new Set();
     for (let idx = 0; idx < entries.length; idx += 1) {
       const [chartId, sheet] = entries[idx];
       const chartMeta = sheet?.chartMeta || null;
       const chartName = sheet?.name || chartMeta?.chart_name || `Chart ${idx + 1}`;
       const hasExistingChart = !!chartMeta?._id;
+      const docIdKey = chartMeta?._id != null ? String(chartMeta._id) : "";
+      const docAlreadyClaimed = !!docIdKey && claimedChartDocIds.has(docIdKey);
       if (!hasExistingChart && isPlaceholderChartSheet(sheet, idx)) continue;
 
       const chartProps = chartMeta?.chart_properties;
@@ -621,7 +626,7 @@ const Nav = () => {
       const snapshot =
         sheet?.snapshot ||
         snapshotFromMeta ||
-        (hasExistingChart ? inferDefaultBuilderSnapshot(connectedData || []) : null);
+        (hasExistingChart && !docAlreadyClaimed ? inferDefaultBuilderSnapshot(connectedData || []) : null);
       const hasChartState = !!snapshot && (snapshot.selX || (Array.isArray(snapshot.selY) && snapshot.selY.length));
       const hasNamedChart = String(chartName || "").trim() !== "" && String(chartName || "").trim() !== `Chart ${idx + 1}`;
       if (!hasChartState && !hasNamedChart && !hasExistingChart) continue;
@@ -630,7 +635,8 @@ const Nav = () => {
         : chartMeta?.chart_properties?.rechartsBuilder;
       const chartNameUnchanged = String(chartMeta?.chart_name || chartName) === String(chartName);
       const chartSnapshotUnchanged = JSON.stringify(previousSnapshot || null) === JSON.stringify(snapshot || null);
-      if (!forceCreate && hasExistingChart && chartNameUnchanged && chartSnapshotUnchanged) {
+      if (!forceCreate && hasExistingChart && !docAlreadyClaimed && chartNameUnchanged && chartSnapshotUnchanged) {
+        claimedChartDocIds.add(docIdKey);
         nextSheets[chartId] = {
           ...(sheet || {}),
           name: chartName,
@@ -647,7 +653,11 @@ const Nav = () => {
       };
 
       let saved = null;
-      const canUpdateExisting = !forceCreate && chartMeta?._id && String(chartMeta?.data_set_id || dataSetId) === String(dataSetId);
+      const canUpdateExisting =
+        !forceCreate &&
+        !docAlreadyClaimed &&
+        chartMeta?._id &&
+        String(chartMeta?.data_set_id || dataSetId) === String(dataSetId);
       if (canUpdateExisting) {
         const updateRes = await fetch(`/api/charts/chart/${chartMeta._id}`, {
           method: 'PUT',
@@ -670,6 +680,9 @@ const Nav = () => {
         const createJson = await createRes.json();
         saved = createJson?.data || null;
       }
+
+      if (saved?._id) claimedChartDocIds.add(String(saved._id));
+      else if (canUpdateExisting && docIdKey) claimedChartDocIds.add(docIdKey);
 
       nextSheets[chartId] = {
         ...(sheet || {}),

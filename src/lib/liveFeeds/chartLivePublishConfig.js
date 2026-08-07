@@ -76,15 +76,22 @@ export function chartReferencedSheetIds(dataSheets, snapshot) {
 
 /**
  * Ensure candlestick snapshots persist an explicit sheet id (not "") for public embeds.
+ * Prefer the editor's active data sheet when the chart uses "active sheet" mode.
  * @param {Record<string, unknown> | null | undefined} snapshot
  * @param {Record<string, object> | null | undefined} dataSheets
+ * @param {{ preferredSheetId?: string | null }} [opts]
  */
-export function stampChartSnapshotForLivePublish(snapshot, dataSheets) {
+export function stampChartSnapshotForLivePublish(snapshot, dataSheets, opts = {}) {
   if (!snapshot || typeof snapshot !== "object") return snapshot || null;
   const next = { ...snapshot };
   if (String(next.selChartType || "") !== "candlestick") return next;
   if (String(next.candlestickSheetId || "").trim()) return next;
   const sheets = dataSheets && typeof dataSheets === "object" ? dataSheets : {};
+  const preferred = String(opts.preferredSheetId || "").trim();
+  if (preferred && sheets[preferred]) {
+    next.candlestickSheetId = preferred;
+    return next;
+  }
   const primary = primarySheetIdForChartSnapshot(sheets, next);
   if (primary && sheets[primary]) {
     next.candlestickSheetId = primary;
@@ -202,6 +209,7 @@ export function buildChartLivePublishConfig(opts = {}) {
   const stamped = stampChartSnapshotForLivePublish(
     readChartBuilderSnapshot(opts.snapshot) || readChartBuilderSnapshot(opts.chart),
     opts.dataSheets,
+    { preferredSheetId: opts.preferredSheetId },
   );
   const snapshot = stamped;
   const dataSheets = opts.dataSheets && typeof opts.dataSheets === "object" ? opts.dataSheets : {};

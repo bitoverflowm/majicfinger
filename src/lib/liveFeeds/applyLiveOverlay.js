@@ -18,9 +18,28 @@ export function applyLiveOverlay(basePayload, tick) {
   const kind = tick.overlayKind || "sheet_rows";
   const periodInterval = Math.floor(Number(tick.params?.periodInterval)) || 1;
 
+  /** @type {Record<string, Record<string, unknown>[]>} */
+  let tickSheets = { ...tick.sheets };
+  // If publish stamped the wrong sheet id into the seed but live_publish is correct (or
+  // vice versa), remap a single-sheet tick onto the chart's candlestick sheet.
+  const rb =
+    basePayload?.chart?.rechartsBuilder?.v === 1
+      ? basePayload.chart.rechartsBuilder
+      : Array.isArray(basePayload?.chart?.chart_properties) &&
+          basePayload.chart.chart_properties[0]?.rechartsBuilder?.v === 1
+        ? basePayload.chart.chart_properties[0].rechartsBuilder
+        : null;
+  const candleId = String(rb?.candlestickSheetId || "").trim();
+  if (candleId && !Array.isArray(tickSheets[candleId])) {
+    const keys = Object.keys(tickSheets);
+    if (keys.length === 1) {
+      tickSheets = { [candleId]: tickSheets[keys[0]] };
+    }
+  }
+
   if (kind === "candlestick_ohlc") {
     let next = basePayload;
-    for (const [sheetId, rows] of Object.entries(tick.sheets)) {
+    for (const [sheetId, rows] of Object.entries(tickSheets)) {
       if (!Array.isArray(rows) || !rows.length) continue;
       next = applyLiveCandleOverlay(next, {
         sheetId,
@@ -39,7 +58,7 @@ export function applyLiveOverlay(basePayload, tick) {
       : {};
   let primaryRows = Array.isArray(basePayload.rows) ? [...basePayload.rows] : [];
 
-  for (const [sheetId, rows] of Object.entries(tick.sheets)) {
+  for (const [sheetId, rows] of Object.entries(tickSheets)) {
     if (!Array.isArray(rows)) continue;
     const sid = String(sheetId || "").trim();
     if (!sid) continue;

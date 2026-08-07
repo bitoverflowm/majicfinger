@@ -111,6 +111,35 @@ test("empty candlestickSheetId scopes live publish to the primary sheet only", (
   assert.equal(cfg?.params.sheetIds?.[0], "sheet-1");
 });
 
+test("preferredSheetId stamps the active market sheet for empty candle id", () => {
+  const dataSheets = {
+    "sheet-meta": {
+      name: "markets",
+      data: [],
+      provenance: {
+        source: "kalshi-live",
+        endpoint: "event_candlesticks",
+        sheetKind: "markets_metadata",
+        eventTicker: "KXEVENT",
+        seriesTicker: "KXSERIES",
+      },
+    },
+    "sheet-1": candleSheet("KX-A"),
+    "sheet-2": candleSheet("KX-B"),
+  };
+  const cfg = buildChartLivePublishConfig({
+    snapshot: {
+      v: 1,
+      selChartType: "candlestick",
+      candlestickSheetId: "",
+    },
+    dataSheets,
+    preferredSheetId: "sheet-2",
+  });
+  assert.deepEqual(cfg?.params.marketTickers, ["KX-B"]);
+  assert.equal(cfg?.params.sheetIds?.[0], "sheet-2");
+});
+
 test("uses candlestick_ohlc overlay for candlestick charts", () => {
   const dataSheets = {
     "sheet-meta": {

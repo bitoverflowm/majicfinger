@@ -1794,13 +1794,25 @@ export function ChartBuilderProvider({ demo, children, initialBuilderSnapshot, e
   };
 
   const getBuilderSnapshot = useCallback(
-    () => ({
-      v: 1,
-      ...builderStateRef.current,
-      chartLineFilters: normalizeChartLineFilters(chartLineFilters),
-      referenceLines: normalizeReferenceLines(referenceLines),
-    }),
-    [chartLineFilters, referenceLines],
+    () => {
+      const state = { ...(builderStateRef.current || {}) };
+      // Empty candlestickSheetId means "use active data sheet". Persist the resolved id so
+      // publish/live embeds don't bind the workbook's first sheet (wrong market) by accident.
+      if (
+        String(state.selChartType || "") === "candlestick" &&
+        !String(state.candlestickSheetId || "").trim()
+      ) {
+        const active = String(contextStateV2?.activeSheetId || "").trim();
+        if (active) state.candlestickSheetId = active;
+      }
+      return {
+        v: 1,
+        ...state,
+        chartLineFilters: normalizeChartLineFilters(chartLineFilters),
+        referenceLines: normalizeReferenceLines(referenceLines),
+      };
+    },
+    [chartLineFilters, referenceLines, contextStateV2?.activeSheetId],
   );
   useEffect(() => {
     if (typeof onSnapshotGetterReady !== "function") return;

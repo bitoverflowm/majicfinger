@@ -1328,12 +1328,18 @@ export default function DataSheetWithIntegration({
     if (!loadedChartMeta && !loadedChartBuilderSnapshot) return;
     setChartSheets?.((prev) => {
       const cur = prev?.[activeChartSheetId] || { name: "Chart", snapshot: null, chartMeta: null };
+      const curId = cur.chartMeta?._id != null ? String(cur.chartMeta._id) : "";
+      const loadedId = loadedChartMeta?._id != null ? String(loadedChartMeta._id) : "";
+      // Only sync meta when this tab already owns that chart document. Never attach a
+      // foreign chart _id onto a tab that has none / a different id (multi-chart publish bug).
+      const metaMatches =
+        !!loadedChartMeta && !!curId && !!loadedId && curId === loadedId;
       return {
         ...(prev || {}),
         [activeChartSheetId]: {
           ...cur,
-          name: loadedChartMeta?.chart_name || cur.name,
-          chartMeta: loadedChartMeta || cur.chartMeta || null,
+          name: metaMatches ? loadedChartMeta?.chart_name || cur.name : cur.name,
+          chartMeta: metaMatches ? loadedChartMeta : cur.chartMeta || null,
           // Prefer in-memory chartSheets snapshot — it is flushed from the live builder and may include
           // edits (e.g. chartLineFilters) that loadedChartBuilderSnapshot has not caught up with yet.
           snapshot: cur.snapshot ?? loadedChartBuilderSnapshot ?? null,
