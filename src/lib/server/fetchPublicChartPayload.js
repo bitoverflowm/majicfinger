@@ -5,12 +5,15 @@ import User from "@/models/Users";
 import { buildPublicChartBundle } from "@/lib/chartBundle";
 import { hydrateDataSetForPublicChartViewer } from "@/lib/server/hydratePublicChartDataset";
 import { publicPayloadFromPublishedBundle } from "@/lib/server/materializeChartBundle";
+import {
+  sanitizeChartLivePublish,
+  seedPublicChartLivePayload,
+} from "@/lib/liveFeeds/publicChartLivePublish";
 
 /**
  * Load public chart payload server-side (same shape as GET /api/public/charts/[username]/[slug]).
  * @param {string} username
  * @param {string} slug
- * @returns {Promise<{ chart: object; rows: unknown[]; dataSheets: object; owner_handle: string; owner_name: string | null; owner_profile_pic: string | null } | null>}
  */
 export async function fetchPublicChartPayload(username, slug) {
   const u = String(username || "").trim();
@@ -31,15 +34,25 @@ export async function fetchPublicChartPayload(username, slug) {
     }).lean();
     if (!chart) return null;
 
+    const liveBacked = !!chart.live_backed;
+    const livePublish = sanitizeChartLivePublish(chart.live_publish);
+    const liveFlags = {
+      live_backed: liveBacked,
+      live_poll_interval_ms: liveBacked ? livePublish?.pollIntervalMs || null : null,
+      live_overlay_kind: liveBacked ? livePublish?.overlayKind || null : null,
+    };
+
     const cached = publicPayloadFromPublishedBundle(chart);
     if (cached) {
+      const seeded = liveBacked ? seedPublicChartLivePayload(cached, chart.live_publish) : cached;
       return {
-        chart: cached.chart,
-        rows: cached.rows,
-        dataSheets: cached.dataSheets,
+        chart: seeded.chart,
+        rows: seeded.rows,
+        dataSheets: seeded.dataSheets,
         owner_handle: user.user_name ? String(user.user_name) : u,
         owner_name: user.name ? String(user.name) : null,
         owner_profile_pic: user.profile_pic ? String(user.profile_pic) : null,
+        ...liveFlags,
       };
     }
 
@@ -47,15 +60,17 @@ export async function fetchPublicChartPayload(username, slug) {
     if (!dataSetRaw) return null;
 
     const dataSet = await hydrateDataSetForPublicChartViewer(chart, dataSetRaw);
-    const { chart: publicChart, rows, dataSheets } = buildPublicChartBundle(chart, dataSet);
+    const bundle = buildPublicChartBundle(chart, dataSet);
+    const seeded = liveBacked ? seedPublicChartLivePayload(bundle, chart.live_publish) : bundle;
 
     return {
-      chart: publicChart,
-      rows,
-      dataSheets,
+      chart: seeded.chart,
+      rows: seeded.rows,
+      dataSheets: seeded.dataSheets,
       owner_handle: user.user_name ? String(user.user_name) : u,
       owner_name: user.name ? String(user.name) : null,
       owner_profile_pic: user.profile_pic ? String(user.profile_pic) : null,
+      ...liveFlags,
     };
   } catch (err) {
     console.error("[fetchPublicChartPayload]", u, s, err);

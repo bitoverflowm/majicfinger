@@ -46,6 +46,21 @@ export {
 } from "@/lib/liveFeeds/publicLiveConfig";
 
 export {
+  buildChartLivePublishConfig,
+  resolveChartLiveEligibility,
+  sanitizeChartLivePublish,
+  liveBackedChartFields,
+  readChartBuilderSnapshot,
+} from "@/lib/liveFeeds/chartLivePublishConfig";
+
+export {
+  fetchPublicChartLiveTick,
+  seedPublicChartLivePayload,
+} from "@/lib/liveFeeds/publicChartLivePublish";
+
+export { applyLiveOverlay } from "@/lib/liveFeeds/applyLiveOverlay";
+
+export {
   startEventCandlesticksEditorLiveFeed,
   startMarketCandlesticksEditorLiveFeed,
   maybeAutoStartPublishedProjectLiveFeed,

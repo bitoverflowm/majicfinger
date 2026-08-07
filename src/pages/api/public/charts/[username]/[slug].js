@@ -9,6 +9,23 @@ import {
   publicChartCacheControl,
   publicPayloadFromPublishedBundle,
 } from "@/lib/server/materializeChartBundle";
+import {
+  sanitizeChartLivePublish,
+  seedPublicChartLivePayload,
+} from "@/lib/liveFeeds/publicChartLivePublish";
+
+function withLiveFlags(data, chart) {
+  const liveBacked = !!chart?.live_backed;
+  const livePublish = sanitizeChartLivePublish(chart?.live_publish);
+  return {
+    ...data,
+    live_backed: liveBacked,
+    live_poll_interval_ms: liveBacked
+      ? livePublish?.pollIntervalMs || null
+      : null,
+    live_overlay_kind: liveBacked ? livePublish?.overlayKind || null : null,
+  };
+}
 
 export default async function handler(req, res) {
   const { username, slug } = req.query;
@@ -42,38 +59,60 @@ export default async function handler(req, res) {
       return res.status(404).json({ success: false, message: "Dataset not found" });
     }
 
+    const owner = {
+      owner_handle: user.user_name ? String(user.user_name) : String(username || "").trim(),
+      owner_name: user.name ? String(user.name) : null,
+      owner_profile_pic: user.profile_pic ? String(user.profile_pic) : null,
+    };
+
     const cached = publicPayloadFromPublishedBundle(chart);
     if (cached) {
-      res.setHeader("Cache-Control", publicChartCacheControl(true));
+      const seeded = chart.live_backed
+        ? seedPublicChartLivePayload(cached, chart.live_publish)
+        : cached;
+      res.setHeader(
+        "Cache-Control",
+        chart.live_backed
+          ? "public, s-maxage=30, stale-while-revalidate=60"
+          : publicChartCacheControl(true),
+      );
       return res.status(200).json({
         success: true,
-        data: {
-          chart: cached.chart,
-          rows: cached.rows,
-          dataSheets: cached.dataSheets,
-          owner_handle: user.user_name ? String(user.user_name) : String(username || "").trim(),
-          owner_name: user.name ? String(user.name) : null,
-          owner_profile_pic: user.profile_pic ? String(user.profile_pic) : null,
-          live_backed: false,
-        },
+        data: withLiveFlags(
+          {
+            chart: seeded.chart,
+            rows: seeded.rows,
+            dataSheets: seeded.dataSheets,
+            ...owner,
+          },
+          chart,
+        ),
       });
     }
 
     const dataSet = await hydrateDataSetForPublicChartViewer(chart, dataSetRaw);
-    const { chart: publicChart, rows, dataSheets } = buildPublicChartBundle(chart, dataSet);
+    const bundle = buildPublicChartBundle(chart, dataSet);
+    const seeded = chart.live_backed
+      ? seedPublicChartLivePayload(bundle, chart.live_publish)
+      : bundle;
 
-    res.setHeader("Cache-Control", publicChartCacheControl(chartHasPublishedSnapshot(chart)));
+    res.setHeader(
+      "Cache-Control",
+      chart.live_backed
+        ? "public, s-maxage=30, stale-while-revalidate=60"
+        : publicChartCacheControl(chartHasPublishedSnapshot(chart)),
+    );
     return res.status(200).json({
       success: true,
-      data: {
-        chart: publicChart,
-        rows,
-        dataSheets,
-        owner_handle: user.user_name ? String(user.user_name) : String(username || "").trim(),
-        owner_name: user.name ? String(user.name) : null,
-        owner_profile_pic: user.profile_pic ? String(user.profile_pic) : null,
-        live_backed: false,
-      },
+      data: withLiveFlags(
+        {
+          chart: seeded.chart,
+          rows: seeded.rows,
+          dataSheets: seeded.dataSheets,
+          ...owner,
+        },
+        chart,
+      ),
     });
   } catch (e) {
     return res.status(500).json({ success: false, message: e.message || "Server error" });

@@ -37,6 +37,7 @@ import {
   embedSlugStatusMessage,
   useEmbedSlugAvailability,
 } from "@/hooks/useEmbedSlugAvailability";
+import { resolveChartLiveEligibility } from "@/lib/liveFeeds/chartLivePublishConfig";
 import { Progress } from "@/components/ui/progress";
 
 function getColKeys(connectedCols) {
@@ -163,6 +164,7 @@ function ShareEmbedSection({ runOrRequestPro }) {
   }, [getChartOgImageDataUrl]);
 
   const [slugInput, setSlugInput] = useState("");
+  const [publishMode, setPublishMode] = useState("static"); // "static" | "live"
   const [showDeleteEmbedDialog, setShowDeleteEmbedDialog] = useState(false);
   const [isPublishingCache, setIsPublishingCache] = useState(false);
   const [publishCacheProgress, setPublishCacheProgress] = useState(0);
@@ -182,6 +184,39 @@ function ShareEmbedSection({ runOrRequestPro }) {
     }
     setSlugInput(normalizeChartEmbedSlug(workbookChartName || activeChartMeta?.chart_name || "chart") || "chart");
   }, [activeChartMeta?._id, activeChartMeta?.chart_name, activeChartMeta?.public_slug, workbookChartName]);
+
+  useEffect(() => {
+    if (activeChartMeta?.live_backed) setPublishMode("live");
+    else setPublishMode("static");
+  }, [activeChartMeta?._id, activeChartMeta?.live_backed]);
+
+  const liveEligibility = useMemo(() => {
+    const snapshot =
+      (typeof getBuilderSnapshot === "function" ? getBuilderSnapshot() : null) ||
+      activeChartSheet?.snapshot ||
+      null;
+    return resolveChartLiveEligibility({
+      snapshot,
+      chart: activeChartMeta,
+      dataSheets,
+      liveFeedSource: loadedDataMeta?.live_feed_source,
+    });
+  }, [
+    getBuilderSnapshot,
+    activeChartSheet?.snapshot,
+    activeChartMeta,
+    dataSheets,
+    loadedDataMeta?.live_feed_source,
+    // Recompute when axes/type likely change via sheet registration
+    activeChartSheetId,
+    hasShareableChart,
+  ]);
+
+  useEffect(() => {
+    if (!liveEligibility.eligible && publishMode === "live") {
+      setPublishMode("static");
+    }
+  }, [liveEligibility.eligible, publishMode]);
 
   const {
     status: slugStatus,
@@ -284,7 +319,7 @@ function ShareEmbedSection({ runOrRequestPro }) {
   }, [dataSheets, isPublishingCache, publishCacheProgress, setLoadedChartMeta, syncActiveChartSheet]);
 
   const publishChartById = useCallback(
-    async (chartId, slug) => {
+    async (chartId, slug, { live = false, livePublish = null } = {}) => {
       if (!chartId) {
         toast.error("Could not find a saved chart to publish.");
         return false;
@@ -309,6 +344,20 @@ function ShareEmbedSection({ runOrRequestPro }) {
       const chart_properties = [{ ...prev0, title: publishChartName, rechartsBuilder: snapshot }];
       const ogImageUrl = await uploadOgImage(chartId);
 
+      const resolvedLive =
+        live
+          ? resolveChartLiveEligibility({
+              snapshot,
+              dataSheets,
+              liveFeedSource: loadedDataMeta?.live_feed_source,
+            })
+          : { eligible: false, config: null };
+      const livePublishConfig = livePublish || resolvedLive.config;
+      if (live && !livePublishConfig) {
+        toast.error("This chart is not backed by an enabled live feed.");
+        return false;
+      }
+
       const putRes = await fetch(`/api/charts/chart/${chartId}`, {
         method: "PUT",
         credentials: "include",
@@ -319,6 +368,8 @@ function ShareEmbedSection({ runOrRequestPro }) {
           labels: full.labels?.length ? full.labels : ["export"],
           public_slug: slug,
           is_public: true,
+          live_backed: !!live,
+          ...(live && livePublishConfig ? { live_publish: livePublishConfig } : {}),
           ...(ogImageUrl ? { og_image_url: ogImageUrl } : {}),
         }),
       });
@@ -331,7 +382,11 @@ function ShareEmbedSection({ runOrRequestPro }) {
       syncActiveChartSheet(putJson?.data, snapshot);
       setRefetchChart?.(1);
       await runChartPublishCache(chartId);
-      toast.success("Embed link is live");
+      toast.success(
+        live
+          ? "Live embed is published"
+          : "Static embed is published",
+      );
       return true;
     },
     [
@@ -342,6 +397,8 @@ function ShareEmbedSection({ runOrRequestPro }) {
       syncActiveChartSheet,
       setRefetchChart,
       runChartPublishCache,
+      dataSheets,
+      loadedDataMeta?.live_feed_source,
     ],
   );
 
@@ -370,6 +427,12 @@ function ShareEmbedSection({ runOrRequestPro }) {
       return;
     }
 
+    const wantLive = publishMode === "live";
+    if (wantLive && !liveEligibility.eligible) {
+      toast.error("Enable a live feed on this chart’s data before publishing live.");
+      return;
+    }
+
     if (typeof requestSaveProjectDialog !== "function") {
       toast.error("Save project is unavailable right now.");
       return;
@@ -381,7 +444,10 @@ function ShareEmbedSection({ runOrRequestPro }) {
         const fromActive = sheetId ? sheets?.[sheetId]?.chartMeta : null;
         const fromShareable = Object.values(sheets || {}).find((s) => s?.chartMeta?._id)?.chartMeta;
         const chartId = fromActive?._id || fromShareable?._id || activeChartMeta?._id;
-        await publishChartById(chartId, slug);
+        await publishChartById(chartId, slug, {
+          live: wantLive,
+          livePublish: liveEligibility.config,
+        });
       },
     });
   }, [
@@ -392,13 +458,58 @@ function ShareEmbedSection({ runOrRequestPro }) {
     requestSaveProjectDialog,
     publishChartById,
     activeChartMeta?._id,
+    publishMode,
+    liveEligibility,
   ]);
 
   const republishEmbed = useCallback(async () => {
     if (!activeChartMeta?._id || isPublishingCache) return;
-    await runChartPublishCache(activeChartMeta._id);
-    toast.success("Chart republished with latest data");
-  }, [activeChartMeta?._id, isPublishingCache, runChartPublishCache]);
+    if (!user) {
+      toast.error("Sign in to republish");
+      return;
+    }
+    if (!userHandle) {
+      toast.error("Set your user handle under Profile before publishing");
+      return;
+    }
+    const slug = normalizeChartEmbedSlug(slugInput);
+    if (!isValidChartEmbedSlug(slug)) {
+      toast.error("Use a URL slug with lowercase letters, numbers, and hyphens only");
+      return;
+    }
+
+    const wantLive = publishMode === "live";
+    if (wantLive && !liveEligibility.eligible) {
+      toast.error("Enable a live feed on this chart’s data before publishing live.");
+      return;
+    }
+
+    const slugCheck = await checkSlugNow();
+    if (!slugCheck.available) {
+      toast.error(
+        slugCheck.reason === "taken"
+          ? "That slug is already used by another chart of yours."
+          : embedSlugStatusMessage(slugCheck.reason, "chart") || "Slug is not available.",
+      );
+      return;
+    }
+
+    // Overwrite public flags (static ↔ live) and rebuild seed/snapshot.
+    await publishChartById(activeChartMeta._id, slug, {
+      live: wantLive,
+      livePublish: liveEligibility.config,
+    });
+  }, [
+    activeChartMeta?._id,
+    isPublishingCache,
+    user,
+    userHandle,
+    slugInput,
+    publishMode,
+    liveEligibility,
+    checkSlugNow,
+    publishChartById,
+  ]);
 
   const copyText = useCallback(async (text, label) => {
     try {
@@ -459,6 +570,61 @@ function ShareEmbedSection({ runOrRequestPro }) {
       <p className="text-[10px] text-muted-foreground">
         Pick a URL slug, then publish. We’ll save the project first (overwrite or new name), then publish the embed.
       </p>
+      {hasShareableChart ? (
+        <div className="space-y-1">
+          <p className="text-[10px] font-medium text-muted-foreground">Publish mode</p>
+          <div className="flex flex-wrap gap-1">
+            <Button
+              type="button"
+              size="sm"
+              variant={publishMode === "static" ? "default" : "outline"}
+              className="h-7 px-2 text-[10px]"
+              onClick={() => setPublishMode("static")}
+            >
+              Static chart
+            </Button>
+            <TooltipProvider delayDuration={120}>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <span>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant={publishMode === "live" ? "default" : "outline"}
+                      className="h-7 px-2 text-[10px]"
+                      disabled={!liveEligibility.eligible}
+                      onClick={() => setPublishMode("live")}
+                    >
+                      Live chart
+                    </Button>
+                  </span>
+                </TooltipTrigger>
+                {!liveEligibility.eligible ? (
+                  <TooltipContent side="top" className="max-w-[220px] text-xs">
+                    Available when this chart references a sheet with an enabled live feed
+                    (candlesticks today).
+                  </TooltipContent>
+                ) : null}
+              </Tooltip>
+            </TooltipProvider>
+          </div>
+          {publishMode === "live" && liveEligibility.config ? (
+            <p className="text-[10px] text-muted-foreground">
+              On-demand poll every{" "}
+              {Math.round((liveEligibility.config.pollIntervalMs || 60_000) / 60_000)}m ·{" "}
+              {liveEligibility.config.endpoint.replace(/_/g, " ")}
+              {Array.isArray(liveEligibility.config.params?.marketTickers) &&
+              liveEligibility.config.params.marketTickers.length
+                ? ` · ${liveEligibility.config.params.marketTickers.join(", ")}`
+                : ""}
+            </p>
+          ) : (
+            <p className="text-[10px] text-muted-foreground">
+              Frozen snapshot of the chart at publish time.
+            </p>
+          )}
+        </div>
+      ) : null}
       {isPublishingCache ? (
         <div className="space-y-1 rounded-md border border-border bg-muted/30 p-2">
           <p className="text-[10px] text-muted-foreground">{publishCacheMessage || "Building chart snapshot…"}</p>
@@ -511,52 +677,26 @@ function ShareEmbedSection({ runOrRequestPro }) {
       </div>
       <div className="flex flex-wrap gap-1">
         <TooltipProvider delayDuration={120}>
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <span tabIndex={hasShareableChart ? undefined : 0}>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  className="h-8 px-2 text-[10px]"
-                  disabled={
-                    !hasShareableChart ||
-                    isPublishingCache ||
-                    slugChecking ||
-                    !slugCanPublish
-                  }
-                  onClick={() =>
-                    runOrRequestPro?.(() => publishEmbed(), "publishing embeds")
-                  }
-                >
-                  {isPublishingCache ? "Publishing…" : "Publish embed"}
-                </Button>
-              </span>
-            </TooltipTrigger>
-            {!hasShareableChart ? (
-              <TooltipContent side="top" className="text-xs">
-                Create a chart from the Chart tab first
-              </TooltipContent>
-            ) : slugTaken ? (
-              <TooltipContent side="top" className="text-xs">
-                That slug is already used by another chart of yours
-              </TooltipContent>
-            ) : slugChecking ? (
-              <TooltipContent side="top" className="text-xs">
-                Checking slug…
-              </TooltipContent>
-            ) : null}
-          </Tooltip>
           {isPublishedForCurrentSlug ? (
             <Tooltip>
               <TooltipTrigger asChild>
                 <span tabIndex={0}>
                   <Button
                     type="button"
-                    variant={publishBundleStale ? "default" : "outline"}
+                    variant={
+                      publishBundleStale ||
+                      publishMode !== (activeChartMeta?.live_backed ? "live" : "static")
+                        ? "default"
+                        : "outline"
+                    }
                     size="sm"
                     className="h-8 px-2 text-[10px]"
-                    disabled={isPublishingCache}
+                    disabled={
+                      isPublishingCache ||
+                      slugChecking ||
+                      !slugCanPublish ||
+                      (publishMode === "live" && !liveEligibility.eligible)
+                    }
                     onClick={() =>
                       runOrRequestPro?.(() => republishEmbed(), "republishing embeds")
                     }
@@ -566,12 +706,53 @@ function ShareEmbedSection({ runOrRequestPro }) {
                 </span>
               </TooltipTrigger>
               <TooltipContent side="top" className="text-xs">
-                {publishBundleStale
-                  ? "Update public chart with latest project data"
-                  : "Rebuild public chart snapshot"}
+                {publishMode === "live" && !activeChartMeta?.live_backed
+                  ? "Switch this public chart to live"
+                  : publishMode === "static" && activeChartMeta?.live_backed
+                    ? "Switch this public chart to a static snapshot"
+                    : publishBundleStale
+                      ? "Update public chart with latest project data"
+                      : "Rebuild public chart with the selected publish mode"}
               </TooltipContent>
             </Tooltip>
-          ) : null}
+          ) : (
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <span tabIndex={hasShareableChart ? undefined : 0}>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="h-8 px-2 text-[10px]"
+                    disabled={
+                      !hasShareableChart ||
+                      isPublishingCache ||
+                      slugChecking ||
+                      !slugCanPublish
+                    }
+                    onClick={() =>
+                      runOrRequestPro?.(() => publishEmbed(), "publishing embeds")
+                    }
+                  >
+                    {isPublishingCache ? "Publishing…" : "Publish embed"}
+                  </Button>
+                </span>
+              </TooltipTrigger>
+              {!hasShareableChart ? (
+                <TooltipContent side="top" className="text-xs">
+                  Create a chart from the Chart tab first
+                </TooltipContent>
+              ) : slugTaken ? (
+                <TooltipContent side="top" className="text-xs">
+                  That slug is already used by another chart of yours
+                </TooltipContent>
+              ) : slugChecking ? (
+                <TooltipContent side="top" className="text-xs">
+                  Checking slug…
+                </TooltipContent>
+              ) : null}
+            </Tooltip>
+          )}
           <Tooltip>
             <TooltipTrigger asChild>
               <span tabIndex={0}>

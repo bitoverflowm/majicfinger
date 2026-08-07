@@ -13,6 +13,7 @@ import { publicEmbedOutboundLinkProps } from "@/components/publicEmbed/publicEmb
 import { RunForYourselfButton } from "@/components/runYourself/RunForYourselfButton";
 import { useTelegramContentTracker } from "@/hooks/useTelegramContentTracker";
 import { LYCHEE_CHART_EMBED_READY, LYCHEE_CHART_EMBED_RESIZE } from "@/lib/content/chart-embed-resize";
+import { applyLiveOverlay } from "@/lib/liveFeeds/applyLiveOverlay";
 
 const SITE = process.env.NEXT_PUBLIC_SITE_URL || "https://lycheedata.com";
 
@@ -55,8 +56,17 @@ type PublicPayload = {
     owner_profile_pic?: string | null;
     live_backed?: boolean;
     live_poll_interval_ms?: number | null;
+    live_overlay_kind?: string | null;
   };
   message?: string;
+};
+
+type LiveTick = {
+  overlayKind: string;
+  pollIntervalMs: number;
+  sheets: Record<string, Record<string, unknown>[]>;
+  params?: { periodInterval?: number };
+  fetchedAt: number | null;
 };
 
 export default function PublicChartEmbedClient({
@@ -70,15 +80,38 @@ export default function PublicChartEmbedClient({
   articleEmbed?: boolean;
 }) {
   const [payload, setPayload] = useState<PublicPayload | null>(null);
+  const [liveTick, setLiveTick] = useState<LiveTick | null>(null);
   const [err, setErr] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [isEmbedded, setIsEmbedded] = useState(
     () => articleEmbed || (typeof window !== "undefined" && window.self !== window.top),
   );
   const rootRef = useRef<HTMLDivElement>(null);
-  const rows = payload?.data?.rows ?? [];
-  const dataSheets = payload?.data?.dataSheets ?? {};
-  const chartFromPayload = payload?.data?.chart;
+
+  const displayPayload = useMemo(() => {
+    if (!payload?.success || !payload.data) return payload;
+    if (!payload.data.live_backed || !liveTick) return payload;
+    const base = {
+      chart: payload.data.chart,
+      rows: payload.data.rows,
+      dataSheets: payload.data.dataSheets,
+    };
+    const overlaid = applyLiveOverlay(base, liveTick);
+    if (!overlaid) return payload;
+    return {
+      ...payload,
+      data: {
+        ...payload.data,
+        chart: overlaid.chart ?? payload.data.chart,
+        rows: overlaid.rows ?? payload.data.rows,
+        dataSheets: overlaid.dataSheets ?? payload.data.dataSheets,
+      },
+    };
+  }, [payload, liveTick]);
+
+  const rows = displayPayload?.data?.rows ?? [];
+  const dataSheets = displayPayload?.data?.dataSheets ?? {};
+  const chartFromPayload = displayPayload?.data?.chart;
   const chartProps0: Record<string, unknown> =
     Array.isArray(chartFromPayload?.chart_properties) &&
     chartFromPayload.chart_properties[0] &&
@@ -96,11 +129,11 @@ export default function PublicChartEmbedClient({
     if (fromApi) return fromApi as Record<string, unknown>;
     return normalizeBuilderSnapshot(undefined, rows, dataSheets);
   }, [chartFromPayload?.rechartsBuilder, chartPropsRb, rows, dataSheets]);
-  const chartName = payload?.data?.chart?.chart_name || slug;
-  const ownerHandleForTracker = payload?.data?.owner_handle || username;
+  const chartName = displayPayload?.data?.chart?.chart_name || slug;
+  const ownerHandleForTracker = displayPayload?.data?.owner_handle || username;
   const trackerReady =
-    !!payload?.success &&
-    !!payload?.data &&
+    !!displayPayload?.success &&
+    !!displayPayload?.data &&
     (rows.length > 0 ||
       Object.values(dataSheets || {}).some(
         (sheet: any) => Array.isArray(sheet?.data) && sheet.data.length > 0,
@@ -135,16 +168,17 @@ export default function PublicChartEmbedClient({
     const observer = new ResizeObserver(reportHeight);
     observer.observe(el);
     return () => observer.disconnect();
-  }, [articleEmbed, loading, payload, err]);
+  }, [articleEmbed, loading, displayPayload, err]);
 
   useEffect(() => {
-    if (!articleEmbed || loading || err || !payload?.success || !payload.data) return;
+    if (!articleEmbed || loading || err || !displayPayload?.success || !displayPayload.data) return;
     window.parent.postMessage({ type: LYCHEE_CHART_EMBED_READY }, window.location.origin);
-  }, [articleEmbed, loading, err, payload]);
+  }, [articleEmbed, loading, err, displayPayload]);
 
   useEffect(() => {
     let cancelled = false;
     setPayload(null);
+    setLiveTick(null);
     setErr(null);
     setLoading(true);
     fetch(
@@ -170,7 +204,55 @@ export default function PublicChartEmbedClient({
     };
   }, [username, slug]);
 
-  if (loading || !payload?.success || !payload.data) {
+  // On-demand live poll (same pattern as public dashboards).
+  useEffect(() => {
+    if (!payload?.success || !payload.data?.live_backed) return undefined;
+    let cancelled = false;
+    let timer: ReturnType<typeof setTimeout> | null = null;
+
+    const pollMs = Math.max(
+      15_000,
+      Math.floor(Number(payload.data.live_poll_interval_ms)) || 60_000,
+    );
+
+    const tick = async () => {
+      try {
+        const res = await fetch(
+          `/api/public/charts/${encodeURIComponent(username)}/${encodeURIComponent(slug)}/live`,
+        );
+        const json = await res.json().catch(() => ({}));
+        if (cancelled || !res.ok || !json?.success || !json?.data) return;
+        setLiveTick({
+          overlayKind: String(json.data.overlayKind || payload.data?.live_overlay_kind || "sheet_rows"),
+          pollIntervalMs: Math.floor(Number(json.data.pollIntervalMs)) || pollMs,
+          sheets: json.data.sheets && typeof json.data.sheets === "object" ? json.data.sheets : {},
+          params: json.data.params || {},
+          fetchedAt: json.data.fetchedAt || Date.now(),
+        });
+      } catch {
+        // Keep last tick; retry on next interval.
+      } finally {
+        if (!cancelled) {
+          timer = setTimeout(tick, pollMs);
+        }
+      }
+    };
+
+    void tick();
+    return () => {
+      cancelled = true;
+      if (timer) clearTimeout(timer);
+    };
+  }, [
+    payload?.success,
+    payload?.data?.live_backed,
+    payload?.data?.live_poll_interval_ms,
+    payload?.data?.live_overlay_kind,
+    username,
+    slug,
+  ]);
+
+  if (loading || !displayPayload?.success || !displayPayload.data) {
     if (err) {
       return (
         <div className="flex min-h-[240px] flex-col items-center justify-center gap-2 p-6 text-sm text-muted-foreground">
@@ -200,9 +282,10 @@ export default function PublicChartEmbedClient({
   }
 
   const chart = chartFromPayload!;
-  const ownerHandle = payload.data.owner_handle || username;
-  const ownerName = payload.data.owner_name ?? null;
-  const ownerProfilePic = payload.data.owner_profile_pic ?? null;
+  const ownerHandle = displayPayload.data.owner_handle || username;
+  const ownerName = displayPayload.data.owner_name ?? null;
+  const ownerProfilePic = displayPayload.data.owner_profile_pic ?? null;
+  const isLive = !!displayPayload.data.live_backed;
 
   return (
     <StateProviderV2 initialSettings={{ viewing: "charts", demo: false, rightPanelOpen: false }}>
@@ -224,7 +307,13 @@ export default function PublicChartEmbedClient({
             isEmbedded ? "" : "flex flex-1 items-center justify-center md:mt-2"
           }`}
         >
+          {isLive ? (
+            <div className="pointer-events-none absolute right-2 top-2 z-10 rounded-md bg-emerald-600/90 px-1.5 py-0.5 text-[10px] font-medium text-white">
+              Live
+            </div>
+          ) : null}
           <ChartBuilderProvider
+            key={slug}
             demo={false}
             embedCompact
             embedInArticle={isEmbedded}

@@ -2,6 +2,10 @@ import dbConnect from "@/lib/dbConnect";
 import Chart from "@/models/Charts";
 import { assertDocumentOwner, requireLoginSession } from "@/lib/resourceOwnership";
 import { isValidChartEmbedSlug, normalizeChartEmbedSlug } from "@/lib/chartEmbedSlug";
+import {
+  liveBackedChartFields,
+  sanitizeChartLivePublish,
+} from "@/lib/liveFeeds/chartLivePublishConfig";
 
 export default async function handler(req, res) {
     const {
@@ -45,7 +49,7 @@ export default async function handler(req, res) {
                     $set.og_image_updated_at = new Date();
                 }
 
-                const updateOp = { $set };
+                const updateOp = { $set, $unset: {} };
 
                 if (wantsEmbed) {
                     const pub = !!req.body.is_public;
@@ -67,9 +71,52 @@ export default async function handler(req, res) {
                             return res.status(409).json({ success: false, message: "That slug is already used for one of your charts." });
                         }
                         $set.public_slug = raw;
+
+                        const wantsLive = Object.prototype.hasOwnProperty.call(req.body, "live_backed")
+                          ? !!req.body.live_backed
+                          : !!chart.live_backed;
+                        if (wantsLive) {
+                          const livePublish = sanitizeChartLivePublish(req.body.live_publish);
+                          if (!livePublish) {
+                            return res.status(400).json({
+                              success: false,
+                              message: "Live publish requires a valid live feed config for this chart.",
+                            });
+                          }
+                          const liveFields = liveBackedChartFields(true, livePublish);
+                          Object.assign($set, liveFields.$set || {});
+                        } else {
+                          const liveFields = liveBackedChartFields(false);
+                          Object.assign($set, liveFields.$set || {});
+                          Object.assign(updateOp.$unset, liveFields.$unset || {});
+                        }
                     } else {
-                        updateOp.$unset = { public_slug: "" };
+                        updateOp.$unset.public_slug = "";
+                        const liveFields = liveBackedChartFields(false);
+                        Object.assign($set, liveFields.$set || {});
+                        Object.assign(updateOp.$unset, liveFields.$unset || {});
                     }
+                } else if (Object.prototype.hasOwnProperty.call(req.body, "live_backed")) {
+                  // Allow updating live flags without republishing slug.
+                  if (req.body.live_backed) {
+                    const livePublish = sanitizeChartLivePublish(req.body.live_publish || chart.live_publish);
+                    if (!livePublish) {
+                      return res.status(400).json({
+                        success: false,
+                        message: "Live publish requires a valid live feed config for this chart.",
+                      });
+                    }
+                    const liveFields = liveBackedChartFields(true, livePublish);
+                    Object.assign($set, liveFields.$set || {});
+                  } else {
+                    const liveFields = liveBackedChartFields(false);
+                    Object.assign($set, liveFields.$set || {});
+                    Object.assign(updateOp.$unset, liveFields.$unset || {});
+                  }
+                }
+
+                if (!Object.keys(updateOp.$unset).length) {
+                  delete updateOp.$unset;
                 }
 
                 const updatedChart = await Chart.findOneAndUpdate(

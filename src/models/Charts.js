@@ -68,6 +68,26 @@ const ChartSchema = new mongoose.Schema({
     published_bundle_built_at: {
         type: Date,
     },
+    /**
+     * Public embed serves on-demand Kalshi (or future) live ticks via /api/public/charts/.../live.
+     * Distinct from published_bundle_meta.materialization_mode === "live_lake" (Athena overflow).
+     */
+    live_backed: {
+        type: Boolean,
+        default: false,
+        index: true,
+    },
+    live_backed_at: {
+        type: Date,
+    },
+    /**
+     * Compact live publish contract (integration/endpoint/params/overlayKind).
+     * Written at publish time; /live dispatches by registry adapter.
+     */
+    live_publish: {
+        type: Schema.Types.Mixed,
+        default: null,
+    },
 })
 
 // Same as ChartDashboard: sparse+unique still indexes null slug once per user.
