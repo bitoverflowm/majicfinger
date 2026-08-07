@@ -1140,7 +1140,7 @@ export const StateProviderV2 = ({children, initialSettings}) => {
     const [chartSheets, setChartSheets] = useState(() => ({
       "chart-1": { name: "Chart 1", snapshot: null, chartMeta: null, userCreated: false },
     }));
-    const [activeChartSheetId, setActiveChartSheetId] = useState(null);
+    const [activeChartSheetId, setActiveChartSheetId] = useState("chart-1");
 
     // Polymarket WebSocket live price feed: controls and preset for line chart (time/price)
     const [polymarketWsState, setPolymarketWsState] = useState({

@@ -1311,7 +1311,8 @@ export default function DataSheetWithIntegration({
 
   useEffect(() => {
     if (!effectiveChartMode) return;
-    if (!activeChartSheetId || chartSheets?.[activeChartSheetId]) return;
+    // Activate a sheet when none is selected, or the active id was removed.
+    if (activeChartSheetId && chartSheets?.[activeChartSheetId]) return;
     const firstId = Object.keys(chartSheets || {})[0];
     if (firstId) setActiveChartSheetId?.(firstId);
   }, [effectiveChartMode, chartSheets, activeChartSheetId, setActiveChartSheetId]);

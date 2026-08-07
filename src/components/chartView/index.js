@@ -918,7 +918,11 @@ export function ChartBuilderProvider({ demo, children, initialBuilderSnapshot, e
     const snap = initialBuilderSnapshot;
     if (!snap || snap.v !== 1) return;
     if (snapshotSeedRestoredFromRef.current === snap) return;
-    const hasSavedAxes = !!(snap.selX || (Array.isArray(snap.selY) && snap.selY.length));
+    const hasSavedAxes = !!(
+      snap.selX ||
+      (Array.isArray(snap.selY) && snap.selY.length) ||
+      snap.selChartType === "candlestick"
+    );
     const hasLineFilters = Array.isArray(snap.chartLineFilters);
     const hasReferenceLines = Array.isArray(snap.referenceLines);
     if (!hasSavedAxes && !hasLineFilters && !hasReferenceLines) return;
@@ -927,6 +931,12 @@ export function ChartBuilderProvider({ demo, children, initialBuilderSnapshot, e
       if (snap.selChartType != null) setSelChartType(snap.selChartType);
       if (snap.selX !== undefined) setSelX(snap.selX);
       if (Array.isArray(snap.selY)) setSelY(snap.selY);
+      if (snap.candlestickOhlcSetId != null) {
+        setCandlestickOhlcSetId(String(snap.candlestickOhlcSetId) || "auto");
+      }
+      if (snap.candlestickSheetId != null) {
+        setCandlestickSheetId(String(snap.candlestickSheetId || ""));
+      }
     }
     if (hasLineFilters) {
       setChartLineFilters(normalizeChartLineFilters(snap.chartLineFilters));
@@ -1800,7 +1810,9 @@ export function ChartBuilderProvider({ demo, children, initialBuilderSnapshot, e
   // Once axes land on the canvas, register the sheet as a real chart (snapshot + userCreated)
   // so Export/Share unlock without requiring "+ Chart". Tab-only empty Chart 1 stays unregistered.
   useEffect(() => {
-    if (demo || !activeChartSheetId || typeof setChartSheets !== "function") return;
+    if (demo || typeof setChartSheets !== "function") return;
+    // Prefer the active sheet; fall back to the default workbook chart when id is still null.
+    const sheetId = activeChartSheetId || "chart-1";
     const yKeys = Array.isArray(selY) ? selY.filter(Boolean) : [];
     const realAxesConfigured =
       (!!selX && yKeys.length > 0) ||
@@ -1811,10 +1823,10 @@ export function ChartBuilderProvider({ demo, children, initialBuilderSnapshot, e
       const snap = getBuilderSnapshot();
       if (!snap) return;
       setChartSheets((prev) => {
-        const cur = prev?.[activeChartSheetId] || { name: "Chart", snapshot: null, chartMeta: null };
+        const cur = prev?.[sheetId] || { name: "Chart", snapshot: null, chartMeta: null };
         return {
           ...(prev || {}),
-          [activeChartSheetId]: { ...cur, snapshot: snap, userCreated: true },
+          [sheetId]: { ...cur, snapshot: snap, userCreated: true },
         };
       });
     }, 250);
