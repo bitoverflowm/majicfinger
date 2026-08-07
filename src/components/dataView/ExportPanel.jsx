@@ -17,7 +17,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import Link from "next/link";
-import { ExternalLink } from "lucide-react";
+import { ChevronDown, ExternalLink } from "lucide-react";
 import { DestructiveIconButton } from "@/components/primitives/destructive-icon-button";
 import { toast } from "sonner";
 import * as XLSX from "xlsx";
@@ -37,8 +37,15 @@ import {
   embedSlugStatusMessage,
   useEmbedSlugAvailability,
 } from "@/hooks/useEmbedSlugAvailability";
-import { resolveChartLiveEligibility, stampChartSnapshotForLivePublish } from "@/lib/liveFeeds/chartLivePublishConfig";
+import {
+  chartReferencedSheetIds,
+  readChartBuilderSnapshot,
+  resolveChartLiveEligibility,
+  stampChartSnapshotForLivePublish,
+} from "@/lib/liveFeeds/chartLivePublishConfig";
 import { Progress } from "@/components/ui/progress";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { cn } from "@/lib/utils";
 
 function getColKeys(connectedCols) {
   return (connectedCols || [])
@@ -99,6 +106,48 @@ const SITE = typeof process !== "undefined" && process.env.NEXT_PUBLIC_SITE_URL
   ? process.env.NEXT_PUBLIC_SITE_URL
   : "https://lycheedata.com";
 
+function readChartSheetSnapshot(chartSheet) {
+  if (!chartSheet || typeof chartSheet !== "object") return null;
+  return (
+    readChartBuilderSnapshot(chartSheet.snapshot) ||
+    readChartBuilderSnapshot(chartSheet.chartMeta) ||
+    null
+  );
+}
+
+/**
+ * Human labels for data sheets a chart tab plots (one chart → many sheets is fine).
+ * @param {object | null | undefined} chartSheet
+ * @param {Record<string, object>} dataSheets
+ */
+function describeChartDataSources(chartSheet, dataSheets) {
+  const snap = readChartSheetSnapshot(chartSheet);
+  const ids = chartReferencedSheetIds(dataSheets, snap);
+  const sheets = dataSheets && typeof dataSheets === "object" ? dataSheets : {};
+  const labels = ids
+    .map((id) => {
+      const sheet = sheets[id];
+      const name = String(sheet?.name || "").trim();
+      const ticker = String(sheet?.provenance?.marketTicker || "").trim().toUpperCase();
+      if (name && ticker && name.toUpperCase() !== ticker) return `${name} (${ticker})`;
+      return name || ticker || id;
+    })
+    .filter(Boolean);
+  return {
+    sheetIds: ids,
+    labels,
+    chartType: String(snap?.selChartType || "").trim() || null,
+  };
+}
+
+function publicChartUrlForSlug(userHandle, slug, runtimeOrigin) {
+  const normalized = normalizeChartEmbedSlug(slug);
+  if (!userHandle || !isValidChartEmbedSlug(normalized)) return "";
+  const effectiveSite =
+    process.env.NODE_ENV === "development" && runtimeOrigin ? runtimeOrigin : SITE;
+  return `${effectiveSite.replace(/\/$/, "")}/${encodeURIComponent(userHandle)}/charts/${encodeURIComponent(normalized)}`;
+}
+
 function ShareEmbedSection({ runOrRequestPro }) {
   const user = useUser();
   const v2 = useMyStateV2();
@@ -111,6 +160,7 @@ function ShareEmbedSection({ runOrRequestPro }) {
   const chartSheets = v2?.chartSheets || {};
   const setChartSheets = v2?.setChartSheets;
   const activeChartSheetId = v2?.activeChartSheetId;
+  const setActiveChartSheetId = v2?.setActiveChartSheetId;
   const setRefetchChart = v2?.setRefetchChart;
   const chartSnapshotFlusher = v2?.chartSnapshotFlusher;
   const requestSaveProjectDialog = v2?.requestSaveProjectDialog;
@@ -122,6 +172,38 @@ function ShareEmbedSection({ runOrRequestPro }) {
     () => (activeChartSheet?.chartMeta?.chart_name || activeChartSheet?.name || "").trim(),
     [activeChartSheet],
   );
+  const activeDataSources = useMemo(
+    () => describeChartDataSources(activeChartSheet, dataSheets),
+    [activeChartSheet, dataSheets],
+  );
+
+  const publishedCharts = useMemo(() => {
+    const entries = [];
+    for (const [chartSheetId, sheet] of Object.entries(chartSheets || {})) {
+      const meta = sheet?.chartMeta;
+      const slug = normalizeChartEmbedSlug(meta?.public_slug || "");
+      if (!meta?._id || !meta?.is_public || !slug) continue;
+      const sources = describeChartDataSources(sheet, dataSheets);
+      const livePublish = meta.live_publish && typeof meta.live_publish === "object" ? meta.live_publish : null;
+      entries.push({
+        chartSheetId,
+        chartId: String(meta._id),
+        name: String(meta.chart_name || sheet?.name || slug).trim() || slug,
+        slug,
+        live: !!meta.live_backed,
+        liveEndpoint: livePublish?.endpoint ? String(livePublish.endpoint) : null,
+        liveTickers: Array.isArray(livePublish?.params?.marketTickers)
+          ? livePublish.params.marketTickers.map((t) => String(t || "").trim()).filter(Boolean)
+          : [],
+        pollIntervalMs: Math.floor(Number(livePublish?.pollIntervalMs)) || null,
+        sources,
+        isActive: chartSheetId === activeChartSheetId,
+        stale: isPublishedChartBundleStale(meta, loadedDataMeta),
+      });
+    }
+    entries.sort((a, b) => a.name.localeCompare(b.name));
+    return entries;
+  }, [chartSheets, dataSheets, activeChartSheetId, loadedDataMeta]);
 
   const syncActiveChartSheet = useCallback((chartMeta, snapshot = null) => {
     if (!activeChartSheetId || !chartMeta) return;
@@ -166,6 +248,8 @@ function ShareEmbedSection({ runOrRequestPro }) {
   const [slugInput, setSlugInput] = useState("");
   const [publishMode, setPublishMode] = useState("static"); // "static" | "live"
   const [showDeleteEmbedDialog, setShowDeleteEmbedDialog] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState(null); // { chartId, chartSheetId, name, slug }
+  const [publishedChartsOpen, setPublishedChartsOpen] = useState(true);
   const [isPublishingCache, setIsPublishingCache] = useState(false);
   const [publishCacheProgress, setPublishCacheProgress] = useState(0);
   const [publishCacheMessage, setPublishCacheMessage] = useState("");
@@ -530,7 +614,9 @@ function ShareEmbedSection({ runOrRequestPro }) {
   }, []);
 
   const deleteEmbed = useCallback(async () => {
-    if (!activeChartMeta?._id) return;
+    const chartId = deleteTarget?.chartId || activeChartMeta?._id;
+    const chartSheetId = deleteTarget?.chartSheetId || activeChartSheetId;
+    if (!chartId) return;
     try {
       setIsDeletingEmbed(true);
       const res = await fetch("/api/assets/delete", {
@@ -539,7 +625,7 @@ function ShareEmbedSection({ runOrRequestPro }) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           type: "publicPage",
-          id: activeChartMeta._id,
+          id: chartId,
         }),
       });
       const json = await res.json();
@@ -547,38 +633,93 @@ function ShareEmbedSection({ runOrRequestPro }) {
         toast.error(json?.message || "Failed to delete public page");
         return;
       }
-      setLoadedChartMeta?.((prev) =>
-        prev ? { ...prev, is_public: false, public_slug: undefined } : prev,
-      );
-      if (activeChartSheetId) {
+      const clearMeta = (meta) =>
+        meta
+          ? {
+              ...meta,
+              is_public: false,
+              public_slug: undefined,
+              live_backed: false,
+              live_publish: undefined,
+              live_backed_at: undefined,
+            }
+          : meta;
+      if (String(activeChartMeta?._id || "") === String(chartId)) {
+        setLoadedChartMeta?.((prev) => clearMeta(prev));
+      }
+      if (chartSheetId) {
         setChartSheets?.((prev) => {
-          const cur = prev?.[activeChartSheetId];
+          const cur = prev?.[chartSheetId];
           if (!cur?.chartMeta) return prev;
           return {
             ...(prev || {}),
-            [activeChartSheetId]: {
+            [chartSheetId]: {
               ...cur,
-              chartMeta: { ...cur.chartMeta, is_public: false, public_slug: undefined },
+              chartMeta: clearMeta(cur.chartMeta),
             },
           };
         });
       }
       setRefetchChart?.(1);
       setShowDeleteEmbedDialog(false);
+      setDeleteTarget(null);
       toast.success("Public embed deleted");
     } catch {
       toast.error("Failed to delete public page");
     } finally {
       setIsDeletingEmbed(false);
     }
-  }, [activeChartMeta?._id, activeChartSheetId, setChartSheets, setLoadedChartMeta, setRefetchChart]);
+  }, [
+    deleteTarget,
+    activeChartMeta?._id,
+    activeChartSheetId,
+    setChartSheets,
+    setLoadedChartMeta,
+    setRefetchChart,
+  ]);
+
+  const focusPublishedChart = useCallback(
+    (chartSheetId) => {
+      if (!chartSheetId || chartSheetId === activeChartSheetId) return;
+      setActiveChartSheetId?.(chartSheetId);
+      toast.message("Switched to that chart — edit publish settings below");
+    },
+    [activeChartSheetId, setActiveChartSheetId],
+  );
 
   return (
-    <div className="space-y-2">
-      <p className="text-xs font-bold text-muted-foreground">Share</p>
-      <p className="text-[10px] text-muted-foreground">
-        Pick a URL slug, then publish. We’ll save the project first (overwrite or new name), then publish the embed.
-      </p>
+    <div className="space-y-3">
+      <div className="space-y-1">
+        <p className="text-xs font-bold text-muted-foreground">Share</p>
+        <p className="text-[10px] text-muted-foreground">
+          Publish any chart tab independently. Embeds only load their own chart and data sheets — not
+          other charts in this project.
+        </p>
+      </div>
+
+      {hasShareableChart ? (
+        <div className="space-y-1.5 rounded-md border border-border/70 bg-muted/20 p-2">
+          <p className="text-[10px] font-semibold text-foreground">
+            This chart · {workbookChartName || "Untitled chart"}
+          </p>
+          <p className="text-[10px] text-muted-foreground">
+            {activeDataSources.chartType ? `${activeDataSources.chartType} · ` : ""}
+            {activeDataSources.labels.length
+              ? `Data: ${activeDataSources.labels.join(", ")}`
+              : "Data: (no sheet linked yet)"}
+          </p>
+          {activeChartMeta?.is_public && activeChartMeta?.public_slug ? (
+            <p className="text-[10px] text-muted-foreground">
+              Published as{" "}
+              <span className="font-medium text-foreground">/{activeChartMeta.public_slug}</span>
+              {activeChartMeta.live_backed ? " · Live" : " · Static"}
+            </p>
+          ) : (
+            <p className="text-[10px] text-muted-foreground">Not published yet</p>
+          )}
+        </div>
+      ) : null}
+
       {hasShareableChart ? (
         <div className="space-y-1">
           <p className="text-[10px] font-medium text-muted-foreground">Publish mode</p>
@@ -590,7 +731,7 @@ function ShareEmbedSection({ runOrRequestPro }) {
               className="h-7 px-2 text-[10px]"
               onClick={() => setPublishMode("static")}
             >
-              Static chart
+              Static
             </Button>
             <TooltipProvider delayDuration={120}>
               <Tooltip>
@@ -604,14 +745,14 @@ function ShareEmbedSection({ runOrRequestPro }) {
                       disabled={!liveEligibility.eligible}
                       onClick={() => setPublishMode("live")}
                     >
-                      Live chart
+                      Live
                     </Button>
                   </span>
                 </TooltipTrigger>
                 {!liveEligibility.eligible ? (
                   <TooltipContent side="top" className="max-w-[220px] text-xs">
                     Available when this chart references a sheet with an enabled live feed
-                    (candlesticks today).
+                    (candlesticks today; multi-series live later).
                   </TooltipContent>
                 ) : null}
               </Tooltip>
@@ -621,7 +762,7 @@ function ShareEmbedSection({ runOrRequestPro }) {
             <p className="text-[10px] text-muted-foreground">
               On-demand poll every{" "}
               {Math.round((liveEligibility.config.pollIntervalMs || 60_000) / 60_000)}m ·{" "}
-              {liveEligibility.config.endpoint.replace(/_/g, " ")}
+              {String(liveEligibility.config.endpoint || "").replace(/_/g, " ")}
               {Array.isArray(liveEligibility.config.params?.marketTickers) &&
               liveEligibility.config.params.marketTickers.length
                 ? ` · ${liveEligibility.config.params.marketTickers.join(", ")}`
@@ -629,11 +770,12 @@ function ShareEmbedSection({ runOrRequestPro }) {
             </p>
           ) : (
             <p className="text-[10px] text-muted-foreground">
-              Frozen snapshot of the chart at publish time.
+              Frozen snapshot of this chart at publish time.
             </p>
           )}
         </div>
       ) : null}
+
       {isPublishingCache ? (
         <div className="space-y-1 rounded-md border border-border bg-muted/30 p-2">
           <p className="text-[10px] text-muted-foreground">{publishCacheMessage || "Building chart snapshot…"}</p>
@@ -650,9 +792,10 @@ function ShareEmbedSection({ runOrRequestPro }) {
           This chart uses live lake data on each view (large dataset).
         </p>
       ) : null}
+
       <div className="flex flex-col gap-1">
         <label className="text-[10px] font-medium text-muted-foreground" htmlFor="embed-slug">
-          URL slug
+          URL slug for this chart
         </label>
         <div className="flex items-center gap-2">
           <p className="truncate text-[10px] text-muted-foreground">
@@ -684,6 +827,7 @@ function ShareEmbedSection({ runOrRequestPro }) {
           </p>
         ) : null}
       </div>
+
       <div className="flex flex-wrap gap-1">
         <TooltipProvider delayDuration={120}>
           {isPublishedForCurrentSlug ? (
@@ -779,13 +923,9 @@ function ShareEmbedSection({ runOrRequestPro }) {
                 </Button>
               </span>
             </TooltipTrigger>
-            {!hasShareableChart ? (
+            {!isPublishedForCurrentSlug ? (
               <TooltipContent side="top" className="text-xs">
-                Create a chart from the Chart tab first
-              </TooltipContent>
-            ) : !isPublishedForCurrentSlug ? (
-              <TooltipContent side="top" className="text-xs">
-                only avail after you publish the chart
+                Available after you publish this chart
               </TooltipContent>
             ) : null}
           </Tooltip>
@@ -809,54 +949,227 @@ function ShareEmbedSection({ runOrRequestPro }) {
                 </Button>
               </span>
             </TooltipTrigger>
-            {!hasShareableChart ? (
+            {!isPublishedForCurrentSlug ? (
               <TooltipContent side="top" className="text-xs">
-                Create a chart from the Chart tab first
-              </TooltipContent>
-            ) : !isPublishedForCurrentSlug ? (
-              <TooltipContent side="top" className="text-xs">
-                only avail after you publish the chart
+                Available after you publish this chart
               </TooltipContent>
             ) : null}
           </Tooltip>
-        </TooltipProvider>
-      </div>
-      {hasShareableChart && publicUrl ? (
-        <div className="flex items-center gap-2">
-          <Link
-            href={publicUrl}
-            target="_blank"
-            rel="noreferrer"
-            className="inline-flex items-center gap-1 break-all text-[10px] text-primary underline underline-offset-2"
-          >
-            {publicUrl}
-            <ExternalLink className="h-3 w-3 shrink-0" />
-          </Link>
           {isPublishedForCurrentSlug ? (
-            <TooltipProvider delayDuration={120}>
-              <Tooltip>
-                <TooltipTrigger asChild>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <span>
                   <DestructiveIconButton
-                    onClick={() =>
+                    onClick={() => {
+                      setDeleteTarget({
+                        chartId: activeChartMeta._id,
+                        chartSheetId: activeChartSheetId,
+                        name: workbookChartName || activeChartMeta.chart_name,
+                        slug: publishedSlug,
+                      });
                       runOrRequestPro?.(
                         () => setShowDeleteEmbedDialog(true),
                         "managing embeds",
-                      )
-                    }
+                      );
+                    }}
                   />
-                </TooltipTrigger>
-                <TooltipContent side="top" className="text-xs">delete</TooltipContent>
-              </Tooltip>
-            </TooltipProvider>
+                </span>
+              </TooltipTrigger>
+              <TooltipContent side="top" className="text-xs">
+                Delete this public embed
+              </TooltipContent>
+            </Tooltip>
           ) : null}
-        </div>
+        </TooltipProvider>
+      </div>
+
+      {hasShareableChart && publicUrl && isPublishedForCurrentSlug ? (
+        <Link
+          href={publicUrl}
+          target="_blank"
+          rel="noreferrer"
+          className="inline-flex items-center gap-1 break-all text-[10px] text-primary underline underline-offset-2"
+        >
+          {publicUrl}
+          <ExternalLink className="h-3 w-3 shrink-0" />
+        </Link>
       ) : null}
-      <AlertDialog open={showDeleteEmbedDialog} onOpenChange={setShowDeleteEmbedDialog}>
+
+      <Collapsible open={publishedChartsOpen} onOpenChange={setPublishedChartsOpen} className="rounded-md border border-border/70">
+        <CollapsibleTrigger asChild>
+          <button
+            type="button"
+            className="flex w-full items-center justify-between gap-2 px-2 py-1.5 text-left text-[10px] font-semibold text-foreground hover:bg-muted/40"
+          >
+            <span>
+              Published charts
+              <span className="ml-1 font-normal text-muted-foreground">
+                ({publishedCharts.length})
+              </span>
+            </span>
+            <ChevronDown
+              className={cn(
+                "h-3.5 w-3.5 shrink-0 text-muted-foreground transition-transform duration-200",
+                publishedChartsOpen ? "rotate-180" : "",
+              )}
+            />
+          </button>
+        </CollapsibleTrigger>
+        <CollapsibleContent className="border-t border-border/60 px-2 pb-2 pt-1.5">
+          {publishedCharts.length === 0 ? (
+            <p className="text-[10px] text-muted-foreground">
+              No public chart embeds in this project yet. Publish the active chart above — you can
+              publish many charts from the same or different data sheets.
+            </p>
+          ) : (
+            <ul className="space-y-2">
+              {publishedCharts.map((item) => {
+                const url = publicChartUrlForSlug(userHandle, item.slug, runtimeOrigin);
+                return (
+                  <li
+                    key={item.chartId}
+                    className={cn(
+                      "space-y-1 rounded-md border px-2 py-1.5",
+                      item.isActive ? "border-foreground/30 bg-muted/40" : "border-border/60 bg-background/60",
+                    )}
+                  >
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="min-w-0 space-y-0.5">
+                        <p className="truncate text-[10px] font-medium text-foreground">
+                          {item.name}
+                          {item.isActive ? (
+                            <span className="ml-1 font-normal text-muted-foreground">(editing)</span>
+                          ) : null}
+                        </p>
+                        <p className="truncate text-[10px] text-muted-foreground">/{item.slug}</p>
+                        <p className="text-[10px] text-muted-foreground">
+                          {item.sources.chartType ? `${item.sources.chartType} · ` : ""}
+                          {item.sources.labels.length
+                            ? item.sources.labels.join(", ")
+                            : "sheet unknown"}
+                        </p>
+                        <p className="text-[10px]">
+                          <span
+                            className={cn(
+                              "rounded px-1 py-0.5 font-medium",
+                              item.live
+                                ? "bg-emerald-600/15 text-emerald-700 dark:text-emerald-400"
+                                : "bg-muted text-muted-foreground",
+                            )}
+                          >
+                            {item.live ? "Live" : "Static"}
+                          </span>
+                          {item.live && item.liveTickers.length ? (
+                            <span className="ml-1 text-muted-foreground">
+                              {item.liveTickers.join(", ")}
+                            </span>
+                          ) : null}
+                          {item.stale ? (
+                            <span className="ml-1 text-amber-600 dark:text-amber-400">· stale</span>
+                          ) : null}
+                        </p>
+                      </div>
+                      <TooltipProvider delayDuration={120}>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <span>
+                              <DestructiveIconButton
+                                onClick={() => {
+                                  setDeleteTarget({
+                                    chartId: item.chartId,
+                                    chartSheetId: item.chartSheetId,
+                                    name: item.name,
+                                    slug: item.slug,
+                                  });
+                                  runOrRequestPro?.(
+                                    () => setShowDeleteEmbedDialog(true),
+                                    "managing embeds",
+                                  );
+                                }}
+                              />
+                            </span>
+                          </TooltipTrigger>
+                          <TooltipContent side="top" className="text-xs">
+                            Unpublish /{item.slug}
+                          </TooltipContent>
+                        </Tooltip>
+                      </TooltipProvider>
+                    </div>
+                    <div className="flex flex-wrap gap-1">
+                      {!item.isActive ? (
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="outline"
+                          className="h-7 px-2 text-[10px]"
+                          onClick={() => focusPublishedChart(item.chartSheetId)}
+                        >
+                          Edit
+                        </Button>
+                      ) : (
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="outline"
+                          className="h-7 px-2 text-[10px]"
+                          disabled={isPublishingCache}
+                          onClick={() =>
+                            runOrRequestPro?.(() => republishEmbed(), "republishing embeds")
+                          }
+                        >
+                          Republish
+                        </Button>
+                      )}
+                      {url ? (
+                        <Button type="button" size="sm" variant="outline" className="h-7 px-2 text-[10px]" asChild>
+                          <Link href={url} target="_blank" rel="noreferrer">
+                            Open
+                          </Link>
+                        </Button>
+                      ) : null}
+                      {url ? (
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="outline"
+                          className="h-7 px-2 text-[10px]"
+                          onClick={() =>
+                            runOrRequestPro?.(() => copyText(url, "Link"), "sharing charts")
+                          }
+                        >
+                          Copy
+                        </Button>
+                      ) : null}
+                    </div>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+        </CollapsibleContent>
+      </Collapsible>
+
+      <AlertDialog
+        open={showDeleteEmbedDialog}
+        onOpenChange={(open) => {
+          setShowDeleteEmbedDialog(open);
+          if (!open) setDeleteTarget(null);
+        }}
+      >
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Delete public embed?</AlertDialogTitle>
             <AlertDialogDescription>
-              This will unpublish the public chart page and disable its embed URL.
+              This will unpublish{" "}
+              {deleteTarget?.slug ? (
+                <>
+                  <span className="font-medium">/{deleteTarget.slug}</span>
+                  {deleteTarget.name ? ` (${deleteTarget.name})` : ""}
+                </>
+              ) : (
+                "this public chart page"
+              )}{" "}
+              and disable its embed URL. Other published charts in the project are unchanged.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
