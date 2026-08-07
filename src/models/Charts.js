@@ -99,4 +99,23 @@ ChartSchema.index(
     },
 )
 
+// Hot reload can keep a cached Chart model compiled before live_* paths existed.
+// Under mongoose strict mode those writes were silently stripped — live embeds never flipped on.
+if (mongoose.models.Chart && !mongoose.models.Chart.schema.path("live_backed")) {
+    mongoose.models.Chart.schema.add({
+        live_backed: {
+            type: Boolean,
+            default: false,
+            index: true,
+        },
+        live_backed_at: {
+            type: Date,
+        },
+        live_publish: {
+            type: Schema.Types.Mixed,
+            default: null,
+        },
+    });
+}
+
 export default mongoose.models.Chart || mongoose.model("Chart", ChartSchema)

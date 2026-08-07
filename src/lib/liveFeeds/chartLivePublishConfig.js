@@ -13,7 +13,7 @@ import {
   pollIntervalMsForPeriod,
 } from "@/lib/liveFeeds/registry";
 import {
-  dataSheetsReferencedBySnapshot,
+  collectChartSnapshotColumnsBySheetId,
   primarySheetIdForChartSnapshot,
 } from "@/lib/chartSnapshotDataDeps";
 import { sanitizeProjectLiveFeedSource } from "@/lib/liveFeeds/sanitizeProjectLiveFeedSource";
@@ -54,6 +54,7 @@ export function readChartBuilderSnapshot(chartOrSnapshot) {
 
 /**
  * Sheet ids the chart actually reads (any chart type).
+ * Never expands to the whole workbook — empty candle sheet ("use active") resolves to primary only.
  * @param {Record<string, object>} dataSheets
  * @param {Record<string, unknown> | null} snapshot
  * @returns {string[]}
@@ -64,11 +65,31 @@ export function chartReferencedSheetIds(dataSheets, snapshot) {
     const primary = primarySheetIdForChartSnapshot(sheets, null);
     return primary && sheets[primary] ? [primary] : [];
   }
-  const scoped = dataSheetsReferencedBySnapshot(sheets, snapshot);
-  const ids = Object.keys(scoped || {});
+  const defaultId = primarySheetIdForChartSnapshot(sheets, snapshot);
+  const colsBySheet = collectChartSnapshotColumnsBySheetId(snapshot, defaultId, sheets);
+  const ids = [...colsBySheet.keys()].filter((id) => sheets[id]);
   if (ids.length) return ids;
-  const primary = primarySheetIdForChartSnapshot(sheets, snapshot);
-  return primary && sheets[primary] ? [primary] : [];
+  // Candlestick with candlestickSheetId "" (active sheet) / charts with no axis keys.
+  if (defaultId && sheets[defaultId]) return [defaultId];
+  return [];
+}
+
+/**
+ * Ensure candlestick snapshots persist an explicit sheet id (not "") for public embeds.
+ * @param {Record<string, unknown> | null | undefined} snapshot
+ * @param {Record<string, object> | null | undefined} dataSheets
+ */
+export function stampChartSnapshotForLivePublish(snapshot, dataSheets) {
+  if (!snapshot || typeof snapshot !== "object") return snapshot || null;
+  const next = { ...snapshot };
+  if (String(next.selChartType || "") !== "candlestick") return next;
+  if (String(next.candlestickSheetId || "").trim()) return next;
+  const sheets = dataSheets && typeof dataSheets === "object" ? dataSheets : {};
+  const primary = primarySheetIdForChartSnapshot(sheets, next);
+  if (primary && sheets[primary]) {
+    next.candlestickSheetId = primary;
+  }
+  return next;
 }
 
 /**
@@ -178,10 +199,11 @@ export function liveBackedChartFields(liveBacked, livePublish = null) {
  * @returns {ChartLivePublishConfig | null}
  */
 export function buildChartLivePublishConfig(opts = {}) {
-  const snapshot =
-    readChartBuilderSnapshot(opts.snapshot) ||
-    readChartBuilderSnapshot(opts.chart) ||
-    null;
+  const stamped = stampChartSnapshotForLivePublish(
+    readChartBuilderSnapshot(opts.snapshot) || readChartBuilderSnapshot(opts.chart),
+    opts.dataSheets,
+  );
+  const snapshot = stamped;
   const dataSheets = opts.dataSheets && typeof opts.dataSheets === "object" ? opts.dataSheets : {};
   const sheetIds = chartReferencedSheetIds(dataSheets, snapshot);
   if (!sheetIds.length) return null;

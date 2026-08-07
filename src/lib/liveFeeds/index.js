@@ -51,6 +51,7 @@ export {
   sanitizeChartLivePublish,
   liveBackedChartFields,
   readChartBuilderSnapshot,
+  stampChartSnapshotForLivePublish,
 } from "@/lib/liveFeeds/chartLivePublishConfig";
 
 export {

@@ -310,6 +310,11 @@ export default function PublicChartEmbedClient({
           {isLive ? (
             <div className="pointer-events-none absolute right-2 top-2 z-10 rounded-md bg-emerald-600/90 px-1.5 py-0.5 text-[10px] font-medium text-white">
               Live
+              {liveTick?.fetchedAt ? (
+                <span className="ml-1 opacity-90">
+                  · {new Date(liveTick.fetchedAt).toLocaleTimeString()}
+                </span>
+              ) : null}
             </div>
           ) : null}
           <ChartBuilderProvider

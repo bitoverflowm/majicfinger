@@ -37,7 +37,7 @@ import {
   embedSlugStatusMessage,
   useEmbedSlugAvailability,
 } from "@/hooks/useEmbedSlugAvailability";
-import { resolveChartLiveEligibility } from "@/lib/liveFeeds/chartLivePublishConfig";
+import { resolveChartLiveEligibility, stampChartSnapshotForLivePublish } from "@/lib/liveFeeds/chartLivePublishConfig";
 import { Progress } from "@/components/ui/progress";
 
 function getColKeys(connectedCols) {
@@ -339,7 +339,9 @@ function ShareEmbedSection({ runOrRequestPro }) {
         typeof full.chart_properties[0] === "object"
           ? { ...full.chart_properties[0] }
           : {};
-      const snapshot = await capturePublishSnapshot();
+      const snapshotRaw = await capturePublishSnapshot();
+      const snapshot =
+        stampChartSnapshotForLivePublish(snapshotRaw, dataSheets) || snapshotRaw || {};
       const publishChartName = (workbookChartName || full.chart_name || "").trim() || "Chart";
       const chart_properties = [{ ...prev0, title: publishChartName, rechartsBuilder: snapshot }];
       const ogImageUrl = await uploadOgImage(chartId);
@@ -369,13 +371,20 @@ function ShareEmbedSection({ runOrRequestPro }) {
           public_slug: slug,
           is_public: true,
           live_backed: !!live,
-          ...(live && livePublishConfig ? { live_publish: livePublishConfig } : {}),
+          // Always send live_publish when live so the server can persist (or reject clearly).
+          ...(live ? { live_publish: livePublishConfig } : { live_publish: null }),
           ...(ogImageUrl ? { og_image_url: ogImageUrl } : {}),
         }),
       });
       const putJson = await putRes.json();
       if (!putRes.ok || !putJson?.success) {
         toast.error(putJson?.message || "Publish failed");
+        return false;
+      }
+      if (live && !putJson?.data?.live_backed) {
+        toast.error(
+          "Live flag did not save. Restart the dev server and republish (stale Chart model).",
+        );
         return false;
       }
       setLoadedChartMeta?.(putJson?.data);

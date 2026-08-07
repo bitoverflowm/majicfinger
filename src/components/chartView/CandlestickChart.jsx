@@ -138,10 +138,14 @@ export function CandlestickChartView({ data, dark = false, className }) {
     const timeScale = chart.timeScale();
     const prev = prevDataRef.current;
     const preserveZoom = isSameSeriesLiveUpdate(prev, list);
+    const prevLast = prev.length ? prev[prev.length - 1]?.time : null;
+    const nextLast = list.length ? list[list.length - 1]?.time : null;
+    const tipAdvanced =
+      prevLast != null && nextLast != null && nextLast > prevLast;
 
     /** @type {{ from: number; to: number } | null} */
     let savedLogical = null;
-    if (preserveZoom) {
+    if (preserveZoom && !tipAdvanced) {
       try {
         const range = timeScale.getVisibleLogicalRange();
         if (range && Number.isFinite(range.from) && Number.isFinite(range.to)) {
@@ -156,6 +160,27 @@ export function CandlestickChartView({ data, dark = false, className }) {
     prevDataRef.current = list;
 
     if (!list.length) return;
+
+    if (preserveZoom && tipAdvanced) {
+      // Keep the same window width but pin to the newest bar (public live embeds).
+      try {
+        const range = timeScale.getVisibleLogicalRange();
+        if (range && Number.isFinite(range.from) && Number.isFinite(range.to)) {
+          const width = Math.max(10, range.to - range.from);
+          const to = list.length - 1 + 0.5;
+          timeScale.setVisibleLogicalRange({ from: to - width, to });
+          return;
+        }
+      } catch {
+        // fall through
+      }
+      try {
+        timeScale.scrollToRealTime();
+        return;
+      } catch {
+        // fall through to fit
+      }
+    }
 
     if (savedLogical) {
       try {
