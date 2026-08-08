@@ -853,6 +853,8 @@ export function ChartBuilderProvider({ demo, children, initialBuilderSnapshot, e
   const [innerBoxColor, setInnerBoxColor] = useState(null);
 
   const [gridVisible, setGridVisible] = useState(true);
+  /** Scroll-wheel zoom on numeric / time X (line, area, bar, scatter). Ephemeral domain lives in ChartCanvas. */
+  const [enableZoom, setEnableZoom] = useState(false);
   const [yAxisLineVisible, setYAxisLineVisible] = useState(false);
   /** When true, category / time tick text on the X dimension is not drawn (area, line, bar). */
   const [hideXAxisLabels, setHideXAxisLabels] = useState(false);
@@ -1060,6 +1062,7 @@ export function ChartBuilderProvider({ demo, children, initialBuilderSnapshot, e
     if (s.bodyContentColor !== undefined) setBodyContentColor(s.bodyContentColor);
     if (s.innerBoxColor !== undefined) setInnerBoxColor(s.innerBoxColor);
     if (s.gridVisible !== undefined) setGridVisible(!!s.gridVisible);
+    if (s.enableZoom !== undefined) setEnableZoom(!!s.enableZoom);
     if (s.yAxisLineVisible !== undefined) setYAxisLineVisible(!!s.yAxisLineVisible);
     if (s.hideXAxisLabels !== undefined) setHideXAxisLabels(!!s.hideXAxisLabels);
     if (s.gridLineColor !== undefined) setGridLineColor(s.gridLineColor);
@@ -1762,6 +1765,7 @@ export function ChartBuilderProvider({ demo, children, initialBuilderSnapshot, e
     bodyContentColor,
     innerBoxColor,
     gridVisible,
+    enableZoom,
     yAxisLineVisible,
     hideXAxisLabels,
     gridLineColor,
@@ -2089,6 +2093,8 @@ export function ChartBuilderProvider({ demo, children, initialBuilderSnapshot, e
     setInnerBoxColor,
     gridVisible,
     setGridVisible,
+    enableZoom,
+    setEnableZoom,
     yAxisLineVisible,
     setYAxisLineVisible,
     hideXAxisLabels,
@@ -2294,6 +2300,7 @@ export function ChartCanvas() {
     bodyContentColor,
     innerBoxColor,
     gridVisible,
+    enableZoom,
     yAxisLineVisible,
     hideXAxisLabels,
     gridLineColor,
@@ -2520,6 +2527,112 @@ export function ChartCanvas() {
       ? ((effectiveUseTimeSeriesX || chartUsesTimeframes) && sortXDir === "desc" ? ["dataMax", "dataMin"] : ["dataMin", "dataMax"])
       : undefined;
 
+  /** Full numeric X extent for wheel-zoom clamping. */
+  const dataXExtent = useMemo(() => {
+    if (rechartsXAxisType !== "number" || !Array.isArray(finalRenderedData) || !plotXKey) {
+      return null;
+    }
+    let min = Infinity;
+    let max = -Infinity;
+    for (const row of finalRenderedData) {
+      const v = Number(row?.[plotXKey]);
+      if (!Number.isFinite(v)) continue;
+      if (v < min) min = v;
+      if (v > max) max = v;
+    }
+    if (!Number.isFinite(min) || !Number.isFinite(max) || min >= max) return null;
+    return [min, max];
+  }, [rechartsXAxisType, finalRenderedData, plotXKey]);
+
+  const zoomDesc =
+    (effectiveUseTimeSeriesX || chartUsesTimeframes) && sortXDir === "desc";
+
+  const [zoomXDomain, setZoomXDomain] = useState(/** @type {[number, number] | null} */ (null));
+
+  useEffect(() => {
+    if (!enableZoom) setZoomXDomain(null);
+  }, [enableZoom]);
+
+  // Reset ephemeral zoom when the underlying series / axes change.
+  useEffect(() => {
+    setZoomXDomain(null);
+  }, [selChartType, plotXKey, selX, dataXExtent?.[0], dataXExtent?.[1]]);
+
+  const effectiveXDomain = useMemo(() => {
+    if (!enableZoom || !zoomXDomain || rechartsXAxisType !== "number") {
+      return xAxisNumberDomain;
+    }
+    return zoomXDomain;
+  }, [enableZoom, zoomXDomain, rechartsXAxisType, xAxisNumberDomain]);
+
+  const chartZoomRef = useRef(/** @type {HTMLDivElement | null} */ (null));
+
+  const handleChartWheel = useCallback(
+    (e) => {
+      if (!enableZoom || !dataXExtent) return;
+      // Only intercept when zoom is on — keep page scroll otherwise.
+      e.preventDefault();
+      e.stopPropagation();
+      const [dMin, dMax] = dataXExtent;
+      const fullSpan = dMax - dMin;
+      if (!(fullSpan > 0)) return;
+
+      const current = zoomXDomain
+        ? zoomXDomain
+        : zoomDesc
+          ? [dMax, dMin]
+          : [dMin, dMax];
+      const lo = Math.min(current[0], current[1]);
+      const hi = Math.max(current[0], current[1]);
+      const span = Math.max(hi - lo, fullSpan * 1e-9);
+      // Wheel down → zoom out; wheel up → zoom in (matches TradingView-style feel).
+      const factor = e.deltaY > 0 ? 1.18 : 1 / 1.18;
+      const el = chartZoomRef.current;
+      const rect = el?.getBoundingClientRect?.();
+      const frac =
+        rect && rect.width > 0
+          ? Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width))
+          : 0.5;
+      const center = lo + span * frac;
+      let newSpan = span * factor;
+      const minSpan = fullSpan * 0.002;
+      newSpan = Math.max(minSpan, Math.min(fullSpan, newSpan));
+      let newLo = center - newSpan * frac;
+      let newHi = center + newSpan * (1 - frac);
+      if (newLo < dMin) {
+        newHi += dMin - newLo;
+        newLo = dMin;
+      }
+      if (newHi > dMax) {
+        newLo -= newHi - dMax;
+        newHi = dMax;
+      }
+      newLo = Math.max(dMin, newLo);
+      newHi = Math.min(dMax, newHi);
+      if (newHi - newLo < minSpan) {
+        const mid = (newLo + newHi) / 2;
+        newLo = Math.max(dMin, mid - minSpan / 2);
+        newHi = Math.min(dMax, mid + minSpan / 2);
+      }
+      setZoomXDomain(zoomDesc ? [newHi, newLo] : [newLo, newHi]);
+    },
+    [enableZoom, dataXExtent, zoomXDomain, zoomDesc],
+  );
+
+  const handleChartDoubleClick = useCallback(() => {
+    if (!enableZoom) return;
+    setZoomXDomain(null);
+  }, [enableZoom]);
+
+  // Non-passive wheel so we can preventDefault while zooming.
+  useEffect(() => {
+    const el = chartZoomRef.current;
+    if (!el || !enableZoom || !dataXExtent) return undefined;
+    const onWheel = (ev) => handleChartWheel(ev);
+    el.addEventListener("wheel", onWheel, { passive: false });
+    return () => el.removeEventListener("wheel", onWheel);
+  }, [enableZoom, dataXExtent, handleChartWheel]);
+
   /** Recharts Treemap: one synthetic root whose children are sheet rows (name ← X, value ← Y). */
   const treemapData = useMemo(() => {
     if (selChartType !== "treemap" || !Array.isArray(treemapRows) || !yKeys[0]) {
@@ -2646,6 +2759,11 @@ export function ChartCanvas() {
     }
     return ticks.length > 0 ? ticks : undefined;
   }, [rechartsXAxisType, finalRenderedData, xKey]);
+
+  const effectiveXTicks = useMemo(() => {
+    if (enableZoom && zoomXDomain) return undefined;
+    return xAxisTicks;
+  }, [enableZoom, zoomXDomain, xAxisTicks]);
 
   const xTickFormatter = (v) => {
     const forcedPreset =
@@ -2980,10 +3098,18 @@ export function ChartCanvas() {
                     ) : null}
                     <ChartContainer
                     id={CHART_BUILDER_DOM_ID}
+                    ref={chartZoomRef}
                     config={chartConfig || dfltChartConfig}
+                    onDoubleClick={handleChartDoubleClick}
+                    title={
+                      enableZoom && dataXExtent
+                        ? "Scroll to zoom · double-click to reset"
+                        : undefined
+                    }
                     className={cn(
                       // `max-w` only applies when the card is wider than this cap; narrow layouts are widened via CardContent `px-*` above.
                       "flex flex-col items-center justify-start aspect-auto mx-auto w-full transition-[min-height,padding] duration-300 ease-out",
+                      enableZoom && dataXExtent ? "cursor-crosshair" : null,
                       embedInArticle
                         ? "h-[var(--article-embed-plot-height)] max-w-full flex-none py-0"
                         : "h-full max-w-[min(100%,67.2rem)] flex-1",
@@ -3011,8 +3137,9 @@ export function ChartCanvas() {
                         <XAxis
                           type={rechartsXAxisType}
                           dataKey={plotXKey}
-                          domain={xAxisNumberDomain}
-                          ticks={xAxisTicks}
+                          domain={effectiveXDomain}
+                          allowDataOverflow={!!(enableZoom && zoomXDomain)}
+                          ticks={effectiveXTicks}
                           tickLine={false}
                           axisLine={false}
                           tickMargin={xAxisTickMargin}
@@ -3115,8 +3242,11 @@ export function ChartCanvas() {
                             <XAxis
                               type={rechartsXAxisType}
                               dataKey={plotXKey}
-                              domain={rechartsXAxisType === "number" ? xAxisNumberDomain : undefined}
-                              ticks={rechartsXAxisType === "number" ? xAxisTicks : undefined}
+                              domain={rechartsXAxisType === "number" ? effectiveXDomain : undefined}
+                              allowDataOverflow={
+                                !!(enableZoom && zoomXDomain && rechartsXAxisType === "number")
+                              }
+                              ticks={rechartsXAxisType === "number" ? effectiveXTicks : undefined}
                               tickLine={false}
                               axisLine={false}
                               tickMargin={xAxisTickMargin}
@@ -3212,8 +3342,9 @@ export function ChartCanvas() {
                           type={rechartsXAxisType}
                           dataKey={plotXKey}
                           name={stripSheetScopedColumnKey(xKey)}
-                          domain={xAxisNumberDomain}
-                          ticks={xAxisTicks}
+                          domain={effectiveXDomain}
+                          allowDataOverflow={!!(enableZoom && zoomXDomain)}
+                          ticks={effectiveXTicks}
                           tickLine={false}
                           axisLine={false}
                           tickMargin={xAxisTickMargin}
@@ -3307,8 +3438,9 @@ export function ChartCanvas() {
                         <XAxis
                           type={rechartsXAxisType}
                           dataKey={plotXKey}
-                          domain={xAxisNumberDomain}
-                          ticks={xAxisTicks}
+                          domain={effectiveXDomain}
+                          allowDataOverflow={!!(enableZoom && zoomXDomain)}
+                          ticks={effectiveXTicks}
                           tickLine={false}
                           axisLine={false}
                           tickMargin={xAxisTickMargin}

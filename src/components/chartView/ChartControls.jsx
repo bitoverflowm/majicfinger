@@ -364,6 +364,8 @@ export default function ChartControls() {
     setInnerBoxColor,
     gridVisible,
     setGridVisible,
+    enableZoom,
+    setEnableZoom,
     yAxisLineVisible,
     setYAxisLineVisible,
     hideXAxisLabels,
@@ -2206,6 +2208,32 @@ export default function ChartControls() {
                           Bucket the visible chart by time without changing the sheet data.
                         </p>
                       )}
+                    </div>
+                  )}
+
+                  {(selChartType === "area" ||
+                    selChartType === "line" ||
+                    selChartType === "bar" ||
+                    selChartType === "scatter") && (
+                    <div className="space-y-2 border-b border-border/60 pb-3">
+                      <div className="flex items-center gap-2">
+                        <Switch
+                          id="chart-design-enable-zoom"
+                          checked={enableZoom}
+                          onCheckedChange={setEnableZoom}
+                          className="scale-75 origin-left"
+                        />
+                        <Label
+                          htmlFor="chart-design-enable-zoom"
+                          className="cursor-pointer text-xs text-muted-foreground"
+                        >
+                          Enable zoom
+                        </Label>
+                      </div>
+                      <p className="text-[10px] leading-snug text-muted-foreground">
+                        Scroll over the chart to zoom into a time or value range (numeric X).
+                        Double-click to reset. Works like candlestick scroll zoom.
+                      </p>
                     </div>
                   )}
 
