@@ -1,5 +1,8 @@
 import assert from "node:assert/strict";
-import { mapRowsToLivelinePoints } from "./mapRowsToLivelinePoints.js";
+import {
+  clipLivelinePointsToWindow,
+  mapRowsToLivelinePoints,
+} from "./mapRowsToLivelinePoints.js";
 
 function test(name, fn) {
   try {
@@ -31,6 +34,7 @@ test("mapRowsToLivelinePoints resolves sheet-scoped trade columns", () => {
     "sheet-t::created_time",
     "sheet-t::yes_price_dollars",
     "sheet-t",
+    { clip: false },
   );
   assert.equal(points.length, 2);
   assert.equal(points[0].time, 1_700_000_000);
@@ -49,6 +53,7 @@ test("mapRowsToLivelinePoints falls back to plain column names on scoped keys", 
     "sheet-t::created_time",
     "sheet-t::yes_price_dollars",
     "sheet-t",
+    { clip: false },
   );
   assert.equal(points.length, 2);
   assert.equal(points[0].value, 0.61);
@@ -61,7 +66,9 @@ test("mapRowsToLivelinePoints skips rows without a real timestamp (no idx fallba
     { yes_price_dollars: 0.6 },
     { created_time: 1_700_000_030_000, yes_price_dollars: 0.7 },
   ];
-  const points = mapRowsToLivelinePoints(rows, "created_time", "yes_price_dollars");
+  const points = mapRowsToLivelinePoints(rows, "created_time", "yes_price_dollars", null, {
+    clip: false,
+  });
   assert.equal(points.length, 1);
   assert.equal(points[0].value, 0.7);
 });
@@ -71,9 +78,28 @@ test("mapRowsToLivelinePoints sorts by time ascending", () => {
     { created_time: 1_700_000_050_000, yes_price_dollars: 0.9 },
     { created_time: 1_700_000_040_000, yes_price_dollars: 0.8 },
   ];
-  const points = mapRowsToLivelinePoints(rows, "created_time", "yes_price_dollars");
+  const points = mapRowsToLivelinePoints(rows, "created_time", "yes_price_dollars", null, {
+    clip: false,
+  });
   assert.deepEqual(
     points.map((p) => p.time),
     [1_700_000_040, 1_700_000_050],
   );
+});
+
+test("clipLivelinePointsToWindow caps and respects window", () => {
+  const nowSec = 1_800_000_000;
+  const points = [];
+  for (let i = 0; i < 200; i += 1) {
+    points.push({ time: nowSec - 199 + i, value: i });
+  }
+  const clipped = clipLivelinePointsToWindow(points, {
+    windowSecs: 60,
+    bufferSecs: 0,
+    nowSec,
+    maxPoints: 40,
+  });
+  assert.equal(clipped.length, 40);
+  assert.ok(clipped.every((p) => p.time >= nowSec - 60));
+  assert.equal(clipped[clipped.length - 1].time, nowSec);
 });

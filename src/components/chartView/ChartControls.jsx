@@ -2023,6 +2023,26 @@ export default function ChartControls() {
                     </>
                   )}
 
+                  {selChartType === "liveline" && (
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      size="sm"
+                      className="text-xs"
+                      onClick={() => {
+                        const next = (availableYOptions || []).find((opt) => !(selY || []).includes(opt));
+                        if (next) handleSelectY(next);
+                      }}
+                      disabled={
+                        !availableYOptions?.length ||
+                        (availableYOptions || []).every((opt) => (selY || []).includes(opt))
+                      }
+                    >
+                      {(availableYOptions || []).every((opt) => (selY || []).includes(opt))
+                        ? "No more columns to add"
+                        : "+ Add line"}
+                    </Button>
+                  )}
                   {selChartType !== "pie" && selChartType !== "scatter" && selChartType !== "liveline" && selChartType !== "candlestick" && selChartType !== "line" && selChartType !== "treemap" && !(selChartType === "bar" && barSeriesColumn) && (
                     <Button
                       type="button"

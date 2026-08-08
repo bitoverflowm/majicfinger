@@ -1300,7 +1300,7 @@ export function ChartBuilderProvider({ demo, children, initialBuilderSnapshot, e
   // Auto-trim Y for single-series chart types (keeps filters/sorts intact).
   useEffect(() => {
     const singleSeries =
-      selChartType === "pie" || selChartType === "radar" || selChartType === "liveline" || selChartType === "treemap";
+      selChartType === "pie" || selChartType === "radar" || selChartType === "treemap";
     if (!singleSeries) return;
     setSelY((prev) => {
       const curr = Array.isArray(prev) ? prev : [];
@@ -1682,19 +1682,41 @@ export function ChartBuilderProvider({ demo, children, initialBuilderSnapshot, e
   }, [selChartType, scopedKeysInUse, barUsesCrossSheetData, crossSheetChartData, chartData]);
 
   /** Same sheet merge as line charts so `sheet-id::col` axes work with live REST upserts. */
-  const livelineData = useMemo(() => {
+  const livelineSeries = useMemo(() => {
     const rows =
       scopedKeysInUse || selChartType === "liveline" ? crossSheetChartData : chartData;
-    return mapRowsToLivelinePoints(rows, selX, selY?.[0], activeSheetId);
-  }, [scopedKeysInUse, selChartType, crossSheetChartData, chartData, selX, selY, activeSheetId]);
+    const yKeys = Array.isArray(selY) ? selY.filter(Boolean) : [];
+    if (!rows?.length || !selX || !yKeys.length) return [];
+    const clipOpts = { windowSecs: 900 };
+    return yKeys.map((yKey, idx) => {
+      const data = mapRowsToLivelinePoints(rows, selX, yKey, activeSheetId, clipOpts);
+      return {
+        id: String(yKey),
+        label: resolveChartSeriesLabel(yKey, idx, lineLabelOverrides),
+        color: null, // filled in ChartCanvas with palette
+        data,
+        value: data[data.length - 1]?.value ?? 0,
+      };
+    });
+  }, [
+    scopedKeysInUse,
+    selChartType,
+    crossSheetChartData,
+    chartData,
+    selX,
+    selY,
+    activeSheetId,
+    lineLabelOverrides,
+  ]);
 
-  /** Pause Liveline wall-clock scroll when the REST feed covering this sheet is paused. */
+  const livelineData = useMemo(() => livelineSeries[0]?.data || [], [livelineSeries]);
+
+  /** Pause Liveline wall-clock scroll when the REST feed covering this sheet is paused / ended. */
   const livelineFeedPaused = useMemo(() => {
     const feeds = Object.values(liveFeedState?.feedsById || {});
-    if (!feeds.length) return false;
     const xSheet =
       parseScopedColumnKey(selX, activeSheetId).sheetId || activeSheetId || "";
-    return feeds.some((f) => {
+    const feedPaused = feeds.some((f) => {
       if (!f?.isPaused) return false;
       const sheetIds = [
         f?.sheets?.marketsMetadataSheetId,
@@ -1704,7 +1726,15 @@ export function ChartBuilderProvider({ demo, children, initialBuilderSnapshot, e
         .map(String);
       return xSheet && sheetIds.includes(String(xSheet));
     });
-  }, [liveFeedState?.feedsById, selX, activeSheetId]);
+    if (feedPaused) return true;
+    // No points in the last 2 minutes → market idle/over; freeze instead of scrolling empty.
+    const latest = livelineSeries.reduce((max, s) => {
+      const t = s?.data?.[s.data.length - 1]?.time;
+      return Number.isFinite(t) && t > max ? t : max;
+    }, 0);
+    if (!latest) return false;
+    return Date.now() / 1000 - latest > 120;
+  }, [liveFeedState?.feedsById, selX, activeSheetId, livelineSeries]);
 
   const chartTimeframesAvailable = useMemo(() => {
     const rows = ((selChartType === "line" || scopedKeysInUse) ? lineChartData : chartData) || [];
@@ -2234,6 +2264,7 @@ export function ChartBuilderProvider({ demo, children, initialBuilderSnapshot, e
     setBodyContent,
 
     livelineData,
+    livelineSeries,
     livelineFeedPaused,
     candlestickMapped,
     xAxisRange: null,
@@ -2296,6 +2327,7 @@ export function ChartCanvas() {
     subTitle,
     subTitleColor,
     livelineData,
+    livelineSeries,
     livelineFeedPaused,
     livelineColorChoice,
     livelineMomentum,
@@ -3157,12 +3189,27 @@ export function ChartCanvas() {
                   </div>
                 ) : selChartType === "liveline" ? (
                   <div className="flex min-h-[180px] w-full flex-1 flex-col items-center justify-center">
-                    {livelineData && livelineData.length > 0 ? (
+                    {livelineSeries && livelineSeries.length > 0 && livelineSeries.some((s) => s.data?.length) ? (
                       <Liveline
-                        data={livelineData}
-                        value={livelineData[livelineData.length - 1].value}
+                        data={livelineSeries[0].data}
+                        value={livelineSeries[0].data[livelineSeries[0].data.length - 1]?.value ?? 0}
+                        series={
+                          livelineSeries.length > 1
+                            ? livelineSeries.map((s, idx) => ({
+                                ...s,
+                                color:
+                                  livelineColorChoice === "__palette__"
+                                    ? seriesColorAt(idx)
+                                    : idx === 0
+                                      ? livelineColorChoice
+                                      : seriesColorAt(idx),
+                              }))
+                            : undefined
+                        }
                         theme={dark ? "dark" : "light"}
-                        color={livelineColorChoice === "__palette__" ? seriesColorAt(0) : livelineColorChoice}
+                        color={
+                          livelineColorChoice === "__palette__" ? seriesColorAt(0) : livelineColorChoice
+                        }
                         momentum={livelineMomentum}
                         showValue={livelineShowValue}
                         valueMomentumColor={livelineValueMomentumColor}
@@ -3175,6 +3222,7 @@ export function ChartCanvas() {
                         badge={livelineBadge}
                         badgeVariant={livelineBadgeVariant}
                         paused={!!livelineFeedPaused}
+                        seriesToggleCompact={livelineSeries.length > 1}
                       />
                     ) : (
                       <div className="max-w-sm px-4 text-center text-xs text-muted-foreground">

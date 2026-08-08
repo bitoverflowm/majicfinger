@@ -227,6 +227,32 @@ export function evaluateTrackedMarketsClosure(metaRows, trackedTickers, nowMs = 
 }
 
 /**
+ * Prefer fresh tick meta rows; fill gaps from the markets metadata sheet so a failed
+ * meta refresh still ends the feed when the market is already closed in-sheet.
+ *
+ * @param {Record<string, unknown>[] | null | undefined} tickMetaRows
+ * @param {Record<string, unknown>[] | null | undefined} sheetMetaRows
+ * @returns {Record<string, unknown>[]}
+ */
+export function mergeMarketMetaRowsForClosure(tickMetaRows, sheetMetaRows) {
+  /** @type {Map<string, Record<string, unknown>>} */
+  const byTicker = new Map();
+  for (const row of Array.isArray(sheetMetaRows) ? sheetMetaRows : []) {
+    const t = String(row?.ticker || row?.market_ticker || "")
+      .trim()
+      .toUpperCase();
+    if (t) byTicker.set(t, row);
+  }
+  for (const row of Array.isArray(tickMetaRows) ? tickMetaRows : []) {
+    const t = String(row?.ticker || row?.market_ticker || "")
+      .trim()
+      .toUpperCase();
+    if (t) byTicker.set(t, row);
+  }
+  return [...byTicker.values()];
+}
+
+/**
  * @param {import("@/lib/liveFeeds/feedConfig").LiveFeedConfig} feed
  * @param {{
  *   reason?: string;

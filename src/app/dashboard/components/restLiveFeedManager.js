@@ -15,10 +15,23 @@ import {
   buildLiveFeedEndedStamp,
   clearLiveFeedEndedOnSheets,
   evaluateTrackedMarketsClosure,
+  mergeMarketMetaRowsForClosure,
   stampLiveFeedEndedOnSheets,
 } from "@/lib/liveFeeds/marketClosure";
 
 const noop = () => {};
+
+/**
+ * Markets metadata rows already on the workbook (used when the tick meta refresh fails).
+ * @param {Record<string, object> | null | undefined} dataSheets
+ * @param {import("@/lib/liveFeeds/feedConfig").LiveFeedConfig} feed
+ */
+function sheetMetaRowsForFeed(dataSheets, feed) {
+  const metaId = String(feed?.sheets?.marketsMetadataSheetId || "").trim();
+  if (!metaId) return [];
+  const rows = dataSheets?.[metaId]?.data;
+  return Array.isArray(rows) ? rows : [];
+}
 
 /**
  * Browser REST live-feed poller (sibling to LiveStreamManager for WebSockets).
@@ -147,6 +160,18 @@ export default function RestLiveFeedManager() {
           const marketTickers = Array.isArray(feed.params.marketTickers)
             ? feed.params.marketTickers
             : Object.keys(resolvedForFetch?.marketSheetIdsByTicker || {});
+
+          // Stop immediately when workbook meta already shows all markets closed
+          // (avoids 1s poll spam + UI freeze after an esports market ends).
+          const preClosure = evaluateTrackedMarketsClosure(
+            sheetMetaRowsForFeed(sheetsNow, { ...feed, sheets: resolvedForFetch }),
+            marketTickers,
+            Date.now(),
+          );
+          if (preClosure.allClosed) {
+            return endFeedMarketsClosed(feedId, { ...feed, sheets: resolvedForFetch }, preClosure);
+          }
+
           const needsGapBackfill =
             !!feed.needsGapBackfill || (Number(feed.tickCount) || 0) === 0;
           if (needsGapBackfill) {
@@ -182,7 +207,21 @@ export default function RestLiveFeedManager() {
           const tracked = Object.keys(
             (configByFeedIdRef.current[feedId] || feed).sheets?.marketSheetIdsByTicker || {},
           );
-          const closure = evaluateTrackedMarketsClosure(tick.metaRows, tracked, Date.now());
+          const sheetsAfter = dataSheetsRef.current || {};
+          const prevMeta = Array.isArray(configByFeedIdRef.current[feedId]?.lastMetaRows)
+            ? configByFeedIdRef.current[feedId].lastMetaRows
+            : [];
+          const mergedMeta = mergeMarketMetaRowsForClosure(
+            mergeMarketMetaRowsForClosure(tick.metaRows, prevMeta),
+            sheetMetaRowsForFeed(sheetsAfter, configByFeedIdRef.current[feedId] || feed),
+          );
+          if (Array.isArray(tick.metaRows) && tick.metaRows.length) {
+            configByFeedIdRef.current[feedId] = {
+              ...(configByFeedIdRef.current[feedId] || feed),
+              lastMetaRows: tick.metaRows,
+            };
+          }
+          const closure = evaluateTrackedMarketsClosure(mergedMeta, tracked, Date.now());
           if (closure.allClosed) {
             return endFeedMarketsClosed(feedId, feed, closure);
           }
@@ -291,7 +330,12 @@ export default function RestLiveFeedManager() {
         const tracked = Object.keys(
           (configByFeedIdRef.current[feedId] || feed).sheets?.marketSheetIdsByTicker || {},
         );
-        const closure = evaluateTrackedMarketsClosure(tick.metaRows, tracked, Date.now());
+        const sheetsAfter = dataSheetsRef.current || {};
+        const mergedMeta = mergeMarketMetaRowsForClosure(
+          tick.metaRows,
+          sheetMetaRowsForFeed(sheetsAfter, configByFeedIdRef.current[feedId] || feed),
+        );
+        const closure = evaluateTrackedMarketsClosure(mergedMeta, tracked, Date.now());
         if (closure.allClosed) {
           return endFeedMarketsClosed(feedId, feed, closure);
         }
