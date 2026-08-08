@@ -5,13 +5,14 @@ import {
   publicLiveLookbackPeriods,
 } from "@/lib/liveFeeds/publicLiveKalshiCache";
 import { fetchKalshiLiveTradesIncrementalServer } from "@/lib/liveFeeds/fetchTradesIncrementalServer";
+import { fetchKalshiLiveOrderbookIncrementalServer } from "@/lib/liveFeeds/fetchOrderbookIncrementalServer";
 import { resolveDashboardByUsernameSlug } from "@/lib/server/resolveDashboardByUsernameSlug";
 
 /**
  * GET /api/public/dashboards/[username]/[slug]/live
  *
  * On-demand Kalshi live for a published live dashboard
- * (event candlesticks or market trades).
+ * (event candlesticks, market trades, or market orderbook).
  * Shared short-TTL cache so many visitors → one upstream pull (candles).
  */
 export default async function handler(req, res) {
@@ -79,6 +80,48 @@ export default async function handler(req, res) {
           periodInterval: 1,
           pollIntervalMs: liveConfig.pollIntervalMs,
           lookbackSec: liveConfig.lookbackSec,
+          charts,
+          fetchedAt: Date.now(),
+          cacheHit: false,
+        },
+      });
+    }
+
+    if (liveConfig.kind === "orderbook") {
+      const tickers = [
+        ...new Set(
+          Object.values(liveConfig.chartMap || {}).map((r) =>
+            String(r?.ticker || "").trim().toUpperCase(),
+          ),
+        ),
+      ].filter(Boolean);
+      const tick = await fetchKalshiLiveOrderbookIncrementalServer({
+        marketTickers: tickers.length ? tickers : liveConfig.marketTickers || [],
+        depth: liveConfig.depth,
+      });
+      /** @type {Record<string, Record<string, unknown>[]>} */
+      const rowsByTicker = {};
+      for (const m of tick.byMarket || []) {
+        const t = String(m.ticker || "").trim().toUpperCase();
+        if (t) rowsByTicker[t] = Array.isArray(m.rows) ? m.rows : [];
+      }
+      for (const [chartId, ref] of Object.entries(liveConfig.chartMap)) {
+        charts[chartId] = {
+          ticker: ref.ticker,
+          sheetId: ref.sheetId,
+          rows: rowsByTicker[ref.ticker] || [],
+        };
+      }
+
+      res.setHeader("Cache-Control", isPublic ? publicLiveCacheControl() : "private, no-store");
+      return res.status(200).json({
+        success: true,
+        data: {
+          kind: "orderbook",
+          overlayKind: "sheet_rows",
+          periodInterval: 1,
+          pollIntervalMs: liveConfig.pollIntervalMs,
+          depth: liveConfig.depth ?? null,
           charts,
           fetchedAt: Date.now(),
           cacheHit: false,

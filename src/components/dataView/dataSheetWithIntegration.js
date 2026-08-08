@@ -62,7 +62,8 @@ import { collectRequestCardEntries } from "@/lib/connectHomeRequestCards";
 import { connectHomeAnySheetHasData, isConnectUserDataPullActive } from "@/lib/connectHomePullDestination";
 import { EventCandlesticksLiveFeedControls } from "@/components/liveFeeds/EventCandlesticksLiveFeedControls";
 import { TradesLiveFeedControls } from "@/components/liveFeeds/TradesLiveFeedControls";
-import { discoverKalshiCandlesticksLiveGroup, discoverTradesFeedGroup } from "@/lib/liveFeeds/feedConfig";
+import { OrderbookLiveFeedControls } from "@/components/liveFeeds/OrderbookLiveFeedControls";
+import { discoverKalshiCandlesticksLiveGroup, discoverOrderbookFeedGroup, discoverTradesFeedGroup } from "@/lib/liveFeeds/feedConfig";
 import { KALSHI_GUIDED_TARGETS } from "@/lib/guidedWorkflows/targets";
 import { GUIDED_TARGET_ATTR } from "@/lib/guidedWorkflows/types";
 import {
@@ -292,8 +293,13 @@ export default function DataSheetWithIntegration({
     [dataSheets],
   );
   const showTradesLiveControls = hasTradesLiveGroup;
+  const hasOrderbookLiveGroup = useMemo(
+    () => !!discoverOrderbookFeedGroup(dataSheets),
+    [dataSheets],
+  );
+  const showOrderbookLiveControls = hasOrderbookLiveGroup;
   const showAnyLivePowerMoveControls =
-    showKalshiCandlesticksLiveControls || showTradesLiveControls;
+    showKalshiCandlesticksLiveControls || showTradesLiveControls || showOrderbookLiveControls;
   const hasAnySheetRows = useMemo(
     () => connectHomeAnySheetHasData(dataSheets, connectedData),
     [dataSheets, connectedData],
@@ -1908,6 +1914,7 @@ export default function DataSheetWithIntegration({
                             </>
                           ) : null}
                           {showTradesLiveControls ? <TradesLiveFeedControls /> : null}
+                          {showOrderbookLiveControls ? <OrderbookLiveFeedControls /> : null}
                           {!showAnyLivePowerMoveControls &&
                           connectPowerMove === "historical_v2_candlesticks" ? (
                             <>

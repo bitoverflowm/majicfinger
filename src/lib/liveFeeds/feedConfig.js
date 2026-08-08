@@ -109,7 +109,7 @@ export function createLiveFeedConfig(input) {
     const seriesTicker = String(input.params?.seriesTicker || "").trim().toUpperCase();
     if (!eventTicker || !seriesTicker) return null;
     params = { eventTicker, seriesTicker, periodInterval };
-  } else if (endpoint === "candlesticks" || endpoint === "trades") {
+  } else if (endpoint === "candlesticks" || endpoint === "trades" || endpoint === "orderbook") {
     const fromParams = normalizeMarketTickersParam(input.params?.marketTickers);
     const fromSheets = Object.keys(sanitizedSheets.marketSheetIdsByTicker || {});
     const marketTickers = fromParams.length ? fromParams : fromSheets;
@@ -122,10 +122,19 @@ export function createLiveFeedConfig(input) {
     }
     if (!Object.keys(filteredByTicker).length) return null;
     sanitizedSheets.marketSheetIdsByTicker = filteredByTicker;
-    params =
-      endpoint === "trades"
-        ? { marketTickers: Object.keys(filteredByTicker) }
-        : { marketTickers: Object.keys(filteredByTicker), periodInterval };
+    if (endpoint === "trades") {
+      params = { marketTickers: Object.keys(filteredByTicker) };
+    } else if (endpoint === "orderbook") {
+      const depthRaw = Math.floor(Number(input.params?.depth));
+      params = {
+        marketTickers: Object.keys(filteredByTicker),
+        ...(Number.isFinite(depthRaw) && depthRaw >= 0 && depthRaw <= 100
+          ? { depth: depthRaw }
+          : {}),
+      };
+    } else {
+      params = { marketTickers: Object.keys(filteredByTicker), periodInterval };
+    }
   } else {
     return null;
   }
@@ -433,6 +442,94 @@ export function discoverTradesFeedGroup(dataSheets, opts = {}) {
  */
 export function resolveTradesSheetsMap(dataSheets, feed) {
   const discovered = discoverTradesFeedGroup(dataSheets, {
+    marketTickers: normalizeMarketTickersParam(feed?.params?.marketTickers),
+  });
+  const sheets = sanitizeLiveFeedSheetsMap(discovered?.sheets || feed?.sheets || null, {
+    requireMeta: false,
+  });
+  if (!sheets) return null;
+  const want = normalizeMarketTickersParam(feed?.params?.marketTickers);
+  if (!want.length) return sheets;
+  /** @type {Record<string, string>} */
+  const filtered = {};
+  for (const t of want) {
+    if (sheets.marketSheetIdsByTicker[t]) filtered[t] = sheets.marketSheetIdsByTicker[t];
+  }
+  if (!Object.keys(filtered).length) return null;
+  return { marketSheetIdsByTicker: filtered };
+}
+
+/**
+ * Discover a market-orderbook sheet group from workbook provenance (one sheet per ticker).
+ * @param {Record<string, object>} dataSheets
+ * @param {{ marketTickers?: string[] }} [opts]
+ * @returns {{
+ *   kind: "orderbook";
+ *   marketTickers: string[];
+ *   depth: number | null;
+ *   sheets: LiveFeedSheetsMap;
+ * } | null}
+ */
+export function discoverOrderbookFeedGroup(dataSheets, opts = {}) {
+  const want = new Set(normalizeMarketTickersParam(opts.marketTickers).map((t) => t));
+  /** @type {Record<string, string>} */
+  const marketSheetIdsByTicker = {};
+  /** @type {number | null} */
+  let depth = null;
+
+  for (const [sheetId, sheet] of Object.entries(dataSheets || {})) {
+    const prov = sheet?.provenance;
+    if (!prov || typeof prov !== "object") continue;
+    if (String(prov.source || "") !== "kalshi-live") continue;
+    if (String(prov.endpoint || "") !== "orderbook") continue;
+
+    const kind = String(prov.sheetKind || "");
+    // Prefer market_orderbook; accept legacy pulls without sheetKind.
+    if (kind && kind !== "market_orderbook") continue;
+
+    const mt = String(
+      prov.marketTicker ||
+        (typeof prov.marketTickers === "string" ? prov.marketTickers : "") ||
+        sheet?.name ||
+        "",
+    )
+      .trim()
+      .toUpperCase();
+    if (!mt) continue;
+    if (want.size && !want.has(mt)) continue;
+    marketSheetIdsByTicker[mt] = sheetId;
+
+    if (depth == null) {
+      const filters = Array.isArray(prov.whereFilters) ? prov.whereFilters : [];
+      for (const f of filters) {
+        if (f?.column === "depth" && Number.isFinite(Number(f.value))) {
+          const d = Math.floor(Number(f.value));
+          if (d >= 0 && d <= 100) depth = d;
+        }
+      }
+    }
+  }
+
+  if (!Object.keys(marketSheetIdsByTicker).length) return null;
+
+  const sheets = sanitizeLiveFeedSheetsMap({ marketSheetIdsByTicker }, { requireMeta: false });
+  if (!sheets) return null;
+
+  return {
+    kind: "orderbook",
+    marketTickers: Object.keys(sheets.marketSheetIdsByTicker),
+    depth,
+    sheets,
+  };
+}
+
+/**
+ * @param {Record<string, object>} dataSheets
+ * @param {Pick<LiveFeedConfig, "params" | "sheets"> | null | undefined} feed
+ * @returns {LiveFeedSheetsMap | null}
+ */
+export function resolveOrderbookSheetsMap(dataSheets, feed) {
+  const discovered = discoverOrderbookFeedGroup(dataSheets, {
     marketTickers: normalizeMarketTickersParam(feed?.params?.marketTickers),
   });
   const sheets = sanitizeLiveFeedSheetsMap(discovered?.sheets || feed?.sheets || null, {

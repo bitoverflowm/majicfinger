@@ -6,6 +6,7 @@
 import {
   discoverEventCandlesticksFeedGroup,
   discoverMarketCandlesticksFeedGroup,
+  discoverOrderbookFeedGroup,
   discoverTradesFeedGroup,
 } from "@/lib/liveFeeds/feedConfig";
 import {
@@ -18,7 +19,7 @@ export { sanitizeProjectLiveFeedSource };
 
 /**
  * Build live_feed_source from workbook provenance (+ optional poll preference).
- * Prefers event candlesticks, then market candlesticks, then trades.
+ * Prefers event candlesticks, then market candlesticks, then trades, then orderbook.
  * @param {Record<string, object> | null | undefined} dataSheets
  * @param {{
  *   pollIntervalMs?: number | null;
@@ -32,7 +33,11 @@ export function buildProjectLiveFeedSourceFromSheets(dataSheets, opts = {}) {
     : null;
   const tradesGroup =
     !eventGroup && !marketGroup ? discoverTradesFeedGroup(dataSheets || {}) : null;
-  if (!eventGroup && !marketGroup && !tradesGroup) return null;
+  const orderbookGroup =
+    !eventGroup && !marketGroup && !tradesGroup
+      ? discoverOrderbookFeedGroup(dataSheets || {})
+      : null;
+  if (!eventGroup && !marketGroup && !tradesGroup && !orderbookGroup) return null;
 
   const prev = sanitizeProjectLiveFeedSource(opts.previous);
   const periodInterval = eventGroup?.periodInterval || marketGroup?.periodInterval || 1;
@@ -75,23 +80,46 @@ export function buildProjectLiveFeedSourceFromSheets(dataSheets, opts = {}) {
     });
   }
 
+  if (tradesGroup) {
+    const pollIntervalMs = clampLiveFeedPollIntervalMsForEndpoint(
+      Number.isFinite(pollFromOpt) && pollFromOpt > 0
+        ? pollFromOpt
+        : prev?.endpoint === "trades"
+          ? prev.pollIntervalMs
+          : 60_000,
+      "kalshi-live",
+      "trades",
+    );
+    return sanitizeProjectLiveFeedSource({
+      enabled: true,
+      integration: "kalshi-live",
+      endpoint: "trades",
+      marketTickers: tradesGroup.marketTickers,
+      periodInterval: 1,
+      pollIntervalMs,
+      marketCount: tradesGroup.marketTickers.length,
+      updatedAt: new Date().toISOString(),
+    });
+  }
+
   const pollIntervalMs = clampLiveFeedPollIntervalMsForEndpoint(
     Number.isFinite(pollFromOpt) && pollFromOpt > 0
       ? pollFromOpt
-      : prev?.endpoint === "trades"
+      : prev?.endpoint === "orderbook"
         ? prev.pollIntervalMs
         : 60_000,
     "kalshi-live",
-    "trades",
+    "orderbook",
   );
   return sanitizeProjectLiveFeedSource({
     enabled: true,
     integration: "kalshi-live",
-    endpoint: "trades",
-    marketTickers: tradesGroup.marketTickers,
+    endpoint: "orderbook",
+    marketTickers: orderbookGroup.marketTickers,
     periodInterval: 1,
     pollIntervalMs,
-    marketCount: tradesGroup.marketTickers.length,
+    marketCount: orderbookGroup.marketTickers.length,
+    ...(orderbookGroup.depth != null ? { depth: orderbookGroup.depth } : {}),
     updatedAt: new Date().toISOString(),
   });
 }
@@ -106,6 +134,7 @@ export function projectHasLiveFeedSource(project, dataSheets) {
   return !!(
     discoverEventCandlesticksFeedGroup(dataSheets || {}) ||
     discoverMarketCandlesticksFeedGroup(dataSheets || {}) ||
-    discoverTradesFeedGroup(dataSheets || {})
+    discoverTradesFeedGroup(dataSheets || {}) ||
+    discoverOrderbookFeedGroup(dataSheets || {})
   );
 }

@@ -33,6 +33,7 @@ import { KalshiLiveCandlestickCommonQueries } from "@/components/connectData/kal
 import { KalshiLiveEventCandlesticksRealtimeFeed } from "@/components/connectData/kalshiLive/KalshiLiveEventCandlesticksRealtimeFeed";
 import { KalshiLiveMarketCandlesticksRealtimeFeed } from "@/components/connectData/kalshiLive/KalshiLiveMarketCandlesticksRealtimeFeed";
 import { KalshiLiveTradesRealtimeFeed } from "@/components/connectData/kalshiLive/KalshiLiveTradesRealtimeFeed";
+import { KalshiLiveOrderbookRealtimeFeed } from "@/components/connectData/kalshiLive/KalshiLiveOrderbookRealtimeFeed";
 import { KalshiLiveTradesCommonQueries } from "@/components/connectData/kalshiLive/KalshiLiveTradesCommonQueries";
 import { KalshiLiveCandlestickHistoricalCutoffNote, KalshiLiveTradesHistoricalCutoffNote } from "@/components/connectData/kalshiLive/KalshiLiveCandlestickHistoricalCutoffNote";
 import { KalshiLiveTradesTickerField } from "@/components/connectData/kalshiLive/KalshiLiveTradesTickerField";
@@ -1375,6 +1376,7 @@ export function KalshiLiveIntegrationsCore({ onRunPull, className, stepBackRef }
                   disabled={pullLoading}
                 />
                 <KalshiLiveOrderbookCommonQueries className="mt-4" disabled={pullLoading} />
+                <KalshiLiveOrderbookRealtimeFeed className="mt-4" disabled={pullLoading} />
               </>
             ) : null}
             {selectedId === "series" ? (

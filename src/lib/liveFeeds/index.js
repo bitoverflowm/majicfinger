@@ -18,6 +18,7 @@ export {
   discoverEventCandlesticksFeedGroup,
   discoverMarketCandlesticksFeedGroup,
   discoverTradesFeedGroup,
+  discoverOrderbookFeedGroup,
   discoverKalshiCandlesticksLiveGroup,
   extractPersistedLiveFeedsFromSheets,
   stampLiveFeedOntoSheets,
@@ -27,6 +28,7 @@ export {
   resolveEventCandlesticksSheetsMap,
   resolveMarketCandlesticksSheetsMap,
   resolveTradesSheetsMap,
+  resolveOrderbookSheetsMap,
 } from "@/lib/liveFeeds/feedConfig";
 
 export {
@@ -38,6 +40,7 @@ export {
 export {
   datasetHasEventCandlesticksLiveSource,
   datasetHasTradesLiveSource,
+  datasetHasOrderbookLiveSource,
   liveBackedDashboardFields,
   resolveDatasetLiveBacked,
   resolvePublicDashboardLiveConfig,
@@ -63,6 +66,7 @@ export {
   startEventCandlesticksEditorLiveFeed,
   startMarketCandlesticksEditorLiveFeed,
   startTradesEditorLiveFeed,
+  startOrderbookEditorLiveFeed,
   maybeAutoStartPublishedProjectLiveFeed,
   dashboardHasPublishedSlug,
   projectHasPublishedLiveDashboard,

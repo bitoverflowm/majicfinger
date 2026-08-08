@@ -42,7 +42,7 @@ export function sanitizeProjectLiveFeedSource(raw) {
 
   const periodInterval = Math.floor(Number(raw.periodInterval)) || 1;
   const pollIntervalMs = Math.floor(Number(raw.pollIntervalMs)) || 60_000;
-  const minPoll = endpoint === "trades" ? 1_000 : 15_000;
+  const minPoll = endpoint === "trades" || endpoint === "orderbook" ? 1_000 : 15_000;
   const base = {
     enabled: /** @type {const} */ (true),
     integration,
@@ -61,13 +61,19 @@ export function sanitizeProjectLiveFeedSource(raw) {
     return { ...base, eventTicker, seriesTicker };
   }
 
-  if (endpoint === "candlesticks" || endpoint === "trades") {
+  if (endpoint === "candlesticks" || endpoint === "trades" || endpoint === "orderbook") {
     const marketTickers = normalizeTickers(raw.marketTickers);
     if (!marketTickers.length) return null;
     return {
       ...base,
       marketTickers,
       marketCount: base.marketCount || marketTickers.length,
+      ...(endpoint === "orderbook" &&
+      Number.isFinite(Math.floor(Number(raw.depth))) &&
+      Math.floor(Number(raw.depth)) >= 0 &&
+      Math.floor(Number(raw.depth)) <= 100
+        ? { depth: Math.floor(Number(raw.depth)) }
+        : {}),
     };
   }
 

@@ -43,6 +43,7 @@ import { fetchKalshiLiveEventForecastPull } from "@/lib/kalshiLive/fetchKalshiLi
 import { startEventCandlesticksEditorLiveFeed } from "@/lib/liveFeeds/startEventCandlesticksEditorLiveFeed";
 import { startMarketCandlesticksEditorLiveFeed } from "@/lib/liveFeeds/startEventCandlesticksEditorLiveFeed";
 import { startTradesEditorLiveFeed } from "@/lib/liveFeeds/startEventCandlesticksEditorLiveFeed";
+import { startOrderbookEditorLiveFeed } from "@/lib/liveFeeds/startEventCandlesticksEditorLiveFeed";
 import {
   clampLiveFeedPollIntervalMs,
   clampLiveFeedPollIntervalMsForEndpoint,
@@ -2354,6 +2355,8 @@ export default function KalshiLive({ setConnectedData, connectHomePullBridge = f
           : [{ ticker: marketTickers || "orderbook", raw, rows: accumulated }];
 
       let firstSheetId = sheetId || ctx?.activeSheetId || null;
+      /** @type {Record<string, object> | null} */
+      let writtenSheets = null;
       const totalRows = groups.reduce(
         (sum, g) => sum + (Array.isArray(g.rows) ? g.rows.length : 0),
         0,
@@ -2395,6 +2398,8 @@ export default function KalshiLive({ setConnectedData, connectHomePullBridge = f
                 provenance: {
                   source: "kalshi-live",
                   endpoint: "orderbook",
+                  sheetKind: "market_orderbook",
+                  marketTicker: tickerName,
                   marketTickers: tickerName,
                   whereFilters,
                   sortClauses,
@@ -2405,6 +2410,7 @@ export default function KalshiLive({ setConnectedData, connectHomePullBridge = f
             }
 
             firstSheetId = writtenIds[0] || firstSheetId;
+            writtenSheets = next;
             return next;
           });
 
@@ -2419,6 +2425,31 @@ export default function KalshiLive({ setConnectedData, connectHomePullBridge = f
 
       if (ctx?.requestConnectAnalyzeScroll) {
         ctx.requestConnectAnalyzeScroll();
+      }
+
+      if (
+        totalRows > 0 &&
+        writtenSheets &&
+        ctx?.connectKalshiLiveRealtimeFeedEnabled &&
+        typeof ctx?.liveFeedActions?.start === "function"
+      ) {
+        const pollMs = clampLiveFeedPollIntervalMsForEndpoint(
+          ctx.connectKalshiLiveRealtimePollIntervalMs ?? 60_000,
+          "kalshi-live",
+          "orderbook",
+        );
+        const selectedLive = Array.isArray(ctx.connectKalshiLiveRealtimeMarketTickers)
+          ? ctx.connectKalshiLiveRealtimeMarketTickers
+          : [];
+        startOrderbookEditorLiveFeed({
+          dataSheets: writtenSheets,
+          liveFeedActions: ctx.liveFeedActions,
+          liveFeedState: ctx.liveFeedState,
+          marketTickers: selectedLive.length ? selectedLive : undefined,
+          pollIntervalMs: pollMs,
+          reason: "manual",
+          toastOnStart: true,
+        });
       }
 
       return totalRows;

@@ -6,7 +6,7 @@
 
 /** @typedef {"rest_poll"} LiveFeedTransport */
 /** @typedef {"ephemeral" | "persisted" | "paused"} LiveFeedStatus */
-/** @typedef {"kalshi_candlestick_upsert" | "kalshi_trades_upsert"} LiveFeedMergeStrategy */
+/** @typedef {"kalshi_candlestick_upsert" | "kalshi_trades_upsert" | "kalshi_orderbook_replace"} LiveFeedMergeStrategy */
 
 /**
  * @typedef {object} LiveFeedEndpointDef
@@ -18,7 +18,7 @@
  * @property {number} [defaultPeriodInterval]
  * @property {number} defaultPollIntervalMs
  * @property {number} minPollIntervalMs
- * @property {number} lookbackPeriods  Candles: window in candle periods. Trades: lookback window in seconds when sheet is empty / public seed.
+ * @property {number} lookbackPeriods  Candles: window in candle periods. Trades: lookback window in seconds when sheet is empty / public seed. Orderbook: unused (full snapshot).
  * @property {number} maxConcurrentEphemeralPerTab
  * @property {number} softRowCapPerSheet
  */
@@ -64,6 +64,20 @@ export const LIVE_FEED_REGISTRY = {
     lookbackPeriods: 3_600,
     maxConcurrentEphemeralPerTab: 2,
     softRowCapPerSheet: 50_000,
+  },
+  "kalshi-live:orderbook": {
+    integration: "kalshi-live",
+    endpoint: "orderbook",
+    transport: "rest_poll",
+    merge: "kalshi_orderbook_replace",
+    defaultPollIntervalMs: 60_000,
+    // 1s for editor testing; public embeds still floor at 15s.
+    minPollIntervalMs: 1_000,
+    // Unused — each tick replaces the full book snapshot.
+    lookbackPeriods: 0,
+    maxConcurrentEphemeralPerTab: 2,
+    // Depth 100 × 2 sides + headroom.
+    softRowCapPerSheet: 500,
   },
 };
 

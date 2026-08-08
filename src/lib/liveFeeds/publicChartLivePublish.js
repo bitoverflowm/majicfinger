@@ -12,6 +12,7 @@ import {
 } from "@/lib/liveFeeds/publicLiveKalshiCache";
 import { fetchKalshiLiveMarketCandlesticksIncrementalServer } from "@/lib/liveFeeds/fetchMarketCandlesticksIncrementalServer";
 import { fetchKalshiLiveTradesIncrementalServer } from "@/lib/liveFeeds/fetchTradesIncrementalServer";
+import { fetchKalshiLiveOrderbookIncrementalServer } from "@/lib/liveFeeds/fetchOrderbookIncrementalServer";
 import { getLiveFeedEndpointDef } from "@/lib/liveFeeds/registry";
 import { structureOnlyLiveChartPayload } from "@/lib/server/publicDashboardHydration";
 import {
@@ -47,6 +48,11 @@ export function seedPublicChartLivePayload(payload, livePublish) {
     // Cap seed rows so embeds paint quickly; first /live tick backfills the window.
     const seedRowCap = Math.min(2_000, Math.max(200, Math.floor(lookbackSec / 2)));
     return structureOnlyLiveChartPayload(payload, { seedRowCap });
+  }
+  if (cfg?.endpoint === "orderbook") {
+    const softCap =
+      getLiveFeedEndpointDef("kalshi-live", "orderbook")?.softRowCapPerSheet || 500;
+    return structureOnlyLiveChartPayload(payload, { seedRowCap: softCap });
   }
   const period = Math.floor(Number(cfg?.params?.periodInterval)) || 1;
   const seedRowCap = publicLiveSeedRowCap(period);
@@ -146,6 +152,34 @@ export async function fetchPublicChartLiveTick(livePublish) {
       },
       fetchedAt,
       lookbackPeriods: lookbackSec,
+      cacheHit: false,
+    };
+  } else if (cfg.endpoint === "orderbook") {
+    const depthRaw = Math.floor(Number(cfg.params.depth));
+    const depth =
+      Number.isFinite(depthRaw) && depthRaw >= 0 && depthRaw <= 100 ? depthRaw : null;
+    const tick = await fetchKalshiLiveOrderbookIncrementalServer({
+      marketTickers,
+      depth,
+    });
+    fetchedAt = Date.now();
+    for (const m of tick.byMarket || []) {
+      const ticker = String(m.ticker || "").trim().toUpperCase();
+      const sheetId = String(sheetIdByTicker[ticker] || "").trim();
+      if (!sheetId) continue;
+      sheets[sheetId] = Array.isArray(m.rows) ? m.rows : [];
+    }
+    return {
+      overlayKind: cfg.overlayKind,
+      pollIntervalMs: Math.max(15_000, cfg.pollIntervalMs || 60_000),
+      sheets,
+      params: {
+        periodInterval: 1,
+        marketTickers,
+        ...(depth != null ? { depth } : {}),
+      },
+      fetchedAt,
+      lookbackPeriods: 0,
       cacheHit: false,
     };
   } else {

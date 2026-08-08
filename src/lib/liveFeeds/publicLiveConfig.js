@@ -8,6 +8,7 @@ import Chart from "@/models/Charts";
 import DataSet from "@/models/DataSets";
 import {
   discoverEventCandlesticksFeedGroup,
+  discoverOrderbookFeedGroup,
   discoverTradesFeedGroup,
 } from "@/lib/liveFeeds/feedConfig";
 import {
@@ -32,6 +33,14 @@ export function datasetHasEventCandlesticksLiveSource(dataSheets) {
  */
 export function datasetHasTradesLiveSource(dataSheets) {
   return !!discoverTradesFeedGroup(dataSheets || {});
+}
+
+/**
+ * True when workbook sheets look like Kalshi market orderbook live group.
+ * @param {Record<string, object> | null | undefined} dataSheets
+ */
+export function datasetHasOrderbookLiveSource(dataSheets) {
+  return !!discoverOrderbookFeedGroup(dataSheets || {});
 }
 
 /**
@@ -174,10 +183,70 @@ export async function resolvePublicDashboardLiveConfig(dash) {
   }
 
   const tradesGroup = discoverTradesFeedGroup(sheets);
-  if (!tradesGroup) return null;
+  if (tradesGroup) {
+    const tickerBySheetId = new Map();
+    for (const [ticker, sheetId] of Object.entries(tradesGroup.sheets.marketSheetIdsByTicker || {})) {
+      tickerBySheetId.set(String(sheetId), String(ticker).toUpperCase());
+    }
+
+    const chartIds = [...collectChartIdsFromLayout(dash.layout)];
+    /** @type {Record<string, { ticker: string; sheetId: string }>} */
+    const chartMap = {};
+
+    if (chartIds.length) {
+      const charts = await Chart.find({ _id: { $in: chartIds } })
+        .select("chart_properties rechartsBuilder")
+        .lean();
+      for (const chart of charts) {
+        const sheetIds = sheetIdsFromChart(chart, sheets);
+        for (const sheetId of sheetIds) {
+          const ticker = tickerBySheetId.get(sheetId);
+          if (!ticker) continue;
+          chartMap[String(chart._id)] = { ticker, sheetId };
+          break;
+        }
+      }
+    }
+
+    if (Object.keys(chartMap).length < chartIds.length) {
+      const rows = Array.isArray(dash?.layout?.rows) ? dash.layout.rows : [];
+      for (const row of rows) {
+        if (row?.type !== "cards" || !Array.isArray(row.columns)) continue;
+        for (const col of row.columns) {
+          const cid = String(col?.chart_id || "").trim();
+          if (!cid || chartMap[cid]) continue;
+          const micro = String(col?.microtext || "").trim().toUpperCase();
+          const sheetId = tradesGroup.sheets.marketSheetIdsByTicker?.[micro];
+          if (micro && sheetId) {
+            chartMap[cid] = { ticker: micro, sheetId };
+          }
+        }
+      }
+    }
+
+    if (Object.keys(chartMap).length) {
+      const lookbackSec =
+        getLiveFeedEndpointDef("kalshi-live", "trades")?.lookbackPeriods || 3_600;
+
+      return {
+        kind: "trades",
+        periodInterval: 1,
+        pollIntervalMs: Math.max(15_000, 60_000),
+        marketTickers: tradesGroup.marketTickers,
+        lookbackSec,
+        overlayKind: "sheet_rows",
+        chartMap,
+      };
+    }
+  }
+
+  const orderbookGroup = discoverOrderbookFeedGroup(sheets);
+  if (!orderbookGroup) return null;
 
   const tickerBySheetId = new Map();
-  for (const [ticker, sheetId] of Object.entries(tradesGroup.sheets.marketSheetIdsByTicker || {})) {
+  for (const [ticker, sheetId] of Object.entries(
+    orderbookGroup.sheets.marketSheetIdsByTicker || {},
+  )) {
     tickerBySheetId.set(String(sheetId), String(ticker).toUpperCase());
   }
 
@@ -200,33 +269,14 @@ export async function resolvePublicDashboardLiveConfig(dash) {
     }
   }
 
-  if (Object.keys(chartMap).length < chartIds.length) {
-    const rows = Array.isArray(dash?.layout?.rows) ? dash.layout.rows : [];
-    for (const row of rows) {
-      if (row?.type !== "cards" || !Array.isArray(row.columns)) continue;
-      for (const col of row.columns) {
-        const cid = String(col?.chart_id || "").trim();
-        if (!cid || chartMap[cid]) continue;
-        const micro = String(col?.microtext || "").trim().toUpperCase();
-        const sheetId = tradesGroup.sheets.marketSheetIdsByTicker?.[micro];
-        if (micro && sheetId) {
-          chartMap[cid] = { ticker: micro, sheetId };
-        }
-      }
-    }
-  }
-
   if (!Object.keys(chartMap).length) return null;
 
-  const lookbackSec =
-    getLiveFeedEndpointDef("kalshi-live", "trades")?.lookbackPeriods || 3_600;
-
   return {
-    kind: "trades",
+    kind: "orderbook",
     periodInterval: 1,
     pollIntervalMs: Math.max(15_000, 60_000),
-    marketTickers: tradesGroup.marketTickers,
-    lookbackSec,
+    marketTickers: orderbookGroup.marketTickers,
+    depth: orderbookGroup.depth,
     overlayKind: "sheet_rows",
     chartMap,
   };

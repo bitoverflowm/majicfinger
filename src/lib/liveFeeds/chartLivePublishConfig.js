@@ -6,6 +6,7 @@
 import {
   discoverEventCandlesticksFeedGroup,
   discoverMarketCandlesticksFeedGroup,
+  discoverOrderbookFeedGroup,
   discoverTradesFeedGroup,
 } from "@/lib/liveFeeds/feedConfig";
 import {
@@ -137,18 +138,19 @@ export function sanitizeChartLivePublish(raw) {
   const allowed =
     key === "kalshi-live:event_candlesticks" ||
     key === "kalshi-live:candlesticks" ||
-    key === "kalshi-live:trades";
+    key === "kalshi-live:trades" ||
+    key === "kalshi-live:orderbook";
   if (!allowed) return null;
   const params = raw.params && typeof raw.params === "object" ? { ...raw.params } : {};
   const periodInterval = Math.floor(Number(params.periodInterval)) || 1;
   const pollFrom = Math.floor(Number(raw.pollIntervalMs));
   let pollIntervalMs;
-  if (endpoint === "trades") {
+  if (endpoint === "trades" || endpoint === "orderbook") {
     // Public embeds still floor at 15s even if editor tested at 1s.
     const clamped = clampLiveFeedPollIntervalMsForEndpoint(
       Number.isFinite(pollFrom) && pollFrom > 0 ? pollFrom : 60_000,
       "kalshi-live",
-      "trades",
+      endpoint,
     );
     pollIntervalMs = Math.max(PUBLIC_LIVE_MIN_POLL_MS, clamped);
   } else {
@@ -158,7 +160,7 @@ export function sanitizeChartLivePublish(raw) {
         : defaultPublicPollIntervalMs(periodInterval);
   }
   const overlayKind =
-    endpoint === "trades"
+    endpoint === "trades" || endpoint === "orderbook"
       ? "sheet_rows"
       : raw.overlayKind === "candlestick_ohlc" || raw.overlayKind === "sheet_rows"
         ? raw.overlayKind
@@ -170,7 +172,7 @@ export function sanitizeChartLivePublish(raw) {
     overlayKind,
     params: {
       ...params,
-      periodInterval: endpoint === "trades" ? 1 : periodInterval,
+      periodInterval: endpoint === "trades" || endpoint === "orderbook" ? 1 : periodInterval,
       marketTickers: Array.isArray(params.marketTickers)
         ? [
             ...new Set(
@@ -350,6 +352,51 @@ export function buildChartLivePublishConfig(opts = {}) {
           sheetIdByTicker: Object.fromEntries(
             scopedSheetIds.map((sid) => [bySheet.get(sid), sid]).filter(([t]) => t),
           ),
+        },
+      };
+    }
+  }
+
+  const orderbookGroup = discoverOrderbookFeedGroup(dataSheets);
+  if (orderbookGroup) {
+    const bySheet = tickerBySheetIdMap(orderbookGroup.sheets.marketSheetIdsByTicker);
+    /** @type {string[]} */
+    const marketTickers = [];
+    /** @type {string[]} */
+    const scopedSheetIds = [];
+    for (const sid of sheetIds) {
+      const ticker = bySheet.get(sid);
+      if (!ticker) continue;
+      marketTickers.push(ticker);
+      scopedSheetIds.push(sid);
+    }
+    if (marketTickers.length) {
+      const pollFromSource =
+        liveSource?.endpoint === "orderbook" ? liveSource.pollIntervalMs : null;
+      const clamped = clampLiveFeedPollIntervalMsForEndpoint(
+        Number.isFinite(Number(pollFromSource)) && Number(pollFromSource) > 0
+          ? pollFromSource
+          : 60_000,
+        "kalshi-live",
+        "orderbook",
+      );
+      const pollIntervalMs = Math.max(PUBLIC_LIVE_MIN_POLL_MS, clamped);
+      const depthRaw = Math.floor(Number(orderbookGroup.depth ?? liveSource?.depth));
+      return {
+        integration: "kalshi-live",
+        endpoint: "orderbook",
+        pollIntervalMs,
+        overlayKind: "sheet_rows",
+        params: {
+          periodInterval: 1,
+          marketTickers: [...new Set(marketTickers)],
+          sheetIds: scopedSheetIds,
+          sheetIdByTicker: Object.fromEntries(
+            scopedSheetIds.map((sid) => [bySheet.get(sid), sid]).filter(([t]) => t),
+          ),
+          ...(Number.isFinite(depthRaw) && depthRaw >= 0 && depthRaw <= 100
+            ? { depth: depthRaw }
+            : {}),
         },
       };
     }

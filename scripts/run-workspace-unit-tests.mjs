@@ -39,6 +39,7 @@ import "@/lib/mapRowsToLivelinePoints.test.js";
 import "@/lib/liveFeeds/marketClosure.test.js";
 import "@/lib/liveFeeds/publicChartLivePublish.test.js";
 import "@/lib/liveFeeds/registry.trades.node.test.js";
+import "@/lib/liveFeeds/registry.orderbook.node.test.js";
 import "@/lib/sheetOperations/aggregateBucketRows.test.js";
 import "@/lib/dataLake/restoreQuantAthenaReplayConfig.test.js";
 import "@/lib/projectPersistence.quant.test.js";

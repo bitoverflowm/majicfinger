@@ -3,12 +3,14 @@
 import { useCallback, useEffect, useRef } from "react";
 import { toast } from "sonner";
 import { useMyStateV2 } from "@/context/stateContextV2";
-import { createLiveFeedConfig, resolveEventCandlesticksSheetsMap, resolveMarketCandlesticksSheetsMap, resolveTradesSheetsMap } from "@/lib/liveFeeds/feedConfig";
+import { createLiveFeedConfig, resolveEventCandlesticksSheetsMap, resolveMarketCandlesticksSheetsMap, resolveOrderbookSheetsMap, resolveTradesSheetsMap } from "@/lib/liveFeeds/feedConfig";
 import { getLiveFeedEndpointDef, liveFeedRegistryKey } from "@/lib/liveFeeds/registry";
 import { fetchKalshiLiveEventCandlesticksIncremental } from "@/lib/liveFeeds/fetchEventCandlesticksIncremental";
 import { fetchKalshiLiveMarketCandlesticksIncremental } from "@/lib/liveFeeds/fetchMarketCandlesticksIncremental";
+import { fetchKalshiLiveOrderbookIncremental } from "@/lib/liveFeeds/fetchOrderbookIncremental";
 import { fetchKalshiLiveTradesIncremental } from "@/lib/liveFeeds/fetchTradesIncremental";
 import { applyKalshiCandlestickUpsertToSheets } from "@/lib/liveFeeds/merge/kalshiCandlestickUpsert";
+import { applyKalshiOrderbookReplaceToSheets } from "@/lib/liveFeeds/merge/kalshiOrderbookReplace";
 import { applyKalshiTradesUpsertToSheets } from "@/lib/liveFeeds/merge/kalshiTradesUpsert";
 import { resolveCandlestickBackfillStartTs } from "@/lib/liveFeeds/candlestickBackfill";
 import {
@@ -149,7 +151,8 @@ export default function RestLiveFeedManager() {
         const isEventCandles = registryKey === "kalshi-live:event_candlesticks";
         const isMarketCandles = registryKey === "kalshi-live:candlesticks";
         const isTrades = registryKey === "kalshi-live:trades";
-        if (!isEventCandles && !isMarketCandles && !isTrades) {
+        const isOrderbook = registryKey === "kalshi-live:orderbook";
+        if (!isEventCandles && !isMarketCandles && !isTrades && !isOrderbook) {
           return { ended: false };
         }
 
@@ -240,6 +243,108 @@ export default function RestLiveFeedManager() {
             statusMessage = `Receiving live trades · +${tickStats.tradesAdded} new`;
           } else if (tickStats?.tradesUpdated > 0) {
             statusMessage = `Receiving live trades · ${tickStats.tradesUpdated} updated`;
+          }
+          if (closure.anyClosed && closure.openTickers.length > 0) {
+            const n = closure.closedTickers.length;
+            statusMessage = `${statusMessage.replace(/…$/, "")} · ${n} market${n === 1 ? "" : "s"} closed`;
+          }
+
+          const nextCfg = {
+            ...(configByFeedIdRef.current[feedId] || feed),
+            lastPolledAt: now,
+            lastSuccessAt: successAt,
+            lastError: null,
+            tickCount,
+            lastTickStats: tickStats,
+            needsGapBackfill: false,
+          };
+          configByFeedIdRef.current[feedId] = nextCfg;
+          patchFeedState(feedId, {
+            lastPolledAt: now,
+            lastSuccessAt: successAt,
+            lastError: null,
+            tickCount,
+            lastTickStats: tickStats,
+            statusMessage,
+            needsGapBackfill: false,
+          });
+          return { ended: false };
+        }
+
+        if (isOrderbook) {
+          const resolveSheets = resolveOrderbookSheetsMap;
+          const sheetsNow = dataSheetsRef.current || {};
+          const resolvedForFetch = resolveSheets(sheetsNow, feed) || feed.sheets;
+          const marketTickers = Array.isArray(feed.params.marketTickers)
+            ? feed.params.marketTickers
+            : Object.keys(resolvedForFetch?.marketSheetIdsByTicker || {});
+
+          const preClosure = evaluateTrackedMarketsClosure(
+            sheetMetaRowsForFeed(sheetsNow, { ...feed, sheets: resolvedForFetch }),
+            marketTickers,
+            Date.now(),
+          );
+          if (preClosure.allClosed) {
+            return endFeedMarketsClosed(feedId, { ...feed, sheets: resolvedForFetch }, preClosure);
+          }
+
+          const tick = await fetchKalshiLiveOrderbookIncremental({
+            marketTickers,
+            depth: feed.params?.depth,
+            signal: ac.signal,
+          });
+
+          if (!configByFeedIdRef.current[feedId]) return { ended: true };
+
+          let tickStats = null;
+          setDataSheets((prev) => {
+            const resolvedSheets = resolveSheets(prev, feed) || feed.sheets;
+            const feedForTick = { ...feed, sheets: resolvedSheets };
+            configByFeedIdRef.current[feedId] = {
+              ...(configByFeedIdRef.current[feedId] || feed),
+              sheets: resolvedSheets,
+            };
+            const result = applyKalshiOrderbookReplaceToSheets(prev, feedForTick, tick, {
+              softRowCap,
+            });
+            tickStats = result.stats;
+            return result.dataSheets;
+          });
+
+          const tracked = Object.keys(
+            (configByFeedIdRef.current[feedId] || feed).sheets?.marketSheetIdsByTicker || {},
+          );
+          const sheetsAfter = dataSheetsRef.current || {};
+          const prevMeta = Array.isArray(configByFeedIdRef.current[feedId]?.lastMetaRows)
+            ? configByFeedIdRef.current[feedId].lastMetaRows
+            : [];
+          const mergedMeta = mergeMarketMetaRowsForClosure(
+            mergeMarketMetaRowsForClosure(tick.metaRows, prevMeta),
+            sheetMetaRowsForFeed(sheetsAfter, configByFeedIdRef.current[feedId] || feed),
+          );
+          if (Array.isArray(tick.metaRows) && tick.metaRows.length) {
+            configByFeedIdRef.current[feedId] = {
+              ...(configByFeedIdRef.current[feedId] || feed),
+              lastMetaRows: tick.metaRows,
+            };
+          }
+          const closure = evaluateTrackedMarketsClosure(mergedMeta, tracked, Date.now());
+          if (closure.allClosed) {
+            return endFeedMarketsClosed(feedId, feed, closure);
+          }
+
+          const successAt = Date.now();
+          const prevTickCount = Number(configByFeedIdRef.current[feedId]?.tickCount) || 0;
+          const tickCount = prevTickCount + 1;
+          let statusMessage = "Receiving live orderbook…";
+          if (tickStats?.levelsReceived === 0) {
+            statusMessage = "Pull ok · empty book";
+          } else if (tickStats?.marketsMatched === 0) {
+            statusMessage = "Pull ok · no matching sheets";
+          } else if (tickStats?.levelsAdded > 0 || tickStats?.levelsRemoved > 0) {
+            statusMessage = `Receiving live orderbook · +${tickStats.levelsAdded || 0}/−${tickStats.levelsRemoved || 0}`;
+          } else if (tickStats?.levelsUpdated > 0) {
+            statusMessage = `Receiving live orderbook · ${tickStats.levelsUpdated} updated`;
           }
           if (closure.anyClosed && closure.openTickers.length > 0) {
             const n = closure.closedTickers.length;
