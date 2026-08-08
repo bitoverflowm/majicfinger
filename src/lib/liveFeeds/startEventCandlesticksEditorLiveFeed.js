@@ -3,12 +3,14 @@ import {
   createLiveFeedConfig,
   discoverEventCandlesticksFeedGroup,
   discoverMarketCandlesticksFeedGroup,
+  discoverTradesFeedGroup,
 } from "@/lib/liveFeeds/feedConfig";
 import { evaluateTrackedMarketsClosure } from "@/lib/liveFeeds/marketClosure";
 import {
   describeCandlePeriod,
   LIVE_FEED_POLL_FREQUENCY_OPTIONS,
   clampLiveFeedPollIntervalMs,
+  clampLiveFeedPollIntervalMsForEndpoint,
   pollIntervalMsForPeriod,
 } from "@/lib/liveFeeds/registry";
 
@@ -268,6 +270,118 @@ export function startMarketCandlesticksEditorLiveFeed(opts = {}) {
 }
 
 /**
+ * Start editor ephemeral live feed for Market Trades.
+ *
+ * @param {{
+ *   dataSheets?: Record<string, unknown> | null;
+ *   liveFeedActions?: { start?: (cfg: object) => string | null } | null;
+ *   liveFeedState?: { feedsById?: Record<string, { isRunning?: boolean; endpoint?: string; params?: { marketTickers?: string[] } }> } | null;
+ *   marketTickers?: string[] | null;
+ *   pollIntervalMs?: number | null;
+ *   toastOnStart?: boolean;
+ *   reason?: "published_project" | "published_dashboard" | "manual";
+ * }} opts
+ * @returns {{ started: boolean; feedId?: string | null; skipped?: string }}
+ */
+export function startTradesEditorLiveFeed(opts = {}) {
+  const dataSheets = opts.dataSheets && typeof opts.dataSheets === "object" ? opts.dataSheets : {};
+  const liveFeedActions = opts.liveFeedActions;
+  const liveFeedState = opts.liveFeedState;
+  const wantTickers = Array.isArray(opts.marketTickers)
+    ? [
+        ...new Set(
+          opts.marketTickers.map((t) => String(t || "").trim().toUpperCase()).filter(Boolean),
+        ),
+      ]
+    : [];
+
+  const group = discoverTradesFeedGroup(dataSheets, {
+    marketTickers: wantTickers.length ? wantTickers : undefined,
+  });
+  if (!group?.marketTickers?.length) {
+    return { started: false, skipped: "no_group" };
+  }
+  if (typeof liveFeedActions?.start !== "function") {
+    return { started: false, skipped: "no_actions" };
+  }
+
+  /** @type {Record<string, string>} */
+  const sheetMap = { ...(group.sheets.marketSheetIdsByTicker || {}) };
+  const trackTickers = wantTickers.length
+    ? wantTickers.filter((t) => sheetMap[t])
+    : Object.keys(sheetMap);
+  if (!trackTickers.length) {
+    return { started: false, skipped: "no_tickers" };
+  }
+
+  const existing = Object.values(liveFeedState?.feedsById || {}).find((f) => {
+    if (!f?.isRunning || f?.endpoint !== "trades") return false;
+    const running = new Set(
+      (Array.isArray(f?.params?.marketTickers) ? f.params.marketTickers : []).map((t) =>
+        String(t || "").trim().toUpperCase(),
+      ),
+    );
+    return trackTickers.some((t) => running.has(t));
+  });
+  if (existing) {
+    return { started: false, feedId: null, skipped: "already_running" };
+  }
+
+  for (const t of trackTickers) {
+    const sid = sheetMap[t];
+    const sheet = sid ? dataSheets?.[sid] : null;
+    if (sheet?.liveFeedEnded?.reason === "markets_closed") {
+      return { started: false, skipped: "markets_closed" };
+    }
+  }
+
+  /** @type {Record<string, string>} */
+  const trackedSheets = {};
+  for (const t of trackTickers) {
+    if (sheetMap[t]) trackedSheets[t] = sheetMap[t];
+  }
+
+  const pollMs = clampLiveFeedPollIntervalMsForEndpoint(
+    Math.floor(Number(opts.pollIntervalMs)) || 60_000,
+    "kalshi-live",
+    "trades",
+  );
+  const cfg = createLiveFeedConfig({
+    integration: "kalshi-live",
+    endpoint: "trades",
+    status: "ephemeral",
+    pollIntervalMs: pollMs,
+    params: {
+      marketTickers: trackTickers,
+    },
+    sheets: {
+      marketSheetIdsByTicker: trackedSheets,
+    },
+  });
+  if (!cfg) {
+    return { started: false, skipped: "invalid_config" };
+  }
+
+  const feedId = liveFeedActions.start(cfg);
+  if (!feedId) {
+    return { started: false, skipped: "start_failed" };
+  }
+
+  if (opts.toastOnStart !== false) {
+    const freq =
+      LIVE_FEED_POLL_FREQUENCY_OPTIONS.find((o) => o.valueMs === pollMs)?.label ||
+      `every ${Math.round(pollMs / 1000)}s`;
+    const prefix =
+      opts.reason === "published_dashboard" || opts.reason === "published_project"
+        ? "Live feed resumed"
+        : "Live feed started";
+    toast.success(`${prefix} · market trades · ${freq.toLowerCase()}`);
+  }
+
+  return { started: true, feedId };
+}
+
+/**
  * After project sheets hydrate: if a published dashboard exists for the project
  * and sheets are live-capable, auto-start the editor ephemeral feed.
  *
@@ -286,7 +400,11 @@ export async function maybeAutoStartPublishedProjectLiveFeed(opts = {}) {
   const marketGroup = !eventGroup
     ? discoverMarketCandlesticksFeedGroup(dataSheets || {})
     : null;
-  if (!eventGroup && !marketGroup) return { started: false, skipped: "not_live_capable" };
+  const tradesGroup =
+    !eventGroup && !marketGroup ? discoverTradesFeedGroup(dataSheets || {}) : null;
+  if (!eventGroup && !marketGroup && !tradesGroup) {
+    return { started: false, skipped: "not_live_capable" };
+  }
 
   let published = opts.publishedHint === true;
   if (!published) {
@@ -306,7 +424,16 @@ export async function maybeAutoStartPublishedProjectLiveFeed(opts = {}) {
     });
   }
 
-  return startMarketCandlesticksEditorLiveFeed({
+  if (marketGroup) {
+    return startMarketCandlesticksEditorLiveFeed({
+      dataSheets,
+      liveFeedActions: opts.liveFeedActions,
+      liveFeedState: opts.liveFeedState,
+      reason: "published_project",
+    });
+  }
+
+  return startTradesEditorLiveFeed({
     dataSheets,
     liveFeedActions: opts.liveFeedActions,
     liveFeedState: opts.liveFeedState,

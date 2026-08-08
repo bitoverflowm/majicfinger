@@ -186,3 +186,71 @@ test("applies sheet_rows overlay", () => {
   });
   assert.equal(next?.dataSheets?.["sheet-2"]?.data?.length, 2);
 });
+
+test("sanitizes trades live_publish and floors public poll at 15s", () => {
+  const ok = sanitizeChartLivePublish({
+    integration: "kalshi-live",
+    endpoint: "trades",
+    pollIntervalMs: 1_000,
+    overlayKind: "sheet_rows",
+    params: {
+      marketTickers: ["KX-A"],
+      sheetIds: ["sheet-t"],
+      sheetIdByTicker: { "KX-A": "sheet-t" },
+    },
+  });
+  assert.equal(ok?.endpoint, "trades");
+  assert.equal(ok?.overlayKind, "sheet_rows");
+  assert.ok((ok?.pollIntervalMs || 0) >= 15_000);
+});
+
+test("is eligible for line chart on a live trades sheet", () => {
+  const dataSheets = {
+    "sheet-t": {
+      name: "KX-A",
+      data: [{ trade_id: "1", created_time: 1_700_000_000_000, yes_price_dollars: 0.5 }],
+      provenance: {
+        source: "kalshi-live",
+        endpoint: "trades",
+        sheetKind: "market_trades",
+        marketTicker: "KX-A",
+      },
+    },
+  };
+  const lineSnap = {
+    v: 1,
+    selChartType: "line",
+    selX: "sheet-t::created_time",
+    selY: ["sheet-t::yes_price_dollars"],
+  };
+  const eligibility = resolveChartLiveEligibility({
+    snapshot: lineSnap,
+    dataSheets,
+  });
+  assert.equal(eligibility.eligible, true);
+  assert.equal(eligibility.config?.endpoint, "trades");
+  assert.equal(eligibility.config?.overlayKind, "sheet_rows");
+});
+
+test("merges trades overlay by trade_id without full replace", () => {
+  const base = {
+    chart: { chart_name: "T" },
+    rows: [],
+    dataSheets: {
+      "sheet-t": {
+        name: "KX-A",
+        data: [{ trade_id: "a", created_time: 1000, yes_price_dollars: 0.4 }],
+      },
+    },
+  };
+  const next = applyLiveOverlay(base, {
+    overlayKind: "sheet_rows",
+    sheets: {
+      "sheet-t": [{ trade_id: "b", created_time: 2000, yes_price_dollars: 0.5 }],
+    },
+  });
+  assert.deepEqual(
+    next?.dataSheets?.["sheet-t"]?.data?.map((r) => r.trade_id),
+    ["a", "b"],
+  );
+});

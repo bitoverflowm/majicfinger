@@ -73,16 +73,28 @@ export function createLiveFeedConfig(input) {
   const def = getLiveFeedEndpointDef(integration, endpoint);
   if (!def) return null;
 
+  const allowedPeriods = Array.isArray(def.allowedPeriodIntervals)
+    ? def.allowedPeriodIntervals
+    : null;
   let periodInterval = Math.floor(
-    Number(input.params?.periodInterval ?? input.periodInterval ?? def.defaultPeriodInterval),
+    Number(input.params?.periodInterval ?? input.periodInterval ?? def.defaultPeriodInterval ?? 1),
   );
-  if (!def.allowedPeriodIntervals.includes(periodInterval)) {
-    periodInterval = def.defaultPeriodInterval;
+  if (allowedPeriods?.length) {
+    if (!allowedPeriods.includes(periodInterval)) {
+      periodInterval = def.defaultPeriodInterval ?? allowedPeriods[0];
+    }
+  } else {
+    // Non-candle feeds (trades) do not use Kalshi period_interval.
+    periodInterval = 1;
   }
 
   let pollIntervalMs = Math.floor(Number(input.pollIntervalMs));
   if (!Number.isFinite(pollIntervalMs) || pollIntervalMs < def.minPollIntervalMs) {
-    pollIntervalMs = Math.max(def.minPollIntervalMs, pollIntervalMsForPeriod(periodInterval));
+    pollIntervalMs = Math.max(
+      def.minPollIntervalMs,
+      Math.floor(Number(def.defaultPollIntervalMs)) ||
+        (allowedPeriods ? pollIntervalMsForPeriod(periodInterval) : 60_000),
+    );
   }
 
   const requireMeta = endpoint === "event_candlesticks";
@@ -97,7 +109,7 @@ export function createLiveFeedConfig(input) {
     const seriesTicker = String(input.params?.seriesTicker || "").trim().toUpperCase();
     if (!eventTicker || !seriesTicker) return null;
     params = { eventTicker, seriesTicker, periodInterval };
-  } else if (endpoint === "candlesticks") {
+  } else if (endpoint === "candlesticks" || endpoint === "trades") {
     const fromParams = normalizeMarketTickersParam(input.params?.marketTickers);
     const fromSheets = Object.keys(sanitizedSheets.marketSheetIdsByTicker || {});
     const marketTickers = fromParams.length ? fromParams : fromSheets;
@@ -110,7 +122,10 @@ export function createLiveFeedConfig(input) {
     }
     if (!Object.keys(filteredByTicker).length) return null;
     sanitizedSheets.marketSheetIdsByTicker = filteredByTicker;
-    params = { marketTickers: Object.keys(filteredByTicker), periodInterval };
+    params =
+      endpoint === "trades"
+        ? { marketTickers: Object.keys(filteredByTicker) }
+        : { marketTickers: Object.keys(filteredByTicker), periodInterval };
   } else {
     return null;
   }
@@ -359,6 +374,80 @@ export function discoverMarketCandlesticksFeedGroup(dataSheets, opts = {}) {
     periodInterval,
     sheets,
   };
+}
+
+/**
+ * Discover a market-trades sheet group from workbook provenance (one sheet per ticker).
+ * @param {Record<string, object>} dataSheets
+ * @param {{ marketTickers?: string[] }} [opts]
+ * @returns {{
+ *   kind: "trades";
+ *   marketTickers: string[];
+ *   sheets: LiveFeedSheetsMap;
+ * } | null}
+ */
+export function discoverTradesFeedGroup(dataSheets, opts = {}) {
+  const want = new Set(normalizeMarketTickersParam(opts.marketTickers).map((t) => t));
+  /** @type {Record<string, string>} */
+  const marketSheetIdsByTicker = {};
+
+  for (const [sheetId, sheet] of Object.entries(dataSheets || {})) {
+    const prov = sheet?.provenance;
+    if (!prov || typeof prov !== "object") continue;
+    if (String(prov.source || "") !== "kalshi-live") continue;
+    if (String(prov.endpoint || "") !== "trades") continue;
+
+    const kind = String(prov.sheetKind || "");
+    // Prefer market_trades; accept legacy pulls without sheetKind.
+    if (kind && kind !== "market_trades") continue;
+
+    const mt = String(
+      prov.marketTicker ||
+        (typeof prov.marketTickers === "string" ? prov.marketTickers : "") ||
+        sheet?.name ||
+        "",
+    )
+      .trim()
+      .toUpperCase();
+    if (!mt) continue;
+    if (want.size && !want.has(mt)) continue;
+    marketSheetIdsByTicker[mt] = sheetId;
+  }
+
+  if (!Object.keys(marketSheetIdsByTicker).length) return null;
+
+  const sheets = sanitizeLiveFeedSheetsMap({ marketSheetIdsByTicker }, { requireMeta: false });
+  if (!sheets) return null;
+
+  return {
+    kind: "trades",
+    marketTickers: Object.keys(sheets.marketSheetIdsByTicker),
+    sheets,
+  };
+}
+
+/**
+ * @param {Record<string, object>} dataSheets
+ * @param {Pick<LiveFeedConfig, "params" | "sheets"> | null | undefined} feed
+ * @returns {LiveFeedSheetsMap | null}
+ */
+export function resolveTradesSheetsMap(dataSheets, feed) {
+  const discovered = discoverTradesFeedGroup(dataSheets, {
+    marketTickers: normalizeMarketTickersParam(feed?.params?.marketTickers),
+  });
+  const sheets = sanitizeLiveFeedSheetsMap(discovered?.sheets || feed?.sheets || null, {
+    requireMeta: false,
+  });
+  if (!sheets) return null;
+  const want = normalizeMarketTickersParam(feed?.params?.marketTickers);
+  if (!want.length) return sheets;
+  /** @type {Record<string, string>} */
+  const filtered = {};
+  for (const t of want) {
+    if (sheets.marketSheetIdsByTicker[t]) filtered[t] = sheets.marketSheetIdsByTicker[t];
+  }
+  if (!Object.keys(filtered).length) return null;
+  return { marketSheetIdsByTicker: filtered };
 }
 
 /**

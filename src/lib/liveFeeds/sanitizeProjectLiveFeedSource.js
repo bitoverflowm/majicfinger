@@ -42,12 +42,13 @@ export function sanitizeProjectLiveFeedSource(raw) {
 
   const periodInterval = Math.floor(Number(raw.periodInterval)) || 1;
   const pollIntervalMs = Math.floor(Number(raw.pollIntervalMs)) || 60_000;
+  const minPoll = endpoint === "trades" ? 1_000 : 15_000;
   const base = {
     enabled: /** @type {const} */ (true),
     integration,
     endpoint,
     periodInterval: [1, 60, 1440].includes(periodInterval) ? periodInterval : 1,
-    pollIntervalMs: Math.max(15_000, pollIntervalMs),
+    pollIntervalMs: Math.max(minPoll, pollIntervalMs),
     marketsMetadataSheetId: String(raw.marketsMetadataSheetId || "").trim() || undefined,
     marketCount: Math.max(0, Math.floor(Number(raw.marketCount)) || 0) || undefined,
     updatedAt: String(raw.updatedAt || "").trim() || new Date().toISOString(),
@@ -60,7 +61,7 @@ export function sanitizeProjectLiveFeedSource(raw) {
     return { ...base, eventTicker, seriesTicker };
   }
 
-  if (endpoint === "candlesticks") {
+  if (endpoint === "candlesticks" || endpoint === "trades") {
     const marketTickers = normalizeTickers(raw.marketTickers);
     if (!marketTickers.length) return null;
     return {

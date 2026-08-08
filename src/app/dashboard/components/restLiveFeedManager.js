@@ -3,11 +3,13 @@
 import { useCallback, useEffect, useRef } from "react";
 import { toast } from "sonner";
 import { useMyStateV2 } from "@/context/stateContextV2";
-import { createLiveFeedConfig, resolveEventCandlesticksSheetsMap, resolveMarketCandlesticksSheetsMap } from "@/lib/liveFeeds/feedConfig";
+import { createLiveFeedConfig, resolveEventCandlesticksSheetsMap, resolveMarketCandlesticksSheetsMap, resolveTradesSheetsMap } from "@/lib/liveFeeds/feedConfig";
 import { getLiveFeedEndpointDef, liveFeedRegistryKey } from "@/lib/liveFeeds/registry";
 import { fetchKalshiLiveEventCandlesticksIncremental } from "@/lib/liveFeeds/fetchEventCandlesticksIncremental";
 import { fetchKalshiLiveMarketCandlesticksIncremental } from "@/lib/liveFeeds/fetchMarketCandlesticksIncremental";
+import { fetchKalshiLiveTradesIncremental } from "@/lib/liveFeeds/fetchTradesIncremental";
 import { applyKalshiCandlestickUpsertToSheets } from "@/lib/liveFeeds/merge/kalshiCandlestickUpsert";
+import { applyKalshiTradesUpsertToSheets } from "@/lib/liveFeeds/merge/kalshiTradesUpsert";
 import { resolveCandlestickBackfillStartTs } from "@/lib/liveFeeds/candlestickBackfill";
 import {
   buildLiveFeedEndedStamp,
@@ -133,7 +135,97 @@ export default function RestLiveFeedManager() {
 
         const isEventCandles = registryKey === "kalshi-live:event_candlesticks";
         const isMarketCandles = registryKey === "kalshi-live:candlesticks";
-        if (!isEventCandles && !isMarketCandles) {
+        const isTrades = registryKey === "kalshi-live:trades";
+        if (!isEventCandles && !isMarketCandles && !isTrades) {
+          return { ended: false };
+        }
+
+        if (isTrades) {
+          const resolveSheets = resolveTradesSheetsMap;
+          const sheetsNow = dataSheetsRef.current || {};
+          const resolvedForFetch = resolveSheets(sheetsNow, feed) || feed.sheets;
+          const marketTickers = Array.isArray(feed.params.marketTickers)
+            ? feed.params.marketTickers
+            : Object.keys(resolvedForFetch?.marketSheetIdsByTicker || {});
+          const needsGapBackfill =
+            !!feed.needsGapBackfill || (Number(feed.tickCount) || 0) === 0;
+          if (needsGapBackfill) {
+            patchFeedState(feedId, { statusMessage: "Backfilling trades since last stop…" });
+          }
+
+          const tick = await fetchKalshiLiveTradesIncremental({
+            marketTickers,
+            lookbackSec: lookbackPeriods,
+            dataSheets: sheetsNow,
+            marketSheetIdsByTicker: resolvedForFetch?.marketSheetIdsByTicker,
+            forceLookback: needsGapBackfill && !(Number(feed.tickCount) > 0),
+            signal: ac.signal,
+          });
+
+          if (!configByFeedIdRef.current[feedId]) return { ended: true };
+
+          let tickStats = null;
+          setDataSheets((prev) => {
+            const resolvedSheets = resolveSheets(prev, feed) || feed.sheets;
+            const feedForTick = { ...feed, sheets: resolvedSheets };
+            configByFeedIdRef.current[feedId] = {
+              ...(configByFeedIdRef.current[feedId] || feed),
+              sheets: resolvedSheets,
+            };
+            const result = applyKalshiTradesUpsertToSheets(prev, feedForTick, tick, {
+              softRowCap,
+            });
+            tickStats = result.stats;
+            return result.dataSheets;
+          });
+
+          const tracked = Object.keys(
+            (configByFeedIdRef.current[feedId] || feed).sheets?.marketSheetIdsByTicker || {},
+          );
+          const closure = evaluateTrackedMarketsClosure(tick.metaRows, tracked, Date.now());
+          if (closure.allClosed) {
+            return endFeedMarketsClosed(feedId, feed, closure);
+          }
+
+          const successAt = Date.now();
+          const prevTickCount = Number(configByFeedIdRef.current[feedId]?.tickCount) || 0;
+          const tickCount = prevTickCount + 1;
+          let statusMessage = "Receiving live trades…";
+          if (tick.usedBackfillWindow && tickStats?.tradesAdded > 0) {
+            statusMessage = `Backfilled · +${tickStats.tradesAdded} trades`;
+          } else if (tickStats?.tradesReceived === 0) {
+            statusMessage = "Pull ok · no new trades";
+          } else if (tickStats?.marketsMatched === 0) {
+            statusMessage = "Pull ok · no matching sheets";
+          } else if (tickStats?.tradesAdded > 0) {
+            statusMessage = `Receiving live trades · +${tickStats.tradesAdded} new`;
+          } else if (tickStats?.tradesUpdated > 0) {
+            statusMessage = `Receiving live trades · ${tickStats.tradesUpdated} updated`;
+          }
+          if (closure.anyClosed && closure.openTickers.length > 0) {
+            const n = closure.closedTickers.length;
+            statusMessage = `${statusMessage.replace(/…$/, "")} · ${n} market${n === 1 ? "" : "s"} closed`;
+          }
+
+          const nextCfg = {
+            ...(configByFeedIdRef.current[feedId] || feed),
+            lastPolledAt: now,
+            lastSuccessAt: successAt,
+            lastError: null,
+            tickCount,
+            lastTickStats: tickStats,
+            needsGapBackfill: false,
+          };
+          configByFeedIdRef.current[feedId] = nextCfg;
+          patchFeedState(feedId, {
+            lastPolledAt: now,
+            lastSuccessAt: successAt,
+            lastError: null,
+            tickCount,
+            lastTickStats: tickStats,
+            statusMessage,
+            needsGapBackfill: false,
+          });
           return { ended: false };
         }
 
@@ -368,11 +460,20 @@ export default function RestLiveFeedManager() {
   );
 
   const restart = useCallback(
-    (feedId) => {
+    (feedId, patch = null) => {
       const cfg = configByFeedIdRef.current[feedId];
       if (!cfg) return;
+      const next =
+        patch && typeof patch === "object"
+          ? {
+              ...cfg,
+              ...(Number.isFinite(Number(patch.pollIntervalMs))
+                ? { pollIntervalMs: Math.floor(Number(patch.pollIntervalMs)) }
+                : {}),
+            }
+          : cfg;
       stop(feedId);
-      start(cfg);
+      start(next);
     },
     [stop, start],
   );

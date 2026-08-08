@@ -1,0 +1,176 @@
+"use client";
+
+import { useEffect, useMemo } from "react";
+import { Radio } from "lucide-react";
+
+import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Switch } from "@/components/ui/switch";
+import { useMyStateV2 } from "@/context/stateContextV2";
+import { parseKalshiLiveTradesTickersInput } from "@/lib/kalshiLive/tradesColumns";
+import {
+  clampLiveFeedPollIntervalMsForEndpoint,
+  filterLiveFeedPollOptionsForEndpoint,
+} from "@/lib/liveFeeds/registry";
+import { cn } from "@/lib/utils";
+
+/**
+ * Compose-time Real Time Feed for Market Trades.
+ * Live polls are only for post-cutoff (live API) markets — Common queries already
+ * clamp the date range; this checkbox starts the editor poll after pull.
+ *
+ * @param {{ className?: string; disabled?: boolean }} props
+ */
+export function KalshiLiveTradesRealtimeFeed({ className, disabled = false }) {
+  const ctx = useMyStateV2() ?? {};
+  const {
+    connectKalshiLiveTradesTicker = "",
+    connectKalshiLiveRealtimeFeedEnabled = false,
+    setConnectKalshiLiveRealtimeFeedEnabled,
+    connectKalshiLiveRealtimePollIntervalMs,
+    setConnectKalshiLiveRealtimePollIntervalMs,
+    connectKalshiLiveRealtimeMarketTickers = [],
+    setConnectKalshiLiveRealtimeMarketTickers,
+  } = ctx;
+
+  const tickers = useMemo(
+    () => parseKalshiLiveTradesTickersInput(connectKalshiLiveTradesTicker),
+    [connectKalshiLiveTradesTicker],
+  );
+  const noTickers = tickers.length === 0;
+
+  const pollOptions = useMemo(
+    () => filterLiveFeedPollOptionsForEndpoint("kalshi-live", "trades"),
+    [],
+  );
+
+  const pollValueMs = useMemo(() => {
+    return clampLiveFeedPollIntervalMsForEndpoint(
+      connectKalshiLiveRealtimePollIntervalMs ?? 60_000,
+      "kalshi-live",
+      "trades",
+    );
+  }, [connectKalshiLiveRealtimePollIntervalMs]);
+
+  useEffect(() => {
+    if (!setConnectKalshiLiveRealtimePollIntervalMs) return;
+    const next = clampLiveFeedPollIntervalMsForEndpoint(
+      connectKalshiLiveRealtimePollIntervalMs ?? 60_000,
+      "kalshi-live",
+      "trades",
+    );
+    if (next !== Number(connectKalshiLiveRealtimePollIntervalMs)) {
+      setConnectKalshiLiveRealtimePollIntervalMs(next);
+    }
+  }, [connectKalshiLiveRealtimePollIntervalMs, setConnectKalshiLiveRealtimePollIntervalMs]);
+
+  // Track all selected tickers for the live feed (one sheet each after pull).
+  useEffect(() => {
+    if (!setConnectKalshiLiveRealtimeMarketTickers) return;
+    const next = [...tickers];
+    const prev = Array.isArray(connectKalshiLiveRealtimeMarketTickers)
+      ? connectKalshiLiveRealtimeMarketTickers
+      : [];
+    const same =
+      next.length === prev.length &&
+      next.every((t, i) => t === String(prev[i] || "").toUpperCase());
+    if (!same) setConnectKalshiLiveRealtimeMarketTickers(next);
+  }, [tickers, connectKalshiLiveRealtimeMarketTickers, setConnectKalshiLiveRealtimeMarketTickers]);
+
+  useEffect(() => {
+    if (noTickers) setConnectKalshiLiveRealtimeFeedEnabled?.(false);
+  }, [noTickers, setConnectKalshiLiveRealtimeFeedEnabled]);
+
+  const enabled = !!connectKalshiLiveRealtimeFeedEnabled && !noTickers;
+  const controlsDisabled = disabled || noTickers;
+
+  return (
+    <div className={cn("space-y-2", className)}>
+      <div className="flex items-center gap-1.5">
+        <Radio
+          className={cn(
+            "h-3.5 w-3.5 shrink-0",
+            enabled ? "text-emerald-500" : "text-muted-foreground",
+          )}
+          aria-hidden
+        />
+        <h2 className="text-xs font-semibold tracking-tight text-foreground">Real Time Feed</h2>
+      </div>
+
+      <p className="text-[11px] leading-snug text-muted-foreground">
+        Optionally start a live REST poll when you submit this pull. Each market stays on its own
+        sheet; only new trades are appended. You can change the feed later from Power moves.
+      </p>
+      <p className="text-[10px] leading-snug text-muted-foreground">
+        Live polls use the live Markets Trades API (after the historical cutoff). Pre-cutoff history
+        belongs on Historical Trades — not this feed.
+      </p>
+
+      <div className="space-y-3">
+        <div className="flex items-center gap-2">
+          <Switch
+            id="market-trades-realtime-enable"
+            checked={!!connectKalshiLiveRealtimeFeedEnabled && !noTickers}
+            disabled={controlsDisabled}
+            className="h-4 w-7 shrink-0 [&>span]:h-3 [&>span]:w-3 [&>span]:data-[state=checked]:translate-x-3"
+            onCheckedChange={(checked) => {
+              setConnectKalshiLiveRealtimeFeedEnabled?.(!!checked);
+            }}
+          />
+          <Label
+            htmlFor="market-trades-realtime-enable"
+            className="cursor-pointer text-[11px] font-medium text-foreground"
+          >
+            Enable real time feed
+          </Label>
+        </div>
+
+        {connectKalshiLiveRealtimeFeedEnabled && !noTickers ? (
+          <div className="space-y-1.5">
+            <Label className="text-[11px] font-medium text-muted-foreground">
+              Feed refresh rate
+            </Label>
+            <Select
+              value={String(pollValueMs)}
+              disabled={controlsDisabled}
+              onValueChange={(raw) => {
+                const next = clampLiveFeedPollIntervalMsForEndpoint(
+                  Number(raw),
+                  "kalshi-live",
+                  "trades",
+                );
+                setConnectKalshiLiveRealtimePollIntervalMs?.(next);
+              }}
+            >
+              <SelectTrigger className="h-9 text-xs">
+                <SelectValue placeholder="Refresh rate" />
+              </SelectTrigger>
+              <SelectContent>
+                {pollOptions.map((opt) => (
+                  <SelectItem key={opt.valueMs} value={String(opt.valueMs)} className="text-xs">
+                    {opt.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <p className="text-[10px] leading-snug text-muted-foreground">
+              One Kalshi request per market per tick. Use 1 second only for short tests — prefer 1
+              minute+ in normal use to stay within rate limits.
+            </p>
+            {tickers.length > 1 ? (
+              <p className="text-[10px] leading-snug text-muted-foreground">
+                Streaming {tickers.length} markets: {tickers.join(", ")}
+              </p>
+            ) : null}
+          </div>
+        ) : null}
+      </div>
+    </div>
+  );
+}

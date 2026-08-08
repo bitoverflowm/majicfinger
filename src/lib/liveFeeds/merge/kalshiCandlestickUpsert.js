@@ -81,6 +81,8 @@ export function mergeLiveSheetRowPreserve(existing, incoming) {
  */
 export function liveSheetRowKey(row) {
   if (!row || typeof row !== "object") return null;
+  const tradeId = String(row.trade_id || "").trim();
+  if (tradeId) return `trade:${tradeId}`;
   const ts = normalizeLiveEndPeriodTs(row.end_period_ts);
   if (Number.isFinite(ts)) return `ts:${ts}`;
   const ticker = String(row.ticker || row.market_ticker || "")

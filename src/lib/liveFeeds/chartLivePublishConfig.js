@@ -6,9 +6,11 @@
 import {
   discoverEventCandlesticksFeedGroup,
   discoverMarketCandlesticksFeedGroup,
+  discoverTradesFeedGroup,
 } from "@/lib/liveFeeds/feedConfig";
 import {
   clampLiveFeedPollIntervalMs,
+  clampLiveFeedPollIntervalMsForEndpoint,
   liveFeedRegistryKey,
   pollIntervalMsForPeriod,
 } from "@/lib/liveFeeds/registry";
@@ -132,19 +134,35 @@ export function sanitizeChartLivePublish(raw) {
   const endpoint = String(raw.endpoint || "").trim();
   if (!integration || !endpoint) return null;
   const key = liveFeedRegistryKey(integration, endpoint);
-  if (key !== "kalshi-live:event_candlesticks" && key !== "kalshi-live:candlesticks") {
-    return null;
-  }
+  const allowed =
+    key === "kalshi-live:event_candlesticks" ||
+    key === "kalshi-live:candlesticks" ||
+    key === "kalshi-live:trades";
+  if (!allowed) return null;
   const params = raw.params && typeof raw.params === "object" ? { ...raw.params } : {};
   const periodInterval = Math.floor(Number(params.periodInterval)) || 1;
   const pollFrom = Math.floor(Number(raw.pollIntervalMs));
-  const pollIntervalMs = Number.isFinite(pollFrom) && pollFrom > 0
-    ? clampLiveFeedPollIntervalMs(pollFrom, periodInterval)
-    : defaultPublicPollIntervalMs(periodInterval);
+  let pollIntervalMs;
+  if (endpoint === "trades") {
+    // Public embeds still floor at 15s even if editor tested at 1s.
+    const clamped = clampLiveFeedPollIntervalMsForEndpoint(
+      Number.isFinite(pollFrom) && pollFrom > 0 ? pollFrom : 60_000,
+      "kalshi-live",
+      "trades",
+    );
+    pollIntervalMs = Math.max(PUBLIC_LIVE_MIN_POLL_MS, clamped);
+  } else {
+    pollIntervalMs =
+      Number.isFinite(pollFrom) && pollFrom > 0
+        ? clampLiveFeedPollIntervalMs(pollFrom, periodInterval)
+        : defaultPublicPollIntervalMs(periodInterval);
+  }
   const overlayKind =
-    raw.overlayKind === "candlestick_ohlc" || raw.overlayKind === "sheet_rows"
-      ? raw.overlayKind
-      : "sheet_rows";
+    endpoint === "trades"
+      ? "sheet_rows"
+      : raw.overlayKind === "candlestick_ohlc" || raw.overlayKind === "sheet_rows"
+        ? raw.overlayKind
+        : "sheet_rows";
   return {
     integration,
     endpoint,
@@ -152,7 +170,7 @@ export function sanitizeChartLivePublish(raw) {
     overlayKind,
     params: {
       ...params,
-      periodInterval,
+      periodInterval: endpoint === "trades" ? 1 : periodInterval,
       marketTickers: Array.isArray(params.marketTickers)
         ? [
             ...new Set(
@@ -288,6 +306,47 @@ export function buildChartLivePublishConfig(opts = {}) {
           marketTickers: [...new Set(marketTickers)],
           sheetIds: scopedSheetIds,
           marketsMetadataSheetId: marketGroup.sheets.marketsMetadataSheetId || null,
+          sheetIdByTicker: Object.fromEntries(
+            scopedSheetIds.map((sid) => [bySheet.get(sid), sid]).filter(([t]) => t),
+          ),
+        },
+      };
+    }
+  }
+
+  const tradesGroup = discoverTradesFeedGroup(dataSheets);
+  if (tradesGroup) {
+    const bySheet = tickerBySheetIdMap(tradesGroup.sheets.marketSheetIdsByTicker);
+    /** @type {string[]} */
+    const marketTickers = [];
+    /** @type {string[]} */
+    const scopedSheetIds = [];
+    for (const sid of sheetIds) {
+      const ticker = bySheet.get(sid);
+      if (!ticker) continue;
+      marketTickers.push(ticker);
+      scopedSheetIds.push(sid);
+    }
+    if (marketTickers.length) {
+      const pollFromSource =
+        liveSource?.endpoint === "trades" ? liveSource.pollIntervalMs : null;
+      const clamped = clampLiveFeedPollIntervalMsForEndpoint(
+        Number.isFinite(Number(pollFromSource)) && Number(pollFromSource) > 0
+          ? pollFromSource
+          : 60_000,
+        "kalshi-live",
+        "trades",
+      );
+      const pollIntervalMs = Math.max(PUBLIC_LIVE_MIN_POLL_MS, clamped);
+      return {
+        integration: "kalshi-live",
+        endpoint: "trades",
+        pollIntervalMs,
+        overlayKind: "sheet_rows",
+        params: {
+          periodInterval: 1,
+          marketTickers: [...new Set(marketTickers)],
+          sheetIds: scopedSheetIds,
           sheetIdByTicker: Object.fromEntries(
             scopedSheetIds.map((sid) => [bySheet.get(sid), sid]).filter(([t]) => t),
           ),

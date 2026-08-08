@@ -11,6 +11,8 @@ import {
   publicLiveSeedRowCap,
 } from "@/lib/liveFeeds/publicLiveKalshiCache";
 import { fetchKalshiLiveMarketCandlesticksIncrementalServer } from "@/lib/liveFeeds/fetchMarketCandlesticksIncrementalServer";
+import { fetchKalshiLiveTradesIncrementalServer } from "@/lib/liveFeeds/fetchTradesIncrementalServer";
+import { getLiveFeedEndpointDef } from "@/lib/liveFeeds/registry";
 import { structureOnlyLiveChartPayload } from "@/lib/server/publicDashboardHydration";
 import {
   buildChartLivePublishConfig,
@@ -39,6 +41,13 @@ export {
  */
 export function seedPublicChartLivePayload(payload, livePublish) {
   const cfg = sanitizeChartLivePublish(livePublish);
+  if (cfg?.endpoint === "trades") {
+    const lookbackSec =
+      getLiveFeedEndpointDef("kalshi-live", "trades")?.lookbackPeriods || 3_600;
+    // Cap seed rows so embeds paint quickly; first /live tick backfills the window.
+    const seedRowCap = Math.min(2_000, Math.max(200, Math.floor(lookbackSec / 2)));
+    return structureOnlyLiveChartPayload(payload, { seedRowCap });
+  }
   const period = Math.floor(Number(cfg?.params?.periodInterval)) || 1;
   const seedRowCap = publicLiveSeedRowCap(period);
   return structureOnlyLiveChartPayload(payload, { seedRowCap });
@@ -109,6 +118,36 @@ export async function fetchPublicChartLiveTick(livePublish) {
       if (!sheetId) continue;
       sheets[sheetId] = Array.isArray(m.rows) ? m.rows : [];
     }
+  } else if (cfg.endpoint === "trades") {
+    const lookbackSec =
+      Math.floor(Number(cfg.params.lookbackSec)) ||
+      getLiveFeedEndpointDef("kalshi-live", "trades")?.lookbackPeriods ||
+      3_600;
+    const tick = await fetchKalshiLiveTradesIncrementalServer({
+      marketTickers,
+      lookbackSec,
+      forceLookback: true,
+    });
+    fetchedAt = Date.now();
+    for (const m of tick.byMarket || []) {
+      const ticker = String(m.ticker || "").trim().toUpperCase();
+      const sheetId = String(sheetIdByTicker[ticker] || "").trim();
+      if (!sheetId) continue;
+      sheets[sheetId] = Array.isArray(m.rows) ? m.rows : [];
+    }
+    return {
+      overlayKind: cfg.overlayKind,
+      pollIntervalMs: Math.max(15_000, cfg.pollIntervalMs || 60_000),
+      sheets,
+      params: {
+        periodInterval: 1,
+        marketTickers,
+        lookbackSec,
+      },
+      fetchedAt,
+      lookbackPeriods: lookbackSec,
+      cacheHit: false,
+    };
   } else {
     throw new Error(`No public live adapter for ${cfg.integration}:${cfg.endpoint}`);
   }

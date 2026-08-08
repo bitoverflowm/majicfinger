@@ -4,6 +4,8 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import dynamic from "next/dynamic";
 import { ChartEmbedSkeleton } from "@/components/publicEmbed/ChartEmbedSkeleton";
 import { applyLiveCandleOverlay } from "@/lib/liveFeeds/applyLiveCandleOverlay";
+import { applyLiveOverlay } from "@/lib/liveFeeds/applyLiveOverlay";
+import { sheetDataLooksLikeTrades } from "@/lib/liveFeeds/merge/kalshiTradesUpsert";
 
 const PublicDashboardChartBlock = dynamic(
   () =>
@@ -82,10 +84,19 @@ export function LazyPublicDashboardChart({
   const liveOverlayRef = useRef(liveOverlay);
   liveOverlayRef.current = liveOverlay;
 
-  const payload = useMemo(
-    () => applyLiveCandleOverlay(basePayload, liveOverlay),
-    [basePayload, liveOverlay],
-  );
+  const payload = useMemo(() => {
+    if (!liveOverlay?.sheetId || !Array.isArray(liveOverlay.rows) || !liveOverlay.rows.length) {
+      return basePayload;
+    }
+    if (sheetDataLooksLikeTrades(liveOverlay.rows)) {
+      return applyLiveOverlay(basePayload, {
+        overlayKind: "sheet_rows",
+        sheets: { [liveOverlay.sheetId]: liveOverlay.rows },
+        params: { periodInterval: liveOverlay.periodInterval },
+      });
+    }
+    return applyLiveCandleOverlay(basePayload, liveOverlay);
+  }, [basePayload, liveOverlay]);
 
   useEffect(() => {
     if (initialPayload && chartPayloadHasData(initialPayload)) {

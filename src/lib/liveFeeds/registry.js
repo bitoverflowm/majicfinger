@@ -1,12 +1,12 @@
 /**
  * Live REST-poll feed registry.
- * Allowlist entries for Kalshi Live candlestick endpoints.
+ * Allowlist entries for Kalshi Live candlestick + trades endpoints.
  * Add entries here when expanding to other endpoints / integrations.
  */
 
 /** @typedef {"rest_poll"} LiveFeedTransport */
 /** @typedef {"ephemeral" | "persisted" | "paused"} LiveFeedStatus */
-/** @typedef {"kalshi_candlestick_upsert"} LiveFeedMergeStrategy */
+/** @typedef {"kalshi_candlestick_upsert" | "kalshi_trades_upsert"} LiveFeedMergeStrategy */
 
 /**
  * @typedef {object} LiveFeedEndpointDef
@@ -14,11 +14,11 @@
  * @property {string} endpoint
  * @property {LiveFeedTransport} transport
  * @property {LiveFeedMergeStrategy} merge
- * @property {number[]} allowedPeriodIntervals  Kalshi minutes: 1 | 60 | 1440
- * @property {number} defaultPeriodInterval
+ * @property {number[]} [allowedPeriodIntervals]  Kalshi minutes: 1 | 60 | 1440 (candles only)
+ * @property {number} [defaultPeriodInterval]
  * @property {number} defaultPollIntervalMs
  * @property {number} minPollIntervalMs
- * @property {number} lookbackPeriods  Incremental window size in candle periods
+ * @property {number} lookbackPeriods  Candles: window in candle periods. Trades: lookback window in seconds when sheet is empty / public seed.
  * @property {number} maxConcurrentEphemeralPerTab
  * @property {number} softRowCapPerSheet
  */
@@ -49,6 +49,19 @@ export const LIVE_FEED_REGISTRY = {
     defaultPollIntervalMs: 60_000,
     minPollIntervalMs: 15_000,
     lookbackPeriods: 3,
+    maxConcurrentEphemeralPerTab: 2,
+    softRowCapPerSheet: 50_000,
+  },
+  "kalshi-live:trades": {
+    integration: "kalshi-live",
+    endpoint: "trades",
+    transport: "rest_poll",
+    merge: "kalshi_trades_upsert",
+    defaultPollIntervalMs: 60_000,
+    // 1s for editor testing; public embeds still floor at 15s.
+    minPollIntervalMs: 1_000,
+    // Empty-sheet / public seed lookback window in seconds (1 hour).
+    lookbackPeriods: 3_600,
     maxConcurrentEphemeralPerTab: 2,
     softRowCapPerSheet: 50_000,
   },
@@ -110,18 +123,57 @@ export function describeCandlePeriod(periodIntervalMinutes) {
 
 /** How often the live feed may poll (independent of candle size). */
 export const LIVE_FEED_POLL_FREQUENCY_OPTIONS = [
+  { valueMs: 1_000, label: "Every 1 second" },
   { valueMs: 60_000, label: "Every 1 minute" },
   { valueMs: 5 * 60_000, label: "Every 5 minutes" },
   { valueMs: 15 * 60_000, label: "Every 15 minutes" },
   { valueMs: 60 * 60_000, label: "Every 1 hour" },
-  { valueMs: 24 * 60 * 60_000, label: "Every 1 day" },
-  { valueMs: 7 * 24 * 60 * 60_000, label: "Every 1 week" },
-  { valueMs: 30 * 24 * 60 * 60_000, label: "Every 1 month" },
+  { valueMs: 24 * 60_000 * 60, label: "Every 1 day" },
+  { valueMs: 7 * 24 * 60_000 * 60, label: "Every 1 week" },
+  { valueMs: 30 * 24 * 60_000 * 60, label: "Every 1 month" },
 ];
 
 /**
+ * Poll options for non-candle feeds (e.g. trades). Includes 1s for testing;
+ * still respects the endpoint's minPollIntervalMs.
+ *
+ * @param {string} integration
+ * @param {string} endpoint
+ * @returns {typeof LIVE_FEED_POLL_FREQUENCY_OPTIONS}
+ */
+export function filterLiveFeedPollOptionsForEndpoint(integration, endpoint) {
+  const def = getLiveFeedEndpointDef(integration, endpoint);
+  const minMs = Math.max(1_000, Math.floor(Number(def?.minPollIntervalMs)) || 1_000);
+  return LIVE_FEED_POLL_FREQUENCY_OPTIONS.filter((o) => o.valueMs >= minMs);
+}
+
+/**
+ * Clamp poll ms to an allowed option for a non-candle endpoint.
+ *
+ * @param {number | null | undefined} pollMs
+ * @param {string} integration
+ * @param {string} endpoint
+ * @returns {number}
+ */
+export function clampLiveFeedPollIntervalMsForEndpoint(pollMs, integration, endpoint) {
+  const def = getLiveFeedEndpointDef(integration, endpoint);
+  const options = filterLiveFeedPollOptionsForEndpoint(integration, endpoint);
+  if (!options.length) {
+    return Math.max(
+      Math.floor(Number(def?.minPollIntervalMs)) || 1_000,
+      Math.floor(Number(def?.defaultPollIntervalMs)) || 60_000,
+    );
+  }
+  const n = Math.floor(Number(pollMs));
+  if (Number.isFinite(n) && options.some((o) => o.valueMs === n)) return n;
+  const preferred = Math.floor(Number(def?.defaultPollIntervalMs)) || 60_000;
+  if (options.some((o) => o.valueMs === preferred)) return preferred;
+  return options[0].valueMs;
+}
+
+/**
  * Poll options allowed for a candle period_interval.
- * Refresh cannot be faster than one candle: 1m candles → any rate;
+ * Refresh cannot be faster than one candle: 1m candles → ≥1m (1s is candles-incompatible);
  * 1h candles → ≥1h; 1d candles → ≥1d.
  *
  * @param {number} periodIntervalMinutes
@@ -131,7 +183,10 @@ export function filterLiveFeedPollOptionsForPeriod(periodIntervalMinutes) {
   const minutes = Math.floor(Number(periodIntervalMinutes));
   const periodMs =
     Number.isFinite(minutes) && minutes > 0 ? minutes * 60_000 : 60_000;
-  return LIVE_FEED_POLL_FREQUENCY_OPTIONS.filter((o) => o.valueMs >= periodMs);
+  // Candles never offer sub-minute polls (min registry floor is 15s; period floor ≥1m).
+  return LIVE_FEED_POLL_FREQUENCY_OPTIONS.filter(
+    (o) => o.valueMs >= periodMs && o.valueMs >= 15_000,
+  );
 }
 
 /**

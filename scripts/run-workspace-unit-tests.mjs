@@ -36,6 +36,7 @@ import "@/lib/chartBundle.test.js";
 import "@/lib/chartLineFilters.test.js";
 import "@/lib/chartSnapshotDataDeps.test.js";
 import "@/lib/liveFeeds/publicChartLivePublish.test.js";
+import "@/lib/liveFeeds/registry.trades.node.test.js";
 import "@/lib/sheetOperations/aggregateBucketRows.test.js";
 import "@/lib/dataLake/restoreQuantAthenaReplayConfig.test.js";
 import "@/lib/projectPersistence.quant.test.js";

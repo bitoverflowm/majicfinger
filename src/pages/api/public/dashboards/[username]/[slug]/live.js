@@ -4,14 +4,15 @@ import {
   publicLiveCacheControl,
   publicLiveLookbackPeriods,
 } from "@/lib/liveFeeds/publicLiveKalshiCache";
+import { fetchKalshiLiveTradesIncrementalServer } from "@/lib/liveFeeds/fetchTradesIncrementalServer";
 import { resolveDashboardByUsernameSlug } from "@/lib/server/resolveDashboardByUsernameSlug";
 
 /**
  * GET /api/public/dashboards/[username]/[slug]/live
  *
- * On-demand Kalshi event candlesticks for a published live dashboard
- * (public world, or private published for the owner).
- * Shared short-TTL cache so many visitors → one upstream pull.
+ * On-demand Kalshi live for a published live dashboard
+ * (event candlesticks or market trades).
+ * Shared short-TTL cache so many visitors → one upstream pull (candles).
  */
 export default async function handler(req, res) {
   const { username, slug } = req.query;
@@ -35,7 +36,53 @@ export default async function handler(req, res) {
     if (!liveConfig) {
       return res.status(400).json({
         success: false,
-        message: "No Kalshi event-candlesticks live source on this dashboard",
+        message: "No Kalshi live source on this dashboard",
+      });
+    }
+
+    /** @type {Record<string, { ticker: string; sheetId: string; rows: Record<string, unknown>[] }>} */
+    const charts = {};
+
+    if (liveConfig.kind === "trades") {
+      const tickers = [
+        ...new Set(
+          Object.values(liveConfig.chartMap || {}).map((r) =>
+            String(r?.ticker || "").trim().toUpperCase(),
+          ),
+        ),
+      ].filter(Boolean);
+      const tick = await fetchKalshiLiveTradesIncrementalServer({
+        marketTickers: tickers.length ? tickers : liveConfig.marketTickers || [],
+        lookbackSec: liveConfig.lookbackSec,
+        forceLookback: true,
+      });
+      /** @type {Record<string, Record<string, unknown>[]>} */
+      const rowsByTicker = {};
+      for (const m of tick.byMarket || []) {
+        const t = String(m.ticker || "").trim().toUpperCase();
+        if (t) rowsByTicker[t] = Array.isArray(m.rows) ? m.rows : [];
+      }
+      for (const [chartId, ref] of Object.entries(liveConfig.chartMap)) {
+        charts[chartId] = {
+          ticker: ref.ticker,
+          sheetId: ref.sheetId,
+          rows: rowsByTicker[ref.ticker] || [],
+        };
+      }
+
+      res.setHeader("Cache-Control", isPublic ? publicLiveCacheControl() : "private, no-store");
+      return res.status(200).json({
+        success: true,
+        data: {
+          kind: "trades",
+          overlayKind: "sheet_rows",
+          periodInterval: 1,
+          pollIntervalMs: liveConfig.pollIntervalMs,
+          lookbackSec: liveConfig.lookbackSec,
+          charts,
+          fetchedAt: Date.now(),
+          cacheHit: false,
+        },
       });
     }
 
@@ -54,8 +101,6 @@ export default async function handler(req, res) {
       if (t) rowsByTicker[t] = Array.isArray(m.rows) ? m.rows : [];
     }
 
-    /** @type {Record<string, { ticker: string; sheetId: string; rows: Record<string, unknown>[] }>} */
-    const charts = {};
     for (const [chartId, ref] of Object.entries(liveConfig.chartMap)) {
       charts[chartId] = {
         ticker: ref.ticker,
@@ -68,6 +113,8 @@ export default async function handler(req, res) {
     return res.status(200).json({
       success: true,
       data: {
+        kind: "event_candlesticks",
+        overlayKind: "candlestick_ohlc",
         eventTicker: liveConfig.eventTicker,
         seriesTicker: liveConfig.seriesTicker,
         periodInterval: liveConfig.periodInterval,

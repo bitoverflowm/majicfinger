@@ -42,8 +42,10 @@ import { fetchKalshiLiveEventCandlesticksPull } from "@/lib/kalshiLive/fetchKals
 import { fetchKalshiLiveEventForecastPull } from "@/lib/kalshiLive/fetchKalshiLiveEventForecastPull";
 import { startEventCandlesticksEditorLiveFeed } from "@/lib/liveFeeds/startEventCandlesticksEditorLiveFeed";
 import { startMarketCandlesticksEditorLiveFeed } from "@/lib/liveFeeds/startEventCandlesticksEditorLiveFeed";
+import { startTradesEditorLiveFeed } from "@/lib/liveFeeds/startEventCandlesticksEditorLiveFeed";
 import {
   clampLiveFeedPollIntervalMs,
+  clampLiveFeedPollIntervalMsForEndpoint,
   pollIntervalMsForPeriod,
 } from "@/lib/liveFeeds/registry";
 import { inferSeriesTickerFromMarket } from "@/lib/kalshiLive/fetchKalshiLiveCandlesticksUpstream";
@@ -2182,6 +2184,8 @@ export default function KalshiLive({ setConnectedData, connectHomePullBridge = f
           : [{ ticker: marketTickers || "trades", raw, rows: accumulated }];
 
       let firstSheetId = sheetId || ctx?.activeSheetId || null;
+      /** @type {Record<string, object> | null} */
+      let writtenSheets = null;
       const totalRows = groups.reduce(
         (sum, g) => sum + (Array.isArray(g.rows) ? g.rows.length : 0),
         0,
@@ -2223,6 +2227,8 @@ export default function KalshiLive({ setConnectedData, connectHomePullBridge = f
                 provenance: {
                   source: "kalshi-live",
                   endpoint: "trades",
+                  sheetKind: "market_trades",
+                  marketTicker: tickerName,
                   marketTickers: tickerName,
                   whereFilters,
                   sortClauses,
@@ -2234,6 +2240,7 @@ export default function KalshiLive({ setConnectedData, connectHomePullBridge = f
             }
 
             firstSheetId = writtenIds[0] || firstSheetId;
+            writtenSheets = next;
             return next;
           });
 
@@ -2248,6 +2255,31 @@ export default function KalshiLive({ setConnectedData, connectHomePullBridge = f
 
       if (ctx?.requestConnectAnalyzeScroll) {
         ctx.requestConnectAnalyzeScroll();
+      }
+
+      if (
+        totalRows > 0 &&
+        writtenSheets &&
+        ctx?.connectKalshiLiveRealtimeFeedEnabled &&
+        typeof ctx?.liveFeedActions?.start === "function"
+      ) {
+        const pollMs = clampLiveFeedPollIntervalMsForEndpoint(
+          ctx.connectKalshiLiveRealtimePollIntervalMs ?? 60_000,
+          "kalshi-live",
+          "trades",
+        );
+        const selectedLive = Array.isArray(ctx.connectKalshiLiveRealtimeMarketTickers)
+          ? ctx.connectKalshiLiveRealtimeMarketTickers
+          : [];
+        startTradesEditorLiveFeed({
+          dataSheets: writtenSheets,
+          liveFeedActions: ctx.liveFeedActions,
+          liveFeedState: ctx.liveFeedState,
+          marketTickers: selectedLive.length ? selectedLive : undefined,
+          pollIntervalMs: pollMs,
+          reason: "manual",
+          toastOnStart: true,
+        });
       }
 
       return totalRows;

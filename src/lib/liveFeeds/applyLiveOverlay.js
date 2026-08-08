@@ -4,6 +4,10 @@
  */
 
 import { applyLiveCandleOverlay } from "@/lib/liveFeeds/applyLiveCandleOverlay";
+import {
+  sheetDataLooksLikeTrades,
+  upsertTradeRowsByTradeId,
+} from "@/lib/liveFeeds/merge/kalshiTradesUpsert";
 
 /**
  * @param {object | null | undefined} basePayload
@@ -50,7 +54,7 @@ export function applyLiveOverlay(basePayload, tick) {
     return next;
   }
 
-  // sheet_rows: upsert candle-shaped rows by end_period_ts, else replace sheet data.
+  // sheet_rows: trades by trade_id, candles by end_period_ts, else replace sheet data.
   if (!basePayload || typeof basePayload !== "object") return basePayload ?? null;
   const prevSheets =
     basePayload.dataSheets && typeof basePayload.dataSheets === "object"
@@ -62,6 +66,26 @@ export function applyLiveOverlay(basePayload, tick) {
     if (!Array.isArray(rows)) continue;
     const sid = String(sheetId || "").trim();
     if (!sid) continue;
+    const existingSheet =
+      prevSheets[sid] && typeof prevSheets[sid] === "object" ? prevSheets[sid] : { name: sid };
+    const existingData = Array.isArray(existingSheet.data) ? existingSheet.data : [];
+
+    if (sheetDataLooksLikeTrades(rows) || sheetDataLooksLikeTrades(existingData)) {
+      const merged = upsertTradeRowsByTradeId(existingData, rows);
+      prevSheets[sid] = {
+        ...existingSheet,
+        data: merged,
+        rowCount: merged.length,
+        fullRowCount: merged.length,
+      };
+      if (!primaryRows.length || primaryRows === existingData) {
+        primaryRows = merged;
+      } else if (Array.isArray(basePayload.rows) && basePayload.rows === existingData) {
+        primaryRows = merged;
+      }
+      continue;
+    }
+
     const looksLikeCandles = rows.some((r) => r && r.end_period_ts != null);
     if (looksLikeCandles) {
       const mergedPayload = applyLiveCandleOverlay(
@@ -81,9 +105,7 @@ export function applyLiveOverlay(basePayload, tick) {
       const mergedSheet = mergedPayload?.dataSheets?.[sid];
       if (mergedSheet) {
         prevSheets[sid] = {
-          ...(prevSheets[sid] && typeof prevSheets[sid] === "object"
-            ? prevSheets[sid]
-            : { name: sid }),
+          ...existingSheet,
           ...mergedSheet,
         };
         if (!primaryRows.length && Array.isArray(mergedSheet.data)) {
@@ -92,9 +114,7 @@ export function applyLiveOverlay(basePayload, tick) {
       }
     } else {
       prevSheets[sid] = {
-        ...(prevSheets[sid] && typeof prevSheets[sid] === "object"
-          ? prevSheets[sid]
-          : { name: sid }),
+        ...existingSheet,
         data: rows,
         rowCount: rows.length,
         fullRowCount: rows.length,

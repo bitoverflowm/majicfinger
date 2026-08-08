@@ -1,10 +1,3 @@
-/**
- * Live REST-poll feeds — public barrel.
- *
- * Editor: ephemeral browser poll via RestLiveFeedManager.
- * Public dashboards: on-demand Kalshi via /api/public/.../live (cached), not cron.
- */
-
 export {
   LIVE_FEED_REGISTRY,
   getLiveFeedEndpointDef,
@@ -15,13 +8,16 @@ export {
   describeCandlePeriod,
   LIVE_FEED_POLL_FREQUENCY_OPTIONS,
   filterLiveFeedPollOptionsForPeriod,
+  filterLiveFeedPollOptionsForEndpoint,
   clampLiveFeedPollIntervalMs,
+  clampLiveFeedPollIntervalMsForEndpoint,
 } from "@/lib/liveFeeds/registry";
 
 export {
   createLiveFeedConfig,
   discoverEventCandlesticksFeedGroup,
   discoverMarketCandlesticksFeedGroup,
+  discoverTradesFeedGroup,
   discoverKalshiCandlesticksLiveGroup,
   extractPersistedLiveFeedsFromSheets,
   stampLiveFeedOntoSheets,
@@ -30,6 +26,7 @@ export {
   sanitizeLiveFeedSheetsMap,
   resolveEventCandlesticksSheetsMap,
   resolveMarketCandlesticksSheetsMap,
+  resolveTradesSheetsMap,
 } from "@/lib/liveFeeds/feedConfig";
 
 export {
@@ -40,6 +37,7 @@ export {
 
 export {
   datasetHasEventCandlesticksLiveSource,
+  datasetHasTradesLiveSource,
   liveBackedDashboardFields,
   resolveDatasetLiveBacked,
   resolvePublicDashboardLiveConfig,
@@ -64,6 +62,7 @@ export { applyLiveOverlay } from "@/lib/liveFeeds/applyLiveOverlay";
 export {
   startEventCandlesticksEditorLiveFeed,
   startMarketCandlesticksEditorLiveFeed,
+  startTradesEditorLiveFeed,
   maybeAutoStartPublishedProjectLiveFeed,
   dashboardHasPublishedSlug,
   projectHasPublishedLiveDashboard,

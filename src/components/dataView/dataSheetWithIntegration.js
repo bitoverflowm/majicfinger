@@ -61,7 +61,8 @@ import { ConnectIntegrationsPickerList } from "@/components/connectData/ConnectI
 import { collectRequestCardEntries } from "@/lib/connectHomeRequestCards";
 import { connectHomeAnySheetHasData, isConnectUserDataPullActive } from "@/lib/connectHomePullDestination";
 import { EventCandlesticksLiveFeedControls } from "@/components/liveFeeds/EventCandlesticksLiveFeedControls";
-import { discoverKalshiCandlesticksLiveGroup } from "@/lib/liveFeeds/feedConfig";
+import { TradesLiveFeedControls } from "@/components/liveFeeds/TradesLiveFeedControls";
+import { discoverKalshiCandlesticksLiveGroup, discoverTradesFeedGroup } from "@/lib/liveFeeds/feedConfig";
 import { KALSHI_GUIDED_TARGETS } from "@/lib/guidedWorkflows/targets";
 import { GUIDED_TARGET_ATTR } from "@/lib/guidedWorkflows/types";
 import {
@@ -286,6 +287,13 @@ export default function DataSheetWithIntegration({
   const showMarketCandlesticksLiveControls = hasMarketCandlesticksLiveGroup;
   const showKalshiCandlesticksLiveControls =
     showEventCandlesticksPowerMoves || showMarketCandlesticksLiveControls;
+  const hasTradesLiveGroup = useMemo(
+    () => !!discoverTradesFeedGroup(dataSheets),
+    [dataSheets],
+  );
+  const showTradesLiveControls = hasTradesLiveGroup;
+  const showAnyLivePowerMoveControls =
+    showKalshiCandlesticksLiveControls || showTradesLiveControls;
   const hasAnySheetRows = useMemo(
     () => connectHomeAnySheetHasData(dataSheets, connectedData),
     [dataSheets, connectedData],
@@ -1898,7 +1906,10 @@ export default function DataSheetWithIntegration({
                                 </>
                               ) : null}
                             </>
-                          ) : connectPowerMove === "historical_v2_candlesticks" ? (
+                          ) : null}
+                          {showTradesLiveControls ? <TradesLiveFeedControls /> : null}
+                          {!showAnyLivePowerMoveControls &&
+                          connectPowerMove === "historical_v2_candlesticks" ? (
                             <>
                               <Button
                                 type="button"
@@ -1921,12 +1932,12 @@ export default function DataSheetWithIntegration({
                                 dashboard. Save the project to keep the charts and candles.
                               </p>
                             </>
-                          ) : (
+                          ) : !showAnyLivePowerMoveControls &&
+                            connectPowerMove !== "historical_v2_candlesticks" ? (
                             <p className="px-1 py-2 text-xs text-muted-foreground">
                               No power moves available yet.
                             </p>
-                          )}
-                        </div>
+                          ) : null}                        </div>
                       </TabsContent>
 
                       <TabsContent value="charts" className="m-0 h-full min-w-0 w-full max-w-full">
