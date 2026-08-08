@@ -320,6 +320,34 @@ function formatEpochMsWithPreset(ms, preset) {
   return "";
 }
 
+const UTC_DAY_MS = 24 * 60 * 60 * 1000;
+
+/** UTC midnight (00:00:00.000Z) for the calendar day containing `ms`. */
+function utcDayStartMs(ms) {
+  if (!Number.isFinite(ms)) return NaN;
+  const d = new Date(ms);
+  return Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate());
+}
+
+/**
+ * UTC midnights that fall within [minMs, maxMs] (inclusive).
+ * Used for HH:mm day-separation markers on time-scale X axes.
+ */
+function enumerateUtcDayStartsInRange(minMs, maxMs) {
+  if (!Number.isFinite(minMs) || !Number.isFinite(maxMs)) return [];
+  const lo = Math.min(minMs, maxMs);
+  const hi = Math.max(minMs, maxMs);
+  let t = utcDayStartMs(lo);
+  if (!Number.isFinite(t)) return [];
+  if (t < lo) t += UTC_DAY_MS;
+  const out = [];
+  while (t <= hi) {
+    out.push(t);
+    t += UTC_DAY_MS;
+  }
+  return out;
+}
+
 /**
  * Local calendar label as dd-mmm (e.g. 08-Apr). Shorter than full datetime so angled ticks fit.
  * @param {number} _rangeMs reserved for future granularity (unused)
@@ -788,6 +816,8 @@ export function ChartBuilderProvider({ demo, children, initialBuilderSnapshot, e
   const [xTimeScale, setXTimeScale] = useState(false);
   /** Display-only formatting override for temporal X axes (ticks + tooltip). */
   const [xDateFormatPreset, setXDateFormatPreset] = useState("auto");
+  /** When Date label is Time (HH:mm), mark UTC day starts on the X axis as DD-MMM. */
+  const [showDaySeparationBlocks, setShowDaySeparationBlocks] = useState(false);
   /** Chart-only temporal bucketing; does not mutate or persist sheet rows. */
   const [chartTimeframesEnabled, setChartTimeframesEnabled] = useState(false);
   const [chartTimeframe, setChartTimeframe] = useState("15m");
@@ -1001,6 +1031,7 @@ export function ChartBuilderProvider({ demo, children, initialBuilderSnapshot, e
     if (s.lineHumanReadableTime !== undefined) setLineHumanReadableTime(!!s.lineHumanReadableTime);
     if (s.xTimeScale !== undefined) setXTimeScale(!!s.xTimeScale);
     if (s.xDateFormatPreset != null) setXDateFormatPreset(String(s.xDateFormatPreset || "auto"));
+    if (s.showDaySeparationBlocks !== undefined) setShowDaySeparationBlocks(!!s.showDaySeparationBlocks);
     if (s.chartTimeframesEnabled !== undefined) setChartTimeframesEnabled(!!s.chartTimeframesEnabled);
     if (s.chartTimeframe != null && CHART_TIMEFRAME_OPTIONS.some((opt) => opt.value === s.chartTimeframe)) {
       setChartTimeframe(s.chartTimeframe);
@@ -1718,6 +1749,7 @@ export function ChartBuilderProvider({ demo, children, initialBuilderSnapshot, e
     lineHumanReadableTime,
     xTimeScale,
     xDateFormatPreset,
+    showDaySeparationBlocks,
     chartTimeframesEnabled,
     chartTimeframe,
     scaleX,
@@ -2132,6 +2164,8 @@ export function ChartBuilderProvider({ demo, children, initialBuilderSnapshot, e
     xDateFormatPreset,
     setXDateFormatPreset,
     X_DATE_FORMAT_PRESETS,
+    showDaySeparationBlocks,
+    setShowDaySeparationBlocks,
     chartTimeframesEnabled,
     setChartTimeframesEnabled,
     chartTimeframe,
@@ -2274,6 +2308,7 @@ export function ChartCanvas() {
     lineHumanReadableTime,
     xTimeScale,
     xDateFormatPreset,
+    showDaySeparationBlocks,
     chartTimeframesEnabled,
     chartTimeframe,
     setChartTimeframe,
@@ -2760,10 +2795,43 @@ export function ChartCanvas() {
     return ticks.length > 0 ? ticks : undefined;
   }, [rechartsXAxisType, finalRenderedData, xKey]);
 
+  const daySeparationActive =
+    showDaySeparationBlocks &&
+    String(xDateFormatPreset || "") === "time_hm" &&
+    rechartsXAxisType === "number";
+
+  const daySeparationStartsMs = useMemo(() => {
+    if (!daySeparationActive) return [];
+    const extent =
+      enableZoom && zoomXDomain && Array.isArray(zoomXDomain) && zoomXDomain.length === 2
+        ? zoomXDomain
+        : dataXExtent;
+    if (!extent) return [];
+    const a = Number(extent[0]);
+    const b = Number(extent[1]);
+    if (!Number.isFinite(a) || !Number.isFinite(b)) return [];
+    return enumerateUtcDayStartsInRange(a, b);
+  }, [daySeparationActive, enableZoom, zoomXDomain, dataXExtent]);
+
+  const daySeparationStartSet = useMemo(
+    () => new Set(daySeparationStartsMs),
+    [daySeparationStartsMs],
+  );
+
   const effectiveXTicks = useMemo(() => {
     if (enableZoom && zoomXDomain) return undefined;
-    return xAxisTicks;
-  }, [enableZoom, zoomXDomain, xAxisTicks]);
+    if (!daySeparationActive || daySeparationStartsMs.length === 0) return xAxisTicks;
+    const seen = new Set(xAxisTicks || []);
+    const merged = [...(xAxisTicks || [])];
+    for (const ms of daySeparationStartsMs) {
+      if (!seen.has(ms)) {
+        seen.add(ms);
+        merged.push(ms);
+      }
+    }
+    merged.sort((a, b) => a - b);
+    return merged.length > 0 ? merged : undefined;
+  }, [enableZoom, zoomXDomain, xAxisTicks, daySeparationActive, daySeparationStartsMs]);
 
   const xTickFormatter = (v) => {
     const forcedPreset =
@@ -2772,6 +2840,10 @@ export function ChartCanvas() {
         : "auto";
     if (forcedPreset !== "auto") {
       const ms = temporalToMs(v);
+      if (daySeparationActive && Number.isFinite(ms) && daySeparationStartSet.has(ms)) {
+        const dayLabel = formatEpochMsWithPreset(ms, "dd-mmm");
+        if (dayLabel) return dayLabel;
+      }
       const forced = Number.isFinite(ms) ? formatEpochMsWithPreset(ms, forcedPreset) : "";
       if (forced) return forced;
     }
@@ -2794,6 +2866,22 @@ export function ChartCanvas() {
   const tickFillY = yAxisTickColor || (dark ? "#94a3b8" : "#64748b");
   const gridStroke = gridLineColor || (dark ? "rgba(148,163,184,0.32)" : "rgba(100,116,139,0.35)");
   const labelListFill = chartTextColor || (dark ? "#e2e8f0" : "#0f172a");
+
+  const renderedDaySeparationLines = useMemo(() => {
+    if (!daySeparationActive || daySeparationStartsMs.length === 0) return [];
+    const stroke = dark ? "rgba(148,163,184,0.55)" : "rgba(100,116,139,0.45)";
+    return daySeparationStartsMs.map((ms) => (
+      <ReferenceLine
+        key={`day-sep-${ms}`}
+        x={ms}
+        stroke={stroke}
+        strokeWidth={1}
+        strokeDasharray="4 4"
+        ifOverflow="hidden"
+        isFront={false}
+      />
+    ));
+  }, [daySeparationActive, daySeparationStartsMs, dark]);
 
   const hasChartLineFilters = normalizeChartLineFilters(chartLineFilters).some(
     (rule) => rule.seriesKey && rule.column,
@@ -2904,8 +2992,8 @@ export function ChartCanvas() {
   }, [finalRenderedData, referenceLines, rechartsXAxisType, xKey]);
 
   const renderedCartesianReferenceLines = useMemo(
-    () => [...renderedReferenceLines, ...renderedEquationReferenceLines],
-    [renderedReferenceLines, renderedEquationReferenceLines],
+    () => [...renderedDaySeparationLines, ...renderedReferenceLines, ...renderedEquationReferenceLines],
+    [renderedDaySeparationLines, renderedReferenceLines, renderedEquationReferenceLines],
   );
 
   const xTooltipLabelFormatter = (label) => {

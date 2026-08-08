@@ -107,7 +107,10 @@ function TimeseriesXAxisFormatSection({
   xDateFormatPreset,
   setXDateFormatPreset,
   X_DATE_FORMAT_PRESETS,
+  showDaySeparationBlocks,
+  setShowDaySeparationBlocks,
 }) {
+  const isTimeHm = String(xDateFormatPreset || "") === "time_hm";
   return (
     <>
       <div className="flex items-center">
@@ -183,6 +186,27 @@ function TimeseriesXAxisFormatSection({
               ))}
             </SelectContent>
           </Select>
+          {isTimeHm ? (
+            <div className="flex items-start gap-2 pt-0.5">
+              <Switch
+                id="chart-line-day-separation-blocks"
+                checked={!!showDaySeparationBlocks}
+                onCheckedChange={(checked) => setShowDaySeparationBlocks?.(!!checked)}
+                className="mt-0.5 scale-75 origin-left"
+              />
+              <div className="min-w-0 space-y-0.5">
+                <Label
+                  htmlFor="chart-line-day-separation-blocks"
+                  className="cursor-pointer text-xs font-normal text-muted-foreground"
+                >
+                  Show day separation markers
+                </Label>
+                <p className="text-[10px] leading-snug text-muted-foreground">
+                  Draw a marker where each new day starts, labeled as DD-MMM (e.g. 08-Aug).
+                </p>
+              </div>
+            </div>
+          ) : null}
         </div>
       ) : null}
     </>
@@ -302,6 +326,8 @@ export default function ChartControls() {
     xDateFormatPreset,
     setXDateFormatPreset,
     X_DATE_FORMAT_PRESETS,
+    showDaySeparationBlocks,
+    setShowDaySeparationBlocks,
     chartTimeframesEnabled,
     setChartTimeframesEnabled,
     chartTimeframe,
@@ -1597,6 +1623,8 @@ export default function ChartControls() {
                           xDateFormatPreset={xDateFormatPreset}
                           setXDateFormatPreset={setXDateFormatPreset}
                           X_DATE_FORMAT_PRESETS={X_DATE_FORMAT_PRESETS}
+                          showDaySeparationBlocks={showDaySeparationBlocks}
+                          setShowDaySeparationBlocks={setShowDaySeparationBlocks}
                         />
 
                         {yAxisFormatControls}
@@ -1683,6 +1711,8 @@ export default function ChartControls() {
                           xDateFormatPreset={xDateFormatPreset}
                           setXDateFormatPreset={setXDateFormatPreset}
                           X_DATE_FORMAT_PRESETS={X_DATE_FORMAT_PRESETS}
+                          showDaySeparationBlocks={showDaySeparationBlocks}
+                          setShowDaySeparationBlocks={setShowDaySeparationBlocks}
                         />
                       </div>
                       {yAxisFormatControls}
