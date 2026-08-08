@@ -36,6 +36,7 @@ import {
   validateReferenceEquation,
 } from "@/lib/chartReferenceEquation";
 import { temporalToMs } from "@/lib/temporalParse";
+import { mapRowsToLivelinePoints } from "@/lib/mapRowsToLivelinePoints";
 import { downsampleRowsForChart } from "@/lib/chartRenderCap";
 import { pivotBarChartBySeries } from "@/components/chartView/pivotBarChartData";
 import { resolveChartSeriesLabel } from "@/lib/chartLineLabels";
@@ -747,6 +748,7 @@ export function ChartBuilderProvider({ demo, children, initialBuilderSnapshot, e
 
   const polymarketWsState = contextStateV2?.polymarketWsState;
   const chainlinkWsState = contextStateV2?.chainlinkWsState;
+  const liveFeedState = contextStateV2?.liveFeedState;
 
   const effectiveData = (chartDataOverride && Array.isArray(chartDataOverride) && chartDataOverride.length) ? chartDataOverride : connectedData;
   const effectiveCols = (chartDataOverride && Array.isArray(chartDataOverride) && chartDataOverride.length) ? Object.keys(chartDataOverride[0] || {}).map((field) => ({ field })) : connectedCols;
@@ -905,7 +907,7 @@ export function ChartBuilderProvider({ demo, children, initialBuilderSnapshot, e
   const [livelineMomentum, setLivelineMomentum] = useState(true);
   const [livelineShowValue, setLivelineShowValue] = useState(false);
   const [livelineValueMomentumColor, setLivelineValueMomentumColor] = useState(false);
-  const [livelineWindowsEnabled, setLivelineWindowsEnabled] = useState(false);
+  const [livelineWindowsEnabled, setLivelineWindowsEnabled] = useState(true);
   const [livelineExaggerate, setLivelineExaggerate] = useState(false);
   const [livelineScrub, setLivelineScrub] = useState(true);
   const [livelineDegen, setLivelineDegen] = useState(false);
@@ -1489,21 +1491,6 @@ export function ChartBuilderProvider({ demo, children, initialBuilderSnapshot, e
     });
   }, [selY, globalColumnOptions, activeSheetId]);
 
-  const livelineData = useMemo(() => {
-    if (!chartData?.length || !selX || !selY?.length) return [];
-    const valueKey = selY[0];
-    return chartData
-      .map((row, idx) => {
-        const rawT = row?.[selX];
-        const ms = temporalToMs(rawT);
-        const timeSec = Number.isFinite(ms) ? ms / 1000 : idx;
-        const vNum = Number(row?.[valueKey]);
-        const value = Number.isFinite(vNum) ? vNum : null;
-        return { time: timeSec, value };
-      })
-      .filter((p) => p.value != null && Number.isFinite(p.value));
-  }, [chartData, selX, selY]);
-
   const candlestickSourceRows = useMemo(() => {
     const dataSheets = contextStateV2?.dataSheets || {};
     const requested = String(candlestickSheetId || "").trim();
@@ -1685,11 +1672,39 @@ export function ChartBuilderProvider({ demo, children, initialBuilderSnapshot, e
 
   const lineChartData = useMemo(() => {
     const base =
-      selChartType === "line" || scopedKeysInUse || barUsesCrossSheetData
+      selChartType === "line" ||
+      selChartType === "liveline" ||
+      scopedKeysInUse ||
+      barUsesCrossSheetData
         ? crossSheetChartData
         : chartData;
     return downsampleRowsForChart(base);
   }, [selChartType, scopedKeysInUse, barUsesCrossSheetData, crossSheetChartData, chartData]);
+
+  /** Same sheet merge as line charts so `sheet-id::col` axes work with live REST upserts. */
+  const livelineData = useMemo(() => {
+    const rows =
+      scopedKeysInUse || selChartType === "liveline" ? crossSheetChartData : chartData;
+    return mapRowsToLivelinePoints(rows, selX, selY?.[0], activeSheetId);
+  }, [scopedKeysInUse, selChartType, crossSheetChartData, chartData, selX, selY, activeSheetId]);
+
+  /** Pause Liveline wall-clock scroll when the REST feed covering this sheet is paused. */
+  const livelineFeedPaused = useMemo(() => {
+    const feeds = Object.values(liveFeedState?.feedsById || {});
+    if (!feeds.length) return false;
+    const xSheet =
+      parseScopedColumnKey(selX, activeSheetId).sheetId || activeSheetId || "";
+    return feeds.some((f) => {
+      if (!f?.isPaused) return false;
+      const sheetIds = [
+        f?.sheets?.marketsMetadataSheetId,
+        ...Object.values(f?.sheets?.marketSheetIdsByTicker || {}),
+      ]
+        .filter(Boolean)
+        .map(String);
+      return xSheet && sheetIds.includes(String(xSheet));
+    });
+  }, [liveFeedState?.feedsById, selX, activeSheetId]);
 
   const chartTimeframesAvailable = useMemo(() => {
     const rows = ((selChartType === "line" || scopedKeysInUse) ? lineChartData : chartData) || [];
@@ -2219,6 +2234,7 @@ export function ChartBuilderProvider({ demo, children, initialBuilderSnapshot, e
     setBodyContent,
 
     livelineData,
+    livelineFeedPaused,
     candlestickMapped,
     xAxisRange: null,
     chartRef,
@@ -2280,6 +2296,7 @@ export function ChartCanvas() {
     subTitle,
     subTitleColor,
     livelineData,
+    livelineFeedPaused,
     livelineColorChoice,
     livelineMomentum,
     livelineShowValue,
@@ -3149,6 +3166,7 @@ export function ChartCanvas() {
                         momentum={livelineMomentum}
                         showValue={livelineShowValue}
                         valueMomentumColor={livelineValueMomentumColor}
+                        window={900}
                         windows={livelineWindowsEnabled ? LIVELINE_WINDOWS : undefined}
                         windowStyle="rounded"
                         exaggerate={livelineExaggerate}
@@ -3156,9 +3174,14 @@ export function ChartCanvas() {
                         degen={livelineDegen}
                         badge={livelineBadge}
                         badgeVariant={livelineBadgeVariant}
+                        paused={!!livelineFeedPaused}
                       />
                     ) : (
-                      <div className="text-xs text-muted-foreground">Liveline: select a time-like X and numeric Y, then connect a live feed.</div>
+                      <div className="max-w-sm px-4 text-center text-xs text-muted-foreground">
+                        Liveline needs a timestamp X (e.g. <span className="font-mono">created_time</span>) and a
+                        numeric Y (e.g. <span className="font-mono">yes_price_dollars</span>). Start a trades live
+                        feed so new rows keep arriving.
+                      </div>
                     )}
                   </div>
                 ) : (
