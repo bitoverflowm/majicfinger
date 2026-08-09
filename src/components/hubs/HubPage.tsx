@@ -25,13 +25,13 @@ function isHubAssetSection(section: HubSection): section is HubAssetSectionType 
 }
 
 export function HubPage({ config, slug }: HubPageProps) {
-  const { collectionPage, breadcrumb, faqPage } = buildHubJsonLd(config);
+  const { webPage, breadcrumb, faqPage } = buildHubJsonLd(config);
 
   return (
     <>
       <script
         type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(collectionPage) }}
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(webPage) }}
       />
       <script
         type="application/ld+json"

@@ -1,8 +1,11 @@
+import {
+  INTEGRATION_HUBS,
+  type IntegrationHub,
+} from "@/lib/content/taxonomy";
 import { buildRegistryHubLinkGroups } from "@/lib/hubs/buildRegistryLinkGroups";
-import type { IntegrationHub } from "@/lib/content/taxonomy";
 import type { HubPageConfig, HubSection } from "@/types/hub";
 
-/** Inject registry-driven guide links into hub configs at request time (server only). */
+/** Inject registry-driven guide links and hero title into hub configs at request time (server only). */
 export function enrichHubConfig(config: HubPageConfig): HubPageConfig {
   const hubId = config.id as IntegrationHub | undefined;
   if (!hubId) return config;
@@ -10,7 +13,7 @@ export function enrichHubConfig(config: HubPageConfig): HubPageConfig {
   const groups = buildRegistryHubLinkGroups(hubId);
   let foundGuidesSection = false;
 
-  const sections = config.sections.flatMap((section) => {
+  let sections = config.sections.flatMap((section) => {
     if (section.type !== "link_group" || section.anchorId !== "guides") {
       return [section];
     }
@@ -37,6 +40,14 @@ export function enrichHubConfig(config: HubPageConfig): HubPageConfig {
     const heroIndex = sections.findIndex((section) => section.type === "hero");
     const insertAt = heroIndex >= 0 ? heroIndex + 1 : 0;
     sections.splice(insertAt, 0, guidesSection);
+  }
+
+  const hubMeta = INTEGRATION_HUBS[hubId];
+  const heroTitle = config.heroTitle?.trim() || hubMeta?.label;
+  if (heroTitle) {
+    sections = sections.map((section) =>
+      section.type === "hero" ? { ...section, title: heroTitle } : section,
+    );
   }
 
   return { ...config, sections };

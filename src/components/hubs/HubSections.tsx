@@ -10,6 +10,7 @@ import type {
   HubCtaSection,
   HubFaqSection,
   HubHeroSection,
+  HubInlinePart,
   HubLink,
   HubLinkGroupSection,
   HubPublishedAssets,
@@ -287,6 +288,34 @@ function HubQuery({ section }: { section: HubQuerySection }) {
   );
 }
 
+function HubInlineCopy({
+  parts,
+  className,
+}: {
+  parts: HubInlinePart[];
+  className?: string;
+}) {
+  return (
+    <span className={className}>
+      {parts.map((part, index) => {
+        if (part.type === "link") {
+          return (
+            <Link
+              key={`${part.href}-${index}`}
+              href={part.href}
+              className="font-medium text-foreground underline underline-offset-2 hover:text-primary"
+              prefetch={false}
+            >
+              {part.label}
+            </Link>
+          );
+        }
+        return <span key={`text-${index}`}>{part.value}</span>;
+      })}
+    </span>
+  );
+}
+
 function HubTextBlock({ section }: { section: HubTextBlockSection }) {
   return (
     <section className="w-full px-6 py-16 md:py-24">
@@ -295,8 +324,17 @@ function HubTextBlock({ section }: { section: HubTextBlockSection }) {
           {section.title}
         </h2>
         <p className="text-base leading-relaxed text-muted-foreground md:text-lg text-pretty">
-          {section.content}
+          {section.contentParts?.length ? (
+            <HubInlineCopy parts={section.contentParts} />
+          ) : (
+            section.content
+          )}
         </p>
+        {section.supportingText ? (
+          <p className="text-sm leading-relaxed text-muted-foreground md:text-base text-pretty">
+            {section.supportingText}
+          </p>
+        ) : null}
       </div>
     </section>
   );
@@ -410,7 +448,11 @@ function HubFaq({ section }: { section: HubFaqSection }) {
             <div key={item.question} className="space-y-2 border-b border-border/60 pb-6 last:border-0">
               <dt className="text-base font-semibold text-foreground md:text-lg">{item.question}</dt>
               <dd className="text-base leading-relaxed text-muted-foreground text-pretty">
-                {item.answer}
+                {item.answerParts?.length ? (
+                  <HubInlineCopy parts={item.answerParts} />
+                ) : (
+                  item.answer
+                )}
               </dd>
             </div>
           ))}
@@ -453,9 +495,16 @@ function HubLinkGroup({ section }: { section: HubLinkGroupSection }) {
       className={cn("w-full px-6 py-20 md:py-28", section.anchorId && "scroll-mt-28")}
     >
       <div className="mx-auto w-full max-w-4xl space-y-12">
-        <h2 className="text-center text-2xl font-semibold tracking-tight text-foreground md:text-3xl">
-          {section.title}
-        </h2>
+        <div className="mx-auto max-w-2xl space-y-4 text-center">
+          <h2 className="text-2xl font-semibold tracking-tight text-foreground md:text-3xl">
+            {section.title}
+          </h2>
+          {section.description ? (
+            <p className="text-base leading-relaxed text-muted-foreground md:text-lg text-pretty">
+              {section.description}
+            </p>
+          ) : null}
+        </div>
         <div className="mx-auto w-full max-w-xl space-y-10">
           {hasCategories
             ? section.categories!.map((category, categoryIndex) => (

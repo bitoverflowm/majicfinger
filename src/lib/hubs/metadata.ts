@@ -21,15 +21,34 @@ function resolveCanonical(config: HubPageConfig): string {
   return `${SITE_URL}/${slug}`;
 }
 
+function resolveDocumentTitle(config: HubPageConfig): string {
+  return config.seoTitle?.trim() || config.title;
+}
+
+function resolveSocialTitle(config: HubPageConfig): string {
+  return config.socialTitle?.trim() || resolveDocumentTitle(config);
+}
+
+function resolveSocialDescription(config: HubPageConfig): string {
+  return config.socialDescription?.trim() || config.description;
+}
+
+function resolveOgImageAlt(config: HubPageConfig): string {
+  return config.ogImageAlt?.trim() || resolveSocialTitle(config);
+}
+
 export function buildHubMetadata(config: HubPageConfig): Metadata {
   const canonical = resolveCanonical(config);
-  const displayTitle = config.seoTitle?.trim() || config.title;
+  const documentTitle = resolveDocumentTitle(config);
+  const socialTitle = resolveSocialTitle(config);
+  const socialDescription = resolveSocialDescription(config);
   const ogImageUrl = resolveImageUrl(config);
+  const ogImageAlt = resolveOgImageAlt(config);
   const twitterCard = config.twitterCard ?? "summary_large_image";
 
   return {
     metadataBase: new URL(SITE_URL),
-    title: { absolute: displayTitle },
+    title: { absolute: documentTitle },
     description: config.description,
     keywords: config.keywords,
     authors: config.author ? [{ name: config.author }] : undefined,
@@ -46,8 +65,8 @@ export function buildHubMetadata(config: HubPageConfig): Metadata {
       },
     },
     openGraph: {
-      title: displayTitle,
-      description: config.description,
+      title: socialTitle,
+      description: socialDescription,
       type: "website",
       url: canonical,
       siteName: "Lychee",
@@ -60,15 +79,15 @@ export function buildHubMetadata(config: HubPageConfig): Metadata {
           url: ogImageUrl,
           width: 1200,
           height: 630,
-          alt: displayTitle,
+          alt: ogImageAlt,
         },
       ],
     },
     twitter: {
       card: twitterCard,
-      title: displayTitle,
-      description: config.description,
-      images: [{ url: ogImageUrl, alt: displayTitle }],
+      title: socialTitle,
+      description: socialDescription,
+      images: [{ url: ogImageUrl, alt: ogImageAlt }],
     },
     ...(config.readingTime?.trim() && {
       other: { "reading-time": config.readingTime.trim() },
@@ -78,7 +97,7 @@ export function buildHubMetadata(config: HubPageConfig): Metadata {
 
 export function buildHubJsonLd(config: HubPageConfig) {
   const url = resolveCanonical(config);
-  const displayTitle = config.seoTitle?.trim() || config.title;
+  const documentTitle = resolveDocumentTitle(config);
   const imageUrl = resolveImageUrl(config);
   const timeRequired = readingTimeToIsoDuration(config.readingTime);
   const keywords =
@@ -101,10 +120,10 @@ export function buildHubJsonLd(config: HubPageConfig) {
         }
       : undefined;
 
-  const collectionPage = {
+  const webPage = {
     "@context": "https://schema.org",
-    "@type": "CollectionPage",
-    name: displayTitle,
+    "@type": "WebPage",
+    name: documentTitle,
     description: config.description,
     url,
     image: imageUrl,
@@ -139,5 +158,5 @@ export function buildHubJsonLd(config: HubPageConfig) {
     ],
   };
 
-  return { collectionPage, breadcrumb, faqPage };
+  return { webPage, breadcrumb, faqPage };
 }

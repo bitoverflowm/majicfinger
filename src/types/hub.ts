@@ -115,10 +115,20 @@ export type HubQuerySection = {
   cta?: HubCta;
 };
 
+/** Inline copy with optional links (UI); keep a plain `content`/`answer` string for JSON-LD. */
+export type HubInlinePart =
+  | { type: "text"; value: string }
+  | { type: "link"; label: string; href: string };
+
 export type HubTextBlockSection = {
   type: "text_block";
   title: string;
+  /** Plain-text body (also used for schema / accessibility when contentParts is set). */
   content: string;
+  /** When set, rendered instead of `content` so phrases can link out. */
+  contentParts?: HubInlinePart[];
+  /** Optional supporting line under the body paragraph. */
+  supportingText?: string;
 };
 
 export type HubCard = {
@@ -177,7 +187,10 @@ export type HubComparisonTableSection = {
 
 export type HubFaqItem = {
   question: string;
+  /** Plain-text answer for JSON-LD and default UI. */
   answer: string;
+  /** When set, rendered instead of `answer` so phrases can link out. */
+  answerParts?: HubInlinePart[];
 };
 
 export type HubFaqSection = {
@@ -190,6 +203,7 @@ export type HubLinkGroupSection = {
   type: "link_group";
   anchorId?: string;
   title: string;
+  description?: string;
   /** Flat topic groups (legacy / registry injection). */
   groups?: HubLinkGroup[];
   /** Category → subcategory hierarchy (Guides, Research, Charts, …). */
@@ -274,11 +288,20 @@ export type HubPageConfig = {
   id: string;
   /** URL segment, e.g. "kalshi-historical-data" → /kalshi-historical-data */
   slug: string;
-  /** Display / schema name */
+  /** Display / schema / breadcrumb name */
   title: string;
-  /** Overrides `<title>` and OG/Twitter titles when set */
+  /**
+   * Hero H1 override. When set, enrichHubConfig applies this to the hero section;
+   * otherwise the hero keeps taxonomy label / section title.
+   */
+  heroTitle?: string;
+  /** Document `<title>`; falls back to `title` */
   seoTitle?: string;
   description: string;
+  /** Open Graph + Twitter title; falls back to seoTitle / title */
+  socialTitle?: string;
+  /** Open Graph + Twitter description; falls back to description */
+  socialDescription?: string;
   keywords?: string[];
   canonical?: string;
   publishedAt?: string;
@@ -288,6 +311,8 @@ export type HubPageConfig = {
   integration?: string[];
   coverImage?: string;
   ogImage?: string;
+  /** Alt text for OG/Twitter preview image */
+  ogImageAlt?: string;
   featured?: boolean;
   readingTime?: string;
   twitterCard?: "summary" | "summary_large_image" | "app" | "player";
