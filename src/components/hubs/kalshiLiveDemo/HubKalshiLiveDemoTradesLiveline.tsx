@@ -3,6 +3,13 @@
 import { forwardRef, useEffect, useMemo, useState } from "react";
 import { Liveline } from "liveline";
 
+import {
+  defaultSeriesColorToken,
+  demoChartCssVar,
+  type DemoChartColorTokenId,
+  resolveDemoChartColor,
+} from "@/components/hubs/kalshiLiveDemo/demoChartColors";
+import { HubKalshiLiveDemoTradeSeriesLegend } from "@/components/hubs/kalshiLiveDemo/HubKalshiLiveDemoTradeSeriesLegend";
 import { cn } from "@/lib/utils";
 
 type TradeRow = Record<string, unknown>;
@@ -11,16 +18,18 @@ export type HubKalshiLiveDemoTradesLivelineSeries = {
   id: string;
   label: string;
   color: string;
+  colorToken?: DemoChartColorTokenId;
   trades: TradeRow[];
 };
 
 type HubKalshiLiveDemoTradesLivelineProps = {
   series: HubKalshiLiveDemoTradesLivelineSeries[];
+  hiddenSeriesIds?: ReadonlySet<string>;
+  onToggleSeries?: (id: string) => void;
+  onChangeSeriesColor?: (id: string, tokenId: DemoChartColorTokenId) => void;
   className?: string;
   paused?: boolean;
 };
-
-const SERIES_COLORS = ["#2563EB", "#EA580C"] as const;
 /** Floor so a sparse first few polls still have room to breathe. */
 const LIVE_WINDOW_MIN_SECS = 45;
 /**
@@ -84,7 +93,6 @@ function windowSecsForPoints(pointSets: { time: number; value: number }[][]) {
 
   const nowSec = Date.now() / 1000;
   const spanSecs = Math.max(0, newest - oldest);
-  // Liveline shows [now - window, now]; cover from oldest visible point through now.
   const coverOldest = Math.max(0, nowSec - oldest);
   const padded = Math.ceil(Math.max(spanSecs, coverOldest) * 1.2) + 8;
   return Math.min(
@@ -98,7 +106,6 @@ function focusRecentPoints(points: { time: number; value: number }[]) {
   const nowSec = Date.now() / 1000;
   const cutoff = nowSec - LIVE_FOCUS_SECS;
   const recent = points.filter((p) => p.time >= cutoff);
-  // If nothing falls in the live focus window yet, keep a short tail so the chart isn't empty.
   return recent.length ? recent : points.slice(-Math.min(40, points.length));
 }
 
@@ -118,29 +125,58 @@ function useIsDarkTheme() {
 export const HubKalshiLiveDemoTradesLiveline = forwardRef<
   HTMLDivElement,
   HubKalshiLiveDemoTradesLivelineProps
->(function HubKalshiLiveDemoTradesLiveline({ series, className, paused = false }, ref) {
+>(function HubKalshiLiveDemoTradesLiveline({
+  series,
+  hiddenSeriesIds,
+  onToggleSeries,
+  onChangeSeriesColor,
+  className,
+  paused = false,
+}, ref) {
   const dark = useIsDarkTheme();
+  const hidden = hiddenSeriesIds ?? new Set<string>();
 
   const mapped = useMemo(() => {
     return series.map((item, index) => {
       const data = focusRecentPoints(tradesToPoints(item.trades));
+      const token = item.colorToken ?? defaultSeriesColorToken(index);
       return {
         id: item.id,
         label: item.label,
-        color: item.color || SERIES_COLORS[index % SERIES_COLORS.length],
+        colorToken: token,
+        color:
+          item.color ||
+          resolveDemoChartColor(token) ||
+          demoChartCssVar(token),
         data,
         value: data[data.length - 1]?.value ?? 0,
       };
     });
   }, [series]);
 
+  const visible = useMemo(
+    () => mapped.filter((s) => !hidden.has(s.id) && s.data.length > 0),
+    [mapped, hidden],
+  );
+
   const windowSecs = useMemo(
-    () => windowSecsForPoints(mapped.map((s) => s.data)),
+    () => windowSecsForPoints(visible.map((s) => s.data)),
+    [visible],
+  );
+
+  const legendItems = useMemo(
+    () =>
+      mapped.map((s) => ({
+        id: s.id,
+        label: s.label,
+        color: s.color,
+        colorToken: s.colorToken,
+      })),
     [mapped],
   );
 
-  const primary = mapped[0];
-  if (!primary?.data.length) {
+  const primary = visible[0];
+  if (!mapped.some((s) => s.data.length)) {
     return (
       <div ref={ref} className={className}>
         <p className="px-3 py-8 text-center text-sm text-muted-foreground">
@@ -153,37 +189,52 @@ export const HubKalshiLiveDemoTradesLiveline = forwardRef<
   return (
     <div
       ref={ref}
-      className={cn("flex h-full min-h-[32rem] w-full flex-1 flex-col", className)}
+      className={cn("flex h-full min-h-0 w-full flex-1 flex-col", className)}
     >
-      <div className="min-h-[32rem] w-full flex-1 px-1 pb-3 pt-1 sm:px-2">
-        <Liveline
-          data={primary.data}
-          value={primary.value}
-          series={
-            mapped.length > 1
-              ? mapped.map((s) => ({
-                  id: s.id,
-                  label: s.label,
-                  color: s.color,
-                  data: s.data,
-                  value: s.value,
-                }))
-              : undefined
-          }
-          color={primary.color}
-          theme={dark ? "dark" : "light"}
-          momentum
-          scrub
-          badge
-          paused={paused}
-          seriesToggleCompact={mapped.length > 1}
-          window={windowSecs}
-          formatValue={(v) => `${Math.round(Number(v))}¢`}
-          padding={{ top: 28, right: 92, bottom: 52, left: 18 }}
-          className="h-full w-full"
-          style={{ height: "100%", minHeight: "32rem" }}
+      {onToggleSeries ? (
+        <HubKalshiLiveDemoTradeSeriesLegend
+          items={legendItems}
+          hiddenIds={hidden}
+          onToggle={onToggleSeries}
+          onChangeColor={onChangeSeriesColor}
+          className="shrink-0"
         />
-      </div>
+      ) : null}
+      {!primary ? (
+        <p className="flex flex-1 items-center justify-center px-3 py-8 text-center text-sm text-muted-foreground">
+          All series hidden — click a legend item to show it again.
+        </p>
+      ) : (
+        <div className="min-h-0 w-full flex-1 px-1 pb-3 pt-1 sm:px-2">
+          <Liveline
+            data={primary.data}
+            value={primary.value}
+            series={
+              visible.length > 1
+                ? visible.map((s) => ({
+                    id: s.id,
+                    label: s.label,
+                    color: s.color,
+                    data: s.data,
+                    value: s.value,
+                  }))
+                : undefined
+            }
+            color={primary.color}
+            theme={dark ? "dark" : "light"}
+            momentum
+            scrub
+            badge
+            paused={paused}
+            seriesToggleCompact={false}
+            window={windowSecs}
+            formatValue={(v) => `${Math.round(Number(v))}¢`}
+            padding={{ top: 28, right: 92, bottom: 52, left: 18 }}
+            className="h-full w-full"
+            style={{ height: "100%", minHeight: "32rem" }}
+          />
+        </div>
+      )}
     </div>
   );
 });

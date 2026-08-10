@@ -12,8 +12,14 @@ import {
   HubKalshiLiveDemoTabs,
   type HubKalshiLiveDemoTabId,
 } from "@/components/hubs/kalshiLiveDemo/HubKalshiLiveDemoTabs";
+import { HubKalshiLiveDemoOrderbookChart } from "@/components/hubs/kalshiLiveDemo/HubKalshiLiveDemoOrderbookChart";
 import { HubKalshiLiveDemoTradesChart } from "@/components/hubs/kalshiLiveDemo/HubKalshiLiveDemoTradesChart";
 import { HubKalshiLiveDemoTradesLiveline } from "@/components/hubs/kalshiLiveDemo/HubKalshiLiveDemoTradesLiveline";
+import {
+  defaultSeriesColorToken,
+  type DemoChartColorTokenId,
+  resolveDemoChartColor,
+} from "@/components/hubs/kalshiLiveDemo/demoChartColors";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -31,7 +37,14 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { isKalshiMarketLiveStatus } from "@/lib/kalshiLive/kalshiMarketTiming";
+import { normalizeKalshiLiveOrderbook } from "@/lib/kalshiLive/normalizeOrderbookRow";
+import { KALSHI_LIVE_ORDERBOOK_COLUMNS } from "@/lib/kalshiLive/orderbookColumns";
 import { KALSHI_LIVE_TRADES_COLUMNS } from "@/lib/kalshiLive/tradesColumns";
+import {
+  buildOrderbookLiveFlashRows,
+  liveOrderbookRowKey,
+  normalizeOrderbookSnapshotRows,
+} from "@/lib/liveFeeds/merge/kalshiOrderbookReplace";
 import { cn } from "@/lib/utils";
 
 const DEMO_MAX_TICKERS = 2;
@@ -47,11 +60,22 @@ const DEMO_TRADES_LIVE_DURATION_MS = 60_000;
 /** Soft cap while live so charts stay complete without unbounded memory growth. */
 const DEMO_TRADES_LIVE_MEMORY_CAP = 1_000;
 const DEMO_TRADES_FLASH_MS = 2_000;
+/** Demo orderbook depth per side (Kalshi depth query). */
+const DEMO_ORDERBOOK_DEPTH = 20;
+const DEMO_ORDERBOOK_LIVE_POLL_MS_SINGLE = 3_000;
+const DEMO_ORDERBOOK_LIVE_POLL_MS_MULTI = 5_000;
+const DEMO_ORDERBOOK_LIVE_DURATION_MS = 60_000;
+const DEMO_ORDERBOOK_FLASH_MS = 2_000;
+const DEMO_ORDERBOOK_SOFT_ROW_CAP = 500;
 
 const TRADES_PREFERRED_COLUMNS = KALSHI_LIVE_TRADES_COLUMNS.map((c) => c.name);
+const ORDERBOOK_PREFERRED_COLUMNS = KALSHI_LIVE_ORDERBOOK_COLUMNS.map(
+  (c) => c.name,
+);
 
 type ViewMode = "sheet" | "json";
 type TradesViewMode = ViewMode | "chart";
+type OrderbookViewMode = ViewMode | "chart";
 
 type TradesGroup = {
   ticker: string;
@@ -59,6 +83,17 @@ type TradesGroup = {
   label: string;
   trades: Record<string, unknown>[];
 };
+
+type OrderbookGroup = {
+  ticker: string;
+  label: string;
+  levels: Record<string, unknown>[];
+};
+
+type OrderbookFlashMap = Record<
+  string,
+  { isNew: boolean; columns?: string[] }
+>;
 
 type FeaturedMarket = {
   ticker: string;
@@ -259,7 +294,10 @@ function JsonSkeleton({ lines = 12 }: { lines?: number }) {
 
 function ChartSkeleton() {
   return (
-    <div className="flex h-[22rem] w-full flex-col gap-3 px-3 py-3" aria-hidden>
+    <div
+      className="flex min-h-0 w-full flex-1 flex-col gap-3 px-3 py-3"
+      aria-hidden
+    >
       <div className="flex min-h-0 flex-1 gap-3">
         <div className="flex w-10 shrink-0 flex-col justify-between py-1">
           {Array.from({ length: 5 }).map((_, i) => (
@@ -295,9 +333,11 @@ export function HubKalshiLiveDemo({ className }: HubKalshiLiveDemoProps) {
   const [error, setError] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<ViewMode>("json");
   const [tradesViewMode, setTradesViewMode] = useState<TradesViewMode>("sheet");
+  const [orderbookViewMode, setOrderbookViewMode] =
+    useState<OrderbookViewMode>("sheet");
   const [activeTab, setActiveTab] = useState<HubKalshiLiveDemoTabId>("search");
   const [featured, setFeatured] = useState<FeaturedMarket[]>([]);
-  const prevHasDataRef = useRef(false);
+  const prevHasSelectionRef = useRef(false);
   const [featuredLoading, setFeaturedLoading] = useState(true);
   const [featuredRefreshing, setFeaturedRefreshing] = useState(false);
   const [featuredError, setFeaturedError] = useState<string | null>(null);
@@ -305,10 +345,24 @@ export function HubKalshiLiveDemo({ className }: HubKalshiLiveDemoProps) {
   const [tradesLoading, setTradesLoading] = useState(false);
   const [tradesError, setTradesError] = useState<string | null>(null);
   const [activeTradesSheetIndex, setActiveTradesSheetIndex] = useState(0);
+  const [orderbookGroups, setOrderbookGroups] = useState<OrderbookGroup[] | null>(
+    null,
+  );
+  const [orderbookLoading, setOrderbookLoading] = useState(false);
+  const [orderbookError, setOrderbookError] = useState<string | null>(null);
+  const [activeOrderbookSheetIndex, setActiveOrderbookSheetIndex] = useState(0);
   const [liveEmbedOpen, setLiveEmbedOpen] = useState(false);
   const [liveLimitOpen, setLiveLimitOpen] = useState(false);
   const [tradesLive, setTradesLive] = useState(false);
+  const [orderbookLive, setOrderbookLive] = useState(false);
   const [newTradeIds, setNewTradeIds] = useState<Set<string>>(() => new Set());
+  const [orderbookFlash, setOrderbookFlash] = useState<OrderbookFlashMap>({});
+  const [hiddenTradeSeriesIds, setHiddenTradeSeriesIds] = useState<Set<string>>(
+    () => new Set(),
+  );
+  const [tradeSeriesColorTokens, setTradeSeriesColorTokens] = useState<
+    Record<string, DemoChartColorTokenId>
+  >({});
   const [chartExporting, setChartExporting] = useState(false);
   const abortRef = useRef<AbortController | null>(null);
   const seqRef = useRef(0);
@@ -318,6 +372,12 @@ export function HubKalshiLiveDemo({ className }: HubKalshiLiveDemoProps) {
   const tradesLiveStartedAtRef = useRef<number | null>(null);
   const tradesGroupsRef = useRef<TradesGroup[] | null>(null);
   const tradesChartRef = useRef<HTMLDivElement | null>(null);
+  const orderbookAbortRef = useRef<AbortController | null>(null);
+  const orderbookSeqRef = useRef(0);
+  const orderbookLiveAbortRef = useRef<AbortController | null>(null);
+  const orderbookLiveStartedAtRef = useRef<number | null>(null);
+  const orderbookGroupsRef = useRef<OrderbookGroup[] | null>(null);
+  const orderbookChartRef = useRef<HTMLDivElement | null>(null);
   const demoShellRef = useRef<HTMLDivElement | null>(null);
   const [demoShellMinHeight, setDemoShellMinHeight] = useState<number | null>(null);
 
@@ -342,10 +402,23 @@ export function HubKalshiLiveDemo({ className }: HubKalshiLiveDemoProps) {
   }, [tradesGroups]);
 
   useEffect(() => {
+    orderbookGroupsRef.current = orderbookGroups;
+  }, [orderbookGroups]);
+
+  useEffect(() => {
     if (!newTradeIds.size) return;
     const timer = window.setTimeout(() => setNewTradeIds(new Set()), DEMO_TRADES_FLASH_MS);
     return () => window.clearTimeout(timer);
   }, [newTradeIds]);
+
+  useEffect(() => {
+    if (!Object.keys(orderbookFlash).length) return;
+    const timer = window.setTimeout(
+      () => setOrderbookFlash({}),
+      DEMO_ORDERBOOK_FLASH_MS,
+    );
+    return () => window.clearTimeout(timer);
+  }, [orderbookFlash]);
 
   const stopTradesLive = useCallback((opts?: { limitReached?: boolean }) => {
     tradesLiveAbortRef.current?.abort();
@@ -355,12 +428,29 @@ export function HubKalshiLiveDemo({ className }: HubKalshiLiveDemoProps) {
     if (opts?.limitReached) setLiveLimitOpen(true);
   }, []);
 
+  const stopOrderbookLive = useCallback((opts?: { limitReached?: boolean }) => {
+    orderbookLiveAbortRef.current?.abort();
+    orderbookLiveAbortRef.current = null;
+    orderbookLiveStartedAtRef.current = null;
+    setOrderbookLive(false);
+    if (opts?.limitReached) setLiveLimitOpen(true);
+  }, []);
+
   const startTradesLive = useCallback(() => {
     if (!tickers.length) return;
+    stopOrderbookLive();
     tradesLiveStartedAtRef.current = Date.now();
     setNewTradeIds(new Set());
     setTradesLive(true);
-  }, [tickers.length]);
+  }, [tickers.length, stopOrderbookLive]);
+
+  const startOrderbookLive = useCallback(() => {
+    if (!tickers.length) return;
+    stopTradesLive();
+    orderbookLiveStartedAtRef.current = Date.now();
+    setOrderbookFlash({});
+    setOrderbookLive(true);
+  }, [tickers.length, stopTradesLive]);
 
   const loadFeaturedMarkets = useCallback(async (opts?: { excludeTickers?: string[] }) => {
     const exclude = (opts?.excludeTickers || [])
@@ -443,6 +533,7 @@ export function HubKalshiLiveDemo({ className }: HubKalshiLiveDemoProps) {
 
     const ac = new AbortController();
     abortRef.current = ac;
+    setMarkets(null);
     setLoading(true);
     setError(null);
 
@@ -715,6 +806,231 @@ export function HubKalshiLiveDemo({ className }: HubKalshiLiveDemoProps) {
     stopTradesLive,
   ]);
 
+  useEffect(() => {
+    orderbookAbortRef.current?.abort();
+
+    if (activeTab !== "orderbook" || tickers.length === 0) {
+      if (tickers.length === 0) {
+        setOrderbookGroups(null);
+        setOrderbookError(null);
+        setOrderbookLoading(false);
+        setActiveOrderbookSheetIndex(0);
+        setOrderbookFlash({});
+      }
+      return;
+    }
+
+    if (orderbookLive) return;
+
+    const mySeq = ++orderbookSeqRef.current;
+    const ac = new AbortController();
+    orderbookAbortRef.current = ac;
+    setOrderbookGroups(null);
+    setOrderbookLoading(true);
+    setOrderbookError(null);
+    setActiveOrderbookSheetIndex(0);
+    setOrderbookFlash({});
+
+    const yesSubByTicker = new Map<string, string>();
+    for (const market of markets || []) {
+      const t = String(market?.ticker || "").trim().toUpperCase();
+      if (!t) continue;
+      const yesSub = String(market?.yes_sub_title || "").trim();
+      if (yesSub) yesSubByTicker.set(t, yesSub);
+    }
+    for (const item of featured) {
+      const t = String(item?.ticker || "").trim().toUpperCase();
+      if (!t || yesSubByTicker.has(t)) continue;
+      const yesSub = String(item?.subtitle || "").trim();
+      if (yesSub) yesSubByTicker.set(t, yesSub);
+    }
+
+    Promise.all(
+      tickers.map(async (ticker) => {
+        const params = new URLSearchParams({
+          ticker,
+          depth: String(DEMO_ORDERBOOK_DEPTH),
+        });
+        const res = await fetch(
+          `/api/integrations/kalshi-live/markets/orderbook?${params.toString()}`,
+          {
+            headers: { Accept: "application/json" },
+            credentials: "same-origin",
+            signal: ac.signal,
+          },
+        );
+        const body = await res.json().catch(() => ({}));
+        if (!res.ok) {
+          throw new Error(
+            typeof body?.error === "string"
+              ? body.error
+              : res.status === 429
+                ? "Too many requests — slow down and try again."
+                : `Failed to load orderbook for ${ticker}`,
+          );
+        }
+        const levels = normalizeOrderbookSnapshotRows(
+          normalizeKalshiLiveOrderbook(ticker, body?.orderbook_fp),
+          { softRowCap: DEMO_ORDERBOOK_SOFT_ROW_CAP },
+        );
+        return {
+          ticker,
+          label: shortTradeSheetLabel(ticker, tickers, yesSubByTicker.get(ticker)),
+          levels,
+        } satisfies OrderbookGroup;
+      }),
+    )
+      .then((groups) => {
+        if (mySeq !== orderbookSeqRef.current) return;
+        setOrderbookGroups(groups);
+      })
+      .catch((e) => {
+        if (e instanceof DOMException && e.name === "AbortError") return;
+        if (mySeq !== orderbookSeqRef.current) return;
+        setOrderbookGroups(null);
+        setOrderbookError(
+          e instanceof Error ? e.message : "Failed to load orderbook",
+        );
+      })
+      .finally(() => {
+        if (mySeq === orderbookSeqRef.current) setOrderbookLoading(false);
+      });
+
+    return () => {
+      ac.abort();
+    };
+  }, [activeTab, tickers, tickersKey, markets, featured, orderbookLive]);
+
+  useEffect(() => {
+    if (!orderbookLive) return;
+    if (activeTab !== "orderbook" || tickers.length === 0) {
+      stopOrderbookLive();
+      return;
+    }
+
+    let cancelled = false;
+    let inFlight = false;
+
+    const yesSubByTicker = new Map<string, string>();
+    for (const market of markets || []) {
+      const t = String(market?.ticker || "").trim().toUpperCase();
+      if (!t) continue;
+      const yesSub = String(market?.yes_sub_title || "").trim();
+      if (yesSub) yesSubByTicker.set(t, yesSub);
+    }
+    for (const item of featured) {
+      const t = String(item?.ticker || "").trim().toUpperCase();
+      if (!t || yesSubByTicker.has(t)) continue;
+      const yesSub = String(item?.subtitle || "").trim();
+      if (yesSub) yesSubByTicker.set(t, yesSub);
+    }
+
+    const pollOnce = async () => {
+      if (cancelled || inFlight) return;
+      const startedAt = orderbookLiveStartedAtRef.current;
+      if (
+        startedAt != null &&
+        Date.now() - startedAt >= DEMO_ORDERBOOK_LIVE_DURATION_MS
+      ) {
+        stopOrderbookLive({ limitReached: true });
+        return;
+      }
+
+      inFlight = true;
+      orderbookLiveAbortRef.current?.abort();
+      const ac = new AbortController();
+      orderbookLiveAbortRef.current = ac;
+
+      try {
+        const previous = orderbookGroupsRef.current || [];
+        const prevByTicker = new Map(previous.map((g) => [g.ticker, g]));
+        const flashRows: OrderbookFlashMap = {};
+
+        const nextGroups = await Promise.all(
+          tickers.map(async (ticker) => {
+            const params = new URLSearchParams({
+              ticker,
+              depth: String(DEMO_ORDERBOOK_DEPTH),
+            });
+            const res = await fetch(
+              `/api/integrations/kalshi-live/markets/orderbook?${params.toString()}`,
+              {
+                headers: { Accept: "application/json" },
+                credentials: "same-origin",
+                signal: ac.signal,
+              },
+            );
+            const body = await res.json().catch(() => ({}));
+            if (!res.ok) {
+              throw new Error(
+                typeof body?.error === "string"
+                  ? body.error
+                  : res.status === 429
+                    ? "Too many requests — slow down and try again."
+                    : `Failed to load orderbook for ${ticker}`,
+              );
+            }
+            const prevGroup = prevByTicker.get(ticker);
+            const snapshot = normalizeOrderbookSnapshotRows(
+              normalizeKalshiLiveOrderbook(ticker, body?.orderbook_fp),
+              { softRowCap: DEMO_ORDERBOOK_SOFT_ROW_CAP },
+            );
+            const flash = buildOrderbookLiveFlashRows(
+              prevGroup?.levels || [],
+              snapshot,
+            );
+            Object.assign(flashRows, flash);
+            return {
+              ticker,
+              label:
+                prevGroup?.label ||
+                shortTradeSheetLabel(ticker, tickers, yesSubByTicker.get(ticker)),
+              levels: snapshot,
+            } satisfies OrderbookGroup;
+          }),
+        );
+
+        if (cancelled || ac.signal.aborted) return;
+        setOrderbookGroups(nextGroups);
+        setOrderbookError(null);
+        if (Object.keys(flashRows).length) {
+          setOrderbookFlash(flashRows);
+        }
+      } catch (e) {
+        if (e instanceof DOMException && e.name === "AbortError") return;
+        if (cancelled) return;
+        setOrderbookError(
+          e instanceof Error ? e.message : "Failed to refresh live orderbook",
+        );
+      } finally {
+        inFlight = false;
+      }
+    };
+
+    void pollOnce();
+    const pollMs =
+      tickers.length > 1
+        ? DEMO_ORDERBOOK_LIVE_POLL_MS_MULTI
+        : DEMO_ORDERBOOK_LIVE_POLL_MS_SINGLE;
+    const intervalId = window.setInterval(() => {
+      void pollOnce();
+    }, pollMs);
+
+    return () => {
+      cancelled = true;
+      window.clearInterval(intervalId);
+      orderbookLiveAbortRef.current?.abort();
+    };
+  }, [
+    orderbookLive,
+    activeTab,
+    tickers,
+    tickersKey,
+    markets,
+    featured,
+    stopOrderbookLive,
+  ]);
+
   const jsonText = useMemo(() => {
     if (!markets) return "";
     return JSON.stringify(markets, null, 2);
@@ -771,23 +1087,77 @@ export function HubKalshiLiveDemo({ className }: HubKalshiLiveDemoProps) {
 
   const tradesChartSeries = useMemo(
     () =>
-      (tradesGroups || []).map((group, index) => ({
-        key: `m${index}`,
-        label: group.label,
-        trades: group.trades,
-      })),
-    [tradesGroups],
+      (tradesGroups || []).map((group, index) => {
+        const key = `m${index}`;
+        const colorToken =
+          tradeSeriesColorTokens[key] ?? defaultSeriesColorToken(index);
+        return {
+          key,
+          label: group.label,
+          colorToken,
+          color: resolveDemoChartColor(colorToken),
+          trades: group.trades,
+        };
+      }),
+    [tradesGroups, tradeSeriesColorTokens],
   );
 
   const tradesLivelineSeries = useMemo(
     () =>
-      (tradesGroups || []).map((group, index) => ({
-        id: `m${index}`,
-        label: group.label,
-        color: index === 0 ? "#2563EB" : "#EA580C",
-        trades: group.trades,
-      })),
-    [tradesGroups],
+      (tradesGroups || []).map((group, index) => {
+        const id = `m${index}`;
+        const colorToken =
+          tradeSeriesColorTokens[id] ?? defaultSeriesColorToken(index);
+        return {
+          id,
+          label: group.label,
+          colorToken,
+          color: resolveDemoChartColor(colorToken),
+          trades: group.trades,
+        };
+      }),
+    [tradesGroups, tradeSeriesColorTokens],
+  );
+
+  useEffect(() => {
+    const valid = new Set(tradesChartSeries.map((s) => s.key));
+    setHiddenTradeSeriesIds((prev) => {
+      let changed = false;
+      const next = new Set<string>();
+      for (const id of prev) {
+        if (valid.has(id)) next.add(id);
+        else changed = true;
+      }
+      return changed ? next : prev;
+    });
+    setTradeSeriesColorTokens((prev) => {
+      let changed = false;
+      const next: Record<string, DemoChartColorTokenId> = {};
+      for (const [id, token] of Object.entries(prev)) {
+        if (valid.has(id)) next[id] = token;
+        else changed = true;
+      }
+      return changed ? next : prev;
+    });
+  }, [tradesChartSeries]);
+
+  const toggleTradeSeries = useCallback((id: string) => {
+    setHiddenTradeSeriesIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }, []);
+
+  const changeTradeSeriesColor = useCallback(
+    (id: string, tokenId: DemoChartColorTokenId) => {
+      setTradeSeriesColorTokens((prev) => {
+        if (prev[id] === tokenId) return prev;
+        return { ...prev, [id]: tokenId };
+      });
+    },
+    [],
   );
 
   const hasData = Boolean(markets?.length);
@@ -796,6 +1166,41 @@ export function HubKalshiLiveDemo({ className }: HubKalshiLiveDemoProps) {
     0,
   );
   const hasTrades = tradesCount > 0;
+  const orderbookLevelCount = (orderbookGroups || []).reduce(
+    (sum, group) => sum + group.levels.length,
+    0,
+  );
+  const hasOrderbook = orderbookLevelCount > 0;
+
+  const activeOrderbookGroup =
+    orderbookGroups && orderbookGroups.length
+      ? orderbookGroups[
+          Math.min(
+            activeOrderbookSheetIndex,
+            Math.max(0, orderbookGroups.length - 1),
+          )
+        ]
+      : null;
+  const activeOrderbookLevels = activeOrderbookGroup?.levels ?? null;
+
+  const orderbookSheetColumns = useMemo(() => {
+    if (!activeOrderbookLevels?.length) return [] as string[];
+    const keys = new Set<string>();
+    for (const row of activeOrderbookLevels) {
+      if (!row || typeof row !== "object") continue;
+      for (const key of Object.keys(row)) keys.add(key);
+    }
+    const ordered = ORDERBOOK_PREFERRED_COLUMNS.filter((k) => keys.has(k));
+    for (const key of keys) {
+      if (!ordered.includes(key)) ordered.push(key);
+    }
+    return ordered;
+  }, [activeOrderbookLevels]);
+
+  const orderbookFlashKeys = useMemo(
+    () => new Set(Object.keys(orderbookFlash)),
+    [orderbookFlash],
+  );
 
   const exportJson = useCallback(() => {
     if (!markets?.length) return;
@@ -918,6 +1323,93 @@ export function HubKalshiLiveDemo({ className }: HubKalshiLiveDemoProps) {
     [chartExporting],
   );
 
+  const exportOrderbookJson = useCallback(() => {
+    if (!activeOrderbookLevels?.length) return;
+    const blob = new Blob([JSON.stringify(activeOrderbookLevels, null, 2)], {
+      type: "application/json;charset=utf-8;",
+    });
+    const suffix = activeOrderbookGroup?.ticker
+      ? `-${activeOrderbookGroup.ticker}`
+      : "";
+    downloadBlob(blob, `kalshi-live-orderbook${suffix}-${Date.now()}.json`);
+  }, [activeOrderbookLevels, activeOrderbookGroup]);
+
+  const exportOrderbookCsv = useCallback(() => {
+    if (!activeOrderbookLevels?.length || !orderbookSheetColumns.length) return;
+    const header = orderbookSheetColumns.map(escapeCsv).join(",");
+    const rows = activeOrderbookLevels.map((row) =>
+      orderbookSheetColumns.map((col) => escapeCsv(cellValue(row[col]))).join(","),
+    );
+    const csv = [header, ...rows].join("\n");
+    const suffix = activeOrderbookGroup?.ticker
+      ? `-${activeOrderbookGroup.ticker}`
+      : "";
+    downloadBlob(
+      new Blob([csv], { type: "text/csv;charset=utf-8;" }),
+      `kalshi-live-orderbook${suffix}-${Date.now()}.csv`,
+    );
+  }, [activeOrderbookLevels, activeOrderbookGroup, orderbookSheetColumns]);
+
+  const exportOrderbookXlsx = useCallback(() => {
+    if (!orderbookGroups?.length) return;
+    const wb = XLSX.utils.book_new();
+    for (const group of orderbookGroups) {
+      if (!group.levels.length) continue;
+      const keys = new Set<string>();
+      for (const row of group.levels) {
+        for (const key of Object.keys(row)) keys.add(key);
+      }
+      const cols = ORDERBOOK_PREFERRED_COLUMNS.filter((k) => keys.has(k));
+      for (const key of keys) {
+        if (!cols.includes(key)) cols.push(key);
+      }
+      const rows = group.levels.map((row) => {
+        const out: Record<string, string> = {};
+        for (const col of cols) out[col] = cellValue(row[col]);
+        return out;
+      });
+      const ws = XLSX.utils.json_to_sheet(rows);
+      const sheetName = group.ticker.slice(0, 31) || "Orderbook";
+      XLSX.utils.book_append_sheet(wb, ws, sheetName);
+    }
+    if (!wb.SheetNames.length) return;
+    XLSX.writeFile(wb, `kalshi-live-orderbook-${Date.now()}.xlsx`);
+  }, [orderbookGroups]);
+
+  const exportOrderbookChart = useCallback(
+    async (format: "png" | "svg" | "jpg") => {
+      const el = orderbookChartRef.current;
+      if (!el || chartExporting) return;
+      setChartExporting(true);
+      const opts = {
+        cacheBust: true,
+        pixelRatio: 2,
+        backgroundColor:
+          typeof window !== "undefined"
+            ? getComputedStyle(el).backgroundColor || "#ffffff"
+            : "#ffffff",
+      };
+      const filename = `kalshi-live-orderbook-chart-${Date.now()}`;
+      try {
+        if (format === "png") {
+          downloadDataUrl(await toPng(el, opts), `${filename}.png`);
+        } else if (format === "svg") {
+          downloadDataUrl(await toSvg(el, opts), `${filename}.svg`);
+        } else {
+          downloadDataUrl(
+            await toJpeg(el, { ...opts, quality: 0.95 }),
+            `${filename}.jpg`,
+          );
+        }
+      } catch (e) {
+        console.error("[HubKalshiLiveDemo] orderbook chart export failed", e);
+      } finally {
+        setChartExporting(false);
+      }
+    },
+    [chartExporting],
+  );
+
   const selectFeaturedMarket = useCallback((market: FeaturedMarket) => {
     const t = String(market?.ticker || "").trim().toUpperCase();
     if (!t) return;
@@ -925,21 +1417,45 @@ export function HubKalshiLiveDemo({ className }: HubKalshiLiveDemoProps) {
       setMarkets([market.raw]);
       setError(null);
       setLoading(false);
+    } else {
+      setMarkets(null);
+      setLoading(true);
+      setError(null);
     }
     setTickersValue(t);
     setViewMode("json");
     setActiveTab("metadata");
   }, []);
 
+  const handleTickersChange = useCallback((next: string) => {
+    setTickersValue(next);
+    const hasSelection = next
+      .split(",")
+      .some((part) => Boolean(String(part || "").trim()));
+    if (!hasSelection) {
+      setMarkets(null);
+      setError(null);
+      setLoading(false);
+      setActiveTab("search");
+      return;
+    }
+    // Leave search immediately so the metadata skeleton shows while we fetch.
+    setActiveTab("metadata");
+    setLoading(true);
+    setError(null);
+    setMarkets(null);
+  }, []);
+
   useEffect(() => {
-    if (hasData && !prevHasDataRef.current) {
+    const hasSelection = tickers.length > 0;
+    if (hasSelection && !prevHasSelectionRef.current) {
       setActiveTab((prev) => (prev === "search" ? "metadata" : prev));
     }
-    if (!hasData && prevHasDataRef.current) {
+    if (!hasSelection && prevHasSelectionRef.current) {
       setActiveTab("search");
     }
-    prevHasDataRef.current = hasData;
-  }, [hasData]);
+    prevHasSelectionRef.current = hasSelection;
+  }, [tickers.length]);
 
   // Lock demo shell height to the Natural Language search layout so other tabs don't shrink it.
   useLayoutEffect(() => {
@@ -972,7 +1488,7 @@ export function HubKalshiLiveDemo({ className }: HubKalshiLiveDemoProps) {
         title: "Market metadata",
         description:
           "Inspect the full Kalshi market payload — prices, volume, status, and more — as JSON or a sheet.",
-        disabled: !hasData,
+        disabled: tickers.length === 0,
       },
       {
         id: "trades" as const,
@@ -999,7 +1515,7 @@ export function HubKalshiLiveDemo({ className }: HubKalshiLiveDemoProps) {
         disabled: !hasData,
       },
     ],
-    [hasData],
+    [hasData, tickers.length],
   );
 
   const comingSoonPanel = (label: string) => (
@@ -1048,7 +1564,9 @@ export function HubKalshiLiveDemo({ className }: HubKalshiLiveDemoProps) {
                       ? loading
                       : activeTab === "trades"
                         ? tradesLoading
-                        : false
+                        : activeTab === "orderbook"
+                          ? orderbookLoading
+                          : false
                 }
               />
             </div>
@@ -1058,7 +1576,7 @@ export function HubKalshiLiveDemo({ className }: HubKalshiLiveDemoProps) {
                 <div className="flex w-full flex-col gap-4 px-2 sm:px-4 lg:px-6">
                   <MarketTickerSearch
                     value={tickersValue}
-                    onChange={setTickersValue}
+                    onChange={handleTickersChange}
                     maxTickers={DEMO_MAX_TICKERS}
                     dataSource="live"
                     searchScope="markets"
@@ -1627,12 +2145,19 @@ export function HubKalshiLiveDemo({ className }: HubKalshiLiveDemoProps) {
                           <HubKalshiLiveDemoTradesLiveline
                             ref={tradesChartRef}
                             series={tradesLivelineSeries}
+                            hiddenSeriesIds={hiddenTradeSeriesIds}
+                            onToggleSeries={toggleTradeSeries}
+                            onChangeSeriesColor={changeTradeSeriesColor}
                             className="min-h-0 flex-1"
                           />
                         ) : (
                           <HubKalshiLiveDemoTradesChart
                             ref={tradesChartRef}
                             series={tradesChartSeries}
+                            hiddenSeriesIds={hiddenTradeSeriesIds}
+                            onToggleSeries={toggleTradeSeries}
+                            onChangeSeriesColor={changeTradeSeriesColor}
+                            className="min-h-0 flex-1"
                           />
                         )}
                       </div>
@@ -1710,7 +2235,377 @@ export function HubKalshiLiveDemo({ className }: HubKalshiLiveDemoProps) {
                 </div>
               ) : null}
               {activeTab === "orderbook" ? (
-                <div className="px-2 sm:px-4 lg:px-6">{comingSoonPanel("Orderbook")}</div>
+                <div className="flex min-h-0 flex-1 flex-col px-2 sm:px-4 lg:px-6">
+                  <div
+                    className={cn(
+                      "flex min-h-[12rem] flex-1 flex-col overflow-hidden rounded-xl border border-border/70 bg-muted/20",
+                      orderbookViewMode === "chart" && "min-h-[36rem]",
+                    )}
+                  >
+                    <div className="flex shrink-0 flex-wrap items-center justify-between gap-2 border-b border-border/60 px-3 py-2">
+                      <p className="text-xs font-medium text-muted-foreground">
+                        Orderbook
+                      </p>
+                      <div className="flex flex-wrap items-center justify-end gap-2">
+                        {orderbookLoading ? (
+                          <span className="inline-flex items-center gap-1.5 text-xs text-muted-foreground">
+                            <Loader2 className="size-3.5 animate-spin" aria-hidden />
+                            Loading…
+                          </span>
+                        ) : orderbookGroups ? (
+                          <span className="text-xs text-muted-foreground">
+                            {orderbookLevelCount} level
+                            {orderbookLevelCount === 1 ? "" : "s"}
+                            {orderbookGroups.length > 1
+                              ? ` · ${orderbookGroups.length} markets`
+                              : ""}
+                          </span>
+                        ) : null}
+
+                        <div className="inline-flex items-center gap-1.5">
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            disabled={!hasOrderbook || orderbookLoading}
+                            onClick={() => {
+                              if (orderbookLive) return;
+                              startOrderbookLive();
+                            }}
+                            className={cn(
+                              "h-7 gap-1.5 px-2 text-[11px] font-medium text-muted-foreground",
+                              orderbookLive &&
+                                "border-emerald-500/40 bg-emerald-500/10 text-foreground",
+                            )}
+                            aria-pressed={orderbookLive}
+                          >
+                            <span
+                              className={cn(
+                                "size-2 shrink-0 rounded-full",
+                                orderbookLive
+                                  ? "bg-emerald-500 animate-pulse"
+                                  : "bg-amber-500 animate-pulse",
+                              )}
+                              aria-hidden
+                            />
+                            Live
+                          </Button>
+                          {orderbookLive ? (
+                            <button
+                              type="button"
+                              aria-label="Stop live feed"
+                              title="Stop live feed"
+                              onClick={() => stopOrderbookLive()}
+                              className="inline-flex size-7 items-center justify-center rounded-md border border-border/70 bg-background text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                            >
+                              <span
+                                className="size-2.5 rounded-full bg-red-500"
+                                aria-hidden
+                              />
+                            </button>
+                          ) : null}
+                        </div>
+
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          disabled={!hasOrderbook}
+                          onClick={() => setOrderbookViewMode("chart")}
+                          className={cn(
+                            "h-7 gap-1.5 px-2 text-[11px] font-medium text-muted-foreground",
+                            orderbookViewMode === "chart" &&
+                              "border-secondary/40 bg-secondary/10 text-foreground",
+                          )}
+                        >
+                          <LineChart className="size-3.5" aria-hidden />
+                          Chart
+                        </Button>
+
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              disabled={!hasOrderbook || chartExporting}
+                              className="h-7 gap-1.5 px-2 text-[11px] font-medium text-muted-foreground"
+                            >
+                              <Download className="size-3.5" aria-hidden />
+                              Export
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end" className="min-w-[9.5rem]">
+                            {orderbookViewMode === "chart" ? (
+                              <>
+                                <DropdownMenuItem
+                                  className="text-xs"
+                                  disabled={!hasOrderbook || chartExporting}
+                                  onSelect={() => void exportOrderbookChart("png")}
+                                >
+                                  PNG
+                                </DropdownMenuItem>
+                                <DropdownMenuItem
+                                  className="text-xs"
+                                  disabled={!hasOrderbook || chartExporting}
+                                  onSelect={() => void exportOrderbookChart("svg")}
+                                >
+                                  SVG
+                                </DropdownMenuItem>
+                                <DropdownMenuItem
+                                  className="text-xs"
+                                  disabled={!hasOrderbook || chartExporting}
+                                  onSelect={() => void exportOrderbookChart("jpg")}
+                                >
+                                  JPG
+                                </DropdownMenuItem>
+                                <DropdownMenuItem
+                                  className="text-xs"
+                                  onSelect={() => setLiveEmbedOpen(true)}
+                                >
+                                  Live embed
+                                </DropdownMenuItem>
+                                <DropdownMenuSeparator />
+                              </>
+                            ) : null}
+                            <DropdownMenuItem
+                              className="text-xs"
+                              disabled={!hasOrderbook}
+                              onSelect={exportOrderbookJson}
+                            >
+                              JSON
+                            </DropdownMenuItem>
+                            <DropdownMenuItem
+                              className="text-xs"
+                              disabled={!hasOrderbook}
+                              onSelect={exportOrderbookCsv}
+                            >
+                              CSV
+                            </DropdownMenuItem>
+                            <DropdownMenuItem
+                              className="text-xs"
+                              disabled={!hasOrderbook}
+                              onSelect={exportOrderbookXlsx}
+                            >
+                              XLSX
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+
+                        <div
+                          className="inline-flex h-7 items-center rounded-md border border-border/70 bg-background p-0.5"
+                          role="group"
+                          aria-label="Orderbook result view"
+                        >
+                          <button
+                            type="button"
+                            disabled={!hasOrderbook && !orderbookLoading}
+                            onClick={() => {
+                              if (orderbookViewMode === "chart") {
+                                setOrderbookViewMode("sheet");
+                                return;
+                              }
+                              setOrderbookViewMode(
+                                orderbookViewMode === "json" ? "sheet" : "json",
+                              );
+                            }}
+                            className="inline-flex h-6 items-center gap-1 rounded px-2 text-[11px] font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                            aria-label={
+                              orderbookViewMode === "chart"
+                                ? "Switch to data sheet"
+                                : orderbookViewMode === "json"
+                                  ? "Switch to sheet view"
+                                  : "Switch to JSON view"
+                            }
+                          >
+                            {orderbookViewMode === "chart" ? (
+                              <>
+                                <Table2 className="size-3.5" aria-hidden />
+                                Data Sheet
+                              </>
+                            ) : orderbookViewMode === "json" ? (
+                              <>
+                                <Table2 className="size-3.5" aria-hidden />
+                                Sheet
+                              </>
+                            ) : (
+                              <>
+                                <Braces className="size-3.5" aria-hidden />
+                                JSON
+                              </>
+                            )}
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+
+                    <p className="shrink-0 border-b border-border/40 px-3 py-2 text-[11px] leading-relaxed text-muted-foreground text-pretty">
+                      {orderbookLive ? (
+                        <>
+                          Live feed replaces the book snapshot each refresh and
+                          flashes changed levels. Demo live pulls pause after 1
+                          minute.{" "}
+                        </>
+                      ) : (
+                        <>
+                          Showing top {DEMO_ORDERBOOK_DEPTH} levels per side
+                          {tickers.length > 1 ? " per market" : ""}.{" "}
+                        </>
+                      )}
+                      <Link
+                        href="/#pricing"
+                        className="font-medium text-foreground underline underline-offset-2 hover:text-primary"
+                      >
+                        Sign up
+                      </Link>{" "}
+                      for full depth, continuous live books, and multi-market
+                      dashboards.
+                    </p>
+
+                    {(orderbookGroups?.length || 0) > 1 ? (
+                      <div
+                        className="flex shrink-0 flex-wrap items-center gap-1.5 border-b border-border/40 px-2 py-2 sm:px-3"
+                        role="tablist"
+                        aria-label="Orderbook sheets"
+                      >
+                        {orderbookGroups?.map((group, index) => {
+                          const selected = index === activeOrderbookSheetIndex;
+                          return (
+                            <button
+                              key={group.ticker}
+                              type="button"
+                              role="tab"
+                              aria-selected={selected}
+                              title={`${group.label} · ${group.ticker}`}
+                              onClick={() => setActiveOrderbookSheetIndex(index)}
+                              className={cn(
+                                "inline-flex max-w-full items-center rounded-md px-2.5 py-1.5 text-[11px] font-medium transition-colors",
+                                selected
+                                  ? "bg-background text-foreground shadow-sm ring-1 ring-border/70"
+                                  : "text-muted-foreground hover:bg-muted/50 hover:text-foreground",
+                              )}
+                            >
+                              <span className="truncate">{group.label}</span>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    ) : null}
+
+                    {orderbookError ? (
+                      <p className="px-3 py-4 text-sm text-destructive">
+                        {orderbookError}
+                      </p>
+                    ) : orderbookLoading ? (
+                      orderbookViewMode === "chart" ? (
+                        <ChartSkeleton />
+                      ) : orderbookViewMode === "json" ? (
+                        <JsonSkeleton />
+                      ) : (
+                        <SheetTableSkeleton rows={8} />
+                      )
+                    ) : !hasOrderbook ? (
+                      <p className="px-3 py-8 text-center text-sm text-muted-foreground">
+                        No orderbook levels for this market.
+                      </p>
+                    ) : orderbookViewMode === "chart" ? (
+                      <div className="flex min-h-0 flex-1 flex-col">
+                        <HubKalshiLiveDemoOrderbookChart
+                          ref={orderbookChartRef}
+                          levels={activeOrderbookLevels || []}
+                          flashKeys={orderbookFlashKeys}
+                          label={activeOrderbookGroup?.label}
+                          className="min-h-0 flex-1"
+                        />
+                      </div>
+                    ) : orderbookViewMode === "json" ? (
+                      <div className="max-h-[28rem] overflow-auto px-3 py-3 font-mono text-[11px] leading-relaxed text-foreground sm:text-xs">
+                        <span className="text-muted-foreground">[</span>
+                        {(activeOrderbookLevels || []).map((row, rowIndex) => {
+                          const id = liveOrderbookRowKey(row) || String(rowIndex);
+                          const flash = orderbookFlash[id];
+                          return (
+                            <div
+                              key={id}
+                              className={cn(
+                                "rounded-sm px-1 transition-colors duration-500",
+                                flash &&
+                                  "bg-amber-400/25 ring-1 ring-amber-400/40",
+                              )}
+                            >
+                              <pre className="whitespace-pre-wrap break-all">
+                                {JSON.stringify(row, null, 2)}
+                                {rowIndex <
+                                (activeOrderbookLevels?.length || 0) - 1
+                                  ? ","
+                                  : ""}
+                              </pre>
+                            </div>
+                          );
+                        })}
+                        <span className="text-muted-foreground">]</span>
+                      </div>
+                    ) : !activeOrderbookLevels?.length ? (
+                      <p className="px-3 py-8 text-center text-sm text-muted-foreground">
+                        No orderbook levels for this market.
+                      </p>
+                    ) : (
+                      <div className="max-h-[28rem] overflow-auto">
+                        <table className="w-max min-w-full border-collapse text-left text-[11px] sm:text-xs">
+                          <thead className="sticky top-0 z-[1] bg-muted/80 backdrop-blur">
+                            <tr className="border-b border-border/60">
+                              {orderbookSheetColumns.map((col) => (
+                                <th
+                                  key={col}
+                                  className="whitespace-nowrap px-3 py-2 font-medium text-muted-foreground"
+                                >
+                                  {col}
+                                </th>
+                              ))}
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {activeOrderbookLevels.map((row, rowIndex) => {
+                              const id =
+                                liveOrderbookRowKey(row) || String(rowIndex);
+                              const flash = orderbookFlash[id];
+                              return (
+                                <tr
+                                  key={id}
+                                  className={cn(
+                                    "border-b border-border/40 last:border-0 transition-colors duration-500",
+                                    flash?.isNew && "bg-amber-400/25",
+                                  )}
+                                >
+                                  {orderbookSheetColumns.map((col) => {
+                                    const cellLit =
+                                      Boolean(flash) &&
+                                      (flash?.isNew ||
+                                        flash?.columns?.includes(col));
+                                    return (
+                                      <td
+                                        key={`${rowIndex}-${col}`}
+                                        className={cn(
+                                          "max-w-[16rem] truncate whitespace-nowrap px-3 py-2 text-foreground transition-colors duration-500",
+                                          cellLit &&
+                                            !flash?.isNew &&
+                                            "bg-amber-400/30",
+                                        )}
+                                        title={cellValue(row[col])}
+                                      >
+                                        {cellValue(row[col])}
+                                      </td>
+                                    );
+                                  })}
+                                </tr>
+                              );
+                            })}
+                          </tbody>
+                        </table>
+                      </div>
+                    )}
+                  </div>
+                </div>
               ) : null}
               {activeTab === "candlesticks" ? (
                 <div className="px-2 sm:px-4 lg:px-6">{comingSoonPanel("Candlesticks")}</div>
@@ -1722,8 +2617,9 @@ export function HubKalshiLiveDemo({ className }: HubKalshiLiveDemoProps) {
           </div>
 
           <p className="text-xs leading-relaxed text-muted-foreground text-pretty">
-            This preview is limited to search, market metadata, and the{" "}
-            {DEMO_TRADES_LIMIT} most recent trades.{" "}
+            This preview is limited to search, market metadata, the{" "}
+            {DEMO_TRADES_LIMIT} most recent trades, and orderbook depth (
+            {DEMO_ORDERBOOK_DEPTH} levels/side).{" "}
             <Link
               href="/#pricing"
               className="font-medium text-foreground underline underline-offset-2 hover:text-primary"
@@ -1767,10 +2663,10 @@ export function HubKalshiLiveDemo({ className }: HubKalshiLiveDemoProps) {
           <DialogHeader>
             <DialogTitle>Demo live feed paused</DialogTitle>
             <DialogDescription>
-              This preview streams live trades for 1 minute so you can feel the
-              product. Upgrade for unlimited live pulls, deeper history, custom
-              refresh rates, multi-market dashboards, and full export/embed
-              controls.
+              This preview streams live trades and orderbooks for 1 minute so you
+              can feel the product. Upgrade for unlimited live pulls, deeper
+              history, custom refresh rates, multi-market dashboards, and full
+              export/embed controls.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>

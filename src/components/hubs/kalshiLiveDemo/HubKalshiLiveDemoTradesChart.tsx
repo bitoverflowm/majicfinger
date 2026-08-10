@@ -1,35 +1,36 @@
 "use client";
 
 import { forwardRef, useMemo } from "react";
-import { CartesianGrid, Legend, Line, LineChart, XAxis, YAxis } from "recharts";
+import { CartesianGrid, Line, LineChart, XAxis, YAxis } from "recharts";
 
 import {
   ChartContainer,
   ChartTooltip,
   ChartTooltipContent,
 } from "@/components/ui/chart";
+import {
+  defaultSeriesColorToken,
+  demoChartCssVar,
+  type DemoChartColorTokenId,
+} from "@/components/hubs/kalshiLiveDemo/demoChartColors";
+import { HubKalshiLiveDemoTradeSeriesLegend } from "@/components/hubs/kalshiLiveDemo/HubKalshiLiveDemoTradeSeriesLegend";
+import { cn } from "@/lib/utils";
 
 export type HubKalshiLiveDemoTradesChartSeries = {
   key: string;
   label: string;
+  color?: string;
+  colorToken?: DemoChartColorTokenId;
   trades: Record<string, unknown>[];
 };
 
 type HubKalshiLiveDemoTradesChartProps = {
   series: HubKalshiLiveDemoTradesChartSeries[];
+  hiddenSeriesIds?: ReadonlySet<string>;
+  onToggleSeries?: (id: string) => void;
+  onChangeSeriesColor?: (id: string, tokenId: DemoChartColorTokenId) => void;
   className?: string;
 };
-
-const SERIES_THEMES = [
-  {
-    light: "#2563EB",
-    dark: "#7DD3FC",
-  },
-  {
-    light: "#EA580C",
-    dark: "#FB923C",
-  },
-] as const;
 
 function parseTradeTime(row: Record<string, unknown>): number | null {
   const raw = row.created_time ?? row.created_ts ?? row.ts;
@@ -92,23 +93,42 @@ function formatCents(value: number): string {
 export const HubKalshiLiveDemoTradesChart = forwardRef<
   HTMLDivElement,
   HubKalshiLiveDemoTradesChartProps
->(function HubKalshiLiveDemoTradesChart({ series, className }, ref) {
+>(function HubKalshiLiveDemoTradesChart({
+  series,
+  hiddenSeriesIds,
+  onToggleSeries,
+  onChangeSeriesColor,
+  className,
+}, ref) {
+  const hidden = hiddenSeriesIds ?? new Set<string>();
+
   const chartConfig = useMemo(() => {
-    const config: Record<
-      string,
-      { label: string; theme: { light: string; dark: string } }
-    > = {};
+    const config: Record<string, { label: string; color: string }> = {};
     series.forEach((item, index) => {
+      const token = item.colorToken ?? defaultSeriesColorToken(index);
       config[item.key] = {
         label: item.label,
-        theme: SERIES_THEMES[index % SERIES_THEMES.length],
+        color: demoChartCssVar(token),
       };
     });
     return config;
   }, [series]);
 
+  const legendItems = useMemo(
+    () =>
+      series.map((item, index) => {
+        const token = item.colorToken ?? defaultSeriesColorToken(index);
+        return {
+          id: item.key,
+          label: item.label,
+          color: item.color || demoChartCssVar(token),
+          colorToken: token,
+        };
+      }),
+    [series],
+  );
+
   const data = useMemo(() => {
-    /** @type {Map<number, Record<string, unknown>>} */
     const byTime = new Map<number, Record<string, unknown>>();
 
     for (const item of series) {
@@ -128,9 +148,20 @@ export const HubKalshiLiveDemoTradesChart = forwardRef<
     ) as Array<Record<string, unknown>>;
   }, [series]);
 
+  const visibleSeries = useMemo(
+    () => series.filter((item) => !hidden.has(item.key)),
+    [series, hidden],
+  );
+
   if (!data.length || !series.length) {
     return (
-      <div ref={ref} className={className}>
+      <div
+        ref={ref}
+        className={cn(
+          "flex min-h-0 w-full flex-1 flex-col items-center justify-center",
+          className,
+        )}
+      >
         <p className="px-3 py-8 text-center text-sm text-muted-foreground">
           No plottable trade points (need created time and yes price).
         </p>
@@ -139,10 +170,25 @@ export const HubKalshiLiveDemoTradesChart = forwardRef<
   }
 
   return (
-    <div ref={ref} className={className}>
+    <div
+      ref={ref}
+      className={cn(
+        "flex min-h-0 w-full flex-1 flex-col",
+        className,
+      )}
+    >
+      {onToggleSeries ? (
+        <HubKalshiLiveDemoTradeSeriesLegend
+          items={legendItems}
+          hiddenIds={hidden}
+          onToggle={onToggleSeries}
+          onChangeColor={onChangeSeriesColor}
+          className="shrink-0"
+        />
+      ) : null}
       <ChartContainer
         config={chartConfig}
-        className="aspect-auto h-[22rem] w-full px-2 py-3 sm:px-3"
+        className="aspect-auto h-full min-h-0 w-full flex-1 px-2 py-2 sm:px-3 sm:py-3"
       >
         <LineChart
           accessibilityLayer
@@ -188,14 +234,7 @@ export const HubKalshiLiveDemoTradesChart = forwardRef<
               />
             }
           />
-          {series.length > 1 ? (
-            <Legend
-              verticalAlign="top"
-              height={28}
-              formatter={(value) => chartConfig[String(value)]?.label || String(value)}
-            />
-          ) : null}
-          {series.map((item) => (
+          {visibleSeries.map((item) => (
             <Line
               key={item.key}
               type="monotone"
@@ -215,6 +254,11 @@ export const HubKalshiLiveDemoTradesChart = forwardRef<
           ))}
         </LineChart>
       </ChartContainer>
+      {!visibleSeries.length ? (
+        <p className="px-3 pb-4 text-center text-xs text-muted-foreground">
+          All series hidden — click a legend item to show it again.
+        </p>
+      ) : null}
     </div>
   );
 });

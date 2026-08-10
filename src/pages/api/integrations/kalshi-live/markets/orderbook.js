@@ -1,3 +1,4 @@
+import { rejectIfAnonymousRateLimited } from "@/lib/kalshiLive/anonymousIpRateLimit";
 import { kalshiLiveUrl } from "@/lib/kalshiLive/kalshiLiveApiBase";
 import { parseKalshiLiveOrderbookTickerInput } from "@/lib/kalshiLive/orderbookColumns";
 
@@ -21,6 +22,16 @@ export default async function handler(req, res) {
   if (req.method !== "GET") {
     res.setHeader("Allow", ["GET"]);
     return res.status(405).json({ error: "Method not allowed" });
+  }
+
+  if (
+    rejectIfAnonymousRateLimited(req, res, {
+      keyPrefix: "kalshi-live-orderbook",
+      max: 30,
+      windowMs: 60_000,
+    })
+  ) {
+    return;
   }
 
   const ticker = parseKalshiLiveOrderbookTickerInput(queryParam(req, "ticker"));
