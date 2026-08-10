@@ -351,6 +351,7 @@ function SelectionChipsRow({ selections, busy, onRemove }) {
  *   historyEntity?: "trades" | "candlesticks" | "data";
  *   showCutoffNotes?: boolean;
  *   searchScope?: "markets" | "series" | "events" | "events_semantic";
+ *   placeholder?: string;
  * }} props
  */
 export function MarketTickerSearch({
@@ -374,6 +375,7 @@ export function MarketTickerSearch({
   headerStart = null,
   /** When false, empty state shows "Optional" instead of "Required". */
   required = true,
+  placeholder: placeholderProp,
 }) {
   const seriesOnly = searchScope === "series";
   const eventsOnly = searchScope === "events";
@@ -922,11 +924,12 @@ export function MarketTickerSearch({
             value={draft}
             disabled={busy || atCap}
             placeholder={
-              eventsSemantic
+              placeholderProp ||
+              (eventsSemantic
                 ? "Search for an event (e.g. NYC high temp, Fed rate) or type an event ticker"
                 : seriesOnly
                   ? "Add one or more series tickers here, e.g. KXHIGHNY; multiple tickers separated by commas: SERIES1, SERIES2"
-                  : "Add one or more tickers here, e.g. KXHIGHNY-25JAN01-T77; multiple tickers separated by commas: TICKER1, TICKER2"
+                  : "Add one or more tickers here, e.g. KXHIGHNY-25JAN01-T77; multiple tickers separated by commas: TICKER1, TICKER2")
             }
             onChange={(e) => {
               setDraft(e.target.value);

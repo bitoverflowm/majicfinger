@@ -110,18 +110,18 @@ export function HubKalshiLiveDemo({ className }: HubKalshiLiveDemoProps) {
       <HubKalshiLiveDemoMockup>
         <div className="flex w-full flex-col gap-5 p-4 sm:p-6">
           <div className="space-y-1.5">
-            <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs font-medium uppercase tracking-wider text-muted-foreground">
-              <span>Live demo · up to {DEMO_MAX_TICKERS} markets</span>
+            <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs font-medium tracking-wider text-muted-foreground">
+              <span className="uppercase">
+                Live demo · up to {DEMO_MAX_TICKERS} markets
+              </span>
               <Link
                 href="/#pricing"
-                className="underline underline-offset-2 hover:text-foreground"
+                className="normal-case tracking-normal underline underline-offset-2 hover:text-foreground"
               >
-                Sign up for unlimited markets
+                Sign up for unlimited markets, events, series, orderbooks,
+                candlesticks, trades, full coverage of everything Polymarket and
+                Kalshi
               </Link>
-            </p>
-            <p className="text-sm leading-relaxed text-muted-foreground text-pretty">
-              Search by ticker or natural language. Select a series to pick markets. Metadata
-              loads as JSON — no filters or column pickers in this preview.
             </p>
           </div>
 
@@ -133,6 +133,7 @@ export function HubKalshiLiveDemo({ className }: HubKalshiLiveDemoProps) {
             searchScope="markets"
             showCutoffNotes={false}
             required={false}
+            placeholder="Start typing to search for anything on Kalshi here"
             className="w-full"
           />
 
