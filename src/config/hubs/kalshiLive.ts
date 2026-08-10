@@ -94,8 +94,6 @@ export const kalshiLiveHub: HubPageConfig = {
       title: "Explore the Kalshi API Without Writing Code",
       content:
         "Select a Kalshi market-data endpoint, configure the request visually and preview its response before loading the data into your workspace. Access markets, events, trades, order books and candlesticks without writing Python, handling pagination or maintaining a data pipeline. Developers can inspect the structured response fields, while non-technical users can work with the same data through a guided interface.",
-      supportingText:
-        "No Kalshi API key is required for the public market-data endpoints available through Lychee.",
     },
     {
       type: "text_block",
@@ -104,22 +102,22 @@ export const kalshiLiveHub: HubPageConfig = {
         "Monitor real-time probability changes as events unfold, compare prices across related contracts, inspect liquidity and trading activity, analyze candlestick trends, track volume and open interest, and publish live Kalshi charts or dashboards. Use current market data for intraday research, event monitoring, trading analysis and shareable reports.",
     },
     {
-      type: "published_charts",
-      anchorId: "live-charts",
-      title: "Live Kalshi Price & Candlestick Charts",
+      type: "kalshi_live_bonus_features",
+      anchorId: "bonus-features",
+      title: "Bonus Features",
       description:
-        "Explore published charts built from current Kalshi prices, candlesticks, volume and open interest. Open any chart to inspect the underlying data, then fork the workflow for another market, event or time window.",
+        "Extra Kalshi Live capabilities beyond the core market pull—event forecasts, batch event candlesticks, and leaderboards.",
     },
     {
       type: "text_block",
       title: "Kalshi Live Data vs. Kalshi Historical Data",
       content:
-        "Kalshi separates current and recent exchange data from older archived records. Use Kalshi Live for active and recently closed markets, live prices, recent trades, current order books and recent candlesticks. Use Kalshi Historical Data for older settled markets, deep trade history, historical order books, outcomes, backtesting and long-range research. Lychee brings both workflows into one platform.",
+        "Lychee separates current and recent exchange data from older archived records. Use Kalshi Live for active and recently closed markets, live prices, recent trades, current order books and recent candlesticks. Use Kalshi Historical Data for older settled markets, deep trade history, historical order books, outcomes, backtesting and long-range research. Lychee brings both workflows into one platform.",
       contentParts: [
         {
           type: "text",
           value:
-            "Kalshi separates current and recent exchange data from older archived records. Use Kalshi Live for active and recently closed markets, live prices, recent trades, current order books and recent candlesticks. Use ",
+            "Lychee separates current and recent exchange data from older archived records. Use Kalshi Live for active and recently closed markets, live prices, recent trades, current order books and recent candlesticks. Use ",
         },
         {
           type: "link",
@@ -174,7 +172,7 @@ export const kalshiLiveHub: HubPageConfig = {
         {
           question: "Do I need a Kalshi API key?",
           answer:
-            "No Kalshi API key is required for the public market-data endpoints available through Lychee. Private account data, trading endpoints and direct WebSocket connections require authentication with Kalshi.",
+            "No Kalshi API key is required for the public market-data endpoints available through Lychee.",
         },
         {
           question: "Can I download Kalshi market data?",

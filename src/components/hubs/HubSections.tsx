@@ -11,6 +11,7 @@ import type {
   HubFaqSection,
   HubHeroSection,
   HubInlinePart,
+  HubKalshiLiveBonusFeaturesSection,
   HubKalshiLiveDemoSection,
   HubLink,
   HubLinkGroupSection,
@@ -47,6 +48,19 @@ const HubKalshiLiveDemo = dynamic(
   () =>
     import("@/components/hubs/kalshiLiveDemo/HubKalshiLiveDemo").then(
       (m) => m.HubKalshiLiveDemo,
+    ),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="h-[40rem] w-full animate-pulse rounded-2xl bg-muted/40 ring-1 ring-border/60 sm:h-[44rem]" />
+    ),
+  },
+);
+
+const HubKalshiLiveBonusFeatures = dynamic(
+  () =>
+    import("@/components/hubs/kalshiLiveDemo/HubKalshiLiveBonusFeatures").then(
+      (m) => m.HubKalshiLiveBonusFeatures,
     ),
   {
     ssr: false,
@@ -773,6 +787,43 @@ function HubKalshiLiveDemoSectionView({
   );
 }
 
+function HubKalshiLiveBonusFeaturesSectionView({
+  section,
+}: {
+  section: HubKalshiLiveBonusFeaturesSection;
+}) {
+  return (
+    <section
+      id={section.anchorId}
+      className={cn(
+        "w-full px-6 py-16 md:py-24",
+        section.anchorId && "scroll-mt-28",
+      )}
+    >
+      <div className="mx-auto w-full max-w-3xl space-y-4 text-center">
+        <h2 className="text-2xl font-semibold tracking-tight text-foreground md:text-3xl">
+          {section.title?.trim() || "Bonus Features"}
+        </h2>
+        {section.description?.trim() ? (
+          <p className="text-base leading-relaxed text-muted-foreground md:text-lg text-pretty">
+            {section.description}
+          </p>
+        ) : null}
+      </div>
+
+      <div className={cn("mx-auto w-full max-w-6xl", "mt-10 md:mt-12")}>
+        <HubLazyWhenVisible
+          fallback={
+            <div className="h-[40rem] w-full animate-pulse rounded-2xl bg-muted/40 ring-1 ring-border/60 sm:h-[44rem]" />
+          }
+        >
+          <HubKalshiLiveBonusFeatures />
+        </HubLazyWhenVisible>
+      </div>
+    </section>
+  );
+}
+
 export function HubSectionRenderer({
   section,
   assets,
@@ -799,6 +850,8 @@ export function HubSectionRenderer({
       return wrapper(<HubQuery section={section} />);
     case "kalshi_live_demo":
       return wrapper(<HubKalshiLiveDemoSectionView section={section} />);
+    case "kalshi_live_bonus_features":
+      return wrapper(<HubKalshiLiveBonusFeaturesSectionView section={section} />);
     case "text_block":
       return wrapper(<HubTextBlock section={section} />);
     case "cards":

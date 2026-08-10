@@ -2061,7 +2061,7 @@ export function HubKalshiLiveDemo({ className }: HubKalshiLiveDemoProps) {
               <HubKalshiLiveDemoTabs
                 tabs={tabs}
                 activeId={activeTab}
-                onChange={setActiveTab}
+                onChange={(id) => setActiveTab(id as HubKalshiLiveDemoTabId)}
                 contentLoading={
                   activeTab === "search"
                     ? featuredLoading

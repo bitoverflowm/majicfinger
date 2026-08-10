@@ -265,6 +265,14 @@ export type HubKalshiLiveDemoSection = {
   connectAbove?: boolean;
 };
 
+/** Bonus Kalshi Live features (event forecasts, batch candlesticks, leaderboards). */
+export type HubKalshiLiveBonusFeaturesSection = {
+  type: "kalshi_live_bonus_features";
+  anchorId?: string;
+  title?: string;
+  description?: string;
+};
+
 export type HubSection =
   | HubHeroSection
   | HubStatsSection
@@ -280,7 +288,8 @@ export type HubSection =
   | HubPublishedChartsSection
   | HubPublishedDashboardsSection
   | HubVideoCarouselSection
-  | HubKalshiLiveDemoSection;
+  | HubKalshiLiveDemoSection
+  | HubKalshiLiveBonusFeaturesSection;
 
 export type HubAssetFilter = {
   /** Match dashboards whose tags include any of these (case-insensitive). */
