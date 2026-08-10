@@ -35,10 +35,20 @@ function parseTradeTime(row: Record<string, unknown>): number | null {
   return Number.isFinite(ms) ? ms : null;
 }
 
-function parseYesPrice(row: Record<string, unknown>): number | null {
-  const raw = row.yes_price_dollars ?? row.yes_price;
-  const n = typeof raw === "number" ? raw : Number(raw);
-  return Number.isFinite(n) ? n : null;
+function parseYesPriceCents(row: Record<string, unknown>): number | null {
+  const dollarsRaw = row.yes_price_dollars;
+  if (dollarsRaw != null && dollarsRaw !== "") {
+    const dollars = typeof dollarsRaw === "number" ? dollarsRaw : Number(dollarsRaw);
+    if (Number.isFinite(dollars)) return Math.round(dollars * 100);
+  }
+  const centsRaw = row.yes_price;
+  if (centsRaw != null && centsRaw !== "") {
+    const cents = typeof centsRaw === "number" ? centsRaw : Number(centsRaw);
+    if (!Number.isFinite(cents)) return null;
+    // Legacy yes_price is usually cents (0–100); dollars would be ≤ 1.
+    return cents <= 1 ? Math.round(cents * 100) : Math.round(cents);
+  }
+  return null;
 }
 
 function formatAxisTime(ms: number): string {
@@ -69,11 +79,9 @@ function formatTooltipTime(ms: number): string {
   }
 }
 
-function formatPrice(value: number): string {
+function formatCents(value: number): string {
   if (!Number.isFinite(value)) return "—";
-  // Kalshi yes prices are dollars (0–1); show cents for readability.
-  if (value >= 0 && value <= 1) return `${Math.round(value * 100)}¢`;
-  return value.toFixed(2);
+  return `${Math.round(value)}¢`;
 }
 
 export function HubKalshiLiveDemoTradesChart({
@@ -85,7 +93,7 @@ export function HubKalshiLiveDemoTradesChart({
     for (const row of trades) {
       if (!row || typeof row !== "object") continue;
       const t = parseTradeTime(row);
-      const yesPrice = parseYesPrice(row);
+      const yesPrice = parseYesPriceCents(row);
       if (t == null || yesPrice == null) continue;
       points.push({ t, label: formatAxisTime(t), yesPrice });
     }
@@ -126,8 +134,10 @@ export function HubKalshiLiveDemoTradesChart({
             axisLine={false}
             width={44}
             tickMargin={6}
-            tickFormatter={(v) => formatPrice(Number(v))}
-            domain={["auto", "auto"]}
+            domain={[0, 100]}
+            ticks={[0, 25, 50, 75, 100]}
+            allowDataOverflow
+            tickFormatter={(v) => formatCents(Number(v))}
           />
           <ChartTooltip
             cursor={{ stroke: "var(--border)", strokeWidth: 1 }}
@@ -141,7 +151,7 @@ export function HubKalshiLiveDemoTradesChart({
                   <div className="flex w-full items-center justify-between gap-4">
                     <span className="text-muted-foreground">Yes price</span>
                     <span className="font-mono font-medium text-foreground tabular-nums">
-                      {formatPrice(Number(value))}
+                      {formatCents(Number(value))}
                     </span>
                   </div>
                 )}
@@ -155,6 +165,7 @@ export function HubKalshiLiveDemoTradesChart({
             strokeWidth={2}
             dot={{ r: 2.5, fill: "var(--color-yesPrice)", strokeWidth: 0 }}
             activeDot={{ r: 4 }}
+            isAnimationActive={false}
           />
         </LineChart>
       </ChartContainer>
