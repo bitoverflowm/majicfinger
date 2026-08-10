@@ -37,9 +37,15 @@ import { cn } from "@/lib/utils";
 const DEMO_MAX_TICKERS = 2;
 const FEATURED_LIMIT = 5;
 const DEMO_TRADES_LIMIT = 20;
-/** Stay under anonymous trades rate limit (~30/min) even with 2 markets. */
-const DEMO_TRADES_LIVE_POLL_MS = 5_000;
+/**
+ * Anonymous trades proxy is ~30 req/min. With 2 markets each poll costs 2 requests,
+ * so use 5s when dual-selected; 3s is fine for a single market.
+ */
+const DEMO_TRADES_LIVE_POLL_MS_SINGLE = 3_000;
+const DEMO_TRADES_LIVE_POLL_MS_MULTI = 5_000;
 const DEMO_TRADES_LIVE_DURATION_MS = 60_000;
+/** Soft cap while live so charts stay complete without unbounded memory growth. */
+const DEMO_TRADES_LIVE_MEMORY_CAP = 1_000;
 const DEMO_TRADES_FLASH_MS = 2_000;
 
 const TRADES_PREFERRED_COLUMNS = KALSHI_LIVE_TRADES_COLUMNS.map((c) => c.name);
@@ -184,20 +190,20 @@ function mergeNewestTrades(
     const id = tradeRowId(row);
     if (id) byId.set(id, row);
   }
-  const discovered: string[] = [];
+  const discovered = new Set<string>();
   for (const row of incoming) {
     const id = tradeRowId(row);
     if (!id) continue;
-    if (!prevIds.has(id)) discovered.push(id);
+    if (!prevIds.has(id)) discovered.add(id);
     byId.set(id, row);
   }
   const trades = [...byId.values()]
     .sort((a, b) => tradeRowTimeMs(b) - tradeRowTimeMs(a))
-    .slice(0, limit);
+    .slice(0, Math.max(1, limit));
   const visible = new Set(trades.map(tradeRowId));
   return {
     trades,
-    newIds: discovered.filter((id) => visible.has(id)),
+    newIds: [...discovered].filter((id) => visible.has(id)),
   };
 }
 
@@ -632,11 +638,17 @@ export function HubKalshiLiveDemo({ className }: HubKalshiLiveDemoProps) {
                     : `Failed to load trades for ${ticker}`,
               );
             }
+            // Each poll only asks Kalshi for the newest page; we merge into local memory
+            // (deduped by trade_id) so the chart keeps a continuous history.
             const list = (
               Array.isArray(body?.trades) ? body.trades : []
             ).slice(0, DEMO_TRADES_LIMIT) as Record<string, unknown>[];
             const prevGroup = prevByTicker.get(ticker);
-            const merged = mergeNewestTrades(prevGroup?.trades || [], list, DEMO_TRADES_LIMIT);
+            const merged = mergeNewestTrades(
+              prevGroup?.trades || [],
+              list,
+              DEMO_TRADES_LIVE_MEMORY_CAP,
+            );
             flashIds.push(...merged.newIds);
             return {
               ticker,
@@ -664,9 +676,13 @@ export function HubKalshiLiveDemo({ className }: HubKalshiLiveDemoProps) {
     };
 
     void pollOnce();
+    const pollMs =
+      tickers.length > 1
+        ? DEMO_TRADES_LIVE_POLL_MS_MULTI
+        : DEMO_TRADES_LIVE_POLL_MS_SINGLE;
     const intervalId = window.setInterval(() => {
       void pollOnce();
-    }, DEMO_TRADES_LIVE_POLL_MS);
+    }, pollMs);
 
     return () => {
       cancelled = true;
@@ -1484,8 +1500,18 @@ export function HubKalshiLiveDemo({ className }: HubKalshiLiveDemoProps) {
                     </div>
 
                     <p className="border-b border-border/40 px-3 py-2 text-[11px] leading-relaxed text-muted-foreground text-pretty">
-                      Only {DEMO_TRADES_LIMIT} most recent trades shown
-                      {tickers.length > 1 ? " per market" : ""}.{" "}
+                      {tradesLive ? (
+                        <>
+                          Live feed is accumulating trades in this session (newest
+                          first, duplicates skipped). Demo live pulls pause after 1
+                          minute.{" "}
+                        </>
+                      ) : (
+                        <>
+                          Only {DEMO_TRADES_LIMIT} most recent trades shown
+                          {tickers.length > 1 ? " per market" : ""}.{" "}
+                        </>
+                      )}
                       <Link
                         href="/#pricing"
                         className="font-medium text-foreground underline underline-offset-2 hover:text-primary"
