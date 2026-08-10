@@ -1,7 +1,7 @@
 "use client";
 
-import { useMemo } from "react";
-import { CartesianGrid, Line, LineChart, XAxis, YAxis } from "recharts";
+import { forwardRef, useMemo } from "react";
+import { CartesianGrid, Legend, Line, LineChart, XAxis, YAxis } from "recharts";
 
 import {
   ChartContainer,
@@ -9,26 +9,32 @@ import {
   ChartTooltipContent,
 } from "@/components/ui/chart";
 
-type HubKalshiLiveDemoTradesChartProps = {
+export type HubKalshiLiveDemoTradesChartSeries = {
+  key: string;
+  label: string;
   trades: Record<string, unknown>[];
+};
+
+type HubKalshiLiveDemoTradesChartProps = {
+  series: HubKalshiLiveDemoTradesChartSeries[];
   className?: string;
 };
 
-const chartConfig = {
-  yesPrice: {
-    label: "Yes price",
-    theme: {
-      light: "#2563EB",
-      dark: "#7DD3FC",
-    },
+const SERIES_THEMES = [
+  {
+    light: "#2563EB",
+    dark: "#7DD3FC",
   },
-};
+  {
+    light: "#EA580C",
+    dark: "#FB923C",
+  },
+] as const;
 
 function parseTradeTime(row: Record<string, unknown>): number | null {
   const raw = row.created_time ?? row.created_ts ?? row.ts;
   if (raw == null || raw === "") return null;
   if (typeof raw === "number" && Number.isFinite(raw)) {
-    // Kalshi sometimes returns unix seconds.
     return raw < 1e12 ? raw * 1000 : raw;
   }
   const ms = Date.parse(String(raw));
@@ -45,7 +51,6 @@ function parseYesPriceCents(row: Record<string, unknown>): number | null {
   if (centsRaw != null && centsRaw !== "") {
     const cents = typeof centsRaw === "number" ? centsRaw : Number(centsRaw);
     if (!Number.isFinite(cents)) return null;
-    // Legacy yes_price is usually cents (0–100); dollars would be ≤ 1.
     return cents <= 1 ? Math.round(cents * 100) : Math.round(cents);
   }
   return null;
@@ -84,33 +89,57 @@ function formatCents(value: number): string {
   return `${Math.round(value)}¢`;
 }
 
-export function HubKalshiLiveDemoTradesChart({
-  trades,
-  className,
-}: HubKalshiLiveDemoTradesChartProps) {
-  const data = useMemo(() => {
-    const points: { t: number; label: string; yesPrice: number }[] = [];
-    for (const row of trades) {
-      if (!row || typeof row !== "object") continue;
-      const t = parseTradeTime(row);
-      const yesPrice = parseYesPriceCents(row);
-      if (t == null || yesPrice == null) continue;
-      points.push({ t, label: formatAxisTime(t), yesPrice });
-    }
-    points.sort((a, b) => a.t - b.t);
-    return points;
-  }, [trades]);
+export const HubKalshiLiveDemoTradesChart = forwardRef<
+  HTMLDivElement,
+  HubKalshiLiveDemoTradesChartProps
+>(function HubKalshiLiveDemoTradesChart({ series, className }, ref) {
+  const chartConfig = useMemo(() => {
+    const config: Record<
+      string,
+      { label: string; theme: { light: string; dark: string } }
+    > = {};
+    series.forEach((item, index) => {
+      config[item.key] = {
+        label: item.label,
+        theme: SERIES_THEMES[index % SERIES_THEMES.length],
+      };
+    });
+    return config;
+  }, [series]);
 
-  if (!data.length) {
+  const data = useMemo(() => {
+    /** @type {Map<number, Record<string, unknown>>} */
+    const byTime = new Map<number, Record<string, unknown>>();
+
+    for (const item of series) {
+      for (const row of item.trades) {
+        if (!row || typeof row !== "object") continue;
+        const t = parseTradeTime(row);
+        const yesPrice = parseYesPriceCents(row);
+        if (t == null || yesPrice == null) continue;
+        const point = byTime.get(t) || { t, label: formatAxisTime(t) };
+        point[item.key] = yesPrice;
+        byTime.set(t, point);
+      }
+    }
+
+    return [...byTime.values()].sort(
+      (a, b) => Number(a.t) - Number(b.t),
+    ) as Array<Record<string, unknown>>;
+  }, [series]);
+
+  if (!data.length || !series.length) {
     return (
-      <p className="px-3 py-8 text-center text-sm text-muted-foreground">
-        No plottable trade points (need created time and yes price).
-      </p>
+      <div ref={ref} className={className}>
+        <p className="px-3 py-8 text-center text-sm text-muted-foreground">
+          No plottable trade points (need created time and yes price).
+        </p>
+      </div>
     );
   }
 
   return (
-    <div className={className}>
+    <div ref={ref} className={className}>
       <ChartContainer
         config={chartConfig}
         className="aspect-auto h-[22rem] w-full px-2 py-3 sm:px-3"
@@ -129,7 +158,6 @@ export function HubKalshiLiveDemoTradesChart({
             tickMargin={8}
           />
           <YAxis
-            dataKey="yesPrice"
             tickLine={false}
             axisLine={false}
             width={44}
@@ -147,9 +175,11 @@ export function HubKalshiLiveDemoTradesChart({
                   const point = payload?.[0]?.payload as { t?: number } | undefined;
                   return point?.t != null ? formatTooltipTime(point.t) : "";
                 }}
-                formatter={(value) => (
+                formatter={(value, name) => (
                   <div className="flex w-full items-center justify-between gap-4">
-                    <span className="text-muted-foreground">Yes price</span>
+                    <span className="text-muted-foreground">
+                      {chartConfig[String(name)]?.label || String(name)}
+                    </span>
                     <span className="font-mono font-medium text-foreground tabular-nums">
                       {formatCents(Number(value))}
                     </span>
@@ -158,17 +188,33 @@ export function HubKalshiLiveDemoTradesChart({
               />
             }
           />
-          <Line
-            type="monotone"
-            dataKey="yesPrice"
-            stroke="var(--color-yesPrice)"
-            strokeWidth={2}
-            dot={{ r: 2.5, fill: "var(--color-yesPrice)", strokeWidth: 0 }}
-            activeDot={{ r: 4 }}
-            isAnimationActive={false}
-          />
+          {series.length > 1 ? (
+            <Legend
+              verticalAlign="top"
+              height={28}
+              formatter={(value) => chartConfig[String(value)]?.label || String(value)}
+            />
+          ) : null}
+          {series.map((item) => (
+            <Line
+              key={item.key}
+              type="monotone"
+              dataKey={item.key}
+              name={item.key}
+              stroke={`var(--color-${item.key})`}
+              strokeWidth={2}
+              connectNulls
+              dot={{
+                r: 2.5,
+                fill: `var(--color-${item.key})`,
+                strokeWidth: 0,
+              }}
+              activeDot={{ r: 4 }}
+              isAnimationActive={false}
+            />
+          ))}
         </LineChart>
       </ChartContainer>
     </div>
   );
-}
+});

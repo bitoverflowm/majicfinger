@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { Braces, Download, LineChart, Loader2, Table2 } from "lucide-react";
 import * as XLSX from "xlsx";
@@ -41,6 +41,13 @@ const TRADES_PREFERRED_COLUMNS = KALSHI_LIVE_TRADES_COLUMNS.map((c) => c.name);
 
 type ViewMode = "sheet" | "json";
 type TradesViewMode = ViewMode | "chart";
+
+type TradesGroup = {
+  ticker: string;
+  /** Natural-language sheet label, e.g. "Recent trades for …". */
+  label: string;
+  trades: Record<string, unknown>[];
+};
 
 type FeaturedMarket = {
   ticker: string;
@@ -210,9 +217,10 @@ export function HubKalshiLiveDemo({ className }: HubKalshiLiveDemoProps) {
   const prevHasDataRef = useRef(false);
   const [featuredLoading, setFeaturedLoading] = useState(true);
   const [featuredError, setFeaturedError] = useState<string | null>(null);
-  const [trades, setTrades] = useState<Record<string, unknown>[] | null>(null);
+  const [tradesGroups, setTradesGroups] = useState<TradesGroup[] | null>(null);
   const [tradesLoading, setTradesLoading] = useState(false);
   const [tradesError, setTradesError] = useState<string | null>(null);
+  const [activeTradesSheetIndex, setActiveTradesSheetIndex] = useState(0);
   const [liveEmbedOpen, setLiveEmbedOpen] = useState(false);
   const [chartExporting, setChartExporting] = useState(false);
   const abortRef = useRef<AbortController | null>(null);
@@ -220,6 +228,8 @@ export function HubKalshiLiveDemo({ className }: HubKalshiLiveDemoProps) {
   const tradesAbortRef = useRef<AbortController | null>(null);
   const tradesSeqRef = useRef(0);
   const tradesChartRef = useRef<HTMLDivElement | null>(null);
+  const demoShellRef = useRef<HTMLDivElement | null>(null);
+  const [demoShellMinHeight, setDemoShellMinHeight] = useState<number | null>(null);
 
   const tickersKey = useMemo(
     () =>
@@ -364,9 +374,10 @@ export function HubKalshiLiveDemo({ className }: HubKalshiLiveDemoProps) {
 
     if (activeTab !== "trades" || tickers.length === 0) {
       if (tickers.length === 0) {
-        setTrades(null);
+        setTradesGroups(null);
         setTradesError(null);
         setTradesLoading(false);
+        setActiveTradesSheetIndex(0);
       }
       return;
     }
@@ -374,9 +385,24 @@ export function HubKalshiLiveDemo({ className }: HubKalshiLiveDemoProps) {
     const mySeq = ++tradesSeqRef.current;
     const ac = new AbortController();
     tradesAbortRef.current = ac;
-    setTrades(null);
+    setTradesGroups(null);
     setTradesLoading(true);
     setTradesError(null);
+    setActiveTradesSheetIndex(0);
+
+    const titleByTicker = new Map<string, string>();
+    for (const market of markets || []) {
+      const t = String(market?.ticker || "").trim().toUpperCase();
+      if (!t) continue;
+      const title = String(market?.title || market?.yes_sub_title || "").trim();
+      if (title) titleByTicker.set(t, title);
+    }
+    for (const item of featured) {
+      const t = String(item?.ticker || "").trim().toUpperCase();
+      if (!t || titleByTicker.has(t)) continue;
+      const title = String(item?.title || "").trim();
+      if (title) titleByTicker.set(t, title);
+    }
 
     Promise.all(
       tickers.map(async (ticker) => {
@@ -403,17 +429,25 @@ export function HubKalshiLiveDemo({ className }: HubKalshiLiveDemoProps) {
           );
         }
         const list = Array.isArray(body?.trades) ? body.trades : [];
-        return list.slice(0, DEMO_TRADES_LIMIT) as Record<string, unknown>[];
+        const marketTitle = titleByTicker.get(ticker);
+        const label = marketTitle
+          ? `Recent trades for ${marketTitle}`
+          : `Recent trades for ${ticker}`;
+        return {
+          ticker,
+          label,
+          trades: list.slice(0, DEMO_TRADES_LIMIT) as Record<string, unknown>[],
+        } satisfies TradesGroup;
       }),
     )
       .then((groups) => {
         if (mySeq !== tradesSeqRef.current) return;
-        setTrades(groups.flat());
+        setTradesGroups(groups);
       })
       .catch((e) => {
         if (e instanceof DOMException && e.name === "AbortError") return;
         if (mySeq !== tradesSeqRef.current) return;
-        setTrades(null);
+        setTradesGroups(null);
         setTradesError(e instanceof Error ? e.message : "Failed to load trades");
       })
       .finally(() => {
@@ -423,7 +457,7 @@ export function HubKalshiLiveDemo({ className }: HubKalshiLiveDemoProps) {
     return () => {
       ac.abort();
     };
-  }, [activeTab, tickers, tickersKey]);
+  }, [activeTab, tickers, tickersKey, markets, featured]);
 
   const jsonText = useMemo(() => {
     if (!markets) return "";
@@ -456,15 +490,24 @@ export function HubKalshiLiveDemo({ className }: HubKalshiLiveDemoProps) {
     return ordered;
   }, [markets]);
 
+  const activeTradesGroup =
+    tradesGroups && tradesGroups.length
+      ? tradesGroups[
+          Math.min(activeTradesSheetIndex, Math.max(0, tradesGroups.length - 1))
+        ]
+      : null;
+
+  const activeTrades = activeTradesGroup?.trades ?? null;
+
   const tradesJsonText = useMemo(() => {
-    if (!trades) return "";
-    return JSON.stringify(trades, null, 2);
-  }, [trades]);
+    if (!activeTrades) return "";
+    return JSON.stringify(activeTrades, null, 2);
+  }, [activeTrades]);
 
   const tradesSheetColumns = useMemo(() => {
-    if (!trades?.length) return [] as string[];
+    if (!activeTrades?.length) return [] as string[];
     const keys = new Set<string>();
-    for (const row of trades) {
+    for (const row of activeTrades) {
       if (!row || typeof row !== "object") continue;
       for (const key of Object.keys(row)) keys.add(key);
     }
@@ -473,10 +516,24 @@ export function HubKalshiLiveDemo({ className }: HubKalshiLiveDemoProps) {
       if (!ordered.includes(key)) ordered.push(key);
     }
     return ordered;
-  }, [trades]);
+  }, [activeTrades]);
+
+  const tradesChartSeries = useMemo(
+    () =>
+      (tradesGroups || []).map((group, index) => ({
+        key: `m${index}`,
+        label: group.ticker,
+        trades: group.trades,
+      })),
+    [tradesGroups],
+  );
 
   const hasData = Boolean(markets?.length);
-  const hasTrades = Boolean(trades?.length);
+  const tradesCount = (tradesGroups || []).reduce(
+    (sum, group) => sum + group.trades.length,
+    0,
+  );
+  const hasTrades = tradesCount > 0;
 
   const exportJson = useCallback(() => {
     if (!markets?.length) return;
@@ -513,38 +570,57 @@ export function HubKalshiLiveDemo({ className }: HubKalshiLiveDemoProps) {
   }, [markets, sheetColumns]);
 
   const exportTradesJson = useCallback(() => {
-    if (!trades?.length) return;
-    const blob = new Blob([JSON.stringify(trades, null, 2)], {
+    if (!activeTrades?.length) return;
+    const blob = new Blob([JSON.stringify(activeTrades, null, 2)], {
       type: "application/json;charset=utf-8;",
     });
-    downloadBlob(blob, `kalshi-live-trades-${Date.now()}.json`);
-  }, [trades]);
+    const suffix = activeTradesGroup?.ticker
+      ? `-${activeTradesGroup.ticker}`
+      : "";
+    downloadBlob(blob, `kalshi-live-trades${suffix}-${Date.now()}.json`);
+  }, [activeTrades, activeTradesGroup]);
 
   const exportTradesCsv = useCallback(() => {
-    if (!trades?.length || !tradesSheetColumns.length) return;
+    if (!activeTrades?.length || !tradesSheetColumns.length) return;
     const header = tradesSheetColumns.map(escapeCsv).join(",");
-    const rows = trades.map((row) =>
+    const rows = activeTrades.map((row) =>
       tradesSheetColumns.map((col) => escapeCsv(cellValue(row[col]))).join(","),
     );
     const csv = [header, ...rows].join("\n");
+    const suffix = activeTradesGroup?.ticker
+      ? `-${activeTradesGroup.ticker}`
+      : "";
     downloadBlob(
       new Blob([csv], { type: "text/csv;charset=utf-8;" }),
-      `kalshi-live-trades-${Date.now()}.csv`,
+      `kalshi-live-trades${suffix}-${Date.now()}.csv`,
     );
-  }, [trades, tradesSheetColumns]);
+  }, [activeTrades, activeTradesGroup, tradesSheetColumns]);
 
   const exportTradesXlsx = useCallback(() => {
-    if (!trades?.length || !tradesSheetColumns.length) return;
-    const rows = trades.map((row) => {
-      const out: Record<string, string> = {};
-      for (const col of tradesSheetColumns) out[col] = cellValue(row[col]);
-      return out;
-    });
-    const ws = XLSX.utils.json_to_sheet(rows);
+    if (!tradesGroups?.length) return;
     const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "Trades");
+    for (const group of tradesGroups) {
+      if (!group.trades.length) continue;
+      const keys = new Set<string>();
+      for (const row of group.trades) {
+        for (const key of Object.keys(row)) keys.add(key);
+      }
+      const cols = TRADES_PREFERRED_COLUMNS.filter((k) => keys.has(k));
+      for (const key of keys) {
+        if (!cols.includes(key)) cols.push(key);
+      }
+      const rows = group.trades.map((row) => {
+        const out: Record<string, string> = {};
+        for (const col of cols) out[col] = cellValue(row[col]);
+        return out;
+      });
+      const ws = XLSX.utils.json_to_sheet(rows);
+      const sheetName = group.ticker.slice(0, 31) || "Trades";
+      XLSX.utils.book_append_sheet(wb, ws, sheetName);
+    }
+    if (!wb.SheetNames.length) return;
     XLSX.writeFile(wb, `kalshi-live-trades-${Date.now()}.xlsx`);
-  }, [trades, tradesSheetColumns]);
+  }, [tradesGroups]);
 
   const exportTradesChart = useCallback(
     async (format: "png" | "svg" | "jpg") => {
@@ -603,6 +679,24 @@ export function HubKalshiLiveDemo({ className }: HubKalshiLiveDemoProps) {
     prevHasDataRef.current = hasData;
   }, [hasData]);
 
+  // Lock demo shell height to the Natural Language search layout so other tabs don't shrink it.
+  useLayoutEffect(() => {
+    if (activeTab !== "search") return;
+    const el = demoShellRef.current;
+    if (!el || typeof ResizeObserver === "undefined") return;
+
+    const update = () => {
+      const next = Math.ceil(el.getBoundingClientRect().height);
+      if (next <= 0) return;
+      setDemoShellMinHeight((prev) => (prev == null ? next : Math.max(prev, next)));
+    };
+
+    update();
+    const ro = new ResizeObserver(update);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [activeTab, featuredLoading, featured.length]);
+
   const tabs = useMemo(
     () => [
       {
@@ -658,7 +752,11 @@ export function HubKalshiLiveDemo({ className }: HubKalshiLiveDemoProps) {
   return (
     <div className={cn("w-full", className)}>
       <HubKalshiLiveDemoMockup>
-        <div className="flex w-full flex-col gap-4 px-4 py-6 sm:gap-5 sm:px-6 sm:py-8 lg:px-8 lg:py-10">
+        <div
+          ref={demoShellRef}
+          className="flex w-full flex-col gap-4 px-4 py-6 sm:gap-5 sm:px-6 sm:py-8 lg:px-8 lg:py-10"
+          style={demoShellMinHeight ? { minHeight: demoShellMinHeight } : undefined}
+        >
           <div className="space-y-1.5">
             <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs font-medium tracking-wider text-muted-foreground">
               <span className="uppercase">
@@ -675,7 +773,7 @@ export function HubKalshiLiveDemo({ className }: HubKalshiLiveDemoProps) {
             </p>
           </div>
 
-          <div className="grid w-full grid-cols-1 gap-5 py-12 lg:grid-cols-5 lg:gap-6 lg:items-start">
+          <div className="grid w-full grid-cols-1 gap-5 py-12 lg:grid-cols-5 lg:gap-6 lg:items-stretch">
             <div className="lg:col-span-1">
               <HubKalshiLiveDemoTabs
                 tabs={tabs}
@@ -693,7 +791,7 @@ export function HubKalshiLiveDemo({ className }: HubKalshiLiveDemoProps) {
               />
             </div>
 
-            <div className="min-w-0 lg:col-span-4" role="tabpanel">
+            <div className="flex min-h-0 min-w-0 flex-col lg:col-span-4" role="tabpanel">
               {activeTab === "search" ? (
                 <div className="flex w-full flex-col gap-4 px-2 sm:px-4 lg:px-6">
                   <MarketTickerSearch
@@ -972,9 +1070,12 @@ export function HubKalshiLiveDemo({ className }: HubKalshiLiveDemoProps) {
                             <Loader2 className="size-3.5 animate-spin" aria-hidden />
                             Loading…
                           </span>
-                        ) : trades ? (
+                        ) : tradesGroups ? (
                           <span className="text-xs text-muted-foreground">
-                            {trades.length} trade{trades.length === 1 ? "" : "s"}
+                            {tradesCount} trade{tradesCount === 1 ? "" : "s"}
+                            {tradesGroups.length > 1
+                              ? ` · ${tradesGroups.length} markets`
+                              : ""}
                           </span>
                         ) : null}
 
@@ -1112,7 +1213,8 @@ export function HubKalshiLiveDemo({ className }: HubKalshiLiveDemoProps) {
                     </div>
 
                     <p className="border-b border-border/40 px-3 py-2 text-[11px] leading-relaxed text-muted-foreground text-pretty">
-                      Only {DEMO_TRADES_LIMIT} most recent trades shown.{" "}
+                      Only {DEMO_TRADES_LIMIT} most recent trades shown
+                      {tickers.length > 1 ? " per market" : ""}.{" "}
                       <Link
                         href="/#pricing"
                         className="font-medium text-foreground underline underline-offset-2 hover:text-primary"
@@ -1122,6 +1224,40 @@ export function HubKalshiLiveDemo({ className }: HubKalshiLiveDemoProps) {
                       to get full trades and historical trades all the way from
                       Kalshi launch in 2021.
                     </p>
+
+                    {tradesViewMode !== "chart" &&
+                    (tradesGroups?.length || 0) > 1 ? (
+                      <div
+                        className="flex flex-col gap-1 border-b border-border/40 px-2 py-2 sm:px-3"
+                        role="tablist"
+                        aria-label="Trade sheets"
+                      >
+                        {tradesGroups?.map((group, index) => {
+                          const selected = index === activeTradesSheetIndex;
+                          return (
+                            <button
+                              key={group.ticker}
+                              type="button"
+                              role="tab"
+                              aria-selected={selected}
+                              onClick={() => setActiveTradesSheetIndex(index)}
+                              className={cn(
+                                "rounded-md px-2.5 py-1.5 text-left text-[11px] leading-snug transition-colors",
+                                selected
+                                  ? "bg-background font-medium text-foreground shadow-sm ring-1 ring-border/70"
+                                  : "text-muted-foreground hover:bg-muted/50 hover:text-foreground",
+                              )}
+                            >
+                              <span className="block truncate">{group.label}</span>
+                              <span className="mt-0.5 block truncate font-mono text-[10px] text-muted-foreground">
+                                {group.ticker} · {group.trades.length} trade
+                                {group.trades.length === 1 ? "" : "s"}
+                              </span>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    ) : null}
 
                     {tradesError ? (
                       <p className="px-3 py-4 text-sm text-destructive">{tradesError}</p>
@@ -1133,19 +1269,23 @@ export function HubKalshiLiveDemo({ className }: HubKalshiLiveDemoProps) {
                       ) : (
                         <SheetTableSkeleton rows={8} />
                       )
-                    ) : !trades?.length ? (
+                    ) : !hasTrades ? (
                       <p className="px-3 py-8 text-center text-sm text-muted-foreground">
                         No recent trades for this market.
                       </p>
                     ) : tradesViewMode === "chart" ? (
                       <HubKalshiLiveDemoTradesChart
                         ref={tradesChartRef}
-                        trades={trades}
+                        series={tradesChartSeries}
                       />
                     ) : tradesViewMode === "json" ? (
                       <pre className="max-h-[28rem] overflow-auto px-3 py-3 font-mono text-[11px] leading-relaxed text-foreground sm:text-xs">
                         {tradesJsonText}
                       </pre>
+                    ) : !activeTrades?.length ? (
+                      <p className="px-3 py-8 text-center text-sm text-muted-foreground">
+                        No recent trades for this market.
+                      </p>
                     ) : (
                       <div className="max-h-[28rem] overflow-auto">
                         <table className="w-max min-w-full border-collapse text-left text-[11px] sm:text-xs">
@@ -1162,7 +1302,7 @@ export function HubKalshiLiveDemo({ className }: HubKalshiLiveDemoProps) {
                             </tr>
                           </thead>
                           <tbody>
-                            {trades.map((row, rowIndex) => (
+                            {activeTrades.map((row, rowIndex) => (
                               <tr
                                 key={String(row.trade_id || rowIndex)}
                                 className="border-b border-border/40 last:border-0"
