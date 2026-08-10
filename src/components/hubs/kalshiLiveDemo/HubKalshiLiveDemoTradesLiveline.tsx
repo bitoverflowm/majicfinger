@@ -33,11 +33,13 @@ type HubKalshiLiveDemoTradesLivelineProps = {
 /** Floor so a sparse first few polls still have room to breathe. */
 const LIVE_WINDOW_MIN_SECS = 45;
 /**
- * Live demo only runs ~1 minute; frame the chart around recent activity so
- * older seed trades don't compress the view into a 15-minute timeline.
+ * Prefer framing around recent live activity; older seed trades are kept and
+ * either covered by a wider window or time-aligned into the live viewport.
  */
 const LIVE_FOCUS_SECS = 90;
-const LIVE_WINDOW_MAX_SECS = 2 * 60;
+const LIVE_WINDOW_MAX_SECS = 15 * 60;
+/** Always keep at least this many seed trades visible while waiting for live ticks. */
+const LIVE_SEED_TRADE_COUNT = 20;
 
 function parseTradeTimeSec(row: TradeRow): number | null {
   const raw = row.created_time ?? row.created_ts ?? row.ts;
@@ -76,7 +78,47 @@ function tradesToPoints(trades: TradeRow[]) {
   return points;
 }
 
-/** Fit Liveline's wall-clock window to recent points so short live sessions aren't compressed. */
+/**
+ * Prefer recent live points; if the book is quiet, keep the last N seed trades
+ * so Liveline never boots empty while waiting on the next pull.
+ */
+function seedLivePoints(points: { time: number; value: number }[]) {
+  if (!points.length) return points;
+  const seed = points.slice(-LIVE_SEED_TRADE_COUNT);
+  if (seed.length < 2) return seed;
+
+  const nowSec = Date.now() / 1000;
+  const cutoff = nowSec - LIVE_FOCUS_SECS;
+  const recent = points.filter((p) => p.time >= cutoff);
+  if (recent.length >= 2) return recent;
+  return seed;
+}
+
+/**
+ * Liveline only renders points inside [now − window, now]. When the last trades
+ * are older than that (quiet market / slow first poll), shift them into the
+ * viewport while preserving relative spacing so the seed series stays visible.
+ */
+function alignPointsToLiveWindow(
+  points: { time: number; value: number }[],
+  windowSecs: number,
+) {
+  if (points.length < 2) return points;
+  const nowSec = Date.now() / 1000;
+  const newest = points[points.length - 1]!.time;
+  const leftEdge = nowSec - windowSecs + 2;
+  if (newest >= leftEdge) return points;
+
+  const oldest = points[0]!.time;
+  const span = Math.max(newest - oldest, 1e-3);
+  const targetSpan = Math.min(span, Math.max(8, windowSecs * 0.85));
+  const anchor = nowSec - 2;
+  return points.map((p) => ({
+    time: anchor - ((newest - p.time) / span) * targetSpan,
+    value: p.value,
+  }));
+}
+
 function windowSecsForPoints(pointSets: { time: number; value: number }[][]) {
   let oldest = Number.POSITIVE_INFINITY;
   let newest = Number.NEGATIVE_INFINITY;
@@ -93,20 +135,20 @@ function windowSecsForPoints(pointSets: { time: number; value: number }[][]) {
 
   const nowSec = Date.now() / 1000;
   const spanSecs = Math.max(0, newest - oldest);
+  // If seed is stale, use a compact live window — points will be aligned into it.
+  if (newest < nowSec - LIVE_WINDOW_MAX_SECS) {
+    return Math.min(
+      LIVE_WINDOW_MAX_SECS,
+      Math.max(LIVE_WINDOW_MIN_SECS, Math.ceil(spanSecs * 1.25) + 12),
+    );
+  }
+
   const coverOldest = Math.max(0, nowSec - oldest);
-  const padded = Math.ceil(Math.max(spanSecs, coverOldest) * 1.2) + 8;
+  const padded = Math.ceil(Math.max(spanSecs, coverOldest) * 1.15) + 8;
   return Math.min(
     LIVE_WINDOW_MAX_SECS,
     Math.max(LIVE_WINDOW_MIN_SECS, padded),
   );
-}
-
-function focusRecentPoints(points: { time: number; value: number }[]) {
-  if (!points.length) return points;
-  const nowSec = Date.now() / 1000;
-  const cutoff = nowSec - LIVE_FOCUS_SECS;
-  const recent = points.filter((p) => p.time >= cutoff);
-  return recent.length ? recent : points.slice(-Math.min(40, points.length));
 }
 
 function useIsDarkTheme() {
@@ -137,8 +179,8 @@ export const HubKalshiLiveDemoTradesLiveline = forwardRef<
   const hidden = hiddenSeriesIds ?? new Set<string>();
 
   const mapped = useMemo(() => {
-    return series.map((item, index) => {
-      const data = focusRecentPoints(tradesToPoints(item.trades));
+    const seeded = series.map((item, index) => {
+      const rawPoints = seedLivePoints(tradesToPoints(item.trades));
       const token = item.colorToken ?? defaultSeriesColorToken(index);
       return {
         id: item.id,
@@ -148,35 +190,50 @@ export const HubKalshiLiveDemoTradesLiveline = forwardRef<
           item.color ||
           resolveDemoChartColor(token) ||
           demoChartCssVar(token),
-        data,
-        value: data[data.length - 1]?.value ?? 0,
+        rawPoints,
       };
     });
+
+    const windowSecs = windowSecsForPoints(
+      seeded.map((s) => s.rawPoints).filter((p) => p.length > 0),
+    );
+
+    return {
+      windowSecs,
+      series: seeded.map((s) => {
+        const data = alignPointsToLiveWindow(s.rawPoints, windowSecs);
+        return {
+          id: s.id,
+          label: s.label,
+          colorToken: s.colorToken,
+          color: s.color,
+          data,
+          value: data[data.length - 1]?.value ?? 0,
+        };
+      }),
+    };
   }, [series]);
 
   const visible = useMemo(
-    () => mapped.filter((s) => !hidden.has(s.id) && s.data.length > 0),
-    [mapped, hidden],
+    () => mapped.series.filter((s) => !hidden.has(s.id) && s.data.length > 0),
+    [mapped.series, hidden],
   );
 
-  const windowSecs = useMemo(
-    () => windowSecsForPoints(visible.map((s) => s.data)),
-    [visible],
-  );
+  const windowSecs = mapped.windowSecs;
 
   const legendItems = useMemo(
     () =>
-      mapped.map((s) => ({
+      mapped.series.map((s) => ({
         id: s.id,
         label: s.label,
         color: s.color,
         colorToken: s.colorToken,
       })),
-    [mapped],
+    [mapped.series],
   );
 
   const primary = visible[0];
-  if (!mapped.some((s) => s.data.length)) {
+  if (!mapped.series.some((s) => s.data.length)) {
     return (
       <div ref={ref} className={className}>
         <p className="px-3 py-8 text-center text-sm text-muted-foreground">

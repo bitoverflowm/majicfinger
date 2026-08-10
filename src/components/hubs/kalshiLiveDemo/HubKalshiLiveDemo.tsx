@@ -12,6 +12,10 @@ import {
   HubKalshiLiveDemoTabs,
   type HubKalshiLiveDemoTabId,
 } from "@/components/hubs/kalshiLiveDemo/HubKalshiLiveDemoTabs";
+import {
+  HubKalshiLiveDemoCandlesticksChart,
+  type DemoCandlePeriod,
+} from "@/components/hubs/kalshiLiveDemo/HubKalshiLiveDemoCandlesticksChart";
 import { HubKalshiLiveDemoOrderbookChart } from "@/components/hubs/kalshiLiveDemo/HubKalshiLiveDemoOrderbookChart";
 import { HubKalshiLiveDemoTradesChart } from "@/components/hubs/kalshiLiveDemo/HubKalshiLiveDemoTradesChart";
 import { HubKalshiLiveDemoTradesLiveline } from "@/components/hubs/kalshiLiveDemo/HubKalshiLiveDemoTradesLiveline";
@@ -37,9 +41,18 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { isKalshiMarketLiveStatus } from "@/lib/kalshiLive/kalshiMarketTiming";
+import { KALSHI_LIVE_CANDLESTICK_COLUMNS } from "@/lib/kalshiLive/candlesticksColumns";
 import { normalizeKalshiLiveOrderbook } from "@/lib/kalshiLive/normalizeOrderbookRow";
+import {
+  flattenKalshiLiveCandlestickGroups,
+} from "@/lib/kalshiLive/normalizeCandlestickRow";
 import { KALSHI_LIVE_ORDERBOOK_COLUMNS } from "@/lib/kalshiLive/orderbookColumns";
 import { KALSHI_LIVE_TRADES_COLUMNS } from "@/lib/kalshiLive/tradesColumns";
+import {
+  buildCandlestickLiveFlashRows,
+  liveSheetRowKey,
+  upsertCandlestickRowsByEndPeriodTs,
+} from "@/lib/liveFeeds/merge/kalshiCandlestickUpsert";
 import {
   buildOrderbookLiveFlashRows,
   liveOrderbookRowKey,
@@ -67,15 +80,24 @@ const DEMO_ORDERBOOK_LIVE_POLL_MS_MULTI = 5_000;
 const DEMO_ORDERBOOK_LIVE_DURATION_MS = 60_000;
 const DEMO_ORDERBOOK_FLASH_MS = 2_000;
 const DEMO_ORDERBOOK_SOFT_ROW_CAP = 500;
+const DEMO_CANDLES_LIVE_POLL_MS_SINGLE = 3_000;
+const DEMO_CANDLES_LIVE_POLL_MS_MULTI = 5_000;
+const DEMO_CANDLES_LIVE_DURATION_MS = 60_000;
+const DEMO_CANDLES_FLASH_MS = 2_000;
+const DEMO_CANDLES_SOFT_ROW_CAP = 500;
 
 const TRADES_PREFERRED_COLUMNS = KALSHI_LIVE_TRADES_COLUMNS.map((c) => c.name);
 const ORDERBOOK_PREFERRED_COLUMNS = KALSHI_LIVE_ORDERBOOK_COLUMNS.map(
+  (c) => c.name,
+);
+const CANDLES_PREFERRED_COLUMNS = KALSHI_LIVE_CANDLESTICK_COLUMNS.map(
   (c) => c.name,
 );
 
 type ViewMode = "sheet" | "json";
 type TradesViewMode = ViewMode | "chart";
 type OrderbookViewMode = ViewMode | "chart";
+type CandlesticksViewMode = ViewMode | "chart";
 
 type TradesGroup = {
   ticker: string;
@@ -91,6 +113,17 @@ type OrderbookGroup = {
 };
 
 type OrderbookFlashMap = Record<
+  string,
+  { isNew: boolean; columns?: string[] }
+>;
+
+type CandlesGroup = {
+  ticker: string;
+  label: string;
+  candles: Record<string, unknown>[];
+};
+
+type CandlesFlashMap = Record<
   string,
   { isNew: boolean; columns?: string[] }
 >;
@@ -193,6 +226,12 @@ function shortTradeSheetLabel(
   const yes = String(yesSubTitle || "").trim();
   if (yes) return yes;
   return tickerDifferentiator(ticker, allTickers);
+}
+
+function demoCandleRangeSec(period: DemoCandlePeriod): number {
+  if (period === 1) return 2 * 60 * 60;
+  if (period === 60) return 3 * 24 * 60 * 60;
+  return 60 * 24 * 60 * 60;
 }
 
 function tradeRowId(row: Record<string, unknown>): string {
@@ -335,6 +374,9 @@ export function HubKalshiLiveDemo({ className }: HubKalshiLiveDemoProps) {
   const [tradesViewMode, setTradesViewMode] = useState<TradesViewMode>("sheet");
   const [orderbookViewMode, setOrderbookViewMode] =
     useState<OrderbookViewMode>("sheet");
+  const [candlesViewMode, setCandlesViewMode] =
+    useState<CandlesticksViewMode>("sheet");
+  const [candlePeriod, setCandlePeriod] = useState<DemoCandlePeriod>(1);
   const [activeTab, setActiveTab] = useState<HubKalshiLiveDemoTabId>("search");
   const [featured, setFeatured] = useState<FeaturedMarket[]>([]);
   const prevHasSelectionRef = useRef(false);
@@ -351,12 +393,20 @@ export function HubKalshiLiveDemo({ className }: HubKalshiLiveDemoProps) {
   const [orderbookLoading, setOrderbookLoading] = useState(false);
   const [orderbookError, setOrderbookError] = useState<string | null>(null);
   const [activeOrderbookSheetIndex, setActiveOrderbookSheetIndex] = useState(0);
+  const [candlesGroups, setCandlesGroups] = useState<CandlesGroup[] | null>(
+    null,
+  );
+  const [candlesLoading, setCandlesLoading] = useState(false);
+  const [candlesError, setCandlesError] = useState<string | null>(null);
+  const [activeCandlesSheetIndex, setActiveCandlesSheetIndex] = useState(0);
   const [liveEmbedOpen, setLiveEmbedOpen] = useState(false);
   const [liveLimitOpen, setLiveLimitOpen] = useState(false);
   const [tradesLive, setTradesLive] = useState(false);
   const [orderbookLive, setOrderbookLive] = useState(false);
+  const [candlesLive, setCandlesLive] = useState(false);
   const [newTradeIds, setNewTradeIds] = useState<Set<string>>(() => new Set());
   const [orderbookFlash, setOrderbookFlash] = useState<OrderbookFlashMap>({});
+  const [candlesFlash, setCandlesFlash] = useState<CandlesFlashMap>({});
   const [hiddenTradeSeriesIds, setHiddenTradeSeriesIds] = useState<Set<string>>(
     () => new Set(),
   );
@@ -378,6 +428,12 @@ export function HubKalshiLiveDemo({ className }: HubKalshiLiveDemoProps) {
   const orderbookLiveStartedAtRef = useRef<number | null>(null);
   const orderbookGroupsRef = useRef<OrderbookGroup[] | null>(null);
   const orderbookChartRef = useRef<HTMLDivElement | null>(null);
+  const candlesAbortRef = useRef<AbortController | null>(null);
+  const candlesSeqRef = useRef(0);
+  const candlesLiveAbortRef = useRef<AbortController | null>(null);
+  const candlesLiveStartedAtRef = useRef<number | null>(null);
+  const candlesGroupsRef = useRef<CandlesGroup[] | null>(null);
+  const candlesChartRef = useRef<HTMLDivElement | null>(null);
   const demoShellRef = useRef<HTMLDivElement | null>(null);
   const [demoShellMinHeight, setDemoShellMinHeight] = useState<number | null>(null);
 
@@ -406,6 +462,10 @@ export function HubKalshiLiveDemo({ className }: HubKalshiLiveDemoProps) {
   }, [orderbookGroups]);
 
   useEffect(() => {
+    candlesGroupsRef.current = candlesGroups;
+  }, [candlesGroups]);
+
+  useEffect(() => {
     if (!newTradeIds.size) return;
     const timer = window.setTimeout(() => setNewTradeIds(new Set()), DEMO_TRADES_FLASH_MS);
     return () => window.clearTimeout(timer);
@@ -419,6 +479,15 @@ export function HubKalshiLiveDemo({ className }: HubKalshiLiveDemoProps) {
     );
     return () => window.clearTimeout(timer);
   }, [orderbookFlash]);
+
+  useEffect(() => {
+    if (!Object.keys(candlesFlash).length) return;
+    const timer = window.setTimeout(
+      () => setCandlesFlash({}),
+      DEMO_CANDLES_FLASH_MS,
+    );
+    return () => window.clearTimeout(timer);
+  }, [candlesFlash]);
 
   const stopTradesLive = useCallback((opts?: { limitReached?: boolean }) => {
     tradesLiveAbortRef.current?.abort();
@@ -436,21 +505,40 @@ export function HubKalshiLiveDemo({ className }: HubKalshiLiveDemoProps) {
     if (opts?.limitReached) setLiveLimitOpen(true);
   }, []);
 
+  const stopCandlesLive = useCallback((opts?: { limitReached?: boolean }) => {
+    candlesLiveAbortRef.current?.abort();
+    candlesLiveAbortRef.current = null;
+    candlesLiveStartedAtRef.current = null;
+    setCandlesLive(false);
+    if (opts?.limitReached) setLiveLimitOpen(true);
+  }, []);
+
   const startTradesLive = useCallback(() => {
     if (!tickers.length) return;
     stopOrderbookLive();
+    stopCandlesLive();
     tradesLiveStartedAtRef.current = Date.now();
     setNewTradeIds(new Set());
     setTradesLive(true);
-  }, [tickers.length, stopOrderbookLive]);
+  }, [tickers.length, stopOrderbookLive, stopCandlesLive]);
 
   const startOrderbookLive = useCallback(() => {
     if (!tickers.length) return;
     stopTradesLive();
+    stopCandlesLive();
     orderbookLiveStartedAtRef.current = Date.now();
     setOrderbookFlash({});
     setOrderbookLive(true);
-  }, [tickers.length, stopTradesLive]);
+  }, [tickers.length, stopTradesLive, stopCandlesLive]);
+
+  const startCandlesLive = useCallback(() => {
+    if (!tickers.length) return;
+    stopTradesLive();
+    stopOrderbookLive();
+    candlesLiveStartedAtRef.current = Date.now();
+    setCandlesFlash({});
+    setCandlesLive(true);
+  }, [tickers.length, stopTradesLive, stopOrderbookLive]);
 
   const loadFeaturedMarkets = useCallback(async (opts?: { excludeTickers?: string[] }) => {
     const exclude = (opts?.excludeTickers || [])
@@ -1031,6 +1119,266 @@ export function HubKalshiLiveDemo({ className }: HubKalshiLiveDemoProps) {
     stopOrderbookLive,
   ]);
 
+  useEffect(() => {
+    candlesAbortRef.current?.abort();
+
+    if (activeTab !== "candlesticks" || tickers.length === 0) {
+      if (tickers.length === 0) {
+        setCandlesGroups(null);
+        setCandlesError(null);
+        setCandlesLoading(false);
+        setActiveCandlesSheetIndex(0);
+        setCandlesFlash({});
+      }
+      return;
+    }
+
+    if (candlesLive) return;
+
+    const mySeq = ++candlesSeqRef.current;
+    const ac = new AbortController();
+    candlesAbortRef.current = ac;
+    setCandlesGroups(null);
+    setCandlesLoading(true);
+    setCandlesError(null);
+    setActiveCandlesSheetIndex(0);
+    setCandlesFlash({});
+
+    const yesSubByTicker = new Map<string, string>();
+    for (const market of markets || []) {
+      const t = String(market?.ticker || "").trim().toUpperCase();
+      if (!t) continue;
+      const yesSub = String(market?.yes_sub_title || "").trim();
+      if (yesSub) yesSubByTicker.set(t, yesSub);
+    }
+    for (const item of featured) {
+      const t = String(item?.ticker || "").trim().toUpperCase();
+      if (!t || yesSubByTicker.has(t)) continue;
+      const yesSub = String(item?.subtitle || "").trim();
+      if (yesSub) yesSubByTicker.set(t, yesSub);
+    }
+
+    const endTs = Math.floor(Date.now() / 1000);
+    const startTs = endTs - demoCandleRangeSec(candlePeriod);
+
+    Promise.all(
+      tickers.map(async (ticker) => {
+        const params = new URLSearchParams({
+          market_tickers: ticker,
+          start_ts: String(startTs),
+          end_ts: String(endTs),
+          period_interval: String(candlePeriod),
+          per_ticker: "1",
+        });
+        const res = await fetch(
+          `/api/integrations/kalshi-live/markets/candlesticks?${params.toString()}`,
+          {
+            headers: { Accept: "application/json" },
+            credentials: "same-origin",
+            signal: ac.signal,
+          },
+        );
+        const body = await res.json().catch(() => ({}));
+        if (!res.ok) {
+          throw new Error(
+            typeof body?.error === "string"
+              ? body.error
+              : res.status === 429
+                ? "Too many requests — slow down and try again."
+                : `Failed to load candlesticks for ${ticker}`,
+          );
+        }
+        const candles = flattenKalshiLiveCandlestickGroups(body?.markets).filter(
+          (row) =>
+            String(row.market_ticker || "")
+              .trim()
+              .toUpperCase() === ticker,
+        );
+        return {
+          ticker,
+          label: shortTradeSheetLabel(ticker, tickers, yesSubByTicker.get(ticker)),
+          candles: upsertCandlestickRowsByEndPeriodTs([], candles, {
+            softRowCap: DEMO_CANDLES_SOFT_ROW_CAP,
+          }),
+        } satisfies CandlesGroup;
+      }),
+    )
+      .then((groups) => {
+        if (mySeq !== candlesSeqRef.current) return;
+        setCandlesGroups(groups);
+      })
+      .catch((e) => {
+        if (e instanceof DOMException && e.name === "AbortError") return;
+        if (mySeq !== candlesSeqRef.current) return;
+        setCandlesGroups(null);
+        setCandlesError(
+          e instanceof Error ? e.message : "Failed to load candlesticks",
+        );
+      })
+      .finally(() => {
+        if (mySeq === candlesSeqRef.current) setCandlesLoading(false);
+      });
+
+    return () => {
+      ac.abort();
+    };
+  }, [
+    activeTab,
+    tickers,
+    tickersKey,
+    markets,
+    featured,
+    candlesLive,
+    candlePeriod,
+  ]);
+
+  useEffect(() => {
+    if (!candlesLive) return;
+    if (activeTab !== "candlesticks" || tickers.length === 0) {
+      stopCandlesLive();
+      return;
+    }
+
+    let cancelled = false;
+    let inFlight = false;
+
+    const yesSubByTicker = new Map<string, string>();
+    for (const market of markets || []) {
+      const t = String(market?.ticker || "").trim().toUpperCase();
+      if (!t) continue;
+      const yesSub = String(market?.yes_sub_title || "").trim();
+      if (yesSub) yesSubByTicker.set(t, yesSub);
+    }
+    for (const item of featured) {
+      const t = String(item?.ticker || "").trim().toUpperCase();
+      if (!t || yesSubByTicker.has(t)) continue;
+      const yesSub = String(item?.subtitle || "").trim();
+      if (yesSub) yesSubByTicker.set(t, yesSub);
+    }
+
+    const pollOnce = async () => {
+      if (cancelled || inFlight) return;
+      const startedAt = candlesLiveStartedAtRef.current;
+      if (
+        startedAt != null &&
+        Date.now() - startedAt >= DEMO_CANDLES_LIVE_DURATION_MS
+      ) {
+        stopCandlesLive({ limitReached: true });
+        return;
+      }
+
+      inFlight = true;
+      candlesLiveAbortRef.current?.abort();
+      const ac = new AbortController();
+      candlesLiveAbortRef.current = ac;
+
+      try {
+        const previous = candlesGroupsRef.current || [];
+        const prevByTicker = new Map(previous.map((g) => [g.ticker, g]));
+        const flashRows: CandlesFlashMap = {};
+
+        const endTs = Math.floor(Date.now() / 1000);
+        const lookbackSec = 5 * candlePeriod * 60;
+        const startTs = endTs - lookbackSec;
+
+        const nextGroups = await Promise.all(
+          tickers.map(async (ticker) => {
+            const params = new URLSearchParams({
+              market_tickers: ticker,
+              start_ts: String(startTs),
+              end_ts: String(endTs),
+              period_interval: String(candlePeriod),
+              per_ticker: "1",
+            });
+            const res = await fetch(
+              `/api/integrations/kalshi-live/markets/candlesticks?${params.toString()}`,
+              {
+                headers: { Accept: "application/json" },
+                credentials: "same-origin",
+                signal: ac.signal,
+              },
+            );
+            const body = await res.json().catch(() => ({}));
+            if (!res.ok) {
+              throw new Error(
+                typeof body?.error === "string"
+                  ? body.error
+                  : res.status === 429
+                    ? "Too many requests — slow down and try again."
+                    : `Failed to load candlesticks for ${ticker}`,
+              );
+            }
+            const prevGroup = prevByTicker.get(ticker);
+            const incoming = flattenKalshiLiveCandlestickGroups(
+              body?.markets,
+            ).filter(
+              (row) =>
+                String(row.market_ticker || "")
+                  .trim()
+                  .toUpperCase() === ticker,
+            );
+            const merged = upsertCandlestickRowsByEndPeriodTs(
+              prevGroup?.candles || [],
+              incoming,
+              { softRowCap: DEMO_CANDLES_SOFT_ROW_CAP },
+            );
+            const flash = buildCandlestickLiveFlashRows(
+              prevGroup?.candles || [],
+              incoming,
+            );
+            Object.assign(flashRows, flash);
+            return {
+              ticker,
+              label:
+                prevGroup?.label ||
+                shortTradeSheetLabel(ticker, tickers, yesSubByTicker.get(ticker)),
+              candles: merged,
+            } satisfies CandlesGroup;
+          }),
+        );
+
+        if (cancelled || ac.signal.aborted) return;
+        setCandlesGroups(nextGroups);
+        setCandlesError(null);
+        if (Object.keys(flashRows).length) {
+          setCandlesFlash(flashRows);
+        }
+      } catch (e) {
+        if (e instanceof DOMException && e.name === "AbortError") return;
+        if (cancelled) return;
+        setCandlesError(
+          e instanceof Error ? e.message : "Failed to refresh live candlesticks",
+        );
+      } finally {
+        inFlight = false;
+      }
+    };
+
+    void pollOnce();
+    const pollMs =
+      tickers.length > 1
+        ? DEMO_CANDLES_LIVE_POLL_MS_MULTI
+        : DEMO_CANDLES_LIVE_POLL_MS_SINGLE;
+    const intervalId = window.setInterval(() => {
+      void pollOnce();
+    }, pollMs);
+
+    return () => {
+      cancelled = true;
+      window.clearInterval(intervalId);
+      candlesLiveAbortRef.current?.abort();
+    };
+  }, [
+    candlesLive,
+    activeTab,
+    tickers,
+    tickersKey,
+    markets,
+    featured,
+    candlePeriod,
+    stopCandlesLive,
+  ]);
+
   const jsonText = useMemo(() => {
     if (!markets) return "";
     return JSON.stringify(markets, null, 2);
@@ -1171,6 +1519,11 @@ export function HubKalshiLiveDemo({ className }: HubKalshiLiveDemoProps) {
     0,
   );
   const hasOrderbook = orderbookLevelCount > 0;
+  const candlesCount = (candlesGroups || []).reduce(
+    (sum, group) => sum + group.candles.length,
+    0,
+  );
+  const hasCandles = candlesCount > 0;
 
   const activeOrderbookGroup =
     orderbookGroups && orderbookGroups.length
@@ -1200,6 +1553,36 @@ export function HubKalshiLiveDemo({ className }: HubKalshiLiveDemoProps) {
   const orderbookFlashKeys = useMemo(
     () => new Set(Object.keys(orderbookFlash)),
     [orderbookFlash],
+  );
+
+  const activeCandlesGroup =
+    candlesGroups && candlesGroups.length
+      ? candlesGroups[
+          Math.min(
+            activeCandlesSheetIndex,
+            Math.max(0, candlesGroups.length - 1),
+          )
+        ]
+      : null;
+  const activeCandles = activeCandlesGroup?.candles ?? null;
+
+  const candlesSheetColumns = useMemo(() => {
+    if (!activeCandles?.length) return [] as string[];
+    const keys = new Set<string>();
+    for (const row of activeCandles) {
+      if (!row || typeof row !== "object") continue;
+      for (const key of Object.keys(row)) keys.add(key);
+    }
+    const ordered = CANDLES_PREFERRED_COLUMNS.filter((k) => keys.has(k));
+    for (const key of keys) {
+      if (!ordered.includes(key)) ordered.push(key);
+    }
+    return ordered;
+  }, [activeCandles]);
+
+  const candlesFlashKeys = useMemo(
+    () => new Set(Object.keys(candlesFlash)),
+    [candlesFlash],
   );
 
   const exportJson = useCallback(() => {
@@ -1410,6 +1793,93 @@ export function HubKalshiLiveDemo({ className }: HubKalshiLiveDemoProps) {
     [chartExporting],
   );
 
+  const exportCandlesJson = useCallback(() => {
+    if (!activeCandles?.length) return;
+    const blob = new Blob([JSON.stringify(activeCandles, null, 2)], {
+      type: "application/json;charset=utf-8;",
+    });
+    const suffix = activeCandlesGroup?.ticker
+      ? `-${activeCandlesGroup.ticker}`
+      : "";
+    downloadBlob(blob, `kalshi-live-candlesticks${suffix}-${Date.now()}.json`);
+  }, [activeCandles, activeCandlesGroup]);
+
+  const exportCandlesCsv = useCallback(() => {
+    if (!activeCandles?.length || !candlesSheetColumns.length) return;
+    const header = candlesSheetColumns.map(escapeCsv).join(",");
+    const rows = activeCandles.map((row) =>
+      candlesSheetColumns.map((col) => escapeCsv(cellValue(row[col]))).join(","),
+    );
+    const csv = [header, ...rows].join("\n");
+    const suffix = activeCandlesGroup?.ticker
+      ? `-${activeCandlesGroup.ticker}`
+      : "";
+    downloadBlob(
+      new Blob([csv], { type: "text/csv;charset=utf-8;" }),
+      `kalshi-live-candlesticks${suffix}-${Date.now()}.csv`,
+    );
+  }, [activeCandles, activeCandlesGroup, candlesSheetColumns]);
+
+  const exportCandlesXlsx = useCallback(() => {
+    if (!candlesGroups?.length) return;
+    const wb = XLSX.utils.book_new();
+    for (const group of candlesGroups) {
+      if (!group.candles.length) continue;
+      const keys = new Set<string>();
+      for (const row of group.candles) {
+        for (const key of Object.keys(row)) keys.add(key);
+      }
+      const cols = CANDLES_PREFERRED_COLUMNS.filter((k) => keys.has(k));
+      for (const key of keys) {
+        if (!cols.includes(key)) cols.push(key);
+      }
+      const rows = group.candles.map((row) => {
+        const out: Record<string, string> = {};
+        for (const col of cols) out[col] = cellValue(row[col]);
+        return out;
+      });
+      const ws = XLSX.utils.json_to_sheet(rows);
+      const sheetName = group.ticker.slice(0, 31) || "Candles";
+      XLSX.utils.book_append_sheet(wb, ws, sheetName);
+    }
+    if (!wb.SheetNames.length) return;
+    XLSX.writeFile(wb, `kalshi-live-candlesticks-${Date.now()}.xlsx`);
+  }, [candlesGroups]);
+
+  const exportCandlesChart = useCallback(
+    async (format: "png" | "svg" | "jpg") => {
+      const el = candlesChartRef.current;
+      if (!el || chartExporting) return;
+      setChartExporting(true);
+      const opts = {
+        cacheBust: true,
+        pixelRatio: 2,
+        backgroundColor:
+          typeof window !== "undefined"
+            ? getComputedStyle(el).backgroundColor || "#ffffff"
+            : "#ffffff",
+      };
+      const filename = `kalshi-live-candlesticks-chart-${Date.now()}`;
+      try {
+        if (format === "png") {
+          downloadDataUrl(await toPng(el, opts), `${filename}.png`);
+        } else if (format === "svg") {
+          downloadDataUrl(await toSvg(el, opts), `${filename}.svg`);
+        } else {
+          downloadDataUrl(
+            await toJpeg(el, { ...opts, quality: 0.95 }),
+            `${filename}.jpg`,
+          );
+        }
+      } catch (e) {
+        console.error("[HubKalshiLiveDemo] candlesticks chart export failed", e);
+      } finally {
+        setChartExporting(false);
+      }
+    },
+    [chartExporting],
+  );
+
   const selectFeaturedMarket = useCallback((market: FeaturedMarket) => {
     const t = String(market?.ticker || "").trim().toUpperCase();
     if (!t) return;
@@ -1479,7 +1949,7 @@ export function HubKalshiLiveDemo({ className }: HubKalshiLiveDemoProps) {
     () => [
       {
         id: "search" as const,
-        title: "The best Natural Language",
+        title: "Search",
         description:
           "The best search capabilities available anywhere for Markets, Events and Series",
       },
@@ -1566,7 +2036,9 @@ export function HubKalshiLiveDemo({ className }: HubKalshiLiveDemoProps) {
                         ? tradesLoading
                         : activeTab === "orderbook"
                           ? orderbookLoading
-                          : false
+                          : activeTab === "candlesticks"
+                            ? candlesLoading
+                            : false
                 }
               />
             </div>
@@ -2608,7 +3080,421 @@ export function HubKalshiLiveDemo({ className }: HubKalshiLiveDemoProps) {
                 </div>
               ) : null}
               {activeTab === "candlesticks" ? (
-                <div className="px-2 sm:px-4 lg:px-6">{comingSoonPanel("Candlesticks")}</div>
+                <div className="flex min-h-0 flex-1 flex-col px-2 sm:px-4 lg:px-6">
+                  <div
+                    className={cn(
+                      "flex min-h-[12rem] flex-1 flex-col overflow-hidden rounded-xl border border-border/70 bg-muted/20",
+                      candlesViewMode === "chart" && "min-h-[36rem]",
+                    )}
+                  >
+                    <div className="flex shrink-0 flex-wrap items-center justify-between gap-2 border-b border-border/60 px-3 py-2">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <p className="text-xs font-medium text-muted-foreground">
+                          Candlesticks
+                        </p>
+                        <div
+                          className="inline-flex h-7 items-center rounded-md border border-border/70 bg-background p-0.5"
+                          role="group"
+                          aria-label="Candlestick interval"
+                        >
+                          {(
+                            [
+                              { label: "Minute", value: 1 },
+                              { label: "Hour", value: 60 },
+                              { label: "Day", value: 1440 },
+                            ] as const
+                          ).map(({ label, value }) => (
+                            <button
+                              key={value}
+                              type="button"
+                              disabled={candlesLive}
+                              onClick={() => {
+                                if (candlePeriod === value) return;
+                                stopCandlesLive();
+                                setCandlePeriod(value);
+                                setCandlesGroups(null);
+                                setActiveCandlesSheetIndex(0);
+                                setCandlesFlash({});
+                              }}
+                              className={cn(
+                                "inline-flex h-6 items-center rounded px-2 text-[11px] font-medium transition-colors",
+                                candlePeriod === value
+                                  ? "bg-muted text-foreground shadow-sm"
+                                  : "text-muted-foreground hover:bg-muted/50 hover:text-foreground",
+                              )}
+                              aria-pressed={candlePeriod === value}
+                            >
+                              {label}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                      <div className="flex flex-wrap items-center justify-end gap-2">
+                        {candlesLoading ? (
+                          <span className="inline-flex items-center gap-1.5 text-xs text-muted-foreground">
+                            <Loader2 className="size-3.5 animate-spin" aria-hidden />
+                            Loading…
+                          </span>
+                        ) : candlesGroups ? (
+                          <span className="text-xs text-muted-foreground">
+                            {candlesCount} candle{candlesCount === 1 ? "" : "s"}
+                            {candlesGroups.length > 1
+                              ? ` · ${candlesGroups.length} markets`
+                              : ""}
+                          </span>
+                        ) : null}
+
+                        <div className="inline-flex items-center gap-1.5">
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            disabled={!hasCandles || candlesLoading}
+                            onClick={() => {
+                              if (candlesLive) return;
+                              startCandlesLive();
+                            }}
+                            className={cn(
+                              "h-7 gap-1.5 px-2 text-[11px] font-medium text-muted-foreground",
+                              candlesLive &&
+                                "border-emerald-500/40 bg-emerald-500/10 text-foreground",
+                            )}
+                            aria-pressed={candlesLive}
+                          >
+                            <span
+                              className={cn(
+                                "size-2 shrink-0 rounded-full",
+                                candlesLive
+                                  ? "bg-emerald-500 animate-pulse"
+                                  : "bg-amber-500 animate-pulse",
+                              )}
+                              aria-hidden
+                            />
+                            Live
+                          </Button>
+                          {candlesLive ? (
+                            <button
+                              type="button"
+                              aria-label="Stop live feed"
+                              title="Stop live feed"
+                              onClick={() => stopCandlesLive()}
+                              className="inline-flex size-7 items-center justify-center rounded-md border border-border/70 bg-background text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                            >
+                              <span className="size-2.5 rounded-full bg-red-500" aria-hidden />
+                            </button>
+                          ) : null}
+                        </div>
+
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          disabled={!hasCandles}
+                          onClick={() => setCandlesViewMode("chart")}
+                          className={cn(
+                            "h-7 gap-1.5 px-2 text-[11px] font-medium text-muted-foreground",
+                            candlesViewMode === "chart" &&
+                              "border-secondary/40 bg-secondary/10 text-foreground",
+                          )}
+                        >
+                          <LineChart className="size-3.5" aria-hidden />
+                          Chart
+                        </Button>
+
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              disabled={!hasCandles || chartExporting}
+                              className="h-7 gap-1.5 px-2 text-[11px] font-medium text-muted-foreground"
+                            >
+                              <Download className="size-3.5" aria-hidden />
+                              Export
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end" className="min-w-[9.5rem]">
+                            {candlesViewMode === "chart" ? (
+                              <>
+                                <DropdownMenuItem
+                                  className="text-xs"
+                                  disabled={!hasCandles || chartExporting}
+                                  onSelect={() => void exportCandlesChart("png")}
+                                >
+                                  PNG
+                                </DropdownMenuItem>
+                                <DropdownMenuItem
+                                  className="text-xs"
+                                  disabled={!hasCandles || chartExporting}
+                                  onSelect={() => void exportCandlesChart("svg")}
+                                >
+                                  SVG
+                                </DropdownMenuItem>
+                                <DropdownMenuItem
+                                  className="text-xs"
+                                  disabled={!hasCandles || chartExporting}
+                                  onSelect={() => void exportCandlesChart("jpg")}
+                                >
+                                  JPG
+                                </DropdownMenuItem>
+                                <DropdownMenuItem
+                                  className="text-xs"
+                                  onSelect={() => setLiveEmbedOpen(true)}
+                                >
+                                  Live embed
+                                </DropdownMenuItem>
+                                <DropdownMenuSeparator />
+                              </>
+                            ) : null}
+                            <DropdownMenuItem
+                              className="text-xs"
+                              disabled={!hasCandles}
+                              onSelect={exportCandlesJson}
+                            >
+                              JSON
+                            </DropdownMenuItem>
+                            <DropdownMenuItem
+                              className="text-xs"
+                              disabled={!hasCandles}
+                              onSelect={exportCandlesCsv}
+                            >
+                              CSV
+                            </DropdownMenuItem>
+                            <DropdownMenuItem
+                              className="text-xs"
+                              disabled={!hasCandles}
+                              onSelect={exportCandlesXlsx}
+                            >
+                              XLSX
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+
+                        <div
+                          className="inline-flex h-7 items-center rounded-md border border-border/70 bg-background p-0.5"
+                          role="group"
+                          aria-label="Candlesticks result view"
+                        >
+                          <button
+                            type="button"
+                            disabled={!hasCandles && !candlesLoading}
+                            onClick={() => {
+                              if (candlesViewMode === "chart") {
+                                setCandlesViewMode("sheet");
+                                return;
+                              }
+                              setCandlesViewMode(
+                                candlesViewMode === "json" ? "sheet" : "json",
+                              );
+                            }}
+                            className="inline-flex h-6 items-center gap-1 rounded px-2 text-[11px] font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                            aria-label={
+                              candlesViewMode === "chart"
+                                ? "Switch to data sheet"
+                                : candlesViewMode === "json"
+                                  ? "Switch to sheet view"
+                                  : "Switch to JSON view"
+                            }
+                          >
+                            {candlesViewMode === "chart" ? (
+                              <>
+                                <Table2 className="size-3.5" aria-hidden />
+                                Data Sheet
+                              </>
+                            ) : candlesViewMode === "json" ? (
+                              <>
+                                <Table2 className="size-3.5" aria-hidden />
+                                Sheet
+                              </>
+                            ) : (
+                              <>
+                                <Braces className="size-3.5" aria-hidden />
+                                JSON
+                              </>
+                            )}
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+
+                    <p className="shrink-0 border-b border-border/40 px-3 py-2 text-[11px] leading-relaxed text-muted-foreground text-pretty">
+                      {candlesLive ? (
+                        <>
+                          Live feed upserts candlesticks by period end and flashes
+                          changed bars. Demo live pulls pause after 1 minute.{" "}
+                        </>
+                      ) : (
+                        <>
+                          Showing{" "}
+                          {candlePeriod === 1
+                            ? "minute"
+                            : candlePeriod === 60
+                              ? "hour"
+                              : "day"}{" "}
+                          candles for the last{" "}
+                          {candlePeriod === 1
+                            ? "2 hours"
+                            : candlePeriod === 60
+                              ? "3 days"
+                              : "60 days"}
+                          {tickers.length > 1 ? " per market" : ""}.{" "}
+                        </>
+                      )}
+                      <Link
+                        href="/#pricing"
+                        className="font-medium text-foreground underline underline-offset-2 hover:text-primary"
+                      >
+                        Sign up
+                      </Link>{" "}
+                      for full candlestick history, continuous live updates, and
+                      multi-market dashboards.
+                    </p>
+
+                    {(candlesGroups?.length || 0) > 1 ? (
+                      <div
+                        className="flex shrink-0 flex-wrap items-center gap-1.5 border-b border-border/40 px-2 py-2 sm:px-3"
+                        role="tablist"
+                        aria-label="Candlestick sheets"
+                      >
+                        {candlesGroups?.map((group, index) => {
+                          const selected = index === activeCandlesSheetIndex;
+                          return (
+                            <button
+                              key={group.ticker}
+                              type="button"
+                              role="tab"
+                              aria-selected={selected}
+                              title={`${group.label} · ${group.ticker}`}
+                              onClick={() => setActiveCandlesSheetIndex(index)}
+                              className={cn(
+                                "inline-flex max-w-full items-center rounded-md px-2.5 py-1.5 text-[11px] font-medium transition-colors",
+                                selected
+                                  ? "bg-background text-foreground shadow-sm ring-1 ring-border/70"
+                                  : "text-muted-foreground hover:bg-muted/50 hover:text-foreground",
+                              )}
+                            >
+                              <span className="truncate">{group.label}</span>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    ) : null}
+
+                    {candlesError ? (
+                      <p className="px-3 py-4 text-sm text-destructive">
+                        {candlesError}
+                      </p>
+                    ) : candlesLoading ? (
+                      candlesViewMode === "chart" ? (
+                        <ChartSkeleton />
+                      ) : candlesViewMode === "json" ? (
+                        <JsonSkeleton />
+                      ) : (
+                        <SheetTableSkeleton rows={8} />
+                      )
+                    ) : !hasCandles ? (
+                      <p className="px-3 py-8 text-center text-sm text-muted-foreground">
+                        No candlesticks for this market.
+                      </p>
+                    ) : candlesViewMode === "chart" ? (
+                      <div className="flex min-h-0 flex-1 flex-col">
+                        <HubKalshiLiveDemoCandlesticksChart
+                          ref={candlesChartRef}
+                          candles={activeCandlesGroup?.candles || []}
+                          periodInterval={candlePeriod}
+                          flashKeys={candlesFlashKeys}
+                          label={activeCandlesGroup?.label}
+                          className="min-h-0 flex-1"
+                        />
+                      </div>
+                    ) : candlesViewMode === "json" ? (
+                      <div className="max-h-[28rem] overflow-auto px-3 py-3 font-mono text-[11px] leading-relaxed text-foreground sm:text-xs">
+                        <span className="text-muted-foreground">[</span>
+                        {(activeCandles || []).map((row, rowIndex) => {
+                          const id = liveSheetRowKey(row) || String(rowIndex);
+                          const flash = candlesFlash[id];
+                          return (
+                            <div
+                              key={id}
+                              className={cn(
+                                "rounded-sm px-1 transition-colors duration-500",
+                                flash &&
+                                  "bg-amber-400/25 ring-1 ring-amber-400/40",
+                              )}
+                            >
+                              <pre className="whitespace-pre-wrap break-all">
+                                {JSON.stringify(row, null, 2)}
+                                {rowIndex < (activeCandles?.length || 0) - 1
+                                  ? ","
+                                  : ""}
+                              </pre>
+                            </div>
+                          );
+                        })}
+                        <span className="text-muted-foreground">]</span>
+                      </div>
+                    ) : !activeCandles?.length ? (
+                      <p className="px-3 py-8 text-center text-sm text-muted-foreground">
+                        No candlesticks for this market.
+                      </p>
+                    ) : (
+                      <div className="max-h-[28rem] overflow-auto">
+                        <table className="w-max min-w-full border-collapse text-left text-[11px] sm:text-xs">
+                          <thead className="sticky top-0 z-[1] bg-muted/80 backdrop-blur">
+                            <tr className="border-b border-border/60">
+                              {candlesSheetColumns.map((col) => (
+                                <th
+                                  key={col}
+                                  className="whitespace-nowrap px-3 py-2 font-medium text-muted-foreground"
+                                >
+                                  {col}
+                                </th>
+                              ))}
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {activeCandles.map((row, rowIndex) => {
+                              const id =
+                                liveSheetRowKey(row) || String(rowIndex);
+                              const flash = candlesFlash[id];
+                              return (
+                                <tr
+                                  key={id}
+                                  className={cn(
+                                    "border-b border-border/40 last:border-0 transition-colors duration-500",
+                                    flash?.isNew && "bg-amber-400/25",
+                                  )}
+                                >
+                                  {candlesSheetColumns.map((col) => {
+                                    const cellLit =
+                                      Boolean(flash) &&
+                                      (flash?.isNew ||
+                                        flash?.columns?.includes(col));
+                                    return (
+                                      <td
+                                        key={`${rowIndex}-${col}`}
+                                        className={cn(
+                                          "max-w-[16rem] truncate whitespace-nowrap px-3 py-2 text-foreground transition-colors duration-500",
+                                          cellLit &&
+                                            !flash?.isNew &&
+                                            "bg-amber-400/30",
+                                        )}
+                                        title={cellValue(row[col])}
+                                      >
+                                        {cellValue(row[col])}
+                                      </td>
+                                    );
+                                  })}
+                                </tr>
+                              );
+                            })}
+                          </tbody>
+                        </table>
+                      </div>
+                    )}
+                  </div>
+                </div>
               ) : null}
               {activeTab === "event_forecast" ? (
                 <div className="px-2 sm:px-4 lg:px-6">{comingSoonPanel("Event forecast")}</div>
@@ -2618,8 +3504,9 @@ export function HubKalshiLiveDemo({ className }: HubKalshiLiveDemoProps) {
 
           <p className="text-xs leading-relaxed text-muted-foreground text-pretty">
             This preview is limited to search, market metadata, the{" "}
-            {DEMO_TRADES_LIMIT} most recent trades, and orderbook depth (
-            {DEMO_ORDERBOOK_DEPTH} levels/side).{" "}
+            {DEMO_TRADES_LIMIT} most recent trades, orderbook depth (
+            {DEMO_ORDERBOOK_DEPTH} levels/side), and candlesticks (minute/hour/day
+            intervals).{" "}
             <Link
               href="/#pricing"
               className="font-medium text-foreground underline underline-offset-2 hover:text-primary"
@@ -2663,10 +3550,10 @@ export function HubKalshiLiveDemo({ className }: HubKalshiLiveDemoProps) {
           <DialogHeader>
             <DialogTitle>Demo live feed paused</DialogTitle>
             <DialogDescription>
-              This preview streams live trades and orderbooks for 1 minute so you
-              can feel the product. Upgrade for unlimited live pulls, deeper
-              history, custom refresh rates, multi-market dashboards, and full
-              export/embed controls.
+              This preview streams live trades, orderbooks, and candlesticks for 1
+              minute so you can feel the product. Upgrade for unlimited live pulls,
+              deeper history, custom refresh rates, multi-market dashboards, and
+              full export/embed controls.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
