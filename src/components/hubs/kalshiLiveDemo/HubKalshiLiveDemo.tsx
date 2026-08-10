@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
-import { Braces, Download, Loader2, Table2 } from "lucide-react";
+import { Braces, Download, LineChart, Loader2, Table2 } from "lucide-react";
 import * as XLSX from "xlsx";
 
 import { MarketTickerSearch } from "@/components/connectData/MarketTickerSearch";
@@ -11,6 +11,7 @@ import {
   HubKalshiLiveDemoTabs,
   type HubKalshiLiveDemoTabId,
 } from "@/components/hubs/kalshiLiveDemo/HubKalshiLiveDemoTabs";
+import { HubKalshiLiveDemoTradesChart } from "@/components/hubs/kalshiLiveDemo/HubKalshiLiveDemoTradesChart";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -29,6 +30,7 @@ const DEMO_TRADES_LIMIT = 20;
 const TRADES_PREFERRED_COLUMNS = KALSHI_LIVE_TRADES_COLUMNS.map((c) => c.name);
 
 type ViewMode = "sheet" | "json";
+type TradesViewMode = ViewMode | "chart";
 
 type FeaturedMarket = {
   ticker: string;
@@ -144,7 +146,7 @@ export function HubKalshiLiveDemo({ className }: HubKalshiLiveDemoProps) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<ViewMode>("json");
-  const [tradesViewMode, setTradesViewMode] = useState<ViewMode>("sheet");
+  const [tradesViewMode, setTradesViewMode] = useState<TradesViewMode>("sheet");
   const [activeTab, setActiveTab] = useState<HubKalshiLiveDemoTabId>("search");
   const [featured, setFeatured] = useState<FeaturedMarket[]>([]);
   const prevHasDataRef = useRef(false);
@@ -880,6 +882,22 @@ export function HubKalshiLiveDemo({ className }: HubKalshiLiveDemoProps) {
                           </span>
                         ) : null}
 
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          disabled={!hasTrades}
+                          onClick={() => setTradesViewMode("chart")}
+                          className={cn(
+                            "h-7 gap-1.5 px-2 text-[11px] font-medium text-muted-foreground",
+                            tradesViewMode === "chart" &&
+                              "border-secondary/40 bg-secondary/10 text-foreground",
+                          )}
+                        >
+                          <LineChart className="size-3.5" aria-hidden />
+                          Chart
+                        </Button>
+
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild>
                             <Button
@@ -974,6 +992,8 @@ export function HubKalshiLiveDemo({ className }: HubKalshiLiveDemoProps) {
                       <p className="px-3 py-8 text-center text-sm text-muted-foreground">
                         No recent trades for this market.
                       </p>
+                    ) : tradesViewMode === "chart" ? (
+                      <HubKalshiLiveDemoTradesChart trades={trades} />
                     ) : tradesViewMode === "json" ? (
                       <pre className="max-h-[28rem] overflow-auto px-3 py-3 font-mono text-[11px] leading-relaxed text-foreground sm:text-xs">
                         {tradesJsonText}
