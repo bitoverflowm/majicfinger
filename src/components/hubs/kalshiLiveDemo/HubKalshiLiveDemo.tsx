@@ -338,6 +338,12 @@ export function HubKalshiLiveDemo({ className }: HubKalshiLiveDemoProps) {
             className="w-full"
           />
 
+          {showingFeatured ? (
+            <p className="text-sm leading-relaxed text-muted-foreground text-pretty">
+              or click on any of the following markets as a starting point
+            </p>
+          ) : null}
+
           <div className="min-h-[12rem] overflow-hidden rounded-xl border border-border/70 bg-muted/20">
             <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border/60 px-3 py-2">
               <p className="text-xs font-medium text-muted-foreground">
@@ -457,7 +463,7 @@ export function HubKalshiLiveDemo({ className }: HubKalshiLiveDemoProps) {
                   No live markets available right now. Try searching above.
                 </p>
               ) : (
-                <ul className="max-h-[26rem] space-y-2 overflow-auto p-3">
+                <ul className="space-y-2 p-3">
                   {featured.map((market) => {
                     const live = isKalshiMarketLiveStatus(market.status);
                     return (

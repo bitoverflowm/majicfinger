@@ -51,7 +51,7 @@ const HubKalshiLiveDemo = dynamic(
   {
     ssr: false,
     loading: () => (
-      <div className="h-[22rem] w-full animate-pulse rounded-2xl bg-muted/40 ring-1 ring-border/60 sm:h-[26rem]" />
+      <div className="h-[36rem] w-full animate-pulse rounded-2xl bg-muted/40 ring-1 ring-border/60 sm:h-[42rem]" />
     ),
   },
 );
@@ -763,7 +763,7 @@ function HubKalshiLiveDemoSectionView({
       >
         <HubLazyWhenVisible
           fallback={
-            <div className="h-[22rem] w-full animate-pulse rounded-2xl bg-muted/40 ring-1 ring-border/60 sm:h-[26rem]" />
+            <div className="h-[36rem] w-full animate-pulse rounded-2xl bg-muted/40 ring-1 ring-border/60 sm:h-[42rem]" />
           }
         >
           <HubKalshiLiveDemo />

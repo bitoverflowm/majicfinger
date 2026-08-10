@@ -18,7 +18,7 @@ export function HubKalshiLiveDemoMockup({
   return (
     <DemoWindowMockup
       className={className}
-      contentClassName={cn("min-h-[22rem] sm:min-h-[26rem]")}
+      contentClassName={cn("min-h-[36rem] sm:min-h-[42rem]")}
     >
       {children}
     </DemoWindowMockup>
