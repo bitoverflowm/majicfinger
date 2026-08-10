@@ -13,6 +13,7 @@ import {
   type HubKalshiLiveDemoTabId,
 } from "@/components/hubs/kalshiLiveDemo/HubKalshiLiveDemoTabs";
 import { HubKalshiLiveDemoTradesChart } from "@/components/hubs/kalshiLiveDemo/HubKalshiLiveDemoTradesChart";
+import { HubKalshiLiveDemoTradesLiveline } from "@/components/hubs/kalshiLiveDemo/HubKalshiLiveDemoTradesLiveline";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -36,6 +37,10 @@ import { cn } from "@/lib/utils";
 const DEMO_MAX_TICKERS = 2;
 const FEATURED_LIMIT = 5;
 const DEMO_TRADES_LIMIT = 20;
+/** Stay under anonymous trades rate limit (~30/min) even with 2 markets. */
+const DEMO_TRADES_LIVE_POLL_MS = 5_000;
+const DEMO_TRADES_LIVE_DURATION_MS = 60_000;
+const DEMO_TRADES_FLASH_MS = 2_000;
 
 const TRADES_PREFERRED_COLUMNS = KALSHI_LIVE_TRADES_COLUMNS.map((c) => c.name);
 
@@ -149,6 +154,53 @@ function shortTradeSheetLabel(
   return tickerDifferentiator(ticker, allTickers);
 }
 
+function tradeRowId(row: Record<string, unknown>): string {
+  const id = row.trade_id ?? row.id;
+  if (id != null && String(id).trim()) return String(id).trim();
+  const t = String(row.ticker || "").trim().toUpperCase();
+  const ts = String(row.created_time ?? row.created_ts ?? "");
+  const yes = String(row.yes_price_dollars ?? row.yes_price ?? "");
+  const count = String(row.count_fp ?? row.count ?? "");
+  return `${t}|${ts}|${yes}|${count}`;
+}
+
+function tradeRowTimeMs(row: Record<string, unknown>): number {
+  const raw = row.created_time ?? row.created_ts ?? row.ts;
+  if (typeof raw === "number" && Number.isFinite(raw)) {
+    return raw < 1e12 ? raw * 1000 : raw;
+  }
+  const ms = Date.parse(String(raw || ""));
+  return Number.isFinite(ms) ? ms : 0;
+}
+
+function mergeNewestTrades(
+  previous: Record<string, unknown>[],
+  incoming: Record<string, unknown>[],
+  limit: number,
+): { trades: Record<string, unknown>[]; newIds: string[] } {
+  const prevIds = new Set(previous.map(tradeRowId).filter(Boolean));
+  const byId = new Map<string, Record<string, unknown>>();
+  for (const row of previous) {
+    const id = tradeRowId(row);
+    if (id) byId.set(id, row);
+  }
+  const discovered: string[] = [];
+  for (const row of incoming) {
+    const id = tradeRowId(row);
+    if (!id) continue;
+    if (!prevIds.has(id)) discovered.push(id);
+    byId.set(id, row);
+  }
+  const trades = [...byId.values()]
+    .sort((a, b) => tradeRowTimeMs(b) - tradeRowTimeMs(a))
+    .slice(0, limit);
+  const visible = new Set(trades.map(tradeRowId));
+  return {
+    trades,
+    newIds: discovered.filter((id) => visible.has(id)),
+  };
+}
+
 function FeaturedMarketSkeleton() {
   return (
     <div className="space-y-2 p-3">
@@ -247,11 +299,17 @@ export function HubKalshiLiveDemo({ className }: HubKalshiLiveDemoProps) {
   const [tradesError, setTradesError] = useState<string | null>(null);
   const [activeTradesSheetIndex, setActiveTradesSheetIndex] = useState(0);
   const [liveEmbedOpen, setLiveEmbedOpen] = useState(false);
+  const [liveLimitOpen, setLiveLimitOpen] = useState(false);
+  const [tradesLive, setTradesLive] = useState(false);
+  const [newTradeIds, setNewTradeIds] = useState<Set<string>>(() => new Set());
   const [chartExporting, setChartExporting] = useState(false);
   const abortRef = useRef<AbortController | null>(null);
   const seqRef = useRef(0);
   const tradesAbortRef = useRef<AbortController | null>(null);
   const tradesSeqRef = useRef(0);
+  const tradesLiveAbortRef = useRef<AbortController | null>(null);
+  const tradesLiveStartedAtRef = useRef<number | null>(null);
+  const tradesGroupsRef = useRef<TradesGroup[] | null>(null);
   const tradesChartRef = useRef<HTMLDivElement | null>(null);
   const demoShellRef = useRef<HTMLDivElement | null>(null);
   const [demoShellMinHeight, setDemoShellMinHeight] = useState<number | null>(null);
@@ -271,6 +329,31 @@ export function HubKalshiLiveDemo({ className }: HubKalshiLiveDemoProps) {
     () => (tickersKey ? tickersKey.split(",") : []),
     [tickersKey],
   );
+
+  useEffect(() => {
+    tradesGroupsRef.current = tradesGroups;
+  }, [tradesGroups]);
+
+  useEffect(() => {
+    if (!newTradeIds.size) return;
+    const timer = window.setTimeout(() => setNewTradeIds(new Set()), DEMO_TRADES_FLASH_MS);
+    return () => window.clearTimeout(timer);
+  }, [newTradeIds]);
+
+  const stopTradesLive = useCallback((opts?: { limitReached?: boolean }) => {
+    tradesLiveAbortRef.current?.abort();
+    tradesLiveAbortRef.current = null;
+    tradesLiveStartedAtRef.current = null;
+    setTradesLive(false);
+    if (opts?.limitReached) setLiveLimitOpen(true);
+  }, []);
+
+  const startTradesLive = useCallback(() => {
+    if (!tickers.length) return;
+    tradesLiveStartedAtRef.current = Date.now();
+    setNewTradeIds(new Set());
+    setTradesLive(true);
+  }, [tickers.length]);
 
   useEffect(() => {
     const ac = new AbortController();
@@ -407,6 +490,9 @@ export function HubKalshiLiveDemo({ className }: HubKalshiLiveDemoProps) {
       return;
     }
 
+    // Live polling owns refreshes while the feed is running.
+    if (tradesLive) return;
+
     const mySeq = ++tradesSeqRef.current;
     const ac = new AbortController();
     tradesAbortRef.current = ac;
@@ -478,7 +564,124 @@ export function HubKalshiLiveDemo({ className }: HubKalshiLiveDemoProps) {
     return () => {
       ac.abort();
     };
-  }, [activeTab, tickers, tickersKey, markets, featured]);
+  }, [activeTab, tickers, tickersKey, markets, featured, tradesLive]);
+
+  useEffect(() => {
+    if (!tradesLive) return;
+    if (activeTab !== "trades" || tickers.length === 0) {
+      stopTradesLive();
+      return;
+    }
+
+    let cancelled = false;
+    let inFlight = false;
+
+    const yesSubByTicker = new Map<string, string>();
+    for (const market of markets || []) {
+      const t = String(market?.ticker || "").trim().toUpperCase();
+      if (!t) continue;
+      const yesSub = String(market?.yes_sub_title || "").trim();
+      if (yesSub) yesSubByTicker.set(t, yesSub);
+    }
+    for (const item of featured) {
+      const t = String(item?.ticker || "").trim().toUpperCase();
+      if (!t || yesSubByTicker.has(t)) continue;
+      const yesSub = String(item?.subtitle || "").trim();
+      if (yesSub) yesSubByTicker.set(t, yesSub);
+    }
+
+    const pollOnce = async () => {
+      if (cancelled || inFlight) return;
+      const startedAt = tradesLiveStartedAtRef.current;
+      if (startedAt != null && Date.now() - startedAt >= DEMO_TRADES_LIVE_DURATION_MS) {
+        stopTradesLive({ limitReached: true });
+        return;
+      }
+
+      inFlight = true;
+      tradesLiveAbortRef.current?.abort();
+      const ac = new AbortController();
+      tradesLiveAbortRef.current = ac;
+
+      try {
+        const previous = tradesGroupsRef.current || [];
+        const prevByTicker = new Map(previous.map((g) => [g.ticker, g]));
+        const flashIds: string[] = [];
+
+        const nextGroups = await Promise.all(
+          tickers.map(async (ticker) => {
+            const params = new URLSearchParams({
+              ticker,
+              limit: String(DEMO_TRADES_LIMIT),
+            });
+            const res = await fetch(
+              `/api/integrations/kalshi-live/markets/trades?${params.toString()}`,
+              {
+                headers: { Accept: "application/json" },
+                credentials: "same-origin",
+                signal: ac.signal,
+              },
+            );
+            const body = await res.json().catch(() => ({}));
+            if (!res.ok) {
+              throw new Error(
+                typeof body?.error === "string"
+                  ? body.error
+                  : res.status === 429
+                    ? "Too many requests — slow down and try again."
+                    : `Failed to load trades for ${ticker}`,
+              );
+            }
+            const list = (
+              Array.isArray(body?.trades) ? body.trades : []
+            ).slice(0, DEMO_TRADES_LIMIT) as Record<string, unknown>[];
+            const prevGroup = prevByTicker.get(ticker);
+            const merged = mergeNewestTrades(prevGroup?.trades || [], list, DEMO_TRADES_LIMIT);
+            flashIds.push(...merged.newIds);
+            return {
+              ticker,
+              label:
+                prevGroup?.label ||
+                shortTradeSheetLabel(ticker, tickers, yesSubByTicker.get(ticker)),
+              trades: merged.trades,
+            } satisfies TradesGroup;
+          }),
+        );
+
+        if (cancelled || ac.signal.aborted) return;
+        setTradesGroups(nextGroups);
+        setTradesError(null);
+        if (flashIds.length) {
+          setNewTradeIds(new Set(flashIds));
+        }
+      } catch (e) {
+        if (e instanceof DOMException && e.name === "AbortError") return;
+        if (cancelled) return;
+        setTradesError(e instanceof Error ? e.message : "Failed to refresh live trades");
+      } finally {
+        inFlight = false;
+      }
+    };
+
+    void pollOnce();
+    const intervalId = window.setInterval(() => {
+      void pollOnce();
+    }, DEMO_TRADES_LIVE_POLL_MS);
+
+    return () => {
+      cancelled = true;
+      window.clearInterval(intervalId);
+      tradesLiveAbortRef.current?.abort();
+    };
+  }, [
+    tradesLive,
+    activeTab,
+    tickers,
+    tickersKey,
+    markets,
+    featured,
+    stopTradesLive,
+  ]);
 
   const jsonText = useMemo(() => {
     if (!markets) return "";
@@ -520,11 +723,6 @@ export function HubKalshiLiveDemo({ className }: HubKalshiLiveDemoProps) {
 
   const activeTrades = activeTradesGroup?.trades ?? null;
 
-  const tradesJsonText = useMemo(() => {
-    if (!activeTrades) return "";
-    return JSON.stringify(activeTrades, null, 2);
-  }, [activeTrades]);
-
   const tradesSheetColumns = useMemo(() => {
     if (!activeTrades?.length) return [] as string[];
     const keys = new Set<string>();
@@ -544,6 +742,17 @@ export function HubKalshiLiveDemo({ className }: HubKalshiLiveDemoProps) {
       (tradesGroups || []).map((group, index) => ({
         key: `m${index}`,
         label: group.label,
+        trades: group.trades,
+      })),
+    [tradesGroups],
+  );
+
+  const tradesLivelineSeries = useMemo(
+    () =>
+      (tradesGroups || []).map((group, index) => ({
+        id: `m${index}`,
+        label: group.label,
+        color: index === 0 ? "#2563EB" : "#EA580C",
         trades: group.trades,
       })),
     [tradesGroups],
@@ -1100,6 +1309,47 @@ export function HubKalshiLiveDemo({ className }: HubKalshiLiveDemoProps) {
                           </span>
                         ) : null}
 
+                        <div className="inline-flex items-center gap-1.5">
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            disabled={!hasTrades || tradesLoading}
+                            onClick={() => {
+                              if (tradesLive) return;
+                              startTradesLive();
+                            }}
+                            className={cn(
+                              "h-7 gap-1.5 px-2 text-[11px] font-medium text-muted-foreground",
+                              tradesLive &&
+                                "border-emerald-500/40 bg-emerald-500/10 text-foreground",
+                            )}
+                            aria-pressed={tradesLive}
+                          >
+                            <span
+                              className={cn(
+                                "size-2 shrink-0 rounded-full",
+                                tradesLive
+                                  ? "bg-emerald-500 animate-pulse"
+                                  : "bg-amber-500 animate-pulse",
+                              )}
+                              aria-hidden
+                            />
+                            Live
+                          </Button>
+                          {tradesLive ? (
+                            <button
+                              type="button"
+                              aria-label="Stop live feed"
+                              title="Stop live feed"
+                              onClick={() => stopTradesLive()}
+                              className="inline-flex size-7 items-center justify-center rounded-md border border-border/70 bg-background text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                            >
+                              <span className="size-2.5 rounded-full bg-red-500" aria-hidden />
+                            </button>
+                          ) : null}
+                        </div>
+
                         <Button
                           type="button"
                           variant="outline"
@@ -1292,14 +1542,40 @@ export function HubKalshiLiveDemo({ className }: HubKalshiLiveDemoProps) {
                         No recent trades for this market.
                       </p>
                     ) : tradesViewMode === "chart" ? (
-                      <HubKalshiLiveDemoTradesChart
-                        ref={tradesChartRef}
-                        series={tradesChartSeries}
-                      />
+                      tradesLive ? (
+                        <HubKalshiLiveDemoTradesLiveline
+                          ref={tradesChartRef}
+                          series={tradesLivelineSeries}
+                        />
+                      ) : (
+                        <HubKalshiLiveDemoTradesChart
+                          ref={tradesChartRef}
+                          series={tradesChartSeries}
+                        />
+                      )
                     ) : tradesViewMode === "json" ? (
-                      <pre className="max-h-[28rem] overflow-auto px-3 py-3 font-mono text-[11px] leading-relaxed text-foreground sm:text-xs">
-                        {tradesJsonText}
-                      </pre>
+                      <div className="max-h-[28rem] overflow-auto px-3 py-3 font-mono text-[11px] leading-relaxed text-foreground sm:text-xs">
+                        <span className="text-muted-foreground">[</span>
+                        {(activeTrades || []).map((row, rowIndex) => {
+                          const id = tradeRowId(row);
+                          const isNew = newTradeIds.has(id);
+                          return (
+                            <div
+                              key={id || rowIndex}
+                              className={cn(
+                                "rounded-sm px-1 transition-colors duration-500",
+                                isNew && "bg-amber-400/25 ring-1 ring-amber-400/40",
+                              )}
+                            >
+                              <pre className="whitespace-pre-wrap break-all">
+                                {JSON.stringify(row, null, 2)}
+                                {rowIndex < (activeTrades?.length || 0) - 1 ? "," : ""}
+                              </pre>
+                            </div>
+                          );
+                        })}
+                        <span className="text-muted-foreground">]</span>
+                      </div>
                     ) : !activeTrades?.length ? (
                       <p className="px-3 py-8 text-center text-sm text-muted-foreground">
                         No recent trades for this market.
@@ -1320,22 +1596,29 @@ export function HubKalshiLiveDemo({ className }: HubKalshiLiveDemoProps) {
                             </tr>
                           </thead>
                           <tbody>
-                            {activeTrades.map((row, rowIndex) => (
-                              <tr
-                                key={String(row.trade_id || rowIndex)}
-                                className="border-b border-border/40 last:border-0"
-                              >
-                                {tradesSheetColumns.map((col) => (
-                                  <td
-                                    key={`${rowIndex}-${col}`}
-                                    className="max-w-[16rem] truncate whitespace-nowrap px-3 py-2 text-foreground"
-                                    title={cellValue(row[col])}
-                                  >
-                                    {cellValue(row[col])}
-                                  </td>
-                                ))}
-                              </tr>
-                            ))}
+                            {activeTrades.map((row, rowIndex) => {
+                              const id = tradeRowId(row);
+                              const isNew = newTradeIds.has(id);
+                              return (
+                                <tr
+                                  key={id || rowIndex}
+                                  className={cn(
+                                    "border-b border-border/40 last:border-0 transition-colors duration-500",
+                                    isNew && "bg-amber-400/25",
+                                  )}
+                                >
+                                  {tradesSheetColumns.map((col) => (
+                                    <td
+                                      key={`${rowIndex}-${col}`}
+                                      className="max-w-[16rem] truncate whitespace-nowrap px-3 py-2 text-foreground"
+                                      title={cellValue(row[col])}
+                                    >
+                                      {cellValue(row[col])}
+                                    </td>
+                                  ))}
+                                </tr>
+                              );
+                            })}
                           </tbody>
                         </table>
                       </div>
@@ -1389,7 +1672,35 @@ export function HubKalshiLiveDemo({ className }: HubKalshiLiveDemoProps) {
             </Button>
             <Button type="button" asChild>
               <Link href="/#pricing" onClick={() => setLiveEmbedOpen(false)}>
-                View pricing
+                Get Access Now
+              </Link>
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={liveLimitOpen} onOpenChange={setLiveLimitOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Demo live feed paused</DialogTitle>
+            <DialogDescription>
+              This preview streams live trades for 1 minute so you can feel the
+              product. Upgrade for unlimited live pulls, deeper history, custom
+              refresh rates, multi-market dashboards, and full export/embed
+              controls.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setLiveLimitOpen(false)}
+            >
+              Close
+            </Button>
+            <Button type="button" asChild>
+              <Link href="/#pricing" onClick={() => setLiveLimitOpen(false)}>
+                Get Access Now
               </Link>
             </Button>
           </DialogFooter>
