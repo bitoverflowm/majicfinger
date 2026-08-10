@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
-import { Braces, Download, LineChart, Loader2, Table2 } from "lucide-react";
+import { Braces, Download, LineChart, Loader2, RefreshCw, Table2 } from "lucide-react";
 import * as XLSX from "xlsx";
 import { toJpeg, toPng, toSvg } from "html-to-image";
 
@@ -299,6 +299,7 @@ export function HubKalshiLiveDemo({ className }: HubKalshiLiveDemoProps) {
   const [featured, setFeatured] = useState<FeaturedMarket[]>([]);
   const prevHasDataRef = useRef(false);
   const [featuredLoading, setFeaturedLoading] = useState(true);
+  const [featuredRefreshing, setFeaturedRefreshing] = useState(false);
   const [featuredError, setFeaturedError] = useState<string | null>(null);
   const [tradesGroups, setTradesGroups] = useState<TradesGroup[] | null>(null);
   const [tradesLoading, setTradesLoading] = useState(false);
@@ -361,37 +362,52 @@ export function HubKalshiLiveDemo({ className }: HubKalshiLiveDemoProps) {
     setTradesLive(true);
   }, [tickers.length]);
 
-  useEffect(() => {
-    const ac = new AbortController();
-    setFeaturedLoading(true);
-    setFeaturedError(null);
+  const loadFeaturedMarkets = useCallback(async (opts?: { excludeTickers?: string[] }) => {
+    const exclude = (opts?.excludeTickers || [])
+      .map((t) => String(t || "").trim().toUpperCase())
+      .filter(Boolean);
+    const refreshing = exclude.length > 0;
 
-    fetch(`/api/integrations/kalshi-live/markets/featured?limit=${FEATURED_LIMIT}`, {
-      headers: { Accept: "application/json" },
-      credentials: "same-origin",
-      signal: ac.signal,
-    })
-      .then(async (res) => {
-        const body = await res.json().catch(() => ({}));
-        if (!res.ok) {
-          throw new Error(
-            typeof body?.error === "string" ? body.error : "Failed to load live markets",
-          );
-        }
-        const list = Array.isArray(body?.markets) ? body.markets : [];
-        setFeatured(list);
-      })
-      .catch((e) => {
-        if (e instanceof DOMException && e.name === "AbortError") return;
+    if (refreshing) setFeaturedRefreshing(true);
+    else {
+      setFeaturedLoading(true);
+      setFeaturedError(null);
+    }
+
+    const params = new URLSearchParams({ limit: String(FEATURED_LIMIT) });
+    if (exclude.length) params.set("exclude", exclude.join(","));
+
+    try {
+      const res = await fetch(
+        `/api/integrations/kalshi-live/markets/featured?${params.toString()}`,
+        {
+          headers: { Accept: "application/json" },
+          credentials: "same-origin",
+        },
+      );
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(
+          typeof body?.error === "string" ? body.error : "Failed to load live markets",
+        );
+      }
+      const list = Array.isArray(body?.markets) ? body.markets : [];
+      setFeatured(list);
+      setFeaturedError(null);
+    } catch (e) {
+      if (!refreshing) {
         setFeatured([]);
         setFeaturedError(e instanceof Error ? e.message : "Failed to load live markets");
-      })
-      .finally(() => {
-        if (!ac.signal.aborted) setFeaturedLoading(false);
-      });
-
-    return () => ac.abort();
+      }
+    } finally {
+      setFeaturedLoading(false);
+      setFeaturedRefreshing(false);
+    }
   }, []);
+
+  useEffect(() => {
+    void loadFeaturedMarkets();
+  }, [loadFeaturedMarkets]);
 
   useEffect(() => {
     abortRef.current?.abort();
@@ -1067,10 +1083,43 @@ export function HubKalshiLiveDemo({ className }: HubKalshiLiveDemoProps) {
                           Loading…
                         </span>
                       ) : featured.length ? (
-                        <span className="text-xs text-muted-foreground">
-                          {featured.length} market{featured.length === 1 ? "" : "s"}
+                        <span className="inline-flex items-center gap-1.5 text-xs text-muted-foreground">
+                          <span>
+                            {featured.length} market{featured.length === 1 ? "" : "s"}
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() =>
+                              void loadFeaturedMarkets({
+                                excludeTickers: featured.map((m) => m.ticker),
+                              })
+                            }
+                            disabled={featuredLoading || featuredRefreshing}
+                            className="inline-flex size-6 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:opacity-50"
+                            aria-label="Refresh featured live markets"
+                            title="Show different high-volume live markets"
+                          >
+                            <RefreshCw
+                              className={cn(
+                                "size-3.5",
+                                featuredRefreshing && "animate-spin",
+                              )}
+                              aria-hidden
+                            />
+                          </button>
                         </span>
-                      ) : null}
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => void loadFeaturedMarkets()}
+                          disabled={featuredLoading}
+                          className="inline-flex size-6 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:opacity-50"
+                          aria-label="Refresh featured live markets"
+                          title="Refresh high-volume live markets"
+                        >
+                          <RefreshCw className="size-3.5" aria-hidden />
+                        </button>
+                      )}
                     </div>
 
                     {featuredLoading ? (
@@ -1304,9 +1353,14 @@ export function HubKalshiLiveDemo({ className }: HubKalshiLiveDemoProps) {
               ) : null}
 
               {activeTab === "trades" ? (
-                <div className="px-2 sm:px-4 lg:px-6">
-                  <div className="min-h-[12rem] overflow-hidden rounded-xl border border-border/70 bg-muted/20">
-                    <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border/60 px-3 py-2">
+                <div className="flex min-h-0 flex-1 flex-col px-2 sm:px-4 lg:px-6">
+                  <div
+                    className={cn(
+                      "flex min-h-[12rem] flex-1 flex-col overflow-hidden rounded-xl border border-border/70 bg-muted/20",
+                      tradesViewMode === "chart" && "min-h-[36rem]",
+                    )}
+                  >
+                    <div className="flex shrink-0 flex-wrap items-center justify-between gap-2 border-b border-border/60 px-3 py-2">
                       <p className="text-xs font-medium text-muted-foreground">
                         Recent trades
                       </p>
@@ -1499,7 +1553,7 @@ export function HubKalshiLiveDemo({ className }: HubKalshiLiveDemoProps) {
                       </div>
                     </div>
 
-                    <p className="border-b border-border/40 px-3 py-2 text-[11px] leading-relaxed text-muted-foreground text-pretty">
+                    <p className="shrink-0 border-b border-border/40 px-3 py-2 text-[11px] leading-relaxed text-muted-foreground text-pretty">
                       {tradesLive ? (
                         <>
                           Live feed is accumulating trades in this session (newest
@@ -1525,7 +1579,7 @@ export function HubKalshiLiveDemo({ className }: HubKalshiLiveDemoProps) {
                     {tradesViewMode !== "chart" &&
                     (tradesGroups?.length || 0) > 1 ? (
                       <div
-                        className="flex flex-wrap items-center gap-1.5 border-b border-border/40 px-2 py-2 sm:px-3"
+                        className="flex shrink-0 flex-wrap items-center gap-1.5 border-b border-border/40 px-2 py-2 sm:px-3"
                         role="tablist"
                         aria-label="Trade sheets"
                       >
@@ -1568,17 +1622,20 @@ export function HubKalshiLiveDemo({ className }: HubKalshiLiveDemoProps) {
                         No recent trades for this market.
                       </p>
                     ) : tradesViewMode === "chart" ? (
-                      tradesLive ? (
-                        <HubKalshiLiveDemoTradesLiveline
-                          ref={tradesChartRef}
-                          series={tradesLivelineSeries}
-                        />
-                      ) : (
-                        <HubKalshiLiveDemoTradesChart
-                          ref={tradesChartRef}
-                          series={tradesChartSeries}
-                        />
-                      )
+                      <div className="flex min-h-0 flex-1 flex-col">
+                        {tradesLive ? (
+                          <HubKalshiLiveDemoTradesLiveline
+                            ref={tradesChartRef}
+                            series={tradesLivelineSeries}
+                            className="min-h-0 flex-1"
+                          />
+                        ) : (
+                          <HubKalshiLiveDemoTradesChart
+                            ref={tradesChartRef}
+                            series={tradesChartSeries}
+                          />
+                        )}
+                      </div>
                     ) : tradesViewMode === "json" ? (
                       <div className="max-h-[28rem] overflow-auto px-3 py-3 font-mono text-[11px] leading-relaxed text-foreground sm:text-xs">
                         <span className="text-muted-foreground">[</span>

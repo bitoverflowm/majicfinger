@@ -23,10 +23,22 @@ export default async function handler(req, res) {
 
   const rawLimit = Array.isArray(req.query.limit) ? req.query.limit[0] : req.query.limit;
   const limit = rawLimit ? Number(rawLimit) : 5;
+  const rawExclude = Array.isArray(req.query.exclude)
+    ? req.query.exclude.join(",")
+    : req.query.exclude;
+  const excludeTickers = String(rawExclude || "")
+    .split(",")
+    .map((t) => t.trim())
+    .filter(Boolean);
 
   try {
-    const markets = await fetchKalshiLiveFeaturedMarkets({ limit });
-    res.setHeader("Cache-Control", "public, s-maxage=120, stale-while-revalidate=300");
+    const markets = await fetchKalshiLiveFeaturedMarkets({ limit, excludeTickers });
+    res.setHeader(
+      "Cache-Control",
+      excludeTickers.length
+        ? "private, no-store"
+        : "public, s-maxage=120, stale-while-revalidate=300",
+    );
     return res.status(200).json({ markets });
   } catch (e) {
     return res.status(502).json({

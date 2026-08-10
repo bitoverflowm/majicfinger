@@ -1,6 +1,8 @@
 import { kalshiLiveUrl } from "@/lib/kalshiLive/kalshiLiveApiBase";
 
 const FEATURED_LIMIT_DEFAULT = 5;
+const FEATURED_POOL_SIZE = 20;
+const FEATURED_PER_SERIES = 2;
 const FEATURED_CACHE_TTL_MS = 5 * 60_000;
 
 /**
@@ -91,9 +93,10 @@ async function kalshiGet(path, query = {}) {
 
 /**
  * @param {string} seriesTicker
- * @returns {Promise<Record<string, unknown> | null>}
+ * @param {number} [take]
+ * @returns {Promise<Record<string, unknown>[]>}
  */
-async function fetchTopOpenMarketForSeries(seriesTicker) {
+async function fetchTopOpenMarketsForSeries(seriesTicker, take = FEATURED_PER_SERIES) {
   const body = await kalshiGet("markets", {
     series_ticker: seriesTicker,
     status: "open",
@@ -101,19 +104,17 @@ async function fetchTopOpenMarketForSeries(seriesTicker) {
     limit: 100,
   });
   const markets = Array.isArray(body?.markets) ? body.markets : [];
-  if (!markets.length) return null;
+  if (!markets.length) return [];
 
-  let best = null;
-  let bestVol = -1;
-  for (const m of markets) {
-    if (!m || typeof m !== "object") continue;
-    const vol = toNum(m.volume_24h_fp) ?? toNum(m.volume_fp) ?? 0;
-    if (vol > bestVol) {
-      bestVol = vol;
-      best = /** @type {Record<string, unknown>} */ (m);
-    }
-  }
-  return best;
+  return markets
+    .filter((m) => m && typeof m === "object")
+    .map((m) => ({
+      market: /** @type {Record<string, unknown>} */ (m),
+      vol: toNum(m.volume_24h_fp) ?? toNum(m.volume_fp) ?? 0,
+    }))
+    .sort((a, b) => b.vol - a.vol)
+    .slice(0, Math.max(1, take))
+    .map((row) => row.market);
 }
 
 /**
@@ -166,40 +167,41 @@ function toFeaturedMarket(market, extra = {}) {
 }
 
 /**
- * Highest-volume live Kalshi markets for hub demo initial state.
- * Cached in-process (~5 min).
- *
- * @param {{ limit?: number }} [opts]
  * @returns {Promise<FeaturedKalshiMarket[]>}
  */
-export async function fetchKalshiLiveFeaturedMarkets(opts = {}) {
-  const limit = Math.max(1, Math.min(12, Math.floor(Number(opts.limit) || FEATURED_LIMIT_DEFAULT)));
-
+async function getFeaturedPool() {
   if (featuredCache && Date.now() - featuredCache.at < FEATURED_CACHE_TTL_MS) {
-    return featuredCache.markets.slice(0, limit);
+    return featuredCache.markets;
   }
 
   const marketHits = await Promise.all(
     SEED_SERIES.map(async (seriesTicker) => {
       try {
-        const market = await fetchTopOpenMarketForSeries(seriesTicker);
-        if (!market) return null;
-        return { seriesTicker, market };
+        const markets = await fetchTopOpenMarketsForSeries(seriesTicker, FEATURED_PER_SERIES);
+        return markets.map((market) => ({ seriesTicker, market }));
       } catch {
-        return null;
+        return [];
       }
     }),
   );
 
-  const scored = marketHits
-    .filter(Boolean)
-    .map((hit) => {
-      const vol =
-        toNum(hit.market.volume_24h_fp) ?? toNum(hit.market.volume_fp) ?? 0;
-      return { ...hit, vol };
-    })
+  /** @type {Map<string, { seriesTicker: string; market: Record<string, unknown>; vol: number }>} */
+  const byTicker = new Map();
+  for (const hit of marketHits.flat()) {
+    if (!hit?.market) continue;
+    const ticker = String(hit.market.ticker || "").trim().toUpperCase();
+    if (!ticker) continue;
+    const vol =
+      toNum(hit.market.volume_24h_fp) ?? toNum(hit.market.volume_fp) ?? 0;
+    const prev = byTicker.get(ticker);
+    if (!prev || vol > prev.vol) {
+      byTicker.set(ticker, { seriesTicker: hit.seriesTicker, market: hit.market, vol });
+    }
+  }
+
+  const scored = [...byTicker.values()]
     .sort((a, b) => b.vol - a.vol)
-    .slice(0, limit);
+    .slice(0, FEATURED_POOL_SIZE);
 
   const withImages = await Promise.all(
     scored.map(async ({ seriesTicker, market }) => {
@@ -212,4 +214,34 @@ export async function fetchKalshiLiveFeaturedMarkets(opts = {}) {
 
   featuredCache = { at: Date.now(), markets: withImages };
   return withImages;
+}
+
+/**
+ * Highest-volume live Kalshi markets for hub demo initial state.
+ * Cached in-process (~5 min) as a larger pool so refresh can rotate results.
+ *
+ * @param {{
+ *   limit?: number;
+ *   excludeTickers?: string[];
+ * }} [opts]
+ * @returns {Promise<FeaturedKalshiMarket[]>}
+ */
+export async function fetchKalshiLiveFeaturedMarkets(opts = {}) {
+  const limit = Math.max(1, Math.min(12, Math.floor(Number(opts.limit) || FEATURED_LIMIT_DEFAULT)));
+  const exclude = new Set(
+    (Array.isArray(opts.excludeTickers) ? opts.excludeTickers : [])
+      .map((t) => String(t || "").trim().toUpperCase())
+      .filter(Boolean),
+  );
+
+  const pool = await getFeaturedPool();
+  if (!pool.length) return [];
+
+  const preferred = exclude.size
+    ? pool.filter((m) => !exclude.has(String(m.ticker || "").toUpperCase()))
+    : pool;
+
+  /** Prefer unseen markets; if the pool is exhausted, fall back to the full ranked list. */
+  const source = preferred.length >= Math.min(limit, pool.length) ? preferred : pool;
+  return source.slice(0, limit);
 }
