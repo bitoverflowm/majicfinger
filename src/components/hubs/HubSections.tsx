@@ -11,6 +11,7 @@ import type {
   HubFaqSection,
   HubHeroSection,
   HubInlinePart,
+  HubKalshiLiveDemoSection,
   HubLink,
   HubLinkGroupSection,
   HubPublishedAssets,
@@ -40,6 +41,19 @@ const HubKalshiQueryBuilder = dynamic(
       (m) => m.HubKalshiQueryBuilder,
     ),
   { ssr: false, loading: () => <div className="h-48 w-full animate-pulse bg-muted/40" /> },
+);
+
+const HubKalshiLiveDemo = dynamic(
+  () =>
+    import("@/components/hubs/kalshiLiveDemo/HubKalshiLiveDemo").then(
+      (m) => m.HubKalshiLiveDemo,
+    ),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="h-[22rem] w-full animate-pulse rounded-2xl bg-muted/40 ring-1 ring-border/60 sm:h-[26rem]" />
+    ),
+  },
 );
 
 const HubPublishedChartEmbedLazy = dynamic(
@@ -317,19 +331,30 @@ function HubInlineCopy({
 }
 
 function HubTextBlock({ section }: { section: HubTextBlockSection }) {
+  const paragraphs = section.contentParts?.length
+    ? null
+    : section.content.split("\n\n").filter(Boolean);
+
   return (
     <section className="w-full px-6 py-16 md:py-24">
       <div className="mx-auto w-full max-w-2xl space-y-5">
         <h2 className="text-xl font-semibold tracking-tight text-foreground md:text-2xl">
           {section.title}
         </h2>
-        <p className="text-base leading-relaxed text-muted-foreground md:text-lg text-pretty">
-          {section.contentParts?.length ? (
+        {section.contentParts?.length ? (
+          <p className="text-base leading-relaxed text-muted-foreground md:text-lg text-pretty">
             <HubInlineCopy parts={section.contentParts} />
-          ) : (
-            section.content
-          )}
-        </p>
+          </p>
+        ) : (
+          paragraphs!.map((paragraph) => (
+            <p
+              key={paragraph.slice(0, 48)}
+              className="text-base leading-relaxed text-muted-foreground md:text-lg text-pretty"
+            >
+              {paragraph}
+            </p>
+          ))
+        )}
         {section.supportingText ? (
           <p className="text-sm leading-relaxed text-muted-foreground md:text-base text-pretty">
             {section.supportingText}
@@ -681,6 +706,40 @@ function HubCta({ section }: { section: HubCtaSection }) {
   );
 }
 
+function HubKalshiLiveDemoSectionView({
+  section,
+}: {
+  section: HubKalshiLiveDemoSection;
+}) {
+  return (
+    <section
+      id={section.anchorId}
+      className={cn("w-full px-6 py-16 md:py-24", section.anchorId && "scroll-mt-28")}
+    >
+      <div className="mx-auto w-full max-w-3xl space-y-4 text-center">
+        <h2 className="text-2xl font-semibold tracking-tight text-foreground md:text-3xl">
+          {section.title}
+        </h2>
+        {section.description ? (
+          <p className="text-base leading-relaxed text-muted-foreground md:text-lg text-pretty">
+            {section.description}
+          </p>
+        ) : null}
+      </div>
+
+      <div className="relative z-20 mx-auto mt-10 w-full max-w-3xl px-2 sm:mt-12 sm:px-4">
+        <HubLazyWhenVisible
+          fallback={
+            <div className="h-[22rem] w-full animate-pulse rounded-2xl bg-muted/40 ring-1 ring-border/60 sm:h-[26rem]" />
+          }
+        >
+          <HubKalshiLiveDemo />
+        </HubLazyWhenVisible>
+      </div>
+    </section>
+  );
+}
+
 export function HubSectionRenderer({
   section,
   assets,
@@ -705,6 +764,8 @@ export function HubSectionRenderer({
       return <HubProofMetrics section={section} />;
     case "query":
       return wrapper(<HubQuery section={section} />);
+    case "kalshi_live_demo":
+      return wrapper(<HubKalshiLiveDemoSectionView section={section} />);
     case "text_block":
       return wrapper(<HubTextBlock section={section} />);
     case "cards":

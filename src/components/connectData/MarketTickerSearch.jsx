@@ -871,6 +871,7 @@ export function MarketTickerSearch({
 
   const busy = disabled || resolveLoading;
   const atCap = selections.length >= maxTickers;
+  const seriesPickerRemaining = Math.max(0, maxTickers - selections.length);
 
   const seriesSelectedCount = useMemo(
     () => (seriesModal ? seriesModal.selected.size : 0),
@@ -1155,7 +1156,9 @@ export function MarketTickerSearch({
                 {seriesModal?.title || "Select markets"}
               </DialogTitle>
               <DialogDescription>
-                Select one or more markets to add to your ticker list.
+                Select up to {seriesPickerRemaining} market
+                {seriesPickerRemaining === 1 ? "" : "s"} to add to your ticker list
+                {maxTickers < 100 ? ` (max ${maxTickers} total)` : ""}.
                 {seriesModal?.markets?.length
                   ? ` ${seriesModal.markets.length} markets in this series.`
                   : ""}
@@ -1175,19 +1178,23 @@ export function MarketTickerSearch({
                       const allSelected =
                         prev.markets.length > 0 &&
                         prev.markets.every((m) => prev.selected.has(m.ticker));
-                      if (allSelected) {
+                      if (allSelected || seriesPickerRemaining <= 0) {
                         return { ...prev, selected: new Set() };
                       }
-                      return {
-                        ...prev,
-                        selected: new Set(prev.markets.map((m) => m.ticker)),
-                      };
+                      const selected = new Set();
+                      for (const m of prev.markets) {
+                        if (selected.size >= seriesPickerRemaining) break;
+                        selected.add(m.ticker);
+                      }
+                      return { ...prev, selected };
                     });
                   }}
                 >
                   {seriesModal &&
                   seriesModal.markets.length > 0 &&
-                  seriesModal.markets.every((m) => seriesModal.selected.has(m.ticker))
+                  seriesModal.selected.size > 0 &&
+                  (seriesModal.selected.size >= seriesPickerRemaining ||
+                    seriesModal.markets.every((m) => seriesModal.selected.has(m.ticker)))
                     ? "Deselect all"
                     : "Select all"}
                 </Button>
@@ -1200,22 +1207,27 @@ export function MarketTickerSearch({
               ) : (
                 (seriesModal?.markets || []).map((m) => {
                   const checked = seriesModal?.selected.has(m.ticker);
+                  const blocked =
+                    !checked && (seriesModal?.selected.size || 0) >= seriesPickerRemaining;
                   return (
                     <button
                       key={m.ticker}
                       type="button"
+                      disabled={blocked}
                       className={cn(
                         "flex w-full items-start gap-2 rounded-md border px-2.5 py-2 text-left transition-colors",
                         checked
                           ? "border-primary/40 bg-primary/5"
-                          : "border-border/60 bg-background hover:bg-muted/30",
+                          : blocked
+                            ? "cursor-not-allowed border-border/40 bg-muted/20 opacity-60"
+                            : "border-border/60 bg-background hover:bg-muted/30",
                       )}
                       onClick={() => {
                         setSeriesModal((prev) => {
                           if (!prev) return prev;
                           const selected = new Set(prev.selected);
                           if (selected.has(m.ticker)) selected.delete(m.ticker);
-                          else selected.add(m.ticker);
+                          else if (selected.size < seriesPickerRemaining) selected.add(m.ticker);
                           return { ...prev, selected };
                         });
                       }}

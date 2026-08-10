@@ -1,3 +1,4 @@
+import { rejectIfAnonymousRateLimited } from "@/lib/kalshiLive/anonymousIpRateLimit";
 import { fetchKalshiEmbeddingSearchSuggestions } from "@/lib/kalshiLive/kalshiLiveEmbeddingSearch";
 
 /**
@@ -8,6 +9,16 @@ export default async function handler(req, res) {
   if (req.method !== "GET") {
     res.setHeader("Allow", ["GET"]);
     return res.status(405).json({ error: "Method not allowed" });
+  }
+
+  if (
+    rejectIfAnonymousRateLimited(req, res, {
+      keyPrefix: "kalshi-live-search",
+      max: 30,
+      windowMs: 60_000,
+    })
+  ) {
+    return;
   }
 
   const rawQ = req.query.q;

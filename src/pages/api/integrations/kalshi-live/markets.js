@@ -1,3 +1,4 @@
+import { rejectIfAnonymousRateLimited } from "@/lib/kalshiLive/anonymousIpRateLimit";
 import { buildKalshiLiveMarketsDiscoveryQueryParams } from "@/lib/kalshiLive/marketDiscovery";
 import { buildKalshiLiveMarketsQueryParams } from "@/lib/kalshiLive/marketFilterRules";
 import { kalshiLiveUrl } from "@/lib/kalshiLive/kalshiLiveApiBase";
@@ -33,6 +34,16 @@ export default async function handler(req, res) {
   if (req.method !== "GET") {
     res.setHeader("Allow", ["GET"]);
     return res.status(405).json({ error: "Method not allowed" });
+  }
+
+  if (
+    rejectIfAnonymousRateLimited(req, res, {
+      keyPrefix: "kalshi-live-markets",
+      max: 30,
+      windowMs: 60_000,
+    })
+  ) {
+    return;
   }
 
   const cursor = queryParam(req, "cursor");

@@ -247,6 +247,14 @@ export type HubVideoCarouselSection = {
   videos: HubVideoInstruction[];
 };
 
+/** Contained Kalshi Live search → metadata demo (hub marketing page). */
+export type HubKalshiLiveDemoSection = {
+  type: "kalshi_live_demo";
+  anchorId?: string;
+  title: string;
+  description?: string;
+};
+
 export type HubSection =
   | HubHeroSection
   | HubStatsSection
@@ -261,7 +269,8 @@ export type HubSection =
   | HubCtaSection
   | HubPublishedChartsSection
   | HubPublishedDashboardsSection
-  | HubVideoCarouselSection;
+  | HubVideoCarouselSection
+  | HubKalshiLiveDemoSection;
 
 export type HubAssetFilter = {
   /** Match dashboards whose tags include any of these (case-insensitive). */

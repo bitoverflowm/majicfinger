@@ -8,19 +8,6 @@ export const KALSHI_ELECTIONS_SEARCH_BASE =
   "https://api.elections.kalshi.com/v1";
 
 /**
- * True when the query has at least one word with ≥5 letters/digits.
- * @param {string} raw
- */
-export function isKalshiEmbeddingSearchEligible(raw) {
-  const tokens = String(raw || "")
-    .trim()
-    .split(/\s+/)
-    .map((t) => t.replace(/[^a-zA-Z0-9]/g, ""))
-    .filter(Boolean);
-  return tokens.some((t) => t.length >= 5);
-}
-
-/**
  * @typedef {{
  *   entity: "embedding_series";
  *   ticker: string;
@@ -32,6 +19,25 @@ export function isKalshiEmbeddingSearchEligible(raw) {
  *   raw: Record<string, unknown>;
  * }} KalshiEmbeddingSearchSuggestion
  */
+
+const EMBEDDING_CACHE_TTL_MS = 45_000;
+const EMBEDDING_CACHE_MAX = 200;
+
+/** @type {Map<string, { at: number; payload: { suggestions: KalshiEmbeddingSearchSuggestion[]; q: string; total_results_count?: number } }>} */
+const embeddingSuggestionCache = new Map();
+
+/**
+ * True when the query has at least one word with ≥5 letters/digits.
+ * @param {string} raw
+ */
+export function isKalshiEmbeddingSearchEligible(raw) {
+  const tokens = String(raw || "")
+    .trim()
+    .split(/\s+/)
+    .map((t) => t.replace(/[^a-zA-Z0-9]/g, ""))
+    .filter(Boolean);
+  return tokens.some((t) => t.length >= 5);
+}
 
 /**
  * @param {unknown} item
@@ -147,6 +153,12 @@ export async function fetchKalshiEmbeddingSearchSuggestions(q, opts = {}) {
     return { suggestions: [], q: query };
   }
 
+  const cacheKey = query.toLowerCase();
+  const cached = embeddingSuggestionCache.get(cacheKey);
+  if (cached && Date.now() - cached.at < EMBEDDING_CACHE_TTL_MS) {
+    return cached.payload;
+  }
+
   const params = new URLSearchParams({
     query,
     embedding_search: "true",
@@ -179,9 +191,17 @@ export async function fetchKalshiEmbeddingSearchSuggestions(q, opts = {}) {
     if (sug) suggestions.push(sug);
   }
 
-  return {
+  const payload = {
     suggestions: suggestions.slice(0, 40),
     q: query,
     total_results_count: Number(body?.total_results_count) || suggestions.length,
   };
+
+  embeddingSuggestionCache.set(cacheKey, { at: Date.now(), payload });
+  if (embeddingSuggestionCache.size > EMBEDDING_CACHE_MAX) {
+    const oldest = embeddingSuggestionCache.keys().next().value;
+    if (oldest) embeddingSuggestionCache.delete(oldest);
+  }
+
+  return payload;
 }

@@ -77,7 +77,14 @@ export const kalshiLiveHub: HubPageConfig = {
       type: "text_block",
       title: "What Kalshi market data can you access?",
       content:
-        "Lychee turns Kalshi’s public market-data endpoints into a visual workspace. Browse series, events and markets; pull live prices, recent trades, order books, candlesticks, volume and open interest; then filter, transform, chart and export the results without building or maintaining an API integration.",
+        "Lychee turns Kalshi’s public market-data endpoints into a visual workspace. Browse series, events and markets; pull live prices, recent trades, order books, candlesticks, volume and open interest; then filter, transform, chart and export the results without building or maintaining an API integration.\n\nSearch for any Kalshi market in plain English. Select an event or contract, then instantly explore its current prices, market metadata, recent trades, order book, candlesticks, volume and open interest—directly on this page.",
+    },
+    {
+      type: "kalshi_live_demo",
+      anchorId: "live-demo",
+      title: "Try Kalshi Live Search",
+      description:
+        "Search markets and events in plain English, pick up to two contracts, and inspect the live market metadata JSON returned by Kalshi.",
     },
     {
       type: "text_block",
