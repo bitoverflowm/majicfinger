@@ -60,15 +60,15 @@ export const kalshiLiveHub: HubPageConfig = {
         "No code. No setup. No Kalshi API key required for public market data.",
       primaryCTAs: [
         {
-          label: "Explore Kalshi Live",
-          href: "/#demo",
+          label: "Get Access Now",
+          href: "/#pricing",
           requiresAuth: false,
         },
       ],
       secondaryCTAs: [
         {
-          label: "View Live Charts",
-          href: "#live-charts",
+          label: "Try for Free",
+          href: "#live-demo",
           requiresAuth: false,
         },
       ],

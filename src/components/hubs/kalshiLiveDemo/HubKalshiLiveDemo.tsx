@@ -415,7 +415,7 @@ export function HubKalshiLiveDemo({ className }: HubKalshiLiveDemoProps) {
   return (
     <div className={cn("w-full", className)}>
       <HubKalshiLiveDemoMockup>
-        <div className="flex w-full flex-col gap-4 p-4 sm:gap-5 sm:p-6">
+        <div className="flex w-full flex-col gap-4 px-4 py-6 sm:gap-5 sm:px-6 sm:py-8 lg:px-8 lg:py-10">
           <div className="space-y-1.5">
             <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs font-medium tracking-wider text-muted-foreground">
               <span className="uppercase">
@@ -432,7 +432,7 @@ export function HubKalshiLiveDemo({ className }: HubKalshiLiveDemoProps) {
             </p>
           </div>
 
-          <div className="grid w-full grid-cols-1 gap-5 lg:grid-cols-5 lg:gap-6 lg:items-start">
+          <div className="grid w-full grid-cols-1 gap-5 py-12 lg:grid-cols-5 lg:gap-6 lg:items-start">
             <div className="lg:col-span-1">
               <HubKalshiLiveDemoTabs
                 tabs={tabs}
@@ -443,7 +443,7 @@ export function HubKalshiLiveDemo({ className }: HubKalshiLiveDemoProps) {
 
             <div className="min-w-0 lg:col-span-4" role="tabpanel">
               {activeTab === "search" ? (
-                <div className="flex w-full flex-col gap-4">
+                <div className="flex w-full flex-col gap-4 px-2 sm:px-4 lg:px-6">
                   <MarketTickerSearch
                     value={tickersValue}
                     onChange={setTickersValue}
@@ -565,6 +565,7 @@ export function HubKalshiLiveDemo({ className }: HubKalshiLiveDemoProps) {
               ) : null}
 
               {activeTab === "metadata" ? (
+                <div className="px-2 sm:px-4 lg:px-6">
                 <div className="min-h-[12rem] overflow-hidden rounded-xl border border-border/70 bg-muted/20">
                   <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border/60 px-3 py-2">
                     <p className="text-xs font-medium text-muted-foreground">
@@ -702,12 +703,21 @@ export function HubKalshiLiveDemo({ className }: HubKalshiLiveDemoProps) {
                     </div>
                   )}
                 </div>
+                </div>
               ) : null}
 
-              {activeTab === "trades" ? comingSoonPanel("Trades") : null}
-              {activeTab === "orderbook" ? comingSoonPanel("Orderbook") : null}
-              {activeTab === "candlesticks" ? comingSoonPanel("Candlesticks") : null}
-              {activeTab === "event_forecast" ? comingSoonPanel("Event forecast") : null}
+              {activeTab === "trades" ? (
+                <div className="px-2 sm:px-4 lg:px-6">{comingSoonPanel("Trades")}</div>
+              ) : null}
+              {activeTab === "orderbook" ? (
+                <div className="px-2 sm:px-4 lg:px-6">{comingSoonPanel("Orderbook")}</div>
+              ) : null}
+              {activeTab === "candlesticks" ? (
+                <div className="px-2 sm:px-4 lg:px-6">{comingSoonPanel("Candlesticks")}</div>
+              ) : null}
+              {activeTab === "event_forecast" ? (
+                <div className="px-2 sm:px-4 lg:px-6">{comingSoonPanel("Event forecast")}</div>
+              ) : null}
             </div>
           </div>
 
