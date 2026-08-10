@@ -336,7 +336,12 @@ function HubTextBlock({ section }: { section: HubTextBlockSection }) {
     : section.content.split("\n\n").filter(Boolean);
 
   return (
-    <section className="w-full px-6 py-16 md:py-24">
+    <section
+      className={cn(
+        "w-full px-6 pt-16 md:pt-24",
+        section.connectBelow ? "pb-6 md:pb-8" : "pb-16 md:pb-24",
+      )}
+    >
       <div className="mx-auto w-full max-w-2xl space-y-5">
         <h2 className="text-xl font-semibold tracking-tight text-foreground md:text-2xl">
           {section.title}
@@ -358,6 +363,17 @@ function HubTextBlock({ section }: { section: HubTextBlockSection }) {
         {section.supportingText ? (
           <p className="text-sm leading-relaxed text-muted-foreground md:text-base text-pretty">
             {section.supportingText}
+          </p>
+        ) : null}
+        {section.footerLink ? (
+          <p className="text-base leading-relaxed text-muted-foreground md:text-lg text-pretty">
+            <Link
+              href={section.footerLink.href}
+              className="underline underline-offset-4 hover:text-foreground"
+              prefetch={false}
+            >
+              {section.footerLink.label}
+            </Link>
           </p>
         ) : null}
       </div>
@@ -711,23 +727,40 @@ function HubKalshiLiveDemoSectionView({
 }: {
   section: HubKalshiLiveDemoSection;
 }) {
+  const hasHeader = Boolean(section.title?.trim() || section.description?.trim());
+
   return (
     <section
       id={section.anchorId}
-      className={cn("w-full px-6 py-16 md:py-24", section.anchorId && "scroll-mt-28")}
+      className={cn(
+        "w-full px-6",
+        section.connectAbove
+          ? "bg-muted/20 pb-16 pt-2 md:pb-24 md:pt-4"
+          : "py-16 md:py-24",
+        section.anchorId && "scroll-mt-28",
+      )}
     >
-      <div className="mx-auto w-full max-w-3xl space-y-4 text-center">
-        <h2 className="text-2xl font-semibold tracking-tight text-foreground md:text-3xl">
-          {section.title}
-        </h2>
-        {section.description ? (
-          <p className="text-base leading-relaxed text-muted-foreground md:text-lg text-pretty">
-            {section.description}
-          </p>
-        ) : null}
-      </div>
+      {hasHeader ? (
+        <div className="mx-auto w-full max-w-3xl space-y-4 text-center">
+          {section.title?.trim() ? (
+            <h2 className="text-2xl font-semibold tracking-tight text-foreground md:text-3xl">
+              {section.title}
+            </h2>
+          ) : null}
+          {section.description ? (
+            <p className="text-base leading-relaxed text-muted-foreground md:text-lg text-pretty">
+              {section.description}
+            </p>
+          ) : null}
+        </div>
+      ) : null}
 
-      <div className="relative z-20 mx-auto mt-10 w-full max-w-3xl px-2 sm:mt-12 sm:px-4">
+      <div
+        className={cn(
+          "relative z-20 mx-auto w-full max-w-3xl px-2 sm:px-4",
+          hasHeader ? "mt-10 sm:mt-12" : "mt-0",
+        )}
+      >
         <HubLazyWhenVisible
           fallback={
             <div className="h-[22rem] w-full animate-pulse rounded-2xl bg-muted/40 ring-1 ring-border/60 sm:h-[26rem]" />

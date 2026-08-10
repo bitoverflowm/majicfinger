@@ -129,6 +129,13 @@ export type HubTextBlockSection = {
   contentParts?: HubInlinePart[];
   /** Optional supporting line under the body paragraph. */
   supportingText?: string;
+  /** Optional underlined text link after body (e.g. scroll to demo). */
+  footerLink?: {
+    label: string;
+    href: string;
+  };
+  /** Reduce bottom padding so the next section reads as a continuation. */
+  connectBelow?: boolean;
 };
 
 export type HubCard = {
@@ -251,8 +258,11 @@ export type HubVideoCarouselSection = {
 export type HubKalshiLiveDemoSection = {
   type: "kalshi_live_demo";
   anchorId?: string;
-  title: string;
+  /** Optional heading; omit to nest visually under the previous section. */
+  title?: string;
   description?: string;
+  /** Continue muted band + tight top padding under the intro. */
+  connectAbove?: boolean;
 };
 
 export type HubSection =

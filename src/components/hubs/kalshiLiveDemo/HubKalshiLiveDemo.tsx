@@ -110,8 +110,14 @@ export function HubKalshiLiveDemo({ className }: HubKalshiLiveDemoProps) {
       <HubKalshiLiveDemoMockup>
         <div className="flex w-full flex-col gap-5 p-4 sm:p-6">
           <div className="space-y-1.5">
-            <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
-              Live demo · up to {DEMO_MAX_TICKERS} markets
+            <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs font-medium uppercase tracking-wider text-muted-foreground">
+              <span>Live demo · up to {DEMO_MAX_TICKERS} markets</span>
+              <Link
+                href="/#pricing"
+                className="underline underline-offset-2 hover:text-foreground"
+              >
+                Sign up for unlimited markets
+              </Link>
             </p>
             <p className="text-sm leading-relaxed text-muted-foreground text-pretty">
               Search by ticker or natural language. Select a series to pick markets. Metadata
