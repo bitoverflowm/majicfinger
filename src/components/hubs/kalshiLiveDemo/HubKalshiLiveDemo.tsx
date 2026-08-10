@@ -846,7 +846,7 @@ export function HubKalshiLiveDemo({ className }: HubKalshiLiveDemoProps) {
                                 onClick={() => selectFeaturedMarket(market)}
                                 className="flex w-full items-start gap-3 rounded-xl border border-border/70 bg-background p-3 text-left shadow-sm transition-colors hover:border-border hover:bg-muted/30"
                               >
-                                <div className="relative size-12 shrink-0 overflow-hidden rounded-lg border border-border/60 bg-muted">
+                                <div className="relative size-12 shrink-0 overflow-hidden rounded-lg border border-border/60 bg-black">
                                   {market.imageUrl ? (
                                     // eslint-disable-next-line @next/next/no-img-element
                                     <img
