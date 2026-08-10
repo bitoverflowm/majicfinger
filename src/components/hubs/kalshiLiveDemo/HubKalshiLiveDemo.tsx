@@ -44,7 +44,7 @@ type TradesViewMode = ViewMode | "chart";
 
 type TradesGroup = {
   ticker: string;
-  /** Natural-language sheet label, e.g. "Recent trades for …". */
+  /** Short tab label — preferably Kalshi yes_sub_title (e.g. "Republicans"). */
   label: string;
   trades: Record<string, unknown>[];
 };
@@ -122,6 +122,31 @@ function formatLastPrice(value: number | null | undefined): string {
   if (value == null || !Number.isFinite(value)) return "—";
   const cents = Math.round(value * 100);
   return `${cents}¢`;
+}
+
+/** Prefer the trailing ticker segment that differs across siblings (e.g. R vs D). */
+function tickerDifferentiator(ticker: string, allTickers: string[]): string {
+  if (allTickers.length < 2) return ticker;
+  const parts = allTickers.map((t) => t.split("-").filter(Boolean));
+  const maxLen = Math.max(0, ...parts.map((p) => p.length));
+  for (let offset = 1; offset <= maxLen; offset += 1) {
+    const segs = parts.map((p) => p[p.length - offset] || "");
+    if (new Set(segs).size > 1) {
+      const mine = ticker.split("-").filter(Boolean);
+      return mine[mine.length - offset] || ticker;
+    }
+  }
+  return ticker;
+}
+
+function shortTradeSheetLabel(
+  ticker: string,
+  allTickers: string[],
+  yesSubTitle?: string,
+): string {
+  const yes = String(yesSubTitle || "").trim();
+  if (yes) return yes;
+  return tickerDifferentiator(ticker, allTickers);
 }
 
 function FeaturedMarketSkeleton() {
@@ -390,18 +415,18 @@ export function HubKalshiLiveDemo({ className }: HubKalshiLiveDemoProps) {
     setTradesError(null);
     setActiveTradesSheetIndex(0);
 
-    const titleByTicker = new Map<string, string>();
+    const yesSubByTicker = new Map<string, string>();
     for (const market of markets || []) {
       const t = String(market?.ticker || "").trim().toUpperCase();
       if (!t) continue;
-      const title = String(market?.title || market?.yes_sub_title || "").trim();
-      if (title) titleByTicker.set(t, title);
+      const yesSub = String(market?.yes_sub_title || "").trim();
+      if (yesSub) yesSubByTicker.set(t, yesSub);
     }
     for (const item of featured) {
       const t = String(item?.ticker || "").trim().toUpperCase();
-      if (!t || titleByTicker.has(t)) continue;
-      const title = String(item?.title || "").trim();
-      if (title) titleByTicker.set(t, title);
+      if (!t || yesSubByTicker.has(t)) continue;
+      const yesSub = String(item?.subtitle || "").trim();
+      if (yesSub) yesSubByTicker.set(t, yesSub);
     }
 
     Promise.all(
@@ -429,13 +454,9 @@ export function HubKalshiLiveDemo({ className }: HubKalshiLiveDemoProps) {
           );
         }
         const list = Array.isArray(body?.trades) ? body.trades : [];
-        const marketTitle = titleByTicker.get(ticker);
-        const label = marketTitle
-          ? `Recent trades for ${marketTitle}`
-          : `Recent trades for ${ticker}`;
         return {
           ticker,
-          label,
+          label: shortTradeSheetLabel(ticker, tickers, yesSubByTicker.get(ticker)),
           trades: list.slice(0, DEMO_TRADES_LIMIT) as Record<string, unknown>[],
         } satisfies TradesGroup;
       }),
@@ -522,7 +543,7 @@ export function HubKalshiLiveDemo({ className }: HubKalshiLiveDemoProps) {
     () =>
       (tradesGroups || []).map((group, index) => ({
         key: `m${index}`,
-        label: group.ticker,
+        label: group.label,
         trades: group.trades,
       })),
     [tradesGroups],
@@ -1228,7 +1249,7 @@ export function HubKalshiLiveDemo({ className }: HubKalshiLiveDemoProps) {
                     {tradesViewMode !== "chart" &&
                     (tradesGroups?.length || 0) > 1 ? (
                       <div
-                        className="flex flex-col gap-1 border-b border-border/40 px-2 py-2 sm:px-3"
+                        className="flex flex-wrap items-center gap-1.5 border-b border-border/40 px-2 py-2 sm:px-3"
                         role="tablist"
                         aria-label="Trade sheets"
                       >
@@ -1240,19 +1261,16 @@ export function HubKalshiLiveDemo({ className }: HubKalshiLiveDemoProps) {
                               type="button"
                               role="tab"
                               aria-selected={selected}
+                              title={`${group.label} · ${group.ticker}`}
                               onClick={() => setActiveTradesSheetIndex(index)}
                               className={cn(
-                                "rounded-md px-2.5 py-1.5 text-left text-[11px] leading-snug transition-colors",
+                                "inline-flex max-w-full items-center rounded-md px-2.5 py-1.5 text-[11px] font-medium transition-colors",
                                 selected
-                                  ? "bg-background font-medium text-foreground shadow-sm ring-1 ring-border/70"
+                                  ? "bg-background text-foreground shadow-sm ring-1 ring-border/70"
                                   : "text-muted-foreground hover:bg-muted/50 hover:text-foreground",
                               )}
                             >
-                              <span className="block truncate">{group.label}</span>
-                              <span className="mt-0.5 block truncate font-mono text-[10px] text-muted-foreground">
-                                {group.ticker} · {group.trades.length} trade
-                                {group.trades.length === 1 ? "" : "s"}
-                              </span>
+                              <span className="truncate">{group.label}</span>
                             </button>
                           );
                         })}
