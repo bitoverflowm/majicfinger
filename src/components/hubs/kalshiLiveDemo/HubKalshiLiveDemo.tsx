@@ -16,6 +16,7 @@ import {
   HubKalshiLiveDemoCandlesticksChart,
   type DemoCandlePeriod,
 } from "@/components/hubs/kalshiLiveDemo/HubKalshiLiveDemoCandlesticksChart";
+import { HubKalshiLiveDemoCandlesticksProfessionalChart } from "@/components/hubs/kalshiLiveDemo/HubKalshiLiveDemoCandlesticksProfessionalChart";
 import { HubKalshiLiveDemoOrderbookChart } from "@/components/hubs/kalshiLiveDemo/HubKalshiLiveDemoOrderbookChart";
 import { HubKalshiLiveDemoTradesChart } from "@/components/hubs/kalshiLiveDemo/HubKalshiLiveDemoTradesChart";
 import { HubKalshiLiveDemoTradesLiveline } from "@/components/hubs/kalshiLiveDemo/HubKalshiLiveDemoTradesLiveline";
@@ -98,6 +99,7 @@ type ViewMode = "sheet" | "json";
 type TradesViewMode = ViewMode | "chart";
 type OrderbookViewMode = ViewMode | "chart";
 type CandlesticksViewMode = ViewMode | "chart";
+type CandleChartEngine = "basic" | "professional";
 
 type TradesGroup = {
   ticker: string;
@@ -120,6 +122,8 @@ type OrderbookFlashMap = Record<
 type CandlesGroup = {
   ticker: string;
   label: string;
+  /** Period these rows were pulled for — discard stale live merges across switches. */
+  periodInterval: DemoCandlePeriod;
   candles: Record<string, unknown>[];
 };
 
@@ -232,6 +236,14 @@ function demoCandleRangeSec(period: DemoCandlePeriod): number {
   if (period === 1) return 2 * 60 * 60;
   if (period === 60) return 3 * 24 * 60 * 60;
   return 60 * 24 * 60 * 60;
+}
+
+/** Full replace for a period pull — never merge with a prior interval's rows. */
+function replaceCandlestickRows(
+  incoming: Record<string, unknown>[],
+  softRowCap: number,
+): Record<string, unknown>[] {
+  return upsertCandlestickRowsByEndPeriodTs([], incoming, { softRowCap });
 }
 
 function tradeRowId(row: Record<string, unknown>): string {
@@ -377,6 +389,8 @@ export function HubKalshiLiveDemo({ className }: HubKalshiLiveDemoProps) {
   const [candlesViewMode, setCandlesViewMode] =
     useState<CandlesticksViewMode>("sheet");
   const [candlePeriod, setCandlePeriod] = useState<DemoCandlePeriod>(1);
+  const [candleChartEngine, setCandleChartEngine] =
+    useState<CandleChartEngine>("basic");
   const [activeTab, setActiveTab] = useState<HubKalshiLiveDemoTabId>("search");
   const [featured, setFeatured] = useState<FeaturedMarket[]>([]);
   const prevHasSelectionRef = useRef(false);
@@ -512,6 +526,25 @@ export function HubKalshiLiveDemo({ className }: HubKalshiLiveDemoProps) {
     setCandlesLive(false);
     if (opts?.limitReached) setLiveLimitOpen(true);
   }, []);
+
+  const resetCandlesForPeriodChange = useCallback(
+    (nextPeriod: DemoCandlePeriod) => {
+      // Abort any in-flight initial or live request so stale rows can't merge in.
+      candlesAbortRef.current?.abort();
+      candlesLiveAbortRef.current?.abort();
+      candlesLiveAbortRef.current = null;
+      candlesLiveStartedAtRef.current = null;
+      candlesSeqRef.current += 1;
+      candlesGroupsRef.current = null;
+      setCandlesLive(false);
+      setCandlePeriod(nextPeriod);
+      setCandlesGroups(null);
+      setActiveCandlesSheetIndex(0);
+      setCandlesFlash({});
+      setCandlesError(null);
+    },
+    [],
+  );
 
   const startTradesLive = useCallback(() => {
     if (!tickers.length) return;
@@ -1197,9 +1230,8 @@ export function HubKalshiLiveDemo({ className }: HubKalshiLiveDemoProps) {
         return {
           ticker,
           label: shortTradeSheetLabel(ticker, tickers, yesSubByTicker.get(ticker)),
-          candles: upsertCandlestickRowsByEndPeriodTs([], candles, {
-            softRowCap: DEMO_CANDLES_SOFT_ROW_CAP,
-          }),
+          periodInterval: candlePeriod,
+          candles: replaceCandlestickRows(candles, DEMO_CANDLES_SOFT_ROW_CAP),
         } satisfies CandlesGroup;
       }),
     )
@@ -1317,21 +1349,24 @@ export function HubKalshiLiveDemo({ className }: HubKalshiLiveDemoProps) {
                   .trim()
                   .toUpperCase() === ticker,
             );
+            // Never merge across period switches — only upsert within the same interval.
+            const baseline =
+              prevGroup?.periodInterval === candlePeriod
+                ? prevGroup.candles || []
+                : [];
             const merged = upsertCandlestickRowsByEndPeriodTs(
-              prevGroup?.candles || [],
+              baseline,
               incoming,
               { softRowCap: DEMO_CANDLES_SOFT_ROW_CAP },
             );
-            const flash = buildCandlestickLiveFlashRows(
-              prevGroup?.candles || [],
-              incoming,
-            );
+            const flash = buildCandlestickLiveFlashRows(baseline, incoming);
             Object.assign(flashRows, flash);
             return {
               ticker,
               label:
                 prevGroup?.label ||
                 shortTradeSheetLabel(ticker, tickers, yesSubByTicker.get(ticker)),
+              periodInterval: candlePeriod,
               candles: merged,
             } satisfies CandlesGroup;
           }),
@@ -3110,11 +3145,7 @@ export function HubKalshiLiveDemo({ className }: HubKalshiLiveDemoProps) {
                               disabled={candlesLive}
                               onClick={() => {
                                 if (candlePeriod === value) return;
-                                stopCandlesLive();
-                                setCandlePeriod(value);
-                                setCandlesGroups(null);
-                                setActiveCandlesSheetIndex(0);
-                                setCandlesFlash({});
+                                resetCandlesForPeriodChange(value);
                               }}
                               className={cn(
                                 "inline-flex h-6 items-center rounded px-2 text-[11px] font-medium transition-colors",
@@ -3123,6 +3154,41 @@ export function HubKalshiLiveDemo({ className }: HubKalshiLiveDemoProps) {
                                   : "text-muted-foreground hover:bg-muted/50 hover:text-foreground",
                               )}
                               aria-pressed={candlePeriod === value}
+                            >
+                              {label}
+                            </button>
+                          ))}
+                        </div>
+                        <div
+                          className="inline-flex h-7 items-center rounded-md border border-border/70 bg-background p-0.5"
+                          role="group"
+                          aria-label="Candlestick chart style"
+                        >
+                          {(
+                            [
+                              { label: "Basic", value: "basic" as const },
+                              {
+                                label: "Professional",
+                                value: "professional" as const,
+                              },
+                            ] as const
+                          ).map(({ label, value }) => (
+                            <button
+                              key={value}
+                              type="button"
+                              onClick={() => {
+                                setCandleChartEngine(value);
+                                if (value === "professional") {
+                                  setCandlesViewMode("chart");
+                                }
+                              }}
+                              className={cn(
+                                "inline-flex h-6 items-center rounded px-2 text-[11px] font-medium transition-colors",
+                                candleChartEngine === value
+                                  ? "bg-muted text-foreground shadow-sm"
+                                  : "text-muted-foreground hover:bg-muted/50 hover:text-foreground",
+                              )}
+                              aria-pressed={candleChartEngine === value}
                             >
                               {label}
                             </button>
@@ -3399,14 +3465,23 @@ export function HubKalshiLiveDemo({ className }: HubKalshiLiveDemoProps) {
                       </p>
                     ) : candlesViewMode === "chart" ? (
                       <div className="flex min-h-0 flex-1 flex-col">
-                        <HubKalshiLiveDemoCandlesticksChart
-                          ref={candlesChartRef}
-                          candles={activeCandlesGroup?.candles || []}
-                          periodInterval={candlePeriod}
-                          flashKeys={candlesFlashKeys}
-                          label={activeCandlesGroup?.label}
-                          className="min-h-0 flex-1"
-                        />
+                        {candleChartEngine === "professional" ? (
+                          <HubKalshiLiveDemoCandlesticksProfessionalChart
+                            ref={candlesChartRef}
+                            candles={activeCandlesGroup?.candles || []}
+                            label={activeCandlesGroup?.label}
+                            className="min-h-0 flex-1"
+                          />
+                        ) : (
+                          <HubKalshiLiveDemoCandlesticksChart
+                            ref={candlesChartRef}
+                            candles={activeCandlesGroup?.candles || []}
+                            periodInterval={candlePeriod}
+                            flashKeys={candlesFlashKeys}
+                            label={activeCandlesGroup?.label}
+                            className="min-h-0 flex-1"
+                          />
+                        )}
                       </div>
                     ) : candlesViewMode === "json" ? (
                       <div className="max-h-[28rem] overflow-auto px-3 py-3 font-mono text-[11px] leading-relaxed text-foreground sm:text-xs">
