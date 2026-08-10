@@ -19,10 +19,14 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { isKalshiMarketLiveStatus } from "@/lib/kalshiLive/kalshiMarketTiming";
+import { KALSHI_LIVE_TRADES_COLUMNS } from "@/lib/kalshiLive/tradesColumns";
 import { cn } from "@/lib/utils";
 
 const DEMO_MAX_TICKERS = 2;
 const FEATURED_LIMIT = 5;
+const DEMO_TRADES_LIMIT = 20;
+
+const TRADES_PREFERRED_COLUMNS = KALSHI_LIVE_TRADES_COLUMNS.map((c) => c.name);
 
 type ViewMode = "sheet" | "json";
 
@@ -114,6 +118,22 @@ function FeaturedMarketSkeleton() {
   );
 }
 
+function SheetTableSkeleton({ rows = 8 }: { rows?: number }) {
+  return (
+    <div className="animate-pulse space-y-2 p-3" aria-hidden>
+      <div className="h-8 w-full rounded bg-muted/80" />
+      {Array.from({ length: rows }).map((_, i) => (
+        <div key={i} className="flex gap-2">
+          <div className="h-7 w-[18%] rounded bg-muted/70" />
+          <div className="h-7 w-[22%] rounded bg-muted/60" />
+          <div className="h-7 w-[14%] rounded bg-muted/70" />
+          <div className="h-7 flex-1 rounded bg-muted/50" />
+        </div>
+      ))}
+    </div>
+  );
+}
+
 /**
  * Contained Kalshi Live hub demo: featured live markets → search → metadata sheet/JSON.
  * Local state only — does not mount dashboard connect/sheets.
@@ -124,13 +144,19 @@ export function HubKalshiLiveDemo({ className }: HubKalshiLiveDemoProps) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<ViewMode>("json");
+  const [tradesViewMode, setTradesViewMode] = useState<ViewMode>("sheet");
   const [activeTab, setActiveTab] = useState<HubKalshiLiveDemoTabId>("search");
   const [featured, setFeatured] = useState<FeaturedMarket[]>([]);
   const prevHasDataRef = useRef(false);
   const [featuredLoading, setFeaturedLoading] = useState(true);
   const [featuredError, setFeaturedError] = useState<string | null>(null);
+  const [trades, setTrades] = useState<Record<string, unknown>[] | null>(null);
+  const [tradesLoading, setTradesLoading] = useState(false);
+  const [tradesError, setTradesError] = useState<string | null>(null);
   const abortRef = useRef<AbortController | null>(null);
   const seqRef = useRef(0);
+  const tradesAbortRef = useRef<AbortController | null>(null);
+  const tradesSeqRef = useRef(0);
 
   const tickersKey = useMemo(
     () =>
@@ -270,6 +296,72 @@ export function HubKalshiLiveDemo({ className }: HubKalshiLiveDemoProps) {
     };
   }, [tickers, tickersKey, featured]);
 
+  useEffect(() => {
+    tradesAbortRef.current?.abort();
+
+    if (activeTab !== "trades" || tickers.length === 0) {
+      if (tickers.length === 0) {
+        setTrades(null);
+        setTradesError(null);
+        setTradesLoading(false);
+      }
+      return;
+    }
+
+    const mySeq = ++tradesSeqRef.current;
+    const ac = new AbortController();
+    tradesAbortRef.current = ac;
+    setTrades(null);
+    setTradesLoading(true);
+    setTradesError(null);
+
+    Promise.all(
+      tickers.map(async (ticker) => {
+        const params = new URLSearchParams({
+          ticker,
+          limit: String(DEMO_TRADES_LIMIT),
+        });
+        const res = await fetch(
+          `/api/integrations/kalshi-live/markets/trades?${params.toString()}`,
+          {
+            headers: { Accept: "application/json" },
+            credentials: "same-origin",
+            signal: ac.signal,
+          },
+        );
+        const body = await res.json().catch(() => ({}));
+        if (!res.ok) {
+          throw new Error(
+            typeof body?.error === "string"
+              ? body.error
+              : res.status === 429
+                ? "Too many requests — slow down and try again."
+                : `Failed to load trades for ${ticker}`,
+          );
+        }
+        const list = Array.isArray(body?.trades) ? body.trades : [];
+        return list.slice(0, DEMO_TRADES_LIMIT) as Record<string, unknown>[];
+      }),
+    )
+      .then((groups) => {
+        if (mySeq !== tradesSeqRef.current) return;
+        setTrades(groups.flat());
+      })
+      .catch((e) => {
+        if (e instanceof DOMException && e.name === "AbortError") return;
+        if (mySeq !== tradesSeqRef.current) return;
+        setTrades(null);
+        setTradesError(e instanceof Error ? e.message : "Failed to load trades");
+      })
+      .finally(() => {
+        if (mySeq === tradesSeqRef.current) setTradesLoading(false);
+      });
+
+    return () => {
+      ac.abort();
+    };
+  }, [activeTab, tickers, tickersKey]);
+
   const jsonText = useMemo(() => {
     if (!markets) return "";
     return JSON.stringify(markets, null, 2);
@@ -301,7 +393,27 @@ export function HubKalshiLiveDemo({ className }: HubKalshiLiveDemoProps) {
     return ordered;
   }, [markets]);
 
+  const tradesJsonText = useMemo(() => {
+    if (!trades) return "";
+    return JSON.stringify(trades, null, 2);
+  }, [trades]);
+
+  const tradesSheetColumns = useMemo(() => {
+    if (!trades?.length) return [] as string[];
+    const keys = new Set<string>();
+    for (const row of trades) {
+      if (!row || typeof row !== "object") continue;
+      for (const key of Object.keys(row)) keys.add(key);
+    }
+    const ordered = TRADES_PREFERRED_COLUMNS.filter((k) => keys.has(k));
+    for (const key of keys) {
+      if (!ordered.includes(key)) ordered.push(key);
+    }
+    return ordered;
+  }, [trades]);
+
   const hasData = Boolean(markets?.length);
+  const hasTrades = Boolean(trades?.length);
 
   const exportJson = useCallback(() => {
     if (!markets?.length) return;
@@ -336,6 +448,40 @@ export function HubKalshiLiveDemo({ className }: HubKalshiLiveDemoProps) {
     XLSX.utils.book_append_sheet(wb, ws, "Markets");
     XLSX.writeFile(wb, `kalshi-live-markets-${Date.now()}.xlsx`);
   }, [markets, sheetColumns]);
+
+  const exportTradesJson = useCallback(() => {
+    if (!trades?.length) return;
+    const blob = new Blob([JSON.stringify(trades, null, 2)], {
+      type: "application/json;charset=utf-8;",
+    });
+    downloadBlob(blob, `kalshi-live-trades-${Date.now()}.json`);
+  }, [trades]);
+
+  const exportTradesCsv = useCallback(() => {
+    if (!trades?.length || !tradesSheetColumns.length) return;
+    const header = tradesSheetColumns.map(escapeCsv).join(",");
+    const rows = trades.map((row) =>
+      tradesSheetColumns.map((col) => escapeCsv(cellValue(row[col]))).join(","),
+    );
+    const csv = [header, ...rows].join("\n");
+    downloadBlob(
+      new Blob([csv], { type: "text/csv;charset=utf-8;" }),
+      `kalshi-live-trades-${Date.now()}.csv`,
+    );
+  }, [trades, tradesSheetColumns]);
+
+  const exportTradesXlsx = useCallback(() => {
+    if (!trades?.length || !tradesSheetColumns.length) return;
+    const rows = trades.map((row) => {
+      const out: Record<string, string> = {};
+      for (const col of tradesSheetColumns) out[col] = cellValue(row[col]);
+      return out;
+    });
+    const ws = XLSX.utils.json_to_sheet(rows);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Trades");
+    XLSX.writeFile(wb, `kalshi-live-trades-${Date.now()}.xlsx`);
+  }, [trades, tradesSheetColumns]);
 
   const selectFeaturedMarket = useCallback((market: FeaturedMarket) => {
     const t = String(market?.ticker || "").trim().toUpperCase();
@@ -443,7 +589,9 @@ export function HubKalshiLiveDemo({ className }: HubKalshiLiveDemoProps) {
                     ? featuredLoading
                     : activeTab === "metadata"
                       ? loading
-                      : false
+                      : activeTab === "trades"
+                        ? tradesLoading
+                        : false
                 }
               />
             </div>
@@ -714,7 +862,160 @@ export function HubKalshiLiveDemo({ className }: HubKalshiLiveDemoProps) {
               ) : null}
 
               {activeTab === "trades" ? (
-                <div className="px-2 sm:px-4 lg:px-6">{comingSoonPanel("Trades")}</div>
+                <div className="px-2 sm:px-4 lg:px-6">
+                  <div className="min-h-[12rem] overflow-hidden rounded-xl border border-border/70 bg-muted/20">
+                    <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border/60 px-3 py-2">
+                      <p className="text-xs font-medium text-muted-foreground">
+                        Recent trades
+                      </p>
+                      <div className="flex flex-wrap items-center justify-end gap-2">
+                        {tradesLoading ? (
+                          <span className="inline-flex items-center gap-1.5 text-xs text-muted-foreground">
+                            <Loader2 className="size-3.5 animate-spin" aria-hidden />
+                            Loading…
+                          </span>
+                        ) : trades ? (
+                          <span className="text-xs text-muted-foreground">
+                            {trades.length} trade{trades.length === 1 ? "" : "s"}
+                          </span>
+                        ) : null}
+
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              disabled={!hasTrades}
+                              className="h-7 gap-1.5 px-2 text-[11px] font-medium text-muted-foreground"
+                            >
+                              <Download className="size-3.5" aria-hidden />
+                              Export
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end" className="min-w-[8rem]">
+                            <DropdownMenuItem
+                              className="text-xs"
+                              disabled={!hasTrades}
+                              onSelect={exportTradesJson}
+                            >
+                              JSON
+                            </DropdownMenuItem>
+                            <DropdownMenuItem
+                              className="text-xs"
+                              disabled={!hasTrades}
+                              onSelect={exportTradesCsv}
+                            >
+                              CSV
+                            </DropdownMenuItem>
+                            <DropdownMenuItem
+                              className="text-xs"
+                              disabled={!hasTrades}
+                              onSelect={exportTradesXlsx}
+                            >
+                              XLSX
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+
+                        <div
+                          className="inline-flex h-7 items-center rounded-md border border-border/70 bg-background p-0.5"
+                          role="group"
+                          aria-label="Trades result view"
+                        >
+                          <button
+                            type="button"
+                            disabled={!hasTrades && !tradesLoading}
+                            onClick={() =>
+                              setTradesViewMode(
+                                tradesViewMode === "json" ? "sheet" : "json",
+                              )
+                            }
+                            className="inline-flex h-6 items-center gap-1 rounded px-2 text-[11px] font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                            aria-label={
+                              tradesViewMode === "json"
+                                ? "Switch to sheet view"
+                                : "Switch to JSON view"
+                            }
+                          >
+                            {tradesViewMode === "json" ? (
+                              <>
+                                <Table2 className="size-3.5" aria-hidden />
+                                Sheet
+                              </>
+                            ) : (
+                              <>
+                                <Braces className="size-3.5" aria-hidden />
+                                JSON
+                              </>
+                            )}
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+
+                    <p className="border-b border-border/40 px-3 py-2 text-[11px] leading-relaxed text-muted-foreground text-pretty">
+                      Only {DEMO_TRADES_LIMIT} most recent trades shown.{" "}
+                      <Link
+                        href="/#pricing"
+                        className="font-medium text-foreground underline underline-offset-2 hover:text-primary"
+                      >
+                        Sign up
+                      </Link>{" "}
+                      to get full trades and historical trades all the way from
+                      Kalshi launch in 2021.
+                    </p>
+
+                    {tradesError ? (
+                      <p className="px-3 py-4 text-sm text-destructive">{tradesError}</p>
+                    ) : tradesLoading && !trades ? (
+                      <SheetTableSkeleton rows={8} />
+                    ) : !trades?.length ? (
+                      <p className="px-3 py-8 text-center text-sm text-muted-foreground">
+                        No recent trades for this market.
+                      </p>
+                    ) : tradesViewMode === "json" ? (
+                      <pre className="max-h-[28rem] overflow-auto px-3 py-3 font-mono text-[11px] leading-relaxed text-foreground sm:text-xs">
+                        {tradesJsonText}
+                      </pre>
+                    ) : (
+                      <div className="max-h-[28rem] overflow-auto">
+                        <table className="w-max min-w-full border-collapse text-left text-[11px] sm:text-xs">
+                          <thead className="sticky top-0 z-[1] bg-muted/80 backdrop-blur">
+                            <tr className="border-b border-border/60">
+                              {tradesSheetColumns.map((col) => (
+                                <th
+                                  key={col}
+                                  className="whitespace-nowrap px-3 py-2 font-medium text-muted-foreground"
+                                >
+                                  {col}
+                                </th>
+                              ))}
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {trades.map((row, rowIndex) => (
+                              <tr
+                                key={String(row.trade_id || rowIndex)}
+                                className="border-b border-border/40 last:border-0"
+                              >
+                                {tradesSheetColumns.map((col) => (
+                                  <td
+                                    key={`${rowIndex}-${col}`}
+                                    className="max-w-[16rem] truncate whitespace-nowrap px-3 py-2 text-foreground"
+                                    title={cellValue(row[col])}
+                                  >
+                                    {cellValue(row[col])}
+                                  </td>
+                                ))}
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    )}
+                  </div>
+                </div>
               ) : null}
               {activeTab === "orderbook" ? (
                 <div className="px-2 sm:px-4 lg:px-6">{comingSoonPanel("Orderbook")}</div>
@@ -729,14 +1030,16 @@ export function HubKalshiLiveDemo({ className }: HubKalshiLiveDemoProps) {
           </div>
 
           <p className="text-xs leading-relaxed text-muted-foreground text-pretty">
-            This preview is limited to search and raw market metadata.{" "}
+            This preview is limited to search, market metadata, and the{" "}
+            {DEMO_TRADES_LIMIT} most recent trades.{" "}
             <Link
               href="/#pricing"
               className="font-medium text-foreground underline underline-offset-2 hover:text-primary"
             >
               Register for full access
             </Link>{" "}
-            to pull trades, order books, candlesticks, charts, exports, and dashboards.
+            to pull full trade history, order books, candlesticks, charts, exports,
+            and dashboards.
           </p>
         </div>
       </HubKalshiLiveDemoMockup>
