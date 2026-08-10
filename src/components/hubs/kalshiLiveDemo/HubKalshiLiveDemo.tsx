@@ -438,6 +438,13 @@ export function HubKalshiLiveDemo({ className }: HubKalshiLiveDemoProps) {
                 tabs={tabs}
                 activeId={activeTab}
                 onChange={setActiveTab}
+                contentLoading={
+                  activeTab === "search"
+                    ? featuredLoading
+                    : activeTab === "metadata"
+                      ? loading
+                      : false
+                }
               />
             </div>
 
