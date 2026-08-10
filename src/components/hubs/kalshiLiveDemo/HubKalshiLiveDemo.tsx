@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { Braces, Download, LineChart, Loader2, Table2 } from "lucide-react";
 import * as XLSX from "xlsx";
+import { toJpeg, toPng, toSvg } from "html-to-image";
 
 import { MarketTickerSearch } from "@/components/connectData/MarketTickerSearch";
 import { HubKalshiLiveDemoMockup } from "@/components/hubs/kalshiLiveDemo/HubKalshiLiveDemoMockup";
@@ -14,9 +15,18 @@ import {
 import { HubKalshiLiveDemoTradesChart } from "@/components/hubs/kalshiLiveDemo/HubKalshiLiveDemoTradesChart";
 import { Button } from "@/components/ui/button";
 import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { isKalshiMarketLiveStatus } from "@/lib/kalshiLive/kalshiMarketTiming";
@@ -64,6 +74,13 @@ function cellValue(value: unknown): string {
   } catch {
     return String(value);
   }
+}
+
+function downloadDataUrl(dataUrl: string, filename: string) {
+  const a = document.createElement("a");
+  a.href = dataUrl;
+  a.download = filename;
+  a.click();
 }
 
 function downloadBlob(blob: Blob, filename: string) {
@@ -136,6 +153,47 @@ function SheetTableSkeleton({ rows = 8 }: { rows?: number }) {
   );
 }
 
+function JsonSkeleton({ lines = 12 }: { lines?: number }) {
+  return (
+    <div className="animate-pulse space-y-2 px-3 py-3" aria-hidden>
+      {Array.from({ length: lines }).map((_, i) => (
+        <div
+          key={i}
+          className="h-3 rounded bg-muted/70"
+          style={{ width: `${58 + ((i * 17) % 36)}%` }}
+        />
+      ))}
+    </div>
+  );
+}
+
+function ChartSkeleton() {
+  return (
+    <div className="flex h-[22rem] w-full flex-col gap-3 px-3 py-3" aria-hidden>
+      <div className="flex min-h-0 flex-1 gap-3">
+        <div className="flex w-10 shrink-0 flex-col justify-between py-1">
+          {Array.from({ length: 5 }).map((_, i) => (
+            <div key={i} className="h-2.5 w-full animate-pulse rounded bg-muted/70" />
+          ))}
+        </div>
+        <div className="relative min-h-0 flex-1 overflow-hidden rounded-md border border-border/40 bg-muted/15">
+          <div className="absolute inset-x-0 top-[20%] h-px bg-border/40" />
+          <div className="absolute inset-x-0 top-[40%] h-px bg-border/40" />
+          <div className="absolute inset-x-0 top-[60%] h-px bg-border/40" />
+          <div className="absolute inset-x-0 top-[80%] h-px bg-border/40" />
+          <div className="absolute inset-[18%_8%_22%_6%] animate-pulse rounded-full bg-muted/50" />
+          <div className="absolute inset-[42%_12%_28%_10%] animate-pulse rounded-full bg-muted/40" />
+        </div>
+      </div>
+      <div className="flex gap-2 pl-12">
+        {Array.from({ length: 6 }).map((_, i) => (
+          <div key={i} className="h-2.5 flex-1 animate-pulse rounded bg-muted/60" />
+        ))}
+      </div>
+    </div>
+  );
+}
+
 /**
  * Contained Kalshi Live hub demo: featured live markets → search → metadata sheet/JSON.
  * Local state only — does not mount dashboard connect/sheets.
@@ -155,10 +213,13 @@ export function HubKalshiLiveDemo({ className }: HubKalshiLiveDemoProps) {
   const [trades, setTrades] = useState<Record<string, unknown>[] | null>(null);
   const [tradesLoading, setTradesLoading] = useState(false);
   const [tradesError, setTradesError] = useState<string | null>(null);
+  const [liveEmbedOpen, setLiveEmbedOpen] = useState(false);
+  const [chartExporting, setChartExporting] = useState(false);
   const abortRef = useRef<AbortController | null>(null);
   const seqRef = useRef(0);
   const tradesAbortRef = useRef<AbortController | null>(null);
   const tradesSeqRef = useRef(0);
+  const tradesChartRef = useRef<HTMLDivElement | null>(null);
 
   const tickersKey = useMemo(
     () =>
@@ -484,6 +545,40 @@ export function HubKalshiLiveDemo({ className }: HubKalshiLiveDemoProps) {
     XLSX.utils.book_append_sheet(wb, ws, "Trades");
     XLSX.writeFile(wb, `kalshi-live-trades-${Date.now()}.xlsx`);
   }, [trades, tradesSheetColumns]);
+
+  const exportTradesChart = useCallback(
+    async (format: "png" | "svg" | "jpg") => {
+      const el = tradesChartRef.current;
+      if (!el || chartExporting) return;
+      setChartExporting(true);
+      const opts = {
+        cacheBust: true,
+        pixelRatio: 2,
+        backgroundColor:
+          typeof window !== "undefined"
+            ? getComputedStyle(el).backgroundColor || "#ffffff"
+            : "#ffffff",
+      };
+      const filename = `kalshi-live-trades-chart-${Date.now()}`;
+      try {
+        if (format === "png") {
+          downloadDataUrl(await toPng(el, opts), `${filename}.png`);
+        } else if (format === "svg") {
+          downloadDataUrl(await toSvg(el, opts), `${filename}.svg`);
+        } else {
+          downloadDataUrl(
+            await toJpeg(el, { ...opts, quality: 0.95 }),
+            `${filename}.jpg`,
+          );
+        }
+      } catch (e) {
+        console.error("[HubKalshiLiveDemo] chart export failed", e);
+      } finally {
+        setChartExporting(false);
+      }
+    },
+    [chartExporting],
+  );
 
   const selectFeaturedMarket = useCallback((market: FeaturedMarket) => {
     const t = String(market?.ticker || "").trim().toUpperCase();
@@ -814,11 +909,12 @@ export function HubKalshiLiveDemo({ className }: HubKalshiLiveDemoProps) {
 
                   {error ? (
                     <p className="px-3 py-4 text-sm text-destructive">{error}</p>
-                  ) : loading && !markets ? (
-                    <div className="flex items-center justify-center gap-2 px-3 py-10 text-sm text-muted-foreground">
-                      <Loader2 className="size-4 animate-spin" aria-hidden />
-                      Fetching market metadata…
-                    </div>
+                  ) : loading ? (
+                    viewMode === "json" ? (
+                      <JsonSkeleton />
+                    ) : (
+                      <SheetTableSkeleton rows={8} />
+                    )
                   ) : viewMode === "json" ? (
                     <pre className="max-h-[28rem] overflow-auto px-3 py-3 font-mono text-[11px] leading-relaxed text-foreground sm:text-xs">
                       {jsonText}
@@ -904,14 +1000,46 @@ export function HubKalshiLiveDemo({ className }: HubKalshiLiveDemoProps) {
                               type="button"
                               variant="outline"
                               size="sm"
-                              disabled={!hasTrades}
+                              disabled={!hasTrades || chartExporting}
                               className="h-7 gap-1.5 px-2 text-[11px] font-medium text-muted-foreground"
                             >
                               <Download className="size-3.5" aria-hidden />
                               Export
                             </Button>
                           </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end" className="min-w-[8rem]">
+                          <DropdownMenuContent align="end" className="min-w-[9.5rem]">
+                            {tradesViewMode === "chart" ? (
+                              <>
+                                <DropdownMenuItem
+                                  className="text-xs"
+                                  disabled={!hasTrades || chartExporting}
+                                  onSelect={() => void exportTradesChart("png")}
+                                >
+                                  PNG
+                                </DropdownMenuItem>
+                                <DropdownMenuItem
+                                  className="text-xs"
+                                  disabled={!hasTrades || chartExporting}
+                                  onSelect={() => void exportTradesChart("svg")}
+                                >
+                                  SVG
+                                </DropdownMenuItem>
+                                <DropdownMenuItem
+                                  className="text-xs"
+                                  disabled={!hasTrades || chartExporting}
+                                  onSelect={() => void exportTradesChart("jpg")}
+                                >
+                                  JPG
+                                </DropdownMenuItem>
+                                <DropdownMenuItem
+                                  className="text-xs"
+                                  onSelect={() => setLiveEmbedOpen(true)}
+                                >
+                                  Live embed
+                                </DropdownMenuItem>
+                                <DropdownMenuSeparator />
+                              </>
+                            ) : null}
                             <DropdownMenuItem
                               className="text-xs"
                               disabled={!hasTrades}
@@ -944,19 +1072,30 @@ export function HubKalshiLiveDemo({ className }: HubKalshiLiveDemoProps) {
                           <button
                             type="button"
                             disabled={!hasTrades && !tradesLoading}
-                            onClick={() =>
+                            onClick={() => {
+                              if (tradesViewMode === "chart") {
+                                setTradesViewMode("sheet");
+                                return;
+                              }
                               setTradesViewMode(
                                 tradesViewMode === "json" ? "sheet" : "json",
-                              )
-                            }
+                              );
+                            }}
                             className="inline-flex h-6 items-center gap-1 rounded px-2 text-[11px] font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
                             aria-label={
-                              tradesViewMode === "json"
-                                ? "Switch to sheet view"
-                                : "Switch to JSON view"
+                              tradesViewMode === "chart"
+                                ? "Switch to data sheet"
+                                : tradesViewMode === "json"
+                                  ? "Switch to sheet view"
+                                  : "Switch to JSON view"
                             }
                           >
-                            {tradesViewMode === "json" ? (
+                            {tradesViewMode === "chart" ? (
+                              <>
+                                <Table2 className="size-3.5" aria-hidden />
+                                Data Sheet
+                              </>
+                            ) : tradesViewMode === "json" ? (
                               <>
                                 <Table2 className="size-3.5" aria-hidden />
                                 Sheet
@@ -986,14 +1125,23 @@ export function HubKalshiLiveDemo({ className }: HubKalshiLiveDemoProps) {
 
                     {tradesError ? (
                       <p className="px-3 py-4 text-sm text-destructive">{tradesError}</p>
-                    ) : tradesLoading && !trades ? (
-                      <SheetTableSkeleton rows={8} />
+                    ) : tradesLoading ? (
+                      tradesViewMode === "chart" ? (
+                        <ChartSkeleton />
+                      ) : tradesViewMode === "json" ? (
+                        <JsonSkeleton />
+                      ) : (
+                        <SheetTableSkeleton rows={8} />
+                      )
                     ) : !trades?.length ? (
                       <p className="px-3 py-8 text-center text-sm text-muted-foreground">
                         No recent trades for this market.
                       </p>
                     ) : tradesViewMode === "chart" ? (
-                      <HubKalshiLiveDemoTradesChart trades={trades} />
+                      <HubKalshiLiveDemoTradesChart
+                        ref={tradesChartRef}
+                        trades={trades}
+                      />
                     ) : tradesViewMode === "json" ? (
                       <pre className="max-h-[28rem] overflow-auto px-3 py-3 font-mono text-[11px] leading-relaxed text-foreground sm:text-xs">
                         {tradesJsonText}
@@ -1063,6 +1211,32 @@ export function HubKalshiLiveDemo({ className }: HubKalshiLiveDemoProps) {
           </p>
         </div>
       </HubKalshiLiveDemoMockup>
+
+      <Dialog open={liveEmbedOpen} onOpenChange={setLiveEmbedOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Live embed</DialogTitle>
+            <DialogDescription>
+              Live chart embeds are only available for subscribers. Upgrade to
+              publish and embed updating Kalshi charts on your site.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setLiveEmbedOpen(false)}
+            >
+              Close
+            </Button>
+            <Button type="button" asChild>
+              <Link href="/#pricing" onClick={() => setLiveEmbedOpen(false)}>
+                View pricing
+              </Link>
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
