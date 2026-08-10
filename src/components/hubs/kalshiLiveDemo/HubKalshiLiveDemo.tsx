@@ -36,6 +36,8 @@ type FeaturedMarket = {
   imageUrl?: string;
   seriesTitle?: string;
   category?: string;
+  /** Full Kalshi market object from the featured pull — reuse on click. */
+  raw?: Record<string, unknown>;
 };
 
 type HubKalshiLiveDemoProps = {
@@ -117,7 +119,7 @@ export function HubKalshiLiveDemo({ className }: HubKalshiLiveDemoProps) {
   const [markets, setMarkets] = useState<Record<string, unknown>[] | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [viewMode, setViewMode] = useState<ViewMode>("sheet");
+  const [viewMode, setViewMode] = useState<ViewMode>("json");
   const [featured, setFeatured] = useState<FeaturedMarket[]>([]);
   const [featuredLoading, setFeaturedLoading] = useState(true);
   const [featuredError, setFeaturedError] = useState<string | null>(null);
@@ -185,14 +187,35 @@ export function HubKalshiLiveDemo({ className }: HubKalshiLiveDemoProps) {
       return;
     }
 
+    const featuredRawByTicker = new Map<string, Record<string, unknown>>();
+    for (const item of featured) {
+      const t = String(item?.ticker || "").trim().toUpperCase();
+      if (!t || !item?.raw || typeof item.raw !== "object") continue;
+      featuredRawByTicker.set(t, item.raw);
+    }
+
+    /** @type {Array<Record<string, unknown> | null>} */
+    const resolved: Array<Record<string, unknown> | null> = tickers.map(
+      (t) => featuredRawByTicker.get(t) ?? null,
+    );
+    const missing = tickers.filter((_, i) => !resolved[i]);
+
+    // All selected tickers already came from the featured pull — no refetch.
+    if (missing.length === 0) {
+      setMarkets(resolved as Record<string, unknown>[]);
+      setError(null);
+      setLoading(false);
+      return;
+    }
+
     const ac = new AbortController();
     abortRef.current = ac;
     setLoading(true);
     setError(null);
 
     const params = new URLSearchParams({
-      tickers: tickersKey,
-      limit: String(tickers.length),
+      tickers: missing.join(","),
+      limit: String(missing.length),
     });
 
     fetch(`/api/integrations/kalshi-live/markets?${params.toString()}`, {
@@ -214,8 +237,19 @@ export function HubKalshiLiveDemo({ className }: HubKalshiLiveDemoProps) {
           );
           return;
         }
-        const list = Array.isArray(body?.markets) ? body.markets : [];
-        setMarkets(list);
+        const fetched = Array.isArray(body?.markets) ? body.markets : [];
+        const fetchedByTicker = new Map<string, Record<string, unknown>>();
+        for (const row of fetched) {
+          if (!row || typeof row !== "object") continue;
+          const t = String(row.ticker || "").trim().toUpperCase();
+          if (t) fetchedByTicker.set(t, row);
+        }
+
+        const merged = tickers
+          .map((t) => featuredRawByTicker.get(t) || fetchedByTicker.get(t) || null)
+          .filter(Boolean) as Record<string, unknown>[];
+
+        setMarkets(merged);
       })
       .catch((e) => {
         if (e instanceof DOMException && e.name === "AbortError") return;
@@ -230,7 +264,7 @@ export function HubKalshiLiveDemo({ className }: HubKalshiLiveDemoProps) {
     return () => {
       ac.abort();
     };
-  }, [tickers, tickersKey]);
+  }, [tickers, tickersKey, featured]);
 
   const jsonText = useMemo(() => {
     if (!markets) return "";
@@ -299,11 +333,16 @@ export function HubKalshiLiveDemo({ className }: HubKalshiLiveDemoProps) {
     XLSX.writeFile(wb, `kalshi-live-markets-${Date.now()}.xlsx`);
   }, [markets, sheetColumns]);
 
-  const selectFeaturedMarket = useCallback((ticker: string) => {
-    const t = String(ticker || "").trim().toUpperCase();
+  const selectFeaturedMarket = useCallback((market: FeaturedMarket) => {
+    const t = String(market?.ticker || "").trim().toUpperCase();
     if (!t) return;
+    if (market.raw && typeof market.raw === "object") {
+      setMarkets([market.raw]);
+      setError(null);
+      setLoading(false);
+    }
     setTickersValue(t);
-    setViewMode("sheet");
+    setViewMode("json");
   }, []);
 
   return (
@@ -420,32 +459,27 @@ export function HubKalshiLiveDemo({ className }: HubKalshiLiveDemoProps) {
                       <button
                         type="button"
                         disabled={!hasData && !loading}
-                        onClick={() => setViewMode("sheet")}
-                        className={cn(
-                          "inline-flex h-6 items-center gap-1 rounded px-2 text-[11px] font-medium transition-colors",
-                          viewMode === "sheet"
-                            ? "bg-muted text-foreground"
-                            : "text-muted-foreground hover:text-foreground",
-                        )}
-                        aria-pressed={viewMode === "sheet"}
-                      >
-                        <Table2 className="size-3.5" aria-hidden />
-                        Sheet
-                      </button>
-                      <button
-                        type="button"
-                        disabled={!hasData && !loading}
-                        onClick={() => setViewMode("json")}
-                        className={cn(
-                          "inline-flex h-6 items-center gap-1 rounded px-2 text-[11px] font-medium transition-colors",
+                        onClick={() =>
+                          setViewMode(viewMode === "json" ? "sheet" : "json")
+                        }
+                        className="inline-flex h-6 items-center gap-1 rounded px-2 text-[11px] font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                        aria-label={
                           viewMode === "json"
-                            ? "bg-muted text-foreground"
-                            : "text-muted-foreground hover:text-foreground",
-                        )}
-                        aria-pressed={viewMode === "json"}
+                            ? "Switch to sheet view"
+                            : "Switch to JSON view"
+                        }
                       >
-                        <Braces className="size-3.5" aria-hidden />
-                        JSON
+                        {viewMode === "json" ? (
+                          <>
+                            <Table2 className="size-3.5" aria-hidden />
+                            Sheet
+                          </>
+                        ) : (
+                          <>
+                            <Braces className="size-3.5" aria-hidden />
+                            JSON
+                          </>
+                        )}
                       </button>
                     </div>
                   </>
@@ -470,7 +504,7 @@ export function HubKalshiLiveDemo({ className }: HubKalshiLiveDemoProps) {
                       <li key={market.ticker}>
                         <button
                           type="button"
-                          onClick={() => selectFeaturedMarket(market.ticker)}
+                          onClick={() => selectFeaturedMarket(market)}
                           className="flex w-full items-start gap-3 rounded-xl border border-border/70 bg-background p-3 text-left shadow-sm transition-colors hover:border-border hover:bg-muted/30"
                         >
                           <div className="relative size-12 shrink-0 overflow-hidden rounded-lg border border-border/60 bg-muted">
