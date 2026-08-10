@@ -209,6 +209,90 @@ export function validateKalshiLiveEventForecastPull(
 }
 
 /**
+ * @param {unknown} raw
+ * @returns {number | null} unix seconds
+ */
+export function parseKalshiLiveTimestampToUnix(raw) {
+  if (raw == null || raw === "") return null;
+  if (typeof raw === "number" && Number.isFinite(raw)) {
+    return raw > 1e12 ? Math.floor(raw / 1000) : Math.floor(raw);
+  }
+  const ms = Date.parse(String(raw));
+  return Number.isFinite(ms) ? Math.floor(ms / 1000) : null;
+}
+
+/**
+ * Choose the finest forecast period that still fits under the soft point cap.
+ * @param {number} spanSec
+ * @returns {0 | 1 | 60 | 1440}
+ */
+export function pickEventForecastPeriodInterval(spanSec) {
+  const span = Math.max(0, Number(spanSec) || 0);
+  /** @type {Array<1 | 60 | 1440>} */
+  const candidates = [1, 60, 1440];
+  for (const p of candidates) {
+    const maxSpan = maxKalshiEventForecastRangeSec(p);
+    if (Number.isFinite(maxSpan) && span <= maxSpan) return p;
+  }
+  return 1440;
+}
+
+/**
+ * Fixed forecast window from the event + nested markets (open → close/now).
+ * Used by the hub Bonus Features demo so users don't pick dates manually.
+ *
+ * @param {Record<string, unknown> | null | undefined} event
+ * @param {unknown[]} [markets]
+ * @returns {{
+ *   start_ts: number;
+ *   end_ts: number;
+ *   period_interval: number;
+ *   clamped: boolean;
+ * }}
+ */
+export function deriveEventForecastWindowFromEvent(event, markets) {
+  const now = Math.floor(Date.now() / 1000);
+  /** @type {number | null} */
+  let start = null;
+  /** @type {number | null} */
+  let end = null;
+
+  const list = Array.isArray(markets) ? markets : [];
+  for (const raw of list) {
+    if (!raw || typeof raw !== "object") continue;
+    const m = /** @type {Record<string, unknown>} */ (raw);
+    const open = parseKalshiLiveTimestampToUnix(m.open_time ?? m.open_ts);
+    const close = parseKalshiLiveTimestampToUnix(
+      m.close_time ?? m.close_ts ?? m.expiration_time ?? m.expected_expiration_time,
+    );
+    if (open != null) start = start == null ? open : Math.min(start, open);
+    if (close != null) end = end == null ? close : Math.max(end, close);
+  }
+
+  const strike = parseKalshiLiveTimestampToUnix(
+    event && typeof event === "object" ? event.strike_date : null,
+  );
+  if (end == null && strike != null) end = strike;
+  if (start == null && strike != null) start = strike - 7 * 24 * 60 * 60;
+
+  if (end == null || !Number.isFinite(end)) end = now;
+  // Forecast history only exists through "now".
+  end = Math.min(Math.floor(end), now);
+  if (start == null || !Number.isFinite(start)) start = end - 24 * 60 * 60;
+  start = Math.floor(start);
+  if (start >= end) start = Math.max(0, end - 24 * 60 * 60);
+
+  const period_interval = pickEventForecastPeriodInterval(end - start);
+  const clamped = clampEventForecastWindow(start, end, period_interval);
+  return {
+    start_ts: clamped.start_ts,
+    end_ts: clamped.end_ts,
+    period_interval,
+    clamped: clamped.clamped,
+  };
+}
+
+/**
  * @param {string} eventTicker
  * @param {string} seriesTicker
  * @param {Record<string, number>} apiParams

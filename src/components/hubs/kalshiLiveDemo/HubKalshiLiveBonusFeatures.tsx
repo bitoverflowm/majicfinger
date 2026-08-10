@@ -1,18 +1,20 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
+import { HubKalshiLiveBonusEventForecasts } from "@/components/hubs/kalshiLiveDemo/HubKalshiLiveBonusEventForecasts";
+import { HubKalshiLiveBonusLeaderboards } from "@/components/hubs/kalshiLiveDemo/HubKalshiLiveBonusLeaderboards";
 import { HubKalshiLiveDemoMockup } from "@/components/hubs/kalshiLiveDemo/HubKalshiLiveDemoMockup";
 import {
   HubKalshiLiveDemoTabs,
   type HubKalshiLiveDemoTabDef,
 } from "@/components/hubs/kalshiLiveDemo/HubKalshiLiveDemoTabs";
+import {
+  HUB_KALSHI_BONUS_TAB_EVENT,
+  HUB_KALSHI_BONUS_TAB_STORAGE_KEY,
+  type HubKalshiLiveBonusFeatureId,
+} from "@/components/hubs/kalshiLiveDemo/bonusFeaturesNav";
 import { cn } from "@/lib/utils";
-
-export type HubKalshiLiveBonusFeatureId =
-  | "event_forecasts"
-  | "batch_event_candlesticks"
-  | "leaderboards";
 
 const BONUS_TABS: HubKalshiLiveDemoTabDef[] = [
   {
@@ -22,26 +24,37 @@ const BONUS_TABS: HubKalshiLiveDemoTabDef[] = [
       "Explore event-level forecast percentile history and how market expectations shift over time.",
   },
   {
-    id: "batch_event_candlesticks",
-    title: "Batch Event candlesticks",
-    description:
-      "Pull candlestick history across an event’s markets in one batch for comparison and charting.",
-  },
-  {
     id: "leaderboards",
     title: "Leaderboards",
     description:
       "Browse Kalshi leaderboard standings and trader performance metrics from the live exchange.",
   },
+  {
+    id: "batch_candlesticks",
+    title: "Batch Candlesticks",
+    description:
+      "Pull candlestick history across an event’s markets in one batch for comparison and charting.",
+  },
 ];
+
+const LIVE_BONUS_TABS = new Set<HubKalshiLiveBonusFeatureId>([
+  "event_forecasts",
+  "leaderboards",
+]);
+
+const BONUS_IDS = new Set(BONUS_TABS.map((t) => t.id));
+
+function isBonusFeatureId(id: string): id is HubKalshiLiveBonusFeatureId {
+  return BONUS_IDS.has(id);
+}
 
 type HubKalshiLiveBonusFeaturesProps = {
   className?: string;
 };
 
 /**
- * Placeholder tabbed playground for Kalshi Live bonus endpoints.
- * Panels are stubs for now — wired like the main live demo rail.
+ * Tabbed playground for Kalshi Live bonus endpoints.
+ * Event Forecasts + Leaderboards are live; batch candlesticks remains a stub.
  */
 export function HubKalshiLiveBonusFeatures({
   className,
@@ -49,8 +62,31 @@ export function HubKalshiLiveBonusFeatures({
   const [activeId, setActiveId] =
     useState<HubKalshiLiveBonusFeatureId>("event_forecasts");
 
+  useEffect(() => {
+    const apply = (raw: string | null | undefined) => {
+      if (!raw || !isBonusFeatureId(raw)) return;
+      setActiveId(raw);
+    };
+
+    try {
+      apply(sessionStorage.getItem(HUB_KALSHI_BONUS_TAB_STORAGE_KEY));
+    } catch {
+      // ignore
+    }
+
+    const onNavigate = (event: Event) => {
+      const detail = (event as CustomEvent<string>).detail;
+      apply(detail);
+    };
+    window.addEventListener(HUB_KALSHI_BONUS_TAB_EVENT, onNavigate);
+    return () => {
+      window.removeEventListener(HUB_KALSHI_BONUS_TAB_EVENT, onNavigate);
+    };
+  }, []);
+
   const activeTab =
     BONUS_TABS.find((tab) => tab.id === activeId) || BONUS_TABS[0]!;
+  const isLive = LIVE_BONUS_TABS.has(activeId);
 
   return (
     <div className={cn("w-full", className)}>
@@ -58,7 +94,8 @@ export function HubKalshiLiveBonusFeatures({
         <div className="flex w-full flex-col gap-4 px-4 py-6 sm:gap-5 sm:px-6 sm:py-8 lg:px-8 lg:py-10">
           <div className="space-y-1.5">
             <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
-              Bonus features · placeholders
+              Bonus features
+              {isLive ? " · live preview" : " · placeholders"}
             </p>
           </div>
 
@@ -67,9 +104,10 @@ export function HubKalshiLiveBonusFeatures({
               <HubKalshiLiveDemoTabs
                 tabs={BONUS_TABS}
                 activeId={activeId}
-                onChange={(id) =>
-                  setActiveId(id as HubKalshiLiveBonusFeatureId)
-                }
+                contentLoading={false}
+                onChange={(id) => {
+                  if (isBonusFeatureId(id)) setActiveId(id);
+                }}
               />
             </div>
 
@@ -77,17 +115,23 @@ export function HubKalshiLiveBonusFeatures({
               className="flex min-h-0 min-w-0 flex-col lg:col-span-4"
               role="tabpanel"
             >
-              <div className="flex min-h-[22rem] flex-1 flex-col items-center justify-center gap-2 rounded-xl border border-border/70 bg-muted/20 px-6 py-16 text-center">
-                <p className="text-sm font-medium text-foreground">
-                  {activeTab.title}
-                </p>
-                <p className="max-w-md text-sm leading-relaxed text-muted-foreground text-pretty">
-                  {activeTab.description}
-                </p>
-                <p className="mt-2 text-xs text-muted-foreground">
-                  UI placeholder for now — endpoint pull comes next.
-                </p>
-              </div>
+              {activeId === "event_forecasts" ? (
+                <HubKalshiLiveBonusEventForecasts className="px-2 sm:px-4 lg:px-6" />
+              ) : activeId === "leaderboards" ? (
+                <HubKalshiLiveBonusLeaderboards className="px-2 sm:px-4 lg:px-6" />
+              ) : (
+                <div className="flex min-h-[22rem] flex-1 flex-col items-center justify-center gap-2 rounded-xl border border-border/70 bg-muted/20 px-6 py-16 text-center">
+                  <p className="text-sm font-medium text-foreground">
+                    {activeTab.title}
+                  </p>
+                  <p className="max-w-md text-sm leading-relaxed text-muted-foreground text-pretty">
+                    {activeTab.description}
+                  </p>
+                  <p className="mt-2 text-xs text-muted-foreground">
+                    UI placeholder for now — endpoint pull comes next.
+                  </p>
+                </div>
+              )}
             </div>
           </div>
         </div>

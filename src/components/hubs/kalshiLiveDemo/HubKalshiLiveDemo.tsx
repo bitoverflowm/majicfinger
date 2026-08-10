@@ -13,6 +13,10 @@ import {
   type HubKalshiLiveDemoTabId,
 } from "@/components/hubs/kalshiLiveDemo/HubKalshiLiveDemoTabs";
 import {
+  navigateToKalshiBonusFeature,
+  type HubKalshiLiveBonusFeatureId,
+} from "@/components/hubs/kalshiLiveDemo/bonusFeaturesNav";
+import {
   HubKalshiLiveDemoCandlesticksChart,
   type DemoCandlePeriod,
 } from "@/components/hubs/kalshiLiveDemo/HubKalshiLiveDemoCandlesticksChart";
@@ -2014,23 +2018,43 @@ export function HubKalshiLiveDemo({ className }: HubKalshiLiveDemoProps) {
         disabled: !hasData,
       },
       {
-        id: "event_forecast" as const,
+        id: "event_forecasts",
         title: "Event forecast",
-        description: "Explore event-level forecast data for the selected market.",
-        disabled: !hasData,
+        description:
+          "Explore event-level forecast percentile history in Bonus Features.",
+        separatorBefore: true,
+        navigateToBonus: true,
+      },
+      {
+        id: "leaderboards",
+        title: "Leaderboards",
+        description:
+          "Browse Kalshi leaderboard standings in Bonus Features.",
+        navigateToBonus: true,
+      },
+      {
+        id: "batch_candlesticks",
+        title: "Batch Candlesticks",
+        description:
+          "Pull event-wide candlestick batches in Bonus Features.",
+        navigateToBonus: true,
       },
     ],
     [hasData, tickers.length],
   );
 
-  const comingSoonPanel = (label: string) => (
-    <div className="flex min-h-[22rem] flex-col items-center justify-center gap-2 px-6 py-16 text-center">
-      <p className="text-sm font-medium text-foreground">{label}</p>
-      <p className="max-w-sm text-sm leading-relaxed text-muted-foreground text-pretty">
-        UI placeholder for now — endpoint pull comes next.
-      </p>
-    </div>
-  );
+  const handleDemoTabChange = useCallback((id: string) => {
+    const bonusIds: HubKalshiLiveBonusFeatureId[] = [
+      "event_forecasts",
+      "leaderboards",
+      "batch_candlesticks",
+    ];
+    if (bonusIds.includes(id as HubKalshiLiveBonusFeatureId)) {
+      navigateToKalshiBonusFeature(id as HubKalshiLiveBonusFeatureId);
+      return;
+    }
+    setActiveTab(id as HubKalshiLiveDemoTabId);
+  }, []);
 
   return (
     <div className={cn("w-full", className)}>
@@ -2061,7 +2085,7 @@ export function HubKalshiLiveDemo({ className }: HubKalshiLiveDemoProps) {
               <HubKalshiLiveDemoTabs
                 tabs={tabs}
                 activeId={activeTab}
-                onChange={(id) => setActiveTab(id as HubKalshiLiveDemoTabId)}
+                onChange={handleDemoTabChange}
                 contentLoading={
                   activeTab === "search"
                     ? featuredLoading
@@ -3570,9 +3594,6 @@ export function HubKalshiLiveDemo({ className }: HubKalshiLiveDemoProps) {
                     )}
                   </div>
                 </div>
-              ) : null}
-              {activeTab === "event_forecast" ? (
-                <div className="px-2 sm:px-4 lg:px-6">{comingSoonPanel("Event forecast")}</div>
               ) : null}
             </div>
           </div>

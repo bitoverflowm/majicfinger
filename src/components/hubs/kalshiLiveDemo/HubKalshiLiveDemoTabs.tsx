@@ -15,14 +15,20 @@ export type HubKalshiLiveDemoTabId =
   | "metadata"
   | "trades"
   | "orderbook"
-  | "candlesticks"
-  | "event_forecast";
+  | "candlesticks";
 
 export type HubKalshiLiveDemoTabDef = {
   id: string;
   title: string;
   description: string;
   disabled?: boolean;
+  /** Draw a divider above this tab (e.g. before bonus links). */
+  separatorBefore?: boolean;
+  /**
+   * If set, click navigates/scrolls instead of selecting an in-demo panel.
+   * Typically a bonus-feature id handled by the parent via onChange or onNavigate.
+   */
+  navigateToBonus?: boolean;
 };
 
 type HubKalshiLiveDemoTabsProps = {
@@ -85,7 +91,7 @@ export function HubKalshiLiveDemoTabs({
         role="tablist"
       >
         {tabs.map((tab) => {
-          const open = tab.id === activeId;
+          const open = tab.id === activeId && !tab.navigateToBonus;
           const disabled = Boolean(tab.disabled);
 
           const tabButton = (
@@ -144,16 +150,10 @@ export function HubKalshiLiveDemoTabs({
             </button>
           );
 
-          if (!disabled) {
-            return (
-              <div key={tab.id} className="w-full">
-                {tabButton}
-              </div>
-            );
-          }
-
-          return (
-            <Tooltip key={tab.id}>
+          const item = !disabled ? (
+            <div className="w-full">{tabButton}</div>
+          ) : (
+            <Tooltip>
               <TooltipTrigger asChild>
                 <span className="block w-full outline-none">{tabButton}</span>
               </TooltipTrigger>
@@ -165,6 +165,18 @@ export function HubKalshiLiveDemoTabs({
                 {DISABLED_TAB_TOOLTIP}
               </TooltipContent>
             </Tooltip>
+          );
+
+          return (
+            <div key={tab.id} className="w-full">
+              {tab.separatorBefore ? (
+                <div
+                  className="mb-2 mt-1 border-t border-border/60 pt-2"
+                  aria-hidden
+                />
+              ) : null}
+              {item}
+            </div>
           );
         })}
       </div>
