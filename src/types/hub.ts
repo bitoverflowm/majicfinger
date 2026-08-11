@@ -71,6 +71,20 @@ export type HubHeroSection = {
       href: string;
     };
   };
+  /**
+   * Live Kalshi trades Liveline in the premium hero right column
+   * (mutually preferred over `heroChart` when both are set).
+   */
+  heroLiveChart?: {
+    eyebrow?: string;
+    caption?: string;
+    captionLink?: {
+      label: string;
+      href: string;
+    };
+    /** Poll interval while visible (default 20s). */
+    pollIntervalMs?: number;
+  };
   capabilityPills?: string[];
   primaryCTAs: HubCta[];
   secondaryCTAs?: HubCta[];

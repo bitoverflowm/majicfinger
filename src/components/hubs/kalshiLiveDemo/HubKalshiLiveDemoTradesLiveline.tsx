@@ -29,6 +29,8 @@ type HubKalshiLiveDemoTradesLivelineProps = {
   onChangeSeriesColor?: (id: string, tokenId: DemoChartColorTokenId) => void;
   className?: string;
   paused?: boolean;
+  /** Shorter canvas for hero / compact embeds. */
+  compact?: boolean;
 };
 /** Floor so a sparse first few polls still have room to breathe. */
 const LIVE_WINDOW_MIN_SECS = 45;
@@ -174,6 +176,7 @@ export const HubKalshiLiveDemoTradesLiveline = forwardRef<
   onChangeSeriesColor,
   className,
   paused = false,
+  compact = false,
 }, ref) {
   const dark = useIsDarkTheme();
   const hidden = hiddenSeriesIds ?? new Set<string>();
@@ -182,13 +185,16 @@ export const HubKalshiLiveDemoTradesLiveline = forwardRef<
     const seeded = series.map((item, index) => {
       const rawPoints = seedLivePoints(tradesToPoints(item.trades));
       const token = item.colorToken ?? defaultSeriesColorToken(index);
+      const resolved = resolveDemoChartColor(token);
       return {
         id: item.id,
         label: item.label,
         colorToken: token,
         color:
+          (resolved && !resolved.startsWith("var(") ? resolved : null) ||
+          (item.color && !item.color.startsWith("var(") ? item.color : null) ||
+          resolved ||
           item.color ||
-          resolveDemoChartColor(token) ||
           demoChartCssVar(token),
         rawPoints,
       };
@@ -288,7 +294,10 @@ export const HubKalshiLiveDemoTradesLiveline = forwardRef<
             formatValue={(v) => `${Math.round(Number(v))}¢`}
             padding={{ top: 28, right: 92, bottom: 52, left: 18 }}
             className="h-full w-full"
-            style={{ height: "100%", minHeight: "32rem" }}
+            style={{
+              height: "100%",
+              minHeight: compact ? "16rem" : "32rem",
+            }}
           />
         </div>
       )}

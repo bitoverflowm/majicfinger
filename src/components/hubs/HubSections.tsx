@@ -96,6 +96,21 @@ const HubHeroChartEmbedLazy = dynamic(
   },
 );
 
+const HubKalshiLiveHeroTradesChartLazy = dynamic(
+  () =>
+    import("@/components/hubs/kalshiLiveDemo/HubKalshiLiveHeroTradesChart").then(
+      (m) => m.HubKalshiLiveHeroTradesChart,
+    ),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="w-full overflow-hidden rounded-xl bg-card/40">
+        <HubHeroChartEmbedSkeleton />
+      </div>
+    ),
+  },
+);
+
 function HubHeroBadge({
   badge,
   badgeHref,
@@ -202,7 +217,11 @@ function HubHero({ section }: { section: HubHeroSection }) {
               </div>
             </div>
 
-            {section.heroChart ? (
+            {section.heroLiveChart ? (
+              <div className="w-full lg:-mr-4 lg:-mt-12 lg:self-start">
+                <HubKalshiLiveHeroTradesChartLazy copy={section.heroLiveChart} />
+              </div>
+            ) : section.heroChart ? (
               <div className="w-full lg:-mr-4 lg:-mt-12 lg:self-start">
                 <HubHeroChartEmbedLazy
                   username={section.heroChart.username}

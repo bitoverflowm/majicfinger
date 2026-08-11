@@ -53,14 +53,36 @@ export const kalshiLiveHub: HubPageConfig = {
   sections: [
     {
       type: "hero",
+      variant: "premium",
       title: "Kalshi Live",
       badge: "Looking for Kalshi Historical Data?",
       badgeHref: "/kalshi-historical-data",
       badgeIcon: "dot",
-      subtitle:
-        "Access live Kalshi markets, prices, trades, order books and candlesticks—then analyze, chart, export and publish the data directly from your browser.",
-      microtext:
-        "No code. No setup. No Kalshi API key required.",
+      subtitle: "Live Kalshi market data without code.",
+      heroBody: {
+        parts: [
+          {
+            type: "text",
+            value:
+              "Search any market in plain English, then pull live prices, trades, order books, and candlesticks — analyze, chart, export, and publish from your browser. ",
+          },
+          { type: "metric", value: "No code." },
+          { type: "text", value: " " },
+          { type: "metric", value: "No setup." },
+          { type: "text", value: " " },
+          { type: "metric", value: "No Kalshi API key." },
+        ],
+      },
+      heroLiveChart: {
+        eyebrow: "Live trades · high-volume Kalshi market",
+        caption:
+          "YES price prints updating from Kalshi live trades in Lychee.",
+        captionLink: {
+          label: "Try the live demo",
+          href: "#live-demo",
+        },
+        pollIntervalMs: 20_000,
+      },
       primaryCTAs: [
         {
           label: "Get Access Now",
