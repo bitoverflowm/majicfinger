@@ -12,7 +12,7 @@ import { ProductsNavDropdown } from "@/components/nav/products-nav-dropdown";
 import { DemoScrollLink } from "@/components/sections/demo-scroll-link";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { siteConfig } from "@/lib/config";
-import { getNavLinksForPathname, isAbsoluteHomeHashHref, navHrefToSectionId } from "@/lib/nav-hrefs";
+import { getNavLinksForPathname, isAbsoluteHomeHashHref, navHrefIsInPageScrollSpy, navHrefToSectionId } from "@/lib/nav-hrefs";
 import type { ProductsNavData } from "@/lib/nav/products-nav";
 import { cn } from "@/lib/utils";
 import { useUser } from "@/lib/hooks";
@@ -61,7 +61,7 @@ export function Navbar({ productsNav }: { productsNav: ProductsNavData }) {
   const { scrollY } = useScroll();
   const [hasScrolled, setHasScrolled] = useState(false);
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
-  const [activeSection, setActiveSection] = useState("hero");
+  const [activeSection, setActiveSection] = useState<string | null>(null);
   const user = useUser();
   const router = useRouter();
   const pathname = usePathname();
@@ -69,18 +69,21 @@ export function Navbar({ productsNav }: { productsNav: ProductsNavData }) {
   useEffect(() => {
     const handleScroll = () => {
       const sections = getNavLinksForPathname(pathname)
+        .filter((item) => navHrefIsInPageScrollSpy(item.href, pathname))
         .map((item) => navHrefToSectionId(item.href))
         .filter((id): id is string => Boolean(id));
 
+      let next: string | null = null;
       for (const section of sections) {
         const element = document.getElementById(section);
         if (!element) continue;
         const rect = element.getBoundingClientRect();
         if (rect.top <= 150 && rect.bottom >= 150) {
-          setActiveSection(section);
+          next = section;
           break;
         }
       }
+      setActiveSection(next);
     };
 
     window.addEventListener("scroll", handleScroll);
@@ -292,7 +295,9 @@ export function Navbar({ productsNav }: { productsNav: ProductsNavData }) {
                           }}
                           className={cn(
                             "underline-offset-4 hover:text-primary/80 transition-colors",
-                            activeSection === navHrefToSectionId(item.href)
+                            activeSection &&
+                              activeSection === navHrefToSectionId(item.href) &&
+                              navHrefIsInPageScrollSpy(item.href, pathname)
                               ? "text-primary font-medium"
                               : "text-primary/60",
                           )}

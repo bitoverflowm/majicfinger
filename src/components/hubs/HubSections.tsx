@@ -1,5 +1,6 @@
 import Link from "next/link";
 import dynamic from "next/dynamic";
+import { ArrowRightIcon } from "@radix-ui/react-icons";
 import { HubComparisonTable } from "@/components/hubs/HubComparisonTable";
 import { HubCtaButton } from "@/components/hubs/HubCtaButton";
 import { HubCardsNoteCta } from "@/components/hubs/HubCardsNoteCta";
@@ -27,6 +28,7 @@ import type {
 import { HubHeroBody } from "@/components/hubs/HubHeroBody";
 import { HubHeroCapabilityPills } from "@/components/hubs/HubHeroCapabilityPills";
 import { HubKalshiExplorerBranding } from "@/components/hubs/HubKalshiExplorerBranding";
+import { HubKalshiLiveDemoLoadingShell } from "@/components/hubs/kalshiLiveDemo/HubKalshiLiveDemoLoadingShell";
 import { HubKalshiQueryMockup } from "@/components/hubs/kalshiQuery/HubKalshiQueryMockup";
 import { HubLazyWhenVisible } from "@/components/hubs/HubLazyWhenVisible";
 import { HubProofMetrics } from "@/components/hubs/HubProofMetrics";
@@ -51,9 +53,7 @@ const HubKalshiLiveDemo = dynamic(
     ),
   {
     ssr: false,
-    loading: () => (
-      <div className="h-[40rem] w-full animate-pulse rounded-2xl bg-muted/40 ring-1 ring-border/60 sm:h-[44rem]" />
-    ),
+    loading: () => <HubKalshiLiveDemoLoadingShell />,
   },
 );
 
@@ -96,6 +96,56 @@ const HubHeroChartEmbedLazy = dynamic(
   },
 );
 
+function HubHeroBadge({
+  badge,
+  badgeHref,
+  badgeIcon,
+  className,
+}: {
+  badge: string;
+  badgeHref?: string;
+  badgeIcon?: "dot";
+  className?: string;
+}) {
+  const badgeClassName = cn(
+    "border border-border bg-accent rounded-full text-sm h-8 px-3 inline-flex items-center gap-2 max-w-full text-center text-foreground",
+    className,
+  );
+  const leadingIcon =
+    badgeIcon === "dot" ? (
+      <span className="relative flex h-2.5 w-2.5 shrink-0">
+        <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-500/60" />
+        <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-emerald-500" />
+      </span>
+    ) : null;
+
+  if (badgeHref) {
+    return (
+      <Link
+        href={badgeHref}
+        className={cn(
+          badgeClassName,
+          "transition-colors hover:bg-accent/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
+        )}
+      >
+        {leadingIcon}
+        <span className="leading-tight">{badge}</span>
+        <ArrowRightIcon
+          className="h-3.5 w-3.5 shrink-0 text-muted-foreground"
+          aria-hidden
+        />
+      </Link>
+    );
+  }
+
+  return (
+    <p className={badgeClassName}>
+      {leadingIcon}
+      {badge}
+    </p>
+  );
+}
+
 function HubHero({ section }: { section: HubHeroSection }) {
   const isPremium = section.variant === "premium";
 
@@ -108,8 +158,14 @@ function HubHero({ section }: { section: HubHeroSection }) {
         />
         <div className="relative z-10 w-full px-6 pb-16 pt-[6.8rem] md:pb-20 md:pt-[8.5rem]">
           <div className="mx-auto grid w-full max-w-6xl items-start gap-10 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.12fr)] lg:gap-14">
-            <div className="flex flex-col items-start gap-5 px-4 text-left sm:px-6 md:gap-6 lg:px-0 lg:pt-2">
-              {section.eyebrow ? (
+            <div className="flex flex-col items-start gap-5 px-4 text-left sm:px-6 md:gap-6 lg:pl-2 lg:pr-0 lg:pt-2">
+              {section.badge ? (
+                <HubHeroBadge
+                  badge={section.badge}
+                  badgeHref={section.badgeHref}
+                  badgeIcon={section.badgeIcon}
+                />
+              ) : section.eyebrow ? (
                 <p className="text-[0.7rem] font-semibold uppercase tracking-[0.18em] text-secondary">
                   {section.eyebrow}
                 </p>
@@ -182,9 +238,19 @@ function HubHero({ section }: { section: HubHeroSection }) {
 
   return (
     <section className="relative w-full overflow-hidden">
-      <div className="flex w-full flex-col items-center px-6 pb-20 pt-[7.65rem] md:pb-28 md:pt-[9.35rem]">
+      <div
+        aria-hidden
+        className="hub-hero-aura-gradient pointer-events-none absolute inset-0 z-0 w-full"
+      />
+      <div className="relative z-10 flex w-full flex-col items-center px-6 pb-20 pt-[7.65rem] md:pb-28 md:pt-[9.35rem]">
         <div className="mx-auto flex w-full max-w-3xl flex-col items-center gap-8 text-center">
-          {section.eyebrow ? (
+          {section.badge ? (
+            <HubHeroBadge
+              badge={section.badge}
+              badgeHref={section.badgeHref}
+              badgeIcon={section.badgeIcon}
+            />
+          ) : section.eyebrow ? (
             <p className="text-xs font-medium uppercase tracking-widest text-muted-foreground">
               {section.eyebrow}
             </p>
@@ -214,6 +280,12 @@ function HubHero({ section }: { section: HubHeroSection }) {
             ))}
           </div>
         </div>
+        {section.capabilityPills?.length ? (
+          <HubHeroCapabilityPills
+            pills={section.capabilityPills}
+            className="mx-auto mt-10 max-w-6xl px-2 sm:mt-12 sm:px-4 lg:mt-14"
+          />
+        ) : null}
       </div>
     </section>
   );
@@ -776,9 +848,7 @@ function HubKalshiLiveDemoSectionView({
         )}
       >
         <HubLazyWhenVisible
-          fallback={
-            <div className="h-[40rem] w-full animate-pulse rounded-2xl bg-muted/40 ring-1 ring-border/60 sm:h-[44rem]" />
-          }
+          fallback={<HubKalshiLiveDemoLoadingShell />}
         >
           <HubKalshiLiveDemo />
         </HubLazyWhenVisible>

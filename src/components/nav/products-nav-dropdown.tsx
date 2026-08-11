@@ -96,22 +96,34 @@ function HubFlyout({ hub }: { hub: ProductsNavHub }) {
 
 function DesktopProductsPanel({
   data,
+  open,
   panelRef,
   panelLeft,
+  onNavigate,
 }: {
   data: ProductsNavData;
+  open: boolean;
   panelRef: RefObject<HTMLDivElement | null>;
   panelLeft: number;
+  onNavigate: () => void;
 }) {
   return (
     <div
       ref={panelRef}
       style={{ left: panelLeft }}
       className={cn(
-        "invisible absolute top-full z-50 opacity-0 transition-opacity duration-150",
+        "absolute top-full z-50 transition-opacity duration-150",
         DROPDOWN_HOVER_BRIDGE,
-        "pointer-events-none group-hover/products:visible group-hover/products:opacity-100 group-hover/products:pointer-events-auto group-focus-within/products:visible group-focus-within/products:opacity-100 group-focus-within/products:pointer-events-auto",
+        open
+          ? "visible opacity-100 pointer-events-auto"
+          : "invisible opacity-0 pointer-events-none",
       )}
+      onClickCapture={(event) => {
+        const target = event.target;
+        if (target instanceof Element && target.closest("a")) {
+          onNavigate();
+        }
+      }}
     >
       <div className="w-[min(42rem,calc(100vw-1.5rem))] rounded-xl border border-border bg-popover p-4 text-popover-foreground shadow-xl sm:p-5">
         <div className="grid grid-cols-1 gap-5 lg:grid-cols-[1.1fr_0.9fr] lg:gap-6">
@@ -165,6 +177,7 @@ function DesktopProductsDropdown({ data }: { data: ProductsNavData }) {
   const anchorRef = useRef<HTMLLIElement>(null);
   const panelRef = useRef<HTMLDivElement>(null);
   const [panelLeft, setPanelLeft] = useState(0);
+  const [open, setOpen] = useState(false);
 
   const clampPanelToViewport = useCallback(() => {
     const anchor = anchorRef.current;
@@ -184,6 +197,14 @@ function DesktopProductsDropdown({ data }: { data: ProductsNavData }) {
     }
 
     setPanelLeft(left);
+  }, []);
+
+  const closeMenu = useCallback(() => {
+    setOpen(false);
+    const active = document.activeElement;
+    if (active instanceof HTMLElement && anchorRef.current?.contains(active)) {
+      active.blur();
+    }
   }, []);
 
   useLayoutEffect(() => {
@@ -208,14 +229,30 @@ function DesktopProductsDropdown({ data }: { data: ProductsNavData }) {
   return (
     <li
       ref={anchorRef}
-      className="group/products relative z-20 flex h-full items-center"
-      onMouseEnter={clampPanelToViewport}
+      className="relative z-20 flex h-full items-center"
+      onMouseEnter={() => {
+        setOpen(true);
+        clampPanelToViewport();
+      }}
+      onMouseLeave={() => setOpen(false)}
+      onFocusCapture={() => {
+        setOpen(true);
+        clampPanelToViewport();
+      }}
+      onBlurCapture={(event) => {
+        const next = event.relatedTarget;
+        if (next instanceof Node && event.currentTarget.contains(next)) return;
+        setOpen(false);
+      }}
     >
       <button
         type="button"
-        className="flex h-full cursor-default items-center justify-center px-4 py-2 text-sm font-medium tracking-tight text-primary/60 transition-colors duration-200 hover:text-primary group-hover/products:text-primary"
+        className={cn(
+          "flex h-full cursor-default items-center justify-center px-4 py-2 text-sm font-medium tracking-tight text-primary/60 transition-colors duration-200 hover:text-primary",
+          open && "text-primary",
+        )}
         aria-haspopup="true"
-        aria-expanded="false"
+        aria-expanded={open}
         tabIndex={-1}
       >
         Products
@@ -224,7 +261,13 @@ function DesktopProductsDropdown({ data }: { data: ProductsNavData }) {
           aria-hidden
         />
       </button>
-      <DesktopProductsPanel data={data} panelRef={panelRef} panelLeft={panelLeft} />
+      <DesktopProductsPanel
+        data={data}
+        open={open}
+        panelRef={panelRef}
+        panelLeft={panelLeft}
+        onNavigate={closeMenu}
+      />
     </li>
   );
 }

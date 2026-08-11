@@ -296,8 +296,8 @@ export function HubKalshiLiveBonusLeaderboards({
         <p className="mt-1.5 text-sm leading-relaxed text-muted-foreground text-pretty">
           Kalshi’s public social leaderboard ranks traders by metrics like projected
           PnL, volume, ROI, and markets traded over a chosen window. Optionally
-          narrow by market category—the same category tags used elsewhere in Kalshi
-          Live—to see who’s leading in elections, sports, crypto, and more.
+          narrow by market category. Lychee has extracted out the same category tags used by Kalshi
+          itself-- you can see who’s leading in elections, sports, crypto, and more.
         </p>
       </div>
 

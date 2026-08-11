@@ -1,6 +1,11 @@
 "use client";
 
-import { getNavLinksForPathname, isAbsoluteHomeHashHref, navHrefToSectionId } from "@/lib/nav-hrefs";
+import {
+  getNavLinksForPathname,
+  isAbsoluteHomeHashHref,
+  navHrefIsInPageScrollSpy,
+  navHrefToSectionId,
+} from "@/lib/nav-hrefs";
 import type { ProductsNavData } from "@/lib/nav/products-nav";
 import { ProductsNavDropdown } from "@/components/nav/products-nav-dropdown";
 import { motion } from "framer-motion";
@@ -23,33 +28,51 @@ export function NavMenu({ productsNav }: NavMenuProps) {
   const [left, setLeft] = useState(0);
   const [width, setWidth] = useState(0);
   const [isReady, setIsReady] = useState(false);
-  const [activeSection, setActiveSection] = useState("hero");
+  const [activeSection, setActiveSection] = useState<string | null>(null);
   const [isManualScroll, setIsManualScroll] = useState(false);
 
-  React.useEffect(() => {
-    const firstItem = ref.current?.querySelector(`[href="${navs[0]?.href}"]`)?.parentElement;
-    if (firstItem) {
-      const rect = firstItem.getBoundingClientRect();
-      setLeft(firstItem.offsetLeft);
-      setWidth(rect.width);
-      setIsReady(true);
+  const syncPillToSection = React.useCallback((sectionId: string | null) => {
+    if (!sectionId || !ref.current) {
+      setIsReady(false);
+      return;
     }
-  }, [navs]);
+    const navItem = ref.current.querySelector(
+      `[data-nav-section="${sectionId}"]`,
+    )?.parentElement;
+    if (!navItem) {
+      setIsReady(false);
+      return;
+    }
+    const rect = navItem.getBoundingClientRect();
+    setLeft(navItem.offsetLeft);
+    setWidth(rect.width);
+    setIsReady(true);
+  }, []);
 
   React.useEffect(() => {
     const handleScroll = () => {
       if (isManualScroll) return;
 
       const sections = navs
+        .filter((item) => navHrefIsInPageScrollSpy(item.href, pathname))
         .map((item) => navHrefToSectionId(item.href))
         .filter((id): id is string => Boolean(id));
-      let closestSection = sections[0] ?? "hero";
+
+      if (!sections.length) {
+        setActiveSection(null);
+        setIsReady(false);
+        return;
+      }
+
+      let closestSection: string | null = null;
       let minDistance = Infinity;
 
       for (const section of sections) {
         const element = document.getElementById(section);
         if (!element) continue;
         const rect = element.getBoundingClientRect();
+        // Only highlight when the section is near/in the viewport spy band.
+        if (rect.bottom < 80 || rect.top > window.innerHeight * 0.65) continue;
         const distance = Math.abs(rect.top - 100);
         if (distance < minDistance) {
           minDistance = distance;
@@ -58,20 +81,13 @@ export function NavMenu({ productsNav }: NavMenuProps) {
       }
 
       setActiveSection(closestSection);
-      const navItem = ref.current?.querySelector(
-        `[data-nav-section="${closestSection}"]`,
-      )?.parentElement;
-      if (navItem) {
-        const rect = navItem.getBoundingClientRect();
-        setLeft(navItem.offsetLeft);
-        setWidth(rect.width);
-      }
+      syncPillToSection(closestSection);
     };
 
     window.addEventListener("scroll", handleScroll);
     handleScroll();
     return () => window.removeEventListener("scroll", handleScroll);
-  }, [isManualScroll, navs]);
+  }, [isManualScroll, navs, pathname, syncPillToSection]);
 
   const handleClick = (e: React.MouseEvent<HTMLAnchorElement>, item: NavItem) => {
     e.preventDefault();
@@ -83,12 +99,7 @@ export function NavMenu({ productsNav }: NavMenuProps) {
         if (!element) return;
         setIsManualScroll(true);
         setActiveSection(hash);
-        const navItem = e.currentTarget.parentElement;
-        if (navItem) {
-          const rect = navItem.getBoundingClientRect();
-          setLeft(navItem.offsetLeft);
-          setWidth(rect.width);
-        }
+        syncPillToSection(hash);
         const elementPosition = element.getBoundingClientRect().top;
         const offsetPosition = elementPosition + window.pageYOffset - 100;
         window.scrollTo({ top: offsetPosition, behavior: "smooth" });
@@ -107,12 +118,7 @@ export function NavMenu({ productsNav }: NavMenuProps) {
     setIsManualScroll(true);
 
     setActiveSection(targetId);
-    const navItem = e.currentTarget.parentElement;
-    if (navItem) {
-      const rect = navItem.getBoundingClientRect();
-      setLeft(navItem.offsetLeft);
-      setWidth(rect.width);
-    }
+    syncPillToSection(targetId);
 
     const elementPosition = element.getBoundingClientRect().top;
     const offsetPosition = elementPosition + window.pageYOffset - 100;
@@ -128,31 +134,39 @@ export function NavMenu({ productsNav }: NavMenuProps) {
         ref={ref}
       >
         <ProductsNavDropdown data={productsNav} />
-        {navs.map((item) => (
-          <li
-            key={item.name}
-            className={`z-10 cursor-pointer h-full flex items-center justify-center px-4 py-2 text-sm font-medium transition-colors duration-200 ${
-              activeSection === navHrefToSectionId(item.href)
-                ? "text-primary"
-                : "text-primary/60 hover:text-primary"
-            } tracking-tight`}
-          >
-            <a
-              href={item.href}
-              data-nav-section={navHrefToSectionId(item.href) ?? undefined}
-              onClick={(e) => handleClick(e, item)}
+        {navs.map((item) => {
+          const sectionId = navHrefToSectionId(item.href);
+          const isActive =
+            Boolean(activeSection) &&
+            activeSection === sectionId &&
+            navHrefIsInPageScrollSpy(item.href, pathname);
+
+          return (
+            <li
+              key={item.name}
+              className={`z-10 cursor-pointer h-full flex items-center justify-center px-4 py-2 text-sm font-medium transition-colors duration-200 ${
+                isActive
+                  ? "text-primary"
+                  : "text-primary/60 hover:text-primary"
+              } tracking-tight`}
             >
-              {item.name}
-            </a>
-          </li>
-        ))}
-        {isReady && (
+              <a
+                href={item.href}
+                data-nav-section={sectionId ?? undefined}
+                onClick={(e) => handleClick(e, item)}
+              >
+                {item.name}
+              </a>
+            </li>
+          );
+        })}
+        {isReady && activeSection ? (
           <motion.li
             animate={{ left, width }}
             transition={{ type: "spring", stiffness: 400, damping: 30 }}
             className="absolute inset-0 my-1.5 rounded-full bg-accent/60 border border-border"
           />
-        )}
+        ) : null}
       </ul>
     </div>
   );

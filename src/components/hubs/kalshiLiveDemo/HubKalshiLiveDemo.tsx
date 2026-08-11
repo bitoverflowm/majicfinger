@@ -8,6 +8,7 @@ import { toJpeg, toPng, toSvg } from "html-to-image";
 
 import { MarketTickerSearch } from "@/components/connectData/MarketTickerSearch";
 import { HubKalshiLiveDemoMockup } from "@/components/hubs/kalshiLiveDemo/HubKalshiLiveDemoMockup";
+import { FeaturedMarketListSkeleton } from "@/components/hubs/kalshiLiveDemo/HubKalshiLiveDemoLoadingShell";
 import {
   HubKalshiLiveDemoTabs,
   type HubKalshiLiveDemoTabId,
@@ -298,23 +299,7 @@ function mergeNewestTrades(
 }
 
 function FeaturedMarketSkeleton() {
-  return (
-    <div className="space-y-2 p-3">
-      {Array.from({ length: FEATURED_LIMIT }).map((_, i) => (
-        <div
-          key={i}
-          className="flex animate-pulse gap-3 rounded-xl border border-border/60 bg-background/80 p-3"
-        >
-          <div className="size-12 shrink-0 rounded-lg bg-muted" />
-          <div className="min-w-0 flex-1 space-y-2 py-0.5">
-            <div className="h-3.5 w-3/4 rounded bg-muted" />
-            <div className="h-3 w-1/2 rounded bg-muted" />
-            <div className="h-3 w-2/5 rounded bg-muted" />
-          </div>
-        </div>
-      ))}
-    </div>
-  );
+  return <FeaturedMarketListSkeleton count={FEATURED_LIMIT} />;
 }
 
 function SheetTableSkeleton({ rows = 8 }: { rows?: number }) {
@@ -2065,13 +2050,13 @@ export function HubKalshiLiveDemo({ className }: HubKalshiLiveDemoProps) {
           style={demoShellMinHeight ? { minHeight: demoShellMinHeight } : undefined}
         >
           <div className="space-y-1.5">
-            <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs font-medium tracking-wider text-muted-foreground">
-              <span className="uppercase">
-                Live demo · up to {DEMO_MAX_TICKERS} markets
-              </span>
+            <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+              Live demo · up to {DEMO_MAX_TICKERS} markets
+            </p>
+            <p className="text-xs font-medium text-muted-foreground">
               <Link
                 href="/#pricing"
-                className="normal-case tracking-normal underline underline-offset-2 hover:text-foreground"
+                className="underline underline-offset-2 hover:text-foreground"
               >
                 Sign up for unlimited markets, events, series, orderbooks,
                 candlesticks, trades, full coverage of everything Polymarket and
@@ -2088,7 +2073,7 @@ export function HubKalshiLiveDemo({ className }: HubKalshiLiveDemoProps) {
                 onChange={handleDemoTabChange}
                 contentLoading={
                   activeTab === "search"
-                    ? featuredLoading
+                    ? false
                     : activeTab === "metadata"
                       ? loading
                       : activeTab === "trades"
@@ -2118,7 +2103,9 @@ export function HubKalshiLiveDemo({ className }: HubKalshiLiveDemoProps) {
                   />
 
                   <p className="text-sm leading-relaxed text-muted-foreground text-pretty">
-                    or click on any of the following markets as a starting point
+                    If you don&apos;t know your ticker, search anything and suggestions
+                    will populate — or click on any of the following markets as a
+                    starting point
                   </p>
 
                   <div className="min-h-[12rem] overflow-hidden rounded-xl border border-border/70 bg-muted/20">
@@ -3598,20 +3585,24 @@ export function HubKalshiLiveDemo({ className }: HubKalshiLiveDemoProps) {
             </div>
           </div>
 
-          <p className="text-xs leading-relaxed text-muted-foreground text-pretty">
-            This preview is limited to search, market metadata, the{" "}
-            {DEMO_TRADES_LIMIT} most recent trades, orderbook depth (
-            {DEMO_ORDERBOOK_DEPTH} levels/side), and candlesticks (minute/hour/day
-            intervals).{" "}
-            <Link
-              href="/#pricing"
-              className="font-medium text-foreground underline underline-offset-2 hover:text-primary"
-            >
-              Register for full access
-            </Link>{" "}
-            to pull full trade history, order books, candlesticks, charts, exports,
-            and dashboards.
-          </p>
+          <div className="space-y-1 text-xs leading-relaxed text-muted-foreground text-pretty">
+            <p>
+              This preview is limited to search, market metadata, the{" "}
+              {DEMO_TRADES_LIMIT} most recent trades, orderbook depth (
+              {DEMO_ORDERBOOK_DEPTH} levels/side), and candlesticks (minute/hour/day
+              intervals).
+            </p>
+            <p>
+              <Link
+                href="/#pricing"
+                className="font-medium text-foreground underline underline-offset-2 hover:text-primary"
+              >
+                Register for full access
+              </Link>{" "}
+              to pull full trade history, order books, candlesticks, charts, exports,
+              and dashboards.
+            </p>
+          </div>
         </div>
       </HubKalshiLiveDemoMockup>
 

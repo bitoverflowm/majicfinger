@@ -45,6 +45,12 @@ export type HubHeroBodyPart =
 export type HubHeroSection = {
   type: "hero";
   eyebrow?: string;
+  /** Optional pill above the title (homepage-style). */
+  badge?: string;
+  /** When set, the badge is a link (shows a trailing arrow). */
+  badgeHref?: string;
+  /** Optional leading icon in the hero badge (matches landing `badgeIcon`). */
+  badgeIcon?: "dot";
   title: string;
   subtitle: string;
   microtext?: string;

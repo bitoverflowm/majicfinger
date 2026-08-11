@@ -3,11 +3,12 @@
 import { useEffect } from "react";
 import { scrollToDemoSection } from "@/lib/scrollToDemo";
 
-/** Corrects native #demo hash scroll on load / back-navigation. */
+/** Corrects native demo hash scroll on load / back-navigation. */
 export function LandingDemoScrollManager() {
   useEffect(() => {
     const sync = () => {
-      if (window.location.hash !== "#demo") return;
+      const hash = window.location.hash;
+      if (hash !== "#demo" && hash !== "#live-demo") return;
       scrollToDemoSection({ behavior: "auto" });
     };
 

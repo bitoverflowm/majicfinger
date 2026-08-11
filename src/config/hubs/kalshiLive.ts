@@ -54,10 +54,13 @@ export const kalshiLiveHub: HubPageConfig = {
     {
       type: "hero",
       title: "Kalshi Live",
+      badge: "Looking for Kalshi Historical Data?",
+      badgeHref: "/kalshi-historical-data",
+      badgeIcon: "dot",
       subtitle:
         "Access live Kalshi markets, prices, trades, order books and candlesticks—then analyze, chart, export and publish the data directly from your browser.",
       microtext:
-        "No code. No setup. No Kalshi API key required for public market data.",
+        "No code. No setup. No Kalshi API key required.",
       primaryCTAs: [
         {
           label: "Get Access Now",
@@ -72,12 +75,54 @@ export const kalshiLiveHub: HubPageConfig = {
           requiresAuth: false,
         },
       ],
+      capabilityPills: [
+        "Trade history",
+        "Orderbook history",
+        "CSV/XLSX/JSON exports",
+        "No-code querying",
+        "Backtesting-ready",
+      ],
+    },
+    {
+      type: "proof_metrics",
+      heading: "10,000+ researchers, traders, quants, and analysts use Lychee.",
+      subheading:
+        "43,400,000+ historical data requests were served from the archive in June 2026 alone.",
+      primaryMetrics: [
+        {
+          value: "7.68M+",
+          label: "unique markets",
+          tickerValue: 7.68,
+          decimalPlaces: 2,
+          suffix: "M+",
+        },
+        {
+          value: "72.1M+",
+          label: "historical trades",
+          tickerValue: 72.1,
+          decimalPlaces: 1,
+          suffix: "M+",
+        },
+        {
+          value: "36GB+",
+          label: "compressed archive",
+          tickerValue: 36,
+          decimalPlaces: 0,
+          suffix: "GB+",
+        },
+        {
+          value: "Since July 2021",
+          label: "Every Kalshi market and trade since launch",
+          static: true,
+        },
+      ],
+      trustMetrics: [],
     },
     {
       type: "text_block",
       title: "What Kalshi market data can you access?",
       content:
-        "Lychee turns Kalshi’s public market-data endpoints into a visual workspace. Browse series, events and markets; pull live prices, recent trades, order books, candlesticks, volume and open interest; then filter, transform, chart and export the results without building or maintaining an API integration.\n\nSearch for any Kalshi market in plain English. Select an event or contract, then instantly explore its current prices, market metadata, recent trades, order book, candlesticks, volume and open interest—directly on this page.",
+        "Lychee turns Kalshi market-data into a visual workspace. Browse series, events and markets; pull live prices, recent trades, order books, candlesticks, volume and open interest; then filter, transform, chart and export the results without building or maintaining an API integration.\n\nSearch for any Kalshi market in plain English. Select an event or contract, then instantly explore its current prices, market metadata, recent trades, order book, candlesticks, volume and open interest—directly on this page.",
       footerLink: {
         label: "Check it out below",
         href: "#live-demo",
