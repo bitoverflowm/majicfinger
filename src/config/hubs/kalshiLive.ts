@@ -211,12 +211,7 @@ export const kalshiLiveHub: HubPageConfig = {
         {
           question: "Is Kalshi market data real-time?",
           answer:
-            "Kalshi’s live endpoints return current exchange data when queried. Lychee lets you refresh, analyze and visualize that data through tables, charts and dashboards. Authenticated WebSocket connections are required for direct streaming updates from Kalshi.",
-        },
-        {
-          question: "Do I need a Kalshi API key?",
-          answer:
-            "No Kalshi API key is required for the public market-data endpoints available through Lychee.",
+            "Kalshi’s live endpoints return current exchange data when queried. Lychee lets you refresh, analyze and visualize that data through tables, charts and dashboards.",
         },
         {
           question: "Can I download Kalshi market data?",
@@ -275,9 +270,9 @@ export const kalshiLiveHub: HubPageConfig = {
           ],
         },
         {
-          question: "Is the Kalshi API free?",
+          question: "Do I need a Kalshi API key to use Lychee?",
           answer:
-            "Kalshi provides public market-data endpoints that can be accessed without authentication. Authenticated endpoints remain subject to Kalshi’s access requirements and rate limits. Lychee provides a visual interface for public market data, with its own plan and usage limits.",
+            "No. Lychee lets you search and explore public Kalshi market data without configuring an API key or writing code. Find a market in plain English, then access its prices, trades, order book and candlesticks through one visual workspace.",
         },
       ],
     },

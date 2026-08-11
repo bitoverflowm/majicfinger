@@ -34,7 +34,7 @@ const BONUS_TABS: HubKalshiLiveDemoTabDef[] = [
     id: "batch_candlesticks",
     title: "Batch Candlesticks",
     description:
-      "Search an event and instantly preview a multi-market candlestick dashboard — no code, no save.",
+      "Search an event and instantly preview a multi-market candlestick dashboard — no code, no signup, no nonsense.",
   },
 ];
 

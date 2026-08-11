@@ -85,6 +85,25 @@ function formatForecastValue(value: number): string {
   return value.toLocaleString(undefined, { maximumFractionDigits: 4 });
 }
 
+/** Compact y-axis labels so wide values (e.g. 100,000) stay inside the chart. */
+function formatAxisForecastValue(value: number): string {
+  if (!Number.isFinite(value)) return "—";
+  const abs = Math.abs(value);
+  if (abs >= 1_000_000) {
+    return `${(value / 1_000_000).toLocaleString(undefined, { maximumFractionDigits: 1 })}M`;
+  }
+  if (abs >= 10_000) {
+    return `${(value / 1_000).toLocaleString(undefined, { maximumFractionDigits: 0 })}k`;
+  }
+  if (abs >= 1000) {
+    return value.toLocaleString(undefined, { maximumFractionDigits: 0 });
+  }
+  if (abs >= 10) {
+    return value.toLocaleString(undefined, { maximumFractionDigits: 1 });
+  }
+  return value.toLocaleString(undefined, { maximumFractionDigits: 2 });
+}
+
 function seriesColorToken(
   index: number,
   override?: DemoChartColorTokenId,
@@ -214,7 +233,7 @@ export const HubKalshiLiveBonusEventForecastChart = forwardRef<
         <LineChart
           accessibilityLayer
           data={data}
-          margin={{ top: 8, right: 12, left: 4, bottom: 4 }}
+          margin={{ top: 8, right: 12, left: 8, bottom: 4 }}
         >
           <CartesianGrid vertical={false} strokeDasharray="3 3" />
           <XAxis
@@ -227,9 +246,9 @@ export const HubKalshiLiveBonusEventForecastChart = forwardRef<
           <YAxis
             tickLine={false}
             axisLine={false}
-            width={52}
-            tickMargin={6}
-            tickFormatter={(v) => formatForecastValue(Number(v))}
+            width={56}
+            tickMargin={8}
+            tickFormatter={(v) => formatAxisForecastValue(Number(v))}
           />
           <ChartTooltip
             cursor={{ stroke: "var(--border)", strokeWidth: 1 }}

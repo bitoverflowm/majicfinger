@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import Link from "next/link";
 import { Loader2, LayoutDashboard } from "lucide-react";
 
 import { MarketTickerSearch } from "@/components/connectData/MarketTickerSearch";
@@ -11,6 +12,7 @@ import {
   Dialog,
   DialogContent,
   DialogDescription,
+  DialogFooter,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
@@ -85,6 +87,7 @@ export function HubKalshiLiveBonusBatchCandlesticks({
   const [error, setError] = useState<string | null>(null);
   const [dashboard, setDashboard] = useState<BatchDashboard | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
+  const [upgradeOpen, setUpgradeOpen] = useState(false);
 
   const abortRef = useRef<AbortController | null>(null);
   const requestIdRef = useRef(0);
@@ -279,9 +282,10 @@ export function HubKalshiLiveBonusBatchCandlesticks({
           Batch candlestick dashboard
         </p>
         <p className="mt-1.5 text-sm leading-relaxed text-muted-foreground text-pretty">
-          Search for a Kalshi event, then instantly open a scrollable dashboard of
-          TradingView candlesticks for every market in that event—the same one-click
-          batch plot you get in Connect, previewed here as a public dashboard mock.
+          The ultimate tool to monitor the situation.
+          <br />
+          Search Kalshi event, then instantly plot all candlesticks for every
+          market in that event.
         </p>
       </div>
 
@@ -373,17 +377,45 @@ export function HubKalshiLiveBonusBatchCandlesticks({
               bodyClassName="max-h-[calc(92vh-52px)]"
             >
               <div className="px-4 py-5 sm:px-6 sm:py-6 lg:px-8">
-                <div className="mb-5 space-y-1">
-                  <h2 className="text-balance text-xl font-semibold tracking-tight text-foreground sm:text-2xl">
-                    {dashboard.title}
-                  </h2>
-                  <p className="text-sm text-muted-foreground">
-                    {dashboard.markets.length} market
-                    {dashboard.markets.length === 1 ? "" : "s"}
-                    {dashboard.eventTicker
-                      ? ` · ${dashboard.eventTicker}`
-                      : ""}
-                  </p>
+                <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
+                  <div className="min-w-0 space-y-1">
+                    <h2 className="text-balance text-xl font-semibold tracking-tight text-foreground sm:text-2xl">
+                      {dashboard.title}
+                    </h2>
+                    <p className="text-sm text-muted-foreground">
+                      {dashboard.markets.length} market
+                      {dashboard.markets.length === 1 ? "" : "s"}
+                      {dashboard.eventTicker
+                        ? ` · ${dashboard.eventTicker}`
+                        : ""}
+                    </p>
+                  </div>
+                  <div className="flex shrink-0 flex-wrap items-center gap-2">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="h-8 gap-1.5 border-emerald-500/40 bg-emerald-500/10 px-3 text-xs font-medium text-foreground hover:bg-emerald-500/15"
+                      onClick={() => {
+                        setModalOpen(false);
+                        setUpgradeOpen(true);
+                      }}
+                    >
+                      <span
+                        className="size-2 shrink-0 animate-pulse rounded-full bg-emerald-500"
+                        aria-hidden
+                      />
+                      Start live feed
+                    </Button>
+                    <Button type="button" size="sm" className="h-8 px-3 text-xs" asChild>
+                      <Link
+                        href="/#pricing"
+                        onClick={() => setModalOpen(false)}
+                      >
+                        Get full access now
+                      </Link>
+                    </Button>
+                  </div>
                 </div>
 
                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
@@ -422,6 +454,36 @@ export function HubKalshiLiveBonusBatchCandlesticks({
               </div>
             </SafariBrowserFrame>
           ) : null}
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={upgradeOpen} onOpenChange={setUpgradeOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Unlock live feeds</DialogTitle>
+            <DialogDescription>
+              Upgrade to stream live candlesticks, build custom dashboards, run
+              unlimited queries, and get full Kalshi market access—everything in
+              this preview, kept live.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setUpgradeOpen(false)}
+            >
+              Close
+            </Button>
+            <Button type="button" asChild>
+              <Link
+                href="/#pricing"
+                onClick={() => setUpgradeOpen(false)}
+              >
+                View pricing
+              </Link>
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>
