@@ -19,6 +19,8 @@ const MARKET_DWELL_MS = 2 * 60_000;
 const PREFETCH_AFTER_MS = 40_000;
 /** Hold the "Market ended" celebration before rotating. */
 const MARKET_ENDED_CELEBRATION_MS = 2600;
+/** Pause wall-clock scroll when no new prints so the line stays on screen. */
+const FEED_QUIET_MS = 90_000;
 const FEATURED_POOL_LIMIT = 8;
 const SEED_TRADE_LIMIT = 40;
 const POLL_TRADE_LIMIT = 25;
@@ -35,6 +37,8 @@ const HERO_LINE_COLORS = [
 type FeaturedMarket = {
   ticker: string;
   title?: string;
+  /** What a YES contract means (Kalshi `yes_sub_title`). */
+  yesLabel?: string;
   subtitle?: string;
   volume24h?: number | null;
   lastPriceDollars?: number | null;
@@ -127,11 +131,17 @@ function normalizeFeatured(raw: unknown): FeaturedMarket | null {
   const top = raw as Record<string, unknown>;
   const ticker = String(top.ticker || "").trim().toUpperCase();
   if (!ticker) return null;
+  const yesLabel =
+    String(top.yes_sub_title || top.subtitle || "").trim() || undefined;
+  const title =
+    String(top.title || "").trim() ||
+    yesLabel ||
+    ticker;
   return {
     ticker,
-    title: String(top.title || "").trim() || undefined,
-    subtitle:
-      String(top.subtitle || top.yes_sub_title || "").trim() || undefined,
+    title,
+    yesLabel,
+    subtitle: yesLabel,
     volume24h:
       top.volume24h != null && Number.isFinite(Number(top.volume24h))
         ? Number(top.volume24h)
@@ -243,7 +253,12 @@ function isMarketEndedStatus(status: string, closeTime?: string): boolean {
 async function fetchMarketStatus(
   ticker: string,
   signal: AbortSignal,
-): Promise<{ status: string; closeTime?: string } | null> {
+): Promise<{
+  status: string;
+  closeTime?: string;
+  title?: string;
+  yesLabel?: string;
+} | null> {
   const qs = new URLSearchParams({ ticker });
   const res = await fetch(
     `/api/integrations/kalshi-live/markets/get?${qs.toString()}`,
@@ -257,12 +272,16 @@ async function fetchMarketStatus(
   if (!res.ok) return null;
   const market = body?.market;
   if (!market || typeof market !== "object") return null;
+  const yesLabel = String(market.yes_sub_title || "").trim() || undefined;
+  const title = String(market.title || "").trim() || undefined;
   return {
     status: String(market.status || "").trim(),
     closeTime:
       String(
         market.close_time || market.close_ts || market.expiration_time || "",
       ).trim() || undefined,
+    title,
+    yesLabel,
   };
 }
 
@@ -309,6 +328,7 @@ export function HubKalshiLiveHeroTradesChart({
   const [demoFrozen, setDemoFrozen] = useState(false);
   const [marketEnded, setMarketEnded] = useState(false);
   const [confettiKey, setConfettiKey] = useState(0);
+  const [nowTick, setNowTick] = useState(() => Date.now());
 
   const pollingActive = inView && tabVisible && !demoFrozen && !marketEnded;
 
@@ -637,12 +657,20 @@ export function HubKalshiLiveHeroTradesChart({
           fetchMarketStatus(tickerRef.current, ac.signal),
           pullTradesIntoState(tickerRef.current, POLL_TRADE_LIMIT, ac.signal),
         ]);
-        if (
-          statusInfo &&
-          isMarketEndedStatus(statusInfo.status, statusInfo.closeTime)
-        ) {
-          celebrateMarketEnded();
-          return;
+        if (statusInfo) {
+          setMarket((prev) => {
+            if (!prev || prev.ticker !== tickerRef.current) return prev;
+            return {
+              ...prev,
+              title: statusInfo.title || prev.title,
+              yesLabel: statusInfo.yesLabel || prev.yesLabel,
+              subtitle: statusInfo.yesLabel || prev.subtitle,
+            };
+          });
+          if (isMarketEndedStatus(statusInfo.status, statusInfo.closeTime)) {
+            celebrateMarketEnded();
+            return;
+          }
         }
       } catch {
         // Keep last good seed.
@@ -672,6 +700,27 @@ export function HubKalshiLiveHeroTradesChart({
     celebrateMarketEnded,
   ]);
 
+  // Keep a light clock tick so quiet-feed pause stays accurate without new trades.
+  useEffect(() => {
+    if (!pollingActive) return undefined;
+    const id = setInterval(() => setNowTick(Date.now()), 5_000);
+    return () => clearInterval(id);
+  }, [pollingActive]);
+
+  const lastTradeMs = useMemo(() => {
+    if (!trades.length) return 0;
+    let newest = 0;
+    for (const row of trades) {
+      const ms = parseTradeTimeMs(row);
+      if (ms > newest) newest = ms;
+    }
+    return newest;
+  }, [trades]);
+
+  const feedQuiet =
+    lastTradeMs > 0 && nowTick - lastTradeMs > FEED_QUIET_MS;
+  const livelinePaused = !pollingActive || feedQuiet;
+
   const lineColor = HERO_LINE_COLORS[colorIndex % HERO_LINE_COLORS.length]!;
 
   const series = useMemo(() => {
@@ -679,7 +728,7 @@ export function HubKalshiLiveHeroTradesChart({
     return [
       {
         id: market.ticker,
-        label: market.subtitle || market.title || market.ticker,
+        label: market.yesLabel || market.subtitle || market.title || market.ticker,
         color: lineColor.hex,
         trades,
       },
@@ -694,11 +743,19 @@ export function HubKalshiLiveHeroTradesChart({
     market?.title ||
     copy?.eyebrow ||
     "Live trades · high-volume Kalshi market";
+  const yesLine = market?.yesLabel ? `Yes · ${market.yesLabel}` : null;
   const metaBits = [
+    yesLine,
     market?.ticker,
     priceLabel ? `Last ${priceLabel}` : null,
     volLabel ? `24h vol ${volLabel}` : null,
-    marketEnded ? "Ended" : pollingActive ? "Live" : "Paused",
+    marketEnded
+      ? "Ended"
+      : feedQuiet
+        ? "Holding last print"
+        : pollingActive
+          ? "Live"
+          : "Paused",
   ].filter(Boolean);
 
   return (
@@ -757,7 +814,7 @@ export function HubKalshiLiveHeroTradesChart({
             key={chartKey}
             series={series}
             compact
-            paused={!pollingActive}
+            paused={livelinePaused}
             className="h-full min-h-0"
           />
           {marketEnded ? (

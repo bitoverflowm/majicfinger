@@ -87,12 +87,26 @@ function tradesToPoints(trades: TradeRow[]) {
 function seedLivePoints(points: { time: number; value: number }[]) {
   if (!points.length) return points;
   const seed = points.slice(-LIVE_SEED_TRADE_COUNT);
+  if (seed.length === 1) {
+    const only = seed[0]!;
+    return [
+      { time: only.time - 8, value: only.value },
+      only,
+    ];
+  }
   if (seed.length < 2) return seed;
 
   const nowSec = Date.now() / 1000;
   const cutoff = nowSec - LIVE_FOCUS_SECS;
   const recent = points.filter((p) => p.time >= cutoff);
   if (recent.length >= 2) return recent;
+  if (recent.length === 1) {
+    const only = recent[0]!;
+    return [
+      { time: only.time - 8, value: only.value },
+      only,
+    ];
+  }
   return seed;
 }
 
