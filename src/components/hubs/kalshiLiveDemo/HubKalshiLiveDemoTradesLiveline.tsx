@@ -186,13 +186,15 @@ export const HubKalshiLiveDemoTradesLiveline = forwardRef<
       const rawPoints = seedLivePoints(tradesToPoints(item.trades));
       const token = item.colorToken ?? defaultSeriesColorToken(index);
       const resolved = resolveDemoChartColor(token);
+      const explicit =
+        item.color && !item.color.startsWith("var(") ? item.color : null;
       return {
         id: item.id,
         label: item.label,
         colorToken: token,
         color:
+          explicit ||
           (resolved && !resolved.startsWith("var(") ? resolved : null) ||
-          (item.color && !item.color.startsWith("var(") ? item.color : null) ||
           resolved ||
           item.color ||
           demoChartCssVar(token),
