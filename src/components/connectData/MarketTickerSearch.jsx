@@ -351,6 +351,8 @@ function SelectionChipsRow({ selections, busy, onRemove }) {
  *   historyEntity?: "trades" | "candlesticks" | "data";
  *   showCutoffNotes?: boolean;
  *   searchScope?: "markets" | "series" | "events" | "events_semantic";
+ *   headerStart?: import("react").ReactNode;
+ *   required?: boolean;
  *   placeholder?: string;
  * }} props
  */
