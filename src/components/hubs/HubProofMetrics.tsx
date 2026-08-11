@@ -82,13 +82,22 @@ export function HubProofMetrics({ section }: { section: HubProofMetricsSection }
     <section className="relative z-20 w-full bg-background px-6 pb-12 pt-10 md:pb-16 md:pt-12">
       <div className="mx-auto flex w-full max-w-7xl flex-col items-center gap-6 md:gap-7">
         <div className="flex w-full flex-col items-center gap-4 md:gap-5">
-          {section.heading || section.subheading ? (
-            <div className="flex flex-col items-center gap-1 text-center">
-              {section.heading ? (
-                <p className={PROOF_HEADING_CLASS}>{section.heading}</p>
+          {section.title || section.heading || section.subheading ? (
+            <div className="flex flex-col items-center gap-3 text-center">
+              {section.title ? (
+                <h2 className="max-w-3xl text-balance text-2xl font-semibold tracking-tight text-foreground md:text-3xl">
+                  {section.title}
+                </h2>
               ) : null}
-              {section.subheading ? (
-                <p className={PROOF_HEADING_CLASS}>{section.subheading}</p>
+              {section.heading || section.subheading ? (
+                <div className="flex flex-col items-center gap-1 text-center">
+                  {section.heading ? (
+                    <p className={PROOF_HEADING_CLASS}>{section.heading}</p>
+                  ) : null}
+                  {section.subheading ? (
+                    <p className={PROOF_HEADING_CLASS}>{section.subheading}</p>
+                  ) : null}
+                </div>
               ) : null}
             </div>
           ) : null}

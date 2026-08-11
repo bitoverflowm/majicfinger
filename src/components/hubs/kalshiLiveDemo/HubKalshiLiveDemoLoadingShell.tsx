@@ -8,9 +8,9 @@ import { cn } from "@/lib/utils";
 const SHELL_TABS = [
   {
     id: "search",
-    title: "Search",
+    title: "Natural-language search",
     description:
-      "The best search capabilities available anywhere for Markets, Events and Series",
+      "Find markets, events and series by describing what you want—no ticker or market ID required.",
     open: true,
   },
   { id: "metadata", title: "Market metadata", open: false },

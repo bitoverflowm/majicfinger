@@ -85,34 +85,33 @@ export const kalshiLiveHub: HubPageConfig = {
     },
     {
       type: "proof_metrics",
+      title: "Built for serious prediction-market research",
       heading: "10,000+ researchers, traders, quants, and analysts use Lychee.",
       subheading:
-        "43,400,000+ historical data requests were served from the archive in June 2026 alone.",
+        "75,400,000+ data requests served via Lychee since June 2026.",
       primaryMetrics: [
         {
-          value: "7.68M+",
-          label: "unique markets",
-          tickerValue: 7.68,
-          decimalPlaces: 2,
-          suffix: "M+",
-        },
-        {
-          value: "72.1M+",
-          label: "historical trades",
-          tickerValue: 72.1,
-          decimalPlaces: 1,
-          suffix: "M+",
-        },
-        {
-          value: "36GB+",
-          label: "compressed archive",
-          tickerValue: 36,
+          value: "0 Lines",
+          label: "Of code or API setup",
+          tickerValue: 0,
           decimalPlaces: 0,
-          suffix: "GB+",
+          suffix: " Lines",
+        },
+        {
+          value: "100%",
+          label: "Kalshi Coverage",
+          tickerValue: 100,
+          decimalPlaces: 0,
+          suffix: "%",
+        },
+        {
+          value: "One Workspace",
+          label: "From live data to published research",
+          static: true,
         },
         {
           value: "Since July 2021",
-          label: "Every Kalshi market and trade since launch",
+          label: "Every Kalshi market, event, series, candlestick, and trade",
           static: true,
         },
       ],

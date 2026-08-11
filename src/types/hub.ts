@@ -96,6 +96,8 @@ export type HubProofMetric = {
 
 export type HubProofMetricsSection = {
   type: "proof_metrics";
+  /** Optional section title shown above the social-proof lines. */
+  title?: string;
   heading?: string;
   subheading?: string;
   primaryMetrics: HubProofMetric[];

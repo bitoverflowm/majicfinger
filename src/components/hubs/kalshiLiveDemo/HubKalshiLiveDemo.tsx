@@ -1973,9 +1973,9 @@ export function HubKalshiLiveDemo({ className }: HubKalshiLiveDemoProps) {
     () => [
       {
         id: "search" as const,
-        title: "Search",
+        title: "Natural-language search",
         description:
-          "The best search capabilities available anywhere for Markets, Events and Series",
+          "Find markets, events and series by describing what you want—no ticker or market ID required.",
       },
       {
         id: "metadata" as const,
