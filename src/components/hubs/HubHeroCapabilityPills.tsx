@@ -2,6 +2,7 @@ import {
   Activity,
   BookOpen,
   FileDown,
+  LayoutDashboard,
   LineChart,
   MousePointerClick,
   type LucideIcon,
@@ -14,6 +15,9 @@ const PILL_ICONS: Record<string, LucideIcon> = {
   "CSV/XLSX/JSON exports": FileDown,
   "No-code querying": MousePointerClick,
   "Backtesting-ready": LineChart,
+  "Live Trades": Activity,
+  "Live Orderbooks": BookOpen,
+  "Live Charts & Dashboards": LayoutDashboard,
 };
 
 type HubHeroCapabilityPillsProps = {

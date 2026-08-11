@@ -76,10 +76,10 @@ export const kalshiLiveHub: HubPageConfig = {
         },
       ],
       capabilityPills: [
-        "Trade history",
-        "Orderbook history",
+        "Live Trades",
+        "Live Orderbooks",
         "CSV/XLSX/JSON exports",
-        "No-code querying",
+        "Live Charts & Dashboards",
         "Backtesting-ready",
       ],
     },
