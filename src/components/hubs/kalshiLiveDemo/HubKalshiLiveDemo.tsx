@@ -2021,7 +2021,7 @@ export function HubKalshiLiveDemo({ className }: HubKalshiLiveDemoProps) {
         id: "batch_candlesticks",
         title: "Batch Candlesticks",
         description:
-          "Pull event-wide candlestick batches in Bonus Features.",
+          "Search an event and preview a multi-market candlestick dashboard in Bonus Features.",
         navigateToBonus: true,
       },
     ],

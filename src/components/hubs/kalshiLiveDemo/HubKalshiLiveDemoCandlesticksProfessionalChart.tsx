@@ -10,6 +10,8 @@ type HubKalshiLiveDemoCandlesticksProfessionalChartProps = {
   candles: Record<string, unknown>[];
   label?: string;
   className?: string;
+  /** Override chart container height classes (default is demo-tall). */
+  chartClassName?: string;
 };
 
 function useIsDarkTheme() {
@@ -32,7 +34,7 @@ export const HubKalshiLiveDemoCandlesticksProfessionalChart = forwardRef<
   HTMLDivElement,
   HubKalshiLiveDemoCandlesticksProfessionalChartProps
 >(function HubKalshiLiveDemoCandlesticksProfessionalChart(
-  { candles, label, className },
+  { candles, label, className, chartClassName },
   ref,
 ) {
   const dark = useIsDarkTheme();
@@ -75,7 +77,10 @@ export const HubKalshiLiveDemoCandlesticksProfessionalChart = forwardRef<
         <CandlestickChartView
           data={mapped.data}
           dark={dark}
-          className="h-full min-h-[28rem] w-full rounded-md border border-border/40 bg-background"
+          className={cn(
+            "h-full min-h-[28rem] w-full rounded-md border border-border/40 bg-background",
+            chartClassName,
+          )}
         />
       </div>
     </div>

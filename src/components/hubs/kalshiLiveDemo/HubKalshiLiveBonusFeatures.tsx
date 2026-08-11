@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 
+import { HubKalshiLiveBonusBatchCandlesticks } from "@/components/hubs/kalshiLiveDemo/HubKalshiLiveBonusBatchCandlesticks";
 import { HubKalshiLiveBonusEventForecasts } from "@/components/hubs/kalshiLiveDemo/HubKalshiLiveBonusEventForecasts";
 import { HubKalshiLiveBonusLeaderboards } from "@/components/hubs/kalshiLiveDemo/HubKalshiLiveBonusLeaderboards";
 import { HubKalshiLiveDemoMockup } from "@/components/hubs/kalshiLiveDemo/HubKalshiLiveDemoMockup";
@@ -33,13 +34,14 @@ const BONUS_TABS: HubKalshiLiveDemoTabDef[] = [
     id: "batch_candlesticks",
     title: "Batch Candlesticks",
     description:
-      "Pull candlestick history across an event’s markets in one batch for comparison and charting.",
+      "Search an event and instantly preview a multi-market candlestick dashboard — no code, no save.",
   },
 ];
 
 const LIVE_BONUS_TABS = new Set<HubKalshiLiveBonusFeatureId>([
   "event_forecasts",
   "leaderboards",
+  "batch_candlesticks",
 ]);
 
 const BONUS_IDS = new Set(BONUS_TABS.map((t) => t.id));
@@ -54,7 +56,7 @@ type HubKalshiLiveBonusFeaturesProps = {
 
 /**
  * Tabbed playground for Kalshi Live bonus endpoints.
- * Event Forecasts + Leaderboards are live; batch candlesticks remains a stub.
+ * Event Forecasts, Leaderboards, and Batch Candlesticks are live demos.
  */
 export function HubKalshiLiveBonusFeatures({
   className,
@@ -84,8 +86,6 @@ export function HubKalshiLiveBonusFeatures({
     };
   }, []);
 
-  const activeTab =
-    BONUS_TABS.find((tab) => tab.id === activeId) || BONUS_TABS[0]!;
   const isLive = LIVE_BONUS_TABS.has(activeId);
 
   return (
@@ -120,17 +120,7 @@ export function HubKalshiLiveBonusFeatures({
               ) : activeId === "leaderboards" ? (
                 <HubKalshiLiveBonusLeaderboards className="px-2 sm:px-4 lg:px-6" />
               ) : (
-                <div className="flex min-h-[22rem] flex-1 flex-col items-center justify-center gap-2 rounded-xl border border-border/70 bg-muted/20 px-6 py-16 text-center">
-                  <p className="text-sm font-medium text-foreground">
-                    {activeTab.title}
-                  </p>
-                  <p className="max-w-md text-sm leading-relaxed text-muted-foreground text-pretty">
-                    {activeTab.description}
-                  </p>
-                  <p className="mt-2 text-xs text-muted-foreground">
-                    UI placeholder for now — endpoint pull comes next.
-                  </p>
-                </div>
+                <HubKalshiLiveBonusBatchCandlesticks className="px-2 sm:px-4 lg:px-6" />
               )}
             </div>
           </div>
