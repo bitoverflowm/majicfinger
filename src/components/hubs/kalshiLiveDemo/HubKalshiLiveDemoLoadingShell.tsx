@@ -73,7 +73,7 @@ export function HubKalshiLiveDemoLoadingShell({
               <div className="flex w-full flex-col gap-2 lg:gap-2.5" role="presentation">
                 {SHELL_TABS.map((tab) => (
                   <div key={tab.id} className="w-full">
-                    {tab.separatorBefore ? (
+                    {"separatorBefore" in tab && tab.separatorBefore ? (
                       <div
                         className="mb-2 mt-1 border-t border-border/60 pt-2"
                         aria-hidden
