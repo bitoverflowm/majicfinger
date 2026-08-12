@@ -188,10 +188,6 @@ const EasyCharts = () => {
         />
         <div className="relative z-10 mx-auto flex w-full max-w-4xl flex-col items-center gap-6 px-6 pb-12 pt-[6.8rem] text-center md:pt-[8rem]">
           <p className="inline-flex h-8 max-w-full items-center gap-2 rounded-full border border-border bg-accent px-3 text-sm text-foreground">
-            <span className="relative flex h-2.5 w-2.5">
-              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-500/60" />
-              <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-emerald-500" />
-            </span>
             We&apos;ll save you from all the complex yabba-dabba-doos out there
           </p>
           <h1 className="text-balance text-[clamp(2rem,4vw+0.5rem,3.25rem)] font-medium leading-[1.1] tracking-tighter text-primary">
