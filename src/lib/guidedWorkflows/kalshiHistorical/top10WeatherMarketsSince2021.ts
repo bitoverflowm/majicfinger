@@ -306,7 +306,7 @@ export const top10WeatherMarketsSince2021Workflow: GuidedWorkflowDefinition = {
       waitForTarget: true,
       blockTargetInteraction: false,
       continueLabel: "Done",
-      ctaLink: { label: "Upgrade to Pro", href: "/#pricing" },
+      ctaLink: { label: "Upgrade to Pro", href: "#pricing" },
     },
   ],
 };

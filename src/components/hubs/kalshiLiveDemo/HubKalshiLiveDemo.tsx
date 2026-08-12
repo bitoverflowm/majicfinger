@@ -2055,7 +2055,7 @@ export function HubKalshiLiveDemo({ className }: HubKalshiLiveDemoProps) {
             </p>
             <p className="text-xs font-medium text-muted-foreground">
               <Link
-                href="/#pricing"
+                href="#pricing"
                 className="underline underline-offset-2 hover:text-foreground"
               >
                 Sign up for unlimited markets, events, series, orderbooks,
@@ -2604,7 +2604,7 @@ export function HubKalshiLiveDemo({ className }: HubKalshiLiveDemoProps) {
                         </>
                       )}
                       <Link
-                        href="/#pricing"
+                        href="#pricing"
                         className="font-medium text-foreground underline underline-offset-2 hover:text-primary"
                       >
                         Sign up
@@ -2972,7 +2972,7 @@ export function HubKalshiLiveDemo({ className }: HubKalshiLiveDemoProps) {
                         </>
                       )}
                       <Link
-                        href="/#pricing"
+                        href="#pricing"
                         className="font-medium text-foreground underline underline-offset-2 hover:text-primary"
                       >
                         Sign up
@@ -3420,7 +3420,7 @@ export function HubKalshiLiveDemo({ className }: HubKalshiLiveDemoProps) {
                         </>
                       )}
                       <Link
-                        href="/#pricing"
+                        href="#pricing"
                         className="font-medium text-foreground underline underline-offset-2 hover:text-primary"
                       >
                         Sign up
@@ -3595,7 +3595,7 @@ export function HubKalshiLiveDemo({ className }: HubKalshiLiveDemoProps) {
             </p>
             <p>
               <Link
-                href="/#pricing"
+                href="#pricing"
                 className="font-medium text-foreground underline underline-offset-2 hover:text-primary"
               >
                 Register for full access
@@ -3625,7 +3625,7 @@ export function HubKalshiLiveDemo({ className }: HubKalshiLiveDemoProps) {
               Close
             </Button>
             <Button type="button" asChild>
-              <Link href="/#pricing" onClick={() => setLiveEmbedOpen(false)}>
+              <Link href="#pricing" onClick={() => setLiveEmbedOpen(false)}>
                 Get Access Now
               </Link>
             </Button>
@@ -3653,7 +3653,7 @@ export function HubKalshiLiveDemo({ className }: HubKalshiLiveDemoProps) {
               Close
             </Button>
             <Button type="button" asChild>
-              <Link href="/#pricing" onClick={() => setLiveLimitOpen(false)}>
+              <Link href="#pricing" onClick={() => setLiveLimitOpen(false)}>
                 Get Access Now
               </Link>
             </Button>

@@ -109,7 +109,7 @@ export const kalshiHistoricalHub: HubPageConfig = {
       primaryCTAs: [
         {
           label: "Get Access Now",
-          href: "/#pricing",
+          href: "#pricing",
           ariaLabel: "Access Kalshi Historical Data now",
           eventLabel: "kalshi_historical_access_now",
           tracking: {
@@ -216,7 +216,7 @@ export const kalshiHistoricalHub: HubPageConfig = {
         "Kalshi Historical is just one layer of Lychee.\n\nEvery paid plan also includes Kalshi Live, Polymarket Historical, Polymarket Live, no-code charts, dashboards, exports, alerts, and quant workflows — so you can compare historical markets against what is happening now.",
       cta: {
         label: "Get Access Now",
-        href: "/#pricing",
+        href: "#pricing",
         ariaLabel: "Go to Lychee pricing",
         requiresAuth: false,
       },
@@ -319,6 +319,10 @@ export const kalshiHistoricalHub: HubPageConfig = {
     },
 
     {
+      type: "pricing",
+    },
+
+    {
       type: "faq",
       title: "Kalshi Historical FAQ",
       items: [
@@ -367,7 +371,7 @@ export const kalshiHistoricalHub: HubPageConfig = {
       },
       secondaryCta: {
         label: "View pricing",
-        href: "/#pricing",
+        href: "#pricing",
         requiresAuth: false,
       },
     },

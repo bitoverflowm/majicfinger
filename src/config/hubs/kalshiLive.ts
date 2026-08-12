@@ -87,7 +87,7 @@ export const kalshiLiveHub: HubPageConfig = {
       primaryCTAs: [
         {
           label: "Get Access Now",
-          href: "/#pricing",
+          href: "#pricing",
           requiresAuth: false,
         },
       ],
@@ -207,6 +207,9 @@ export const kalshiLiveHub: HubPageConfig = {
       groups: [],
     },
     {
+      type: "pricing",
+    },
+    {
       type: "cta",
       title: "Start Analyzing Live Kalshi Market Data",
       description:
@@ -261,6 +264,23 @@ export const kalshiLiveHub: HubPageConfig = {
           question: "What is the difference between Kalshi Live and Kalshi Historical?",
           answer:
             "Kalshi Live covers current and recent exchange data, including active markets, recent trades, current order books and recent candlesticks. Kalshi Historical is designed for older markets, complete market history, historical trades, outcomes, backtesting and long-range research.",
+          answerParts: [
+            {
+              type: "text",
+              value:
+                "Kalshi Live covers current and recent exchange data, including active markets, recent trades, current order books and recent candlesticks. ",
+            },
+            {
+              type: "link",
+              label: "Kalshi Historical",
+              href: "/kalshi-historical-data",
+            },
+            {
+              type: "text",
+              value:
+                " is designed for older markets, complete market history, historical trades, outcomes, backtesting and long-range research.",
+            },
+          ],
         },
         {
           question: "Can I build Kalshi charts without coding?",

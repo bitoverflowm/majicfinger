@@ -409,7 +409,7 @@ export function HubKalshiLiveBonusBatchCandlesticks({
                     </Button>
                     <Button type="button" size="sm" className="h-8 px-3 text-xs" asChild>
                       <Link
-                        href="/#pricing"
+                        href="#pricing"
                         onClick={() => setModalOpen(false)}
                       >
                         Get full access now
@@ -477,7 +477,7 @@ export function HubKalshiLiveBonusBatchCandlesticks({
             </Button>
             <Button type="button" asChild>
               <Link
-                href="/#pricing"
+                href="#pricing"
                 onClick={() => setUpgradeOpen(false)}
               >
                 View pricing

@@ -33,6 +33,7 @@ import { HubKalshiQueryMockup } from "@/components/hubs/kalshiQuery/HubKalshiQue
 import { HubLazyWhenVisible } from "@/components/hubs/HubLazyWhenVisible";
 import { HubProofMetrics } from "@/components/hubs/HubProofMetrics";
 import { HubVideoInstructionsCarousel } from "@/components/hubs/HubVideoInstructionsCarousel";
+import { PricingSection } from "@/components/sections/pricing-section";
 import {
   HubChartEmbedSkeleton,
   HubHeroChartEmbedSkeleton,
@@ -965,6 +966,12 @@ export function HubSectionRenderer({
       return wrapper(<HubVideoCarousel section={section} />);
     case "cta":
       return wrapper(<HubCta section={section} />);
+    case "pricing":
+      return (
+        <div className="w-full py-10">
+          <PricingSection />
+        </div>
+      );
     default:
       return null;
   }

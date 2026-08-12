@@ -295,6 +295,11 @@ export type HubKalshiLiveBonusFeaturesSection = {
   description?: string;
 };
 
+/** Same marketing pricing table as the homepage (`#pricing`). */
+export type HubPricingSection = {
+  type: "pricing";
+};
+
 export type HubSection =
   | HubHeroSection
   | HubStatsSection
@@ -311,7 +316,8 @@ export type HubSection =
   | HubPublishedDashboardsSection
   | HubVideoCarouselSection
   | HubKalshiLiveDemoSection
-  | HubKalshiLiveBonusFeaturesSection;
+  | HubKalshiLiveBonusFeaturesSection
+  | HubPricingSection;
 
 export type HubAssetFilter = {
   /** Match dashboards whose tags include any of these (case-insensitive). */
