@@ -350,6 +350,7 @@ function SelectionChipsRow({ selections, busy, onRemove }) {
  *   dataSource?: KalshiTickerSearchDataSource;
  *   historyEntity?: "trades" | "candlesticks" | "data";
  *   showCutoffNotes?: boolean;
+ *   showHelperText?: boolean;
  *   searchScope?: "markets" | "series" | "events" | "events_semantic";
  *   headerStart?: import("react").ReactNode;
  *   required?: boolean;
@@ -368,6 +369,8 @@ export function MarketTickerSearch({
   // Snapshot-style pulls (e.g. orderbook) have no historical range, so the
   // cutoff notes are irrelevant and can be turned off by the wrapper.
   showCutoffNotes = true,
+  /** When false, hides the small helper line under the search input. */
+  showHelperText = true,
   // "series" = series suggestions only (no markets, selecting a series adds that series ticker).
   // "events" = manual event tickers only (no semantic search / resolve).
   // "events_semantic" = series-style semantic search that resolves to an event ticker
@@ -1107,11 +1110,13 @@ export function MarketTickerSearch({
           </AnimatePresence>
         </div>
 
-        <p className="text-[10px] leading-snug text-muted-foreground">
-          {eventsSemantic
-            ? "Semantic search finds events (and their series). If a result is a series only, pick which event to use."
-            : "If you don't know your ticker, search anything and suggestions will populate."}
-        </p>
+        {showHelperText ? (
+          <p className="text-[10px] leading-snug text-muted-foreground">
+            {eventsSemantic
+              ? "Semantic search finds events (and their series). If a result is a series only, pick which event to use."
+              : "If you don't know your ticker, search anything and suggestions will populate."}
+          </p>
+        ) : null}
 
         {selections.length > 0 ? (
           <SelectionChipsRow selections={selections} busy={busy} onRemove={removeSelection} />

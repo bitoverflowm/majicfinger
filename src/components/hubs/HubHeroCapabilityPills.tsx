@@ -18,6 +18,7 @@ const PILL_ICONS: Record<string, LucideIcon> = {
   "Live Trades": Activity,
   "Live Orderbooks": BookOpen,
   "Live Charts & Dashboards": LayoutDashboard,
+  "Live Candlesticks": LineChart,
 };
 
 type HubHeroCapabilityPillsProps = {

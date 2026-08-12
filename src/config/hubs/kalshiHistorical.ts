@@ -77,6 +77,9 @@ export const kalshiHistoricalHub: HubPageConfig = {
     {
       type: "hero",
       variant: "premium",
+      badge: "Looking for Live Kalshi Data, Orderbooks, Trades, Candlesticks and Predictions?",
+      badgeHref: "/kalshi-live-data",
+      badgeIcon: "dot",
       eyebrow: "The complete Kalshi historical archive",
       title: "Kalshi Historical Data",
       subtitle: "Every Kalshi market and trade — ready to query, chart, export, and backtest.",

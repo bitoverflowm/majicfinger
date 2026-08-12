@@ -2097,6 +2097,7 @@ export function HubKalshiLiveDemo({ className }: HubKalshiLiveDemoProps) {
                     dataSource="live"
                     searchScope="markets"
                     showCutoffNotes={false}
+                    showHelperText={false}
                     required={false}
                     placeholder="Start typing to search for anything on Kalshi here"
                     className="w-full"

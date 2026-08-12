@@ -12,6 +12,7 @@ export const kalshiLiveHub: HubPageConfig = {
   socialDescription:
     "Explore live Kalshi markets, prices, trades, order books and candlesticks. Build charts, exports and dashboards directly from your browser.",
   publishedAt: "2026-06-20",
+  updatedAt: "2026-08-12",
   author: "misterrpink",
   topics: [
     "kalshi",
@@ -58,7 +59,7 @@ export const kalshiLiveHub: HubPageConfig = {
       badge: "Looking for Kalshi Historical Data?",
       badgeHref: "/kalshi-historical-data",
       badgeIcon: "dot",
-      subtitle: "Live Kalshi market data without code.",
+      subtitle: "Search any market. Explore every layer of its live data.",
       heroBody: {
         parts: [
           {
@@ -102,7 +103,7 @@ export const kalshiLiveHub: HubPageConfig = {
         "Live Orderbooks",
         "CSV/XLSX/JSON exports",
         "Live Charts & Dashboards",
-        "Backtesting-ready",
+        "Live Candlesticks",
       ],
     },
     {
