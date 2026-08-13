@@ -7,10 +7,8 @@ import {
   Radio,
   Search,
   Sparkles,
-  Trophy,
   Users,
   Vote,
-  Wand2,
   Dices,
   Medal,
 } from "lucide-react";
@@ -61,27 +59,6 @@ const ENDPOINT_PRESENTATION = {
   wsNewMarket: { icon: Radio, accent: "emerald" },
   wsMarketResolved: { icon: Radio, accent: "emerald" },
 };
-
-const COMING_SOON_WORKFLOWS = [
-  {
-    id: "pm-live-top-volume",
-    title: "Top volume markets right now",
-    description: "Pull the highest-volume open markets and chart odds over time.",
-    icon: Trophy,
-  },
-  {
-    id: "pm-live-event-snapshot",
-    title: "Full event + nested markets",
-    description: "Load one event by slug and flatten every market outcome into sheets.",
-    icon: Vote,
-  },
-  {
-    id: "pm-live-holder-watch",
-    title: "Watch top holders",
-    description: "Track concentration of shares for a condition ID.",
-    icon: Users,
-  },
-];
 
 const SEARCH_EXAMPLES = [
   { label: "Presidential election", icon: Vote },
@@ -229,32 +206,6 @@ function LiveSourceOption({ endpoint, isSelected, onSelect }) {
   );
 }
 
-function ComingSoonWorkflowOption({ workflow }) {
-  const Icon = workflow.icon || Wand2;
-  return (
-    <button
-      type="button"
-      disabled
-      className="flex w-full cursor-not-allowed items-center gap-2 rounded-lg border border-border/40 bg-muted/20 p-2.5 text-left opacity-60"
-    >
-      <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-muted/40 text-muted-foreground/70">
-        <Icon className="size-3.5" strokeWidth={1.75} aria-hidden />
-      </span>
-      <div className="min-w-0 flex-1">
-        <span className="flex flex-wrap items-center gap-1.5">
-          <span className="text-xs font-medium text-muted-foreground">{workflow.title}</span>
-          <span className="rounded border border-border/60 bg-muted/70 px-1 py-px text-[8px] font-medium uppercase tracking-wide text-muted-foreground">
-            Soon
-          </span>
-        </span>
-        <p className="mt-0.5 line-clamp-2 text-[10px] leading-snug text-muted-foreground">
-          {workflow.description}
-        </p>
-      </div>
-    </button>
-  );
-}
-
 /**
  * Polymarket Live compose UI — Kalshi Live–style hub (category tags + endpoints),
  * then column picker for Connect home pulls.
@@ -345,12 +296,12 @@ export function PolymarketLiveIntegrationsCore({ onRunPull, className, stepBackR
               What do you want to do with Polymarket live data?
             </h3>
             <p className="text-xs leading-relaxed text-muted-foreground">
-              Start from a live endpoint, browse by category, or launch a guided workflow for
-              real-time prediction market monitoring.
+              Start from a live endpoint or browse by category for real-time prediction market
+              monitoring.
             </p>
           </div>
 
-          <div className="grid grid-cols-1 items-stretch gap-3 sm:grid-cols-3">
+          <div className="grid grid-cols-1 items-stretch gap-3 sm:grid-cols-2">
             <HubStartingPointColumn
               icon={Layers}
               title="Live Data Straight from Polymarket"
@@ -382,7 +333,7 @@ export function PolymarketLiveIntegrationsCore({ onRunPull, className, stepBackR
               )}
             </HubStartingPointColumn>
 
-            <div className="flex min-h-[16rem] min-w-0 flex-col gap-3 sm:min-h-0 sm:col-span-1">
+            <div className="flex min-h-[16rem] min-w-0 flex-col gap-3 sm:min-h-0">
               <HubStartingPointColumn
                 icon={Sparkles}
                 title="Natural Language Search"
@@ -416,20 +367,6 @@ export function PolymarketLiveIntegrationsCore({ onRunPull, className, stepBackR
                 </ul>
               </HubStartingPointColumn>
             </div>
-
-            <HubStartingPointColumn
-              id="polymarket-live-guided-workflows"
-              icon={Wand2}
-              title="Use a guided workflow"
-              badge="Best for guided setup"
-              description="Follow a step-by-step guided walkthrough for common Polymarket live data tasks."
-            >
-              <div className="space-y-1.5">
-                {COMING_SOON_WORKFLOWS.map((workflow) => (
-                  <ComingSoonWorkflowOption key={workflow.id} workflow={workflow} />
-                ))}
-              </div>
-            </HubStartingPointColumn>
           </div>
         </div>
       ) : (
