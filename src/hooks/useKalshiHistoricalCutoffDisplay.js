@@ -147,5 +147,14 @@ export function kalshiHistoricalV2Caption(cutoffLabel) {
   return "most recent historical data until: …";
 }
 
+/**
+ * @param {string | null | undefined} cutoffLabel
+ * @returns {string}
+ */
+export function kalshiLiveCaption(cutoffLabel) {
+  if (cutoffLabel) return `recent and live kalshi data ${cutoffLabel} - now`;
+  return "recent and live kalshi data … - now";
+}
+
 export const KALSHI_HISTORICAL_DEEP_CAPTION =
   "Deep historical data: Kalshi Launch - Dec 2025";

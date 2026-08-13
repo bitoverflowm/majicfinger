@@ -55,6 +55,7 @@ import { useDemoProGate } from "@/hooks/useDemoProGate";
 import {
   KALSHI_HISTORICAL_DEEP_CAPTION,
   kalshiHistoricalV2Caption,
+  kalshiLiveCaption,
   useKalshiHistoricalCutoffDisplay,
 } from "@/hooks/useKalshiHistoricalCutoffDisplay";
 
@@ -613,6 +614,9 @@ export default function ConnectDataStep1({
       if (row.listCaptionKey === "kalshiHistoricalCutoff") {
         captionLoading = kalshiCutoffLoading;
         caption = kalshiCutoffLoading ? null : kalshiHistoricalV2Caption(kalshiCutoffLabel);
+      } else if (row.listCaptionKey === "kalshiLiveCutoff") {
+        captionLoading = kalshiCutoffLoading;
+        caption = kalshiCutoffLoading ? null : kalshiLiveCaption(kalshiCutoffLabel);
       } else if (id === "kalshiHistorical") {
         caption = row.listCaption || KALSHI_HISTORICAL_DEEP_CAPTION;
       }

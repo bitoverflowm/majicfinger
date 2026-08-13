@@ -21,6 +21,7 @@ import { DemoSignUpBadge } from "@/components/demo/DemoSignUpBadge";
 import {
   KALSHI_HISTORICAL_DEEP_CAPTION,
   kalshiHistoricalV2Caption,
+  kalshiLiveCaption,
   useKalshiHistoricalCutoffDisplay,
 } from "@/hooks/useKalshiHistoricalCutoffDisplay";
 
@@ -224,10 +225,16 @@ const IntegrationsView = () => {
                       let caption = integration.listCaption || null;
                       if (integration.listCaptionKey === "kalshiHistoricalCutoff") {
                         caption = cutoffLoading ? null : kalshiHistoricalV2Caption(kalshiCutoffLabel);
+                      } else if (integration.listCaptionKey === "kalshiLiveCutoff") {
+                        caption = cutoffLoading ? null : kalshiLiveCaption(kalshiCutoffLabel);
                       } else if (integration.clickHandler === "kalshiHistorical") {
                         caption = integration.listCaption || KALSHI_HISTORICAL_DEEP_CAPTION;
                       }
-                      if (integration.listCaptionKey === "kalshiHistoricalCutoff" && cutoffLoading) {
+                      if (
+                        (integration.listCaptionKey === "kalshiHistoricalCutoff" ||
+                          integration.listCaptionKey === "kalshiLiveCutoff") &&
+                        cutoffLoading
+                      ) {
                         return (
                           <p className="pt-1 text-[10px] leading-snug text-muted-foreground">
                             <Skeleton className="h-4 w-[10.5rem] bg-muted-foreground/20" />

@@ -9,6 +9,7 @@ import { AthenaConnectionStatusDot } from "@/components/connectData/AthenaConnec
 import { KalshiPowerToolsSearch } from "@/components/connectData/KalshiPowerToolsSearch";
 import { KalshiLiveIntegrationsCore } from "@/components/connectData/kalshiLive/KalshiLiveIntegrationsCore";
 import { KalshiHistoricalV2IntegrationsCore } from "@/components/connectData/kalshiHistoricalV2/KalshiHistoricalV2IntegrationsCore";
+import { PolymarketLiveIntegrationsCore } from "@/components/connectData/polymarketLive/PolymarketLiveIntegrationsCore";
 import { integrations_list } from "@/components/integrationsView/integrationsConfig";
 import { Button } from "@/components/ui/button";
 import { useMyStateV2 } from "@/context/stateContextV2";
@@ -29,10 +30,8 @@ import { isConnectIntegrationWorkspace } from "@/lib/connectHomeWorkspace";
 import {
   getConnectDataLakeConfig,
   getConnectLiveStreamConfig,
-  getPolymarketApiColumnsForEndpoint,
   isConnectDataLakeIntegration,
   isConnectQueryComposeIntegration,
-  POLYMARKET_API_CONNECT_SOURCES,
 } from "@/lib/connectQueryComposeConfig";
 import {
   CONNECT_WORKSPACE_SCROLL_OFFSET_PX,
@@ -685,6 +684,7 @@ export function ConnectHomeIntegrationWorkflow({ integrationId, className }) {
   const isKalshiLive = integrationId === "kalshiLive";
   const isKalshiHistoricalV2 = integrationId === "kalshiHistoricalV2";
   const isLive = !!liveConfig;
+  const isPolymarketLive = isApi;
 
   const sampleById = useMemo(() => sampleByIdForConfig(lakeConfig), [lakeConfig]);
 
@@ -787,7 +787,6 @@ export function ConnectHomeIntegrationWorkflow({ integrationId, className }) {
     });
   }, []);
 
-  const apiDisplayLabel = useCallback((col) => col.name, []);
   const liveDisplayLabel = useCallback((col) => col.name, []);
 
   /** Child hubs (Kalshi Live / Historical) register a step-back that clears nested source. */
@@ -862,7 +861,8 @@ export function ConnectHomeIntegrationWorkflow({ integrationId, className }) {
   const { name, description } = getIntegrationMeta(integrationId);
   const connectKalshiLiveEndpointId = ctx.connectKalshiLiveEndpointId;
   const isKalshiHistorical = integrationId === "kalshiHistorical";
-  const isWideKalshiCompose = isKalshiHistorical || isKalshiLive || isKalshiHistoricalV2;
+  const isWideKalshiCompose =
+    isKalshiHistorical || isKalshiLive || isKalshiHistoricalV2 || isPolymarketLive;
 
   const hasComposeUi =
     (isDataLake && !!connectDataLakeSampleId) ||
@@ -904,6 +904,15 @@ export function ConnectHomeIntegrationWorkflow({ integrationId, className }) {
           </div>
         ) : null}
 
+        {isPolymarketLive ? (
+          <div className="mt-4 sm:mt-5">
+            <PolymarketLiveIntegrationsCore
+              onRunPull={handleRunIntegrationPull}
+              stepBackRef={stepBackRef}
+            />
+          </div>
+        ) : null}
+
         {isKalshiHistoricalV2 ? (
           <div className="mt-4 sm:mt-5">
             <KalshiHistoricalV2IntegrationsCore stepBackRef={stepBackRef} onRunPull={handleRunIntegrationPull} />
@@ -931,42 +940,6 @@ export function ConnectHomeIntegrationWorkflow({ integrationId, className }) {
             showPowerTools={false}
             onPowerSearchSelect={handleKalshiPowerSearchSelect}
             powerSearchDisabled={!!connectDataLakePullState?.loading}
-          />
-        ) : null}
-
-        {isApi ? (
-          <GenericSourceCards
-            sources={POLYMARKET_API_CONNECT_SOURCES}
-            selectedId={connectApiEndpointId}
-            onSelect={(id) => setConnectApiEndpointId?.(id)}
-            getColumnsForSource={getPolymarketApiColumnsForEndpoint}
-            getDisplayLabel={apiDisplayLabel}
-            columnSelections={connectApiColumnSelections || {}}
-            onSelectColumn={(sourceId, col) =>
-              patchKeyedColumns(setConnectApiColumnSelections, sourceId, (c) =>
-                c.includes(col) ? c : [...c, col],
-              )
-            }
-            onDeselectColumn={(sourceId, col) =>
-              patchKeyedColumns(setConnectApiColumnSelections, sourceId, (c) =>
-                c.filter((x) => x !== col),
-              )
-            }
-            onSelectAllColumns={(sourceId) => {
-              const names = getPolymarketApiColumnsForEndpoint(sourceId).map((c) => c.name);
-              setConnectApiColumnSelections?.((prev) => ({ ...(prev || {}), [sourceId]: names }));
-            }}
-            onDeselectAllColumns={(sourceId) => {
-              setConnectApiColumnSelections?.((prev) => ({ ...(prev || {}), [sourceId]: [] }));
-            }}
-            pickHint="Choose an API endpoint, then select response fields to pull"
-            runBar={({ selectedCount }) => (
-              <ConnectQueryComposeRunBar
-                selectedCount={selectedCount}
-                onRun={handleRunIntegrationPull}
-                runLabel="Run pull"
-              />
-            )}
           />
         ) : null}
 

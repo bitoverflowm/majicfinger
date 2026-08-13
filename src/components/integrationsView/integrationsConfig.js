@@ -44,7 +44,7 @@ export const integrations_list = [
     color: "#2E5CFF",
     icon: <IntegrationLogoImage src="/polymarket.png" />,
     clickHandler: "polymarket",
-    name: "Polymarket Live Data Feed",
+    name: "Polymarket Live",
     description: "All real-time decentralized polymarket, prediction market API.",
     guide: {
       href: "/guides/polymarket-events-endpoint-no-code",
@@ -125,9 +125,11 @@ export const integrations_list = [
       </div>
     ),
     clickHandler: "kalshiLive",
-    name: "Kalshi Live Data Feed",
+    name: "Kalshi Live",
     description:
       "Real-time Kalshi market data, prices, and order flow for live dashboards and alerts.",
+    /** Dynamic caption filled from GET /historical/cutoff in picker / hub UI. */
+    listCaptionKey: "kalshiLiveCutoff",
     tags: ["featured", "crypto", "finance", "trading", "prediction"],
     live: true,
   },

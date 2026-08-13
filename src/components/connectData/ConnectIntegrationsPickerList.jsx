@@ -21,6 +21,7 @@ import { useMyStateV2 } from "@/context/stateContextV2";
 import {
   KALSHI_HISTORICAL_DEEP_CAPTION,
   kalshiHistoricalV2Caption,
+  kalshiLiveCaption,
   useKalshiHistoricalCutoffDisplay,
 } from "@/hooks/useKalshiHistoricalCutoffDisplay";
 import { cn } from "@/lib/utils";
@@ -54,6 +55,9 @@ function integrationTooltipContent(row) {
 function resolveListCaption(row, cutoffLabel) {
   if (row.listCaptionKey === "kalshiHistoricalCutoff") {
     return kalshiHistoricalV2Caption(cutoffLabel);
+  }
+  if (row.listCaptionKey === "kalshiLiveCutoff") {
+    return kalshiLiveCaption(cutoffLabel);
   }
   if (row.id === "kalshiHistorical") {
     return row.listCaption || KALSHI_HISTORICAL_DEEP_CAPTION;
@@ -204,7 +208,9 @@ export function ConnectIntegrationsPickerList({
                               <span className="block truncate text-[11px] font-normal leading-tight text-foreground">
                                 {row.name}
                               </span>
-                              {row.listCaptionKey === "kalshiHistoricalCutoff" && cutoffLoading ? (
+                              {(row.listCaptionKey === "kalshiHistoricalCutoff" ||
+                                row.listCaptionKey === "kalshiLiveCutoff") &&
+                              cutoffLoading ? (
                                 <span className="mt-0.5 block text-[8px] font-normal leading-tight text-muted-foreground">
                                   <Skeleton className="h-3 w-[9.5rem] bg-muted-foreground/20" />
                                 </span>
