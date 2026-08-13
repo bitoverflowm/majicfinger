@@ -17,6 +17,14 @@ import {
   POLYMARKET_MARKETS_COMPOSE_COLUMNS,
   POLYMARKET_MARKETS_COMPOSE_ENDPOINT_ID,
 } from "@/lib/polymarketLive/marketsCompose";
+import {
+  POLYMARKET_HOLDERS_BY_MARKETS_COMPOSE_COLUMNS,
+  POLYMARKET_HOLDERS_BY_MARKETS_ENDPOINT_ID,
+} from "@/lib/polymarketLive/holdersByMarketsCompose";
+import {
+  POLYMARKET_OPEN_INTEREST_COMPOSE_COLUMNS,
+  POLYMARKET_OPEN_INTEREST_COMPOSE_ENDPOINT_ID,
+} from "@/lib/polymarketLive/openInterestCompose";
 
 /**
  * Top-level Polymarket Live endpoint groups (hub column tags).
@@ -47,6 +55,8 @@ const HIDDEN_EVENT_ENDPOINT_IDS = new Set([
   "getMarketBySlug",
   "getMarketByToken",
   "getMarketTags",
+  "getTopHolders",
+  "getOpenInterest",
 ]);
 
 /** @type {Record<string, string>} */
@@ -65,6 +75,8 @@ const ENDPOINT_CATEGORY_BY_QUERY = {
   [POLYMARKET_EVENTS_COMPOSE_ENDPOINT_ID]: "events",
   [POLYMARKET_MARKETS_BY_EVENTS_ENDPOINT_ID]: "markets",
   [POLYMARKET_MARKETS_COMPOSE_ENDPOINT_ID]: "markets",
+  [POLYMARKET_HOLDERS_BY_MARKETS_ENDPOINT_ID]: "holders",
+  [POLYMARKET_OPEN_INTEREST_COMPOSE_ENDPOINT_ID]: "markets",
   getTopHolders: "holders",
   getTradesByMarket: "holders",
   getTradesByUser: "holders",
@@ -174,6 +186,20 @@ export const POLYMARKET_LIVE_CONNECT_ENDPOINTS = [
     description:
       "Discover event(s), search with natural language, id, slug, or list events that match your criteria by volume, tag, status, etc.",
   },
+  {
+    id: POLYMARKET_HOLDERS_BY_MARKETS_ENDPOINT_ID,
+    category: "holders",
+    title: "Get holders by market(s)",
+    description:
+      "Pick one or more markets, then pull top holders — with limit and min balance filters.",
+  },
+  {
+    id: POLYMARKET_OPEN_INTEREST_COMPOSE_ENDPOINT_ID,
+    category: "markets",
+    title: "Get Open Interest",
+    description:
+      "Search markets (or paste condition ids), then pull open interest for those markets.",
+  },
   ...ENDPOINTS.map((ep) => {
     const category = ENDPOINT_CATEGORY_BY_QUERY[ep.query] || ep.group || "markets";
     const underConstruction = !!ep.wsType || !!ep.broken;
@@ -214,6 +240,12 @@ export function getPolymarketLiveColumnsForEndpoint(endpointQuery) {
   if (id === POLYMARKET_MARKETS_BY_EVENTS_ENDPOINT_ID) {
     return POLYMARKET_MARKETS_BY_EVENTS_COMPOSE_COLUMNS;
   }
+  if (id === POLYMARKET_HOLDERS_BY_MARKETS_ENDPOINT_ID) {
+    return POLYMARKET_HOLDERS_BY_MARKETS_COMPOSE_COLUMNS;
+  }
+  if (id === POLYMARKET_OPEN_INTEREST_COMPOSE_ENDPOINT_ID) {
+    return POLYMARKET_OPEN_INTEREST_COMPOSE_COLUMNS;
+  }
   const ep = ENDPOINTS.find((e) => e.query === id);
   if (ep?.responseFields?.length) {
     return ep.responseFields.map((name) => ({
@@ -239,23 +271,12 @@ export function getPolymarketLiveColumnsForEndpoint(endpointQuery) {
     ];
   }
 
-  if (id === "getTopHolders") {
-    return [
-      { name: "token", type: "string", description: "Token / outcome identifier" },
-      { name: "proxyWallet", type: "string", description: "Holder wallet" },
-      { name: "amount", type: "string", description: "Position size" },
-      { name: "name", type: "string", description: "Display name" },
-      { name: "pseudonym", type: "string", description: "Pseudonym" },
-      { name: "bio", type: "string", description: "Profile bio" },
-      { name: "profileImage", type: "string", description: "Profile image URL" },
-    ];
+  if (id === "getTopHolders" || id === POLYMARKET_HOLDERS_BY_MARKETS_ENDPOINT_ID) {
+    return POLYMARKET_HOLDERS_BY_MARKETS_COMPOSE_COLUMNS;
   }
 
-  if (id === "getOpenInterest") {
-    return [
-      { name: "market", type: "string", description: "Condition ID" },
-      { name: "value", type: "string", description: "Open interest value" },
-    ];
+  if (id === "getOpenInterest" || id === POLYMARKET_OPEN_INTEREST_COMPOSE_ENDPOINT_ID) {
+    return POLYMARKET_OPEN_INTEREST_COMPOSE_COLUMNS;
   }
 
   if (id === "getLiveVolume") {

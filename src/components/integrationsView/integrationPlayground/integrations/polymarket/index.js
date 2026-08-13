@@ -76,7 +76,25 @@ import {
   normalizePolymarketMarketsComposeState,
   POLYMARKET_MARKETS_COMPOSE_ENDPOINT_ID,
 } from "@/lib/polymarketLive/marketsCompose";
+import {
+  emptyPolymarketHoldersByMarketsComposeState,
+  normalizePolymarketHoldersByMarketsComposeState,
+  POLYMARKET_HOLDERS_BY_MARKETS_ENDPOINT_ID,
+} from "@/lib/polymarketLive/holdersByMarketsCompose";
+import {
+  emptyPolymarketOpenInterestComposeState,
+  normalizePolymarketOpenInterestComposeState,
+  POLYMARKET_OPEN_INTEREST_COMPOSE_ENDPOINT_ID,
+} from "@/lib/polymarketLive/openInterestCompose";
 import { applyPolymarketMarketsByEventsFromEventsPayload } from "@/lib/polymarketLive/polymarketMarketsByEventsPull";
+import {
+  applyPolymarketHoldersByMarketsRows,
+  fetchPolymarketHoldersByMarketsRows,
+} from "@/lib/polymarketLive/polymarketHoldersByMarketsPull";
+import {
+  applyPolymarketOpenInterestRows,
+  fetchPolymarketOpenInterestRows,
+} from "@/lib/polymarketLive/polymarketOpenInterestPull";
 
 const COOLDOWN_MS = 1500;
 // Fallback when no endpoint responseFields and no prior pull – use Trade schema (docs: get-trades-for-a-user-or-markets)
@@ -438,12 +456,22 @@ const Polymarket = ({ setConnectedData, requestSheetDestination, connectHomePull
     const isEventsCompose = endpointId === "getEvents";
     const isMarketsByEventsCompose = endpointId === POLYMARKET_MARKETS_BY_EVENTS_ENDPOINT_ID;
     const isMarketsCompose = endpointId === POLYMARKET_MARKETS_COMPOSE_ENDPOINT_ID;
+    const isHoldersByMarketsCompose = endpointId === POLYMARKET_HOLDERS_BY_MARKETS_ENDPOINT_ID;
+    const isOpenInterestCompose = endpointId === POLYMARKET_OPEN_INTEREST_COMPOSE_ENDPOINT_ID;
     const isEventsStyleCompose = isEventsCompose || isMarketsByEventsCompose;
-    const isComposeEndpoint = isEventsStyleCompose || isMarketsCompose;
+    const isComposeEndpoint =
+      isEventsStyleCompose ||
+      isMarketsCompose ||
+      isHoldersByMarketsCompose ||
+      isOpenInterestCompose;
     const endpoint = isEventsStyleCompose
       ? ENDPOINTS.find((e) => e.query === "listEvents")
       : isMarketsCompose
         ? ENDPOINTS.find((e) => e.query === "listMarkets")
+        : isHoldersByMarketsCompose
+          ? ENDPOINTS.find((e) => e.query === "getTopHolders")
+          : isOpenInterestCompose
+            ? ENDPOINTS.find((e) => e.query === "getOpenInterest")
         : ENDPOINTS.find((e) => e.query === endpointId);
     if (!endpoint && !isComposeEndpoint) {
       setConnectDataLakePullState?.((prev) => ({
@@ -457,6 +485,8 @@ const Polymarket = ({ setConnectedData, requestSheetDestination, connectHomePull
       connectApiColumnSelections[endpointId] ||
       (isEventsCompose ? connectApiColumnSelections.listEvents : null) ||
       (isMarketsCompose ? connectApiColumnSelections.listMarkets : null) ||
+      (isHoldersByMarketsCompose ? connectApiColumnSelections.getTopHolders : null) ||
+      (isOpenInterestCompose ? connectApiColumnSelections.getOpenInterest : null) ||
       [];
     if (!cols.length) {
       setConnectDataLakePullState?.((prev) => ({
@@ -573,6 +603,190 @@ const Polymarket = ({ setConnectedData, requestSheetDestination, connectHomePull
             integration: "polymarket",
             source: "polymarket.getMarketsByEvents",
             meta: { endpoint: POLYMARKET_MARKETS_BY_EVENTS_ENDPOINT_ID },
+          });
+          setConnectDataLakePullState?.((prev) => ({
+            ...prev,
+            loading: false,
+            error: msg,
+            label: "",
+            progress: 0,
+          }));
+        }
+      })();
+      return;
+    }
+
+    if (isHoldersByMarketsCompose) {
+      const compose = normalizePolymarketHoldersByMarketsComposeState(
+        contextStateV2?.connectPolymarketLiveHoldersByMarketsCompose ||
+          emptyPolymarketHoldersByMarketsComposeState(),
+      );
+      if (compose.mode !== "advanced") {
+        setConnectDataLakePullState?.((prev) => ({
+          ...prev,
+          loading: false,
+          error: "Switch to Advanced search to run a holders pull, or select markets and press Go.",
+        }));
+        return;
+      }
+      setConnectDataLakePullState?.((prev) => ({
+        ...prev,
+        loading: true,
+        error: null,
+        label: "Pulling holders…",
+        progress: Math.max(Number(prev.progress) || 0, 5),
+      }));
+
+      void (async () => {
+        const pullStartMs =
+          typeof performance !== "undefined" && performance?.now ? performance.now() : Date.now();
+        trackDataPullStart({
+          integration: "polymarket",
+          endpoint: POLYMARKET_HOLDERS_BY_MARKETS_ENDPOINT_ID,
+          sampleLabel: "Get holders by market(s)",
+        });
+        try {
+          const { rows } = await fetchPolymarketHoldersByMarketsRows(compose, {
+            selectedColumns: cols,
+          });
+          if (!rows.length) {
+            setConnectDataLakePullState?.((prev) => ({
+              ...prev,
+              loading: false,
+              error: "No holders found for the selected markets.",
+              progress: 0,
+              label: "",
+            }));
+            return;
+          }
+          const ctx = {
+            ...contextStateV2,
+            setConnectedData,
+            addNewSheetAndActivate,
+            setSheetData,
+            setDataSheets: contextStateV2?.setDataSheets,
+            setActiveSheetId: contextStateV2?.setActiveSheetId,
+          };
+          applyPolymarketHoldersByMarketsRows(ctx, rows);
+          setLastRequestAt(Date.now());
+          setThrottleRemaining(COOLDOWN_MS);
+          setConnectDataLakePullState?.((prev) => ({
+            ...prev,
+            loading: false,
+            label: "",
+            progress: 100,
+            error: null,
+          }));
+          const elapsedMs =
+            (typeof performance !== "undefined" && performance?.now ? performance.now() : Date.now()) -
+            pullStartMs;
+          trackDataPullComplete({
+            integration: "polymarket",
+            endpoint: POLYMARKET_HOLDERS_BY_MARKETS_ENDPOINT_ID,
+            sampleLabel: "Get holders by market(s)",
+            rowCount: rows.length,
+            elapsedMs,
+          });
+        } catch (e) {
+          const msg = e instanceof Error ? e.message : "Request failed";
+          trackDataPullError({
+            message: msg,
+            integration: "polymarket",
+            source: "polymarket.getHoldersByMarkets",
+            meta: { endpoint: POLYMARKET_HOLDERS_BY_MARKETS_ENDPOINT_ID },
+          });
+          setConnectDataLakePullState?.((prev) => ({
+            ...prev,
+            loading: false,
+            error: msg,
+            label: "",
+            progress: 0,
+          }));
+        }
+      })();
+      return;
+    }
+
+    if (isOpenInterestCompose) {
+      const compose = normalizePolymarketOpenInterestComposeState(
+        contextStateV2?.connectPolymarketLiveOpenInterestCompose ||
+          emptyPolymarketOpenInterestComposeState(),
+      );
+      if (compose.mode !== "advanced") {
+        setConnectDataLakePullState?.((prev) => ({
+          ...prev,
+          loading: false,
+          error:
+            "Switch to Advanced search to run an open-interest pull, or select markets and press Go.",
+        }));
+        return;
+      }
+      setConnectDataLakePullState?.((prev) => ({
+        ...prev,
+        loading: true,
+        error: null,
+        label: "Pulling open interest…",
+        progress: Math.max(Number(prev.progress) || 0, 5),
+      }));
+
+      void (async () => {
+        const pullStartMs =
+          typeof performance !== "undefined" && performance?.now ? performance.now() : Date.now();
+        trackDataPullStart({
+          integration: "polymarket",
+          endpoint: POLYMARKET_OPEN_INTEREST_COMPOSE_ENDPOINT_ID,
+          sampleLabel: "Get Open Interest",
+        });
+        try {
+          const { rows } = await fetchPolymarketOpenInterestRows(compose, {
+            selectedColumns: cols,
+            allowEmptyMarkets: true,
+          });
+          if (!rows.length) {
+            setConnectDataLakePullState?.((prev) => ({
+              ...prev,
+              loading: false,
+              error: "No open interest rows returned.",
+              progress: 0,
+              label: "",
+            }));
+            return;
+          }
+          const ctx = {
+            ...contextStateV2,
+            setConnectedData,
+            addNewSheetAndActivate,
+            setSheetData,
+            setDataSheets: contextStateV2?.setDataSheets,
+            setActiveSheetId: contextStateV2?.setActiveSheetId,
+          };
+          applyPolymarketOpenInterestRows(ctx, rows);
+          setLastRequestAt(Date.now());
+          setThrottleRemaining(COOLDOWN_MS);
+          setConnectDataLakePullState?.((prev) => ({
+            ...prev,
+            loading: false,
+            label: "",
+            progress: 100,
+            error: null,
+          }));
+          const elapsedMs =
+            (typeof performance !== "undefined" && performance?.now ? performance.now() : Date.now()) -
+            pullStartMs;
+          trackDataPullComplete({
+            integration: "polymarket",
+            endpoint: POLYMARKET_OPEN_INTEREST_COMPOSE_ENDPOINT_ID,
+            sampleLabel: "Get Open Interest",
+            rowCount: rows.length,
+            elapsedMs,
+          });
+        } catch (e) {
+          const msg = e instanceof Error ? e.message : "Request failed";
+          trackDataPullError({
+            message: msg,
+            integration: "polymarket",
+            source: "polymarket.getOpenInterestCompose",
+            meta: { endpoint: POLYMARKET_OPEN_INTEREST_COMPOSE_ENDPOINT_ID },
           });
           setConnectDataLakePullState?.((prev) => ({
             ...prev,

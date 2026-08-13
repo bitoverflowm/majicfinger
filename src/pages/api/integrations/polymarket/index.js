@@ -241,6 +241,48 @@ function normalizeResponse(data, fieldsFilter) {
   return sortByDate(flattened);
 }
 
+/**
+ * Expand Data API MetaHolder[] into one sheet row per holder.
+ * @param {unknown} data
+ * @param {string[] | null} fieldsFilter
+ */
+function expandHoldersResponse(data, fieldsFilter) {
+  const arr = Array.isArray(data) ? data : data != null ? [data] : [];
+  /** @type {Record<string, unknown>[]} */
+  const rows = [];
+  for (const item of arr) {
+    if (!item || typeof item !== "object") continue;
+    const meta = /** @type {Record<string, unknown>} */ (item);
+    const token = meta.token != null ? String(meta.token) : "";
+    const holders = Array.isArray(meta.holders) ? meta.holders : null;
+    if (!holders) {
+      rows.push(flattenForSheet(meta));
+      continue;
+    }
+    if (!holders.length) {
+      rows.push({ token });
+      continue;
+    }
+    for (const h of holders) {
+      if (!h || typeof h !== "object") continue;
+      rows.push({ token, ...flattenForSheet(h) });
+    }
+  }
+  if (fieldsFilter && fieldsFilter.length > 0) {
+    const set = new Set(fieldsFilter.map((f) => f.trim()).filter(Boolean));
+    if (set.size > 0) {
+      return rows.map((row) => {
+        const out = {};
+        for (const k of Object.keys(row)) {
+          if (set.has(k)) out[k] = row[k];
+        }
+        return out;
+      });
+    }
+  }
+  return rows;
+}
+
 function buildSearchParams(allowed, query) {
   const p = new URLSearchParams();
   allowed.forEach((param) => {
@@ -1193,6 +1235,8 @@ export default async function handler(req, res) {
     let result;
     if (skipFlatten) {
       result = Array.isArray(data) ? data : data != null ? [data] : [];
+    } else if (query === "getTopHolders") {
+      result = expandHoldersResponse(data, fieldsFilter);
     } else if (outcomeOptimizedFormat && (query === "listEvents" || query === "getEvent" || query === "getEventBySlug" || query === "listMarkets" || query === "getMarket" || query === "getMarketBySlug")) {
       const source = (query === "listEvents" || query === "getEvent" || query === "getEventBySlug") ? "events" : "markets";
       result = toOutcomeOptimizedFormat(data, source, fieldsFilter);

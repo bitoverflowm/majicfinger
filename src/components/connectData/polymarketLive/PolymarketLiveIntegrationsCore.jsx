@@ -16,6 +16,8 @@ import {
 import { PolymarketLiveSearch } from "@/components/connectData/polymarketLive/PolymarketLiveSearch";
 import { PolymarketLiveEventsFields } from "@/components/connectData/polymarketLive/PolymarketLiveEventsFields";
 import { PolymarketLiveMarketsFields } from "@/components/connectData/polymarketLive/PolymarketLiveMarketsFields";
+import { PolymarketLiveHoldersByMarketsFields } from "@/components/connectData/polymarketLive/PolymarketLiveHoldersByMarketsFields";
+import { PolymarketLiveOpenInterestFields } from "@/components/connectData/polymarketLive/PolymarketLiveOpenInterestFields";
 import {
   ColumnPicker,
 } from "@/components/connectData/ConnectHomeIntegrationWorkflow";
@@ -48,9 +50,23 @@ import {
   POLYMARKET_MARKETS_COMPOSE_ENDPOINT_ID,
 } from "@/lib/polymarketLive/marketsCompose";
 import {
+  emptyPolymarketHoldersByMarketsComposeState,
+  normalizePolymarketHoldersByMarketsComposeState,
+  POLYMARKET_HOLDERS_BY_MARKETS_DEFAULT_COLUMNS,
+  POLYMARKET_HOLDERS_BY_MARKETS_ENDPOINT_ID,
+} from "@/lib/polymarketLive/holdersByMarketsCompose";
+import {
+  emptyPolymarketOpenInterestComposeState,
+  normalizePolymarketOpenInterestComposeState,
+  POLYMARKET_OPEN_INTEREST_DEFAULT_COLUMNS,
+  POLYMARKET_OPEN_INTEREST_COMPOSE_ENDPOINT_ID,
+} from "@/lib/polymarketLive/openInterestCompose";
+import {
   applyPolymarketMarketsByEventsSearchAll,
   applyPolymarketMarketsByEventsSearchSelection,
 } from "@/lib/polymarketLive/polymarketMarketsByEventsPull";
+import { applyPolymarketHoldersByMarketsSearchAll } from "@/lib/polymarketLive/polymarketHoldersByMarketsPull";
+import { applyPolymarketOpenInterestSearchAll } from "@/lib/polymarketLive/polymarketOpenInterestPull";
 import {
   applyPolymarketLiveSearchAll,
   applyPolymarketLiveSearchSelection,
@@ -62,6 +78,8 @@ const ENDPOINT_PRESENTATION = {
   [POLYMARKET_MARKETS_COMPOSE_ENDPOINT_ID]: { icon: Layers, accent: "secondary" },
   [POLYMARKET_MARKETS_BY_EVENTS_ENDPOINT_ID]: { icon: Layers, accent: "secondary" },
   [POLYMARKET_EVENTS_COMPOSE_ENDPOINT_ID]: { icon: Vote, accent: "secondary" },
+  [POLYMARKET_HOLDERS_BY_MARKETS_ENDPOINT_ID]: { icon: Users, accent: "secondary" },
+  [POLYMARKET_OPEN_INTEREST_COMPOSE_ENDPOINT_ID]: { icon: Layers, accent: "secondary" },
   listMarkets: { icon: Layers, accent: "secondary" },
   getMarket: { icon: Layers, accent: "secondary" },
   getMarketBySlug: { icon: Layers, accent: "secondary" },
@@ -257,6 +275,10 @@ export function PolymarketLiveIntegrationsCore({ onRunPull, className, stepBackR
     setConnectPolymarketLiveMarketsByEventsCompose,
     connectPolymarketLiveMarketsCompose,
     setConnectPolymarketLiveMarketsCompose,
+    connectPolymarketLiveHoldersByMarketsCompose,
+    setConnectPolymarketLiveHoldersByMarketsCompose,
+    connectPolymarketLiveOpenInterestCompose,
+    setConnectPolymarketLiveOpenInterestCompose,
   } = ctx;
 
   const runPolymarketLiveAction = useCallback(
@@ -325,18 +347,44 @@ export function PolymarketLiveIntegrationsCore({ onRunPull, className, stepBackR
     [connectPolymarketLiveMarketsCompose],
   );
 
+  const holdersByMarketsCompose = useMemo(
+    () =>
+      normalizePolymarketHoldersByMarketsComposeState(
+        connectPolymarketLiveHoldersByMarketsCompose || emptyPolymarketHoldersByMarketsComposeState(),
+      ),
+    [connectPolymarketLiveHoldersByMarketsCompose],
+  );
+
+  const openInterestCompose = useMemo(
+    () =>
+      normalizePolymarketOpenInterestComposeState(
+        connectPolymarketLiveOpenInterestCompose || emptyPolymarketOpenInterestComposeState(),
+      ),
+    [connectPolymarketLiveOpenInterestCompose],
+  );
+
   const isEventsCompose = selectedId === POLYMARKET_EVENTS_COMPOSE_ENDPOINT_ID;
   const isMarketsByEventsCompose = selectedId === POLYMARKET_MARKETS_BY_EVENTS_ENDPOINT_ID;
   const isMarketsCompose = selectedId === POLYMARKET_MARKETS_COMPOSE_ENDPOINT_ID;
+  const isHoldersByMarketsCompose = selectedId === POLYMARKET_HOLDERS_BY_MARKETS_ENDPOINT_ID;
+  const isOpenInterestCompose = selectedId === POLYMARKET_OPEN_INTEREST_COMPOSE_ENDPOINT_ID;
   const isEventsStyleCompose = isEventsCompose || isMarketsByEventsCompose;
-  const isComposeEndpoint = isEventsStyleCompose || isMarketsCompose;
+  const isComposeEndpoint =
+    isEventsStyleCompose ||
+    isMarketsCompose ||
+    isHoldersByMarketsCompose ||
+    isOpenInterestCompose;
   const showAdvancedPullUi =
     !isComposeEndpoint ||
     (isEventsCompose
       ? eventsCompose.mode === "advanced"
       : isMarketsByEventsCompose
         ? marketsByEventsCompose.mode === "advanced"
-        : marketsCompose.mode === "advanced");
+        : isMarketsCompose
+          ? marketsCompose.mode === "advanced"
+          : isHoldersByMarketsCompose
+            ? holdersByMarketsCompose.mode === "advanced"
+            : openInterestCompose.mode === "advanced");
 
   const handleSelectEndpoint = useCallback(
     (id) => {
@@ -355,6 +403,14 @@ export function PolymarketLiveIntegrationsCore({ onRunPull, className, stepBackR
               ? POLYMARKET_MARKETS_COMPOSE_DEFAULT_COLUMNS.filter((name) =>
                   cols.some((c) => c.name === name),
                 )
+              : id === POLYMARKET_HOLDERS_BY_MARKETS_ENDPOINT_ID
+                ? POLYMARKET_HOLDERS_BY_MARKETS_DEFAULT_COLUMNS.filter((name) =>
+                    cols.some((c) => c.name === name),
+                  )
+                : id === POLYMARKET_OPEN_INTEREST_COMPOSE_ENDPOINT_ID
+                  ? POLYMARKET_OPEN_INTEREST_DEFAULT_COLUMNS.filter((name) =>
+                      cols.some((c) => c.name === name),
+                    )
               : cols.map((c) => c.name);
       if (cols.length) {
         setConnectApiColumnSelections?.((prev) => ({
@@ -381,6 +437,20 @@ export function PolymarketLiveIntegrationsCore({ onRunPull, className, stepBackR
             : emptyPolymarketMarketsComposeState(),
         );
       }
+      if (id === POLYMARKET_HOLDERS_BY_MARKETS_ENDPOINT_ID) {
+        setConnectPolymarketLiveHoldersByMarketsCompose?.((prev) =>
+          prev
+            ? normalizePolymarketHoldersByMarketsComposeState(prev)
+            : emptyPolymarketHoldersByMarketsComposeState(),
+        );
+      }
+      if (id === POLYMARKET_OPEN_INTEREST_COMPOSE_ENDPOINT_ID) {
+        setConnectPolymarketLiveOpenInterestCompose?.((prev) =>
+          prev
+            ? normalizePolymarketOpenInterestComposeState(prev)
+            : emptyPolymarketOpenInterestComposeState(),
+        );
+      }
     },
     [
       setConnectApiEndpointId,
@@ -388,6 +458,8 @@ export function PolymarketLiveIntegrationsCore({ onRunPull, className, stepBackR
       setConnectPolymarketLiveEventsCompose,
       setConnectPolymarketLiveMarketsByEventsCompose,
       setConnectPolymarketLiveMarketsCompose,
+      setConnectPolymarketLiveHoldersByMarketsCompose,
+      setConnectPolymarketLiveOpenInterestCompose,
     ],
   );
 
@@ -424,12 +496,88 @@ export function PolymarketLiveIntegrationsCore({ onRunPull, className, stepBackR
         );
         return;
       }
+      if (isHoldersByMarketsCompose) {
+        runPolymarketLiveAction(() => {
+          void (async () => {
+            ctx.setConnectDataLakePullState?.((prev) => ({
+              ...prev,
+              loading: true,
+              error: null,
+              label: "Pulling holders…",
+              progress: Math.max(Number(prev.progress) || 0, 8),
+            }));
+            try {
+              await applyPolymarketHoldersByMarketsSearchAll(ctx, suggestions, {
+                compose: holdersByMarketsCompose,
+                selectedColumns,
+              });
+              ctx.setConnectDataLakePullState?.((prev) => ({
+                ...prev,
+                loading: false,
+                error: null,
+                label: "",
+                progress: 100,
+              }));
+            } catch (e) {
+              const msg = e instanceof Error ? e.message : "Request failed";
+              ctx.setConnectDataLakePullState?.((prev) => ({
+                ...prev,
+                loading: false,
+                error: msg,
+                label: "",
+                progress: 0,
+              }));
+            }
+          })();
+        });
+        return;
+      }
+      if (isOpenInterestCompose) {
+        runPolymarketLiveAction(() => {
+          void (async () => {
+            ctx.setConnectDataLakePullState?.((prev) => ({
+              ...prev,
+              loading: true,
+              error: null,
+              label: "Pulling open interest…",
+              progress: Math.max(Number(prev.progress) || 0, 8),
+            }));
+            try {
+              await applyPolymarketOpenInterestSearchAll(ctx, suggestions, {
+                compose: openInterestCompose,
+                selectedColumns,
+              });
+              ctx.setConnectDataLakePullState?.((prev) => ({
+                ...prev,
+                loading: false,
+                error: null,
+                label: "",
+                progress: 100,
+              }));
+            } catch (e) {
+              const msg = e instanceof Error ? e.message : "Request failed";
+              ctx.setConnectDataLakePullState?.((prev) => ({
+                ...prev,
+                loading: false,
+                error: msg,
+                label: "",
+                progress: 0,
+              }));
+            }
+          })();
+        });
+        return;
+      }
       runPolymarketLiveAction(() => applyPolymarketLiveSearchAll(ctx, suggestions));
     },
     [
       ctx,
+      holdersByMarketsCompose,
+      isHoldersByMarketsCompose,
       isMarketsByEventsCompose,
+      isOpenInterestCompose,
       marketsByEventsCompose.sheetLayout,
+      openInterestCompose,
       runPolymarketLiveAction,
       selectedColumns,
     ],
@@ -584,6 +732,20 @@ export function PolymarketLiveIntegrationsCore({ onRunPull, className, stepBackR
             <PolymarketLiveMarketsFields
               className="mt-2"
               onSearchSelect={handlePublicSearchSelect}
+              onSearchSubmitAll={handlePublicSearchSubmitAll}
+            />
+          ) : null}
+
+          {isHoldersByMarketsCompose ? (
+            <PolymarketLiveHoldersByMarketsFields
+              className="mt-2"
+              onSearchSubmitAll={handlePublicSearchSubmitAll}
+            />
+          ) : null}
+
+          {isOpenInterestCompose ? (
+            <PolymarketLiveOpenInterestFields
+              className="mt-2"
               onSearchSubmitAll={handlePublicSearchSubmitAll}
             />
           ) : null}
