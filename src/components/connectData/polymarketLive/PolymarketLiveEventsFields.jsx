@@ -1,12 +1,21 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Loader2, X } from "lucide-react";
+import { ChevronsUpDown, Loader2, X } from "lucide-react";
 
 import { PolymarketLiveSearch } from "@/components/connectData/polymarketLive/PolymarketLiveSearch";
 import { Button } from "@/components/ui/button";
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from "@/components/ui/command";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import {
   Select,
   SelectContent,
@@ -73,10 +82,16 @@ export function PolymarketLiveEventsFields({
 
   const [tagCatalog, setTagCatalog] = useState(/** @type {Array<{id:string;slug:string;label?:string}>} */ ([]));
   const [tagsLoading, setTagsLoading] = useState(false);
+  const [tagPickerOpen, setTagPickerOpen] = useState(false);
   const [relatedTags, setRelatedTags] = useState(
     /** @type {Array<{id:string;slug:string;label?:string}>} */ ([]),
   );
   const [relatedLoading, setRelatedLoading] = useState(false);
+
+  const availableTags = useMemo(() => {
+    const selected = new Set(state.tags.map((t) => t.slug || t.id));
+    return tagCatalog.filter((t) => !selected.has(t.slug) && !selected.has(t.id));
+  }, [state.tags, tagCatalog]);
 
   useEffect(() => {
     let alive = true;
@@ -235,7 +250,7 @@ export function PolymarketLiveEventsFields({
   return (
     <div className={cn("space-y-4", className)}>
       <div className="space-y-2">
-        <Label className="text-[0.6875rem] font-medium uppercase tracking-wider text-muted-foreground">
+        <Label className="text-[0.6875rem] font-medium uppercase tracking-wider text-muted-foreground dark:text-slate-400">
           Mode
         </Label>
         <ToggleGroup
@@ -258,7 +273,7 @@ export function PolymarketLiveEventsFields({
 
       {state.mode === "search" ? (
         <div className="space-y-2">
-          <p className="text-[11px] leading-snug text-muted-foreground">
+          <p className="text-[11px] leading-snug text-muted-foreground dark:text-slate-400">
             Search for an event or multiple events. Click on a single result or press Enter to load
             all search recommendations into your sheet.
           </p>
@@ -273,8 +288,8 @@ export function PolymarketLiveEventsFields({
             />
         </div>
       ) : (
-        <div className="space-y-4 rounded-xl border border-border/60 bg-muted/10 p-3">
-          <p className="text-[11px] leading-snug text-muted-foreground">
+        <div className="space-y-4 rounded-xl border border-border/60 bg-muted/10 p-3 text-foreground">
+          <p className="text-[11px] leading-snug text-muted-foreground dark:text-slate-400">
             Query options for Polymarket{" "}
             <span className="font-mono text-[10px]">GET /events</span>. Then pick return fields
             below and run pull.
@@ -282,7 +297,10 @@ export function PolymarketLiveEventsFields({
 
           <div className="grid gap-3 sm:grid-cols-2">
             <div className="space-y-1.5">
-              <Label className="text-[11px]">Limit</Label>
+              <Label className="text-[11px] text-foreground">Limit</Label>
+              <p className="text-[10px] leading-snug text-muted-foreground dark:text-slate-400">
+                Max number of events to return in this pull.
+              </p>
               <Input
                 type="number"
                 min={0}
@@ -296,9 +314,9 @@ export function PolymarketLiveEventsFields({
 
             <div className="space-y-1.5">
               <div className="flex items-center justify-between gap-2">
-                <Label className="text-[11px]">Sort</Label>
+                <Label className="text-[11px] text-foreground">Sort</Label>
                 <div className="flex items-center gap-1.5">
-                  <span className="text-[10px] text-muted-foreground">Ascending</span>
+                  <span className="text-[10px] text-muted-foreground dark:text-slate-400">Ascending</span>
                   <Switch
                     checked={state.ascending}
                     disabled={disabled}
@@ -307,6 +325,9 @@ export function PolymarketLiveEventsFields({
                   />
                 </div>
               </div>
+              <p className="text-[10px] leading-snug text-muted-foreground dark:text-slate-400">
+                Order results by one or more fields; earlier fields take priority.
+              </p>
               <Select
                 key={`sort:${state.orderFields.join(",")}`}
                 disabled={disabled || availableSortOptions.length === 0}
@@ -354,8 +375,8 @@ export function PolymarketLiveEventsFields({
           </div>
 
           <div className="space-y-1.5">
-            <Label className="text-[11px]">Event id / slug</Label>
-            <p className="text-[10px] leading-snug text-muted-foreground">
+            <Label className="text-[11px] text-foreground">Event id / slug</Label>
+            <p className="text-[10px] leading-snug text-muted-foreground dark:text-slate-400">
               Search events and keep adding. Selecting fills both id and slug when available.
             </p>
             <PolymarketLiveSearch
@@ -401,42 +422,72 @@ export function PolymarketLiveEventsFields({
           </div>
 
           <div className="space-y-1.5">
-            <Label className="text-[11px]">Tags</Label>
-            <p className="text-[10px] leading-snug text-muted-foreground">
-              Pick tags from Polymarket. List events uses the first selected tag (
-              <span className="font-mono">tag_id</span> / <span className="font-mono">tag_slug</span>
-              ). Related tags appear after you select one.
-            </p>
-            <Select
-              key={`tag:${state.tags.map((t) => t.slug).join(",")}`}
-              disabled={disabled || tagsLoading}
-              onValueChange={(slug) => {
-                const tag = tagCatalog.find((t) => t.slug === slug || t.id === slug);
-                if (tag) addTag(tag);
-              }}
-            >
-              <SelectTrigger className="h-8 text-xs">
-                <SelectValue
-                  placeholder={tagsLoading ? "Loading tags…" : "Add tag…"}
-                />
-              </SelectTrigger>
-              <SelectContent className="max-h-[min(20rem,50vh)]">
-                {tagCatalog.map((tag) => (
-                  <SelectItem key={tag.slug || tag.id} value={tag.slug || tag.id} className="text-xs">
-                    <span className="font-mono">{tag.slug}</span>
-                    {tag.label && tag.label !== tag.slug ? (
-                      <span className="text-muted-foreground"> · {tag.label}</span>
-                    ) : null}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <Label className="text-[11px] text-foreground">Tags</Label>
+            <Popover open={tagPickerOpen} onOpenChange={setTagPickerOpen}>
+              <PopoverTrigger asChild>
+                <Button
+                  type="button"
+                  variant="outline"
+                  role="combobox"
+                  aria-expanded={tagPickerOpen}
+                  disabled={disabled || tagsLoading}
+                  className="h-8 w-full justify-between px-3 text-xs font-normal text-muted-foreground shadow-sm"
+                >
+                  {tagsLoading ? "Loading tags…" : "Search tags…"}
+                  <ChevronsUpDown className="ml-2 size-3.5 shrink-0 opacity-50" />
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent
+                className="w-[var(--radix-popover-trigger-width)] p-0"
+                align="start"
+                onOpenAutoFocus={(e) => e.preventDefault()}
+              >
+                <Command
+                  filter={(value, search) => {
+                    const q = search.trim().toLowerCase();
+                    if (!q) return 1;
+                    return value.toLowerCase().includes(q) ? 1 : 0;
+                  }}
+                >
+                  <CommandInput
+                    placeholder="Type to filter tags…"
+                    className="h-9 text-xs"
+                  />
+                  <CommandList className="max-h-[min(20rem,50vh)]">
+                    <CommandEmpty className="py-4 text-center text-xs text-muted-foreground">
+                      No tags found.
+                    </CommandEmpty>
+                    <CommandGroup>
+                      {availableTags.map((tag) => {
+                        const value = `${tag.slug} ${tag.label || ""} ${tag.id}`;
+                        return (
+                          <CommandItem
+                            key={tag.slug || tag.id}
+                            value={value}
+                            className="text-xs"
+                            onSelect={() => {
+                              addTag(tag);
+                              setTagPickerOpen(false);
+                            }}
+                          >
+                            <span className="font-mono">{tag.slug}</span>
+                            {tag.label && tag.label !== tag.slug ? (
+                              <span className="text-muted-foreground"> · {tag.label}</span>
+                            ) : null}
+                          </CommandItem>
+                        );
+                      })}
+                    </CommandGroup>
+                  </CommandList>
+                </Command>
+              </PopoverContent>
+            </Popover>
             {state.tags.length ? (
               <div className="flex flex-wrap gap-1 pt-1">
                 {state.tags.map((tag) => (
                   <span
                     key={tag.slug}
-                    className="inline-flex items-center gap-1 rounded-full border border-border/60 bg-background px-2 py-0.5 font-mono text-[10px]"
+                    className="inline-flex items-center gap-1 rounded-full border border-border/60 bg-background px-2 py-0.5 font-mono text-[10px] text-foreground"
                   >
                     {tag.slug}
                     <button
@@ -453,7 +504,7 @@ export function PolymarketLiveEventsFields({
             ) : null}
             {primaryTagSlug ? (
               <div className="pt-1">
-                <p className="mb-1 flex items-center gap-1.5 text-[10px] text-muted-foreground">
+                <p className="mb-1 flex items-center gap-1.5 text-[10px] text-muted-foreground dark:text-slate-400">
                   Related tags
                   {relatedLoading ? <Loader2 className="size-3 animate-spin" /> : null}
                 </p>
@@ -498,7 +549,7 @@ export function PolymarketLiveEventsFields({
                 <span className="min-w-0">
                   <span className="block text-[11px] font-medium text-foreground">{row.label}</span>
                   {row.hint ? (
-                    <span className="mt-0.5 block text-[10px] leading-snug text-muted-foreground">
+                    <span className="mt-0.5 block text-[10px] leading-snug text-muted-foreground dark:text-slate-400">
                       {row.hint}
                     </span>
                   ) : null}
@@ -514,8 +565,8 @@ export function PolymarketLiveEventsFields({
           </div>
 
           <div className="space-y-1.5">
-            <Label className="text-[11px]">Recurrence</Label>
-            <p className="text-[10px] leading-snug text-muted-foreground">
+            <Label className="text-[11px] text-foreground">Recurrence</Label>
+            <p className="text-[10px] leading-snug text-muted-foreground dark:text-slate-400">
               Filters events according to how frequently their associated series repeats.
             </p>
             <Select
