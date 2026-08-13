@@ -863,6 +863,76 @@ export default async function handler(req, res) {
         data = await fetchJson(`${GAMMA_BASE}/tags?${sp}`);
         break;
       }
+      case "getTagBySlug": {
+        const slug = String(req.query.slug || "").trim();
+        if (!slug) return res.status(400).json({ message: "Missing required parameter: slug" });
+        const sp = new URLSearchParams();
+        if (req.query.include_template === "true" || req.query.include_template === "false") {
+          sp.set("include_template", String(req.query.include_template));
+        }
+        const qs = sp.toString();
+        try {
+          data = await fetchJson(
+            `${GAMMA_BASE}/tags/slug/${encodeURIComponent(slug)}${qs ? `?${qs}` : ""}`,
+          );
+        } catch (err) {
+          const msg = err instanceof Error ? err.message : String(err);
+          if (/not found/i.test(msg)) {
+            return res.status(404).json({ message: "Tag not found", slug });
+          }
+          throw err;
+        }
+        break;
+      }
+      case "searchTags": {
+        const rawQ = String(req.query.q || "").trim();
+        if (!rawQ) {
+          return res.status(200).json({ query: "", slug: "", matches: [], related: [] });
+        }
+        const slug = rawQ
+          .toLowerCase()
+          .replace(/[^a-z0-9]+/g, "-")
+          .replace(/^-+|-+$/g, "");
+
+        const softFetch = async (url) => {
+          try {
+            return await fetchJson(url);
+          } catch {
+            return null;
+          }
+        };
+
+        const [exact, relatedRaw] = await Promise.all([
+          slug ? softFetch(`${GAMMA_BASE}/tags/slug/${encodeURIComponent(slug)}`) : null,
+          slug
+            ? softFetch(`${GAMMA_BASE}/tags/slug/${encodeURIComponent(slug)}/related-tags/tags`)
+            : null,
+        ]);
+
+        const normalize = (t) => {
+          if (!t || typeof t !== "object") return null;
+          const id = String(t.id ?? "").trim();
+          const s = String(t.slug ?? "").trim();
+          const label = String(t.label || t.slug || "").trim() || undefined;
+          if (!id && !s) return null;
+          return { id: id || s, slug: s || id, label };
+        };
+
+        const match = exact ? normalize(exact) : null;
+        const matchKey = match ? match.slug || match.id : "";
+        const relatedList = (Array.isArray(relatedRaw) ? relatedRaw : [])
+          .map(normalize)
+          .filter(Boolean)
+          .filter((t) => (t.slug || t.id) !== matchKey);
+
+        data = {
+          query: rawQ,
+          slug,
+          matches: match ? [match] : [],
+          related: relatedList,
+        };
+        break;
+      }
       case "relatedTagsBySlug": {
         const slug = String(req.query.slug || "").trim();
         if (!slug) return res.status(400).json({ message: "Missing required parameter: slug" });
