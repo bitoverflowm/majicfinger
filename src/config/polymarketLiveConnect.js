@@ -13,6 +13,10 @@ import {
   POLYMARKET_MARKETS_BY_EVENTS_COMPOSE_COLUMNS,
   POLYMARKET_MARKETS_BY_EVENTS_ENDPOINT_ID,
 } from "@/lib/polymarketLive/marketsByEventsCompose";
+import {
+  POLYMARKET_MARKETS_COMPOSE_COLUMNS,
+  POLYMARKET_MARKETS_COMPOSE_ENDPOINT_ID,
+} from "@/lib/polymarketLive/marketsCompose";
 
 /**
  * Top-level Polymarket Live endpoint groups (hub column tags).
@@ -32,12 +36,16 @@ export const POLYMARKET_LIVE_ENDPOINT_CATEGORIES = [
 
 export const POLYMARKET_LIVE_DEFAULT_ENDPOINT_CATEGORY = "markets";
 
-/** Legacy granular event endpoints — hidden from hub in favor of Get Event/Events. */
+/** Legacy granular event/market endpoints — hidden in favor of compose flows. */
 const HIDDEN_EVENT_ENDPOINT_IDS = new Set([
   "listEvents",
   "getEvent",
   "getEventBySlug",
   "getEventTags",
+  "listMarkets",
+  "getMarket",
+  "getMarketBySlug",
+  "getMarketByToken",
 ]);
 
 /** @type {Record<string, string>} */
@@ -55,6 +63,7 @@ const ENDPOINT_CATEGORY_BY_QUERY = {
   getEventTags: "events",
   [POLYMARKET_EVENTS_COMPOSE_ENDPOINT_ID]: "events",
   [POLYMARKET_MARKETS_BY_EVENTS_ENDPOINT_ID]: "markets",
+  [POLYMARKET_MARKETS_COMPOSE_ENDPOINT_ID]: "markets",
   getTopHolders: "holders",
   getTradesByMarket: "holders",
   getTradesByUser: "holders",
@@ -144,6 +153,13 @@ const PLACEHOLDER_ENDPOINTS = [
  */
 export const POLYMARKET_LIVE_CONNECT_ENDPOINTS = [
   {
+    id: POLYMARKET_MARKETS_COMPOSE_ENDPOINT_ID,
+    category: "markets",
+    title: "Get Market/Markets",
+    description:
+      "Discover market(s) with natural language, id, slug, or token — or list markets by volume, tag, dates, and other filters.",
+  },
+  {
     id: POLYMARKET_MARKETS_BY_EVENTS_ENDPOINT_ID,
     category: "markets",
     title: "Get markets by event(s)",
@@ -190,6 +206,9 @@ export function getPolymarketLiveColumnsForEndpoint(endpointQuery) {
   const id = String(endpointQuery || "").trim();
   if (id === POLYMARKET_EVENTS_COMPOSE_ENDPOINT_ID) {
     return POLYMARKET_EVENTS_COMPOSE_COLUMNS;
+  }
+  if (id === POLYMARKET_MARKETS_COMPOSE_ENDPOINT_ID) {
+    return POLYMARKET_MARKETS_COMPOSE_COLUMNS;
   }
   if (id === POLYMARKET_MARKETS_BY_EVENTS_ENDPOINT_ID) {
     return POLYMARKET_MARKETS_BY_EVENTS_COMPOSE_COLUMNS;

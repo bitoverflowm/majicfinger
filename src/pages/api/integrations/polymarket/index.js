@@ -973,6 +973,15 @@ export default async function handler(req, res) {
       }
       case "listMarkets": {
         const sp = buildSearchParams(MARKETS_PARAMS, req.query);
+        for (const key of ["id", "slug", "clob_token_ids", "condition_ids", "market_maker_address", "sports_market_types", "question_ids"]) {
+          const raw = req.query[key];
+          if (typeof raw === "string" && raw.includes(",")) {
+            sp.delete(key);
+            for (const part of raw.split(",").map((s) => s.trim()).filter(Boolean)) {
+              sp.append(key, part);
+            }
+          }
+        }
         data = await fetchJson(`${GAMMA_BASE}/markets?${sp}`);
         break;
       }

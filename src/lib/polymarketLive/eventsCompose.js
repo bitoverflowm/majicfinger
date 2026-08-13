@@ -36,6 +36,10 @@
  *   includeTemplate: boolean | null;
  *   closed: boolean | null;
  *   recurrence: string;
+ *   startDateMin: string;
+ *   startDateMax: string;
+ *   endDateMin: string;
+ *   endDateMax: string;
  * }} PolymarketEventsComposeState
  */
 
@@ -199,6 +203,10 @@ export function emptyPolymarketEventsComposeState() {
     includeTemplate: null,
     closed: null,
     recurrence: "",
+    startDateMin: "",
+    startDateMax: "",
+    endDateMin: "",
+    endDateMax: "",
   };
 }
 
@@ -266,6 +274,10 @@ export function normalizePolymarketEventsComposeState(raw) {
     includeTemplate: tri(o.includeTemplate),
     closed: tri(o.closed),
     recurrence: String(o.recurrence || "").trim(),
+    startDateMin: String(o.startDateMin || "").trim(),
+    startDateMax: String(o.startDateMax || "").trim(),
+    endDateMin: String(o.endDateMin || "").trim(),
+    endDateMax: String(o.endDateMax || "").trim(),
   };
 }
 
@@ -309,6 +321,11 @@ export function buildPolymarketEventsListQueryValues(state) {
   setBool("closed", s.closed);
 
   if (s.recurrence) values.recurrence = s.recurrence;
+
+  if (s.startDateMin) values.start_date_min = s.startDateMin;
+  if (s.startDateMax) values.start_date_max = s.startDateMax;
+  if (s.endDateMin) values.end_date_min = s.endDateMin;
+  if (s.endDateMax) values.end_date_max = s.endDateMax;
 
   return values;
 }

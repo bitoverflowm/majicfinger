@@ -15,6 +15,7 @@ import {
 
 import { PolymarketLiveSearch } from "@/components/connectData/polymarketLive/PolymarketLiveSearch";
 import { PolymarketLiveEventsFields } from "@/components/connectData/polymarketLive/PolymarketLiveEventsFields";
+import { PolymarketLiveMarketsFields } from "@/components/connectData/polymarketLive/PolymarketLiveMarketsFields";
 import {
   ColumnPicker,
 } from "@/components/connectData/ConnectHomeIntegrationWorkflow";
@@ -41,6 +42,12 @@ import {
   POLYMARKET_MARKETS_BY_EVENTS_ENDPOINT_ID,
 } from "@/lib/polymarketLive/marketsByEventsCompose";
 import {
+  emptyPolymarketMarketsComposeState,
+  normalizePolymarketMarketsComposeState,
+  POLYMARKET_MARKETS_COMPOSE_DEFAULT_COLUMNS,
+  POLYMARKET_MARKETS_COMPOSE_ENDPOINT_ID,
+} from "@/lib/polymarketLive/marketsCompose";
+import {
   applyPolymarketMarketsByEventsSearchAll,
   applyPolymarketMarketsByEventsSearchSelection,
 } from "@/lib/polymarketLive/polymarketMarketsByEventsPull";
@@ -52,6 +59,7 @@ import { useDemoProGate } from "@/hooks/useDemoProGate";
 import { cn } from "@/lib/utils";
 
 const ENDPOINT_PRESENTATION = {
+  [POLYMARKET_MARKETS_COMPOSE_ENDPOINT_ID]: { icon: Layers, accent: "secondary" },
   [POLYMARKET_MARKETS_BY_EVENTS_ENDPOINT_ID]: { icon: Layers, accent: "secondary" },
   [POLYMARKET_EVENTS_COMPOSE_ENDPOINT_ID]: { icon: Vote, accent: "secondary" },
   listMarkets: { icon: Layers, accent: "secondary" },
@@ -247,6 +255,8 @@ export function PolymarketLiveIntegrationsCore({ onRunPull, className, stepBackR
     setConnectPolymarketLiveEventsCompose,
     connectPolymarketLiveMarketsByEventsCompose,
     setConnectPolymarketLiveMarketsByEventsCompose,
+    connectPolymarketLiveMarketsCompose,
+    setConnectPolymarketLiveMarketsCompose,
   } = ctx;
 
   const runPolymarketLiveAction = useCallback(
@@ -307,12 +317,26 @@ export function PolymarketLiveIntegrationsCore({ onRunPull, className, stepBackR
     [connectPolymarketLiveMarketsByEventsCompose],
   );
 
+  const marketsCompose = useMemo(
+    () =>
+      normalizePolymarketMarketsComposeState(
+        connectPolymarketLiveMarketsCompose || emptyPolymarketMarketsComposeState(),
+      ),
+    [connectPolymarketLiveMarketsCompose],
+  );
+
   const isEventsCompose = selectedId === POLYMARKET_EVENTS_COMPOSE_ENDPOINT_ID;
   const isMarketsByEventsCompose = selectedId === POLYMARKET_MARKETS_BY_EVENTS_ENDPOINT_ID;
+  const isMarketsCompose = selectedId === POLYMARKET_MARKETS_COMPOSE_ENDPOINT_ID;
   const isEventsStyleCompose = isEventsCompose || isMarketsByEventsCompose;
+  const isComposeEndpoint = isEventsStyleCompose || isMarketsCompose;
   const showAdvancedPullUi =
-    !isEventsStyleCompose ||
-    (isEventsCompose ? eventsCompose.mode === "advanced" : marketsByEventsCompose.mode === "advanced");
+    !isComposeEndpoint ||
+    (isEventsCompose
+      ? eventsCompose.mode === "advanced"
+      : isMarketsByEventsCompose
+        ? marketsByEventsCompose.mode === "advanced"
+        : marketsCompose.mode === "advanced");
 
   const handleSelectEndpoint = useCallback(
     (id) => {
@@ -327,7 +351,11 @@ export function PolymarketLiveIntegrationsCore({ onRunPull, className, stepBackR
             ? POLYMARKET_MARKETS_BY_EVENTS_DEFAULT_COLUMNS.filter((name) =>
                 cols.some((c) => c.name === name),
               )
-            : cols.map((c) => c.name);
+            : id === POLYMARKET_MARKETS_COMPOSE_ENDPOINT_ID
+              ? POLYMARKET_MARKETS_COMPOSE_DEFAULT_COLUMNS.filter((name) =>
+                  cols.some((c) => c.name === name),
+                )
+              : cols.map((c) => c.name);
       if (cols.length) {
         setConnectApiColumnSelections?.((prev) => ({
           ...(prev || {}),
@@ -346,12 +374,20 @@ export function PolymarketLiveIntegrationsCore({ onRunPull, className, stepBackR
             : emptyPolymarketMarketsByEventsComposeState(),
         );
       }
+      if (id === POLYMARKET_MARKETS_COMPOSE_ENDPOINT_ID) {
+        setConnectPolymarketLiveMarketsCompose?.((prev) =>
+          prev
+            ? normalizePolymarketMarketsComposeState(prev)
+            : emptyPolymarketMarketsComposeState(),
+        );
+      }
     },
     [
       setConnectApiEndpointId,
       setConnectApiColumnSelections,
       setConnectPolymarketLiveEventsCompose,
       setConnectPolymarketLiveMarketsByEventsCompose,
+      setConnectPolymarketLiveMarketsCompose,
     ],
   );
 
@@ -539,6 +575,14 @@ export function PolymarketLiveIntegrationsCore({ onRunPull, className, stepBackR
             <PolymarketLiveEventsFields
               className="mt-2"
               variant={isMarketsByEventsCompose ? "marketsByEvents" : "events"}
+              onSearchSelect={handlePublicSearchSelect}
+              onSearchSubmitAll={handlePublicSearchSubmitAll}
+            />
+          ) : null}
+
+          {isMarketsCompose ? (
+            <PolymarketLiveMarketsFields
+              className="mt-2"
               onSearchSelect={handlePublicSearchSelect}
               onSearchSubmitAll={handlePublicSearchSubmitAll}
             />

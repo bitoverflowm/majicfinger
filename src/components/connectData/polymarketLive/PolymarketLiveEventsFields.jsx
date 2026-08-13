@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ChevronsUpDown, Loader2, X } from "lucide-react";
 
 import { PolymarketLiveSearch } from "@/components/connectData/polymarketLive/PolymarketLiveSearch";
+import { PolymarketDateTimeField } from "@/components/connectData/polymarketLive/PolymarketDateTimeField";
 import { Button } from "@/components/ui/button";
 import {
   Command,
@@ -1018,6 +1019,45 @@ export function PolymarketLiveEventsFields({
                 </div>
               </div>
             ) : null}
+          </div>
+
+          <div className="space-y-1.5">
+            <Label className="text-[11px] text-foreground">Date filters</Label>
+            <p className="text-[10px] leading-snug text-muted-foreground dark:text-slate-400">
+              Optional start/end date bounds for list events (
+              <span className="font-mono">start_date_*</span> /{" "}
+              <span className="font-mono">end_date_*</span>).
+            </p>
+            <div className="grid gap-2 sm:grid-cols-2">
+              <PolymarketDateTimeField
+                label="Start date min"
+                value={state.startDateMin || ""}
+                onChange={(iso) => patch({ startDateMin: iso })}
+                disabled={disabled}
+                placeholder="Start ≥"
+              />
+              <PolymarketDateTimeField
+                label="Start date max"
+                value={state.startDateMax || ""}
+                onChange={(iso) => patch({ startDateMax: iso })}
+                disabled={disabled}
+                placeholder="Start ≤"
+              />
+              <PolymarketDateTimeField
+                label="End date min"
+                value={state.endDateMin || ""}
+                onChange={(iso) => patch({ endDateMin: iso })}
+                disabled={disabled}
+                placeholder="End ≥"
+              />
+              <PolymarketDateTimeField
+                label="End date max"
+                value={state.endDateMax || ""}
+                onChange={(iso) => patch({ endDateMax: iso })}
+                disabled={disabled}
+                placeholder="End ≤"
+              />
+            </div>
           </div>
 
           <div className="grid gap-2 sm:grid-cols-2">

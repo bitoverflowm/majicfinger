@@ -70,6 +70,12 @@ import {
   normalizePolymarketMarketsByEventsComposeState,
   POLYMARKET_MARKETS_BY_EVENTS_ENDPOINT_ID,
 } from "@/lib/polymarketLive/marketsByEventsCompose";
+import {
+  buildPolymarketMarketsListQueryValues,
+  emptyPolymarketMarketsComposeState,
+  normalizePolymarketMarketsComposeState,
+  POLYMARKET_MARKETS_COMPOSE_ENDPOINT_ID,
+} from "@/lib/polymarketLive/marketsCompose";
 import { applyPolymarketMarketsByEventsFromEventsPayload } from "@/lib/polymarketLive/polymarketMarketsByEventsPull";
 
 const COOLDOWN_MS = 1500;
@@ -431,11 +437,15 @@ const Polymarket = ({ setConnectedData, requestSheetDestination, connectHomePull
     const endpointId = String(connectApiEndpointId || "").trim();
     const isEventsCompose = endpointId === "getEvents";
     const isMarketsByEventsCompose = endpointId === POLYMARKET_MARKETS_BY_EVENTS_ENDPOINT_ID;
+    const isMarketsCompose = endpointId === POLYMARKET_MARKETS_COMPOSE_ENDPOINT_ID;
     const isEventsStyleCompose = isEventsCompose || isMarketsByEventsCompose;
+    const isComposeEndpoint = isEventsStyleCompose || isMarketsCompose;
     const endpoint = isEventsStyleCompose
       ? ENDPOINTS.find((e) => e.query === "listEvents")
-      : ENDPOINTS.find((e) => e.query === endpointId);
-    if (!endpoint && !isEventsStyleCompose) {
+      : isMarketsCompose
+        ? ENDPOINTS.find((e) => e.query === "listMarkets")
+        : ENDPOINTS.find((e) => e.query === endpointId);
+    if (!endpoint && !isComposeEndpoint) {
       setConnectDataLakePullState?.((prev) => ({
         ...prev,
         loading: false,
@@ -446,6 +456,7 @@ const Polymarket = ({ setConnectedData, requestSheetDestination, connectHomePull
     const cols =
       connectApiColumnSelections[endpointId] ||
       (isEventsCompose ? connectApiColumnSelections.listEvents : null) ||
+      (isMarketsCompose ? connectApiColumnSelections.listMarkets : null) ||
       [];
     if (!cols.length) {
       setConnectDataLakePullState?.((prev) => ({
@@ -455,7 +466,7 @@ const Polymarket = ({ setConnectedData, requestSheetDestination, connectHomePull
       }));
       return;
     }
-    if (!isEventsStyleCompose) {
+    if (!isComposeEndpoint) {
       for (const p of endpoint.params || []) {
         if (!p.required) continue;
         setConnectDataLakePullState?.((prev) => ({
@@ -591,6 +602,19 @@ const Polymarket = ({ setConnectedData, requestSheetDestination, connectHomePull
         return;
       }
       values = { ...values, ...buildPolymarketEventsListQueryValues(compose) };
+    } else if (isMarketsCompose) {
+      const compose = normalizePolymarketMarketsComposeState(
+        contextStateV2?.connectPolymarketLiveMarketsCompose || emptyPolymarketMarketsComposeState(),
+      );
+      if (compose.mode !== "advanced") {
+        setConnectDataLakePullState?.((prev) => ({
+          ...prev,
+          loading: false,
+          error: "Switch to Advanced search to run a list-markets pull, or select a search result.",
+        }));
+        return;
+      }
+      values = { ...values, ...buildPolymarketMarketsListQueryValues(compose) };
     } else {
       endpoint.params?.forEach((p) => {
         if (p.default !== undefined && p.default !== "") values[p.key] = String(p.default);
@@ -604,7 +628,9 @@ const Polymarket = ({ setConnectedData, requestSheetDestination, connectHomePull
       label: "Pulling Polymarket data…",
       progress: Math.max(Number(prev.progress) || 0, 5),
     }));
-    runRequest(isEventsCompose ? "listEvents" : endpoint.query, values);
+    const query =
+      isEventsCompose ? "listEvents" : isMarketsCompose ? "listMarkets" : endpoint.query;
+    runRequest(query, values);
   }, [
     connectHomeActive,
     connectIntegrationPullTick,
