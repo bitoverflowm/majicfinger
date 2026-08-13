@@ -46,6 +46,7 @@ const HIDDEN_EVENT_ENDPOINT_IDS = new Set([
   "getMarket",
   "getMarketBySlug",
   "getMarketByToken",
+  "getMarketTags",
 ]);
 
 /** @type {Record<string, string>} */
