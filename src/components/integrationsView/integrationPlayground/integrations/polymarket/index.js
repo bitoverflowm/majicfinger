@@ -60,6 +60,11 @@ import {
 import { cn } from "@/lib/utils";
 import { ENDPOINTS, POLYMARKET_GROUPS, TRADES_RESPONSE_FIELDS } from "./config";
 import { trackDataPullComplete, trackDataPullError, trackDataPullStart } from "@/lib/analytics/trackDataPull";
+import {
+  buildPolymarketEventsListQueryValues,
+  emptyPolymarketEventsComposeState,
+  normalizePolymarketEventsComposeState,
+} from "@/lib/polymarketLive/eventsCompose";
 
 const COOLDOWN_MS = 1500;
 // Fallback when no endpoint responseFields and no prior pull – use Trade schema (docs: get-trades-for-a-user-or-markets)
@@ -417,8 +422,12 @@ const Polymarket = ({ setConnectedData, requestSheetDestination, connectHomePull
     if (lastConnectPullTickRef.current === connectIntegrationPullTick) return;
     lastConnectPullTickRef.current = connectIntegrationPullTick;
 
-    const endpoint = ENDPOINTS.find((e) => e.query === connectApiEndpointId);
-    if (!endpoint) {
+    const endpointId = String(connectApiEndpointId || "").trim();
+    const isEventsCompose = endpointId === "getEvents";
+    const endpoint = isEventsCompose
+      ? ENDPOINTS.find((e) => e.query === "listEvents")
+      : ENDPOINTS.find((e) => e.query === endpointId);
+    if (!endpoint && !isEventsCompose) {
       setConnectDataLakePullState?.((prev) => ({
         ...prev,
         loading: false,
@@ -426,7 +435,10 @@ const Polymarket = ({ setConnectedData, requestSheetDestination, connectHomePull
       }));
       return;
     }
-    const cols = connectApiColumnSelections[connectApiEndpointId] || [];
+    const cols =
+      connectApiColumnSelections[endpointId] ||
+      (isEventsCompose ? connectApiColumnSelections.listEvents : null) ||
+      [];
     if (!cols.length) {
       setConnectDataLakePullState?.((prev) => ({
         ...prev,
@@ -435,21 +447,39 @@ const Polymarket = ({ setConnectedData, requestSheetDestination, connectHomePull
       }));
       return;
     }
-    for (const p of endpoint.params || []) {
-      if (!p.required) continue;
-      setConnectDataLakePullState?.((prev) => ({
-        ...prev,
-        loading: false,
-        error: `"${endpoint.name}" needs ${p.label}. Use the integrations panel for required parameters, or pick a list endpoint.`,
-      }));
-      return;
+    if (!isEventsCompose) {
+      for (const p of endpoint.params || []) {
+        if (!p.required) continue;
+        setConnectDataLakePullState?.((prev) => ({
+          ...prev,
+          loading: false,
+          error: `"${endpoint.name}" needs ${p.label}. Use the integrations panel for required parameters, or pick a list endpoint.`,
+        }));
+        return;
+      }
     }
     const selectedFields = Object.fromEntries(cols.map((c) => [c, true]));
-    const values = { selectedFields };
-    endpoint.params?.forEach((p) => {
-      if (p.default !== undefined && p.default !== "") values[p.key] = String(p.default);
-      else if (p.key === "limit") values[p.key] = "20";
-    });
+    /** @type {Record<string, unknown>} */
+    let values = { selectedFields };
+    if (isEventsCompose) {
+      const compose = normalizePolymarketEventsComposeState(
+        contextStateV2?.connectPolymarketLiveEventsCompose || emptyPolymarketEventsComposeState(),
+      );
+      if (compose.mode !== "advanced") {
+        setConnectDataLakePullState?.((prev) => ({
+          ...prev,
+          loading: false,
+          error: "Switch to Advanced search to run a list-events pull, or select a search result.",
+        }));
+        return;
+      }
+      values = { ...values, ...buildPolymarketEventsListQueryValues(compose) };
+    } else {
+      endpoint.params?.forEach((p) => {
+        if (p.default !== undefined && p.default !== "") values[p.key] = String(p.default);
+        else if (p.key === "limit") values[p.key] = "20";
+      });
+    }
     setConnectDataLakePullState?.((prev) => ({
       ...prev,
       loading: true,
@@ -457,7 +487,7 @@ const Polymarket = ({ setConnectedData, requestSheetDestination, connectHomePull
       label: "Pulling Polymarket data…",
       progress: Math.max(Number(prev.progress) || 0, 5),
     }));
-    runRequest(endpoint.query, values);
+    runRequest(isEventsCompose ? "listEvents" : endpoint.query, values);
   }, [
     connectHomeActive,
     connectIntegrationPullTick,
@@ -465,6 +495,7 @@ const Polymarket = ({ setConnectedData, requestSheetDestination, connectHomePull
     connectApiColumnSelections,
     runRequest,
     setConnectDataLakePullState,
+    contextStateV2?.connectPolymarketLiveEventsCompose,
   ]);
 
   useEffect(() => {

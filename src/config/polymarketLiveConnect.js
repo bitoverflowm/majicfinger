@@ -5,6 +5,10 @@ import {
   PRICES_HISTORY_RESPONSE_FIELDS,
   TRADES_RESPONSE_FIELDS,
 } from "@/components/integrationsView/integrationPlayground/integrations/polymarket/config";
+import {
+  POLYMARKET_EVENTS_COMPOSE_COLUMNS,
+  POLYMARKET_EVENTS_COMPOSE_ENDPOINT_ID,
+} from "@/lib/polymarketLive/eventsCompose";
 
 /**
  * Top-level Polymarket Live endpoint groups (hub column tags).
@@ -24,6 +28,14 @@ export const POLYMARKET_LIVE_ENDPOINT_CATEGORIES = [
 
 export const POLYMARKET_LIVE_DEFAULT_ENDPOINT_CATEGORY = "markets";
 
+/** Legacy granular event endpoints — hidden from hub in favor of Get Event/Events. */
+const HIDDEN_EVENT_ENDPOINT_IDS = new Set([
+  "listEvents",
+  "getEvent",
+  "getEventBySlug",
+  "getEventTags",
+]);
+
 /** @type {Record<string, string>} */
 const ENDPOINT_CATEGORY_BY_QUERY = {
   listMarkets: "markets",
@@ -37,6 +49,7 @@ const ENDPOINT_CATEGORY_BY_QUERY = {
   getEvent: "events",
   getEventBySlug: "events",
   getEventTags: "events",
+  [POLYMARKET_EVENTS_COMPOSE_ENDPOINT_ID]: "events",
   getTopHolders: "holders",
   getTradesByMarket: "holders",
   getTradesByUser: "holders",
@@ -125,6 +138,13 @@ const PLACEHOLDER_ENDPOINTS = [
  * }>}
  */
 export const POLYMARKET_LIVE_CONNECT_ENDPOINTS = [
+  {
+    id: POLYMARKET_EVENTS_COMPOSE_ENDPOINT_ID,
+    category: "events",
+    title: "Get Event/Events",
+    description:
+      "Discover event(s), search with natural language, id, slug, or list events that match your criteria by volume, tag, status, etc.",
+  },
   ...ENDPOINTS.map((ep) => {
     const category = ENDPOINT_CATEGORY_BY_QUERY[ep.query] || ep.group || "markets";
     const underConstruction = !!ep.wsType || !!ep.broken;
@@ -136,6 +156,7 @@ export const POLYMARKET_LIVE_CONNECT_ENDPOINTS = [
       underConstruction,
       broken: !!ep.broken,
       wsType: !!ep.wsType,
+      hidden: HIDDEN_EVENT_ENDPOINT_IDS.has(ep.query),
     };
   }),
   ...PLACEHOLDER_ENDPOINTS,
@@ -144,7 +165,9 @@ export const POLYMARKET_LIVE_CONNECT_ENDPOINTS = [
 /** @param {string} categoryId */
 export function getPolymarketLiveEndpointsForCategory(categoryId) {
   const cat = String(categoryId || POLYMARKET_LIVE_DEFAULT_ENDPOINT_CATEGORY).trim();
-  return POLYMARKET_LIVE_CONNECT_ENDPOINTS.filter((ep) => (ep.category || "markets") === cat);
+  return POLYMARKET_LIVE_CONNECT_ENDPOINTS.filter(
+    (ep) => (ep.category || "markets") === cat && !ep.hidden,
+  );
 }
 
 /**
@@ -153,6 +176,9 @@ export function getPolymarketLiveEndpointsForCategory(categoryId) {
  */
 export function getPolymarketLiveColumnsForEndpoint(endpointQuery) {
   const id = String(endpointQuery || "").trim();
+  if (id === POLYMARKET_EVENTS_COMPOSE_ENDPOINT_ID) {
+    return POLYMARKET_EVENTS_COMPOSE_COLUMNS;
+  }
   const ep = ENDPOINTS.find((e) => e.query === id);
   if (ep?.responseFields?.length) {
     return ep.responseFields.map((name) => ({

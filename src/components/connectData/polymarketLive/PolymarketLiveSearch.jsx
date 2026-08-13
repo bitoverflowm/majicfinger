@@ -72,6 +72,10 @@ function suggestionKey(s) {
  *   disabled?: boolean;
  *   className?: string;
  *   onFocus?: () => void;
+ *   entities?: Array<"event" | "market" | "profile" | "tag">;
+ *   placeholder?: string;
+ *   searchTags?: boolean;
+ *   searchProfiles?: boolean;
  * }} props
  */
 export function PolymarketLiveSearch({
@@ -80,6 +84,10 @@ export function PolymarketLiveSearch({
   disabled = false,
   className,
   onFocus,
+  entities,
+  placeholder = "Search markets, events, profiles…",
+  searchTags = true,
+  searchProfiles = true,
 }) {
   const debounceRef = useRef(null);
   const suggestAbortRef = useRef(null);
@@ -115,8 +123,8 @@ export function PolymarketLiveSearch({
         query: "metadataSuggestions",
         q: trimmed,
         limit_per_type: "12",
-        search_tags: "true",
-        search_profiles: "true",
+        search_tags: searchTags ? "true" : "false",
+        search_profiles: searchProfiles ? "true" : "false",
         keep_closed_markets: "1",
       });
       const res = await fetch(`/api/integrations/polymarket?${params.toString()}`, {
@@ -133,7 +141,11 @@ export function PolymarketLiveSearch({
         setError(typeof data?.message === "string" ? data.message : "Search failed");
         return;
       }
-      const list = Array.isArray(data?.suggestions) ? data.suggestions : [];
+      let list = Array.isArray(data?.suggestions) ? data.suggestions : [];
+      if (Array.isArray(entities) && entities.length) {
+        const allow = new Set(entities);
+        list = list.filter((s) => allow.has(s?.entity));
+      }
       setSuggestions(list);
       setSuggestOpen(true);
     } catch (e) {
@@ -145,7 +157,7 @@ export function PolymarketLiveSearch({
     } finally {
       if (mySeq === suggestSeqRef.current) setSuggestLoading(false);
     }
-  }, []);
+  }, [entities, searchProfiles, searchTags]);
 
   useEffect(() => {
     if (debounceRef.current) clearTimeout(debounceRef.current);
@@ -206,7 +218,7 @@ export function PolymarketLiveSearch({
         </span>
         <input
           type="search"
-          placeholder="Search markets, events, profiles…"
+          placeholder={placeholder}
           value={q}
           onChange={(e) => setQ(e.target.value)}
           onFocus={() => {
@@ -336,11 +348,7 @@ export function PolymarketLiveSearch({
         <p className="text-[10px] leading-snug text-muted-foreground">
           Type at least 2 characters to search.
         </p>
-      ) : (
-        <p className="text-[10px] leading-snug text-muted-foreground">
-          Enter pulls all matches into your sheet. Click one result to pull just that hit.
-        </p>
-      )}
+      ) : null}
 
       {selectLoading ? (
         <p className="flex items-center gap-1.5 text-xs text-muted-foreground">

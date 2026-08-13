@@ -1,0 +1,546 @@
+"use client";
+
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { Loader2, X } from "lucide-react";
+
+import { PolymarketLiveSearch } from "@/components/connectData/polymarketLive/PolymarketLiveSearch";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Switch } from "@/components/ui/switch";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
+import { useMyStateV2 } from "@/context/stateContextV2";
+import {
+  emptyPolymarketEventsComposeState,
+  normalizePolymarketEventsComposeState,
+  POLYMARKET_EVENTS_RECURRENCE_OPTIONS,
+  POLYMARKET_EVENTS_SORT_OPTIONS,
+} from "@/lib/polymarketLive/eventsCompose";
+import { cn } from "@/lib/utils";
+
+/**
+ * @param {{
+ *   className?: string;
+ *   disabled?: boolean;
+ *   onSearchSelect?: (suggestion: import("@/lib/polymarketLive/polymarketPublicSearch").PolymarketPublicSearchSuggestion) => void;
+ *   onSearchSubmitAll?: (suggestions: import("@/lib/polymarketLive/polymarketPublicSearch").PolymarketPublicSearchSuggestion[]) => void;
+ * }} props
+ */
+export function PolymarketLiveEventsFields({
+  className,
+  disabled = false,
+  onSearchSelect,
+  onSearchSubmitAll,
+}) {
+  const ctx = useMyStateV2() ?? {};
+  const {
+    connectPolymarketLiveEventsCompose,
+    setConnectPolymarketLiveEventsCompose,
+  } = ctx;
+
+  const state = useMemo(
+    () =>
+      normalizePolymarketEventsComposeState(
+        connectPolymarketLiveEventsCompose || emptyPolymarketEventsComposeState(),
+      ),
+    [connectPolymarketLiveEventsCompose],
+  );
+
+  const patch = useCallback(
+    (partial) => {
+      setConnectPolymarketLiveEventsCompose?.((prev) => {
+        const cur = normalizePolymarketEventsComposeState(
+          prev || emptyPolymarketEventsComposeState(),
+        );
+        return normalizePolymarketEventsComposeState({ ...cur, ...partial });
+      });
+    },
+    [setConnectPolymarketLiveEventsCompose],
+  );
+
+  useEffect(() => {
+    if (connectPolymarketLiveEventsCompose == null) {
+      setConnectPolymarketLiveEventsCompose?.(emptyPolymarketEventsComposeState());
+    }
+  }, [connectPolymarketLiveEventsCompose, setConnectPolymarketLiveEventsCompose]);
+
+  const [tagCatalog, setTagCatalog] = useState(/** @type {Array<{id:string;slug:string;label?:string}>} */ ([]));
+  const [tagsLoading, setTagsLoading] = useState(false);
+  const [relatedTags, setRelatedTags] = useState(
+    /** @type {Array<{id:string;slug:string;label?:string}>} */ ([]),
+  );
+  const [relatedLoading, setRelatedLoading] = useState(false);
+
+  useEffect(() => {
+    let alive = true;
+    setTagsLoading(true);
+    void (async () => {
+      try {
+        const res = await fetch(
+          `/api/integrations/polymarket?query=listTags&limit=200&offset=0&order=id&ascending=true`,
+          { headers: { Accept: "application/json" }, credentials: "same-origin" },
+        );
+        const data = await res.json().catch(() => []);
+        if (!alive) return;
+        const list = Array.isArray(data) ? data : Array.isArray(data?.data) ? data.data : [];
+        setTagCatalog(
+          list
+            .map((t) => ({
+              id: String(t?.id ?? "").trim(),
+              slug: String(t?.slug ?? "").trim(),
+              label: String(t?.label || t?.slug || "").trim() || undefined,
+            }))
+            .filter((t) => t.id || t.slug),
+        );
+      } catch {
+        if (alive) setTagCatalog([]);
+      } finally {
+        if (alive) setTagsLoading(false);
+      }
+    })();
+    return () => {
+      alive = false;
+    };
+  }, []);
+
+  const primaryTagSlug = state.tags[0]?.slug || "";
+
+  useEffect(() => {
+    if (!primaryTagSlug) {
+      setRelatedTags([]);
+      return;
+    }
+    let alive = true;
+    setRelatedLoading(true);
+    void (async () => {
+      try {
+        const res = await fetch(
+          `/api/integrations/polymarket?query=relatedTagsBySlug&slug=${encodeURIComponent(primaryTagSlug)}`,
+          { headers: { Accept: "application/json" }, credentials: "same-origin" },
+        );
+        const data = await res.json().catch(() => []);
+        if (!alive) return;
+        const list = Array.isArray(data) ? data : [];
+        const selected = new Set(state.tags.map((t) => t.slug));
+        setRelatedTags(
+          list
+            .map((t) => ({
+              id: String(t?.id ?? "").trim(),
+              slug: String(t?.slug ?? "").trim(),
+              label: String(t?.label || t?.slug || "").trim() || undefined,
+            }))
+            .filter((t) => t.slug && !selected.has(t.slug))
+            .slice(0, 12),
+        );
+      } catch {
+        if (alive) setRelatedTags([]);
+      } finally {
+        if (alive) setRelatedLoading(false);
+      }
+    })();
+    return () => {
+      alive = false;
+    };
+  }, [primaryTagSlug, state.tags]);
+
+  const addEventRef = useCallback(
+    (suggestion) => {
+      const id = String(suggestion?.id || "").trim();
+      const slug = String(suggestion?.slug || "").trim();
+      const title = String(suggestion?.title || "").trim();
+      if (!id && !slug) return;
+      const next = [...state.eventRefs];
+      const existingIdx = next.findIndex(
+        (r) => (id && r.id === id) || (slug && r.slug === slug),
+      );
+      const row = {
+        id: id || next[existingIdx]?.id || "",
+        slug: slug || next[existingIdx]?.slug || undefined,
+        title: title || next[existingIdx]?.title || undefined,
+      };
+      if (!row.id && row.slug) row.id = row.slug;
+      if (existingIdx >= 0) next[existingIdx] = { ...next[existingIdx], ...row };
+      else next.push(row);
+      patch({ eventRefs: next });
+    },
+    [patch, state.eventRefs],
+  );
+
+  const removeEventRef = useCallback(
+    (id) => {
+      patch({ eventRefs: state.eventRefs.filter((r) => r.id !== id) });
+    },
+    [patch, state.eventRefs],
+  );
+
+  const addTag = useCallback(
+    (tag) => {
+      const id = String(tag?.id || "").trim();
+      const slug = String(tag?.slug || "").trim();
+      if (!id && !slug) return;
+      if (state.tags.some((t) => t.slug === slug || t.id === id)) return;
+      patch({
+        tags: [
+          ...state.tags,
+          {
+            id: id || slug,
+            slug: slug || id,
+            label: String(tag?.label || slug || id).trim() || undefined,
+          },
+        ],
+      });
+    },
+    [patch, state.tags],
+  );
+
+  const removeTag = useCallback(
+    (slug) => {
+      patch({ tags: state.tags.filter((t) => t.slug !== slug) });
+    },
+    [patch, state.tags],
+  );
+
+  const addOrderField = useCallback(
+    (value) => {
+      const v = String(value || "").trim();
+      if (!v || state.orderFields.includes(v)) return;
+      patch({ orderFields: [...state.orderFields, v] });
+    },
+    [patch, state.orderFields],
+  );
+
+  const removeOrderField = useCallback(
+    (value) => {
+      patch({ orderFields: state.orderFields.filter((f) => f !== value) });
+    },
+    [patch, state.orderFields],
+  );
+
+  const availableSortOptions = POLYMARKET_EVENTS_SORT_OPTIONS.filter(
+    (o) => !state.orderFields.includes(o.value),
+  );
+
+  /** @param {string} key @param {boolean} checked */
+  const setTriBool = (key, checked) => {
+    patch({ [key]: checked ? true : null });
+  };
+
+  return (
+    <div className={cn("space-y-4", className)}>
+      <div className="space-y-2">
+        <Label className="text-[0.6875rem] font-medium uppercase tracking-wider text-muted-foreground">
+          Mode
+        </Label>
+        <ToggleGroup
+          type="single"
+          value={state.mode}
+          onValueChange={(v) => {
+            if (v === "search" || v === "advanced") patch({ mode: v });
+          }}
+          className="justify-start"
+          disabled={disabled}
+        >
+          <ToggleGroupItem value="search" className="h-8 px-3 text-xs">
+            Search
+          </ToggleGroupItem>
+          <ToggleGroupItem value="advanced" className="h-8 px-3 text-xs">
+            Advanced search
+          </ToggleGroupItem>
+        </ToggleGroup>
+      </div>
+
+      {state.mode === "search" ? (
+        <div className="space-y-2">
+          <p className="text-[11px] leading-snug text-muted-foreground">
+            Search for an event or multiple events. Click on a single result or press Enter to load
+            all search recommendations into your sheet.
+          </p>
+            <PolymarketLiveSearch
+              entities={["event"]}
+              searchTags={false}
+              searchProfiles={false}
+              placeholder="Search events…"
+              disabled={disabled}
+              onSelect={(s) => onSearchSelect?.(s)}
+              onSubmitAll={(list) => onSearchSubmitAll?.(list)}
+            />
+        </div>
+      ) : (
+        <div className="space-y-4 rounded-xl border border-border/60 bg-muted/10 p-3">
+          <p className="text-[11px] leading-snug text-muted-foreground">
+            Query options for Polymarket{" "}
+            <span className="font-mono text-[10px]">GET /events</span>. Then pick return fields
+            below and run pull.
+          </p>
+
+          <div className="grid gap-3 sm:grid-cols-2">
+            <div className="space-y-1.5">
+              <Label className="text-[11px]">Limit</Label>
+              <Input
+                type="number"
+                min={0}
+                max={500}
+                className="h-8 text-xs"
+                disabled={disabled}
+                value={state.limit}
+                onChange={(e) => patch({ limit: Number(e.target.value) || 0 })}
+              />
+            </div>
+
+            <div className="space-y-1.5">
+              <div className="flex items-center justify-between gap-2">
+                <Label className="text-[11px]">Sort</Label>
+                <div className="flex items-center gap-1.5">
+                  <span className="text-[10px] text-muted-foreground">Ascending</span>
+                  <Switch
+                    checked={state.ascending}
+                    disabled={disabled}
+                    onCheckedChange={(v) => patch({ ascending: !!v })}
+                    className="scale-90"
+                  />
+                </div>
+              </div>
+              <Select
+                key={`sort:${state.orderFields.join(",")}`}
+                disabled={disabled || availableSortOptions.length === 0}
+                onValueChange={addOrderField}
+              >
+                <SelectTrigger className="h-8 text-xs">
+                  <SelectValue placeholder="Add sort field…" />
+                </SelectTrigger>
+                <SelectContent>
+                  {availableSortOptions.map((opt) => (
+                    <SelectItem key={opt.value} value={opt.value} className="text-xs">
+                      {opt.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {state.orderFields.length ? (
+                <div className="flex flex-wrap gap-1 pt-1">
+                  {state.orderFields.map((field, idx) => {
+                    const label =
+                      POLYMARKET_EVENTS_SORT_OPTIONS.find((o) => o.value === field)?.label ||
+                      field;
+                    return (
+                      <span
+                        key={`${field}:${idx}`}
+                        className="inline-flex items-center gap-1 rounded-full border border-border/60 bg-background px-2 py-0.5 text-[10px] text-foreground"
+                      >
+                        <span className="text-muted-foreground">{idx + 1}.</span>
+                        {label}
+                        <button
+                          type="button"
+                          disabled={disabled}
+                          className="text-muted-foreground hover:text-foreground"
+                          onClick={() => removeOrderField(field)}
+                          aria-label={`Remove sort ${label}`}
+                        >
+                          <X className="size-3" />
+                        </button>
+                      </span>
+                    );
+                  })}
+                </div>
+              ) : null}
+            </div>
+          </div>
+
+          <div className="space-y-1.5">
+            <Label className="text-[11px]">Event id / slug</Label>
+            <p className="text-[10px] leading-snug text-muted-foreground">
+              Search events and keep adding. Selecting fills both id and slug when available.
+            </p>
+            <PolymarketLiveSearch
+              entities={["event"]}
+              searchTags={false}
+              searchProfiles={false}
+              placeholder="Search events to add id + slug…"
+              disabled={disabled}
+              onSelect={(s) => addEventRef(s)}
+              onSubmitAll={(list) => list.forEach((s) => addEventRef(s))}
+            />
+            {state.eventRefs.length ? (
+              <ul className="mt-1 space-y-1">
+                {state.eventRefs.map((ref) => (
+                  <li
+                    key={ref.id}
+                    className="flex items-start justify-between gap-2 rounded-md border border-border/50 bg-background/80 px-2 py-1.5"
+                  >
+                    <div className="min-w-0">
+                      <p className="truncate text-xs font-medium text-foreground">
+                        {ref.title || ref.slug || ref.id}
+                      </p>
+                      <p className="truncate font-mono text-[10px] text-muted-foreground">
+                        id {ref.id}
+                        {ref.slug ? ` · ${ref.slug}` : ""}
+                      </p>
+                    </div>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      className="size-6 shrink-0"
+                      disabled={disabled}
+                      onClick={() => removeEventRef(ref.id)}
+                      aria-label="Remove event"
+                    >
+                      <X className="size-3.5" />
+                    </Button>
+                  </li>
+                ))}
+              </ul>
+            ) : null}
+          </div>
+
+          <div className="space-y-1.5">
+            <Label className="text-[11px]">Tags</Label>
+            <p className="text-[10px] leading-snug text-muted-foreground">
+              Pick tags from Polymarket. List events uses the first selected tag (
+              <span className="font-mono">tag_id</span> / <span className="font-mono">tag_slug</span>
+              ). Related tags appear after you select one.
+            </p>
+            <Select
+              key={`tag:${state.tags.map((t) => t.slug).join(",")}`}
+              disabled={disabled || tagsLoading}
+              onValueChange={(slug) => {
+                const tag = tagCatalog.find((t) => t.slug === slug || t.id === slug);
+                if (tag) addTag(tag);
+              }}
+            >
+              <SelectTrigger className="h-8 text-xs">
+                <SelectValue
+                  placeholder={tagsLoading ? "Loading tags…" : "Add tag…"}
+                />
+              </SelectTrigger>
+              <SelectContent className="max-h-[min(20rem,50vh)]">
+                {tagCatalog.map((tag) => (
+                  <SelectItem key={tag.slug || tag.id} value={tag.slug || tag.id} className="text-xs">
+                    <span className="font-mono">{tag.slug}</span>
+                    {tag.label && tag.label !== tag.slug ? (
+                      <span className="text-muted-foreground"> · {tag.label}</span>
+                    ) : null}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            {state.tags.length ? (
+              <div className="flex flex-wrap gap-1 pt-1">
+                {state.tags.map((tag) => (
+                  <span
+                    key={tag.slug}
+                    className="inline-flex items-center gap-1 rounded-full border border-border/60 bg-background px-2 py-0.5 font-mono text-[10px]"
+                  >
+                    {tag.slug}
+                    <button
+                      type="button"
+                      disabled={disabled}
+                      onClick={() => removeTag(tag.slug)}
+                      aria-label={`Remove tag ${tag.slug}`}
+                    >
+                      <X className="size-3" />
+                    </button>
+                  </span>
+                ))}
+              </div>
+            ) : null}
+            {primaryTagSlug ? (
+              <div className="pt-1">
+                <p className="mb-1 flex items-center gap-1.5 text-[10px] text-muted-foreground">
+                  Related tags
+                  {relatedLoading ? <Loader2 className="size-3 animate-spin" /> : null}
+                </p>
+                <div className="flex flex-wrap gap-1">
+                  {relatedTags.map((tag) => (
+                    <button
+                      key={tag.slug}
+                      type="button"
+                      disabled={disabled}
+                      onClick={() => addTag(tag)}
+                      className="rounded-full border border-dashed border-border/70 bg-muted/30 px-2 py-0.5 font-mono text-[10px] text-muted-foreground hover:border-border hover:text-foreground"
+                    >
+                      {tag.slug}
+                    </button>
+                  ))}
+                  {!relatedLoading && relatedTags.length === 0 ? (
+                    <span className="text-[10px] text-muted-foreground">No related tags</span>
+                  ) : null}
+                </div>
+              </div>
+            ) : null}
+          </div>
+
+          <div className="grid gap-2 sm:grid-cols-2">
+            {[
+              { key: "active", label: "Active" },
+              { key: "closed", label: "Closed" },
+              { key: "archived", label: "Archived" },
+              { key: "featured", label: "Featured" },
+              {
+                key: "cyom",
+                label: "CYOM",
+                hint: "CYOM markets are events created through Polymarket’s user/community market-creation workflow",
+              },
+              { key: "includeChat", label: "Include chat" },
+              { key: "includeTemplate", label: "Include template" },
+            ].map((row) => (
+              <label
+                key={row.key}
+                className="flex items-start justify-between gap-2 rounded-md border border-border/40 bg-background/60 px-2 py-1.5"
+              >
+                <span className="min-w-0">
+                  <span className="block text-[11px] font-medium text-foreground">{row.label}</span>
+                  {row.hint ? (
+                    <span className="mt-0.5 block text-[10px] leading-snug text-muted-foreground">
+                      {row.hint}
+                    </span>
+                  ) : null}
+                </span>
+                <Switch
+                  checked={state[row.key] === true}
+                  disabled={disabled}
+                  onCheckedChange={(v) => setTriBool(row.key, !!v)}
+                  className="mt-0.5 scale-90"
+                />
+              </label>
+            ))}
+          </div>
+
+          <div className="space-y-1.5">
+            <Label className="text-[11px]">Recurrence</Label>
+            <p className="text-[10px] leading-snug text-muted-foreground">
+              Filters events according to how frequently their associated series repeats.
+            </p>
+            <Select
+              disabled={disabled}
+              value={state.recurrence || "__any__"}
+              onValueChange={(v) => patch({ recurrence: v === "__any__" ? "" : v })}
+            >
+              <SelectTrigger className="h-8 text-xs">
+                <SelectValue placeholder="Any" />
+              </SelectTrigger>
+              <SelectContent>
+                {POLYMARKET_EVENTS_RECURRENCE_OPTIONS.map((opt) => (
+                  <SelectItem
+                    key={opt.value || "__any__"}
+                    value={opt.value || "__any__"}
+                    className="text-xs"
+                  >
+                    {opt.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}

@@ -834,7 +834,47 @@ export default async function handler(req, res) {
     switch (query) {
       case "listEvents": {
         const sp = buildSearchParams(EVENTS_PARAMS, req.query);
+        for (const key of ["id", "slug"]) {
+          const raw = req.query[key];
+          if (typeof raw === "string" && raw.includes(",")) {
+            sp.delete(key);
+            for (const part of raw.split(",").map((s) => s.trim()).filter(Boolean)) {
+              sp.append(key, part);
+            }
+          }
+        }
         data = await fetchJson(`${GAMMA_BASE}/events?${sp}`);
+        break;
+      }
+      case "listTags": {
+        const sp = new URLSearchParams();
+        if (req.query.limit != null && req.query.limit !== "") sp.set("limit", String(req.query.limit));
+        if (req.query.offset != null && req.query.offset !== "") sp.set("offset", String(req.query.offset));
+        if (req.query.order) sp.set("order", String(req.query.order));
+        if (req.query.ascending === "true" || req.query.ascending === "false") {
+          sp.set("ascending", String(req.query.ascending));
+        }
+        if (req.query.include_template === "true" || req.query.include_template === "false") {
+          sp.set("include_template", String(req.query.include_template));
+        }
+        if (req.query.is_carousel === "true" || req.query.is_carousel === "false") {
+          sp.set("is_carousel", String(req.query.is_carousel));
+        }
+        data = await fetchJson(`${GAMMA_BASE}/tags?${sp}`);
+        break;
+      }
+      case "relatedTagsBySlug": {
+        const slug = String(req.query.slug || "").trim();
+        if (!slug) return res.status(400).json({ message: "Missing required parameter: slug" });
+        const sp = new URLSearchParams();
+        if (req.query.omit_empty === "true" || req.query.omit_empty === "false") {
+          sp.set("omit_empty", String(req.query.omit_empty));
+        }
+        if (req.query.status) sp.set("status", String(req.query.status));
+        const qs = sp.toString();
+        data = await fetchJson(
+          `${GAMMA_BASE}/tags/slug/${encodeURIComponent(slug)}/related-tags/tags${qs ? `?${qs}` : ""}`,
+        );
         break;
       }
       case "getEvent": {

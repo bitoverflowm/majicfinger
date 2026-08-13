@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 
 import { PolymarketLiveSearch } from "@/components/connectData/polymarketLive/PolymarketLiveSearch";
+import { PolymarketLiveEventsFields } from "@/components/connectData/polymarketLive/PolymarketLiveEventsFields";
 import {
   ColumnPicker,
 } from "@/components/connectData/ConnectHomeIntegrationWorkflow";
@@ -28,6 +29,12 @@ import {
   getPolymarketLiveEndpointsForCategory,
 } from "@/config/polymarketLiveConnect";
 import {
+  emptyPolymarketEventsComposeState,
+  normalizePolymarketEventsComposeState,
+  POLYMARKET_EVENTS_COMPOSE_DEFAULT_COLUMNS,
+  POLYMARKET_EVENTS_COMPOSE_ENDPOINT_ID,
+} from "@/lib/polymarketLive/eventsCompose";
+import {
   applyPolymarketLiveSearchAll,
   applyPolymarketLiveSearchSelection,
 } from "@/lib/polymarketLivePowerSearchPull";
@@ -35,6 +42,7 @@ import { useDemoProGate } from "@/hooks/useDemoProGate";
 import { cn } from "@/lib/utils";
 
 const ENDPOINT_PRESENTATION = {
+  [POLYMARKET_EVENTS_COMPOSE_ENDPOINT_ID]: { icon: Vote, accent: "secondary" },
   listMarkets: { icon: Layers, accent: "secondary" },
   getMarket: { icon: Layers, accent: "secondary" },
   getMarketBySlug: { icon: Layers, accent: "secondary" },
@@ -224,6 +232,8 @@ export function PolymarketLiveIntegrationsCore({ onRunPull, className, stepBackR
     setConnectApiEndpointId,
     connectApiColumnSelections = {},
     setConnectApiColumnSelections,
+    connectPolymarketLiveEventsCompose,
+    setConnectPolymarketLiveEventsCompose,
   } = ctx;
 
   const runPolymarketLiveAction = useCallback(
@@ -267,18 +277,44 @@ export function PolymarketLiveIntegrationsCore({ onRunPull, className, stepBackR
 
   const selectedColumns = connectApiColumnSelections?.[selectedId] || [];
 
+  const eventsCompose = useMemo(
+    () =>
+      normalizePolymarketEventsComposeState(
+        connectPolymarketLiveEventsCompose || emptyPolymarketEventsComposeState(),
+      ),
+    [connectPolymarketLiveEventsCompose],
+  );
+
+  const isEventsCompose = selectedId === POLYMARKET_EVENTS_COMPOSE_ENDPOINT_ID;
+  const showAdvancedPullUi = !isEventsCompose || eventsCompose.mode === "advanced";
+
   const handleSelectEndpoint = useCallback(
     (id) => {
       setConnectApiEndpointId?.(id);
       const cols = getPolymarketLiveColumnsForEndpoint(id);
+      const defaultCols =
+        id === POLYMARKET_EVENTS_COMPOSE_ENDPOINT_ID
+          ? POLYMARKET_EVENTS_COMPOSE_DEFAULT_COLUMNS.filter((name) =>
+              cols.some((c) => c.name === name),
+            )
+          : cols.map((c) => c.name);
       if (cols.length) {
         setConnectApiColumnSelections?.((prev) => ({
           ...(prev || {}),
-          [id]: prev?.[id]?.length ? prev[id] : cols.map((c) => c.name),
+          [id]: prev?.[id]?.length ? prev[id] : defaultCols.length ? defaultCols : cols.map((c) => c.name),
         }));
       }
+      if (id === POLYMARKET_EVENTS_COMPOSE_ENDPOINT_ID) {
+        setConnectPolymarketLiveEventsCompose?.((prev) =>
+          prev ? normalizePolymarketEventsComposeState(prev) : emptyPolymarketEventsComposeState(),
+        );
+      }
     },
-    [setConnectApiEndpointId, setConnectApiColumnSelections],
+    [
+      setConnectApiEndpointId,
+      setConnectApiColumnSelections,
+      setConnectPolymarketLiveEventsCompose,
+    ],
   );
 
   const handlePublicSearchSelect = useCallback(
@@ -431,32 +467,42 @@ export function PolymarketLiveIntegrationsCore({ onRunPull, className, stepBackR
             </Button>
           </div>
 
-          <ColumnPicker
-            key={`polymarket-live:${selectedId}`}
-            sourceId={selectedId}
-            sourceName={selectedEndpointMeta?.title || selectedId}
-            columns={endpointColumns}
-            getDisplayLabel={displayLabel}
-            lake={null}
-            table={null}
-            enableComposeFormats={false}
-            selectedColumns={selectedColumns}
-            onSelectColumn={(col) =>
-              patchColumns(selectedId, (cur) => (cur.includes(col) ? cur : [...cur, col]))
-            }
-            onDeselectColumn={(col) =>
-              patchColumns(selectedId, (cur) => cur.filter((c) => c !== col))
-            }
-            onSelectAll={() => patchColumns(selectedId, () => endpointColumns.map((c) => c.name))}
-            onDeselectAll={() => patchColumns(selectedId, () => [])}
-            showComposeOperations={false}
-          >
-            <ConnectQueryComposeRunBar
-              selectedCount={selectedColumns.length}
-              onRun={onRunPull}
-              runLabel="Run pull"
+          {isEventsCompose ? (
+            <PolymarketLiveEventsFields
+              className="mt-2"
+              onSearchSelect={handlePublicSearchSelect}
+              onSearchSubmitAll={handlePublicSearchSubmitAll}
             />
-          </ColumnPicker>
+          ) : null}
+
+          {showAdvancedPullUi ? (
+            <ColumnPicker
+              key={`polymarket-live:${selectedId}`}
+              sourceId={selectedId}
+              sourceName={selectedEndpointMeta?.title || selectedId}
+              columns={endpointColumns}
+              getDisplayLabel={displayLabel}
+              lake={null}
+              table={null}
+              enableComposeFormats={false}
+              selectedColumns={selectedColumns}
+              onSelectColumn={(col) =>
+                patchColumns(selectedId, (cur) => (cur.includes(col) ? cur : [...cur, col]))
+              }
+              onDeselectColumn={(col) =>
+                patchColumns(selectedId, (cur) => cur.filter((c) => c !== col))
+              }
+              onSelectAll={() => patchColumns(selectedId, () => endpointColumns.map((c) => c.name))}
+              onDeselectAll={() => patchColumns(selectedId, () => [])}
+              showComposeOperations={false}
+            >
+              <ConnectQueryComposeRunBar
+                selectedCount={selectedColumns.length}
+                onRun={onRunPull}
+                runLabel="Run pull"
+              />
+            </ColumnPicker>
+          ) : null}
         </div>
       )}
       {demoProDialog}
