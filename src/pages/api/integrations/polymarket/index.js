@@ -1175,13 +1175,16 @@ export default async function handler(req, res) {
     }
 
     const outcomeOptimizedFormat = req.query.outcomeOptimizedFormat === "true" || req.query.outcomeOptimizedFormat === "1";
+    const skipFlatten = req.query.skipFlatten === "true" || req.query.skipFlatten === "1";
     const fieldsParam = req.query.fields;
     const fieldsFilter = fieldsParam
       ? String(fieldsParam).split(",").map((f) => f.trim()).filter(Boolean)
       : null;
 
     let result;
-    if (outcomeOptimizedFormat && (query === "listEvents" || query === "getEvent" || query === "getEventBySlug" || query === "listMarkets" || query === "getMarket" || query === "getMarketBySlug")) {
+    if (skipFlatten) {
+      result = Array.isArray(data) ? data : data != null ? [data] : [];
+    } else if (outcomeOptimizedFormat && (query === "listEvents" || query === "getEvent" || query === "getEventBySlug" || query === "listMarkets" || query === "getMarket" || query === "getMarketBySlug")) {
       const source = (query === "listEvents" || query === "getEvent" || query === "getEventBySlug") ? "events" : "markets";
       result = toOutcomeOptimizedFormat(data, source, fieldsFilter);
     } else {

@@ -65,6 +65,12 @@ import {
   emptyPolymarketEventsComposeState,
   normalizePolymarketEventsComposeState,
 } from "@/lib/polymarketLive/eventsCompose";
+import {
+  emptyPolymarketMarketsByEventsComposeState,
+  normalizePolymarketMarketsByEventsComposeState,
+  POLYMARKET_MARKETS_BY_EVENTS_ENDPOINT_ID,
+} from "@/lib/polymarketLive/marketsByEventsCompose";
+import { applyPolymarketMarketsByEventsFromEventsPayload } from "@/lib/polymarketLive/polymarketMarketsByEventsPull";
 
 const COOLDOWN_MS = 1500;
 // Fallback when no endpoint responseFields and no prior pull – use Trade schema (docs: get-trades-for-a-user-or-markets)
@@ -424,10 +430,12 @@ const Polymarket = ({ setConnectedData, requestSheetDestination, connectHomePull
 
     const endpointId = String(connectApiEndpointId || "").trim();
     const isEventsCompose = endpointId === "getEvents";
-    const endpoint = isEventsCompose
+    const isMarketsByEventsCompose = endpointId === POLYMARKET_MARKETS_BY_EVENTS_ENDPOINT_ID;
+    const isEventsStyleCompose = isEventsCompose || isMarketsByEventsCompose;
+    const endpoint = isEventsStyleCompose
       ? ENDPOINTS.find((e) => e.query === "listEvents")
       : ENDPOINTS.find((e) => e.query === endpointId);
-    if (!endpoint && !isEventsCompose) {
+    if (!endpoint && !isEventsStyleCompose) {
       setConnectDataLakePullState?.((prev) => ({
         ...prev,
         loading: false,
@@ -447,7 +455,7 @@ const Polymarket = ({ setConnectedData, requestSheetDestination, connectHomePull
       }));
       return;
     }
-    if (!isEventsCompose) {
+    if (!isEventsStyleCompose) {
       for (const p of endpoint.params || []) {
         if (!p.required) continue;
         setConnectDataLakePullState?.((prev) => ({
@@ -458,6 +466,115 @@ const Polymarket = ({ setConnectedData, requestSheetDestination, connectHomePull
         return;
       }
     }
+
+    if (isMarketsByEventsCompose) {
+      const compose = normalizePolymarketMarketsByEventsComposeState(
+        contextStateV2?.connectPolymarketLiveMarketsByEventsCompose ||
+          emptyPolymarketMarketsByEventsComposeState(),
+      );
+      if (compose.mode !== "advanced") {
+        setConnectDataLakePullState?.((prev) => ({
+          ...prev,
+          loading: false,
+          error: "Switch to Advanced search to run a markets-by-event pull, or select a search result.",
+        }));
+        return;
+      }
+      const values = buildPolymarketEventsListQueryValues(compose);
+      setConnectDataLakePullState?.((prev) => ({
+        ...prev,
+        loading: true,
+        error: null,
+        label: "Pulling markets from events…",
+        progress: Math.max(Number(prev.progress) || 0, 5),
+      }));
+
+      void (async () => {
+        const pullStartMs =
+          typeof performance !== "undefined" && performance?.now ? performance.now() : Date.now();
+        trackDataPullStart({
+          integration: "polymarket",
+          endpoint: POLYMARKET_MARKETS_BY_EVENTS_ENDPOINT_ID,
+          sampleLabel: "Get markets by event(s)",
+        });
+        try {
+          const params = new URLSearchParams({ query: "listEvents", skipFlatten: "1" });
+          for (const [k, v] of Object.entries(values)) {
+            if (v === undefined || v === null || v === "") continue;
+            params.set(k, String(v));
+          }
+          // Need nested markets intact — skipFlatten keeps the Gamma event.markets array.
+          const res = await fetch(`/api/integrations/polymarket?${params.toString()}`, {
+            method: "GET",
+            headers: { Accept: "application/json", "Content-Type": "application/json" },
+            credentials: "same-origin",
+          });
+          const data = await res.json().catch(() => ({}));
+          if (!res.ok) {
+            throw new Error(typeof data?.message === "string" ? data.message : "Request failed");
+          }
+          const events = Array.isArray(data) ? data : data != null ? [data] : [];
+          const ctx = {
+            ...contextStateV2,
+            setConnectedData,
+            addNewSheetAndActivate,
+            setSheetData,
+            setDataSheets: contextStateV2?.setDataSheets,
+            setActiveSheetId: contextStateV2?.setActiveSheetId,
+          };
+          const rowCount = applyPolymarketMarketsByEventsFromEventsPayload(ctx, events, {
+            sheetLayout: compose.sheetLayout,
+            selectedColumns: cols,
+          });
+          if (!rowCount) {
+            setConnectDataLakePullState?.((prev) => ({
+              ...prev,
+              loading: false,
+              error: "No markets found on the matched events.",
+              progress: 0,
+              label: "",
+            }));
+            return;
+          }
+          setLastRequestAt(Date.now());
+          setThrottleRemaining(COOLDOWN_MS);
+          setConnectDataLakePullState?.((prev) => ({
+            ...prev,
+            loading: false,
+            label: "",
+            progress: 100,
+            error: null,
+          }));
+          const elapsedMs =
+            (typeof performance !== "undefined" && performance?.now ? performance.now() : Date.now()) -
+            pullStartMs;
+          trackDataPullComplete({
+            integration: "polymarket",
+            endpoint: POLYMARKET_MARKETS_BY_EVENTS_ENDPOINT_ID,
+            sampleLabel: "Get markets by event(s)",
+            rowCount,
+            elapsedMs,
+          });
+        } catch (e) {
+          const msg = e instanceof Error ? e.message : "Request failed";
+          trackDataPullError({
+            message: msg,
+            integration: "polymarket",
+            source: "polymarket.getMarketsByEvents",
+            meta: { endpoint: POLYMARKET_MARKETS_BY_EVENTS_ENDPOINT_ID },
+          });
+          setConnectDataLakePullState?.((prev) => ({
+            ...prev,
+            loading: false,
+            error: msg,
+            label: "",
+            progress: 0,
+          }));
+        }
+      })();
+      return;
+    }
+
     const selectedFields = Object.fromEntries(cols.map((c) => [c, true]));
     /** @type {Record<string, unknown>} */
     let values = { selectedFields };
@@ -495,7 +612,10 @@ const Polymarket = ({ setConnectedData, requestSheetDestination, connectHomePull
     connectApiColumnSelections,
     runRequest,
     setConnectDataLakePullState,
-    contextStateV2?.connectPolymarketLiveEventsCompose,
+    contextStateV2,
+    setConnectedData,
+    addNewSheetAndActivate,
+    setSheetData,
   ]);
 
   useEffect(() => {

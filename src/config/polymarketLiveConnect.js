@@ -9,6 +9,10 @@ import {
   POLYMARKET_EVENTS_COMPOSE_COLUMNS,
   POLYMARKET_EVENTS_COMPOSE_ENDPOINT_ID,
 } from "@/lib/polymarketLive/eventsCompose";
+import {
+  POLYMARKET_MARKETS_BY_EVENTS_COMPOSE_COLUMNS,
+  POLYMARKET_MARKETS_BY_EVENTS_ENDPOINT_ID,
+} from "@/lib/polymarketLive/marketsByEventsCompose";
 
 /**
  * Top-level Polymarket Live endpoint groups (hub column tags).
@@ -50,6 +54,7 @@ const ENDPOINT_CATEGORY_BY_QUERY = {
   getEventBySlug: "events",
   getEventTags: "events",
   [POLYMARKET_EVENTS_COMPOSE_ENDPOINT_ID]: "events",
+  [POLYMARKET_MARKETS_BY_EVENTS_ENDPOINT_ID]: "markets",
   getTopHolders: "holders",
   getTradesByMarket: "holders",
   getTradesByUser: "holders",
@@ -139,6 +144,13 @@ const PLACEHOLDER_ENDPOINTS = [
  */
 export const POLYMARKET_LIVE_CONNECT_ENDPOINTS = [
   {
+    id: POLYMARKET_MARKETS_BY_EVENTS_ENDPOINT_ID,
+    category: "markets",
+    title: "Get markets by event(s)",
+    description:
+      "Find event(s), then extract their markets — all in one sheet, with event details, or one sheet per event.",
+  },
+  {
     id: POLYMARKET_EVENTS_COMPOSE_ENDPOINT_ID,
     category: "events",
     title: "Get Event/Events",
@@ -178,6 +190,9 @@ export function getPolymarketLiveColumnsForEndpoint(endpointQuery) {
   const id = String(endpointQuery || "").trim();
   if (id === POLYMARKET_EVENTS_COMPOSE_ENDPOINT_ID) {
     return POLYMARKET_EVENTS_COMPOSE_COLUMNS;
+  }
+  if (id === POLYMARKET_MARKETS_BY_EVENTS_ENDPOINT_ID) {
+    return POLYMARKET_MARKETS_BY_EVENTS_COMPOSE_COLUMNS;
   }
   const ep = ENDPOINTS.find((e) => e.query === id);
   if (ep?.responseFields?.length) {
