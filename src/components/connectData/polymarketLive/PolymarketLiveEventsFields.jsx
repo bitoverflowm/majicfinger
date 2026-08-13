@@ -496,6 +496,44 @@ export function PolymarketLiveEventsFields({
     (o) => !state.orderFields.includes(o.value),
   );
 
+  const [searchPicks, setSearchPicks] = useState(
+    /** @type {import("@/lib/polymarketLive/polymarketPublicSearch").PolymarketPublicSearchSuggestion[]} */ (
+      []
+    ),
+  );
+  const [searchGoLoading, setSearchGoLoading] = useState(false);
+
+  /**
+   * @param {import("@/lib/polymarketLive/polymarketPublicSearch").PolymarketPublicSearchSuggestion} s
+   */
+  const addSearchPick = useCallback((s) => {
+    if (!s) return;
+    setSearchPicks((prev) => {
+      const key = `${s.entity}:${s.id || ""}:${s.slug || ""}`;
+      if (prev.some((p) => `${p.entity}:${p.id || ""}:${p.slug || ""}` === key)) return prev;
+      return [...prev, s];
+    });
+  }, []);
+
+  /**
+   * @param {string} key
+   */
+  const removeSearchPick = useCallback((key) => {
+    setSearchPicks((prev) =>
+      prev.filter((p) => `${p.entity}:${p.id || ""}:${p.slug || ""}` !== key),
+    );
+  }, []);
+
+  const handleSearchGo = useCallback(async () => {
+    if (!searchPicks.length || !onSearchSubmitAll) return;
+    setSearchGoLoading(true);
+    try {
+      await onSearchSubmitAll(searchPicks);
+    } finally {
+      setSearchGoLoading(false);
+    }
+  }, [onSearchSubmitAll, searchPicks]);
+
   /** @param {string} key @param {boolean} checked */
   const setTriBool = (key, checked) => {
     patch({ [key]: checked ? true : null });
@@ -511,7 +549,10 @@ export function PolymarketLiveEventsFields({
           type="single"
           value={state.mode}
           onValueChange={(v) => {
-            if (v === "search" || v === "advanced") patch({ mode: v });
+            if (v === "search" || v === "advanced") {
+              patch({ mode: v });
+              if (v === "advanced") setSearchPicks([]);
+            }
           }}
           className="justify-start"
           disabled={disabled}
@@ -529,8 +570,8 @@ export function PolymarketLiveEventsFields({
         <div className="space-y-3">
           <p className="text-[11px] leading-snug text-muted-foreground dark:text-slate-400">
             {isMarketsByEvents
-              ? "Search for an event or multiple events. We’ll pull the markets inside those events into your sheet(s)."
-              : "Search for an event or multiple events. Click on a single result or press Enter to load all search recommendations into your sheet."}
+              ? "Search and add one or more events, then press Go to pull markets from those events into your sheet(s)."
+              : "Search and add one or more events, then press Go to load them into your sheet."}
           </p>
           {isMarketsByEvents ? (
             <div className="space-y-2">
@@ -562,15 +603,75 @@ export function PolymarketLiveEventsFields({
               </div>
             </div>
           ) : null}
-            <PolymarketLiveSearch
-              entities={["event"]}
-              searchTags={false}
-              searchProfiles={false}
-              placeholder="Search events…"
-              disabled={disabled}
-              onSelect={(s) => onSearchSelect?.(s)}
-              onSubmitAll={(list) => onSearchSubmitAll?.(list)}
-            />
+          <PolymarketLiveSearch
+            entities={["event"]}
+            searchTags={false}
+            searchProfiles={false}
+            placeholder="Search events…"
+            disabled={disabled || searchGoLoading}
+            collectMode
+            onSelect={(s) => addSearchPick(s)}
+            onSubmitAll={(list) => {
+              for (const s of list || []) addSearchPick(s);
+            }}
+          />
+          {searchPicks.length ? (
+            <div className="space-y-2">
+              <div className="flex flex-wrap gap-1.5">
+                {searchPicks.map((s) => {
+                  const key = `${s.entity}:${s.id || ""}:${s.slug || ""}`;
+                  const label = String(s.title || s.slug || s.ticker || s.id || "Event").trim();
+                  return (
+                    <span
+                      key={key}
+                      className="inline-flex max-w-full items-center gap-0.5 rounded-full border border-emerald-600/25 bg-emerald-500/10 py-px pl-1.5 pr-0.5 text-[10px] font-medium leading-4 text-emerald-900 dark:text-emerald-100"
+                    >
+                      <span className="truncate">{label}</span>
+                      <button
+                        type="button"
+                        disabled={disabled || searchGoLoading}
+                        aria-label={`Remove ${label}`}
+                        className="rounded-full p-0.5 text-emerald-800/70 hover:bg-emerald-500/20 hover:text-emerald-950 dark:text-emerald-100/80"
+                        onClick={() => removeSearchPick(key)}
+                      >
+                        <X className="size-3" />
+                      </button>
+                    </span>
+                  );
+                })}
+              </div>
+              <div className="flex items-center gap-2">
+                <Button
+                  type="button"
+                  size="sm"
+                  className="h-8 px-3 text-xs"
+                  disabled={disabled || searchGoLoading || !searchPicks.length}
+                  onClick={() => void handleSearchGo()}
+                >
+                  {searchGoLoading ? (
+                    <>
+                      <Loader2 className="mr-1.5 size-3.5 animate-spin" />
+                      Pulling…
+                    </>
+                  ) : (
+                    `Go (${searchPicks.length})`
+                  )}
+                </Button>
+                <button
+                  type="button"
+                  disabled={disabled || searchGoLoading}
+                  className="text-[11px] text-muted-foreground hover:text-foreground"
+                  onClick={() => setSearchPicks([])}
+                >
+                  Clear
+                </button>
+              </div>
+            </div>
+          ) : (
+            <p className="text-[10px] leading-snug text-muted-foreground dark:text-slate-400">
+              Select events from search to build your list, then press Go.
+            </p>
+          )}
         </div>
       ) : (
         <div className="space-y-4 rounded-xl border border-border/60 bg-muted/10 p-3 text-foreground">

@@ -64,7 +64,8 @@ function suggestionKey(s) {
 /**
  * Polymarket Gamma `/public-search` suggestions for Connect home.
  *
- * Enter pulls all current matches; clicking a suggestion pulls that hit only.
+ * Default: Enter pulls all current matches; clicking a suggestion pulls that hit only.
+ * `collectMode`: clicking / Enter adds matches as selections (parent shows chips + Go).
  *
  * @param {{
  *   onSelect: (suggestion: PolymarketPublicSearchSuggestion) => void | Promise<void>;
@@ -76,6 +77,7 @@ function suggestionKey(s) {
  *   placeholder?: string;
  *   searchTags?: boolean;
  *   searchProfiles?: boolean;
+ *   collectMode?: boolean;
  * }} props
  */
 export function PolymarketLiveSearch({
@@ -88,6 +90,7 @@ export function PolymarketLiveSearch({
   placeholder = "Search markets, events, profiles…",
   searchTags = true,
   searchProfiles = true,
+  collectMode = false,
 }) {
   const debounceRef = useRef(null);
   const suggestAbortRef = useRef(null);
@@ -172,8 +175,18 @@ export function PolymarketLiveSearch({
   const handleSelect = useCallback(
     async (s) => {
       setSuggestOpen(false);
-      setSelectLoading(true);
       setError(null);
+      if (collectMode) {
+        try {
+          await onSelect(s);
+          setQ("");
+          setSuggestions([]);
+        } catch (e) {
+          setError(e instanceof Error ? e.message : "Failed to add selection");
+        }
+        return;
+      }
+      setSelectLoading(true);
       try {
         await onSelect(s);
       } catch (e) {
@@ -182,14 +195,25 @@ export function PolymarketLiveSearch({
         setSelectLoading(false);
       }
     },
-    [onSelect],
+    [collectMode, onSelect],
   );
 
   const handleSubmitAll = useCallback(async () => {
     if (!suggestions.length) return;
     setSuggestOpen(false);
-    setSelectLoading(true);
     setError(null);
+    if (collectMode) {
+      try {
+        if (onSubmitAll) await onSubmitAll(suggestions);
+        else await onSelect(suggestions[0]);
+        setQ("");
+        setSuggestions([]);
+      } catch (e) {
+        setError(e instanceof Error ? e.message : "Failed to add selections");
+      }
+      return;
+    }
+    setSelectLoading(true);
     try {
       if (onSubmitAll) {
         await onSubmitAll(suggestions);
@@ -201,7 +225,7 @@ export function PolymarketLiveSearch({
     } finally {
       setSelectLoading(false);
     }
-  }, [onSelect, onSubmitAll, suggestions]);
+  }, [collectMode, onSelect, onSubmitAll, suggestions]);
 
   const busy = disabled || selectLoading;
   const eligible = isPolymarketPublicSearchEligible(q);
@@ -353,7 +377,7 @@ export function PolymarketLiveSearch({
       {selectLoading ? (
         <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
           <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden />
-          Loading into your sheet…
+          {collectMode ? "Adding…" : "Loading into your sheet…"}
         </p>
       ) : null}
       {error ? <p className="text-xs text-destructive">{error}</p> : null}
