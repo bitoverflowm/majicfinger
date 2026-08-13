@@ -469,11 +469,20 @@ async function tryNamedClobFetch(target, name, url) {
   }
 }
 
+function tagLabelsFromEntity(entity) {
+  const tags = entity?.tags;
+  if (!Array.isArray(tags)) return [];
+  return tags
+    .map((t) => (t && typeof t === "object" ? String(t.label || t.slug || "").trim() : ""))
+    .filter(Boolean)
+    .slice(0, 6);
+}
+
 function flattenPublicSearchToSuggestions(searchPayload, max = 28) {
   const out = [];
   const seen = new Set();
   const add = (row) => {
-    const k = `${row.entity}:${row.id || ""}:${row.slug || ""}`;
+    const k = `${row.entity}:${row.id || ""}:${row.slug || ""}:${row.proxyWallet || ""}`;
     if (seen.has(k)) return;
     seen.add(k);
     out.push(row);
@@ -485,14 +494,25 @@ function flattenPublicSearchToSuggestions(searchPayload, max = 28) {
       if (!ev) continue;
       const eid = ev.id != null ? String(ev.id) : "";
       const eslug = ev.slug ? String(ev.slug) : "";
+      const eticker = ev.ticker ? String(ev.ticker) : "";
       if (eid || eslug) {
         add({
           entity: "event",
           id: eid,
           slug: eslug || undefined,
+          ticker: eticker || undefined,
           title: ev.title || ev.ticker || "Event",
           subtitle: ev.subtitle || (ev.description ? String(ev.description).slice(0, 180) : undefined),
-          volume24hr: ev.volume24hr,
+          volume: ev.volume ?? null,
+          volume24hr: ev.volume24hr ?? null,
+          active: ev.active ?? null,
+          closed: ev.closed ?? null,
+          live: ev.live ?? null,
+          archived: ev.archived ?? null,
+          featured: ev.featured ?? null,
+          new: ev.new ?? null,
+          tagLabels: tagLabelsFromEntity(ev),
+          raw: ev,
         });
       }
       const markets = ev.markets;
@@ -506,36 +526,113 @@ function flattenPublicSearchToSuggestions(searchPayload, max = 28) {
             entity: "market",
             id: mid,
             slug: mslug || undefined,
+            ticker: mslug || mid || undefined,
             title: m.question || m.groupItemTitle || "Market",
             subtitle: ev.title ? `Event: ${ev.title}` : undefined,
             conditionId: m.conditionId ?? m.condition_id,
             parentEventId: eid || undefined,
             parentEventSlug: eslug || undefined,
-            volume24hr: m.volume24hr ?? m.volume,
+            volume: m.volumeNum ?? m.volume ?? null,
+            volume24hr: m.volume24hr ?? null,
+            active: m.active ?? null,
+            closed: m.closed ?? null,
+            live: m.fpmmLive ?? null,
+            archived: m.archived ?? null,
+            featured: m.featured ?? null,
+            new: m.new ?? null,
+            acceptingOrders: m.acceptingOrders ?? null,
+            tagLabels: tagLabelsFromEntity(m),
+            raw: m,
           });
         }
       }
     }
   }
+
+  const profiles = searchPayload?.profiles;
+  if (Array.isArray(profiles)) {
+    for (const p of profiles) {
+      if (!p) continue;
+      const pid = p.id != null ? String(p.id) : "";
+      const wallet = p.proxyWallet ? String(p.proxyWallet) : "";
+      const name = String(p.name || p.pseudonym || "").trim();
+      if (!pid && !wallet && !name) continue;
+      add({
+        entity: "profile",
+        id: pid,
+        slug: undefined,
+        ticker: wallet ? `${wallet.slice(0, 6)}…${wallet.slice(-4)}` : undefined,
+        title: name || wallet || "Profile",
+        subtitle: p.bio ? String(p.bio).slice(0, 180) : wallet || undefined,
+        proxyWallet: wallet || undefined,
+        pseudonym: p.pseudonym ? String(p.pseudonym) : undefined,
+        volume: null,
+        volume24hr: null,
+        active: null,
+        closed: null,
+        live: null,
+        tagLabels: [],
+        raw: p,
+      });
+    }
+  }
+
+  const tags = searchPayload?.tags;
+  if (Array.isArray(tags)) {
+    for (const t of tags) {
+      if (!t) continue;
+      const tid = t.id != null ? String(t.id) : "";
+      const label = String(t.label || t.slug || "").trim();
+      if (!tid && !label) continue;
+      add({
+        entity: "tag",
+        id: tid,
+        slug: t.slug ? String(t.slug) : undefined,
+        ticker: t.slug ? String(t.slug) : undefined,
+        title: label || "Tag",
+        subtitle:
+          t.event_count != null ? `${t.event_count} events` : undefined,
+        volume: null,
+        volume24hr: null,
+        active: null,
+        closed: null,
+        live: null,
+        eventCount: t.event_count ?? null,
+        tagLabels: [],
+        raw: t,
+      });
+    }
+  }
+
   return out.slice(0, max);
 }
 
-async function runMetadataSuggestions(rawQ, limitPerType) {
+async function runMetadataSuggestions(rawQ, limitPerType, opts = {}) {
   const trimmed = String(rawQ || "").trim();
   if (!trimmed) {
     return { query: "", suggestions: [], publicSearch: null };
   }
   const cap = Math.min(50, Math.max(5, limitPerType ?? 20));
+  const searchTags = opts.searchTags === true || opts.searchTags === "true" || opts.searchTags === "1";
+  const searchProfiles =
+    opts.searchProfiles === true ||
+    opts.searchProfiles === "true" ||
+    opts.searchProfiles === "1";
+  const keepClosed =
+    opts.keepClosedMarkets === true ||
+    opts.keepClosedMarkets === "true" ||
+    opts.keepClosedMarkets === "1" ||
+    opts.keepClosedMarkets === 1;
   const ps = new URLSearchParams();
   ps.set("q", trimmed);
   ps.set("limit_per_type", String(cap));
-  ps.set("search_tags", "false");
-  ps.set("search_profiles", "false");
-  ps.set("keep_closed_markets", "0");
+  ps.set("search_tags", searchTags ? "true" : "false");
+  ps.set("search_profiles", searchProfiles ? "true" : "false");
+  ps.set("keep_closed_markets", keepClosed ? "1" : "0");
   const publicSearch = await fetchJson(`${GAMMA_BASE}/public-search?${ps.toString()}`);
   return {
     query: trimmed,
-    suggestions: flattenPublicSearchToSuggestions(publicSearch, 30),
+    suggestions: flattenPublicSearchToSuggestions(publicSearch, 40),
     publicSearch,
   };
 }
@@ -921,7 +1018,11 @@ export default async function handler(req, res) {
           return res.status(200).json({ query: "", suggestions: [], publicSearch: null });
         }
         const limitPerType = Math.min(50, Math.max(5, Number(req.query.limit_per_type) || 20));
-        const payload = await runMetadataSuggestions(String(q).trim(), limitPerType);
+        const payload = await runMetadataSuggestions(String(q).trim(), limitPerType, {
+          searchTags: req.query.search_tags,
+          searchProfiles: req.query.search_profiles,
+          keepClosedMarkets: req.query.keep_closed_markets,
+        });
         return res.status(200).json(payload);
       }
       case "metadataResolve": {

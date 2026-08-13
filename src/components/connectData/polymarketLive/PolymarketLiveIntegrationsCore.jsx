@@ -13,6 +13,7 @@ import {
   Medal,
 } from "lucide-react";
 
+import { PolymarketLiveSearch } from "@/components/connectData/polymarketLive/PolymarketLiveSearch";
 import {
   ColumnPicker,
 } from "@/components/connectData/ConnectHomeIntegrationWorkflow";
@@ -26,6 +27,11 @@ import {
   getPolymarketLiveColumnsForEndpoint,
   getPolymarketLiveEndpointsForCategory,
 } from "@/config/polymarketLiveConnect";
+import {
+  applyPolymarketLiveSearchAll,
+  applyPolymarketLiveSearchSelection,
+} from "@/lib/polymarketLivePowerSearchPull";
+import { useDemoProGate } from "@/hooks/useDemoProGate";
 import { cn } from "@/lib/utils";
 
 const ENDPOINT_PRESENTATION = {
@@ -212,12 +218,28 @@ function LiveSourceOption({ endpoint, isSelected, onSelect }) {
  */
 export function PolymarketLiveIntegrationsCore({ onRunPull, className, stepBackRef }) {
   const ctx = useMyStateV2() ?? {};
+  const { workspaceWriteLocked, requestProUpgrade, dialog: demoProDialog } = useDemoProGate();
   const {
     connectApiEndpointId = "",
     setConnectApiEndpointId,
     connectApiColumnSelections = {},
     setConnectApiColumnSelections,
   } = ctx;
+
+  const runPolymarketLiveAction = useCallback(
+    (action) => {
+      if (workspaceWriteLocked) {
+        requestProUpgrade("Polymarket Live", {
+          title: "Upgrade to unlock",
+          description:
+            "Saving, data pulls, uploads, and integrations require an active paid plan (or lifetime access).",
+        });
+        return;
+      }
+      if (typeof action === "function") action();
+    },
+    [workspaceWriteLocked, requestProUpgrade],
+  );
 
   const selectedId = String(connectApiEndpointId || "").trim();
 
@@ -259,6 +281,20 @@ export function PolymarketLiveIntegrationsCore({ onRunPull, className, stepBackR
     [setConnectApiEndpointId, setConnectApiColumnSelections],
   );
 
+  const handlePublicSearchSelect = useCallback(
+    (suggestion) => {
+      runPolymarketLiveAction(() => applyPolymarketLiveSearchSelection(ctx, suggestion));
+    },
+    [ctx, runPolymarketLiveAction],
+  );
+
+  const handlePublicSearchSubmitAll = useCallback(
+    (suggestions) => {
+      runPolymarketLiveAction(() => applyPolymarketLiveSearchAll(ctx, suggestions));
+    },
+    [ctx, runPolymarketLiveAction],
+  );
+
   const patchColumns = useCallback(
     (sourceId, updater) => {
       setConnectApiColumnSelections?.((prev) => {
@@ -296,8 +332,8 @@ export function PolymarketLiveIntegrationsCore({ onRunPull, className, stepBackR
               What do you want to do with Polymarket live data?
             </h3>
             <p className="text-xs leading-relaxed text-muted-foreground">
-              Start from a live endpoint or browse by category for real-time prediction market
-              monitoring.
+              Start from a live endpoint, or search markets, events, and profiles with Polymarket&apos;s
+              public search.
             </p>
           </div>
 
@@ -337,18 +373,19 @@ export function PolymarketLiveIntegrationsCore({ onRunPull, className, stepBackR
               <HubStartingPointColumn
                 icon={Sparkles}
                 title="Natural Language Search"
-                description="Search markets and events in plain language. Coming soon for Polymarket Live."
+                description="Search anything — markets, events, profiles, and tags — powered by Polymarket public search."
                 className="h-auto shrink-0"
               >
-                <div className="rounded-lg border border-dashed border-border/60 bg-background/60 px-3 py-4 text-center">
-                  <p className="text-[11px] text-muted-foreground">Search coming soon</p>
-                </div>
+                <PolymarketLiveSearch
+                  onSelect={handlePublicSearchSelect}
+                  onSubmitAll={handlePublicSearchSubmitAll}
+                />
               </HubStartingPointColumn>
 
               <HubStartingPointColumn
                 icon={Search}
                 title="Search for a specific market or event"
-                description="Ticker and slug search will live here — use List endpoints for now."
+                description="Ticker and slug search will live here — use List endpoints or natural language search for now."
                 className="h-auto min-h-0 flex-1"
               >
                 <p className="text-[11px] font-medium text-muted-foreground">Examples</p>
@@ -422,6 +459,7 @@ export function PolymarketLiveIntegrationsCore({ onRunPull, className, stepBackR
           </ColumnPicker>
         </div>
       )}
+      {demoProDialog}
     </div>
   );
 }
