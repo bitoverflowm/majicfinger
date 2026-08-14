@@ -5,11 +5,13 @@ import {
   prepareConnectHomePullSheet,
 } from "@/lib/connectHomePullDestination";
 import {
+  marketRefFromListMarketsRow,
   marketRefFromPublicSearchSuggestion,
   normalizePolymarketHoldersByMarketsComposeState,
   normalizePolymarketHoldersByMarketsSheetLayout,
   POLYMARKET_HOLDERS_BY_MARKETS_SHEET_LAYOUT_PER_MARKET,
 } from "@/lib/polymarketLive/holdersByMarketsCompose";
+import { buildPolymarketMarketsListQueryValues } from "@/lib/polymarketLive/marketsCompose";
 
 /**
  * @param {Record<string, unknown>} dataSheets
@@ -168,21 +170,78 @@ export async function resolveHoldersMarketConditionIds(refs) {
 }
 
 /**
+ * List markets matching advanced filters, then map to holder market refs.
+ *
+ * @param {import("@/lib/polymarketLive/marketsCompose").PolymarketMarketsComposeState} marketsFilters
+ * @returns {Promise<import("@/lib/polymarketLive/holdersByMarketsCompose").PolymarketHoldersMarketRef[]>}
+ */
+export async function discoverHoldersMarketsFromListFilters(marketsFilters) {
+  const values = buildPolymarketMarketsListQueryValues({
+    ...marketsFilters,
+    mode: "advanced",
+  });
+  const params = new URLSearchParams({ query: "listMarkets" });
+  for (const [k, v] of Object.entries(values)) {
+    if (v === undefined || v === null || v === "") continue;
+    params.set(k, String(v));
+  }
+  // Need conditionId on each market — request a focused field set.
+  params.set("fields", "id,slug,question,conditionId,condition_id,groupItemTitle,title");
+
+  const res = await fetch(`/api/integrations/polymarket?${params.toString()}`, {
+    method: "GET",
+    headers: { Accept: "application/json" },
+    credentials: "same-origin",
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    throw new Error(typeof data?.message === "string" ? data.message : "Failed to list markets");
+  }
+  const arr = Array.isArray(data) ? data : data != null ? [data] : [];
+  /** @type {import("@/lib/polymarketLive/holdersByMarketsCompose").PolymarketHoldersMarketRef[]} */
+  const refs = [];
+  const seen = new Set();
+  for (const row of arr) {
+    const ref = marketRefFromListMarketsRow(row);
+    if (!ref) continue;
+    const key = ref.conditionId || `${ref.id}:${ref.slug}`;
+    if (!key || seen.has(key)) continue;
+    seen.add(key);
+    refs.push(ref);
+  }
+  return refs;
+}
+
+/**
  * Fetch holders for compose state and return flattened rows (plus per-market groups).
  *
  * @param {import("@/lib/polymarketLive/holdersByMarketsCompose").PolymarketHoldersByMarketsComposeState} compose
- * @param {{ selectedColumns?: string[] }} [opts]
+ * @param {{ selectedColumns?: string[]; marketRefsOverride?: import("@/lib/polymarketLive/holdersByMarketsCompose").PolymarketHoldersMarketRef[] }} [opts]
  * @returns {Promise<{
  *   rows: Record<string, unknown>[];
  *   byMarket: Array<{ conditionId: string; sheetName: string; rows: Record<string, unknown>[] }>;
  *   market: string;
  *   sheetLayout: import("@/lib/polymarketLive/holdersByMarketsCompose").PolymarketHoldersByMarketsSheetLayout;
+ *   marketsDiscovered: number;
  * }>}
  */
 export async function fetchPolymarketHoldersByMarketsRows(compose, opts = {}) {
   const normalized = normalizePolymarketHoldersByMarketsComposeState(compose);
   const sheetLayout = normalizePolymarketHoldersByMarketsSheetLayout(normalized.sheetLayout);
-  const resolvedRefs = await resolveHoldersMarketConditionIds(normalized.marketRefs);
+
+  let seedRefs = Array.isArray(opts.marketRefsOverride)
+    ? opts.marketRefsOverride
+    : normalized.marketRefs;
+
+  // Advanced compose: discover markets via GET /markets filters first.
+  if (!opts.marketRefsOverride && normalized.mode === "advanced") {
+    seedRefs = await discoverHoldersMarketsFromListFilters(normalized.marketsFilters);
+    if (!seedRefs.length) {
+      throw new Error("No markets matched your filters.");
+    }
+  }
+
+  const resolvedRefs = await resolveHoldersMarketConditionIds(seedRefs);
   const conditionIds = [
     ...new Set(resolvedRefs.map((r) => String(r.conditionId || "").trim()).filter(Boolean)),
   ];
@@ -275,6 +334,7 @@ export async function fetchPolymarketHoldersByMarketsRows(compose, opts = {}) {
     byMarket,
     market: conditionIds.join(","),
     sheetLayout,
+    marketsDiscovered: conditionIds.length,
   };
 }
 
@@ -364,10 +424,12 @@ export async function applyPolymarketHoldersByMarketsSearchAll(ctx, suggestions,
   }
   const compose = normalizePolymarketHoldersByMarketsComposeState({
     ...(opts.compose || {}),
+    mode: "search",
     marketRefs: refs,
   });
   const fetched = await fetchPolymarketHoldersByMarketsRows(compose, {
     selectedColumns: opts.selectedColumns,
+    marketRefsOverride: refs,
   });
   if (!fetched.rows.length) {
     throw new Error("No holders found for the selected markets.");

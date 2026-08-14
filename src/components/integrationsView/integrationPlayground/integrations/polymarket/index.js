@@ -629,13 +629,13 @@ const Polymarket = ({ setConnectedData, requestSheetDestination, connectHomePull
         }));
         return;
       }
-      setConnectDataLakePullState?.((prev) => ({
-        ...prev,
-        loading: true,
-        error: null,
-        label: "Pulling holders…",
-        progress: Math.max(Number(prev.progress) || 0, 5),
-      }));
+          setConnectDataLakePullState?.((prev) => ({
+            ...prev,
+            loading: true,
+            error: null,
+            label: "Discovering markets, then pulling holders…",
+            progress: Math.max(Number(prev.progress) || 0, 5),
+          }));
 
       void (async () => {
         const pullStartMs =

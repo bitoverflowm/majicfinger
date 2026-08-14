@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Loader2, X } from "lucide-react";
 
+import { PolymarketLiveMarketsListFilters } from "@/components/connectData/polymarketLive/PolymarketLiveMarketsListFilters";
 import { PolymarketLiveSearch } from "@/components/connectData/polymarketLive/PolymarketLiveSearch";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -11,21 +12,13 @@ import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { useMyStateV2 } from "@/context/stateContextV2";
 import {
   emptyPolymarketHoldersByMarketsComposeState,
-  marketRefFromPublicSearchSuggestion,
   normalizePolymarketHoldersByMarketsComposeState,
   normalizePolymarketHoldersByMarketsSheetLayout,
   POLYMARKET_HOLDERS_BY_MARKETS_LIMIT_MAX,
   POLYMARKET_HOLDERS_BY_MARKETS_SHEET_LAYOUT_OPTIONS,
 } from "@/lib/polymarketLive/holdersByMarketsCompose";
+import { normalizePolymarketMarketsComposeState } from "@/lib/polymarketLive/marketsCompose";
 import { cn } from "@/lib/utils";
-
-/**
- * @param {import("@/lib/polymarketLive/holdersByMarketsCompose").PolymarketHoldersMarketRef} ref
- * @returns {string}
- */
-function marketRefKey(ref) {
-  return `${ref.id || ""}:${ref.slug || ""}:${ref.conditionId || ""}`;
-}
 
 /**
  * @param {{
@@ -68,52 +61,30 @@ export function PolymarketLiveHoldersByMarketsFields({
     [setCompose],
   );
 
+  const patchMarketsFilters = useCallback(
+    (partial) => {
+      setCompose?.((prev) => {
+        const cur = normalizePolymarketHoldersByMarketsComposeState(
+          prev || emptyPolymarketHoldersByMarketsComposeState(),
+        );
+        return normalizePolymarketHoldersByMarketsComposeState({
+          ...cur,
+          marketsFilters: normalizePolymarketMarketsComposeState({
+            ...cur.marketsFilters,
+            ...partial,
+            mode: "advanced",
+          }),
+        });
+      });
+    },
+    [setCompose],
+  );
+
   useEffect(() => {
     if (composeRaw == null) {
       setCompose?.(emptyPolymarketHoldersByMarketsComposeState());
     }
   }, [composeRaw, setCompose]);
-
-  const addMarketRef = useCallback(
-    (suggestion) => {
-      const row = marketRefFromPublicSearchSuggestion(suggestion);
-      if (!row) return;
-      const next = [...state.marketRefs];
-      const existingIdx = next.findIndex(
-        (r) =>
-          (row.id && r.id === row.id) ||
-          (row.slug && r.slug === row.slug) ||
-          (row.conditionId && r.conditionId === row.conditionId),
-      );
-      if (existingIdx >= 0) next[existingIdx] = { ...next[existingIdx], ...row };
-      else next.push(row);
-      patch({ marketRefs: next });
-    },
-    [patch, state.marketRefs],
-  );
-
-  const removeMarketRef = useCallback(
-    (key) => {
-      patch({
-        marketRefs: state.marketRefs.filter((r) => marketRefKey(r) !== key),
-      });
-    },
-    [patch, state.marketRefs],
-  );
-
-  const [conditionIdDraft, setConditionIdDraft] = useState("");
-
-  const addConditionIdRef = useCallback(() => {
-    const conditionId = String(conditionIdDraft || "").trim();
-    if (!conditionId) return;
-    const next = [...state.marketRefs];
-    const existingIdx = next.findIndex((r) => r.conditionId === conditionId);
-    const row = { id: "", conditionId, title: conditionId };
-    if (existingIdx >= 0) next[existingIdx] = { ...next[existingIdx], ...row };
-    else next.push(row);
-    patch({ marketRefs: next });
-    setConditionIdDraft("");
-  }, [patch, state.marketRefs, conditionIdDraft]);
 
   const [searchPicks, setSearchPicks] = useState(
     /** @type {import("@/lib/polymarketLive/polymarketPublicSearch").PolymarketPublicSearchSuggestion[]} */ (
@@ -161,12 +132,13 @@ export function PolymarketLiveHoldersByMarketsFields({
     }
   }, [onSearchSubmitAll, searchPicks]);
 
-  const limitMinBalanceFields = (
+  const holdersLimitMinBalanceFields = (
     <div className="grid gap-3 sm:grid-cols-2">
       <div className="space-y-1.5">
-        <Label className="text-[11px] text-foreground">Limit</Label>
+        <Label className="text-[11px] text-foreground">Holders limit</Label>
         <p className="text-[10px] leading-snug text-muted-foreground dark:text-slate-400">
-          Max holders per outcome token (capped at {POLYMARKET_HOLDERS_BY_MARKETS_LIMIT_MAX}).
+          Max holders per market outcome token (capped at {POLYMARKET_HOLDERS_BY_MARKETS_LIMIT_MAX}
+          ). With N markets this pulls up to N × limit holders.
         </p>
         <Input
           type="number"
@@ -259,7 +231,7 @@ export function PolymarketLiveHoldersByMarketsFields({
           <p className="text-[11px] leading-snug text-muted-foreground dark:text-slate-400">
             Search and add one or more markets, then press Go to load top holders into your sheet.
           </p>
-          {limitMinBalanceFields}
+          {holdersLimitMinBalanceFields}
           {sheetLayoutFields}
           <PolymarketLiveSearch
             entities={["market"]}
@@ -338,89 +310,22 @@ export function PolymarketLiveHoldersByMarketsFields({
             markets.
           </p>
 
-          {limitMinBalanceFields}
-
+          {holdersLimitMinBalanceFields}
           {sheetLayoutFields}
 
-          <div className="space-y-1.5">
-            <Label className="text-[11px] text-foreground">Markets</Label>
+          <div className="space-y-2 border-t border-border/50 pt-3">
+            <Label className="text-[11px] text-foreground">Market discovery filters</Label>
             <p className="text-[10px] leading-snug text-muted-foreground dark:text-slate-400">
-              Holders are fetched by each market&apos;s condition id. Search markets to add, or paste
-              a condition id.
+              Same filters as Get Market/Markets. We list matching markets first, then pull holders
+              for each (holders limit × markets found).
             </p>
-            <PolymarketLiveSearch
-              entities={["market"]}
-              searchTags={false}
-              searchProfiles={false}
-              placeholder="Search markets to add…"
+            <PolymarketLiveMarketsListFilters
+              state={state.marketsFilters}
+              onPatch={patchMarketsFilters}
               disabled={disabled}
-              onSelect={(s) => addMarketRef(s)}
-              onSubmitAll={(list) => list.forEach((s) => addMarketRef(s))}
+              marketsLimitHint="Max markets to discover before fetching holders for each."
+              marketSearchHint="Holders are fetched by each market's condition id. If you do not know the condition id of your market(s) just search using natural language and Lychee will populate the condition id, otherwise just enter your condition id."
             />
-            <div className="flex items-center gap-2 pt-1">
-              <Input
-                className="h-8 flex-1 font-mono text-xs"
-                disabled={disabled}
-                placeholder="Paste condition id (0x…)…"
-                value={conditionIdDraft}
-                onChange={(e) => setConditionIdDraft(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") {
-                    e.preventDefault();
-                    addConditionIdRef();
-                  }
-                }}
-              />
-              <Button
-                type="button"
-                size="sm"
-                variant="outline"
-                className="h-8 shrink-0 px-3 text-xs"
-                disabled={disabled || !String(conditionIdDraft || "").trim()}
-                onClick={addConditionIdRef}
-              >
-                Add
-              </Button>
-            </div>
-            {state.marketRefs.length ? (
-              <ul className="mt-1 space-y-1">
-                {state.marketRefs.map((ref) => {
-                  const key = marketRefKey(ref);
-                  return (
-                    <li
-                      key={key}
-                      className="flex items-start justify-between gap-2 rounded-md border border-border/50 bg-background/80 px-2 py-1.5"
-                    >
-                      <div className="min-w-0">
-                        <p className="truncate text-xs font-medium text-foreground">
-                          {ref.title || ref.slug || ref.conditionId || ref.id}
-                        </p>
-                        <p className="truncate font-mono text-[10px] text-muted-foreground">
-                          {ref.conditionId
-                            ? `cond ${ref.conditionId}`
-                            : ref.id
-                              ? `id ${ref.id} (resolving condition id on pull)`
-                              : ref.slug
-                                ? `${ref.slug} (resolving condition id on pull)`
-                                : ""}
-                        </p>
-                      </div>
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="icon"
-                        className="size-6 shrink-0"
-                        disabled={disabled}
-                        onClick={() => removeMarketRef(key)}
-                        aria-label="Remove market"
-                      >
-                        <X className="size-3.5" />
-                      </Button>
-                    </li>
-                  );
-                })}
-              </ul>
-            ) : null}
           </div>
         </div>
       )}

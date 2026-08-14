@@ -2,6 +2,11 @@
  * Polymarket Live — Get holders by market(s) (Data API GET /holders).
  */
 
+import {
+  emptyPolymarketMarketsComposeState,
+  normalizePolymarketMarketsComposeState,
+} from "@/lib/polymarketLive/marketsCompose";
+
 /** @typedef {"search" | "advanced"} PolymarketHoldersByMarketsComposeMode */
 
 /** @typedef {"one_sheet" | "sheet_per_market"} PolymarketHoldersByMarketsSheetLayout */
@@ -22,6 +27,7 @@
  *   minBalance: number;
  *   marketRefs: PolymarketHoldersMarketRef[];
  *   sheetLayout: PolymarketHoldersByMarketsSheetLayout;
+ *   marketsFilters: import("@/lib/polymarketLive/marketsCompose").PolymarketMarketsComposeState;
  * }} PolymarketHoldersByMarketsComposeState
  */
 
@@ -98,6 +104,10 @@ export function emptyPolymarketHoldersByMarketsComposeState() {
     minBalance: 1,
     marketRefs: [],
     sheetLayout: POLYMARKET_HOLDERS_BY_MARKETS_SHEET_LAYOUT_ONE_SHEET,
+    marketsFilters: {
+      ...emptyPolymarketMarketsComposeState(),
+      mode: "advanced",
+    },
   };
 }
 
@@ -137,12 +147,18 @@ export function normalizePolymarketHoldersByMarketsComposeState(raw) {
         .filter(Boolean)
     : [];
 
+  const marketsFilters = normalizePolymarketMarketsComposeState({
+    ...(o.marketsFilters && typeof o.marketsFilters === "object" ? o.marketsFilters : {}),
+    mode: "advanced",
+  });
+
   return {
     mode,
     limit,
     minBalance,
     marketRefs: /** @type {PolymarketHoldersMarketRef[]} */ (marketRefs),
     sheetLayout: normalizePolymarketHoldersByMarketsSheetLayout(o.sheetLayout),
+    marketsFilters,
   };
 }
 
@@ -182,6 +198,26 @@ export function marketRefFromPublicSearchSuggestion(suggestion) {
   ).trim();
   const title = String(suggestion.title || raw.question || raw.groupItemTitle || "").trim();
   if (!id && !slug && !conditionId) return null;
+  return {
+    id,
+    slug: slug || undefined,
+    conditionId: conditionId || undefined,
+    title: title || undefined,
+  };
+}
+
+/**
+ * @param {unknown} marketRow
+ * @returns {PolymarketHoldersMarketRef | null}
+ */
+export function marketRefFromListMarketsRow(marketRow) {
+  if (!marketRow || typeof marketRow !== "object") return null;
+  const row = /** @type {Record<string, unknown>} */ (marketRow);
+  const id = String(row.id || "").trim();
+  const slug = String(row.slug || "").trim();
+  const conditionId = String(row.conditionId || row.condition_id || "").trim();
+  const title = String(row.question || row.groupItemTitle || row.title || "").trim();
+  if (!conditionId && !id && !slug) return null;
   return {
     id,
     slug: slug || undefined,
