@@ -334,9 +334,8 @@ export function PolymarketLiveHoldersByMarketsFields({
       ) : (
         <div className="space-y-4 rounded-xl border border-border/60 bg-muted/10 p-3 text-foreground">
           <p className="text-[11px] leading-snug text-muted-foreground dark:text-slate-400">
-            Query options for Polymarket{" "}
-            <span className="font-mono text-[10px]">GET /holders</span>. Add markets by search or
-            condition id, then pick return fields below and run pull.
+            Find all markets that match your search criteria and subsequently all holders for those
+            markets.
           </p>
 
           {limitMinBalanceFields}
