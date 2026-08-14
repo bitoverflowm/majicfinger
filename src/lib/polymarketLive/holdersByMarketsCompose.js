@@ -4,6 +4,8 @@
 
 /** @typedef {"search" | "advanced"} PolymarketHoldersByMarketsComposeMode */
 
+/** @typedef {"one_sheet" | "sheet_per_market"} PolymarketHoldersByMarketsSheetLayout */
+
 /**
  * @typedef {{
  *   id: string;
@@ -19,6 +21,7 @@
  *   limit: number;
  *   minBalance: number;
  *   marketRefs: PolymarketHoldersMarketRef[];
+ *   sheetLayout: PolymarketHoldersByMarketsSheetLayout;
  * }} PolymarketHoldersByMarketsComposeState
  */
 
@@ -26,6 +29,24 @@ export const POLYMARKET_HOLDERS_BY_MARKETS_ENDPOINT_ID = "getHoldersByMarkets";
 
 /** Max holders per token (Polymarket Data API cap). */
 export const POLYMARKET_HOLDERS_BY_MARKETS_LIMIT_MAX = 20;
+
+export const POLYMARKET_HOLDERS_BY_MARKETS_SHEET_LAYOUT_ONE_SHEET =
+  /** @type {PolymarketHoldersByMarketsSheetLayout} */ ("one_sheet");
+export const POLYMARKET_HOLDERS_BY_MARKETS_SHEET_LAYOUT_PER_MARKET =
+  /** @type {PolymarketHoldersByMarketsSheetLayout} */ ("sheet_per_market");
+
+export const POLYMARKET_HOLDERS_BY_MARKETS_SHEET_LAYOUT_OPTIONS = [
+  {
+    value: POLYMARKET_HOLDERS_BY_MARKETS_SHEET_LAYOUT_ONE_SHEET,
+    label: "All holders in one sheet",
+    description: "Combine holders from every selected market into a single sheet.",
+  },
+  {
+    value: POLYMARKET_HOLDERS_BY_MARKETS_SHEET_LAYOUT_PER_MARKET,
+    label: "Separate sheet per market",
+    description: "Put each market’s holders on its own sheet (named after the market).",
+  },
+];
 
 export const POLYMARKET_HOLDERS_BY_MARKETS_COMPOSE_COLUMNS = [
   { name: "token", type: "string", description: "Outcome token / asset id" },
@@ -57,6 +78,17 @@ export const POLYMARKET_HOLDERS_BY_MARKETS_DEFAULT_COLUMNS = [
 ];
 
 /**
+ * @param {unknown} raw
+ * @returns {PolymarketHoldersByMarketsSheetLayout}
+ */
+export function normalizePolymarketHoldersByMarketsSheetLayout(raw) {
+  if (raw === POLYMARKET_HOLDERS_BY_MARKETS_SHEET_LAYOUT_PER_MARKET) {
+    return POLYMARKET_HOLDERS_BY_MARKETS_SHEET_LAYOUT_PER_MARKET;
+  }
+  return POLYMARKET_HOLDERS_BY_MARKETS_SHEET_LAYOUT_ONE_SHEET;
+}
+
+/**
  * @returns {PolymarketHoldersByMarketsComposeState}
  */
 export function emptyPolymarketHoldersByMarketsComposeState() {
@@ -65,6 +97,7 @@ export function emptyPolymarketHoldersByMarketsComposeState() {
     limit: 20,
     minBalance: 1,
     marketRefs: [],
+    sheetLayout: POLYMARKET_HOLDERS_BY_MARKETS_SHEET_LAYOUT_ONE_SHEET,
   };
 }
 
@@ -109,6 +142,7 @@ export function normalizePolymarketHoldersByMarketsComposeState(raw) {
     limit,
     minBalance,
     marketRefs: /** @type {PolymarketHoldersMarketRef[]} */ (marketRefs),
+    sheetLayout: normalizePolymarketHoldersByMarketsSheetLayout(o.sheetLayout),
   };
 }
 

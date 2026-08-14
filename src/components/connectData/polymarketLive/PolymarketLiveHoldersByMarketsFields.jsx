@@ -13,7 +13,9 @@ import {
   emptyPolymarketHoldersByMarketsComposeState,
   marketRefFromPublicSearchSuggestion,
   normalizePolymarketHoldersByMarketsComposeState,
+  normalizePolymarketHoldersByMarketsSheetLayout,
   POLYMARKET_HOLDERS_BY_MARKETS_LIMIT_MAX,
+  POLYMARKET_HOLDERS_BY_MARKETS_SHEET_LAYOUT_OPTIONS,
 } from "@/lib/polymarketLive/holdersByMarketsCompose";
 import { cn } from "@/lib/utils";
 
@@ -194,6 +196,37 @@ export function PolymarketLiveHoldersByMarketsFields({
     </div>
   );
 
+  const sheetLayoutFields = (
+    <div className="space-y-2">
+      <Label className="text-[11px] text-foreground">How should holders be organized?</Label>
+      <div className="space-y-2">
+        {POLYMARKET_HOLDERS_BY_MARKETS_SHEET_LAYOUT_OPTIONS.map((opt) => {
+          const selected =
+            normalizePolymarketHoldersByMarketsSheetLayout(state.sheetLayout) === opt.value;
+          return (
+            <button
+              key={opt.value}
+              type="button"
+              disabled={disabled || searchGoLoading}
+              onClick={() => patch({ sheetLayout: opt.value })}
+              className={cn(
+                "w-full rounded-lg border px-3 py-2 text-left transition-colors",
+                selected
+                  ? "border-ring bg-background shadow-sm"
+                  : "border-border/60 bg-muted/20 hover:border-border hover:bg-background/80",
+              )}
+            >
+              <span className="block text-xs font-medium text-foreground">{opt.label}</span>
+              <span className="mt-0.5 block text-[10px] leading-snug text-muted-foreground dark:text-slate-400">
+                {opt.description}
+              </span>
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+
   return (
     <div className={cn("space-y-4", className)}>
       <div className="space-y-2">
@@ -227,6 +260,7 @@ export function PolymarketLiveHoldersByMarketsFields({
             Search and add one or more markets, then press Go to load top holders into your sheet.
           </p>
           {limitMinBalanceFields}
+          {sheetLayoutFields}
           <PolymarketLiveSearch
             entities={["market"]}
             searchTags={false}
@@ -306,6 +340,8 @@ export function PolymarketLiveHoldersByMarketsFields({
           </p>
 
           {limitMinBalanceFields}
+
+          {sheetLayoutFields}
 
           <div className="space-y-1.5">
             <Label className="text-[11px] text-foreground">Markets</Label>

@@ -646,10 +646,10 @@ const Polymarket = ({ setConnectedData, requestSheetDestination, connectHomePull
           sampleLabel: "Get holders by market(s)",
         });
         try {
-          const { rows } = await fetchPolymarketHoldersByMarketsRows(compose, {
+          const fetched = await fetchPolymarketHoldersByMarketsRows(compose, {
             selectedColumns: cols,
           });
-          if (!rows.length) {
+          if (!fetched.rows.length) {
             setConnectDataLakePullState?.((prev) => ({
               ...prev,
               loading: false,
@@ -667,7 +667,7 @@ const Polymarket = ({ setConnectedData, requestSheetDestination, connectHomePull
             setDataSheets: contextStateV2?.setDataSheets,
             setActiveSheetId: contextStateV2?.setActiveSheetId,
           };
-          applyPolymarketHoldersByMarketsRows(ctx, rows);
+          applyPolymarketHoldersByMarketsRows(ctx, fetched);
           setLastRequestAt(Date.now());
           setThrottleRemaining(COOLDOWN_MS);
           setConnectDataLakePullState?.((prev) => ({
@@ -684,7 +684,7 @@ const Polymarket = ({ setConnectedData, requestSheetDestination, connectHomePull
             integration: "polymarket",
             endpoint: POLYMARKET_HOLDERS_BY_MARKETS_ENDPOINT_ID,
             sampleLabel: "Get holders by market(s)",
-            rowCount: rows.length,
+            rowCount: fetched.rows.length,
             elapsedMs,
           });
         } catch (e) {

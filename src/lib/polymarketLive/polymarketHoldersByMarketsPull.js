@@ -7,7 +7,40 @@ import {
 import {
   marketRefFromPublicSearchSuggestion,
   normalizePolymarketHoldersByMarketsComposeState,
+  normalizePolymarketHoldersByMarketsSheetLayout,
+  POLYMARKET_HOLDERS_BY_MARKETS_SHEET_LAYOUT_PER_MARKET,
 } from "@/lib/polymarketLive/holdersByMarketsCompose";
+
+/**
+ * @param {Record<string, unknown>} dataSheets
+ * @returns {string}
+ */
+function allocateNextSheetId(dataSheets) {
+  const keys = Object.keys(dataSheets || {});
+  const nextNum =
+    keys.reduce((max, k) => {
+      const n = parseInt(String(k).replace(/\D/g, ""), 10) || 0;
+      return Math.max(max, n);
+    }, 0) + 1;
+  return `sheet-${nextNum}`;
+}
+
+/**
+ * @param {{ title?: string; slug?: string; id?: string; conditionId?: string }} meta
+ * @param {number} index
+ * @returns {string}
+ */
+function sheetNameForMarket(meta, index) {
+  const title = String(meta?.title || "").trim();
+  if (title) return title.slice(0, 80);
+  const slug = String(meta?.slug || "").trim();
+  if (slug) return slug.slice(0, 80);
+  const id = String(meta?.id || "").trim();
+  if (id) return `Market ${id}`.slice(0, 80);
+  const cid = String(meta?.conditionId || "").trim();
+  if (cid) return `Holders ${cid.slice(0, 10)}…`.slice(0, 80);
+  return `Market ${index + 1}`;
+}
 
 /**
  * @param {unknown} payload
@@ -31,7 +64,11 @@ export function flattenPolymarketHoldersPayloadToRows(payload, opts = {}) {
     if (!item || typeof item !== "object") continue;
     const meta = /** @type {Record<string, unknown>} */ (item);
     // Already flattened holder rows (from API expand)
-    if (meta.proxyWallet != null || meta.amount != null || (meta.token != null && !Array.isArray(meta.holders))) {
+    if (
+      meta.proxyWallet != null ||
+      meta.amount != null ||
+      (meta.token != null && !Array.isArray(meta.holders))
+    ) {
       const conditionId = String(meta.conditionId || "").trim();
       const m = conditionId ? metaByCid[conditionId] : null;
       const row = {
@@ -103,7 +140,7 @@ export async function resolveHoldersMarketConditionIds(refs) {
           headers: { Accept: "application/json" },
           credentials: "same-origin",
         });
-        const data = await res.json().catch(() => ([]));
+        const data = await res.json().catch(() => []);
         if (!res.ok) return;
         const arr = Array.isArray(data) ? data : data != null ? [data] : [];
         const hit = arr.find((m) => m && typeof m === "object") || null;
@@ -131,14 +168,20 @@ export async function resolveHoldersMarketConditionIds(refs) {
 }
 
 /**
- * Fetch holders for compose state and return flattened rows.
+ * Fetch holders for compose state and return flattened rows (plus per-market groups).
  *
  * @param {import("@/lib/polymarketLive/holdersByMarketsCompose").PolymarketHoldersByMarketsComposeState} compose
  * @param {{ selectedColumns?: string[] }} [opts]
- * @returns {Promise<{ rows: Record<string, unknown>[]; market: string }>}
+ * @returns {Promise<{
+ *   rows: Record<string, unknown>[];
+ *   byMarket: Array<{ conditionId: string; sheetName: string; rows: Record<string, unknown>[] }>;
+ *   market: string;
+ *   sheetLayout: import("@/lib/polymarketLive/holdersByMarketsCompose").PolymarketHoldersByMarketsSheetLayout;
+ * }>}
  */
 export async function fetchPolymarketHoldersByMarketsRows(compose, opts = {}) {
   const normalized = normalizePolymarketHoldersByMarketsComposeState(compose);
+  const sheetLayout = normalizePolymarketHoldersByMarketsSheetLayout(normalized.sheetLayout);
   const resolvedRefs = await resolveHoldersMarketConditionIds(normalized.marketRefs);
   const conditionIds = [
     ...new Set(resolvedRefs.map((r) => String(r.conditionId || "").trim()).filter(Boolean)),
@@ -166,9 +209,12 @@ export async function fetchPolymarketHoldersByMarketsRows(compose, opts = {}) {
 
   /** @type {Record<string, unknown>[]} */
   const allRows = [];
+  /** @type {Array<{ conditionId: string; sheetName: string; rows: Record<string, unknown>[] }>} */
+  const byMarket = [];
 
-  // Fetch per condition id so we can attach market meta onto each holder row.
-  for (const cid of conditionIds) {
+  // Fetch per condition id so we can attach market meta / split sheets.
+  for (let i = 0; i < conditionIds.length; i++) {
+    const cid = conditionIds[i];
     const params = new URLSearchParams({
       query: "getTopHolders",
       market: cid,
@@ -194,7 +240,7 @@ export async function fetchPolymarketHoldersByMarketsRows(compose, opts = {}) {
     }
 
     const meta = marketMetaByConditionId[cid] || { conditionId: cid };
-    const rows = flattenPolymarketHoldersPayloadToRows(data, {
+    const rowsRaw = flattenPolymarketHoldersPayloadToRows(data, {
       selectedColumns: [],
       marketMetaByConditionId: { [cid]: meta },
     }).map((row) => ({
@@ -204,29 +250,92 @@ export async function fetchPolymarketHoldersByMarketsRows(compose, opts = {}) {
       market_slug: meta.slug || row.market_slug || "",
       market_title: meta.title || row.market_title || "",
     }));
+
+    const rows = selected.length
+      ? rowsRaw.map((row) => {
+          /** @type {Record<string, unknown>} */
+          const out = {};
+          for (const k of selected) {
+            if (k in row) out[k] = row[k];
+          }
+          return out;
+        })
+      : rowsRaw;
+
+    byMarket.push({
+      conditionId: cid,
+      sheetName: sheetNameForMarket(meta, i),
+      rows,
+    });
     allRows.push(...rows);
   }
 
-  const filtered = selected.length
-    ? allRows.map((row) => {
-        /** @type {Record<string, unknown>} */
-        const out = {};
-        for (const k of selected) {
-          if (k in row) out[k] = row[k];
-        }
-        return out;
-      })
-    : allRows;
-
-  return { rows: filtered, market: conditionIds.join(",") };
+  return {
+    rows: allRows,
+    byMarket,
+    market: conditionIds.join(","),
+    sheetLayout,
+  };
 }
 
 /**
  * @param {Record<string, unknown>} ctx
- * @param {Record<string, unknown>[]} rows
+ * @param {{
+ *   rows: Record<string, unknown>[];
+ *   byMarket?: Array<{ conditionId: string; sheetName: string; rows: Record<string, unknown>[] }>;
+ *   sheetLayout?: string;
+ * }} payload
  */
-export function applyPolymarketHoldersByMarketsRows(ctx, rows) {
-  if (!rows?.length) return 0;
+export function applyPolymarketHoldersByMarketsRows(ctx, payload) {
+  const rows = Array.isArray(payload?.rows) ? payload.rows : Array.isArray(payload) ? payload : [];
+  const byMarket = Array.isArray(payload?.byMarket) ? payload.byMarket : [];
+  const sheetLayout = normalizePolymarketHoldersByMarketsSheetLayout(payload?.sheetLayout);
+
+  if (
+    sheetLayout === POLYMARKET_HOLDERS_BY_MARKETS_SHEET_LAYOUT_PER_MARKET &&
+    byMarket.length > 1 &&
+    ctx?.setDataSheets
+  ) {
+    prepareConnectHomePullSheet(ctx);
+    let firstSheetId = ctx?.activeSheetId || null;
+    flushSync(() => {
+      ctx.setDataSheets((prev) => {
+        let next = { ...(prev || {}) };
+        /** @type {string[]} */
+        const writtenIds = [];
+        for (let i = 0; i < byMarket.length; i++) {
+          const group = byMarket[i];
+          const groupRows = Array.isArray(group.rows) ? group.rows : [];
+          let targetSheetId;
+          if (i === 0 && firstSheetId && next[firstSheetId]) {
+            targetSheetId = firstSheetId;
+          } else {
+            targetSheetId = allocateNextSheetId(next);
+          }
+          writtenIds.push(targetSheetId);
+          const existing = next[targetSheetId] || { name: `Sheet`, data: [] };
+          next = {
+            ...next,
+            [targetSheetId]: {
+              ...existing,
+              name: String(group.sheetName || existing.name || `Market ${i + 1}`).slice(0, 80),
+              data: groupRows,
+            },
+          };
+        }
+        firstSheetId = writtenIds[0] || firstSheetId;
+        return next;
+      });
+      if (firstSheetId && ctx?.setActiveSheetId) {
+        ctx.setActiveSheetId(firstSheetId);
+      }
+      ctx?.setConnectHomeAnalyzeActive?.(true);
+    });
+    ctx?.requestConnectAnalyzeScroll?.();
+    return byMarket.reduce((sum, g) => sum + (Array.isArray(g.rows) ? g.rows.length : 0), 0);
+  }
+
+  if (!rows.length) return 0;
   prepareConnectHomePullSheet(ctx);
   flushSync(() => {
     applyConnectHomePullData(ctx, rows);
@@ -237,7 +346,7 @@ export function applyPolymarketHoldersByMarketsRows(ctx, rows) {
 }
 
 /**
- * Search-mode Go: build market refs from suggestions, fetch holders, apply to sheet.
+ * Search-mode Go: build market refs from suggestions, fetch holders, apply to sheet(s).
  *
  * @param {Record<string, unknown>} ctx
  * @param {import("@/lib/polymarketLive/polymarketPublicSearch").PolymarketPublicSearchSuggestion[]} suggestions
@@ -257,11 +366,11 @@ export async function applyPolymarketHoldersByMarketsSearchAll(ctx, suggestions,
     ...(opts.compose || {}),
     marketRefs: refs,
   });
-  const { rows } = await fetchPolymarketHoldersByMarketsRows(compose, {
+  const fetched = await fetchPolymarketHoldersByMarketsRows(compose, {
     selectedColumns: opts.selectedColumns,
   });
-  if (!rows.length) {
+  if (!fetched.rows.length) {
     throw new Error("No holders found for the selected markets.");
   }
-  return applyPolymarketHoldersByMarketsRows(ctx, rows);
+  return applyPolymarketHoldersByMarketsRows(ctx, fetched);
 }
