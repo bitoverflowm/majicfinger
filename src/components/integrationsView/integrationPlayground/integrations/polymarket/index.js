@@ -101,6 +101,15 @@ import {
   fetchPolymarketLiveEventVolumeRows,
 } from "@/lib/polymarketLive/polymarketLiveEventVolumePull";
 import {
+  emptyPolymarketSamplingMarketsComposeState,
+  normalizePolymarketSamplingMarketsComposeState,
+  POLYMARKET_SAMPLING_MARKETS_ENDPOINT_ID,
+} from "@/lib/polymarketLive/samplingMarketsCompose";
+import {
+  createPolymarketSamplingMarketsWaterfallWriter,
+  fetchPolymarketSamplingMarketsRows,
+} from "@/lib/polymarketLive/polymarketSamplingMarketsPull";
+import {
   applyPolymarketOpenInterestRows,
   fetchPolymarketOpenInterestRows,
 } from "@/lib/polymarketLive/polymarketOpenInterestPull";
@@ -468,13 +477,15 @@ const Polymarket = ({ setConnectedData, requestSheetDestination, connectHomePull
     const isHoldersByMarketsCompose = endpointId === POLYMARKET_HOLDERS_BY_MARKETS_ENDPOINT_ID;
     const isOpenInterestCompose = endpointId === POLYMARKET_OPEN_INTEREST_COMPOSE_ENDPOINT_ID;
     const isLiveEventVolumeCompose = endpointId === POLYMARKET_LIVE_EVENT_VOLUME_ENDPOINT_ID;
+    const isSamplingMarketsCompose = endpointId === POLYMARKET_SAMPLING_MARKETS_ENDPOINT_ID;
     const isEventsStyleCompose = isEventsCompose || isMarketsByEventsCompose;
     const isComposeEndpoint =
       isEventsStyleCompose ||
       isMarketsCompose ||
       isHoldersByMarketsCompose ||
       isOpenInterestCompose ||
-      isLiveEventVolumeCompose;
+      isLiveEventVolumeCompose ||
+      isSamplingMarketsCompose;
     const endpoint = isEventsStyleCompose
       ? ENDPOINTS.find((e) => e.query === "listEvents")
       : isMarketsCompose
@@ -485,6 +496,8 @@ const Polymarket = ({ setConnectedData, requestSheetDestination, connectHomePull
             ? ENDPOINTS.find((e) => e.query === "getOpenInterest")
             : isLiveEventVolumeCompose
               ? ENDPOINTS.find((e) => e.query === "getLiveVolume")
+              : isSamplingMarketsCompose
+                ? { query: POLYMARKET_SAMPLING_MARKETS_ENDPOINT_ID, name: "Get all current tradable markets", params: [] }
         : ENDPOINTS.find((e) => e.query === endpointId);
     if (!endpoint && !isComposeEndpoint) {
       setConnectDataLakePullState?.((prev) => ({
@@ -520,6 +533,102 @@ const Polymarket = ({ setConnectedData, requestSheetDestination, connectHomePull
         }));
         return;
       }
+    }
+
+    if (isSamplingMarketsCompose) {
+      const compose = normalizePolymarketSamplingMarketsComposeState(
+        contextStateV2?.connectPolymarketLiveSamplingMarketsCompose ||
+          emptyPolymarketSamplingMarketsComposeState(),
+      );
+      setConnectDataLakePullState?.((prev) => ({
+        ...prev,
+        loading: true,
+        error: null,
+        label: "Pulling currently tradable markets…",
+        progress: Math.max(Number(prev.progress) || 0, 5),
+      }));
+
+      void (async () => {
+        const pullStartMs =
+          typeof performance !== "undefined" && performance?.now ? performance.now() : Date.now();
+        trackDataPullStart({
+          integration: "polymarket",
+          endpoint: POLYMARKET_SAMPLING_MARKETS_ENDPOINT_ID,
+          sampleLabel: "Get all current tradable markets",
+        });
+        try {
+          const ctx = {
+            ...contextStateV2,
+            setConnectedData,
+            addNewSheetAndActivate,
+            setSheetData,
+            setDataSheets: contextStateV2?.setDataSheets,
+            setActiveSheetId: contextStateV2?.setActiveSheetId,
+          };
+          const waterfall = createPolymarketSamplingMarketsWaterfallWriter(ctx);
+          const fetched = await fetchPolymarketSamplingMarketsRows(compose, {
+            selectedColumns: cols,
+            onPageRows: (batch) => {
+              waterfall.write(batch.rows);
+              setConnectDataLakePullState?.((prev) => ({
+                ...prev,
+                loading: true,
+                error: null,
+                label: `Pulled ${batch.pulled.toLocaleString()} of ${batch.limit.toLocaleString()} tradable markets…`,
+                progress: Math.max(
+                  Number(prev.progress) || 0,
+                  Math.min(95, Math.round(5 + (batch.pulled / Math.max(batch.limit, 1)) * 90)),
+                ),
+              }));
+            },
+          });
+          if (!fetched.rows.length) {
+            setConnectDataLakePullState?.((prev) => ({
+              ...prev,
+              loading: false,
+              error: "No currently tradable markets were returned.",
+              label: "",
+              progress: 0,
+            }));
+            return;
+          }
+          setLastRequestAt(Date.now());
+          setThrottleRemaining(COOLDOWN_MS);
+          setConnectDataLakePullState?.((prev) => ({
+            ...prev,
+            loading: false,
+            label: "",
+            progress: 100,
+            error: null,
+          }));
+          const elapsedMs =
+            (typeof performance !== "undefined" && performance?.now ? performance.now() : Date.now()) -
+            pullStartMs;
+          trackDataPullComplete({
+            integration: "polymarket",
+            endpoint: POLYMARKET_SAMPLING_MARKETS_ENDPOINT_ID,
+            sampleLabel: "Get all current tradable markets",
+            rowCount: fetched.rows.length,
+            elapsedMs,
+          });
+        } catch (e) {
+          const msg = e instanceof Error ? e.message : "Request failed";
+          trackDataPullError({
+            message: msg,
+            integration: "polymarket",
+            source: "polymarket.getSamplingMarkets",
+            meta: { endpoint: POLYMARKET_SAMPLING_MARKETS_ENDPOINT_ID },
+          });
+          setConnectDataLakePullState?.((prev) => ({
+            ...prev,
+            loading: false,
+            error: msg,
+            label: "",
+            progress: 0,
+          }));
+        }
+      })();
+      return;
     }
 
     if (isMarketsByEventsCompose) {

@@ -1027,6 +1027,15 @@ export default async function handler(req, res) {
         data = await fetchJson(`${GAMMA_BASE}/markets?${sp}`);
         break;
       }
+      case "getSamplingMarkets": {
+        const nextCursor = String(req.query.next_cursor || "").trim();
+        const sp = new URLSearchParams();
+        if (nextCursor) sp.set("next_cursor", nextCursor);
+        data = await fetchJson(
+          `${CLOB_BASE}/sampling-markets${sp.toString() ? `?${sp.toString()}` : ""}`,
+        );
+        break;
+      }
       case "getMarket": {
         const id = req.query.id;
         if (!id) return res.status(400).json({ message: "Missing required parameter: id" });

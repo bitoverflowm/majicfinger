@@ -29,6 +29,10 @@ import {
   POLYMARKET_LIVE_EVENT_VOLUME_COMPOSE_COLUMNS,
   POLYMARKET_LIVE_EVENT_VOLUME_ENDPOINT_ID,
 } from "@/lib/polymarketLive/liveEventVolumeCompose";
+import {
+  POLYMARKET_SAMPLING_MARKETS_COLUMNS,
+  POLYMARKET_SAMPLING_MARKETS_ENDPOINT_ID,
+} from "@/lib/polymarketLive/samplingMarketsCompose";
 
 /**
  * Top-level Polymarket Live endpoint groups (hub column tags).
@@ -84,6 +88,7 @@ const ENDPOINT_CATEGORY_BY_QUERY = {
   [POLYMARKET_HOLDERS_BY_MARKETS_ENDPOINT_ID]: "holders",
   [POLYMARKET_OPEN_INTEREST_COMPOSE_ENDPOINT_ID]: "markets",
   [POLYMARKET_LIVE_EVENT_VOLUME_ENDPOINT_ID]: "events",
+  [POLYMARKET_SAMPLING_MARKETS_ENDPOINT_ID]: "markets",
   getTopHolders: "holders",
   getTradesByMarket: "holders",
   getTradesByUser: "holders",
@@ -180,6 +185,12 @@ export const POLYMARKET_LIVE_CONNECT_ENDPOINTS = [
       "Discover market(s) with natural language, id, slug, or token — or list markets by volume, tag, dates, and other filters.",
   },
   {
+    id: POLYMARKET_SAMPLING_MARKETS_ENDPOINT_ID,
+    category: "markets",
+    title: "Get all current tradable markets",
+    description: "Feed of currently open and tradable markets.",
+  },
+  {
     id: POLYMARKET_MARKETS_BY_EVENTS_ENDPOINT_ID,
     category: "markets",
     title: "Get markets by event(s)",
@@ -262,6 +273,9 @@ export function getPolymarketLiveColumnsForEndpoint(endpointQuery) {
   }
   if (id === POLYMARKET_LIVE_EVENT_VOLUME_ENDPOINT_ID) {
     return POLYMARKET_LIVE_EVENT_VOLUME_COMPOSE_COLUMNS;
+  }
+  if (id === POLYMARKET_SAMPLING_MARKETS_ENDPOINT_ID) {
+    return POLYMARKET_SAMPLING_MARKETS_COLUMNS;
   }
   const ep = ENDPOINTS.find((e) => e.query === id);
   if (ep?.responseFields?.length) {

@@ -47,6 +47,7 @@ import "@/lib/dataLake/normalizeQuantAthenaRows.test.js";
 import "@/lib/dataLake/buildQuantAthenaSql.test.js";
 import "@/lib/sheetOperations/quant/quantOperations.test.js";
 import "@/lib/polymarketLive/liveEventVolumeCompose.test.js";
+import "@/lib/polymarketLive/samplingMarketsCompose.test.js";
 
 function test(name, fn) {
   try {
