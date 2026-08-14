@@ -184,6 +184,36 @@ function WorkspaceTabChip({ item, textSize, onSelect, livePaused = false }) {
   );
 }
 
+/** Overflow menu row — truncated label with full-text hover tooltip. */
+function OverflowWorkspaceMenuItem({ item, livePaused = false }) {
+  const label = String(item?.label || "");
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <DropdownMenuItem
+          className={cn(
+            "flex w-full items-center justify-between gap-2",
+            item.isActive && "bg-accent",
+          )}
+          onClick={item.onSelect}
+        >
+          <span className="min-w-0 flex-1 truncate font-mono text-sm">{label}</span>
+          {item.hasLiveFeed ? (
+            <LiveFeedPulseDot className="ml-2" paused={livePaused} />
+          ) : null}
+        </DropdownMenuItem>
+      </TooltipTrigger>
+      <TooltipContent
+        side="right"
+        sideOffset={8}
+        className="z-[60] max-w-[min(24rem,80vw)] text-pretty text-xs"
+      >
+        {label}
+      </TooltipContent>
+    </Tooltip>
+  );
+}
+
 function WorkspaceTabStrip({ items, compact, textSize, gapClass, livePaused = false }) {
   const stripRef = useRef(null);
   const [{ visible, overflow }, setSplit] = useState(() =>
@@ -253,86 +283,58 @@ function WorkspaceTabStrip({ items, compact, textSize, gapClass, livePaused = fa
               align="start"
               className="max-h-[min(20rem,70dvh)] w-[min(20rem,90vw)] overflow-y-auto font-mono text-xs"
             >
-              <DropdownMenuLabel className="text-[10px] uppercase tracking-wide text-muted-foreground">
-                Sheets, charts & dashboards ({totalCount})
-              </DropdownMenuLabel>
-              <DropdownMenuSeparator />
-              {sheetItems.length > 0 ? (
-                <>
-                  <DropdownMenuLabel className="py-1 text-[10px] text-muted-foreground">
-                    Sheets
-                  </DropdownMenuLabel>
-                  {sheetItems.map((item) => (
-                    <DropdownMenuItem
-                      key={item.key}
-                      className={cn(
-                        "flex w-full items-center justify-between gap-2",
-                        item.isActive && "bg-accent",
-                      )}
-                      onClick={item.onSelect}
-                    >
-                      <span className="min-w-0 flex-1 truncate font-mono text-sm">
-                        {item.label}
-                      </span>
-                      {item.hasLiveFeed ? (
-                        <LiveFeedPulseDot className="ml-2" paused={livePaused} />
-                      ) : null}
-                    </DropdownMenuItem>
-                  ))}
-                </>
-              ) : null}
-              {chartItems.length > 0 ? (
-                <>
-                  {sheetItems.length > 0 ? <DropdownMenuSeparator /> : null}
-                  <DropdownMenuLabel className="py-1 text-[10px] text-muted-foreground">
-                    Charts
-                  </DropdownMenuLabel>
-                  {chartItems.map((item) => (
-                    <DropdownMenuItem
-                      key={item.key}
-                      className={cn(
-                        "flex w-full items-center justify-between gap-2",
-                        item.isActive && "bg-accent",
-                      )}
-                      onClick={item.onSelect}
-                    >
-                      <span className="min-w-0 flex-1 truncate font-mono text-sm">
-                        {item.label}
-                      </span>
-                      {item.hasLiveFeed ? (
-                        <LiveFeedPulseDot className="ml-2" paused={livePaused} />
-                      ) : null}
-                    </DropdownMenuItem>
-                  ))}
-                </>
-              ) : null}
-              {dashboardItems.length > 0 ? (
-                <>
-                  {sheetItems.length > 0 || chartItems.length > 0 ? (
-                    <DropdownMenuSeparator />
-                  ) : null}
-                  <DropdownMenuLabel className="py-1 text-[10px] text-muted-foreground">
-                    Dashboards
-                  </DropdownMenuLabel>
-                  {dashboardItems.map((item) => (
-                    <DropdownMenuItem
-                      key={item.key}
-                      className={cn(
-                        "flex w-full items-center justify-between gap-2",
-                        item.isActive && "bg-accent",
-                      )}
-                      onClick={item.onSelect}
-                    >
-                      <span className="min-w-0 flex-1 truncate font-mono text-sm">
-                        {item.label}
-                      </span>
-                      {item.hasLiveFeed ? (
-                        <LiveFeedPulseDot className="ml-2" paused={livePaused} />
-                      ) : null}
-                    </DropdownMenuItem>
-                  ))}
-                </>
-              ) : null}
+              <TooltipProvider delayDuration={200}>
+                <DropdownMenuLabel className="text-[10px] uppercase tracking-wide text-muted-foreground">
+                  Sheets, charts & dashboards ({totalCount})
+                </DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                {sheetItems.length > 0 ? (
+                  <>
+                    <DropdownMenuLabel className="py-1 text-[10px] text-muted-foreground">
+                      Sheets
+                    </DropdownMenuLabel>
+                    {sheetItems.map((item) => (
+                      <OverflowWorkspaceMenuItem
+                        key={item.key}
+                        item={item}
+                        livePaused={livePaused}
+                      />
+                    ))}
+                  </>
+                ) : null}
+                {chartItems.length > 0 ? (
+                  <>
+                    {sheetItems.length > 0 ? <DropdownMenuSeparator /> : null}
+                    <DropdownMenuLabel className="py-1 text-[10px] text-muted-foreground">
+                      Charts
+                    </DropdownMenuLabel>
+                    {chartItems.map((item) => (
+                      <OverflowWorkspaceMenuItem
+                        key={item.key}
+                        item={item}
+                        livePaused={livePaused}
+                      />
+                    ))}
+                  </>
+                ) : null}
+                {dashboardItems.length > 0 ? (
+                  <>
+                    {sheetItems.length > 0 || chartItems.length > 0 ? (
+                      <DropdownMenuSeparator />
+                    ) : null}
+                    <DropdownMenuLabel className="py-1 text-[10px] text-muted-foreground">
+                      Dashboards
+                    </DropdownMenuLabel>
+                    {dashboardItems.map((item) => (
+                      <OverflowWorkspaceMenuItem
+                        key={item.key}
+                        item={item}
+                        livePaused={livePaused}
+                      />
+                    ))}
+                  </>
+                ) : null}
+              </TooltipProvider>
             </DropdownMenuContent>
           </DropdownMenu>
         ) : null}

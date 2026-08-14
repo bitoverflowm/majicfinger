@@ -137,8 +137,7 @@ export function PolymarketLiveHoldersByMarketsFields({
       <div className="space-y-1.5">
         <Label className="text-[11px] text-foreground">Holders limit</Label>
         <p className="text-[10px] leading-snug text-muted-foreground dark:text-slate-400">
-          Max holders per market outcome token (capped at {POLYMARKET_HOLDERS_BY_MARKETS_LIMIT_MAX}
-          ). With N markets this pulls up to N × limit holders.
+          How many holders do you want to pull per market? (max 20)
         </p>
         <Input
           type="number"

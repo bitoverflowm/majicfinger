@@ -88,7 +88,7 @@ import {
 } from "@/lib/polymarketLive/openInterestCompose";
 import { applyPolymarketMarketsByEventsFromEventsPayload } from "@/lib/polymarketLive/polymarketMarketsByEventsPull";
 import {
-  applyPolymarketHoldersByMarketsRows,
+  createPolymarketHoldersWaterfallWriter,
   fetchPolymarketHoldersByMarketsRows,
 } from "@/lib/polymarketLive/polymarketHoldersByMarketsPull";
 import {
@@ -646,8 +646,33 @@ const Polymarket = ({ setConnectedData, requestSheetDestination, connectHomePull
           sampleLabel: "Get holders by market(s)",
         });
         try {
+          const ctx = {
+            ...contextStateV2,
+            setConnectedData,
+            addNewSheetAndActivate,
+            setSheetData,
+            setDataSheets: contextStateV2?.setDataSheets,
+            setActiveSheetId: contextStateV2?.setActiveSheetId,
+          };
+          const waterfall = createPolymarketHoldersWaterfallWriter(ctx, {
+            sheetLayout: compose.sheetLayout,
+          });
           const fetched = await fetchPolymarketHoldersByMarketsRows(compose, {
             selectedColumns: cols,
+            onMarketRows: (batch) => {
+              waterfall.write(batch);
+              const completed = batch.index + 1;
+              setConnectDataLakePullState?.((prev) => ({
+                ...prev,
+                loading: true,
+                error: null,
+                label: `Pulled holders for ${completed} of ${batch.total} markets…`,
+                progress: Math.max(
+                  Number(prev.progress) || 0,
+                  Math.round(10 + (completed / Math.max(batch.total, 1)) * 85),
+                ),
+              }));
+            },
           });
           if (!fetched.rows.length) {
             setConnectDataLakePullState?.((prev) => ({
@@ -659,15 +684,6 @@ const Polymarket = ({ setConnectedData, requestSheetDestination, connectHomePull
             }));
             return;
           }
-          const ctx = {
-            ...contextStateV2,
-            setConnectedData,
-            addNewSheetAndActivate,
-            setSheetData,
-            setDataSheets: contextStateV2?.setDataSheets,
-            setActiveSheetId: contextStateV2?.setActiveSheetId,
-          };
-          applyPolymarketHoldersByMarketsRows(ctx, fetched);
           setLastRequestAt(Date.now());
           setThrottleRemaining(COOLDOWN_MS);
           setConnectDataLakePullState?.((prev) => ({

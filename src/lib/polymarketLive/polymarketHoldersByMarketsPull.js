@@ -1,8 +1,10 @@
 import { flushSync } from "react-dom";
 
 import {
+  applyConnectHomeSheetNameToSheet,
   applyConnectHomePullData,
   prepareConnectHomePullSheet,
+  resolveConnectHomeSheetDestination,
 } from "@/lib/connectHomePullDestination";
 import {
   marketRefFromListMarketsRow,
@@ -216,7 +218,17 @@ export async function discoverHoldersMarketsFromListFilters(marketsFilters) {
  * Fetch holders for compose state and return flattened rows (plus per-market groups).
  *
  * @param {import("@/lib/polymarketLive/holdersByMarketsCompose").PolymarketHoldersByMarketsComposeState} compose
- * @param {{ selectedColumns?: string[]; marketRefsOverride?: import("@/lib/polymarketLive/holdersByMarketsCompose").PolymarketHoldersMarketRef[] }} [opts]
+ * @param {{
+ *   selectedColumns?: string[];
+ *   marketRefsOverride?: import("@/lib/polymarketLive/holdersByMarketsCompose").PolymarketHoldersMarketRef[];
+ *   onMarketRows?: (batch: {
+ *     conditionId: string;
+ *     sheetName: string;
+ *     rows: Record<string, unknown>[];
+ *     index: number;
+ *     total: number;
+ *   }) => void | Promise<void>;
+ * }} [opts]
  * @returns {Promise<{
  *   rows: Record<string, unknown>[];
  *   byMarket: Array<{ conditionId: string; sheetName: string; rows: Record<string, unknown>[] }>;
@@ -327,6 +339,13 @@ export async function fetchPolymarketHoldersByMarketsRows(compose, opts = {}) {
       rows,
     });
     allRows.push(...rows);
+    await opts.onMarketRows?.({
+      conditionId: cid,
+      sheetName: sheetNameForMarket(meta, i),
+      rows,
+      index: i,
+      total: conditionIds.length,
+    });
   }
 
   return {
@@ -335,6 +354,117 @@ export async function fetchPolymarketHoldersByMarketsRows(compose, opts = {}) {
     market: conditionIds.join(","),
     sheetLayout,
     marketsDiscovered: conditionIds.length,
+  };
+}
+
+/**
+ * Create a batch writer for multi-market holder pulls. The first completed
+ * market prepares the destination; every later market appends immediately.
+ *
+ * @param {Record<string, unknown>} ctx
+ * @param {{ sheetLayout?: string }} [opts]
+ */
+export function createPolymarketHoldersWaterfallWriter(ctx, opts = {}) {
+  const sheetLayout = normalizePolymarketHoldersByMarketsSheetLayout(opts.sheetLayout);
+  const perMarket = sheetLayout === POLYMARKET_HOLDERS_BY_MARKETS_SHEET_LAYOUT_PER_MARKET;
+  let prepared = false;
+  let firstSheetId = null;
+  let writtenMarkets = 0;
+
+  const prepareFirstSheet = () => {
+    if (prepared) return;
+    prepared = true;
+    const destination = resolveConnectHomeSheetDestination(ctx);
+
+    if (destination.action === "new_sheet" && ctx?.addNewSheetAndActivate) {
+      flushSync(() => {
+        ctx.addNewSheetAndActivate(
+          (newId) => {
+            firstSheetId = newId;
+            ctx.setSheetData?.(newId, []);
+            if (!perMarket) applyConnectHomeSheetNameToSheet(ctx, newId);
+          },
+          { syncActivate: true },
+        );
+      });
+    } else {
+      firstSheetId = ctx?.activeSheetId || null;
+      flushSync(() => {
+        if (firstSheetId) {
+          ctx?.setSheetData?.(firstSheetId, []);
+          if (!perMarket) applyConnectHomeSheetNameToSheet(ctx, firstSheetId);
+        } else {
+          ctx?.replaceCurrentSheetData?.([]);
+        }
+      });
+    }
+
+    ctx?.setConnectHomeAnalyzeActive?.(true);
+    ctx?.requestConnectAnalyzeScroll?.();
+  };
+
+  return {
+    /**
+     * @param {{
+     *   sheetName?: string;
+     *   rows?: Record<string, unknown>[];
+     * }} batch
+     */
+    write(batch) {
+      const rows = Array.isArray(batch?.rows) ? batch.rows : [];
+      if (!rows.length) return 0;
+      prepareFirstSheet();
+
+      if (!perMarket) {
+        if (firstSheetId && ctx?.setSheetData) {
+          flushSync(() => {
+            ctx.setSheetData(firstSheetId, (prev) => [
+              ...(Array.isArray(prev) ? prev : []),
+              ...rows,
+            ]);
+          });
+        } else {
+          flushSync(() => {
+            ctx?.setConnectedData?.((prev) => [
+              ...(Array.isArray(prev) ? prev : []),
+              ...rows,
+            ]);
+          });
+        }
+        writtenMarkets += 1;
+        return rows.length;
+      }
+
+      if (writtenMarkets === 0 && firstSheetId) {
+        flushSync(() => {
+          ctx?.setDataSheets?.((prev) => {
+            const existing = prev?.[firstSheetId] || { name: "Sheet", data: [] };
+            return {
+              ...(prev || {}),
+              [firstSheetId]: {
+                ...existing,
+                name: String(batch.sheetName || existing.name || "Market 1").slice(0, 80),
+                data: rows,
+              },
+            };
+          });
+        });
+      } else {
+        flushSync(() => {
+          ctx?.setDataSheets?.((prev) => {
+            const next = { ...(prev || {}) };
+            const targetSheetId = allocateNextSheetId(next);
+            next[targetSheetId] = {
+              name: String(batch.sheetName || `Market ${writtenMarkets + 1}`).slice(0, 80),
+              data: rows,
+            };
+            return next;
+          });
+        });
+      }
+      writtenMarkets += 1;
+      return rows.length;
+    },
   };
 }
 
@@ -427,12 +557,29 @@ export async function applyPolymarketHoldersByMarketsSearchAll(ctx, suggestions,
     mode: "search",
     marketRefs: refs,
   });
+  const waterfall = createPolymarketHoldersWaterfallWriter(ctx, {
+    sheetLayout: compose.sheetLayout,
+  });
   const fetched = await fetchPolymarketHoldersByMarketsRows(compose, {
     selectedColumns: opts.selectedColumns,
     marketRefsOverride: refs,
+    onMarketRows: (batch) => {
+      waterfall.write(batch);
+      const completed = batch.index + 1;
+      ctx?.setConnectDataLakePullState?.((prev) => ({
+        ...prev,
+        loading: true,
+        error: null,
+        label: `Pulled holders for ${completed} of ${batch.total} markets…`,
+        progress: Math.max(
+          Number(prev?.progress) || 0,
+          Math.round(10 + (completed / Math.max(batch.total, 1)) * 85),
+        ),
+      }));
+    },
   });
   if (!fetched.rows.length) {
     throw new Error("No holders found for the selected markets.");
   }
-  return applyPolymarketHoldersByMarketsRows(ctx, fetched);
+  return fetched.rows.length;
 }

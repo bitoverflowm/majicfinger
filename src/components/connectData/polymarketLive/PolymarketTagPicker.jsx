@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { ChevronsUpDown, Loader2, X } from "lucide-react";
+import { ChevronsUpDown, X } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -14,11 +14,25 @@ import {
 } from "@/components/ui/command";
 import { Label } from "@/components/ui/label";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 
 /** @typedef {{ id: string; slug: string; label?: string }} PolymarketTagOption */
 
 const TAG_PAGE_SIZE = 40;
+const TAG_SEARCH_PREFETCH_PAGE_LIMIT = 8;
+const TAG_SEARCH_LOCAL_HIT_TARGET = 12;
+
+/** @param {{ rows?: number }} props */
+function TagRowsSkeleton({ rows = 3 }) {
+  return (
+    <div className="space-y-1.5 px-2 py-2" aria-hidden="true">
+      {Array.from({ length: rows }).map((_, i) => (
+        <Skeleton key={i} className="h-4 w-full" />
+      ))}
+    </div>
+  );
+}
 
 /**
  * @param {unknown} t
@@ -72,12 +86,12 @@ export function PolymarketTagPicker({ tags, onChange, disabled = false, classNam
   const [tagSearchLoading, setTagSearchLoading] = useState(false);
   const [relatedTags, setRelatedTags] = useState(/** @type {PolymarketTagOption[]} */ ([]));
   const [relatedLoading, setRelatedLoading] = useState(false);
+  const [tagSearchPrefetchPages, setTagSearchPrefetchPages] = useState(0);
 
   const tagOffsetRef = useRef(0);
   const tagsLoadingMoreRef = useRef(false);
   const tagSearchSeqRef = useRef(0);
   const tagSearchAbortRef = useRef(/** @type {AbortController | null} */ (null));
-  const tagSearchPrefetchPagesRef = useRef(0);
 
   const selectedTags = Array.isArray(tags) ? tags : [];
 
@@ -90,6 +104,15 @@ export function PolymarketTagPicker({ tags, onChange, disabled = false, classNam
     (list) => (list || []).filter((t) => !selectedTagKeys.has(t.slug) && !selectedTagKeys.has(t.id)),
     [selectedTagKeys],
   );
+
+  const localCatalogMatches = useMemo(() => {
+    const q = tagSearch.trim().toLowerCase();
+    if (!q) return /** @type {PolymarketTagOption[]} */ ([]);
+    return tagCatalog.filter((t) => {
+      const hay = `${t.slug} ${t.label || ""} ${t.id}`.toLowerCase();
+      return hay.includes(q);
+    });
+  }, [tagCatalog, tagSearch]);
 
   const loadTagPage = useCallback(async ({ reset = false } = {}) => {
     if (tagsLoadingMoreRef.current) return;
@@ -144,7 +167,7 @@ export function PolymarketTagPicker({ tags, onChange, disabled = false, classNam
 
   useEffect(() => {
     const q = tagSearch.trim();
-    tagSearchPrefetchPagesRef.current = 0;
+    setTagSearchPrefetchPages(0);
     if (!tagPickerOpen || !q) {
       tagSearchAbortRef.current?.abort();
       setTagSearchMatches([]);
@@ -154,11 +177,11 @@ export function PolymarketTagPicker({ tags, onChange, disabled = false, classNam
     }
 
     const mySeq = ++tagSearchSeqRef.current;
+    setTagSearchLoading(true);
     const handle = setTimeout(() => {
       tagSearchAbortRef.current?.abort();
       const ac = new AbortController();
       tagSearchAbortRef.current = ac;
-      setTagSearchLoading(true);
       void (async () => {
         try {
           const params = new URLSearchParams({
@@ -180,9 +203,9 @@ export function PolymarketTagPicker({ tags, onChange, disabled = false, classNam
             .filter(Boolean);
           setTagSearchMatches(/** @type {PolymarketTagOption[]} */ (matches));
           setTagSearchRelated(/** @type {PolymarketTagOption[]} */ (related));
-          setTagSearchLoading(false);
 
-          // Enrich with Polymarket public-search tags (slower; does not block first paint).
+          // Enrich with Polymarket public-search tags. Kept inside the same loading window
+          // so results settle once instead of paging in behind a toggling placeholder.
           try {
             const fuzzyParams = new URLSearchParams({
               query: "metadataSuggestions",
@@ -222,7 +245,8 @@ export function PolymarketTagPicker({ tags, onChange, disabled = false, classNam
           if (mySeq !== tagSearchSeqRef.current) return;
           setTagSearchMatches([]);
           setTagSearchRelated([]);
-          setTagSearchLoading(false);
+        } finally {
+          if (mySeq === tagSearchSeqRef.current) setTagSearchLoading(false);
         }
       })();
     }, 280);
@@ -234,14 +258,10 @@ export function PolymarketTagPicker({ tags, onChange, disabled = false, classNam
   useEffect(() => {
     const q = tagSearch.trim().toLowerCase();
     if (!tagPickerOpen || !q || !tagsHasMore || tagsLoading || tagsLoadingMore) return;
-    if (tagSearchPrefetchPagesRef.current >= 8) return;
-    const localHits = tagCatalog.filter((t) => {
-      const hay = `${t.slug} ${t.label || ""} ${t.id}`.toLowerCase();
-      return hay.includes(q);
-    }).length;
-    if (localHits >= 12) return;
+    if (tagSearchPrefetchPages >= TAG_SEARCH_PREFETCH_PAGE_LIMIT) return;
+    if (localCatalogMatches.length >= TAG_SEARCH_LOCAL_HIT_TARGET) return;
     const t = setTimeout(() => {
-      tagSearchPrefetchPagesRef.current += 1;
+      setTagSearchPrefetchPages((n) => n + 1);
       void loadTagPage({ reset: false });
     }, 120);
     return () => clearTimeout(t);
@@ -251,22 +271,17 @@ export function PolymarketTagPicker({ tags, onChange, disabled = false, classNam
     tagsHasMore,
     tagsLoading,
     tagsLoadingMore,
-    tagCatalog,
+    tagSearchPrefetchPages,
+    localCatalogMatches,
     loadTagPage,
   ]);
 
   const browseTags = useMemo(() => filterOutSelected(tagCatalog), [filterOutSelected, tagCatalog]);
 
-  const localSearchHits = useMemo(() => {
-    const q = tagSearch.trim().toLowerCase();
-    if (!q) return /** @type {PolymarketTagOption[]} */ ([]);
-    return filterOutSelected(
-      tagCatalog.filter((t) => {
-        const hay = `${t.slug} ${t.label || ""} ${t.id}`.toLowerCase();
-        return hay.includes(q);
-      }),
-    );
-  }, [filterOutSelected, tagCatalog, tagSearch]);
+  const localSearchHits = useMemo(
+    () => filterOutSelected(localCatalogMatches),
+    [filterOutSelected, localCatalogMatches],
+  );
 
   const suggestedMatches = useMemo(() => {
     const q = tagSearch.trim();
@@ -280,6 +295,19 @@ export function PolymarketTagPicker({ tags, onChange, disabled = false, classNam
     const matchKeys = new Set(suggestedMatches.map((t) => t.slug || t.id));
     return filterOutSelected(tagSearchRelated).filter((t) => !matchKeys.has(t.slug || t.id));
   }, [filterOutSelected, suggestedMatches, tagSearch, tagSearchRelated]);
+
+  // Stays true for the whole search burst (debounce, search request, and background
+  // catalog paging) so the placeholder never blinks between individual page loads.
+  const tagSearchBusy =
+    Boolean(tagSearch.trim()) &&
+    (tagSearchLoading ||
+      tagsLoading ||
+      tagsLoadingMore ||
+      (tagsHasMore &&
+        tagSearchPrefetchPages < TAG_SEARCH_PREFETCH_PAGE_LIMIT &&
+        localCatalogMatches.length < TAG_SEARCH_LOCAL_HIT_TARGET));
+
+  const browseBusy = !tagSearch.trim() && (tagsLoading || tagsLoadingMore);
 
   const primaryTagSlug = selectedTags[0]?.slug || "";
 
@@ -384,13 +412,11 @@ export function PolymarketTagPicker({ tags, onChange, disabled = false, classNam
               onValueChange={setTagSearch}
             />
             <CommandList className="max-h-[min(20rem,50vh)]" onScroll={onTagListScroll}>
-              <CommandEmpty className="py-4 text-center text-xs text-muted-foreground">
-                {tagSearchLoading || tagsLoading
-                  ? "Searching tags…"
-                  : tagSearch.trim()
-                    ? "No tags found."
-                    : "No tags yet."}
-              </CommandEmpty>
+              {tagSearchBusy || browseBusy ? null : (
+                <CommandEmpty className="py-4 text-center text-xs text-muted-foreground">
+                  {tagSearch.trim() ? "No tags found." : "No tags yet."}
+                </CommandEmpty>
+              )}
 
               {tagSearch.trim() ? (
                 <>
@@ -434,11 +460,10 @@ export function PolymarketTagPicker({ tags, onChange, disabled = false, classNam
                       ))}
                     </CommandGroup>
                   ) : null}
-                  {tagSearchLoading || tagsLoadingMore ? (
-                    <div className="flex items-center justify-center gap-1.5 py-2 text-[10px] text-muted-foreground">
-                      <Loader2 className="size-3 animate-spin" />
-                      Loading more suggestions…
-                    </div>
+                  {tagSearchBusy ? (
+                    <TagRowsSkeleton
+                      rows={suggestedMatches.length || suggestedRelated.length ? 2 : 4}
+                    />
                   ) : null}
                 </>
               ) : (
@@ -459,11 +484,8 @@ export function PolymarketTagPicker({ tags, onChange, disabled = false, classNam
                       ) : null}
                     </CommandItem>
                   ))}
-                  {tagsLoading || tagsLoadingMore ? (
-                    <div className="flex items-center justify-center gap-1.5 py-2 text-[10px] text-muted-foreground">
-                      <Loader2 className="size-3 animate-spin" />
-                      Loading tags…
-                    </div>
+                  {browseBusy ? (
+                    <TagRowsSkeleton rows={browseTags.length ? 2 : 5} />
                   ) : tagsHasMore ? (
                     <div className="py-2 text-center text-[10px] text-muted-foreground">
                       Scroll for more
@@ -499,27 +521,25 @@ export function PolymarketTagPicker({ tags, onChange, disabled = false, classNam
           ))}
         </div>
       ) : null}
-      {primaryTagSlug ? (
+      {primaryTagSlug && (relatedLoading || relatedTags.length > 0) ? (
         <div className="pt-1">
-          <p className="mb-1 flex items-center gap-1.5 text-[10px] text-muted-foreground dark:text-slate-400">
-            Related tags
-            {relatedLoading ? <Loader2 className="size-3 animate-spin" /> : null}
-          </p>
+          <p className="mb-1 text-[10px] text-muted-foreground dark:text-slate-400">Related tags</p>
           <div className="flex flex-wrap gap-1">
-            {relatedTags.map((tag) => (
-              <button
-                key={tag.slug}
-                type="button"
-                disabled={disabled}
-                onClick={() => addTag(tag)}
-                className="rounded-full border border-dashed border-border/70 bg-muted/30 px-2 py-0.5 font-mono text-[10px] text-muted-foreground hover:border-border hover:text-foreground"
-              >
-                {tag.slug}
-              </button>
-            ))}
-            {!relatedLoading && relatedTags.length === 0 ? (
-              <span className="text-[10px] text-muted-foreground">No related tags</span>
-            ) : null}
+            {relatedLoading
+              ? Array.from({ length: 4 }).map((_, i) => (
+                  <Skeleton key={`related-skeleton:${i}`} className="h-[18px] w-16 rounded-full" />
+                ))
+              : relatedTags.map((tag) => (
+                  <button
+                    key={tag.slug}
+                    type="button"
+                    disabled={disabled}
+                    onClick={() => addTag(tag)}
+                    className="rounded-full border border-dashed border-border/70 bg-muted/30 px-2 py-0.5 font-mono text-[10px] text-muted-foreground hover:border-border hover:text-foreground"
+                  >
+                    {tag.slug}
+                  </button>
+                ))}
           </div>
         </div>
       ) : null}
