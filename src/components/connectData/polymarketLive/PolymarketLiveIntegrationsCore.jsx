@@ -62,11 +62,18 @@ import {
   POLYMARKET_OPEN_INTEREST_COMPOSE_ENDPOINT_ID,
 } from "@/lib/polymarketLive/openInterestCompose";
 import {
+  emptyPolymarketLiveEventVolumeComposeState,
+  normalizePolymarketLiveEventVolumeComposeState,
+  POLYMARKET_LIVE_EVENT_VOLUME_DEFAULT_COLUMNS,
+  POLYMARKET_LIVE_EVENT_VOLUME_ENDPOINT_ID,
+} from "@/lib/polymarketLive/liveEventVolumeCompose";
+import {
   applyPolymarketMarketsByEventsSearchAll,
   applyPolymarketMarketsByEventsSearchSelection,
 } from "@/lib/polymarketLive/polymarketMarketsByEventsPull";
 import { applyPolymarketHoldersByMarketsSearchAll } from "@/lib/polymarketLive/polymarketHoldersByMarketsPull";
 import { applyPolymarketOpenInterestSearchAll } from "@/lib/polymarketLive/polymarketOpenInterestPull";
+import { applyPolymarketLiveEventVolumeSearchAll } from "@/lib/polymarketLive/polymarketLiveEventVolumePull";
 import {
   applyPolymarketLiveSearchAll,
   applyPolymarketLiveSearchSelection,
@@ -78,6 +85,7 @@ const ENDPOINT_PRESENTATION = {
   [POLYMARKET_MARKETS_COMPOSE_ENDPOINT_ID]: { icon: Layers, accent: "secondary" },
   [POLYMARKET_MARKETS_BY_EVENTS_ENDPOINT_ID]: { icon: Layers, accent: "secondary" },
   [POLYMARKET_EVENTS_COMPOSE_ENDPOINT_ID]: { icon: Vote, accent: "secondary" },
+  [POLYMARKET_LIVE_EVENT_VOLUME_ENDPOINT_ID]: { icon: Vote, accent: "secondary" },
   [POLYMARKET_HOLDERS_BY_MARKETS_ENDPOINT_ID]: { icon: Users, accent: "secondary" },
   [POLYMARKET_OPEN_INTEREST_COMPOSE_ENDPOINT_ID]: { icon: Layers, accent: "secondary" },
   listMarkets: { icon: Layers, accent: "secondary" },
@@ -279,6 +287,8 @@ export function PolymarketLiveIntegrationsCore({ onRunPull, className, stepBackR
     setConnectPolymarketLiveHoldersByMarketsCompose,
     connectPolymarketLiveOpenInterestCompose,
     setConnectPolymarketLiveOpenInterestCompose,
+    connectPolymarketLiveEventVolumeCompose,
+    setConnectPolymarketLiveEventVolumeCompose,
   } = ctx;
 
   const runPolymarketLiveAction = useCallback(
@@ -363,12 +373,21 @@ export function PolymarketLiveIntegrationsCore({ onRunPull, className, stepBackR
     [connectPolymarketLiveOpenInterestCompose],
   );
 
+  const liveEventVolumeCompose = useMemo(
+    () =>
+      normalizePolymarketLiveEventVolumeComposeState(
+        connectPolymarketLiveEventVolumeCompose || emptyPolymarketLiveEventVolumeComposeState(),
+      ),
+    [connectPolymarketLiveEventVolumeCompose],
+  );
+
   const isEventsCompose = selectedId === POLYMARKET_EVENTS_COMPOSE_ENDPOINT_ID;
   const isMarketsByEventsCompose = selectedId === POLYMARKET_MARKETS_BY_EVENTS_ENDPOINT_ID;
   const isMarketsCompose = selectedId === POLYMARKET_MARKETS_COMPOSE_ENDPOINT_ID;
   const isHoldersByMarketsCompose = selectedId === POLYMARKET_HOLDERS_BY_MARKETS_ENDPOINT_ID;
   const isOpenInterestCompose = selectedId === POLYMARKET_OPEN_INTEREST_COMPOSE_ENDPOINT_ID;
-  const isEventsStyleCompose = isEventsCompose || isMarketsByEventsCompose;
+  const isLiveEventVolumeCompose = selectedId === POLYMARKET_LIVE_EVENT_VOLUME_ENDPOINT_ID;
+  const isEventsStyleCompose = isEventsCompose || isMarketsByEventsCompose || isLiveEventVolumeCompose;
   const isComposeEndpoint =
     isEventsStyleCompose ||
     isMarketsCompose ||
@@ -380,11 +399,13 @@ export function PolymarketLiveIntegrationsCore({ onRunPull, className, stepBackR
       ? eventsCompose.mode === "advanced"
       : isMarketsByEventsCompose
         ? marketsByEventsCompose.mode === "advanced"
-        : isMarketsCompose
-          ? marketsCompose.mode === "advanced"
-          : isHoldersByMarketsCompose
-            ? holdersByMarketsCompose.mode === "advanced"
-            : openInterestCompose.mode === "advanced");
+        : isLiveEventVolumeCompose
+          ? liveEventVolumeCompose.mode === "advanced"
+          : isMarketsCompose
+            ? marketsCompose.mode === "advanced"
+            : isHoldersByMarketsCompose
+              ? holdersByMarketsCompose.mode === "advanced"
+              : openInterestCompose.mode === "advanced");
 
   const handleSelectEndpoint = useCallback(
     (id) => {
@@ -411,6 +432,10 @@ export function PolymarketLiveIntegrationsCore({ onRunPull, className, stepBackR
                   ? POLYMARKET_OPEN_INTEREST_DEFAULT_COLUMNS.filter((name) =>
                       cols.some((c) => c.name === name),
                     )
+                  : id === POLYMARKET_LIVE_EVENT_VOLUME_ENDPOINT_ID
+                    ? POLYMARKET_LIVE_EVENT_VOLUME_DEFAULT_COLUMNS.filter((name) =>
+                        cols.some((c) => c.name === name),
+                      )
               : cols.map((c) => c.name);
       if (cols.length) {
         setConnectApiColumnSelections?.((prev) => ({
@@ -451,6 +476,13 @@ export function PolymarketLiveIntegrationsCore({ onRunPull, className, stepBackR
             : emptyPolymarketOpenInterestComposeState(),
         );
       }
+      if (id === POLYMARKET_LIVE_EVENT_VOLUME_ENDPOINT_ID) {
+        setConnectPolymarketLiveEventVolumeCompose?.((prev) =>
+          prev
+            ? normalizePolymarketLiveEventVolumeComposeState(prev)
+            : emptyPolymarketLiveEventVolumeComposeState(),
+        );
+      }
     },
     [
       setConnectApiEndpointId,
@@ -460,6 +492,7 @@ export function PolymarketLiveIntegrationsCore({ onRunPull, className, stepBackR
       setConnectPolymarketLiveMarketsCompose,
       setConnectPolymarketLiveHoldersByMarketsCompose,
       setConnectPolymarketLiveOpenInterestCompose,
+      setConnectPolymarketLiveEventVolumeCompose,
     ],
   );
 
@@ -568,14 +601,52 @@ export function PolymarketLiveIntegrationsCore({ onRunPull, className, stepBackR
         });
         return;
       }
+      if (isLiveEventVolumeCompose) {
+        runPolymarketLiveAction(() => {
+          void (async () => {
+            ctx.setConnectDataLakePullState?.((prev) => ({
+              ...prev,
+              loading: true,
+              error: null,
+              label: "Pulling live volume…",
+              progress: Math.max(Number(prev.progress) || 0, 8),
+            }));
+            try {
+              await applyPolymarketLiveEventVolumeSearchAll(ctx, suggestions, {
+                compose: liveEventVolumeCompose,
+                selectedColumns,
+              });
+              ctx.setConnectDataLakePullState?.((prev) => ({
+                ...prev,
+                loading: false,
+                error: null,
+                label: "",
+                progress: 100,
+              }));
+            } catch (e) {
+              const msg = e instanceof Error ? e.message : "Request failed";
+              ctx.setConnectDataLakePullState?.((prev) => ({
+                ...prev,
+                loading: false,
+                error: msg,
+                label: "",
+                progress: 0,
+              }));
+            }
+          })();
+        });
+        return;
+      }
       runPolymarketLiveAction(() => applyPolymarketLiveSearchAll(ctx, suggestions));
     },
     [
       ctx,
       holdersByMarketsCompose,
       isHoldersByMarketsCompose,
+      isLiveEventVolumeCompose,
       isMarketsByEventsCompose,
       isOpenInterestCompose,
+      liveEventVolumeCompose,
       marketsByEventsCompose.sheetLayout,
       openInterestCompose,
       runPolymarketLiveAction,
@@ -722,7 +793,13 @@ export function PolymarketLiveIntegrationsCore({ onRunPull, className, stepBackR
           {isEventsStyleCompose ? (
             <PolymarketLiveEventsFields
               className="mt-2"
-              variant={isMarketsByEventsCompose ? "marketsByEvents" : "events"}
+              variant={
+                isLiveEventVolumeCompose
+                  ? "liveEventVolume"
+                  : isMarketsByEventsCompose
+                    ? "marketsByEvents"
+                    : "events"
+              }
               onSearchSelect={handlePublicSearchSelect}
               onSearchSubmitAll={handlePublicSearchSubmitAll}
             />

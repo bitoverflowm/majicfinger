@@ -25,6 +25,10 @@ import {
   POLYMARKET_OPEN_INTEREST_COMPOSE_COLUMNS,
   POLYMARKET_OPEN_INTEREST_COMPOSE_ENDPOINT_ID,
 } from "@/lib/polymarketLive/openInterestCompose";
+import {
+  POLYMARKET_LIVE_EVENT_VOLUME_COMPOSE_COLUMNS,
+  POLYMARKET_LIVE_EVENT_VOLUME_ENDPOINT_ID,
+} from "@/lib/polymarketLive/liveEventVolumeCompose";
 
 /**
  * Top-level Polymarket Live endpoint groups (hub column tags).
@@ -57,6 +61,8 @@ const HIDDEN_EVENT_ENDPOINT_IDS = new Set([
   "getMarketTags",
   "getTopHolders",
   "getOpenInterest",
+  "getLiveVolume",
+  "getTradesByMarket",
 ]);
 
 /** @type {Record<string, string>} */
@@ -77,6 +83,7 @@ const ENDPOINT_CATEGORY_BY_QUERY = {
   [POLYMARKET_MARKETS_COMPOSE_ENDPOINT_ID]: "markets",
   [POLYMARKET_HOLDERS_BY_MARKETS_ENDPOINT_ID]: "holders",
   [POLYMARKET_OPEN_INTEREST_COMPOSE_ENDPOINT_ID]: "markets",
+  [POLYMARKET_LIVE_EVENT_VOLUME_ENDPOINT_ID]: "events",
   getTopHolders: "holders",
   getTradesByMarket: "holders",
   getTradesByUser: "holders",
@@ -187,6 +194,13 @@ export const POLYMARKET_LIVE_CONNECT_ENDPOINTS = [
       "Discover event(s), search with natural language, id, slug, or list events that match your criteria by volume, tag, status, etc.",
   },
   {
+    id: POLYMARKET_LIVE_EVENT_VOLUME_ENDPOINT_ID,
+    category: "events",
+    title: "Get live volume for event",
+    description:
+      "Find event(s), then pull live volume and per-market volume — one sheet, per event, or with event metadata first.",
+  },
+  {
     id: POLYMARKET_HOLDERS_BY_MARKETS_ENDPOINT_ID,
     category: "holders",
     title: "Get holders by market(s)",
@@ -245,6 +259,9 @@ export function getPolymarketLiveColumnsForEndpoint(endpointQuery) {
   }
   if (id === POLYMARKET_OPEN_INTEREST_COMPOSE_ENDPOINT_ID) {
     return POLYMARKET_OPEN_INTEREST_COMPOSE_COLUMNS;
+  }
+  if (id === POLYMARKET_LIVE_EVENT_VOLUME_ENDPOINT_ID) {
+    return POLYMARKET_LIVE_EVENT_VOLUME_COMPOSE_COLUMNS;
   }
   const ep = ENDPOINTS.find((e) => e.query === id);
   if (ep?.responseFields?.length) {

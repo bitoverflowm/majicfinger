@@ -31,13 +31,19 @@ import {
   POLYMARKET_MARKETS_BY_EVENTS_SHEET_LAYOUT_OPTIONS,
   normalizePolymarketMarketsByEventsSheetLayout,
 } from "@/lib/polymarketLive/marketsByEventsCompose";
+import {
+  emptyPolymarketLiveEventVolumeComposeState,
+  normalizePolymarketLiveEventVolumeComposeState,
+  POLYMARKET_LIVE_EVENT_VOLUME_SHEET_LAYOUT_OPTIONS,
+  normalizePolymarketLiveEventVolumeSheetLayout,
+} from "@/lib/polymarketLive/liveEventVolumeCompose";
 import { cn } from "@/lib/utils";
 
 /**
  * @param {{
  *   className?: string;
  *   disabled?: boolean;
- *   variant?: "events" | "marketsByEvents";
+ *   variant?: "events" | "marketsByEvents" | "liveEventVolume";
  *   onSearchSelect?: (suggestion: import("@/lib/polymarketLive/polymarketPublicSearch").PolymarketPublicSearchSuggestion) => void;
  *   onSearchSubmitAll?: (suggestions: import("@/lib/polymarketLive/polymarketPublicSearch").PolymarketPublicSearchSuggestion[]) => void;
  * }} props
@@ -50,36 +56,53 @@ export function PolymarketLiveEventsFields({
   onSearchSubmitAll,
 }) {
   const isMarketsByEvents = variant === "marketsByEvents";
+  const isLiveEventVolume = variant === "liveEventVolume";
   const ctx = useMyStateV2() ?? {};
   const {
     connectPolymarketLiveEventsCompose,
     setConnectPolymarketLiveEventsCompose,
     connectPolymarketLiveMarketsByEventsCompose,
     setConnectPolymarketLiveMarketsByEventsCompose,
+    connectPolymarketLiveEventVolumeCompose,
+    setConnectPolymarketLiveEventVolumeCompose,
   } = ctx;
 
-  const composeRaw = isMarketsByEvents
-    ? connectPolymarketLiveMarketsByEventsCompose
-    : connectPolymarketLiveEventsCompose;
-  const setCompose = isMarketsByEvents
-    ? setConnectPolymarketLiveMarketsByEventsCompose
-    : setConnectPolymarketLiveEventsCompose;
+  const composeRaw = isLiveEventVolume
+    ? connectPolymarketLiveEventVolumeCompose
+    : isMarketsByEvents
+      ? connectPolymarketLiveMarketsByEventsCompose
+      : connectPolymarketLiveEventsCompose;
+  const setCompose = isLiveEventVolume
+    ? setConnectPolymarketLiveEventVolumeCompose
+    : isMarketsByEvents
+      ? setConnectPolymarketLiveMarketsByEventsCompose
+      : setConnectPolymarketLiveEventsCompose;
 
   const state = useMemo(
     () =>
-      isMarketsByEvents
-        ? normalizePolymarketMarketsByEventsComposeState(
-            composeRaw || emptyPolymarketMarketsByEventsComposeState(),
+      isLiveEventVolume
+        ? normalizePolymarketLiveEventVolumeComposeState(
+            composeRaw || emptyPolymarketLiveEventVolumeComposeState(),
           )
-        : normalizePolymarketEventsComposeState(
-            composeRaw || emptyPolymarketEventsComposeState(),
-          ),
-    [composeRaw, isMarketsByEvents],
+        : isMarketsByEvents
+          ? normalizePolymarketMarketsByEventsComposeState(
+              composeRaw || emptyPolymarketMarketsByEventsComposeState(),
+            )
+          : normalizePolymarketEventsComposeState(
+              composeRaw || emptyPolymarketEventsComposeState(),
+            ),
+    [composeRaw, isLiveEventVolume, isMarketsByEvents],
   );
 
   const patch = useCallback(
     (partial) => {
       setCompose?.((prev) => {
+        if (isLiveEventVolume) {
+          const cur = normalizePolymarketLiveEventVolumeComposeState(
+            prev || emptyPolymarketLiveEventVolumeComposeState(),
+          );
+          return normalizePolymarketLiveEventVolumeComposeState({ ...cur, ...partial });
+        }
         if (isMarketsByEvents) {
           const cur = normalizePolymarketMarketsByEventsComposeState(
             prev || emptyPolymarketMarketsByEventsComposeState(),
@@ -92,18 +115,20 @@ export function PolymarketLiveEventsFields({
         return normalizePolymarketEventsComposeState({ ...cur, ...partial });
       });
     },
-    [isMarketsByEvents, setCompose],
+    [isLiveEventVolume, isMarketsByEvents, setCompose],
   );
 
   useEffect(() => {
     if (composeRaw == null) {
       setCompose?.(
-        isMarketsByEvents
-          ? emptyPolymarketMarketsByEventsComposeState()
-          : emptyPolymarketEventsComposeState(),
+        isLiveEventVolume
+          ? emptyPolymarketLiveEventVolumeComposeState()
+          : isMarketsByEvents
+            ? emptyPolymarketMarketsByEventsComposeState()
+            : emptyPolymarketEventsComposeState(),
       );
     }
-  }, [composeRaw, isMarketsByEvents, setCompose]);
+  }, [composeRaw, isLiveEventVolume, isMarketsByEvents, setCompose]);
 
   const addEventRef = useCallback(
     (suggestion) => {
@@ -198,6 +223,66 @@ export function PolymarketLiveEventsFields({
     patch({ [key]: checked ? true : null });
   };
 
+  const layoutFields = isLiveEventVolume ? (
+    <div className="space-y-2">
+      <Label className="text-[11px] text-foreground">How should live volume be organized?</Label>
+      <div className="space-y-2">
+        {POLYMARKET_LIVE_EVENT_VOLUME_SHEET_LAYOUT_OPTIONS.map((opt) => {
+          const selected =
+            normalizePolymarketLiveEventVolumeSheetLayout(state.sheetLayout) === opt.value;
+          return (
+            <button
+              key={opt.value}
+              type="button"
+              disabled={disabled}
+              onClick={() => patch({ sheetLayout: opt.value })}
+              className={cn(
+                "w-full rounded-lg border px-3 py-2 text-left transition-colors",
+                selected
+                  ? "border-ring bg-background shadow-sm"
+                  : "border-border/60 bg-muted/20 hover:border-border hover:bg-background/80",
+              )}
+            >
+              <span className="block text-xs font-medium text-foreground">{opt.label}</span>
+              <span className="mt-0.5 block text-[10px] leading-snug text-muted-foreground dark:text-slate-400">
+                {opt.description}
+              </span>
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  ) : isMarketsByEvents ? (
+    <div className="space-y-2">
+      <Label className="text-[11px] text-foreground">How should markets be organized?</Label>
+      <div className="space-y-2">
+        {POLYMARKET_MARKETS_BY_EVENTS_SHEET_LAYOUT_OPTIONS.map((opt) => {
+          const selected =
+            normalizePolymarketMarketsByEventsSheetLayout(state.sheetLayout) === opt.value;
+          return (
+            <button
+              key={opt.value}
+              type="button"
+              disabled={disabled}
+              onClick={() => patch({ sheetLayout: opt.value })}
+              className={cn(
+                "w-full rounded-lg border px-3 py-2 text-left transition-colors",
+                selected
+                  ? "border-ring bg-background shadow-sm"
+                  : "border-border/60 bg-muted/20 hover:border-border hover:bg-background/80",
+              )}
+            >
+              <span className="block text-xs font-medium text-foreground">{opt.label}</span>
+              <span className="mt-0.5 block text-[10px] leading-snug text-muted-foreground dark:text-slate-400">
+                {opt.description}
+              </span>
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  ) : null;
+
   return (
     <div className={cn("space-y-4", className)}>
       <div className="space-y-2">
@@ -228,40 +313,13 @@ export function PolymarketLiveEventsFields({
       {state.mode === "search" ? (
         <div className="space-y-3">
           <p className="text-[11px] leading-snug text-muted-foreground dark:text-slate-400">
-            {isMarketsByEvents
-              ? "Search and add one or more events, then press Go to pull markets from those events into your sheet(s)."
-              : "Search and add one or more events, then press Go to load them into your sheet."}
+            {isLiveEventVolume
+              ? "Search and add one or more events, then press Go to pull live volume for those events into your sheet(s)."
+              : isMarketsByEvents
+                ? "Search and add one or more events, then press Go to pull markets from those events into your sheet(s)."
+                : "Search and add one or more events, then press Go to load them into your sheet."}
           </p>
-          {isMarketsByEvents ? (
-            <div className="space-y-2">
-              <Label className="text-[11px] text-foreground">How should markets be organized?</Label>
-              <div className="space-y-2">
-                {POLYMARKET_MARKETS_BY_EVENTS_SHEET_LAYOUT_OPTIONS.map((opt) => {
-                  const selected =
-                    normalizePolymarketMarketsByEventsSheetLayout(state.sheetLayout) === opt.value;
-                  return (
-                    <button
-                      key={opt.value}
-                      type="button"
-                      disabled={disabled}
-                      onClick={() => patch({ sheetLayout: opt.value })}
-                      className={cn(
-                        "w-full rounded-lg border px-3 py-2 text-left transition-colors",
-                        selected
-                          ? "border-ring bg-background shadow-sm"
-                          : "border-border/60 bg-muted/20 hover:border-border hover:bg-background/80",
-                      )}
-                    >
-                      <span className="block text-xs font-medium text-foreground">{opt.label}</span>
-                      <span className="mt-0.5 block text-[10px] leading-snug text-muted-foreground dark:text-slate-400">
-                        {opt.description}
-                      </span>
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-          ) : null}
+          {layoutFields}
           <PolymarketLiveSearch
             entities={["event"]}
             searchTags={false}
@@ -335,7 +393,12 @@ export function PolymarketLiveEventsFields({
       ) : (
         <div className="space-y-4 rounded-xl border border-border/60 bg-muted/10 p-3 text-foreground">
           <p className="text-[11px] leading-snug text-muted-foreground dark:text-slate-400">
-            {isMarketsByEvents ? (
+            {isLiveEventVolume ? (
+              <>
+                Find all events that match your search criteria and subsequently live volume for those
+                events.
+              </>
+            ) : isMarketsByEvents ? (
               <>
                 Find events with Polymarket{" "}
                 <span className="font-mono text-[10px]">GET /events</span>, then extract each
@@ -350,36 +413,7 @@ export function PolymarketLiveEventsFields({
             )}
           </p>
 
-          {isMarketsByEvents ? (
-            <div className="space-y-2">
-              <Label className="text-[11px] text-foreground">How should markets be organized?</Label>
-              <div className="space-y-2">
-                {POLYMARKET_MARKETS_BY_EVENTS_SHEET_LAYOUT_OPTIONS.map((opt) => {
-                  const selected =
-                    normalizePolymarketMarketsByEventsSheetLayout(state.sheetLayout) === opt.value;
-                  return (
-                    <button
-                      key={opt.value}
-                      type="button"
-                      disabled={disabled}
-                      onClick={() => patch({ sheetLayout: opt.value })}
-                      className={cn(
-                        "w-full rounded-lg border px-3 py-2 text-left transition-colors",
-                        selected
-                          ? "border-ring bg-background shadow-sm"
-                          : "border-border/60 bg-muted/20 hover:border-border hover:bg-background/80",
-                      )}
-                    >
-                      <span className="block text-xs font-medium text-foreground">{opt.label}</span>
-                      <span className="mt-0.5 block text-[10px] leading-snug text-muted-foreground dark:text-slate-400">
-                        {opt.description}
-                      </span>
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-          ) : null}
+          {layoutFields}
 
           <div className="grid gap-3 sm:grid-cols-2">
             <div className="space-y-1.5">

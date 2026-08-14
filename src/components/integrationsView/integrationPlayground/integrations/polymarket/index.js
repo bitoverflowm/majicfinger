@@ -86,11 +86,20 @@ import {
   normalizePolymarketOpenInterestComposeState,
   POLYMARKET_OPEN_INTEREST_COMPOSE_ENDPOINT_ID,
 } from "@/lib/polymarketLive/openInterestCompose";
+import {
+  emptyPolymarketLiveEventVolumeComposeState,
+  normalizePolymarketLiveEventVolumeComposeState,
+  POLYMARKET_LIVE_EVENT_VOLUME_ENDPOINT_ID,
+} from "@/lib/polymarketLive/liveEventVolumeCompose";
 import { applyPolymarketMarketsByEventsFromEventsPayload } from "@/lib/polymarketLive/polymarketMarketsByEventsPull";
 import {
   createPolymarketHoldersWaterfallWriter,
   fetchPolymarketHoldersByMarketsRows,
 } from "@/lib/polymarketLive/polymarketHoldersByMarketsPull";
+import {
+  createPolymarketLiveEventVolumeWaterfallWriter,
+  fetchPolymarketLiveEventVolumeRows,
+} from "@/lib/polymarketLive/polymarketLiveEventVolumePull";
 import {
   applyPolymarketOpenInterestRows,
   fetchPolymarketOpenInterestRows,
@@ -458,12 +467,14 @@ const Polymarket = ({ setConnectedData, requestSheetDestination, connectHomePull
     const isMarketsCompose = endpointId === POLYMARKET_MARKETS_COMPOSE_ENDPOINT_ID;
     const isHoldersByMarketsCompose = endpointId === POLYMARKET_HOLDERS_BY_MARKETS_ENDPOINT_ID;
     const isOpenInterestCompose = endpointId === POLYMARKET_OPEN_INTEREST_COMPOSE_ENDPOINT_ID;
+    const isLiveEventVolumeCompose = endpointId === POLYMARKET_LIVE_EVENT_VOLUME_ENDPOINT_ID;
     const isEventsStyleCompose = isEventsCompose || isMarketsByEventsCompose;
     const isComposeEndpoint =
       isEventsStyleCompose ||
       isMarketsCompose ||
       isHoldersByMarketsCompose ||
-      isOpenInterestCompose;
+      isOpenInterestCompose ||
+      isLiveEventVolumeCompose;
     const endpoint = isEventsStyleCompose
       ? ENDPOINTS.find((e) => e.query === "listEvents")
       : isMarketsCompose
@@ -472,6 +483,8 @@ const Polymarket = ({ setConnectedData, requestSheetDestination, connectHomePull
           ? ENDPOINTS.find((e) => e.query === "getTopHolders")
           : isOpenInterestCompose
             ? ENDPOINTS.find((e) => e.query === "getOpenInterest")
+            : isLiveEventVolumeCompose
+              ? ENDPOINTS.find((e) => e.query === "getLiveVolume")
         : ENDPOINTS.find((e) => e.query === endpointId);
     if (!endpoint && !isComposeEndpoint) {
       setConnectDataLakePullState?.((prev) => ({
@@ -487,6 +500,7 @@ const Polymarket = ({ setConnectedData, requestSheetDestination, connectHomePull
       (isMarketsCompose ? connectApiColumnSelections.listMarkets : null) ||
       (isHoldersByMarketsCompose ? connectApiColumnSelections.getTopHolders : null) ||
       (isOpenInterestCompose ? connectApiColumnSelections.getOpenInterest : null) ||
+      (isLiveEventVolumeCompose ? connectApiColumnSelections.getLiveVolume : null) ||
       [];
     if (!cols.length) {
       setConnectDataLakePullState?.((prev) => ({
@@ -710,6 +724,114 @@ const Polymarket = ({ setConnectedData, requestSheetDestination, connectHomePull
             integration: "polymarket",
             source: "polymarket.getHoldersByMarkets",
             meta: { endpoint: POLYMARKET_HOLDERS_BY_MARKETS_ENDPOINT_ID },
+          });
+          setConnectDataLakePullState?.((prev) => ({
+            ...prev,
+            loading: false,
+            error: msg,
+            label: "",
+            progress: 0,
+          }));
+        }
+      })();
+      return;
+    }
+
+    if (isLiveEventVolumeCompose) {
+      const compose = normalizePolymarketLiveEventVolumeComposeState(
+        contextStateV2?.connectPolymarketLiveEventVolumeCompose ||
+          emptyPolymarketLiveEventVolumeComposeState(),
+      );
+      if (compose.mode !== "advanced") {
+        setConnectDataLakePullState?.((prev) => ({
+          ...prev,
+          loading: false,
+          error:
+            "Switch to Advanced search to run a live-volume pull, or select events and press Go.",
+        }));
+        return;
+      }
+      setConnectDataLakePullState?.((prev) => ({
+        ...prev,
+        loading: true,
+        error: null,
+        label: "Discovering events, then pulling live volume…",
+        progress: Math.max(Number(prev.progress) || 0, 5),
+      }));
+
+      void (async () => {
+        const pullStartMs =
+          typeof performance !== "undefined" && performance?.now ? performance.now() : Date.now();
+        trackDataPullStart({
+          integration: "polymarket",
+          endpoint: POLYMARKET_LIVE_EVENT_VOLUME_ENDPOINT_ID,
+          sampleLabel: "Get live volume for event",
+        });
+        try {
+          const ctx = {
+            ...contextStateV2,
+            setConnectedData,
+            addNewSheetAndActivate,
+            setSheetData,
+            setDataSheets: contextStateV2?.setDataSheets,
+            setActiveSheetId: contextStateV2?.setActiveSheetId,
+          };
+          const waterfall = createPolymarketLiveEventVolumeWaterfallWriter(ctx, {
+            sheetLayout: compose.sheetLayout,
+          });
+          const fetched = await fetchPolymarketLiveEventVolumeRows(compose, {
+            selectedColumns: cols,
+            onEventRows: (batch) => {
+              waterfall.write(batch);
+              const completed = batch.index + 1;
+              setConnectDataLakePullState?.((prev) => ({
+                ...prev,
+                loading: true,
+                error: null,
+                label: `Pulled live volume for ${completed} of ${batch.total} events…`,
+                progress: Math.max(
+                  Number(prev.progress) || 0,
+                  Math.round(10 + (completed / Math.max(batch.total, 1)) * 85),
+                ),
+              }));
+            },
+          });
+          if (!fetched.rows.length && !fetched.metadataRows.length) {
+            setConnectDataLakePullState?.((prev) => ({
+              ...prev,
+              loading: false,
+              error: "No live volume found for the selected events.",
+              progress: 0,
+              label: "",
+            }));
+            return;
+          }
+          setLastRequestAt(Date.now());
+          setThrottleRemaining(COOLDOWN_MS);
+          setConnectDataLakePullState?.((prev) => ({
+            ...prev,
+            loading: false,
+            label: "",
+            progress: 100,
+            error: null,
+          }));
+          const elapsedMs =
+            (typeof performance !== "undefined" && performance?.now ? performance.now() : Date.now()) -
+            pullStartMs;
+          trackDataPullComplete({
+            integration: "polymarket",
+            endpoint: POLYMARKET_LIVE_EVENT_VOLUME_ENDPOINT_ID,
+            sampleLabel: "Get live volume for event",
+            rowCount: fetched.rows.length,
+            elapsedMs,
+          });
+        } catch (e) {
+          const msg = e instanceof Error ? e.message : "Request failed";
+          trackDataPullError({
+            message: msg,
+            integration: "polymarket",
+            source: "polymarket.getLiveVolumeForEvent",
+            meta: { endpoint: POLYMARKET_LIVE_EVENT_VOLUME_ENDPOINT_ID },
           });
           setConnectDataLakePullState?.((prev) => ({
             ...prev,
