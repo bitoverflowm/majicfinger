@@ -241,7 +241,7 @@ export const POLYMARKET_LIVE_CONNECT_ENDPOINTS = [
     category: "markets",
     title: "Spreads",
     description:
-      "Discover one or many markets, then return one best-ask minus best-bid spread row per market in a single sheet.",
+      "Spread is the difference between the best ask and best bid prices for a given market",
   },
   {
     id: POLYMARKET_LAST_TRADE_PRICES_ENDPOINT_ID,
