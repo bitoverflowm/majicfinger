@@ -248,7 +248,7 @@ export const POLYMARKET_LIVE_CONNECT_ENDPOINTS = [
     category: "markets",
     title: "Last Trade Prices",
     description:
-      "Discover one or many markets, then return one last-trade price and side row per market in a single sheet.",
+      "Last trade price and side for a specific Market outcome",
   },
   {
     id: POLYMARKET_MARKETS_BY_EVENTS_ENDPOINT_ID,

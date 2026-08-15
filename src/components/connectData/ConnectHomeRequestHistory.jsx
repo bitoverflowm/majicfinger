@@ -78,16 +78,16 @@ function RequestHistoryQueryCard({ card, sheet, pull }) {
             <div className="pt-0.5">
               <button
                 type="button"
-                className="inline-flex max-w-full items-start gap-1 text-left text-[11px] text-foreground/90 hover:text-foreground"
+                className="inline-flex max-w-full items-center gap-1 overflow-hidden text-left text-[11px] text-foreground/90 hover:text-foreground"
                 onClick={() => setExpanded((v) => !v)}
                 aria-expanded={expanded}
               >
                 {expanded ? (
-                  <ChevronDown className="mt-0.5 h-3 w-3 shrink-0" aria-hidden />
+                  <ChevronDown className="h-3 w-3 shrink-0" aria-hidden />
                 ) : (
-                  <ChevronRight className="mt-0.5 h-3 w-3 shrink-0" aria-hidden />
+                  <ChevronRight className="h-3 w-3 shrink-0" aria-hidden />
                 )}
-                <span className="min-w-0 break-words">
+                <span className="min-w-0 truncate">
                   <span className="font-medium text-foreground">Params</span>
                   {expanded ? "" : ` · ${live.queryParamsCompact}`}
                 </span>
