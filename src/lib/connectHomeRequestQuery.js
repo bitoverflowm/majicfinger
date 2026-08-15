@@ -5,6 +5,7 @@ export function integrationLabelFromLake(lake) {
   if (key === "kalshi") return "Kalshi Historical";
   if (key === "kalshi-live") return "Kalshi Live";
   if (key === "polymarket") return "Polymarket Historical";
+  if (key === "polymarket-live" || key === "polymarket live") return "Polymarket Live";
   return key ? `${key.charAt(0).toUpperCase()}${key.slice(1)}` : "Data Lake";
 }
 

@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useMemo, useRef, useState } from "react";
-import { History, RotateCcw } from "lucide-react";
+import { ChevronDown, ChevronRight, History, RotateCcw } from "lucide-react";
 import { toast } from "sonner";
 
 import { ConnectHomeReplaySheetDialog } from "@/components/connectData/ConnectHomeReplaySheetDialog";
@@ -16,6 +16,7 @@ import {
   listConnectHomeSheetHistory,
   requestCardSummaryLabel,
 } from "@/lib/connectHomeRequestHistory";
+import { describePolymarketLiveRequestCard } from "@/lib/polymarketLive/polymarketLiveRequestHistory";
 import { rehydrateSheetFromProvenance } from "@/lib/rehydrateSheetFromProvenance";
 import { resolvePersistedFullRowCount } from "@/lib/projectPersistence";
 import { cn } from "@/lib/utils";
@@ -46,6 +47,101 @@ function finishReplayPullProgress(setConnectDataLakePullState) {
     progress: 0,
     error: null,
   });
+}
+
+function RequestHistoryQueryCard({ card, sheet, pull }) {
+  const [expanded, setExpanded] = useState(false);
+  const live = describePolymarketLiveRequestCard(card, sheet);
+  const queryText = formatConnectRequestCardQuery(card, sheet);
+  const hasExpandableParams =
+    (live && (live.queryParams.length > 0 || live.detailLines.length > 0)) ||
+    Boolean(queryText && queryText.length > 120);
+
+  return (
+    <li className="rounded-md bg-background/60 px-2 py-1.5 text-[11px] text-muted-foreground">
+      {live ? (
+        <div className="space-y-1">
+          <p className="font-medium text-foreground break-words leading-snug">
+            {live.integrationLabel}
+          </p>
+          <p className="break-words leading-snug text-foreground/90">
+            {live.categoryLabel}
+            {live.endpointTitle ? ` · ${live.endpointTitle}` : ""}
+          </p>
+          <p className="break-words leading-snug">
+            {[live.searchModeLabel, live.marketScopeLabel].filter(Boolean).join(" · ")}
+          </p>
+          <p className="break-words leading-snug text-foreground/90">
+            Market · {live.marketLabel}
+          </p>
+          {live.queryParamsCompact ? (
+            <div className="pt-0.5">
+              <button
+                type="button"
+                className="inline-flex max-w-full items-start gap-1 text-left text-[11px] text-foreground/90 hover:text-foreground"
+                onClick={() => setExpanded((v) => !v)}
+                aria-expanded={expanded}
+              >
+                {expanded ? (
+                  <ChevronDown className="mt-0.5 h-3 w-3 shrink-0" aria-hidden />
+                ) : (
+                  <ChevronRight className="mt-0.5 h-3 w-3 shrink-0" aria-hidden />
+                )}
+                <span className="min-w-0 break-words">
+                  <span className="font-medium text-foreground">Params</span>
+                  {expanded ? "" : ` · ${live.queryParamsCompact}`}
+                </span>
+              </button>
+              {expanded ? (
+                <ul className="mt-1 space-y-0.5 border-l border-border/50 pl-2">
+                  {(live.queryParams.length
+                    ? live.queryParams.map((p) => `${p.key} = ${p.value}`)
+                    : live.detailLines
+                  ).map((line) => (
+                    <li key={line} className="break-words leading-snug text-foreground/85">
+                      {line}
+                    </li>
+                  ))}
+                </ul>
+              ) : null}
+            </div>
+          ) : null}
+        </div>
+      ) : (
+        <div>
+          <p className="font-medium text-foreground break-words leading-snug">Query</p>
+          <p className="mt-0.5 break-words leading-snug text-foreground/90">{queryText || "—"}</p>
+          {hasExpandableParams ? (
+            <button
+              type="button"
+              className="mt-1 inline-flex items-center gap-1 text-[11px] text-primary"
+              onClick={() => setExpanded((v) => !v)}
+            >
+              {expanded ? "Hide details" : "Show details"}
+            </button>
+          ) : null}
+          {expanded && queryText ? (
+            <p className="mt-1 break-words leading-snug text-foreground/85 whitespace-pre-wrap">
+              {queryText}
+            </p>
+          ) : null}
+        </div>
+      )}
+
+      {card?.status === "in_progress" ? (
+        <p className="mt-1.5 text-primary">In progress… {pull.label || "Loading data…"}</p>
+      ) : (
+        <>
+          <p className="mt-1.5">created in {fmtRequestElapsed(card?.elapsedMs)}</p>
+          {card?.loadedRowCount != null ? (
+            <p>
+              loaded <strong>{card.loadedRowCount}</strong> rows
+            </p>
+          ) : null}
+        </>
+      )}
+    </li>
+  );
 }
 
 export function ConnectHomeRequestHistory({ className }) {
@@ -164,7 +260,10 @@ export function ConnectHomeRequestHistory({ className }) {
           const querySummary = formatConnectRequestCardQuery(sourceCard, {
             provenance: replayProvenance,
           });
-          const intentFullRowCount = resolvePersistedFullRowCount(replaySource, json?.rowCount ?? rows.length);
+          const intentFullRowCount = resolvePersistedFullRowCount(
+            replaySource,
+            json?.rowCount ?? rows.length,
+          );
           const replayCard = sourceCard
             ? {
                 ...sourceCard,
@@ -260,7 +359,8 @@ export function ConnectHomeRequestHistory({ className }) {
           Request history
         </h3>
         <p className="mt-1 text-[11px] leading-snug text-muted-foreground">
-          All sheets and pulls across integrations — Kalshi, Polymarket Historical, and more.
+          All sheets and pulls across integrations — Kalshi, Polymarket Live, Polymarket Historical, and
+          more.
         </p>
       </div>
 
@@ -284,8 +384,24 @@ export function ConnectHomeRequestHistory({ className }) {
       <div className="space-y-3">
         {sheetHistory.map(({ sheetId, sheet, cards, rowCount }) => {
           const sheetName = String(sheet?.name || sheetId).trim();
-          const integration = integrationLabelFromLake(sheet?.provenance?.lake || cards[0]?.lake);
-          const canReplay = !!sheet?.provenance;
+          const firstCard = cards[0] || null;
+          const live = describePolymarketLiveRequestCard(firstCard, sheet);
+          const integration =
+            live?.integrationLabel ||
+            integrationLabelFromLake(
+              sheet?.provenance?.lake || sheet?.provenance?.source || firstCard?.lake,
+            );
+          const endpointHint = live
+            ? [live.categoryLabel, live.endpointTitle].filter(Boolean).join(" · ")
+            : "";
+          const canReplay = (() => {
+            const prov = sheet?.provenance;
+            if (!prov) return false;
+            const lake = String(prov.lake || prov.source || "").toLowerCase();
+            // Athena / Data Lake compose provenance only — live API pulls are not rehydratable this way.
+            if (lake === "polymarket-live" || lake === "kalshi-live") return false;
+            return true;
+          })();
           const variationLines = extractSheetVariationLines(sheet?.provenance);
 
           return (
@@ -298,6 +414,11 @@ export function ConnectHomeRequestHistory({ className }) {
                   <p className="text-sm font-semibold truncate">{sheetName}</p>
                   {forkContext ? (
                     <p className="mt-0.5 text-[11px] leading-snug text-primary/90">{forkContext.line}</p>
+                  ) : null}
+                  {endpointHint ? (
+                    <p className="mt-0.5 text-[11px] font-medium leading-snug text-foreground/90">
+                      {endpointHint}
+                    </p>
                   ) : null}
                   {variationLines.map((line) => (
                     <p
@@ -329,36 +450,14 @@ export function ConnectHomeRequestHistory({ className }) {
 
               {cards.length > 0 ? (
                 <ul className="mt-2 space-y-1.5 border-t border-border/40 pt-2">
-                  {cards.map((card) => {
-                    const queryText = formatConnectRequestCardQuery(card, sheet);
-                    return (
-                      <li
-                        key={card.id}
-                        className="rounded-md bg-background/60 px-2 py-1.5 text-[11px] text-muted-foreground"
-                      >
-                        <p className="font-medium text-foreground break-words leading-snug">
-                          Query
-                        </p>
-                        <p className="mt-0.5 break-words leading-snug text-foreground/90">
-                          {queryText || "—"}
-                        </p>
-                        {card?.status === "in_progress" ? (
-                          <p className="mt-1.5 text-primary">
-                            In progress… {pull.label || "Loading data…"}
-                          </p>
-                        ) : (
-                          <>
-                            <p className="mt-1.5">created in {fmtRequestElapsed(card?.elapsedMs)}</p>
-                            {card?.loadedRowCount != null ? (
-                              <p>
-                                loaded <strong>{card.loadedRowCount}</strong> rows
-                              </p>
-                            ) : null}
-                          </>
-                        )}
-                      </li>
-                    );
-                  })}
+                  {cards.map((card) => (
+                    <RequestHistoryQueryCard
+                      key={card.id}
+                      card={card}
+                      sheet={sheet}
+                      pull={pull}
+                    />
+                  ))}
                 </ul>
               ) : null}
             </div>

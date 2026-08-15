@@ -839,8 +839,19 @@ const Polymarket = ({ setConnectedData, requestSheetDestination, connectHomePull
             setConnectedData,
             addNewSheetAndActivate,
             setSheetData,
+            setDataSheets: contextStateV2?.setDataSheets,
           };
-          applyPolymarketMarketPricesRows(ctx, fetched.rows);
+          const elapsedMs =
+            (typeof performance !== "undefined" && performance?.now ? performance.now() : Date.now()) -
+            pullStartMs;
+          applyPolymarketMarketPricesRows(ctx, fetched.rows, {
+            endpointId: POLYMARKET_MARKET_PRICES_ENDPOINT_ID,
+            compose,
+            marketRefs: fetched.refs || compose.marketRefs,
+            selectedColumns: cols,
+            tokenIds: fetched.tokenIds,
+            elapsedMs,
+          });
           setLastRequestAt(Date.now());
           setThrottleRemaining(COOLDOWN_MS);
           setConnectDataLakePullState?.((prev) => ({
@@ -850,9 +861,6 @@ const Polymarket = ({ setConnectedData, requestSheetDestination, connectHomePull
             progress: 100,
             error: null,
           }));
-          const elapsedMs =
-            (typeof performance !== "undefined" && performance?.now ? performance.now() : Date.now()) -
-            pullStartMs;
           trackDataPullComplete({
             integration: "polymarket",
             endpoint: POLYMARKET_MARKET_PRICES_ENDPOINT_ID,
@@ -922,8 +930,19 @@ const Polymarket = ({ setConnectedData, requestSheetDestination, connectHomePull
             setConnectedData,
             addNewSheetAndActivate,
             setSheetData,
+            setDataSheets: contextStateV2?.setDataSheets,
           };
-          applyPolymarketMarketPricesRows(ctx, fetched.rows);
+          const elapsedMs =
+            (typeof performance !== "undefined" && performance?.now ? performance.now() : Date.now()) -
+            pullStartMs;
+          applyPolymarketMarketPricesRows(ctx, fetched.rows, {
+            endpointId: POLYMARKET_MIDPOINT_PRICES_ENDPOINT_ID,
+            compose,
+            marketRefs: fetched.refs || compose.marketRefs,
+            selectedColumns: cols,
+            tokenIds: fetched.tokenIds,
+            elapsedMs,
+          });
           setLastRequestAt(Date.now());
           setThrottleRemaining(COOLDOWN_MS);
           setConnectDataLakePullState?.((prev) => ({
@@ -933,9 +952,6 @@ const Polymarket = ({ setConnectedData, requestSheetDestination, connectHomePull
             progress: 100,
             error: null,
           }));
-          const elapsedMs =
-            (typeof performance !== "undefined" && performance?.now ? performance.now() : Date.now()) -
-            pullStartMs;
           trackDataPullComplete({
             integration: "polymarket",
             endpoint: POLYMARKET_MIDPOINT_PRICES_ENDPOINT_ID,
@@ -1005,8 +1021,19 @@ const Polymarket = ({ setConnectedData, requestSheetDestination, connectHomePull
             setConnectedData,
             addNewSheetAndActivate,
             setSheetData,
+            setDataSheets: contextStateV2?.setDataSheets,
           };
-          applyPolymarketMarketPricesRows(ctx, fetched.rows);
+          const elapsedMs =
+            (typeof performance !== "undefined" && performance?.now ? performance.now() : Date.now()) -
+            pullStartMs;
+          applyPolymarketMarketPricesRows(ctx, fetched.rows, {
+            endpointId: POLYMARKET_SPREADS_ENDPOINT_ID,
+            compose,
+            marketRefs: fetched.refs || compose.marketRefs,
+            selectedColumns: cols,
+            tokenIds: fetched.tokenIds,
+            elapsedMs,
+          });
           setLastRequestAt(Date.now());
           setThrottleRemaining(COOLDOWN_MS);
           setConnectDataLakePullState?.((prev) => ({
@@ -1016,9 +1043,6 @@ const Polymarket = ({ setConnectedData, requestSheetDestination, connectHomePull
             progress: 100,
             error: null,
           }));
-          const elapsedMs =
-            (typeof performance !== "undefined" && performance?.now ? performance.now() : Date.now()) -
-            pullStartMs;
           trackDataPullComplete({
             integration: "polymarket",
             endpoint: POLYMARKET_SPREADS_ENDPOINT_ID,
@@ -1088,8 +1112,19 @@ const Polymarket = ({ setConnectedData, requestSheetDestination, connectHomePull
             setConnectedData,
             addNewSheetAndActivate,
             setSheetData,
+            setDataSheets: contextStateV2?.setDataSheets,
           };
-          applyPolymarketMarketPricesRows(ctx, fetched.rows);
+          const elapsedMs =
+            (typeof performance !== "undefined" && performance?.now ? performance.now() : Date.now()) -
+            pullStartMs;
+          applyPolymarketMarketPricesRows(ctx, fetched.rows, {
+            endpointId: POLYMARKET_LAST_TRADE_PRICES_ENDPOINT_ID,
+            compose,
+            marketRefs: fetched.refs || compose.marketRefs,
+            selectedColumns: cols,
+            tokenIds: fetched.tokenIds,
+            elapsedMs,
+          });
           setLastRequestAt(Date.now());
           setThrottleRemaining(COOLDOWN_MS);
           setConnectDataLakePullState?.((prev) => ({
@@ -1099,9 +1134,6 @@ const Polymarket = ({ setConnectedData, requestSheetDestination, connectHomePull
             progress: 100,
             error: null,
           }));
-          const elapsedMs =
-            (typeof performance !== "undefined" && performance?.now ? performance.now() : Date.now()) -
-            pullStartMs;
           trackDataPullComplete({
             integration: "polymarket",
             endpoint: POLYMARKET_LAST_TRADE_PRICES_ENDPOINT_ID,

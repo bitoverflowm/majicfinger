@@ -2,6 +2,7 @@ import {
   flattenLastTradePricesRows,
   lastTradePriceRefFromSuggestion,
   normalizePolymarketLastTradePricesComposeState,
+  POLYMARKET_LAST_TRADE_PRICES_ENDPOINT_ID,
 } from "@/lib/polymarketLive/lastTradePricesCompose";
 import {
   applyPolymarketMarketPricesRows,
@@ -86,6 +87,7 @@ export async function fetchPolymarketLastTradePricesRows(compose, opts = {}) {
     rows: flattenLastTradePricesRows(payload, refs, opts.selectedColumns),
     marketsDiscovered: refs.length,
     tokenIds,
+    refs,
   };
 }
 
@@ -98,6 +100,8 @@ export async function fetchPolymarketLastTradePricesRows(compose, opts = {}) {
  * }} opts
  */
 export async function applyPolymarketLastTradePricesSearchAll(ctx, suggestions, opts) {
+  const pullStartMs =
+    typeof performance !== "undefined" && performance?.now ? performance.now() : Date.now();
   const refs = (suggestions || []).map(lastTradePriceRefFromSuggestion).filter(Boolean);
   if (!refs.length) throw new Error("Select at least one market.");
   const compose = normalizePolymarketLastTradePricesComposeState({
@@ -112,5 +116,15 @@ export async function applyPolymarketLastTradePricesSearchAll(ctx, suggestions, 
   if (!fetched.rows.length) {
     throw new Error("No last trade prices found for the selected markets.");
   }
-  return applyPolymarketMarketPricesRows(ctx, fetched.rows);
+  const elapsedMs =
+    (typeof performance !== "undefined" && performance?.now ? performance.now() : Date.now()) -
+    pullStartMs;
+  return applyPolymarketMarketPricesRows(ctx, fetched.rows, {
+    endpointId: POLYMARKET_LAST_TRADE_PRICES_ENDPOINT_ID,
+    compose,
+    marketRefs: fetched.refs || refs,
+    selectedColumns: opts.selectedColumns,
+    tokenIds: fetched.tokenIds,
+    elapsedMs,
+  });
 }

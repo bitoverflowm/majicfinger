@@ -5,6 +5,7 @@ import {
   flattenMidpointPricesRows,
   midpointPriceRefFromSuggestion,
   normalizePolymarketMidpointPricesComposeState,
+  POLYMARKET_MIDPOINT_PRICES_ENDPOINT_ID,
 } from "@/lib/polymarketLive/midpointPricesCompose";
 import {
   discoverOrderbooksMarketsFromListFilters,
@@ -85,6 +86,7 @@ export async function fetchPolymarketMidpointPricesRows(compose, opts = {}) {
     ),
     marketsDiscovered: refs.length,
     tokenIds,
+    refs,
   };
 }
 
@@ -97,6 +99,8 @@ export async function fetchPolymarketMidpointPricesRows(compose, opts = {}) {
  * }} opts
  */
 export async function applyPolymarketMidpointPricesSearchAll(ctx, suggestions, opts) {
+  const pullStartMs =
+    typeof performance !== "undefined" && performance?.now ? performance.now() : Date.now();
   const refs = (suggestions || []).map(midpointPriceRefFromSuggestion).filter(Boolean);
   if (!refs.length) throw new Error("Select at least one market.");
   const compose = normalizePolymarketMidpointPricesComposeState({
@@ -111,5 +115,15 @@ export async function applyPolymarketMidpointPricesSearchAll(ctx, suggestions, o
   if (!fetched.rows.length) {
     throw new Error("No midpoint prices found for the selected markets.");
   }
-  return applyPolymarketMarketPricesRows(ctx, fetched.rows);
+  const elapsedMs =
+    (typeof performance !== "undefined" && performance?.now ? performance.now() : Date.now()) -
+    pullStartMs;
+  return applyPolymarketMarketPricesRows(ctx, fetched.rows, {
+    endpointId: POLYMARKET_MIDPOINT_PRICES_ENDPOINT_ID,
+    compose,
+    marketRefs: fetched.refs || refs,
+    selectedColumns: opts.selectedColumns,
+    tokenIds: fetched.tokenIds,
+    elapsedMs,
+  });
 }

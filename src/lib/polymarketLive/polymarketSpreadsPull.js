@@ -7,6 +7,7 @@ import { parseTokenIdList } from "@/lib/polymarketLive/orderbooksCompose";
 import {
   flattenSpreadsRows,
   normalizePolymarketSpreadsComposeState,
+  POLYMARKET_SPREADS_ENDPOINT_ID,
   spreadRefFromSuggestion,
 } from "@/lib/polymarketLive/spreadsCompose";
 
@@ -77,6 +78,7 @@ export async function fetchPolymarketSpreadsRows(compose, opts = {}) {
     rows: flattenSpreadsRows(unwrapSpreadsPayload(data), refs, opts.selectedColumns),
     marketsDiscovered: refs.length,
     tokenIds,
+    refs,
   };
 }
 
@@ -89,6 +91,8 @@ export async function fetchPolymarketSpreadsRows(compose, opts = {}) {
  * }} opts
  */
 export async function applyPolymarketSpreadsSearchAll(ctx, suggestions, opts) {
+  const pullStartMs =
+    typeof performance !== "undefined" && performance?.now ? performance.now() : Date.now();
   const refs = (suggestions || []).map(spreadRefFromSuggestion).filter(Boolean);
   if (!refs.length) throw new Error("Select at least one market.");
   const compose = normalizePolymarketSpreadsComposeState({
@@ -101,5 +105,15 @@ export async function applyPolymarketSpreadsSearchAll(ctx, suggestions, opts) {
     marketRefsOverride: refs,
   });
   if (!fetched.rows.length) throw new Error("No spreads found for the selected markets.");
-  return applyPolymarketMarketPricesRows(ctx, fetched.rows);
+  const elapsedMs =
+    (typeof performance !== "undefined" && performance?.now ? performance.now() : Date.now()) -
+    pullStartMs;
+  return applyPolymarketMarketPricesRows(ctx, fetched.rows, {
+    endpointId: POLYMARKET_SPREADS_ENDPOINT_ID,
+    compose,
+    marketRefs: fetched.refs || refs,
+    selectedColumns: opts.selectedColumns,
+    tokenIds: fetched.tokenIds,
+    elapsedMs,
+  });
 }

@@ -8,7 +8,11 @@ import {
   flattenMarketPricesRows,
   marketPriceRefFromSuggestion,
   normalizePolymarketMarketPricesComposeState,
+  POLYMARKET_MARKET_PRICES_ENDPOINT_ID,
 } from "@/lib/polymarketLive/marketPricesCompose";
+import {
+  attachPolymarketLiveRequestMetadata,
+} from "@/lib/polymarketLive/polymarketLiveRequestHistory";
 import {
   discoverOrderbooksMarketsFromListFilters,
   resolveOrderbooksMarketTokenIds,
@@ -94,6 +98,7 @@ export async function fetchPolymarketMarketPricesRows(compose, opts = {}) {
     rows: flattenMarketPricesRows(unwrapPricesPayload(data), refs, opts.selectedColumns),
     marketsDiscovered: refs.length,
     tokenIds,
+    refs,
   };
 }
 
@@ -102,13 +107,38 @@ export async function fetchPolymarketMarketPricesRows(compose, opts = {}) {
  *
  * @param {Record<string, unknown>} ctx
  * @param {Record<string, unknown>[]} rows
+ * @param {{
+ *   endpointId?: string;
+ *   compose?: import("@/lib/polymarketLive/marketPricesCompose").PolymarketMarketPricesComposeState;
+ *   marketRefs?: import("@/lib/polymarketLive/marketPricesCompose").PolymarketMarketPriceMarketRef[];
+ *   selectedColumns?: string[];
+ *   tokenIds?: string[];
+ *   elapsedMs?: number;
+ * }} [meta]
  */
-export function applyPolymarketMarketPricesRows(ctx, rows) {
+export function applyPolymarketMarketPricesRows(ctx, rows, meta = {}) {
   const list = Array.isArray(rows) ? rows : [];
   if (!list.length) return 0;
   prepareConnectHomePullSheet(ctx);
   flushSync(() => {
     applyConnectHomePullData(ctx, list);
+    const compose = meta.compose || null;
+    const marketRefs =
+      Array.isArray(meta.marketRefs) && meta.marketRefs.length
+        ? meta.marketRefs
+        : Array.isArray(compose?.marketRefs)
+          ? compose.marketRefs
+          : [];
+    attachPolymarketLiveRequestMetadata(ctx, {
+      endpointId: meta.endpointId || POLYMARKET_MARKET_PRICES_ENDPOINT_ID,
+      mode: compose?.mode === "advanced" ? "advanced" : "search",
+      marketRefs,
+      marketsFilters: compose?.marketsFilters,
+      selectedColumns: meta.selectedColumns,
+      tokenIds: meta.tokenIds,
+      elapsedMs: meta.elapsedMs,
+      loadedRowCount: list.length,
+    });
     ctx?.setConnectHomeAnalyzeActive?.(true);
   });
   ctx?.requestConnectAnalyzeScroll?.();
@@ -121,9 +151,12 @@ export function applyPolymarketMarketPricesRows(ctx, rows) {
  * @param {{
  *   compose: import("@/lib/polymarketLive/marketPricesCompose").PolymarketMarketPricesComposeState;
  *   selectedColumns?: string[];
+ *   endpointId?: string;
  * }} opts
  */
 export async function applyPolymarketMarketPricesSearchAll(ctx, suggestions, opts) {
+  const pullStartMs =
+    typeof performance !== "undefined" && performance?.now ? performance.now() : Date.now();
   const refs = (suggestions || []).map(marketPriceRefFromSuggestion).filter(Boolean);
   if (!refs.length) throw new Error("Select at least one market.");
   const compose = normalizePolymarketMarketPricesComposeState({
@@ -138,5 +171,15 @@ export async function applyPolymarketMarketPricesSearchAll(ctx, suggestions, opt
   if (!fetched.rows.length) {
     throw new Error("No market prices found for the selected markets.");
   }
-  return applyPolymarketMarketPricesRows(ctx, fetched.rows);
+  const elapsedMs =
+    (typeof performance !== "undefined" && performance?.now ? performance.now() : Date.now()) -
+    pullStartMs;
+  return applyPolymarketMarketPricesRows(ctx, fetched.rows, {
+    endpointId: opts.endpointId || POLYMARKET_MARKET_PRICES_ENDPOINT_ID,
+    compose,
+    marketRefs: fetched.refs || refs,
+    selectedColumns: opts.selectedColumns,
+    tokenIds: fetched.tokenIds,
+    elapsedMs,
+  });
 }
