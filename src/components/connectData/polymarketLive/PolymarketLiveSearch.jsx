@@ -1,12 +1,14 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { Loader2, Search } from "lucide-react";
+import { Check, Loader2, Search } from "lucide-react";
 
 import {
   formatPolymarketVolume,
   isPolymarketPublicSearchEligible,
+  isPolymarketSelectionMatch,
+  polymarketSelectionTokenSet,
   polymarketSuggestionStatusTags,
 } from "@/lib/polymarketLive/polymarketPublicSearch";
 import { cn } from "@/lib/utils";
@@ -78,6 +80,7 @@ function suggestionKey(s) {
  *   searchTags?: boolean;
  *   searchProfiles?: boolean;
  *   collectMode?: boolean;
+ *   selectedItems?: Array<Record<string, unknown>>;
  * }} props
  */
 export function PolymarketLiveSearch({
@@ -91,10 +94,12 @@ export function PolymarketLiveSearch({
   searchTags = true,
   searchProfiles = true,
   collectMode = false,
+  selectedItems,
 }) {
   const debounceRef = useRef(null);
   const suggestAbortRef = useRef(null);
   const suggestSeqRef = useRef(0);
+  const containerRef = useRef(/** @type {HTMLDivElement | null} */ (null));
 
   const [q, setQ] = useState("");
   const [suggestions, setSuggestions] = useState(
@@ -172,20 +177,29 @@ export function PolymarketLiveSearch({
     };
   }, [q, fetchSuggestions]);
 
+  useEffect(() => {
+    if (!suggestOpen) return undefined;
+    const onPointerDown = (event) => {
+      if (!containerRef.current?.contains(event.target)) setSuggestOpen(false);
+    };
+    document.addEventListener("pointerdown", onPointerDown);
+    return () => document.removeEventListener("pointerdown", onPointerDown);
+  }, [suggestOpen]);
+
   const handleSelect = useCallback(
     async (s) => {
-      setSuggestOpen(false);
       setError(null);
       if (collectMode) {
+        // Keep the list open so the row it just added shows as checked, and the
+        // rest of the matches stay pickable.
         try {
           await onSelect(s);
-          setQ("");
-          setSuggestions([]);
         } catch (e) {
           setError(e instanceof Error ? e.message : "Failed to add selection");
         }
         return;
       }
+      setSuggestOpen(false);
       setSelectLoading(true);
       try {
         await onSelect(s);
@@ -229,9 +243,13 @@ export function PolymarketLiveSearch({
 
   const busy = disabled || selectLoading;
   const eligible = isPolymarketPublicSearchEligible(q);
+  const selectedTokens = useMemo(
+    () => polymarketSelectionTokenSet(selectedItems),
+    [selectedItems],
+  );
 
   return (
-    <div className={cn("space-y-2", className)}>
+    <div className={cn("space-y-2", className)} ref={containerRef}>
       <div className="relative">
         <span className="pointer-events-none absolute left-3 top-1/2 z-[1] flex h-4 w-4 -translate-y-1/2 items-center justify-center text-muted-foreground">
           {suggestLoading ? (
@@ -255,7 +273,9 @@ export function PolymarketLiveSearch({
               if (eligible && suggestions.length > 0) {
                 void handleSubmitAll();
               }
+              return;
             }
+            if (e.key === "Escape") setSuggestOpen(false);
           }}
           disabled={busy}
           autoComplete="off"
@@ -296,17 +316,41 @@ export function PolymarketLiveSearch({
                 const vol24 = formatPolymarketVolume(s.volume24hr);
                 const vol = formatPolymarketVolume(s.volume);
                 const topicTags = Array.isArray(s.tagLabels) ? s.tagLabels.slice(0, 3) : [];
+                const alreadySelected = isPolymarketSelectionMatch(s, selectedTokens);
                 return (
-                  <motion.li key={suggestionKey(s)} role="option" variants={suggestionRowVariants}>
+                  <motion.li
+                    key={suggestionKey(s)}
+                    role="option"
+                    aria-selected={alreadySelected}
+                    variants={suggestionRowVariants}
+                  >
                     <button
                       type="button"
-                      disabled={busy}
-                      className="flex w-full flex-col gap-1 px-3 py-2 text-left text-sm hover:bg-accent disabled:opacity-50"
+                      disabled={busy || alreadySelected}
+                      className={cn(
+                        "flex w-full flex-col gap-1 px-3 py-2 text-left text-sm disabled:cursor-not-allowed",
+                        alreadySelected
+                          ? "bg-emerald-500/5 opacity-70"
+                          : "hover:bg-accent disabled:opacity-50",
+                      )}
                       onMouseDown={(e) => e.preventDefault()}
                       onClick={() => handleSelect(s)}
                     >
-                      <span className="font-medium text-foreground line-clamp-2">
-                        {s.title || s.ticker || s.slug || s.id}
+                      <span className="flex w-full items-start gap-1.5">
+                        {alreadySelected ? (
+                          <Check
+                            className="mt-0.5 size-3.5 shrink-0 text-emerald-600 dark:text-emerald-400"
+                            aria-hidden
+                          />
+                        ) : null}
+                        <span className="min-w-0 font-medium text-foreground line-clamp-2">
+                          {s.title || s.ticker || s.slug || s.id}
+                        </span>
+                        {alreadySelected ? (
+                          <span className="ml-auto shrink-0 rounded px-1.5 py-0.5 text-[0.65rem] font-medium text-emerald-700 ring-1 ring-emerald-600/25 dark:text-emerald-300">
+                            Selected
+                          </span>
+                        ) : null}
                       </span>
                       {s.subtitle ? (
                         <span className="text-xs text-muted-foreground line-clamp-1">

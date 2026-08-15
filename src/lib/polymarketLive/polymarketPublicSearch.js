@@ -53,6 +53,60 @@ export function formatPolymarketVolume(value) {
 }
 
 /**
+ * Identity tokens used to match a suggestion against already-picked selections.
+ * Selections are stored in several shapes (raw suggestions, compose market refs,
+ * event refs), so matching on any shared identifier is more reliable than a
+ * single composite key.
+ *
+ * @param {Record<string, unknown> | null | undefined} item
+ * @returns {string[]}
+ */
+export function polymarketSelectionTokens(item) {
+  if (!item || typeof item !== "object") return [];
+  const o = /** @type {Record<string, unknown>} */ (item);
+  /** @type {string[]} */
+  const tokens = [];
+  const push = (prefix, value) => {
+    if (Array.isArray(value)) {
+      for (const entry of value) push(prefix, entry);
+      return;
+    }
+    const raw = String(value ?? "").trim().toLowerCase();
+    if (raw) tokens.push(`${prefix}:${raw}`);
+  };
+  push("id", o.id);
+  push("slug", o.slug);
+  push("ticker", o.ticker);
+  push("cond", o.conditionId ?? o.condition_id);
+  push("wallet", o.proxyWallet ?? o.proxy_wallet);
+  push("token", o.tokenId ?? o.token_id);
+  push("token", o.tokenIds ?? o.clobTokenIds);
+  return tokens;
+}
+
+/**
+ * @param {Array<Record<string, unknown>> | null | undefined} items
+ * @returns {Set<string>}
+ */
+export function polymarketSelectionTokenSet(items) {
+  const set = new Set();
+  for (const item of Array.isArray(items) ? items : []) {
+    for (const token of polymarketSelectionTokens(item)) set.add(token);
+  }
+  return set;
+}
+
+/**
+ * @param {Record<string, unknown> | null | undefined} item
+ * @param {Set<string> | null | undefined} tokenSet
+ * @returns {boolean}
+ */
+export function isPolymarketSelectionMatch(item, tokenSet) {
+  if (!tokenSet || tokenSet.size === 0) return false;
+  return polymarketSelectionTokens(item).some((token) => tokenSet.has(token));
+}
+
+/**
  * Status chips for suggestion rows (live / closed / active / etc.).
  * @param {PolymarketPublicSearchSuggestion} s
  * @returns {string[]}

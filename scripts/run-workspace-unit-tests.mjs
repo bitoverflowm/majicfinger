@@ -54,6 +54,7 @@ import "@/lib/polymarketLive/midpointPricesCompose.test.js";
 import "@/lib/polymarketLive/spreadsCompose.test.js";
 import "@/lib/polymarketLive/lastTradePricesCompose.test.js";
 import "@/lib/polymarketLive/polymarketLiveRequestHistory.test.js";
+import "@/lib/polymarketLive/polymarketPublicSearch.test.js";
 
 function test(name, fn) {
   try {

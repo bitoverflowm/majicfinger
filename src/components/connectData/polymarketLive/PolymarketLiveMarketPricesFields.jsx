@@ -183,6 +183,7 @@ export function PolymarketLiveMarketPricesFields({
             placeholder="Search markets…"
             disabled={disabled || searchGoLoading}
             collectMode
+            selectedItems={searchPicks}
             onSelect={addSearchPick}
             onSubmitAll={(list) => {
               for (const suggestion of list || []) addSearchPick(suggestion);

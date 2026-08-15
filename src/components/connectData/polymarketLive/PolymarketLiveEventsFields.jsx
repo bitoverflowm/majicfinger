@@ -327,6 +327,7 @@ export function PolymarketLiveEventsFields({
             placeholder="Search events…"
             disabled={disabled || searchGoLoading}
             collectMode
+            selectedItems={searchPicks}
             onSelect={(s) => addSearchPick(s)}
             onSubmitAll={(list) => {
               for (const s of list || []) addSearchPick(s);
@@ -505,6 +506,7 @@ export function PolymarketLiveEventsFields({
               searchProfiles={false}
               placeholder="Search events to add id + slug…"
               disabled={disabled}
+              selectedItems={state.eventRefs}
               onSelect={(s) => addEventRef(s)}
               onSubmitAll={(list) => list.forEach((s) => addEventRef(s))}
             />

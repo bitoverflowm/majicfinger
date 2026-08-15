@@ -246,6 +246,7 @@ export function PolymarketLiveMarketsListFilters({
           searchProfiles={false}
           placeholder="Search markets to add…"
           disabled={disabled}
+          selectedItems={state.marketRefs}
           onSelect={(s) => addMarketRef(s)}
           onSubmitAll={(list) => list.forEach((s) => addMarketRef(s))}
         />

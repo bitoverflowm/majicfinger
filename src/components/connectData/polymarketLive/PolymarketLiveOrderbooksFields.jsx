@@ -237,6 +237,7 @@ export function PolymarketLiveOrderbooksFields({
             placeholder="Search markets…"
             disabled={disabled || searchGoLoading}
             collectMode
+            selectedItems={searchPicks}
             onSelect={(s) => addSearchPick(s)}
             onSubmitAll={(list) => {
               for (const s of list || []) addSearchPick(s);

@@ -199,6 +199,7 @@ export function PolymarketLiveOpenInterestFields({
             placeholder="Search markets…"
             disabled={disabled || searchGoLoading}
             collectMode
+            selectedItems={searchPicks}
             onSelect={(s) => addSearchPick(s)}
             onSubmitAll={(list) => {
               for (const s of list || []) addSearchPick(s);
@@ -282,6 +283,7 @@ export function PolymarketLiveOpenInterestFields({
               searchProfiles={false}
               placeholder="Search markets to add…"
               disabled={disabled}
+              selectedItems={state.marketRefs}
               onSelect={(s) => addMarketRef(s)}
               onSubmitAll={(list) => list.forEach((s) => addMarketRef(s))}
             />
