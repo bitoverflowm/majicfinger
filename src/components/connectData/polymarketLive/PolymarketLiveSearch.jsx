@@ -100,6 +100,10 @@ export function PolymarketLiveSearch({
   const suggestAbortRef = useRef(null);
   const suggestSeqRef = useRef(0);
   const containerRef = useRef(/** @type {HTMLDivElement | null} */ (null));
+  /** Set when the user dismisses the list so a late response can't reopen it. */
+  const dismissedRef = useRef(false);
+  /** Clicks inside the dropdown (rows, scrollbar) blur the input but must not close it. */
+  const pointerInsideRef = useRef(false);
 
   const [q, setQ] = useState("");
   const [suggestions, setSuggestions] = useState(
@@ -109,6 +113,22 @@ export function PolymarketLiveSearch({
   const [suggestLoading, setSuggestLoading] = useState(false);
   const [selectLoading, setSelectLoading] = useState(false);
   const [error, setError] = useState(/** @type {string | null} */ (null));
+
+  /** Callers pass `entities` as a literal, so key the fetch on its contents, not its identity. */
+  const entitiesKey = Array.isArray(entities) ? entities.join(",") : "";
+
+  const dismissSuggestions = useCallback(() => {
+    dismissedRef.current = true;
+    suggestSeqRef.current += 1;
+    suggestAbortRef.current?.abort();
+    suggestAbortRef.current = null;
+    if (debounceRef.current) {
+      clearTimeout(debounceRef.current);
+      debounceRef.current = null;
+    }
+    setSuggestLoading(false);
+    setSuggestOpen(false);
+  }, []);
 
   const fetchSuggestions = useCallback(async (term) => {
     const mySeq = ++suggestSeqRef.current;
@@ -150,12 +170,12 @@ export function PolymarketLiveSearch({
         return;
       }
       let list = Array.isArray(data?.suggestions) ? data.suggestions : [];
-      if (Array.isArray(entities) && entities.length) {
-        const allow = new Set(entities);
+      if (entitiesKey) {
+        const allow = new Set(entitiesKey.split(","));
         list = list.filter((s) => allow.has(s?.entity));
       }
       setSuggestions(list);
-      setSuggestOpen(true);
+      if (!dismissedRef.current) setSuggestOpen(true);
     } catch (e) {
       if (e instanceof DOMException && e.name === "AbortError") return;
       if (mySeq !== suggestSeqRef.current) return;
@@ -165,9 +185,10 @@ export function PolymarketLiveSearch({
     } finally {
       if (mySeq === suggestSeqRef.current) setSuggestLoading(false);
     }
-  }, [entities, searchProfiles, searchTags]);
+  }, [entitiesKey, searchProfiles, searchTags]);
 
   useEffect(() => {
+    if (dismissedRef.current) return undefined;
     if (debounceRef.current) clearTimeout(debounceRef.current);
     debounceRef.current = setTimeout(() => {
       fetchSuggestions(q);
@@ -178,13 +199,15 @@ export function PolymarketLiveSearch({
   }, [q, fetchSuggestions]);
 
   useEffect(() => {
-    if (!suggestOpen) return undefined;
+    if (!suggestOpen && !suggestLoading) return undefined;
     const onPointerDown = (event) => {
-      if (!containerRef.current?.contains(event.target)) setSuggestOpen(false);
+      if (containerRef.current?.contains(event.target)) return;
+      pointerInsideRef.current = false;
+      dismissSuggestions();
     };
     document.addEventListener("pointerdown", onPointerDown);
     return () => document.removeEventListener("pointerdown", onPointerDown);
-  }, [suggestOpen]);
+  }, [suggestOpen, suggestLoading, dismissSuggestions]);
 
   const handleSelect = useCallback(
     async (s) => {
@@ -199,7 +222,7 @@ export function PolymarketLiveSearch({
         }
         return;
       }
-      setSuggestOpen(false);
+      dismissSuggestions();
       setSelectLoading(true);
       try {
         await onSelect(s);
@@ -209,12 +232,12 @@ export function PolymarketLiveSearch({
         setSelectLoading(false);
       }
     },
-    [collectMode, onSelect],
+    [collectMode, dismissSuggestions, onSelect],
   );
 
   const handleSubmitAll = useCallback(async () => {
     if (!suggestions.length) return;
-    setSuggestOpen(false);
+    dismissSuggestions();
     setError(null);
     if (collectMode) {
       try {
@@ -239,7 +262,7 @@ export function PolymarketLiveSearch({
     } finally {
       setSelectLoading(false);
     }
-  }, [collectMode, onSelect, onSubmitAll, suggestions]);
+  }, [collectMode, dismissSuggestions, onSelect, onSubmitAll, suggestions]);
 
   const busy = disabled || selectLoading;
   const eligible = isPolymarketPublicSearchEligible(q);
@@ -249,7 +272,13 @@ export function PolymarketLiveSearch({
   );
 
   return (
-    <div className={cn("space-y-2", className)} ref={containerRef}>
+    <div
+      className={cn("space-y-2", className)}
+      ref={containerRef}
+      onPointerDown={() => {
+        pointerInsideRef.current = true;
+      }}
+    >
       <div className="relative">
         <span className="pointer-events-none absolute left-3 top-1/2 z-[1] flex h-4 w-4 -translate-y-1/2 items-center justify-center text-muted-foreground">
           {suggestLoading ? (
@@ -262,10 +291,29 @@ export function PolymarketLiveSearch({
           type="search"
           placeholder={placeholder}
           value={q}
-          onChange={(e) => setQ(e.target.value)}
+          onChange={(e) => {
+            dismissedRef.current = false;
+            setQ(e.target.value);
+          }}
           onFocus={() => {
             onFocus?.();
-            if (suggestions.length > 0) setSuggestOpen(true);
+            dismissedRef.current = false;
+            if (suggestions.length > 0) {
+              setSuggestOpen(true);
+              return;
+            }
+            if (isPolymarketPublicSearchEligible(q)) void fetchSuggestions(q);
+          }}
+          onBlur={(e) => {
+            // Leaving the search should stop it, so an in-flight request can't pop the
+            // list back open. Clicks inside the dropdown are not "leaving".
+            if (pointerInsideRef.current) {
+              pointerInsideRef.current = false;
+              return;
+            }
+            const next = e.relatedTarget;
+            if (next && containerRef.current?.contains(next)) return;
+            dismissSuggestions();
           }}
           onKeyDown={(e) => {
             if (e.key === "Enter") {
@@ -275,7 +323,7 @@ export function PolymarketLiveSearch({
               }
               return;
             }
-            if (e.key === "Escape") setSuggestOpen(false);
+            if (e.key === "Escape") dismissSuggestions();
           }}
           disabled={busy}
           autoComplete="off"
