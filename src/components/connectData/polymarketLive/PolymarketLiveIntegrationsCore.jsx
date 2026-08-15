@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
+  BookOpen,
   Building2,
   Layers,
   Radio,
@@ -19,6 +20,8 @@ import { PolymarketLiveMarketsFields } from "@/components/connectData/polymarket
 import { PolymarketLiveHoldersByMarketsFields } from "@/components/connectData/polymarketLive/PolymarketLiveHoldersByMarketsFields";
 import { PolymarketLiveOpenInterestFields } from "@/components/connectData/polymarketLive/PolymarketLiveOpenInterestFields";
 import { PolymarketLiveSamplingMarketsFields } from "@/components/connectData/polymarketLive/PolymarketLiveSamplingMarketsFields";
+import { PolymarketLiveOrderbooksFields } from "@/components/connectData/polymarketLive/PolymarketLiveOrderbooksFields";
+import { PolymarketLiveMarketPricesFields } from "@/components/connectData/polymarketLive/PolymarketLiveMarketPricesFields";
 import {
   ColumnPicker,
 } from "@/components/connectData/ConnectHomeIntegrationWorkflow";
@@ -75,12 +78,47 @@ import {
   POLYMARKET_SAMPLING_MARKETS_ENDPOINT_ID,
 } from "@/lib/polymarketLive/samplingMarketsCompose";
 import {
+  emptyPolymarketOrderbooksComposeState,
+  normalizePolymarketOrderbooksComposeState,
+  POLYMARKET_ORDERBOOKS_DEFAULT_COLUMNS,
+  POLYMARKET_ORDERBOOKS_ENDPOINT_ID,
+} from "@/lib/polymarketLive/orderbooksCompose";
+import {
+  emptyPolymarketMarketPricesComposeState,
+  normalizePolymarketMarketPricesComposeState,
+  POLYMARKET_MARKET_PRICES_DEFAULT_COLUMNS,
+  POLYMARKET_MARKET_PRICES_ENDPOINT_ID,
+} from "@/lib/polymarketLive/marketPricesCompose";
+import {
+  emptyPolymarketMidpointPricesComposeState,
+  normalizePolymarketMidpointPricesComposeState,
+  POLYMARKET_MIDPOINT_PRICES_DEFAULT_COLUMNS,
+  POLYMARKET_MIDPOINT_PRICES_ENDPOINT_ID,
+} from "@/lib/polymarketLive/midpointPricesCompose";
+import {
+  emptyPolymarketSpreadsComposeState,
+  normalizePolymarketSpreadsComposeState,
+  POLYMARKET_SPREADS_DEFAULT_COLUMNS,
+  POLYMARKET_SPREADS_ENDPOINT_ID,
+} from "@/lib/polymarketLive/spreadsCompose";
+import {
+  emptyPolymarketLastTradePricesComposeState,
+  normalizePolymarketLastTradePricesComposeState,
+  POLYMARKET_LAST_TRADE_PRICES_DEFAULT_COLUMNS,
+  POLYMARKET_LAST_TRADE_PRICES_ENDPOINT_ID,
+} from "@/lib/polymarketLive/lastTradePricesCompose";
+import {
   applyPolymarketMarketsByEventsSearchAll,
   applyPolymarketMarketsByEventsSearchSelection,
 } from "@/lib/polymarketLive/polymarketMarketsByEventsPull";
 import { applyPolymarketHoldersByMarketsSearchAll } from "@/lib/polymarketLive/polymarketHoldersByMarketsPull";
 import { applyPolymarketOpenInterestSearchAll } from "@/lib/polymarketLive/polymarketOpenInterestPull";
 import { applyPolymarketLiveEventVolumeSearchAll } from "@/lib/polymarketLive/polymarketLiveEventVolumePull";
+import { applyPolymarketOrderbooksSearchAll } from "@/lib/polymarketLive/polymarketOrderbooksPull";
+import { applyPolymarketMarketPricesSearchAll } from "@/lib/polymarketLive/polymarketMarketPricesPull";
+import { applyPolymarketMidpointPricesSearchAll } from "@/lib/polymarketLive/polymarketMidpointPricesPull";
+import { applyPolymarketSpreadsSearchAll } from "@/lib/polymarketLive/polymarketSpreadsPull";
+import { applyPolymarketLastTradePricesSearchAll } from "@/lib/polymarketLive/polymarketLastTradePricesPull";
 import {
   applyPolymarketLiveSearchAll,
   applyPolymarketLiveSearchSelection,
@@ -96,6 +134,11 @@ const ENDPOINT_PRESENTATION = {
   [POLYMARKET_SAMPLING_MARKETS_ENDPOINT_ID]: { icon: Layers, accent: "secondary" },
   [POLYMARKET_HOLDERS_BY_MARKETS_ENDPOINT_ID]: { icon: Users, accent: "secondary" },
   [POLYMARKET_OPEN_INTEREST_COMPOSE_ENDPOINT_ID]: { icon: Layers, accent: "secondary" },
+  [POLYMARKET_ORDERBOOKS_ENDPOINT_ID]: { icon: BookOpen, accent: "secondary" },
+  [POLYMARKET_MARKET_PRICES_ENDPOINT_ID]: { icon: Layers, accent: "secondary" },
+  [POLYMARKET_MIDPOINT_PRICES_ENDPOINT_ID]: { icon: Layers, accent: "secondary" },
+  [POLYMARKET_SPREADS_ENDPOINT_ID]: { icon: Layers, accent: "secondary" },
+  [POLYMARKET_LAST_TRADE_PRICES_ENDPOINT_ID]: { icon: Layers, accent: "secondary" },
   listMarkets: { icon: Layers, accent: "secondary" },
   getMarket: { icon: Layers, accent: "secondary" },
   getMarketBySlug: { icon: Layers, accent: "secondary" },
@@ -298,6 +341,16 @@ export function PolymarketLiveIntegrationsCore({ onRunPull, className, stepBackR
     connectPolymarketLiveEventVolumeCompose,
     setConnectPolymarketLiveEventVolumeCompose,
     setConnectPolymarketLiveSamplingMarketsCompose,
+    connectPolymarketLiveOrderbooksCompose,
+    setConnectPolymarketLiveOrderbooksCompose,
+    connectPolymarketLiveMarketPricesCompose,
+    setConnectPolymarketLiveMarketPricesCompose,
+    connectPolymarketLiveMidpointPricesCompose,
+    setConnectPolymarketLiveMidpointPricesCompose,
+    connectPolymarketLiveSpreadsCompose,
+    setConnectPolymarketLiveSpreadsCompose,
+    connectPolymarketLiveLastTradePricesCompose,
+    setConnectPolymarketLiveLastTradePricesCompose,
   } = ctx;
 
   const runPolymarketLiveAction = useCallback(
@@ -390,6 +443,49 @@ export function PolymarketLiveIntegrationsCore({ onRunPull, className, stepBackR
     [connectPolymarketLiveEventVolumeCompose],
   );
 
+  const orderbooksCompose = useMemo(
+    () =>
+      normalizePolymarketOrderbooksComposeState(
+        connectPolymarketLiveOrderbooksCompose || emptyPolymarketOrderbooksComposeState(),
+      ),
+    [connectPolymarketLiveOrderbooksCompose],
+  );
+
+  const marketPricesCompose = useMemo(
+    () =>
+      normalizePolymarketMarketPricesComposeState(
+        connectPolymarketLiveMarketPricesCompose ||
+          emptyPolymarketMarketPricesComposeState(),
+      ),
+    [connectPolymarketLiveMarketPricesCompose],
+  );
+
+  const midpointPricesCompose = useMemo(
+    () =>
+      normalizePolymarketMidpointPricesComposeState(
+        connectPolymarketLiveMidpointPricesCompose ||
+          emptyPolymarketMidpointPricesComposeState(),
+      ),
+    [connectPolymarketLiveMidpointPricesCompose],
+  );
+
+  const spreadsCompose = useMemo(
+    () =>
+      normalizePolymarketSpreadsComposeState(
+        connectPolymarketLiveSpreadsCompose || emptyPolymarketSpreadsComposeState(),
+      ),
+    [connectPolymarketLiveSpreadsCompose],
+  );
+
+  const lastTradePricesCompose = useMemo(
+    () =>
+      normalizePolymarketLastTradePricesComposeState(
+        connectPolymarketLiveLastTradePricesCompose ||
+          emptyPolymarketLastTradePricesComposeState(),
+      ),
+    [connectPolymarketLiveLastTradePricesCompose],
+  );
+
   const isEventsCompose = selectedId === POLYMARKET_EVENTS_COMPOSE_ENDPOINT_ID;
   const isMarketsByEventsCompose = selectedId === POLYMARKET_MARKETS_BY_EVENTS_ENDPOINT_ID;
   const isMarketsCompose = selectedId === POLYMARKET_MARKETS_COMPOSE_ENDPOINT_ID;
@@ -397,13 +493,23 @@ export function PolymarketLiveIntegrationsCore({ onRunPull, className, stepBackR
   const isOpenInterestCompose = selectedId === POLYMARKET_OPEN_INTEREST_COMPOSE_ENDPOINT_ID;
   const isLiveEventVolumeCompose = selectedId === POLYMARKET_LIVE_EVENT_VOLUME_ENDPOINT_ID;
   const isSamplingMarketsCompose = selectedId === POLYMARKET_SAMPLING_MARKETS_ENDPOINT_ID;
+  const isOrderbooksCompose = selectedId === POLYMARKET_ORDERBOOKS_ENDPOINT_ID;
+  const isMarketPricesCompose = selectedId === POLYMARKET_MARKET_PRICES_ENDPOINT_ID;
+  const isMidpointPricesCompose = selectedId === POLYMARKET_MIDPOINT_PRICES_ENDPOINT_ID;
+  const isSpreadsCompose = selectedId === POLYMARKET_SPREADS_ENDPOINT_ID;
+  const isLastTradePricesCompose = selectedId === POLYMARKET_LAST_TRADE_PRICES_ENDPOINT_ID;
   const isEventsStyleCompose = isEventsCompose || isMarketsByEventsCompose || isLiveEventVolumeCompose;
   const isComposeEndpoint =
     isEventsStyleCompose ||
     isMarketsCompose ||
     isHoldersByMarketsCompose ||
     isOpenInterestCompose ||
-    isSamplingMarketsCompose;
+    isSamplingMarketsCompose ||
+    isOrderbooksCompose ||
+    isMarketPricesCompose ||
+    isMidpointPricesCompose ||
+    isSpreadsCompose ||
+    isLastTradePricesCompose;
   const showAdvancedPullUi =
     !isComposeEndpoint ||
     (isEventsCompose
@@ -418,7 +524,17 @@ export function PolymarketLiveIntegrationsCore({ onRunPull, className, stepBackR
               ? holdersByMarketsCompose.mode === "advanced"
               : isOpenInterestCompose
                 ? openInterestCompose.mode === "advanced"
-                : true);
+                : isOrderbooksCompose
+                  ? orderbooksCompose.mode === "advanced"
+                  : isMarketPricesCompose
+                    ? marketPricesCompose.mode === "advanced"
+                    : isMidpointPricesCompose
+                      ? midpointPricesCompose.mode === "advanced"
+                      : isSpreadsCompose
+                        ? spreadsCompose.mode === "advanced"
+                        : isLastTradePricesCompose
+                          ? lastTradePricesCompose.mode === "advanced"
+                  : true);
 
   const handleSelectEndpoint = useCallback(
     (id) => {
@@ -453,6 +569,26 @@ export function PolymarketLiveIntegrationsCore({ onRunPull, className, stepBackR
                       ? POLYMARKET_SAMPLING_MARKETS_DEFAULT_COLUMNS.filter((name) =>
                           cols.some((c) => c.name === name),
                         )
+                      : id === POLYMARKET_ORDERBOOKS_ENDPOINT_ID
+                        ? POLYMARKET_ORDERBOOKS_DEFAULT_COLUMNS.filter((name) =>
+                            cols.some((c) => c.name === name),
+                          )
+                        : id === POLYMARKET_MARKET_PRICES_ENDPOINT_ID
+                          ? POLYMARKET_MARKET_PRICES_DEFAULT_COLUMNS.filter((name) =>
+                              cols.some((c) => c.name === name),
+                            )
+                          : id === POLYMARKET_MIDPOINT_PRICES_ENDPOINT_ID
+                            ? POLYMARKET_MIDPOINT_PRICES_DEFAULT_COLUMNS.filter((name) =>
+                                cols.some((c) => c.name === name),
+                              )
+                            : id === POLYMARKET_SPREADS_ENDPOINT_ID
+                              ? POLYMARKET_SPREADS_DEFAULT_COLUMNS.filter((name) =>
+                                  cols.some((c) => c.name === name),
+                                )
+                              : id === POLYMARKET_LAST_TRADE_PRICES_ENDPOINT_ID
+                                ? POLYMARKET_LAST_TRADE_PRICES_DEFAULT_COLUMNS.filter((name) =>
+                                    cols.some((c) => c.name === name),
+                                  )
               : cols.map((c) => c.name);
       if (cols.length) {
         setConnectApiColumnSelections?.((prev) => ({
@@ -507,6 +643,41 @@ export function PolymarketLiveIntegrationsCore({ onRunPull, className, stepBackR
             : emptyPolymarketSamplingMarketsComposeState(),
         );
       }
+      if (id === POLYMARKET_ORDERBOOKS_ENDPOINT_ID) {
+        setConnectPolymarketLiveOrderbooksCompose?.((prev) =>
+          prev
+            ? normalizePolymarketOrderbooksComposeState(prev)
+            : emptyPolymarketOrderbooksComposeState(),
+        );
+      }
+      if (id === POLYMARKET_MARKET_PRICES_ENDPOINT_ID) {
+        setConnectPolymarketLiveMarketPricesCompose?.((prev) =>
+          prev
+            ? normalizePolymarketMarketPricesComposeState(prev)
+            : emptyPolymarketMarketPricesComposeState(),
+        );
+      }
+      if (id === POLYMARKET_MIDPOINT_PRICES_ENDPOINT_ID) {
+        setConnectPolymarketLiveMidpointPricesCompose?.((prev) =>
+          prev
+            ? normalizePolymarketMidpointPricesComposeState(prev)
+            : emptyPolymarketMidpointPricesComposeState(),
+        );
+      }
+      if (id === POLYMARKET_SPREADS_ENDPOINT_ID) {
+        setConnectPolymarketLiveSpreadsCompose?.((prev) =>
+          prev
+            ? normalizePolymarketSpreadsComposeState(prev)
+            : emptyPolymarketSpreadsComposeState(),
+        );
+      }
+      if (id === POLYMARKET_LAST_TRADE_PRICES_ENDPOINT_ID) {
+        setConnectPolymarketLiveLastTradePricesCompose?.((prev) =>
+          prev
+            ? normalizePolymarketLastTradePricesComposeState(prev)
+            : emptyPolymarketLastTradePricesComposeState(),
+        );
+      }
     },
     [
       setConnectApiEndpointId,
@@ -518,6 +689,11 @@ export function PolymarketLiveIntegrationsCore({ onRunPull, className, stepBackR
       setConnectPolymarketLiveOpenInterestCompose,
       setConnectPolymarketLiveEventVolumeCompose,
       setConnectPolymarketLiveSamplingMarketsCompose,
+      setConnectPolymarketLiveOrderbooksCompose,
+      setConnectPolymarketLiveMarketPricesCompose,
+      setConnectPolymarketLiveMidpointPricesCompose,
+      setConnectPolymarketLiveSpreadsCompose,
+      setConnectPolymarketLiveLastTradePricesCompose,
     ],
   );
 
@@ -662,6 +838,186 @@ export function PolymarketLiveIntegrationsCore({ onRunPull, className, stepBackR
         });
         return;
       }
+      if (isOrderbooksCompose) {
+        runPolymarketLiveAction(() => {
+          void (async () => {
+            ctx.setConnectDataLakePullState?.((prev) => ({
+              ...prev,
+              loading: true,
+              error: null,
+              label: "Pulling orderbooks…",
+              progress: Math.max(Number(prev.progress) || 0, 8),
+            }));
+            try {
+              await applyPolymarketOrderbooksSearchAll(ctx, suggestions, {
+                compose: orderbooksCompose,
+                selectedColumns,
+              });
+              ctx.setConnectDataLakePullState?.((prev) => ({
+                ...prev,
+                loading: false,
+                error: null,
+                label: "",
+                progress: 100,
+              }));
+            } catch (e) {
+              const msg = e instanceof Error ? e.message : "Request failed";
+              ctx.setConnectDataLakePullState?.((prev) => ({
+                ...prev,
+                loading: false,
+                error: msg,
+                label: "",
+                progress: 0,
+              }));
+            }
+          })();
+        });
+        return;
+      }
+      if (isMarketPricesCompose) {
+        runPolymarketLiveAction(() => {
+          void (async () => {
+            ctx.setConnectDataLakePullState?.((prev) => ({
+              ...prev,
+              loading: true,
+              error: null,
+              label: "Pulling market prices…",
+              progress: Math.max(Number(prev.progress) || 0, 8),
+            }));
+            try {
+              await applyPolymarketMarketPricesSearchAll(ctx, suggestions, {
+                compose: marketPricesCompose,
+                selectedColumns,
+              });
+              ctx.setConnectDataLakePullState?.((prev) => ({
+                ...prev,
+                loading: false,
+                error: null,
+                label: "",
+                progress: 100,
+              }));
+            } catch (e) {
+              const msg = e instanceof Error ? e.message : "Request failed";
+              ctx.setConnectDataLakePullState?.((prev) => ({
+                ...prev,
+                loading: false,
+                error: msg,
+                label: "",
+                progress: 0,
+              }));
+            }
+          })();
+        });
+        return;
+      }
+      if (isMidpointPricesCompose) {
+        runPolymarketLiveAction(() => {
+          void (async () => {
+            ctx.setConnectDataLakePullState?.((prev) => ({
+              ...prev,
+              loading: true,
+              error: null,
+              label: "Pulling midpoint prices…",
+              progress: Math.max(Number(prev.progress) || 0, 8),
+            }));
+            try {
+              await applyPolymarketMidpointPricesSearchAll(ctx, suggestions, {
+                compose: midpointPricesCompose,
+                selectedColumns,
+              });
+              ctx.setConnectDataLakePullState?.((prev) => ({
+                ...prev,
+                loading: false,
+                error: null,
+                label: "",
+                progress: 100,
+              }));
+            } catch (e) {
+              const msg = e instanceof Error ? e.message : "Request failed";
+              ctx.setConnectDataLakePullState?.((prev) => ({
+                ...prev,
+                loading: false,
+                error: msg,
+                label: "",
+                progress: 0,
+              }));
+            }
+          })();
+        });
+        return;
+      }
+      if (isSpreadsCompose) {
+        runPolymarketLiveAction(() => {
+          void (async () => {
+            ctx.setConnectDataLakePullState?.((prev) => ({
+              ...prev,
+              loading: true,
+              error: null,
+              label: "Pulling spreads…",
+              progress: Math.max(Number(prev.progress) || 0, 8),
+            }));
+            try {
+              await applyPolymarketSpreadsSearchAll(ctx, suggestions, {
+                compose: spreadsCompose,
+                selectedColumns,
+              });
+              ctx.setConnectDataLakePullState?.((prev) => ({
+                ...prev,
+                loading: false,
+                error: null,
+                label: "",
+                progress: 100,
+              }));
+            } catch (e) {
+              const msg = e instanceof Error ? e.message : "Request failed";
+              ctx.setConnectDataLakePullState?.((prev) => ({
+                ...prev,
+                loading: false,
+                error: msg,
+                label: "",
+                progress: 0,
+              }));
+            }
+          })();
+        });
+        return;
+      }
+      if (isLastTradePricesCompose) {
+        runPolymarketLiveAction(() => {
+          void (async () => {
+            ctx.setConnectDataLakePullState?.((prev) => ({
+              ...prev,
+              loading: true,
+              error: null,
+              label: "Pulling last trade prices…",
+              progress: Math.max(Number(prev.progress) || 0, 8),
+            }));
+            try {
+              await applyPolymarketLastTradePricesSearchAll(ctx, suggestions, {
+                compose: lastTradePricesCompose,
+                selectedColumns,
+              });
+              ctx.setConnectDataLakePullState?.((prev) => ({
+                ...prev,
+                loading: false,
+                error: null,
+                label: "",
+                progress: 100,
+              }));
+            } catch (e) {
+              const msg = e instanceof Error ? e.message : "Request failed";
+              ctx.setConnectDataLakePullState?.((prev) => ({
+                ...prev,
+                loading: false,
+                error: msg,
+                label: "",
+                progress: 0,
+              }));
+            }
+          })();
+        });
+        return;
+      }
       runPolymarketLiveAction(() => applyPolymarketLiveSearchAll(ctx, suggestions));
     },
     [
@@ -671,9 +1027,19 @@ export function PolymarketLiveIntegrationsCore({ onRunPull, className, stepBackR
       isLiveEventVolumeCompose,
       isMarketsByEventsCompose,
       isOpenInterestCompose,
+      isOrderbooksCompose,
+      isMarketPricesCompose,
+      isMidpointPricesCompose,
+      isSpreadsCompose,
+      isLastTradePricesCompose,
       liveEventVolumeCompose,
+      marketPricesCompose,
+      midpointPricesCompose,
+      spreadsCompose,
+      lastTradePricesCompose,
       marketsByEventsCompose.sheetLayout,
       openInterestCompose,
+      orderbooksCompose,
       runPolymarketLiveAction,
       selectedColumns,
     ],
@@ -854,6 +1220,44 @@ export function PolymarketLiveIntegrationsCore({ onRunPull, className, stepBackR
 
           {isSamplingMarketsCompose ? (
             <PolymarketLiveSamplingMarketsFields className="mt-2" />
+          ) : null}
+
+          {isOrderbooksCompose ? (
+            <PolymarketLiveOrderbooksFields
+              className="mt-2"
+              onSearchSubmitAll={handlePublicSearchSubmitAll}
+            />
+          ) : null}
+
+          {isMarketPricesCompose ? (
+            <PolymarketLiveMarketPricesFields
+              className="mt-2"
+              onSearchSubmitAll={handlePublicSearchSubmitAll}
+            />
+          ) : null}
+
+          {isMidpointPricesCompose ? (
+            <PolymarketLiveMarketPricesFields
+              className="mt-2"
+              variant="midpointPrice"
+              onSearchSubmitAll={handlePublicSearchSubmitAll}
+            />
+          ) : null}
+
+          {isSpreadsCompose ? (
+            <PolymarketLiveMarketPricesFields
+              className="mt-2"
+              variant="spreads"
+              onSearchSubmitAll={handlePublicSearchSubmitAll}
+            />
+          ) : null}
+
+          {isLastTradePricesCompose ? (
+            <PolymarketLiveMarketPricesFields
+              className="mt-2"
+              variant="lastTradePrices"
+              onSearchSubmitAll={handlePublicSearchSubmitAll}
+            />
           ) : null}
 
           {showAdvancedPullUi ? (

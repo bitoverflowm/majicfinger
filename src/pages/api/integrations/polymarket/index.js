@@ -293,7 +293,15 @@ function buildSearchParams(allowed, query) {
 }
 
 /** ERC1155 token/condition ID fields - must stay as strings, never parsed as numbers */
-const TOKEN_ID_KEYS = ["conditionId", "condition_id", "id", "clobTokenIds", "clob_token_ids"];
+const TOKEN_ID_KEYS = [
+  "conditionId",
+  "condition_id",
+  "id",
+  "clobTokenIds",
+  "clob_token_ids",
+  "token_id",
+  "asset_id",
+];
 
 /** Preprocess JSON text so large numbers in token ID fields are quoted (preserve full precision) */
 function preserveTokenIdsInJson(text) {
@@ -335,6 +343,37 @@ async function fetchJson(url, opts = {}) {
   const text = await res.text();
   const preserved = preserveTokenIdsInJson(text);
   return JSON.parse(preserved);
+}
+
+/**
+ * CLOB batch token endpoints. The documented GET/query-parameter variants of
+ * these routes reject every request with `Invalid payload`; only the POST body
+ * form works, so all batch reads go through POST regardless of how the caller
+ * reached this proxy.
+ */
+const CLOB_BATCH_TOKEN_PATHS = {
+  getOrderBooks: "books",
+  getSpreads: "spreads",
+  getMarketPrices: "prices",
+  getMidpointPrices: "midpoints",
+  getLastTradePrices: "last-trades-prices",
+};
+
+const CLOB_BATCH_TOKEN_LIMIT = 500;
+
+/**
+ * @param {string} path
+ * @param {Record<string, string>[]} payload
+ */
+async function postClobTokenBatch(path, payload) {
+  return fetchJson(`${CLOB_BASE}/${path}`, {
+    method: "POST",
+    headers: {
+      Accept: "application/json",
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(payload),
+  });
 }
 
 /** Polymarket prices-history: startTs/endTs are Unix epoch seconds (UTC instant); API types them as number (double). */
@@ -864,12 +903,71 @@ async function runPolymarketMetadataLookup(rawQ, opts) {
 }
 
 export default async function handler(req, res) {
-  if (req.method !== "GET") {
-    res.setHeader("Allow", "GET");
-    return res.status(405).json({ message: "Method not allowed" });
-  }
   const { query } = req.query;
   if (!query) return res.status(400).json({ message: "Missing query parameter" });
+
+  if (req.method === "POST") {
+    const clobPath = CLOB_BATCH_TOKEN_PATHS[query];
+    if (!clobPath) {
+      res.setHeader("Allow", "GET");
+      return res.status(405).json({ message: "Method not allowed" });
+    }
+    try {
+      const rawBody = req.body;
+      const list = Array.isArray(rawBody)
+        ? rawBody
+        : Array.isArray(rawBody?.params)
+          ? rawBody.params
+          : Array.isArray(rawBody?.token_ids)
+            ? rawBody.token_ids.map((token_id) =>
+                typeof token_id === "object" && token_id != null ? token_id : { token_id },
+              )
+            : null;
+      if (!list || !list.length) {
+        return res.status(400).json({
+          message: "POST body must be a non-empty array of { token_id } objects",
+        });
+      }
+      const payload = list
+        .map((item) => {
+          if (!item || typeof item !== "object") return null;
+          const tokenId = String(
+            /** @type {Record<string, unknown>} */ (item).token_id ||
+              /** @type {Record<string, unknown>} */ (item).tokenId ||
+              "",
+          ).trim();
+          if (!tokenId) return null;
+          /** @type {Record<string, string>} */
+          const row = { token_id: tokenId };
+          const side = String(
+            /** @type {Record<string, unknown>} */ (item).side || "",
+          ).trim();
+          if (side) row.side = side;
+          return row;
+        })
+        .filter(Boolean);
+      if (!payload.length) {
+        return res.status(400).json({
+          message: "POST body must include at least one token_id",
+        });
+      }
+      if (payload.length > CLOB_BATCH_TOKEN_LIMIT) {
+        return res.status(400).json({
+          message: `A maximum of ${CLOB_BATCH_TOKEN_LIMIT} token IDs may be requested per call`,
+        });
+      }
+      const data = await postClobTokenBatch(clobPath, payload);
+      return res.status(200).json(data);
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "Request failed";
+      return res.status(502).json({ message: msg });
+    }
+  }
+
+  if (req.method !== "GET") {
+    res.setHeader("Allow", "GET, POST");
+    return res.status(405).json({ message: "Method not allowed" });
+  }
 
   try {
     let data;
@@ -1033,6 +1131,92 @@ export default async function handler(req, res) {
         if (nextCursor) sp.set("next_cursor", nextCursor);
         data = await fetchJson(
           `${CLOB_BASE}/sampling-markets${sp.toString() ? `?${sp.toString()}` : ""}`,
+        );
+        break;
+      }
+      case "getOrderBook": {
+        const tokenId = req.query.token_id ?? req.query.tokenId;
+        if (!tokenId) {
+          return res.status(400).json({
+            message: "Missing required parameter: token_id (CLOB outcome token id)",
+          });
+        }
+        data = await fetchJson(
+          `${CLOB_BASE}/book?token_id=${encodeURIComponent(String(tokenId))}`,
+        );
+        break;
+      }
+      case "getMarketPrices": {
+        const tokenIds = String(req.query.token_ids || "").trim();
+        const sides = String(req.query.sides || "").trim();
+        if (!tokenIds) {
+          return res.status(400).json({
+            message: "Missing required parameter: token_ids",
+          });
+        }
+        if (!sides) {
+          return res.status(400).json({
+            message: "Missing required parameter: sides",
+          });
+        }
+        const tokenList = tokenIds.split(",").map((v) => v.trim()).filter(Boolean);
+        const sideList = sides.split(",").map((v) => v.trim().toUpperCase()).filter(Boolean);
+        if (tokenList.length !== sideList.length) {
+          return res.status(400).json({
+            message: "token_ids and sides must contain the same number of values",
+          });
+        }
+        if (sideList.some((side) => side !== "BUY" && side !== "SELL")) {
+          return res.status(400).json({
+            message: "sides may contain only BUY or SELL",
+          });
+        }
+        if (tokenList.length > CLOB_BATCH_TOKEN_LIMIT) {
+          return res.status(400).json({
+            message: `A maximum of ${CLOB_BATCH_TOKEN_LIMIT} token IDs may be requested per call`,
+          });
+        }
+        data = await postClobTokenBatch(
+          "prices",
+          tokenList.map((token_id, i) => ({ token_id, side: sideList[i] })),
+        );
+        break;
+      }
+      case "getMidpointPrices": {
+        const tokenIds = String(req.query.token_ids || "").trim();
+        if (!tokenIds) {
+          return res.status(400).json({
+            message: "Missing required parameter: token_ids",
+          });
+        }
+        const tokenList = tokenIds.split(",").map((v) => v.trim()).filter(Boolean);
+        if (tokenList.length > CLOB_BATCH_TOKEN_LIMIT) {
+          return res.status(400).json({
+            message: `A maximum of ${CLOB_BATCH_TOKEN_LIMIT} token IDs may be requested per call`,
+          });
+        }
+        data = await postClobTokenBatch(
+          "midpoints",
+          tokenList.map((token_id) => ({ token_id })),
+        );
+        break;
+      }
+      case "getLastTradePrices": {
+        const tokenIds = String(req.query.token_ids || "").trim();
+        if (!tokenIds) {
+          return res.status(400).json({
+            message: "Missing required parameter: token_ids",
+          });
+        }
+        const tokenList = tokenIds.split(",").map((v) => v.trim()).filter(Boolean);
+        if (tokenList.length > CLOB_BATCH_TOKEN_LIMIT) {
+          return res.status(400).json({
+            message: `A maximum of ${CLOB_BATCH_TOKEN_LIMIT} token IDs may be requested per call`,
+          });
+        }
+        data = await postClobTokenBatch(
+          "last-trades-prices",
+          tokenList.map((token_id) => ({ token_id })),
         );
         break;
       }

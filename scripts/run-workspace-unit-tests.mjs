@@ -48,6 +48,11 @@ import "@/lib/dataLake/buildQuantAthenaSql.test.js";
 import "@/lib/sheetOperations/quant/quantOperations.test.js";
 import "@/lib/polymarketLive/liveEventVolumeCompose.test.js";
 import "@/lib/polymarketLive/samplingMarketsCompose.test.js";
+import "@/lib/polymarketLive/orderbooksCompose.test.js";
+import "@/lib/polymarketLive/marketPricesCompose.test.js";
+import "@/lib/polymarketLive/midpointPricesCompose.test.js";
+import "@/lib/polymarketLive/spreadsCompose.test.js";
+import "@/lib/polymarketLive/lastTradePricesCompose.test.js";
 
 function test(name, fn) {
   try {

@@ -33,6 +33,26 @@ import {
   POLYMARKET_SAMPLING_MARKETS_COLUMNS,
   POLYMARKET_SAMPLING_MARKETS_ENDPOINT_ID,
 } from "@/lib/polymarketLive/samplingMarketsCompose";
+import {
+  POLYMARKET_ORDERBOOKS_COMPOSE_COLUMNS,
+  POLYMARKET_ORDERBOOKS_ENDPOINT_ID,
+} from "@/lib/polymarketLive/orderbooksCompose";
+import {
+  POLYMARKET_MARKET_PRICES_COLUMNS,
+  POLYMARKET_MARKET_PRICES_ENDPOINT_ID,
+} from "@/lib/polymarketLive/marketPricesCompose";
+import {
+  POLYMARKET_MIDPOINT_PRICES_COLUMNS,
+  POLYMARKET_MIDPOINT_PRICES_ENDPOINT_ID,
+} from "@/lib/polymarketLive/midpointPricesCompose";
+import {
+  POLYMARKET_SPREADS_COLUMNS,
+  POLYMARKET_SPREADS_ENDPOINT_ID,
+} from "@/lib/polymarketLive/spreadsCompose";
+import {
+  POLYMARKET_LAST_TRADE_PRICES_COLUMNS,
+  POLYMARKET_LAST_TRADE_PRICES_ENDPOINT_ID,
+} from "@/lib/polymarketLive/lastTradePricesCompose";
 
 /**
  * Top-level Polymarket Live endpoint groups (hub column tags).
@@ -89,6 +109,11 @@ const ENDPOINT_CATEGORY_BY_QUERY = {
   [POLYMARKET_OPEN_INTEREST_COMPOSE_ENDPOINT_ID]: "markets",
   [POLYMARKET_LIVE_EVENT_VOLUME_ENDPOINT_ID]: "events",
   [POLYMARKET_SAMPLING_MARKETS_ENDPOINT_ID]: "markets",
+  [POLYMARKET_ORDERBOOKS_ENDPOINT_ID]: "markets",
+  [POLYMARKET_MARKET_PRICES_ENDPOINT_ID]: "markets",
+  [POLYMARKET_MIDPOINT_PRICES_ENDPOINT_ID]: "markets",
+  [POLYMARKET_SPREADS_ENDPOINT_ID]: "markets",
+  [POLYMARKET_LAST_TRADE_PRICES_ENDPOINT_ID]: "markets",
   getTopHolders: "holders",
   getTradesByMarket: "holders",
   getTradesByUser: "holders",
@@ -191,6 +216,41 @@ export const POLYMARKET_LIVE_CONNECT_ENDPOINTS = [
     description: "Feed of currently open and tradable markets.",
   },
   {
+    id: POLYMARKET_ORDERBOOKS_ENDPOINT_ID,
+    category: "markets",
+    title: "Orderbook(s)",
+    description:
+      "Discover market(s), then pull CLOB orderbooks — Buy, Sell, or both — with one sheet per market (optional metadata sheet first).",
+  },
+  {
+    id: POLYMARKET_MARKET_PRICES_ENDPOINT_ID,
+    category: "markets",
+    title: "Market Price",
+    description:
+      "Discover one or many markets, then return one row per market with BUY and SELL prices in a single sheet.",
+  },
+  {
+    id: POLYMARKET_MIDPOINT_PRICES_ENDPOINT_ID,
+    category: "markets",
+    title: "Midpoint Prices",
+    description:
+      "Discover one or many markets, then return one midpoint-price row per market in a single sheet.",
+  },
+  {
+    id: POLYMARKET_SPREADS_ENDPOINT_ID,
+    category: "markets",
+    title: "Spreads",
+    description:
+      "Discover one or many markets, then return one best-ask minus best-bid spread row per market in a single sheet.",
+  },
+  {
+    id: POLYMARKET_LAST_TRADE_PRICES_ENDPOINT_ID,
+    category: "markets",
+    title: "Last Trade Prices",
+    description:
+      "Discover one or many markets, then return one last-trade price and side row per market in a single sheet.",
+  },
+  {
     id: POLYMARKET_MARKETS_BY_EVENTS_ENDPOINT_ID,
     category: "markets",
     title: "Get markets by event(s)",
@@ -276,6 +336,21 @@ export function getPolymarketLiveColumnsForEndpoint(endpointQuery) {
   }
   if (id === POLYMARKET_SAMPLING_MARKETS_ENDPOINT_ID) {
     return POLYMARKET_SAMPLING_MARKETS_COLUMNS;
+  }
+  if (id === POLYMARKET_ORDERBOOKS_ENDPOINT_ID) {
+    return POLYMARKET_ORDERBOOKS_COMPOSE_COLUMNS;
+  }
+  if (id === POLYMARKET_MARKET_PRICES_ENDPOINT_ID) {
+    return POLYMARKET_MARKET_PRICES_COLUMNS;
+  }
+  if (id === POLYMARKET_MIDPOINT_PRICES_ENDPOINT_ID) {
+    return POLYMARKET_MIDPOINT_PRICES_COLUMNS;
+  }
+  if (id === POLYMARKET_SPREADS_ENDPOINT_ID) {
+    return POLYMARKET_SPREADS_COLUMNS;
+  }
+  if (id === POLYMARKET_LAST_TRADE_PRICES_ENDPOINT_ID) {
+    return POLYMARKET_LAST_TRADE_PRICES_COLUMNS;
   }
   const ep = ENDPOINTS.find((e) => e.query === id);
   if (ep?.responseFields?.length) {
