@@ -407,6 +407,8 @@ export default function DataSheetWithIntegration({
   const wasOpenRef = useRef(!!rightPanelOpen);
   const autoExpandedEmptySheetRef = useRef(false);
   const autoOpenedRequestHistoryRef = useRef(false);
+  const prevConnectPullActiveRef = useRef(false);
+  const prevConnectSheetDataRef = useRef(hasConnectSheetData);
   const prevDashboardModeRef = useRef(false);
   const mainColumnRef = useRef(null);
   const [mainColumnRect, setMainColumnRect] = useState(null);
@@ -656,17 +658,40 @@ export default function DataSheetWithIntegration({
     if (!rightPanelOpen) return;
     if (rightPanelTab !== "integrations") return;
     if (drawerExpanded) return;
+    if (hasConnectSheetData) return;
     const isEmpty = !Array.isArray(connectedData) || connectedData.length === 0;
     if (!isEmpty) return;
     if (autoExpandedEmptySheetRef.current) return;
     autoExpandedEmptySheetRef.current = true;
     setDrawerExpanded(true);
-  }, [isDemo, dashboardMode, rightPanelOpen, rightPanelTab, drawerExpanded, connectedData]);
+  }, [
+    isDemo,
+    dashboardMode,
+    rightPanelOpen,
+    rightPanelTab,
+    drawerExpanded,
+    connectedData,
+    hasConnectSheetData,
+  ]);
 
   useEffect(() => {
     const isEmpty = !Array.isArray(connectedData) || connectedData.length === 0;
     if (!isEmpty) autoExpandedEmptySheetRef.current = false;
   }, [connectedData]);
+
+  // A finished pull hands the workspace over to the data sheet: drop the drawer back to its
+  // narrow width instead of keeping the half-viewport compose width over the rows.
+  useEffect(() => {
+    const wasPulling = prevConnectPullActiveRef.current;
+    const hadSheetData = prevConnectSheetDataRef.current;
+    prevConnectPullActiveRef.current = connectUserPullActive;
+    prevConnectSheetDataRef.current = hasConnectSheetData;
+    if (!hasConnectSheetData) return;
+    const pullFinished = wasPulling && !connectUserPullActive;
+    const rowsJustLanded = !hadSheetData;
+    if (!pullFinished && !rowsJustLanded) return;
+    setDrawerExpanded(false);
+  }, [connectUserPullActive, hasConnectSheetData]);
 
   const closePanel = useCallback(() => {
     if (isPanelClosing) return;
