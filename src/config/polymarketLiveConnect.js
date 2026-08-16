@@ -57,6 +57,10 @@ import {
   POLYMARKET_PRICES_HISTORY_COLUMNS,
   POLYMARKET_PRICES_HISTORY_ENDPOINT_ID,
 } from "@/lib/polymarketLive/pricesHistoryCompose";
+import {
+  POLYMARKET_PUBLIC_PROFILES_COLUMNS,
+  POLYMARKET_PUBLIC_PROFILES_ENDPOINT_ID,
+} from "@/lib/polymarketLive/publicProfilesCompose";
 
 /**
  * Top-level Polymarket Live endpoint groups (hub column tags).
@@ -122,6 +126,7 @@ const ENDPOINT_CATEGORY_BY_QUERY = {
   [POLYMARKET_SPREADS_ENDPOINT_ID]: "orderbooks",
   [POLYMARKET_LAST_TRADE_PRICES_ENDPOINT_ID]: "trades",
   [POLYMARKET_PRICES_HISTORY_ENDPOINT_ID]: "trades",
+  [POLYMARKET_PUBLIC_PROFILES_ENDPOINT_ID]: "holders",
   getTopHolders: "holders",
   getTradesByMarket: "holders",
   getTradesByUser: "holders",
@@ -293,6 +298,13 @@ export const POLYMARKET_LIVE_CONNECT_ENDPOINTS = [
       "Pick one or more markets, then pull top holders — with limit and min balance filters.",
   },
   {
+    id: POLYMARKET_PUBLIC_PROFILES_ENDPOINT_ID,
+    category: "holders",
+    title: "Get public profile(s)",
+    description:
+      "Get public profiles directly by proxy wallet or user address — no market discovery required.",
+  },
+  {
     id: POLYMARKET_OPEN_INTEREST_COMPOSE_ENDPOINT_ID,
     category: "markets",
     title: "Get Open Interest",
@@ -368,6 +380,9 @@ export function getPolymarketLiveColumnsForEndpoint(endpointQuery) {
   }
   if (id === POLYMARKET_PRICES_HISTORY_ENDPOINT_ID) {
     return POLYMARKET_PRICES_HISTORY_COLUMNS;
+  }
+  if (id === POLYMARKET_PUBLIC_PROFILES_ENDPOINT_ID) {
+    return POLYMARKET_PUBLIC_PROFILES_COLUMNS;
   }
   const ep = ENDPOINTS.find((e) => e.query === id);
   if (ep?.responseFields?.length) {

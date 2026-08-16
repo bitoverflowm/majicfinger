@@ -23,6 +23,7 @@ import { PolymarketLiveSamplingMarketsFields } from "@/components/connectData/po
 import { PolymarketLiveOrderbooksFields } from "@/components/connectData/polymarketLive/PolymarketLiveOrderbooksFields";
 import { PolymarketLiveMarketPricesFields } from "@/components/connectData/polymarketLive/PolymarketLiveMarketPricesFields";
 import { PolymarketLivePricesHistoryFields } from "@/components/connectData/polymarketLive/PolymarketLivePricesHistoryFields";
+import { PolymarketLivePublicProfilesFields } from "@/components/connectData/polymarketLive/PolymarketLivePublicProfilesFields";
 import {
   ColumnPicker,
 } from "@/components/connectData/ConnectHomeIntegrationWorkflow";
@@ -115,6 +116,12 @@ import {
   POLYMARKET_PRICES_HISTORY_ENDPOINT_ID,
 } from "@/lib/polymarketLive/pricesHistoryCompose";
 import {
+  emptyPolymarketPublicProfilesComposeState,
+  normalizePolymarketPublicProfilesComposeState,
+  POLYMARKET_PUBLIC_PROFILES_DEFAULT_COLUMNS,
+  POLYMARKET_PUBLIC_PROFILES_ENDPOINT_ID,
+} from "@/lib/polymarketLive/publicProfilesCompose";
+import {
   applyPolymarketMarketsByEventsSearchAll,
   applyPolymarketMarketsByEventsSearchSelection,
 } from "@/lib/polymarketLive/polymarketMarketsByEventsPull";
@@ -141,6 +148,7 @@ const ENDPOINT_PRESENTATION = {
   [POLYMARKET_LIVE_EVENT_VOLUME_ENDPOINT_ID]: { icon: Vote, accent: "secondary" },
   [POLYMARKET_SAMPLING_MARKETS_ENDPOINT_ID]: { icon: Layers, accent: "secondary" },
   [POLYMARKET_HOLDERS_BY_MARKETS_ENDPOINT_ID]: { icon: Users, accent: "secondary" },
+  [POLYMARKET_PUBLIC_PROFILES_ENDPOINT_ID]: { icon: Users, accent: "secondary" },
   [POLYMARKET_OPEN_INTEREST_COMPOSE_ENDPOINT_ID]: { icon: Layers, accent: "secondary" },
   [POLYMARKET_ORDERBOOKS_ENDPOINT_ID]: { icon: BookOpen, accent: "secondary" },
   [POLYMARKET_MARKET_PRICES_ENDPOINT_ID]: { icon: Layers, accent: "secondary" },
@@ -363,6 +371,7 @@ export function PolymarketLiveIntegrationsCore({ onRunPull, className, stepBackR
     setConnectPolymarketLiveLastTradePricesCompose,
     connectPolymarketLivePricesHistoryCompose,
     setConnectPolymarketLivePricesHistoryCompose,
+    setConnectPolymarketLivePublicProfilesCompose,
   } = ctx;
 
   const runPolymarketLiveAction = useCallback(
@@ -520,6 +529,7 @@ export function PolymarketLiveIntegrationsCore({ onRunPull, className, stepBackR
   const isSpreadsCompose = selectedId === POLYMARKET_SPREADS_ENDPOINT_ID;
   const isLastTradePricesCompose = selectedId === POLYMARKET_LAST_TRADE_PRICES_ENDPOINT_ID;
   const isPricesHistoryCompose = selectedId === POLYMARKET_PRICES_HISTORY_ENDPOINT_ID;
+  const isPublicProfilesCompose = selectedId === POLYMARKET_PUBLIC_PROFILES_ENDPOINT_ID;
   const isEventsStyleCompose = isEventsCompose || isMarketsByEventsCompose || isLiveEventVolumeCompose;
   const isComposeEndpoint =
     isEventsStyleCompose ||
@@ -532,7 +542,8 @@ export function PolymarketLiveIntegrationsCore({ onRunPull, className, stepBackR
     isMidpointPricesCompose ||
     isSpreadsCompose ||
     isLastTradePricesCompose ||
-    isPricesHistoryCompose;
+    isPricesHistoryCompose ||
+    isPublicProfilesCompose;
   const showAdvancedPullUi =
     !isComposeEndpoint ||
     (isEventsCompose
@@ -618,6 +629,10 @@ export function PolymarketLiveIntegrationsCore({ onRunPull, className, stepBackR
                                   ? POLYMARKET_PRICES_HISTORY_DEFAULT_COLUMNS.filter((name) =>
                                       cols.some((c) => c.name === name),
                                     )
+                                  : id === POLYMARKET_PUBLIC_PROFILES_ENDPOINT_ID
+                                    ? POLYMARKET_PUBLIC_PROFILES_DEFAULT_COLUMNS.filter((name) =>
+                                        cols.some((c) => c.name === name),
+                                      )
               : cols.map((c) => c.name);
       if (cols.length) {
         setConnectApiColumnSelections?.((prev) => ({
@@ -714,6 +729,13 @@ export function PolymarketLiveIntegrationsCore({ onRunPull, className, stepBackR
             : emptyPolymarketPricesHistoryComposeState(),
         );
       }
+      if (id === POLYMARKET_PUBLIC_PROFILES_ENDPOINT_ID) {
+        setConnectPolymarketLivePublicProfilesCompose?.((prev) =>
+          prev
+            ? normalizePolymarketPublicProfilesComposeState(prev)
+            : emptyPolymarketPublicProfilesComposeState(),
+        );
+      }
     },
     [
       setConnectApiEndpointId,
@@ -731,6 +753,7 @@ export function PolymarketLiveIntegrationsCore({ onRunPull, className, stepBackR
       setConnectPolymarketLiveSpreadsCompose,
       setConnectPolymarketLiveLastTradePricesCompose,
       setConnectPolymarketLivePricesHistoryCompose,
+      setConnectPolymarketLivePublicProfilesCompose,
     ],
   );
 
@@ -1284,6 +1307,10 @@ export function PolymarketLiveIntegrationsCore({ onRunPull, className, stepBackR
               className="mt-2"
               onSearchSubmitAll={handlePublicSearchSubmitAll}
             />
+          ) : null}
+
+          {isPublicProfilesCompose ? (
+            <PolymarketLivePublicProfilesFields className="mt-2" />
           ) : null}
 
           {isOpenInterestCompose ? (

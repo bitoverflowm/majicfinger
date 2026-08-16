@@ -156,6 +156,15 @@ import {
   createPolymarketPricesHistoryWaterfallWriter,
   fetchPolymarketPricesHistoryRows,
 } from "@/lib/polymarketLive/polymarketPricesHistoryPull";
+import {
+  emptyPolymarketPublicProfilesComposeState,
+  normalizePolymarketPublicProfilesComposeState,
+  POLYMARKET_PUBLIC_PROFILES_ENDPOINT_ID,
+} from "@/lib/polymarketLive/publicProfilesCompose";
+import {
+  applyPolymarketPublicProfilesRows,
+  fetchPolymarketPublicProfilesRows,
+} from "@/lib/polymarketLive/polymarketPublicProfilesPull";
 import { attachPolymarketLiveRequestMetadata } from "@/lib/polymarketLive/polymarketLiveRequestHistory";
 import {
   applyPolymarketOpenInterestRows,
@@ -532,6 +541,7 @@ const Polymarket = ({ setConnectedData, requestSheetDestination, connectHomePull
     const isSpreadsCompose = endpointId === POLYMARKET_SPREADS_ENDPOINT_ID;
     const isLastTradePricesCompose = endpointId === POLYMARKET_LAST_TRADE_PRICES_ENDPOINT_ID;
     const isPricesHistoryCompose = endpointId === POLYMARKET_PRICES_HISTORY_ENDPOINT_ID;
+    const isPublicProfilesCompose = endpointId === POLYMARKET_PUBLIC_PROFILES_ENDPOINT_ID;
     const isEventsStyleCompose = isEventsCompose || isMarketsByEventsCompose;
     const isComposeEndpoint =
       isEventsStyleCompose ||
@@ -545,7 +555,8 @@ const Polymarket = ({ setConnectedData, requestSheetDestination, connectHomePull
       isMidpointPricesCompose ||
       isSpreadsCompose ||
       isLastTradePricesCompose ||
-      isPricesHistoryCompose;
+      isPricesHistoryCompose ||
+      isPublicProfilesCompose;
     const endpoint = isEventsStyleCompose
       ? ENDPOINTS.find((e) => e.query === "listEvents")
       : isMarketsCompose
@@ -574,6 +585,12 @@ const Polymarket = ({ setConnectedData, requestSheetDestination, connectHomePull
                                 name: "Trade History",
                                 params: [],
                               }
+                            : isPublicProfilesCompose
+                              ? {
+                                  query: POLYMARKET_PUBLIC_PROFILES_ENDPOINT_ID,
+                                  name: "Get public profile(s)",
+                                  params: [],
+                                }
         : ENDPOINTS.find((e) => e.query === endpointId);
     if (!endpoint && !isComposeEndpoint) {
       setConnectDataLakePullState?.((prev) => ({
@@ -609,6 +626,85 @@ const Polymarket = ({ setConnectedData, requestSheetDestination, connectHomePull
         }));
         return;
       }
+    }
+
+    if (isPublicProfilesCompose) {
+      const compose = normalizePolymarketPublicProfilesComposeState(
+        contextStateV2?.connectPolymarketLivePublicProfilesCompose ||
+          emptyPolymarketPublicProfilesComposeState(),
+      );
+      setConnectDataLakePullState?.((prev) => ({
+        ...prev,
+        loading: true,
+        error: null,
+        label: "Pulling public profiles…",
+        progress: Math.max(Number(prev.progress) || 0, 10),
+      }));
+
+      void (async () => {
+        const pullStartMs =
+          typeof performance !== "undefined" && performance?.now ? performance.now() : Date.now();
+        trackDataPullStart({
+          integration: "polymarket",
+          endpoint: POLYMARKET_PUBLIC_PROFILES_ENDPOINT_ID,
+          sampleLabel: "Get public profile(s)",
+        });
+        try {
+          const fetched = await fetchPolymarketPublicProfilesRows(compose.addresses, {
+            selectedColumns: cols,
+          });
+          const elapsedMs =
+            (typeof performance !== "undefined" && performance?.now ? performance.now() : Date.now()) -
+            pullStartMs;
+          const ctx = {
+            ...contextStateV2,
+            setConnectedData,
+            addNewSheetAndActivate,
+            setSheetData,
+            setDataSheets: contextStateV2?.setDataSheets,
+          };
+          applyPolymarketPublicProfilesRows(ctx, fetched.rows, {
+            endpointId: POLYMARKET_PUBLIC_PROFILES_ENDPOINT_ID,
+            addresses: fetched.addresses,
+            selectedColumns: cols,
+            elapsedMs,
+          });
+          setLastRequestAt(Date.now());
+          setThrottleRemaining(COOLDOWN_MS);
+          setConnectDataLakePullState?.((prev) => ({
+            ...prev,
+            loading: false,
+            label: "",
+            progress: 100,
+            error: fetched.failures.length
+              ? `${fetched.failures.length} profile request(s) failed; ${fetched.rows.length} loaded.`
+              : null,
+          }));
+          trackDataPullComplete({
+            integration: "polymarket",
+            endpoint: POLYMARKET_PUBLIC_PROFILES_ENDPOINT_ID,
+            sampleLabel: "Get public profile(s)",
+            rowCount: fetched.rows.length,
+            elapsedMs,
+          });
+        } catch (error) {
+          const message = error instanceof Error ? error.message : "Request failed";
+          trackDataPullError({
+            message,
+            integration: "polymarket",
+            source: "polymarket.getPublicProfiles",
+            meta: { endpoint: POLYMARKET_PUBLIC_PROFILES_ENDPOINT_ID },
+          });
+          setConnectDataLakePullState?.((prev) => ({
+            ...prev,
+            loading: false,
+            error: message,
+            label: "",
+            progress: 0,
+          }));
+        }
+      })();
+      return;
     }
 
     if (isSamplingMarketsCompose) {

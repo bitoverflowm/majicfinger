@@ -137,3 +137,22 @@ import { integrationLabelFromLake } from "@/lib/connectHomeRequestQuery.js";
   assert.ok(meta.queryParams.some((p) => p.key === "fidelity" && p.value === "5"));
   console.log("ok polymarket live price history trades query meta");
 }
+
+{
+  const meta = buildPolymarketLiveQueryMeta({
+    endpointId: "getPublicProfiles",
+    mode: "search",
+    addresses: [
+      "0x1111111111111111111111111111111111111111",
+      "0x2222222222222222222222222222222222222222",
+    ],
+    selectedColumns: ["name", "proxyWallet"],
+  });
+  assert.equal(meta.categoryLabel, "Holders");
+  assert.equal(meta.endpointTitle, "Get public profile(s)");
+  assert.equal(meta.marketScope, "multi");
+  assert.match(meta.marketScopeLabel, /Multiple addresses/);
+  assert.ok(meta.queryParams.some((p) => p.key === "addresses"));
+  assert.ok(meta.queryParams.some((p) => p.key === "fields" && p.value.includes("name")));
+  console.log("ok polymarket live public profiles query meta");
+}

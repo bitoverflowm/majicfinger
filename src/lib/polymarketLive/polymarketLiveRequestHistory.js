@@ -29,6 +29,7 @@ const ENDPOINT_TITLE_FALLBACKS = {
   [POLYMARKET_LAST_TRADE_PRICES_ENDPOINT_ID]: "Last Trade Prices",
   [POLYMARKET_PRICES_HISTORY_ENDPOINT_ID]: "Trade History",
   [POLYMARKET_ORDERBOOKS_ENDPOINT_ID]: "Orderbook(s)",
+  getPublicProfiles: "Get public profile(s)",
 };
 
 export function genPolymarketLiveRequestCardId() {
@@ -148,6 +149,7 @@ export function formatPolymarketLiveQueryParamsCompact(params, opts = {}) {
  * @param {unknown} [input.marketsFilters]
  * @param {string[]} [input.selectedColumns]
  * @param {string[]} [input.tokenIds]
+ * @param {string[]} [input.addresses]
  * @param {string} [input.outcomeSelection]
  * @param {boolean} [input.separateSheetPerOutcome]
  * @param {string} [input.startTs]
@@ -164,6 +166,9 @@ export function buildPolymarketLiveQueryMeta(input) {
     Array.isArray(input?.tokenIds) && input.tokenIds.length
       ? input.tokenIds.map((t) => String(t || "").trim()).filter(Boolean)
       : marketSummary.tokenIds;
+  const addresses = Array.isArray(input?.addresses)
+    ? input.addresses.map((a) => String(a || "").trim()).filter(Boolean)
+    : [];
 
   /** @type {Record<string, string>} */
   const queryValues = {};
@@ -185,6 +190,7 @@ export function buildPolymarketLiveQueryMeta(input) {
   if (tokenIds.length) queryValues.token_ids = tokenIds.join(",");
   if (marketSummary.marketIds.length) queryValues.market_ids = marketSummary.marketIds.join(",");
   if (marketSummary.marketSlugs.length) queryValues.market_slugs = marketSummary.marketSlugs.join(",");
+  if (addresses.length) queryValues.addresses = addresses.join(",");
   if (Array.isArray(input?.selectedColumns) && input.selectedColumns.length) {
     queryValues.fields = input.selectedColumns.map((c) => String(c || "").trim()).filter(Boolean).join(",");
   }
@@ -192,15 +198,23 @@ export function buildPolymarketLiveQueryMeta(input) {
   const queryParams = compactPolymarketLiveQueryParams(queryValues);
   const searchModeLabel = mode === "advanced" ? "Advanced search" : "NL search";
   const marketScopeLabel =
-    marketSummary.marketScope === "multi"
-      ? `Multiple markets (${Math.max(marketSummary.marketCount, 2)})`
-      : "Single market";
+    addresses.length > 1
+      ? `Multiple addresses (${addresses.length})`
+      : addresses.length === 1
+        ? "Single address"
+        : marketSummary.marketScope === "multi"
+          ? `Multiple markets (${Math.max(marketSummary.marketCount, 2)})`
+          : "Single market";
   const marketNameLabel =
-    marketSummary.marketNames.length === 0
-      ? marketSummary.marketSlugs[0] || marketSummary.marketIds[0] || "—"
-      : marketSummary.marketNames.length === 1
-        ? marketSummary.marketNames[0]
-        : `${marketSummary.marketNames[0]} +${marketSummary.marketNames.length - 1} more`;
+    addresses.length === 1
+      ? addresses[0]
+      : addresses.length > 1
+        ? `${addresses[0]} +${addresses.length - 1} more`
+        : marketSummary.marketNames.length === 0
+          ? marketSummary.marketSlugs[0] || marketSummary.marketIds[0] || "—"
+          : marketSummary.marketNames.length === 1
+            ? marketSummary.marketNames[0]
+            : `${marketSummary.marketNames[0]} +${marketSummary.marketNames.length - 1} more`;
 
   const headlineParts = [
     "Polymarket Live",
@@ -215,12 +229,18 @@ export function buildPolymarketLiveQueryMeta(input) {
     `Category · ${presentation.categoryLabel}`,
     `Endpoint · ${presentation.endpointTitle}`,
     `Search · ${searchModeLabel}`,
-    `Markets · ${marketScopeLabel}`,
-    `Market · ${
-      marketSummary.marketNames.length
-        ? marketSummary.marketNames.join(", ")
-        : marketNameLabel
-    }`,
+    addresses.length
+      ? `Addresses · ${addresses.join(", ")}`
+      : `Markets · ${marketScopeLabel}`,
+    ...(addresses.length
+      ? []
+      : [
+          `Market · ${
+            marketSummary.marketNames.length
+              ? marketSummary.marketNames.join(", ")
+              : marketNameLabel
+          }`,
+        ]),
     ...(queryParams.length
       ? [`Params · ${formatPolymarketLiveQueryParamsCompact(queryParams, { max: 8 })}`]
       : []),
@@ -236,12 +256,13 @@ export function buildPolymarketLiveQueryMeta(input) {
     endpointTitle: presentation.endpointTitle,
     searchMode: mode,
     searchModeLabel,
-    marketScope: marketSummary.marketScope,
+    marketScope: addresses.length > 1 || marketSummary.marketScope === "multi" ? "multi" : "single",
     marketScopeLabel,
-    marketNames: marketSummary.marketNames,
+    marketNames: addresses.length ? addresses : marketSummary.marketNames,
     marketSlugs: marketSummary.marketSlugs,
     marketIds: marketSummary.marketIds,
     tokenIds,
+    addresses,
     queryParams,
     queryParamsCompact: formatPolymarketLiveQueryParamsCompact(queryParams),
     querySummary,
@@ -328,6 +349,7 @@ export function buildPolymarketLiveProvenance(input) {
     interval: input?.interval || undefined,
     fidelity: input?.fidelity != null ? input.fidelity : undefined,
     tokenIds: meta.tokenIds,
+    addresses: meta.addresses,
     marketNames: meta.marketNames,
     queryParams: meta.queryParams,
     querySummary: meta.querySummary,

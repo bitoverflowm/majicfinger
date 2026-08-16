@@ -1316,6 +1316,19 @@ export default async function handler(req, res) {
         data = await fetchJson(`${DATA_API_BASE}/holders?market=${encodeURIComponent(market)}&limit=${limit}&minBalance=${minBalance}`);
         break;
       }
+      case "getPublicProfile": {
+        const address = String(req.query.address || "").trim();
+        if (!address) {
+          return res.status(400).json({ message: "Missing required parameter: address" });
+        }
+        if (!/^0x[a-fA-F0-9]{40}$/.test(address)) {
+          return res.status(400).json({ message: "Invalid wallet address" });
+        }
+        data = await fetchJson(
+          `${GAMMA_BASE}/public-profile?address=${encodeURIComponent(address)}`,
+        );
+        break;
+      }
       case "getOpenInterest": {
         const market = req.query.market || "";
         data = await fetchJson(`${DATA_API_BASE}/oi${market ? `?market=${encodeURIComponent(market)}` : ""}`);
