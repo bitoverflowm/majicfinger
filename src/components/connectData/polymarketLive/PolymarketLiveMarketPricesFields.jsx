@@ -131,13 +131,52 @@ export function PolymarketLiveMarketPricesFields({
 
   const handleSearchGo = useCallback(async () => {
     if (!searchPicks.length || !onSearchSubmitAll) return;
+    if (isLastTrade && !state.outcomeSelection) return;
     setSearchGoLoading(true);
     try {
       await onSearchSubmitAll(searchPicks);
     } finally {
       setSearchGoLoading(false);
     }
-  }, [onSearchSubmitAll, searchPicks]);
+  }, [isLastTrade, onSearchSubmitAll, searchPicks, state.outcomeSelection]);
+
+  const lastTradeOutcomeFields = isLastTrade ? (
+    <div className="space-y-2">
+      <Label className="text-[0.6875rem] font-medium uppercase tracking-wider text-muted-foreground">
+        Outcome
+      </Label>
+      <p className="text-[10px] leading-snug text-muted-foreground">
+        Which market outcome?
+      </p>
+      <ToggleGroup
+        type="single"
+        value={state.outcomeSelection}
+        onValueChange={(value) => {
+          if (value === "yes" || value === "no" || value === "both") {
+            patch({ outcomeSelection: value });
+          }
+        }}
+        className="justify-start"
+        disabled={disabled || searchGoLoading}
+        aria-label="Last trade price outcomes"
+      >
+        <ToggleGroupItem value="yes" className="h-8 px-3 text-xs">
+          YES
+        </ToggleGroupItem>
+        <ToggleGroupItem value="no" className="h-8 px-3 text-xs">
+          NO
+        </ToggleGroupItem>
+        <ToggleGroupItem value="both" className="h-8 px-3 text-xs">
+          Both
+        </ToggleGroupItem>
+      </ToggleGroup>
+      {!state.outcomeSelection ? (
+        <p className="text-[10px] text-amber-700 dark:text-amber-300">
+          Select YES, NO, or both before pulling.
+        </p>
+      ) : null}
+    </div>
+  ) : null;
 
   return (
     <div className={cn("space-y-4", className)}>
@@ -169,7 +208,7 @@ export function PolymarketLiveMarketPricesFields({
         <div className="space-y-3">
           <p className="text-[11px] leading-snug text-muted-foreground">
             {isLastTrade
-              ? "Search and add one or more markets. Every market becomes one last-trade price row, and all rows go to one sheet."
+              ? "Search and add one or more markets. Each selected outcome becomes one last-trade price row in a single sheet."
               : isSpreads
               ? "Search and add one or more markets. Every market becomes one spread row, and all rows go to one sheet."
               : isMidpoint
@@ -189,6 +228,7 @@ export function PolymarketLiveMarketPricesFields({
               for (const suggestion of list || []) addSearchPick(suggestion);
             }}
           />
+          {lastTradeOutcomeFields}
           {searchPicks.length ? (
             <div className="space-y-2">
               <div className="flex flex-wrap gap-1.5">
@@ -229,7 +269,9 @@ export function PolymarketLiveMarketPricesFields({
                   type="button"
                   size="sm"
                   className="h-8 px-3 text-xs"
-                  disabled={disabled || searchGoLoading}
+                  disabled={
+                    disabled || searchGoLoading || (isLastTrade && !state.outcomeSelection)
+                  }
                   onClick={() => void handleSearchGo()}
                 >
                   {searchGoLoading ? (
@@ -260,7 +302,7 @@ export function PolymarketLiveMarketPricesFields({
         <div className="space-y-3 rounded-xl border border-border/60 bg-muted/10 p-3">
           <p className="text-[11px] leading-snug text-muted-foreground">
             {isLastTrade
-              ? "Find markets with the same filters as Get Market/Markets, resolve each primary CLOB token id, and return one last-trade price and side row per market in one sheet."
+              ? "Find markets with the same filters as Get Market/Markets, then pull the chosen YES, NO, or both outcome tokens for every matched market."
               : isSpreads
               ? "Find markets with the same filters as Get Market/Markets, resolve each primary CLOB token id, and return one spread row per market in one sheet."
               : isMidpoint
@@ -288,8 +330,13 @@ export function PolymarketLiveMarketPricesFields({
                   : isMidpoint
                     ? "Midpoint Prices"
                     : "Market Price"
-            } uses the primary CLOB token id from each matched market.`}
+            } ${
+              isLastTrade
+                ? "uses the chosen outcome token or tokens from each matched market."
+                : "uses the primary CLOB token id from each matched market."
+            }`}
           />
+          {lastTradeOutcomeFields}
         </div>
       )}
     </div>

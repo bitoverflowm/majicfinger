@@ -103,6 +103,7 @@ export function summarizePolymarketLiveMarketRefs(refs) {
     marketSlugs,
     marketIds,
     tokenIds,
+    marketCount: count,
     marketScope: count > 1 ? "multi" : "single",
   };
 }
@@ -145,6 +146,7 @@ export function formatPolymarketLiveQueryParamsCompact(params, opts = {}) {
  * @param {unknown} [input.marketsFilters]
  * @param {string[]} [input.selectedColumns]
  * @param {string[]} [input.tokenIds]
+ * @param {string} [input.outcomeSelection]
  */
 export function buildPolymarketLiveQueryMeta(input) {
   const endpointId = String(input?.endpointId || "").trim();
@@ -161,6 +163,9 @@ export function buildPolymarketLiveQueryMeta(input) {
   if (mode === "advanced" && input?.marketsFilters) {
     Object.assign(queryValues, buildPolymarketMarketsListQueryValues(input.marketsFilters));
   }
+  if (input?.outcomeSelection) {
+    queryValues.outcome = String(input.outcomeSelection).toUpperCase();
+  }
   if (tokenIds.length) queryValues.token_ids = tokenIds.join(",");
   if (marketSummary.marketIds.length) queryValues.market_ids = marketSummary.marketIds.join(",");
   if (marketSummary.marketSlugs.length) queryValues.market_slugs = marketSummary.marketSlugs.join(",");
@@ -172,7 +177,7 @@ export function buildPolymarketLiveQueryMeta(input) {
   const searchModeLabel = mode === "advanced" ? "Advanced search" : "NL search";
   const marketScopeLabel =
     marketSummary.marketScope === "multi"
-      ? `Multiple markets (${Math.max(marketSummary.marketNames.length, tokenIds.length, 2)})`
+      ? `Multiple markets (${Math.max(marketSummary.marketCount, 2)})`
       : "Single market";
   const marketNameLabel =
     marketSummary.marketNames.length === 0
@@ -239,6 +244,7 @@ export function buildPolymarketLiveQueryMeta(input) {
  * @param {unknown} [input.marketsFilters]
  * @param {string[]} [input.selectedColumns]
  * @param {string[]} [input.tokenIds]
+ * @param {string} [input.outcomeSelection]
  */
 export function buildPolymarketLiveRequestCard(input) {
   const meta = buildPolymarketLiveQueryMeta(input);
@@ -278,6 +284,7 @@ export function buildPolymarketLiveRequestCard(input) {
  * @param {unknown} [input.marketsFilters]
  * @param {string[]} [input.selectedColumns]
  * @param {string[]} [input.tokenIds]
+ * @param {string} [input.outcomeSelection]
  */
 export function buildPolymarketLiveProvenance(input) {
   const meta = buildPolymarketLiveQueryMeta(input);
@@ -296,6 +303,7 @@ export function buildPolymarketLiveProvenance(input) {
         ? input.marketsFilters
         : undefined,
     selectedColumns: Array.isArray(input?.selectedColumns) ? input.selectedColumns : [],
+    outcomeSelection: input?.outcomeSelection || undefined,
     tokenIds: meta.tokenIds,
     marketNames: meta.marketNames,
     queryParams: meta.queryParams,

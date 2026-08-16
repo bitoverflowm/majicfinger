@@ -3,6 +3,7 @@ import {
   lastTradePriceRefFromSuggestion,
   normalizePolymarketLastTradePricesComposeState,
   POLYMARKET_LAST_TRADE_PRICES_ENDPOINT_ID,
+  selectLastTradePriceOutcomeTokens,
 } from "@/lib/polymarketLive/lastTradePricesCompose";
 import {
   applyPolymarketMarketPricesRows,
@@ -58,6 +59,9 @@ async function fetchLastTradePriceBatch(tokenIds) {
  */
 export async function fetchPolymarketLastTradePricesRows(compose, opts = {}) {
   const normalized = normalizePolymarketLastTradePricesComposeState(compose);
+  if (!normalized.outcomeSelection) {
+    throw new Error("Choose YES, NO, or both outcomes before pulling last trade prices.");
+  }
   let refs = Array.isArray(opts.marketRefsOverride)
     ? opts.marketRefsOverride
     : normalized.marketRefs;
@@ -73,7 +77,16 @@ export async function fetchPolymarketLastTradePricesRows(compose, opts = {}) {
     throw new Error("Select at least one market with a CLOB token id.");
   }
 
-  const tokenIds = refs.map((ref) => parseTokenIdList(ref.tokenIds)[0]).filter(Boolean);
+  const tokenIds = [
+    ...new Set(
+      selectLastTradePriceOutcomeTokens(refs, normalized.outcomeSelection).map((p) => p.tokenId),
+    ),
+  ];
+  if (!tokenIds.length) {
+    throw new Error(
+      `No ${normalized.outcomeSelection.toUpperCase()} outcome tokens were found for the selected markets.`,
+    );
+  }
   const payload = [];
   for (let offset = 0; offset < tokenIds.length; offset += POLYMARKET_LAST_TRADE_PRICES_MAX_TOKENS_PER_REQUEST) {
     const batch = tokenIds.slice(
@@ -84,7 +97,12 @@ export async function fetchPolymarketLastTradePricesRows(compose, opts = {}) {
   }
 
   return {
-    rows: flattenLastTradePricesRows(payload, refs, opts.selectedColumns),
+    rows: flattenLastTradePricesRows(
+      payload,
+      refs,
+      opts.selectedColumns,
+      normalized.outcomeSelection,
+    ),
     marketsDiscovered: refs.length,
     tokenIds,
     refs,

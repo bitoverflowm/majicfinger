@@ -134,6 +134,7 @@ export function applyPolymarketMarketPricesRows(ctx, rows, meta = {}) {
       mode: compose?.mode === "advanced" ? "advanced" : "search",
       marketRefs,
       marketsFilters: compose?.marketsFilters,
+      outcomeSelection: compose?.outcomeSelection,
       selectedColumns: meta.selectedColumns,
       tokenIds: meta.tokenIds,
       elapsedMs: meta.elapsedMs,
