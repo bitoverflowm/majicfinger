@@ -1224,9 +1224,9 @@ const Polymarket = ({ setConnectedData, requestSheetDestination, connectHomePull
             marketsFilters: compose.marketsFilters,
             selectedColumns: cols,
             outcomeSelection: compose.outcomeSelection,
-            startTs: compose.startTs,
-            endTs: compose.endTs,
-            interval: compose.interval,
+            startTs: compose.windowMode === "date_range" ? compose.startTs : "",
+            endTs: compose.windowMode === "date_range" ? compose.endTs : "",
+            interval: compose.windowMode === "interval" ? compose.interval : "",
             fidelity: compose.fidelity,
           };
           const waterfall = createPolymarketPricesHistoryWaterfallWriter(ctx, {

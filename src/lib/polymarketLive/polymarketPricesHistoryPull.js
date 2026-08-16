@@ -13,6 +13,7 @@ import {
 } from "@/lib/polymarketLive/polymarketOrderbooksPull";
 import {
   flattenPricesHistoryRowsForMarket,
+  minimumPolymarketPricesHistoryFidelity,
   normalizePolymarketPricesHistoryComposeState,
   normalizePolymarketPricesHistorySheetLayout,
   pricesHistoryLayoutIncludesMetadata,
@@ -84,6 +85,7 @@ function asHistoryMap(payload) {
  *   endTs?: string;
  *   interval?: string;
  *   fidelity?: number;
+ *   windowMode?: "interval" | "date_range";
  * }} params
  */
 async function fetchBatchPricesHistory(tokenIds, params) {
@@ -97,9 +99,12 @@ async function fetchBatchPricesHistory(tokenIds, params) {
 
   /** @type {Record<string, unknown>} */
   const body = { markets: unique };
-  if (params.startTs) body.start_ts = Number(params.startTs);
-  if (params.endTs) body.end_ts = Number(params.endTs);
-  if (params.interval) body.interval = params.interval;
+  if (params.windowMode === "date_range") {
+    if (params.startTs) body.start_ts = Number(params.startTs);
+    if (params.endTs) body.end_ts = Number(params.endTs);
+  } else if (params.interval) {
+    body.interval = params.interval;
+  }
   if (params.fidelity != null && Number.isFinite(Number(params.fidelity))) {
     body.fidelity = Number(params.fidelity);
   }
@@ -143,6 +148,21 @@ export async function fetchPolymarketPricesHistoryRows(compose, opts = {}) {
   const normalized = normalizePolymarketPricesHistoryComposeState(compose);
   if (!normalized.outcomeSelection) {
     throw new Error("Choose YES, NO, or both outcomes before pulling price history.");
+  }
+  const usesDateRange = normalized.windowMode === "date_range";
+  if (usesDateRange && (!normalized.startTs || !normalized.endTs)) {
+    throw new Error("Choose a complete date range before pulling price history.");
+  }
+  if (usesDateRange && Number(normalized.startTs) >= Number(normalized.endTs)) {
+    throw new Error("Price history end date must be after the start date.");
+  }
+  const minimumFidelity = usesDateRange
+    ? 1
+    : minimumPolymarketPricesHistoryFidelity(normalized.interval);
+  if (normalized.fidelity < minimumFidelity) {
+    throw new Error(
+      `${normalized.interval} interval requires fidelity of at least ${minimumFidelity} minutes.`,
+    );
   }
 
   const sheetLayout = normalizePolymarketPricesHistorySheetLayout(normalized.sheetLayout);
@@ -225,6 +245,7 @@ export async function fetchPolymarketPricesHistoryRows(compose, opts = {}) {
         endTs: normalized.endTs,
         interval: normalized.interval,
         fidelity: normalized.fidelity,
+        windowMode: normalized.windowMode,
       });
       historyByToken = { ...historyByToken, ...chunk };
     } catch (e) {
@@ -232,6 +253,9 @@ export async function fetchPolymarketPricesHistoryRows(compose, opts = {}) {
       batchFailures.push(msg);
       // Continue so remaining batches / markets can still produce sheets.
     }
+  }
+  if (!Object.keys(historyByToken).length && batchFailures.length) {
+    throw new Error(batchFailures[0]);
   }
 
   /** @type {Record<string, unknown>[]} */
@@ -488,9 +512,9 @@ export async function applyPolymarketPricesHistorySearchAll(ctx, suggestions, op
     marketRefs: refs,
     selectedColumns: opts.selectedColumns,
     outcomeSelection: compose.outcomeSelection,
-    startTs: compose.startTs,
-    endTs: compose.endTs,
-    interval: compose.interval,
+    startTs: compose.windowMode === "date_range" ? compose.startTs : "",
+    endTs: compose.windowMode === "date_range" ? compose.endTs : "",
+    interval: compose.windowMode === "interval" ? compose.interval : "",
     fidelity: compose.fidelity,
   };
 

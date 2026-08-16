@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import {
   emptyPolymarketPricesHistoryComposeState,
   flattenPricesHistoryRowsForMarket,
+  minimumPolymarketPricesHistoryFidelity,
   normalizePolymarketPricesHistoryComposeState,
   normalizePolymarketPricesHistoryFidelity,
   selectPricesHistoryOutcomeTokens,
@@ -24,7 +25,8 @@ test("prices history compose defaults and normalization", () => {
   const empty = emptyPolymarketPricesHistoryComposeState();
   assert.equal(empty.mode, "search");
   assert.equal(empty.outcomeSelection, "");
-  assert.equal(empty.interval, "1d");
+  assert.equal(empty.windowMode, "interval");
+  assert.equal(empty.interval, "max");
   assert.equal(empty.fidelity, 1);
   assert.equal(empty.sheetLayout, "meta_plus_per_market");
 
@@ -38,6 +40,7 @@ test("prices history compose defaults and normalization", () => {
   });
   assert.equal(normalized.mode, "advanced");
   assert.equal(normalized.outcomeSelection, "both");
+  assert.equal(normalized.windowMode, "date_range");
   assert.equal(normalized.interval, "1w");
   assert.equal(normalized.fidelity, 60);
   assert.equal(normalized.startTs, "1700000000");
@@ -49,6 +52,36 @@ test("prices history fidelity falls back to 1 for unsupported values", () => {
   assert.equal(normalizePolymarketPricesHistoryFidelity(7), 1);
   assert.equal(normalizePolymarketPricesHistoryFidelity(15), 15);
   assert.equal(normalizePolymarketPricesHistoryFidelity("1440"), 1440);
+  assert.equal(minimumPolymarketPricesHistoryFidelity("1m"), 10);
+  assert.equal(minimumPolymarketPricesHistoryFidelity("1w"), 5);
+  assert.equal(minimumPolymarketPricesHistoryFidelity("1d"), 1);
+
+  assert.equal(
+    normalizePolymarketPricesHistoryComposeState({
+      interval: "1m",
+      fidelity: 1,
+    }).fidelity,
+    10,
+  );
+  assert.equal(
+    normalizePolymarketPricesHistoryComposeState({
+      interval: "1m",
+      fidelity: 1,
+      startTs: "1700000000",
+      endTs: "1700086400",
+    }).fidelity,
+    1,
+  );
+  assert.equal(
+    normalizePolymarketPricesHistoryComposeState({
+      windowMode: "interval",
+      interval: "1m",
+      fidelity: 1,
+      startTs: "1700000000",
+      endTs: "1700086400",
+    }).fidelity,
+    10,
+  );
 });
 
 test("prices history selects yes/no/both tokens including non Yes/No labels", () => {

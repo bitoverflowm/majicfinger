@@ -24,6 +24,7 @@ import { selectLastTradePriceOutcomeTokens } from "@/lib/polymarketLive/lastTrad
 /** @typedef {"per_market" | "meta_plus_per_market"} PolymarketPricesHistorySheetLayout */
 /** @typedef {"yes" | "no" | "both" | ""} PolymarketPricesHistoryOutcomeSelection */
 /** @typedef {"max" | "all" | "1m" | "1w" | "1d" | "6h" | "1h"} PolymarketPricesHistoryInterval */
+/** @typedef {"interval" | "date_range"} PolymarketPricesHistoryWindowMode */
 
 /**
  * @typedef {import("@/lib/polymarketLive/orderbooksCompose").PolymarketOrderbooksMarketRef} PolymarketPricesHistoryMarketRef
@@ -35,6 +36,7 @@ import { selectLastTradePriceOutcomeTokens } from "@/lib/polymarketLive/lastTrad
  *   marketRefs: PolymarketPricesHistoryMarketRef[];
  *   sheetLayout: PolymarketPricesHistorySheetLayout;
  *   outcomeSelection: PolymarketPricesHistoryOutcomeSelection;
+ *   windowMode: PolymarketPricesHistoryWindowMode;
  *   startTs: string;
  *   endTs: string;
  *   interval: PolymarketPricesHistoryInterval | "";
@@ -67,13 +69,13 @@ export const POLYMARKET_PRICES_HISTORY_SHEET_LAYOUT_OPTIONS = [
 ];
 
 export const POLYMARKET_PRICES_HISTORY_INTERVAL_OPTIONS = [
-  { value: /** @type {PolymarketPricesHistoryInterval} */ ("max"), label: "Max" },
-  { value: /** @type {PolymarketPricesHistoryInterval} */ ("all"), label: "All" },
-  { value: /** @type {PolymarketPricesHistoryInterval} */ ("1m"), label: "1 month" },
-  { value: /** @type {PolymarketPricesHistoryInterval} */ ("1w"), label: "1 week" },
-  { value: /** @type {PolymarketPricesHistoryInterval} */ ("1d"), label: "1 day" },
-  { value: /** @type {PolymarketPricesHistoryInterval} */ ("6h"), label: "6 hours" },
-  { value: /** @type {PolymarketPricesHistoryInterval} */ ("1h"), label: "1 hour" },
+  { value: /** @type {PolymarketPricesHistoryInterval} */ ("1h"), label: "1H" },
+  { value: /** @type {PolymarketPricesHistoryInterval} */ ("6h"), label: "6H" },
+  { value: /** @type {PolymarketPricesHistoryInterval} */ ("1d"), label: "1D" },
+  { value: /** @type {PolymarketPricesHistoryInterval} */ ("1w"), label: "1W" },
+  { value: /** @type {PolymarketPricesHistoryInterval} */ ("1m"), label: "1M" },
+  { value: /** @type {PolymarketPricesHistoryInterval} */ ("all"), label: "ALL" },
+  { value: /** @type {PolymarketPricesHistoryInterval} */ ("max"), label: "MAX" },
 ];
 
 /** Fidelity values confirmed against live POST /batch-prices-history (minutes). */
@@ -130,6 +132,14 @@ export function normalizePolymarketPricesHistorySheetLayout(raw) {
 
 /**
  * @param {unknown} raw
+ * @returns {PolymarketPricesHistoryWindowMode}
+ */
+export function normalizePolymarketPricesHistoryWindowMode(raw) {
+  return raw === "date_range" ? "date_range" : "interval";
+}
+
+/**
+ * @param {unknown} raw
  * @returns {PolymarketPricesHistoryOutcomeSelection}
  */
 export function normalizePolymarketPricesHistoryOutcomeSelection(raw) {
@@ -175,6 +185,20 @@ export function normalizePolymarketPricesHistoryFidelity(raw) {
 }
 
 /**
+ * Minimum fidelity accepted by the live batch endpoint for each relative interval.
+ * The API returns HTTP 400 below these values.
+ *
+ * @param {unknown} interval
+ * @returns {number}
+ */
+export function minimumPolymarketPricesHistoryFidelity(interval) {
+  const value = normalizePolymarketPricesHistoryInterval(interval);
+  if (value === "1m") return 10;
+  if (value === "1w") return 5;
+  return 1;
+}
+
+/**
  * @param {unknown} raw
  * @returns {string}
  */
@@ -192,9 +216,10 @@ export function emptyPolymarketPricesHistoryComposeState() {
     marketRefs: [],
     sheetLayout: POLYMARKET_PRICES_HISTORY_SHEET_LAYOUT_META_PLUS_PER_MARKET,
     outcomeSelection: "",
+    windowMode: "interval",
     startTs: "",
     endTs: "",
-    interval: "1d",
+    interval: "max",
     fidelity: 1,
     marketsFilters: {
       ...emptyPolymarketMarketsComposeState(),
@@ -212,6 +237,18 @@ export function normalizePolymarketPricesHistoryComposeState(raw) {
   if (!raw || typeof raw !== "object") return base;
   const o = /** @type {Record<string, unknown>} */ (raw);
   const mode = o.mode === "advanced" ? "advanced" : "search";
+  const interval = normalizePolymarketPricesHistoryInterval(o.interval) || "max";
+  const startTs = normalizePolymarketPricesHistoryUnixTs(o.startTs);
+  const endTs = normalizePolymarketPricesHistoryUnixTs(o.endTs);
+  const legacyDateRange = !o.windowMode && startTs && endTs;
+  const windowMode = legacyDateRange
+    ? "date_range"
+    : normalizePolymarketPricesHistoryWindowMode(o.windowMode);
+  const hasDateRange = windowMode === "date_range" && Boolean(startTs && endTs);
+  const fidelity = Math.max(
+    normalizePolymarketPricesHistoryFidelity(o.fidelity),
+    hasDateRange ? 1 : minimumPolymarketPricesHistoryFidelity(interval),
+  );
   const marketRefs = Array.isArray(o.marketRefs)
     ? o.marketRefs
         .map((r) => {
@@ -240,10 +277,11 @@ export function normalizePolymarketPricesHistoryComposeState(raw) {
     marketRefs: /** @type {PolymarketPricesHistoryMarketRef[]} */ (marketRefs),
     sheetLayout: normalizePolymarketPricesHistorySheetLayout(o.sheetLayout),
     outcomeSelection: normalizePolymarketPricesHistoryOutcomeSelection(o.outcomeSelection),
-    startTs: normalizePolymarketPricesHistoryUnixTs(o.startTs),
-    endTs: normalizePolymarketPricesHistoryUnixTs(o.endTs),
-    interval: normalizePolymarketPricesHistoryInterval(o.interval) || "1d",
-    fidelity: normalizePolymarketPricesHistoryFidelity(o.fidelity),
+    windowMode,
+    startTs,
+    endTs,
+    interval,
+    fidelity,
     marketsFilters: normalizePolymarketMarketsComposeState({
       ...(o.marketsFilters && typeof o.marketsFilters === "object" ? o.marketsFilters : {}),
       mode: "advanced",

@@ -23,10 +23,12 @@ import { useMyStateV2 } from "@/context/stateContextV2";
 import { normalizePolymarketMarketsComposeState } from "@/lib/polymarketLive/marketsCompose";
 import {
   emptyPolymarketPricesHistoryComposeState,
+  minimumPolymarketPricesHistoryFidelity,
   normalizePolymarketPricesHistoryComposeState,
   normalizePolymarketPricesHistoryFidelity,
   normalizePolymarketPricesHistoryInterval,
   normalizePolymarketPricesHistorySheetLayout,
+  normalizePolymarketPricesHistoryWindowMode,
   POLYMARKET_PRICES_HISTORY_FIDELITY_OPTIONS,
   POLYMARKET_PRICES_HISTORY_INTERVAL_OPTIONS,
   POLYMARKET_PRICES_HISTORY_SHEET_LAYOUT_OPTIONS,
@@ -141,6 +143,9 @@ export function PolymarketLivePricesHistoryFields({
     const to = dateFromUnixEastern(state.endTs);
     return { from, to };
   }, [state.startTs, state.endTs]);
+  const hasDateRange = Boolean(state.startTs && state.endTs);
+  const windowMode = normalizePolymarketPricesHistoryWindowMode(state.windowMode);
+  const dateRangeReady = windowMode !== "date_range" || hasDateRange;
 
   /**
    * @param {import("@/lib/polymarketLive/polymarketPublicSearch").PolymarketPublicSearchSuggestion} s
@@ -170,14 +175,14 @@ export function PolymarketLivePricesHistoryFields({
 
   const handleSearchGo = useCallback(async () => {
     if (!searchPicks.length || !onSearchSubmitAll) return;
-    if (!state.outcomeSelection) return;
+    if (!state.outcomeSelection || !dateRangeReady) return;
     setSearchGoLoading(true);
     try {
       await onSearchSubmitAll(searchPicks);
     } finally {
       setSearchGoLoading(false);
     }
-  }, [onSearchSubmitAll, searchPicks, state.outcomeSelection]);
+  }, [dateRangeReady, onSearchSubmitAll, searchPicks, state.outcomeSelection]);
 
   /**
    * @param {{ from?: Date; to?: Date } | undefined} range
@@ -270,113 +275,167 @@ export function PolymarketLivePricesHistoryFields({
   );
 
   const historyParamFields = (
-    <div className="space-y-2">
-      <p className="text-[10px] leading-snug text-muted-foreground">
-        Date range, interval, and fidelity apply to every selected market. Days use America/New_York.
-        Leave the date range empty to rely on the interval window alone.
-      </p>
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-[minmax(0,1.4fr)_minmax(0,0.8fr)_minmax(0,0.8fr)]">
-        <div className="space-y-1.5 min-w-0">
-          <Label className="text-[11px] text-foreground">Date range</Label>
-          <Popover open={rangeOpen} onOpenChange={setRangeOpen}>
-            <PopoverTrigger asChild>
-              <Button
-                type="button"
-                variant="outline"
-                disabled={disabled || searchGoLoading}
-                className="h-8 w-full justify-start px-2.5 text-left text-xs font-normal"
-              >
-                <CalendarIcon className="mr-2 h-3.5 w-3.5 shrink-0 opacity-70" />
-                <span
-                  className={cn(
-                    "truncate",
-                    !(dateRange.from || dateRange.to) && "text-muted-foreground",
-                  )}
-                >
-                  {dateRange.from ? (
-                    dateRange.to ? (
-                      <>
-                        {format(dateRange.from, "LLL dd, y")} - {format(dateRange.to, "LLL dd, y")}
-                      </>
-                    ) : (
-                      format(dateRange.from, "LLL dd, y")
-                    )
-                  ) : (
-                    "Pick a date range"
-                  )}
-                </span>
-              </Button>
-            </PopoverTrigger>
-            <PopoverContent className="w-auto max-w-[calc(100vw-2rem)] p-3" align="start">
-              <Calendar
-                mode="range"
-                numberOfMonths={1}
-                selected={dateRange}
-                onSelect={handleRangeSelect}
-                disabled={(day) => day > new Date()}
-              />
-              {dateRange.from || dateRange.to ? (
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  className="mt-2 h-7 w-full text-[10px]"
-                  disabled={disabled || searchGoLoading}
-                  onClick={() => {
-                    patch({ startTs: "", endTs: "" });
-                    setRangeOpen(false);
-                  }}
-                >
-                  Clear dates
-                </Button>
-              ) : null}
-            </PopoverContent>
-          </Popover>
-        </div>
-
-        <div className="space-y-1.5 min-w-0">
-          <Label className="text-[11px] text-foreground">Interval</Label>
-          <Select
-            value={normalizePolymarketPricesHistoryInterval(state.interval) || "1d"}
-            onValueChange={(value) => {
-              const interval = normalizePolymarketPricesHistoryInterval(value);
-              if (interval) patch({ interval });
-            }}
-            disabled={disabled || searchGoLoading}
-          >
-            <SelectTrigger className="h-8 text-xs">
-              <SelectValue placeholder="Interval" />
-            </SelectTrigger>
-            <SelectContent>
-              {POLYMARKET_PRICES_HISTORY_INTERVAL_OPTIONS.map((opt) => (
-                <SelectItem key={opt.value} value={opt.value} className="text-xs">
-                  {opt.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-
-        <div className="space-y-1.5 min-w-0">
-          <Label className="text-[11px] text-foreground">Fidelity</Label>
-          <Select
-            value={String(normalizePolymarketPricesHistoryFidelity(state.fidelity))}
-            onValueChange={(value) => patch({ fidelity: Number(value) })}
-            disabled={disabled || searchGoLoading}
-          >
-            <SelectTrigger className="h-8 text-xs">
-              <SelectValue placeholder="Fidelity" />
-            </SelectTrigger>
-            <SelectContent>
-              {POLYMARKET_PRICES_HISTORY_FIDELITY_OPTIONS.map((opt) => (
-                <SelectItem key={opt.value} value={String(opt.value)} className="text-xs">
-                  {opt.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
+    <div className="space-y-3">
+      <div className="space-y-2">
+        <Label className="text-[0.6875rem] font-medium uppercase tracking-wider text-muted-foreground">
+          History window
+        </Label>
+        <ToggleGroup
+          type="single"
+          value={windowMode}
+          onValueChange={(value) => {
+            if (value === "interval" || value === "date_range") {
+              patch({ windowMode: value });
+            }
+          }}
+          className="justify-start"
+          disabled={disabled || searchGoLoading}
+          aria-label="Price history window"
+        >
+          <ToggleGroupItem value="interval" className="h-8 px-3 text-xs">
+            Interval
+          </ToggleGroupItem>
+          <ToggleGroupItem value="date_range" className="h-8 px-3 text-xs">
+            Date range
+          </ToggleGroupItem>
+        </ToggleGroup>
       </div>
+
+      {windowMode === "interval" ? (
+        <div className="space-y-2">
+          <p className="text-[10px] leading-snug text-muted-foreground">
+            Choose a relative history window. Fidelity is selected automatically to satisfy the
+            endpoint for that interval.
+          </p>
+          <div
+            className="flex flex-wrap items-center gap-1 rounded-lg border border-border/60 bg-muted/15 p-1"
+            role="group"
+            aria-label="Price history interval"
+          >
+            {POLYMARKET_PRICES_HISTORY_INTERVAL_OPTIONS.map((opt) => {
+              const selected =
+                normalizePolymarketPricesHistoryInterval(state.interval) === opt.value;
+              return (
+                <button
+                  key={opt.value}
+                  type="button"
+                  disabled={disabled || searchGoLoading}
+                  aria-pressed={selected}
+                  onClick={() =>
+                    patch({
+                      interval: opt.value,
+                      fidelity: minimumPolymarketPricesHistoryFidelity(opt.value),
+                    })
+                  }
+                  className={cn(
+                    "h-8 min-w-11 flex-1 rounded-md px-3 text-xs font-semibold transition-colors",
+                    selected
+                      ? "bg-background text-foreground shadow-sm ring-1 ring-border"
+                      : "text-muted-foreground hover:bg-background/70 hover:text-foreground",
+                  )}
+                >
+                  {opt.label}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      ) : (
+        <div className="space-y-2">
+          <p className="text-[10px] leading-snug text-muted-foreground">
+            Choose explicit dates and a sampling fidelity. The same range applies to every selected
+            market. Days use America/New_York.
+          </p>
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-[minmax(0,1.5fr)_minmax(0,0.75fr)]">
+            <div className="space-y-1.5 min-w-0">
+              <Label className="text-[11px] text-foreground">Date range</Label>
+              <Popover open={rangeOpen} onOpenChange={setRangeOpen}>
+                <PopoverTrigger asChild>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    disabled={disabled || searchGoLoading}
+                    className="h-8 w-full justify-start px-2.5 text-left text-xs font-normal"
+                  >
+                    <CalendarIcon className="mr-2 h-3.5 w-3.5 shrink-0 opacity-70" />
+                    <span
+                      className={cn(
+                        "truncate",
+                        !(dateRange.from || dateRange.to) && "text-muted-foreground",
+                      )}
+                    >
+                      {dateRange.from ? (
+                        dateRange.to ? (
+                          <>
+                            {format(dateRange.from, "LLL dd, y")} -{" "}
+                            {format(dateRange.to, "LLL dd, y")}
+                          </>
+                        ) : (
+                          format(dateRange.from, "LLL dd, y")
+                        )
+                      ) : (
+                        "Pick a date range"
+                      )}
+                    </span>
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent
+                  className="w-auto max-w-[calc(100vw-2rem)] p-3"
+                  align="start"
+                >
+                  <Calendar
+                    mode="range"
+                    numberOfMonths={1}
+                    selected={dateRange}
+                    onSelect={handleRangeSelect}
+                    disabled={(day) => day > new Date()}
+                  />
+                  {dateRange.from || dateRange.to ? (
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      className="mt-2 h-7 w-full text-[10px]"
+                      disabled={disabled || searchGoLoading}
+                      onClick={() => {
+                        patch({ startTs: "", endTs: "" });
+                        setRangeOpen(false);
+                      }}
+                    >
+                      Clear dates
+                    </Button>
+                  ) : null}
+                </PopoverContent>
+              </Popover>
+              {!hasDateRange ? (
+                <p className="text-[9px] text-amber-700 dark:text-amber-300">
+                  Select a complete date range.
+                </p>
+              ) : null}
+            </div>
+
+            <div className="space-y-1.5 min-w-0">
+              <Label className="text-[11px] text-foreground">Fidelity</Label>
+              <Select
+                value={String(normalizePolymarketPricesHistoryFidelity(state.fidelity))}
+                onValueChange={(value) => patch({ fidelity: Number(value) })}
+                disabled={disabled || searchGoLoading}
+              >
+                <SelectTrigger className="h-8 text-xs">
+                  <SelectValue placeholder="Fidelity" />
+                </SelectTrigger>
+                <SelectContent>
+                  {POLYMARKET_PRICES_HISTORY_FIDELITY_OPTIONS.map((opt) => (
+                    <SelectItem key={opt.value} value={String(opt.value)} className="text-xs">
+                      {opt.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 
@@ -463,7 +522,8 @@ export function PolymarketLivePricesHistoryFields({
                     disabled ||
                     searchGoLoading ||
                     !searchPicks.length ||
-                    !state.outcomeSelection
+                    !state.outcomeSelection ||
+                    !dateRangeReady
                   }
                   onClick={() => void handleSearchGo()}
                 >
