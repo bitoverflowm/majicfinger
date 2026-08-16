@@ -60,11 +60,12 @@ import {
 
 /**
  * Top-level Polymarket Live endpoint groups (hub column tags).
- * Order matches Polymarket API surface: markets → events → series → holders →
- * trades → builders → sports → combos → live.
+ * Order matches Polymarket API surface: markets → orderbooks → events → series →
+ * holders → trades → builders → sports → combos → live.
  */
 export const POLYMARKET_LIVE_ENDPOINT_CATEGORIES = [
   { id: "markets", label: "Markets" },
+  { id: "orderbooks", label: "Orderbooks" },
   { id: "events", label: "Events" },
   { id: "series", label: "Series" },
   { id: "holders", label: "Holders" },
@@ -115,10 +116,10 @@ const ENDPOINT_CATEGORY_BY_QUERY = {
   [POLYMARKET_OPEN_INTEREST_COMPOSE_ENDPOINT_ID]: "markets",
   [POLYMARKET_LIVE_EVENT_VOLUME_ENDPOINT_ID]: "events",
   [POLYMARKET_SAMPLING_MARKETS_ENDPOINT_ID]: "markets",
-  [POLYMARKET_ORDERBOOKS_ENDPOINT_ID]: "markets",
+  [POLYMARKET_ORDERBOOKS_ENDPOINT_ID]: "orderbooks",
   [POLYMARKET_MARKET_PRICES_ENDPOINT_ID]: "markets",
-  [POLYMARKET_MIDPOINT_PRICES_ENDPOINT_ID]: "markets",
-  [POLYMARKET_SPREADS_ENDPOINT_ID]: "markets",
+  [POLYMARKET_MIDPOINT_PRICES_ENDPOINT_ID]: "orderbooks",
+  [POLYMARKET_SPREADS_ENDPOINT_ID]: "orderbooks",
   [POLYMARKET_LAST_TRADE_PRICES_ENDPOINT_ID]: "trades",
   [POLYMARKET_PRICES_HISTORY_ENDPOINT_ID]: "trades",
   getTopHolders: "holders",
@@ -224,7 +225,7 @@ export const POLYMARKET_LIVE_CONNECT_ENDPOINTS = [
   },
   {
     id: POLYMARKET_ORDERBOOKS_ENDPOINT_ID,
-    category: "markets",
+    category: "orderbooks",
     title: "Orderbook(s)",
     description:
       "Discover market(s), then pull CLOB orderbooks — Buy, Sell, or both — with one sheet per market (optional metadata sheet first).",
@@ -238,14 +239,14 @@ export const POLYMARKET_LIVE_CONNECT_ENDPOINTS = [
   },
   {
     id: POLYMARKET_MIDPOINT_PRICES_ENDPOINT_ID,
-    category: "markets",
+    category: "orderbooks",
     title: "Midpoint Prices",
     description:
       "Discover one or many markets, then return one midpoint-price row per market in a single sheet.",
   },
   {
     id: POLYMARKET_SPREADS_ENDPOINT_ID,
-    category: "markets",
+    category: "orderbooks",
     title: "Spreads",
     description:
       "Spread is the difference between the best ask and best bid prices for a given market",
@@ -260,9 +261,8 @@ export const POLYMARKET_LIVE_CONNECT_ENDPOINTS = [
   {
     id: POLYMARKET_PRICES_HISTORY_ENDPOINT_ID,
     category: "trades",
-    title: "Price History",
-    description:
-      "Discover market(s), choose YES / NO / both outcomes, then pull historical prices — optional metadata sheet plus one history sheet per market.",
+    title: "Trade History",
+    description: "Get trade history by markets aka Price history",
   },
   {
     id: POLYMARKET_MARKETS_BY_EVENTS_ENDPOINT_ID,

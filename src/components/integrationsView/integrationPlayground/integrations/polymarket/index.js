@@ -571,7 +571,7 @@ const Polymarket = ({ setConnectedData, requestSheetDestination, connectHomePull
                           : isPricesHistoryCompose
                             ? {
                                 query: POLYMARKET_PRICES_HISTORY_ENDPOINT_ID,
-                                name: "Price History",
+                                name: "Trade History",
                                 params: [],
                               }
         : ENDPOINTS.find((e) => e.query === endpointId);
@@ -1207,7 +1207,7 @@ const Polymarket = ({ setConnectedData, requestSheetDestination, connectHomePull
         trackDataPullStart({
           integration: "polymarket",
           endpoint: POLYMARKET_PRICES_HISTORY_ENDPOINT_ID,
-          sampleLabel: "Price History",
+          sampleLabel: "Trade History",
         });
         try {
           const ctx = {
@@ -1285,7 +1285,7 @@ const Polymarket = ({ setConnectedData, requestSheetDestination, connectHomePull
           trackDataPullComplete({
             integration: "polymarket",
             endpoint: POLYMARKET_PRICES_HISTORY_ENDPOINT_ID,
-            sampleLabel: "Price History",
+            sampleLabel: "Trade History",
             rowCount: fetched.rows.length,
             elapsedMs,
           });

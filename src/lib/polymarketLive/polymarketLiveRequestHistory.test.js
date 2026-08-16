@@ -124,7 +124,7 @@ import { integrationLabelFromLake } from "@/lib/connectHomeRequestQuery.js";
     tokenIds: ["yes", "no", "y2", "n2"],
   });
   assert.equal(meta.categoryLabel, "Trades");
-  assert.equal(meta.endpointTitle, "Price History");
+  assert.equal(meta.endpointTitle, "Trade History");
   assert.equal(meta.marketScope, "multi");
   assert.ok(meta.queryParams.some((p) => p.key === "outcome" && p.value === "BOTH"));
   assert.ok(
