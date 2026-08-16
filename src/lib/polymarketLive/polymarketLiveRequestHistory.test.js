@@ -156,3 +156,138 @@ import { integrationLabelFromLake } from "@/lib/connectHomeRequestQuery.js";
   assert.ok(meta.queryParams.some((p) => p.key === "fields" && p.value.includes("name")));
   console.log("ok polymarket live public profiles query meta");
 }
+
+{
+  const meta = buildPolymarketLiveQueryMeta({
+    endpointId: "getCurrentPositions",
+    mode: "search",
+    addresses: ["0x1111111111111111111111111111111111111111"],
+    requestParams: {
+      eventId: "123,456",
+      sizeThreshold: "2",
+      redeemable: "false",
+      limit: "100",
+    },
+    selectedColumns: ["proxyWallet", "title", "size"],
+  });
+  assert.equal(meta.categoryLabel, "Holders");
+  assert.equal(meta.endpointTitle, "Current Holder Positions");
+  assert.equal(meta.marketScopeLabel, "Single address");
+  assert.ok(meta.queryParams.some((p) => p.key === "eventId" && p.value === "123,456"));
+  assert.ok(meta.queryParams.some((p) => p.key === "sizeThreshold" && p.value === "2"));
+  console.log("ok polymarket live current positions query meta");
+}
+
+{
+  const meta = buildPolymarketLiveQueryMeta({
+    endpointId: "getClosedPositions",
+    mode: "search",
+    addresses: ["0x1111111111111111111111111111111111111111"],
+    requestParams: {
+      market: "0xabc",
+      sortBy: "REALIZEDPNL",
+      sortDirection: "DESC",
+      limit: "10",
+    },
+    selectedColumns: ["proxyWallet", "title", "realizedPnl"],
+  });
+  assert.equal(meta.categoryLabel, "Holders");
+  assert.equal(meta.endpointTitle, "Holder's Closed Positions");
+  assert.ok(meta.queryParams.some((p) => p.key === "sortBy" && p.value === "REALIZEDPNL"));
+  console.log("ok polymarket live closed positions query meta");
+}
+
+{
+  const meta = buildPolymarketLiveQueryMeta({
+    endpointId: "getUserActivity",
+    mode: "search",
+    addresses: ["0x1111111111111111111111111111111111111111"],
+    requestParams: {
+      type: "TRADE,REDEEM",
+      start: "1700000000",
+      sortBy: "TIMESTAMP",
+      side: "BUY",
+    },
+    selectedColumns: ["proxyWallet", "timestamp", "type"],
+  });
+  assert.equal(meta.categoryLabel, "Holders");
+  assert.equal(meta.endpointTitle, "User Activity");
+  assert.ok(meta.queryParams.some((p) => p.key === "type" && p.value === "TRADE,REDEEM"));
+  assert.ok(meta.queryParams.some((p) => p.key === "side" && p.value === "BUY"));
+  console.log("ok polymarket live user activity query meta");
+}
+
+{
+  const meta = buildPolymarketLiveQueryMeta({
+    endpointId: "getHolderPositionValue",
+    mode: "search",
+    addresses: [
+      "0x1111111111111111111111111111111111111111",
+      "0x2222222222222222222222222222222222222222",
+    ],
+    requestParams: { market: "0xabc,0xdef" },
+    selectedColumns: ["user", "value"],
+  });
+  assert.equal(meta.categoryLabel, "Holders");
+  assert.equal(meta.endpointTitle, "Total Value of Holder's Positions");
+  assert.match(meta.marketScopeLabel, /Multiple addresses/);
+  assert.ok(meta.queryParams.some((p) => p.key === "market"));
+  console.log("ok polymarket live holder position value query meta");
+}
+
+{
+  const meta = buildPolymarketLiveQueryMeta({
+    endpointId: "getHolderTrades",
+    mode: "search",
+    addresses: ["0x1111111111111111111111111111111111111111"],
+    requestParams: {
+      eventId: "123",
+      takerOnly: "true",
+      filterType: "CASH",
+      filterAmount: "100",
+      side: "SELL",
+    },
+    selectedColumns: ["proxyWallet", "timestamp", "price"],
+  });
+  assert.equal(meta.categoryLabel, "Holders");
+  assert.equal(meta.endpointTitle, "Holder Trades");
+  assert.ok(meta.queryParams.some((p) => p.key === "filterType" && p.value === "CASH"));
+  assert.ok(meta.queryParams.some((p) => p.key === "side" && p.value === "SELL"));
+  console.log("ok polymarket live holder trades query meta");
+}
+
+{
+  const meta = buildPolymarketLiveQueryMeta({
+    endpointId: "getHolderTradedMarkets",
+    mode: "search",
+    addresses: [
+      "0x1111111111111111111111111111111111111111",
+      "0x2222222222222222222222222222222222222222",
+    ],
+    selectedColumns: ["user", "traded"],
+  });
+  assert.equal(meta.categoryLabel, "Holders");
+  assert.equal(meta.endpointTitle, "Total Markets Traded");
+  assert.ok(meta.queryParams.some((p) => p.key === "addresses"));
+  console.log("ok polymarket live holder traded markets query meta");
+}
+
+{
+  const meta = buildPolymarketLiveQueryMeta({
+    endpointId: "getTraderLeaderboard",
+    mode: "search",
+    requestParams: {
+      category: "SPORTS",
+      timePeriod: "WEEK",
+      orderBy: "VOL",
+      limit: "25",
+      offset: "0",
+    },
+    selectedColumns: ["rank", "proxyWallet", "vol"],
+  });
+  assert.equal(meta.categoryLabel, "Leaderboard");
+  assert.equal(meta.endpointTitle, "Trader Leaderboard Rankings");
+  assert.ok(meta.queryParams.some((p) => p.key === "category" && p.value === "SPORTS"));
+  assert.ok(meta.queryParams.some((p) => p.key === "orderBy" && p.value === "VOL"));
+  console.log("ok polymarket live trader leaderboard query meta");
+}

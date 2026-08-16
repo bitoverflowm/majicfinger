@@ -165,6 +165,69 @@ import {
   applyPolymarketPublicProfilesRows,
   fetchPolymarketPublicProfilesRows,
 } from "@/lib/polymarketLive/polymarketPublicProfilesPull";
+import {
+  emptyPolymarketCurrentPositionsComposeState,
+  normalizePolymarketCurrentPositionsComposeState,
+  POLYMARKET_CURRENT_POSITIONS_ENDPOINT_ID,
+} from "@/lib/polymarketLive/currentPositionsCompose";
+import {
+  applyPolymarketCurrentPositionsRows,
+  fetchPolymarketCurrentPositionsRows,
+} from "@/lib/polymarketLive/polymarketCurrentPositionsPull";
+import {
+  emptyPolymarketClosedPositionsComposeState,
+  normalizePolymarketClosedPositionsComposeState,
+  POLYMARKET_CLOSED_POSITIONS_ENDPOINT_ID,
+} from "@/lib/polymarketLive/closedPositionsCompose";
+import {
+  applyPolymarketClosedPositionsRows,
+  fetchPolymarketClosedPositionsRows,
+} from "@/lib/polymarketLive/polymarketClosedPositionsPull";
+import {
+  emptyPolymarketUserActivityComposeState,
+  normalizePolymarketUserActivityComposeState,
+  POLYMARKET_USER_ACTIVITY_ENDPOINT_ID,
+} from "@/lib/polymarketLive/userActivityCompose";
+import {
+  applyPolymarketUserActivityRows,
+  fetchPolymarketUserActivityRows,
+} from "@/lib/polymarketLive/polymarketUserActivityPull";
+import {
+  emptyPolymarketHolderPositionValueComposeState,
+  normalizePolymarketHolderPositionValueComposeState,
+  POLYMARKET_HOLDER_POSITION_VALUE_ENDPOINT_ID,
+} from "@/lib/polymarketLive/holderPositionValueCompose";
+import {
+  applyPolymarketHolderPositionValueRows,
+  fetchPolymarketHolderPositionValueRows,
+} from "@/lib/polymarketLive/polymarketHolderPositionValuePull";
+import {
+  emptyPolymarketHolderTradesComposeState,
+  normalizePolymarketHolderTradesComposeState,
+  POLYMARKET_HOLDER_TRADES_ENDPOINT_ID,
+} from "@/lib/polymarketLive/holderTradesCompose";
+import {
+  applyPolymarketHolderTradesRows,
+  fetchPolymarketHolderTradesRows,
+} from "@/lib/polymarketLive/polymarketHolderTradesPull";
+import {
+  emptyPolymarketHolderTradedMarketsComposeState,
+  normalizePolymarketHolderTradedMarketsComposeState,
+  POLYMARKET_HOLDER_TRADED_MARKETS_ENDPOINT_ID,
+} from "@/lib/polymarketLive/holderTradedMarketsCompose";
+import {
+  applyPolymarketHolderTradedMarketsRows,
+  fetchPolymarketHolderTradedMarketsRows,
+} from "@/lib/polymarketLive/polymarketHolderTradedMarketsPull";
+import {
+  emptyPolymarketTraderLeaderboardComposeState,
+  normalizePolymarketTraderLeaderboardComposeState,
+  POLYMARKET_TRADER_LEADERBOARD_ENDPOINT_ID,
+} from "@/lib/polymarketLive/traderLeaderboardCompose";
+import {
+  applyPolymarketTraderLeaderboardRows,
+  fetchPolymarketTraderLeaderboardRows,
+} from "@/lib/polymarketLive/polymarketTraderLeaderboardPull";
 import { attachPolymarketLiveRequestMetadata } from "@/lib/polymarketLive/polymarketLiveRequestHistory";
 import {
   applyPolymarketOpenInterestRows,
@@ -542,6 +605,16 @@ const Polymarket = ({ setConnectedData, requestSheetDestination, connectHomePull
     const isLastTradePricesCompose = endpointId === POLYMARKET_LAST_TRADE_PRICES_ENDPOINT_ID;
     const isPricesHistoryCompose = endpointId === POLYMARKET_PRICES_HISTORY_ENDPOINT_ID;
     const isPublicProfilesCompose = endpointId === POLYMARKET_PUBLIC_PROFILES_ENDPOINT_ID;
+    const isCurrentPositionsCompose = endpointId === POLYMARKET_CURRENT_POSITIONS_ENDPOINT_ID;
+    const isClosedPositionsCompose = endpointId === POLYMARKET_CLOSED_POSITIONS_ENDPOINT_ID;
+    const isUserActivityCompose = endpointId === POLYMARKET_USER_ACTIVITY_ENDPOINT_ID;
+    const isHolderPositionValueCompose =
+      endpointId === POLYMARKET_HOLDER_POSITION_VALUE_ENDPOINT_ID;
+    const isHolderTradesCompose = endpointId === POLYMARKET_HOLDER_TRADES_ENDPOINT_ID;
+    const isHolderTradedMarketsCompose =
+      endpointId === POLYMARKET_HOLDER_TRADED_MARKETS_ENDPOINT_ID;
+    const isTraderLeaderboardCompose =
+      endpointId === POLYMARKET_TRADER_LEADERBOARD_ENDPOINT_ID;
     const isEventsStyleCompose = isEventsCompose || isMarketsByEventsCompose;
     const isComposeEndpoint =
       isEventsStyleCompose ||
@@ -556,7 +629,14 @@ const Polymarket = ({ setConnectedData, requestSheetDestination, connectHomePull
       isSpreadsCompose ||
       isLastTradePricesCompose ||
       isPricesHistoryCompose ||
-      isPublicProfilesCompose;
+      isPublicProfilesCompose ||
+      isCurrentPositionsCompose ||
+      isClosedPositionsCompose ||
+      isUserActivityCompose ||
+      isHolderPositionValueCompose ||
+      isHolderTradesCompose ||
+      isHolderTradedMarketsCompose ||
+      isTraderLeaderboardCompose;
     const endpoint = isEventsStyleCompose
       ? ENDPOINTS.find((e) => e.query === "listEvents")
       : isMarketsCompose
@@ -591,6 +671,48 @@ const Polymarket = ({ setConnectedData, requestSheetDestination, connectHomePull
                                   name: "Get public profile(s)",
                                   params: [],
                                 }
+                              : isCurrentPositionsCompose
+                                ? {
+                                    query: POLYMARKET_CURRENT_POSITIONS_ENDPOINT_ID,
+                                    name: "Current Holder Positions",
+                                    params: [],
+                                  }
+                                : isClosedPositionsCompose
+                                  ? {
+                                      query: POLYMARKET_CLOSED_POSITIONS_ENDPOINT_ID,
+                                      name: "Holder's Closed Positions",
+                                      params: [],
+                                    }
+                                  : isUserActivityCompose
+                                    ? {
+                                        query: POLYMARKET_USER_ACTIVITY_ENDPOINT_ID,
+                                        name: "User Activity",
+                                        params: [],
+                                      }
+                                    : isHolderPositionValueCompose
+                                      ? {
+                                          query: POLYMARKET_HOLDER_POSITION_VALUE_ENDPOINT_ID,
+                                          name: "Total Value of Holder's Positions",
+                                          params: [],
+                                        }
+                                      : isHolderTradesCompose
+                                        ? {
+                                            query: POLYMARKET_HOLDER_TRADES_ENDPOINT_ID,
+                                            name: "Holder Trades",
+                                            params: [],
+                                          }
+                                        : isHolderTradedMarketsCompose
+                                          ? {
+                                              query: POLYMARKET_HOLDER_TRADED_MARKETS_ENDPOINT_ID,
+                                              name: "Total Markets Traded",
+                                              params: [],
+                                            }
+                                          : isTraderLeaderboardCompose
+                                            ? {
+                                                query: POLYMARKET_TRADER_LEADERBOARD_ENDPOINT_ID,
+                                                name: "Trader Leaderboard Rankings",
+                                                params: [],
+                                              }
         : ENDPOINTS.find((e) => e.query === endpointId);
     if (!endpoint && !isComposeEndpoint) {
       setConnectDataLakePullState?.((prev) => ({
@@ -626,6 +748,556 @@ const Polymarket = ({ setConnectedData, requestSheetDestination, connectHomePull
         }));
         return;
       }
+    }
+
+    if (isHolderTradesCompose) {
+      const compose = normalizePolymarketHolderTradesComposeState(
+        contextStateV2?.providerValue?.connectPolymarketLiveHolderTradesCompose ||
+          emptyPolymarketHolderTradesComposeState(),
+      );
+      setConnectDataLakePullState?.((prev) => ({
+        ...prev,
+        loading: true,
+        error: null,
+        label: "Pulling holder trades…",
+        progress: Math.max(Number(prev.progress) || 0, 10),
+      }));
+
+      void (async () => {
+        const pullStartMs =
+          typeof performance !== "undefined" && performance?.now ? performance.now() : Date.now();
+        trackDataPullStart({
+          integration: "polymarket",
+          endpoint: POLYMARKET_HOLDER_TRADES_ENDPOINT_ID,
+          sampleLabel: "Holder Trades",
+        });
+        try {
+          const fetched = await fetchPolymarketHolderTradesRows(compose, {
+            selectedColumns: cols,
+          });
+          const elapsedMs =
+            (typeof performance !== "undefined" && performance?.now ? performance.now() : Date.now()) -
+            pullStartMs;
+          const ctx = {
+            ...contextStateV2,
+            setConnectedData,
+            addNewSheetAndActivate,
+            setSheetData,
+            setDataSheets: contextStateV2?.setDataSheets,
+          };
+          applyPolymarketHolderTradesRows(ctx, fetched.rows, {
+            addresses: fetched.addresses,
+            selectedColumns: cols,
+            requestParams: fetched.requestParams,
+            elapsedMs,
+          });
+          setLastRequestAt(Date.now());
+          setThrottleRemaining(COOLDOWN_MS);
+          setConnectDataLakePullState?.((prev) => ({
+            ...prev,
+            loading: false,
+            label: "",
+            progress: 100,
+            error: fetched.failures.length
+              ? `${fetched.failures.length} holder request(s) failed; ${fetched.rows.length} trades loaded.`
+              : null,
+          }));
+          trackDataPullComplete({
+            integration: "polymarket",
+            endpoint: POLYMARKET_HOLDER_TRADES_ENDPOINT_ID,
+            sampleLabel: "Holder Trades",
+            rowCount: fetched.rows.length,
+            elapsedMs,
+          });
+        } catch (error) {
+          const message = error instanceof Error ? error.message : "Request failed";
+          trackDataPullError({
+            message,
+            integration: "polymarket",
+            source: "polymarket.getHolderTrades",
+            meta: { endpoint: POLYMARKET_HOLDER_TRADES_ENDPOINT_ID },
+          });
+          setConnectDataLakePullState?.((prev) => ({
+            ...prev,
+            loading: false,
+            error: message,
+            label: "",
+            progress: 0,
+          }));
+        }
+      })();
+      return;
+    }
+
+    if (isHolderTradedMarketsCompose) {
+      const compose = normalizePolymarketHolderTradedMarketsComposeState(
+        contextStateV2?.providerValue?.connectPolymarketLiveHolderTradedMarketsCompose ||
+          emptyPolymarketHolderTradedMarketsComposeState(),
+      );
+      setConnectDataLakePullState?.((prev) => ({
+        ...prev,
+        loading: true,
+        error: null,
+        label: "Pulling traded market totals…",
+        progress: Math.max(Number(prev.progress) || 0, 10),
+      }));
+
+      void (async () => {
+        const pullStartMs =
+          typeof performance !== "undefined" && performance?.now ? performance.now() : Date.now();
+        trackDataPullStart({
+          integration: "polymarket",
+          endpoint: POLYMARKET_HOLDER_TRADED_MARKETS_ENDPOINT_ID,
+          sampleLabel: "Total Markets Traded",
+        });
+        try {
+          const fetched = await fetchPolymarketHolderTradedMarketsRows(compose, {
+            selectedColumns: cols,
+          });
+          const elapsedMs =
+            (typeof performance !== "undefined" && performance?.now ? performance.now() : Date.now()) -
+            pullStartMs;
+          const ctx = {
+            ...contextStateV2,
+            setConnectedData,
+            addNewSheetAndActivate,
+            setSheetData,
+            setDataSheets: contextStateV2?.setDataSheets,
+          };
+          applyPolymarketHolderTradedMarketsRows(ctx, fetched.rows, {
+            addresses: fetched.addresses,
+            selectedColumns: cols,
+            requestParams: fetched.requestParams,
+            elapsedMs,
+          });
+          setLastRequestAt(Date.now());
+          setThrottleRemaining(COOLDOWN_MS);
+          setConnectDataLakePullState?.((prev) => ({
+            ...prev,
+            loading: false,
+            label: "",
+            progress: 100,
+            error: fetched.failures.length
+              ? `${fetched.failures.length} holder request(s) failed; ${fetched.rows.length} row(s) loaded.`
+              : null,
+          }));
+          trackDataPullComplete({
+            integration: "polymarket",
+            endpoint: POLYMARKET_HOLDER_TRADED_MARKETS_ENDPOINT_ID,
+            sampleLabel: "Total Markets Traded",
+            rowCount: fetched.rows.length,
+            elapsedMs,
+          });
+        } catch (error) {
+          const message = error instanceof Error ? error.message : "Request failed";
+          trackDataPullError({
+            message,
+            integration: "polymarket",
+            source: "polymarket.getHolderTradedMarkets",
+            meta: { endpoint: POLYMARKET_HOLDER_TRADED_MARKETS_ENDPOINT_ID },
+          });
+          setConnectDataLakePullState?.((prev) => ({
+            ...prev,
+            loading: false,
+            error: message,
+            label: "",
+            progress: 0,
+          }));
+        }
+      })();
+      return;
+    }
+
+    if (isTraderLeaderboardCompose) {
+      const compose = normalizePolymarketTraderLeaderboardComposeState(
+        contextStateV2?.providerValue?.connectPolymarketLiveTraderLeaderboardCompose ||
+          emptyPolymarketTraderLeaderboardComposeState(),
+      );
+      setConnectDataLakePullState?.((prev) => ({
+        ...prev,
+        loading: true,
+        error: null,
+        label: "Pulling trader leaderboard…",
+        progress: Math.max(Number(prev.progress) || 0, 10),
+      }));
+
+      void (async () => {
+        const pullStartMs =
+          typeof performance !== "undefined" && performance?.now ? performance.now() : Date.now();
+        trackDataPullStart({
+          integration: "polymarket",
+          endpoint: POLYMARKET_TRADER_LEADERBOARD_ENDPOINT_ID,
+          sampleLabel: "Trader Leaderboard Rankings",
+        });
+        try {
+          const fetched = await fetchPolymarketTraderLeaderboardRows(compose, {
+            selectedColumns: cols,
+          });
+          const elapsedMs =
+            (typeof performance !== "undefined" && performance?.now ? performance.now() : Date.now()) -
+            pullStartMs;
+          const ctx = {
+            ...contextStateV2,
+            setConnectedData,
+            addNewSheetAndActivate,
+            setSheetData,
+            setDataSheets: contextStateV2?.setDataSheets,
+          };
+          applyPolymarketTraderLeaderboardRows(ctx, fetched.rows, {
+            selectedColumns: cols,
+            requestParams: fetched.requestParams,
+            elapsedMs,
+          });
+          setLastRequestAt(Date.now());
+          setThrottleRemaining(COOLDOWN_MS);
+          setConnectDataLakePullState?.((prev) => ({
+            ...prev,
+            loading: false,
+            label: "",
+            progress: 100,
+            error: null,
+          }));
+          trackDataPullComplete({
+            integration: "polymarket",
+            endpoint: POLYMARKET_TRADER_LEADERBOARD_ENDPOINT_ID,
+            sampleLabel: "Trader Leaderboard Rankings",
+            rowCount: fetched.rows.length,
+            elapsedMs,
+          });
+        } catch (error) {
+          const message = error instanceof Error ? error.message : "Request failed";
+          trackDataPullError({
+            message,
+            integration: "polymarket",
+            source: "polymarket.getTraderLeaderboard",
+            meta: { endpoint: POLYMARKET_TRADER_LEADERBOARD_ENDPOINT_ID },
+          });
+          setConnectDataLakePullState?.((prev) => ({
+            ...prev,
+            loading: false,
+            error: message,
+            label: "",
+            progress: 0,
+          }));
+        }
+      })();
+      return;
+    }
+
+    if (isHolderPositionValueCompose) {
+      const compose = normalizePolymarketHolderPositionValueComposeState(
+        contextStateV2?.providerValue?.connectPolymarketLiveHolderPositionValueCompose ||
+          emptyPolymarketHolderPositionValueComposeState(),
+      );
+      setConnectDataLakePullState?.((prev) => ({
+        ...prev,
+        loading: true,
+        error: null,
+        label: "Pulling holder position values…",
+        progress: Math.max(Number(prev.progress) || 0, 10),
+      }));
+
+      void (async () => {
+        const pullStartMs =
+          typeof performance !== "undefined" && performance?.now ? performance.now() : Date.now();
+        trackDataPullStart({
+          integration: "polymarket",
+          endpoint: POLYMARKET_HOLDER_POSITION_VALUE_ENDPOINT_ID,
+          sampleLabel: "Total Value of Holder's Positions",
+        });
+        try {
+          const fetched = await fetchPolymarketHolderPositionValueRows(compose, {
+            selectedColumns: cols,
+          });
+          const elapsedMs =
+            (typeof performance !== "undefined" && performance?.now ? performance.now() : Date.now()) -
+            pullStartMs;
+          const ctx = {
+            ...contextStateV2,
+            setConnectedData,
+            addNewSheetAndActivate,
+            setSheetData,
+            setDataSheets: contextStateV2?.setDataSheets,
+          };
+          applyPolymarketHolderPositionValueRows(ctx, fetched.rows, {
+            addresses: fetched.addresses,
+            selectedColumns: cols,
+            requestParams: fetched.requestParams,
+            elapsedMs,
+          });
+          setLastRequestAt(Date.now());
+          setThrottleRemaining(COOLDOWN_MS);
+          setConnectDataLakePullState?.((prev) => ({
+            ...prev,
+            loading: false,
+            label: "",
+            progress: 100,
+            error: fetched.failures.length
+              ? `${fetched.failures.length} holder request(s) failed; ${fetched.rows.length} values loaded.`
+              : null,
+          }));
+          trackDataPullComplete({
+            integration: "polymarket",
+            endpoint: POLYMARKET_HOLDER_POSITION_VALUE_ENDPOINT_ID,
+            sampleLabel: "Total Value of Holder's Positions",
+            rowCount: fetched.rows.length,
+            elapsedMs,
+          });
+        } catch (error) {
+          const message = error instanceof Error ? error.message : "Request failed";
+          trackDataPullError({
+            message,
+            integration: "polymarket",
+            source: "polymarket.getHolderPositionValue",
+            meta: { endpoint: POLYMARKET_HOLDER_POSITION_VALUE_ENDPOINT_ID },
+          });
+          setConnectDataLakePullState?.((prev) => ({
+            ...prev,
+            loading: false,
+            error: message,
+            label: "",
+            progress: 0,
+          }));
+        }
+      })();
+      return;
+    }
+
+    if (isUserActivityCompose) {
+      const compose = normalizePolymarketUserActivityComposeState(
+        contextStateV2?.providerValue?.connectPolymarketLiveUserActivityCompose ||
+          emptyPolymarketUserActivityComposeState(),
+      );
+      setConnectDataLakePullState?.((prev) => ({
+        ...prev,
+        loading: true,
+        error: null,
+        label: "Pulling user activity…",
+        progress: Math.max(Number(prev.progress) || 0, 10),
+      }));
+
+      void (async () => {
+        const pullStartMs =
+          typeof performance !== "undefined" && performance?.now ? performance.now() : Date.now();
+        trackDataPullStart({
+          integration: "polymarket",
+          endpoint: POLYMARKET_USER_ACTIVITY_ENDPOINT_ID,
+          sampleLabel: "User Activity",
+        });
+        try {
+          const fetched = await fetchPolymarketUserActivityRows(compose, {
+            selectedColumns: cols,
+          });
+          const elapsedMs =
+            (typeof performance !== "undefined" && performance?.now ? performance.now() : Date.now()) -
+            pullStartMs;
+          const ctx = {
+            ...contextStateV2,
+            setConnectedData,
+            addNewSheetAndActivate,
+            setSheetData,
+            setDataSheets: contextStateV2?.setDataSheets,
+          };
+          applyPolymarketUserActivityRows(ctx, fetched.rows, {
+            addresses: fetched.addresses,
+            selectedColumns: cols,
+            requestParams: fetched.requestParams,
+            elapsedMs,
+          });
+          setLastRequestAt(Date.now());
+          setThrottleRemaining(COOLDOWN_MS);
+          setConnectDataLakePullState?.((prev) => ({
+            ...prev,
+            loading: false,
+            label: "",
+            progress: 100,
+            error: fetched.failures.length
+              ? `${fetched.failures.length} user request(s) failed; ${fetched.rows.length} activities loaded.`
+              : null,
+          }));
+          trackDataPullComplete({
+            integration: "polymarket",
+            endpoint: POLYMARKET_USER_ACTIVITY_ENDPOINT_ID,
+            sampleLabel: "User Activity",
+            rowCount: fetched.rows.length,
+            elapsedMs,
+          });
+        } catch (error) {
+          const message = error instanceof Error ? error.message : "Request failed";
+          trackDataPullError({
+            message,
+            integration: "polymarket",
+            source: "polymarket.getUserActivity",
+            meta: { endpoint: POLYMARKET_USER_ACTIVITY_ENDPOINT_ID },
+          });
+          setConnectDataLakePullState?.((prev) => ({
+            ...prev,
+            loading: false,
+            error: message,
+            label: "",
+            progress: 0,
+          }));
+        }
+      })();
+      return;
+    }
+
+    if (isClosedPositionsCompose) {
+      const compose = normalizePolymarketClosedPositionsComposeState(
+        contextStateV2?.providerValue?.connectPolymarketLiveClosedPositionsCompose ||
+          emptyPolymarketClosedPositionsComposeState(),
+      );
+      setConnectDataLakePullState?.((prev) => ({
+        ...prev,
+        loading: true,
+        error: null,
+        label: "Pulling closed holder positions…",
+        progress: Math.max(Number(prev.progress) || 0, 10),
+      }));
+
+      void (async () => {
+        const pullStartMs =
+          typeof performance !== "undefined" && performance?.now ? performance.now() : Date.now();
+        trackDataPullStart({
+          integration: "polymarket",
+          endpoint: POLYMARKET_CLOSED_POSITIONS_ENDPOINT_ID,
+          sampleLabel: "Holder's Closed Positions",
+        });
+        try {
+          const fetched = await fetchPolymarketClosedPositionsRows(compose, {
+            selectedColumns: cols,
+          });
+          const elapsedMs =
+            (typeof performance !== "undefined" && performance?.now ? performance.now() : Date.now()) -
+            pullStartMs;
+          const ctx = {
+            ...contextStateV2,
+            setConnectedData,
+            addNewSheetAndActivate,
+            setSheetData,
+            setDataSheets: contextStateV2?.setDataSheets,
+          };
+          applyPolymarketClosedPositionsRows(ctx, fetched.rows, {
+            addresses: fetched.addresses,
+            selectedColumns: cols,
+            requestParams: fetched.requestParams,
+            elapsedMs,
+          });
+          setLastRequestAt(Date.now());
+          setThrottleRemaining(COOLDOWN_MS);
+          setConnectDataLakePullState?.((prev) => ({
+            ...prev,
+            loading: false,
+            label: "",
+            progress: 100,
+            error: fetched.failures.length
+              ? `${fetched.failures.length} holder request(s) failed; ${fetched.rows.length} closed positions loaded.`
+              : null,
+          }));
+          trackDataPullComplete({
+            integration: "polymarket",
+            endpoint: POLYMARKET_CLOSED_POSITIONS_ENDPOINT_ID,
+            sampleLabel: "Holder's Closed Positions",
+            rowCount: fetched.rows.length,
+            elapsedMs,
+          });
+        } catch (error) {
+          const message = error instanceof Error ? error.message : "Request failed";
+          trackDataPullError({
+            message,
+            integration: "polymarket",
+            source: "polymarket.getClosedPositions",
+            meta: { endpoint: POLYMARKET_CLOSED_POSITIONS_ENDPOINT_ID },
+          });
+          setConnectDataLakePullState?.((prev) => ({
+            ...prev,
+            loading: false,
+            error: message,
+            label: "",
+            progress: 0,
+          }));
+        }
+      })();
+      return;
+    }
+
+    if (isCurrentPositionsCompose) {
+      const compose = normalizePolymarketCurrentPositionsComposeState(
+        contextStateV2?.providerValue?.connectPolymarketLiveCurrentPositionsCompose ||
+          emptyPolymarketCurrentPositionsComposeState(),
+      );
+      setConnectDataLakePullState?.((prev) => ({
+        ...prev,
+        loading: true,
+        error: null,
+        label: "Pulling current holder positions…",
+        progress: Math.max(Number(prev.progress) || 0, 10),
+      }));
+
+      void (async () => {
+        const pullStartMs =
+          typeof performance !== "undefined" && performance?.now ? performance.now() : Date.now();
+        trackDataPullStart({
+          integration: "polymarket",
+          endpoint: POLYMARKET_CURRENT_POSITIONS_ENDPOINT_ID,
+          sampleLabel: "Current Holder Positions",
+        });
+        try {
+          const fetched = await fetchPolymarketCurrentPositionsRows(compose, {
+            selectedColumns: cols,
+          });
+          const elapsedMs =
+            (typeof performance !== "undefined" && performance?.now ? performance.now() : Date.now()) -
+            pullStartMs;
+          const ctx = {
+            ...contextStateV2,
+            setConnectedData,
+            addNewSheetAndActivate,
+            setSheetData,
+            setDataSheets: contextStateV2?.setDataSheets,
+          };
+          applyPolymarketCurrentPositionsRows(ctx, fetched.rows, {
+            addresses: fetched.addresses,
+            selectedColumns: cols,
+            requestParams: fetched.requestParams,
+            elapsedMs,
+          });
+          setLastRequestAt(Date.now());
+          setThrottleRemaining(COOLDOWN_MS);
+          setConnectDataLakePullState?.((prev) => ({
+            ...prev,
+            loading: false,
+            label: "",
+            progress: 100,
+            error: fetched.failures.length
+              ? `${fetched.failures.length} holder request(s) failed; ${fetched.rows.length} positions loaded.`
+              : null,
+          }));
+          trackDataPullComplete({
+            integration: "polymarket",
+            endpoint: POLYMARKET_CURRENT_POSITIONS_ENDPOINT_ID,
+            sampleLabel: "Current Holder Positions",
+            rowCount: fetched.rows.length,
+            elapsedMs,
+          });
+        } catch (error) {
+          const message = error instanceof Error ? error.message : "Request failed";
+          trackDataPullError({
+            message,
+            integration: "polymarket",
+            source: "polymarket.getCurrentPositions",
+            meta: { endpoint: POLYMARKET_CURRENT_POSITIONS_ENDPOINT_ID },
+          });
+          setConnectDataLakePullState?.((prev) => ({
+            ...prev,
+            loading: false,
+            error: message,
+            label: "",
+            progress: 0,
+          }));
+        }
+      })();
+      return;
     }
 
     if (isPublicProfilesCompose) {

@@ -61,11 +61,39 @@ import {
   POLYMARKET_PUBLIC_PROFILES_COLUMNS,
   POLYMARKET_PUBLIC_PROFILES_ENDPOINT_ID,
 } from "@/lib/polymarketLive/publicProfilesCompose";
+import {
+  POLYMARKET_CURRENT_POSITIONS_COLUMNS,
+  POLYMARKET_CURRENT_POSITIONS_ENDPOINT_ID,
+} from "@/lib/polymarketLive/currentPositionsCompose";
+import {
+  POLYMARKET_CLOSED_POSITIONS_COLUMNS,
+  POLYMARKET_CLOSED_POSITIONS_ENDPOINT_ID,
+} from "@/lib/polymarketLive/closedPositionsCompose";
+import {
+  POLYMARKET_USER_ACTIVITY_COLUMNS,
+  POLYMARKET_USER_ACTIVITY_ENDPOINT_ID,
+} from "@/lib/polymarketLive/userActivityCompose";
+import {
+  POLYMARKET_HOLDER_POSITION_VALUE_COLUMNS,
+  POLYMARKET_HOLDER_POSITION_VALUE_ENDPOINT_ID,
+} from "@/lib/polymarketLive/holderPositionValueCompose";
+import {
+  POLYMARKET_HOLDER_TRADES_COLUMNS,
+  POLYMARKET_HOLDER_TRADES_ENDPOINT_ID,
+} from "@/lib/polymarketLive/holderTradesCompose";
+import {
+  POLYMARKET_HOLDER_TRADED_MARKETS_COLUMNS,
+  POLYMARKET_HOLDER_TRADED_MARKETS_ENDPOINT_ID,
+} from "@/lib/polymarketLive/holderTradedMarketsCompose";
+import {
+  POLYMARKET_TRADER_LEADERBOARD_COLUMNS,
+  POLYMARKET_TRADER_LEADERBOARD_ENDPOINT_ID,
+} from "@/lib/polymarketLive/traderLeaderboardCompose";
 
 /**
  * Top-level Polymarket Live endpoint groups (hub column tags).
  * Order matches Polymarket API surface: markets → orderbooks → events → series →
- * holders → trades → builders → sports → combos → live.
+ * holders → leaderboard → trades → live.
  */
 export const POLYMARKET_LIVE_ENDPOINT_CATEGORIES = [
   { id: "markets", label: "Markets" },
@@ -73,10 +101,8 @@ export const POLYMARKET_LIVE_ENDPOINT_CATEGORIES = [
   { id: "events", label: "Events" },
   { id: "series", label: "Series" },
   { id: "holders", label: "Holders" },
+  { id: "leaderboard", label: "Leaderboard" },
   { id: "trades", label: "Trades" },
-  { id: "builders", label: "Builders" },
-  { id: "sports", label: "Sports" },
-  { id: "combos", label: "Combos" },
   { id: "live", label: "Live" },
 ];
 
@@ -97,6 +123,7 @@ const HIDDEN_EVENT_ENDPOINT_IDS = new Set([
   "getOpenInterest",
   "getLiveVolume",
   "getTradesByMarket",
+  "getTradesByUser",
   "getPricesHistory",
 ]);
 
@@ -127,6 +154,13 @@ const ENDPOINT_CATEGORY_BY_QUERY = {
   [POLYMARKET_LAST_TRADE_PRICES_ENDPOINT_ID]: "trades",
   [POLYMARKET_PRICES_HISTORY_ENDPOINT_ID]: "trades",
   [POLYMARKET_PUBLIC_PROFILES_ENDPOINT_ID]: "holders",
+  [POLYMARKET_CURRENT_POSITIONS_ENDPOINT_ID]: "holders",
+  [POLYMARKET_CLOSED_POSITIONS_ENDPOINT_ID]: "holders",
+  [POLYMARKET_USER_ACTIVITY_ENDPOINT_ID]: "holders",
+  [POLYMARKET_HOLDER_POSITION_VALUE_ENDPOINT_ID]: "holders",
+  [POLYMARKET_HOLDER_TRADES_ENDPOINT_ID]: "holders",
+  [POLYMARKET_HOLDER_TRADED_MARKETS_ENDPOINT_ID]: "holders",
+  [POLYMARKET_TRADER_LEADERBOARD_ENDPOINT_ID]: "leaderboard",
   getTopHolders: "holders",
   getTradesByMarket: "holders",
   getTradesByUser: "holders",
@@ -156,48 +190,6 @@ const PLACEHOLDER_ENDPOINTS = [
     category: "series",
     title: "Get series by ID",
     description: "Fetch a single series by ID, including nested events.",
-    underConstruction: true,
-  },
-  {
-    id: "builderLeaderboard",
-    category: "builders",
-    title: "Builder leaderboard",
-    description: "Aggregated builder volume and rankings across Polymarket.",
-    underConstruction: true,
-  },
-  {
-    id: "builderVolume",
-    category: "builders",
-    title: "Daily builder volume",
-    description: "Daily builder volume time-series for routed order flow.",
-    underConstruction: true,
-  },
-  {
-    id: "sportsMetadata",
-    category: "sports",
-    title: "Sports metadata",
-    description: "Sports leagues and metadata used to discover sports markets.",
-    underConstruction: true,
-  },
-  {
-    id: "sportsMarketTypes",
-    category: "sports",
-    title: "Sports market types",
-    description: "Valid sports market types (spreads, totals, moneyline, etc.).",
-    underConstruction: true,
-  },
-  {
-    id: "listTeams",
-    category: "sports",
-    title: "List teams",
-    description: "Sports teams metadata for filtering and labeling markets.",
-    underConstruction: true,
-  },
-  {
-    id: "getComboMarkets",
-    category: "combos",
-    title: "Combo markets",
-    description: "Active markets that can be used as combo legs, ordered by volume.",
     underConstruction: true,
   },
 ];
@@ -305,6 +297,54 @@ export const POLYMARKET_LIVE_CONNECT_ENDPOINTS = [
       "Get public profiles directly by proxy wallet or user address — no market discovery required.",
   },
   {
+    id: POLYMARKET_CURRENT_POSITIONS_ENDPOINT_ID,
+    category: "holders",
+    title: "Current Holder Positions",
+    description:
+      "Get current positions for one or more holder addresses, optionally filtered by markets, events, size, status, or title.",
+  },
+  {
+    id: POLYMARKET_CLOSED_POSITIONS_ENDPOINT_ID,
+    category: "holders",
+    title: "Holder's Closed Positions",
+    description:
+      "Get closed positions for one or more holder addresses, optionally filtered by markets, events, or title.",
+  },
+  {
+    id: POLYMARKET_USER_ACTIVITY_ENDPOINT_ID,
+    category: "holders",
+    title: "User Activity",
+    description:
+      "Get activity for one or more user addresses, filtered by markets, events, activity types, dates, or trade side.",
+  },
+  {
+    id: POLYMARKET_HOLDER_POSITION_VALUE_ENDPOINT_ID,
+    category: "holders",
+    title: "Total Value of Holder's Positions",
+    description:
+      "Get the total value of positions for one or more holder addresses, optionally limited to specific markets.",
+  },
+  {
+    id: POLYMARKET_HOLDER_TRADES_ENDPOINT_ID,
+    category: "holders",
+    title: "Holder Trades",
+    description:
+      "Get trades for one or more holder addresses, filtered by markets, events, side, amount, or time.",
+  },
+  {
+    id: POLYMARKET_HOLDER_TRADED_MARKETS_ENDPOINT_ID,
+    category: "holders",
+    title: "Total Markets Traded",
+    description: "Get the total number of markets each holder address has traded.",
+  },
+  {
+    id: POLYMARKET_TRADER_LEADERBOARD_ENDPOINT_ID,
+    category: "leaderboard",
+    title: "Trader Leaderboard Rankings",
+    description:
+      "Rank traders by profit and loss or volume, filtered by category and time period.",
+  },
+  {
     id: POLYMARKET_OPEN_INTEREST_COMPOSE_ENDPOINT_ID,
     category: "markets",
     title: "Get Open Interest",
@@ -383,6 +423,27 @@ export function getPolymarketLiveColumnsForEndpoint(endpointQuery) {
   }
   if (id === POLYMARKET_PUBLIC_PROFILES_ENDPOINT_ID) {
     return POLYMARKET_PUBLIC_PROFILES_COLUMNS;
+  }
+  if (id === POLYMARKET_CURRENT_POSITIONS_ENDPOINT_ID) {
+    return POLYMARKET_CURRENT_POSITIONS_COLUMNS;
+  }
+  if (id === POLYMARKET_CLOSED_POSITIONS_ENDPOINT_ID) {
+    return POLYMARKET_CLOSED_POSITIONS_COLUMNS;
+  }
+  if (id === POLYMARKET_USER_ACTIVITY_ENDPOINT_ID) {
+    return POLYMARKET_USER_ACTIVITY_COLUMNS;
+  }
+  if (id === POLYMARKET_HOLDER_POSITION_VALUE_ENDPOINT_ID) {
+    return POLYMARKET_HOLDER_POSITION_VALUE_COLUMNS;
+  }
+  if (id === POLYMARKET_HOLDER_TRADES_ENDPOINT_ID) {
+    return POLYMARKET_HOLDER_TRADES_COLUMNS;
+  }
+  if (id === POLYMARKET_HOLDER_TRADED_MARKETS_ENDPOINT_ID) {
+    return POLYMARKET_HOLDER_TRADED_MARKETS_COLUMNS;
+  }
+  if (id === POLYMARKET_TRADER_LEADERBOARD_ENDPOINT_ID) {
+    return POLYMARKET_TRADER_LEADERBOARD_COLUMNS;
   }
   const ep = ENDPOINTS.find((e) => e.query === id);
   if (ep?.responseFields?.length) {

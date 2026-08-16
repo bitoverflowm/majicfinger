@@ -211,6 +211,48 @@ export const StateProviderV2 = ({children, initialSettings}) => {
           null
         ),
       );
+    const [connectPolymarketLiveCurrentPositionsCompose, setConnectPolymarketLiveCurrentPositionsCompose] =
+      useState(
+        /** @type {import("@/lib/polymarketLive/currentPositionsCompose").PolymarketCurrentPositionsComposeState | null} */ (
+          null
+        ),
+      );
+    const [connectPolymarketLiveClosedPositionsCompose, setConnectPolymarketLiveClosedPositionsCompose] =
+      useState(
+        /** @type {import("@/lib/polymarketLive/closedPositionsCompose").PolymarketClosedPositionsComposeState | null} */ (
+          null
+        ),
+      );
+    const [connectPolymarketLiveUserActivityCompose, setConnectPolymarketLiveUserActivityCompose] =
+      useState(
+        /** @type {ReturnType<typeof import("@/lib/polymarketLive/userActivityCompose").emptyPolymarketUserActivityComposeState> | null} */ (
+          null
+        ),
+      );
+    const [connectPolymarketLiveHolderPositionValueCompose, setConnectPolymarketLiveHolderPositionValueCompose] =
+      useState(
+        /** @type {ReturnType<typeof import("@/lib/polymarketLive/holderPositionValueCompose").emptyPolymarketHolderPositionValueComposeState> | null} */ (
+          null
+        ),
+      );
+    const [connectPolymarketLiveHolderTradesCompose, setConnectPolymarketLiveHolderTradesCompose] =
+      useState(
+        /** @type {ReturnType<typeof import("@/lib/polymarketLive/holderTradesCompose").emptyPolymarketHolderTradesComposeState> | null} */ (
+          null
+        ),
+      );
+    const [connectPolymarketLiveHolderTradedMarketsCompose, setConnectPolymarketLiveHolderTradedMarketsCompose] =
+      useState(
+        /** @type {ReturnType<typeof import("@/lib/polymarketLive/holderTradedMarketsCompose").emptyPolymarketHolderTradedMarketsComposeState> | null} */ (
+          null
+        ),
+      );
+    const [connectPolymarketLiveTraderLeaderboardCompose, setConnectPolymarketLiveTraderLeaderboardCompose] =
+      useState(
+        /** @type {ReturnType<typeof import("@/lib/polymarketLive/traderLeaderboardCompose").emptyPolymarketTraderLeaderboardComposeState> | null} */ (
+          null
+        ),
+      );
     /** Connect home live stream symbol (chainlink pair or binance symbol). */
     const [connectLiveSourceId, setConnectLiveSourceId] = useState("");
     /** Connect home live stream column picks keyed by symbol id. */
@@ -960,6 +1002,13 @@ export const StateProviderV2 = ({children, initialSettings}) => {
         setConnectPolymarketLiveLastTradePricesCompose(null);
         setConnectPolymarketLivePricesHistoryCompose(null);
         setConnectPolymarketLivePublicProfilesCompose(null);
+        setConnectPolymarketLiveCurrentPositionsCompose(null);
+        setConnectPolymarketLiveClosedPositionsCompose(null);
+        setConnectPolymarketLiveUserActivityCompose(null);
+        setConnectPolymarketLiveHolderPositionValueCompose(null);
+        setConnectPolymarketLiveHolderTradesCompose(null);
+        setConnectPolymarketLiveHolderTradedMarketsCompose(null);
+        setConnectPolymarketLiveTraderLeaderboardCompose(null);
         setConnectLiveSourceId("");
         setConnectLiveColumnSelections({});
         setConnectKalshiLiveEndpointId("");
@@ -1085,6 +1134,13 @@ export const StateProviderV2 = ({children, initialSettings}) => {
       setConnectPolymarketLiveLastTradePricesCompose(null);
       setConnectPolymarketLivePricesHistoryCompose(null);
       setConnectPolymarketLivePublicProfilesCompose(null);
+      setConnectPolymarketLiveCurrentPositionsCompose(null);
+      setConnectPolymarketLiveClosedPositionsCompose(null);
+      setConnectPolymarketLiveUserActivityCompose(null);
+      setConnectPolymarketLiveHolderPositionValueCompose(null);
+      setConnectPolymarketLiveHolderTradesCompose(null);
+      setConnectPolymarketLiveHolderTradedMarketsCompose(null);
+      setConnectPolymarketLiveTraderLeaderboardCompose(null);
       setConnectLiveSourceId("");
       setConnectLiveColumnSelections({});
       setConnectKalshiLiveEndpointId("");
@@ -1361,8 +1417,15 @@ export const StateProviderV2 = ({children, initialSettings}) => {
 
     // Memoize the context value to optimize performance
     const providerValue = useMemo(() => ({
-        settings, setSettings, viewing, setViewing, connectedData, setConnectedData, connectedCols, setConnectedCols, dataTypes, setDataTypes, dataTypeMismatch, setDataTypeMismatch
-    }), [settings, viewing, connectedCols, dataTypes, dataTypeMismatch]);
+        settings, setSettings, viewing, setViewing, connectedData, setConnectedData, connectedCols, setConnectedCols, dataTypes, setDataTypes, dataTypeMismatch, setDataTypeMismatch,
+        connectPolymarketLiveCurrentPositionsCompose, setConnectPolymarketLiveCurrentPositionsCompose,
+        connectPolymarketLiveClosedPositionsCompose, setConnectPolymarketLiveClosedPositionsCompose,
+        connectPolymarketLiveUserActivityCompose, setConnectPolymarketLiveUserActivityCompose,
+        connectPolymarketLiveHolderPositionValueCompose, setConnectPolymarketLiveHolderPositionValueCompose,
+        connectPolymarketLiveHolderTradesCompose, setConnectPolymarketLiveHolderTradesCompose,
+        connectPolymarketLiveHolderTradedMarketsCompose, setConnectPolymarketLiveHolderTradedMarketsCompose,
+        connectPolymarketLiveTraderLeaderboardCompose, setConnectPolymarketLiveTraderLeaderboardCompose,
+    }), [settings, viewing, connectedCols, dataTypes, dataTypeMismatch, connectPolymarketLiveCurrentPositionsCompose, connectPolymarketLiveClosedPositionsCompose, connectPolymarketLiveUserActivityCompose, connectPolymarketLiveHolderPositionValueCompose, connectPolymarketLiveHolderTradesCompose, connectPolymarketLiveHolderTradedMarketsCompose, connectPolymarketLiveTraderLeaderboardCompose]);
     
 
     useEffect(() => {

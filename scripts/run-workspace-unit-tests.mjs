@@ -55,6 +55,13 @@ import "@/lib/polymarketLive/spreadsCompose.test.js";
 import "@/lib/polymarketLive/lastTradePricesCompose.test.js";
 import "@/lib/polymarketLive/pricesHistoryCompose.test.js";
 import "@/lib/polymarketLive/publicProfilesCompose.test.js";
+import "@/lib/polymarketLive/currentPositionsCompose.test.js";
+import "@/lib/polymarketLive/closedPositionsCompose.test.js";
+import "@/lib/polymarketLive/userActivityCompose.test.js";
+import "@/lib/polymarketLive/holderPositionValueCompose.test.js";
+import "@/lib/polymarketLive/holderTradesCompose.test.js";
+import "@/lib/polymarketLive/holderTradedMarketsCompose.test.js";
+import "@/lib/polymarketLive/traderLeaderboardCompose.test.js";
 import "@/lib/polymarketLive/polymarketLiveRequestHistory.test.js";
 import "@/lib/polymarketLive/polymarketPublicSearch.test.js";
 

@@ -30,6 +30,13 @@ const ENDPOINT_TITLE_FALLBACKS = {
   [POLYMARKET_PRICES_HISTORY_ENDPOINT_ID]: "Trade History",
   [POLYMARKET_ORDERBOOKS_ENDPOINT_ID]: "Orderbook(s)",
   getPublicProfiles: "Get public profile(s)",
+  getCurrentPositions: "Current Holder Positions",
+  getClosedPositions: "Holder's Closed Positions",
+  getUserActivity: "User Activity",
+  getHolderPositionValue: "Total Value of Holder's Positions",
+  getHolderTrades: "Holder Trades",
+  getHolderTradedMarkets: "Total Markets Traded",
+  getTraderLeaderboard: "Trader Leaderboard Rankings",
 };
 
 export function genPolymarketLiveRequestCardId() {
@@ -150,6 +157,7 @@ export function formatPolymarketLiveQueryParamsCompact(params, opts = {}) {
  * @param {string[]} [input.selectedColumns]
  * @param {string[]} [input.tokenIds]
  * @param {string[]} [input.addresses]
+ * @param {Record<string, string>} [input.requestParams]
  * @param {string} [input.outcomeSelection]
  * @param {boolean} [input.separateSheetPerOutcome]
  * @param {string} [input.startTs]
@@ -191,6 +199,9 @@ export function buildPolymarketLiveQueryMeta(input) {
   if (marketSummary.marketIds.length) queryValues.market_ids = marketSummary.marketIds.join(",");
   if (marketSummary.marketSlugs.length) queryValues.market_slugs = marketSummary.marketSlugs.join(",");
   if (addresses.length) queryValues.addresses = addresses.join(",");
+  if (input?.requestParams && typeof input.requestParams === "object") {
+    Object.assign(queryValues, input.requestParams);
+  }
   if (Array.isArray(input?.selectedColumns) && input.selectedColumns.length) {
     queryValues.fields = input.selectedColumns.map((c) => String(c || "").trim()).filter(Boolean).join(",");
   }
