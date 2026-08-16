@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 
 import { POLYMARKET_MARKET_PRICES_ENDPOINT_ID } from "@/lib/polymarketLive/marketPricesCompose.js";
+import { POLYMARKET_PRICES_HISTORY_ENDPOINT_ID } from "@/lib/polymarketLive/pricesHistoryCompose.js";
 import {
   buildPolymarketLiveQueryMeta,
   buildPolymarketLiveRequestCard,
@@ -104,4 +105,29 @@ import { integrationLabelFromLake } from "@/lib/connectHomeRequestQuery.js";
   assert.equal(described.marketLabel, "Election winner");
   assert.equal(card.loadedRowCount, 1);
   console.log("ok describe polymarket live request card");
+}
+
+{
+  const meta = buildPolymarketLiveQueryMeta({
+    endpointId: POLYMARKET_PRICES_HISTORY_ENDPOINT_ID,
+    mode: "search",
+    marketRefs: [
+      { id: "1", title: "Will it rain?", tokenIds: ["yes", "no"] },
+      { id: "2", title: "Will it snow?", tokenIds: ["y2", "n2"] },
+    ],
+    outcomeSelection: "both",
+    startTs: "1700000000",
+    endTs: "1700086400",
+    interval: "1d",
+    fidelity: 5,
+    tokenIds: ["yes", "no", "y2", "n2"],
+  });
+  assert.equal(meta.categoryLabel, "Trades");
+  assert.equal(meta.endpointTitle, "Price History");
+  assert.equal(meta.marketScope, "multi");
+  assert.ok(meta.queryParams.some((p) => p.key === "outcome" && p.value === "BOTH"));
+  assert.ok(meta.queryParams.some((p) => p.key === "start_ts" && p.value === "1700000000"));
+  assert.ok(meta.queryParams.some((p) => p.key === "interval" && p.value === "1d"));
+  assert.ok(meta.queryParams.some((p) => p.key === "fidelity" && p.value === "5"));
+  console.log("ok polymarket live price history trades query meta");
 }

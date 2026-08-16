@@ -53,17 +53,22 @@ import {
   POLYMARKET_LAST_TRADE_PRICES_COLUMNS,
   POLYMARKET_LAST_TRADE_PRICES_ENDPOINT_ID,
 } from "@/lib/polymarketLive/lastTradePricesCompose";
+import {
+  POLYMARKET_PRICES_HISTORY_COLUMNS,
+  POLYMARKET_PRICES_HISTORY_ENDPOINT_ID,
+} from "@/lib/polymarketLive/pricesHistoryCompose";
 
 /**
  * Top-level Polymarket Live endpoint groups (hub column tags).
  * Order matches Polymarket API surface: markets → events → series → holders →
- * builders → sports → combos → live.
+ * trades → builders → sports → combos → live.
  */
 export const POLYMARKET_LIVE_ENDPOINT_CATEGORIES = [
   { id: "markets", label: "Markets" },
   { id: "events", label: "Events" },
   { id: "series", label: "Series" },
   { id: "holders", label: "Holders" },
+  { id: "trades", label: "Trades" },
   { id: "builders", label: "Builders" },
   { id: "sports", label: "Sports" },
   { id: "combos", label: "Combos" },
@@ -87,6 +92,7 @@ const HIDDEN_EVENT_ENDPOINT_IDS = new Set([
   "getOpenInterest",
   "getLiveVolume",
   "getTradesByMarket",
+  "getPricesHistory",
 ]);
 
 /** @type {Record<string, string>} */
@@ -97,7 +103,7 @@ const ENDPOINT_CATEGORY_BY_QUERY = {
   getMarketTags: "markets",
   getOpenInterest: "markets",
   getLiveVolume: "markets",
-  getPricesHistory: "markets",
+  getPricesHistory: "trades",
   listEvents: "events",
   getEvent: "events",
   getEventBySlug: "events",
@@ -113,7 +119,8 @@ const ENDPOINT_CATEGORY_BY_QUERY = {
   [POLYMARKET_MARKET_PRICES_ENDPOINT_ID]: "markets",
   [POLYMARKET_MIDPOINT_PRICES_ENDPOINT_ID]: "markets",
   [POLYMARKET_SPREADS_ENDPOINT_ID]: "markets",
-  [POLYMARKET_LAST_TRADE_PRICES_ENDPOINT_ID]: "markets",
+  [POLYMARKET_LAST_TRADE_PRICES_ENDPOINT_ID]: "trades",
+  [POLYMARKET_PRICES_HISTORY_ENDPOINT_ID]: "trades",
   getTopHolders: "holders",
   getTradesByMarket: "holders",
   getTradesByUser: "holders",
@@ -245,10 +252,17 @@ export const POLYMARKET_LIVE_CONNECT_ENDPOINTS = [
   },
   {
     id: POLYMARKET_LAST_TRADE_PRICES_ENDPOINT_ID,
-    category: "markets",
+    category: "trades",
     title: "Last Trade Prices",
     description:
       "Last trade price and side for a specific Market outcome",
+  },
+  {
+    id: POLYMARKET_PRICES_HISTORY_ENDPOINT_ID,
+    category: "trades",
+    title: "Price History",
+    description:
+      "Discover market(s), choose YES / NO / both outcomes, then pull historical prices — optional metadata sheet plus one history sheet per market.",
   },
   {
     id: POLYMARKET_MARKETS_BY_EVENTS_ENDPOINT_ID,
@@ -351,6 +365,9 @@ export function getPolymarketLiveColumnsForEndpoint(endpointQuery) {
   }
   if (id === POLYMARKET_LAST_TRADE_PRICES_ENDPOINT_ID) {
     return POLYMARKET_LAST_TRADE_PRICES_COLUMNS;
+  }
+  if (id === POLYMARKET_PRICES_HISTORY_ENDPOINT_ID) {
+    return POLYMARKET_PRICES_HISTORY_COLUMNS;
   }
   const ep = ENDPOINTS.find((e) => e.query === id);
   if (ep?.responseFields?.length) {

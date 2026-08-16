@@ -17,6 +17,7 @@ import { POLYMARKET_MARKET_PRICES_ENDPOINT_ID } from "@/lib/polymarketLive/marke
 import { POLYMARKET_MIDPOINT_PRICES_ENDPOINT_ID } from "@/lib/polymarketLive/midpointPricesCompose";
 import { POLYMARKET_SPREADS_ENDPOINT_ID } from "@/lib/polymarketLive/spreadsCompose";
 import { POLYMARKET_LAST_TRADE_PRICES_ENDPOINT_ID } from "@/lib/polymarketLive/lastTradePricesCompose";
+import { POLYMARKET_PRICES_HISTORY_ENDPOINT_ID } from "@/lib/polymarketLive/pricesHistoryCompose";
 
 export const POLYMARKET_LIVE_LAKE = "polymarket-live";
 
@@ -26,6 +27,7 @@ const ENDPOINT_TITLE_FALLBACKS = {
   [POLYMARKET_MIDPOINT_PRICES_ENDPOINT_ID]: "Midpoint Prices",
   [POLYMARKET_SPREADS_ENDPOINT_ID]: "Spreads",
   [POLYMARKET_LAST_TRADE_PRICES_ENDPOINT_ID]: "Last Trade Prices",
+  [POLYMARKET_PRICES_HISTORY_ENDPOINT_ID]: "Price History",
   [POLYMARKET_ORDERBOOKS_ENDPOINT_ID]: "Orderbook(s)",
 };
 
@@ -147,6 +149,10 @@ export function formatPolymarketLiveQueryParamsCompact(params, opts = {}) {
  * @param {string[]} [input.selectedColumns]
  * @param {string[]} [input.tokenIds]
  * @param {string} [input.outcomeSelection]
+ * @param {string} [input.startTs]
+ * @param {string} [input.endTs]
+ * @param {string} [input.interval]
+ * @param {number|string} [input.fidelity]
  */
 export function buildPolymarketLiveQueryMeta(input) {
   const endpointId = String(input?.endpointId || "").trim();
@@ -165,6 +171,12 @@ export function buildPolymarketLiveQueryMeta(input) {
   }
   if (input?.outcomeSelection) {
     queryValues.outcome = String(input.outcomeSelection).toUpperCase();
+  }
+  if (input?.startTs) queryValues.start_ts = String(input.startTs);
+  if (input?.endTs) queryValues.end_ts = String(input.endTs);
+  if (input?.interval) queryValues.interval = String(input.interval);
+  if (input?.fidelity != null && String(input.fidelity).trim() !== "") {
+    queryValues.fidelity = String(input.fidelity);
   }
   if (tokenIds.length) queryValues.token_ids = tokenIds.join(",");
   if (marketSummary.marketIds.length) queryValues.market_ids = marketSummary.marketIds.join(",");
@@ -304,6 +316,10 @@ export function buildPolymarketLiveProvenance(input) {
         : undefined,
     selectedColumns: Array.isArray(input?.selectedColumns) ? input.selectedColumns : [],
     outcomeSelection: input?.outcomeSelection || undefined,
+    startTs: input?.startTs || undefined,
+    endTs: input?.endTs || undefined,
+    interval: input?.interval || undefined,
+    fidelity: input?.fidelity != null ? input.fidelity : undefined,
     tokenIds: meta.tokenIds,
     marketNames: meta.marketNames,
     queryParams: meta.queryParams,
@@ -321,7 +337,7 @@ export function attachPolymarketLiveRequestMetadata(ctx, input) {
   const setDataSheets = ctx?.setDataSheets;
   if (typeof setDataSheets !== "function") return null;
 
-  const preferredSheetId = String(ctx?.activeSheetId || input?.sheetId || "").trim();
+  const preferredSheetId = String(input?.sheetId || ctx?.activeSheetId || "").trim();
   const loadedRowCount = Number.isFinite(input?.loadedRowCount)
     ? Number(input.loadedRowCount)
     : undefined;

@@ -148,6 +148,16 @@ import {
 } from "@/lib/polymarketLive/lastTradePricesCompose";
 import { fetchPolymarketLastTradePricesRows } from "@/lib/polymarketLive/polymarketLastTradePricesPull";
 import {
+  emptyPolymarketPricesHistoryComposeState,
+  normalizePolymarketPricesHistoryComposeState,
+  POLYMARKET_PRICES_HISTORY_ENDPOINT_ID,
+} from "@/lib/polymarketLive/pricesHistoryCompose";
+import {
+  createPolymarketPricesHistoryWaterfallWriter,
+  fetchPolymarketPricesHistoryRows,
+} from "@/lib/polymarketLive/polymarketPricesHistoryPull";
+import { attachPolymarketLiveRequestMetadata } from "@/lib/polymarketLive/polymarketLiveRequestHistory";
+import {
   applyPolymarketOpenInterestRows,
   fetchPolymarketOpenInterestRows,
 } from "@/lib/polymarketLive/polymarketOpenInterestPull";
@@ -521,6 +531,7 @@ const Polymarket = ({ setConnectedData, requestSheetDestination, connectHomePull
     const isMidpointPricesCompose = endpointId === POLYMARKET_MIDPOINT_PRICES_ENDPOINT_ID;
     const isSpreadsCompose = endpointId === POLYMARKET_SPREADS_ENDPOINT_ID;
     const isLastTradePricesCompose = endpointId === POLYMARKET_LAST_TRADE_PRICES_ENDPOINT_ID;
+    const isPricesHistoryCompose = endpointId === POLYMARKET_PRICES_HISTORY_ENDPOINT_ID;
     const isEventsStyleCompose = isEventsCompose || isMarketsByEventsCompose;
     const isComposeEndpoint =
       isEventsStyleCompose ||
@@ -533,7 +544,8 @@ const Polymarket = ({ setConnectedData, requestSheetDestination, connectHomePull
       isMarketPricesCompose ||
       isMidpointPricesCompose ||
       isSpreadsCompose ||
-      isLastTradePricesCompose;
+      isLastTradePricesCompose ||
+      isPricesHistoryCompose;
     const endpoint = isEventsStyleCompose
       ? ENDPOINTS.find((e) => e.query === "listEvents")
       : isMarketsCompose
@@ -556,6 +568,12 @@ const Polymarket = ({ setConnectedData, requestSheetDestination, connectHomePull
                         ? { query: POLYMARKET_SPREADS_ENDPOINT_ID, name: "Spreads", params: [] }
                         : isLastTradePricesCompose
                           ? { query: POLYMARKET_LAST_TRADE_PRICES_ENDPOINT_ID, name: "Last Trade Prices", params: [] }
+                          : isPricesHistoryCompose
+                            ? {
+                                query: POLYMARKET_PRICES_HISTORY_ENDPOINT_ID,
+                                name: "Price History",
+                                params: [],
+                              }
         : ENDPOINTS.find((e) => e.query === endpointId);
     if (!endpoint && !isComposeEndpoint) {
       setConnectDataLakePullState?.((prev) => ({
@@ -1148,6 +1166,135 @@ const Polymarket = ({ setConnectedData, requestSheetDestination, connectHomePull
             integration: "polymarket",
             source: "polymarket.getLastTradePrices",
             meta: { endpoint: POLYMARKET_LAST_TRADE_PRICES_ENDPOINT_ID },
+          });
+          setConnectDataLakePullState?.((prev) => ({
+            ...prev,
+            loading: false,
+            error: msg,
+            label: "",
+            progress: 0,
+          }));
+        }
+      })();
+      return;
+    }
+
+    if (isPricesHistoryCompose) {
+      const compose = normalizePolymarketPricesHistoryComposeState(
+        contextStateV2?.connectPolymarketLivePricesHistoryCompose ||
+          emptyPolymarketPricesHistoryComposeState(),
+      );
+      if (compose.mode !== "advanced") {
+        setConnectDataLakePullState?.((prev) => ({
+          ...prev,
+          loading: false,
+          error:
+            "Switch to Advanced search to run a price history pull, or select markets and press Go.",
+        }));
+        return;
+      }
+      setConnectDataLakePullState?.((prev) => ({
+        ...prev,
+        loading: true,
+        error: null,
+        label: "Discovering markets, then pulling price history…",
+        progress: Math.max(Number(prev.progress) || 0, 5),
+      }));
+
+      void (async () => {
+        const pullStartMs =
+          typeof performance !== "undefined" && performance?.now ? performance.now() : Date.now();
+        trackDataPullStart({
+          integration: "polymarket",
+          endpoint: POLYMARKET_PRICES_HISTORY_ENDPOINT_ID,
+          sampleLabel: "Price History",
+        });
+        try {
+          const ctx = {
+            ...contextStateV2,
+            setConnectedData,
+            addNewSheetAndActivate,
+            setSheetData,
+            setDataSheets: contextStateV2?.setDataSheets,
+            setActiveSheetId: contextStateV2?.setActiveSheetId,
+          };
+          const requestMeta = {
+            endpointId: POLYMARKET_PRICES_HISTORY_ENDPOINT_ID,
+            mode: "advanced",
+            marketsFilters: compose.marketsFilters,
+            selectedColumns: cols,
+            outcomeSelection: compose.outcomeSelection,
+            startTs: compose.startTs,
+            endTs: compose.endTs,
+            interval: compose.interval,
+            fidelity: compose.fidelity,
+          };
+          const waterfall = createPolymarketPricesHistoryWaterfallWriter(ctx, {
+            sheetLayout: compose.sheetLayout,
+            requestMeta,
+          });
+          const fetched = await fetchPolymarketPricesHistoryRows(compose, {
+            selectedColumns: cols,
+            onMarketRows: (batch) => {
+              waterfall.write(batch);
+              const completed = batch.index + 1;
+              setConnectDataLakePullState?.((prev) => ({
+                ...prev,
+                loading: true,
+                error: null,
+                label: `Pulled price history for ${completed} of ${batch.total} markets…`,
+                progress: Math.max(
+                  Number(prev.progress) || 0,
+                  Math.round(10 + (completed / Math.max(batch.total, 1)) * 85),
+                ),
+              }));
+            },
+          });
+          if (!fetched.byMarket.length) {
+            setConnectDataLakePullState?.((prev) => ({
+              ...prev,
+              loading: false,
+              error: "No price history found for the selected markets.",
+              progress: 0,
+              label: "",
+            }));
+            return;
+          }
+          const elapsedMs =
+            (typeof performance !== "undefined" && performance?.now ? performance.now() : Date.now()) -
+            pullStartMs;
+          for (const sheetId of waterfall.getCreatedSheetIds()) {
+            attachPolymarketLiveRequestMetadata(ctx, {
+              ...requestMeta,
+              sheetId,
+              tokenIds: fetched.tokenIds,
+              marketRefs: fetched.refs,
+              elapsedMs,
+            });
+          }
+          setLastRequestAt(Date.now());
+          setThrottleRemaining(COOLDOWN_MS);
+          setConnectDataLakePullState?.((prev) => ({
+            ...prev,
+            loading: false,
+            label: "",
+            progress: 100,
+            error: null,
+          }));
+          trackDataPullComplete({
+            integration: "polymarket",
+            endpoint: POLYMARKET_PRICES_HISTORY_ENDPOINT_ID,
+            sampleLabel: "Price History",
+            rowCount: fetched.rows.length,
+            elapsedMs,
+          });
+        } catch (e) {
+          const msg = e instanceof Error ? e.message : "Request failed";
+          trackDataPullError({
+            message: msg,
+            integration: "polymarket",
+            source: "polymarket.getBatchPricesHistory",
+            meta: { endpoint: POLYMARKET_PRICES_HISTORY_ENDPOINT_ID },
           });
           setConnectDataLakePullState?.((prev) => ({
             ...prev,

@@ -907,6 +907,70 @@ export default async function handler(req, res) {
   if (!query) return res.status(400).json({ message: "Missing query parameter" });
 
   if (req.method === "POST") {
+    if (query === "getBatchPricesHistory") {
+      try {
+        const rawBody = req.body && typeof req.body === "object" ? req.body : {};
+        const marketsRaw = Array.isArray(rawBody.markets)
+          ? rawBody.markets
+          : Array.isArray(rawBody.token_ids)
+            ? rawBody.token_ids
+            : Array.isArray(rawBody.tokenIds)
+              ? rawBody.tokenIds
+              : null;
+        if (!marketsRaw || !marketsRaw.length) {
+          return res.status(400).json({
+            message: "POST body must include a non-empty markets array of token/asset ids",
+          });
+        }
+        const markets = marketsRaw
+          .map((item) => {
+            if (item && typeof item === "object") {
+              return String(
+                /** @type {Record<string, unknown>} */ (item).token_id ||
+                  /** @type {Record<string, unknown>} */ (item).tokenId ||
+                  /** @type {Record<string, unknown>} */ (item).market ||
+                  "",
+              ).trim();
+            }
+            return String(item ?? "").trim();
+          })
+          .filter(Boolean);
+        if (!markets.length) {
+          return res.status(400).json({
+            message: "POST body must include at least one market token/asset id",
+          });
+        }
+        if (markets.length > 20) {
+          return res.status(400).json({
+            message: "A maximum of 20 market token IDs may be requested per batch-prices-history call",
+          });
+        }
+        /** @type {Record<string, unknown>} */
+        const payload = { markets };
+        const startTs = Number(rawBody.start_ts ?? rawBody.startTs);
+        const endTs = Number(rawBody.end_ts ?? rawBody.endTs);
+        if (Number.isFinite(startTs) && startTs > 0) payload.start_ts = startTs;
+        if (Number.isFinite(endTs) && endTs > 0) payload.end_ts = endTs;
+        const interval = String(rawBody.interval || "").trim();
+        if (interval) payload.interval = interval;
+        const fidelity = Number(rawBody.fidelity);
+        if (Number.isFinite(fidelity) && fidelity > 0) payload.fidelity = Math.floor(fidelity);
+
+        const data = await fetchJson(`${CLOB_BASE}/batch-prices-history`, {
+          method: "POST",
+          headers: {
+            Accept: "application/json",
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(payload),
+        });
+        return res.status(200).json(data);
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : "Request failed";
+        return res.status(502).json({ message: msg });
+      }
+    }
+
     const clobPath = CLOB_BATCH_TOKEN_PATHS[query];
     if (!clobPath) {
       res.setHeader("Allow", "GET");
