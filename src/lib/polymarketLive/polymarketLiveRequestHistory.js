@@ -149,6 +149,7 @@ export function formatPolymarketLiveQueryParamsCompact(params, opts = {}) {
  * @param {string[]} [input.selectedColumns]
  * @param {string[]} [input.tokenIds]
  * @param {string} [input.outcomeSelection]
+ * @param {boolean} [input.separateSheetPerOutcome]
  * @param {string} [input.startTs]
  * @param {string} [input.endTs]
  * @param {string} [input.interval]
@@ -171,6 +172,9 @@ export function buildPolymarketLiveQueryMeta(input) {
   }
   if (input?.outcomeSelection) {
     queryValues.outcome = String(input.outcomeSelection).toUpperCase();
+  }
+  if (input?.separateSheetPerOutcome) {
+    queryValues.separate_sheet_per_outcome = "true";
   }
   if (input?.startTs) queryValues.start_ts = String(input.startTs);
   if (input?.endTs) queryValues.end_ts = String(input.endTs);
@@ -257,6 +261,7 @@ export function buildPolymarketLiveQueryMeta(input) {
  * @param {string[]} [input.selectedColumns]
  * @param {string[]} [input.tokenIds]
  * @param {string} [input.outcomeSelection]
+ * @param {boolean} [input.separateSheetPerOutcome]
  */
 export function buildPolymarketLiveRequestCard(input) {
   const meta = buildPolymarketLiveQueryMeta(input);
@@ -297,6 +302,7 @@ export function buildPolymarketLiveRequestCard(input) {
  * @param {string[]} [input.selectedColumns]
  * @param {string[]} [input.tokenIds]
  * @param {string} [input.outcomeSelection]
+ * @param {boolean} [input.separateSheetPerOutcome]
  */
 export function buildPolymarketLiveProvenance(input) {
   const meta = buildPolymarketLiveQueryMeta(input);
@@ -316,6 +322,7 @@ export function buildPolymarketLiveProvenance(input) {
         : undefined,
     selectedColumns: Array.isArray(input?.selectedColumns) ? input.selectedColumns : [],
     outcomeSelection: input?.outcomeSelection || undefined,
+    separateSheetPerOutcome: input?.separateSheetPerOutcome === true,
     startTs: input?.startTs || undefined,
     endTs: input?.endTs || undefined,
     interval: input?.interval || undefined,

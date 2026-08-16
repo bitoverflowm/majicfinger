@@ -116,6 +116,7 @@ import { integrationLabelFromLake } from "@/lib/connectHomeRequestQuery.js";
       { id: "2", title: "Will it snow?", tokenIds: ["y2", "n2"] },
     ],
     outcomeSelection: "both",
+    separateSheetPerOutcome: true,
     startTs: "1700000000",
     endTs: "1700086400",
     interval: "1d",
@@ -126,6 +127,11 @@ import { integrationLabelFromLake } from "@/lib/connectHomeRequestQuery.js";
   assert.equal(meta.endpointTitle, "Price History");
   assert.equal(meta.marketScope, "multi");
   assert.ok(meta.queryParams.some((p) => p.key === "outcome" && p.value === "BOTH"));
+  assert.ok(
+    meta.queryParams.some(
+      (p) => p.key === "separate_sheet_per_outcome" && p.value === "true",
+    ),
+  );
   assert.ok(meta.queryParams.some((p) => p.key === "start_ts" && p.value === "1700000000"));
   assert.ok(meta.queryParams.some((p) => p.key === "interval" && p.value === "1d"));
   assert.ok(meta.queryParams.some((p) => p.key === "fidelity" && p.value === "5"));

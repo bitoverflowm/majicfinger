@@ -1224,6 +1224,7 @@ const Polymarket = ({ setConnectedData, requestSheetDestination, connectHomePull
             marketsFilters: compose.marketsFilters,
             selectedColumns: cols,
             outcomeSelection: compose.outcomeSelection,
+            separateSheetPerOutcome: compose.separateSheetPerOutcome,
             startTs: compose.windowMode === "date_range" ? compose.startTs : "",
             endTs: compose.windowMode === "date_range" ? compose.endTs : "",
             interval: compose.windowMode === "interval" ? compose.interval : "",

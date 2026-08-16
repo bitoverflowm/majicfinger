@@ -25,6 +25,7 @@ test("prices history compose defaults and normalization", () => {
   const empty = emptyPolymarketPricesHistoryComposeState();
   assert.equal(empty.mode, "search");
   assert.equal(empty.outcomeSelection, "");
+  assert.equal(empty.separateSheetPerOutcome, false);
   assert.equal(empty.windowMode, "interval");
   assert.equal(empty.interval, "max");
   assert.equal(empty.fidelity, 1);
@@ -33,6 +34,7 @@ test("prices history compose defaults and normalization", () => {
   const normalized = normalizePolymarketPricesHistoryComposeState({
     mode: "advanced",
     outcomeSelection: "BOTH",
+    separateSheetPerOutcome: true,
     interval: "1w",
     fidelity: 60,
     startTs: "1700000000",
@@ -40,6 +42,7 @@ test("prices history compose defaults and normalization", () => {
   });
   assert.equal(normalized.mode, "advanced");
   assert.equal(normalized.outcomeSelection, "both");
+  assert.equal(normalized.separateSheetPerOutcome, true);
   assert.equal(normalized.windowMode, "date_range");
   assert.equal(normalized.interval, "1w");
   assert.equal(normalized.fidelity, 60);

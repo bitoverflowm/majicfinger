@@ -208,38 +208,68 @@ export function PolymarketLivePricesHistoryFields({
   );
 
   const outcomeFields = (
-    <div className="space-y-2">
-      <Label className="text-[0.6875rem] font-medium uppercase tracking-wider text-muted-foreground">
-        Outcome
-      </Label>
-      <p className="text-[10px] leading-snug text-muted-foreground">Which market outcome?</p>
-      <ToggleGroup
-        type="single"
-        value={state.outcomeSelection}
-        onValueChange={(value) => {
-          if (value === "yes" || value === "no" || value === "both") {
-            patch({ outcomeSelection: value });
-          }
-        }}
-        className="justify-start"
-        disabled={disabled || searchGoLoading}
-        aria-label="Price history outcomes"
-      >
-        <ToggleGroupItem value="yes" className="h-8 px-3 text-xs">
-          YES
-        </ToggleGroupItem>
-        <ToggleGroupItem value="no" className="h-8 px-3 text-xs">
-          NO
-        </ToggleGroupItem>
-        <ToggleGroupItem value="both" className="h-8 px-3 text-xs">
-          Both
-        </ToggleGroupItem>
-      </ToggleGroup>
-      {!state.outcomeSelection ? (
-        <p className="text-[10px] text-amber-700 dark:text-amber-300">
-          Select YES, NO, or both before pulling.
+    <div className="grid gap-4 sm:grid-cols-2">
+      <div className="space-y-2">
+        <Label className="text-[0.6875rem] font-medium uppercase tracking-wider text-muted-foreground">
+          Outcome
+        </Label>
+        <p className="text-[10px] leading-snug text-muted-foreground">Which market outcome?</p>
+        <ToggleGroup
+          type="single"
+          value={state.outcomeSelection}
+          onValueChange={(value) => {
+            if (value === "yes" || value === "no" || value === "both") {
+              patch({ outcomeSelection: value });
+            }
+          }}
+          className="justify-start"
+          disabled={disabled || searchGoLoading}
+          aria-label="Price history outcomes"
+        >
+          <ToggleGroupItem value="yes" className="h-8 px-3 text-xs">
+            YES
+          </ToggleGroupItem>
+          <ToggleGroupItem value="no" className="h-8 px-3 text-xs">
+            NO
+          </ToggleGroupItem>
+          <ToggleGroupItem value="both" className="h-8 px-3 text-xs">
+            Both
+          </ToggleGroupItem>
+        </ToggleGroup>
+        {!state.outcomeSelection ? (
+          <p className="text-[10px] text-amber-700 dark:text-amber-300">
+            Select YES, NO, or both before pulling.
+          </p>
+        ) : null}
+      </div>
+
+      <div className="space-y-2">
+        <Label className="text-[0.6875rem] font-medium uppercase tracking-wider text-muted-foreground">
+          Separate sheet per outcome?
+        </Label>
+        <p className="text-[10px] leading-snug text-muted-foreground">
+          When Both is selected, put each outcome in its own market sheet.
         </p>
-      ) : null}
+        <ToggleGroup
+          type="single"
+          value={state.separateSheetPerOutcome ? "yes" : "no"}
+          onValueChange={(value) => {
+            if (value === "yes" || value === "no") {
+              patch({ separateSheetPerOutcome: value === "yes" });
+            }
+          }}
+          className="justify-start"
+          disabled={disabled || searchGoLoading}
+          aria-label="Separate price history sheet per outcome"
+        >
+          <ToggleGroupItem value="yes" className="h-8 px-3 text-xs">
+            Yes
+          </ToggleGroupItem>
+          <ToggleGroupItem value="no" className="h-8 px-3 text-xs">
+            No
+          </ToggleGroupItem>
+        </ToggleGroup>
+      </div>
     </div>
   );
 

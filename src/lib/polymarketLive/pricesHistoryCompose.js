@@ -36,6 +36,7 @@ import { selectLastTradePriceOutcomeTokens } from "@/lib/polymarketLive/lastTrad
  *   marketRefs: PolymarketPricesHistoryMarketRef[];
  *   sheetLayout: PolymarketPricesHistorySheetLayout;
  *   outcomeSelection: PolymarketPricesHistoryOutcomeSelection;
+ *   separateSheetPerOutcome: boolean;
  *   windowMode: PolymarketPricesHistoryWindowMode;
  *   startTs: string;
  *   endTs: string;
@@ -216,6 +217,7 @@ export function emptyPolymarketPricesHistoryComposeState() {
     marketRefs: [],
     sheetLayout: POLYMARKET_PRICES_HISTORY_SHEET_LAYOUT_META_PLUS_PER_MARKET,
     outcomeSelection: "",
+    separateSheetPerOutcome: false,
     windowMode: "interval",
     startTs: "",
     endTs: "",
@@ -277,6 +279,7 @@ export function normalizePolymarketPricesHistoryComposeState(raw) {
     marketRefs: /** @type {PolymarketPricesHistoryMarketRef[]} */ (marketRefs),
     sheetLayout: normalizePolymarketPricesHistorySheetLayout(o.sheetLayout),
     outcomeSelection: normalizePolymarketPricesHistoryOutcomeSelection(o.outcomeSelection),
+    separateSheetPerOutcome: o.separateSheetPerOutcome === true,
     windowMode,
     startTs,
     endTs,

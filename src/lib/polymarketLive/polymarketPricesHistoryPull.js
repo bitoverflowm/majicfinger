@@ -138,6 +138,7 @@ async function fetchBatchPricesHistory(tokenIds, params) {
  *     marketKey: string;
  *     sheetName: string;
  *     metadataRow: Record<string, unknown>;
+ *     appendMetadata?: boolean;
  *     rows: Record<string, unknown>[];
  *     index: number;
  *     total: number;
@@ -294,15 +295,46 @@ export async function fetchPolymarketPricesHistoryRows(compose, opts = {}) {
     const rows = flattenPricesHistoryRowsForMarket(historyByToken, ref, pairs, selected);
     metadataRows.push(metadataRow);
     allRows.push(...rows);
-    byMarket.push({ marketKey, sheetName, metadataRow, rows });
-    await opts.onMarketRows?.({
-      marketKey,
-      sheetName,
-      metadataRow,
-      rows,
-      index: i,
-      total: unique.length,
-    });
+    const splitOutcomes = normalized.separateSheetPerOutcome && pairs.length > 1;
+    if (splitOutcomes) {
+      for (let pairIndex = 0; pairIndex < pairs.length; pairIndex++) {
+        const pair = pairs[pairIndex];
+        const outcomeRows = flattenPricesHistoryRowsForMarket(
+          historyByToken,
+          ref,
+          [pair],
+          selected,
+        );
+        const outcomeLabel = String(pair.outcome || `Outcome ${pairIndex + 1}`).trim();
+        const outcomeSheetName = `${sheetName} — ${outcomeLabel}`.slice(0, 80);
+        byMarket.push({
+          marketKey,
+          sheetName: outcomeSheetName,
+          metadataRow,
+          rows: outcomeRows,
+        });
+        await opts.onMarketRows?.({
+          marketKey,
+          sheetName: outcomeSheetName,
+          metadataRow,
+          appendMetadata: pairIndex === 0,
+          rows: outcomeRows,
+          index: i,
+          total: unique.length,
+        });
+      }
+    } else {
+      byMarket.push({ marketKey, sheetName, metadataRow, rows });
+      await opts.onMarketRows?.({
+        marketKey,
+        sheetName,
+        metadataRow,
+        appendMetadata: true,
+        rows,
+        index: i,
+        total: unique.length,
+      });
+    }
   }
 
   if (!byMarket.length) {
@@ -438,6 +470,7 @@ export function createPolymarketPricesHistoryWaterfallWriter(ctx, opts = {}) {
      * @param {{
      *   sheetName?: string;
      *   metadataRow?: Record<string, unknown>;
+     *   appendMetadata?: boolean;
      *   rows?: Record<string, unknown>[];
      * }} batch
      */
@@ -451,7 +484,12 @@ export function createPolymarketPricesHistoryWaterfallWriter(ctx, opts = {}) {
 
       let marketSheetId = null;
       flushSync(() => {
-        if (includeMeta && metadataSheetId && metadataRow) {
+        if (
+          includeMeta &&
+          metadataSheetId &&
+          metadataRow &&
+          batch.appendMetadata !== false
+        ) {
           appendRows(metadataSheetId, [metadataRow]);
         }
 
@@ -512,6 +550,7 @@ export async function applyPolymarketPricesHistorySearchAll(ctx, suggestions, op
     marketRefs: refs,
     selectedColumns: opts.selectedColumns,
     outcomeSelection: compose.outcomeSelection,
+    separateSheetPerOutcome: compose.separateSheetPerOutcome,
     startTs: compose.windowMode === "date_range" ? compose.startTs : "",
     endTs: compose.windowMode === "date_range" ? compose.endTs : "",
     interval: compose.windowMode === "interval" ? compose.interval : "",
