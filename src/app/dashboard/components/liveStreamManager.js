@@ -8,6 +8,7 @@ import { useMyStateV2 } from "@/context/stateContextV2";
 const POLYMARKET_WS_URL =
   process.env.NEXT_PUBLIC_POLYMARKET_WS_URL || "wss://ws-subscriptions-clob.polymarket.com/ws/market";
 const POLYMARKET_PING_MS = 10000;
+const POLYMARKET_MAX_ROWS_PER_STREAM = 2500;
 const CHAINLINK_WS_URL = "wss://ws-live-data.polymarket.com";
 const CHAINLINK_PING_MS = 5000;
 
@@ -15,12 +16,16 @@ const noop = () => {};
 
 function pushRow(setSheetData, sheetId, pausedRef, row) {
   if (pausedRef.current[sheetId]) return;
-  setSheetData(sheetId, (prev) => (Array.isArray(prev) ? [...prev, row] : [row]));
+  setSheetData(sheetId, (prev) =>
+    (Array.isArray(prev) ? [...prev, row] : [row]).slice(-POLYMARKET_MAX_ROWS_PER_STREAM),
+  );
 }
 
 function pushRows(setSheetData, sheetId, pausedRef, rows) {
   if (pausedRef.current[sheetId]) return;
-  setSheetData(sheetId, (prev) => (Array.isArray(prev) ? [...prev, ...rows] : rows));
+  setSheetData(sheetId, (prev) =>
+    (Array.isArray(prev) ? [...prev, ...rows] : rows).slice(-POLYMARKET_MAX_ROWS_PER_STREAM),
+  );
 }
 
 export default function LiveStreamManager() {
@@ -78,7 +83,7 @@ export default function LiveStreamManager() {
   );
 
   const startPolymarket = useCallback(
-    (sheetId, assetIds, eventType) => {
+    (sheetId, assetIds, eventType, options = {}) => {
       if (wsBySheetIdRef.current[sheetId] || !assetIds?.length || !setSheetData) return;
       eventTypeBySheetIdRef.current[sheetId] = eventType;
       intentionalCloseBySheetIdRef.current[sheetId] = false;
@@ -86,8 +91,13 @@ export default function LiveStreamManager() {
       wsBySheetIdRef.current[sheetId] = ws;
 
       ws.onopen = () => {
-        ws.send(JSON.stringify({ assets_ids: assetIds, type: "market", initial_dump: true }));
-        setSheetData(sheetId, []);
+        ws.send(JSON.stringify({
+          assets_ids: assetIds,
+          type: "market",
+          initial_dump: true,
+          custom_feature_enabled: eventType === "best_bid_ask",
+        }));
+        if (!options.preserveExistingRows) setSheetData(sheetId, []);
         const pi = pingIntervalBySheetIdRef.current[sheetId];
         if (pi) clearInterval(pi);
         pingIntervalBySheetIdRef.current[sheetId] = setInterval(() => {
@@ -99,15 +109,36 @@ export default function LiveStreamManager() {
           sheetId,
           assetIds,
           stop: () => stop(sheetId),
-          start: () => start(sheetId, "polymarket", { assetIds, eventType }),
+          start: () =>
+            start(sheetId, "polymarket", {
+              assetIds,
+              eventType,
+              preserveExistingRows: options.preserveExistingRows,
+            }),
           chartPreset: { type: "line", xKey: "time", yKey: "price" },
         });
-        typeConfigBySheetIdRef.current[sheetId] = { type: "polymarket", config: { assetIds, eventType } };
+        typeConfigBySheetIdRef.current[sheetId] = {
+          type: "polymarket",
+          config: {
+            assetIds,
+            eventType,
+            preserveExistingRows: options.preserveExistingRows,
+          },
+        };
         setLiveStreamState((s) => ({
           ...s,
           streamsBySheetId: {
             ...(s.streamsBySheetId || {}),
-            [sheetId]: { type: "polymarket", config: { assetIds, eventType }, isRunning: true, isPaused: false },
+            [sheetId]: {
+              type: "polymarket",
+              config: {
+                assetIds,
+                eventType,
+                preserveExistingRows: options.preserveExistingRows,
+              },
+              isRunning: true,
+              isPaused: false,
+            },
           },
         }));
       };
@@ -121,6 +152,8 @@ export default function LiveStreamManager() {
             const rows = msg.price_changes.map((pc) => {
               const priceNum = pc.price != null ? parseFloat(pc.price) : null;
               return {
+                ...msg,
+                ...pc,
                 event_type: msg.event_type,
                 market: msg.market,
                 timestamp: msg.timestamp,
@@ -139,6 +172,7 @@ export default function LiveStreamManager() {
             const ts = msg.timestamp ? Number(msg.timestamp) : Date.now();
             const priceNum = msg.price != null ? parseFloat(String(msg.price)) : null;
             pushRow(setSheetData, sheetId, pausedBySheetIdRef, {
+              ...msg,
               event_type: msg.event_type,
               market: msg.market ?? "",
               timestamp: msg.timestamp ?? String(ts),
@@ -153,6 +187,7 @@ export default function LiveStreamManager() {
           } else if (et === "book" && msg.event_type === "book" && msg.asset_id) {
             const ts = msg.timestamp ? Number(msg.timestamp) : Date.now();
             pushRow(setSheetData, sheetId, pausedBySheetIdRef, {
+              ...msg,
               event_type: msg.event_type,
               asset_id: msg.asset_id,
               market: msg.market ?? "",
@@ -176,6 +211,7 @@ export default function LiveStreamManager() {
             else if (bestAsk != null && !Number.isNaN(bestAsk)) price = bestAsk;
             if (price != null) {
               pushRow(setSheetData, sheetId, pausedBySheetIdRef, {
+                ...msg,
                 event_type: msg.event_type,
                 market: msg.market ?? "",
                 timestamp: String(ts),
@@ -192,6 +228,7 @@ export default function LiveStreamManager() {
           } else if (et === "tick_size_change" && msg.event_type === "tick_size_change" && msg.asset_id) {
             const ts = msg.timestamp ? Number(msg.timestamp) : Date.now();
             pushRow(setSheetData, sheetId, pausedBySheetIdRef, {
+              ...msg,
               event_type: msg.event_type,
               asset_id: msg.asset_id,
               market: msg.market ?? "",
@@ -203,6 +240,7 @@ export default function LiveStreamManager() {
           } else if (et === "best_bid_ask" && msg.event_type === "best_bid_ask" && msg.asset_id) {
             const ts = msg.timestamp ? Number(msg.timestamp) : Date.now();
             pushRow(setSheetData, sheetId, pausedBySheetIdRef, {
+              ...msg,
               event_type: msg.event_type,
               asset_id: msg.asset_id,
               market: msg.market ?? "",
@@ -381,7 +419,12 @@ export default function LiveStreamManager() {
       stop(sheetId);
       if (!pausedBySheetIdRef.current[sheetId]) pausedBySheetIdRef.current[sheetId] = false;
       if (type === "polymarket" && config?.assetIds?.length) {
-        startPolymarket(sheetId, config.assetIds, config.eventType || "price_change");
+        startPolymarket(
+          sheetId,
+          config.assetIds,
+          config.eventType || "price_change",
+          { preserveExistingRows: !!config.preserveExistingRows },
+        );
       } else if (type === "chainlink" && config?.symbol) {
         startChainlink(sheetId, config.symbol);
       }

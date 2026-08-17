@@ -80,6 +80,7 @@ function suggestionKey(s) {
  *   searchTags?: boolean;
  *   searchProfiles?: boolean;
  *   collectMode?: boolean;
+ *   dismissAfterSelect?: boolean;
  *   selectedItems?: Array<Record<string, unknown>>;
  * }} props
  */
@@ -94,6 +95,7 @@ export function PolymarketLiveSearch({
   searchTags = true,
   searchProfiles = true,
   collectMode = false,
+  dismissAfterSelect = false,
   selectedItems,
 }) {
   const debounceRef = useRef(null);
@@ -213,10 +215,13 @@ export function PolymarketLiveSearch({
     async (s) => {
       setError(null);
       if (collectMode) {
-        // Keep the list open so the row it just added shows as checked, and the
-        // rest of the matches stay pickable.
         try {
           await onSelect(s);
+          if (dismissAfterSelect) {
+            dismissSuggestions();
+            setQ("");
+            setSuggestions([]);
+          }
         } catch (e) {
           setError(e instanceof Error ? e.message : "Failed to add selection");
         }
@@ -232,7 +237,7 @@ export function PolymarketLiveSearch({
         setSelectLoading(false);
       }
     },
-    [collectMode, dismissSuggestions, onSelect],
+    [collectMode, dismissAfterSelect, dismissSuggestions, onSelect],
   );
 
   const handleSubmitAll = useCallback(async () => {

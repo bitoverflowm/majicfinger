@@ -31,6 +31,11 @@ type HubKalshiLiveDemoTradesLivelineProps = {
   paused?: boolean;
   /** Shorter canvas for hero / compact embeds. */
   compact?: boolean;
+  /**
+   * Size strictly to the parent box. Required inside content-sized containers,
+   * where a min-height lets the canvas grow the layout that measures it.
+   */
+  fill?: boolean;
 };
 /** Floor so a sparse first few polls still have room to breathe. */
 const LIVE_WINDOW_MIN_SECS = 45;
@@ -191,6 +196,7 @@ export const HubKalshiLiveDemoTradesLiveline = forwardRef<
   className,
   paused = false,
   compact = false,
+  fill = false,
 }, ref) {
   const dark = useIsDarkTheme();
   const hidden = hiddenSeriesIds ?? new Set<string>();
@@ -268,7 +274,11 @@ export const HubKalshiLiveDemoTradesLiveline = forwardRef<
   return (
     <div
       ref={ref}
-      className={cn("flex h-full min-h-0 w-full flex-1 flex-col", className)}
+      className={cn(
+        "flex h-full min-h-0 w-full flex-1 flex-col",
+        fill && "overflow-hidden",
+        className,
+      )}
     >
       {onToggleSeries ? (
         <HubKalshiLiveDemoTradeSeriesLegend
@@ -312,7 +322,7 @@ export const HubKalshiLiveDemoTradesLiveline = forwardRef<
             className="h-full w-full"
             style={{
               height: "100%",
-              minHeight: compact ? "16rem" : "32rem",
+              minHeight: fill ? 0 : compact ? "16rem" : "32rem",
             }}
           />
         </div>

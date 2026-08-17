@@ -62,6 +62,8 @@ import "@/lib/polymarketLive/holderPositionValueCompose.test.js";
 import "@/lib/polymarketLive/holderTradesCompose.test.js";
 import "@/lib/polymarketLive/holderTradedMarketsCompose.test.js";
 import "@/lib/polymarketLive/traderLeaderboardCompose.test.js";
+import "@/lib/polymarketLive/polymarketRealtimeCompose.test.js";
+import "@/lib/polymarketLive/polymarketRealtimeSeed.test.js";
 import "@/lib/polymarketLive/polymarketLiveRequestHistory.test.js";
 import "@/lib/polymarketLive/polymarketPublicSearch.test.js";
 

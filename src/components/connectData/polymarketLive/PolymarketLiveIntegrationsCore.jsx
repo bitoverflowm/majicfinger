@@ -29,6 +29,8 @@ import { PolymarketLiveHolderPositionValueFields } from "@/components/connectDat
 import { PolymarketLiveHolderTradesFields } from "@/components/connectData/polymarketLive/PolymarketLiveHolderTradesFields";
 import { PolymarketLiveHolderTradedMarketsFields } from "@/components/connectData/polymarketLive/PolymarketLiveHolderTradedMarketsFields";
 import { PolymarketLiveTraderLeaderboardFields } from "@/components/connectData/polymarketLive/PolymarketLiveTraderLeaderboardFields";
+import { PolymarketLiveConnectionWizard } from "@/components/connectData/polymarketLive/PolymarketLiveConnectionWizard";
+import { PolymarketLiveRealtimeDashboard } from "@/components/connectData/polymarketLive/PolymarketLiveRealtimeDashboard";
 import {
   ColumnPicker,
 } from "@/components/connectData/ConnectHomeIntegrationWorkflow";
@@ -168,6 +170,8 @@ import {
   POLYMARKET_TRADER_LEADERBOARD_DEFAULT_COLUMNS,
   POLYMARKET_TRADER_LEADERBOARD_ENDPOINT_ID,
 } from "@/lib/polymarketLive/traderLeaderboardCompose";
+import { POLYMARKET_REALTIME_FEED_OPTIONS } from "@/lib/polymarketLive/polymarketRealtimeCompose";
+import { fetchPolymarketRealtimeSeedRows } from "@/lib/polymarketLive/polymarketRealtimeSeed";
 import {
   applyPolymarketMarketsByEventsSearchAll,
   applyPolymarketMarketsByEventsSearchSelection,
@@ -382,6 +386,26 @@ function LiveSourceOption({ endpoint, isSelected, onSelect }) {
   );
 }
 
+function LiveConnectionStartingOption({ onStart }) {
+  return (
+    <button
+      type="button"
+      onClick={onStart}
+      className="group flex w-full items-center gap-2 rounded-lg border border-secondary/30 bg-secondary/10 p-2.5 text-left transition-all hover:-translate-y-0.5 hover:border-secondary/50 hover:bg-secondary/15 hover:shadow-sm"
+    >
+      <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-secondary/15 text-secondary dark:text-secondary">
+        <Radio className="size-3.5" strokeWidth={1.75} aria-hidden />
+      </span>
+      <div className="min-w-0 flex-1">
+        <p className="text-xs font-semibold text-foreground">Start a new real-time connection</p>
+        <p className="mt-0.5 text-[10px] leading-snug text-muted-foreground">
+          Then pick exactly what you want a live Polymarket feed of.
+        </p>
+      </div>
+    </button>
+  );
+}
+
 /**
  * Polymarket Live compose UI — Kalshi Live–style hub (category tags + endpoints),
  * then column picker for Connect home pulls.
@@ -456,6 +480,9 @@ export function PolymarketLiveIntegrationsCore({ onRunPull, className, stepBackR
   const [endpointCategory, setEndpointCategory] = useState(
     POLYMARKET_LIVE_DEFAULT_ENDPOINT_CATEGORY,
   );
+  const [liveRealtimeMode, setLiveRealtimeMode] = useState("hub");
+  const [liveRealtimeSession, setLiveRealtimeSession] = useState(null);
+  const [liveRealtimeConnecting, setLiveRealtimeConnecting] = useState(false);
 
   const categoryEndpoints = useMemo(
     () => getPolymarketLiveEndpointsForCategory(endpointCategory),
@@ -1321,6 +1348,14 @@ export function PolymarketLiveIntegrationsCore({ onRunPull, className, stepBackR
   useEffect(() => {
     if (!stepBackRef) return;
     stepBackRef.current = () => {
+      if (liveRealtimeMode === "wizard") {
+        setLiveRealtimeMode(liveRealtimeSession ? "dashboard" : "hub");
+        return true;
+      }
+      if (liveRealtimeMode === "dashboard") {
+        setLiveRealtimeMode("hub");
+        return true;
+      }
       if (selectedId) {
         setConnectApiEndpointId?.("");
         return true;
@@ -1330,9 +1365,127 @@ export function PolymarketLiveIntegrationsCore({ onRunPull, className, stepBackR
     return () => {
       if (stepBackRef) stepBackRef.current = null;
     };
-  }, [stepBackRef, selectedId, setConnectApiEndpointId]);
+  }, [
+    liveRealtimeMode,
+    liveRealtimeSession,
+    stepBackRef,
+    selectedId,
+    setConnectApiEndpointId,
+  ]);
 
   const displayLabel = useCallback((col) => col.name, []);
+  const stopRealtimeSession = useCallback(
+    (session = liveRealtimeSession) => {
+      for (const sheetId of Object.values(session?.sheetsByFeed || {})) {
+        ctx.liveStreamActions?.stop?.(sheetId);
+      }
+    },
+    [ctx.liveStreamActions, liveRealtimeSession],
+  );
+  const connectRealtimeSession = useCallback(
+    async (config) => {
+      if (!ctx.addNewSheetAndActivate || !ctx.liveStreamActions?.start) return;
+      setLiveRealtimeConnecting(true);
+      try {
+        stopRealtimeSession();
+        const seed = await fetchPolymarketRealtimeSeedRows(config);
+        const sheetsByFeed = {};
+        const labelByFeed = Object.fromEntries(
+          POLYMARKET_REALTIME_FEED_OPTIONS.map((option) => [option.id, option.label]),
+        );
+        for (const feedType of config.feedTypes) {
+          const seedRows = seed.rowsByFeed[feedType] || [];
+          ctx.addNewSheetAndActivate(
+            (sheetId) => {
+              sheetsByFeed[feedType] = sheetId;
+              ctx.setDataSheets?.((previous) => ({
+                ...(previous || {}),
+                [sheetId]: {
+                  ...(previous?.[sheetId] || { data: [] }),
+                  data: seedRows,
+                  name: `Live · ${labelByFeed[feedType] || feedType}`,
+                  provenance: {
+                    integration: "polymarket-live",
+                    endpointId: feedType,
+                    realtime: true,
+                    seededFromRest: seedRows.length > 0,
+                    seedErrors: seed.errors,
+                    assetIds: config.assetIds,
+                    markets: config.markets.map((market) => ({
+                      id: market.id,
+                      conditionId: market.conditionId,
+                      slug: market.slug,
+                      title: market.title,
+                      selectedOutcomes: market.selectedOutcomes,
+                      selectedTokenIds: market.selectedTokenIds,
+                    })),
+                  },
+                },
+              }));
+              ctx.liveStreamActions.start(sheetId, "polymarket", {
+                assetIds: config.assetIds,
+                eventType: feedType,
+                preserveExistingRows: true,
+              });
+            },
+            { syncActivate: true },
+          );
+        }
+        setLiveRealtimeSession({
+          ...config,
+          sheetsByFeed,
+          seedErrors: seed.errors,
+          seededRowCount: Object.values(seed.rowsByFeed).reduce(
+            (sum, rows) => sum + rows.length,
+            0,
+          ),
+        });
+        setLiveRealtimeMode("dashboard");
+      } finally {
+        setLiveRealtimeConnecting(false);
+      }
+    },
+    [ctx, stopRealtimeSession],
+  );
+  const openRealtimeEditor = useCallback(() => {
+    const firstSheetId = Object.values(liveRealtimeSession?.sheetsByFeed || {})[0];
+    if (firstSheetId) ctx.setActiveSheetId?.(firstSheetId);
+    ctx.setConnectHomeAnalyzeActive?.(true);
+    ctx.setConnectHomeCenterView?.("sheet");
+    ctx.setRightPanelOpen?.(true);
+    ctx.setRightPanelTab?.("charts");
+    ctx.requestConnectAnalyzeScroll?.();
+  }, [ctx, liveRealtimeSession]);
+
+  if (liveRealtimeMode === "wizard") {
+    return (
+      <div className={cn("relative z-20 w-full font-sans", className)}>
+        <PolymarketLiveConnectionWizard
+          initialMarkets={liveRealtimeSession?.markets || []}
+          connecting={liveRealtimeConnecting}
+          onBack={() => setLiveRealtimeMode(liveRealtimeSession ? "dashboard" : "hub")}
+          onConnect={connectRealtimeSession}
+        />
+      </div>
+    );
+  }
+
+  if (liveRealtimeMode === "dashboard" && liveRealtimeSession) {
+    return (
+      <div className={cn("relative z-20 w-full font-sans", className)}>
+        <PolymarketLiveRealtimeDashboard
+          session={liveRealtimeSession}
+          onSubscribeMore={() => setLiveRealtimeMode("wizard")}
+          onOpenEditor={openRealtimeEditor}
+          onStop={() => {
+            stopRealtimeSession();
+            setLiveRealtimeSession(null);
+            setLiveRealtimeMode("hub");
+          }}
+        />
+      </div>
+    );
+  }
 
   return (
     <div className={cn("relative z-20 w-full font-sans space-y-6", className)}>
@@ -1364,6 +1517,9 @@ export function PolymarketLiveIntegrationsCore({ onRunPull, className, stepBackR
             >
               {categoryEndpoints.length > 0 ? (
                 <div className="space-y-1.5">
+                  {endpointCategory === "live" ? (
+                    <LiveConnectionStartingOption onStart={() => setLiveRealtimeMode("wizard")} />
+                  ) : null}
                   {categoryEndpoints.map((endpoint) => (
                     <LiveSourceOption
                       key={endpoint.id}
