@@ -155,7 +155,14 @@ function FeedVisualization({ feedType, rows, market, paused }) {
   if (feedType === "last_trade_price") {
     const series = priceSeries(rows, market);
     return series.some((item) => item.trades.length) ? (
-      <HubKalshiLiveDemoTradesLiveline series={series} paused={paused} compact fill className="min-h-0" />
+      <HubKalshiLiveDemoTradesLiveline
+        series={series}
+        paused={paused}
+        compact
+        fill
+        persistHistory
+        className="min-h-0"
+      />
     ) : (
       <WaitingForData label="Waiting for a live trade…" />
     );
@@ -210,6 +217,7 @@ function FeedVisualization({ feedType, rows, market, paused }) {
           paused={paused}
           compact
           fill
+          persistHistory
           className="min-h-0 flex-1"
         />
       </div>

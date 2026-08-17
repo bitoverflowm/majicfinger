@@ -36,6 +36,12 @@ type HubKalshiLiveDemoTradesLivelineProps = {
    * where a min-height lets the canvas grow the layout that measures it.
    */
   fill?: boolean;
+  /**
+   * Plot every point instead of framing the last seconds of live activity, and
+   * widen the window to cover them. For feeds seeded with REST history, where
+   * the seeded line must stay on screen through quiet stretches.
+   */
+  persistHistory?: boolean;
 };
 /** Floor so a sparse first few polls still have room to breathe. */
 const LIVE_WINDOW_MIN_SECS = 45;
@@ -47,6 +53,12 @@ const LIVE_FOCUS_SECS = 90;
 const LIVE_WINDOW_MAX_SECS = 15 * 60;
 /** Always keep at least this many seed trades visible while waiting for live ticks. */
 const LIVE_SEED_TRADE_COUNT = 20;
+/**
+ * persistHistory framing: wide enough that a seeded line always fills the chart,
+ * narrow enough that individual live ticks still move it.
+ */
+const PERSIST_WINDOW_MAX_SECS = 60 * 60;
+const PERSIST_MAX_POINTS = 3000;
 
 function parseTradeTimeSec(row: TradeRow): number | null {
   const raw = row.created_time ?? row.created_ts ?? row.ts;
@@ -116,6 +128,18 @@ function seedLivePoints(points: { time: number; value: number }[]) {
 }
 
 /**
+ * Liveline needs two points to draw, so a lone reading is widened rather than
+ * dropped — otherwise a seeded series with a single snapshot renders as empty.
+ */
+function persistedPoints(points: { time: number; value: number }[]) {
+  if (points.length === 1) {
+    const only = points[0]!;
+    return [{ time: only.time - 8, value: only.value }, only];
+  }
+  return points.length > PERSIST_MAX_POINTS ? points.slice(-PERSIST_MAX_POINTS) : points;
+}
+
+/**
  * Liveline only renders points inside [now − window, now]. When the last trades
  * are older than that (quiet market / slow first poll), shift them into the
  * viewport while preserving relative spacing so the seed series stays visible.
@@ -140,7 +164,10 @@ function alignPointsToLiveWindow(
   }));
 }
 
-function windowSecsForPoints(pointSets: { time: number; value: number }[][]) {
+function windowSecsForPoints(
+  pointSets: { time: number; value: number }[][],
+  maxSecs: number = LIVE_WINDOW_MAX_SECS,
+) {
   let oldest = Number.POSITIVE_INFINITY;
   let newest = Number.NEGATIVE_INFINITY;
   for (const points of pointSets) {
@@ -157,19 +184,16 @@ function windowSecsForPoints(pointSets: { time: number; value: number }[][]) {
   const nowSec = Date.now() / 1000;
   const spanSecs = Math.max(0, newest - oldest);
   // If seed is stale, use a compact live window — points will be aligned into it.
-  if (newest < nowSec - LIVE_WINDOW_MAX_SECS) {
+  if (newest < nowSec - maxSecs) {
     return Math.min(
-      LIVE_WINDOW_MAX_SECS,
+      maxSecs,
       Math.max(LIVE_WINDOW_MIN_SECS, Math.ceil(spanSecs * 1.25) + 12),
     );
   }
 
   const coverOldest = Math.max(0, nowSec - oldest);
   const padded = Math.ceil(Math.max(spanSecs, coverOldest) * 1.15) + 8;
-  return Math.min(
-    LIVE_WINDOW_MAX_SECS,
-    Math.max(LIVE_WINDOW_MIN_SECS, padded),
-  );
+  return Math.min(maxSecs, Math.max(LIVE_WINDOW_MIN_SECS, padded));
 }
 
 function useIsDarkTheme() {
@@ -197,13 +221,15 @@ export const HubKalshiLiveDemoTradesLiveline = forwardRef<
   paused = false,
   compact = false,
   fill = false,
+  persistHistory = false,
 }, ref) {
   const dark = useIsDarkTheme();
   const hidden = hiddenSeriesIds ?? new Set<string>();
 
   const mapped = useMemo(() => {
     const seeded = series.map((item, index) => {
-      const rawPoints = seedLivePoints(tradesToPoints(item.trades));
+      const points = tradesToPoints(item.trades);
+      const rawPoints = persistHistory ? persistedPoints(points) : seedLivePoints(points);
       const token = item.colorToken ?? defaultSeriesColorToken(index);
       const resolved = resolveDemoChartColor(token);
       const explicit =
@@ -224,6 +250,7 @@ export const HubKalshiLiveDemoTradesLiveline = forwardRef<
 
     const windowSecs = windowSecsForPoints(
       seeded.map((s) => s.rawPoints).filter((p) => p.length > 0),
+      persistHistory ? PERSIST_WINDOW_MAX_SECS : LIVE_WINDOW_MAX_SECS,
     );
 
     return {
@@ -240,7 +267,7 @@ export const HubKalshiLiveDemoTradesLiveline = forwardRef<
         };
       }),
     };
-  }, [series]);
+  }, [persistHistory, series]);
 
   const visible = useMemo(
     () => mapped.series.filter((s) => !hidden.has(s.id) && s.data.length > 0),

@@ -134,7 +134,7 @@ async function fetchHistory(assetIds) {
       method: "POST",
       headers: { Accept: "application/json", "Content-Type": "application/json" },
       credentials: "same-origin",
-      body: JSON.stringify({ markets, interval: "1w", fidelity: 60 }),
+      body: JSON.stringify({ markets, interval: "1d", fidelity: 1 }),
     });
     const payload = await response.json().catch(() => ({}));
     if (!response.ok) {
