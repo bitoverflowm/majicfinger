@@ -2,7 +2,9 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
+  ArrowRight,
   BookOpen,
+  Check,
   Layers,
   Radio,
   Sparkles,
@@ -384,17 +386,21 @@ function LiveConnectionStartingOption({ onStart }) {
     <button
       type="button"
       onClick={onStart}
-      className="group flex w-full items-center gap-2 rounded-lg border border-secondary/30 bg-secondary/10 p-2.5 text-left transition-all hover:-translate-y-0.5 hover:border-secondary/50 hover:bg-secondary/15 hover:shadow-sm"
+      className="group flex w-full items-center gap-2.5 rounded-lg bg-secondary px-3 py-2.5 text-left text-white shadow-sm transition-all hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-secondary focus-visible:ring-offset-2 focus-visible:ring-offset-background"
     >
-      <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-secondary/15 text-secondary dark:text-secondary">
-        <Radio className="size-3.5" strokeWidth={1.75} aria-hidden />
+      <span className="flex size-7 shrink-0 items-center justify-center rounded-full bg-white/20">
+        <Radio className="size-3.5" strokeWidth={2} aria-hidden />
       </span>
-      <div className="min-w-0 flex-1">
-        <p className="text-xs font-semibold text-foreground">Start a new real-time connection</p>
-        <p className="mt-0.5 text-[10px] leading-snug text-muted-foreground">
+      <span className="min-w-0 flex-1">
+        <span className="block text-xs font-semibold">Start a new real-time connection</span>
+        <span className="mt-0.5 block text-[10px] leading-snug text-white/80">
           Then pick exactly what you want a live Polymarket feed of.
-        </p>
-      </div>
+        </span>
+      </span>
+      <ArrowRight
+        className="size-4 shrink-0 transition-transform group-hover:translate-x-0.5"
+        aria-hidden
+      />
     </button>
   );
 }
@@ -483,10 +489,6 @@ export function PolymarketLiveIntegrationsCore({ onRunPull, className, stepBackR
   );
   const hubEndpointCategories = useMemo(
     () => POLYMARKET_LIVE_ENDPOINT_CATEGORIES.filter((category) => category.id !== "live"),
-    [],
-  );
-  const realtimeEndpoints = useMemo(
-    () => getPolymarketLiveEndpointsForCategory("live"),
     [],
   );
 
@@ -1550,19 +1552,53 @@ export function PolymarketLiveIntegrationsCore({ onRunPull, className, stepBackR
               <HubStartingPointColumn
                 icon={Radio}
                 title="Real-time"
-                description="Start a WebSocket connection and choose the markets, outcomes, and live updates you want to follow."
+                description="Get real-time data on live markets, Lychee instantly plots your markets on a dashboard, you can customize however you like."
                 className="h-auto min-h-0 flex-1"
               >
-                <div className="min-h-0 flex-1 space-y-1.5 overflow-y-auto">
+                <div className="min-h-0 flex-1 space-y-3 overflow-y-auto">
                   <LiveConnectionStartingOption onStart={() => setLiveRealtimeMode("wizard")} />
-                  {realtimeEndpoints.map((endpoint) => (
-                    <LiveSourceOption
-                      key={endpoint.id}
-                      endpoint={endpoint}
-                      isSelected={selectedId === endpoint.id}
-                      onSelect={handleSelectEndpoint}
-                    />
-                  ))}
+
+                  <div className="space-y-2">
+                    <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+                      What you can get from Lychee&apos;s Real-time Polymarket integration
+                    </p>
+                    <ul className="space-y-1.5">
+                      {POLYMARKET_REALTIME_FEED_OPTIONS.map((option) => (
+                        <li key={option.id} className="flex gap-1.5">
+                          <Check
+                            className="mt-0.5 size-3 shrink-0 text-emerald-600 dark:text-emerald-400"
+                            strokeWidth={2.5}
+                            aria-hidden
+                          />
+                          <p className="text-[10px] leading-snug text-muted-foreground">
+                            <span className="font-medium text-foreground">{option.label}</span>
+                            {" — "}
+                            {option.description}
+                          </p>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+
+                  <div className="space-y-1.5 border-t border-border/50 pt-2.5">
+                    <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+                      Coming soon
+                    </p>
+                    <ul className="space-y-1">
+                      {["Monitor new market creation", "Monitor market resolutions"].map((label) => (
+                        <li
+                          key={label}
+                          className="flex items-center gap-1.5 text-[10px] leading-snug text-muted-foreground"
+                        >
+                          <span
+                            className="size-1 shrink-0 rounded-full bg-muted-foreground/50"
+                            aria-hidden
+                          />
+                          {label}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
                 </div>
               </HubStartingPointColumn>
             </div>
