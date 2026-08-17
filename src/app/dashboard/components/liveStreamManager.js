@@ -3,6 +3,12 @@
 import { useCallback, useEffect, useRef } from "react";
 import { toast } from "sonner";
 import { useMyStateV2 } from "@/context/stateContextV2";
+import {
+  advancePolymarketCandles,
+  applyPolymarketCandleOverlay,
+  polymarketCandleIntervalMs,
+  upsertPolymarketTradeCandle,
+} from "@/lib/polymarketLive/polymarketCandlesticks";
 
 /** Polymarket CLOB market WS; override with NEXT_PUBLIC_POLYMARKET_WS_URL if Polymarket documents a V2 preview URL. */
 const POLYMARKET_WS_URL =
@@ -45,12 +51,22 @@ export default function LiveStreamManager() {
   const firstDataReceivedBySheetIdRef = useRef({});
   const reconnectTimeoutBySheetIdRef = useRef({});
   const typeConfigBySheetIdRef = useRef({});
+  const candleIntervalBySheetIdRef = useRef({});
+  const candleTimerBySheetIdRef = useRef({});
+  const candleTradeHashesBySheetIdRef = useRef({});
   const stop = useCallback(
     (sheetId) => {
       if (sheetId != null) {
         intentionalCloseBySheetIdRef.current[sheetId] = true;
         delete typeConfigBySheetIdRef.current[sheetId];
         delete firstDataReceivedBySheetIdRef.current[sheetId];
+        delete candleIntervalBySheetIdRef.current[sheetId];
+        delete candleTradeHashesBySheetIdRef.current[sheetId];
+        const candleTimer = candleTimerBySheetIdRef.current[sheetId];
+        if (candleTimer) {
+          clearTimeout(candleTimer);
+          delete candleTimerBySheetIdRef.current[sheetId];
+        }
         const tid = reconnectTimeoutBySheetIdRef.current[sheetId];
         if (tid) {
           clearTimeout(tid);
@@ -86,6 +102,10 @@ export default function LiveStreamManager() {
     (sheetId, assetIds, eventType, options = {}) => {
       if (wsBySheetIdRef.current[sheetId] || !assetIds?.length || !setSheetData) return;
       eventTypeBySheetIdRef.current[sheetId] = eventType;
+      candleIntervalBySheetIdRef.current[sheetId] = options.candleInterval || "5m";
+      if (eventType === "candlesticks" && !candleTradeHashesBySheetIdRef.current[sheetId]) {
+        candleTradeHashesBySheetIdRef.current[sheetId] = new Set();
+      }
       intentionalCloseBySheetIdRef.current[sheetId] = false;
       const ws = new WebSocket(POLYMARKET_WS_URL);
       wsBySheetIdRef.current[sheetId] = ws;
@@ -114,8 +134,12 @@ export default function LiveStreamManager() {
               assetIds,
               eventType,
               preserveExistingRows: options.preserveExistingRows,
+              candleInterval: options.candleInterval,
             }),
-          chartPreset: { type: "line", xKey: "time", yKey: "price" },
+          chartPreset:
+            eventType === "candlesticks"
+              ? { type: "candlestick", xKey: "end_period_ts", yKey: "price_close_dollars" }
+              : { type: "line", xKey: "time", yKey: "price" },
         });
         typeConfigBySheetIdRef.current[sheetId] = {
           type: "polymarket",
@@ -123,6 +147,7 @@ export default function LiveStreamManager() {
             assetIds,
             eventType,
             preserveExistingRows: options.preserveExistingRows,
+            candleInterval: options.candleInterval,
           },
         };
         setLiveStreamState((s) => ({
@@ -135,12 +160,40 @@ export default function LiveStreamManager() {
                 assetIds,
                 eventType,
                 preserveExistingRows: options.preserveExistingRows,
+                candleInterval: options.candleInterval,
               },
               isRunning: true,
               isPaused: false,
             },
           },
         }));
+        if (eventType === "candlesticks") {
+          const oldTimer = candleTimerBySheetIdRef.current[sheetId];
+          if (oldTimer) clearTimeout(oldTimer);
+          const advance = () => {
+            if (pausedBySheetIdRef.current[sheetId]) return;
+            setSheetData(sheetId, (rows) =>
+              advancePolymarketCandles(
+                rows,
+                Date.now(),
+                candleIntervalBySheetIdRef.current[sheetId],
+              ),
+            );
+          };
+          advance();
+          const scheduleAdvance = () => {
+            if (intentionalCloseBySheetIdRef.current[sheetId]) return;
+            const intervalMs = polymarketCandleIntervalMs(
+              candleIntervalBySheetIdRef.current[sheetId],
+            );
+            const delay = intervalMs - (Date.now() % intervalMs) + 25;
+            candleTimerBySheetIdRef.current[sheetId] = setTimeout(() => {
+              advance();
+              scheduleAdvance();
+            }, delay);
+          };
+          scheduleAdvance();
+        }
       };
 
       ws.onmessage = (event) => {
@@ -148,7 +201,38 @@ export default function LiveStreamManager() {
         try {
           const msg = JSON.parse(event.data);
           const et = eventTypeBySheetIdRef.current[sheetId] || "price_change";
-          if (et === "price_change" && msg.event_type === "price_change" && msg.price_changes) {
+          if (et === "candlesticks" && msg.event_type === "last_trade_price" && msg.asset_id) {
+            const transactionHash = String(msg.transaction_hash || "");
+            const seen = candleTradeHashesBySheetIdRef.current[sheetId] || new Set();
+            if (transactionHash && seen.has(transactionHash)) return;
+            if (transactionHash) {
+              seen.add(transactionHash);
+              if (seen.size > 10_000) seen.delete(seen.values().next().value);
+              candleTradeHashesBySheetIdRef.current[sheetId] = seen;
+            }
+            if (!pausedBySheetIdRef.current[sheetId]) {
+              setSheetData(sheetId, (rows) =>
+                upsertPolymarketTradeCandle(
+                  rows,
+                  msg,
+                  candleIntervalBySheetIdRef.current[sheetId],
+                ),
+              );
+            }
+          } else if (
+            et === "candlesticks" &&
+            msg.event_type === "price_change" &&
+            Array.isArray(msg.price_changes)
+          ) {
+            if (!pausedBySheetIdRef.current[sheetId]) {
+              setSheetData(sheetId, (rows) =>
+                msg.price_changes.reduce(
+                  (current, change) => applyPolymarketCandleOverlay(current, change),
+                  rows,
+                ),
+              );
+            }
+          } else if (et === "price_change" && msg.event_type === "price_change" && msg.price_changes) {
             const rows = msg.price_changes.map((pc) => {
               const priceNum = pc.price != null ? parseFloat(pc.price) : null;
               return {
@@ -281,18 +365,44 @@ export default function LiveStreamManager() {
       };
 
       ws.onclose = () => {
+        if (wsBySheetIdRef.current[sheetId] !== ws) return;
         wsBySheetIdRef.current[sheetId] = null;
         const pi = pingIntervalBySheetIdRef.current[sheetId];
         if (pi) {
           clearInterval(pi);
           pingIntervalBySheetIdRef.current[sheetId] = null;
         }
+        const candleTimer = candleTimerBySheetIdRef.current[sheetId];
+        if (candleTimer) {
+          clearTimeout(candleTimer);
+          delete candleTimerBySheetIdRef.current[sheetId];
+        }
+        const intentional = intentionalCloseBySheetIdRef.current[sheetId];
         setPolymarketWsState?.((prev) => (prev?.sheetId === sheetId ? { ...prev, isRunning: false, stop: null } : prev));
         setLiveStreamState((s) => {
           const next = { ...(s.streamsBySheetId || {}) };
-          if (next[sheetId]) next[sheetId] = { ...next[sheetId], isRunning: false };
+          if (next[sheetId]) {
+            next[sheetId] = {
+              ...next[sheetId],
+              isRunning: false,
+              connecting: !intentional,
+              statusMessage: intentional ? "Stopped" : "Reconnecting…",
+            };
+          }
           return { ...s, streamsBySheetId: next };
         });
+        if (!intentional) {
+          const config = typeConfigBySheetIdRef.current[sheetId]?.config;
+          reconnectTimeoutBySheetIdRef.current[sheetId] = setTimeout(() => {
+            reconnectTimeoutBySheetIdRef.current[sheetId] = null;
+            if (!intentionalCloseBySheetIdRef.current[sheetId] && config?.assetIds?.length) {
+              startPolymarket(sheetId, config.assetIds, config.eventType, {
+                preserveExistingRows: true,
+                candleInterval: config.candleInterval,
+              });
+            }
+          }, 1500);
+        }
       };
     },
     [setSheetData, setLiveStreamState, setPolymarketWsState, stop]
@@ -423,7 +533,10 @@ export default function LiveStreamManager() {
           sheetId,
           config.assetIds,
           config.eventType || "price_change",
-          { preserveExistingRows: !!config.preserveExistingRows },
+          {
+            preserveExistingRows: !!config.preserveExistingRows,
+            candleInterval: config.candleInterval,
+          },
         );
       } else if (type === "chainlink" && config?.symbol) {
         startChainlink(sheetId, config.symbol);

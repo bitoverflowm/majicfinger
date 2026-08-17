@@ -1414,6 +1414,8 @@ export function PolymarketLiveIntegrationsCore({ onRunPull, className, stepBackR
                     seededFromRest: seedRows.length > 0,
                     seedErrors: seed.errors,
                     assetIds: config.assetIds,
+                    candleInterval:
+                      feedType === "candlesticks" ? config.candleInterval : undefined,
                     markets: config.markets.map((market) => ({
                       id: market.id,
                       conditionId: market.conditionId,
@@ -1429,6 +1431,7 @@ export function PolymarketLiveIntegrationsCore({ onRunPull, className, stepBackR
                 assetIds: config.assetIds,
                 eventType: feedType,
                 preserveExistingRows: true,
+                candleInterval: config.candleInterval,
               });
             },
             { syncActivate: true },
@@ -1466,6 +1469,7 @@ export function PolymarketLiveIntegrationsCore({ onRunPull, className, stepBackR
         <PolymarketLiveConnectionWizard
           initialMarkets={liveRealtimeSession?.markets || []}
           initialDashboardLayout={liveRealtimeSession?.dashboardLayout || "one_page"}
+          initialCandleInterval={liveRealtimeSession?.candleInterval || "5m"}
           connecting={liveRealtimeConnecting}
           onBack={() => setLiveRealtimeMode(liveRealtimeSession ? "dashboard" : "hub")}
           onConnect={connectRealtimeSession}

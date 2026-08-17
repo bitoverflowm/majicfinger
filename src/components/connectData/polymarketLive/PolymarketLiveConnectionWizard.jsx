@@ -22,17 +22,20 @@ import {
   polymarketRealtimeMarketKey,
   polymarketRealtimeMarketsFromEventSuggestion,
 } from "@/lib/polymarketLive/polymarketRealtimeCompose";
+import { POLYMARKET_CANDLE_INTERVALS } from "@/lib/polymarketLive/polymarketCandlesticks";
 import { cn } from "@/lib/utils";
 
 export function PolymarketLiveConnectionWizard({
   initialMarkets = [],
   initialDashboardLayout = "one_page",
+  initialCandleInterval = "5m",
   onBack,
   onConnect,
   connecting = false,
 }) {
   const [markets, setMarkets] = useState(initialMarkets);
   const [feedTypes, setFeedTypes] = useState(["last_trade_price"]);
+  const [candleInterval, setCandleInterval] = useState(initialCandleInterval);
   const [dashboardLayout, setDashboardLayout] = useState(initialDashboardLayout);
   const [eventPicker, setEventPicker] = useState(null);
   const [eventMarketKeys, setEventMarketKeys] = useState(new Set());
@@ -90,11 +93,18 @@ export function PolymarketLiveConnectionWizard({
   const connect = useCallback(() => {
     setError("");
     try {
-      onConnect(buildPolymarketRealtimeConnection({ markets, feedTypes, dashboardLayout }));
+      onConnect(
+        buildPolymarketRealtimeConnection({
+          markets,
+          feedTypes,
+          dashboardLayout,
+          candleInterval,
+        }),
+      );
     } catch (nextError) {
       setError(nextError instanceof Error ? nextError.message : "Check your selections.");
     }
-  }, [dashboardLayout, feedTypes, markets, onConnect]);
+  }, [candleInterval, dashboardLayout, feedTypes, markets, onConnect]);
 
   return (
     <div className="space-y-5 rounded-xl border border-border/70 bg-background p-4 shadow-sm sm:p-5">
@@ -262,6 +272,33 @@ export function PolymarketLiveConnectionWizard({
             );
           })}
         </div>
+        {feedTypes.includes("candlesticks") ? (
+          <div className="flex flex-wrap items-center gap-2 rounded-lg border border-secondary/25 bg-secondary/5 px-3 py-2.5">
+            <label
+              htmlFor="polymarket-candle-interval"
+              className="text-[11px] font-medium text-foreground"
+            >
+              Candlestick interval
+            </label>
+            <select
+              id="polymarket-candle-interval"
+              value={candleInterval}
+              disabled={connecting}
+              onChange={(event) => setCandleInterval(event.target.value)}
+              className="h-8 rounded-md border border-border bg-background px-2.5 text-xs text-foreground outline-none focus:ring-2 focus:ring-secondary/40"
+            >
+              {POLYMARKET_CANDLE_INTERVALS.map((interval) => (
+                <option key={interval.value} value={interval.value}>
+                  {interval.label}
+                </option>
+              ))}
+            </select>
+            <p className="text-[10px] text-muted-foreground">
+              Built only from executed trades. Quiet intervals carry the previous close with zero
+              volume.
+            </p>
+          </div>
+        ) : null}
       </section>
 
       <section className="space-y-2">

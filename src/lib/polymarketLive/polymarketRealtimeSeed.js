@@ -1,3 +1,5 @@
+import { buildPolymarketCandlestickSeedRows } from "@/lib/polymarketLive/polymarketCandlesticks";
+
 const HISTORY_BATCH_SIZE = 20;
 const CLOB_BATCH_SIZE = 500;
 
@@ -94,7 +96,7 @@ export function normalizePolymarketRealtimeBookRows(payload, assetIds = []) {
 }
 
 export function buildPolymarketRealtimeSeedRows(
-  { feedTypes = [] },
+  { feedTypes = [], candleInterval = "5m" },
   { historyPayload = {}, booksPayload = [], assetIds = [] } = {},
 ) {
   const historyRows = normalizePolymarketRealtimeHistoryRows(historyPayload);
@@ -103,6 +105,11 @@ export function buildPolymarketRealtimeSeedRows(
   for (const feedType of feedTypes) {
     if (feedType === "last_trade_price" || feedType === "price_change") {
       rowsByFeed[feedType] = historyRows;
+    } else if (feedType === "candlesticks") {
+      rowsByFeed[feedType] = buildPolymarketCandlestickSeedRows(
+        historyRows,
+        candleInterval,
+      );
     } else if (feedType === "book") {
       rowsByFeed[feedType] = bookRows;
     } else if (feedType === "best_bid_ask") {
@@ -168,7 +175,7 @@ export async function fetchPolymarketRealtimeSeedRows(config) {
   const assetIds = [...new Set((config?.assetIds || []).map(String).filter(Boolean))];
   const feedTypes = [...new Set(config?.feedTypes || [])];
   const needsHistory = feedTypes.some((type) =>
-    type === "last_trade_price" || type === "price_change",
+    type === "last_trade_price" || type === "price_change" || type === "candlesticks",
   );
   const needsBooks = feedTypes.some((type) =>
     ["book", "best_bid_ask", "tick_size_change"].includes(type),
@@ -188,7 +195,7 @@ export async function fetchPolymarketRealtimeSeedRows(config) {
 
   return {
     rowsByFeed: buildPolymarketRealtimeSeedRows(
-      { feedTypes },
+      { feedTypes, candleInterval: config?.candleInterval },
       { historyPayload, booksPayload, assetIds },
     ),
     errors,

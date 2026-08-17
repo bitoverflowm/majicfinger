@@ -15,6 +15,7 @@ import {
 } from "lucide-react";
 
 import { HubKalshiLiveDemoTradesLiveline } from "@/components/hubs/kalshiLiveDemo/HubKalshiLiveDemoTradesLiveline";
+import { HubKalshiLiveDemoCandlesticksProfessionalChart } from "@/components/hubs/kalshiLiveDemo/HubKalshiLiveDemoCandlesticksProfessionalChart";
 import { Button } from "@/components/ui/button";
 import { useMyStateV2 } from "@/context/stateContextV2";
 import { POLYMARKET_REALTIME_FEED_OPTIONS } from "@/lib/polymarketLive/polymarketRealtimeCompose";
@@ -154,6 +155,52 @@ function WaitingForData({ label }) {
   );
 }
 
+function CandlestickFeed({ rows, market }) {
+  const availableTokens = (market.selectedTokenIds || []).filter((tokenId) =>
+    rows.some((row) => String(row?.asset_id || "") === String(tokenId)),
+  );
+  const [activeToken, setActiveToken] = useState(
+    () => availableTokens[0] || market.selectedTokenIds?.[0] || "",
+  );
+  const token = availableTokens.includes(activeToken) ? activeToken : availableTokens[0];
+  const candles = token
+    ? rows.filter((row) => String(row?.asset_id || "") === String(token))
+    : [];
+
+  if (!candles.length) {
+    return <WaitingForData label="Waiting for candlestick history or the first trade…" />;
+  }
+
+  return (
+    <div className="flex h-full min-h-0 flex-col">
+      {availableTokens.length > 1 ? (
+        <div className="mb-1 flex shrink-0 gap-1 overflow-x-auto">
+          {availableTokens.map((tokenId) => (
+            <button
+              key={tokenId}
+              type="button"
+              onClick={() => setActiveToken(tokenId)}
+              className={cn(
+                "shrink-0 rounded-full border px-2 py-1 text-[10px] transition-colors",
+                tokenId === token
+                  ? "border-secondary/40 bg-secondary/10 text-foreground"
+                  : "border-border/60 text-muted-foreground hover:text-foreground",
+              )}
+            >
+              {outcomeLabel(market, tokenId)}
+            </button>
+          ))}
+        </div>
+      ) : null}
+      <HubKalshiLiveDemoCandlesticksProfessionalChart
+        candles={candles}
+        className="min-h-0 flex-1"
+        chartClassName="min-h-0 border-0 rounded-none"
+      />
+    </div>
+  );
+}
+
 /** Liveline draws nothing from a lone reading, so keep the pinned frame until a series has a line. */
 function hasPlottableSeries(series) {
   return series.some((item) => item.trades.length >= 2);
@@ -161,6 +208,7 @@ function hasPlottableSeries(series) {
 
 function FeedVisualization({ feedType, rows, market, paused }) {
   if (feedType === "book") return <OrderbookDepth rows={rows} market={market} />;
+  if (feedType === "candlesticks") return <CandlestickFeed rows={rows} market={market} />;
 
   if (feedType === "last_trade_price") {
     const series = priceSeries(rows, market);
@@ -488,6 +536,7 @@ export function PolymarketLiveRealtimeDashboard({
                       <div className="min-w-0 space-y-0.5">
                         <h4 className="truncate text-sm font-medium leading-snug text-foreground">
                           {FEED_LABELS[feedType]}
+                          {feedType === "candlesticks" ? ` · ${session.candleInterval}` : ""}
                           <span className="font-normal text-muted-foreground">
                             {" — "}
                             {stream?.isRunning ? "live" : stream?.connecting ? "connecting…" : "waiting"}

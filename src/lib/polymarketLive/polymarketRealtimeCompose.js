@@ -4,6 +4,7 @@ import {
   parseOutcomeList,
   parseTokenIdList,
 } from "@/lib/polymarketLive/orderbooksCompose";
+import { normalizePolymarketCandleInterval } from "@/lib/polymarketLive/polymarketCandlesticks";
 
 export const POLYMARKET_REALTIME_FEED_OPTIONS = [
   {
@@ -20,6 +21,11 @@ export const POLYMARKET_REALTIME_FEED_OPTIONS = [
     id: "last_trade_price",
     label: "Last trade price",
     description: "Executed trade prices as they happen.",
+  },
+  {
+    id: "candlesticks",
+    label: "Candlesticks",
+    description: "Live trade OHLC and volume aggregated into your selected interval.",
   },
   {
     id: "tick_size_change",
@@ -128,6 +134,7 @@ export function mergePolymarketRealtimeMarkets(current, incoming) {
  * @param {{
  *   markets?: Array<Record<string, unknown>>;
  *   feedTypes?: string[];
+ *   candleInterval?: string;
  *   dashboardLayout?: "one_page" | "separate_tabs";
  * }} input
  */
@@ -162,5 +169,6 @@ export function buildPolymarketRealtimeConnection(input) {
   }
   const dashboardLayout =
     input.dashboardLayout === "separate_tabs" ? "separate_tabs" : "one_page";
-  return { markets, feedTypes, assetIds, dashboardLayout };
+  const candleInterval = normalizePolymarketCandleInterval(input.candleInterval);
+  return { markets, feedTypes, assetIds, dashboardLayout, candleInterval };
 }
