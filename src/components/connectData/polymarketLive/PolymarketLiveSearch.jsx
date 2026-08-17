@@ -79,6 +79,7 @@ function suggestionKey(s) {
  *   placeholder?: string;
  *   searchTags?: boolean;
  *   searchProfiles?: boolean;
+ *   keepClosedMarkets?: boolean;
  *   collectMode?: boolean;
  *   dismissAfterSelect?: boolean;
  *   selectedItems?: Array<Record<string, unknown>>;
@@ -94,6 +95,7 @@ export function PolymarketLiveSearch({
   placeholder = "Search markets, events, profiles…",
   searchTags = true,
   searchProfiles = true,
+  keepClosedMarkets = true,
   collectMode = false,
   dismissAfterSelect = false,
   selectedItems,
@@ -155,7 +157,7 @@ export function PolymarketLiveSearch({
         limit_per_type: "12",
         search_tags: searchTags ? "true" : "false",
         search_profiles: searchProfiles ? "true" : "false",
-        keep_closed_markets: "1",
+        keep_closed_markets: keepClosedMarkets ? "1" : "0",
       });
       const res = await fetch(`/api/integrations/polymarket?${params.toString()}`, {
         headers: { Accept: "application/json" },
@@ -176,6 +178,9 @@ export function PolymarketLiveSearch({
         const allow = new Set(entitiesKey.split(","));
         list = list.filter((s) => allow.has(s?.entity));
       }
+      if (!keepClosedMarkets) {
+        list = list.filter((s) => s?.closed !== true && s?.closed !== "true");
+      }
       setSuggestions(list);
       if (!dismissedRef.current) setSuggestOpen(true);
     } catch (e) {
@@ -187,7 +192,7 @@ export function PolymarketLiveSearch({
     } finally {
       if (mySeq === suggestSeqRef.current) setSuggestLoading(false);
     }
-  }, [entitiesKey, searchProfiles, searchTags]);
+  }, [entitiesKey, keepClosedMarkets, searchProfiles, searchTags]);
 
   useEffect(() => {
     if (dismissedRef.current) return undefined;

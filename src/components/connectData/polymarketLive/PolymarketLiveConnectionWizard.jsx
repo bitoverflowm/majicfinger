@@ -135,6 +135,7 @@ export function PolymarketLiveConnectionWizard({
           entities={["market", "event"]}
           searchProfiles={false}
           searchTags={false}
+          keepClosedMarkets={false}
           placeholder="Search live Polymarket markets and events…"
           selectedItems={markets}
           onSelect={handleSearchSelection}
@@ -279,14 +280,14 @@ export function PolymarketLiveConnectionWizard({
           if (!open) setEventPicker(null);
         }}
       >
-        <DialogContent className="max-h-[85vh] overflow-hidden sm:max-w-xl">
-          <DialogHeader>
+        <DialogContent className="flex max-h-[85vh] flex-col gap-3 overflow-hidden sm:max-w-xl">
+          <DialogHeader className="shrink-0">
             <DialogTitle>{eventPicker?.title || "Select event markets"}</DialogTitle>
             <DialogDescription>
               Choose all markets in this event or only the ones you want in your live stream.
             </DialogDescription>
           </DialogHeader>
-          <div className="flex items-center justify-between gap-2">
+          <div className="flex shrink-0 items-center justify-between gap-2">
             <Button
               type="button"
               variant="ghost"
@@ -310,7 +311,7 @@ export function PolymarketLiveConnectionWizard({
               {eventMarketKeys.size} selected
             </span>
           </div>
-          <div className="min-h-0 space-y-1 overflow-y-auto pr-1">
+          <div className="min-h-0 flex-1 space-y-1 overflow-y-auto pr-1">
             {(eventPicker?.markets || []).map((market) => {
               const key = polymarketRealtimeMarketKey(market);
               const checked = eventMarketKeys.has(key);
@@ -346,9 +347,15 @@ export function PolymarketLiveConnectionWizard({
               );
             })}
           </div>
-          <DialogFooter>
+          <DialogFooter className="shrink-0 items-center border-t border-border/60 pt-3 sm:justify-between">
+            <p className="text-[11px] text-muted-foreground">
+              {eventMarketKeys.size
+                ? `${eventMarketKeys.size} market${eventMarketKeys.size === 1 ? "" : "s"} ready to add`
+                : "Pick at least one market to continue."}
+            </p>
             <Button
               type="button"
+              className="gap-1.5"
               disabled={!eventMarketKeys.size}
               onClick={() => {
                 const selected = (eventPicker?.markets || []).filter((market) =>

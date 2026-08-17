@@ -5,7 +5,6 @@ import {
   BookOpen,
   Layers,
   Radio,
-  Search,
   Sparkles,
   Users,
   Vote,
@@ -239,12 +238,6 @@ const ENDPOINT_PRESENTATION = {
   wsNewMarket: { icon: Radio, accent: "emerald" },
   wsMarketResolved: { icon: Radio, accent: "emerald" },
 };
-
-const SEARCH_EXAMPLES = [
-  { label: "Presidential election", icon: Vote },
-  { label: "Bitcoin price", icon: Layers },
-  { label: "NBA finals", icon: Medal },
-];
 
 function hubSourceCardClasses({ isSelected, accent }) {
   if (isSelected) {
@@ -487,6 +480,14 @@ export function PolymarketLiveIntegrationsCore({ onRunPull, className, stepBackR
   const categoryEndpoints = useMemo(
     () => getPolymarketLiveEndpointsForCategory(endpointCategory),
     [endpointCategory],
+  );
+  const hubEndpointCategories = useMemo(
+    () => POLYMARKET_LIVE_ENDPOINT_CATEGORIES.filter((category) => category.id !== "live"),
+    [],
+  );
+  const realtimeEndpoints = useMemo(
+    () => getPolymarketLiveEndpointsForCategory("live"),
+    [],
   );
 
   const selectedEndpointMeta = useMemo(() => {
@@ -1509,7 +1510,7 @@ export function PolymarketLiveIntegrationsCore({ onRunPull, className, stepBackR
               description="Choose what you want to track, then narrow it to the exact markets, fields, and filters you need."
               headerBelow={
                 <HubEndpointCategoryTags
-                  categories={POLYMARKET_LIVE_ENDPOINT_CATEGORIES}
+                  categories={hubEndpointCategories}
                   value={endpointCategory}
                   onChange={setEndpointCategory}
                 />
@@ -1517,9 +1518,6 @@ export function PolymarketLiveIntegrationsCore({ onRunPull, className, stepBackR
             >
               {categoryEndpoints.length > 0 ? (
                 <div className="space-y-1.5">
-                  {endpointCategory === "live" ? (
-                    <LiveConnectionStartingOption onStart={() => setLiveRealtimeMode("wizard")} />
-                  ) : null}
                   {categoryEndpoints.map((endpoint) => (
                     <LiveSourceOption
                       key={endpoint.id}
@@ -1550,25 +1548,22 @@ export function PolymarketLiveIntegrationsCore({ onRunPull, className, stepBackR
               </HubStartingPointColumn>
 
               <HubStartingPointColumn
-                icon={Search}
-                title="Search for a specific market or event"
-                description="Ticker and slug search will live here — use List endpoints or natural language search for now."
+                icon={Radio}
+                title="Real-time"
+                description="Start a WebSocket connection and choose the markets, outcomes, and live updates you want to follow."
                 className="h-auto min-h-0 flex-1"
               >
-                <p className="text-[11px] font-medium text-muted-foreground">Examples</p>
-                <ul className="space-y-1">
-                  {SEARCH_EXAMPLES.map((example) => {
-                    const ExampleIcon = example.icon;
-                    return (
-                      <li key={example.label}>
-                        <span className="flex w-full items-center gap-2 rounded-md px-1 py-1 text-left text-[11px] leading-snug text-muted-foreground">
-                          <ExampleIcon className="size-3 shrink-0" aria-hidden />
-                          {example.label}
-                        </span>
-                      </li>
-                    );
-                  })}
-                </ul>
+                <div className="min-h-0 flex-1 space-y-1.5 overflow-y-auto">
+                  <LiveConnectionStartingOption onStart={() => setLiveRealtimeMode("wizard")} />
+                  {realtimeEndpoints.map((endpoint) => (
+                    <LiveSourceOption
+                      key={endpoint.id}
+                      endpoint={endpoint}
+                      isSelected={selectedId === endpoint.id}
+                      onSelect={handleSelectEndpoint}
+                    />
+                  ))}
+                </div>
               </HubStartingPointColumn>
             </div>
           </div>

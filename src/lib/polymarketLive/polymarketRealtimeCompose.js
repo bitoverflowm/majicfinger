@@ -93,6 +93,7 @@ export function polymarketRealtimeMarketsFromEventSuggestion(suggestion) {
       : {};
   const markets = Array.isArray(raw.markets) ? raw.markets : [];
   return markets
+    .filter((market) => market?.closed !== true && market?.closed !== "true")
     .map((market) => {
       const ref = orderbooksMarketRefFromListMarketsRow(market);
       if (!ref) return null;

@@ -47,12 +47,21 @@ import {
           outcomes: ["Yes", "No"],
           clobTokenIds: ["b-yes", "b-no"],
         },
+        {
+          id: "m3",
+          conditionId: "0x3",
+          question: "Closed candidate?",
+          outcomes: ["Yes", "No"],
+          clobTokenIds: ["c-yes", "c-no"],
+          closed: true,
+        },
       ],
     },
   });
   assert.equal(markets.length, 2);
   assert.equal(markets[0].eventTitle, "Election event");
-  console.log("ok realtime event suggestion expands nested markets");
+  assert.equal(markets.some((market) => market.id === "m3"), false);
+  console.log("ok realtime event suggestion expands only open nested markets");
 }
 
 {
