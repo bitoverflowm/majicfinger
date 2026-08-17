@@ -918,6 +918,10 @@ export function ChartBuilderProvider({ demo, children, initialBuilderSnapshot, e
   const [candlestickOhlcSetId, setCandlestickOhlcSetId] = useState("auto");
   /** Which data sheet to chart; empty = active sheet. */
   const [candlestickSheetId, setCandlestickSheetId] = useState("");
+  /** Optional token/asset filter for multi-outcome candlestick sheets. */
+  const [candlestickAssetId, setCandlestickAssetId] = useState(
+    () => String(initialBuilderSnapshot?.candlestickAssetId || ""),
+  );
 
   const [chartFilterColumn, setChartFilterColumn] = useState(null);
   const [chartFilterConfig, setChartFilterConfig] = useState({});
@@ -971,6 +975,9 @@ export function ChartBuilderProvider({ demo, children, initialBuilderSnapshot, e
       if (snap.candlestickSheetId != null) {
         setCandlestickSheetId(String(snap.candlestickSheetId || ""));
       }
+      if (snap.candlestickAssetId != null) {
+        setCandlestickAssetId(String(snap.candlestickAssetId || ""));
+      }
     }
     if (hasLineFilters) {
       setChartLineFilters(normalizeChartLineFilters(snap.chartLineFilters));
@@ -1011,6 +1018,7 @@ export function ChartBuilderProvider({ demo, children, initialBuilderSnapshot, e
       if (s.livelineColorChoice != null) setLivelineColorChoice(s.livelineColorChoice);
       if (s.candlestickOhlcSetId != null) setCandlestickOhlcSetId(String(s.candlestickOhlcSetId) || "auto");
       if (s.candlestickSheetId != null) setCandlestickSheetId(String(s.candlestickSheetId || ""));
+      if (s.candlestickAssetId != null) setCandlestickAssetId(String(s.candlestickAssetId || ""));
     }
     const rows = Array.isArray(effectiveData) ? effectiveData : [];
     const anySheetRows = Object.values(contextStateV2?.dataSheets || {}).some(
@@ -1121,6 +1129,7 @@ export function ChartBuilderProvider({ demo, children, initialBuilderSnapshot, e
     if (s.livelineColorChoice != null) setLivelineColorChoice(s.livelineColorChoice);
     if (s.candlestickOhlcSetId != null) setCandlestickOhlcSetId(String(s.candlestickOhlcSetId) || "auto");
     if (s.candlestickSheetId != null) setCandlestickSheetId(String(s.candlestickSheetId || ""));
+    if (s.candlestickAssetId != null) setCandlestickAssetId(String(s.candlestickAssetId || ""));
     if (s.chartFilterColumn !== undefined) setChartFilterColumn(s.chartFilterColumn);
     if (s.chartFilterConfig && typeof s.chartFilterConfig === "object") setChartFilterConfig(s.chartFilterConfig);
     if (Array.isArray(s.chartLineFilters)) {
@@ -1498,11 +1507,23 @@ export function ChartBuilderProvider({ demo, children, initialBuilderSnapshot, e
       ? resolveChartSheetId(requested, dataSheets, activeSheetId)
       : activeSheetId;
     if (resolvedId && Array.isArray(dataSheets?.[resolvedId]?.data)) {
-      return dataSheets[resolvedId].data;
+      const rows = dataSheets[resolvedId].data;
+      return candlestickAssetId
+        ? rows.filter((row) => String(row?.asset_id || "") === candlestickAssetId)
+        : rows;
     }
     // Fallback: connected / override rows (single-sheet or demo).
-    return Array.isArray(chartData) ? chartData : [];
-  }, [candlestickSheetId, contextStateV2?.dataSheets, activeSheetId, chartData]);
+    const rows = Array.isArray(chartData) ? chartData : [];
+    return candlestickAssetId
+      ? rows.filter((row) => String(row?.asset_id || "") === candlestickAssetId)
+      : rows;
+  }, [
+    candlestickAssetId,
+    candlestickSheetId,
+    contextStateV2?.dataSheets,
+    activeSheetId,
+    chartData,
+  ]);
 
   const candlestickSheetOptions = useMemo(() => {
     return (globalSheetColumnGroups || [])
@@ -1866,6 +1887,7 @@ export function ChartBuilderProvider({ demo, children, initialBuilderSnapshot, e
     livelineColorChoice,
     candlestickOhlcSetId,
     candlestickSheetId,
+    candlestickAssetId,
     chartFilterColumn,
     chartFilterConfig,
     chartLineFilters,
@@ -2116,6 +2138,8 @@ export function ChartBuilderProvider({ demo, children, initialBuilderSnapshot, e
     setCandlestickOhlcSetId,
     candlestickSheetId,
     setCandlestickSheetId,
+    candlestickAssetId,
+    setCandlestickAssetId,
     candlestickSheetOptions,
     candlestickMapped,
 

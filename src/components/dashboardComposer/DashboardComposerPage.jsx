@@ -176,6 +176,7 @@ function computeRowsAfterAddChart(layout) {
 }
 
 export default function DashboardComposerPage({ user }) {
+  const ctx = useMyStateV2() ?? {};
   const {
     chartDashboardDraft,
     setChartDashboardDraft,
@@ -211,7 +212,11 @@ export default function DashboardComposerPage({ user }) {
     setConnectPowerMove,
     liveFeedActions,
     liveFeedState,
-  } = useMyStateV2() ?? {};
+  } = ctx;
+  const polymarketLiveRealtimeSession =
+    ctx.providerValue?.polymarketLiveRealtimeSession || null;
+  const setPolymarketLiveDashboardActive =
+    ctx.providerValue?.setPolymarketLiveDashboardActive;
 
   const [demoDashboardDialogOpen, setDemoDashboardDialogOpen] = useState(false);
 
@@ -660,11 +665,14 @@ export default function DashboardComposerPage({ user }) {
 
   const savedDashboardOptions = useMemo(() => {
     const list = Array.isArray(savedChartDashboards) ? savedChartDashboards : [];
-    return list.map((d) => ({
+    const saved = list.map((d) => ({
       id: String(d._id),
       label: (d.dashboard_name || d.page_heading || "Untitled dashboard").trim(),
     }));
-  }, [savedChartDashboards]);
+    return polymarketLiveRealtimeSession
+      ? [{ id: "__polymarket_live_active__", label: "Active dashboard" }, ...saved]
+      : saved;
+  }, [polymarketLiveRealtimeSession, savedChartDashboards]);
 
   const demoDashboardDialog = (
     <AlertDialog open={demoDashboardDialogOpen} onOpenChange={setDemoDashboardDialogOpen}>
@@ -714,6 +722,10 @@ export default function DashboardComposerPage({ user }) {
               <Select
                 onValueChange={(id) => {
                   if (!id) return;
+                  if (id === "__polymarket_live_active__") {
+                    setPolymarketLiveDashboardActive?.(true);
+                    return;
+                  }
                   setChartDashboardDraft(null);
                   setActiveChartDashboardId?.(String(id));
                   setSelectedDashboardCard?.(null);

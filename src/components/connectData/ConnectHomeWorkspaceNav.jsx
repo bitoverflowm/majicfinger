@@ -374,6 +374,12 @@ export function ConnectHomeWorkspaceNav({ className, compact = false, onPanelMan
   const connectWorkspace = ctx?.connectWorkspace;
   const connectDataLakePullState = ctx?.connectDataLakePullState ?? {};
   const cancelConnectDataFeedPull = ctx?.cancelConnectDataFeedPull;
+  const polymarketLiveRealtimeSession =
+    ctx?.providerValue?.polymarketLiveRealtimeSession || null;
+  const polymarketLiveDashboardActive =
+    !!ctx?.providerValue?.polymarketLiveDashboardActive;
+  const setPolymarketLiveDashboardActive =
+    ctx?.providerValue?.setPolymarketLiveDashboardActive;
   const guidedWorkflowPull = !!ctx?.guidedWorkflowPull;
   const connectedData = ctx?.connectedData ?? [];
   const pullProgress = Number(connectDataLakePullState.progress) || 0;
@@ -500,6 +506,7 @@ export function ConnectHomeWorkspaceNav({ className, compact = false, onPanelMan
 
   const selectDashboard = useCallback(
     (dashboardId) => {
+      setPolymarketLiveDashboardActive?.(false);
       if (dashboardId) {
         if (
           !(
@@ -518,6 +525,7 @@ export function ConnectHomeWorkspaceNav({ className, compact = false, onPanelMan
       openDashboard,
       setActiveChartDashboardId,
       setChartDashboardDraft,
+      setPolymarketLiveDashboardActive,
     ],
   );
 
@@ -593,8 +601,23 @@ export function ConnectHomeWorkspaceNav({ className, compact = false, onPanelMan
       }
     }
 
+    if (polymarketLiveRealtimeSession) {
+      byId.set("__polymarket_live_active__", {
+        id: "__polymarket_live_active__",
+        label: "Active dashboard",
+        hasLiveFeed: true,
+        isEphemeral: true,
+      });
+    }
+
     return Array.from(byId.values());
-  }, [chartDashboardDraft, loadedDataId, projectIsLiveCapable, savedChartDashboards]);
+  }, [
+    chartDashboardDraft,
+    loadedDataId,
+    polymarketLiveRealtimeSession,
+    projectIsLiveCapable,
+    savedChartDashboards,
+  ]);
 
   const workspaceTabItems = useMemo(() => {
     const items = [];
@@ -622,7 +645,9 @@ export function ConnectHomeWorkspaceNav({ className, compact = false, onPanelMan
       const keyId = dash.id || "draft";
       const isActive =
         dashboardViewActive &&
-        (dash.id
+        (dash.isEphemeral
+          ? polymarketLiveDashboardActive
+          : dash.id
           ? String(activeChartDashboardId || "") === String(dash.id)
           : !activeChartDashboardId && !!chartDashboardDraft);
       items.push({
@@ -632,7 +657,11 @@ export function ConnectHomeWorkspaceNav({ className, compact = false, onPanelMan
         hasLiveFeed: !!dash.hasLiveFeed,
         isActive,
         onSelect: () => {
-          if (dash.id) selectDashboard(dash.id);
+          if (dash.isEphemeral) {
+            setPolymarketLiveDashboardActive?.(true);
+            setConnectHomeCenterView?.(CONNECT_HOME_CENTER_VIEW.DASHBOARD);
+            ctx?.setConnectHomeAnalyzeActive?.(true);
+          } else if (dash.id) selectDashboard(dash.id);
           else openDashboard();
         },
       });
@@ -650,10 +679,12 @@ export function ConnectHomeWorkspaceNav({ className, compact = false, onPanelMan
     dataSheetIds,
     dataSheets,
     openDashboard,
+    polymarketLiveDashboardActive,
     projectDashboardEntries,
     projectIsLiveCapable,
     selectChart,
     selectDashboard,
+    setPolymarketLiveDashboardActive,
     selectSheet,
     tableViewActive,
   ]);

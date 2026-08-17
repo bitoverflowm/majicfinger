@@ -121,6 +121,7 @@ import { patchChartDashboardColumn } from "@/lib/patchChartDashboardColumn";
 import { runEventCandlesticksDashboardPowerMove } from "@/lib/kalshiLive/eventCandlesticksPowerMove";
 import { runHistoricalV2CandlesticksDashboardPowerMove } from "@/lib/kalshiHistoricalV2/historicalCandlesticksPowerMove";
 import { ConnectProgressWithLabel } from "@/components/integrationsView/integrationPlayground/integrations/polymarketHistorical/ConnectProgressWithLabel";
+import { PolymarketLiveRealtimeDashboard } from "@/components/connectData/polymarketLive/PolymarketLiveRealtimeDashboard";
 import {
   flattenDashboardLayers,
   findRowIdForColumn,
@@ -244,6 +245,16 @@ export default function DataSheetWithIntegration({
       connectWorkspace === "binance");
   const connectHomeAnalyzeActive = !!contextStateV2?.connectHomeAnalyzeActive;
   const setConnectHomeAnalyzeActive = contextStateV2?.setConnectHomeAnalyzeActive;
+  const polymarketLiveRealtimeSession =
+    contextStateV2?.providerValue?.polymarketLiveRealtimeSession || null;
+  const polymarketLiveDashboardActive =
+    !!contextStateV2?.providerValue?.polymarketLiveDashboardActive;
+  const setPolymarketLiveRealtimeSession =
+    contextStateV2?.providerValue?.setPolymarketLiveRealtimeSession;
+  const setPolymarketLiveRealtimeMode =
+    contextStateV2?.providerValue?.setPolymarketLiveRealtimeMode;
+  const setPolymarketLiveDashboardActive =
+    contextStateV2?.providerValue?.setPolymarketLiveDashboardActive;
 
   useEffect(() => {
     setDataPullSurfaceContext({
@@ -961,6 +972,87 @@ export default function DataSheetWithIntegration({
     setChartDashboardDraft?.(null);
   }, [dashboardMode, setSelectedDashboardCard, setActiveChartDashboardId, setChartDashboardDraft]);
 
+  const openPolymarketLiveDashboard = useCallback(() => {
+    if (!polymarketLiveRealtimeSession) return;
+    setPolymarketLiveDashboardActive?.(true);
+    setConnectHomeAnalyzeActive?.(true);
+    setConnectHomeCenterView?.(CONNECT_HOME_CENTER_VIEW.DASHBOARD);
+    setRightPanelOpen?.(false);
+    contextStateV2?.requestConnectAnalyzeScroll?.();
+  }, [
+    contextStateV2,
+    polymarketLiveRealtimeSession,
+    setConnectHomeAnalyzeActive,
+    setConnectHomeCenterView,
+    setPolymarketLiveDashboardActive,
+    setRightPanelOpen,
+  ]);
+
+  const openPolymarketLiveEditor = useCallback(() => {
+    if (!polymarketLiveRealtimeSession) return;
+    const firstSheetId = Object.values(polymarketLiveRealtimeSession.sheetsByFeed || {})[0];
+    if (firstSheetId) contextStateV2?.setActiveSheetId?.(firstSheetId);
+    const firstChartId = polymarketLiveRealtimeSession.chartIds?.[0];
+    if (firstChartId) {
+      setActiveChartSheetId?.(firstChartId);
+      setLoadedChartBuilderSnapshot?.(chartSheets?.[firstChartId]?.snapshot || null);
+      setLoadedChartMeta?.(null);
+    }
+    setPolymarketLiveDashboardActive?.(false);
+    setConnectHomeAnalyzeActive?.(true);
+    setConnectHomeCenterView?.(CONNECT_HOME_CENTER_VIEW.CHARTS);
+    setRightPanelTab?.("charts");
+    setRightPanelOpen?.(true);
+  }, [
+    chartSheets,
+    contextStateV2,
+    polymarketLiveRealtimeSession,
+    setActiveChartSheetId,
+    setConnectHomeAnalyzeActive,
+    setConnectHomeCenterView,
+    setLoadedChartBuilderSnapshot,
+    setLoadedChartMeta,
+    setPolymarketLiveDashboardActive,
+    setRightPanelOpen,
+    setRightPanelTab,
+  ]);
+
+  const subscribeMorePolymarketLiveMarkets = useCallback(() => {
+    if (!polymarketLiveRealtimeSession) return;
+    setPolymarketLiveDashboardActive?.(false);
+    setPolymarketLiveRealtimeMode?.("wizard");
+    setConnectHomeCenterView?.(CONNECT_HOME_CENTER_VIEW.SHEET);
+    setConnectHomeAnalyzeActive?.(false);
+    contextStateV2?.setIntegrationSidebar?.("polymarket");
+    contextStateV2?.requestConnectComposeScroll?.();
+  }, [
+    contextStateV2,
+    polymarketLiveRealtimeSession,
+    setConnectHomeAnalyzeActive,
+    setConnectHomeCenterView,
+    setPolymarketLiveDashboardActive,
+    setPolymarketLiveRealtimeMode,
+  ]);
+
+  const stopPolymarketLiveDashboard = useCallback(() => {
+    for (const sheetId of Object.values(polymarketLiveRealtimeSession?.sheetsByFeed || {})) {
+      contextStateV2?.liveStreamActions?.stop?.(sheetId);
+    }
+    setPolymarketLiveDashboardActive?.(false);
+    setPolymarketLiveRealtimeSession?.(null);
+    setPolymarketLiveRealtimeMode?.("hub");
+    setConnectHomeCenterView?.(CONNECT_HOME_CENTER_VIEW.SHEET);
+    setConnectHomeAnalyzeActive?.(false);
+  }, [
+    contextStateV2,
+    polymarketLiveRealtimeSession,
+    setConnectHomeAnalyzeActive,
+    setConnectHomeCenterView,
+    setPolymarketLiveDashboardActive,
+    setPolymarketLiveRealtimeMode,
+    setPolymarketLiveRealtimeSession,
+  ]);
+
   const deleteDashboardFromComposer = useCallback(async () => {
     if (!chartDashboardDraft || !dashboardMode) return;
     const id = chartDashboardDraft._id;
@@ -1559,7 +1651,20 @@ export default function DataSheetWithIntegration({
                 </div>
               ) : null}
               <div className="flex min-h-0 min-w-0 flex-1 flex-col">
-                <DashboardComposerPage user={user} />
+                {polymarketLiveDashboardActive && polymarketLiveRealtimeSession ? (
+                  <div className="min-h-0 flex-1 overflow-auto px-4 py-5 sm:px-6 lg:px-8">
+                    <div className="mx-auto w-full max-w-[90rem]">
+                      <PolymarketLiveRealtimeDashboard
+                        session={polymarketLiveRealtimeSession}
+                        onSubscribeMore={subscribeMorePolymarketLiveMarkets}
+                        onStop={stopPolymarketLiveDashboard}
+                        onOpenEditor={openPolymarketLiveEditor}
+                      />
+                    </div>
+                  </div>
+                ) : (
+                  <DashboardComposerPage user={user} />
+                )}
               </div>
             </div>
           ) : effectiveChartMode ? (
@@ -1759,7 +1864,8 @@ export default function DataSheetWithIntegration({
                               value === "powerMoves" &&
                               (!!connectPowerMove ||
                                 hasEventCandlesticksLiveGroup ||
-                                hasMarketCandlesticksLiveGroup) &&
+                                hasMarketCandlesticksLiveGroup ||
+                                !!polymarketLiveRealtimeSession) &&
                               rightPanelTab !== "powerMoves";
                             return (
                               <TabsTrigger
@@ -1909,6 +2015,27 @@ export default function DataSheetWithIntegration({
                             </div>
                           ) : null}
 
+                          {polymarketLiveRealtimeSession ? (
+                            <>
+                              <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                className="h-auto w-full justify-start gap-2 whitespace-normal px-2.5 py-2 text-left text-xs"
+                                onClick={openPolymarketLiveDashboard}
+                              >
+                                <LayoutDashboard
+                                  className="h-3.5 w-3.5 shrink-0 text-emerald-500"
+                                  aria-hidden
+                                />
+                                <span className="min-w-0">Live Dashboard</span>
+                              </Button>
+                              <p className="px-1 text-[11px] leading-snug text-muted-foreground">
+                                Return to the active Polymarket WebSocket dashboard.
+                              </p>
+                            </>
+                          ) : null}
+
                           {showKalshiCandlesticksLiveControls ? (
                             <>
                               <EventCandlesticksLiveFeedControls />
@@ -1964,7 +2091,8 @@ export default function DataSheetWithIntegration({
                                 dashboard. Save the project to keep the charts and candles.
                               </p>
                             </>
-                          ) : !showAnyLivePowerMoveControls &&
+                          ) : !polymarketLiveRealtimeSession &&
+                            !showAnyLivePowerMoveControls &&
                             connectPowerMove !== "historical_v2_candlesticks" ? (
                             <p className="px-1 py-2 text-xs text-muted-foreground">
                               No power moves available yet.

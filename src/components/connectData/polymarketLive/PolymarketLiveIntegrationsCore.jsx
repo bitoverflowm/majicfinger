@@ -174,6 +174,10 @@ import {
 import { POLYMARKET_REALTIME_FEED_OPTIONS } from "@/lib/polymarketLive/polymarketRealtimeCompose";
 import { fetchPolymarketRealtimeSeedRows } from "@/lib/polymarketLive/polymarketRealtimeSeed";
 import {
+  buildPolymarketRealtimeChartEntries,
+  reconcilePolymarketRealtimeChartSheets,
+} from "@/lib/polymarketLive/polymarketRealtimeCharts";
+import {
   applyPolymarketMarketsByEventsSearchAll,
   applyPolymarketMarketsByEventsSearchSelection,
 } from "@/lib/polymarketLive/polymarketMarketsByEventsPull";
@@ -479,8 +483,11 @@ export function PolymarketLiveIntegrationsCore({ onRunPull, className, stepBackR
   const [endpointCategory, setEndpointCategory] = useState(
     POLYMARKET_LIVE_DEFAULT_ENDPOINT_CATEGORY,
   );
-  const [liveRealtimeMode, setLiveRealtimeMode] = useState("hub");
-  const [liveRealtimeSession, setLiveRealtimeSession] = useState(null);
+  const liveRealtimeMode = ctx.providerValue?.polymarketLiveRealtimeMode || "hub";
+  const setLiveRealtimeMode = ctx.providerValue?.setPolymarketLiveRealtimeMode;
+  const liveRealtimeSession = ctx.providerValue?.polymarketLiveRealtimeSession || null;
+  const setLiveRealtimeSession = ctx.providerValue?.setPolymarketLiveRealtimeSession;
+  const setLiveDashboardActive = ctx.providerValue?.setPolymarketLiveDashboardActive;
   const [liveRealtimeConnecting, setLiveRealtimeConnecting] = useState(false);
 
   const categoryEndpoints = useMemo(
@@ -1437,31 +1444,58 @@ export function PolymarketLiveIntegrationsCore({ onRunPull, className, stepBackR
             { syncActivate: true },
           );
         }
-        setLiveRealtimeSession({
+        const nextSession = {
           ...config,
+          sessionId:
+            typeof crypto !== "undefined" && typeof crypto.randomUUID === "function"
+              ? crypto.randomUUID()
+              : `polymarket-live-${Date.now()}`,
           sheetsByFeed,
           seedErrors: seed.errors,
           seededRowCount: Object.values(seed.rowsByFeed).reduce(
             (sum, rows) => sum + rows.length,
             0,
           ),
-        });
-        setLiveRealtimeMode("dashboard");
+        };
+        const chartEntries = buildPolymarketRealtimeChartEntries(nextSession);
+        nextSession.chartIds = Object.keys(chartEntries);
+        ctx.setChartSheets?.((previous) =>
+          reconcilePolymarketRealtimeChartSheets(previous, chartEntries),
+        );
+        setLiveRealtimeSession?.(nextSession);
+        setLiveRealtimeMode?.("dashboard");
+        setLiveDashboardActive?.(true);
+        ctx.setConnectHomeAnalyzeActive?.(true);
+        ctx.setConnectHomeCenterView?.("dashboard");
+        ctx.setRightPanelOpen?.(false);
+        ctx.requestConnectAnalyzeScroll?.();
       } finally {
         setLiveRealtimeConnecting(false);
       }
     },
-    [ctx, stopRealtimeSession],
+    [
+      ctx,
+      setLiveDashboardActive,
+      setLiveRealtimeMode,
+      setLiveRealtimeSession,
+      stopRealtimeSession,
+    ],
   );
   const openRealtimeEditor = useCallback(() => {
     const firstSheetId = Object.values(liveRealtimeSession?.sheetsByFeed || {})[0];
     if (firstSheetId) ctx.setActiveSheetId?.(firstSheetId);
+    const firstChartId = liveRealtimeSession?.chartIds?.[0];
+    if (firstChartId) {
+      ctx.setActiveChartSheetId?.(firstChartId);
+      ctx.setLoadedChartBuilderSnapshot?.(ctx.chartSheets?.[firstChartId]?.snapshot || null);
+    }
+    setLiveDashboardActive?.(false);
     ctx.setConnectHomeAnalyzeActive?.(true);
-    ctx.setConnectHomeCenterView?.("sheet");
+    ctx.setConnectHomeCenterView?.("charts");
     ctx.setRightPanelOpen?.(true);
     ctx.setRightPanelTab?.("charts");
     ctx.requestConnectAnalyzeScroll?.();
-  }, [ctx, liveRealtimeSession]);
+  }, [ctx, liveRealtimeSession, setLiveDashboardActive]);
 
   if (liveRealtimeMode === "wizard") {
     return (

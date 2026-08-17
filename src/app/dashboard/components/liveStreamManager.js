@@ -270,6 +270,14 @@ export default function LiveStreamManager() {
             });
           } else if (et === "book" && msg.event_type === "book" && msg.asset_id) {
             const ts = msg.timestamp ? Number(msg.timestamp) : Date.now();
+            const bids = Array.isArray(msg.bids) ? msg.bids : [];
+            const asks = Array.isArray(msg.asks) ? msg.asks : [];
+            const levelPrice = (level) =>
+              Number(level?.price ?? (Array.isArray(level) ? level[0] : NaN));
+            const bidPrices = bids.map(levelPrice).filter(Number.isFinite);
+            const askPrices = asks.map(levelPrice).filter(Number.isFinite);
+            const bestBid = bidPrices.length ? Math.max(...bidPrices) : "";
+            const bestAsk = askPrices.length ? Math.min(...askPrices) : "";
             pushRow(setSheetData, sheetId, pausedBySheetIdRef, {
               ...msg,
               event_type: msg.event_type,
@@ -277,9 +285,13 @@ export default function LiveStreamManager() {
               market: msg.market ?? "",
               timestamp: msg.timestamp ?? String(ts),
               time: new Date(ts).toISOString(),
-              bids: Array.isArray(msg.bids) ? JSON.stringify(msg.bids) : "",
-              asks: Array.isArray(msg.asks) ? JSON.stringify(msg.asks) : "",
+              bids: JSON.stringify(bids),
+              asks: JSON.stringify(asks),
               hash: msg.hash ?? "",
+              best_bid: bestBid,
+              best_ask: bestAsk,
+              spread:
+                bestBid !== "" && bestAsk !== "" ? Number(bestAsk) - Number(bestBid) : "",
             });
           } else if (et === "price_change" && msg.event_type === "book" && msg.asset_id) {
             const ts = msg.timestamp ? Number(msg.timestamp) : Date.now();

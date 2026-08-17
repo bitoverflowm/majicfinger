@@ -1336,6 +1336,11 @@ export const StateProviderV2 = ({children, initialSettings}) => {
       resume: noop,
       restart: noop,
     });
+    // Ephemeral Polymarket WebSocket dashboard. Provider-owned so it survives
+    // switching between the live dashboard and sheet/chart editor surfaces.
+    const [polymarketLiveRealtimeSession, setPolymarketLiveRealtimeSession] = useState(null);
+    const [polymarketLiveRealtimeMode, setPolymarketLiveRealtimeMode] = useState("hub");
+    const [polymarketLiveDashboardActive, setPolymarketLiveDashboardActive] = useState(false);
 
     // REST live feeds (Kalshi poll etc.): keyed by feedId
     const [liveFeedState, setLiveFeedState] = useState({
@@ -1373,6 +1378,9 @@ export const StateProviderV2 = ({children, initialSettings}) => {
       });
       liveStreamActions?.stop?.();
       setLiveStreamState?.({ streamsBySheetId: {} });
+      setPolymarketLiveRealtimeSession(null);
+      setPolymarketLiveRealtimeMode("hub");
+      setPolymarketLiveDashboardActive(false);
 
       const hasData = connectHomeAnySheetHasData(dataSheets, connectedData);
       if (!hasData) {
@@ -1388,6 +1396,9 @@ export const StateProviderV2 = ({children, initialSettings}) => {
       liveFeedState?.feedsById,
       setLiveFeedState,
       setLiveStreamState,
+      setPolymarketLiveRealtimeSession,
+      setPolymarketLiveRealtimeMode,
+      setPolymarketLiveDashboardActive,
     ]);
 
     const [chartSnapshotFlusher, setChartSnapshotFlusher] = useState(() => async () => null);
@@ -1425,7 +1436,10 @@ export const StateProviderV2 = ({children, initialSettings}) => {
         connectPolymarketLiveHolderTradesCompose, setConnectPolymarketLiveHolderTradesCompose,
         connectPolymarketLiveHolderTradedMarketsCompose, setConnectPolymarketLiveHolderTradedMarketsCompose,
         connectPolymarketLiveTraderLeaderboardCompose, setConnectPolymarketLiveTraderLeaderboardCompose,
-    }), [settings, viewing, connectedCols, dataTypes, dataTypeMismatch, connectPolymarketLiveCurrentPositionsCompose, connectPolymarketLiveClosedPositionsCompose, connectPolymarketLiveUserActivityCompose, connectPolymarketLiveHolderPositionValueCompose, connectPolymarketLiveHolderTradesCompose, connectPolymarketLiveHolderTradedMarketsCompose, connectPolymarketLiveTraderLeaderboardCompose]);
+        polymarketLiveRealtimeSession, setPolymarketLiveRealtimeSession,
+        polymarketLiveRealtimeMode, setPolymarketLiveRealtimeMode,
+        polymarketLiveDashboardActive, setPolymarketLiveDashboardActive,
+    }), [settings, viewing, connectedCols, dataTypes, dataTypeMismatch, connectPolymarketLiveCurrentPositionsCompose, connectPolymarketLiveClosedPositionsCompose, connectPolymarketLiveUserActivityCompose, connectPolymarketLiveHolderPositionValueCompose, connectPolymarketLiveHolderTradesCompose, connectPolymarketLiveHolderTradedMarketsCompose, connectPolymarketLiveTraderLeaderboardCompose, polymarketLiveRealtimeSession, polymarketLiveRealtimeMode, polymarketLiveDashboardActive]);
     
 
     useEffect(() => {
