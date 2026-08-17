@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   ArrowLeft,
   GripVertical,
@@ -275,6 +275,23 @@ export function PolymarketLiveRealtimeDashboard({
   const dragRef = useRef(null);
   const [orderByMarket, setOrderByMarket] = useState({});
   const [wideCards, setWideCards] = useState(new Set());
+  const [activeMarketKey, setActiveMarketKey] = useState(() => {
+    const first = session.markets?.[0];
+    return first ? String(first.conditionId || first.id || first.slug) : "";
+  });
+  const separateMarketTabs = session.dashboardLayout === "separate_tabs";
+  useEffect(() => {
+    const keys = session.markets.map((market) =>
+      String(market.conditionId || market.id || market.slug),
+    );
+    if (!keys.includes(activeMarketKey)) setActiveMarketKey(keys[0] || "");
+  }, [activeMarketKey, session.markets]);
+  const visibleMarkets = separateMarketTabs
+    ? session.markets.filter(
+        (market) =>
+          String(market.conditionId || market.id || market.slug) === activeMarketKey,
+      )
+    : session.markets;
 
   const rowsByFeed = useMemo(
     () =>
@@ -380,7 +397,42 @@ export function PolymarketLiveRealtimeDashboard({
         </p>
       ) : null}
 
-      {session.markets.map((market) => {
+      {separateMarketTabs && session.markets.length > 1 ? (
+        <div
+          className="mb-6 flex gap-1 overflow-x-auto border-b border-border/60"
+          role="tablist"
+          aria-label="Live markets"
+        >
+          {session.markets.map((market) => {
+            const key = String(market.conditionId || market.id || market.slug);
+            const active = key === activeMarketKey;
+            return (
+              <button
+                key={key}
+                type="button"
+                role="tab"
+                aria-selected={active}
+                onClick={() => setActiveMarketKey(key)}
+                className={cn(
+                  "max-w-64 shrink-0 border-b-2 px-3 py-2 text-left text-xs font-medium transition-colors",
+                  active
+                    ? "border-secondary text-foreground"
+                    : "border-transparent text-muted-foreground hover:text-foreground",
+                )}
+              >
+                <span className="block truncate">
+                  {market.title || market.slug || market.id}
+                </span>
+                <span className="mt-0.5 block truncate text-[10px] font-normal text-muted-foreground">
+                  {(market.selectedOutcomes || []).join(" · ")}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+      ) : null}
+
+      {visibleMarkets.map((market) => {
         const marketKey = String(market.conditionId || market.id || market.slug);
         const order = orderByMarket[marketKey] || session.feedTypes;
         return (

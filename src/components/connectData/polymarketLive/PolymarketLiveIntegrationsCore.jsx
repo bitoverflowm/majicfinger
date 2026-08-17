@@ -1465,6 +1465,7 @@ export function PolymarketLiveIntegrationsCore({ onRunPull, className, stepBackR
       <div className={cn("relative z-20 w-full font-sans", className)}>
         <PolymarketLiveConnectionWizard
           initialMarkets={liveRealtimeSession?.markets || []}
+          initialDashboardLayout={liveRealtimeSession?.dashboardLayout || "one_page"}
           connecting={liveRealtimeConnecting}
           onBack={() => setLiveRealtimeMode(liveRealtimeSession ? "dashboard" : "hub")}
           onConnect={connectRealtimeSession}

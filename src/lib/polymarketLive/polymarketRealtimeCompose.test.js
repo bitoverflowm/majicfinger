@@ -88,9 +88,28 @@ import {
       },
     ],
     feedTypes: ["book", "last_trade_price", "book", "new_market"],
+    dashboardLayout: "separate_tabs",
   });
   assert.deepEqual(config.assetIds, ["yes"]);
   assert.deepEqual(config.feedTypes, ["book", "last_trade_price"]);
   assert.deepEqual(config.markets[0].selectedOutcomes, ["Yes"]);
+  assert.equal(config.dashboardLayout, "separate_tabs");
   console.log("ok realtime connection validates feeds and selected outcomes");
+}
+
+{
+  const config = buildPolymarketRealtimeConnection({
+    markets: [
+      {
+        id: "m1",
+        tokenIds: ["yes"],
+        selectedTokenIds: ["yes"],
+        outcomePairs: [{ tokenId: "yes", outcome: "Yes" }],
+      },
+    ],
+    feedTypes: ["last_trade_price"],
+    dashboardLayout: "unsupported",
+  });
+  assert.equal(config.dashboardLayout, "one_page");
+  console.log("ok realtime connection defaults to one-page dashboard layout");
 }

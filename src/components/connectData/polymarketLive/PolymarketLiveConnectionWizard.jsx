@@ -26,12 +26,14 @@ import { cn } from "@/lib/utils";
 
 export function PolymarketLiveConnectionWizard({
   initialMarkets = [],
+  initialDashboardLayout = "one_page",
   onBack,
   onConnect,
   connecting = false,
 }) {
   const [markets, setMarkets] = useState(initialMarkets);
   const [feedTypes, setFeedTypes] = useState(["last_trade_price"]);
+  const [dashboardLayout, setDashboardLayout] = useState(initialDashboardLayout);
   const [eventPicker, setEventPicker] = useState(null);
   const [eventMarketKeys, setEventMarketKeys] = useState(new Set());
   const [error, setError] = useState("");
@@ -88,11 +90,11 @@ export function PolymarketLiveConnectionWizard({
   const connect = useCallback(() => {
     setError("");
     try {
-      onConnect(buildPolymarketRealtimeConnection({ markets, feedTypes }));
+      onConnect(buildPolymarketRealtimeConnection({ markets, feedTypes, dashboardLayout }));
     } catch (nextError) {
       setError(nextError instanceof Error ? nextError.message : "Check your selections.");
     }
-  }, [feedTypes, markets, onConnect]);
+  }, [dashboardLayout, feedTypes, markets, onConnect]);
 
   return (
     <div className="space-y-5 rounded-xl border border-border/70 bg-background p-4 shadow-sm sm:p-5">
@@ -247,6 +249,60 @@ export function PolymarketLiveConnectionWizard({
                         : current.filter((id) => id !== option.id),
                     )
                   }
+                />
+                <span>
+                  <span className="block text-[11px] font-medium text-foreground">
+                    {option.label}
+                  </span>
+                  <span className="mt-0.5 block text-[10px] leading-snug text-muted-foreground">
+                    {option.description}
+                  </span>
+                </span>
+              </label>
+            );
+          })}
+        </div>
+      </section>
+
+      <section className="space-y-2">
+        <div>
+          <h3 className="text-xs font-semibold text-foreground">4. Choose dashboard layout</h3>
+          <p className="text-[11px] text-muted-foreground">
+            Decide how multiple markets should be organized when the live dashboard opens.
+          </p>
+        </div>
+        <div className="grid gap-2 sm:grid-cols-2">
+          {[
+            {
+              id: "separate_tabs",
+              label: "Separate tabs",
+              description: "Open one market at a time and switch between markets using tabs.",
+            },
+            {
+              id: "one_page",
+              label: "1 page for all markets",
+              description: "Stack every market and its live-feed charts on one scrolling page.",
+            },
+          ].map((option) => {
+            const checked = dashboardLayout === option.id;
+            return (
+              <label
+                key={option.id}
+                className={cn(
+                  "flex cursor-pointer items-start gap-2 rounded-lg border p-3 transition-colors",
+                  checked
+                    ? "border-secondary/35 bg-secondary/10"
+                    : "border-border/60 bg-background hover:bg-muted/30",
+                )}
+              >
+                <input
+                  type="radio"
+                  name="polymarket-dashboard-layout"
+                  value={option.id}
+                  checked={checked}
+                  disabled={connecting}
+                  onChange={() => setDashboardLayout(option.id)}
+                  className="mt-0.5 size-4 accent-secondary"
                 />
                 <span>
                   <span className="block text-[11px] font-medium text-foreground">

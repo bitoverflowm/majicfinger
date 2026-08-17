@@ -128,6 +128,7 @@ export function mergePolymarketRealtimeMarkets(current, incoming) {
  * @param {{
  *   markets?: Array<Record<string, unknown>>;
  *   feedTypes?: string[];
+ *   dashboardLayout?: "one_page" | "separate_tabs";
  * }} input
  */
 export function buildPolymarketRealtimeConnection(input) {
@@ -159,5 +160,7 @@ export function buildPolymarketRealtimeConnection(input) {
   if (!feedTypes.length) {
     throw new Error("Select at least one real-time feed.");
   }
-  return { markets, feedTypes, assetIds };
+  const dashboardLayout =
+    input.dashboardLayout === "separate_tabs" ? "separate_tabs" : "one_page";
+  return { markets, feedTypes, assetIds, dashboardLayout };
 }
