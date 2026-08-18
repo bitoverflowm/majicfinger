@@ -1,6 +1,6 @@
 "use client";
 
-import { forwardRef, useEffect, useMemo, useState } from "react";
+import { forwardRef, useCallback, useEffect, useMemo, useState } from "react";
 import { Liveline } from "liveline";
 
 import {
@@ -247,7 +247,23 @@ export const HubKalshiLiveDemoTradesLiveline = forwardRef<
   fullHistory = false,
 }, ref) {
   const dark = useIsDarkTheme();
-  const hidden = hiddenSeriesIds ?? new Set<string>();
+  const [ownedHiddenIds, setOwnedHiddenIds] = useState(() => new Set<string>());
+  const hidden = hiddenSeriesIds ?? ownedHiddenIds;
+  const toggleSeries = useCallback(
+    (id: string) => {
+      if (onToggleSeries) {
+        onToggleSeries(id);
+        return;
+      }
+      setOwnedHiddenIds((prev) => {
+        const next = new Set(prev);
+        if (next.has(id)) next.delete(id);
+        else next.add(id);
+        return next;
+      });
+    },
+    [onToggleSeries],
+  );
   const useFullArchive = fullHistory || persistHistory;
 
   const mapped = useMemo(() => {
@@ -311,14 +327,17 @@ export const HubKalshiLiveDemoTradesLiveline = forwardRef<
 
   const legendItems = useMemo(
     () =>
-      mapped.series.map((s) => ({
-        id: s.id,
-        label: s.label,
-        color: s.color,
-        colorToken: s.colorToken,
-      })),
+      mapped.series
+        .filter((s) => s.data.length > 0)
+        .map((s) => ({
+          id: s.id,
+          label: s.label,
+          color: s.color,
+          colorToken: s.colorToken,
+        })),
     [mapped.series],
   );
+  const showLegend = legendItems.length > 1;
 
   const primary = visible[0];
   if (!mapped.series.some((s) => s.data.length)) {
@@ -340,11 +359,11 @@ export const HubKalshiLiveDemoTradesLiveline = forwardRef<
         className,
       )}
     >
-      {onToggleSeries ? (
+      {showLegend ? (
         <HubKalshiLiveDemoTradeSeriesLegend
           items={legendItems}
           hiddenIds={hidden}
-          onToggle={onToggleSeries}
+          onToggle={toggleSeries}
           onChangeColor={onChangeSeriesColor}
           className="shrink-0"
         />
@@ -354,7 +373,14 @@ export const HubKalshiLiveDemoTradesLiveline = forwardRef<
           All series hidden — click a legend item to show it again.
         </p>
       ) : (
-        <div className="min-h-0 w-full flex-1 px-1 pb-3 pt-1 sm:px-2">
+        <div
+          className={cn(
+            "min-h-0 w-full flex-1 px-1 pb-3 pt-1 sm:px-2",
+            // Liveline always draws its own series chips when `series` has
+            // 2+ items; hide them so the legend above is the only toggle.
+            visible.length > 1 && "[&>div:first-child]:hidden",
+          )}
+        >
           <Liveline
             data={primary.data}
             value={primary.value}

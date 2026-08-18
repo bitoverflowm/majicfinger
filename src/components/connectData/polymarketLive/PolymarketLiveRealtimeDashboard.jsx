@@ -702,10 +702,6 @@ export function PolymarketLiveRealtimeDashboard({
                 return (
                   <article
                     key={cardKey}
-                    draggable
-                    onDragStart={() => {
-                      dragRef.current = { marketKey, feedType };
-                    }}
                     onDragOver={(event) => event.preventDefault()}
                     onDrop={() => {
                       const dragged = dragRef.current;
@@ -795,10 +791,16 @@ export function PolymarketLiveRealtimeDashboard({
                             }
                           />
                         ) : null}
-                        <GripVertical
-                          className="size-3.5 cursor-grab text-muted-foreground"
+                        <span
+                          draggable
+                          onDragStart={() => {
+                            dragRef.current = { marketKey, feedType };
+                          }}
+                          className="inline-flex cursor-grab items-center"
                           aria-hidden
-                        />
+                        >
+                          <GripVertical className="size-3.5 text-muted-foreground" />
+                        </span>
                         <Button
                           type="button"
                           variant="ghost"
