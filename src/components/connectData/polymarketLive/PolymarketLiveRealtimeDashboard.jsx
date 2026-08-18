@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import {
   ArrowLeft,
   GripVertical,
+  History,
   Layers,
   Maximize2,
   Minimize2,
@@ -25,6 +26,12 @@ import {
   DropdownMenuLabel,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { useMyStateV2 } from "@/context/stateContextV2";
 import {
   POLYMARKET_REALTIME_FEED_OPTIONS,
@@ -36,6 +43,14 @@ const FEED_LABELS = Object.fromEntries(
   POLYMARKET_REALTIME_FEED_OPTIONS.map((option) => [option.id, option.label]),
 );
 const COLOR_TOKENS = ["chart-1", "chart-2", "chart-3", "chart-4", "chart-5"];
+const LIVE_CANDLE_BARS = 120;
+const FEEDS_WITH_FULL_HISTORY = new Set([
+  "last_trade_price",
+  "price_change",
+  "best_bid_ask",
+  "candlesticks",
+  "tick_size_change",
+]);
 
 function parseLevels(value) {
   if (Array.isArray(value)) return value;
@@ -87,10 +102,6 @@ function outcomeLabel(market, tokenId) {
   );
 }
 
-function priceSeries(rows, market, valueKey = "price") {
-  return multiMarketPriceSeries(rows, [market], valueKey);
-}
-
 function multiMarketPriceSeries(rows, markets, valueKey = "price") {
   let colorIndex = 0;
   const labelWithMarket = (markets || []).length > 1;
@@ -132,17 +143,26 @@ function LastTradeOverlayMenu({
 
   return (
     <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        <Button
-          type="button"
-          variant="outline"
-          size="sm"
-          className="h-7 shrink-0 gap-1 px-2 text-[11px] font-normal"
-        >
-          <Layers className="size-3" aria-hidden />
-          {overlayKeys.length ? `Overlay · ${overlayKeys.length}` : "Overlay markets"}
-        </Button>
-      </DropdownMenuTrigger>
+      <TooltipProvider delayDuration={200}>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <DropdownMenuTrigger asChild>
+              <Button
+                type="button"
+                variant={overlayKeys.length ? "secondary" : "outline"}
+                size="icon"
+                className="size-7 shrink-0"
+              >
+                <Layers className="size-3.5" aria-hidden />
+                <span className="sr-only">Overlay markets</span>
+              </Button>
+            </DropdownMenuTrigger>
+          </TooltipTrigger>
+          <TooltipContent side="bottom" className="text-xs">
+            Overlay markets
+          </TooltipContent>
+        </Tooltip>
+      </TooltipProvider>
       <DropdownMenuContent align="end" className="max-w-sm">
         <DropdownMenuLabel className="text-xs font-normal text-muted-foreground">
           Overlay other workspace markets
@@ -163,6 +183,55 @@ function LastTradeOverlayMenu({
         })}
       </DropdownMenuContent>
     </DropdownMenu>
+  );
+}
+
+function recentRows(rows, maxRows = LIVE_CANDLE_BARS) {
+  if (!rows?.length || rows.length <= maxRows) return rows || [];
+  return rows.slice(-maxRows);
+}
+
+function formatRowTime(row) {
+  if (row?.time) return String(row.time);
+  const timestamp = Number(row?.timestamp);
+  if (Number.isFinite(timestamp)) {
+    const ms = timestamp < 1e12 ? timestamp * 1000 : timestamp;
+    return new Date(ms).toISOString();
+  }
+  return "—";
+}
+
+function TickSizeHistory({ rows }) {
+  if (!rows.length) {
+    return <WaitingForData label="Waiting for a tick-size update…" />;
+  }
+
+  return (
+    <div className="flex h-full min-h-0 flex-col overflow-hidden rounded-md bg-muted/10">
+      <div className="grid shrink-0 grid-cols-[1fr_auto_auto] gap-2 border-b border-border/50 px-3 py-2 text-[10px] uppercase tracking-wide text-muted-foreground">
+        <span>When</span>
+        <span>Previous</span>
+        <span>New</span>
+      </div>
+      <div className="min-h-0 flex-1 overflow-auto">
+        {[...rows].reverse().map((row, index) => (
+          <div
+            key={`${row.asset_id || "tick"}:${row.timestamp || index}`}
+            className="grid grid-cols-[1fr_auto_auto] gap-2 border-b border-border/40 px-3 py-2 text-xs"
+          >
+            <span className="truncate font-mono text-[11px] text-muted-foreground">
+              {formatRowTime(row)}
+            </span>
+            <span className="font-mono tabular-nums text-foreground">
+              {row.old_tick_size ?? "—"}
+            </span>
+            <span className="font-mono tabular-nums font-medium text-foreground">
+              {row.new_tick_size ?? "—"}
+            </span>
+          </div>
+        ))}
+      </div>
+    </div>
   );
 }
 
@@ -240,7 +309,7 @@ function WaitingForData({ label }) {
   );
 }
 
-function CandlestickFeed({ rows, market }) {
+function CandlestickFeed({ rows, market, fullHistory }) {
   const availableTokens = (market.selectedTokenIds || []).filter((tokenId) =>
     rows.some((row) => String(row?.asset_id || "") === String(tokenId)),
   );
@@ -248,9 +317,10 @@ function CandlestickFeed({ rows, market }) {
     () => availableTokens[0] || market.selectedTokenIds?.[0] || "",
   );
   const token = availableTokens.includes(activeToken) ? activeToken : availableTokens[0];
-  const candles = token
+  const allCandles = token
     ? rows.filter((row) => String(row?.asset_id || "") === String(token))
     : [];
+  const candles = fullHistory ? allCandles : recentRows(allCandles);
 
   if (!candles.length) {
     return <WaitingForData label="Waiting for candlestick history or the first trade…" />;
@@ -291,9 +361,11 @@ function hasPlottableSeries(series) {
   return series.some((item) => item.trades.length >= 2);
 }
 
-function FeedVisualization({ feedType, rows, market, chartMarkets, paused }) {
+function FeedVisualization({ feedType, rows, market, chartMarkets, paused, fullHistory }) {
   if (feedType === "book") return <OrderbookDepth rows={rows} market={market} />;
-  if (feedType === "candlesticks") return <CandlestickFeed rows={rows} market={market} />;
+  if (feedType === "candlesticks") {
+    return <CandlestickFeed rows={rows} market={market} fullHistory={fullHistory} />;
+  }
 
   if (feedType === "last_trade_price") {
     const seriesMarkets = chartMarkets?.length ? chartMarkets : [market];
@@ -304,7 +376,8 @@ function FeedVisualization({ feedType, rows, market, chartMarkets, paused }) {
         paused={paused}
         compact
         fill
-        persistHistory
+        persistHistory={!fullHistory}
+        fullHistory={fullHistory}
         className="min-h-0"
       />
     ) : (
@@ -313,12 +386,13 @@ function FeedVisualization({ feedType, rows, market, chartMarkets, paused }) {
   }
 
   if (feedType === "best_bid_ask" || feedType === "price_change") {
-    const bidSeries = priceSeries(rows, market, "best_bid").map((item) => ({
+    const seriesMarkets = chartMarkets?.length ? chartMarkets : [market];
+    const bidSeries = multiMarketPriceSeries(rows, seriesMarkets, "best_bid").map((item) => ({
       ...item,
       id: `bid:${item.id}`,
       label: `${item.label} bid`,
     }));
-    const askSeries = priceSeries(rows, market, "best_ask").map((item, index) => ({
+    const askSeries = multiMarketPriceSeries(rows, seriesMarkets, "best_ask").map((item, index) => ({
       ...item,
       id: `ask:${item.id}`,
       label: `${item.label} ask`,
@@ -327,7 +401,7 @@ function FeedVisualization({ feedType, rows, market, chartMarkets, paused }) {
     const topOfBookSeries = [...bidSeries, ...askSeries];
     const series =
       feedType === "price_change"
-        ? [...priceSeries(rows, market), ...topOfBookSeries]
+        ? [...multiMarketPriceSeries(rows, seriesMarkets), ...topOfBookSeries]
         : topOfBookSeries;
     const latest = [...rows].reverse().find(
       (row) => Number.isFinite(Number(row?.best_bid)) || Number.isFinite(Number(row?.best_ask)),
@@ -362,7 +436,8 @@ function FeedVisualization({ feedType, rows, market, chartMarkets, paused }) {
             paused={paused}
             compact
             fill
-            persistHistory
+            persistHistory={!fullHistory}
+            fullHistory={fullHistory}
             className="min-h-0 flex-1"
           />
         ) : (
@@ -380,20 +455,30 @@ function FeedVisualization({ feedType, rows, market, chartMarkets, paused }) {
     );
   }
 
-  const latest = rows[rows.length - 1];
-  return latest ? (
-    <div className="flex h-full min-h-32 flex-col items-center justify-center rounded-md bg-muted/10 p-4 text-center">
-      <p className="text-[11px] uppercase tracking-wide text-muted-foreground">Current tick size</p>
-      <p className="mt-2 text-3xl font-semibold tabular-nums text-foreground">
-        {latest.new_tick_size ?? "—"}
-      </p>
-      <p className="mt-1 text-[11px] text-muted-foreground">
-        Previous {latest.old_tick_size ?? "—"} · {latest.time || "Live"}
-      </p>
-    </div>
-  ) : (
-    <WaitingForData label="Waiting for a tick-size update…" />
-  );
+  if (feedType === "tick_size_change") {
+    return fullHistory ? (
+      <TickSizeHistory rows={rows} />
+    ) : (
+      (() => {
+        const latest = rows[rows.length - 1];
+        return latest ? (
+          <div className="flex h-full min-h-32 flex-col items-center justify-center rounded-md bg-muted/10 p-4 text-center">
+            <p className="text-[11px] uppercase tracking-wide text-muted-foreground">Current tick size</p>
+            <p className="mt-2 text-3xl font-semibold tabular-nums text-foreground">
+              {latest.new_tick_size ?? "—"}
+            </p>
+            <p className="mt-1 text-[11px] text-muted-foreground">
+              Previous {latest.old_tick_size ?? "—"} · {latest.time || "Live"}
+            </p>
+          </div>
+        ) : (
+          <WaitingForData label="Waiting for a tick-size update…" />
+        );
+      })()
+    );
+  }
+
+  return <WaitingForData label="No visualization for this feed yet." />;
 }
 
 export function PolymarketLiveRealtimeDashboard({
@@ -410,6 +495,7 @@ export function PolymarketLiveRealtimeDashboard({
   const [orderByMarket, setOrderByMarket] = useState({});
   const [wideCards, setWideCards] = useState(new Set());
   const [lastTradeOverlays, setLastTradeOverlays] = useState({});
+  const [fullHistoryCards, setFullHistoryCards] = useState(() => new Set());
   const [activeMarketKey, setActiveMarketKey] = useState(() => {
     const first = session.markets?.[0];
     return first ? String(first.conditionId || first.id || first.slug) : "";
@@ -610,6 +696,7 @@ export function PolymarketLiveRealtimeDashboard({
                 const rows = chartMarkets
                   ? marketsRows(rowsByFeed[feedType], chartMarkets)
                   : marketRows(rowsByFeed[feedType], market);
+                const fullHistory = fullHistoryCards.has(cardKey);
                 const seedCount = rows.filter((row) => row?.source === "rest_seed").length;
                 const liveCount = Math.max(0, rows.length - seedCount);
                 return (
@@ -654,15 +741,44 @@ export function PolymarketLiveRealtimeDashboard({
                           {overlayMarkets.length
                             ? ` · ${overlayMarkets.length + 1} markets`
                             : ""}
+                          {fullHistory ? " · full history" : ""}
                         </p>
                       </div>
                       <div
                         className={cn(
                           "flex shrink-0 items-center gap-0.5",
-                          feedType !== "last_trade_price" &&
+                          feedType === "book" &&
                             "opacity-0 transition-opacity focus-within:opacity-100 group-hover:opacity-100",
                         )}
                       >
+                        {FEEDS_WITH_FULL_HISTORY.has(feedType) ? (
+                          <TooltipProvider delayDuration={200}>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <Button
+                                  type="button"
+                                  variant={fullHistory ? "secondary" : "outline"}
+                                  size="icon"
+                                  className="size-7 shrink-0"
+                                  onClick={() =>
+                                    setFullHistoryCards((current) => {
+                                      const next = new Set(current);
+                                      if (next.has(cardKey)) next.delete(cardKey);
+                                      else next.add(cardKey);
+                                      return next;
+                                    })
+                                  }
+                                >
+                                  <History className="size-3.5" aria-hidden />
+                                  <span className="sr-only">View full history</span>
+                                </Button>
+                              </TooltipTrigger>
+                              <TooltipContent side="bottom" className="text-xs">
+                                View full history
+                              </TooltipContent>
+                            </Tooltip>
+                          </TooltipProvider>
+                        ) : null}
                         {feedType === "last_trade_price" && session.markets.length > 1 ? (
                           <LastTradeOverlayMenu
                             primaryMarketKey={marketKey}
@@ -709,6 +825,7 @@ export function PolymarketLiveRealtimeDashboard({
                         market={market}
                         chartMarkets={chartMarkets}
                         paused={paused}
+                        fullHistory={fullHistory}
                       />
                     </div>
                   </article>

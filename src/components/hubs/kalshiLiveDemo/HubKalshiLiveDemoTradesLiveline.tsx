@@ -42,6 +42,11 @@ type HubKalshiLiveDemoTradesLivelineProps = {
    * the seeded line must stay on screen through quiet stretches.
    */
   persistHistory?: boolean;
+  /**
+   * Show the entire seeded archive at real timestamps (oldest REST seed through
+   * now) while live ticks continue to append. Skips live-window compression.
+   */
+  fullHistory?: boolean;
 };
 /** Floor so a sparse first few polls still have room to breathe. */
 const LIVE_WINDOW_MIN_SECS = 45;
@@ -59,6 +64,8 @@ const LIVE_SEED_TRADE_COUNT = 20;
  */
 const PERSIST_WINDOW_MAX_SECS = 60 * 60;
 const PERSIST_MAX_POINTS = 3000;
+/** Full-history mode: span from oldest seed through live now (up to ~1 year). */
+const FULL_HISTORY_MAX_SECS = 365 * 24 * 60 * 60;
 
 function parseTradeTimeSec(row: TradeRow): number | null {
   const raw = row.created_time ?? row.created_ts ?? row.ts;
@@ -131,11 +138,15 @@ function seedLivePoints(points: { time: number; value: number }[]) {
  * Liveline needs two points to draw, so a lone reading is widened rather than
  * dropped — otherwise a seeded series with a single snapshot renders as empty.
  */
-function persistedPoints(points: { time: number; value: number }[]) {
+function persistedPoints(
+  points: { time: number; value: number }[],
+  fullHistory = false,
+) {
   if (points.length === 1) {
     const only = points[0]!;
     return [{ time: only.time - 8, value: only.value }, only];
   }
+  if (fullHistory) return points;
   return points.length > PERSIST_MAX_POINTS ? points.slice(-PERSIST_MAX_POINTS) : points;
 }
 
@@ -167,6 +178,7 @@ function alignPointsToLiveWindow(
 function windowSecsForPoints(
   pointSets: { time: number; value: number }[][],
   maxSecs: number = LIVE_WINDOW_MAX_SECS,
+  fullHistory = false,
 ) {
   let oldest = Number.POSITIVE_INFINITY;
   let newest = Number.NEGATIVE_INFINITY;
@@ -182,6 +194,16 @@ function windowSecsForPoints(
   }
 
   const nowSec = Date.now() / 1000;
+  if (fullHistory) {
+    const coverOldest = Math.max(0, nowSec - oldest);
+    const spanSecs = Math.max(0, newest - oldest);
+    const padded = Math.ceil(Math.max(spanSecs, coverOldest) * 1.08) + 12;
+    return Math.min(
+      FULL_HISTORY_MAX_SECS,
+      Math.max(LIVE_WINDOW_MIN_SECS, padded),
+    );
+  }
+
   const spanSecs = Math.max(0, newest - oldest);
   // If seed is stale, use a compact live window — points will be aligned into it.
   if (newest < nowSec - maxSecs) {
@@ -222,14 +244,18 @@ export const HubKalshiLiveDemoTradesLiveline = forwardRef<
   compact = false,
   fill = false,
   persistHistory = false,
+  fullHistory = false,
 }, ref) {
   const dark = useIsDarkTheme();
   const hidden = hiddenSeriesIds ?? new Set<string>();
+  const useFullArchive = fullHistory || persistHistory;
 
   const mapped = useMemo(() => {
     const seeded = series.map((item, index) => {
       const points = tradesToPoints(item.trades);
-      const rawPoints = persistHistory ? persistedPoints(points) : seedLivePoints(points);
+      const rawPoints = useFullArchive
+        ? persistedPoints(points, fullHistory)
+        : seedLivePoints(points);
       const token = item.colorToken ?? defaultSeriesColorToken(index);
       const resolved = resolveDemoChartColor(token);
       const explicit =
@@ -250,13 +276,20 @@ export const HubKalshiLiveDemoTradesLiveline = forwardRef<
 
     const windowSecs = windowSecsForPoints(
       seeded.map((s) => s.rawPoints).filter((p) => p.length > 0),
-      persistHistory ? PERSIST_WINDOW_MAX_SECS : LIVE_WINDOW_MAX_SECS,
+      fullHistory
+        ? FULL_HISTORY_MAX_SECS
+        : persistHistory
+          ? PERSIST_WINDOW_MAX_SECS
+          : LIVE_WINDOW_MAX_SECS,
+      fullHistory,
     );
 
     return {
       windowSecs,
       series: seeded.map((s) => {
-        const data = alignPointsToLiveWindow(s.rawPoints, windowSecs);
+        const data = fullHistory
+          ? s.rawPoints
+          : alignPointsToLiveWindow(s.rawPoints, windowSecs);
         return {
           id: s.id,
           label: s.label,
@@ -267,7 +300,7 @@ export const HubKalshiLiveDemoTradesLiveline = forwardRef<
         };
       }),
     };
-  }, [persistHistory, series]);
+  }, [fullHistory, persistHistory, series, useFullArchive]);
 
   const visible = useMemo(
     () => mapped.series.filter((s) => !hidden.has(s.id) && s.data.length > 0),
