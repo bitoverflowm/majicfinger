@@ -31,6 +31,20 @@ const MARKETS_PARAMS = [
   "rewards_min_size", "question_ids", "include_tag", "closed",
 ];
 
+const SERIES_PARAMS = [
+  "limit",
+  "offset",
+  "order",
+  "ascending",
+  "slug",
+  "categories_ids",
+  "categories_labels",
+  "closed",
+  "include_chat",
+  "recurrence",
+  "exclude_events",
+];
+
 /** Parse outcomes/outcomePrices from API (may be JSON string or array) */
 function parseOutcomesAndPrices(market) {
   let outcomes = market.outcomes;
@@ -1173,6 +1187,31 @@ export default async function handler(req, res) {
         const id = req.query.id;
         if (!id) return res.status(400).json({ message: "Missing required parameter: id" });
         data = await fetchJson(`${GAMMA_BASE}/events/${encodeURIComponent(id)}/tags`);
+        break;
+      }
+      case "listSeries": {
+        const sp = buildSearchParams(SERIES_PARAMS, req.query);
+        for (const key of ["slug", "categories_ids", "categories_labels"]) {
+          const raw = req.query[key];
+          if (typeof raw === "string" && raw.includes(",")) {
+            sp.delete(key);
+            for (const part of raw.split(",").map((s) => s.trim()).filter(Boolean)) {
+              sp.append(key, part);
+            }
+          }
+        }
+        data = await fetchJson(`${GAMMA_BASE}/series?${sp}`);
+        break;
+      }
+      case "getSeries": {
+        const id = req.query.id;
+        if (!id) return res.status(400).json({ message: "Missing required parameter: id" });
+        const sp = new URLSearchParams();
+        if (req.query.include_chat === "true" || req.query.include_chat === "false") {
+          sp.set("include_chat", String(req.query.include_chat));
+        }
+        const qs = sp.toString();
+        data = await fetchJson(`${GAMMA_BASE}/series/${encodeURIComponent(id)}${qs ? `?${qs}` : ""}`);
         break;
       }
       case "listMarkets": {

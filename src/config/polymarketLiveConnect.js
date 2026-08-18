@@ -10,6 +10,10 @@ import {
   POLYMARKET_EVENTS_COMPOSE_ENDPOINT_ID,
 } from "@/lib/polymarketLive/eventsCompose";
 import {
+  POLYMARKET_SERIES_COMPOSE_COLUMNS,
+  POLYMARKET_SERIES_COMPOSE_ENDPOINT_ID,
+} from "@/lib/polymarketLive/seriesCompose";
+import {
   POLYMARKET_MARKETS_BY_EVENTS_COMPOSE_COLUMNS,
   POLYMARKET_MARKETS_BY_EVENTS_ENDPOINT_ID,
 } from "@/lib/polymarketLive/marketsByEventsCompose";
@@ -141,6 +145,7 @@ const ENDPOINT_CATEGORY_BY_QUERY = {
   getEventBySlug: "events",
   getEventTags: "events",
   [POLYMARKET_EVENTS_COMPOSE_ENDPOINT_ID]: "events",
+  [POLYMARKET_SERIES_COMPOSE_ENDPOINT_ID]: "series",
   [POLYMARKET_MARKETS_BY_EVENTS_ENDPOINT_ID]: "markets",
   [POLYMARKET_MARKETS_COMPOSE_ENDPOINT_ID]: "markets",
   [POLYMARKET_HOLDERS_BY_MARKETS_ENDPOINT_ID]: "holders",
@@ -177,22 +182,7 @@ const ENDPOINT_CATEGORY_BY_QUERY = {
  * Placeholder endpoints for API areas not yet wired into Connect home pulls.
  * @type {Array<{ id: string; category: string; title: string; description: string; underConstruction: true }>}
  */
-const PLACEHOLDER_ENDPOINTS = [
-  {
-    id: "listSeries",
-    category: "series",
-    title: "List series",
-    description: "List series (grouped events) with optional filters.",
-    underConstruction: true,
-  },
-  {
-    id: "getSeries",
-    category: "series",
-    title: "Get series by ID",
-    description: "Fetch a single series by ID, including nested events.",
-    underConstruction: true,
-  },
-];
+const PLACEHOLDER_ENDPOINTS = [];
 
 /**
  * Connect home — Polymarket Live endpoints (HTTP + live WebSocket, plus coming-soon stubs).
@@ -274,6 +264,13 @@ export const POLYMARKET_LIVE_CONNECT_ENDPOINTS = [
     title: "Get Event/Events",
     description:
       "Discover event(s), search with natural language, id, slug, or list events that match your criteria by volume, tag, status, etc.",
+  },
+  {
+    id: POLYMARKET_SERIES_COMPOSE_ENDPOINT_ID,
+    category: "series",
+    title: "Series",
+    description:
+      "Look up a specific series by ID, or search for series with matching list-series filters.",
   },
   {
     id: POLYMARKET_LIVE_EVENT_VOLUME_ENDPOINT_ID,
@@ -384,6 +381,9 @@ export function getPolymarketLiveColumnsForEndpoint(endpointQuery) {
   const id = String(endpointQuery || "").trim();
   if (id === POLYMARKET_EVENTS_COMPOSE_ENDPOINT_ID) {
     return POLYMARKET_EVENTS_COMPOSE_COLUMNS;
+  }
+  if (id === POLYMARKET_SERIES_COMPOSE_ENDPOINT_ID) {
+    return POLYMARKET_SERIES_COMPOSE_COLUMNS;
   }
   if (id === POLYMARKET_MARKETS_COMPOSE_ENDPOINT_ID) {
     return POLYMARKET_MARKETS_COMPOSE_COLUMNS;

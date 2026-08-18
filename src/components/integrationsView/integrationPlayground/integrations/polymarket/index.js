@@ -66,6 +66,12 @@ import {
   normalizePolymarketEventsComposeState,
 } from "@/lib/polymarketLive/eventsCompose";
 import {
+  buildPolymarketSeriesListQueryValues,
+  emptyPolymarketSeriesComposeState,
+  normalizePolymarketSeriesComposeState,
+  POLYMARKET_SERIES_COMPOSE_ENDPOINT_ID,
+} from "@/lib/polymarketLive/seriesCompose";
+import {
   emptyPolymarketMarketsByEventsComposeState,
   normalizePolymarketMarketsByEventsComposeState,
   POLYMARKET_MARKETS_BY_EVENTS_ENDPOINT_ID,
@@ -92,6 +98,10 @@ import {
   POLYMARKET_LIVE_EVENT_VOLUME_ENDPOINT_ID,
 } from "@/lib/polymarketLive/liveEventVolumeCompose";
 import { applyPolymarketMarketsByEventsFromEventsPayload } from "@/lib/polymarketLive/polymarketMarketsByEventsPull";
+import {
+  applyPolymarketSeriesListPayload,
+  applyPolymarketSeriesLookupPayload,
+} from "@/lib/polymarketLive/polymarketSeriesPull";
 import {
   createPolymarketHoldersWaterfallWriter,
   fetchPolymarketHoldersByMarketsRows,
@@ -592,6 +602,7 @@ const Polymarket = ({ setConnectedData, requestSheetDestination, connectHomePull
 
     const endpointId = String(connectApiEndpointId || "").trim();
     const isEventsCompose = endpointId === "getEvents";
+    const isSeriesCompose = endpointId === POLYMARKET_SERIES_COMPOSE_ENDPOINT_ID;
     const isMarketsByEventsCompose = endpointId === POLYMARKET_MARKETS_BY_EVENTS_ENDPOINT_ID;
     const isMarketsCompose = endpointId === POLYMARKET_MARKETS_COMPOSE_ENDPOINT_ID;
     const isHoldersByMarketsCompose = endpointId === POLYMARKET_HOLDERS_BY_MARKETS_ENDPOINT_ID;
@@ -618,6 +629,7 @@ const Polymarket = ({ setConnectedData, requestSheetDestination, connectHomePull
     const isEventsStyleCompose = isEventsCompose || isMarketsByEventsCompose;
     const isComposeEndpoint =
       isEventsStyleCompose ||
+      isSeriesCompose ||
       isMarketsCompose ||
       isHoldersByMarketsCompose ||
       isOpenInterestCompose ||
@@ -647,6 +659,12 @@ const Polymarket = ({ setConnectedData, requestSheetDestination, connectHomePull
             ? ENDPOINTS.find((e) => e.query === "getOpenInterest")
             : isLiveEventVolumeCompose
               ? ENDPOINTS.find((e) => e.query === "getLiveVolume")
+                : isSeriesCompose
+                  ? {
+                      query: POLYMARKET_SERIES_COMPOSE_ENDPOINT_ID,
+                      name: "Series",
+                      params: [],
+                    }
               : isSamplingMarketsCompose
                 ? { query: POLYMARKET_SAMPLING_MARKETS_ENDPOINT_ID, name: "Get all current tradable markets", params: [] }
                 : isOrderbooksCompose
@@ -2064,6 +2082,124 @@ const Polymarket = ({ setConnectedData, requestSheetDestination, connectHomePull
             integration: "polymarket",
             source: "polymarket.getBatchPricesHistory",
             meta: { endpoint: POLYMARKET_PRICES_HISTORY_ENDPOINT_ID },
+          });
+          setConnectDataLakePullState?.((prev) => ({
+            ...prev,
+            loading: false,
+            error: msg,
+            label: "",
+            progress: 0,
+          }));
+        }
+      })();
+      return;
+    }
+
+    if (isSeriesCompose) {
+      const compose = normalizePolymarketSeriesComposeState(
+        contextStateV2?.connectPolymarketLiveSeriesCompose ||
+          emptyPolymarketSeriesComposeState(),
+      );
+      if (compose.mode === "lookup" && !compose.seriesId) {
+        setConnectDataLakePullState?.((prev) => ({
+          ...prev,
+          loading: false,
+          error: "Enter a series ID to run a series lookup.",
+        }));
+        return;
+      }
+      setConnectDataLakePullState?.((prev) => ({
+        ...prev,
+        loading: true,
+        error: null,
+        label: compose.mode === "lookup" ? "Pulling series…" : "Finding series…",
+        progress: Math.max(Number(prev.progress) || 0, 5),
+      }));
+      void (async () => {
+        const pullStartMs =
+          typeof performance !== "undefined" && performance?.now ? performance.now() : Date.now();
+        trackDataPullStart({
+          integration: "polymarket",
+          endpoint: POLYMARKET_SERIES_COMPOSE_ENDPOINT_ID,
+          sampleLabel: "Series",
+        });
+        try {
+          const params = new URLSearchParams({
+            query: compose.mode === "lookup" ? "getSeries" : "listSeries",
+          });
+          if (compose.mode === "lookup") {
+            params.set("id", compose.seriesId);
+            if (compose.includeChat === true) params.set("include_chat", "true");
+            else if (compose.includeChat === false) params.set("include_chat", "false");
+          } else {
+            const values = buildPolymarketSeriesListQueryValues(compose);
+            for (const [key, value] of Object.entries(values)) {
+              if (value === undefined || value === null || value === "") continue;
+              params.set(key, String(value));
+            }
+          }
+          const res = await fetch(`/api/integrations/polymarket?${params.toString()}`, {
+            method: "GET",
+            headers: { Accept: "application/json", "Content-Type": "application/json" },
+            credentials: "same-origin",
+          });
+          const data = await res.json().catch(() => ({}));
+          if (!res.ok) {
+            throw new Error(typeof data?.message === "string" ? data.message : "Request failed");
+          }
+          const ctx = {
+            ...contextStateV2,
+            setConnectedData,
+            addNewSheetAndActivate,
+            setSheetData,
+            setDataSheets: contextStateV2?.setDataSheets,
+            setActiveSheetId: contextStateV2?.setActiveSheetId,
+          };
+          const rowCount =
+            compose.mode === "lookup"
+              ? applyPolymarketSeriesLookupPayload(ctx, data, {
+                  sheetLayout: compose.sheetLayout,
+                  selectedColumns: cols,
+                })
+              : applyPolymarketSeriesListPayload(ctx, data, {
+                  selectedColumns: cols,
+                });
+          if (!rowCount) {
+            setConnectDataLakePullState?.((prev) => ({
+              ...prev,
+              loading: false,
+              error: compose.mode === "lookup" ? "Series not found." : "No series matched your filters.",
+              progress: 0,
+              label: "",
+            }));
+            return;
+          }
+          setLastRequestAt(Date.now());
+          setThrottleRemaining(COOLDOWN_MS);
+          setConnectDataLakePullState?.((prev) => ({
+            ...prev,
+            loading: false,
+            label: "",
+            progress: 100,
+            error: null,
+          }));
+          const elapsedMs =
+            (typeof performance !== "undefined" && performance?.now ? performance.now() : Date.now()) -
+            pullStartMs;
+          trackDataPullComplete({
+            integration: "polymarket",
+            endpoint: POLYMARKET_SERIES_COMPOSE_ENDPOINT_ID,
+            sampleLabel: "Series",
+            rowCount,
+            elapsedMs,
+          });
+        } catch (e) {
+          const msg = e instanceof Error ? e.message : "Request failed";
+          trackDataPullError({
+            message: msg,
+            integration: "polymarket",
+            source: "polymarket.seriesCompose",
+            meta: { endpoint: POLYMARKET_SERIES_COMPOSE_ENDPOINT_ID },
           });
           setConnectDataLakePullState?.((prev) => ({
             ...prev,
