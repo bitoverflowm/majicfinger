@@ -33,6 +33,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { useMyStateV2 } from "@/context/stateContextV2";
+import { distinctiveMarketLabels } from "@/lib/polymarketLive/distinctiveMarketLabels";
 import {
   POLYMARKET_REALTIME_FEED_OPTIONS,
   polymarketRealtimeMarketKey,
@@ -104,18 +105,24 @@ function outcomeLabel(market, tokenId) {
 
 function multiMarketPriceSeries(rows, markets, valueKey = "price") {
   let colorIndex = 0;
-  const labelWithMarket = (markets || []).length > 1;
-  return (markets || []).flatMap((market) => {
+  const list = markets || [];
+  const labelWithMarket = list.length > 1;
+  const shortTitles = distinctiveMarketLabels(list.map((market) => marketDisplayLabel(market)));
+  const shortByKey = new Map(
+    list.map((market, index) => [polymarketRealtimeMarketKey(market), shortTitles[index]]),
+  );
+  return list.flatMap((market) => {
     const marketKey = polymarketRealtimeMarketKey(market);
+    const fullTitle = marketDisplayLabel(market);
+    const shortTitle = shortByKey.get(marketKey) || fullTitle;
     return (market.selectedTokenIds || []).map((tokenId) => {
       const outcome = outcomeLabel(market, tokenId);
       const colorToken = COLOR_TOKENS[colorIndex % COLOR_TOKENS.length];
       colorIndex += 1;
       return {
         id: labelWithMarket ? `${marketKey}:${tokenId}` : tokenId,
-        label: labelWithMarket
-          ? `${outcome} · ${marketDisplayLabel(market)}`
-          : outcome,
+        label: labelWithMarket ? `${outcome} · ${shortTitle}` : outcome,
+        fullLabel: labelWithMarket ? `${outcome} · ${fullTitle}` : outcome,
         color: `var(--${colorToken})`,
         colorToken,
         trades: rows
@@ -671,7 +678,7 @@ export function PolymarketLiveRealtimeDashboard({
                 {(market.selectedOutcomes || []).join(" · ")}
               </p>
             </div>
-            <div className="grid auto-rows-[20rem] grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            <div className="grid auto-rows-[36rem] grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
               {order.map((feedType) => {
                 const cardKey = `${marketKey}:${feedType}`;
                 const wide = wideCards.has(cardKey);

@@ -1,6 +1,6 @@
 "use client";
 
-import { forwardRef, useCallback, useEffect, useMemo, useState } from "react";
+import { forwardRef, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { Liveline } from "liveline";
 
 import {
@@ -17,6 +17,8 @@ type TradeRow = Record<string, unknown>;
 export type HubKalshiLiveDemoTradesLivelineSeries = {
   id: string;
   label: string;
+  /** Longer name shown in native title tooltips when labels are abbreviated. */
+  fullLabel?: string;
   color: string;
   colorToken?: DemoChartColorTokenId;
   trades: TradeRow[];
@@ -247,23 +249,7 @@ export const HubKalshiLiveDemoTradesLiveline = forwardRef<
   fullHistory = false,
 }, ref) {
   const dark = useIsDarkTheme();
-  const [ownedHiddenIds, setOwnedHiddenIds] = useState(() => new Set<string>());
-  const hidden = hiddenSeriesIds ?? ownedHiddenIds;
-  const toggleSeries = useCallback(
-    (id: string) => {
-      if (onToggleSeries) {
-        onToggleSeries(id);
-        return;
-      }
-      setOwnedHiddenIds((prev) => {
-        const next = new Set(prev);
-        if (next.has(id)) next.delete(id);
-        else next.add(id);
-        return next;
-      });
-    },
-    [onToggleSeries],
-  );
+  const hidden = hiddenSeriesIds ?? new Set<string>();
   const useFullArchive = fullHistory || persistHistory;
 
   const mapped = useMemo(() => {
@@ -279,6 +265,7 @@ export const HubKalshiLiveDemoTradesLiveline = forwardRef<
       return {
         id: item.id,
         label: item.label,
+        fullLabel: item.fullLabel || item.label,
         colorToken: token,
         color:
           explicit ||
@@ -309,6 +296,7 @@ export const HubKalshiLiveDemoTradesLiveline = forwardRef<
         return {
           id: s.id,
           label: s.label,
+          fullLabel: s.fullLabel,
           colorToken: s.colorToken,
           color: s.color,
           data,
@@ -327,19 +315,30 @@ export const HubKalshiLiveDemoTradesLiveline = forwardRef<
 
   const legendItems = useMemo(
     () =>
-      mapped.series
-        .filter((s) => s.data.length > 0)
-        .map((s) => ({
-          id: s.id,
-          label: s.label,
-          color: s.color,
-          colorToken: s.colorToken,
-        })),
+      mapped.series.map((s) => ({
+        id: s.id,
+        label: s.label,
+        color: s.color,
+        colorToken: s.colorToken,
+      })),
     [mapped.series],
   );
-  const showLegend = legendItems.length > 1;
 
   const primary = visible[0];
+  const chartWrapRef = useRef<HTMLDivElement | null>(null);
+  useLayoutEffect(() => {
+    const root = chartWrapRef.current;
+    if (!root) return;
+    const titles = new Map(
+      mapped.series.map((item) => [item.label, item.fullLabel || item.label]),
+    );
+    for (const button of root.querySelectorAll("button")) {
+      const text = button.textContent?.replace(/\s+/g, " ").trim();
+      const title = text ? titles.get(text) : "";
+      if (title) button.setAttribute("title", title);
+    }
+  }, [mapped.series, visible]);
+
   if (!mapped.series.some((s) => s.data.length)) {
     return (
       <div ref={ref} className={className}>
@@ -359,11 +358,11 @@ export const HubKalshiLiveDemoTradesLiveline = forwardRef<
         className,
       )}
     >
-      {showLegend ? (
+      {onToggleSeries ? (
         <HubKalshiLiveDemoTradeSeriesLegend
           items={legendItems}
           hiddenIds={hidden}
-          onToggle={toggleSeries}
+          onToggle={onToggleSeries}
           onChangeColor={onChangeSeriesColor}
           className="shrink-0"
         />
@@ -374,11 +373,10 @@ export const HubKalshiLiveDemoTradesLiveline = forwardRef<
         </p>
       ) : (
         <div
+          ref={chartWrapRef}
           className={cn(
-            "min-h-0 w-full flex-1 px-1 pb-3 pt-1 sm:px-2",
-            // Liveline always draws its own series chips when `series` has
-            // 2+ items; hide them so the legend above is the only toggle.
-            visible.length > 1 && "[&>div:first-child]:hidden",
+            "min-h-0 w-full flex-1 overflow-hidden px-1 pb-3 pt-1 sm:px-2",
+            fill && "flex flex-col",
           )}
         >
           <Liveline
@@ -405,11 +403,15 @@ export const HubKalshiLiveDemoTradesLiveline = forwardRef<
             window={windowSecs}
             formatValue={(v) => `${Math.round(Number(v))}¢`}
             padding={{ top: 28, right: 92, bottom: 52, left: 18 }}
-            className="h-full w-full"
-            style={{
-              height: "100%",
-              minHeight: fill ? 0 : compact ? "16rem" : "32rem",
-            }}
+            className={cn("w-full", fill ? "min-h-0 flex-1" : "h-full")}
+            style={
+              fill
+                ? { minHeight: 0, flex: "1 1 0%", height: "auto" }
+                : {
+                    height: "100%",
+                    minHeight: compact ? "16rem" : "32rem",
+                  }
+            }
           />
         </div>
       )}
