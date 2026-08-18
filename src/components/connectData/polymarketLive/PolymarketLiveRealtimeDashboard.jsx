@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import {
   ArrowLeft,
   GripVertical,
+  Layers,
   Maximize2,
   Minimize2,
   Pause,
@@ -17,8 +18,18 @@ import {
 import { HubKalshiLiveDemoTradesLiveline } from "@/components/hubs/kalshiLiveDemo/HubKalshiLiveDemoTradesLiveline";
 import { HubKalshiLiveDemoCandlesticksProfessionalChart } from "@/components/hubs/kalshiLiveDemo/HubKalshiLiveDemoCandlesticksProfessionalChart";
 import { Button } from "@/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuCheckboxItem,
+  DropdownMenuContent,
+  DropdownMenuLabel,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { useMyStateV2 } from "@/context/stateContextV2";
-import { POLYMARKET_REALTIME_FEED_OPTIONS } from "@/lib/polymarketLive/polymarketRealtimeCompose";
+import {
+  POLYMARKET_REALTIME_FEED_OPTIONS,
+  polymarketRealtimeMarketKey,
+} from "@/lib/polymarketLive/polymarketRealtimeCompose";
 import { cn } from "@/lib/utils";
 
 const FEED_LABELS = Object.fromEntries(
@@ -58,6 +69,17 @@ function marketRows(rows, market) {
   return (rows || []).filter((row) => tokens.has(String(row?.asset_id || "")));
 }
 
+function marketsRows(rows, markets) {
+  const tokens = new Set(
+    (markets || []).flatMap((market) => market.selectedTokenIds || []),
+  );
+  return (rows || []).filter((row) => tokens.has(String(row?.asset_id || "")));
+}
+
+function marketDisplayLabel(market) {
+  return market.title || market.slug || market.id || "Market";
+}
+
 function outcomeLabel(market, tokenId) {
   return (
     market.outcomePairs?.find((pair) => String(pair.tokenId) === String(tokenId))?.outcome ||
@@ -66,19 +88,82 @@ function outcomeLabel(market, tokenId) {
 }
 
 function priceSeries(rows, market, valueKey = "price") {
-  return (market.selectedTokenIds || []).map((tokenId, index) => ({
-    id: tokenId,
-    label: outcomeLabel(market, tokenId),
-    color: `var(--${COLOR_TOKENS[index % COLOR_TOKENS.length]})`,
-    colorToken: COLOR_TOKENS[index % COLOR_TOKENS.length],
-    trades: rows
-      .filter((row) => String(row?.asset_id || "") === tokenId)
-      .map((row) => ({
-        created_time: row.time || new Date(Number(row.timestamp || Date.now())).toISOString(),
-        yes_price_dollars: Number(row[valueKey]),
-      }))
-      .filter((row) => Number.isFinite(row.yes_price_dollars)),
-  }));
+  return multiMarketPriceSeries(rows, [market], valueKey);
+}
+
+function multiMarketPriceSeries(rows, markets, valueKey = "price") {
+  let colorIndex = 0;
+  const labelWithMarket = (markets || []).length > 1;
+  return (markets || []).flatMap((market) => {
+    const marketKey = polymarketRealtimeMarketKey(market);
+    return (market.selectedTokenIds || []).map((tokenId) => {
+      const outcome = outcomeLabel(market, tokenId);
+      const colorToken = COLOR_TOKENS[colorIndex % COLOR_TOKENS.length];
+      colorIndex += 1;
+      return {
+        id: labelWithMarket ? `${marketKey}:${tokenId}` : tokenId,
+        label: labelWithMarket
+          ? `${outcome} · ${marketDisplayLabel(market)}`
+          : outcome,
+        color: `var(--${colorToken})`,
+        colorToken,
+        trades: rows
+          .filter((row) => String(row?.asset_id || "") === tokenId)
+          .map((row) => ({
+            created_time: row.time || new Date(Number(row.timestamp || Date.now())).toISOString(),
+            yes_price_dollars: Number(row[valueKey]),
+          }))
+          .filter((row) => Number.isFinite(row.yes_price_dollars)),
+      };
+    });
+  });
+}
+
+function LastTradeOverlayMenu({
+  primaryMarketKey,
+  sessionMarkets,
+  overlayKeys,
+  onToggle,
+}) {
+  const otherMarkets = (sessionMarkets || []).filter(
+    (market) => polymarketRealtimeMarketKey(market) !== primaryMarketKey,
+  );
+  if (!otherMarkets.length) return null;
+
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          className="h-7 shrink-0 gap-1 px-2 text-[11px] font-normal"
+        >
+          <Layers className="size-3" aria-hidden />
+          {overlayKeys.length ? `Overlay · ${overlayKeys.length}` : "Overlay markets"}
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" className="max-w-sm">
+        <DropdownMenuLabel className="text-xs font-normal text-muted-foreground">
+          Overlay other workspace markets
+        </DropdownMenuLabel>
+        {otherMarkets.map((market) => {
+          const key = polymarketRealtimeMarketKey(market);
+          return (
+            <DropdownMenuCheckboxItem
+              key={key}
+              checked={overlayKeys.includes(key)}
+              onCheckedChange={(checked) => onToggle(key, Boolean(checked))}
+              onSelect={(event) => event.preventDefault()}
+              className="text-xs"
+            >
+              <span className="truncate">{marketDisplayLabel(market)}</span>
+            </DropdownMenuCheckboxItem>
+          );
+        })}
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
 }
 
 function OrderbookDepth({ rows, market }) {
@@ -206,12 +291,13 @@ function hasPlottableSeries(series) {
   return series.some((item) => item.trades.length >= 2);
 }
 
-function FeedVisualization({ feedType, rows, market, paused }) {
+function FeedVisualization({ feedType, rows, market, chartMarkets, paused }) {
   if (feedType === "book") return <OrderbookDepth rows={rows} market={market} />;
   if (feedType === "candlesticks") return <CandlestickFeed rows={rows} market={market} />;
 
   if (feedType === "last_trade_price") {
-    const series = priceSeries(rows, market);
+    const seriesMarkets = chartMarkets?.length ? chartMarkets : [market];
+    const series = multiMarketPriceSeries(rows, seriesMarkets);
     return hasPlottableSeries(series) ? (
       <HubKalshiLiveDemoTradesLiveline
         series={series}
@@ -323,6 +409,7 @@ export function PolymarketLiveRealtimeDashboard({
   const dragRef = useRef(null);
   const [orderByMarket, setOrderByMarket] = useState({});
   const [wideCards, setWideCards] = useState(new Set());
+  const [lastTradeOverlays, setLastTradeOverlays] = useState({});
   const [activeMarketKey, setActiveMarketKey] = useState(() => {
     const first = session.markets?.[0];
     return first ? String(first.conditionId || first.id || first.slug) : "";
@@ -504,7 +591,25 @@ export function PolymarketLiveRealtimeDashboard({
                 const wide = wideCards.has(cardKey);
                 const sheetId = session.sheetsByFeed[feedType];
                 const stream = streams[sheetId];
-                const rows = marketRows(rowsByFeed[feedType], market);
+                const overlayKeys =
+                  feedType === "last_trade_price" ? lastTradeOverlays[marketKey] || [] : [];
+                const overlayMarkets =
+                  feedType === "last_trade_price"
+                    ? overlayKeys
+                        .map((key) =>
+                          session.markets.find(
+                            (candidate) => polymarketRealtimeMarketKey(candidate) === key,
+                          ),
+                        )
+                        .filter(Boolean)
+                    : [];
+                const chartMarkets =
+                  feedType === "last_trade_price" && overlayMarkets.length
+                    ? [market, ...overlayMarkets]
+                    : null;
+                const rows = chartMarkets
+                  ? marketsRows(rowsByFeed[feedType], chartMarkets)
+                  : marketRows(rowsByFeed[feedType], market);
                 const seedCount = rows.filter((row) => row?.source === "rest_seed").length;
                 const liveCount = Math.max(0, rows.length - seedCount);
                 return (
@@ -546,9 +651,34 @@ export function PolymarketLiveRealtimeDashboard({
                           {seedCount} REST seed{seedCount === 1 ? "" : "s"}
                           {" · "}
                           {liveCount} live update{liveCount === 1 ? "" : "s"}
+                          {overlayMarkets.length
+                            ? ` · ${overlayMarkets.length + 1} markets`
+                            : ""}
                         </p>
                       </div>
-                      <div className="flex shrink-0 items-center gap-0.5 opacity-0 transition-opacity focus-within:opacity-100 group-hover:opacity-100">
+                      <div
+                        className={cn(
+                          "flex shrink-0 items-center gap-0.5",
+                          feedType !== "last_trade_price" &&
+                            "opacity-0 transition-opacity focus-within:opacity-100 group-hover:opacity-100",
+                        )}
+                      >
+                        {feedType === "last_trade_price" && session.markets.length > 1 ? (
+                          <LastTradeOverlayMenu
+                            primaryMarketKey={marketKey}
+                            sessionMarkets={session.markets}
+                            overlayKeys={overlayKeys}
+                            onToggle={(overlayKey, checked) =>
+                              setLastTradeOverlays((current) => {
+                                const previous = current[marketKey] || [];
+                                const next = checked
+                                  ? [...new Set([...previous, overlayKey])]
+                                  : previous.filter((key) => key !== overlayKey);
+                                return { ...current, [marketKey]: next };
+                              })
+                            }
+                          />
+                        ) : null}
                         <GripVertical
                           className="size-3.5 cursor-grab text-muted-foreground"
                           aria-hidden
@@ -573,7 +703,13 @@ export function PolymarketLiveRealtimeDashboard({
                       </div>
                     </div>
                     <div className="min-h-0 flex-1 overflow-hidden p-2">
-                      <FeedVisualization feedType={feedType} rows={rows} market={market} paused={paused} />
+                      <FeedVisualization
+                        feedType={feedType}
+                        rows={rows}
+                        market={market}
+                        chartMarkets={chartMarkets}
+                        paused={paused}
+                      />
                     </div>
                   </article>
                 );
