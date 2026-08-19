@@ -5,6 +5,7 @@ import {
   LayoutDashboard,
   LineChart,
   MousePointerClick,
+  Users,
   type LucideIcon,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -19,6 +20,13 @@ const PILL_ICONS: Record<string, LucideIcon> = {
   "Live Orderbooks": BookOpen,
   "Live Charts & Dashboards": LayoutDashboard,
   "Live Candlesticks": LineChart,
+  "Live prices": LineChart,
+  "Spreads and liquidity": Activity,
+  "Order books": BookOpen,
+  Trades: Activity,
+  Candlesticks: LineChart,
+  "Holders and positions": Users,
+  "Live dashboards": LayoutDashboard,
 };
 
 type HubHeroCapabilityPillsProps = {

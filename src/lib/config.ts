@@ -186,6 +186,8 @@ export const siteConfig = {
         { id: 14, title: "Polymarket metadata", url: "/polymarket-metadata" },
         { id: 15, title: "Kalshi Historical Data", url: "/kalshi-historical-data" },
         { id: 16, title: "Kalshi Live Data", url: "/kalshi-live-data" },
+        { id: 17, title: "Polymarket Live Data", url: "/polymarket-live-data" },
+        { id: 18, title: "Polymarket Historical Data", url: "/polymarket-historical-data" },
       ],
     },
   ],

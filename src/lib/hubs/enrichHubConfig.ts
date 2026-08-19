@@ -25,6 +25,11 @@ export function enrichHubConfig(config: HubPageConfig): HubPageConfig {
       return [section];
     }
 
+    // Manual groups already authored on the hub — keep as-is.
+    if (section.groups && section.groups.length > 0) {
+      return [section];
+    }
+
     if (groups.length === 0) return [];
     return [{ ...section, groups }];
   });

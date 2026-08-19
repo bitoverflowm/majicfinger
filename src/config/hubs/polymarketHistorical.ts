@@ -46,6 +46,9 @@ export const polymarketHistoricalHub: HubPageConfig = {
     {
       type: "hero",
       title: "Polymarket Historical",
+      badge: "Looking for live Polymarket prices, trades, and order books?",
+      badgeHref: "/polymarket-live-data",
+      badgeIcon: "dot",
       subtitle:
         "Analyze Polymarket market history — archived odds, resolved outcomes, event metadata, and long-run probability trends.",
       microtext:
@@ -57,7 +60,20 @@ export const polymarketHistoricalHub: HubPageConfig = {
       type: "text_block",
       title: "What is Polymarket Historical Data?",
       content:
-        "Polymarket historical data includes past market prices, resolution outcomes, event metadata, and category-level activity across crypto-native prediction markets. Lychee helps you look up market identifiers, pull event archives, and build charts that show how implied probabilities evolved before resolution — useful for calibration studies, strategy backtests, and market-efficiency research.",
+        "Polymarket historical data includes past market prices, resolution outcomes, event metadata, and category-level activity across crypto-native prediction markets. Lychee helps you look up market identifiers, pull event archives, and build charts that show how implied probabilities evolved before resolution — useful for calibration studies, strategy backtests, and market-efficiency research. For active markets and current conditions, explore live Polymarket data in the same workspace.",
+      contentParts: [
+        {
+          type: "text",
+          value:
+            "Polymarket historical data includes past market prices, resolution outcomes, event metadata, and category-level activity across crypto-native prediction markets. Lychee helps you look up market identifiers, pull event archives, and build charts that show how implied probabilities evolved before resolution — useful for calibration studies, strategy backtests, and market-efficiency research. For active markets and current conditions, ",
+        },
+        {
+          type: "link",
+          label: "explore live Polymarket data",
+          href: "/polymarket-live-data",
+        },
+        { type: "text", value: " in the same workspace." },
+      ],
     },
     {
       type: "link_group",

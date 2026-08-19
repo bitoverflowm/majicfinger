@@ -4,7 +4,7 @@ import ChartDashboard from "@/models/ChartDashboards";
 import Chart from "@/models/Charts";
 import User from "@/models/Users";
 import { getAllContent, getAllSlugs } from "@/lib/content";
-import { getAllHubSlugs } from "@/config/hubs";
+import { getAllHubs } from "@/config/hubs";
 import { getSiteUrl } from "@/lib/site";
 
 export const runtime = "nodejs";
@@ -51,17 +51,23 @@ export async function GET() {
   const urls: UrlEntry[] = [];
 
   // Core static pages (high priority, stable).
-  const staticPaths: Array<{ path: string; priority?: string; changefreq?: string }> = [
+  const staticPaths: Array<{
+    path: string;
+    priority?: string;
+    changefreq?: string;
+    lastmod?: string;
+  }> = [
     { path: "/", priority: "1.0", changefreq: "weekly" },
     { path: "/guides", priority: "0.9", changefreq: "weekly" },
     { path: "/charts", priority: "0.7", changefreq: "weekly" },
     { path: "/dashboards-gallery", priority: "0.85", changefreq: "weekly" },
     { path: "/search", priority: "0.6", changefreq: "weekly" },
     { path: "/polymarket-metadata", priority: "0.7", changefreq: "monthly" },
-    ...getAllHubSlugs().map((slug) => ({
-      path: `/${slug}`,
+    ...getAllHubs().map((hub) => ({
+      path: `/${hub.slug}`,
       priority: "0.85",
       changefreq: "weekly" as const,
+      lastmod: hub.updatedAt || hub.publishedAt,
     })),
     { path: "/terms", priority: "0.2", changefreq: "yearly" },
     { path: "/privacy", priority: "0.2", changefreq: "yearly" },
@@ -69,6 +75,7 @@ export async function GET() {
   for (const p of staticPaths) {
     urls.push({
       loc: `${SITE}${p.path}`,
+      lastmod: p.lastmod,
       priority: p.priority,
       changefreq: p.changefreq,
     });

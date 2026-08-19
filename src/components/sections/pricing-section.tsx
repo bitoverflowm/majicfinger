@@ -96,9 +96,18 @@ type LifetimeAccess = {
   features: string[];
 };
 
-export function PricingSection() {
+export function PricingSection({
+  title: titleOverride,
+  description: descriptionOverride,
+}: {
+  title?: string;
+  description?: string;
+} = {}) {
   const [billingCycle, setBillingCycle] = useState<BillingCycle>("monthly");
-  const { title, description, pricingItems } = siteConfig.pricingSection;
+  const { title: defaultTitle, description: defaultDescription, pricingItems } =
+    siteConfig.pricingSection;
+  const title = titleOverride?.trim() || defaultTitle;
+  const description = descriptionOverride?.trim() || defaultDescription;
   const includedInPaidPlans = (
     siteConfig.pricingSection as {
       includedInPaidPlans?: { label: string; items: readonly string[] };

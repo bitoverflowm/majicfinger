@@ -33,6 +33,7 @@ import { HubKalshiQueryMockup } from "@/components/hubs/kalshiQuery/HubKalshiQue
 import { HubLazyWhenVisible } from "@/components/hubs/HubLazyWhenVisible";
 import { HubProofMetrics } from "@/components/hubs/HubProofMetrics";
 import { HubVideoInstructionsCarousel } from "@/components/hubs/HubVideoInstructionsCarousel";
+import { HubDemoModule } from "@/components/hubs/polymarketLiveDemo/HubDemoModule";
 import { PricingSection } from "@/components/sections/pricing-section";
 import {
   HubChartEmbedSkeleton,
@@ -112,6 +113,29 @@ const HubKalshiLiveHeroTradesChartLazy = dynamic(
   },
 );
 
+const HubPolymarketLiveHeroTradesChartLazy = dynamic(
+  () =>
+    import("@/components/hubs/polymarketLiveDemo/HubPolymarketLiveHeroTradesChart").then(
+      (m) => m.HubPolymarketLiveHeroTradesChart,
+    ),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="w-full overflow-hidden rounded-xl bg-card/40">
+        <HubHeroChartEmbedSkeleton />
+      </div>
+    ),
+  },
+);
+
+function HubSectionEyebrow({ children }: { children: string }) {
+  return (
+    <p className="text-[0.7rem] font-semibold uppercase tracking-[0.18em] text-secondary">
+      {children}
+    </p>
+  );
+}
+
 function HubHeroBadge({
   badge,
   badgeHref,
@@ -181,7 +205,8 @@ function HubHero({ section }: { section: HubHeroSection }) {
                   badgeHref={section.badgeHref}
                   badgeIcon={section.badgeIcon}
                 />
-              ) : section.eyebrow ? (
+              ) : null}
+              {section.eyebrow ? (
                 <p className="text-[0.7rem] font-semibold uppercase tracking-[0.18em] text-secondary">
                   {section.eyebrow}
                 </p>
@@ -220,7 +245,11 @@ function HubHero({ section }: { section: HubHeroSection }) {
 
             {section.heroLiveChart ? (
               <div className="w-full lg:-mr-4 lg:-mt-12 lg:self-start">
-                <HubKalshiLiveHeroTradesChartLazy copy={section.heroLiveChart} />
+                {section.heroLiveChart.source === "polymarket" ? (
+                  <HubPolymarketLiveHeroTradesChartLazy copy={section.heroLiveChart} />
+                ) : (
+                  <HubKalshiLiveHeroTradesChartLazy copy={section.heroLiveChart} />
+                )}
               </div>
             ) : section.heroChart ? (
               <div className="w-full lg:-mr-4 lg:-mt-12 lg:self-start">
@@ -443,12 +472,15 @@ function HubTextBlock({ section }: { section: HubTextBlockSection }) {
 
   return (
     <section
+      id={section.anchorId}
       className={cn(
         "w-full px-6 pt-16 md:pt-24",
         section.connectBelow ? "pb-6 md:pb-8" : "pb-16 md:pb-24",
+        section.anchorId && "scroll-mt-28",
       )}
     >
       <div className="mx-auto w-full max-w-2xl space-y-5">
+        {section.eyebrow ? <HubSectionEyebrow>{section.eyebrow}</HubSectionEyebrow> : null}
         <h2 className="text-xl font-semibold tracking-tight text-foreground md:text-2xl">
           {section.title}
         </h2>
@@ -470,6 +502,21 @@ function HubTextBlock({ section }: { section: HubTextBlockSection }) {
           <p className="text-sm leading-relaxed text-muted-foreground md:text-base text-pretty">
             {section.supportingText}
           </p>
+        ) : null}
+        {section.bullets?.length ? (
+          <ul className="space-y-2">
+            {section.bullets.map((bullet) => (
+              <li
+                key={bullet}
+                className="flex gap-3 text-base leading-relaxed text-foreground"
+              >
+                <span className="text-muted-foreground" aria-hidden>
+                  •
+                </span>
+                <span>{bullet}</span>
+              </li>
+            ))}
+          </ul>
         ) : null}
         {section.footerLink ? (
           <p className="text-base leading-relaxed text-muted-foreground md:text-lg text-pretty">
@@ -498,25 +545,40 @@ function HubCards({ section }: { section: HubCardsSection }) {
     >
       <div className="mx-auto w-full max-w-4xl space-y-10 px-2 sm:px-0">
         <div className="mx-auto max-w-2xl space-y-4 text-center">
+          {section.eyebrow ? (
+            <div className="flex justify-center">
+              <HubSectionEyebrow>{section.eyebrow}</HubSectionEyebrow>
+            </div>
+          ) : null}
           <h2 className="text-2xl font-semibold tracking-tight text-foreground md:text-3xl">
             {section.title}
           </h2>
-          {section.intro ? (
-            <p className="text-base leading-relaxed text-muted-foreground md:text-lg text-pretty">
-              {section.intro}
-            </p>
-          ) : null}
+          {section.intro
+            ? section.intro.split("\n\n").filter(Boolean).map((paragraph) => (
+                <p
+                  key={paragraph.slice(0, 48)}
+                  className="text-base leading-relaxed text-muted-foreground md:text-lg text-pretty"
+                >
+                  {paragraph}
+                </p>
+              ))
+            : null}
         </div>
         <ul className="grid gap-4 sm:grid-cols-2">
           {section.cards.map((card) => (
             <li
               key={card.title}
-              className="rounded-xl border border-border bg-background p-5 shadow-sm"
+              className="flex flex-col rounded-xl border border-border bg-background p-5 shadow-sm"
             >
               <h3 className="font-semibold text-foreground">{card.title}</h3>
-              <p className="mt-2 text-sm leading-relaxed text-muted-foreground text-pretty">
+              <p className="mt-2 flex-1 text-sm leading-relaxed text-muted-foreground text-pretty">
                 {card.description}
               </p>
+              {card.cta ? (
+                <div className="mt-4">
+                  <HubCtaButton cta={card.cta} variant="secondary" />
+                </div>
+              ) : null}
             </li>
           ))}
         </ul>
@@ -585,7 +647,10 @@ function HubBullets({ section }: { section: HubBulletsSection }) {
 
 function HubFaq({ section }: { section: HubFaqSection }) {
   return (
-    <section className="w-full px-6 py-16 md:py-24">
+    <section
+      id={section.anchorId}
+      className={cn("w-full px-6 py-16 md:py-24", section.anchorId && "scroll-mt-28")}
+    >
       <div className="mx-auto w-full max-w-2xl space-y-10">
         <h2 className="text-center text-2xl font-semibold tracking-tight text-foreground md:text-3xl">
           {section.title}
@@ -593,7 +658,11 @@ function HubFaq({ section }: { section: HubFaqSection }) {
         <dl className="space-y-6">
           {section.items.map((item) => (
             <div key={item.question} className="space-y-2 border-b border-border/60 pb-6 last:border-0">
-              <dt className="text-base font-semibold text-foreground md:text-lg">{item.question}</dt>
+              <dt>
+                <h3 className="text-base font-semibold text-foreground md:text-lg">
+                  {item.question}
+                </h3>
+              </dt>
               <dd className="text-base leading-relaxed text-muted-foreground text-pretty">
                 {item.answerParts?.length ? (
                   <HubInlineCopy parts={item.answerParts} />
@@ -643,6 +712,11 @@ function HubLinkGroup({ section }: { section: HubLinkGroupSection }) {
     >
       <div className="mx-auto w-full max-w-4xl space-y-12">
         <div className="mx-auto max-w-2xl space-y-4 text-center">
+          {section.eyebrow ? (
+            <div className="flex justify-center">
+              <HubSectionEyebrow>{section.eyebrow}</HubSectionEyebrow>
+            </div>
+          ) : null}
           <h2 className="text-2xl font-semibold tracking-tight text-foreground md:text-3xl">
             {section.title}
           </h2>
@@ -685,6 +759,11 @@ function HubLinkGroup({ section }: { section: HubLinkGroupSection }) {
                 </div>
               ))}
         </div>
+        {section.cta ? (
+          <div className="flex justify-center">
+            <HubCtaButton cta={section.cta} variant="secondary" />
+          </div>
+        ) : null}
       </div>
     </section>
   );
@@ -810,6 +889,11 @@ function HubCta({ section }: { section: HubCtaSection }) {
     <section className="w-full px-6 py-20 md:py-28">
       <div className="mx-auto w-full max-w-2xl">
         <div className="rounded-2xl border border-border bg-muted/40 px-8 py-14 text-center md:px-12 md:py-16">
+          {section.eyebrow ? (
+            <div className="mb-4 flex justify-center">
+              <HubSectionEyebrow>{section.eyebrow}</HubSectionEyebrow>
+            </div>
+          ) : null}
           <h2 className="text-2xl font-semibold tracking-tight text-foreground md:text-3xl">
             {section.title}
           </h2>
@@ -822,6 +906,9 @@ function HubCta({ section }: { section: HubCtaSection }) {
               <HubCtaButton cta={section.secondaryCta} variant="secondary" />
             ) : null}
           </div>
+          {section.supportLine ? (
+            <p className="mt-4 text-sm text-muted-foreground">{section.supportLine}</p>
+          ) : null}
         </div>
       </div>
     </section>
@@ -964,12 +1051,29 @@ export function HubSectionRenderer({
       return wrapper(<HubPublishedDashboards section={section} assets={assets} />);
     case "video_carousel":
       return wrapper(<HubVideoCarousel section={section} />);
+    case "demo_module":
+      return wrapper(<HubDemoModule section={section} />);
     case "cta":
       return wrapper(<HubCta section={section} />);
     case "pricing":
       return (
-        <div className="w-full py-10">
-          <PricingSection />
+        <div
+          id={section.anchorId}
+          className={cn("w-full py-10", section.anchorId && "scroll-mt-28")}
+        >
+          {section.eyebrow || section.title || section.description ? (
+            <div className="mx-auto mb-8 max-w-2xl space-y-3 px-6 text-center">
+              {section.eyebrow ? (
+                <div className="flex justify-center">
+                  <HubSectionEyebrow>{section.eyebrow}</HubSectionEyebrow>
+                </div>
+              ) : null}
+            </div>
+          ) : null}
+          <PricingSection
+            title={section.title}
+            description={section.description}
+          />
         </div>
       );
     default:

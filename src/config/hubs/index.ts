@@ -19,3 +19,7 @@ export function getHubBySlug(slug: string): HubPageConfig | null {
 export function getAllHubSlugs(): string[] {
   return Object.keys(HUB_REGISTRY);
 }
+
+export function getAllHubs(): HubPageConfig[] {
+  return Object.values(HUB_REGISTRY);
+}

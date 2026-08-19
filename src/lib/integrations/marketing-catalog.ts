@@ -28,7 +28,7 @@ export const MARKETING_INTEGRATIONS: MarketingIntegrationEntry[] = [
     id: "polymarket",
     label: "Polymarket Live",
     description:
-      "Real-time decentralized Polymarket prediction market API — live prices, events, and streaming charts.",
+      "Search live Polymarket markets, follow prices, trades, order books, and holders, and build charts and dashboards without code.",
     href: integrationPath("polymarket"),
   },
   {

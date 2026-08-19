@@ -72,7 +72,7 @@ export type HubHeroSection = {
     };
   };
   /**
-   * Live Kalshi trades Liveline in the premium hero right column
+   * Live trades Liveline in the premium hero right column
    * (mutually preferred over `heroChart` when both are set).
    */
   heroLiveChart?: {
@@ -82,8 +82,12 @@ export type HubHeroSection = {
       label: string;
       href: string;
     };
-    /** Poll interval while visible (default 20s). */
+    /** Poll interval while visible (default 20s). Kalshi REST poll only. */
     pollIntervalMs?: number;
+    /** Which live feed to render. Defaults to kalshi. */
+    source?: "kalshi" | "polymarket";
+    /** Freeze the rotator when this page section is used. */
+    freezeOnAnchorId?: string;
   };
   capabilityPills?: string[];
   primaryCTAs: HubCta[];
@@ -145,12 +149,16 @@ export type HubInlinePart =
 export type HubTextBlockSection = {
   type: "text_block";
   title: string;
+  /** Small uppercase label above the H2. */
+  eyebrow?: string;
+  anchorId?: string;
   /** Plain-text body (also used for schema / accessibility when contentParts is set). */
   content: string;
   /** When set, rendered instead of `content` so phrases can link out. */
   contentParts?: HubInlinePart[];
   /** Optional supporting line under the body paragraph. */
   supportingText?: string;
+  bullets?: string[];
   /** Optional underlined text link after body (e.g. scroll to demo). */
   footerLink?: {
     label: string;
@@ -163,11 +171,13 @@ export type HubTextBlockSection = {
 export type HubCard = {
   title: string;
   description: string;
+  cta?: HubCta;
 };
 
 export type HubCardsSection = {
   type: "cards";
   anchorId?: string;
+  eyebrow?: string;
   title: string;
   intro?: string;
   note?: string;
@@ -225,24 +235,29 @@ export type HubFaqItem = {
 export type HubFaqSection = {
   type: "faq";
   title: string;
+  anchorId?: string;
   items: HubFaqItem[];
 };
 
 export type HubLinkGroupSection = {
   type: "link_group";
   anchorId?: string;
+  eyebrow?: string;
   title: string;
   description?: string;
   /** Flat topic groups (legacy / registry injection). */
   groups?: HubLinkGroup[];
   /** Category → subcategory hierarchy (Guides, Research, Charts, …). */
   categories?: HubLinkCategory[];
+  cta?: HubCta;
 };
 
 export type HubCtaSection = {
   type: "cta";
+  eyebrow?: string;
   title: string;
   description: string;
+  supportLine?: string;
   cta: HubCta;
   secondaryCta?: HubCta;
 };
@@ -298,6 +313,41 @@ export type HubKalshiLiveBonusFeaturesSection = {
 /** Same marketing pricing table as the homepage (`#pricing`). */
 export type HubPricingSection = {
   type: "pricing";
+  anchorId?: string;
+  eyebrow?: string;
+  title?: string;
+  description?: string;
+};
+
+export type HubDemoDefinition = {
+  term: string;
+  definition: string;
+};
+
+/** Polished placeholder (or future live slot) for a landing-page demo module. */
+export type HubDemoModuleSection = {
+  type: "demo_module";
+  anchorId: string;
+  eyebrow?: string;
+  title: string;
+  content: string;
+  contentParts?: HubInlinePart[];
+  callout?: string;
+  definitions?: HubDemoDefinition[];
+  bullets?: string[];
+  examplesTitle?: string;
+  examples?: string[];
+  inlineHeading?: string;
+  inlineHelper?: string;
+  placeholder?: string;
+  cta?: HubCta;
+  secondaryCta?: HubCta;
+  internalLink?: {
+    prefix?: string;
+    label: string;
+    href: string;
+  };
+  note?: string;
 };
 
 export type HubSection =
@@ -317,6 +367,7 @@ export type HubSection =
   | HubVideoCarouselSection
   | HubKalshiLiveDemoSection
   | HubKalshiLiveBonusFeaturesSection
+  | HubDemoModuleSection
   | HubPricingSection;
 
 export type HubAssetFilter = {

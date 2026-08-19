@@ -158,5 +158,23 @@ export function buildHubJsonLd(config: HubPageConfig) {
     ],
   };
 
-  return { webPage, breadcrumb, faqPage };
+  const softwareApplication = {
+    "@context": "https://schema.org",
+    "@type": "SoftwareApplication",
+    name: config.integration?.[0]
+      ? `Lychee ${config.title}`
+      : "Lychee",
+    applicationCategory: "BusinessApplication",
+    operatingSystem: "Web",
+    url,
+    description: config.description,
+    image: imageUrl,
+    publisher: {
+      "@type": "Organization",
+      name: "LycheeData",
+      url: SITE_URL,
+    },
+  };
+
+  return { webPage, breadcrumb, faqPage, softwareApplication };
 }
