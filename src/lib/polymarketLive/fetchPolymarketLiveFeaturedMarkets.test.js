@@ -23,11 +23,15 @@ test("normalizePolymarketFeaturedMarket pairs Yes/No token ids", () => {
     clobTokenIds: '["tok-yes","tok-no"]',
     outcomes: '["Yes","No"]',
     outcomePrices: '["0.63","0.37"]',
+    image: "https://example.com/rain.png",
+    tags: [{ label: "Weather" }, { slug: "nyc" }],
   });
 
   assert.equal(market?.title, "Will it rain in NYC tomorrow?");
   assert.equal(market?.featured, true);
   assert.equal(market?.volume24h, 123456);
+  assert.equal(market?.imageUrl, "https://example.com/rain.png");
+  assert.deepEqual(market?.tags, ["Weather", "nyc"]);
   assert.deepEqual(
     market?.outcomes.map((row) => [row.outcome, row.tokenId, row.lastPrice]),
     [

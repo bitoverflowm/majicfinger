@@ -49,6 +49,11 @@ type HubKalshiLiveDemoTradesLivelineProps = {
    * now) while live ticks continue to append. Skips live-window compression.
    */
   fullHistory?: boolean;
+  /**
+   * When two or more series are visible, pin the Y-axis to this domain
+   * (e.g. price 0–100). Hidden again as soon as only one line remains.
+   */
+  fixedValueDomain?: { min: number; max: number };
 };
 /** Floor so a sparse first few polls still have room to breathe. */
 const LIVE_WINDOW_MIN_SECS = 45;
@@ -220,6 +225,49 @@ function windowSecsForPoints(
   return Math.min(maxSecs, Math.max(LIVE_WINDOW_MIN_SECS, padded));
 }
 
+const EMPTY_HIDDEN_IDS: ReadonlySet<string> = new Set();
+const DOMAIN_SENTINEL_PREFIX = "__liveline_domain_";
+const DOMAIN_SENTINEL_COLOR = "rgba(0,0,0,0)";
+
+function buildDomainSentinelSeries(
+  domain: { min: number; max: number },
+  existing: { data: { time: number; value: number }[] }[],
+) {
+  let tMin = Number.POSITIVE_INFINITY;
+  let tMax = Number.NEGATIVE_INFINITY;
+  for (const s of existing) {
+    for (const p of s.data) {
+      if (p.time < tMin) tMin = p.time;
+      if (p.time > tMax) tMax = p.time;
+    }
+  }
+  if (!Number.isFinite(tMin) || !Number.isFinite(tMax) || tMax <= tMin) {
+    return [];
+  }
+  return [
+    {
+      id: `${DOMAIN_SENTINEL_PREFIX}min`,
+      label: "",
+      color: DOMAIN_SENTINEL_COLOR,
+      data: [
+        { time: tMin, value: domain.min },
+        { time: tMax, value: domain.min },
+      ],
+      value: domain.min,
+    },
+    {
+      id: `${DOMAIN_SENTINEL_PREFIX}max`,
+      label: "",
+      color: DOMAIN_SENTINEL_COLOR,
+      data: [
+        { time: tMin, value: domain.max },
+        { time: tMax, value: domain.max },
+      ],
+      value: domain.max,
+    },
+  ];
+}
+
 function useIsDarkTheme() {
   const [dark, setDark] = useState(false);
   useEffect(() => {
@@ -247,9 +295,10 @@ export const HubKalshiLiveDemoTradesLiveline = forwardRef<
   fill = false,
   persistHistory = false,
   fullHistory = false,
+  fixedValueDomain,
 }, ref) {
   const dark = useIsDarkTheme();
-  const hidden = hiddenSeriesIds ?? new Set<string>();
+  const hidden = hiddenSeriesIds ?? EMPTY_HIDDEN_IDS;
   const useFullArchive = fullHistory || persistHistory;
 
   const mapped = useMemo(() => {
@@ -266,7 +315,7 @@ export const HubKalshiLiveDemoTradesLiveline = forwardRef<
         id: item.id,
         label: item.label,
         fullLabel: item.fullLabel || item.label,
-        colorToken: token,
+        colorToken: explicit && !item.colorToken ? undefined : token,
         color:
           explicit ||
           (resolved && !resolved.startsWith("var(") ? resolved : null) ||
@@ -310,6 +359,14 @@ export const HubKalshiLiveDemoTradesLiveline = forwardRef<
     () => mapped.series.filter((s) => !hidden.has(s.id) && s.data.length > 0),
     [mapped.series, hidden],
   );
+
+  const plotSeries = useMemo(() => {
+    if (visible.length <= 1 || !fixedValueDomain) return visible;
+    const sentinels = buildDomainSentinelSeries(fixedValueDomain, visible);
+    return sentinels.length ? [...visible, ...sentinels] : visible;
+  }, [fixedValueDomain, visible]);
+
+  const hideBuiltInSeriesToggle = Boolean(onToggleSeries) || plotSeries.length > visible.length;
 
   const windowSecs = mapped.windowSecs;
 
@@ -364,7 +421,7 @@ export const HubKalshiLiveDemoTradesLiveline = forwardRef<
           hiddenIds={hidden}
           onToggle={onToggleSeries}
           onChangeColor={onChangeSeriesColor}
-          className="shrink-0"
+          className={cn("shrink-0", compact && "py-1")}
         />
       ) : null}
       {!primary ? (
@@ -375,16 +432,17 @@ export const HubKalshiLiveDemoTradesLiveline = forwardRef<
         <div
           ref={chartWrapRef}
           className={cn(
-            "min-h-0 w-full flex-1 overflow-hidden px-1 pb-3 pt-1 sm:px-2",
-            fill && "flex flex-col",
+            "flex min-h-0 w-full flex-1 flex-col overflow-hidden px-1 pb-3 pt-1 sm:px-2",
+            hideBuiltInSeriesToggle &&
+              "[&>div:first-child:not(:last-child)]:hidden",
           )}
         >
           <Liveline
             data={primary.data}
             value={primary.value}
             series={
-              visible.length > 1
-                ? visible.map((s) => ({
+              plotSeries.length > 1
+                ? plotSeries.map((s) => ({
                     id: s.id,
                     label: s.label,
                     color: s.color,
@@ -403,13 +461,16 @@ export const HubKalshiLiveDemoTradesLiveline = forwardRef<
             window={windowSecs}
             formatValue={(v) => `${Math.round(Number(v))}¢`}
             padding={{ top: 28, right: 92, bottom: 52, left: 18 }}
-            className={cn("w-full", fill ? "min-h-0 flex-1" : "h-full")}
+            className={cn(
+              "w-full min-h-0 flex-1",
+              !fill && !compact && "h-full",
+            )}
             style={
-              fill
+              fill || compact
                 ? { minHeight: 0, flex: "1 1 0%", height: "auto" }
                 : {
                     height: "100%",
-                    minHeight: compact ? "16rem" : "32rem",
+                    minHeight: "32rem",
                   }
             }
           />

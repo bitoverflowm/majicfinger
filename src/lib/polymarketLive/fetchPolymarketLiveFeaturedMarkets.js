@@ -37,6 +37,9 @@ let featuredCache = null;
  *   title: string;
  *   volume24h: number | null;
  *   featured: boolean;
+ *   imageUrl?: string;
+ *   tags?: string[];
+ *   eventTitle?: string;
  *   outcomes: FeaturedPolymarketOutcome[];
  * }} FeaturedPolymarketMarket
  */
@@ -91,9 +94,40 @@ async function gammaGet(path, query = {}) {
   return body;
 }
 
+function firstImageUrl(...sources) {
+  for (const source of sources) {
+    if (!source || typeof source !== "object") continue;
+    const row = /** @type {Record<string, unknown>} */ (source);
+    const url = String(
+      row.image || row.icon || row.featuredImage || row.imageUrl || "",
+    ).trim();
+    if (url) return url;
+  }
+  return "";
+}
+
+function tagLabelsFrom(source) {
+  if (!source || typeof source !== "object") return [];
+  const raw = /** @type {Record<string, unknown>} */ (source).tags;
+  if (!Array.isArray(raw)) return [];
+  /** @type {string[]} */
+  const labels = [];
+  for (const item of raw) {
+    if (typeof item === "string" && item.trim()) {
+      labels.push(item.trim());
+      continue;
+    }
+    if (!item || typeof item !== "object") continue;
+    const row = /** @type {Record<string, unknown>} */ (item);
+    const label = String(row.label || row.slug || row.name || "").trim();
+    if (label) labels.push(label);
+  }
+  return labels.slice(0, 4);
+}
+
 /**
  * @param {unknown} raw
- * @param {{ featured?: boolean }} [extra]
+ * @param {{ featured?: boolean; imageUrl?: string; tags?: string[]; eventTitle?: string }} [extra]
  * @returns {FeaturedPolymarketMarket | null}
  */
 export function normalizePolymarketFeaturedMarket(raw, extra = {}) {
@@ -129,6 +163,9 @@ export function normalizePolymarketFeaturedMarket(raw, extra = {}) {
     title,
     volume24h: toNum(market.volume24hr ?? market.volume24hrClob ?? market.volume),
     featured: extra.featured === true || market.featured === true,
+    imageUrl: extra.imageUrl || firstImageUrl(market) || undefined,
+    tags: extra.tags?.length ? extra.tags : tagLabelsFrom(market),
+    eventTitle: extra.eventTitle || undefined,
     outcomes: paired,
   };
 }
@@ -161,8 +198,16 @@ function marketsFromEventsPayload(payload) {
     if (!event || typeof event !== "object") continue;
     const nested = Array.isArray(event.markets) ? event.markets : [];
     const featured = event.featured === true;
+    const eventTags = tagLabelsFrom(event);
+    const eventImage = firstImageUrl(event);
+    const eventTitle = String(event.title || event.ticker || "").trim() || undefined;
     for (const raw of nested) {
-      const market = normalizePolymarketFeaturedMarket(raw, { featured });
+      const market = normalizePolymarketFeaturedMarket(raw, {
+        featured,
+        imageUrl: firstImageUrl(raw) || eventImage || undefined,
+        tags: tagLabelsFrom(raw).length ? tagLabelsFrom(raw) : eventTags,
+        eventTitle,
+      });
       if (market) out.push(market);
     }
   }
@@ -208,9 +253,18 @@ async function getFeaturedPool() {
         byKey.set(key, {
           ...market,
           featured: Boolean(prev?.featured || market.featured),
+          imageUrl: market.imageUrl || prev?.imageUrl,
+          tags: market.tags?.length ? market.tags : prev?.tags || [],
+          eventTitle: market.eventTitle || prev?.eventTitle,
         });
-      } else if (market.featured && prev) {
-        byKey.set(key, { ...prev, featured: true });
+      } else if (prev) {
+        byKey.set(key, {
+          ...prev,
+          featured: Boolean(prev.featured || market.featured),
+          imageUrl: prev.imageUrl || market.imageUrl,
+          tags: prev.tags?.length ? prev.tags : market.tags || [],
+          eventTitle: prev.eventTitle || market.eventTitle,
+        });
       }
     }
   };

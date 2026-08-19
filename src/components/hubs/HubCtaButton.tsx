@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, type MouseEvent } from "react";
+import { useCallback, type MouseEvent, type ReactNode } from "react";
 import { trackJourneyEvent } from "@/lib/analytics/journeyClient";
 import { scrollToHashSection } from "@/lib/scrollToHashSection";
 import { getOrCreateVisitorSessionId } from "@/lib/analytics/visitorSession";
@@ -80,6 +80,34 @@ export function HubCtaButton({ cta, variant = "primary" }: HubCtaButtonProps) {
       onClick={handleClick}
     >
       {cta.label}
+    </Link>
+  );
+}
+
+type HubInPageLinkProps = {
+  href: string;
+  children: ReactNode;
+  className?: string;
+  onClick?: (e: MouseEvent<HTMLAnchorElement>) => void;
+};
+
+/** Same-page hash link that smooth-scrolls (Next.js client nav skips native hash scroll). */
+export function HubInPageLink({ href, children, className, onClick }: HubInPageLinkProps) {
+  const handleClick = useCallback(
+    (e: MouseEvent<HTMLAnchorElement>) => {
+      onClick?.(e);
+      if (e.defaultPrevented) return;
+      if (href.startsWith("#") && href.length > 1) {
+        e.preventDefault();
+        scrollToHashSection(href);
+      }
+    },
+    [href, onClick],
+  );
+
+  return (
+    <Link href={href} className={className} prefetch={false} onClick={handleClick}>
+      {children}
     </Link>
   );
 }

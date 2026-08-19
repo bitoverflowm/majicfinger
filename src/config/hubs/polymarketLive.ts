@@ -1,5 +1,12 @@
 import type { HubPageConfig } from "@/types/hub";
 
+const GET_FULL_ACCESS = {
+  label: "Get Full Access Now",
+  href: "#polymarket-live-pricing",
+  requiresAuth: false,
+  ariaLabel: "Get full access now — view Polymarket Live pricing",
+} as const;
+
 const EXPLORE_LIVE = {
   label: "Explore Polymarket Live",
   href: "/#demo",
@@ -71,7 +78,6 @@ export const polymarketLiveHub: HubPageConfig = {
           { type: "metric", value: "No code." },
           { type: "text", value: " " },
           { type: "metric", value: "No data pipeline." },
-          { type: "text", value: " Start with a market question." },
         ],
       },
       heroLiveChart: {
@@ -87,8 +93,10 @@ export const polymarketLiveHub: HubPageConfig = {
       },
       primaryCTAs: [
         {
-          ...EXPLORE_LIVE,
-          ariaLabel: "Explore Polymarket Live in Lychee",
+          label: "Get Access Now",
+          href: "#polymarket-live-pricing",
+          requiresAuth: false,
+          ariaLabel: "Get access now — view Polymarket Live pricing",
         },
       ],
       secondaryCTAs: [
@@ -122,9 +130,11 @@ export const polymarketLiveHub: HubPageConfig = {
           suffix: " Lines",
         },
         {
-          value: "Search markets",
-          label: "Events and series across Polymarket",
-          static: true,
+          value: "100% coverage",
+          label: "Every market, event, series, and trader across Polymarket",
+          tickerValue: 100,
+          decimalPlaces: 0,
+          suffix: "% coverage",
         },
         {
           value: "One Workspace",
@@ -132,8 +142,8 @@ export const polymarketLiveHub: HubPageConfig = {
           static: true,
         },
         {
-          value: "No pipeline",
-          label: "Start with a market question",
+          value: "Real Time",
+          label: "Directly from Polymarket",
           static: true,
         },
       ],
@@ -155,7 +165,8 @@ export const polymarketLiveHub: HubPageConfig = {
         "Compare multiple markets in one dashboard",
       ],
       footerLink: {
-        label: "Start with a market search",
+        label:
+          "Start now with a market search for free (no sign up or card required)",
         href: "#find-polymarket-markets",
       },
       connectBelow: true,
@@ -177,11 +188,14 @@ export const polymarketLiveHub: HubPageConfig = {
       inlineHeading: "Try a Polymarket Search",
       inlineHelper:
         "Describe a topic, event, or outcome. Select a result to update the live examples on this page.",
-      placeholder: "Search for a Polymarket market to load this view.",
-      cta: {
-        label: "Explore More Polymarket Markets",
-        href: "/#demo",
+      placeholder: "Search live Polymarket markets, events, and tags…",
+      demoSlot: "polymarket-live-search",
+      cta: { ...GET_FULL_ACCESS },
+      secondaryCta: {
+        label: "Next: Watch Live Prices for This Market",
+        href: "#live-polymarket-prices",
         requiresAuth: false,
+        ariaLabel: "Continue to live prices for the selected market",
       },
     },
     {
@@ -196,10 +210,13 @@ export const polymarketLiveHub: HubPageConfig = {
       inlineHeading: "Watch a Live Price",
       inlineHelper: "Choose a market and outcome to see its latest price and recent movement.",
       placeholder: "Search for a Polymarket market to load this view.",
-      cta: {
-        label: "Explore Live Polymarket Prices",
-        href: "/#demo",
+      demoSlot: "polymarket-live-prices",
+      cta: { ...GET_FULL_ACCESS },
+      secondaryCta: {
+        label: "Next: Check the Live Spread",
+        href: "#polymarket-spread-liquidity",
         requiresAuth: false,
+        ariaLabel: "Continue to the live spread for the selected market",
       },
       internalLink: {
         prefix: "Learn more in the",
@@ -226,10 +243,12 @@ export const polymarketLiveHub: HubPageConfig = {
       inlineHeading: "Check the Live Spread",
       inlineHelper: "Search for a market to compare its best bid, best ask, and current spread.",
       placeholder: "Search for a Polymarket market to load this view.",
-      cta: {
-        label: "Compare Polymarket Spreads",
-        href: "/#demo",
+      cta: { ...GET_FULL_ACCESS },
+      secondaryCta: {
+        label: "Next: Inspect the Live Order Book",
+        href: "#polymarket-order-book",
         requiresAuth: false,
+        ariaLabel: "Continue to the live order book for the selected market",
       },
       note: "Quotes and available size can change or be cancelled. The view describes current market conditions; it does not guarantee an execution price.",
     },
@@ -250,10 +269,12 @@ export const polymarketLiveHub: HubPageConfig = {
       inlineHeading: "Inspect a Live Order Book",
       inlineHelper: "Select an outcome to see its current bids, asks, and available depth.",
       placeholder: "Search for a Polymarket market to load this view.",
-      cta: {
-        label: "Explore Polymarket Order Books",
-        href: "/#demo",
+      cta: { ...GET_FULL_ACCESS },
+      secondaryCta: {
+        label: "Next: Follow Live Trades",
+        href: "#live-polymarket-trades",
         requiresAuth: false,
+        ariaLabel: "Continue to live trades for the selected market",
       },
     },
     {
@@ -267,10 +288,12 @@ export const polymarketLiveHub: HubPageConfig = {
       inlineHelper:
         "Choose a market to stream its latest executed activity and recent price history.",
       placeholder: "Search for a Polymarket market to load this view.",
-      cta: {
-        label: "Explore Live Polymarket Trades",
-        href: "/#demo",
+      cta: { ...GET_FULL_ACCESS },
+      secondaryCta: {
+        label: "Next: Chart Live Candlesticks",
+        href: "#polymarket-candlestick-charts",
         requiresAuth: false,
+        ariaLabel: "Continue to live candlesticks for the selected market",
       },
     },
     {
@@ -283,10 +306,12 @@ export const polymarketLiveHub: HubPageConfig = {
       inlineHeading: "Build a Live Candlestick Chart",
       inlineHelper: "Select a market, outcome, and time interval to chart the live price path.",
       placeholder: "Search for a Polymarket market to load this view.",
-      cta: {
-        label: "Chart Polymarket Odds",
-        href: "/charts",
+      cta: { ...GET_FULL_ACCESS },
+      secondaryCta: {
+        label: "Next: Explore Holders and Positions",
+        href: "#polymarket-holders-positions",
         requiresAuth: false,
+        ariaLabel: "Continue to holders and positions for the selected market",
       },
       internalLink: {
         prefix: "For longer-range context, see the",
@@ -311,10 +336,12 @@ export const polymarketLiveHub: HubPageConfig = {
       inlineHeading: "Explore Market Holders",
       inlineHelper: "Choose a market to inspect its visible holders and position distribution.",
       placeholder: "Search for a Polymarket market to load this view.",
-      cta: {
-        label: "Explore Polymarket Holders",
-        href: "/#demo",
+      cta: { ...GET_FULL_ACCESS },
+      secondaryCta: {
+        label: "Next: Build a Live Dashboard",
+        href: "#polymarket-live-dashboard",
         requiresAuth: false,
+        ariaLabel: "Continue to a live dashboard for the selected market",
       },
       note: "Large positions are evidence of exposure, not proof of superior information. Use wallet, market, timing, and liquidity context together.",
     },
@@ -336,15 +363,12 @@ export const polymarketLiveHub: HubPageConfig = {
       inlineHeading: "Create a Live Dashboard",
       inlineHelper: "Add the markets and live views you want to monitor together.",
       placeholder: "Search for a Polymarket market to load this view.",
-      cta: {
-        label: "Build a Polymarket Dashboard",
-        href: "/dashboards-gallery",
-        requiresAuth: false,
-      },
+      cta: { ...GET_FULL_ACCESS },
       secondaryCta: {
-        label: "View Dashboard Examples",
-        href: "/dashboards-gallery",
+        label: "Next: Ask Better Market Questions",
+        href: "#analyze-polymarket-live-data",
         requiresAuth: false,
+        ariaLabel: "Continue to live analysis examples",
       },
     },
     {
@@ -376,10 +400,12 @@ export const polymarketLiveHub: HubPageConfig = {
             "Combine trades, spread, depth, and short-interval candlesticks to examine fast changes in an active market.",
         },
       ],
-      cta: {
-        label: "Explore Lychee Analysis Tools",
-        href: "/quant-analysis",
+      cta: { ...GET_FULL_ACCESS },
+      secondaryCta: {
+        label: "Next: Choose Live vs Historical",
+        href: "#live-vs-historical-polymarket-data",
         requiresAuth: false,
+        ariaLabel: "Continue to live vs historical Polymarket data",
       },
     },
     {
@@ -407,6 +433,13 @@ export const polymarketLiveHub: HubPageConfig = {
           },
         },
       ],
+      cta: { ...GET_FULL_ACCESS },
+      secondaryCta: {
+        label: "Next: Browse Live Data Guides",
+        href: "#guides",
+        requiresAuth: false,
+        ariaLabel: "Continue to Polymarket live data guides",
+      },
     },
     {
       type: "link_group",
@@ -463,10 +496,12 @@ export const polymarketLiveHub: HubPageConfig = {
           ],
         },
       ],
-      cta: {
-        label: "Browse All Polymarket Guides",
-        href: "/guides",
+      cta: { ...GET_FULL_ACCESS },
+      secondaryCta: {
+        label: "Next: Choose a Plan",
+        href: "#polymarket-live-pricing",
         requiresAuth: false,
+        ariaLabel: "Continue to Polymarket Live pricing",
       },
     },
     {
@@ -576,11 +611,12 @@ export const polymarketLiveHub: HubPageConfig = {
       description:
         "Find a market in plain English, see what is happening behind the price, and turn the live data into a chart or dashboard built for your research.",
       supportLine: "No code required.",
-      cta: { ...EXPLORE_LIVE },
+      cta: { ...GET_FULL_ACCESS },
       secondaryCta: {
-        label: "View Pricing",
-        href: "#polymarket-live-pricing",
+        label: "Start with a Market Search",
+        href: "#find-polymarket-markets",
         requiresAuth: false,
+        ariaLabel: "Go back to the live market search",
       },
     },
   ],

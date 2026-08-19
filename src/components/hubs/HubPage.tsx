@@ -4,6 +4,7 @@ import { HubAssetSection } from "@/components/hubs/HubAssetSection";
 import { HubAssetSectionSkeleton } from "@/components/hubs/HubAssetSectionSkeleton";
 import { HubHashScrollManager } from "@/components/hubs/HubHashScrollManager";
 import { HubSectionRenderer } from "@/components/hubs/HubSections";
+import { HubPolymarketLiveDemoProvider } from "@/components/hubs/polymarketLiveDemo/HubPolymarketLiveDemoSelection";
 import { EMPTY_HUB_ASSETS } from "@/lib/hubs/loadHubPage";
 import { buildHubJsonLd } from "@/lib/hubs/metadata";
 import type {
@@ -22,6 +23,34 @@ type HubAssetSectionType = HubPublishedChartsSection | HubPublishedDashboardsSec
 
 function isHubAssetSection(section: HubSection): section is HubAssetSectionType {
   return section.type === "published_charts" || section.type === "published_dashboards";
+}
+
+function HubPageSections({ config, slug }: HubPageProps) {
+  return (
+    <>
+      {config.sections.map((section, index) => {
+        if (isHubAssetSection(section)) {
+          return (
+            <Suspense
+              key={`${section.type}-${index}`}
+              fallback={<HubAssetSectionSkeleton section={section} />}
+            >
+              <HubAssetSection slug={slug} section={section} index={index} />
+            </Suspense>
+          );
+        }
+
+        return (
+          <HubSectionRenderer
+            key={`${section.type}-${index}`}
+            section={section}
+            assets={EMPTY_HUB_ASSETS}
+            index={index}
+          />
+        );
+      })}
+    </>
+  );
 }
 
 export function HubPage({ config, slug }: HubPageProps) {
@@ -53,27 +82,13 @@ export function HubPage({ config, slug }: HubPageProps) {
       <HubHashScrollManager />
 
       <main className="flex min-h-screen w-full flex-col items-stretch overflow-x-visible bg-background font-sans antialiased theme-landing scroll-smooth">
-        {config.sections.map((section, index) => {
-          if (isHubAssetSection(section)) {
-            return (
-              <Suspense
-                key={`${section.type}-${index}`}
-                fallback={<HubAssetSectionSkeleton section={section} />}
-              >
-                <HubAssetSection slug={slug} section={section} index={index} />
-              </Suspense>
-            );
-          }
-
-          return (
-            <HubSectionRenderer
-              key={`${section.type}-${index}`}
-              section={section}
-              assets={EMPTY_HUB_ASSETS}
-              index={index}
-            />
-          );
-        })}
+        {config.id === "polymarket-live" ? (
+          <HubPolymarketLiveDemoProvider>
+            <HubPageSections config={config} slug={slug} />
+          </HubPolymarketLiveDemoProvider>
+        ) : (
+          <HubPageSections config={config} slug={slug} />
+        )}
         <FooterSection />
       </main>
     </>

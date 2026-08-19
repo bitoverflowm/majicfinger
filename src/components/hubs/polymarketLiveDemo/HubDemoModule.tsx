@@ -1,5 +1,10 @@
+"use client";
+
 import Link from "next/link";
 import { HubCtaButton } from "@/components/hubs/HubCtaButton";
+import { useHubPolymarketLiveDemo } from "@/components/hubs/polymarketLiveDemo/HubPolymarketLiveDemoSelection";
+import { HubPolymarketLivePricesDemo } from "@/components/hubs/polymarketLiveDemo/HubPolymarketLivePricesDemo";
+import { HubPolymarketLiveSearchDemo } from "@/components/hubs/polymarketLiveDemo/HubPolymarketLiveSearchDemo";
 import { DemoWindowMockup } from "@/components/sections/demo-window-mockup";
 import { cn } from "@/lib/utils";
 import type { HubDemoModuleSection, HubInlinePart } from "@/types/hub";
@@ -29,6 +34,36 @@ function HubInlineCopy({
         return <span key={`text-${index}`}>{part.value}</span>;
       })}
     </span>
+  );
+}
+
+function HubDemoModulePlaceholder({ section }: { section: HubDemoModuleSection }) {
+  const selection = useHubPolymarketLiveDemo();
+  const selected = selection?.markets ?? [];
+
+  return (
+    <div className="flex min-h-[18rem] flex-col justify-center gap-3 px-6 py-10 text-center sm:min-h-[20rem] sm:px-10">
+      {section.inlineHeading ? (
+        <h3 className="text-lg font-semibold tracking-tight text-foreground">
+          {section.inlineHeading}
+        </h3>
+      ) : null}
+      {section.inlineHelper ? (
+        <p className="text-pretty text-sm leading-relaxed text-muted-foreground md:text-base">
+          {section.inlineHelper}
+        </p>
+      ) : null}
+      {selected.length ? (
+        <p className="text-sm text-foreground">
+          Loaded{" "}
+          {selected.map((market) => String(market.title || market.id || "market")).join(" · ")}
+        </p>
+      ) : (
+        <p className="text-sm text-muted-foreground/80">
+          {section.placeholder || "Search for a Polymarket market to load this view."}
+        </p>
+      )}
+    </div>
   );
 }
 
@@ -122,22 +157,30 @@ export function HubDemoModule({ section }: { section: HubDemoModuleSection }) {
       </div>
 
       <div className="mx-auto mt-10 w-full max-w-5xl px-0 sm:px-2">
-        <DemoWindowMockup contentClassName="min-h-[18rem] sm:min-h-[20rem]">
-          <div className="flex min-h-[18rem] flex-col justify-center gap-3 px-6 py-10 text-center sm:min-h-[20rem] sm:px-10">
-            {section.inlineHeading ? (
-              <h3 className="text-lg font-semibold tracking-tight text-foreground">
-                {section.inlineHeading}
-              </h3>
-            ) : null}
-            {section.inlineHelper ? (
-              <p className="text-pretty text-sm leading-relaxed text-muted-foreground md:text-base">
-                {section.inlineHelper}
-              </p>
-            ) : null}
-            <p className="text-sm text-muted-foreground/80">
-              {section.placeholder || "Search for a Polymarket market to load this view."}
-            </p>
-          </div>
+        <DemoWindowMockup
+          contentClassName={
+            section.demoSlot === "polymarket-live-search"
+              ? "h-[min(48rem,78vh)] min-h-0 sm:h-[50rem]"
+              : section.demoSlot === "polymarket-live-prices"
+                ? "h-[min(44rem,78vh)] min-h-0 sm:h-[46rem]"
+                : "min-h-[18rem] sm:min-h-[20rem]"
+          }
+        >
+          {section.demoSlot === "polymarket-live-search" ? (
+            <HubPolymarketLiveSearchDemo
+              heading={section.inlineHeading}
+              helper={section.inlineHelper}
+              placeholder={section.placeholder}
+            />
+          ) : section.demoSlot === "polymarket-live-prices" ? (
+            <HubPolymarketLivePricesDemo
+              heading={section.inlineHeading}
+              helper={section.inlineHelper}
+              placeholder={section.placeholder}
+            />
+          ) : (
+            <HubDemoModulePlaceholder section={section} />
+          )}
         </DemoWindowMockup>
       </div>
 

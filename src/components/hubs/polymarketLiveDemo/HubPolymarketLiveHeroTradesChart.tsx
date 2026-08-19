@@ -293,6 +293,9 @@ export function HubPolymarketLiveHeroTradesChart({
   const [demoFrozen, setDemoFrozen] = useState(false);
   const [socketLive, setSocketLive] = useState(false);
   const [nowTick, setNowTick] = useState(() => Date.now());
+  const [hiddenSeriesIds, setHiddenSeriesIds] = useState<Set<string>>(
+    () => new Set(),
+  );
 
   const pollingActive = inView && tabVisible && !demoFrozen;
 
@@ -532,6 +535,19 @@ export function HubPolymarketLiveHeroTradesChart({
     })).filter((item) => item.trades.length > 0);
   }, [market, tradesByToken]);
 
+  useEffect(() => {
+    setHiddenSeriesIds(new Set());
+  }, [chartKey]);
+
+  const toggleSeries = useCallback((id: string) => {
+    setHiddenSeriesIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }, []);
+
   const yes = market?.outcomes[0];
   const no = market?.outcomes[1];
   const yesLast =
@@ -595,13 +611,22 @@ export function HubPolymarketLiveHeroTradesChart({
       ) : null}
 
       {!loading && !error && series.length ? (
-        <div className={cn("relative w-full", HUB_HERO_CHART_EMBED_HEIGHT)}>
+        <div
+          className={cn(
+            "relative flex w-full flex-col overflow-hidden",
+            HUB_HERO_CHART_EMBED_HEIGHT,
+          )}
+        >
           <HubKalshiLiveDemoTradesLiveline
             key={chartKey}
             series={series}
             compact
+            fill
             persistHistory
             paused={livelinePaused}
+            hiddenSeriesIds={hiddenSeriesIds}
+            onToggleSeries={toggleSeries}
+            fixedValueDomain={{ min: 0, max: 100 }}
             className="h-full min-h-0"
           />
         </div>

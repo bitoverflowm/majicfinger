@@ -83,6 +83,9 @@ function suggestionKey(s) {
  *   collectMode?: boolean;
  *   dismissAfterSelect?: boolean;
  *   selectedItems?: Array<Record<string, unknown>>;
+ *   limitPerType?: number;
+ *   layout?: "dropdown" | "panel";
+ *   resultsClassName?: string;
  * }} props
  */
 export function PolymarketLiveSearch({
@@ -99,6 +102,9 @@ export function PolymarketLiveSearch({
   collectMode = false,
   dismissAfterSelect = false,
   selectedItems,
+  limitPerType = 12,
+  layout = "dropdown",
+  resultsClassName,
 }) {
   const debounceRef = useRef(null);
   const suggestAbortRef = useRef(null);
@@ -154,7 +160,7 @@ export function PolymarketLiveSearch({
       const params = new URLSearchParams({
         query: "metadataSuggestions",
         q: trimmed,
-        limit_per_type: "12",
+        limit_per_type: String(Math.min(50, Math.max(5, Number(limitPerType) || 12))),
         search_tags: searchTags ? "true" : "false",
         search_profiles: searchProfiles ? "true" : "false",
         keep_closed_markets: keepClosedMarkets ? "1" : "0",
@@ -192,7 +198,7 @@ export function PolymarketLiveSearch({
     } finally {
       if (mySeq === suggestSeqRef.current) setSuggestLoading(false);
     }
-  }, [entitiesKey, keepClosedMarkets, searchProfiles, searchTags]);
+  }, [entitiesKey, keepClosedMarkets, limitPerType, searchProfiles, searchTags]);
 
   useEffect(() => {
     if (dismissedRef.current) return undefined;
@@ -276,20 +282,158 @@ export function PolymarketLiveSearch({
 
   const busy = disabled || selectLoading;
   const eligible = isPolymarketPublicSearchEligible(q);
+  const isPanel = layout === "panel";
   const selectedTokens = useMemo(
     () => polymarketSelectionTokenSet(selectedItems),
     [selectedItems],
   );
 
+  const suggestionItems = suggestions.map((s) => {
+    const statusTags = polymarketSuggestionStatusTags(s);
+    const vol24 = formatPolymarketVolume(s.volume24hr);
+    const vol = formatPolymarketVolume(s.volume);
+    const topicTags = Array.isArray(s.tagLabels) ? s.tagLabels.slice(0, 3) : [];
+    const alreadySelected = isPolymarketSelectionMatch(s, selectedTokens);
+    return (
+      <motion.li
+        key={suggestionKey(s)}
+        role="option"
+        aria-selected={alreadySelected}
+        variants={suggestionRowVariants}
+      >
+        <button
+          type="button"
+          disabled={busy || alreadySelected}
+          className={cn(
+            "flex w-full flex-col gap-1 px-3 py-2 text-left text-sm disabled:cursor-not-allowed",
+            alreadySelected
+              ? "bg-emerald-500/5 opacity-70"
+              : "hover:bg-accent disabled:opacity-50",
+          )}
+          onMouseDown={(e) => e.preventDefault()}
+          onClick={() => handleSelect(s)}
+        >
+          <span className="flex w-full items-start gap-1.5">
+            {alreadySelected ? (
+              <Check
+                className="mt-0.5 size-3.5 shrink-0 text-emerald-600 dark:text-emerald-400"
+                aria-hidden
+              />
+            ) : null}
+            <span className="min-w-0 font-medium text-foreground line-clamp-2">
+              {s.title || s.ticker || s.slug || s.id}
+            </span>
+            {alreadySelected ? (
+              <span className="ml-auto shrink-0 rounded px-1.5 py-0.5 text-[0.65rem] font-medium text-emerald-700 ring-1 ring-emerald-600/25 dark:text-emerald-300">
+                Selected
+              </span>
+            ) : null}
+          </span>
+          {s.subtitle ? (
+            <span className="text-xs text-muted-foreground line-clamp-1">
+              {s.subtitle}
+            </span>
+          ) : null}
+          <span className="flex flex-wrap items-center gap-1">
+            <span
+              className={cn(
+                "rounded px-1.5 py-0.5 font-mono text-[0.65rem] font-medium capitalize tracking-wide",
+                entityTagClass(s.entity),
+              )}
+            >
+              {s.entity}
+            </span>
+            {statusTags.map((tag) => (
+              <span
+                key={tag}
+                className={cn(
+                  "rounded px-1.5 py-0.5 text-[0.65rem] font-medium tracking-wide",
+                  statusTagClass(tag),
+                )}
+              >
+                {tag}
+              </span>
+            ))}
+            {topicTags.map((tag) => (
+              <span
+                key={`topic:${tag}`}
+                className="rounded bg-muted/80 px-1.5 py-0.5 text-[0.65rem] font-medium text-muted-foreground ring-1 ring-border/50"
+              >
+                {tag}
+              </span>
+            ))}
+          </span>
+          <span className="text-[10px] leading-snug text-muted-foreground">
+            {s.ticker ? <span className="font-mono">{s.ticker}</span> : null}
+            {s.slug && s.slug !== s.ticker ? (
+              <span>
+                {s.ticker ? " · " : ""}
+                <span className="font-mono">{s.slug}</span>
+              </span>
+            ) : null}
+            {s.id ? (
+              <span>
+                {(s.ticker || s.slug) ? " · " : ""}
+                id {s.id}
+              </span>
+            ) : null}
+            {vol24 ? <span>{` · 24h ${vol24}`}</span> : null}
+            {!vol24 && vol ? <span>{` · vol ${vol}`}</span> : null}
+          </span>
+        </button>
+      </motion.li>
+    );
+  });
+
+  const resultsList = suggestOpen && suggestions.length > 0 ? (
+    <motion.ul
+      key="suggestions"
+      role="listbox"
+      variants={suggestionListVariants}
+      initial="hidden"
+      animate="visible"
+      exit="exit"
+      className={cn(
+        isPanel
+          ? "relative z-10 mt-2 min-h-0 overflow-y-auto overscroll-contain rounded-lg border border-border bg-popover py-1"
+          : "absolute left-0 right-0 top-full z-50 mt-1 max-h-80 overflow-auto rounded-lg border border-border bg-popover py-1 shadow-md",
+        isPanel && !resultsClassName && "flex-1",
+        resultsClassName,
+      )}
+    >
+      {suggestionItems}
+    </motion.ul>
+  ) : null;
+
+  const emptyResults =
+    suggestOpen && !suggestLoading && eligible && suggestions.length === 0 ? (
+      <motion.p
+        key="no-matches"
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0 }}
+        className={
+          isPanel
+            ? "mt-2 rounded-lg border border-border bg-popover px-3 py-2 text-xs text-muted-foreground"
+            : "absolute left-0 right-0 top-full z-50 mt-1 rounded-lg border border-border bg-popover px-3 py-2 text-xs text-muted-foreground shadow-md"
+        }
+      >
+        No matches for &ldquo;{q.trim()}&rdquo;
+      </motion.p>
+    ) : null;
+
   return (
     <div
-      className={cn("space-y-2", className)}
+      className={cn(
+        isPanel ? "flex h-full min-h-0 flex-col gap-2" : "space-y-2",
+        className,
+      )}
       ref={containerRef}
       onPointerDown={() => {
         pointerInsideRef.current = true;
       }}
     >
-      <div className="relative">
+      <div className={cn("relative", isPanel && "shrink-0")}>
         <span className="pointer-events-none absolute left-3 top-1/2 z-[1] flex h-4 w-4 -translate-y-1/2 items-center justify-center text-muted-foreground">
           {suggestLoading ? (
             <Loader2 className="h-4 w-4 animate-spin text-primary" aria-hidden />
@@ -315,6 +459,7 @@ export function PolymarketLiveSearch({
             if (isPolymarketPublicSearchEligible(q)) void fetchSuggestions(q);
           }}
           onBlur={(e) => {
+            if (isPanel) return;
             // Leaving the search should stop it, so an in-flight request can't pop the
             // list back open. Clicks inside the dropdown are not "leaving".
             if (pointerInsideRef.current) {
@@ -344,145 +489,34 @@ export function PolymarketLiveSearch({
           aria-label="Polymarket natural language search"
         />
 
-        <AnimatePresence>
-          {suggestOpen && !suggestLoading && eligible && suggestions.length === 0 ? (
-            <motion.p
-              key="no-matches"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              className="absolute left-0 right-0 top-full z-50 mt-1 rounded-lg border border-border bg-popover px-3 py-2 text-xs text-muted-foreground shadow-md"
-            >
-              No matches for &ldquo;{q.trim()}&rdquo;
-            </motion.p>
-          ) : null}
-        </AnimatePresence>
-
-        <AnimatePresence>
-          {suggestOpen && suggestions.length > 0 ? (
-            <motion.ul
-              key="suggestions"
-              role="listbox"
-              variants={suggestionListVariants}
-              initial="hidden"
-              animate="visible"
-              exit="exit"
-              className="absolute left-0 right-0 top-full z-50 mt-1 max-h-80 overflow-auto rounded-lg border border-border bg-popover py-1 shadow-md"
-            >
-              {suggestions.map((s) => {
-                const statusTags = polymarketSuggestionStatusTags(s);
-                const vol24 = formatPolymarketVolume(s.volume24hr);
-                const vol = formatPolymarketVolume(s.volume);
-                const topicTags = Array.isArray(s.tagLabels) ? s.tagLabels.slice(0, 3) : [];
-                const alreadySelected = isPolymarketSelectionMatch(s, selectedTokens);
-                return (
-                  <motion.li
-                    key={suggestionKey(s)}
-                    role="option"
-                    aria-selected={alreadySelected}
-                    variants={suggestionRowVariants}
-                  >
-                    <button
-                      type="button"
-                      disabled={busy || alreadySelected}
-                      className={cn(
-                        "flex w-full flex-col gap-1 px-3 py-2 text-left text-sm disabled:cursor-not-allowed",
-                        alreadySelected
-                          ? "bg-emerald-500/5 opacity-70"
-                          : "hover:bg-accent disabled:opacity-50",
-                      )}
-                      onMouseDown={(e) => e.preventDefault()}
-                      onClick={() => handleSelect(s)}
-                    >
-                      <span className="flex w-full items-start gap-1.5">
-                        {alreadySelected ? (
-                          <Check
-                            className="mt-0.5 size-3.5 shrink-0 text-emerald-600 dark:text-emerald-400"
-                            aria-hidden
-                          />
-                        ) : null}
-                        <span className="min-w-0 font-medium text-foreground line-clamp-2">
-                          {s.title || s.ticker || s.slug || s.id}
-                        </span>
-                        {alreadySelected ? (
-                          <span className="ml-auto shrink-0 rounded px-1.5 py-0.5 text-[0.65rem] font-medium text-emerald-700 ring-1 ring-emerald-600/25 dark:text-emerald-300">
-                            Selected
-                          </span>
-                        ) : null}
-                      </span>
-                      {s.subtitle ? (
-                        <span className="text-xs text-muted-foreground line-clamp-1">
-                          {s.subtitle}
-                        </span>
-                      ) : null}
-                      <span className="flex flex-wrap items-center gap-1">
-                        <span
-                          className={cn(
-                            "rounded px-1.5 py-0.5 font-mono text-[0.65rem] font-medium capitalize tracking-wide",
-                            entityTagClass(s.entity),
-                          )}
-                        >
-                          {s.entity}
-                        </span>
-                        {statusTags.map((tag) => (
-                          <span
-                            key={tag}
-                            className={cn(
-                              "rounded px-1.5 py-0.5 text-[0.65rem] font-medium tracking-wide",
-                              statusTagClass(tag),
-                            )}
-                          >
-                            {tag}
-                          </span>
-                        ))}
-                        {topicTags.map((tag) => (
-                          <span
-                            key={`topic:${tag}`}
-                            className="rounded bg-muted/80 px-1.5 py-0.5 text-[0.65rem] font-medium text-muted-foreground ring-1 ring-border/50"
-                          >
-                            {tag}
-                          </span>
-                        ))}
-                      </span>
-                      <span className="text-[10px] leading-snug text-muted-foreground">
-                        {s.ticker ? <span className="font-mono">{s.ticker}</span> : null}
-                        {s.slug && s.slug !== s.ticker ? (
-                          <span>
-                            {s.ticker ? " · " : ""}
-                            <span className="font-mono">{s.slug}</span>
-                          </span>
-                        ) : null}
-                        {s.id ? (
-                          <span>
-                            {(s.ticker || s.slug) ? " · " : ""}
-                            id {s.id}
-                          </span>
-                        ) : null}
-                        {vol24 ? <span>{` · 24h ${vol24}`}</span> : null}
-                        {!vol24 && vol ? <span>{` · vol ${vol}`}</span> : null}
-                      </span>
-                    </button>
-                  </motion.li>
-                );
-              })}
-            </motion.ul>
-          ) : null}
-        </AnimatePresence>
+        {!isPanel ? (
+          <>
+            <AnimatePresence>{emptyResults}</AnimatePresence>
+            <AnimatePresence>{resultsList}</AnimatePresence>
+          </>
+        ) : null}
       </div>
 
+      {isPanel ? (
+        <div className="flex min-h-0 flex-1 flex-col">
+          <AnimatePresence>{emptyResults}</AnimatePresence>
+          <AnimatePresence>{resultsList}</AnimatePresence>
+        </div>
+      ) : null}
+
       {q.trim() && !eligible ? (
-        <p className="text-[10px] leading-snug text-muted-foreground">
+        <p className="shrink-0 text-[10px] leading-snug text-muted-foreground">
           Type at least 2 characters to search.
         </p>
       ) : null}
 
       {selectLoading ? (
-        <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
+        <p className="flex shrink-0 items-center gap-1.5 text-xs text-muted-foreground">
           <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden />
           {collectMode ? "Adding…" : "Loading into your sheet…"}
         </p>
       ) : null}
-      {error ? <p className="text-xs text-destructive">{error}</p> : null}
+      {error ? <p className="shrink-0 text-xs text-destructive">{error}</p> : null}
     </div>
   );
 }

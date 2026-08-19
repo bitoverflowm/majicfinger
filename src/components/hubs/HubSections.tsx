@@ -2,7 +2,7 @@ import Link from "next/link";
 import dynamic from "next/dynamic";
 import { ArrowRightIcon } from "@radix-ui/react-icons";
 import { HubComparisonTable } from "@/components/hubs/HubComparisonTable";
-import { HubCtaButton } from "@/components/hubs/HubCtaButton";
+import { HubCtaButton, HubInPageLink } from "@/components/hubs/HubCtaButton";
 import { HubCardsNoteCta } from "@/components/hubs/HubCardsNoteCta";
 import { cn } from "@/lib/utils";
 import type {
@@ -520,13 +520,12 @@ function HubTextBlock({ section }: { section: HubTextBlockSection }) {
         ) : null}
         {section.footerLink ? (
           <p className="text-base leading-relaxed text-muted-foreground md:text-lg text-pretty">
-            <Link
+            <HubInPageLink
               href={section.footerLink.href}
               className="underline underline-offset-4 hover:text-foreground"
-              prefetch={false}
             >
               {section.footerLink.label}
-            </Link>
+            </HubInPageLink>
           </p>
         ) : null}
       </div>
@@ -603,9 +602,12 @@ function HubCards({ section }: { section: HubCardsSection }) {
             ) : null}
           </div>
         ) : null}
-        {section.cta ? (
-          <div className="flex justify-center pt-2">
-            <HubCtaButton cta={section.cta} variant="primary" />
+        {section.cta || section.secondaryCta ? (
+          <div className="flex flex-wrap items-center justify-center gap-3 pt-2">
+            {section.cta ? <HubCtaButton cta={section.cta} variant="primary" /> : null}
+            {section.secondaryCta ? (
+              <HubCtaButton cta={section.secondaryCta} variant="secondary" />
+            ) : null}
           </div>
         ) : null}
       </div>
@@ -759,9 +761,12 @@ function HubLinkGroup({ section }: { section: HubLinkGroupSection }) {
                 </div>
               ))}
         </div>
-        {section.cta ? (
-          <div className="flex justify-center">
-            <HubCtaButton cta={section.cta} variant="secondary" />
+        {section.cta || section.secondaryCta ? (
+          <div className="flex flex-wrap items-center justify-center gap-3">
+            {section.cta ? <HubCtaButton cta={section.cta} variant="primary" /> : null}
+            {section.secondaryCta ? (
+              <HubCtaButton cta={section.secondaryCta} variant="secondary" />
+            ) : null}
           </div>
         ) : null}
       </div>

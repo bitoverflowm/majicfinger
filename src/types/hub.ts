@@ -189,6 +189,7 @@ export type HubCardsSection = {
     highlightTargetId?: string;
   };
   cta?: HubCta;
+  secondaryCta?: HubCta;
   cards: HubCard[];
 };
 
@@ -250,6 +251,7 @@ export type HubLinkGroupSection = {
   /** Category → subcategory hierarchy (Guides, Research, Charts, …). */
   categories?: HubLinkCategory[];
   cta?: HubCta;
+  secondaryCta?: HubCta;
 };
 
 export type HubCtaSection = {
@@ -337,6 +339,7 @@ export type HubDemoModuleSection = {
   bullets?: string[];
   examplesTitle?: string;
   examples?: string[];
+  demoSlot?: "polymarket-live-search" | "polymarket-live-prices";
   inlineHeading?: string;
   inlineHelper?: string;
   placeholder?: string;
