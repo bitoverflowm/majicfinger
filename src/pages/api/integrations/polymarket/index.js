@@ -573,10 +573,21 @@ function tagLabelsFromEntity(entity) {
     .slice(0, 6);
 }
 
-function flattenPublicSearchToSuggestions(searchPayload, max = 28) {
+function isSearchRowClosed(value) {
+  return value === true || value === "true";
+}
+
+/**
+ * Gamma `keep_closed_markets=0` still ranks closed events first, and each event
+ * can nest dozens of markets. Flattening those before the cap is applied would
+ * drop every live hit (e.g. "new york") after the client filters closed rows.
+ */
+function flattenPublicSearchToSuggestions(searchPayload, max = 28, opts = {}) {
+  const excludeClosed = opts.excludeClosed === true;
   const out = [];
   const seen = new Set();
   const add = (row) => {
+    if (excludeClosed && isSearchRowClosed(row.closed)) return;
     const k = `${row.entity}:${row.id || ""}:${row.slug || ""}:${row.proxyWallet || ""}`;
     if (seen.has(k)) return;
     seen.add(k);
@@ -727,7 +738,11 @@ async function runMetadataSuggestions(rawQ, limitPerType, opts = {}) {
   const publicSearch = await fetchJson(`${GAMMA_BASE}/public-search?${ps.toString()}`);
   return {
     query: trimmed,
-    suggestions: flattenPublicSearchToSuggestions(publicSearch, 40),
+    suggestions: flattenPublicSearchToSuggestions(
+      publicSearch,
+      Math.min(200, Math.max(40, cap * 3)),
+      { excludeClosed: !keepClosed },
+    ),
     publicSearch,
   };
 }
