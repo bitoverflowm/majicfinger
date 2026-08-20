@@ -4,8 +4,11 @@ import {
 } from "@/lib/polymarketLive/orderbooksCompose";
 
 const FEATURED_LIMIT_DEFAULT = 8;
-const FEATURED_POOL_SIZE = 16;
+const FEATURED_POOL_SIZE = 32;
 const FEATURED_CACHE_TTL_MS = 5 * 60_000;
+/** Drop markets already pinned near 0¢ / 100¢ — they are poor charting examples. */
+const CHARTABLE_PRICE_MIN = 0.05;
+const CHARTABLE_PRICE_MAX = 0.95;
 
 function polymarketApiBase(envVar, fallback) {
   const v = process.env[envVar];
@@ -49,6 +52,32 @@ function toNum(raw) {
   if (raw == null || raw === "") return null;
   const n = Number(raw);
   return Number.isFinite(n) ? n : null;
+}
+
+/**
+ * Normalize a Gamma outcome price to 0–1 dollars.
+ * @param {unknown} price
+ * @returns {number | null}
+ */
+export function featuredOutcomePriceDollars(price) {
+  const n = toNum(price);
+  if (n == null) return null;
+  if (n > 1 && n <= 100) return n / 100;
+  return n;
+}
+
+/**
+ * True when at least one outcome sits away from 0¢ / 100¢ so the path can still move.
+ * @param {{ outcomes?: Array<{ lastPrice?: number | null }> } | null | undefined} market
+ */
+export function isPolymarketFeaturedMarketChartable(market) {
+  const prices = (market?.outcomes || [])
+    .map((row) => featuredOutcomePriceDollars(row?.lastPrice))
+    .filter((price) => price != null);
+  if (!prices.length) return false;
+  return prices.some(
+    (price) => price >= CHARTABLE_PRICE_MIN && price <= CHARTABLE_PRICE_MAX,
+  );
 }
 
 function parsePriceList(value) {
@@ -231,14 +260,14 @@ async function getFeaturedPool() {
       closed: false,
       order: "volume24hr",
       ascending: false,
-      limit: 24,
+      limit: 48,
     }),
     gammaGet("/events", {
       closed: false,
       featured: true,
       order: "volume",
       ascending: false,
-      limit: 12,
+      limit: 24,
     }),
   ]);
 
@@ -278,6 +307,7 @@ async function getFeaturedPool() {
 
   const ranked = [...byKey.values()]
     .filter((market) => market.outcomes.length >= 2)
+    .filter(isPolymarketFeaturedMarketChartable)
     .sort((a, b) => {
       if (a.featured !== b.featured) return a.featured ? -1 : 1;
       return (b.volume24h || 0) - (a.volume24h || 0);

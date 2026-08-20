@@ -1,6 +1,9 @@
 import assert from "node:assert/strict";
 
-import { normalizePolymarketFeaturedMarket } from "./fetchPolymarketLiveFeaturedMarkets.js";
+import {
+  isPolymarketFeaturedMarketChartable,
+  normalizePolymarketFeaturedMarket,
+} from "./fetchPolymarketLiveFeaturedMarkets.js";
 
 function test(name, fn) {
   try {
@@ -51,4 +54,24 @@ test("normalizePolymarketFeaturedMarket skips markets without two tokens", () =>
     }),
     null,
   );
+});
+
+test("isPolymarketFeaturedMarketChartable drops Yes 0¢ / No 100¢ markets", () => {
+  const pinned = normalizePolymarketFeaturedMarket({
+    id: "m3",
+    question: "Already decided",
+    clobTokenIds: '["tok-yes","tok-no"]',
+    outcomes: '["Yes","No"]',
+    outcomePrices: '["0.00","1.00"]',
+  });
+  assert.equal(isPolymarketFeaturedMarketChartable(pinned), false);
+
+  const live = normalizePolymarketFeaturedMarket({
+    id: "m4",
+    question: "Still moving",
+    clobTokenIds: '["tok-yes","tok-no"]',
+    outcomes: '["Yes","No"]',
+    outcomePrices: '["0.63","0.37"]',
+  });
+  assert.equal(isPolymarketFeaturedMarketChartable(live), true);
 });
