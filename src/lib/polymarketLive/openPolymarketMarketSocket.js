@@ -4,25 +4,15 @@ const DEFAULT_WS_URL =
 const PING_MS = 10_000;
 
 /**
- * Subscribe to Polymarket CLOB market-channel last-trade prints for the given
- * asset ids. Returns a disposer.
- *
  * @param {{
  *   assetIds: string[];
- *   onTrade: (row: {
- *     asset_id: string;
- *     price: number;
- *     time: string;
- *     timestamp: string;
- *     side?: string;
- *     size?: string;
- *     transaction_hash?: string;
- *   }) => void;
+ *   customFeatureEnabled?: boolean;
+ *   onMessage: (msg: Record<string, unknown>) => void;
  *   onStatus?: (status: "open" | "closed" | "error") => void;
  * }} opts
  * @returns {() => void}
  */
-export function openPolymarketLastTradeSocket(opts) {
+function openPolymarketMarketChannel(opts) {
   const assetIds = [...new Set((opts.assetIds || []).map(String).filter(Boolean))];
   if (!assetIds.length) return () => {};
 
@@ -51,20 +41,11 @@ export function openPolymarketLastTradeSocket(opts) {
     const messages = Array.isArray(payload) ? payload : [payload];
     for (const msg of messages) {
       if (!msg || typeof msg !== "object") continue;
-      if (msg.event_type !== "last_trade_price" || !msg.asset_id) continue;
-      const priceNum = msg.price != null ? parseFloat(String(msg.price)) : NaN;
-      if (!Number.isFinite(priceNum)) continue;
-      const ts = msg.timestamp ? Number(msg.timestamp) : Date.now();
-      const ms = Number.isFinite(ts) ? (ts < 1e12 ? ts * 1000 : ts) : Date.now();
-      opts.onTrade({
-        asset_id: String(msg.asset_id),
-        price: priceNum,
-        timestamp: String(ms),
-        time: new Date(ms).toISOString(),
-        side: msg.side != null ? String(msg.side) : "",
-        size: msg.size != null ? String(msg.size) : "",
-        transaction_hash: msg.transaction_hash != null ? String(msg.transaction_hash) : "",
-      });
+      try {
+        opts.onMessage(msg);
+      } catch {
+        /* ignore */
+      }
     }
   };
 
@@ -82,13 +63,15 @@ export function openPolymarketLastTradeSocket(opts) {
       attempt = 0;
       emitStatus("open");
       try {
-        ws.send(
-          JSON.stringify({
-            assets_ids: assetIds,
-            type: "market",
-            initial_dump: true,
-          }),
-        );
+        const payload = {
+          assets_ids: assetIds,
+          type: "market",
+          initial_dump: true,
+        };
+        if (opts.customFeatureEnabled === true) {
+          payload.custom_feature_enabled = true;
+        }
+        ws.send(JSON.stringify(payload));
       } catch {
         /* ignore */
       }
@@ -154,4 +137,177 @@ export function openPolymarketLastTradeSocket(opts) {
       ws = null;
     }
   };
+}
+
+function messageTime(msg) {
+  const ts = msg.timestamp ? Number(msg.timestamp) : Date.now();
+  const ms = Number.isFinite(ts) ? (ts < 1e12 ? ts * 1000 : ts) : Date.now();
+  return { timestamp: String(ms), time: new Date(ms).toISOString() };
+}
+
+function levelPrice(level) {
+  if (Array.isArray(level)) return Number(level[0]);
+  if (level && typeof level === "object") return Number(level.price);
+  return NaN;
+}
+
+function levelSize(level) {
+  if (Array.isArray(level)) return Number(level[1]);
+  if (level && typeof level === "object") return Number(level.size);
+  return NaN;
+}
+
+/**
+ * Subscribe to Polymarket CLOB market-channel last-trade prints for the given
+ * asset ids. Returns a disposer.
+ *
+ * @param {{
+ *   assetIds: string[];
+ *   onTrade: (row: {
+ *     asset_id: string;
+ *     price: number;
+ *     time: string;
+ *     timestamp: string;
+ *     side?: string;
+ *     size?: string;
+ *     transaction_hash?: string;
+ *   }) => void;
+ *   onStatus?: (status: "open" | "closed" | "error") => void;
+ * }} opts
+ * @returns {() => void}
+ */
+export function openPolymarketLastTradeSocket(opts) {
+  return openPolymarketMarketChannel({
+    assetIds: opts.assetIds,
+    onStatus: opts.onStatus,
+    onMessage: (msg) => {
+      if (msg.event_type !== "last_trade_price" || !msg.asset_id) return;
+      const priceNum = msg.price != null ? parseFloat(String(msg.price)) : NaN;
+      if (!Number.isFinite(priceNum)) return;
+      const stamp = messageTime(msg);
+      opts.onTrade({
+        asset_id: String(msg.asset_id),
+        price: priceNum,
+        timestamp: stamp.timestamp,
+        time: stamp.time,
+        side: msg.side != null ? String(msg.side) : "",
+        size: msg.size != null ? String(msg.size) : "",
+        transaction_hash:
+          msg.transaction_hash != null ? String(msg.transaction_hash) : "",
+      });
+    },
+  });
+}
+
+/**
+ * Subscribe to best bid / ask / spread (and book snapshots) for top-of-book
+ * live views. `custom_feature_enabled` is required for `best_bid_ask` events.
+ *
+ * @param {{
+ *   assetIds: string[];
+ *   onQuote: (row: {
+ *     asset_id: string;
+ *     best_bid: number | null;
+ *     best_ask: number | null;
+ *     spread: number | null;
+ *     bid_size: number | null;
+ *     ask_size: number | null;
+ *     time: string;
+ *     timestamp: string;
+ *     source: string;
+ *   }) => void;
+ *   onBook?: (row: {
+ *     asset_id: string;
+ *     bids: Array<{ price: number; size: number }>;
+ *     asks: Array<{ price: number; size: number }>;
+ *     time: string;
+ *     timestamp: string;
+ *   }) => void;
+ *   onStatus?: (status: "open" | "closed" | "error") => void;
+ * }} opts
+ * @returns {() => void}
+ */
+export function openPolymarketQuoteSocket(opts) {
+  return openPolymarketMarketChannel({
+    assetIds: opts.assetIds,
+    customFeatureEnabled: true,
+    onStatus: opts.onStatus,
+    onMessage: (msg) => {
+      const assetId = String(msg.asset_id || msg.assetId || "").trim();
+      if (!assetId) return;
+      const stamp = messageTime(msg);
+      const type = String(msg.event_type || "");
+
+      const emitQuote = (quote) => {
+        if (
+          quote.best_bid == null &&
+          quote.best_ask == null &&
+          quote.spread == null
+        ) {
+          return;
+        }
+        opts.onQuote({
+          asset_id: assetId,
+          ...quote,
+          time: stamp.time,
+          timestamp: stamp.timestamp,
+          source: type || "quote",
+        });
+      };
+
+      if (type === "best_bid_ask") {
+        const bestBid = Number(msg.best_bid);
+        const bestAsk = Number(msg.best_ask);
+        const spreadRaw = Number(msg.spread);
+        const bidSize = Number(msg.best_bid_size ?? msg.bid_size);
+        const askSize = Number(msg.best_ask_size ?? msg.ask_size);
+        emitQuote({
+          best_bid: Number.isFinite(bestBid) ? bestBid : null,
+          best_ask: Number.isFinite(bestAsk) ? bestAsk : null,
+          spread: Number.isFinite(spreadRaw)
+            ? spreadRaw
+            : Number.isFinite(bestBid) && Number.isFinite(bestAsk)
+              ? bestAsk - bestBid
+              : null,
+          bid_size: Number.isFinite(bidSize) ? bidSize : null,
+          ask_size: Number.isFinite(askSize) ? askSize : null,
+        });
+        return;
+      }
+
+      if (type === "book" || type === "price_change") {
+        const bids = Array.isArray(msg.bids) ? msg.bids : [];
+        const asks = Array.isArray(msg.asks) ? msg.asks : [];
+        const parsedBids = bids
+          .map((level) => ({ price: levelPrice(level), size: levelSize(level) }))
+          .filter((row) => Number.isFinite(row.price) && Number.isFinite(row.size));
+        const parsedAsks = asks
+          .map((level) => ({ price: levelPrice(level), size: levelSize(level) }))
+          .filter((row) => Number.isFinite(row.price) && Number.isFinite(row.size));
+        parsedBids.sort((a, b) => b.price - a.price);
+        parsedAsks.sort((a, b) => a.price - b.price);
+        const bestBid = parsedBids[0]?.price ?? Number(msg.best_bid);
+        const bestAsk = parsedAsks[0]?.price ?? Number(msg.best_ask);
+        emitQuote({
+          best_bid: Number.isFinite(bestBid) ? bestBid : null,
+          best_ask: Number.isFinite(bestAsk) ? bestAsk : null,
+          spread:
+            Number.isFinite(bestBid) && Number.isFinite(bestAsk)
+              ? bestAsk - bestBid
+              : null,
+          bid_size: parsedBids[0]?.size ?? null,
+          ask_size: parsedAsks[0]?.size ?? null,
+        });
+        if (type === "book" && opts.onBook) {
+          opts.onBook({
+            asset_id: assetId,
+            bids: parsedBids,
+            asks: parsedAsks,
+            time: stamp.time,
+            timestamp: stamp.timestamp,
+          });
+        }
+      }
+    },
+  });
 }

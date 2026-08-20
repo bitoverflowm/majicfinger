@@ -339,7 +339,10 @@ export type HubDemoModuleSection = {
   bullets?: string[];
   examplesTitle?: string;
   examples?: string[];
-  demoSlot?: "polymarket-live-search" | "polymarket-live-prices";
+  demoSlot?:
+    | "polymarket-live-search"
+    | "polymarket-live-prices"
+    | "polymarket-live-spread";
   inlineHeading?: string;
   inlineHelper?: string;
   placeholder?: string;

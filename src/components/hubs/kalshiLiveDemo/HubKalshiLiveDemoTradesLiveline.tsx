@@ -54,6 +54,11 @@ type HubKalshiLiveDemoTradesLivelineProps = {
    * (e.g. price 0–100). Hidden again as soon as only one line remains.
    */
   fixedValueDomain?: { min: number; max: number };
+  /** Override Liveline’s cents formatter (e.g. compact size). */
+  formatValue?: (value: number) => string;
+  /** Override trade → numeric value (defaults to yes price in cents). */
+  parseRowValue?: (row: TradeRow) => number | null;
+  emptyMessage?: string;
 };
 /** Floor so a sparse first few polls still have room to breathe. */
 const LIVE_WINDOW_MIN_SECS = 45;
@@ -99,11 +104,14 @@ function parseYesPriceCents(row: TradeRow): number | null {
   return null;
 }
 
-function tradesToPoints(trades: TradeRow[]) {
+function tradesToPoints(
+  trades: TradeRow[],
+  parseValue: (row: TradeRow) => number | null = parseYesPriceCents,
+) {
   const points: { time: number; value: number }[] = [];
   for (const row of trades) {
     const time = parseTradeTimeSec(row);
-    const value = parseYesPriceCents(row);
+    const value = parseValue(row);
     if (time == null || value == null) continue;
     points.push({ time, value });
   }
@@ -296,14 +304,20 @@ export const HubKalshiLiveDemoTradesLiveline = forwardRef<
   persistHistory = false,
   fullHistory = false,
   fixedValueDomain,
+  formatValue,
+  parseRowValue,
+  emptyMessage,
 }, ref) {
   const dark = useIsDarkTheme();
   const hidden = hiddenSeriesIds ?? EMPTY_HIDDEN_IDS;
   const useFullArchive = fullHistory || persistHistory;
+  const parseValue = parseRowValue ?? parseYesPriceCents;
+  const formatTick =
+    formatValue ?? ((v: number) => `${Math.round(Number(v))}¢`);
 
   const mapped = useMemo(() => {
     const seeded = series.map((item, index) => {
-      const points = tradesToPoints(item.trades);
+      const points = tradesToPoints(item.trades, parseValue);
       const rawPoints = useFullArchive
         ? persistedPoints(points, fullHistory)
         : seedLivePoints(points);
@@ -353,7 +367,7 @@ export const HubKalshiLiveDemoTradesLiveline = forwardRef<
         };
       }),
     };
-  }, [fullHistory, persistHistory, series, useFullArchive]);
+  }, [fullHistory, parseValue, persistHistory, series, useFullArchive]);
 
   const visible = useMemo(
     () => mapped.series.filter((s) => !hidden.has(s.id) && s.data.length > 0),
@@ -400,7 +414,7 @@ export const HubKalshiLiveDemoTradesLiveline = forwardRef<
     return (
       <div ref={ref} className={className}>
         <p className="px-3 py-8 text-center text-sm text-muted-foreground">
-          No plottable live trade points yet.
+          {emptyMessage || "No plottable live trade points yet."}
         </p>
       </div>
     );
@@ -455,7 +469,7 @@ export const HubKalshiLiveDemoTradesLiveline = forwardRef<
             paused={paused}
             seriesToggleCompact={false}
             window={windowSecs}
-            formatValue={(v) => `${Math.round(Number(v))}¢`}
+            formatValue={(v) => formatTick(Number(v))}
             padding={{ top: 28, right: 92, bottom: 52, left: 18 }}
             className={cn(
               "w-full min-h-0 flex-1",

@@ -241,8 +241,10 @@ export const polymarketLiveHub: HubPageConfig = {
         },
       ],
       inlineHeading: "Check the Live Spread",
-      inlineHelper: "Search for a market to compare its best bid, best ask, and current spread.",
+      inlineHelper:
+        "The selected market’s best bid, best ask, spread, and top-of-book size stream live. Open the snapshot tab for the full CLOB book.",
       placeholder: "Search for a Polymarket market to load this view.",
+      demoSlot: "polymarket-live-spread",
       cta: { ...GET_FULL_ACCESS },
       secondaryCta: {
         label: "Next: Inspect the Live Order Book",
