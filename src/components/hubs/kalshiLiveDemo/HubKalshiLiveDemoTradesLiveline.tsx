@@ -431,11 +431,7 @@ export const HubKalshiLiveDemoTradesLiveline = forwardRef<
       ) : (
         <div
           ref={chartWrapRef}
-          className={cn(
-            "flex min-h-0 w-full flex-1 flex-col overflow-hidden px-1 pb-3 pt-1 sm:px-2",
-            hideBuiltInSeriesToggle &&
-              "[&>div:first-child:not(:last-child)]:hidden",
-          )}
+          className="flex min-h-0 w-full flex-1 flex-col overflow-hidden px-1 pb-3 pt-1 sm:px-2"
         >
           <Liveline
             data={primary.data}
@@ -464,6 +460,8 @@ export const HubKalshiLiveDemoTradesLiveline = forwardRef<
             className={cn(
               "w-full min-h-0 flex-1",
               !fill && !compact && "h-full",
+              hideBuiltInSeriesToggle &&
+                "[&>div:first-child:not(:last-child)]:hidden",
             )}
             style={
               fill || compact

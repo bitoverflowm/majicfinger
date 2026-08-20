@@ -159,11 +159,10 @@ export function HubDemoModule({ section }: { section: HubDemoModuleSection }) {
       <div className="mx-auto mt-10 w-full max-w-5xl px-0 sm:px-2">
         <DemoWindowMockup
           contentClassName={
-            section.demoSlot === "polymarket-live-search"
-              ? "h-[min(48rem,78vh)] min-h-0 sm:h-[50rem]"
-              : section.demoSlot === "polymarket-live-prices"
-                ? "h-[min(44rem,78vh)] min-h-0 sm:h-[46rem]"
-                : "min-h-[18rem] sm:min-h-[20rem]"
+            section.demoSlot === "polymarket-live-search" ||
+            section.demoSlot === "polymarket-live-prices"
+              ? "h-[min(36rem,calc(100dvh-14rem))] min-h-0"
+              : "min-h-[18rem] sm:min-h-[20rem]"
           }
         >
           {section.demoSlot === "polymarket-live-search" ? (
@@ -184,9 +183,9 @@ export function HubDemoModule({ section }: { section: HubDemoModuleSection }) {
         </DemoWindowMockup>
       </div>
 
-      <div className="mx-auto mt-8 flex w-full max-w-2xl flex-col items-start gap-3">
+      <div className="mx-auto mt-8 flex w-full max-w-2xl flex-col items-center gap-3">
         {section.cta || section.secondaryCta ? (
-          <div className="flex flex-wrap items-center gap-3">
+          <div className="flex w-full flex-wrap items-center justify-center gap-3">
             {section.cta ? <HubCtaButton cta={section.cta} variant="primary" /> : null}
             {section.secondaryCta ? (
               <HubCtaButton cta={section.secondaryCta} variant="secondary" />

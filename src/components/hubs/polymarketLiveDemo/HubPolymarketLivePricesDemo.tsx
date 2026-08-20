@@ -41,11 +41,11 @@ type SeriesSpec = {
   id: string;
   tokenId: string;
   label: string;
+  outcome: string;
 };
 
 const MAX_LIVE_POINTS = 240;
 const MAX_HISTORY_POINTS = 2500;
-const PRICING_HREF = "#polymarket-live-pricing";
 const SEARCH_HREF = "#find-polymarket-markets";
 
 const SHEET_PREFERRED_COLUMNS = [
@@ -63,12 +63,12 @@ const SHEET_PREFERRED_COLUMNS = [
 const PRICE_TABS: HubKalshiLiveDemoTabDef[] = [
   {
     id: "liveline",
-    title: "Liveline",
+    title: "Real time price",
     description: "Live last-trade prices as they print for the selected market.",
   },
   {
     id: "history",
-    title: "Full Price History",
+    title: "Full Trade History",
     description: "The complete price path pulled from Polymarket, plotted on one chart.",
   },
 ];
@@ -170,35 +170,65 @@ function mergeTrades(
     .slice(-max);
 }
 
-function firstTokenId(market: HubPolymarketLiveDemoMarket): string {
-  const ids = Array.isArray(market.tokenIds) ? market.tokenIds : [];
-  const first = String(ids[0] || "").trim();
-  if (first) return first;
-  const pairs = Array.isArray(market.outcomePairs) ? market.outcomePairs : [];
-  const pair = pairs[0];
-  if (pair && typeof pair === "object") {
-    return String((pair as { tokenId?: string }).tokenId || "").trim();
+function outcomePairsFromMarket(
+  market: HubPolymarketLiveDemoMarket,
+): { tokenId: string; outcome: string }[] {
+  const rawPairs = Array.isArray(market.outcomePairs) ? market.outcomePairs : [];
+  if (rawPairs.length) {
+    return rawPairs
+      .map((pair) => {
+        if (!pair || typeof pair !== "object") return null;
+        const item = pair as { tokenId?: string; outcome?: string };
+        const tokenId = String(item.tokenId || "").trim();
+        if (!tokenId) return null;
+        return {
+          tokenId,
+          outcome: String(item.outcome || "").trim() || "Outcome",
+        };
+      })
+      .filter(Boolean) as { tokenId: string; outcome: string }[];
   }
-  return "";
+  const tokenIds = Array.isArray(market.tokenIds)
+    ? market.tokenIds.map((id) => String(id).trim()).filter(Boolean)
+    : [];
+  const outcomes = Array.isArray(market.outcomes)
+    ? market.outcomes.map((name) => String(name).trim())
+    : [];
+  return tokenIds.map((tokenId, index) => ({
+    tokenId,
+    outcome:
+      outcomes[index] ||
+      (index === 0 ? "Yes" : index === 1 ? "No" : `Outcome ${index + 1}`),
+  }));
 }
 
 function seriesSpecsFromMarkets(markets: HubPolymarketLiveDemoMarket[]): SeriesSpec[] {
+  const multiMarket = markets.length > 1;
   const usedLabels = new Map<string, number>();
   const out: SeriesSpec[] = [];
   for (const market of markets) {
-    const tokenId = firstTokenId(market);
-    if (!tokenId) continue;
-    const base =
+    const title =
       String(market.title || market.slug || market.id || "Market").trim() || "Market";
-    const count = (usedLabels.get(base) || 0) + 1;
-    usedLabels.set(base, count);
-    out.push({
-      id: tokenId,
-      tokenId,
-      label: count > 1 ? `${base} (${count})` : base,
-    });
+    for (const pair of outcomePairsFromMarket(market)) {
+      const base = multiMarket ? `${title} · ${pair.outcome}` : pair.outcome;
+      const count = (usedLabels.get(base) || 0) + 1;
+      usedLabels.set(base, count);
+      out.push({
+        id: pair.tokenId,
+        tokenId: pair.tokenId,
+        outcome: pair.outcome,
+        label: count > 1 ? `${base} (${count})` : base,
+      });
+    }
   }
   return out;
+}
+
+function colorTokenForSpec(spec: SeriesSpec, index: number): DemoChartColorTokenId {
+  const outcome = spec.outcome.toLowerCase();
+  if (outcome === "yes") return "chart-3";
+  if (outcome === "no") return "chart-1";
+  return defaultSeriesColorToken(index);
 }
 
 async function fetchHistoryByToken(
@@ -514,7 +544,8 @@ export function HubPolymarketLivePricesDemo({
   const chartSeries = useMemo(
     () =>
       seriesSpecs.map((spec, index) => {
-        const colorToken = seriesColorTokens[spec.id] ?? defaultSeriesColorToken(index);
+        const colorToken =
+          seriesColorTokens[spec.id] ?? colorTokenForSpec(spec, index);
         const trades = pointsByToken[spec.tokenId] || [];
         return {
           key: spec.id,
@@ -683,7 +714,7 @@ export function HubPolymarketLivePricesDemo({
             >
               <div className="flex shrink-0 flex-wrap items-center justify-between gap-2 border-b border-border/60 px-3 py-2">
                 <p className="text-xs font-medium text-muted-foreground">
-                  {activeTab === "liveline" ? "Live prices" : "Price history"}
+                  {activeTab === "liveline" ? "Live prices" : "Trade history"}
                 </p>
                 <div className="flex flex-wrap items-center justify-end gap-2">
                   {loading ? (
@@ -694,7 +725,7 @@ export function HubPolymarketLivePricesDemo({
                   ) : hasData ? (
                     <span className="text-xs text-muted-foreground">
                       {sheetRows.length} point{sheetRows.length === 1 ? "" : "s"}
-                      {seriesSpecs.length > 1 ? ` · ${seriesSpecs.length} markets` : ""}
+                      {markets.length > 1 ? ` · ${markets.length} markets` : ""}
                     </span>
                   ) : null}
 
@@ -866,25 +897,6 @@ export function HubPolymarketLivePricesDemo({
                   </div>
                 </div>
               </div>
-
-              <p className="shrink-0 border-b border-border/40 px-3 py-2 text-[11px] leading-relaxed text-muted-foreground text-pretty">
-                {activeTab === "liveline" ? (
-                  <>
-                    Live last-trade prints for the selected market
-                    {seriesSpecs.length > 1 ? "s" : ""}, seeded from recent
-                    history.{" "}
-                  </>
-                ) : (
-                  <>Full available price history for the selected market{seriesSpecs.length > 1 ? "s" : ""}. </>
-                )}
-                <HubInPageLink
-                  href={PRICING_HREF}
-                  className="font-medium text-foreground underline underline-offset-2 hover:text-primary"
-                >
-                  Sign up
-                </HubInPageLink>{" "}
-                for unlimited markets and longer-range history.
-              </p>
 
               {error && !hasData ? (
                 <p className="px-3 py-4 text-sm text-destructive">{error}</p>
