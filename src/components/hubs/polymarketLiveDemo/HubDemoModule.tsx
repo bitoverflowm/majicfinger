@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { HubCtaButton } from "@/components/hubs/HubCtaButton";
 import { useHubPolymarketLiveDemo } from "@/components/hubs/polymarketLiveDemo/HubPolymarketLiveDemoSelection";
+import { HubPolymarketLiveOrderbookDemo } from "@/components/hubs/polymarketLiveDemo/HubPolymarketLiveOrderbookDemo";
 import { HubPolymarketLivePricesDemo } from "@/components/hubs/polymarketLiveDemo/HubPolymarketLivePricesDemo";
 import { HubPolymarketLiveSearchDemo } from "@/components/hubs/polymarketLiveDemo/HubPolymarketLiveSearchDemo";
 import { HubPolymarketLiveSpreadDemo } from "@/components/hubs/polymarketLiveDemo/HubPolymarketLiveSpreadDemo";
@@ -160,7 +161,8 @@ export function HubDemoModule({ section }: { section: HubDemoModuleSection }) {
       <div className="mx-auto mt-10 w-full max-w-5xl px-0 sm:px-2">
         <DemoWindowMockup
           contentClassName={
-            section.demoSlot === "polymarket-live-spread"
+            section.demoSlot === "polymarket-live-spread" ||
+            section.demoSlot === "polymarket-live-orderbook"
               ? "h-[min(40rem,calc(100dvh-12rem))] min-h-0"
               : section.demoSlot === "polymarket-live-search" ||
                   section.demoSlot === "polymarket-live-prices"
@@ -182,6 +184,12 @@ export function HubDemoModule({ section }: { section: HubDemoModuleSection }) {
             />
           ) : section.demoSlot === "polymarket-live-spread" ? (
             <HubPolymarketLiveSpreadDemo
+              heading={section.inlineHeading}
+              helper={section.inlineHelper}
+              placeholder={section.placeholder}
+            />
+          ) : section.demoSlot === "polymarket-live-orderbook" ? (
+            <HubPolymarketLiveOrderbookDemo
               heading={section.inlineHeading}
               helper={section.inlineHelper}
               placeholder={section.placeholder}

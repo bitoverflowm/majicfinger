@@ -205,7 +205,7 @@ export function openPolymarketLastTradeSocket(opts) {
  *
  * @param {{
  *   assetIds: string[];
- *   onQuote: (row: {
+ *   onQuote?: (row: {
  *     asset_id: string;
  *     best_bid: number | null;
  *     best_ask: number | null;
@@ -223,6 +223,14 @@ export function openPolymarketLastTradeSocket(opts) {
  *     time: string;
  *     timestamp: string;
  *   }) => void;
+ *   onPriceChange?: (row: {
+ *     asset_id: string;
+ *     price: number;
+ *     size: number;
+ *     side: string;
+ *     time: string;
+ *     timestamp: string;
+ *   }) => void;
  *   onStatus?: (status: "open" | "closed" | "error") => void;
  * }} opts
  * @returns {() => void}
@@ -233,12 +241,10 @@ export function openPolymarketQuoteSocket(opts) {
     customFeatureEnabled: true,
     onStatus: opts.onStatus,
     onMessage: (msg) => {
-      const assetId = String(msg.asset_id || msg.assetId || "").trim();
-      if (!assetId) return;
       const stamp = messageTime(msg);
       const type = String(msg.event_type || "");
 
-      const emitQuote = (quote) => {
+      const emitQuote = (id, quote) => {
         if (
           quote.best_bid == null &&
           quote.best_ask == null &&
@@ -246,8 +252,8 @@ export function openPolymarketQuoteSocket(opts) {
         ) {
           return;
         }
-        opts.onQuote({
-          asset_id: assetId,
+        opts.onQuote?.({
+          asset_id: id,
           ...quote,
           time: stamp.time,
           timestamp: stamp.timestamp,
@@ -255,13 +261,54 @@ export function openPolymarketQuoteSocket(opts) {
         });
       };
 
+      if (type === "price_change") {
+        const changes = Array.isArray(msg.price_changes)
+          ? msg.price_changes
+          : Array.isArray(msg.changes)
+            ? msg.changes
+            : [];
+        for (const change of changes) {
+          if (!change || typeof change !== "object") continue;
+          const id = String(
+            change.asset_id || change.assetId || msg.asset_id || msg.assetId || "",
+          ).trim();
+          const price = Number(change.price);
+          const size = Number(change.size);
+          if (!id || !Number.isFinite(price) || !Number.isFinite(size)) continue;
+          opts.onPriceChange?.({
+            asset_id: id,
+            price,
+            size,
+            side: String(change.side || "").toUpperCase(),
+            time: stamp.time,
+            timestamp: stamp.timestamp,
+          });
+          const bestBid = Number(change.best_bid ?? msg.best_bid);
+          const bestAsk = Number(change.best_ask ?? msg.best_ask);
+          emitQuote(id, {
+            best_bid: Number.isFinite(bestBid) ? bestBid : null,
+            best_ask: Number.isFinite(bestAsk) ? bestAsk : null,
+            spread:
+              Number.isFinite(bestBid) && Number.isFinite(bestAsk)
+                ? bestAsk - bestBid
+                : null,
+            bid_size: null,
+            ask_size: null,
+          });
+        }
+        return;
+      }
+
+      const assetId = String(msg.asset_id || msg.assetId || "").trim();
+      if (!assetId) return;
+
       if (type === "best_bid_ask") {
         const bestBid = Number(msg.best_bid);
         const bestAsk = Number(msg.best_ask);
         const spreadRaw = Number(msg.spread);
         const bidSize = Number(msg.best_bid_size ?? msg.bid_size);
         const askSize = Number(msg.best_ask_size ?? msg.ask_size);
-        emitQuote({
+        emitQuote(assetId, {
           best_bid: Number.isFinite(bestBid) ? bestBid : null,
           best_ask: Number.isFinite(bestAsk) ? bestAsk : null,
           spread: Number.isFinite(spreadRaw)
@@ -275,7 +322,7 @@ export function openPolymarketQuoteSocket(opts) {
         return;
       }
 
-      if (type === "book" || type === "price_change") {
+      if (type === "book") {
         const bids = Array.isArray(msg.bids) ? msg.bids : [];
         const asks = Array.isArray(msg.asks) ? msg.asks : [];
         const parsedBids = bids
@@ -288,7 +335,7 @@ export function openPolymarketQuoteSocket(opts) {
         parsedAsks.sort((a, b) => a.price - b.price);
         const bestBid = parsedBids[0]?.price ?? Number(msg.best_bid);
         const bestAsk = parsedAsks[0]?.price ?? Number(msg.best_ask);
-        emitQuote({
+        emitQuote(assetId, {
           best_bid: Number.isFinite(bestBid) ? bestBid : null,
           best_ask: Number.isFinite(bestAsk) ? bestAsk : null,
           spread:
@@ -298,15 +345,13 @@ export function openPolymarketQuoteSocket(opts) {
           bid_size: parsedBids[0]?.size ?? null,
           ask_size: parsedAsks[0]?.size ?? null,
         });
-        if (type === "book" && opts.onBook) {
-          opts.onBook({
-            asset_id: assetId,
-            bids: parsedBids,
-            asks: parsedAsks,
-            time: stamp.time,
-            timestamp: stamp.timestamp,
-          });
-        }
+        opts.onBook?.({
+          asset_id: assetId,
+          bids: parsedBids,
+          asks: parsedAsks,
+          time: stamp.time,
+          timestamp: stamp.timestamp,
+        });
       }
     },
   });

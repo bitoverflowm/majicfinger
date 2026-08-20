@@ -342,7 +342,8 @@ export type HubDemoModuleSection = {
   demoSlot?:
     | "polymarket-live-search"
     | "polymarket-live-prices"
-    | "polymarket-live-spread";
+    | "polymarket-live-spread"
+    | "polymarket-live-orderbook";
   inlineHeading?: string;
   inlineHelper?: string;
   placeholder?: string;

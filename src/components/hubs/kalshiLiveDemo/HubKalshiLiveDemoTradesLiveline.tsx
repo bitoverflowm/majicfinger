@@ -380,8 +380,6 @@ export const HubKalshiLiveDemoTradesLiveline = forwardRef<
     return sentinels.length ? [...visible, ...sentinels] : visible;
   }, [fixedValueDomain, visible]);
 
-  const hideBuiltInSeriesToggle = Boolean(onToggleSeries) || plotSeries.length > visible.length;
-
   const windowSecs = mapped.windowSecs;
 
   const legendItems = useMemo(
@@ -405,10 +403,18 @@ export const HubKalshiLiveDemoTradesLiveline = forwardRef<
     );
     for (const button of root.querySelectorAll("button")) {
       const text = button.textContent?.replace(/\s+/g, " ").trim();
-      const title = text ? titles.get(text) : "";
+      // Domain sentinels pin 0–100¢ but Liveline still draws blank chips for them.
+      if (!text) {
+        button.style.display = "none";
+        button.setAttribute("aria-hidden", "true");
+        continue;
+      }
+      button.style.display = "";
+      button.removeAttribute("aria-hidden");
+      const title = titles.get(text);
       if (title) button.setAttribute("title", title);
     }
-  }, [mapped.series, visible]);
+  }, [mapped.series, plotSeries, visible]);
 
   if (!mapped.series.some((s) => s.data.length)) {
     return (
@@ -445,7 +451,10 @@ export const HubKalshiLiveDemoTradesLiveline = forwardRef<
       ) : (
         <div
           ref={chartWrapRef}
-          className="flex min-h-0 w-full flex-1 flex-col overflow-hidden px-1 pb-3 pt-1 sm:px-2"
+          className={cn(
+            "flex min-h-0 w-full flex-1 flex-col overflow-hidden px-1 pb-3 pt-1 sm:px-2",
+            "[&_button:has(>span:only-child)]:hidden",
+          )}
         >
           <Liveline
             data={primary.data}
@@ -474,8 +483,6 @@ export const HubKalshiLiveDemoTradesLiveline = forwardRef<
             className={cn(
               "w-full min-h-0 flex-1",
               !fill && !compact && "h-full",
-              hideBuiltInSeriesToggle &&
-                "[&>div:first-child:not(:last-child)]:hidden",
             )}
             style={
               fill || compact

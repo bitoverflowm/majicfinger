@@ -29,10 +29,21 @@ export type HubPolymarketLiveOrderbookDepthChartProps = {
   label?: string;
   className?: string;
   maxLevels?: number;
+  /** Keys like `bid:62` / `ask:64` that should flash. */
+  flashKeys?: ReadonlySet<string>;
 };
+
+const FLASH_BID = "oklch(0.75 0.15 162)";
+const FLASH_ASK = "oklch(0.75 0.18 41)";
+
+export function polymarketBookFlashKey(side: "bid" | "ask", price: number): string {
+  const cents = price <= 1 ? Math.round(price * 100) : Math.round(price);
+  return `${side}:${cents}`;
+}
 
 const BID_COLOR = "var(--chart-3)";
 const ASK_COLOR = "var(--chart-1)";
+const EMPTY_FLASH: ReadonlySet<string> = new Set();
 
 function formatCents(value: number): string {
   if (!Number.isFinite(value)) return "—";
@@ -71,9 +82,10 @@ export const HubPolymarketLiveOrderbookDepthChart = forwardRef<
   HTMLDivElement,
   HubPolymarketLiveOrderbookDepthChartProps
 >(function HubPolymarketLiveOrderbookDepthChart(
-  { bids, asks, label, className, maxLevels = 12 },
+  { bids, asks, label, className, maxLevels = 12, flashKeys },
   ref,
 ) {
+  const flash = flashKeys ?? EMPTY_FLASH;
   const { data, peak } = useMemo(() => {
     const byPrice = new Map<number, DepthPoint>();
 
@@ -211,9 +223,17 @@ export const HubPolymarketLiveOrderbookDepthChart = forwardRef<
             maxBarSize={18}
             isAnimationActive={false}
           >
-            {data.map((entry) => (
-              <Cell key={`bid-${entry.priceCents}`} fill={BID_COLOR} />
-            ))}
+            {data.map((entry) => {
+              const lit = flash.has(`bid:${entry.priceCents}`);
+              return (
+                <Cell
+                  key={`bid-${entry.priceCents}`}
+                  fill={lit ? FLASH_BID : BID_COLOR}
+                  stroke={lit ? "oklch(0.55 0.14 162)" : "transparent"}
+                  strokeWidth={lit ? 1.5 : 0}
+                />
+              );
+            })}
           </Bar>
           <Bar
             dataKey="askSize"
@@ -223,9 +243,17 @@ export const HubPolymarketLiveOrderbookDepthChart = forwardRef<
             maxBarSize={18}
             isAnimationActive={false}
           >
-            {data.map((entry) => (
-              <Cell key={`ask-${entry.priceCents}`} fill={ASK_COLOR} />
-            ))}
+            {data.map((entry) => {
+              const lit = flash.has(`ask:${entry.priceCents}`);
+              return (
+                <Cell
+                  key={`ask-${entry.priceCents}`}
+                  fill={lit ? FLASH_ASK : ASK_COLOR}
+                  stroke={lit ? "oklch(0.55 0.16 41)" : "transparent"}
+                  strokeWidth={lit ? 1.5 : 0}
+                />
+              );
+            })}
           </Bar>
         </BarChart>
       </ChartContainer>

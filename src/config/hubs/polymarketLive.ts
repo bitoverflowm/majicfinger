@@ -269,8 +269,10 @@ export const polymarketLiveHub: HubPageConfig = {
         "Updates as the visible book changes",
       ],
       inlineHeading: "Inspect a Live Order Book",
-      inlineHelper: "Select an outcome to see its current bids, asks, and available depth.",
+      inlineHelper:
+        "Watch the selected market’s bids, asks, and depth update live, or pull a REST snapshot of the same book.",
       placeholder: "Search for a Polymarket market to load this view.",
+      demoSlot: "polymarket-live-orderbook",
       cta: { ...GET_FULL_ACCESS },
       secondaryCta: {
         label: "Next: Follow Live Trades",
