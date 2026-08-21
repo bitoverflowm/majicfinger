@@ -309,8 +309,10 @@ export const polymarketLiveHub: HubPageConfig = {
       content:
         "Individual price updates are useful in the moment but difficult to compare over time. Lychee turns incoming market activity into live candlesticks so you can see each interval’s open, high, low, and close in one view.\n\nChange the interval, zoom into a fast move, compare related outcomes, or place multiple markets on the same chart. The result is a clearer view of how the market reached its current probability—not only where it is now.",
       inlineHeading: "Build a Live Candlestick Chart",
-      inlineHelper: "Select a market, outcome, and time interval to chart the live price path.",
+      inlineHelper:
+        "Executed trades become open, high, low, and close bars. Live prints and top-of-book updates keep the active candle moving.",
       placeholder: "Search for a Polymarket market to load this view.",
+      demoSlot: "polymarket-live-candlesticks",
       cta: { ...GET_FULL_ACCESS },
       secondaryCta: {
         label: "Next: Explore Holders and Positions",

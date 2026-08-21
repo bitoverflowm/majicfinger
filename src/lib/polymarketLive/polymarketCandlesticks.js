@@ -5,6 +5,7 @@ export const POLYMARKET_CANDLE_INTERVALS = [
   { value: "30m", label: "30 minutes", milliseconds: 30 * 60_000 },
   { value: "1h", label: "1 hour", milliseconds: 60 * 60_000 },
   { value: "4h", label: "4 hours", milliseconds: 4 * 60 * 60_000 },
+  { value: "1d", label: "1 day", milliseconds: 24 * 60 * 60_000 },
 ];
 
 const INTERVAL_MS = Object.fromEntries(

@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { HubCtaButton } from "@/components/hubs/HubCtaButton";
 import { useHubPolymarketLiveDemo } from "@/components/hubs/polymarketLiveDemo/HubPolymarketLiveDemoSelection";
+import { HubPolymarketLiveCandlesticksDemo } from "@/components/hubs/polymarketLiveDemo/HubPolymarketLiveCandlesticksDemo";
 import { HubPolymarketLiveOrderbookDemo } from "@/components/hubs/polymarketLiveDemo/HubPolymarketLiveOrderbookDemo";
 import { HubPolymarketLivePricesDemo } from "@/components/hubs/polymarketLiveDemo/HubPolymarketLivePricesDemo";
 import { HubPolymarketLiveSearchDemo } from "@/components/hubs/polymarketLiveDemo/HubPolymarketLiveSearchDemo";
@@ -162,7 +163,8 @@ export function HubDemoModule({ section }: { section: HubDemoModuleSection }) {
       <div className="mx-auto mt-10 w-full max-w-5xl px-0 sm:px-2">
         <DemoWindowMockup
           contentClassName={
-            section.demoSlot === "polymarket-live-trades"
+            section.demoSlot === "polymarket-live-trades" ||
+            section.demoSlot === "polymarket-live-candlesticks"
               ? "h-[min(46rem,calc(100dvh-10rem))] min-h-0"
               : section.demoSlot === "polymarket-live-spread" ||
                 section.demoSlot === "polymarket-live-orderbook"
@@ -199,6 +201,12 @@ export function HubDemoModule({ section }: { section: HubDemoModuleSection }) {
             />
           ) : section.demoSlot === "polymarket-live-trades" ? (
             <HubPolymarketLiveTradesDemo
+              heading={section.inlineHeading}
+              helper={section.inlineHelper}
+              placeholder={section.placeholder}
+            />
+          ) : section.demoSlot === "polymarket-live-candlesticks" ? (
+            <HubPolymarketLiveCandlesticksDemo
               heading={section.inlineHeading}
               helper={section.inlineHelper}
               placeholder={section.placeholder}
