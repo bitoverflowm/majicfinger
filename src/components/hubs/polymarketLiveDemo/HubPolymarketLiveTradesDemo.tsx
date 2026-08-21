@@ -124,7 +124,6 @@ function tradeNotionalUsd(row: Record<string, unknown>): number | null {
 
 function passesSizeFilter(row: Record<string, unknown>, minNotional: MinNotional): boolean {
   if (minNotional == null) return true;
-  if (String(row.source || "").toLowerCase() !== "live") return true;
   const notional = tradeNotionalUsd(row);
   return notional != null && notional >= minNotional;
 }
@@ -596,7 +595,10 @@ export function HubPolymarketLiveTradesDemo({
     () => chartSeries.flatMap((item) => item.trades),
     [chartSeries],
   );
-  const hasData = sheetRows.length > 0;
+  const hasData = useMemo(
+    () => Object.values(pointsByToken).some((rows) => rows.length > 0),
+    [pointsByToken],
+  );
   const jsonText = useMemo(() => JSON.stringify(sheetRows, null, 2), [sheetRows]);
   const sheetColumns = useMemo(() => {
     const keys = new Set<string>();
@@ -925,12 +927,17 @@ export function HubPolymarketLiveTradesDemo({
                 ))}
               </div>
 
-              <DropdownMenu>
+              <div className="inline-flex items-center gap-2">
+                <span className="text-[11px] text-muted-foreground">
+                  filter by trade size
+                </span>
+                <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button
                     type="button"
                     variant="outline"
                     size="sm"
+                    aria-label="Filter by trade size"
                     className={cn(
                       "h-7 gap-1.5 px-2 text-[11px] font-medium text-muted-foreground",
                       minNotional != null &&
@@ -966,6 +973,7 @@ export function HubPolymarketLiveTradesDemo({
                   ))}
                 </DropdownMenuContent>
               </DropdownMenu>
+              </div>
             </div>
           </div>
 
