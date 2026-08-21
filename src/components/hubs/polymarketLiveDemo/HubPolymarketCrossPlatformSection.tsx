@@ -1,11 +1,13 @@
 "use client";
 
 import dynamic from "next/dynamic";
+import Image from "next/image";
 import Link from "next/link";
 import { ArrowRightIcon } from "@radix-ui/react-icons";
 
 import { HubCtaButton } from "@/components/hubs/HubCtaButton";
 import { HubLazyWhenVisible } from "@/components/hubs/HubLazyWhenVisible";
+import { INTEGRATION_LOGO_STRIP } from "@/lib/integrations/integration-logo-strip";
 import { PRIMARY_INTEGRATION_HUB_PATHS } from "@/lib/integrations/marketing-catalog";
 import { cn } from "@/lib/utils";
 import type {
@@ -31,6 +33,38 @@ function SectionEyebrow({ children }: { children: string }) {
     <p className="text-[0.65rem] font-semibold uppercase tracking-[0.16em] text-secondary">
       {children}
     </p>
+  );
+}
+
+function IntegrationLogoChip({
+  label,
+  src,
+  href,
+  comingSoon,
+}: {
+  label: string;
+  src: string | null;
+  href: string;
+  comingSoon?: boolean;
+}) {
+  return (
+    <Link
+      href={href}
+      title={comingSoon ? `${label} (coming soon)` : label}
+      className={cn(
+        "relative inline-flex size-9 items-center justify-center overflow-hidden rounded-full border border-border/60 bg-background shadow-sm transition-colors hover:border-border hover:bg-muted/40",
+        comingSoon && "opacity-80",
+      )}
+    >
+      {src ? (
+        <Image src={src} alt="" width={28} height={28} className="object-contain p-0.5" />
+      ) : (
+        <span className="px-0.5 text-center text-[7px] font-semibold leading-tight text-foreground">
+          {label}
+        </span>
+      )}
+      {comingSoon ? <span className="sr-only">Coming soon</span> : null}
+    </Link>
   );
 }
 
@@ -169,20 +203,18 @@ export function HubPolymarketCrossPlatformSection({
               {section.signalsBody}
             </p>
           ) : null}
-          {section.signalLinks?.length ? (
-            <ul className="mt-3 flex flex-wrap items-center justify-center gap-2">
-              {section.signalLinks.map((link) => (
-                <li key={link.href}>
-                  <Link
-                    href={link.href}
-                    className="inline-flex rounded-full border border-border/60 bg-background px-2.5 py-1 text-[11px] font-medium text-foreground hover:bg-muted/40"
-                  >
-                    {link.label}
-                  </Link>
-                </li>
-              ))}
-            </ul>
-          ) : null}
+          <ul className="mt-3 flex flex-wrap items-center justify-center gap-2">
+            {INTEGRATION_LOGO_STRIP.map((item) => (
+              <li key={item.id}>
+                <IntegrationLogoChip
+                  label={item.label}
+                  src={item.src}
+                  href={item.href}
+                  comingSoon={item.comingSoon}
+                />
+              </li>
+            ))}
+          </ul>
           {section.cta || section.secondaryCta ? (
             <div className="mt-4 flex flex-wrap items-center justify-center gap-2">
               {section.cta ? <HubCtaButton cta={section.cta} variant="secondary" /> : null}

@@ -745,8 +745,8 @@ export function HubPolymarketKalshiCompareDemo() {
               </div>
 
               <div className="grid gap-3 sm:grid-cols-2">
-                <div className="overflow-hidden rounded-xl border border-border/70 bg-muted/10">
-                  <div className="flex items-center gap-2 border-b border-border/50 px-3 py-2">
+                <div className="flex flex-col overflow-hidden rounded-xl border border-border/70 bg-muted/10">
+                  <div className="flex shrink-0 items-center gap-2 border-b border-border/50 px-3 py-2">
                     <span
                       className="size-2.5 shrink-0 rounded-full"
                       style={{ backgroundColor: resolveDemoChartColor(defaultSeriesColorToken(0)) }}
@@ -754,34 +754,37 @@ export function HubPolymarketKalshiCompareDemo() {
                     />
                     <p className="text-xs font-semibold text-foreground">Polymarket</p>
                   </div>
-                  {seriesLoading && !polyFiltered.length ? (
-                    <div className="flex min-h-[14rem] items-center justify-center gap-2 text-sm text-muted-foreground">
-                      <Loader2 className="size-4 animate-spin" aria-hidden />
-                      Loading…
-                    </div>
-                  ) : !polyFiltered.length ? (
-                    <p className="flex min-h-[14rem] items-center justify-center px-4 text-center text-sm text-muted-foreground">
-                      No chart at present
-                    </p>
-                  ) : (
-                    <HubKalshiLiveDemoTradesLiveline
-                      series={polySeries}
-                      persistHistory
-                      fullHistory={interval === "all"}
-                      fixedValueDomain={{ min: 0, max: 100 }}
-                      formatValue={(v) => `${v.toFixed(1)}%`}
-                      parseRowValue={(row) => {
-                        const n = Number(row._probability_pct);
-                        return Number.isFinite(n) ? n : null;
-                      }}
-                      className="min-h-[14rem]"
-                      emptyMessage="No chart at present"
-                    />
-                  )}
+                  <div className="h-56 min-h-0 w-full shrink-0 sm:h-64">
+                    {seriesLoading && !polyFiltered.length ? (
+                      <div className="flex h-full items-center justify-center gap-2 text-sm text-muted-foreground">
+                        <Loader2 className="size-4 animate-spin" aria-hidden />
+                        Loading…
+                      </div>
+                    ) : !polyFiltered.length ? (
+                      <p className="flex h-full items-center justify-center px-4 text-center text-sm text-muted-foreground">
+                        No chart at present
+                      </p>
+                    ) : (
+                      <HubKalshiLiveDemoTradesLiveline
+                        series={polySeries}
+                        persistHistory
+                        fullHistory={interval === "all"}
+                        fill
+                        fixedValueDomain={{ min: 0, max: 100 }}
+                        formatValue={(v) => `${v.toFixed(1)}%`}
+                        parseRowValue={(row) => {
+                          const n = Number(row._probability_pct);
+                          return Number.isFinite(n) ? n : null;
+                        }}
+                        className="h-full min-h-0"
+                        emptyMessage="No chart at present"
+                      />
+                    )}
+                  </div>
                 </div>
 
-                <div className="overflow-hidden rounded-xl border border-border/70 bg-muted/10">
-                  <div className="flex items-center gap-2 border-b border-border/50 px-3 py-2">
+                <div className="flex flex-col overflow-hidden rounded-xl border border-border/70 bg-muted/10">
+                  <div className="flex shrink-0 items-center gap-2 border-b border-border/50 px-3 py-2">
                     <span
                       className="size-2.5 shrink-0 rounded-full"
                       style={{ backgroundColor: KALSHI_LINE_GREEN }}
@@ -789,30 +792,33 @@ export function HubPolymarketKalshiCompareDemo() {
                     />
                     <p className="text-xs font-semibold text-foreground">Kalshi</p>
                   </div>
-                  {seriesLoading && !kalshiFiltered.length ? (
-                    <div className="flex min-h-[14rem] items-center justify-center gap-2 text-sm text-muted-foreground">
-                      <Loader2 className="size-4 animate-spin" aria-hidden />
-                      Loading…
-                    </div>
-                  ) : !kalshiFiltered.length ? (
-                    <p className="flex min-h-[14rem] items-center justify-center px-4 text-center text-sm text-muted-foreground">
-                      No chart at present
-                    </p>
-                  ) : (
-                    <HubKalshiLiveDemoTradesLiveline
-                      series={kalshiSeries}
-                      persistHistory
-                      fullHistory={interval === "all"}
-                      fixedValueDomain={{ min: 0, max: 100 }}
-                      formatValue={(v) => `${v.toFixed(1)}%`}
-                      parseRowValue={(row) => {
-                        const n = Number(row._probability_pct);
-                        return Number.isFinite(n) ? n : null;
-                      }}
-                      className="min-h-[14rem]"
-                      emptyMessage="No chart at present"
-                    />
-                  )}
+                  <div className="h-56 min-h-0 w-full shrink-0 sm:h-64">
+                    {seriesLoading && !kalshiFiltered.length ? (
+                      <div className="flex h-full items-center justify-center gap-2 text-sm text-muted-foreground">
+                        <Loader2 className="size-4 animate-spin" aria-hidden />
+                        Loading…
+                      </div>
+                    ) : !kalshiFiltered.length ? (
+                      <p className="flex h-full items-center justify-center px-4 text-center text-sm text-muted-foreground">
+                        No chart at present
+                      </p>
+                    ) : (
+                      <HubKalshiLiveDemoTradesLiveline
+                        series={kalshiSeries}
+                        persistHistory
+                        fullHistory={interval === "all"}
+                        fill
+                        fixedValueDomain={{ min: 0, max: 100 }}
+                        formatValue={(v) => `${v.toFixed(1)}%`}
+                        parseRowValue={(row) => {
+                          const n = Number(row._probability_pct);
+                          return Number.isFinite(n) ? n : null;
+                        }}
+                        className="h-full min-h-0"
+                        emptyMessage="No chart at present"
+                      />
+                    )}
+                  </div>
                 </div>
               </div>
 
@@ -885,7 +891,7 @@ export function HubPolymarketKalshiCompareDemo() {
                   <Link href="#polymarket-live-pricing">Compare Markets in Lychee</Link>
                 </Button>
                 <Button type="button" size="sm" variant="outline" asChild>
-                  <Link href="#polymarket-live-dashboard">Add Both to a Live Dashboard</Link>
+                  <Link href="#polymarket-live-pricing">Add Both to a Live Dashboard</Link>
                 </Button>
               </div>
             </div>

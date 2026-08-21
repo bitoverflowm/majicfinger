@@ -497,15 +497,11 @@ export const polymarketLiveHub: HubPageConfig = {
       signalsTitle: "Add the Signals Behind the Market",
       signalsBody:
         "Bring X, news, Chainlink, weather and other real-world data beside prediction-market prices to investigate what may be moving the odds.",
-      signalLinks: [
-        { label: "X", href: "/integrations/twitter" },
-        { label: "Chainlink", href: "/integrations/chainlink" },
-      ],
       cta: {
-        label: "Explore All Lychee Integrations",
-        href: "/data-sheet",
+        label: "Upgrade now for full access.",
+        href: "#polymarket-live-pricing",
         requiresAuth: false,
-        ariaLabel: "Explore all Lychee data integrations in the data sheet",
+        ariaLabel: "Upgrade now for full access — view Polymarket Live pricing",
       },
       secondaryCta: {
         label: "Next: Browse Live Data Guides",
