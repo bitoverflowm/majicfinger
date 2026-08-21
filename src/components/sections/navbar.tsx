@@ -65,6 +65,12 @@ export function Navbar({ productsNav }: { productsNav: ProductsNavData }) {
   const user = useUser();
   const router = useRouter();
   const pathname = usePathname();
+  const tryForFreeHref =
+    pathname === "/polymarket-live-data"
+      ? "#find-polymarket-markets"
+      : siteConfig.hero.cta.primary.href;
+  const TryForFreeLink =
+    pathname === "/polymarket-live-data" ? Link : DemoScrollLink;
 
   useEffect(() => {
     const handleScroll = () => {
@@ -163,12 +169,12 @@ export function Navbar({ productsNav }: { productsNav: ProductsNavData }) {
               <div className="flex items-center space-x-3">
                 {!user ? (
                   <>
-                    <DemoScrollLink
+                    <TryForFreeLink
                       className="bg-secondary h-8 hidden md:flex items-center justify-center text-sm font-normal tracking-wide rounded-full text-primary-foreground dark:text-secondary-foreground w-fit px-4 shadow-[inset_0_1px_2px_rgba(255,255,255,0.25),0_3px_3px_-1.5px_rgba(16,24,40,0.06),0_1px_1px_rgba(16,24,40,0.08)] border border-white/[0.12] hover:bg-secondary/80 transition-all ease-out active:scale-95"
-                      href={siteConfig.hero.cta.primary.href}
+                      href={tryForFreeHref}
                     >
                       {siteConfig.hero.cta.primary.text}
-                    </DemoScrollLink>
+                    </TryForFreeLink>
                     <Link
                       className="h-8 hidden md:flex items-center justify-center text-sm font-normal tracking-wide rounded-full w-fit px-4 border border-border bg-background hover:bg-muted transition-all ease-out active:scale-95"
                       href="/login"
@@ -312,12 +318,12 @@ export function Navbar({ productsNav }: { productsNav: ProductsNavData }) {
                 <div className="flex flex-col gap-2">
                   {!user ? (
                     <>
-                      <DemoScrollLink
-                        href={siteConfig.hero.cta.primary.href}
+                      <TryForFreeLink
+                        href={tryForFreeHref}
                         className="bg-secondary h-8 flex items-center justify-center text-sm font-normal tracking-wide rounded-full text-primary-foreground dark:text-secondary-foreground w-full px-4 shadow-[inset_0_1px_2px_rgba(255,255,255,0.25),0_3px_3px_-1.5px_rgba(16,24,40,0.06),0_1px_1px_rgba(16,24,40,0.08)] border border-white/[0.12] hover:bg-secondary/80 transition-all ease-out active:scale-95"
                       >
                         {siteConfig.hero.cta.primary.text}
-                      </DemoScrollLink>
+                      </TryForFreeLink>
                       <Link
                         href="/login"
                         className="h-8 flex items-center justify-center text-sm font-normal tracking-wide rounded-full w-full px-4 border border-border bg-background hover:bg-muted transition-all ease-out active:scale-95"

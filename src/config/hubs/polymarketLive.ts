@@ -14,12 +14,12 @@ const GET_FULL_ACCESS = {
 
 const EXPLORE_LIVE = {
   label: "Explore Polymarket Live",
-  href: "/#demo",
+  href: "#find-polymarket-markets",
   requiresAuth: false,
   eventLabel: "polymarket_live_explore",
   tracking: {
     page: "/polymarket-live-data",
-    destination: "homepage demo / polymarket live",
+    destination: "#find-polymarket-markets",
   },
 } as const;
 

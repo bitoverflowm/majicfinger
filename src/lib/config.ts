@@ -159,7 +159,7 @@ export const siteConfig = {
     {
       title: "Product",
       links: [
-        { id: 1, title: "Features", url: "#features" },
+        { id: 1, title: "Features", url: "/#features" },
         { id: 2, title: "Pricing", url: "#pricing" },
         { id: 3, title: "Dashboard", url: "/dashboard" },
         { id: 4, title: "Charts", url: "/charts" },
