@@ -162,9 +162,10 @@ export function HubDemoModule({ section }: { section: HubDemoModuleSection }) {
       <div className="mx-auto mt-10 w-full max-w-5xl px-0 sm:px-2">
         <DemoWindowMockup
           contentClassName={
-            section.demoSlot === "polymarket-live-spread" ||
-            section.demoSlot === "polymarket-live-orderbook" ||
             section.demoSlot === "polymarket-live-trades"
+              ? "h-[min(46rem,calc(100dvh-10rem))] min-h-0"
+              : section.demoSlot === "polymarket-live-spread" ||
+                section.demoSlot === "polymarket-live-orderbook"
               ? "h-[min(40rem,calc(100dvh-12rem))] min-h-0"
               : section.demoSlot === "polymarket-live-search" ||
                   section.demoSlot === "polymarket-live-prices"

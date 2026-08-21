@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { HubInPageLink } from "@/components/hubs/HubCtaButton";
-import { Braces, Download, LineChart, Loader2, Table2 } from "lucide-react";
+import { Braces, Download, Filter, LineChart, Loader2, Table2 } from "lucide-react";
 import { toJpeg, toPng, toSvg } from "html-to-image";
 import * as XLSX from "xlsx";
 
@@ -30,6 +30,31 @@ import { normalizePolymarketRealtimeHistoryRows } from "@/lib/polymarketLive/pol
 import { cn } from "@/lib/utils";
 
 type ViewMode = "chart" | "sheet" | "json";
+type ChartTimeframe = "all" | "minute" | "hour" | "day";
+type MinNotional = 10 | 100 | 1000 | null;
+
+const TIMEFRAME_OPTIONS: { id: ChartTimeframe; label: string }[] = [
+  { id: "all", label: "All trades" },
+  { id: "minute", label: "Minute" },
+  { id: "hour", label: "Hour" },
+  { id: "day", label: "Day" },
+];
+
+const SIZE_FILTER_OPTIONS: { value: MinNotional; label: string }[] = [
+  { value: 10, label: "$10+" },
+  { value: 100, label: "$100+" },
+  { value: 1000, label: "$1,000+" },
+  { value: null, label: "Cancel filter" },
+];
+
+const TIMEFRAME_BUCKET_MS: Record<ChartTimeframe, number | null> = {
+  all: null,
+  minute: 60 * 1000,
+  hour: 60 * 60 * 1000,
+  day: 24 * 60 * 60 * 1000,
+};
+
+const MAX_LIVE_TAPE = 80;
 
 type SeriesSpec = {
   id: string;
@@ -88,6 +113,66 @@ function downloadDataUrl(dataUrl: string, filename: string) {
   a.href = dataUrl;
   a.download = filename;
   a.click();
+}
+
+function tradeNotionalUsd(row: Record<string, unknown>): number | null {
+  const price = Number(row.yes_price_dollars ?? row.price);
+  const size = Number(row.size);
+  if (!Number.isFinite(price) || !Number.isFinite(size) || size <= 0) return null;
+  return size * price;
+}
+
+function passesSizeFilter(row: Record<string, unknown>, minNotional: MinNotional): boolean {
+  if (minNotional == null) return true;
+  if (String(row.source || "").toLowerCase() !== "live") return true;
+  const notional = tradeNotionalUsd(row);
+  return notional != null && notional >= minNotional;
+}
+
+function bucketTrades(
+  trades: Record<string, unknown>[],
+  timeframe: ChartTimeframe,
+): Record<string, unknown>[] {
+  const bucketMs = TIMEFRAME_BUCKET_MS[timeframe];
+  if (bucketMs == null) return trades;
+  const buckets = new Map<number, Record<string, unknown>>();
+  for (const row of trades) {
+    const t = parseTradeTimeMs(row);
+    if (!t) continue;
+    const key = Math.floor(t / bucketMs) * bucketMs;
+    buckets.set(key, {
+      ...row,
+      created_time: new Date(key).toISOString(),
+      time: new Date(key).toISOString(),
+      timestamp: String(key),
+    });
+  }
+  return [...buckets.values()].sort((a, b) => parseTradeTimeMs(a) - parseTradeTimeMs(b));
+}
+
+function formatTapeTime(ms: number): string {
+  if (!ms) return "—";
+  try {
+    return new Intl.DateTimeFormat(undefined, {
+      hour: "numeric",
+      minute: "2-digit",
+      second: "2-digit",
+    }).format(new Date(ms));
+  } catch {
+    return new Date(ms).toLocaleTimeString();
+  }
+}
+
+function formatTapePrice(price: unknown): string {
+  const n = Number(price);
+  if (!Number.isFinite(n)) return "—";
+  return `${Math.round(n <= 1 ? n * 100 : n)}¢`;
+}
+
+function formatTapeSide(side: unknown): string {
+  const s = String(side || "").trim();
+  if (!s) return "—";
+  return s.toUpperCase();
 }
 
 function tradeKey(row: Record<string, unknown>): string {
@@ -351,6 +436,9 @@ export function HubPolymarketLiveTradesDemo({
   const [seriesColorTokens, setSeriesColorTokens] = useState<
     Record<string, DemoChartColorTokenId>
   >({});
+  const [timeframe, setTimeframe] = useState<ChartTimeframe>("all");
+  const [minNotional, setMinNotional] = useState<MinNotional>(null);
+  const [liveTape, setLiveTape] = useState<Record<string, unknown>[]>([]);
 
   const rootRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<HTMLDivElement>(null);
@@ -384,6 +472,7 @@ export function HubPolymarketLiveTradesDemo({
 
   useEffect(() => {
     setPointsByToken({});
+    setLiveTape([]);
     setError(null);
     setLivePaused(false);
     setHiddenSeriesIds(new Set());
@@ -441,7 +530,6 @@ export function HubPolymarketLiveTradesDemo({
   useEffect(() => {
     stopSocket();
     if (!pollingActive) return undefined;
-    const titleByToken = new Map(seriesSpecs.map((spec) => [spec.tokenId, spec.label]));
     socketStopRef.current = openPolymarketLastTradeSocket({
       assetIds: seriesSpecs.map((spec) => spec.tokenId),
       onStatus: (status: "open" | "closed" | "error") => {
@@ -449,21 +537,26 @@ export function HubPolymarketLiveTradesDemo({
       },
       onTrade: (row) => {
         const tokenId = String(row.asset_id || "");
-        const title = titleByToken.get(tokenId);
-        if (!title) return;
+        const spec = seriesSpecs.find((item) => item.tokenId === tokenId);
+        if (!spec) return;
+        const liveRow = {
+          ...row,
+          yes_price_dollars: row.price,
+          source: "live",
+          outcome: spec.outcome,
+          market_title: spec.label,
+        };
+        setLiveTape((prev) => {
+          const next = [liveRow, ...prev.filter((item) => tradeKey(item) !== tradeKey(liveRow))];
+          return next.slice(0, MAX_LIVE_TAPE);
+        });
         setPointsByToken((prev) => ({
           ...prev,
           [tokenId]: mergeTrades(
             prev[tokenId] || [],
-            [
-              {
-                ...row,
-                yes_price_dollars: row.price,
-                source: "live",
-              },
-            ],
+            [liveRow],
             tokenId,
-            title,
+            spec.label,
             "live",
             MAX_MERGED_POINTS,
           ),
@@ -479,16 +572,24 @@ export function HubPolymarketLiveTradesDemo({
     () =>
       seriesSpecs.map((spec, index) => {
         const colorToken = seriesColorTokens[spec.id] ?? colorTokenForSpec(spec, index);
+        const filtered = (pointsByToken[spec.tokenId] || []).filter((row) =>
+          passesSizeFilter(row, minNotional),
+        );
         return {
           key: spec.id,
           id: spec.id,
           label: spec.label,
           colorToken,
           color: resolveDemoChartColor(colorToken),
-          trades: pointsByToken[spec.tokenId] || [],
+          trades: bucketTrades(filtered, timeframe),
         };
       }),
-    [pointsByToken, seriesColorTokens, seriesSpecs],
+    [minNotional, pointsByToken, seriesColorTokens, seriesSpecs, timeframe],
+  );
+
+  const liveTapeRows = useMemo(
+    () => liveTape.filter((row) => passesSizeFilter(row, minNotional)),
+    [liveTape, minNotional],
   );
 
   const sheetRows = useMemo(
@@ -627,11 +728,12 @@ export function HubPolymarketLiveTradesDemo({
           role="region"
           aria-label="Live trades with price history"
         >
-          <div className="flex shrink-0 flex-wrap items-center justify-between gap-2 border-b border-border/60 px-3 py-2">
-            <p className="text-xs font-medium text-muted-foreground">
-              Price history with live trades
-            </p>
-            <div className="flex flex-wrap items-center justify-end gap-2">
+          <div className="flex shrink-0 flex-col gap-2 border-b border-border/60 px-3 py-2">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <p className="text-xs font-medium text-muted-foreground">
+                Price history with live trades
+              </p>
+              <div className="flex flex-wrap items-center justify-end gap-2">
               {loading ? (
                 <span className="inline-flex items-center gap-1.5 text-xs text-muted-foreground">
                   <Loader2 className="size-3.5 animate-spin" aria-hidden />
@@ -797,6 +899,74 @@ export function HubPolymarketLiveTradesDemo({
                 </button>
               </div>
             </div>
+            </div>
+
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div
+                className="inline-flex h-7 items-center rounded-md border border-border/70 bg-background p-0.5"
+                role="group"
+                aria-label="Chart time frame"
+              >
+                {TIMEFRAME_OPTIONS.map((option) => (
+                  <button
+                    key={option.id}
+                    type="button"
+                    onClick={() => setTimeframe(option.id)}
+                    className={cn(
+                      "inline-flex h-6 items-center rounded px-2 text-[11px] font-medium transition-colors",
+                      timeframe === option.id
+                        ? "bg-muted text-foreground"
+                        : "text-muted-foreground hover:bg-muted/70 hover:text-foreground",
+                    )}
+                    aria-pressed={timeframe === option.id}
+                  >
+                    {option.label}
+                  </button>
+                ))}
+              </div>
+
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className={cn(
+                      "h-7 gap-1.5 px-2 text-[11px] font-medium text-muted-foreground",
+                      minNotional != null &&
+                        "border-secondary/40 bg-secondary/10 text-foreground",
+                    )}
+                  >
+                    <Filter className="size-3.5" aria-hidden />
+                    {minNotional == null
+                      ? "Size"
+                      : minNotional === 1000
+                        ? "$1,000+"
+                        : `$${minNotional}+`}
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="min-w-[9.5rem]">
+                  {SIZE_FILTER_OPTIONS.map((option) => (
+                    <DropdownMenuItem
+                      key={String(option.value)}
+                      className="text-xs"
+                      onSelect={() => setMinNotional(option.value)}
+                    >
+                      <span
+                        className={cn(
+                          "mr-2 inline-block w-3 text-center",
+                          minNotional === option.value ? "opacity-100" : "opacity-0",
+                        )}
+                        aria-hidden
+                      >
+                        ✓
+                      </span>
+                      {option.label}
+                    </DropdownMenuItem>
+                  ))}
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
           </div>
 
           {error && !hasData ? (
@@ -814,15 +984,79 @@ export function HubPolymarketLiveTradesDemo({
               Waiting for price history and live trades…
             </p>
           ) : viewMode === "chart" ? (
-            <HubKalshiLiveDemoTradesChart
-              ref={chartRef}
-              series={chartSeries}
-              hiddenSeriesIds={hiddenSeriesIds}
-              onToggleSeries={toggleSeries}
-              onChangeSeriesColor={changeSeriesColor}
-              emphasizeLiveDots
-              className="min-h-0 flex-1"
-            />
+            <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
+              <HubKalshiLiveDemoTradesChart
+                ref={chartRef}
+                series={chartSeries}
+                hiddenSeriesIds={hiddenSeriesIds}
+                onToggleSeries={toggleSeries}
+                onChangeSeriesColor={changeSeriesColor}
+                emphasizeLiveDots
+                livePulse={!livePaused && socketLive}
+                animate
+                className="min-h-[12rem] flex-1"
+              />
+              <div className="flex max-h-[10.5rem] min-h-[7.5rem] shrink-0 flex-col border-t border-border/60 bg-background/40">
+                <div className="flex shrink-0 items-center gap-2 px-3 py-1.5">
+                  <p className="text-[11px] font-medium text-muted-foreground">
+                    Live trades
+                  </p>
+                </div>
+                <div className="min-h-0 flex-1 overflow-auto">
+                  <table className="w-full min-w-0 border-collapse text-left text-[11px] sm:text-xs">
+                    <thead className="sticky top-0 z-[1] bg-muted/90 backdrop-blur">
+                      <tr className="border-b border-border/60">
+                        <th className="whitespace-nowrap px-3 py-1.5 font-medium text-muted-foreground">
+                          Time
+                        </th>
+                        <th className="whitespace-nowrap px-3 py-1.5 font-medium text-muted-foreground">
+                          Outcome
+                        </th>
+                        <th className="whitespace-nowrap px-3 py-1.5 font-medium text-muted-foreground">
+                          Side
+                        </th>
+                        <th className="whitespace-nowrap px-3 py-1.5 font-medium text-muted-foreground">
+                          Price
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {liveTapeRows.length ? (
+                        liveTapeRows.map((row, rowIndex) => (
+                          <tr
+                            key={tradeKey(row) || String(rowIndex)}
+                            className="border-b border-border/40 last:border-0"
+                          >
+                            <td className="whitespace-nowrap px-3 py-1.5 font-mono tabular-nums text-foreground">
+                              {formatTapeTime(parseTradeTimeMs(row))}
+                            </td>
+                            <td className="whitespace-nowrap px-3 py-1.5 text-foreground">
+                              {String(row.outcome || row.market_title || "—")}
+                            </td>
+                            <td className="whitespace-nowrap px-3 py-1.5 text-foreground">
+                              {formatTapeSide(row.side)}
+                            </td>
+                            <td className="whitespace-nowrap px-3 py-1.5 font-mono tabular-nums text-foreground">
+                              {formatTapePrice(row.yes_price_dollars ?? row.price)}
+                            </td>
+                          </tr>
+                        ))
+                      ) : (
+                        <tr>
+                          <td
+                            colSpan={4}
+                            className="px-3 py-4 text-center text-muted-foreground"
+                          >
+                            No live trades yet
+                            {minNotional != null ? ` at $${minNotional}+` : ""}.
+                          </td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
           ) : viewMode === "json" ? (
             <pre className="max-h-[28rem] overflow-auto px-3 py-3 font-mono text-[11px] leading-relaxed text-foreground sm:text-xs">
               {jsonText}

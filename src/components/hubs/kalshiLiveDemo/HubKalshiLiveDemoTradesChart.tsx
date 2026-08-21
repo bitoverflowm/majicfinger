@@ -37,7 +37,43 @@ type HubKalshiLiveDemoTradesChartProps = {
    * so websocket prints sit on top of REST history.
    */
   emphasizeLiveDots?: boolean;
+  /** Pulsing tip on the latest point of each visible series. */
+  livePulse?: boolean;
+  /** Smooth line transitions when points, filters, or windows change. */
+  animate?: boolean;
 };
+
+function LivePulseDot({
+  cx,
+  cy,
+  color,
+}: {
+  cx: number;
+  cy: number;
+  color: string;
+}) {
+  return (
+    <g>
+      <circle cx={cx} cy={cy} r={4} fill={color} opacity={0.35}>
+        <animate attributeName="r" values="4;12" dur="1.5s" repeatCount="indefinite" />
+        <animate
+          attributeName="opacity"
+          values="0.4;0"
+          dur="1.5s"
+          repeatCount="indefinite"
+        />
+      </circle>
+      <circle
+        cx={cx}
+        cy={cy}
+        r={4.25}
+        fill={color}
+        stroke="var(--background)"
+        strokeWidth={1.5}
+      />
+    </g>
+  );
+}
 
 function parseTradeTime(row: Record<string, unknown>): number | null {
   const raw = row.created_time ?? row.created_ts ?? row.ts;
@@ -108,6 +144,8 @@ export const HubKalshiLiveDemoTradesChart = forwardRef<
   className,
   showDots = true,
   emphasizeLiveDots = false,
+  livePulse = false,
+  animate = false,
 }, ref) {
   const hidden = hiddenSeriesIds ?? new Set<string>();
 
@@ -161,6 +199,20 @@ export const HubKalshiLiveDemoTradesChart = forwardRef<
     ) as Array<Record<string, unknown>>;
   }, [series]);
 
+  const lastPointByKey = useMemo(() => {
+    const last: Record<string, Record<string, unknown>> = {};
+    for (const item of series) {
+      for (let i = data.length - 1; i >= 0; i -= 1) {
+        const point = data[i];
+        if (point && point[item.key] != null) {
+          last[item.key] = point;
+          break;
+        }
+      }
+    }
+    return last;
+  }, [data, series]);
+
   const visibleSeries = useMemo(
     () => series.filter((item) => !hidden.has(item.key)),
     [series, hidden],
@@ -206,7 +258,7 @@ export const HubKalshiLiveDemoTradesChart = forwardRef<
         <LineChart
           accessibilityLayer
           data={data}
-          margin={{ top: 8, right: 12, left: 4, bottom: 4 }}
+          margin={{ top: 10, right: 18, left: 4, bottom: 4 }}
         >
           <CartesianGrid vertical={false} strokeDasharray="3 3" />
           <XAxis
@@ -257,36 +309,73 @@ export const HubKalshiLiveDemoTradesChart = forwardRef<
               strokeWidth={2}
               connectNulls
               dot={
-                emphasizeLiveDots
-                  ? (props: {
-                      cx?: number;
-                      cy?: number;
-                      payload?: Record<string, unknown>;
-                    }) => {
-                      if (!props.payload?.[`${item.key}Live`]) return null;
-                      if (props.cx == null || props.cy == null) return null;
+                (props: {
+                  cx?: number;
+                  cy?: number;
+                  payload?: Record<string, unknown>;
+                }) => {
+                  if (props.cx == null || props.cy == null) {
+                    return <g key={`${item.key}-empty`} />;
+                  }
+                  const last = lastPointByKey[item.key];
+                  const isTip = last != null && props.payload?.t === last.t;
+                  if (isTip) {
+                    if (livePulse) {
                       return (
-                        <circle
-                          key={`${item.key}-live-${props.cx}-${props.cy}`}
+                        <LivePulseDot
+                          key={`${item.key}-pulse`}
                           cx={props.cx}
                           cy={props.cy}
-                          r={3.25}
-                          fill={`var(--color-${item.key})`}
-                          stroke="var(--background)"
-                          strokeWidth={1}
+                          color={`var(--color-${item.key})`}
                         />
                       );
                     }
-                  : showDots
-                    ? {
-                        r: 2.5,
-                        fill: `var(--color-${item.key})`,
-                        strokeWidth: 0,
-                      }
-                    : false
+                    return (
+                      <circle
+                        key={`${item.key}-tip`}
+                        cx={props.cx}
+                        cy={props.cy}
+                        r={4.25}
+                        fill={`var(--color-${item.key})`}
+                        stroke="var(--background)"
+                        strokeWidth={1.5}
+                      />
+                    );
+                  }
+                  if (emphasizeLiveDots) {
+                    if (!props.payload?.[`${item.key}Live`]) {
+                      return <g key={`${item.key}-skip-${props.cx}-${props.cy}`} />;
+                    }
+                    return (
+                      <circle
+                        key={`${item.key}-live-${props.cx}-${props.cy}`}
+                        cx={props.cx}
+                        cy={props.cy}
+                        r={3.25}
+                        fill={`var(--color-${item.key})`}
+                        stroke="var(--background)"
+                        strokeWidth={1}
+                      />
+                    );
+                  }
+                  if (!showDots) {
+                    return <g key={`${item.key}-hidden-${props.cx}-${props.cy}`} />;
+                  }
+                  return (
+                    <circle
+                      key={`${item.key}-dot-${props.cx}-${props.cy}`}
+                      cx={props.cx}
+                      cy={props.cy}
+                      r={2.5}
+                      fill={`var(--color-${item.key})`}
+                    />
+                  );
+                }
               }
               activeDot={{ r: 4 }}
-              isAnimationActive={false}
+              isAnimationActive={animate}
+              animationDuration={animate ? 450 : 0}
+              animationEasing="ease-in-out"
             />
           ))}
         </LineChart>
