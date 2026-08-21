@@ -4,6 +4,8 @@ import Link from "next/link";
 import { HubCtaButton } from "@/components/hubs/HubCtaButton";
 import { useHubPolymarketLiveDemo } from "@/components/hubs/polymarketLiveDemo/HubPolymarketLiveDemoSelection";
 import { HubPolymarketLiveCandlesticksDemo } from "@/components/hubs/polymarketLiveDemo/HubPolymarketLiveCandlesticksDemo";
+import { HubPolymarketLiveDashboardDemo } from "@/components/hubs/polymarketLiveDemo/HubPolymarketLiveDashboardDemo";
+import { HubPolymarketLiveHoldersDemo } from "@/components/hubs/polymarketLiveDemo/HubPolymarketLiveHoldersDemo";
 import { HubPolymarketLiveOrderbookDemo } from "@/components/hubs/polymarketLiveDemo/HubPolymarketLiveOrderbookDemo";
 import { HubPolymarketLivePricesDemo } from "@/components/hubs/polymarketLiveDemo/HubPolymarketLivePricesDemo";
 import { HubPolymarketLiveSearchDemo } from "@/components/hubs/polymarketLiveDemo/HubPolymarketLiveSearchDemo";
@@ -164,7 +166,9 @@ export function HubDemoModule({ section }: { section: HubDemoModuleSection }) {
         <DemoWindowMockup
           contentClassName={
             section.demoSlot === "polymarket-live-trades" ||
-            section.demoSlot === "polymarket-live-candlesticks"
+            section.demoSlot === "polymarket-live-candlesticks" ||
+            section.demoSlot === "polymarket-live-holders" ||
+            section.demoSlot === "polymarket-live-dashboard"
               ? "h-[min(46rem,calc(100dvh-10rem))] min-h-0"
               : section.demoSlot === "polymarket-live-spread" ||
                 section.demoSlot === "polymarket-live-orderbook"
@@ -207,6 +211,18 @@ export function HubDemoModule({ section }: { section: HubDemoModuleSection }) {
             />
           ) : section.demoSlot === "polymarket-live-candlesticks" ? (
             <HubPolymarketLiveCandlesticksDemo
+              heading={section.inlineHeading}
+              helper={section.inlineHelper}
+              placeholder={section.placeholder}
+            />
+          ) : section.demoSlot === "polymarket-live-holders" ? (
+            <HubPolymarketLiveHoldersDemo
+              heading={section.inlineHeading}
+              helper={section.inlineHelper}
+              placeholder={section.placeholder}
+            />
+          ) : section.demoSlot === "polymarket-live-dashboard" ? (
+            <HubPolymarketLiveDashboardDemo
               heading={section.inlineHeading}
               helper={section.inlineHelper}
               placeholder={section.placeholder}

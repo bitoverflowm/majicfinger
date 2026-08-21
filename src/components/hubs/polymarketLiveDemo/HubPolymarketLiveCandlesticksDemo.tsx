@@ -355,8 +355,8 @@ export function HubPolymarketLiveCandlesticksDemo({
   const hasSelection = outcomeSpecs.length > 0;
 
   const [viewMode, setViewMode] = useState<ViewMode>("chart");
-  const [chartEngine, setChartEngine] = useState<ChartEngine>("basic");
-  const [interval, setIntervalId] = useState<DemoInterval>("1m");
+  const [chartEngine, setChartEngine] = useState<ChartEngine>("professional");
+  const [interval, setIntervalId] = useState<DemoInterval>("1d");
   const [activeTokenId, setActiveTokenId] = useState("");
   const [seedRows, setSeedRows] = useState<HistoryPoint[]>([]);
   const [liveTrades, setLiveTrades] = useState<HistoryPoint[]>([]);

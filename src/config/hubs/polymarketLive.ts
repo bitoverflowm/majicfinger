@@ -341,8 +341,10 @@ export const polymarketLiveHub: HubPageConfig = {
         "The markets and outcomes a wallet is currently holding",
       ],
       inlineHeading: "Explore Market Holders",
-      inlineHelper: "Choose a market to inspect its visible holders and position distribution.",
+      inlineHelper:
+        "Top holders with avatars, market P&L, overall leaderboard rank, and whale tags for outsized positions. Click a name to open their other markets.",
       placeholder: "Search for a Polymarket market to load this view.",
+      demoSlot: "polymarket-live-holders",
       cta: { ...GET_FULL_ACCESS },
       secondaryCta: {
         label: "Next: Build a Live Dashboard",
@@ -368,8 +370,10 @@ export const polymarketLiveHub: HubPageConfig = {
         "Holder activity beside price and liquidity over time",
       ],
       inlineHeading: "Create a Live Dashboard",
-      inlineHelper: "Add the markets and live views you want to monitor together.",
+      inlineHelper:
+        "Generate one dashboard from the live analytics on this page — single view or separate tabs.",
       placeholder: "Search for a Polymarket market to load this view.",
+      demoSlot: "polymarket-live-dashboard",
       cta: { ...GET_FULL_ACCESS },
       secondaryCta: {
         label: "Next: Ask Better Market Questions",
