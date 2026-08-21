@@ -26,7 +26,6 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { openPolymarketLastTradeSocket } from "@/lib/polymarketLive/openPolymarketMarketSocket";
-import { normalizePolymarketRealtimeHistoryRows } from "@/lib/polymarketLive/polymarketRealtimeSeed";
 import { cn } from "@/lib/utils";
 
 type ViewMode = "chart" | "sheet" | "json";
@@ -65,17 +64,19 @@ type SeriesSpec = {
 
 const MAX_HISTORY_POINTS = 2500;
 const MAX_MERGED_POINTS = 2800;
+const TRADE_HISTORY_LIMIT = 1000;
 const SEARCH_HREF = "#find-polymarket-markets";
 
 const SHEET_PREFERRED_COLUMNS = [
   "market_title",
   "created_time",
   "time",
+  "outcome",
+  "side",
+  "size",
   "yes_price_dollars",
   "price",
   "asset_id",
-  "side",
-  "size",
   "source",
   "transaction_hash",
 ];
@@ -213,9 +214,10 @@ function toChartRow(
     timestamp: String(ms || Date.parse(time) || Date.now()),
     yes_price_dollars: price,
     price,
+    outcome: row.outcome != null ? String(row.outcome) : "",
     side: row.side != null ? String(row.side) : "",
-    size: row.size != null ? String(row.size) : "",
-    transaction_hash: row.transaction_hash ?? row.hash ?? "",
+    size: row.size != null && row.size !== "" ? String(row.size) : "",
+    transaction_hash: row.transaction_hash ?? row.transactionHash ?? row.hash ?? "",
     source,
   };
 }
@@ -303,45 +305,91 @@ function colorTokenForSpec(spec: SeriesSpec, index: number): DemoChartColorToken
   return defaultSeriesColorToken(index);
 }
 
-async function fetchHistoryByToken(
+function conditionIdsFromMarkets(markets: HubPolymarketLiveDemoMarket[]): string[] {
+  return [
+    ...new Set(
+      markets
+        .map((market) => String(market.conditionId || "").trim())
+        .filter(Boolean),
+    ),
+  ];
+}
+
+function specForExecutedTrade(
+  trade: Record<string, unknown>,
   specs: SeriesSpec[],
-  opts: { interval: string; fidelity: number },
+): SeriesSpec | null {
+  const asset = String(trade.asset || trade.asset_id || "").trim();
+  if (asset) {
+    const byAsset = specs.find((spec) => spec.tokenId === asset);
+    if (byAsset) return byAsset;
+  }
+  const outcome = String(trade.outcome || "").trim().toLowerCase();
+  if (!outcome) return null;
+  return specs.find((spec) => spec.outcome.toLowerCase() === outcome) || null;
+}
+
+async function fetchExecutedTrades(
+  markets: HubPolymarketLiveDemoMarket[],
+  specs: SeriesSpec[],
   signal: AbortSignal,
 ): Promise<Record<string, Record<string, unknown>[]>> {
-  const tokenIds = specs.map((spec) => spec.tokenId);
-  const titleByToken = new Map(specs.map((spec) => [spec.tokenId, spec.label]));
-  const res = await fetch("/api/integrations/polymarket?query=getBatchPricesHistory", {
-    method: "POST",
-    credentials: "same-origin",
-    headers: { Accept: "application/json", "Content-Type": "application/json" },
-    body: JSON.stringify({
-      markets: tokenIds,
-      interval: opts.interval,
-      fidelity: opts.fidelity,
-    }),
-    signal,
-  });
-  const payload = await res.json().catch(() => ({}));
-  if (!res.ok) {
-    throw new Error(
-      typeof payload?.message === "string"
-        ? payload.message
-        : typeof payload?.error === "string"
-          ? payload.error
-          : "Failed to load price history",
-    );
+  const conditionIds = conditionIdsFromMarkets(markets);
+  if (!conditionIds.length) {
+    throw new Error("Selected markets are missing condition IDs for trade history.");
   }
-  const rows = normalizePolymarketRealtimeHistoryRows(payload);
+
+  const pages = await Promise.all(
+    conditionIds.map(async (market) => {
+      const params = new URLSearchParams({
+        query: "getTradesByMarket",
+        market,
+        limit: String(TRADE_HISTORY_LIMIT),
+        takerOnly: "true",
+        skipFlatten: "true",
+      });
+      const res = await fetch(`/api/integrations/polymarket?${params.toString()}`, {
+        credentials: "same-origin",
+        headers: { Accept: "application/json" },
+        signal,
+      });
+      const payload = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(
+          typeof payload?.message === "string"
+            ? payload.message
+            : typeof payload?.error === "string"
+              ? payload.error
+              : "Failed to load trade history",
+        );
+      }
+      return Array.isArray(payload) ? payload : [];
+    }),
+  );
+
   const byToken: Record<string, Record<string, unknown>[]> = {};
   for (const spec of specs) byToken[spec.tokenId] = [];
-  for (const row of rows) {
-    const tokenId = String(row.asset_id || "");
-    const title = titleByToken.get(tokenId) || "";
-    const mapped = toChartRow(row, tokenId, title, "history");
+
+  for (const raw of pages.flat()) {
+    if (!raw || typeof raw !== "object") continue;
+    const trade = raw as Record<string, unknown>;
+    const spec = specForExecutedTrade(trade, specs);
+    if (!spec) continue;
+    const mapped = toChartRow(
+      {
+        ...trade,
+        asset_id: spec.tokenId,
+        outcome: trade.outcome || spec.outcome,
+        transaction_hash: trade.transactionHash ?? trade.transaction_hash,
+      },
+      spec.tokenId,
+      spec.label,
+      "history",
+    );
     if (!mapped) continue;
-    if (!byToken[tokenId]) byToken[tokenId] = [];
-    byToken[tokenId].push(mapped);
+    byToken[spec.tokenId].push(mapped);
   }
+
   for (const spec of specs) {
     byToken[spec.tokenId] = mergeTrades(
       [],
@@ -492,39 +540,22 @@ export function HubPolymarketLiveTradesDemo({
 
     const load = async () => {
       try {
-        const byToken = await fetchHistoryByToken(
-          seriesSpecs,
-          { interval: "max", fidelity: 60 },
-          ac.signal,
-        );
+        const byToken = await fetchExecutedTrades(markets, seriesSpecs, ac.signal);
         if (ac.signal.aborted) return;
         setPointsByToken(byToken);
         setLoading(false);
-      } catch (firstError) {
-        if (firstError instanceof DOMException && firstError.name === "AbortError") return;
+        setError(null);
+      } catch (err) {
+        if (err instanceof DOMException && err.name === "AbortError") return;
         if (ac.signal.aborted) return;
-        try {
-          const byToken = await fetchHistoryByToken(
-            seriesSpecs,
-            { interval: "1m", fidelity: 60 },
-            ac.signal,
-          );
-          if (ac.signal.aborted) return;
-          setPointsByToken(byToken);
-          setLoading(false);
-          setError(null);
-        } catch (err) {
-          if (err instanceof DOMException && err.name === "AbortError") return;
-          if (ac.signal.aborted) return;
-          setPointsByToken({});
-          setLoading(false);
-          setError(err instanceof Error ? err.message : "Failed to load price history");
-        }
+        setPointsByToken({});
+        setLoading(false);
+        setError(err instanceof Error ? err.message : "Failed to load trade history");
       }
     };
     void load();
     return () => ac.abort();
-  }, [hasSelection, marketsKey, seriesSpecs]);
+  }, [hasSelection, markets, marketsKey, seriesSpecs]);
 
   useEffect(() => {
     stopSocket();
@@ -728,12 +759,12 @@ export function HubPolymarketLiveTradesDemo({
             viewMode === "chart" && "min-h-[28rem]",
           )}
           role="region"
-          aria-label="Live trades with price history"
+          aria-label="Live trades with executed history"
         >
           <div className="flex shrink-0 flex-col gap-2 border-b border-border/60 px-3 py-2">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <p className="text-xs font-medium text-muted-foreground">
-                Price history with live trades
+                  Executed trades with live prints
               </p>
               <div className="flex flex-wrap items-center justify-end gap-2">
               {loading ? (
@@ -989,7 +1020,7 @@ export function HubPolymarketLiveTradesDemo({
             )
           ) : !hasData ? (
             <p className="px-3 py-8 text-center text-sm text-muted-foreground">
-              Waiting for price history and live trades…
+              Waiting for trade history and live prints…
             </p>
           ) : viewMode === "chart" ? (
             <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
