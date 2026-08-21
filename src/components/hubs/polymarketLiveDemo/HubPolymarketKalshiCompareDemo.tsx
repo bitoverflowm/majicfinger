@@ -27,6 +27,8 @@ import { cn } from "@/lib/utils";
 type IntervalId = "15m" | "1h" | "6h" | "1d" | "all";
 
 const SEARCH_HREF = "#find-polymarket-markets";
+/** Kalshi brand-forward green for the comparison line. */
+const KALSHI_LINE_GREEN = "#22c55e";
 const INTERVALS: { id: IntervalId; label: string; ms: number | null }[] = [
   { id: "15m", label: "15m", ms: 15 * 60 * 1000 },
   { id: "1h", label: "1h", ms: 60 * 60 * 1000 },
@@ -37,6 +39,14 @@ const INTERVALS: { id: IntervalId; label: string; ms: number | null }[] = [
 
 function yesTokenId(market: Record<string, unknown> | null): string {
   if (!market) return "";
+  const pairs = Array.isArray(market.outcomePairs)
+    ? (market.outcomePairs as Array<{ tokenId?: string; outcome?: string }>)
+    : [];
+  if (pairs.length) {
+    const yes = pairs.find((p) => String(p.outcome || "").toLowerCase() === "yes");
+    if (yes?.tokenId) return String(yes.tokenId).trim();
+    if (pairs[0]?.tokenId) return String(pairs[0].tokenId).trim();
+  }
   const outcomes = Array.isArray(market.outcomes) ? market.outcomes.map(String) : [];
   const tokens = Array.isArray(market.tokenIds) ? market.tokenIds.map(String) : [];
   const yesIdx = outcomes.findIndex((o) => o.toLowerCase() === "yes");
@@ -45,28 +55,39 @@ function yesTokenId(market: Record<string, unknown> | null): string {
 }
 
 function parseTs(row: Record<string, unknown>): number | null {
-  const raw = row.created_time ?? row.created_ts ?? row.timestamp ?? row.ts ?? row.t;
+  const raw = row.created_time ?? row.time ?? row.timestamp ?? row.created_ts ?? row.ts ?? row.t;
   if (typeof raw === "number" && Number.isFinite(raw)) {
     return raw > 1e12 ? raw : raw * 1000;
   }
-  const s = String(raw || "").trim();
-  if (!s) return null;
-  const ms = Date.parse(s);
+  const asNum = Number(raw);
+  // Epoch seconds/ms often arrive as numeric strings ("1712345678") — Date.parse fails on those.
+  if (Number.isFinite(asNum) && asNum > 0 && String(raw).trim() !== "") {
+    const rawStr = String(raw).trim();
+    if (/^\d+(\.\d+)?$/.test(rawStr)) {
+      return asNum > 1e12 ? asNum : asNum * 1000;
+    }
+  }
+  const ms = Date.parse(String(raw || "").trim());
   return Number.isFinite(ms) ? ms : null;
 }
 
 function toPctPoint(row: Record<string, unknown>, platform: string): Record<string, unknown> | null {
   const ts = parseTs(row);
   if (ts == null) return null;
-  const price =
-    Number(row.yes_price_dollars ?? row.price ?? row.last_price_dollars ?? row.yes_price) || NaN;
+  const priceRaw =
+    row.yes_price_dollars ?? row.price ?? row.last_price_dollars ?? row.yes_price;
+  const price = Number(priceRaw);
   if (!Number.isFinite(price)) return null;
+  // Dollars (0–1) → %, cents/already-% (0–100) stay as %.
   const pct = price <= 1.5 ? price * 100 : price;
   if (pct < 0 || pct > 100) return null;
   return {
     ...row,
     created_time: new Date(ts).toISOString(),
+    time: new Date(ts).toISOString(),
+    timestamp: String(ts),
     yes_price_dollars: pct / 100,
+    price: pct / 100,
     _platform: platform,
     _probability_pct: pct,
   };
@@ -105,6 +126,7 @@ async function fetchPolymarketHistory(
   tokenId: string,
   signal: AbortSignal,
 ): Promise<Record<string, unknown>[]> {
+  // Pull a wide archive once; interval buttons filter client-side (same as prices demo cache).
   const res = await fetch("/api/integrations/polymarket?query=getBatchPricesHistory", {
     method: "POST",
     credentials: "same-origin",
@@ -112,7 +134,7 @@ async function fetchPolymarketHistory(
     signal,
     body: JSON.stringify({
       markets: [tokenId],
-      interval: "1d",
+      interval: "max",
       fidelity: 60,
     }),
   });
@@ -122,9 +144,11 @@ async function fetchPolymarketHistory(
       typeof payload?.error === "string" ? payload.error : "Failed to load Polymarket history",
     );
   }
-  return normalizePolymarketRealtimeHistoryRows(payload).filter(
-    (row) => String(row.asset_id || "") === tokenId || !row.asset_id,
+  const rows = normalizePolymarketRealtimeHistoryRows(payload);
+  const forToken = rows.filter(
+    (row) => !row.asset_id || String(row.asset_id) === tokenId,
   );
+  return forToken.length ? forToken : rows;
 }
 
 async function fetchKalshiTrades(
@@ -368,24 +392,30 @@ export function HubPolymarketKalshiCompareDemo() {
     [kalshiPoints, interval],
   );
 
-  const chartSeries = useMemo(
+  const polySeries = useMemo(
     () => [
       {
         id: "polymarket",
-        label: "Polymarket YES",
+        label: "Polymarket",
         colorToken: defaultSeriesColorToken(0),
         color: resolveDemoChartColor(defaultSeriesColorToken(0)),
         trades: polyFiltered,
       },
+    ],
+    [polyFiltered],
+  );
+
+  const kalshiSeries = useMemo(
+    () => [
       {
         id: "kalshi",
-        label: "Kalshi YES",
-        colorToken: defaultSeriesColorToken(1),
-        color: resolveDemoChartColor(defaultSeriesColorToken(1)),
+        label: "Kalshi",
+        colorToken: "chart-3" as const,
+        color: KALSHI_LINE_GREEN,
         trades: kalshiFiltered,
       },
     ],
-    [kalshiFiltered, polyFiltered],
+    [kalshiFiltered],
   );
 
   const polyYesPct = useMemo(() => {
@@ -714,29 +744,76 @@ export function HubPolymarketKalshiCompareDemo() {
                 </Button>
               </div>
 
-              <div className="overflow-hidden rounded-xl border border-border/70 bg-muted/10">
-                {seriesLoading && !polyFiltered.length && !kalshiFiltered.length ? (
-                  <div className="flex min-h-[16rem] items-center justify-center gap-2 text-sm text-muted-foreground">
-                    <Loader2 className="size-4 animate-spin" aria-hidden />
-                    Loading probability series…
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div className="overflow-hidden rounded-xl border border-border/70 bg-muted/10">
+                  <div className="flex items-center gap-2 border-b border-border/50 px-3 py-2">
+                    <span
+                      className="size-2.5 shrink-0 rounded-full"
+                      style={{ backgroundColor: resolveDemoChartColor(defaultSeriesColorToken(0)) }}
+                      aria-hidden
+                    />
+                    <p className="text-xs font-semibold text-foreground">Polymarket</p>
                   </div>
-                ) : seriesError && !polyFiltered.length && !kalshiFiltered.length ? (
-                  <p className="px-4 py-8 text-center text-sm text-destructive">{seriesError}</p>
-                ) : (
-                  <HubKalshiLiveDemoTradesLiveline
-                    series={chartSeries}
-                    persistHistory
-                    fullHistory={interval === "all"}
-                    fixedValueDomain={{ min: 0, max: 100 }}
-                    formatValue={(v) => `${v.toFixed(1)}%`}
-                    parseRowValue={(row) => {
-                      const n = Number(row._probability_pct);
-                      return Number.isFinite(n) ? n : null;
-                    }}
-                    className="min-h-[18rem]"
-                    emptyMessage="No overlapping trade prints in this interval."
-                  />
-                )}
+                  {seriesLoading && !polyFiltered.length ? (
+                    <div className="flex min-h-[14rem] items-center justify-center gap-2 text-sm text-muted-foreground">
+                      <Loader2 className="size-4 animate-spin" aria-hidden />
+                      Loading…
+                    </div>
+                  ) : !polyFiltered.length ? (
+                    <p className="flex min-h-[14rem] items-center justify-center px-4 text-center text-sm text-muted-foreground">
+                      No chart at present
+                    </p>
+                  ) : (
+                    <HubKalshiLiveDemoTradesLiveline
+                      series={polySeries}
+                      persistHistory
+                      fullHistory={interval === "all"}
+                      fixedValueDomain={{ min: 0, max: 100 }}
+                      formatValue={(v) => `${v.toFixed(1)}%`}
+                      parseRowValue={(row) => {
+                        const n = Number(row._probability_pct);
+                        return Number.isFinite(n) ? n : null;
+                      }}
+                      className="min-h-[14rem]"
+                      emptyMessage="No chart at present"
+                    />
+                  )}
+                </div>
+
+                <div className="overflow-hidden rounded-xl border border-border/70 bg-muted/10">
+                  <div className="flex items-center gap-2 border-b border-border/50 px-3 py-2">
+                    <span
+                      className="size-2.5 shrink-0 rounded-full"
+                      style={{ backgroundColor: KALSHI_LINE_GREEN }}
+                      aria-hidden
+                    />
+                    <p className="text-xs font-semibold text-foreground">Kalshi</p>
+                  </div>
+                  {seriesLoading && !kalshiFiltered.length ? (
+                    <div className="flex min-h-[14rem] items-center justify-center gap-2 text-sm text-muted-foreground">
+                      <Loader2 className="size-4 animate-spin" aria-hidden />
+                      Loading…
+                    </div>
+                  ) : !kalshiFiltered.length ? (
+                    <p className="flex min-h-[14rem] items-center justify-center px-4 text-center text-sm text-muted-foreground">
+                      No chart at present
+                    </p>
+                  ) : (
+                    <HubKalshiLiveDemoTradesLiveline
+                      series={kalshiSeries}
+                      persistHistory
+                      fullHistory={interval === "all"}
+                      fixedValueDomain={{ min: 0, max: 100 }}
+                      formatValue={(v) => `${v.toFixed(1)}%`}
+                      parseRowValue={(row) => {
+                        const n = Number(row._probability_pct);
+                        return Number.isFinite(n) ? n : null;
+                      }}
+                      className="min-h-[14rem]"
+                      emptyMessage="No chart at present"
+                    />
+                  )}
+                </div>
               </div>
 
               <div className="grid gap-3 sm:grid-cols-2">
