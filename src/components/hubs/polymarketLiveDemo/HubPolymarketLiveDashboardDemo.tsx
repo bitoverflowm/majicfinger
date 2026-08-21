@@ -14,6 +14,7 @@ import { useHubPolymarketLiveDemo } from "@/components/hubs/polymarketLiveDemo/H
 import { HubPolymarketLiveSpreadDemo } from "@/components/hubs/polymarketLiveDemo/HubPolymarketLiveSpreadDemo";
 import { HubPolymarketLiveTradesDemo } from "@/components/hubs/polymarketLiveDemo/HubPolymarketLiveTradesDemo";
 import { Button } from "@/components/ui/button";
+import { trackPolymarketLiveHubEvent } from "@/lib/analytics/polymarketLiveHubEvents";
 import {
   Dialog,
   DialogContent,
@@ -207,6 +208,10 @@ export function HubPolymarketLiveDashboardDemo({
 
   const generateDashboard = () => {
     if (!hasSelection || generating) return;
+    trackPolymarketLiveHubEvent("polymarket_live_dashboard_cta_click", {
+      layout,
+      marketCount: markets.length,
+    });
     setGenerating(true);
     setGeneratedLayout(layout);
     setActivePanel("prices-liveline");

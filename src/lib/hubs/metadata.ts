@@ -50,7 +50,8 @@ export function buildHubMetadata(config: HubPageConfig): Metadata {
     metadataBase: new URL(SITE_URL),
     title: { absolute: documentTitle },
     description: config.description,
-    keywords: config.keywords,
+    // Explicit empty array overrides root layout keywords so hubs do not emit meta keywords.
+    keywords: config.keywords?.length ? config.keywords : [],
     authors: config.author ? [{ name: config.author }] : undefined,
     alternates: { canonical },
     robots: {
@@ -174,6 +175,7 @@ export function buildHubJsonLd(config: HubPageConfig) {
       name: "LycheeData",
       url: SITE_URL,
     },
+    // No aggregateRating / offers — unsupported claims must not be invented.
   };
 
   return { webPage, breadcrumb, faqPage, softwareApplication };

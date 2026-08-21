@@ -35,6 +35,7 @@ import { HubProofMetrics } from "@/components/hubs/HubProofMetrics";
 import { HubVideoInstructionsCarousel } from "@/components/hubs/HubVideoInstructionsCarousel";
 import { HubDemoModule } from "@/components/hubs/polymarketLiveDemo/HubDemoModule";
 import { HubPolymarketCrossPlatformSection } from "@/components/hubs/polymarketLiveDemo/HubPolymarketCrossPlatformSection";
+import { HubPolymarketLivePricingViewTracker } from "@/components/hubs/polymarketLiveDemo/HubPolymarketLivePricingViewTracker";
 import { PricingSection } from "@/components/sections/pricing-section";
 import {
   HubChartEmbedSkeleton,
@@ -1069,6 +1070,9 @@ export function HubSectionRenderer({
           id={section.anchorId}
           className={cn("w-full py-10", section.anchorId && "scroll-mt-28")}
         >
+          {section.anchorId === "polymarket-live-pricing" ? (
+            <HubPolymarketLivePricingViewTracker enabled />
+          ) : null}
           {section.eyebrow || section.title || section.description ? (
             <div className="mx-auto mb-8 max-w-2xl space-y-3 px-6 text-center">
               {section.eyebrow ? (

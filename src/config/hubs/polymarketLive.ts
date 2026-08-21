@@ -5,6 +5,11 @@ const GET_FULL_ACCESS = {
   href: "#polymarket-live-pricing",
   requiresAuth: false,
   ariaLabel: "Get full access now — view Polymarket Live pricing",
+  eventLabel: "polymarket_live_get_full_access",
+  tracking: {
+    page: "/polymarket-live-data",
+    destination: "#polymarket-live-pricing",
+  },
 } as const;
 
 const EXPLORE_LIVE = {
@@ -30,7 +35,7 @@ export const polymarketLiveHub: HubPageConfig = {
   socialDescription:
     "Find any Polymarket market, follow live prices and market activity, and turn the data into interactive charts and dashboards without code.",
   publishedAt: "2026-06-20",
-  updatedAt: "2026-08-19",
+  updatedAt: "2026-08-21",
   author: "misterrpink",
   topics: [
     "polymarket",
@@ -41,6 +46,7 @@ export const polymarketLiveHub: HubPageConfig = {
     "order books",
     "trades",
   ],
+  // Do not set `keywords` — hubs intentionally omit meta keywords tags.
   integration: ["Polymarket", "Lychee"],
   ogImage: "https://lycheedata.com/ogImage2.png",
   ogImageAlt:
@@ -502,6 +508,11 @@ export const polymarketLiveHub: HubPageConfig = {
         href: "#polymarket-live-pricing",
         requiresAuth: false,
         ariaLabel: "Upgrade now for full access — view Polymarket Live pricing",
+        eventLabel: "polymarket_live_upgrade_cta",
+        tracking: {
+          page: "/polymarket-live-data",
+          destination: "#polymarket-live-pricing",
+        },
       },
       secondaryCta: {
         label: "Next: Browse Live Data Guides",

@@ -22,6 +22,7 @@ import {
   matchTierLabel,
   polymarketOutcomeShape,
 } from "@/lib/predictionMarkets/matchPolymarketToKalshiLive";
+import { trackPolymarketLiveHubEvent } from "@/lib/analytics/polymarketLiveHubEvents";
 import { cn } from "@/lib/utils";
 
 type IntervalId = "15m" | "1h" | "6h" | "1d" | "all";
@@ -241,11 +242,26 @@ export function HubPolymarketKalshiCompareDemo() {
     void findKalshiLiveMatchesForPolymarket(polyMarket, { signal: ac.signal })
       .then((result) => {
         if (ac.signal.aborted) return;
+        trackPolymarketLiveHubEvent("polymarket_kalshi_compare_attempt", {
+          query: result.query,
+          candidateCount: result.candidates.length,
+          hasPreselected: Boolean(result.preselected),
+        });
         setCandidates(result.candidates);
         setEmptyMessage(result.emptyMessage);
         if (result.preselected) {
+          trackPolymarketLiveHubEvent("polymarket_kalshi_compare_match", {
+            tier: result.preselected.tier,
+            ticker: result.preselected.market.marketTicker,
+            auto: true,
+          });
           setSelectedTicker(result.preselected.market.marketTicker);
         } else if (result.candidates.length === 1) {
+          trackPolymarketLiveHubEvent("polymarket_kalshi_compare_match", {
+            tier: result.candidates[0]!.tier,
+            ticker: result.candidates[0]!.market.marketTicker,
+            auto: false,
+          });
           setSelectedTicker(result.candidates[0]!.market.marketTicker);
         }
       })

@@ -20,6 +20,16 @@ const nextConfig = {
         destination: '/',
         permanent: true,
       },
+      {
+        source: '/polymarket-live',
+        destination: '/polymarket-live-data',
+        permanent: true,
+      },
+      {
+        source: '/polymarket-live/',
+        destination: '/polymarket-live-data',
+        permanent: true,
+      },
     ]
   },
   async headers() {

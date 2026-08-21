@@ -23,6 +23,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { formatPolymarketVolume } from "@/lib/polymarketLive/polymarketPublicSearch";
+import { trackPolymarketLiveHubEvent } from "@/lib/analytics/polymarketLiveHubEvents";
 import {
   polymarketRealtimeMarketFromSuggestion,
   polymarketRealtimeMarketKey,
@@ -211,6 +212,15 @@ export function HubPolymarketLiveSearchDemo({
         setError("That market does not expose streamable outcome token IDs.");
         return;
       }
+      trackPolymarketLiveHubEvent("polymarket_live_market_selected", {
+        source: "search_suggestion",
+        title: String((market as HubPolymarketLiveDemoMarket).title || ""),
+        conditionId: String(
+          (market as HubPolymarketLiveDemoMarket).conditionId ||
+            (market as HubPolymarketLiveDemoMarket).id ||
+            "",
+        ),
+      });
       addMarkets([market as HubPolymarketLiveDemoMarket]);
     },
     [addMarkets, remainingSlots],
@@ -286,6 +296,9 @@ export function HubPolymarketLiveSearchDemo({
           selectedItems={markets}
           onSelect={handleSearchSelection}
           onSubmitAll={handleSearchAll}
+          onFocus={() => {
+            trackPolymarketLiveHubEvent("polymarket_live_market_search_start");
+          }}
         />
       </div>
 
