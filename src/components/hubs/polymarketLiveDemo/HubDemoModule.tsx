@@ -7,6 +7,7 @@ import { HubPolymarketLiveOrderbookDemo } from "@/components/hubs/polymarketLive
 import { HubPolymarketLivePricesDemo } from "@/components/hubs/polymarketLiveDemo/HubPolymarketLivePricesDemo";
 import { HubPolymarketLiveSearchDemo } from "@/components/hubs/polymarketLiveDemo/HubPolymarketLiveSearchDemo";
 import { HubPolymarketLiveSpreadDemo } from "@/components/hubs/polymarketLiveDemo/HubPolymarketLiveSpreadDemo";
+import { HubPolymarketLiveTradesDemo } from "@/components/hubs/polymarketLiveDemo/HubPolymarketLiveTradesDemo";
 import { DemoWindowMockup } from "@/components/sections/demo-window-mockup";
 import { cn } from "@/lib/utils";
 import type { HubDemoModuleSection, HubInlinePart } from "@/types/hub";
@@ -162,7 +163,8 @@ export function HubDemoModule({ section }: { section: HubDemoModuleSection }) {
         <DemoWindowMockup
           contentClassName={
             section.demoSlot === "polymarket-live-spread" ||
-            section.demoSlot === "polymarket-live-orderbook"
+            section.demoSlot === "polymarket-live-orderbook" ||
+            section.demoSlot === "polymarket-live-trades"
               ? "h-[min(40rem,calc(100dvh-12rem))] min-h-0"
               : section.demoSlot === "polymarket-live-search" ||
                   section.demoSlot === "polymarket-live-prices"
@@ -190,6 +192,12 @@ export function HubDemoModule({ section }: { section: HubDemoModuleSection }) {
             />
           ) : section.demoSlot === "polymarket-live-orderbook" ? (
             <HubPolymarketLiveOrderbookDemo
+              heading={section.inlineHeading}
+              helper={section.inlineHelper}
+              placeholder={section.placeholder}
+            />
+          ) : section.demoSlot === "polymarket-live-trades" ? (
+            <HubPolymarketLiveTradesDemo
               heading={section.inlineHeading}
               helper={section.inlineHelper}
               placeholder={section.placeholder}

@@ -343,7 +343,8 @@ export type HubDemoModuleSection = {
     | "polymarket-live-search"
     | "polymarket-live-prices"
     | "polymarket-live-spread"
-    | "polymarket-live-orderbook";
+    | "polymarket-live-orderbook"
+    | "polymarket-live-trades";
   inlineHeading?: string;
   inlineHelper?: string;
   placeholder?: string;

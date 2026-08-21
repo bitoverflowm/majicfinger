@@ -30,6 +30,13 @@ type HubKalshiLiveDemoTradesChartProps = {
   onToggleSeries?: (id: string) => void;
   onChangeSeriesColor?: (id: string, tokenId: DemoChartColorTokenId) => void;
   className?: string;
+  /** When false, draw the line without per-point dots. Default true. */
+  showDots?: boolean;
+  /**
+   * Draw the full path as a line and only mark points tagged `source: "live"`
+   * so websocket prints sit on top of REST history.
+   */
+  emphasizeLiveDots?: boolean;
 };
 
 function parseTradeTime(row: Record<string, unknown>): number | null {
@@ -99,6 +106,8 @@ export const HubKalshiLiveDemoTradesChart = forwardRef<
   onToggleSeries,
   onChangeSeriesColor,
   className,
+  showDots = true,
+  emphasizeLiveDots = false,
 }, ref) {
   const hidden = hiddenSeriesIds ?? new Set<string>();
 
@@ -139,6 +148,10 @@ export const HubKalshiLiveDemoTradesChart = forwardRef<
         if (t == null || yesPrice == null) continue;
         const point = byTime.get(t) || { t, label: formatAxisTime(t) };
         point[item.key] = yesPrice;
+        const source = String(row.source || "").toLowerCase();
+        if (source === "live" || source === "websocket") {
+          point[`${item.key}Live`] = true;
+        }
         byTime.set(t, point);
       }
     }
@@ -243,11 +256,35 @@ export const HubKalshiLiveDemoTradesChart = forwardRef<
               stroke={`var(--color-${item.key})`}
               strokeWidth={2}
               connectNulls
-              dot={{
-                r: 2.5,
-                fill: `var(--color-${item.key})`,
-                strokeWidth: 0,
-              }}
+              dot={
+                emphasizeLiveDots
+                  ? (props: {
+                      cx?: number;
+                      cy?: number;
+                      payload?: Record<string, unknown>;
+                    }) => {
+                      if (!props.payload?.[`${item.key}Live`]) return null;
+                      if (props.cx == null || props.cy == null) return null;
+                      return (
+                        <circle
+                          key={`${item.key}-live-${props.cx}-${props.cy}`}
+                          cx={props.cx}
+                          cy={props.cy}
+                          r={3.25}
+                          fill={`var(--color-${item.key})`}
+                          stroke="var(--background)"
+                          strokeWidth={1}
+                        />
+                      );
+                    }
+                  : showDots
+                    ? {
+                        r: 2.5,
+                        fill: `var(--color-${item.key})`,
+                        strokeWidth: 0,
+                      }
+                    : false
+              }
               activeDot={{ r: 4 }}
               isAnimationActive={false}
             />

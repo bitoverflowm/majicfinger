@@ -290,8 +290,9 @@ export const polymarketLiveHub: HubPageConfig = {
         "The order book shows what participants are offering. The trade feed shows executed market activity. Follow recent trades by time, price, size, market, and outcome where available, then compare them with the quote that was visible around the same period.\n\nThis makes it easier to separate a moving headline price from a sequence of real transactions—and to investigate whether the market moved gradually, jumped after new information, or traded through thin liquidity.",
       inlineHeading: "Watch Recent Trades",
       inlineHelper:
-        "Choose a market to stream its latest executed activity and recent price history.",
+        "Full Yes and No price history on one chart, with live trades printing onto the same lines.",
       placeholder: "Search for a Polymarket market to load this view.",
+      demoSlot: "polymarket-live-trades",
       cta: { ...GET_FULL_ACCESS },
       secondaryCta: {
         label: "Next: Chart Live Candlesticks",
