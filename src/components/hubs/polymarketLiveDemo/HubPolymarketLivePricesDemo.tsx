@@ -31,11 +31,16 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { openPolymarketLastTradeSocket } from "@/lib/polymarketLive/openPolymarketMarketSocket";
+import {
+  minimumPolymarketPricesHistoryFidelity,
+  POLYMARKET_PRICES_HISTORY_INTERVAL_OPTIONS,
+} from "@/lib/polymarketLive/pricesHistoryCompose";
 import { normalizePolymarketRealtimeHistoryRows } from "@/lib/polymarketLive/polymarketRealtimeSeed";
 import { cn } from "@/lib/utils";
 
 type PriceTabId = "liveline" | "history";
 type ViewMode = "chart" | "sheet" | "json";
+type HistoryInterval = (typeof POLYMARKET_PRICES_HISTORY_INTERVAL_OPTIONS)[number]["value"];
 
 type SeriesSpec = {
   id: string;
@@ -47,6 +52,20 @@ type SeriesSpec = {
 const MAX_LIVE_POINTS = 240;
 const MAX_HISTORY_POINTS = 2500;
 const SEARCH_HREF = "#find-polymarket-markets";
+const HISTORY_WATERFALL_ORDER: HistoryInterval[] = [
+  "max",
+  "all",
+  "1m",
+  "1w",
+  "1d",
+  "6h",
+  "1h",
+];
+
+function fidelityForHistoryInterval(interval: HistoryInterval): number {
+  if (interval === "max" || interval === "all") return 60;
+  return minimumPolymarketPricesHistoryFidelity(interval);
+}
 
 const SHEET_PREFERRED_COLUMNS = [
   "market_title",
@@ -68,7 +87,7 @@ const PRICE_TABS: HubKalshiLiveDemoTabDef[] = [
   },
   {
     id: "history",
-    title: "Full Trade History",
+    title: "Full Price History",
     description: "The complete price path pulled from Polymarket, plotted on one chart.",
   },
 ];
@@ -352,11 +371,12 @@ export function HubPolymarketLivePricesDemo({
   const [livePoints, setLivePoints] = useState<Record<string, Record<string, unknown>[]>>(
     {},
   );
-  const [historyPoints, setHistoryPoints] = useState<
-    Record<string, Record<string, unknown>[]>
+  const [historyByInterval, setHistoryByInterval] = useState<
+    Partial<Record<HistoryInterval, Record<string, Record<string, unknown>[]>>>
   >({});
-  const [liveLoading, setLiveLoading] = useState(false);
+  const [historyInterval, setHistoryInterval] = useState<HistoryInterval>("max");
   const [historyLoading, setHistoryLoading] = useState(false);
+  const [liveLoading, setLiveLoading] = useState(false);
   const [liveError, setLiveError] = useState<string | null>(null);
   const [historyError, setHistoryError] = useState<string | null>(null);
   const [socketLive, setSocketLive] = useState(false);
@@ -374,8 +394,12 @@ export function HubPolymarketLivePricesDemo({
   const chartRef = useRef<HTMLDivElement>(null);
   const socketStopRef = useRef<(() => void) | null>(null);
   const liveAbortRef = useRef<AbortController | null>(null);
+  const historyCacheRef = useRef<
+    Partial<Record<HistoryInterval, Record<string, Record<string, unknown>[]>>>
+  >({});
+  const historyInflightRef = useRef<Set<HistoryInterval>>(new Set());
+  const historyIntervalRef = useRef<HistoryInterval>("max");
   const historyAbortRef = useRef<AbortController | null>(null);
-  const historyKeyRef = useRef("");
 
   const pollingActive =
     hasSelection && inView && tabVisible && !livePaused && activeTab === "liveline";
@@ -405,14 +429,17 @@ export function HubPolymarketLivePricesDemo({
 
   useEffect(() => {
     setLivePoints({});
-    setHistoryPoints({});
+    setHistoryByInterval({});
+    historyCacheRef.current = {};
+    historyInflightRef.current = new Set();
+    setHistoryInterval("max");
+    historyIntervalRef.current = "max";
     setLiveError(null);
     setHistoryError(null);
     setLivePaused(false);
     setHiddenSeriesIds(new Set());
     setSeriesColorTokens({});
     setChartKey((k) => k + 1);
-    historyKeyRef.current = "";
     if (!hasSelection) {
       setLiveLoading(false);
       setHistoryLoading(false);
@@ -446,53 +473,81 @@ export function HubPolymarketLivePricesDemo({
   }, [hasSelection, marketsKey, seriesSpecs]);
 
   useEffect(() => {
-    if (!hasSelection || activeTab !== "history") return undefined;
-    if (historyKeyRef.current === marketsKey) return undefined;
+    historyIntervalRef.current = historyInterval;
+  }, [historyInterval]);
+
+  useEffect(() => {
+    if (!hasSelection) return undefined;
     historyAbortRef.current?.abort();
     const ac = new AbortController();
     historyAbortRef.current = ac;
-    setHistoryLoading(true);
-    setHistoryError(null);
-    const load = async () => {
+
+    const persist = (
+      interval: HistoryInterval,
+      byToken: Record<string, Record<string, unknown>[]>,
+    ) => {
+      historyCacheRef.current[interval] = byToken;
+      setHistoryByInterval({ ...historyCacheRef.current });
+      if (historyIntervalRef.current === interval) {
+        setHistoryLoading(false);
+        setHistoryError(null);
+      }
+    };
+
+    const loadInterval = async (interval: HistoryInterval) => {
+      if (ac.signal.aborted) return;
+      if (historyCacheRef.current[interval]) return;
+      if (historyInflightRef.current.has(interval)) return;
+      historyInflightRef.current.add(interval);
       try {
         const byToken = await fetchHistoryByToken(
           seriesSpecs,
-          { interval: "max", fidelity: 60 },
+          { interval, fidelity: fidelityForHistoryInterval(interval) },
           ac.signal,
         );
         if (ac.signal.aborted) return;
-        historyKeyRef.current = marketsKey;
-        setHistoryPoints(byToken);
-        setHistoryLoading(false);
-      } catch (firstError) {
-        if (firstError instanceof DOMException && firstError.name === "AbortError") return;
+        persist(interval, byToken);
+      } catch (error) {
+        if (error instanceof DOMException && error.name === "AbortError") return;
         if (ac.signal.aborted) return;
-        try {
-          const byToken = await fetchHistoryByToken(
-            seriesSpecs,
-            { interval: "1m", fidelity: 60 },
-            ac.signal,
-          );
-          if (ac.signal.aborted) return;
-          historyKeyRef.current = marketsKey;
-          setHistoryPoints(byToken);
-          setHistoryLoading(false);
-          setHistoryError(null);
-        } catch (error) {
-          if (error instanceof DOMException && error.name === "AbortError") return;
-          if (ac.signal.aborted) return;
-          historyKeyRef.current = "";
-          setHistoryPoints({});
-          setHistoryLoading(false);
+        if (historyIntervalRef.current === interval && !historyCacheRef.current[interval]) {
           setHistoryError(
             error instanceof Error ? error.message : "Failed to load price history",
           );
+          setHistoryLoading(false);
         }
+      } finally {
+        historyInflightRef.current.delete(interval);
       }
     };
-    void load();
+
+    const waterfall = async () => {
+      const selected = historyIntervalRef.current;
+      if (!historyCacheRef.current[selected]) {
+        setHistoryLoading(true);
+        setHistoryError(null);
+      }
+      while (!ac.signal.aborted) {
+        const preferred = historyIntervalRef.current;
+        const next =
+          !historyCacheRef.current[preferred] && !historyInflightRef.current.has(preferred)
+            ? preferred
+            : HISTORY_WATERFALL_ORDER.find(
+                (interval) =>
+                  !historyCacheRef.current[interval] &&
+                  !historyInflightRef.current.has(interval),
+              );
+        if (!next) break;
+        await loadInterval(next);
+      }
+      if (!ac.signal.aborted && !historyCacheRef.current[historyIntervalRef.current]) {
+        setHistoryLoading(false);
+      }
+    };
+
+    void waterfall();
     return () => ac.abort();
-  }, [activeTab, hasSelection, marketsKey, seriesSpecs]);
+  }, [hasSelection, marketsKey, seriesSpecs]);
 
   useEffect(() => {
     stopSocket();
@@ -537,8 +592,10 @@ export function HubPolymarketLivePricesDemo({
     };
   }, [pollingActive, seriesSpecs, stopSocket, chartKey]);
 
-  const pointsByToken = activeTab === "history" ? historyPoints : livePoints;
-  const loading = activeTab === "history" ? historyLoading : liveLoading;
+  const historyPoints = historyByInterval[historyInterval];
+  const historyReady = historyPoints != null;
+  const pointsByToken = activeTab === "history" ? historyPoints || {} : livePoints;
+  const loading = activeTab === "history" ? historyLoading && !historyReady : liveLoading;
   const error = activeTab === "history" ? historyError : liveError;
 
   const chartSeries = useMemo(
@@ -712,9 +769,10 @@ export function HubPolymarketLivePricesDemo({
                 viewMode === "chart" && "min-h-[28rem]",
               )}
             >
-              <div className="flex shrink-0 flex-wrap items-center justify-between gap-2 border-b border-border/60 px-3 py-2">
+              <div className="flex shrink-0 flex-col gap-2 border-b border-border/60 px-3 py-2">
+              <div className="flex flex-wrap items-center justify-between gap-2">
                 <p className="text-xs font-medium text-muted-foreground">
-                  {activeTab === "liveline" ? "Live prices" : "Trade history"}
+                  {activeTab === "liveline" ? "Live prices" : "Price history"}
                 </p>
                 <div className="flex flex-wrap items-center justify-end gap-2">
                   {loading ? (
@@ -897,6 +955,39 @@ export function HubPolymarketLivePricesDemo({
                   </div>
                 </div>
               </div>
+              {activeTab === "history" ? (
+                <div
+                  className="inline-flex h-7 w-fit max-w-full items-center overflow-x-auto rounded-md border border-border/70 bg-background p-0.5"
+                  role="group"
+                  aria-label="Price history interval"
+                >
+                  {POLYMARKET_PRICES_HISTORY_INTERVAL_OPTIONS.map((option) => {
+                    const cached = historyByInterval[option.value] != null;
+                    const selected = historyInterval === option.value;
+                    return (
+                      <button
+                        key={option.value}
+                        type="button"
+                        onClick={() => {
+                          if (historyInterval === option.value) return;
+                          setHistoryInterval(option.value);
+                          setHistoryLoading(!cached);
+                        }}
+                        className={cn(
+                          "inline-flex h-6 shrink-0 items-center rounded px-2 text-[11px] font-medium transition-colors",
+                          selected
+                            ? "bg-muted text-foreground shadow-sm"
+                            : "text-muted-foreground hover:bg-muted/50 hover:text-foreground",
+                        )}
+                        aria-pressed={selected}
+                      >
+                        {option.label}
+                      </button>
+                    );
+                  })}
+                </div>
+              ) : null}
+              </div>
 
               {error && !hasData ? (
                 <p className="px-3 py-4 text-sm text-destructive">{error}</p>
@@ -939,6 +1030,7 @@ export function HubPolymarketLivePricesDemo({
                       hiddenSeriesIds={hiddenSeriesIds}
                       onToggleSeries={toggleSeries}
                       onChangeSeriesColor={changeSeriesColor}
+                      animate
                       className="min-h-0 flex-1"
                     />
                   )}
