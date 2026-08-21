@@ -29,9 +29,15 @@ import { cn } from "@/lib/utils";
 type DashboardLayout = "one_view" | "separate_tabs";
 
 type AnalyticsPanelId =
-  | "prices"
-  | "spread"
-  | "orderbook"
+  | "prices-liveline"
+  | "prices-history"
+  | "spread-best-bid"
+  | "spread-best-ask"
+  | "spread-spread"
+  | "spread-liquidity"
+  | "spread-orderbook"
+  | "orderbook-live"
+  | "orderbook-snapshot"
   | "trades"
   | "candlesticks"
   | "holders";
@@ -48,14 +54,14 @@ const LAYOUT_OPTIONS: {
     id: "one_view",
     label: "Place all analytics into 1 view",
     description:
-      "Stack live prices, spread, order book, trades, candlesticks, and holders on one scrolling page.",
+      "Stack every live chart on one scrolling page — no nested tabs inside each view.",
     icon: Rows3,
   },
   {
     id: "separate_tabs",
     label: "Place all analytics into separate tabs",
     description:
-      "Keep each analysis on its own tab so you can switch between price, liquidity, trades, and holders.",
+      "Give each chart its own tab so you can jump between prices, liquidity, trades, and holders.",
     icon: PanelsTopLeft,
   },
 ];
@@ -66,19 +72,49 @@ const ANALYTICS_PANELS: {
   description: string;
 }[] = [
   {
-    id: "prices",
-    title: "Live prices",
-    description: "Real-time outcome prices and full price history.",
+    id: "prices-liveline",
+    title: "Real-time price",
+    description: "Live last-trade prices as they print.",
   },
   {
-    id: "spread",
-    title: "Spread & liquidity",
-    description: "Best bid, ask, spread, and live liquidity.",
+    id: "prices-history",
+    title: "Full price history",
+    description: "Complete price path from Polymarket history.",
   },
   {
-    id: "orderbook",
-    title: "Order book",
-    description: "Depth across bid and ask levels.",
+    id: "spread-best-bid",
+    title: "Best bid",
+    description: "Highest price buyers are offering.",
+  },
+  {
+    id: "spread-best-ask",
+    title: "Best ask",
+    description: "Lowest price sellers are offering.",
+  },
+  {
+    id: "spread-spread",
+    title: "Spread",
+    description: "Gap between best ask and best bid.",
+  },
+  {
+    id: "spread-liquidity",
+    title: "Liquidity",
+    description: "Size available at the top of book.",
+  },
+  {
+    id: "spread-orderbook",
+    title: "Order book depth",
+    description: "Bid and ask depth from the CLOB book.",
+  },
+  {
+    id: "orderbook-live",
+    title: "Live order book",
+    description: "Bids, asks, and depth over websocket.",
+  },
+  {
+    id: "orderbook-snapshot",
+    title: "Order book snapshot",
+    description: "Point-in-time book from REST.",
   },
   {
     id: "trades",
@@ -99,48 +135,30 @@ const ANALYTICS_PANELS: {
 
 function AnalyticsPanelBody({ id }: { id: AnalyticsPanelId }) {
   switch (id) {
-    case "prices":
-      return (
-        <HubPolymarketLivePricesDemo
-          heading="Live prices"
-          helper="Real-time outcome prices for the selected market."
-        />
-      );
-    case "spread":
-      return (
-        <HubPolymarketLiveSpreadDemo
-          heading="Spread & liquidity"
-          helper="Top-of-book quote and liquidity for the selected market."
-        />
-      );
-    case "orderbook":
-      return (
-        <HubPolymarketLiveOrderbookDemo
-          heading="Order book"
-          helper="Live depth across bids and asks."
-        />
-      );
+    case "prices-liveline":
+      return <HubPolymarketLivePricesDemo panelMode lockedTab="liveline" />;
+    case "prices-history":
+      return <HubPolymarketLivePricesDemo panelMode lockedTab="history" />;
+    case "spread-best-bid":
+      return <HubPolymarketLiveSpreadDemo panelMode lockedTab="best-bid" />;
+    case "spread-best-ask":
+      return <HubPolymarketLiveSpreadDemo panelMode lockedTab="best-ask" />;
+    case "spread-spread":
+      return <HubPolymarketLiveSpreadDemo panelMode lockedTab="spread" />;
+    case "spread-liquidity":
+      return <HubPolymarketLiveSpreadDemo panelMode lockedTab="liquidity" />;
+    case "spread-orderbook":
+      return <HubPolymarketLiveSpreadDemo panelMode lockedTab="orderbook" />;
+    case "orderbook-live":
+      return <HubPolymarketLiveOrderbookDemo panelMode lockedTab="live" />;
+    case "orderbook-snapshot":
+      return <HubPolymarketLiveOrderbookDemo panelMode lockedTab="snapshot" />;
     case "trades":
-      return (
-        <HubPolymarketLiveTradesDemo
-          heading="Recent trades"
-          helper="Executed trades printing onto the price path."
-        />
-      );
+      return <HubPolymarketLiveTradesDemo panelMode />;
     case "candlesticks":
-      return (
-        <HubPolymarketLiveCandlesticksDemo
-          heading="Candlesticks"
-          helper="Live open, high, low, and close from trade activity."
-        />
-      );
+      return <HubPolymarketLiveCandlesticksDemo panelMode />;
     case "holders":
-      return (
-        <HubPolymarketLiveHoldersDemo
-          heading="Holders & positions"
-          helper="Largest visible holders with market and overall P&L."
-        />
-      );
+      return <HubPolymarketLiveHoldersDemo panelMode />;
     default:
       return null;
   }
@@ -168,7 +186,7 @@ export function HubPolymarketLiveDashboardDemo({
   const [generating, setGenerating] = useState(false);
   const [modalOpen, setModalOpen] = useState(false);
   const [upgradeOpen, setUpgradeOpen] = useState(false);
-  const [activePanel, setActivePanel] = useState<AnalyticsPanelId>("prices");
+  const [activePanel, setActivePanel] = useState<AnalyticsPanelId>("prices-liveline");
   const [generatedLayout, setGeneratedLayout] = useState<DashboardLayout>("one_view");
 
   const marketTitle = useMemo(() => {
@@ -191,11 +209,16 @@ export function HubPolymarketLiveDashboardDemo({
     if (!hasSelection || generating) return;
     setGenerating(true);
     setGeneratedLayout(layout);
-    setActivePanel("prices");
+    setActivePanel("prices-liveline");
     window.setTimeout(() => {
       setGenerating(false);
       setModalOpen(true);
     }, 450);
+  };
+
+  const openUpgrade = () => {
+    setModalOpen(false);
+    setUpgradeOpen(true);
   };
 
   return (
@@ -226,10 +249,10 @@ export function HubPolymarketLiveDashboardDemo({
           <div className="rounded-xl border border-border/70 bg-muted/15 px-4 py-3.5 sm:px-5">
             <p className="text-sm font-medium text-foreground">Ready to assemble</p>
             <p className="mt-1.5 text-sm leading-relaxed text-muted-foreground text-pretty">
-              We’ll place the live analytics from this page — prices, spread, order book, trades,
-              candlesticks, and holders — onto one dashboard for{" "}
+              We’ll lay out every live chart from this page as a flat dashboard for{" "}
               <span className="font-medium text-foreground">{marketTitle}</span>
-              {markets.length > 1 ? ` (${markets.length} markets)` : ""}.
+              {markets.length > 1 ? ` (${markets.length} markets)` : ""} — no nested tabs inside
+              each view.
             </p>
           </div>
 
@@ -343,7 +366,7 @@ export function HubPolymarketLiveDashboardDemo({
                     {marketTitle || "Polymarket live dashboard"}
                   </h2>
                   <p className="text-sm text-muted-foreground">
-                    {ANALYTICS_PANELS.length} live views
+                    {ANALYTICS_PANELS.length} live charts
                     {generatedLayout === "separate_tabs"
                       ? " · separate tabs"
                       : " · single scrolling view"}
@@ -355,10 +378,7 @@ export function HubPolymarketLiveDashboardDemo({
                     variant="outline"
                     size="sm"
                     className="h-8 gap-1.5 border-emerald-500/40 bg-emerald-500/10 px-3 text-xs font-medium text-foreground hover:bg-emerald-500/15"
-                    onClick={() => {
-                      setModalOpen(false);
-                      setUpgradeOpen(true);
-                    }}
+                    onClick={openUpgrade}
                   >
                     <span
                       className="size-2 shrink-0 animate-pulse rounded-full bg-emerald-500"
@@ -370,6 +390,15 @@ export function HubPolymarketLiveDashboardDemo({
                     <Link href="#polymarket-live-pricing" onClick={() => setModalOpen(false)}>
                       Get full access now
                     </Link>
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="h-8 px-3 text-xs"
+                    onClick={openUpgrade}
+                  >
+                    Customize Dashboard
                   </Button>
                 </div>
               </div>
@@ -436,8 +465,8 @@ export function HubPolymarketLiveDashboardDemo({
           <DialogHeader>
             <DialogTitle>Unlock live Polymarket dashboards</DialogTitle>
             <DialogDescription>
-              Upgrade to keep prices, spreads, order books, trades, candlesticks, and holders live
-              together — save the dashboard, refresh continuously, and add more markets anytime.
+              Upgrade to customize this dashboard, keep every chart live, save the layout, and add
+              more markets anytime. Full access also unlocks continuous refresh and publishing.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>

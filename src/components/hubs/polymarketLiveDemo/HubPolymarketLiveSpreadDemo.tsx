@@ -482,10 +482,14 @@ export function HubPolymarketLiveSpreadDemo({
   heading,
   helper,
   placeholder,
+  panelMode = false,
+  lockedTab,
 }: {
   heading?: string;
   helper?: string;
   placeholder?: string;
+  panelMode?: boolean;
+  lockedTab?: SpreadTabId;
 }) {
   const selection = useHubPolymarketLiveDemo();
   const markets = selection?.markets ?? [];
@@ -493,7 +497,8 @@ export function HubPolymarketLiveSpreadDemo({
   const marketsKey = seriesSpecs.map((spec) => spec.tokenId).join(",");
   const hasSelection = seriesSpecs.length > 0;
 
-  const [activeTab, setActiveTab] = useState<SpreadTabId>("best-bid");
+  const [activeTab, setActiveTab] = useState<SpreadTabId>(lockedTab || "best-bid");
+  const resolvedTab = lockedTab || activeTab;
   const [viewMode, setViewMode] = useState<ViewMode>("chart");
   const [quotesByToken, setQuotesByToken] = useState<Record<string, QuoteTick[]>>({});
   const [booksByToken, setBooksByToken] = useState<Record<string, BookSnapshot>>({});
@@ -518,7 +523,7 @@ export function HubPolymarketLiveSpreadDemo({
   const booksAbortRef = useRef<AbortController | null>(null);
 
   const pollingActive = hasSelection && inView && tabVisible && !livePaused;
-  const liveTab = activeTab !== "orderbook";
+  const liveTab = resolvedTab !== "orderbook";
 
   const stopSocket = useCallback(() => {
     socketStopRef.current?.();
@@ -690,11 +695,11 @@ export function HubPolymarketLiveSpreadDemo({
     seriesSpecs[0];
 
   const priceSeries = useMemo(() => {
-    if (activeTab === "orderbook" || activeTab === "liquidity") return [];
+    if (resolvedTab === "orderbook" || resolvedTab === "liquidity") return [];
     return seriesSpecs.map((spec, index) => {
       const colorToken = seriesColorTokens[spec.id] ?? colorTokenForSpec(spec, index);
       const trades = (quotesByToken[spec.tokenId] || [])
-        .map((quote) => toPriceRow(quote, spec, activeTab))
+        .map((quote) => toPriceRow(quote, spec, resolvedTab))
         .filter(Boolean) as Record<string, unknown>[];
       return {
         key: spec.id,
@@ -705,10 +710,10 @@ export function HubPolymarketLiveSpreadDemo({
         trades,
       };
     });
-  }, [activeTab, quotesByToken, seriesColorTokens, seriesSpecs]);
+  }, [resolvedTab, quotesByToken, seriesColorTokens, seriesSpecs]);
 
   const liquiditySeries = useMemo(() => {
-    if (activeTab !== "liquidity") return [];
+    if (resolvedTab !== "liquidity") return [];
     const out: {
       key: string;
       id: string;
@@ -773,7 +778,7 @@ export function HubPolymarketLiveSpreadDemo({
       });
     });
     return out;
-  }, [activeTab, quotesByToken, seriesColorTokens, seriesSpecs]);
+  }, [resolvedTab, quotesByToken, seriesColorTokens, seriesSpecs]);
 
   const bookRows = useMemo(() => {
     if (!activeBook || !activeBookSpec) return [];
@@ -798,14 +803,14 @@ export function HubPolymarketLiveSpreadDemo({
     ];
   }, [activeBook, activeBookSpec]);
 
-  const chartSeries = activeTab === "liquidity" ? liquiditySeries : priceSeries;
+  const chartSeries = resolvedTab === "liquidity" ? liquiditySeries : priceSeries;
   const sheetRows =
-    activeTab === "orderbook"
+    resolvedTab === "orderbook"
       ? bookRows
-      : activeTab === "liquidity"
+      : resolvedTab === "liquidity"
         ? liquiditySeries.flatMap((item) => item.trades)
         : priceSeries.flatMap((item) => item.trades);
-  const sheetColumns = activeTab === "orderbook" ? BOOK_SHEET_COLUMNS : QUOTE_SHEET_COLUMNS;
+  const sheetColumns = resolvedTab === "orderbook" ? BOOK_SHEET_COLUMNS : QUOTE_SHEET_COLUMNS;
   const hasData = sheetRows.length > 0;
   const jsonText = useMemo(() => JSON.stringify(sheetRows, null, 2), [sheetRows]);
 
@@ -825,7 +830,7 @@ export function HubPolymarketLiveSpreadDemo({
     });
   }, []);
 
-  const exportBasename = `polymarket-live-spread-${activeTab}-${Date.now()}`;
+  const exportBasename = `polymarket-live-spread-${resolvedTab}-${Date.now()}`;
 
   const exportJson = useCallback(() => {
     if (!sheetRows.length) return;
@@ -898,29 +903,36 @@ export function HubPolymarketLiveSpreadDemo({
   );
 
   const toolbarLabel =
-    activeTab === "best-bid"
+    resolvedTab === "best-bid"
       ? "Live best bid"
-      : activeTab === "best-ask"
+      : resolvedTab === "best-ask"
         ? "Live best ask"
-        : activeTab === "spread"
+        : resolvedTab === "spread"
           ? "Live spread"
-          : activeTab === "liquidity"
+          : resolvedTab === "liquidity"
             ? "Live liquidity"
             : "Order book snapshot";
 
   return (
     <div
       ref={rootRef}
-      className="flex h-full min-h-0 flex-1 flex-col gap-4 overflow-y-auto px-4 py-4 sm:px-5 sm:py-5"
+      className={cn(
+        "flex h-full min-h-0 flex-1 flex-col",
+        panelMode
+          ? "gap-0 overflow-hidden p-0"
+          : "gap-4 overflow-y-auto px-4 py-4 sm:px-5 sm:py-5",
+      )}
     >
-      <div className="shrink-0 space-y-1">
-        {heading ? (
-          <h3 className="text-lg font-semibold tracking-tight text-foreground">{heading}</h3>
-        ) : null}
-        {helper ? (
-          <p className="text-pretty text-sm leading-relaxed text-muted-foreground">{helper}</p>
-        ) : null}
-      </div>
+      {!panelMode ? (
+        <div className="shrink-0 space-y-1">
+          {heading ? (
+            <h3 className="text-lg font-semibold tracking-tight text-foreground">{heading}</h3>
+          ) : null}
+          {helper ? (
+            <p className="text-pretty text-sm leading-relaxed text-muted-foreground">{helper}</p>
+          ) : null}
+        </div>
+      ) : null}
 
       {!hasSelection ? (
         <div className="flex min-h-[16rem] flex-1 flex-col items-center justify-center gap-2 px-4 text-center">
@@ -935,17 +947,30 @@ export function HubPolymarketLiveSpreadDemo({
           </HubInPageLink>
         </div>
       ) : (
-        <div className="grid min-h-0 flex-1 grid-cols-1 gap-4 lg:grid-cols-5 lg:items-stretch">
-          <div className="lg:col-span-1">
-            <HubKalshiLiveDemoTabs
-              tabs={tabs}
-              activeId={activeTab}
-              onChange={(id) => setActiveTab(id as SpreadTabId)}
-              contentLoading={loading}
-            />
-          </div>
+        <div
+          className={cn(
+            "grid min-h-0 flex-1 grid-cols-1 gap-4 lg:items-stretch",
+            panelMode ? "lg:grid-cols-1" : "lg:grid-cols-5",
+          )}
+        >
+          {!panelMode ? (
+            <div className="lg:col-span-1">
+              <HubKalshiLiveDemoTabs
+                tabs={tabs}
+                activeId={resolvedTab}
+                onChange={(id) => setActiveTab(id as SpreadTabId)}
+                contentLoading={loading}
+              />
+            </div>
+          ) : null}
 
-          <div className="flex min-h-0 min-w-0 flex-col lg:col-span-4" role="tabpanel">
+          <div
+            className={cn(
+              "flex min-h-0 min-w-0 flex-col",
+              panelMode ? "col-span-1" : "lg:col-span-4",
+            )}
+            role="tabpanel"
+          >
             <div
               className={cn(
                 "flex min-h-[12rem] flex-1 flex-col overflow-hidden rounded-xl border border-border/70 bg-muted/20",
@@ -962,7 +987,7 @@ export function HubPolymarketLiveSpreadDemo({
                     </span>
                   ) : hasData ? (
                     <span className="text-xs text-muted-foreground">
-                      {sheetRows.length} {activeTab === "orderbook" ? "level" : "point"}
+                      {sheetRows.length} {resolvedTab === "orderbook" ? "level" : "point"}
                       {sheetRows.length === 1 ? "" : "s"}
                       {markets.length > 1 ? ` · ${markets.length} markets` : ""}
                     </span>
@@ -1141,7 +1166,7 @@ export function HubPolymarketLiveSpreadDemo({
 
               {liveTab ? <QuoteStrip specs={seriesSpecs} latestByToken={latestByToken} /> : null}
 
-              {activeTab === "orderbook" && seriesSpecs.length > 1 ? (
+              {resolvedTab === "orderbook" && seriesSpecs.length > 1 ? (
                 <div className="flex shrink-0 flex-wrap gap-1.5 border-b border-border/50 px-3 py-2">
                   {seriesSpecs.map((spec) => {
                     const selected = (bookTokenId || seriesSpecs[0]?.tokenId) === spec.tokenId;
@@ -1176,13 +1201,13 @@ export function HubPolymarketLiveSpreadDemo({
                 )
               ) : !hasData ? (
                 <p className="px-3 py-8 text-center text-sm text-muted-foreground">
-                  {activeTab === "orderbook"
+                  {resolvedTab === "orderbook"
                     ? "No order-book snapshot available for this market."
                     : "Waiting for live quotes…"}
                 </p>
               ) : viewMode === "chart" ? (
                 <div className="flex min-h-0 flex-1 flex-col">
-                  {activeTab === "orderbook" ? (
+                  {resolvedTab === "orderbook" ? (
                     <HubPolymarketLiveOrderbookDepthChart
                       ref={chartRef}
                       bids={activeBook?.bids || []}
@@ -1192,7 +1217,7 @@ export function HubPolymarketLiveSpreadDemo({
                     />
                   ) : (
                     <HubKalshiLiveDemoTradesLiveline
-                      key={`${chartKey}-${activeTab}`}
+                      key={`${chartKey}-${resolvedTab}`}
                       ref={chartRef}
                       series={chartSeries}
                       hiddenSeriesIds={hiddenSeriesIds}
@@ -1201,13 +1226,13 @@ export function HubPolymarketLiveSpreadDemo({
                       fill
                       paused={livePaused || !pollingActive}
                       fixedValueDomain={
-                        (activeTab === "best-bid" || activeTab === "best-ask") &&
+                        (resolvedTab === "best-bid" || resolvedTab === "best-ask") &&
                         seriesSpecs.length > 1
                           ? { min: 0, max: 100 }
                           : undefined
                       }
-                      parseRowValue={activeTab === "liquidity" ? parseSizeValue : undefined}
-                      formatValue={activeTab === "liquidity" ? formatQty : undefined}
+                      parseRowValue={resolvedTab === "liquidity" ? parseSizeValue : undefined}
+                      formatValue={resolvedTab === "liquidity" ? formatQty : undefined}
                       emptyMessage="Waiting for live quotes…"
                       className="min-h-0 flex-1"
                     />

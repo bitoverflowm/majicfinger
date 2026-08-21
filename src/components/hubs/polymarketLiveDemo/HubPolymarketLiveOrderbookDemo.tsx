@@ -393,10 +393,14 @@ export function HubPolymarketLiveOrderbookDemo({
   heading,
   helper,
   placeholder,
+  panelMode = false,
+  lockedTab,
 }: {
   heading?: string;
   helper?: string;
   placeholder?: string;
+  panelMode?: boolean;
+  lockedTab?: BookTabId;
 }) {
   const selection = useHubPolymarketLiveDemo();
   const markets = selection?.markets ?? [];
@@ -404,7 +408,8 @@ export function HubPolymarketLiveOrderbookDemo({
   const marketsKey = seriesSpecs.map((spec) => spec.tokenId).join(",");
   const hasSelection = seriesSpecs.length > 0;
 
-  const [activeTab, setActiveTab] = useState<BookTabId>("live");
+  const [activeTab, setActiveTab] = useState<BookTabId>(lockedTab || "live");
+  const resolvedTab = lockedTab || activeTab;
   const [viewMode, setViewMode] = useState<ViewMode>("chart");
   const [liveBooks, setLiveBooks] = useState<Record<string, BookSnapshot>>({});
   const [snapshotBooks, setSnapshotBooks] = useState<Record<string, BookSnapshot>>({});
@@ -596,7 +601,7 @@ export function HubPolymarketLiveOrderbookDemo({
     [],
   );
 
-  const booksByToken = activeTab === "live" ? liveBooks : snapshotBooks;
+  const booksByToken = resolvedTab === "live" ? liveBooks : snapshotBooks;
   const activeBook =
     booksByToken[bookTokenId] || booksByToken[seriesSpecs[0]?.tokenId || ""];
   const activeSpec =
@@ -630,7 +635,7 @@ export function HubPolymarketLiveOrderbookDemo({
 
   const hasData = sheetRows.length > 0;
   const jsonText = useMemo(() => JSON.stringify(sheetRows, null, 2), [sheetRows]);
-  const exportBasename = `polymarket-live-orderbook-${activeTab}-${Date.now()}`;
+  const exportBasename = `polymarket-live-orderbook-${resolvedTab}-${Date.now()}`;
 
   const exportJson = useCallback(() => {
     if (!sheetRows.length) return;
@@ -703,16 +708,23 @@ export function HubPolymarketLiveOrderbookDemo({
   return (
     <div
       ref={rootRef}
-      className="flex h-full min-h-0 flex-1 flex-col gap-4 overflow-y-auto px-4 py-4 sm:px-5 sm:py-5"
+      className={cn(
+        "flex h-full min-h-0 flex-1 flex-col",
+        panelMode
+          ? "gap-0 overflow-hidden p-0"
+          : "gap-4 overflow-y-auto px-4 py-4 sm:px-5 sm:py-5",
+      )}
     >
-      <div className="shrink-0 space-y-1">
-        {heading ? (
-          <h3 className="text-lg font-semibold tracking-tight text-foreground">{heading}</h3>
-        ) : null}
-        {helper ? (
-          <p className="text-pretty text-sm leading-relaxed text-muted-foreground">{helper}</p>
-        ) : null}
-      </div>
+      {!panelMode ? (
+        <div className="shrink-0 space-y-1">
+          {heading ? (
+            <h3 className="text-lg font-semibold tracking-tight text-foreground">{heading}</h3>
+          ) : null}
+          {helper ? (
+            <p className="text-pretty text-sm leading-relaxed text-muted-foreground">{helper}</p>
+          ) : null}
+        </div>
+      ) : null}
 
       {!hasSelection ? (
         <div className="flex min-h-[16rem] flex-1 flex-col items-center justify-center gap-2 px-4 text-center">
@@ -727,17 +739,30 @@ export function HubPolymarketLiveOrderbookDemo({
           </HubInPageLink>
         </div>
       ) : (
-        <div className="grid min-h-0 flex-1 grid-cols-1 gap-4 lg:grid-cols-5 lg:items-stretch">
-          <div className="lg:col-span-1">
-            <HubKalshiLiveDemoTabs
-              tabs={tabs}
-              activeId={activeTab}
-              onChange={(id) => setActiveTab(id as BookTabId)}
-              contentLoading={loading}
-            />
-          </div>
+        <div
+          className={cn(
+            "grid min-h-0 flex-1 grid-cols-1 gap-4 lg:items-stretch",
+            panelMode ? "lg:grid-cols-1" : "lg:grid-cols-5",
+          )}
+        >
+          {!panelMode ? (
+            <div className="lg:col-span-1">
+              <HubKalshiLiveDemoTabs
+                tabs={tabs}
+                activeId={resolvedTab}
+                onChange={(id) => setActiveTab(id as BookTabId)}
+                contentLoading={loading}
+              />
+            </div>
+          ) : null}
 
-          <div className="flex min-h-0 min-w-0 flex-col lg:col-span-4" role="tabpanel">
+          <div
+            className={cn(
+              "flex min-h-0 min-w-0 flex-col",
+              panelMode ? "col-span-1" : "lg:col-span-4",
+            )}
+            role="tabpanel"
+          >
             <div
               className={cn(
                 "flex min-h-[12rem] flex-1 flex-col overflow-hidden rounded-xl border border-border/70 bg-muted/20",
@@ -746,7 +771,7 @@ export function HubPolymarketLiveOrderbookDemo({
             >
               <div className="flex shrink-0 flex-wrap items-center justify-between gap-2 border-b border-border/60 px-3 py-2">
                 <p className="text-xs font-medium text-muted-foreground">
-                  {activeTab === "live" ? "Live order book" : "Order book snapshot"}
+                  {resolvedTab === "live" ? "Live order book" : "Order book snapshot"}
                 </p>
                 <div className="flex flex-wrap items-center justify-end gap-2">
                   {loading ? (
@@ -761,7 +786,7 @@ export function HubPolymarketLiveOrderbookDemo({
                     </span>
                   ) : null}
 
-                  {activeTab === "live" ? (
+                  {resolvedTab === "live" ? (
                     <div className="inline-flex items-center gap-1.5">
                       <Button
                         type="button"
@@ -971,7 +996,7 @@ export function HubPolymarketLiveOrderbookDemo({
                 )
               ) : !hasData ? (
                 <p className="px-3 py-8 text-center text-sm text-muted-foreground">
-                  {activeTab === "live"
+                  {resolvedTab === "live"
                     ? "Waiting for live order-book updates…"
                     : "No order-book snapshot available for this market."}
                 </p>
@@ -981,7 +1006,7 @@ export function HubPolymarketLiveOrderbookDemo({
                   bids={activeBook?.bids || []}
                   asks={activeBook?.asks || []}
                   label={activeSpec?.label}
-                  flashKeys={activeTab === "live" ? flashKeys : undefined}
+                  flashKeys={resolvedTab === "live" ? flashKeys : undefined}
                   className="min-h-0 flex-1"
                 />
               ) : viewMode === "json" ? (

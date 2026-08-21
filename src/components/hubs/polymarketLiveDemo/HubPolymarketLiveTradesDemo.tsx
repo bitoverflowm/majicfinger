@@ -457,10 +457,12 @@ export function HubPolymarketLiveTradesDemo({
   heading,
   helper,
   placeholder,
+  panelMode = false,
 }: {
   heading?: string;
   helper?: string;
   placeholder?: string;
+  panelMode?: boolean;
 }) {
   const selection = useHubPolymarketLiveDemo();
   const markets = selection?.markets ?? [];
@@ -729,16 +731,23 @@ export function HubPolymarketLiveTradesDemo({
   return (
     <div
       ref={rootRef}
-      className="flex h-full min-h-0 flex-1 flex-col gap-4 overflow-y-auto px-4 py-4 sm:px-5 sm:py-5"
+      className={cn(
+        "flex h-full min-h-0 flex-1 flex-col",
+        panelMode
+          ? "gap-0 overflow-hidden p-0"
+          : "gap-4 overflow-y-auto px-4 py-4 sm:px-5 sm:py-5",
+      )}
     >
-      <div className="shrink-0 space-y-1">
-        {heading ? (
-          <h3 className="text-lg font-semibold tracking-tight text-foreground">{heading}</h3>
-        ) : null}
-        {helper ? (
-          <p className="text-pretty text-sm leading-relaxed text-muted-foreground">{helper}</p>
-        ) : null}
-      </div>
+      {!panelMode ? (
+        <div className="shrink-0 space-y-1">
+          {heading ? (
+            <h3 className="text-lg font-semibold tracking-tight text-foreground">{heading}</h3>
+          ) : null}
+          {helper ? (
+            <p className="text-pretty text-sm leading-relaxed text-muted-foreground">{helper}</p>
+          ) : null}
+        </div>
+      ) : null}
 
       {!hasSelection ? (
         <div className="flex min-h-[16rem] flex-1 flex-col items-center justify-center gap-2 px-4 text-center">

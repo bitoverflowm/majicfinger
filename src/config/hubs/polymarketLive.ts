@@ -446,6 +446,68 @@ export const polymarketLiveHub: HubPageConfig = {
       ],
       cta: { ...GET_FULL_ACCESS },
       secondaryCta: {
+        label: "Next: Expand Your Research",
+        href: "#expand-polymarket-research",
+        requiresAuth: false,
+        ariaLabel: "Continue to cross-platform research integrations",
+      },
+    },
+    {
+      type: "cross_platform_research",
+      anchorId: "expand-polymarket-research",
+      eyebrow: "EXPAND YOUR RESEARCH",
+      title: "One Workspace Across Prediction Markets and the Signals That Move Them",
+      intro:
+        "Start with live Polymarket activity, add historical context, compare probabilities across exchanges, or bring external signals into the same research workflow.",
+      cards: [
+        {
+          id: "polymarket-live",
+          title: "Polymarket Live",
+          description:
+            "Follow active markets, prices, trades, spreads, order books, holders and positions as conditions change.",
+          href: "/polymarket-live-data",
+          youAreHere: true,
+        },
+        {
+          id: "polymarket-historical",
+          title: "Polymarket Historical",
+          description:
+            "Study resolved markets, longer price histories and past market behavior for research and backtesting.",
+          href: "/polymarket-historical-data",
+        },
+        {
+          id: "kalshi-live",
+          title: "Kalshi Live",
+          description:
+            "Compare current probabilities, prices, volume and market activity across prediction-market platforms.",
+          href: "/kalshi-live-data",
+        },
+        {
+          id: "kalshi-historical",
+          title: "Kalshi Historical",
+          description:
+            "Explore Kalshi markets and trades across the platform’s complete historical lifecycle.",
+          href: "/kalshi-historical-data",
+        },
+      ],
+      compareEyebrow: "COMPARE PREDICTION MARKETS",
+      compareTitle: "See How the Same Event Is Trading on Polymarket and Kalshi",
+      compareIntro:
+        "Search once, find matching markets across both platforms, and compare their live probabilities, price movement and trading activity in one view.",
+      signalsTitle: "Add the Signals Behind the Market",
+      signalsBody:
+        "Bring X, news, Chainlink, weather and other real-world data beside prediction-market prices to investigate what may be moving the odds.",
+      signalLinks: [
+        { label: "X", href: "/integrations/twitter" },
+        { label: "Chainlink", href: "/integrations/chainlink" },
+      ],
+      cta: {
+        label: "Explore All Lychee Integrations",
+        href: "/data-sheet",
+        requiresAuth: false,
+        ariaLabel: "Explore all Lychee data integrations in the data sheet",
+      },
+      secondaryCta: {
         label: "Next: Browse Live Data Guides",
         href: "#guides",
         requiresAuth: false,

@@ -355,10 +355,16 @@ export function HubPolymarketLivePricesDemo({
   heading,
   helper,
   placeholder,
+  panelMode = false,
+  lockedTab,
 }: {
   heading?: string;
   helper?: string;
   placeholder?: string;
+  /** Hide left tabs and outer chrome for dashboard embeds. */
+  panelMode?: boolean;
+  /** Force a single chart view when embedded flat in a dashboard. */
+  lockedTab?: PriceTabId;
 }) {
   const selection = useHubPolymarketLiveDemo();
   const markets = selection?.markets ?? [];
@@ -366,7 +372,8 @@ export function HubPolymarketLivePricesDemo({
   const marketsKey = seriesSpecs.map((spec) => spec.tokenId).join(",");
   const hasSelection = seriesSpecs.length > 0;
 
-  const [activeTab, setActiveTab] = useState<PriceTabId>("liveline");
+  const [activeTab, setActiveTab] = useState<PriceTabId>(lockedTab || "liveline");
+  const resolvedTab = lockedTab || activeTab;
   const [viewMode, setViewMode] = useState<ViewMode>("chart");
   const [livePoints, setLivePoints] = useState<Record<string, Record<string, unknown>[]>>(
     {},
@@ -402,7 +409,7 @@ export function HubPolymarketLivePricesDemo({
   const historyAbortRef = useRef<AbortController | null>(null);
 
   const pollingActive =
-    hasSelection && inView && tabVisible && !livePaused && activeTab === "liveline";
+    hasSelection && inView && tabVisible && !livePaused && resolvedTab === "liveline";
 
   const stopSocket = useCallback(() => {
     socketStopRef.current?.();
@@ -594,9 +601,9 @@ export function HubPolymarketLivePricesDemo({
 
   const historyPoints = historyByInterval[historyInterval];
   const historyReady = historyPoints != null;
-  const pointsByToken = activeTab === "history" ? historyPoints || {} : livePoints;
-  const loading = activeTab === "history" ? historyLoading && !historyReady : liveLoading;
-  const error = activeTab === "history" ? historyError : liveError;
+  const pointsByToken = resolvedTab === "history" ? historyPoints || {} : livePoints;
+  const loading = resolvedTab === "history" ? historyLoading && !historyReady : liveLoading;
+  const error = resolvedTab === "history" ? historyError : liveError;
 
   const chartSeries = useMemo(
     () =>
@@ -724,20 +731,27 @@ export function HubPolymarketLivePricesDemo({
   return (
     <div
       ref={rootRef}
-      className="flex h-full min-h-0 flex-1 flex-col gap-4 overflow-y-auto px-4 py-4 sm:px-5 sm:py-5"
+      className={cn(
+        "flex h-full min-h-0 flex-1 flex-col",
+        panelMode
+          ? "gap-0 overflow-hidden p-0"
+          : "gap-4 overflow-y-auto px-4 py-4 sm:px-5 sm:py-5",
+      )}
     >
-      <div className="shrink-0 space-y-1">
-        {heading ? (
-          <h3 className="text-lg font-semibold tracking-tight text-foreground">
-            {heading}
-          </h3>
-        ) : null}
-        {helper ? (
-          <p className="text-pretty text-sm leading-relaxed text-muted-foreground">
-            {helper}
-          </p>
-        ) : null}
-      </div>
+      {!panelMode ? (
+        <div className="shrink-0 space-y-1">
+          {heading ? (
+            <h3 className="text-lg font-semibold tracking-tight text-foreground">
+              {heading}
+            </h3>
+          ) : null}
+          {helper ? (
+            <p className="text-pretty text-sm leading-relaxed text-muted-foreground">
+              {helper}
+            </p>
+          ) : null}
+        </div>
+      ) : null}
 
       {!hasSelection ? (
         <div className="flex min-h-[16rem] flex-1 flex-col items-center justify-center gap-2 px-4 text-center">
@@ -752,17 +766,30 @@ export function HubPolymarketLivePricesDemo({
           </HubInPageLink>
         </div>
       ) : (
-        <div className="grid min-h-0 flex-1 grid-cols-1 gap-4 lg:grid-cols-5 lg:items-stretch">
-          <div className="lg:col-span-1">
-            <HubKalshiLiveDemoTabs
-              tabs={tabs}
-              activeId={activeTab}
-              onChange={(id) => setActiveTab(id as PriceTabId)}
-              contentLoading={loading}
-            />
-          </div>
+        <div
+          className={cn(
+            "grid min-h-0 flex-1 grid-cols-1 gap-4 lg:items-stretch",
+            panelMode ? "lg:grid-cols-1" : "lg:grid-cols-5",
+          )}
+        >
+          {!panelMode ? (
+            <div className="lg:col-span-1">
+              <HubKalshiLiveDemoTabs
+                tabs={tabs}
+                activeId={resolvedTab}
+                onChange={(id) => setActiveTab(id as PriceTabId)}
+                contentLoading={loading}
+              />
+            </div>
+          ) : null}
 
-          <div className="flex min-h-0 min-w-0 flex-col lg:col-span-4" role="tabpanel">
+          <div
+            className={cn(
+              "flex min-h-0 min-w-0 flex-col",
+              panelMode ? "col-span-1" : "lg:col-span-4",
+            )}
+            role="tabpanel"
+          >
             <div
               className={cn(
                 "flex min-h-[12rem] flex-1 flex-col overflow-hidden rounded-xl border border-border/70 bg-muted/20",
@@ -772,7 +799,7 @@ export function HubPolymarketLivePricesDemo({
               <div className="flex shrink-0 flex-col gap-2 border-b border-border/60 px-3 py-2">
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <p className="text-xs font-medium text-muted-foreground">
-                  {activeTab === "liveline" ? "Live prices" : "Price history"}
+                  {resolvedTab === "liveline" ? "Live prices" : "Price history"}
                 </p>
                 <div className="flex flex-wrap items-center justify-end gap-2">
                   {loading ? (
@@ -787,7 +814,7 @@ export function HubPolymarketLivePricesDemo({
                     </span>
                   ) : null}
 
-                  {activeTab === "liveline" ? (
+                  {resolvedTab === "liveline" ? (
                     <div className="inline-flex items-center gap-1.5">
                       <Button
                         type="button"
@@ -955,7 +982,7 @@ export function HubPolymarketLivePricesDemo({
                   </div>
                 </div>
               </div>
-              {activeTab === "history" ? (
+              {resolvedTab === "history" ? (
                 <div
                   className="inline-flex h-7 w-fit max-w-full items-center overflow-x-auto rounded-md border border-border/70 bg-background p-0.5"
                   role="group"
@@ -1001,13 +1028,13 @@ export function HubPolymarketLivePricesDemo({
                 )
               ) : !hasData ? (
                 <p className="px-3 py-8 text-center text-sm text-muted-foreground">
-                  {activeTab === "liveline"
+                  {resolvedTab === "liveline"
                     ? "Waiting for live market activity…"
                     : "No price history available for this market."}
                 </p>
               ) : viewMode === "chart" ? (
                 <div className="flex min-h-0 flex-1 flex-col">
-                  {activeTab === "liveline" ? (
+                  {resolvedTab === "liveline" ? (
                     <HubKalshiLiveDemoTradesLiveline
                       key={chartKey}
                       ref={chartRef}

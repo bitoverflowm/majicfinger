@@ -34,6 +34,7 @@ import { HubLazyWhenVisible } from "@/components/hubs/HubLazyWhenVisible";
 import { HubProofMetrics } from "@/components/hubs/HubProofMetrics";
 import { HubVideoInstructionsCarousel } from "@/components/hubs/HubVideoInstructionsCarousel";
 import { HubDemoModule } from "@/components/hubs/polymarketLiveDemo/HubDemoModule";
+import { HubPolymarketCrossPlatformSection } from "@/components/hubs/polymarketLiveDemo/HubPolymarketCrossPlatformSection";
 import { PricingSection } from "@/components/sections/pricing-section";
 import {
   HubChartEmbedSkeleton,
@@ -1038,6 +1039,8 @@ export function HubSectionRenderer({
       return wrapper(<HubTextBlock section={section} />);
     case "cards":
       return wrapper(<HubCards section={section} />);
+    case "cross_platform_research":
+      return wrapper(<HubPolymarketCrossPlatformSection section={section} />);
     case "bullets":
       return wrapper(<HubBullets section={section} />);
     case "comparison_table":

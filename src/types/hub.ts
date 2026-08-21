@@ -361,6 +361,32 @@ export type HubDemoModuleSection = {
   note?: string;
 };
 
+export type HubCrossPlatformResearchCard = {
+  id: string;
+  title: string;
+  description: string;
+  href: string;
+  youAreHere?: boolean;
+};
+
+/** Compact cross-platform research: integration cards + compare demo + signals. */
+export type HubCrossPlatformResearchSection = {
+  type: "cross_platform_research";
+  anchorId?: string;
+  eyebrow?: string;
+  title: string;
+  intro?: string;
+  cards: HubCrossPlatformResearchCard[];
+  compareEyebrow?: string;
+  compareTitle?: string;
+  compareIntro?: string;
+  signalsTitle?: string;
+  signalsBody?: string;
+  signalLinks?: Array<{ label: string; href: string }>;
+  cta?: HubCta;
+  secondaryCta?: HubCta;
+};
+
 export type HubSection =
   | HubHeroSection
   | HubStatsSection
@@ -379,7 +405,8 @@ export type HubSection =
   | HubKalshiLiveDemoSection
   | HubKalshiLiveBonusFeaturesSection
   | HubDemoModuleSection
-  | HubPricingSection;
+  | HubPricingSection
+  | HubCrossPlatformResearchSection;
 
 export type HubAssetFilter = {
   /** Match dashboards whose tags include any of these (case-insensitive). */
