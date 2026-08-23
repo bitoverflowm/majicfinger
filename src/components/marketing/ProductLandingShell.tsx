@@ -21,7 +21,8 @@ export function buildProductLandingMetadata({
     title: { absolute: `${title} · Lychee Data` },
     description,
     alternates: { canonical: url },
-    robots: { index: true, follow: true },
+    // Placeholder / coming-soon shells must not be indexed.
+    robots: { index: false, follow: true },
     openGraph: {
       title: `${title} · Lychee Data`,
       description,

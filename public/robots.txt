@@ -1,23 +1,42 @@
-User-agent: *
-Allow: /
+# Lychee crawl policy — canonical host: https://lycheedata.com
+# Google matches path + query; longest rule wins. `$` = end of URL; `*` = any sequence.
 
-# Block Next.js internals / build artifacts (RSC payloads, etc.)
-# Static assets (fonts, JS, CSS) under /_next/static/ are public and crawlable.
+User-agent: *
+# Render assets Googlebot needs (fonts, JS, CSS, image optimizer).
 Allow: /_next/static/
+Allow: /_next/image
+
+# Exact landing-page demo APIs only (not a broad /api open).
+# Kalshi live demo: list endpoint + nested market demo routes.
+Allow: /api/integrations/kalshi-live/markets$
+Allow: /api/integrations/kalshi-live/markets?*
+Allow: /api/integrations/kalshi-live/markets/
+# Polymarket hub demos hit this single route with query=… (not polymarket-live).
+Allow: /api/integrations/polymarket$
+Allow: /api/integrations/polymarket?*
+Allow: /api/integrations/polymarket-live/markets/featured
+Allow: /api/public/charts/
+
+# Next.js internals (RSC payloads, data routes). Static/image allowed above.
 Disallow: /_next/
 
-# Block API routes
+# Private / authenticated / analytics / workspace APIs stay blocked.
 Disallow: /api/
 
-# Block common private/auth/admin areas (adjust as needed)
-Disallow: /admin/
-Disallow: /dashboard/
-Disallow: /account/
-Disallow: /settings/
+# Authenticated app surfaces (prefix match; do not enumerate private APIs).
+Disallow: /admin
+Disallow: /dashboard
+Disallow: /account
+Disallow: /settings
 Disallow: /login
 Disallow: /logout
 Disallow: /signup
-Disallow: /auth/
+Disallow: /auth
 
-# Public published dashboards and charts are crawlable at /{username}/dashboards/* and /{username}/charts/*
+# Everything else (HTML pages, /images/, public CSS/JS outside /_next, etc.).
+Allow: /
+
+# Public published dashboards/charts remain crawlable at
+# /{username}/dashboards/* and /{username}/charts/*
+
 Sitemap: https://lycheedata.com/sitemap.xml
