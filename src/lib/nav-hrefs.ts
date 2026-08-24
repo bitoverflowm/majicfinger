@@ -10,11 +10,24 @@ export type NavMenuLink = {
  * Marketing navbar links (after Products dropdown).
  * Home is omitted — the Lychee logo links to `/`.
  * Polymarket metadata uses a slim single-link nav.
+ * Prediction-market hubs keep Pricing on-page (`#pricing`).
  */
+const HUB_PAGES_WITH_IN_PAGE_PRICING = new Set([
+  "/polymarket-live-data",
+  "/polymarket-historical-data",
+  "/kalshi-live-data",
+  "/kalshi-historical-data",
+]);
+
 export function getNavLinksForPathname(pathname: string | null | undefined) {
   const p = (pathname ?? "").replace(/\/$/, "") || "/";
   if (p === "/polymarket-metadata") {
     return [{ id: "guides", name: "Learn more", href: "#guides" }] satisfies NavMenuLink[];
+  }
+  if (HUB_PAGES_WITH_IN_PAGE_PRICING.has(p)) {
+    return siteConfig.nav.links.map((link) =>
+      link.id === "pricing" ? { ...link, href: "#pricing" } : link,
+    );
   }
   return siteConfig.nav.links;
 }
