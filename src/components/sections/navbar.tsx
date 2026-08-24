@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, type MouseEvent } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { usePathname, useRouter } from "next/navigation";
@@ -17,6 +17,7 @@ import type { ProductsNavData } from "@/lib/nav/products-nav";
 import { cn } from "@/lib/utils";
 import { useUser } from "@/lib/hooks";
 import { endAuthenticatedSession } from "@/lib/analytics/authJourneyClient";
+import { scrollToHashSection } from "@/lib/scrollToHashSection";
 
 const INITIAL_WIDTH = "70rem";
 const MAX_WIDTH = "800px";
@@ -68,9 +69,22 @@ export function Navbar({ productsNav }: { productsNav: ProductsNavData }) {
   const tryForFreeHref =
     pathname === "/polymarket-live-data"
       ? "#find-polymarket-markets"
-      : siteConfig.hero.cta.primary.href;
+      : pathname === "/polymarket-historical-data" ||
+          pathname === "/kalshi-historical-data"
+        ? "#explore-data"
+        : siteConfig.hero.cta.primary.href;
   const TryForFreeLink =
-    pathname === "/polymarket-live-data" ? Link : DemoScrollLink;
+    pathname === "/polymarket-live-data" ||
+    pathname === "/polymarket-historical-data" ||
+    pathname === "/kalshi-historical-data"
+      ? Link
+      : DemoScrollLink;
+  const handleTryForFreeClick = (event: MouseEvent<HTMLAnchorElement>) => {
+    if (TryForFreeLink !== Link || !tryForFreeHref.startsWith("#")) return;
+    event.preventDefault();
+    scrollToHashSection(tryForFreeHref);
+    setIsDrawerOpen(false);
+  };
 
   useEffect(() => {
     const handleScroll = () => {
@@ -172,6 +186,7 @@ export function Navbar({ productsNav }: { productsNav: ProductsNavData }) {
                     <TryForFreeLink
                       className="bg-secondary h-8 hidden md:flex items-center justify-center text-sm font-normal tracking-wide rounded-full text-primary-foreground dark:text-secondary-foreground w-fit px-4 shadow-[inset_0_1px_2px_rgba(255,255,255,0.25),0_3px_3px_-1.5px_rgba(16,24,40,0.06),0_1px_1px_rgba(16,24,40,0.08)] border border-white/[0.12] hover:bg-secondary/80 transition-all ease-out active:scale-95"
                       href={tryForFreeHref}
+                      onClick={handleTryForFreeClick}
                     >
                       {siteConfig.hero.cta.primary.text}
                     </TryForFreeLink>
@@ -320,6 +335,7 @@ export function Navbar({ productsNav }: { productsNav: ProductsNavData }) {
                     <>
                       <TryForFreeLink
                         href={tryForFreeHref}
+                        onClick={handleTryForFreeClick}
                         className="bg-secondary h-8 flex items-center justify-center text-sm font-normal tracking-wide rounded-full text-primary-foreground dark:text-secondary-foreground w-full px-4 shadow-[inset_0_1px_2px_rgba(255,255,255,0.25),0_3px_3px_-1.5px_rgba(16,24,40,0.06),0_1px_1px_rgba(16,24,40,0.08)] border border-white/[0.12] hover:bg-secondary/80 transition-all ease-out active:scale-95"
                       >
                         {siteConfig.hero.cta.primary.text}

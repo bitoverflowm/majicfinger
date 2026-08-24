@@ -136,7 +136,9 @@ export const polymarketHistoricalHub: HubPageConfig = {
 
     {
       type: "proof_metrics",
-      heading: "One workspace for Polymarket historical research",
+      heading: "10,000+ researchers, traders, quants, and analysts use Lychee.",
+      subheading:
+        "43,400,000+ historical data requests were served from the archive in June 2026 alone.",
       primaryMetrics: [
         {
           value: "404M+",
