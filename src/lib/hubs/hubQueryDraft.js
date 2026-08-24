@@ -12,7 +12,7 @@ const STORAGE_KEY = "lychee:hubQueryDraft";
 /**
  * @typedef {object} HubQueryDraft
  * @property {1} version
- * @property {"kalshiHistorical"} integrationId
+ * @property {"kalshiHistorical" | "polymarketHistorical"} integrationId
  * @property {string} sampleId
  * @property {Record<string, string[]>} columnSelections
  * @property {HubQueryWhereFilter[]} [whereFilters]
@@ -161,7 +161,10 @@ export function normalizeHubQueryDraft(draft) {
   if (!Array.isArray(selections) || selections.length === 0) return null;
   return {
     version: 1,
-    integrationId: "kalshiHistorical",
+    integrationId:
+      draft.integrationId === "polymarketHistorical"
+        ? "polymarketHistorical"
+        : "kalshiHistorical",
     sampleId,
     columnSelections: draft.columnSelections || { [sampleId]: selections },
     whereFilters: normalizeHubQueryWhereFilters(draft.whereFilters),

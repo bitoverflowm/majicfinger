@@ -47,6 +47,7 @@ import {
   useDemoProGate,
 } from "@/hooks/useDemoProGate";
 import { HubKalshiQueryBuilder } from "@/components/hubs/kalshiQuery/HubKalshiQueryBuilder";
+import { HubPolymarketQueryBuilder } from "@/components/hubs/polymarketQuery/HubPolymarketQueryBuilder";
 
 function sampleByIdForConfig(lakeConfig) {
   return Object.fromEntries((lakeConfig?.sampleOptions || []).map((s) => [s.id, s]));
@@ -861,8 +862,13 @@ export function ConnectHomeIntegrationWorkflow({ integrationId, className }) {
   const { name, description } = getIntegrationMeta(integrationId);
   const connectKalshiLiveEndpointId = ctx.connectKalshiLiveEndpointId;
   const isKalshiHistorical = integrationId === "kalshiHistorical";
-  const isWideKalshiCompose =
-    isKalshiHistorical || isKalshiLive || isKalshiHistoricalV2 || isPolymarketLive;
+  const isPolymarketHistorical = integrationId === "polymarketHistorical";
+  const isWideHistoricalCompose =
+    isKalshiHistorical ||
+    isPolymarketHistorical ||
+    isKalshiLive ||
+    isKalshiHistoricalV2 ||
+    isPolymarketLive;
 
   const hasComposeUi =
     (isDataLake && !!connectDataLakeSampleId) ||
@@ -876,7 +882,7 @@ export function ConnectHomeIntegrationWorkflow({ integrationId, className }) {
       className={cn(
         "flex flex-col px-4 sm:px-6 md:px-10 lg:px-14",
         connectWorkspaceScrollInsetClass,
-        hasComposeUi || isWideKalshiCompose
+        hasComposeUi || isWideHistoricalCompose
           ? "min-h-0 justify-start py-4 sm:py-5"
           : "min-h-0 justify-start pb-10 pt-16 sm:pb-12 sm:pt-20 md:pt-24",
         className,
@@ -885,13 +891,13 @@ export function ConnectHomeIntegrationWorkflow({ integrationId, className }) {
       <div
         className={cn(
           "mx-auto w-full",
-          isWideKalshiCompose ? "max-w-6xl" : "max-w-2xl",
+          isWideHistoricalCompose ? "max-w-6xl" : "max-w-2xl",
         )}
       >
         <IntegrationWorkflowHeader
-          name={isWideKalshiCompose ? undefined : name}
-          description={isWideKalshiCompose ? undefined : description}
-          compact={hasComposeUi || isWideKalshiCompose}
+          name={isWideHistoricalCompose ? undefined : name}
+          description={isWideHistoricalCompose ? undefined : description}
+          compact={hasComposeUi || isWideHistoricalCompose}
           onGoBack={handleGoBack}
         />
 
@@ -925,7 +931,13 @@ export function ConnectHomeIntegrationWorkflow({ integrationId, className }) {
           </div>
         ) : null}
 
-        {isDataLake && lakeConfig && !isKalshiHistorical ? (
+        {isPolymarketHistorical ? (
+          <div className="mt-4 sm:mt-5">
+            <HubPolymarketQueryBuilder connectHome stepBackRef={stepBackRef} />
+          </div>
+        ) : null}
+
+        {isDataLake && lakeConfig && !isKalshiHistorical && !isPolymarketHistorical ? (
           <DataLakeSourceCards
             lakeConfig={lakeConfig}
             selectedSampleId={connectDataLakeSampleId}

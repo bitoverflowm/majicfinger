@@ -71,6 +71,7 @@ import {
  *   onComposeChange?: (snapshot: Record<string, unknown>) => void;
  *   composeSeed?: Record<string, unknown> | null;
  *   panelClassName?: string;
+ *   standaloneWorkspaceId?: string;
  * }} [props]
  */
 export function ConnectComposeOperationPanel({
@@ -84,6 +85,7 @@ export function ConnectComposeOperationPanel({
   onComposeChange,
   composeSeed,
   panelClassName,
+  standaloneWorkspaceId,
 }) {
   const ctx = useMyStateV2() ?? {};
   const isDemo = standalone ? false : !!ctx.isDemo;
@@ -133,7 +135,7 @@ export function ConnectComposeOperationPanel({
     setComposeJoins,
   } = compose;
 
-  const workspaceId = standalone ? "kalshiHistorical" : connectWorkspace;
+  const workspaceId = standalone ? (standaloneWorkspaceId ?? "kalshiHistorical") : connectWorkspace;
   const lakeConfig = getConnectDataLakeConfig(workspaceId);
   const sampleById = useMemo(
     () => Object.fromEntries((lakeConfig?.sampleOptions || []).map((s) => [s.id, s])),

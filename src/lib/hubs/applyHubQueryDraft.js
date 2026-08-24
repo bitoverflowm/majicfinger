@@ -41,10 +41,13 @@ export function applyHubQueryDraft(ctx, draft, options = {}) {
   const columnSelections = draft.columnSelections || {};
   const whereFilters = normalizeHubQueryWhereFilters(draft.whereFilters);
 
+  const integrationId =
+    options.integrationId || draft.integrationId || "kalshiHistorical";
+
   flushSync(() => {
     ctx.setViewing?.("connectDataHome");
-    ctx.setConnectWorkspace?.("kalshiHistorical");
-    ctx.setIntegrationSidebar?.("kalshiHistorical");
+    ctx.setConnectWorkspace?.(integrationId);
+    ctx.setIntegrationSidebar?.(integrationId);
     if (guidedInlinePull) {
       ctx.setConnectHomeAnalyzeActive?.(true);
       ctx.setGuidedWorkflowPullRequested?.(true);
