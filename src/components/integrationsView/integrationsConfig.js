@@ -79,7 +79,7 @@ export const integrations_list = [
     ),
     clickHandler: "kalshiHistorical",
     name: "Kalshi Historical",
-    description: "Access and analyze Kalshi historical data — download order book and trade history for backtesting and real-time trading dashboards.",
+    description: "Access and analyze Kalshi historical data — download market and trade history for backtesting, historical research and trading dashboards.",
     listCaption: "Deep historical data: Kalshi Launch - Dec 2025",
     guide: {
       href: "/guides/kalshi-historical-data",
