@@ -198,6 +198,32 @@ function HubHeroBadge({
 
 function HubHero({ section }: { section: HubHeroSection }) {
   const isPremium = section.variant === "premium";
+  const hasHeroVisual = Boolean(section.heroLiveChart || section.heroChart);
+
+  const heroVisual = section.heroLiveChart ? (
+    <div className="w-full lg:-mr-4 lg:-mt-12 lg:self-start">
+      {section.heroLiveChart.source === "polymarket" ? (
+        <HubPolymarketLiveHeroTradesChartLazy copy={section.heroLiveChart} />
+      ) : (
+        <HubKalshiLiveHeroTradesChartLazy copy={section.heroLiveChart} />
+      )}
+    </div>
+  ) : section.heroChart ? (
+    <div className="w-full lg:-mr-4 lg:-mt-12 lg:self-start">
+      <HubHeroChartEmbedLazy
+        username={section.heroChart.username}
+        slug={section.heroChart.slug}
+        variant="hero"
+        heroCopy={{
+          eyebrow: section.heroChart.eyebrow,
+          title: section.heroChart.title,
+          subtitle: section.heroChart.subtitle,
+          caption: section.heroChart.caption,
+          captionLink: section.heroChart.captionLink,
+        }}
+      />
+    </div>
+  ) : null;
 
   if (isPremium) {
     return (
@@ -207,8 +233,22 @@ function HubHero({ section }: { section: HubHeroSection }) {
           className="hub-hero-aura-gradient pointer-events-none absolute inset-0 z-0 w-full"
         />
         <div className="relative z-10 w-full px-6 pb-16 pt-[6.8rem] md:pb-20 md:pt-[8.5rem]">
-          <div className="mx-auto grid w-full max-w-6xl items-start gap-10 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.12fr)] lg:gap-14">
-            <div className="flex flex-col items-start gap-5 px-4 text-left sm:px-6 md:gap-6 lg:pl-2 lg:pr-0 lg:pt-2">
+          <div
+            className={cn(
+              "mx-auto grid w-full max-w-6xl items-start gap-10",
+              hasHeroVisual
+                ? "lg:grid-cols-[minmax(0,1fr)_minmax(0,1.12fr)] lg:gap-14"
+                : "justify-items-center",
+            )}
+          >
+            <div
+              className={cn(
+                "flex flex-col gap-5 px-4 sm:px-6 md:gap-6 lg:pt-2",
+                hasHeroVisual
+                  ? "items-start text-left lg:pl-2 lg:pr-0"
+                  : "mx-auto max-w-3xl items-center text-center lg:px-2",
+              )}
+            >
               {section.badge ? (
                 <HubHeroBadge
                   badge={section.badge}
@@ -224,26 +264,49 @@ function HubHero({ section }: { section: HubHeroSection }) {
               <h1 className="text-balance text-4xl font-semibold leading-[1.08] tracking-tight text-primary md:text-5xl lg:text-[3.25rem]">
                 {section.title}
               </h1>
-              <p className="max-w-xl text-balance text-2xl font-semibold leading-snug tracking-tight text-foreground md:text-[1.65rem]">
+              <p
+                className={cn(
+                  "text-balance text-2xl font-semibold leading-snug tracking-tight text-foreground md:text-[1.65rem]",
+                  hasHeroVisual ? "max-w-xl" : "max-w-2xl",
+                )}
+              >
                 {section.subtitle}
               </p>
               {section.heroBody ? (
-                <HubHeroBody parts={section.heroBody.parts} />
+                <HubHeroBody
+                  parts={section.heroBody.parts}
+                  className={cn(!hasHeroVisual && "mx-auto max-w-2xl text-center")}
+                />
               ) : (
                 <>
                   {section.microtext ? (
-                    <p className="max-w-xl text-pretty text-base leading-relaxed text-muted-foreground">
+                    <p
+                      className={cn(
+                        "text-pretty text-base leading-relaxed text-muted-foreground",
+                        hasHeroVisual ? "max-w-xl" : "max-w-2xl",
+                      )}
+                    >
                       {section.microtext}
                     </p>
                   ) : null}
                   {section.supportingText ? (
-                    <p className="max-w-xl text-pretty text-base leading-relaxed text-muted-foreground">
+                    <p
+                      className={cn(
+                        "text-pretty text-base leading-relaxed text-muted-foreground",
+                        hasHeroVisual ? "max-w-xl" : "max-w-2xl",
+                      )}
+                    >
                       {section.supportingText}
                     </p>
                   ) : null}
                 </>
               )}
-              <div className="flex flex-wrap items-center gap-3 pt-1">
+              <div
+                className={cn(
+                  "flex flex-wrap items-center gap-3 pt-1",
+                  !hasHeroVisual && "justify-center",
+                )}
+              >
                 {section.primaryCTAs.map((cta) => (
                   <HubCtaButton key={cta.href} cta={cta} variant="primary" />
                 ))}
@@ -253,35 +316,7 @@ function HubHero({ section }: { section: HubHeroSection }) {
               </div>
             </div>
 
-            {section.heroLiveChart ? (
-              <div className="w-full lg:-mr-4 lg:-mt-12 lg:self-start">
-                {section.heroLiveChart.source === "polymarket" ? (
-                  <HubPolymarketLiveHeroTradesChartLazy copy={section.heroLiveChart} />
-                ) : (
-                  <HubKalshiLiveHeroTradesChartLazy copy={section.heroLiveChart} />
-                )}
-              </div>
-            ) : section.heroChart ? (
-              <div className="w-full lg:-mr-4 lg:-mt-12 lg:self-start">
-                <HubHeroChartEmbedLazy
-                  username={section.heroChart.username}
-                  slug={section.heroChart.slug}
-                  variant="hero"
-                  heroCopy={{
-                    eyebrow: section.heroChart.eyebrow,
-                    title: section.heroChart.title,
-                    subtitle: section.heroChart.subtitle,
-                    caption: section.heroChart.caption,
-                    captionLink: section.heroChart.captionLink,
-                  }}
-                />
-              </div>
-            ) : (
-              <div
-                aria-hidden
-                className="min-h-[280px] w-full rounded-2xl border border-border/60 bg-background shadow-sm sm:min-h-[320px] lg:min-h-[380px]"
-              />
-            )}
+            {heroVisual}
           </div>
 
           {section.capabilityPills?.length ? (

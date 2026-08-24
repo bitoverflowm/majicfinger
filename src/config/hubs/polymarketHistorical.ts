@@ -310,13 +310,13 @@ export const polymarketHistoricalHub: HubPageConfig = {
       ],
       cta: {
         label: "Open the Full Historical Workspace",
-        href: "/#demo",
-        ariaLabel: "Open the full Polymarket Historical workspace",
+        href: "#pricing",
+        ariaLabel: "Open the full Polymarket Historical workspace — view pricing",
         requiresAuth: false,
         eventLabel: "polymarket_historical_full_workspace",
         tracking: {
           page: "/polymarket-historical-data",
-          destination: "full workspace / demo",
+          destination: "pricing",
         },
       },
     },
