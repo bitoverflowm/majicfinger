@@ -17,7 +17,7 @@ export function ConnectProgressWithLabel({ label, progress, className }) {
           htmlFor={id}
           className="!flex w-full min-w-0 max-w-full flex-col items-stretch gap-1 sm:flex-row sm:flex-wrap sm:items-baseline sm:justify-between sm:gap-x-2 sm:gap-y-1"
         >
-          <span className="min-w-0 max-w-full whitespace-normal break-words text-left text-xs font-medium leading-snug">
+          <span className="min-w-0 max-w-full whitespace-normal break-words text-left text-xs font-medium leading-snug text-foreground">
             {label}
           </span>
           <span className="shrink-0 tabular-nums text-xs text-muted-foreground sm:ml-auto">{Math.round(pct)}%</span>

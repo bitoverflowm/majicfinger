@@ -10,6 +10,9 @@ import { rawAthenaRowsSliceToObjects } from "@/lib/dataLake/largeAthenaPull";
 const JSON_INITIAL_ROWS = 40;
 const JSON_CHUNK_ROWS = 160;
 
+const panelShellClass =
+  "space-y-3 rounded-lg border border-border/70 bg-muted/20 p-3 text-foreground";
+
 /**
  * Large Athena pull: paginated raw JSON browse + table-prepare progress.
  *
@@ -86,9 +89,9 @@ export function LargeAthenaPullPanel({
 
   if (isDownloading) {
     return (
-      <div className={`space-y-3 rounded-lg border border-border/70 bg-muted/20 p-3 ${className}`}>
+      <div className={`${panelShellClass} ${className}`}>
         <div className="space-y-0.5">
-          <p className="text-sm font-medium">
+          <p className="text-sm font-medium text-foreground">
             Large result expected
             {rowCount > 0 ? ` — up to ${rowCount.toLocaleString()} rows` : ""}
           </p>
@@ -106,10 +109,10 @@ export function LargeAthenaPullPanel({
   }
 
   return (
-    <div className={`space-y-3 rounded-lg border border-border/70 bg-muted/20 p-3 ${className}`}>
+    <div className={`${panelShellClass} ${className}`}>
       <div className="flex flex-wrap items-start justify-between gap-2">
         <div className="space-y-0.5 min-w-0">
-          <p className="text-sm font-medium">Large result — {total.toLocaleString()} rows</p>
+          <p className="text-sm font-medium text-foreground">Large result — {total.toLocaleString()} rows</p>
           <p className="text-[11px] text-muted-foreground leading-snug">
             {tableReady
               ? "Data table is ready. Browse JSON below or open the spreadsheet view."
@@ -176,7 +179,7 @@ export function LargeAthenaPullPanel({
 
       {hasRawRows ? (
       <pre
-        className="max-h-[min(42dvh,360px)] overflow-auto rounded-md border border-border/60 bg-background/80 p-3 text-[11px] leading-snug font-mono whitespace-pre break-words"
+        className="max-h-[min(42dvh,360px)] overflow-auto rounded-md border border-border/60 bg-background/80 p-3 text-[11px] leading-snug font-mono text-foreground whitespace-pre break-words"
         onScroll={handleScroll}
       >
         {`[\n`}
