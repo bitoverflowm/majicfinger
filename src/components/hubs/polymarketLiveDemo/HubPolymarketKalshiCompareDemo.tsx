@@ -2,16 +2,25 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
-import { Loader2, Search } from "lucide-react";
+import { Loader2, RefreshCw, Search } from "lucide-react";
 
-import { HubInPageLink } from "@/components/hubs/HubCtaButton";
+import { PolymarketLiveSearch } from "@/components/connectData/polymarketLive/PolymarketLiveSearch";
+import { MarketTickerSearch } from "@/components/connectData/MarketTickerSearch";
 import { HubKalshiLiveDemoTradesLiveline } from "@/components/hubs/kalshiLiveDemo/HubKalshiLiveDemoTradesLiveline";
 import {
   defaultSeriesColorToken,
   resolveDemoChartColor,
 } from "@/components/hubs/kalshiLiveDemo/demoChartColors";
-import { useHubPolymarketLiveDemo } from "@/components/hubs/polymarketLiveDemo/HubPolymarketLiveDemoSelection";
-import { MarketTickerSearch } from "@/components/connectData/MarketTickerSearch";
+import {
+  featuredPolymarketMarketToDemoMarket,
+  useHubPolymarketLiveDemo,
+  type HubPolymarketLiveDemoMarket,
+} from "@/components/hubs/polymarketLiveDemo/HubPolymarketLiveDemoSelection";
+import {
+  polymarketRealtimeMarketFromSuggestion,
+  polymarketRealtimeMarketKey,
+  polymarketRealtimeMarketsFromEventSuggestion,
+} from "@/lib/polymarketLive/polymarketRealtimeCompose";
 import { Button } from "@/components/ui/button";
 import { fetchKalshiLiveMarket } from "@/lib/kalshiLive/fetchKalshiLiveMarket";
 import { impliedChancePctFromMarketRow } from "@/lib/kalshiLive/eventCandlesticksPowerMove";
@@ -23,11 +32,88 @@ import {
   polymarketOutcomeShape,
 } from "@/lib/predictionMarkets/matchPolymarketToKalshiLive";
 import { trackPolymarketLiveHubEvent } from "@/lib/analytics/polymarketLiveHubEvents";
+import { formatPolymarketVolume } from "@/lib/polymarketLive/polymarketPublicSearch";
 import { cn } from "@/lib/utils";
+
+const COMPARE_FEATURED_LIMIT = 5;
+
+type CompareFeaturedCard = {
+  id: string;
+  slug?: string;
+  conditionId: string;
+  title: string;
+  volume24h: number | null;
+  featured?: boolean;
+  imageUrl?: string;
+  tags?: string[];
+  eventTitle?: string;
+  outcomes: { tokenId: string; outcome: string; lastPrice: number | null }[];
+};
+
+function compareFeaturedKey(market: CompareFeaturedCard) {
+  return String(market.conditionId || market.id || market.slug || "").trim();
+}
+
+function formatCompareFeaturedPrice(value: number | null | undefined) {
+  if (value == null || !Number.isFinite(value)) return "—";
+  return `${Math.round(value * 100)}¢`;
+}
+
+function shuffleCompareFeatured<T>(items: T[], count: number): T[] {
+  const copy = [...items];
+  for (let i = copy.length - 1; i > 0; i -= 1) {
+    const j = Math.floor(Math.random() * (i + 1));
+    const current = copy[i]!;
+    copy[i] = copy[j]!;
+    copy[j] = current;
+  }
+  return copy.slice(0, count);
+}
+
+function normalizeCompareFeaturedCard(raw: unknown): CompareFeaturedCard | null {
+  if (!raw || typeof raw !== "object") return null;
+  const row = raw as Record<string, unknown>;
+  const outcomesRaw = Array.isArray(row.outcomes) ? row.outcomes : [];
+  const outcomes = outcomesRaw
+    .map((item) => {
+      if (!item || typeof item !== "object") return null;
+      const outcome = item as Record<string, unknown>;
+      const tokenId = String(outcome.tokenId || "").trim();
+      if (!tokenId) return null;
+      return {
+        tokenId,
+        outcome: String(outcome.outcome || "").trim() || "Outcome",
+        lastPrice:
+          outcome.lastPrice != null && Number.isFinite(Number(outcome.lastPrice))
+            ? Number(outcome.lastPrice)
+            : null,
+      };
+    })
+    .filter(Boolean) as CompareFeaturedCard["outcomes"];
+  const id = String(row.id || row.conditionId || row.slug || "").trim();
+  const title = String(row.title || "").trim() || id;
+  if (!id || !title || outcomes.length < 1) return null;
+  return {
+    id,
+    slug: String(row.slug || "").trim() || undefined,
+    conditionId: String(row.conditionId || id).trim(),
+    title,
+    volume24h:
+      row.volume24h != null && Number.isFinite(Number(row.volume24h))
+        ? Number(row.volume24h)
+        : null,
+    featured: row.featured === true,
+    imageUrl: String(row.imageUrl || "").trim() || undefined,
+    tags: Array.isArray(row.tags)
+      ? row.tags.map((tag) => String(tag).trim()).filter(Boolean).slice(0, 4)
+      : [],
+    eventTitle: String(row.eventTitle || "").trim() || undefined,
+    outcomes,
+  };
+}
 
 type IntervalId = "15m" | "1h" | "6h" | "1d" | "all";
 
-const SEARCH_HREF = "#find-polymarket-markets";
 /** Kalshi brand-forward green for the comparison line. */
 const KALSHI_LINE_GREEN = "#22c55e";
 const INTERVALS: { id: IntervalId; label: string; ms: number | null }[] = [
@@ -169,6 +255,343 @@ async function fetchKalshiTrades(
   return (Array.isArray(body?.trades) ? body.trades : []).filter(
     (row: unknown) => row && typeof row === "object",
   ) as Record<string, unknown>[];
+}
+
+
+function ComparePolymarketMarketSearch() {
+  const selection = useHubPolymarketLiveDemo();
+  const selectMarket = selection?.selectMarket;
+  const [error, setError] = useState("");
+  const [eventTitle, setEventTitle] = useState("");
+  const [eventMarkets, setEventMarkets] = useState<HubPolymarketLiveDemoMarket[] | null>(
+    null,
+  );
+  const [featured, setFeatured] = useState<CompareFeaturedCard[]>([]);
+  const [featuredLoading, setFeaturedLoading] = useState(true);
+  const [featuredRefreshing, setFeaturedRefreshing] = useState(false);
+  const [featuredError, setFeaturedError] = useState<string | null>(null);
+
+  const loadFeatured = useCallback(async (opts?: { excludeIds?: string[] }) => {
+    const exclude = opts?.excludeIds || [];
+    const refreshing = exclude.length > 0;
+    if (refreshing) setFeaturedRefreshing(true);
+    else setFeaturedLoading(true);
+    setFeaturedError(null);
+    try {
+      const params = new URLSearchParams({ limit: "8" });
+      if (exclude.length) params.set("exclude", exclude.join(","));
+      const res = await fetch(
+        `/api/integrations/polymarket-live/markets/featured?${params.toString()}`,
+        { credentials: "same-origin", headers: { Accept: "application/json" } },
+      );
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(
+          typeof body?.error === "string" ? body.error : "Failed to load featured markets",
+        );
+      }
+      const parsed = (Array.isArray(body?.markets) ? body.markets : [])
+        .map(normalizeCompareFeaturedCard)
+        .filter(Boolean) as CompareFeaturedCard[];
+      setFeatured(shuffleCompareFeatured(parsed, COMPARE_FEATURED_LIMIT));
+    } catch (e) {
+      setFeatured([]);
+      setFeaturedError(e instanceof Error ? e.message : "Failed to load featured markets");
+    } finally {
+      setFeaturedLoading(false);
+      setFeaturedRefreshing(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    void loadFeatured();
+  }, [loadFeatured]);
+
+  const applyMarket = useCallback(
+    (market: HubPolymarketLiveDemoMarket, source: "compare_search" | "compare_featured") => {
+      if (!selectMarket) return;
+      trackPolymarketLiveHubEvent("polymarket_live_market_selected", {
+        source,
+        title: String(market.title || ""),
+        conditionId: String(market.conditionId || market.id || ""),
+      });
+      selectMarket(market);
+      setEventMarkets(null);
+      setEventTitle("");
+      setError("");
+    },
+    [selectMarket],
+  );
+
+  const selectFeatured = useCallback(
+    (card: CompareFeaturedCard) => {
+      const market = featuredPolymarketMarketToDemoMarket(card);
+      if (!market) {
+        setError("That featured market does not expose streamable outcome token IDs.");
+        return;
+      }
+      applyMarket(market, "compare_featured");
+    },
+    [applyMarket],
+  );
+
+  const handleSearchSelection = useCallback(
+    (suggestion: Record<string, unknown>) => {
+      setError("");
+      const entity = String(suggestion?.entity || "");
+      if (entity === "event") {
+        const nested = polymarketRealtimeMarketsFromEventSuggestion(
+          suggestion,
+        ) as HubPolymarketLiveDemoMarket[];
+        if (!nested.length) {
+          setError("That event does not include any streamable markets with outcome token IDs.");
+          return;
+        }
+        if (nested.length === 1) {
+          applyMarket(nested[0]!, "compare_search");
+          return;
+        }
+        setEventTitle(String(suggestion.title || "Select a market in this event"));
+        setEventMarkets(nested);
+        return;
+      }
+      if (entity !== "market") {
+        setError("Pick a market or event to start the comparison.");
+        return;
+      }
+      const market = polymarketRealtimeMarketFromSuggestion(suggestion) as
+        | HubPolymarketLiveDemoMarket
+        | null;
+      if (!market) {
+        setError("That market does not expose streamable outcome token IDs.");
+        return;
+      }
+      applyMarket(market, "compare_search");
+    },
+    [applyMarket],
+  );
+
+  const handleSearchAll = useCallback(
+    (suggestions: Array<Record<string, unknown>>) => {
+      for (const suggestion of suggestions || []) {
+        if (suggestion?.entity === "market") {
+          handleSearchSelection(suggestion);
+          return;
+        }
+      }
+      for (const suggestion of suggestions || []) {
+        if (suggestion?.entity === "event") {
+          handleSearchSelection(suggestion);
+          return;
+        }
+      }
+      setError("No comparable Polymarket markets found for that search.");
+    },
+    [handleSearchSelection],
+  );
+
+  return (
+    <div className="space-y-3 text-left">
+      <div className="space-y-1 text-center">
+        <p className="text-sm font-medium text-foreground">
+          Find a Polymarket market to compare with Kalshi Live
+        </p>
+        <p className="text-sm text-muted-foreground">
+          Search in plain English, then we&apos;ll match it against Kalshi.
+        </p>
+      </div>
+      <PolymarketLiveSearch
+        layout="panel"
+        dismissAfterSelect
+        searchTags
+        searchProfiles={false}
+        keepClosedMarkets={false}
+        limitPerType={50}
+        resultsClassName="max-h-56 flex-none"
+        placeholder="Search Polymarket markets in plain English…"
+        onSelect={handleSearchSelection}
+        onSubmitAll={handleSearchAll}
+        onFocus={() => {
+          trackPolymarketLiveHubEvent("polymarket_live_market_search_start", {
+            source: "compare_demo",
+          });
+        }}
+      />
+      <div className="space-y-2">
+        <p className="text-sm leading-relaxed text-muted-foreground text-pretty">
+          Or try one of these trending live markets
+        </p>
+        <div className="overflow-hidden rounded-xl border border-border/70 bg-muted/20">
+          <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border/60 px-3 py-2">
+            <p className="text-xs font-medium text-muted-foreground">Featured live markets</p>
+            {featuredLoading ? (
+              <span className="inline-flex items-center gap-1.5 text-xs text-muted-foreground">
+                <Loader2 className="size-3.5 animate-spin" aria-hidden />
+                Loading…
+              </span>
+            ) : featured.length ? (
+              <span className="inline-flex items-center gap-1.5 text-xs text-muted-foreground">
+                <span>
+                  {featured.length} market{featured.length === 1 ? "" : "s"}
+                </span>
+                <button
+                  type="button"
+                  onClick={() =>
+                    void loadFeatured({
+                      excludeIds: featured.map((item) => compareFeaturedKey(item)),
+                    })
+                  }
+                  disabled={featuredLoading || featuredRefreshing}
+                  className="inline-flex size-6 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:opacity-50"
+                  aria-label="Show different featured live markets"
+                  title="Show different featured live markets"
+                >
+                  <RefreshCw
+                    className={cn("size-3.5", featuredRefreshing && "animate-spin")}
+                    aria-hidden
+                  />
+                </button>
+              </span>
+            ) : (
+              <button
+                type="button"
+                onClick={() => void loadFeatured()}
+                disabled={featuredLoading}
+                className="inline-flex size-6 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:opacity-50"
+                aria-label="Refresh featured live markets"
+              >
+                <RefreshCw className="size-3.5" aria-hidden />
+              </button>
+            )}
+          </div>
+
+          {featuredLoading ? (
+            <div className="space-y-2 p-3" aria-hidden>
+              {Array.from({ length: COMPARE_FEATURED_LIMIT }).map((_, index) => (
+                <div
+                  key={index}
+                  className="flex animate-pulse gap-3 rounded-xl border border-border/60 bg-background/80 p-3"
+                >
+                  <div className="size-12 shrink-0 rounded-lg bg-muted" />
+                  <div className="min-w-0 flex-1 space-y-2 py-0.5">
+                    <div className="h-3.5 w-3/4 rounded bg-muted" />
+                    <div className="h-3 w-1/2 rounded bg-muted" />
+                    <div className="h-3 w-2/5 rounded bg-muted" />
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : featuredError ? (
+            <p className="px-3 py-4 text-sm text-destructive">{featuredError}</p>
+          ) : !featured.length ? (
+            <p className="px-3 py-8 text-center text-sm text-muted-foreground">
+              No featured markets available right now. Try searching above.
+            </p>
+          ) : (
+            <ul className="space-y-2 p-3">
+              {featured.map((market) => {
+                const yes = market.outcomes[0];
+                return (
+                  <li key={compareFeaturedKey(market)}>
+                    <button
+                      type="button"
+                      onClick={() => selectFeatured(market)}
+                      className="flex w-full items-start gap-3 rounded-xl border border-border/70 bg-background p-3 text-left shadow-sm transition-colors hover:border-border hover:bg-muted/30"
+                    >
+                      <div className="relative size-12 shrink-0 overflow-hidden rounded-lg border border-border/60 bg-black">
+                        {market.imageUrl ? (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img
+                            src={market.imageUrl}
+                            alt=""
+                            className="size-full object-cover"
+                            loading="lazy"
+                          />
+                        ) : (
+                          <div className="flex size-full items-center justify-center text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+                            PM
+                          </div>
+                        )}
+                      </div>
+                      <div className="min-w-0 flex-1 space-y-1.5">
+                        <div className="flex items-start justify-between gap-2">
+                          <p className="text-sm font-medium leading-snug text-foreground text-pretty">
+                            {market.title}
+                          </p>
+                          <span className="inline-flex shrink-0 items-center gap-1.5 text-[10px] font-medium text-muted-foreground">
+                            <span className="size-2 animate-pulse rounded-full bg-green-500" aria-hidden />
+                            Live
+                          </span>
+                        </div>
+                        {market.eventTitle ? (
+                          <p className="truncate text-[11px] text-muted-foreground">
+                            {market.eventTitle}
+                          </p>
+                        ) : null}
+                        {market.tags?.length ? (
+                          <div className="flex flex-wrap gap-1">
+                            {market.featured ? (
+                              <span className="rounded bg-amber-500/15 px-1.5 py-0.5 text-[0.65rem] font-medium text-amber-900 ring-1 ring-amber-600/25 dark:text-amber-100">
+                                Featured
+                              </span>
+                            ) : null}
+                            {market.tags.map((tag) => (
+                              <span
+                                key={tag}
+                                className="rounded bg-muted/80 px-1.5 py-0.5 text-[0.65rem] font-medium text-muted-foreground ring-1 ring-border/50"
+                              >
+                                {tag}
+                              </span>
+                            ))}
+                          </div>
+                        ) : null}
+                        <div className="flex flex-wrap gap-x-3 gap-y-1 text-[11px] text-muted-foreground">
+                          <span>
+                            {yes?.outcome || "Yes"}{" "}
+                            <span className="font-medium text-foreground">
+                              {formatCompareFeaturedPrice(yes?.lastPrice)}
+                            </span>
+                          </span>
+                          <span>
+                            24h vol{" "}
+                            <span className="font-medium text-foreground">
+                              {formatPolymarketVolume(market.volume24h) || "—"}
+                            </span>
+                          </span>
+                        </div>
+                      </div>
+                    </button>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+        </div>
+      </div>
+      {error ? <p className="text-center text-sm text-destructive">{error}</p> : null}
+      {eventMarkets?.length ? (
+        <div className="space-y-2 rounded-lg border border-border/60 bg-background/80 p-3">
+          <p className="text-xs font-medium text-muted-foreground">{eventTitle}</p>
+          <ul className="grid gap-1.5">
+            {eventMarkets.slice(0, 8).map((market) => {
+              const key = polymarketRealtimeMarketKey(market);
+              return (
+                <li key={key}>
+                  <button
+                    type="button"
+                    className="w-full rounded-md border border-border/60 bg-muted/20 px-3 py-2 text-left text-sm text-foreground transition-colors hover:bg-muted/40"
+                    onClick={() => applyMarket(market, "compare_search")}
+                  >
+                    {String(market.title || market.slug || "Market")}
+                  </button>
+                </li>
+              );
+            })}
+          </ul>
+        </div>
+      ) : null}
+    </div>
+  );
 }
 
 export function HubPolymarketKalshiCompareDemo() {
@@ -468,16 +891,8 @@ export function HubPolymarketKalshiCompareDemo() {
   return (
     <div ref={rootRef} className="space-y-5">
       {!polyMarket ? (
-        <div className="rounded-xl border border-border/70 bg-muted/15 px-4 py-8 text-center">
-          <p className="text-sm text-muted-foreground">
-            Select a Polymarket market above to compare it with Kalshi Live.
-          </p>
-          <HubInPageLink
-            href={SEARCH_HREF}
-            className="mt-2 inline-block text-sm font-medium text-foreground underline underline-offset-4"
-          >
-            Find a market
-          </HubInPageLink>
+        <div className="rounded-xl border border-border/70 bg-muted/15 px-4 py-5 sm:px-5 sm:py-6">
+          <ComparePolymarketMarketSearch />
         </div>
       ) : (
         <>
