@@ -1,12 +1,14 @@
 "use client";
 
 import { useCallback, useMemo, useRef, useState } from "react";
-import { ChevronDown, ChevronRight, History, RotateCcw } from "lucide-react";
+import { ChevronDown, ChevronRight, History, Play, RotateCcw } from "lucide-react";
 import { toast } from "sonner";
 
 import { ConnectHomeReplaySheetDialog } from "@/components/connectData/ConnectHomeReplaySheetDialog";
+import { integrations_list } from "@/components/integrationsView/integrationsConfig";
 import { Button } from "@/components/ui/button";
 import { useMyStateV2 } from "@/context/stateContextV2";
+import { CONNECT_HOME_CENTER_VIEW } from "@/lib/connectHomeFlow";
 import { collectRequestCardEntries, fmtRequestElapsed } from "@/lib/connectHomeRequestCards";
 import { formatConnectRequestCardQuery } from "@/lib/connectHomeRequestQuery";
 import {
@@ -16,10 +18,18 @@ import {
   listConnectHomeSheetHistory,
   requestCardSummaryLabel,
 } from "@/lib/connectHomeRequestHistory";
+import { isConnectIntegrationWorkspace } from "@/lib/connectHomeWorkspace";
 import { describePolymarketLiveRequestCard } from "@/lib/polymarketLive/polymarketLiveRequestHistory";
 import { rehydrateSheetFromProvenance } from "@/lib/rehydrateSheetFromProvenance";
 import { resolvePersistedFullRowCount } from "@/lib/projectPersistence";
 import { cn } from "@/lib/utils";
+
+function integrationDisplayName(integrationId) {
+  const id = String(integrationId || "").trim();
+  if (!id) return "";
+  const row = integrations_list.find((i) => i.clickHandler === id);
+  return row?.name || id;
+}
 
 function startReplayPullProgress(setConnectDataLakePullState) {
   setConnectDataLakePullState?.({
@@ -156,10 +166,32 @@ export function ConnectHomeRequestHistory({ className }) {
   const requestConnectAnalyzeScroll = ctx.requestConnectAnalyzeScroll;
   const setConnectDataLakePullState = ctx.setConnectDataLakePullState;
   const pull = ctx.connectDataLakePullState ?? {};
+  const connectWorkspace = ctx.connectWorkspace;
+  const integrationSidebar = ctx.integrationSidebar;
+  const setIntegrationSidebar = ctx.setIntegrationSidebar;
+  const setRightPanelTab = ctx.setRightPanelTab;
+  const setRightPanelOpen = ctx.setRightPanelOpen;
+  const setConnectHomeAnalyzeActive = ctx.setConnectHomeAnalyzeActive;
+  const setConnectHomeCenterView = ctx.setConnectHomeCenterView;
+  const setConnectHomePullDestination = ctx.setConnectHomePullDestination;
+  const requestConnectComposeScroll = ctx.requestConnectComposeScroll;
+  const requestConnectWorkspace = ctx.requestConnectWorkspace;
+  const setViewing = ctx.setViewing;
 
   const sheetHistory = useMemo(() => listConnectHomeSheetHistory(dataSheets), [dataSheets]);
   const cardEntries = useMemo(() => collectRequestCardEntries(dataSheets), [dataSheets]);
   const forkContext = useMemo(() => describeForkProject(loadedDataMeta), [loadedDataMeta]);
+
+  const currentIntegrationId = useMemo(() => {
+    if (isConnectIntegrationWorkspace(connectWorkspace)) return connectWorkspace;
+    if (integrationSidebar) return String(integrationSidebar);
+    return "";
+  }, [connectWorkspace, integrationSidebar]);
+
+  const currentIntegrationName = useMemo(
+    () => integrationDisplayName(currentIntegrationId),
+    [currentIntegrationId],
+  );
 
   const [replayOpen, setReplayOpen] = useState(false);
   const [replaySourceSheetId, setReplaySourceSheetId] = useState(null);
@@ -191,6 +223,42 @@ export function ConnectHomeRequestHistory({ className }) {
     },
     [dataSheets],
   );
+
+  const runAnotherIntegrationRequest = useCallback(() => {
+    if (!currentIntegrationId) return;
+
+    setIntegrationSidebar?.(currentIntegrationId);
+    setConnectHomeCenterView?.(CONNECT_HOME_CENTER_VIEW.SHEET);
+    setConnectHomePullDestination?.("new_sheet");
+
+    const onSameConnectIntegration =
+      isConnectIntegrationWorkspace(connectWorkspace) &&
+      connectWorkspace === currentIntegrationId;
+
+    if (onSameConnectIntegration) {
+      // Return to compose for this integration; keep filters so the user can tweak and re-run.
+      setConnectHomeAnalyzeActive?.(false);
+      requestConnectComposeScroll?.();
+    } else if (isConnectIntegrationWorkspace(currentIntegrationId)) {
+      requestConnectWorkspace?.(currentIntegrationId, { scroll: true });
+    } else {
+      setViewing?.("dataStart");
+      setRightPanelTab?.("integrations");
+      setRightPanelOpen?.(true);
+    }
+  }, [
+    connectWorkspace,
+    currentIntegrationId,
+    requestConnectComposeScroll,
+    requestConnectWorkspace,
+    setConnectHomeAnalyzeActive,
+    setConnectHomeCenterView,
+    setConnectHomePullDestination,
+    setIntegrationSidebar,
+    setRightPanelOpen,
+    setRightPanelTab,
+    setViewing,
+  ]);
 
   const runReplay = useCallback(
     async (destination, newSheetName) => {
@@ -352,118 +420,141 @@ export function ConnectHomeRequestHistory({ className }) {
   );
 
   return (
-    <div className={cn("space-y-3 text-sm min-w-0 max-w-full overflow-hidden", className)}>
-      <div>
-        <h3 className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-          <History className="h-3.5 w-3.5 shrink-0" aria-hidden />
-          Request history
-        </h3>
-        <p className="mt-1 text-[11px] leading-snug text-muted-foreground">
-          All sheets and pulls across integrations — Kalshi, Polymarket Live, Polymarket Historical, and
-          more.
-        </p>
-      </div>
-
-      {pull.error ? (
-        <p className="text-[11px] text-destructive" role="alert">
-          {pull.error}
-        </p>
-      ) : null}
-
-      {sheetHistory.length === 0 && cardEntries.length === 0 && !pull.loading ? (
-        <p className="text-[11px] text-muted-foreground">Run a pull to build your request history.</p>
-      ) : null}
-
-      {pull.loading && cardEntries.length === 0 && !pull.error ? (
-        <div className="rounded-lg border border-border/60 bg-slate-100 p-3 dark:bg-slate-800/40">
-          <p className="text-sm font-semibold">Pull in progress</p>
-          <p className="mt-1 text-[11px] text-muted-foreground">{pull.label || "Loading data…"}</p>
+    <div
+      className={cn(
+        "flex h-full min-h-0 w-full min-w-0 max-w-full flex-col text-sm overflow-hidden",
+        className,
+      )}
+    >
+      <div className="min-h-0 flex-1 space-y-3 overflow-auto">
+        <div>
+          <h3 className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+            <History className="h-3.5 w-3.5 shrink-0" aria-hidden />
+            Request history
+          </h3>
+          <p className="mt-1 text-[11px] leading-snug text-muted-foreground">
+            All sheets and pulls across integrations — Kalshi, Polymarket Live, Polymarket Historical, and
+            more.
+          </p>
         </div>
-      ) : null}
 
-      <div className="space-y-3">
-        {sheetHistory.map(({ sheetId, sheet, cards, rowCount }) => {
-          const sheetName = String(sheet?.name || sheetId).trim();
-          const firstCard = cards[0] || null;
-          const live = describePolymarketLiveRequestCard(firstCard, sheet);
-          const integration =
-            live?.integrationLabel ||
-            integrationLabelFromLake(
-              sheet?.provenance?.lake || sheet?.provenance?.source || firstCard?.lake,
-            );
-          const endpointHint = live
-            ? [live.categoryLabel, live.endpointTitle].filter(Boolean).join(" · ")
-            : "";
-          const canReplay = (() => {
-            const prov = sheet?.provenance;
-            if (!prov) return false;
-            const lake = String(prov.lake || prov.source || "").toLowerCase();
-            // Athena / Data Lake compose provenance only — live API pulls are not rehydratable this way.
-            if (lake === "polymarket-live" || lake === "kalshi-live") return false;
-            return true;
-          })();
-          const variationLines = extractSheetVariationLines(sheet?.provenance);
+        {pull.error ? (
+          <p className="text-[11px] text-destructive" role="alert">
+            {pull.error}
+          </p>
+        ) : null}
 
-          return (
-            <div
-              key={sheetId}
-              className="rounded-lg border border-border/60 bg-slate-100 p-3 dark:bg-slate-800/40"
-            >
-              <div className="flex items-start justify-between gap-2">
-                <div className="min-w-0">
-                  <p className="text-sm font-semibold truncate">{sheetName}</p>
-                  {forkContext ? (
-                    <p className="mt-0.5 text-[11px] leading-snug text-primary/90">{forkContext.line}</p>
-                  ) : null}
-                  {endpointHint ? (
-                    <p className="mt-0.5 text-[11px] font-medium leading-snug text-foreground/90">
-                      {endpointHint}
+        {sheetHistory.length === 0 && cardEntries.length === 0 && !pull.loading ? (
+          <p className="text-[11px] text-muted-foreground">Run a pull to build your request history.</p>
+        ) : null}
+
+        {pull.loading && cardEntries.length === 0 && !pull.error ? (
+          <div className="rounded-lg border border-border/60 bg-slate-100 p-3 dark:bg-slate-800/40">
+            <p className="text-sm font-semibold">Pull in progress</p>
+            <p className="mt-1 text-[11px] text-muted-foreground">{pull.label || "Loading data…"}</p>
+          </div>
+        ) : null}
+
+        <div className="space-y-3">
+          {sheetHistory.map(({ sheetId, sheet, cards, rowCount }) => {
+            const sheetName = String(sheet?.name || sheetId).trim();
+            const firstCard = cards[0] || null;
+            const live = describePolymarketLiveRequestCard(firstCard, sheet);
+            const integration =
+              live?.integrationLabel ||
+              integrationLabelFromLake(
+                sheet?.provenance?.lake || sheet?.provenance?.source || firstCard?.lake,
+              );
+            const endpointHint = live
+              ? [live.categoryLabel, live.endpointTitle].filter(Boolean).join(" · ")
+              : "";
+            const canReplay = (() => {
+              const prov = sheet?.provenance;
+              if (!prov) return false;
+              const lake = String(prov.lake || prov.source || "").toLowerCase();
+              // Athena / Data Lake compose provenance only — live API pulls are not rehydratable this way.
+              if (lake === "polymarket-live" || lake === "kalshi-live") return false;
+              return true;
+            })();
+            const variationLines = extractSheetVariationLines(sheet?.provenance);
+
+            return (
+              <div
+                key={sheetId}
+                className="rounded-lg border border-border/60 bg-slate-100 p-3 dark:bg-slate-800/40"
+              >
+                <div className="flex items-start justify-between gap-2">
+                  <div className="min-w-0">
+                    <p className="text-sm font-semibold truncate">{sheetName}</p>
+                    {forkContext ? (
+                      <p className="mt-0.5 text-[11px] leading-snug text-primary/90">{forkContext.line}</p>
+                    ) : null}
+                    {endpointHint ? (
+                      <p className="mt-0.5 text-[11px] font-medium leading-snug text-foreground/90">
+                        {endpointHint}
+                      </p>
+                    ) : null}
+                    {variationLines.map((line) => (
+                      <p
+                        key={`${sheetId}-${line}`}
+                        className="mt-0.5 text-[11px] font-medium leading-snug text-foreground/90"
+                      >
+                        {line}
+                      </p>
+                    ))}
+                    <p className="mt-0.5 text-[11px] text-muted-foreground">
+                      {integration}
+                      {rowCount > 0 ? ` · ${rowCount.toLocaleString()} rows loaded` : " · no rows"}
                     </p>
-                  ) : null}
-                  {variationLines.map((line) => (
-                    <p
-                      key={`${sheetId}-${line}`}
-                      className="mt-0.5 text-[11px] font-medium leading-snug text-foreground/90"
+                  </div>
+                  {canReplay ? (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="h-7 shrink-0 gap-1 px-2 text-[10px]"
+                      disabled={replayBusy}
+                      onClick={() => openReplayDialog(sheetId)}
                     >
-                      {line}
-                    </p>
-                  ))}
-                  <p className="mt-0.5 text-[11px] text-muted-foreground">
-                    {integration}
-                    {rowCount > 0 ? ` · ${rowCount.toLocaleString()} rows loaded` : " · no rows"}
-                  </p>
+                      <RotateCcw className="h-3 w-3" aria-hidden />
+                      Replay
+                    </Button>
+                  ) : null}
                 </div>
-                {canReplay ? (
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    className="h-7 shrink-0 gap-1 px-2 text-[10px]"
-                    disabled={replayBusy}
-                    onClick={() => openReplayDialog(sheetId)}
-                  >
-                    <RotateCcw className="h-3 w-3" aria-hidden />
-                    Replay
-                  </Button>
+
+                {cards.length > 0 ? (
+                  <ul className="mt-2 space-y-1.5 border-t border-border/40 pt-2">
+                    {cards.map((card) => (
+                      <RequestHistoryQueryCard
+                        key={card.id}
+                        card={card}
+                        sheet={sheet}
+                        pull={pull}
+                      />
+                    ))}
+                  </ul>
                 ) : null}
               </div>
-
-              {cards.length > 0 ? (
-                <ul className="mt-2 space-y-1.5 border-t border-border/40 pt-2">
-                  {cards.map((card) => (
-                    <RequestHistoryQueryCard
-                      key={card.id}
-                      card={card}
-                      sheet={sheet}
-                      pull={pull}
-                    />
-                  ))}
-                </ul>
-              ) : null}
-            </div>
-          );
-        })}
+            );
+          })}
+        </div>
       </div>
+
+      {currentIntegrationName ? (
+        <div className="shrink-0 flex justify-end border-t border-border/40 bg-background/80 pt-2 mt-2">
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="h-auto max-w-full justify-end gap-1.5 whitespace-normal px-2.5 py-1.5 text-right text-[11px] leading-snug"
+            disabled={!!pull.loading || replayBusy}
+            onClick={runAnotherIntegrationRequest}
+          >
+            <Play className="h-3 w-3 shrink-0" aria-hidden />
+            <span className="min-w-0">Run another {currentIntegrationName} request</span>
+          </Button>
+        </div>
+      ) : null}
 
       <ConnectHomeReplaySheetDialog
         open={replayOpen}

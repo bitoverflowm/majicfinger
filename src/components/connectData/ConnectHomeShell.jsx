@@ -56,6 +56,7 @@ export default function ConnectHomeShell({ user, userProfileFetchOk, startNew, s
   const guidedWorkflowPull = !!context?.guidedWorkflowPull;
   const connectWorkspace = context?.connectWorkspace;
   const connectWorkspaceScrollTick = context?.connectWorkspaceScrollTick ?? 0;
+  const connectComposeScrollTick = context?.connectComposeScrollTick ?? 0;
   const connectAnalyzeScrollTick = context?.connectAnalyzeScrollTick ?? 0;
   const connectHomeAnalyzeActive = !!context?.connectHomeAnalyzeActive;
   const connectDataLakePullState = context?.connectDataLakePullState ?? {};
@@ -251,6 +252,19 @@ export default function ConnectHomeShell({ user, userProfileFetchOk, startNew, s
     if (!connectWorkspace || !connectWorkspaceScrollTick) return;
     scrollToWorkspace();
   }, [useFixedViewport, connectWorkspace, connectWorkspaceScrollTick, scrollToWorkspace]);
+
+  useLayoutEffect(() => {
+    if (!connectComposeScrollTick) return;
+    // Fixed viewport already shows compose full-screen; only scroll in page layout mode.
+    if (useFixedViewport) return;
+    if (!isConnectIntegrationWorkspace(connectWorkspace) || connectHomeAnalyzeActive) return;
+    scheduleConnectHomeIntegrationActivate(workspaceRef, scrollRef);
+  }, [
+    connectComposeScrollTick,
+    connectWorkspace,
+    connectHomeAnalyzeActive,
+    useFixedViewport,
+  ]);
 
   useLayoutEffect(() => {
     if (useFixedViewport) return;

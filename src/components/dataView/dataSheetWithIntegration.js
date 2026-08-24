@@ -1987,7 +1987,7 @@ export default function DataSheetWithIntegration({
 
                       <TabsContent
                         value="requestHistory"
-                        className="m-0 h-full w-full min-w-0 max-w-full overflow-auto"
+                        className="m-0 flex h-full w-full min-w-0 max-w-full flex-col overflow-hidden"
                       >
                         <ConnectHomeRequestHistory />
                       </TabsContent>
