@@ -319,7 +319,70 @@ export const kalshiHistoricalHub: HubPageConfig = {
     },
 
     {
+      type: "cross_platform_research",
+      anchorId: "prediction-market-data",
+      eyebrow: "EXPAND YOUR RESEARCH",
+      title: "One Workspace Across Four Prediction-Market Data Layers",
+      intro:
+        "Start with Kalshi history, add the current market state, compare related questions across exchanges, or carry the same analysis method into Polymarket.",
+      cards: [
+        {
+          id: "kalshi-historical",
+          title: "Kalshi Historical",
+          description:
+            "Explore Kalshi markets, trades, outcomes, historical order books, and long-range research from launch.",
+          href: "/kalshi-historical-data",
+          youAreHere: true,
+        },
+        {
+          id: "kalshi-live",
+          title: "Kalshi Live",
+          description:
+            "Monitor current Kalshi markets, prices, trades, order books, candlesticks, volume, and open interest.",
+          href: "/kalshi-live-data",
+        },
+        {
+          id: "polymarket-historical",
+          title: "Polymarket Historical",
+          description:
+            "Study every Polymarket market from launch, with historical trades, prices, events, resolutions, exports, and backtesting workflows.",
+          href: "/polymarket-historical-data",
+        },
+        {
+          id: "polymarket-live",
+          title: "Polymarket Live",
+          description:
+            "Follow active Polymarket prices, trades, spreads, order books, candlesticks, holders, and positions.",
+          href: "/polymarket-live-data",
+        },
+      ],
+      compareEyebrow: "COMPARE PREDICTION MARKETS",
+      compareTitle: "Compare the Same Event Across Exchanges",
+      compareIntro:
+        "Move from one exchange to the other without rebuilding the workflow. Compare related probabilities, price paths, volume, and market behavior across Kalshi and Polymarket.",
+      signalsTitle: "Add the Signals Behind the Market",
+      signalsBody:
+        "Bring available Lychee reference and market datasets beside prediction-market probabilities to investigate the information, prices, and real-world signals behind a move.",
+      signalLinks: [
+        { label: "Browse integrations", href: "/#demo" },
+        { label: "CSV exports", href: "/csv-exports" },
+        { label: "Quant analysis", href: "/quant-analysis" },
+      ],
+      cta: {
+        label: "Explore Historical Data",
+        href: "#explore-data",
+        requiresAuth: false,
+      },
+      secondaryCta: {
+        label: "Explore Kalshi Live",
+        href: "/kalshi-live-data",
+        requiresAuth: false,
+      },
+    },
+
+    {
       type: "pricing",
+      anchorId: "pricing",
     },
 
     {

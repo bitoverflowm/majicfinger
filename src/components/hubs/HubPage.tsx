@@ -88,7 +88,10 @@ export function HubPage({ config, slug }: HubPageProps) {
       <HubHashScrollManager />
 
       <main className="flex min-h-screen w-full flex-col items-stretch overflow-x-visible bg-background font-sans antialiased theme-landing scroll-smooth">
-        {config.id === "polymarket-live" ? (
+        {config.id === "polymarket-live" ||
+        config.id === "polymarket-historical" ||
+        config.id === "kalshi-live" ||
+        config.id === "kalshi-historical" ? (
           <HubPolymarketLiveDemoProvider>
             <HubPageSections config={config} slug={slug} />
           </HubPolymarketLiveDemoProvider>

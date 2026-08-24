@@ -163,16 +163,14 @@ export const polymarketHistoricalComparisonTable: HubComparisonTableSection = {
       },
     },
   ],
-  punchline:
-    "Coverage and product capabilities change. Verify current provider documentation before making a purchase or architecture decision. As one public-archive example, the SII-WANGZJ Polymarket dataset currently states that its public CLOB archive begins on November 21, 2022 and excludes the earlier 2020–November 2022 FPMM/AMM era. Sources: docs.polymarket.com (price history, blockchain data), huggingface.co/datasets/SII-WANGZJ/Polymarket_data, dune.com Polymarket and Kalshi overview. Last reviewed August 24, 2026.",
   cta: {
-    label: "Explore Historical Data",
-    href: "#explore-data",
-    ariaLabel: "Explore Polymarket Historical Data",
-    eventLabel: "polymarket_historical_compare_explore",
+    label: "Get Access Now",
+    href: "#pricing",
+    ariaLabel: "Get access to Polymarket Historical Data",
+    eventLabel: "polymarket_historical_compare_pricing",
     tracking: {
       page: "/polymarket-historical-data",
-      destination: "explore-data",
+      destination: "pricing",
     },
   },
 };
