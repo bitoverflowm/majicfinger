@@ -134,8 +134,8 @@ export type HubQuerySection = {
   anchorId?: string;
   title: string;
   description: string;
-  /** Stacked Lychee + Kalshi logos and pill below the section title. */
-  headerBranding?: "kalshi_historical";
+  /** Stacked branding below the section title. */
+  headerBranding?: "kalshi_historical" | "polymarket_historical";
   examplesTitle?: string;
   examples?: string[];
   cta?: HubCta;
@@ -463,6 +463,17 @@ export type HubPageConfig = {
   twitterCard?: "summary" | "summary_large_image" | "app" | "player";
   sections: HubSection[];
   assetFilter?: HubAssetFilter;
+  /**
+   * Optional Dataset JSON-LD for historical/archive hubs.
+   * When set, emitted alongside WebPage / Breadcrumb / FAQ.
+   */
+  datasetSchema?: {
+    name: string;
+    alternateName?: string;
+    description: string;
+    keywords?: string[];
+    variableMeasured?: string[];
+  };
 };
 
 export type HubPublishedChart = {

@@ -478,7 +478,7 @@ export const polymarketLiveHub: HubPageConfig = {
           id: "polymarket-historical",
           title: "Polymarket Historical",
           description:
-            "Study resolved markets, longer price histories and past market behavior for research and backtesting.",
+            "Study every Polymarket market from launch, with historical trades, prices, events, resolutions, exports, and backtesting workflows.",
           href: "/polymarket-historical-data",
         },
         {

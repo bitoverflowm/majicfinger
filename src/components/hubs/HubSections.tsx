@@ -50,6 +50,14 @@ const HubKalshiQueryBuilder = dynamic(
   { ssr: false, loading: () => <div className="h-48 w-full animate-pulse bg-muted/40" /> },
 );
 
+const HubPolymarketQueryBuilder = dynamic(
+  () =>
+    import("@/components/hubs/polymarketQuery/HubPolymarketQueryBuilder").then(
+      (m) => m.HubPolymarketQueryBuilder,
+    ),
+  { ssr: false, loading: () => <div className="h-48 w-full animate-pulse bg-muted/40" /> },
+);
+
 const HubKalshiLiveDemo = dynamic(
   () =>
     import("@/components/hubs/kalshiLiveDemo/HubKalshiLiveDemo").then(
@@ -389,6 +397,7 @@ function HubStats({ section }: { section: HubStatsSection }) {
 }
 
 function HubQuery({ section }: { section: HubQuerySection }) {
+  const isPolymarket = section.headerBranding === "polymarket_historical";
   return (
     <section
       id={section.anchorId}
@@ -413,10 +422,20 @@ function HubQuery({ section }: { section: HubQuerySection }) {
             }
           >
             <HubKalshiQueryMockup>
-              <HubKalshiQueryBuilder mockup />
+              {isPolymarket ? (
+                <HubPolymarketQueryBuilder mockup />
+              ) : (
+                <HubKalshiQueryBuilder mockup />
+              )}
             </HubKalshiQueryMockup>
           </HubLazyWhenVisible>
         </div>
+
+        {section.cta ? (
+          <div className="mx-auto mt-10 flex w-full max-w-3xl justify-center">
+            <HubCtaButton cta={section.cta} />
+          </div>
+        ) : null}
 
         {section.examples && section.examples.length > 0 ? (
         <div className="mx-auto w-full max-w-3xl space-y-4 pt-12">
@@ -450,12 +469,16 @@ function HubInlineCopy({
     <span className={className}>
       {parts.map((part, index) => {
         if (part.type === "link") {
+          const external = /^https?:\/\//i.test(part.href);
           return (
             <Link
               key={`${part.href}-${index}`}
               href={part.href}
               className="font-medium text-foreground underline underline-offset-2 hover:text-primary"
               prefetch={false}
+              {...(external
+                ? { target: "_blank", rel: "noopener noreferrer" }
+                : {})}
             >
               {part.label}
             </Link>
@@ -501,7 +524,7 @@ function HubTextBlock({ section }: { section: HubTextBlockSection }) {
           ))
         )}
         {section.supportingText ? (
-          <p className="text-sm leading-relaxed text-muted-foreground md:text-base text-pretty">
+          <p className="rounded-lg border border-border/60 bg-muted/20 px-4 py-3 text-base font-medium leading-relaxed text-foreground md:text-lg text-pretty">
             {section.supportingText}
           </p>
         ) : null}

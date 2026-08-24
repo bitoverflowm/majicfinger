@@ -33,7 +33,7 @@ export function buildColumnComposeItemsFromSelections(sampleId, columnSelections
  * Hydrate dashboard compose state from a hub query draft and trigger pull.
  * @param {Record<string, unknown>} ctx
  * @param {import("@/lib/hubs/hubQueryDraft").HubQueryDraft} draft
- * @param {{ autoPull?: boolean; guidedInlinePull?: boolean }} [options]
+ * @param {{ autoPull?: boolean; guidedInlinePull?: boolean; integrationId?: string }} [options]
  */
 export function applyHubQueryDraft(ctx, draft, options = {}) {
   const { autoPull = true, guidedInlinePull = false } = options;

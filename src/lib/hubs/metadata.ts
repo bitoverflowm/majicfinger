@@ -178,5 +178,33 @@ export function buildHubJsonLd(config: HubPageConfig) {
     // No aggregateRating / offers — unsupported claims must not be invented.
   };
 
-  return { webPage, breadcrumb, faqPage, softwareApplication };
+  const dataset = config.datasetSchema
+    ? {
+        "@context": "https://schema.org",
+        "@type": "Dataset",
+        "@id": `${url}#dataset`,
+        name: config.datasetSchema.name,
+        ...(config.datasetSchema.alternateName && {
+          alternateName: config.datasetSchema.alternateName,
+        }),
+        description: config.datasetSchema.description,
+        url,
+        creator: {
+          "@type": "Organization",
+          name: "Lychee",
+          url: SITE_URL,
+        },
+        ...(config.datasetSchema.keywords?.length && {
+          keywords: config.datasetSchema.keywords.join(", "),
+        }),
+        ...(config.datasetSchema.variableMeasured?.length && {
+          variableMeasured: config.datasetSchema.variableMeasured,
+        }),
+        ...(config.updatedAt && { dateModified: config.updatedAt }),
+        ...(config.publishedAt &&
+          !config.updatedAt && { dateModified: config.publishedAt }),
+      }
+    : undefined;
+
+  return { webPage, breadcrumb, faqPage, softwareApplication, dataset };
 }

@@ -5,18 +5,24 @@ import { Check, Database, Layers, LineChart, Search, Wand2, Box } from "lucide-r
 
 import { ConnectComposeOperationPanel } from "@/components/connectData/ConnectComposeOperationPanel";
 import { ConnectDataOperationsSection } from "@/components/connectData/ConnectDataOperationsSection";
+import { RunForYourselfAuthModal } from "@/components/runYourself/RunForYourselfAuthModal";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { POLYMARKET_CONNECT_DATA_SOURCES } from "@/config/dataLakeParquetSamples";
+import useSWR from "swr";
+import { userSwrFetcher } from "@/lib/hooks";
 import { useMyStateV2 } from "@/context/stateContextV2";
 import { useDemoProGate } from "@/hooks/useDemoProGate";
 import { getConnectDataLakeConfig } from "@/lib/connectQueryComposeConfig";
 import { applyHubQueryDraft } from "@/lib/hubs/applyHubQueryDraft";
 import {
+  buildHubQueryDashboardUrl,
   hasComposeDraftPayload,
+  navigateToHubQueryDashboard,
   normalizeHubQueryDraft,
   normalizeHubQueryWhereFilters,
+  saveHubQueryDraft,
 } from "@/lib/hubs/hubQueryDraft";
 import {
   getPolymarketColumnDisplayLabel,
@@ -262,14 +268,27 @@ function PolymarketTableNotes({ sampleId }) {
 }
 
 /**
- * Connect home Polymarket Historical — same 3-column starting layout as Kalshi Historical.
+ * Polymarket Historical query builder — Connect home and hub landing mockup.
  * Search and guided workflows are shown but disabled until implemented.
  *
- * @param {{ connectHome?: boolean; stepBackRef?: React.MutableRefObject<(() => boolean) | null> }} props
+ * @param {{
+ *   connectHome?: boolean;
+ *   mockup?: boolean;
+ *   embedded?: boolean;
+ *   stepBackRef?: React.MutableRefObject<(() => boolean) | null>;
+ * }} props
  */
-export function HubPolymarketQueryBuilder({ connectHome = false, stepBackRef }) {
+export function HubPolymarketQueryBuilder({
+  connectHome = false,
+  mockup = false,
+  embedded = false,
+  stepBackRef,
+}) {
+  const { data: user, isLoading: userLoading } = useSWR("/api/user", userSwrFetcher);
+  const isLoggedIn = !!user;
   const connectCtx = useMyStateV2();
   const { requestHistoricalProUpgrade, workspaceWriteLocked, dialog: demoProDialog } = useDemoProGate();
+  const [authOpen, setAuthOpen] = useState(false);
   const [submitBusy, setSubmitBusy] = useState(false);
   const [error, setError] = useState(null);
 
@@ -429,6 +448,24 @@ export function HubPolymarketQueryBuilder({ connectHome = false, stepBackRef }) 
     });
   }, [sampleId, columnSelections, composeDraft, activeComposeOps, sheetName]);
 
+  const continueToDashboard = useCallback(async () => {
+    const draft = buildDraft();
+    if (!draft) {
+      setError("Select a dataset and at least one column.");
+      return;
+    }
+    saveHubQueryDraft(draft);
+    setSubmitBusy(true);
+    setError(null);
+    try {
+      navigateToHubQueryDashboard(buildHubQueryDashboardUrl());
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Something went wrong");
+    } finally {
+      setSubmitBusy(false);
+    }
+  }, [buildDraft]);
+
   const runConnectHomePull = useCallback(
     (draft) => {
       if (!connectCtx) {
@@ -453,20 +490,48 @@ export function HubPolymarketQueryBuilder({ connectHome = false, stepBackRef }) 
   );
 
   const handleSubmit = useCallback(() => {
+    if (!connectHome && userLoading) return;
+
     const draft = buildDraft();
     if (!draft) {
       setError("Select a dataset and at least one column.");
       return;
     }
-    runConnectHomePull(draft);
-  }, [buildDraft, runConnectHomePull]);
 
-  const density = hubEmbedDensity(connectHome);
-  const compact = connectHome;
+    if (connectHome) {
+      runConnectHomePull(draft);
+      return;
+    }
+
+    saveHubQueryDraft(draft);
+
+    if (isLoggedIn) {
+      void continueToDashboard();
+      return;
+    }
+
+    setAuthOpen(true);
+  }, [
+    buildDraft,
+    connectHome,
+    continueToDashboard,
+    isLoggedIn,
+    runConnectHomePull,
+    userLoading,
+  ]);
+
+  const density = hubEmbedDensity(connectHome || embedded || mockup);
+  const compact = connectHome || embedded || mockup;
 
   return (
     <>
-      <div className={cn("relative z-20 w-full font-sans", density.stack)}>
+      <div
+        className={cn(
+          "relative z-20 w-full font-sans",
+          density.stack,
+          !connectHome && (mockup || embedded) && "bg-background px-4 py-5 md:px-5 md:py-6",
+        )}
+      >
         {!sampleId ? (
           <div className={density.sectionStack}>
             <div className="space-y-1">
@@ -476,6 +541,9 @@ export function HubPolymarketQueryBuilder({ connectHome = false, stepBackRef }) 
               <p className={cn("leading-relaxed text-muted-foreground", density.subheading)}>
                 Start from raw data, search a specific market, or launch a guided workflow built for
                 prediction market research.
+              </p>
+              <p className="text-[11px] leading-snug text-muted-foreground">
+                Public demo preview · up to 10 rows per query in the full workspace.
               </p>
             </div>
 
@@ -699,18 +767,45 @@ export function HubPolymarketQueryBuilder({ connectHome = false, stepBackRef }) 
         {error ? <p className="text-xs text-destructive">{error}</p> : null}
 
         <div className={cn("flex justify-end border-t border-border/60", density.footerPt)}>
-          <Button
-            type="button"
-            size={density.submitSize}
-            className={cn("rounded-full text-sm lg:text-base", density.submitPx)}
-            disabled={submitBusy || !sampleId || selectedColumns.length === 0}
-            onClick={handleSubmit}
-          >
-            {submitBusy ? "Running…" : "Run pull"}
-          </Button>
+          <div className="flex flex-col items-center gap-2">
+            <Button
+              type="button"
+              size={density.submitSize}
+              className={cn("rounded-full text-sm lg:text-base", density.submitPx)}
+              disabled={
+                submitBusy ||
+                (!connectHome && userLoading) ||
+                !sampleId ||
+                selectedColumns.length === 0
+              }
+              onClick={handleSubmit}
+            >
+              {submitBusy
+                ? connectHome
+                  ? "Running…"
+                  : "Starting…"
+                : !connectHome && userLoading
+                  ? "Loading…"
+                  : connectHome
+                    ? "Run pull"
+                    : isLoggedIn
+                      ? "Run query"
+                      : "Run for Free"}
+            </Button>
+            {!connectHome && !isLoggedIn ? (
+              <p className="text-[11px] text-muted-foreground">No credit card required</p>
+            ) : null}
+          </div>
         </div>
       </div>
-      {demoProDialog}
+      {!connectHome ? (
+        <RunForYourselfAuthModal
+          open={authOpen}
+          onOpenChange={setAuthOpen}
+          onAuthenticated={() => void continueToDashboard()}
+        />
+      ) : null}
+      {connectHome ? demoProDialog : null}
     </>
   );
 }

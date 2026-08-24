@@ -54,7 +54,7 @@ function HubPageSections({ config, slug }: HubPageProps) {
 }
 
 export function HubPage({ config, slug }: HubPageProps) {
-  const { webPage, breadcrumb, faqPage, softwareApplication } = buildHubJsonLd(config);
+  const { webPage, breadcrumb, faqPage, softwareApplication, dataset } = buildHubJsonLd(config);
 
   return (
     <>
@@ -70,6 +70,12 @@ export function HubPage({ config, slug }: HubPageProps) {
         <script
           type="application/ld+json"
           dangerouslySetInnerHTML={{ __html: JSON.stringify(softwareApplication) }}
+        />
+      ) : null}
+      {dataset ? (
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(dataset) }}
         />
       ) : null}
       {faqPage ? (
