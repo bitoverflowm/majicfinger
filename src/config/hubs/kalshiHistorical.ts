@@ -87,7 +87,7 @@ export const kalshiHistoricalHub: HubPageConfig = {
         username: "misterrpink",
         slug: "kalshi-historical-data-hero",
         eyebrow: "NYC weather market historical volatility signal",
-        caption: "Analysis built form Kalshi historical market and trades using rolling intraday price movement using Lychee no-code browser based charting and quant tools.",
+        caption: "Analysis built from Kalshi historical markets and trades using rolling intraday price movement and Lychee’s no-code charting and quantitative tools.",
         captionLink: {
           label: "How to guide",
           href: "/guides/kalshi-weather-volatility-chart",
@@ -382,7 +382,7 @@ export const kalshiHistoricalHub: HubPageConfig = {
 
     {
       type: "pricing",
-      anchorId: "pricing",
+      anchorId: "kalshi-historical-pricing",
     },
 
     {

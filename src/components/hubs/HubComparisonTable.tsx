@@ -15,6 +15,7 @@ function ComparisonCell({
   featured?: boolean;
 }) {
   const isYes = featured && cellStartsWithYes(text);
+  const yesDetail = isYes ? text.replace(/^yes\s*[—–-]?\s*/i, "").trim() : "";
 
   return (
     <div
@@ -30,7 +31,10 @@ function ComparisonCell({
             className="mt-0.5 size-3.5 shrink-0 text-emerald-600 dark:text-emerald-400"
             aria-hidden
           />
-          <span>{text.replace(/^yes\s*[—–-]?\s*/i, "")}</span>
+          <span>
+            <span className={yesDetail ? "sr-only" : undefined}>Yes</span>
+            {yesDetail ? <span>{yesDetail}</span> : null}
+          </span>
         </span>
       ) : (
         text

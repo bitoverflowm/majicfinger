@@ -2215,14 +2215,15 @@ export default function DataSheetWithIntegration({
                                     value={
                                       chartDashboardDraft.data_set_id
                                         ? String(chartDashboardDraft.data_set_id)
-                                        : ""
+                                        : "__"
                                     }
-                                    onValueChange={(v) =>
+                                    onValueChange={(v) => {
+                                      if (v === "__") return;
                                       setChartDashboardDraft?.((prev) => ({
                                         ...(prev || {}),
                                         data_set_id: v,
-                                      }))
-                                    }
+                                      }));
+                                    }}
                                   >
                                     <SelectTrigger
                                       id="dash-associated-project"
@@ -2231,6 +2232,7 @@ export default function DataSheetWithIntegration({
                                       <SelectValue placeholder="Select project" />
                                     </SelectTrigger>
                                   <SelectContent>
+                                    <SelectItem value="__">Select project</SelectItem>
                                     {dashboardDataSetOptions.map((d) => (
                                       <SelectItem key={d.id} value={d.id}>
                                         {d.name}
@@ -2790,7 +2792,7 @@ export default function DataSheetWithIntegration({
                                                       <div className="w-full min-w-0 max-w-full overflow-hidden">
                                                         <Select
                                                           value={
-                                                            col.chart_id ? String(col.chart_id) : undefined
+                                                            col.chart_id ? String(col.chart_id) : "__none__"
                                                           }
                                                           onValueChange={(v) => {
                                                             patchChartDashboardColumn(

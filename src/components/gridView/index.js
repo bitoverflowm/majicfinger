@@ -2941,11 +2941,8 @@ const GridView = ({ startNew, fillViewport = false }) => {
         () => ({
             filter: true,
             editable: true,
-            background: { visible: false },
             resizable: true,
             suppressAutoSize: false,
-            singleClickEdit: true,
-            stopEditingWhenCellsLoseFocus: true,
             minWidth: fillViewport ? 72 : 80,
         }),
         [fillViewport],
@@ -3006,6 +3003,8 @@ const GridView = ({ startNew, fillViewport = false }) => {
 
     const gridOptions = useMemo(
         () => ({
+            singleClickEdit: true,
+            stopEditingWhenCellsLoseFocus: true,
             onCellClicked: () =>
                 toast(`Hit Enter to accept change`, {
                     duration: 5000,

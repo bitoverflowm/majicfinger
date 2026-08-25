@@ -803,9 +803,15 @@ function HubLinkGroup({ section }: { section: HubLinkGroupSection }) {
                   <div className={cn("space-y-6", category.label && "pl-0 sm:pl-1")}>
                     {category.subgroups.map((subgroup) => (
                       <div key={`${category.label ?? "general"}-${subgroup.label}`} className="space-y-3">
-                        <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground/80">
-                          {subgroup.label}
-                        </h4>
+                        {category.label ? (
+                          <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground/80">
+                            {subgroup.label}
+                          </h4>
+                        ) : (
+                          <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground/80">
+                            {subgroup.label}
+                          </h3>
+                        )}
                         <HubLinkList links={subgroup.links} />
                       </div>
                     ))}

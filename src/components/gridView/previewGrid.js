@@ -21,11 +21,8 @@ const PreviewGrid = ({h, w}) => {
     //Apply settings across all columns
     const defaultColDef = useMemo(() => ({
         filter: true, // Enable filtering on all columns
-        //maxWidth: 120,
         editable: true,
-        background: {visible: false},
         resizable: true,
-        singleClickEdit: false,
     }))
 
     return (
@@ -35,10 +32,11 @@ const PreviewGrid = ({h, w}) => {
                 rowData={connectedData.slice(0, Math.min(connectedData.length, 10))} 
                 columnDefs={connectedCols} 
                 pagination={false}
+                singleClickEdit={false}
                 //enableRangeSelection={true}
                 />
         </div>
-    )
+    );
 
 
 

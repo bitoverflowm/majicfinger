@@ -433,8 +433,9 @@ export function ConnectComposeOperationPanel({
             {composeWhereFilters.map((f, fIdx) => (
               <div key={f.id} className="flex w-full flex-nowrap items-center gap-1.5">
                 <Select
-                  value={f.column}
+                  value={f.column || "__"}
                   onValueChange={(val) => {
+                    if (val === "__") return;
                     const kind = kindForColumn(val);
                     updateWhereFilter(f.id, { column: val, kind });
                   }}
@@ -448,6 +449,9 @@ export function ConnectComposeOperationPanel({
                     <SelectValue placeholder="Column" />
                   </SelectTrigger>
                   <SelectContent>
+                    <SelectItem value="__" className="text-[13px] text-muted-foreground">
+                      Column
+                    </SelectItem>
                     {whereFilterColumnOptions.map((c) => (
                       <SelectItem key={c} value={c} className="text-[13px]">
                         {composeSourceColumnLabel(c)}
@@ -550,10 +554,14 @@ export function ConnectComposeOperationPanel({
                 <div key={jr.id} className="space-y-2 rounded-md border border-border/50 p-2">
                   <div className="flex flex-wrap items-center gap-2">
                   <Select
-                    value={jr.targetTable || ""}
+                    value={jr.targetTable || "__"}
                     onValueChange={(v) =>
                       setComposeJoins?.((prev) =>
-                        (prev || []).map((r) => (r.id === jr.id ? { ...r, targetTable: v, rightColumn: "" } : r)),
+                        (prev || []).map((r) =>
+                          r.id === jr.id
+                            ? { ...r, targetTable: v === "__" ? "" : v, rightColumn: "" }
+                            : r,
+                        ),
                       )
                     }
                   >
@@ -561,6 +569,9 @@ export function ConnectComposeOperationPanel({
                       <SelectValue placeholder="Table" />
                     </SelectTrigger>
                     <SelectContent>
+                      <SelectItem value="__" className="text-xs text-muted-foreground">
+                        Table
+                      </SelectItem>
                       {glueJoinTableOptions.map((t) => (
                         <SelectItem key={t} value={t} className="text-xs">
                           {t}
@@ -569,7 +580,7 @@ export function ConnectComposeOperationPanel({
                     </SelectContent>
                   </Select>
                   <Select
-                    value={jr.joinType}
+                    value={jr.joinType || "inner"}
                     onValueChange={(v) =>
                       setComposeJoins?.((prev) =>
                         (prev || []).map((r) => (r.id === jr.id ? { ...r, joinType: v } : r)),
@@ -589,10 +600,12 @@ export function ConnectComposeOperationPanel({
                     </SelectContent>
                   </Select>
                   <Select
-                    value={jr.leftColumn || ""}
+                    value={jr.leftColumn || "__"}
                     onValueChange={(v) =>
                       setComposeJoins?.((prev) =>
-                        (prev || []).map((r) => (r.id === jr.id ? { ...r, leftColumn: v } : r)),
+                        (prev || []).map((r) =>
+                          r.id === jr.id ? { ...r, leftColumn: v === "__" ? "" : v } : r,
+                        ),
                       )
                     }
                   >
@@ -600,6 +613,9 @@ export function ConnectComposeOperationPanel({
                       <SelectValue placeholder="Left col" />
                     </SelectTrigger>
                     <SelectContent>
+                      <SelectItem value="__" className="text-xs text-muted-foreground">
+                        Left col
+                      </SelectItem>
                       {baseTableColumnNames.map((c) => (
                         <SelectItem key={c} value={c} className="text-xs">
                           {composeSourceColumnLabel(c)}
@@ -609,10 +625,12 @@ export function ConnectComposeOperationPanel({
                   </Select>
                   <span className="text-[10px] text-muted-foreground">=</span>
                   <Select
-                    value={jr.rightColumn || ""}
+                    value={jr.rightColumn || "__"}
                     onValueChange={(v) =>
                       setComposeJoins?.((prev) =>
-                        (prev || []).map((r) => (r.id === jr.id ? { ...r, rightColumn: v } : r)),
+                        (prev || []).map((r) =>
+                          r.id === jr.id ? { ...r, rightColumn: v === "__" ? "" : v } : r,
+                        ),
                       )
                     }
                   >
@@ -620,6 +638,9 @@ export function ConnectComposeOperationPanel({
                       <SelectValue placeholder="Right col" />
                     </SelectTrigger>
                     <SelectContent>
+                      <SelectItem value="__" className="text-xs text-muted-foreground">
+                        Right col
+                      </SelectItem>
                       {rightCols.map((c) => (
                         <SelectItem key={c} value={c} className="text-xs">
                           {composeSourceColumnLabel(c)}
@@ -663,12 +684,13 @@ export function ConnectComposeOperationPanel({
                     <div className="flex w-full min-w-0 items-center gap-2">
                       <div className="min-w-0 flex-1 basis-1/2">
                         <Select
-                          value={ob.alias}
-                          onValueChange={(v) =>
+                          value={ob.alias || "__"}
+                          onValueChange={(v) => {
+                            if (v === "__") return;
                             setColumnComposeOrderBy?.((prev) =>
                               (prev || []).map((r, j) => (j === obIdx ? { ...r, alias: v } : r)),
-                            )
-                          }
+                            );
+                          }}
                         >
                           <SelectTrigger
                             className="h-8 w-full min-w-0 text-xs"
@@ -679,6 +701,9 @@ export function ConnectComposeOperationPanel({
                             <SelectValue placeholder="Column" />
                           </SelectTrigger>
                           <SelectContent>
+                            <SelectItem value="__" className="text-xs text-muted-foreground">
+                              Column
+                            </SelectItem>
                             {composeSelectAliasChoices.map((c) => (
                               <SelectItem key={c.alias} value={c.alias} className="text-xs">
                                 {c.label}
@@ -689,7 +714,7 @@ export function ConnectComposeOperationPanel({
                       </div>
                       <div className="min-w-0 flex-1 basis-1/2">
                         <Select
-                          value={ob.direction}
+                          value={ob.direction || "asc"}
                           onValueChange={(v) =>
                             setColumnComposeOrderBy?.((prev) =>
                               (prev || []).map((r, j) => (j === obIdx ? { ...r, direction: v } : r)),
@@ -786,17 +811,21 @@ export function ConnectComposeOperationPanel({
             {composeHavingFilters.map((f) => (
               <motion.div key={f.id} className="flex flex-wrap items-center gap-1">
                 <Select
-                  value={f.havingAlias}
-                  onValueChange={(val) =>
+                  value={f.havingAlias || "__"}
+                  onValueChange={(val) => {
+                    if (val === "__") return;
                     setComposeHavingFilters?.((prev) =>
                       (prev || []).map((row) => (row.id === f.id ? { ...row, havingAlias: val } : row)),
-                    )
-                  }
+                    );
+                  }}
                 >
                   <SelectTrigger className="h-7 min-w-[6rem] text-[11px]">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
+                    <SelectItem value="__" className="text-[13px] text-muted-foreground">
+                      Aggregate
+                    </SelectItem>
                     {composeAggregateAliasChoices.map((a) => (
                       <SelectItem key={a.alias} value={a.alias} className="text-[13px]">
                         {a.label}

@@ -554,7 +554,7 @@ export const polymarketHistoricalHub: HubPageConfig = {
 
     {
       type: "pricing",
-      anchorId: "pricing",
+      anchorId: "polymarket-historical-pricing",
       eyebrow: "START WITH THE WORKFLOW YOU NEED",
       title: "Choose the Scale of Historical Research You Need",
       description:

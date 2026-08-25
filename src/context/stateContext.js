@@ -243,12 +243,8 @@ export const StateProvider = ({ children, bento=false }) => {
   //Apply settings across all columns
   const defaultColDef = useMemo(() => ({
     filter: true, // Enable filtering on all columns
-    //maxWidth: 120,
     editable: true,
-    background: {visible: false},
     resizable: true,
-    singleClickEdit: true,
-    stopEditingWhenCellsLoseFocus : true,
   }))
 
   /*

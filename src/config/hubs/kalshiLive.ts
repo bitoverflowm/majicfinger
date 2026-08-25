@@ -269,7 +269,7 @@ export const kalshiLiveHub: HubPageConfig = {
     },
     {
       type: "pricing",
-      anchorId: "pricing",
+      anchorId: "kalshi-live-pricing",
     },
     {
       type: "cta",
