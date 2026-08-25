@@ -37,14 +37,14 @@ export const polymarketHistoricalResearchGuides: HubLinkGroupSection = {
     },
   ],
   cta: {
-    label: "Explore Historical Data",
-    href: "#explore-data",
-    ariaLabel: "Open the Polymarket Historical Data explorer",
+    label: "Upgrade Now to Get Full Access",
+    href: "#pricing",
+    ariaLabel: "Upgrade now to get full access — view pricing",
     requiresAuth: false,
-    eventLabel: "polymarket_historical_guides_explore",
+    eventLabel: "polymarket_historical_guides_upgrade",
     tracking: {
       page: "/polymarket-historical-data",
-      destination: "explore-data",
+      destination: "pricing",
     },
   },
 };

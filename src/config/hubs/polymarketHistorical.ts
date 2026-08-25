@@ -311,11 +311,11 @@ export const polymarketHistoricalHub: HubPageConfig = {
         "Chart, export, or backtest the result",
       ],
       cta: {
-        label: "Open the Full Historical Workspace",
+        label: "Upgrade Now to Get Full Access",
         href: "#pricing",
-        ariaLabel: "Open the full Polymarket Historical workspace — view pricing",
+        ariaLabel: "Upgrade now to get full access — view pricing",
         requiresAuth: false,
-        eventLabel: "polymarket_historical_full_workspace",
+        eventLabel: "polymarket_historical_upgrade_full_access",
         tracking: {
           page: "/polymarket-historical-data",
           destination: "pricing",
@@ -391,19 +391,15 @@ export const polymarketHistoricalHub: HubPageConfig = {
         },
       ],
       note: "Historical strategy tests use Lychee’s quantitative analysis tools.",
-      noteCta: {
-        label: "Quantitative analysis →",
-        href: "/quant-analysis",
-      },
       cta: {
-        label: "Build a Historical Analysis",
-        href: "#explore-data",
-        ariaLabel: "Build a Polymarket historical analysis",
+        label: "Upgrade Now to Get Full Access",
+        href: "#pricing",
+        ariaLabel: "Upgrade now to get full access — view pricing",
         requiresAuth: false,
-        eventLabel: "polymarket_historical_build_analysis",
+        eventLabel: "polymarket_historical_analysis_upgrade",
         tracking: {
           page: "/polymarket-historical-data",
-          destination: "explore-data",
+          destination: "pricing",
         },
       },
     },
@@ -535,9 +531,15 @@ export const polymarketHistoricalHub: HubPageConfig = {
         { label: "Quant analysis", href: "/quant-analysis" },
       ],
       cta: {
-        label: "Explore Historical Data",
-        href: "#explore-data",
+        label: "Upgrade Now to Get Full Access",
+        href: "#pricing",
+        ariaLabel: "Upgrade now to get full access — view pricing",
         requiresAuth: false,
+        eventLabel: "polymarket_historical_cross_platform_upgrade",
+        tracking: {
+          page: "/polymarket-historical-data",
+          destination: "pricing",
+        },
       },
       secondaryCta: {
         label: "Explore Polymarket Live",

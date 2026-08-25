@@ -217,7 +217,7 @@ export function HubPolymarketCrossPlatformSection({
           </ul>
           {section.cta || section.secondaryCta ? (
             <div className="mt-4 flex flex-wrap items-center justify-center gap-2">
-              {section.cta ? <HubCtaButton cta={section.cta} variant="secondary" /> : null}
+              {section.cta ? <HubCtaButton cta={section.cta} variant="primary" /> : null}
               {section.secondaryCta ? (
                 <HubCtaButton cta={section.secondaryCta} variant="secondary" />
               ) : null}
