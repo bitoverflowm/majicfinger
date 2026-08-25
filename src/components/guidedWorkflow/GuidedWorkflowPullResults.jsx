@@ -39,13 +39,14 @@ function GuidedWorkflowPullBootstrap({ draft }) {
 }
 
 /**
- * Inline data sheet + pull progress for guided workflows (landing-page demo layout).
+ * Inline data sheet + pull progress for guided / public hub demos (landing-page layout).
  *
  * @param {{
  *   draft: import("@/lib/hubs/hubQueryDraft").HubQueryDraft;
  *   embedded?: boolean;
  *   mockup?: boolean;
  *   connectHome?: boolean;
+ *   integrationId?: string;
  *   className?: string;
  *   onPullComplete?: () => void;
  * }} props
@@ -55,6 +56,7 @@ export function GuidedWorkflowPullResults({
   embedded = false,
   mockup = false,
   connectHome = false,
+  integrationId = "kalshiHistorical",
   className,
   onPullComplete,
 }) {
@@ -62,6 +64,7 @@ export function GuidedWorkflowPullResults({
   const whereFilters = normalizeHubQueryWhereFilters(draft?.whereFilters);
   const guidedHubDraft = draft ? { ...draft, whereFilters } : null;
   const columnSelections = draft?.columnSelections || {};
+  const workspaceId = draft?.integrationId || integrationId || "kalshiHistorical";
   const columnComposeItems = useMemo(() => {
     if (Array.isArray(draft?.columnComposeItems) && draft.columnComposeItems.length > 0) {
       return draft.columnComposeItems;
@@ -97,7 +100,7 @@ export function GuidedWorkflowPullResults({
             guidedWorkflowPullRequested: true,
             guidedWorkflowHubDraft: guidedHubDraft,
             viewing: "connectDataHome",
-            connectWorkspace: "kalshiHistorical",
+            connectWorkspace: workspaceId,
             connectDataLakeSampleId: sampleId,
             connectDataLakeColumnSelections: columnSelections,
             dataLakeColumnComposeItems: columnComposeItems,
@@ -118,7 +121,7 @@ export function GuidedWorkflowPullResults({
             },
             rightPanelOpen: false,
             rightPanelTab: "integrations",
-            integrationSidebar: "kalshiHistorical",
+            integrationSidebar: workspaceId,
             connectHomeFlowStepsOpen: false,
           }}
         >

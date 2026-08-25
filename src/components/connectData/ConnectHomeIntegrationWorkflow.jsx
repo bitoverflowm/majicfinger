@@ -42,10 +42,7 @@ import {
   scrollConnectComposeTargetIntoView,
 } from "@/lib/connectHubScroll";
 import { cn } from "@/lib/utils";
-import {
-  isDemoGatedHistoricalIntegration,
-  useDemoProGate,
-} from "@/hooks/useDemoProGate";
+import { useDemoProGate } from "@/hooks/useDemoProGate";
 import { HubKalshiQueryBuilder } from "@/components/hubs/kalshiQuery/HubKalshiQueryBuilder";
 import { HubPolymarketQueryBuilder } from "@/components/hubs/polymarketQuery/HubPolymarketQueryBuilder";
 
@@ -651,7 +648,6 @@ function GenericSourceCards({
  */
 export function ConnectHomeIntegrationWorkflow({ integrationId, className }) {
   const ctx = useMyStateV2() ?? {};
-  const isDemo = !!ctx.isDemo;
   const { requestHistoricalProUpgrade, workspaceWriteLocked, dialog: demoProDialog } = useDemoProGate();
   const {
     connectDataLakeSampleId,
@@ -713,17 +709,13 @@ export function ConnectHomeIntegrationWorkflow({ integrationId, className }) {
 
   const handleKalshiPowerSearchSelect = useCallback(
     (suggestion) => {
-      if (isDemo && isDemoGatedHistoricalIntegration(integrationId)) {
-        requestHistoricalProUpgrade(getIntegrationMeta(integrationId).name);
-        return;
-      }
       if (workspaceWriteLocked) {
         requestHistoricalProUpgrade(getIntegrationMeta(integrationId).name);
         return;
       }
       applyKalshiPowerSearchSelection(ctx, suggestion);
     },
-    [ctx, integrationId, isDemo, workspaceWriteLocked, requestHistoricalProUpgrade],
+    [ctx, integrationId, workspaceWriteLocked, requestHistoricalProUpgrade],
   );
 
   useEffect(() => {
@@ -825,10 +817,6 @@ export function ConnectHomeIntegrationWorkflow({ integrationId, className }) {
   ]);
 
   const handleRunIntegrationPull = useCallback(() => {
-    if (isDemo && isDemoGatedHistoricalIntegration(integrationId)) {
-      requestHistoricalProUpgrade(getIntegrationMeta(integrationId).name);
-      return;
-    }
     if (workspaceWriteLocked) {
       requestHistoricalProUpgrade(getIntegrationMeta(integrationId).name);
       return;
@@ -837,7 +825,7 @@ export function ConnectHomeIntegrationWorkflow({ integrationId, className }) {
     flushSync(() => {
       requestConnectIntegrationPull?.();
     });
-  }, [ctx, integrationId, isDemo, workspaceWriteLocked, requestConnectIntegrationPull, requestHistoricalProUpgrade]);
+  }, [ctx, integrationId, workspaceWriteLocked, requestConnectIntegrationPull, requestHistoricalProUpgrade]);
 
   if (!isConnectIntegrationWorkspace(integrationId)) return null;
   if (!isConnectQueryComposeIntegration(integrationId)) {

@@ -25,7 +25,6 @@ import { GuidedWorkflowOverlay } from "@/components/guidedWorkflow/GuidedWorkflo
 import { GuidedWorkflowActionsBridge } from "@/components/guidedWorkflow/GuidedWorkflowActionsBridge";
 import { GuidedWorkflowProvider } from "@/components/guidedWorkflow/GuidedWorkflowProvider";
 import { GuidedWorkflowPullResults } from "@/components/guidedWorkflow/GuidedWorkflowPullResults";
-import { RunForYourselfAuthModal } from "@/components/runYourself/RunForYourselfAuthModal";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -436,7 +435,6 @@ function HubKalshiQueryBuilderInner({
     workspaceWriteLocked,
     dialog: demoProDialog,
   } = useDemoProGate();
-  const [authOpen, setAuthOpen] = useState(false);
   const [submitBusy, setSubmitBusy] = useState(false);
   const [error, setError] = useState(null);
 
@@ -645,6 +643,7 @@ function HubKalshiQueryBuilderInner({
       pendingSheetName: sheetName.trim() || undefined,
       sourceHubPath: sourceHubPath || undefined,
       sourceHubName: sourceHubPath ? inferPageNameFromPath(sourceHubPath) : undefined,
+      integrationId: "kalshiHistorical",
     });
   }, [sampleId, columnSelections, composeDraft, activeComposeOps, sheetName]);
 
@@ -672,11 +671,12 @@ function HubKalshiQueryBuilderInner({
     flushSync(() => {
       setGuidedPostPullReady(true);
     });
+    if (guidedPullDraft?.guidedWorkflowId !== KALSHI_GUIDED_WEATHER_WORKFLOW_ID) return;
     guidedActionsRef.current.resumePostPullStep?.(
       KALSHI_GUIDED_WEATHER_WORKFLOW_ID,
       KALSHI_GUIDED_STEP_IDS.dataSheetLoaded,
     );
-  }, []);
+  }, [guidedPullDraft?.guidedWorkflowId]);
 
   const runConnectHomePull = useCallback(
     (draft) => {
@@ -773,14 +773,18 @@ function HubKalshiQueryBuilderInner({
       return;
     }
 
-    saveHubQueryDraft(draft);
-
-    if (isLoggedIn) {
-      void continueToDashboard();
+    // Public hub / mockup demo: run the capped query inline without sign-in.
+    if (!isLoggedIn) {
+      setGuidedPostPullReady(false);
+      flushSync(() => {
+        setGuidedPullDraft(draft);
+      });
+      setError(null);
       return;
     }
 
-    setAuthOpen(true);
+    saveHubQueryDraft(draft);
+    void continueToDashboard();
   }, [
     buildDraft,
     userLoading,
@@ -824,6 +828,7 @@ function HubKalshiQueryBuilderInner({
         embedded={embedded}
         mockup={mockup}
         connectHome={connectHome}
+        integrationId="kalshiHistorical"
         onPullComplete={handleGuidedPullComplete}
       />
     ) : (
@@ -1144,26 +1149,12 @@ function HubKalshiQueryBuilderInner({
                   ? "Loading…"
                   : connectHome
                     ? "Run pull"
-                    : isLoggedIn
-                      ? "Run query"
-                      : "Run for Free"}
+                    : "Run query"}
             </Button>
-            {!connectHome && !isLoggedIn ? (
-              <p className={cn("text-muted-foreground", embedded ? "text-[11px]" : "text-xs")}>
-                No credit card required
-              </p>
-            ) : null}
           </div>
         </div>
       </div>
 
-      {!connectHome ? (
-        <RunForYourselfAuthModal
-          open={authOpen}
-          onOpenChange={setAuthOpen}
-          onAuthenticated={() => void continueToDashboard()}
-        />
-      ) : null}
       {connectHome ? demoProDialog : null}
     </>
     )}

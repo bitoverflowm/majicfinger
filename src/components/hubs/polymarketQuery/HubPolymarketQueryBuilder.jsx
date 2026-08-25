@@ -1,11 +1,8 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Check, Database, Layers, LineChart, Search, Wand2, Box } from "lucide-react";
-
 import { ConnectComposeOperationPanel } from "@/components/connectData/ConnectComposeOperationPanel";
 import { ConnectDataOperationsSection } from "@/components/connectData/ConnectDataOperationsSection";
-import { RunForYourselfAuthModal } from "@/components/runYourself/RunForYourselfAuthModal";
+import { GuidedWorkflowPullResults } from "@/components/guidedWorkflow/GuidedWorkflowPullResults";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -31,6 +28,9 @@ import {
   getPolymarketTableNotes,
 } from "@/lib/polymarketConnectColumns";
 import { cn } from "@/lib/utils";
+import { flushSync } from "react-dom";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Check, Database, Layers, LineChart, Search, Wand2, Box } from "lucide-react";
 
 const INTEGRATION_ID = "polymarketHistorical";
 const LAKE_CONFIG = getConnectDataLakeConfig(INTEGRATION_ID);
@@ -288,9 +288,9 @@ export function HubPolymarketQueryBuilder({
   const isLoggedIn = !!user;
   const connectCtx = useMyStateV2();
   const { requestHistoricalProUpgrade, workspaceWriteLocked, dialog: demoProDialog } = useDemoProGate();
-  const [authOpen, setAuthOpen] = useState(false);
   const [submitBusy, setSubmitBusy] = useState(false);
   const [error, setError] = useState(null);
+  const [demoPullDraft, setDemoPullDraft] = useState(null);
 
   const [sampleId, setSampleId] = useState("");
   const [hoveredSampleId, setHoveredSampleId] = useState("");
@@ -503,14 +503,17 @@ export function HubPolymarketQueryBuilder({
       return;
     }
 
-    saveHubQueryDraft(draft);
-
-    if (isLoggedIn) {
-      void continueToDashboard();
+    // Public hub / mockup demo: run the capped query inline without sign-in.
+    if (!isLoggedIn) {
+      flushSync(() => {
+        setDemoPullDraft(draft);
+      });
+      setError(null);
       return;
     }
 
-    setAuthOpen(true);
+    saveHubQueryDraft(draft);
+    void continueToDashboard();
   }, [
     buildDraft,
     connectHome,
@@ -522,6 +525,18 @@ export function HubPolymarketQueryBuilder({
 
   const density = hubEmbedDensity(connectHome || embedded || mockup);
   const compact = connectHome || embedded || mockup;
+
+  if (demoPullDraft) {
+    return (
+      <GuidedWorkflowPullResults
+        draft={demoPullDraft}
+        embedded={embedded}
+        mockup={mockup}
+        connectHome={connectHome}
+        integrationId={INTEGRATION_ID}
+      />
+    );
+  }
 
   return (
     <>
@@ -788,23 +803,11 @@ export function HubPolymarketQueryBuilder({
                   ? "Loading…"
                   : connectHome
                     ? "Run pull"
-                    : isLoggedIn
-                      ? "Run query"
-                      : "Run for Free"}
+                    : "Run query"}
             </Button>
-            {!connectHome && !isLoggedIn ? (
-              <p className="text-[11px] text-muted-foreground">No credit card required</p>
-            ) : null}
           </div>
         </div>
       </div>
-      {!connectHome ? (
-        <RunForYourselfAuthModal
-          open={authOpen}
-          onOpenChange={setAuthOpen}
-          onAuthenticated={() => void continueToDashboard()}
-        />
-      ) : null}
       {connectHome ? demoProDialog : null}
     </>
   );

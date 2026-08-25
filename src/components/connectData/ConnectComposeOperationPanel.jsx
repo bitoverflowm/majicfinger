@@ -52,10 +52,6 @@ import { ConnectComposeSummarizeSection } from "@/components/connectData/Connect
 import { ComposeJoinTargetColumnPicker } from "@/components/connectData/ComposeJoinTargetColumnPicker";
 import { ConnectHomeSheetPullFields } from "@/components/connectData/ConnectHomeSheetPullFields";
 import { prepareConnectHomePullSheet } from "@/lib/connectHomePullDestination";
-import {
-  isDemoGatedHistoricalIntegration,
-  useDemoProGate,
-} from "@/hooks/useDemoProGate";
 
 /**
  * Inline compose controls (mirrors integrations panel) for Connect home vertical flow.
@@ -88,8 +84,6 @@ export function ConnectComposeOperationPanel({
   standaloneWorkspaceId,
 }) {
   const ctx = useMyStateV2() ?? {};
-  const isDemo = standalone ? false : !!ctx.isDemo;
-  const { requestHistoricalProUpgrade, dialog: demoProDialog } = useDemoProGate();
   const {
     connectActiveComposeOps: ctxActiveComposeOps = [],
     setConnectActiveComposeOps: ctxSetActiveComposeOps,
@@ -423,9 +417,6 @@ export function ConnectComposeOperationPanel({
     requestConnectDataLakePull,
     setConnectActiveComposeOps,
     setComposeJoins,
-    isDemo,
-    connectWorkspace,
-    requestHistoricalProUpgrade,
   ]);
 
   const updateComposeItem = useCallback(
@@ -961,7 +952,6 @@ export function ConnectComposeOperationPanel({
         </Button>
       </motion.div>
       ) : null}
-      {!hidePullActions ? demoProDialog : null}
     </motion.div>
   );
 }
