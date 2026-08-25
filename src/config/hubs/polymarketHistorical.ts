@@ -252,7 +252,7 @@ export const polymarketHistoricalHub: HubPageConfig = {
         },
       ],
       supportingText:
-        "Lychee handles that preparation upfront. Find the markets you care about, query indexed historical tables, apply joins and transformations visually, and turn the result into a chart, dashboard, export, or backtest from the same workspace. Users assemble the analysis—not the data infrastructure.",
+        "Lychee handles that preparation upfront. Find the markets you care about, query indexed historical tables, apply joins and transformations visually, and turn the result into a chart, dashboard, export, or backtest from the same workspace. You assemble the analysis—not the data infrastructure.",
       bullets: [
         "No archive collector to maintain",
         "No SQL required for joins or transformations",
