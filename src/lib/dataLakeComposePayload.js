@@ -21,6 +21,8 @@ export function buildDataLakeServerComposePayload({
   kalshiTradesJoinPreset,
   kalshiTradesJoinPresets,
   composeLimitScope,
+  randomSampleEnabled = false,
+  randomSampleSize = null,
 }) {
   const selectItems = selectRowsForAggregatedCompose(columnComposeItems);
   const selectAliasSet = new Set(
@@ -87,9 +89,17 @@ export function buildDataLakeServerComposePayload({
     .filter((j) => j.table && j.on.leftColumn && j.on.rightColumn);
   if (tableJoins.length) payload.joins = tableJoins;
 
-  const scopeRaw = String(composeLimitScope || "").toLowerCase().trim();
-  if (tableJoins.length && (scopeRaw === "primary" || scopeRaw === "result")) {
-    payload.limitScope = scopeRaw;
+  const sampleOn = randomSampleEnabled === true;
+  if (sampleOn) {
+    const n = Number(randomSampleSize);
+    if (Number.isFinite(n) && Math.floor(n) === n && n >= 1) {
+      payload.randomSample = { enabled: true, size: Math.floor(n) };
+    }
+  } else {
+    const scopeRaw = String(composeLimitScope || "").toLowerCase().trim();
+    if (tableJoins.length && (scopeRaw === "primary" || scopeRaw === "result")) {
+      payload.limitScope = scopeRaw;
+    }
   }
 
   return payload;

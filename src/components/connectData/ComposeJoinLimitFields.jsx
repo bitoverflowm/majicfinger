@@ -33,11 +33,19 @@ export function ComposeJoinLimitFields({
   primaryTableLabel = "primary table",
   showSetLimitButton = true,
   inputClassName,
+  disabled = false,
+  disabledReason = "",
 }) {
   const scope = composeLimitScope === "result" ? "result" : "primary";
 
   return (
     <div className={cn("space-y-2", className)}>
+      {disabled ? (
+        <p className="text-[10px] leading-snug text-muted-foreground">
+          {disabledReason ||
+            "Limit and Offset are unavailable while Random Sample is enabled. Sort is applied after the sample is selected."}
+        </p>
+      ) : null}
       {composeLimitRuleOpen ? (
         <>
           <Label className="text-xs text-muted-foreground">Maximum rows</Label>
@@ -47,6 +55,7 @@ export function ComposeJoinLimitFields({
               min={1}
               className={cn("h-8 w-32 text-xs", inputClassName)}
               value={composeLimitRuleValue}
+              disabled={disabled}
               onChange={(e) => {
                 setComposeLimitRuleOpen?.(true);
                 setComposeLimitRuleValue?.(e.target.value);
@@ -59,6 +68,7 @@ export function ComposeJoinLimitFields({
               variant="ghost"
               size="sm"
               className="h-8 text-[11px]"
+              disabled={disabled}
               onClick={() => {
                 setComposeLimitRuleOpen?.(false);
                 setComposeLimitRuleValue?.("");
@@ -72,6 +82,7 @@ export function ComposeJoinLimitFields({
               <Label className="text-[11px] text-muted-foreground">Apply limit to</Label>
               <Select
                 value={scope}
+                disabled={disabled}
                 onValueChange={(v) => setComposeLimitScope?.(v === "result" ? "result" : "primary")}
               >
                 <SelectTrigger className="h-8 w-full text-xs">
@@ -100,6 +111,8 @@ export function ComposeJoinLimitFields({
           variant="outline"
           size="sm"
           className="h-8 text-xs"
+          disabled={disabled}
+          title={disabled ? disabledReason || undefined : undefined}
           onClick={() => {
             setComposeLimitRuleOpen?.(true);
             setComposeLimitRuleValue?.((v) =>

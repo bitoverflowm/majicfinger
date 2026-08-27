@@ -24,6 +24,8 @@ const STORAGE_KEY = "lychee:hubQueryDraft";
  * @property {boolean} [composeLimitOpen]
  * @property {string} [composeLimitValue]
  * @property {string} [composeLimitScope]
+ * @property {boolean} [randomSampleEnabled]
+ * @property {string} [randomSampleSize]
  * @property {string} [pendingSheetName]
  * @property {string} [sourceHubPath]
  * @property {string} [sourceHubName]
@@ -63,7 +65,8 @@ export function hasComposeDraftPayload(draft) {
     (Array.isArray(draft.columnComposeItems) && draft.columnComposeItems.length > 0) ||
     (Array.isArray(draft.orderBy) && draft.orderBy.length > 0) ||
     (Array.isArray(draft.activeComposeOps) && draft.activeComposeOps.length > 0) ||
-    !!draft.composeLimitOpen
+    !!draft.composeLimitOpen ||
+    !!draft.randomSampleEnabled
   );
 }
 
@@ -159,6 +162,14 @@ export function normalizeHubQueryDraft(draft) {
   if (!sampleId) return null;
   const selections = draft?.columnSelections?.[sampleId] || [];
   if (!Array.isArray(selections) || selections.length === 0) return null;
+  const randomSampleEnabled = !!draft.randomSampleEnabled;
+  // Random Sample takes precedence: clear ordinary limit when hydrating incompatible state.
+  const composeLimitOpen = randomSampleEnabled ? false : !!draft.composeLimitOpen;
+  const composeLimitValue = randomSampleEnabled
+    ? ""
+    : draft.composeLimitValue != null
+      ? String(draft.composeLimitValue)
+      : "";
   return {
     version: 1,
     integrationId:
@@ -173,9 +184,11 @@ export function normalizeHubQueryDraft(draft) {
     orderBy: Array.isArray(draft.orderBy) ? draft.orderBy : [],
     havingFilters: Array.isArray(draft.havingFilters) ? draft.havingFilters : [],
     joins: Array.isArray(draft.joins) ? draft.joins : [],
-    composeLimitOpen: !!draft.composeLimitOpen,
-    composeLimitValue: draft.composeLimitValue != null ? String(draft.composeLimitValue) : "",
+    composeLimitOpen,
+    composeLimitValue,
     composeLimitScope: draft.composeLimitScope ? String(draft.composeLimitScope) : "primary",
+    randomSampleEnabled,
+    randomSampleSize: draft.randomSampleSize != null ? String(draft.randomSampleSize) : "",
     pendingSheetName: draft.pendingSheetName ? String(draft.pendingSheetName).trim() : undefined,
     sourceHubPath: draft.sourceHubPath ? String(draft.sourceHubPath).trim() : undefined,
     sourceHubName: draft.sourceHubName ? String(draft.sourceHubName).trim() : undefined,

@@ -107,7 +107,9 @@ export function formatConnectRequestCardQuery(card, sheet) {
     if (ord) lines.push(`ORDER BY ${ord}`);
   }
 
-  if (card?.composeRowLimit != null && card.composeRowLimit !== "") {
+  if (card?.randomSampleSize != null && card.randomSampleSize !== "") {
+    lines.push(`RANDOM SAMPLE ${card.randomSampleSize}`);
+  } else if (card?.composeRowLimit != null && card.composeRowLimit !== "") {
     const scopeLabel =
       composeSpec?.limitScope === "primary"
         ? " (primary table, then expand joins)"
@@ -129,6 +131,7 @@ export function buildRequestCardQuerySummary({
   hasWhere,
   whereText,
   composeRowLimit,
+  randomSampleSize,
 }) {
   return formatConnectRequestCardQuery(
     {
@@ -138,6 +141,7 @@ export function buildRequestCardQuerySummary({
       hasWhere,
       whereText,
       composeRowLimit,
+      randomSampleSize,
     },
     { provenance: { lake, table, composeSpec } },
   );

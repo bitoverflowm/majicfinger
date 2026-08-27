@@ -19,6 +19,8 @@ export function useDataLakeComposeState(shareViaContext) {
   const [localComposeWhereFilters, setLocalComposeWhereFilters] = useState([]);
   const [localComposeHavingFilters, setLocalComposeHavingFilters] = useState([]);
   const [localComposeJoins, setLocalComposeJoins] = useState([]);
+  const [localRandomSampleEnabled, setLocalRandomSampleEnabled] = useState(false);
+  const [localRandomSampleSize, setLocalRandomSampleSize] = useState("");
 
   if (shareViaContext) {
     return {
@@ -38,6 +40,10 @@ export function useDataLakeComposeState(shareViaContext) {
       setComposeHavingFilters: ctx.setDataLakeComposeHavingFilters,
       composeJoins: ctx.dataLakeComposeJoins ?? [],
       setComposeJoins: ctx.setDataLakeComposeJoins,
+      randomSampleEnabled: !!ctx.dataLakeComposeRandomSampleEnabled,
+      setRandomSampleEnabled: ctx.setDataLakeComposeRandomSampleEnabled,
+      randomSampleSize: ctx.dataLakeComposeRandomSampleSize ?? "",
+      setRandomSampleSize: ctx.setDataLakeComposeRandomSampleSize,
     };
   }
 
@@ -58,5 +64,9 @@ export function useDataLakeComposeState(shareViaContext) {
     setComposeHavingFilters: setLocalComposeHavingFilters,
     composeJoins: localComposeJoins,
     setComposeJoins: setLocalComposeJoins,
+    randomSampleEnabled: localRandomSampleEnabled,
+    setRandomSampleEnabled: setLocalRandomSampleEnabled,
+    randomSampleSize: localRandomSampleSize,
+    setRandomSampleSize: setLocalRandomSampleSize,
   };
 }

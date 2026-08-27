@@ -123,7 +123,7 @@ export function ConnectDataOperationsSection({
           <p className="mt-1 max-w-prose text-[11px] leading-snug text-muted-foreground">{description}</p>
         </motion.div>
 
-        <ul className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
+        <ul className="grid grid-cols-1 gap-2 pb-2 sm:grid-cols-2 lg:grid-cols-3">
           {operationList.map((op, i) => {
             const Icon = OPERATION_ICONS[op.id] || Filter;
             const isOpen = openSet.has(op.id);

@@ -127,6 +127,10 @@ export function ConnectComposeOperationPanel({
     setComposeHavingFilters,
     composeJoins,
     setComposeJoins,
+    randomSampleEnabled,
+    setRandomSampleEnabled,
+    randomSampleSize,
+    setRandomSampleSize,
   } = compose;
 
   const workspaceId = standalone ? (standaloneWorkspaceId ?? "kalshiHistorical") : connectWorkspace;
@@ -183,6 +187,16 @@ export function ConnectComposeOperationPanel({
     if (composeSeed.composeLimitScope != null) {
       setComposeLimitScope?.(String(composeSeed.composeLimitScope));
     }
+    if (composeSeed.randomSampleEnabled != null) {
+      setRandomSampleEnabled?.(!!composeSeed.randomSampleEnabled);
+      if (composeSeed.randomSampleEnabled) {
+        setComposeLimitRuleOpen?.(false);
+        setComposeLimitRuleValue?.("");
+      }
+    }
+    if (composeSeed.randomSampleSize != null) {
+      setRandomSampleSize?.(String(composeSeed.randomSampleSize));
+    }
   }, [
     composeSeed,
     standalone,
@@ -194,6 +208,8 @@ export function ConnectComposeOperationPanel({
     setComposeLimitRuleOpen,
     setComposeLimitRuleValue,
     setComposeLimitScope,
+    setRandomSampleEnabled,
+    setRandomSampleSize,
   ]);
 
   useEffect(() => {
@@ -208,6 +224,8 @@ export function ConnectComposeOperationPanel({
       composeLimitOpen: composeLimitRuleOpen,
       composeLimitValue: composeLimitRuleValue,
       composeLimitScope: composeLimitScope,
+      randomSampleEnabled: !!randomSampleEnabled,
+      randomSampleSize: randomSampleSize ?? "",
     });
   }, [
     standalone,
@@ -221,6 +239,8 @@ export function ConnectComposeOperationPanel({
     composeLimitRuleOpen,
     composeLimitRuleValue,
     composeLimitScope,
+    randomSampleEnabled,
+    randomSampleSize,
   ]);
 
   const pullColumns = useMemo(
@@ -783,6 +803,8 @@ export function ConnectComposeOperationPanel({
             setComposeLimitScope={setComposeLimitScope}
             hasTableJoin={hasTableJoin}
             primaryTableLabel={primaryTableLabel}
+            disabled={!!randomSampleEnabled}
+            disabledReason="Limit and Offset are unavailable while Random Sample is enabled. Sort is applied after the sample is selected."
           />
         ) : null}
 

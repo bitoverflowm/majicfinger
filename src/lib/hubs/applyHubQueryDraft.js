@@ -72,6 +72,8 @@ export function applyHubQueryDraft(ctx, draft, options = {}) {
     ctx.setDataLakeComposeLimitOpen?.(!!draft.composeLimitOpen);
     ctx.setDataLakeComposeLimitValue?.(draft.composeLimitValue ?? "");
     ctx.setDataLakeComposeLimitScope?.(draft.composeLimitScope ?? "primary");
+    ctx.setDataLakeComposeRandomSampleEnabled?.(!!draft.randomSampleEnabled);
+    ctx.setDataLakeComposeRandomSampleSize?.(draft.randomSampleSize ?? "");
     ctx.setDataLakeColumnComposeItems?.(
       Array.isArray(draft.columnComposeItems) && draft.columnComposeItems.length > 0
         ? draft.columnComposeItems

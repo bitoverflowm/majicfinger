@@ -23,6 +23,7 @@ import {
   KALSHI_TRADES_RESOLVED_MARKETS_JOIN_PRESET,
   KALSHI_TRADES_RESOLVED_MARKETS_JOIN_PRESET_CENT,
 } from "./lakeTableColumns";
+import { parseRandomSampleSize } from "./randomSample";
 
 function getRegion() {
   return process.env.AWS_REGION || process.env.AWS_DEFAULT_REGION || "us-east-1";
@@ -270,6 +271,9 @@ export async function startAthenaBoundedQuery({
       err.code = "BAD_REQUEST";
       throw err;
     }
+    const sampleSizeParsed = parseRandomSampleSize(compose?.randomSample?.size, {
+      maxSize: demo ? ATHENA_DEMO_ROW_LIMIT : undefined,
+    });
     // Demo embeds use a smaller cap so marketing visitors see a tiny sample only.
     const capRows = demo
       ? ATHENA_DEMO_ROW_LIMIT
@@ -277,11 +281,16 @@ export async function startAthenaBoundedQuery({
         ? Math.floor(composeSqlCap)
         : COMPOSE_UNCONSTRAINED_ROW_CAP;
     const explicitLimit =
-      limit != null && limit !== "" && Number.isFinite(Number(limit))
-        ? Math.max(1, Math.floor(Number(limit)))
-        : null;
+      sampleSizeParsed != null
+        ? null
+        : limit != null && limit !== "" && Number.isFinite(Number(limit))
+          ? Math.max(1, Math.floor(Number(limit)))
+          : null;
     let sqlLimit = null;
-    if (demo) {
+    if (sampleSizeParsed != null) {
+      // Eligible population must not be pre-limited; sample LIMIT is applied by the wrapper.
+      sqlLimit = null;
+    } else if (demo) {
       sqlLimit = ATHENA_DEMO_ROW_LIMIT;
     } else if (explicitLimit != null) {
       sqlLimit = Math.min(capRows, explicitLimit);
@@ -290,7 +299,10 @@ export async function startAthenaBoundedQuery({
     } else {
       sqlLimit = capRows;
     }
-    const expandedFetchCap = resolveComposeExpandedFetchRowLimit(compose, explicitLimit, capRows);
+    const expandedFetchCap =
+      sampleSizeParsed != null
+        ? null
+        : resolveComposeExpandedFetchRowLimit(compose, explicitLimit, capRows);
     const sql = buildComposeAthenaSelectSql({
       physicalTableName: safeTable,
       limit: sqlLimit,
@@ -300,6 +312,7 @@ export async function startAthenaBoundedQuery({
       whereSql,
       kalshiMaterializedVirtuals: kalshiComposeVirtuals,
       expandedJoinResultCap: expandedFetchCap,
+      randomSampleSize: sampleSizeParsed,
     });
     const athena = getAthenaClient();
     const { QueryExecutionId } = await athena.send(
@@ -310,7 +323,7 @@ export async function startAthenaBoundedQuery({
         QueryExecutionContext: { Catalog: catalog, Database: db },
       }),
     );
-    let fetchRowLimit = sqlLimit;
+    let fetchRowLimit = sampleSizeParsed != null ? sampleSizeParsed : sqlLimit;
     if (expandedFetchCap != null) {
       fetchRowLimit = expandedFetchCap;
     }

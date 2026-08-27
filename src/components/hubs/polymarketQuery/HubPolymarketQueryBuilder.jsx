@@ -2,6 +2,7 @@
 
 import { ConnectComposeOperationPanel } from "@/components/connectData/ConnectComposeOperationPanel";
 import { ConnectDataOperationsSection } from "@/components/connectData/ConnectDataOperationsSection";
+import { ConnectResearchToolsSection } from "@/components/connectData/ConnectResearchToolsSection";
 import { GuidedWorkflowPullResults } from "@/components/guidedWorkflow/GuidedWorkflowPullResults";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -308,6 +309,44 @@ export function HubPolymarketQueryBuilder({
     setComposeDraft(next);
   }, []);
 
+  const patchComposeDraft = useCallback((patch) => {
+    const next = { ...(composeDraftRef.current || {}), ...patch };
+    composeDraftRef.current = next;
+    setComposeDraft(next);
+    setComposeSeed(next);
+  }, []);
+
+  const enableRandomSample = useCallback(() => {
+    patchComposeDraft({
+      randomSampleEnabled: true,
+      composeLimitOpen: false,
+      composeLimitValue: "",
+      randomSampleSize:
+        String(composeDraftRef.current?.randomSampleSize || "").trim() || "100",
+    });
+    setActiveComposeOps((prev) => (prev || []).filter((id) => id !== "row_limit"));
+  }, [patchComposeDraft]);
+
+  const setRandomSampleEnabled = useCallback(
+    (next) => {
+      const enabled =
+        typeof next === "function" ? next(!!composeDraftRef.current?.randomSampleEnabled) : !!next;
+      if (enabled) {
+        enableRandomSample();
+        return;
+      }
+      patchComposeDraft({ randomSampleEnabled: false });
+    },
+    [enableRandomSample, patchComposeDraft],
+  );
+
+  const setRandomSampleSize = useCallback(
+    (value) => {
+      patchComposeDraft({ randomSampleSize: value });
+    },
+    [patchComposeDraft],
+  );
+
   const hoveredSourceLabel = useMemo(() => {
     if (!hoveredSampleId) return "";
     return POLYMARKET_CONNECT_DATA_SOURCES.find((source) => source.sampleId === hoveredSampleId)?.title ?? "";
@@ -445,6 +484,8 @@ export function HubPolymarketQueryBuilder({
       composeLimitOpen: !!draftState.composeLimitOpen,
       composeLimitValue: draftState.composeLimitValue ?? "",
       composeLimitScope: draftState.composeLimitScope ?? "primary",
+      randomSampleEnabled: !!draftState.randomSampleEnabled,
+      randomSampleSize: draftState.randomSampleSize ?? "",
       pendingSheetName: sheetName.trim() || undefined,
     });
   }, [sampleId, columnSelections, composeDraft, activeComposeOps, sheetName]);
@@ -748,6 +789,15 @@ export function HubPolymarketQueryBuilder({
                   setActiveComposeOps={setActiveComposeOps}
                   title="Refine your query"
                   description="Optional: add filters, sort, limit, join, summarize, or conditional columns before you run."
+                />
+                <ConnectResearchToolsSection
+                  selectedCount={selectedColumns.length}
+                  className="mt-6 border-t border-border/40 pt-6"
+                  randomSampleEnabled={!!composeDraft.randomSampleEnabled}
+                  setRandomSampleEnabled={setRandomSampleEnabled}
+                  randomSampleSize={composeDraft.randomSampleSize ?? ""}
+                  setRandomSampleSize={setRandomSampleSize}
+                  onEnableRandomSample={enableRandomSample}
                 />
                 <ConnectComposeOperationPanel
                   key={sampleId}

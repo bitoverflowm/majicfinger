@@ -272,6 +272,7 @@ async function buildComposeWithSheetGraphSql({ provenance, body, access, limit }
       table: validated.table,
       whereSql,
       kalshiMaterializedVirtuals: materializedVirtuals,
+      randomSampleSize: validated.compose?.randomSample?.size ?? null,
     });
     cteSqlById.set(sheetId, { cteName, sql });
     cteDefsInOrder.push(sheetId);

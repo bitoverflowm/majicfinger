@@ -30,6 +30,11 @@ import {
   resolveComposeGroupByAliases,
   selectRowsForAggregatedCompose,
 } from "@/lib/composeColumnGrouping";
+import {
+  normalizeRandomSampleConfig,
+  sanitizeComposeForRandomSample,
+  validateRandomSampleSizeInput,
+} from "./randomSample";
 
 export class AthenaLakeRequestError extends Error {
   /**
@@ -300,12 +305,61 @@ export function validateAthenaLakeQueryBody(body, access) {
       }
       limClamped = Math.min(maxComposeRowsCap, maxSelectRows, Math.max(1, Math.floor(n)));
     }
-    if (demo) limClamped = Math.min(limClamped, ATHENA_DEMO_ROW_LIMIT);
+    if (demo) limClamped = Math.min(limClamped ?? ATHENA_DEMO_ROW_LIMIT, ATHENA_DEMO_ROW_LIMIT);
   } else {
     const base =
       body.limit != null && body.limit !== "" ? Number(body.limit) : 100;
     limClamped = Math.min(maxSelectRows, Math.max(1, Math.floor(Number.isFinite(base) ? base : 100)));
     if (demo) limClamped = Math.min(limClamped, ATHENA_DEMO_ROW_LIMIT);
+  }
+
+  /** @type {{ size: number } | null} */
+  let randomSampleValidated = null;
+  if (queryType === "compose") {
+    const rawComposePeek = body.compose && typeof body.compose === "object" ? body.compose : null;
+    const rawSample =
+      rawComposePeek?.randomSample != null
+        ? rawComposePeek.randomSample
+        : body.randomSample != null
+          ? body.randomSample
+          : null;
+    if (rawSample != null) {
+      const maxSample = demo
+        ? ATHENA_DEMO_ROW_LIMIT
+        : Math.min(maxComposeRowsCap, maxSelectRows, COMPOSE_SQL_LIMIT_ABSOLUTE_MAX);
+      const sizeErr = validateRandomSampleSizeInput(
+        typeof rawSample === "object" && rawSample != null
+          ? rawSample.size ?? rawSample.sampleSize
+          : rawSample,
+        { maxSize: maxSample, required: true },
+      );
+      // Allow disabled / empty randomSample object without error.
+      const enabledFlag =
+        typeof rawSample === "object" && rawSample != null
+          ? rawSample.enabled === true ||
+            rawSample.enabled === "true" ||
+            rawSample.enabled === 1 ||
+            (rawSample.enabled == null &&
+              (rawSample.size != null || rawSample.sampleSize != null))
+          : true;
+      if (enabledFlag) {
+        if (sizeErr) {
+          throw new AthenaLakeRequestError(sizeErr, { statusCode: 400, code: "BAD_REQUEST" });
+        }
+        randomSampleValidated = normalizeRandomSampleConfig(
+          typeof rawSample === "object" ? { ...rawSample, enabled: true } : { enabled: true, size: rawSample },
+          { maxSize: maxSample },
+        );
+        if (!randomSampleValidated) {
+          throw new AthenaLakeRequestError("Invalid random sample size", {
+            statusCode: 400,
+            code: "BAD_REQUEST",
+          });
+        }
+        // Random Sample takes precedence over ordinary Limit / Offset.
+        limClamped = null;
+      }
+    }
   }
 
   if (queryType === "compose") {
@@ -905,11 +959,20 @@ export function validateAthenaLakeQueryBody(body, access) {
       ...(validatedJoins.length ? { joins: validatedJoins } : {}),
       ...(validatedCteJoins.length ? { cteJoins: validatedCteJoins } : {}),
       ...(normalizedHaving ? { having: normalizedHaving } : {}),
-      ...(limitScopeValidated ? { limitScope: limitScopeValidated } : {}),
+      ...(limitScopeValidated && !randomSampleValidated ? { limitScope: limitScopeValidated } : {}),
     };
 
+    if (randomSampleValidated) {
+      validatedCompose = sanitizeComposeForRandomSample(validatedCompose, randomSampleValidated);
+    }
+
     try {
-      const capRows = composeUnboundedSelectShouldCapRows(validatedCompose) ? maxComposeRowsCap : null;
+      const capRows =
+        randomSampleValidated != null
+          ? null
+          : composeUnboundedSelectShouldCapRows(validatedCompose)
+            ? maxComposeRowsCap
+            : null;
       buildComposeAthenaSelectSql({
         physicalTableName: physical,
         limit: capRows,
@@ -922,6 +985,7 @@ export function validateAthenaLakeQueryBody(body, access) {
           lake,
           table,
         }),
+        randomSampleSize: randomSampleValidated?.size ?? null,
       });
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);

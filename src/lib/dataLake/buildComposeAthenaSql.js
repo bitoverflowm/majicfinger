@@ -13,6 +13,10 @@ import {
   KALSHI_VIRTUAL_TAXONOMY_CATEGORY_COLUMN,
 } from "@/lib/kalshi/kalshiTaxonomySql";
 import { composeBucketMsColumnAlias } from "@/lib/composeDateDisplay";
+import {
+  parseRandomSampleSize,
+  wrapComposeSqlWithRandomSample,
+} from "@/lib/dataLake/randomSample";
 
 /** @typedef {"hour" | "day" | "week" | "month" | "quarter" | "year"} DateBucket */
 /** @typedef {"raw" | "iso" | "dmy" | "ym" | "dm" | "hm"} DateFormat */
@@ -682,6 +686,48 @@ export function buildComposeAthenaSelectSql({
   whereSql = "",
   kalshiMaterializedVirtuals = null,
   expandedJoinResultCap = null,
+  randomSampleSize = null,
+}) {
+  const sampleSizeParsed = parseRandomSampleSize(randomSampleSize);
+  const postSampleOrderBy =
+    sampleSizeParsed != null && Array.isArray(compose?.orderBy) ? compose.orderBy : [];
+  // Random Sample: build the eligible query without user ORDER BY / LIMIT, then wrap.
+  const composeForBuild =
+    sampleSizeParsed != null
+      ? { ...compose, orderBy: [], limitScope: undefined }
+      : compose;
+  const limitForBuild = sampleSizeParsed != null ? null : limit;
+  const expandCapForBuild = sampleSizeParsed != null ? null : expandedJoinResultCap;
+
+  return buildComposeAthenaSelectSqlInner({
+    physicalTableName,
+    limit: limitForBuild,
+    compose: composeForBuild,
+    lake,
+    table,
+    whereSql,
+    kalshiMaterializedVirtuals,
+    expandedJoinResultCap: expandCapForBuild,
+    postSampleOrderBy,
+    randomSampleSize: sampleSizeParsed,
+  });
+}
+
+/**
+ * @param {object} params
+ * @returns {string}
+ */
+function buildComposeAthenaSelectSqlInner({
+  physicalTableName,
+  limit,
+  compose,
+  lake = null,
+  table = null,
+  whereSql = "",
+  kalshiMaterializedVirtuals = null,
+  expandedJoinResultCap = null,
+  postSampleOrderBy = [],
+  randomSampleSize = null,
 }) {
   const safeTable = String(physicalTableName).trim();
   if (!/^[a-zA-Z0-9_]+$/.test(safeTable)) {
@@ -932,6 +978,19 @@ export function buildComposeAthenaSelectSql({
     orderSql = ` ORDER BY ${obParts.join(", ")}`;
   }
 
+  // Post-sample user sort: validate aliases against SELECT output (not applied to eligible SQL).
+  const postOb = Array.isArray(postSampleOrderBy) ? postSampleOrderBy : [];
+  if (postOb.length > 0) {
+    for (const o of postOb) {
+      const a = String(o?.alias || "").trim();
+      if (!SAFE_ALIAS.test(a) || !byAlias.has(a)) {
+        const err = new Error(`ORDER BY must reference a SELECT alias: ${a}`);
+        err.code = "BAD_REQUEST";
+        throw err;
+      }
+    }
+  }
+
   const havingAnd = Array.isArray(compose?.having?.and) ? compose.having.and : [];
   let havingSql = "";
   if (havingAnd.length > 0) {
@@ -995,5 +1054,21 @@ export function buildComposeAthenaSelectSql({
     finalLimit = expandCap != null ? ` LIMIT ${expandCap}` : "";
   }
 
-  return `${ctePrefix}SELECT ${selectParts.join(", ")} ${finalFrom}${finalWhere}${groupSql}${havingSql}${finalOrder}${finalLimit}`;
+  return finalizeComposeSqlWithOptionalRandomSample(
+    `${ctePrefix}SELECT ${selectParts.join(", ")} ${finalFrom}${finalWhere}${groupSql}${havingSql}${finalOrder}${finalLimit}`,
+    { randomSampleSize, postSampleOrderBy },
+  );
+}
+
+/**
+ * @param {string} eligibleSql
+ * @param {{ randomSampleSize: number | null; postSampleOrderBy: Array<{ alias: string; direction: string }> }} opts
+ */
+function finalizeComposeSqlWithOptionalRandomSample(eligibleSql, opts) {
+  const sampleN = opts?.randomSampleSize;
+  if (sampleN == null) return eligibleSql;
+  return wrapComposeSqlWithRandomSample(eligibleSql, {
+    sampleSize: sampleN,
+    orderBy: opts.postSampleOrderBy || [],
+  });
 }

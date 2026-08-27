@@ -109,6 +109,8 @@ export function GuidedWorkflowPullResults({
             dataLakeComposeLimitOpen: !!draft?.composeLimitOpen,
             dataLakeComposeLimitValue: draft?.composeLimitValue ?? "",
             dataLakeComposeLimitScope: draft?.composeLimitScope ?? "primary",
+            dataLakeComposeRandomSampleEnabled: !!draft?.randomSampleEnabled,
+            dataLakeComposeRandomSampleSize: draft?.randomSampleSize ?? "",
             connectActiveComposeOps: Array.isArray(draft?.activeComposeOps)
               ? draft.activeComposeOps
               : [],

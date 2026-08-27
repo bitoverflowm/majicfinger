@@ -107,6 +107,8 @@ import { buildComposeFiltersPayload, resolveEffectiveHubWhereFilters } from "@/l
 import { useDataLakeComposeState } from "@/hooks/useDataLakeComposeState";
 import { buildDataLakeServerComposePayload } from "@/lib/dataLakeComposePayload";
 import { COMPOSE_PRIMARY_JOIN_EXPAND_CAP_DEFAULT } from "@/lib/composeLimitScope";
+import { validateRandomSampleSizeInput } from "@/lib/dataLake/randomSample";
+import { ConnectRandomSamplePanel } from "@/components/connectData/ConnectRandomSamplePanel";
 import {
   composeColumnsWithJoinTargets,
   composeItemRefKey,
@@ -619,6 +621,10 @@ export default function DataLakeParquetPanel({
     setComposeHavingFilters,
     composeJoins,
     setComposeJoins,
+    randomSampleEnabled,
+    setRandomSampleEnabled,
+    randomSampleSize,
+    setRandomSampleSize,
   } = useDataLakeComposeState(connectHomeDataLakeCompose);
   const user = useUser();
   const subscriberAthenaAccess = useMemo(() => userHasExpandedAthenaAccess(user), [user]);
@@ -1316,6 +1322,8 @@ export default function DataLakeParquetPanel({
       kalshiTradesJoinPreset,
       kalshiTradesJoinPresets: KALSHI_TRADES_JOIN_PRESETS,
       composeLimitScope,
+      randomSampleEnabled: !!randomSampleEnabled,
+      randomSampleSize,
     });
   }, [
     columnComposeItems,
@@ -1328,6 +1336,8 @@ export default function DataLakeParquetPanel({
     kalshiTradesJoinPreset,
     composeJoins,
     composeLimitScope,
+    randomSampleEnabled,
+    randomSampleSize,
   ]);
 
   const composeFriendlySummary = useMemo(() => {
@@ -3190,7 +3200,17 @@ export default function DataLakeParquetPanel({
         seen.add(a);
       }
 
-      if (composeLimitRuleOpen) {
+      if (randomSampleEnabled) {
+        const sampleErr = validateRandomSampleSizeInput(randomSampleSize, {
+          maxSize: athenaRowLimit,
+          required: true,
+        });
+        if (sampleErr) {
+          rejectConnectHomePull(sampleErr);
+          return;
+        }
+        composeAthenaRowLimit = null;
+      } else if (composeLimitRuleOpen) {
         const rawLim = String(composeLimitRuleValue ?? "").trim();
         if (!rawLim) {
           rejectConnectHomePull("Enter a maximum row count for the limit, or remove the row limit.");
@@ -3276,6 +3296,9 @@ export default function DataLakeParquetPanel({
             hasWhere: whereSummary.hasWhere,
             whereText: whereSummary.text,
             composeRowLimit: composeAthenaRowLimit,
+            randomSampleSize: randomSampleEnabled
+              ? Math.floor(Number(randomSampleSize))
+              : null,
             querySummary: buildRequestCardQuerySummary({
               lake,
               table: selected.table,
@@ -3284,6 +3307,9 @@ export default function DataLakeParquetPanel({
               hasWhere: whereSummary.hasWhere,
               whereText: whereSummary.text,
               composeRowLimit: composeAthenaRowLimit,
+              randomSampleSize: randomSampleEnabled
+                ? Math.floor(Number(randomSampleSize))
+                : null,
             }),
           }
         : null;
@@ -3531,6 +3557,15 @@ export default function DataLakeParquetPanel({
     }
     if (
       (selectionTab === "columns" || selectionTab === "recipes") &&
+      randomSampleEnabled
+    ) {
+      const sampleErr = validateRandomSampleSizeInput(randomSampleSize, {
+        maxSize: athenaRowLimit,
+        required: true,
+      });
+      if (sampleErr) reasons.push(sampleErr);
+    } else if (
+      (selectionTab === "columns" || selectionTab === "recipes") &&
       composeLimitRuleOpen
     ) {
       const rawLim = String(composeLimitRuleValue ?? "").trim();
@@ -3561,6 +3596,9 @@ export default function DataLakeParquetPanel({
     composeHavingFilters,
     composeLimitRuleOpen,
     composeLimitRuleValue,
+    randomSampleEnabled,
+    randomSampleSize,
+    athenaRowLimit,
     buildAllMetaOpSpecsForRun,
     isDemo,
   ]);
@@ -4748,6 +4786,14 @@ export default function DataLakeParquetPanel({
                       primaryTableLabel={selected?.table || "primary table"}
                       showSetLimitButton={false}
                       inputClassName="w-1/4 min-w-[7rem]"
+                      disabled={!!randomSampleEnabled}
+                      disabledReason="Limit and Offset are unavailable while Random Sample is enabled. Sort is applied after the sample is selected."
+                    />
+                  ) : null}
+                  {randomSampleEnabled ? (
+                    <ConnectRandomSamplePanel
+                      sampleSize={randomSampleSize}
+                      onSampleSizeChange={setRandomSampleSize}
                     />
                   ) : null}
                   <div className="flex flex-wrap items-center gap-2 min-w-0">
@@ -4777,7 +4823,12 @@ export default function DataLakeParquetPanel({
                         variant="outline"
                         size="sm"
                         className="h-8 text-xs shrink-0"
-                        disabled={composeSelectAliasChoices.length === 0}
+                        disabled={composeSelectAliasChoices.length === 0 || !!randomSampleEnabled}
+                        title={
+                          randomSampleEnabled
+                            ? "Limit and Offset are unavailable while Random Sample is enabled. Sort is applied after the sample is selected."
+                            : undefined
+                        }
                         onClick={() => {
                           setComposeLimitRuleOpen(true);
                           setComposeLimitRuleValue((v) => (String(v || "").trim() ? v : String(Math.min(1000, athenaRowLimit))));
@@ -4786,6 +4837,25 @@ export default function DataLakeParquetPanel({
                         row limit
                       </Button>
                     ) : null}
+                    <Button
+                      type="button"
+                      variant={randomSampleEnabled ? "default" : "outline"}
+                      size="sm"
+                      className="h-8 text-xs shrink-0"
+                      disabled={composeSelectAliasChoices.length === 0}
+                      onClick={() => {
+                        if (randomSampleEnabled) {
+                          setRandomSampleEnabled?.(false);
+                          return;
+                        }
+                        setComposeLimitRuleOpen?.(false);
+                        setComposeLimitRuleValue?.("");
+                        setRandomSampleEnabled?.(true);
+                        setRandomSampleSize?.((v) => (String(v || "").trim() ? v : "100"));
+                      }}
+                    >
+                      random sample
+                    </Button>
                   </div>
                 </div>
 

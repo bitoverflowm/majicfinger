@@ -185,6 +185,7 @@ async function buildSheetCteBundle(sheetGraph, rootSheetId, access) {
       table: validated.table,
       whereSql,
       kalshiMaterializedVirtuals: kalshiMat,
+      randomSampleSize: validated.compose?.randomSample?.size ?? null,
     });
 
     cteSqlById.set(sheetId, { cteName, cteSql });
