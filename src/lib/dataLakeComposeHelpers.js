@@ -28,11 +28,13 @@ export function kindForLakeColumn(name, typesByName) {
   const t = typesByName[name];
   if (!t) return "string";
   const typeNorm = String(t).toLowerCase();
+  if (typeNorm === "boolean" || typeNorm === "bool") return "boolean";
   const isDateLike =
     /time|date|_at$|_ms$|timestamp/i.test(name) &&
     (typeNorm === "bigint" || typeNorm === "int" || typeNorm === "datetime");
   if ((typeNorm === "bigint" || typeNorm === "int") && isDateLike) return "date";
   if (typeNorm === "double" || typeNorm === "bigint" || typeNorm === "int") return "number";
   if (typeNorm === "string") return "string";
+  // Unknown Hive types: keep free-form string (do not invent constrained controls).
   return "string";
 }

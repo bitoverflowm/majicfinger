@@ -230,6 +230,14 @@ export function buildComposeFiltersWhereSql(opts) {
       return `${colSql} ${opSql} ${Number(p.value)}`;
     }
 
+    if (p.kind === "boolean") {
+      const boolVal = p.value === true || p.value === "true" || p.value === 1 || p.value === "1";
+      // CAST keeps Athena happy across boolean / string-ish lake storage.
+      const boolCmp = `LOWER(CAST(${colSql} AS VARCHAR))`;
+      const lit = boolVal ? "true" : "false";
+      return p.op === "neq" ? `${boolCmp} <> '${lit}'` : `${boolCmp} = '${lit}'`;
+    }
+
     const colMaybeLower = caseSensitive ? colSql : `LOWER(${colSql})`;
     if (p.op === "contains" || p.op === "not_contains") {
       const pattern = `%${escapeLike(p.value)}%`;

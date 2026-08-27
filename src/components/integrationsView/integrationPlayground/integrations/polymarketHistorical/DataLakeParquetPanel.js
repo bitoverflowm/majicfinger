@@ -109,6 +109,14 @@ import { buildDataLakeServerComposePayload } from "@/lib/dataLakeComposePayload"
 import { COMPOSE_PRIMARY_JOIN_EXPAND_CAP_DEFAULT } from "@/lib/composeLimitScope";
 import { validateRandomSampleSizeInput } from "@/lib/dataLake/randomSample";
 import { ConnectRandomSamplePanel } from "@/components/connectData/ConnectRandomSamplePanel";
+import { ComposeWhereValueField } from "@/components/connectData/ComposeWhereValueField";
+import {
+  coerceWhereOpForKind,
+  defaultWhereValueForKind,
+  isComposeWhereFilterIncomplete,
+  whereOpsForKind,
+} from "@/lib/composeWhereFilterUi";
+import { kindForLakeColumn } from "@/lib/dataLakeComposeHelpers";
 import {
   composeColumnsWithJoinTargets,
   composeItemRefKey,
@@ -918,15 +926,10 @@ export default function DataLakeParquetPanel({
     return /(^timestamp$)|(_at$)|(_time$)|(^created_)|(_date$)|date|time/i.test(String(name || ""));
   }, []);
 
-  const kindForColumn = useCallback((columnName) => {
-    const t = availableColumnTypesByName[columnName];
-    if (!t) return "string";
-    const typeNorm = String(t).toLowerCase();
-    if ((typeNorm === "bigint" || typeNorm === "int") && isDateLikeName(columnName)) return "date";
-    if (typeNorm === "double" || typeNorm === "bigint" || typeNorm === "int") return "number";
-    if (typeNorm === "string") return "string";
-    return "string";
-  }, [availableColumnTypesByName, isDateLikeName]);
+  const kindForColumn = useCallback(
+    (columnName) => kindForLakeColumn(columnName, availableColumnTypesByName),
+    [availableColumnTypesByName],
+  );
 
   useEffect(() => {
     if (!connectHomeDataLakeCompose || !connectDataLakeSampleId) return;
@@ -3161,12 +3164,7 @@ export default function DataLakeParquetPanel({
         !isDemo &&
         Array.isArray(composeWhereFilters) &&
         composeWhereFilters.length > 0 &&
-        composeWhereFilters.some((f) => {
-          if (!f?.column || !f?.op || !f?.kind) return true;
-          if (f.op === "in" || f.op === "not_in") return !String(f.value ?? "").trim();
-          if (f.kind === "string") return !String(f.value ?? "").trim();
-          return !Number.isFinite(Number(f.value));
-        });
+        composeWhereFilters.some((f) => isComposeWhereFilterIncomplete(f));
       if (hasIncompleteComposeWhereFilters) {
         rejectConnectHomePull("Enter a value for each WHERE filter before running.");
         return;
@@ -3530,12 +3528,7 @@ export default function DataLakeParquetPanel({
       !isDemo &&
       Array.isArray(composeWhereFilters) &&
       composeWhereFilters.length > 0 &&
-      composeWhereFilters.some((f) => {
-        if (!f?.column || !f?.op || !f?.kind) return true;
-        if (f.op === "in" || f.op === "not_in") return !String(f.value ?? "").trim();
-        if (f.kind === "string") return !String(f.value ?? "").trim();
-        return !Number.isFinite(Number(f.value));
-      });
+      composeWhereFilters.some((f) => isComposeWhereFilterIncomplete(f));
     if ((selectionTab === "columns" || selectionTab === "recipes") && hasIncompleteComposeWhereFilters) {
       reasons.push("Enter a value for each WHERE filter.");
     }
@@ -3938,19 +3931,9 @@ export default function DataLakeParquetPanel({
       setError(null);
       const kind = kindForColumn(column);
       const id = `w-${Date.now()}-${Math.random().toString(16).slice(2)}`;
-      const defaultValue =
-        op === "in" || op === "not_in"
-          ? kind === "number"
-            ? "1, 2, 3"
-            : kind === "string"
-              ? '"yes", "no"'
-              : String(Date.now())
-          : kind === "date"
-            ? Date.now()
-            : kind === "number"
-              ? 0
-              : "";
-      const predicate = { id, column, kind, op, value: defaultValue };
+      const safeOp = coerceWhereOpForKind(op || "eq", kind);
+      const defaultValue = defaultWhereValueForKind(kind, safeOp);
+      const predicate = { id, column, kind, op: safeOp, value: defaultValue };
       setComposeWhereFilters((prev) => [...prev, predicate]);
     },
     [kindForColumn],
@@ -4182,17 +4165,12 @@ export default function DataLakeParquetPanel({
                                         ? [
                                             { id: "contains", label: "contains" },
                                             { id: "not_contains", label: "not contains" },
-                                            { id: "in", label: "in set" },
-                                            { id: "not_in", label: "not in set" },
-                                          ]
-                                        : [
-                                            { id: "gt", label: "greater than" },
-                                            { id: "lt", label: "less than" },
                                             { id: "eq", label: "is equal to" },
                                             { id: "neq", label: "not equal to" },
                                             { id: "in", label: "in set" },
                                             { id: "not_in", label: "not in set" },
-                                          ];
+                                          ]
+                                        : whereOpsForKind(filterKind);
 
                                     return (
                                       <DropdownMenuSub key={filterCol}>
@@ -4271,34 +4249,13 @@ export default function DataLakeParquetPanel({
                             value={f.column}
                             onValueChange={(val) => {
                               const kind = kindForColumn(val);
-                              const isInListOp = f.op === "in" || f.op === "not_in";
-                              const defaultValue = isInListOp
-                                ? kind === "number"
-                                  ? "1, 2, 3"
-                                  : kind === "string"
-                                    ? '"yes", "no"'
-                                    : String(Date.now())
-                                : kind === "date"
-                                  ? Date.now()
-                                  : kind === "number"
-                                    ? 0
-                                    : "";
-
-                              const nextOp =
-                                kind === "string"
-                                  ? isInListOp
-                                    ? f.op
-                                    : f.op === "neq"
-                                      ? "neq"
-                                      : "eq"
-                                  : kind === "number"
-                                    ? ["gt", "lt", "eq", "neq", "in", "not_in"].includes(f.op)
-                                      ? f.op
-                                      : "gt"
-                                    : // date (epoch ms): keep scalar ops; map IN list to eq
-                                      ["gt", "lt", "eq", "neq"].includes(f.op) ? f.op : "eq";
-
-                              updateComposeWhereFilter(f.id, { column: val, kind, op: nextOp, value: defaultValue });
+                              const nextOp = coerceWhereOpForKind(f.op, kind);
+                              updateComposeWhereFilter(f.id, {
+                                column: val,
+                                kind,
+                                op: nextOp,
+                                value: defaultWhereValueForKind(kind, nextOp),
+                              });
                             }}
                           >
                             <SelectTrigger className="h-7 text-[11px] min-w-[7rem] w-1/4">
@@ -4320,27 +4277,22 @@ export default function DataLakeParquetPanel({
                               </Button>
                             </DropdownMenuTrigger>
                             <DropdownMenuContent align="start" className="w-44">
-                              {(
-                                f.kind === "string"
-                                  ? [
-                                      { id: "eq", label: "is equal to" },
-                                      { id: "neq", label: "not equal to" },
-                                      { id: "in", label: "in set" },
-                                      { id: "not_in", label: "not in set" },
-                                    ]
-                                  : [
-                                      { id: "gt", label: "greater than" },
-                                      { id: "lt", label: "less than" },
-                                      { id: "eq", label: "is equal to" },
-                                      { id: "neq", label: "not equal to" },
-                                      { id: "in", label: "in set" },
-                                      { id: "not_in", label: "not in set" },
-                                    ]
-                              ).map((op) => (
+                              {whereOpsForKind(f.kind).map((op) => (
                                 <DropdownMenuItem
                                   key={op.id}
                                   className="text-[13px]"
-                                  onSelect={() => updateComposeWhereFilter(f.id, { op: op.id })}
+                                  onSelect={() =>
+                                    updateComposeWhereFilter(f.id, {
+                                      op: op.id,
+                                      value:
+                                        op.id === "in" ||
+                                        op.id === "not_in" ||
+                                        f.op === "in" ||
+                                        f.op === "not_in"
+                                          ? defaultWhereValueForKind(f.kind, op.id)
+                                          : f.value,
+                                    })
+                                  }
                                 >
                                   <span className="inline-flex items-center gap-2">
                                     <span className="inline-flex min-w-6 justify-center rounded border border-border/60 px-1 font-mono text-[10px]">
@@ -4353,66 +4305,25 @@ export default function DataLakeParquetPanel({
                             </DropdownMenuContent>
                           </DropdownMenu>
 
-                          {f.kind === "date" ? (
-                            <Input
-                              type="datetime-local"
-                              className={`h-7 text-[11px] min-w-0 flex-[2] placeholder:text-[11px] ${
-                                !Number.isFinite(Number(f.value)) ? "border-destructive focus-visible:ring-destructive" : ""
-                              }`}
-                              value={
-                                Number.isFinite(Number(f.value))
-                                  ? new Date(Number(f.value)).toISOString().slice(0, 16)
-                                  : ""
+                          <ComposeWhereValueField
+                            kind={f.kind}
+                            op={f.op}
+                            value={f.value}
+                            onChange={(v) => updateComposeWhereFilter(f.id, { value: v })}
+                            inputClassName="min-w-0 flex-[2] placeholder:text-[11px]"
+                            invalid={isComposeWhereFilterIncomplete(f)}
+                            onInListFocus={() => {
+                              if (f.kind === "string") {
+                                toast(
+                                  'Strings: use double quotes, e.g. "yes", "no" (comma-separated).',
+                                );
+                              } else if (f.kind === "number") {
+                                toast(
+                                  "Numbers: use raw numbers (no quotes), e.g. 1, 2, 3 (comma-separated).",
+                                );
                               }
-                              onChange={(e) => {
-                                const ms = new Date(String(e.target.value)).getTime();
-                                updateComposeWhereFilter(f.id, { value: Number.isFinite(ms) ? ms : "" });
-                              }}
-                              placeholder="Value"
-                            />
-                          ) : f.op === "in" || f.op === "not_in" ? (
-                            <Input
-                              type="text"
-                              className={`h-7 text-[11px] min-w-0 flex-[2] placeholder:text-[11px] ${
-                                !String(f.value ?? "").trim() ? "border-destructive focus-visible:ring-destructive" : ""
-                              }`}
-                              value={String(f.value ?? "")}
-                              onClick={() => {
-                                if (f.kind === "string") {
-                                  toast(
-                                    'Strings: use double quotes, e.g. "yes", "no" (comma-separated).'
-                                  );
-                                } else {
-                                  toast('Numbers: use raw numbers (no quotes), e.g. 1, 2, 3 (comma-separated).');
-                                }
-                              }}
-                              onChange={(e) => updateComposeWhereFilter(f.id, { value: e.target.value })}
-                              placeholder={f.kind === "string" ? '"yes", "no"' : "1, 2, 3"}
-                            />
-                          ) : f.kind === "number" ? (
-                            <Input
-                              type="number"
-                              step="1"
-                              className={`h-7 text-[11px] min-w-0 flex-[2] placeholder:text-[11px] ${
-                                f.value === "" ? "border-destructive focus-visible:ring-destructive" : ""
-                              }`}
-                              value={f.value}
-                              onChange={(e) =>
-                                updateComposeWhereFilter(f.id, { value: e.target.value === "" ? "" : Number(e.target.value) })
-                              }
-                              placeholder="Value"
-                            />
-                          ) : (
-                            <Input
-                              type="text"
-                              className={`h-7 text-[11px] min-w-0 flex-[2] placeholder:text-[11px] ${
-                                !String(f.value ?? "").trim() ? "border-destructive focus-visible:ring-destructive" : ""
-                              }`}
-                              value={String(f.value ?? "")}
-                              onChange={(e) => updateComposeWhereFilter(f.id, { value: e.target.value })}
-                              placeholder="Value"
-                            />
-                          )}
+                            }}
+                          />
 
                           <TooltipProvider delayDuration={250}>
                             <Tooltip>
@@ -4446,22 +4357,7 @@ export default function DataLakeParquetPanel({
                           <DropdownMenuSeparator />
                           {availableColumns.map((filterCol) => {
                             const filterKind = kindForColumn(filterCol);
-                            const ops =
-                              filterKind === "string"
-                                ? [
-                                    { id: "eq", label: "is equal to" },
-                                    { id: "neq", label: "not equal to" },
-                                    { id: "in", label: "in set" },
-                                    { id: "not_in", label: "not in set" },
-                                  ]
-                                : [
-                                    { id: "gt", label: "greater than" },
-                                    { id: "lt", label: "less than" },
-                                    { id: "eq", label: "is equal to" },
-                                    { id: "neq", label: "not equal to" },
-                                    { id: "in", label: "in set" },
-                                    { id: "not_in", label: "not in set" },
-                                  ];
+                            const ops = whereOpsForKind(filterKind);
                             return (
                               <DropdownMenuSub key={`where-add-${filterCol}`}>
                                 <DropdownMenuSubTrigger className="text-xs">

@@ -47,7 +47,13 @@ import { hasConfiguredTableJoins } from "@/lib/composeJoinColumns";
 import { selectRowsForAggregatedCompose } from "@/lib/composeColumnGrouping";
 import { cn } from "@/lib/utils";
 import { ComposeJoinLimitFields } from "@/components/connectData/ComposeJoinLimitFields";
+import { ComposeWhereValueField } from "@/components/connectData/ComposeWhereValueField";
 import { ConnectComposeIfElseSection } from "@/components/connectData/ConnectComposeIfElseSection";
+import {
+  coerceWhereOpForKind,
+  defaultWhereValueForKind,
+  whereOpsForKindCompact,
+} from "@/lib/composeWhereFilterUi";
 import { ConnectComposeSummarizeSection } from "@/components/connectData/ConnectComposeSummarizeSection";
 import { ComposeJoinTargetColumnPicker } from "@/components/connectData/ComposeJoinTargetColumnPicker";
 import { ConnectHomeSheetPullFields } from "@/components/connectData/ConnectHomeSheetPullFields";
@@ -312,19 +318,12 @@ export function ConnectComposeOperationPanel({
     (column, op) => {
       const kind = kindForColumn(column);
       const id = `w-${Date.now()}-${Math.random().toString(16).slice(2)}`;
-      const defaultValue =
-        op === "in" || op === "not_in"
-          ? kind === "number"
-            ? "1, 2, 3"
-            : kind === "string"
-              ? '"yes", "no"'
-              : String(Date.now())
-          : kind === "date"
-            ? Date.now()
-            : kind === "number"
-              ? 0
-              : "";
-      setComposeWhereFilters?.((prev) => [...(prev || []), { id, column, kind, op, value: defaultValue }]);
+      const safeOp = coerceWhereOpForKind(op || "eq", kind, { compact: true });
+      const defaultValue = defaultWhereValueForKind(kind, safeOp);
+      setComposeWhereFilters?.((prev) => [
+        ...(prev || []),
+        { id, column, kind, op: safeOp, value: defaultValue },
+      ]);
     },
     [kindForColumn, setComposeWhereFilters],
   );
@@ -457,7 +456,13 @@ export function ConnectComposeOperationPanel({
                   onValueChange={(val) => {
                     if (val === "__") return;
                     const kind = kindForColumn(val);
-                    updateWhereFilter(f.id, { column: val, kind });
+                    const op = coerceWhereOpForKind(f.op, kind, { compact: true });
+                    updateWhereFilter(f.id, {
+                      column: val,
+                      kind,
+                      op,
+                      value: defaultWhereValueForKind(kind, op),
+                    });
                   }}
                 >
                   <SelectTrigger
@@ -493,32 +498,32 @@ export function ConnectComposeOperationPanel({
                     </Button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="start" className="w-44">
-                    {(f.kind === "string"
-                      ? [
-                          { id: "eq", label: "is equal to" },
-                          { id: "neq", label: "not equal to" },
-                          { id: "in", label: "in set" },
-                        ]
-                      : [
-                          { id: "gt", label: "greater than" },
-                          { id: "lt", label: "less than" },
-                          { id: "eq", label: "is equal to" },
-                          { id: "in", label: "in set" },
-                        ]
-                    ).map((op) => (
-                      <DropdownMenuItem key={op.id} onSelect={() => updateWhereFilter(f.id, { op: op.id })}>
+                    {whereOpsForKindCompact(f.kind).map((op) => (
+                      <DropdownMenuItem
+                        key={op.id}
+                        onSelect={() =>
+                          updateWhereFilter(f.id, {
+                            op: op.id,
+                            value:
+                              op.id === "in" || op.id === "not_in" || f.op === "in" || f.op === "not_in"
+                                ? defaultWhereValueForKind(f.kind, op.id)
+                                : f.value,
+                          })
+                        }
+                      >
                         {op.label}
                       </DropdownMenuItem>
                     ))}
                   </DropdownMenuContent>
                 </DropdownMenu>
-                <Input
-                  className="h-7 min-w-[3rem] flex-1 text-[11px]"
-                  value={String(f.value ?? "")}
-                  onChange={(e) => updateWhereFilter(f.id, { value: e.target.value })}
-                  {...(fIdx === 0
-                    ? { [GUIDED_TARGET_ATTR]: KALSHI_GUIDED_TARGETS.whereValue }
-                    : {})}
+                <ComposeWhereValueField
+                  kind={f.kind}
+                  op={f.op}
+                  value={f.value}
+                  onChange={(v) => updateWhereFilter(f.id, { value: v })}
+                  guidedAttrs={
+                    fIdx === 0 ? { [GUIDED_TARGET_ATTR]: KALSHI_GUIDED_TARGETS.whereValue } : undefined
+                  }
                 />
                 {!(isCategoryPickStep && fIdx === 0) ? (
                 <button

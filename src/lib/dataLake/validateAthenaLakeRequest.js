@@ -160,7 +160,7 @@ export function validateAthenaLakeQueryBody(body, access) {
     const safeIdent = /^[a-zA-Z_][a-zA-Z0-9_]*$/;
     /**
      * @param {any} p
-     * @returns {{ column: string; kind: "date" | "string" | "number"; op: string; value: any }}
+     * @returns {{ column: string; kind: "date" | "string" | "number" | "boolean"; op: string; value: any }}
      */
     const normalizePredicate = (p) => {
       if (!p || typeof p !== "object") {
@@ -169,13 +169,46 @@ export function validateAthenaLakeQueryBody(body, access) {
       const column = String(p.column || "").trim();
       const kindRaw = String(p.kind || "").toLowerCase().trim();
       const op = String(p.op || "").toLowerCase().trim();
-      const kind = kindRaw === "date" ? "date" : kindRaw === "string" ? "string" : "number";
+      const kind =
+        kindRaw === "boolean"
+          ? "boolean"
+          : kindRaw === "date"
+            ? "date"
+            : kindRaw === "string"
+              ? "string"
+              : "number";
 
       if (!safeIdent.test(column)) {
         throw new AthenaLakeRequestError(`Invalid filter column: ${column}`, { statusCode: 400, code: "BAD_REQUEST" });
       }
 
       const isInListOp = op === "in" || op === "not_in";
+
+      if (kind === "boolean") {
+        if (!["eq", "neq"].includes(op)) {
+          throw new AthenaLakeRequestError("Invalid boolean filter operator", { statusCode: 400, code: "BAD_REQUEST" });
+        }
+        const boolVal =
+          p.value === true ||
+          p.value === false
+            ? p.value === true
+            : String(p.value ?? "")
+                  .trim()
+                  .toLowerCase() === "true"
+              ? true
+              : String(p.value ?? "")
+                    .trim()
+                    .toLowerCase() === "false"
+                ? false
+                : null;
+        if (boolVal == null) {
+          throw new AthenaLakeRequestError("Invalid boolean filter value (use true or false)", {
+            statusCode: 400,
+            code: "BAD_REQUEST",
+          });
+        }
+        return { column, kind, op, value: boolVal };
+      }
 
       if (kind === "date") {
         if (!["gt", "lt", "eq", "neq"].includes(op)) {

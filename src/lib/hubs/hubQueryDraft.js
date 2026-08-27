@@ -1,12 +1,14 @@
+import { parseBooleanish } from "@/lib/composeWhereFilterUi";
+
 const STORAGE_KEY = "lychee:hubQueryDraft";
 
 /**
  * @typedef {object} HubQueryWhereFilter
  * @property {string} id
  * @property {string} column
- * @property {"string" | "number"} kind
+ * @property {"string" | "number" | "date" | "boolean"} kind
  * @property {string} op
- * @property {string} value
+ * @property {string | number | boolean} value
  */
 
 /**
@@ -40,12 +42,32 @@ export function normalizeHubQueryWhereFilters(filters) {
     .map((f) => {
       if (!f || typeof f !== "object") return null;
       const column = String(f.column || "").trim();
-      const value = String(f.value ?? "").trim();
-      if (!column || !value) return null;
+      if (!column) return null;
       const kindRaw = String(f.kind || "").toLowerCase().trim();
       const kind =
-        kindRaw === "date" ? "date" : kindRaw === "number" ? "number" : "string";
+        kindRaw === "boolean"
+          ? "boolean"
+          : kindRaw === "date"
+            ? "date"
+            : kindRaw === "number"
+              ? "number"
+              : "string";
       const op = String(f.op || "eq").trim() || "eq";
+
+      if (kind === "boolean") {
+        const parsed = parseBooleanish(f.value);
+        if (parsed == null) return null;
+        return {
+          id: String(f.id || `w-${column}-${Math.random().toString(36).slice(2)}`),
+          column,
+          kind,
+          op: op === "neq" ? "neq" : "eq",
+          value: parsed ? "true" : "false",
+        };
+      }
+
+      const value = String(f.value ?? "").trim();
+      if (!value) return null;
       return {
         id: String(f.id || `w-${column}-${Math.random().toString(36).slice(2)}`),
         column,
