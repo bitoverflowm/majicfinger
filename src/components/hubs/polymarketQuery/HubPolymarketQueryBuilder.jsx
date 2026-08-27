@@ -11,6 +11,7 @@ import useSWR from "swr";
 import { userSwrFetcher } from "@/lib/hooks";
 import { useMyStateV2 } from "@/context/stateContextV2";
 import { useDemoProGate } from "@/hooks/useDemoProGate";
+import { getConnectComposeOperationsForWorkspace } from "@/lib/connectComposeOperations";
 import { getConnectDataLakeConfig } from "@/lib/connectQueryComposeConfig";
 import { applyHubQueryDraft } from "@/lib/hubs/applyHubQueryDraft";
 import {
@@ -742,6 +743,7 @@ export function HubPolymarketQueryBuilder({
                 <ConnectDataOperationsSection
                   selectedCount={selectedColumns.length}
                   className="mt-0 border-t-0 pt-0"
+                  operations={getConnectComposeOperationsForWorkspace(INTEGRATION_ID)}
                   activeComposeOps={activeComposeOps}
                   setActiveComposeOps={setActiveComposeOps}
                   title="Refine your query"

@@ -5,12 +5,19 @@
 
 /** @typedef {{ id: string; title: string; description: string }} ConnectComposeOperation */
 
+const WHERE_DESCRIPTION_DEFAULT =
+  "Filter your data before pulling. (eg: category = Weather; volume > 10000).";
+
+/** Polymarket historical lakes have no Category column — use a real market field in the example. */
+const WHERE_DESCRIPTION_POLYMARKET =
+  "Filter your data before pulling. (eg: closed = true; volume > 10000).";
+
 /** @type {ConnectComposeOperation[]} */
 export const CONNECT_COMPOSE_OPERATIONS = [
   {
     id: "where",
     title: "Where",
-    description: "Filter your data before pulling. (eg: category = Weather; volume > 10000).",
+    description: WHERE_DESCRIPTION_DEFAULT,
   },
   {
     id: "sort",
@@ -43,3 +50,16 @@ export const CONNECT_COMPOSE_OPERATIONS = [
     description: "Combine data pull with another table using a pivot (join markets and trades on ticker: combines markets and trades wherre trades match tickers).",
   },
 ];
+
+/**
+ * Compose op copy for a Connect workspace. Polymarket Historical uses a closed-market example
+ * instead of Kalshi’s category = Weather.
+ * @param {string | null | undefined} workspaceId
+ * @returns {ConnectComposeOperation[]}
+ */
+export function getConnectComposeOperationsForWorkspace(workspaceId) {
+  if (workspaceId !== "polymarketHistorical") return CONNECT_COMPOSE_OPERATIONS;
+  return CONNECT_COMPOSE_OPERATIONS.map((op) =>
+    op.id === "where" ? { ...op, description: WHERE_DESCRIPTION_POLYMARKET } : op,
+  );
+}
