@@ -119,6 +119,7 @@ import {
   whereOpsForKind,
 } from "@/lib/composeWhereFilterUi";
 import { kindForLakeColumn } from "@/lib/dataLakeComposeHelpers";
+import { syncComposeItemsWithSelectedColumns } from "@/lib/dataLakeComposeSummarize";
 import {
   composeColumnsWithJoinTargets,
   composeItemRefKey,
@@ -944,14 +945,8 @@ export default function DataLakeParquetPanel({
     const cols = connectDataLakeColumnSelections[connectDataLakeSampleId];
     if (!Array.isArray(cols)) return;
 
-    setColumnComposeItems((prev) => {
-      const prevCols = new Set(prev.map((i) => i.column));
-      if (prev.length === cols.length && cols.every((c) => prevCols.has(c))) {
-        return prev;
-      }
-      return cols.map((col) => {
-        const existing = prev.find((i) => i.column === col);
-        if (existing) return existing;
+    setColumnComposeItems((prev) =>
+      syncComposeItemsWithSelectedColumns(prev || [], cols, (col) => {
         const t = String(availableColumnTypesByName[col] || "").toLowerCase();
         const isDate = (t === "bigint" || t === "int") && isDateLikeName(col);
         return {
@@ -967,8 +962,8 @@ export default function DataLakeParquetPanel({
           sumCase: { enabled: false, branches: [], elseColumn: "" },
           equation: { enabled: false },
         };
-      });
-    });
+      }),
+    );
   }, [
     connectHomeDataLakeCompose,
     connectDataLakeSampleId,

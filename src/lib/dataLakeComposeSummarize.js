@@ -82,6 +82,60 @@ export function summarizeRollupLabel(value) {
   return universal?.label || value;
 }
 
+/** SQL/output alias must match Athena identifier rules. */
+export function sanitizeComposeAlias(raw, fallback = "col") {
+  let s = String(raw || "")
+    .trim()
+    .replace(/[^a-zA-Z0-9_]+/g, "_")
+    .replace(/^_+|_+$/g, "")
+    .replace(/_+/g, "_");
+  if (!s) s = String(fallback || "col");
+  if (!/^[a-zA-Z_]/.test(s)) s = `c_${s}`;
+  return s.slice(0, 64);
+}
+
+/**
+ * Default output alias for a summarize metric (unique among existing aliases).
+ * @param {string} column
+ * @param {string | null | undefined} aggregate rollup id (sum, max, …) or "equation"
+ * @param {Iterable<string>} [existingAliases]
+ */
+export function suggestSummarizeAlias(column, aggregate, existingAliases = []) {
+  const col = sanitizeComposeAlias(column, "col");
+  const agg = String(aggregate || "").trim().toLowerCase();
+  const suffix =
+    !agg || agg === "none"
+      ? ""
+      : agg === "equation"
+        ? "equation"
+        : agg === "count_distinct"
+          ? "count_distinct"
+          : agg;
+  const base = suffix ? `${col}_${suffix}` : col;
+  const taken = new Set(
+    [...existingAliases].map((a) => String(a || "").trim()).filter(Boolean),
+  );
+  if (!taken.has(base)) return base;
+  let i = 2;
+  while (taken.has(`${base}_${i}`)) i += 1;
+  return `${base}_${i}`;
+}
+
+/**
+ * Whether alias still looks like an auto-generated summarize name for this column/agg.
+ * @param {string} alias
+ * @param {string} column
+ * @param {string | null | undefined} aggregate
+ */
+export function isAutoSummarizeAlias(alias, column, aggregate) {
+  const a = String(alias || "").trim();
+  if (!a) return true;
+  const expected = suggestSummarizeAlias(column, aggregate, []);
+  if (a === expected) return true;
+  const re = new RegExp(`^${expected.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}_\\d+$`);
+  return re.test(a);
+}
+
 /**
  * @param {object} item compose row
  * @param {string} v rollup select value
@@ -138,4 +192,39 @@ export function buildSummarizeRollupPatch(item, v, { availableColumns, numericCo
     ...(v !== "sum" ? { sumCase: { enabled: false, branches: [], elseColumn: "" } } : {}),
     equation: { enabled: false },
   };
+}
+
+/**
+ * Default rollup when adding a summarize metric for a column kind.
+ * @param {"number" | "string" | "date" | "boolean" | string} kind
+ */
+export function defaultSummarizeRollupForKind(kind) {
+  return kind === "number" ? "sum" : "count";
+}
+
+/**
+ * Merge selected pull columns into compose items while preserving extra aggregate
+ * rows that share a source column (e.g. SUM(volume) + MAX(volume)).
+ *
+ * @param {object[]} prevRows
+ * @param {string[]} selectedColumns
+ * @param {(col: string) => object} createBaseRow
+ */
+export function syncComposeItemsWithSelectedColumns(prevRows, selectedColumns, createBaseRow) {
+  const cols = Array.isArray(selectedColumns) ? selectedColumns.filter(Boolean) : [];
+  const selected = new Set(cols);
+  const prev = Array.isArray(prevRows) ? prevRows : [];
+
+  const kept = prev.filter((row) => selected.has(String(row?.column || "").trim()));
+  const next = [...kept];
+  for (const col of cols) {
+    if (!next.some((row) => String(row?.column || "").trim() === col)) {
+      next.push(createBaseRow(col));
+    }
+  }
+
+  if (next.length === prev.length && next.every((row, i) => row === prev[i])) {
+    return prev;
+  }
+  return next;
 }

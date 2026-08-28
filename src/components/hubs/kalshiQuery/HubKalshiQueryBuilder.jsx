@@ -1168,6 +1168,7 @@ function HubKalshiQueryBuilderInner({
                     standalone
                     sampleId={sampleId}
                     columnSelections={columnSelections}
+                    onColumnSelectionsChange={setColumnSelections}
                     hidePullActions
                     activeComposeOps={activeComposeOps}
                     setActiveComposeOps={setActiveComposeOps}

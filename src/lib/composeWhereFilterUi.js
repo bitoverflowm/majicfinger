@@ -110,8 +110,9 @@ export function defaultWhereValueForKind(kind, op) {
     return "";
   }
   if (kind === "boolean") return "true";
-  if (kind === "date") return Date.now();
-  if (kind === "number") return 0;
+  if (kind === "date") return "";
+  // Numbers start empty so 0 is an intentional value, never a stand-in for "unset"/null.
+  if (kind === "number") return "";
   return "";
 }
 
@@ -137,7 +138,11 @@ export function isComposeWhereFilterIncomplete(f) {
   if (f.op === "in" || f.op === "not_in") return !String(f.value ?? "").trim();
   if (kind === "boolean") return parseBooleanish(f.value) == null;
   if (kind === "string") return !String(f.value ?? "").trim();
-  if (kind === "date" || kind === "number") return !Number.isFinite(Number(f.value));
+  if (kind === "date" || kind === "number") {
+    // "" must stay incomplete — Number("") === 0 and must not be treated as a real zero.
+    if (f.value === "" || f.value == null) return true;
+    return !Number.isFinite(Number(f.value));
+  }
   // Unknown kinds: do not invent controls; require a non-empty value.
   return !String(f.value ?? "").trim();
 }

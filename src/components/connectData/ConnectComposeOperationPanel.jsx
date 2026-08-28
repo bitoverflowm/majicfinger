@@ -44,7 +44,10 @@ import {
 import { useGuidedWorkflowOptional } from "@/components/guidedWorkflow/GuidedWorkflowProvider";
 import { pruneConnectComposeBeforePull } from "@/lib/connectComposeSanitize";
 import { hasConfiguredTableJoins } from "@/lib/composeJoinColumns";
-import { selectRowsForAggregatedCompose } from "@/lib/composeColumnGrouping";
+import {
+  keepComposeItemsForOneSummaryRow,
+  selectRowsForAggregatedCompose,
+} from "@/lib/composeColumnGrouping";
 import { cn } from "@/lib/utils";
 import { ComposeJoinLimitFields } from "@/components/connectData/ComposeJoinLimitFields";
 import { ComposeWhereValueField } from "@/components/connectData/ComposeWhereValueField";
@@ -75,6 +78,7 @@ import { prepareConnectHomePullSheet } from "@/lib/connectHomePullDestination";
  *   composeSeed?: Record<string, unknown> | null;
  *   panelClassName?: string;
  *   standaloneWorkspaceId?: string;
+ *   onColumnSelectionsChange?: (nextBySampleId: Record<string, string[]>) => void;
  * }} [props]
  */
 export function ConnectComposeOperationPanel({
@@ -89,6 +93,7 @@ export function ConnectComposeOperationPanel({
   composeSeed,
   panelClassName,
   standaloneWorkspaceId,
+  onColumnSelectionsChange,
 }) {
   const ctx = useMyStateV2() ?? {};
   const {
@@ -96,6 +101,7 @@ export function ConnectComposeOperationPanel({
     setConnectActiveComposeOps: ctxSetActiveComposeOps,
     connectDataLakeSampleId: ctxSampleId,
     connectDataLakeColumnSelections: ctxColumnSelections,
+    setConnectDataLakeColumnSelections,
     connectWorkspace,
     activeSheetId,
     dataSheets,
@@ -375,21 +381,31 @@ export function ConnectComposeOperationPanel({
     setComposeLimitRuleOpen?.(false);
     setComposeLimitRuleValue?.("");
     setComposeLimitScope?.("primary");
-    setColumnComposeItems?.((prev) =>
-      (prev || []).map((row) => ({
-        ...row,
-        aggregate: null,
-        dateBucket: null,
-        dateFormat: null,
-        stringBucket: null,
-        numberBucket: null,
-        numberScale: "none",
-        decimals: null,
-        treatAsDate: row.treatAsDate,
-        sumCase: { enabled: false, branches: [], elseColumn: "" },
-        equation: { enabled: false },
-      })),
-    );
+    setColumnComposeItems?.((prev) => {
+      const seen = new Set();
+      const collapsed = [];
+      for (const row of prev || []) {
+        const col = String(row.column || "").trim();
+        if (!col || seen.has(col)) continue;
+        seen.add(col);
+        collapsed.push({
+          ...row,
+          alias: col,
+          aggregate: null,
+          dateBucket: null,
+          dateFormat: null,
+          stringBucket: null,
+          numberBucket: null,
+          numberScale: "none",
+          decimals: null,
+          treatAsDate: row.treatAsDate,
+          sumCase: { enabled: false, branches: [], elseColumn: "" },
+          equation: { enabled: false },
+          displayName: null,
+        });
+      }
+      return collapsed;
+    });
     setConnectActiveComposeOps?.([]);
   }, [
     setComposeWhereFilters,
@@ -445,6 +461,44 @@ export function ConnectComposeOperationPanel({
     },
     [setColumnComposeItems],
   );
+
+  const handleKeepOneSummaryRow = useCallback(() => {
+    const kept = keepComposeItemsForOneSummaryRow(columnComposeItems);
+    const keepAliases = new Set(
+      kept.map((r) => String(r.alias || r.column || "").trim()).filter(Boolean),
+    );
+    const keepColumns = [
+      ...new Set(kept.map((r) => String(r.column || "").trim()).filter(Boolean)),
+    ];
+    setColumnComposeItems?.(kept);
+    setColumnComposeOrderBy?.((prev) =>
+      (prev || []).filter((o) => keepAliases.has(String(o?.alias || "").trim())),
+    );
+
+    const sampleKey = String(connectDataLakeSampleId || "").trim();
+    if (!sampleKey) return;
+
+    if (standalone && typeof onColumnSelectionsChange === "function") {
+      onColumnSelectionsChange({
+        ...(connectDataLakeColumnSelections || {}),
+        [sampleKey]: keepColumns,
+      });
+      return;
+    }
+    setConnectDataLakeColumnSelections?.((prev) => ({
+      ...(prev || {}),
+      [sampleKey]: keepColumns,
+    }));
+  }, [
+    columnComposeItems,
+    connectDataLakeColumnSelections,
+    connectDataLakeSampleId,
+    onColumnSelectionsChange,
+    setColumnComposeItems,
+    setColumnComposeOrderBy,
+    setConnectDataLakeColumnSelections,
+    standalone,
+  ]);
 
   const renderComposeOpBody = (opId) => (
     <>
@@ -823,9 +877,11 @@ export function ConnectComposeOperationPanel({
           <ConnectComposeSummarizeSection
             columnComposeItems={columnComposeItems}
             updateComposeItem={updateComposeItem}
+            setColumnComposeItems={setColumnComposeItems}
             availableColumns={columnsForCompose}
             numericColumns={numericColumns}
             kindForColumn={kindForColumn}
+            onKeepOneSummaryRow={handleKeepOneSummaryRow}
           />
         ) : null}
 

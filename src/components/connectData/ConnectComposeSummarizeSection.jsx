@@ -1,11 +1,12 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useMemo } from "react";
 import { Minus, Plus } from "lucide-react";
 import { toast } from "sonner";
 
 import EquationExprBuilder from "@/components/integrationsView/integrationPlayground/integrations/polymarketHistorical/EquationExprBuilder";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -23,101 +24,234 @@ import { useMyStateV2 } from "@/context/stateContextV2";
 import {
   buildSummarizeRollupPatch,
   composeRollUpSelectValue,
+  defaultSummarizeRollupForKind,
   getSummarizeRollupOptions,
+  isAutoSummarizeAlias,
+  sanitizeComposeAlias,
+  suggestSummarizeAlias,
 } from "@/lib/dataLakeComposeSummarize";
-import { composeSourceColumnLabel } from "@/lib/dataLakeComposeHelpers";
+import {
+  formatAlsoSelectedColumnsLine,
+  getUnsummarizedDimensionColumns,
+} from "@/lib/composeColumnGrouping";
+import { composeSourceColumnLabel, genComposeRowId } from "@/lib/dataLakeComposeHelpers";
 import { getKalshiColumnDisplayLabel } from "@/lib/kalshiConnectColumns";
 
 function columnLabel(col) {
   return getKalshiColumnDisplayLabel({ name: col }) || composeSourceColumnLabel(col);
 }
 
+function createSummarizeComposeRow(col, { aggregate, alias, kindForColumn, isDateLike }) {
+  const kind = kindForColumn?.(col) || "string";
+  const isDate = kind === "date" || !!isDateLike?.(col);
+  return {
+    id: genComposeRowId(),
+    column: col,
+    alias,
+    aggregate: aggregate || null,
+    dateBucket: null,
+    dateFormat: null,
+    stringBucket: null,
+    numberBucket: null,
+    numberScale: "none",
+    decimals: null,
+    treatAsDate: isDate,
+    sumCase: { enabled: false, branches: [], elseColumn: "" },
+    equation: { enabled: false },
+    displayName: null,
+  };
+}
+
 /**
- * Where-style summarize: pick a column, then choose an operation for its data type.
+ * Where-style summarize: pick columns (same column allowed multiple times),
+ * choose an aggregate, and optionally name the output column.
  */
 export function ConnectComposeSummarizeSection({
   columnComposeItems,
   updateComposeItem,
+  setColumnComposeItems,
   availableColumns,
   numericColumns,
   kindForColumn,
+  onKeepOneSummaryRow,
 }) {
   const isDemo = !!useMyStateV2()?.isDemo;
-  const itemByColumn = useMemo(
-    () => Object.fromEntries((columnComposeItems || []).map((item) => [item.column, item])),
-    [columnComposeItems],
-  );
 
-  const [summarizeColumns, setSummarizeColumns] = useState([]);
-  const hydratedFromItems = useRef(false);
-
-  useEffect(() => {
-    const pullCols = new Set((columnComposeItems || []).map((i) => i.column));
-    setSummarizeColumns((prev) => prev.filter((c) => pullCols.has(c)));
-  }, [columnComposeItems]);
-
-  useEffect(() => {
-    if (hydratedFromItems.current) return;
-    const active = (columnComposeItems || [])
-      .filter((item) => {
+  const summarizeItems = useMemo(
+    () =>
+      (columnComposeItems || []).filter((item) => {
         if (item.sumCase?.enabled) return false;
         const roll = composeRollUpSelectValue(item);
         return roll !== "none" && roll !== "if_else_case";
-      })
-      .map((item) => item.column);
-    if (active.length > 0) {
-      setSummarizeColumns((prev) => [...new Set([...prev, ...active])]);
-      hydratedFromItems.current = true;
-    }
-  }, [columnComposeItems]);
+      }),
+    [columnComposeItems],
+  );
 
-  const addSummarizeColumn = useCallback((col) => {
-    setSummarizeColumns((prev) => (prev.includes(col) ? prev : [...prev, col]));
-  }, []);
+  const unsummarizedColumns = useMemo(
+    () => getUnsummarizedDimensionColumns(columnComposeItems),
+    [columnComposeItems],
+  );
 
-  const removeSummarizeColumn = useCallback(
+  const alsoSelectedLine = useMemo(
+    () => formatAlsoSelectedColumnsLine(unsummarizedColumns, columnLabel),
+    [unsummarizedColumns],
+  );
+
+  const existingAliases = useMemo(
+    () => (columnComposeItems || []).map((i) => String(i.alias || i.column || "").trim()),
+    [columnComposeItems],
+  );
+
+  const addSummarizeMetric = useCallback(
     (col) => {
-      setSummarizeColumns((prev) => prev.filter((c) => c !== col));
-      const item = itemByColumn[col];
-      if (item) {
-        updateComposeItem(
-          item.id,
-          buildSummarizeRollupPatch(item, "none", {
-            availableColumns,
-            numericColumns,
-            kindForColumn,
-          }),
+      if (!setColumnComposeItems) return;
+      const kind = kindForColumn(col);
+      const rollup = defaultSummarizeRollupForKind(kind);
+      const patchCtx = { availableColumns, numericColumns, kindForColumn };
+
+      setColumnComposeItems((prev) => {
+        const rows = prev || [];
+        const unusedBase = rows.find(
+          (r) =>
+            r.column === col &&
+            !r.sumCase?.enabled &&
+            composeRollUpSelectValue(r) === "none",
         );
-      }
+
+        if (unusedBase) {
+          const rollPatch = buildSummarizeRollupPatch(unusedBase, rollup, patchCtx);
+          const nextAgg = rollPatch.aggregate || (rollup === "equation" ? "sum" : rollup);
+          const alias = suggestSummarizeAlias(
+            col,
+            rollup === "equation" ? "equation" : nextAgg,
+            rows.filter((r) => r.id !== unusedBase.id).map((r) => r.alias || r.column),
+          );
+          return rows.map((r) =>
+            r.id === unusedBase.id
+              ? { ...r, ...rollPatch, alias, displayName: null }
+              : r,
+          );
+        }
+
+        const alias = suggestSummarizeAlias(col, rollup, rows.map((r) => r.alias || r.column));
+        const base = createSummarizeComposeRow(col, {
+          aggregate: null,
+          alias,
+          kindForColumn,
+        });
+        const rollPatch = buildSummarizeRollupPatch(base, rollup, patchCtx);
+        return [...rows, { ...base, ...rollPatch, alias }];
+      });
     },
-    [itemByColumn, updateComposeItem, availableColumns, numericColumns, kindForColumn],
+    [availableColumns, kindForColumn, numericColumns, setColumnComposeItems],
   );
 
-  const changeSummarizeColumn = useCallback(
-    (prevCol, nextCol) => {
-      if (prevCol === nextCol) return;
-      const prevItem = itemByColumn[prevCol];
-      if (prevItem) {
-        updateComposeItem(
-          prevItem.id,
-          buildSummarizeRollupPatch(prevItem, "none", {
-            availableColumns,
-            numericColumns,
-            kindForColumn,
-          }),
-        );
-      }
-      setSummarizeColumns((rows) => rows.map((c) => (c === prevCol ? nextCol : c)));
+  const removeSummarizeItem = useCallback(
+    (item) => {
+      if (!setColumnComposeItems) return;
+      setColumnComposeItems((prev) => {
+        const rows = prev || [];
+        const sameColumnCount = rows.filter((r) => r.column === item.column).length;
+        if (sameColumnCount <= 1) {
+          return rows.map((r) =>
+            r.id === item.id
+              ? {
+                  ...r,
+                  ...buildSummarizeRollupPatch(r, "none", {
+                    availableColumns,
+                    numericColumns,
+                    kindForColumn,
+                  }),
+                  alias: item.column,
+                  displayName: null,
+                }
+              : r,
+          );
+        }
+        return rows.filter((r) => r.id !== item.id);
+      });
     },
-    [itemByColumn, updateComposeItem, availableColumns, numericColumns, kindForColumn],
+    [availableColumns, kindForColumn, numericColumns, setColumnComposeItems],
   );
 
-  const addableColumns = useMemo(
-    () =>
-      availableColumns.filter(
-        (c) => !summarizeColumns.includes(c) && !itemByColumn[c]?.sumCase?.enabled,
-      ),
-    [availableColumns, summarizeColumns, itemByColumn],
+  const changeSummarizeSourceColumn = useCallback(
+    (item, nextCol) => {
+      if (!nextCol || nextCol === item.column) return;
+      const roll = composeRollUpSelectValue(item);
+      const aliases = existingAliases.filter((a) => a !== String(item.alias || "").trim());
+      const nextAlias = isAutoSummarizeAlias(item.alias, item.column, roll)
+        ? suggestSummarizeAlias(nextCol, roll === "none" ? null : roll, aliases)
+        : item.alias;
+      updateComposeItem(item.id, {
+        column: nextCol,
+        alias: nextAlias,
+        ...(isAutoSummarizeAlias(item.alias, item.column, roll) ? { displayName: null } : {}),
+      });
+    },
+    [existingAliases, updateComposeItem],
+  );
+
+  const onRollupChange = useCallback(
+    (item, v) => {
+      if (isDemo && v === "equation") {
+        toast.info("Sign up to use Equation summarize options.");
+        return;
+      }
+      const rollPatch = buildSummarizeRollupPatch(item, v, {
+        availableColumns,
+        numericColumns,
+        kindForColumn,
+      });
+      const prevRoll = composeRollUpSelectValue(item);
+      const nextAggKey = v === "equation" ? "equation" : v === "none" ? null : v;
+      const aliases = existingAliases.filter((a) => a !== String(item.alias || "").trim());
+      const shouldRetargetAlias =
+        v !== "none" && isAutoSummarizeAlias(item.alias, item.column, prevRoll);
+      const patch = { ...rollPatch };
+      if (v === "none") {
+        patch.alias = item.column;
+        patch.displayName = null;
+      } else if (shouldRetargetAlias) {
+        patch.alias = suggestSummarizeAlias(item.column, nextAggKey, aliases);
+        patch.displayName = null;
+      }
+      updateComposeItem(item.id, patch);
+    },
+    [
+      availableColumns,
+      existingAliases,
+      isDemo,
+      kindForColumn,
+      numericColumns,
+      updateComposeItem,
+    ],
+  );
+
+  const onOutputNameChange = useCallback(
+    (item, raw) => {
+      const displayName = String(raw ?? "");
+      const fallback = suggestSummarizeAlias(
+        item.column,
+        composeRollUpSelectValue(item),
+        existingAliases.filter((a) => a !== String(item.alias || "").trim()),
+      );
+      const alias = sanitizeComposeAlias(displayName, fallback);
+      // Keep alias unique.
+      const taken = new Set(
+        existingAliases.filter((a) => a !== String(item.alias || "").trim()),
+      );
+      let unique = alias;
+      if (taken.has(unique)) {
+        let i = 2;
+        while (taken.has(`${alias}_${i}`)) i += 1;
+        unique = `${alias}_${i}`;
+      }
+      updateComposeItem(item.id, {
+        alias: unique,
+        displayName: displayName.trim() ? displayName.trim() : null,
+      });
+    },
+    [existingAliases, updateComposeItem],
   );
 
   if (!availableColumns?.length) {
@@ -130,33 +264,20 @@ export function ConnectComposeSummarizeSection({
 
   return (
     <div className="space-y-2">
-      {summarizeColumns.map((col) => {
-        const item = itemByColumn[col];
-        if (!item) return null;
-
+      {summarizeItems.map((item) => {
+        const col = item.column;
         const kind = kindForColumn(col);
         const rollVal = composeRollUpSelectValue(item);
         const rollupOptions = getSummarizeRollupOptions(kind, { isDemo });
-
-        const onRollupChange = (v) => {
-          if (isDemo && v === "equation") {
-            toast.info("Sign up to use Equation summarize options.");
-            return;
-          }
-          updateComposeItem(
-            item.id,
-            buildSummarizeRollupPatch(item, v, {
-              availableColumns,
-              numericColumns,
-              kindForColumn,
-            }),
-          );
-        };
+        const nameValue = item.displayName?.trim() || item.alias || "";
 
         return (
-          <div key={col} className="space-y-2">
+          <div key={item.id} className="space-y-2">
             <div className="flex w-full flex-nowrap items-center gap-1.5">
-              <Select value={col} onValueChange={(val) => changeSummarizeColumn(col, val)}>
+              <Select
+                value={col}
+                onValueChange={(val) => changeSummarizeSourceColumn(item, val)}
+              >
                 <SelectTrigger className="h-7 w-auto min-w-[5.5rem] max-w-[10rem] shrink-0 text-[11px]">
                   <SelectValue placeholder="Column" />
                 </SelectTrigger>
@@ -168,8 +289,8 @@ export function ConnectComposeSummarizeSection({
                   ))}
                 </SelectContent>
               </Select>
-              <Select value={rollVal} onValueChange={onRollupChange}>
-                <SelectTrigger className="h-7 min-w-[7.5rem] flex-1 text-[11px]">
+              <Select value={rollVal} onValueChange={(v) => onRollupChange(item, v)}>
+                <SelectTrigger className="h-7 min-w-[7rem] flex-1 text-[11px]">
                   <SelectValue placeholder="Summarize" />
                 </SelectTrigger>
                 <SelectContent align="start" className="max-h-[280px]">
@@ -185,10 +306,18 @@ export function ConnectComposeSummarizeSection({
                   ))}
                 </SelectContent>
               </Select>
+              <Input
+                className="h-7 min-w-[5.5rem] flex-1 text-[11px]"
+                value={nameValue}
+                placeholder="Column name"
+                aria-label={`Output name for ${col}`}
+                title="Name for this summarized column in your sheet"
+                onChange={(e) => onOutputNameChange(item, e.target.value)}
+              />
               <button
                 type="button"
                 className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded text-muted-foreground hover:bg-muted/60"
-                onClick={() => removeSummarizeColumn(col)}
+                onClick={() => removeSummarizeItem(item)}
                 aria-label={`Remove summarize for ${col}`}
               >
                 <Minus className="h-2.5 w-2.5" />
@@ -213,25 +342,48 @@ export function ConnectComposeSummarizeSection({
         <DropdownMenuTrigger asChild>
           <Button type="button" variant="outline" size="sm" className="h-7 text-[11px] gap-1">
             <Plus className="h-3 w-3" />
-            {summarizeColumns.length > 0
+            {summarizeItems.length > 0
               ? "Add another summarize"
               : "Select column you want to summarize"}
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="start" className="w-56 max-h-[280px] overflow-y-auto">
-          {addableColumns.length > 0 ? (
-            addableColumns.map((col) => (
-              <DropdownMenuItem key={col} onSelect={() => addSummarizeColumn(col)}>
+          {availableColumns.length > 0 ? (
+            availableColumns.map((col) => (
+              <DropdownMenuItem key={col} onSelect={() => addSummarizeMetric(col)}>
                 {columnLabel(col)}
               </DropdownMenuItem>
             ))
           ) : (
             <DropdownMenuItem disabled className="text-xs text-muted-foreground">
-              All pull columns already added
+              No columns available
             </DropdownMenuItem>
           )}
         </DropdownMenuContent>
       </DropdownMenu>
+
+      {summarizeItems.length > 0 && unsummarizedColumns.length > 0 ? (
+        <div className="rounded-md border border-border/50 bg-background/80 px-2.5 py-2 space-y-1.5">
+          <p className="text-[11px] font-medium leading-snug text-foreground">{alsoSelectedLine}</p>
+          <p className="text-[10px] leading-snug text-muted-foreground">
+            They aren't summarized, so Lychee will group by them (many rows).
+          </p>
+          <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="h-7 text-[11px]"
+              onClick={() => onKeepOneSummaryRow?.()}
+            >
+              Keep one summary row
+            </Button>
+            <span className="text-[10px] leading-snug text-muted-foreground">
+              Or add summarize rules for those columns too.
+            </span>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }

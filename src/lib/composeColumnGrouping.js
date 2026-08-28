@@ -215,6 +215,54 @@ export function hasExplicitComposeGrouping(items) {
 }
 
 /**
+ * Pull columns that would silently become GROUP BY keys when summarizing
+ * without an explicit Bucket / Unique values grouping.
+ * @param {object[]} items
+ * @returns {string[]}
+ */
+export function getUnsummarizedDimensionColumns(items) {
+  const rows = items || [];
+  const hasAgg = rows.some((r) => r.aggregate != null);
+  if (!hasAgg) return [];
+  if (hasExplicitComposeGrouping(rows)) return [];
+
+  const seen = new Set();
+  const out = [];
+  for (const r of rows) {
+    if (r?.aggregate != null) continue;
+    if (isComposeGroupByKeyRow(r)) continue;
+    const col = String(r?.column || "").trim();
+    if (!col || seen.has(col)) continue;
+    seen.add(col);
+    out.push(col);
+  }
+  return out;
+}
+
+/**
+ * @param {string[]} columns
+ * @param {(col: string) => string} [labelFn]
+ * @param {{ maxNamed?: number }} [opts]
+ */
+export function formatAlsoSelectedColumnsLine(columns, labelFn, opts = {}) {
+  const maxNamed = opts.maxNamed ?? 2;
+  const labels = (columns || []).map((c) => (labelFn ? labelFn(c) : c)).filter(Boolean);
+  if (!labels.length) return "";
+  if (labels.length <= maxNamed) return `Also selected: ${labels.join(", ")}`;
+  const head = labels.slice(0, maxNamed);
+  const rest = labels.length - maxNamed;
+  return `Also selected: ${head.join(", ")}, +${rest} more`;
+}
+
+/**
+ * Keep only summarize metrics (and explicit group keys). Used by "Keep one summary row".
+ * @param {object[]} items
+ */
+export function keepComposeItemsForOneSummaryRow(items) {
+  return (items || []).filter((r) => r?.aggregate != null || isComposeGroupByKeyRow(r));
+}
+
+/**
  * GROUP BY aliases for a compose pull.
  * When explicit grouping exists, only bucketed dimensions group — not every selected column.
  * @param {object[]} items

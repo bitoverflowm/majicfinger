@@ -44,7 +44,23 @@ export function ComposeWhereValueField({
   const invalidClass = invalid ? "border-destructive focus-visible:ring-destructive" : "";
 
   if (isNullaryWhereOp(op)) {
-    return null;
+    return (
+      <span
+        className={cn(
+          "min-w-0 flex-1 truncate text-[10px] leading-snug text-muted-foreground",
+          className,
+        )}
+        title={
+          op === "is_not_null"
+            ? "Keeps real values including 0. Only missing/null rows are dropped."
+            : "Matches only missing/null. 0 is a real value and is not null."
+        }
+      >
+        {op === "is_not_null"
+          ? "Keeps values including 0 — only drops missing/null"
+          : "Only missing/null — 0 is not null"}
+      </span>
+    );
   }
 
   if (k === "boolean" && !isInList) {

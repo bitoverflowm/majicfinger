@@ -827,6 +827,7 @@ export function HubPolymarketQueryBuilder({
                     standaloneWorkspaceId={INTEGRATION_ID}
                     sampleId={sampleId}
                     columnSelections={columnSelections}
+                    onColumnSelectionsChange={setColumnSelections}
                     hidePullActions
                     activeComposeOps={activeComposeOps}
                     setActiveComposeOps={setActiveComposeOps}

@@ -3,6 +3,7 @@
 import { useCallback, useEffect } from "react";
 
 import { genComposeRowId } from "@/lib/dataLakeComposeHelpers";
+import { syncComposeItemsWithSelectedColumns } from "@/lib/dataLakeComposeSummarize";
 
 /**
  * Mirror Connect home column checkboxes into shared dataLakeColumnComposeItems
@@ -23,15 +24,8 @@ export function useSyncConnectDataLakeComposeItems({
     const cols = connectDataLakeColumnSelections?.[connectDataLakeSampleId];
     if (!Array.isArray(cols)) return;
 
-    setColumnComposeItems((prev) => {
-      const prevRows = prev || [];
-      const prevCols = new Set(prevRows.map((i) => i.column));
-      if (prevRows.length === cols.length && cols.every((c) => prevCols.has(c))) {
-        return prevRows;
-      }
-      return cols.map((col) => {
-        const existing = prevRows.find((i) => i.column === col);
-        if (existing) return existing;
+    setColumnComposeItems((prev) =>
+      syncComposeItemsWithSelectedColumns(prev || [], cols, (col) => {
         const t = String(typesByName[col] || "").toLowerCase();
         const isDate = (t === "bigint" || t === "int") && isDateLikeName(col);
         return {
@@ -50,8 +44,8 @@ export function useSyncConnectDataLakeComposeItems({
           equation: { enabled: false },
           displayName: null,
         };
-      });
-    });
+      }),
+    );
   }, [
     connectDataLakeSampleId,
     connectDataLakeColumnSelections,

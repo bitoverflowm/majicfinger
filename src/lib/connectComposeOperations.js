@@ -6,11 +6,11 @@
 /** @typedef {{ id: string; title: string; description: string }} ConnectComposeOperation */
 
 const WHERE_DESCRIPTION_DEFAULT =
-  "Filter your data before pulling. (eg: category = Weather; volume > 10000).";
+  "Filter your data before pulling. (eg: category = Weather; volume > 10000; volume is not null). 0 is a real value — not the same as null.";
 
 /** Polymarket historical lakes have no Category column — use a real market field in the example. */
 const WHERE_DESCRIPTION_POLYMARKET =
-  "Filter your data before pulling. (eg: closed = true; volume > 10000).";
+  "Filter your data before pulling. (eg: closed = true; volume > 10000; volume is not null). 0 is a real value — not the same as null.";
 
 /** @type {ConnectComposeOperation[]} */
 export const CONNECT_COMPOSE_OPERATIONS = [
@@ -32,7 +32,7 @@ export const CONNECT_COMPOSE_OPERATIONS = [
   {
     id: "summarize",
     title: "Summarize",
-    description: "Sum or count values. Use Bucket → Unique values on a column to group rows, or leave one metric for a grand total.",
+    description: "Sum, min, max, or count values. Add the same column more than once for multiple metrics, and name each output column.",
   },
   {
     id: "if_else",

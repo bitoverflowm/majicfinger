@@ -49,6 +49,51 @@ test("is_not_null is complete without a value", () => {
   assert.equal(defaultWhereValueForKind("number", "is_not_null"), "");
 });
 
+test("number zero is a complete equality value and empty is not", () => {
+  assert.equal(
+    isComposeWhereFilterIncomplete({
+      column: "volume",
+      kind: "number",
+      op: "eq",
+      value: 0,
+    }),
+    false,
+  );
+  assert.equal(
+    isComposeWhereFilterIncomplete({
+      column: "volume",
+      kind: "number",
+      op: "eq",
+      value: "",
+    }),
+    true,
+  );
+  assert.equal(defaultWhereValueForKind("number", "eq"), "");
+});
+
+test("volume equals zero SQL is not the same as is_not_null", () => {
+  const eqZero = buildComposeFiltersWhereSql({
+    filters: {
+      and: [{ column: "volume", kind: "number", op: "eq", value: 0 }],
+      or: [],
+    },
+    caseSensitive: true,
+    baseAlias: "t0",
+  });
+  const notNull = buildComposeFiltersWhereSql({
+    filters: {
+      and: [{ column: "volume", kind: "number", op: "is_not_null", value: null }],
+      or: [],
+    },
+    caseSensitive: true,
+    baseAlias: "t0",
+  });
+  assert.ok(eqZero.includes('t0."volume" = 0'));
+  assert.ok(!eqZero.includes("IS NOT NULL"));
+  assert.ok(notNull.includes('t0."volume" IS NOT NULL'));
+  assert.ok(!notNull.includes("= 0"));
+});
+
 test("normalizeHubQueryWhereFilters keeps is_not_null without a value", () => {
   const out = normalizeHubQueryWhereFilters([
     { id: "1", column: "volume", kind: "number", op: "is_not_null", value: "" },
