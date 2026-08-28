@@ -44,6 +44,11 @@ import {
   saveHubQueryDraft,
 } from "@/lib/hubs/hubQueryDraft";
 import { applyHubQueryDraft } from "@/lib/hubs/applyHubQueryDraft";
+import { applyDraftToHubBuilderState } from "@/lib/hubs/applyDraftToHubBuilderState";
+import {
+  subscribeConnectComposeEditDraft,
+  takeConnectComposeEditDraft,
+} from "@/lib/hubs/connectComposeEditDraft";
 import { KALSHI_GUIDED_WEATHER_WORKFLOW_ID, KALSHI_GUIDED_STEP_IDS } from "@/lib/guidedWorkflows/kalshiHistorical/stepIds";
 import { inferPageNameFromPath } from "@/lib/analytics/sessionStartMeta";
 import {
@@ -447,9 +452,29 @@ function HubKalshiQueryBuilderInner({
   const [composeDraft, setComposeDraft] = useState({});
   const composeDraftRef = useRef({});
   const [composeSeed, setComposeSeed] = useState(null);
+  const [sheetName, setSheetName] = useState("");
   const handleComposeChange = useCallback((next) => {
     composeDraftRef.current = next;
     setComposeDraft(next);
+  }, []);
+
+  useEffect(() => {
+    const tryHydrateEditDraft = () => {
+      const draft = takeConnectComposeEditDraft("kalshiHistorical");
+      if (!draft) return;
+      applyDraftToHubBuilderState(draft, {
+        setSampleId,
+        setColumnSelections,
+        setActiveComposeOps,
+        setComposeDraft,
+        composeDraftRef,
+        setComposeSeed,
+        setSheetName,
+        setError,
+      });
+    };
+    tryHydrateEditDraft();
+    return subscribeConnectComposeEditDraft(tryHydrateEditDraft);
   }, []);
 
   const patchComposeDraft = useCallback((patch) => {
@@ -503,7 +528,6 @@ function HubKalshiQueryBuilderInner({
     setResearchHelperOpen(true);
   }, []);
 
-  const [sheetName, setSheetName] = useState("");
   const [marketSearchInitial, setMarketSearchInitial] = useState("");
   const [marketSearchKey, setMarketSearchKey] = useState(0);
   const clearHoverTimeoutRef = useRef(null);

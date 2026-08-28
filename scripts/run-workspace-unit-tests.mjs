@@ -50,6 +50,7 @@ import "@/lib/dataLake/buildComposeAthenaSql.randomSample.test.js";
 import "@/lib/featureHelper.test.js";
 import "@/lib/composeWhereFilterUi.test.js";
 import "@/lib/dataLakeComposeSummarize.test.js";
+import "@/lib/hubs/buildHubQueryDraftFromProvenance.test.js";
 import "@/lib/sheetOperations/quant/quantOperations.test.js";
 import "@/lib/polymarketLive/liveEventVolumeCompose.test.js";
 import "@/lib/polymarketLive/samplingMarketsCompose.test.js";

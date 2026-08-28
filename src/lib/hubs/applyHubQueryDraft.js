@@ -37,6 +37,9 @@ export function buildColumnComposeItemsFromSelections(sampleId, columnSelections
  */
 export function applyHubQueryDraft(ctx, draft, options = {}) {
   const { autoPull = true, guidedInlinePull = false } = options;
+  // Edit-from-history passes prepareSheet: false so we don't wipe the sheet until Run.
+  const prepareSheet =
+    options.prepareSheet != null ? !!options.prepareSheet : autoPull || guidedInlinePull;
   const sampleId = draft.sampleId;
   const columnSelections = draft.columnSelections || {};
   const whereFilters = normalizeHubQueryWhereFilters(draft.whereFilters);
@@ -86,7 +89,9 @@ export function applyHubQueryDraft(ctx, draft, options = {}) {
     }
   });
 
-  prepareConnectHomePullSheet(ctx);
+  if (prepareSheet) {
+    prepareConnectHomePullSheet(ctx);
+  }
   if (guidedInlinePull && ctx.guidedWorkflowHubDraftRef) {
     ctx.guidedWorkflowHubDraftRef.current = {
       ...draft,

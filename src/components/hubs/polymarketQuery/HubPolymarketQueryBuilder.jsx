@@ -16,6 +16,11 @@ import { useDemoProGate } from "@/hooks/useDemoProGate";
 import { getConnectComposeOperationsForWorkspace } from "@/lib/connectComposeOperations";
 import { getConnectDataLakeConfig } from "@/lib/connectQueryComposeConfig";
 import { applyHubQueryDraft } from "@/lib/hubs/applyHubQueryDraft";
+import { applyDraftToHubBuilderState } from "@/lib/hubs/applyDraftToHubBuilderState";
+import {
+  subscribeConnectComposeEditDraft,
+  takeConnectComposeEditDraft,
+} from "@/lib/hubs/connectComposeEditDraft";
 import {
   buildHubQueryDashboardUrl,
   hasComposeDraftPayload,
@@ -308,6 +313,25 @@ export function HubPolymarketQueryBuilder({
   const handleComposeChange = useCallback((next) => {
     composeDraftRef.current = next;
     setComposeDraft(next);
+  }, []);
+
+  useEffect(() => {
+    const tryHydrateEditDraft = () => {
+      const draft = takeConnectComposeEditDraft(INTEGRATION_ID);
+      if (!draft) return;
+      applyDraftToHubBuilderState(draft, {
+        setSampleId,
+        setColumnSelections,
+        setActiveComposeOps,
+        setComposeDraft,
+        composeDraftRef,
+        setComposeSeed,
+        setSheetName,
+        setError,
+      });
+    };
+    tryHydrateEditDraft();
+    return subscribeConnectComposeEditDraft(tryHydrateEditDraft);
   }, []);
 
   const patchComposeDraft = useCallback((patch) => {

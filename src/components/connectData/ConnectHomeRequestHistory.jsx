@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useMemo, useRef, useState } from "react";
-import { ChevronDown, ChevronRight, History, Play, RotateCcw } from "lucide-react";
+import { ChevronDown, ChevronRight, History, Pencil, Play, RotateCcw } from "lucide-react";
 import { toast } from "sonner";
 
 import { ConnectHomeReplaySheetDialog } from "@/components/connectData/ConnectHomeReplaySheetDialog";
@@ -19,6 +19,7 @@ import {
   requestCardSummaryLabel,
 } from "@/lib/connectHomeRequestHistory";
 import { isConnectIntegrationWorkspace } from "@/lib/connectHomeWorkspace";
+import { openConnectComposeEdit } from "@/lib/hubs/openConnectComposeEdit";
 import { describePolymarketLiveRequestCard } from "@/lib/polymarketLive/polymarketLiveRequestHistory";
 import { rehydrateSheetFromProvenance } from "@/lib/rehydrateSheetFromProvenance";
 import { resolvePersistedFullRowCount } from "@/lib/projectPersistence";
@@ -222,6 +223,19 @@ export function ConnectHomeRequestHistory({ className }) {
       setReplayOpen(true);
     },
     [dataSheets],
+  );
+
+  const openEditCompose = useCallback(
+    (sheetId) => {
+      const sheet = dataSheets?.[sheetId];
+      const result = openConnectComposeEdit(ctx, { sheetId, sheet });
+      if (!result.ok) {
+        toast.error(result.error);
+        return;
+      }
+      toast.message("Query loaded in compose — edit and run when ready.");
+    },
+    [ctx, dataSheets],
   );
 
   const runAnotherIntegrationRequest = useCallback(() => {
@@ -476,6 +490,14 @@ export function ConnectHomeRequestHistory({ className }) {
               if (lake === "polymarket-live" || lake === "kalshi-live") return false;
               return true;
             })();
+            const canEdit = (() => {
+              const prov = sheet?.provenance;
+              if (!prov) return false;
+              const kind = String(prov.kind || "").trim();
+              if (kind && kind !== "compose" && kind !== "compose_browser_join") return false;
+              const lake = String(prov.lake || prov.source || "").toLowerCase();
+              return lake === "polymarket" || lake === "kalshi";
+            })();
             const variationLines = extractSheetVariationLines(sheet?.provenance);
 
             return (
@@ -507,18 +529,35 @@ export function ConnectHomeRequestHistory({ className }) {
                       {rowCount > 0 ? ` · ${rowCount.toLocaleString()} rows loaded` : " · no rows"}
                     </p>
                   </div>
-                  {canReplay ? (
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      className="h-7 shrink-0 gap-1 px-2 text-[10px]"
-                      disabled={replayBusy}
-                      onClick={() => openReplayDialog(sheetId)}
-                    >
-                      <RotateCcw className="h-3 w-3" aria-hidden />
-                      Replay
-                    </Button>
+                  {canReplay || canEdit ? (
+                    <div className="flex shrink-0 items-center gap-1">
+                      {canEdit ? (
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          className="h-7 gap-1 px-2 text-[10px]"
+                          disabled={replayBusy || !!pull.loading}
+                          onClick={() => openEditCompose(sheetId)}
+                        >
+                          <Pencil className="h-3 w-3" aria-hidden />
+                          Edit
+                        </Button>
+                      ) : null}
+                      {canReplay ? (
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          className="h-7 gap-1 px-2 text-[10px]"
+                          disabled={replayBusy}
+                          onClick={() => openReplayDialog(sheetId)}
+                        >
+                          <RotateCcw className="h-3 w-3" aria-hidden />
+                          Replay
+                        </Button>
+                      ) : null}
+                    </div>
                   ) : null}
                 </div>
 
