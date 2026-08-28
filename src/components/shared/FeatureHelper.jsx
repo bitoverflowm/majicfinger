@@ -1,21 +1,14 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 import { X } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
-import {
-  Drawer,
-  DrawerClose,
-  DrawerDescription,
-  DrawerHeader,
-  DrawerSideContent,
-  DrawerTitle,
-} from "@/components/ui/drawer";
 import { filterFeatureHelperGuideLinks } from "@/lib/featureHelper";
 import { cn } from "@/lib/utils";
 
-/** Matches DrawerSideContent width (w-72). */
+/** Matches FeatureHelper panel width (w-72). Used to pad compose content while open. */
 export const FEATURE_HELPER_DRAWER_WIDTH_CLASS = "pr-72";
 
 /**
@@ -115,8 +108,8 @@ export function FeatureHelperBody({ introduction, sections = [], guideLinks = []
 }
 
 /**
- * Non-modal right-side drawer for research-tool helpers (Vaul / shadcn drawer).
- * Pass controlled `open` / `onOpenChange` from the parent when enabling a research tool.
+ * Non-modal right-edge helper panel. Portaled as fixed UI — no Dialog/overlay —
+ * so the compose workspace stays fully interactive while it is open.
  *
  * @param {{
  *   label?: string;
@@ -142,45 +135,62 @@ export function FeatureHelper({
   onOpenChange,
 }) {
   const [internalOpen, setInternalOpen] = useState(!!defaultOpen);
+  const [mounted, setMounted] = useState(false);
   const open = openProp !== undefined ? openProp : internalOpen;
   const setOpen = onOpenChange ?? setInternalOpen;
   const heading = title ? `${label} · ${title}` : label;
 
-  return (
-    <Drawer
-      open={open}
-      onOpenChange={setOpen}
-      direction="right"
-      modal={false}
-      dismissible={false}
-      shouldScaleBackground={false}
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  // Ensure prior modal drawers cannot leave body pointer-events locked.
+  useEffect(() => {
+    if (!open || typeof document === "undefined") return undefined;
+    document.body.style.pointerEvents = "";
+    return () => {
+      document.body.style.pointerEvents = "";
+    };
+  }, [open]);
+
+  if (!open || !mounted || typeof document === "undefined") return null;
+
+  return createPortal(
+    <aside
+      role="complementary"
+      aria-label={heading}
+      data-feature-helper-panel=""
+      className={cn(
+        "pointer-events-auto fixed inset-y-0 right-0 z-40 flex w-72 max-w-[100vw] flex-col",
+        "border-l border-border bg-background shadow-xl",
+        "animate-in slide-in-from-right-4 fade-in-0 duration-200",
+        className,
+      )}
     >
-      <DrawerSideContent className={cn("gap-0 p-0", className)} side="right">
-        <DrawerHeader className="relative space-y-1 border-b border-border/50 px-4 py-3 pr-10 text-left">
-          <DrawerTitle className="text-sm font-semibold tracking-tight">{heading}</DrawerTitle>
-          <DrawerDescription className="text-[11px] leading-snug text-muted-foreground">
-            How this feature works in your query. Keep composing while you read.
-          </DrawerDescription>
-          <DrawerClose asChild>
-            <Button
-              type="button"
-              variant="ghost"
-              size="icon"
-              className="absolute right-2 top-2 h-7 w-7 shrink-0 text-muted-foreground hover:text-foreground"
-              aria-label="Close helper"
-            >
-              <X className="h-3.5 w-3.5" />
-            </Button>
-          </DrawerClose>
-        </DrawerHeader>
-        <div className="min-h-0 flex-1 overflow-y-auto px-4 py-3">
-          <FeatureHelperBody
-            introduction={introduction}
-            sections={sections}
-            guideLinks={guideLinks}
-          />
-        </div>
-      </DrawerSideContent>
-    </Drawer>
+      <div className="relative shrink-0 space-y-1 border-b border-border/50 px-4 py-3 pr-10 text-left">
+        <h3 className="text-sm font-semibold tracking-tight text-foreground">{heading}</h3>
+        <p className="text-[11px] leading-snug text-muted-foreground">
+          How this feature works in your query. Keep composing while you read.
+        </p>
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon"
+          className="absolute right-2 top-2 h-7 w-7 shrink-0 text-muted-foreground hover:text-foreground"
+          aria-label="Close helper"
+          onClick={() => setOpen(false)}
+        >
+          <X className="h-3.5 w-3.5" />
+        </Button>
+      </div>
+      <div className="min-h-0 flex-1 overflow-y-auto px-4 py-3">
+        <FeatureHelperBody
+          introduction={introduction}
+          sections={sections}
+          guideLinks={guideLinks}
+        />
+      </div>
+    </aside>,
+    document.body,
   );
 }

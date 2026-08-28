@@ -195,6 +195,9 @@ export function buildComposeFiltersWhereSql(opts) {
     const virt = resolveComposeFilterColumnSql(p.column, safeBa, lake, table, mat);
     const colSql = virt ?? `${safeBa}."${String(p.column || "").trim()}"`;
 
+    if (p.op === "is_null") return `${colSql} IS NULL`;
+    if (p.op === "is_not_null") return `${colSql} IS NOT NULL`;
+
     if (p.op === "in" || p.op === "not_in") {
       const opSql = p.op === "in" ? "IN" : "NOT IN";
 

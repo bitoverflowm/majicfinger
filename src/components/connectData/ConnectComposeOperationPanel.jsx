@@ -52,6 +52,7 @@ import { ConnectComposeIfElseSection } from "@/components/connectData/ConnectCom
 import {
   coerceWhereOpForKind,
   defaultWhereValueForKind,
+  isNullaryWhereOp,
   whereOpsForKindCompact,
 } from "@/lib/composeWhereFilterUi";
 import { ConnectComposeSummarizeSection } from "@/components/connectData/ConnectComposeSummarizeSection";
@@ -505,7 +506,12 @@ export function ConnectComposeOperationPanel({
                           updateWhereFilter(f.id, {
                             op: op.id,
                             value:
-                              op.id === "in" || op.id === "not_in" || f.op === "in" || f.op === "not_in"
+                              isNullaryWhereOp(op.id) ||
+                              op.id === "in" ||
+                              op.id === "not_in" ||
+                              isNullaryWhereOp(f.op) ||
+                              f.op === "in" ||
+                              f.op === "not_in"
                                 ? defaultWhereValueForKind(f.kind, op.id)
                                 : f.value,
                           })

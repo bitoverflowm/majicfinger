@@ -8,12 +8,13 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { parseBooleanish } from "@/lib/composeWhereFilterUi";
+import { isNullaryWhereOp, parseBooleanish } from "@/lib/composeWhereFilterUi";
 import { cn } from "@/lib/utils";
 
 /**
  * Type-aware WHERE value control. Uses constrained inputs only for known kinds
  * (boolean / number / date). Strings and unknown stay free-form text.
+ * Nullary ops (is null / is not null) render no value control.
  *
  * @param {{
  *   kind: string;
@@ -41,6 +42,10 @@ export function ComposeWhereValueField({
   const k = String(kind || "string").toLowerCase();
   const isInList = op === "in" || op === "not_in";
   const invalidClass = invalid ? "border-destructive focus-visible:ring-destructive" : "";
+
+  if (isNullaryWhereOp(op)) {
+    return null;
+  }
 
   if (k === "boolean" && !isInList) {
     const boolStr = parseBooleanish(value) === false ? "false" : "true";

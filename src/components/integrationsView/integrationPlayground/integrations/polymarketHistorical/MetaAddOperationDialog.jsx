@@ -26,6 +26,10 @@ function operatorSymbol(op) {
   if (op === "lt") return "<";
   if (op === "eq" || op === "contains") return "=";
   if (op === "neq" || op === "not_contains") return "!=";
+  if (op === "in") return "IN";
+  if (op === "not_in") return "NOT IN";
+  if (op === "is_null") return "IS NULL";
+  if (op === "is_not_null") return "IS NOT NULL";
   return "=";
 }
 

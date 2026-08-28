@@ -1,5 +1,8 @@
 "use client";
 
+import { X } from "lucide-react";
+
+import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
@@ -11,6 +14,7 @@ import { cn } from "@/lib/utils";
  * @param {{
  *   sampleSize: string | number;
  *   onSampleSizeChange: (value: string) => void;
+ *   onRemove?: () => void;
  *   disabled?: boolean;
  *   className?: string;
  *   error?: string | null;
@@ -19,15 +23,32 @@ import { cn } from "@/lib/utils";
 export function ConnectRandomSamplePanel({
   sampleSize,
   onSampleSizeChange,
+  onRemove,
   disabled = false,
   className,
   error = null,
 }) {
   return (
     <div className={cn("space-y-1.5", className)}>
-      <Label htmlFor="lychee-random-sample-size" className="text-xs text-muted-foreground">
-        Sample size
-      </Label>
+      <div className="flex items-center justify-between gap-2">
+        <Label htmlFor="lychee-random-sample-size" className="text-xs text-muted-foreground">
+          Sample size
+        </Label>
+        {typeof onRemove === "function" ? (
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            className="h-6 w-6 shrink-0 text-muted-foreground hover:text-foreground"
+            aria-label="Remove Random Sample"
+            title="Remove Random Sample"
+            disabled={disabled}
+            onClick={onRemove}
+          >
+            <X className="h-3.5 w-3.5" />
+          </Button>
+        ) : null}
+      </div>
       <Input
         id="lychee-random-sample-size"
         type="number"

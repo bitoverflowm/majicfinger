@@ -183,6 +183,11 @@ export function validateAthenaLakeQueryBody(body, access) {
       }
 
       const isInListOp = op === "in" || op === "not_in";
+      const isNullaryOp = op === "is_null" || op === "is_not_null";
+
+      if (isNullaryOp) {
+        return { column, kind, op, value: null };
+      }
 
       if (kind === "boolean") {
         if (!["eq", "neq"].includes(op)) {
@@ -211,15 +216,15 @@ export function validateAthenaLakeQueryBody(body, access) {
       }
 
       if (kind === "date") {
-        if (!["gt", "lt", "eq", "neq"].includes(op)) {
+        if (!["gt", "lt", "eq", "neq", "is_null", "is_not_null"].includes(op)) {
           throw new AthenaLakeRequestError("Invalid date filter operator", { statusCode: 400, code: "BAD_REQUEST" });
         }
       } else if (kind === "number") {
-        if (!["gt", "lt", "eq", "neq", "in", "not_in"].includes(op)) {
+        if (!["gt", "lt", "eq", "neq", "in", "not_in", "is_null", "is_not_null"].includes(op)) {
           throw new AthenaLakeRequestError("Invalid number filter operator", { statusCode: 400, code: "BAD_REQUEST" });
         }
       } else if (kind === "string") {
-        if (!["contains", "not_contains", "eq", "neq", "in", "not_in"].includes(op)) {
+        if (!["contains", "not_contains", "eq", "neq", "in", "not_in", "is_null", "is_not_null"].includes(op)) {
           throw new AthenaLakeRequestError("Invalid string filter operator", { statusCode: 400, code: "BAD_REQUEST" });
         }
       }

@@ -1,13 +1,15 @@
 "use client";
 
-import { useCallback, useState } from "react";
+import { useCallback } from "react";
 import { motion } from "framer-motion";
+import { X } from "lucide-react";
 
 import {
   CONNECT_RESEARCH_TOOLS,
   getResearchToolHelperContent,
 } from "@/lib/connectResearchTools";
 import { ConnectRandomSamplePanel } from "@/components/connectData/ConnectRandomSamplePanel";
+import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
 /** Mathematical sample-size symbol (n) used as the Random Sample card icon. */
@@ -74,12 +76,17 @@ export function ConnectResearchToolsSection({
     onResearchToolHelperChange?.(null);
   }, [onResearchToolHelperChange]);
 
+  const clearRandomSample = useCallback(() => {
+    setRandomSampleEnabled?.(false);
+    closeHelper();
+  }, [closeHelper, setRandomSampleEnabled]);
+
   if (selectedCount <= 0 || !tools?.length) return null;
 
-  const toggleRandomSample = () => {
+  const enableRandomSample = () => {
     if (randomSampleEnabled) {
-      setRandomSampleEnabled?.(false);
-      closeHelper();
+      // Already on — reopen helper if needed; use X to remove.
+      openHelperForTool("random_sample");
       return;
     }
     onEnableRandomSample?.();
@@ -130,16 +137,24 @@ export function ConnectResearchToolsSection({
                   delay: 0.08 + i * 0.04,
                   ease: [0.22, 1, 0.36, 1],
                 }}
+                className="relative"
               >
                 <button
                   type="button"
                   disabled={!interactive}
                   aria-disabled={!interactive}
                   aria-pressed={interactive ? selected : undefined}
-                  title={interactive ? (selected ? "Disable Random Sample" : "Enable Random Sample") : "Coming soon"}
-                  onClick={interactive ? toggleRandomSample : undefined}
+                  title={
+                    interactive
+                      ? selected
+                        ? "Random Sample is enabled"
+                        : "Enable Random Sample"
+                      : "Coming soon"
+                  }
+                  onClick={interactive ? enableRandomSample : undefined}
                   className={cn(
                     "flex h-full w-full flex-col rounded-lg border bg-card p-3 text-left",
+                    selected && "pr-8",
                     "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40 focus-visible:ring-offset-2 focus-visible:ring-offset-background",
                     interactive
                       ? selected
@@ -167,6 +182,23 @@ export function ConnectResearchToolsSection({
                     </span>
                   ) : null}
                 </button>
+                {selected && interactive ? (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    className="absolute right-1.5 top-1.5 h-6 w-6 text-muted-foreground hover:text-foreground"
+                    aria-label={`Remove ${tool.title}`}
+                    title={`Remove ${tool.title}`}
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      clearRandomSample();
+                    }}
+                  >
+                    <X className="h-3.5 w-3.5" />
+                  </Button>
+                ) : null}
               </motion.li>
             );
           })}
@@ -176,6 +208,7 @@ export function ConnectResearchToolsSection({
           <ConnectRandomSamplePanel
             sampleSize={randomSampleSize}
             onSampleSizeChange={setRandomSampleSize}
+            onRemove={clearRandomSample}
             error={randomSampleError}
           />
         ) : null}

@@ -27,13 +27,60 @@ test("kindForLakeColumn maps registry boolean columns", () => {
   assert.equal(kindForLakeColumn("mystery", { mystery: "struct" }), "string");
 });
 
-test("boolean where ops are eq/neq only", () => {
+test("boolean where ops include equality and null checks", () => {
   assert.deepEqual(
     whereOpsForKind("boolean").map((o) => o.id),
-    ["eq", "neq"],
+    ["eq", "neq", "is_not_null", "is_null"],
   );
   assert.equal(coerceWhereOpForKind("gt", "boolean"), "eq");
   assert.equal(defaultWhereValueForKind("boolean", "eq"), "true");
+});
+
+test("is_not_null is complete without a value", () => {
+  assert.equal(
+    isComposeWhereFilterIncomplete({
+      column: "volume",
+      kind: "number",
+      op: "is_not_null",
+      value: "",
+    }),
+    false,
+  );
+  assert.equal(defaultWhereValueForKind("number", "is_not_null"), "");
+});
+
+test("normalizeHubQueryWhereFilters keeps is_not_null without a value", () => {
+  const out = normalizeHubQueryWhereFilters([
+    { id: "1", column: "volume", kind: "number", op: "is_not_null", value: "" },
+    { id: "2", column: "volume", kind: "number", op: "eq", value: "" },
+  ]);
+  assert.equal(out.length, 1);
+  assert.equal(out[0].op, "is_not_null");
+  assert.equal(out[0].column, "volume");
+});
+
+test("is_not_null WHERE SQL", () => {
+  const sql = buildComposeFiltersWhereSql({
+    filters: {
+      and: [{ column: "volume", kind: "number", op: "is_not_null", value: null }],
+      or: [],
+    },
+    caseSensitive: true,
+    baseAlias: "t0",
+  });
+  assert.ok(sql.includes('t0."volume" IS NOT NULL'));
+});
+
+test("is_null WHERE SQL", () => {
+  const sql = buildComposeFiltersWhereSql({
+    filters: {
+      and: [{ column: "question", kind: "string", op: "is_null", value: null }],
+      or: [],
+    },
+    caseSensitive: true,
+    baseAlias: "t0",
+  });
+  assert.ok(sql.includes('t0."question" IS NULL'));
 });
 
 test("boolean false is a complete filter value", () => {

@@ -167,6 +167,9 @@ export async function startAthenaBoundedQuery({
   const predicateToSql = (p) => {
     const colSql = `"${p.column}"`;
 
+    if (p.op === "is_null") return `${colSql} IS NULL`;
+    if (p.op === "is_not_null") return `${colSql} IS NOT NULL`;
+
     if (p.op === "in" || p.op === "not_in") {
       const opSql = p.op === "in" ? "IN" : "NOT IN";
 

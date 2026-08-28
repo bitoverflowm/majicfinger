@@ -7,6 +7,17 @@ import { parseBooleanish } from "@/lib/sheetOperations/refineQuery";
 
 export { parseBooleanish };
 
+/** Ops that do not take a comparison value (SQL IS NULL / IS NOT NULL). */
+export function isNullaryWhereOp(op) {
+  const o = String(op || "").trim();
+  return o === "is_null" || o === "is_not_null";
+}
+
+const NULLARY_WHERE_OPS = [
+  { id: "is_not_null", label: "is not null" },
+  { id: "is_null", label: "is null" },
+];
+
 /**
  * @param {"string" | "number" | "date" | "boolean"} kind
  * @returns {Array<{ id: string; label: string }>}
@@ -16,6 +27,7 @@ export function whereOpsForKind(kind) {
     return [
       { id: "eq", label: "is equal to" },
       { id: "neq", label: "not equal to" },
+      ...NULLARY_WHERE_OPS,
     ];
   }
   if (kind === "string") {
@@ -24,6 +36,7 @@ export function whereOpsForKind(kind) {
       { id: "neq", label: "not equal to" },
       { id: "in", label: "in set" },
       { id: "not_in", label: "not in set" },
+      ...NULLARY_WHERE_OPS,
     ];
   }
   if (kind === "date") {
@@ -32,6 +45,7 @@ export function whereOpsForKind(kind) {
       { id: "lt", label: "less than" },
       { id: "eq", label: "is equal to" },
       { id: "neq", label: "not equal to" },
+      ...NULLARY_WHERE_OPS,
     ];
   }
   // number
@@ -42,6 +56,7 @@ export function whereOpsForKind(kind) {
     { id: "neq", label: "not equal to" },
     { id: "in", label: "in set" },
     { id: "not_in", label: "not in set" },
+    ...NULLARY_WHERE_OPS,
   ];
 }
 
@@ -54,6 +69,7 @@ export function whereOpsForKindCompact(kind) {
     return [
       { id: "eq", label: "is equal to" },
       { id: "neq", label: "not equal to" },
+      ...NULLARY_WHERE_OPS,
     ];
   }
   if (kind === "string") {
@@ -61,6 +77,7 @@ export function whereOpsForKindCompact(kind) {
       { id: "eq", label: "is equal to" },
       { id: "neq", label: "not equal to" },
       { id: "in", label: "in set" },
+      ...NULLARY_WHERE_OPS,
     ];
   }
   if (kind === "date") {
@@ -68,6 +85,7 @@ export function whereOpsForKindCompact(kind) {
       { id: "gt", label: "greater than" },
       { id: "lt", label: "less than" },
       { id: "eq", label: "is equal to" },
+      ...NULLARY_WHERE_OPS,
     ];
   }
   return [
@@ -75,6 +93,7 @@ export function whereOpsForKindCompact(kind) {
     { id: "lt", label: "less than" },
     { id: "eq", label: "is equal to" },
     { id: "in", label: "in set" },
+    ...NULLARY_WHERE_OPS,
   ];
 }
 
@@ -83,6 +102,7 @@ export function whereOpsForKindCompact(kind) {
  * @param {string} [op]
  */
 export function defaultWhereValueForKind(kind, op) {
+  if (isNullaryWhereOp(op)) return "";
   if (op === "in" || op === "not_in") {
     if (kind === "number") return "1, 2, 3";
     if (kind === "string") return '"yes", "no"';
@@ -112,6 +132,7 @@ export function coerceWhereOpForKind(currentOp, kind, opts = {}) {
  */
 export function isComposeWhereFilterIncomplete(f) {
   if (!f?.column || !f?.op || !f?.kind) return true;
+  if (isNullaryWhereOp(f.op)) return false;
   const kind = String(f.kind).toLowerCase();
   if (f.op === "in" || f.op === "not_in") return !String(f.value ?? "").trim();
   if (kind === "boolean") return parseBooleanish(f.value) == null;

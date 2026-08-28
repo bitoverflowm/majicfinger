@@ -115,6 +115,7 @@ import {
   coerceWhereOpForKind,
   defaultWhereValueForKind,
   isComposeWhereFilterIncomplete,
+  isNullaryWhereOp,
   whereOpsForKind,
 } from "@/lib/composeWhereFilterUi";
 import { kindForLakeColumn } from "@/lib/dataLakeComposeHelpers";
@@ -366,6 +367,8 @@ function operatorSymbol(op) {
   if (op === "neq" || op === "not_contains") return "!=";
   if (op === "in") return "IN";
   if (op === "not_in") return "NOT IN";
+  if (op === "is_null") return "IS NULL";
+  if (op === "is_not_null") return "IS NOT NULL";
   return "=";
 }
 
@@ -400,6 +403,7 @@ function summarizeWhereFilters(filters) {
       const op = String(f?.op || "").trim();
       const v = f?.value;
       if (!c || !op) return "";
+      if (op === "is_null" || op === "is_not_null") return `${c} ${op === "is_null" ? "IS NULL" : "IS NOT NULL"}`;
       if (op === "in" || op === "not_in") return `${c} ${op} (…)`;
       if (typeof v === "string") return `${c} ${op} "${v}"`;
       if (typeof v === "number" && Number.isFinite(v)) return `${c} ${op} ${v}`;
@@ -4298,8 +4302,10 @@ export default function DataLakeParquetPanel({
                                     updateComposeWhereFilter(f.id, {
                                       op: op.id,
                                       value:
+                                        isNullaryWhereOp(op.id) ||
                                         op.id === "in" ||
                                         op.id === "not_in" ||
+                                        isNullaryWhereOp(f.op) ||
                                         f.op === "in" ||
                                         f.op === "not_in"
                                           ? defaultWhereValueForKind(f.kind, op.id)
@@ -4703,6 +4709,11 @@ export default function DataLakeParquetPanel({
                     <ConnectRandomSamplePanel
                       sampleSize={randomSampleSize}
                       onSampleSizeChange={setRandomSampleSize}
+                      onRemove={() => {
+                        setRandomSampleEnabled?.(false);
+                        setResearchHelperOpen(false);
+                        setResearchHelperToolId(null);
+                      }}
                     />
                   ) : null}
                   <div className="flex flex-wrap items-center gap-2 min-w-0">

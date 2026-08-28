@@ -54,6 +54,16 @@ export function normalizeHubQueryWhereFilters(filters) {
               : "string";
       const op = String(f.op || "eq").trim() || "eq";
 
+      if (op === "is_null" || op === "is_not_null") {
+        return {
+          id: String(f.id || `w-${column}-${Math.random().toString(36).slice(2)}`),
+          column,
+          kind,
+          op,
+          value: "",
+        };
+      }
+
       if (kind === "boolean") {
         const parsed = parseBooleanish(f.value);
         if (parsed == null) return null;
