@@ -1,9 +1,9 @@
 "use client";
 
-import { useCallback, useEffect, useMemo } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo } from "react";
 import { flushSync } from "react-dom";
 import { motion, AnimatePresence } from "framer-motion";
-import { Minus, Play, Plus } from "lucide-react";
+import { Minus, Play, Plus, X } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -225,7 +225,8 @@ export function ConnectComposeOperationPanel({
     setRandomSampleSize,
   ]);
 
-  useEffect(() => {
+  // Sync hub draft before paint so Run pull never reads a stale WHERE/summarize snapshot.
+  useLayoutEffect(() => {
     if (!standalone || !onComposeChange) return;
     onComposeChange({
       activeComposeOps: connectActiveComposeOps,
@@ -460,6 +461,80 @@ export function ConnectComposeOperationPanel({
       setColumnComposeItems?.((prev) => (prev || []).map((row) => (row.id === id ? { ...row, ...patch } : row)));
     },
     [setColumnComposeItems],
+  );
+
+  const dismissComposeOp = useCallback(
+    (opId) => {
+      setConnectActiveComposeOps?.((prev) => (Array.isArray(prev) ? prev : []).filter((id) => id !== opId));
+      if (opId === "sort") {
+        setColumnComposeOrderBy?.([]);
+        return;
+      }
+      if (opId === "where") {
+        setComposeWhereFilters?.([]);
+        return;
+      }
+      if (opId === "having") {
+        setComposeHavingFilters?.([]);
+        return;
+      }
+      if (opId === "join") {
+        setComposeJoins?.([]);
+        return;
+      }
+      if (opId === "row_limit") {
+        setComposeLimitRuleOpen?.(false);
+        setComposeLimitRuleValue?.("");
+        return;
+      }
+      if (opId === "summarize") {
+        setColumnComposeItems?.((prev) => {
+          const seen = new Set();
+          const next = [];
+          for (const row of prev || []) {
+            const col = String(row.column || "").trim();
+            if (!col) continue;
+            const cleared = {
+              ...row,
+              aggregate: null,
+              equation: { enabled: false },
+              dateBucket: row.dateBucket ?? null,
+              dateFormat: row.dateFormat ?? null,
+              stringBucket: row.stringBucket ?? null,
+              numberBucket: row.numberBucket ?? null,
+            };
+            // Collapse duplicate metric rows for the same source column back to one base row.
+            if (seen.has(col)) continue;
+            seen.add(col);
+            next.push({
+              ...cleared,
+              alias: col,
+              displayName: null,
+            });
+          }
+          return next;
+        });
+        return;
+      }
+      if (opId === "if_else") {
+        setColumnComposeItems?.((prev) =>
+          (prev || []).map((row) => ({
+            ...row,
+            sumCase: { enabled: false, branches: [], elseColumn: "" },
+          })),
+        );
+      }
+    },
+    [
+      setColumnComposeItems,
+      setColumnComposeOrderBy,
+      setComposeHavingFilters,
+      setComposeJoins,
+      setComposeLimitRuleOpen,
+      setComposeLimitRuleValue,
+      setComposeWhereFilters,
+      setConnectActiveComposeOps,
+    ],
   );
 
   const handleKeepOneSummaryRow = useCallback(() => {
@@ -1027,16 +1102,28 @@ export function ConnectComposeOperationPanel({
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: 4 }}
             transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
-            className={cn("space-y-4 rounded-lg border border-border/60 bg-muted/15 p-4", panelClassName)}
+            className={cn("relative space-y-4 rounded-lg border border-border/60 bg-muted/15 p-4", panelClassName)}
           >
             <motion.div
               initial={{ opacity: 0, y: 4 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.18, ease: [0.22, 1, 0.36, 1] }}
+              className="pr-8"
             >
               <h3 className="text-xs font-semibold tracking-tight text-foreground">{op.title}</h3>
               <p className="mt-1 text-[11px] leading-snug text-muted-foreground">{op.description}</p>
             </motion.div>
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              className="absolute right-2 top-2 h-7 w-7 text-muted-foreground hover:text-foreground"
+              aria-label={`Remove ${op.title}`}
+              title={`Remove ${op.title}`}
+              onClick={() => dismissComposeOp(op.id)}
+            >
+              <X className="h-3.5 w-3.5" />
+            </Button>
             {renderComposeOpBody(op.id)}
           </motion.div>
         ))}

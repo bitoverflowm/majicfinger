@@ -6,8 +6,13 @@ import {
   isComposeWhereFilterIncomplete,
   whereOpsForKind,
 } from "./composeWhereFilterUi.js";
-import { normalizeHubQueryWhereFilters } from "./hubs/hubQueryDraft.js";
+import {
+  buildComposeFiltersPayload,
+  normalizeHubQueryWhereFilters,
+} from "./hubs/hubQueryDraft.js";
 import { buildComposeFiltersWhereSql } from "./dataLake/composeWherePredicateSql.js";
+import { buildComposeAthenaSelectSql } from "./dataLake/buildComposeAthenaSql.js";
+import { buildDataLakeServerComposePayload } from "./dataLakeComposePayload.js";
 
 function test(name, fn) {
   try {
@@ -186,4 +191,79 @@ test("boolean neq false SQL", () => {
     baseAlias: "t0",
   });
   assert.ok(sql.includes("<> 'false'"));
+});
+
+test("hub draft: is_not_null + closed + renamed summarize metrics compose into SQL", () => {
+  const whereFilters = normalizeHubQueryWhereFilters([
+    { id: "1", column: "volume", kind: "number", op: "is_not_null", value: "" },
+    { id: "2", column: "closed", kind: "boolean", op: "eq", value: true },
+  ]);
+  const filtersPayload = buildComposeFiltersPayload(whereFilters);
+  const whereSql = buildComposeFiltersWhereSql({
+    filters: filtersPayload,
+    caseSensitive: true,
+    baseAlias: "t0",
+    lake: "polymarket",
+    table: "markets",
+  });
+  assert.ok(whereSql.includes('t0."volume" IS NOT NULL'));
+  assert.ok(!whereSql.includes('t0."volume" IS NULL'));
+  assert.ok(whereSql.includes("= 'true'"));
+
+  const compose = buildDataLakeServerComposePayload({
+    columnComposeItems: [
+      { column: "id", alias: "market_count", aggregate: "count" },
+      { column: "volume", alias: "total_volume", aggregate: "sum" },
+      { column: "volume", alias: "average_volume", aggregate: "avg" },
+      { column: "volume", alias: "min_volume", aggregate: "min" },
+      { column: "volume", alias: "max_volume", aggregate: "max" },
+    ],
+    columnComposeOrderBy: [],
+    composeHavingFilters: [],
+    composeJoins: [],
+    hasComposeAggregates: true,
+    composeDimensionAliases: [],
+    dataset: "polymarket",
+    selectedTable: "markets",
+    kalshiTradesJoinPreset: null,
+    kalshiTradesJoinPresets: null,
+    composeLimitScope: "primary",
+  });
+  assert.deepEqual(
+    compose.select.map((s) => s.alias),
+    ["market_count", "total_volume", "average_volume", "min_volume", "max_volume"],
+  );
+  assert.equal(compose.groupByAliases.length, 0);
+
+  const sql = buildComposeAthenaSelectSql({
+    physicalTableName: "polymarket_markets",
+    limit: null,
+    compose,
+    lake: "polymarket",
+    table: "markets",
+    whereSql,
+  });
+  assert.ok(sql.includes('COUNT(t0."id") AS "market_count"'));
+  assert.ok(sql.includes('SUM(CAST(t0."volume" AS DOUBLE)) AS "total_volume"'));
+  assert.ok(sql.includes('AVG(CAST(t0."volume" AS DOUBLE)) AS "average_volume"'));
+  assert.ok(sql.includes('MIN(CAST(t0."volume" AS DOUBLE)) AS "min_volume"'));
+  assert.ok(sql.includes('MAX(CAST(t0."volume" AS DOUBLE)) AS "max_volume"'));
+  assert.ok(sql.includes('t0."volume" IS NOT NULL'));
+  assert.ok(sql.includes("WHERE"));
+});
+
+test("is_null WHERE is distinct from is_not_null (empty-summary failure mode)", () => {
+  const nullSql = buildComposeFiltersWhereSql({
+    filters: {
+      and: [
+        { column: "volume", kind: "number", op: "is_null", value: null },
+        { column: "closed", kind: "boolean", op: "eq", value: true },
+      ],
+      or: [],
+    },
+    caseSensitive: true,
+    baseAlias: "t0",
+  });
+  assert.ok(nullSql.includes('t0."volume" IS NULL'));
+  assert.ok(!nullSql.includes("IS NOT NULL"));
 });
