@@ -109,6 +109,8 @@ import { buildDataLakeServerComposePayload } from "@/lib/dataLakeComposePayload"
 import { COMPOSE_PRIMARY_JOIN_EXPAND_CAP_DEFAULT } from "@/lib/composeLimitScope";
 import { validateRandomSampleSizeInput } from "@/lib/dataLake/randomSample";
 import { ConnectRandomSamplePanel } from "@/components/connectData/ConnectRandomSamplePanel";
+import { FeatureHelper } from "@/components/shared/FeatureHelper";
+import { RANDOM_SAMPLE_HELPER_CONTENT } from "@/lib/randomSampleHelperContent";
 import { ComposeWhereValueField } from "@/components/connectData/ComposeWhereValueField";
 import {
   coerceWhereOpForKind,
@@ -634,6 +636,7 @@ export default function DataLakeParquetPanel({
     randomSampleSize,
     setRandomSampleSize,
   } = useDataLakeComposeState(connectHomeDataLakeCompose);
+  const [randomSampleHelperOpen, setRandomSampleHelperOpen] = useState(false);
   const user = useUser();
   const subscriberAthenaAccess = useMemo(() => userHasExpandedAthenaAccess(user), [user]);
   const athenaRowLimit = useMemo(
@@ -4692,6 +4695,13 @@ export default function DataLakeParquetPanel({
                       onSampleSizeChange={setRandomSampleSize}
                     />
                   ) : null}
+                  {randomSampleEnabled ? (
+                    <FeatureHelper
+                      {...RANDOM_SAMPLE_HELPER_CONTENT}
+                      open={randomSampleHelperOpen}
+                      onOpenChange={setRandomSampleHelperOpen}
+                    />
+                  ) : null}
                   <div className="flex flex-wrap items-center gap-2 min-w-0">
                     <Button
                       type="button"
@@ -4742,12 +4752,14 @@ export default function DataLakeParquetPanel({
                       onClick={() => {
                         if (randomSampleEnabled) {
                           setRandomSampleEnabled?.(false);
+                          setRandomSampleHelperOpen(false);
                           return;
                         }
                         setComposeLimitRuleOpen?.(false);
                         setComposeLimitRuleValue?.("");
                         setRandomSampleEnabled?.(true);
                         setRandomSampleSize?.((v) => (String(v || "").trim() ? v : "100"));
+                        setRandomSampleHelperOpen(true);
                       }}
                     >
                       random sample

@@ -1,13 +1,14 @@
 "use client";
 
 import { useState } from "react";
-import { ChevronDown } from "lucide-react";
 
 import {
-  Collapsible,
-  CollapsibleContent,
-  CollapsibleTrigger,
-} from "@/components/ui/collapsible";
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
+} from "@/components/ui/sheet";
 import { filterFeatureHelperGuideLinks } from "@/lib/featureHelper";
 import { cn } from "@/lib/utils";
 
@@ -23,8 +24,93 @@ import { cn } from "@/lib/utils";
  */
 
 /**
- * Shared, data-driven helper disclosure for query-builder features.
- * Content is passed via props — do not hardcode feature-specific copy here.
+ * @param {{
+ *   introduction?: string | string[];
+ *   sections?: FeatureHelperSection[];
+ *   guideLinks?: FeatureHelperGuideLink[];
+ * }} props
+ */
+export function FeatureHelperBody({ introduction, sections = [], guideLinks = [] }) {
+  const introBlocks = Array.isArray(introduction)
+    ? introduction.filter((s) => String(s || "").trim())
+    : introduction
+      ? [String(introduction)]
+      : [];
+  const links = filterFeatureHelperGuideLinks(guideLinks);
+
+  return (
+    <div className="space-y-3 text-[12px] leading-snug text-muted-foreground">
+      {introBlocks.map((p, i) => (
+        <p key={`intro-${i}`}>{p}</p>
+      ))}
+      {(sections || []).map((section, i) => {
+        const type = section?.type || "paragraph";
+        if (type === "heading") {
+          return (
+            <h4 key={`sec-${i}`} className="pt-1 text-[12px] font-semibold text-foreground">
+              {section.content}
+            </h4>
+          );
+        }
+        if (type === "unordered_list") {
+          return (
+            <ul key={`sec-${i}`} className="list-disc space-y-1.5 pl-4">
+              {(section.items || []).map((item, j) => (
+                <li key={j}>{item}</li>
+              ))}
+            </ul>
+          );
+        }
+        if (type === "ordered_list") {
+          return (
+            <ol key={`sec-${i}`} className="list-decimal space-y-1.5 pl-4">
+              {(section.items || []).map((item, j) => (
+                <li key={j}>{item}</li>
+              ))}
+            </ol>
+          );
+        }
+        if (type === "code") {
+          return (
+            <div key={`sec-${i}`} className="space-y-1.5">
+              {section.caption ? <p>{section.caption}</p> : null}
+              <pre
+                className="max-w-full overflow-x-auto rounded-md bg-muted/60 p-2.5 font-mono text-[11px] leading-relaxed text-foreground"
+                tabIndex={0}
+              >
+                <code>{section.content}</code>
+              </pre>
+            </div>
+          );
+        }
+        return <p key={`sec-${i}`}>{section.content}</p>;
+      })}
+      {links.length > 0 ? (
+        <div className="space-y-1.5 border-t border-border/40 pt-3">
+          <p className="font-semibold text-foreground">Guides</p>
+          <ul className="space-y-1.5">
+            {links.map((l) => (
+              <li key={l.href}>
+                <a
+                  href={l.href}
+                  className="text-foreground underline-offset-2 hover:underline"
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  {l.label}
+                </a>
+              </li>
+            ))}
+          </ul>
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+/**
+ * Shared, data-driven helper in a right-side slide-out panel.
+ * Pass controlled `open` / `onOpenChange` from the parent when enabling a research tool.
  *
  * @param {{
  *   label?: string;
@@ -34,6 +120,8 @@ import { cn } from "@/lib/utils";
  *   guideLinks?: FeatureHelperGuideLink[];
  *   className?: string;
  *   defaultOpen?: boolean;
+ *   open?: boolean;
+ *   onOpenChange?: (open: boolean) => void;
  * }} props
  */
 export function FeatureHelper({
@@ -44,104 +132,38 @@ export function FeatureHelper({
   guideLinks = [],
   className,
   defaultOpen = false,
+  open: openProp,
+  onOpenChange,
 }) {
-  const [open, setOpen] = useState(!!defaultOpen);
-  const introBlocks = Array.isArray(introduction)
-    ? introduction.filter((s) => String(s || "").trim())
-    : introduction
-      ? [String(introduction)]
-      : [];
-  const links = filterFeatureHelperGuideLinks(guideLinks);
+  const [internalOpen, setInternalOpen] = useState(!!defaultOpen);
+  const open = openProp !== undefined ? openProp : internalOpen;
+  const setOpen = onOpenChange ?? setInternalOpen;
+  const heading = title ? `${label} · ${title}` : label;
 
   return (
-    <Collapsible open={open} onOpenChange={setOpen} className={cn("rounded-md border border-border/50", className)}>
-      <CollapsibleTrigger
-        type="button"
+    <Sheet open={open} onOpenChange={setOpen}>
+      <SheetContent
+        side="right"
         className={cn(
-          "flex w-full items-center justify-between gap-2 px-2.5 py-1.5 text-left",
-          "text-[11px] font-medium text-muted-foreground hover:text-foreground",
-          "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40",
+          "flex w-full flex-col gap-0 p-0 sm:max-w-md",
+          "border-l border-border/60 bg-background",
+          className,
         )}
       >
-        <span>
-          <span className="text-muted-foreground/80">{label}</span>
-          {title ? <span className="text-foreground"> · {title}</span> : null}
-        </span>
-        <ChevronDown
-          className={cn("h-3.5 w-3.5 shrink-0 transition-transform", open && "rotate-180")}
-          aria-hidden
-        />
-      </CollapsibleTrigger>
-      <CollapsibleContent className="border-t border-border/40 px-2.5 pb-2.5 pt-2">
-        <div className="space-y-2.5 text-[11px] leading-snug text-muted-foreground">
-          {introBlocks.map((p, i) => (
-            <p key={`intro-${i}`}>{p}</p>
-          ))}
-          {(sections || []).map((section, i) => {
-            const type = section?.type || "paragraph";
-            if (type === "heading") {
-              return (
-                <h4 key={`sec-${i}`} className="pt-1 text-[11px] font-semibold text-foreground">
-                  {section.content}
-                </h4>
-              );
-            }
-            if (type === "unordered_list") {
-              return (
-                <ul key={`sec-${i}`} className="list-disc space-y-1 pl-4">
-                  {(section.items || []).map((item, j) => (
-                    <li key={j}>{item}</li>
-                  ))}
-                </ul>
-              );
-            }
-            if (type === "ordered_list") {
-              return (
-                <ol key={`sec-${i}`} className="list-decimal space-y-1 pl-4">
-                  {(section.items || []).map((item, j) => (
-                    <li key={j}>{item}</li>
-                  ))}
-                </ol>
-              );
-            }
-            if (type === "code") {
-              return (
-                <div key={`sec-${i}`} className="space-y-1">
-                  {section.caption ? <p>{section.caption}</p> : null}
-                  <pre
-                    className="max-w-full overflow-x-auto rounded-md bg-muted/60 p-2 font-mono text-[10px] leading-relaxed text-foreground"
-                    tabIndex={0}
-                  >
-                    <code>{section.content}</code>
-                  </pre>
-                </div>
-              );
-            }
-            return (
-              <p key={`sec-${i}`}>{section.content}</p>
-            );
-          })}
-          {links.length > 0 ? (
-            <div className="space-y-1 border-t border-border/40 pt-2">
-              <p className="font-semibold text-foreground">Guides</p>
-              <ul className="space-y-1">
-                {links.map((l) => (
-                  <li key={l.href}>
-                    <a
-                      href={l.href}
-                      className="text-foreground underline-offset-2 hover:underline"
-                      target="_blank"
-                      rel="noreferrer"
-                    >
-                      {l.label}
-                    </a>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          ) : null}
+        <SheetHeader className="space-y-1 border-b border-border/50 px-4 py-3 text-left">
+          <SheetTitle className="text-sm font-semibold tracking-tight">{heading}</SheetTitle>
+          <SheetDescription className="text-[11px] text-muted-foreground">
+            How this feature works in your query. Close the panel anytime to return to composing.
+          </SheetDescription>
+        </SheetHeader>
+        <div className="min-h-0 flex-1 overflow-y-auto px-4 py-3">
+          <FeatureHelperBody
+            introduction={introduction}
+            sections={sections}
+            guideLinks={guideLinks}
+          />
         </div>
-      </CollapsibleContent>
-    </Collapsible>
+      </SheetContent>
+    </Sheet>
   );
 }

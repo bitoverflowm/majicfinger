@@ -1,9 +1,14 @@
 "use client";
 
+import { useCallback, useState } from "react";
 import { motion } from "framer-motion";
 
-import { CONNECT_RESEARCH_TOOLS } from "@/lib/connectResearchTools";
+import {
+  CONNECT_RESEARCH_TOOLS,
+  getResearchToolHelperContent,
+} from "@/lib/connectResearchTools";
 import { ConnectRandomSamplePanel } from "@/components/connectData/ConnectRandomSamplePanel";
+import { FeatureHelper } from "@/components/shared/FeatureHelper";
 import { cn } from "@/lib/utils";
 
 /** Mathematical sample-size symbol (n) used as the Random Sample card icon. */
@@ -55,16 +60,39 @@ export function ConnectResearchToolsSection({
   randomSampleError = null,
   onEnableRandomSample,
 }) {
+  const [activeHelperToolId, setActiveHelperToolId] = useState(null);
+  const [helperOpen, setHelperOpen] = useState(false);
+
+  const openHelperForTool = useCallback((toolId) => {
+    const content = getResearchToolHelperContent(toolId);
+    if (!content) return;
+    setActiveHelperToolId(toolId);
+    setHelperOpen(true);
+  }, []);
+
+  const closeHelper = useCallback(() => {
+    setHelperOpen(false);
+  }, []);
+
   if (selectedCount <= 0 || !tools?.length) return null;
 
   const toggleRandomSample = () => {
     if (randomSampleEnabled) {
       setRandomSampleEnabled?.(false);
+      if (activeHelperToolId === "random_sample") {
+        closeHelper();
+        setActiveHelperToolId(null);
+      }
       return;
     }
     onEnableRandomSample?.();
     setRandomSampleEnabled?.(true);
+    openHelperForTool("random_sample");
   };
+
+  const activeHelperContent = activeHelperToolId
+    ? getResearchToolHelperContent(activeHelperToolId)
+    : null;
 
   return (
     <motion.section
@@ -156,6 +184,18 @@ export function ConnectResearchToolsSection({
             sampleSize={randomSampleSize}
             onSampleSizeChange={setRandomSampleSize}
             error={randomSampleError}
+          />
+        ) : null}
+
+        {activeHelperContent ? (
+          <FeatureHelper
+            label={activeHelperContent.label}
+            title={activeHelperContent.title}
+            introduction={activeHelperContent.introduction}
+            sections={activeHelperContent.sections}
+            guideLinks={activeHelperContent.guideLinks}
+            open={helperOpen}
+            onOpenChange={setHelperOpen}
           />
         ) : null}
       </motion.div>
