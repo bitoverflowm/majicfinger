@@ -1,4 +1,4 @@
-import { defaultDateFormatForBucket } from "@/lib/composeDateDisplay";
+import { genComposeRowId } from "@/lib/dataLakeComposeHelpers";
 
 /**
  * Column bucket (GROUP BY dimension) and format (display) options for compose pulls.
@@ -198,12 +198,17 @@ export function composeRowAlias(row) {
   return String(row?.alias || row?.column || "").trim();
 }
 
+/** Row kept for WHERE/HAVING/join refs only — not SELECT output or GROUP BY. */
+export function isComposePullExcludedRow(row) {
+  return row?.pullExcluded === true;
+}
+
 /**
  * Row is a GROUP BY dimension when summarizing (bucket, unique values, CASE column).
  * @param {object} row
  */
 export function isComposeGroupByKeyRow(row) {
-  if (!row || row.aggregate != null) return false;
+  if (!row || row.aggregate != null || isComposePullExcludedRow(row)) return false;
   if (hasColumnGrouping(row)) return true;
   if (row.sumCase?.enabled) return true;
   return false;
@@ -230,6 +235,7 @@ export function getUnsummarizedDimensionColumns(items) {
   const out = [];
   for (const r of rows) {
     if (r?.aggregate != null) continue;
+    if (isComposePullExcludedRow(r)) continue;
     if (isComposeGroupByKeyRow(r)) continue;
     const col = String(r?.column || "").trim();
     if (!col || seen.has(col)) continue;
@@ -259,7 +265,60 @@ export function formatAlsoSelectedColumnsLine(columns, labelFn, opts = {}) {
  * @param {object[]} items
  */
 export function keepComposeItemsForOneSummaryRow(items) {
-  return (items || []).filter((r) => r?.aggregate != null || isComposeGroupByKeyRow(r));
+  return (items || []).filter(
+    (r) => r?.aggregate != null || isComposeGroupByKeyRow(r) || isComposePullExcludedRow(r),
+  );
+}
+
+/**
+ * Columns referenced by compose ops other than plain SELECT output.
+ * @param {{
+ *   whereFilters?: object[];
+ *   havingFilters?: object[];
+ *   joins?: object[];
+ *   orderBy?: object[];
+ * }} refs
+ */
+export function collectReferencedComposeColumns(refs = {}) {
+  const out = new Set();
+  const add = (col) => {
+    const c = String(col || "").trim();
+    if (c) out.add(c);
+  };
+  for (const f of refs.whereFilters || []) add(f?.column);
+  for (const f of refs.havingFilters || []) add(f?.havingAlias);
+  for (const j of refs.joins || []) {
+    add(j?.leftColumn);
+    add(j?.rightColumn);
+  }
+  for (const o of refs.orderBy || []) add(o?.alias);
+  return out;
+}
+
+/**
+ * Compose row that keeps a column in the query (WHERE, etc.) without SELECT / GROUP BY.
+ * @param {string} column
+ * @param {{ treatAsDate?: boolean }} [opts]
+ */
+export function createPullExcludedComposeRow(column, opts = {}) {
+  const col = String(column || "").trim();
+  return {
+    id: genComposeRowId(),
+    column: col,
+    alias: col,
+    aggregate: null,
+    pullExcluded: true,
+    dateBucket: null,
+    dateFormat: null,
+    stringBucket: null,
+    numberBucket: null,
+    numberScale: "none",
+    decimals: null,
+    treatAsDate: opts.treatAsDate === true,
+    sumCase: { enabled: false, branches: [], elseColumn: "" },
+    equation: { enabled: false },
+    displayName: null,
+  };
 }
 
 /**
@@ -274,7 +333,9 @@ export function resolveComposeGroupByAliases(items) {
     return rows.filter(isComposeGroupByKeyRow).map(composeRowAlias);
   }
   if (hasAgg) {
-    return rows.filter((r) => r.aggregate == null).map(composeRowAlias);
+    return rows
+      .filter((r) => r.aggregate == null && !isComposePullExcludedRow(r))
+      .map(composeRowAlias);
   }
   return [];
 }
@@ -285,10 +346,11 @@ export function resolveComposeGroupByAliases(items) {
  */
 export function selectRowsForAggregatedCompose(items) {
   const rows = items || [];
-  if (!hasExplicitComposeGrouping(rows)) {
-    return rows;
+  const withoutRefs = rows.filter((r) => !isComposePullExcludedRow(r));
+  if (!hasExplicitComposeGrouping(withoutRefs)) {
+    return withoutRefs;
   }
-  return rows.filter((r) => r.aggregate != null || isComposeGroupByKeyRow(r));
+  return withoutRefs.filter((r) => r.aggregate != null || isComposeGroupByKeyRow(r));
 }
 
 /** True when the pull will GROUP BY (bucket and/or summarize). */

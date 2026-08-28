@@ -45,6 +45,9 @@ import { useGuidedWorkflowOptional } from "@/components/guidedWorkflow/GuidedWor
 import { pruneConnectComposeBeforePull } from "@/lib/connectComposeSanitize";
 import { hasConfiguredTableJoins } from "@/lib/composeJoinColumns";
 import {
+  collectReferencedComposeColumns,
+  createPullExcludedComposeRow,
+  getUnsummarizedDimensionColumns,
   keepComposeItemsForOneSummaryRow,
   selectRowsForAggregatedCompose,
 } from "@/lib/composeColumnGrouping";
@@ -538,12 +541,42 @@ export function ConnectComposeOperationPanel({
   );
 
   const handleKeepOneSummaryRow = useCallback(() => {
+    const dims = getUnsummarizedDimensionColumns(columnComposeItems);
+    const referenced = collectReferencedComposeColumns({
+      whereFilters: composeWhereFilters,
+      havingFilters: composeHavingFilters,
+      joins: composeJoins,
+      orderBy: columnComposeOrderBy,
+    });
     const kept = keepComposeItemsForOneSummaryRow(columnComposeItems);
+    for (const col of dims) {
+      if (!referenced.has(col)) continue;
+      if (kept.some((r) => String(r?.column || "").trim() === col)) continue;
+      kept.push(
+        createPullExcludedComposeRow(col, {
+          treatAsDate: kindForColumn(col) === "date",
+        }),
+      );
+    }
     const keepAliases = new Set(
-      kept.map((r) => String(r.alias || r.column || "").trim()).filter(Boolean),
+      kept
+        .filter((r) => !r.pullExcluded)
+        .map((r) => String(r.alias || r.column || "").trim())
+        .filter(Boolean),
     );
-    const keepColumns = [
-      ...new Set(kept.map((r) => String(r.column || "").trim()).filter(Boolean)),
+    const outputColumns = [
+      ...new Set(
+        kept
+          .filter((r) => !r.pullExcluded)
+          .map((r) => String(r.column || "").trim())
+          .filter(Boolean),
+      ),
+    ];
+    const selectionColumns = [
+      ...new Set([
+        ...outputColumns,
+        ...dims.filter((col) => referenced.has(col)),
+      ]),
     ];
     setColumnComposeItems?.(kept);
     setColumnComposeOrderBy?.((prev) =>
@@ -556,18 +589,23 @@ export function ConnectComposeOperationPanel({
     if (standalone && typeof onColumnSelectionsChange === "function") {
       onColumnSelectionsChange({
         ...(connectDataLakeColumnSelections || {}),
-        [sampleKey]: keepColumns,
+        [sampleKey]: selectionColumns,
       });
       return;
     }
     setConnectDataLakeColumnSelections?.((prev) => ({
       ...(prev || {}),
-      [sampleKey]: keepColumns,
+      [sampleKey]: selectionColumns,
     }));
   }, [
     columnComposeItems,
+    columnComposeOrderBy,
+    composeHavingFilters,
+    composeJoins,
+    composeWhereFilters,
     connectDataLakeColumnSelections,
     connectDataLakeSampleId,
+    kindForColumn,
     onColumnSelectionsChange,
     setColumnComposeItems,
     setColumnComposeOrderBy,

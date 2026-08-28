@@ -215,12 +215,19 @@ export function syncComposeItemsWithSelectedColumns(prevRows, selectedColumns, c
   const selected = new Set(cols);
   const prev = Array.isArray(prevRows) ? prevRows : [];
 
-  const kept = prev.filter((row) => selected.has(String(row?.column || "").trim()));
+  const kept = prev.filter((row) => {
+    const col = String(row?.column || "").trim();
+    if (row?.pullExcluded) return true;
+    return selected.has(col);
+  });
   const next = [...kept];
+  const hasAgg = next.some((r) => r?.aggregate != null);
   for (const col of cols) {
-    if (!next.some((row) => String(row?.column || "").trim() === col)) {
-      next.push(createBaseRow(col));
-    }
+    if (next.some((row) => String(row?.column || "").trim() === col)) continue;
+    const hadAnyRow = prev.some((row) => String(row?.column || "").trim() === col);
+    // Summarize mode: do not resurrect plain dimension rows dropped for one summary row.
+    if (hasAgg && hadAnyRow) continue;
+    next.push(createBaseRow(col));
   }
 
   if (next.length === prev.length && next.every((row, i) => row === prev[i])) {

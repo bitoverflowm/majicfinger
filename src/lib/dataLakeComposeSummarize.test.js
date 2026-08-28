@@ -1,8 +1,10 @@
 import assert from "node:assert/strict";
 import {
+  collectReferencedComposeColumns,
   formatAlsoSelectedColumnsLine,
   getUnsummarizedDimensionColumns,
   keepComposeItemsForOneSummaryRow,
+  selectRowsForAggregatedCompose,
 } from "./composeColumnGrouping.js";
 import {
   isAutoSummarizeAlias,
@@ -117,4 +119,48 @@ test("keepComposeItemsForOneSummaryRow drops plain dimensions", () => {
   ]);
   assert.equal(kept.length, 2);
   assert.ok(kept.every((r) => r.aggregate != null));
+});
+
+test("pullExcluded rows are omitted from SELECT and GROUP BY", () => {
+  const items = [
+    { column: "id", alias: "market_count", aggregate: "count" },
+    { column: "volume", alias: "total_volume", aggregate: "sum" },
+    { column: "closed", alias: "closed", aggregate: null, pullExcluded: true },
+  ];
+  assert.deepEqual(getUnsummarizedDimensionColumns(items), []);
+  assert.deepEqual(
+    selectRowsForAggregatedCompose(items).map((r) => r.column),
+    ["id", "volume"],
+  );
+});
+
+test("collectReferencedComposeColumns gathers WHERE and join columns", () => {
+  const refs = collectReferencedComposeColumns({
+    whereFilters: [{ column: "closed" }, { column: "volume" }],
+    joins: [{ leftColumn: "id", rightColumn: "market_id" }],
+  });
+  assert.ok(refs.has("closed"));
+  assert.ok(refs.has("volume"));
+  assert.ok(refs.has("id"));
+  assert.ok(refs.has("market_id"));
+});
+
+test("syncComposeItemsWithSelectedColumns preserves pullExcluded and skips resurrecting dropped dims", () => {
+  const prev = [
+    { column: "volume", alias: "total_volume", aggregate: "sum" },
+    { column: "closed", alias: "closed", aggregate: null, pullExcluded: true },
+  ];
+  const next = syncComposeItemsWithSelectedColumns(prev, ["volume", "closed"], (col) => ({
+    column: col,
+    alias: col,
+    aggregate: null,
+  }));
+  assert.equal(next.length, 2);
+  assert.ok(next.some((r) => r.column === "closed" && r.pullExcluded));
+  const withQuestion = syncComposeItemsWithSelectedColumns(next, ["volume", "closed", "question"], (col) => ({
+    column: col,
+    alias: col,
+    aggregate: null,
+  }));
+  assert.ok(withQuestion.some((r) => r.column === "question" && !r.pullExcluded));
 });
