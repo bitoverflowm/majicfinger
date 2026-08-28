@@ -1,16 +1,22 @@
 "use client";
 
 import { useState } from "react";
+import { X } from "lucide-react";
 
+import { Button } from "@/components/ui/button";
 import {
-  Sheet,
-  SheetContent,
-  SheetDescription,
-  SheetHeader,
-  SheetTitle,
-} from "@/components/ui/sheet";
+  Drawer,
+  DrawerClose,
+  DrawerDescription,
+  DrawerHeader,
+  DrawerSideContent,
+  DrawerTitle,
+} from "@/components/ui/drawer";
 import { filterFeatureHelperGuideLinks } from "@/lib/featureHelper";
 import { cn } from "@/lib/utils";
+
+/** Matches DrawerSideContent width (w-72). */
+export const FEATURE_HELPER_DRAWER_WIDTH_CLASS = "pr-72";
 
 /**
  * @typedef {{ label: string; href: string }} FeatureHelperGuideLink
@@ -109,7 +115,7 @@ export function FeatureHelperBody({ introduction, sections = [], guideLinks = []
 }
 
 /**
- * Shared, data-driven helper in a right-side slide-out panel.
+ * Non-modal right-side drawer for research-tool helpers (Vaul / shadcn drawer).
  * Pass controlled `open` / `onOpenChange` from the parent when enabling a research tool.
  *
  * @param {{
@@ -141,21 +147,32 @@ export function FeatureHelper({
   const heading = title ? `${label} · ${title}` : label;
 
   return (
-    <Sheet open={open} onOpenChange={setOpen}>
-      <SheetContent
-        side="right"
-        className={cn(
-          "flex w-full flex-col gap-0 p-0 sm:max-w-md",
-          "border-l border-border/60 bg-background",
-          className,
-        )}
-      >
-        <SheetHeader className="space-y-1 border-b border-border/50 px-4 py-3 text-left">
-          <SheetTitle className="text-sm font-semibold tracking-tight">{heading}</SheetTitle>
-          <SheetDescription className="text-[11px] text-muted-foreground">
-            How this feature works in your query. Close the panel anytime to return to composing.
-          </SheetDescription>
-        </SheetHeader>
+    <Drawer
+      open={open}
+      onOpenChange={setOpen}
+      direction="right"
+      modal={false}
+      dismissible={false}
+      shouldScaleBackground={false}
+    >
+      <DrawerSideContent className={cn("gap-0 p-0", className)} side="right">
+        <DrawerHeader className="relative space-y-1 border-b border-border/50 px-4 py-3 pr-10 text-left">
+          <DrawerTitle className="text-sm font-semibold tracking-tight">{heading}</DrawerTitle>
+          <DrawerDescription className="text-[11px] leading-snug text-muted-foreground">
+            How this feature works in your query. Keep composing while you read.
+          </DrawerDescription>
+          <DrawerClose asChild>
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              className="absolute right-2 top-2 h-7 w-7 shrink-0 text-muted-foreground hover:text-foreground"
+              aria-label="Close helper"
+            >
+              <X className="h-3.5 w-3.5" />
+            </Button>
+          </DrawerClose>
+        </DrawerHeader>
         <div className="min-h-0 flex-1 overflow-y-auto px-4 py-3">
           <FeatureHelperBody
             introduction={introduction}
@@ -163,7 +180,7 @@ export function FeatureHelper({
             guideLinks={guideLinks}
           />
         </div>
-      </SheetContent>
-    </Sheet>
+      </DrawerSideContent>
+    </Drawer>
   );
 }

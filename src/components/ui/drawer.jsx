@@ -7,9 +7,14 @@ import { cn } from "@/lib/utils"
 
 const Drawer = ({
   shouldScaleBackground = true,
+  direction = "bottom",
   ...props
 }) => (
-  <DrawerPrimitive.Root shouldScaleBackground={shouldScaleBackground} {...props} />
+  <DrawerPrimitive.Root
+    direction={direction}
+    shouldScaleBackground={shouldScaleBackground}
+    {...props}
+  />
 )
 Drawer.displayName = "Drawer"
 
@@ -44,6 +49,28 @@ const DrawerContent = React.forwardRef(({ className, children, ...props }, ref) 
   </DrawerPortal>
 ))
 DrawerContent.displayName = "DrawerContent"
+
+/** Viewport-edge side drawer (no overlay) for non-modal panels such as FeatureHelper. */
+const DrawerSideContent = React.forwardRef(
+  ({ className, children, side = "right", hideOverlay = true, ...props }, ref) => (
+    <DrawerPortal>
+      {!hideOverlay ? <DrawerOverlay className="bg-black/20" /> : null}
+      <DrawerPrimitive.Content
+        ref={ref}
+        className={cn(
+          "fixed z-50 flex h-full max-h-[100dvh] flex-col bg-background shadow-xl outline-none",
+          side === "right" && "inset-y-0 right-0 w-72 border-l border-border",
+          side === "left" && "inset-y-0 left-0 w-72 border-r border-border",
+          className,
+        )}
+        {...props}
+      >
+        {children}
+      </DrawerPrimitive.Content>
+    </DrawerPortal>
+  ),
+)
+DrawerSideContent.displayName = "DrawerSideContent"
 
 const DrawerHeader = ({
   className,
@@ -86,6 +113,7 @@ export {
   DrawerTrigger,
   DrawerClose,
   DrawerContent,
+  DrawerSideContent,
   DrawerHeader,
   DrawerFooter,
   DrawerTitle,

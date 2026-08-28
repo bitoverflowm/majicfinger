@@ -20,6 +20,7 @@ import {
 import { KalshiPowerToolsSearch } from "@/components/connectData/KalshiPowerToolsSearch";
 import { KalshiHistoricalCandlestickLiveCutoffNote } from "@/components/connectData/kalshiLive/KalshiLiveCandlestickHistoricalCutoffNote";
 import { ConnectComposeOperationPanel } from "@/components/connectData/ConnectComposeOperationPanel";
+import { ConnectComposeHelperLayout } from "@/components/connectData/ConnectComposeHelperLayout";
 import { ConnectDataOperationsSection } from "@/components/connectData/ConnectDataOperationsSection";
 import { ConnectResearchToolsSection } from "@/components/connectData/ConnectResearchToolsSection";
 import { GuidedWorkflowOverlay } from "@/components/guidedWorkflow/GuidedWorkflowOverlay";
@@ -488,6 +489,19 @@ function HubKalshiQueryBuilderInner({
     },
     [patchComposeDraft],
   );
+
+  const [researchHelperToolId, setResearchHelperToolId] = useState(null);
+  const [researchHelperOpen, setResearchHelperOpen] = useState(false);
+
+  const handleResearchToolHelperChange = useCallback((toolId) => {
+    if (!toolId) {
+      setResearchHelperOpen(false);
+      setResearchHelperToolId(null);
+      return;
+    }
+    setResearchHelperToolId(toolId);
+    setResearchHelperOpen(true);
+  }, []);
 
   const [sheetName, setSheetName] = useState("");
   const [marketSearchInitial, setMarketSearchInitial] = useState("");
@@ -1120,41 +1134,50 @@ function HubKalshiQueryBuilderInner({
             </div>
 
             {selectedColumns.length > 0 ? (
-              <div
-                className="space-y-0"
-                {...{ [GUIDED_TARGET_ATTR]: KALSHI_GUIDED_TARGETS.composePanel }}
+              <ConnectComposeHelperLayout
+                activeHelperToolId={researchHelperToolId}
+                helperOpen={researchHelperOpen}
+                onHelperOpenChange={(open) => {
+                  if (!open) handleResearchToolHelperChange(null);
+                }}
               >
-                <ConnectDataOperationsSection
-                  selectedCount={selectedColumns.length}
-                  className={cn("mt-0 border-t-0 pt-0", embedded && "mt-0")}
-                  activeComposeOps={activeComposeOps}
-                  setActiveComposeOps={setActiveComposeOps}
-                  title="Refine your query"
-                  description="Optional: add filters, sort, limit, join, summarize, or conditional columns before you run."
-                />
-                <ConnectResearchToolsSection
-                  selectedCount={selectedColumns.length}
-                  className="mt-6 border-t border-border/40 pt-6"
-                  randomSampleEnabled={!!composeDraft.randomSampleEnabled}
-                  setRandomSampleEnabled={setRandomSampleEnabled}
-                  randomSampleSize={composeDraft.randomSampleSize ?? ""}
-                  setRandomSampleSize={setRandomSampleSize}
-                  onEnableRandomSample={enableRandomSample}
-                />
-                <ConnectComposeOperationPanel
-                  key={sampleId}
-                  standalone
-                  sampleId={sampleId}
-                  columnSelections={columnSelections}
-                  hidePullActions
-                  activeComposeOps={activeComposeOps}
-                  setActiveComposeOps={setActiveComposeOps}
-                  onComposeChange={handleComposeChange}
-                  composeSeed={composeSeed}
-                  className="mt-0"
-                  panelClassName={embedded || connectHome ? "p-3" : "p-3 lg:p-4"}
-                />
-              </div>
+                <div
+                  className="space-y-0"
+                  {...{ [GUIDED_TARGET_ATTR]: KALSHI_GUIDED_TARGETS.composePanel }}
+                >
+                  <ConnectDataOperationsSection
+                    selectedCount={selectedColumns.length}
+                    className={cn("mt-0 border-t-0 pt-0", embedded && "mt-0")}
+                    activeComposeOps={activeComposeOps}
+                    setActiveComposeOps={setActiveComposeOps}
+                    title="Refine your query"
+                    description="Optional: add filters, sort, limit, join, summarize, or conditional columns before you run."
+                  />
+                  <ConnectResearchToolsSection
+                    selectedCount={selectedColumns.length}
+                    className="mt-6 border-t border-border/40 pt-6"
+                    randomSampleEnabled={!!composeDraft.randomSampleEnabled}
+                    setRandomSampleEnabled={setRandomSampleEnabled}
+                    randomSampleSize={composeDraft.randomSampleSize ?? ""}
+                    setRandomSampleSize={setRandomSampleSize}
+                    onEnableRandomSample={enableRandomSample}
+                    onResearchToolHelperChange={handleResearchToolHelperChange}
+                  />
+                  <ConnectComposeOperationPanel
+                    key={sampleId}
+                    standalone
+                    sampleId={sampleId}
+                    columnSelections={columnSelections}
+                    hidePullActions
+                    activeComposeOps={activeComposeOps}
+                    setActiveComposeOps={setActiveComposeOps}
+                    onComposeChange={handleComposeChange}
+                    composeSeed={composeSeed}
+                    className="mt-0"
+                    panelClassName={embedded || connectHome ? "p-3" : "p-3 lg:p-4"}
+                  />
+                </div>
+              </ConnectComposeHelperLayout>
             ) : null}
 
             <div className="space-y-2">

@@ -8,7 +8,6 @@ import {
   getResearchToolHelperContent,
 } from "@/lib/connectResearchTools";
 import { ConnectRandomSamplePanel } from "@/components/connectData/ConnectRandomSamplePanel";
-import { FeatureHelper } from "@/components/shared/FeatureHelper";
 import { cn } from "@/lib/utils";
 
 /** Mathematical sample-size symbol (n) used as the Random Sample card icon. */
@@ -45,6 +44,7 @@ const RESEARCH_TOOL_ICONS = {
  *   setRandomSampleSize?: (value: string) => void;
  *   randomSampleError?: string | null;
  *   onEnableRandomSample?: () => void;
+ *   onResearchToolHelperChange?: (toolId: string | null) => void;
  * }} props
  */
 export function ConnectResearchToolsSection({
@@ -59,40 +59,33 @@ export function ConnectResearchToolsSection({
   setRandomSampleSize,
   randomSampleError = null,
   onEnableRandomSample,
+  onResearchToolHelperChange,
 }) {
-  const [activeHelperToolId, setActiveHelperToolId] = useState(null);
-  const [helperOpen, setHelperOpen] = useState(false);
-
-  const openHelperForTool = useCallback((toolId) => {
-    const content = getResearchToolHelperContent(toolId);
-    if (!content) return;
-    setActiveHelperToolId(toolId);
-    setHelperOpen(true);
-  }, []);
+  const openHelperForTool = useCallback(
+    (toolId) => {
+      const content = getResearchToolHelperContent(toolId);
+      if (!content) return;
+      onResearchToolHelperChange?.(toolId);
+    },
+    [onResearchToolHelperChange],
+  );
 
   const closeHelper = useCallback(() => {
-    setHelperOpen(false);
-  }, []);
+    onResearchToolHelperChange?.(null);
+  }, [onResearchToolHelperChange]);
 
   if (selectedCount <= 0 || !tools?.length) return null;
 
   const toggleRandomSample = () => {
     if (randomSampleEnabled) {
       setRandomSampleEnabled?.(false);
-      if (activeHelperToolId === "random_sample") {
-        closeHelper();
-        setActiveHelperToolId(null);
-      }
+      closeHelper();
       return;
     }
     onEnableRandomSample?.();
     setRandomSampleEnabled?.(true);
     openHelperForTool("random_sample");
   };
-
-  const activeHelperContent = activeHelperToolId
-    ? getResearchToolHelperContent(activeHelperToolId)
-    : null;
 
   return (
     <motion.section
@@ -184,18 +177,6 @@ export function ConnectResearchToolsSection({
             sampleSize={randomSampleSize}
             onSampleSizeChange={setRandomSampleSize}
             error={randomSampleError}
-          />
-        ) : null}
-
-        {activeHelperContent ? (
-          <FeatureHelper
-            label={activeHelperContent.label}
-            title={activeHelperContent.title}
-            introduction={activeHelperContent.introduction}
-            sections={activeHelperContent.sections}
-            guideLinks={activeHelperContent.guideLinks}
-            open={helperOpen}
-            onOpenChange={setHelperOpen}
           />
         ) : null}
       </motion.div>

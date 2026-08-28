@@ -1,6 +1,7 @@
 "use client";
 
 import { ConnectComposeOperationPanel } from "@/components/connectData/ConnectComposeOperationPanel";
+import { ConnectComposeHelperLayout } from "@/components/connectData/ConnectComposeHelperLayout";
 import { ConnectDataOperationsSection } from "@/components/connectData/ConnectDataOperationsSection";
 import { ConnectResearchToolsSection } from "@/components/connectData/ConnectResearchToolsSection";
 import { GuidedWorkflowPullResults } from "@/components/guidedWorkflow/GuidedWorkflowPullResults";
@@ -346,6 +347,19 @@ export function HubPolymarketQueryBuilder({
     },
     [patchComposeDraft],
   );
+
+  const [researchHelperToolId, setResearchHelperToolId] = useState(null);
+  const [researchHelperOpen, setResearchHelperOpen] = useState(false);
+
+  const handleResearchToolHelperChange = useCallback((toolId) => {
+    if (!toolId) {
+      setResearchHelperOpen(false);
+      setResearchHelperToolId(null);
+      return;
+    }
+    setResearchHelperToolId(toolId);
+    setResearchHelperOpen(true);
+  }, []);
 
   const hoveredSourceLabel = useMemo(() => {
     if (!hoveredSampleId) return "";
@@ -780,40 +794,49 @@ export function HubPolymarketQueryBuilder({
             </div>
 
             {selectedColumns.length > 0 ? (
-              <div className="space-y-0">
-                <ConnectDataOperationsSection
-                  selectedCount={selectedColumns.length}
-                  className="mt-0 border-t-0 pt-0"
-                  operations={getConnectComposeOperationsForWorkspace(INTEGRATION_ID)}
-                  activeComposeOps={activeComposeOps}
-                  setActiveComposeOps={setActiveComposeOps}
-                  title="Refine your query"
-                  description="Optional: add filters, sort, limit, join, summarize, or conditional columns before you run."
-                />
-                <ConnectResearchToolsSection
-                  selectedCount={selectedColumns.length}
-                  className="mt-6 border-t border-border/40 pt-6"
-                  randomSampleEnabled={!!composeDraft.randomSampleEnabled}
-                  setRandomSampleEnabled={setRandomSampleEnabled}
-                  randomSampleSize={composeDraft.randomSampleSize ?? ""}
-                  setRandomSampleSize={setRandomSampleSize}
-                  onEnableRandomSample={enableRandomSample}
-                />
-                <ConnectComposeOperationPanel
-                  key={sampleId}
-                  standalone
-                  standaloneWorkspaceId={INTEGRATION_ID}
-                  sampleId={sampleId}
-                  columnSelections={columnSelections}
-                  hidePullActions
-                  activeComposeOps={activeComposeOps}
-                  setActiveComposeOps={setActiveComposeOps}
-                  onComposeChange={handleComposeChange}
-                  composeSeed={composeSeed}
-                  className="mt-0"
-                  panelClassName="p-3"
-                />
-              </div>
+              <ConnectComposeHelperLayout
+                activeHelperToolId={researchHelperToolId}
+                helperOpen={researchHelperOpen}
+                onHelperOpenChange={(open) => {
+                  if (!open) handleResearchToolHelperChange(null);
+                }}
+              >
+                <div className="space-y-0">
+                  <ConnectDataOperationsSection
+                    selectedCount={selectedColumns.length}
+                    className="mt-0 border-t-0 pt-0"
+                    operations={getConnectComposeOperationsForWorkspace(INTEGRATION_ID)}
+                    activeComposeOps={activeComposeOps}
+                    setActiveComposeOps={setActiveComposeOps}
+                    title="Refine your query"
+                    description="Optional: add filters, sort, limit, join, summarize, or conditional columns before you run."
+                  />
+                  <ConnectResearchToolsSection
+                    selectedCount={selectedColumns.length}
+                    className="mt-6 border-t border-border/40 pt-6"
+                    randomSampleEnabled={!!composeDraft.randomSampleEnabled}
+                    setRandomSampleEnabled={setRandomSampleEnabled}
+                    randomSampleSize={composeDraft.randomSampleSize ?? ""}
+                    setRandomSampleSize={setRandomSampleSize}
+                    onEnableRandomSample={enableRandomSample}
+                    onResearchToolHelperChange={handleResearchToolHelperChange}
+                  />
+                  <ConnectComposeOperationPanel
+                    key={sampleId}
+                    standalone
+                    standaloneWorkspaceId={INTEGRATION_ID}
+                    sampleId={sampleId}
+                    columnSelections={columnSelections}
+                    hidePullActions
+                    activeComposeOps={activeComposeOps}
+                    setActiveComposeOps={setActiveComposeOps}
+                    onComposeChange={handleComposeChange}
+                    composeSeed={composeSeed}
+                    className="mt-0"
+                    panelClassName="p-3"
+                  />
+                </div>
+              </ConnectComposeHelperLayout>
             ) : null}
 
             <div className="space-y-2">
