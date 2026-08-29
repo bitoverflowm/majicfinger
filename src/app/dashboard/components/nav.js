@@ -33,6 +33,8 @@ import {
   resetProjectWorkspaceState,
   workspaceHasUnsavedProgress,
 } from "@/lib/resetProjectWorkspaceState"
+import { clearHubQueryDraft } from "@/lib/hubs/hubQueryDraft"
+import { clearPendingResearchBucketing } from "@/lib/hubs/pendingResearchBucketing"
 import {
   persistChartDashboardDraft,
   mergeCreatedChartDashboardDraft,
@@ -391,6 +393,7 @@ const Nav = () => {
   const currentStreamState = effectiveStreamSheetId ? streamsBySheetId[effectiveStreamSheetId] : null
   const [newProjectPromptOpen, setNewProjectPromptOpen] = useState(false)
   const [newProjectSaveMode, setNewProjectSaveMode] = useState(/** @type {"save" | "saveAs"} */ ("save"))
+  const [clearWorkspacePromptOpen, setClearWorkspacePromptOpen] = useState(false)
   const pendingNewProjectAfterSaveRef = useRef(false)
 
   const [isOpen, setIsOpen] = useState(false) 
@@ -524,9 +527,10 @@ const Nav = () => {
     dataSetName ||
     "Untitled project";
 
-  const performNewProjectWipe = () => {
+  const performNewProjectWipe = (successToast = "Ready to start a new project.") => {
     pendingNewProjectAfterSaveRef.current = false;
     setNewProjectPromptOpen(false);
+    setClearWorkspacePromptOpen(false);
 
     resetProjectWorkspaceState(
       {
@@ -579,7 +583,30 @@ const Nav = () => {
       });
     }
 
-    toast.success("Ready to start a new project.");
+    if (successToast) toast.success(successToast);
+  };
+
+  const performClearWorkspace = () => {
+    clearPendingResearchBucketing();
+    clearHubQueryDraft();
+    performNewProjectWipe("Workspace cleared. You can start fresh.");
+  };
+
+  const handleClearWorkspace = () => {
+    const hasProgress = workspaceHasUnsavedProgress({
+      dataSheets,
+      chartSheets,
+      connectedData,
+      chartDashboardDraft,
+      loadedDataMeta,
+      liveFeedState,
+      liveStreamState,
+    });
+    if (hasProgress) {
+      setClearWorkspacePromptOpen(true);
+      return;
+    }
+    performClearWorkspace();
   };
 
   const handleStartNewProject = () => {
@@ -1500,6 +1527,18 @@ const Nav = () => {
                 </span>
               </>
             ) : null}
+            {user ? (
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="ml-1 h-7 shrink-0 gap-1 px-2 text-xs font-medium"
+                onClick={handleClearWorkspace}
+                title="Clear pulled data, sheets, and integration state from memory"
+              >
+                Clear workspace
+              </Button>
+            ) : null}
           </div>
           { user ? (
               <div className="flex w-full flex-wrap items-center justify-end gap-2 sm:w-auto sm:ml-auto sm:flex-nowrap">
@@ -1663,6 +1702,30 @@ const Nav = () => {
                           </AlertDialogFooter>
                         </>
                       )}
+                    </AlertDialogContent>
+                  </AlertDialog>
+                  <AlertDialog
+                    open={clearWorkspacePromptOpen}
+                    onOpenChange={setClearWorkspacePromptOpen}
+                  >
+                    <AlertDialogContent>
+                      <AlertDialogHeader>
+                        <AlertDialogTitle>Clear workspace?</AlertDialogTitle>
+                        <AlertDialogDescription>
+                          This removes pulled data, sheets, charts draft state, and integration
+                          selections from memory so you can start clean. Saved projects on the
+                          server are not deleted.
+                        </AlertDialogDescription>
+                      </AlertDialogHeader>
+                      <AlertDialogFooter>
+                        <AlertDialogCancel>Cancel</AlertDialogCancel>
+                        <AlertDialogAction
+                          className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                          onClick={performClearWorkspace}
+                        >
+                          Clear workspace
+                        </AlertDialogAction>
+                      </AlertDialogFooter>
                     </AlertDialogContent>
                   </AlertDialog>
                   {showWorkspaceUsageIndicator && (
