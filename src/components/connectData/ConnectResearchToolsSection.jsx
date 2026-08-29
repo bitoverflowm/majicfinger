@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useMemo } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { motion } from "framer-motion";
 import { Layers, X } from "lucide-react";
 
@@ -8,8 +8,8 @@ import {
   CONNECT_RESEARCH_TOOLS,
   getResearchToolHelperContent,
 } from "@/lib/connectResearchTools";
-import { ConnectBucketPanel } from "@/components/connectData/ConnectBucketPanel";
-import { ConnectRandomSamplePanel } from "@/components/connectData/ConnectRandomSamplePanel";
+import { ConnectBucketDialog } from "@/components/connectData/ConnectBucketDialog";
+import { ConnectRandomSampleDialog } from "@/components/connectData/ConnectRandomSampleDialog";
 import { Button } from "@/components/ui/button";
 import { createEmptyBucketTab } from "@/lib/bucketSheetTabs";
 import { inferBucketColumnProfileFromType } from "@/lib/sheetOperations/inferBucketColumnProfile";
@@ -41,6 +41,7 @@ const RESEARCH_TOOL_ICONS = {
 
 /**
  * Card grid for historical research helpers (Kalshi Historical V1 / Polymarket Historical).
+ * Tool configuration opens in pop-out dialogs to keep the compose flow uncluttered.
  *
  * @param {{
  *   selectedCount: number;
@@ -87,6 +88,8 @@ export function ConnectResearchToolsSection({
   onEnableBucketing,
   onResearchToolHelperChange,
 }) {
+  const [configToolId, setConfigToolId] = useState(null);
+
   const openHelperForTool = useCallback(
     (toolId) => {
       const content = getResearchToolHelperContent(toolId);
@@ -102,11 +105,13 @@ export function ConnectResearchToolsSection({
 
   const clearRandomSample = useCallback(() => {
     setRandomSampleEnabled?.(false);
+    setConfigToolId((id) => (id === "random_sample" ? null : id));
     closeHelper();
   }, [closeHelper, setRandomSampleEnabled]);
 
   const clearBucketing = useCallback(() => {
     setBucketingEnabled?.(false);
+    setConfigToolId((id) => (id === "bucketing" ? null : id));
     closeHelper();
   }, [closeHelper, setBucketingEnabled]);
 
@@ -117,29 +122,66 @@ export function ConnectResearchToolsSection({
     return inferBucketColumnProfileFromType(type);
   }, [bucketConfig?.bucketColumn, columnTypesByName]);
 
+  // Auto-pick bucket style from schema type (same as sheet workspace).
+  useEffect(() => {
+    if (!bucketingEnabled || !bucketConfig || !bucketColumnProfile) return;
+    const col = String(bucketConfig.bucketColumn || "").trim();
+    if (!col) return;
+    if (bucketColumnProfile.isTemporal && bucketConfig.bucketMode !== "time") {
+      setBucketConfig?.({ ...bucketConfig, bucketMode: "time" });
+      return;
+    }
+    if (
+      bucketColumnProfile.isNumeric &&
+      !bucketColumnProfile.isTemporal &&
+      bucketConfig.bucketMode !== "number"
+    ) {
+      setBucketConfig?.({
+        ...bucketConfig,
+        bucketMode: "number",
+        numericBucketSize:
+          String(bucketConfig.numericBucketSize || "").trim() ||
+          String(bucketColumnProfile.suggestedSize || 1),
+      });
+      return;
+    }
+    if (
+      !bucketColumnProfile.isNumeric &&
+      !bucketColumnProfile.isTemporal &&
+      bucketConfig.bucketMode !== "category"
+    ) {
+      setBucketConfig?.({ ...bucketConfig, bucketMode: "category" });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [
+    bucketingEnabled,
+    bucketConfig?.bucketColumn,
+    bucketColumnProfile?.isNumeric,
+    bucketColumnProfile?.isTemporal,
+    bucketColumnProfile?.suggestedSize,
+  ]);
+
   if (selectedCount <= 0 || !tools?.length) return null;
 
-  const enableRandomSample = () => {
-    if (randomSampleEnabled) {
-      openHelperForTool("random_sample");
-      return;
+  const openRandomSample = () => {
+    if (!randomSampleEnabled) {
+      onEnableRandomSample?.();
+      setRandomSampleEnabled?.(true);
     }
-    onEnableRandomSample?.();
-    setRandomSampleEnabled?.(true);
     openHelperForTool("random_sample");
+    setConfigToolId("random_sample");
   };
 
-  const enableBucketing = () => {
-    if (bucketingEnabled) {
-      openHelperForTool("bucketing");
-      return;
-    }
-    onEnableBucketing?.();
-    setBucketingEnabled?.(true);
-    if (!bucketConfig) {
-      setBucketConfig?.(createEmptyBucketTab("Bucketed sheet"));
+  const openBucketing = () => {
+    if (!bucketingEnabled) {
+      onEnableBucketing?.();
+      setBucketingEnabled?.(true);
+      if (!bucketConfig) {
+        setBucketConfig?.(createEmptyBucketTab("Bucketed sheet"));
+      }
     }
     openHelperForTool("bucketing");
+    setConfigToolId("bucketing");
   };
 
   const toolSelected = (toolId) => {
@@ -154,14 +196,26 @@ export function ConnectResearchToolsSection({
     return false;
   };
 
-  const enableTool = (toolId) => {
-    if (toolId === "random_sample") enableRandomSample();
-    else if (toolId === "bucketing") enableBucketing();
+  const openTool = (toolId) => {
+    if (toolId === "random_sample") openRandomSample();
+    else if (toolId === "bucketing") openBucketing();
   };
 
   const clearTool = (toolId) => {
     if (toolId === "random_sample") clearRandomSample();
     else if (toolId === "bucketing") clearBucketing();
+  };
+
+  const toolSummary = (toolId) => {
+    if (toolId === "random_sample" && randomSampleEnabled) {
+      const n = String(randomSampleSize ?? "").trim();
+      return n ? `n = ${n}` : "Configure sample size";
+    }
+    if (toolId === "bucketing" && bucketingEnabled) {
+      const col = String(bucketConfig?.bucketColumn || "").trim();
+      return col ? `Bucket by ${col}` : "Configure bucketing";
+    }
+    return null;
   };
 
   return (
@@ -184,7 +238,7 @@ export function ConnectResearchToolsSection({
           transition={{ duration: 0.2, delay: 0.05, ease: [0.22, 1, 0.36, 1] }}
         >
           <h2 className="text-xs font-semibold tracking-tight text-foreground">{title}</h2>
-          <p className="mt-1 max-w-prose text-[11px] leading-snug text-muted-foreground">
+          <p className="mt-1 max-w-prose text-[11px] leading-snug text-muted-foreground dark:text-slate-400">
             {description}
           </p>
         </motion.div>
@@ -195,6 +249,7 @@ export function ConnectResearchToolsSection({
             const hasDescription = Boolean(tool.description?.trim());
             const selected = toolSelected(tool.id);
             const interactive = toolInteractive(tool.id);
+            const summary = toolSummary(tool.id);
 
             return (
               <motion.li
@@ -216,13 +271,13 @@ export function ConnectResearchToolsSection({
                   title={
                     interactive
                       ? selected
-                        ? `${tool.title} is enabled`
-                        : `Enable ${tool.title}`
+                        ? `Edit ${tool.title}`
+                        : `Configure ${tool.title}`
                       : "Coming soon"
                   }
-                  onClick={interactive ? () => enableTool(tool.id) : undefined}
+                  onClick={interactive ? () => openTool(tool.id) : undefined}
                   className={cn(
-                    "flex h-full w-full flex-col rounded-lg border bg-card p-3 text-left",
+                    "flex h-full w-full flex-col rounded-lg border bg-card p-3 text-left text-card-foreground",
                     selected && "pr-8",
                     "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40 focus-visible:ring-offset-2 focus-visible:ring-offset-background",
                     interactive
@@ -236,17 +291,27 @@ export function ConnectResearchToolsSection({
                     <span
                       className={cn(
                         "flex h-7 w-7 shrink-0 items-center justify-center rounded-md",
-                        selected ? "bg-foreground/10 text-foreground" : "bg-muted/50 text-muted-foreground",
+                        selected
+                          ? "bg-foreground/10 text-foreground"
+                          : "bg-muted/50 text-muted-foreground dark:text-slate-400",
                       )}
                     >
-                      <Icon className={selected ? "text-foreground" : "text-muted-foreground"} />
+                      <Icon
+                        className={
+                          selected ? "text-foreground" : "text-muted-foreground dark:text-slate-400"
+                        }
+                      />
                     </span>
                     <span className="text-[11px] font-semibold tracking-tight text-foreground">
                       {tool.title}
                     </span>
                   </span>
-                  {hasDescription ? (
-                    <span className="mt-2 text-[10px] leading-snug text-muted-foreground">
+                  {summary ? (
+                    <span className="mt-2 text-[10px] leading-snug text-muted-foreground dark:text-slate-400">
+                      {summary}
+                    </span>
+                  ) : hasDescription ? (
+                    <span className="mt-2 text-[10px] leading-snug text-muted-foreground dark:text-slate-400">
                       {tool.description}
                     </span>
                   ) : null}
@@ -256,7 +321,7 @@ export function ConnectResearchToolsSection({
                     type="button"
                     variant="ghost"
                     size="icon"
-                    className="absolute right-1.5 top-1.5 h-6 w-6 text-muted-foreground hover:text-foreground"
+                    className="absolute right-1.5 top-1.5 h-6 w-6 text-muted-foreground hover:text-foreground dark:text-slate-400"
                     aria-label={`Remove ${tool.title}`}
                     title={`Remove ${tool.title}`}
                     onClick={(e) => {
@@ -272,27 +337,31 @@ export function ConnectResearchToolsSection({
             );
           })}
         </ul>
-
-        {randomSampleEnabled ? (
-          <ConnectRandomSamplePanel
-            sampleSize={randomSampleSize}
-            onSampleSizeChange={setRandomSampleSize}
-            onRemove={clearRandomSample}
-            error={randomSampleError}
-          />
-        ) : null}
-
-        {bucketingEnabled ? (
-          <ConnectBucketPanel
-            columnNames={columnNames}
-            bucketConfig={bucketConfig}
-            onBucketConfigChange={setBucketConfig}
-            columnProfile={bucketColumnProfile}
-            onRemove={clearBucketing}
-            error={bucketingError}
-          />
-        ) : null}
       </motion.div>
+
+      <ConnectRandomSampleDialog
+        open={configToolId === "random_sample"}
+        onOpenChange={(open) => {
+          if (!open) setConfigToolId((id) => (id === "random_sample" ? null : id));
+        }}
+        sampleSize={randomSampleSize}
+        onSampleSizeChange={setRandomSampleSize}
+        onRemove={clearRandomSample}
+        error={randomSampleError}
+      />
+
+      <ConnectBucketDialog
+        open={configToolId === "bucketing"}
+        onOpenChange={(open) => {
+          if (!open) setConfigToolId((id) => (id === "bucketing" ? null : id));
+        }}
+        columnNames={columnNames}
+        bucketConfig={bucketConfig}
+        onBucketConfigChange={setBucketConfig}
+        columnProfile={bucketColumnProfile}
+        onRemove={clearBucketing}
+        error={bucketingError}
+      />
     </motion.section>
   );
 }

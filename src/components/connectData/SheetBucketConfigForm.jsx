@@ -1,6 +1,5 @@
 "use client";
 
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
@@ -19,6 +18,12 @@ import { niceBucketSize } from "@/lib/sheetOperations/niceBucketSize";
 import { cn } from "@/lib/utils";
 
 const APPLY_FIELD_ERROR_CLASS = "border-destructive focus-visible:ring-destructive/40";
+
+/** Explicit colors so labels stay readable when theme tokens under-contrast on dark surfaces. */
+const FIELD_LABEL = "text-xs font-medium text-foreground";
+const FIELD_HINT = "text-[10px] leading-snug text-muted-foreground dark:text-slate-400";
+const FIELD_SUBLABEL = "text-[10px] font-medium text-foreground/80 dark:text-slate-300";
+const CHECK_LABEL = "truncate font-mono text-xs text-foreground";
 
 const EMPTY_PROFILE = {
   isNumeric: true,
@@ -121,17 +126,17 @@ export function SheetBucketConfigForm({
   return (
     <div className={cn("space-y-3", className)}>
       {showCreatesSheetAlert ? (
-        <Alert className="py-2">
-          <AlertTitle className="text-xs">Bucket creates a new sheet</AlertTitle>
-          <AlertDescription className="text-xs">
+        <div className="rounded-lg border border-border bg-muted/40 px-3 py-2 dark:border-slate-700 dark:bg-slate-900/80">
+          <p className="text-xs font-medium text-foreground">Bucket creates a new sheet</p>
+          <p className={cn(FIELD_HINT, "mt-1")}>
             This groups the query result into bucket rows after your pull. The original result sheet will not be changed.
-          </AlertDescription>
-        </Alert>
+          </p>
+        </div>
       ) : null}
 
       <div className="grid gap-3 sm:grid-cols-2">
         <div className="space-y-1">
-          <Label className="text-xs">Column to bucket</Label>
+          <Label className={FIELD_LABEL}>Column to bucket</Label>
           <Select
             value={bucketColumn || "__"}
             onValueChange={(v) => {
@@ -165,7 +170,7 @@ export function SheetBucketConfigForm({
           ) : null}
         </div>
         <div className="space-y-1">
-          <Label className="text-xs">New bucket column name</Label>
+          <Label className={FIELD_LABEL}>New bucket column name</Label>
           <Input
             className={cn("h-9 text-xs", fieldErrors.bucketOutputColumn && APPLY_FIELD_ERROR_CLASS)}
             value={tab?.bucketOutputColumn ?? "bucket"}
@@ -177,10 +182,10 @@ export function SheetBucketConfigForm({
       </div>
 
       {bucketColumn ? (
-        <div className="space-y-2 rounded-md border border-border/70 p-2">
+        <div className="space-y-2 rounded-md border border-border/70 p-2 dark:border-slate-700">
           <div className="grid gap-3 sm:grid-cols-2">
             <div className="space-y-1">
-              <Label className="text-xs">Bucket style</Label>
+              <Label className={FIELD_LABEL}>Bucket style</Label>
               <Select
                 value={bucketMode}
                 onValueChange={(v) => onTabChange({ bucketMode: v })}
@@ -198,7 +203,7 @@ export function SheetBucketConfigForm({
                   </SelectItem>
                 </SelectContent>
               </Select>
-              <p className="text-[10px] text-muted-foreground">
+              <p className={FIELD_HINT}>
                 {profile.isTemporal && columnProfile
                   ? "Detected as time-like. Choose the time window."
                   : profile.isNumeric && columnProfile
@@ -210,7 +215,7 @@ export function SheetBucketConfigForm({
             </div>
             {bucketMode === "time" ? (
               <div className="space-y-1">
-                <Label className="text-xs">Time bucket</Label>
+                <Label className={FIELD_LABEL}>Time bucket</Label>
                 <Select
                   value={tab?.timeInterval || "day"}
                   onValueChange={(v) => onTabChange({ timeInterval: v })}
@@ -231,7 +236,7 @@ export function SheetBucketConfigForm({
               </div>
             ) : bucketMode === "number" ? (
               <div className="space-y-1">
-                <Label className="text-xs">Range size</Label>
+                <Label className={FIELD_LABEL}>Range size</Label>
                 <div className="flex gap-2">
                   <Input
                     className={cn(
@@ -270,14 +275,14 @@ export function SheetBucketConfigForm({
                     Wider
                   </Button>
                 </div>
-                <p className="text-[10px] text-muted-foreground">
+                <p className={FIELD_HINT}>
                   Suggested: {formatBucketNumber(profile.suggestedSize)} per bucket.
                 </p>
               </div>
             ) : (
               <div className="space-y-1">
-                <Label className="text-xs">Exact value buckets</Label>
-                <div className="rounded-md border border-border/60 bg-muted/20 px-2 py-2 text-xs text-muted-foreground">
+                <Label className={FIELD_LABEL}>Exact value buckets</Label>
+                <div className="rounded-md border border-border/60 bg-muted/20 px-2 py-2 text-xs text-foreground dark:border-slate-700 dark:text-slate-300">
                   One output row per distinct {bucketColumn} value.
                 </div>
               </div>
@@ -287,38 +292,38 @@ export function SheetBucketConfigForm({
       ) : null}
 
       <div className="space-y-2">
-        <Label className="text-xs">Additional group by columns</Label>
-        <p className="text-[10px] text-muted-foreground">
+        <Label className={FIELD_LABEL}>Additional group by columns</Label>
+        <p className={FIELD_HINT}>
           Group rows by these columns in addition to the bucket. Each unique combination gets its own
           output rows and aggregations.
         </p>
-        <div className="grid max-h-32 gap-2 overflow-auto rounded-md border border-border/70 p-2 sm:grid-cols-2">
+        <div className="grid max-h-32 gap-2 overflow-auto rounded-md border border-border/70 p-2 dark:border-slate-700 sm:grid-cols-2">
           {columnNames
             .filter((col) => col !== bucketColumn && col !== bucketOutputColumn)
             .map((col) => (
               <label key={`bucket-group-${col}`} className="flex min-w-0 items-center gap-2 text-xs">
                 <Checkbox checked={groupByCols.has(col)} onCheckedChange={() => toggleGroupBy(col)} />
-                <span className="truncate font-mono">{col}</span>
+                <span className={CHECK_LABEL}>{col}</span>
               </label>
             ))}
           {!columnNames.length ? (
-            <p className="text-[10px] text-muted-foreground">Select columns in your query first.</p>
+            <p className={FIELD_HINT}>Select columns in your query first.</p>
           ) : null}
         </div>
       </div>
 
       <div className="space-y-2">
         <div className="flex items-center justify-between gap-2">
-          <Label className="text-xs">Aggregations</Label>
+          <Label className={FIELD_LABEL}>Aggregations</Label>
           <Button type="button" variant="outline" size="sm" className="h-7 text-xs" onClick={addAggregation}>
             + Add aggregation
           </Button>
         </div>
         <div className="space-y-2">
           {aggregations.map((agg, idx) => (
-            <div key={agg.id} className="rounded-lg border border-border/70 p-2">
+            <div key={agg.id} className="rounded-lg border border-border/70 p-2 dark:border-slate-700">
               <div className="mb-2 flex items-center justify-between gap-2">
-                <span className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+                <span className="text-[10px] font-semibold uppercase tracking-wide text-foreground/70 dark:text-slate-400">
                   Aggregation {idx + 1}
                 </span>
                 {aggregations.length > 1 ? (
@@ -332,7 +337,7 @@ export function SheetBucketConfigForm({
               </div>
               <div className="grid gap-2 sm:grid-cols-4">
                 <div className="space-y-1">
-                  <Label className="text-[10px] text-muted-foreground">Type</Label>
+                  <Label className={FIELD_SUBLABEL}>Type</Label>
                   <Select
                     value={agg.type}
                     onValueChange={(v) => {
@@ -388,7 +393,7 @@ export function SheetBucketConfigForm({
                   </Select>
                 </div>
                 <div className="space-y-1">
-                  <Label className="text-[10px] text-muted-foreground">
+                  <Label className={FIELD_SUBLABEL}>
                     {agg.type === "subgroup_by"
                       ? "Sub-group column"
                       : agg.type === "count"
@@ -453,7 +458,7 @@ export function SheetBucketConfigForm({
                 </div>
                 {agg.type === "weighted_average" || agg.type === "product_ratio" ? (
                   <div className="space-y-1">
-                    <Label className="text-[10px] text-muted-foreground">
+                    <Label className={FIELD_SUBLABEL}>
                       {agg.type === "product_ratio" ? "Multiplier column" : "Weight column"}
                     </Label>
                     <Select
@@ -483,7 +488,7 @@ export function SheetBucketConfigForm({
                   <div className="hidden sm:block" />
                 )}
                 <div className="space-y-1">
-                  <Label className="text-[10px] text-muted-foreground">Generated column</Label>
+                  <Label className={FIELD_SUBLABEL}>Generated column</Label>
                   <Input
                     className={cn(
                       "h-8 text-xs",
@@ -499,7 +504,7 @@ export function SheetBucketConfigForm({
 
               {agg.type === "product_ratio" ? (
                 <div className="mt-2 space-y-1 rounded-md border border-border/50 bg-muted/10 p-2">
-                  <Label className="text-[10px] text-muted-foreground">
+                  <Label className={FIELD_SUBLABEL}>
                     Divide by generated aggregation
                   </Label>
                   <Select
@@ -525,7 +530,7 @@ export function SheetBucketConfigForm({
                         ))}
                     </SelectContent>
                   </Select>
-                  <p className="text-[10px] text-muted-foreground">
+                  <p className={FIELD_HINT}>
                     Example: SUM(yes_price * volume) / total_volume = VWAP_price.
                   </p>
                 </div>
@@ -545,12 +550,12 @@ export function SheetBucketConfigForm({
                         })
                       }
                     />
-                    <span>Where condition for this aggregation</span>
+                    <span className="text-xs text-foreground">Where condition for this aggregation</span>
                   </label>
                   {agg.filterEnabled ? (
                     <div className="grid gap-2 sm:grid-cols-[1fr_0.7fr_1fr]">
                       <div className="space-y-1">
-                        <Label className="text-[10px] text-muted-foreground">Where column</Label>
+                        <Label className={FIELD_SUBLABEL}>Where column</Label>
                         <Select
                           value={agg.filterColumn || "__"}
                           onValueChange={(v) =>
@@ -575,7 +580,7 @@ export function SheetBucketConfigForm({
                         </Select>
                       </div>
                       <div className="space-y-1">
-                        <Label className="text-[10px] text-muted-foreground">Op</Label>
+                        <Label className={FIELD_SUBLABEL}>Op</Label>
                         <Select
                           value={agg.filterOperator || "="}
                           onValueChange={(v) => updateAggregation(agg.id, { filterOperator: v })}
@@ -593,7 +598,7 @@ export function SheetBucketConfigForm({
                         </Select>
                       </div>
                       <div className="space-y-1">
-                        <Label className="text-[10px] text-muted-foreground">Value</Label>
+                        <Label className={FIELD_SUBLABEL}>Value</Label>
                         <Input
                           className="h-8 text-xs"
                           value={agg.filterValue ?? ""}
@@ -614,7 +619,7 @@ export function SheetBucketConfigForm({
                 <div className="mt-2 space-y-2 rounded-md border border-border/50 bg-muted/10 p-2">
                   <div className="grid gap-2 sm:grid-cols-[0.7fr_1fr]">
                     <div className="space-y-1">
-                      <Label className="text-[10px] text-muted-foreground">Op</Label>
+                      <Label className={FIELD_SUBLABEL}>Op</Label>
                       <Select
                         value={agg.filterOperator || "="}
                         onValueChange={(v) =>
@@ -634,7 +639,7 @@ export function SheetBucketConfigForm({
                       </Select>
                     </div>
                     <div className="space-y-1">
-                      <Label className="text-[10px] text-muted-foreground">Value</Label>
+                      <Label className={FIELD_SUBLABEL}>Value</Label>
                       <Input
                         className={cn(
                           "h-8 text-xs",
@@ -660,12 +665,12 @@ export function SheetBucketConfigForm({
       </div>
 
       <div className="space-y-2">
-        <Label className="text-xs">Transfer columns as-is</Label>
-        <p className="text-[10px] text-muted-foreground">
+        <Label className={FIELD_LABEL}>Transfer columns as-is</Label>
+        <p className={FIELD_HINT}>
           These values are copied from the first row in each group. Use this for labels that are
           stable inside a bucket. This is not the same as group by.
         </p>
-        <div className="grid max-h-32 gap-2 overflow-auto rounded-md border border-border/70 p-2 sm:grid-cols-2">
+        <div className="grid max-h-32 gap-2 overflow-auto rounded-md border border-border/70 p-2 dark:border-slate-700 sm:grid-cols-2">
           {columnNames
             .filter(
               (col) =>
@@ -677,7 +682,7 @@ export function SheetBucketConfigForm({
                   checked={passthroughCols.has(col)}
                   onCheckedChange={() => togglePassthrough(col)}
                 />
-                <span className="truncate font-mono">{col}</span>
+                <span className={CHECK_LABEL}>{col}</span>
               </label>
             ))}
         </div>
@@ -685,7 +690,7 @@ export function SheetBucketConfigForm({
 
       {showSheetName ? (
         <div className="space-y-1">
-          <Label className="text-xs">New sheet name</Label>
+          <Label className={FIELD_LABEL}>New sheet name</Label>
           <Input
             className={cn("h-9 text-xs", fieldErrors.sheetName && APPLY_FIELD_ERROR_CLASS)}
             value={tab?.sheetName ?? ""}
