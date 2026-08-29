@@ -142,6 +142,12 @@ import {
 import { toast } from "sonner";
 import { trackAuthEvent } from "@/lib/analytics/authJourneyClient";
 import { trackDataPullComplete, trackDataPullError, trackDataPullStart } from "@/lib/analytics/trackDataPull";
+import { applyResearchBucketingToRows } from "@/lib/hubs/applyResearchBucketingToRows";
+import {
+  clearPendingResearchBucketing,
+  peekPendingResearchBucketing,
+  takePendingResearchBucketing,
+} from "@/lib/hubs/pendingResearchBucketing";
 
 /** Shown in the column picker / compose cards for server-computed Kalshi fields. */
 const KALSHI_VIRTUAL_COMPOSE_LABELS = {
@@ -756,6 +762,8 @@ export default function DataLakeParquetPanel({
   const largePullHandoffRef = useRef(false);
   const pullGenerationRef = useRef(0);
   const selectionTabRef = useRef(selectionTab);
+  /** Ensures research Buckets/Bands collapse runs once per pull write. */
+  const researchBucketingAppliedRef = useRef(false);
 
   const clearConnectLargePullView = useCallback(() => {
     if (!connectHomeDataLakeCompose || !setConnectDataLakePullState) return;
@@ -1491,33 +1499,76 @@ export default function DataLakeParquetPanel({
     setBeckerViews(listBeckerParquetViews());
   }, []);
 
+  /** Collapse pulled rows via research Buckets/Bands once per pull (if pending). */
+  const collapseResearchBucketingRows = useCallback((rows) => {
+    const source = Array.isArray(rows) ? rows : [];
+    if (researchBucketingAppliedRef.current) {
+      return { rows: source, sheetName: "", applied: false };
+    }
+    const pending = peekPendingResearchBucketing();
+    if (!pending?.enabled || !pending.config) {
+      return { rows: source, sheetName: "", applied: false };
+    }
+    const result = applyResearchBucketingToRows(source, pending.config);
+    if (!result.applied) {
+      return { rows: source, sheetName: "", applied: false };
+    }
+    takePendingResearchBucketing();
+    researchBucketingAppliedRef.current = true;
+    const modeLabel = result.mode === "bands" ? "Bands" : "Buckets";
+    toast.success(
+      `${modeLabel}: ${result.rows.length.toLocaleString()} row${result.rows.length === 1 ? "" : "s"} from ${source.length.toLocaleString()} pulled.`,
+    );
+    return {
+      rows: result.rows,
+      sheetName: result.sheetName || "",
+      applied: true,
+    };
+  }, []);
+
   const applyRowsToActiveSheet = useCallback(
     (rows, extras = {}) => {
-      const provenance = extras?.provenance ?? null;
-      const requestCards = extras?.requestCards;
-      const name = extras?.name;
-      const rowCount = Array.isArray(rows) ? rows.length : 0;
+      const collapsed = collapseResearchBucketingRows(rows);
+      const outRows = collapsed.rows;
+      let outExtras = extras && typeof extras === "object" ? { ...extras } : {};
+      if (collapsed.sheetName) {
+        outExtras.name = String(collapsed.sheetName).slice(0, 80);
+      }
+      if (collapsed.applied) {
+        setLastRowCount(outRows.length);
+      }
+      const provenance = outExtras?.provenance ?? null;
+      const requestCards = outExtras?.requestCards;
+      const name = outExtras?.name;
+      const rowCount = Array.isArray(outRows) ? outRows.length : 0;
       const patch = (prev) =>
-        applyAthenaPullToSheetPatch(prev, activeSheetId, rows, {
+        applyAthenaPullToSheetPatch(prev, activeSheetId, outRows, {
           provenance,
           requestCards,
           name,
         });
       if (!activeSheetId || !setDataSheets) {
-        replaceCurrentSheetData?.(rows);
-        setConnectedData?.(rows);
-        return;
+        replaceCurrentSheetData?.(outRows);
+        setConnectedData?.(outRows);
+        return rowCount;
       }
       // Large Athena pulls block the main thread if we force a synchronous commit.
       if (rowCount > 5000) {
         setDataSheets(patch);
-        return;
+        return rowCount;
       }
       flushSync(() => {
         setDataSheets(patch);
       });
+      return rowCount;
     },
-    [activeSheetId, setDataSheets, replaceCurrentSheetData, setConnectedData],
+    [
+      activeSheetId,
+      setDataSheets,
+      replaceCurrentSheetData,
+      setConnectedData,
+      collapseResearchBucketingRows,
+    ],
   );
 
   /** Always write rows to the sheet first (Mongo-style). Nullish cleanup is optional afterward. */
@@ -2243,6 +2294,7 @@ export default function DataLakeParquetPanel({
     ingestAbortControllerRef.current = ingestAbort;
     const signal = ingestAbort.signal;
     pullInFlightRef.current = true;
+    researchBucketingAppliedRef.current = false;
     setLoading(true);
     setLoadLabel(PARQUET_LOAD_PHASE_MESSAGES[0].text);
     setLoadProgress(5);
@@ -2278,14 +2330,14 @@ export default function DataLakeParquetPanel({
           setExpandedRequestKey(null);
           setShowRequestComposer(false);
         }
-        applyRowsToActiveSheet(finalRows, {
+        const written = applyRowsToActiveSheet(finalRows, {
           provenance: sheetProvenance,
           requestCards,
           ...(connectHomeDataLakeCompose && connectHomeSheetName
             ? { name: connectHomeSheetName.slice(0, 80) }
             : {}),
         });
-        setLastRowCount(n);
+        setLastRowCount(typeof written === "number" ? written : n);
         refreshBeckerViews();
         reportDataPullComplete({ lake: lk, table, sampleId: sid, mode, rowCount: n, requestStartMs });
       },
@@ -2358,25 +2410,27 @@ export default function DataLakeParquetPanel({
           setExpandedRequestKey(null);
           setShowRequestComposer(false);
         }
-        applyRowsToActiveSheet(finalRows, {
+        const written = applyRowsToActiveSheet(finalRows, {
           provenance: sheetProvenance,
           requestCards,
           ...(connectHomeDataLakeCompose && connectHomeSheetName
             ? { name: connectHomeSheetName.slice(0, 80) }
             : {}),
         });
-        setLastRowCount(n);
+        setLastRowCount(typeof written === "number" ? written : n);
         refreshBeckerViews();
         reportDataPullComplete({ lake: lk, table, sampleId: sid, mode, rowCount: n, requestStartMs });
       });
     } catch (e) {
       if (e?.name === "AbortError") {
+        clearPendingResearchBucketing();
         setError(null);
         resetLargePullState();
         syncConnectPullState({ loading: false, error: null, label: "", progress: 0 });
         toast("Request cancelled");
         return;
       }
+      clearPendingResearchBucketing();
       const msg = e?.message || String(e);
       setError(msg);
       resetLargePullState();
@@ -2593,6 +2647,7 @@ export default function DataLakeParquetPanel({
     ingestAbortControllerRef.current = ingestAbort;
     const signal = ingestAbort.signal;
     pullInFlightRef.current = true;
+    researchBucketingAppliedRef.current = false;
     setLoading(true);
     setLoadLabel(PARQUET_LOAD_PHASE_MESSAGES[0].text);
     setLoadProgress(5);
@@ -2626,6 +2681,9 @@ export default function DataLakeParquetPanel({
     largePullHandoffRef.current = false;
     const pendingApplyNewSheet = {
       onApply: (finalRows, n) => {
+        const collapsed = collapseResearchBucketingRows(finalRows);
+        const sheetRows = collapsed.rows;
+        const sheetRowCount = sheetRows.length;
         const newCardId = requestCard ? genRequestCardId() : null;
         const connectHomeSheetName = String(ctx?.connectHomePendingSheetName || "").trim();
         const applyToPreparedSheet = (targetId) => {
@@ -2633,19 +2691,27 @@ export default function DataLakeParquetPanel({
           const elapsedMs = Math.max(0, Number(endMs) - Number(requestStartMs || endMs));
           const card =
             requestCard && newCardId
-              ? { ...requestCard, id: newCardId, sheetId: targetId, elapsedMs, loadedRowCount: n }
+              ? {
+                  ...requestCard,
+                  id: newCardId,
+                  sheetId: targetId,
+                  elapsedMs,
+                  loadedRowCount: sheetRowCount,
+                }
               : null;
           const autoName = `${prefix} · ${sampleLabel}${mode === "meta" ? " · Count" : mode === "columns" ? " · Query" : ""}`.slice(
             0,
             80,
           );
-          const sheetName =
-            connectHomeDataLakeCompose && connectHomeSheetName
-              ? connectHomeSheetName.slice(0, 80)
-              : autoName;
+          const sheetName = (
+            collapsed.sheetName ||
+            (connectHomeDataLakeCompose && connectHomeSheetName
+              ? connectHomeSheetName
+              : autoName)
+          ).slice(0, 80);
           flushSync(() => {
             setDataSheets?.((prev) =>
-              applyAthenaPullToSheetPatch(prev, targetId, finalRows, {
+              applyAthenaPullToSheetPatch(prev, targetId, sheetRows, {
                 provenance: sheetProvenance,
                 name: sheetName,
                 requestCards: card && mode === "columns" ? [card] : undefined,
@@ -2666,7 +2732,7 @@ export default function DataLakeParquetPanel({
           setExpandedRequestKey(null);
           setShowRequestComposer(false);
         }
-        setLastRowCount(n);
+        setLastRowCount(sheetRowCount);
         refreshBeckerViews();
         const endMs = typeof performance !== "undefined" && performance?.now ? performance.now() : Date.now();
         trackDataPullComplete({
@@ -2676,7 +2742,7 @@ export default function DataLakeParquetPanel({
           sampleId: sid,
           sampleLabel,
           mode,
-          rowCount: n,
+          rowCount: sheetRowCount,
           largePull: true,
           elapsedMs: Math.max(0, Number(endMs) - Number(requestStartMs || endMs)),
         });
@@ -2725,24 +2791,37 @@ export default function DataLakeParquetPanel({
       }
 
       finalizeIngestSheetRows(rows, rowCount, (finalRows, n) => {
+        const collapsed = collapseResearchBucketingRows(finalRows);
+        const sheetRows = collapsed.rows;
+        const sheetRowCount = sheetRows.length;
         const newCardId = requestCard ? genRequestCardId() : null;
         const connectHomeSheetName = String(ctx?.connectHomePendingSheetName || "").trim();
         const applyToPreparedSheet = (targetId) => {
           const endMs = typeof performance !== "undefined" && performance?.now ? performance.now() : Date.now();
           const elapsedMs = Math.max(0, Number(endMs) - Number(requestStartMs || endMs));
           const card =
-            requestCard && newCardId ? { ...requestCard, id: newCardId, sheetId: targetId, elapsedMs, loadedRowCount: n } : null;
+            requestCard && newCardId
+              ? {
+                  ...requestCard,
+                  id: newCardId,
+                  sheetId: targetId,
+                  elapsedMs,
+                  loadedRowCount: sheetRowCount,
+                }
+              : null;
           const autoName = `${prefix} · ${sampleLabel}${mode === "meta" ? " · Count" : mode === "columns" ? " · Query" : ""}`.slice(
             0,
             80,
           );
-          const sheetName =
-            connectHomeDataLakeCompose && connectHomeSheetName
-              ? connectHomeSheetName.slice(0, 80)
-              : autoName;
+          const sheetName = (
+            collapsed.sheetName ||
+            (connectHomeDataLakeCompose && connectHomeSheetName
+              ? connectHomeSheetName
+              : autoName)
+          ).slice(0, 80);
           flushSync(() => {
             setDataSheets?.((prev) =>
-              applyAthenaPullToSheetPatch(prev, targetId, finalRows, {
+              applyAthenaPullToSheetPatch(prev, targetId, sheetRows, {
                 provenance: sheetProvenance,
                 name: sheetName,
                 requestCards: card && mode === "columns" ? [card] : undefined,
@@ -2763,7 +2842,7 @@ export default function DataLakeParquetPanel({
           setExpandedRequestKey(null);
           setShowRequestComposer(false);
         }
-        setLastRowCount(n);
+        setLastRowCount(sheetRowCount);
         refreshBeckerViews();
         const endMs = typeof performance !== "undefined" && performance?.now ? performance.now() : Date.now();
         trackDataPullComplete({
@@ -2773,7 +2852,7 @@ export default function DataLakeParquetPanel({
           sampleId: sid,
           sampleLabel,
           mode,
-          rowCount: n,
+          rowCount: sheetRowCount,
           elapsedMs: Math.max(0, Number(endMs) - Number(requestStartMs || endMs)),
         });
       });

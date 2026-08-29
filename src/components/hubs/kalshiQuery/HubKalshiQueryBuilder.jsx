@@ -1238,6 +1238,7 @@ function HubKalshiQueryBuilderInner({
                     onEnableBucketing={enableBucketing}
                     helperOpen={researchHelperOpen}
                     onResearchToolHelperChange={handleResearchToolHelperChange}
+                    composeDraft={composeDraft}
                   />
                   <ConnectComposeOperationPanel
                     key={sampleId}

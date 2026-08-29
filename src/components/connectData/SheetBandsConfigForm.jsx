@@ -11,7 +11,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { BUCKET_AGG_FILTER_OPERATORS } from "@/lib/sheetOperations/bucketAggFilterOperators";
 import {
   BAND_PREDICATE_KINDS,
   createEmptyBandDefinition,
@@ -19,6 +18,7 @@ import {
   formatBandPredicateLabel,
   normalizeBandsConfig,
 } from "@/lib/sheetOperations/bandsConfig";
+import { summarizeComposeDraftForBands } from "@/lib/sheetOperations/summarizeComposeDraftForBands";
 import { cn } from "@/lib/utils";
 
 const FIELD_LABEL = "text-xs font-medium text-foreground";
@@ -35,6 +35,7 @@ const APPLY_FIELD_ERROR_CLASS = "border-destructive focus-visible:ring-destructi
  *   config?: object | null;
  *   onConfigChange?: (next: object) => void;
  *   fieldErrors?: Record<string, string>;
+ *   composeDraft?: object | null;
  *   className?: string;
  * }} props
  */
@@ -43,6 +44,7 @@ export function SheetBandsConfigForm({
   config = null,
   onConfigChange,
   fieldErrors = {},
+  composeDraft = null,
   className,
 }) {
   const tab = normalizeBandsConfig(config);
@@ -50,9 +52,9 @@ export function SheetBandsConfigForm({
   const bandOutputColumn = String(tab.bandOutputColumn || "band").trim();
   const aggregations = Array.isArray(tab.aggregations) ? tab.aggregations : [];
   const bands = Array.isArray(tab.bands) ? tab.bands : [];
-  const rowFilters = Array.isArray(tab.rowFilters) ? tab.rowFilters : [];
   const groupByCols = new Set(tab.groupByColumns || []);
   const passthroughCols = new Set(tab.passthroughColumns || []);
+  const inherited = summarizeComposeDraftForBands(composeDraft);
 
   const patch = (next) => onConfigChange?.({ ...tab, ...next });
 
@@ -101,30 +103,6 @@ export function SheetBandsConfigForm({
     patch({ aggregations: aggregations.filter((agg) => agg.id !== id) });
   };
 
-  const addRowFilter = () => {
-    patch({
-      rowFilters: [
-        ...rowFilters,
-        {
-          id: `band-filter-${Date.now()}`,
-          column: columnNames[0] || "",
-          operator: "=",
-          value: "",
-        },
-      ],
-    });
-  };
-
-  const updateRowFilter = (id, nextPatch) => {
-    patch({
-      rowFilters: rowFilters.map((f) => (f.id === id ? { ...f, ...nextPatch } : f)),
-    });
-  };
-
-  const removeRowFilter = (id) => {
-    patch({ rowFilters: rowFilters.filter((f) => f.id !== id) });
-  };
-
   const toggleGroupBy = (column) => {
     const next = new Set(groupByCols);
     if (next.has(column)) next.delete(column);
@@ -169,24 +147,6 @@ export function SheetBandsConfigForm({
           filterColumn: "",
           filterOperator: "=",
           filterValue: "",
-        },
-      ],
-      rowFilters: [
-        ...(columnNames.includes("closed")
-          ? [
-              {
-                id: `band-filter-closed-${Date.now()}`,
-                column: "closed",
-                operator: "=",
-                value: "true",
-              },
-            ]
-          : []),
-        {
-          id: `band-filter-vol-${Date.now()}`,
-          column: col,
-          operator: "is_not_empty",
-          value: "",
         },
       ],
       sheetName: tab.sheetName || "Volume bands",
@@ -238,78 +198,22 @@ export function SheetBandsConfigForm({
         </div>
       </div>
 
-      <div className="space-y-2">
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <div>
-            <Label className={FIELD_LABEL}>Shared filters (optional)</Label>
-            <p className={FIELD_HINT}>
-              Applied to every row before band assignment (for example closed = true). Parent query
-              WHERE still applies first.
-            </p>
-          </div>
-          <Button type="button" variant="outline" size="sm" className="h-7 text-xs" onClick={addRowFilter}>
-            + Filter
-          </Button>
-        </div>
-        {rowFilters.length ? (
-          <div className="space-y-2">
-            {rowFilters.map((f) => (
-              <div
-                key={f.id}
-                className="grid gap-2 rounded-md border border-border/70 p-2 dark:border-slate-700 sm:grid-cols-[1fr_0.7fr_1fr_auto]"
-              >
-                <Select
-                  value={f.column || "__"}
-                  onValueChange={(v) => updateRowFilter(f.id, { column: v === "__" ? "" : v })}
-                >
-                  <SelectTrigger className="h-8 text-xs">
-                    <SelectValue placeholder="Column" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="__">—</SelectItem>
-                    {columnNames.map((c) => (
-                      <SelectItem key={`rf-col-${f.id}-${c}`} value={c} className="font-mono text-xs">
-                        {c}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <Select
-                  value={f.operator || "="}
-                  onValueChange={(v) => updateRowFilter(f.id, { operator: v })}
-                >
-                  <SelectTrigger className="h-8 text-xs">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {BUCKET_AGG_FILTER_OPERATORS.map((op) => (
-                      <SelectItem key={op.value} value={op.value}>
-                        {op.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <Input
-                  className="h-8 text-xs text-foreground"
-                  value={f.value ?? ""}
-                  onChange={(e) => updateRowFilter(f.id, { value: e.target.value })}
-                  placeholder="Value"
-                  disabled={["is_empty", "is_not_empty"].includes(f.operator)}
-                />
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  className="h-8 text-xs text-muted-foreground hover:text-destructive"
-                  onClick={() => removeRowFilter(f.id)}
-                >
-                  Remove
-                </Button>
-              </div>
+      <div className="space-y-1.5 rounded-lg border border-border/70 bg-muted/30 px-3 py-2.5 dark:border-slate-700 dark:bg-slate-900/60">
+        <Label className={FIELD_LABEL}>Already applied from your query</Label>
+        <p className={FIELD_HINT}>
+          Bands run on the result after Refine your query (WHERE, joins, summarize, sample, and
+          limit). Add closed / volume filters there if you need them.
+        </p>
+        {inherited.items.length ? (
+          <ul className="mt-1.5 list-disc space-y-1 pl-4 text-[11px] leading-snug text-foreground dark:text-slate-200">
+            {inherited.items.map((line) => (
+              <li key={line} className="font-mono text-[10px] sm:text-[11px]">
+                {line}
+              </li>
             ))}
-          </div>
+          </ul>
         ) : (
-          <p className={FIELD_HINT}>No shared filters — all result rows are eligible for banding.</p>
+          <p className={cn(FIELD_HINT, "mt-1")}>{inherited.emptyMessage}</p>
         )}
       </div>
 

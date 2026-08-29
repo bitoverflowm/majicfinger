@@ -3,6 +3,7 @@ import { flushSync } from "react-dom";
 import { genComposeRowId } from "@/lib/dataLakeComposeHelpers";
 import { normalizeHubQueryWhereFilters } from "@/lib/hubs/hubQueryDraft";
 import { prepareConnectHomePullSheet } from "@/lib/connectHomePullDestination";
+import { setPendingResearchBucketing } from "@/lib/hubs/pendingResearchBucketing";
 
 /**
  * @param {string} sampleId
@@ -83,6 +84,8 @@ export function applyHubQueryDraft(ctx, draft, options = {}) {
         : buildColumnComposeItemsFromSelections(sampleId, columnSelections),
     );
     ctx.setConnectActiveComposeOps?.(draft.activeComposeOps || []);
+
+    setPendingResearchBucketing(!!draft.bucketingEnabled, draft.bucketConfig);
 
     if (draft.pendingSheetName) {
       ctx.setConnectHomePendingSheetName?.(draft.pendingSheetName);

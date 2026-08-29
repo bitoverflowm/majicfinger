@@ -38,6 +38,7 @@ import { cn } from "@/lib/utils";
  *   error?: string | null;
  *   besideHelper?: boolean;
  *   onBucketingModeChange?: (mode: 'buckets' | 'bands') => void;
+ *   composeDraft?: object | null;
  * }} props
  */
 export function ConnectBucketDialog({
@@ -52,6 +53,7 @@ export function ConnectBucketDialog({
   error = null,
   besideHelper = false,
   onBucketingModeChange,
+  composeDraft = null,
 }) {
   const tab = bucketConfig && typeof bucketConfig === "object" ? bucketConfig : createEmptyBucketTab();
   const activeMode = tab.activeMode === "bands" ? "bands" : "buckets";
@@ -113,12 +115,12 @@ export function ConnectBucketDialog({
           onValueChange={handleModeChange}
           className="flex min-h-0 flex-1 flex-col overflow-hidden"
         >
-          <div className="shrink-0 border-b border-border px-6 pt-3">
-            <TabsList className="h-9 w-full justify-start gap-1 bg-muted/60 p-1 dark:bg-slate-800/80 sm:w-auto">
-              <TabsTrigger value="buckets" className="px-3 text-xs">
+          <div className="shrink-0 px-6 pt-3">
+            <TabsList className="grid h-9 w-full grid-cols-2 sm:inline-flex sm:w-auto">
+              <TabsTrigger value="buckets" className="text-xs">
                 Buckets
               </TabsTrigger>
-              <TabsTrigger value="bands" className="px-3 text-xs">
+              <TabsTrigger value="bands" className="text-xs">
                 Bands
               </TabsTrigger>
             </TabsList>
@@ -142,6 +144,7 @@ export function ConnectBucketDialog({
                 config={bandsConfig}
                 onConfigChange={handleBandsChange}
                 fieldErrors={fieldErrors}
+                composeDraft={composeDraft}
               />
             </TabsContent>
             {error ? <p className="mt-3 text-[11px] text-destructive">{error}</p> : null}

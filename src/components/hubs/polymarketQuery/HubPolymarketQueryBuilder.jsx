@@ -896,6 +896,7 @@ export function HubPolymarketQueryBuilder({
                     onEnableBucketing={enableBucketing}
                     helperOpen={researchHelperOpen}
                     onResearchToolHelperChange={handleResearchToolHelperChange}
+                    composeDraft={composeDraft}
                   />
                   <ConnectComposeOperationPanel
                     key={sampleId}

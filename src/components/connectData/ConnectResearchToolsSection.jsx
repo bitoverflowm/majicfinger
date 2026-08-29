@@ -66,6 +66,7 @@ const RESEARCH_TOOL_ICONS = {
  *   onEnableBucketing?: () => void;
  *   helperOpen?: boolean;
  *   onResearchToolHelperChange?: (toolId: string | null) => void;
+ *   composeDraft?: object | null;
  * }} props
  */
 export function ConnectResearchToolsSection({
@@ -90,6 +91,7 @@ export function ConnectResearchToolsSection({
   onEnableBucketing,
   helperOpen = false,
   onResearchToolHelperChange,
+  composeDraft = null,
 }) {
   const [configToolId, setConfigToolId] = useState(null);
 
@@ -381,6 +383,7 @@ export function ConnectResearchToolsSection({
         error={bucketingError}
         besideHelper={!!helperOpen}
         onBucketingModeChange={handleBucketingModeChange}
+        composeDraft={composeDraft}
       />
     </motion.section>
   );
