@@ -332,6 +332,7 @@ export function ConnectComposeSummarizeSection({
                 availableColumns={availableColumns}
                 numericColumns={numericColumns}
                 kindForColumn={kindForColumn}
+                composeSourceColumnLabel={composeSourceColumnLabel}
               />
             ) : null}
           </div>
