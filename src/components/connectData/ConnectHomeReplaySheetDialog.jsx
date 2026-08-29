@@ -25,6 +25,7 @@ import { ConnectProgressWithLabel } from "@/components/integrationsView/integrat
  *   onReplaceCurrent: () => void | Promise<void>;
  *   onCreateNewSheet: (name: string) => void | Promise<void>;
  *   queryLabel?: string;
+ *   sourceSheetName?: string;
  *   loading?: boolean;
  *   pullLabel?: string;
  *   pullProgress?: number;
@@ -37,6 +38,7 @@ export function ConnectHomeReplaySheetDialog({
   onReplaceCurrent,
   onCreateNewSheet,
   queryLabel,
+  sourceSheetName,
   loading = false,
   pullLabel = "Loading data…",
   pullProgress = 0,
@@ -180,9 +182,8 @@ export function ConnectHomeReplaySheetDialog({
                 type="button"
                 className="w-full sm:w-auto shrink-0"
                 onClick={() => {
-                  setSheetName(
-                    queryLabel ? queryLabel.replace(/[^\w\s·-]/g, "").slice(0, 48) : "",
-                  );
+                  const fromSheet = String(sourceSheetName || "").trim();
+                  setSheetName(fromSheet.slice(0, 80));
                   setStep("name");
                 }}
               >

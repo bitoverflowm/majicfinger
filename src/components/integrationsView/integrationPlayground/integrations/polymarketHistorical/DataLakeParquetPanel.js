@@ -2267,6 +2267,7 @@ export default function DataLakeParquetPanel({
     }
     if (!connectHomeDataLakeCompose) scrollToLoadProgress();
     largePullHandoffRef.current = false;
+    const connectHomeSheetName = String(ctx?.connectHomePendingSheetName || "").trim();
     const pendingApply = {
       onApply: (finalRows, n) => {
         let requestCards;
@@ -2277,7 +2278,13 @@ export default function DataLakeParquetPanel({
           setExpandedRequestKey(null);
           setShowRequestComposer(false);
         }
-        applyRowsToActiveSheet(finalRows, { provenance: sheetProvenance, requestCards });
+        applyRowsToActiveSheet(finalRows, {
+          provenance: sheetProvenance,
+          requestCards,
+          ...(connectHomeDataLakeCompose && connectHomeSheetName
+            ? { name: connectHomeSheetName.slice(0, 80) }
+            : {}),
+        });
         setLastRowCount(n);
         refreshBeckerViews();
         reportDataPullComplete({ lake: lk, table, sampleId: sid, mode, rowCount: n, requestStartMs });
@@ -2351,7 +2358,13 @@ export default function DataLakeParquetPanel({
           setExpandedRequestKey(null);
           setShowRequestComposer(false);
         }
-        applyRowsToActiveSheet(finalRows, { provenance: sheetProvenance, requestCards });
+        applyRowsToActiveSheet(finalRows, {
+          provenance: sheetProvenance,
+          requestCards,
+          ...(connectHomeDataLakeCompose && connectHomeSheetName
+            ? { name: connectHomeSheetName.slice(0, 80) }
+            : {}),
+        });
         setLastRowCount(n);
         refreshBeckerViews();
         reportDataPullComplete({ lake: lk, table, sampleId: sid, mode, rowCount: n, requestStartMs });
@@ -2392,6 +2405,7 @@ export default function DataLakeParquetPanel({
     beginLargePullIngest,
     clearConnectLargePullView,
     connectHomeDataLakeCompose,
+    ctx?.connectHomePendingSheetName,
     resetLargePullState,
     finalizeIngestSheetRows,
     refreshBeckerViews,

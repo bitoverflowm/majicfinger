@@ -1,12 +1,19 @@
 "use client";
 
-import { useCallback, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ChevronDown, ChevronRight, History, Pencil, Play, RotateCcw } from "lucide-react";
 import { toast } from "sonner";
 
 import { ConnectHomeReplaySheetDialog } from "@/components/connectData/ConnectHomeReplaySheetDialog";
 import { integrations_list } from "@/components/integrationsView/integrationsConfig";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { useMyStateV2 } from "@/context/stateContextV2";
 import { CONNECT_HOME_CENTER_VIEW } from "@/lib/connectHomeFlow";
 import { collectRequestCardEntries, fmtRequestElapsed } from "@/lib/connectHomeRequestCards";
@@ -58,6 +65,81 @@ function finishReplayPullProgress(setConnectDataLakePullState) {
     progress: 0,
     error: null,
   });
+}
+
+const SHEET_NAME_MAX = 80;
+
+/**
+ * Display name only — sheet identity stays on sheetId (joins / provenance use ids).
+ * @param {{
+ *   sheetId: string;
+ *   name: string;
+ *   isEditing: boolean;
+ *   draft: string;
+ *   onDraftChange: (v: string) => void;
+ *   onStartEdit: () => void;
+ *   onCommit: () => void;
+ *   onCancel: () => void;
+ * }} props
+ */
+function RequestHistorySheetName({
+  sheetId,
+  name,
+  isEditing,
+  draft,
+  onDraftChange,
+  onStartEdit,
+  onCommit,
+  onCancel,
+}) {
+  const inputRef = useRef(null);
+
+  useEffect(() => {
+    if (!isEditing) return;
+    const el = inputRef.current;
+    if (!el) return;
+    el.focus();
+    el.select();
+  }, [isEditing]);
+
+  if (isEditing) {
+    return (
+      <Input
+        ref={inputRef}
+        value={draft}
+        maxLength={SHEET_NAME_MAX}
+        aria-label="Rename sheet"
+        className="h-7 px-1.5 text-sm font-semibold"
+        onChange={(e) => onDraftChange(e.target.value)}
+        onBlur={() => onCommit()}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") {
+            e.preventDefault();
+            onCommit();
+          } else if (e.key === "Escape") {
+            e.preventDefault();
+            onCancel();
+          }
+        }}
+        onClick={(e) => e.stopPropagation()}
+      />
+    );
+  }
+
+  return (
+    <button
+      type="button"
+      className="block max-w-full truncate text-left text-sm font-semibold text-foreground hover:underline decoration-foreground/30 underline-offset-2"
+      title="Click to rename"
+      aria-label={`Rename ${name || sheetId}`}
+      onClick={(e) => {
+        e.stopPropagation();
+        onStartEdit();
+      }}
+    >
+      {name || sheetId}
+    </button>
+  );
 }
 
 function RequestHistoryQueryCard({ card, sheet, pull }) {
@@ -198,6 +280,8 @@ export function ConnectHomeRequestHistory({ className }) {
   const [sheetActionIntent, setSheetActionIntent] = useState(/** @type {"replay" | "edit"} */ ("replay"));
   const [sheetActionSourceId, setSheetActionSourceId] = useState(null);
   const [replayBusy, setReplayBusy] = useState(false);
+  const [renamingSheetId, setRenamingSheetId] = useState(null);
+  const [renameDraft, setRenameDraft] = useState("");
   const progressTimerRef = useRef(null);
 
   const actionSource = sheetActionSourceId ? dataSheets[sheetActionSourceId] : null;
@@ -218,6 +302,42 @@ export function ConnectHomeRequestHistory({ className }) {
     setSheetActionSourceId(null);
     setSheetActionIntent("replay");
   }, []);
+
+  const startRenameSheet = useCallback(
+    (sheetId) => {
+      const current = String(dataSheets?.[sheetId]?.name || sheetId).trim();
+      setRenamingSheetId(sheetId);
+      setRenameDraft(current);
+    },
+    [dataSheets],
+  );
+
+  const cancelRenameSheet = useCallback(() => {
+    setRenamingSheetId(null);
+    setRenameDraft("");
+  }, []);
+
+  const commitRenameSheet = useCallback(() => {
+    const id = renamingSheetId;
+    if (!id || !setDataSheets) {
+      cancelRenameSheet();
+      return;
+    }
+    const nextName = String(renameDraft || "").trim().slice(0, SHEET_NAME_MAX);
+    const prevName = String(dataSheets?.[id]?.name || "").trim();
+    setRenamingSheetId(null);
+    setRenameDraft("");
+    if (!nextName || nextName === prevName) return;
+    // Only mutates display `name` — joins / provenance / charts key off sheetId.
+    setDataSheets((prev) => {
+      const cur = prev?.[id];
+      if (!cur) return prev;
+      return {
+        ...(prev || {}),
+        [id]: { ...cur, name: nextName },
+      };
+    });
+  }, [cancelRenameSheet, dataSheets, renameDraft, renamingSheetId, setDataSheets]);
 
   const openReplayDialog = useCallback(
     (sheetId) => {
@@ -477,7 +597,7 @@ export function ConnectHomeRequestHistory({ className }) {
   return (
     <div
       className={cn(
-        "flex h-full min-h-0 w-full min-w-0 max-w-full flex-col text-sm overflow-hidden",
+        "flex h-full min-h-0 w-full min-w-0 max-w-full flex-col overflow-hidden text-sm text-foreground",
         className,
       )}
     >
@@ -485,12 +605,8 @@ export function ConnectHomeRequestHistory({ className }) {
         <div>
           <h3 className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
             <History className="h-3.5 w-3.5 shrink-0" aria-hidden />
-            Request history
+            Query history
           </h3>
-          <p className="mt-1 text-[11px] leading-snug text-muted-foreground">
-            All sheets and pulls across integrations — Kalshi, Polymarket Live, Polymarket Historical, and
-            more.
-          </p>
         </div>
 
         {pull.error ? (
@@ -500,7 +616,7 @@ export function ConnectHomeRequestHistory({ className }) {
         ) : null}
 
         {sheetHistory.length === 0 && cardEntries.length === 0 && !pull.loading ? (
-          <p className="text-[11px] text-muted-foreground">Run a pull to build your request history.</p>
+          <p className="text-[11px] text-muted-foreground">Run a pull to build your query history.</p>
         ) : null}
 
         {pull.loading && cardEntries.length === 0 && !pull.error ? (
@@ -548,19 +664,28 @@ export function ConnectHomeRequestHistory({ className }) {
               >
                 <div className="flex items-start justify-between gap-2">
                   <div className="min-w-0">
-                    <p className="text-sm font-semibold truncate">{sheetName}</p>
+                    <RequestHistorySheetName
+                      sheetId={sheetId}
+                      name={sheetName}
+                      isEditing={renamingSheetId === sheetId}
+                      draft={renameDraft}
+                      onDraftChange={setRenameDraft}
+                      onStartEdit={() => startRenameSheet(sheetId)}
+                      onCommit={commitRenameSheet}
+                      onCancel={cancelRenameSheet}
+                    />
                     {forkContext ? (
-                      <p className="mt-0.5 text-[11px] leading-snug text-primary/90">{forkContext.line}</p>
+                      <p className="mt-0.5 text-[11px] leading-snug text-primary">{forkContext.line}</p>
                     ) : null}
                     {endpointHint ? (
-                      <p className="mt-0.5 text-[11px] font-medium leading-snug text-foreground/90">
+                      <p className="mt-0.5 text-[11px] font-medium leading-snug text-foreground">
                         {endpointHint}
                       </p>
                     ) : null}
                     {variationLines.map((line) => (
                       <p
                         key={`${sheetId}-${line}`}
-                        className="mt-0.5 text-[11px] font-medium leading-snug text-foreground/90"
+                        className="mt-0.5 text-[11px] font-medium leading-snug text-foreground"
                       >
                         {line}
                       </p>
@@ -571,34 +696,50 @@ export function ConnectHomeRequestHistory({ className }) {
                     </p>
                   </div>
                   {canReplay || canEdit ? (
-                    <div className="flex shrink-0 items-center gap-1">
-                      {canEdit ? (
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="sm"
-                          className="h-7 gap-1 px-2 text-[10px]"
-                          disabled={replayBusy || !!pull.loading}
-                          onClick={() => openEditDialog(sheetId)}
-                        >
-                          <Pencil className="h-3 w-3" aria-hidden />
-                          Edit
-                        </Button>
-                      ) : null}
-                      {canReplay ? (
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="sm"
-                          className="h-7 gap-1 px-2 text-[10px]"
-                          disabled={replayBusy}
-                          onClick={() => openReplayDialog(sheetId)}
-                        >
-                          <RotateCcw className="h-3 w-3" aria-hidden />
-                          Replay
-                        </Button>
-                      ) : null}
-                    </div>
+                    <TooltipProvider delayDuration={300}>
+                      <div className="flex shrink-0 items-center gap-1">
+                        {canEdit ? (
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                className="h-7 w-7 px-0"
+                                disabled={replayBusy || !!pull.loading}
+                                onClick={() => openEditDialog(sheetId)}
+                                aria-label="Edit"
+                              >
+                                <Pencil className="h-3 w-3" aria-hidden />
+                              </Button>
+                            </TooltipTrigger>
+                            <TooltipContent side="bottom" className="text-xs">
+                              Edit
+                            </TooltipContent>
+                          </Tooltip>
+                        ) : null}
+                        {canReplay ? (
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                className="h-7 w-7 px-0"
+                                disabled={replayBusy}
+                                onClick={() => openReplayDialog(sheetId)}
+                                aria-label="Replay"
+                              >
+                                <RotateCcw className="h-3 w-3" aria-hidden />
+                              </Button>
+                            </TooltipTrigger>
+                            <TooltipContent side="bottom" className="text-xs">
+                              Replay
+                            </TooltipContent>
+                          </Tooltip>
+                        ) : null}
+                      </div>
+                    </TooltipProvider>
                   ) : null}
                 </div>
 
@@ -645,6 +786,7 @@ export function ConnectHomeRequestHistory({ className }) {
           else setSheetActionOpen(true);
         }}
         queryLabel={actionQueryLabel}
+        sourceSheetName={String(actionSource?.name || "").trim()}
         loading={sheetActionIntent === "replay" && replayBusy}
         pullLabel={pull.label}
         pullProgress={pull.progress}

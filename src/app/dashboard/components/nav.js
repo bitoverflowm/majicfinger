@@ -1534,7 +1534,9 @@ const Nav = () => {
                     </div>
                   )}
                   {showUnsavedFlag && (
-                    <span className="text-[7pt] px-2 py-1 rounded-sm bg-rose-100 text-rose-500  dark:text-amber-400 font-bold shrink-0">Viewing Unsaved Data</span>
+                    <span className="shrink-0 rounded-sm bg-rose-100 px-2 py-1 text-[7pt] font-bold text-rose-600 dark:bg-amber-950/50 dark:text-amber-300">
+                      Viewing Unsaved Data
+                    </span>
                   )}
                   {showProjectToolbar && (
                       <Button

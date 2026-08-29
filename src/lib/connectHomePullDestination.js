@@ -48,16 +48,15 @@ export function normalizeConnectHomePullDestination(value) {
 }
 
 /**
- * Rename active sheet when user entered a name (replace mode).
+ * Rename a sheet when the user entered a Connect home sheet name.
  *
  * @param {object} ctx
- */
-/**
- * @param {object} ctx
  * @param {string} [sheetId] defaults to activeSheetId
+ * @param {string} [nameOverride] prefer over ctx.connectHomePendingSheetName (avoids stale ctx after setState)
  */
-export function applyConnectHomeSheetNameToSheet(ctx, sheetId) {
-  const sheetName = String(ctx?.connectHomePendingSheetName || "").trim();
+export function applyConnectHomeSheetNameToSheet(ctx, sheetId, nameOverride) {
+  const fromOverride = nameOverride != null ? String(nameOverride).trim() : "";
+  const sheetName = fromOverride || String(ctx?.connectHomePendingSheetName || "").trim();
   const targetId = sheetId || ctx?.activeSheetId;
   const { setDataSheets } = ctx || {};
   if (!sheetName || !targetId || !setDataSheets) return;
@@ -68,8 +67,8 @@ export function applyConnectHomeSheetNameToSheet(ctx, sheetId) {
   });
 }
 
-export function applyConnectHomeSheetNameToActiveSheet(ctx) {
-  applyConnectHomeSheetNameToSheet(ctx);
+export function applyConnectHomeSheetNameToActiveSheet(ctx, nameOverride) {
+  applyConnectHomeSheetNameToSheet(ctx, undefined, nameOverride);
 }
 
 /**
@@ -93,9 +92,14 @@ export function resolveConnectHomeSheetDestination(ctx) {
  * Before Run pull: empty target sheet and switch to it so Step 2 shows progress + skeleton.
  *
  * @param {object} ctx
+ * @param {{ pendingSheetName?: string }} [opts] explicit name — ctx.connectHomePendingSheetName may be stale mid-flush
  * @returns {{ action: "replace" } | { action: "new_sheet" }}
  */
-export function prepareConnectHomePullSheet(ctx) {
+export function prepareConnectHomePullSheet(ctx, opts = {}) {
+  const pendingSheetName =
+    opts.pendingSheetName != null
+      ? String(opts.pendingSheetName).trim()
+      : String(ctx?.connectHomePendingSheetName || "").trim();
   const destination = resolveConnectHomeSheetDestination(ctx);
   if (destination.action === "new_sheet" && ctx?.addNewSheetAndActivate) {
     const activeId = ctx?.activeSheetId;
@@ -107,7 +111,7 @@ export function prepareConnectHomePullSheet(ctx) {
       !activeSheet?.provenance;
     if (activePreparedEmpty) {
       flushSync(() => {
-        applyConnectHomeSheetNameToSheet(ctx, activeId);
+        applyConnectHomeSheetNameToSheet(ctx, activeId, pendingSheetName);
         ctx.setSheetData?.(activeId, []);
       });
       return destination;
@@ -116,7 +120,7 @@ export function prepareConnectHomePullSheet(ctx) {
       ctx.addNewSheetAndActivate(
         (newId) => {
           ctx.setSheetData?.(newId, []);
-          applyConnectHomeSheetNameToSheet(ctx, newId);
+          applyConnectHomeSheetNameToSheet(ctx, newId, pendingSheetName);
         },
         { syncActivate: true },
       );
@@ -124,7 +128,7 @@ export function prepareConnectHomePullSheet(ctx) {
     return destination;
   }
   flushSync(() => {
-    applyConnectHomeSheetNameToActiveSheet(ctx);
+    applyConnectHomeSheetNameToActiveSheet(ctx, pendingSheetName);
     ctx.replaceCurrentSheetData?.([]);
   });
   return destination;

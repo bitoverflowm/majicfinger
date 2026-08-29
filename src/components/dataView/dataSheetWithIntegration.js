@@ -171,7 +171,7 @@ function pageFormatDockTargetKey(t) {
 }
 
 const RIGHT_PANEL_TAB_ITEMS = [
-  { value: "requestHistory", label: "Request history", Icon: History },
+  { value: "requestHistory", label: "Query history", Icon: History },
   { value: "integrations", label: "Integrations", Icon: Cable },
   { value: "powerMoves", label: "Power moves", Icon: Zap },
   { value: "charts", label: "Charts", Icon: BarChart3 },

@@ -90,7 +90,9 @@ export function applyHubQueryDraft(ctx, draft, options = {}) {
   });
 
   if (prepareSheet) {
-    prepareConnectHomePullSheet(ctx);
+    prepareConnectHomePullSheet(ctx, {
+      pendingSheetName: draft.pendingSheetName,
+    });
   }
   if (guidedInlinePull && ctx.guidedWorkflowHubDraftRef) {
     ctx.guidedWorkflowHubDraftRef.current = {
