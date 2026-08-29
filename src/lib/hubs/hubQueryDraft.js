@@ -28,6 +28,8 @@ const STORAGE_KEY = "lychee:hubQueryDraft";
  * @property {string} [composeLimitScope]
  * @property {boolean} [randomSampleEnabled]
  * @property {string} [randomSampleSize]
+ * @property {boolean} [bucketingEnabled]
+ * @property {object | null} [bucketConfig]
  * @property {string} [pendingSheetName]
  * @property {string} [sourceHubPath]
  * @property {string} [sourceHubName]
@@ -98,7 +100,8 @@ export function hasComposeDraftPayload(draft) {
     (Array.isArray(draft.orderBy) && draft.orderBy.length > 0) ||
     (Array.isArray(draft.activeComposeOps) && draft.activeComposeOps.length > 0) ||
     !!draft.composeLimitOpen ||
-    !!draft.randomSampleEnabled
+    !!draft.randomSampleEnabled ||
+    !!draft.bucketingEnabled
   );
 }
 
@@ -221,6 +224,9 @@ export function normalizeHubQueryDraft(draft) {
     composeLimitScope: draft.composeLimitScope ? String(draft.composeLimitScope) : "primary",
     randomSampleEnabled,
     randomSampleSize: draft.randomSampleSize != null ? String(draft.randomSampleSize) : "",
+    bucketingEnabled: !!draft.bucketingEnabled,
+    bucketConfig:
+      draft.bucketConfig && typeof draft.bucketConfig === "object" ? draft.bucketConfig : null,
     pendingSheetName: draft.pendingSheetName ? String(draft.pendingSheetName).trim() : undefined,
     sourceHubPath: draft.sourceHubPath ? String(draft.sourceHubPath).trim() : undefined,
     sourceHubName: draft.sourceHubName ? String(draft.sourceHubName).trim() : undefined,

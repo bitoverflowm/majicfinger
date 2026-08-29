@@ -1,8 +1,9 @@
 /**
  * Research tools shown under “Refine your query” for Kalshi Historical (V1)
- * and Polymarket Historical. Random Sample is wired; other tools may follow.
+ * and Polymarket Historical. Random Sample and Bucketing are wired.
  */
 
+import { BUCKETING_HELPER_CONTENT } from "@/lib/bucketingHelperContent";
 import { RANDOM_SAMPLE_HELPER_CONTENT } from "@/lib/randomSampleHelperContent";
 
 /** @typedef {{ id: string; title: string; description?: string; helper?: boolean }} ConnectResearchTool */
@@ -14,11 +15,17 @@ export const CONNECT_RESEARCH_TOOLS = [
     title: "Random Sample",
     helper: true,
   },
+  {
+    id: "bucketing",
+    title: "Bucketing",
+    helper: true,
+  },
 ];
 
 /** @type {Record<string, typeof RANDOM_SAMPLE_HELPER_CONTENT>} */
 export const RESEARCH_TOOL_HELPER_CONTENT = {
   random_sample: RANDOM_SAMPLE_HELPER_CONTENT,
+  bucketing: BUCKETING_HELPER_CONTENT,
 };
 
 /**

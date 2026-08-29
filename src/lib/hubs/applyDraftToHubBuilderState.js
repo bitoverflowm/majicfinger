@@ -28,6 +28,9 @@ export function applyDraftToHubBuilderState(draft, setters) {
     composeLimitScope: draft.composeLimitScope ?? "primary",
     randomSampleEnabled: !!draft.randomSampleEnabled,
     randomSampleSize: draft.randomSampleSize ?? "",
+    bucketingEnabled: !!draft.bucketingEnabled,
+    bucketConfig:
+      draft.bucketConfig && typeof draft.bucketConfig === "object" ? draft.bucketConfig : null,
   };
 
   setters.setError?.(null);

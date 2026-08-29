@@ -1,15 +1,18 @@
 "use client";
 
-import { useCallback } from "react";
+import { useCallback, useMemo } from "react";
 import { motion } from "framer-motion";
-import { X } from "lucide-react";
+import { Layers, X } from "lucide-react";
 
 import {
   CONNECT_RESEARCH_TOOLS,
   getResearchToolHelperContent,
 } from "@/lib/connectResearchTools";
+import { ConnectBucketPanel } from "@/components/connectData/ConnectBucketPanel";
 import { ConnectRandomSamplePanel } from "@/components/connectData/ConnectRandomSamplePanel";
 import { Button } from "@/components/ui/button";
+import { createEmptyBucketTab } from "@/lib/bucketSheetTabs";
+import { inferBucketColumnProfileFromType } from "@/lib/sheetOperations/inferBucketColumnProfile";
 import { cn } from "@/lib/utils";
 
 /** Mathematical sample-size symbol (n) used as the Random Sample card icon. */
@@ -27,8 +30,13 @@ function SampleNIcon({ className }) {
   );
 }
 
+function BucketIcon({ className }) {
+  return <Layers className={cn("h-3.5 w-3.5", className)} aria-hidden />;
+}
+
 const RESEARCH_TOOL_ICONS = {
   random_sample: SampleNIcon,
+  bucketing: BucketIcon,
 };
 
 /**
@@ -40,12 +48,20 @@ const RESEARCH_TOOL_ICONS = {
  *   tools?: import("@/lib/connectResearchTools").ConnectResearchTool[];
  *   title?: string;
  *   description?: string;
+ *   columnNames?: string[];
+ *   columnTypesByName?: Record<string, string>;
  *   randomSampleEnabled?: boolean;
  *   setRandomSampleEnabled?: (next: boolean | ((prev: boolean) => boolean)) => void;
  *   randomSampleSize?: string | number;
  *   setRandomSampleSize?: (value: string) => void;
  *   randomSampleError?: string | null;
  *   onEnableRandomSample?: () => void;
+ *   bucketingEnabled?: boolean;
+ *   setBucketingEnabled?: (next: boolean | ((prev: boolean) => boolean)) => void;
+ *   bucketConfig?: object | null;
+ *   setBucketConfig?: (next: object) => void;
+ *   bucketingError?: string | null;
+ *   onEnableBucketing?: () => void;
  *   onResearchToolHelperChange?: (toolId: string | null) => void;
  * }} props
  */
@@ -55,12 +71,20 @@ export function ConnectResearchToolsSection({
   tools = CONNECT_RESEARCH_TOOLS,
   title = "Research tools",
   description = "Useful tools to move your research along",
+  columnNames = [],
+  columnTypesByName = {},
   randomSampleEnabled = false,
   setRandomSampleEnabled,
   randomSampleSize = "",
   setRandomSampleSize,
   randomSampleError = null,
   onEnableRandomSample,
+  bucketingEnabled = false,
+  setBucketingEnabled,
+  bucketConfig = null,
+  setBucketConfig,
+  bucketingError = null,
+  onEnableBucketing,
   onResearchToolHelperChange,
 }) {
   const openHelperForTool = useCallback(
@@ -81,17 +105,63 @@ export function ConnectResearchToolsSection({
     closeHelper();
   }, [closeHelper, setRandomSampleEnabled]);
 
+  const clearBucketing = useCallback(() => {
+    setBucketingEnabled?.(false);
+    closeHelper();
+  }, [closeHelper, setBucketingEnabled]);
+
+  const bucketColumnProfile = useMemo(() => {
+    const col = String(bucketConfig?.bucketColumn || "").trim();
+    if (!col) return null;
+    const type = columnTypesByName[col];
+    return inferBucketColumnProfileFromType(type);
+  }, [bucketConfig?.bucketColumn, columnTypesByName]);
+
   if (selectedCount <= 0 || !tools?.length) return null;
 
   const enableRandomSample = () => {
     if (randomSampleEnabled) {
-      // Already on — reopen helper if needed; use X to remove.
       openHelperForTool("random_sample");
       return;
     }
     onEnableRandomSample?.();
     setRandomSampleEnabled?.(true);
     openHelperForTool("random_sample");
+  };
+
+  const enableBucketing = () => {
+    if (bucketingEnabled) {
+      openHelperForTool("bucketing");
+      return;
+    }
+    onEnableBucketing?.();
+    setBucketingEnabled?.(true);
+    if (!bucketConfig) {
+      setBucketConfig?.(createEmptyBucketTab("Bucketed sheet"));
+    }
+    openHelperForTool("bucketing");
+  };
+
+  const toolSelected = (toolId) => {
+    if (toolId === "random_sample") return !!randomSampleEnabled;
+    if (toolId === "bucketing") return !!bucketingEnabled;
+    return false;
+  };
+
+  const toolInteractive = (toolId) => {
+    if (toolId === "random_sample") return typeof setRandomSampleEnabled === "function";
+    if (toolId === "bucketing") return typeof setBucketingEnabled === "function";
+    return false;
+  };
+
+  const enableTool = (toolId) => {
+    if (toolId === "random_sample") enableRandomSample();
+    else if (toolId === "bucketing") enableBucketing();
+  };
+
+  const clearTool = (toolId) => {
+    if (toolId === "random_sample") clearRandomSample();
+    else if (toolId === "bucketing") clearBucketing();
   };
 
   return (
@@ -123,9 +193,8 @@ export function ConnectResearchToolsSection({
           {tools.map((tool, i) => {
             const Icon = RESEARCH_TOOL_ICONS[tool.id] || SampleNIcon;
             const hasDescription = Boolean(tool.description?.trim());
-            const isRandom = tool.id === "random_sample";
-            const selected = isRandom && randomSampleEnabled;
-            const interactive = isRandom && typeof setRandomSampleEnabled === "function";
+            const selected = toolSelected(tool.id);
+            const interactive = toolInteractive(tool.id);
 
             return (
               <motion.li
@@ -147,11 +216,11 @@ export function ConnectResearchToolsSection({
                   title={
                     interactive
                       ? selected
-                        ? "Random Sample is enabled"
-                        : "Enable Random Sample"
+                        ? `${tool.title} is enabled`
+                        : `Enable ${tool.title}`
                       : "Coming soon"
                   }
-                  onClick={interactive ? enableRandomSample : undefined}
+                  onClick={interactive ? () => enableTool(tool.id) : undefined}
                   className={cn(
                     "flex h-full w-full flex-col rounded-lg border bg-card p-3 text-left",
                     selected && "pr-8",
@@ -193,7 +262,7 @@ export function ConnectResearchToolsSection({
                     onClick={(e) => {
                       e.preventDefault();
                       e.stopPropagation();
-                      clearRandomSample();
+                      clearTool(tool.id);
                     }}
                   >
                     <X className="h-3.5 w-3.5" />
@@ -210,6 +279,17 @@ export function ConnectResearchToolsSection({
             onSampleSizeChange={setRandomSampleSize}
             onRemove={clearRandomSample}
             error={randomSampleError}
+          />
+        ) : null}
+
+        {bucketingEnabled ? (
+          <ConnectBucketPanel
+            columnNames={columnNames}
+            bucketConfig={bucketConfig}
+            onBucketConfigChange={setBucketConfig}
+            columnProfile={bucketColumnProfile}
+            onRemove={clearBucketing}
+            error={bucketingError}
           />
         ) : null}
       </motion.div>

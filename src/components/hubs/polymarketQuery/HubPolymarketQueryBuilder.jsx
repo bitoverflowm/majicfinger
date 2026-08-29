@@ -17,6 +17,7 @@ import { getConnectComposeOperationsForWorkspace } from "@/lib/connectComposeOpe
 import { getConnectDataLakeConfig } from "@/lib/connectQueryComposeConfig";
 import { applyHubQueryDraft } from "@/lib/hubs/applyHubQueryDraft";
 import { applyDraftToHubBuilderState } from "@/lib/hubs/applyDraftToHubBuilderState";
+import { createEmptyBucketTab } from "@/lib/bucketSheetTabs";
 import {
   subscribeConnectComposeEditDraft,
   takeConnectComposeEditDraft,
@@ -311,8 +312,10 @@ export function HubPolymarketQueryBuilder({
   const clearHoverTimeoutRef = useRef(null);
 
   const handleComposeChange = useCallback((next) => {
-    composeDraftRef.current = next;
-    setComposeDraft(next);
+    // Merge so research-tool fields (bucketing, etc.) the op panel does not own are kept.
+    const merged = { ...(composeDraftRef.current || {}), ...(next || {}) };
+    composeDraftRef.current = merged;
+    setComposeDraft(merged);
   }, []);
 
   useEffect(() => {
@@ -368,6 +371,40 @@ export function HubPolymarketQueryBuilder({
   const setRandomSampleSize = useCallback(
     (value) => {
       patchComposeDraft({ randomSampleSize: value });
+    },
+    [patchComposeDraft],
+  );
+
+  const enableBucketing = useCallback(() => {
+    const existing = composeDraftRef.current?.bucketConfig;
+    patchComposeDraft({
+      bucketingEnabled: true,
+      bucketConfig:
+        existing && typeof existing === "object"
+          ? existing
+          : createEmptyBucketTab("Bucketed sheet"),
+    });
+  }, [patchComposeDraft]);
+
+  const setBucketingEnabled = useCallback(
+    (next) => {
+      const enabled =
+        typeof next === "function" ? next(!!composeDraftRef.current?.bucketingEnabled) : !!next;
+      if (enabled) {
+        enableBucketing();
+        return;
+      }
+      patchComposeDraft({ bucketingEnabled: false });
+    },
+    [enableBucketing, patchComposeDraft],
+  );
+
+  const setBucketConfig = useCallback(
+    (value) => {
+      patchComposeDraft({
+        bucketConfig: value && typeof value === "object" ? value : null,
+        bucketingEnabled: true,
+      });
     },
     [patchComposeDraft],
   );
@@ -524,6 +561,11 @@ export function HubPolymarketQueryBuilder({
       composeLimitScope: draftState.composeLimitScope ?? "primary",
       randomSampleEnabled: !!draftState.randomSampleEnabled,
       randomSampleSize: draftState.randomSampleSize ?? "",
+      bucketingEnabled: !!draftState.bucketingEnabled,
+      bucketConfig:
+        draftState.bucketConfig && typeof draftState.bucketConfig === "object"
+          ? draftState.bucketConfig
+          : null,
       pendingSheetName: sheetName.trim() || undefined,
     });
   }, [sampleId, columnSelections, composeDraft, activeComposeOps, sheetName]);
@@ -838,11 +880,20 @@ export function HubPolymarketQueryBuilder({
                   <ConnectResearchToolsSection
                     selectedCount={selectedColumns.length}
                     className="mt-6 border-t border-border/40 pt-6"
+                    columnNames={selectedColumns}
+                    columnTypesByName={Object.fromEntries(
+                      (columns || []).map((col) => [col.name, col.type]),
+                    )}
                     randomSampleEnabled={!!composeDraft.randomSampleEnabled}
                     setRandomSampleEnabled={setRandomSampleEnabled}
                     randomSampleSize={composeDraft.randomSampleSize ?? ""}
                     setRandomSampleSize={setRandomSampleSize}
                     onEnableRandomSample={enableRandomSample}
+                    bucketingEnabled={!!composeDraft.bucketingEnabled}
+                    setBucketingEnabled={setBucketingEnabled}
+                    bucketConfig={composeDraft.bucketConfig ?? null}
+                    setBucketConfig={setBucketConfig}
+                    onEnableBucketing={enableBucketing}
                     onResearchToolHelperChange={handleResearchToolHelperChange}
                   />
                   <ConnectComposeOperationPanel
