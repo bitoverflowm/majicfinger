@@ -3,16 +3,21 @@ import { flushSync } from "react-dom";
 import { applyHubQueryDraft } from "@/lib/hubs/applyHubQueryDraft";
 import { buildHubQueryDraftFromProvenance } from "@/lib/hubs/buildHubQueryDraftFromProvenance";
 import { stashConnectComposeEditDraft } from "@/lib/hubs/connectComposeEditDraft";
+import { normalizeConnectHomePullDestination } from "@/lib/connectHomePullDestination";
 
 /**
  * Open Connect compose with the same fields as a historical pull (no auto-run).
- * Replace vs new sheet stays on the usual pull destination controls.
  *
  * @param {Record<string, unknown>} ctx
- * @param {{ sheetId: string; sheet?: object | null }} args
+ * @param {{
+ *   sheetId: string;
+ *   sheet?: object | null;
+ *   destination?: "replace" | "new_sheet";
+ *   pendingSheetName?: string;
+ * }} args
  * @returns {{ ok: true; draft: object } | { ok: false; error: string }}
  */
-export function openConnectComposeEdit(ctx, { sheetId, sheet } = {}) {
+export function openConnectComposeEdit(ctx, { sheetId, sheet, destination, pendingSheetName } = {}) {
   const id = String(sheetId || "").trim();
   const source = sheet || ctx?.dataSheets?.[id] || null;
   if (!id || !source) {
@@ -31,23 +36,36 @@ export function openConnectComposeEdit(ctx, { sheetId, sheet } = {}) {
     };
   }
 
-  stashConnectComposeEditDraft(draft);
+  const dest = normalizeConnectHomePullDestination(destination ?? "replace");
+  const nameFromArg = String(pendingSheetName || "").trim();
+  const sheetName =
+    dest === "new_sheet"
+      ? nameFromArg || String(source.name || "").trim()
+      : nameFromArg || String(source.name || "").trim();
+
+  const draftWithName = {
+    ...draft,
+    pendingSheetName: sheetName || draft.pendingSheetName,
+  };
+
+  stashConnectComposeEditDraft(draftWithName);
 
   flushSync(() => {
+    // Replace always targets the history sheet; new sheet is created on Run via destination.
     ctx.setActiveSheetId?.(id);
-    ctx.setConnectHomePullDestination?.("replace");
-    ctx.setConnectHomePendingSheetName?.(String(source.name || "").trim() || "");
+    ctx.setConnectHomePullDestination?.(dest);
+    ctx.setConnectHomePendingSheetName?.(sheetName || "");
     ctx.setConnectHomeAnalyzeActive?.(false);
     ctx.setRightPanelOpen?.(false);
 
-    applyHubQueryDraft(ctx, draft, {
+    applyHubQueryDraft(ctx, draftWithName, {
       autoPull: false,
       prepareSheet: false,
-      integrationId: draft.integrationId,
+      integrationId: draftWithName.integrationId,
     });
   });
 
   ctx.requestConnectComposeScroll?.();
 
-  return { ok: true, draft };
+  return { ok: true, draft: draftWithName };
 }

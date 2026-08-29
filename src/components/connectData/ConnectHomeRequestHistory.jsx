@@ -194,15 +194,16 @@ export function ConnectHomeRequestHistory({ className }) {
     [currentIntegrationId],
   );
 
-  const [replayOpen, setReplayOpen] = useState(false);
-  const [replaySourceSheetId, setReplaySourceSheetId] = useState(null);
+  const [sheetActionOpen, setSheetActionOpen] = useState(false);
+  const [sheetActionIntent, setSheetActionIntent] = useState(/** @type {"replay" | "edit"} */ ("replay"));
+  const [sheetActionSourceId, setSheetActionSourceId] = useState(null);
   const [replayBusy, setReplayBusy] = useState(false);
   const progressTimerRef = useRef(null);
 
-  const replaySource = replaySourceSheetId ? dataSheets[replaySourceSheetId] : null;
-  const replayProvenance = replaySource?.provenance;
-  const replayLabel = replaySource
-    ? requestCardSummaryLabel(replaySource.requestCards?.[0], replaySource)
+  const actionSource = sheetActionSourceId ? dataSheets[sheetActionSourceId] : null;
+  const replayProvenance = actionSource?.provenance;
+  const actionQueryLabel = actionSource
+    ? requestCardSummaryLabel(actionSource.requestCards?.[0], actionSource)
     : "";
 
   const clearProgressTimer = useCallback(() => {
@@ -212,6 +213,12 @@ export function ConnectHomeRequestHistory({ className }) {
     }
   }, []);
 
+  const closeSheetActionDialog = useCallback(() => {
+    setSheetActionOpen(false);
+    setSheetActionSourceId(null);
+    setSheetActionIntent("replay");
+  }, []);
+
   const openReplayDialog = useCallback(
     (sheetId) => {
       const sheet = dataSheets?.[sheetId];
@@ -219,23 +226,57 @@ export function ConnectHomeRequestHistory({ className }) {
         toast.error("This sheet does not have a saved query to replay.");
         return;
       }
-      setReplaySourceSheetId(sheetId);
-      setReplayOpen(true);
+      setSheetActionIntent("replay");
+      setSheetActionSourceId(sheetId);
+      setSheetActionOpen(true);
     },
     [dataSheets],
   );
 
-  const openEditCompose = useCallback(
+  const openEditDialog = useCallback(
     (sheetId) => {
       const sheet = dataSheets?.[sheetId];
-      const result = openConnectComposeEdit(ctx, { sheetId, sheet });
+      if (!sheet?.provenance) {
+        toast.error("This sheet does not have a saved query to edit.");
+        return;
+      }
+      const lake = String(sheet.provenance?.lake || sheet.provenance?.source || "").toLowerCase();
+      if (lake !== "polymarket" && lake !== "kalshi") {
+        toast.error("This pull cannot be edited in compose.");
+        return;
+      }
+      setSheetActionIntent("edit");
+      setSheetActionSourceId(sheetId);
+      setSheetActionOpen(true);
+    },
+    [dataSheets],
+  );
+
+  const runEditCompose = useCallback(
+    (destination, newSheetName) => {
+      if (!sheetActionSourceId) return;
+      const sheet = dataSheets?.[sheetActionSourceId];
+      const result = openConnectComposeEdit(ctx, {
+        sheetId: sheetActionSourceId,
+        sheet,
+        destination,
+        pendingSheetName:
+          destination === "new_sheet"
+            ? String(newSheetName || "").trim()
+            : String(sheet?.name || "").trim(),
+      });
+      closeSheetActionDialog();
       if (!result.ok) {
         toast.error(result.error);
         return;
       }
-      toast.message("Query loaded in compose — edit and run when ready.");
+      toast.message(
+        destination === "new_sheet"
+          ? "Query loaded in compose — run to create the new sheet."
+          : "Query loaded in compose — run to replace this sheet.",
+      );
     },
-    [ctx, dataSheets],
+    [closeSheetActionDialog, ctx, dataSheets, sheetActionSourceId],
   );
 
   const runAnotherIntegrationRequest = useCallback(() => {
@@ -276,7 +317,7 @@ export function ConnectHomeRequestHistory({ className }) {
 
   const runReplay = useCallback(
     async (destination, newSheetName) => {
-      if (!replaySourceSheetId || !replayProvenance || !setDataSheets || !setConnectedData) return;
+      if (!sheetActionSourceId || !replayProvenance || !setDataSheets || !setConnectedData) return;
 
       setReplayBusy(true);
       startReplayPullProgress(setConnectDataLakePullState);
@@ -290,7 +331,7 @@ export function ConnectHomeRequestHistory({ className }) {
       }, 450);
 
       try {
-        let targetSheetId = activeSheetId;
+        let targetSheetId = destination === "replace" ? sheetActionSourceId : activeSheetId;
 
         if (destination === "new_sheet") {
           const trimmedName = String(newSheetName || "").trim();
@@ -313,6 +354,7 @@ export function ConnectHomeRequestHistory({ className }) {
           });
           bumpReplayPullProgress(setConnectDataLakePullState, 24, "Preparing new sheet…");
         } else {
+          setActiveSheetId?.(sheetActionSourceId);
           bumpReplayPullProgress(setConnectDataLakePullState, 20, "Replacing sheet data…");
         }
 
@@ -322,7 +364,7 @@ export function ConnectHomeRequestHistory({ className }) {
           targetSheetId,
           provenance: replayProvenance,
           dataSheets,
-          sourceSheetId: replaySourceSheetId,
+          sourceSheetId: sheetActionSourceId,
         });
 
         bumpReplayPullProgress(setConnectDataLakePullState, 96, "Finishing up…");
@@ -336,14 +378,14 @@ export function ConnectHomeRequestHistory({ className }) {
             destination === "new_sheet"
               ? String(newSheetName || "").trim() || cur.name
               : cur.name;
-          const sourceCard = Array.isArray(replaySource?.requestCards)
-            ? replaySource.requestCards[0]
+          const sourceCard = Array.isArray(actionSource?.requestCards)
+            ? actionSource.requestCards[0]
             : null;
           const querySummary = formatConnectRequestCardQuery(sourceCard, {
             provenance: replayProvenance,
           });
           const intentFullRowCount = resolvePersistedFullRowCount(
-            replaySource,
+            actionSource,
             json?.rowCount ?? rows.length,
           );
           const replayCard = sourceCard
@@ -357,8 +399,8 @@ export function ConnectHomeRequestHistory({ className }) {
                 querySummary: querySummary || sourceCard.querySummary,
               }
             : null;
-          const priorCards = Array.isArray(replaySource?.requestCards)
-            ? replaySource.requestCards
+          const priorCards = Array.isArray(actionSource?.requestCards)
+            ? actionSource.requestCards
             : Array.isArray(cur.requestCards)
               ? cur.requestCards
               : [];
@@ -372,7 +414,7 @@ export function ConnectHomeRequestHistory({ className }) {
               name,
               data: rows,
               provenance: replayProvenance,
-              operationHistory: replaySource?.operationHistory || cur.operationHistory || [],
+              operationHistory: actionSource?.operationHistory || cur.operationHistory || [],
               storageMode: rows.length >= intentFullRowCount ? "inline" : "provenance",
               rehydrationStatus: rows.length >= intentFullRowCount ? "complete" : "preview",
               rowCount: rows.length,
@@ -399,8 +441,7 @@ export function ConnectHomeRequestHistory({ className }) {
           toast.success("Query replayed into sheet.");
         }
 
-        setReplayOpen(false);
-        setReplaySourceSheetId(null);
+        closeSheetActionDialog();
       } catch (e) {
         setConnectDataLakePullState?.({
           loading: false,
@@ -409,8 +450,7 @@ export function ConnectHomeRequestHistory({ className }) {
           error: e?.message || "Failed to replay query.",
         });
         toast.error(e?.message || "Failed to replay query.");
-        setReplayOpen(false);
-        setReplaySourceSheetId(null);
+        closeSheetActionDialog();
       } finally {
         clearProgressTimer();
         setReplayBusy(false);
@@ -418,18 +458,19 @@ export function ConnectHomeRequestHistory({ className }) {
       }
     },
     [
+      actionSource,
       activeSheetId,
       addNewSheetAndActivate,
       clearProgressTimer,
+      closeSheetActionDialog,
       dataSheets,
       replayProvenance,
-      replaySource,
-      replaySourceSheetId,
       requestConnectAnalyzeScroll,
       setActiveSheetId,
       setConnectDataLakePullState,
       setConnectedData,
       setDataSheets,
+      sheetActionSourceId,
     ],
   );
 
@@ -538,7 +579,7 @@ export function ConnectHomeRequestHistory({ className }) {
                           size="sm"
                           className="h-7 gap-1 px-2 text-[10px]"
                           disabled={replayBusy || !!pull.loading}
-                          onClick={() => openEditCompose(sheetId)}
+                          onClick={() => openEditDialog(sheetId)}
                         >
                           <Pencil className="h-3 w-3" aria-hidden />
                           Edit
@@ -596,18 +637,25 @@ export function ConnectHomeRequestHistory({ className }) {
       ) : null}
 
       <ConnectHomeReplaySheetDialog
-        open={replayOpen}
+        open={sheetActionOpen}
+        intent={sheetActionIntent}
         onOpenChange={(open) => {
           if (replayBusy) return;
-          setReplayOpen(open);
-          if (!open) setReplaySourceSheetId(null);
+          if (!open) closeSheetActionDialog();
+          else setSheetActionOpen(true);
         }}
-        queryLabel={replayLabel}
-        loading={replayBusy}
+        queryLabel={actionQueryLabel}
+        loading={sheetActionIntent === "replay" && replayBusy}
         pullLabel={pull.label}
         pullProgress={pull.progress}
-        onReplaceCurrent={() => void runReplay("replace")}
-        onCreateNewSheet={(name) => runReplay("new_sheet", name)}
+        onReplaceCurrent={() => {
+          if (sheetActionIntent === "edit") runEditCompose("replace");
+          else void runReplay("replace");
+        }}
+        onCreateNewSheet={(name) => {
+          if (sheetActionIntent === "edit") runEditCompose("new_sheet", name);
+          else void runReplay("new_sheet", name);
+        }}
       />
     </div>
   );

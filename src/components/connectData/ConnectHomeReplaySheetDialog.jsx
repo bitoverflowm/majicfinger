@@ -16,6 +16,21 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { ConnectProgressWithLabel } from "@/components/integrationsView/integrationPlayground/integrations/polymarketHistorical/ConnectProgressWithLabel";
 
+/**
+ * Choose replace vs new sheet for Replay (run now) or Edit (open compose).
+ *
+ * @param {{
+ *   open: boolean;
+ *   onOpenChange: (open: boolean) => void;
+ *   onReplaceCurrent: () => void | Promise<void>;
+ *   onCreateNewSheet: (name: string) => void | Promise<void>;
+ *   queryLabel?: string;
+ *   loading?: boolean;
+ *   pullLabel?: string;
+ *   pullProgress?: number;
+ *   intent?: "replay" | "edit";
+ * }} props
+ */
 export function ConnectHomeReplaySheetDialog({
   open,
   onOpenChange,
@@ -25,7 +40,9 @@ export function ConnectHomeReplaySheetDialog({
   loading = false,
   pullLabel = "Loading data…",
   pullProgress = 0,
+  intent = "replay",
 }) {
+  const isEdit = intent === "edit";
   const [step, setStep] = useState("choose");
   const [sheetName, setSheetName] = useState("");
 
@@ -50,8 +67,13 @@ export function ConnectHomeReplaySheetDialog({
   const handleCreateNewSheet = async () => {
     const name = String(sheetName || "").trim();
     if (!name) return;
-    setStep("loading");
+    if (!isEdit) setStep("loading");
     await onCreateNewSheet?.(name);
+  };
+
+  const handleReplace = async () => {
+    if (!isEdit) setStep("loading");
+    await onReplaceCurrent?.();
   };
 
   return (
@@ -78,8 +100,9 @@ export function ConnectHomeReplaySheetDialog({
             <DialogHeader>
               <DialogTitle>Name your sheet</DialogTitle>
               <DialogDescription>
-                Choose a name for the new sheet. We&apos;ll run the query and load the data when you
-                continue.
+                {isEdit
+                  ? "Choose a name for the new sheet. We’ll open compose with this query so you can edit and run."
+                  : "Choose a name for the new sheet. We’ll run the query and load the data when you continue."}
               </DialogDescription>
             </DialogHeader>
             <div className="space-y-2 py-1">
@@ -90,7 +113,7 @@ export function ConnectHomeReplaySheetDialog({
                 id="replay-new-sheet-name"
                 value={sheetName}
                 onChange={(e) => setSheetName(e.target.value)}
-                placeholder="e.g. Kalshi markets replay"
+                placeholder={isEdit ? "e.g. closed markets summary" : "e.g. Kalshi markets replay"}
                 className="w-full"
                 autoFocus
                 onKeyDown={(e) => {
@@ -121,18 +144,22 @@ export function ConnectHomeReplaySheetDialog({
                 disabled={!String(sheetName || "").trim()}
                 onClick={() => void handleCreateNewSheet()}
               >
-                Run query
+                {isEdit ? "Open in compose" : "Run query"}
               </Button>
             </DialogFooter>
           </>
         ) : (
           <>
             <DialogHeader>
-              <DialogTitle>Replay query</DialogTitle>
+              <DialogTitle>{isEdit ? "Edit query" : "Replay query"}</DialogTitle>
               <DialogDescription className="text-pretty">
-                {queryLabel
-                  ? `Run “${queryLabel}” again. Replace the current sheet or create a new sheet with a fresh name.`
-                  : "Run this query again. Replace the current sheet or create a new sheet with a fresh name."}
+                {isEdit
+                  ? queryLabel
+                    ? `Edit “${queryLabel}” in compose. Replace this sheet when you run, or create a new sheet.`
+                    : "Edit this query in compose. Replace this sheet when you run, or create a new sheet."
+                  : queryLabel
+                    ? `Run “${queryLabel}” again. Replace the current sheet or create a new sheet with a fresh name.`
+                    : "Run this query again. Replace the current sheet or create a new sheet with a fresh name."}
               </DialogDescription>
             </DialogHeader>
             <DialogFooter className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:justify-end">
@@ -145,7 +172,7 @@ export function ConnectHomeReplaySheetDialog({
                 type="button"
                 variant="outline"
                 className="w-full sm:w-auto shrink-0"
-                onClick={onReplaceCurrent}
+                onClick={() => void handleReplace()}
               >
                 Replace current sheet
               </Button>
