@@ -6,6 +6,7 @@ import { Layers, X } from "lucide-react";
 
 import {
   CONNECT_RESEARCH_TOOLS,
+  getBucketingHelperToolId,
   getResearchToolHelperContent,
 } from "@/lib/connectResearchTools";
 import { ConnectBucketDialog } from "@/components/connectData/ConnectBucketDialog";
@@ -63,6 +64,7 @@ const RESEARCH_TOOL_ICONS = {
  *   setBucketConfig?: (next: object) => void;
  *   bucketingError?: string | null;
  *   onEnableBucketing?: () => void;
+ *   helperOpen?: boolean;
  *   onResearchToolHelperChange?: (toolId: string | null) => void;
  * }} props
  */
@@ -86,6 +88,7 @@ export function ConnectResearchToolsSection({
   setBucketConfig,
   bucketingError = null,
   onEnableBucketing,
+  helperOpen = false,
   onResearchToolHelperChange,
 }) {
   const [configToolId, setConfigToolId] = useState(null);
@@ -180,8 +183,13 @@ export function ConnectResearchToolsSection({
         setBucketConfig?.(createEmptyBucketTab("Bucketed sheet"));
       }
     }
-    openHelperForTool("bucketing");
+    const mode = bucketConfig?.activeMode === "bands" ? "bands" : "buckets";
+    openHelperForTool(getBucketingHelperToolId(mode));
     setConfigToolId("bucketing");
+  };
+
+  const handleBucketingModeChange = (mode) => {
+    openHelperForTool(getBucketingHelperToolId(mode));
   };
 
   const toolSelected = (toolId) => {
@@ -212,6 +220,15 @@ export function ConnectResearchToolsSection({
       return n ? `n = ${n}` : "Configure sample size";
     }
     if (toolId === "bucketing" && bucketingEnabled) {
+      if (bucketConfig?.activeMode === "bands") {
+        const col = String(bucketConfig?.bandsConfig?.bandColumn || "").trim();
+        const n = Array.isArray(bucketConfig?.bandsConfig?.bands)
+          ? bucketConfig.bandsConfig.bands.length
+          : 0;
+        if (col && n) return `${n} band${n === 1 ? "" : "s"} on ${col}`;
+        if (col) return `Bands on ${col}`;
+        return "Configure bands";
+      }
       const col = String(bucketConfig?.bucketColumn || "").trim();
       return col ? `Bucket by ${col}` : "Configure bucketing";
     }
@@ -348,6 +365,7 @@ export function ConnectResearchToolsSection({
         onSampleSizeChange={setRandomSampleSize}
         onRemove={clearRandomSample}
         error={randomSampleError}
+        besideHelper={!!helperOpen}
       />
 
       <ConnectBucketDialog
@@ -361,6 +379,8 @@ export function ConnectResearchToolsSection({
         columnProfile={bucketColumnProfile}
         onRemove={clearBucketing}
         error={bucketingError}
+        besideHelper={!!helperOpen}
+        onBucketingModeChange={handleBucketingModeChange}
       />
     </motion.section>
   );

@@ -1,25 +1,25 @@
 /**
- * Content configuration for the Bucketing FeatureHelper.
+ * Content configuration for the Bucketing → Buckets FeatureHelper.
  * Mirrors sheet workspace Stats → Bucket behavior (client-side after data loads).
  */
 
 export const BUCKETING_HELPER_CONTENT = {
   label: "Helper",
-  title: "Bucketing",
+  title: "Buckets",
   introduction: [
-    "Bucketing groups rows from your query result into buckets and aggregates metrics within each bucket. It uses the same engine as Stats → Bucket in the data sheet workspace.",
+    "Buckets group rows from your query result using automatic binning — exact values, equal-width numeric ranges, or time intervals — then aggregate metrics within each bucket. This is the same engine as Stats → Bucket in the data sheet workspace.",
     "Lychee first runs your query (filters, joins, summarize, random sample, and other criteria). After rows land in a sheet, bucketing groups those rows and writes a new bucketed sheet.",
-    "Choose a column to bucket (exact values, numeric ranges, or time intervals), optional extra group-by columns, and one or more aggregations such as count, sum, or mean.",
+    "For hand-authored, unequal ranges (for example custom volume tiers), switch to the Bands tab.",
   ],
   sections: [
     {
       type: "heading",
-      content: "How Bucketing works in Lychee",
+      content: "How Buckets work in Lychee",
     },
     {
       type: "paragraph",
       content:
-        "Bucketing is a sheet operation applied to the completed query result. It does not change your SQL SELECT list the way Summarize does.",
+        "Buckets are a sheet operation applied to the completed query result. They do not change your SQL SELECT list the way Summarize does.",
     },
     {
       type: "unordered_list",
@@ -45,8 +45,8 @@ export const BUCKETING_HELPER_CONTENT = {
     {
       type: "unordered_list",
       items: [
-        "Bucketing creates a new sheet; the original query result sheet is left unchanged.",
-        "Configure Bucketing here before you run; application after pull will be adapted to match this research-tool flow.",
+        "Buckets create a new sheet; the original query result sheet is left unchanged.",
+        "Configure here before you run; application after pull will be adapted to this research-tool flow.",
         "Prefer Summarize in Refine your query when you want grouping and aggregates pushed into Athena SQL.",
       ],
     },

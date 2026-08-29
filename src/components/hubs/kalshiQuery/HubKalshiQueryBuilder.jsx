@@ -1236,6 +1236,7 @@ function HubKalshiQueryBuilderInner({
                     bucketConfig={composeDraft.bucketConfig ?? null}
                     setBucketConfig={setBucketConfig}
                     onEnableBucketing={enableBucketing}
+                    helperOpen={researchHelperOpen}
                     onResearchToolHelperChange={handleResearchToolHelperChange}
                   />
                   <ConnectComposeOperationPanel

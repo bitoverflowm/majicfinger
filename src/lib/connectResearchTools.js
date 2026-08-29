@@ -3,6 +3,7 @@
  * and Polymarket Historical. Random Sample and Bucketing are wired.
  */
 
+import { BANDS_HELPER_CONTENT } from "@/lib/bandsHelperContent";
 import { BUCKETING_HELPER_CONTENT } from "@/lib/bucketingHelperContent";
 import { RANDOM_SAMPLE_HELPER_CONTENT } from "@/lib/randomSampleHelperContent";
 
@@ -26,6 +27,7 @@ export const CONNECT_RESEARCH_TOOLS = [
 export const RESEARCH_TOOL_HELPER_CONTENT = {
   random_sample: RANDOM_SAMPLE_HELPER_CONTENT,
   bucketing: BUCKETING_HELPER_CONTENT,
+  bucketing_bands: BANDS_HELPER_CONTENT,
 };
 
 /**
@@ -34,6 +36,14 @@ export const RESEARCH_TOOL_HELPER_CONTENT = {
 export function getResearchToolHelperContent(toolId) {
   const id = String(toolId || "").trim();
   return id ? RESEARCH_TOOL_HELPER_CONTENT[id] : undefined;
+}
+
+/**
+ * Helper id for the Bucketing dialog mode (Buckets vs Bands).
+ * @param {'buckets' | 'bands' | string | null | undefined} mode
+ */
+export function getBucketingHelperToolId(mode) {
+  return mode === "bands" ? "bucketing_bands" : "bucketing";
 }
 
 /**

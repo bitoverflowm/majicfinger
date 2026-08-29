@@ -11,6 +11,17 @@ import { cn } from "@/lib/utils";
 /** Matches FeatureHelper panel width (w-72). Used to pad compose content while open. */
 export const FEATURE_HELPER_DRAWER_WIDTH_CLASS = "pr-72";
 
+/** Tailwind width of the helper panel — keep in sync with FeatureHelper `w-72`. */
+export const FEATURE_HELPER_PANEL_WIDTH_CLASS = "w-72";
+
+/**
+ * Dialog overlay/content classes when a FeatureHelper panel is open on the right,
+ * so the modal sits in the remaining viewport and both stay visible.
+ */
+export const DIALOG_BESIDE_HELPER_OVERLAY_CLASS = "right-72";
+export const DIALOG_BESIDE_HELPER_CONTENT_CLASS =
+  "left-[calc((100vw-18rem)/2)] !max-w-[min(42rem,calc(100vw-18rem-2rem))] sm:!max-w-[min(42rem,calc(100vw-18rem-2rem))]";
+
 /**
  * @typedef {{ label: string; href: string }} FeatureHelperGuideLink
  * @typedef {{
@@ -161,7 +172,7 @@ export function FeatureHelper({
       aria-label={heading}
       data-feature-helper-panel=""
       className={cn(
-        "pointer-events-auto fixed inset-y-0 right-0 z-40 flex w-72 max-w-[100vw] flex-col",
+        "pointer-events-auto fixed inset-y-0 right-0 z-[60] flex w-72 max-w-[100vw] flex-col",
         "border-l border-border bg-background shadow-xl",
         "animate-in slide-in-from-right-4 fade-in-0 duration-200",
         className,

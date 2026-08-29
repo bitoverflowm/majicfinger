@@ -11,6 +11,11 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import {
+  DIALOG_BESIDE_HELPER_CONTENT_CLASS,
+  DIALOG_BESIDE_HELPER_OVERLAY_CLASS,
+} from "@/components/shared/FeatureHelper";
+import { cn } from "@/lib/utils";
 
 /**
  * Pop-out config for Random Sample research tool.
@@ -22,6 +27,7 @@ import { Label } from "@/components/ui/label";
  *   onSampleSizeChange: (value: string) => void;
  *   onRemove?: () => void;
  *   error?: string | null;
+ *   besideHelper?: boolean;
  * }} props
  */
 export function ConnectRandomSampleDialog({
@@ -31,10 +37,17 @@ export function ConnectRandomSampleDialog({
   onSampleSizeChange,
   onRemove,
   error = null,
+  besideHelper = false,
 }) {
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="w-[calc(100%-2rem)] max-w-md gap-4 text-foreground sm:max-w-md">
+    <Dialog open={open} onOpenChange={onOpenChange} modal={!besideHelper}>
+      <DialogContent
+        overlayClassName={besideHelper ? DIALOG_BESIDE_HELPER_OVERLAY_CLASS : undefined}
+        className={cn(
+          "w-[calc(100%-2rem)] max-w-md gap-4 text-foreground sm:max-w-md",
+          besideHelper && DIALOG_BESIDE_HELPER_CONTENT_CLASS,
+        )}
+      >
         <DialogHeader>
           <DialogTitle>Random Sample</DialogTitle>
           <DialogDescription className="text-muted-foreground dark:text-slate-400">

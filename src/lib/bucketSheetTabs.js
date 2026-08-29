@@ -66,6 +66,8 @@ export function createEmptyBucketTab(sheetName = "Bucketed sheet") {
     targetSheetId: null,
     savedSheetName: "",
     sheetName: String(sheetName || "").trim(),
+    /** @type {'buckets' | 'bands'} */
+    activeMode: "buckets",
     bucketColumn: "",
     bucketOutputColumn: "bucket",
     bucketMode: "category",
@@ -74,6 +76,7 @@ export function createEmptyBucketTab(sheetName = "Bucketed sheet") {
     groupByColumns: [],
     passthroughColumns: [],
     aggregations: DEFAULT_AGGREGATIONS.map((agg) => ({ ...agg, id: `bucket-agg-${id}` })),
+    bandsConfig: null,
   };
 }
 
