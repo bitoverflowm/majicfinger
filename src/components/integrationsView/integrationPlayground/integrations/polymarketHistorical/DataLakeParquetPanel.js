@@ -588,7 +588,14 @@ export default function DataLakeParquetPanel({
   const guidedWorkflowPull = !!ctx?.guidedWorkflowPull;
   const guidedWorkflowPullRequested = !!ctx?.guidedWorkflowPullRequested;
   const setGuidedWorkflowPullRequested = ctx?.setGuidedWorkflowPullRequested;
-  const demoPullMode = isDemo && !guidedWorkflowPull;
+  /**
+   * All demo embeds (landing dashboard + Polymarket/Kalshi Historical guided hubs)
+   * must pass `demo: true` so Athena caps at ATHENA_DEMO_ROW_LIMIT (10).
+   * Do not gate this on guidedWorkflowPull — that was letting guided demos pull 100 rows.
+   */
+  const demoPullMode = isDemo;
+  /** Free-play demo only: clear WHERE so visitors aren't stuck on empty filters. Guided demos keep draft WHERE. */
+  const demoClearsWhereFilters = isDemo && !guidedWorkflowPull;
   const viewing = ctx?.viewing;
   const connectWorkspace = ctx?.connectWorkspace;
   const connectDataLakeSampleId = ctx?.connectDataLakeSampleId ?? "";
@@ -3483,6 +3490,14 @@ export default function DataLakeParquetPanel({
         }
         composeAthenaRowLimit = n;
       }
+      if (demoPullMode) {
+        if (composeAthenaRowLimit != null) {
+          composeAthenaRowLimit = Math.min(composeAthenaRowLimit, ATHENA_DEMO_ROW_LIMIT);
+        } else if (!randomSampleEnabled) {
+          // Always send the demo cap so guided Historical hubs cannot fall through to the 100-row sample default.
+          composeAthenaRowLimit = ATHENA_DEMO_ROW_LIMIT;
+        }
+      }
     }
     if (selectionTab === "meta") {
       const allSpecs = buildAllMetaOpSpecsForRun();
@@ -3529,7 +3544,7 @@ export default function DataLakeParquetPanel({
       ctx?.guidedWorkflowHubDraftRef,
     );
     const composeFiltersForRun = isComposeTab
-      ? demoPullMode
+      ? demoClearsWhereFilters
         ? null
         : buildComposeFiltersPayload(effectiveWhereFilters)
       : undefined;
