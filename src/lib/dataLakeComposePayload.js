@@ -52,6 +52,7 @@ export function buildDataLakeServerComposePayload({
       ...((i.aggregate === "sum" || i.aggregate == null) && i.sumCase && i.sumCase.enabled
         ? { sumCase: i.sumCase }
         : {}),
+      ...(i.aggregate == null && i.bandCase && i.bandCase.enabled ? { bandCase: i.bandCase } : {}),
       ...(i.aggregate === "sum" && i.equation && i.equation.enabled ? { equation: i.equation } : {}),
     })),
     groupByAliases,

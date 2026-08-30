@@ -2,11 +2,14 @@
  * Hub research-tool bucketing (Buckets / Bands) applied after Athena pull lands.
  * Set when applyHubQueryDraft runs; consumed once when rows are written to the sheet.
  *
+ * When Bands compile to Athena CASE+GROUP BY, `athenaCompiled` is set at payload-build
+ * time so the post-pull pass only zero-fills empty bands (no full re-aggregate).
+ *
  * `sticky` keeps the last enabled config so Compose "Run" / retries can re-arm after
  * a successful take (pending is one-shot).
  */
 
-/** @type {{ enabled: boolean; config: object | null } | null} */
+/** @type {{ enabled: boolean; config: object | null; athenaCompiled?: boolean } | null} */
 let pending = null;
 
 /** @type {{ enabled: boolean; config: object | null } | null} */
@@ -24,7 +27,7 @@ export function setPendingResearchBucketing(enabled, config) {
   }
   const next = { enabled: true, config };
   pending = next;
-  sticky = next;
+  sticky = { enabled: true, config };
 }
 
 /** Re-arm pending from sticky before a pull (Compose Run, retry). */
@@ -36,7 +39,16 @@ export function ensurePendingResearchBucketing() {
   return pending;
 }
 
-/** @returns {{ enabled: boolean; config: object | null } | null} */
+/**
+ * Mark that this pull's compose payload already applied Bands in Athena.
+ * @param {boolean} compiled
+ */
+export function markPendingResearchBucketingAthenaCompiled(compiled) {
+  if (!pending?.enabled) return;
+  pending = { ...pending, athenaCompiled: !!compiled };
+}
+
+/** @returns {{ enabled: boolean; config: object | null; athenaCompiled?: boolean } | null} */
 export function peekPendingResearchBucketing() {
   return pending;
 }
@@ -46,7 +58,7 @@ export function hasStickyResearchBucketing() {
   return !!(sticky?.enabled && sticky.config);
 }
 
-/** @returns {{ enabled: boolean; config: object | null } | null} */
+/** @returns {{ enabled: boolean; config: object | null; athenaCompiled?: boolean } | null} */
 export function takePendingResearchBucketing() {
   const next = pending;
   pending = null;

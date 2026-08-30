@@ -418,6 +418,7 @@ function buildSelectExpression(opts) {
     numberScale,
     decimals,
     sumCase,
+    bandCase,
     equation,
     baseAlias = null,
     kalshiMaterializedVirtuals = null,
@@ -542,6 +543,93 @@ function buildSelectExpression(opts) {
     return `CASE ${caseParts.join(" ")} ELSE CAST(${colRefFn(elseCol)} AS DOUBLE) END`;
   };
 
+  /**
+   * Research Bands → CASE WHEN … THEN 'label' … ELSE NULL END (VARCHAR dimension for GROUP BY).
+   * @param {any} bandCaseIn
+   * @param {(c: string) => string} colRefFn
+   */
+  const buildBandCaseLabelSql = (bandCaseIn, colRefFn) => {
+    const bc = bandCaseIn && typeof bandCaseIn === "object" ? bandCaseIn : null;
+    if (!bc || !bc.enabled) {
+      const err = new Error("band CASE is not enabled");
+      err.code = "BAD_REQUEST";
+      throw err;
+    }
+    const branchesIn = Array.isArray(bc.branches) ? bc.branches : [];
+    if (branchesIn.length === 0) {
+      const err = new Error("band CASE requires at least one branch");
+      err.code = "BAD_REQUEST";
+      throw err;
+    }
+
+    const predToSql = (pred) => {
+      const c = String(pred?.column || "").trim();
+      const op = String(pred?.op || "").toLowerCase().trim();
+      const v = pred?.value;
+      if (!c || !isValidColumnIdentifier(c)) {
+        const err = new Error("Invalid band WHEN column");
+        err.code = "BAD_REQUEST";
+        throw err;
+      }
+      const colSql = `CAST(${colRefFn(c)} AS DOUBLE)`;
+      const opSql =
+        op === "gt"
+          ? ">"
+          : op === "gte"
+            ? ">="
+            : op === "lt"
+              ? "<"
+              : op === "lte"
+                ? "<="
+                : op === "eq"
+                  ? "="
+                  : op === "neq"
+                    ? "!="
+                    : null;
+      if (!opSql) {
+        const err = new Error(`Invalid band WHEN operator: ${op}`);
+        err.code = "BAD_REQUEST";
+        throw err;
+      }
+      if (typeof v === "number" && Number.isFinite(v)) {
+        return `${colSql} ${opSql} ${v}`;
+      }
+      const n = Number(String(v ?? "").trim().replace(/,/g, ""));
+      if (Number.isFinite(n)) {
+        return `${colSql} ${opSql} ${n}`;
+      }
+      const err = new Error("band WHEN value must be numeric");
+      err.code = "BAD_REQUEST";
+      throw err;
+    };
+
+    const whenToSql = (when) => {
+      if (!when || typeof when !== "object") {
+        const err = new Error("band branch.when must be an object");
+        err.code = "BAD_REQUEST";
+        throw err;
+      }
+      if (Array.isArray(when.and) && when.and.length > 0) {
+        return when.and.map(predToSql).join(" AND ");
+      }
+      return predToSql(when);
+    };
+
+    const caseParts = branchesIn.map((b) => {
+      const whenSql = whenToSql(b?.when);
+      const label = String(b?.thenLabel ?? "").trim();
+      if (!label || label.length > 200) {
+        const err = new Error("band THEN label is required (max 200 chars)");
+        err.code = "BAD_REQUEST";
+        throw err;
+      }
+      const esc = label.replace(/'/g, "''");
+      return `WHEN ${whenSql} THEN '${esc}'`;
+    });
+
+    return `CASE ${caseParts.join(" ")} ELSE NULL END`;
+  };
+
   // Aggregates
   if (aggregate === "sum") {
     if (equation && typeof equation === "object" && equation.enabled && equation.root) {
@@ -592,6 +680,11 @@ function buildSelectExpression(opts) {
   if (aggregate === "count_distinct") {
     const base = `COUNT(DISTINCT ${colRef(column)})`;
     return { innerSql: base, isAggregate: true };
+  }
+
+  // Non-aggregate band labels → CASE WHEN … THEN 'label' (VARCHAR GROUP BY key)
+  if (!aggregate && bandCase && typeof bandCase === "object" && bandCase.enabled) {
+    return { innerSql: buildBandCaseLabelSql(bandCase, colRef), isAggregate: false };
   }
 
   // Non-aggregate IF/ELSE → CASE (one output DOUBLE per source row; no implicit SUM)
@@ -895,6 +988,7 @@ function buildComposeAthenaSelectSqlInner({
       numberScale: row.numberScale || null,
       decimals: row.decimals != null ? Number(row.decimals) : null,
       sumCase: row.sumCase || null,
+      bandCase: row.bandCase || null,
       equation: row.equation || null,
       baseAlias: rowBaseAlias,
       kalshiMaterializedVirtuals: rowKalshiMat,

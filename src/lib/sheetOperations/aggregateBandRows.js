@@ -99,16 +99,32 @@ export function aggregateBandRows(rows, rawConfig) {
 
   const aggregated = aggregateBucketRows(labeled, {
     bucketColumn: bandOutputColumn,
-    bucketOutputColumn,
+    bucketOutputColumn: bandOutputColumn,
     bucketMode: "category",
     groupByColumns: config.groupByColumns,
     passthroughColumns: config.passthroughColumns,
     aggregations: config.aggregations,
   });
 
-  // Preserve configured band order; include empty bands when there is no extra group-by.
+  return zeroFillBandAggregateRows(aggregated, config);
+}
+
+/**
+ * Ensure every configured band appears (zeros for empty), preserving band order.
+ * Used after Athena CASE+GROUP BY (which omits empty groups) and after client aggregate.
+ *
+ * @param {object[]} aggregatedRows
+ * @param {object} rawConfig
+ * @returns {object[]}
+ */
+export function zeroFillBandAggregateRows(aggregatedRows, rawConfig) {
+  const config = normalizeBandsConfig(rawConfig);
+  const bandColumn = String(config.bandColumn || "").trim();
+  const bandOutputColumn = String(config.bandOutputColumn || "band").trim() || "band";
+  const bands = Array.isArray(config.bands) ? config.bands : [];
   const groupBy = Array.isArray(config.groupByColumns) ? config.groupByColumns.filter(Boolean) : [];
-  if (groupBy.length) return aggregated;
+  const aggregated = Array.isArray(aggregatedRows) ? aggregatedRows : [];
+  if (!bands.length || groupBy.length) return aggregated;
 
   const byLabel = new Map();
   for (const row of aggregated) {

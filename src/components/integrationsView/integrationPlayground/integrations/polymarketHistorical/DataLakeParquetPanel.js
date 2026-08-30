@@ -146,9 +146,14 @@ import { applyResearchBucketingToRows } from "@/lib/hubs/applyResearchBucketingT
 import {
   clearPendingResearchBucketing,
   ensurePendingResearchBucketing,
+  markPendingResearchBucketingAthenaCompiled,
   peekPendingResearchBucketing,
   takePendingResearchBucketing,
 } from "@/lib/hubs/pendingResearchBucketing";
+import {
+  canCompileBandsConfigToAthena,
+  compileBandsConfigToCompose,
+} from "@/lib/sheetOperations/compileBandsConfigToCompose";
 
 /** Shown in the column picker / compose cards for server-computed Kalshi fields. */
 const KALSHI_VIRTUAL_COMPOSE_LABELS = {
@@ -1327,19 +1332,38 @@ export default function DataLakeParquetPanel({
   }, [columnComposeItems]);
 
   const buildServerComposePayload = useCallback(() => {
+    ensurePendingResearchBucketing();
+    const pendingBanding = peekPendingResearchBucketing();
+    let items = columnComposeItems;
+    let athenaBands = false;
+    if (
+      pendingBanding?.enabled &&
+      pendingBanding.config &&
+      canCompileBandsConfigToAthena(pendingBanding.config)
+    ) {
+      const compiled = compileBandsConfigToCompose(pendingBanding.config);
+      if (compiled?.columnComposeItems?.length) {
+        items = compiled.columnComposeItems;
+        athenaBands = true;
+      }
+    }
+    markPendingResearchBucketingAthenaCompiled(athenaBands);
+
     return buildDataLakeServerComposePayload({
-      columnComposeItems,
-      columnComposeOrderBy,
-      composeHavingFilters,
+      columnComposeItems: items,
+      columnComposeOrderBy: athenaBands ? [] : columnComposeOrderBy,
+      composeHavingFilters: athenaBands ? [] : composeHavingFilters,
       composeJoins,
-      hasComposeAggregates,
+      hasComposeAggregates: athenaBands
+        ? items.some((i) => i.aggregate != null)
+        : hasComposeAggregates,
       composeDimensionAliases,
       dataset,
       selectedTable: selected?.table,
       kalshiTradesJoinPreset,
       kalshiTradesJoinPresets: KALSHI_TRADES_JOIN_PRESETS,
       composeLimitScope,
-      randomSampleEnabled: !!randomSampleEnabled,
+      randomSampleEnabled: athenaBands ? false : !!randomSampleEnabled,
       randomSampleSize,
     });
   }, [
@@ -1514,7 +1538,9 @@ export default function DataLakeParquetPanel({
     if (!pending?.enabled || !pending.config) {
       return { rows: source, sheetName: "", applied: false };
     }
-    const result = applyResearchBucketingToRows(source, pending.config);
+    const result = applyResearchBucketingToRows(source, pending.config, {
+      athenaCompiled: !!pending.athenaCompiled,
+    });
     if (!result.applied) {
       return { rows: source, sheetName: "", applied: false };
     }
@@ -1527,9 +1553,15 @@ export default function DataLakeParquetPanel({
       outCount: result.rows.length,
     };
     const modeLabel = result.mode === "bands" ? "Bands" : "Buckets";
-    toast.success(
-      `${modeLabel}: ${result.rows.length.toLocaleString()} row${result.rows.length === 1 ? "" : "s"} from ${source.length.toLocaleString()} pulled.`,
-    );
+    if (pending.athenaCompiled && result.mode === "bands") {
+      toast.success(
+        `${modeLabel} (Athena): ${result.rows.length.toLocaleString()} row${result.rows.length === 1 ? "" : "s"}.`,
+      );
+    } else {
+      toast.success(
+        `${modeLabel}: ${result.rows.length.toLocaleString()} row${result.rows.length === 1 ? "" : "s"} from ${source.length.toLocaleString()} pulled.`,
+      );
+    }
     return {
       rows: result.rows,
       sheetName: result.sheetName || "",

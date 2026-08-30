@@ -706,6 +706,125 @@ export function validateAthenaLakeQueryBody(body, access) {
         }
       }
 
+      /** @type {null | { enabled: true; branches: Array<{ when: any; thenLabel: string }> }} */
+      let normalizedBandCase = null;
+      if (aggregate == null && row.bandCase != null) {
+        if (typeof row.bandCase !== "object" || Array.isArray(row.bandCase)) {
+          throw new AthenaLakeRequestError("compose.select.bandCase must be an object", {
+            statusCode: 400,
+            code: "BAD_REQUEST",
+          });
+        }
+        if (row.bandCase.enabled === true) {
+          if (normalizedSumCase) {
+            throw new AthenaLakeRequestError("Only one of sumCase or bandCase may be enabled on a select item", {
+              statusCode: 400,
+              code: "BAD_REQUEST",
+            });
+          }
+          if (!isNumericHiveType(colType)) {
+            throw new AthenaLakeRequestError("bandCase requires a numeric source column", {
+              statusCode: 400,
+              code: "BAD_REQUEST",
+            });
+          }
+          const branchesIn = Array.isArray(row.bandCase.branches) ? row.bandCase.branches : [];
+          if (!branchesIn.length) {
+            throw new AthenaLakeRequestError("bandCase requires at least one branch", {
+              statusCode: 400,
+              code: "BAD_REQUEST",
+            });
+          }
+          if (branchesIn.length > 64) {
+            throw new AthenaLakeRequestError("bandCase supports at most 64 branches", {
+              statusCode: 400,
+              code: "BAD_REQUEST",
+            });
+          }
+
+          const normalizePred = (pred) => {
+            if (!pred || typeof pred !== "object" || Array.isArray(pred)) {
+              throw new AthenaLakeRequestError("bandCase WHEN predicate must be an object", {
+                statusCode: 400,
+                code: "BAD_REQUEST",
+              });
+            }
+            const whenColumn = String(pred.column || "").trim();
+            if (!whenColumn || !allowed.has(whenColumn)) {
+              throw new AthenaLakeRequestError("bandCase WHEN column must be a valid column", {
+                statusCode: 400,
+                code: "BAD_REQUEST",
+              });
+            }
+            const whenType = columnHiveTypeForLakeTable(lake, table, whenColumn);
+            if (!isNumericHiveType(whenType)) {
+              throw new AthenaLakeRequestError("bandCase WHEN column must be numeric", {
+                statusCode: 400,
+                code: "BAD_REQUEST",
+              });
+            }
+            const opRaw = String(pred.op || "").toLowerCase().trim();
+            if (!["eq", "neq", "gt", "gte", "lt", "lte"].includes(opRaw)) {
+              throw new AthenaLakeRequestError(`Invalid bandCase WHEN operator: ${opRaw}`, {
+                statusCode: 400,
+                code: "BAD_REQUEST",
+              });
+            }
+            const n = Number(pred.value);
+            if (!Number.isFinite(n)) {
+              throw new AthenaLakeRequestError("bandCase WHEN value must be a number", {
+                statusCode: 400,
+                code: "BAD_REQUEST",
+              });
+            }
+            return { column: whenColumn, op: opRaw, value: n };
+          };
+
+          const normBranches = [];
+          for (const b of branchesIn) {
+            if (!b || typeof b !== "object") {
+              throw new AthenaLakeRequestError("Invalid bandCase branch", { statusCode: 400, code: "BAD_REQUEST" });
+            }
+            const when = b.when;
+            if (!when || typeof when !== "object" || Array.isArray(when)) {
+              throw new AthenaLakeRequestError("bandCase branch.when must be an object", {
+                statusCode: 400,
+                code: "BAD_REQUEST",
+              });
+            }
+            let normalizedWhen;
+            if (Array.isArray(when.and)) {
+              if (!when.and.length || when.and.length > 8) {
+                throw new AthenaLakeRequestError("bandCase when.and must have 1–8 predicates", {
+                  statusCode: 400,
+                  code: "BAD_REQUEST",
+                });
+              }
+              normalizedWhen = { and: when.and.map(normalizePred) };
+            } else {
+              normalizedWhen = normalizePred(when);
+            }
+            const thenLabel = String(b.thenLabel ?? "").trim();
+            if (!thenLabel || thenLabel.length > 200) {
+              throw new AthenaLakeRequestError("bandCase thenLabel is required (max 200 chars)", {
+                statusCode: 400,
+                code: "BAD_REQUEST",
+              });
+            }
+            normBranches.push({ when: normalizedWhen, thenLabel });
+          }
+          normalizedBandCase = { enabled: true, branches: normBranches };
+        }
+      } else if (row.bandCase != null && aggregate != null) {
+        const bcEnabled = row.bandCase && typeof row.bandCase === "object" && row.bandCase.enabled === true;
+        if (bcEnabled) {
+          throw new AthenaLakeRequestError("bandCase is only supported on non-aggregate select items", {
+            statusCode: 400,
+            code: "BAD_REQUEST",
+          });
+        }
+      }
+
       /** @type {null | { enabled: true; agg: "sum"; root: any }} */
       let normalizedEquation = null;
       if (aggregate === "sum" && row.equation != null) {
@@ -799,7 +918,8 @@ export function validateAthenaLakeQueryBody(body, access) {
         });
       }
 
-      const caseOnlyDimension = aggregate == null && normalizedSumCase?.enabled === true;
+      const caseOnlyDimension =
+        aggregate == null && (normalizedSumCase?.enabled === true || normalizedBandCase?.enabled === true);
       if (normalizedSumCase?.enabled && (dateBucket || dateFormat || stringBucket || numberBucket != null)) {
         throw new AthenaLakeRequestError("Do not combine if/else CASE with date bucket/format on the same row", {
           statusCode: 400,
@@ -844,6 +964,13 @@ export function validateAthenaLakeQueryBody(body, access) {
         });
       }
 
+      if (normalizedBandCase && (dateBucket || dateFormat || stringBucket || numberBucket != null || treatAsDate)) {
+        throw new AthenaLakeRequestError("bandCase cannot be combined with date/string/number buckets", {
+          statusCode: 400,
+          code: "BAD_REQUEST",
+        });
+      }
+
       normalizedSelect.push({
         column,
         ...(sourceTable ? { sourceTable } : {}),
@@ -858,6 +985,7 @@ export function validateAthenaLakeQueryBody(body, access) {
         treatAsDate,
         columnType: colType,
         ...(normalizedSumCase ? { sumCase: normalizedSumCase } : {}),
+        ...(normalizedBandCase ? { bandCase: normalizedBandCase } : {}),
         ...(normalizedEquation ? { equation: normalizedEquation } : {}),
       });
     }

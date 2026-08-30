@@ -211,6 +211,7 @@ export function isComposeGroupByKeyRow(row) {
   if (!row || row.aggregate != null || isComposePullExcludedRow(row)) return false;
   if (hasColumnGrouping(row)) return true;
   if (row.sumCase?.enabled) return true;
+  if (row.bandCase?.enabled) return true;
   return false;
 }
 

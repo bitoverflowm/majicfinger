@@ -1,7 +1,7 @@
 /**
  * Research-tool Bands config (custom mutually exclusive ranges).
- * Applied as a post-pull pass over the query result (same family as sheet bucketing),
- * not pushed into Athena SQL compose — keeps historical + live paths consistent.
+ * Prefer Athena CASE + GROUP BY via compileBandsConfigToCompose when possible;
+ * otherwise applied as a post-pull pass (live paths / unsupported aggs).
  */
 
 const DEFAULT_AGGREGATIONS = [
