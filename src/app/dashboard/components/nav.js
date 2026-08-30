@@ -34,7 +34,7 @@ import {
   workspaceHasUnsavedProgress,
 } from "@/lib/resetProjectWorkspaceState"
 import { clearHubQueryDraft } from "@/lib/hubs/hubQueryDraft"
-import { clearPendingResearchBucketing } from "@/lib/hubs/pendingResearchBucketing"
+import { clearResearchBucketingSticky } from "@/lib/hubs/pendingResearchBucketing"
 import {
   persistChartDashboardDraft,
   mergeCreatedChartDashboardDraft,
@@ -587,7 +587,7 @@ const Nav = () => {
   };
 
   const performClearWorkspace = () => {
-    clearPendingResearchBucketing();
+    clearResearchBucketingSticky();
     clearHubQueryDraft();
     performNewProjectWipe("Workspace cleared. You can start fresh.");
   };

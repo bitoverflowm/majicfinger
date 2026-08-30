@@ -97,6 +97,8 @@ export function ConnectHomeAnalyzeSection({
           progressLabel={pull.label}
           progressPct={pull.progress ?? 0}
           onViewDataTable={() => ctx.connectLargePullApplyRef?.current?.()}
+          suppressRawBrowse={!!largePullView.suppressRawBrowse}
+          researchCollapseMode={largePullView.researchCollapseMode || null}
           className="mb-4 shrink-0"
         />
       ) : null}

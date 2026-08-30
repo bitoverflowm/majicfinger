@@ -20,12 +20,14 @@ const panelShellClass =
  *   columns: string[];
  *   rows: string[][];
  *   rowCount: number;
- *   parseStatus: "downloading" | "raw" | "parsing" | "ready" | "error";
+ *   parseStatus: "downloading" | "raw" | "parsing" | "ready" | "error" | "research_collapse";
  *   parsedProgress?: { processed: number; total: number };
  *   parseError?: string | null;
  *   progressLabel?: string;
  *   progressPct?: number;
  *   onViewDataTable?: () => void;
+ *   suppressRawBrowse?: boolean;
+ *   researchCollapseMode?: "buckets" | "bands" | null;
  *   className?: string;
  * }} props
  */
@@ -39,6 +41,8 @@ export function LargeAthenaPullPanel({
   progressLabel = "",
   progressPct = 0,
   onViewDataTable,
+  suppressRawBrowse = false,
+  researchCollapseMode = null,
   className = "",
 }) {
   const [visibleRows, setVisibleRows] = useState(JSON_INITIAL_ROWS);
@@ -80,28 +84,41 @@ export function LargeAthenaPullPanel({
 
   const tableReady = parseStatus === "ready";
   const isDownloading = parseStatus === "downloading";
-  const tableParsing = parseStatus === "parsing" || parseStatus === "raw";
-  const hasRawRows = Array.isArray(rows) && rows.length > 0;
+  const researchCollapse =
+    suppressRawBrowse || parseStatus === "research_collapse";
+  const collapseNoun = researchCollapseMode === "bands" ? "bands" : "buckets";
+  const tableParsing =
+    parseStatus === "parsing" || parseStatus === "raw" || parseStatus === "research_collapse";
+  const hasRawRows = !researchCollapse && Array.isArray(rows) && rows.length > 0;
   const parsePct =
     parsedProgress?.total > 0
       ? Math.round((parsedProgress.processed / parsedProgress.total) * 100)
       : 0;
 
-  if (isDownloading) {
+  if (isDownloading || (researchCollapse && !tableReady && parseStatus !== "error")) {
     return (
       <div className={`${panelShellClass} ${className}`}>
         <div className="space-y-0.5">
           <p className="text-sm font-medium text-foreground">
-            Large result expected
-            {rowCount > 0 ? ` — up to ${rowCount.toLocaleString()} rows` : ""}
+            {researchCollapse
+              ? `Pulling data for ${collapseNoun}`
+              : "Large result expected"}
+            {rowCount > 0 ? ` — ${rowCount.toLocaleString()} matching rows` : ""}
           </p>
           <p className="text-[11px] text-muted-foreground leading-snug">
-            Athena finished. Downloading rows — JSON browse will appear as soon as data arrives in the browser.
+            {researchCollapse
+              ? `Working through the full query result in the background, then collapsing to your ${collapseNoun} output. The sheet will show only the aggregated rows — not the raw pull.`
+              : "Athena finished. Downloading rows — JSON browse will appear as soon as data arrives in the browser."}
           </p>
         </div>
         <ConnectProgressWithLabel
-          label={progressLabel || "Downloading rows from Athena…"}
-          progress={Math.max(progressPct, 15)}
+          label={
+            progressLabel ||
+            (researchCollapse
+              ? `Downloading rows for ${collapseNoun}…`
+              : "Downloading rows from Athena…")
+          }
+          progress={Math.max(progressPct, researchCollapse ? 12 : 15)}
           className="w-full min-w-0"
         />
       </div>

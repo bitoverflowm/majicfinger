@@ -145,6 +145,7 @@ import { trackDataPullComplete, trackDataPullError, trackDataPullStart } from "@
 import { applyResearchBucketingToRows } from "@/lib/hubs/applyResearchBucketingToRows";
 import {
   clearPendingResearchBucketing,
+  ensurePendingResearchBucketing,
   peekPendingResearchBucketing,
   takePendingResearchBucketing,
 } from "@/lib/hubs/pendingResearchBucketing";
@@ -795,6 +796,8 @@ export default function DataLakeParquetPanel({
       parseStatus: largePull.parseStatus || "downloading",
       parsedProgress: largePull.parsedProgress || { processed: 0, total: 0 },
       parseError: largePull.parseError ?? null,
+      suppressRawBrowse: !!largePull.suppressRawBrowse,
+      researchCollapseMode: largePull.researchCollapseMode || null,
     };
     setConnectDataLakePullState((prev) => {
       const cur = prev.largePullView;
@@ -803,7 +806,8 @@ export default function DataLakeParquetPanel({
         cur.parseStatus === view.parseStatus &&
         cur.rowCount === view.rowCount &&
         cur.rows?.length === view.rows?.length &&
-        cur.parsedProgress?.processed === view.parsedProgress?.processed
+        cur.parsedProgress?.processed === view.parsedProgress?.processed &&
+        !!cur.suppressRawBrowse === view.suppressRawBrowse
       ) {
         return prev;
       }
@@ -1500,6 +1504,7 @@ export default function DataLakeParquetPanel({
   }, []);
 
   /** Collapse pulled rows via research Buckets/Bands once per pull (if pending). */
+  const lastResearchBandingMetaRef = useRef(null);
   const collapseResearchBucketingRows = useCallback((rows) => {
     const source = Array.isArray(rows) ? rows : [];
     if (researchBucketingAppliedRef.current) {
@@ -1515,6 +1520,12 @@ export default function DataLakeParquetPanel({
     }
     takePendingResearchBucketing();
     researchBucketingAppliedRef.current = true;
+    lastResearchBandingMetaRef.current = {
+      sheetName: result.sheetName || "",
+      mode: result.mode,
+      sourceCount: source.length,
+      outCount: result.rows.length,
+    };
     const modeLabel = result.mode === "bands" ? "Bands" : "Buckets";
     toast.success(
       `${modeLabel}: ${result.rows.length.toLocaleString()} row${result.rows.length === 1 ? "" : "s"} from ${source.length.toLocaleString()} pulled.`,
@@ -1533,6 +1544,11 @@ export default function DataLakeParquetPanel({
       let outExtras = extras && typeof extras === "object" ? { ...extras } : {};
       if (collapsed.sheetName) {
         outExtras.name = String(collapsed.sheetName).slice(0, 80);
+      } else if (
+        researchBucketingAppliedRef.current &&
+        lastResearchBandingMetaRef.current?.sheetName
+      ) {
+        outExtras.name = String(lastResearchBandingMetaRef.current.sheetName).slice(0, 80);
       }
       if (collapsed.applied) {
         setLastRowCount(outRows.length);
@@ -1616,13 +1632,16 @@ export default function DataLakeParquetPanel({
   const beginLargePullIngest = useCallback(
     async (ingestResult, pendingApply, signal, tableName = "markets") => {
       const n = ingestResult.rowCount ?? ingestResult.rawRows?.length ?? 0;
+      const willCollapseResearch = !!pullUiRef.current?.researchCollapse;
+      const researchMode =
+        pullUiRef.current?.researchCollapseMode === "bands" ? "bands" : "buckets";
       largePullHandoffRef.current = true;
       flushSync(() => {
         setLargePull({
-          columns: ingestResult.rawColumns || [],
-          rows: ingestResult.rawRows || [],
+          columns: willCollapseResearch ? [] : ingestResult.rawColumns || [],
+          rows: willCollapseResearch ? [] : ingestResult.rawRows || [],
           rowCount: n,
-          parseStatus: "parsing",
+          parseStatus: willCollapseResearch ? "research_collapse" : "parsing",
           parsedProgress: { processed: 0, total: n },
           parsedRows: null,
           parseError: null,
@@ -1631,14 +1650,21 @@ export default function DataLakeParquetPanel({
           kalshiIngestExtras: ingestResult.kalshiIngestExtras ?? null,
           primaryJoinExpanded: ingestResult.primaryJoinExpanded,
           expandedJoinRowCap: ingestResult.expandedJoinRowCap,
+          suppressRawBrowse: willCollapseResearch,
+          researchCollapseMode: willCollapseResearch ? researchMode : null,
         });
         setLoading(false);
-        setLoadLabel(`${n.toLocaleString()} rows in memory — preparing data table…`);
+        const startLabel = willCollapseResearch
+          ? `${n.toLocaleString()} matching rows in memory — preparing ${researchMode === "bands" ? "bands" : "buckets"}…`
+          : `${n.toLocaleString()} rows in memory — preparing data table…`;
+        setLoadLabel(startLabel);
         setLoadProgress(28);
       });
       syncConnectPullState({
         loading: true,
-        label: `${n.toLocaleString()} rows in memory — preparing data table…`,
+        label: willCollapseResearch
+          ? `${n.toLocaleString()} matching rows in memory — preparing ${researchMode === "bands" ? "bands" : "buckets"}…`
+          : `${n.toLocaleString()} rows in memory — preparing data table…`,
         progress: 28,
       });
       await yieldToUi();
@@ -1650,12 +1676,21 @@ export default function DataLakeParquetPanel({
           signal,
           onProgress: ({ processed, total }) => {
             const pct = total > 0 ? Math.round((processed / total) * 100) : 0;
-            const label = `Preparing data table… ${processed.toLocaleString()} / ${total.toLocaleString()} rows (${pct}%)`;
+            const label = willCollapseResearch
+              ? `Reading pulled rows for ${researchMode === "bands" ? "bands" : "buckets"}… ${processed.toLocaleString()} / ${total.toLocaleString()} (${pct}%)`
+              : `Preparing data table… ${processed.toLocaleString()} / ${total.toLocaleString()} rows (${pct}%)`;
             setLoadLabel(label);
-            setLoadProgress(28 + pct * 0.65);
-            syncConnectPullState({ loading: true, label, progress: 28 + pct * 0.65 });
+            setLoadProgress(28 + pct * 0.55);
+            syncConnectPullState({ loading: true, label, progress: 28 + pct * 0.55 });
             setLargePull((prev) =>
-              prev ? { ...prev, parsedProgress: { processed, total }, parseStatus: "parsing" } : prev,
+              prev
+                ? {
+                    ...prev,
+                    parsedProgress: { processed, total },
+                    parseStatus: willCollapseResearch ? "research_collapse" : "parsing",
+                    suppressRawBrowse: willCollapseResearch,
+                  }
+                : prev,
             );
           },
         });
@@ -1667,56 +1702,90 @@ export default function DataLakeParquetPanel({
           tableName,
         );
 
-        ingestParsedObjectsAsView({
-          dataset,
-          sampleId: ingestResult.sampleId,
-          columns: ingestResult.rawColumns,
-          objects,
-        });
+        if (willCollapseResearch) {
+          const applyLabel = `Applying ${researchMode === "bands" ? "bands" : "buckets"} across ${objects.length.toLocaleString()} rows…`;
+          setLoadLabel(applyLabel);
+          setLoadProgress(90);
+          syncConnectPullState({ loading: true, label: applyLabel, progress: 90 });
+          await yieldToUi();
+        }
 
-        setLargePull((prev) =>
-          prev
-            ? {
-                ...prev,
-                parseStatus: "ready",
-                parsedRows: objects,
-                parsedProgress: { processed: objects.length, total: objects.length },
-              }
-            : prev,
-        );
+        const collapsed = collapseResearchBucketingRows(objects);
+        const presentRows = collapsed.applied ? collapsed.rows : objects;
+        const presentCount = presentRows.length;
 
-        const readyView = {
-          columns: ingestResult.rawColumns || [],
-          rows: ingestResult.rawRows || [],
-          rowCount: objects.length,
-          parseStatus: "ready",
-          parsedProgress: { processed: objects.length, total: objects.length },
-          parseError: null,
-        };
-        pushConnectLargePullView(readyView);
-
-        setLoadLabel(`Data table ready — ${objects.length.toLocaleString()} rows`);
-        setLoadProgress(100);
-
-        if (connectHomeDataLakeCompose && pendingApply) {
-          finalizeIngestSheetRows(objects, objects.length, (finalRows, n) => {
-            pendingApply.onApply?.(finalRows, n);
+        if (!collapsed.applied) {
+          ingestParsedObjectsAsView({
+            dataset,
+            sampleId: ingestResult.sampleId,
+            columns: ingestResult.rawColumns,
+            objects,
           });
-          syncConnectPullState({
-            loading: false,
-            label: `Loaded ${objects.length.toLocaleString()} rows`,
-            progress: 100,
-            error: null,
-          });
-          toast.success(`Loaded ${objects.length.toLocaleString()} rows into your sheet`);
+
+          setLargePull((prev) =>
+            prev
+              ? {
+                  ...prev,
+                  parseStatus: "ready",
+                  parsedRows: objects,
+                  parsedProgress: { processed: objects.length, total: objects.length },
+                  suppressRawBrowse: false,
+                }
+              : prev,
+          );
+
+          const readyView = {
+            columns: ingestResult.rawColumns || [],
+            rows: ingestResult.rawRows || [],
+            rowCount: objects.length,
+            parseStatus: "ready",
+            parsedProgress: { processed: objects.length, total: objects.length },
+            parseError: null,
+          };
+          pushConnectLargePullView(readyView);
+
+          setLoadLabel(`Data table ready — ${objects.length.toLocaleString()} rows`);
+          setLoadProgress(100);
+
+          if (connectHomeDataLakeCompose && pendingApply) {
+            finalizeIngestSheetRows(objects, objects.length, (finalRows, n) => {
+              pendingApply.onApply?.(finalRows, n);
+            });
+            syncConnectPullState({
+              loading: false,
+              label: `Loaded ${objects.length.toLocaleString()} rows`,
+              progress: 100,
+              error: null,
+            });
+            toast.success(`Loaded ${objects.length.toLocaleString()} rows into your sheet`);
+          } else {
+            syncConnectPullState({
+              loading: false,
+              label: `Data table ready — ${objects.length.toLocaleString()} rows`,
+              progress: 100,
+              error: null,
+            });
+            toast.success(`Data table ready — ${objects.length.toLocaleString()} rows`);
+          }
         } else {
+          // Research Buckets/Bands: never flash the raw multi-thousand-row JSON browse.
+          resetLargePullState();
+          setLoadLabel(
+            `${researchMode === "bands" ? "Bands" : "Buckets"} ready — ${presentCount.toLocaleString()} row${presentCount === 1 ? "" : "s"}`,
+          );
+          setLoadProgress(100);
+
+          if (pendingApply) {
+            finalizeIngestSheetRows(presentRows, presentCount, (finalRows, n) => {
+              pendingApply.onApply?.(finalRows, n);
+            });
+          }
           syncConnectPullState({
             loading: false,
-            label: `Data table ready — ${objects.length.toLocaleString()} rows`,
+            label: `Loaded ${presentCount.toLocaleString()} ${researchMode === "bands" ? "band" : "bucket"} row${presentCount === 1 ? "" : "s"}`,
             progress: 100,
             error: null,
           });
-          toast.success(`Data table ready — ${objects.length.toLocaleString()} rows`);
         }
       } catch (e) {
         if (e?.name === "AbortError") throw e;
@@ -1730,18 +1799,26 @@ export default function DataLakeParquetPanel({
     },
     [
       applyKalshiTaxonomyRollupIfNeeded,
+      collapseResearchBucketingRows,
       connectHomeDataLakeCompose,
       dataset,
       finalizeIngestSheetRows,
       pushConnectLargePullView,
+      resetLargePullState,
       syncConnectPullState,
     ],
   );
 
   const handleAthenaPullPhase = useCallback(
     (info) => {
+      const researchCollapseActive = !!pullUiRef.current?.researchCollapse;
+      const collapseMode = pullUiRef.current?.researchCollapseMode === "bands" ? "bands" : "buckets";
+      const collapseNoun = collapseMode === "bands" ? "bands" : "buckets";
+
       if (info?.phase === "polling") {
-        const label = "Querying the lake API (Athena)…";
+        const label = researchCollapseActive
+          ? `Querying the lake for ${collapseNoun}…`
+          : "Querying the lake API (Athena)…";
         setLoadLabel(label);
         setLoadProgress(10);
         syncConnectPullState({ loading: true, label, progress: 10 });
@@ -1749,8 +1826,11 @@ export default function DataLakeParquetPanel({
       }
       if (info?.phase === "athena_succeeded") {
         const expected = info.rowLimit ?? info.expandedJoinRowCap;
-        const label =
-          expected != null
+        const label = researchCollapseActive
+          ? expected != null
+            ? `Athena complete — downloading up to ${Number(expected).toLocaleString()} rows to apply ${collapseNoun}…`
+            : `Athena complete — downloading rows to apply ${collapseNoun}…`
+          : expected != null
             ? `Athena complete — downloading up to ${Number(expected).toLocaleString()} rows…`
             : "Athena complete — downloading results…";
         setLoadLabel(label);
@@ -1765,6 +1845,8 @@ export default function DataLakeParquetPanel({
             parseStatus: "downloading",
             parsedProgress: { processed: 0, total: Number(expected) || 0 },
             parseError: null,
+            suppressRawBrowse: researchCollapseActive,
+            researchCollapseMode: researchCollapseActive ? collapseMode : null,
           };
           flushSync(() => {
             setLargePull({
@@ -1792,8 +1874,11 @@ export default function DataLakeParquetPanel({
         const processed = info.processed ?? 0;
         const total = info.total ?? info.rowLimit ?? processed;
         const pct = total > 0 ? Math.round((processed / total) * 100) : 0;
-        const label =
-          total > 0
+        const label = researchCollapseActive
+          ? total > 0
+            ? `Downloading rows for ${collapseNoun}… ${processed.toLocaleString()} / ${total.toLocaleString()} (${pct}%)`
+            : `Downloading rows for ${collapseNoun}… ${processed.toLocaleString()}`
+          : total > 0
             ? `Downloading rows… ${processed.toLocaleString()} / ${total.toLocaleString()} (${pct}%)`
             : `Downloading rows… ${processed.toLocaleString()}`;
         const progress = 18 + (total > 0 ? Math.min(6, (processed / total) * 6) : 1);
@@ -1804,14 +1889,28 @@ export default function DataLakeParquetPanel({
         const cols = info.columns;
         if (Array.isArray(accumulated)) {
           largePullHandoffRef.current = true;
-          const pageView = {
-            columns: cols?.length ? cols : [],
-            rows: accumulated,
-            rowCount: total > 0 ? total : processed,
-            parseStatus: processed > 0 ? "raw" : "downloading",
-            parsedProgress: { processed, total: total > 0 ? total : processed },
-            parseError: null,
-          };
+          // When bands/buckets will collapse the result, never stream raw JSON into the UI.
+          const pageView = researchCollapseActive
+            ? {
+                columns: [],
+                rows: [],
+                rowCount: total > 0 ? total : processed,
+                parseStatus: "downloading",
+                parsedProgress: { processed, total: total > 0 ? total : processed },
+                parseError: null,
+                suppressRawBrowse: true,
+                researchCollapseMode: collapseMode,
+              }
+            : {
+                columns: cols?.length ? cols : [],
+                rows: accumulated,
+                rowCount: total > 0 ? total : processed,
+                parseStatus: processed > 0 ? "raw" : "downloading",
+                parsedProgress: { processed, total: total > 0 ? total : processed },
+                parseError: null,
+                suppressRawBrowse: false,
+                researchCollapseMode: null,
+              };
           setLargePull((prev) => ({
             ...pageView,
             columns: pageView.columns.length ? pageView.columns : prev?.columns || [],
@@ -1825,14 +1924,16 @@ export default function DataLakeParquetPanel({
           }));
           pushConnectLargePullView({
             ...pageView,
-            columns: cols?.length ? cols : [],
+            columns: pageView.columns,
             rowCount: total > 0 ? total : processed,
           });
         }
         return;
       }
       if (info?.phase === "parsing_response") {
-        const label = "Receiving rows — parsing response in browser…";
+        const label = researchCollapseActive
+          ? `Receiving rows — preparing to apply ${collapseNoun}…`
+          : "Receiving rows — parsing response in browser…";
         setLoadLabel(label);
         setLoadProgress(22);
         syncConnectPullState({ loading: true, label, progress: 22 });
@@ -1840,7 +1941,9 @@ export default function DataLakeParquetPanel({
       }
       if (info?.phase === "download_complete") {
         const n = info.rowCount ?? 0;
-        const label = `${Number(n).toLocaleString()} rows received — loading JSON view…`;
+        const label = researchCollapseActive
+          ? `${Number(n).toLocaleString()} rows received — applying ${collapseNoun} next…`
+          : `${Number(n).toLocaleString()} rows received — loading JSON view…`;
         setLoadLabel(label);
         setLoadProgress(24);
         syncConnectPullState({ loading: true, label, progress: 24 });
@@ -1892,6 +1995,8 @@ export default function DataLakeParquetPanel({
         progressLabel={loadLabel}
         progressPct={loadProgress}
         onViewDataTable={handleLargePullViewDataTable}
+        suppressRawBrowse={!!largePull.suppressRawBrowse}
+        researchCollapseMode={largePull.researchCollapseMode || null}
         className="mt-2"
       />
     ) : null;
@@ -2295,13 +2400,25 @@ export default function DataLakeParquetPanel({
     const signal = ingestAbort.signal;
     pullInFlightRef.current = true;
     researchBucketingAppliedRef.current = false;
+    lastResearchBandingMetaRef.current = null;
+    ensurePendingResearchBucketing();
+    const pendingBanding = peekPendingResearchBucketing();
+    const researchCollapse = !!(pendingBanding?.enabled && pendingBanding.config);
+    const researchCollapseMode =
+      pendingBanding?.config?.activeMode === "bands" ? "bands" : "buckets";
     setLoading(true);
-    setLoadLabel(PARQUET_LOAD_PHASE_MESSAGES[0].text);
+    setLoadLabel(
+      researchCollapse
+        ? `Preparing pull for ${researchCollapseMode === "bands" ? "bands" : "buckets"}…`
+        : PARQUET_LOAD_PHASE_MESSAGES[0].text,
+    );
     setLoadProgress(5);
     syncConnectPullState({
       loading: true,
       error: null,
-      label: PARQUET_LOAD_PHASE_MESSAGES[0].text,
+      label: researchCollapse
+        ? `Preparing pull for ${researchCollapseMode === "bands" ? "bands" : "buckets"}…`
+        : PARQUET_LOAD_PHASE_MESSAGES[0].text,
       progress: 5,
     });
     if (connectHomeDataLakeCompose && mode === "columns" && requestCard && activeSheetId && setDataSheets) {
@@ -2346,6 +2463,8 @@ export default function DataLakeParquetPanel({
       sampleId: `${sid}-compose`,
       kalshiIngestExtras,
       pendingApply,
+      researchCollapse,
+      researchCollapseMode,
       beginLargePull: (ingestResult) => {
         void beginLargePullIngest(ingestResult, pendingApply, signal, table);
       },
@@ -2531,6 +2650,8 @@ export default function DataLakeParquetPanel({
       sampleId: `${sid}-compose`,
       kalshiIngestExtras,
       pendingApply: pendingApplyAppend,
+      researchCollapse: false,
+      researchCollapseMode: null,
       beginLargePull: (ingestResult) => {
         void beginLargePullIngest(ingestResult, pendingApplyAppend, signal, table);
       },
@@ -2648,13 +2769,25 @@ export default function DataLakeParquetPanel({
     const signal = ingestAbort.signal;
     pullInFlightRef.current = true;
     researchBucketingAppliedRef.current = false;
+    lastResearchBandingMetaRef.current = null;
+    ensurePendingResearchBucketing();
+    const pendingBandingNew = peekPendingResearchBucketing();
+    const researchCollapseNew = !!(pendingBandingNew?.enabled && pendingBandingNew.config);
+    const researchCollapseModeNew =
+      pendingBandingNew?.config?.activeMode === "bands" ? "bands" : "buckets";
     setLoading(true);
-    setLoadLabel(PARQUET_LOAD_PHASE_MESSAGES[0].text);
+    setLoadLabel(
+      researchCollapseNew
+        ? `Preparing pull for ${researchCollapseModeNew === "bands" ? "bands" : "buckets"}…`
+        : PARQUET_LOAD_PHASE_MESSAGES[0].text,
+    );
     setLoadProgress(5);
     syncConnectPullState({
       loading: true,
       error: null,
-      label: PARQUET_LOAD_PHASE_MESSAGES[0].text,
+      label: researchCollapseNew
+        ? `Preparing pull for ${researchCollapseModeNew === "bands" ? "bands" : "buckets"}…`
+        : PARQUET_LOAD_PHASE_MESSAGES[0].text,
       progress: 5,
     });
     if (!connectHomeDataLakeCompose) scrollToLoadProgress();
@@ -2752,6 +2885,8 @@ export default function DataLakeParquetPanel({
       sampleId: `${sid}-compose`,
       kalshiIngestExtras,
       pendingApply: pendingApplyNewSheet,
+      researchCollapse: researchCollapseNew,
+      researchCollapseMode: researchCollapseModeNew,
       beginLargePull: (ingestResult) => {
         void beginLargePullIngest(ingestResult, pendingApplyNewSheet, signal, table);
       },
