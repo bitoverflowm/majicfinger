@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { BarChart3, Cable, LayoutDashboard, Share2 } from "lucide-react";
 
 import {
   DropdownMenu,
@@ -32,10 +33,10 @@ import { projectHasLiveFeedSource } from "@/lib/liveFeeds/projectLiveFeedSource"
 import { cn } from "@/lib/utils";
 
 const WORKSPACE_ACTION_TOOLTIPS = {
-  integration: "Add more data and connect to another integration",
-  chart: "Add a new empty chart",
-  dashboard: "Create a dashboard",
-  export: "Share and download your work",
+  integration: "Add new Integration",
+  chart: "Add new Chart",
+  dashboard: "Add new Dashboard",
+  export: "Export your work",
 };
 
 const chipBase =
@@ -74,11 +75,65 @@ function LiveFeedPulseDot({ className, paused = false }) {
   );
 }
 
-const actionChipBase =
-  "relative cursor-pointer rounded px-[0.35rem] py-[0.2rem] font-mono font-semibold leading-none transition-colors whitespace-nowrap";
-const actionChipIdle =
-  "bg-slate-200/70 text-slate-900 hover:bg-lychee_blue/80 hover:text-lychee_white dark:bg-slate-800/70 dark:text-slate-100";
-const actionChipActive = "bg-lychee_blue/30 text-foreground";
+const actionIconIdle =
+  "text-slate-500 hover:bg-white hover:text-slate-950 hover:shadow-sm dark:text-slate-400 dark:hover:bg-slate-950 dark:hover:text-slate-50";
+const actionIconActive =
+  "bg-white text-slate-950 shadow-sm dark:bg-slate-950 dark:text-slate-50";
+
+/** Matches tab chip row height: text-xs/sm + py-[0.2rem]. */
+function workspaceNavControlRowClass(compact) {
+  return cn("flex min-w-0 items-center", compact ? "h-[22px]" : "h-[26px]");
+}
+
+function workspaceNavLabelClass(compact) {
+  return cn(
+    "font-mono font-medium leading-none text-muted-foreground",
+    compact ? "text-[9px] tracking-wide" : "text-[10px] tracking-wide",
+  );
+}
+
+function actionIconButtonClass(compact) {
+  return cn(
+    "inline-flex shrink-0 cursor-pointer items-center justify-center rounded transition-colors",
+    compact ? "h-5 w-5" : "h-6 w-6",
+  );
+}
+
+function actionIconGlyphClass(compact) {
+  return cn("shrink-0", compact ? "h-3 w-3" : "h-3 w-3");
+}
+
+function WorkspaceActionIconButton({
+  icon: Icon,
+  label,
+  tooltip,
+  active,
+  onClick,
+  guidedTargetAttr,
+  compact = false,
+}) {
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <button
+          type="button"
+          aria-label={label}
+          className={cn(
+            actionIconButtonClass(compact),
+            active ? actionIconActive : actionIconIdle,
+          )}
+          onClick={onClick}
+          {...(guidedTargetAttr ? { [GUIDED_TARGET_ATTR]: guidedTargetAttr } : {})}
+        >
+          <Icon className={actionIconGlyphClass(compact)} aria-hidden />
+        </button>
+      </TooltipTrigger>
+      <TooltipContent side="bottom" className="max-w-[14rem] text-xs">
+        {tooltip}
+      </TooltipContent>
+    </Tooltip>
+  );
+}
 
 const CHIP_GAP_PX = 4;
 const OVERFLOW_BTN_WIDTH_PX = 56;
@@ -691,47 +746,51 @@ export function ConnectHomeWorkspaceNav({ className, compact = false, onPanelMan
 
   const textSize = compact ? "text-xs" : "text-sm";
   const gapClass = compact ? "gap-0.5" : "gap-1";
+  const controlRowClass = workspaceNavControlRowClass(compact);
+  const labelClass = workspaceNavLabelClass(compact);
 
   return (
-    <nav
-      className={cn(
-        "mb-2 flex min-w-0 items-end justify-between gap-2",
-        compact && "mb-1 gap-1.5",
-        className,
-      )}
-      aria-label="Workspace navigation"
-    >
-      <div
-        className="flex min-w-0 flex-1 flex-col items-start gap-0.5"
-        aria-labelledby="connect-workspace-tabs-label"
+    <TooltipProvider delayDuration={200}>
+      <nav
+        className={cn(
+          "mb-2 grid min-w-0 grid-cols-[minmax(0,1fr)_auto] grid-rows-[auto_auto] gap-x-2 gap-y-0.5",
+          compact && "mb-1 gap-x-1.5",
+          className,
+        )}
+        aria-label="Workspace navigation"
       >
         <span
           id="connect-workspace-tabs-label"
-          className={cn(
-            "font-mono font-medium leading-none text-muted-foreground",
-            compact ? "text-[9px] tracking-wide" : "text-[10px] tracking-wide",
-          )}
+          className={cn(labelClass, "col-start-1 row-start-1 self-end")}
         >
           Your sheets, charts and dashboards
         </span>
-        <div className={cn("flex min-w-0 w-full items-end", gapClass)}>
+        <span
+          id="connect-workspace-actions-label"
+          className={cn(labelClass, "col-start-2 row-start-1 justify-self-end self-end text-right")}
+        >
+          Add & export
+        </span>
+
+        <div
+          className={cn(controlRowClass, "col-start-1 row-start-2", gapClass)}
+          aria-labelledby="connect-workspace-tabs-label"
+        >
           {showCancelDataPull ? (
-            <TooltipProvider delayDuration={200}>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <span className="mb-[0.2rem] inline-flex shrink-0 self-center">
-                    <AmberCancelButton
-                      ariaLabel="Cancel data pull"
-                      title="Cancel data pull"
-                      onClick={handleCancelDataPull}
-                    />
-                  </span>
-                </TooltipTrigger>
-                <TooltipContent side="bottom" className="max-w-[14rem] text-xs">
-                  Cancel data pull and return to integrations with your selections
-                </TooltipContent>
-              </Tooltip>
-            </TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <span className="inline-flex shrink-0 self-center">
+                  <AmberCancelButton
+                    ariaLabel="Cancel data pull"
+                    title="Cancel data pull"
+                    onClick={handleCancelDataPull}
+                  />
+                </span>
+              </TooltipTrigger>
+              <TooltipContent side="bottom" className="max-w-[14rem] text-xs">
+                Cancel data pull and return to integrations with your selections
+              </TooltipContent>
+            </Tooltip>
           ) : null}
           <WorkspaceTabStrip
             items={workspaceTabItems}
@@ -741,94 +800,60 @@ export function ConnectHomeWorkspaceNav({ className, compact = false, onPanelMan
             livePaused={projectLiveFeedPaused}
           />
         </div>
-      </div>
 
-      <div
-        className="flex shrink-0 flex-col items-end gap-0.5"
-        aria-labelledby="connect-workspace-actions-label"
-      >
-        <span
-          id="connect-workspace-actions-label"
+        <div
           className={cn(
-            "font-mono font-medium leading-none text-muted-foreground",
-            compact ? "text-[9px] tracking-wide" : "text-[10px] tracking-wide",
+            controlRowClass,
+            "col-start-2 row-start-2 justify-end justify-self-end",
           )}
+          aria-labelledby="connect-workspace-actions-label"
         >
-          Add & export
-        </span>
-        <TooltipProvider delayDuration={200}>
-          <div className={cn("flex flex-wrap items-center justify-end", gapClass)}>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <button
-                  type="button"
-                  className={cn(
-                    actionChipBase,
-                    textSize,
-                    integrationsPanelActive && !chartViewActive && !dashboardViewActive
-                      ? actionChipActive
-                      : actionChipIdle,
-                  )}
-                  onClick={openIntegrationsPanel}
-                >
-                  Integration
-                </button>
-              </TooltipTrigger>
-              <TooltipContent side="bottom" className="max-w-[14rem] text-xs">
-                {WORKSPACE_ACTION_TOOLTIPS.integration}
-              </TooltipContent>
-            </Tooltip>
-
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <button
-                  type="button"
-                  className={cn(actionChipBase, textSize, chartViewActive ? actionChipActive : actionChipIdle)}
-                  onClick={addChart}
-                >
-                  + Chart
-                </button>
-              </TooltipTrigger>
-              <TooltipContent side="bottom" className="max-w-[14rem] text-xs">
-                {WORKSPACE_ACTION_TOOLTIPS.chart}
-              </TooltipContent>
-            </Tooltip>
-
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <button
-                  type="button"
-                  className={cn(actionChipBase, textSize, dashboardViewActive ? actionChipActive : actionChipIdle)}
-                  onClick={openDashboard}
-                >
-                  Dashboard
-                </button>
-              </TooltipTrigger>
-              <TooltipContent side="bottom" className="max-w-[14rem] text-xs">
-                {WORKSPACE_ACTION_TOOLTIPS.dashboard}
-              </TooltipContent>
-            </Tooltip>
-
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <button
-                  type="button"
-                  className={cn(actionChipBase, textSize, exportActive ? actionChipActive : actionChipIdle)}
-                  onClick={openExport}
-                  {...(guidedExportTargetReady
-                    ? { [GUIDED_TARGET_ATTR]: KALSHI_GUIDED_TARGETS.exportButton }
-                    : {})}
-                >
-                  Export
-                </button>
-              </TooltipTrigger>
-              <TooltipContent side="bottom" className="max-w-[14rem] text-xs">
-                {WORKSPACE_ACTION_TOOLTIPS.export}
-              </TooltipContent>
-            </Tooltip>
+          <div
+            className={cn(
+              "flex h-full items-center gap-0.5 rounded bg-slate-100 p-px text-slate-500 dark:bg-slate-800 dark:text-slate-400",
+              gapClass,
+            )}
+          >
+            <WorkspaceActionIconButton
+              icon={Cable}
+              label="Integrations"
+              tooltip={WORKSPACE_ACTION_TOOLTIPS.integration}
+              active={
+                integrationsPanelActive && !chartViewActive && !dashboardViewActive
+              }
+              onClick={openIntegrationsPanel}
+              compact={compact}
+            />
+            <WorkspaceActionIconButton
+              icon={BarChart3}
+              label="Charts"
+              tooltip={WORKSPACE_ACTION_TOOLTIPS.chart}
+              active={chartViewActive}
+              onClick={addChart}
+              compact={compact}
+            />
+            <WorkspaceActionIconButton
+              icon={LayoutDashboard}
+              label="Dashboard"
+              tooltip={WORKSPACE_ACTION_TOOLTIPS.dashboard}
+              active={dashboardViewActive}
+              onClick={openDashboard}
+              compact={compact}
+            />
+            <WorkspaceActionIconButton
+              icon={Share2}
+              label="Export"
+              tooltip={WORKSPACE_ACTION_TOOLTIPS.export}
+              active={exportActive}
+              onClick={openExport}
+              guidedTargetAttr={
+                guidedExportTargetReady ? KALSHI_GUIDED_TARGETS.exportButton : undefined
+              }
+              compact={compact}
+            />
           </div>
-        </TooltipProvider>
-      </div>
-    </nav>
+        </div>
+      </nav>
+    </TooltipProvider>
   );
 }
