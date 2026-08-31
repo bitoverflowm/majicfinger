@@ -27,6 +27,7 @@ import { KALSHI_GUIDED_TARGETS } from "@/lib/guidedWorkflows/targets";
 import { GUIDED_TARGET_ATTR } from "@/lib/guidedWorkflows/types";
 import { resolvePaletteSeedForNewChart } from "@/lib/chartPaletteSnapshot";
 import { CONNECT_HOME_CENTER_VIEW, normalizeConnectHomeCenterView } from "@/lib/connectHomeFlow";
+import { connectHomeAddBlankSheet } from "@/lib/connectHomeAddBlankSheet";
 import { isConnectIntegrationWorkspace } from "@/lib/connectHomeWorkspace";
 import { chartSheetIsShareable } from "@/lib/inferDefaultBuilderSnapshot";
 import { projectHasLiveFeedSource } from "@/lib/liveFeeds/projectLiveFeedSource";
@@ -403,7 +404,7 @@ function WorkspaceTabStrip({ items, compact, textSize, gapClass, livePaused = fa
  * Connect home — sheet/chart tabs on the left; sheet/integration/chart/dashboard + export on the right.
  *
  * @param {object} props
- * @param {() => void} [props.onAddSheet] Called when user taps “Add sheet”. Wire to {@link connectHomeAddBlankSheet} when ready.
+ * @param {() => void} [props.onAddSheet] Optional override for “Add sheet”. Default: {@link connectHomeAddBlankSheet}.
  */
 export function ConnectHomeWorkspaceNav({
   className,
@@ -434,6 +435,10 @@ export function ConnectHomeWorkspaceNav({
   const setRightPanelTab = ctx?.setRightPanelTab;
   const setRightPanelOpen = ctx?.setRightPanelOpen;
   const addNewChartAndActivate = ctx?.addNewChartAndActivate;
+  const addNewSheetAndActivate = ctx?.addNewSheetAndActivate;
+  const setConnectHomeAnalyzeActive = ctx?.setConnectHomeAnalyzeActive;
+  const setDataConnected = ctx?.setDataConnected;
+  const dataConnected = !!ctx?.dataConnected;
   const chartSnapshotFlusher = ctx?.chartSnapshotFlusher;
   const connectWorkspace = ctx?.connectWorkspace;
   const connectDataLakePullState = ctx?.connectDataLakePullState ?? {};
@@ -600,8 +605,29 @@ export function ConnectHomeWorkspaceNav({
   }, [onPanelManualOpen, setRightPanelOpen, setRightPanelTab]);
 
   const handleAddSheet = useCallback(() => {
-    onAddSheet?.();
-  }, [onAddSheet]);
+    if (typeof onAddSheet === "function") {
+      onAddSheet();
+      return;
+    }
+    connectHomeAddBlankSheet({
+      dataSheets,
+      dataConnected,
+      addNewSheetAndActivate,
+      setConnectHomeCenterView,
+      setConnectHomeAnalyzeActive,
+      setDataConnected,
+      setRightPanelTab,
+    });
+  }, [
+    onAddSheet,
+    dataSheets,
+    dataConnected,
+    addNewSheetAndActivate,
+    setConnectHomeCenterView,
+    setConnectHomeAnalyzeActive,
+    setDataConnected,
+    setRightPanelTab,
+  ]);
 
   const handleCancelDataPull = useCallback(() => {
     cancelConnectDataFeedPull?.();
@@ -831,7 +857,6 @@ export function ConnectHomeWorkspaceNav({
               icon={Table2}
               label="Sheet"
               tooltip={WORKSPACE_ACTION_TOOLTIPS.sheet}
-              active={tableViewActive && !chartViewActive && !dashboardViewActive}
               onClick={handleAddSheet}
               compact={compact}
             />

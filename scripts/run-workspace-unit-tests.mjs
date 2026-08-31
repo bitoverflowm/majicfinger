@@ -54,6 +54,7 @@ import "@/lib/composeWhereFilterUi.test.js";
 import "@/lib/dataLakeComposeSummarize.test.js";
 import "@/lib/hubs/buildHubQueryDraftFromProvenance.test.js";
 import "@/lib/connectHomePullDestination.test.js";
+import "@/lib/connectHomeAddBlankSheet.test.js";
 import "@/lib/sheetOperations/quant/quantOperations.test.js";
 import "@/lib/polymarketLive/liveEventVolumeCompose.test.js";
 import "@/lib/polymarketLive/samplingMarketsCompose.test.js";

@@ -889,7 +889,12 @@ export const StateProviderV2 = ({children, initialSettings}) => {
             return Math.max(max, n);
           }, 0) + 1;
         newId = `sheet-${nextNum}`;
-        return { ...prev, [newId]: { name: `Sheet ${nextNum}`, data: [] } };
+        const name =
+          typeof options?.name === "string" && options.name.trim()
+            ? options.name.trim()
+            : `Sheet ${nextNum}`;
+        const data = Array.isArray(options?.data) ? options.data : [];
+        return { ...prev, [newId]: { name, data, provenance: null } };
       });
       const activate = () => {
         setActiveSheetId(newId);
