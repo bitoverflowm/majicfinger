@@ -5,11 +5,13 @@ import {
   Columns3,
   FileJson,
   FileSpreadsheet,
-  FileUp,
+  FileType2,
   Plus,
   Rows3,
+  Table2,
 } from "lucide-react";
 import { toast } from "sonner";
+import * as XLSX from "xlsx";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -20,16 +22,6 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -37,7 +29,17 @@ import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { useMyStateV2 } from "@/context/stateContextV2";
 import { formatConnectRequestCardQuery } from "@/lib/connectHomeRequestQuery";
+import { nextNewSheetLabel } from "@/lib/connectHomeAddBlankSheet";
 import { parseSpreadsheetFile } from "@/lib/parseSpreadsheetFile";
+import {
+  applyColumnPolicy,
+  colsFromKeys,
+  columnKeysFromRows,
+  diffImportColumns,
+  parseCsvText,
+  parseJsonRows,
+  parseMarkdownTable,
+} from "@/lib/parseSheetImportText";
 import {
   appendSheetOperation,
   createSheetOperation,
@@ -50,39 +52,56 @@ const PROP_LABEL = "text-[10px] font-medium leading-tight text-foreground";
 const MUTED = "text-[10px] leading-snug text-muted-foreground";
 const ACTION_BTN =
   "h-7 w-full justify-start gap-1.5 px-2 text-[11px] font-normal text-foreground";
+const FORMAT_BTN =
+  "h-7 flex-1 min-w-[3.5rem] gap-1 px-1.5 text-[10px] font-medium text-foreground";
 
-function columnKeysFromRows(rows) {
-  const keys = new Set();
-  for (const row of rows || []) {
-    if (!row || typeof row !== "object" || Array.isArray(row)) continue;
-    for (const k of Object.keys(row)) keys.add(k);
-  }
-  return [...keys];
-}
+/** @typedef {"json"|"csv"|"xlsx"|"markdown"} ImportFormat */
+/** @typedef {"append"|"replace"|"new_sheet"} ImportDisposition */
+/** @typedef {"disposition"|"input"|"mismatch"} ImportStep */
 
-function colsFromKeys(keys) {
-  return keys.map((field) => ({ field, cellDataType: "text" }));
-}
-
-function parseJsonRows(text) {
-  const raw = String(text || "").trim();
-  if (!raw) throw new Error("Paste JSON first.");
-  let parsed;
-  try {
-    parsed = JSON.parse(raw);
-  } catch {
-    throw new Error("Invalid JSON.");
-  }
-  if (Array.isArray(parsed)) {
-    if (!parsed.length) return [];
-    if (!parsed.every((r) => r && typeof r === "object" && !Array.isArray(r))) {
-      throw new Error("JSON array must contain objects (rows).");
-    }
-    return parsed;
-  }
-  if (parsed && typeof parsed === "object") return [parsed];
-  throw new Error("JSON must be an object or an array of objects.");
-}
+const FORMAT_META = {
+  json: {
+    label: "JSON",
+    title: "Add JSON",
+    Icon: FileJson,
+    acceptsPaste: true,
+    acceptsUpload: true,
+    accept: ".json,application/json",
+    pastePlaceholder: '[{"col": "value"}]',
+    pasteHint: "Paste a JSON array of objects (or one object).",
+  },
+  csv: {
+    label: "CSV",
+    title: "Add CSV",
+    Icon: FileSpreadsheet,
+    acceptsPaste: true,
+    acceptsUpload: true,
+    accept: ".csv,text/csv",
+    pastePlaceholder: "col_a,col_b\n1,2",
+    pasteHint: "Paste CSV text, or upload a .csv file.",
+  },
+  xlsx: {
+    label: "XLSX",
+    title: "Add XLSX",
+    Icon: FileSpreadsheet,
+    acceptsPaste: false,
+    acceptsUpload: true,
+    accept: ".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    pastePlaceholder: "",
+    pasteHint: "Upload an .xlsx workbook (first sheet is used).",
+  },
+  markdown: {
+    label: "Markdown",
+    title: "Add Markdown table",
+    Icon: Table2,
+    acceptsPaste: true,
+    acceptsUpload: false,
+    accept: "",
+    pastePlaceholder:
+      "| col_a | col_b |\n| ----- | ----- |\n| 1     | 2     |",
+    pasteHint: "Paste a Markdown pipe table (GPT-style tables work).",
+  },
+};
 
 function summarizeEquations(sheet) {
   const out = [];
@@ -137,6 +156,21 @@ function sheetIsLive(sheet, sheetId, liveFeedState) {
   });
 }
 
+function existingColumnNames(connectedCols, rows) {
+  const fromCols = (connectedCols || [])
+    .map((c) => (c && typeof c === "object" ? c.field : c))
+    .filter(Boolean)
+    .map(String);
+  if (fromCols.length) return fromCols;
+  return columnKeysFromRows(rows);
+}
+
+function sheetHasMeaningfulData(rows, cols) {
+  if ((cols || []).length > 0) return true;
+  if (!Array.isArray(rows) || !rows.length) return false;
+  return rows.some((r) => r && typeof r === "object" && Object.keys(r).length > 0);
+}
+
 /**
  * Right-drawer Sheet tab — properties, actions, and import for the active data sheet.
  */
@@ -151,6 +185,11 @@ export function ConnectHomeSheetPanel({ className }) {
   const setConnectedCols = ctx?.setConnectedCols;
   const setDataConnected = ctx?.setDataConnected;
   const liveFeedState = ctx?.liveFeedState;
+  const addNewSheetAndActivate = ctx?.addNewSheetAndActivate;
+  const setConnectHomeCenterView = ctx?.setConnectHomeCenterView;
+  const setConnectHomeAnalyzeActive = ctx?.setConnectHomeAnalyzeActive;
+  const setRightPanelTab = ctx?.setRightPanelTab;
+  const setRightPanelOpen = ctx?.setRightPanelOpen;
 
   const sheet = activeSheetId ? dataSheets[activeSheetId] : null;
   const rows = Array.isArray(sheet?.data)
@@ -165,16 +204,27 @@ export function ConnectHomeSheetPanel({ className }) {
 
   const [addColOpen, setAddColOpen] = useState(false);
   const [newColName, setNewColName] = useState("");
-
   const [jsonViewerOpen, setJsonViewerOpen] = useState(false);
-  const [jsonPaste, setJsonPaste] = useState("[]");
 
+  /** @type {[ImportFormat|null, Function]} */
+  const [importFormat, setImportFormat] = useState(null);
+  /** @type {[ImportStep, Function]} */
+  const [importStep, setImportStep] = useState("disposition");
+  /** @type {[ImportDisposition, Function]} */
+  const [disposition, setDisposition] = useState("append");
+  const [pasteText, setPasteText] = useState("");
   const [pendingRows, setPendingRows] = useState(null);
-  const [importSource, setImportSource] = useState("");
-  const [dispositionOpen, setDispositionOpen] = useState(false);
+  const [columnDiff, setColumnDiff] = useState(null);
+  const fileInputRef = useRef(null);
 
-  const csvInputRef = useRef(null);
-  const xlsxInputRef = useRef(null);
+  const existingCols = useMemo(
+    () => existingColumnNames(connectedCols, rows),
+    [connectedCols, rows],
+  );
+  const hasSheetData = useMemo(
+    () => sheetHasMeaningfulData(rows, existingCols),
+    [rows, existingCols],
+  );
 
   useEffect(() => {
     setNameDraft(String(sheet?.name || ""));
@@ -192,15 +242,29 @@ export function ConnectHomeSheetPanel({ className }) {
     [sheet, activeSheetId, liveFeedState],
   );
 
-  const colCount = useMemo(() => {
-    const fromCols = (connectedCols || [])
-      .map((c) => (c && typeof c === "object" ? c.field : c))
-      .filter(Boolean);
-    if (fromCols.length) return fromCols.length;
-    return columnKeysFromRows(rows).length;
-  }, [connectedCols, rows]);
-
+  const colCount = existingCols.length;
   const rowCount = rows.length;
+
+  const resetImportModal = useCallback(() => {
+    setImportFormat(null);
+    setImportStep("disposition");
+    setDisposition(hasSheetData ? "append" : "replace");
+    setPasteText("");
+    setPendingRows(null);
+    setColumnDiff(null);
+  }, [hasSheetData]);
+
+  const openImport = useCallback(
+    (format) => {
+      setImportFormat(format);
+      setImportStep("disposition");
+      setDisposition(hasSheetData ? "append" : "replace");
+      setPasteText("");
+      setPendingRows(null);
+      setColumnDiff(null);
+    },
+    [hasSheetData],
+  );
 
   const commitName = useCallback(() => {
     const next = String(nameDraft || "").trim();
@@ -219,39 +283,11 @@ export function ConnectHomeSheetPanel({ className }) {
     toast.success("Sheet renamed");
   }, [activeSheetId, nameDraft, setDataSheets, sheet?.name]);
 
-  const applyRowsToSheet = useCallback(
-    (incoming, mode) => {
+  const writeRowsToActiveSheet = useCallback(
+    (nextRows, { clearProvenance = false } = {}) => {
       if (!activeSheetId || !setDataSheets) return;
-      const nextRows = Array.isArray(incoming) ? incoming : [];
-      if (mode === "replace") {
-        const keys = columnKeysFromRows(nextRows);
-        setConnectedData?.(nextRows);
-        setConnectedCols?.(colsFromKeys(keys));
-        setDataSheets((prev) => {
-          const cur = prev?.[activeSheetId] || { name: "Sheet" };
-          return {
-            ...prev,
-            [activeSheetId]: {
-              ...cur,
-              data: nextRows,
-              provenance: null,
-            },
-          };
-        });
-        setDataConnected?.(true);
-        toast.success(
-          `Replaced sheet with ${nextRows.length.toLocaleString()} row${nextRows.length === 1 ? "" : "s"}`,
-        );
-        return;
-      }
-      const existing = Array.isArray(sheet?.data)
-        ? sheet.data
-        : Array.isArray(connectedData)
-          ? connectedData
-          : [];
-      const merged = [...existing, ...nextRows];
-      const keys = columnKeysFromRows(merged);
-      setConnectedData?.(merged);
+      const keys = columnKeysFromRows(nextRows);
+      setConnectedData?.(nextRows);
       setConnectedCols?.(colsFromKeys(keys));
       setDataSheets((prev) => {
         const cur = prev?.[activeSheetId] || { name: "Sheet" };
@@ -259,37 +295,200 @@ export function ConnectHomeSheetPanel({ className }) {
           ...prev,
           [activeSheetId]: {
             ...cur,
-            data: merged,
+            data: nextRows,
+            ...(clearProvenance ? { provenance: null } : {}),
           },
         };
       });
       setDataConnected?.(true);
+    },
+    [activeSheetId, setConnectedCols, setConnectedData, setDataConnected, setDataSheets],
+  );
+
+  const commitImport = useCallback(
+    (incomingRows, columnPolicy) => {
+      const existing = existingColumnNames(connectedCols, rows);
+      let nextRows = Array.isArray(incomingRows) ? incomingRows : [];
+
+      if (disposition === "append" && columnPolicy === "enforce") {
+        nextRows = applyColumnPolicy(nextRows, existing, "enforce");
+      }
+
+      if (disposition === "new_sheet") {
+        const name = nextNewSheetLabel(dataSheets);
+        addNewSheetAndActivate?.(
+          () => {
+            setConnectHomeCenterView?.("sheet");
+            setConnectHomeAnalyzeActive?.(true);
+            setDataConnected?.(true);
+            setRightPanelTab?.("sheet");
+            setRightPanelOpen?.(true);
+          },
+          { name, data: nextRows, syncActivate: true },
+        );
+        const keys = columnKeysFromRows(nextRows);
+        setTimeout(() => {
+          setConnectedCols?.(colsFromKeys(keys));
+          setConnectedData?.(nextRows);
+        }, 0);
+        toast.success(
+          `Created ${name} with ${nextRows.length.toLocaleString()} row${nextRows.length === 1 ? "" : "s"}`,
+        );
+        resetImportModal();
+        return;
+      }
+
+      if (disposition === "replace") {
+        writeRowsToActiveSheet(nextRows, { clearProvenance: true });
+        toast.success(
+          `Replaced sheet with ${nextRows.length.toLocaleString()} row${nextRows.length === 1 ? "" : "s"}`,
+        );
+        resetImportModal();
+        return;
+      }
+
+      const existingRows = Array.isArray(sheet?.data)
+        ? sheet.data
+        : Array.isArray(connectedData)
+          ? connectedData
+          : [];
+      const paddedExisting =
+        columnPolicy === "add"
+          ? existingRows.map((r) => {
+              const out = { ...r };
+              for (const k of columnKeysFromRows(nextRows)) {
+                if (!(k in out)) out[k] = "";
+              }
+              return out;
+            })
+          : existingRows;
+      const paddedIncoming =
+        columnPolicy === "add"
+          ? nextRows.map((r) => {
+              const out = { ...r };
+              for (const k of existing) {
+                if (!(k in out)) out[k] = "";
+              }
+              return out;
+            })
+          : nextRows;
+      const merged = [...paddedExisting, ...paddedIncoming];
+      writeRowsToActiveSheet(merged);
       toast.success(
         `Appended ${nextRows.length.toLocaleString()} row${nextRows.length === 1 ? "" : "s"}`,
       );
+      resetImportModal();
     },
     [
-      activeSheetId,
+      addNewSheetAndActivate,
+      connectedCols,
       connectedData,
+      dataSheets,
+      disposition,
+      resetImportModal,
+      rows,
+      setConnectHomeAnalyzeActive,
+      setConnectHomeCenterView,
       setConnectedCols,
       setConnectedData,
       setDataConnected,
-      setDataSheets,
+      setRightPanelOpen,
+      setRightPanelTab,
       sheet?.data,
+      writeRowsToActiveSheet,
     ],
   );
 
-  const openDisposition = useCallback((incoming, sourceLabel) => {
-    setPendingRows(incoming);
-    setImportSource(sourceLabel);
-    setDispositionOpen(true);
+  const maybeHandleMismatchThenCommit = useCallback(
+    (incomingRows) => {
+      const needsMismatchCheck = disposition === "append" && hasSheetData;
+      if (!needsMismatchCheck) {
+        commitImport(incomingRows, "add");
+        return;
+      }
+      const diff = diffImportColumns(existingCols, incomingRows);
+      if (!diff.hasMismatch) {
+        commitImport(incomingRows, "add");
+        return;
+      }
+      setPendingRows(incomingRows);
+      setColumnDiff(diff);
+      setImportStep("mismatch");
+    },
+    [commitImport, disposition, existingCols, hasSheetData],
+  );
+
+  const parsePasteForFormat = useCallback((format, text) => {
+    if (format === "json") return parseJsonRows(text);
+    if (format === "markdown") return parseMarkdownTable(text);
+    if (format === "csv") return parseCsvText(text, XLSX);
+    throw new Error("This format requires a file upload.");
   }, []);
 
+  const handleFormatPaste = useCallback(() => {
+    if (!importFormat || importFormat === "xlsx") return;
+    try {
+      if (importFormat === "json") {
+        const parsed = JSON.parse(String(pasteText || "").trim() || "[]");
+        setPasteText(JSON.stringify(parsed, null, 2));
+        return;
+      }
+      setPasteText(String(pasteText || "").trim());
+      toast.success("Formatted");
+    } catch {
+      toast.error("Could not format — check your paste");
+    }
+  }, [importFormat, pasteText]);
+
+  const handleApplyPaste = useCallback(() => {
+    if (!importFormat) return;
+    try {
+      const next = parsePasteForFormat(importFormat, pasteText);
+      if (!next.length) {
+        toast.error("No rows found in paste");
+        return;
+      }
+      maybeHandleMismatchThenCommit(next);
+    } catch (e) {
+      toast.error(e?.message || "Could not parse paste");
+    }
+  }, [importFormat, maybeHandleMismatchThenCommit, parsePasteForFormat, pasteText]);
+
+  const handleFileChosen = useCallback(
+    async (file) => {
+      if (!file || !importFormat) return;
+      try {
+        if (importFormat === "json") {
+          const text = await file.text();
+          const next = parseJsonRows(text);
+          if (!next.length) {
+            toast.error("JSON file has no rows");
+            return;
+          }
+          maybeHandleMismatchThenCommit(next);
+          return;
+        }
+        if (importFormat === "csv" || importFormat === "xlsx") {
+          const result = await parseSpreadsheetFile(file);
+          const first = result.sheets?.[result.activeSheetId];
+          const next = Array.isArray(first?.data) ? first.data : [];
+          if (!next.length) {
+            toast.error("File has no rows");
+            return;
+          }
+          maybeHandleMismatchThenCommit(next);
+          return;
+        }
+        toast.error("Upload is not supported for this format");
+      } catch (e) {
+        toast.error(e?.message || "Could not read file");
+      }
+    },
+    [importFormat, maybeHandleMismatchThenCommit],
+  );
+
   const handleAddRow = useCallback(() => {
-    const keys = (connectedCols || [])
-      .map((c) => (c && typeof c === "object" ? c.field : c))
-      .filter(Boolean);
-    const fields = keys.length ? keys : columnKeysFromRows(rows);
+    const fields = existingCols;
     if (!fields.length) {
       setConnectedData?.([...(rows || []), {}]);
     } else {
@@ -299,7 +498,7 @@ export function ConnectHomeSheetPanel({ className }) {
     }
     setDataConnected?.(true);
     toast.success("Row added");
-  }, [connectedCols, rows, setConnectedData, setDataConnected]);
+  }, [existingCols, rows, setConnectedData, setDataConnected]);
 
   const handleAddColumn = useCallback(() => {
     const name = String(newColName || "").trim();
@@ -307,13 +506,7 @@ export function ConnectHomeSheetPanel({ className }) {
       toast.error("Enter a column name");
       return;
     }
-    const existing = new Set(
-      (connectedCols || [])
-        .map((c) => (c && typeof c === "object" ? c.field : c))
-        .filter(Boolean)
-        .map(String),
-    );
-    for (const k of columnKeysFromRows(rows)) existing.add(k);
+    const existing = new Set(existingCols);
     if (existing.has(name)) {
       toast.error("Column already exists");
       return;
@@ -339,6 +532,7 @@ export function ConnectHomeSheetPanel({ className }) {
   }, [
     activeSheetId,
     connectedCols,
+    existingCols,
     newColName,
     rows,
     setConnectedCols,
@@ -347,39 +541,7 @@ export function ConnectHomeSheetPanel({ className }) {
     setDataSheets,
   ]);
 
-  const handlePrettyJsonPaste = useCallback(() => {
-    try {
-      const parsed = JSON.parse(String(jsonPaste || "").trim() || "[]");
-      setJsonPaste(JSON.stringify(parsed, null, 2));
-    } catch {
-      toast.error("Invalid JSON — fix before formatting");
-    }
-  }, [jsonPaste]);
-
-  const handleApplyJsonPaste = useCallback(() => {
-    try {
-      const next = parseJsonRows(jsonPaste);
-      openDisposition(next, "JSON");
-    } catch (e) {
-      toast.error(e?.message || "Could not parse JSON");
-    }
-  }, [jsonPaste, openDisposition]);
-
-  const handleFileImport = useCallback(
-    async (file, kind) => {
-      if (!file) return;
-      try {
-        const result = await parseSpreadsheetFile(file);
-        const firstId = result.activeSheetId;
-        const first = result.sheets?.[firstId];
-        const nextRows = Array.isArray(first?.data) ? first.data : [];
-        openDisposition(nextRows, kind.toUpperCase());
-      } catch (e) {
-        toast.error(e?.message || `Could not parse ${kind}`);
-      }
-    },
-    [openDisposition],
-  );
+  const formatMeta = importFormat ? FORMAT_META[importFormat] : null;
 
   if (!activeSheetId || !sheet) {
     return (
@@ -538,88 +700,29 @@ export function ConnectHomeSheetPanel({ className }) {
 
       <section className="grid gap-1.5" aria-labelledby="sheet-import-heading">
         <h3 id="sheet-import-heading" className={SECTION_LABEL}>
-          Add more data
+          Add Data
         </h3>
-
-        <div className="grid gap-1">
-          <Label htmlFor="sheet-json-paste" className={PROP_LABEL}>
-            Paste JSON
-          </Label>
-          <Textarea
-            id="sheet-json-paste"
-            value={jsonPaste}
-            onChange={(e) => setJsonPaste(e.target.value)}
-            onBlur={handlePrettyJsonPaste}
-            spellCheck={false}
-            className="min-h-[7rem] resize-y px-2 py-1.5 font-mono text-[10px] leading-snug text-foreground"
-            placeholder='[{"col": "value"}]'
-          />
-          <div className="flex gap-1">
-            <Button
-              type="button"
-              variant="secondary"
-              size="sm"
-              className="h-7 flex-1 text-[10px]"
-              onClick={handlePrettyJsonPaste}
-            >
-              Format
-            </Button>
-            <Button
-              type="button"
-              size="sm"
-              className="h-7 flex-1 text-[10px]"
-              onClick={handleApplyJsonPaste}
-            >
-              Apply JSON
-            </Button>
-          </div>
+        <div className="flex flex-wrap gap-1">
+          {/** @type {ImportFormat[]} */ (["json", "csv", "xlsx", "markdown"]).map((fmt) => {
+            const meta = FORMAT_META[fmt];
+            const Icon = meta.Icon;
+            return (
+              <Button
+                key={fmt}
+                type="button"
+                variant="outline"
+                className={FORMAT_BTN}
+                onClick={() => openImport(fmt)}
+              >
+                <Icon className="h-3 w-3 shrink-0" aria-hidden />
+                {meta.label}
+              </Button>
+            );
+          })}
         </div>
-
-        <div className="grid gap-1 pt-1">
-          <Button
-            type="button"
-            variant="outline"
-            className={ACTION_BTN}
-            onClick={() => csvInputRef.current?.click()}
-          >
-            <FileUp className="h-3 w-3 shrink-0" aria-hidden />
-            Upload CSV
-          </Button>
-          <Button
-            type="button"
-            variant="outline"
-            className={ACTION_BTN}
-            onClick={() => xlsxInputRef.current?.click()}
-          >
-            <FileSpreadsheet className="h-3 w-3 shrink-0" aria-hidden />
-            Upload XLSX
-          </Button>
-          <input
-            ref={csvInputRef}
-            type="file"
-            accept=".csv,text/csv"
-            className="sr-only"
-            onChange={(e) => {
-              const file = e.target.files?.[0];
-              void handleFileImport(file, "csv");
-              e.target.value = "";
-            }}
-          />
-          <input
-            ref={xlsxInputRef}
-            type="file"
-            accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-            className="sr-only"
-            onChange={(e) => {
-              const file = e.target.files?.[0];
-              void handleFileImport(file, "xlsx");
-              e.target.value = "";
-            }}
-          />
-          <p className={cn(MUTED, "pt-0.5")}>
-            You&apos;ll choose append or replace after selecting data.
-          </p>
-        </div>
+        <p className={MUTED}>
+          Choose a format — you&apos;ll pick append, replace, or a new sheet next.
+        </p>
       </section>
 
       <Dialog open={addColOpen} onOpenChange={setAddColOpen}>
@@ -693,49 +796,212 @@ export function ConnectHomeSheetPanel({ className }) {
         </DialogContent>
       </Dialog>
 
-      <AlertDialog open={dispositionOpen} onOpenChange={setDispositionOpen}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>How should this data land?</AlertDialogTitle>
-            <AlertDialogDescription>
-              {importSource ? `${importSource}: ` : ""}
-              {(pendingRows || []).length.toLocaleString()} row
-              {(pendingRows || []).length === 1 ? "" : "s"} ready for “{sheet.name}”.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter className="flex-col gap-2 sm:flex-col">
-            <AlertDialogAction
-              className="w-full"
-              onClick={() => {
-                applyRowsToSheet(pendingRows, "append");
-                setPendingRows(null);
-              }}
-            >
-              Append to existing data on sheet
-            </AlertDialogAction>
-            <AlertDialogAction
-              className={cn(
-                "w-full",
-                "bg-destructive text-destructive-foreground hover:bg-destructive/90",
-              )}
-              onClick={() => {
-                applyRowsToSheet(pendingRows, "replace");
-                setPendingRows(null);
-              }}
-            >
-              Wipe and replace data on sheet
-            </AlertDialogAction>
-            <AlertDialogCancel
-              className="w-full"
-              onClick={() => {
-                setPendingRows(null);
-              }}
-            >
-              Cancel
-            </AlertDialogCancel>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      <Dialog
+        open={!!importFormat}
+        onOpenChange={(open) => {
+          if (!open) resetImportModal();
+        }}
+      >
+        <DialogContent className="flex max-h-[min(90dvh,720px)] flex-col gap-3 sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="text-sm">{formatMeta?.title || "Add data"}</DialogTitle>
+            <DialogDescription className="text-xs">
+              {importStep === "disposition"
+                ? "Choose how this data should land on your workbook."
+                : importStep === "mismatch"
+                  ? "Incoming columns don’t fully match this sheet."
+                  : formatMeta?.pasteHint}
+            </DialogDescription>
+          </DialogHeader>
+
+          {importStep === "disposition" ? (
+            <div className="grid gap-2 py-1">
+              <p className={cn(PROP_LABEL, "text-foreground")}>Destination</p>
+              {[
+                {
+                  id: "append",
+                  label: "Append to current data",
+                  desc: "Add rows under what’s already on this sheet.",
+                },
+                {
+                  id: "replace",
+                  label: "Wipe and replace current sheet",
+                  desc: "Clear this sheet and load the new rows.",
+                },
+                {
+                  id: "new_sheet",
+                  label: "Add new sheet",
+                  desc: `Create ${nextNewSheetLabel(dataSheets)} with the imported rows.`,
+                },
+              ].map((opt) => (
+                <button
+                  key={opt.id}
+                  type="button"
+                  onClick={() => setDisposition(/** @type {ImportDisposition} */ (opt.id))}
+                  className={cn(
+                    "rounded-md border px-2.5 py-2 text-left transition-colors",
+                    disposition === opt.id
+                      ? "border-foreground/40 bg-muted/50"
+                      : "border-border/70 bg-background hover:bg-muted/30",
+                  )}
+                >
+                  <span className="block text-[11px] font-medium text-foreground">{opt.label}</span>
+                  <span className={cn(MUTED, "mt-0.5 block")}>{opt.desc}</span>
+                </button>
+              ))}
+              <DialogFooter className="mt-2 gap-2 sm:justify-between">
+                <Button type="button" variant="outline" size="sm" onClick={resetImportModal}>
+                  Cancel
+                </Button>
+                <Button type="button" size="sm" onClick={() => setImportStep("input")}>
+                  Next
+                </Button>
+              </DialogFooter>
+            </div>
+          ) : null}
+
+          {importStep === "input" && formatMeta ? (
+            <div className="grid min-h-0 gap-2 py-1">
+              {formatMeta.acceptsPaste ? (
+                <div className="grid gap-1">
+                  <Label htmlFor="sheet-import-paste" className={PROP_LABEL}>
+                    Paste here
+                  </Label>
+                  <Textarea
+                    id="sheet-import-paste"
+                    value={pasteText}
+                    onChange={(e) => setPasteText(e.target.value)}
+                    spellCheck={false}
+                    className="min-h-[9rem] resize-y px-2 py-1.5 font-mono text-[10px] leading-snug text-foreground"
+                    placeholder={formatMeta.pastePlaceholder}
+                  />
+                  <div className="flex gap-1">
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      size="sm"
+                      className="h-7 flex-1 text-[10px]"
+                      onClick={handleFormatPaste}
+                    >
+                      Format
+                    </Button>
+                    <Button
+                      type="button"
+                      size="sm"
+                      className="h-7 flex-1 text-[10px]"
+                      onClick={handleApplyPaste}
+                    >
+                      Apply paste
+                    </Button>
+                  </div>
+                </div>
+              ) : null}
+
+              {formatMeta.acceptsUpload ? (
+                <div className="grid gap-1 pt-1">
+                  {formatMeta.acceptsPaste ? (
+                    <p className={cn(MUTED, "text-center")}>— or —</p>
+                  ) : null}
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className={ACTION_BTN}
+                    onClick={() => fileInputRef.current?.click()}
+                  >
+                    <FileType2 className="h-3 w-3 shrink-0" aria-hidden />
+                    Upload file
+                  </Button>
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept={formatMeta.accept}
+                    className="sr-only"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      void handleFileChosen(file);
+                      e.target.value = "";
+                    }}
+                  />
+                </div>
+              ) : null}
+
+              <DialogFooter className="mt-2 gap-2 sm:justify-between">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setImportStep("disposition")}
+                >
+                  Back
+                </Button>
+                <Button type="button" variant="ghost" size="sm" onClick={resetImportModal}>
+                  Cancel
+                </Button>
+              </DialogFooter>
+            </div>
+          ) : null}
+
+          {importStep === "mismatch" && columnDiff ? (
+            <div className="grid gap-2 py-1">
+              <p className="text-[11px] leading-snug text-foreground">
+                These columns don&apos;t match any existing column
+                {columnDiff.unknown.length ? ":" : "."}
+              </p>
+              {columnDiff.unknown.length ? (
+                <ul className="max-h-24 overflow-auto rounded-md border border-amber-500/30 bg-amber-500/10 px-2 py-1.5">
+                  {columnDiff.unknown.map((c) => (
+                    <li key={c} className="font-mono text-[10px] text-amber-950 dark:text-amber-100">
+                      {c}
+                    </li>
+                  ))}
+                </ul>
+              ) : null}
+              {columnDiff.overlap.length === 0 ? (
+                <p className={cn(MUTED, "text-destructive")}>
+                  No overlapping columns with the current sheet.
+                </p>
+              ) : null}
+              {columnDiff.missing.length ? (
+                <p className={MUTED}>
+                  Missing from import (will stay blank on new rows):{" "}
+                  <span className="font-mono text-foreground">
+                    {columnDiff.missing.slice(0, 8).join(", ")}
+                    {columnDiff.missing.length > 8 ? "…" : ""}
+                  </span>
+                </p>
+              ) : null}
+              <DialogFooter className="mt-1 flex-col gap-2 sm:flex-col">
+                <Button
+                  type="button"
+                  className="w-full"
+                  size="sm"
+                  onClick={() => commitImport(pendingRows, "add")}
+                >
+                  Add new columns
+                </Button>
+                <Button
+                  type="button"
+                  variant="secondary"
+                  className="w-full"
+                  size="sm"
+                  onClick={() => commitImport(pendingRows, "enforce")}
+                >
+                  Enforce match (drop unknown columns)
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="w-full"
+                  size="sm"
+                  onClick={() => setImportStep("input")}
+                >
+                  Back
+                </Button>
+              </DialogFooter>
+            </div>
+          ) : null}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
