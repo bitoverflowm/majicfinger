@@ -1883,7 +1883,7 @@ export default function DataSheetWithIntegration({
                       <div className="relative flex min-w-0 items-center gap-1 p-1.5">
                         <TabsList
                           className={cn(
-                            "h-auto min-h-0 min-w-0 flex-1 justify-start gap-0.5 overflow-x-auto overflow-y-hidden rounded bg-slate-100 p-px text-slate-500 dark:bg-slate-800 dark:text-slate-400",
+                            "h-auto min-h-0 w-fit max-w-full justify-start gap-0.5 overflow-x-auto overflow-y-hidden rounded bg-slate-100 p-px text-slate-500 dark:bg-slate-800 dark:text-slate-400",
                             drawerExpanded && "flex-wrap",
                           )}
                         >

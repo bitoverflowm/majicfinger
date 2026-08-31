@@ -33,6 +33,21 @@ export const SHADCN_CHART_BASE_ORDER = [
 export const SHADCN_CHART_SHADE_KEYS = [50, 100, 200, 300, 400, 500, 600, 700, 800, 900, 950];
 
 /**
+ * Out-of-the-box series colors (Line 1 / Bar 1 / …) when no Shadcn ramp is selected.
+ * rose-600, lime-500, blue-500 — then cycle.
+ */
+export const DEFAULT_CHART_SERIES_COLORS = [
+  shadcnChartPalettesJson?.rose?.["600"] || "#e11d48",
+  shadcnChartPalettesJson?.lime?.["500"] || "#84cc16",
+  shadcnChartPalettesJson?.blue?.["500"] || "#3b82f6",
+];
+
+/** Default chart card fill when the user has not set Inner box / a palette chrome stop. */
+export function defaultChartInnerBackground(dark) {
+  return dark ? "#000000" : "#ffffff";
+}
+
+/**
  * "Single colors" palette: one representative swatch per base color.
  * Useful for letting users pick an explicit series color, independent of the global ramp palette.
  * @param {number} shadeKey Tailwind shade (default 600 for good contrast)

@@ -3,6 +3,8 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import {
   SHADCN_CHART_BASE_ORDER,
+  DEFAULT_CHART_SERIES_COLORS,
+  defaultChartInnerBackground,
   getShadcnChartPaletteArray,
 } from '@/components/chartView/panels/shadcnChartPalettes';
 import { Area, AreaChart, Bar, BarChart, CartesianGrid, Cell, LabelList, Line, LineChart, Pie, PieChart, ReferenceLine, Scatter, ScatterChart, Treemap, XAxis, YAxis, ZAxis } from 'recharts';
@@ -1159,14 +1161,6 @@ export function ChartBuilderProvider({ demo, children, initialBuilderSnapshot, e
     else if (s.legendLabelColumn) setTooltipExtraColumns([s.legendLabelColumn]);
   }, [demo, effectiveData, initialBuilderSnapshot, contextStateV2?.dataSheets]);
 
-  useEffect(() => {
-    if (selectedPalette?.length) return;
-    const firstPalette = getShadcnChartPaletteArray(SHADCN_CHART_BASE_ORDER[0]);
-    if (Array.isArray(firstPalette) && firstPalette.length) {
-      setSelectedPalette(firstPalette);
-    }
-  }, [selectedPalette]);
-
   const areArraysEqual = (a, b) =>
     Array.isArray(a) &&
     Array.isArray(b) &&
@@ -2056,7 +2050,7 @@ export function ChartBuilderProvider({ demo, children, initialBuilderSnapshot, e
       const padColor =
         innerBoxColor ||
         (paletteChrome && paletteChrome.length > 2 ? paletteChrome[2] : null) ||
-        (dark ? "#000000" : "#ffffff");
+        defaultChartInnerBackground(dark);
 
       ctx.fillStyle = padColor;
       ctx.fillRect(0, 0, OG_IMAGE_WIDTH, OG_IMAGE_HEIGHT);
@@ -2849,27 +2843,25 @@ export function ChartCanvas() {
     const reversed = [...selectedPalette].reverse();
     return extrapolateColorsFromPalette(reversed, n);
   }, [treemapData, hasSelectedPalette, selectedPalette]);
-  const defaultPalette = dark
-    ? ["#ffffff", "#000000", "#000000", "#ffffff"]
-    : ["#000000", "#ffffff", "#ffffff", "#000000"];
-  const activePalette = hasSelectedPalette ? selectedPalette : defaultPalette;
-  const fallbackSeriesColor = dark ? "#ffffff" : "#000000";
+  const fallbackSeriesColor = DEFAULT_CHART_SERIES_COLORS[0];
   /**
-   * Shadcn palettes are ordered light → dark (50 … 950). Outer chrome uses the first stops; series
-   * should read from the dark end so lines/bars read on light card backgrounds.
+   * With a user-picked Shadcn ramp: chrome uses early stops; series read from the dark end.
+   * Out of the box (no ramp): rose-600 → lime-500 → blue-500, then cycle.
    */
   const seriesColorAt = (idx) => {
-    const p = activePalette;
+    const i = Math.max(0, Number(idx) || 0);
+    if (!hasSelectedPalette) {
+      const n = DEFAULT_CHART_SERIES_COLORS.length;
+      return DEFAULT_CHART_SERIES_COLORS[i % n] || fallbackSeriesColor;
+    }
+    const p = selectedPalette;
     const n = p?.length || 0;
     if (!n) return fallbackSeriesColor;
-    if (!hasSelectedPalette) {
-      return p[idx] ?? p[3] ?? p[0] ?? fallbackSeriesColor;
-    }
     const chromeSlots = 3;
     if (n <= chromeSlots) {
-      return p[Math.max(0, n - 1 - (idx % Math.max(1, n)))] ?? fallbackSeriesColor;
+      return p[Math.max(0, n - 1 - (i % Math.max(1, n)))] ?? fallbackSeriesColor;
     }
-    const fromEnd = n - 1 - idx;
+    const fromEnd = n - 1 - i;
     const pick = Math.min(n - 1, Math.max(chromeSlots, fromEnd));
     return p[pick] ?? p[n - 1] ?? fallbackSeriesColor;
   };
@@ -2882,7 +2874,7 @@ export function ChartCanvas() {
   const scatterPointColorFor = (row, idx) => {
     if (!scatterColorEnabled || !selColorCol) return seriesColorFor(ySeries[0]?.sourceKey, 0);
     const value = rowValueForDataKey(row, selColorCol);
-    return seriesColorAt(stableHashIndex(value, Math.max(1, activePalette?.length || 1))) || seriesColorAt(idx);
+    return seriesColorAt(stableHashIndex(value, Math.max(1, hasSelectedPalette ? selectedPalette.length : DEFAULT_CHART_SERIES_COLORS.length))) || seriesColorAt(idx);
   };
   const yAxisFormatter = (raw) => {
     const n = Number(raw);
@@ -3004,8 +2996,9 @@ export function ChartCanvas() {
     );
   };
 
-  const tickFillX = xAxisTickColor || (dark ? "#94a3b8" : "#64748b");
-  const tickFillY = yAxisTickColor || (dark ? "#94a3b8" : "#64748b");
+  const chartSurfaceDark = !!htmlDark || !!dark;
+  const tickFillX = xAxisTickColor || (chartSurfaceDark ? "#94a3b8" : "#64748b");
+  const tickFillY = yAxisTickColor || (chartSurfaceDark ? "#94a3b8" : "#64748b");
   const chartXAxisTitleLabel = showChartXAxisTitle
     ? {
         value: String(xAxisLabel).trim(),
@@ -3039,8 +3032,8 @@ export function ChartCanvas() {
         style: { textAnchor: "middle", fill: xAxisLabelColor || tickFillX, fontSize: 11 },
       }
     : undefined;
-  const gridStroke = gridLineColor || (dark ? "rgba(148,163,184,0.32)" : "rgba(100,116,139,0.35)");
-  const labelListFill = chartTextColor || (dark ? "#e2e8f0" : "#0f172a");
+  const gridStroke = gridLineColor || (chartSurfaceDark ? "rgba(148,163,184,0.32)" : "rgba(100,116,139,0.35)");
+  const labelListFill = chartTextColor || (chartSurfaceDark ? "#e2e8f0" : "#0f172a");
 
   const renderedDaySeparationLines = useMemo(() => {
     if (!daySeparationActive || daySeparationStartsMs.length === 0) return [];
@@ -3273,10 +3266,8 @@ export function ChartCanvas() {
               style={{
                 backgroundColor:
                   innerBoxColor ||
-                  activePalette?.[2] ||
-                  ((selChartType === "candlestick" ? htmlDark : dark)
-                    ? "#000000"
-                    : "#ffffff"),
+                  (hasSelectedPalette ? selectedPalette?.[2] : null) ||
+                  defaultChartInnerBackground(!!htmlDark),
               }}
             >
               {!titleHidden || !subTitleHidden ? (

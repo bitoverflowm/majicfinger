@@ -17,6 +17,14 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
+import {
+  Field,
+  FieldContent,
+  FieldDescription,
+  FieldGroup,
+  FieldLabel,
+  FieldTitle,
+} from "@/components/ui/field";
 import { Switch } from "@/components/ui/switch";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { Toggle } from "@/components/ui/toggle";
@@ -43,6 +51,7 @@ import { normalizeChartEmbedSlug } from "@/lib/chartEmbedSlug";
 import { REFERENCE_EQUATION_PRESETS, validateReferenceEquation } from "@/lib/chartReferenceEquation";
 import { ChartColorPalettePopover } from "@/components/chartView/ChartColorPalettePopover";
 import { pivotBarChartBySeries } from "@/components/chartView/pivotBarChartData";
+import { DEFAULT_CHART_SERIES_COLORS } from "@/components/chartView/panels/shadcnChartPalettes";
 import { defaultChartSeriesLabel } from "@/lib/chartLineLabels";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import {
@@ -121,65 +130,73 @@ function TimeseriesXAxisFormatSection({
 }) {
   const isTimeHm = String(xDateFormatPreset || "") === "time_hm";
   return (
-    <>
-      <div className="flex items-center">
+    <FieldGroup className="gap-4">
+      <Field orientation="horizontal" className="items-center gap-2">
         <Switch
           id="chart-line-time-series-x-axis"
           checked={canUseTimeSeriesX && xTimeScale}
           onCheckedChange={(checked) => setXTimeScale(canUseTimeSeriesX ? checked : false)}
-          className="scale-75 origin-left"
+          className="h-4 w-7 shrink-0 [&>span]:h-3 [&>span]:w-3 data-[state=checked]:[&>span]:translate-x-3"
           disabled={!canUseTimeSeriesX}
         />
-        <Label
-          htmlFor="chart-line-time-series-x-axis"
-          className={`pr-1 cursor-pointer text-xs font-normal text-muted-foreground ${!canUseTimeSeriesX ? "opacity-60" : ""}`}
-        >
-          Set x-axis to timeseries format
-        </Label>
-        <TooltipProvider delayDuration={250}>
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <span className={`inline-flex cursor-help ${dark ? "text-slate-400" : "text-muted-foreground"}`}>
-                <CircleHelp className="h-3.5 w-3.5" />
-              </span>
-            </TooltipTrigger>
-            <TooltipContent side="bottom" className="max-w-[280px] text-xs">
-              Uses a numeric time scale so each row maps along the full width. Turn off for categorical X (e.g. labels).
-            </TooltipContent>
-          </Tooltip>
-        </TooltipProvider>
-      </div>
-      <div className="flex items-center">
+        <FieldContent className="gap-0.5">
+          <FieldLabel
+            htmlFor="chart-line-time-series-x-axis"
+            className={`cursor-pointer text-xs font-normal ${!canUseTimeSeriesX ? "opacity-60" : ""}`}
+          >
+            <span className="inline-flex items-center gap-1.5">
+              Set x-axis to timeseries format
+              <TooltipProvider delayDuration={250}>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <span className={`inline-flex cursor-help ${dark ? "text-slate-400" : "text-muted-foreground"}`}>
+                      <CircleHelp className="h-3.5 w-3.5" />
+                    </span>
+                  </TooltipTrigger>
+                  <TooltipContent side="bottom" className="max-w-[280px] text-xs">
+                    Uses a numeric time scale so each row maps along the full width. Turn off for categorical X (e.g. labels).
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+            </span>
+          </FieldLabel>
+        </FieldContent>
+      </Field>
+      <Field orientation="horizontal" className="items-center gap-2">
         <Switch
           id="chart-line-human-readable-time"
           checked={canUseTimeSeriesX && lineHumanReadableTime}
           onCheckedChange={(checked) => setLineHumanReadableTime(canUseTimeSeriesX ? checked : false)}
-          className="scale-75 origin-left"
+          className="h-4 w-7 shrink-0 [&>span]:h-3 [&>span]:w-3 data-[state=checked]:[&>span]:translate-x-3"
           disabled={!canUseTimeSeriesX}
         />
-        <Label
-          htmlFor="chart-line-human-readable-time"
-          className={`pr-1 cursor-pointer text-xs font-normal ${dark ? "text-slate-300" : "text-muted-foreground"} ${!canUseTimeSeriesX ? "opacity-60" : ""}`}
-        >
-          Human readable time
-        </Label>
-        <TooltipProvider delayDuration={250}>
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <span className={`inline-flex cursor-help ${dark ? "text-slate-400" : "text-muted-foreground"}`}>
-                <CircleHelp className="h-3.5 w-3.5" />
-              </span>
-            </TooltipTrigger>
-            <TooltipContent side="bottom" className="max-w-[280px] text-xs">
-              format time like dd-mm-yyyy instead of unix/ iso time stamp
-            </TooltipContent>
-          </Tooltip>
-        </TooltipProvider>
-      </div>
+        <FieldContent className="gap-0.5">
+          <FieldLabel
+            htmlFor="chart-line-human-readable-time"
+            className={`cursor-pointer text-xs font-normal ${!canUseTimeSeriesX ? "opacity-60" : ""}`}
+          >
+            <span className="inline-flex items-center gap-1.5">
+              Human readable time
+              <TooltipProvider delayDuration={250}>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <span className={`inline-flex cursor-help ${dark ? "text-slate-400" : "text-muted-foreground"}`}>
+                      <CircleHelp className="h-3.5 w-3.5" />
+                    </span>
+                  </TooltipTrigger>
+                  <TooltipContent side="bottom" className="max-w-[280px] text-xs">
+                    format time like dd-mm-yyyy instead of unix/ iso time stamp
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+            </span>
+          </FieldLabel>
+        </FieldContent>
+      </Field>
 
       {canUseTimeSeriesX ? (
-        <div className="grid gap-1.5 pt-1">
-          <Label className="text-xs text-muted-foreground">Date label format (display only)</Label>
+        <Field>
+          <FieldLabel className="text-xs">Date label format (display only)</FieldLabel>
           <Select
             value={String(xDateFormatPreset || "auto")}
             onValueChange={(v) => setXDateFormatPreset?.(v || "auto")}
@@ -196,29 +213,29 @@ function TimeseriesXAxisFormatSection({
             </SelectContent>
           </Select>
           {isTimeHm ? (
-            <div className="flex items-start gap-2 pt-0.5">
+            <Field orientation="horizontal" className="items-start gap-2 pt-1">
               <Switch
                 id="chart-line-day-separation-blocks"
                 checked={!!showDaySeparationBlocks}
                 onCheckedChange={(checked) => setShowDaySeparationBlocks?.(!!checked)}
-                className="mt-0.5 scale-75 origin-left"
+                className="mt-0.5 h-4 w-7 shrink-0 [&>span]:h-3 [&>span]:w-3 data-[state=checked]:[&>span]:translate-x-3"
               />
-              <div className="min-w-0 space-y-0.5">
-                <Label
+              <FieldContent className="gap-1">
+                <FieldLabel
                   htmlFor="chart-line-day-separation-blocks"
-                  className="cursor-pointer text-xs font-normal text-muted-foreground"
+                  className="cursor-pointer text-xs font-normal"
                 >
                   Show day separation markers
-                </Label>
-                <p className="text-[10px] leading-snug text-muted-foreground">
+                </FieldLabel>
+                <FieldDescription className="text-xs">
                   Draw a marker where each new day starts, labeled as DD-MMM (e.g. 08-Aug).
-                </p>
-              </div>
-            </div>
+                </FieldDescription>
+              </FieldContent>
+            </Field>
           ) : null}
-        </div>
+        </Field>
       ) : null}
-    </>
+    </FieldGroup>
   );
 }
 
@@ -530,23 +547,21 @@ export default function ChartControls() {
     return false;
   });
   const hasSelectedPalette = Array.isArray(selectedPalette) && selectedPalette.length > 0;
-  const defaultPalette = dark
-    ? ["#ffffff", "#000000", "#000000", "#ffffff"]
-    : ["#000000", "#ffffff", "#ffffff", "#000000"];
-  const activePalette = hasSelectedPalette ? selectedPalette : defaultPalette;
-  const fallbackSeriesColor = dark ? "#ffffff" : "#000000";
+  const fallbackSeriesColor = DEFAULT_CHART_SERIES_COLORS[0];
   const defaultSeriesColorAt = (idx) => {
-    const p = activePalette;
+    const i = Math.max(0, Number(idx) || 0);
+    if (!hasSelectedPalette) {
+      const n = DEFAULT_CHART_SERIES_COLORS.length;
+      return DEFAULT_CHART_SERIES_COLORS[i % n] || fallbackSeriesColor;
+    }
+    const p = selectedPalette;
     const n = p?.length || 0;
     if (!n) return fallbackSeriesColor;
-    if (!hasSelectedPalette) {
-      return p[idx] ?? p[3] ?? p[0] ?? fallbackSeriesColor;
-    }
     const chromeSlots = 3;
     if (n <= chromeSlots) {
-      return p[Math.max(0, n - 1 - (idx % Math.max(1, n)))] ?? fallbackSeriesColor;
+      return p[Math.max(0, n - 1 - (i % Math.max(1, n)))] ?? fallbackSeriesColor;
     }
-    const fromEnd = n - 1 - idx;
+    const fromEnd = n - 1 - i;
     const pick = Math.min(n - 1, Math.max(chromeSlots, fromEnd));
     return p[pick] ?? p[n - 1] ?? fallbackSeriesColor;
   };
@@ -828,12 +843,12 @@ export default function ChartControls() {
     Array.isArray(selY) &&
     selY.length > 0;
   const normalizeValuesControl = showNormalizeControl ? (
-    <div className="flex min-w-0 items-center gap-2 border-t py-2">
+    <Field orientation="horizontal" className="items-center gap-2 border-t border-border/60 pt-4">
       <Switch
         id="chart-data-normalize"
         checked={normalizeMode === "basic" || normalizeMode === "min-max"}
         onCheckedChange={(on) => setNormalizeMode(on ? "basic" : null)}
-        className="shrink-0 scale-75 origin-left"
+        className="h-4 w-7 shrink-0 [&>span]:h-3 [&>span]:w-3 data-[state=checked]:[&>span]:translate-x-3"
       />
       {normalizeMode === "basic" || normalizeMode === "min-max" ? (
         <Select
@@ -859,77 +874,79 @@ export default function ChartControls() {
           </SelectContent>
         </Select>
       ) : (
-        <Label htmlFor="chart-data-normalize" className="cursor-pointer text-xs text-muted-foreground">
+        <FieldLabel htmlFor="chart-data-normalize" className="cursor-pointer text-xs font-normal">
           Normalize
-        </Label>
+        </FieldLabel>
       )}
-    </div>
+    </Field>
   ) : null;
   const yAxisFormatControls = showYAxisFormat ? (
-    <Collapsible open={yAxisFormatOpen} onOpenChange={setYAxisFormatOpen} className="border-t py-2">
+    <Collapsible open={yAxisFormatOpen} onOpenChange={setYAxisFormatOpen} className="border-t border-border/60 pt-4">
       <CollapsibleTrigger asChild>
         <button
           type="button"
-          className={`flex w-full min-w-0 items-center justify-between gap-2 rounded-md py-1 text-left text-xs font-bold ${
-            dark ? "text-slate-200 hover:text-white" : "text-muted-foreground hover:text-foreground"
-          }`}
+          className="flex w-full min-w-0 items-center justify-between gap-2 rounded-md text-left"
         >
-          <span>y-axis</span>
+          <FieldTitle className="text-xs">y-axis</FieldTitle>
           <ChevronDown
-            className={`h-4 w-4 shrink-0 transition-transform duration-200 ${yAxisFormatOpen ? "rotate-180" : ""}`}
+            className={`h-3.5 w-3.5 shrink-0 text-muted-foreground transition-transform duration-200 ${yAxisFormatOpen ? "rotate-180" : ""}`}
             aria-hidden
           />
         </button>
       </CollapsibleTrigger>
-      <CollapsibleContent className="pt-2">
-        <div className="grid grid-cols-2 gap-2">
-          <Select
-            value={String(yAxisDivisor || 1)}
-            onValueChange={(v) => setYAxisDivisor(Number(v) || 1)}
-          >
-            <SelectTrigger className="h-8 min-w-0 text-xs">
-              <SelectValue placeholder="Divide by" />
-            </SelectTrigger>
-            <SelectContent className="text-xs">
-              <SelectItem value="1">No divisor (x1)</SelectItem>
-              <SelectItem value="1000">/ 1,000</SelectItem>
-              <SelectItem value="1000000">/ 1,000,000</SelectItem>
-              <SelectItem value="1000000000">/ 1,000,000,000</SelectItem>
-            </SelectContent>
-          </Select>
-          <Select
-            value={yAxisCompact ? "compact" : "full"}
-            onValueChange={(v) => setYAxisCompact(v === "compact")}
-          >
-            <SelectTrigger className="h-8 min-w-0 text-xs">
-              <SelectValue placeholder="Label style" />
-            </SelectTrigger>
-            <SelectContent className="text-xs">
-              <SelectItem value="compact">Compact (5m, 1.5b)</SelectItem>
-              <SelectItem value="full">Full numbers</SelectItem>
-            </SelectContent>
-          </Select>
+      <CollapsibleContent className="pt-3">
+        <div className="grid grid-cols-2 gap-3">
+          <Field>
+            <FieldLabel className="text-xs text-muted-foreground">Divisor</FieldLabel>
+            <Select
+              value={String(yAxisDivisor || 1)}
+              onValueChange={(v) => setYAxisDivisor(Number(v) || 1)}
+            >
+              <SelectTrigger className="h-8 min-w-0 text-xs">
+                <SelectValue placeholder="Divide by" />
+              </SelectTrigger>
+              <SelectContent className="text-xs">
+                <SelectItem value="1">No divisor (x1)</SelectItem>
+                <SelectItem value="1000">/ 1,000</SelectItem>
+                <SelectItem value="1000000">/ 1,000,000</SelectItem>
+                <SelectItem value="1000000000">/ 1,000,000,000</SelectItem>
+              </SelectContent>
+            </Select>
+          </Field>
+          <Field>
+            <FieldLabel className="text-xs text-muted-foreground">Labels</FieldLabel>
+            <Select
+              value={yAxisCompact ? "compact" : "full"}
+              onValueChange={(v) => setYAxisCompact(v === "compact")}
+            >
+              <SelectTrigger className="h-8 min-w-0 text-xs">
+                <SelectValue placeholder="Label style" />
+              </SelectTrigger>
+              <SelectContent className="text-xs">
+                <SelectItem value="compact">Compact (5m, 1.5b)</SelectItem>
+                <SelectItem value="full">Full numbers</SelectItem>
+              </SelectContent>
+            </Select>
+          </Field>
         </div>
       </CollapsibleContent>
     </Collapsible>
   ) : null;
   const lineSeriesControls = selChartType === "line" ? (
-    <Collapsible open={linesOpen} onOpenChange={setLinesOpen} className="border-t py-2">
+    <Collapsible open={linesOpen} onOpenChange={setLinesOpen} className="border-t border-border/60 pt-4">
       <CollapsibleTrigger asChild>
         <button
           type="button"
-          className={`flex w-full min-w-0 items-center justify-between gap-2 rounded-md py-1 text-left text-xs font-bold ${
-            dark ? "text-slate-200 hover:text-white" : "text-muted-foreground hover:text-foreground"
-          }`}
+          className="flex w-full min-w-0 items-center justify-between gap-2 rounded-md text-left"
         >
-          <span>Lines</span>
+          <FieldTitle className="text-xs">Lines</FieldTitle>
           <ChevronDown
-            className={`h-4 w-4 shrink-0 transition-transform duration-200 ${linesOpen ? "rotate-180" : ""}`}
+            className={`h-3.5 w-3.5 shrink-0 text-muted-foreground transition-transform duration-200 ${linesOpen ? "rotate-180" : ""}`}
             aria-hidden
           />
         </button>
       </CollapsibleTrigger>
-      <CollapsibleContent className="space-y-2 pt-2">
+      <CollapsibleContent className="space-y-3 pt-3">
         <div className="flex flex-wrap gap-2">
           {(selY || []).map((lineColumn, index) => (
             <div key={`${lineColumn}-${index}`} className="inline-flex items-center gap-1">
@@ -972,7 +989,7 @@ export default function ChartControls() {
 
         {renderSeriesLabelInputs(selY)}
 
-        <div>
+        <Field>
           <Select
             value={lineAddValue}
             onValueChange={(val) => {
@@ -1011,16 +1028,16 @@ export default function ChartControls() {
           </Select>
 
           {!canAddLine && !selX && (
-            <span className="pl-2 text-[10px] text-muted-foreground">
+            <FieldDescription className="text-xs">
               Choose an X-axis column first
-            </span>
+            </FieldDescription>
           )}
           {!canAddLine && selX && (
-            <span className="pl-2 text-[10px] text-muted-foreground">
+            <FieldDescription className="text-xs">
               No more lines to add
-            </span>
+            </FieldDescription>
           )}
-        </div>
+        </Field>
         {lineNonNumericColumns.length > 0 && (
           <p className="text-xs text-destructive">
             non-numericl vlaue detected this does not work for line cahrt
@@ -1498,19 +1515,18 @@ export default function ChartControls() {
                 <AccordionTrigger className="py-2 text-xs font-bold text-muted-foreground hover:no-underline">
                   Data
                 </AccordionTrigger>
-                <AccordionContent>
+                <AccordionContent className="pt-1">
+                  <FieldGroup className="gap-5">
                   {selChartType === "candlestick" ? (
-                    <div className="space-y-3 py-2">
-                      <p className={`text-[11px] leading-snug ${dark ? "text-slate-300" : "text-muted-foreground"}`}>
+                    <>
+                      <FieldDescription className="text-xs">
                         Candlesticks auto-map from Kalshi-style columns:{" "}
                         <span className="font-mono text-[10px]">end_period_ts</span> plus a full OHLC
                         quartet. Bars missing any open/high/low/close value are skipped.
-                      </p>
+                      </FieldDescription>
 
-                      <div className="space-y-1.5">
-                        <Label className="text-[11px] font-medium text-muted-foreground">
-                          Data sheet
-                        </Label>
+                      <Field>
+                        <FieldLabel className="text-xs">Data sheet</FieldLabel>
                         <Select
                           value={candlestickSheetId || "__active__"}
                           onValueChange={(v) =>
@@ -1531,13 +1547,11 @@ export default function ChartControls() {
                             ))}
                           </SelectContent>
                         </Select>
-                      </div>
+                      </Field>
 
                       {candlestickMapped?.available?.length ? (
-                        <div className="space-y-1.5">
-                          <Label className="text-[11px] font-medium text-muted-foreground">
-                            OHLC series
-                          </Label>
+                        <Field>
+                          <FieldLabel className="text-xs">OHLC series</FieldLabel>
                           <Select
                             value={candlestickOhlcSetId || "auto"}
                             onValueChange={(v) => setCandlestickOhlcSetId(v || "auto")}
@@ -1558,106 +1572,105 @@ export default function ChartControls() {
                             </SelectContent>
                           </Select>
                           {candlestickMapped.ok ? (
-                            <p className="text-[10px] text-muted-foreground">
+                            <FieldDescription className="text-xs">
                               Using {candlestickMapped.ohlc?.label || "OHLC"} ·{" "}
                               {candlestickMapped.data.length.toLocaleString()} bars
                               {candlestickMapped.skipped
                                 ? ` · ${candlestickMapped.skipped.toLocaleString()} skipped`
                                 : ""}
-                            </p>
+                            </FieldDescription>
                           ) : (
-                            <p className="text-[10px] text-amber-700 dark:text-amber-300">
+                            <FieldDescription className="text-xs text-amber-700 dark:text-amber-300">
                               Columns found, but no bars have all four OHLC values filled in.
-                            </p>
+                            </FieldDescription>
                           )}
-                        </div>
+                        </Field>
                       ) : (
-                        <p className="text-[11px] text-amber-700 dark:text-amber-300">
+                        <FieldDescription className="text-xs text-amber-700 dark:text-amber-300">
                           This sheet does not match the candlestick shape. Pull Get Market Candlesticks
                           (or provide end_period_ts + price_/yes_bid_/yes_ask_ OHLC columns).
-                        </p>
+                        </FieldDescription>
                       )}
-                    </div>
+                    </>
                   ) : selChartType === "line" ? (
                     <>
-                      <div className="py-2 space-y-2">
-                        <div className="flex min-w-0 items-center gap-2 text-foreground">
-                          <span className={`text-xs font-semibold ${dark ? "text-slate-200" : "text-muted-foreground"}`}>Pivot (x-axis):</span>
-                          <Select value={xAxisSelectValue} onValueChange={handleXAxisChange}>
-                            <SelectTrigger className="h-8 min-w-0 flex-1 text-xs font-normal">
-                              <SelectValue placeholder="X axis" className="text-xs font-normal" />
-                            </SelectTrigger>
-                            <SelectContent className="text-xs">
-                              <SelectItem value={CHART_X_AXIS_NONE} className="text-xs font-normal">
-                                — Select X axis —
-                              </SelectItem>
-                              <GroupedColumnSelectItems
-                                groups={lineSheetColumnGroups}
-                                allowedValues={xOptions}
-                                itemClassName="text-xs font-normal"
-                              />
-                            </SelectContent>
-                          </Select>
-                        </div>
-                        {selX ? (
-                          <div className="flex items-center">
-                            {(() => {
-                              const xType = getAxisType(selX, dataTypes, chartData);
-                              const isCategorical = xType === "string" && !lineIsTemporalX;
-                              const ascendingLabel = isCategorical
-                                ? "Sort alphabetical"
-                                : lineIsTemporalX
-                                  ? "Sort chronological"
-                                  : "Sort ascending";
-                              const descendingLabel = isCategorical
-                                ? "Sort reverse-alphabetical"
-                                : lineIsTemporalX
-                                  ? "Sort reverse chronological"
-                                  : "Sort descending";
-                              const sortLabel = sortXDir === "desc" ? descendingLabel : ascendingLabel;
-                              return (
-                                <>
-                                  <Switch
-                                    id="chart-line-sort-x-dir"
-                                    checked={sortXDir === "desc"}
-                                    onCheckedChange={(checked) => setSortXDir(checked ? "desc" : "asc")}
-                                    className="scale-75 origin-left"
-                                  />
-                                  <Label
-                                    htmlFor="chart-line-sort-x-dir"
-                                    className="cursor-pointer text-xs font-normal text-muted-foreground"
-                                  >
-                                    {sortLabel}
-                                  </Label>
-                                </>
-                              );
-                            })()}
-                          </div>
-                        ) : null}
-                        <TimeseriesXAxisFormatSection
-                          dark={dark}
-                          canUseTimeSeriesX={canUseTimeSeriesX}
-                          xTimeScale={xTimeScale}
-                          setXTimeScale={setXTimeScale}
-                          lineHumanReadableTime={lineHumanReadableTime}
-                          setLineHumanReadableTime={setLineHumanReadableTime}
-                          xDateFormatPreset={xDateFormatPreset}
-                          setXDateFormatPreset={setXDateFormatPreset}
-                          X_DATE_FORMAT_PRESETS={X_DATE_FORMAT_PRESETS}
-                          showDaySeparationBlocks={showDaySeparationBlocks}
-                          setShowDaySeparationBlocks={setShowDaySeparationBlocks}
-                        />
+                      <Field>
+                        <FieldLabel className="text-xs">Pivot (x-axis)</FieldLabel>
+                        <Select value={xAxisSelectValue} onValueChange={handleXAxisChange}>
+                          <SelectTrigger className="h-8 min-w-0 text-xs font-normal">
+                            <SelectValue placeholder="X axis" className="text-xs font-normal" />
+                          </SelectTrigger>
+                          <SelectContent className="text-xs">
+                            <SelectItem value={CHART_X_AXIS_NONE} className="text-xs font-normal">
+                              — Select X axis —
+                            </SelectItem>
+                            <GroupedColumnSelectItems
+                              groups={lineSheetColumnGroups}
+                              allowedValues={xOptions}
+                              itemClassName="text-xs font-normal"
+                            />
+                          </SelectContent>
+                        </Select>
+                      </Field>
+                      {selX ? (
+                        <Field orientation="horizontal" className="items-center gap-2">
+                          {(() => {
+                            const xType = getAxisType(selX, dataTypes, chartData);
+                            const isCategorical = xType === "string" && !lineIsTemporalX;
+                            const ascendingLabel = isCategorical
+                              ? "Sort alphabetical"
+                              : lineIsTemporalX
+                                ? "Sort chronological"
+                                : "Sort ascending";
+                            const descendingLabel = isCategorical
+                              ? "Sort reverse-alphabetical"
+                              : lineIsTemporalX
+                                ? "Sort reverse chronological"
+                                : "Sort descending";
+                            const sortLabel = sortXDir === "desc" ? descendingLabel : ascendingLabel;
+                            return (
+                              <>
+                                <Switch
+                                  id="chart-line-sort-x-dir"
+                                  checked={sortXDir === "desc"}
+                                  onCheckedChange={(checked) => setSortXDir(checked ? "desc" : "asc")}
+                                  className="h-4 w-7 shrink-0 [&>span]:h-3 [&>span]:w-3 data-[state=checked]:[&>span]:translate-x-3"
+                                />
+                                <FieldLabel
+                                  htmlFor="chart-line-sort-x-dir"
+                                  className="cursor-pointer text-xs font-normal"
+                                >
+                                  {sortLabel}
+                                </FieldLabel>
+                              </>
+                            );
+                          })()}
+                        </Field>
+                      ) : null}
+                      <TimeseriesXAxisFormatSection
+                        dark={dark}
+                        canUseTimeSeriesX={canUseTimeSeriesX}
+                        xTimeScale={xTimeScale}
+                        setXTimeScale={setXTimeScale}
+                        lineHumanReadableTime={lineHumanReadableTime}
+                        setLineHumanReadableTime={setLineHumanReadableTime}
+                        xDateFormatPreset={xDateFormatPreset}
+                        setXDateFormatPreset={setXDateFormatPreset}
+                        X_DATE_FORMAT_PRESETS={X_DATE_FORMAT_PRESETS}
+                        showDaySeparationBlocks={showDaySeparationBlocks}
+                        setShowDaySeparationBlocks={setShowDaySeparationBlocks}
+                      />
 
-                        {yAxisFormatControls}
-                        {normalizeValuesControl}
-                        {lineSeriesControls}
-                      </div>
+                      {yAxisFormatControls}
+                      {normalizeValuesControl}
+                      {lineSeriesControls}
                     </>
                   ) : (selChartType === "area") ? (
                     <>
-                      <div className="min-w-0 py-2 text-foreground">
+                      <Field>
+                        <FieldLabel className="text-xs">X axis</FieldLabel>
                         <Select value={xAxisSelectValue} onValueChange={handleXAxisChange}>
-                          <SelectTrigger className="min-w-0">
+                          <SelectTrigger className="h-8 min-w-0 text-xs">
                             <SelectValue placeholder="X axis" className="text-xs" />
                           </SelectTrigger>
                           <SelectContent className="text-xs">
@@ -1670,17 +1683,17 @@ export default function ChartControls() {
                             />
                           </SelectContent>
                         </Select>
-                      </div>
-                      <div className="py-2">
-                        <p className={`mb-1 text-xs font-bold ${dark ? "text-slate-200" : "text-muted-foreground"}`}>Areas</p>
+                      </Field>
+                      <Field>
+                        <FieldLabel className="text-xs">Areas</FieldLabel>
                         {selY.length > 0 &&
                           selY.map((yValue, index) => (
                             <div
-                              className="flex min-w-0 place-items-center gap-2 py-1 text-foreground"
+                              className="flex min-w-0 place-items-center gap-2"
                               key={`${yValue}-${index}`}
                             >
                               <Select value={yValue} onValueChange={(val) => handleSelectY(val, index)}>
-                                <SelectTrigger className="min-w-0 flex-1">
+                                <SelectTrigger className="h-8 min-w-0 flex-1 text-xs">
                                   <SelectValue className="text-xs">{formatColumnLabel(yValue)}</SelectValue>
                                 </SelectTrigger>
                                 <SelectContent className="text-xs">
@@ -1706,44 +1719,41 @@ export default function ChartControls() {
                           ))}
                         {renderSeriesLabelInputs(selY)}
                         {selY.length === 0 && (
-                          <div className="min-w-0">
-                            <Select onValueChange={(val) => handleSelectY(val)}>
-                              <SelectTrigger className="min-w-0">
-                                <SelectValue placeholder="Y column" className="text-xs" />
-                              </SelectTrigger>
-                              <SelectContent className="text-xs">
-                                <GroupedColumnSelectItems
-                                  groups={lineSheetColumnGroups}
-                                  allowedValues={availableYOptions}
-                                />
-                              </SelectContent>
-                            </Select>
-                          </div>
+                          <Select onValueChange={(val) => handleSelectY(val)}>
+                            <SelectTrigger className="h-8 min-w-0 text-xs">
+                              <SelectValue placeholder="Y column" className="text-xs" />
+                            </SelectTrigger>
+                            <SelectContent className="text-xs">
+                              <GroupedColumnSelectItems
+                                groups={lineSheetColumnGroups}
+                                allowedValues={availableYOptions}
+                              />
+                            </SelectContent>
+                          </Select>
                         )}
-                      </div>
-                      <div className="min-w-0 space-y-2 py-2">
-                        <TimeseriesXAxisFormatSection
-                          dark={dark}
-                          canUseTimeSeriesX={canUseTimeSeriesX}
-                          xTimeScale={xTimeScale}
-                          setXTimeScale={setXTimeScale}
-                          lineHumanReadableTime={lineHumanReadableTime}
-                          setLineHumanReadableTime={setLineHumanReadableTime}
-                          xDateFormatPreset={xDateFormatPreset}
-                          setXDateFormatPreset={setXDateFormatPreset}
-                          X_DATE_FORMAT_PRESETS={X_DATE_FORMAT_PRESETS}
-                          showDaySeparationBlocks={showDaySeparationBlocks}
-                          setShowDaySeparationBlocks={setShowDaySeparationBlocks}
-                        />
-                      </div>
+                      </Field>
+                      <TimeseriesXAxisFormatSection
+                        dark={dark}
+                        canUseTimeSeriesX={canUseTimeSeriesX}
+                        xTimeScale={xTimeScale}
+                        setXTimeScale={setXTimeScale}
+                        lineHumanReadableTime={lineHumanReadableTime}
+                        setLineHumanReadableTime={setLineHumanReadableTime}
+                        xDateFormatPreset={xDateFormatPreset}
+                        setXDateFormatPreset={setXDateFormatPreset}
+                        X_DATE_FORMAT_PRESETS={X_DATE_FORMAT_PRESETS}
+                        showDaySeparationBlocks={showDaySeparationBlocks}
+                        setShowDaySeparationBlocks={setShowDaySeparationBlocks}
+                      />
                       {yAxisFormatControls}
                       {normalizeValuesControl}
                     </>
                   ) : (
                     <>
-                      <div className="min-w-0 py-2 text-foreground">
+                      <Field>
+                        <FieldLabel className="text-xs">X axis</FieldLabel>
                         <Select value={xAxisSelectValue} onValueChange={handleXAxisChange}>
-                          <SelectTrigger className="min-w-0">
+                          <SelectTrigger className="h-8 min-w-0 text-xs">
                             <SelectValue placeholder="X axis" className="text-xs" />
                           </SelectTrigger>
                           <SelectContent className="text-xs">
@@ -1756,20 +1766,20 @@ export default function ChartControls() {
                             />
                           </SelectContent>
                         </Select>
-                      </div>
+                      </Field>
                       {barXAxisSpacingConfigurable ? (
-                        <div className="min-w-0 space-y-1 border-b border-border/60 pb-3">
-                          <Label className="text-xs text-muted-foreground">X-axis spacing</Label>
-                          <p className="text-[10px] leading-snug text-muted-foreground">
+                        <Field>
+                          <FieldLabel className="text-xs">X-axis spacing</FieldLabel>
+                          <FieldDescription className="text-xs">
                             {barXAxisIsDate
                               ? "Date mode spaces bars by calendar time. Categorical mode places each date at equal intervals."
                               : "Numeric mode spaces bars by their X value. Categorical mode places each bar at equal intervals."}
-                          </p>
+                          </FieldDescription>
                           <ToggleGroup
                             type="single"
                             variant="outline"
                             size="sm"
-                            className="mt-0.5 flex w-full min-w-0 justify-stretch [&>button]:min-w-0 [&>button]:flex-1"
+                            className="flex w-full min-w-0 justify-stretch [&>button]:min-w-0 [&>button]:flex-1"
                             value={barXAxisMode}
                             onValueChange={(v) => {
                               if (v === "date" || v === "categorical") setBarXAxisMode(v);
@@ -1783,14 +1793,15 @@ export default function ChartControls() {
                               Categorical
                             </ToggleGroupItem>
                           </ToggleGroup>
-                        </div>
+                        </Field>
                       ) : null}
-                      <div className="py-2">
+                      <Field>
+                        <FieldLabel className="text-xs">Y columns</FieldLabel>
                         {selY.length > 0 &&
                           selY.map((yValue, index) => (
-                            <div className="flex min-w-0 place-items-center gap-2 py-1 text-foreground" key={index}>
+                            <div className="flex min-w-0 place-items-center gap-2" key={index}>
                               <Select value={yValue} onValueChange={(val) => handleSelectY(val, index)}>
-                                <SelectTrigger className="min-w-0 flex-1">
+                                <SelectTrigger className="h-8 min-w-0 flex-1 text-xs">
                                 <SelectValue className="text-xs">{formatColumnLabel(yValue)}</SelectValue>
                                 </SelectTrigger>
                                 <SelectContent className="text-xs">
@@ -1808,33 +1819,31 @@ export default function ChartControls() {
                             </div>
                           ))}
                         {selY.length === 0 && (
-                          <div className="min-w-0">
-                            <Select onValueChange={(val) => handleSelectY(val)}>
-                              <SelectTrigger className="min-w-0">
-                                <SelectValue placeholder="Y column" className="text-xs" />
-                              </SelectTrigger>
-                              <SelectContent className="text-xs">
-                                <GroupedColumnSelectItems
-                                  groups={lineSheetColumnGroups}
-                                  allowedValues={availableYOptions}
-                                />
-                              </SelectContent>
-                            </Select>
-                          </div>
+                          <Select onValueChange={(val) => handleSelectY(val)}>
+                            <SelectTrigger className="h-8 min-w-0 text-xs">
+                              <SelectValue placeholder="Y column" className="text-xs" />
+                            </SelectTrigger>
+                            <SelectContent className="text-xs">
+                              <GroupedColumnSelectItems
+                                groups={lineSheetColumnGroups}
+                                allowedValues={availableYOptions}
+                              />
+                            </SelectContent>
+                          </Select>
                         )}
-                      </div>
+                      </Field>
                       {selChartType === "bar" && selY.length > 0 && (
-                        <div className="min-w-0 space-y-2 border-b border-border/60 pb-3 pt-2">
-                          <div>
-                            <p className="mb-1 text-xs font-bold text-muted-foreground">Break down bars by</p>
-                            <p className="mb-1 text-[10px] leading-snug text-muted-foreground">
+                        <>
+                          <Field>
+                            <FieldLabel className="text-xs">Break down bars by</FieldLabel>
+                            <FieldDescription className="text-xs">
                               Pivot long data (e.g. outcome) into stacked or grouped series on the same X value.
-                            </p>
+                            </FieldDescription>
                             <Select
                               value={barSeriesColumn ?? "__none__"}
                               onValueChange={(v) => setBarSeriesColumn(v === "__none__" ? null : v)}
                             >
-                              <SelectTrigger className="min-w-0">
+                              <SelectTrigger className="h-8 min-w-0 text-xs">
                                 <SelectValue placeholder="None" className="text-xs" />
                               </SelectTrigger>
                               <SelectContent className="text-xs">
@@ -1848,10 +1857,10 @@ export default function ChartControls() {
                                 />
                               </SelectContent>
                             </Select>
-                          </div>
+                          </Field>
                           {barSeriesColumn ? (
-                            <div>
-                              <p className="mb-1 text-xs font-bold text-muted-foreground">Bar layout</p>
+                            <Field>
+                              <FieldLabel className="text-xs">Bar layout</FieldLabel>
                               <ToggleGroup
                                 type="single"
                                 variant="outline"
@@ -1871,15 +1880,15 @@ export default function ChartControls() {
                                   Stacked
                                 </ToggleGroupItem>
                               </ToggleGroup>
-                            </div>
+                            </Field>
                           ) : null}
                           {barSeriesColumn && barBreakdownSeriesKeys.length > 0 ? (
-                            <div>
-                              <p className="mb-1 text-xs font-bold text-muted-foreground">Category colors</p>
-                              <p className="mb-1 text-[10px] leading-snug text-muted-foreground">
+                            <Field>
+                              <FieldLabel className="text-xs">Category colors</FieldLabel>
+                              <FieldDescription className="text-xs">
                                 Pick a color for each {formatColumnLabel(barSeriesColumn)} value.
-                              </p>
-                              <div className="flex flex-wrap gap-2 py-1">
+                              </FieldDescription>
+                              <div className="flex flex-wrap gap-2">
                                 {barBreakdownSeriesKeys.map((seriesKey, index) => (
                                   <div key={`${seriesKey}-${index}`} className="inline-flex items-center gap-1">
                                     <Badge variant="secondary" className="gap-2 py-1 pl-2 pr-1 text-xs">
@@ -1907,14 +1916,14 @@ export default function ChartControls() {
                                   </div>
                                 ))}
                               </div>
-                            </div>
+                            </Field>
                           ) : null}
-                        </div>
+                        </>
                       )}
                       {selChartType === "bar" && selY.length > 0 && !barSeriesColumn && (
-                        <div className="pt-2">
-                          <p className="mb-1 text-xs font-bold text-muted-foreground">Bars</p>
-                          <div className="flex flex-wrap gap-2 py-1">
+                        <Field>
+                          <FieldLabel className="text-xs">Bars</FieldLabel>
+                          <div className="flex flex-wrap gap-2">
                             {(selY || []).map((seriesColumn, index) => (
                               <div key={`${seriesColumn}-${index}`} className="inline-flex items-center gap-1">
                                 <Badge variant="secondary" className="gap-2 py-1 pl-2 pr-1 text-xs">
@@ -1947,7 +1956,7 @@ export default function ChartControls() {
                             ))}
                           </div>
                           {renderSeriesLabelInputs(selY)}
-                        </div>
+                        </Field>
                       )}
                       {yAxisFormatControls}
                       {selChartType === "bar" ? normalizeValuesControl : null}
@@ -1957,12 +1966,14 @@ export default function ChartControls() {
                   {/* Scatter/bubble: Z (bubble size) and Color column */}
                   {selChartType === "scatter" && (
                     <>
-                      <div className="min-w-0 py-2">
+                      <Field>
                         <div className="flex items-start justify-between gap-3">
-                          <div className="min-w-0">
-                            <p className={`text-xs font-bold ${dark ? "text-slate-200" : "text-muted-foreground"} pt-2`}>Bubble size (Z)</p>
-                            <p className={`text-xs ${dark ? "text-slate-300" : "text-muted-foreground"}`}>Optional numeric column for bubble radius</p>
-                          </div>
+                          <FieldContent className="gap-1">
+                            <FieldTitle className="text-xs">Bubble size (Z)</FieldTitle>
+                            <FieldDescription className="text-xs">
+                              Optional numeric column for bubble radius
+                            </FieldDescription>
+                          </FieldContent>
                           <Switch
                             checked={!!scatterZEnabled}
                             onCheckedChange={(checked) => {
@@ -1970,11 +1981,12 @@ export default function ChartControls() {
                               if (!checked) setSelZ(null);
                             }}
                             aria-label="Enable bubble size Z column"
+                            className="h-4 w-7 shrink-0 [&>span]:h-3 [&>span]:w-3 data-[state=checked]:[&>span]:translate-x-3"
                           />
                         </div>
                         {scatterZEnabled ? (
                           <Select value={selZ || ""} onValueChange={(v) => setSelZ(v || null)}>
-                            <SelectTrigger className="mt-1 min-w-0">
+                            <SelectTrigger className="h-8 min-w-0 text-xs">
                               <SelectValue placeholder="Select Z column" className="text-xs" />
                             </SelectTrigger>
                             <SelectContent className="text-xs">
@@ -1986,13 +1998,15 @@ export default function ChartControls() {
                             </SelectContent>
                           </Select>
                         ) : null}
-                      </div>
-                      <div className="min-w-0 py-2">
+                      </Field>
+                      <Field>
                         <div className="flex items-start justify-between gap-3">
-                          <div className="min-w-0">
-                            <p className={`text-xs font-bold ${dark ? "text-slate-200" : "text-muted-foreground"} pt-2`}>Color by</p>
-                            <p className={`text-xs ${dark ? "text-slate-300" : "text-muted-foreground"}`}>Optional column for point color</p>
-                          </div>
+                          <FieldContent className="gap-1">
+                            <FieldTitle className="text-xs">Color by</FieldTitle>
+                            <FieldDescription className="text-xs">
+                              Optional column for point color
+                            </FieldDescription>
+                          </FieldContent>
                           <Switch
                             checked={!!scatterColorEnabled}
                             onCheckedChange={(checked) => {
@@ -2000,11 +2014,12 @@ export default function ChartControls() {
                               if (!checked) setSelColorCol(null);
                             }}
                             aria-label="Enable scatter color by column"
+                            className="h-4 w-7 shrink-0 [&>span]:h-3 [&>span]:w-3 data-[state=checked]:[&>span]:translate-x-3"
                           />
                         </div>
                         {scatterColorEnabled ? (
                           <Select value={selColorCol ?? "__none__"} onValueChange={(v) => setSelColorCol(v === "__none__" ? null : v)}>
-                            <SelectTrigger className="mt-1 min-w-0">
+                            <SelectTrigger className="h-8 min-w-0 text-xs">
                               <SelectValue placeholder="None or select column" className="text-xs" />
                             </SelectTrigger>
                             <SelectContent className="text-xs">
@@ -2018,16 +2033,16 @@ export default function ChartControls() {
                             </SelectContent>
                           </Select>
                         ) : null}
-                      </div>
+                      </Field>
                       {scatterZEnabled && selZ && (
-                        <div className="py-2 flex items-center gap-2">
-                          <span className={`text-xs ${dark ? "text-slate-200" : "text-muted-foreground"}`}>Z scale:</span>
+                        <Field orientation="horizontal" className="items-center gap-2">
+                          <FieldLabel className="text-xs">Z scale</FieldLabel>
                           <TooltipProvider delayDuration={300}>
                             <Tooltip>
                               <TooltipTrigger asChild>
                                 <button
                                   type="button"
-                                  className={`p-1.5 rounded border ${scaleZ === "log" ? "bg-muted" : "bg-background"} border-border flex items-center gap-1`}
+                                  className={`flex items-center gap-1 rounded border border-border p-1.5 ${scaleZ === "log" ? "bg-muted" : "bg-background"}`}
                                   onClick={() => setScaleZ((s) => (s === "log" ? "linear" : "log"))}
                                 >
                                   <LogIn className="h-4 w-4" />
@@ -2039,7 +2054,7 @@ export default function ChartControls() {
                               </TooltipContent>
                             </Tooltip>
                           </TooltipProvider>
-                        </div>
+                        </Field>
                       )}
                     </>
                   )}
@@ -2076,6 +2091,7 @@ export default function ChartControls() {
                       {availableYOptions && availableYOptions.length === 0 ? "You have no more columns" : "+ Stack Another Value"}
                     </Button>
                   )}
+                  </FieldGroup>
                 </AccordionContent>
               </AccordionItem>
 
