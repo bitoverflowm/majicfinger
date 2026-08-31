@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useLayoutEffect, useMemo, useRef, useState } from "react";
-import { BarChart3, Cable, LayoutDashboard, Share2 } from "lucide-react";
+import { BarChart3, Cable, LayoutDashboard, Share2, Table2 } from "lucide-react";
 
 import {
   DropdownMenu,
@@ -33,6 +33,7 @@ import { projectHasLiveFeedSource } from "@/lib/liveFeeds/projectLiveFeedSource"
 import { cn } from "@/lib/utils";
 
 const WORKSPACE_ACTION_TOOLTIPS = {
+  sheet: "Add new Sheet",
   integration: "Add new Integration",
   chart: "Add new Chart",
   dashboard: "Add new Dashboard",
@@ -399,9 +400,17 @@ function WorkspaceTabStrip({ items, compact, textSize, gapClass, livePaused = fa
 }
 
 /**
- * Connect home — sheet/chart tabs on the left; integration/chart/dashboard + export on the right.
+ * Connect home — sheet/chart tabs on the left; sheet/integration/chart/dashboard + export on the right.
+ *
+ * @param {object} props
+ * @param {() => void} [props.onAddSheet] Called when user taps “Add sheet”. Wire to {@link connectHomeAddBlankSheet} when ready.
  */
-export function ConnectHomeWorkspaceNav({ className, compact = false, onPanelManualOpen }) {
+export function ConnectHomeWorkspaceNav({
+  className,
+  compact = false,
+  onPanelManualOpen,
+  onAddSheet,
+}) {
   const ctx = useMyStateV2();
   const dataSheets = ctx?.dataSheets || {};
   const chartSheets = ctx?.chartSheets || {};
@@ -589,6 +598,10 @@ export function ConnectHomeWorkspaceNav({ className, compact = false, onPanelMan
     setRightPanelTab?.("export");
     setRightPanelOpen?.(true);
   }, [onPanelManualOpen, setRightPanelOpen, setRightPanelTab]);
+
+  const handleAddSheet = useCallback(() => {
+    onAddSheet?.();
+  }, [onAddSheet]);
 
   const handleCancelDataPull = useCallback(() => {
     cancelConnectDataFeedPull?.();
@@ -814,6 +827,14 @@ export function ConnectHomeWorkspaceNav({ className, compact = false, onPanelMan
               gapClass,
             )}
           >
+            <WorkspaceActionIconButton
+              icon={Table2}
+              label="Sheet"
+              tooltip={WORKSPACE_ACTION_TOOLTIPS.sheet}
+              active={tableViewActive && !chartViewActive && !dashboardViewActive}
+              onClick={handleAddSheet}
+              compact={compact}
+            />
             <WorkspaceActionIconButton
               icon={Cable}
               label="Integrations"
