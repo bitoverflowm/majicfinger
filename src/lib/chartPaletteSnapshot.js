@@ -1,20 +1,27 @@
 /** Color-related builder snapshot fields copied when creating a new chart (deep-cloned, not linked). */
 export const CHART_PALETTE_SNAPSHOT_KEYS = [
-  "selectedShadBaseId",
-  "selectedPalette",
-  "lineColorOverrides",
-  "dark",
   "titleColor",
   "subTitleColor",
   "bodyHeadingColor",
   "bodyContentColor",
-  "innerBoxColor",
   "gridLineColor",
   "chartTextColor",
   "xAxisTickColor",
   "yAxisTickColor",
   "chartConfig",
   "livelineColorChoice",
+];
+
+/**
+ * Intentionally not copied onto new charts — fresh charts use out-of-the-box
+ * rose/lime/blue series + light/dark theme card background instead of the prior ramp.
+ */
+export const CHART_PALETTE_SNAPSHOT_KEYS_EXCLUDED_FROM_NEW_CHART = [
+  "selectedShadBaseId",
+  "selectedPalette",
+  "lineColorOverrides",
+  "dark",
+  "innerBoxColor",
 ];
 
 function cloneSnapshotValue(value) {

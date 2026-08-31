@@ -2046,11 +2046,13 @@ export function ChartBuilderProvider({ demo, children, initialBuilderSnapshot, e
       const ctx = canvas.getContext("2d");
       if (!ctx) return null;
 
-      const paletteChrome = Array.isArray(selectedPalette) && selectedPalette.length > 0 ? selectedPalette : null;
       const padColor =
         innerBoxColor ||
-        (paletteChrome && paletteChrome.length > 2 ? paletteChrome[2] : null) ||
-        defaultChartInnerBackground(dark);
+        defaultChartInnerBackground(
+          typeof document !== "undefined"
+            ? document.documentElement.classList.contains("dark")
+            : !!dark,
+        );
 
       ctx.fillStyle = padColor;
       ctx.fillRect(0, 0, OG_IMAGE_WIDTH, OG_IMAGE_HEIGHT);
@@ -2073,7 +2075,7 @@ export function ChartBuilderProvider({ demo, children, initialBuilderSnapshot, e
     } catch {
       return null;
     }
-  }, [innerBoxColor, dark, selectedPalette]);
+  }, [innerBoxColor, dark]);
 
   const wsStop = polymarketWsState?.stop ?? chainlinkWsState?.stop;
   const wsStart = polymarketWsState?.start ?? chainlinkWsState?.start;
@@ -3265,9 +3267,7 @@ export function ChartCanvas() {
               )}
               style={{
                 backgroundColor:
-                  innerBoxColor ||
-                  (hasSelectedPalette ? selectedPalette?.[2] : null) ||
-                  defaultChartInnerBackground(!!htmlDark),
+                  innerBoxColor || defaultChartInnerBackground(!!htmlDark),
               }}
             >
               {!titleHidden || !subTitleHidden ? (
@@ -3288,7 +3288,12 @@ export function ChartCanvas() {
                 )}
               >
                 {!axesConfigured ? (
-                  <div className="flex min-h-[200px] w-full flex-1 flex-col items-center justify-center px-4 text-center text-sm text-muted-foreground">
+                  <div
+                    className={cn(
+                      "flex min-h-[200px] w-full flex-1 flex-col items-center justify-center px-4 text-center text-sm",
+                      chartSurfaceDark ? "text-slate-400" : "text-muted-foreground",
+                    )}
+                  >
                     {selChartType === "candlestick"
                       ? "Candlestick charts need sheet rows with end_period_ts and a full OHLC set (price_*, yes_bid_*, or yes_ask_* dollars)."
                       : "Select an X axis and at least one Y column under Data to plot your sheet."}
