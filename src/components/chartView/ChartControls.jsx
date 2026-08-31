@@ -2411,118 +2411,6 @@ export default function ChartControls() {
                     </div>
                   )}
 
-                  <div className="space-y-2 pb-3">
-                    <div className="flex min-w-0 items-center gap-2">
-                      <Label htmlFor="chart-design-title" className="w-24 shrink-0 text-xs text-muted-foreground">
-                        Title
-                      </Label>
-                      <Input
-                        id="chart-design-title"
-                        type="text"
-                        value={title}
-                        placeholder="Give your chart a title"
-                        className="h-8 min-w-0 flex-1 text-xs"
-                        onChange={(e) => setTitle(e.target.value)}
-                      />
-                      <ChartColorPalettePopover
-                        value={titleColor}
-                        onChange={setTitleColor}
-                        ariaLabel="Title text color"
-                        onClear={() => setTitleColor(null)}
-                      />
-                      <button
-                        type="button"
-                        className="flex h-6 w-6 shrink-0 cursor-pointer items-center justify-center rounded-full bg-yellow-400/30 p-2 text-foreground hover:bg-lychee_green/40"
-                        onClick={() => setTitleHidden(!titleHidden)}
-                        aria-label={titleHidden ? "Show title on chart" : "Hide title on chart"}
-                      >
-                        {!titleHidden ? <EyeOpenIcon className="h-3 w-3" /> : <EyeClosedIcon className="h-3 w-3" />}
-                      </button>
-                    </div>
-                    <div className="flex min-w-0 items-center gap-2">
-                      <Label htmlFor="chart-design-desc" className="w-24 shrink-0 text-xs text-muted-foreground">
-                        Description
-                      </Label>
-                      <Input
-                        id="chart-design-desc"
-                        type="text"
-                        value={subTitle}
-                        placeholder="Description"
-                        className="h-8 min-w-0 flex-1 text-xs"
-                        onChange={(e) => setSubTitle(e.target.value)}
-                      />
-                      <ChartColorPalettePopover
-                        value={subTitleColor}
-                        onChange={setSubTitleColor}
-                        ariaLabel="Description text color"
-                        onClear={() => setSubTitleColor(null)}
-                      />
-                      <button
-                        type="button"
-                        className="flex h-6 w-6 shrink-0 cursor-pointer items-center justify-center rounded-full bg-yellow-400/30 p-2 text-foreground hover:bg-lychee_green/40"
-                        onClick={() => setSubTitleHidden(!subTitleHidden)}
-                        aria-label={subTitleHidden ? "Show description on chart" : "Hide description on chart"}
-                      >
-                        {!subTitleHidden ? <EyeOpenIcon className="h-3 w-3" /> : <EyeClosedIcon className="h-3 w-3" />}
-                      </button>
-                    </div>
-                    <div className="flex min-w-0 items-center gap-2">
-                      <Label htmlFor="chart-design-body-h" className="w-24 shrink-0 text-xs text-muted-foreground">
-                        Body heading
-                      </Label>
-                      <Input
-                        id="chart-design-body-h"
-                        type="text"
-                        value={bodyHeading}
-                        placeholder="Body heading"
-                        className="h-8 min-w-0 flex-1 text-xs"
-                        onChange={(e) => setBodyHeading(e.target.value)}
-                      />
-                      <ChartColorPalettePopover
-                        value={bodyHeadingColor}
-                        onChange={setBodyHeadingColor}
-                        ariaLabel="Body heading color"
-                        onClear={() => setBodyHeadingColor(null)}
-                      />
-                      <button
-                        type="button"
-                        className="flex h-6 w-6 shrink-0 cursor-pointer items-center justify-center rounded-full bg-yellow-400/30 p-2 text-foreground hover:bg-lychee_green/40"
-                        onClick={() => setHeadingHidden(!bodyHeadingHidden)}
-                        aria-label={bodyHeadingHidden ? "Show body heading on chart" : "Hide body heading on chart"}
-                      >
-                        {!bodyHeadingHidden ? <EyeOpenIcon className="h-3 w-3" /> : <EyeClosedIcon className="h-3 w-3" />}
-                      </button>
-                    </div>
-                    <div className="flex min-w-0 items-start gap-2">
-                      <Label htmlFor="chart-design-content" className="w-24 shrink-0 pt-2 text-xs text-muted-foreground">
-                        Content
-                      </Label>
-                      <Textarea
-                        id="chart-design-content"
-                        value={bodyContent}
-                        placeholder="Content"
-                        className="min-h-[72px] min-w-0 flex-1 resize-y text-xs"
-                        onChange={(e) => setBodyContent(e.target.value)}
-                      />
-                      <div className="flex shrink-0 flex-col items-center gap-1 pt-1">
-                        <ChartColorPalettePopover
-                          value={bodyContentColor}
-                          onChange={setBodyContentColor}
-                          ariaLabel="Content text color"
-                          onClear={() => setBodyContentColor(null)}
-                        />
-                        <button
-                          type="button"
-                          className="flex h-6 w-6 cursor-pointer items-center justify-center rounded-full bg-yellow-400/30 p-2 text-foreground hover:bg-lychee_green/40"
-                          onClick={() => setBodyContentHidden(!bodyContentHidden)}
-                          aria-label={bodyContentHidden ? "Show content on chart" : "Hide content on chart"}
-                        >
-                          {!bodyContentHidden ? <EyeOpenIcon className="h-3 w-3" /> : <EyeClosedIcon className="h-3 w-3" />}
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-
               {/* Scatter/bubble: Z (bubble size) and Color column */}
               {selChartType === "scatter" && (
                 <>
@@ -2969,6 +2857,125 @@ export default function ChartControls() {
                         <PiChartDonut className="h-4 w-4 text-foreground" />
                       </Toggle>
                     )}
+                  </div>
+                </AccordionContent>
+              </AccordionItem>
+
+              <AccordionItem value="text">
+                <AccordionTrigger className="py-2 text-xs font-bold text-muted-foreground hover:no-underline">
+                  Text
+                </AccordionTrigger>
+                <AccordionContent className="pt-2">
+                  <div className="space-y-2 pb-1">
+                    <div className="flex min-w-0 items-center gap-2">
+                      <Label htmlFor="chart-text-title" className="w-24 shrink-0 text-xs text-muted-foreground">
+                        Title
+                      </Label>
+                      <Input
+                        id="chart-text-title"
+                        type="text"
+                        value={title}
+                        placeholder="Give your chart a title"
+                        className="h-8 min-w-0 flex-1 text-xs"
+                        onChange={(e) => setTitle(e.target.value)}
+                      />
+                      <ChartColorPalettePopover
+                        value={titleColor}
+                        onChange={setTitleColor}
+                        ariaLabel="Title text color"
+                        onClear={() => setTitleColor(null)}
+                      />
+                      <button
+                        type="button"
+                        className="flex h-6 w-6 shrink-0 cursor-pointer items-center justify-center rounded-full bg-yellow-400/30 p-2 text-foreground hover:bg-lychee_green/40"
+                        onClick={() => setTitleHidden(!titleHidden)}
+                        aria-label={titleHidden ? "Show title on chart" : "Hide title on chart"}
+                      >
+                        {!titleHidden ? <EyeOpenIcon className="h-3 w-3" /> : <EyeClosedIcon className="h-3 w-3" />}
+                      </button>
+                    </div>
+                    <div className="flex min-w-0 items-center gap-2">
+                      <Label htmlFor="chart-text-desc" className="w-24 shrink-0 text-xs text-muted-foreground">
+                        Description
+                      </Label>
+                      <Input
+                        id="chart-text-desc"
+                        type="text"
+                        value={subTitle}
+                        placeholder="Description"
+                        className="h-8 min-w-0 flex-1 text-xs"
+                        onChange={(e) => setSubTitle(e.target.value)}
+                      />
+                      <ChartColorPalettePopover
+                        value={subTitleColor}
+                        onChange={setSubTitleColor}
+                        ariaLabel="Description text color"
+                        onClear={() => setSubTitleColor(null)}
+                      />
+                      <button
+                        type="button"
+                        className="flex h-6 w-6 shrink-0 cursor-pointer items-center justify-center rounded-full bg-yellow-400/30 p-2 text-foreground hover:bg-lychee_green/40"
+                        onClick={() => setSubTitleHidden(!subTitleHidden)}
+                        aria-label={subTitleHidden ? "Show description on chart" : "Hide description on chart"}
+                      >
+                        {!subTitleHidden ? <EyeOpenIcon className="h-3 w-3" /> : <EyeClosedIcon className="h-3 w-3" />}
+                      </button>
+                    </div>
+                    <div className="flex min-w-0 items-center gap-2">
+                      <Label htmlFor="chart-text-body-h" className="w-24 shrink-0 text-xs text-muted-foreground">
+                        Body heading
+                      </Label>
+                      <Input
+                        id="chart-text-body-h"
+                        type="text"
+                        value={bodyHeading}
+                        placeholder="Body heading"
+                        className="h-8 min-w-0 flex-1 text-xs"
+                        onChange={(e) => setBodyHeading(e.target.value)}
+                      />
+                      <ChartColorPalettePopover
+                        value={bodyHeadingColor}
+                        onChange={setBodyHeadingColor}
+                        ariaLabel="Body heading color"
+                        onClear={() => setBodyHeadingColor(null)}
+                      />
+                      <button
+                        type="button"
+                        className="flex h-6 w-6 shrink-0 cursor-pointer items-center justify-center rounded-full bg-yellow-400/30 p-2 text-foreground hover:bg-lychee_green/40"
+                        onClick={() => setHeadingHidden(!bodyHeadingHidden)}
+                        aria-label={bodyHeadingHidden ? "Show body heading on chart" : "Hide body heading on chart"}
+                      >
+                        {!bodyHeadingHidden ? <EyeOpenIcon className="h-3 w-3" /> : <EyeClosedIcon className="h-3 w-3" />}
+                      </button>
+                    </div>
+                    <div className="flex min-w-0 items-start gap-2">
+                      <Label htmlFor="chart-text-content" className="w-24 shrink-0 pt-2 text-xs text-muted-foreground">
+                        Content
+                      </Label>
+                      <Textarea
+                        id="chart-text-content"
+                        value={bodyContent}
+                        placeholder="Content"
+                        className="min-h-[72px] min-w-0 flex-1 resize-y text-xs"
+                        onChange={(e) => setBodyContent(e.target.value)}
+                      />
+                      <div className="flex shrink-0 flex-col items-center gap-1 pt-1">
+                        <ChartColorPalettePopover
+                          value={bodyContentColor}
+                          onChange={setBodyContentColor}
+                          ariaLabel="Content text color"
+                          onClear={() => setBodyContentColor(null)}
+                        />
+                        <button
+                          type="button"
+                          className="flex h-6 w-6 cursor-pointer items-center justify-center rounded-full bg-yellow-400/30 p-2 text-foreground hover:bg-lychee_green/40"
+                          onClick={() => setBodyContentHidden(!bodyContentHidden)}
+                          aria-label={bodyContentHidden ? "Show content on chart" : "Hide content on chart"}
+                        >
+                          {!bodyContentHidden ? <EyeOpenIcon className="h-3 w-3" /> : <EyeClosedIcon className="h-3 w-3" />}
+                        </button>
+                      </div>
+                    </div>
                   </div>
                 </AccordionContent>
               </AccordionItem>
