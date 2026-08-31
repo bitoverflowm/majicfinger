@@ -71,7 +71,7 @@ export const StateProviderV2 = ({children, initialSettings}) => {
     )
     const [integrationSidebar, setIntegrationSidebar] = useState(initialSettings?.integrationSidebar ?? null) // 'polymarket' | 'polymarketHistorical' | 'kalshiHistorical' | 'coinGecko' | etc.
     const [rightPanelOpen, setRightPanelOpen] = useState(!!initialSettings?.rightPanelOpen) // unified right-side panel (integrations/charts)
-    const [rightPanelTab, setRightPanelTab] = useState(initialSettings?.rightPanelTab || 'integrations') // 'integrations' | 'requestHistory' | 'powerMoves' | 'charts' | 'export' | 'dashboard'
+    const [rightPanelTab, setRightPanelTab] = useState(initialSettings?.rightPanelTab || 'integrations') // 'sheet' | 'integrations' | 'requestHistory' | 'powerMoves' | 'charts' | 'export' | 'dashboard'
     /** Available power move after a qualifying pull (e.g. 'event_candlesticks'), or null. */
     const [connectPowerMove, setConnectPowerMove] = useState(/** @type {string | null} */ (null))
     /** Live progress while a power move builds a dashboard (waterfall charts). */

@@ -617,7 +617,9 @@ export function ConnectHomeWorkspaceNav({
       setConnectHomeAnalyzeActive,
       setDataConnected,
       setRightPanelTab,
+      setRightPanelOpen,
     });
+    onPanelManualOpen?.("sheet");
   }, [
     onAddSheet,
     dataSheets,
@@ -627,6 +629,8 @@ export function ConnectHomeWorkspaceNav({
     setConnectHomeAnalyzeActive,
     setDataConnected,
     setRightPanelTab,
+    setRightPanelOpen,
+    onPanelManualOpen,
   ]);
 
   const handleCancelDataPull = useCallback(() => {

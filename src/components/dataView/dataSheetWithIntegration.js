@@ -38,6 +38,7 @@ import {
   ChevronDown,
   LayoutDashboard,
   Share2,
+  Table2,
   Zap,
   X,
   Plus,
@@ -57,6 +58,7 @@ import { ConnectHomeIntegrationWorkflow } from "@/components/connectData/Connect
 import { ConnectHomeAnalyzeSection } from "@/components/connectData/ConnectHomeAnalyzeSection";
 import { ConnectHomeWorkspaceNav } from "@/components/connectData/ConnectHomeWorkspaceNav";
 import { ConnectHomeRequestHistory } from "@/components/connectData/ConnectHomeRequestHistory";
+import { ConnectHomeSheetPanel } from "@/components/connectData/ConnectHomeSheetPanel";
 import { ConnectIntegrationsPickerList } from "@/components/connectData/ConnectIntegrationsPickerList";
 import { collectRequestCardEntries } from "@/lib/connectHomeRequestCards";
 import { connectHomeAnySheetHasData, isConnectUserDataPullActive } from "@/lib/connectHomePullDestination";
@@ -171,6 +173,7 @@ function pageFormatDockTargetKey(t) {
 }
 
 const RIGHT_PANEL_TAB_ITEMS = [
+  { value: "sheet", label: "Sheet", Icon: Table2 },
   { value: "requestHistory", label: "Query history", Icon: History },
   { value: "integrations", label: "Integrations", Icon: Cable },
   { value: "powerMoves", label: "Power moves", Icon: Zap },
@@ -600,6 +603,7 @@ export default function DataSheetWithIntegration({
   useEffect(() => {
     if (!setRightPanelTab) return;
     const valid = new Set([
+      "sheet",
       "integrations",
       "requestHistory",
       "powerMoves",
@@ -724,7 +728,9 @@ export default function DataSheetWithIntegration({
       if (tab) setRightPanelTab?.(tab);
       setRightPanelOpen?.(true);
       if (connectHomeMode) {
-        if (tab === "charts") {
+        if (tab === "sheet") {
+          setConnectHomeCenterView?.(CONNECT_HOME_CENTER_VIEW.SHEET);
+        } else if (tab === "charts") {
           setConnectHomeCenterView?.(CONNECT_HOME_CENTER_VIEW.CHARTS);
         } else if (tab === "dashboard") {
           setConnectHomeCenterView?.(CONNECT_HOME_CENTER_VIEW.DASHBOARD);
@@ -1224,6 +1230,7 @@ export default function DataSheetWithIntegration({
     connectHomeDashboardActive;
 
   const connectHomeSidebarTab =
+    rightPanelTab === "sheet" ||
     rightPanelTab === "integrations" ||
     rightPanelTab === "requestHistory" ||
     rightPanelTab === "powerMoves" ||
@@ -1818,7 +1825,9 @@ export default function DataSheetWithIntegration({
                       setRightPanelTab?.(v);
                       setRightPanelOpen?.(true);
                       if (connectHomeMode) {
-                        if (v === "charts") {
+                        if (v === "sheet") {
+                          setConnectHomeCenterView?.(CONNECT_HOME_CENTER_VIEW.SHEET);
+                        } else if (v === "charts") {
                           setConnectHomeCenterView?.(CONNECT_HOME_CENTER_VIEW.CHARTS);
                         } else if (v === "dashboard") {
                           setConnectHomeCenterView?.(CONNECT_HOME_CENTER_VIEW.DASHBOARD);
@@ -1827,7 +1836,7 @@ export default function DataSheetWithIntegration({
                         if (v === "integrations") {
                           setIntegrationSidebar?.((prev) => prev ?? "polymarket");
                         }
-                        if (v === "charts" || v === "dashboard" || v === "export") {
+                        if (v === "sheet" || v === "charts" || v === "dashboard" || v === "export") {
                           setDrawerExpanded(false);
                         }
                         return;
@@ -1850,10 +1859,10 @@ export default function DataSheetWithIntegration({
                     className="flex h-full flex-col"
                   >
                     <TooltipProvider delayDuration={200}>
-                      <div className="relative flex min-w-0 items-center gap-2 p-2">
+                      <div className="relative flex min-w-0 items-center gap-1 p-1.5">
                         <TabsList
                           className={cn(
-                            "h-9 min-h-9 min-w-0 flex-1 justify-start gap-0.5 overflow-x-auto overflow-y-hidden rounded-md bg-slate-100 p-1 text-slate-500 dark:bg-slate-800 dark:text-slate-400",
+                            "h-auto min-h-0 min-w-0 flex-1 justify-start gap-0.5 overflow-x-auto overflow-y-hidden rounded bg-slate-100 p-px text-slate-500 dark:bg-slate-800 dark:text-slate-400",
                             drawerExpanded && "flex-wrap",
                           )}
                         >
@@ -1873,8 +1882,10 @@ export default function DataSheetWithIntegration({
                                 value={value}
                                 title={iconOnly ? label : undefined}
                                 className={cn(
-                                  "shrink-0 gap-1.5 text-xs transition-colors aria-selected:z-[1] aria-selected:bg-white aria-selected:text-slate-950 aria-selected:shadow-sm dark:aria-selected:bg-slate-950 dark:aria-selected:text-slate-50",
-                                  iconOnly ? "px-2" : "px-2.5",
+                                  "shrink-0 gap-1 py-0 text-[10px] transition-colors aria-selected:z-[1] aria-selected:bg-white aria-selected:text-slate-950 aria-selected:shadow-sm dark:aria-selected:bg-slate-950 dark:aria-selected:text-slate-50",
+                                  iconOnly
+                                    ? "h-5 w-5 px-0"
+                                    : "h-6 px-1.5",
                                   flashPowerMove &&
                                     "animate-pulse bg-amber-400/20 text-amber-600 dark:bg-amber-400/15 dark:text-amber-400",
                                 )}
@@ -1882,17 +1893,17 @@ export default function DataSheetWithIntegration({
                               >
                                 {drawerExpanded ? (
                                   <>
-                                    <Icon className="h-3.5 w-3.5 shrink-0" aria-hidden />
+                                    <Icon className="h-3 w-3 shrink-0" aria-hidden />
                                     <span className="truncate">{label}</span>
                                   </>
                                 ) : (
-                                  <Icon className="h-3.5 w-3.5 shrink-0" aria-hidden />
+                                  <Icon className="h-3 w-3 shrink-0" aria-hidden />
                                 )}
                               </TabsTrigger>
                             );
                           })}
                         </TabsList>
-                        <div className="flex shrink-0 items-center gap-1">
+                        <div className="flex shrink-0 items-center gap-0.5">
                           {drawerExpanded ? (
                             <>
                               <Tooltip>
@@ -1900,11 +1911,11 @@ export default function DataSheetWithIntegration({
                                   <Button
                                     variant="ghost"
                                     size="icon"
-                                    className="h-8 w-8 shrink-0"
+                                    className="h-5 w-5 shrink-0"
                                     onClick={() => setDrawerExpanded(false)}
                                     aria-label="Narrow panel"
                                   >
-                                    <ChevronRight className="h-4 w-4" />
+                                    <ChevronRight className="h-3 w-3" />
                                   </Button>
                                 </TooltipTrigger>
                                 <TooltipContent side="bottom" className="text-xs">
@@ -1916,11 +1927,11 @@ export default function DataSheetWithIntegration({
                                   <Button
                                     variant="ghost"
                                     size="icon"
-                                    className="h-8 w-8 shrink-0"
+                                    className="h-5 w-5 shrink-0"
                                     onClick={closePanel}
                                     aria-label="Close panel"
                                   >
-                                    <X className="h-4 w-4" />
+                                    <X className="h-3 w-3" />
                                   </Button>
                                 </TooltipTrigger>
                                 <TooltipContent side="bottom" className="text-xs">
@@ -1935,11 +1946,11 @@ export default function DataSheetWithIntegration({
                                   <Button
                                     variant="ghost"
                                     size="icon"
-                                    className="h-8 w-8 shrink-0"
+                                    className="h-5 w-5 shrink-0"
                                     onClick={() => setDrawerExpanded(true)}
                                     aria-label="Expand panel"
                                   >
-                                    <ChevronLeft className="h-4 w-4" />
+                                    <ChevronLeft className="h-3 w-3" />
                                   </Button>
                                 </TooltipTrigger>
                                 <TooltipContent side="bottom" className="text-xs">
@@ -1951,11 +1962,11 @@ export default function DataSheetWithIntegration({
                                   <Button
                                     variant="ghost"
                                     size="icon"
-                                    className="h-8 w-8 shrink-0"
+                                    className="h-5 w-5 shrink-0"
                                     onClick={closePanel}
                                     aria-label="Close panel"
                                   >
-                                    <X className="h-4 w-4" />
+                                    <X className="h-3 w-3" />
                                   </Button>
                                 </TooltipTrigger>
                                 <TooltipContent side="bottom" className="text-xs">
@@ -1974,6 +1985,10 @@ export default function DataSheetWithIntegration({
                         drawerExpanded ? "w-full max-w-none px-3 sm:px-4" : "max-w-full px-2",
                       )}
                     >
+                      <TabsContent value="sheet" className="m-0 h-full w-full min-w-0 max-w-full overflow-hidden">
+                        <ConnectHomeSheetPanel />
+                      </TabsContent>
+
                       <TabsContent value="integrations" className="m-0 h-full w-full min-w-0 max-w-full">
                         <div className="flex h-full w-full min-w-0 max-w-full flex-col gap-2 px-0.5">
                           <ConnectIntegrationsPickerList connectHomeMode={connectHomeMode} />

@@ -52,9 +52,8 @@ export function connectHomeAddBlankSheet(ctx) {
       if (ctx?.setDataConnected && !ctx?.dataConnected) {
         ctx.setDataConnected(true);
       }
-      ctx?.setRightPanelTab?.((prev) =>
-        prev === "charts" || prev === "dashboard" ? "integrations" : prev,
-      );
+      ctx?.setRightPanelTab?.("sheet");
+      ctx?.setRightPanelOpen?.(true);
     },
     {
       name,
