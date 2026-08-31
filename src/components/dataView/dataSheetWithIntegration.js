@@ -338,13 +338,19 @@ export default function DataSheetWithIntegration({
   const showConnectAnalyzeSection =
     showConnectIntegrationIntro &&
     (connectHomeAnalyzeActive || connectUserPullActive || hasConnectSheetData);
+  const connectHomeDesignSurfaceReady =
+    showConnectIntegrationIntro ||
+    isSavedProjectWorkspace ||
+    isConnectUploadWithSheetData ||
+    isConnectBlankSheetWorkspace ||
+    (connectHomeAnalyzeActive && hasConnectSheetData);
   const connectHomeChartsActive =
     connectHomeMode &&
-    (showConnectIntegrationIntro || isSavedProjectWorkspace || isConnectUploadWithSheetData) &&
+    connectHomeDesignSurfaceReady &&
     connectHomeCenterView === CONNECT_HOME_CENTER_VIEW.CHARTS;
   const connectHomeDashboardActive =
     connectHomeMode &&
-    (showConnectIntegrationIntro || isSavedProjectWorkspace || isConnectUploadWithSheetData) &&
+    connectHomeDesignSurfaceReady &&
     connectHomeCenterView === CONNECT_HOME_CENTER_VIEW.DASHBOARD;
   const effectiveChartMode = chartMode || connectHomeChartsActive;
   const effectiveDashboardMode = dashboardMode || connectHomeDashboardActive;
@@ -1354,7 +1360,6 @@ export default function DataSheetWithIntegration({
       window.removeEventListener("scroll", update, true);
     };
   }, [effectiveDashboardMode, rightPanelOpen, isPanelOpen, drawerExpanded, isPanelClosing]);
-  const chartsActive = rightPanelTab === "charts";
   const panelAnimatingOpen = isPanelOpen && !isPanelClosing;
   const chartSheetIds = useMemo(() => Object.keys(chartSheets || {}), [chartSheets]);
   const chartSnapshotSeed = useMemo(() => {
@@ -1452,8 +1457,24 @@ export default function DataSheetWithIntegration({
     // Activate a sheet when none is selected, or the active id was removed.
     if (activeChartSheetId && chartSheets?.[activeChartSheetId]) return;
     const firstId = Object.keys(chartSheets || {})[0];
-    if (firstId) setActiveChartSheetId?.(firstId);
-  }, [effectiveChartMode, chartSheets, activeChartSheetId, setActiveChartSheetId]);
+    if (firstId) {
+      setActiveChartSheetId?.(firstId);
+      return;
+    }
+    // First visit to charts with no chart tabs yet — seed one so controls + canvas have a target.
+    if (typeof addNewChartAndActivate === "function") {
+      addNewChartAndActivate(() => {
+        setLoadedChartBuilderSnapshot?.(null);
+      });
+    }
+  }, [
+    effectiveChartMode,
+    chartSheets,
+    activeChartSheetId,
+    setActiveChartSheetId,
+    addNewChartAndActivate,
+    setLoadedChartBuilderSnapshot,
+  ]);
 
   useEffect(() => {
     if (!setChartSnapshotFlusher) return;
@@ -2115,10 +2136,13 @@ export default function DataSheetWithIntegration({
                           ) : null}                        </div>
                       </TabsContent>
 
-                      <TabsContent value="charts" className="m-0 h-full min-w-0 w-full max-w-full">
+                      <TabsContent
+                        value="charts"
+                        className="m-0 flex h-full min-h-0 min-w-0 w-full max-w-full flex-col overflow-hidden data-[state=inactive]:hidden"
+                      >
                         <div
                           className={cn(
-                            "h-full min-w-0 max-w-full overflow-auto",
+                            "min-h-0 min-w-0 flex-1 max-w-full overflow-x-hidden overflow-y-auto",
                             drawerExpanded ? "w-full p-1 sm:p-2" : "p-1",
                           )}
                         >
@@ -2141,10 +2165,8 @@ export default function DataSheetWithIntegration({
                                 Open chart workspace
                               </Button>
                             </div>
-                          ) : chartsActive ? (
-                            <ChartControls />
                           ) : (
-                            <div className="text-xs text-muted-foreground">Select Charts tab to edit.</div>
+                            <ChartControls />
                           )}
                         </div>
                       </TabsContent>
