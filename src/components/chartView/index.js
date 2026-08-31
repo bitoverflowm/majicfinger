@@ -6,6 +6,7 @@ import {
   DEFAULT_CHART_SERIES_COLORS,
   defaultChartInnerBackground,
   getShadcnChartPaletteArray,
+  isShadcnChartGreyBase,
 } from '@/components/chartView/panels/shadcnChartPalettes';
 import { Area, AreaChart, Bar, BarChart, CartesianGrid, Cell, LabelList, Line, LineChart, Pie, PieChart, ReferenceLine, Scatter, ScatterChart, Treemap, XAxis, YAxis, ZAxis } from 'recharts';
 import { ChartContainer, ChartLegend, ChartLegendContent, ChartTooltip, ChartTooltipContent } from '@/components/ui/chart';
@@ -1007,7 +1008,14 @@ export function ChartBuilderProvider({ demo, children, initialBuilderSnapshot, e
     if (!paletteAppliedRef.current) {
       paletteAppliedRef.current = true;
       if (s.selectedShadBaseId != null) setSelectedShadBaseId(s.selectedShadBaseId);
-      if (Array.isArray(s.selectedPalette) && s.selectedPalette.length) setSelectedPalette(s.selectedPalette);
+      // Grey ramps were the old auto-default and read as near-invisible on black/white cards.
+      // Skip them so rose/lime/blue series defaults apply; keep chromatic user picks.
+      if (Array.isArray(s.selectedPalette) && s.selectedPalette.length) {
+        const baseId = s.selectedShadBaseId ?? SHADCN_CHART_BASE_ORDER[0];
+        if (!isShadcnChartGreyBase(baseId)) {
+          setSelectedPalette(s.selectedPalette);
+        }
+      }
       if (s.lineColorOverrides && typeof s.lineColorOverrides === "object") {
         setLineColorOverrides(s.lineColorOverrides);
       }
@@ -1077,7 +1085,12 @@ export function ChartBuilderProvider({ demo, children, initialBuilderSnapshot, e
     if (s.sortXDir != null) setSortXDir(s.sortXDir);
     if (s.sortYDir !== undefined) setSortYDir(s.sortYDir);
     if (s.selectedShadBaseId != null) setSelectedShadBaseId(s.selectedShadBaseId);
-    if (Array.isArray(s.selectedPalette) && s.selectedPalette.length) setSelectedPalette(s.selectedPalette);
+    if (Array.isArray(s.selectedPalette) && s.selectedPalette.length) {
+      const baseId = s.selectedShadBaseId ?? SHADCN_CHART_BASE_ORDER[0];
+      if (!isShadcnChartGreyBase(baseId)) {
+        setSelectedPalette(s.selectedPalette);
+      }
+    }
     if (s.lineColorOverrides && typeof s.lineColorOverrides === "object") setLineColorOverrides(s.lineColorOverrides);
     if (s.lineLabelOverrides && typeof s.lineLabelOverrides === "object") setLineLabelOverrides(s.lineLabelOverrides);
     if (s.expanded !== undefined) setExpanded(!!s.expanded);
@@ -2382,6 +2395,7 @@ export function ChartCanvas() {
     wsStart,
     chartRef,
     selectedPalette,
+    selectedShadBaseId,
     lineColorOverrides,
     lineLabelOverrides,
     titleHidden,
@@ -2837,22 +2851,25 @@ export function ChartCanvas() {
     });
   }, [selChartType, xKey, scatterYKey, finalRenderedData, rechartsXAxisType]);
   const hasSelectedPalette = Array.isArray(selectedPalette) && selectedPalette.length > 0;
+  /** Chromatic user-picked ramps drive series; grey/legacy auto ramps use rose/lime/blue defaults. */
+  const usePaletteForSeries =
+    hasSelectedPalette && !isShadcnChartGreyBase(selectedShadBaseId);
   const treemapLeafFills = useMemo(() => {
     const leaves = treemapData?.[0]?.children;
     const n = Array.isArray(leaves) ? leaves.length : 0;
-    if (!n || !hasSelectedPalette) return null;
+    if (!n || !usePaletteForSeries) return null;
     // Anchor extrapolation from the dark end of the ramp (Shadcn order: 50 → 950).
     const reversed = [...selectedPalette].reverse();
     return extrapolateColorsFromPalette(reversed, n);
-  }, [treemapData, hasSelectedPalette, selectedPalette]);
+  }, [treemapData, usePaletteForSeries, selectedPalette]);
   const fallbackSeriesColor = DEFAULT_CHART_SERIES_COLORS[0];
   /**
-   * With a user-picked Shadcn ramp: chrome uses early stops; series read from the dark end.
-   * Out of the box (no ramp): rose-600 → lime-500 → blue-500, then cycle.
+   * Out of the box: rose-600 → lime-500 → blue-500, then cycle.
+   * With a chromatic Shadcn ramp: series read from the dark end of the ramp.
    */
   const seriesColorAt = (idx) => {
     const i = Math.max(0, Number(idx) || 0);
-    if (!hasSelectedPalette) {
+    if (!usePaletteForSeries) {
       const n = DEFAULT_CHART_SERIES_COLORS.length;
       return DEFAULT_CHART_SERIES_COLORS[i % n] || fallbackSeriesColor;
     }
@@ -2876,7 +2893,7 @@ export function ChartCanvas() {
   const scatterPointColorFor = (row, idx) => {
     if (!scatterColorEnabled || !selColorCol) return seriesColorFor(ySeries[0]?.sourceKey, 0);
     const value = rowValueForDataKey(row, selColorCol);
-    return seriesColorAt(stableHashIndex(value, Math.max(1, hasSelectedPalette ? selectedPalette.length : DEFAULT_CHART_SERIES_COLORS.length))) || seriesColorAt(idx);
+    return seriesColorAt(stableHashIndex(value, Math.max(1, usePaletteForSeries ? selectedPalette.length : DEFAULT_CHART_SERIES_COLORS.length))) || seriesColorAt(idx);
   };
   const yAxisFormatter = (raw) => {
     const n = Number(raw);

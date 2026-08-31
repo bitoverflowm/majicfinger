@@ -51,7 +51,7 @@ import { normalizeChartEmbedSlug } from "@/lib/chartEmbedSlug";
 import { REFERENCE_EQUATION_PRESETS, validateReferenceEquation } from "@/lib/chartReferenceEquation";
 import { ChartColorPalettePopover } from "@/components/chartView/ChartColorPalettePopover";
 import { pivotBarChartBySeries } from "@/components/chartView/pivotBarChartData";
-import { DEFAULT_CHART_SERIES_COLORS } from "@/components/chartView/panels/shadcnChartPalettes";
+import { DEFAULT_CHART_SERIES_COLORS, isShadcnChartGreyBase } from "@/components/chartView/panels/shadcnChartPalettes";
 import { defaultChartSeriesLabel } from "@/lib/chartLineLabels";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import {
@@ -332,6 +332,7 @@ export default function ChartControls() {
     lineIsTemporalX,
 
     selectedPalette,
+    selectedShadBaseId,
     lineColorOverrides,
     setLineColorOverrides,
     lineLabelOverrides,
@@ -547,10 +548,12 @@ export default function ChartControls() {
     return false;
   });
   const hasSelectedPalette = Array.isArray(selectedPalette) && selectedPalette.length > 0;
+  const usePaletteForSeries =
+    hasSelectedPalette && !isShadcnChartGreyBase(selectedShadBaseId);
   const fallbackSeriesColor = DEFAULT_CHART_SERIES_COLORS[0];
   const defaultSeriesColorAt = (idx) => {
     const i = Math.max(0, Number(idx) || 0);
-    if (!hasSelectedPalette) {
+    if (!usePaletteForSeries) {
       const n = DEFAULT_CHART_SERIES_COLORS.length;
       return DEFAULT_CHART_SERIES_COLORS[i % n] || fallbackSeriesColor;
     }
