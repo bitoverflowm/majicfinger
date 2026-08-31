@@ -28,6 +28,7 @@ import type {
 import { HubHeroBody } from "@/components/hubs/HubHeroBody";
 import { HubHeroCapabilityPills } from "@/components/hubs/HubHeroCapabilityPills";
 import { HubKalshiExplorerBranding } from "@/components/hubs/HubKalshiExplorerBranding";
+import { HubPolymarketExplorerBranding } from "@/components/hubs/HubPolymarketExplorerBranding";
 import { HubKalshiLiveDemoLoadingShell } from "@/components/hubs/kalshiLiveDemo/HubKalshiLiveDemoLoadingShell";
 import { HubKalshiQueryMockup } from "@/components/hubs/kalshiQuery/HubKalshiQueryMockup";
 import { HubLazyWhenVisible } from "@/components/hubs/HubLazyWhenVisible";
@@ -447,6 +448,8 @@ function HubQuery({ section }: { section: HubQuerySection }) {
           </p>
           {section.headerBranding === "kalshi_historical" ? (
             <HubKalshiExplorerBranding />
+          ) : section.headerBranding === "polymarket_historical" ? (
+            <HubPolymarketExplorerBranding />
           ) : null}
         </div>
 

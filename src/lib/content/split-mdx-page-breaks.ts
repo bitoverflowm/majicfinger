@@ -2,7 +2,10 @@ import { Children, Fragment, isValidElement, type ReactNode } from "react";
 import { renderMDXBody } from "@/lib/content/mdx";
 
 /** MDX component tags that interrupt the white article surface. */
-export const MDX_PAGE_BREAK_TAG_NAMES = ["KalshiHistoricalDataQuery"] as const;
+export const MDX_PAGE_BREAK_TAG_NAMES = [
+  "KalshiHistoricalDataQuery",
+  "PolymarketHistoricalDataQuery",
+] as const;
 
 export type MdxSourceSegment =
   | { kind: "prose"; source: string }

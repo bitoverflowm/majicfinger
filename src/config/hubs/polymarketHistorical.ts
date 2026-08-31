@@ -2,7 +2,7 @@ import type { HubPageConfig } from "@/types/hub";
 import { polymarketHistoricalComparisonTable } from "./polymarketHistoricalComparisonTable";
 import { polymarketHistoricalResearchGuides } from "./polymarketHistoricalResearchGuides";
 
-/** Shared copy for the hub explore block. */
+/** Shared copy for the hub explore block and guide `<PolymarketHistoricalDataQuery />` embeds. */
 export const POLYMARKET_HISTORICAL_EXPLORE_SECTION = {
   anchorId: "explore-data",
   title: "Explore Polymarket Historical Data Without Writing Code",

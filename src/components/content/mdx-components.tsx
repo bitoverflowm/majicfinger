@@ -6,6 +6,7 @@ import { ContentImage } from "./content-image";
 import { LYCHEE_CONTENT_TYPE, ArticleDivider } from "./article-prose";
 import { ArticleTable } from "./ArticleTable";
 import { KalshiHistoricalDataQuery } from "./KalshiHistoricalDataQuery";
+import { PolymarketHistoricalDataQuery } from "./PolymarketHistoricalDataQuery";
 import { PublicChart } from "./PublicChart";
 
 // MDX may pass legacy `ref` (string refs); use loose props to avoid @types/react version skew (e.g. @hello-pangea/dnd).
@@ -72,6 +73,7 @@ function MdxHr() {
  * - Inline code: backticks or `<TypographyInlineCode>` (shadcn-style muted pill)
  * - PublicChart: `<PublicChart username="..." slug="..." />`
  * - KalshiHistoricalDataQuery: `<KalshiHistoricalDataQuery />` — Kalshi markets/trades query builder
+ * - PolymarketHistoricalDataQuery: `<PolymarketHistoricalDataQuery />` — Polymarket markets/trades query builder
  * - GIFs: Use standard markdown ![alt](/path/to.gif) or ContentImage
  */
 export function useMDXComponents(components?: MDXComponents): MDXComponents {
@@ -106,6 +108,7 @@ export function useMDXComponents(components?: MDXComponents): MDXComponents {
     YouTube,
     PublicChart,
     KalshiHistoricalDataQuery,
+    PolymarketHistoricalDataQuery,
     ...components,
   };
 }
