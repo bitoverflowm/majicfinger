@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { format } from "date-fns";
-import { CaretRightIcon, EyeClosedIcon, EyeOpenIcon, IdCardIcon } from "@radix-ui/react-icons";
+import { CaretRightIcon, IdCardIcon } from "@radix-ui/react-icons";
 import { MinusCircle } from "react-feather";
 import { IoPieChartOutline, IoStatsChart } from "react-icons/io5";
 import { PiChartBarHorizontalLight, PiChartDonut, PiChartLine, PiChartLineThin } from "react-icons/pi";
@@ -45,6 +45,15 @@ import { ChartColorPalettePopover } from "@/components/chartView/ChartColorPalet
 import { pivotBarChartBySeries } from "@/components/chartView/pivotBarChartData";
 import { defaultChartSeriesLabel } from "@/lib/chartLineLabels";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
+import {
+  Item,
+  ItemActions,
+  ItemContent,
+  ItemGroup,
+  ItemHeader,
+  ItemMedia,
+  ItemTitle,
+} from "@/components/ui/item";
 import { Calendar } from "@/components/ui/calendar";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -388,6 +397,18 @@ export default function ChartControls() {
     setBodyContentColor,
     innerBoxColor,
     setInnerBoxColor,
+    xAxisLabelHidden,
+    setXAxisLabelHidden,
+    xAxisLabel,
+    setXAxisLabel,
+    xAxisLabelColor,
+    setXAxisLabelColor,
+    yAxisLabelHidden,
+    setYAxisLabelHidden,
+    yAxisLabel,
+    setYAxisLabel,
+    yAxisLabelColor,
+    setYAxisLabelColor,
     gridVisible,
     setGridVisible,
     enableZoom,
@@ -2866,117 +2887,126 @@ export default function ChartControls() {
                   Text
                 </AccordionTrigger>
                 <AccordionContent className="pt-2">
-                  <div className="space-y-2 pb-1">
-                    <div className="flex min-w-0 items-center gap-2">
-                      <Label htmlFor="chart-text-title" className="w-24 shrink-0 text-xs text-muted-foreground">
-                        Title
-                      </Label>
-                      <Input
-                        id="chart-text-title"
-                        type="text"
-                        value={title}
-                        placeholder="Give your chart a title"
-                        className="h-8 min-w-0 flex-1 text-xs"
-                        onChange={(e) => setTitle(e.target.value)}
-                      />
-                      <ChartColorPalettePopover
-                        value={titleColor}
-                        onChange={setTitleColor}
-                        ariaLabel="Title text color"
-                        onClear={() => setTitleColor(null)}
-                      />
-                      <button
-                        type="button"
-                        className="flex h-6 w-6 shrink-0 cursor-pointer items-center justify-center rounded-full bg-yellow-400/30 p-2 text-foreground hover:bg-lychee_green/40"
-                        onClick={() => setTitleHidden(!titleHidden)}
-                        aria-label={titleHidden ? "Show title on chart" : "Hide title on chart"}
+                  <ItemGroup className="gap-2">
+                    {[
+                      {
+                        id: "chart-text-title",
+                        label: "Title",
+                        value: title,
+                        setValue: setTitle,
+                        placeholder: "Give your chart a title",
+                        color: titleColor,
+                        setColor: setTitleColor,
+                        visible: !titleHidden,
+                        setVisible: (on) => setTitleHidden(!on),
+                        rows: 2,
+                      },
+                      {
+                        id: "chart-text-desc",
+                        label: "Description",
+                        value: subTitle,
+                        setValue: setSubTitle,
+                        placeholder: "Description",
+                        color: subTitleColor,
+                        setColor: setSubTitleColor,
+                        visible: !subTitleHidden,
+                        setVisible: (on) => setSubTitleHidden(!on),
+                        rows: 2,
+                      },
+                      {
+                        id: "chart-text-body-h",
+                        label: "Body heading",
+                        value: bodyHeading,
+                        setValue: setBodyHeading,
+                        placeholder: "Body heading",
+                        color: bodyHeadingColor,
+                        setColor: setBodyHeadingColor,
+                        visible: !bodyHeadingHidden,
+                        setVisible: (on) => setHeadingHidden(!on),
+                        rows: 2,
+                      },
+                      {
+                        id: "chart-text-content",
+                        label: "Content",
+                        value: bodyContent,
+                        setValue: setBodyContent,
+                        placeholder: "Content",
+                        color: bodyContentColor,
+                        setColor: setBodyContentColor,
+                        visible: !bodyContentHidden,
+                        setVisible: (on) => setBodyContentHidden(!on),
+                        rows: 4,
+                      },
+                      {
+                        id: "chart-text-x-axis",
+                        label: "X-axis label",
+                        value: xAxisLabel,
+                        setValue: setXAxisLabel,
+                        placeholder: "X-axis label",
+                        color: xAxisLabelColor,
+                        setColor: setXAxisLabelColor,
+                        visible: !xAxisLabelHidden,
+                        setVisible: (on) => setXAxisLabelHidden(!on),
+                        rows: 2,
+                      },
+                      {
+                        id: "chart-text-y-axis",
+                        label: "Y-axis label",
+                        value: yAxisLabel,
+                        setValue: setYAxisLabel,
+                        placeholder: "Y-axis label",
+                        color: yAxisLabelColor,
+                        setColor: setYAxisLabelColor,
+                        visible: !yAxisLabelHidden,
+                        setVisible: (on) => setYAxisLabelHidden(!on),
+                        rows: 2,
+                      },
+                    ].map((field) => (
+                      <Item
+                        key={field.id}
+                        variant="outline"
+                        size="sm"
+                        className="w-full flex-col items-stretch gap-2 px-2.5 py-2"
                       >
-                        {!titleHidden ? <EyeOpenIcon className="h-3 w-3" /> : <EyeClosedIcon className="h-3 w-3" />}
-                      </button>
-                    </div>
-                    <div className="flex min-w-0 items-center gap-2">
-                      <Label htmlFor="chart-text-desc" className="w-24 shrink-0 text-xs text-muted-foreground">
-                        Description
-                      </Label>
-                      <Input
-                        id="chart-text-desc"
-                        type="text"
-                        value={subTitle}
-                        placeholder="Description"
-                        className="h-8 min-w-0 flex-1 text-xs"
-                        onChange={(e) => setSubTitle(e.target.value)}
-                      />
-                      <ChartColorPalettePopover
-                        value={subTitleColor}
-                        onChange={setSubTitleColor}
-                        ariaLabel="Description text color"
-                        onClear={() => setSubTitleColor(null)}
-                      />
-                      <button
-                        type="button"
-                        className="flex h-6 w-6 shrink-0 cursor-pointer items-center justify-center rounded-full bg-yellow-400/30 p-2 text-foreground hover:bg-lychee_green/40"
-                        onClick={() => setSubTitleHidden(!subTitleHidden)}
-                        aria-label={subTitleHidden ? "Show description on chart" : "Hide description on chart"}
-                      >
-                        {!subTitleHidden ? <EyeOpenIcon className="h-3 w-3" /> : <EyeClosedIcon className="h-3 w-3" />}
-                      </button>
-                    </div>
-                    <div className="flex min-w-0 items-center gap-2">
-                      <Label htmlFor="chart-text-body-h" className="w-24 shrink-0 text-xs text-muted-foreground">
-                        Body heading
-                      </Label>
-                      <Input
-                        id="chart-text-body-h"
-                        type="text"
-                        value={bodyHeading}
-                        placeholder="Body heading"
-                        className="h-8 min-w-0 flex-1 text-xs"
-                        onChange={(e) => setBodyHeading(e.target.value)}
-                      />
-                      <ChartColorPalettePopover
-                        value={bodyHeadingColor}
-                        onChange={setBodyHeadingColor}
-                        ariaLabel="Body heading color"
-                        onClear={() => setBodyHeadingColor(null)}
-                      />
-                      <button
-                        type="button"
-                        className="flex h-6 w-6 shrink-0 cursor-pointer items-center justify-center rounded-full bg-yellow-400/30 p-2 text-foreground hover:bg-lychee_green/40"
-                        onClick={() => setHeadingHidden(!bodyHeadingHidden)}
-                        aria-label={bodyHeadingHidden ? "Show body heading on chart" : "Hide body heading on chart"}
-                      >
-                        {!bodyHeadingHidden ? <EyeOpenIcon className="h-3 w-3" /> : <EyeClosedIcon className="h-3 w-3" />}
-                      </button>
-                    </div>
-                    <div className="flex min-w-0 items-start gap-2">
-                      <Label htmlFor="chart-text-content" className="w-24 shrink-0 pt-2 text-xs text-muted-foreground">
-                        Content
-                      </Label>
-                      <Textarea
-                        id="chart-text-content"
-                        value={bodyContent}
-                        placeholder="Content"
-                        className="min-h-[72px] min-w-0 flex-1 resize-y text-xs"
-                        onChange={(e) => setBodyContent(e.target.value)}
-                      />
-                      <div className="flex shrink-0 flex-col items-center gap-1 pt-1">
-                        <ChartColorPalettePopover
-                          value={bodyContentColor}
-                          onChange={setBodyContentColor}
-                          ariaLabel="Content text color"
-                          onClear={() => setBodyContentColor(null)}
-                        />
-                        <button
-                          type="button"
-                          className="flex h-6 w-6 cursor-pointer items-center justify-center rounded-full bg-yellow-400/30 p-2 text-foreground hover:bg-lychee_green/40"
-                          onClick={() => setBodyContentHidden(!bodyContentHidden)}
-                          aria-label={bodyContentHidden ? "Show content on chart" : "Hide content on chart"}
-                        >
-                          {!bodyContentHidden ? <EyeOpenIcon className="h-3 w-3" /> : <EyeClosedIcon className="h-3 w-3" />}
-                        </button>
-                      </div>
-                    </div>
-                  </div>
+                        <ItemHeader>
+                          <ItemTitle className="text-[11px] font-medium text-muted-foreground">
+                            {field.label}
+                          </ItemTitle>
+                          <ItemActions>
+                            <Switch
+                              checked={field.visible}
+                              onCheckedChange={field.setVisible}
+                              aria-label={`Show ${field.label} on chart`}
+                              className="h-4 w-7 data-[state=checked]:bg-slate-900 dark:data-[state=checked]:bg-slate-50 [&>span]:h-3 [&>span]:w-3 data-[state=checked]:[&>span]:translate-x-3"
+                            />
+                          </ItemActions>
+                        </ItemHeader>
+                        {field.visible ? (
+                          <div className="flex w-full min-w-0 items-start gap-2">
+                            <ItemContent className="min-w-0 gap-0">
+                              <Textarea
+                                id={field.id}
+                                value={field.value}
+                                placeholder={field.placeholder}
+                                rows={field.rows}
+                                className="min-h-0 min-w-0 resize-y text-xs"
+                                onChange={(e) => field.setValue(e.target.value)}
+                              />
+                            </ItemContent>
+                            <ItemMedia variant="image" className="size-8 shrink-0 self-start p-0">
+                              <ChartColorPalettePopover
+                                value={field.color}
+                                onChange={field.setColor}
+                                ariaLabel={`${field.label} color`}
+                                onClear={() => field.setColor(null)}
+                                triggerClassName="h-full w-full rounded-sm border-border"
+                              />
+                            </ItemMedia>
+                          </div>
+                        ) : null}
+                      </Item>
+                    ))}
+                  </ItemGroup>
                 </AccordionContent>
               </AccordionItem>
             </Accordion>

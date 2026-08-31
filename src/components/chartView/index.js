@@ -884,6 +884,14 @@ export function ChartBuilderProvider({ demo, children, initialBuilderSnapshot, e
   const [bodyContentColor, setBodyContentColor] = useState(null);
   const [innerBoxColor, setInnerBoxColor] = useState(null);
 
+  /** Axis title strings (Recharts axis `label`), independent of tick labels. */
+  const [xAxisLabelHidden, setXAxisLabelHidden] = useState(true);
+  const [xAxisLabel, setXAxisLabel] = useState("");
+  const [xAxisLabelColor, setXAxisLabelColor] = useState(null);
+  const [yAxisLabelHidden, setYAxisLabelHidden] = useState(true);
+  const [yAxisLabel, setYAxisLabel] = useState("");
+  const [yAxisLabelColor, setYAxisLabelColor] = useState(null);
+
   const [gridVisible, setGridVisible] = useState(true);
   /** Scroll-wheel zoom on numeric / time X (line, area, bar, scatter). Ephemeral domain lives in ChartCanvas. */
   const [enableZoom, setEnableZoom] = useState(false);
@@ -1102,6 +1110,12 @@ export function ChartBuilderProvider({ demo, children, initialBuilderSnapshot, e
     if (s.bodyHeadingColor !== undefined) setBodyHeadingColor(s.bodyHeadingColor);
     if (s.bodyContentColor !== undefined) setBodyContentColor(s.bodyContentColor);
     if (s.innerBoxColor !== undefined) setInnerBoxColor(s.innerBoxColor);
+    if (s.xAxisLabelHidden !== undefined) setXAxisLabelHidden(!!s.xAxisLabelHidden);
+    if (s.xAxisLabel != null) setXAxisLabel(String(s.xAxisLabel));
+    if (s.xAxisLabelColor !== undefined) setXAxisLabelColor(s.xAxisLabelColor);
+    if (s.yAxisLabelHidden !== undefined) setYAxisLabelHidden(!!s.yAxisLabelHidden);
+    if (s.yAxisLabel != null) setYAxisLabel(String(s.yAxisLabel));
+    if (s.yAxisLabelColor !== undefined) setYAxisLabelColor(s.yAxisLabelColor);
     if (s.gridVisible !== undefined) setGridVisible(!!s.gridVisible);
     if (s.enableZoom !== undefined) setEnableZoom(!!s.enableZoom);
     if (s.yAxisLineVisible !== undefined) setYAxisLineVisible(!!s.yAxisLineVisible);
@@ -1862,6 +1876,12 @@ export function ChartBuilderProvider({ demo, children, initialBuilderSnapshot, e
     bodyHeadingColor,
     bodyContentColor,
     innerBoxColor,
+    xAxisLabelHidden,
+    xAxisLabel,
+    xAxisLabelColor,
+    yAxisLabelHidden,
+    yAxisLabel,
+    yAxisLabelColor,
     gridVisible,
     enableZoom,
     yAxisLineVisible,
@@ -2192,6 +2212,18 @@ export function ChartBuilderProvider({ demo, children, initialBuilderSnapshot, e
     setBodyContentColor,
     innerBoxColor,
     setInnerBoxColor,
+    xAxisLabelHidden,
+    setXAxisLabelHidden,
+    xAxisLabel,
+    setXAxisLabel,
+    xAxisLabelColor,
+    setXAxisLabelColor,
+    yAxisLabelHidden,
+    setYAxisLabelHidden,
+    yAxisLabel,
+    setYAxisLabel,
+    yAxisLabelColor,
+    setYAxisLabelColor,
     gridVisible,
     setGridVisible,
     enableZoom,
@@ -2286,6 +2318,18 @@ export function ChartBuilderProvider({ demo, children, initialBuilderSnapshot, e
     setBodyContentHidden,
     bodyContent,
     setBodyContent,
+    xAxisLabelHidden,
+    setXAxisLabelHidden,
+    xAxisLabel,
+    setXAxisLabel,
+    xAxisLabelColor,
+    setXAxisLabelColor,
+    yAxisLabelHidden,
+    setYAxisLabelHidden,
+    yAxisLabel,
+    setYAxisLabel,
+    yAxisLabelColor,
+    setYAxisLabelColor,
 
     livelineData,
     livelineSeries,
@@ -2417,6 +2461,12 @@ export function ChartCanvas() {
     yAxisTickColor,
     xAxisTicksAngled,
     xAxisLabelGapPx,
+    xAxisLabelHidden,
+    xAxisLabel,
+    xAxisLabelColor,
+    yAxisLabelHidden,
+    yAxisLabel,
+    yAxisLabelColor,
     lineIsTemporalX,
     lineChartData,
     scopedKeysInUse,
@@ -2440,27 +2490,46 @@ export function ChartCanvas() {
     (selChartType === "line" || selChartType === "area") &&
     lineInterpolationNeedsYHeadroom(lineStyle);
   /** Angled labels need extra bottom space inside the SVG; value tuned for dd-mmm at −45°. */
-  const cartesianBottomAngled = hideXAxisLabels ? 12 : xAxisTicksAngled ? 88 : 0;
+  const showChartXAxisTitle = !xAxisLabelHidden && !!String(xAxisLabel || "").trim();
+  const showChartYAxisTitle = !yAxisLabelHidden && !!String(yAxisLabel || "").trim();
+  const cartesianBottomAngled =
+    (hideXAxisLabels ? 12 : xAxisTicksAngled ? 88 : 0) + (showChartXAxisTitle ? 22 : 0);
+  const cartesianLeftExtra = showChartYAxisTitle ? 18 : 0;
   const cartesianMarginWithAngledTicks = useMemo(
     () => ({
       ...CARTESIAN_MARGIN_AREA_LINE,
+      left: CARTESIAN_MARGIN_AREA_LINE.left + cartesianLeftExtra,
       bottom: cartesianBottomAngled,
       top: needsCurveYHeadroom ? CARTESIAN_CURVE_TOP_MARGIN : 0,
     }),
-    [cartesianBottomAngled, needsCurveYHeadroom],
+    [cartesianBottomAngled, cartesianLeftExtra, needsCurveYHeadroom],
   );
   const cartesianBarMarginWithAngledTicks = useMemo(
-    () => ({ ...CARTESIAN_MARGIN_BAR, bottom: cartesianBottomAngled }),
-    [cartesianBottomAngled],
+    () => ({
+      ...CARTESIAN_MARGIN_BAR,
+      left: CARTESIAN_MARGIN_BAR.left + cartesianLeftExtra,
+      bottom: cartesianBottomAngled,
+    }),
+    [cartesianBottomAngled, cartesianLeftExtra],
   );
   /** Horizontal bars: category axis is Y; leave room for labels (wider when slanted). */
   const cartesianBarMarginHorizontal = useMemo(() => {
     if (hideXAxisLabels) {
-      return { left: 48, right: CARTESIAN_MARGIN_BAR.right, top: 4, bottom: 20 };
+      return {
+        left: 48 + (showChartXAxisTitle ? 16 : 0),
+        right: CARTESIAN_MARGIN_BAR.right,
+        top: 4,
+        bottom: 20 + (showChartYAxisTitle ? 18 : 0),
+      };
     }
-    const left = xAxisTicksAngled ? 108 : 84;
-    return { left, right: CARTESIAN_MARGIN_BAR.right, top: 4, bottom: 20 };
-  }, [xAxisTicksAngled, hideXAxisLabels]);
+    const left = (xAxisTicksAngled ? 108 : 84) + (showChartXAxisTitle ? 16 : 0);
+    return {
+      left,
+      right: CARTESIAN_MARGIN_BAR.right,
+      top: 4,
+      bottom: 20 + (showChartYAxisTitle ? 18 : 0),
+    };
+  }, [xAxisTicksAngled, hideXAxisLabels, showChartXAxisTitle, showChartYAxisTitle]);
   const xAxisTickMargin = (xAxisTicksAngled ? 12 : 8) + (Number.isFinite(Number(xAxisLabelGapPx)) ? Number(xAxisLabelGapPx) : 0);
 
   const barUsesCrossSheetData =
@@ -2937,6 +3006,39 @@ export function ChartCanvas() {
 
   const tickFillX = xAxisTickColor || (dark ? "#94a3b8" : "#64748b");
   const tickFillY = yAxisTickColor || (dark ? "#94a3b8" : "#64748b");
+  const chartXAxisTitleLabel = showChartXAxisTitle
+    ? {
+        value: String(xAxisLabel).trim(),
+        position: "insideBottom",
+        offset: -2,
+        style: { fill: xAxisLabelColor || tickFillX, fontSize: 11 },
+      }
+    : undefined;
+  const chartYAxisTitleLabel = showChartYAxisTitle
+    ? {
+        value: String(yAxisLabel).trim(),
+        angle: -90,
+        position: "insideLeft",
+        style: { textAnchor: "middle", fill: yAxisLabelColor || tickFillY, fontSize: 11 },
+      }
+    : undefined;
+  /** Horizontal bars: value axis is bottom (X), category is left (Y). */
+  const chartYAxisTitleLabelBottom = showChartYAxisTitle
+    ? {
+        value: String(yAxisLabel).trim(),
+        position: "insideBottom",
+        offset: -2,
+        style: { fill: yAxisLabelColor || tickFillY, fontSize: 11 },
+      }
+    : undefined;
+  const chartXAxisTitleLabelSide = showChartXAxisTitle
+    ? {
+        value: String(xAxisLabel).trim(),
+        angle: -90,
+        position: "insideLeft",
+        style: { textAnchor: "middle", fill: xAxisLabelColor || tickFillX, fontSize: 11 },
+      }
+    : undefined;
   const gridStroke = gridLineColor || (dark ? "rgba(148,163,184,0.32)" : "rgba(100,116,139,0.35)");
   const labelListFill = chartTextColor || (dark ? "#e2e8f0" : "#0f172a");
 
@@ -3329,6 +3431,7 @@ export function ChartCanvas() {
                           angle={xAxisTickAngle}
                           tickFormatter={hideXAxisLabels ? () => "" : xTickFormatter}
                           tick={hideXAxisLabels ? false : { fill: tickFillX }}
+                          label={chartXAxisTitleLabel}
                         />
                         <YAxis
                           tickLine={false}
@@ -3339,6 +3442,7 @@ export function ChartCanvas() {
                           scale={scaleY === "log" ? "log" : "auto"}
                           domain={scaleY === "log" ? ["auto", "auto"] : cartesianYAxisDomain}
                           tick={{ fill: tickFillY }}
+                          label={chartYAxisTitleLabel}
                         />
                         <ChartTooltip
                           cursor={false}
@@ -3404,6 +3508,7 @@ export function ChartCanvas() {
                               tick={{ fill: tickFillY }}
                               scale={scaleY === "log" ? "log" : "auto"}
                               domain={scaleY === "log" ? ["auto", "auto"] : undefined}
+                              label={chartYAxisTitleLabelBottom}
                             />
                             <YAxis
                               type={rechartsXAxisType}
@@ -3418,6 +3523,7 @@ export function ChartCanvas() {
                               tick={hideXAxisLabels ? false : { fill: tickFillX }}
                               width={xAxisTicksAngled ? 120 : 96}
                               padding={BAR_X_AXIS_PADDING}
+                              label={chartXAxisTitleLabelSide}
                             />
                           </>
                         ) : (
@@ -3437,6 +3543,7 @@ export function ChartCanvas() {
                               tickFormatter={hideXAxisLabels ? () => "" : xTickFormatter}
                               tick={hideXAxisLabels ? false : { fill: tickFillX }}
                               padding={BAR_X_AXIS_PADDING}
+                              label={chartXAxisTitleLabel}
                             />
                             <YAxis
                               tickLine={false}
@@ -3447,6 +3554,7 @@ export function ChartCanvas() {
                               scale={scaleY === "log" ? "log" : "auto"}
                               domain={scaleY === "log" ? ["auto", "auto"] : undefined}
                               tick={{ fill: tickFillY }}
+                              label={chartYAxisTitleLabel}
                             />
                           </>
                         )}
@@ -3534,6 +3642,7 @@ export function ChartCanvas() {
                           angle={xAxisTickAngle}
                           tickFormatter={hideXAxisLabels ? () => "" : xTickFormatter}
                           tick={hideXAxisLabels ? false : { fill: tickFillX }}
+                          label={chartXAxisTitleLabel}
                         />
                         <YAxis
                           type="number"
@@ -3547,6 +3656,7 @@ export function ChartCanvas() {
                           scale={scaleY === "log" ? "log" : "auto"}
                           domain={scaleY === "log" ? ["auto", "auto"] : undefined}
                           tick={{ fill: tickFillY }}
+                          label={chartYAxisTitleLabel}
                         />
                         {scatterZEnabled && selZ ? (
                           <ZAxis
@@ -3630,6 +3740,7 @@ export function ChartCanvas() {
                           angle={xAxisTickAngle}
                           tickFormatter={hideXAxisLabels ? () => "" : xTickFormatter}
                           tick={hideXAxisLabels ? false : { fill: tickFillX }}
+                          label={chartXAxisTitleLabel}
                         />
                         <YAxis
                           tickLine={false}
@@ -3640,6 +3751,7 @@ export function ChartCanvas() {
                           scale={scaleY === "log" ? "log" : "auto"}
                           domain={scaleY === "log" ? ["auto", "auto"] : cartesianYAxisDomain}
                           tick={{ fill: tickFillY }}
+                          label={chartYAxisTitleLabel}
                         />
                         <ChartTooltip
                           cursor={false}
