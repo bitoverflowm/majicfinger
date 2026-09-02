@@ -10,6 +10,7 @@ import {
   replayProjectDerivedSheets,
 } from "@/lib/replayProjectDerivedSheets";
 import { stripProvenanceRowPayloadForLoad } from "@/lib/projectPersistence";
+import { coerceDataTypes } from "@/lib/coerceDataTypes";
 
 /**
  * Shared helpers to load a saved DataSet (project) into sheet + chart workspace state.
@@ -26,9 +27,10 @@ export function applyDataSetToWorkspace(ds, { setDataSheets, setActiveSheetId, s
           : sheet?.storageMode === "derived"
             ? "derived"
             : "inline";
+      const raw = Array.isArray(sheet?.data) ? sheet.data : [];
       acc[sheetId] = {
         ...sheet,
-        data: Array.isArray(sheet?.data) ? sheet.data : [],
+        data: coerceDataTypes(raw),
         storageMode: mode,
         rehydrationStatus:
           mode === "provenance" || mode === "derived"
@@ -44,7 +46,7 @@ export function applyDataSetToWorkspace(ds, { setDataSheets, setActiveSheetId, s
     setConnectedData?.(firstRows);
     return;
   }
-  const rows = Array.isArray(ds?.data) ? ds.data : [];
+  const rows = coerceDataTypes(Array.isArray(ds?.data) ? ds.data : []);
   const fallback = { "sheet-1": { name: "Sheet 1", data: rows, provenance: null } };
   setDataSheets?.(fallback);
   setActiveSheetId?.("sheet-1");
@@ -176,11 +178,20 @@ function yieldToPaint() {
 function applyActiveSheetFromSheets(allSheets, setters) {
   const { setDataSheets, setActiveSheetId, setConnectedData } = setters;
   if (!allSheets || !setDataSheets) return;
-  setDataSheets({ ...allSheets });
-  const activeKey = pickInitialActiveSheetId(allSheets);
+  const coerced = Object.fromEntries(
+    Object.entries(allSheets).map(([id, sheet]) => [
+      id,
+      {
+        ...sheet,
+        data: coerceDataTypes(Array.isArray(sheet?.data) ? sheet.data : []),
+      },
+    ]),
+  );
+  setDataSheets({ ...coerced });
+  const activeKey = pickInitialActiveSheetId(coerced);
   if (activeKey) {
     setActiveSheetId?.(activeKey);
-    setConnectedData?.(Array.isArray(allSheets[activeKey]?.data) ? allSheets[activeKey].data : []);
+    setConnectedData?.(Array.isArray(coerced[activeKey]?.data) ? coerced[activeKey].data : []);
   }
 }
 

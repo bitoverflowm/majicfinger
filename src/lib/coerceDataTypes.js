@@ -155,3 +155,6 @@ export function coerceDataTypes(rows) {
   }
   return out;
 }
+
+export { coerceNumberColumnsInRows, parseNumberTypedCell } from "./coerceNumberTypedCells.js";
+

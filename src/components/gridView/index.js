@@ -20,6 +20,10 @@ import { AgGridReact } from 'ag-grid-react'; // React Grid Logic
 import "ag-grid-community/styles/ag-grid.css"; // Core CSS
 import "ag-grid-community/styles/ag-theme-balham.css"; // Theme
 import { flashLiveSheetInGrid } from "@/lib/liveFeeds/flashLiveSheetInGrid";
+import {
+  coerceNumberColumnsInRows,
+  parseNumberTypedCell,
+} from "@/lib/coerceNumberTypedCells";
 
 import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
 
@@ -746,8 +750,7 @@ const GridView = ({ startNew, fillViewport = false }) => {
         let newValue = row?.[column];
         switch (newType) {
           case "number":
-            newValue = parseFloat(newValue);
-            if (isNaN(newValue)) newValue = null;
+            newValue = parseNumberTypedCell(newValue);
             break;
           case "boolean":
             newValue = Boolean(newValue);
@@ -2777,8 +2780,24 @@ const GridView = ({ startNew, fillViewport = false }) => {
       });
     }, [connectedData, colKeys]);
 
+    const numberTypedFields = useMemo(() => {
+      const fields = new Set();
+      for (const c of connectedCols || []) {
+        const field = c && typeof c === "object" && "field" in c ? c.field : c;
+        if (!field) continue;
+        const fromCol = typeof c === "object" && c != null ? c.cellDataType : null;
+        const t = dataTypes?.[field] || fromCol;
+        if (t === "number") fields.add(field);
+      }
+      for (const [field, t] of Object.entries(dataTypes || {})) {
+        if (t === "number" && field) fields.add(field);
+      }
+      return fields;
+    }, [connectedCols, dataTypes]);
+
     const displayData = useMemo(() => {
-      const withIndex = (connectedData || []).map((r, i) => ({ ...r, _origIndex: i }));
+      const typedRows = coerceNumberColumnsInRows(connectedData || [], numberTypedFields);
+      const withIndex = typedRows.map((r, i) => ({ ...r, _origIndex: i }));
       let out = withIndex;
       const { dateColumn, dateFrom, dateTo, sortKey, sortDir, categoryFilters } = filterState;
       if (dateColumn && (dateFrom || dateTo)) {
@@ -2824,7 +2843,7 @@ const GridView = ({ startNew, fillViewport = false }) => {
         });
       }
       return out;
-    }, [connectedData, filterState]);
+    }, [connectedData, filterState, numberTypedFields]);
 
     const columnDefsWithMeta = useMemo(() => {
       const cols = (connectedCols || []).map((c) => {
@@ -2832,13 +2851,18 @@ const GridView = ({ startNew, fillViewport = false }) => {
         const fl = field && field.toLowerCase();
         const isTokenId = fl && (TOKEN_ID_FIELDS.has(fl) || fl.endsWith('_conditionid') || fl.endsWith('_condition_id') || fl.endsWith('_asset_id') || fl === 'id' || fl.endsWith('id'));
         const fmt = isTokenId ? (p) => (p?.value != null ? String(p.value) : '') : undefined;
+        const declaredType = (field && dataTypes?.[field]) || (typeof c === 'object' && c != null ? c.cellDataType : null);
         return typeof c === 'object' && c !== null
-          ? { ...c, valueFormatter: isTokenId ? fmt : c.valueFormatter }
-          : { field: c, valueFormatter: fmt };
+          ? {
+              ...c,
+              ...(declaredType ? { cellDataType: declaredType } : {}),
+              valueFormatter: isTokenId ? fmt : c.valueFormatter,
+            }
+          : { field: c, ...(declaredType ? { cellDataType: declaredType } : {}), valueFormatter: fmt };
       });
       cols.push({ field: '_origIndex', hide: true, suppressColumnsToolPanel: true });
       return cols;
-    }, [connectedCols]);
+    }, [connectedCols, dataTypes]);
 
     const distinctByColumn = useMemo(() => {
       const map = {};
@@ -3005,6 +3029,29 @@ const GridView = ({ startNew, fillViewport = false }) => {
         () => ({
             singleClickEdit: true,
             stopEditingWhenCellsLoseFocus: true,
+            // Accept numeric strings for number-typed columns (JSON/Athena often leave counts/sums as strings).
+            dataTypeDefinitions: {
+              number: {
+                extendsDataType: "number",
+                baseDataType: "number",
+                valueParser: (params) => {
+                  const raw = params?.newValue;
+                  if (raw == null) return null;
+                  if (typeof raw === "string" && raw.trim() === "") return null;
+                  return parseNumberTypedCell(raw);
+                },
+                valueFormatter: (params) => {
+                  const v = params?.value;
+                  if (v == null || v === "") return "";
+                  if (typeof v === "number" && Number.isFinite(v)) return String(v);
+                  const n = parseNumberTypedCell(v);
+                  return n != null ? String(n) : "";
+                },
+                dataTypeMatcher: (value) =>
+                  typeof value === "number" ||
+                  (typeof value === "string" && parseNumberTypedCell(value) != null),
+              },
+            },
             onCellClicked: () =>
                 toast(`Hit Enter to accept change`, {
                     duration: 5000,
