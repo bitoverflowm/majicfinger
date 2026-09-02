@@ -110,8 +110,14 @@ function summarizeEquations(sheet) {
     const type = String(op?.type || "");
     if (type === "computed.column") {
       const col = op?.payload?.column || op?.column;
-      const kind = op?.payload?.expression?.kind;
+      const kind = op?.payload?.expression?.kind || op?.expression?.kind;
       out.push(col ? `${col}${kind ? ` (${kind})` : ""}` : "Computed column");
+      continue;
+    }
+    if (type === "summary.row") {
+      const outputs = op?.outputs || op?.payload?.outputs;
+      const label = Array.isArray(outputs) && outputs.length ? outputs.join(", ") : "Summary row";
+      out.push(`Summary · ${label}`);
       continue;
     }
     if (type === "bucket.sheet" || type === "band.sheet") {

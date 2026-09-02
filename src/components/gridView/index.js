@@ -138,8 +138,36 @@ import {
 } from "@/lib/bucketSheetTabs";
 import { aggregateBucketRows, formatBucketNumber } from "@/lib/sheetOperations/aggregateBucketRows";
 import { QuantOperationsPanel } from "@/components/gridView/QuantOperationsPanel";
+import {
+  SummaryRowEditor,
+  createInitialSummaryDraft,
+} from "@/components/gridView/SummaryRowEditor";
+import {
+  computeSummaryRow,
+  isSummaryRefKey,
+  normalizeSummaryConfig,
+  summaryRefKey,
+  summaryRefOutputName,
+} from "@/lib/sheetOperations/computeSummaryRow";
 import { BUCKET_TIME_INTERVALS } from "@/lib/sheetOperations/bucketTimeIntervals";
-import { temporalToMs } from "@/lib/temporalParse";
+
+/** Column + summary named-value options for math operand selects. */
+function MathOperandSelectItems({ columns, summaryOptions, keyPrefix }) {
+  return (
+    <>
+      {(columns || []).map((c) => (
+        <SelectItem key={`${keyPrefix}-col-${c}`} value={c} className="font-mono text-xs">
+          {c}
+        </SelectItem>
+      ))}
+      {(summaryOptions || []).map((opt) => (
+        <SelectItem key={`${keyPrefix}-sum-${opt.value}`} value={opt.value} className="font-mono text-xs">
+          {opt.label}
+        </SelectItem>
+      ))}
+    </>
+  );
+}import { temporalToMs } from "@/lib/temporalParse";
 import {
   applyRefineQueryToRows,
   buildRefineFiltersFromClauses,
@@ -607,6 +635,7 @@ const GridView = ({ startNew, fillViewport = false }) => {
     const [mathBasicColB, setMathBasicColB] = useState("");
     const [mathDestination, setMathDestination] = useState("current_sheet");
     const [mathDialogTab, setMathDialogTab] = useState("basic");
+    const [summaryDraft, setSummaryDraft] = useState(() => createInitialSummaryDraft(null, []));
     const [quantBusy, setQuantBusy] = useState(false);
     const [quantCanSubmit, setQuantCanSubmit] = useState(false);
     const [mathFunctionType, setMathFunctionType] = useState("row_operation");
@@ -945,6 +974,210 @@ const GridView = ({ startNew, fillViewport = false }) => {
       while (existing.has(`resultCol${n}`)) n += 1;
       return `resultCol${n}`;
     }, [sheetColumnNamesForMath]);
+
+    const summaryConfig = activeSheet?.summaryConfig || null;
+    const summaryComputed = useMemo(
+      () => computeSummaryRow(Array.isArray(connectedData) ? connectedData : [], summaryConfig),
+      [connectedData, summaryConfig],
+    );
+    const summaryNamedValues = summaryComputed.namedValues || {};
+    const showSummaryPane =
+      summaryConfig?.destination === "this_view" &&
+      Array.isArray(summaryConfig?.metrics) &&
+      summaryConfig.metrics.length > 0 &&
+      summaryComputed.columns.length > 0;
+
+    const summaryColumnDefs = useMemo(
+      () =>
+        (summaryComputed.columns || []).map((field) => ({
+          field,
+          headerName: field,
+          cellDataType: "number",
+          editable: false,
+          flex: 1,
+          minWidth: 120,
+        })),
+      [summaryComputed.columns],
+    );
+
+    const resolveMathOperand = useCallback(
+      (row, key) => {
+        const k = String(key || "").trim();
+        if (!k) return 0;
+        if (isSummaryRefKey(k)) {
+          const v = summaryNamedValues[k] ?? summaryNamedValues[summaryRefOutputName(k)];
+          return Number.isFinite(v) ? v : 0;
+        }
+        if (Object.prototype.hasOwnProperty.call(summaryNamedValues, k) && summaryConfig?.metrics?.some((m) => m.outputName === k)) {
+          const v = summaryNamedValues[k];
+          return Number.isFinite(v) ? v : 0;
+        }
+        const n = Number(row?.[k]);
+        return Number.isFinite(n) ? n : 0;
+      },
+      [summaryNamedValues, summaryConfig],
+    );
+
+    const summarySelectOptions = useMemo(() => {
+      const names = (summaryConfig?.metrics || [])
+        .map((m) => String(m.outputName || "").trim())
+        .filter(Boolean);
+      return names.map((name) => ({
+        value: summaryRefKey(name),
+        label: `Σ ${name}`,
+      }));
+    }, [summaryConfig]);
+
+    useEffect(() => {
+      if (!mathDialogOpen) return;
+      if (mathDialogTab === "summary") {
+        setSummaryDraft(createInitialSummaryDraft(activeSheet?.summaryConfig, sheetColumnNamesForMath));
+      }
+    }, [mathDialogOpen, mathDialogTab, activeSheet?.summaryConfig, sheetColumnNamesForMath]);
+
+    const lastSummarySyncRef = useRef({});
+    useEffect(() => {
+      if (!setDataSheets || !dataSheets) return;
+      const patches = {};
+      for (const [sid, sheet] of Object.entries(dataSheets)) {
+        const cfg = sheet?.summaryConfig;
+        if (!cfg || cfg.destination !== "new_sheet" || !cfg.linkedSheetId) continue;
+        if (!Array.isArray(cfg.metrics) || !cfg.metrics.length) continue;
+        const { row, columns } = computeSummaryRow(Array.isArray(sheet.data) ? sheet.data : [], cfg);
+        const sig = `${sid}:${columns.map((c) => `${c}=${row[c]}`).join("|")}`;
+        if (lastSummarySyncRef.current[sid] === sig) continue;
+        lastSummarySyncRef.current[sid] = sig;
+        patches[cfg.linkedSheetId] = { row, sourceId: sid };
+      }
+      const linkedIds = Object.keys(patches);
+      if (!linkedIds.length) return;
+      setDataSheets((prev) => {
+        let changed = false;
+        const next = { ...(prev || {}) };
+        for (const [lid, { row }] of Object.entries(patches)) {
+          if (!next[lid]) continue;
+          next[lid] = { ...next[lid], data: [row], summaryRow: row };
+          changed = true;
+        }
+        return changed ? next : prev;
+      });
+    }, [dataSheets, setDataSheets]);
+
+    const applySummaryRow = useCallback(() => {
+      const rows = Array.isArray(connectedData) ? connectedData : [];
+      if (!rows.length) {
+        toast.error("Load sheet data before building a summary row.");
+        return;
+      }
+      const config = normalizeSummaryConfig(summaryDraft);
+      if (!config.metrics.length) {
+        toast.error("Add at least one summary metric.");
+        return;
+      }
+      for (const m of config.metrics) {
+        if (!String(m.outputName || "").trim()) {
+          toast.error("Each metric needs an output column name.");
+          return;
+        }
+        if (m.op !== "binary" && m.op !== "if_else" && m.op !== "count" && !m.columns.length) {
+          toast.error(`Metric "${m.outputName}" needs a source column.`);
+          return;
+        }
+      }
+      const computed = computeSummaryRow(rows, config);
+      if (computed.errors.length) {
+        toast.error(computed.errors[0]);
+        return;
+      }
+      const operation = createSheetOperation("summary.row", {
+        summaryConfig: config,
+        outputs: computed.columns,
+      });
+
+      if (config.destination === "new_sheet") {
+        const sheetName = `Summary · ${String(activeSheet?.name || activeSheetId || "sheet")}`.slice(0, 80);
+        addNewSheetAndActivate?.((newId) => {
+          setSheetData?.(newId, [computed.row]);
+          setDataSheets?.((prev) => {
+            const p = prev || {};
+            const source = p[activeSheetId] || { name: "Sheet 1", data: rows };
+            const linked = p[newId];
+            if (!linked) return prev;
+            const nextConfig = {
+              ...config,
+              linkedSheetId: newId,
+              sourceSheetId: activeSheetId,
+            };
+            return {
+              ...p,
+              [activeSheetId]: {
+                ...source,
+                summaryConfig: nextConfig,
+                summaryRow: computed.row,
+                operationHistory: [
+                  ...(Array.isArray(source.operationHistory) ? source.operationHistory : []),
+                  operation,
+                ],
+              },
+              [newId]: {
+                ...linked,
+                name: sheetName,
+                data: [computed.row],
+                summaryRow: computed.row,
+                sourceSheetId: activeSheetId,
+                dataTypes: Object.fromEntries(computed.columns.map((c) => [c, "number"])),
+                operationHistory: [
+                  ...(Array.isArray(linked.operationHistory) ? linked.operationHistory : []),
+                  operation,
+                ],
+              },
+            };
+          });
+        });
+        toast.success("Created summary sheet.");
+      } else {
+        if (!activeSheetId || !setDataSheets) {
+          toast.error("No active sheet.");
+          return;
+        }
+        setDataSheets((prev) => {
+          const sheet = prev?.[activeSheetId] || { name: "Sheet 1", data: rows };
+          return {
+            ...prev,
+            [activeSheetId]: {
+              ...sheet,
+              summaryConfig: { ...config, linkedSheetId: null, sourceSheetId: activeSheetId },
+              summaryRow: computed.row,
+              operationHistory: [
+                ...(Array.isArray(sheet.operationHistory) ? sheet.operationHistory : []),
+                operation,
+              ],
+            },
+          };
+        });
+        toast.success("Summary row added under this sheet.");
+      }
+      setMathDialogOpen(false);
+    }, [
+      connectedData,
+      summaryDraft,
+      activeSheet,
+      activeSheetId,
+      addNewSheetAndActivate,
+      setSheetData,
+      setDataSheets,
+    ]);
+
+    const clearSummaryRow = useCallback(() => {
+      if (!activeSheetId || !setDataSheets) return;
+      setDataSheets((prev) => {
+        const sheet = prev?.[activeSheetId];
+        if (!sheet) return prev;
+        const { summaryConfig: _sc, summaryRow: _sr, ...rest } = sheet;
+        return { ...prev, [activeSheetId]: { ...rest, summaryConfig: null, summaryRow: null } };
+      });
+      toast("Summary row cleared");
+    }, [activeSheetId, setDataSheets]);
 
     useEffect(() => {
       if (!mathDialogOpen) return;
@@ -1615,10 +1848,6 @@ const GridView = ({ startNew, fillViewport = false }) => {
         toast.error("Enter a name for the new column.");
         return;
       }
-      const valueOrZero = (v) => {
-        const n = Number(v);
-        return Number.isFinite(n) ? n : 0;
-      };
 
       let next;
       if (mathDialogTab === "basic" || (mathDialogTab === "functions" && mathFunctionType === "column")) {
@@ -1631,8 +1860,8 @@ const GridView = ({ startNew, fillViewport = false }) => {
         }
         next = rows.map((row) => {
           if (!row || typeof row !== "object") return row;
-          const a = valueOrZero(row[colA]);
-          const b = valueOrZero(row[colB]);
+          const a = resolveMathOperand(row, colA);
+          const b = unaryAbs ? 0 : resolveMathOperand(row, colB);
           let v = null;
           if (mathOp === "add") v = a + b;
           else if (mathOp === "subtract") v = a - b;
@@ -1657,8 +1886,12 @@ const GridView = ({ startNew, fillViewport = false }) => {
             if (refRow == null) {
               return { ...row, [out]: null };
             }
-            const current = parseCellFiniteForStat(row, baseCol);
-            const relative = parseCellFiniteForStat(refRow, baseCol);
+            const current = isSummaryRefKey(baseCol)
+              ? resolveMathOperand(row, baseCol)
+              : parseCellFiniteForStat(row, baseCol);
+            const relative = isSummaryRefKey(baseCol)
+              ? resolveMathOperand(refRow, baseCol)
+              : parseCellFiniteForStat(refRow, baseCol);
             if (current == null || relative == null) {
               return { ...row, [out]: null };
             }
@@ -1672,8 +1905,12 @@ const GridView = ({ startNew, fillViewport = false }) => {
           if (refRow == null) {
             return { ...row, [out]: null };
           }
-          const current = parseCellFiniteForStat(row, baseCol);
-          const relative = parseCellFiniteForStat(refRow, baseCol);
+          const current = isSummaryRefKey(baseCol)
+            ? resolveMathOperand(row, baseCol)
+            : parseCellFiniteForStat(row, baseCol);
+          const relative = isSummaryRefKey(baseCol)
+            ? resolveMathOperand(refRow, baseCol)
+            : parseCellFiniteForStat(refRow, baseCol);
           if (current == null || relative == null) {
             return { ...row, [out]: null };
           }
@@ -1692,12 +1929,33 @@ const GridView = ({ startNew, fillViewport = false }) => {
       if (setDataTypes) {
         setDataTypes((prev) => ({ ...(prev || {}), [out]: inferredType }));
       }
+      const leftKind = isSummaryRefKey(mathBasicColA) ? "summary" : "column";
+      const rightKind = isSummaryRefKey(mathBasicColB) ? "summary" : "column";
+      const summaryValues =
+        leftKind === "summary" || rightKind === "summary"
+          ? {
+              ...(leftKind === "summary"
+                ? { [mathBasicColA]: summaryNamedValues[mathBasicColA] ?? null }
+                : {}),
+              ...(rightKind === "summary"
+                ? { [mathBasicColB]: summaryNamedValues[mathBasicColB] ?? null }
+                : {}),
+            }
+          : undefined;
       const operation = createSheetOperation("computed.column", {
         column: out,
         expression:
           (mathDialogTab === "basic" || mathFunctionType === "column")
-            ? { kind: "binary", op: mathOp, leftColumn: mathBasicColA, rightColumn: mathOp === "abs" ? "" : mathBasicColB }
+            ? {
+                kind: "binary",
+                op: mathOp,
+                leftColumn: mathBasicColA,
+                rightColumn: mathOp === "abs" ? "" : mathBasicColB,
+                leftKind,
+                rightKind,
+              }
             : { kind: "relative-row", op: mathOp, baseColumn: mathBaseCol, rowRef: mathRelativeRowRef },
+        ...(summaryValues ? { summaryValues } : {}),
       });
       if (mathDestination === "new_sheet") {
         const sheetName = `${out} calc`;
@@ -1737,6 +1995,8 @@ const GridView = ({ startNew, fillViewport = false }) => {
       mathOutCol,
       mathRelativeRowRef,
       nextFreeResultColumnName,
+      resolveMathOperand,
+      summaryNamedValues,
       addNewSheetAndActivate,
       replaceCurrentSheetData,
       setConnectedData,
@@ -3790,6 +4050,9 @@ const GridView = ({ startNew, fillViewport = false }) => {
                           <TabsTrigger value="stats" className="h-7 px-2 text-xs">
                             Stats
                           </TabsTrigger>
+                          <TabsTrigger value="summary" className="h-7 px-2 text-xs">
+                            Summary row
+                          </TabsTrigger>
                           <TabsTrigger value="quant" className="h-7 px-2 text-xs">
                             Quant Operations
                           </TabsTrigger>
@@ -3822,11 +4085,11 @@ const GridView = ({ startNew, fillViewport = false }) => {
                                 </SelectTrigger>
                                 <SelectContent>
                                   <SelectItem value="__">—</SelectItem>
-                                  {sheetColumnNamesForMath.map((c) => (
-                                    <SelectItem key={`math-basic-a-${c}`} value={c} className="font-mono text-xs">
-                                      {c}
-                                    </SelectItem>
-                                  ))}
+                                  <MathOperandSelectItems
+                                    columns={sheetColumnNamesForMath}
+                                    summaryOptions={summarySelectOptions}
+                                    keyPrefix="math-basic-a"
+                                  />
                                 </SelectContent>
                               </Select>
                             </div>
@@ -3842,11 +4105,11 @@ const GridView = ({ startNew, fillViewport = false }) => {
                                   </SelectTrigger>
                                   <SelectContent>
                                     <SelectItem value="__">—</SelectItem>
-                                    {sheetColumnNamesForMath.map((c) => (
-                                      <SelectItem key={`math-basic-b-${c}`} value={c} className="font-mono text-xs">
-                                        {c}
-                                      </SelectItem>
-                                    ))}
+                                    <MathOperandSelectItems
+                                      columns={sheetColumnNamesForMath}
+                                      summaryOptions={summarySelectOptions}
+                                      keyPrefix="math-basic-b"
+                                    />
                                   </SelectContent>
                                 </Select>
                               </div>
@@ -3934,11 +4197,11 @@ const GridView = ({ startNew, fillViewport = false }) => {
                                       </SelectTrigger>
                                       <SelectContent>
                                         <SelectItem value="__">—</SelectItem>
-                                        {sheetColumnNamesForMath.map((c) => (
-                                          <SelectItem key={`math-fn-basic-a-${c}`} value={c} className="font-mono text-xs">
-                                            {c}
-                                          </SelectItem>
-                                        ))}
+                                        <MathOperandSelectItems
+                                          columns={sheetColumnNamesForMath}
+                                          summaryOptions={summarySelectOptions}
+                                          keyPrefix="math-fn-basic-a"
+                                        />
                                       </SelectContent>
                                     </Select>
                                   </div>
@@ -3950,11 +4213,11 @@ const GridView = ({ startNew, fillViewport = false }) => {
                                       </SelectTrigger>
                                       <SelectContent>
                                         <SelectItem value="__">—</SelectItem>
-                                        {sheetColumnNamesForMath.map((c) => (
-                                          <SelectItem key={`math-fn-basic-b-${c}`} value={c} className="font-mono text-xs">
-                                            {c}
-                                          </SelectItem>
-                                        ))}
+                                        <MathOperandSelectItems
+                                          columns={sheetColumnNamesForMath}
+                                          summaryOptions={summarySelectOptions}
+                                          keyPrefix="math-fn-basic-b"
+                                        />
                                       </SelectContent>
                                     </Select>
                                   </div>
@@ -3970,11 +4233,11 @@ const GridView = ({ startNew, fillViewport = false }) => {
                                     </SelectTrigger>
                                     <SelectContent>
                                       <SelectItem value="__">—</SelectItem>
-                                      {sheetColumnNamesForMath.map((c) => (
-                                        <SelectItem key={`math-base-${c}`} value={c} className="font-mono text-xs">
-                                          {c}
-                                        </SelectItem>
-                                      ))}
+                                      <MathOperandSelectItems
+                                        columns={sheetColumnNamesForMath}
+                                        summaryOptions={summarySelectOptions}
+                                        keyPrefix="math-base"
+                                      />
                                     </SelectContent>
                                   </Select>
                                 </div>
@@ -4894,6 +5157,13 @@ const GridView = ({ startNew, fillViewport = false }) => {
                             </div>
                           )}
                         </TabsContent>
+                        <TabsContent value="summary" className="mt-2 space-y-3">
+                          <SummaryRowEditor
+                            draft={summaryDraft}
+                            onChange={setSummaryDraft}
+                            columnNames={sheetColumnNamesForMath}
+                          />
+                        </TabsContent>
                         <TabsContent value="quant" className="mt-2 space-y-3">
                           <QuantOperationsPanel
                             rows={connectedData}
@@ -4919,7 +5189,9 @@ const GridView = ({ startNew, fillViewport = false }) => {
                           />
                         </TabsContent>
                       </Tabs>
-                      {mathDialogTab !== "quant" && !(mathDialogTab === "stats" && statsBucketActive) ? (
+                      {mathDialogTab !== "quant" &&
+                      mathDialogTab !== "summary" &&
+                      !(mathDialogTab === "stats" && statsBucketActive) ? (
                         <div className="space-y-1">
                           <Label className="text-xs">Apply to</Label>
                           <div className="flex flex-wrap gap-2">
@@ -4968,7 +5240,8 @@ const GridView = ({ startNew, fillViewport = false }) => {
                       <Button
                         type="button"
                         onClick={() => {
-                          if (mathDialogTab === "stats") {
+                          if (mathDialogTab === "summary") applySummaryRow();
+                          else if (mathDialogTab === "stats") {
                             if (statsBucketActive) void applyStatsBucket();
                             else if (statsCumsumActive) applyStatsCumsum();
                             else applyStatsStdDev();
@@ -4977,6 +5250,8 @@ const GridView = ({ startNew, fillViewport = false }) => {
                         disabled={
                           bucketApplyState.busy ||
                           quantBusy ||
+                          (mathDialogTab === "summary" &&
+                            !(Array.isArray(summaryDraft?.metrics) && summaryDraft.metrics.length > 0)) ||
                           (mathDialogTab === "stats" &&
                             ((!statsStdDevActive && !statsCumsumActive && !statsBucketActive) ||
                               (statsStdDevActive && !statsStdCanSubmit) ||
@@ -4994,9 +5269,13 @@ const GridView = ({ startNew, fillViewport = false }) => {
                       >
                         {statsBucketActive && bucketApplyState.busy
                           ? "Creating…"
-                          : mathDialogTab === "stats" && statsBucketActive
-                            ? "Create bucket sheet"
-                            : "Apply to sheet"}
+                          : mathDialogTab === "summary"
+                            ? summaryDraft?.destination === "new_sheet"
+                              ? "Create summary sheet"
+                              : "Add summary to this view"
+                            : mathDialogTab === "stats" && statsBucketActive
+                              ? "Create bucket sheet"
+                              : "Apply to sheet"}
                       </Button>
                     </DialogFooter>
                   </DialogContent>
@@ -5750,11 +6029,18 @@ const GridView = ({ startNew, fillViewport = false }) => {
             ) : (
             <div
                 className={cn(
-                    agThemeClass,
-                    fillViewport && connectGridAgCompactClass,
+                    "flex min-h-0 flex-col gap-2",
                     fillViewport ? connectGridFillViewportClass : gridExpanded ? "h-[750px]" : "h-[550px]",
                 )}
             >
+                <div
+                    className={cn(
+                        agThemeClass,
+                        fillViewport && connectGridAgCompactClass,
+                        "min-h-0 flex-1 overflow-hidden",
+                        showSummaryPane && "min-h-[40%]",
+                    )}
+                >
                 <AgGridReact
                     defaultColDef={defaultColDef}
                     rowData={displayData}
@@ -5771,6 +6057,55 @@ const GridView = ({ startNew, fillViewport = false }) => {
                     gridOptions={gridOptions}
                     {...(autoSizeStrategy ? { autoSizeStrategy } : {})}
                 />
+                </div>
+                {showSummaryPane ? (
+                  <div className="flex shrink-0 flex-col gap-1 border-t border-border/60 pt-2">
+                    <div className="flex items-center justify-between gap-2 px-0.5">
+                      <p className="text-[11px] font-medium text-muted-foreground">Summary</p>
+                      <div className="flex items-center gap-1">
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          className="h-6 px-2 text-[10px]"
+                          onClick={() => {
+                            setMathDialogTab("summary");
+                            setMathDialogOpen(true);
+                          }}
+                        >
+                          Edit
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          className="h-6 px-2 text-[10px] text-destructive"
+                          onClick={clearSummaryRow}
+                        >
+                          Clear
+                        </Button>
+                      </div>
+                    </div>
+                    <div
+                      className={cn(
+                        agThemeClass,
+                        fillViewport && connectGridAgCompactClass,
+                        "h-[88px] overflow-hidden",
+                      )}
+                    >
+                      <AgGridReact
+                        defaultColDef={{ ...defaultColDef, editable: false, filter: false }}
+                        rowData={[summaryComputed.row]}
+                        columnDefs={summaryColumnDefs}
+                        pagination={false}
+                        headerHeight={24}
+                        rowHeight={22}
+                        domLayout="normal"
+                        suppressCellFocus={true}
+                      />
+                    </div>
+                  </div>
+                ) : null}
             </div>
             )}
         </div>

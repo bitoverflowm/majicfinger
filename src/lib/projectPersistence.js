@@ -525,6 +525,8 @@ function buildSheetRecord(sheetId, sheet, rows, { storageMode, previewLimit, est
     previewRowCount: data.length,
     columns,
     dataTypes: sheet?.dataTypes || null,
+    summaryConfig: sheet?.summaryConfig || null,
+    summaryRow: sheet?.summaryRow || null,
     provenance: sheet?.provenance ?? null,
     sourceSheetId: sheet?.sourceSheetId ?? null,
     operationHistory,
@@ -835,6 +837,10 @@ export function applyBrowserOperationToRows(rows, op) {
       return String(key) !== String(rowKey);
     });
   }
+  if (op.type === "summary.row") {
+    // Summary is stored as sheet.summaryConfig and recomputed live; history is audit-only.
+    return list;
+  }
   if (op.type === "computed.column") {
     return applyComputedColumnOperation(list, op);
   }
@@ -934,10 +940,18 @@ function applyComputedColumnOperation(rows, op) {
     const left = String(expr.leftColumn || "");
     const right = String(expr.rightColumn || "");
     const opName = String(expr.op || "");
+    const summaryValues = op?.summaryValues && typeof op.summaryValues === "object" ? op.summaryValues : {};
+    const resolveSide = (row, col, kind) => {
+      if (kind === "summary" || String(col).startsWith("summary::")) {
+        const v = summaryValues[col];
+        return finiteNumber(v) ?? 0;
+      }
+      return finiteNumber(row[col]) ?? 0;
+    };
     return rows.map((row) => {
       if (!row || typeof row !== "object") return row;
-      const a = finiteNumber(row[left]) ?? 0;
-      const b = opName === "abs" ? 0 : finiteNumber(row[right]) ?? 0;
+      const a = resolveSide(row, left, expr.leftKind);
+      const b = opName === "abs" ? 0 : resolveSide(row, right, expr.rightKind);
       const value = applyBinaryMath(opName, a, b);
       return { ...row, [out]: Number.isFinite(value) ? value : null };
     });
