@@ -4,11 +4,9 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Columns3,
   FileJson,
-  FileSpreadsheet,
   FileType2,
   Plus,
   Rows3,
-  Table2,
 } from "lucide-react";
 import { toast } from "sonner";
 import * as XLSX from "xlsx";
@@ -64,7 +62,6 @@ const FORMAT_META = {
   json: {
     label: "JSON",
     title: "Add JSON",
-    Icon: FileJson,
     acceptsPaste: true,
     acceptsUpload: true,
     accept: ".json,application/json",
@@ -74,7 +71,6 @@ const FORMAT_META = {
   csv: {
     label: "CSV",
     title: "Add CSV",
-    Icon: FileSpreadsheet,
     acceptsPaste: true,
     acceptsUpload: true,
     accept: ".csv,text/csv",
@@ -84,7 +80,6 @@ const FORMAT_META = {
   xlsx: {
     label: "XLSX",
     title: "Add XLSX",
-    Icon: FileSpreadsheet,
     acceptsPaste: false,
     acceptsUpload: true,
     accept: ".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
@@ -94,7 +89,6 @@ const FORMAT_META = {
   markdown: {
     label: "Markdown",
     title: "Add Markdown table",
-    Icon: Table2,
     acceptsPaste: true,
     acceptsUpload: false,
     accept: "",
@@ -686,7 +680,6 @@ export function ConnectHomeSheetPanel({ className }) {
         <div className="flex flex-wrap gap-1">
           {/** @type {ImportFormat[]} */ (["json", "csv", "xlsx", "markdown"]).map((fmt) => {
             const meta = FORMAT_META[fmt];
-            const Icon = meta.Icon;
             return (
               <Button
                 key={fmt}
@@ -695,7 +688,6 @@ export function ConnectHomeSheetPanel({ className }) {
                 className={FORMAT_BTN}
                 onClick={() => openImport(fmt)}
               >
-                <Icon className="h-3 w-3 shrink-0" aria-hidden />
                 {meta.label}
               </Button>
             );

@@ -149,7 +149,7 @@ import {
   summaryRefKey,
   summaryRefOutputName,
 } from "@/lib/sheetOperations/computeSummaryRow";
-import { subscribeSheetEquationEdit } from "@/lib/sheetEquationEditRequest";
+import { listSheetEquations, subscribeSheetEquationEdit } from "@/lib/sheetEquationEditRequest";
 import { BUCKET_TIME_INTERVALS } from "@/lib/sheetOperations/bucketTimeIntervals";
 
 /** Column + summary named-value options for math operand selects. */
@@ -637,6 +637,8 @@ const GridView = ({ startNew, fillViewport = false }) => {
     const [mathDestination, setMathDestination] = useState("current_sheet");
     const [mathDialogTab, setMathDialogTab] = useState("basic");
     const [summaryDraft, setSummaryDraft] = useState(() => createInitialSummaryDraft(null, []));
+    /** When set, Apply updates this operation instead of appending a new one. */
+    const [mathEditingOpId, setMathEditingOpId] = useState(null);
     const [quantBusy, setQuantBusy] = useState(false);
     const [quantCanSubmit, setQuantCanSubmit] = useState(false);
     const [mathFunctionType, setMathFunctionType] = useState("row_operation");
@@ -1029,23 +1031,55 @@ const GridView = ({ startNew, fillViewport = false }) => {
       }));
     }, [summaryConfig]);
 
-    useEffect(() => {
-      if (!mathDialogOpen) return;
-      if (mathDialogTab === "summary") {
-        setSummaryDraft(createInitialSummaryDraft(activeSheet?.summaryConfig, sheetColumnNamesForMath));
-      }
-    }, [mathDialogOpen, mathDialogTab, activeSheet?.summaryConfig, sheetColumnNamesForMath]);
+    const sheetMathEquations = useMemo(() => listSheetEquations(activeSheet), [activeSheet]);
 
-    useEffect(() => {
-      return subscribeSheetEquationEdit((req) => {
+    const startNewMathOperation = useCallback(() => {
+      setMathEditingOpId(null);
+      setMathDialogTab("basic");
+      setMathFunctionType("row_operation");
+      setMathOp("subtract");
+      setMathOutCol(nextFreeResultColumnName());
+      setMathBasicColA(sheetColumnNamesForMath[0] || "");
+      setMathBasicColB(sheetColumnNamesForMath[1] || sheetColumnNamesForMath[0] || "");
+      setMathBaseCol(sheetColumnNamesForMath[0] || "");
+      setMathRelativeRowRef("prev_row");
+      setStatsStdDevActive(false);
+      setStatsCumsumActive(false);
+      setStatsBucketActive(false);
+      setSummaryDraft(createInitialSummaryDraft(null, sheetColumnNamesForMath));
+    }, [nextFreeResultColumnName, sheetColumnNamesForMath]);
+
+    /** Append a math op, or replace the one being edited in the math dialog. */
+    const commitActiveSheetMathOperation = useCallback(
+      (operation) => {
+        if (!activeSheetId || !setDataSheets || !operation) return;
+        const editingId = mathEditingOpId;
+        setDataSheets((prev) => {
+          if (editingId) {
+            return replaceSheetOperation(prev, activeSheetId, editingId, operation);
+          }
+          return appendSheetOperation(prev, activeSheetId, operation);
+        });
+        setMathEditingOpId(null);
+      },
+      [activeSheetId, setDataSheets, mathEditingOpId],
+    );
+
+    const mathPanelEquations = useMemo(
+      () => sheetMathEquations.filter((e) => e?.type !== "compose.equation"),
+      [sheetMathEquations],
+    );
+
+    const openMathEquationEntry = useCallback(
+      (req) => {
         if (!req) return;
         if (req.sheetId && activeSheetId && String(req.sheetId) !== String(activeSheetId)) {
-          // Still allow edit when the request targets another sheet id if user switched — skip mismatch.
           return;
         }
 
         const op = req.op && typeof req.op === "object" ? req.op : null;
         const type = String(req.type || op?.type || "");
+        const opId = op?.id != null ? String(op.id) : req.id != null ? String(req.id) : null;
 
         if (type === "summary.row") {
           const cfg =
@@ -1055,6 +1089,7 @@ const GridView = ({ startNew, fillViewport = false }) => {
             null;
           setSummaryDraft(createInitialSummaryDraft(cfg, sheetColumnNamesForMath));
           setMathDialogTab("summary");
+          setMathEditingOpId(opId);
           setMathDialogOpen(true);
           return;
         }
@@ -1069,12 +1104,14 @@ const GridView = ({ startNew, fillViewport = false }) => {
           setStatsStdDevActive(false);
           setStatsCumsumActive(false);
           setStatsBucketActive(true);
+          setMathEditingOpId(opId);
           setMathDialogOpen(true);
           return;
         }
 
         if (type.startsWith("quant.")) {
           setMathDialogTab("quant");
+          setMathEditingOpId(opId);
           setMathDialogOpen(true);
           return;
         }
@@ -1083,6 +1120,7 @@ const GridView = ({ startNew, fillViewport = false }) => {
           const expr = op.expression || op.payload?.expression || {};
           const kind = String(expr.kind || "");
           const outCol = String(op.column || op.payload?.column || "").trim();
+          setMathEditingOpId(opId);
 
           if (kind === "if-else") {
             const tab = ifElseTabFromOperation(op);
@@ -1098,7 +1136,11 @@ const GridView = ({ startNew, fillViewport = false }) => {
 
           if (kind === "manual-empty-column") {
             setSheetPropsDialogOpen(true);
-            toast.message(outCol ? `Column "${outCol}" — rename or set type in Sheet Properties.` : "Open Sheet Properties to edit columns.");
+            toast.message(
+              outCol
+                ? `Column "${outCol}" — rename or set type in Sheet Properties.`
+                : "Open Sheet Properties to edit columns.",
+            );
             return;
           }
 
@@ -1156,8 +1198,20 @@ const GridView = ({ startNew, fillViewport = false }) => {
         }
 
         toast.message("No editor available for this equation yet.");
-      });
-    }, [activeSheetId, activeSheet?.summaryConfig, sheetColumnNamesForMath]);
+      },
+      [activeSheetId, activeSheet?.summaryConfig, sheetColumnNamesForMath],
+    );
+
+    useEffect(() => {
+      if (!mathDialogOpen) return;
+      if (mathDialogTab === "summary" && !mathEditingOpId) {
+        setSummaryDraft(createInitialSummaryDraft(activeSheet?.summaryConfig, sheetColumnNamesForMath));
+      }
+    }, [mathDialogOpen, mathDialogTab, activeSheet?.summaryConfig, sheetColumnNamesForMath, mathEditingOpId]);
+
+    useEffect(() => {
+      return subscribeSheetEquationEdit((req) => openMathEquationEntry(req));
+    }, [openMathEquationEntry]);
 
     const lastSummarySyncRef = useRef({});
     useEffect(() => {
@@ -1214,11 +1268,12 @@ const GridView = ({ startNew, fillViewport = false }) => {
         return;
       }
       const operation = createSheetOperation("summary.row", {
+        ...(mathEditingOpId ? { id: mathEditingOpId } : {}),
         summaryConfig: config,
         outputs: computed.columns,
       });
 
-      if (config.destination === "new_sheet") {
+      if (config.destination === "new_sheet" && !mathEditingOpId) {
         const sheetName = `Summary · ${String(activeSheet?.name || activeSheetId || "sheet")}`.slice(0, 80);
         addNewSheetAndActivate?.((newId) => {
           setSheetData?.(newId, [computed.row]);
@@ -1259,37 +1314,43 @@ const GridView = ({ startNew, fillViewport = false }) => {
           });
         });
         toast.success("Created summary sheet.");
+        setMathEditingOpId(null);
+        setMathDialogOpen(false);
       } else {
         if (!activeSheetId || !setDataSheets) {
           toast.error("No active sheet.");
           return;
         }
+        const wasEditing = Boolean(mathEditingOpId);
         setDataSheets((prev) => {
           const sheet = prev?.[activeSheetId] || { name: "Sheet 1", data: rows };
-          return {
+          const nextConfig = { ...config, linkedSheetId: null, sourceSheetId: activeSheetId };
+          const base = {
             ...prev,
             [activeSheetId]: {
               ...sheet,
-              summaryConfig: { ...config, linkedSheetId: null, sourceSheetId: activeSheetId },
+              summaryConfig: nextConfig,
               summaryRow: computed.row,
-              operationHistory: [
-                ...(Array.isArray(sheet.operationHistory) ? sheet.operationHistory : []),
-                operation,
-              ],
             },
           };
+          if (mathEditingOpId) {
+            return replaceSheetOperation(base, activeSheetId, mathEditingOpId, operation);
+          }
+          return appendSheetOperation(base, activeSheetId, operation);
         });
-        toast.success("Summary row added under this sheet.");
+        toast.success(wasEditing ? "Summary row updated." : "Summary row added under this sheet.");
+        startNewMathOperation();
       }
-      setMathDialogOpen(false);
     }, [
       connectedData,
       summaryDraft,
       activeSheet,
       activeSheetId,
+      mathEditingOpId,
       addNewSheetAndActivate,
       setSheetData,
       setDataSheets,
+      startNewMathOperation,
     ]);
 
     const clearSummaryRow = useCallback(() => {
@@ -2072,6 +2133,7 @@ const GridView = ({ startNew, fillViewport = false }) => {
             }
           : undefined;
       const operation = createSheetOperation("computed.column", {
+        ...(mathEditingOpId ? { id: mathEditingOpId } : {}),
         column: out,
         expression:
           (mathDialogTab === "basic" || mathFunctionType === "column")
@@ -2092,7 +2154,8 @@ const GridView = ({ startNew, fillViewport = false }) => {
               },
         ...(summaryValues ? { summaryValues } : {}),
       });
-      if (mathDestination === "new_sheet") {
+      const wasEditing = Boolean(mathEditingOpId);
+      if (mathDestination === "new_sheet" && !wasEditing) {
         const sheetName = `${out} calc`;
         addNewSheetAndActivate?.((newId) => {
           setSheetData?.(newId, next);
@@ -2111,13 +2174,14 @@ const GridView = ({ startNew, fillViewport = false }) => {
           });
         });
         toast.success("Applied calculation in a new sheet.");
+        setMathDialogOpen(false);
       } else {
         replaceCurrentSheetData?.(next);
         setConnectedData?.(next);
-        appendActiveSheetOperation("computed.column", operation);
-        toast.success("Applied calculation to current sheet.");
+        commitActiveSheetMathOperation(operation);
+        toast.success(wasEditing ? "Updated calculation on current sheet." : "Applied calculation to current sheet.");
+        startNewMathOperation();
       }
-      setMathDialogOpen(false);
     }, [
       connectedData,
       mathDialogTab,
@@ -2125,6 +2189,7 @@ const GridView = ({ startNew, fillViewport = false }) => {
       mathBasicColB,
       mathBaseCol,
       mathDestination,
+      mathEditingOpId,
       mathFunctionType,
       mathOp,
       mathOutCol,
@@ -2138,7 +2203,8 @@ const GridView = ({ startNew, fillViewport = false }) => {
       setDataSheets,
       setDataTypes,
       setSheetData,
-      appendActiveSheetOperation,
+      commitActiveSheetMathOperation,
+      startNewMathOperation,
     ]);
 
     const applyStatsStdDev = useCallback(() => {
@@ -2184,10 +2250,12 @@ const GridView = ({ startNew, fillViewport = false }) => {
         setDataTypes((prev) => ({ ...(prev || {}), [out]: "number" }));
       }
       const operation = createSheetOperation("computed.column", {
+        ...(mathEditingOpId ? { id: mathEditingOpId } : {}),
         column: out,
         expression: { kind: "standard-deviation", mode: statsStdMode, sourceColumn: src, window: statsStdMode === "rolling" ? Number(statsRollCount) : null },
       });
-      if (mathDestination === "new_sheet") {
+      const wasEditing = Boolean(mathEditingOpId);
+      if (mathDestination === "new_sheet" && !wasEditing) {
         const sheetName = statsStdMode === "rolling" ? `${out} rolling σ` : `${out} σ`;
         addNewSheetAndActivate?.((newId) => {
           setSheetData?.(newId, next);
@@ -2210,17 +2278,22 @@ const GridView = ({ startNew, fillViewport = false }) => {
             ? "Added rolling standard deviation column in a new sheet."
             : "Added standard deviation column in a new sheet.",
         );
+        setMathDialogOpen(false);
       } else {
         replaceCurrentSheetData?.(next);
         setConnectedData?.(next);
-        appendActiveSheetOperation("computed.column", operation);
+        commitActiveSheetMathOperation(operation);
         toast.success(
-          statsStdMode === "rolling"
-            ? "Added rolling standard deviation column to current sheet."
-            : "Added standard deviation column to current sheet.",
+          wasEditing
+            ? statsStdMode === "rolling"
+              ? "Updated rolling standard deviation column."
+              : "Updated standard deviation column."
+            : statsStdMode === "rolling"
+              ? "Added rolling standard deviation column to current sheet."
+              : "Added standard deviation column to current sheet.",
         );
+        startNewMathOperation();
       }
-      setMathDialogOpen(false);
     }, [
       connectedData,
       statsStdSourceCol,
@@ -2228,6 +2301,7 @@ const GridView = ({ startNew, fillViewport = false }) => {
       statsStdMode,
       statsRollCount,
       mathDestination,
+      mathEditingOpId,
       nextFreeResultColumnName,
       addNewSheetAndActivate,
       replaceCurrentSheetData,
@@ -2235,7 +2309,8 @@ const GridView = ({ startNew, fillViewport = false }) => {
       setDataSheets,
       setDataTypes,
       setSheetData,
-      appendActiveSheetOperation,
+      commitActiveSheetMathOperation,
+      startNewMathOperation,
     ]);
 
     const applyStatsCumsum = useCallback(() => {
@@ -2267,10 +2342,12 @@ const GridView = ({ startNew, fillViewport = false }) => {
         setDataTypes((prev) => ({ ...(prev || {}), [out]: "number" }));
       }
       const operation = createSheetOperation("computed.column", {
+        ...(mathEditingOpId ? { id: mathEditingOpId } : {}),
         column: out,
         expression: { kind: "cumulative-sum", sourceColumn: src },
       });
-      if (mathDestination === "new_sheet") {
+      const wasEditing = Boolean(mathEditingOpId);
+      if (mathDestination === "new_sheet" && !wasEditing) {
         const sheetName = `${out} cumsum`.slice(0, 80);
         addNewSheetAndActivate?.((newId) => {
           setSheetData?.(newId, next);
@@ -2289,25 +2366,28 @@ const GridView = ({ startNew, fillViewport = false }) => {
           });
         });
         toast.success("Added cumulative sum column in a new sheet.");
+        setMathDialogOpen(false);
       } else {
         replaceCurrentSheetData?.(next);
         setConnectedData?.(next);
-        appendActiveSheetOperation("computed.column", operation);
-        toast.success("Added cumulative sum column to current sheet.");
+        commitActiveSheetMathOperation(operation);
+        toast.success(wasEditing ? "Updated cumulative sum column." : "Added cumulative sum column to current sheet.");
+        startNewMathOperation();
       }
-      setMathDialogOpen(false);
     }, [
       connectedData,
       statsCumsumSourceCol,
       statsCumsumOutCol,
       mathDestination,
+      mathEditingOpId,
       addNewSheetAndActivate,
       replaceCurrentSheetData,
       setConnectedData,
       setDataSheets,
       setDataTypes,
       setSheetData,
-      appendActiveSheetOperation,
+      commitActiveSheetMathOperation,
+      startNewMathOperation,
     ]);
 
     const applyStatsBucket = useCallback(async () => {
@@ -3894,7 +3974,10 @@ const GridView = ({ startNew, fillViewport = false }) => {
                         size="icon"
                         className="h-8 w-8 shrink-0"
                         aria-label="Mathematics Operations"
-                        onClick={() => setMathDialogOpen(true)}
+                        onClick={() => {
+                          startNewMathOperation();
+                          setMathDialogOpen(true);
+                        }}
                       >
                         <Sigma className="h-4 w-4" aria-hidden />
                       </Button>
@@ -4153,15 +4236,36 @@ const GridView = ({ startNew, fillViewport = false }) => {
                     </DialogFooter>
                   </DialogContent>
                 </Dialog>
-                <Dialog open={mathDialogOpen} onOpenChange={setMathDialogOpen}>
-                  <DialogContent className="max-h-[calc(100dvh-2rem)] grid-rows-[auto_minmax(0,1fr)_auto] overflow-hidden sm:max-w-2xl">
+                <Dialog
+                  open={mathDialogOpen}
+                  onOpenChange={(open) => {
+                    setMathDialogOpen(open);
+                    if (!open) setMathEditingOpId(null);
+                  }}
+                >
+                  <DialogContent className="max-h-[calc(100dvh-2rem)] grid-rows-[auto_minmax(0,1fr)_auto] overflow-hidden sm:max-w-5xl">
                     <DialogHeader>
                       <DialogTitle>Mathematics Operations</DialogTitle>
                       <DialogDescription>
                         Build row-wise calculations, statistical transforms, and quant workflows on your sheet data.
                       </DialogDescription>
                     </DialogHeader>
-                    <div className="min-h-0 space-y-3 overflow-y-auto py-2 pr-1">
+                    <div className="min-h-0 grid gap-3 overflow-hidden md:grid-cols-[minmax(0,1fr)_240px]">
+                      <div className="min-h-0 space-y-3 overflow-y-auto py-2 pr-1">
+                        <div className="flex items-center justify-between gap-2">
+                          <p className="text-xs font-medium text-foreground">
+                            {mathEditingOpId ? "Edit operation" : "New operation"}
+                          </p>
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant={mathEditingOpId ? "default" : "outline"}
+                            className="h-7 text-xs"
+                            onClick={startNewMathOperation}
+                          >
+                            New operation
+                          </Button>
+                        </div>
                       <Tabs
                         value={mathDialogTab}
                         onValueChange={(v) => {
@@ -5364,6 +5468,49 @@ const GridView = ({ startNew, fillViewport = false }) => {
                           </div>
                         </div>
                       ) : null}
+                      </div>
+                      <aside className="flex min-h-0 flex-col border-t border-border/60 pt-3 md:border-l md:border-t-0 md:pl-3 md:pt-2">
+                        <p className="mb-2 text-xs font-medium text-foreground">Current operations</p>
+                        <div className="min-h-0 flex-1 space-y-1 overflow-y-auto pr-0.5">
+                          {mathPanelEquations.length === 0 ? (
+                            <p className="text-[11px] leading-relaxed text-muted-foreground">
+                              Applied Basic, Functions, Stats, Summary, and Quant ops appear here. Click one to edit it on the left.
+                            </p>
+                          ) : (
+                            mathPanelEquations.map((entry) => {
+                              const kind =
+                                entry?.op?.expression?.kind || entry?.op?.payload?.expression?.kind || "";
+                              const type = String(entry?.type || "");
+                              let section = "Op";
+                              if (type === "summary.row") section = "Summary";
+                              else if (type === "bucket.sheet" || type === "band.sheet") section = "Stats";
+                              else if (type.startsWith("quant.")) section = "Quant";
+                              else if (kind === "relative-row") section = "Functions";
+                              else if (kind === "binary") section = "Basic";
+                              else if (kind === "standard-deviation" || kind === "cumulative-sum") section = "Stats";
+                              const selected = mathEditingOpId != null && String(mathEditingOpId) === String(entry.id);
+                              return (
+                                <button
+                                  key={entry.id}
+                                  type="button"
+                                  className={cn(
+                                    "w-full rounded-md border px-2 py-1.5 text-left transition-colors",
+                                    selected
+                                      ? "border-primary bg-primary/10 text-foreground"
+                                      : "border-border/60 bg-muted/15 text-foreground hover:bg-muted/40",
+                                  )}
+                                  onClick={() => openMathEquationEntry(entry)}
+                                >
+                                  <span className="block text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+                                    {section}
+                                  </span>
+                                  <span className="block truncate text-xs">{entry.label}</span>
+                                </button>
+                              );
+                            })
+                          )}
+                        </div>
+                      </aside>
                     </div>
                     {statsBucketActive ? (
                       <div className="space-y-2 border-t border-border/60 px-1 pt-2">
@@ -5417,13 +5564,19 @@ const GridView = ({ startNew, fillViewport = false }) => {
                       >
                         {statsBucketActive && bucketApplyState.busy
                           ? "Creating…"
-                          : mathDialogTab === "summary"
-                            ? summaryDraft?.destination === "new_sheet"
-                              ? "Create summary sheet"
-                              : "Add summary to this view"
-                            : mathDialogTab === "stats" && statsBucketActive
-                              ? "Create bucket sheet"
-                              : "Apply to sheet"}
+                          : mathEditingOpId
+                            ? mathDialogTab === "summary"
+                              ? "Update summary"
+                              : mathDialogTab === "stats" && statsBucketActive
+                                ? "Update bucket sheet"
+                                : "Update operation"
+                            : mathDialogTab === "summary"
+                              ? summaryDraft?.destination === "new_sheet"
+                                ? "Create summary sheet"
+                                : "Add summary to this view"
+                              : mathDialogTab === "stats" && statsBucketActive
+                                ? "Create bucket sheet"
+                                : "Apply to sheet"}
                       </Button>
                     </DialogFooter>
                   </DialogContent>
