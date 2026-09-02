@@ -940,6 +940,7 @@ function applyComputedColumnOperation(rows, op) {
     const left = String(expr.leftColumn || "");
     const right = String(expr.rightColumn || "");
     const opName = String(expr.op || "");
+    const asPercent = Boolean(expr.asPercent);
     const summaryValues = op?.summaryValues && typeof op.summaryValues === "object" ? op.summaryValues : {};
     const resolveSide = (row, col, kind) => {
       if (kind === "summary" || String(col).startsWith("summary::")) {
@@ -948,12 +949,16 @@ function applyComputedColumnOperation(rows, op) {
       }
       return finiteNumber(row[col]) ?? 0;
     };
+    const scale = (v) => {
+      if (!Number.isFinite(v)) return null;
+      return asPercent ? v * 100 : v;
+    };
     return rows.map((row) => {
       if (!row || typeof row !== "object") return row;
       const a = resolveSide(row, left, expr.leftKind);
       const b = opName === "abs" ? 0 : resolveSide(row, right, expr.rightKind);
       const value = applyBinaryMath(opName, a, b);
-      return { ...row, [out]: Number.isFinite(value) ? value : null };
+      return { ...row, [out]: scale(value) };
     });
   }
 
@@ -961,9 +966,14 @@ function applyComputedColumnOperation(rows, op) {
     const base = String(expr.baseColumn || "");
     const rowRef = String(expr.rowRef || "previous");
     const opName = String(expr.op || "");
+    const asPercent = Boolean(expr.asPercent);
     const summaryValues = op?.summaryValues && typeof op.summaryValues === "object" ? op.summaryValues : {};
     const refIsSummary =
       expr.rowRefKind === "summary" || String(rowRef).startsWith("summary::");
+    const scale = (v) => {
+      if (!Number.isFinite(v)) return null;
+      return asPercent ? v * 100 : v;
+    };
     return rows.map((row, idx) => {
       if (!row || typeof row !== "object") return row;
       const a = finiteNumber(row[base]);
@@ -980,10 +990,10 @@ function applyComputedColumnOperation(rows, op) {
       if (opName === "pct_growth") {
         if (b === 0) return { ...row, [out]: null };
         const growth = (a - b) / b;
-        return { ...row, [out]: Number.isFinite(growth) ? growth : null };
+        return { ...row, [out]: scale(growth) };
       }
       const value = applyBinaryMath(opName, a, b);
-      return { ...row, [out]: Number.isFinite(value) ? value : null };
+      return { ...row, [out]: scale(value) };
     });
   }
 

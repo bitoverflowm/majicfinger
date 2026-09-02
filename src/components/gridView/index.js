@@ -642,6 +642,7 @@ const GridView = ({ startNew, fillViewport = false }) => {
     const [quantBusy, setQuantBusy] = useState(false);
     const [quantCanSubmit, setQuantCanSubmit] = useState(false);
     const [mathFunctionType, setMathFunctionType] = useState("row_operation");
+    const [mathAsPercent, setMathAsPercent] = useState(false);
     const [ifElseTabs, setIfElseTabs] = useState([]);
     const [activeIfElseTabId, setActiveIfElseTabId] = useState(null);
     const ifElseDialogInitializedRef = useRef(false);
@@ -1046,6 +1047,7 @@ const GridView = ({ startNew, fillViewport = false }) => {
       setStatsStdDevActive(false);
       setStatsCumsumActive(false);
       setStatsBucketActive(false);
+      setMathAsPercent(false);
       setSummaryDraft(createInitialSummaryDraft(null, sheetColumnNamesForMath));
     }, [nextFreeResultColumnName, sheetColumnNamesForMath]);
 
@@ -1177,16 +1179,25 @@ const GridView = ({ startNew, fillViewport = false }) => {
             setMathOp(String(expr.op || "subtract"));
             setMathRelativeRowRef(String(expr.rowRef || "prev_row"));
             setMathOutCol(outCol);
+            setMathAsPercent(Boolean(expr.asPercent));
             setMathDialogOpen(true);
             return;
           }
 
           if (kind === "binary") {
-            setMathDialogTab("basic");
+            const asPct = Boolean(expr.asPercent);
+            if (asPct) {
+              setMathDialogTab("functions");
+              setMathFunctionType("column");
+            } else {
+              setMathDialogTab("basic");
+              setMathFunctionType("row_operation");
+            }
             setMathOp(String(expr.op || "add"));
             setMathBasicColA(String(expr.leftColumn || ""));
             setMathBasicColB(String(expr.rightColumn || ""));
             setMathOutCol(outCol);
+            setMathAsPercent(asPct);
             setMathDialogOpen(true);
             return;
           }
@@ -1340,6 +1351,7 @@ const GridView = ({ startNew, fillViewport = false }) => {
         });
         toast.success(wasEditing ? "Summary row updated." : "Summary row added under this sheet.");
         startNewMathOperation();
+        setMathDialogOpen(false);
       }
     }, [
       connectedData,
@@ -2037,6 +2049,11 @@ const GridView = ({ startNew, fillViewport = false }) => {
       }
 
       let next;
+      const applyPercentScale = mathDialogTab === "functions" && mathAsPercent;
+      const scaleMathValue = (v) => {
+        if (v == null || !Number.isFinite(v)) return null;
+        return applyPercentScale ? v * 100 : v;
+      };
       if (mathDialogTab === "basic" || (mathDialogTab === "functions" && mathFunctionType === "column")) {
         const colA = String(mathBasicColA || "").trim();
         const colB = String(mathBasicColB || "").trim();
@@ -2055,7 +2072,7 @@ const GridView = ({ startNew, fillViewport = false }) => {
           else if (mathOp === "multiply") v = a * b;
           else if (mathOp === "divide") v = b === 0 ? null : a / b;
           else if (mathOp === "abs") v = Math.abs(a);
-          return { ...row, [out]: Number.isFinite(v) ? v : null };
+          return { ...row, [out]: scaleMathValue(v) };
         });
       } else {
         const baseCol = String(mathBaseCol || "").trim();
@@ -2094,7 +2111,7 @@ const GridView = ({ startNew, fillViewport = false }) => {
               return { ...row, [out]: null };
             }
             const v = (current - relative) / relative;
-            return { ...row, [out]: Number.isFinite(v) ? v : null };
+            return { ...row, [out]: scaleMathValue(v) };
           }
 
           if (current == null || relative == null) {
@@ -2105,7 +2122,7 @@ const GridView = ({ startNew, fillViewport = false }) => {
           else if (mathOp === "subtract") v = current - relative;
           else if (mathOp === "multiply") v = current * relative;
           else if (mathOp === "divide") v = relative === 0 ? null : current / relative;
-          return { ...row, [out]: Number.isFinite(v) ? v : null };
+          return { ...row, [out]: scaleMathValue(v) };
         });
       }
 
@@ -2144,6 +2161,7 @@ const GridView = ({ startNew, fillViewport = false }) => {
                 rightColumn: mathOp === "abs" ? "" : mathBasicColB,
                 leftKind,
                 rightKind,
+                ...(applyPercentScale ? { asPercent: true } : {}),
               }
             : {
                 kind: "relative-row",
@@ -2151,6 +2169,7 @@ const GridView = ({ startNew, fillViewport = false }) => {
                 baseColumn: mathBaseCol,
                 rowRef: mathRelativeRowRef,
                 rowRefKind: relativeIsSummary ? "summary" : "row",
+                ...(applyPercentScale ? { asPercent: true } : {}),
               },
         ...(summaryValues ? { summaryValues } : {}),
       });
@@ -2181,6 +2200,7 @@ const GridView = ({ startNew, fillViewport = false }) => {
         commitActiveSheetMathOperation(operation);
         toast.success(wasEditing ? "Updated calculation on current sheet." : "Applied calculation to current sheet.");
         startNewMathOperation();
+        setMathDialogOpen(false);
       }
     }, [
       connectedData,
@@ -2191,6 +2211,7 @@ const GridView = ({ startNew, fillViewport = false }) => {
       mathDestination,
       mathEditingOpId,
       mathFunctionType,
+      mathAsPercent,
       mathOp,
       mathOutCol,
       mathRelativeRowRef,
@@ -2293,6 +2314,7 @@ const GridView = ({ startNew, fillViewport = false }) => {
               : "Added standard deviation column to current sheet.",
         );
         startNewMathOperation();
+        setMathDialogOpen(false);
       }
     }, [
       connectedData,
@@ -2373,6 +2395,7 @@ const GridView = ({ startNew, fillViewport = false }) => {
         commitActiveSheetMathOperation(operation);
         toast.success(wasEditing ? "Updated cumulative sum column." : "Added cumulative sum column to current sheet.");
         startNewMathOperation();
+        setMathDialogOpen(false);
       }
     }, [
       connectedData,
@@ -4553,12 +4576,12 @@ const GridView = ({ startNew, fillViewport = false }) => {
                                 {mathFunctionType === "column" ? (
                                   `${mathOutCol || nextFreeResultColumnName()} = ${mathBasicColA || "Column A"} ${
                                     mathOp === "add" ? "+" : mathOp === "subtract" ? "−" : mathOp === "multiply" ? "×" : "÷"
-                                  } ${mathBasicColB || "Column B"} (per row)`
+                                  } ${mathBasicColB || "Column B"} (per row)${mathAsPercent ? " × 100" : ""}`
                                 ) : mathOp === "pct_growth" ? (
                                   <span className="line-clamp-2">
                                     {isSummaryRefKey(mathRelativeRowRef)
-                                      ? `${mathOutCol || nextFreeResultColumnName()} = (${mathBaseCol || "col"} − ${summaryRefOutputName(mathRelativeRowRef) || "Σ"}) / ${summaryRefOutputName(mathRelativeRowRef) || "Σ"}`
-                                      : `${mathOutCol || nextFreeResultColumnName()} = (${mathBaseCol || "col"} − ${mathBaseCol || "col"}@${mathRelativeRowRef === "next_row" ? "next" : "prev"}) / ${mathBaseCol || "col"}@${mathRelativeRowRef === "next_row" ? "next" : "prev"} · first/last row → blank`}
+                                      ? `${mathOutCol || nextFreeResultColumnName()} = (${mathBaseCol || "col"} − ${summaryRefOutputName(mathRelativeRowRef) || "Σ"}) / ${summaryRefOutputName(mathRelativeRowRef) || "Σ"}${mathAsPercent ? " × 100" : ""}`
+                                      : `${mathOutCol || nextFreeResultColumnName()} = (${mathBaseCol || "col"} − ${mathBaseCol || "col"}@${mathRelativeRowRef === "next_row" ? "next" : "prev"}) / ${mathBaseCol || "col"}@${mathRelativeRowRef === "next_row" ? "next" : "prev"}${mathAsPercent ? " × 100" : ""} · first/last row → blank`}
                                   </span>
                                 ) : (
                                   `${mathOutCol || nextFreeResultColumnName()} = ${mathBaseCol || "column"} (current row) ${
@@ -4569,9 +4592,19 @@ const GridView = ({ startNew, fillViewport = false }) => {
                                       : mathRelativeRowRef === "next_row"
                                         ? "next row"
                                         : "prev row"
-                                  }`
+                                  }${mathAsPercent ? " × 100" : ""}`
                                 )}
                               </div>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <Checkbox
+                                id="math-as-percent"
+                                checked={mathAsPercent}
+                                onCheckedChange={(v) => setMathAsPercent(v === true)}
+                              />
+                              <Label htmlFor="math-as-percent" className="text-xs font-normal leading-snug">
+                                % mode (multiply result by 100)
+                              </Label>
                             </div>
                           </div>
                         </TabsContent>
