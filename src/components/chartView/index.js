@@ -41,6 +41,7 @@ import {
 import { temporalToMs } from "@/lib/temporalParse";
 import { mapRowsToLivelinePoints } from "@/lib/mapRowsToLivelinePoints";
 import { downsampleRowsForChart } from "@/lib/chartRenderCap";
+import { findSheetIdOrderColumn, orderSheetRowsByDataTypes } from "@/lib/sheetIdOrder";
 import { pivotBarChartBySeries } from "@/components/chartView/pivotBarChartData";
 import { resolveChartSeriesLabel } from "@/lib/chartLineLabels";
 import {
@@ -1374,11 +1375,12 @@ export function ChartBuilderProvider({ demo, children, initialBuilderSnapshot, e
   const chartData = useMemo(() => {
     if (demo) {
       const live = Array.isArray(effectiveData) ? effectiveData : [];
-      if (live.length) return live;
+      if (live.length) return orderSheetRowsByDataTypes(live, dataTypes);
       return dfltChartData;
     }
-    return Array.isArray(effectiveData) ? effectiveData : [];
-  }, [demo, effectiveData]);
+    const rows = Array.isArray(effectiveData) ? effectiveData : [];
+    return orderSheetRowsByDataTypes(rows, dataTypes);
+  }, [demo, effectiveData, dataTypes]);
 
   const lineSeriesColumnOptions = useMemo(() => {
     if (!xOptions?.length) return [];
@@ -2608,6 +2610,20 @@ export function ChartCanvas() {
   const sortedPlotRows = useMemo(() => {
     if (!selX || !Array.isArray(plotRows) || plotRows.length <= 1) return plotRows;
     if (xAxisType !== "date" && xAxisType !== "number" && xAxisType !== "string") return plotRows;
+
+    const idOrderCol = findSheetIdOrderColumn(dataTypes);
+    const xColName = stripSheetScopedColumnKey(xKey);
+    // When sheet has an `_id` order column and X is a label/category (not the id itself),
+    // keep the sheet's id-enforced row order instead of sorting labels A→Z.
+    if (
+      idOrderCol &&
+      xColName !== idOrderCol &&
+      xKey !== idOrderCol &&
+      (xAxisType === "string" || xIsCategoricalLabel)
+    ) {
+      return sortXDir === "desc" ? [...plotRows].reverse() : plotRows;
+    }
+
     return [...plotRows].sort((a, b) => {
       const av = toSortableXAxisValue(a?.[xKey], xAxisType, effectiveTemporalSort);
       const bv = toSortableXAxisValue(b?.[xKey], xAxisType, effectiveTemporalSort);
@@ -2616,7 +2632,7 @@ export function ChartCanvas() {
         : av - bv;
       return sortXDir === "desc" ? -cmp : cmp;
     });
-  }, [plotRows, xAxisType, xKey, selX, sortXDir, effectiveTemporalSort]);
+  }, [plotRows, xAxisType, xKey, selX, sortXDir, effectiveTemporalSort, dataTypes, xIsCategoricalLabel]);
 
   const barSeriesPivot = useMemo(() => {
     if (selChartType !== "bar" || !barSeriesColumn || !yKeys[0]) return null;

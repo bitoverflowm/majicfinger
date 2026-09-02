@@ -108,3 +108,15 @@ export function mergeDetectedDataTypesPreservingId(detected, prev) {
   }
   return changed ? merged : prev && typeof prev === "object" ? prev : merged;
 }
+
+/**
+ * Sort rows using the sheet's `_id` / `id` typed column when present.
+ * @param {Array<Record<string, unknown>>} rows
+ * @param {Record<string, string> | null | undefined} dataTypes
+ * @returns {Array<Record<string, unknown>>}
+ */
+export function orderSheetRowsByDataTypes(rows, dataTypes) {
+  const idCol = findSheetIdOrderColumn(dataTypes);
+  if (!idCol) return rows;
+  return sortRowsByIdColumn(rows, idCol);
+}

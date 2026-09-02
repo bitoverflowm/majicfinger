@@ -4,6 +4,7 @@ import {
   isNumberLikeSheetDataType,
   isSheetIdDataType,
   mergeDetectedDataTypesPreservingId,
+  orderSheetRowsByDataTypes,
   sortRowsByIdColumn,
   toAgGridCellDataType,
 } from "./sheetIdOrder.js";
@@ -36,6 +37,18 @@ test("sortRowsByIdColumn orders numeric string ids", () => {
   assert.equal(Number(out[1].id), 2);
   assert.equal(Number(out[2].id), 3);
   assert.equal(out[0].Band, "a");
+});
+
+test("orderSheetRowsByDataTypes uses typed id column", () => {
+  const rows = [
+    { id: 2, volume: 100 },
+    { id: 0, volume: 0 },
+    { id: 1, volume: 10 },
+  ];
+  const out = orderSheetRowsByDataTypes(rows, { id: "id", volume: "number" });
+  assert.equal(out[0].id, 0);
+  assert.equal(out[0].volume, 0);
+  assert.equal(out[2].id, 2);
 });
 
 test("mergeDetectedDataTypesPreservingId keeps user id and promotes id columns", () => {

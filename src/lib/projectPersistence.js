@@ -1,5 +1,6 @@
 import { isLakeBigintColumnName } from "@/lib/dataLake/lakeTableColumns";
 import { normalizeLakeBigintCellValue } from "@/lib/dataLake/lakeBigintNormalize";
+import { isSheetIdDataType, sortRowsByIdColumn } from "@/lib/sheetIdOrder";
 import { aggregateBucketRows } from "@/lib/sheetOperations/aggregateBucketRows";
 import { applyRefineQueryToRows } from "@/lib/sheetOperations/refineQuery";
 import { compareConditionValues } from "@/lib/ifElseConditionValues";
@@ -811,16 +812,22 @@ export function applyBrowserOperationToRows(rows, op) {
   if (op.type === "cast.column") {
     const col = String(op.column || "");
     const dataType = String(op.dataType || "text");
-    return list.map((row) => {
+    const asNumber = dataType === "number" || isSheetIdDataType(dataType);
+    let next = list.map((row) => {
       if (!row || typeof row !== "object") return row;
       let value = row[col];
-      if (dataType === "number") {
+      if (asNumber) {
         value = isLakeBigintColumnName(col) ? normalizeLakeBigintCellValue(value) : Number(value);
+        if (typeof value === "number" && !Number.isFinite(value)) value = null;
       } else if (dataType === "boolean") value = Boolean(value);
       else if (dataType === "dateString") value = value ? new Date(value).toISOString() : value;
       else if (dataType === "text") value = String(value ?? "");
       return { ...row, [col]: value };
     });
+    if (col && isSheetIdDataType(dataType)) {
+      next = sortRowsByIdColumn(next, col);
+    }
+    return next;
   }
   if (op.type === "manual.cell.patch") {
     const rowKey = op.rowKey;

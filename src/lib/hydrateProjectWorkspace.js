@@ -11,6 +11,7 @@ import {
 } from "@/lib/replayProjectDerivedSheets";
 import { stripProvenanceRowPayloadForLoad } from "@/lib/projectPersistence";
 import { coerceDataTypes } from "@/lib/coerceDataTypes";
+import { orderSheetRowsByDataTypes } from "@/lib/sheetIdOrder";
 
 /**
  * Shared helpers to load a saved DataSet (project) into sheet + chart workspace state.
@@ -28,9 +29,10 @@ export function applyDataSetToWorkspace(ds, { setDataSheets, setActiveSheetId, s
             ? "derived"
             : "inline";
       const raw = Array.isArray(sheet?.data) ? sheet.data : [];
+      const coerced = coerceDataTypes(raw);
       acc[sheetId] = {
         ...sheet,
-        data: coerceDataTypes(raw),
+        data: orderSheetRowsByDataTypes(coerced, sheet?.dataTypes),
         storageMode: mode,
         rehydrationStatus:
           mode === "provenance" || mode === "derived"
@@ -179,13 +181,16 @@ function applyActiveSheetFromSheets(allSheets, setters) {
   const { setDataSheets, setActiveSheetId, setConnectedData } = setters;
   if (!allSheets || !setDataSheets) return;
   const coerced = Object.fromEntries(
-    Object.entries(allSheets).map(([id, sheet]) => [
-      id,
-      {
-        ...sheet,
-        data: coerceDataTypes(Array.isArray(sheet?.data) ? sheet.data : []),
-      },
-    ]),
+    Object.entries(allSheets).map(([id, sheet]) => {
+      const rows = coerceDataTypes(Array.isArray(sheet?.data) ? sheet.data : []);
+      return [
+        id,
+        {
+          ...sheet,
+          data: orderSheetRowsByDataTypes(rows, sheet?.dataTypes),
+        },
+      ];
+    }),
   );
   setDataSheets({ ...coerced });
   const activeKey = pickInitialActiveSheetId(coerced);

@@ -5,7 +5,9 @@ import { flushSync } from 'react-dom';
 import { CONNECT_PROJECT_LOAD_IDLE } from '@/lib/connectProjectLoad';
 import { coerceDataTypes } from '@/lib/coerceDataTypes';
 import {
+  findSheetIdOrderColumn,
   mergeDetectedDataTypesPreservingId,
+  orderSheetRowsByDataTypes,
   toAgGridCellDataType,
 } from '@/lib/sheetIdOrder';
 import { isComposeBucketMsColumn } from '@/lib/composeDateDisplay';
@@ -878,7 +880,10 @@ export const StateProviderV2 = ({children, initialSettings}) => {
       setDataSheets((prev) => {
         const sheet = prev[activeSheetId] || { name: 'Sheet 1', data: [] };
         const raw = typeof value === 'function' ? value(sheet.data || []) : value;
-        const data = Array.isArray(raw) ? coerceDataTypes(raw) : (raw != null && typeof raw === 'object' ? coerceDataTypes([raw]) : sheet.data || []);
+        const coerced = Array.isArray(raw)
+          ? coerceDataTypes(raw)
+          : (raw != null && typeof raw === 'object' ? coerceDataTypes([raw]) : sheet.data || []);
+        const data = orderSheetRowsByDataTypes(coerced, sheet.dataTypes);
         return { ...prev, [activeSheetId]: { ...sheet, data } };
       });
     }, [activeSheetId]);
@@ -1470,8 +1475,43 @@ export const StateProviderV2 = ({children, initialSettings}) => {
     useEffect(() => {
         if (connectedData && connectedData.length > 0) {
             const detectedDataTypes = determineDataTypes(connectedData);
-            const mergedTypes = mergeDetectedDataTypesPreservingId(detectedDataTypes, dataTypes);
-            setDataTypes((prev) => mergeDetectedDataTypesPreservingId(detectedDataTypes, prev));
+            const sheetTypes = activeSheetId ? dataSheets?.[activeSheetId]?.dataTypes : null;
+            // Sheet-persisted types (especially `_id`) win over prior in-memory state.
+            const baseTypes = { ...(dataTypes || {}), ...(sheetTypes || {}) };
+            const mergedTypes = mergeDetectedDataTypesPreservingId(detectedDataTypes, baseTypes);
+            setDataTypes((prev) =>
+              mergeDetectedDataTypesPreservingId(detectedDataTypes, {
+                ...(prev || {}),
+                ...(sheetTypes || {}),
+              }),
+            );
+
+            // Keep `_id` casts on the sheet record so project save/reload remembers them,
+            // and re-apply ascending id order whenever rows drift.
+            const idCol = findSheetIdOrderColumn(mergedTypes);
+            if (activeSheetId && idCol && setDataSheets) {
+              const sheetIdType = mergedTypes[idCol];
+              setDataSheets((prev) => {
+                const sheet = prev?.[activeSheetId];
+                if (!sheet) return prev;
+                const nextTypes = { ...(sheet.dataTypes || {}), [idCol]: sheetIdType };
+                const nextData = orderSheetRowsByDataTypes(
+                  Array.isArray(sheet.data) ? sheet.data : [],
+                  nextTypes,
+                );
+                const typesSame = sheet.dataTypes?.[idCol] === sheetIdType;
+                const dataSame = nextData === sheet.data;
+                if (typesSame && dataSame) return prev;
+                return {
+                  ...prev,
+                  [activeSheetId]: {
+                    ...sheet,
+                    dataTypes: nextTypes,
+                    data: nextData,
+                  },
+                };
+              });
+            }
 
             const keys = Object.keys(connectedData[0]).filter((key) => !isComposeBucketMsColumn(key));
             const displayNames = composeFieldDisplayNameMap(dataLakeColumnComposeItems);
@@ -1483,33 +1523,24 @@ export const StateProviderV2 = ({children, initialSettings}) => {
                 }))
             );
         }
-    }, [connectedData, dataLakeColumnComposeItems]);
+    }, [connectedData, dataLakeColumnComposeItems, activeSheetId]);
 
-    // Restore per-sheet dataTypes (including `_id` order type) when switching sheets.
+    // Restore per-sheet dataTypes (including `_id` order type) when switching sheets or loading a project.
+    const activeSheetDataTypes = activeSheetId ? dataSheets?.[activeSheetId]?.dataTypes : null;
     useEffect(() => {
-        const sheetTypes = activeSheetId ? dataSheets?.[activeSheetId]?.dataTypes : null;
-        if (!sheetTypes || typeof sheetTypes !== "object") return;
+        if (!activeSheetDataTypes || typeof activeSheetDataTypes !== "object") return;
         setDataTypes((prev) => {
-            const next = { ...sheetTypes };
-            // Keep keys for columns still present; sheet types win for id casts.
+            const next = { ...(prev || {}), ...activeSheetDataTypes };
             let changed = false;
-            for (const [k, v] of Object.entries(next)) {
+            for (const [k, v] of Object.entries(activeSheetDataTypes)) {
                 if (prev?.[k] !== v) {
                     changed = true;
                     break;
                 }
             }
-            if (!changed) {
-                for (const k of Object.keys(prev || {})) {
-                    if (!(k in next)) {
-                        changed = true;
-                        break;
-                    }
-                }
-            }
-            return changed ? { ...(prev || {}), ...next } : prev;
+            return changed ? next : prev;
         });
-    }, [activeSheetId]);
+    }, [activeSheetId, activeSheetDataTypes]);
 
     useEffect(() => {
         if (!connectedData?.length) return;
