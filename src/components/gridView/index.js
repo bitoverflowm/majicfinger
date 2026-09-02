@@ -24,6 +24,15 @@ import {
   coerceNumberColumnsInRows,
   parseNumberTypedCell,
 } from "@/lib/coerceNumberTypedCells";
+import { coerceDataTypes } from "@/lib/coerceDataTypes";
+import {
+  findSheetIdOrderColumn,
+  isNumberLikeSheetDataType,
+  isSheetIdDataType,
+  SHEET_ID_DATA_TYPE,
+  sortRowsByIdColumn,
+  toAgGridCellDataType,
+} from "@/lib/sheetIdOrder";
 
 import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
 
@@ -750,6 +759,8 @@ const GridView = ({ startNew, fillViewport = false }) => {
         let newValue = row?.[column];
         switch (newType) {
           case "number":
+          case "id":
+          case "_id":
             newValue = parseNumberTypedCell(newValue);
             break;
           case "boolean":
@@ -858,18 +869,47 @@ const GridView = ({ startNew, fillViewport = false }) => {
       const colName = String(getColField(col) || "");
       if (!colName) return;
 
-      const updatedData = convertDataType(connectedData, colName, newType);
-      setConnectedData?.(updatedData);
+      const normalizedType = isSheetIdDataType(newType) ? SHEET_ID_DATA_TYPE : newType;
+      let updatedData = convertDataType(connectedData, colName, normalizedType);
+      if (isSheetIdDataType(normalizedType)) {
+        updatedData = sortRowsByIdColumn(updatedData, colName);
+      }
+      const nextTypes = {
+        ...(dataTypes || {}),
+        [colName]: normalizedType,
+      };
 
       if (setDataTypes) {
-        setDataTypes((prevTypes) => ({
-          ...(prevTypes || {}),
-          [colName]: newType,
-        }));
+        setDataTypes(nextTypes);
       }
 
-      appendActiveSheetOperation("cast.column", { column: colName, dataType: newType });
-      toast(`Column "${colName}" type updated to "${newType}"`, { duration: 5000 });
+      if (activeSheetId && setDataSheets) {
+        // Single sheet patch so data + dataTypes don't race (both use setDataSheets).
+        setDataSheets((prev) => {
+          const sheet = prev?.[activeSheetId] || { name: "Sheet 1", data: [] };
+          return {
+            ...prev,
+            [activeSheetId]: {
+              ...sheet,
+              data: coerceDataTypes(updatedData),
+              dataTypes: {
+                ...(sheet.dataTypes || {}),
+                ...nextTypes,
+              },
+            },
+          };
+        });
+      } else {
+        setConnectedData?.(updatedData);
+      }
+
+      appendActiveSheetOperation("cast.column", { column: colName, dataType: normalizedType });
+      toast(
+        isSheetIdDataType(normalizedType)
+          ? `Column "${colName}" typed as _id — rows stay ordered by this column.`
+          : `Column "${colName}" type updated to "${normalizedType}"`,
+        { duration: 5000 },
+      );
     };
 
     const onDragEnd = (result) => {
@@ -2787,13 +2827,15 @@ const GridView = ({ startNew, fillViewport = false }) => {
         if (!field) continue;
         const fromCol = typeof c === "object" && c != null ? c.cellDataType : null;
         const t = dataTypes?.[field] || fromCol;
-        if (t === "number") fields.add(field);
+        if (isNumberLikeSheetDataType(t)) fields.add(field);
       }
       for (const [field, t] of Object.entries(dataTypes || {})) {
-        if (t === "number" && field) fields.add(field);
+        if (isNumberLikeSheetDataType(t) && field) fields.add(field);
       }
       return fields;
     }, [connectedCols, dataTypes]);
+
+    const idOrderColumn = useMemo(() => findSheetIdOrderColumn(dataTypes), [dataTypes]);
 
     const displayData = useMemo(() => {
       const typedRows = coerceNumberColumnsInRows(connectedData || [], numberTypedFields);
@@ -2841,9 +2883,12 @@ const GridView = ({ startNew, fillViewport = false }) => {
           const cmp = ka != null && kb != null ? ka - kb : String(va).localeCompare(String(vb), undefined, { numeric: true });
           return sortDir === "asc" ? cmp : -cmp;
         });
+      } else if (idOrderColumn) {
+        // Default stable order from _id-typed column (unless user picked an explicit Sort & filter sort).
+        out = sortRowsByIdColumn(out, idOrderColumn);
       }
       return out;
-    }, [connectedData, filterState, numberTypedFields]);
+    }, [connectedData, filterState, numberTypedFields, idOrderColumn]);
 
     const columnDefsWithMeta = useMemo(() => {
       const cols = (connectedCols || []).map((c) => {
@@ -2852,13 +2897,16 @@ const GridView = ({ startNew, fillViewport = false }) => {
         const isTokenId = fl && (TOKEN_ID_FIELDS.has(fl) || fl.endsWith('_conditionid') || fl.endsWith('_condition_id') || fl.endsWith('_asset_id') || fl === 'id' || fl.endsWith('id'));
         const fmt = isTokenId ? (p) => (p?.value != null ? String(p.value) : '') : undefined;
         const declaredType = (field && dataTypes?.[field]) || (typeof c === 'object' && c != null ? c.cellDataType : null);
+        const agType = declaredType ? toAgGridCellDataType(declaredType) : null;
+        // Token/condition IDs stay as text strings; sheet `_id` order type stays numeric in the grid.
+        const forceText = isTokenId && !isSheetIdDataType(declaredType);
         return typeof c === 'object' && c !== null
           ? {
               ...c,
-              ...(declaredType ? { cellDataType: declaredType } : {}),
-              valueFormatter: isTokenId ? fmt : c.valueFormatter,
+              ...(agType ? { cellDataType: forceText ? "text" : agType } : {}),
+              valueFormatter: forceText ? fmt : c.valueFormatter,
             }
-          : { field: c, ...(declaredType ? { cellDataType: declaredType } : {}), valueFormatter: fmt };
+          : { field: c, ...(agType ? { cellDataType: forceText ? "text" : agType } : {}), valueFormatter: forceText ? fmt : undefined };
       });
       cols.push({ field: '_origIndex', hide: true, suppressColumnsToolPanel: true });
       return cols;
@@ -3389,6 +3437,7 @@ const GridView = ({ startNew, fillViewport = false }) => {
                                             >
                                               <option value="text">Text</option>
                                               <option value="number">Number</option>
+                                              <option value="id">_id</option>
                                               <option value="boolean">Boolean</option>
                                               <option value="date">Date</option>
                                               <option value="dateString">DateString</option>

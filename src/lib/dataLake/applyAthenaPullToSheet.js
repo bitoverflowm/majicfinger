@@ -1,5 +1,6 @@
 import { coerceDataTypes } from "@/lib/coerceDataTypes";
 import { athenaRowsToObjects } from "@/lib/duckdb/athenaRowsToObjects";
+import { findSheetIdOrderColumn, sortRowsByIdColumn } from "@/lib/sheetIdOrder";
 
 /** Above this row count, skip synchronous coerce (Mongo loads don't coerce either). */
 const COERCE_ROW_CAP = 50_000;
@@ -39,9 +40,14 @@ export function athenaPollToSheetRows(columns, rows, opts = {}) {
  */
 export function applyAthenaPullToSheetPatch(prev, sheetId, rows, extras = {}) {
   const raw = Array.isArray(rows) ? rows : [];
-  const rowData =
+  let rowData =
     raw.length > COERCE_ROW_CAP ? raw : coerceDataTypes(raw);
   const cur = prev?.[sheetId] || { name: "Sheet 1", data: [] };
+  const idCol =
+    findSheetIdOrderColumn(cur.dataTypes) || findSheetIdOrderColumn(extras.dataTypes);
+  if (idCol) {
+    rowData = sortRowsByIdColumn(rowData, idCol);
+  }
   const pulledAt = Date.now();
 
   return {
@@ -58,6 +64,14 @@ export function applyAthenaPullToSheetPatch(prev, sheetId, rows, extras = {}) {
       },
       ...(extras.provenance ? { provenance: extras.provenance } : {}),
       ...(extras.requestCards ? { requestCards: extras.requestCards } : {}),
+      ...(extras.dataTypes
+        ? {
+            dataTypes: {
+              ...(cur.dataTypes || {}),
+              ...extras.dataTypes,
+            },
+          }
+        : {}),
     },
   };
 }

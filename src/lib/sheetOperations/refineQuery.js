@@ -23,7 +23,7 @@ function escapeLike(s) {
  */
 export function inferRefineColumnKind(column, dataTypes, rows) {
   const t = dataTypes?.[column];
-  if (t === "number") return "number";
+  if (t === "number" || t === "id" || t === "_id") return "number";
   if (t === "boolean") return "boolean";
   if (t === "date" || t === "dateString") return "date";
   if (t === "text" || t === "string") return "string";

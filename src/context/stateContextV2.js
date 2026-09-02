@@ -4,6 +4,10 @@ import React, { createContext, useState, useContext, useEffect, useMemo, useCall
 import { flushSync } from 'react-dom';
 import { CONNECT_PROJECT_LOAD_IDLE } from '@/lib/connectProjectLoad';
 import { coerceDataTypes } from '@/lib/coerceDataTypes';
+import {
+  mergeDetectedDataTypesPreservingId,
+  toAgGridCellDataType,
+} from '@/lib/sheetIdOrder';
 import { isComposeBucketMsColumn } from '@/lib/composeDateDisplay';
 import { composeFieldDisplayNameMap } from '@/lib/connectComposeDisplayLabels';
 import {
@@ -1466,18 +1470,8 @@ export const StateProviderV2 = ({children, initialSettings}) => {
     useEffect(() => {
         if (connectedData && connectedData.length > 0) {
             const detectedDataTypes = determineDataTypes(connectedData);
-            setDataTypes((prev) => {
-                const merged = { ...prev };
-                let changed = false;
-                for (const [k, v] of Object.entries(detectedDataTypes)) {
-                    if (merged[k] !== v) {
-                        merged[k] = v;
-                        changed = true;
-                    }
-                }
-                if (!changed) return prev;
-                return merged;
-            });
+            const mergedTypes = mergeDetectedDataTypesPreservingId(detectedDataTypes, dataTypes);
+            setDataTypes((prev) => mergeDetectedDataTypesPreservingId(detectedDataTypes, prev));
 
             const keys = Object.keys(connectedData[0]).filter((key) => !isComposeBucketMsColumn(key));
             const displayNames = composeFieldDisplayNameMap(dataLakeColumnComposeItems);
@@ -1485,11 +1479,37 @@ export const StateProviderV2 = ({children, initialSettings}) => {
                 keys.map((key) => ({
                     field: key,
                     ...(displayNames[key] ? { headerName: displayNames[key] } : {}),
-                    cellDataType: detectedDataTypes[key] || "text",
+                    cellDataType: toAgGridCellDataType(mergedTypes?.[key] || detectedDataTypes[key] || "text"),
                 }))
             );
         }
     }, [connectedData, dataLakeColumnComposeItems]);
+
+    // Restore per-sheet dataTypes (including `_id` order type) when switching sheets.
+    useEffect(() => {
+        const sheetTypes = activeSheetId ? dataSheets?.[activeSheetId]?.dataTypes : null;
+        if (!sheetTypes || typeof sheetTypes !== "object") return;
+        setDataTypes((prev) => {
+            const next = { ...sheetTypes };
+            // Keep keys for columns still present; sheet types win for id casts.
+            let changed = false;
+            for (const [k, v] of Object.entries(next)) {
+                if (prev?.[k] !== v) {
+                    changed = true;
+                    break;
+                }
+            }
+            if (!changed) {
+                for (const k of Object.keys(prev || {})) {
+                    if (!(k in next)) {
+                        changed = true;
+                        break;
+                    }
+                }
+            }
+            return changed ? { ...(prev || {}), ...next } : prev;
+        });
+    }, [activeSheetId]);
 
     useEffect(() => {
         if (!connectedData?.length) return;

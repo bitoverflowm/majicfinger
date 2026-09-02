@@ -180,7 +180,9 @@ export function getAxisType(key, dataTypes, data) {
   const dt = dataTypes && (dataTypes[skey] ?? (descoped ? dataTypes[descoped] : undefined));
   if (dt) {
     const t = dt;
-    if (t === "number" || t === "date") return t;
+    if (t === "number" || t === "id" || t === "_id" || t === "date") {
+      return t === "date" ? "date" : "number";
+    }
     // Stale/wrong "string" in context — infer from actual rows so charts sort and scale correctly.
     if (data?.length) {
       const v = rowValueForDataKey(data[0], key);
