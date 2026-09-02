@@ -44,6 +44,7 @@ import {
   appendSheetOperation,
   createSheetOperation,
 } from "@/lib/projectPersistence";
+import { listSheetEquations, requestSheetEquationEdit } from "@/lib/sheetEquationEditRequest";
 import { cn } from "@/lib/utils";
 
 const SECTION_LABEL =
@@ -102,43 +103,6 @@ const FORMAT_META = {
     pasteHint: "Paste a Markdown pipe table (GPT-style tables work).",
   },
 };
-
-function summarizeEquations(sheet) {
-  const out = [];
-  const history = Array.isArray(sheet?.operationHistory) ? sheet.operationHistory : [];
-  for (const op of history) {
-    const type = String(op?.type || "");
-    if (type === "computed.column") {
-      const col = op?.payload?.column || op?.column;
-      const kind = op?.payload?.expression?.kind || op?.expression?.kind;
-      out.push(col ? `${col}${kind ? ` (${kind})` : ""}` : "Computed column");
-      continue;
-    }
-    if (type === "summary.row") {
-      const outputs = op?.outputs || op?.payload?.outputs;
-      const label = Array.isArray(outputs) && outputs.length ? outputs.join(", ") : "Summary row";
-      out.push(`Summary · ${label}`);
-      continue;
-    }
-    if (type === "bucket.sheet" || type === "band.sheet") {
-      out.push(type === "band.sheet" ? "Bands" : "Buckets");
-      continue;
-    }
-    if (type.startsWith("quant.") || type.includes("equation")) {
-      out.push(type);
-    }
-  }
-  const select = sheet?.provenance?.composeSpec?.select;
-  if (Array.isArray(select)) {
-    for (const item of select) {
-      if (item?.equation) {
-        const alias = String(item.alias || item.column || "equation").trim();
-        out.push(`Compose · ${alias}`);
-      }
-    }
-  }
-  return [...new Set(out.filter(Boolean))];
-}
 
 function sheetQuerySummary(sheet) {
   const cards = Array.isArray(sheet?.requestCards) ? sheet.requestCards : [];
@@ -242,7 +206,7 @@ export function ConnectHomeSheetPanel({ className }) {
   }, [editingName]);
 
   const queryText = useMemo(() => sheetQuerySummary(sheet), [sheet]);
-  const equations = useMemo(() => summarizeEquations(sheet), [sheet]);
+  const equations = useMemo(() => listSheetEquations(sheet), [sheet]);
   const isLive = useMemo(
     () => sheetIsLive(sheet, activeSheetId, liveFeedState),
     [sheet, activeSheetId, liveFeedState],
@@ -639,12 +603,23 @@ export function ConnectHomeSheetPanel({ className }) {
           {equations.length ? (
             <ul className="flex flex-col gap-0.5">
               {equations.map((eq) => (
-                <li
-                  key={eq}
-                  className="truncate rounded border border-border/50 bg-muted/15 px-1.5 py-0.5 text-[10px] text-foreground"
-                  title={eq}
-                >
-                  {eq}
+                <li key={eq.id}>
+                  <button
+                    type="button"
+                    className="w-full truncate rounded border border-border/50 bg-muted/15 px-1.5 py-0.5 text-left text-[10px] text-foreground transition-colors hover:border-border hover:bg-muted/40 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                    title={`Edit: ${eq.label}`}
+                    onClick={() =>
+                      requestSheetEquationEdit({
+                        sheetId: activeSheetId,
+                        type: eq.type,
+                        label: eq.label,
+                        op: eq.op,
+                        composeAlias: eq.composeAlias || null,
+                      })
+                    }
+                  >
+                    {eq.label}
+                  </button>
                 </li>
               ))}
             </ul>

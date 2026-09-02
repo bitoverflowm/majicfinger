@@ -961,14 +961,27 @@ function applyComputedColumnOperation(rows, op) {
     const base = String(expr.baseColumn || "");
     const rowRef = String(expr.rowRef || "previous");
     const opName = String(expr.op || "");
+    const summaryValues = op?.summaryValues && typeof op.summaryValues === "object" ? op.summaryValues : {};
+    const refIsSummary =
+      expr.rowRefKind === "summary" || String(rowRef).startsWith("summary::");
     return rows.map((row, idx) => {
       if (!row || typeof row !== "object") return row;
-      const refIdx = rowRef === "next" ? idx + 1 : idx - 1;
-      const ref = rows[refIdx];
-      if (!ref) return { ...row, [out]: null };
       const a = finiteNumber(row[base]);
-      const b = finiteNumber(ref[base]);
+      let b = null;
+      if (refIsSummary) {
+        b = finiteNumber(summaryValues[rowRef]);
+      } else {
+        const refIdx = rowRef === "next" || rowRef === "next_row" ? idx + 1 : idx - 1;
+        const ref = rows[refIdx];
+        if (!ref) return { ...row, [out]: null };
+        b = finiteNumber(ref[base]);
+      }
       if (a == null || b == null) return { ...row, [out]: null };
+      if (opName === "pct_growth") {
+        if (b === 0) return { ...row, [out]: null };
+        const growth = (a - b) / b;
+        return { ...row, [out]: Number.isFinite(growth) ? growth : null };
+      }
       const value = applyBinaryMath(opName, a, b);
       return { ...row, [out]: Number.isFinite(value) ? value : null };
     });

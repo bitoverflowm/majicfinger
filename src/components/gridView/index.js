@@ -149,6 +149,7 @@ import {
   summaryRefKey,
   summaryRefOutputName,
 } from "@/lib/sheetOperations/computeSummaryRow";
+import { subscribeSheetEquationEdit } from "@/lib/sheetEquationEditRequest";
 import { BUCKET_TIME_INTERVALS } from "@/lib/sheetOperations/bucketTimeIntervals";
 
 /** Column + summary named-value options for math operand selects. */
@@ -1035,6 +1036,129 @@ const GridView = ({ startNew, fillViewport = false }) => {
       }
     }, [mathDialogOpen, mathDialogTab, activeSheet?.summaryConfig, sheetColumnNamesForMath]);
 
+    useEffect(() => {
+      return subscribeSheetEquationEdit((req) => {
+        if (!req) return;
+        if (req.sheetId && activeSheetId && String(req.sheetId) !== String(activeSheetId)) {
+          // Still allow edit when the request targets another sheet id if user switched — skip mismatch.
+          return;
+        }
+
+        const op = req.op && typeof req.op === "object" ? req.op : null;
+        const type = String(req.type || op?.type || "");
+
+        if (type === "summary.row") {
+          const cfg =
+            op?.summaryConfig ||
+            op?.payload?.summaryConfig ||
+            activeSheet?.summaryConfig ||
+            null;
+          setSummaryDraft(createInitialSummaryDraft(cfg, sheetColumnNamesForMath));
+          setMathDialogTab("summary");
+          setMathDialogOpen(true);
+          return;
+        }
+
+        if (type === "compose.equation") {
+          toast.message("Compose equations are edited in the query builder, not sheet math.");
+          return;
+        }
+
+        if (type === "bucket.sheet" || type === "band.sheet") {
+          setMathDialogTab("stats");
+          setStatsStdDevActive(false);
+          setStatsCumsumActive(false);
+          setStatsBucketActive(true);
+          setMathDialogOpen(true);
+          return;
+        }
+
+        if (type.startsWith("quant.")) {
+          setMathDialogTab("quant");
+          setMathDialogOpen(true);
+          return;
+        }
+
+        if (type === "computed.column" && op) {
+          const expr = op.expression || op.payload?.expression || {};
+          const kind = String(expr.kind || "");
+          const outCol = String(op.column || op.payload?.column || "").trim();
+
+          if (kind === "if-else") {
+            const tab = ifElseTabFromOperation(op);
+            if (tab) {
+              setIfElseTabs([tab]);
+              setActiveIfElseTabId(tab.id);
+              setIfElseDialogOpen(true);
+            } else {
+              toast.error("Could not open if/else editor for this equation.");
+            }
+            return;
+          }
+
+          if (kind === "manual-empty-column") {
+            setSheetPropsDialogOpen(true);
+            toast.message(outCol ? `Column "${outCol}" — rename or set type in Sheet Properties.` : "Open Sheet Properties to edit columns.");
+            return;
+          }
+
+          if (kind === "standard-deviation") {
+            setMathDialogTab("stats");
+            setStatsBucketActive(false);
+            setStatsCumsumActive(false);
+            setStatsStdDevActive(true);
+            setStatsStdSourceCol(String(expr.sourceColumn || ""));
+            setStatsStdOutCol(outCol);
+            setStatsStdMode(expr.mode === "rolling" ? "rolling" : "full");
+            if (expr.window != null) setStatsRollCount(String(expr.window));
+            setMathDialogOpen(true);
+            return;
+          }
+
+          if (kind === "cumulative-sum") {
+            setMathDialogTab("stats");
+            setStatsBucketActive(false);
+            setStatsStdDevActive(false);
+            setStatsCumsumActive(true);
+            setStatsCumsumSourceCol(String(expr.sourceColumn || ""));
+            setStatsCumsumOutCol(outCol);
+            setMathDialogOpen(true);
+            return;
+          }
+
+          if (kind === "relative-row") {
+            setMathDialogTab("functions");
+            setMathFunctionType("row_operation");
+            setMathReferenceMode("row_wise");
+            setMathCurrentRowRef("current_row");
+            setMathBaseCol(String(expr.baseColumn || ""));
+            setMathOp(String(expr.op || "subtract"));
+            setMathRelativeRowRef(String(expr.rowRef || "prev_row"));
+            setMathOutCol(outCol);
+            setMathDialogOpen(true);
+            return;
+          }
+
+          if (kind === "binary") {
+            setMathDialogTab("basic");
+            setMathOp(String(expr.op || "add"));
+            setMathBasicColA(String(expr.leftColumn || ""));
+            setMathBasicColB(String(expr.rightColumn || ""));
+            setMathOutCol(outCol);
+            setMathDialogOpen(true);
+            return;
+          }
+
+          setMathDialogTab("basic");
+          setMathOutCol(outCol);
+          setMathDialogOpen(true);
+          return;
+        }
+
+        toast.message("No editor available for this equation yet.");
+      });
+    }, [activeSheetId, activeSheet?.summaryConfig, sheetColumnNamesForMath]);
+
     const lastSummarySyncRef = useRef({});
     useEffect(() => {
       if (!setDataSheets || !dataSheets) return;
@@ -1181,15 +1305,17 @@ const GridView = ({ startNew, fillViewport = false }) => {
 
     useEffect(() => {
       if (!mathDialogOpen) return;
+      const isValidOperand = (prev) =>
+        Boolean(prev) && (sheetColumnNamesForMath.includes(prev) || isSummaryRefKey(prev));
       setMathOutCol((prev) => (String(prev || "").trim() ? prev : nextFreeResultColumnName()));
       setMathBaseCol((prev) =>
-        prev && sheetColumnNamesForMath.includes(prev) ? prev : sheetColumnNamesForMath[0] || "",
+        isValidOperand(prev) ? prev : sheetColumnNamesForMath[0] || "",
       );
       setMathBasicColA((prev) =>
-        prev && sheetColumnNamesForMath.includes(prev) ? prev : sheetColumnNamesForMath[0] || "",
+        isValidOperand(prev) ? prev : sheetColumnNamesForMath[0] || "",
       );
       setMathBasicColB((prev) =>
-        prev && sheetColumnNamesForMath.includes(prev)
+        isValidOperand(prev)
           ? prev
           : sheetColumnNamesForMath[1] || sheetColumnNamesForMath[0] || "",
       );
@@ -1876,22 +2002,30 @@ const GridView = ({ startNew, fillViewport = false }) => {
           toast.error("Choose a column for the functions calculation.");
           return;
         }
+        const refKey = String(mathRelativeRowRef || "").trim();
+        const refIsSummary = isSummaryRefKey(refKey);
         next = rows.map((row, idx) => {
           if (!row || typeof row !== "object") return row;
-          const refIdx = mathRelativeRowRef === "next_row" ? idx + 1 : idx - 1;
-          const refRow = refIdx >= 0 && refIdx < rows.length ? rows[refIdx] : null;
 
-          if (mathOp === "pct_growth") {
-            // No previous/next row at the sheet edge — leave blank (NaN breaks number cells in the grid).
+          const current = isSummaryRefKey(baseCol)
+            ? resolveMathOperand(row, baseCol)
+            : parseCellFiniteForStat(row, baseCol);
+
+          let relative = null;
+          if (refIsSummary) {
+            relative = resolveMathOperand(row, refKey);
+          } else {
+            const refIdx = refKey === "next_row" ? idx + 1 : idx - 1;
+            const refRow = refIdx >= 0 && refIdx < rows.length ? rows[refIdx] : null;
             if (refRow == null) {
               return { ...row, [out]: null };
             }
-            const current = isSummaryRefKey(baseCol)
-              ? resolveMathOperand(row, baseCol)
-              : parseCellFiniteForStat(row, baseCol);
-            const relative = isSummaryRefKey(baseCol)
+            relative = isSummaryRefKey(baseCol)
               ? resolveMathOperand(refRow, baseCol)
               : parseCellFiniteForStat(refRow, baseCol);
+          }
+
+          if (mathOp === "pct_growth") {
             if (current == null || relative == null) {
               return { ...row, [out]: null };
             }
@@ -1902,15 +2036,6 @@ const GridView = ({ startNew, fillViewport = false }) => {
             return { ...row, [out]: Number.isFinite(v) ? v : null };
           }
 
-          if (refRow == null) {
-            return { ...row, [out]: null };
-          }
-          const current = isSummaryRefKey(baseCol)
-            ? resolveMathOperand(row, baseCol)
-            : parseCellFiniteForStat(row, baseCol);
-          const relative = isSummaryRefKey(baseCol)
-            ? resolveMathOperand(refRow, baseCol)
-            : parseCellFiniteForStat(refRow, baseCol);
           if (current == null || relative == null) {
             return { ...row, [out]: null };
           }
@@ -1931,14 +2056,18 @@ const GridView = ({ startNew, fillViewport = false }) => {
       }
       const leftKind = isSummaryRefKey(mathBasicColA) ? "summary" : "column";
       const rightKind = isSummaryRefKey(mathBasicColB) ? "summary" : "column";
+      const relativeIsSummary = isSummaryRefKey(mathRelativeRowRef);
       const summaryValues =
-        leftKind === "summary" || rightKind === "summary"
+        leftKind === "summary" || rightKind === "summary" || relativeIsSummary
           ? {
               ...(leftKind === "summary"
                 ? { [mathBasicColA]: summaryNamedValues[mathBasicColA] ?? null }
                 : {}),
               ...(rightKind === "summary"
                 ? { [mathBasicColB]: summaryNamedValues[mathBasicColB] ?? null }
+                : {}),
+              ...(relativeIsSummary
+                ? { [mathRelativeRowRef]: summaryNamedValues[mathRelativeRowRef] ?? null }
                 : {}),
             }
           : undefined;
@@ -1954,7 +2083,13 @@ const GridView = ({ startNew, fillViewport = false }) => {
                 leftKind,
                 rightKind,
               }
-            : { kind: "relative-row", op: mathOp, baseColumn: mathBaseCol, rowRef: mathRelativeRowRef },
+            : {
+                kind: "relative-row",
+                op: mathOp,
+                baseColumn: mathBaseCol,
+                rowRef: mathRelativeRowRef,
+                rowRefKind: relativeIsSummary ? "summary" : "row",
+              },
         ...(summaryValues ? { summaryValues } : {}),
       });
       if (mathDestination === "new_sheet") {
@@ -4287,8 +4422,8 @@ const GridView = ({ startNew, fillViewport = false }) => {
                                 </div>
                                 ) : null}
                                 {mathBaseCol && mathReferenceMode === "row_wise" && mathCurrentRowRef === "current_row" ? (
-                                <div className="space-y-1">
-                                  <Label className="text-xs">Relative row</Label>
+                                <div className="space-y-1 min-w-0">
+                                  <Label className="text-[10px] leading-tight">relative row/reference val</Label>
                                   <Select value={mathRelativeRowRef} onValueChange={setMathRelativeRowRef}>
                                     <SelectTrigger className="h-9 text-xs">
                                       <SelectValue />
@@ -4296,6 +4431,11 @@ const GridView = ({ startNew, fillViewport = false }) => {
                                     <SelectContent>
                                       <SelectItem value="prev_row">Prev row</SelectItem>
                                       <SelectItem value="next_row">Next row</SelectItem>
+                                      {(summarySelectOptions || []).map((opt) => (
+                                        <SelectItem key={`math-rel-sum-${opt.value}`} value={opt.value} className="font-mono text-xs">
+                                          {opt.label}
+                                        </SelectItem>
+                                      ))}
                                     </SelectContent>
                                   </Select>
                                 </div>
@@ -4312,12 +4452,20 @@ const GridView = ({ startNew, fillViewport = false }) => {
                                   } ${mathBasicColB || "Column B"} (per row)`
                                 ) : mathOp === "pct_growth" ? (
                                   <span className="line-clamp-2">
-                                    {`${mathOutCol || nextFreeResultColumnName()} = (${mathBaseCol || "col"} − ${mathBaseCol || "col"}@${mathRelativeRowRef === "next_row" ? "next" : "prev"}) / ${mathBaseCol || "col"}@${mathRelativeRowRef === "next_row" ? "next" : "prev"} · first/last row → blank`}
+                                    {isSummaryRefKey(mathRelativeRowRef)
+                                      ? `${mathOutCol || nextFreeResultColumnName()} = (${mathBaseCol || "col"} − ${summaryRefOutputName(mathRelativeRowRef) || "Σ"}) / ${summaryRefOutputName(mathRelativeRowRef) || "Σ"}`
+                                      : `${mathOutCol || nextFreeResultColumnName()} = (${mathBaseCol || "col"} − ${mathBaseCol || "col"}@${mathRelativeRowRef === "next_row" ? "next" : "prev"}) / ${mathBaseCol || "col"}@${mathRelativeRowRef === "next_row" ? "next" : "prev"} · first/last row → blank`}
                                   </span>
                                 ) : (
                                   `${mathOutCol || nextFreeResultColumnName()} = ${mathBaseCol || "column"} (current row) ${
                                     mathOp === "add" ? "+" : mathOp === "subtract" ? "-" : mathOp === "multiply" ? "x" : "/"
-                                  } ${mathRelativeRowRef === "next_row" ? "next row" : "prev row"}`
+                                  } ${
+                                    isSummaryRefKey(mathRelativeRowRef)
+                                      ? `Σ ${summaryRefOutputName(mathRelativeRowRef) || "summary"}`
+                                      : mathRelativeRowRef === "next_row"
+                                        ? "next row"
+                                        : "prev row"
+                                  }`
                                 )}
                               </div>
                             </div>
