@@ -84,8 +84,13 @@ async function findUserForWebhook({ email, stripeCustomerId, stripeSubscriptionI
 
   const normalized = normalizeEmail(email);
   if (!normalized) return null;
+
+  // Prefer login email, then billing_email (for remapped accounts).
   const candidates = await User.find({
-    email: { $regex: new RegExp(`^${escapeRegex(normalized)}$`, "i") },
+    $or: [
+      { email: { $regex: new RegExp(`^${escapeRegex(normalized)}$`, "i") } },
+      { billing_email: { $regex: new RegExp(`^${escapeRegex(normalized)}$`, "i") } },
+    ],
   });
   if (!candidates?.length) return null;
   candidates.sort((a, b) => userEntitlementScore(b) - userEntitlementScore(a));
@@ -573,7 +578,17 @@ async function updateUserPayment(email, name, amount, opts) {
   if (!user) {
     await User.create({ email: normalizedEmail, ...update });
   } else {
-    await User.findByIdAndUpdate(user._id, { $set: { ...update, email: normalizeEmail(user.email || normalizedEmail) } });
+    // Never overwrite a remapped login email with Stripe's billing email.
+    const next = { ...update };
+    if (user.billing_email) {
+      next.billing_email = normalizeEmail(user.billing_email);
+    } else if (normalizedEmail && normalizeEmail(user.email) !== normalizedEmail) {
+      // Keep login email; record Stripe email as billing_email when they differ.
+      next.billing_email = normalizedEmail;
+    }
+    await User.findByIdAndUpdate(user._id, {
+      $set: { ...next, email: normalizeEmail(user.email || normalizedEmail) },
+    });
   }
 
   if (shouldNotify) {

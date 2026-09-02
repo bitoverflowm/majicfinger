@@ -14,6 +14,7 @@ import { RunForYourselfButton } from "@/components/runYourself/RunForYourselfBut
 import { useTelegramContentTracker } from "@/hooks/useTelegramContentTracker";
 import { LYCHEE_CHART_EMBED_READY, LYCHEE_CHART_EMBED_RESIZE } from "@/lib/content/chart-embed-resize";
 import { applyLiveOverlay } from "@/lib/liveFeeds/applyLiveOverlay";
+import { useEmbedParentThemeSync } from "@/hooks/use-embed-parent-theme-sync";
 
 const SITE = process.env.NEXT_PUBLIC_SITE_URL || "https://lycheedata.com";
 
@@ -87,6 +88,7 @@ export default function PublicChartEmbedClient({
     () => articleEmbed || (typeof window !== "undefined" && window.self !== window.top),
   );
   const rootRef = useRef<HTMLDivElement>(null);
+  useEmbedParentThemeSync(isEmbedded || articleEmbed);
 
   const displayPayload = useMemo(() => {
     if (!payload?.success || !payload.data) return payload;
@@ -291,13 +293,13 @@ export default function PublicChartEmbedClient({
     <StateProviderV2 initialSettings={{ viewing: "charts", demo: false, rightPanelOpen: false }}>
       <div
         ref={rootRef}
-        className={`mx-auto flex w-full max-w-[1200px] flex-col ${
+        className={`mx-auto flex w-full max-w-[1200px] flex-col bg-background text-foreground ${
           isEmbedded
-            ? "h-auto min-h-0 gap-0 bg-white px-0 py-0"
+            ? "h-auto min-h-0 gap-0 px-0 py-0"
             : "min-h-screen gap-3 px-4 py-5 md:px-6 md:py-6"
         }`}
         style={{
-          backgroundColor: isEmbedded ? "#ffffff" : (chartProps0.bgColor as string) || undefined,
+          backgroundColor: isEmbedded ? undefined : (chartProps0.bgColor as string) || undefined,
           color: (chartProps0.textColor as string) || undefined,
         }}
       >

@@ -15,6 +15,11 @@ const UserSchema = new mongoose.Schema({
         required: [true, "Email is required"],
         maxLength: [240, "Email cannot be more than 240 characters"],
     },
+    /** Stripe / invoice email when login email differs from billing email. */
+    billing_email: {
+        type: String,
+        maxLength: [240, "Billing email cannot be more than 240 characters"],
+    },
     lifetimeMember: {
         type: Boolean,
         default: false,

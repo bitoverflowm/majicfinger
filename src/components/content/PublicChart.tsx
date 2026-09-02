@@ -3,6 +3,7 @@
 import { PublicChartIframe } from "./PublicChartIframe";
 import { useArticleChartLoad } from "./ArticleChartLoadProvider";
 import { Skeleton } from "@/components/ui/skeleton";
+import { useHtmlDarkClass } from "@/hooks/use-html-dark-class";
 
 const SITE = process.env.NEXT_PUBLIC_SITE_URL || "https://lycheedata.com";
 const IS_DEV = process.env.NODE_ENV === "development";
@@ -20,7 +21,7 @@ type PublicChartProps = {
 function ArticleChartPlaceholder({ height }: { height: number }) {
   return (
     <div
-      className="flex w-full flex-col gap-2 rounded-lg bg-white"
+      className="flex w-full flex-col gap-2 rounded-lg bg-background"
       style={{ height }}
       aria-hidden="true"
       aria-label="Chart loading"
@@ -44,7 +45,8 @@ export function PublicChart({
   height = LYCHEE_CONTENT_CHART_EMBED_HEIGHT,
 }: PublicChartProps) {
   const { allowed, notifyReady } = useArticleChartLoad(username, slug);
-  const path = `/${encodeURIComponent(username)}/charts/${encodeURIComponent(slug)}?embed=1`;
+  const isDark = useHtmlDarkClass();
+  const path = `/${encodeURIComponent(username)}/charts/${encodeURIComponent(slug)}?embed=1&theme=${isDark ? "dark" : "light"}`;
   const src = IS_DEV ? path : `${SITE.replace(/\/$/, "")}${path}`;
 
   return (

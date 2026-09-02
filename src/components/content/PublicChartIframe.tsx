@@ -5,6 +5,8 @@ import {
   LYCHEE_CHART_EMBED_READY,
   LYCHEE_CHART_EMBED_RESIZE,
 } from "@/lib/content/chart-embed-resize";
+import { useHtmlDarkClass } from "@/hooks/use-html-dark-class";
+import { cn } from "@/lib/utils";
 
 type PublicChartIframeProps = {
   src: string;
@@ -23,6 +25,7 @@ export function PublicChartIframe({
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const readyRef = useRef(false);
   const [height, setHeight] = useState(initialHeight);
+  const isDark = useHtmlDarkClass();
 
   useEffect(() => {
     readyRef.current = false;
@@ -58,7 +61,8 @@ export function PublicChartIframe({
       src={src}
       width="100%"
       height={height}
-      style={{ border: 0, background: "#ffffff" }}
+      className={cn("border-0 bg-background")}
+      style={{ border: 0, background: "transparent", colorScheme: isDark ? "dark" : "light" }}
       loading="eager"
     />
   );

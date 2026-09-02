@@ -103,7 +103,7 @@ export default async function PublicChartPage({
     },
   };
   return (
-    <div className={isArticleEmbed ? "min-h-0 bg-white" : "min-h-screen bg-background"}>
+    <div className={isArticleEmbed ? "min-h-0 bg-background" : "min-h-screen bg-background"}>
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(chartJsonLd) }}

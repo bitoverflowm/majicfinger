@@ -2503,7 +2503,7 @@ export function ChartCanvas() {
   const showChartXAxisTitle = !xAxisLabelHidden && !!String(xAxisLabel || "").trim();
   const showChartYAxisTitle = !yAxisLabelHidden && !!String(yAxisLabel || "").trim();
   const cartesianBottomAngled =
-    (hideXAxisLabels ? 12 : xAxisTicksAngled ? 88 : 0) + (showChartXAxisTitle ? 22 : 0);
+    (hideXAxisLabels ? 12 : xAxisTicksAngled ? 88 : 0) + (showChartXAxisTitle ? 36 : 0);
   const cartesianLeftExtra = showChartYAxisTitle ? 18 : 0;
   const cartesianMarginWithAngledTicks = useMemo(
     () => ({
@@ -3021,8 +3021,8 @@ export function ChartCanvas() {
   const chartXAxisTitleLabel = showChartXAxisTitle
     ? {
         value: String(xAxisLabel).trim(),
-        position: "insideBottom",
-        offset: -2,
+        position: "bottom",
+        offset: 8,
         style: { fill: xAxisLabelColor || tickFillX, fontSize: 11 },
       }
     : undefined;
@@ -3038,8 +3038,8 @@ export function ChartCanvas() {
   const chartYAxisTitleLabelBottom = showChartYAxisTitle
     ? {
         value: String(yAxisLabel).trim(),
-        position: "insideBottom",
-        offset: -2,
+        position: "bottom",
+        offset: 8,
         style: { fill: yAxisLabelColor || tickFillY, fontSize: 11 },
       }
     : undefined;

@@ -1,4 +1,4 @@
-Lychee Zora Telegram bot — reconstructed history from MongoDB
+using our Lychee Zora Telegram bot — reconstructed history from MongoDB
 Database target: production
 UTC range: 2026-07-01 00:00:00 through 2026-07-02 23:59:59 (inclusive days)
 Generated: 2026-07-02T06:13:26.507Z

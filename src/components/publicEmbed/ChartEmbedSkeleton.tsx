@@ -78,7 +78,7 @@ export function CardGridSkeleton({ count = 4 }: { count?: number }) {
 
 export function PublicChartPageSkeleton() {
   return (
-    <div className="mx-auto flex w-full max-w-[1200px] flex-col px-4 py-5 md:px-6 md:py-6">
+    <div className="mx-auto flex w-full max-w-[1200px] flex-col bg-background px-4 py-5 text-foreground md:px-6 md:py-6">
       <ChartEmbedSkeleton
         className={cn("mx-auto border-0 bg-transparent p-2", PUBLIC_CHART_EMBED_HEIGHT)}
         showTitle={false}
