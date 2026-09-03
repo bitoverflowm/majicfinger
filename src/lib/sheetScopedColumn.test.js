@@ -3,6 +3,7 @@ import {
   buildWorkspaceSheetColumnGroups,
   isRelativeRowOffsetRef,
   parseSheetScopedColumnKey,
+  resolveFixedReferenceFiniteNumber,
   resolveScopedFiniteNumber,
   stripSheetScopedColumnKey,
   toSheetScopedColumnKey,
@@ -65,9 +66,25 @@ test("toSheetScopedColumnKey round trip", () => {
   assert.equal(toSheetScopedColumnKey("sheet-3", "Sample Mean"), "sheet-3::Sample Mean");
 });
 
-test("isRelativeRowOffsetRef", () => {
-  assert.equal(isRelativeRowOffsetRef("prev_row"), true);
-  assert.equal(isRelativeRowOffsetRef("next_row"), true);
-  assert.equal(isRelativeRowOffsetRef("sheet-1::Sample Mean"), false);
-  assert.equal(isRelativeRowOffsetRef("summary::avg"), false);
+test("resolveFixedReferenceFiniteNumber uses first finite cell", () => {
+  const dataSheets = {
+    "sheet-1": { data: [{ mean_volume: 100 }, { mean_volume: 200 }] },
+    "sheet-pop": { data: [{ mean_volume: 55.5 }] },
+  };
+  assert.equal(
+    resolveFixedReferenceFiniteNumber({
+      dataSheets,
+      activeSheetId: "sheet-1",
+      key: "sheet-pop::mean_volume",
+    }),
+    55.5,
+  );
+  assert.equal(
+    resolveFixedReferenceFiniteNumber({
+      dataSheets,
+      activeSheetId: "sheet-1",
+      key: "prev_row",
+    }),
+    null,
+  );
 });

@@ -164,6 +164,42 @@ export function isRelativeRowOffsetRef(key) {
 }
 
 /**
+ * Resolve a single fixed reference number from a column/summary (first finite value).
+ * Used when Functions "reference val" is on — same constant applied to every row.
+ *
+ * @param {{
+ *   dataSheets?: Record<string, object> | null;
+ *   activeSheetId?: string | null;
+ *   key?: string | null;
+ *   summaryNamedValues?: Record<string, number> | null;
+ * }} params
+ * @returns {number | null}
+ */
+export function resolveFixedReferenceFiniteNumber({
+  dataSheets,
+  activeSheetId,
+  key,
+  summaryNamedValues = null,
+}) {
+  const k = String(key || "").trim();
+  if (!k || isRelativeRowOffsetRef(k)) return null;
+  if (k.startsWith("summary::")) {
+    const v = summaryNamedValues?.[k];
+    return Number.isFinite(v) ? v : null;
+  }
+  const { sheetId, column } = parseSheetScopedColumnKey(k, activeSheetId);
+  const useSheetId = sheetId || activeSheetId;
+  if (!useSheetId || !column || !dataSheets || typeof dataSheets !== "object") return null;
+  const sheetRows = Array.isArray(dataSheets[useSheetId]?.data) ? dataSheets[useSheetId].data : [];
+  for (const row of sheetRows) {
+    if (!row || typeof row !== "object") continue;
+    const n = finiteNumberFromCell(row[column]);
+    if (n != null) return n;
+  }
+  return null;
+}
+
+/**
  * @param {string | null | undefined} key
  * @param {{ dataSheets?: Record<string, object> | null; activeSheetId?: string | null; summaryRefDisplayLabel?: (k: string) => string }} [opts]
  * @returns {string}

@@ -5,7 +5,7 @@ import { applyManualCellPatchByIdentity, attachUserRowOverlays, overlayUserColum
 import { aggregateBucketRows } from "@/lib/sheetOperations/aggregateBucketRows";
 import { applyRefineQueryToRows } from "@/lib/sheetOperations/refineQuery";
 import { compareConditionValues } from "@/lib/ifElseConditionValues";
-import { resolveScopedFiniteNumber, isRelativeRowOffsetRef } from "@/lib/sheetScopedColumn";
+import { resolveScopedFiniteNumber, isRelativeRowOffsetRef, resolveFixedReferenceFiniteNumber } from "@/lib/sheetScopedColumn";
 
 export const PROJECT_FULL_DATA_SAFE_BYTES = 12 * 1024 * 1024;
 export const PROJECT_PREVIEW_ROW_LIMIT = 50000;
@@ -1004,6 +1004,10 @@ function applyComputedColumnOperation(rows, op, ctx = null) {
     const refIsSummary =
       expr.rowRefKind === "summary" || String(rowRef).startsWith("summary::");
     const refIsOffset = isRelativeRowOffsetRef(rowRef);
+    const useFixedReference =
+      Boolean(expr.referenceValFixed) ||
+      expr.rowRefKind === "fixed" ||
+      (refIsSummary && !refIsOffset);
     const scale = (v) => {
       if (!Number.isFinite(v)) return null;
       return asPercent ? v * 100 : v;
@@ -1022,11 +1026,28 @@ function applyComputedColumnOperation(rows, op, ctx = null) {
       if (scoped != null) return scoped;
       return finiteNumber(row?.[base]);
     };
+    let fixedRelative = null;
+    if (useFixedReference && !refIsOffset) {
+      if (Number.isFinite(Number(expr.fixedReferenceValue))) {
+        fixedRelative = Number(expr.fixedReferenceValue);
+      } else if (refIsSummary) {
+        fixedRelative = finiteNumber(summaryValues[rowRef]);
+      } else {
+        fixedRelative = resolveFixedReferenceFiniteNumber({
+          dataSheets,
+          activeSheetId,
+          key: rowRef,
+          summaryNamedValues: summaryValues,
+        });
+      }
+    }
     return rows.map((row, idx) => {
       if (!row || typeof row !== "object") return row;
       const a = readBaseAt(idx, row);
       let b = null;
-      if (refIsSummary) {
+      if (useFixedReference && !refIsOffset) {
+        b = fixedRelative;
+      } else if (refIsSummary) {
         b = finiteNumber(summaryValues[rowRef]);
       } else if (expr.rowRefKind === "column" || (!refIsOffset && String(rowRef).trim())) {
         const scoped = resolveScopedFiniteNumber({

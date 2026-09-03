@@ -177,6 +177,7 @@ import {
   buildWorkspaceSheetColumnGroups,
   isRelativeRowOffsetRef,
   mathOperandDisplayLabel,
+  resolveFixedReferenceFiniteNumber,
   resolveScopedFiniteNumber,
   workspaceSheetColumnOperandValues,
 } from "@/lib/sheetScopedColumn";
@@ -690,6 +691,8 @@ const GridView = ({ startNew, fillViewport = false }) => {
     const [mathCurrentRowRef, setMathCurrentRowRef] = useState("current_row");
     const [mathOp, setMathOp] = useState("subtract");
     const [mathRelativeRowRef, setMathRelativeRowRef] = useState("prev_row");
+    /** When true, relative column/summary is a single fixed value for every row. */
+    const [mathReferenceValFixed, setMathReferenceValFixed] = useState(false);
     const [mathOutCol, setMathOutCol] = useState("");
     const [mathBasicColA, setMathBasicColA] = useState("");
     const [mathBasicColB, setMathBasicColB] = useState("");
@@ -1229,6 +1232,7 @@ const GridView = ({ startNew, fillViewport = false }) => {
       setMathBasicColB(mathOperandColumnValues[1] || mathOperandColumnValues[0] || "");
       setMathBaseCol(mathOperandColumnValues[0] || "");
       setMathRelativeRowRef("prev_row");
+      setMathReferenceValFixed(false);
       setStatsStdDevActive(false);
       setStatsCumsumActive(false);
       setStatsBucketActive(false);
@@ -1379,6 +1383,11 @@ const GridView = ({ startNew, fillViewport = false }) => {
             setMathRelativeRowRef(String(expr.rowRef || "prev_row"));
             setMathOutCol(outCol);
             setMathAsPercent(Boolean(expr.asPercent));
+            setMathReferenceValFixed(
+              Boolean(expr.referenceValFixed) ||
+                expr.rowRefKind === "fixed" ||
+                expr.rowRefKind === "summary",
+            );
             setMathDialogOpen(true);
             return;
           }
@@ -1809,6 +1818,7 @@ const GridView = ({ startNew, fillViewport = false }) => {
         setMathBasicColA("");
         setMathBasicColB("");
         setMathFunctionType("row_operation");
+        setMathReferenceValFixed(false);
       }
     }, [mathDialogOpen]);
 
@@ -2450,6 +2460,8 @@ const GridView = ({ startNew, fillViewport = false }) => {
         const refKey = String(mathRelativeRowRef || "").trim();
         const refIsSummary = isSummaryRefKey(refKey);
         const refIsOffset = isRelativeRowOffsetRef(refKey);
+        const useFixedReference =
+          mathReferenceValFixed && !refIsOffset && Boolean(refKey);
         const readBaseAt = (rowIdx, row) => {
           if (isSummaryRefKey(baseCol)) return resolveMathOperand(row, baseCol, rowIdx);
           return resolveScopedFiniteNumber({
@@ -2460,13 +2472,32 @@ const GridView = ({ startNew, fillViewport = false }) => {
             key: baseCol,
           });
         };
+        const fixedRelative = useFixedReference
+          ? resolveFixedReferenceFiniteNumber({
+              dataSheets,
+              activeSheetId,
+              key: refKey,
+              summaryNamedValues: {
+                ...mathSummaryNamedValues,
+                ...summaryNamedValues,
+              },
+            })
+          : null;
+        if (useFixedReference && fixedRelative == null) {
+          toast.error(
+            "Reference val could not be resolved — pick a column/summary with at least one numeric value.",
+          );
+          return;
+        }
         next = rows.map((row, idx) => {
           if (!row || typeof row !== "object") return row;
 
           const current = readBaseAt(idx, row);
 
           let relative = null;
-          if (refIsSummary || (!refIsOffset && refKey)) {
+          if (useFixedReference) {
+            relative = fixedRelative;
+          } else if (refIsSummary || (!refIsOffset && refKey)) {
             relative = resolveMathOperand(row, refKey, idx);
           } else {
             const refIdx = refKey === "next_row" ? idx + 1 : idx - 1;
@@ -2511,8 +2542,21 @@ const GridView = ({ startNew, fillViewport = false }) => {
       const relativeIsSummary = isSummaryRefKey(mathRelativeRowRef);
       const relativeIsOffset = isRelativeRowOffsetRef(mathRelativeRowRef);
       const relativeIsColumn = Boolean(mathRelativeRowRef) && !relativeIsSummary && !relativeIsOffset;
+      const useFixedReferencePersist =
+        mathReferenceValFixed && !relativeIsOffset && Boolean(mathRelativeRowRef);
       const resolveSummarySnapshot = (key) =>
         mathSummaryNamedValues[key] ?? summaryNamedValues[key] ?? null;
+      const fixedReferenceValue = useFixedReferencePersist
+        ? resolveFixedReferenceFiniteNumber({
+            dataSheets,
+            activeSheetId,
+            key: mathRelativeRowRef,
+            summaryNamedValues: {
+              ...mathSummaryNamedValues,
+              ...summaryNamedValues,
+            },
+          })
+        : null;
       const summaryValues =
         leftKind === "summary" || rightKind === "summary" || relativeIsSummary
           ? {
@@ -2546,7 +2590,15 @@ const GridView = ({ startNew, fillViewport = false }) => {
                 op: mathOp,
                 baseColumn: mathBaseCol,
                 rowRef: mathRelativeRowRef,
-                rowRefKind: relativeIsSummary ? "summary" : relativeIsColumn ? "column" : "row",
+                rowRefKind: useFixedReferencePersist
+                  ? "fixed"
+                  : relativeIsSummary
+                    ? "summary"
+                    : relativeIsColumn
+                      ? "column"
+                      : "row",
+                ...(useFixedReferencePersist ? { referenceValFixed: true } : {}),
+                ...(fixedReferenceValue != null ? { fixedReferenceValue } : {}),
                 ...(applyPercentScale ? { asPercent: true } : {}),
               },
         ...(summaryValues ? { summaryValues } : {}),
@@ -2593,6 +2645,7 @@ const GridView = ({ startNew, fillViewport = false }) => {
       mathOp,
       mathOutCol,
       mathRelativeRowRef,
+      mathReferenceValFixed,
       nextFreeResultColumnName,
       resolveMathOperand,
       dataSheets,
@@ -4964,7 +5017,15 @@ const GridView = ({ startNew, fillViewport = false }) => {
                                 {mathBaseCol && mathReferenceMode === "row_wise" && mathCurrentRowRef === "current_row" ? (
                                 <div className="space-y-1 min-w-0">
                                   <Label className="text-[10px] leading-tight">relative row/reference val</Label>
-                                  <Select value={mathRelativeRowRef} onValueChange={setMathRelativeRowRef}>
+                                  <Select
+                                    value={mathRelativeRowRef}
+                                    onValueChange={(v) => {
+                                      setMathRelativeRowRef(v);
+                                      if (isRelativeRowOffsetRef(v)) {
+                                        setMathReferenceValFixed(false);
+                                      }
+                                    }}
+                                  >
                                     <SelectTrigger className="h-9 text-xs">
                                       <SelectValue />
                                     </SelectTrigger>
@@ -4984,6 +5045,22 @@ const GridView = ({ startNew, fillViewport = false }) => {
                                       />
                                     </SelectContent>
                                   </Select>
+                                  {!isRelativeRowOffsetRef(mathRelativeRowRef) ? (
+                                    <div className="flex items-start gap-2 pt-1">
+                                      <Checkbox
+                                        id="math-reference-val-fixed"
+                                        checked={mathReferenceValFixed}
+                                        onCheckedChange={(v) => setMathReferenceValFixed(v === true)}
+                                      />
+                                      <Label
+                                        htmlFor="math-reference-val-fixed"
+                                        className="text-[10px] font-normal leading-snug text-muted-foreground"
+                                      >
+                                        Reference val — use one fixed value from this selection for every row
+                                        (e.g. a population mean), instead of matching row-by-row.
+                                      </Label>
+                                    </div>
+                                  ) : null}
                                 </div>
                                 ) : null}
                               </div>
@@ -5003,10 +5080,10 @@ const GridView = ({ startNew, fillViewport = false }) => {
                                 ) : mathOp === "pct_growth" ? (
                                   <span className="line-clamp-2">
                                     {isSummaryRefKey(mathRelativeRowRef)
-                                      ? `${mathOutCol || nextFreeResultColumnName()} = (${formatMathOperandLabel(mathBaseCol) || "col"} − ${summaryRefDisplayLabel(mathRelativeRowRef)}) / ${summaryRefDisplayLabel(mathRelativeRowRef)}${mathAsPercent ? " × 100" : ""}`
+                                      ? `${mathOutCol || nextFreeResultColumnName()} = (${formatMathOperandLabel(mathBaseCol) || "col"} − ${summaryRefDisplayLabel(mathRelativeRowRef)}) / ${summaryRefDisplayLabel(mathRelativeRowRef)}${mathAsPercent ? " × 100" : ""}${mathReferenceValFixed ? " · fixed ref" : ""}`
                                       : isRelativeRowOffsetRef(mathRelativeRowRef)
                                         ? `${mathOutCol || nextFreeResultColumnName()} = (${formatMathOperandLabel(mathBaseCol) || "col"} − ${formatMathOperandLabel(mathBaseCol) || "col"}@${mathRelativeRowRef === "next_row" ? "next" : "prev"}) / ${formatMathOperandLabel(mathBaseCol) || "col"}@${mathRelativeRowRef === "next_row" ? "next" : "prev"}${mathAsPercent ? " × 100" : ""} · first/last row → blank`
-                                        : `${mathOutCol || nextFreeResultColumnName()} = (${formatMathOperandLabel(mathBaseCol) || "col"} − ${formatMathOperandLabel(mathRelativeRowRef) || "ref"}) / ${formatMathOperandLabel(mathRelativeRowRef) || "ref"}${mathAsPercent ? " × 100" : ""}`}
+                                        : `${mathOutCol || nextFreeResultColumnName()} = (${formatMathOperandLabel(mathBaseCol) || "col"} − ${formatMathOperandLabel(mathRelativeRowRef) || "ref"}) / ${formatMathOperandLabel(mathRelativeRowRef) || "ref"}${mathAsPercent ? " × 100" : ""}${mathReferenceValFixed ? " · fixed ref" : ""}`}
                                   </span>
                                 ) : (
                                   `${mathOutCol || nextFreeResultColumnName()} = ${
@@ -5021,7 +5098,11 @@ const GridView = ({ startNew, fillViewport = false }) => {
                                           ? "next row"
                                           : "prev row"
                                         : formatMathOperandLabel(mathRelativeRowRef) || "reference"
-                                  }${mathAsPercent ? " × 100" : ""}`
+                                  }${mathAsPercent ? " × 100" : ""}${
+                                    mathReferenceValFixed && !isRelativeRowOffsetRef(mathRelativeRowRef)
+                                      ? " · fixed ref"
+                                      : ""
+                                  }`
                                 )}
                               </div>
                             </div>
