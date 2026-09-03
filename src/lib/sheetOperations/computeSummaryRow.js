@@ -18,10 +18,20 @@ export const SUMMARY_METRIC_OPS = [
 export const SUMMARY_SCOPES = ["column", "columns", "row_series"];
 
 export const SUMMARY_REF_PREFIX = "summary::";
+export const SUMMARY_SHEET_REF_MARKER = "sheet:";
 
 /** @param {string} outputName */
 export function summaryRefKey(outputName) {
   return `${SUMMARY_REF_PREFIX}${String(outputName || "").trim()}`;
+}
+
+/**
+ * Cross-sheet summary ref (scoped to another sheet's summary metric / summary-row column).
+ * @param {string} sheetId
+ * @param {string} outputName
+ */
+export function summarySheetRefKey(sheetId, outputName) {
+  return `${SUMMARY_REF_PREFIX}${SUMMARY_SHEET_REF_MARKER}${String(sheetId || "").trim()}:${String(outputName || "").trim()}`;
 }
 
 /** @param {string} key */
@@ -29,11 +39,118 @@ export function isSummaryRefKey(key) {
   return String(key || "").startsWith(SUMMARY_REF_PREFIX);
 }
 
+/**
+ * @param {string} key
+ * @returns {{ sheetId: string | null; outputName: string } | null}
+ */
+export function parseSummaryRefKey(key) {
+  const s = String(key || "");
+  if (!s.startsWith(SUMMARY_REF_PREFIX)) return null;
+  const rest = s.slice(SUMMARY_REF_PREFIX.length);
+  if (rest.startsWith(SUMMARY_SHEET_REF_MARKER)) {
+    const body = rest.slice(SUMMARY_SHEET_REF_MARKER.length);
+    const colon = body.indexOf(":");
+    if (colon <= 0) return null;
+    const sheetId = body.slice(0, colon).trim();
+    const outputName = body.slice(colon + 1).trim();
+    if (!sheetId || !outputName) return null;
+    return { sheetId, outputName };
+  }
+  const outputName = rest.trim();
+  return outputName ? { sheetId: null, outputName } : null;
+}
+
 /** @param {string} key */
 export function summaryRefOutputName(key) {
-  const s = String(key || "");
-  if (!s.startsWith(SUMMARY_REF_PREFIX)) return "";
-  return s.slice(SUMMARY_REF_PREFIX.length);
+  return parseSummaryRefKey(key)?.outputName || "";
+}
+
+/**
+ * Dropdown options + resolved numeric map for math ops (active sheet + other sheets' summaries).
+ * @param {{ dataSheets?: Record<string, object> | null; activeSheetId?: string | null }} args
+ * @returns {{ options: { value: string; label: string; sheetId: string | null; local: boolean }[]; namedValues: Record<string, number | null> }}
+ */
+export function collectWorkspaceSummaryRefs({ dataSheets, activeSheetId } = {}) {
+  const sheets = dataSheets && typeof dataSheets === "object" ? dataSheets : {};
+  /** @type {{ value: string; label: string; sheetId: string | null; local: boolean }[]} */
+  const options = [];
+  /** @type {Record<string, number | null>} */
+  const namedValues = {};
+  const seen = new Set();
+
+  const pushOption = (opt, value) => {
+    if (!opt?.value || seen.has(opt.value)) return;
+    seen.add(opt.value);
+    options.push(opt);
+    namedValues[opt.value] =
+      value != null && Number.isFinite(Number(value)) ? Number(value) : value == null ? null : null;
+  };
+
+  const activeId = activeSheetId != null ? String(activeSheetId) : null;
+  const activeSheet = activeId ? sheets[activeId] : null;
+  if (activeSheet?.summaryConfig?.metrics?.length) {
+    const computed = computeSummaryRow(
+      Array.isArray(activeSheet.data) ? activeSheet.data : [],
+      activeSheet.summaryConfig,
+    );
+    for (const metric of activeSheet.summaryConfig.metrics) {
+      const name = String(metric?.outputName || "").trim();
+      if (!name) continue;
+      const key = summaryRefKey(name);
+      pushOption(
+        { value: key, label: `Σ ${name}`, sheetId: activeId, local: true },
+        computed.namedValues?.[key] ?? computed.namedValues?.[name] ?? null,
+      );
+      if (namedValues[key] != null) namedValues[name] = namedValues[key];
+    }
+  }
+
+  const linkedTargetIds = new Set();
+  for (const sheet of Object.values(sheets)) {
+    const lid = sheet?.summaryConfig?.linkedSheetId;
+    if (lid != null && String(lid).trim()) linkedTargetIds.add(String(lid));
+  }
+
+  for (const [sid, sheet] of Object.entries(sheets)) {
+    if (!sheet || typeof sheet !== "object") continue;
+    if (activeId && sid === activeId) continue;
+    const sheetName = String(sheet.name || sid);
+    const cfg = sheet.summaryConfig;
+
+    // Other sheets with an in-view summary: expose their metrics under sheet-scoped keys.
+    if (cfg?.destination !== "new_sheet" && Array.isArray(cfg?.metrics) && cfg.metrics.length) {
+      const computed = computeSummaryRow(Array.isArray(sheet.data) ? sheet.data : [], cfg);
+      for (const metric of cfg.metrics) {
+        const name = String(metric?.outputName || "").trim();
+        if (!name) continue;
+        const key = summarySheetRefKey(sid, name);
+        pushOption(
+          { value: key, label: `Σ ${sheetName} · ${name}`, sheetId: sid, local: false },
+          computed.namedValues?.[summaryRefKey(name)] ?? computed.namedValues?.[name] ?? null,
+        );
+      }
+      continue;
+    }
+
+    // Dedicated summary sheets (created via "new sheet") or any sheet carrying a summaryRow.
+    const isLinkedSummary = linkedTargetIds.has(sid) || sheet.sourceSheetId != null || sheet.summaryRow != null;
+    if (!isLinkedSummary) continue;
+    const row =
+      (sheet.summaryRow && typeof sheet.summaryRow === "object" ? sheet.summaryRow : null) ||
+      (Array.isArray(sheet.data) && sheet.data[0] && typeof sheet.data[0] === "object" ? sheet.data[0] : null);
+    if (!row) continue;
+    for (const [col, raw] of Object.entries(row)) {
+      if (!col || col === "_origIndex" || col === "_lychee_row_id") continue;
+      const key = summarySheetRefKey(sid, col);
+      const n = Number(raw);
+      pushOption(
+        { value: key, label: `Σ ${sheetName} · ${col}`, sheetId: sid, local: false },
+        Number.isFinite(n) ? n : null,
+      );
+    }
+  }
+
+  return { options, namedValues };
 }
 
 function newMetricId() {

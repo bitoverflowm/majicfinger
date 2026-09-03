@@ -58,7 +58,9 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import {
   Select,
   SelectContent,
+  SelectGroup,
   SelectItem,
+  SelectLabel,
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
@@ -146,6 +148,7 @@ import {
   createInitialSummaryDraft,
 } from "@/components/gridView/SummaryRowEditor";
 import {
+  collectWorkspaceSummaryRefs,
   computeSummaryRow,
   isSummaryRefKey,
   normalizeSummaryConfig,
@@ -164,6 +167,8 @@ import { BUCKET_TIME_INTERVALS } from "@/lib/sheetOperations/bucketTimeIntervals
 
 /** Column + summary named-value options for math operand selects. */
 function MathOperandSelectItems({ columns, summaryOptions, keyPrefix }) {
+  const localSummaries = (summaryOptions || []).filter((opt) => opt.local !== false);
+  const otherSummaries = (summaryOptions || []).filter((opt) => opt.local === false);
   return (
     <>
       {(columns || []).map((c) => (
@@ -171,11 +176,26 @@ function MathOperandSelectItems({ columns, summaryOptions, keyPrefix }) {
           {c}
         </SelectItem>
       ))}
-      {(summaryOptions || []).map((opt) => (
-        <SelectItem key={`${keyPrefix}-sum-${opt.value}`} value={opt.value} className="font-mono text-xs">
-          {opt.label}
-        </SelectItem>
-      ))}
+      {localSummaries.length ? (
+        <SelectGroup>
+          <SelectLabel className="text-[10px] text-muted-foreground">This sheet summary</SelectLabel>
+          {localSummaries.map((opt) => (
+            <SelectItem key={`${keyPrefix}-sum-${opt.value}`} value={opt.value} className="font-mono text-xs">
+              {opt.label}
+            </SelectItem>
+          ))}
+        </SelectGroup>
+      ) : null}
+      {otherSummaries.length ? (
+        <SelectGroup>
+          <SelectLabel className="text-[10px] text-muted-foreground">Other sheet summaries</SelectLabel>
+          {otherSummaries.map((opt) => (
+            <SelectItem key={`${keyPrefix}-sum-${opt.value}`} value={opt.value} className="font-mono text-xs">
+              {opt.label}
+            </SelectItem>
+          ))}
+        </SelectGroup>
+      ) : null}
     </>
   );
 }import { temporalToMs } from "@/lib/temporalParse";
@@ -1081,6 +1101,21 @@ const GridView = ({ startNew, fillViewport = false }) => {
       [connectedData, summaryConfig],
     );
     const summaryNamedValues = summaryComputed.namedValues || {};
+    const workspaceSummaryRefs = useMemo(
+      () => collectWorkspaceSummaryRefs({ dataSheets, activeSheetId }),
+      [dataSheets, activeSheetId],
+    );
+    const summarySelectOptions = workspaceSummaryRefs.options;
+    const mathSummaryNamedValues = workspaceSummaryRefs.namedValues;
+    const summaryRefDisplayLabel = useCallback(
+      (key) => {
+        const k = String(key || "");
+        const hit = summarySelectOptions.find((opt) => opt.value === k);
+        if (hit?.label) return hit.label.replace(/^Σ\s*/, "");
+        return summaryRefOutputName(k) || "summary";
+      },
+      [summarySelectOptions],
+    );
     const showSummaryPane =
       summaryConfig?.destination === "this_view" &&
       Array.isArray(summaryConfig?.metrics) &&
@@ -1105,7 +1140,10 @@ const GridView = ({ startNew, fillViewport = false }) => {
         const k = String(key || "").trim();
         if (!k) return 0;
         if (isSummaryRefKey(k)) {
-          const v = summaryNamedValues[k] ?? summaryNamedValues[summaryRefOutputName(k)];
+          const v =
+            mathSummaryNamedValues[k] ??
+            summaryNamedValues[k] ??
+            summaryNamedValues[summaryRefOutputName(k)];
           return Number.isFinite(v) ? v : 0;
         }
         if (Object.prototype.hasOwnProperty.call(summaryNamedValues, k) && summaryConfig?.metrics?.some((m) => m.outputName === k)) {
@@ -1115,18 +1153,8 @@ const GridView = ({ startNew, fillViewport = false }) => {
         const n = Number(row?.[k]);
         return Number.isFinite(n) ? n : 0;
       },
-      [summaryNamedValues, summaryConfig],
+      [mathSummaryNamedValues, summaryNamedValues, summaryConfig],
     );
-
-    const summarySelectOptions = useMemo(() => {
-      const names = (summaryConfig?.metrics || [])
-        .map((m) => String(m.outputName || "").trim())
-        .filter(Boolean);
-      return names.map((name) => ({
-        value: summaryRefKey(name),
-        label: `Σ ${name}`,
-      }));
-    }, [summaryConfig]);
 
     const sheetMathEquations = useMemo(() => listSheetEquations(activeSheet), [activeSheet]);
 
@@ -2231,17 +2259,19 @@ const GridView = ({ startNew, fillViewport = false }) => {
       const leftKind = isSummaryRefKey(mathBasicColA) ? "summary" : "column";
       const rightKind = isSummaryRefKey(mathBasicColB) ? "summary" : "column";
       const relativeIsSummary = isSummaryRefKey(mathRelativeRowRef);
+      const resolveSummarySnapshot = (key) =>
+        mathSummaryNamedValues[key] ?? summaryNamedValues[key] ?? null;
       const summaryValues =
         leftKind === "summary" || rightKind === "summary" || relativeIsSummary
           ? {
               ...(leftKind === "summary"
-                ? { [mathBasicColA]: summaryNamedValues[mathBasicColA] ?? null }
+                ? { [mathBasicColA]: resolveSummarySnapshot(mathBasicColA) }
                 : {}),
               ...(rightKind === "summary"
-                ? { [mathBasicColB]: summaryNamedValues[mathBasicColB] ?? null }
+                ? { [mathBasicColB]: resolveSummarySnapshot(mathBasicColB) }
                 : {}),
               ...(relativeIsSummary
-                ? { [mathRelativeRowRef]: summaryNamedValues[mathRelativeRowRef] ?? null }
+                ? { [mathRelativeRowRef]: resolveSummarySnapshot(mathRelativeRowRef) }
                 : {}),
             }
           : undefined;
@@ -2314,6 +2344,7 @@ const GridView = ({ startNew, fillViewport = false }) => {
       nextFreeResultColumnName,
       resolveMathOperand,
       summaryNamedValues,
+      mathSummaryNamedValues,
       addNewSheetAndActivate,
       replaceCurrentSheetData,
       setConnectedData,
@@ -4511,10 +4542,16 @@ const GridView = ({ startNew, fillViewport = false }) => {
                               <Label className="text-xs">Preview</Label>
                               <div className="rounded-md border border-border/60 bg-muted/20 px-2 py-1.5 text-xs font-mono text-muted-foreground">
                                 {mathOp === "abs"
-                                  ? `${mathOutCol || nextFreeResultColumnName()} = |${mathBasicColA}| (per row)`
-                                  : `${mathOutCol || nextFreeResultColumnName()} = ${mathBasicColA} ${
+                                  ? `${mathOutCol || nextFreeResultColumnName()} = |${
+                                      isSummaryRefKey(mathBasicColA) ? `Σ ${summaryRefDisplayLabel(mathBasicColA)}` : mathBasicColA
+                                    }| (per row)`
+                                  : `${mathOutCol || nextFreeResultColumnName()} = ${
+                                      isSummaryRefKey(mathBasicColA) ? `Σ ${summaryRefDisplayLabel(mathBasicColA)}` : mathBasicColA
+                                    } ${
                                       mathOp === "add" ? "+" : mathOp === "subtract" ? "−" : mathOp === "multiply" ? "×" : "÷"
-                                    } ${mathBasicColB} (per row)`}
+                                    } ${
+                                      isSummaryRefKey(mathBasicColB) ? `Σ ${summaryRefDisplayLabel(mathBasicColB)}` : mathBasicColB
+                                    } (per row)`}
                               </div>
                             </div>
                           ) : null}
@@ -4677,11 +4714,30 @@ const GridView = ({ startNew, fillViewport = false }) => {
                                     <SelectContent>
                                       <SelectItem value="prev_row">Prev row</SelectItem>
                                       <SelectItem value="next_row">Next row</SelectItem>
-                                      {(summarySelectOptions || []).map((opt) => (
-                                        <SelectItem key={`math-rel-sum-${opt.value}`} value={opt.value} className="font-mono text-xs">
-                                          {opt.label}
-                                        </SelectItem>
-                                      ))}
+                                      {(summarySelectOptions || []).filter((opt) => opt.local !== false).length ? (
+                                        <SelectGroup>
+                                          <SelectLabel className="text-[10px] text-muted-foreground">This sheet summary</SelectLabel>
+                                          {(summarySelectOptions || [])
+                                            .filter((opt) => opt.local !== false)
+                                            .map((opt) => (
+                                              <SelectItem key={`math-rel-sum-${opt.value}`} value={opt.value} className="font-mono text-xs">
+                                                {opt.label}
+                                              </SelectItem>
+                                            ))}
+                                        </SelectGroup>
+                                      ) : null}
+                                      {(summarySelectOptions || []).filter((opt) => opt.local === false).length ? (
+                                        <SelectGroup>
+                                          <SelectLabel className="text-[10px] text-muted-foreground">Other sheet summaries</SelectLabel>
+                                          {(summarySelectOptions || [])
+                                            .filter((opt) => opt.local === false)
+                                            .map((opt) => (
+                                              <SelectItem key={`math-rel-sum-${opt.value}`} value={opt.value} className="font-mono text-xs">
+                                                {opt.label}
+                                              </SelectItem>
+                                            ))}
+                                        </SelectGroup>
+                                      ) : null}
                                     </SelectContent>
                                   </Select>
                                 </div>
@@ -4693,21 +4749,27 @@ const GridView = ({ startNew, fillViewport = false }) => {
                               <Label className="text-xs">Preview equation</Label>
                               <div className="min-h-9 rounded-md border border-border/60 bg-muted/20 px-2 py-1 text-xs flex items-center font-mono leading-snug">
                                 {mathFunctionType === "column" ? (
-                                  `${mathOutCol || nextFreeResultColumnName()} = ${mathBasicColA || "Column A"} ${
+                                  `${mathOutCol || nextFreeResultColumnName()} = ${
+                                    isSummaryRefKey(mathBasicColA) ? `Σ ${summaryRefDisplayLabel(mathBasicColA)}` : (mathBasicColA || "Column A")
+                                  } ${
                                     mathOp === "add" ? "+" : mathOp === "subtract" ? "−" : mathOp === "multiply" ? "×" : "÷"
-                                  } ${mathBasicColB || "Column B"} (per row)${mathAsPercent ? " × 100" : ""}`
+                                  } ${
+                                    isSummaryRefKey(mathBasicColB) ? `Σ ${summaryRefDisplayLabel(mathBasicColB)}` : (mathBasicColB || "Column B")
+                                  } (per row)${mathAsPercent ? " × 100" : ""}`
                                 ) : mathOp === "pct_growth" ? (
                                   <span className="line-clamp-2">
                                     {isSummaryRefKey(mathRelativeRowRef)
-                                      ? `${mathOutCol || nextFreeResultColumnName()} = (${mathBaseCol || "col"} − ${summaryRefOutputName(mathRelativeRowRef) || "Σ"}) / ${summaryRefOutputName(mathRelativeRowRef) || "Σ"}${mathAsPercent ? " × 100" : ""}`
+                                      ? `${mathOutCol || nextFreeResultColumnName()} = (${mathBaseCol || "col"} − ${summaryRefDisplayLabel(mathRelativeRowRef)}) / ${summaryRefDisplayLabel(mathRelativeRowRef)}${mathAsPercent ? " × 100" : ""}`
                                       : `${mathOutCol || nextFreeResultColumnName()} = (${mathBaseCol || "col"} − ${mathBaseCol || "col"}@${mathRelativeRowRef === "next_row" ? "next" : "prev"}) / ${mathBaseCol || "col"}@${mathRelativeRowRef === "next_row" ? "next" : "prev"}${mathAsPercent ? " × 100" : ""} · first/last row → blank`}
                                   </span>
                                 ) : (
-                                  `${mathOutCol || nextFreeResultColumnName()} = ${mathBaseCol || "column"} (current row) ${
+                                  `${mathOutCol || nextFreeResultColumnName()} = ${
+                                    isSummaryRefKey(mathBaseCol) ? `Σ ${summaryRefDisplayLabel(mathBaseCol)}` : (mathBaseCol || "column")
+                                  } (current row) ${
                                     mathOp === "add" ? "+" : mathOp === "subtract" ? "-" : mathOp === "multiply" ? "x" : "/"
                                   } ${
                                     isSummaryRefKey(mathRelativeRowRef)
-                                      ? `Σ ${summaryRefOutputName(mathRelativeRowRef) || "summary"}`
+                                      ? `Σ ${summaryRefDisplayLabel(mathRelativeRowRef)}`
                                       : mathRelativeRowRef === "next_row"
                                         ? "next row"
                                         : "prev row"
