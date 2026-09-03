@@ -5,7 +5,7 @@ import { applyManualCellPatchByIdentity, attachUserRowOverlays, overlayUserColum
 import { aggregateBucketRows } from "@/lib/sheetOperations/aggregateBucketRows";
 import { applyRefineQueryToRows } from "@/lib/sheetOperations/refineQuery";
 import { compareConditionValues } from "@/lib/ifElseConditionValues";
-import { resolveScopedFiniteNumber } from "@/lib/sheetScopedColumn";
+import { resolveScopedFiniteNumber, isRelativeRowOffsetRef } from "@/lib/sheetScopedColumn";
 
 export const PROJECT_FULL_DATA_SAFE_BYTES = 12 * 1024 * 1024;
 export const PROJECT_PREVIEW_ROW_LIMIT = 50000;
@@ -1003,6 +1003,7 @@ function applyComputedColumnOperation(rows, op, ctx = null) {
     const summaryValues = op?.summaryValues && typeof op.summaryValues === "object" ? op.summaryValues : {};
     const refIsSummary =
       expr.rowRefKind === "summary" || String(rowRef).startsWith("summary::");
+    const refIsOffset = isRelativeRowOffsetRef(rowRef);
     const scale = (v) => {
       if (!Number.isFinite(v)) return null;
       return asPercent ? v * 100 : v;
@@ -1027,6 +1028,15 @@ function applyComputedColumnOperation(rows, op, ctx = null) {
       let b = null;
       if (refIsSummary) {
         b = finiteNumber(summaryValues[rowRef]);
+      } else if (expr.rowRefKind === "column" || (!refIsOffset && String(rowRef).trim())) {
+        const scoped = resolveScopedFiniteNumber({
+          dataSheets,
+          activeSheetId,
+          rowIndex: idx,
+          row,
+          key: rowRef,
+        });
+        b = scoped != null ? scoped : finiteNumber(row?.[rowRef]);
       } else {
         const refIdx = rowRef === "next" || rowRef === "next_row" ? idx + 1 : idx - 1;
         const ref = refIdx >= 0 && refIdx < rows.length ? rows[refIdx] : null;

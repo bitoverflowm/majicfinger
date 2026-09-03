@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import {
   buildWorkspaceSheetColumnGroups,
+  isRelativeRowOffsetRef,
   parseSheetScopedColumnKey,
   resolveScopedFiniteNumber,
   stripSheetScopedColumnKey,
@@ -62,4 +63,11 @@ test("resolveScopedFiniteNumber reads other sheet at same row index", () => {
 
 test("toSheetScopedColumnKey round trip", () => {
   assert.equal(toSheetScopedColumnKey("sheet-3", "Sample Mean"), "sheet-3::Sample Mean");
+});
+
+test("isRelativeRowOffsetRef", () => {
+  assert.equal(isRelativeRowOffsetRef("prev_row"), true);
+  assert.equal(isRelativeRowOffsetRef("next_row"), true);
+  assert.equal(isRelativeRowOffsetRef("sheet-1::Sample Mean"), false);
+  assert.equal(isRelativeRowOffsetRef("summary::avg"), false);
 });

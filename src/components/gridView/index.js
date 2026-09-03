@@ -175,6 +175,7 @@ import {
 import { BUCKET_TIME_INTERVALS } from "@/lib/sheetOperations/bucketTimeIntervals";
 import {
   buildWorkspaceSheetColumnGroups,
+  isRelativeRowOffsetRef,
   mathOperandDisplayLabel,
   resolveScopedFiniteNumber,
   workspaceSheetColumnOperandValues,
@@ -2448,6 +2449,7 @@ const GridView = ({ startNew, fillViewport = false }) => {
         }
         const refKey = String(mathRelativeRowRef || "").trim();
         const refIsSummary = isSummaryRefKey(refKey);
+        const refIsOffset = isRelativeRowOffsetRef(refKey);
         const readBaseAt = (rowIdx, row) => {
           if (isSummaryRefKey(baseCol)) return resolveMathOperand(row, baseCol, rowIdx);
           return resolveScopedFiniteNumber({
@@ -2464,7 +2466,7 @@ const GridView = ({ startNew, fillViewport = false }) => {
           const current = readBaseAt(idx, row);
 
           let relative = null;
-          if (refIsSummary) {
+          if (refIsSummary || (!refIsOffset && refKey)) {
             relative = resolveMathOperand(row, refKey, idx);
           } else {
             const refIdx = refKey === "next_row" ? idx + 1 : idx - 1;
@@ -2507,6 +2509,8 @@ const GridView = ({ startNew, fillViewport = false }) => {
       const leftKind = isSummaryRefKey(mathBasicColA) ? "summary" : "column";
       const rightKind = isSummaryRefKey(mathBasicColB) ? "summary" : "column";
       const relativeIsSummary = isSummaryRefKey(mathRelativeRowRef);
+      const relativeIsOffset = isRelativeRowOffsetRef(mathRelativeRowRef);
+      const relativeIsColumn = Boolean(mathRelativeRowRef) && !relativeIsSummary && !relativeIsOffset;
       const resolveSummarySnapshot = (key) =>
         mathSummaryNamedValues[key] ?? summaryNamedValues[key] ?? null;
       const summaryValues =
@@ -2542,7 +2546,7 @@ const GridView = ({ startNew, fillViewport = false }) => {
                 op: mathOp,
                 baseColumn: mathBaseCol,
                 rowRef: mathRelativeRowRef,
-                rowRefKind: relativeIsSummary ? "summary" : "row",
+                rowRefKind: relativeIsSummary ? "summary" : relativeIsColumn ? "column" : "row",
                 ...(applyPercentScale ? { asPercent: true } : {}),
               },
         ...(summaryValues ? { summaryValues } : {}),
@@ -4964,33 +4968,20 @@ const GridView = ({ startNew, fillViewport = false }) => {
                                     <SelectTrigger className="h-9 text-xs">
                                       <SelectValue />
                                     </SelectTrigger>
-                                    <SelectContent>
-                                      <SelectItem value="prev_row">Prev row</SelectItem>
-                                      <SelectItem value="next_row">Next row</SelectItem>
-                                      {(summarySelectOptions || []).filter((opt) => opt.local !== false).length ? (
-                                        <SelectGroup>
-                                          <SelectLabel className="text-[10px] text-muted-foreground">This sheet summary</SelectLabel>
-                                          {(summarySelectOptions || [])
-                                            .filter((opt) => opt.local !== false)
-                                            .map((opt) => (
-                                              <SelectItem key={`math-rel-sum-${opt.value}`} value={opt.value} className="font-mono text-xs">
-                                                {opt.label}
-                                              </SelectItem>
-                                            ))}
-                                        </SelectGroup>
-                                      ) : null}
-                                      {(summarySelectOptions || []).filter((opt) => opt.local === false).length ? (
-                                        <SelectGroup>
-                                          <SelectLabel className="text-[10px] text-muted-foreground">Other sheet summaries</SelectLabel>
-                                          {(summarySelectOptions || [])
-                                            .filter((opt) => opt.local === false)
-                                            .map((opt) => (
-                                              <SelectItem key={`math-rel-sum-${opt.value}`} value={opt.value} className="font-mono text-xs">
-                                                {opt.label}
-                                              </SelectItem>
-                                            ))}
-                                        </SelectGroup>
-                                      ) : null}
+                                    <SelectContent className="max-h-72">
+                                      <SelectGroup>
+                                        <SelectLabel className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+                                          Relative row
+                                        </SelectLabel>
+                                        <SelectItem value="prev_row">Prev row</SelectItem>
+                                        <SelectItem value="next_row">Next row</SelectItem>
+                                      </SelectGroup>
+                                      <SelectSeparator />
+                                      <MathOperandSelectItems
+                                        sheetColumnGroups={mathSheetColumnGroups}
+                                        summaryOptions={summarySelectOptions}
+                                        keyPrefix="math-rel"
+                                      />
                                     </SelectContent>
                                   </Select>
                                 </div>
@@ -5013,7 +5004,9 @@ const GridView = ({ startNew, fillViewport = false }) => {
                                   <span className="line-clamp-2">
                                     {isSummaryRefKey(mathRelativeRowRef)
                                       ? `${mathOutCol || nextFreeResultColumnName()} = (${formatMathOperandLabel(mathBaseCol) || "col"} − ${summaryRefDisplayLabel(mathRelativeRowRef)}) / ${summaryRefDisplayLabel(mathRelativeRowRef)}${mathAsPercent ? " × 100" : ""}`
-                                      : `${mathOutCol || nextFreeResultColumnName()} = (${formatMathOperandLabel(mathBaseCol) || "col"} − ${formatMathOperandLabel(mathBaseCol) || "col"}@${mathRelativeRowRef === "next_row" ? "next" : "prev"}) / ${formatMathOperandLabel(mathBaseCol) || "col"}@${mathRelativeRowRef === "next_row" ? "next" : "prev"}${mathAsPercent ? " × 100" : ""} · first/last row → blank`}
+                                      : isRelativeRowOffsetRef(mathRelativeRowRef)
+                                        ? `${mathOutCol || nextFreeResultColumnName()} = (${formatMathOperandLabel(mathBaseCol) || "col"} − ${formatMathOperandLabel(mathBaseCol) || "col"}@${mathRelativeRowRef === "next_row" ? "next" : "prev"}) / ${formatMathOperandLabel(mathBaseCol) || "col"}@${mathRelativeRowRef === "next_row" ? "next" : "prev"}${mathAsPercent ? " × 100" : ""} · first/last row → blank`
+                                        : `${mathOutCol || nextFreeResultColumnName()} = (${formatMathOperandLabel(mathBaseCol) || "col"} − ${formatMathOperandLabel(mathRelativeRowRef) || "ref"}) / ${formatMathOperandLabel(mathRelativeRowRef) || "ref"}${mathAsPercent ? " × 100" : ""}`}
                                   </span>
                                 ) : (
                                   `${mathOutCol || nextFreeResultColumnName()} = ${
@@ -5023,9 +5016,11 @@ const GridView = ({ startNew, fillViewport = false }) => {
                                   } ${
                                     isSummaryRefKey(mathRelativeRowRef)
                                       ? `Σ ${summaryRefDisplayLabel(mathRelativeRowRef)}`
-                                      : mathRelativeRowRef === "next_row"
-                                        ? "next row"
-                                        : "prev row"
+                                      : isRelativeRowOffsetRef(mathRelativeRowRef)
+                                        ? mathRelativeRowRef === "next_row"
+                                          ? "next row"
+                                          : "prev row"
+                                        : formatMathOperandLabel(mathRelativeRowRef) || "reference"
                                   }${mathAsPercent ? " × 100" : ""}`
                                 )}
                               </div>

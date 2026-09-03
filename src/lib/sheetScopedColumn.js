@@ -154,6 +154,16 @@ export function resolveScopedFiniteNumber({ dataSheets, activeSheetId, rowIndex 
 }
 
 /**
+ * Prev/next row offsets for Functions "relative row/reference val".
+ * @param {unknown} key
+ * @returns {boolean}
+ */
+export function isRelativeRowOffsetRef(key) {
+  const k = String(key || "").trim();
+  return k === "prev_row" || k === "next_row" || k === "previous" || k === "next";
+}
+
+/**
  * @param {string | null | undefined} key
  * @param {{ dataSheets?: Record<string, object> | null; activeSheetId?: string | null; summaryRefDisplayLabel?: (k: string) => string }} [opts]
  * @returns {string}
