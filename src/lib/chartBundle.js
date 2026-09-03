@@ -55,7 +55,18 @@ export function normalizeBuilderSnapshot(snapshot, rows, dataSheets = {}) {
     return fallback;
   }
 
-  const allowedTypes = new Set(["area", "bar", "line", "pie", "treemap", "liveline", "candlestick"]);
+  const allowedTypes = new Set([
+    "area",
+    "bar",
+    "line",
+    "pie",
+    "treemap",
+    "heatmap",
+    "scatter",
+    "radar",
+    "liveline",
+    "candlestick",
+  ]);
   const type = String(s.selChartType || "").trim();
   s.selChartType = allowedTypes.has(type) ? type : fallback.selChartType;
 
@@ -109,6 +120,28 @@ export function normalizeBuilderSnapshot(snapshot, rows, dataSheets = {}) {
       const col = deScope(rawBar);
       s.barSeriesColumn = col && keys.includes(col) ? col : null;
     }
+  }
+
+  if (s.heatmapChangeCol !== undefined && s.heatmapChangeCol !== null) {
+    const rawChange = String(s.heatmapChangeCol || "");
+    if (rawChange.includes("::")) {
+      s.heatmapChangeCol = rawChange;
+    } else {
+      const col = deScope(rawChange);
+      s.heatmapChangeCol = col && keys.includes(col) ? col : null;
+    }
+  }
+  if (s.heatmapCapMode !== "auto" && s.heatmapCapMode !== "manual") {
+    s.heatmapCapMode = "auto";
+  }
+  if (s.heatmapCap != null && Number.isFinite(Number(s.heatmapCap))) {
+    s.heatmapCap = Math.max(0.1, Number(s.heatmapCap));
+  }
+  if (s.heatmapUpColor != null && typeof s.heatmapUpColor !== "string") {
+    s.heatmapUpColor = null;
+  }
+  if (s.heatmapDownColor != null && typeof s.heatmapDownColor !== "string") {
+    s.heatmapDownColor = null;
   }
 
   if (s.lineColorOverrides && typeof s.lineColorOverrides === "object") {

@@ -128,6 +128,9 @@ export function isPlottableBuilderSnapshot(snap) {
   if (!snap || typeof snap !== "object" || snap.v !== 1) return false;
   if (snap.selChartType === "candlestick") return true;
   const y = Array.isArray(snap.selY) ? snap.selY.filter(Boolean) : [];
+  if (snap.selChartType === "heatmap") {
+    return !!(snap.selX && y.length > 0 && snap.heatmapChangeCol);
+  }
   return !!(snap.selX && y.length > 0);
 }
 

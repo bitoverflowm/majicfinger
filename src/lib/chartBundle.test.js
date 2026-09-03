@@ -138,3 +138,37 @@ test("normalizeBuilderSnapshot does not inject markets axes onto candlestick cha
   assert.equal(out.selX, null);
   assert.deepEqual(out.selY, []);
 });
+
+test("normalizeBuilderSnapshot preserves heatmap type and change column", () => {
+  const heatRows = [
+    { question: "A", volume: 100, change_pct: 2.5 },
+    { question: "B", volume: 50, change_pct: -1.2 },
+  ];
+  const snapshot = {
+    v: 1,
+    selChartType: "heatmap",
+    selX: "question",
+    selY: ["volume"],
+    heatmapChangeCol: "change_pct",
+    heatmapCapMode: "auto",
+    heatmapCap: 6,
+    title: "Heatmap title",
+  };
+  const out = normalizeBuilderSnapshot(snapshot, heatRows, {});
+  assert.equal(out.selChartType, "heatmap");
+  assert.equal(out.selX, "question");
+  assert.deepEqual(out.selY, ["volume"]);
+  assert.equal(out.heatmapChangeCol, "change_pct");
+  assert.equal(out.heatmapCapMode, "auto");
+});
+
+test("normalizeBuilderSnapshot preserves scatter type", () => {
+  const snapshot = {
+    v: 1,
+    selChartType: "scatter",
+    selX: "title",
+    selY: ["yes_rate"],
+  };
+  const out = normalizeBuilderSnapshot(snapshot, rows, {});
+  assert.equal(out.selChartType, "scatter");
+});
