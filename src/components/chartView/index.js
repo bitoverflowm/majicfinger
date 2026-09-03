@@ -2786,7 +2786,7 @@ export function ChartCanvas() {
 
   const heatmapBuilt = useMemo(() => {
     if (selChartType !== "heatmap" || !selX || !yKeys[0] || !heatmapChangeCol) {
-      return { items: [], inferredCap: 6 };
+      return { items: [], inferredCap: 6, scaleMode: "diverging" };
     }
     return buildHeatmapItems(rawData, {
       labelKey: xKey,
@@ -2799,6 +2799,10 @@ export function ChartCanvas() {
     heatmapCapMode === "manual" && Number.isFinite(Number(heatmapCap))
       ? Math.max(0.1, Number(heatmapCap))
       : heatmapBuilt.inferredCap;
+  const heatmapScaleMode =
+    heatmapBuilt.scaleMode === "positive" || heatmapBuilt.scaleMode === "negative"
+      ? heatmapBuilt.scaleMode
+      : "diverging";
 
   const heatmapPlotHeight = embedInArticle
     ? ARTICLE_EMBED_PLOT_HEIGHT_PX
@@ -3452,6 +3456,12 @@ export function ChartCanvas() {
                       data={heatmapBuilt.items}
                       height={heatmapPlotHeight}
                       cap={heatmapEffectiveCap}
+                      scaleMode={heatmapScaleMode}
+                      metricLabel={
+                        heatmapChangeCol
+                          ? stripSheetScopedColumnKey(heatmapChangeCol)
+                          : "Change"
+                      }
                       title={titleHidden ? "" : title || "Heatmap"}
                       subtitle={subTitleHidden ? "" : subTitle || ""}
                       status={heatmapStatus}

@@ -8,6 +8,7 @@ import {
   Keyframes,
   changeColor,
   formatSignedPct,
+  heatLegendSampleChanges,
   marketVarsClassName,
   squarify,
   useElementWidth,
@@ -69,6 +70,10 @@ export function MarketHeatmap({
   data = [],
   height = 380,
   cap = 6,
+  /** When data is all ≥0 or all ≤0, legend/colors use a one-sided ramp instead of ±cap. */
+  scaleMode = "diverging",
+  /** Display name for the color metric (change column), shown next to the aggregate value. */
+  metricLabel = "Weighted",
   title = "Heatmap",
   subtitle = "",
   status = "ready",
@@ -82,14 +87,18 @@ export function MarketHeatmap({
   const [wrapRef, width] = useElementWidth();
   const [hovered, setHovered] = React.useState(null);
 
+  const mode =
+    scaleMode === "positive" || scaleMode === "negative" ? scaleMode : "diverging";
+
   const heatColors = React.useMemo(() => {
     const defaults = htmlDark ? SPECTRUM_HEAT_DEFAULTS.dark : SPECTRUM_HEAT_DEFAULTS.light;
     return {
       up: upColor || defaults.up,
       down: downColor || defaults.down,
       flat: defaults.flat,
+      mode,
     };
-  }, [htmlDark, upColor, downColor]);
+  }, [htmlDark, upColor, downColor, mode]);
 
   const w = Math.max(width, 260);
   const gap = 2;
@@ -102,6 +111,12 @@ export function MarketHeatmap({
 
   const ready = width > 0;
   const labelFill = htmlDark ? "#f8fafc" : "#0a0a0a";
+  const legendSamples = React.useMemo(
+    () => heatLegendSampleChanges(cap, mode, 9),
+    [cap, mode],
+  );
+  const legendLowLabel = mode === "positive" ? "0%" : `−${cap}%`;
+  const legendHighLabel = mode === "negative" ? "0%" : `+${cap}%`;
 
   const setHover = React.useCallback(
     (tile, clientX, clientY) => {
@@ -155,7 +170,12 @@ export function MarketHeatmap({
         </div>
         <div className="flex items-center gap-3">
           <span className="font-mono text-[11px] tabular-nums text-neutral-500 dark:text-neutral-400">
-            Weighted{" "}
+            <span
+              className="inline-block max-w-[14rem] truncate align-bottom"
+              title={metricLabel || "Weighted"}
+            >
+              {metricLabel || "Weighted"}
+            </span>{" "}
             <Stat ready={status === "ready"}>
               <span
                 className="font-medium"
@@ -168,17 +188,17 @@ export function MarketHeatmap({
             </Stat>
           </span>
           <div className="flex items-center gap-1.5">
-            <span className="font-mono text-[9.5px] tabular-nums text-neutral-400">−{cap}%</span>
+            <span className="font-mono text-[9.5px] tabular-nums text-neutral-400">{legendLowLabel}</span>
             <span className="flex h-2 w-24 overflow-hidden rounded-full">
-              {Array.from({ length: 9 }, (_, i) => (
+              {legendSamples.map((sample, i) => (
                 <span
                   key={i}
                   className="h-full flex-1"
-                  style={{ background: changeColor(((i - 4) / 4) * cap, cap, heatColors) }}
+                  style={{ background: changeColor(sample, cap, heatColors) }}
                 />
               ))}
             </span>
-            <span className="font-mono text-[9.5px] tabular-nums text-neutral-400">+{cap}%</span>
+            <span className="font-mono text-[9.5px] tabular-nums text-neutral-400">{legendHighLabel}</span>
           </div>
         </div>
       </div>

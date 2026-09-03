@@ -17,6 +17,7 @@ export {
   parseHexColor,
   mixSrgbHex,
   changeColor,
+  heatLegendSampleChanges,
 } from "@/components/spectrumui/charts/heatmapColors";
 
 export function formatSignedPct(value) {
