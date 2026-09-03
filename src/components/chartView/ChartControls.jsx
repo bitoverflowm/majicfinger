@@ -10,7 +10,7 @@ import { PiChartBarHorizontalLight, PiChartDonut, PiChartLine, PiChartLineThin }
 import { MdOutlineAreaChart, MdStackedBarChart } from "react-icons/md";
 import { GoDotFill } from "react-icons/go";
 import { AiOutlineRadarChart } from "react-icons/ai";
-import { CircleDot, CircleHelp, Expand, LogIn, Tag, LayoutGrid, Shuffle, ChevronUp, ChevronDown, Calendar as CalendarIcon, CandlestickChart } from "lucide-react";
+import { CircleDot, CircleHelp, Expand, LogIn, Tag, LayoutGrid, Grid2X2, Shuffle, ChevronUp, ChevronDown, Calendar as CalendarIcon, CandlestickChart } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -272,6 +272,16 @@ export default function ChartControls() {
     setSelZ,
     selColorCol,
     setSelColorCol,
+    heatmapChangeCol,
+    setHeatmapChangeCol,
+    heatmapCapMode,
+    setHeatmapCapMode,
+    heatmapCap,
+    setHeatmapCap,
+    heatmapUpColor,
+    setHeatmapUpColor,
+    heatmapDownColor,
+    setHeatmapDownColor,
     scaleZ,
     setScaleZ,
     scatterZEnabled,
@@ -456,9 +466,11 @@ export default function ChartControls() {
         ? "Candlestick"
         : selChartType === "treemap"
           ? "Treemap"
-          : selChartType
-            ? selChartType.charAt(0).toUpperCase() + selChartType.slice(1)
-            : "—";
+          : selChartType === "heatmap"
+            ? "Heatmap"
+            : selChartType
+              ? selChartType.charAt(0).toUpperCase() + selChartType.slice(1)
+              : "—";
 
   /** Selected chart type uses the same color users see on hover (works for light/dark). */
   const chartTypeSelectedClass = "bg-slate-100 text-slate-900 dark:bg-slate-800 dark:text-slate-50";
@@ -1465,6 +1477,21 @@ export default function ChartControls() {
                         <Tooltip>
                           <TooltipTrigger asChild>
                             <ToggleGroupItem
+                              value="heatmap"
+                              aria-label="Heatmap"
+                              className={chartTypeItemClassName("heatmap")}
+                            >
+                              <Grid2X2 className={chartTypeIconClass} />
+                            </ToggleGroupItem>
+                          </TooltipTrigger>
+                          <TooltipContent side="bottom" className="max-w-[280px] text-xs">
+                            Heatmap — market-style squarified map. Label sets tiles, weight sets area, change sets
+                            color intensity (diverging up/down).
+                          </TooltipContent>
+                        </Tooltip>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <ToggleGroupItem
                               value="scatter"
                               aria-label="Scatter / bubble chart"
                               className={chartTypeItemClassName("scatter")}
@@ -1750,6 +1777,91 @@ export default function ChartControls() {
                       />
                       {yAxisFormatControls}
                       {normalizeValuesControl}
+                    </>
+                  ) : selChartType === "heatmap" ? (
+                    <>
+                      <Field>
+                        <FieldLabel className="text-xs">Label</FieldLabel>
+                        <FieldDescription className="text-xs">
+                          Category for each tile (e.g. question, slug, ticker).
+                        </FieldDescription>
+                        <Select value={xAxisSelectValue} onValueChange={handleXAxisChange}>
+                          <SelectTrigger className="h-8 min-w-0 text-xs">
+                            <SelectValue placeholder="Label column" className="text-xs" />
+                          </SelectTrigger>
+                          <SelectContent className="text-xs">
+                            <SelectItem value={CHART_X_AXIS_NONE} className="text-xs">
+                              — Select label —
+                            </SelectItem>
+                            <GroupedColumnSelectItems
+                              groups={lineSheetColumnGroups}
+                              allowedValues={xOptions}
+                            />
+                          </SelectContent>
+                        </Select>
+                      </Field>
+                      <Field>
+                        <FieldLabel className="text-xs">Weight</FieldLabel>
+                        <FieldDescription className="text-xs">
+                          Numeric column that sets tile area (square size).
+                        </FieldDescription>
+                        {selY.length > 0 ? (
+                          selY.slice(0, 1).map((yValue, index) => (
+                            <Select
+                              key={`${yValue}-${index}`}
+                              value={yValue}
+                              onValueChange={(val) => handleSelectY(val, index)}
+                            >
+                              <SelectTrigger className="h-8 min-w-0 text-xs">
+                                <SelectValue className="text-xs">{formatColumnLabel(yValue)}</SelectValue>
+                              </SelectTrigger>
+                              <SelectContent className="text-xs">
+                                <GroupedColumnSelectItems
+                                  groups={lineSheetColumnGroups}
+                                  allowedValues={availableYOptions}
+                                />
+                              </SelectContent>
+                            </Select>
+                          ))
+                        ) : (
+                          <Select onValueChange={(val) => handleSelectY(val)}>
+                            <SelectTrigger className="h-8 min-w-0 text-xs">
+                              <SelectValue placeholder="Weight column" className="text-xs" />
+                            </SelectTrigger>
+                            <SelectContent className="text-xs">
+                              <GroupedColumnSelectItems
+                                groups={lineSheetColumnGroups}
+                                allowedValues={availableYOptions}
+                              />
+                            </SelectContent>
+                          </Select>
+                        )}
+                      </Field>
+                      <Field>
+                        <FieldLabel className="text-xs">Change</FieldLabel>
+                        <FieldDescription className="text-xs">
+                          Numeric column for color intensity (positive = up, negative = down).
+                        </FieldDescription>
+                        <Select
+                          value={heatmapChangeCol || CHART_X_AXIS_NONE}
+                          onValueChange={(v) =>
+                            setHeatmapChangeCol(v === CHART_X_AXIS_NONE ? null : v)
+                          }
+                        >
+                          <SelectTrigger className="h-8 min-w-0 text-xs">
+                            <SelectValue placeholder="Change column" className="text-xs" />
+                          </SelectTrigger>
+                          <SelectContent className="text-xs">
+                            <SelectItem value={CHART_X_AXIS_NONE} className="text-xs">
+                              — Select change —
+                            </SelectItem>
+                            <GroupedColumnSelectItems
+                              groups={lineSheetColumnGroups}
+                              allowedValues={xOptions}
+                            />
+                          </SelectContent>
+                        </Select>
+                      </Field>
                     </>
                   ) : (
                     <>
@@ -2082,7 +2194,7 @@ export default function ChartControls() {
                         : "+ Add line"}
                     </Button>
                   )}
-                  {selChartType !== "pie" && selChartType !== "scatter" && selChartType !== "liveline" && selChartType !== "candlestick" && selChartType !== "line" && selChartType !== "treemap" && !(selChartType === "bar" && barSeriesColumn) && (
+                  {selChartType !== "pie" && selChartType !== "scatter" && selChartType !== "liveline" && selChartType !== "candlestick" && selChartType !== "line" && selChartType !== "treemap" && selChartType !== "heatmap" && !(selChartType === "bar" && barSeriesColumn) && (
                     <Button
                       type="button"
                       variant="secondary"
@@ -2112,6 +2224,66 @@ export default function ChartControls() {
                       onClear={() => setInnerBoxColor(null)}
                     />
                   </div>
+
+                  {selChartType === "heatmap" && (
+                    <div className="min-w-0 space-y-3 border-b border-border/60 pb-3 pt-1">
+                      <div className="space-y-1.5">
+                        <Label className="text-xs text-muted-foreground">Color cap</Label>
+                        <p className="text-[10px] leading-snug text-muted-foreground">
+                          Saturates the diverging ramp at ±cap. Auto uses the max absolute change in the data.
+                        </p>
+                        <ToggleGroup
+                          type="single"
+                          variant="outline"
+                          size="sm"
+                          className="flex w-full min-w-0 justify-stretch [&>button]:min-w-0 [&>button]:flex-1"
+                          value={heatmapCapMode === "manual" ? "manual" : "auto"}
+                          onValueChange={(v) => {
+                            if (v === "auto" || v === "manual") setHeatmapCapMode(v);
+                          }}
+                          aria-label="Heatmap color cap mode"
+                        >
+                          <ToggleGroupItem value="auto" className="text-xs">
+                            Auto
+                          </ToggleGroupItem>
+                          <ToggleGroupItem value="manual" className="text-xs">
+                            Manual
+                          </ToggleGroupItem>
+                        </ToggleGroup>
+                        {heatmapCapMode === "manual" ? (
+                          <Input
+                            type="number"
+                            min="0.1"
+                            step="0.5"
+                            value={String(heatmapCap ?? 6)}
+                            onChange={(e) =>
+                              setHeatmapCap(Math.max(0.1, Number(e.target.value) || 6))
+                            }
+                            className="h-8 text-xs"
+                            aria-label="Heatmap color cap value"
+                          />
+                        ) : null}
+                      </div>
+                      <div className="flex min-w-0 items-center gap-2">
+                        <Label className="w-28 shrink-0 text-xs text-muted-foreground">Up color</Label>
+                        <ChartColorPalettePopover
+                          value={heatmapUpColor}
+                          onChange={setHeatmapUpColor}
+                          ariaLabel="Heatmap up (positive) color"
+                          onClear={() => setHeatmapUpColor(null)}
+                        />
+                      </div>
+                      <div className="flex min-w-0 items-center gap-2">
+                        <Label className="w-28 shrink-0 text-xs text-muted-foreground">Down color</Label>
+                        <ChartColorPalettePopover
+                          value={heatmapDownColor}
+                          onChange={setHeatmapDownColor}
+                          ariaLabel="Heatmap down (negative) color"
+                          onClear={() => setHeatmapDownColor(null)}
+                        />
+                      </div>
+                    </div>
+                  )}
 
                   {selChartType === "bar" && (
                     <div className="flex min-w-0 items-center justify-between gap-2 border-b border-border/60 pb-3">
@@ -2622,24 +2794,28 @@ export default function ChartControls() {
                 (selChartType === "bar" ||
                   selChartType === "area" ||
                   selChartType === "line" ||
-                  selChartType === "pie") && (
+                  selChartType === "pie" ||
+                  selChartType === "heatmap" ||
+                  selChartType === "treemap") && (
                   <div className="min-w-0 space-y-3 border-b border-border/60 py-3">
                     <p className={`text-xs font-bold ${dark ? "text-slate-200" : "text-muted-foreground"}`}>Tooltip</p>
                     <p className={`text-xs ${dark ? "text-slate-300" : "text-muted-foreground"}`}>
                       Hover over your chart to view tooltip
                     </p>
                     <div className="flex flex-col gap-2">
-                      <div className="flex items-center gap-2">
-                        <Switch
-                          id="chart-tooltip-show-x"
-                          checked={tooltipShowXValue}
-                          onCheckedChange={setTooltipShowXValue}
-                          className="scale-75 origin-left"
-                        />
-                        <Label htmlFor="chart-tooltip-show-x" className="cursor-pointer text-xs text-muted-foreground">
-                          Show X value in tooltip
-                        </Label>
-                      </div>
+                      {selChartType !== "heatmap" && selChartType !== "treemap" ? (
+                        <div className="flex items-center gap-2">
+                          <Switch
+                            id="chart-tooltip-show-x"
+                            checked={tooltipShowXValue}
+                            onCheckedChange={setTooltipShowXValue}
+                            className="scale-75 origin-left"
+                          />
+                          <Label htmlFor="chart-tooltip-show-x" className="cursor-pointer text-xs text-muted-foreground">
+                            Show X value in tooltip
+                          </Label>
+                        </div>
+                      ) : null}
                     </div>
                     <div className="space-y-1.5">
                       <p className={`text-xs font-semibold ${dark ? "text-slate-200" : "text-muted-foreground"}`}>
@@ -2854,9 +3030,11 @@ export default function ChartControls() {
                         <Expand className={`h-4 w-4 font-bold ${dark ? "text-slate-200" : "text-muted-foreground"}`} />
                       </Toggle>
                     )}
-                    <Toggle area-label="Toggle Legend" pressed={legendVisible} onPressedChange={handleToggleLegend}>
-                      <IdCardIcon className="h-4 w-4 text-foreground" />
-                    </Toggle>
+                    {selChartType !== "heatmap" && selChartType !== "candlestick" && selChartType !== "liveline" ? (
+                      <Toggle area-label="Toggle Legend" pressed={legendVisible} onPressedChange={handleToggleLegend}>
+                        <IdCardIcon className="h-4 w-4 text-foreground" />
+                      </Toggle>
+                    ) : null}
                     {legendVisible ? (
                       <div className="min-w-0 flex-1 basis-full space-y-1">
                         <Label htmlFor="chart-legend-title" className="text-xs text-muted-foreground">
@@ -2922,10 +3100,10 @@ export default function ChartControls() {
                       },
                       {
                         id: "chart-text-desc",
-                        label: "Description",
+                        label: selChartType === "heatmap" ? "Subtitle" : "Description",
                         value: subTitle,
                         setValue: setSubTitle,
-                        placeholder: "Description",
+                        placeholder: selChartType === "heatmap" ? "Subtitle" : "Description",
                         color: subTitleColor,
                         setColor: setSubTitleColor,
                         visible: !subTitleHidden,
@@ -2980,7 +3158,12 @@ export default function ChartControls() {
                         setVisible: (on) => setYAxisLabelHidden(!on),
                         rows: 2,
                       },
-                    ].map((field) => (
+                    ]
+                      .filter((field) => {
+                        if (selChartType !== "heatmap") return true;
+                        return field.id === "chart-text-title" || field.id === "chart-text-desc";
+                      })
+                      .map((field) => (
                       <Item
                         key={field.id}
                         variant="outline"
@@ -3012,15 +3195,17 @@ export default function ChartControls() {
                                 onChange={(e) => field.setValue(e.target.value)}
                               />
                             </ItemContent>
-                            <ItemMedia variant="image" className="size-8 shrink-0 self-start p-0">
-                              <ChartColorPalettePopover
-                                value={field.color}
-                                onChange={field.setColor}
-                                ariaLabel={`${field.label} color`}
-                                onClear={() => field.setColor(null)}
-                                triggerClassName="h-full w-full rounded-sm border-border"
-                              />
-                            </ItemMedia>
+                            {selChartType === "heatmap" ? null : (
+                              <ItemMedia variant="image" className="size-8 shrink-0 self-start p-0">
+                                <ChartColorPalettePopover
+                                  value={field.color}
+                                  onChange={field.setColor}
+                                  ariaLabel={`${field.label} color`}
+                                  onClear={() => field.setColor(null)}
+                                  triggerClassName="h-full w-full rounded-sm border-border"
+                                />
+                              </ItemMedia>
+                            )}
                           </div>
                         ) : null}
                       </Item>

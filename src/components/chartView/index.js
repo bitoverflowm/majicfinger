@@ -1,6 +1,7 @@
 "use client";
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import {
   SHADCN_CHART_BASE_ORDER,
   DEFAULT_CHART_SERIES_COLORS,
@@ -22,6 +23,9 @@ import { useHtmlDarkClass } from '@/hooks/use-html-dark-class';
 import { useMyStateV2 } from '@/context/stateContextV2';
 import ChartControls from '@/components/chartView/ChartControls';
 import { TreemapCategoryRect } from '@/components/chartView/treemapCategoryContent';
+import { MarketHeatmap } from '@/components/spectrumui/charts/market-heatmap';
+import { buildHeatmapItems } from '@/components/chartView/buildHeatmapRows';
+import { formatSignedPct } from '@/components/spectrumui/charts/chart-engine';
 import { extrapolateColorsFromPalette } from '@/components/chartView/paletteExtrapolation';
 import { toPng, toSvg, toJpeg } from 'html-to-image';
 import { toast } from 'sonner';
@@ -800,10 +804,6 @@ export function ChartBuilderProvider({ demo, children, initialBuilderSnapshot, e
     const s = initialBuilderSnapshot;
     return s?.v === 1 && s.selChartType != null ? s.selChartType : "area";
   });
-
-  useEffect(() => {
-    setSelChartType((prev) => (prev === "heatmap" ? "treemap" : prev));
-  }, []);
   const [selX, setSelX] = useState(() => {
     const s = initialBuilderSnapshot;
     return s?.v === 1 && s.selX !== undefined ? s.selX : undefined;
@@ -836,6 +836,13 @@ export function ChartBuilderProvider({ demo, children, initialBuilderSnapshot, e
   const [scaleZ, setScaleZ] = useState("linear");
   const [scatterZEnabled, setScatterZEnabled] = useState(false);
   const [scatterColorEnabled, setScatterColorEnabled] = useState(false);
+  /** Heatmap (Spectrum market map): column that drives tile color intensity. */
+  const [heatmapChangeCol, setHeatmapChangeCol] = useState(null);
+  /** `auto` derives cap from |change|; `manual` uses heatmapCap. */
+  const [heatmapCapMode, setHeatmapCapMode] = useState("auto");
+  const [heatmapCap, setHeatmapCap] = useState(6);
+  const [heatmapUpColor, setHeatmapUpColor] = useState(null);
+  const [heatmapDownColor, setHeatmapDownColor] = useState(null);
   const [yAxisDivisor, setYAxisDivisor] = useState(1);
   const [yAxisCompact, setYAxisCompact] = useState(true);
   /** Line/area/bar: null = off; "basic" = baseline index; "min-max" = min-max scale to 0–100. */
@@ -1071,6 +1078,13 @@ export function ChartBuilderProvider({ demo, children, initialBuilderSnapshot, e
     if (s.scaleY != null) setScaleY(s.scaleY);
     if (s.selZ !== undefined) setSelZ(s.selZ);
     if (s.selColorCol !== undefined) setSelColorCol(s.selColorCol);
+    if (s.heatmapChangeCol !== undefined) setHeatmapChangeCol(s.heatmapChangeCol || null);
+    if (s.heatmapCapMode === "auto" || s.heatmapCapMode === "manual") setHeatmapCapMode(s.heatmapCapMode);
+    if (s.heatmapCap != null && Number.isFinite(Number(s.heatmapCap))) {
+      setHeatmapCap(Math.max(0.1, Number(s.heatmapCap)));
+    }
+    if (s.heatmapUpColor !== undefined) setHeatmapUpColor(s.heatmapUpColor || null);
+    if (s.heatmapDownColor !== undefined) setHeatmapDownColor(s.heatmapDownColor || null);
     if (s.scaleZ === "log" || s.scaleZ === "linear") setScaleZ(s.scaleZ);
     if (s.scatterZEnabled !== undefined) setScatterZEnabled(!!s.scatterZEnabled);
     else if (s.selZ) setScatterZEnabled(true);
@@ -1333,7 +1347,7 @@ export function ChartBuilderProvider({ demo, children, initialBuilderSnapshot, e
   // Auto-trim Y for single-series chart types (keeps filters/sorts intact).
   useEffect(() => {
     const singleSeries =
-      selChartType === "pie" || selChartType === "radar" || selChartType === "treemap";
+      selChartType === "pie" || selChartType === "radar" || selChartType === "treemap" || selChartType === "heatmap";
     if (!singleSeries) return;
     setSelY((prev) => {
       const curr = Array.isArray(prev) ? prev : [];
@@ -1622,6 +1636,7 @@ export function ChartBuilderProvider({ demo, children, initialBuilderSnapshot, e
       ...(selY || []),
       selZ,
       selColorCol,
+      heatmapChangeCol,
       lineSeriesColumn,
       chartFilterColumn,
       ...filterColumns,
@@ -1630,7 +1645,7 @@ export function ChartBuilderProvider({ demo, children, initialBuilderSnapshot, e
       barSeriesColumn,
     ].filter(Boolean);
     return keys.some((k) => String(k).includes("::"));
-  }, [selX, selY, selZ, selColorCol, lineSeriesColumn, chartFilterColumn, chartLineFilters, tooltipExtraColumns, rainbowLegendLabelColumn, barSeriesColumn]);
+  }, [selX, selY, selZ, selColorCol, heatmapChangeCol, lineSeriesColumn, chartFilterColumn, chartLineFilters, tooltipExtraColumns, rainbowLegendLabelColumn, barSeriesColumn]);
 
   const crossSheetChartData = useMemo(() => {
     const sheetEntries = Object.entries(contextStateV2?.dataSheets || {}).filter(([, sheet]) => Array.isArray(sheet?.data) && sheet.data.length);
@@ -1643,6 +1658,7 @@ export function ChartBuilderProvider({ demo, children, initialBuilderSnapshot, e
       ...(selY || []),
       selZ,
       selColorCol,
+      heatmapChangeCol,
       lineSeriesColumn,
       chartFilterColumn,
       rainbowLegendLabelColumn,
@@ -1708,6 +1724,7 @@ export function ChartBuilderProvider({ demo, children, initialBuilderSnapshot, e
     rainbowLegendLabelColumn,
     barSeriesColumn,
     selColorCol,
+    heatmapChangeCol,
     selX,
     selY,
     selZ,
@@ -1847,6 +1864,11 @@ export function ChartBuilderProvider({ demo, children, initialBuilderSnapshot, e
     scaleY,
     selZ,
     selColorCol,
+    heatmapChangeCol,
+    heatmapCapMode,
+    heatmapCap,
+    heatmapUpColor,
+    heatmapDownColor,
     scaleZ,
     scatterZEnabled,
     scatterColorEnabled,
@@ -1961,7 +1983,9 @@ export function ChartBuilderProvider({ demo, children, initialBuilderSnapshot, e
     const sheetId = activeChartSheetId || "chart-1";
     const yKeys = Array.isArray(selY) ? selY.filter(Boolean) : [];
     const realAxesConfigured =
-      (!!selX && yKeys.length > 0) ||
+      (selChartType === "heatmap"
+        ? !!selX && yKeys.length > 0 && !!heatmapChangeCol
+        : !!selX && yKeys.length > 0) ||
       (selChartType === "candlestick" &&
         (!!candlestickMapped?.ok || (candlestickMapped?.available?.length ?? 0) > 0));
     if (!realAxesConfigured) return;
@@ -1985,6 +2009,7 @@ export function ChartBuilderProvider({ demo, children, initialBuilderSnapshot, e
     selX,
     selY,
     selChartType,
+    heatmapChangeCol,
     candlestickMapped,
     chartLineFilters,
     referenceLines,
@@ -2139,6 +2164,16 @@ export function ChartBuilderProvider({ demo, children, initialBuilderSnapshot, e
     setSelZ,
     selColorCol,
     setSelColorCol,
+    heatmapChangeCol,
+    setHeatmapChangeCol,
+    heatmapCapMode,
+    setHeatmapCapMode,
+    heatmapCap,
+    setHeatmapCap,
+    heatmapUpColor,
+    setHeatmapUpColor,
+    heatmapDownColor,
+    setHeatmapDownColor,
     scaleZ,
     setScaleZ,
     scatterZEnabled,
@@ -2492,11 +2527,21 @@ export function ChartCanvas() {
     scaleZ,
     scatterZEnabled,
     scatterColorEnabled,
+    heatmapChangeCol,
+    heatmapCapMode,
+    heatmapCap,
+    heatmapUpColor,
+    heatmapDownColor,
     yAxisDivisor,
     yAxisCompact,
     normalizeMode,
     sortXDir,
   } = useChartBuilder();
+
+  const [heatmapHover, setHeatmapHover] = useState(null);
+  useEffect(() => {
+    if (selChartType !== "heatmap") setHeatmapHover(null);
+  }, [selChartType]);
 
   const xAxisTickAngle = xAxisTicksAngled ? -45 : 0;
   const needsCurveYHeadroom =
@@ -2554,7 +2599,9 @@ export function ChartCanvas() {
   /** Demo sample mode pre-seeds axes; with real integration rows, require X + Y like the dashboard. */
   const axesConfigured =
     usingSampleFallback ||
-    (!!selX && yKeys.length > 0) ||
+    (selChartType === "heatmap"
+      ? !!selX && yKeys.length > 0 && !!heatmapChangeCol
+      : !!selX && yKeys.length > 0) ||
     (selChartType === "candlestick" &&
       (!!candlestickMapped?.ok || (candlestickMapped?.available?.length ?? 0) > 0));
   const xKey = selX || "month";
@@ -2713,6 +2760,35 @@ export function ChartCanvas() {
       return av - bv;
     });
   }, [rawData, xAxisType, xKey, selX, effectiveTemporalSort]);
+
+  const heatmapBuilt = useMemo(() => {
+    if (selChartType !== "heatmap" || !selX || !yKeys[0] || !heatmapChangeCol) {
+      return { items: [], inferredCap: 6 };
+    }
+    return buildHeatmapItems(rawData, {
+      labelKey: xKey,
+      weightKey: yKeys[0],
+      changeKey: heatmapChangeCol,
+    });
+  }, [selChartType, selX, yKeys, heatmapChangeCol, rawData, xKey]);
+
+  const heatmapEffectiveCap =
+    heatmapCapMode === "manual" && Number.isFinite(Number(heatmapCap))
+      ? Math.max(0.1, Number(heatmapCap))
+      : heatmapBuilt.inferredCap;
+
+  const heatmapPlotHeight = embedInArticle
+    ? ARTICLE_EMBED_PLOT_HEIGHT_PX
+    : embedCompact
+      ? 280
+      : 380;
+
+  const heatmapStatus =
+    !axesConfigured
+      ? "loading"
+      : heatmapBuilt.items.length
+        ? "ready"
+        : "empty";
 
   const firstPlotX =
     selX && finalRenderedData.length ? rowValueForDataKey(finalRenderedData[0], xKey) : null;
@@ -3305,7 +3381,7 @@ export function ChartCanvas() {
                   innerBoxColor || defaultChartInnerBackground(!!htmlDark),
               }}
             >
-              {!titleHidden || !subTitleHidden ? (
+              {selChartType !== "heatmap" && (!titleHidden || !subTitleHidden) ? (
                 <CardHeader className="shrink-0 pb-2">
                   {!titleHidden ? <CardTitle style={{ color: titleColor || undefined }}>{title}</CardTitle> : null}
                   {!subTitleHidden ? (
@@ -3331,7 +3407,9 @@ export function ChartCanvas() {
                   >
                     {selChartType === "candlestick"
                       ? "Candlestick charts need sheet rows with end_period_ts and a full OHLC set (price_*, yes_bid_*, or yes_ask_* dollars)."
-                      : "Select an X axis and at least one Y column under Data to plot your sheet."}
+                      : selChartType === "heatmap"
+                        ? "Select a label, weight, and change column under Data to plot the heatmap."
+                        : "Select an X axis and at least one Y column under Data to plot your sheet."}
                   </div>
                 ) : selChartType === "candlestick" ? (
                   <div className="flex min-h-[220px] w-full flex-1 flex-col">
@@ -3343,6 +3421,84 @@ export function ChartCanvas() {
                         values (null trade prices are skipped — try YES bid / YES ask OHLC).
                       </div>
                     )}
+                  </div>
+                ) : selChartType === "heatmap" ? (
+                  <div className="relative flex min-h-[220px] w-full flex-1 flex-col px-1">
+                    <MarketHeatmap
+                      data={heatmapBuilt.items}
+                      height={heatmapPlotHeight}
+                      cap={heatmapEffectiveCap}
+                      title={titleHidden ? "" : title || "Heatmap"}
+                      subtitle={subTitleHidden ? "" : subTitle || ""}
+                      status={heatmapStatus}
+                      upColor={heatmapUpColor || undefined}
+                      downColor={heatmapDownColor || undefined}
+                      onTileHover={(payload) => {
+                        if (!payload?.tile) {
+                          setHeatmapHover(null);
+                          return;
+                        }
+                        setHeatmapHover({
+                          tile: payload.tile,
+                          clientX: payload.clientX,
+                          clientY: payload.clientY,
+                        });
+                      }}
+                    />
+                    {heatmapHover?.tile && typeof document !== "undefined"
+                      ? createPortal(
+                          <div
+                            className="pointer-events-none fixed z-[200] min-w-[10rem] rounded-lg border border-border/50 bg-background px-2.5 py-1.5 text-xs shadow-xl"
+                            style={{
+                              left: Math.min(
+                                (heatmapHover.clientX || 0) + 14,
+                                (typeof window !== "undefined" ? window.innerWidth : 0) - 220,
+                              ),
+                              top: Math.min(
+                                (heatmapHover.clientY || 0) + 14,
+                                (typeof window !== "undefined" ? window.innerHeight : 0) - 160,
+                              ),
+                            }}
+                          >
+                            <div className="font-medium">{heatmapHover.tile.label}</div>
+                            {heatmapHover.tile.name ? (
+                              <div className="text-muted-foreground">{heatmapHover.tile.name}</div>
+                            ) : null}
+                            <div className="mt-1 grid gap-0.5 tabular-nums">
+                              <div className="flex items-center justify-between gap-4">
+                                <span className="text-muted-foreground">
+                                  {stripSheetScopedColumnKey(yKeys[0] || "Weight")}
+                                </span>
+                                <span>
+                                  {formatCompactNumber
+                                    ? formatCompactNumber(heatmapHover.tile.weight)
+                                    : heatmapHover.tile.weight}
+                                </span>
+                              </div>
+                              <div className="flex items-center justify-between gap-4">
+                                <span className="text-muted-foreground">
+                                  {stripSheetScopedColumnKey(heatmapChangeCol || "Change")}
+                                </span>
+                                <span>{formatSignedPct(heatmapHover.tile.change)}</span>
+                              </div>
+                              {(tooltipExtraColumns || []).map((col) => {
+                                const row = heatmapHover.tile.payload;
+                                if (!row || col == null) return null;
+                                const plain = stripSheetScopedColumnKey(col);
+                                const val = row[col] ?? row[plain];
+                                if (val == null || val === "") return null;
+                                return (
+                                  <div key={col} className="flex items-center justify-between gap-4">
+                                    <span className="text-muted-foreground">{plain}</span>
+                                    <span>{String(val)}</span>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          </div>,
+                          document.body,
+                        )
+                      : null}
                   </div>
                 ) : selChartType === "liveline" ? (
                   <div className="flex min-h-[180px] w-full flex-1 flex-col items-center justify-center">

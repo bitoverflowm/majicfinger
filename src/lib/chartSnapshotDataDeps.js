@@ -243,6 +243,7 @@ export function collectChartSnapshotColumnsBySheetId(snapshot, defaultSheetId, d
   for (const y of Array.isArray(s.selY) ? s.selY : []) addAxisKey(y);
   if (s.selZ) addAxisKey(s.selZ);
   if (s.selColorCol) add(s.selColorCol);
+  if (s.heatmapChangeCol) add(s.heatmapChangeCol);
   if (s.lineSeriesColumn) addAxisKey(s.lineSeriesColumn);
   if (s.barSeriesColumn) addAxisKey(s.barSeriesColumn);
   if (s.chartFilterColumn) add(s.chartFilterColumn);
