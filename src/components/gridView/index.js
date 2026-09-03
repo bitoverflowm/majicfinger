@@ -1129,16 +1129,6 @@ const GridView = ({ startNew, fillViewport = false }) => {
       [dataSheets, activeSheetId],
     );
 
-    const formatMathOperandLabel = useCallback(
-      (key) =>
-        mathOperandDisplayLabel(key, {
-          dataSheets,
-          activeSheetId,
-          summaryRefDisplayLabel,
-        }),
-      [dataSheets, activeSheetId, summaryRefDisplayLabel],
-    );
-
     const nextFreeResultColumnName = useCallback(() => {
       const existing = new Set(sheetColumnNamesForMath);
       let n = 1;
@@ -1167,6 +1157,17 @@ const GridView = ({ startNew, fillViewport = false }) => {
       },
       [summarySelectOptions],
     );
+
+    const formatMathOperandLabel = useCallback(
+      (key) =>
+        mathOperandDisplayLabel(key, {
+          dataSheets,
+          activeSheetId,
+          summaryRefDisplayLabel,
+        }),
+      [dataSheets, activeSheetId, summaryRefDisplayLabel],
+    );
+
     const showSummaryPane =
       summaryConfig?.destination === "this_view" &&
       Array.isArray(summaryConfig?.metrics) &&
