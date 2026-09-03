@@ -59,6 +59,29 @@ const ChartBuilderContext = createContext(null);
 const OG_IMAGE_WIDTH = 1200;
 const OG_IMAGE_HEIGHT = 630;
 
+/** Shared html-to-image options so heatmap SVG tiles stay visible in exports. */
+function chartExportImageOpts(extra = {}) {
+  return {
+    cacheBust: true,
+    pixelRatio: 2,
+    onclone: (_doc, cloned) => {
+      cloned.querySelectorAll("[style*='animation']").forEach((node) => {
+        if (!(node instanceof HTMLElement) && !(node instanceof SVGElement)) return;
+        node.style.animation = "none";
+        node.style.opacity = "1";
+      });
+      cloned.querySelectorAll("svg g").forEach((node) => {
+        if (!(node instanceof SVGElement)) return;
+        if (node.style.opacity === "0" || node.getAttribute("opacity") === "0") {
+          node.style.opacity = "1";
+          node.removeAttribute("opacity");
+        }
+      });
+    },
+    ...extra,
+  };
+}
+
 function loadImageFromDataUrl(dataUrl) {
   return new Promise((resolve, reject) => {
     const img = new Image();
@@ -2021,7 +2044,7 @@ export function ChartBuilderProvider({ demo, children, initialBuilderSnapshot, e
       toast.error('Chart not ready to export');
       return;
     }
-    const opts = { cacheBust: true, pixelRatio: 2 };
+    const opts = chartExportImageOpts();
     const filename = `chart-${Date.now()}`;
     if (format === 'png') {
       toPng(el, opts)
@@ -2069,7 +2092,7 @@ export function ChartBuilderProvider({ demo, children, initialBuilderSnapshot, e
     const el = chartRef.current;
     if (!el) return null;
     try {
-      return await toPng(el, { cacheBust: true, pixelRatio: 2 });
+      return await toPng(el, chartExportImageOpts());
     } catch {
       return null;
     }
@@ -2080,7 +2103,7 @@ export function ChartBuilderProvider({ demo, children, initialBuilderSnapshot, e
     const el = chartRef.current;
     if (!el || typeof document === "undefined") return null;
     try {
-      const sourceDataUrl = await toPng(el, { cacheBust: true, pixelRatio: 2 });
+      const sourceDataUrl = await toPng(el, chartExportImageOpts());
       const img = await loadImageFromDataUrl(sourceDataUrl);
       const canvas = document.createElement("canvas");
       canvas.width = OG_IMAGE_WIDTH;
@@ -3423,8 +3446,9 @@ export function ChartCanvas() {
                     )}
                   </div>
                 ) : selChartType === "heatmap" ? (
-                  <div className="relative flex min-h-[220px] w-full flex-1 flex-col px-1">
+                  <div className="relative flex min-h-[220px] w-full flex-1 flex-col items-stretch justify-center px-1">
                     <MarketHeatmap
+                      className="w-full shrink-0"
                       data={heatmapBuilt.items}
                       height={heatmapPlotHeight}
                       cap={heatmapEffectiveCap}

@@ -12,7 +12,14 @@ import {
   squarify,
   useElementWidth,
   usePrefersReducedMotion,
+  SPECTRUM_HEAT_DEFAULTS,
 } from "@/components/spectrumui/charts/chart-engine";
+import {
+  labelCopyForTier,
+  tileLabelFontSize,
+  wrapTileLabel,
+} from "@/components/spectrumui/charts/heatmapTileLabel";
+import { useHtmlDarkClass } from "@/hooks/use-html-dark-class";
 
 function labelTier(w, h) {
   if (w >= 108 && h >= 66) return "full";
@@ -71,8 +78,18 @@ export function MarketHeatmap({
   onTileHover,
 }) {
   const reduce = usePrefersReducedMotion();
+  const htmlDark = useHtmlDarkClass();
   const [wrapRef, width] = useElementWidth();
   const [hovered, setHovered] = React.useState(null);
+
+  const heatColors = React.useMemo(() => {
+    const defaults = htmlDark ? SPECTRUM_HEAT_DEFAULTS.dark : SPECTRUM_HEAT_DEFAULTS.light;
+    return {
+      up: upColor || defaults.up,
+      down: downColor || defaults.down,
+      flat: defaults.flat,
+    };
+  }, [htmlDark, upColor, downColor]);
 
   const w = Math.max(width, 260);
   const gap = 2;
@@ -84,6 +101,7 @@ export function MarketHeatmap({
   }, [data]);
 
   const ready = width > 0;
+  const labelFill = htmlDark ? "#f8fafc" : "#0a0a0a";
 
   const setHover = React.useCallback(
     (tile, clientX, clientY) => {
@@ -104,8 +122,9 @@ export function MarketHeatmap({
   );
 
   const styleVars = {
-    ...(upColor ? { "--spectrum-chart-up": upColor } : null),
-    ...(downColor ? { "--spectrum-chart-down": downColor } : null),
+    "--spectrum-chart-up": heatColors.up,
+    "--spectrum-chart-down": heatColors.down,
+    "--spectrum-heat-flat": heatColors.flat,
   };
 
   return (
@@ -155,7 +174,7 @@ export function MarketHeatmap({
                 <span
                   key={i}
                   className="h-full flex-1"
-                  style={{ background: changeColor(((i - 4) / 4) * cap, cap) }}
+                  style={{ background: changeColor(((i - 4) / 4) * cap, cap, heatColors) }}
                 />
               ))}
             </span>
@@ -192,7 +211,24 @@ export function MarketHeatmap({
                 const active = hovered === tile.label;
                 const cx = tile.x + tw / 2;
                 const cy = tile.y + th / 2;
-                const size = Math.max(9, Math.min(19, Math.sqrt(tw * th) / 6.5));
+                const labelSource = labelCopyForTier(tile.label, tier === "none" ? "ticker" : tier);
+                const size = tileLabelFontSize(tw, th, labelSource, tier === "none" ? "ticker" : tier);
+                const maxLines = tier === "ticker" ? 1 : 2;
+                const textMaxWidth = Math.max(12, tw - 12);
+                const { lines } = wrapTileLabel(labelSource, {
+                  maxWidth: textMaxWidth,
+                  fontSize: size,
+                  maxLines,
+                });
+                const lineH = size * 1.2;
+                const showChange = tier === "full" || tier === "compact";
+                const changeSize = size * 0.72;
+                const changeGap = showChange ? size * 0.35 : 0;
+                const labelBlockH = lines.length * lineH;
+                const totalTextH = labelBlockH + (showChange ? changeGap + changeSize : 0);
+                const labelStartY = cy - totalTextH / 2 + lineH / 2;
+                const changeY = labelStartY + Math.max(0, lines.length - 1) * lineH + changeGap + changeSize * 0.55;
+                const clipId = `hm-clip-${index}`;
 
                 return (
                   <g
@@ -209,62 +245,62 @@ export function MarketHeatmap({
                     }}
                     style={{
                       cursor: "default",
-                      transformBox: "fill-box",
-                      transformOrigin: "center",
-                      animation: reduce
-                        ? undefined
-                        : `spectrum-mc-fade 420ms ease-out ${Math.min(index * 26, 420)}ms both`,
+                      // Avoid opacity keyframe animations — html-to-image clones restart
+                      // them with fill-mode both → tiles export as fully transparent.
+                      opacity: reduce ? 1 : undefined,
                     }}
                   >
+                    <defs>
+                      <clipPath id={clipId}>
+                        <rect x={tile.x} y={tile.y} width={tw} height={th} rx={4} />
+                      </clipPath>
+                    </defs>
                     <rect
                       x={tile.x}
                       y={tile.y}
                       width={tw}
                       height={th}
                       rx={4}
-                      fill={changeColor(tile.change, cap)}
-                      stroke={active ? "currentColor" : "transparent"}
+                      fill={changeColor(tile.change, cap, heatColors)}
+                      stroke={active ? labelFill : "transparent"}
                       strokeWidth={1.5}
-                      className="text-neutral-900 dark:text-white"
                       style={{
                         opacity: hovered && !active ? 0.55 : 1,
                         transition: reduce ? undefined : "opacity 160ms ease-out, stroke 160ms ease-out",
                       }}
                     />
-                    {tier === "none" ? null : (
-                      <g className="pointer-events-none fill-neutral-950 dark:fill-white" textAnchor="middle">
-                        <text
-                          x={cx}
-                          y={tier === "ticker" ? cy : cy - size * 0.34}
-                          dominantBaseline="middle"
-                          fontSize={size}
-                          fontWeight={600}
-                          className="font-mono"
-                        >
-                          {tile.label}
-                        </text>
-                        {tier === "ticker" ? null : (
+                    {tier === "none" || !lines.length ? null : (
+                      <g
+                        pointerEvents="none"
+                        textAnchor="middle"
+                        clipPath={`url(#${clipId})`}
+                        fill={labelFill}
+                      >
+                        {lines.map((line, lineIdx) => (
+                          <text
+                            key={`${tile.label}-line-${lineIdx}`}
+                            x={cx}
+                            y={labelStartY + lineIdx * lineH}
+                            dominantBaseline="middle"
+                            fontSize={size}
+                            fontWeight={600}
+                            className="font-mono"
+                            fill={labelFill}
+                          >
+                            {line}
+                          </text>
+                        ))}
+                        {showChange ? (
                           <text
                             x={cx}
-                            y={cy + size * 0.72}
+                            y={changeY}
                             dominantBaseline="middle"
-                            fontSize={size * 0.72}
+                            fontSize={changeSize}
                             className="font-mono tabular-nums"
+                            fill={labelFill}
                             opacity={0.75}
                           >
                             {formatSignedPct(tile.change)}
-                          </text>
-                        )}
-                        {tier === "full" && tile.name ? (
-                          <text
-                            x={cx}
-                            y={cy + size * 1.72}
-                            dominantBaseline="middle"
-                            fontSize={size * 0.58}
-                            className="font-sans"
-                            opacity={0.5}
-                          >
-                            {tile.name}
                           </text>
                         ) : null}
                       </g>

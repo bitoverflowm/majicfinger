@@ -12,6 +12,13 @@ export const UP = "var(--spectrum-chart-up)";
 export const DOWN = "var(--spectrum-chart-down)";
 export const EASE = "cubic-bezier(0.22, 1, 0.36, 1)";
 
+export {
+  SPECTRUM_HEAT_DEFAULTS,
+  parseHexColor,
+  mixSrgbHex,
+  changeColor,
+} from "@/components/spectrumui/charts/heatmapColors";
+
 export function formatSignedPct(value) {
   const n = Number(value);
   if (!Number.isFinite(n)) return "—";
@@ -142,14 +149,6 @@ export function squarify(items, width, height) {
   if (row.length) layoutRow(row, w >= h ? w : h, w >= h);
 
   return out;
-}
-
-export function changeColor(change, cap = 4) {
-  const t = Math.max(-1, Math.min(1, change / (cap || 1)));
-  if (Math.abs(t) < 0.04) return "var(--spectrum-heat-flat)";
-  const weight = 0.22 + Math.abs(t) * 0.78;
-  const base = t > 0 ? UP : DOWN;
-  return `color-mix(in srgb, ${base} ${(weight * 100).toFixed(0)}%, var(--spectrum-heat-flat))`;
 }
 
 /** @typedef {'ready' | 'loading' | 'empty' | 'error'} ChartStatus */
