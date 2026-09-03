@@ -148,6 +148,10 @@ import {
   createInitialSummaryDraft,
 } from "@/components/gridView/SummaryRowEditor";
 import {
+  MultiSheetSummaryEditor,
+  createInitialMultiSheetSummaryDraft,
+} from "@/components/gridView/MultiSheetSummaryEditor";
+import {
   collectWorkspaceSummaryRefs,
   computeSummaryRow,
   isSummaryRefKey,
@@ -155,6 +159,10 @@ import {
   summaryRefKey,
   summaryRefOutputName,
 } from "@/lib/sheetOperations/computeSummaryRow";
+import {
+  computeMultiSheetSummary,
+  normalizeMultiSheetSummaryConfig,
+} from "@/lib/sheetOperations/computeMultiSheetSummary";
 import { listSheetEquations, subscribeSheetEquationEdit } from "@/lib/sheetEquationEditRequest";
 import { parseJsonRows } from "@/lib/parseSheetImportText";
 import {
@@ -667,6 +675,9 @@ const GridView = ({ startNew, fillViewport = false }) => {
     const [mathDestination, setMathDestination] = useState("current_sheet");
     const [mathDialogTab, setMathDialogTab] = useState("basic");
     const [summaryDraft, setSummaryDraft] = useState(() => createInitialSummaryDraft(null, []));
+    const [multiSummaryDraft, setMultiSummaryDraft] = useState(() =>
+      createInitialMultiSheetSummaryDraft(null),
+    );
     /** When set, Apply updates this operation instead of appending a new one. */
     const [mathEditingOpId, setMathEditingOpId] = useState(null);
     const [quantBusy, setQuantBusy] = useState(false);
@@ -1173,6 +1184,7 @@ const GridView = ({ startNew, fillViewport = false }) => {
       setStatsBucketActive(false);
       setMathAsPercent(false);
       setSummaryDraft(createInitialSummaryDraft(null, sheetColumnNamesForMath));
+      setMultiSummaryDraft(createInitialMultiSheetSummaryDraft(null));
     }, [nextFreeResultColumnName, sheetColumnNamesForMath]);
 
     /** Append a math op, or replace the one being edited in the math dialog. */
@@ -1215,6 +1227,19 @@ const GridView = ({ startNew, fillViewport = false }) => {
             null;
           setSummaryDraft(createInitialSummaryDraft(cfg, sheetColumnNamesForMath));
           setMathDialogTab("summary");
+          setMathEditingOpId(opId);
+          setMathDialogOpen(true);
+          return;
+        }
+
+        if (type === "summary.multi_sheet") {
+          const cfg =
+            op?.multiSheetSummaryConfig ||
+            op?.payload?.multiSheetSummaryConfig ||
+            activeSheet?.multiSheetSummaryConfig ||
+            null;
+          setMultiSummaryDraft(createInitialMultiSheetSummaryDraft(cfg));
+          setMathDialogTab("multi_summary");
           setMathEditingOpId(opId);
           setMathDialogOpen(true);
           return;
@@ -1334,7 +1359,7 @@ const GridView = ({ startNew, fillViewport = false }) => {
 
         toast.message("No editor available for this equation yet.");
       },
-      [activeSheetId, activeSheet?.summaryConfig, sheetColumnNamesForMath],
+      [activeSheetId, activeSheet?.summaryConfig, activeSheet?.multiSheetSummaryConfig, sheetColumnNamesForMath],
     );
 
     useEffect(() => {
@@ -1342,7 +1367,19 @@ const GridView = ({ startNew, fillViewport = false }) => {
       if (mathDialogTab === "summary" && !mathEditingOpId) {
         setSummaryDraft(createInitialSummaryDraft(activeSheet?.summaryConfig, sheetColumnNamesForMath));
       }
-    }, [mathDialogOpen, mathDialogTab, activeSheet?.summaryConfig, sheetColumnNamesForMath, mathEditingOpId]);
+      if (mathDialogTab === "multi_summary" && !mathEditingOpId) {
+        setMultiSummaryDraft(
+          createInitialMultiSheetSummaryDraft(activeSheet?.multiSheetSummaryConfig || null),
+        );
+      }
+    }, [
+      mathDialogOpen,
+      mathDialogTab,
+      activeSheet?.summaryConfig,
+      activeSheet?.multiSheetSummaryConfig,
+      sheetColumnNamesForMath,
+      mathEditingOpId,
+    ]);
 
     useEffect(() => {
       return subscribeSheetEquationEdit((req) => openMathEquationEntry(req));
@@ -1370,6 +1407,46 @@ const GridView = ({ startNew, fillViewport = false }) => {
         for (const [lid, { row }] of Object.entries(patches)) {
           if (!next[lid]) continue;
           next[lid] = { ...next[lid], data: [row], summaryRow: row };
+          changed = true;
+        }
+        return changed ? next : prev;
+      });
+    }, [dataSheets, setDataSheets]);
+
+    const lastMultiSummarySyncRef = useRef({});
+    useEffect(() => {
+      if (!setDataSheets || !dataSheets) return;
+      /** @type {Record<string, { rows: object[]; metricColumns: string[] }>} */
+      const patches = {};
+      for (const [sid, sheet] of Object.entries(dataSheets)) {
+        const cfg = sheet?.multiSheetSummaryConfig;
+        if (!cfg || !Array.isArray(cfg.sourceSheetIds) || !cfg.sourceSheetIds.length) continue;
+        if (!Array.isArray(cfg.metrics) || !cfg.metrics.length) continue;
+        const resultId = String(cfg.resultSheetId || sid);
+        if (resultId !== sid) continue;
+        const computed = computeMultiSheetSummary(dataSheets, cfg);
+        if (computed.errors.length) continue;
+        const sig = computed.rows
+          .map((r) => `${r.source_sheet_id}:${computed.metricColumns.map((c) => `${c}=${r[c]}`).join(",")}`)
+          .join("|");
+        if (lastMultiSummarySyncRef.current[sid] === sig) continue;
+        lastMultiSummarySyncRef.current[sid] = sig;
+        patches[sid] = { rows: computed.rows, metricColumns: computed.metricColumns };
+      }
+      if (!Object.keys(patches).length) return;
+      setDataSheets((prev) => {
+        let changed = false;
+        const next = { ...(prev || {}) };
+        for (const [rid, { rows, metricColumns }] of Object.entries(patches)) {
+          if (!next[rid]) continue;
+          next[rid] = {
+            ...next[rid],
+            data: rows,
+            dataTypes: {
+              ...(next[rid].dataTypes || {}),
+              ...Object.fromEntries(metricColumns.map((c) => [c, "number"])),
+            },
+          };
           changed = true;
         }
         return changed ? next : prev;
@@ -1499,6 +1576,121 @@ const GridView = ({ startNew, fillViewport = false }) => {
       });
       toast("Summary row cleared");
     }, [activeSheetId, setDataSheets]);
+
+    const applyMultiSheetSummary = useCallback(() => {
+      const config = normalizeMultiSheetSummaryConfig(multiSummaryDraft);
+      if (!config.sourceSheetIds.length) {
+        toast.error("Select at least one sheet.");
+        return;
+      }
+      if (!config.metrics.length) {
+        toast.error("Add at least one summary column.");
+        return;
+      }
+      for (const m of config.metrics) {
+        if (!String(m.outputName || "").trim()) {
+          toast.error("Each column needs a label.");
+          return;
+        }
+        if (m.op !== "count_rows" && !String(m.column || "").trim()) {
+          toast.error(`Column "${m.outputName}" needs a source column.`);
+          return;
+        }
+      }
+      const computed = computeMultiSheetSummary(dataSheets, config);
+      if (computed.errors.length) {
+        toast.error(computed.errors[0]);
+        return;
+      }
+      if (!computed.rows.length) {
+        toast.error("No rows were produced.");
+        return;
+      }
+
+      const operation = createSheetOperation("summary.multi_sheet", {
+        ...(mathEditingOpId ? { id: mathEditingOpId } : {}),
+        multiSheetSummaryConfig: config,
+        outputs: computed.metricColumns,
+      });
+
+      if (mathEditingOpId && activeSheetId && activeSheet?.multiSheetSummaryConfig) {
+        const wasEditing = true;
+        setDataSheets?.((prev) => {
+          const sheet = prev?.[activeSheetId];
+          if (!sheet) return prev;
+          const nextConfig = { ...config, resultSheetId: activeSheetId };
+          const base = {
+            ...(prev || {}),
+            [activeSheetId]: {
+              ...sheet,
+              data: computed.rows,
+              multiSheetSummaryConfig: nextConfig,
+              dataTypes: {
+                ...(sheet.dataTypes || {}),
+                ...Object.fromEntries(computed.metricColumns.map((c) => [c, "number"])),
+              },
+            },
+          };
+          return replaceSheetOperation(base, activeSheetId, mathEditingOpId, {
+            ...operation,
+            multiSheetSummaryConfig: nextConfig,
+          });
+        });
+        toast.success(wasEditing ? "Multi-sheet summary updated." : "Multi-sheet summary created.");
+        setMathEditingOpId(null);
+        setMathDialogOpen(false);
+        return;
+      }
+
+      if (!addNewSheetAndActivate || !setSheetData || !setDataSheets) {
+        toast.error("Cannot create a new sheet in this view.");
+        return;
+      }
+
+      const sheetName = `Multi summary · ${config.sourceSheetIds.length} sheets`.slice(0, 80);
+      addNewSheetAndActivate((newId) => {
+        setSheetData(newId, computed.rows);
+        setDataSheets((prev) => {
+          const p = prev || {};
+          const linked = p[newId];
+          if (!linked) return prev;
+          const nextConfig = { ...config, resultSheetId: newId };
+          const nextOp = {
+            ...operation,
+            multiSheetSummaryConfig: nextConfig,
+          };
+          return {
+            ...p,
+            [newId]: {
+              ...linked,
+              name: sheetName,
+              data: computed.rows,
+              multiSheetSummaryConfig: nextConfig,
+              dataTypes: Object.fromEntries([
+                ["source_sheet_id", "string"],
+                ...computed.metricColumns.map((c) => [c, "number"]),
+              ]),
+              operationHistory: [
+                ...(Array.isArray(linked.operationHistory) ? linked.operationHistory : []),
+                nextOp,
+              ],
+            },
+          };
+        });
+      });
+      toast.success("Created multi-sheet summary.");
+      setMathEditingOpId(null);
+      setMathDialogOpen(false);
+    }, [
+      multiSummaryDraft,
+      dataSheets,
+      mathEditingOpId,
+      activeSheetId,
+      activeSheet,
+      addNewSheetAndActivate,
+      setSheetData,
+      setDataSheets,
+    ]);
 
     useEffect(() => {
       if (!mathDialogOpen) return;
@@ -4465,6 +4657,9 @@ const GridView = ({ startNew, fillViewport = false }) => {
                           <TabsTrigger value="summary" className="h-7 px-2 text-xs">
                             Summary row
                           </TabsTrigger>
+                          <TabsTrigger value="multi_summary" className="h-7 px-2 text-xs">
+                            Multi-sheet summary
+                          </TabsTrigger>
                           <TabsTrigger value="quant" className="h-7 px-2 text-xs">
                             Quant Operations
                           </TabsTrigger>
@@ -5630,6 +5825,13 @@ const GridView = ({ startNew, fillViewport = false }) => {
                             columnNames={sheetColumnNamesForMath}
                           />
                         </TabsContent>
+                        <TabsContent value="multi_summary" className="mt-2 space-y-3">
+                          <MultiSheetSummaryEditor
+                            draft={multiSummaryDraft}
+                            onChange={setMultiSummaryDraft}
+                            dataSheets={dataSheets}
+                          />
+                        </TabsContent>
                         <TabsContent value="quant" className="mt-2 space-y-3">
                           <QuantOperationsPanel
                             rows={connectedData}
@@ -5657,6 +5859,7 @@ const GridView = ({ startNew, fillViewport = false }) => {
                       </Tabs>
                       {mathDialogTab !== "quant" &&
                       mathDialogTab !== "summary" &&
+                      mathDialogTab !== "multi_summary" &&
                       !(mathDialogTab === "stats" && statsBucketActive) ? (
                         <div className="space-y-1">
                           <Label className="text-xs">Apply to</Label>
@@ -5688,7 +5891,7 @@ const GridView = ({ startNew, fillViewport = false }) => {
                         <div className="min-h-0 flex-1 space-y-1 overflow-y-auto pr-0.5">
                           {mathPanelEquations.length === 0 ? (
                             <p className="text-[11px] leading-relaxed text-muted-foreground">
-                              Applied Basic, Functions, Stats, Summary, and Quant ops appear here. Click one to edit it on the left.
+                              Applied Basic, Functions, Stats, Summary, Multi-sheet summary, and Quant ops appear here. Click one to edit it on the left.
                             </p>
                           ) : (
                             mathPanelEquations.map((entry) => {
@@ -5697,6 +5900,7 @@ const GridView = ({ startNew, fillViewport = false }) => {
                               const type = String(entry?.type || "");
                               let section = "Op";
                               if (type === "summary.row") section = "Summary";
+                              else if (type === "summary.multi_sheet") section = "Multi summary";
                               else if (type === "bucket.sheet" || type === "band.sheet") section = "Stats";
                               else if (type.startsWith("quant.")) section = "Quant";
                               else if (kind === "relative-row") section = "Functions";
@@ -5750,6 +5954,7 @@ const GridView = ({ startNew, fillViewport = false }) => {
                         type="button"
                         onClick={() => {
                           if (mathDialogTab === "summary") applySummaryRow();
+                          else if (mathDialogTab === "multi_summary") applyMultiSheetSummary();
                           else if (mathDialogTab === "stats") {
                             if (statsBucketActive) void applyStatsBucket();
                             else if (statsCumsumActive) applyStatsCumsum();
@@ -5761,6 +5966,11 @@ const GridView = ({ startNew, fillViewport = false }) => {
                           quantBusy ||
                           (mathDialogTab === "summary" &&
                             !(Array.isArray(summaryDraft?.metrics) && summaryDraft.metrics.length > 0)) ||
+                          (mathDialogTab === "multi_summary" &&
+                            (!(Array.isArray(multiSummaryDraft?.sourceSheetIds) &&
+                              multiSummaryDraft.sourceSheetIds.length > 0) ||
+                              !(Array.isArray(multiSummaryDraft?.metrics) &&
+                                multiSummaryDraft.metrics.length > 0))) ||
                           (mathDialogTab === "stats" &&
                             ((!statsStdDevActive && !statsCumsumActive && !statsBucketActive) ||
                               (statsStdDevActive && !statsStdCanSubmit) ||
@@ -5781,6 +5991,8 @@ const GridView = ({ startNew, fillViewport = false }) => {
                           : mathEditingOpId
                             ? mathDialogTab === "summary"
                               ? "Update summary"
+                              : mathDialogTab === "multi_summary"
+                                ? "Update multi-sheet summary"
                               : mathDialogTab === "stats" && statsBucketActive
                                 ? "Update bucket sheet"
                                 : "Update operation"
@@ -5788,6 +6000,8 @@ const GridView = ({ startNew, fillViewport = false }) => {
                               ? summaryDraft?.destination === "new_sheet"
                                 ? "Create summary sheet"
                                 : "Add summary to this view"
+                              : mathDialogTab === "multi_summary"
+                                ? "Create multi-sheet summary"
                               : mathDialogTab === "stats" && statsBucketActive
                                 ? "Create bucket sheet"
                                 : "Apply to sheet"}

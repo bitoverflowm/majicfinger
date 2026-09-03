@@ -73,6 +73,17 @@ export function listSheetEquations(sheet) {
       out.push({ id, type, op, label: `Summary · ${label}` });
       continue;
     }
+    if (type === "summary.multi_sheet") {
+      const outputs = op.outputs || op.payload?.outputs;
+      const cfg = op.multiSheetSummaryConfig || op.payload?.multiSheetSummaryConfig;
+      const nSheets = Array.isArray(cfg?.sourceSheetIds) ? cfg.sourceSheetIds.length : 0;
+      const label =
+        Array.isArray(outputs) && outputs.length
+          ? `${outputs.join(", ")} (${nSheets || "?"} sheets)`
+          : `Multi-sheet summary (${nSheets || "?"} sheets)`;
+      out.push({ id, type, op, label: `Multi summary · ${label}` });
+      continue;
+    }
     if (type === "bucket.sheet" || type === "band.sheet") {
       out.push({
         id,

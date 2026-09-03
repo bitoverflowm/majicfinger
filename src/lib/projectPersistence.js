@@ -532,6 +532,7 @@ function buildSheetRecord(sheetId, sheet, rows, { storageMode, previewLimit, est
     userRowOverlay: sheet?.userRowOverlay && typeof sheet.userRowOverlay === "object" ? sheet.userRowOverlay : null,
     summaryConfig: sheet?.summaryConfig || null,
     summaryRow: sheet?.summaryRow || null,
+    multiSheetSummaryConfig: sheet?.multiSheetSummaryConfig || null,
     provenance: sheet?.provenance ?? null,
     sourceSheetId: sheet?.sourceSheetId ?? null,
     operationHistory,
@@ -856,6 +857,10 @@ export function applyBrowserOperationToRows(rows, op) {
   }
   if (op.type === "summary.row") {
     // Summary is stored as sheet.summaryConfig and recomputed live; history is audit-only.
+    return list;
+  }
+  if (op.type === "summary.multi_sheet") {
+    // Multi-sheet summary is stored as sheet.multiSheetSummaryConfig and recomputed live.
     return list;
   }
   if (op.type === "computed.column") {
