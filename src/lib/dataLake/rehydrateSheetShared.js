@@ -27,6 +27,7 @@ export function buildRehydrateSheetRequestBody({ sheetId, provenance, sheetGraph
     provenance,
     sheetGraph: sheetGraph && typeof sheetGraph === "object" ? sheetGraph : {},
     operationHistory: Array.isArray(src.operationHistory) ? src.operationHistory : [],
+    userRowOverlay: src.userRowOverlay && typeof src.userRowOverlay === "object" ? src.userRowOverlay : null,
     previewRowCount: resolvePreviewRowCountForRehydrate(src),
     fullRowCount: intentFull,
     intentFullRowCount: intentFull,

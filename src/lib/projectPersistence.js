@@ -1,6 +1,7 @@
 import { isLakeBigintColumnName } from "@/lib/dataLake/lakeTableColumns";
 import { normalizeLakeBigintCellValue } from "@/lib/dataLake/lakeBigintNormalize";
 import { isSheetIdDataType, sortRowsByIdColumn } from "@/lib/sheetIdOrder";
+import { applyManualCellPatchByIdentity, attachUserRowOverlays, sheetShouldKeepPersistedRows } from "@/lib/sheetUserRowOverlay";
 import { aggregateBucketRows } from "@/lib/sheetOperations/aggregateBucketRows";
 import { applyRefineQueryToRows } from "@/lib/sheetOperations/refineQuery";
 import { compareConditionValues } from "@/lib/ifElseConditionValues";
@@ -375,6 +376,7 @@ export function stripQuantRecipeSheetsForPersist(dataSheets) {
  */
 export function sanitizeSheetsForPersist(dataSheets) {
   let sheets = dataSheets && typeof dataSheets === "object" ? { ...dataSheets } : {};
+  sheets = attachUserRowOverlays(sheets);
   sheets = pruneOrphanDuplicateSheetsForPersist(sheets);
   sheets = stripRefineRecipeSheetsForPersist(sheets);
   sheets = stripQuantRecipeSheetsForPersist(sheets);
@@ -394,7 +396,7 @@ export function stripProvenanceRowPayloadFromSheets(dataSheets) {
       acc[sheetId] = sheet;
       return acc;
     }
-    if (!sheetHasComposeProvenance(sheet)) {
+    if (!sheetHasComposeProvenance(sheet) || sheetShouldKeepPersistedRows(sheet)) {
       acc[sheetId] = sheet;
       return acc;
     }
@@ -502,7 +504,8 @@ function buildSheetRecord(sheetId, sheet, rows, { storageMode, previewLimit, est
     : isRefineDerived || isQuantDerived
       ? "derived"
       : storageMode;
-  const recipeOnly = hasProvenance || isRefineDerived || isQuantDerived;
+  const keepUserRows = sheetShouldKeepPersistedRows({ ...sheet, data: rowList });
+  const recipeOnly = (hasProvenance || isRefineDerived || isQuantDerived) && !keepUserRows;
   const data = recipeOnly
     ? []
     : effectiveStorageMode === "inline"
@@ -526,6 +529,7 @@ function buildSheetRecord(sheetId, sheet, rows, { storageMode, previewLimit, est
     previewRowCount: data.length,
     columns,
     dataTypes: sheet?.dataTypes || null,
+    userRowOverlay: sheet?.userRowOverlay && typeof sheet.userRowOverlay === "object" ? sheet.userRowOverlay : null,
     summaryConfig: sheet?.summaryConfig || null,
     summaryRow: sheet?.summaryRow || null,
     provenance: sheet?.provenance ?? null,
@@ -537,7 +541,7 @@ function buildSheetRecord(sheetId, sheet, rows, { storageMode, previewLimit, est
       ...(sheet?.saveMeta && typeof sheet.saveMeta === "object" ? sheet.saveMeta : {}),
       truncated: recipeOnly || effectiveStorageMode === "provenance",
       recipeOnly,
-      persistRows: !recipeOnly,
+      persistRows: !recipeOnly || keepUserRows,
       savedAt,
       fullRowCount,
       estimatedFullBytes:
@@ -584,7 +588,7 @@ function shrinkProvenancePreviewsUntilWithinBudget(payload, safeBytes) {
     const trimmedSheets = Object.entries(sheets).reduce((acc, [sheetId, sheet]) => {
       const rows = Array.isArray(sheet?.data) ? sheet.data : [];
       const isProvenance = sheet?.storageMode === "provenance";
-      const recipeOnly = sheetHasComposeProvenance(sheet);
+      const recipeOnly = sheetHasComposeProvenance(sheet) && !sheetShouldKeepPersistedRows(sheet);
       acc[sheetId] = {
         ...sheet,
         data: recipeOnly ? [] : isProvenance ? rows.slice(0, previewLimit) : rows,
@@ -830,12 +834,7 @@ export function applyBrowserOperationToRows(rows, op) {
     return next;
   }
   if (op.type === "manual.cell.patch") {
-    const rowKey = op.rowKey;
-    const col = String(op.column || "");
-    return list.map((row, idx) => {
-      const key = row?._lychee_row_id ?? row?._origIndex ?? idx;
-      return String(key) === String(rowKey) ? { ...row, [col]: op.value } : row;
-    });
+    return applyManualCellPatchByIdentity(list, op);
   }
   if (op.type === "manual.row.delete") {
     const rowKey = op.rowKey;

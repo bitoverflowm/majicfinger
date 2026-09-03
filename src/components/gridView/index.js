@@ -151,6 +151,11 @@ import {
   summaryRefOutputName,
 } from "@/lib/sheetOperations/computeSummaryRow";
 import { listSheetEquations, subscribeSheetEquationEdit } from "@/lib/sheetEquationEditRequest";
+import {
+  mergeUserRowOverlays,
+  sheetRowIdentityFields,
+  sheetRowIdentityKey,
+} from "@/lib/sheetUserRowOverlay";
 import { BUCKET_TIME_INTERVALS } from "@/lib/sheetOperations/bucketTimeIntervals";
 
 /** Column + summary named-value options for math operand selects. */
@@ -232,7 +237,7 @@ const BUCKET_AGG_FILTER_OPERATORS = [
 
 function stripInternalGridFields(row) {
   if (!row || typeof row !== "object") return row;
-  const { _origIndex, ...clean } = row;
+  const { _origIndex, _lychee_row_id, ...clean } = row;
   return clean;
 }
 
@@ -3620,20 +3625,43 @@ const GridView = ({ startNew, fillViewport = false }) => {
     );
 
     const updateCellData = (row, field, newValue) => {
-        if (field === '_origIndex') return;
+        if (field === '_origIndex' || field === '_lychee_row_id') return;
         if (newValue === "PRETTY PLEASE DELETE ROW") {
             handleDeleteRow(row);
             return;
         }
+        const identity = sheetRowIdentityFields(row);
+        const identityKey = sheetRowIdentityKey(row);
         const origIndex = row && row._origIndex;
-        if (origIndex == null) return;
+        if (origIndex == null && !identityKey) return;
         setConnectedData((prevData) => {
-          const newData = prevData.map((item, index) =>
-            index === origIndex ? { ...item, [field]: newValue } : item
-          );
+          const newData = (prevData || []).map((item, index) => {
+            if (identityKey && sheetRowIdentityKey(item) === identityKey) {
+              return { ...item, [field]: newValue };
+            }
+            if (!identityKey && index === origIndex) {
+              return { ...item, [field]: newValue };
+            }
+            return item;
+          });
           return newData;
         });
-        appendActiveSheetOperation("manual.cell.patch", { rowKey: origIndex, column: field, value: newValue });
+        if (activeSheetId && setDataSheets && identityKey) {
+          setDataSheets((prev) => {
+            const sheet = prev?.[activeSheetId];
+            if (!sheet) return prev;
+            const nextOverlay = mergeUserRowOverlays(sheet.userRowOverlay, {
+              [identityKey]: { [field]: newValue, ...(identity || {}) },
+            });
+            return { ...prev, [activeSheetId]: { ...sheet, userRowOverlay: nextOverlay } };
+          });
+        }
+        appendActiveSheetOperation("manual.cell.patch", {
+          rowKey: identityKey || origIndex,
+          column: field,
+          value: newValue,
+          ...(identity ? { identity } : {}),
+        });
         toast('Data updated. Chart updated!', { duration: 5000 });
     };
 

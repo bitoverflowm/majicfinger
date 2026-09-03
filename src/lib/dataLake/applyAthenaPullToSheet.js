@@ -1,6 +1,7 @@
 import { coerceDataTypes } from "@/lib/coerceDataTypes";
 import { athenaRowsToObjects } from "@/lib/duckdb/athenaRowsToObjects";
 import { findSheetIdOrderColumn, sortRowsByIdColumn } from "@/lib/sheetIdOrder";
+import { buildUserRowOverlay, mergeUserRowOverlays, overlayUserColumnsByIdentity } from "@/lib/sheetUserRowOverlay";
 
 /** Above this row count, skip synchronous coerce (Mongo loads don't coerce either). */
 const COERCE_ROW_CAP = 50_000;
@@ -43,12 +44,23 @@ export function applyAthenaPullToSheetPatch(prev, sheetId, rows, extras = {}) {
   let rowData =
     raw.length > COERCE_ROW_CAP ? raw : coerceDataTypes(raw);
   const cur = prev?.[sheetId] || { name: "Sheet 1", data: [] };
+  const sourceKeys = rowData[0] && typeof rowData[0] === "object" ? Object.keys(rowData[0]) : [];
+  rowData = overlayUserColumnsByIdentity(
+    rowData,
+    Array.isArray(cur.data) ? cur.data : [],
+    cur.userRowOverlay,
+    sourceKeys,
+  );
   const idCol =
     findSheetIdOrderColumn(cur.dataTypes) || findSheetIdOrderColumn(extras.dataTypes);
   if (idCol) {
     rowData = sortRowsByIdColumn(rowData, idCol);
   }
   const pulledAt = Date.now();
+  const bandResult =
+    rowData.length > 0 &&
+    rowData.length <= 250 &&
+    rowData.some((row) => row && row.band != null && String(row.band).trim() !== "");
 
   return {
     ...(prev || {}),
@@ -58,12 +70,19 @@ export function applyAthenaPullToSheetPatch(prev, sheetId, rows, extras = {}) {
       data: rowData,
       storageMode: "inline",
       rehydrationStatus: "complete",
+      ...(bandResult
+        ? { rowCount: rowData.length, fullRowCount: rowData.length }
+        : {}),
       athenaPullSnapshot: {
         rowCount: rowData.length,
         pulledAt,
       },
       ...(extras.provenance ? { provenance: extras.provenance } : {}),
       ...(extras.requestCards ? { requestCards: extras.requestCards } : {}),
+      userRowOverlay: mergeUserRowOverlays(
+        cur.userRowOverlay,
+        buildUserRowOverlay(rowData, sourceKeys),
+      ),
       ...(extras.dataTypes
         ? {
             dataTypes: {

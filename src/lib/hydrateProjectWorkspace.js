@@ -12,6 +12,7 @@ import {
 import { stripProvenanceRowPayloadForLoad } from "@/lib/projectPersistence";
 import { coerceDataTypes } from "@/lib/coerceDataTypes";
 import { orderSheetRowsByDataTypes } from "@/lib/sheetIdOrder";
+import { overlayUserColumnsByIdentity } from "@/lib/sheetUserRowOverlay";
 
 /**
  * Shared helpers to load a saved DataSet (project) into sheet + chart workspace state.
@@ -29,7 +30,12 @@ export function applyDataSetToWorkspace(ds, { setDataSheets, setActiveSheetId, s
             ? "derived"
             : "inline";
       const raw = Array.isArray(sheet?.data) ? sheet.data : [];
-      const coerced = coerceDataTypes(raw);
+      const coerced = overlayUserColumnsByIdentity(
+        coerceDataTypes(raw),
+        raw,
+        sheet?.userRowOverlay,
+        null,
+      );
       acc[sheetId] = {
         ...sheet,
         data: orderSheetRowsByDataTypes(coerced, sheet?.dataTypes),
@@ -182,7 +188,13 @@ function applyActiveSheetFromSheets(allSheets, setters) {
   if (!allSheets || !setDataSheets) return;
   const coerced = Object.fromEntries(
     Object.entries(allSheets).map(([id, sheet]) => {
-      const rows = coerceDataTypes(Array.isArray(sheet?.data) ? sheet.data : []);
+      const raw = Array.isArray(sheet?.data) ? sheet.data : [];
+      const rows = overlayUserColumnsByIdentity(
+        coerceDataTypes(raw),
+        raw,
+        sheet?.userRowOverlay,
+        null,
+      );
       return [
         id,
         {

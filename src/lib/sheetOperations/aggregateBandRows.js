@@ -144,7 +144,9 @@ export function zeroFillBandAggregateRows(aggregatedRows, rawConfig) {
     const label = bandDisplayLabel(band, bandColumn);
     const existing = byLabel.get(label);
     if (existing) {
-      return { ...existing, id: idx };
+      const next = { ...existing };
+      if (next.id == null || next.id === "") next.id = idx;
+      return next;
     }
     const empty = { [bandOutputColumn]: label, id: idx };
     for (const col of aggCols) {

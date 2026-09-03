@@ -5,6 +5,7 @@ import { athenaRowsToObjects } from "@/lib/duckdb/athenaRowsToObjects";
 import { normalizeLakeBigintFieldsInRows } from "@/lib/dataLake/lakeBigintNormalize";
 import { hashJson, replayOperations } from "@/lib/projectPersistence";
 import { resolvePreviewRowCountForRehydrate } from "@/lib/dataLake/rehydrateSheetShared";
+import { overlayUserColumnsByIdentity } from "@/lib/sheetUserRowOverlay";
 
 /**
  * @param {object} body — rehydrate request body (operationHistory, saveMeta, …)
@@ -22,11 +23,16 @@ export function finalizeRehydrateSheetResult(body, athenaResult, requestedLimit)
     Array.isArray(athenaResult?.columns) ? athenaResult.columns : [],
     Array.isArray(athenaResult?.rows) ? athenaResult.rows : [],
   );
-  const replayedRows = normalizeLakeBigintFieldsInRows(
-    replayOperations({
-      rows: rawObjects,
-      operations: Array.isArray(body?.operationHistory) ? body.operationHistory : [],
-    }),
+  const replayedRows = overlayUserColumnsByIdentity(
+    normalizeLakeBigintFieldsInRows(
+      replayOperations({
+        rows: rawObjects,
+        operations: Array.isArray(body?.operationHistory) ? body.operationHistory : [],
+      }),
+    ),
+    null,
+    body?.userRowOverlay,
+    Array.isArray(athenaResult?.columns) ? athenaResult.columns : null,
   );
 
   const replayedColumns = [];
