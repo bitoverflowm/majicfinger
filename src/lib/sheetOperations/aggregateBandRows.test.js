@@ -1,5 +1,9 @@
 import assert from "node:assert/strict";
-import { aggregateBandRows, valueMatchesBandPredicate } from "./aggregateBandRows.js";
+import {
+  aggregateBandRows,
+  assignVolumeBandPresetOrderIds,
+  valueMatchesBandPredicate,
+} from "./aggregateBandRows.js";
 import { createVolumeBandPresets } from "./bandsConfig.js";
 
 function test(name, fn) {
@@ -67,12 +71,27 @@ test("aggregateBandRows collapses to one row per configured band", () => {
 
   assert.equal(out.length, 7);
   assert.equal(out[0].band, "volume = 0");
+  assert.equal(out[0].id, 0);
   assert.equal(out[0].market_count, 2);
+  assert.equal(out[1].id, 1);
   assert.equal(out[1].market_count, 1);
   assert.equal(out[2].market_count, 1);
   assert.equal(out[3].market_count, 1);
+  assert.equal(out[6].id, 6);
   assert.equal(out[6].market_count, 1);
   assert.equal(out[6].total_volume, 200000000);
   assert.equal(out[4].market_count, 0);
   assert.equal(out[5].market_count, 0);
+});
+
+test("assignVolumeBandPresetOrderIds repairs scrambled ids from band labels", () => {
+  const rows = [
+    { band: "100,000 ≤ volume < 1,000,000", id: 0, market_count: 1 },
+    { band: "volume = 0", id: 3, market_count: 2 },
+    { band: "volume ≥ 100,000,000", id: 2, market_count: 3 },
+  ];
+  const out = assignVolumeBandPresetOrderIds(rows);
+  assert.equal(out.find((r) => r.band === "volume = 0").id, 0);
+  assert.equal(out.find((r) => r.band === "100,000 ≤ volume < 1,000,000").id, 3);
+  assert.equal(out.find((r) => r.band === "volume ≥ 100,000,000").id, 6);
 });

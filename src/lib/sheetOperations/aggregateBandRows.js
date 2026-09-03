@@ -2,6 +2,7 @@ import { aggregateBucketRows } from "./aggregateBucketRows.js";
 import {
   formatBandPredicateLabel,
   normalizeBandsConfig,
+  createVolumeBandPresets,
 } from "./bandsConfig.js";
 
 function parseBandNumber(value) {
@@ -113,6 +114,9 @@ export function aggregateBandRows(rows, rawConfig) {
  * Ensure every configured band appears (zeros for empty), preserving band order.
  * Used after Athena CASE+GROUP BY (which omits empty groups) and after client aggregate.
  *
+ * Each output row gets a stable numeric `id` = index in the bands config (0…n-1),
+ * so charts/`_id` ordering follow the definition order (e.g. volume = 0 → id 0).
+ *
  * @param {object[]} aggregatedRows
  * @param {object} rawConfig
  * @returns {object[]}
@@ -136,14 +140,65 @@ export function zeroFillBandAggregateRows(aggregatedRows, rawConfig) {
     .map((a) => String(a?.outputColumn || "").trim())
     .filter(Boolean);
 
-  return bands.map((band) => {
+  return bands.map((band, idx) => {
     const label = bandDisplayLabel(band, bandColumn);
     const existing = byLabel.get(label);
-    if (existing) return existing;
-    const empty = { [bandOutputColumn]: label };
+    if (existing) {
+      return { ...existing, id: idx };
+    }
+    const empty = { [bandOutputColumn]: label, id: idx };
     for (const col of aggCols) {
       empty[col] = 0;
     }
     return empty;
+  });
+}
+
+/**
+ * Reassign sequential `id` values from band-definition order by matching the band label column.
+ * Fixes sheets where id drifted from the band rows (e.g. after re-sorts or edits).
+ *
+ * @param {object[]} rows
+ * @param {object | null | undefined} rawConfig
+ * @returns {object[]}
+ */
+export function assignBandOrderIds(rows, rawConfig) {
+  const list = Array.isArray(rows) ? rows : [];
+  if (!list.length) return list;
+  const config = normalizeBandsConfig(rawConfig);
+  const bandOutputColumn = String(config.bandOutputColumn || "band").trim() || "band";
+  const bands = Array.isArray(config.bands) ? config.bands : [];
+  const bandColumn = String(config.bandColumn || "").trim();
+  if (!bands.length) return list;
+
+  const labelToId = new Map();
+  bands.forEach((band, idx) => {
+    const label = bandDisplayLabel(band, bandColumn);
+    if (label) labelToId.set(label, idx);
+  });
+
+  return list.map((row) => {
+    if (!row || typeof row !== "object") return row;
+    const label = String(row[bandOutputColumn] ?? "").trim();
+    if (!labelToId.has(label)) return row;
+    return { ...row, id: labelToId.get(label) };
+  });
+}
+
+/**
+ * Best-effort repair when bands config is unavailable: match `band` labels to the
+ * standard volume-band preset order (volume = 0 → id 0, …).
+ *
+ * @param {object[]} rows
+ * @param {string} [bandOutputColumn]
+ * @param {string} [volumeColumn]
+ * @returns {object[]}
+ */
+export function assignVolumeBandPresetOrderIds(rows, bandOutputColumn = "band", volumeColumn = "volume") {
+  const presets = createVolumeBandPresets(volumeColumn);
+  return assignBandOrderIds(rows, {
+    bandColumn: volumeColumn,
+    bandOutputColumn,
+    bands: presets,
   });
 }

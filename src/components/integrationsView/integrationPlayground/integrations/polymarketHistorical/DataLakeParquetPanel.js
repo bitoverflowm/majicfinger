@@ -1539,17 +1539,17 @@ export default function DataLakeParquetPanel({
   const collapseResearchBucketingRows = useCallback((rows) => {
     const source = Array.isArray(rows) ? rows : [];
     if (researchBucketingAppliedRef.current) {
-      return { rows: source, sheetName: "", applied: false };
+      return { rows: source, sheetName: "", applied: false, dataTypes: null };
     }
     const pending = peekPendingResearchBucketing();
     if (!pending?.enabled || !pending.config) {
-      return { rows: source, sheetName: "", applied: false };
+      return { rows: source, sheetName: "", applied: false, dataTypes: null };
     }
     const result = applyResearchBucketingToRows(source, pending.config, {
       athenaCompiled: !!pending.athenaCompiled,
     });
     if (!result.applied) {
-      return { rows: source, sheetName: "", applied: false };
+      return { rows: source, sheetName: "", applied: false, dataTypes: null };
     }
     takePendingResearchBucketing();
     researchBucketingAppliedRef.current = true;
@@ -1573,6 +1573,7 @@ export default function DataLakeParquetPanel({
       rows: result.rows,
       sheetName: result.sheetName || "",
       applied: true,
+      dataTypes: result.dataTypes || null,
     };
   }, []);
 
@@ -1595,12 +1596,14 @@ export default function DataLakeParquetPanel({
       const provenance = outExtras?.provenance ?? null;
       const requestCards = outExtras?.requestCards;
       const name = outExtras?.name;
+      const dataTypes = collapsed.dataTypes || outExtras?.dataTypes || null;
       const rowCount = Array.isArray(outRows) ? outRows.length : 0;
       const patch = (prev) =>
         applyAthenaPullToSheetPatch(prev, activeSheetId, outRows, {
           provenance,
           requestCards,
           name,
+          ...(dataTypes ? { dataTypes } : {}),
         });
       if (!activeSheetId || !setDataSheets) {
         replaceCurrentSheetData?.(outRows);

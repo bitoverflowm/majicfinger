@@ -137,6 +137,7 @@ import {
   getBucketTabValidationErrors,
 } from "@/lib/bucketSheetTabs";
 import { aggregateBucketRows, formatBucketNumber } from "@/lib/sheetOperations/aggregateBucketRows";
+import { assignVolumeBandPresetOrderIds } from "@/lib/sheetOperations/aggregateBandRows";
 import { QuantOperationsPanel } from "@/components/gridView/QuantOperationsPanel";
 import {
   SummaryRowEditor,
@@ -904,7 +905,16 @@ const GridView = ({ startNew, fillViewport = false }) => {
 
       const normalizedType = isSheetIdDataType(newType) ? SHEET_ID_DATA_TYPE : newType;
       let updatedData = convertDataType(connectedData, colName, normalizedType);
+      let repairedBandIds = false;
       if (isSheetIdDataType(normalizedType)) {
+        // Band sheets: re-stamp id from band-definition order so charts follow volume = 0 → 0, …
+        const hasBandCol = (updatedData || []).some(
+          (row) => row && typeof row === "object" && row.band != null && String(row.band).trim() !== "",
+        );
+        if (colName === "id" && hasBandCol) {
+          updatedData = assignVolumeBandPresetOrderIds(updatedData, "band", "volume");
+          repairedBandIds = true;
+        }
         updatedData = sortRowsByIdColumn(updatedData, colName);
       }
       const nextTypes = {
@@ -939,7 +949,9 @@ const GridView = ({ startNew, fillViewport = false }) => {
       appendActiveSheetOperation("cast.column", { column: colName, dataType: normalizedType });
       toast(
         isSheetIdDataType(normalizedType)
-          ? `Column "${colName}" typed as _id — rows stay ordered by this column.`
+          ? repairedBandIds
+            ? `Column "id" typed as _id — ids reset to band order (volume = 0 → 0, …).`
+            : `Column "${colName}" typed as _id — rows stay ordered by this column.`
           : `Column "${colName}" type updated to "${normalizedType}"`,
         { duration: 5000 },
       );
