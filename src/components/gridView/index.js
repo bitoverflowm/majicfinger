@@ -29,6 +29,7 @@ import {
   findSheetIdOrderColumn,
   isNumberLikeSheetDataType,
   isSheetIdDataType,
+  orderSheetRowsByDataTypes,
   SHEET_ID_DATA_TYPE,
   sortRowsByIdColumn,
   toAgGridCellDataType,
@@ -50,6 +51,7 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
+import { Textarea } from "@/components/ui/textarea"
 import { Label } from "@/components/ui/label"
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
@@ -151,7 +153,9 @@ import {
   summaryRefOutputName,
 } from "@/lib/sheetOperations/computeSummaryRow";
 import { listSheetEquations, subscribeSheetEquationEdit } from "@/lib/sheetEquationEditRequest";
+import { parseJsonRows } from "@/lib/parseSheetImportText";
 import {
+  buildUserRowOverlay,
   mergeUserRowOverlays,
   sheetRowIdentityFields,
   sheetRowIdentityKey,
@@ -716,6 +720,9 @@ const GridView = ({ startNew, fillViewport = false }) => {
     const [sheetJsonViewerOpen, setSheetJsonViewerOpen] = useState(false);
     const [sheetJsonVisibleRows, setSheetJsonVisibleRows] = useState(SHEET_JSON_INITIAL_ROWS);
     const [sheetJsonAppending, setSheetJsonAppending] = useState(false);
+    const [sheetJsonEditing, setSheetJsonEditing] = useState(false);
+    const [sheetJsonDraft, setSheetJsonDraft] = useState("");
+    const [sheetJsonEditError, setSheetJsonEditError] = useState("");
 
     const sheetColumnsForProps = useMemo(() => {
       const row0 = Array.isArray(connectedData) && connectedData.length ? connectedData[0] : null;
@@ -725,11 +732,24 @@ const GridView = ({ startNew, fillViewport = false }) => {
         .sort();
     }, [connectedData]);
 
-    useEffect(() => {
-      if (!sheetJsonViewerOpen) return;
+    const resetSheetJsonEditState = useCallback(() => {
+      setSheetJsonEditing(false);
+      setSheetJsonDraft("");
+      setSheetJsonEditError("");
+    }, []);
+
+    const handleSheetJsonViewerOpenChange = useCallback((open) => {
+      setSheetJsonViewerOpen(open);
       setSheetJsonVisibleRows(SHEET_JSON_INITIAL_ROWS);
       setSheetJsonAppending(false);
-    }, [sheetJsonViewerOpen, activeSheetId]);
+      if (!open) resetSheetJsonEditState();
+    }, [resetSheetJsonEditState]);
+
+    useEffect(() => {
+      setSheetJsonVisibleRows(SHEET_JSON_INITIAL_ROWS);
+      setSheetJsonAppending(false);
+      resetSheetJsonEditState();
+    }, [activeSheetId, resetSheetJsonEditState]);
 
     const activeSheetRowsForJson = Array.isArray(connectedData) ? connectedData : [];
     const sheetJsonLoadedCount = Math.min(sheetJsonVisibleRows, activeSheetRowsForJson.length);
@@ -759,23 +779,25 @@ const GridView = ({ startNew, fillViewport = false }) => {
       [activeSheetRowsForJson.length, loadMoreSheetJsonRows, sheetJsonLoadedCount],
     );
     const copySheetJson = useCallback(async () => {
-      if (!activeSheetRowsForJson.length) {
+      const text = sheetJsonEditing ? sheetJsonDraft : serializeRowsAsJson(activeSheetRowsForJson);
+      if (!String(text || "").trim()) {
         toast.error("No sheet data to copy.");
         return;
       }
       try {
-        await navigator.clipboard.writeText(serializeRowsAsJson(activeSheetRowsForJson));
+        await navigator.clipboard.writeText(text);
         toast.success("Sheet JSON copied");
       } catch (e) {
         toast.error("Could not copy JSON");
       }
-    }, [activeSheetRowsForJson]);
+    }, [activeSheetRowsForJson, sheetJsonDraft, sheetJsonEditing]);
     const downloadSheetJson = useCallback(() => {
-      if (!activeSheetRowsForJson.length) {
+      const text = sheetJsonEditing ? sheetJsonDraft : serializeRowsAsJson(activeSheetRowsForJson);
+      if (!String(text || "").trim()) {
         toast.error("No sheet data to download.");
         return;
       }
-      const blob = new Blob([serializeRowsAsJson(activeSheetRowsForJson)], { type: "application/json;charset=utf-8;" });
+      const blob = new Blob([text], { type: "application/json;charset=utf-8;" });
       const nm =
         activeSheetId && dataSheets?.[activeSheetId]?.name
           ? String(dataSheets[activeSheetId].name).replace(/[^a-z0-9-_]+/gi, "-").replace(/^-+|-+$/g, "")
@@ -787,7 +809,64 @@ const GridView = ({ startNew, fillViewport = false }) => {
       a.click();
       URL.revokeObjectURL(url);
       toast.success("Sheet JSON downloaded");
-    }, [activeSheetRowsForJson, activeSheetId, dataSheets]);
+    }, [activeSheetRowsForJson, activeSheetId, dataSheets, sheetJsonDraft, sheetJsonEditing]);
+
+    const startSheetJsonEdit = useCallback(() => {
+      setSheetJsonDraft(serializeRowsAsJson(activeSheetRowsForJson));
+      setSheetJsonEditError("");
+      setSheetJsonEditing(true);
+    }, [activeSheetRowsForJson]);
+
+    const cancelSheetJsonEdit = useCallback(() => {
+      setSheetJsonEditing(false);
+      setSheetJsonDraft("");
+      setSheetJsonEditError("");
+    }, []);
+
+    const applySheetJsonDraft = useCallback(() => {
+      if (!activeSheetId || !setDataSheets) {
+        toast.error("No active sheet to update.");
+        return;
+      }
+      let parsed;
+      try {
+        parsed = parseJsonRows(sheetJsonDraft);
+      } catch (e) {
+        const message = e?.message || "Invalid JSON.";
+        setSheetJsonEditError(message);
+        toast.error(message);
+        return;
+      }
+      const cleaned = parsed.map(stripInternalGridFields);
+      const operation = createSheetOperation("manual.sheet.replace", { rows: cleaned });
+      setDataSheets((prev) => {
+        const sheets = prev || {};
+        const sheet = sheets[activeSheetId] || { name: "Sheet 1", data: [] };
+        const coerced = coerceDataTypes(cleaned);
+        const data = orderSheetRowsByDataTypes(coerced, sheet.dataTypes);
+        const sourceKeys = data[0] && typeof data[0] === "object" ? Object.keys(data[0]) : [];
+        const overlay = buildUserRowOverlay(data, sourceKeys);
+        const nextSheets = {
+          ...sheets,
+          [activeSheetId]: {
+            ...sheet,
+            data,
+            userRowOverlay: overlay,
+            rowCount: data.length,
+            saveMeta: {
+              ...(sheet.saveMeta && typeof sheet.saveMeta === "object" ? sheet.saveMeta : {}),
+              persistRows: true,
+            },
+          },
+        };
+        return appendSheetOperation(nextSheets, activeSheetId, operation);
+      });
+      setSheetJsonEditing(false);
+      setSheetJsonDraft("");
+      setSheetJsonEditError("");
+      setSheetJsonVisibleRows(SHEET_JSON_INITIAL_ROWS);
+      toast("Data updated. Chart updated!", { duration: 5000 });
+    }, [activeSheetId, setDataSheets, sheetJsonDraft]);
 
     const getColField = (col) => (col && typeof col === "object" && "field" in col ? col.field : col);
     const setColField = (col, nextField) =>
@@ -5988,9 +6067,9 @@ const GridView = ({ startNew, fillViewport = false }) => {
                   </Tooltip>
                 </TooltipProvider>
 
-                <Dialog open={sheetJsonViewerOpen} onOpenChange={setSheetJsonViewerOpen}>
+                <Dialog open={sheetJsonViewerOpen} onOpenChange={handleSheetJsonViewerOpenChange}>
                   <DialogContent className="sm:max-w-[min(90vw,720px)] max-h-[min(85dvh,640px)] flex flex-col gap-3">
-                    <DialogHeader className="pr-20">
+                    <DialogHeader className="pr-32">
                       <DialogTitle>Sheet as JSON</DialogTitle>
                       <DialogDescription>
                         {(() => {
@@ -5999,9 +6078,12 @@ const GridView = ({ startNew, fillViewport = false }) => {
                               ? String(dataSheets[activeSheetId].name)
                               : null;
                           const n = activeSheetRowsForJson.length;
+                          const mode = sheetJsonEditing
+                            ? `editable snapshot of ${n} row${n === 1 ? "" : "s"} loaded in the grid. Apply writes the sheet the same way as a cell edit.`
+                            : `snapshot of ${n} row${n === 1 ? "" : "s"} loaded in the grid.`;
                           return nm
-                            ? `Active sheet “${nm}” — read-only snapshot of ${n} row${n === 1 ? "" : "s"} loaded in the grid.`
-                            : `Active sheet — ${n} row${n === 1 ? "" : "s"} loaded in the grid.`;
+                            ? `Active sheet “${nm}” — ${mode}`
+                            : `Active sheet — ${mode}`;
                         })()}
                       </DialogDescription>
                       <div className="absolute right-12 top-5 flex items-center gap-1.5">
@@ -6029,6 +6111,29 @@ const GridView = ({ startNew, fillViewport = false }) => {
                             <TooltipTrigger asChild>
                               <Button
                                 type="button"
+                                variant={sheetJsonEditing ? "default" : "outline"}
+                                size="icon"
+                                className="h-8 w-8"
+                                aria-label={sheetJsonEditing ? "Editing sheet JSON" : "Edit sheet JSON"}
+                                aria-pressed={sheetJsonEditing}
+                                onClick={() => {
+                                  if (sheetJsonEditing) return;
+                                  startSheetJsonEdit();
+                                }}
+                              >
+                                <Pencil className="h-4 w-4" aria-hidden />
+                              </Button>
+                            </TooltipTrigger>
+                            <TooltipContent side="bottom" className="text-xs">
+                              {sheetJsonEditing ? "Editing JSON" : "Edit JSON"}
+                            </TooltipContent>
+                          </Tooltip>
+                        </TooltipProvider>
+                        <TooltipProvider delayDuration={200}>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Button
+                                type="button"
                                 variant="outline"
                                 size="icon"
                                 className="h-8 w-8"
@@ -6045,51 +6150,90 @@ const GridView = ({ startNew, fillViewport = false }) => {
                         </TooltipProvider>
                       </div>
                     </DialogHeader>
-                    <div className="space-y-1">
-                      <div className="flex items-center justify-between gap-2 text-[10px] text-muted-foreground">
-                        <span>
-                          Showing {sheetJsonLoadedCount.toLocaleString()} of {activeSheetRowsForJson.length.toLocaleString()} rows
-                        </span>
-                        <span>{sheetJsonLoadPct}%</span>
+                    {!sheetJsonEditing ? (
+                      <div className="space-y-1">
+                        <div className="flex items-center justify-between gap-2 text-[10px] text-muted-foreground">
+                          <span>
+                            Showing {sheetJsonLoadedCount.toLocaleString()} of {activeSheetRowsForJson.length.toLocaleString()} rows
+                          </span>
+                          <span>{sheetJsonLoadPct}%</span>
+                        </div>
+                        <div className="h-1.5 overflow-hidden rounded-full bg-muted">
+                          <div
+                            className="h-full rounded-full bg-slate-900 transition-[width] duration-200 dark:bg-slate-100"
+                            style={{ width: `${sheetJsonLoadPct}%` }}
+                          />
+                        </div>
                       </div>
-                      <div className="h-1.5 overflow-hidden rounded-full bg-muted">
-                        <div
-                          className="h-full rounded-full bg-slate-900 transition-[width] duration-200 dark:bg-slate-100"
-                          style={{ width: `${sheetJsonLoadPct}%` }}
-                        />
+                    ) : (
+                      <div className="text-[10px] text-muted-foreground">
+                        Editing all {activeSheetRowsForJson.length.toLocaleString()} loaded row{activeSheetRowsForJson.length === 1 ? "" : "s"} as JSON.
                       </div>
-                    </div>
-                    <pre
-                      className="min-h-0 max-h-[min(55dvh,480px)] flex-1 overflow-auto rounded-md border border-border/60 bg-muted/30 p-3 text-[11px] leading-snug font-mono whitespace-pre break-words"
-                      onScroll={handleSheetJsonScroll}
-                    >
-                      {`[\n`}
-                      {visibleSheetJsonRows.map((row, idx) => {
-                        let text = "";
-                        try {
-                          text = JSON.stringify(stripInternalGridFields(row), null, 2)
-                            .split("\n")
-                            .map((line) => `  ${line}`)
-                            .join("\n");
-                        } catch (e) {
-                          text = `  ${JSON.stringify({ error: "Could not serialize row", detail: String(e?.message || e) })}`;
-                        }
-                        const hasMoreRows = idx < visibleSheetJsonRows.length - 1;
-                        return `${text}${hasMoreRows ? "," : ""}\n`;
-                      })}
-                      {`]`}
-                    </pre>
+                    )}
+                    {sheetJsonEditing ? (
+                      <Textarea
+                        value={sheetJsonDraft}
+                        onChange={(event) => {
+                          setSheetJsonDraft(event.target.value);
+                          if (sheetJsonEditError) setSheetJsonEditError("");
+                        }}
+                        onKeyDown={(event) => {
+                          if ((event.metaKey || event.ctrlKey) && event.key === "Enter") {
+                            event.preventDefault();
+                            applySheetJsonDraft();
+                          }
+                        }}
+                        spellCheck={false}
+                        aria-invalid={Boolean(sheetJsonEditError)}
+                        aria-label="Sheet JSON editor"
+                        className="h-[min(55dvh,480px)] min-h-[240px] flex-1 resize-none overflow-auto rounded-md border border-border/60 bg-muted/30 p-3 text-[11px] leading-snug font-mono"
+                      />
+                    ) : (
+                      <pre
+                        className="min-h-0 max-h-[min(55dvh,480px)] flex-1 overflow-auto rounded-md border border-border/60 bg-muted/30 p-3 text-[11px] leading-snug font-mono whitespace-pre break-words"
+                        onScroll={handleSheetJsonScroll}
+                      >
+                        {`[\n`}
+                        {visibleSheetJsonRows.map((row, idx) => {
+                          let text = "";
+                          try {
+                            text = JSON.stringify(stripInternalGridFields(row), null, 2)
+                              .split("\n")
+                              .map((line) => `  ${line}`)
+                              .join("\n");
+                          } catch (e) {
+                            text = `  ${JSON.stringify({ error: "Could not serialize row", detail: String(e?.message || e) })}`;
+                          }
+                          const hasMoreRows = idx < visibleSheetJsonRows.length - 1;
+                          return `${text}${hasMoreRows ? "," : ""}\n`;
+                        })}
+                        {`]`}
+                      </pre>
+                    )}
                     <div className="min-h-4 text-[10px] text-muted-foreground">
-                      {sheetJsonAppending
-                        ? "Loading more JSON rows..."
-                        : sheetJsonLoadedCount < activeSheetRowsForJson.length
-                          ? `${(activeSheetRowsForJson.length - sheetJsonLoadedCount).toLocaleString()} more row${activeSheetRowsForJson.length - sheetJsonLoadedCount === 1 ? "" : "s"} available. Scroll to load more.`
-                          : "All loaded rows are visible."}
+                      {sheetJsonEditing
+                        ? (sheetJsonEditError || "⌘/Ctrl+Enter applies the JSON to the sheet.")
+                        : sheetJsonAppending
+                          ? "Loading more JSON rows..."
+                          : sheetJsonLoadedCount < activeSheetRowsForJson.length
+                            ? `${(activeSheetRowsForJson.length - sheetJsonLoadedCount).toLocaleString()} more row${activeSheetRowsForJson.length - sheetJsonLoadedCount === 1 ? "" : "s"} available. Scroll to load more.`
+                            : "All loaded rows are visible."}
                     </div>
                     <DialogFooter>
-                      <Button type="button" variant="outline" onClick={() => setSheetJsonViewerOpen(false)}>
-                        Close
-                      </Button>
+                      {sheetJsonEditing ? (
+                        <>
+                          <Button type="button" variant="outline" onClick={cancelSheetJsonEdit}>
+                            Cancel
+                          </Button>
+                          <Button type="button" onClick={applySheetJsonDraft}>
+                            Apply
+                          </Button>
+                        </>
+                      ) : (
+                        <Button type="button" variant="outline" onClick={() => setSheetJsonViewerOpen(false)}>
+                          Close
+                        </Button>
+                      )}
                     </DialogFooter>
                   </DialogContent>
                 </Dialog>

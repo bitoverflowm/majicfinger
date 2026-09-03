@@ -1,6 +1,8 @@
 import assert from "node:assert/strict";
 import {
+  applyBrowserOperationToRows,
   findQuantAthenaOperation,
+  replayOperations,
   sheetHasQuantAthenaRecipe,
   stripQuantRecipeSheetsForPersist,
 } from "./projectPersistence.js";
@@ -48,4 +50,56 @@ test("stripQuantRecipeSheetsForPersist keeps preview rows and recipe metadata", 
   assert.equal(sheet.rehydrationStatus, "preview");
   assert.equal(sheet.fullRowCount, 25552);
   assert.equal(findQuantAthenaOperation(sheet)?.rootSheetId, "sheet-1");
+});
+
+test("manual.sheet.replace restores rows when the sheet is empty", () => {
+  const out = applyBrowserOperationToRows([], {
+    type: "manual.sheet.replace",
+    rows: [
+      { band: "volume = 0", id: 0, label: "v = 0", _origIndex: 9 },
+      { band: "0 < volume < 10,000", id: 1, label: "0 < v < 10k" },
+    ],
+  });
+  assert.equal(out.length, 2);
+  assert.equal(out[0].band, "volume = 0");
+  assert.equal(out[0].id, 0);
+  assert.equal(out[0]._origIndex, undefined);
+  assert.equal(out[1].label, "0 < v < 10k");
+});
+
+test("manual.sheet.replace overlays user columns onto existing query rows by band", () => {
+  const current = [
+    { band: "0 < volume < 10,000", market_count: 99 },
+    { band: "volume = 0", market_count: 11 },
+  ];
+  const out = applyBrowserOperationToRows(current, {
+    type: "manual.sheet.replace",
+    rows: [
+      { band: "volume = 0", market_count: 10, id: 0, label: "v = 0" },
+      { band: "0 < volume < 10,000", market_count: 20, id: 1, label: "0 < v < 10k" },
+    ],
+  });
+  assert.equal(out[0].band, "0 < volume < 10,000");
+  assert.equal(out[0].market_count, 99);
+  assert.equal(out[0].id, 1);
+  assert.equal(out[0].label, "0 < v < 10k");
+  assert.equal(out[1].band, "volume = 0");
+  assert.equal(out[1].market_count, 11);
+  assert.equal(out[1].id, 0);
+  assert.equal(out[1].label, "v = 0");
+});
+
+test("replayOperations applies JSON replace after non-SQL ops", () => {
+  const out = replayOperations({
+    rows: [],
+    operations: [
+      { type: "source.compose" },
+      {
+        type: "manual.sheet.replace",
+        rows: [{ band: "volume = 0", id: 0, label: "v = 0" }],
+      },
+    ],
+  });
+  assert.equal(out.length, 1);
+  assert.equal(out[0].id, 0);
 });

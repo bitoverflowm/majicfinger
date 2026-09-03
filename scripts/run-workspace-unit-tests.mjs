@@ -45,6 +45,7 @@ import "@/lib/sheetOperations/compileBandsConfigToCompose.test.js";
 import "@/lib/sheetOperations/aggregateBandRows.test.js";
 import "@/lib/dataLake/restoreQuantAthenaReplayConfig.test.js";
 import "@/lib/projectPersistence.quant.test.js";
+import "@/lib/sheetUserRowOverlay.test.js";
 import "@/lib/dataLake/normalizeQuantAthenaRows.test.js";
 import "@/lib/dataLake/buildQuantAthenaSql.test.js";
 import "@/lib/dataLake/randomSample.test.js";

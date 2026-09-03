@@ -1,7 +1,7 @@
 import { isLakeBigintColumnName } from "@/lib/dataLake/lakeTableColumns";
 import { normalizeLakeBigintCellValue } from "@/lib/dataLake/lakeBigintNormalize";
 import { isSheetIdDataType, sortRowsByIdColumn } from "@/lib/sheetIdOrder";
-import { applyManualCellPatchByIdentity, attachUserRowOverlays, sheetShouldKeepPersistedRows } from "@/lib/sheetUserRowOverlay";
+import { applyManualCellPatchByIdentity, attachUserRowOverlays, overlayUserColumnsByIdentity, sheetShouldKeepPersistedRows } from "@/lib/sheetUserRowOverlay";
 import { aggregateBucketRows } from "@/lib/sheetOperations/aggregateBucketRows";
 import { applyRefineQueryToRows } from "@/lib/sheetOperations/refineQuery";
 import { compareConditionValues } from "@/lib/ifElseConditionValues";
@@ -835,6 +835,17 @@ export function applyBrowserOperationToRows(rows, op) {
   }
   if (op.type === "manual.cell.patch") {
     return applyManualCellPatchByIdentity(list, op);
+  }
+  if (op.type === "manual.sheet.replace") {
+    const next = (Array.isArray(op.rows) ? op.rows : [])
+      .filter((row) => row && typeof row === "object" && !Array.isArray(row))
+      .map((row) => {
+        const { _origIndex, _lychee_row_id, ...clean } = row;
+        return clean;
+      });
+    if (!list.length) return next;
+    const sourceKeys = list[0] && typeof list[0] === "object" ? Object.keys(list[0]) : [];
+    return overlayUserColumnsByIdentity(list, next, null, sourceKeys);
   }
   if (op.type === "manual.row.delete") {
     const rowKey = op.rowKey;

@@ -3,6 +3,7 @@ import {
   applyManualCellPatchByIdentity,
   buildUserRowOverlay,
   overlayUserColumnsByIdentity,
+  sheetHasUserRowEdits,
   sheetRowIdentityKey,
   sheetShouldKeepPersistedRows,
 } from "./sheetUserRowOverlay.js";
@@ -80,4 +81,13 @@ test("small band sheets keep persisted rows", () => {
     true,
   );
   assert.equal(buildUserRowOverlay([{ band: "volume = 0", id: 0, label: "v = 0" }]).hasOwnProperty("band:volume = 0"), true);
+});
+
+test("JSON replace counts as a user row edit so small sheets stay persisted", () => {
+  assert.equal(
+    sheetHasUserRowEdits({
+      operationHistory: [{ type: "manual.sheet.replace", rows: [{ band: "volume = 0", id: 0 }] }],
+    }),
+    true,
+  );
 });

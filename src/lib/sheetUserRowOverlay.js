@@ -52,7 +52,7 @@ export function sheetHasUserRowEdits(sheet) {
     if (Object.keys(sheet.userRowOverlay).length > 0) return true;
   }
   const hist = Array.isArray(sheet?.operationHistory) ? sheet.operationHistory : [];
-  if (hist.some((op) => op?.type === "manual.cell.patch" || op?.type === "manual.row.delete")) {
+  if (hist.some((op) => op?.type === "manual.cell.patch" || op?.type === "manual.row.delete" || op?.type === "manual.sheet.replace")) {
     return true;
   }
   const types = sheet?.dataTypes && typeof sheet.dataTypes === "object" ? sheet.dataTypes : {};
