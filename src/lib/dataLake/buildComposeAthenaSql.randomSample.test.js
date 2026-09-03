@@ -172,7 +172,9 @@ test("sanitize drops limitScope when random sample active", () => {
     { size: 9 },
   );
   assert.equal(out.limitScope, undefined);
-  assert.deepEqual(out.randomSample, { size: 9 });
+  assert.equal(out.randomSample.size, 9);
+  assert.equal(out.randomSample.mode, "unseeded");
+  assert.equal(out.randomSample.enabled, true);
 });
 
 test("hub draft hydration sanitizes limit when random sample enabled", () => {
@@ -216,9 +218,37 @@ test("payload includes randomSample and omits limitScope", () => {
     randomSampleEnabled: true,
     randomSampleSize: 100,
   });
-  assert.deepEqual(payload.randomSample, { enabled: true, size: 100 });
+  assert.equal(payload.randomSample.enabled, true);
+  assert.equal(payload.randomSample.size, 100);
+  assert.equal(payload.randomSample.mode, "seeded");
+  assert.ok(payload.randomSample.seed);
   assert.equal(payload.limitScope, undefined);
   assert.deepEqual(payload.orderBy, [{ alias: "volume", direction: "desc" }]);
+});
+
+test("payload unseeded omits seed", () => {
+  const payload = buildDataLakeServerComposePayload({
+    columnComposeItems: [
+      { column: "id", alias: "id", aggregate: null },
+      { column: "volume", alias: "volume", aggregate: null },
+    ],
+    columnComposeOrderBy: [],
+    composeHavingFilters: [],
+    composeJoins: [],
+    hasComposeAggregates: false,
+    composeDimensionAliases: [],
+    dataset: "polymarket",
+    selectedTable: "markets",
+    composeLimitScope: "primary",
+    randomSampleEnabled: true,
+    randomSampleSize: 100,
+    randomSampleSeeded: false,
+  });
+  assert.deepEqual(payload.randomSample, {
+    enabled: true,
+    size: 100,
+    mode: "unseeded",
+  });
 });
 
 test("historical workspaces share research tools; live does not", () => {

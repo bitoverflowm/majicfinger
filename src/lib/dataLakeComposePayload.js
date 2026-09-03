@@ -2,6 +2,10 @@ import {
   resolveComposeGroupByAliases,
   selectRowsForAggregatedCompose,
 } from "@/lib/composeColumnGrouping";
+import {
+  generateRandomSampleSeed,
+  sanitizeRandomSampleSeed,
+} from "@/lib/dataLake/randomSample";
 
 /**
  * Server compose payload for Athena lake pulls (shared by integrations panel + Connect home).
@@ -23,6 +27,8 @@ export function buildDataLakeServerComposePayload({
   composeLimitScope,
   randomSampleEnabled = false,
   randomSampleSize = null,
+  randomSampleSeeded = true,
+  randomSampleSeed = null,
 }) {
   const selectItems = selectRowsForAggregatedCompose(columnComposeItems);
   const selectAliasSet = new Set(
@@ -94,7 +100,18 @@ export function buildDataLakeServerComposePayload({
   if (sampleOn) {
     const n = Number(randomSampleSize);
     if (Number.isFinite(n) && Math.floor(n) === n && n >= 1) {
-      payload.randomSample = { enabled: true, size: Math.floor(n) };
+      const seeded = randomSampleSeeded !== false;
+      if (seeded) {
+        const seed = sanitizeRandomSampleSeed(randomSampleSeed) || generateRandomSampleSeed();
+        payload.randomSample = {
+          enabled: true,
+          size: Math.floor(n),
+          mode: "seeded",
+          seed,
+        };
+      } else {
+        payload.randomSample = { enabled: true, size: Math.floor(n), mode: "unseeded" };
+      }
     }
   } else {
     const scopeRaw = String(composeLimitScope || "").toLowerCase().trim();

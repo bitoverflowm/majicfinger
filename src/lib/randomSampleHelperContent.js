@@ -14,6 +14,25 @@ export const RANDOM_SAMPLE_HELPER_CONTENT = {
   sections: [
     {
       type: "heading",
+      content: "Seeded vs unseeded samples",
+    },
+    {
+      type: "paragraph",
+      content:
+        "Seeded (recommended for analysis): Lychee generates a unique seed for you automatically — you never type a seed number. Every future pull of that saved query returns the same sample, so charts and summaries stay consistent across project reloads.",
+    },
+    {
+      type: "paragraph",
+      content:
+        "Unseeded: each pull and each project reload draws a new random sample. Use this when you want fresh exploratory draws rather than a fixed analysis set.",
+    },
+    {
+      type: "paragraph",
+      content:
+        "Replaying a seeded query into a new sheet generates a new seed for that sheet, so each sheet can hold an independent but still reproducible sample.",
+    },
+    {
+      type: "heading",
       content: "How Random Sample works in Lychee",
     },
     {
@@ -31,13 +50,14 @@ export const RANDOM_SAMPLE_HELPER_CONTENT = {
         "Resolved markets only",
         "Volume greater than $10,000",
         "Sample size: 100",
+        "Mode: Seeded",
       ],
     },
     {
       type: "code",
       language: "sql",
       caption:
-        "The following is the equivalent operation Lychee performs behind the scenes. You do not need to write SQL yourself.",
+        "Unseeded sampling is equivalent to ordering by random(). Seeded sampling ranks rows with a stable hash of your seed plus row values, then takes the first n.",
       content: `WITH eligible_rows AS (
     SELECT
         id,
@@ -50,15 +70,17 @@ export const RANDOM_SAMPLE_HELPER_CONTENT = {
     WHERE resolved_at IS NOT NULL
       AND volume > 10000
 )
-SELECT *
-FROM eligible_rows
-ORDER BY random()
+-- Unseeded:
+SELECT * FROM eligible_rows ORDER BY random() LIMIT 100;
+-- Seeded (conceptual):
+SELECT * FROM eligible_rows
+ORDER BY hash(seed || row_key)
 LIMIT 100;`,
     },
     {
       type: "paragraph",
       content:
-        "Every eligible row receives a pseudorandom value. Selecting the 100 rows with the lowest values produces a uniform random sample without replacement.",
+        "Every eligible row receives a ranking value. Selecting the n rows with the lowest values produces a uniform random sample without replacement.",
     },
     {
       type: "heading",
@@ -96,7 +118,7 @@ LIMIT 100;`,
       type: "unordered_list",
       items: [
         "Ordinary Limit and Offset are unavailable while Random Sample is enabled.",
-        "Running the query again may produce a different sample.",
+        "Seeded samples stay consistent across reloads; unseeded samples change on every pull.",
         "Random Sample reduces the number of rows returned to the data sheet, analysis, and charts.",
         "Lychee may still need to process the full set of rows required to apply the selected query criteria before choosing the sample.",
         "Separate underlying rows with identical values may still look like duplicates in the result.",

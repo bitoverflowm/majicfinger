@@ -14,7 +14,9 @@ import {
 } from "@/lib/kalshi/kalshiTaxonomySql";
 import { composeBucketMsColumnAlias } from "@/lib/composeDateDisplay";
 import {
+  normalizeRandomSampleConfig,
   parseRandomSampleSize,
+  sampleKeyAliasesFromCompose,
   wrapComposeSqlWithRandomSample,
 } from "@/lib/dataLake/randomSample";
 
@@ -781,7 +783,11 @@ export function buildComposeAthenaSelectSql({
   expandedJoinResultCap = null,
   randomSampleSize = null,
 }) {
-  const sampleSizeParsed = parseRandomSampleSize(randomSampleSize);
+  const sampleFromCompose = normalizeRandomSampleConfig(
+    compose?.randomSample ? { ...compose.randomSample, enabled: true } : null,
+  );
+  const sampleSizeParsed =
+    sampleFromCompose?.size ?? parseRandomSampleSize(randomSampleSize);
   const postSampleOrderBy =
     sampleSizeParsed != null && Array.isArray(compose?.orderBy) ? compose.orderBy : [];
   // Random Sample: build the eligible query without user ORDER BY / LIMIT, then wrap.
@@ -791,6 +797,14 @@ export function buildComposeAthenaSelectSql({
       : compose;
   const limitForBuild = sampleSizeParsed != null ? null : limit;
   const expandCapForBuild = sampleSizeParsed != null ? null : expandedJoinResultCap;
+
+  let randomSampleMode = sampleFromCompose?.mode ?? null;
+  let randomSampleSeed = sampleFromCompose?.seed ?? null;
+  // Size-only fallback from callers that pass randomSampleSize without compose.randomSample.
+  if (sampleSizeParsed != null && !sampleFromCompose) {
+    randomSampleMode = "unseeded";
+    randomSampleSeed = null;
+  }
 
   return buildComposeAthenaSelectSqlInner({
     physicalTableName,
@@ -803,6 +817,9 @@ export function buildComposeAthenaSelectSql({
     expandedJoinResultCap: expandCapForBuild,
     postSampleOrderBy,
     randomSampleSize: sampleSizeParsed,
+    randomSampleMode,
+    randomSampleSeed,
+    randomSampleKeyAliases: sampleKeyAliasesFromCompose(compose),
   });
 }
 
@@ -821,6 +838,9 @@ function buildComposeAthenaSelectSqlInner({
   expandedJoinResultCap = null,
   postSampleOrderBy = [],
   randomSampleSize = null,
+  randomSampleMode = null,
+  randomSampleSeed = null,
+  randomSampleKeyAliases = [],
 }) {
   const safeTable = String(physicalTableName).trim();
   if (!/^[a-zA-Z0-9_]+$/.test(safeTable)) {
@@ -1150,19 +1170,34 @@ function buildComposeAthenaSelectSqlInner({
 
   return finalizeComposeSqlWithOptionalRandomSample(
     `${ctePrefix}SELECT ${selectParts.join(", ")} ${finalFrom}${finalWhere}${groupSql}${havingSql}${finalOrder}${finalLimit}`,
-    { randomSampleSize, postSampleOrderBy },
+    {
+      randomSampleSize,
+      postSampleOrderBy,
+      randomSampleMode,
+      randomSampleSeed,
+      randomSampleKeyAliases,
+    },
   );
 }
 
 /**
  * @param {string} eligibleSql
- * @param {{ randomSampleSize: number | null; postSampleOrderBy: Array<{ alias: string; direction: string }> }} opts
+ * @param {{
+ *   randomSampleSize: number | null;
+ *   postSampleOrderBy: Array<{ alias: string; direction: string }>;
+ *   randomSampleMode?: string | null;
+ *   randomSampleSeed?: string | null;
+ *   randomSampleKeyAliases?: string[];
+ * }} opts
  */
 function finalizeComposeSqlWithOptionalRandomSample(eligibleSql, opts) {
   const sampleN = opts?.randomSampleSize;
   if (sampleN == null) return eligibleSql;
   return wrapComposeSqlWithRandomSample(eligibleSql, {
     sampleSize: sampleN,
+    mode: opts.randomSampleMode || undefined,
+    seed: opts.randomSampleSeed || undefined,
+    sampleKeyAliases: opts.randomSampleKeyAliases || [],
     orderBy: opts.postSampleOrderBy || [],
   });
 }

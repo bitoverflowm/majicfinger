@@ -21,6 +21,8 @@ export function useDataLakeComposeState(shareViaContext) {
   const [localComposeJoins, setLocalComposeJoins] = useState([]);
   const [localRandomSampleEnabled, setLocalRandomSampleEnabled] = useState(false);
   const [localRandomSampleSize, setLocalRandomSampleSize] = useState("");
+  const [localRandomSampleSeeded, setLocalRandomSampleSeeded] = useState(true);
+  const [localRandomSampleSeed, setLocalRandomSampleSeed] = useState("");
 
   if (shareViaContext) {
     return {
@@ -44,6 +46,10 @@ export function useDataLakeComposeState(shareViaContext) {
       setRandomSampleEnabled: ctx.setDataLakeComposeRandomSampleEnabled,
       randomSampleSize: ctx.dataLakeComposeRandomSampleSize ?? "",
       setRandomSampleSize: ctx.setDataLakeComposeRandomSampleSize,
+      randomSampleSeeded: ctx.dataLakeComposeRandomSampleSeeded !== false,
+      setRandomSampleSeeded: ctx.setDataLakeComposeRandomSampleSeeded,
+      randomSampleSeed: ctx.dataLakeComposeRandomSampleSeed ?? "",
+      setRandomSampleSeed: ctx.setDataLakeComposeRandomSampleSeed,
     };
   }
 
@@ -68,5 +74,9 @@ export function useDataLakeComposeState(shareViaContext) {
     setRandomSampleEnabled: setLocalRandomSampleEnabled,
     randomSampleSize: localRandomSampleSize,
     setRandomSampleSize: setLocalRandomSampleSize,
+    randomSampleSeeded: localRandomSampleSeeded,
+    setRandomSampleSeeded: setLocalRandomSampleSeeded,
+    randomSampleSeed: localRandomSampleSeed,
+    setRandomSampleSeed: setLocalRandomSampleSeed,
   };
 }

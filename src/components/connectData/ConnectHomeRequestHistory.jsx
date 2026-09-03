@@ -27,6 +27,7 @@ import {
 } from "@/lib/connectHomeRequestHistory";
 import { isConnectIntegrationWorkspace } from "@/lib/connectHomeWorkspace";
 import { openConnectComposeEdit } from "@/lib/hubs/openConnectComposeEdit";
+import { withFreshRandomSampleSeed } from "@/lib/dataLake/randomSample";
 import { describePolymarketLiveRequestCard } from "@/lib/polymarketLive/polymarketLiveRequestHistory";
 import { rehydrateSheetFromProvenance } from "@/lib/rehydrateSheetFromProvenance";
 import { resolvePersistedFullRowCount } from "@/lib/projectPersistence";
@@ -480,9 +481,15 @@ export function ConnectHomeRequestHistory({ className }) {
 
         bumpReplayPullProgress(setConnectDataLakePullState, 42, "Running saved query…");
 
+        // New sheet + seeded sample → new independent seed; replace keeps the same seed.
+        const replayProv =
+          destination === "new_sheet"
+            ? withFreshRandomSampleSeed(replayProvenance)
+            : replayProvenance;
+
         const { rows, json } = await rehydrateSheetFromProvenance({
           targetSheetId,
-          provenance: replayProvenance,
+          provenance: replayProv,
           dataSheets,
           sourceSheetId: sheetActionSourceId,
         });
@@ -502,7 +509,7 @@ export function ConnectHomeRequestHistory({ className }) {
             ? actionSource.requestCards[0]
             : null;
           const querySummary = formatConnectRequestCardQuery(sourceCard, {
-            provenance: replayProvenance,
+            provenance: replayProv,
           });
           const intentFullRowCount = resolvePersistedFullRowCount(
             actionSource,
@@ -533,7 +540,7 @@ export function ConnectHomeRequestHistory({ className }) {
               ...cur,
               name,
               data: rows,
-              provenance: replayProvenance,
+              provenance: replayProv,
               operationHistory: actionSource?.operationHistory || cur.operationHistory || [],
               storageMode: rows.length >= intentFullRowCount ? "inline" : "provenance",
               rehydrationStatus: rows.length >= intentFullRowCount ? "complete" : "preview",

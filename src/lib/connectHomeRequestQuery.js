@@ -108,7 +108,13 @@ export function formatConnectRequestCardQuery(card, sheet) {
   }
 
   if (card?.randomSampleSize != null && card.randomSampleSize !== "") {
-    lines.push(`RANDOM SAMPLE ${card.randomSampleSize}`);
+    const mode =
+      card?.randomSampleMode ||
+      composeSpec?.randomSample?.mode ||
+      (composeSpec?.randomSample?.seed ? "seeded" : null);
+    const modeLabel =
+      mode === "seeded" ? " (seeded)" : mode === "unseeded" ? " (unseeded)" : "";
+    lines.push(`RANDOM SAMPLE ${card.randomSampleSize}${modeLabel}`);
   } else if (card?.composeRowLimit != null && card.composeRowLimit !== "") {
     const scopeLabel =
       composeSpec?.limitScope === "primary"
@@ -132,6 +138,7 @@ export function buildRequestCardQuerySummary({
   whereText,
   composeRowLimit,
   randomSampleSize,
+  randomSampleMode,
 }) {
   return formatConnectRequestCardQuery(
     {
@@ -142,6 +149,7 @@ export function buildRequestCardQuerySummary({
       whereText,
       composeRowLimit,
       randomSampleSize,
+      randomSampleMode,
     },
     { provenance: { lake, table, composeSpec } },
   );

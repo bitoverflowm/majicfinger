@@ -28,6 +28,8 @@ const STORAGE_KEY = "lychee:hubQueryDraft";
  * @property {string} [composeLimitScope]
  * @property {boolean} [randomSampleEnabled]
  * @property {string} [randomSampleSize]
+ * @property {boolean} [randomSampleSeeded]
+ * @property {string} [randomSampleSeed]
  * @property {boolean} [bucketingEnabled]
  * @property {object | null} [bucketConfig]
  * @property {string} [pendingSheetName]
@@ -224,6 +226,8 @@ export function normalizeHubQueryDraft(draft) {
     composeLimitScope: draft.composeLimitScope ? String(draft.composeLimitScope) : "primary",
     randomSampleEnabled,
     randomSampleSize: draft.randomSampleSize != null ? String(draft.randomSampleSize) : "",
+    randomSampleSeeded: draft.randomSampleSeeded !== false,
+    randomSampleSeed: draft.randomSampleSeed != null ? String(draft.randomSampleSeed) : "",
     bucketingEnabled: !!draft.bucketingEnabled,
     bucketConfig:
       draft.bucketConfig && typeof draft.bucketConfig === "object" ? draft.bucketConfig : null,

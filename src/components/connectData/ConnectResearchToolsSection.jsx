@@ -56,6 +56,8 @@ const RESEARCH_TOOL_ICONS = {
  *   setRandomSampleEnabled?: (next: boolean | ((prev: boolean) => boolean)) => void;
  *   randomSampleSize?: string | number;
  *   setRandomSampleSize?: (value: string) => void;
+ *   randomSampleSeeded?: boolean;
+ *   setRandomSampleSeeded?: (next: boolean | ((prev: boolean) => boolean)) => void;
  *   randomSampleError?: string | null;
  *   onEnableRandomSample?: () => void;
  *   bucketingEnabled?: boolean;
@@ -81,6 +83,8 @@ export function ConnectResearchToolsSection({
   setRandomSampleEnabled,
   randomSampleSize = "",
   setRandomSampleSize,
+  randomSampleSeeded = true,
+  setRandomSampleSeeded,
   randomSampleError = null,
   onEnableRandomSample,
   bucketingEnabled = false,
@@ -365,6 +369,8 @@ export function ConnectResearchToolsSection({
         }}
         sampleSize={randomSampleSize}
         onSampleSizeChange={setRandomSampleSize}
+        seeded={randomSampleSeeded !== false}
+        onSeededChange={(next) => setRandomSampleSeeded?.(!!next)}
         onRemove={clearRandomSample}
         error={randomSampleError}
         besideHelper={!!helperOpen}

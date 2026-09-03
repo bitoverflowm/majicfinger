@@ -1,3 +1,7 @@
+import {
+  injectMissingRandomSampleSeeds,
+  RESEARCH_RANDOM_SAMPLE_SHEET_NAMES,
+} from "@/lib/dataLake/randomSample";
 import { CONNECT_WORKSPACE } from "@/lib/connectHomeWorkspace";
 import { scheduleConnectProjectSheetScroll } from "@/lib/connectHubScroll";
 import { normalizeBuilderSnapshot } from "@/lib/chartBundle";
@@ -287,6 +291,17 @@ export async function loadFullProjectFromApi({
     Object.entries(stripped?.data_sheets || {}).forEach(([id, sheet]) => {
       workingSheets[id] = { ...sheet, ...(workingSheets[id] || {}) };
     });
+
+    // Inject seeds into research sample sheets (and all legacy samples in "sample data analysis").
+    const projectName = String(stripped?.data_set_name || "").trim().toLowerCase();
+    const isSampleAnalysisProject = projectName.includes("sample data analysis");
+    const seedInject = injectMissingRandomSampleSeeds(workingSheets, {
+      sheetNameAllowlist: isSampleAnalysisProject ? null : RESEARCH_RANDOM_SAMPLE_SHEET_NAMES,
+    });
+    workingSheets = seedInject.sheets;
+    if (seedInject.changedIds.length) {
+      setDataSheets?.({ ...workingSheets });
+    }
 
     try {
       workingSheets = await rehydrateProjectProvenanceSheets(workingSheets, {

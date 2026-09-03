@@ -147,6 +147,10 @@ export function ConnectComposeOperationPanel({
     setRandomSampleEnabled,
     randomSampleSize,
     setRandomSampleSize,
+    randomSampleSeeded,
+    setRandomSampleSeeded,
+    randomSampleSeed,
+    setRandomSampleSeed,
   } = compose;
 
   const workspaceId = standalone ? (standaloneWorkspaceId ?? "kalshiHistorical") : connectWorkspace;
@@ -213,6 +217,12 @@ export function ConnectComposeOperationPanel({
     if (composeSeed.randomSampleSize != null) {
       setRandomSampleSize?.(String(composeSeed.randomSampleSize));
     }
+    if (composeSeed.randomSampleSeeded != null) {
+      setRandomSampleSeeded?.(!!composeSeed.randomSampleSeeded);
+    }
+    if (composeSeed.randomSampleSeed != null) {
+      setRandomSampleSeed?.(String(composeSeed.randomSampleSeed));
+    }
   }, [
     composeSeed,
     standalone,
@@ -226,6 +236,8 @@ export function ConnectComposeOperationPanel({
     setComposeLimitScope,
     setRandomSampleEnabled,
     setRandomSampleSize,
+    setRandomSampleSeeded,
+    setRandomSampleSeed,
   ]);
 
   // Sync hub draft before paint so Run pull never reads a stale WHERE/summarize snapshot.
@@ -243,6 +255,8 @@ export function ConnectComposeOperationPanel({
       composeLimitScope: composeLimitScope,
       randomSampleEnabled: !!randomSampleEnabled,
       randomSampleSize: randomSampleSize ?? "",
+      randomSampleSeeded: randomSampleSeeded !== false,
+      randomSampleSeed: randomSampleSeed ?? "",
     });
   }, [
     standalone,
@@ -258,6 +272,8 @@ export function ConnectComposeOperationPanel({
     composeLimitScope,
     randomSampleEnabled,
     randomSampleSize,
+    randomSampleSeeded,
+    randomSampleSeed,
   ]);
 
   const pullColumns = useMemo(

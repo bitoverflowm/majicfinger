@@ -28,6 +28,8 @@ export function applyDraftToHubBuilderState(draft, setters) {
     composeLimitScope: draft.composeLimitScope ?? "primary",
     randomSampleEnabled: !!draft.randomSampleEnabled,
     randomSampleSize: draft.randomSampleSize ?? "",
+    randomSampleSeeded: draft.randomSampleSeeded !== false,
+    randomSampleSeed: draft.randomSampleSeed ?? "",
     bucketingEnabled: !!draft.bucketingEnabled,
     bucketConfig:
       draft.bucketConfig && typeof draft.bucketConfig === "object" ? draft.bucketConfig : null,

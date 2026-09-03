@@ -386,7 +386,7 @@ export function validateAthenaLakeQueryBody(body, access) {
         }
         randomSampleValidated = normalizeRandomSampleConfig(
           typeof rawSample === "object" ? { ...rawSample, enabled: true } : { enabled: true, size: rawSample },
-          { maxSize: maxSample },
+          { maxSize: maxSample, generateSeedIfMissing: true },
         );
         if (!randomSampleValidated) {
           throw new AthenaLakeRequestError("Invalid random sample size", {

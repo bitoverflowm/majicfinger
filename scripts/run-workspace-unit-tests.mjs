@@ -51,6 +51,8 @@ import "@/lib/sheetOperations/computeMultiSheetSummary.test.js";
 import "@/lib/dataLake/restoreQuantAthenaReplayConfig.test.js";
 import "@/lib/projectPersistence.quant.test.js";
 import "@/lib/sheetUserRowOverlay.test.js";
+import "@/lib/sheetUserRowOverlay.randomSample.test.js";
+import "@/lib/sheetScopedColumn.test.js";
 import "@/lib/dataLake/normalizeQuantAthenaRows.test.js";
 import "@/lib/dataLake/buildQuantAthenaSql.test.js";
 import "@/lib/dataLake/randomSample.test.js";

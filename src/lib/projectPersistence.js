@@ -5,6 +5,7 @@ import { applyManualCellPatchByIdentity, attachUserRowOverlays, overlayUserColum
 import { aggregateBucketRows } from "@/lib/sheetOperations/aggregateBucketRows";
 import { applyRefineQueryToRows } from "@/lib/sheetOperations/refineQuery";
 import { compareConditionValues } from "@/lib/ifElseConditionValues";
+import { resolveScopedFiniteNumber } from "@/lib/sheetScopedColumn";
 
 export const PROJECT_FULL_DATA_SAFE_BYTES = 12 * 1024 * 1024;
 export const PROJECT_PREVIEW_ROW_LIMIT = 50000;
@@ -778,7 +779,7 @@ export function applyOperationToComposeSpec(composeSpec, op) {
   return next;
 }
 
-export function applyBrowserOperationToRows(rows, op) {
+export function applyBrowserOperationToRows(rows, op, ctx = null) {
   const list = Array.isArray(rows) ? rows : [];
   if (!op || typeof op !== "object") return list;
   if (op.type === "bucket.sheet") {
@@ -864,7 +865,7 @@ export function applyBrowserOperationToRows(rows, op) {
     return list;
   }
   if (op.type === "computed.column") {
-    return applyComputedColumnOperation(list, op);
+    return applyComputedColumnOperation(list, op, ctx);
   }
   if (op.type === "refine.query") {
     return applyRefineQueryToRows(list, {
@@ -949,10 +950,28 @@ function evaluateIfElseComputed(row, expr) {
   return resolveComputedOperand(row, expr?.else);
 }
 
-function applyComputedColumnOperation(rows, op) {
+function applyComputedColumnOperation(rows, op, ctx = null) {
   const out = String(op?.column || "").trim();
   const expr = op?.expression && typeof op.expression === "object" ? op.expression : null;
   if (!out || !expr) return rows;
+  const dataSheets = ctx?.dataSheets && typeof ctx.dataSheets === "object" ? ctx.dataSheets : null;
+  const activeSheetId = ctx?.activeSheetId != null ? String(ctx.activeSheetId) : null;
+
+  const resolveCol = (row, col, kind, rowIndex) => {
+    if (kind === "summary" || String(col).startsWith("summary::")) {
+      const summaryValues = op?.summaryValues && typeof op.summaryValues === "object" ? op.summaryValues : {};
+      return finiteNumber(summaryValues[col]) ?? 0;
+    }
+    const scoped = resolveScopedFiniteNumber({
+      dataSheets,
+      activeSheetId,
+      rowIndex,
+      row,
+      key: col,
+    });
+    if (scoped != null) return scoped;
+    return finiteNumber(row?.[col]) ?? 0;
+  };
 
   if (expr.kind === "manual-empty-column") {
     return rows.map((row) => (row && typeof row === "object" ? { ...row, [out]: "" } : row));
@@ -963,22 +982,14 @@ function applyComputedColumnOperation(rows, op) {
     const right = String(expr.rightColumn || "");
     const opName = String(expr.op || "");
     const asPercent = Boolean(expr.asPercent);
-    const summaryValues = op?.summaryValues && typeof op.summaryValues === "object" ? op.summaryValues : {};
-    const resolveSide = (row, col, kind) => {
-      if (kind === "summary" || String(col).startsWith("summary::")) {
-        const v = summaryValues[col];
-        return finiteNumber(v) ?? 0;
-      }
-      return finiteNumber(row[col]) ?? 0;
-    };
     const scale = (v) => {
       if (!Number.isFinite(v)) return null;
       return asPercent ? v * 100 : v;
     };
-    return rows.map((row) => {
+    return rows.map((row, idx) => {
       if (!row || typeof row !== "object") return row;
-      const a = resolveSide(row, left, expr.leftKind);
-      const b = opName === "abs" ? 0 : resolveSide(row, right, expr.rightKind);
+      const a = resolveCol(row, left, expr.leftKind, idx);
+      const b = opName === "abs" ? 0 : resolveCol(row, right, expr.rightKind, idx);
       const value = applyBinaryMath(opName, a, b);
       return { ...row, [out]: scale(value) };
     });
@@ -996,17 +1007,31 @@ function applyComputedColumnOperation(rows, op) {
       if (!Number.isFinite(v)) return null;
       return asPercent ? v * 100 : v;
     };
+    const readBaseAt = (rowIdx, row) => {
+      if (String(base).startsWith("summary::")) {
+        return finiteNumber(summaryValues[base]);
+      }
+      const scoped = resolveScopedFiniteNumber({
+        dataSheets,
+        activeSheetId,
+        rowIndex: rowIdx,
+        row,
+        key: base,
+      });
+      if (scoped != null) return scoped;
+      return finiteNumber(row?.[base]);
+    };
     return rows.map((row, idx) => {
       if (!row || typeof row !== "object") return row;
-      const a = finiteNumber(row[base]);
+      const a = readBaseAt(idx, row);
       let b = null;
       if (refIsSummary) {
         b = finiteNumber(summaryValues[rowRef]);
       } else {
         const refIdx = rowRef === "next" || rowRef === "next_row" ? idx + 1 : idx - 1;
-        const ref = rows[refIdx];
+        const ref = refIdx >= 0 && refIdx < rows.length ? rows[refIdx] : null;
         if (!ref) return { ...row, [out]: null };
-        b = finiteNumber(ref[base]);
+        b = readBaseAt(refIdx, ref);
       }
       if (a == null || b == null) return { ...row, [out]: null };
       if (opName === "pct_growth") {
@@ -1055,8 +1080,12 @@ function applyComputedColumnOperation(rows, op) {
   return rows;
 }
 
-export function replayOperations({ rows, operations }) {
+export function replayOperations({ rows, operations, dataSheets = null, activeSheetId = null }) {
+  const ctx =
+    dataSheets && typeof dataSheets === "object"
+      ? { dataSheets, activeSheetId: activeSheetId != null ? String(activeSheetId) : null }
+      : null;
   return (Array.isArray(operations) ? operations : []).reduce((acc, op) => {
-    return isSqlMappableOperation(op) ? acc : applyBrowserOperationToRows(acc, op);
+    return isSqlMappableOperation(op) ? acc : applyBrowserOperationToRows(acc, op, ctx);
   }, Array.isArray(rows) ? rows : []);
 }

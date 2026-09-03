@@ -44,6 +44,7 @@ import {
   saveHubQueryDraft,
 } from "@/lib/hubs/hubQueryDraft";
 import { applyHubQueryDraft } from "@/lib/hubs/applyHubQueryDraft";
+import { generateRandomSampleSeed } from "@/lib/dataLake/randomSample";
 import { applyDraftToHubBuilderState } from "@/lib/hubs/applyDraftToHubBuilderState";
 import { createEmptyBucketTab } from "@/lib/bucketSheetTabs";
 import {
@@ -494,6 +495,9 @@ function HubKalshiQueryBuilderInner({
       composeLimitValue: "",
       randomSampleSize:
         String(composeDraftRef.current?.randomSampleSize || "").trim() || "100",
+      randomSampleSeeded: true,
+      randomSampleSeed:
+        String(composeDraftRef.current?.randomSampleSeed || "").trim() || generateRandomSampleSeed(),
     });
     setActiveComposeOps((prev) => (prev || []).filter((id) => id !== "row_limit"));
   }, [patchComposeDraft]);
@@ -514,6 +518,23 @@ function HubKalshiQueryBuilderInner({
   const setRandomSampleSize = useCallback(
     (value) => {
       patchComposeDraft({ randomSampleSize: value });
+    },
+    [patchComposeDraft],
+  );
+
+  const setRandomSampleSeeded = useCallback(
+    (next) => {
+      const seeded =
+        typeof next === "function" ? next(composeDraftRef.current?.randomSampleSeeded !== false) : !!next;
+      if (seeded) {
+        patchComposeDraft({
+          randomSampleSeeded: true,
+          randomSampleSeed:
+            String(composeDraftRef.current?.randomSampleSeed || "").trim() || generateRandomSampleSeed(),
+        });
+      } else {
+        patchComposeDraft({ randomSampleSeeded: false, randomSampleSeed: "" });
+      }
     },
     [patchComposeDraft],
   );
@@ -757,6 +778,8 @@ function HubKalshiQueryBuilderInner({
       composeLimitScope: draftState.composeLimitScope ?? "primary",
       randomSampleEnabled: !!draftState.randomSampleEnabled,
       randomSampleSize: draftState.randomSampleSize ?? "",
+      randomSampleSeeded: draftState.randomSampleSeeded !== false,
+      randomSampleSeed: draftState.randomSampleSeed ?? "",
       bucketingEnabled: !!draftState.bucketingEnabled,
       bucketConfig:
         draftState.bucketConfig && typeof draftState.bucketConfig === "object"
@@ -1230,6 +1253,8 @@ function HubKalshiQueryBuilderInner({
                     setRandomSampleEnabled={setRandomSampleEnabled}
                     randomSampleSize={composeDraft.randomSampleSize ?? ""}
                     setRandomSampleSize={setRandomSampleSize}
+                    randomSampleSeeded={composeDraft.randomSampleSeeded !== false}
+                    setRandomSampleSeeded={setRandomSampleSeeded}
                     onEnableRandomSample={enableRandomSample}
                     bucketingEnabled={!!composeDraft.bucketingEnabled}
                     setBucketingEnabled={setBucketingEnabled}

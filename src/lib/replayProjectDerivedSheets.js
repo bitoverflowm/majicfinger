@@ -82,6 +82,8 @@ export function replayProjectDerivedSheets(dataSheets) {
       rows = replayOperations({
         rows: parentRows,
         operations: history.filter((op) => op?.type !== "source.compose"),
+        dataSheets: base,
+        activeSheetId: sheetId,
       });
     }
 

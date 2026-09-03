@@ -215,9 +215,20 @@ export function buildHubQueryDraftFromProvenance({ provenance, sheet, sheetId } 
     composeSpec.randomSample && typeof composeSpec.randomSample === "object"
       ? composeSpec.randomSample
       : null;
-  const randomSampleEnabled = randomSample?.enabled === true;
+  const sampleSizeRaw = randomSample?.size ?? randomSample?.sampleSize;
+  const randomSampleEnabled =
+    randomSample?.enabled === true ||
+    (randomSample != null && sampleSizeRaw != null && randomSample.enabled !== false);
   const randomSampleSize =
-    randomSampleEnabled && randomSample?.size != null ? String(randomSample.size) : "";
+    randomSampleEnabled && sampleSizeRaw != null ? String(sampleSizeRaw) : "";
+  const randomSampleSeeded =
+    randomSampleEnabled &&
+    String(randomSample?.mode || "").toLowerCase() !== "unseeded" &&
+    randomSample?.seeded !== false;
+  const randomSampleSeed =
+    randomSampleEnabled && randomSampleSeeded && randomSample?.seed != null
+      ? String(randomSample.seed)
+      : "";
 
   const limitFromProv =
     prov.composeAthenaRowLimit != null && Number.isFinite(Number(prov.composeAthenaRowLimit))
@@ -245,6 +256,8 @@ export function buildHubQueryDraftFromProvenance({ provenance, sheet, sheetId } 
     composeLimitScope,
     randomSampleEnabled,
     randomSampleSize,
+    randomSampleSeeded,
+    randomSampleSeed,
     pendingSheetName: sheetName || undefined,
     sourceSheetId: sheetId ? String(sheetId) : undefined,
   };

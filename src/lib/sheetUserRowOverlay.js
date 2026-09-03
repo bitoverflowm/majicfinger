@@ -1,3 +1,8 @@
+import {
+  normalizeRandomSampleConfig,
+  RANDOM_SAMPLE_MODE_UNSEEDED,
+} from "@/lib/dataLake/randomSample";
+
 /**
  * User-edited cells must follow a stable row identity (e.g. `band`), never array index.
  *
@@ -14,6 +19,25 @@ const INTERNAL_ROW_FIELDS = new Set(["_origIndex", LYCHEE_ROW_ID_FIELD]);
 export const SHEET_ALWAYS_PERSIST_ROW_CAP = 250;
 /** Persist user-edited compose sheets up to this many rows. */
 export const SHEET_USER_EDIT_PERSIST_ROW_CAP = 5000;
+
+/**
+ * @param {object | null | undefined} sheet
+ * @returns {{ size: number; mode: "seeded" | "unseeded"; seed?: string } | null}
+ */
+export function sheetComposeRandomSample(sheet) {
+  const rs = sheet?.provenance?.composeSpec?.randomSample;
+  if (!rs || typeof rs !== "object") return null;
+  return normalizeRandomSampleConfig({ ...rs, enabled: true });
+}
+
+/**
+ * Unseeded random-sample sheets always re-pull from Athena (even when n ≤ 250).
+ * @param {object | null | undefined} sheet
+ */
+export function sheetHasUnseededRandomSample(sheet) {
+  const sample = sheetComposeRandomSample(sheet);
+  return sample?.mode === RANDOM_SAMPLE_MODE_UNSEEDED;
+}
 
 /**
  * @param {Record<string, unknown> | null | undefined} row
@@ -69,6 +93,11 @@ export function sheetShouldKeepPersistedRows(sheet) {
   if (sheet.saveMeta?.persistRows === true && sheetHasUserRowEdits(sheet)) return true;
   if (sheet.userRowOverlay && Object.keys(sheet.userRowOverlay).length > 0) return true;
   const n = Array.isArray(sheet.data) ? sheet.data.length : 0;
+  // Unseeded random samples must re-run Athena on every project load — never freeze via size cap.
+  if (sheetHasUnseededRandomSample(sheet)) {
+    if (sheetHasUserRowEdits(sheet) && n > 0 && n <= SHEET_USER_EDIT_PERSIST_ROW_CAP) return true;
+    return false;
+  }
   if (n > 0 && n <= SHEET_ALWAYS_PERSIST_ROW_CAP) return true;
   if (sheetHasUserRowEdits(sheet) && n > 0 && n <= SHEET_USER_EDIT_PERSIST_ROW_CAP) return true;
   return false;

@@ -61,6 +61,7 @@ import {
   SelectGroup,
   SelectItem,
   SelectLabel,
+  SelectSeparator,
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
@@ -172,20 +173,37 @@ import {
   sheetRowIdentityKey,
 } from "@/lib/sheetUserRowOverlay";
 import { BUCKET_TIME_INTERVALS } from "@/lib/sheetOperations/bucketTimeIntervals";
+import {
+  buildWorkspaceSheetColumnGroups,
+  mathOperandDisplayLabel,
+  resolveScopedFiniteNumber,
+  workspaceSheetColumnOperandValues,
+} from "@/lib/sheetScopedColumn";
+import { temporalToMs } from "@/lib/temporalParse";
 
-/** Column + summary named-value options for math operand selects. */
-function MathOperandSelectItems({ columns, summaryOptions, keyPrefix }) {
+/** Column + summary named-value options for math operand selects (grouped by sheet). */
+function MathOperandSelectItems({ sheetColumnGroups, summaryOptions, keyPrefix }) {
   const localSummaries = (summaryOptions || []).filter((opt) => opt.local !== false);
   const otherSummaries = (summaryOptions || []).filter((opt) => opt.local === false);
+  const groups = Array.isArray(sheetColumnGroups) ? sheetColumnGroups : [];
   return (
     <>
-      {(columns || []).map((c) => (
-        <SelectItem key={`${keyPrefix}-col-${c}`} value={c} className="font-mono text-xs">
-          {c}
-        </SelectItem>
+      {groups.map((group, groupIdx) => (
+        <SelectGroup key={`${keyPrefix}-sheet-${group.sheetId || groupIdx}`}>
+          {groupIdx > 0 ? <SelectSeparator /> : null}
+          <SelectLabel className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+            {group.heading || group.sheetName || group.sheetId}
+          </SelectLabel>
+          {(group.options || []).map((opt) => (
+            <SelectItem key={`${keyPrefix}-col-${opt.value}`} value={opt.value} className="font-mono text-xs">
+              {opt.column}
+            </SelectItem>
+          ))}
+        </SelectGroup>
       ))}
       {localSummaries.length ? (
         <SelectGroup>
+          {groups.length ? <SelectSeparator /> : null}
           <SelectLabel className="text-[10px] text-muted-foreground">This sheet summary</SelectLabel>
           {localSummaries.map((opt) => (
             <SelectItem key={`${keyPrefix}-sum-${opt.value}`} value={opt.value} className="font-mono text-xs">
@@ -196,6 +214,7 @@ function MathOperandSelectItems({ columns, summaryOptions, keyPrefix }) {
       ) : null}
       {otherSummaries.length ? (
         <SelectGroup>
+          <SelectSeparator />
           <SelectLabel className="text-[10px] text-muted-foreground">Other sheet summaries</SelectLabel>
           {otherSummaries.map((opt) => (
             <SelectItem key={`${keyPrefix}-sum-${opt.value}`} value={opt.value} className="font-mono text-xs">
@@ -206,7 +225,8 @@ function MathOperandSelectItems({ columns, summaryOptions, keyPrefix }) {
       ) : null}
     </>
   );
-}import { temporalToMs } from "@/lib/temporalParse";
+}
+
 import {
   applyRefineQueryToRows,
   buildRefineFiltersFromClauses,
@@ -1099,6 +1119,26 @@ const GridView = ({ startNew, fillViewport = false }) => {
         .sort();
     }, [connectedData]);
 
+    const mathSheetColumnGroups = useMemo(
+      () => buildWorkspaceSheetColumnGroups(dataSheets, activeSheetId),
+      [dataSheets, activeSheetId],
+    );
+
+    const mathOperandColumnValues = useMemo(
+      () => workspaceSheetColumnOperandValues(dataSheets, activeSheetId),
+      [dataSheets, activeSheetId],
+    );
+
+    const formatMathOperandLabel = useCallback(
+      (key) =>
+        mathOperandDisplayLabel(key, {
+          dataSheets,
+          activeSheetId,
+          summaryRefDisplayLabel,
+        }),
+      [dataSheets, activeSheetId, summaryRefDisplayLabel],
+    );
+
     const nextFreeResultColumnName = useCallback(() => {
       const existing = new Set(sheetColumnNamesForMath);
       let n = 1;
@@ -1147,7 +1187,7 @@ const GridView = ({ startNew, fillViewport = false }) => {
     );
 
     const resolveMathOperand = useCallback(
-      (row, key) => {
+      (row, key, rowIndex = -1) => {
         const k = String(key || "").trim();
         if (!k) return 0;
         if (isSummaryRefKey(k)) {
@@ -1161,10 +1201,18 @@ const GridView = ({ startNew, fillViewport = false }) => {
           const v = summaryNamedValues[k];
           return Number.isFinite(v) ? v : 0;
         }
+        const scoped = resolveScopedFiniteNumber({
+          dataSheets,
+          activeSheetId,
+          rowIndex,
+          row,
+          key: k,
+        });
+        if (scoped != null) return scoped;
         const n = Number(row?.[k]);
         return Number.isFinite(n) ? n : 0;
       },
-      [mathSummaryNamedValues, summaryNamedValues, summaryConfig],
+      [mathSummaryNamedValues, summaryNamedValues, summaryConfig, dataSheets, activeSheetId],
     );
 
     const sheetMathEquations = useMemo(() => listSheetEquations(activeSheet), [activeSheet]);
@@ -1175,9 +1223,9 @@ const GridView = ({ startNew, fillViewport = false }) => {
       setMathFunctionType("row_operation");
       setMathOp("subtract");
       setMathOutCol(nextFreeResultColumnName());
-      setMathBasicColA(sheetColumnNamesForMath[0] || "");
-      setMathBasicColB(sheetColumnNamesForMath[1] || sheetColumnNamesForMath[0] || "");
-      setMathBaseCol(sheetColumnNamesForMath[0] || "");
+      setMathBasicColA(mathOperandColumnValues[0] || "");
+      setMathBasicColB(mathOperandColumnValues[1] || mathOperandColumnValues[0] || "");
+      setMathBaseCol(mathOperandColumnValues[0] || "");
       setMathRelativeRowRef("prev_row");
       setStatsStdDevActive(false);
       setStatsCumsumActive(false);
@@ -1185,7 +1233,7 @@ const GridView = ({ startNew, fillViewport = false }) => {
       setMathAsPercent(false);
       setSummaryDraft(createInitialSummaryDraft(null, sheetColumnNamesForMath));
       setMultiSummaryDraft(createInitialMultiSheetSummaryDraft(null));
-    }, [nextFreeResultColumnName, sheetColumnNamesForMath]);
+    }, [nextFreeResultColumnName, sheetColumnNamesForMath, mathOperandColumnValues]);
 
     /** Append a math op, or replace the one being edited in the math dialog. */
     const commitActiveSheetMathOperation = useCallback(
@@ -1695,25 +1743,26 @@ const GridView = ({ startNew, fillViewport = false }) => {
     useEffect(() => {
       if (!mathDialogOpen) return;
       const isValidOperand = (prev) =>
-        Boolean(prev) && (sheetColumnNamesForMath.includes(prev) || isSummaryRefKey(prev));
+        Boolean(prev) &&
+        (mathOperandColumnValues.includes(prev) || isSummaryRefKey(prev) || sheetColumnNamesForMath.includes(prev));
       setMathOutCol((prev) => (String(prev || "").trim() ? prev : nextFreeResultColumnName()));
       setMathBaseCol((prev) =>
-        isValidOperand(prev) ? prev : sheetColumnNamesForMath[0] || "",
+        isValidOperand(prev) ? prev : mathOperandColumnValues[0] || "",
       );
       setMathBasicColA((prev) =>
-        isValidOperand(prev) ? prev : sheetColumnNamesForMath[0] || "",
+        isValidOperand(prev) ? prev : mathOperandColumnValues[0] || "",
       );
       setMathBasicColB((prev) =>
         isValidOperand(prev)
           ? prev
-          : sheetColumnNamesForMath[1] || sheetColumnNamesForMath[0] || "",
+          : mathOperandColumnValues[1] || mathOperandColumnValues[0] || "",
       );
       setStatsBucketColumn((prev) =>
         prev && sheetColumnNamesForMath.includes(prev) ? prev : sheetColumnNamesForMath[0] || "",
       );
       setStatsBucketOutputColumn((prev) => (String(prev || "").trim() ? prev : "bucket"));
       setStatsBucketSheetName((prev) => (String(prev || "").trim() ? prev : "Bucketed sheet"));
-    }, [mathDialogOpen, sheetColumnNamesForMath, nextFreeResultColumnName]);
+    }, [mathDialogOpen, sheetColumnNamesForMath, mathOperandColumnValues, nextFreeResultColumnName]);
 
     useEffect(() => {
       if (!ifElseDialogOpen) {
@@ -2378,10 +2427,10 @@ const GridView = ({ startNew, fillViewport = false }) => {
           toast.error(unaryAbs ? "Choose column A for the absolute value operation." : "Choose column A and column B for the operation.");
           return;
         }
-        next = rows.map((row) => {
+        next = rows.map((row, idx) => {
           if (!row || typeof row !== "object") return row;
-          const a = resolveMathOperand(row, colA);
-          const b = unaryAbs ? 0 : resolveMathOperand(row, colB);
+          const a = resolveMathOperand(row, colA, idx);
+          const b = unaryAbs ? 0 : resolveMathOperand(row, colB, idx);
           let v = null;
           if (mathOp === "add") v = a + b;
           else if (mathOp === "subtract") v = a - b;
@@ -2398,25 +2447,31 @@ const GridView = ({ startNew, fillViewport = false }) => {
         }
         const refKey = String(mathRelativeRowRef || "").trim();
         const refIsSummary = isSummaryRefKey(refKey);
+        const readBaseAt = (rowIdx, row) => {
+          if (isSummaryRefKey(baseCol)) return resolveMathOperand(row, baseCol, rowIdx);
+          return resolveScopedFiniteNumber({
+            dataSheets,
+            activeSheetId,
+            rowIndex: rowIdx,
+            row,
+            key: baseCol,
+          });
+        };
         next = rows.map((row, idx) => {
           if (!row || typeof row !== "object") return row;
 
-          const current = isSummaryRefKey(baseCol)
-            ? resolveMathOperand(row, baseCol)
-            : parseCellFiniteForStat(row, baseCol);
+          const current = readBaseAt(idx, row);
 
           let relative = null;
           if (refIsSummary) {
-            relative = resolveMathOperand(row, refKey);
+            relative = resolveMathOperand(row, refKey, idx);
           } else {
             const refIdx = refKey === "next_row" ? idx + 1 : idx - 1;
             const refRow = refIdx >= 0 && refIdx < rows.length ? rows[refIdx] : null;
             if (refRow == null) {
               return { ...row, [out]: null };
             }
-            relative = isSummaryRefKey(baseCol)
-              ? resolveMathOperand(refRow, baseCol)
-              : parseCellFiniteForStat(refRow, baseCol);
+            relative = readBaseAt(refIdx, refRow);
           }
 
           if (mathOp === "pct_growth") {
@@ -2535,6 +2590,8 @@ const GridView = ({ startNew, fillViewport = false }) => {
       mathRelativeRowRef,
       nextFreeResultColumnName,
       resolveMathOperand,
+      dataSheets,
+      activeSheetId,
       summaryNamedValues,
       mathSummaryNamedValues,
       addNewSheetAndActivate,
@@ -4693,7 +4750,7 @@ const GridView = ({ startNew, fillViewport = false }) => {
                                 <SelectContent>
                                   <SelectItem value="__">—</SelectItem>
                                   <MathOperandSelectItems
-                                    columns={sheetColumnNamesForMath}
+                                    sheetColumnGroups={mathSheetColumnGroups}
                                     summaryOptions={summarySelectOptions}
                                     keyPrefix="math-basic-a"
                                   />
@@ -4713,7 +4770,7 @@ const GridView = ({ startNew, fillViewport = false }) => {
                                   <SelectContent>
                                     <SelectItem value="__">—</SelectItem>
                                     <MathOperandSelectItems
-                                      columns={sheetColumnNamesForMath}
+                                      sheetColumnGroups={mathSheetColumnGroups}
                                       summaryOptions={summarySelectOptions}
                                       keyPrefix="math-basic-b"
                                     />
@@ -4738,14 +4795,14 @@ const GridView = ({ startNew, fillViewport = false }) => {
                               <div className="rounded-md border border-border/60 bg-muted/20 px-2 py-1.5 text-xs font-mono text-muted-foreground">
                                 {mathOp === "abs"
                                   ? `${mathOutCol || nextFreeResultColumnName()} = |${
-                                      isSummaryRefKey(mathBasicColA) ? `Σ ${summaryRefDisplayLabel(mathBasicColA)}` : mathBasicColA
+                                      formatMathOperandLabel(mathBasicColA)
                                     }| (per row)`
                                   : `${mathOutCol || nextFreeResultColumnName()} = ${
-                                      isSummaryRefKey(mathBasicColA) ? `Σ ${summaryRefDisplayLabel(mathBasicColA)}` : mathBasicColA
+                                      formatMathOperandLabel(mathBasicColA)
                                     } ${
                                       mathOp === "add" ? "+" : mathOp === "subtract" ? "−" : mathOp === "multiply" ? "×" : "÷"
                                     } ${
-                                      isSummaryRefKey(mathBasicColB) ? `Σ ${summaryRefDisplayLabel(mathBasicColB)}` : mathBasicColB
+                                      formatMathOperandLabel(mathBasicColB)
                                     } (per row)`}
                               </div>
                             </div>
@@ -4811,7 +4868,7 @@ const GridView = ({ startNew, fillViewport = false }) => {
                                       <SelectContent>
                                         <SelectItem value="__">—</SelectItem>
                                         <MathOperandSelectItems
-                                          columns={sheetColumnNamesForMath}
+                                          sheetColumnGroups={mathSheetColumnGroups}
                                           summaryOptions={summarySelectOptions}
                                           keyPrefix="math-fn-basic-a"
                                         />
@@ -4827,7 +4884,7 @@ const GridView = ({ startNew, fillViewport = false }) => {
                                       <SelectContent>
                                         <SelectItem value="__">—</SelectItem>
                                         <MathOperandSelectItems
-                                          columns={sheetColumnNamesForMath}
+                                          sheetColumnGroups={mathSheetColumnGroups}
                                           summaryOptions={summarySelectOptions}
                                           keyPrefix="math-fn-basic-b"
                                         />
@@ -4847,7 +4904,7 @@ const GridView = ({ startNew, fillViewport = false }) => {
                                     <SelectContent>
                                       <SelectItem value="__">—</SelectItem>
                                       <MathOperandSelectItems
-                                        columns={sheetColumnNamesForMath}
+                                        sheetColumnGroups={mathSheetColumnGroups}
                                         summaryOptions={summarySelectOptions}
                                         keyPrefix="math-base"
                                       />
@@ -4945,21 +5002,21 @@ const GridView = ({ startNew, fillViewport = false }) => {
                               <div className="min-h-9 rounded-md border border-border/60 bg-muted/20 px-2 py-1 text-xs flex items-center font-mono leading-snug">
                                 {mathFunctionType === "column" ? (
                                   `${mathOutCol || nextFreeResultColumnName()} = ${
-                                    isSummaryRefKey(mathBasicColA) ? `Σ ${summaryRefDisplayLabel(mathBasicColA)}` : (mathBasicColA || "Column A")
+                                    formatMathOperandLabel(mathBasicColA) || "Column A"
                                   } ${
                                     mathOp === "add" ? "+" : mathOp === "subtract" ? "−" : mathOp === "multiply" ? "×" : "÷"
                                   } ${
-                                    isSummaryRefKey(mathBasicColB) ? `Σ ${summaryRefDisplayLabel(mathBasicColB)}` : (mathBasicColB || "Column B")
+                                    formatMathOperandLabel(mathBasicColB) || "Column B"
                                   } (per row)${mathAsPercent ? " × 100" : ""}`
                                 ) : mathOp === "pct_growth" ? (
                                   <span className="line-clamp-2">
                                     {isSummaryRefKey(mathRelativeRowRef)
-                                      ? `${mathOutCol || nextFreeResultColumnName()} = (${mathBaseCol || "col"} − ${summaryRefDisplayLabel(mathRelativeRowRef)}) / ${summaryRefDisplayLabel(mathRelativeRowRef)}${mathAsPercent ? " × 100" : ""}`
-                                      : `${mathOutCol || nextFreeResultColumnName()} = (${mathBaseCol || "col"} − ${mathBaseCol || "col"}@${mathRelativeRowRef === "next_row" ? "next" : "prev"}) / ${mathBaseCol || "col"}@${mathRelativeRowRef === "next_row" ? "next" : "prev"}${mathAsPercent ? " × 100" : ""} · first/last row → blank`}
+                                      ? `${mathOutCol || nextFreeResultColumnName()} = (${formatMathOperandLabel(mathBaseCol) || "col"} − ${summaryRefDisplayLabel(mathRelativeRowRef)}) / ${summaryRefDisplayLabel(mathRelativeRowRef)}${mathAsPercent ? " × 100" : ""}`
+                                      : `${mathOutCol || nextFreeResultColumnName()} = (${formatMathOperandLabel(mathBaseCol) || "col"} − ${formatMathOperandLabel(mathBaseCol) || "col"}@${mathRelativeRowRef === "next_row" ? "next" : "prev"}) / ${formatMathOperandLabel(mathBaseCol) || "col"}@${mathRelativeRowRef === "next_row" ? "next" : "prev"}${mathAsPercent ? " × 100" : ""} · first/last row → blank`}
                                   </span>
                                 ) : (
                                   `${mathOutCol || nextFreeResultColumnName()} = ${
-                                    isSummaryRefKey(mathBaseCol) ? `Σ ${summaryRefDisplayLabel(mathBaseCol)}` : (mathBaseCol || "column")
+                                    formatMathOperandLabel(mathBaseCol) || "column"
                                   } (current row) ${
                                     mathOp === "add" ? "+" : mathOp === "subtract" ? "-" : mathOp === "multiply" ? "x" : "/"
                                   } ${

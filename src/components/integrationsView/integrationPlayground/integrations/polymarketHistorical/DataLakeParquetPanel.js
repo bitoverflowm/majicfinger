@@ -107,7 +107,10 @@ import { buildComposeFiltersPayload, resolveEffectiveHubWhereFilters } from "@/l
 import { useDataLakeComposeState } from "@/hooks/useDataLakeComposeState";
 import { buildDataLakeServerComposePayload } from "@/lib/dataLakeComposePayload";
 import { COMPOSE_PRIMARY_JOIN_EXPAND_CAP_DEFAULT } from "@/lib/composeLimitScope";
-import { validateRandomSampleSizeInput } from "@/lib/dataLake/randomSample";
+import {
+  generateRandomSampleSeed,
+  validateRandomSampleSizeInput,
+} from "@/lib/dataLake/randomSample";
 import { ConnectRandomSamplePanel } from "@/components/connectData/ConnectRandomSamplePanel";
 import { ConnectComposeHelperLayout } from "@/components/connectData/ConnectComposeHelperLayout";
 import { ComposeWhereValueField } from "@/components/connectData/ComposeWhereValueField";
@@ -658,6 +661,10 @@ export default function DataLakeParquetPanel({
     setRandomSampleEnabled,
     randomSampleSize,
     setRandomSampleSize,
+    randomSampleSeeded,
+    setRandomSampleSeeded,
+    randomSampleSeed,
+    setRandomSampleSeed,
   } = useDataLakeComposeState(connectHomeDataLakeCompose);
   const [researchHelperToolId, setResearchHelperToolId] = useState(null);
   const [researchHelperOpen, setResearchHelperOpen] = useState(false);
@@ -1372,6 +1379,8 @@ export default function DataLakeParquetPanel({
       composeLimitScope,
       randomSampleEnabled: athenaBands ? false : !!randomSampleEnabled,
       randomSampleSize,
+      randomSampleSeeded: athenaBands ? false : randomSampleSeeded !== false,
+      randomSampleSeed: athenaBands ? null : randomSampleSeed,
     });
   }, [
     columnComposeItems,
@@ -1386,6 +1395,8 @@ export default function DataLakeParquetPanel({
     composeLimitScope,
     randomSampleEnabled,
     randomSampleSize,
+    randomSampleSeeded,
+    randomSampleSeed,
   ]);
 
   const composeFriendlySummary = useMemo(() => {
@@ -3540,6 +3551,13 @@ export default function DataLakeParquetPanel({
 
     const effectiveIngestMode = selectionTab === "meta" ? "meta" : "columns";
     const composeSpecForRun = isComposeTab ? buildServerComposePayload() : undefined;
+    if (composeSpecForRun?.randomSample?.seed) {
+      setRandomSampleSeed?.(String(composeSpecForRun.randomSample.seed));
+      setRandomSampleSeeded?.(composeSpecForRun.randomSample.mode !== "unseeded");
+    } else if (composeSpecForRun?.randomSample?.mode === "unseeded") {
+      setRandomSampleSeeded?.(false);
+      setRandomSampleSeed?.("");
+    }
     const composeSelectForCard = composeSpecForRun?.select ?? [];
     const effectiveWhereFilters = resolveEffectiveHubWhereFilters(
       composeWhereFilters,
@@ -3577,6 +3595,11 @@ export default function DataLakeParquetPanel({
             randomSampleSize: randomSampleEnabled
               ? Math.floor(Number(randomSampleSize))
               : null,
+            randomSampleMode: randomSampleEnabled
+              ? randomSampleSeeded !== false
+                ? "seeded"
+                : "unseeded"
+              : null,
             querySummary: buildRequestCardQuerySummary({
               lake,
               table: selected.table,
@@ -3587,6 +3610,10 @@ export default function DataLakeParquetPanel({
               composeRowLimit: composeAthenaRowLimit,
               randomSampleSize: randomSampleEnabled
                 ? Math.floor(Number(randomSampleSize))
+                : null,
+              randomSampleMode: randomSampleEnabled
+                ? composeSpecForRun?.randomSample?.mode ||
+                  (randomSampleSeeded !== false ? "seeded" : "unseeded")
                 : null,
             }),
           }
@@ -4982,6 +5009,17 @@ export default function DataLakeParquetPanel({
                     <ConnectRandomSamplePanel
                       sampleSize={randomSampleSize}
                       onSampleSizeChange={setRandomSampleSize}
+                      seeded={randomSampleSeeded !== false}
+                      onSeededChange={(next) => {
+                        setRandomSampleSeeded?.(!!next);
+                        if (next) {
+                          setRandomSampleSeed?.((prev) =>
+                            String(prev || "").trim() ? prev : generateRandomSampleSeed(),
+                          );
+                        } else {
+                          setRandomSampleSeed?.("");
+                        }
+                      }}
                       onRemove={() => {
                         setRandomSampleEnabled?.(false);
                         setResearchHelperOpen(false);
@@ -5047,6 +5085,10 @@ export default function DataLakeParquetPanel({
                         setComposeLimitRuleValue?.("");
                         setRandomSampleEnabled?.(true);
                         setRandomSampleSize?.((v) => (String(v || "").trim() ? v : "100"));
+                        setRandomSampleSeeded?.(true);
+                        setRandomSampleSeed?.((prev) =>
+                          String(prev || "").trim() ? prev : generateRandomSampleSeed(),
+                        );
                         setResearchHelperToolId("random_sample");
                         setResearchHelperOpen(true);
                       }}
