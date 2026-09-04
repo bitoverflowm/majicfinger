@@ -10,7 +10,7 @@ import { PiChartBarHorizontalLight, PiChartDonut, PiChartLine, PiChartLineThin }
 import { MdOutlineAreaChart, MdStackedBarChart } from "react-icons/md";
 import { GoDotFill } from "react-icons/go";
 import { AiOutlineRadarChart } from "react-icons/ai";
-import { CircleDot, CircleHelp, Expand, LogIn, Tag, LayoutGrid, Grid2X2, Shuffle, ChevronUp, ChevronDown, Calendar as CalendarIcon, CandlestickChart } from "lucide-react";
+import { CircleDot, CircleHelp, Expand, LogIn, Tag, LayoutGrid, Grid2X2, Settings2, Shuffle, ChevronUp, ChevronDown, Calendar as CalendarIcon, CandlestickChart } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -38,6 +38,18 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  DropdownMenu,
+  DropdownMenuCheckboxItem,
+  DropdownMenuContent,
+  DropdownMenuGroup,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuSub,
+  DropdownMenuSubContent,
+  DropdownMenuSubTrigger,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import {
   Tooltip,
   TooltipContent,
@@ -74,6 +86,76 @@ function sheetGroupHeading(sheetId, sheetName, index = 0) {
   const num = digits ? Number(digits[1]) : index + 1;
   const name = sheetName || sheetId || `Sheet ${num}`;
   return `Sheet ${num}: ${name}`;
+}
+
+const AXIS_SCALE_OPTIONS = [
+  { value: "linear", label: "Linear" },
+  { value: "log", label: "Logarithmic" },
+  { value: "categorical", label: "Categorical" },
+];
+
+/**
+ * Gear menu for per-axis settings (Scale submenu = exclusive linear / log / categorical).
+ */
+function AxisScaleSettingsMenu({ value, onValueChange, ariaLabel = "Axis settings" }) {
+  const scale = AXIS_SCALE_OPTIONS.some((o) => o.value === value) ? value : "linear";
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button
+          type="button"
+          variant="outline"
+          size="icon"
+          className="h-7 w-7 shrink-0 rounded-md"
+          aria-label={ariaLabel}
+        >
+          <Settings2 className="h-3.5 w-3.5" />
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" className="w-44 text-xs">
+        <DropdownMenuGroup>
+          <DropdownMenuLabel className="text-[10px] uppercase tracking-wide text-muted-foreground">
+            Axis
+          </DropdownMenuLabel>
+          <DropdownMenuSub>
+            <DropdownMenuSubTrigger className="text-xs">Scale</DropdownMenuSubTrigger>
+            <DropdownMenuSubContent className="text-xs">
+              <DropdownMenuLabel className="text-[10px] uppercase tracking-wide text-muted-foreground">
+                Scale
+              </DropdownMenuLabel>
+              <DropdownMenuSeparator />
+              {AXIS_SCALE_OPTIONS.map((opt) => (
+                <DropdownMenuCheckboxItem
+                  key={opt.value}
+                  className="text-xs"
+                  checked={scale === opt.value}
+                  onCheckedChange={(checked) => {
+                    if (checked) onValueChange?.(opt.value);
+                  }}
+                  onSelect={(e) => e.preventDefault()}
+                >
+                  {opt.label}
+                </DropdownMenuCheckboxItem>
+              ))}
+            </DropdownMenuSubContent>
+          </DropdownMenuSub>
+        </DropdownMenuGroup>
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+}
+
+function AxisFieldLabel({ children, scaleValue, onScaleChange, scaleAriaLabel }) {
+  return (
+    <div className="flex min-w-0 items-center justify-between gap-2">
+      <FieldLabel className="text-xs">{children}</FieldLabel>
+      <AxisScaleSettingsMenu
+        value={scaleValue}
+        onValueChange={onScaleChange}
+        ariaLabel={scaleAriaLabel}
+      />
+    </div>
+  );
 }
 
 function filterSheetColumnGroups(groups, { allowedValues, excludeValues } = {}) {
@@ -330,6 +412,10 @@ export default function ChartControls() {
     setSortXDir,
     sortYDir,
     setSortYDir,
+    scaleX,
+    setScaleX,
+    scaleY,
+    setScaleY,
     yAxisDivisor,
     setYAxisDivisor,
     yAxisCompact,
@@ -1866,7 +1952,13 @@ export default function ChartControls() {
                   ) : (
                     <>
                       <Field>
-                        <FieldLabel className="text-xs">X axis</FieldLabel>
+                        <AxisFieldLabel
+                          scaleValue={scaleX}
+                          onScaleChange={setScaleX}
+                          scaleAriaLabel="X axis settings"
+                        >
+                          X axis
+                        </AxisFieldLabel>
                         <Select value={xAxisSelectValue} onValueChange={handleXAxisChange}>
                           <SelectTrigger className="h-8 min-w-0 text-xs">
                             <SelectValue placeholder="X axis" className="text-xs" />
@@ -1911,7 +2003,13 @@ export default function ChartControls() {
                         </Field>
                       ) : null}
                       <Field>
-                        <FieldLabel className="text-xs">Y columns</FieldLabel>
+                        <AxisFieldLabel
+                          scaleValue={scaleY}
+                          onScaleChange={setScaleY}
+                          scaleAriaLabel="Y axis settings"
+                        >
+                          Y axis
+                        </AxisFieldLabel>
                         {selY.length > 0 &&
                           selY.map((yValue, index) => (
                             <div className="flex min-w-0 place-items-center gap-2" key={index}>
@@ -1936,7 +2034,7 @@ export default function ChartControls() {
                         {selY.length === 0 && (
                           <Select onValueChange={(val) => handleSelectY(val)}>
                             <SelectTrigger className="h-8 min-w-0 text-xs">
-                              <SelectValue placeholder="Y column" className="text-xs" />
+                              <SelectValue placeholder="Y axis" className="text-xs" />
                             </SelectTrigger>
                             <SelectContent className="text-xs">
                               <GroupedColumnSelectItems

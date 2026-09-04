@@ -233,6 +233,14 @@ export function getAxisType(key, dataTypes, data) {
   return "string";
 }
 
+/** Default Scale menu value from column type: numeric/date → linear, text → categorical. */
+export function inferDefaultAxisScale(key, dataTypes, data) {
+  if (!key) return "linear";
+  const axisType = getAxisType(key, dataTypes, data);
+  if (axisType === "number" || axisType === "date" || axisType === "id") return "linear";
+  return "categorical";
+}
+
 function isLikelyTemporalKey(key, dataTypes, data) {
   if (!key) return false;
   const keyNorm = String(key).toLowerCase();
@@ -855,6 +863,9 @@ export function ChartBuilderProvider({ demo, children, initialBuilderSnapshot, e
   const [chartTimeframe, setChartTimeframe] = useState("15m");
   const [scaleX, setScaleX] = useState("linear");
   const [scaleY, setScaleY] = useState("linear");
+  /** Tracks last axis keys we auto-inferred scale for (column change resets to type default). */
+  const scaleInferXKeyRef = useRef(undefined);
+  const scaleInferYKeyRef = useRef(undefined);
   const [selZ, setSelZ] = useState(null);
   const [selColorCol, setSelColorCol] = useState(null);
   const [scaleZ, setScaleZ] = useState("linear");
@@ -1012,8 +1023,24 @@ export function ChartBuilderProvider({ demo, children, initialBuilderSnapshot, e
     snapshotSeedRestoredFromRef.current = snap;
     if (hasSavedAxes) {
       if (snap.selChartType != null) setSelChartType(snap.selChartType);
-      if (snap.selX !== undefined) setSelX(snap.selX);
-      if (Array.isArray(snap.selY)) setSelY(snap.selY);
+      if (snap.selX !== undefined) {
+        setSelX(snap.selX);
+        if (snap.scaleX === "linear" || snap.scaleX === "log" || snap.scaleX === "categorical") {
+          setScaleX(snap.scaleX);
+          scaleInferXKeyRef.current = snap.selX;
+        } else {
+          scaleInferXKeyRef.current = undefined;
+        }
+      }
+      if (Array.isArray(snap.selY)) {
+        setSelY(snap.selY);
+        if (snap.scaleY === "linear" || snap.scaleY === "log" || snap.scaleY === "categorical") {
+          setScaleY(snap.scaleY);
+          scaleInferYKeyRef.current = snap.selY[0] ?? null;
+        } else {
+          scaleInferYKeyRef.current = undefined;
+        }
+      }
       if (snap.candlestickOhlcSetId != null) {
         setCandlestickOhlcSetId(String(snap.candlestickOhlcSetId) || "auto");
       }
@@ -1080,8 +1107,22 @@ export function ChartBuilderProvider({ demo, children, initialBuilderSnapshot, e
     if (snapshotAppliedRef.current) return;
     snapshotAppliedRef.current = true;
     if (s.selChartType != null) setSelChartType(s.selChartType);
-    if (s.selX !== undefined) setSelX(s.selX);
-    if (Array.isArray(s.selY)) setSelY(s.selY);
+    if (s.selX !== undefined) {
+      setSelX(s.selX);
+      if (s.scaleX === "linear" || s.scaleX === "log" || s.scaleX === "categorical") {
+        scaleInferXKeyRef.current = s.selX;
+      } else {
+        scaleInferXKeyRef.current = undefined;
+      }
+    }
+    if (Array.isArray(s.selY)) {
+      setSelY(s.selY);
+      if (s.scaleY === "linear" || s.scaleY === "log" || s.scaleY === "categorical") {
+        scaleInferYKeyRef.current = s.selY[0] ?? null;
+      } else {
+        scaleInferYKeyRef.current = undefined;
+      }
+    }
     if (s.lineStyle != null) setLineStyle(s.lineStyle);
     if (s.lineAliasing !== undefined) setLineAliasing(!!s.lineAliasing);
     if (s.lineStrokeWidth !== undefined && Number.isFinite(Number(s.lineStrokeWidth))) {
@@ -1098,8 +1139,12 @@ export function ChartBuilderProvider({ demo, children, initialBuilderSnapshot, e
     if (s.chartTimeframe != null && CHART_TIMEFRAME_OPTIONS.some((opt) => opt.value === s.chartTimeframe)) {
       setChartTimeframe(s.chartTimeframe);
     }
-    if (s.scaleX != null) setScaleX(s.scaleX);
-    if (s.scaleY != null) setScaleY(s.scaleY);
+    if (s.scaleX === "linear" || s.scaleX === "log" || s.scaleX === "categorical") {
+      setScaleX(s.scaleX);
+    }
+    if (s.scaleY === "linear" || s.scaleY === "log" || s.scaleY === "categorical") {
+      setScaleY(s.scaleY);
+    }
     if (s.selZ !== undefined) setSelZ(s.selZ);
     if (s.selColorCol !== undefined) setSelColorCol(s.selColorCol);
     if (s.heatmapChangeCol !== undefined) setHeatmapChangeCol(s.heatmapChangeCol || null);
@@ -1419,6 +1464,22 @@ export function ChartBuilderProvider({ demo, children, initialBuilderSnapshot, e
     const rows = Array.isArray(effectiveData) ? effectiveData : [];
     return orderSheetRowsByDataTypes(rows, dataTypes);
   }, [demo, effectiveData, dataTypes]);
+
+  // When the user picks a new axis column, reset Scale to the type default (linear vs categorical).
+  useEffect(() => {
+    if (scaleInferXKeyRef.current === selX) return;
+    scaleInferXKeyRef.current = selX;
+    if (!selX) return;
+    setScaleX(inferDefaultAxisScale(selX, dataTypes, chartData));
+  }, [selX, dataTypes, chartData]);
+
+  useEffect(() => {
+    const yKey = Array.isArray(selY) ? selY[0] : null;
+    if (scaleInferYKeyRef.current === yKey) return;
+    scaleInferYKeyRef.current = yKey;
+    if (!yKey) return;
+    setScaleY(inferDefaultAxisScale(yKey, dataTypes, chartData));
+  }, [selY, dataTypes, chartData]);
 
   const lineSeriesColumnOptions = useMemo(() => {
     if (!xOptions?.length) return [];
@@ -2568,6 +2629,7 @@ export function ChartCanvas() {
     scopedKeysInUse,
     formatXAxisValue,
     formatCompactNumber,
+    scaleX,
     scaleY,
     selZ,
     selColorCol,
@@ -2853,10 +2915,15 @@ export function ChartCanvas() {
     selX &&
     plotRows.length &&
     !barForceCategoricalX &&
+    scaleX !== "categorical" &&
     typeof firstPlotX === "number" &&
     Number.isFinite(firstPlotX)
       ? "number"
       : "category";
+  const rechartsXAxisScale =
+    rechartsXAxisType === "number" && scaleX === "log" ? "log" : undefined;
+  const rechartsYAxisType = scaleY === "categorical" ? "category" : "number";
+  const rechartsYAxisScale = scaleY === "log" && rechartsYAxisType === "number" ? "log" : "auto";
 
   const xAxisNumberDomain =
     rechartsXAxisType === "number"
@@ -2996,9 +3063,10 @@ export function ChartCanvas() {
       const y = row?.[scatterYKey];
       if (x == null || x === "" || y == null || y === "") return false;
       if (rechartsXAxisType === "number" && !Number.isFinite(Number(x))) return false;
+      if (scaleY === "categorical") return true;
       return Number.isFinite(Number(y));
     });
-  }, [selChartType, xKey, scatterYKey, finalRenderedData, rechartsXAxisType]);
+  }, [selChartType, xKey, scatterYKey, finalRenderedData, rechartsXAxisType, scaleY]);
   const hasSelectedPalette = Array.isArray(selectedPalette) && selectedPalette.length > 0;
   /** Chromatic user-picked ramps drive series; grey/legacy auto ramps use rose/lime/blue defaults. */
   const usePaletteForSeries =
@@ -3688,7 +3756,7 @@ export function ChartCanvas() {
                           tickMargin={8}
                           width={72}
                           tickFormatter={yAxisFormatter}
-                          scale={scaleY === "log" ? "log" : "auto"}
+                          scale={rechartsYAxisScale}
                           domain={scaleY === "log" ? ["auto", "auto"] : cartesianYAxisDomain}
                           tick={{ fill: tickFillY }}
                           label={chartYAxisTitleLabel}
@@ -3755,7 +3823,7 @@ export function ChartCanvas() {
                               tickMargin={8}
                               tickFormatter={yAxisFormatter}
                               tick={{ fill: tickFillY }}
-                              scale={scaleY === "log" ? "log" : "auto"}
+                              scale={rechartsYAxisScale}
                               domain={scaleY === "log" ? ["auto", "auto"] : undefined}
                               label={chartYAxisTitleLabelBottom}
                             />
@@ -3800,7 +3868,7 @@ export function ChartCanvas() {
                               tickMargin={8}
                               width={74}
                               tickFormatter={yAxisFormatter}
-                              scale={scaleY === "log" ? "log" : "auto"}
+                              scale={rechartsYAxisScale}
                               domain={scaleY === "log" ? ["auto", "auto"] : undefined}
                               tick={{ fill: tickFillY }}
                               label={chartYAxisTitleLabel}
@@ -3883,6 +3951,7 @@ export function ChartCanvas() {
                           dataKey={plotXKey}
                           name={stripSheetScopedColumnKey(xKey)}
                           domain={effectiveXDomain}
+                          scale={rechartsXAxisScale}
                           allowDataOverflow={!!(enableZoom && zoomXDomain)}
                           ticks={effectiveXTicks}
                           tickLine={false}
@@ -3894,15 +3963,15 @@ export function ChartCanvas() {
                           label={chartXAxisTitleLabel}
                         />
                         <YAxis
-                          type="number"
+                          type={rechartsYAxisType}
                           dataKey={scatterYKey}
                           name={stripSheetScopedColumnKey(ySeries[0]?.sourceKey || scatterYKey)}
                           tickLine={false}
                           axisLine={yAxisLineVisible ? { stroke: gridStroke, strokeWidth: 1 } : false}
                           tickMargin={8}
                           width={72}
-                          tickFormatter={yAxisFormatter}
-                          scale={scaleY === "log" ? "log" : "auto"}
+                          tickFormatter={scaleY === "categorical" ? undefined : yAxisFormatter}
+                          scale={rechartsYAxisScale}
                           domain={scaleY === "log" ? ["auto", "auto"] : undefined}
                           tick={{ fill: tickFillY }}
                           label={chartYAxisTitleLabel}
@@ -3997,7 +4066,7 @@ export function ChartCanvas() {
                           tickMargin={8}
                           width={72}
                           tickFormatter={yAxisFormatter}
-                          scale={scaleY === "log" ? "log" : "auto"}
+                          scale={rechartsYAxisScale}
                           domain={scaleY === "log" ? ["auto", "auto"] : cartesianYAxisDomain}
                           tick={{ fill: tickFillY }}
                           label={chartYAxisTitleLabel}
