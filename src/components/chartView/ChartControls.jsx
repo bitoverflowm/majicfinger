@@ -145,10 +145,10 @@ function AxisScaleSettingsMenu({ value, onValueChange, ariaLabel = "Axis setting
   );
 }
 
-/** Faint label sitting tight above the axis column select. */
+/** Faint label sitting tight above the axis column select — uses theme `muted-foreground` (adapts light/dark). */
 function AxisFieldLabel({ children }) {
   return (
-    <FieldLabel className="mb-0 text-[11px] font-normal leading-none text-muted-foreground/70">
+    <FieldLabel className="mb-0 text-[11px] font-normal leading-none">
       {children}
     </FieldLabel>
   );
