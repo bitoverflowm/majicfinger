@@ -3,14 +3,14 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { format } from "date-fns";
-import { CaretRightIcon, IdCardIcon } from "@radix-ui/react-icons";
+import { CaretRightIcon } from "@radix-ui/react-icons";
 import { MinusCircle } from "react-feather";
 import { IoPieChartOutline, IoStatsChart } from "react-icons/io5";
 import { PiChartBarHorizontalLight, PiChartDonut, PiChartLine, PiChartLineThin } from "react-icons/pi";
 import { MdOutlineAreaChart, MdStackedBarChart } from "react-icons/md";
 import { GoDotFill } from "react-icons/go";
 import { AiOutlineRadarChart } from "react-icons/ai";
-import { CircleDot, CircleHelp, Expand, LogIn, Tag, LayoutGrid, Grid2X2, Settings2, Shuffle, ChevronUp, ChevronDown, Calendar as CalendarIcon, CandlestickChart } from "lucide-react";
+import { CircleDot, CircleHelp, Expand, Tag, LayoutGrid, Grid2X2, Settings2, Shuffle, ChevronUp, ChevronDown, Calendar as CalendarIcon, CandlestickChart } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -26,6 +26,7 @@ import {
   FieldTitle,
 } from "@/components/ui/field";
 import { Switch } from "@/components/ui/switch";
+import { Slider } from "@/components/ui/slider";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { Toggle } from "@/components/ui/toggle";
 import {
@@ -106,6 +107,11 @@ const AXIS_LABEL_OPTIONS = [
   { value: "full", label: "Full numbers" },
 ];
 
+const Z_AXIS_SCALE_OPTIONS = [
+  { value: "linear", label: "Linear", valueTypes: ["number"] },
+  { value: "log", label: "Logarithmic", valueTypes: ["number"] },
+];
+
 /** Normalize getAxisType results into menu gating buckets. */
 function axisMenuValueType(axisType, { isTemporal = false } = {}) {
   if (isTemporal || axisType === "date") return "date";
@@ -125,12 +131,19 @@ function AxisSettingsMenu({
   onCompactChange,
   valueType = "number",
   ariaLabel = "Axis settings",
+  menuLabel = "Axis",
+  showScale = true,
+  showNumberFormat,
+  scaleOptions: scaleOptionsProp,
 }) {
-  const scaleOptions = AXIS_SCALE_OPTIONS.filter((o) => o.valueTypes.includes(valueType));
+  const scaleOptions = (scaleOptionsProp || AXIS_SCALE_OPTIONS).filter((o) =>
+    o.valueTypes.includes(valueType),
+  );
   const scale = scaleOptions.some((o) => o.value === scaleValue)
     ? scaleValue
     : scaleOptions[0]?.value || "linear";
-  const showNumberFormat = valueType === "number";
+  const numberFormatVisible =
+    showNumberFormat !== undefined ? !!showNumberFormat : valueType === "number";
   const divisor = String(Number(divisorValue) > 0 ? Number(divisorValue) : 1);
   const labelMode = compactLabels ? "compact" : "full";
 
@@ -150,31 +163,33 @@ function AxisSettingsMenu({
       <DropdownMenuContent align="end" className="w-48 text-xs">
         <DropdownMenuGroup>
           <DropdownMenuLabel className="text-[10px] uppercase tracking-wide text-muted-foreground">
-            Axis
+            {menuLabel}
           </DropdownMenuLabel>
-          <DropdownMenuSub>
-            <DropdownMenuSubTrigger className="text-xs">Scale</DropdownMenuSubTrigger>
-            <DropdownMenuSubContent className="text-xs">
-              <DropdownMenuLabel className="text-[10px] uppercase tracking-wide text-muted-foreground">
-                Scale
-              </DropdownMenuLabel>
-              <DropdownMenuSeparator />
-              {scaleOptions.map((opt) => (
-                <DropdownMenuCheckboxItem
-                  key={opt.value}
-                  className="text-xs"
-                  checked={scale === opt.value}
-                  onCheckedChange={(checked) => {
-                    if (checked) onScaleChange?.(opt.value);
-                  }}
-                  onSelect={(e) => e.preventDefault()}
-                >
-                  {opt.label}
-                </DropdownMenuCheckboxItem>
-              ))}
-            </DropdownMenuSubContent>
-          </DropdownMenuSub>
-          {showNumberFormat ? (
+          {showScale && scaleOptions.length > 0 ? (
+            <DropdownMenuSub>
+              <DropdownMenuSubTrigger className="text-xs">Scale</DropdownMenuSubTrigger>
+              <DropdownMenuSubContent className="text-xs">
+                <DropdownMenuLabel className="text-[10px] uppercase tracking-wide text-muted-foreground">
+                  Scale
+                </DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                {scaleOptions.map((opt) => (
+                  <DropdownMenuCheckboxItem
+                    key={opt.value}
+                    className="text-xs"
+                    checked={scale === opt.value}
+                    onCheckedChange={(checked) => {
+                      if (checked) onScaleChange?.(opt.value);
+                    }}
+                    onSelect={(e) => e.preventDefault()}
+                  >
+                    {opt.label}
+                  </DropdownMenuCheckboxItem>
+                ))}
+              </DropdownMenuSubContent>
+            </DropdownMenuSub>
+          ) : null}
+          {numberFormatVisible ? (
             <>
               <DropdownMenuSub>
                 <DropdownMenuSubTrigger className="text-xs">Divisor</DropdownMenuSubTrigger>
@@ -247,6 +262,10 @@ function AxisSelectRow({
   onCompactChange,
   valueType,
   scaleAriaLabel,
+  menuLabel,
+  showScale,
+  showNumberFormat,
+  scaleOptions,
   children,
 }) {
   return (
@@ -261,6 +280,10 @@ function AxisSelectRow({
         onCompactChange={onCompactChange}
         valueType={valueType}
         ariaLabel={scaleAriaLabel}
+        menuLabel={menuLabel}
+        showScale={showScale}
+        showNumberFormat={showNumberFormat}
+        scaleOptions={scaleOptions}
       />
     </div>
   );
@@ -478,6 +501,12 @@ export default function ChartControls() {
     setScatterZEnabled,
     scatterColorEnabled,
     setScatterColorEnabled,
+    scatterJitterEnabled,
+    setScatterJitterEnabled,
+    scatterJitterX,
+    setScatterJitterX,
+    scatterJitterY,
+    setScatterJitterY,
 
     livelineMomentum,
     setLivelineMomentum,
@@ -2513,14 +2542,9 @@ export default function ChartControls() {
                   {/* Scatter/bubble: Z (bubble size) and Color column */}
                   {selChartType === "scatter" && (
                     <>
-                      <Field>
-                        <div className="flex items-start justify-between gap-3">
-                          <FieldContent className="gap-1">
-                            <FieldTitle className="text-xs">Bubble size (Z)</FieldTitle>
-                            <FieldDescription className="text-xs">
-                              Optional numeric column for bubble radius
-                            </FieldDescription>
-                          </FieldContent>
+                      <Field className="gap-1.5">
+                        <div className="flex min-w-0 items-center justify-between gap-2">
+                          <AxisFieldLabel>Bubble size (Z)</AxisFieldLabel>
                           <Switch
                             checked={!!scatterZEnabled}
                             onCheckedChange={(checked) => {
@@ -2532,28 +2556,33 @@ export default function ChartControls() {
                           />
                         </div>
                         {scatterZEnabled ? (
-                          <Select value={selZ || ""} onValueChange={(v) => setSelZ(v || null)}>
-                            <SelectTrigger className="h-8 min-w-0 text-xs">
-                              <SelectValue placeholder="Select Z column" className="text-xs" />
-                            </SelectTrigger>
-                            <SelectContent className="text-xs">
-                              <GroupedColumnSelectItems
-                                groups={lineSheetColumnGroups}
-                                allowedValues={xOptions}
-                                excludeValues={selX ? [selX] : []}
-                              />
-                            </SelectContent>
-                          </Select>
+                          <AxisSelectRow
+                            scaleValue={scaleZ === "log" ? "log" : "linear"}
+                            onScaleChange={(v) => setScaleZ(v === "log" ? "log" : "linear")}
+                            valueType="number"
+                            showNumberFormat={false}
+                            scaleOptions={Z_AXIS_SCALE_OPTIONS}
+                            menuLabel="Z"
+                            scaleAriaLabel="Bubble size settings"
+                          >
+                            <Select value={selZ || ""} onValueChange={(v) => setSelZ(v || null)}>
+                              <SelectTrigger className="h-8 min-w-0 w-full text-xs">
+                                <SelectValue placeholder="Select Z column" className="text-xs" />
+                              </SelectTrigger>
+                              <SelectContent className="text-xs">
+                                <GroupedColumnSelectItems
+                                  groups={lineSheetColumnGroups}
+                                  allowedValues={xOptions}
+                                  excludeValues={selX ? [selX] : []}
+                                />
+                              </SelectContent>
+                            </Select>
+                          </AxisSelectRow>
                         ) : null}
                       </Field>
-                      <Field>
-                        <div className="flex items-start justify-between gap-3">
-                          <FieldContent className="gap-1">
-                            <FieldTitle className="text-xs">Color by</FieldTitle>
-                            <FieldDescription className="text-xs">
-                              Optional column for point color
-                            </FieldDescription>
-                          </FieldContent>
+                      <Field className="gap-1.5">
+                        <div className="flex min-w-0 items-center justify-between gap-2">
+                          <AxisFieldLabel>Color by</AxisFieldLabel>
                           <Switch
                             checked={!!scatterColorEnabled}
                             onCheckedChange={(checked) => {
@@ -2565,44 +2594,42 @@ export default function ChartControls() {
                           />
                         </div>
                         {scatterColorEnabled ? (
-                          <Select value={selColorCol ?? "__none__"} onValueChange={(v) => setSelColorCol(v === "__none__" ? null : v)}>
-                            <SelectTrigger className="h-8 min-w-0 text-xs">
-                              <SelectValue placeholder="None or select column" className="text-xs" />
-                            </SelectTrigger>
-                            <SelectContent className="text-xs">
-                              <SelectItem value="__none__" className="text-xs">
-                                None
-                              </SelectItem>
-                              <GroupedColumnSelectItems
-                                groups={lineSheetColumnGroups}
-                                allowedValues={xOptions}
-                              />
-                            </SelectContent>
-                          </Select>
+                          <AxisSelectRow
+                            scaleValue={
+                              (() => {
+                                const t = axisMenuValueType(
+                                  selColorCol ? getAxisType(selColorCol, dataTypes, chartData) : "string",
+                                );
+                                return t === "number" || t === "date" ? "linear" : "categorical";
+                              })()
+                            }
+                            onScaleChange={() => {}}
+                            valueType={axisMenuValueType(
+                              selColorCol ? getAxisType(selColorCol, dataTypes, chartData) : "string",
+                            )}
+                            menuLabel="Color"
+                            scaleAriaLabel="Color by settings"
+                          >
+                            <Select
+                              value={selColorCol ?? "__none__"}
+                              onValueChange={(v) => setSelColorCol(v === "__none__" ? null : v)}
+                            >
+                              <SelectTrigger className="h-8 min-w-0 w-full text-xs">
+                                <SelectValue placeholder="None or select column" className="text-xs" />
+                              </SelectTrigger>
+                              <SelectContent className="text-xs">
+                                <SelectItem value="__none__" className="text-xs">
+                                  None
+                                </SelectItem>
+                                <GroupedColumnSelectItems
+                                  groups={lineSheetColumnGroups}
+                                  allowedValues={xOptions}
+                                />
+                              </SelectContent>
+                            </Select>
+                          </AxisSelectRow>
                         ) : null}
                       </Field>
-                      {scatterZEnabled && selZ && (
-                        <Field orientation="horizontal" className="items-center gap-2">
-                          <FieldLabel className="text-xs">Z scale</FieldLabel>
-                          <TooltipProvider delayDuration={300}>
-                            <Tooltip>
-                              <TooltipTrigger asChild>
-                                <button
-                                  type="button"
-                                  className={`flex items-center gap-1 rounded border border-border p-1.5 ${scaleZ === "log" ? "bg-muted" : "bg-background"}`}
-                                  onClick={() => setScaleZ((s) => (s === "log" ? "linear" : "log"))}
-                                >
-                                  <LogIn className="h-4 w-4" />
-                                  <span className="text-[10px]">Z</span>
-                                </button>
-                              </TooltipTrigger>
-                              <TooltipContent side="bottom" className="text-xs max-w-[200px]">
-                                {scaleZ === "linear" ? "Z: Linear scale." : "Z: Log scale (for large value ranges)."}
-                              </TooltipContent>
-                            </Tooltip>
-                          </TooltipProvider>
-                        </Field>
-                      )}
                       {chartLineFilterControls}
                     </>
                   )}
@@ -2647,16 +2674,97 @@ export default function ChartControls() {
                 <AccordionTrigger className="py-2 text-xs font-bold text-muted-foreground hover:no-underline">
                   Design
                 </AccordionTrigger>
-                <AccordionContent className="pt-2">
-                  <div className="flex min-w-0 items-center gap-2 border-b border-border/60 pb-3">
-                    <Label className="w-24 shrink-0 text-xs text-muted-foreground">Inner box</Label>
+                <AccordionContent className="space-y-0.5 pb-2 pt-1">
+                  <div className="flex min-w-0 items-center gap-2 py-1.5">
                     <ChartColorPalettePopover
                       value={innerBoxColor}
                       onChange={setInnerBoxColor}
                       ariaLabel="Inner box background"
                       onClear={() => setInnerBoxColor(null)}
+                      triggerClassName="h-6 w-6 rounded-md"
                     />
+                    <Label className="min-w-0 flex-1 text-left text-xs font-medium text-muted-foreground">
+                      Inner box
+                    </Label>
                   </div>
+
+                  {selChartType === "scatter" && (
+                    <div className="flex min-w-0 items-center gap-2 py-1.5">
+                      <Switch
+                        id="chart-design-scatter-jitter"
+                        checked={!!scatterJitterEnabled}
+                        onCheckedChange={(checked) => setScatterJitterEnabled(!!checked)}
+                        aria-label="Enable scatter jitter"
+                        className="h-4 w-7 shrink-0 [&>span]:h-3 [&>span]:w-3 data-[state=checked]:[&>span]:translate-x-3"
+                      />
+                      <Label
+                        htmlFor="chart-design-scatter-jitter"
+                        className="min-w-0 flex-1 cursor-pointer text-left text-xs font-medium text-muted-foreground"
+                      >
+                        Jitter
+                      </Label>
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="icon"
+                            className="h-7 w-7 shrink-0 rounded-md"
+                            aria-label="Jitter settings"
+                          >
+                            <Settings2 className="h-3.5 w-3.5" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end" className="w-52 text-xs">
+                          <DropdownMenuGroup>
+                            <DropdownMenuLabel className="text-[10px] uppercase tracking-wide text-muted-foreground">
+                              Jitter
+                            </DropdownMenuLabel>
+                            <DropdownMenuSub>
+                              <DropdownMenuSubTrigger className="text-xs">
+                                Horizontal
+                              </DropdownMenuSubTrigger>
+                              <DropdownMenuSubContent className="w-52 p-3 text-xs">
+                                <div className="mb-2 flex items-center justify-between gap-2">
+                                  <span className="text-muted-foreground">Amount</span>
+                                  <span className="tabular-nums text-foreground">{Math.round(Number(scatterJitterX) || 0)}</span>
+                                </div>
+                                <Slider
+                                  min={0}
+                                  max={100}
+                                  step={1}
+                                  value={[Math.max(0, Math.min(100, Number(scatterJitterX) || 0))]}
+                                  onValueChange={(v) => setScatterJitterX(Math.max(0, Math.min(100, Math.round(Number(v?.[0]) || 0))))}
+                                  aria-label="Horizontal jitter amount"
+                                  className="w-full"
+                                />
+                              </DropdownMenuSubContent>
+                            </DropdownMenuSub>
+                            <DropdownMenuSub>
+                              <DropdownMenuSubTrigger className="text-xs">
+                                Vertical
+                              </DropdownMenuSubTrigger>
+                              <DropdownMenuSubContent className="w-52 p-3 text-xs">
+                                <div className="mb-2 flex items-center justify-between gap-2">
+                                  <span className="text-muted-foreground">Amount</span>
+                                  <span className="tabular-nums text-foreground">{Math.round(Number(scatterJitterY) || 0)}</span>
+                                </div>
+                                <Slider
+                                  min={0}
+                                  max={100}
+                                  step={1}
+                                  value={[Math.max(0, Math.min(100, Number(scatterJitterY) || 0))]}
+                                  onValueChange={(v) => setScatterJitterY(Math.max(0, Math.min(100, Math.round(Number(v?.[0]) || 0))))}
+                                  aria-label="Vertical jitter amount"
+                                  className="w-full"
+                                />
+                              </DropdownMenuSubContent>
+                            </DropdownMenuSub>
+                          </DropdownMenuGroup>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </div>
+                  )}
 
                   {selChartType === "heatmap" && (
                     <div className="min-w-0 space-y-3 border-b border-border/60 pb-3 pt-1">
@@ -2908,8 +3016,7 @@ export default function ChartControls() {
 
                   {(selChartType === "area" ||
                     selChartType === "line" ||
-                    selChartType === "bar" ||
-                    selChartType === "scatter") && (
+                    selChartType === "bar") && (
                     <div className="space-y-2 border-b border-border/60 pb-3">
                       <div className="flex items-center gap-2">
                         <Switch
@@ -3205,57 +3312,88 @@ export default function ChartControls() {
                   </div>
                 )}
               {selChartType !== "scatter" ? chartLineFilterControls : null}
-                  <div className="mt-4 flex flex-wrap items-center gap-2 border-t border-border/60 pt-3">
-                    {selChartType === "area" && (
-                      <Toggle area-label="Toggle Expand" pressed={expanded} onPressedChange={handleToggleChange}>
-                        <Expand className={`h-4 w-4 font-bold ${dark ? "text-slate-200" : "text-muted-foreground"}`} />
-                      </Toggle>
-                    )}
+                  <div className="mt-1 flex min-w-0 flex-col gap-1">
                     {selChartType !== "heatmap" && selChartType !== "candlestick" && selChartType !== "liveline" ? (
-                      <Toggle area-label="Toggle Legend" pressed={legendVisible} onPressedChange={handleToggleLegend}>
-                        <IdCardIcon className="h-4 w-4 text-foreground" />
-                      </Toggle>
-                    ) : null}
-                    {legendVisible ? (
-                      <div className="min-w-0 flex-1 basis-full space-y-1">
-                        <Label htmlFor="chart-legend-title" className="text-xs text-muted-foreground">
-                          Legend title
-                        </Label>
-                        <Input
-                          id="chart-legend-title"
-                          type="text"
-                          value={legendTitle}
-                          placeholder="e.g. Score range"
-                          className="h-8 text-xs"
-                          onChange={(e) => setLegendTitle(e.target.value)}
+                      <div className="flex min-w-0 items-center gap-2 py-1.5">
+                        <Switch
+                          id="chart-design-legend"
+                          checked={!!legendVisible}
+                          onCheckedChange={handleToggleLegend}
+                          aria-label="Toggle legend"
+                          className="h-4 w-7 shrink-0 [&>span]:h-3 [&>span]:w-3 data-[state=checked]:[&>span]:translate-x-3"
                         />
+                        <Label
+                          htmlFor="chart-design-legend"
+                          className="min-w-0 flex-1 cursor-pointer text-left text-xs font-medium text-muted-foreground"
+                        >
+                          Legend
+                        </Label>
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="icon"
+                              className="h-7 w-7 shrink-0 rounded-md"
+                              aria-label="Legend settings"
+                            >
+                              <Settings2 className="h-3.5 w-3.5" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end" className="w-56 p-3 text-xs">
+                            <DropdownMenuLabel className="px-0 pb-2 text-[10px] uppercase tracking-wide text-muted-foreground">
+                              Legend
+                            </DropdownMenuLabel>
+                            <div className="space-y-1.5">
+                              <Label htmlFor="chart-legend-title" className="text-xs text-muted-foreground">
+                                Legend title
+                              </Label>
+                              <Input
+                                id="chart-legend-title"
+                                type="text"
+                                value={legendTitle}
+                                placeholder="e.g. Score range"
+                                className="h-8 text-xs"
+                                onChange={(e) => setLegendTitle(e.target.value)}
+                                onKeyDown={(e) => e.stopPropagation()}
+                              />
+                            </div>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
                       </div>
                     ) : null}
-                    {selChartType === "bar" && (
-                      <>
-                        <Toggle area-label="Toggle Horizontal" pressed={horizontal} onPressedChange={handleToggleHorizontal}>
-                          <PiChartBarHorizontalLight className="h-4 w-4 text-foreground" />
+                    <div className="flex flex-wrap items-center gap-2">
+                      {selChartType === "area" && (
+                        <Toggle area-label="Toggle Expand" pressed={expanded} onPressedChange={handleToggleChange}>
+                          <Expand className={`h-4 w-4 font-bold ${dark ? "text-slate-200" : "text-muted-foreground"}`} />
                         </Toggle>
-                        <Toggle area-label="Toggle Stack" pressed={stackedBar} onPressedChange={handleToggleStack}>
-                          <MdStackedBarChart className="h-4 w-4 text-foreground" />
+                      )}
+                      {selChartType === "bar" && (
+                        <>
+                          <Toggle area-label="Toggle Horizontal" pressed={horizontal} onPressedChange={handleToggleHorizontal}>
+                            <PiChartBarHorizontalLight className="h-4 w-4 text-foreground" />
+                          </Toggle>
+                          <Toggle area-label="Toggle Stack" pressed={stackedBar} onPressedChange={handleToggleStack}>
+                            <MdStackedBarChart className="h-4 w-4 text-foreground" />
+                          </Toggle>
+                        </>
+                      )}
+                      {selChartType === "line" && (
+                        <Toggle area-label="Toggle Dots" pressed={dots} onPressedChange={handleToggleDots}>
+                          <GoDotFill className="h-4 w-4 text-foreground" />
                         </Toggle>
-                      </>
-                    )}
-                    {selChartType === "line" && (
-                      <Toggle area-label="Toggle Dots" pressed={dots} onPressedChange={handleToggleDots}>
-                        <GoDotFill className="h-4 w-4 text-foreground" />
-                      </Toggle>
-                    )}
-                    {(selChartType === "line" || selChartType === "pie") && (
-                      <Toggle area-label="Toggle data labels" pressed={labelLine} onPressedChange={handleToggleLabelLine}>
-                        <Tag className="h-4 w-4 text-foreground" />
-                      </Toggle>
-                    )}
-                    {selChartType === "pie" && (
-                      <Toggle area-label="Toggle donut" pressed={donut} onPressedChange={handleToggleDonut}>
-                        <PiChartDonut className="h-4 w-4 text-foreground" />
-                      </Toggle>
-                    )}
+                      )}
+                      {(selChartType === "line" || selChartType === "pie") && (
+                        <Toggle area-label="Toggle data labels" pressed={labelLine} onPressedChange={handleToggleLabelLine}>
+                          <Tag className="h-4 w-4 text-foreground" />
+                        </Toggle>
+                      )}
+                      {selChartType === "pie" && (
+                        <Toggle area-label="Toggle donut" pressed={donut} onPressedChange={handleToggleDonut}>
+                          <PiChartDonut className="h-4 w-4 text-foreground" />
+                        </Toggle>
+                      )}
+                    </div>
                   </div>
                 </AccordionContent>
               </AccordionItem>

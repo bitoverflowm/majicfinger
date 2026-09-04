@@ -752,6 +752,18 @@ function stableHashIndex(value, modulo) {
   return Math.abs(hash) % n;
 }
 
+/** Deterministic 0..1 noise from integer seeds (stable across renders). */
+function unitNoise2d(i, channel) {
+  const x = Math.sin((Number(i) + 1) * 12.9898 + (Number(channel) + 1) * 78.233) * 43758.5453;
+  return x - Math.floor(x);
+}
+
+/** Map 0–100 jitter intensity to a fraction of axis span (max 12% at 100). */
+function scatterJitterFraction(intensity) {
+  const t = Math.max(0, Math.min(100, Number(intensity) || 0)) / 100;
+  return t * 0.12;
+}
+
 function parseScopedColumnKey(value, fallbackSheetId) {
   const raw = String(value || "");
   const splitIdx = raw.indexOf("::");
@@ -871,6 +883,10 @@ export function ChartBuilderProvider({ demo, children, initialBuilderSnapshot, e
   const [scaleZ, setScaleZ] = useState("linear");
   const [scatterZEnabled, setScatterZEnabled] = useState(false);
   const [scatterColorEnabled, setScatterColorEnabled] = useState(false);
+  /** Scatter: nudge overlapping points; amounts are 0–100 intensity (mapped to % of axis span). */
+  const [scatterJitterEnabled, setScatterJitterEnabled] = useState(false);
+  const [scatterJitterX, setScatterJitterX] = useState(2);
+  const [scatterJitterY, setScatterJitterY] = useState(2);
   /** Heatmap (Spectrum market map): column that drives tile color intensity. */
   const [heatmapChangeCol, setHeatmapChangeCol] = useState(null);
   /** `auto` derives cap from |change|; `manual` uses heatmapCap. */
@@ -943,7 +959,7 @@ export function ChartBuilderProvider({ demo, children, initialBuilderSnapshot, e
   const [yAxisLabelColor, setYAxisLabelColor] = useState(null);
 
   const [gridVisible, setGridVisible] = useState(true);
-  /** Scroll-wheel zoom on numeric / time X (line, area, bar, scatter). Ephemeral domain lives in ChartCanvas. */
+  /** Scroll-wheel zoom on numeric / time X (line, area, bar). Ephemeral domain lives in ChartCanvas. */
   const [enableZoom, setEnableZoom] = useState(false);
   const [yAxisLineVisible, setYAxisLineVisible] = useState(false);
   /** When true, category / time tick text on the X dimension is not drawn (area, line, bar). */
@@ -1161,6 +1177,13 @@ export function ChartBuilderProvider({ demo, children, initialBuilderSnapshot, e
     else if (s.selZ) setScatterZEnabled(true);
     if (s.scatterColorEnabled !== undefined) setScatterColorEnabled(!!s.scatterColorEnabled);
     else if (s.selColorCol) setScatterColorEnabled(true);
+    if (s.scatterJitterEnabled !== undefined) setScatterJitterEnabled(!!s.scatterJitterEnabled);
+    if (s.scatterJitterX != null && Number.isFinite(Number(s.scatterJitterX))) {
+      setScatterJitterX(Math.max(0, Math.min(100, Math.round(Number(s.scatterJitterX)))));
+    }
+    if (s.scatterJitterY != null && Number.isFinite(Number(s.scatterJitterY))) {
+      setScatterJitterY(Math.max(0, Math.min(100, Math.round(Number(s.scatterJitterY)))));
+    }
     if (s.yAxisDivisor != null) setYAxisDivisor(s.yAxisDivisor);
     if (s.yAxisCompact !== undefined) setYAxisCompact(!!s.yAxisCompact);
     if (s.xAxisDivisor != null) setXAxisDivisor(s.xAxisDivisor);
@@ -1984,6 +2007,9 @@ export function ChartBuilderProvider({ demo, children, initialBuilderSnapshot, e
     scaleZ,
     scatterZEnabled,
     scatterColorEnabled,
+    scatterJitterEnabled,
+    scatterJitterX,
+    scatterJitterY,
     yAxisDivisor,
     yAxisCompact,
     xAxisDivisor,
@@ -2294,6 +2320,12 @@ export function ChartBuilderProvider({ demo, children, initialBuilderSnapshot, e
     setScatterZEnabled,
     scatterColorEnabled,
     setScatterColorEnabled,
+    scatterJitterEnabled,
+    setScatterJitterEnabled,
+    scatterJitterX,
+    setScatterJitterX,
+    scatterJitterY,
+    setScatterJitterY,
 
     livelineMomentum,
     setLivelineMomentum,
@@ -2646,6 +2678,9 @@ export function ChartCanvas() {
     scaleZ,
     scatterZEnabled,
     scatterColorEnabled,
+    scatterJitterEnabled,
+    scatterJitterX,
+    scatterJitterY,
     heatmapChangeCol,
     heatmapCapMode,
     heatmapCap,
@@ -2762,6 +2797,8 @@ export function ChartCanvas() {
 
   const cartesianChart =
     selChartType === "line" || selChartType === "area" || selChartType === "bar" || selChartType === "scatter";
+  /** Scatter zoom is hidden for now; keep toggle state but do not apply. */
+  const zoomActive = !!enableZoom && selChartType !== "scatter";
   const chartUsesTimeframes = chartTimeframesEnabled && chartTimeframesAvailable;
 
   const temporalNormalizeEnabled =
@@ -2965,8 +3002,8 @@ export function ChartCanvas() {
   const [zoomXDomain, setZoomXDomain] = useState(/** @type {[number, number] | null} */ (null));
 
   useEffect(() => {
-    if (!enableZoom) setZoomXDomain(null);
-  }, [enableZoom]);
+    if (!zoomActive) setZoomXDomain(null);
+  }, [zoomActive]);
 
   // Reset ephemeral zoom when the underlying series / axes change.
   useEffect(() => {
@@ -2974,17 +3011,17 @@ export function ChartCanvas() {
   }, [selChartType, plotXKey, selX, dataXExtent?.[0], dataXExtent?.[1]]);
 
   const effectiveXDomain = useMemo(() => {
-    if (!enableZoom || !zoomXDomain || rechartsXAxisType !== "number") {
+    if (!zoomActive || !zoomXDomain || rechartsXAxisType !== "number") {
       return xAxisNumberDomain;
     }
     return zoomXDomain;
-  }, [enableZoom, zoomXDomain, rechartsXAxisType, xAxisNumberDomain]);
+  }, [zoomActive, zoomXDomain, rechartsXAxisType, xAxisNumberDomain]);
 
   const chartZoomRef = useRef(/** @type {HTMLDivElement | null} */ (null));
 
   const handleChartWheel = useCallback(
     (e) => {
-      if (!enableZoom || !dataXExtent) return;
+      if (!zoomActive || !dataXExtent) return;
       // Only intercept when zoom is on — keep page scroll otherwise.
       e.preventDefault();
       e.stopPropagation();
@@ -3031,22 +3068,22 @@ export function ChartCanvas() {
       }
       setZoomXDomain(zoomDesc ? [newHi, newLo] : [newLo, newHi]);
     },
-    [enableZoom, dataXExtent, zoomXDomain, zoomDesc],
+    [zoomActive, dataXExtent, zoomXDomain, zoomDesc],
   );
 
   const handleChartDoubleClick = useCallback(() => {
-    if (!enableZoom) return;
+    if (!zoomActive) return;
     setZoomXDomain(null);
-  }, [enableZoom]);
+  }, [zoomActive]);
 
   // Non-passive wheel so we can preventDefault while zooming.
   useEffect(() => {
     const el = chartZoomRef.current;
-    if (!el || !enableZoom || !dataXExtent) return undefined;
+    if (!el || !zoomActive || !dataXExtent) return undefined;
     const onWheel = (ev) => handleChartWheel(ev);
     el.addEventListener("wheel", onWheel, { passive: false });
     return () => el.removeEventListener("wheel", onWheel);
-  }, [enableZoom, dataXExtent, handleChartWheel]);
+  }, [zoomActive, dataXExtent, handleChartWheel]);
 
   /** Recharts Treemap: one synthetic root whose children are sheet rows (name ← X, value ← Y). */
   const treemapData = useMemo(() => {
@@ -3070,7 +3107,7 @@ export function ChartCanvas() {
   const scatterYKey = ySeries[0]?.renderKey || null;
   const scatterPlotData = useMemo(() => {
     if (selChartType !== "scatter" || !xKey || !scatterYKey || !Array.isArray(finalRenderedData)) return [];
-    return finalRenderedData.filter((row) => {
+    const filtered = finalRenderedData.filter((row) => {
       const x = row?.[xKey];
       const y = row?.[scatterYKey];
       if (x == null || x === "" || y == null || y === "") return false;
@@ -3078,7 +3115,64 @@ export function ChartCanvas() {
       if (scaleY === "categorical") return true;
       return Number.isFinite(Number(y));
     });
-  }, [selChartType, xKey, scatterYKey, finalRenderedData, rechartsXAxisType, scaleY]);
+    if (!scatterJitterEnabled) return filtered;
+
+    const jitterXAmt = scatterJitterFraction(scatterJitterX);
+    const jitterYAmt = scatterJitterFraction(scatterJitterY);
+    if (jitterXAmt <= 0 && jitterYAmt <= 0) return filtered;
+
+    let xMin = Infinity;
+    let xMax = -Infinity;
+    let yMin = Infinity;
+    let yMax = -Infinity;
+    const numericX = rechartsXAxisType === "number";
+    const numericY = scaleY !== "categorical";
+    for (const row of filtered) {
+      if (numericX) {
+        const x = Number(row?.[xKey]);
+        if (Number.isFinite(x)) {
+          if (x < xMin) xMin = x;
+          if (x > xMax) xMax = x;
+        }
+      }
+      if (numericY) {
+        const y = Number(row?.[scatterYKey]);
+        if (Number.isFinite(y)) {
+          if (y < yMin) yMin = y;
+          if (y > yMax) yMax = y;
+        }
+      }
+    }
+    const xSpan = numericX && Number.isFinite(xMin) && Number.isFinite(xMax) ? Math.max(xMax - xMin, Number.EPSILON) : 0;
+    const ySpan = numericY && Number.isFinite(yMin) && Number.isFinite(yMax) ? Math.max(yMax - yMin, Number.EPSILON) : 0;
+
+    return filtered.map((row, i) => {
+      const next = { ...row };
+      if (numericX && xSpan > 0 && jitterXAmt > 0) {
+        const n = Number(row[xKey]);
+        if (Number.isFinite(n)) {
+          next[xKey] = n + (unitNoise2d(i, 1) - 0.5) * 2 * jitterXAmt * xSpan;
+        }
+      }
+      if (numericY && ySpan > 0 && jitterYAmt > 0) {
+        const n = Number(row[scatterYKey]);
+        if (Number.isFinite(n)) {
+          next[scatterYKey] = n + (unitNoise2d(i, 2) - 0.5) * 2 * jitterYAmt * ySpan;
+        }
+      }
+      return next;
+    });
+  }, [
+    selChartType,
+    xKey,
+    scatterYKey,
+    finalRenderedData,
+    rechartsXAxisType,
+    scaleY,
+    scatterJitterEnabled,
+    scatterJitterX,
+    scatterJitterY,
+  ]);
   const hasSelectedPalette = Array.isArray(selectedPalette) && selectedPalette.length > 0;
   /** Chromatic user-picked ramps drive series; grey/legacy auto ramps use rose/lime/blue defaults. */
   const usePaletteForSeries =
@@ -3185,7 +3279,7 @@ export function ChartCanvas() {
   const daySeparationStartsMs = useMemo(() => {
     if (!daySeparationActive) return [];
     const extent =
-      enableZoom && zoomXDomain && Array.isArray(zoomXDomain) && zoomXDomain.length === 2
+      zoomActive && zoomXDomain && Array.isArray(zoomXDomain) && zoomXDomain.length === 2
         ? zoomXDomain
         : dataXExtent;
     if (!extent) return [];
@@ -3193,7 +3287,7 @@ export function ChartCanvas() {
     const b = Number(extent[1]);
     if (!Number.isFinite(a) || !Number.isFinite(b)) return [];
     return enumerateUtcDayStartsInRange(a, b);
-  }, [daySeparationActive, enableZoom, zoomXDomain, dataXExtent]);
+  }, [daySeparationActive, zoomActive, zoomXDomain, dataXExtent]);
 
   const daySeparationStartSet = useMemo(
     () => new Set(daySeparationStartsMs),
@@ -3201,7 +3295,7 @@ export function ChartCanvas() {
   );
 
   const effectiveXTicks = useMemo(() => {
-    if (enableZoom && zoomXDomain) return undefined;
+    if (zoomActive && zoomXDomain) return undefined;
     if (!daySeparationActive || daySeparationStartsMs.length === 0) return xAxisTicks;
     const seen = new Set(xAxisTicks || []);
     const merged = [...(xAxisTicks || [])];
@@ -3213,7 +3307,7 @@ export function ChartCanvas() {
     }
     merged.sort((a, b) => a - b);
     return merged.length > 0 ? merged : undefined;
-  }, [enableZoom, zoomXDomain, xAxisTicks, daySeparationActive, daySeparationStartsMs]);
+  }, [zoomActive, zoomXDomain, xAxisTicks, daySeparationActive, daySeparationStartsMs]);
 
   const xTickFormatter = (v) => {
     const forcedPreset =
@@ -3743,14 +3837,14 @@ export function ChartCanvas() {
                     config={chartConfig || dfltChartConfig}
                     onDoubleClick={handleChartDoubleClick}
                     title={
-                      enableZoom && dataXExtent
+                      zoomActive && dataXExtent
                         ? "Scroll to zoom · double-click to reset"
                         : undefined
                     }
                     className={cn(
                       // `max-w` only applies when the card is wider than this cap; narrow layouts are widened via CardContent `px-*` above.
                       "flex flex-col items-center justify-start aspect-auto mx-auto w-full transition-[min-height,padding] duration-300 ease-out",
-                      enableZoom && dataXExtent ? "cursor-crosshair" : null,
+                      zoomActive && dataXExtent ? "cursor-crosshair" : null,
                       embedInArticle
                         ? "h-[var(--article-embed-plot-height)] max-w-full flex-none py-0"
                         : "h-full max-w-[min(100%,67.2rem)] flex-1",
@@ -3779,7 +3873,7 @@ export function ChartCanvas() {
                           type={rechartsXAxisType}
                           dataKey={plotXKey}
                           domain={effectiveXDomain}
-                          allowDataOverflow={!!(enableZoom && zoomXDomain)}
+                          allowDataOverflow={!!(zoomActive && zoomXDomain)}
                           ticks={effectiveXTicks}
                           tickLine={false}
                           axisLine={false}
@@ -3889,7 +3983,7 @@ export function ChartCanvas() {
                               dataKey={plotXKey}
                               domain={rechartsXAxisType === "number" ? effectiveXDomain : undefined}
                               allowDataOverflow={
-                                !!(enableZoom && zoomXDomain && rechartsXAxisType === "number")
+                                !!(zoomActive && zoomXDomain && rechartsXAxisType === "number")
                               }
                               ticks={rechartsXAxisType === "number" ? effectiveXTicks : undefined}
                               tickLine={false}
@@ -3991,7 +4085,7 @@ export function ChartCanvas() {
                           name={stripSheetScopedColumnKey(xKey)}
                           domain={effectiveXDomain}
                           scale={rechartsXAxisScale}
-                          allowDataOverflow={!!(enableZoom && zoomXDomain)}
+                          allowDataOverflow={!!(zoomActive && zoomXDomain)}
                           ticks={effectiveXTicks}
                           tickLine={false}
                           axisLine={false}
@@ -4089,7 +4183,7 @@ export function ChartCanvas() {
                           type={rechartsXAxisType}
                           dataKey={plotXKey}
                           domain={effectiveXDomain}
-                          allowDataOverflow={!!(enableZoom && zoomXDomain)}
+                          allowDataOverflow={!!(zoomActive && zoomXDomain)}
                           ticks={effectiveXTicks}
                           tickLine={false}
                           axisLine={false}
