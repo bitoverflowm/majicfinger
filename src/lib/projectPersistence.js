@@ -193,6 +193,145 @@ export function replaceSheetOperation(dataSheets, sheetId, operationId, nextOper
   };
 }
 
+function deScopeColumnName(key) {
+  const raw = String(key || "").trim();
+  const idx = raw.indexOf("::");
+  return idx > -1 ? raw.slice(idx + 2).trim() : raw;
+}
+
+function columnNamesEqual(a, b) {
+  const left = deScopeColumnName(a);
+  const right = deScopeColumnName(b);
+  return Boolean(left) && left === right;
+}
+
+/**
+ * True when an operation's primary output is `columnName` (the column Sheet Properties deletes).
+ * @param {object | null | undefined} op
+ * @param {string} columnName
+ */
+export function operationOutputsColumn(op, columnName) {
+  const col = String(columnName || "").trim();
+  if (!col || !op || typeof op !== "object") return false;
+  const type = String(op.type || "");
+  if (type === "computed.column") {
+    return columnNamesEqual(op.column || op.payload?.column, col);
+  }
+  if (type === "rename.column") {
+    // Rename *to* this name is how the column currently exists in history.
+    return columnNamesEqual(op.to || op.payload?.to, col);
+  }
+  if (type === "delete.column") {
+    return columnNamesEqual(op.column || op.payload?.column, col);
+  }
+  if (type === "cast.column") {
+    return columnNamesEqual(op.column || op.payload?.column, col);
+  }
+  // summary.row / summary.multi_sheet are edited in place (metrics stripped), not removed wholesale.
+  return false;
+}
+
+/**
+ * Drop history entries that created/managed a column that the user deleted in Sheet Properties.
+ * Keeps the rest of the pipeline intact so equations / reload stay consistent.
+ *
+ * @param {unknown[]} history
+ * @param {string} columnName
+ * @returns {object[]}
+ */
+export function pruneOperationHistoryForDeletedColumn(history, columnName) {
+  const col = String(columnName || "").trim();
+  const list = Array.isArray(history) ? history.filter(Boolean) : [];
+  if (!col) return list;
+  return list.filter((op) => !operationOutputsColumn(op, col));
+}
+
+function stripColumnFromSummaryConfig(config, columnName) {
+  if (!config || typeof config !== "object") return config;
+  const col = String(columnName || "").trim();
+  if (!col) return config;
+  const metrics = Array.isArray(config.metrics) ? config.metrics : [];
+  const nextMetrics = metrics.filter((m) => !columnNamesEqual(m?.outputName, col));
+  if (nextMetrics.length === metrics.length) return config;
+  return { ...config, metrics: nextMetrics };
+}
+
+/**
+ * After Sheet Properties deletes a column: prune producer ops, update summary configs,
+ * and append a `delete.column` audit/replay op.
+ *
+ * @param {Record<string, object>} dataSheets
+ * @param {string} sheetId
+ * @param {string} columnName
+ * @returns {Record<string, object>}
+ */
+export function recordSheetColumnDeletion(dataSheets, sheetId, columnName) {
+  if (!sheetId || !columnName || !dataSheets?.[sheetId]) return dataSheets;
+  const sheets = dataSheets || {};
+  const sheet = sheets[sheetId];
+  const col = String(columnName).trim();
+  const history = normalizeOperationHistory(sheet);
+  const pruned = pruneOperationHistoryForDeletedColumn(history, col);
+
+  let multiSheetSummaryConfig = sheet.multiSheetSummaryConfig || null;
+  let summaryConfig = sheet.summaryConfig || null;
+  if (multiSheetSummaryConfig) {
+    multiSheetSummaryConfig = stripColumnFromSummaryConfig(multiSheetSummaryConfig, col);
+  }
+  if (summaryConfig) {
+    summaryConfig = stripColumnFromSummaryConfig(summaryConfig, col);
+  }
+
+  const nextHistory = pruned.map((op) => {
+    if (!op || typeof op !== "object") return op;
+    if (op.type === "summary.multi_sheet") {
+      const cfg =
+        op.multiSheetSummaryConfig ||
+        op.payload?.multiSheetSummaryConfig ||
+        multiSheetSummaryConfig;
+      const nextCfg = stripColumnFromSummaryConfig(cfg, col);
+      if (nextCfg === cfg) return op;
+      const outputs = Array.isArray(op.outputs)
+        ? op.outputs.filter((name) => !columnNamesEqual(name, col))
+        : op.outputs;
+      return {
+        ...op,
+        multiSheetSummaryConfig: nextCfg,
+        ...(outputs ? { outputs } : {}),
+        ts: Date.now(),
+      };
+    }
+    if (op.type === "summary.row") {
+      const cfg = op.summaryConfig || op.payload?.summaryConfig || summaryConfig;
+      const nextCfg = stripColumnFromSummaryConfig(cfg, col);
+      if (nextCfg === cfg) return op;
+      const outputs = Array.isArray(op.outputs)
+        ? op.outputs.filter((name) => !columnNamesEqual(name, col))
+        : op.outputs;
+      return {
+        ...op,
+        summaryConfig: nextCfg,
+        ...(outputs ? { outputs } : {}),
+        ts: Date.now(),
+      };
+    }
+    return op;
+  });
+
+  const deleteOp = createSheetOperation("delete.column", { column: col });
+  return {
+    ...sheets,
+    [sheetId]: {
+      ...sheet,
+      ...(multiSheetSummaryConfig !== sheet.multiSheetSummaryConfig
+        ? { multiSheetSummaryConfig }
+        : {}),
+      ...(summaryConfig !== sheet.summaryConfig ? { summaryConfig } : {}),
+      operationHistory: [...nextHistory, deleteOp],
+    },
+  };
+}
+
 function sheetColumns(sheet, rows) {
   return Array.isArray(sheet?.columns) && sheet.columns.length
     ? sheet.columns

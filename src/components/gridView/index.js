@@ -127,6 +127,7 @@ import {
   createSheetOperation,
   findQuantAthenaOperation,
   isPartialProvenanceReload,
+  recordSheetColumnDeletion,
   replaceSheetOperation,
   resolvePersistedFullRowCount,
   sheetHasComposeProvenance,
@@ -988,7 +989,11 @@ const GridView = ({ startNew, fillViewport = false }) => {
         setEditingColIndex(null);
         setEditingColName("");
       }
-      appendActiveSheetOperation("delete.column", { column: colName });
+      if (activeSheetId && setDataSheets) {
+        setDataSheets((prev) => recordSheetColumnDeletion(prev, activeSheetId, colName));
+      } else {
+        appendActiveSheetOperation("delete.column", { column: colName });
+      }
       toast(`Column "${colName}" deleted!`, { duration: 5000 });
     };
 

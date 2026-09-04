@@ -2,6 +2,9 @@ import assert from "node:assert/strict";
 import {
   applyBrowserOperationToRows,
   findQuantAthenaOperation,
+  operationOutputsColumn,
+  pruneOperationHistoryForDeletedColumn,
+  recordSheetColumnDeletion,
   replayOperations,
   sheetHasQuantAthenaRecipe,
   stripQuantRecipeSheetsForPersist,
@@ -102,4 +105,71 @@ test("replayOperations applies JSON replace after non-SQL ops", () => {
   });
   assert.equal(out.length, 1);
   assert.equal(out[0].id, 0);
+});
+
+test("pruneOperationHistoryForDeletedColumn drops computed.column producers", () => {
+  const pruned = pruneOperationHistoryForDeletedColumn(
+    [
+      { type: "summary.multi_sheet", id: "mss" },
+      { type: "computed.column", id: "err", column: "Signed Mean Error" },
+      { type: "computed.column", id: "keep", column: "Other Col" },
+    ],
+    "Signed Mean Error",
+  );
+  assert.equal(pruned.length, 2);
+  assert.equal(pruned[0].id, "mss");
+  assert.equal(pruned[1].id, "keep");
+  assert.equal(operationOutputsColumn({ type: "computed.column", column: "Signed Mean Error" }, "Signed Mean Error"), true);
+});
+
+test("recordSheetColumnDeletion prunes producer and appends delete.column", () => {
+  const sheets = {
+    "mss-1": {
+      name: "Multi summary",
+      multiSheetSummaryConfig: {
+        sourceSheetIds: ["s1"],
+        metrics: [
+          { id: "m1", outputName: "Sample Mean", op: "avg", column: "volume" },
+          { id: "m2", outputName: "Signed Mean Error", op: "avg", column: "volume" },
+        ],
+        resultSheetId: "mss-1",
+      },
+      operationHistory: [
+        {
+          type: "summary.multi_sheet",
+          id: "op-mss",
+          outputs: ["Sample Mean", "Signed Mean Error"],
+          multiSheetSummaryConfig: {
+            sourceSheetIds: ["s1"],
+            metrics: [
+              { id: "m1", outputName: "Sample Mean", op: "avg", column: "volume" },
+              { id: "m2", outputName: "Signed Mean Error", op: "avg", column: "volume" },
+            ],
+          },
+        },
+        {
+          type: "computed.column",
+          id: "op-err",
+          column: "Signed Mean Error",
+          expression: { kind: "binary", op: "subtract", leftColumn: "a", rightColumn: "b" },
+        },
+      ],
+    },
+  };
+  const next = recordSheetColumnDeletion(sheets, "mss-1", "Signed Mean Error");
+  const hist = next["mss-1"].operationHistory;
+  assert.ok(!hist.some((op) => op.type === "computed.column" && op.column === "Signed Mean Error"));
+  assert.equal(hist[hist.length - 1].type, "delete.column");
+  assert.equal(hist[hist.length - 1].column, "Signed Mean Error");
+  assert.ok(hist.some((op) => op.type === "summary.multi_sheet"));
+  const mssOp = hist.find((op) => op.type === "summary.multi_sheet");
+  assert.deepEqual(
+    mssOp.multiSheetSummaryConfig.metrics.map((m) => m.outputName),
+    ["Sample Mean"],
+  );
+  assert.deepEqual(mssOp.outputs, ["Sample Mean"]);
+  assert.deepEqual(
+    next["mss-1"].multiSheetSummaryConfig.metrics.map((m) => m.outputName),
+    ["Sample Mean"],
+  );
 });
