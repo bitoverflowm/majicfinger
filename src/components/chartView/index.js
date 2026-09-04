@@ -9,7 +9,7 @@ import {
   getShadcnChartPaletteArray,
   isShadcnChartGreyBase,
 } from '@/components/chartView/panels/shadcnChartPalettes';
-import { Area, AreaChart, Bar, BarChart, CartesianGrid, Cell, LabelList, Line, LineChart, Pie, PieChart, ReferenceLine, Scatter, ScatterChart, Treemap, XAxis, YAxis, ZAxis } from 'recharts';
+import { Area, AreaChart, Bar, BarChart, CartesianGrid, Cell, ComposedChart, LabelList, Line, LineChart, Pie, PieChart, ReferenceLine, Scatter, Treemap, XAxis, YAxis, ZAxis } from 'recharts';
 import { ChartContainer, ChartLegend, ChartLegendContent, ChartTooltip, ChartTooltipContent } from '@/components/ui/chart';
 import { RainbowBarLegendContent } from "@/components/chartView/RainbowBarLegendContent";
 import { rainbowBarFillFromPalette } from "@/components/chartView/rainbowBarFill";
@@ -48,6 +48,7 @@ import { isCategoricalLabelColumn, looksLikeProseLabelValue } from "@/lib/chartC
 import { stripSheetScopedColumnKey } from "@/lib/chartColumnDisplay";
 import {
   numericXExtents,
+  parseConstantReferenceEquation,
   sampleReferenceEquationCurve,
   validateReferenceEquation,
 } from "@/lib/chartReferenceEquation";
@@ -1094,11 +1095,9 @@ export function ChartBuilderProvider({ demo, children, initialBuilderSnapshot, e
     }
     if (hasReferenceLines) {
       setReferenceLines(normalizeReferenceLines(snap.referenceLines));
-      if (snap.referenceLinesEnabled !== undefined) {
-        setReferenceLinesEnabled(!!snap.referenceLinesEnabled);
-      } else {
-        setReferenceLinesEnabled(true);
-      }
+    }
+    if (snap.referenceLinesEnabled !== undefined) {
+      setReferenceLinesEnabled(!!snap.referenceLinesEnabled);
     }
   }, [demo, initialBuilderSnapshot]);
 
@@ -1326,9 +1325,6 @@ export function ChartBuilderProvider({ demo, children, initialBuilderSnapshot, e
       setReferenceLines(normalizeReferenceLines(s.referenceLines));
     }
     if (s.referenceLinesEnabled !== undefined) setReferenceLinesEnabled(!!s.referenceLinesEnabled);
-    else if (Array.isArray(s.referenceLines) && s.referenceLines.length > 0) {
-      setReferenceLinesEnabled(true);
-    }
     if (s.tooltipShowXValue !== undefined) setTooltipShowXValue(!!s.tooltipShowXValue);
     else if (s.legendShowXValue !== undefined) setTooltipShowXValue(!!s.legendShowXValue);
     if (Array.isArray(s.tooltipExtraColumns)) setTooltipExtraColumns(s.tooltipExtraColumns);
@@ -3634,14 +3630,50 @@ export function ChartCanvas() {
   ]);
 
   const renderedEquationReferenceLines = useMemo(() => {
-    if (rechartsXAxisType !== "number") return [];
     if (selChartType === "scatter" && !referenceLinesEnabled) return [];
-    const extents = numericXExtents(finalRenderedData, xKey);
-    if (!extents) return [];
+    const axisType = selX ? getAxisType(xKey, dataTypes, finalRenderedData) : "string";
+    const isTemporalX =
+      effectiveUseTimeSeriesX || chartUsesTimeframes || lineIsTemporalX || axisType === "date";
+    const extentRows = selChartType === "scatter" ? scatterPlotData : finalRenderedData;
+    const extentKey = plotXKey || xKey;
+    const extents =
+      rechartsXAxisType === "number" ? numericXExtents(extentRows, extentKey) : null;
 
     return normalizeReferenceLines(referenceLines)
       .filter((line) => line.enabled && line.kind === "equation" && String(line.equation || "").trim())
       .map((line) => {
+        const common = {
+          key: line.id,
+          stroke: line.color,
+          strokeWidth: line.strokeWidth,
+          strokeDasharray: referenceLineDash(line.style),
+          ifOverflow: "visible",
+          isFront: true,
+          style: {
+            stroke: line.color,
+            strokeWidth: line.strokeWidth,
+            strokeDasharray: referenceLineDash(line.style),
+          },
+          label: line.label
+            ? {
+                value: line.label,
+                fill: chartTextColor || tickFillY || line.color,
+                position: "insideTopRight",
+              }
+            : false,
+        };
+
+        // Constant guides (y = 0, x = 1) use ReferenceLine; curves use sampled Line.
+        const constant = parseConstantReferenceEquation(line.equation);
+        if (constant?.axis === "y") {
+          return <ReferenceLine {...common} y={constant.value} />;
+        }
+        if (constant?.axis === "x") {
+          const x = coerceReferenceAxisValue(constant.value, axisType, isTemporalX);
+          return x == null ? null : <ReferenceLine {...common} x={x} />;
+        }
+
+        if (rechartsXAxisType !== "number" || !extents) return null;
         const validation = validateReferenceEquation(line.equation);
         if (!validation.ok) return null;
         const yKey = `__ref_eq_${line.id}`;
@@ -3649,7 +3681,7 @@ export function ChartCanvas() {
           equation: line.equation,
           xMin: extents.min,
           xMax: extents.max,
-          xKey,
+          xKey: extentKey,
           yKey,
         });
         if (points.length < 2) return null;
@@ -3666,12 +3698,28 @@ export function ChartCanvas() {
             strokeWidth={line.strokeWidth}
             strokeDasharray={referenceLineDash(line.style)}
             isAnimationActive={false}
-            legendType="line"
+            legendType="none"
           />
         );
       })
       .filter(Boolean);
-  }, [finalRenderedData, referenceLines, referenceLinesEnabled, rechartsXAxisType, selChartType, xKey]);
+  }, [
+    chartTextColor,
+    chartUsesTimeframes,
+    dataTypes,
+    finalRenderedData,
+    lineIsTemporalX,
+    plotXKey,
+    referenceLines,
+    referenceLinesEnabled,
+    rechartsXAxisType,
+    scatterPlotData,
+    selChartType,
+    selX,
+    tickFillY,
+    effectiveUseTimeSeriesX,
+    xKey,
+  ]);
 
   const renderedCartesianReferenceLines = useMemo(
     () => [...renderedDaySeparationLines, ...renderedReferenceLines, ...renderedEquationReferenceLines],
@@ -4235,7 +4283,7 @@ export function ChartCanvas() {
                     )}
 
                     {selChartType === "scatter" && (
-                      <ScatterChart accessibilityLayer data={scatterPlotData} margin={cartesianMarginWithAngledTicks}>
+                      <ComposedChart accessibilityLayer data={scatterPlotData} margin={cartesianMarginWithAngledTicks}>
                         {gridVisible ? <CartesianGrid vertical={false} stroke={gridStroke} /> : null}
                         <XAxis
                           type={rechartsXAxisType}
@@ -4302,22 +4350,57 @@ export function ChartCanvas() {
                           ))}
                         </Scatter>
                         {renderedCartesianReferenceLines}
-                        {legendVisible || scatterColorLegendModel ? (
+                        {legendVisible ? (
                           <ChartLegend
-                            content={
-                              scatterColorLegendModel ? (
-                                <ScatterColorByLegend
-                                  model={scatterColorLegendModel}
-                                  title={legendTitle}
-                                  className={CHART_CHROME_TEXT_CLASS}
-                                />
-                              ) : (
-                                <ChartLegendContent className={CHART_CHROME_TEXT_CLASS} title={legendTitle} />
-                              )
-                            }
+                            content={(legendProps) => {
+                              if (scatterColorLegendModel) {
+                                return (
+                                  <ScatterColorByLegend
+                                    model={scatterColorLegendModel}
+                                    title={legendTitle}
+                                    className={CHART_CHROME_TEXT_CLASS}
+                                  />
+                                );
+                              }
+                              const payload = Array.isArray(legendProps?.payload)
+                                ? legendProps.payload.filter((item) => item?.type !== "none")
+                                : [];
+                              if (payload.length > 0) {
+                                return (
+                                  <ChartLegendContent
+                                    {...legendProps}
+                                    payload={payload}
+                                    className={CHART_CHROME_TEXT_CLASS}
+                                    title={legendTitle}
+                                  />
+                                );
+                              }
+                              const seriesName = stripSheetScopedColumnKey(
+                                ySeries[0]?.sourceKey || scatterYKey || "Scatter",
+                              );
+                              const seriesColor = seriesColorFor(ySeries[0]?.sourceKey, 0);
+                              return (
+                                <div
+                                  className={`flex flex-col items-center gap-1.5 pt-3 ${CHART_CHROME_TEXT_CLASS}`}
+                                >
+                                  {legendTitle ? (
+                                    <p className="text-center text-[10px] font-medium tracking-wide text-slate-500 dark:text-slate-400">
+                                      {legendTitle}
+                                    </p>
+                                  ) : null}
+                                  <div className="flex items-center gap-1.5">
+                                    <div
+                                      className="h-2 w-2 shrink-0 rounded-[2px]"
+                                      style={{ backgroundColor: seriesColor }}
+                                    />
+                                    <span>{seriesName}</span>
+                                  </div>
+                                </div>
+                              );
+                            }}
                           />
                         ) : null}
-                      </ScatterChart>
+                      </ComposedChart>
                     )}
 
                     {selChartType === "treemap" && yKeys[0] && (

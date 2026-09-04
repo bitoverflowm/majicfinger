@@ -1419,7 +1419,8 @@ export default function ChartControls() {
       id,
       enabled: true,
       kind,
-      y: "",
+      // Empty y never draws; default horizontal guides to y = 0.
+      y: kind === "y" ? "0" : "",
       x: "",
       x1: "",
       y1: "",
@@ -3284,6 +3285,28 @@ export default function ChartControls() {
                                           </SelectItem>
                                         </SelectContent>
                                       </Select>
+                                      <Select
+                                        value={String(Math.max(1, Math.min(8, Number(line.strokeWidth) || 1)))}
+                                        onValueChange={(v) =>
+                                          updateReferenceLine(line.id, {
+                                            strokeWidth: Math.max(1, Math.min(8, Number(v) || 1)),
+                                          })
+                                        }
+                                      >
+                                        <SelectTrigger
+                                          className="h-7 w-[4.25rem] shrink-0 text-xs"
+                                          aria-label={`Reference line ${refIdx + 1} thickness`}
+                                        >
+                                          <SelectValue placeholder="Width" />
+                                        </SelectTrigger>
+                                        <SelectContent className="text-xs">
+                                          {[1, 2, 3, 4, 5, 6, 7, 8].map((w) => (
+                                            <SelectItem key={w} value={String(w)} className="text-xs">
+                                              {w}px
+                                            </SelectItem>
+                                          ))}
+                                        </SelectContent>
+                                      </Select>
                                     </div>
                                   </div>
                                 );
@@ -3851,9 +3874,13 @@ export default function ChartControls() {
                         <Switch
                           id="chart-design-legend"
                           checked={!!legendVisible}
-                          onCheckedChange={handleToggleLegend}
+                          onCheckedChange={(checked) => {
+                            if (typeof handleToggleLegend === "function") {
+                              handleToggleLegend(!!checked);
+                            }
+                          }}
                           aria-label="Toggle legend"
-                          className="h-4 w-7 shrink-0 [&>span]:h-3 [&>span]:w-3 data-[state=checked]:[&>span]:translate-x-3"
+                          className="h-4 w-7 shrink-0 [&>span]:h-3 [&>span]:w-3 data-[state=checked]:[&>span]:translate-x-3 data-[state=unchecked]:[&>span]:translate-x-0"
                         />
                         <Label
                           htmlFor="chart-design-legend"

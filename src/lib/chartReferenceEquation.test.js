@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import {
   evaluateReferenceExpression,
+  parseConstantReferenceEquation,
   parseReferenceEquationInput,
   sampleReferenceEquationCurve,
   validateReferenceEquation,
@@ -20,6 +21,13 @@ test("parseReferenceEquationInput accepts y = x forms", () => {
   assert.deepEqual(parseReferenceEquationInput("y = x"), { expression: "x" });
   assert.deepEqual(parseReferenceEquationInput("y=x^2"), { expression: "x^2" });
   assert.deepEqual(parseReferenceEquationInput("x = y"), { expression: "x" });
+});
+
+test("parseConstantReferenceEquation detects y = 0 / x = c", () => {
+  assert.deepEqual(parseConstantReferenceEquation("y = 0"), { axis: "y", value: 0 });
+  assert.deepEqual(parseConstantReferenceEquation("y=-1.5"), { axis: "y", value: -1.5 });
+  assert.deepEqual(parseConstantReferenceEquation("x = 2"), { axis: "x", value: 2 });
+  assert.equal(parseConstantReferenceEquation("y = x"), null);
 });
 
 test("evaluateReferenceExpression handles powers and functions", () => {

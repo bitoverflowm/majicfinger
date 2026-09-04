@@ -13,6 +13,30 @@ const ALLOWED_UNARY_FUNCS = {
   exp: Math.exp,
 };
 
+const CONSTANT_NUMBER_RE = "[+-]?(?:\\d+\\.?\\d*|\\.\\d+)(?:[eE][+-]?\\d+)?";
+
+/**
+ * Detect literal constant guides like `y = 0` or `x = 1.5`.
+ * These should render as ReferenceLine (not sampled Line curves).
+ * @param {string} raw
+ * @returns {{ axis: "x" | "y"; value: number } | null}
+ */
+export function parseConstantReferenceEquation(raw) {
+  const s = String(raw || "").trim();
+  if (!s) return null;
+  const yConst = new RegExp(`^y\\s*=\\s*(${CONSTANT_NUMBER_RE})\\s*$`, "i").exec(s);
+  if (yConst) {
+    const value = Number(yConst[1]);
+    return Number.isFinite(value) ? { axis: "y", value } : null;
+  }
+  const xConst = new RegExp(`^x\\s*=\\s*(${CONSTANT_NUMBER_RE})\\s*$`, "i").exec(s);
+  if (xConst) {
+    const value = Number(xConst[1]);
+    return Number.isFinite(value) ? { axis: "x", value } : null;
+  }
+  return null;
+}
+
 /**
  * @param {string} raw
  * @returns {{ expression?: string; error?: string }}
