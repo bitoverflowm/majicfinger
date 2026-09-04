@@ -44,6 +44,7 @@ import {
   DropdownMenuCheckboxItem,
   DropdownMenuContent,
   DropdownMenuGroup,
+  DropdownMenuItem,
   DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuSub,
@@ -751,6 +752,8 @@ export default function ChartControls() {
     setChartLineFilters,
     referenceLines,
     setReferenceLines,
+    referenceLinesEnabled,
+    setReferenceLinesEnabled,
     tooltipShowXValue,
     setTooltipShowXValue,
     tooltipExtraColumns,
@@ -3001,6 +3004,296 @@ export default function ChartControls() {
                               </DropdownMenuSubContent>
                             </DropdownMenuSub>
                           </DropdownMenuGroup>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </div>
+                  )}
+
+                  {selChartType === "scatter" && (
+                    <div className="flex min-w-0 items-center gap-2 py-1.5">
+                      <Switch
+                        id="chart-design-scatter-reference"
+                        checked={!!referenceLinesEnabled}
+                        onCheckedChange={(checked) => {
+                          const on = !!checked;
+                          setReferenceLinesEnabled(on);
+                          if (on && normalizedReferenceLines.length === 0) {
+                            addReferenceLine("equation", { equation: "y = x", label: "y = x" });
+                          }
+                        }}
+                        aria-label="Enable reference line"
+                        className="h-4 w-7 shrink-0 [&>span]:h-3 [&>span]:w-3 data-[state=checked]:[&>span]:translate-x-3"
+                      />
+                      <Label
+                        htmlFor="chart-design-scatter-reference"
+                        className="min-w-0 flex-1 cursor-pointer text-left text-xs font-medium text-muted-foreground"
+                      >
+                        Reference line
+                      </Label>
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="icon"
+                            className="h-7 w-7 shrink-0 rounded-md"
+                            aria-label="Reference line settings"
+                          >
+                            <Settings2 className="h-3.5 w-3.5" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end" className="w-64 text-xs">
+                          <DropdownMenuGroup>
+                            <DropdownMenuLabel className="text-[10px] uppercase tracking-wide text-muted-foreground">
+                              Reference line
+                            </DropdownMenuLabel>
+                            <DropdownMenuSub>
+                              <DropdownMenuSubTrigger className="text-xs">Add</DropdownMenuSubTrigger>
+                              <DropdownMenuSubContent className="w-56 text-xs">
+                                <DropdownMenuLabel className="text-[10px] uppercase tracking-wide text-muted-foreground">
+                                  Equation curves
+                                </DropdownMenuLabel>
+                                {REFERENCE_EQUATION_PRESETS.map((preset) => (
+                                  <DropdownMenuItem
+                                    key={preset.equation}
+                                    className="font-mono text-xs"
+                                    onSelect={() => {
+                                      addReferenceLine("equation", preset);
+                                      setReferenceLinesEnabled(true);
+                                    }}
+                                  >
+                                    {preset.label}
+                                  </DropdownMenuItem>
+                                ))}
+                                <DropdownMenuSeparator />
+                                <DropdownMenuLabel className="text-[10px] uppercase tracking-wide text-muted-foreground">
+                                  Guides
+                                </DropdownMenuLabel>
+                                <DropdownMenuItem
+                                  className="text-xs"
+                                  onSelect={() => {
+                                    addReferenceLine("y");
+                                    setReferenceLinesEnabled(true);
+                                  }}
+                                >
+                                  Horizontal (y = …)
+                                </DropdownMenuItem>
+                                <DropdownMenuItem
+                                  className="text-xs"
+                                  onSelect={() => {
+                                    addReferenceLine("x");
+                                    setReferenceLinesEnabled(true);
+                                  }}
+                                >
+                                  Vertical (x = …)
+                                </DropdownMenuItem>
+                                <DropdownMenuItem
+                                  className="text-xs"
+                                  onSelect={() => {
+                                    addReferenceLine("segment");
+                                    setReferenceLinesEnabled(true);
+                                  }}
+                                >
+                                  Segment (two points)
+                                </DropdownMenuItem>
+                                <DropdownMenuItem
+                                  className="text-xs"
+                                  onSelect={() => {
+                                    addReferenceLine("equation", {
+                                      equation: "y = x",
+                                      label: "Custom equation",
+                                    });
+                                    setReferenceLinesEnabled(true);
+                                  }}
+                                >
+                                  Custom equation…
+                                </DropdownMenuItem>
+                              </DropdownMenuSubContent>
+                            </DropdownMenuSub>
+                          </DropdownMenuGroup>
+                          <DropdownMenuSeparator />
+                          {normalizedReferenceLines.length > 0 ? (
+                            <div className="max-h-64 space-y-2 overflow-y-auto px-1 pb-1">
+                              {normalizedReferenceLines.map((line, refIdx) => {
+                                const kind = ["x", "y", "segment", "equation"].includes(line.kind)
+                                  ? line.kind
+                                  : "y";
+                                const equationValidation =
+                                  kind === "equation" && line.equation
+                                    ? validateReferenceEquation(line.equation)
+                                    : { ok: true };
+                                return (
+                                  <div
+                                    key={line.id || refIdx}
+                                    className="space-y-1.5 rounded-md border border-border/70 p-2"
+                                    onPointerDown={(e) => e.stopPropagation()}
+                                  >
+                                    <div className="flex items-center justify-between gap-2">
+                                      <span className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+                                        Line {refIdx + 1}
+                                      </span>
+                                      <button
+                                        type="button"
+                                        className="inline-flex h-2 w-2 items-center justify-center rounded-full bg-red-500 hover:bg-red-600"
+                                        aria-label={`Remove reference line ${refIdx + 1}`}
+                                        onClick={() => removeReferenceLine(line.id)}
+                                      />
+                                    </div>
+                                    <Select
+                                      value={kind}
+                                      onValueChange={(v) => updateReferenceLine(line.id, { kind: v })}
+                                    >
+                                      <SelectTrigger className="h-7 min-w-0 text-xs">
+                                        <SelectValue placeholder="Type" />
+                                      </SelectTrigger>
+                                      <SelectContent className="text-xs">
+                                        <SelectItem value="equation" className="text-xs">
+                                          Equation (y = …)
+                                        </SelectItem>
+                                        <SelectItem value="y" className="text-xs">
+                                          Horizontal y
+                                        </SelectItem>
+                                        <SelectItem value="x" className="text-xs">
+                                          Vertical x
+                                        </SelectItem>
+                                        <SelectItem value="segment" className="text-xs">
+                                          Segment
+                                        </SelectItem>
+                                      </SelectContent>
+                                    </Select>
+                                    {kind === "equation" ? (
+                                      <div className="space-y-1">
+                                        <Input
+                                          value={line.equation ?? ""}
+                                          onChange={(e) =>
+                                            updateReferenceLine(line.id, {
+                                              equation: e.target.value,
+                                              label: line.label || e.target.value,
+                                            })
+                                          }
+                                          placeholder="y = x^2"
+                                          className="h-7 font-mono text-xs"
+                                          spellCheck={false}
+                                          onKeyDown={(e) => e.stopPropagation()}
+                                        />
+                                        {!equationValidation.ok ? (
+                                          <p className="text-[10px] text-destructive">
+                                            {equationValidation.error}
+                                          </p>
+                                        ) : null}
+                                        <div className="flex flex-wrap gap-1">
+                                          {REFERENCE_EQUATION_PRESETS.map((preset) => (
+                                            <Button
+                                              key={`${line.id}-${preset.equation}`}
+                                              type="button"
+                                              variant="outline"
+                                              size="sm"
+                                              className="h-6 px-1.5 font-mono text-[10px]"
+                                              onClick={() =>
+                                                updateReferenceLine(line.id, {
+                                                  equation: preset.equation,
+                                                  label: preset.label,
+                                                })
+                                              }
+                                            >
+                                              {preset.label}
+                                            </Button>
+                                          ))}
+                                        </div>
+                                      </div>
+                                    ) : kind === "segment" ? (
+                                      <div className="grid grid-cols-2 gap-1">
+                                        <Input
+                                          value={line.x1 ?? ""}
+                                          onChange={(e) =>
+                                            updateReferenceLine(line.id, { x1: e.target.value })
+                                          }
+                                          placeholder="x1"
+                                          className="h-7 text-xs"
+                                          onKeyDown={(e) => e.stopPropagation()}
+                                        />
+                                        <Input
+                                          value={line.y1 ?? ""}
+                                          onChange={(e) =>
+                                            updateReferenceLine(line.id, { y1: e.target.value })
+                                          }
+                                          placeholder="y1"
+                                          className="h-7 text-xs"
+                                          onKeyDown={(e) => e.stopPropagation()}
+                                        />
+                                        <Input
+                                          value={line.x2 ?? ""}
+                                          onChange={(e) =>
+                                            updateReferenceLine(line.id, { x2: e.target.value })
+                                          }
+                                          placeholder="x2"
+                                          className="h-7 text-xs"
+                                          onKeyDown={(e) => e.stopPropagation()}
+                                        />
+                                        <Input
+                                          value={line.y2 ?? ""}
+                                          onChange={(e) =>
+                                            updateReferenceLine(line.id, { y2: e.target.value })
+                                          }
+                                          placeholder="y2"
+                                          className="h-7 text-xs"
+                                          onKeyDown={(e) => e.stopPropagation()}
+                                        />
+                                      </div>
+                                    ) : (
+                                      <Input
+                                        value={kind === "x" ? (line.x ?? "") : (line.y ?? "")}
+                                        onChange={(e) =>
+                                          updateReferenceLine(
+                                            line.id,
+                                            kind === "x" ? { x: e.target.value } : { y: e.target.value },
+                                          )
+                                        }
+                                        placeholder={kind === "x" ? "X value" : "Y value"}
+                                        className="h-7 text-xs"
+                                        onKeyDown={(e) => e.stopPropagation()}
+                                      />
+                                    )}
+                                    <div className="flex items-center gap-1.5">
+                                      <ChartColorPalettePopover
+                                        value={line.color || "#ef4444"}
+                                        onChange={(color) =>
+                                          updateReferenceLine(line.id, { color: color || "#ef4444" })
+                                        }
+                                        ariaLabel={`Reference line ${refIdx + 1} color`}
+                                        triggerClassName="h-7 w-7 rounded-md"
+                                      />
+                                      <Select
+                                        value={line.style || "dashed"}
+                                        onValueChange={(v) =>
+                                          updateReferenceLine(line.id, { style: v })
+                                        }
+                                      >
+                                        <SelectTrigger className="h-7 min-w-0 flex-1 text-xs">
+                                          <SelectValue placeholder="Style" />
+                                        </SelectTrigger>
+                                        <SelectContent className="text-xs">
+                                          <SelectItem value="solid" className="text-xs">
+                                            Solid
+                                          </SelectItem>
+                                          <SelectItem value="dashed" className="text-xs">
+                                            Dashed
+                                          </SelectItem>
+                                          <SelectItem value="dotted" className="text-xs">
+                                            Dotted
+                                          </SelectItem>
+                                        </SelectContent>
+                                      </Select>
+                                    </div>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          ) : (
+                            <p className="px-2 py-2 text-[10px] text-muted-foreground">
+                              No reference lines yet. Use Add to create one.
+                            </p>
+                          )}
                         </DropdownMenuContent>
                       </DropdownMenu>
                     </div>

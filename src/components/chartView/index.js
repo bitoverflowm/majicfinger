@@ -1024,6 +1024,8 @@ export function ChartBuilderProvider({ demo, children, initialBuilderSnapshot, e
       : [];
   });
   const [referenceLines, setReferenceLines] = useState([]);
+  /** Master toggle for reference guides (Design → Reference line on scatter; also gates render). */
+  const [referenceLinesEnabled, setReferenceLinesEnabled] = useState(false);
   /** Hover tooltip: optional X / Y / extra sheet columns from the hovered data row (not plotted). */
   const [tooltipShowXValue, setTooltipShowXValue] = useState(true);
   const [tooltipExtraColumns, setTooltipExtraColumns] = useState([]);
@@ -1092,6 +1094,11 @@ export function ChartBuilderProvider({ demo, children, initialBuilderSnapshot, e
     }
     if (hasReferenceLines) {
       setReferenceLines(normalizeReferenceLines(snap.referenceLines));
+      if (snap.referenceLinesEnabled !== undefined) {
+        setReferenceLinesEnabled(!!snap.referenceLinesEnabled);
+      } else {
+        setReferenceLinesEnabled(true);
+      }
     }
   }, [demo, initialBuilderSnapshot]);
 
@@ -1317,6 +1324,10 @@ export function ChartBuilderProvider({ demo, children, initialBuilderSnapshot, e
     }
     if (Array.isArray(s.referenceLines)) {
       setReferenceLines(normalizeReferenceLines(s.referenceLines));
+    }
+    if (s.referenceLinesEnabled !== undefined) setReferenceLinesEnabled(!!s.referenceLinesEnabled);
+    else if (Array.isArray(s.referenceLines) && s.referenceLines.length > 0) {
+      setReferenceLinesEnabled(true);
     }
     if (s.tooltipShowXValue !== undefined) setTooltipShowXValue(!!s.tooltipShowXValue);
     else if (s.legendShowXValue !== undefined) setTooltipShowXValue(!!s.legendShowXValue);
@@ -2129,6 +2140,7 @@ export function ChartBuilderProvider({ demo, children, initialBuilderSnapshot, e
     chartFilterConfig,
     chartLineFilters,
     referenceLines,
+    referenceLinesEnabled,
     tooltipShowXValue,
     tooltipExtraColumns,
   };
@@ -2423,6 +2435,8 @@ export function ChartBuilderProvider({ demo, children, initialBuilderSnapshot, e
     setChartLineFilters,
     referenceLines,
     setReferenceLines,
+    referenceLinesEnabled,
+    setReferenceLinesEnabled,
     tooltipShowXValue,
     setTooltipShowXValue,
     tooltipExtraColumns,
@@ -2668,6 +2682,7 @@ export function ChartCanvas() {
     tooltipExtraColumns,
     chartLineFilters,
     referenceLines,
+    referenceLinesEnabled,
     selChartType,
     chartData,
     dataTypes,
@@ -3565,7 +3580,7 @@ export function ChartCanvas() {
     const isTemporalX =
       effectiveUseTimeSeriesX || chartUsesTimeframes || lineIsTemporalX || axisType === "date";
     return normalizeReferenceLines(referenceLines)
-      .filter((line) => line.enabled && line.kind !== "equation")
+      .filter((line) => line.enabled && (selChartType !== "scatter" || referenceLinesEnabled) && line.kind !== "equation")
       .map((line) => {
         const common = {
           key: line.id,
@@ -3610,6 +3625,8 @@ export function ChartCanvas() {
     finalRenderedData,
     lineIsTemporalX,
     referenceLines,
+    referenceLinesEnabled,
+    selChartType,
     selX,
     tickFillY,
     effectiveUseTimeSeriesX,
@@ -3618,6 +3635,7 @@ export function ChartCanvas() {
 
   const renderedEquationReferenceLines = useMemo(() => {
     if (rechartsXAxisType !== "number") return [];
+    if (selChartType === "scatter" && !referenceLinesEnabled) return [];
     const extents = numericXExtents(finalRenderedData, xKey);
     if (!extents) return [];
 
@@ -3653,7 +3671,7 @@ export function ChartCanvas() {
         );
       })
       .filter(Boolean);
-  }, [finalRenderedData, referenceLines, rechartsXAxisType, xKey]);
+  }, [finalRenderedData, referenceLines, referenceLinesEnabled, rechartsXAxisType, selChartType, xKey]);
 
   const renderedCartesianReferenceLines = useMemo(
     () => [...renderedDaySeparationLines, ...renderedReferenceLines, ...renderedEquationReferenceLines],
