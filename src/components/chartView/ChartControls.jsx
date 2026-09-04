@@ -1456,6 +1456,15 @@ export default function ChartControls() {
       (Array.isArray(prev) ? prev : []).map((line) => (line.id === id ? { ...line, ...patch } : line))
     );
   };
+  const patchReferenceEquation = (line, nextEquation) => {
+    const prevEq = String(line.equation || "");
+    const prevLabel = String(line.label || "").trim();
+    const autoSynced = !prevLabel || prevLabel === prevEq.trim() || /^(y|x)\s*=/i.test(prevLabel);
+    return {
+      equation: nextEquation,
+      ...(autoSynced ? { label: nextEquation } : {}),
+    };
+  };
   const removeReferenceLine = (id) => {
     setReferenceLines((prev) => (Array.isArray(prev) ? prev : []).filter((line) => line.id !== id));
   };
@@ -1777,10 +1786,7 @@ export default function ChartControls() {
                             <Input
                               value={line.equation ?? ""}
                               onChange={(e) =>
-                                updateReferenceLine(line.id, {
-                                  equation: e.target.value,
-                                  label: line.label || e.target.value,
-                                })
+                                updateReferenceLine(line.id, patchReferenceEquation(line, e.target.value))
                               }
                               placeholder="y = x^2"
                               className="h-8 font-mono text-xs"
@@ -3167,10 +3173,10 @@ export default function ChartControls() {
                                         <Input
                                           value={line.equation ?? ""}
                                           onChange={(e) =>
-                                            updateReferenceLine(line.id, {
-                                              equation: e.target.value,
-                                              label: line.label || e.target.value,
-                                            })
+                                            updateReferenceLine(
+                                              line.id,
+                                              patchReferenceEquation(line, e.target.value),
+                                            )
                                           }
                                           placeholder="y = x^2"
                                           className="h-7 font-mono text-xs"

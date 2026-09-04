@@ -573,6 +573,31 @@ function normalizeReferenceLines(value) {
     .filter(Boolean);
 }
 
+/** Auto equation-style labels (y = … / x = …) track the live value; custom names are kept. */
+function resolveReferenceLineLabel(line) {
+  if (!line || typeof line !== "object") return "";
+  const custom = String(line.label || "").trim();
+  const looksAuto = !custom || /^(y|x)\s*=/i.test(custom);
+  if (line.kind === "equation") {
+    const eq = String(line.equation || "").trim();
+    if (eq && looksAuto) return eq;
+    return custom || eq;
+  }
+  if (line.kind === "y") {
+    const y = String(line.y ?? "").trim();
+    const auto = y !== "" ? `y = ${y}` : "";
+    if (auto && looksAuto) return auto;
+    return custom || auto;
+  }
+  if (line.kind === "x") {
+    const x = String(line.x ?? "").trim();
+    const auto = x !== "" ? `x = ${x}` : "";
+    if (auto && looksAuto) return auto;
+    return custom || auto;
+  }
+  return custom;
+}
+
 function coerceReferenceAxisValue(value, axisType, isTemporal = false) {
   if (value == null || value === "") return undefined;
   if (isTemporal || axisType === "date") {
@@ -3578,6 +3603,7 @@ export function ChartCanvas() {
     return normalizeReferenceLines(referenceLines)
       .filter((line) => line.enabled && (selChartType !== "scatter" || referenceLinesEnabled) && line.kind !== "equation")
       .map((line) => {
+        const displayLabel = resolveReferenceLineLabel(line);
         const common = {
           key: line.id,
           stroke: line.color,
@@ -3590,9 +3616,9 @@ export function ChartCanvas() {
             strokeWidth: line.strokeWidth,
             strokeDasharray: referenceLineDash(line.style),
           },
-          label: line.label
+          label: displayLabel
             ? {
-                value: line.label,
+                value: displayLabel,
                 fill: chartTextColor || tickFillY || line.color,
                 position: line.kind === "segment" ? "middle" : "insideTopRight",
               }
@@ -3642,6 +3668,7 @@ export function ChartCanvas() {
     return normalizeReferenceLines(referenceLines)
       .filter((line) => line.enabled && line.kind === "equation" && String(line.equation || "").trim())
       .map((line) => {
+        const displayLabel = resolveReferenceLineLabel(line);
         const common = {
           key: line.id,
           stroke: line.color,
@@ -3654,9 +3681,9 @@ export function ChartCanvas() {
             strokeWidth: line.strokeWidth,
             strokeDasharray: referenceLineDash(line.style),
           },
-          label: line.label
+          label: displayLabel
             ? {
-                value: line.label,
+                value: displayLabel,
                 fill: chartTextColor || tickFillY || line.color,
                 position: "insideTopRight",
               }
@@ -3690,7 +3717,7 @@ export function ChartCanvas() {
             key={line.id}
             data={points}
             dataKey={yKey}
-            name={line.label || line.equation}
+            name={displayLabel || line.equation}
             type="linear"
             dot={false}
             connectNulls
