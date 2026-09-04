@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
+  Check,
   Columns3,
   FileJson,
   FileType2,
@@ -806,22 +807,40 @@ export function ConnectHomeSheetPanel({ className }) {
                   label: "Add new sheet",
                   desc: `Create ${nextNewSheetLabel(dataSheets)} with the imported rows.`,
                 },
-              ].map((opt) => (
-                <button
-                  key={opt.id}
-                  type="button"
-                  onClick={() => setDisposition(/** @type {ImportDisposition} */ (opt.id))}
-                  className={cn(
-                    "rounded-md border px-2.5 py-2 text-left transition-colors",
-                    disposition === opt.id
-                      ? "border-foreground/40 bg-muted/50"
-                      : "border-border/70 bg-background hover:bg-muted/30",
-                  )}
-                >
-                  <span className="block text-[11px] font-medium text-foreground">{opt.label}</span>
-                  <span className={cn(MUTED, "mt-0.5 block")}>{opt.desc}</span>
-                </button>
-              ))}
+              ].map((opt) => {
+                const selected = disposition === opt.id;
+                return (
+                  <button
+                    key={opt.id}
+                    type="button"
+                    onClick={() => setDisposition(/** @type {ImportDisposition} */ (opt.id))}
+                    aria-pressed={selected}
+                    className={cn(
+                      "flex w-full items-start gap-2.5 rounded-md border px-2.5 py-2 text-left transition-colors",
+                      "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40",
+                      selected
+                        ? "border-primary bg-primary/10 shadow-sm ring-2 ring-primary/25"
+                        : "border-border/70 bg-background hover:border-border hover:bg-muted/30",
+                    )}
+                  >
+                    <span
+                      className={cn(
+                        "mt-0.5 flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded-full border transition-colors",
+                        selected
+                          ? "border-primary bg-primary text-primary-foreground"
+                          : "border-border/80 bg-background",
+                      )}
+                      aria-hidden
+                    >
+                      {selected ? <Check className="h-2.5 w-2.5" strokeWidth={2.5} /> : null}
+                    </span>
+                    <span className="min-w-0 flex-1">
+                      <span className="block text-[11px] font-medium text-foreground">{opt.label}</span>
+                      <span className={cn(MUTED, "mt-0.5 block")}>{opt.desc}</span>
+                    </span>
+                  </button>
+                );
+              })}
               <DialogFooter className="mt-2 gap-2 sm:justify-between">
                 <Button type="button" variant="outline" size="sm" onClick={resetImportModal}>
                   Cancel
