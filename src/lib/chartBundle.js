@@ -1,6 +1,7 @@
 import { coerceCategoricalBuilderAxes, inferDefaultBuilderSnapshot } from "@/lib/inferDefaultBuilderSnapshot";
 import {
   dataSheetsReferencedBySnapshot,
+  inferSheetIdForChartColumns,
   primarySheetIdForChartSnapshot,
 } from "@/lib/chartSnapshotDataDeps";
 
@@ -95,19 +96,43 @@ export function normalizeBuilderSnapshot(snapshot, rows, dataSheets = {}) {
       s.candlestickOhlcSetId = "auto";
     }
   } else {
+    const tryScopeAxisKey = (key, plotKeysForScore) => {
+      const raw = String(key || "").trim();
+      if (!raw || raw.includes("::")) return raw || key;
+      if (!dataSheets || !Object.keys(dataSheets).length) return raw;
+      const sheetId = inferSheetIdForChartColumns(
+        [raw, ...(Array.isArray(plotKeysForScore) ? plotKeysForScore : [])],
+        dataSheets,
+        null,
+      );
+      if (!sheetId || !dataSheets[sheetId]) return raw;
+      if (!sheetColumnNames(dataSheets[sheetId]).includes(raw)) return raw;
+      return `${sheetId}::${raw}`;
+    };
+
+    const rawY = Array.isArray(s.selY) ? s.selY : [];
+    const plotKeysForScope = [s.selX, ...rawY].filter(Boolean);
+
     const normalizedX = deScope(s.selX);
     if (String(s.selX || "").includes("::")) {
       s.selX = String(s.selX);
+    } else if (keys.includes(normalizedX)) {
+      s.selX = tryScopeAxisKey(normalizedX, plotKeysForScope);
     } else {
-      s.selX = keys.includes(normalizedX) ? normalizedX : fallback.selX;
+      s.selX = fallback.selX;
     }
 
-    const rawY = Array.isArray(s.selY) ? s.selY : [];
-    const cleanY = rawY.filter((k) => {
-      const raw = String(k || "");
-      if (raw.includes("::")) return true;
-      return keys.includes(deScope(raw));
-    });
+    const cleanY = rawY
+      .filter((k) => {
+        const raw = String(k || "");
+        if (raw.includes("::")) return true;
+        return keys.includes(deScope(raw));
+      })
+      .map((k) => {
+        const raw = String(k || "");
+        if (raw.includes("::")) return raw;
+        return tryScopeAxisKey(deScope(raw), plotKeysForScope);
+      });
     // Keep duplicate Y entries — same column with per-line filters (line:0, line:1, …).
     s.selY = cleanY.length ? cleanY : fallback.selY;
   }

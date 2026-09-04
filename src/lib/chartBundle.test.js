@@ -172,3 +172,31 @@ test("normalizeBuilderSnapshot preserves scatter type", () => {
   const out = normalizeBuilderSnapshot(snapshot, rows, {});
   assert.equal(out.selChartType, "scatter");
 });
+
+test("normalizeBuilderSnapshot scopes scatter axes to the sheet that owns them", () => {
+  const dataSheets = {
+    "sheet-1": {
+      name: "markets",
+      data: [],
+      columns: ["title", "volume"],
+    },
+    "sheet-5": {
+      name: "calibration",
+      data: [
+        { avg_probability: 0.4, yes_rate: 0.35, n: 10 },
+        { avg_probability: 0.7, yes_rate: 0.68, n: 12 },
+      ],
+      columns: ["avg_probability", "yes_rate", "n"],
+    },
+  };
+  const snapshot = {
+    v: 1,
+    selChartType: "scatter",
+    selX: "avg_probability",
+    selY: ["yes_rate"],
+  };
+  const out = normalizeBuilderSnapshot(snapshot, dataSheets["sheet-1"].data, dataSheets);
+  assert.equal(out.selChartType, "scatter");
+  assert.equal(out.selX, "sheet-5::avg_probability");
+  assert.deepEqual(out.selY, ["sheet-5::yes_rate"]);
+});

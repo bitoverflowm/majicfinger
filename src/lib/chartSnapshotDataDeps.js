@@ -132,6 +132,73 @@ export function resolveChartSheetId(requestedSheetId, dataSheets, activeSheetId)
   return first || req || active || "sheet-1";
 }
 
+function sheetColumnNameSet(sheet) {
+  const names = new Set();
+  const rows = Array.isArray(sheet?.data) ? sheet.data : [];
+  if (rows[0] && typeof rows[0] === "object") {
+    Object.keys(rows[0]).forEach((k) => names.add(k));
+  }
+  if (Array.isArray(sheet?.columns)) {
+    sheet.columns.forEach((c) => {
+      const name = typeof c === "string" ? c : c?.field || c?.name || "";
+      if (name) names.add(name);
+    });
+  }
+  return names;
+}
+
+/**
+ * Pick the workbook sheet that best owns the given plot column keys.
+ * Explicit `sheetId::col` keys win; otherwise prefer the sheet with the most matching
+ * columns (and rows) so scatter/area charts survive reload when the active sheet differs.
+ *
+ * @param {unknown[]} columnKeys
+ * @param {Record<string, unknown>} dataSheets
+ * @param {string | null | undefined} activeSheetId
+ * @returns {string}
+ */
+export function inferSheetIdForChartColumns(columnKeys, dataSheets, activeSheetId) {
+  const sheets = dataSheets && typeof dataSheets === "object" ? dataSheets : {};
+  const keys = (Array.isArray(columnKeys) ? columnKeys : [])
+    .map((k) => String(k || "").trim())
+    .filter(Boolean);
+
+  for (const key of keys) {
+    const idx = key.indexOf("::");
+    if (idx > 0) {
+      const sid = key.slice(0, idx).trim();
+      if (sid && sheets[sid]) return sid;
+    }
+  }
+
+  const plainCols = keys
+    .map((key) => {
+      const idx = key.indexOf("::");
+      return idx > 0 ? key.slice(idx + 2).trim() : key;
+    })
+    .filter(Boolean);
+
+  if (!plainCols.length) {
+    return resolveChartSheetId(activeSheetId, sheets, activeSheetId);
+  }
+
+  let best = null;
+  for (const [sid, sheet] of Object.entries(sheets)) {
+    const names = sheetColumnNameSet(sheet);
+    const matches = plainCols.filter((c) => names.has(c)).length;
+    if (!matches) continue;
+    const hasData = Array.isArray(sheet?.data) && sheet.data.length > 0;
+    const rank =
+      matches * 100 +
+      (matches === plainCols.length ? 50 : 0) +
+      (hasData ? 10 : 0) +
+      (sid === activeSheetId ? 1 : 0);
+    if (!best || rank > best.rank) best = { sid, rank };
+  }
+  if (best) return best.sid;
+  return resolveChartSheetId(activeSheetId, sheets, activeSheetId);
+}
+
 /**
  * Recharts reads `row[scopedKey]` directly. Plain sheet rows only store column names — copy values
  * onto scoped keys when cross-sheet merge falls back to connectedData.

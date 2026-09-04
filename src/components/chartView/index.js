@@ -50,6 +50,7 @@ import { pivotBarChartBySeries } from "@/components/chartView/pivotBarChartData"
 import { resolveChartSeriesLabel } from "@/lib/chartLineLabels";
 import {
   aliasScopedColumnKeysOnRows,
+  inferSheetIdForChartColumns,
   resolveChartSheetId,
 } from "@/lib/chartSnapshotDataDeps";
 
@@ -1675,7 +1676,6 @@ export function ChartBuilderProvider({ demo, children, initialBuilderSnapshot, e
     if (!sheetEntries.length) return chartData?.length ? chartData : (demo ? dfltChartData : []);
     const activeSheetId = contextStateV2?.activeSheetId;
     const dataSheets = contextStateV2?.dataSheets || {};
-    const activeRows = Array.isArray(dataSheets?.[activeSheetId]?.data) ? dataSheets[activeSheetId].data : [];
     const plotKeyList = [
       selX,
       ...(selY || []),
@@ -1693,6 +1693,18 @@ export function ChartBuilderProvider({ demo, children, initialBuilderSnapshot, e
       .filter(Boolean);
     const neededKeys = new Set([...plotKeyList, ...tooltipKeys, ...filterKeys]);
     if (!neededKeys.size) return chartData?.length ? chartData : (demo ? dfltChartData : []);
+    // Unscoped axes (legacy / quant suggestions) must bind to the sheet that owns those columns,
+    // not whatever data tab is active after project load — otherwise scatter/area plots go empty.
+    const inferredPlotSheetId = inferSheetIdForChartColumns(
+      [...plotKeyList, ...tooltipKeys, ...filterKeys],
+      dataSheets,
+      activeSheetId,
+    );
+    const fallbackRows = Array.isArray(dataSheets?.[inferredPlotSheetId]?.data)
+      ? dataSheets[inferredPlotSheetId].data
+      : Array.isArray(dataSheets?.[activeSheetId]?.data)
+        ? dataSheets[activeSheetId].data
+        : [];
     /** Only X/Y (and other plot keys) determine row count. Tooltip-only scoped columns must not truncate the series. */
     const sheetRowCount = (resolvedSheetId) => {
       const d = dataSheets?.[resolvedSheetId]?.data;
@@ -1701,23 +1713,27 @@ export function ChartBuilderProvider({ demo, children, initialBuilderSnapshot, e
     const plotSheetLengths = [];
     const seenPlotSheets = new Set();
     for (const key of plotKeyList) {
-      const parsed = parseScopedColumnKey(key, activeSheetId);
-      const sid = resolveChartSheetId(parsed.sheetId || activeSheetId, dataSheets, activeSheetId);
+      const parsed = parseScopedColumnKey(key, inferredPlotSheetId);
+      const sid = resolveChartSheetId(parsed.sheetId || inferredPlotSheetId, dataSheets, activeSheetId);
       if (!sid || seenPlotSheets.has(sid)) continue;
       seenPlotSheets.add(sid);
       plotSheetLengths.push(sheetRowCount(sid));
     }
     const alignedRowCount =
-      plotSheetLengths.length > 0 ? Math.max(0, Math.min(...plotSheetLengths)) : Math.max(0, activeRows.length);
+      plotSheetLengths.length > 0 ? Math.max(0, Math.min(...plotSheetLengths)) : Math.max(0, fallbackRows.length);
     const rows = [];
     for (let idx = 0; idx < alignedRowCount; idx += 1) {
       const row = {};
       for (const key of neededKeys) {
-        const parsed = parseScopedColumnKey(key, activeSheetId);
-        const resolvedSheetId = resolveChartSheetId(parsed.sheetId || activeSheetId, dataSheets, activeSheetId);
+        const parsed = parseScopedColumnKey(key, inferredPlotSheetId);
+        const resolvedSheetId = resolveChartSheetId(
+          parsed.sheetId || inferredPlotSheetId,
+          dataSheets,
+          activeSheetId,
+        );
         const sourceRows = Array.isArray(dataSheets?.[resolvedSheetId]?.data)
           ? dataSheets[resolvedSheetId].data
-          : activeRows;
+          : fallbackRows;
         row[key] = sourceRows[idx]?.[parsed.column] ?? null;
         if (parsed.column && parsed.column !== key && row[key] != null) {
           row[parsed.column] = row[key];
@@ -1729,9 +1745,15 @@ export function ChartBuilderProvider({ demo, children, initialBuilderSnapshot, e
       rows.push(row);
     }
     if (rows.length) return rows;
-    const fallback = chartData?.length ? chartData : demo ? dfltChartData : [];
+    const fallback = fallbackRows.length
+      ? fallbackRows
+      : chartData?.length
+        ? chartData
+        : demo
+          ? dfltChartData
+          : [];
     if (fallback.length && neededKeys.size) {
-      return aliasScopedColumnKeysOnRows(fallback, [...neededKeys], dataSheets, activeSheetId);
+      return aliasScopedColumnKeysOnRows(fallback, [...neededKeys], dataSheets, inferredPlotSheetId);
     }
     return fallback;
   }, [
@@ -1755,17 +1777,19 @@ export function ChartBuilderProvider({ demo, children, initialBuilderSnapshot, e
 
   const barUsesCrossSheetData =
     selChartType === "bar" && (!!barSeriesColumn || scopedKeysInUse);
+  /** Scatter/area need the same sheet-aware merge as line — active-sheet-only data goes empty on reload. */
+  const usesCrossSheetPlotData =
+    selChartType === "line" ||
+    selChartType === "liveline" ||
+    selChartType === "scatter" ||
+    selChartType === "area" ||
+    scopedKeysInUse ||
+    barUsesCrossSheetData;
 
   const lineChartData = useMemo(() => {
-    const base =
-      selChartType === "line" ||
-      selChartType === "liveline" ||
-      scopedKeysInUse ||
-      barUsesCrossSheetData
-        ? crossSheetChartData
-        : chartData;
+    const base = usesCrossSheetPlotData ? crossSheetChartData : chartData;
     return downsampleRowsForChart(base);
-  }, [selChartType, scopedKeysInUse, barUsesCrossSheetData, crossSheetChartData, chartData]);
+  }, [usesCrossSheetPlotData, crossSheetChartData, chartData]);
 
   /** Same sheet merge as line charts so `sheet-id::col` axes work with live REST upserts. */
   const livelineSeries = useMemo(() => {
@@ -2264,7 +2288,7 @@ export function ChartBuilderProvider({ demo, children, initialBuilderSnapshot, e
     normalizeMode,
     setNormalizeMode,
 
-    chartData: scopedKeysInUse ? crossSheetChartData : chartData,
+    chartData: usesCrossSheetPlotData ? crossSheetChartData : chartData,
     getAxisType,
 
     selectedPalette,
@@ -2614,10 +2638,14 @@ export function ChartCanvas() {
   }, [xAxisTicksAngled, hideXAxisLabels, showChartXAxisTitle, showChartYAxisTitle]);
   const xAxisTickMargin = (xAxisTicksAngled ? 12 : 8) + (Number.isFinite(Number(xAxisLabelGapPx)) ? Number(xAxisLabelGapPx) : 0);
 
-  const barUsesCrossSheetData =
-    selChartType === "bar" && (!!barSeriesColumn || scopedKeysInUse);
-  const rawData =
-    (selChartType === "line" || scopedKeysInUse || barUsesCrossSheetData ? lineChartData : chartData) || [];
+  const usesCrossSheetPlotData =
+    selChartType === "line" ||
+    selChartType === "liveline" ||
+    selChartType === "scatter" ||
+    selChartType === "area" ||
+    scopedKeysInUse ||
+    (selChartType === "bar" && (!!barSeriesColumn || scopedKeysInUse));
+  const rawData = (usesCrossSheetPlotData ? lineChartData : chartData) || [];
   const yKeys = Array.isArray(selY) ? selY.filter(Boolean) : [];
   /** Demo sample mode pre-seeds axes; with real integration rows, require X + Y like the dashboard. */
   const axesConfigured =

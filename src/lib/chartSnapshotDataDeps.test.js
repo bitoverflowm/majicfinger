@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import {
   aliasScopedColumnKeysOnRows,
   collectChartSnapshotColumnsBySheetId,
+  inferSheetIdForChartColumns,
   projectRowObjectsToColumnSet,
   resolveChartSheetId,
 } from "./chartSnapshotDataDeps.js";
@@ -28,6 +29,29 @@ const dataSheets = {
 
 test("resolveChartSheetId maps saved workspace sheet id to persisted sheet id", () => {
   assert.equal(resolveChartSheetId("relative_position", dataSheets, "sheet-1"), "sheet-1");
+});
+
+test("inferSheetIdForChartColumns prefers the sheet that owns unscoped scatter axes", () => {
+  const multi = {
+    "sheet-1": {
+      name: "markets",
+      data: [{ title: "A", volume: 1 }],
+      columns: ["title", "volume"],
+    },
+    "sheet-5": {
+      name: "calibration",
+      data: [{ avg_probability: 0.5, yes_rate: 0.4 }],
+      columns: ["avg_probability", "yes_rate"],
+    },
+  };
+  assert.equal(
+    inferSheetIdForChartColumns(["avg_probability", "yes_rate"], multi, "sheet-1"),
+    "sheet-5",
+  );
+  assert.equal(
+    inferSheetIdForChartColumns(["sheet-5::avg_probability", "yes_rate"], multi, "sheet-1"),
+    "sheet-5",
+  );
 });
 
 test("aliasScopedColumnKeysOnRows copies plain columns onto scoped builder keys", () => {
