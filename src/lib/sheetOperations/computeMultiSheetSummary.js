@@ -1,5 +1,6 @@
 import { parseNumberTypedCell } from "@/lib/coerceNumberTypedCells";
 import { aggregateNumericValues } from "@/lib/sheetOperations/computeSummaryRow";
+import { replayOperations } from "@/lib/projectPersistence";
 
 export const MULTI_SHEET_SUMMARY_OPS = [
   "count_rows",
@@ -207,6 +208,120 @@ export function computeMultiSheetSummary(dataSheets, config) {
     errors,
     metricColumns,
   };
+}
+
+/** Ops that define the summary itself — not layered math/filter work on top. */
+const MULTI_SHEET_BASE_OP_TYPES = new Set(["summary.multi_sheet", "source.compose"]);
+
+/**
+ * Follow-on ops recorded after (or alongside) a multi-sheet summary that must be
+ * re-applied whenever the base summary is recomputed (save/load or live sync).
+ *
+ * @param {unknown[]} operationHistory
+ * @returns {object[]}
+ */
+export function multiSheetSummaryFollowOnOperations(operationHistory) {
+  return (Array.isArray(operationHistory) ? operationHistory : []).filter((op) => {
+    const type = String(op?.type || "");
+    return type && !MULTI_SHEET_BASE_OP_TYPES.has(type);
+  });
+}
+
+/**
+ * Recompute multi-sheet summary rows, then replay saved follow-on operations
+ * (computed columns, buckets, etc.) so math on top of the summary survives reload.
+ *
+ * @param {Record<string, object> | null | undefined} dataSheets
+ * @param {string} sheetId
+ * @param {object | null | undefined} sheet
+ * @param {object | null | undefined} [configOverride]
+ * @returns {{
+ *   rows: object[];
+ *   columns: string[];
+ *   errors: string[];
+ *   metricColumns: string[];
+ *   followOnOperations: object[];
+ * } | null}
+ */
+export function recomputeMultiSheetSummaryWithHistory(
+  dataSheets,
+  sheetId,
+  sheet,
+  configOverride = null,
+) {
+  const cfg = configOverride || sheet?.multiSheetSummaryConfig;
+  if (!cfg) return null;
+  const computed = computeMultiSheetSummary(dataSheets, cfg);
+  if (computed.errors.length) {
+    return { ...computed, followOnOperations: [] };
+  }
+  const followOnOperations = multiSheetSummaryFollowOnOperations(sheet?.operationHistory);
+  if (!followOnOperations.length) {
+    return { ...computed, followOnOperations };
+  }
+  const rows = replayOperations({
+    rows: computed.rows,
+    operations: followOnOperations,
+    dataSheets,
+    activeSheetId: sheetId,
+  });
+  return {
+    ...computed,
+    rows: Array.isArray(rows) ? rows : computed.rows,
+    followOnOperations,
+  };
+}
+
+/**
+ * Stable fingerprint for live-sync: base metrics + follow-on op identity.
+ * @param {object[]} rows
+ * @param {string[]} metricColumns
+ * @param {object[]} followOnOperations
+ */
+export function multiSheetSummarySyncFingerprint(rows, metricColumns, followOnOperations) {
+  const base = (Array.isArray(rows) ? rows : [])
+    .map((r) => {
+      const metrics = (Array.isArray(metricColumns) ? metricColumns : [])
+        .map((c) => `${c}=${r?.[c]}`)
+        .join(",");
+      return `${r?.source_sheet_id}:${metrics}`;
+    })
+    .join("|");
+  const follow = (Array.isArray(followOnOperations) ? followOnOperations : [])
+    .map((op) => `${op?.type || ""}:${op?.id || ""}:${op?.column || ""}:${op?.ts || ""}`)
+    .join(";");
+  return `${base}##${follow}`;
+}
+
+/**
+ * After project load (or Athena rehydrate), rebuild every multi-sheet summary tab
+ * including follow-on math so charts can read those columns before the grid mounts.
+ *
+ * @param {Record<string, object> | null | undefined} dataSheets
+ * @returns {Record<string, object>}
+ */
+export function recomputeAllMultiSheetSummarySheets(dataSheets) {
+  const base = dataSheets && typeof dataSheets === "object" ? { ...dataSheets } : {};
+  let changed = false;
+  for (const [sid, sheet] of Object.entries(base)) {
+    const cfg = sheet?.multiSheetSummaryConfig;
+    if (!cfg || !Array.isArray(cfg.sourceSheetIds) || !cfg.sourceSheetIds.length) continue;
+    if (!Array.isArray(cfg.metrics) || !cfg.metrics.length) continue;
+    const resultId = String(cfg.resultSheetId || sid);
+    if (resultId !== sid) continue;
+    const out = recomputeMultiSheetSummaryWithHistory(base, sid, sheet);
+    if (!out || out.errors.length) continue;
+    base[sid] = {
+      ...sheet,
+      data: out.rows,
+      dataTypes: {
+        ...(sheet.dataTypes || {}),
+        ...Object.fromEntries((out.metricColumns || []).map((c) => [c, "number"])),
+      },
+    };
+    changed = true;
+  }
+  return changed ? base : dataSheets && typeof dataSheets === "object" ? dataSheets : {};
 }
 
 /**

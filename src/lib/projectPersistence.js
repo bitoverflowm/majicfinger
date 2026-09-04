@@ -861,7 +861,7 @@ export function applyBrowserOperationToRows(rows, op, ctx = null) {
     return list;
   }
   if (op.type === "summary.multi_sheet") {
-    // Multi-sheet summary is stored as sheet.multiSheetSummaryConfig and recomputed live.
+    // Base rows come from sheet.multiSheetSummaryConfig (live recompute + follow-on replay).
     return list;
   }
   if (op.type === "computed.column") {

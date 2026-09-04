@@ -162,7 +162,9 @@ import {
 } from "@/lib/sheetOperations/computeSummaryRow";
 import {
   computeMultiSheetSummary,
+  multiSheetSummarySyncFingerprint,
   normalizeMultiSheetSummaryConfig,
+  recomputeMultiSheetSummaryWithHistory,
 } from "@/lib/sheetOperations/computeMultiSheetSummary";
 import { listSheetEquations, subscribeSheetEquationEdit } from "@/lib/sheetEquationEditRequest";
 import { parseJsonRows } from "@/lib/parseSheetImportText";
@@ -1483,14 +1485,16 @@ const GridView = ({ startNew, fillViewport = false }) => {
         if (!Array.isArray(cfg.metrics) || !cfg.metrics.length) continue;
         const resultId = String(cfg.resultSheetId || sid);
         if (resultId !== sid) continue;
-        const computed = computeMultiSheetSummary(dataSheets, cfg);
-        if (computed.errors.length) continue;
-        const sig = computed.rows
-          .map((r) => `${r.source_sheet_id}:${computed.metricColumns.map((c) => `${c}=${r[c]}`).join(",")}`)
-          .join("|");
+        const recomputed = recomputeMultiSheetSummaryWithHistory(dataSheets, sid, sheet);
+        if (!recomputed || recomputed.errors.length) continue;
+        const sig = multiSheetSummarySyncFingerprint(
+          recomputed.rows,
+          recomputed.metricColumns,
+          recomputed.followOnOperations,
+        );
         if (lastMultiSummarySyncRef.current[sid] === sig) continue;
         lastMultiSummarySyncRef.current[sid] = sig;
-        patches[sid] = { rows: computed.rows, metricColumns: computed.metricColumns };
+        patches[sid] = { rows: recomputed.rows, metricColumns: recomputed.metricColumns };
       }
       if (!Object.keys(patches).length) return;
       setDataSheets((prev) => {
@@ -1498,12 +1502,23 @@ const GridView = ({ startNew, fillViewport = false }) => {
         const next = { ...(prev || {}) };
         for (const [rid, { rows, metricColumns }] of Object.entries(patches)) {
           if (!next[rid]) continue;
+          const followCols = rows[0] && typeof rows[0] === "object"
+            ? Object.keys(rows[0]).filter(
+                (c) =>
+                  c &&
+                  !c.startsWith("_") &&
+                  c !== "sheet" &&
+                  c !== "source_sheet_id" &&
+                  !metricColumns.includes(c),
+              )
+            : [];
           next[rid] = {
             ...next[rid],
             data: rows,
             dataTypes: {
               ...(next[rid].dataTypes || {}),
               ...Object.fromEntries(metricColumns.map((c) => [c, "number"])),
+              ...Object.fromEntries(followCols.map((c) => [c, next[rid].dataTypes?.[c] || "number"])),
             },
           };
           changed = true;
@@ -1682,7 +1697,6 @@ const GridView = ({ startNew, fillViewport = false }) => {
             ...(prev || {}),
             [activeSheetId]: {
               ...sheet,
-              data: computed.rows,
               multiSheetSummaryConfig: nextConfig,
               dataTypes: {
                 ...(sheet.dataTypes || {}),
@@ -1690,10 +1704,26 @@ const GridView = ({ startNew, fillViewport = false }) => {
               },
             },
           };
-          return replaceSheetOperation(base, activeSheetId, mathEditingOpId, {
+          const withOp = replaceSheetOperation(base, activeSheetId, mathEditingOpId, {
             ...operation,
             multiSheetSummaryConfig: nextConfig,
           });
+          const updated = withOp?.[activeSheetId] || base[activeSheetId];
+          const recomputed = recomputeMultiSheetSummaryWithHistory(
+            withOp,
+            activeSheetId,
+            updated,
+            nextConfig,
+          );
+          const rows = recomputed?.rows?.length ? recomputed.rows : computed.rows;
+          return {
+            ...withOp,
+            [activeSheetId]: {
+              ...updated,
+              data: rows,
+              multiSheetSummaryConfig: nextConfig,
+            },
+          };
         });
         toast.success(wasEditing ? "Multi-sheet summary updated." : "Multi-sheet summary created.");
         setMathEditingOpId(null);

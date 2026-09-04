@@ -13,6 +13,7 @@ import {
   pickPrimaryProvenanceSheetId,
   replayProjectDerivedSheets,
 } from "@/lib/replayProjectDerivedSheets";
+import { recomputeAllMultiSheetSummarySheets } from "@/lib/sheetOperations/computeMultiSheetSummary";
 import { stripProvenanceRowPayloadForLoad } from "@/lib/projectPersistence";
 import { coerceDataTypes } from "@/lib/coerceDataTypes";
 import { orderSheetRowsByDataTypes } from "@/lib/sheetIdOrder";
@@ -322,6 +323,7 @@ export async function loadFullProjectFromApi({
       });
       onRehydrateProgress?.("Replaying derived sheet filters…");
       workingSheets = replayProjectDerivedSheets(workingSheets);
+      workingSheets = recomputeAllMultiSheetSummarySheets(workingSheets);
       applyActiveSheetFromSheets(workingSheets, {
         setDataSheets,
         setActiveSheetId,
@@ -332,6 +334,7 @@ export async function loadFullProjectFromApi({
     } catch (e) {
       console.warn("[loadFullProjectFromApi] Sheet replay failed:", e?.message || e);
       workingSheets = replayProjectDerivedSheets(workingSheets);
+      workingSheets = recomputeAllMultiSheetSummarySheets(workingSheets);
       applyActiveSheetFromSheets(workingSheets, {
         setDataSheets,
         setActiveSheetId,
@@ -342,9 +345,19 @@ export async function loadFullProjectFromApi({
     }
   }
 
+  const sheetsWithMultiSummary = recomputeAllMultiSheetSummarySheets(
+    incomingSheets && typeof incomingSheets === "object" ? incomingSheets : {},
+  );
+  if (sheetsWithMultiSummary !== incomingSheets) {
+    applyActiveSheetFromSheets(sheetsWithMultiSummary, {
+      setDataSheets,
+      setActiveSheetId,
+      setConnectedData,
+    });
+  }
   setRefetchChartDashboardsTick?.((t) => (t || 0) + 1);
   return {
-    dataSheets: incomingSheets && typeof incomingSheets === "object" ? incomingSheets : {},
+    dataSheets: sheetsWithMultiSummary,
     dataSet: stripped,
     liveFeedCapable,
   };

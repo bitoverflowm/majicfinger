@@ -4,7 +4,11 @@ import {
   computeMultiSheetSummary,
   createEmptyMultiSheetMetric,
   evaluateMultiSheetMetric,
+  multiSheetSummaryFollowOnOperations,
+  multiSheetSummarySyncFingerprint,
   normalizeMultiSheetSummaryConfig,
+  recomputeAllMultiSheetSummarySheets,
+  recomputeMultiSheetSummaryWithHistory,
   sheetsMissingColumn,
 } from "./computeMultiSheetSummary.js";
 
@@ -108,4 +112,105 @@ test("collectMultiSheetColumnUnion and sheetsMissingColumn", () => {
   assert.ok(union.includes("volume"));
   assert.ok(union.includes("other"));
   assert.deepEqual(sheetsMissingColumn(sheets, ["s-100a", "s-1k"], "other"), ["s-100a"]);
+});
+
+test("recomputeMultiSheetSummaryWithHistory replays computed.column follow-ons", () => {
+  const cfg = {
+    sourceSheetIds: ["s-100a", "s-1k"],
+    metrics: [{ outputName: "Sample Mean", op: "avg", column: "volume" }],
+    resultSheetId: "mss-1",
+  };
+  const sheet = {
+    name: "Multi summary",
+    multiSheetSummaryConfig: cfg,
+    data: [],
+    operationHistory: [
+      { type: "summary.multi_sheet", id: "op-mss", multiSheetSummaryConfig: cfg },
+      {
+        type: "computed.column",
+        id: "op-err",
+        column: "Signed Mean Error",
+        expression: {
+          kind: "relative-row",
+          op: "pct_growth",
+          baseColumn: "Sample Mean",
+          rowRef: "s-pop::mean_volume",
+          rowRefKind: "fixed",
+          referenceValFixed: true,
+          fixedReferenceValue: 100000,
+          asPercent: true,
+        },
+      },
+    ],
+  };
+  const out = recomputeMultiSheetSummaryWithHistory(
+    {
+      ...sheets,
+      "mss-1": sheet,
+      "s-pop": { name: "pop", data: [{ mean_volume: 100000 }] },
+    },
+    "mss-1",
+    sheet,
+  );
+  assert.ok(out);
+  assert.equal(out.errors.length, 0);
+  assert.equal(out.followOnOperations.length, 1);
+  assert.equal(out.rows.length, 2);
+  assert.ok(Object.prototype.hasOwnProperty.call(out.rows[0], "Signed Mean Error"));
+  assert.equal(typeof out.rows[0]["Signed Mean Error"], "number");
+  assert.ok(Number.isFinite(out.rows[0]["Signed Mean Error"]));
+});
+
+test("multiSheetSummaryFollowOnOperations skips base summary ops", () => {
+  const follow = multiSheetSummaryFollowOnOperations([
+    { type: "source.compose" },
+    { type: "summary.multi_sheet" },
+    { type: "computed.column", column: "x" },
+  ]);
+  assert.equal(follow.length, 1);
+  assert.equal(follow[0].column, "x");
+});
+
+test("multiSheetSummarySyncFingerprint changes when follow-on ops change", () => {
+  const rows = [{ source_sheet_id: "s-100a", "Sample Mean": 1 }];
+  const a = multiSheetSummarySyncFingerprint(rows, ["Sample Mean"], []);
+  const b = multiSheetSummarySyncFingerprint(rows, ["Sample Mean"], [
+    { type: "computed.column", id: "1", column: "Signed Mean Error", ts: 1 },
+  ]);
+  assert.notEqual(a, b);
+});
+
+test("recomputeAllMultiSheetSummarySheets restores follow-on columns across workbook", () => {
+  const cfg = {
+    sourceSheetIds: ["s-100a"],
+    metrics: [{ outputName: "Sample Mean", op: "avg", column: "volume" }],
+    resultSheetId: "mss-1",
+  };
+  const workbook = {
+    ...sheets,
+    "mss-1": {
+      name: "Multi summary",
+      multiSheetSummaryConfig: cfg,
+      data: [],
+      operationHistory: [
+        { type: "summary.multi_sheet", multiSheetSummaryConfig: cfg },
+        {
+          type: "computed.column",
+          column: "Signed Mean Error",
+          expression: {
+            kind: "binary",
+            op: "subtract",
+            leftColumn: "Sample Mean",
+            rightColumn: "Sample Mean",
+            leftKind: "column",
+            rightKind: "column",
+          },
+        },
+      ],
+    },
+  };
+  const next = recomputeAllMultiSheetSummarySheets(workbook);
+  assert.equal(next["mss-1"].data.length, 1);
+  assert.equal(next["mss-1"].data[0]["Sample Mean"], 20);
+  assert.equal(next["mss-1"].data[0]["Signed Mean Error"], 0);
 });
