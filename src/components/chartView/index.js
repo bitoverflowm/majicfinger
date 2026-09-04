@@ -880,6 +880,8 @@ export function ChartBuilderProvider({ demo, children, initialBuilderSnapshot, e
   const [heatmapDownColor, setHeatmapDownColor] = useState(null);
   const [yAxisDivisor, setYAxisDivisor] = useState(1);
   const [yAxisCompact, setYAxisCompact] = useState(true);
+  const [xAxisDivisor, setXAxisDivisor] = useState(1);
+  const [xAxisCompact, setXAxisCompact] = useState(true);
   /** Line/area/bar: null = off; "basic" = baseline index; "min-max" = min-max scale to 0–100. */
   const [normalizeMode, setNormalizeMode] = useState(null);
   const [sortXDir, setSortXDir] = useState("asc");
@@ -1161,6 +1163,8 @@ export function ChartBuilderProvider({ demo, children, initialBuilderSnapshot, e
     else if (s.selColorCol) setScatterColorEnabled(true);
     if (s.yAxisDivisor != null) setYAxisDivisor(s.yAxisDivisor);
     if (s.yAxisCompact !== undefined) setYAxisCompact(!!s.yAxisCompact);
+    if (s.xAxisDivisor != null) setXAxisDivisor(s.xAxisDivisor);
+    if (s.xAxisCompact !== undefined) setXAxisCompact(!!s.xAxisCompact);
     if (s.normalizeMode === "basic" || s.normalizeMode === "min-max") {
       setNormalizeMode(s.normalizeMode);
     } else if (s.valuesNormalized) {
@@ -1982,6 +1986,8 @@ export function ChartBuilderProvider({ demo, children, initialBuilderSnapshot, e
     scatterColorEnabled,
     yAxisDivisor,
     yAxisCompact,
+    xAxisDivisor,
+    xAxisCompact,
     normalizeMode,
     sortXDir,
     sortYDir,
@@ -2346,6 +2352,10 @@ export function ChartBuilderProvider({ demo, children, initialBuilderSnapshot, e
     setYAxisDivisor,
     yAxisCompact,
     setYAxisCompact,
+    xAxisDivisor,
+    setXAxisDivisor,
+    xAxisCompact,
+    setXAxisCompact,
     normalizeMode,
     setNormalizeMode,
 
@@ -2643,6 +2653,8 @@ export function ChartCanvas() {
     heatmapDownColor,
     yAxisDivisor,
     yAxisCompact,
+    xAxisDivisor,
+    xAxisCompact,
     normalizeMode,
     sortXDir,
   } = useChartBuilder();
@@ -3223,6 +3235,20 @@ export function ChartCanvas() {
       const rawLabel = xOriginalTemporalLabelByMs.get(Number(v));
       if (rawLabel) return rawLabel;
     }
+    // Numeric (non-temporal) X: same divisor / compact labels as Y.
+    if (
+      !effectiveUseTimeSeriesX &&
+      !lineIsTemporalX &&
+      xAxisType === "number" &&
+      Number.isFinite(Number(v))
+    ) {
+      const n = Number(v);
+      const divisor = Number(xAxisDivisor) > 0 ? Number(xAxisDivisor) : 1;
+      const adjusted = n / divisor;
+      return xAxisCompact
+        ? formatCompactNumber(adjusted)
+        : adjusted.toLocaleString(undefined, { maximumFractionDigits: 2 });
+    }
     return formatXAxisValue(
       v,
       effectiveTemporalSort,
@@ -3413,6 +3439,19 @@ export function ChartCanvas() {
     if (effectiveUseTimeSeriesX && Number.isFinite(Number(label)) && !xHumanReadable) {
       const rawLabel = xOriginalTemporalLabelByMs.get(Number(label));
       if (rawLabel) return rawLabel;
+    }
+    if (
+      !effectiveUseTimeSeriesX &&
+      !lineIsTemporalX &&
+      xAxisType === "number" &&
+      Number.isFinite(Number(label))
+    ) {
+      const n = Number(label);
+      const divisor = Number(xAxisDivisor) > 0 ? Number(xAxisDivisor) : 1;
+      const adjusted = n / divisor;
+      return xAxisCompact
+        ? formatCompactNumber(adjusted)
+        : adjusted.toLocaleString(undefined, { maximumFractionDigits: 2 });
     }
     if ((!effectiveTemporalSort || !xHumanReadable) && Number.isFinite(Number(label))) {
       const ms = temporalToMs(Number(label));

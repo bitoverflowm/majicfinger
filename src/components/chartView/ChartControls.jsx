@@ -89,16 +89,51 @@ function sheetGroupHeading(sheetId, sheetName, index = 0) {
 }
 
 const AXIS_SCALE_OPTIONS = [
-  { value: "linear", label: "Linear" },
-  { value: "log", label: "Logarithmic" },
-  { value: "categorical", label: "Categorical" },
+  { value: "linear", label: "Linear", valueTypes: ["number", "date"] },
+  { value: "log", label: "Logarithmic", valueTypes: ["number"] },
+  { value: "categorical", label: "Categorical", valueTypes: ["number", "date", "string"] },
 ];
 
+const AXIS_DIVISOR_OPTIONS = [
+  { value: "1", label: "No divisor (x1)" },
+  { value: "1000", label: "/ 1,000" },
+  { value: "1000000", label: "/ 1,000,000" },
+  { value: "1000000000", label: "/ 1,000,000,000" },
+];
+
+const AXIS_LABEL_OPTIONS = [
+  { value: "compact", label: "Compact (5m, 1.5b)" },
+  { value: "full", label: "Full numbers" },
+];
+
+/** Normalize getAxisType results into menu gating buckets. */
+function axisMenuValueType(axisType, { isTemporal = false } = {}) {
+  if (isTemporal || axisType === "date") return "date";
+  if (axisType === "number" || axisType === "id") return "number";
+  return "string";
+}
+
 /**
- * Gear menu for per-axis settings (Scale submenu = exclusive linear / log / categorical).
+ * Gear menu for per-axis settings: Scale + (numeric-only) Divisor / Labels.
  */
-function AxisScaleSettingsMenu({ value, onValueChange, ariaLabel = "Axis settings" }) {
-  const scale = AXIS_SCALE_OPTIONS.some((o) => o.value === value) ? value : "linear";
+function AxisSettingsMenu({
+  scaleValue,
+  onScaleChange,
+  divisorValue = 1,
+  onDivisorChange,
+  compactLabels = true,
+  onCompactChange,
+  valueType = "number",
+  ariaLabel = "Axis settings",
+}) {
+  const scaleOptions = AXIS_SCALE_OPTIONS.filter((o) => o.valueTypes.includes(valueType));
+  const scale = scaleOptions.some((o) => o.value === scaleValue)
+    ? scaleValue
+    : scaleOptions[0]?.value || "linear";
+  const showNumberFormat = valueType === "number";
+  const divisor = String(Number(divisorValue) > 0 ? Number(divisorValue) : 1);
+  const labelMode = compactLabels ? "compact" : "full";
+
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
@@ -112,7 +147,7 @@ function AxisScaleSettingsMenu({ value, onValueChange, ariaLabel = "Axis setting
           <Settings2 className="h-3.5 w-3.5" />
         </Button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="w-44 text-xs">
+      <DropdownMenuContent align="end" className="w-48 text-xs">
         <DropdownMenuGroup>
           <DropdownMenuLabel className="text-[10px] uppercase tracking-wide text-muted-foreground">
             Axis
@@ -124,13 +159,13 @@ function AxisScaleSettingsMenu({ value, onValueChange, ariaLabel = "Axis setting
                 Scale
               </DropdownMenuLabel>
               <DropdownMenuSeparator />
-              {AXIS_SCALE_OPTIONS.map((opt) => (
+              {scaleOptions.map((opt) => (
                 <DropdownMenuCheckboxItem
                   key={opt.value}
                   className="text-xs"
                   checked={scale === opt.value}
                   onCheckedChange={(checked) => {
-                    if (checked) onValueChange?.(opt.value);
+                    if (checked) onScaleChange?.(opt.value);
                   }}
                   onSelect={(e) => e.preventDefault()}
                 >
@@ -139,6 +174,54 @@ function AxisScaleSettingsMenu({ value, onValueChange, ariaLabel = "Axis setting
               ))}
             </DropdownMenuSubContent>
           </DropdownMenuSub>
+          {showNumberFormat ? (
+            <>
+              <DropdownMenuSub>
+                <DropdownMenuSubTrigger className="text-xs">Divisor</DropdownMenuSubTrigger>
+                <DropdownMenuSubContent className="text-xs">
+                  <DropdownMenuLabel className="text-[10px] uppercase tracking-wide text-muted-foreground">
+                    Divisor
+                  </DropdownMenuLabel>
+                  <DropdownMenuSeparator />
+                  {AXIS_DIVISOR_OPTIONS.map((opt) => (
+                    <DropdownMenuCheckboxItem
+                      key={opt.value}
+                      className="text-xs"
+                      checked={divisor === opt.value}
+                      onCheckedChange={(checked) => {
+                        if (checked) onDivisorChange?.(Number(opt.value) || 1);
+                      }}
+                      onSelect={(e) => e.preventDefault()}
+                    >
+                      {opt.label}
+                    </DropdownMenuCheckboxItem>
+                  ))}
+                </DropdownMenuSubContent>
+              </DropdownMenuSub>
+              <DropdownMenuSub>
+                <DropdownMenuSubTrigger className="text-xs">Labels</DropdownMenuSubTrigger>
+                <DropdownMenuSubContent className="text-xs">
+                  <DropdownMenuLabel className="text-[10px] uppercase tracking-wide text-muted-foreground">
+                    Labels
+                  </DropdownMenuLabel>
+                  <DropdownMenuSeparator />
+                  {AXIS_LABEL_OPTIONS.map((opt) => (
+                    <DropdownMenuCheckboxItem
+                      key={opt.value}
+                      className="text-xs"
+                      checked={labelMode === opt.value}
+                      onCheckedChange={(checked) => {
+                        if (checked) onCompactChange?.(opt.value === "compact");
+                      }}
+                      onSelect={(e) => e.preventDefault()}
+                    >
+                      {opt.label}
+                    </DropdownMenuCheckboxItem>
+                  ))}
+                </DropdownMenuSubContent>
+              </DropdownMenuSub>
+            </>
+          ) : null}
         </DropdownMenuGroup>
       </DropdownMenuContent>
     </DropdownMenu>
@@ -155,13 +238,28 @@ function AxisFieldLabel({ children }) {
 }
 
 /** Column select(s) + gear on one row. */
-function AxisSelectRow({ scaleValue, onScaleChange, scaleAriaLabel, children }) {
+function AxisSelectRow({
+  scaleValue,
+  onScaleChange,
+  divisorValue,
+  onDivisorChange,
+  compactLabels,
+  onCompactChange,
+  valueType,
+  scaleAriaLabel,
+  children,
+}) {
   return (
     <div className="flex w-full min-w-0 items-center gap-1.5">
       <div className="min-w-0 flex-1">{children}</div>
-      <AxisScaleSettingsMenu
-        value={scaleValue}
-        onValueChange={onScaleChange}
+      <AxisSettingsMenu
+        scaleValue={scaleValue}
+        onScaleChange={onScaleChange}
+        divisorValue={divisorValue}
+        onDivisorChange={onDivisorChange}
+        compactLabels={compactLabels}
+        onCompactChange={onCompactChange}
+        valueType={valueType}
         ariaLabel={scaleAriaLabel}
       />
     </div>
@@ -430,6 +528,10 @@ export default function ChartControls() {
     setYAxisDivisor,
     yAxisCompact,
     setYAxisCompact,
+    xAxisDivisor,
+    setXAxisDivisor,
+    xAxisCompact,
+    setXAxisCompact,
     normalizeMode,
     setNormalizeMode,
     dataTypes,
@@ -593,10 +695,16 @@ export default function ChartControls() {
   const [linesOpen, setLinesOpen] = useState(true);
   const [lineAdvancedOpen, setLineAdvancedOpen] = useState(false);
   const [referenceMenuOpen, setReferenceMenuOpen] = useState(false);
-  const [yAxisFormatOpen, setYAxisFormatOpen] = useState(true);
   const xAxisSelectValue = selX ?? CHART_X_AXIS_NONE;
   const handleXAxisChange = (v) => setSelX(v === CHART_X_AXIS_NONE ? undefined : v);
   const canUseTimeSeriesX = !!selX && !!lineIsTemporalX;
+  const xAxisMenuValueType = axisMenuValueType(
+    selX ? getAxisType(selX, dataTypes, chartData) : "string",
+    { isTemporal: !!lineIsTemporalX },
+  );
+  const yAxisMenuValueType = axisMenuValueType(
+    selY?.[0] ? getAxisType(selY[0], dataTypes, chartData) : "number",
+  );
   const barXAxisType = selX ? getAxisType(selX, dataTypes, chartData) : "string";
   const barXAxisIsDate =
     selChartType === "bar" &&
@@ -900,6 +1008,172 @@ export default function ChartControls() {
   const removeChartLineFilter = (id) => {
     setChartLineFilters((prev) => (Array.isArray(prev) ? prev : []).filter((rule) => rule.id !== id));
   };
+  const showChartLineFilterControls =
+    !demo && effectiveData?.length > 0 && xOptions?.length > 0 && (selY || []).length > 0;
+  const chartLineFilterControls = showChartLineFilterControls ? (
+    <div className="min-w-0 space-y-3 py-2">
+      <div className="space-y-1">
+        <p className={`text-xs font-bold ${dark ? "text-slate-200" : "text-muted-foreground"}`}>Filter by line</p>
+        <p className={`text-xs ${dark ? "text-slate-300" : "text-muted-foreground"}`}>
+          Filter chart series only. Sheet data is unchanged.
+        </p>
+      </div>
+      {normalizedChartLineFilters.length > 0 ? (
+        <div className="space-y-2">
+          {normalizedChartLineFilters.map((rule, idx) => {
+            const operatorNeedsValue = !["is_empty", "is_not_empty"].includes(rule.operator);
+            const dateFilterColumn = isDateLikeFilterColumn(rule.column);
+            const selectedDateRange = normalizeDateRangeValue(rule.value);
+            const dateColumnStats = dateFilterColumn ? getDateFilterColumnStats(rule.column) : null;
+            const effectiveOperator = filterOperatorOptions.some((opt) => opt.value === rule.operator) ? rule.operator : "=";
+            const scalarRuleValue = rule.value && typeof rule.value === "object" ? "" : (rule.value ?? "");
+            return (
+              <div key={rule.id} className="space-y-1.5 rounded-lg border border-border/70 p-2">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+                    Filter {idx + 1}
+                  </span>
+                  <button
+                    type="button"
+                    className="inline-flex h-2 w-2 items-center justify-center rounded-full bg-red-500 hover:bg-red-600"
+                    aria-label={`Remove filter ${idx + 1}`}
+                    onClick={() => removeChartLineFilter(rule.id)}
+                  >
+                  </button>
+                </div>
+                <Select value={resolveRuleSeriesValue(rule.seriesKey)} onValueChange={(v) => updateChartLineFilter(rule.id, { seriesKey: v })}>
+                  <SelectTrigger className="h-8 min-w-0 text-xs">
+                    <SelectValue placeholder="Apply to line" />
+                  </SelectTrigger>
+                  <SelectContent className="text-xs">
+                    {chartLineOptions.map((opt) => (
+                      <SelectItem key={opt.value} value={opt.value} className="text-xs">
+                        {opt.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <Select
+                  value={rule.column || ""}
+                  onValueChange={(v) =>
+                    updateChartLineFilter(rule.id, {
+                      column: v,
+                      ...(isDateLikeFilterColumn(v)
+                        ? { operator: "date_range", value: { from: undefined, to: undefined } }
+                        : { operator: "=", value: "" }),
+                    })
+                  }
+                >
+                  <SelectTrigger className="h-8 min-w-0 text-xs">
+                    <SelectValue placeholder="Column" />
+                  </SelectTrigger>
+                  <SelectContent className="text-xs">
+                    <GroupedColumnSelectItems
+                      groups={lineSheetColumnGroups}
+                      allowedValues={xOptions}
+                    />
+                  </SelectContent>
+                </Select>
+                {dateFilterColumn ? (
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        className="h-8 w-full justify-start px-3 text-left text-xs font-normal"
+                      >
+                        <CalendarIcon className="mr-2 h-3.5 w-3.5 shrink-0" />
+                        <span className={selectedDateRange.from || selectedDateRange.to ? "truncate" : "truncate text-muted-foreground"}>
+                          {formatDateRangeLabel(selectedDateRange)}
+                        </span>
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0" align="start">
+                      <Calendar
+                        mode="range"
+                        selected={selectedDateRange}
+                        onSelect={(range) =>
+                          updateChartLineFilter(rule.id, {
+                            operator: "date_range",
+                            value: {
+                              from: range?.from ? range.from.toISOString() : undefined,
+                              to: range?.to ? range.to.toISOString() : undefined,
+                            },
+                          })
+                        }
+                        numberOfMonths={1}
+                        defaultMonth={selectedDateRange.from || selectedDateRange.to || dateColumnStats?.min}
+                        fromDate={dateColumnStats?.min}
+                        toDate={dateColumnStats?.max}
+                        disabled={(date) =>
+                          (dateColumnStats?.min && date < dateColumnStats.min) ||
+                          (dateColumnStats?.max && date > dateColumnStats.max)
+                        }
+                      />
+                    </PopoverContent>
+                  </Popover>
+                ) : (
+                  <div className="grid grid-cols-[minmax(0,0.8fr)_minmax(0,1.2fr)] gap-1.5">
+                    <Select
+                      value={effectiveOperator}
+                      onValueChange={(v) => updateChartLineFilter(rule.id, { operator: v })}
+                    >
+                      <SelectTrigger className="h-8 min-w-0 text-xs">
+                        <SelectValue placeholder="Operator" />
+                      </SelectTrigger>
+                      <SelectContent className="text-xs">
+                        {filterOperatorOptions.map((opt) => (
+                          <SelectItem key={opt.value} value={opt.value} className="text-xs">
+                            {opt.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <Input
+                      value={scalarRuleValue}
+                      onChange={(e) => updateChartLineFilter(rule.id, { value: e.target.value })}
+                      placeholder={operatorNeedsValue ? "Value" : "No value needed"}
+                      className="h-8 text-xs"
+                      disabled={!operatorNeedsValue}
+                    />
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      ) : (
+        <p className="rounded-lg border border-dashed border-border/70 px-3 py-2 text-xs text-muted-foreground">
+          No chart filters yet.
+        </p>
+      )}
+      <div className="flex flex-wrap gap-1.5">
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          className="h-8 text-xs"
+          onClick={() => addChartLineFilter()}
+        >
+          + Add filter
+        </Button>
+        {chartLineOptions.length > 1
+          ? chartLineOptions.map((opt, lineIdx) => (
+              <Button
+                key={opt.value}
+                type="button"
+                variant="ghost"
+                size="sm"
+                className="h-8 text-xs text-muted-foreground"
+                onClick={() => addChartLineFilter(opt.value)}
+              >
+                + Line {lineIdx + 1}
+              </Button>
+            ))
+          : null}
+      </div>
+    </div>
+  ) : null;
   const normalizedReferenceLines = Array.isArray(referenceLines) ? referenceLines : [];
   const addReferenceLine = (kind = "y", defaults = {}) => {
     const id = `reference-line-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
@@ -947,8 +1221,6 @@ export default function ChartControls() {
     setReferenceLines((prev) => (Array.isArray(prev) ? prev : []).filter((line) => line.id !== id));
   };
 
-  const showYAxisFormat =
-    selY?.[0] && chartData?.length && getAxisType(selY[0], dataTypes, chartData) === "number";
   const showNormalizeControl =
     (selChartType === "line" || selChartType === "area" || selChartType === "bar") &&
     Array.isArray(selY) &&
@@ -991,72 +1263,32 @@ export default function ChartControls() {
       )}
     </Field>
   ) : null;
-  const yAxisFormatControls = showYAxisFormat ? (
-    <Collapsible open={yAxisFormatOpen} onOpenChange={setYAxisFormatOpen} className="border-t border-border/60 pt-4">
-      <CollapsibleTrigger asChild>
-        <button
-          type="button"
-          className="flex w-full min-w-0 items-center justify-between gap-2 rounded-md text-left"
-        >
-          <FieldTitle className="text-xs">y-axis</FieldTitle>
-          <ChevronDown
-            className={`h-3.5 w-3.5 shrink-0 text-muted-foreground transition-transform duration-200 ${yAxisFormatOpen ? "rotate-180" : ""}`}
-            aria-hidden
-          />
-        </button>
-      </CollapsibleTrigger>
-      <CollapsibleContent className="pt-3">
-        <div className="grid grid-cols-2 gap-3">
-          <Field>
-            <FieldLabel className="text-xs text-muted-foreground">Divisor</FieldLabel>
-            <Select
-              value={String(yAxisDivisor || 1)}
-              onValueChange={(v) => setYAxisDivisor(Number(v) || 1)}
-            >
-              <SelectTrigger className="h-8 min-w-0 text-xs">
-                <SelectValue placeholder="Divide by" />
-              </SelectTrigger>
-              <SelectContent className="text-xs">
-                <SelectItem value="1">No divisor (x1)</SelectItem>
-                <SelectItem value="1000">/ 1,000</SelectItem>
-                <SelectItem value="1000000">/ 1,000,000</SelectItem>
-                <SelectItem value="1000000000">/ 1,000,000,000</SelectItem>
-              </SelectContent>
-            </Select>
-          </Field>
-          <Field>
-            <FieldLabel className="text-xs text-muted-foreground">Labels</FieldLabel>
-            <Select
-              value={yAxisCompact ? "compact" : "full"}
-              onValueChange={(v) => setYAxisCompact(v === "compact")}
-            >
-              <SelectTrigger className="h-8 min-w-0 text-xs">
-                <SelectValue placeholder="Label style" />
-              </SelectTrigger>
-              <SelectContent className="text-xs">
-                <SelectItem value="compact">Compact (5m, 1.5b)</SelectItem>
-                <SelectItem value="full">Full numbers</SelectItem>
-              </SelectContent>
-            </Select>
-          </Field>
-        </div>
-      </CollapsibleContent>
-    </Collapsible>
-  ) : null;
   const lineSeriesControls = selChartType === "line" ? (
     <Collapsible open={linesOpen} onOpenChange={setLinesOpen} className="border-t border-border/60 pt-4">
-      <CollapsibleTrigger asChild>
-        <button
-          type="button"
-          className="flex w-full min-w-0 items-center justify-between gap-2 rounded-md text-left"
-        >
-          <FieldTitle className="text-xs">Lines</FieldTitle>
-          <ChevronDown
-            className={`h-3.5 w-3.5 shrink-0 text-muted-foreground transition-transform duration-200 ${linesOpen ? "rotate-180" : ""}`}
-            aria-hidden
-          />
-        </button>
-      </CollapsibleTrigger>
+      <div className="flex w-full min-w-0 items-center gap-1.5">
+        <CollapsibleTrigger asChild>
+          <button
+            type="button"
+            className="flex min-w-0 flex-1 items-center justify-between gap-2 rounded-md text-left"
+          >
+            <FieldTitle className="text-xs">Lines</FieldTitle>
+            <ChevronDown
+              className={`h-3.5 w-3.5 shrink-0 text-muted-foreground transition-transform duration-200 ${linesOpen ? "rotate-180" : ""}`}
+              aria-hidden
+            />
+          </button>
+        </CollapsibleTrigger>
+        <AxisSettingsMenu
+          scaleValue={scaleY}
+          onScaleChange={setScaleY}
+          divisorValue={yAxisDivisor}
+          onDivisorChange={setYAxisDivisor}
+          compactLabels={yAxisCompact}
+          onCompactChange={setYAxisCompact}
+          valueType={yAxisMenuValueType}
+          ariaLabel="Y axis settings"
+        />
+      </div>
       <CollapsibleContent className="space-y-3 pt-3">
         <div className="flex flex-wrap gap-2">
           {(selY || []).map((lineColumn, index) => (
@@ -1720,23 +1952,34 @@ export default function ChartControls() {
                     </>
                   ) : selChartType === "line" ? (
                     <>
-                      <Field>
-                        <FieldLabel className="text-xs">Pivot (x-axis)</FieldLabel>
-                        <Select value={xAxisSelectValue} onValueChange={handleXAxisChange}>
-                          <SelectTrigger className="h-8 min-w-0 text-xs font-normal">
-                            <SelectValue placeholder="X axis" className="text-xs font-normal" />
-                          </SelectTrigger>
-                          <SelectContent className="text-xs">
-                            <SelectItem value={CHART_X_AXIS_NONE} className="text-xs font-normal">
-                              — Select X axis —
-                            </SelectItem>
-                            <GroupedColumnSelectItems
-                              groups={lineSheetColumnGroups}
-                              allowedValues={xOptions}
-                              itemClassName="text-xs font-normal"
-                            />
-                          </SelectContent>
-                        </Select>
+                      <Field className="gap-1.5">
+                        <AxisFieldLabel>Pivot (x-axis)</AxisFieldLabel>
+                        <AxisSelectRow
+                          scaleValue={scaleX}
+                          onScaleChange={setScaleX}
+                          divisorValue={xAxisDivisor}
+                          onDivisorChange={setXAxisDivisor}
+                          compactLabels={xAxisCompact}
+                          onCompactChange={setXAxisCompact}
+                          valueType={xAxisMenuValueType}
+                          scaleAriaLabel="X axis settings"
+                        >
+                          <Select value={xAxisSelectValue} onValueChange={handleXAxisChange}>
+                            <SelectTrigger className="h-8 min-w-0 w-full text-xs font-normal">
+                              <SelectValue placeholder="X axis" className="text-xs font-normal" />
+                            </SelectTrigger>
+                            <SelectContent className="text-xs">
+                              <SelectItem value={CHART_X_AXIS_NONE} className="text-xs font-normal">
+                                — Select X axis —
+                              </SelectItem>
+                              <GroupedColumnSelectItems
+                                groups={lineSheetColumnGroups}
+                                allowedValues={xOptions}
+                                itemClassName="text-xs font-normal"
+                              />
+                            </SelectContent>
+                          </Select>
+                        </AxisSelectRow>
                       </Field>
                       {selX ? (
                         <Field orientation="horizontal" className="items-center gap-2">
@@ -1787,31 +2030,53 @@ export default function ChartControls() {
                         setShowDaySeparationBlocks={setShowDaySeparationBlocks}
                       />
 
-                      {yAxisFormatControls}
                       {normalizeValuesControl}
                       {lineSeriesControls}
                     </>
                   ) : (selChartType === "area") ? (
                     <>
-                      <Field>
-                        <FieldLabel className="text-xs">X axis</FieldLabel>
-                        <Select value={xAxisSelectValue} onValueChange={handleXAxisChange}>
-                          <SelectTrigger className="h-8 min-w-0 text-xs">
-                            <SelectValue placeholder="X axis" className="text-xs" />
-                          </SelectTrigger>
-                          <SelectContent className="text-xs">
-                            <SelectItem value={CHART_X_AXIS_NONE} className="text-xs">
-                              — Select X axis —
-                            </SelectItem>
-                            <GroupedColumnSelectItems
-                              groups={lineSheetColumnGroups}
-                              allowedValues={xOptions}
-                            />
-                          </SelectContent>
-                        </Select>
+                      <Field className="gap-1.5">
+                        <AxisFieldLabel>X axis</AxisFieldLabel>
+                        <AxisSelectRow
+                          scaleValue={scaleX}
+                          onScaleChange={setScaleX}
+                          divisorValue={xAxisDivisor}
+                          onDivisorChange={setXAxisDivisor}
+                          compactLabels={xAxisCompact}
+                          onCompactChange={setXAxisCompact}
+                          valueType={xAxisMenuValueType}
+                          scaleAriaLabel="X axis settings"
+                        >
+                          <Select value={xAxisSelectValue} onValueChange={handleXAxisChange}>
+                            <SelectTrigger className="h-8 min-w-0 w-full text-xs">
+                              <SelectValue placeholder="X axis" className="text-xs" />
+                            </SelectTrigger>
+                            <SelectContent className="text-xs">
+                              <SelectItem value={CHART_X_AXIS_NONE} className="text-xs">
+                                — Select X axis —
+                              </SelectItem>
+                              <GroupedColumnSelectItems
+                                groups={lineSheetColumnGroups}
+                                allowedValues={xOptions}
+                              />
+                            </SelectContent>
+                          </Select>
+                        </AxisSelectRow>
                       </Field>
-                      <Field>
-                        <FieldLabel className="text-xs">Areas</FieldLabel>
+                      <Field className="gap-1.5">
+                        <div className="flex w-full min-w-0 items-center justify-between gap-1.5">
+                          <AxisFieldLabel>Areas</AxisFieldLabel>
+                          <AxisSettingsMenu
+                            scaleValue={scaleY}
+                            onScaleChange={setScaleY}
+                            divisorValue={yAxisDivisor}
+                            onDivisorChange={setYAxisDivisor}
+                            compactLabels={yAxisCompact}
+                            onCompactChange={setYAxisCompact}
+                            valueType={yAxisMenuValueType}
+                            ariaLabel="Y axis settings"
+                          />
+                        </div>
                         {selY.length > 0 &&
                           selY.map((yValue, index) => (
                             <div
@@ -1871,7 +2136,6 @@ export default function ChartControls() {
                         showDaySeparationBlocks={showDaySeparationBlocks}
                         setShowDaySeparationBlocks={setShowDaySeparationBlocks}
                       />
-                      {yAxisFormatControls}
                       {normalizeValuesControl}
                     </>
                   ) : selChartType === "heatmap" ? (
@@ -1966,6 +2230,11 @@ export default function ChartControls() {
                         <AxisSelectRow
                           scaleValue={scaleX}
                           onScaleChange={setScaleX}
+                          divisorValue={xAxisDivisor}
+                          onDivisorChange={setXAxisDivisor}
+                          compactLabels={xAxisCompact}
+                          onCompactChange={setXAxisCompact}
+                          valueType={xAxisMenuValueType}
                           scaleAriaLabel="X axis settings"
                         >
                           <Select value={xAxisSelectValue} onValueChange={handleXAxisChange}>
@@ -2019,6 +2288,11 @@ export default function ChartControls() {
                             <AxisSelectRow
                               scaleValue={scaleY}
                               onScaleChange={setScaleY}
+                              divisorValue={yAxisDivisor}
+                              onDivisorChange={setYAxisDivisor}
+                              compactLabels={yAxisCompact}
+                              onCompactChange={setYAxisCompact}
+                              valueType={yAxisMenuValueType}
                               scaleAriaLabel="Y axis settings"
                             >
                               <div className="flex min-w-0 items-center gap-2">
@@ -2085,6 +2359,11 @@ export default function ChartControls() {
                           <AxisSelectRow
                             scaleValue={scaleY}
                             onScaleChange={setScaleY}
+                            divisorValue={yAxisDivisor}
+                            onDivisorChange={setYAxisDivisor}
+                            compactLabels={yAxisCompact}
+                            onCompactChange={setYAxisCompact}
+                            valueType={yAxisMenuValueType}
                             scaleAriaLabel="Y axis settings"
                           >
                             <Select onValueChange={(val) => handleSelectY(val)}>
@@ -2227,7 +2506,6 @@ export default function ChartControls() {
                           {renderSeriesLabelInputs(selY)}
                         </Field>
                       )}
-                      {yAxisFormatControls}
                       {selChartType === "bar" ? normalizeValuesControl : null}
                     </>
                   )}
@@ -2325,6 +2603,7 @@ export default function ChartControls() {
                           </TooltipProvider>
                         </Field>
                       )}
+                      {chartLineFilterControls}
                     </>
                   )}
 
@@ -3014,170 +3293,7 @@ export default function ChartControls() {
                     </div>
                   </div>
                 )}
-              {!demo && effectiveData?.length > 0 && xOptions?.length > 0 && (selY || []).length > 0 && (
-                <div className="min-w-0 space-y-3 py-2">
-                  <div className="space-y-1">
-                    <p className={`text-xs font-bold ${dark ? "text-slate-200" : "text-muted-foreground"}`}>Filter by line</p>
-                    <p className={`text-xs ${dark ? "text-slate-300" : "text-muted-foreground"}`}>
-                      Filter chart series only. Sheet data is unchanged.
-                    </p>
-                  </div>
-                  {normalizedChartLineFilters.length > 0 ? (
-                    <div className="space-y-2">
-                      {normalizedChartLineFilters.map((rule, idx) => {
-                        const operatorNeedsValue = !["is_empty", "is_not_empty"].includes(rule.operator);
-                        const dateFilterColumn = isDateLikeFilterColumn(rule.column);
-                        const selectedDateRange = normalizeDateRangeValue(rule.value);
-                        const dateColumnStats = dateFilterColumn ? getDateFilterColumnStats(rule.column) : null;
-                        const effectiveOperator = filterOperatorOptions.some((opt) => opt.value === rule.operator) ? rule.operator : "=";
-                        const scalarRuleValue = rule.value && typeof rule.value === "object" ? "" : (rule.value ?? "");
-                        return (
-                          <div key={rule.id} className="space-y-1.5 rounded-lg border border-border/70 p-2">
-                            <div className="flex items-center justify-between gap-2">
-                              <span className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
-                                Filter {idx + 1}
-                              </span>
-                              <button
-                                type="button"
-                                className="inline-flex h-2 w-2 items-center justify-center rounded-full bg-red-500 hover:bg-red-600"
-                                aria-label={`Remove filter ${idx + 1}`}
-                                onClick={() => removeChartLineFilter(rule.id)}
-                              >
-                              </button>
-                            </div>
-                            <Select value={resolveRuleSeriesValue(rule.seriesKey)} onValueChange={(v) => updateChartLineFilter(rule.id, { seriesKey: v })}>
-                              <SelectTrigger className="h-8 min-w-0 text-xs">
-                                <SelectValue placeholder="Apply to line" />
-                              </SelectTrigger>
-                              <SelectContent className="text-xs">
-                                {chartLineOptions.map((opt) => (
-                                  <SelectItem key={opt.value} value={opt.value} className="text-xs">
-                                    {opt.label}
-                                  </SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
-                            <Select
-                              value={rule.column || ""}
-                              onValueChange={(v) =>
-                                updateChartLineFilter(rule.id, {
-                                  column: v,
-                                  ...(isDateLikeFilterColumn(v)
-                                    ? { operator: "date_range", value: { from: undefined, to: undefined } }
-                                    : { operator: "=", value: "" }),
-                                })
-                              }
-                            >
-                              <SelectTrigger className="h-8 min-w-0 text-xs">
-                                <SelectValue placeholder="Column" />
-                              </SelectTrigger>
-                              <SelectContent className="text-xs">
-                                <GroupedColumnSelectItems
-                                  groups={lineSheetColumnGroups}
-                                  allowedValues={xOptions}
-                                />
-                              </SelectContent>
-                            </Select>
-                            {dateFilterColumn ? (
-                              <Popover>
-                                <PopoverTrigger asChild>
-                                  <Button
-                                    type="button"
-                                    variant="outline"
-                                    className="h-8 w-full justify-start px-3 text-left text-xs font-normal"
-                                  >
-                                    <CalendarIcon className="mr-2 h-3.5 w-3.5 shrink-0" />
-                                    <span className={selectedDateRange.from || selectedDateRange.to ? "truncate" : "truncate text-muted-foreground"}>
-                                      {formatDateRangeLabel(selectedDateRange)}
-                                    </span>
-                                  </Button>
-                                </PopoverTrigger>
-                                <PopoverContent className="w-auto p-0" align="start">
-                                  <Calendar
-                                    mode="range"
-                                    selected={selectedDateRange}
-                                    onSelect={(range) =>
-                                      updateChartLineFilter(rule.id, {
-                                        operator: "date_range",
-                                        value: {
-                                          from: range?.from ? range.from.toISOString() : undefined,
-                                          to: range?.to ? range.to.toISOString() : undefined,
-                                        },
-                                      })
-                                    }
-                                    numberOfMonths={1}
-                                    defaultMonth={selectedDateRange.from || selectedDateRange.to || dateColumnStats?.min}
-                                    fromDate={dateColumnStats?.min}
-                                    toDate={dateColumnStats?.max}
-                                    disabled={(date) =>
-                                      (dateColumnStats?.min && date < dateColumnStats.min) ||
-                                      (dateColumnStats?.max && date > dateColumnStats.max)
-                                    }
-                                  />
-                                </PopoverContent>
-                              </Popover>
-                            ) : (
-                              <div className="grid grid-cols-[minmax(0,0.8fr)_minmax(0,1.2fr)] gap-1.5">
-                                <Select
-                                  value={effectiveOperator}
-                                  onValueChange={(v) => updateChartLineFilter(rule.id, { operator: v })}
-                                >
-                                  <SelectTrigger className="h-8 min-w-0 text-xs">
-                                    <SelectValue placeholder="Operator" />
-                                  </SelectTrigger>
-                                  <SelectContent className="text-xs">
-                                    {filterOperatorOptions.map((opt) => (
-                                      <SelectItem key={opt.value} value={opt.value} className="text-xs">
-                                        {opt.label}
-                                      </SelectItem>
-                                    ))}
-                                  </SelectContent>
-                                </Select>
-                                <Input
-                                  value={scalarRuleValue}
-                                  onChange={(e) => updateChartLineFilter(rule.id, { value: e.target.value })}
-                                  placeholder={operatorNeedsValue ? "Value" : "No value needed"}
-                                  className="h-8 text-xs"
-                                  disabled={!operatorNeedsValue}
-                                />
-                              </div>
-                            )}
-                          </div>
-                        );
-                      })}
-                    </div>
-                  ) : (
-                    <p className="rounded-lg border border-dashed border-border/70 px-3 py-2 text-xs text-muted-foreground">
-                      No chart filters yet.
-                    </p>
-                  )}
-                  <div className="flex flex-wrap gap-1.5">
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      className="h-8 text-xs"
-                      onClick={() => addChartLineFilter()}
-                    >
-                      + Add filter
-                    </Button>
-                    {chartLineOptions.length > 1
-                      ? chartLineOptions.map((opt, lineIdx) => (
-                          <Button
-                            key={opt.value}
-                            type="button"
-                            variant="ghost"
-                            size="sm"
-                            className="h-8 text-xs text-muted-foreground"
-                            onClick={() => addChartLineFilter(opt.value)}
-                          >
-                            + Line {lineIdx + 1}
-                          </Button>
-                        ))
-                      : null}
-                  </div>
-                </div>
-              )}
+              {selChartType !== "scatter" ? chartLineFilterControls : null}
                   <div className="mt-4 flex flex-wrap items-center gap-2 border-t border-border/60 pt-3">
                     {selChartType === "area" && (
                       <Toggle area-label="Toggle Expand" pressed={expanded} onPressedChange={handleToggleChange}>
