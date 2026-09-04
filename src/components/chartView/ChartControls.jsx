@@ -106,7 +106,7 @@ function AxisScaleSettingsMenu({ value, onValueChange, ariaLabel = "Axis setting
           type="button"
           variant="outline"
           size="icon"
-          className="h-7 w-7 shrink-0 rounded-md"
+          className="h-8 w-8 shrink-0 rounded-md"
           aria-label={ariaLabel}
         >
           <Settings2 className="h-3.5 w-3.5" />
@@ -145,10 +145,20 @@ function AxisScaleSettingsMenu({ value, onValueChange, ariaLabel = "Axis setting
   );
 }
 
-function AxisFieldLabel({ children, scaleValue, onScaleChange, scaleAriaLabel }) {
+/** Faint label sitting tight above the axis column select. */
+function AxisFieldLabel({ children }) {
   return (
-    <div className="flex min-w-0 items-center justify-between gap-2">
-      <FieldLabel className="text-xs">{children}</FieldLabel>
+    <FieldLabel className="mb-0 text-[11px] font-normal leading-none text-muted-foreground/70">
+      {children}
+    </FieldLabel>
+  );
+}
+
+/** Column select(s) + gear on one row. */
+function AxisSelectRow({ scaleValue, onScaleChange, scaleAriaLabel, children }) {
+  return (
+    <div className="flex w-full min-w-0 items-center gap-1.5">
+      <div className="min-w-0 flex-1">{children}</div>
       <AxisScaleSettingsMenu
         value={scaleValue}
         onValueChange={onScaleChange}
@@ -1951,28 +1961,28 @@ export default function ChartControls() {
                     </>
                   ) : (
                     <>
-                      <Field>
-                        <AxisFieldLabel
+                      <Field className="gap-1.5">
+                        <AxisFieldLabel>X axis</AxisFieldLabel>
+                        <AxisSelectRow
                           scaleValue={scaleX}
                           onScaleChange={setScaleX}
                           scaleAriaLabel="X axis settings"
                         >
-                          X axis
-                        </AxisFieldLabel>
-                        <Select value={xAxisSelectValue} onValueChange={handleXAxisChange}>
-                          <SelectTrigger className="h-8 min-w-0 text-xs">
-                            <SelectValue placeholder="X axis" className="text-xs" />
-                          </SelectTrigger>
-                          <SelectContent className="text-xs">
-                            <SelectItem value={CHART_X_AXIS_NONE} className="text-xs">
-                              — Select X axis —
-                            </SelectItem>
-                            <GroupedColumnSelectItems
-                              groups={lineSheetColumnGroups}
-                              allowedValues={xOptions}
-                            />
-                          </SelectContent>
-                        </Select>
+                          <Select value={xAxisSelectValue} onValueChange={handleXAxisChange}>
+                            <SelectTrigger className="h-8 min-w-0 w-full text-xs">
+                              <SelectValue placeholder="X axis" className="text-xs" />
+                            </SelectTrigger>
+                            <SelectContent className="text-xs">
+                              <SelectItem value={CHART_X_AXIS_NONE} className="text-xs">
+                                — Select X axis —
+                              </SelectItem>
+                              <GroupedColumnSelectItems
+                                groups={lineSheetColumnGroups}
+                                allowedValues={xOptions}
+                              />
+                            </SelectContent>
+                          </Select>
+                        </AxisSelectRow>
                       </Field>
                       {barXAxisSpacingConfigurable ? (
                         <Field>
@@ -2002,47 +2012,93 @@ export default function ChartControls() {
                           </ToggleGroup>
                         </Field>
                       ) : null}
-                      <Field>
-                        <AxisFieldLabel
-                          scaleValue={scaleY}
-                          onScaleChange={setScaleY}
-                          scaleAriaLabel="Y axis settings"
-                        >
-                          Y axis
-                        </AxisFieldLabel>
-                        {selY.length > 0 &&
-                          selY.map((yValue, index) => (
-                            <div className="flex min-w-0 place-items-center gap-2" key={index}>
-                              <Select value={yValue} onValueChange={(val) => handleSelectY(val, index)}>
-                                <SelectTrigger className="h-8 min-w-0 flex-1 text-xs">
-                                <SelectValue className="text-xs">{formatColumnLabel(yValue)}</SelectValue>
-                                </SelectTrigger>
-                                <SelectContent className="text-xs">
-                                  <GroupedColumnSelectItems
-                                    groups={lineSheetColumnGroups}
-                                    allowedValues={availableYOptions}
-                                  />
-                                </SelectContent>
-                              </Select>
-                              {!(selY.length === 1) && (
-                                <div className="cursor-pointer p-1 text-red-400 hover:text-red-700">
-                                  <MinusCircle className="h-4 w-4" onClick={() => removeY(yValue, index)} />
+                      <Field className="gap-1.5">
+                        <AxisFieldLabel>Y axis</AxisFieldLabel>
+                        {selY.length > 0 ? (
+                          <>
+                            <AxisSelectRow
+                              scaleValue={scaleY}
+                              onScaleChange={setScaleY}
+                              scaleAriaLabel="Y axis settings"
+                            >
+                              <div className="flex min-w-0 items-center gap-2">
+                                <Select
+                                  value={selY[0]}
+                                  onValueChange={(val) => handleSelectY(val, 0)}
+                                >
+                                  <SelectTrigger className="h-8 min-w-0 flex-1 text-xs">
+                                    <SelectValue className="text-xs">
+                                      {formatColumnLabel(selY[0])}
+                                    </SelectValue>
+                                  </SelectTrigger>
+                                  <SelectContent className="text-xs">
+                                    <GroupedColumnSelectItems
+                                      groups={lineSheetColumnGroups}
+                                      allowedValues={availableYOptions}
+                                    />
+                                  </SelectContent>
+                                </Select>
+                                {selY.length > 1 ? (
+                                  <div className="cursor-pointer p-1 text-red-400 hover:text-red-700">
+                                    <MinusCircle
+                                      className="h-4 w-4"
+                                      onClick={() => removeY(selY[0], 0)}
+                                    />
+                                  </div>
+                                ) : null}
+                              </div>
+                            </AxisSelectRow>
+                            {selY.slice(1).map((yValue, sliceIndex) => {
+                              const index = sliceIndex + 1;
+                              return (
+                                <div
+                                  className="flex min-w-0 place-items-center gap-2"
+                                  key={`${yValue}-${index}`}
+                                >
+                                  <Select
+                                    value={yValue}
+                                    onValueChange={(val) => handleSelectY(val, index)}
+                                  >
+                                    <SelectTrigger className="h-8 min-w-0 flex-1 text-xs">
+                                      <SelectValue className="text-xs">
+                                        {formatColumnLabel(yValue)}
+                                      </SelectValue>
+                                    </SelectTrigger>
+                                    <SelectContent className="text-xs">
+                                      <GroupedColumnSelectItems
+                                        groups={lineSheetColumnGroups}
+                                        allowedValues={availableYOptions}
+                                      />
+                                    </SelectContent>
+                                  </Select>
+                                  <div className="cursor-pointer p-1 text-red-400 hover:text-red-700">
+                                    <MinusCircle
+                                      className="h-4 w-4"
+                                      onClick={() => removeY(yValue, index)}
+                                    />
+                                  </div>
                                 </div>
-                              )}
-                            </div>
-                          ))}
-                        {selY.length === 0 && (
-                          <Select onValueChange={(val) => handleSelectY(val)}>
-                            <SelectTrigger className="h-8 min-w-0 text-xs">
-                              <SelectValue placeholder="Y axis" className="text-xs" />
-                            </SelectTrigger>
-                            <SelectContent className="text-xs">
-                              <GroupedColumnSelectItems
-                                groups={lineSheetColumnGroups}
-                                allowedValues={availableYOptions}
-                              />
-                            </SelectContent>
-                          </Select>
+                              );
+                            })}
+                          </>
+                        ) : (
+                          <AxisSelectRow
+                            scaleValue={scaleY}
+                            onScaleChange={setScaleY}
+                            scaleAriaLabel="Y axis settings"
+                          >
+                            <Select onValueChange={(val) => handleSelectY(val)}>
+                              <SelectTrigger className="h-8 min-w-0 w-full text-xs">
+                                <SelectValue placeholder="Y axis" className="text-xs" />
+                              </SelectTrigger>
+                              <SelectContent className="text-xs">
+                                <GroupedColumnSelectItems
+                                  groups={lineSheetColumnGroups}
+                                  allowedValues={availableYOptions}
+                                />
+                              </SelectContent>
+                            </Select>
+                          </AxisSelectRow>
                         )}
                       </Field>
                       {selChartType === "bar" && selY.length > 0 && (
