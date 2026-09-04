@@ -12,7 +12,7 @@ import { ProductsNavDropdown } from "@/components/nav/products-nav-dropdown";
 import { DemoScrollLink } from "@/components/sections/demo-scroll-link";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { siteConfig } from "@/lib/config";
-import { getNavLinksForPathname, isAbsoluteHomeHashHref, navHrefIsInPageScrollSpy, navHrefToSectionId } from "@/lib/nav-hrefs";
+import { getNavLinksForPathname, isAbsoluteHomeHashHref, navHrefIsInPageScrollSpy, navHrefToSectionId, normalizeMarketingPathname } from "@/lib/nav-hrefs";
 import type { ProductsNavData } from "@/lib/nav/products-nav";
 import { cn } from "@/lib/utils";
 import { useUser } from "@/lib/hooks";
@@ -290,8 +290,8 @@ export function Navbar({ productsNav }: { productsNav: ProductsNavData }) {
                         <a
                           href={item.href}
                           onClick={(e) => {
-                            e.preventDefault();
                             if (isAbsoluteHomeHashHref(item.href)) {
+                              e.preventDefault();
                               const hash = item.href.slice(2);
                               if (pathname === "/") {
                                 const element = document.getElementById(hash);
@@ -309,16 +309,23 @@ export function Navbar({ productsNav }: { productsNav: ProductsNavData }) {
                               setIsDrawerOpen(false);
                               return;
                             }
-                            const id = navHrefToSectionId(item.href);
-                            const element = id ? document.getElementById(id) : null;
-                            element?.scrollIntoView({ behavior: "smooth" });
+                            if (item.href.startsWith("#") && item.href.length > 1) {
+                              e.preventDefault();
+                              const id = item.href.slice(1);
+                              document.getElementById(id)?.scrollIntoView({ behavior: "smooth" });
+                              setIsDrawerOpen(false);
+                              return;
+                            }
+                            // Absolute routes (e.g. /changelog) — navigate normally.
                             setIsDrawerOpen(false);
                           }}
                           className={cn(
                             "underline-offset-4 hover:text-primary/80 transition-colors",
-                            activeSection &&
-                              activeSection === navHrefToSectionId(item.href) &&
-                              navHrefIsInPageScrollSpy(item.href, pathname)
+                            (normalizeMarketingPathname(pathname) ===
+                              normalizeMarketingPathname(item.href) ||
+                              (activeSection &&
+                                activeSection === navHrefToSectionId(item.href) &&
+                                navHrefIsInPageScrollSpy(item.href, pathname)))
                               ? "text-primary font-medium"
                               : "text-primary/60",
                           )}

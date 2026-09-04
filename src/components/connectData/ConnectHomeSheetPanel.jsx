@@ -180,6 +180,7 @@ export function ConnectHomeSheetPanel({ className }) {
   const [pasteText, setPasteText] = useState("");
   const [pendingRows, setPendingRows] = useState(null);
   const [columnDiff, setColumnDiff] = useState(null);
+  const [newSheetNameDraft, setNewSheetNameDraft] = useState("");
   const fileInputRef = useRef(null);
 
   const existingCols = useMemo(
@@ -210,6 +211,8 @@ export function ConnectHomeSheetPanel({ className }) {
   const colCount = existingCols.length;
   const rowCount = rows.length;
 
+  const suggestedNewSheetName = useMemo(() => nextNewSheetLabel(dataSheets), [dataSheets]);
+
   const resetImportModal = useCallback(() => {
     setImportFormat(null);
     setImportStep("disposition");
@@ -217,6 +220,7 @@ export function ConnectHomeSheetPanel({ className }) {
     setPasteText("");
     setPendingRows(null);
     setColumnDiff(null);
+    setNewSheetNameDraft("");
   }, [hasSheetData]);
 
   const openImport = useCallback(
@@ -227,9 +231,17 @@ export function ConnectHomeSheetPanel({ className }) {
       setPasteText("");
       setPendingRows(null);
       setColumnDiff(null);
+      setNewSheetNameDraft(nextNewSheetLabel(dataSheets));
     },
-    [hasSheetData],
+    [dataSheets, hasSheetData],
   );
+
+  const goToImportInput = useCallback(() => {
+    if (disposition === "new_sheet" && !String(newSheetNameDraft || "").trim()) {
+      setNewSheetNameDraft(suggestedNewSheetName);
+    }
+    setImportStep("input");
+  }, [disposition, newSheetNameDraft, suggestedNewSheetName]);
 
   const commitName = useCallback(() => {
     const next = String(nameDraft || "").trim();
@@ -280,7 +292,8 @@ export function ConnectHomeSheetPanel({ className }) {
       }
 
       if (disposition === "new_sheet") {
-        const name = nextNewSheetLabel(dataSheets);
+        const name =
+          String(newSheetNameDraft || "").trim() || nextNewSheetLabel(dataSheets);
         addNewSheetAndActivate?.(
           () => {
             setConnectHomeCenterView?.("sheet");
@@ -350,6 +363,7 @@ export function ConnectHomeSheetPanel({ className }) {
       connectedData,
       dataSheets,
       disposition,
+      newSheetNameDraft,
       resetImportModal,
       rows,
       setConnectHomeAnalyzeActive,
@@ -805,7 +819,7 @@ export function ConnectHomeSheetPanel({ className }) {
                 {
                   id: "new_sheet",
                   label: "Add new sheet",
-                  desc: `Create ${nextNewSheetLabel(dataSheets)} with the imported rows.`,
+                  desc: `Create ${String(newSheetNameDraft || "").trim() || suggestedNewSheetName} with the imported rows.`,
                 },
               ].map((opt) => {
                 const selected = disposition === opt.id;
@@ -813,7 +827,12 @@ export function ConnectHomeSheetPanel({ className }) {
                   <button
                     key={opt.id}
                     type="button"
-                    onClick={() => setDisposition(/** @type {ImportDisposition} */ (opt.id))}
+                    onClick={() => {
+                      setDisposition(/** @type {ImportDisposition} */ (opt.id));
+                      if (opt.id === "new_sheet" && !String(newSheetNameDraft || "").trim()) {
+                        setNewSheetNameDraft(suggestedNewSheetName);
+                      }
+                    }}
                     aria-pressed={selected}
                     className={cn(
                       "flex w-full items-start gap-2.5 rounded-md border px-2.5 py-2 text-left transition-colors",
@@ -845,7 +864,7 @@ export function ConnectHomeSheetPanel({ className }) {
                 <Button type="button" variant="outline" size="sm" onClick={resetImportModal}>
                   Cancel
                 </Button>
-                <Button type="button" size="sm" onClick={() => setImportStep("input")}>
+                <Button type="button" size="sm" onClick={goToImportInput}>
                   Next
                 </Button>
               </DialogFooter>
@@ -854,6 +873,25 @@ export function ConnectHomeSheetPanel({ className }) {
 
           {importStep === "input" && formatMeta ? (
             <div className="grid min-h-0 gap-2 py-1">
+              {disposition === "new_sheet" ? (
+                <div className="grid gap-1">
+                  <Label htmlFor="sheet-import-new-name" className={PROP_LABEL}>
+                    Sheet name
+                  </Label>
+                  <Input
+                    id="sheet-import-new-name"
+                    value={newSheetNameDraft}
+                    onChange={(e) => setNewSheetNameDraft(e.target.value)}
+                    placeholder={suggestedNewSheetName}
+                    maxLength={80}
+                    className="h-8 text-xs"
+                    autoComplete="off"
+                  />
+                  <p className={MUTED}>
+                    New sheet destination — name it before applying the import.
+                  </p>
+                </div>
+              ) : null}
               {formatMeta.acceptsPaste ? (
                 <div className="grid gap-1">
                   <Label htmlFor="sheet-import-paste" className={PROP_LABEL}>

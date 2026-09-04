@@ -8,6 +8,7 @@ import { cn } from "@/lib/utils";
 import type { ContentItem } from "@/lib/content/types";
 import type { LandingDashboardCard } from "@/lib/landing/publishedDashboards";
 import { LandingDashboardCardItem } from "@/components/sections/landing-dashboard-card";
+import { isFeatureReleaseContent } from "@/lib/content/featureReleases";
 
 function formatDate(dateStr: string | undefined) {
   if (!dateStr) return "";
@@ -77,27 +78,12 @@ export default function GuidesSection({
   }, [articles, searchQuery]);
 
   const featureReleases = useMemo(
-    () =>
-      filteredArticles.filter((item) => {
-        const section = (item.frontmatter?.section || "").toLowerCase();
-        const topics = Array.isArray(item.frontmatter?.topics)
-          ? item.frontmatter.topics.map((t) => String(t).toLowerCase())
-          : [];
-        return (
-          section === "feature-releases" ||
-          topics.includes("feature-release") ||
-          topics.includes("product-update")
-        );
-      }),
+    () => filteredArticles.filter(isFeatureReleaseContent),
     [filteredArticles],
   );
 
   const standardArticles = useMemo(
-    () =>
-      filteredArticles.filter((item) => {
-        const section = (item.frontmatter?.section || "").toLowerCase();
-        return section !== "feature-releases";
-      }),
+    () => filteredArticles.filter((item) => !isFeatureReleaseContent(item)),
     [filteredArticles],
   );
 

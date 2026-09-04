@@ -824,8 +824,6 @@ export default function ChartControls() {
     handleToggleStack,
     barSeriesColumn,
     setBarSeriesColumn,
-    barXAxisMode,
-    setBarXAxisMode,
     rainbowBar,
     setRainbowBar,
     setRainbowBarShuffleNonce,
@@ -948,13 +946,6 @@ export default function ChartControls() {
   const yAxisMenuValueType = axisMenuValueType(
     selY?.[0] ? getAxisType(selY[0], dataTypes, chartData) : "number",
   );
-  const barXAxisType = selX ? getAxisType(selX, dataTypes, chartData) : "string";
-  const barXAxisIsDate =
-    selChartType === "bar" &&
-    !!selX &&
-    (barXAxisType === "date" || lineIsTemporalX);
-  const barXAxisIsNumeric = selChartType === "bar" && !!selX && barXAxisType === "number";
-  const barXAxisSpacingConfigurable = barXAxisIsDate || barXAxisIsNumeric;
 
   const barBreakdownSeriesKeys = useMemo(() => {
     if (selChartType !== "bar" || !barSeriesColumn || !selX || !selY?.[0]) return [];
@@ -2498,34 +2489,6 @@ export default function ChartControls() {
                           </Select>
                         </AxisSelectRow>
                       </Field>
-                      {barXAxisSpacingConfigurable ? (
-                        <Field>
-                          <FieldLabel className="text-xs">X-axis spacing</FieldLabel>
-                          <FieldDescription className="text-xs">
-                            {barXAxisIsDate
-                              ? "Date mode spaces bars by calendar time. Categorical mode places each date at equal intervals."
-                              : "Numeric mode spaces bars by their X value. Categorical mode places each bar at equal intervals."}
-                          </FieldDescription>
-                          <ToggleGroup
-                            type="single"
-                            variant="outline"
-                            size="sm"
-                            className="flex w-full min-w-0 justify-stretch [&>button]:min-w-0 [&>button]:flex-1"
-                            value={barXAxisMode}
-                            onValueChange={(v) => {
-                              if (v === "date" || v === "categorical") setBarXAxisMode(v);
-                            }}
-                            aria-label="Bar chart X-axis scaled or categorical spacing"
-                          >
-                            <ToggleGroupItem value="date" className="text-xs">
-                              {barXAxisIsDate ? "Date" : "Numeric"}
-                            </ToggleGroupItem>
-                            <ToggleGroupItem value="categorical" className="text-xs">
-                              Categorical
-                            </ToggleGroupItem>
-                          </ToggleGroup>
-                        </Field>
-                      ) : null}
                       <Field className="gap-1.5">
                         <AxisFieldLabel>Y axis</AxisFieldLabel>
                         {selY.length > 0 ? (

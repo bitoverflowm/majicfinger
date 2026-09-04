@@ -1,7 +1,7 @@
 ---
 title: "Why Random Sampling Matters in Data Analysis: A Polymarket Case Study"
-description: "Learn how random sampling works, why sample size matters, and what 15 samples from 383,707 Polymarket markets reveal about representative results."
-publishedAt: "2026-08-30"
+description: "Learn how random sampling, sample size, and representative samples work through 15 seeded samples of 383,707 historical Polymarket markets."
+publishedAt: "2026-09-04"
 author: "misterrpink"
 topics: ["polymarket", "prediction markets", "statistics", "random sampling", "data analysis", "market data"]
 integration: ["Polymarket"]
@@ -9,23 +9,22 @@ coverImage: "/images/guides/random-sampling-data-analysis/main.png"
 ogImage: "https://lycheedata.com/images/guides/random-sampling-data-analysis/main.png"
 featured: true
 slug: "/random-sampling-data-analysis"
-readingTime: "22 min"
-keywords: [
-  "random sampling",
-  "simple random sampling",
-  "random sampling example",
-  "random sampling in data analysis",
-  "why random sampling is important",
-  "representative sample",
-  "random sample vs representative sample",
-  "sampling without replacement",
-  "sample size",
-  "sampling error",
-  "Polymarket data",
-  "Polymarket historical data",
-  "prediction market research",
-  "random sampling tool"
-]
+readingTime: "18 min"
+keywords:
+  - "random sampling"
+  - "simple random sampling"
+  - "random sampling example"
+  - "random sampling in data analysis"
+  - "why random sampling is important"
+  - "representative sample"
+  - "random sample vs representative sample"
+  - "sampling without replacement"
+  - "sample size"
+  - "sampling error"
+  - "Polymarket data"
+  - "Polymarket historical data"
+  - "prediction market research"
+  - "random sampling tool"
 canonical: "https://lycheedata.com/guides/random-sampling-data-analysis"
 seoTitle: "Random Sampling Explained: A Polymarket Data Case Study"
 twitterCard: "summary_large_image"
@@ -33,466 +32,354 @@ twitterCard: "summary_large_image"
 
 # Why Random Sampling Matters in Data Analysis: A Polymarket Case Study
 
-We drew five random samples from the same Polymarket dataset at three different sizes: 100 markets, 1,000 markets, and 10,000 markets.
+One $216.46 million prediction market changed the apparent average of a 1,000-market random sample by more than the entire population mean.
 
-The results did not settle into a neat progression.
+The sample was not broken. It was doing exactly what a valid random sample can do when the population is dominated by a few extreme observations.
 
-One sample of 100 markets estimated average volume at $175,256.77. Another sample of exactly the same size estimated it at only $17,819.53—nearly ten times lower. Both samples were selected correctly. Both came from the same population. And neither result was a software error.
+To see how sample size changes what researchers observe, we used Lychee to draw 15 reproducible random samples from 383,707 closed markets in the [Polymarket Historical archive](/polymarket-historical-data). We drew five samples each at 100, 1,000, and 10,000 markets, then compared every sample mean with the known population mean.
 
-The disagreement revealed something more useful: **a random sample can be valid without looking representative, especially when a small number of extreme observations dominate the population.**
-
-Random sampling is a probability-based method for selecting a subset of observations from a larger dataset. When it is designed correctly, it gives every eligible observation an equal chance of selection. That makes large datasets easier to explore and helps prevent researchers from choosing only the rows that support the conclusion they expect.
-
-But randomness does not make uncertainty disappear. Sample size, population shape, rare observations, and the statistic being estimated all affect what a particular sample will show.
-
-To demonstrate this with real data, we used Lychee to repeatedly sample 383,707 closed markets from the [Polymarket Historical archive](/polymarket-historical-data). The experiment produced a practical lesson in random sampling, representative samples, sample size, the mean, the median, and the statistical power of a few enormous prediction markets.
+The experiment became more than a demonstration of a new research tool. It showed why random sampling matters, why a random sample is not automatically representative, and why the shape of a dataset can matter as much as the number of rows in it.
 
 ## The short version
 
-- Simple random sampling gave every eligible Polymarket market the same chance of being included.
-- Larger samples generally produced more stable estimates, but an individual larger sample was not guaranteed to be closer to the population value.
-- Polymarket market volume was highly right-skewed: 1.38% of markets generated 70.15% of total volume.
-- The sample median stabilized faster than the sample mean because a few exceptionally large markets strongly affected the mean.
-- A random sample describes **how observations were selected**. A representative sample describes **how well the resulting sample reflects relevant characteristics of the population**.
+- Every eligible market had the same chance of selection, and sampling was performed without replacement.
 
-<PublicChart username="misterrpink" slug="polymarket-random-sampling-average-error-by-sample-size" />
+- Each draw used a fixed seed, so the same sample can be reproduced.
 
-*Across five independent draws at each size, average absolute mean error fell from 56.40% to 34.27% to 15.08% as the sample grew.*
+- Typical error declined with sample size: median absolute mean error fell from 39.91% at 100 markets to 32.44% at 1,000 and 18.86% at 10,000.
+
+- The path was not smooth. One 1,000-market sample overestimated average volume by 252.93% after capturing a rare, exceptionally high-volume market.
+
+- The population was extremely right-skewed. Just 1.38% of markets generated 70.15% of all historical volume.
+
+- Random describes the selection process. Representative describes how well the selected sample reflects the population for a particular question.
+
+<PublicChart username="misterrpink" slug="polymarket-random-sampling-median-absolute-error-by-sample-size" />
+
+*Median absolute error across five seeded samples at each size. The statistic summarizes the typical run without allowing the single 252.93% miss to dominate the comparison.*
 
 ## What is random sampling?
 
-**Random sampling is a selection method in which observations are chosen from a defined population using a random process.** In a simple random sample, every eligible observation has the same probability of selection, and every possible sample of a fixed size has the same probability of being drawn.
+**Random sampling is a method for selecting observations from a defined population using a random process.** In a simple random sample, every eligible observation has the same probability of being selected, and every possible fixed-size sample has the same chance of being drawn.
 
-That final condition matters. “We grabbed some rows that looked random” is not the same as a simple random sample.
+Suppose a dataset contains N eligible rows and a researcher selects n distinct rows. Under simple random sampling without replacement, the inclusion probability for any individual row is:
 
-Suppose a dataset contains `N` eligible rows and we select `n` of them using simple random sampling without replacement. The inclusion probability for any individual row is:
+**P(row is included) = n / N**
 
-`P(row is included) = n / N`
+In this experiment, N was 383,707:
 
-For our production experiment:
+| Sample size | Share of population | Inclusion probability for each market |
+|---:|---:|---:|
+| 100 | 0.0261% | 0.0261% |
+| 1,000 | 0.2606% | 0.2606% |
+| 10,000 | 2.6062% | 2.6062% |
 
-- The population contained 383,707 eligible closed markets.
-- A sample of 100 gave each market a 0.0261% chance of inclusion.
-- A sample of 1,000 gave each market a 0.2606% chance.
-- A sample of 10,000 gave each market a 2.6062% chance.
+The samples were drawn **without replacement**, meaning a market could appear only once inside a given sample. This is the common design for selecting distinct rows from a dataset. [Statistics Canada explains](https://www150.statcan.gc.ca/n1/edu/power-pouvoir/ch13/prob/5214899-eng.htm) the distinction between simple random sampling with and without replacement, as well as other probability-sampling designs.
 
-Lychee selects these samples **without replacement**, so the same market cannot appear twice inside one sample. Because a selected row is removed from the remaining pool, the sequential draws are dependent. Equal inclusion probability does not mean that each draw is independent of the draws before it.
+### Why use a seed?
 
-This definition matches standard survey-sampling treatments. [Penn State defines simple random sampling without replacement](https://online.stat.psu.edu/stat506/Lesson01.html) as a design in which every possible sample of `n` units has the same probability of selection. [Statistics Canada](https://www150.statcan.gc.ca/n1/edu/power-pouvoir/ch13/prob/5214899-eng.htm) likewise distinguishes simple random sampling with replacement from the more common without-replacement design.
+A random seed makes a draw reproducible. The seed initializes the random selection process, so the same eligible population, sample size, and seed return the same rows.
 
-### Simple random sampling with vs. without replacement
+That matters for analysis because a reader, collaborator, or future version of you can inspect the exact sample behind a result. Reproducibility does not make the sample more accurate; it makes the evidence auditable.
 
-| Method | Can the same row appear more than once? | Probability changes after a draw? | Common use |
-|---|---:|---:|---|
-| With replacement | Yes | No | Resampling methods and some simulations |
-| Without replacement | No | Yes | Selecting distinct records from a finite dataset |
+## Random sampling methods
 
-Lychee's current Random Sample feature uses the second approach. If you request 10,000 rows and at least 10,000 eligible rows exist, you receive 10,000 distinct rows.
+Simple random sampling is only one probability-sampling method. The right design depends on what the research question needs to preserve.
 
-## Why is random sampling important in data analysis?
-
-Large datasets create a tempting mistake: treating more data as automatically better research.
-
-A complete population is ideal when the goal is to calculate an exact total. But many analytical tasks do not begin with an exact total. They begin with exploration:
-
-- What kinds of records exist?
-- Is the schema usable?
-- Does a proposed calculation behave correctly?
-- What does a typical observation look like?
-- Which hypotheses deserve a full analysis?
-- Can a researcher manually inspect a manageable subset?
-
-Random sampling makes those questions cheaper to investigate while giving every eligible row a known route into the analysis.
-
-It is particularly useful for:
-
-1. **Exploring a large dataset.** A sample lets researchers inspect the structure and range of the data before running an expensive or time-consuming full-population analysis.
-2. **Reducing selection bias.** Choosing the first 1,000 rows, the most popular markets, or the records that look interesting introduces a systematic selection rule. Random selection avoids those particular forms of researcher choice.
-3. **Testing an analytical workflow.** Filters, joins, groupings, calculations, and charts can be validated on a smaller subset before scaling up.
-4. **Estimating population characteristics.** Sample statistics such as a mean or proportion can estimate the corresponding population parameter, provided the sample design and uncertainty are handled correctly.
-5. **Creating review or annotation sets.** Researchers can build a manageable collection of records for manual coding, categorization, quality review, or model evaluation.
-
-Random sampling does not eliminate every form of bias. A sample can only represent its **eligible population**. If relevant rows are missing from the dataset, excluded by a filter, or measured incorrectly, random selection cannot repair those upstream problems.
-
-## The main random sampling methods
-
-“Random sampling” is a family of probability-sampling designs, not one universal procedure.
-
-| Sampling method | How it works | When it is useful |
+| Method | How it works | When it is useful |
 |---|---|---|
-| **Simple random sampling** | Selects units directly with equal probability | General exploration and population estimates |
-| **Stratified random sampling** | Divides the population into defined groups, then samples within every group | Ensuring important categories or rare groups are represented |
-| **Systematic sampling** | Selects units at a regular interval after a random starting point | Ordered frames without problematic periodic patterns |
-| **Cluster sampling** | Randomly selects groups, then studies units within the selected groups | Populations naturally organized into geographic or operational clusters |
-| **Unequal-probability sampling** | Assigns different inclusion probabilities to different units | Designs where size, rarity, or analytical importance should affect selection |
+| Simple random sampling | Selects rows with equal probability | General exploration and population estimates |
+| Stratified sampling | Divides the population into groups, then samples within each group | Ensuring important subgroups are represented |
+| Cluster sampling | Randomly selects groups, then studies rows inside those groups | Populations naturally organized into costly-to-reach groups |
+| Systematic sampling | Selects every kth row after a random start | Efficient selection from an ordered frame without harmful periodicity |
+| Weighted sampling | Gives some rows different selection probabilities | Oversampling rare or strategically important observations |
 
-Lychee's first implementation is **simple random sampling without replacement**. It does not currently perform stratified, cluster, seeded, or weighted sampling.
+Stratified sampling would have guaranteed that our samples contained markets from each volume band. That would be valuable for comparing small and large markets, but it would answer a different question from an unrestricted simple random sample. If strata were sampled at different rates, population estimates would also need appropriate weights.
 
-That distinction becomes important in prediction-market research. If you need every category, year, platform, liquidity tier, or volume band represented, simple random sampling may not be the best final design. [Stratified sampling can reduce estimation error](https://online.stat.psu.edu/stat506/Lesson06.html) when the strata are chosen well, and it prevents rare but important groups from disappearing merely by chance.
+## Why random sampling matters in data analysis
 
-## A random sampling example using Polymarket data
+Random sampling is useful for three main reasons.
 
-We designed a simple experiment using the [Polymarket Historical dataset in Lychee](/polymarket-historical-data).
+First, it reduces the selection bias introduced when a researcher manually chooses convenient, familiar, or visually interesting rows.
 
-### Research question
+Second, it makes very large datasets easier and faster to explore. A sample can support prototyping, validation, chart design, and early investigation before a full-population query is necessary.
 
-How does sample size affect estimates of typical and average market volume when the underlying prediction-market dataset is highly uneven?
+Third, it creates a probability framework for reasoning about uncertainty. Because the sample is selected by a known process, differences between samples can be understood as sampling variation rather than hidden researcher choice.
 
-### Eligible population
+Random sampling does not repair a poorly defined population, missing records, faulty measurements, or an inappropriate statistic. It also does not guarantee that one particular draw will resemble the population closely.
 
-The production analysis includes:
+That last limitation is the center of this case study.
 
-- Polymarket markets available in Lychee's historical archive when the analysis was run on August 30, 2026;
-- markets where `closed = true`;
-- markets with a non-null volume value;
-- one row per eligible market.
+## The Polymarket random sampling experiment
 
-This creates a finite population of 383,707 closed markets. The exact extraction date and filters are reported so another Lychee user can recreate the eligible population instead of silently sampling from a different frame.
+We used [Lychee's historical Polymarket data](/polymarket-historical-data) because it offers both a large population and an unusually demanding distribution.
 
-### Population statistics
+Historical sampling answers a different question from real-time monitoring. If your goal is to follow active prices rather than study an archive, see the guides to [Polymarket odds over time](/guides/polymarket-odds-over-time) and [Polymarket live prices](/guides/polymarket-live-prices).
 
-| Statistic | Full population |
-|---|---:|
-| Market count | 383,707 |
-| Total volume | $46,511,612,988.41 |
-| Mean market volume | $121,216.48 |
-| Median market volume | $3,196.22 |
-| Standard deviation | $3,619,084.45 |
-| Minimum market volume | $0 |
-| Maximum market volume | $1,531,479,284.50 |
+### Research scope
 
-### Sampling procedure
-
-We then generated:
-
-- five independent samples of 100 markets;
-- five independent samples of 1,000 markets;
-- five independent samples of 10,000 markets.
-
-For every run, we recorded:
-
-- row count;
-- total volume;
-- mean volume;
-- median volume;
-- standard deviation;
-- minimum volume;
-- maximum volume.
-
-Each run was unseeded, so running the same request again produced a new sample. Markets could overlap across separate runs, but no market could appear twice within the same sample.
-
-This is an experiment about repeated random samples, not a claim that these 15 samples exhaust every result that the sampling process could produce.
-
-### Explore the Polymarket historical dataset
-
-Use the same historical workspace to define an eligible population, generate a random sample, and calculate its summary statistics.
+- **Analysis run:** August 30, 2026
+- **Dataset coverage:** Polymarket launch through December 2025
+- **Eligible population:** Closed markets with non-null volume
+- **Unit of analysis:** One market
+- **Sampling design:** Simple random sampling without replacement
+- **Repetitions:** Five fixed-seed draws at each sample size
+- **Sample sizes:** 100, 1,000, and 10,000 markets
+- **Primary estimate:** Mean lifetime market volume
+- **Benchmark:** The mean of the full eligible population
 
 <PolymarketHistoricalDataQuery />
 
-## Before sampling: Polymarket volume is extremely concentrated
+### Full population summary
 
-The most important result appeared before we compared any samples.
+| Statistic | Population value |
+|---|---:|
+| Markets | 383,707 |
+| Total volume | $46,511,612,988.41 |
+| Mean volume | $121,216.48 |
+| Median volume | $3,299.94 |
+| Standard deviation | $3,619,084.45 |
+| Minimum | $0.00 |
+| Maximum | $1,531,479,284.50 |
 
-The mean volume of a closed market was $121,216.48, while the median was only $3,196.22. The mean was therefore 37.9 times the median.
+The mean was 36.7 times the median. The largest market was more than 12,600 times the mean. Those two comparisons immediately warn that volume is not distributed symmetrically.
 
-That gap tells us the distribution is strongly right-skewed. Most closed markets sit far below the average, while a small group of extremely high-volume markets pulls the mean upward.
+The distribution has a long right tail: most markets are relatively small, while a tiny number are enormous. [NIST notes](https://www.itl.nist.gov/div898/handbook/eda/section3/eda35b.htm) that extreme values can distort the mean and standard deviation in skewed distributions. That is exactly what made this population such a useful stress test for random sampling.
 
-The volume bands make the imbalance clearer.
+## Polymarket volume is concentrated in very few markets
 
-| Market volume band | Markets | Share of markets | Total volume | Share of volume |
+Dividing the population into lifetime-volume bands shows how little the typical market resembles the average market.
+
+| Lifetime-volume band | Markets | Market share | Total volume | Volume share |
 |---|---:|---:|---:|---:|
-| Volume = $0 | 70,300 | 18.32% | $0 | 0% |
-| $0 < volume < $10K | 174,437 | 45.46% | $421,822,607.79 | 0.91% |
-| $10K ≤ volume < $100K | 98,815 | 25.75% | $3,499,347,844.43 | 7.52% |
-| $100K ≤ volume < $1M | 34,877 | 9.09% | $9,961,081,700.62 | 21.42% |
-| $1M ≤ volume < $10M | 4,789 | 1.248% | $12,294,737,804.45 | 26.43% |
-| $10M ≤ volume < $100M | 453 | 0.1181% | $12,325,605,424.77 | 26.50% |
-| Volume ≥ $100M | 36 | 0.0094% | $8,009,017,606.35 | 17.22% |
+| $0 | 70,300 | 18.32% | $0.00 | 0.00% |
+| More than $0, under $10K | 174,437 | 45.46% | $421,822,607.79 | 0.91% |
+| $10K to under $100K | 98,815 | 25.75% | $3,499,347,844.43 | 7.52% |
+| $100K to under $1M | 34,877 | 9.09% | $9,961,081,700.62 | 21.42% |
+| $1M to under $10M | 4,789 | 1.248% | $12,294,737,804.45 | 26.43% |
+| $10M to under $100M | 453 | 0.1181% | $12,325,605,424.77 | 26.50% |
+| $100M or more | 36 | 0.0094% | $8,009,017,606.35 | 17.22% |
+
+Two comparisons make the imbalance concrete:
+
+- **244,737 markets**, or 63.78% of the population, recorded less than $10,000 in volume or no volume at all. Together, they generated only 0.91% of total volume.
+
+- **5,278 markets** with at least $1 million in volume represented just 1.38% of the population but generated 70.15% of all volume.
 
 <PublicChart username="misterrpink" slug="polymarket-volume-concentration-by-market-volume-band" />
 
-*Low-volume markets make up most of the population, while a very small number of high-volume markets account for a disproportionate share of historical volume.*
+*The grouped bars compare each volume band's share of markets with its share of total volume. The reversal from the low-volume bands to the high-volume tail is the central structural fact behind the sampling results.*
 
-The production population shows that:
+## The ten highest-volume Polymarket markets
 
-- 63.78% of markets generated only 0.91% of volume while remaining below $10,000.
-- 1.38% of markets generated 70.15% of volume while reaching at least $1 million.
-- Only 36 markets—0.0094% of the population—generated 17.22% of all volume.
+The concentration is visible even at the very top. The ten largest closed markets in the archive generated $4.77 billion, equal to 10.26% of total historical volume.
 
-This is why the average market is not the same as a typical market. A randomly selected market will usually have volume far below the population mean.
+| Rank | Market | Volume | Share of all volume |
+|---:|---|---:|---:|
+| 1 | Will Donald Trump win the 2024 US Presidential Election? | $1,531,479,284.50 | 3.29% |
+| 2 | Will Kamala Harris win the 2024 US Presidential Election? | $1,037,039,118.19 | 2.23% |
+| 3 | Will Donald Trump be inaugurated? | $400,409,526.89 | 0.86% |
+| 4 | Will the Sacramento Kings win the 2025 NBA Finals? | $378,011,506.51 | 0.81% |
+| 5 | Will Nicolae Ciucă win the 2024 Romanian Presidential election? | $326,507,670.56 | 0.70% |
+| 6 | Will Zelenskyy wear a suit before July? | $242,231,180.27 | 0.52% |
+| 7 | Will any other Republican Politician win the 2024 US Presidential Election? | $241,655,099.85 | 0.52% |
+| 8 | Fed decreases interest rates by 50+ bps after January 2026 meeting? | $235,065,166.64 | 0.51% |
+| 9 | Fed increases interest rates by 25+ bps after January 2026 meeting? | $216,455,743.15 | 0.47% |
+| 10 | Kamala Harris wins the popular vote? | $163,779,786.65 | 0.35% |
 
-### The largest markets are statistical whales
-
-The ten highest-volume markets generated $4,772,634,083.21, or 10.26% of all volume, despite representing only 0.0026% of eligible markets. The two largest 2024 U.S. presidential-winner markets alone generated $2.569 billion, or 5.52% of the population's total volume.
-
-| Rank | Closed Polymarket market | Volume |
-|---:|---|---:|
-| 1 | Will Donald Trump win the 2024 US Presidential Election? | $1,531,479,284.50 |
-| 2 | Will Kamala Harris win the 2024 US Presidential Election? | $1,037,039,118.19 |
-| 3 | Will Donald Trump be inaugurated? | $400,409,526.89 |
-| 4 | Will the Sacramento Kings win the 2025 NBA Finals? | $378,011,506.51 |
-| 5 | Will Nicolae Ciucă win the 2024 Romanian Presidential election? | $326,507,670.56 |
-| 6 | Will Zelenskyy wear a suit before July? | $242,231,180.27 |
-| 7 | Will any other Republican Politician win the 2024 US Presidential Election? | $241,655,099.85 |
-| 8 | Fed decreases interest rates by 50+ bps after January 2026 meeting? | $235,065,166.64 |
-| 9 | Fed increases interest rates by 25+ bps after January 2026 meeting? | $216,455,743.15 |
-| 10 | Kamala Harris wins the popular vote? | $163,779,786.65 |
+The two presidential-winner markets alone represented 5.52% of all historical volume and 53.82% of the top ten's volume.
 
 <PublicChart username="misterrpink" slug="polymarket-top-10-markets-by-volume" />
 
-*A handful of political, economic, sports, and cultural markets account for a meaningful share of the population's total volume.*
+*Rectangle area represents each market's share of volume among the ten highest-volume markets. The treemap makes the dominance of the first two markets visible without flattening the rest of the ranking into equal categories.*
 
-If one of these markets enters a small random sample, the sample mean can jump dramatically. If none enters, the same estimator can fall far below the population mean.
+## How sample size changed the estimate
 
-## What happened when sample size increased?
+For each sample, we calculated the sample mean and its signed percentage error relative to the known population mean of $121,216.48:
 
-For every run, we compared the sample mean with the known population mean:
+**Signed mean error (%) = ((sample mean - population mean) / population mean) × 100**
 
-`Percentage error = ((sample mean - population mean) / population mean) × 100`
+A negative value is an underestimate. A positive value is an overestimate. Absolute error ignores direction and measures distance from the benchmark.
 
-### Samples of 100 markets
+### Summary across the five seeded draws
 
-The five sample means ranged from $17,819.53 to $175,256.77. Their percentage errors ranged from -85.30% to +44.58%. Four of the five samples underestimated the population mean, and none came within 25% of it.
+| Sample size | Range of sample means | Average signed error | Average absolute error | Median absolute error |
+|---:|---:|---:|---:|---:|
+| 100 | $36,275.91 to $169,594.79 | -28.31% | 44.28% | 39.91% |
+| 1,000 | $60,144.95 to $427,814.31 | +37.19% | 76.97% | 32.44% |
+| 10,000 | $98,237.45 to $164,351.15 | +1.36% | 19.10% | 18.86% |
 
-| Run | Total volume | Mean | Median | Standard deviation | Minimum | Maximum | Mean error |
-|---:|---:|---:|---:|---:|---:|---:|---:|
-| 1 | $17,525,677.44 | $175,256.77 | $7,625.65 | $842,399.21 | $0 | $8,138,887.09 | +44.58% |
-| 2 | $7,135,354.08 | $71,353.54 | $2,318.43 | $189,330.85 | $0 | $1,318,409.91 | -41.14% |
-| 3 | $6,420,869.27 | $64,208.69 | $5,307.77 | $215,781.31 | $0 | $1,938,395.50 | -47.03% |
-| 4 | $1,781,953.31 | $17,819.53 | $1,886.72 | $43,285.09 | $0 | $244,603.35 | -85.30% |
-| 5 | $4,366,762.70 | $43,667.63 | $4,168.68 | $154,976.68 | $0 | $1,317,271.58 | -63.98% |
+The average absolute error at 1,000 markets looks worse than at 100 because one extreme draw dominates the average. The median absolute error tells the more typical story: it declined at every sample size.
 
-None of the five samples contained even one of the 489 markets with at least $10 million in volume. At this size, a single sample had an 11.97% theoretical probability of containing a $10 million market and only a 0.9340% probability of containing one above $100 million. Most samples therefore reflected the mass of ordinary, lower-volume markets rather than the tail that contributed so much to the population mean.
+This is itself an important statistical lesson. The metric used to summarize sampling error can be affected by the same heavy-tail problem as the data being sampled.
 
-### Samples of 1,000 markets
+### All 15 reproducible results
 
-The five sample means ranged from $77,714.26 to $201,378.93, with percentage errors from -35.89% to +66.13%. Two landed within 25% of the population mean, but none came within 10%.
+| Sample size | Run | Sample mean | Signed mean error |
+|---:|---:|---:|---:|
+| 100 | 1 | $36,275.91 | -70.07% |
+| 100 | 2 | $74,894.23 | -38.21% |
+| 100 | 3 | $72,370.29 | -40.30% |
+| 100 | 4 | $81,335.42 | -32.90% |
+| 100 | 5 | $169,594.79 | +39.91% |
+| 1,000 | 1 | $85,017.35 | -29.86% |
+| 1,000 | 2 | $427,814.31 | +252.93% |
+| 1,000 | 3 | $97,938.62 | -19.20% |
+| 1,000 | 4 | $60,144.95 | -50.38% |
+| 1,000 | 5 | $160,544.92 | +32.44% |
+| 10,000 | 1 | $164,351.15 | +35.58% |
+| 10,000 | 2 | $98,237.45 | -18.96% |
+| 10,000 | 3 | $140,093.25 | +15.57% |
+| 10,000 | 4 | $113,313.43 | -6.52% |
+| 10,000 | 5 | $98,359.32 | -18.86% |
 
-| Run | Total volume | Mean | Median | Standard deviation | Minimum | Maximum | Mean error |
-|---:|---:|---:|---:|---:|---:|---:|---:|
-| 1 | $77,714,262.57 | $77,714.26 | $2,955.44 | $411,818.41 | $0 | $8,574,343.52 | -35.89% |
-| 2 | $145,843,515.10 | $145,843.52 | $3,098.75 | $1,836,865.88 | $0 | $55,056,697.13 | +20.32% |
-| 3 | $80,124,904.85 | $80,124.90 | $3,631.41 | $447,682.82 | $0 | $10,128,418.66 | -33.90% |
-| 4 | $102,873,061.46 | $102,873.06 | $2,664.26 | $792,609.36 | $0 | $18,597,089.08 | -15.13% |
-| 5 | $201,378,931.69 | $201,378.93 | $3,091.92 | $1,902,497.89 | $0 | $41,754,060.06 | +66.13% |
-
-This group produced the experiment's most useful contrast. No individual mean was within 10% of the population mean, yet the average of the five sample means was $121,586.94—only 0.31% above the population value. The high and low estimates partially offset one another, illustrating why an estimator's repeated-sampling behavior cannot be judged from a single draw.
-
-The right tail still controlled the individual results. Four samples captured at least one market above $10 million; the fifth captured none. Sample 5 contained five such markets and produced the highest mean. None of the five contained a market above $100 million.
-
-That does not mean 1,000 rows are statistically worse than 100. It means that five realized samples are not a monotonic demonstration. Larger samples reduce expected sampling variability, but any particular sample can land closer to or farther from the target than another particular sample.
-
-[Statistics Canada notes](https://www150.statcan.gc.ca/n1/edu/power-pouvoir/ch6/sampling-echantillonage/5214807-eng.htm) that sampling variance generally decreases as sample size increases, but not proportionally. It also depends on the variability of the characteristic being measured. Here, market volume varies by several orders of magnitude.
-
-### Samples of 10,000 markets
-
-The five sample means ranged from $84,693.61 to $146,375.33, with percentage errors from -30.13% to +20.76%. Four landed within 25% of the population mean, two within 10%, and one within 5%.
-
-| Run | Total volume | Mean | Median | Standard deviation | Minimum | Maximum | Mean error |
-|---:|---:|---:|---:|---:|---:|---:|---:|
-| 1 | $1,463,753,271.15 | $146,375.33 | $3,046.29 | $2,547,696.47 | $0 | $133,173,605.45 | +20.76% |
-| 2 | $1,197,213,754.02 | $119,721.38 | $2,843.45 | $2,791,124.79 | $0 | $235,065,166.64 | -1.23% |
-| 3 | $846,936,128.80 | $84,693.61 | $3,009.35 | $714,819.83 | $0 | $35,232,789.17 | -30.13% |
-| 4 | $1,026,186,601.25 | $102,618.66 | $2,826.96 | $1,228,163.31 | $0 | $71,286,704.69 | -15.34% |
-| 5 | $1,116,031,392.61 | $111,603.14 | $2,822.89 | $1,759,824.90 | $0 | $133,955,589.25 | -7.93% |
-
-The results were more stable overall, but they were not identical. All five samples contained markets above $10 million, while three contained at least one market above $100 million. The two samples that missed every $100 million market both underestimated the population mean. Yet merely capturing a $100 million market did not guarantee an accurate estimate: the magnitudes and counts of all sampled tail observations still mattered.
-
-A sample of 10,000 markets was still only 2.6062% of the population. Even at this size, one mean was 30.13% below the population value.
-
-### What changed as the sample grew?
-
-| Sample size | Range of sample means | Average absolute mean error | Means within 10% | Range of sample medians | Average absolute median error | Runs containing a $100M market |
-|---:|---:|---:|---:|---:|---:|---:|
-| 100 | $17,819.53–$175,256.77 | 56.40% | 0 of 5 | $1,886.72–$7,625.65 | 60.70% | 0 of 5 |
-| 1,000 | $77,714.26–$201,378.93 | 34.27% | 0 of 5 | $2,664.26–$3,631.41 | 8.82% | 0 of 5 |
-| 10,000 | $84,693.61–$146,375.33 | 15.08% | 2 of 5 | $2,822.89–$3,046.29 | 8.96% | 3 of 5 |
-
-The overall pattern is convergence, not perfection. Mean error fell markedly with sample size. The median improved dramatically between 100 and 1,000 observations; at 10,000, its range tightened further even though the five-run average absolute error remained roughly unchanged. With only five draws per size, small reversals like that are expected.
+Four of the five 10,000-market samples landed within 25% of the population mean. None of the 100-market samples did. Yet the best individual result in the experiment was a 10,000-market underestimate of only 6.52%, not a perfect match.
 
 <PublicChart username="misterrpink" slug="polymarket-random-sample-mean-error-all-runs" />
 
-*Larger samples produced a tighter overall range, but estimates did not improve in a perfectly ordered sequence because rare high-volume markets entered different runs.*
+*Each point is one fixed-seed sample. The zero line represents the population mean; points above it overestimate average volume and points below it underestimate average volume.*
 
-## Why a larger sample can still look worse
+## Why the 1,000-market sample produced a 252.93% error
 
-Sample size changes a probability distribution; it does not issue a guarantee about the next draw.
+The most dramatic draw had a mean of $427,814.31—more than three and a half times the population mean.
 
-Across every possible simple random sample of size `n`, the sample mean is an unbiased estimator of the population mean. In repeated sampling, its estimates center on the true value. But one realized sample can still miss high or low.
+That sample included the market “Fed increases interest rates by 25+ bps after January 2026 meeting?”, which had $216,455,743.15 in volume.
 
-The expected variability normally declines as `n` grows. Yet three features of this experiment keep individual outcomes interesting:
+Inside a 1,000-row sample, that single row contributed roughly $216,456 to the sample mean:
 
-1. **The volume distribution has a long right tail.** A few markets are thousands of times larger than the median market.
-2. **The largest markets are rare.** Even a sample containing thousands of rows can miss most of them.
-3. **We ran only five samples per size.** Five draws illustrate sampling variability; they do not fully map the sampling distribution.
+**$216,455,743 / 1,000 ≈ $216,456**
 
-The correct conclusion is therefore not “1,000 rows performed worse.” It is:
+The contribution from that one market was already greater than the full population mean of $121,216.48. The other 999 markets then raised the final estimate further.
 
-> Larger random samples generally reduce sampling variability, but the path is probabilistic—not a staircase where every new sample must beat every smaller sample.
+This is the leverage of an extreme observation. A large sample usually reduces sampling variability, but a rare observation can still produce a large miss when the distribution is heavy-tailed.
 
-## Random sample vs. representative sample
+At 10,000 rows, the same $216.46 million market would contribute about $21,646 to the mean. It would still matter, but it would have one-tenth as much leverage as it had in the 1,000-row sample.
 
-The terms are related, but they describe different things.
+## How likely is a random sample to capture a whale market?
 
-**A random sample describes the selection process. A representative sample describes how well the selected observations reflect specified characteristics of the population.**
+Only 36 of the 383,707 eligible markets had at least $100 million in volume.
 
-| Random sample | Representative sample |
-|---|---|
-| Defined by a probability-based selection process | Evaluated by resemblance to the population on relevant characteristics |
-| Can have known, equal inclusion probabilities | Can still differ depending on which characteristics are checked |
-| Can look unbalanced by chance | May require stratification, weighting, or a larger sample |
-| Supports design-based estimates and measures of sampling uncertainty | Is not a guarantee of unbiased selection by itself |
+For sampling without replacement, the exact probability of selecting at least one of those 36 markets is:
 
-Our samples were random because every eligible market had the same inclusion probability. But an individual sample could contain too many or too few high-volume markets to reproduce the population mean closely.
+**P(at least one whale) = 1 - C(N - K, n) / C(N, n)**
 
-Representativeness is also not one universal property. A sample might closely match the population's volume bands while underrepresenting politics. It could match category shares while missing the largest markets. Researchers must say **representative of what**.
+Here, N is the total population, K is the number of whale markets, n is the sample size, and C(a, b) is the number of ways to choose b items from a.
 
-This distinction is why 5,000 biased observations are not automatically better than 50 well-selected observations—and why 50 random observations are not automatically sufficient for every research question.
-
-## Why the median stabilized faster than the mean
-
-The population mean volume was $121,216.48, but the median was $3,196.22.
-
-The mean uses the magnitude of every value. Add one billion-dollar market to a sample, and its contribution flows directly into the average. The median depends on the ordered middle observation. A massive value at the far end of the distribution does not pull the middle upward in the same way.
-
-That difference appeared across our repeated samples:
-
-| Sample size | Lowest sample median | Highest sample median | Population median |
-|---:|---:|---:|---:|
-| 100 | $1,886.72 | $7,625.65 | $3,196.22 |
-| 1,000 | $2,664.26 | $3,631.41 | $3,196.22 |
-| 10,000 | $2,822.89 | $3,046.29 | $3,196.22 |
-
-<PublicChart username="misterrpink" slug="polymarket-random-sample-median-estimates" />
-
-*The sample median settled near the population median faster than the mean because it was less sensitive to the extreme right tail.*
-
-This does not make the median universally superior. The two statistics answer different questions:
-
-- **Mean volume:** How much volume would each market have if total volume were distributed evenly?
-- **Median volume:** What volume separates the lower half of markets from the upper half?
-
-When data is highly skewed, reporting both is usually more informative than declaring one “average” without context. The [NIST Engineering Statistics Handbook](https://www.itl.nist.gov/div898/handbook/eda/section3/eda35b.htm) recommends graphical examination of skewness and heavy tails because extreme observations can materially change how a dataset should be summarized.
-
-## What is the probability of sampling a whale market?
-
-We defined a “whale” as a market with at least $100 million in volume. The population contained 36 such markets out of 383,707.
-
-For simple random sampling without replacement, the probability of selecting at least one whale is:
-
-`P(at least one whale) = 1 - C(N - K, n) / C(N, n)`
-
-where:
-
-- `N` is the population size;
-- `K` is the number of whale markets;
-- `n` is the sample size.
-
-| Sample size | Probability of ≥1 market above $10M | Probability of ≥1 market above $100M |
-|---:|---:|---:|
-| 100 | 11.97% | 0.934% |
-| 1,000 | 72.11% | 8.97% |
-| 10,000 | 99.9998% | 61.35% |
+| Sample size | Probability of at least one $100M+ market |
+|---:|---:|
+| 100 | 0.934% |
+| 1,000 | 8.967% |
+| 10,000 | 61.353% |
 
 <PublicChart username="misterrpink" slug="polymarket-whale-market-sampling-probability" />
 
-*Larger samples sharply increase the probability of capturing rare high-volume markets, but even 10,000 rows do not guarantee every part of the extreme tail.*
+*The probabilities are calculated exactly without replacement from 383,707 eligible markets and 36 markets with at least $100 million in volume.*
 
-This calculation connects the population structure directly to the sample results. A small sample can be perfectly random while having almost no chance of containing the observations that make the full-population mean so large.
+Larger samples better cover the population, but they are also more likely to encounter the rare markets that dominate its total volume. Those forces are not contradictory. They are part of the same sampling process.
 
-## When prediction-market researchers should use random sampling
+## Random sample vs representative sample
 
-Random sampling is valuable when the research task benefits from a manageable, defensible subset rather than an exact census.
+These terms describe different things.
 
-### Explore an unfamiliar archive
+| Term | What it describes | Central question |
+|---|---|---|
+| Random sample | The method used to select observations | Did each eligible row receive the intended selection probability? |
+| Representative sample | The relationship between the sample and population | Does the sample reflect the characteristics relevant to this analysis? |
 
-Use a random sample to inspect market questions, categories, outcomes, timestamps, identifiers, or metadata without defaulting to the first rows returned by a source.
+A sample can be random but not look representative because of ordinary sampling variation. This is especially common with small samples, rare subgroups, and heavy-tailed variables.
 
-### Test a research workflow
+A sample can also look representative on one dimension and fail on another. A set of markets might match the population's topic mix while missing its high-volume tail. Representativeness is therefore not a permanent label attached to a dataset; it is a judgment tied to a variable and research purpose.
 
-Before joining hundreds of millions of trades, test filters, calculations, and charts on a smaller market sample. You can then carry validated market identifiers into trade or price-history analysis. For an example of moving from market metadata into time-series research, see our guide to [tracking Polymarket odds over time](/guides/polymarket-odds-over-time).
+Random selection provides a defensible design. Sample size and sampling strategy affect how often that design produces estimates close to the target.
 
-### Build a manual review set
+## Mean, median, and the meaning of “typical”
 
-Researchers studying market wording, resolution quality, category labels, or ambiguous questions can randomly select a manageable set for human inspection.
+The population mean was $121,216.48, while the median was only $3,299.94.
 
-### Estimate a common population characteristic
+Neither statistic is wrong. They answer different questions:
 
-A simple random sample can estimate means, proportions, or distributions when the sample size and population variability are appropriate for the precision required.
+- The **mean** describes volume per market after total volume is shared equally across every market. It is essential for totals, expected contributions, and analyses in which every dollar matters.
 
-### Compare repeated samples
+- The **median** describes the middle market after all markets are ordered by volume. It is more informative when the question is what a typical market looks like.
 
-Repeated samples reveal how sensitive a conclusion is to the particular observations selected. If the answer changes dramatically across runs, that instability is itself a result worth investigating.
+When the maximum exceeds $1.53 billion and the mean is 36.7 times the median, reporting only “average volume” hides the structure of the population. A strong analysis should show both measures and disclose the tail.
+
+## How to choose a sample size
+
+There is no universal sample size that makes every random sample representative.
+
+The right choice depends on:
+
+- the statistic being estimated;
+- the variability and shape of the population;
+- how rare the observations of interest are;
+- the precision required;
+- whether subgroup estimates are needed;
+- the sampling design; and
+- the cost of processing more data.
+
+If the target is a rare category, begin with its prevalence rather than a generic sample-size rule. If the target is a heavy-tailed mean, simulate or repeat samples and inspect the sampling distribution. If every exact dollar matters and the full dataset is available, calculate the population total instead of estimating it from a sample.
 
 ## When simple random sampling is not enough
 
-Random sampling is a tool, not a ritual. Sometimes the full population or a different design better matches the question.
-
 | Research goal | Better approach |
 |---|---|
-| Calculate exact total historical volume | Use the full eligible population |
-| Study the largest or most liquid markets | Filter the tail directly instead of hoping to sample it |
-| Compare every market category | Stratify by category, then sample within categories |
-| Analyze rare market types | Oversample the rare group and use appropriate weights for population estimates |
-| Reproduce an identical set later | Use seeded sampling when available, or save the sampled sheet and identifiers |
-| Study change over time | Stratify by period or sample within time windows |
-| Compare Kalshi and Polymarket | Define comparable frames on both platforms before sampling |
+| Calculate exact historical volume | Use the full eligible population |
+| Study the largest markets | Filter the high-volume tail directly |
+| Guarantee coverage across volume bands | Stratify by volume band |
+| Analyze a rare market category | Oversample that category and apply appropriate weights |
+| Compare time periods | Stratify or sample within each period |
+| Compare Polymarket with Kalshi | Define comparable eligible populations on both platforms |
 
-For this volume experiment, a stratified design could divide markets into the seven volume bands and sample within each band. That would guarantee exposure to the tail and make band-level comparisons easier. But it would answer a different question from our simple random sample, and raw sample averages would require weighting if the sampling fractions differed across bands.
+For cross-platform work, start with the [Polymarket Historical](/polymarket-historical-data) and [Kalshi Historical](/kalshi-historical-data) archives, then make sure the unit of analysis and filters mean the same thing before comparing samples.
 
-## How to select a random sample in Lychee
+## How to select a reproducible random sample in Lychee
 
-Lychee adds random sampling to the same no-code research workflow used for filters, joins, aggregations, data sheets, charts, and dashboards.
+Lychee places random sampling inside the same no-code workflow used for filtering, aggregation, data sheets, charts, and published dashboards.
 
 ### 1. Open a historical dataset
 
-Open [Polymarket Historical](/polymarket-historical-data) or [Kalshi Historical](/kalshi-historical-data), then choose the table you want to study.
+Open [Polymarket Historical](/polymarket-historical-data) or [Kalshi Historical](/kalshi-historical-data), then select the table you want to study.
 
 ### 2. Define the eligible population
 
-Apply the filters that determine which rows can enter the sample. In this experiment, we selected closed Polymarket markets with non-null volume.
+Apply the filters that determine which rows can enter the sample. For this experiment, the eligible population was closed Polymarket markets with non-null volume.
 
-This order is important: the filter defines the population; random sampling selects from that population.
+The order matters: filters define the population, and random sampling selects from that population.
 
 ### 3. Enable Random Sample
 
-Open the Research Tools section under Refine Query, enable **Random Sample**, and enter the requested number of rows.
+Open the Research Tools section under Refine Query, enable **Random Sample**, and enter the number of rows.
 
-### 4. Run the pull
+### 4. Set a seed
 
-Lychee selects the requested number of distinct eligible rows when enough rows are available. The selection is unseeded, so a new pull can return a different valid sample.
+Add a seed when you need the result to be reproducible. Reusing the same seed with the same eligible population and sample size recreates the same draw.
 
-### 5. Analyze the result
+### 5. Run and analyze the sample
 
-Calculate the count, mean, median, total, standard deviation, minimum, and maximum. You can then build a [chart](/charts), save the sheet, export it, or publish the analysis to a [dashboard](/dashboards-gallery).
+Calculate the count, mean, median, total, standard deviation, minimum, and maximum. Then create a [chart](/charts), save the sheet, export the data, or assemble the evidence in a [dashboard](/dashboards-gallery).
 
+Random sampling is currently designed for Lychee's historical-data workflows and selects distinct rows without replacement. The practical advantage is that sample selection, descriptive statistics, visualization, and publication happen in one research environment.
 
+## What this experiment does and does not prove
 
-### Current implementation details
+This case study is deliberately transparent, but its scope matters.
 
-- Sampling is available on Lychee's historical data workflows, not the live integrations.
-- Samples are selected without replacement.
-- Samples are currently unseeded.
-- The ordinary Limit control is disabled while Random Sample is enabled.
-- Sorting can be applied after the random sample has been selected.
-- Maximum row and account-tier limits still apply.
-- Sampling occurs after the eligible dataset has been created, including supported filters, joins, projections, and aggregations.
+1. **There were five samples at each size.** Fifteen runs are enough to demonstrate variability, not to map the complete sampling distribution.
 
-The practical benefit is not merely that Lychee can return random rows. It is that the sample remains inside a complete research environment. You can move from sample selection to descriptive statistics, visualization, export, and published evidence without rebuilding the workflow in Python or managing a separate data pipeline.
+2. **The samples were seeded.** The reported rows and statistics are reproducible, but a different seed can produce a different valid result.
 
-## Limitations of this Polymarket sampling experiment
+3. **The analysis focused on market volume.** Prices, outcomes, categories, duration, traders, and trades can have different distributions.
 
-This analysis is intentionally small enough to understand and reproduce. That also creates limitations.
+4. **Polymarket volume is unusually skewed.** The observed error rates are not universal rules for other datasets.
 
-1. **We ran five samples at each size.** More repetitions would show the sampling distributions more completely.
-2. **The samples were unseeded.** We saved each result, but another fresh pull will not return the same markets.
-3. **We studied one primary variable.** Volume behaves differently from categories, resolution outcomes, prices, or market duration.
-4. **The population is unusually skewed.** These results should not be treated as a universal sample-size rule for every dataset.
-5. **The archive has a defined extraction date and scope.** Results can change as the underlying archive is updated or the eligible-population filters change.
-6. **A market is not a trade.** Sampling market rows equally is different from sampling trades, traders, dollars, or time periods equally.
-7. **We know the population values here.** In ordinary sample-based research, the true population mean and median may not be available for comparison.
+5. **The archive has a fixed scope.** This analysis used closed markets with non-null volume from launch through December 2025 and was run on August 30, 2026.
 
-The experiment demonstrates why researchers should report the population definition, sampling design, sample size, measured statistic, and uncertainty—not just the word “random.”
+6. **A market is not a dollar or a trade.** Sampling market rows equally answers a different question from sampling trades, traders, dollars, or time periods.
+
+7. **The population benchmark was known.** In many real studies, the true population mean is unavailable, so uncertainty must be estimated rather than measured directly.
+
+The defensible conclusion is not that 10,000 rows are always enough. It is that larger samples produced lower typical error in these reproducible draws, while the heavy tail continued to matter.
 
 ## Frequently asked questions about random sampling
 
@@ -502,52 +389,52 @@ Simple random sampling is a probability-sampling method in which every unit in t
 
 ### What is a simple random sampling example?
 
-If a dataset contains 100,000 eligible prediction markets and a researcher randomly selects 1,000 distinct markets with equal inclusion probabilities, the resulting subset is a simple random sample without replacement.
+This Polymarket analysis is a simple random sampling example: we defined a population of 383,707 eligible markets and selected distinct groups of 100, 1,000, and 10,000 markets with equal inclusion probabilities.
 
 ### Is random sampling the same as simple random sampling?
 
-Not always. Simple random sampling is one type of random sampling. Stratified, cluster, systematic, and unequal-probability designs also use randomness but structure the selection process differently.
+Not always. Simple random sampling is one type of random sampling. Stratified, cluster, systematic, and weighted probability designs also use randomness but structure the selection process differently.
 
 ### What is the difference between a random sample and a representative sample?
 
-A random sample is defined by how observations are selected. A representative sample is assessed by how closely the selected observations resemble the population on characteristics relevant to the research question. A random sample can be unrepresentative by chance.
+A random sample is defined by how observations were selected. A representative sample is judged by how closely it reflects population characteristics relevant to the research question. A correctly selected random sample can be unrepresentative by chance.
+
+### What is the difference between random sampling and random assignment?
+
+Random sampling selects observations from a population. Random assignment places already-selected participants or units into experimental groups. The first supports population inference; the second helps isolate treatment effects.
 
 ### What does sampling without replacement mean?
 
-Sampling without replacement means a selected observation cannot be chosen again within the same sample. Every row in a Lychee random sample is therefore distinct.
+It means a selected observation cannot be selected again in the same sample. Each market in a Lychee random sample is therefore distinct.
 
 ### Does random sampling eliminate bias?
 
-Random sampling reduces selection bias caused by manually choosing observations, but it cannot correct missing coverage, inaccurate measurements, inappropriate filters, nonresponse, or a badly defined target population.
+No. It reduces bias from subjective row selection, but it cannot fix incomplete coverage, bad measurements, inappropriate filters, nonresponse, or a poorly defined target population.
 
-### Does a larger sample always give a more accurate result?
+### Does a larger sample always produce a more accurate result?
 
-Larger samples generally reduce expected sampling variability, but one individual larger sample is not guaranteed to be closer to the population value than every smaller sample. Population variability and rare extreme observations also matter.
+No individual larger sample is guaranteed to beat every smaller sample. Larger samples generally reduce expected sampling variability, but rare extreme observations can still cause large errors. In this experiment, median absolute error improved with size even though one 1,000-row draw was the largest miss.
 
 ### How large should a random sample be?
 
-There is no universal sample size. The answer depends on the statistic being estimated, population variability, required precision, sampling design, subgroup analysis, and available resources. Rare or heavy-tailed outcomes can require much larger samples than stable, common characteristics.
+There is no universal answer. Sample size depends on population variability, the statistic being estimated, required precision, rare-group prevalence, subgroup needs, sampling design, and available resources.
 
-### Why did the sample median outperform the mean here?
+### Why are the mean and median so different here?
 
-Polymarket volume had a long right tail. A few enormous markets strongly changed the sample mean when included, while the median depended on the middle-ranked market and was less sensitive to those extreme values.
+Polymarket market volume has a long right tail. A small number of enormous markets pull the mean upward, while the median remains tied to the middle-ranked market.
 
-### Can I generate a random sample without Python or Excel?
+### Can I create a random sample without Python or Excel?
 
-Yes. Lychee can select a random sample directly from supported historical datasets after filters and other eligible-population operations are applied. The result can be analyzed, charted, saved, or exported in the same workspace.
+Yes. Lychee can draw a seeded random sample from supported historical datasets after the eligible population is defined. The sample can then be summarized, charted, saved, and published in the same workflow.
 
 ## The real lesson from random sampling
 
-Our first assumption was that the experiment would mainly demonstrate a new way to select rows.
+Random sampling gave every eligible market a fair route into the analysis. It did not make the population simple.
 
-Instead, random sampling exposed the structure of the underlying market.
-
-Polymarket volume was so concentrated that a tiny number of markets could transform the average of an otherwise valid sample. Increasing sample size made estimates more stable overall, but the process remained probabilistic. The median settled faster because it measured the center without giving the tail the same leverage over the result.
+The experiment exposed a market structure in which 1.38% of rows generated 70.15% of volume and one rare market could transform an otherwise ordinary sample mean. Increasing the sample size improved the typical result, but it did not remove chance from the process.
 
 That leads to a better research habit:
 
-> Do not ask only whether a sample was random. Ask what population it came from, which statistic you are estimating, how variable the population is, and how much uncertainty the sample leaves behind.
+> Do not ask only whether a sample was random. Ask what population it came from, which statistic you are estimating, how the population is distributed, and how much uncertainty remains.
 
-You can reproduce this analysis in [Lychee's Polymarket Historical workspace](/polymarket-historical-data), change the sample size, redefine the eligible population, or test a different market characteristic. Then save the result, build an interactive chart, and publish the workflow so other researchers can inspect how the conclusion was produced.
-
-**[Open Polymarket Historical and build your own random sample](/polymarket-historical-data)**
+You can reproduce the workflow in [Lychee's Polymarket Historical workspace](/polymarket-historical-data), change the sample size or seed, redefine the eligible population, and test another market characteristic. From there, save the data sheet, build an interactive visualization, and publish the evidence so other researchers can inspect the path from data to conclusion.

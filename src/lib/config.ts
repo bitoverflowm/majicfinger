@@ -9,6 +9,7 @@ export const siteConfig = {
   nav: {
     links: [
       { id: "guides", name: "Research", href: "/#guides" },
+      { id: "changelog", name: "What's New", href: "/changelog" },
       { id: "pricing", name: "Pricing", href: "/#pricing" },
     ],
   },

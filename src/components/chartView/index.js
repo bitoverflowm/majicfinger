@@ -961,8 +961,6 @@ export function ChartBuilderProvider({ demo, children, initialBuilderSnapshot, e
   const [stackedBar, setStackedBar] = useState(false);
   /** When set (bar charts), pivot long rows by this column into stacked/grouped series (e.g. outcome). */
   const [barSeriesColumn, setBarSeriesColumn] = useState(null);
-  /** Bar chart only: "date" = value-scaled X (calendar time or numeric position); "categorical" = equidistant bars. */
-  const [barXAxisMode, setBarXAxisMode] = useState("date");
   /** Recharts `layout="vertical"` — bars extend horizontally; category axis moves to Y. */
   const [horizontal, setHorizontal] = useState(false);
   /** Bar chart: each bar (per Y series) picks from the active Shadcn palette via a stable hash. */
@@ -1280,7 +1278,8 @@ export function ChartBuilderProvider({ demo, children, initialBuilderSnapshot, e
     if (s.legendTitle != null) setLegendTitle(String(s.legendTitle));
     if (s.stackedBar !== undefined) setStackedBar(!!s.stackedBar);
     if (s.barSeriesColumn !== undefined) setBarSeriesColumn(s.barSeriesColumn || null);
-    if (s.barXAxisMode === "date" || s.barXAxisMode === "categorical") setBarXAxisMode(s.barXAxisMode);
+    // Legacy bar X-axis spacing toggle → Scale in the X-axis gear menu.
+    if (s.barXAxisMode === "categorical") setScaleX("categorical");
     if (s.horizontal !== undefined) setHorizontal(!!s.horizontal);
     if (s.rainbowBar !== undefined) setRainbowBar(!!s.rainbowBar);
     if (s.rainbowBarShuffleNonce != null && Number.isFinite(Number(s.rainbowBarShuffleNonce))) {
@@ -2102,7 +2101,8 @@ export function ChartBuilderProvider({ demo, children, initialBuilderSnapshot, e
     legendTitle,
     stackedBar,
     barSeriesColumn,
-    barXAxisMode,
+    // Persist for older clients; spacing is controlled by scaleX (X-axis Scale menu).
+    barXAxisMode: scaleX === "categorical" ? "categorical" : "date",
     horizontal,
     rainbowBar,
     rainbowBarShuffleNonce,
@@ -2572,8 +2572,6 @@ export function ChartBuilderProvider({ demo, children, initialBuilderSnapshot, e
     handleToggleStack: setStackedBar,
     barSeriesColumn,
     setBarSeriesColumn,
-    barXAxisMode,
-    setBarXAxisMode,
     horizontal,
     handleToggleHorizontal: setHorizontal,
     rainbowBar,
@@ -2726,7 +2724,6 @@ export function ChartCanvas() {
     legendTitle,
     stackedBar,
     barSeriesColumn,
-    barXAxisMode,
     horizontal,
     rainbowBar,
     rainbowBarShuffleNonce,
@@ -2880,10 +2877,10 @@ export function ChartCanvas() {
     !!selX &&
     (xAxisType === "date" || lineIsTemporalX);
 
-  const barUseDateXScale = barXIsTemporalDate && barXAxisMode === "date";
+  const barUseDateXScale = barXIsTemporalDate && scaleX !== "categorical";
   const barForceCategoricalX =
     selChartType === "bar" &&
-    barXAxisMode === "categorical" &&
+    scaleX === "categorical" &&
     !!selX &&
     (barXIsTemporalDate || (xAxisType === "number" && !xIsCategoricalLabel));
 

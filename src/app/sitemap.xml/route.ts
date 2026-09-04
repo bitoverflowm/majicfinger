@@ -120,6 +120,7 @@ export async function GET() {
   }> = [
     { path: "/", priority: "1.0", changefreq: "weekly" },
     { path: "/guides", priority: "0.9", changefreq: "weekly" },
+    { path: "/changelog", priority: "0.85", changefreq: "weekly" },
     { path: "/charts", priority: "0.7", changefreq: "weekly" },
     { path: "/dashboards-gallery", priority: "0.85", changefreq: "weekly" },
     { path: "/search", priority: "0.5", changefreq: "weekly" },

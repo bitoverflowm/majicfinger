@@ -5,6 +5,7 @@ import {
   isAbsoluteHomeHashHref,
   navHrefIsInPageScrollSpy,
   navHrefToSectionId,
+  normalizeMarketingPathname,
 } from "@/lib/nav-hrefs";
 import type { ProductsNavData } from "@/lib/nav/products-nav";
 import { ProductsNavDropdown } from "@/components/nav/products-nav-dropdown";
@@ -90,9 +91,8 @@ export function NavMenu({ productsNav }: NavMenuProps) {
   }, [isManualScroll, navs, pathname, syncPillToSection]);
 
   const handleClick = (e: React.MouseEvent<HTMLAnchorElement>, item: NavItem) => {
-    e.preventDefault();
-
     if (isAbsoluteHomeHashHref(item.href)) {
+      e.preventDefault();
       const hash = item.href.slice(2);
       if (pathname === "/") {
         const element = document.getElementById(hash);
@@ -110,21 +110,25 @@ export function NavMenu({ productsNav }: NavMenuProps) {
       return;
     }
 
-    const targetId = item.href.startsWith("#") ? item.href.slice(1) : "";
-    if (!targetId) return;
-    const element = document.getElementById(targetId);
-    if (!element) return;
+    // In-page hash on the current route (e.g. hub `#pricing`).
+    if (item.href.startsWith("#") && item.href.length > 1) {
+      e.preventDefault();
+      const targetId = item.href.slice(1);
+      const element = document.getElementById(targetId);
+      if (!element) return;
 
-    setIsManualScroll(true);
+      setIsManualScroll(true);
+      setActiveSection(targetId);
+      syncPillToSection(targetId);
 
-    setActiveSection(targetId);
-    syncPillToSection(targetId);
+      const elementPosition = element.getBoundingClientRect().top;
+      const offsetPosition = elementPosition + window.pageYOffset - 100;
+      window.scrollTo({ top: offsetPosition, behavior: "smooth" });
+      setTimeout(() => setIsManualScroll(false), 500);
+      return;
+    }
 
-    const elementPosition = element.getBoundingClientRect().top;
-    const offsetPosition = elementPosition + window.pageYOffset - 100;
-    window.scrollTo({ top: offsetPosition, behavior: "smooth" });
-
-    setTimeout(() => setIsManualScroll(false), 500);
+    // Absolute routes (e.g. /changelog) — let the browser navigate normally.
   };
 
   return (
@@ -136,10 +140,20 @@ export function NavMenu({ productsNav }: NavMenuProps) {
         <ProductsNavDropdown data={productsNav} />
         {navs.map((item) => {
           const sectionId = navHrefToSectionId(item.href);
+          const pathActive =
+            item.href.startsWith("/") &&
+            !item.href.startsWith("/#") &&
+            (normalizeMarketingPathname(pathname) ===
+              normalizeMarketingPathname(item.href) ||
+              (item.href !== "/" &&
+                normalizeMarketingPathname(pathname).startsWith(
+                  `${normalizeMarketingPathname(item.href)}/`,
+                )));
           const isActive =
-            Boolean(activeSection) &&
-            activeSection === sectionId &&
-            navHrefIsInPageScrollSpy(item.href, pathname);
+            pathActive ||
+            (Boolean(activeSection) &&
+              activeSection === sectionId &&
+              navHrefIsInPageScrollSpy(item.href, pathname));
 
           return (
             <li
