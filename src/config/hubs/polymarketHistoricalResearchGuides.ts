@@ -14,6 +14,12 @@ export const polymarketHistoricalResearchGuides: HubLinkGroupSection = {
           label: "Guides",
           links: [
             {
+              title: "Why Random Sampling Matters in Data Analysis",
+              href: "/guides/random-sampling-data-analysis",
+              description:
+                "How sample size and outliers change what you see across 15 seeded draws from 383,707 closed Polymarket markets.",
+            },
+            {
               title: "Polymarket Odds Over Time",
               href: "/guides/polymarket-odds-over-time",
               description:

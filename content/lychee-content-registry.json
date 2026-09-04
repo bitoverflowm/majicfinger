@@ -129,6 +129,13 @@
       "integrationHub": "platform",
       "integrationTopic": "chainlink",
       "publishedAt": "2026-04-15"
+    },
+    {
+      "slug": "random-sampling-data-analysis",
+      "contentClass": "research",
+      "integrationHub": "polymarket-historical",
+      "integrationTopic": "overview",
+      "publishedAt": "2026-09-04"
     }
   ]
 }

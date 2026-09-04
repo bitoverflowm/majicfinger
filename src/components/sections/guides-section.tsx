@@ -8,7 +8,7 @@ import { cn } from "@/lib/utils";
 import type { ContentItem } from "@/lib/content/types";
 import type { LandingDashboardCard } from "@/lib/landing/publishedDashboards";
 import { LandingDashboardCardItem } from "@/components/sections/landing-dashboard-card";
-import { isFeatureReleaseContent } from "@/lib/content/featureReleases";
+import { isFeatureReleaseContent } from "@/lib/content/featureReleaseMatchers";
 
 function formatDate(dateStr: string | undefined) {
   if (!dateStr) return "";
