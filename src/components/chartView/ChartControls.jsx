@@ -64,7 +64,14 @@ import { normalizeChartEmbedSlug } from "@/lib/chartEmbedSlug";
 import { REFERENCE_EQUATION_PRESETS, validateReferenceEquation } from "@/lib/chartReferenceEquation";
 import { ChartColorPalettePopover } from "@/components/chartView/ChartColorPalettePopover";
 import { pivotBarChartBySeries } from "@/components/chartView/pivotBarChartData";
-import { DEFAULT_CHART_SERIES_COLORS, isShadcnChartGreyBase } from "@/components/chartView/panels/shadcnChartPalettes";
+import {
+  DEFAULT_CHART_SERIES_COLORS,
+  SHADCN_CHART_BASE_ORDER,
+  getShadcnChartBaseSwatch950,
+  getShadcnChartPaletteArray,
+  isShadcnChartGreyBase,
+} from "@/components/chartView/panels/shadcnChartPalettes";
+import { SCATTER_COLOR_SCALE_MODES } from "@/components/chartView/scatterColorScale";
 import { defaultChartSeriesLabel } from "@/lib/chartLineLabels";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import {
@@ -289,6 +296,198 @@ function AxisSelectRow({
   );
 }
 
+/** Scatter Color-by gear: color scale mode, palette / reverse, value range. */
+function ColorBySettingsMenu({
+  scaleMode,
+  onScaleModeChange,
+  paletteId,
+  onPaletteIdChange,
+  reverse,
+  onReverseChange,
+  rangeMode,
+  onRangeModeChange,
+  rangeMin,
+  onRangeMinChange,
+  rangeMax,
+  onRangeMaxChange,
+  ariaLabel = "Color by settings",
+}) {
+  const mode = SCATTER_COLOR_SCALE_MODES.some((o) => o.value === scaleMode)
+    ? scaleMode
+    : "sequential";
+  const effectiveRangeMode = rangeMode === "custom" ? "custom" : "auto";
+  const previewStops = paletteId
+    ? getShadcnChartPaletteArray(paletteId)
+    : [];
+  const previewCss = previewStops.length
+    ? `linear-gradient(90deg, ${(reverse ? [...previewStops].reverse() : previewStops).join(", ")})`
+    : undefined;
+
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button
+          type="button"
+          variant="outline"
+          size="icon"
+          className="h-8 w-8 shrink-0 rounded-md"
+          aria-label={ariaLabel}
+        >
+          <Settings2 className="h-3.5 w-3.5" />
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" className="w-56 text-xs">
+        <DropdownMenuGroup>
+          <DropdownMenuLabel className="text-[10px] uppercase tracking-wide text-muted-foreground">
+            Color
+          </DropdownMenuLabel>
+          <DropdownMenuSub>
+            <DropdownMenuSubTrigger className="text-xs">Color scale</DropdownMenuSubTrigger>
+            <DropdownMenuSubContent className="w-64 text-xs">
+              <DropdownMenuLabel className="text-[10px] uppercase tracking-wide text-muted-foreground">
+                Color scale
+              </DropdownMenuLabel>
+              <DropdownMenuSeparator />
+              {SCATTER_COLOR_SCALE_MODES.map((opt) => (
+                <DropdownMenuCheckboxItem
+                  key={opt.value}
+                  className="items-start text-xs"
+                  checked={mode === opt.value}
+                  onCheckedChange={(checked) => {
+                    if (checked) onScaleModeChange?.(opt.value);
+                  }}
+                  onSelect={(e) => e.preventDefault()}
+                >
+                  <div className="min-w-0 space-y-0.5">
+                    <div>{opt.label}</div>
+                    <p className="text-[10px] font-normal leading-snug text-muted-foreground">
+                      {opt.description}
+                    </p>
+                  </div>
+                </DropdownMenuCheckboxItem>
+              ))}
+            </DropdownMenuSubContent>
+          </DropdownMenuSub>
+          <DropdownMenuSub>
+            <DropdownMenuSubTrigger className="text-xs">Colors</DropdownMenuSubTrigger>
+            <DropdownMenuSubContent className="w-64 text-xs">
+              <DropdownMenuLabel className="text-[10px] uppercase tracking-wide text-muted-foreground">
+                Colors
+              </DropdownMenuLabel>
+              <p className="px-2 pb-2 text-[10px] leading-snug text-muted-foreground">
+                Choose a palette or reverse its direction.
+              </p>
+              {previewCss ? (
+                <div
+                  className="mx-2 mb-2 h-2 rounded-sm border border-border/60"
+                  style={{ backgroundImage: previewCss }}
+                  aria-hidden
+                />
+              ) : null}
+              <div className="grid max-h-40 grid-cols-6 gap-1 overflow-y-auto px-2 pb-2">
+                <button
+                  type="button"
+                  className={cn(
+                    "col-span-2 h-7 rounded-md border text-[10px]",
+                    !paletteId ? "border-foreground bg-muted" : "border-border bg-background",
+                  )}
+                  onClick={() => onPaletteIdChange?.(null)}
+                >
+                  Chart palette
+                </button>
+                {SHADCN_CHART_BASE_ORDER.map((baseId) => {
+                  const swatch = getShadcnChartBaseSwatch950(baseId);
+                  const selected = paletteId === baseId;
+                  return (
+                    <button
+                      key={baseId}
+                      type="button"
+                      title={baseId}
+                      aria-label={`Palette ${baseId}`}
+                      className={cn(
+                        "h-7 w-full rounded-md border",
+                        selected ? "border-foreground ring-1 ring-foreground/40" : "border-border",
+                      )}
+                      style={{ backgroundColor: swatch }}
+                      onClick={() => onPaletteIdChange?.(baseId)}
+                    />
+                  );
+                })}
+              </div>
+              <DropdownMenuSeparator />
+              <DropdownMenuCheckboxItem
+                className="text-xs"
+                checked={!!reverse}
+                onCheckedChange={(checked) => onReverseChange?.(!!checked)}
+                onSelect={(e) => e.preventDefault()}
+              >
+                Reverse direction
+              </DropdownMenuCheckboxItem>
+            </DropdownMenuSubContent>
+          </DropdownMenuSub>
+          {mode !== "categories" ? (
+            <DropdownMenuSub>
+              <DropdownMenuSubTrigger className="text-xs">Value range</DropdownMenuSubTrigger>
+              <DropdownMenuSubContent className="w-56 p-2 text-xs">
+                <DropdownMenuLabel className="px-1 text-[10px] uppercase tracking-wide text-muted-foreground">
+                  Value range
+                </DropdownMenuLabel>
+                <p className="px-1 pb-2 text-[10px] leading-snug text-muted-foreground">
+                  Controls which values represent the ends of the color scale.
+                </p>
+                <DropdownMenuCheckboxItem
+                  className="text-xs"
+                  checked={effectiveRangeMode === "auto"}
+                  onCheckedChange={(checked) => {
+                    if (checked) onRangeModeChange?.("auto");
+                  }}
+                  onSelect={(e) => e.preventDefault()}
+                >
+                  Automatic
+                </DropdownMenuCheckboxItem>
+                <DropdownMenuCheckboxItem
+                  className="text-xs"
+                  checked={effectiveRangeMode === "custom"}
+                  onCheckedChange={(checked) => {
+                    if (checked) onRangeModeChange?.("custom");
+                  }}
+                  onSelect={(e) => e.preventDefault()}
+                >
+                  Custom minimum and maximum
+                </DropdownMenuCheckboxItem>
+                {effectiveRangeMode === "custom" ? (
+                  <div className="mt-2 grid grid-cols-2 gap-2 px-1">
+                    <div className="space-y-1">
+                      <Label className="text-[10px] text-muted-foreground">Min</Label>
+                      <Input
+                        type="number"
+                        className="h-7 text-xs"
+                        value={rangeMin ?? ""}
+                        onChange={(e) => onRangeMinChange?.(e.target.value)}
+                        onKeyDown={(e) => e.stopPropagation()}
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <Label className="text-[10px] text-muted-foreground">Max</Label>
+                      <Input
+                        type="number"
+                        className="h-7 text-xs"
+                        value={rangeMax ?? ""}
+                        onChange={(e) => onRangeMaxChange?.(e.target.value)}
+                        onKeyDown={(e) => e.stopPropagation()}
+                      />
+                    </div>
+                  </div>
+                ) : null}
+              </DropdownMenuSubContent>
+            </DropdownMenuSub>
+          ) : null}
+        </DropdownMenuGroup>
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+}
+
 function filterSheetColumnGroups(groups, { allowedValues, excludeValues } = {}) {
   const allow = allowedValues != null ? new Set(allowedValues) : null;
   const exclude = excludeValues?.length ? new Set(excludeValues) : null;
@@ -501,6 +700,18 @@ export default function ChartControls() {
     setScatterZEnabled,
     scatterColorEnabled,
     setScatterColorEnabled,
+    scatterColorScaleMode,
+    setScatterColorScaleMode,
+    scatterColorPaletteId,
+    setScatterColorPaletteId,
+    scatterColorReverse,
+    setScatterColorReverse,
+    scatterColorRangeMode,
+    setScatterColorRangeMode,
+    scatterColorRangeMin,
+    setScatterColorRangeMin,
+    scatterColorRangeMax,
+    setScatterColorRangeMax,
     scatterJitterEnabled,
     setScatterJitterEnabled,
     scatterJitterX,
@@ -2601,40 +2812,62 @@ export default function ChartControls() {
                           </FieldLabel>
                         </div>
                         {scatterColorEnabled ? (
-                          <AxisSelectRow
-                            scaleValue={
-                              (() => {
-                                const t = axisMenuValueType(
-                                  selColorCol ? getAxisType(selColorCol, dataTypes, chartData) : "string",
-                                );
-                                return t === "number" || t === "date" ? "linear" : "categorical";
-                              })()
-                            }
-                            onScaleChange={() => {}}
-                            valueType={axisMenuValueType(
-                              selColorCol ? getAxisType(selColorCol, dataTypes, chartData) : "string",
-                            )}
-                            menuLabel="Color"
-                            scaleAriaLabel="Color by settings"
-                          >
-                            <Select
-                              value={selColorCol ?? "__none__"}
-                              onValueChange={(v) => setSelColorCol(v === "__none__" ? null : v)}
-                            >
-                              <SelectTrigger className="h-8 min-w-0 w-full text-xs">
-                                <SelectValue placeholder="None or select column" className="text-xs" />
-                              </SelectTrigger>
-                              <SelectContent className="text-xs">
-                                <SelectItem value="__none__" className="text-xs">
-                                  None
-                                </SelectItem>
-                                <GroupedColumnSelectItems
-                                  groups={lineSheetColumnGroups}
-                                  allowedValues={xOptions}
-                                />
-                              </SelectContent>
-                            </Select>
-                          </AxisSelectRow>
+                          <div className="flex w-full min-w-0 items-center gap-1.5">
+                            <div className="min-w-0 flex-1">
+                              <Select
+                                value={selColorCol ?? "__none__"}
+                                onValueChange={(v) => {
+                                  const next = v === "__none__" ? null : v;
+                                  setSelColorCol(next);
+                                  if (!next) return;
+                                  const t = axisMenuValueType(getAxisType(next, dataTypes, chartData));
+                                  if (t === "string") setScatterColorScaleMode("categories");
+                                  else if (t === "number") {
+                                    const rows = Array.isArray(chartData) ? chartData : [];
+                                    let hasNeg = false;
+                                    let hasPos = false;
+                                    for (let i = 0; i < Math.min(rows.length, 200); i += 1) {
+                                      const n = Number(rows[i]?.[next]);
+                                      if (!Number.isFinite(n)) continue;
+                                      if (n < 0) hasNeg = true;
+                                      if (n > 0) hasPos = true;
+                                      if (hasNeg && hasPos) break;
+                                    }
+                                    setScatterColorScaleMode(hasNeg && hasPos ? "diverging" : "sequential");
+                                  } else {
+                                    setScatterColorScaleMode("sequential");
+                                  }
+                                }}
+                              >
+                                <SelectTrigger className="h-8 min-w-0 w-full text-xs">
+                                  <SelectValue placeholder="None or select column" className="text-xs" />
+                                </SelectTrigger>
+                                <SelectContent className="text-xs">
+                                  <SelectItem value="__none__" className="text-xs">
+                                    None
+                                  </SelectItem>
+                                  <GroupedColumnSelectItems
+                                    groups={lineSheetColumnGroups}
+                                    allowedValues={xOptions}
+                                  />
+                                </SelectContent>
+                              </Select>
+                            </div>
+                            <ColorBySettingsMenu
+                              scaleMode={scatterColorScaleMode}
+                              onScaleModeChange={setScatterColorScaleMode}
+                              paletteId={scatterColorPaletteId}
+                              onPaletteIdChange={setScatterColorPaletteId}
+                              reverse={scatterColorReverse}
+                              onReverseChange={setScatterColorReverse}
+                              rangeMode={scatterColorRangeMode}
+                              onRangeModeChange={setScatterColorRangeMode}
+                              rangeMin={scatterColorRangeMin}
+                              onRangeMinChange={setScatterColorRangeMin}
+                              rangeMax={scatterColorRangeMax}
+                              onRangeMaxChange={setScatterColorRangeMax}
+                            />
+                          </div>
                         ) : null}
                       </Field>
                       {chartLineFilterControls}

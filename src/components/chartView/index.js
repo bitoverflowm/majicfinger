@@ -27,6 +27,15 @@ import { MarketHeatmap } from '@/components/spectrumui/charts/market-heatmap';
 import { buildHeatmapItems } from '@/components/chartView/buildHeatmapRows';
 import { formatSignedPct } from '@/components/spectrumui/charts/chart-engine';
 import { extrapolateColorsFromPalette } from '@/components/chartView/paletteExtrapolation';
+import {
+  buildScatterColorLegendModel,
+  collectScatterColorCategories,
+  colorForScatterValue,
+  computeScatterColorNumericExtent,
+  resolveScatterColorRange,
+  resolveScatterColorStops,
+} from '@/components/chartView/scatterColorScale';
+import { ScatterColorByLegend } from '@/components/chartView/ScatterColorByLegend';
 import { toPng, toSvg, toJpeg } from 'html-to-image';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
@@ -883,6 +892,15 @@ export function ChartBuilderProvider({ demo, children, initialBuilderSnapshot, e
   const [scaleZ, setScaleZ] = useState("linear");
   const [scatterZEnabled, setScatterZEnabled] = useState(false);
   const [scatterColorEnabled, setScatterColorEnabled] = useState(false);
+  /** sequential | diverging | categories */
+  const [scatterColorScaleMode, setScatterColorScaleMode] = useState("sequential");
+  /** Shadcn base id for Color-by ramp; null = follow chart palette. */
+  const [scatterColorPaletteId, setScatterColorPaletteId] = useState(null);
+  const [scatterColorReverse, setScatterColorReverse] = useState(false);
+  /** auto | custom */
+  const [scatterColorRangeMode, setScatterColorRangeMode] = useState("auto");
+  const [scatterColorRangeMin, setScatterColorRangeMin] = useState("");
+  const [scatterColorRangeMax, setScatterColorRangeMax] = useState("");
   /** Scatter: nudge overlapping points; amounts are 0–100 intensity (mapped to % of axis span). */
   const [scatterJitterEnabled, setScatterJitterEnabled] = useState(false);
   const [scatterJitterX, setScatterJitterX] = useState(2);
@@ -1177,6 +1195,26 @@ export function ChartBuilderProvider({ demo, children, initialBuilderSnapshot, e
     else if (s.selZ) setScatterZEnabled(true);
     if (s.scatterColorEnabled !== undefined) setScatterColorEnabled(!!s.scatterColorEnabled);
     else if (s.selColorCol) setScatterColorEnabled(true);
+    if (
+      s.scatterColorScaleMode === "sequential" ||
+      s.scatterColorScaleMode === "diverging" ||
+      s.scatterColorScaleMode === "categories"
+    ) {
+      setScatterColorScaleMode(s.scatterColorScaleMode);
+    }
+    if (s.scatterColorPaletteId !== undefined) {
+      setScatterColorPaletteId(s.scatterColorPaletteId ? String(s.scatterColorPaletteId) : null);
+    }
+    if (s.scatterColorReverse !== undefined) setScatterColorReverse(!!s.scatterColorReverse);
+    if (s.scatterColorRangeMode === "auto" || s.scatterColorRangeMode === "custom") {
+      setScatterColorRangeMode(s.scatterColorRangeMode);
+    }
+    if (s.scatterColorRangeMin !== undefined) {
+      setScatterColorRangeMin(s.scatterColorRangeMin == null ? "" : String(s.scatterColorRangeMin));
+    }
+    if (s.scatterColorRangeMax !== undefined) {
+      setScatterColorRangeMax(s.scatterColorRangeMax == null ? "" : String(s.scatterColorRangeMax));
+    }
     if (s.scatterJitterEnabled !== undefined) setScatterJitterEnabled(!!s.scatterJitterEnabled);
     if (s.scatterJitterX != null && Number.isFinite(Number(s.scatterJitterX))) {
       setScatterJitterX(Math.max(0, Math.min(100, Math.round(Number(s.scatterJitterX)))));
@@ -2007,6 +2045,12 @@ export function ChartBuilderProvider({ demo, children, initialBuilderSnapshot, e
     scaleZ,
     scatterZEnabled,
     scatterColorEnabled,
+    scatterColorScaleMode,
+    scatterColorPaletteId,
+    scatterColorReverse,
+    scatterColorRangeMode,
+    scatterColorRangeMin,
+    scatterColorRangeMax,
     scatterJitterEnabled,
     scatterJitterX,
     scatterJitterY,
@@ -2320,6 +2364,18 @@ export function ChartBuilderProvider({ demo, children, initialBuilderSnapshot, e
     setScatterZEnabled,
     scatterColorEnabled,
     setScatterColorEnabled,
+    scatterColorScaleMode,
+    setScatterColorScaleMode,
+    scatterColorPaletteId,
+    setScatterColorPaletteId,
+    scatterColorReverse,
+    setScatterColorReverse,
+    scatterColorRangeMode,
+    setScatterColorRangeMode,
+    scatterColorRangeMin,
+    setScatterColorRangeMin,
+    scatterColorRangeMax,
+    setScatterColorRangeMax,
     scatterJitterEnabled,
     setScatterJitterEnabled,
     scatterJitterX,
@@ -2678,6 +2734,12 @@ export function ChartCanvas() {
     scaleZ,
     scatterZEnabled,
     scatterColorEnabled,
+    scatterColorScaleMode,
+    scatterColorPaletteId,
+    scatterColorReverse,
+    scatterColorRangeMode,
+    scatterColorRangeMin,
+    scatterColorRangeMax,
     scatterJitterEnabled,
     scatterJitterX,
     scatterJitterY,
@@ -3213,10 +3275,88 @@ export function ChartCanvas() {
     const override = lineColorOverrides?.[instanceKey] || (yKey ? lineColorOverrides?.[yKey] : null);
     return override || seriesColorAt(idx);
   };
+
+  const scatterColorActive = selChartType === "scatter" && scatterColorEnabled && !!selColorCol;
+
+  const scatterColorStops = useMemo(
+    () =>
+      resolveScatterColorStops({
+        mode: scatterColorScaleMode,
+        paletteId: scatterColorPaletteId,
+        reverse: scatterColorReverse,
+        selectedPalette: usePaletteForSeries ? selectedPalette : null,
+      }),
+    [
+      scatterColorScaleMode,
+      scatterColorPaletteId,
+      scatterColorReverse,
+      usePaletteForSeries,
+      selectedPalette,
+    ],
+  );
+
+  const scatterColorAutoExtent = useMemo(() => {
+    if (!scatterColorActive) return { min: 0, max: 1 };
+    return computeScatterColorNumericExtent(scatterPlotData, selColorCol);
+  }, [scatterColorActive, scatterPlotData, selColorCol]);
+
+  const scatterColorRange = useMemo(
+    () =>
+      resolveScatterColorRange({
+        rangeMode: scatterColorRangeMode,
+        customMin: scatterColorRangeMin,
+        customMax: scatterColorRangeMax,
+        autoMin: scatterColorAutoExtent.min,
+        autoMax: scatterColorAutoExtent.max,
+      }),
+    [
+      scatterColorRangeMode,
+      scatterColorRangeMin,
+      scatterColorRangeMax,
+      scatterColorAutoExtent.min,
+      scatterColorAutoExtent.max,
+    ],
+  );
+
+  const scatterColorCategories = useMemo(() => {
+    if (!scatterColorActive || scatterColorScaleMode !== "categories") return [];
+    return collectScatterColorCategories(scatterPlotData, selColorCol, { limit: 24 });
+  }, [scatterColorActive, scatterColorScaleMode, scatterPlotData, selColorCol]);
+
+  const scatterColorCategoryIndexByKey = useMemo(() => {
+    const map = new Map();
+    scatterColorCategories.forEach((cat, i) => map.set(cat.key, i));
+    return map;
+  }, [scatterColorCategories]);
+
+  const scatterColorLegendModel = useMemo(() => {
+    if (!scatterColorActive) return null;
+    return buildScatterColorLegendModel({
+      mode: scatterColorScaleMode,
+      stops: scatterColorStops,
+      range: scatterColorRange,
+      categories: scatterColorCategories,
+      columnLabel: stripSheetScopedColumnKey(selColorCol),
+    });
+  }, [
+    scatterColorActive,
+    scatterColorScaleMode,
+    scatterColorStops,
+    scatterColorRange,
+    scatterColorCategories,
+    selColorCol,
+  ]);
+
   const scatterPointColorFor = (row, idx) => {
-    if (!scatterColorEnabled || !selColorCol) return seriesColorFor(ySeries[0]?.sourceKey, 0);
+    if (!scatterColorActive) return seriesColorFor(ySeries[0]?.sourceKey, 0);
     const value = rowValueForDataKey(row, selColorCol);
-    return seriesColorAt(stableHashIndex(value, Math.max(1, usePaletteForSeries ? selectedPalette.length : DEFAULT_CHART_SERIES_COLORS.length))) || seriesColorAt(idx);
+    return colorForScatterValue({
+      value,
+      mode: scatterColorScaleMode,
+      stops: scatterColorStops,
+      range: scatterColorRange,
+      categoryIndexByKey: scatterColorCategoryIndexByKey,
+    }).color || seriesColorAt(idx);
   };
   const yAxisFormatter = (raw) => {
     const n = Number(raw);
@@ -4144,13 +4284,21 @@ export function ChartCanvas() {
                           ))}
                         </Scatter>
                         {renderedCartesianReferenceLines}
-                        {legendVisible && (
+                        {legendVisible || scatterColorLegendModel ? (
                           <ChartLegend
                             content={
-                              <ChartLegendContent className={CHART_CHROME_TEXT_CLASS} title={legendTitle} />
+                              scatterColorLegendModel ? (
+                                <ScatterColorByLegend
+                                  model={scatterColorLegendModel}
+                                  title={legendTitle}
+                                  className={CHART_CHROME_TEXT_CLASS}
+                                />
+                              ) : (
+                                <ChartLegendContent className={CHART_CHROME_TEXT_CLASS} title={legendTitle} />
+                              )
                             }
                           />
-                        )}
+                        ) : null}
                       </ScatterChart>
                     )}
 
