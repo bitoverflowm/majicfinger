@@ -1041,12 +1041,7 @@ export default function ChartControls() {
     !demo && effectiveData?.length > 0 && xOptions?.length > 0 && (selY || []).length > 0;
   const chartLineFilterControls = showChartLineFilterControls ? (
     <div className="min-w-0 space-y-3 py-2">
-      <div className="space-y-1">
-        <p className={`text-xs font-bold ${dark ? "text-slate-200" : "text-muted-foreground"}`}>Filter by line</p>
-        <p className={`text-xs ${dark ? "text-slate-300" : "text-muted-foreground"}`}>
-          Filter chart series only. Sheet data is unchanged.
-        </p>
-      </div>
+      <p className={`text-xs font-bold ${dark ? "text-slate-200" : "text-muted-foreground"}`}>Filter data</p>
       {normalizedChartLineFilters.length > 0 ? (
         <div className="space-y-2">
           {normalizedChartLineFilters.map((rule, idx) => {
@@ -2543,9 +2538,9 @@ export default function ChartControls() {
                   {selChartType === "scatter" && (
                     <>
                       <Field className="gap-1.5">
-                        <div className="flex min-w-0 items-center justify-between gap-2">
-                          <AxisFieldLabel>Bubble size (Z)</AxisFieldLabel>
+                        <div className="flex min-w-0 items-center gap-2">
                           <Switch
+                            id="chart-data-scatter-z"
                             checked={!!scatterZEnabled}
                             onCheckedChange={(checked) => {
                               setScatterZEnabled(!!checked);
@@ -2554,6 +2549,12 @@ export default function ChartControls() {
                             aria-label="Enable bubble size Z column"
                             className="h-4 w-7 shrink-0 [&>span]:h-3 [&>span]:w-3 data-[state=checked]:[&>span]:translate-x-3"
                           />
+                          <FieldLabel
+                            htmlFor="chart-data-scatter-z"
+                            className="mb-0 cursor-pointer text-[11px] font-normal leading-none"
+                          >
+                            Bubble size (Z)
+                          </FieldLabel>
                         </div>
                         {scatterZEnabled ? (
                           <AxisSelectRow
@@ -2581,9 +2582,9 @@ export default function ChartControls() {
                         ) : null}
                       </Field>
                       <Field className="gap-1.5">
-                        <div className="flex min-w-0 items-center justify-between gap-2">
-                          <AxisFieldLabel>Color by</AxisFieldLabel>
+                        <div className="flex min-w-0 items-center gap-2">
                           <Switch
+                            id="chart-data-scatter-color"
                             checked={!!scatterColorEnabled}
                             onCheckedChange={(checked) => {
                               setScatterColorEnabled(!!checked);
@@ -2592,6 +2593,12 @@ export default function ChartControls() {
                             aria-label="Enable scatter color by column"
                             className="h-4 w-7 shrink-0 [&>span]:h-3 [&>span]:w-3 data-[state=checked]:[&>span]:translate-x-3"
                           />
+                          <FieldLabel
+                            htmlFor="chart-data-scatter-color"
+                            className="mb-0 cursor-pointer text-[11px] font-normal leading-none"
+                          >
+                            Color by
+                          </FieldLabel>
                         </div>
                         {scatterColorEnabled ? (
                           <AxisSelectRow
