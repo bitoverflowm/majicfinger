@@ -30,6 +30,7 @@ import { ConnectProgressWithLabel } from "@/components/integrationsView/integrat
  *   pullLabel?: string;
  *   pullProgress?: number;
  *   intent?: "replay" | "edit";
+ *   onCancel?: () => void;
  * }} props
  */
 export function ConnectHomeReplaySheetDialog({
@@ -43,6 +44,7 @@ export function ConnectHomeReplaySheetDialog({
   pullLabel = "Loading data…",
   pullProgress = 0,
   intent = "replay",
+  onCancel,
 }) {
   const isEdit = intent === "edit";
   const [step, setStep] = useState("choose");
@@ -62,6 +64,10 @@ export function ConnectHomeReplaySheetDialog({
   }, [open, loading, sheetName, step]);
 
   const handleOpenChange = (next) => {
+    if (loading && next === false) {
+      onCancel?.();
+      return;
+    }
     if (loading) return;
     onOpenChange?.(next);
   };
@@ -96,6 +102,11 @@ export function ConnectHomeReplaySheetDialog({
               progress={pullProgress ?? 0}
               className="py-2"
             />
+            <DialogFooter className="flex flex-col gap-2 sm:flex-row sm:justify-end">
+              <Button type="button" variant="ghost" className="w-full sm:w-auto" onClick={() => onCancel?.()}>
+                Cancel
+              </Button>
+            </DialogFooter>
           </>
         ) : step === "name" ? (
           <>

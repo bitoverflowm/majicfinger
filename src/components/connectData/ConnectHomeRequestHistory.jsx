@@ -283,6 +283,7 @@ export function ConnectHomeRequestHistory({ className }) {
   const [renamingSheetId, setRenamingSheetId] = useState(null);
   const [renameDraft, setRenameDraft] = useState("");
   const progressTimerRef = useRef(null);
+  const replayAbortRef = useRef(/** @type {AbortController | null} */ (null));
 
   const actionSource = sheetActionSourceId ? dataSheets[sheetActionSourceId] : null;
   const replayProvenance = actionSource?.provenance;
@@ -295,6 +296,10 @@ export function ConnectHomeRequestHistory({ className }) {
       clearInterval(progressTimerRef.current);
       progressTimerRef.current = null;
     }
+  }, []);
+
+  const cancelReplay = useCallback(() => {
+    replayAbortRef.current?.abort();
   }, []);
 
   const closeSheetActionDialog = useCallback(() => {
@@ -452,13 +457,25 @@ export function ConnectHomeRequestHistory({ className }) {
       setReplayBusy(true);
       startReplayPullProgress(setConnectDataLakePullState);
       clearProgressTimer();
+      replayAbortRef.current?.abort();
+      const abort = new AbortController();
+      replayAbortRef.current = abort;
+      const replayStartedAt = Date.now();
       progressTimerRef.current = setInterval(() => {
         setConnectDataLakePullState?.((prev) => {
           if (!prev.loading) return prev;
-          const next = Math.min(88, (Number(prev.progress) || 8) + 5);
-          return { ...prev, progress: next };
+          const next = Math.min(88, (Number(prev.progress) || 8) + 3);
+          const waitedS = Math.max(0, Math.round((Date.now() - replayStartedAt) / 1000));
+          const waitingOnAthena = next >= 42;
+          return {
+            ...prev,
+            progress: next,
+            label: waitingOnAthena
+              ? `Waiting for Athena… ${waitedS}s`
+              : prev.label ?? "Replaying query…",
+          };
         });
-      }, 450);
+      }, 800);
 
       try {
         let targetSheetId = destination === "replace" ? sourceId : activeSheetId;
@@ -508,13 +525,45 @@ export function ConnectHomeRequestHistory({ className }) {
           throw new Error("Could not create or select a sheet to replay into.");
         }
 
-        bumpReplayPullProgress(setConnectDataLakePullState, 42, "Running query…");
+        bumpReplayPullProgress(setConnectDataLakePullState, 42, "Waiting for Athena…");
 
+        const sampleSize = Number(replayProv?.composeSpec?.randomSample?.size);
         const { rows, json } = await rehydrateSheetFromProvenance({
           targetSheetId,
           provenance: replayProv,
           dataSheets,
           sourceSheetId: sourceId,
+          maxRows: Number.isFinite(sampleSize) && sampleSize > 0 ? sampleSize : undefined,
+          pollOpts: {
+            signal: abort.signal,
+            onPhase: (info) => {
+              if (info?.phase === "polling") {
+                const waitedS = Math.max(0, Math.round((Date.now() - replayStartedAt) / 1000));
+                bumpReplayPullProgress(
+                  setConnectDataLakePullState,
+                  50,
+                  `Waiting for Athena… ${waitedS}s`,
+                );
+                return;
+              }
+              if (info?.phase === "athena_succeeded") {
+                clearProgressTimer();
+                bumpReplayPullProgress(
+                  setConnectDataLakePullState,
+                  90,
+                  "Athena finished — downloading rows…",
+                );
+                return;
+              }
+              if (info?.phase === "downloading" || info?.phase === "downloading_page") {
+                bumpReplayPullProgress(
+                  setConnectDataLakePullState,
+                  94,
+                  "Downloading results…",
+                );
+              }
+            },
+          },
         });
 
         bumpReplayPullProgress(setConnectDataLakePullState, 96, "Finishing up…");
@@ -592,15 +641,18 @@ export function ConnectHomeRequestHistory({ className }) {
 
         closeSheetActionDialog();
       } catch (e) {
+        const aborted = e?.name === "AbortError" || /aborted/i.test(String(e?.message || ""));
         setConnectDataLakePullState?.({
           loading: false,
           label: "",
           progress: 0,
-          error: e?.message || "Failed to replay query.",
+          error: aborted ? null : e?.message || "Failed to replay query.",
         });
-        toast.error(e?.message || "Failed to replay query.");
+        if (aborted) toast.message("Replay cancelled.");
+        else toast.error(e?.message || "Failed to replay query.");
         closeSheetActionDialog();
       } finally {
+        if (replayAbortRef.current === abort) replayAbortRef.current = null;
         clearProgressTimer();
         setReplayBusy(false);
         window.setTimeout(() => finishReplayPullProgress(setConnectDataLakePullState), 400);
@@ -808,9 +860,17 @@ export function ConnectHomeRequestHistory({ className }) {
         open={sheetActionOpen}
         intent={sheetActionIntent}
         onOpenChange={(open) => {
+          if (replayBusy && !open) {
+            cancelReplay();
+            return;
+          }
           if (replayBusy) return;
           if (!open) closeSheetActionDialog();
           else setSheetActionOpen(true);
+        }}
+        onCancel={() => {
+          cancelReplay();
+          closeSheetActionDialog();
         }}
         queryLabel={actionQueryLabel}
         sourceSheetName={String(actionSource?.name || "").trim()}

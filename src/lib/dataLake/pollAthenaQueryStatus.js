@@ -95,6 +95,12 @@ export async function pollAthenaQueryUntilDone(queryExecutionId, rowLimit, opts 
       break;
     }
 
+    onPhase?.({
+      phase: "polling",
+      rowLimit: rowLimit ?? null,
+      dataScannedBytes,
+    });
+
     if (j.state === "FAILED" || j.state === "CANCELLED") {
       throw new Error(j.error || `Athena ${j.state}`);
     }

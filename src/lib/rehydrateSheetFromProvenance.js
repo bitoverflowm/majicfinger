@@ -31,7 +31,8 @@ function buildSheetGraph(dataSheets, rootSheetId) {
  *   provenance: object;
  *   dataSheets: Record<string, object>;
  *   sourceSheetId?: string;
- *   pollOpts?: { signal?: AbortSignal; pollIntervalMs?: number; maxWaitMs?: number };
+ *   maxRows?: number;
+ *   pollOpts?: { signal?: AbortSignal; pollIntervalMs?: number; maxWaitMs?: number; onPhase?: Function };
  * }} args
  */
 export async function rehydrateSheetFromProvenance({
@@ -39,6 +40,7 @@ export async function rehydrateSheetFromProvenance({
   provenance,
   dataSheets,
   sourceSheetId,
+  maxRows,
   pollOpts,
 }) {
   if (!targetSheetId) {
@@ -56,6 +58,7 @@ export async function rehydrateSheetFromProvenance({
     provenance,
     sheetGraph,
     sheet: sourceSheet,
+    maxRows,
     pollOpts,
   });
 
