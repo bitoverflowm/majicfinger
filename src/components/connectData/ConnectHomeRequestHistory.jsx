@@ -27,7 +27,7 @@ import {
 } from "@/lib/connectHomeRequestHistory";
 import { isConnectIntegrationWorkspace } from "@/lib/connectHomeWorkspace";
 import { openConnectComposeEdit } from "@/lib/hubs/openConnectComposeEdit";
-import { withFreshRandomSampleSeed } from "@/lib/dataLake/randomSample";
+import { seededRandomSampleFromProvenance, withFreshRandomSampleSeed } from "@/lib/dataLake/randomSample";
 import { describePolymarketLiveRequestCard } from "@/lib/polymarketLive/polymarketLiveRequestHistory";
 import { rehydrateSheetFromProvenance } from "@/lib/rehydrateSheetFromProvenance";
 import { resolvePersistedFullRowCount } from "@/lib/projectPersistence";
@@ -287,6 +287,7 @@ export function ConnectHomeRequestHistory({ className }) {
 
   const actionSource = sheetActionSourceId ? dataSheets[sheetActionSourceId] : null;
   const replayProvenance = actionSource?.provenance;
+  const replaySeededSample = seededRandomSampleFromProvenance(replayProvenance);
   const actionQueryLabel = actionSource
     ? requestCardSummaryLabel(actionSource.requestCards?.[0], actionSource)
     : "";
@@ -441,7 +442,7 @@ export function ConnectHomeRequestHistory({ className }) {
   ]);
 
   const runReplay = useCallback(
-    async (destination, newSheetName) => {
+    async (destination, newSheetName, opts = {}) => {
       const sourceId = sheetActionSourceId;
       const sourceSheet = sourceId ? dataSheets?.[sourceId] : null;
       const sourceProvenance = sourceSheet?.provenance || replayProvenance;
@@ -480,9 +481,9 @@ export function ConnectHomeRequestHistory({ className }) {
       try {
         let targetSheetId = destination === "replace" ? sourceId : activeSheetId;
 
-        // New sheet + seeded sample → new independent seed; replace keeps the same seed.
+        // Seeded replay: reuse seed = same rows; fresh seed = new sample. Unseeded always draws again.
         const replayProv =
-          destination === "new_sheet"
+          opts?.seedMode === "fresh"
             ? withFreshRandomSampleSeed(sourceProvenance)
             : sourceProvenance;
 
@@ -877,13 +878,15 @@ export function ConnectHomeRequestHistory({ className }) {
         loading={sheetActionIntent === "replay" && replayBusy}
         pullLabel={pull.label}
         pullProgress={pull.progress}
-        onReplaceCurrent={() => {
+        askSeedChoice={sheetActionIntent === "replay" && !!replaySeededSample}
+        currentSeed={replaySeededSample?.seed || ""}
+        onReplaceCurrent={(opts) => {
           if (sheetActionIntent === "edit") runEditCompose("replace");
-          else void runReplay("replace");
+          else void runReplay("replace", undefined, opts);
         }}
-        onCreateNewSheet={(name) => {
+        onCreateNewSheet={(name, opts) => {
           if (sheetActionIntent === "edit") runEditCompose("new_sheet", name);
-          else void runReplay("new_sheet", name);
+          else void runReplay("new_sheet", name, opts);
         }}
       />
     </div>

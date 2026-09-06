@@ -298,7 +298,24 @@ export function wrapComposeSqlWithRandomSample(eligibleSql, opts) {
 }
 
 /**
- * Clone provenance with a fresh seed when the sample is seeded (e.g. replay → new sheet).
+ * Seeded random-sample config from compose provenance, or null.
+ * @param {object | null | undefined} provenance
+ * @returns {{ size: number; mode: "seeded"; seed: string } | null}
+ */
+export function seededRandomSampleFromProvenance(provenance) {
+  if (!provenance || typeof provenance !== "object") return null;
+  const rs = provenance.composeSpec?.randomSample;
+  const normalized = normalizeRandomSampleConfig(rs ? { ...rs, enabled: true } : null, {
+    defaultMode: RANDOM_SAMPLE_MODE_UNSEEDED,
+  });
+  if (!normalized || normalized.mode !== RANDOM_SAMPLE_MODE_SEEDED) return null;
+  const seed = sanitizeRandomSampleSeed(normalized.seed);
+  if (!seed) return null;
+  return { size: normalized.size, mode: RANDOM_SAMPLE_MODE_SEEDED, seed };
+}
+
+/**
+ * Clone provenance with a fresh seed when the sample is seeded.
  * @param {object | null | undefined} provenance
  * @returns {object | null | undefined}
  */

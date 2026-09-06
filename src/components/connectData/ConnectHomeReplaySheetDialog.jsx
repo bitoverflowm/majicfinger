@@ -18,12 +18,13 @@ import { ConnectProgressWithLabel } from "@/components/integrationsView/integrat
 
 /**
  * Choose replace vs new sheet for Replay (run now) or Edit (open compose).
+ * Seeded random-sample replays also choose reuse-seed vs new-seed.
  *
  * @param {{
  *   open: boolean;
  *   onOpenChange: (open: boolean) => void;
- *   onReplaceCurrent: () => void | Promise<void>;
- *   onCreateNewSheet: (name: string) => void | Promise<void>;
+ *   onReplaceCurrent: (opts?: { seedMode?: "reuse" | "fresh" }) => void | Promise<void>;
+ *   onCreateNewSheet: (name: string, opts?: { seedMode?: "reuse" | "fresh" }) => void | Promise<void>;
  *   queryLabel?: string;
  *   sourceSheetName?: string;
  *   loading?: boolean;
@@ -31,6 +32,8 @@ import { ConnectProgressWithLabel } from "@/components/integrationsView/integrat
  *   pullProgress?: number;
  *   intent?: "replay" | "edit";
  *   onCancel?: () => void;
+ *   askSeedChoice?: boolean;
+ *   currentSeed?: string;
  * }} props
  */
 export function ConnectHomeReplaySheetDialog({
@@ -45,15 +48,20 @@ export function ConnectHomeReplaySheetDialog({
   pullProgress = 0,
   intent = "replay",
   onCancel,
+  askSeedChoice = false,
+  currentSeed = "",
 }) {
   const isEdit = intent === "edit";
   const [step, setStep] = useState("choose");
   const [sheetName, setSheetName] = useState("");
+  /** @type {[{ type: "replace" } | { type: "new_sheet"; name: string } | null, Function]} */
+  const [pendingAction, setPendingAction] = useState(null);
 
   useEffect(() => {
     if (!open) {
       setStep("choose");
       setSheetName("");
+      setPendingAction(null);
       return;
     }
     if (loading) {
@@ -72,17 +80,50 @@ export function ConnectHomeReplaySheetDialog({
     onOpenChange?.(next);
   };
 
+  const goToSeedOrRun = (action) => {
+    if (!isEdit && askSeedChoice) {
+      setPendingAction(action);
+      setStep("seed");
+      return;
+    }
+    if (action.type === "new_sheet") {
+      void onCreateNewSheet?.(action.name, { seedMode: "reuse" });
+      return;
+    }
+    void onReplaceCurrent?.({ seedMode: "reuse" });
+  };
+
   const handleCreateNewSheet = async () => {
     const name = String(sheetName || "").trim();
     if (!name) return;
+    if (!isEdit && askSeedChoice) {
+      goToSeedOrRun({ type: "new_sheet", name });
+      return;
+    }
     if (!isEdit) setStep("loading");
-    await onCreateNewSheet?.(name);
+    await onCreateNewSheet?.(name, { seedMode: "reuse" });
   };
 
   const handleReplace = async () => {
+    if (!isEdit && askSeedChoice) {
+      goToSeedOrRun({ type: "replace" });
+      return;
+    }
     if (!isEdit) setStep("loading");
-    await onReplaceCurrent?.();
+    await onReplaceCurrent?.({ seedMode: "reuse" });
   };
+
+  const handleSeedChoice = async (seedMode) => {
+    const action = pendingAction;
+    if (!isEdit) setStep("loading");
+    if (action?.type === "new_sheet") {
+      await onCreateNewSheet?.(action.name, { seedMode });
+      return;
+    }
+    await onReplaceCurrent?.({ seedMode });
+  };
+
+  const seedLabel = String(currentSeed || "").trim();
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
@@ -105,6 +146,50 @@ export function ConnectHomeReplaySheetDialog({
             <DialogFooter className="flex flex-col gap-2 sm:flex-row sm:justify-end">
               <Button type="button" variant="ghost" className="w-full sm:w-auto" onClick={() => onCancel?.()}>
                 Cancel
+              </Button>
+            </DialogFooter>
+          </>
+        ) : step === "seed" ? (
+          <>
+            <DialogHeader>
+              <DialogTitle>Random sample seed</DialogTitle>
+              <DialogDescription className="text-pretty">
+                This query used a seeded random sample
+                {seedLabel ? (
+                  <>
+                    {" "}
+                    (<span className="break-all font-mono text-[11px]">{seedLabel}</span>)
+                  </>
+                ) : null}
+                . Reuse the current seed to regenerate the same rows, or use a new seed for an entirely
+                new sample.
+              </DialogDescription>
+            </DialogHeader>
+            <DialogFooter className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:justify-end">
+              <Button
+                type="button"
+                variant="ghost"
+                className="w-full sm:w-auto"
+                onClick={() => {
+                  setStep(pendingAction?.type === "new_sheet" ? "name" : "choose");
+                }}
+              >
+                Back
+              </Button>
+              <Button
+                type="button"
+                className="w-full sm:w-auto shrink-0"
+                onClick={() => void handleSeedChoice("reuse")}
+              >
+                Reuse current seed
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                className="w-full sm:w-auto shrink-0"
+                onClick={() => void handleSeedChoice("fresh")}
+              >
+                Use a new seed
               </Button>
             </DialogFooter>
           </>
@@ -157,7 +242,7 @@ export function ConnectHomeReplaySheetDialog({
                 disabled={!String(sheetName || "").trim()}
                 onClick={() => void handleCreateNewSheet()}
               >
-                {isEdit ? "Open in compose" : "Run query"}
+                {isEdit ? "Open in compose" : askSeedChoice ? "Continue" : "Run query"}
               </Button>
             </DialogFooter>
           </>

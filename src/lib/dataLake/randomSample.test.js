@@ -6,6 +6,7 @@ import {
   validateRandomSampleSizeInput,
   wrapComposeSqlWithRandomSample,
   withFreshRandomSampleSeed,
+  seededRandomSampleFromProvenance,
   injectMissingRandomSampleSeeds,
   generateRandomSampleSeed,
   RANDOM_SAMPLE_ABSOLUTE_MAX,
@@ -129,6 +130,19 @@ test("wrapComposeSqlWithRandomSample with user sort outer only", () => {
   assert.ok(randomIdx < sampledIdx);
   assert.ok(sampledIdx < userOrderIdx);
   assert.equal(sql.includes("TABLESAMPLE"), false);
+});
+
+test("seededRandomSampleFromProvenance requires a seed", () => {
+  assert.equal(
+    seededRandomSampleFromProvenance({
+      composeSpec: { randomSample: { enabled: true, size: 100, mode: "unseeded" } },
+    }),
+    null,
+  );
+  const seeded = seededRandomSampleFromProvenance({
+    composeSpec: { randomSample: { enabled: true, size: 50, mode: "seeded", seed: "s_abc" } },
+  });
+  assert.deepEqual(seeded, { size: 50, mode: "seeded", seed: "s_abc" });
 });
 
 test("withFreshRandomSampleSeed only rotates seeded recipes", () => {

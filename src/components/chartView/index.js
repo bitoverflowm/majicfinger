@@ -36,6 +36,13 @@ import {
   resolveScatterColorStops,
 } from '@/components/chartView/scatterColorScale';
 import { ScatterColorByLegend } from '@/components/chartView/ScatterColorByLegend';
+import {
+  SCATTER_OVERLAY_Y_KEY,
+  filterScatterOverlayRows,
+  jitterScatterOverlayRows,
+  scatterJitterFraction,
+  splitScatterOverlaySeries,
+} from '@/components/chartView/scatterOverlay';
 import { toPng, toSvg, toJpeg } from 'html-to-image';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
@@ -820,18 +827,6 @@ function stableHashIndex(value, modulo) {
     hash = ((hash << 5) - hash + s.charCodeAt(i)) | 0;
   }
   return Math.abs(hash) % n;
-}
-
-/** Deterministic 0..1 noise from integer seeds (stable across renders). */
-function unitNoise2d(i, channel) {
-  const x = Math.sin((Number(i) + 1) * 12.9898 + (Number(channel) + 1) * 78.233) * 43758.5453;
-  return x - Math.floor(x);
-}
-
-/** Map 0–100 jitter intensity to a fraction of axis span (max 12% at 100). */
-function scatterJitterFraction(intensity) {
-  const t = Math.max(0, Math.min(100, Number(intensity) || 0)) / 100;
-  return t * 0.12;
 }
 
 function parseScopedColumnKey(value, fallbackSheetId) {
@@ -3272,72 +3267,31 @@ export function ChartCanvas() {
     return [{ name: "root", children: leaves }];
   }, [selChartType, treemapRows, xKey, yKeys]);
   const scatterYKey = ySeries[0]?.renderKey || null;
+  const scatterYKeys = renderedYKeys;
   const scatterPlotData = useMemo(() => {
-    if (selChartType !== "scatter" || !xKey || !scatterYKey || !Array.isArray(finalRenderedData)) return [];
-    const filtered = finalRenderedData.filter((row) => {
-      const x = row?.[xKey];
-      const y = row?.[scatterYKey];
-      if (x == null || x === "" || y == null || y === "") return false;
-      if (rechartsXAxisType === "number" && !Number.isFinite(Number(x))) return false;
-      if (scaleY === "categorical") return true;
-      const yn = Number(y);
-      if (!Number.isFinite(yn)) return false;
-      if (scaleY === "log" && yn <= 0) return false;
-      return true;
+    if (selChartType !== "scatter" || !xKey || !scatterYKeys.length || !Array.isArray(finalRenderedData)) return [];
+    const filtered = filterScatterOverlayRows(finalRenderedData, {
+      xKey,
+      yKeys: scatterYKeys,
+      xIsNumber: rechartsXAxisType === "number",
+      scaleY,
     });
     if (!scatterJitterEnabled) return filtered;
-
     const jitterXAmt = scatterJitterFraction(scatterJitterX);
     const jitterYAmt = scatterJitterFraction(scatterJitterY);
     if (jitterXAmt <= 0 && jitterYAmt <= 0) return filtered;
-
-    let xMin = Infinity;
-    let xMax = -Infinity;
-    let yMin = Infinity;
-    let yMax = -Infinity;
-    const numericX = rechartsXAxisType === "number";
-    const numericY = scaleY !== "categorical";
-    for (const row of filtered) {
-      if (numericX) {
-        const x = Number(row?.[xKey]);
-        if (Number.isFinite(x)) {
-          if (x < xMin) xMin = x;
-          if (x > xMax) xMax = x;
-        }
-      }
-      if (numericY) {
-        const y = Number(row?.[scatterYKey]);
-        if (Number.isFinite(y)) {
-          if (y < yMin) yMin = y;
-          if (y > yMax) yMax = y;
-        }
-      }
-    }
-    const xSpan = numericX && Number.isFinite(xMin) && Number.isFinite(xMax) ? Math.max(xMax - xMin, Number.EPSILON) : 0;
-    const ySpan = numericY && Number.isFinite(yMin) && Number.isFinite(yMax) ? Math.max(yMax - yMin, Number.EPSILON) : 0;
-
-    return filtered.map((row, i) => {
-      const next = { ...row };
-      if (numericX && xSpan > 0 && jitterXAmt > 0) {
-        const n = Number(row[xKey]);
-        if (Number.isFinite(n)) {
-          next[xKey] = n + (unitNoise2d(i, 1) - 0.5) * 2 * jitterXAmt * xSpan;
-        }
-      }
-      if (numericY && ySpan > 0 && jitterYAmt > 0) {
-        const n = Number(row[scatterYKey]);
-        if (Number.isFinite(n)) {
-          let jy = n + (unitNoise2d(i, 2) - 0.5) * 2 * jitterYAmt * ySpan;
-          if (scaleY === "log" && jy <= 0) jy = n;
-          next[scatterYKey] = jy;
-        }
-      }
-      return next;
+    return jitterScatterOverlayRows(filtered, {
+      xKey,
+      yKeys: scatterYKeys,
+      xIsNumber: rechartsXAxisType === "number",
+      scaleY,
+      jitterXAmt,
+      jitterYAmt,
     });
   }, [
     selChartType,
     xKey,
-    scatterYKey,
+    scatterYKeys,
     finalRenderedData,
     rechartsXAxisType,
     scaleY,
@@ -3345,14 +3299,18 @@ export function ChartCanvas() {
     scatterJitterX,
     scatterJitterY,
   ]);
+  const scatterOverlaySeries = useMemo(() => {
+    if (selChartType !== "scatter") return [];
+    return splitScatterOverlaySeries(scatterPlotData, ySeries, scaleY);
+  }, [selChartType, scatterPlotData, ySeries, scaleY]);
   const logYAxisDomain = useMemo(() => {
     if (scaleY !== "log") return undefined;
-    const keys = selChartType === "scatter" ? (scatterYKey ? [scatterYKey] : []) : renderedYKeys;
+    const keys = selChartType === "scatter" ? scatterYKeys : renderedYKeys;
     const rows = selChartType === "scatter" ? scatterPlotData : finalRenderedData;
     const values = collectAxisNumericValues(rows, keys);
     // Log cannot include 0; both range modes use the positive plotted extent.
     return axisRangeDomain(normalizeAxisRange(yAxisRange), values, { isLog: true }) ?? rechartsLogAxisDomain(rows, keys);
-  }, [scaleY, selChartType, scatterYKey, scatterPlotData, renderedYKeys, finalRenderedData, yAxisRange]);
+  }, [scaleY, selChartType, scatterYKeys, scatterPlotData, renderedYKeys, finalRenderedData, yAxisRange]);
   const hasSelectedPalette = Array.isArray(selectedPalette) && selectedPalette.length > 0;
   /** Chromatic user-picked ramps drive series; grey/legacy auto ramps use rose/lime/blue defaults. */
   const usePaletteForSeries =
@@ -3674,7 +3632,7 @@ export function ChartCanvas() {
 
   const cartesianYAxisDomain = useMemo(() => {
     if (scaleY === "categorical") return undefined;
-    const yKeys = selChartType === "scatter" && scatterYKey ? [scatterYKey] : renderedYKeys;
+    const yKeys = selChartType === "scatter" ? scatterYKeys : renderedYKeys;
     const rows =
       selChartType === "scatter" && Array.isArray(scatterPlotData) && scatterPlotData.length
         ? scatterPlotData
@@ -3693,7 +3651,7 @@ export function ChartCanvas() {
   }, [
     scaleY,
     selChartType,
-    scatterYKey,
+    scatterYKeys,
     scatterPlotData,
     renderedYKeys,
     finalRenderedData,
@@ -4440,8 +4398,12 @@ export function ChartCanvas() {
                         />
                         <YAxis
                           type={rechartsYAxisType}
-                          dataKey={scatterYKey}
-                          name={stripSheetScopedColumnKey(ySeries[0]?.sourceKey || scatterYKey)}
+                          dataKey={SCATTER_OVERLAY_Y_KEY}
+                          name={
+                            ySeries.length === 1
+                              ? stripSheetScopedColumnKey(ySeries[0]?.sourceKey || scatterYKey)
+                              : "Y"
+                          }
                           tickLine={false}
                           axisLine={yAxisLineVisible ? { stroke: gridStroke, strokeWidth: 1 } : false}
                           tickMargin={8}
@@ -4477,22 +4439,27 @@ export function ChartCanvas() {
                               pivotName={stripSheetScopedColumnKey(xKey)}
                               pivotLabelFormatter={xTooltipLabelFormatter}
                               {...chartTooltipRowDetails}
-                              rowDetailY
-                              rowDetailYKeys={scatterYKey ? [scatterYKey] : []}
-                              rowDetailFormatY={scaleY === "categorical" ? undefined : yAxisFormatter}
                             />
                           }
                         />
-                        <Scatter
-                          name={stripSheetScopedColumnKey(ySeries[0]?.sourceKey || "Scatter")}
-                          data={scatterPlotData}
-                          fill={seriesColorFor(ySeries[0]?.sourceKey, 0)}
-                          isAnimationActive={false}
-                        >
-                          {scatterPlotData.map((row, i) => (
-                            <Cell key={`scatter-cell-${i}`} fill={scatterPointColorFor(row, i)} />
-                          ))}
-                        </Scatter>
+                        {scatterOverlaySeries.map(({ series, idx, data }) => {
+                          const color = seriesColorFor(series.sourceKey, idx);
+                          return (
+                            <Scatter
+                              key={series.id}
+                              name={series.label}
+                              data={data}
+                              fill={color}
+                              isAnimationActive={false}
+                            >
+                              {scatterColorActive
+                                ? data.map((row, i) => (
+                                    <Cell key={`${series.id}-${i}`} fill={scatterPointColorFor(row, i)} />
+                                  ))
+                                : null}
+                            </Scatter>
+                          );
+                        })}
                         {renderedCartesianReferenceLines}
                         {legendVisible ? (
                           <ChartLegend
@@ -4519,10 +4486,6 @@ export function ChartCanvas() {
                                   />
                                 );
                               }
-                              const seriesName = stripSheetScopedColumnKey(
-                                ySeries[0]?.sourceKey || scatterYKey || "Scatter",
-                              );
-                              const seriesColor = seriesColorFor(ySeries[0]?.sourceKey, 0);
                               return (
                                 <div
                                   className={`flex flex-col items-center gap-1.5 pt-3 ${CHART_CHROME_TEXT_CLASS}`}
@@ -4532,12 +4495,16 @@ export function ChartCanvas() {
                                       {legendTitle}
                                     </p>
                                   ) : null}
-                                  <div className="flex items-center gap-1.5">
-                                    <div
-                                      className="h-2 w-2 shrink-0 rounded-[2px]"
-                                      style={{ backgroundColor: seriesColor }}
-                                    />
-                                    <span>{seriesName}</span>
+                                  <div className="flex flex-wrap items-center justify-center gap-3">
+                                    {ySeries.map((series, idx) => (
+                                      <div key={series.id} className="flex items-center gap-1.5">
+                                        <div
+                                          className="h-2 w-2 shrink-0 rounded-[2px]"
+                                          style={{ backgroundColor: seriesColorFor(series.sourceKey, idx) }}
+                                        />
+                                        <span>{series.label}</span>
+                                      </div>
+                                    ))}
                                   </div>
                                 </div>
                               );

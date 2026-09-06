@@ -64,7 +64,7 @@ import { normalizeAxisRange } from "@/components/chartView/axisRangeDomain";
 import { cn } from "@/lib/utils";
 import { normalizeChartEmbedSlug } from "@/lib/chartEmbedSlug";
 import { REFERENCE_EQUATION_PRESETS, validateReferenceEquation } from "@/lib/chartReferenceEquation";
-import { ChartColorPalettePopover } from "@/components/chartView/ChartColorPalettePopover";
+import { ChartColorPalettePopover, ChartColorSwatchGrid } from "@/components/chartView/ChartColorPalettePopover";
 import { pivotBarChartBySeries } from "@/components/chartView/pivotBarChartData";
 import {
   DEFAULT_CHART_SERIES_COLORS,
@@ -151,6 +151,11 @@ function AxisSettingsMenu({
   showScale = true,
   showNumberFormat,
   showRange,
+  showSeriesColor = false,
+  seriesColor = null,
+  seriesColorSwatch = null,
+  onSeriesColorChange,
+  onSeriesColorClear,
   scaleOptions: scaleOptionsProp,
 }) {
   const scaleOptions = (scaleOptionsProp || AXIS_SCALE_OPTIONS).filter((o) =>
@@ -208,6 +213,31 @@ function AxisSettingsMenu({
                     {opt.label}
                   </DropdownMenuCheckboxItem>
                 ))}
+              </DropdownMenuSubContent>
+            </DropdownMenuSub>
+          ) : null}
+          {showSeriesColor ? (
+            <DropdownMenuSub>
+              <DropdownMenuSubTrigger className="text-xs">
+                <span className="flex min-w-0 flex-1 items-center justify-between gap-2 pr-1">
+                  Color
+                  {seriesColorSwatch || seriesColor ? (
+                    <span
+                      className="h-3 w-3 shrink-0 rounded-full border border-border/70"
+                      style={{ backgroundColor: seriesColorSwatch || seriesColor }}
+                    />
+                  ) : null}
+                </span>
+              </DropdownMenuSubTrigger>
+              <DropdownMenuSubContent className="max-h-[min(72vh,480px)] w-[min(100vw-2rem,20rem)] overflow-y-auto p-2 text-xs">
+                <DropdownMenuLabel className="px-0 text-[10px] uppercase tracking-wide text-muted-foreground">
+                  Color
+                </DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                <ChartColorSwatchGrid
+                  onChange={(color) => onSeriesColorChange?.(color)}
+                  onClear={onSeriesColorClear ? () => onSeriesColorClear() : undefined}
+                />
               </DropdownMenuSubContent>
             </DropdownMenuSub>
           ) : null}
@@ -314,6 +344,11 @@ function AxisSelectRow({
   showScale,
   showNumberFormat,
   showRange,
+  showSeriesColor,
+  seriesColor,
+  seriesColorSwatch,
+  onSeriesColorChange,
+  onSeriesColorClear,
   scaleOptions,
   children,
 }) {
@@ -335,6 +370,11 @@ function AxisSelectRow({
         showScale={showScale}
         showNumberFormat={showNumberFormat}
         showRange={showRange}
+        showSeriesColor={showSeriesColor}
+        seriesColor={seriesColor}
+        seriesColorSwatch={seriesColorSwatch}
+        onSeriesColorChange={onSeriesColorChange}
+        onSeriesColorClear={onSeriesColorClear}
         scaleOptions={scaleOptions}
       />
     </div>
@@ -1162,7 +1202,7 @@ export default function ChartControls() {
   const chartLineOptions = (selY || []).map((lineColumn, lineIdx) => ({
     value: `line:${lineIdx}`,
     lineColumn,
-    label: `Line ${lineIdx + 1}: ${formatColumnLabel(lineColumn)}`,
+    label: `${selChartType === "scatter" ? "Scatter" : "Line"} ${lineIdx + 1}: ${formatColumnLabel(lineColumn)}`,
   }));
   const resolveRuleSeriesValue = (seriesKey) => {
     const raw = String(seriesKey || "");
@@ -2568,6 +2608,11 @@ export default function ChartControls() {
                               valueType={yAxisMenuValueType}
                               scaleAriaLabel="Y axis settings"
                               menuLabel="Y axis"
+                              showSeriesColor={selChartType === "scatter"}
+                              seriesColor={lineColorOverrides?.[seriesInstanceKey(0)] ?? null}
+                              seriesColorSwatch={getSeriesColor(selY[0], 0)}
+                              onSeriesColorChange={(color) => setSeriesColorOverride(0, color)}
+                              onSeriesColorClear={() => clearSeriesColorOverride(0, selY[0])}
                             >
                               <div className="flex min-w-0 items-center gap-2">
                                 <Select
@@ -2598,11 +2643,8 @@ export default function ChartControls() {
                             </AxisSelectRow>
                             {selY.slice(1).map((yValue, sliceIndex) => {
                               const index = sliceIndex + 1;
-                              return (
-                                <div
-                                  className="flex min-w-0 place-items-center gap-2"
-                                  key={`${yValue}-${index}`}
-                                >
+                              const extraSelect = (
+                                <>
                                   <Select
                                     value={yValue}
                                     onValueChange={(val) => handleSelectY(val, index)}
@@ -2625,6 +2667,33 @@ export default function ChartControls() {
                                       onClick={() => removeY(yValue, index)}
                                     />
                                   </div>
+                                </>
+                              );
+                              if (selChartType === "scatter") {
+                                return (
+                                  <AxisSelectRow
+                                    key={`${yValue}-${index}`}
+                                    showScale={false}
+                                    showNumberFormat={false}
+                                    showRange={false}
+                                    showSeriesColor
+                                    seriesColor={lineColorOverrides?.[seriesInstanceKey(index)] ?? null}
+                                    seriesColorSwatch={getSeriesColor(yValue, index)}
+                                    onSeriesColorChange={(color) => setSeriesColorOverride(index, color)}
+                                    onSeriesColorClear={() => clearSeriesColorOverride(index, yValue)}
+                                    menuLabel={`Scatter ${index + 1}`}
+                                    scaleAriaLabel={`Scatter ${index + 1} color`}
+                                  >
+                                    <div className="flex min-w-0 items-center gap-2">{extraSelect}</div>
+                                  </AxisSelectRow>
+                                );
+                              }
+                              return (
+                                <div
+                                  className="flex min-w-0 place-items-center gap-2"
+                                  key={`${yValue}-${index}`}
+                                >
+                                  {extraSelect}
                                 </div>
                               );
                             })}
@@ -2787,9 +2856,28 @@ export default function ChartControls() {
                     </>
                   )}
 
-                  {/* Scatter/bubble: Z (bubble size) and Color column */}
+                  {/* Scatter/bubble: overlay another Y, then Z (bubble size) and Color column */}
                   {selChartType === "scatter" && (
                     <>
+                      <Button
+                        type="button"
+                        variant="secondary"
+                        size="sm"
+                        className="text-xs"
+                        onClick={() => {
+                          const next = (availableYOptions || []).find((opt) => !(selY || []).includes(opt));
+                          if (next) handleSelectY(next);
+                        }}
+                        disabled={
+                          !selY.length ||
+                          !availableYOptions?.length ||
+                          (availableYOptions || []).every((opt) => (selY || []).includes(opt))
+                        }
+                      >
+                        {(availableYOptions || []).every((opt) => (selY || []).includes(opt))
+                          ? "No more columns to add"
+                          : "+ Add scatter"}
+                      </Button>
                       <Field className="gap-1.5">
                         <div className="flex min-w-0 items-center gap-2">
                           <Switch

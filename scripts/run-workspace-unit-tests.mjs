@@ -37,6 +37,7 @@ import "@/lib/chartLineFilters.test.js";
 import "@/lib/chartSnapshotDataDeps.test.js";
 import "@/components/chartView/buildHeatmapRows.test.js";
 import "@/components/chartView/axisRangeDomain.test.js";
+import "@/components/chartView/scatterOverlay.test.js";
 import "@/components/spectrumui/charts/heatmapTileLabel.test.js";
 import "@/components/spectrumui/charts/changeColor.test.js";
 import "@/lib/mapRowsToLivelinePoints.test.js";
