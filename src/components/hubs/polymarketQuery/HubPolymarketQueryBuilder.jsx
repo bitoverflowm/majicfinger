@@ -2,6 +2,7 @@
 
 import { ConnectComposeOperationPanel } from "@/components/connectData/ConnectComposeOperationPanel";
 import { ConnectComposeHelperLayout } from "@/components/connectData/ConnectComposeHelperLayout";
+import { FEATURE_HELPER_DRAWER_WIDTH_CLASS } from "@/components/shared/FeatureHelper";
 import { ConnectDataOperationsSection } from "@/components/connectData/ConnectDataOperationsSection";
 import { ConnectResearchToolsSection } from "@/components/connectData/ConnectResearchToolsSection";
 import { GuidedWorkflowPullResults } from "@/components/guidedWorkflow/GuidedWorkflowPullResults";
@@ -959,7 +960,13 @@ export function HubPolymarketQueryBuilder({
 
         {error ? <p className="text-xs text-destructive">{error}</p> : null}
 
-        <div className={cn("flex justify-end border-t border-border/60", density.footerPt)}>
+        <div
+          className={cn(
+            "flex justify-end border-t border-border/60 transition-[padding] duration-300 ease-out",
+            density.footerPt,
+            researchHelperOpen && FEATURE_HELPER_DRAWER_WIDTH_CLASS,
+          )}
+        >
           <div className="flex flex-col items-center gap-2">
             <Button
               type="button"

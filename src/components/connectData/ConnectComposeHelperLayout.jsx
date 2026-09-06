@@ -6,6 +6,7 @@ import { cn } from "@/lib/utils";
 
 /**
  * Compose layout that reserves space for the viewport-edge helper drawer.
+ * The Run control lives outside this layout and must apply the same inset.
  *
  * @param {{
  *   children: React.ReactNode;

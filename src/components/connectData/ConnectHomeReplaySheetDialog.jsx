@@ -88,7 +88,7 @@ export function ConnectHomeReplaySheetDialog({
               <DialogDescription>
                 {queryLabel
                   ? `Running “${queryLabel}” and building your sheet.`
-                  : "Running your saved query and building your sheet."}
+                  : "Running your query and building your sheet."}
               </DialogDescription>
             </DialogHeader>
             <ConnectProgressWithLabel

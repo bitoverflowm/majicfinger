@@ -116,15 +116,13 @@ export function prepareConnectHomePullSheet(ctx, opts = {}) {
       });
       return destination;
     }
-    flushSync(() => {
-      ctx.addNewSheetAndActivate(
-        (newId) => {
-          ctx.setSheetData?.(newId, []);
-          applyConnectHomeSheetNameToSheet(ctx, newId, pendingSheetName);
-        },
-        { syncActivate: true },
-      );
-    });
+    ctx.addNewSheetAndActivate(
+      (newId) => {
+        ctx.setSheetData?.(newId, []);
+        applyConnectHomeSheetNameToSheet(ctx, newId, pendingSheetName);
+      },
+      { syncActivate: true },
+    );
     return destination;
   }
   flushSync(() => {

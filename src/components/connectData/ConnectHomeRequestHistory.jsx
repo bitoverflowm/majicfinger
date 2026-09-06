@@ -245,7 +245,6 @@ export function ConnectHomeRequestHistory({ className }) {
   const activeSheetId = ctx.activeSheetId;
   const setActiveSheetId = ctx.setActiveSheetId;
   const setDataSheets = ctx.setDataSheets;
-  const setConnectedData = ctx.setConnectedData;
   const addNewSheetAndActivate = ctx.addNewSheetAndActivate;
   const requestConnectAnalyzeScroll = ctx.requestConnectAnalyzeScroll;
   const setConnectDataLakePullState = ctx.setConnectDataLakePullState;
@@ -438,7 +437,17 @@ export function ConnectHomeRequestHistory({ className }) {
 
   const runReplay = useCallback(
     async (destination, newSheetName) => {
-      if (!sheetActionSourceId || !replayProvenance || !setDataSheets || !setConnectedData) return;
+      const sourceId = sheetActionSourceId;
+      const sourceSheet = sourceId ? dataSheets?.[sourceId] : null;
+      const sourceProvenance = sourceSheet?.provenance || replayProvenance;
+      if (!sourceId || !setDataSheets) {
+        toast.error("This query is no longer available to replay.");
+        return;
+      }
+      if (!sourceProvenance) {
+        toast.error("This sheet’s query is only in history — run it from compose to replay.");
+        return;
+      }
 
       setReplayBusy(true);
       startReplayPullProgress(setConnectDataLakePullState);
@@ -452,52 +461,65 @@ export function ConnectHomeRequestHistory({ className }) {
       }, 450);
 
       try {
-        let targetSheetId = destination === "replace" ? sheetActionSourceId : activeSheetId;
+        let targetSheetId = destination === "replace" ? sourceId : activeSheetId;
+
+        // New sheet + seeded sample → new independent seed; replace keeps the same seed.
+        const replayProv =
+          destination === "new_sheet"
+            ? withFreshRandomSampleSeed(sourceProvenance)
+            : sourceProvenance;
 
         if (destination === "new_sheet") {
           const trimmedName = String(newSheetName || "").trim();
           if (!trimmedName) {
             throw new Error("Enter a sheet name to continue.");
           }
-          await new Promise((resolve) => {
-            addNewSheetAndActivate?.((newId) => {
-              targetSheetId = newId;
-              setDataSheets((prev) => {
-                const p = prev || {};
-                const cur = p[newId] || { name: `Sheet`, data: [] };
-                return {
-                  ...p,
-                  [newId]: { ...cur, name: trimmedName },
-                };
-              });
-              resolve();
-            });
+          if (!addNewSheetAndActivate) {
+            throw new Error("Cannot create a new sheet.");
+          }
+          await new Promise((resolve, reject) => {
+            let settled = false;
+            addNewSheetAndActivate(
+              (newId) => {
+                if (settled) return;
+                if (!newId) {
+                  settled = true;
+                  reject(new Error("Could not create a new sheet."));
+                  return;
+                }
+                targetSheetId = newId;
+                settled = true;
+                resolve();
+              },
+              { syncActivate: true, name: trimmedName, provenance: replayProv },
+            );
+            if (!settled) {
+              settled = true;
+              reject(new Error("Could not create a new sheet."));
+            }
           });
           bumpReplayPullProgress(setConnectDataLakePullState, 24, "Preparing new sheet…");
         } else {
-          setActiveSheetId?.(sheetActionSourceId);
+          setActiveSheetId?.(sourceId);
           bumpReplayPullProgress(setConnectDataLakePullState, 20, "Replacing sheet data…");
         }
 
-        bumpReplayPullProgress(setConnectDataLakePullState, 42, "Running saved query…");
+        if (!targetSheetId) {
+          throw new Error("Could not create or select a sheet to replay into.");
+        }
 
-        // New sheet + seeded sample → new independent seed; replace keeps the same seed.
-        const replayProv =
-          destination === "new_sheet"
-            ? withFreshRandomSampleSeed(replayProvenance)
-            : replayProvenance;
+        bumpReplayPullProgress(setConnectDataLakePullState, 42, "Running query…");
 
         const { rows, json } = await rehydrateSheetFromProvenance({
           targetSheetId,
           provenance: replayProv,
           dataSheets,
-          sourceSheetId: sheetActionSourceId,
+          sourceSheetId: sourceId,
         });
 
         bumpReplayPullProgress(setConnectDataLakePullState, 96, "Finishing up…");
 
         setActiveSheetId?.(targetSheetId);
-        setConnectedData(rows);
         setDataSheets((prev) => {
           const p = prev || {};
           const cur = p[targetSheetId] || { name: "Sheet", data: [] };
@@ -505,14 +527,14 @@ export function ConnectHomeRequestHistory({ className }) {
             destination === "new_sheet"
               ? String(newSheetName || "").trim() || cur.name
               : cur.name;
-          const sourceCard = Array.isArray(actionSource?.requestCards)
-            ? actionSource.requestCards[0]
+          const sourceCard = Array.isArray(sourceSheet?.requestCards)
+            ? sourceSheet.requestCards[0]
             : null;
           const querySummary = formatConnectRequestCardQuery(sourceCard, {
             provenance: replayProv,
           });
           const intentFullRowCount = resolvePersistedFullRowCount(
-            actionSource,
+            sourceSheet,
             json?.rowCount ?? rows.length,
           );
           const replayCard = sourceCard
@@ -526,8 +548,8 @@ export function ConnectHomeRequestHistory({ className }) {
                 querySummary: querySummary || sourceCard.querySummary,
               }
             : null;
-          const priorCards = Array.isArray(actionSource?.requestCards)
-            ? actionSource.requestCards
+          const priorCards = Array.isArray(sourceSheet?.requestCards)
+            ? sourceSheet.requestCards
             : Array.isArray(cur.requestCards)
               ? cur.requestCards
               : [];
@@ -541,7 +563,7 @@ export function ConnectHomeRequestHistory({ className }) {
               name,
               data: rows,
               provenance: replayProv,
-              operationHistory: actionSource?.operationHistory || cur.operationHistory || [],
+              operationHistory: sourceSheet?.operationHistory || cur.operationHistory || [],
               storageMode: rows.length >= intentFullRowCount ? "inline" : "provenance",
               rehydrationStatus: rows.length >= intentFullRowCount ? "complete" : "preview",
               rowCount: rows.length,
@@ -585,7 +607,6 @@ export function ConnectHomeRequestHistory({ className }) {
       }
     },
     [
-      actionSource,
       activeSheetId,
       addNewSheetAndActivate,
       clearProgressTimer,
@@ -595,7 +616,6 @@ export function ConnectHomeRequestHistory({ className }) {
       requestConnectAnalyzeScroll,
       setActiveSheetId,
       setConnectDataLakePullState,
-      setConnectedData,
       setDataSheets,
       sheetActionSourceId,
     ],

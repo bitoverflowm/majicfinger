@@ -9,7 +9,7 @@ import {
   getShadcnChartPaletteArray,
   isShadcnChartGreyBase,
 } from '@/components/chartView/panels/shadcnChartPalettes';
-import { Area, AreaChart, Bar, BarChart, CartesianGrid, Cell, ComposedChart, LabelList, Line, LineChart, Pie, PieChart, ReferenceLine, Scatter, Treemap, XAxis, YAxis, ZAxis } from 'recharts';
+import { Area, AreaChart, Bar, BarChart, CartesianGrid, Cell, LabelList, Line, LineChart, Pie, PieChart, ReferenceLine, Scatter, ScatterChart, Treemap, XAxis, YAxis, ZAxis } from 'recharts';
 import { ChartContainer, ChartLegend, ChartLegendContent, ChartTooltip, ChartTooltipContent } from '@/components/ui/chart';
 import { RainbowBarLegendContent } from "@/components/chartView/RainbowBarLegendContent";
 import { rainbowBarFillFromPalette } from "@/components/chartView/rainbowBarFill";
@@ -53,6 +53,11 @@ import {
   validateReferenceEquation,
 } from "@/lib/chartReferenceEquation";
 import { temporalToMs } from "@/lib/temporalParse";
+import {
+  axisRangeDomain,
+  collectAxisNumericValues,
+  normalizeAxisRange,
+} from "@/components/chartView/axisRangeDomain";
 import { mapRowsToLivelinePoints } from "@/lib/mapRowsToLivelinePoints";
 import { downsampleRowsForChart } from "@/lib/chartRenderCap";
 import { findSheetIdOrderColumn, orderSheetRowsByDataTypes } from "@/lib/sheetIdOrder";
@@ -697,6 +702,36 @@ function numericYExtentFromRows(rows, yKeys) {
   return { min, max };
 }
 
+/** d3/Recharts log scales cannot include 0 or negatives — one zero blanks the whole plot. */
+function numericPositiveYExtentFromRows(rows, yKeys) {
+  let min = Infinity;
+  let max = -Infinity;
+  for (const row of rows || []) {
+    if (!row || typeof row !== "object") continue;
+    for (const yk of yKeys || []) {
+      const v = Number(row[yk]);
+      if (Number.isFinite(v) && v > 0) {
+        if (v < min) min = v;
+        if (v > max) max = v;
+      }
+    }
+  }
+  if (!Number.isFinite(min) || !Number.isFinite(max)) return null;
+  return { min, max };
+}
+
+/** Finite positive [min, max] so log axes never inherit a 0 from `["auto", "auto"]`. */
+function rechartsLogAxisDomain(rows, yKeys) {
+  const extent = numericPositiveYExtentFromRows(rows, yKeys);
+  if (!extent) return [1, 10];
+  const { min, max } = extent;
+  if (min === max) {
+    const lo = min >= 1 ? min / 10 : min / 2;
+    return [Math.max(lo, Number.MIN_VALUE), min * 10];
+  }
+  return [min, max];
+}
+
 /** Extra Y span so natural / monotone splines do not clip above dataMax. */
 function yDomainWithCurveHeadroom(extent, rows, yKeys) {
   if (!extent) return undefined;
@@ -910,6 +945,9 @@ export function ChartBuilderProvider({ demo, children, initialBuilderSnapshot, e
   const [chartTimeframe, setChartTimeframe] = useState("15m");
   const [scaleX, setScaleX] = useState("linear");
   const [scaleY, setScaleY] = useState("linear");
+  /** X previously used dataMin/dataMax; Y previously started at 0. */
+  const [xAxisRange, setXAxisRange] = useState("data");
+  const [yAxisRange, setYAxisRange] = useState("zero");
   /** Tracks last axis keys we auto-inferred scale for (column change resets to type default). */
   const scaleInferXKeyRef = useRef(undefined);
   const scaleInferYKeyRef = useRef(undefined);
@@ -1103,6 +1141,8 @@ export function ChartBuilderProvider({ demo, children, initialBuilderSnapshot, e
           scaleInferYKeyRef.current = undefined;
         }
       }
+      if (snap.xAxisRange === "zero" || snap.xAxisRange === "data") setXAxisRange(snap.xAxisRange);
+      if (snap.yAxisRange === "zero" || snap.yAxisRange === "data") setYAxisRange(snap.yAxisRange);
       if (snap.candlestickOhlcSetId != null) {
         setCandlestickOhlcSetId(String(snap.candlestickOhlcSetId) || "auto");
       }
@@ -1210,6 +1250,8 @@ export function ChartBuilderProvider({ demo, children, initialBuilderSnapshot, e
     if (s.scaleY === "linear" || s.scaleY === "log" || s.scaleY === "categorical") {
       setScaleY(s.scaleY);
     }
+    if (s.xAxisRange === "zero" || s.xAxisRange === "data") setXAxisRange(s.xAxisRange);
+    if (s.yAxisRange === "zero" || s.yAxisRange === "data") setYAxisRange(s.yAxisRange);
     if (s.selZ !== undefined) setSelZ(s.selZ);
     if (s.selColorCol !== undefined) setSelColorCol(s.selColorCol);
     if (s.heatmapChangeCol !== undefined) setHeatmapChangeCol(s.heatmapChangeCol || null);
@@ -2066,6 +2108,8 @@ export function ChartBuilderProvider({ demo, children, initialBuilderSnapshot, e
     chartTimeframe,
     scaleX,
     scaleY,
+    xAxisRange,
+    yAxisRange,
     selZ,
     selColorCol,
     heatmapChangeCol,
@@ -2471,6 +2515,10 @@ export function ChartBuilderProvider({ demo, children, initialBuilderSnapshot, e
     setScaleX,
     scaleY,
     setScaleY,
+    xAxisRange,
+    setXAxisRange,
+    yAxisRange,
+    setYAxisRange,
     yAxisDivisor,
     setYAxisDivisor,
     yAxisCompact,
@@ -2622,7 +2670,6 @@ export function ChartBuilderProvider({ demo, children, initialBuilderSnapshot, e
     livelineSeries,
     livelineFeedPaused,
     candlestickMapped,
-    xAxisRange: null,
     chartRef,
 
     wsStop,
@@ -2762,6 +2809,8 @@ export function ChartCanvas() {
     formatCompactNumber,
     scaleX,
     scaleY,
+    xAxisRange,
+    yAxisRange,
     selZ,
     selColorCol,
     scaleZ,
@@ -3069,10 +3118,30 @@ export function ChartCanvas() {
   const rechartsYAxisType = scaleY === "categorical" ? "category" : "number";
   const rechartsYAxisScale = scaleY === "log" && rechartsYAxisType === "number" ? "log" : "auto";
 
-  const xAxisNumberDomain =
-    rechartsXAxisType === "number"
-      ? ((effectiveUseTimeSeriesX || chartUsesTimeframes) && sortXDir === "desc" ? ["dataMax", "dataMin"] : ["dataMin", "dataMax"])
-      : undefined;
+  const xAxisNumberDomain = useMemo(() => {
+    if (rechartsXAxisType !== "number" || !plotXKey) return undefined;
+    const values = collectAxisNumericValues(finalRenderedData, [plotXKey], {
+      parseDates: true,
+      toDateMs: temporalToMs,
+    });
+    const domain = axisRangeDomain(normalizeAxisRange(xAxisRange), values, {
+      isLog: scaleX === "log",
+    });
+    if (!domain) return undefined;
+    if ((effectiveUseTimeSeriesX || chartUsesTimeframes) && sortXDir === "desc") {
+      return [domain[1], domain[0]];
+    }
+    return domain;
+  }, [
+    rechartsXAxisType,
+    plotXKey,
+    finalRenderedData,
+    xAxisRange,
+    scaleX,
+    effectiveUseTimeSeriesX,
+    chartUsesTimeframes,
+    sortXDir,
+  ]);
 
   /** Full numeric X extent for wheel-zoom clamping. */
   const dataXExtent = useMemo(() => {
@@ -3103,7 +3172,7 @@ export function ChartCanvas() {
   // Reset ephemeral zoom when the underlying series / axes change.
   useEffect(() => {
     setZoomXDomain(null);
-  }, [selChartType, plotXKey, selX, dataXExtent?.[0], dataXExtent?.[1]]);
+  }, [selChartType, plotXKey, selX, dataXExtent?.[0], dataXExtent?.[1], xAxisRange]);
 
   const effectiveXDomain = useMemo(() => {
     if (!zoomActive || !zoomXDomain || rechartsXAxisType !== "number") {
@@ -3111,6 +3180,9 @@ export function ChartCanvas() {
     }
     return zoomXDomain;
   }, [zoomActive, zoomXDomain, rechartsXAxisType, xAxisNumberDomain]);
+  const xAxisAllowDataOverflow =
+    (scaleX === "log" && rechartsXAxisType === "number") ||
+    !!(zoomActive && zoomXDomain && rechartsXAxisType === "number");
 
   const chartZoomRef = useRef(/** @type {HTMLDivElement | null} */ (null));
 
@@ -3208,7 +3280,10 @@ export function ChartCanvas() {
       if (x == null || x === "" || y == null || y === "") return false;
       if (rechartsXAxisType === "number" && !Number.isFinite(Number(x))) return false;
       if (scaleY === "categorical") return true;
-      return Number.isFinite(Number(y));
+      const yn = Number(y);
+      if (!Number.isFinite(yn)) return false;
+      if (scaleY === "log" && yn <= 0) return false;
+      return true;
     });
     if (!scatterJitterEnabled) return filtered;
 
@@ -3252,7 +3327,9 @@ export function ChartCanvas() {
       if (numericY && ySpan > 0 && jitterYAmt > 0) {
         const n = Number(row[scatterYKey]);
         if (Number.isFinite(n)) {
-          next[scatterYKey] = n + (unitNoise2d(i, 2) - 0.5) * 2 * jitterYAmt * ySpan;
+          let jy = n + (unitNoise2d(i, 2) - 0.5) * 2 * jitterYAmt * ySpan;
+          if (scaleY === "log" && jy <= 0) jy = n;
+          next[scatterYKey] = jy;
         }
       }
       return next;
@@ -3268,6 +3345,14 @@ export function ChartCanvas() {
     scatterJitterX,
     scatterJitterY,
   ]);
+  const logYAxisDomain = useMemo(() => {
+    if (scaleY !== "log") return undefined;
+    const keys = selChartType === "scatter" ? (scatterYKey ? [scatterYKey] : []) : renderedYKeys;
+    const rows = selChartType === "scatter" ? scatterPlotData : finalRenderedData;
+    const values = collectAxisNumericValues(rows, keys);
+    // Log cannot include 0; both range modes use the positive plotted extent.
+    return axisRangeDomain(normalizeAxisRange(yAxisRange), values, { isLog: true }) ?? rechartsLogAxisDomain(rows, keys);
+  }, [scaleY, selChartType, scatterYKey, scatterPlotData, renderedYKeys, finalRenderedData, yAxisRange]);
   const hasSelectedPalette = Array.isArray(selectedPalette) && selectedPalette.length > 0;
   /** Chromatic user-picked ramps drive series; grey/legacy auto ramps use rose/lime/blue defaults. */
   const usePaletteForSeries =
@@ -3588,10 +3673,33 @@ export function ChartCanvas() {
     lineAliasing || !hasChartLineFilters || (hasChartLineFilters && ySeries.length > 1);
 
   const cartesianYAxisDomain = useMemo(() => {
-    if (!needsCurveYHeadroom) return undefined;
-    const extent = numericYExtentFromRows(finalRenderedData, renderedYKeys);
-    return yDomainWithCurveHeadroom(extent, finalRenderedData, renderedYKeys);
-  }, [needsCurveYHeadroom, finalRenderedData, renderedYKeys]);
+    if (scaleY === "categorical") return undefined;
+    const yKeys = selChartType === "scatter" && scatterYKey ? [scatterYKey] : renderedYKeys;
+    const rows =
+      selChartType === "scatter" && Array.isArray(scatterPlotData) && scatterPlotData.length
+        ? scatterPlotData
+        : finalRenderedData;
+    const values = collectAxisNumericValues(rows, yKeys);
+    const domain = axisRangeDomain(normalizeAxisRange(yAxisRange), values, { isLog: false });
+    if (!domain) return undefined;
+    if (!needsCurveYHeadroom) return domain;
+    const padded = yDomainWithCurveHeadroom(
+      { min: domain[0], max: domain[1] },
+      rows,
+      yKeys,
+    );
+    if (!Array.isArray(padded) || padded.length < 2) return domain;
+    return [domain[0], Math.max(domain[1], padded[1])];
+  }, [
+    scaleY,
+    selChartType,
+    scatterYKey,
+    scatterPlotData,
+    renderedYKeys,
+    finalRenderedData,
+    yAxisRange,
+    needsCurveYHeadroom,
+  ]);
 
   const renderedReferenceLines = useMemo(() => {
     const axisType = selX ? getAxisType(xKey, dataTypes, finalRenderedData) : "string";
@@ -4103,7 +4211,8 @@ export function ChartCanvas() {
                           type={rechartsXAxisType}
                           dataKey={plotXKey}
                           domain={effectiveXDomain}
-                          allowDataOverflow={!!(zoomActive && zoomXDomain)}
+                          scale={rechartsXAxisScale}
+                          allowDataOverflow={xAxisAllowDataOverflow}
                           ticks={effectiveXTicks}
                           tickLine={false}
                           axisLine={false}
@@ -4120,7 +4229,8 @@ export function ChartCanvas() {
                           width={72}
                           tickFormatter={yAxisFormatter}
                           scale={rechartsYAxisScale}
-                          domain={scaleY === "log" ? ["auto", "auto"] : cartesianYAxisDomain}
+                          domain={scaleY === "log" ? logYAxisDomain : cartesianYAxisDomain}
+                          allowDataOverflow={scaleY === "log"}
                           tick={{ fill: tickFillY }}
                           label={chartYAxisTitleLabel}
                         />
@@ -4187,13 +4297,16 @@ export function ChartCanvas() {
                               tickFormatter={yAxisFormatter}
                               tick={{ fill: tickFillY }}
                               scale={rechartsYAxisScale}
-                              domain={scaleY === "log" ? ["auto", "auto"] : undefined}
+                              domain={scaleY === "log" ? logYAxisDomain : cartesianYAxisDomain}
+                              allowDataOverflow={scaleY === "log"}
                               label={chartYAxisTitleLabelBottom}
                             />
                             <YAxis
                               type={rechartsXAxisType}
                               dataKey={plotXKey}
                               domain={rechartsXAxisType === "number" ? xAxisNumberDomain : undefined}
+                              scale={rechartsXAxisScale}
+                              allowDataOverflow={xAxisAllowDataOverflow}
                               ticks={rechartsXAxisType === "number" ? xAxisTicks : undefined}
                               tickLine={false}
                               axisLine={false}
@@ -4212,9 +4325,8 @@ export function ChartCanvas() {
                               type={rechartsXAxisType}
                               dataKey={plotXKey}
                               domain={rechartsXAxisType === "number" ? effectiveXDomain : undefined}
-                              allowDataOverflow={
-                                !!(zoomActive && zoomXDomain && rechartsXAxisType === "number")
-                              }
+                              scale={rechartsXAxisScale}
+                              allowDataOverflow={xAxisAllowDataOverflow}
                               ticks={rechartsXAxisType === "number" ? effectiveXTicks : undefined}
                               tickLine={false}
                               axisLine={false}
@@ -4232,7 +4344,8 @@ export function ChartCanvas() {
                               width={74}
                               tickFormatter={yAxisFormatter}
                               scale={rechartsYAxisScale}
-                              domain={scaleY === "log" ? ["auto", "auto"] : undefined}
+                              domain={scaleY === "log" ? logYAxisDomain : cartesianYAxisDomain}
+                              allowDataOverflow={scaleY === "log"}
                               tick={{ fill: tickFillY }}
                               label={chartYAxisTitleLabel}
                             />
@@ -4307,7 +4420,7 @@ export function ChartCanvas() {
                     )}
 
                     {selChartType === "scatter" && (
-                      <ComposedChart accessibilityLayer data={scatterPlotData} margin={cartesianMarginWithAngledTicks}>
+                      <ScatterChart accessibilityLayer margin={cartesianMarginWithAngledTicks}>
                         {gridVisible ? <CartesianGrid vertical={false} stroke={gridStroke} /> : null}
                         <XAxis
                           type={rechartsXAxisType}
@@ -4315,7 +4428,7 @@ export function ChartCanvas() {
                           name={stripSheetScopedColumnKey(xKey)}
                           domain={effectiveXDomain}
                           scale={rechartsXAxisScale}
-                          allowDataOverflow={!!(zoomActive && zoomXDomain)}
+                          allowDataOverflow={xAxisAllowDataOverflow}
                           ticks={effectiveXTicks}
                           tickLine={false}
                           axisLine={false}
@@ -4335,7 +4448,8 @@ export function ChartCanvas() {
                           width={72}
                           tickFormatter={scaleY === "categorical" ? undefined : yAxisFormatter}
                           scale={rechartsYAxisScale}
-                          domain={scaleY === "log" ? ["auto", "auto"] : undefined}
+                          domain={scaleY === "log" ? logYAxisDomain : cartesianYAxisDomain}
+                          allowDataOverflow={scaleY === "log"}
                           tick={{ fill: tickFillY }}
                           label={chartYAxisTitleLabel}
                         />
@@ -4351,7 +4465,10 @@ export function ChartCanvas() {
                           <ZAxis range={[72, 72]} />
                         )}
                         <ChartTooltip
-                          cursor={false}
+                          shared={false}
+                          cursor={{ strokeDasharray: "3 3", stroke: gridStroke }}
+                          wrapperStyle={{ zIndex: 40, pointerEvents: "none" }}
+                          allowEscapeViewBox={{ x: true, y: true }}
                           labelFormatter={xTooltipLabelFormatter}
                           content={
                             <ChartTooltipContent
@@ -4360,6 +4477,9 @@ export function ChartCanvas() {
                               pivotName={stripSheetScopedColumnKey(xKey)}
                               pivotLabelFormatter={xTooltipLabelFormatter}
                               {...chartTooltipRowDetails}
+                              rowDetailY
+                              rowDetailYKeys={scatterYKey ? [scatterYKey] : []}
+                              rowDetailFormatY={scaleY === "categorical" ? undefined : yAxisFormatter}
                             />
                           }
                         />
@@ -4367,7 +4487,7 @@ export function ChartCanvas() {
                           name={stripSheetScopedColumnKey(ySeries[0]?.sourceKey || "Scatter")}
                           data={scatterPlotData}
                           fill={seriesColorFor(ySeries[0]?.sourceKey, 0)}
-                          isAnimationActive={scatterPlotData.length < 2000}
+                          isAnimationActive={false}
                         >
                           {scatterPlotData.map((row, i) => (
                             <Cell key={`scatter-cell-${i}`} fill={scatterPointColorFor(row, i)} />
@@ -4424,7 +4544,7 @@ export function ChartCanvas() {
                             }}
                           />
                         ) : null}
-                      </ComposedChart>
+                      </ScatterChart>
                     )}
 
                     {selChartType === "treemap" && yKeys[0] && (
@@ -4456,7 +4576,8 @@ export function ChartCanvas() {
                           type={rechartsXAxisType}
                           dataKey={plotXKey}
                           domain={effectiveXDomain}
-                          allowDataOverflow={!!(zoomActive && zoomXDomain)}
+                          scale={rechartsXAxisScale}
+                          allowDataOverflow={xAxisAllowDataOverflow}
                           ticks={effectiveXTicks}
                           tickLine={false}
                           axisLine={false}
@@ -4473,7 +4594,8 @@ export function ChartCanvas() {
                           width={72}
                           tickFormatter={yAxisFormatter}
                           scale={rechartsYAxisScale}
-                          domain={scaleY === "log" ? ["auto", "auto"] : cartesianYAxisDomain}
+                          domain={scaleY === "log" ? logYAxisDomain : cartesianYAxisDomain}
+                          allowDataOverflow={scaleY === "log"}
                           tick={{ fill: tickFillY }}
                           label={chartYAxisTitleLabel}
                         />

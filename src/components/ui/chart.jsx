@@ -81,7 +81,24 @@ const ChartTooltip = RechartsPrimitive.Tooltip
 function formatTooltipRowCell(v) {
   if (v == null || v === "") return "—";
   if (v instanceof Date) return v.toISOString();
+  if (Array.isArray(v)) {
+    const last = v[v.length - 1];
+    return formatTooltipRowCell(last);
+  }
+  if (typeof v === "number" && Number.isFinite(v)) return v.toLocaleString();
   return String(v);
+}
+
+/** Scatter tooltips pass `value` as `[x, y]`; prefer the hovered row's dataKey. */
+function resolveTooltipItemValue(item) {
+  const row = item?.payload;
+  const dataKey = item?.dataKey;
+  if (row && typeof row === "object" && dataKey != null && row[dataKey] != null && !Array.isArray(row[dataKey])) {
+    return row[dataKey];
+  }
+  const value = item?.value;
+  if (Array.isArray(value) && value.length) return value[value.length - 1];
+  return value;
 }
 
 const ChartTooltipContent = React.forwardRef((
@@ -158,14 +175,21 @@ const ChartTooltipContent = React.forwardRef((
 
   const pivotHeader = React.useMemo(() => {
     if (!pivotName || !rowDetailX || hideLabel) return null
-    if (label == null || label === "") return null
+    const row = payload?.[0]?.payload
+    const rowVal =
+      row && typeof row === "object" && !Array.isArray(row) && rowDetailXKey
+        ? row[rowDetailXKey]
+        : undefined
+    const rawLabel =
+      rowVal !== undefined && rowVal !== null && rowVal !== "" ? rowVal : label
+    if (rawLabel == null || rawLabel === "") return null
     let text
     if (typeof pivotLabelFormatter === "function") {
-      text = pivotLabelFormatter(label, payload)
-    } else if (label instanceof Date && !Number.isNaN(label.getTime())) {
-      text = label.toISOString()
+      text = pivotLabelFormatter(rawLabel, payload)
+    } else if (rawLabel instanceof Date && !Number.isNaN(rawLabel.getTime())) {
+      text = rawLabel.toISOString()
     } else {
-      text = String(label)
+      text = String(rawLabel)
     }
     if (text == null || text === "") return null
     return (
@@ -180,7 +204,7 @@ const ChartTooltipContent = React.forwardRef((
         </div>
       </div>
     )
-  }, [pivotName, rowDetailX, pivotLabelFormatter, hideLabel, label, labelClassName, payload])
+  }, [pivotName, rowDetailX, rowDetailXKey, pivotLabelFormatter, hideLabel, label, labelClassName, payload])
 
   if (!active || !payload?.length) {
     return null
@@ -200,6 +224,11 @@ const ChartTooltipContent = React.forwardRef((
   const extraKeys = Array.isArray(rowDetailExtraKeys) ? rowDetailExtraKeys : []
   const showRowExtras = extraKeys.length > 0 && hasDataRow
   const hasRowDetailBlock = showRowDetailX || showRowDetailY || showRowExtras
+  const seriesPayload = payload.filter((item) => {
+    if (!showRowDetailY || !Array.isArray(rowDetailYKeys) || rowDetailYKeys.length === 0) return true
+    const k = item?.dataKey ?? item?.name
+    return !rowDetailYKeys.includes(k)
+  })
 
   return (
     (<div
@@ -265,15 +294,17 @@ const ChartTooltipContent = React.forwardRef((
         </div>
       ) : null}
       {!pivotName && !nestLabel && rowDetailX ? tooltipLabel : null}
+      {seriesPayload.length > 0 ? (
       <div className="grid gap-1.5">
-        {payload.map((item, index) => {
+        {seriesPayload.map((item, index) => {
           const key = `${nameKey || item.name || item.dataKey || "value"}`
           const itemConfig = getPayloadConfigFromPayload(config, item, key)
           const indicatorColor = color || item.payload.fill || item.color
+          const displayValue = resolveTooltipItemValue(item)
 
           return (
             (<div
-              key={item.dataKey}
+              key={`${key}-${index}`}
               className={cn(
                 "flex w-full items-stretch gap-2 [&>svg]:h-2.5 [&>svg]:w-2.5 [&>svg]:text-slate-500 dark:[&>svg]:text-slate-400",
                 indicator === "dot" && "items-center"
@@ -308,10 +339,10 @@ const ChartTooltipContent = React.forwardRef((
                         {itemConfig?.label || item.name}:
                       </span>{" "}
                       <span className="font-mono font-medium tabular-nums text-slate-950 dark:text-slate-50">
-                        {item.value != null && item.value !== ""
-                          ? typeof item.value === "number"
-                            ? item.value.toLocaleString()
-                            : String(item.value)
+                        {displayValue != null && displayValue !== ""
+                          ? typeof displayValue === "number"
+                            ? displayValue.toLocaleString()
+                            : formatTooltipRowCell(displayValue)
                           : "—"}
                       </span>
                     </div>
@@ -328,11 +359,11 @@ const ChartTooltipContent = React.forwardRef((
                           {itemConfig?.label || item.name}
                         </span>
                       </div>
-                      {item.value != null && item.value !== "" ? (
+                      {displayValue != null && displayValue !== "" ? (
                         <span className="font-mono font-medium tabular-nums text-slate-950 dark:text-slate-50">
-                          {typeof item.value === "number"
-                            ? item.value.toLocaleString()
-                            : String(item.value)}
+                          {typeof displayValue === "number"
+                            ? displayValue.toLocaleString()
+                            : formatTooltipRowCell(displayValue)}
                         </span>
                       ) : null}
                     </div>
@@ -343,6 +374,7 @@ const ChartTooltipContent = React.forwardRef((
           );
         })}
       </div>
+      ) : null}
     </div>)
   );
 })

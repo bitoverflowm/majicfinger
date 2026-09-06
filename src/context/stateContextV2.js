@@ -878,57 +878,74 @@ export const StateProviderV2 = ({children, initialSettings}) => {
     // `provenance` stores the structured query that produced the sheet (so we can re-run it server-side as a CTE).
     const [dataSheets, setDataSheets] = useState(() => ({ 'sheet-1': { name: 'Sheet 1', data: [], provenance: null } }));
     const [activeSheetId, setActiveSheetId] = useState('sheet-1');
+    const activeSheetIdRef = useRef(activeSheetId);
+    activeSheetIdRef.current = activeSheetId;
 
     //Connected Data is active working data (derived from active sheet)
     const [dataConnected, setDataConnected] = useState()
     const connectedData = useMemo(() => dataSheets[activeSheetId]?.data ?? [], [dataSheets, activeSheetId]);
     const setConnectedData = useCallback((value) => {
       setDataSheets((prev) => {
-        const sheet = prev[activeSheetId] || { name: 'Sheet 1', data: [] };
+        const id = activeSheetIdRef.current;
+        const sheet = prev[id] || { name: 'Sheet 1', data: [] };
         const raw = typeof value === 'function' ? value(sheet.data || []) : value;
         const coerced = Array.isArray(raw)
           ? coerceDataTypes(raw)
           : (raw != null && typeof raw === 'object' ? coerceDataTypes([raw]) : sheet.data || []);
         const data = orderSheetRowsByDataTypes(coerced, sheet.dataTypes);
-        return { ...prev, [activeSheetId]: { ...sheet, data } };
+        return { ...prev, [id]: { ...sheet, data } };
       });
-    }, [activeSheetId]);
+    }, []);
 
     const addNewSheetAndActivate = useCallback((onNewSheet, options) => {
       let newId;
-      setDataSheets((prev) => {
-        const keys = Object.keys(prev);
-        const nextNum =
-          keys.reduce((max, k) => {
-            const n = parseInt(String(k).replace(/\D/g, ""), 10) || 0;
-            return Math.max(max, n);
-          }, 0) + 1;
-        newId = `sheet-${nextNum}`;
-        const name =
-          typeof options?.name === "string" && options.name.trim()
-            ? options.name.trim()
-            : `Sheet ${nextNum}`;
-        const data = Array.isArray(options?.data) ? options.data : [];
-        return { ...prev, [newId]: { name, data, provenance: null } };
-      });
-      const activate = () => {
-        setActiveSheetId(newId);
-        if (typeof onNewSheet === 'function') onNewSheet(newId);
+      const commitSheet = () => {
+        setDataSheets((prev) => {
+          const keys = Object.keys(prev);
+          const nextNum =
+            keys.reduce((max, k) => {
+              const n = parseInt(String(k).replace(/\D/g, ""), 10) || 0;
+              return Math.max(max, n);
+            }, 0) + 1;
+          newId = `sheet-${nextNum}`;
+          const name =
+            typeof options?.name === "string" && options.name.trim()
+              ? options.name.trim()
+              : `Sheet ${nextNum}`;
+          const data = Array.isArray(options?.data) ? options.data : [];
+          const provenance =
+            options?.provenance && typeof options.provenance === "object"
+              ? options.provenance
+              : null;
+          return { ...prev, [newId]: { name, data, provenance } };
+        });
       };
+      const activate = () => {
+        if (!newId) return;
+        setActiveSheetId(newId);
+        if (typeof onNewSheet === "function") onNewSheet(newId);
+      };
+      // Flush only the sheet insert. Nested flushSync(activate) can run the
+      // callback before the updater assigns newId (replay then looks unsaved).
       if (options?.syncActivate) {
-        flushSync(activate);
+        flushSync(commitSheet);
+        activate();
       } else {
+        commitSheet();
         setTimeout(activate, 0);
       }
     }, []);
 
     const replaceCurrentSheetData = useCallback((data) => {
       const raw = Array.isArray(data) ? data : (data != null ? [data] : []);
-      setDataSheets((prev) => ({
-        ...prev,
-        [activeSheetId]: { ...(prev[activeSheetId] || { name: 'Sheet 1' }), data: coerceDataTypes(raw) },
-      }));
-    }, [activeSheetId]);
+      setDataSheets((prev) => {
+        const id = activeSheetIdRef.current;
+        return {
+          ...prev,
+          [id]: { ...(prev[id] || { name: 'Sheet 1' }), data: coerceDataTypes(raw) },
+        };
+      });
+    }, []);
 
     const setSheetData = useCallback((sheetId, value) => {
       setDataSheets((prev) => {

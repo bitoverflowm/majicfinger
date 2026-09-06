@@ -60,6 +60,7 @@ import {
 } from "@/components/ui/tooltip";
 
 import { useChartBuilder, CHART_X_AXIS_NONE, CHART_X_AXIS_IDENTITY_LINE, isChartXAxisIdentityLine } from "@/components/chartView";
+import { normalizeAxisRange } from "@/components/chartView/axisRangeDomain";
 import { cn } from "@/lib/utils";
 import { normalizeChartEmbedSlug } from "@/lib/chartEmbedSlug";
 import { REFERENCE_EQUATION_PRESETS, validateReferenceEquation } from "@/lib/chartReferenceEquation";
@@ -103,6 +104,11 @@ const AXIS_SCALE_OPTIONS = [
   { value: "categorical", label: "Categorical", valueTypes: ["number", "date", "string"] },
 ];
 
+const AXIS_RANGE_OPTIONS = [
+  { value: "zero", label: "Start at Zero" },
+  { value: "data", label: "Fit to Data" },
+];
+
 const AXIS_DIVISOR_OPTIONS = [
   { value: "1", label: "No divisor (x1)" },
   { value: "1000", label: "/ 1,000" },
@@ -128,7 +134,7 @@ function axisMenuValueType(axisType, { isTemporal = false } = {}) {
 }
 
 /**
- * Gear menu for per-axis settings: Scale + (numeric-only) Divisor / Labels.
+ * Gear menu for per-axis settings: Scale, Axis Range, and (numeric-only) Divisor / Labels.
  */
 function AxisSettingsMenu({
   scaleValue,
@@ -137,11 +143,14 @@ function AxisSettingsMenu({
   onDivisorChange,
   compactLabels = true,
   onCompactChange,
+  rangeValue = "zero",
+  onRangeChange,
   valueType = "number",
   ariaLabel = "Axis settings",
   menuLabel = "Axis",
   showScale = true,
   showNumberFormat,
+  showRange,
   scaleOptions: scaleOptionsProp,
 }) {
   const scaleOptions = (scaleOptionsProp || AXIS_SCALE_OPTIONS).filter((o) =>
@@ -152,6 +161,11 @@ function AxisSettingsMenu({
     : scaleOptions[0]?.value || "linear";
   const numberFormatVisible =
     showNumberFormat !== undefined ? !!showNumberFormat : valueType === "number";
+  const rangeVisible =
+    showRange !== undefined
+      ? !!showRange
+      : (valueType === "number" || valueType === "date") && scale !== "categorical";
+  const rangeMode = normalizeAxisRange(rangeValue);
   const divisor = String(Number(divisorValue) > 0 ? Number(divisorValue) : 1);
   const labelMode = compactLabels ? "compact" : "full";
 
@@ -188,6 +202,30 @@ function AxisSettingsMenu({
                     checked={scale === opt.value}
                     onCheckedChange={(checked) => {
                       if (checked) onScaleChange?.(opt.value);
+                    }}
+                    onSelect={(e) => e.preventDefault()}
+                  >
+                    {opt.label}
+                  </DropdownMenuCheckboxItem>
+                ))}
+              </DropdownMenuSubContent>
+            </DropdownMenuSub>
+          ) : null}
+          {rangeVisible ? (
+            <DropdownMenuSub>
+              <DropdownMenuSubTrigger className="text-xs">Axis Range</DropdownMenuSubTrigger>
+              <DropdownMenuSubContent className="text-xs">
+                <DropdownMenuLabel className="text-[10px] uppercase tracking-wide text-muted-foreground">
+                  Axis Range
+                </DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                {AXIS_RANGE_OPTIONS.map((opt) => (
+                  <DropdownMenuCheckboxItem
+                    key={opt.value}
+                    className="text-xs"
+                    checked={rangeMode === opt.value}
+                    onCheckedChange={(checked) => {
+                      if (checked) onRangeChange?.(opt.value);
                     }}
                     onSelect={(e) => e.preventDefault()}
                   >
@@ -268,11 +306,14 @@ function AxisSelectRow({
   onDivisorChange,
   compactLabels,
   onCompactChange,
+  rangeValue,
+  onRangeChange,
   valueType,
   scaleAriaLabel,
   menuLabel,
   showScale,
   showNumberFormat,
+  showRange,
   scaleOptions,
   children,
 }) {
@@ -286,11 +327,14 @@ function AxisSelectRow({
         onDivisorChange={onDivisorChange}
         compactLabels={compactLabels}
         onCompactChange={onCompactChange}
+        rangeValue={rangeValue}
+        onRangeChange={onRangeChange}
         valueType={valueType}
         ariaLabel={scaleAriaLabel}
         menuLabel={menuLabel}
         showScale={showScale}
         showNumberFormat={showNumberFormat}
+        showRange={showRange}
         scaleOptions={scaleOptions}
       />
     </div>
@@ -767,6 +811,10 @@ export default function ChartControls() {
     setScaleX,
     scaleY,
     setScaleY,
+    xAxisRange,
+    setXAxisRange,
+    yAxisRange,
+    setYAxisRange,
     yAxisDivisor,
     setYAxisDivisor,
     yAxisCompact,
@@ -1524,8 +1572,11 @@ export default function ChartControls() {
           onDivisorChange={setYAxisDivisor}
           compactLabels={yAxisCompact}
           onCompactChange={setYAxisCompact}
+          rangeValue={yAxisRange}
+          onRangeChange={setYAxisRange}
           valueType={yAxisMenuValueType}
           ariaLabel="Y axis settings"
+          menuLabel="Y axis"
         />
       </div>
       <CollapsibleContent className="space-y-3 pt-3">
@@ -2197,8 +2248,11 @@ export default function ChartControls() {
                           onDivisorChange={setXAxisDivisor}
                           compactLabels={xAxisCompact}
                           onCompactChange={setXAxisCompact}
+                          rangeValue={xAxisRange}
+                          onRangeChange={setXAxisRange}
                           valueType={xAxisMenuValueType}
                           scaleAriaLabel="X axis settings"
+                          menuLabel="X axis"
                         >
                           <Select value={xAxisSelectValue} onValueChange={handleXAxisChange}>
                             <SelectTrigger className="h-8 min-w-0 w-full text-xs font-normal">
@@ -2280,8 +2334,11 @@ export default function ChartControls() {
                           onDivisorChange={setXAxisDivisor}
                           compactLabels={xAxisCompact}
                           onCompactChange={setXAxisCompact}
+                          rangeValue={xAxisRange}
+                          onRangeChange={setXAxisRange}
                           valueType={xAxisMenuValueType}
                           scaleAriaLabel="X axis settings"
+                          menuLabel="X axis"
                         >
                           <Select value={xAxisSelectValue} onValueChange={handleXAxisChange}>
                             <SelectTrigger className="h-8 min-w-0 w-full text-xs">
@@ -2309,8 +2366,11 @@ export default function ChartControls() {
                             onDivisorChange={setYAxisDivisor}
                             compactLabels={yAxisCompact}
                             onCompactChange={setYAxisCompact}
+                            rangeValue={yAxisRange}
+                            onRangeChange={setYAxisRange}
                             valueType={yAxisMenuValueType}
                             ariaLabel="Y axis settings"
+                            menuLabel="Y axis"
                           />
                         </div>
                         {selY.length > 0 &&
@@ -2470,8 +2530,11 @@ export default function ChartControls() {
                           onDivisorChange={setXAxisDivisor}
                           compactLabels={xAxisCompact}
                           onCompactChange={setXAxisCompact}
+                          rangeValue={xAxisRange}
+                          onRangeChange={setXAxisRange}
                           valueType={xAxisMenuValueType}
                           scaleAriaLabel="X axis settings"
+                          menuLabel="X axis"
                         >
                           <Select value={xAxisSelectValue} onValueChange={handleXAxisChange}>
                             <SelectTrigger className="h-8 min-w-0 w-full text-xs">
@@ -2500,8 +2563,11 @@ export default function ChartControls() {
                               onDivisorChange={setYAxisDivisor}
                               compactLabels={yAxisCompact}
                               onCompactChange={setYAxisCompact}
+                              rangeValue={yAxisRange}
+                              onRangeChange={setYAxisRange}
                               valueType={yAxisMenuValueType}
                               scaleAriaLabel="Y axis settings"
+                              menuLabel="Y axis"
                             >
                               <div className="flex min-w-0 items-center gap-2">
                                 <Select
@@ -2571,8 +2637,11 @@ export default function ChartControls() {
                             onDivisorChange={setYAxisDivisor}
                             compactLabels={yAxisCompact}
                             onCompactChange={setYAxisCompact}
+                            rangeValue={yAxisRange}
+                            onRangeChange={setYAxisRange}
                             valueType={yAxisMenuValueType}
                             scaleAriaLabel="Y axis settings"
+                            menuLabel="Y axis"
                           >
                             <Select onValueChange={(val) => handleSelectY(val)}>
                               <SelectTrigger className="h-8 min-w-0 w-full text-xs">
@@ -2746,6 +2815,7 @@ export default function ChartControls() {
                             onScaleChange={(v) => setScaleZ(v === "log" ? "log" : "linear")}
                             valueType="number"
                             showNumberFormat={false}
+                            showRange={false}
                             scaleOptions={Z_AXIS_SCALE_OPTIONS}
                             menuLabel="Z"
                             scaleAriaLabel="Bubble size settings"

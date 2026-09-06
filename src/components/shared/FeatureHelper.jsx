@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { filterFeatureHelperGuideLinks } from "@/lib/featureHelper";
 import { cn } from "@/lib/utils";
 
-/** Matches FeatureHelper panel width (w-72). Used to pad compose content while open. */
+/** Matches FeatureHelper panel width (w-72). Pad compose content and the Run control while open. */
 export const FEATURE_HELPER_DRAWER_WIDTH_CLASS = "pr-72";
 
 /** Tailwind width of the helper panel — keep in sync with FeatureHelper `w-72`. */

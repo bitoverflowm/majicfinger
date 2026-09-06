@@ -41,8 +41,11 @@ export async function rehydrateSheetFromProvenance({
   sourceSheetId,
   pollOpts,
 }) {
-  if (!targetSheetId || !provenance) {
-    throw new Error("Missing sheet or saved query to replay.");
+  if (!targetSheetId) {
+    throw new Error("Could not create or select a sheet to replay into.");
+  }
+  if (!provenance) {
+    throw new Error("This query is only in history display — nothing to re-run. Run it from compose first.");
   }
 
   const sourceSheet = sourceSheetId ? dataSheets?.[sourceSheetId] : dataSheets?.[targetSheetId];
