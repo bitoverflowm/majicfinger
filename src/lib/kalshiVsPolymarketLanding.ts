@@ -27,7 +27,7 @@ export const kalshiVsPolymarketLanding = {
     "prediction market arbitrage",
   ],
   hero: {
-    eyebrow: "FREE PREDICTION MARKET COMPARISON",
+    eyebrow: "Real time Polymarket vs Kalshi",
     title: "Compare Kalshi and Polymarket Odds in Real Time",
     description:
       "Search for an event in plain English or enter a market ticker. Find matching markets across Kalshi and Polymarket, then compare live odds, charts and trading activity in one view.",
