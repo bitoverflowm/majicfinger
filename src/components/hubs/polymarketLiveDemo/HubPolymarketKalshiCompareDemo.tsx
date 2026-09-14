@@ -1,8 +1,8 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import Link from "next/link";
-import { Loader2, RefreshCw, Search } from "lucide-react";
+import { Loader2, RefreshCw, Search, Undo2 } from "lucide-react";
 
 import { PolymarketLiveSearch } from "@/components/connectData/polymarketLive/PolymarketLiveSearch";
 import { MarketTickerSearch } from "@/components/connectData/MarketTickerSearch";
@@ -116,13 +116,88 @@ type IntervalId = "15m" | "1h" | "6h" | "1d" | "all";
 
 /** Kalshi brand-forward green for the comparison line. */
 const KALSHI_LINE_GREEN = "#22c55e";
-const INTERVALS: { id: IntervalId; label: string; ms: number | null }[] = [
+const INTERVALS: { id: IntervalId; label: "15m" | "1h" | "6h" | "1d" | "All"; ms: number | null }[] = [
   { id: "15m", label: "15m", ms: 15 * 60 * 1000 },
   { id: "1h", label: "1h", ms: 60 * 60 * 1000 },
   { id: "6h", label: "6h", ms: 6 * 60 * 60 * 1000 },
   { id: "1d", label: "1d", ms: 24 * 60 * 60 * 1000 },
   { id: "all", label: "All", ms: null },
 ];
+
+function CompareFieldSkeleton({ className }: { className?: string }) {
+  return (
+    <span
+      className={cn("inline-block h-3 animate-pulse rounded bg-muted/70 align-middle", className)}
+      aria-hidden
+    />
+  );
+}
+
+function ComparePendingValue({
+  pending,
+  children,
+  skeletonClassName = "w-20",
+}: {
+  pending: boolean;
+  children: ReactNode;
+  skeletonClassName?: string;
+}) {
+  if (pending) return <CompareFieldSkeleton className={skeletonClassName} />;
+  return children;
+}
+
+function CompareChartSkeleton({ animate = true }: { animate?: boolean }) {
+  const pulse = animate ? "animate-pulse" : "";
+  return (
+    <div className="flex h-full min-h-0 w-full flex-col gap-3 px-3 py-3" aria-hidden>
+      <div className="flex min-h-0 flex-1 gap-3">
+        <div className="flex w-10 shrink-0 flex-col justify-between py-1">
+          {Array.from({ length: 5 }).map((_, i) => (
+            <div key={i} className={cn("h-2.5 w-full rounded bg-muted/70", pulse)} />
+          ))}
+        </div>
+        <div className="relative min-h-0 flex-1 overflow-hidden rounded-md border border-border/40 bg-muted/15">
+          <div className="absolute inset-x-0 top-[20%] h-px bg-border/40" />
+          <div className="absolute inset-x-0 top-[40%] h-px bg-border/40" />
+          <div className="absolute inset-x-0 top-[60%] h-px bg-border/40" />
+          <div className="absolute inset-x-0 top-[80%] h-px bg-border/40" />
+          <div className={cn("absolute inset-[18%_8%_22%_6%] rounded-full bg-muted/50", pulse)} />
+          <div className={cn("absolute inset-[42%_12%_28%_10%] rounded-full bg-muted/40", pulse)} />
+        </div>
+      </div>
+      <div className="flex gap-2 pl-12">
+        {Array.from({ length: 6 }).map((_, i) => (
+          <div key={i} className={cn("h-2.5 flex-1 rounded bg-muted/60", pulse)} />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function CompareChartBody({
+  pending,
+  hasData,
+  waitingMessage,
+  children,
+}: {
+  pending: boolean;
+  hasData: boolean;
+  waitingMessage?: string;
+  children: ReactNode;
+}) {
+  if (hasData) return children;
+  if (pending) return <CompareChartSkeleton />;
+  return (
+    <div className="relative h-full min-h-0">
+      <CompareChartSkeleton animate={false} />
+      {waitingMessage ? (
+        <p className="absolute inset-0 flex items-center justify-center px-4 text-center text-sm text-muted-foreground">
+          {waitingMessage}
+        </p>
+      ) : null}
+    </div>
+  );
+}
 
 function yesTokenId(market: Record<string, unknown> | null): string {
   if (!market) return "";
@@ -209,6 +284,62 @@ function filterByInterval(
   });
 }
 
+function isOpaqueHttpErrorMessage(raw: string): boolean {
+  const msg = String(raw || "")
+    .trim()
+    .toLowerCase();
+  return (
+    !msg ||
+    msg.includes("bad request") ||
+    msg.includes("bad_request") ||
+    msg.includes("not found") ||
+    msg.includes("not_found") ||
+    msg.includes("internal server error") ||
+    msg.includes("invalid_parameters") ||
+    msg.includes("field validation") ||
+    msg.includes("not valid")
+  );
+}
+
+function taggedError(message: string, code: string, status?: number): Error {
+  const err = new Error(message);
+  Object.assign(err, { code, status });
+  return err;
+}
+
+function humanizeMatchError(raw: string): string {
+  if (/too many requests|rate limit/i.test(raw)) {
+    return "Kalshi search is rate-limited. Wait a moment, then try again or search Kalshi manually.";
+  }
+  if (isOpaqueHttpErrorMessage(raw) || /failed to fetch|network|search failed/i.test(raw)) {
+    return "We couldn’t search Kalshi for a matching market. Search Kalshi manually, or try another Polymarket market.";
+  }
+  return raw;
+}
+
+function humanizeSeriesError(err: unknown): string {
+  const raw = err instanceof Error ? err.message : String(err || "");
+  const extra = err && typeof err === "object" ? (err as { code?: string; status?: number }) : {};
+  const code = String(extra.code || "");
+  const status = Number(extra.status);
+  if (/too many requests|rate limit/i.test(raw)) {
+    return "Kalshi data is rate-limited. Wait a moment, then try again.";
+  }
+  if (code === "polymarket_history" || /this polymarket market has no yes token/i.test(raw)) {
+    if (/no YES token/i.test(raw)) return raw;
+    return "This Polymarket market does not exist (or could not be loaded). Pick another Polymarket market.";
+  }
+  if (
+    isOpaqueHttpErrorMessage(raw) ||
+    status === 400 ||
+    status === 404 ||
+    /not found|not_found|does not exist|no market/i.test(raw)
+  ) {
+    return "This Kalshi market does not exist (or is no longer listed). Search Kalshi manually to pick another.";
+  }
+  return raw || "Failed to load comparison series";
+}
+
 async function fetchPolymarketHistory(
   tokenId: string,
   signal: AbortSignal,
@@ -227,8 +358,10 @@ async function fetchPolymarketHistory(
   });
   const payload = await res.json().catch(() => ({}));
   if (!res.ok) {
-    throw new Error(
+    throw taggedError(
       typeof payload?.error === "string" ? payload.error : "Failed to load Polymarket history",
+      "polymarket_history",
+      res.status,
     );
   }
   const rows = normalizePolymarketRealtimeHistoryRows(payload);
@@ -250,7 +383,11 @@ async function fetchKalshiTrades(
   });
   const body = await res.json().catch(() => ({}));
   if (!res.ok) {
-    throw new Error(typeof body?.error === "string" ? body.error : "Failed to load Kalshi trades");
+    throw taggedError(
+      typeof body?.error === "string" ? body.error : "Failed to load Kalshi trades",
+      "kalshi_trades",
+      res.status,
+    );
   }
   return (Array.isArray(body?.trades) ? body.trades : []).filter(
     (row: unknown) => row && typeof row === "object",
@@ -570,6 +707,7 @@ function ComparePolymarketMarketSearch() {
 export function HubPolymarketKalshiCompareDemo() {
   const selection = useHubPolymarketLiveDemo();
   const polyMarket = selection?.markets?.[0] || null;
+  const setMarkets = selection?.setMarkets;
   const polyKey = String(polyMarket?.conditionId || polyMarket?.id || polyMarket?.slug || "");
 
   const rootRef = useRef<HTMLDivElement>(null);
@@ -587,7 +725,8 @@ export function HubPolymarketKalshiCompareDemo() {
   const [kalshiMarket, setKalshiMarket] = useState<Record<string, unknown> | null>(null);
   const [polyPoints, setPolyPoints] = useState<Record<string, unknown>[]>([]);
   const [kalshiPoints, setKalshiPoints] = useState<Record<string, unknown>[]>([]);
-  const [seriesLoading, setSeriesLoading] = useState(false);
+  const [polyLoading, setPolyLoading] = useState(false);
+  const [kalshiLoading, setKalshiLoading] = useState(false);
   const [seriesError, setSeriesError] = useState<string | null>(null);
   const [interval, setIntervalId] = useState<IntervalId>("1d");
   const [livePaused, setLivePaused] = useState(false);
@@ -595,7 +734,34 @@ export function HubPolymarketKalshiCompareDemo() {
   const polySocketStop = useRef<(() => void) | null>(null);
   const pollTimer = useRef<ReturnType<typeof setInterval> | null>(null);
   const matchAbort = useRef<AbortController | null>(null);
-  const seriesAbort = useRef<AbortController | null>(null);
+  const polyHistAbort = useRef<AbortController | null>(null);
+  const kalshiSeriesAbort = useRef<AbortController | null>(null);
+
+  const startOver = useCallback(() => {
+    matchAbort.current?.abort();
+    polyHistAbort.current?.abort();
+    kalshiSeriesAbort.current?.abort();
+    polySocketStop.current?.();
+    polySocketStop.current = null;
+    if (pollTimer.current) {
+      clearInterval(pollTimer.current);
+      pollTimer.current = null;
+    }
+    setMatchLoading(false);
+    setMatchError(null);
+    setCandidates([]);
+    setSelectedTicker("");
+    setEmptyMessage(null);
+    setManualOpen(false);
+    setManualTickers("");
+    setKalshiMarket(null);
+    setPolyPoints([]);
+    setKalshiPoints([]);
+    setPolyLoading(false);
+    setKalshiLoading(false);
+    setSeriesError(null);
+    setMarkets?.([]);
+  }, [setMarkets]);
 
   useEffect(() => {
     const el = rootRef.current;
@@ -611,7 +777,8 @@ export function HubPolymarketKalshiCompareDemo() {
   useEffect(() => {
     return () => {
       matchAbort.current?.abort();
-      seriesAbort.current?.abort();
+      polyHistAbort.current?.abort();
+      kalshiSeriesAbort.current?.abort();
       polySocketStop.current?.();
       if (pollTimer.current) clearInterval(pollTimer.current);
     };
@@ -634,6 +801,9 @@ export function HubPolymarketKalshiCompareDemo() {
     setEmptyMessage(null);
     setSelectedTicker("");
     setKalshiMarket(null);
+    setKalshiPoints([]);
+    setManualOpen(false);
+    setSeriesError(null);
 
     void findKalshiLiveMatchesForPolymarket(polyMarket, { signal: ac.signal })
       .then((result) => {
@@ -645,6 +815,7 @@ export function HubPolymarketKalshiCompareDemo() {
         });
         setCandidates(result.candidates);
         setEmptyMessage(result.emptyMessage);
+        if (!result.candidates.length) setManualOpen(true);
         if (result.preselected) {
           trackPolymarketLiveHubEvent("polymarket_kalshi_compare_match", {
             tier: result.preselected.tier,
@@ -663,8 +834,11 @@ export function HubPolymarketKalshiCompareDemo() {
       })
       .catch((err) => {
         if (ac.signal.aborted || (err instanceof DOMException && err.name === "AbortError")) return;
-        setMatchError(err instanceof Error ? err.message : "Match search failed");
+        setMatchError(
+          humanizeMatchError(err instanceof Error ? err.message : "Match search failed"),
+        );
         setCandidates([]);
+        setManualOpen(true);
       })
       .finally(() => {
         if (!ac.signal.aborted) setMatchLoading(false);
@@ -678,83 +852,131 @@ export function HubPolymarketKalshiCompareDemo() {
     [candidates, selectedTicker],
   );
 
-  const loadSeries = useCallback(async () => {
-    if (!polyMarket || !selectedTicker || !inView) return;
+  useEffect(() => {
+    if (!polyMarket || !polyKey) {
+      setPolyPoints([]);
+      setPolyLoading(false);
+      return undefined;
+    }
+    if (!inView) return undefined;
+
     const tokenId = yesTokenId(polyMarket);
     if (!tokenId) {
+      setPolyPoints([]);
+      setPolyLoading(false);
       setSeriesError("This Polymarket market has no YES token to chart.");
-      return;
+      return undefined;
     }
 
-    seriesAbort.current?.abort();
+    polyHistAbort.current?.abort();
     const ac = new AbortController();
-    seriesAbort.current = ac;
-    setSeriesLoading(true);
-    setSeriesError(null);
+    polyHistAbort.current = ac;
+    setPolyLoading(true);
 
-    try {
-      const [market, polyHist, kalshiTrades] = await Promise.all([
-        fetchKalshiLiveMarket({ marketTicker: selectedTicker, signal: ac.signal }),
-        fetchPolymarketHistory(tokenId, ac.signal),
-        fetchKalshiTrades(selectedTicker, ac.signal),
-      ]);
-      if (ac.signal.aborted) return;
-      setKalshiMarket(market);
-      setPolyPoints(
-        polyHist
-          .map((row) => toPctPoint(row, "Polymarket"))
-          .filter(Boolean) as Record<string, unknown>[],
-      );
-      setKalshiPoints(
-        kalshiTrades
-          .map((row) => toPctPoint(row, "Kalshi"))
-          .filter(Boolean) as Record<string, unknown>[],
-      );
-    } catch (err) {
-      if (ac.signal.aborted || (err instanceof DOMException && err.name === "AbortError")) return;
-      setSeriesError(err instanceof Error ? err.message : "Failed to load comparison series");
-    } finally {
-      if (!ac.signal.aborted) setSeriesLoading(false);
-    }
-  }, [inView, polyMarket, selectedTicker]);
+    void fetchPolymarketHistory(tokenId, ac.signal)
+      .then((polyHist) => {
+        if (ac.signal.aborted) return;
+        setPolyPoints(
+          polyHist
+            .map((row) => toPctPoint(row, "Polymarket"))
+            .filter(Boolean) as Record<string, unknown>[],
+        );
+      })
+      .catch((err) => {
+        if (ac.signal.aborted || (err instanceof DOMException && err.name === "AbortError")) return;
+        setSeriesError(humanizeSeriesError(err));
+      })
+      .finally(() => {
+        if (!ac.signal.aborted) setPolyLoading(false);
+      });
+
+    return () => ac.abort();
+  }, [inView, polyKey, polyMarket]);
 
   useEffect(() => {
-    void loadSeries();
-  }, [loadSeries]);
+    if (!selectedTicker) {
+      setKalshiMarket(null);
+      setKalshiPoints([]);
+      setKalshiLoading(false);
+      return undefined;
+    }
+    if (!inView) return undefined;
 
-  // Live updates: Polymarket WS + Kalshi poll while in view.
+    kalshiSeriesAbort.current?.abort();
+    const ac = new AbortController();
+    kalshiSeriesAbort.current = ac;
+    setKalshiLoading(true);
+    setSeriesError(null);
+
+    void Promise.all([
+      fetchKalshiLiveMarket({ marketTicker: selectedTicker, signal: ac.signal }),
+      fetchKalshiTrades(selectedTicker, ac.signal),
+    ])
+      .then(([market, kalshiTrades]) => {
+        if (ac.signal.aborted) return;
+        setKalshiMarket(market);
+        setKalshiPoints(
+          kalshiTrades
+            .map((row) => toPctPoint(row, "Kalshi"))
+            .filter(Boolean) as Record<string, unknown>[],
+        );
+      })
+      .catch((err) => {
+        if (ac.signal.aborted || (err instanceof DOMException && err.name === "AbortError")) return;
+        setSeriesError(humanizeSeriesError(err));
+        setManualOpen(true);
+      })
+      .finally(() => {
+        if (!ac.signal.aborted) setKalshiLoading(false);
+      });
+
+    return () => ac.abort();
+  }, [inView, selectedTicker]);
+
+  // Live Polymarket trades while the selected market is in view.
   useEffect(() => {
     polySocketStop.current?.();
     polySocketStop.current = null;
+
+    if (!inView || livePaused || !polyMarket) return undefined;
+
+    const tokenId = yesTokenId(polyMarket);
+    if (!tokenId) return undefined;
+
+    polySocketStop.current = openPolymarketLastTradeSocket({
+      assetIds: [tokenId],
+      onTrade: (row) => {
+        const asset = String(row.asset_id || "");
+        if (asset && asset !== tokenId) return;
+        const point = toPctPoint(
+          {
+            created_time: row.timestamp || row.time || new Date().toISOString(),
+            price: row.price,
+            yes_price_dollars: row.price,
+            size: row.size,
+            side: row.side,
+          },
+          "Polymarket",
+        );
+        if (!point) return;
+        setPolyPoints((prev) => [...prev.slice(-2000), point]);
+      },
+    });
+
+    return () => {
+      polySocketStop.current?.();
+      polySocketStop.current = null;
+    };
+  }, [inView, livePaused, polyMarket]);
+
+  // Live Kalshi poll while a matched ticker is in view.
+  useEffect(() => {
     if (pollTimer.current) {
       clearInterval(pollTimer.current);
       pollTimer.current = null;
     }
 
-    if (!inView || livePaused || !polyMarket || !selectedTicker) return undefined;
-
-    const tokenId = yesTokenId(polyMarket);
-    if (tokenId) {
-      polySocketStop.current = openPolymarketLastTradeSocket({
-        assetIds: [tokenId],
-        onTrade: (row) => {
-          const asset = String(row.asset_id || "");
-          if (asset && asset !== tokenId) return;
-          const point = toPctPoint(
-            {
-              created_time: row.timestamp || row.time || new Date().toISOString(),
-              price: row.price,
-              yes_price_dollars: row.price,
-              size: row.size,
-              side: row.side,
-            },
-            "Polymarket",
-          );
-          if (!point) return;
-          setPolyPoints((prev) => [...prev.slice(-2000), point]);
-        },
-      });
-    }
+    if (!inView || livePaused || !selectedTicker) return undefined;
 
     pollTimer.current = setInterval(() => {
       void (async () => {
@@ -786,14 +1008,12 @@ export function HubPolymarketKalshiCompareDemo() {
     }, 12_000);
 
     return () => {
-      polySocketStop.current?.();
-      polySocketStop.current = null;
       if (pollTimer.current) {
         clearInterval(pollTimer.current);
         pollTimer.current = null;
       }
     };
-  }, [inView, livePaused, polyMarket, selectedTicker]);
+  }, [inView, livePaused, selectedTicker]);
 
   const polyFiltered = useMemo(
     () => filterByInterval(polyPoints, interval),
@@ -861,6 +1081,12 @@ export function HubPolymarketKalshiCompareDemo() {
     selectedCandidate &&
     (selectedCandidate.tier === "related" || selectedCandidate.tier === "close");
 
+  const polyChartPending = polyLoading && !polyFiltered.length;
+  const kalshiChartPending =
+    (matchLoading || kalshiLoading) && !kalshiFiltered.length;
+  const kalshiFieldsPending = !selectedTicker || (kalshiLoading && !kalshiMarket);
+  const polyFieldsPending = polyLoading && polyYesPct == null;
+
   return (
     <div ref={rootRef} className="space-y-5">
       {!polyMarket ? (
@@ -869,16 +1095,28 @@ export function HubPolymarketKalshiCompareDemo() {
         </div>
       ) : (
         <>
-          <div className="rounded-xl border border-border/60 bg-muted/10 px-3 py-2.5 text-sm">
-            <span className="text-muted-foreground">Polymarket selected: </span>
-            <span className="font-medium text-foreground">
-              {String(polyMarket.title || polyMarket.slug || "Market")}
-            </span>
-            {!shape.isBinary ? (
-              <p className="mt-1 text-[11px] text-amber-600 dark:text-amber-400">
-                Multi-outcome market — comparison uses the YES (or first) outcome only.
-              </p>
-            ) : null}
+          <div className="flex items-start justify-between gap-3 rounded-xl border border-border/60 bg-muted/10 px-3 py-2.5 text-sm">
+            <div className="min-w-0">
+              <span className="text-muted-foreground">Polymarket selected: </span>
+              <span className="font-medium text-foreground">
+                {String(polyMarket.title || polyMarket.slug || "Market")}
+              </span>
+              {!shape.isBinary ? (
+                <p className="mt-1 text-[11px] text-amber-600 dark:text-amber-400">
+                  Multi-outcome market — comparison uses the YES (or first) outcome only.
+                </p>
+              ) : null}
+            </div>
+            <Button
+              type="button"
+              size="sm"
+              variant="ghost"
+              className="h-8 shrink-0 gap-1.5 px-2 text-xs"
+              onClick={startOver}
+            >
+              <Undo2 className="size-3.5" aria-hidden />
+              Start over
+            </Button>
           </div>
 
           {matchLoading ? (
@@ -889,22 +1127,58 @@ export function HubPolymarketKalshiCompareDemo() {
           ) : null}
 
           {matchError ? (
-            <p className="text-sm text-destructive">{matchError}</p>
+            <div className="space-y-3 rounded-xl border border-border/70 bg-muted/15 px-4 py-4">
+              <p className="text-sm text-destructive">{humanizeMatchError(matchError)}</p>
+              <div className="flex flex-wrap gap-2">
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  className="gap-1.5"
+                  onClick={startOver}
+                >
+                  <Undo2 className="size-3.5" aria-hidden />
+                  Start over
+                </Button>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  className="gap-1.5"
+                  onClick={() => setManualOpen(true)}
+                >
+                  <Search className="size-3.5" aria-hidden />
+                  Search Kalshi manually
+                </Button>
+              </div>
+            </div>
           ) : null}
 
-          {emptyMessage && !matchLoading ? (
+          {emptyMessage && !matchLoading && !matchError ? (
             <div className="space-y-3 rounded-xl border border-border/70 bg-muted/15 px-4 py-4">
               <p className="text-sm text-muted-foreground">{emptyMessage}</p>
-              <Button
-                type="button"
-                size="sm"
-                variant="outline"
-                className="gap-1.5"
-                onClick={() => setManualOpen(true)}
-              >
-                <Search className="size-3.5" aria-hidden />
-                Search Kalshi manually
-              </Button>
+              <div className="flex flex-wrap gap-2">
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  className="gap-1.5"
+                  onClick={startOver}
+                >
+                  <Undo2 className="size-3.5" aria-hidden />
+                  Start over
+                </Button>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  className="gap-1.5"
+                  onClick={() => setManualOpen(true)}
+                >
+                  <Search className="size-3.5" aria-hidden />
+                  Search Kalshi manually
+                </Button>
+              </div>
             </div>
           ) : null}
 
@@ -979,6 +1253,9 @@ export function HubPolymarketKalshiCompareDemo() {
 
           {manualOpen ? (
             <div className="rounded-xl border border-border/70 bg-muted/10 p-3">
+              <p className="mb-2 text-xs font-medium text-muted-foreground">
+                Search Kalshi by event name
+              </p>
               <MarketTickerSearch
                 value={manualTickers}
                 onChange={setManualTickers}
@@ -1026,8 +1303,34 @@ export function HubPolymarketKalshiCompareDemo() {
             </p>
           ) : null}
 
-          {selectedTicker ? (
-            <div className="space-y-4">
+          <div className="space-y-4">
+              {seriesError ? (
+                <div className="space-y-3 rounded-xl border border-destructive/30 bg-destructive/5 px-4 py-4">
+                  <p className="text-sm text-destructive">{seriesError}</p>
+                  <div className="flex flex-wrap gap-2">
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      className="gap-1.5"
+                      onClick={startOver}
+                    >
+                      <Undo2 className="size-3.5" aria-hidden />
+                      Start over
+                    </Button>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      className="gap-1.5"
+                      onClick={() => setManualOpen(true)}
+                    >
+                      <Search className="size-3.5" aria-hidden />
+                      Search Kalshi manually
+                    </Button>
+                  </div>
+                </div>
+              ) : null}
               <div className="overflow-hidden rounded-xl border border-border/70">
                 <table className="w-full text-left text-xs sm:text-sm">
                   <thead className="bg-muted/30 text-muted-foreground">
@@ -1044,51 +1347,77 @@ export function HubPolymarketKalshiCompareDemo() {
                         {String(polyMarket.title || "—")}
                       </td>
                       <td className="px-3 py-2 font-medium text-foreground">
-                        {String(
-                          kalshiMarket?.title ||
-                            selectedCandidate?.market.title ||
-                            selectedTicker,
-                        )}
+                        <ComparePendingValue
+                          pending={kalshiFieldsPending && !selectedCandidate?.market.title}
+                          skeletonClassName="h-3.5 w-40 max-w-full"
+                        >
+                          {String(
+                            kalshiMarket?.title ||
+                              selectedCandidate?.market.title ||
+                              selectedTicker ||
+                              "—",
+                          )}
+                        </ComparePendingValue>
                       </td>
                     </tr>
                     <tr>
                       <td className="px-3 py-2 text-muted-foreground">YES</td>
-                      <td className="px-3 py-2">{formatPct(polyYesPct)}</td>
-                      <td className="px-3 py-2">{formatPct(kalshiYesPct)}</td>
+                      <td className="px-3 py-2">
+                        <ComparePendingValue pending={polyFieldsPending}>
+                          {formatPct(polyYesPct)}
+                        </ComparePendingValue>
+                      </td>
+                      <td className="px-3 py-2">
+                        <ComparePendingValue pending={kalshiFieldsPending || (kalshiLoading && kalshiYesPct == null)}>
+                          {formatPct(kalshiYesPct)}
+                        </ComparePendingValue>
+                      </td>
                     </tr>
                     <tr>
                       <td className="px-3 py-2 text-muted-foreground">NO</td>
                       <td className="px-3 py-2">
-                        {formatPct(polyYesPct != null ? 100 - polyYesPct : null)}
+                        <ComparePendingValue pending={polyFieldsPending}>
+                          {formatPct(polyYesPct != null ? 100 - polyYesPct : null)}
+                        </ComparePendingValue>
                       </td>
                       <td className="px-3 py-2">
-                        {formatPct(kalshiYesPct != null ? 100 - kalshiYesPct : null)}
+                        <ComparePendingValue pending={kalshiFieldsPending || (kalshiLoading && kalshiYesPct == null)}>
+                          {formatPct(kalshiYesPct != null ? 100 - kalshiYesPct : null)}
+                        </ComparePendingValue>
                       </td>
                     </tr>
                     <tr>
                       <td className="px-3 py-2 text-muted-foreground">Last trade</td>
                       <td className="px-3 py-2">
-                        {formatAgo(String(polyLast?.created_time || "") || null)}
+                        <ComparePendingValue pending={polyFieldsPending}>
+                          {formatAgo(String(polyLast?.created_time || "") || null)}
+                        </ComparePendingValue>
                       </td>
                       <td className="px-3 py-2">
-                        {formatAgo(String(kalshiLast?.created_time || "") || null)}
+                        <ComparePendingValue pending={kalshiFieldsPending || (kalshiLoading && !kalshiLast)}>
+                          {formatAgo(String(kalshiLast?.created_time || "") || null)}
+                        </ComparePendingValue>
                       </td>
                     </tr>
                     <tr>
                       <td className="px-3 py-2 text-muted-foreground">Activity</td>
                       <td className="px-3 py-2">
-                        {polyFiltered.length} prints in view
-                        {polyMarket.volume24h != null
-                          ? ` · 24h vol $${Number(polyMarket.volume24h).toLocaleString()}`
-                          : ""}
+                        <ComparePendingValue pending={polyChartPending} skeletonClassName="h-3 w-36">
+                          {polyFiltered.length} prints in view
+                          {polyMarket.volume24h != null
+                            ? ` · 24h vol $${Number(polyMarket.volume24h).toLocaleString()}`
+                            : ""}
+                        </ComparePendingValue>
                       </td>
                       <td className="px-3 py-2">
-                        {kalshiFiltered.length} trades in view
-                        {kalshiMarket?.volume != null
-                          ? ` · vol ${Number(kalshiMarket.volume).toLocaleString()} contracts`
-                          : kalshiMarket?.volume_fp != null
-                            ? ` · vol ${Number(kalshiMarket.volume_fp).toLocaleString()} contracts`
-                            : ""}
+                        <ComparePendingValue pending={kalshiFieldsPending || kalshiChartPending} skeletonClassName="h-3 w-36">
+                          {kalshiFiltered.length} trades in view
+                          {kalshiMarket?.volume != null
+                            ? ` · vol ${Number(kalshiMarket.volume).toLocaleString()} contracts`
+                            : kalshiMarket?.volume_fp != null
+                              ? ` · vol ${Number(kalshiMarket.volume_fp).toLocaleString()} contracts`
+                              : ""}
+                        </ComparePendingValue>
                       </td>
                     </tr>
                     <tr>
@@ -1097,7 +1426,9 @@ export function HubPolymarketKalshiCompareDemo() {
                         {polyMarket.closed ? "Closed" : "Live"}
                       </td>
                       <td className="px-3 py-2">
-                        {String(kalshiMarket?.status || selectedCandidate?.market.status || "—")}
+                        <ComparePendingValue pending={kalshiFieldsPending && !selectedCandidate?.market.status}>
+                          {String(kalshiMarket?.status || selectedCandidate?.market.status || "—")}
+                        </ComparePendingValue>
                       </td>
                     </tr>
                   </tbody>
@@ -1159,16 +1490,11 @@ export function HubPolymarketKalshiCompareDemo() {
                     <p className="text-xs font-semibold text-foreground">Polymarket</p>
                   </div>
                   <div className="h-56 min-h-0 w-full shrink-0 sm:h-64">
-                    {seriesLoading && !polyFiltered.length ? (
-                      <div className="flex h-full items-center justify-center gap-2 text-sm text-muted-foreground">
-                        <Loader2 className="size-4 animate-spin" aria-hidden />
-                        Loading…
-                      </div>
-                    ) : !polyFiltered.length ? (
-                      <p className="flex h-full items-center justify-center px-4 text-center text-sm text-muted-foreground">
-                        No chart at present
-                      </p>
-                    ) : (
+                    <CompareChartBody
+                      pending={polyChartPending}
+                      hasData={polyFiltered.length > 0}
+                      waitingMessage="No chart at present"
+                    >
                       <HubKalshiLiveDemoTradesLiveline
                         series={polySeries}
                         persistHistory
@@ -1183,7 +1509,7 @@ export function HubPolymarketKalshiCompareDemo() {
                         className="h-full min-h-0"
                         emptyMessage="No chart at present"
                       />
-                    )}
+                    </CompareChartBody>
                   </div>
                 </div>
 
@@ -1197,16 +1523,15 @@ export function HubPolymarketKalshiCompareDemo() {
                     <p className="text-xs font-semibold text-foreground">Kalshi</p>
                   </div>
                   <div className="h-56 min-h-0 w-full shrink-0 sm:h-64">
-                    {seriesLoading && !kalshiFiltered.length ? (
-                      <div className="flex h-full items-center justify-center gap-2 text-sm text-muted-foreground">
-                        <Loader2 className="size-4 animate-spin" aria-hidden />
-                        Loading…
-                      </div>
-                    ) : !kalshiFiltered.length ? (
-                      <p className="flex h-full items-center justify-center px-4 text-center text-sm text-muted-foreground">
-                        No chart at present
-                      </p>
-                    ) : (
+                    <CompareChartBody
+                      pending={kalshiChartPending}
+                      hasData={kalshiFiltered.length > 0}
+                      waitingMessage={
+                        selectedTicker
+                          ? "No chart at present"
+                          : "Search Kalshi above to plot this chart"
+                      }
+                    >
                       <HubKalshiLiveDemoTradesLiveline
                         series={kalshiSeries}
                         persistHistory
@@ -1221,42 +1546,46 @@ export function HubPolymarketKalshiCompareDemo() {
                         className="h-full min-h-0"
                         emptyMessage="No chart at present"
                       />
-                    )}
+                    </CompareChartBody>
                   </div>
                 </div>
               </div>
 
               <div className="grid gap-3 sm:grid-cols-2">
-                {[
-                  {
-                    platform: "Polymarket",
-                    trades: polyFiltered.length,
-                    volumeLabel:
-                      polyMarket.volume24h != null
-                        ? `24h notional ≈ $${Number(polyMarket.volume24h).toLocaleString()}`
-                        : "Volume metric: platform 24h notional (USDC)",
-                    lastPrice: formatPct(polyYesPct),
-                    lastSize:
-                      polyLast?.size != null ? String(polyLast.size) : "—",
-                    since: formatAgo(String(polyLast?.created_time || "") || null),
-                  },
-                  {
-                    platform: "Kalshi",
-                    trades: kalshiFiltered.length,
-                    volumeLabel:
-                      kalshiMarket?.volume != null || kalshiMarket?.volume_fp != null
-                        ? `Contract volume ${Number(
-                            kalshiMarket.volume ?? kalshiMarket.volume_fp,
-                          ).toLocaleString()}`
-                        : "Volume metric: Kalshi contracts (not USDC)",
-                    lastPrice: formatPct(kalshiYesPct),
-                    lastSize:
-                      kalshiLast?.count != null || kalshiLast?.count_fp != null
-                        ? String(kalshiLast.count ?? kalshiLast.count_fp)
-                        : "—",
-                    since: formatAgo(String(kalshiLast?.created_time || "") || null),
-                  },
-                ].map((panel) => (
+                {(
+                  [
+                    {
+                      platform: "Polymarket",
+                      pending: polyFieldsPending || polyChartPending,
+                      trades: polyFiltered.length,
+                      volumeLabel:
+                        polyMarket.volume24h != null
+                          ? `24h notional ≈ $${Number(polyMarket.volume24h).toLocaleString()}`
+                          : "Volume metric: platform 24h notional (USDC)",
+                      lastPrice: formatPct(polyYesPct),
+                      lastSize:
+                        polyLast?.size != null ? String(polyLast.size) : "—",
+                      since: formatAgo(String(polyLast?.created_time || "") || null),
+                    },
+                    {
+                      platform: "Kalshi",
+                      pending: kalshiFieldsPending || kalshiChartPending,
+                      trades: kalshiFiltered.length,
+                      volumeLabel:
+                        kalshiMarket?.volume != null || kalshiMarket?.volume_fp != null
+                          ? `Contract volume ${Number(
+                              kalshiMarket.volume ?? kalshiMarket.volume_fp,
+                            ).toLocaleString()}`
+                          : "Volume metric: Kalshi contracts (not USDC)",
+                      lastPrice: formatPct(kalshiYesPct),
+                      lastSize:
+                        kalshiLast?.count != null || kalshiLast?.count_fp != null
+                          ? String(kalshiLast.count ?? kalshiLast.count_fp)
+                          : "—",
+                      since: formatAgo(String(kalshiLast?.created_time || "") || null),
+                    },
+                  ] as const
+                ).map((panel) => (
                   <div
                     key={panel.platform}
                     className="rounded-xl border border-border/70 bg-background px-3 py-3"
@@ -1265,25 +1594,43 @@ export function HubPolymarketKalshiCompareDemo() {
                     <dl className="mt-2 space-y-1.5 text-[11px]">
                       <div className="flex justify-between gap-2">
                         <dt className="text-muted-foreground">Trades in interval</dt>
-                        <dd className="font-medium text-foreground">{panel.trades}</dd>
+                        <dd className="font-medium text-foreground">
+                          <ComparePendingValue pending={panel.pending} skeletonClassName="h-3 w-10">
+                            {panel.trades}
+                          </ComparePendingValue>
+                        </dd>
                       </div>
                       <div className="flex justify-between gap-2">
                         <dt className="text-muted-foreground">Volume</dt>
                         <dd className="max-w-[60%] text-right font-medium text-foreground">
-                          {panel.volumeLabel}
+                          <ComparePendingValue pending={panel.pending} skeletonClassName="h-3 w-28">
+                            {panel.volumeLabel}
+                          </ComparePendingValue>
                         </dd>
                       </div>
                       <div className="flex justify-between gap-2">
                         <dt className="text-muted-foreground">Last execution</dt>
-                        <dd className="font-medium text-foreground">{panel.lastPrice}</dd>
+                        <dd className="font-medium text-foreground">
+                          <ComparePendingValue pending={panel.pending} skeletonClassName="h-3 w-12">
+                            {panel.lastPrice}
+                          </ComparePendingValue>
+                        </dd>
                       </div>
                       <div className="flex justify-between gap-2">
                         <dt className="text-muted-foreground">Last size</dt>
-                        <dd className="font-medium text-foreground">{panel.lastSize}</dd>
+                        <dd className="font-medium text-foreground">
+                          <ComparePendingValue pending={panel.pending} skeletonClassName="h-3 w-12">
+                            {panel.lastSize}
+                          </ComparePendingValue>
+                        </dd>
                       </div>
                       <div className="flex justify-between gap-2">
                         <dt className="text-muted-foreground">Since last trade</dt>
-                        <dd className="font-medium text-foreground">{panel.since}</dd>
+                        <dd className="font-medium text-foreground">
+                          <ComparePendingValue pending={panel.pending} skeletonClassName="h-3 w-14">
+                            {panel.since}
+                          </ComparePendingValue>
+                        </dd>
                       </div>
                     </dl>
                   </div>
@@ -1299,7 +1646,6 @@ export function HubPolymarketKalshiCompareDemo() {
                 </Button>
               </div>
             </div>
-          ) : null}
         </>
       )}
     </div>

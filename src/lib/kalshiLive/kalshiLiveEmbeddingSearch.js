@@ -23,8 +23,53 @@ export const KALSHI_ELECTIONS_SEARCH_BASE =
 const EMBEDDING_CACHE_TTL_MS = 45_000;
 const EMBEDDING_CACHE_MAX = 200;
 
+/**
+ * Kalshi `SearchSeriesRequest.Query` uses gin `max` validation. Queries longer
+ * than this return HTTP 400 `{error:{code:"invalid_parameters"}}` (often
+ * surfaced as a bare "Bad Request" if the nested body is ignored).
+ */
+export const KALSHI_EMBEDDING_SEARCH_QUERY_MAX = 128;
+
 /** @type {Map<string, { at: number; payload: { suggestions: KalshiEmbeddingSearchSuggestion[]; q: string; total_results_count?: number } }>} */
 const embeddingSuggestionCache = new Map();
+
+/**
+ * Clip a search string to Kalshi's Query max, preferring a word boundary.
+ * @param {string} raw
+ */
+export function clipKalshiEmbeddingSearchQuery(raw) {
+  const query = String(raw || "")
+    .replace(/\s+/g, " ")
+    .trim();
+  if (query.length <= KALSHI_EMBEDDING_SEARCH_QUERY_MAX) return query;
+  const sliced = query.slice(0, KALSHI_EMBEDDING_SEARCH_QUERY_MAX);
+  const broken = sliced.replace(/\s+\S*$/, "").trim();
+  return broken.length >= 12 ? broken : sliced.trim();
+}
+
+/**
+ * Read a human message from Kalshi JSON (`error` may be a string or `{code,message,details}`).
+ * @param {unknown} body
+ * @param {string} [fallback]
+ */
+export function kalshiUpstreamErrorMessage(body, fallback = "") {
+  if (!body || typeof body !== "object") return fallback;
+  const row = /** @type {Record<string, unknown>} */ (body);
+  const err = row.error;
+  if (typeof err === "string" && err.trim()) return err.trim();
+  if (err && typeof err === "object") {
+    const nested = /** @type {Record<string, unknown>} */ (err);
+    for (const key of ["message", "details", "code"]) {
+      const value = nested[key];
+      if (typeof value === "string" && value.trim()) return value.trim();
+    }
+  }
+  for (const key of ["message", "msg"]) {
+    const value = row[key];
+    if (typeof value === "string" && value.trim()) return value.trim();
+  }
+  return fallback;
+}
 
 /**
  * True when the query has at least one word with ≥5 letters/digits.
@@ -148,7 +193,7 @@ export function flattenKalshiEmbeddingSearchSuggestionsToRows(suggestions) {
  * @param {{ signal?: AbortSignal }} [opts]
  */
 export async function fetchKalshiEmbeddingSearchSuggestions(q, opts = {}) {
-  const query = String(q || "").trim();
+  const query = clipKalshiEmbeddingSearchQuery(q);
   if (!isKalshiEmbeddingSearchEligible(query)) {
     return { suggestions: [], q: query };
   }
@@ -174,13 +219,14 @@ export async function fetchKalshiEmbeddingSearchSuggestions(q, opts = {}) {
   });
   const body = await res.json().catch(() => ({}));
   if (!res.ok) {
-    throw new Error(
-      typeof body?.message === "string"
-        ? body.message
-        : typeof body?.error === "string"
-          ? body.error
-          : res.statusText || "Embedding search failed",
-    );
+    const extracted = kalshiUpstreamErrorMessage(body, "");
+    const fallback =
+      res.status === 400
+        ? "Kalshi rejected this search query."
+        : res.status === 404
+          ? "Kalshi returned no results for this search."
+          : res.statusText || "Embedding search failed";
+    throw new Error(extracted || fallback);
   }
 
   const page = Array.isArray(body?.current_page) ? body.current_page : [];

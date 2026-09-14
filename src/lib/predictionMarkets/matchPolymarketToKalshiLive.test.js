@@ -1,11 +1,17 @@
 import assert from "node:assert/strict";
 import {
   buildKalshiMatchQueryFromPolymarket,
+  findKalshiLiveMatchesForPolymarket,
   matchTierLabel,
   rankKalshiCandidatesForPolymarket,
   scorePolymarketKalshiMarketPair,
   tokenizeMatchText,
 } from "./matchPolymarketToKalshiLive.js";
+import {
+  clipKalshiEmbeddingSearchQuery,
+  KALSHI_EMBEDDING_SEARCH_QUERY_MAX,
+  kalshiUpstreamErrorMessage,
+} from "../kalshiLive/kalshiLiveEmbeddingSearch.js";
 
 {
   const tokens = tokenizeMatchText("Will Benjamin Netanyahu be the next Prime Minister of Israel?");
@@ -74,6 +80,61 @@ import {
   );
   assert.ok(ranked.length >= 1);
   assert.ok(ranked[0].market.marketTicker.includes("FED"));
+}
+
+{
+  assert.equal(KALSHI_EMBEDDING_SEARCH_QUERY_MAX, 128);
+  assert.equal(clipKalshiEmbeddingSearchQuery("a".repeat(128)).length, 128);
+  assert.ok(clipKalshiEmbeddingSearchQuery("a".repeat(200)).length <= 128);
+  const nested = kalshiUpstreamErrorMessage(
+    {
+      error: {
+        code: "invalid_parameters",
+        message: "Some of your input is not valid",
+        details: "Key: 'SearchSeriesRequest.Query' Error:Field validation for 'Query' failed on the 'max' tag",
+      },
+    },
+    "fallback",
+  );
+  assert.match(nested, /not valid/i);
+  assert.equal(kalshiUpstreamErrorMessage({}, "Bad Request"), "Bad Request");
+}
+
+{
+  const q = buildKalshiMatchQueryFromPolymarket({
+    title: "Will there be no change in Fed interest rates after the September 2026 meeting?",
+    outcomes: ["Yes", "No"],
+    tags: ["Economics"],
+    endDateIso: "2026-09-17T00:00:00Z",
+  });
+  assert.ok(q.length <= KALSHI_EMBEDDING_SEARCH_QUERY_MAX);
+  assert.match(q, /Fed interest rates/i);
+  assert.doesNotMatch(q, /prediction market/i);
+}
+
+{
+  const q = buildKalshiMatchQueryFromPolymarket({
+    title: "Will ".concat("really long polymarket question words ").repeat(8),
+    outcomes: ["Yes", "No"],
+    tags: ["Politics"],
+  });
+  assert.ok(q.length <= KALSHI_EMBEDDING_SEARCH_QUERY_MAX);
+}
+
+{
+  const result = await findKalshiLiveMatchesForPolymarket(
+    {
+      title: "Will there be no change in Fed interest rates after the September 2026 meeting?",
+      outcomes: ["Yes", "No"],
+    },
+    {
+      fetchSuggestions: async () => {
+        throw new Error("Bad Request");
+      },
+    },
+  );
+  assert.equal(result.candidates.length, 0);
+  assert.match(String(result.emptyMessage), /Kalshi/i);
 }
 
 console.log("ok matchPolymarketToKalshiLive");

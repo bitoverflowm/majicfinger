@@ -16,12 +16,20 @@ export async function fetchKalshiLiveMarket(opts) {
   });
   const body = await res.json().catch(() => ({}));
   if (!res.ok) {
+    const nested =
+      body?.error && typeof body.error === "object"
+        ? body.error.message || body.error.details || body.error.code
+        : null;
     const msg =
       typeof body?.message === "string"
         ? body.message
         : typeof body?.error === "string"
           ? body.error
-          : res.statusText || "Market request failed";
+          : typeof nested === "string"
+            ? nested
+            : res.status === 404
+              ? "This Kalshi market does not exist."
+              : res.statusText || "Market request failed";
     const err = new Error(msg);
     // @ts-expect-error status for rate-limit retry helpers
     err.status = res.status;

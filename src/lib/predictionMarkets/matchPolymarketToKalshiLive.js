@@ -14,7 +14,11 @@
  * - Close/expiration fields use different shapes and may be missing on either side.
  */
 
-import { isKalshiEmbeddingSearchEligible } from "@/lib/kalshiLive/kalshiLiveEmbeddingSearch";
+import {
+  clipKalshiEmbeddingSearchQuery,
+  isKalshiEmbeddingSearchEligible,
+  KALSHI_EMBEDDING_SEARCH_QUERY_MAX,
+} from "@/lib/kalshiLive/kalshiLiveEmbeddingSearch";
 import { impliedChancePctFromMarketRow } from "@/lib/kalshiLive/eventCandlesticksPowerMove";
 
 /** @typedef {"exact" | "close" | "related" | "none"} MatchTier */
@@ -154,15 +158,20 @@ export function buildKalshiMatchQueryFromPolymarket(polymarket) {
     str(market.end_date_iso) ||
     "";
 
-  const parts = [
-    title,
+  // Kalshi embedding search rejects Query > 128 chars. Keep the title, then
+  // append extras only while they still fit (do not pad with filler text).
+  const extras = [
     outcomes.length ? `outcomes ${outcomes.join(" / ")}` : "",
     category ? `category ${category}` : "",
     end ? `resolves ${end.slice(0, 10)}` : "",
-    "prediction market",
   ].filter(Boolean);
 
-  return parts.join(". ").replace(/\s+/g, " ").trim();
+  let query = clipKalshiEmbeddingSearchQuery(title);
+  for (const extra of extras) {
+    const next = query ? `${query}. ${extra}` : extra;
+    if (next.length <= KALSHI_EMBEDDING_SEARCH_QUERY_MAX) query = next;
+  }
+  return query;
 }
 
 /**
@@ -368,6 +377,28 @@ export function rankKalshiCandidatesForPolymarket(polymarket, suggestions) {
     .slice(0, 12);
 }
 
+const KALSHI_NO_MATCH_MESSAGE =
+  "No Kalshi market was automatically matched for this event. Search Kalshi below to pick one, or try another Polymarket market.";
+
+/**
+ * Opaque 400s from Kalshi search (query too long, nested `bad_request`, etc.).
+ * @param {unknown} err
+ */
+function isRecoverableKalshiMatchSearchError(err) {
+  const msg = String(err && typeof err === "object" && "message" in err ? err.message : err || "")
+    .trim()
+    .toLowerCase();
+  if (!msg) return false;
+  return (
+    msg === "bad request" ||
+    msg === "not found" ||
+    msg.includes("invalid_parameters") ||
+    msg.includes("field validation") ||
+    msg.includes("not valid") ||
+    msg.includes("rejected this search query")
+  );
+}
+
 /**
  * Client-side match: build query → embedding search → score.
  *
@@ -380,8 +411,7 @@ export function rankKalshiCandidatesForPolymarket(polymarket, suggestions) {
  */
 export async function findKalshiLiveMatchesForPolymarket(polymarket, opts = {}) {
   const query = buildKalshiMatchQueryFromPolymarket(polymarket);
-  const emptyMessage =
-    "We couldn’t find an equivalent live Kalshi market for this event. Try another market or search Kalshi manually.";
+  const emptyMessage = KALSHI_NO_MATCH_MESSAGE;
 
   if (!isKalshiEmbeddingSearchEligible(query)) {
     return {
@@ -406,14 +436,34 @@ export async function findKalshiLiveMatchesForPolymarket(polymarket, opts = {}) 
       );
       const body = await res.json().catch(() => ({}));
       if (!res.ok) {
-        throw new Error(
-          typeof body?.error === "string" ? body.error : "Kalshi search failed",
-        );
+        const msg =
+          typeof body?.error === "string"
+            ? body.error
+            : typeof body?.message === "string"
+              ? body.message
+              : "Kalshi search failed";
+        throw new Error(msg);
       }
       return body;
     });
 
-  const body = await fetchSuggestions(query, opts.signal);
+  let body;
+  try {
+    body = await fetchSuggestions(query, opts.signal);
+  } catch (err) {
+    if (err instanceof DOMException && err.name === "AbortError") throw err;
+    if (opts.signal?.aborted) throw err;
+    if (isRecoverableKalshiMatchSearchError(err)) {
+      return {
+        query,
+        candidates: [],
+        preselected: null,
+        requiresUserChoice: false,
+        emptyMessage,
+      };
+    }
+    throw err;
+  }
   const suggestions = Array.isArray(body?.suggestions) ? body.suggestions : [];
   const candidates = rankKalshiCandidatesForPolymarket(polymarket, suggestions);
 
