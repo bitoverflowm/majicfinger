@@ -20,7 +20,7 @@ import { endAuthenticatedSession } from "@/lib/analytics/authJourneyClient";
 import { scrollToHashSection } from "@/lib/scrollToHashSection";
 
 const INITIAL_WIDTH = "70rem";
-const MAX_WIDTH = "800px";
+const MAX_WIDTH = "60rem";
 
 const overlayVariants = {
   hidden: { opacity: 0 },
@@ -151,6 +151,7 @@ export function Navbar({ productsNav }: { productsNav: ProductsNavData }) {
       )}
     >
       <motion.div
+        className="max-w-full"
         initial={{ width: INITIAL_WIDTH }}
         animate={{ width: hasScrolled ? MAX_WIDTH : INITIAL_WIDTH }}
         transition={{ duration: 0.3, ease: [0.25, 0.1, 0.25, 1] }}

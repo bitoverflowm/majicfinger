@@ -248,7 +248,7 @@ function DesktopProductsDropdown({ data }: { data: ProductsNavData }) {
       <button
         type="button"
         className={cn(
-          "flex h-full cursor-default items-center justify-center px-4 py-2 text-sm font-medium tracking-tight text-primary/60 transition-colors duration-200 hover:text-primary",
+          "flex h-full shrink-0 cursor-default items-center justify-center whitespace-nowrap px-4 py-2 text-sm font-medium tracking-tight text-primary/60 transition-colors duration-200 hover:text-primary",
           open && "text-primary",
         )}
         aria-haspopup="true"

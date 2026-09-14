@@ -3,12 +3,12 @@ import Image from "next/image";
 import Link from "next/link";
 
 import { KalshiVsPolymarketCompareTool } from "./compare-tool";
+import { KalshiVsPolymarketDashboardMockupLazy } from "./dashboard-mockup-lazy";
 import { HubCtaButton } from "@/components/hubs/HubCtaButton";
 import { HubHashScrollManager } from "@/components/hubs/HubHashScrollManager";
 import { SafariBrowserFrame } from "@/components/hubs/kalshiLiveDemo/SafariBrowserFrame";
 import { HubSectionRenderer } from "@/components/hubs/HubSections";
 import { BentoSection } from "@/components/sections/bento-section";
-import { DashboardDemoSectionLazy } from "@/components/sections/dashboard-demo-section-lazy";
 import { FAQSection } from "@/components/sections/faq-section";
 import { FooterSection } from "@/components/sections/footer-section";
 import { EMPTY_HUB_ASSETS } from "@/lib/hubs/loadHubPage";
@@ -205,7 +205,7 @@ function DashboardConversionSection() {
       </div>
 
       <div className="mx-auto w-full max-w-[min(100%,84rem)]">
-        <DashboardDemoSectionLazy />
+        <KalshiVsPolymarketDashboardMockupLazy />
       </div>
 
       <div className="mx-auto mt-10 w-full max-w-4xl space-y-8 px-2 sm:px-0">

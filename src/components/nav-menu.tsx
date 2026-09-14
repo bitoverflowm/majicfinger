@@ -158,7 +158,7 @@ export function NavMenu({ productsNav }: NavMenuProps) {
           return (
             <li
               key={item.name}
-              className={`z-10 cursor-pointer h-full flex items-center justify-center px-4 py-2 text-sm font-medium transition-colors duration-200 ${
+              className={`z-10 cursor-pointer h-full flex shrink-0 items-center justify-center px-4 py-2 text-sm font-medium whitespace-nowrap transition-colors duration-200 ${
                 isActive
                   ? "text-primary"
                   : "text-primary/60 hover:text-primary"

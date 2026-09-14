@@ -407,6 +407,7 @@ function ComparePolymarketMarketSearch() {
         searchProfiles={false}
         keepClosedMarkets={false}
         limitPerType={50}
+        className="mx-auto w-full max-w-2xl"
         resultsClassName="max-h-56 flex-none"
         placeholder="Search Polymarket markets in plain English…"
         onSelect={handleSearchSelection}
@@ -430,28 +431,23 @@ function ComparePolymarketMarketSearch() {
                 Loading…
               </span>
             ) : featured.length ? (
-              <span className="inline-flex items-center gap-1.5 text-xs text-muted-foreground">
-                <span>
-                  {featured.length} market{featured.length === 1 ? "" : "s"}
-                </span>
-                <button
-                  type="button"
-                  onClick={() =>
-                    void loadFeatured({
-                      excludeIds: featured.map((item) => compareFeaturedKey(item)),
-                    })
-                  }
-                  disabled={featuredLoading || featuredRefreshing}
-                  className="inline-flex size-6 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:opacity-50"
-                  aria-label="Show different featured live markets"
-                  title="Show different featured live markets"
-                >
-                  <RefreshCw
-                    className={cn("size-3.5", featuredRefreshing && "animate-spin")}
-                    aria-hidden
-                  />
-                </button>
-              </span>
+              <button
+                type="button"
+                onClick={() =>
+                  void loadFeatured({
+                    excludeIds: featured.map((item) => compareFeaturedKey(item)),
+                  })
+                }
+                disabled={featuredLoading || featuredRefreshing}
+                className="inline-flex size-6 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:opacity-50"
+                aria-label="Show different featured live markets"
+                title="Show different featured live markets"
+              >
+                <RefreshCw
+                  className={cn("size-3.5", featuredRefreshing && "animate-spin")}
+                  aria-hidden
+                />
+              </button>
             ) : (
               <button
                 type="button"
