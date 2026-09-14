@@ -35,7 +35,7 @@ import { trackPolymarketLiveHubEvent } from "@/lib/analytics/polymarketLiveHubEv
 import { formatPolymarketVolume } from "@/lib/polymarketLive/polymarketPublicSearch";
 import { cn } from "@/lib/utils";
 
-const COMPARE_FEATURED_LIMIT = 5;
+const COMPARE_FEATURED_LIMIT = 10;
 
 type CompareFeaturedCard = {
   id: string;
@@ -278,7 +278,7 @@ function ComparePolymarketMarketSearch() {
     else setFeaturedLoading(true);
     setFeaturedError(null);
     try {
-      const params = new URLSearchParams({ limit: "8" });
+      const params = new URLSearchParams({ limit: "12" });
       if (exclude.length) params.set("exclude", exclude.join(","));
       const res = await fetch(
         `/api/integrations/polymarket-live/markets/featured?${params.toString()}`,
@@ -466,17 +466,16 @@ function ComparePolymarketMarketSearch() {
           </div>
 
           {featuredLoading ? (
-            <div className="space-y-2 p-3" aria-hidden>
+            <div className="grid grid-cols-1 gap-2 p-3 sm:grid-cols-2" aria-hidden>
               {Array.from({ length: COMPARE_FEATURED_LIMIT }).map((_, index) => (
                 <div
                   key={index}
-                  className="flex animate-pulse gap-3 rounded-xl border border-border/60 bg-background/80 p-3"
+                  className="flex animate-pulse items-start gap-2 rounded-lg border border-border/60 bg-background/80 p-2"
                 >
-                  <div className="size-12 shrink-0 rounded-lg bg-muted" />
-                  <div className="min-w-0 flex-1 space-y-2 py-0.5">
-                    <div className="h-3.5 w-3/4 rounded bg-muted" />
+                  <div className="size-8 shrink-0 rounded-md bg-muted" />
+                  <div className="min-w-0 flex-1 space-y-1.5 py-0.5">
+                    <div className="h-3 w-4/5 rounded bg-muted" />
                     <div className="h-3 w-1/2 rounded bg-muted" />
-                    <div className="h-3 w-2/5 rounded bg-muted" />
                   </div>
                 </div>
               ))}
@@ -488,7 +487,7 @@ function ComparePolymarketMarketSearch() {
               No featured markets available right now. Try searching above.
             </p>
           ) : (
-            <ul className="space-y-2 p-3">
+            <ul className="grid grid-cols-1 gap-2 p-3 sm:grid-cols-2">
               {featured.map((market) => {
                 const yes = market.outcomes[0];
                 return (
@@ -496,9 +495,9 @@ function ComparePolymarketMarketSearch() {
                     <button
                       type="button"
                       onClick={() => selectFeatured(market)}
-                      className="flex w-full items-start gap-3 rounded-xl border border-border/70 bg-background p-3 text-left shadow-sm transition-colors hover:border-border hover:bg-muted/30"
+                      className="flex h-full w-full items-start gap-2 rounded-lg border border-border/70 bg-background p-2 text-left shadow-sm transition-colors hover:border-border hover:bg-muted/30"
                     >
-                      <div className="relative size-12 shrink-0 overflow-hidden rounded-lg border border-border/60 bg-black">
+                      <div className="relative size-8 shrink-0 overflow-hidden rounded-md border border-border/60 bg-black">
                         {market.imageUrl ? (
                           // eslint-disable-next-line @next/next/no-img-element
                           <img
@@ -508,44 +507,22 @@ function ComparePolymarketMarketSearch() {
                             loading="lazy"
                           />
                         ) : (
-                          <div className="flex size-full items-center justify-center text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+                          <div className="flex size-full items-center justify-center text-[9px] font-medium uppercase tracking-wide text-muted-foreground">
                             PM
                           </div>
                         )}
                       </div>
-                      <div className="min-w-0 flex-1 space-y-1.5">
-                        <div className="flex items-start justify-between gap-2">
-                          <p className="text-sm font-medium leading-snug text-foreground text-pretty">
+                      <div className="min-w-0 flex-1 space-y-1">
+                        <div className="flex items-start justify-between gap-1.5">
+                          <p className="line-clamp-2 text-xs font-medium leading-snug text-foreground">
                             {market.title}
                           </p>
-                          <span className="inline-flex shrink-0 items-center gap-1.5 text-[10px] font-medium text-muted-foreground">
-                            <span className="size-2 animate-pulse rounded-full bg-green-500" aria-hidden />
+                          <span className="inline-flex shrink-0 items-center gap-1 pt-0.5 text-[10px] font-medium text-muted-foreground">
+                            <span className="size-1.5 animate-pulse rounded-full bg-green-500" aria-hidden />
                             Live
                           </span>
                         </div>
-                        {market.eventTitle ? (
-                          <p className="truncate text-[11px] text-muted-foreground">
-                            {market.eventTitle}
-                          </p>
-                        ) : null}
-                        {market.tags?.length ? (
-                          <div className="flex flex-wrap gap-1">
-                            {market.featured ? (
-                              <span className="rounded bg-amber-500/15 px-1.5 py-0.5 text-[0.65rem] font-medium text-amber-900 ring-1 ring-amber-600/25 dark:text-amber-100">
-                                Featured
-                              </span>
-                            ) : null}
-                            {market.tags.map((tag) => (
-                              <span
-                                key={tag}
-                                className="rounded bg-muted/80 px-1.5 py-0.5 text-[0.65rem] font-medium text-muted-foreground ring-1 ring-border/50"
-                              >
-                                {tag}
-                              </span>
-                            ))}
-                          </div>
-                        ) : null}
-                        <div className="flex flex-wrap gap-x-3 gap-y-1 text-[11px] text-muted-foreground">
+                        <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[11px] text-muted-foreground">
                           <span>
                             {yes?.outcome || "Yes"}{" "}
                             <span className="font-medium text-foreground">
@@ -553,7 +530,7 @@ function ComparePolymarketMarketSearch() {
                             </span>
                           </span>
                           <span>
-                            24h vol{" "}
+                            vol{" "}
                             <span className="font-medium text-foreground">
                               {formatPolymarketVolume(market.volume24h) || "—"}
                             </span>

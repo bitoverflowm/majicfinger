@@ -143,10 +143,6 @@ function renderSection(section: HubSection) {
 function CompareHero() {
   return (
     <section id="compare" className="relative w-full scroll-mt-28 overflow-visible">
-      <div
-        aria-hidden
-        className="hero-aura-gradient pointer-events-none absolute inset-x-0 top-0 z-0 mx-auto h-[46rem] w-full max-w-[min(100%,84rem)] rounded-b-2xl sm:h-[50rem] md:h-[54rem]"
-      />
       <div className="relative z-10 mx-auto flex w-full max-w-[73rem] flex-col items-center gap-6 px-6 pb-4 pt-32 md:gap-8 md:pb-6 md:pt-32">
         <p className="inline-flex h-8 max-w-full items-center gap-2 rounded-full border border-border bg-accent px-3 text-center text-sm text-foreground">
           <span className="relative flex h-2.5 w-2.5 shrink-0">

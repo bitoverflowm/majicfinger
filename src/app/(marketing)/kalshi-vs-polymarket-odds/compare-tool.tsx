@@ -20,9 +20,7 @@ const HubPolymarketKalshiCompareDemo = dynamic(
 export function KalshiVsPolymarketCompareTool() {
   return (
     <HubPolymarketLiveDemoProvider>
-      <div className="rounded-xl border border-border/70 bg-background/80 p-3 sm:p-4">
-        <HubPolymarketKalshiCompareDemo />
-      </div>
+      <HubPolymarketKalshiCompareDemo />
     </HubPolymarketLiveDemoProvider>
   );
 }
