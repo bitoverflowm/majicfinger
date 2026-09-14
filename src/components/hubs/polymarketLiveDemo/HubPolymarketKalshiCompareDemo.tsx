@@ -91,6 +91,11 @@ function formatCompareCompactNumber(value: number | null | undefined) {
   }
 }
 
+function formatCompareKalshiVolume(value: number | null | undefined) {
+  const formatted = formatCompareCompactNumber(value);
+  return formatted === "—" ? "—" : `$${formatted}`;
+}
+
 function shuffleCompareFeatured<T>(items: T[], count: number): T[] {
   const copy = [...items];
   for (let i = copy.length - 1; i > 0; i -= 1) {
@@ -463,16 +468,16 @@ function CompareFeaturedTags({
 }) {
   const list = Array.isArray(tags) ? tags.filter(Boolean).slice(0, 2) : [];
   return (
-    <div className="flex h-4 min-w-0 flex-nowrap items-center gap-1 overflow-hidden">
+    <div className="flex min-w-0 flex-nowrap items-center gap-1.5">
       {featured ? (
-        <span className="shrink-0 rounded bg-amber-500/15 px-1 py-px text-[10px] font-medium leading-none text-amber-900 ring-1 ring-amber-600/25 dark:text-amber-100">
+        <span className="inline-flex shrink-0 items-center rounded bg-magenta-400 px-1.5 py-0.5 text-[10px] font-medium leading-none text-white">
           Featured
         </span>
       ) : null}
       {list.map((tag) => (
         <span
           key={tag}
-          className="shrink-0 rounded bg-muted/80 px-1 py-px text-[10px] font-medium leading-none text-muted-foreground ring-1 ring-border/50"
+          className="inline-flex shrink-0 items-center rounded bg-muted/80 px-1.5 py-0.5 text-[10px] font-medium leading-none text-muted-foreground ring-1 ring-border/50"
         >
           {tag}
         </span>
@@ -509,40 +514,41 @@ function CompareMarketCard({
       type="button"
       disabled={disabled}
       onClick={onClick}
-      className="flex h-[4.75rem] w-full items-start gap-1.5 overflow-hidden rounded-md border border-border/70 bg-background p-1.5 text-left shadow-sm transition-colors hover:border-border hover:bg-muted/30 disabled:opacity-60"
+      className="flex h-[4.75rem] w-full items-center gap-2 overflow-hidden rounded-md border border-border/70 bg-background p-1.5 text-left shadow-sm transition-colors hover:border-border hover:bg-muted/30 disabled:opacity-60"
     >
-      <div className="relative size-7 shrink-0 overflow-hidden rounded border border-border/60 bg-black">
+      <div className="relative size-11 shrink-0 overflow-hidden rounded-md border border-border/60 bg-black">
         {imageUrl ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img src={imageUrl} alt="" className="size-full object-cover" loading="lazy" />
         ) : (
-          <div className="flex size-full items-center justify-center text-[8px] font-medium uppercase tracking-wide text-muted-foreground">
+          <div className="flex size-full items-center justify-center text-[9px] font-medium uppercase tracking-wide text-muted-foreground">
             {fallback}
           </div>
         )}
       </div>
-      <div className="flex min-h-0 min-w-0 flex-1 flex-col justify-between self-stretch">
-        <div className="flex items-start justify-between gap-1">
-          <p className="line-clamp-2 h-[1.875rem] text-[11px] font-medium leading-[0.9375rem] text-foreground">
-            {title}
-          </p>
-          <span className="inline-flex shrink-0 items-center gap-0.5 pt-px text-[9px] font-medium text-muted-foreground">
-            <span className="size-1.5 animate-pulse rounded-full bg-green-500" aria-hidden />
-            Live
+      <div className="flex min-h-0 min-w-0 flex-1 flex-col justify-center gap-1">
+        <p className="line-clamp-2 h-[1.75rem] text-[11px] font-medium leading-[0.875rem] text-foreground">
+          {title}
+        </p>
+        <CompareFeaturedTags tags={tags} featured={featured} />
+      </div>
+      <div className="flex h-full shrink-0 flex-col items-end justify-center gap-0.5">
+        <span className="inline-flex items-center gap-0.5 text-[9px] font-medium text-muted-foreground">
+          <span className="size-1.5 animate-pulse rounded-full bg-green-500" aria-hidden />
+          Live
+        </span>
+        <span className="text-[10px] leading-none text-muted-foreground">
+          {priceLabel}{" "}
+          <span className="text-base font-semibold tabular-nums leading-none text-foreground">
+            {price}
           </span>
-        </div>
-        <div className="flex min-w-0 items-center justify-between gap-1.5">
-          <CompareFeaturedTags tags={tags} featured={featured} />
-          <div className="flex shrink-0 items-center gap-1.5 text-[10px] text-muted-foreground">
-            <span>
-              {priceLabel}{" "}
-              <span className="font-medium text-foreground">{price}</span>
-            </span>
-            <span>
-              vol <span className="font-medium text-foreground">{volume}</span>
-            </span>
-          </div>
-        </div>
+        </span>
+        <span className="text-[10px] leading-none text-muted-foreground">
+          vol{" "}
+          <span className="text-sm font-semibold tabular-nums leading-none text-foreground">
+            {volume}
+          </span>
+        </span>
       </div>
     </button>
   );
@@ -554,9 +560,9 @@ function CompareFeaturedSkeletonList() {
       {Array.from({ length: COMPARE_FEATURED_LIMIT }).map((_, index) => (
         <div
           key={index}
-          className="flex h-[4.75rem] animate-pulse items-start gap-1.5 rounded-md border border-border/60 bg-background/80 p-1.5"
+          className="flex h-[4.75rem] animate-pulse items-center gap-2 rounded-md border border-border/60 bg-background/80 p-1.5"
         >
-          <div className="size-7 shrink-0 rounded bg-muted" />
+          <div className="size-11 shrink-0 rounded-md bg-muted" />
           <div className="min-w-0 flex-1 space-y-1 py-0.5">
             <div className="h-2.5 w-4/5 rounded bg-muted" />
             <div className="h-2.5 w-2/3 rounded bg-muted" />
@@ -965,7 +971,7 @@ function ComparePolymarketMarketSearch({
                     featured={market.featured}
                     priceLabel="Yes"
                     price={formatCompareFeaturedPrice(market.lastPriceDollars)}
-                    volume={formatCompareCompactNumber(market.volume24h)}
+                    volume={formatCompareKalshiVolume(market.volume24h)}
                     disabled={kalshiPickLoading}
                     onClick={() => void selectKalshiFeatured(market)}
                   />
