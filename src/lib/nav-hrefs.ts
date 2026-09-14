@@ -17,6 +17,7 @@ const HUB_PAGES_WITH_IN_PAGE_PRICING = new Set([
   "/polymarket-historical-data",
   "/kalshi-live-data",
   "/kalshi-historical-data",
+  "/kalshi-vs-polymarket-odds",
 ]);
 
 export function getNavLinksForPathname(pathname: string | null | undefined) {

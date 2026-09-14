@@ -125,6 +125,7 @@ export async function GET() {
     { path: "/dashboards-gallery", priority: "0.85", changefreq: "weekly" },
     { path: "/search", priority: "0.5", changefreq: "weekly" },
     { path: "/polymarket-metadata", priority: "0.7", changefreq: "monthly" },
+    { path: "/kalshi-vs-polymarket-odds", priority: "0.9", changefreq: "weekly" },
     // /data-sheet, /csv-exports, /quant-analysis, and catalog /integrations/*
     // use ProductLandingShell placeholders — excluded until substantive.
     { path: "/help", priority: "0.4", changefreq: "yearly" },

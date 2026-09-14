@@ -7,21 +7,40 @@ import { SectionHeader } from "@/components/section-header";
 import { siteConfig } from "@/lib/config";
 import { cn } from "@/lib/utils";
 
-export function FAQSection() {
+/**
+ * @param {{
+ *   id?: string,
+ *   title?: string,
+ *   description?: string,
+ *   items?: Array<{ id: string | number, question: string, answer: string }>,
+ * }} [props]
+ */
+export function FAQSection({
+  id = "faq",
+  title,
+  description,
+  items,
+} = {}) {
   const { faqSection } = siteConfig;
+  const resolvedTitle = title || faqSection.title;
+  const resolvedDescription =
+    description === undefined ? faqSection.description : description;
+  const resolvedItems = items || faqSection.faQitems;
 
   return (
     <section
-      id="faq"
-      className="flex flex-col items-center justify-center gap-10 pb-10 w-full relative"
+      id={id}
+      className="flex w-full relative scroll-mt-28 flex-col items-center justify-center gap-10 pb-10"
     >
       <SectionHeader>
         <h2 className="text-3xl md:text-4xl font-medium tracking-tighter text-center text-balance">
-          {faqSection.title}
+          {resolvedTitle}
         </h2>
-        <p className="text-muted-foreground text-center text-balance font-medium">
-          {faqSection.description}
-        </p>
+        {resolvedDescription ? (
+          <p className="text-muted-foreground text-center text-balance font-medium">
+            {resolvedDescription}
+          </p>
+        ) : null}
       </SectionHeader>
 
       <div className="max-w-3xl w-full mx-auto px-10">
@@ -30,7 +49,7 @@ export function FAQSection() {
           collapsible
           className="w-full border-b-0 grid gap-2"
         >
-          {faqSection.faQitems.map((faq) => (
+          {resolvedItems.map((faq) => (
             <AccordionPrimitive.Item
               key={faq.id}
               value={String(faq.id)}

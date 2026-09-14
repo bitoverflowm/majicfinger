@@ -72,11 +72,14 @@ export function Navbar({ productsNav }: { productsNav: ProductsNavData }) {
       : pathname === "/polymarket-historical-data" ||
           pathname === "/kalshi-historical-data"
         ? "#explore-data"
-        : siteConfig.hero.cta.primary.href;
+        : pathname === "/kalshi-vs-polymarket-odds"
+          ? "#compare"
+          : siteConfig.hero.cta.primary.href;
   const TryForFreeLink =
     pathname === "/polymarket-live-data" ||
     pathname === "/polymarket-historical-data" ||
-    pathname === "/kalshi-historical-data"
+    pathname === "/kalshi-historical-data" ||
+    pathname === "/kalshi-vs-polymarket-odds"
       ? Link
       : DemoScrollLink;
   const handleTryForFreeClick = (event: MouseEvent<HTMLAnchorElement>) => {

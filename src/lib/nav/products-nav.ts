@@ -160,6 +160,13 @@ export function getProductsNavData(): ProductsNavData {
     integrations: [...predictionMarketIntegrations, ...otherIntegrations],
     products: [
       {
+        id: "compare-markets",
+        label: "Compare markets",
+        href: "/kalshi-vs-polymarket-odds",
+        description:
+          "Compare live Kalshi and Polymarket odds, charts, and trading activity.",
+      },
+      {
         id: "charts",
         label: "Charts",
         href: "/charts",
