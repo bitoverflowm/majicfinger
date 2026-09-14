@@ -1,13 +1,16 @@
 "use client";
 
-import { useMemo, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import Link from "next/link";
 import { Area, AreaChart, Bar, BarChart, CartesianGrid, Cell, Line, LineChart, XAxis, YAxis } from "recharts";
 
 import { HubKalshiLiveDemoCandlesticksProfessionalChart } from "@/components/hubs/kalshiLiveDemo/HubKalshiLiveDemoCandlesticksProfessionalChart";
 import { HubKalshiLiveDemoOrderbookChart } from "@/components/hubs/kalshiLiveDemo/HubKalshiLiveDemoOrderbookChart";
 import { SafariBrowserFrame } from "@/components/hubs/kalshiLiveDemo/SafariBrowserFrame";
-import { HubPolymarketLiveOrderbookDepthChart } from "@/components/hubs/polymarketLiveDemo/HubPolymarketLiveOrderbookDepthChart";
+import {
+  HubPolymarketLiveOrderbookDepthChart,
+  polymarketBookFlashKey,
+} from "@/components/hubs/polymarketLiveDemo/HubPolymarketLiveOrderbookDepthChart";
 import { Button } from "@/components/ui/button";
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart";
 import { buildStaticCandlestickRows } from "@/lib/kalshiLive/staticBatchCandlesticks";
@@ -15,10 +18,50 @@ import { cn } from "@/lib/utils";
 
 type Venue = "kalshi" | "polymarket" | "both";
 
+type PricePoint = { label: string; kalshi: number; polymarket: number };
+type DualSeriesPoint = { t: number; label: string; kalshi: number; polymarket: number };
+type TapeRow = {
+  id: string;
+  venue: "kalshi" | "polymarket";
+  time: string;
+  side: "Yes" | "No";
+  price: string;
+  size: string;
+  fresh?: boolean;
+};
+type HolderRow = {
+  name: string;
+  venue: "kalshi" | "polymarket";
+  outcome: string;
+  size: number;
+  share: number;
+};
+type PolyLevel = { price: number; size: number };
+
+type MockDashboard = {
+  kalshiPrice: number;
+  polyPrice: number;
+  kalshiCandles: Record<string, unknown>[];
+  polyCandles: Record<string, unknown>[];
+  kalshiBook: Record<string, unknown>[];
+  polyBids: PolyLevel[];
+  polyAsks: PolyLevel[];
+  spreadSeries: DualSeriesPoint[];
+  liquiditySeries: DualSeriesPoint[];
+  priceHistory: PricePoint[];
+  tape: TapeRow[];
+  holders: HolderRow[];
+  kalshiFlash: string[];
+  polyFlash: string[];
+};
+
 const DASHBOARD_URL = "lycheedata.com/you/fed-holds-rates-kalshi-vs-polymarket";
 const EVENT_TITLE = "Will the Fed hold rates after the September 2026 meeting?";
 const KALSHI_TICKER = "KXFED-26SEP-T0";
 const POLY_SLUG = "fed-decision-in-september";
+const SERIES_LEN = 42;
+const TAPE_LEN = 9;
+const TICK_MS = 900;
 
 function hashSeed(str: string) {
   let h = 2166136261;
@@ -38,6 +81,10 @@ function mulberry32(seed: number) {
     t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
     return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
   };
+}
+
+function clamp(value: number, min: number, max: number) {
+  return Math.min(max, Math.max(min, value));
 }
 
 function formatCents(value: number) {
@@ -65,6 +112,39 @@ function formatTapeTime(ms: number) {
   } catch {
     return new Date(ms).toISOString();
   }
+}
+
+function formatAxisTime(ms: number) {
+  try {
+    return new Intl.DateTimeFormat(undefined, {
+      hour: "numeric",
+      minute: "2-digit",
+      second: "2-digit",
+    }).format(new Date(ms));
+  } catch {
+    return new Date(ms).toLocaleTimeString();
+  }
+}
+
+function bumpLastCandle(rows: Record<string, unknown>[], close: number) {
+  if (!rows.length) return rows;
+  const next = rows.slice();
+  const last = { ...next[next.length - 1]! };
+  const closeFixed = Number(close.toFixed(4));
+  last.price_close_dollars = closeFixed;
+  last.price_high_dollars = Number(
+    Math.max(Number(last.price_high_dollars), closeFixed).toFixed(4),
+  );
+  last.price_low_dollars = Number(
+    Math.min(Number(last.price_low_dollars), closeFixed).toFixed(4),
+  );
+  next[next.length - 1] = last;
+  return next;
+}
+
+function jitterQty(value: number, amount = 0.12) {
+  const next = value * (1 + (Math.random() - 0.5) * amount);
+  return Math.max(40, Math.round(next));
 }
 
 function VenueBadge({ venue }: { venue: Venue }) {
@@ -131,7 +211,7 @@ function MockCard({
   );
 }
 
-function buildMockDashboard() {
+function buildMockDashboard(): MockDashboard {
   const now = Date.now();
   const kalshiRand = mulberry32(hashSeed(KALSHI_TICKER));
   const polyRand = mulberry32(hashSeed(POLY_SLUG));
@@ -151,33 +231,23 @@ function buildMockDashboard() {
     startPrice: polyMid,
   });
 
-  const points = 42;
   const stepMs = 8 * 60 * 1000;
   let kalshiPrice = kalshiMid;
   let polyPrice = polyMid;
-  const kalshiTrades: Record<string, unknown>[] = [];
-  const polyTrades: Record<string, unknown>[] = [];
-  const spreadSeries: { t: number; label: string; kalshi: number; polymarket: number }[] = [];
-  const liquiditySeries: { t: number; label: string; kalshi: number; polymarket: number }[] = [];
+  const spreadSeries: DualSeriesPoint[] = [];
+  const liquiditySeries: DualSeriesPoint[] = [];
+  const priceHistory: PricePoint[] = [];
 
-  for (let i = 0; i < points; i += 1) {
-    const t = now - (points - 1 - i) * stepMs;
-    kalshiPrice = Math.min(0.48, Math.max(0.1, kalshiPrice + (kalshiRand() - 0.47) * 0.028));
-    polyPrice = Math.min(0.55, Math.max(0.12, polyPrice + (polyRand() - 0.49) * 0.032));
-    const live = i >= points - 3;
-    kalshiTrades.push({
-      created_time: new Date(t).toISOString(),
-      yes_price_dollars: Number(kalshiPrice.toFixed(4)),
-      source: live ? "live" : "history",
+  for (let i = 0; i < SERIES_LEN; i += 1) {
+    const t = now - (SERIES_LEN - 1 - i) * stepMs;
+    kalshiPrice = clamp(kalshiPrice + (kalshiRand() - 0.47) * 0.028, 0.1, 0.48);
+    polyPrice = clamp(polyPrice + (polyRand() - 0.49) * 0.032, 0.12, 0.55);
+    const label = formatAxisTime(t);
+    priceHistory.push({
+      label,
+      kalshi: Math.round(kalshiPrice * 100),
+      polymarket: Math.round(polyPrice * 100),
     });
-    polyTrades.push({
-      created_time: new Date(t).toISOString(),
-      yes_price_dollars: Number(polyPrice.toFixed(4)),
-      source: live ? "live" : "history",
-    });
-    const label = new Intl.DateTimeFormat(undefined, { hour: "numeric", minute: "2-digit" }).format(
-      new Date(t),
-    );
     spreadSeries.push({
       t,
       label,
@@ -191,18 +261,6 @@ function buildMockDashboard() {
       polymarket: Math.round(24_000 + polyRand() * 36_000),
     });
   }
-
-  const priceHistory = kalshiTrades.map((row, index) => {
-    const poly = polyTrades[index];
-    return {
-      label: new Intl.DateTimeFormat(undefined, {
-        hour: "numeric",
-        minute: "2-digit",
-      }).format(new Date(String(row.created_time))),
-      kalshi: Math.round(Number(row.yes_price_dollars) * 100),
-      polymarket: Math.round(Number(poly?.yes_price_dollars) * 100),
-    };
-  });
 
   const kalshiBook: Record<string, unknown>[] = [];
   for (let i = 0; i < 11; i += 1) {
@@ -236,36 +294,34 @@ function buildMockDashboard() {
   }));
 
   const tapeSides = ["Yes", "No"] as const;
-  const tape = Array.from({ length: 9 }, (_, i) => {
+  const tape = Array.from({ length: TAPE_LEN }, (_, i) => {
     const kalshi = i % 2 === 0;
     const rand = kalshi ? kalshiRand : polyRand;
     const ms = now - i * 23_000;
-    const side = tapeSides[i % 2]!;
-    const price = kalshi ? kalshiPrice : polyPrice;
     return {
       id: `${i}-${ms}`,
       venue: kalshi ? ("kalshi" as const) : ("polymarket" as const),
       time: formatTapeTime(ms),
-      side,
-      price: formatCents(price * 100 + (rand() - 0.5) * 2),
+      side: tapeSides[i % 2]!,
+      price: formatCents((kalshi ? kalshiPrice : polyPrice) * 100 + (rand() - 0.5) * 2),
       size: formatCompact(Math.round(40 + rand() * 860)),
     };
   });
 
-  const holders = [
-    { name: "0x8f2a…c41d", venue: "polymarket" as const, outcome: "Yes", size: 184_200, share: 18.4 },
-    { name: "ThetaWhale", venue: "polymarket" as const, outcome: "Yes", size: 121_800, share: 12.2 },
-    { name: "K-MM-04", venue: "kalshi" as const, outcome: "No", size: 96_400, share: 9.6 },
-    { name: "0xb19e…11aa", venue: "polymarket" as const, outcome: "No", size: 74_900, share: 7.5 },
-    { name: "Desk 7", venue: "kalshi" as const, outcome: "Yes", size: 61_200, share: 6.1 },
-    { name: "polybot.eth", venue: "polymarket" as const, outcome: "Yes", size: 48_700, share: 4.9 },
+  const holders: HolderRow[] = [
+    { name: "0x8f2a…c41d", venue: "polymarket", outcome: "Yes", size: 184_200, share: 18.4 },
+    { name: "ThetaWhale", venue: "polymarket", outcome: "Yes", size: 121_800, share: 12.2 },
+    { name: "K-MM-04", venue: "kalshi", outcome: "No", size: 96_400, share: 9.6 },
+    { name: "0xb19e…11aa", venue: "polymarket", outcome: "No", size: 74_900, share: 7.5 },
+    { name: "Desk 7", venue: "kalshi", outcome: "Yes", size: 61_200, share: 6.1 },
+    { name: "polybot.eth", venue: "polymarket", outcome: "Yes", size: 48_700, share: 4.9 },
   ];
 
   return {
+    kalshiPrice,
+    polyPrice,
     kalshiCandles,
     polyCandles,
-    kalshiTrades,
-    polyTrades,
     kalshiBook,
     polyBids,
     polyAsks,
@@ -274,6 +330,108 @@ function buildMockDashboard() {
     priceHistory,
     tape,
     holders,
+    kalshiFlash: [],
+    polyFlash: [],
+  };
+}
+
+function tickMockDashboard(prev: MockDashboard, now: number, extendSeries: boolean): MockDashboard {
+  const kalshiPrice = clamp(prev.kalshiPrice + (Math.random() - 0.48) * 0.008, 0.12, 0.44);
+  const polyPrice = clamp(prev.polyPrice + (Math.random() - 0.5) * 0.01, 0.14, 0.5);
+  const label = formatAxisTime(now);
+
+  const pricePoint: PricePoint = {
+    label,
+    kalshi: Math.round(kalshiPrice * 100),
+    polymarket: Math.round(polyPrice * 100),
+  };
+  const spreadPoint: DualSeriesPoint = {
+    t: now,
+    label,
+    kalshi: Number(clamp((prev.spreadSeries.at(-1)?.kalshi ?? 1.2) + (Math.random() - 0.5) * 0.35, 0.4, 3.6).toFixed(2)),
+    polymarket: Number(
+      clamp((prev.spreadSeries.at(-1)?.polymarket ?? 1.6) + (Math.random() - 0.5) * 0.45, 0.5, 4.2).toFixed(2),
+    ),
+  };
+  const liqPoint: DualSeriesPoint = {
+    t: now,
+    label,
+    kalshi: jitterQty(prev.liquiditySeries.at(-1)?.kalshi ?? 22_000, 0.18),
+    polymarket: jitterQty(prev.liquiditySeries.at(-1)?.polymarket ?? 30_000, 0.18),
+  };
+
+  const priceHistory = extendSeries
+    ? [...prev.priceHistory.slice(1), pricePoint]
+    : [...prev.priceHistory.slice(0, -1), pricePoint];
+  const spreadSeries = extendSeries
+    ? [...prev.spreadSeries.slice(1), spreadPoint]
+    : [...prev.spreadSeries.slice(0, -1), spreadPoint];
+  const liquiditySeries = extendSeries
+    ? [...prev.liquiditySeries.slice(1), liqPoint]
+    : [...prev.liquiditySeries.slice(0, -1), liqPoint];
+
+  const kalshiFlashIndex = Math.floor(Math.random() * prev.kalshiBook.length);
+  const kalshiBook = prev.kalshiBook.map((row, index) => ({
+    ...row,
+    quantity_fp: jitterQty(Number(row.quantity_fp) || 400, index === kalshiFlashIndex ? 0.35 : 0.08),
+  }));
+  const flashedKalshi = kalshiBook[kalshiFlashIndex];
+  const kalshiFlash = flashedKalshi
+    ? [
+        `ob:${String(flashedKalshi.ticker || "").trim().toUpperCase()}|${String(flashedKalshi.side || "").trim().toLowerCase()}|${Number(flashedKalshi.price_dollars)}`,
+      ]
+    : [];
+
+  const polyBids = prev.polyBids.map((row, index) => ({
+    ...row,
+    size: jitterQty(row.size, index === 0 ? 0.28 : 0.1),
+  }));
+  const polyAsks = prev.polyAsks.map((row, index) => ({
+    ...row,
+    size: jitterQty(row.size, index === 0 ? 0.28 : 0.1),
+  }));
+  const flashBid = Math.random() > 0.5;
+  const polyFlash = [
+    flashBid
+      ? polymarketBookFlashKey("bid", polyBids[0]?.price ?? 0.2)
+      : polymarketBookFlashKey("ask", polyAsks[0]?.price ?? 0.32),
+  ];
+
+  const venue = Math.random() > 0.5 ? ("kalshi" as const) : ("polymarket" as const);
+  const side = Math.random() > 0.55 ? ("Yes" as const) : ("No" as const);
+  const tapeRow: TapeRow = {
+    id: `${now}-${Math.random().toString(36).slice(2, 7)}`,
+    venue,
+    time: formatTapeTime(now),
+    side,
+    price: formatCents((venue === "kalshi" ? kalshiPrice : polyPrice) * 100 + (Math.random() - 0.5) * 1.4),
+    size: formatCompact(Math.round(40 + Math.random() * 860)),
+    fresh: true,
+  };
+  const tape = extendSeries
+    ? [tapeRow, ...prev.tape.map((row) => ({ ...row, fresh: false })).slice(0, TAPE_LEN - 1)]
+    : prev.tape.map((row) => ({ ...row, fresh: false }));
+
+  const holders = prev.holders.map((row) => {
+    const size = jitterQty(row.size, 0.06);
+    return { ...row, size, share: Number(((size / 1_000_000) * 100).toFixed(1)) };
+  });
+
+  return {
+    kalshiPrice,
+    polyPrice,
+    kalshiCandles: bumpLastCandle(prev.kalshiCandles, kalshiPrice),
+    polyCandles: bumpLastCandle(prev.polyCandles, polyPrice),
+    kalshiBook,
+    polyBids,
+    polyAsks,
+    spreadSeries,
+    liquiditySeries,
+    priceHistory,
+    tape,
+    holders,
+    kalshiFlash,
+    polyFlash,
   };
 }
 
@@ -293,7 +451,28 @@ const LIQUIDITY_CHART_CONFIG = {
 };
 
 export function KalshiVsPolymarketDashboardMockup() {
-  const mock = useMemo(() => buildMockDashboard(), []);
+  const initial = useMemo(() => buildMockDashboard(), []);
+  const [mock, setMock] = useState(initial);
+  const tickRef = useRef(0);
+
+  useEffect(() => {
+    const reduceMotion =
+      typeof window !== "undefined" &&
+      window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    if (reduceMotion) return undefined;
+
+    const id = window.setInterval(() => {
+      if (typeof document !== "undefined" && document.hidden) return;
+      tickRef.current += 1;
+      const extendSeries = tickRef.current % 2 === 0;
+      setMock((prev) => tickMockDashboard(prev, Date.now(), extendSeries));
+    }, TICK_MS);
+
+    return () => window.clearInterval(id);
+  }, []);
+
+  const kalshiFlash = useMemo(() => new Set(mock.kalshiFlash), [mock.kalshiFlash]);
+  const polyFlash = useMemo(() => new Set(mock.polyFlash), [mock.polyFlash]);
 
   return (
     <section
@@ -312,7 +491,7 @@ export function KalshiVsPolymarketDashboardMockup() {
                 {EVENT_TITLE}
               </h2>
               <p className="text-sm text-muted-foreground">
-                8 simulated charts · Kalshi Live + Polymarket Live · preview layout
+                Live preview · Kalshi + Polymarket · prices, books, tape and holders
               </p>
             </div>
             <div className="flex shrink-0 flex-wrap items-center gap-2">
@@ -363,7 +542,7 @@ export function KalshiVsPolymarketDashboardMockup() {
 
             <MockCard
               title="YES price history"
-              description="Last 6 hours of prints, overlaid"
+              description="Streaming last-trade prices, overlaid"
               venue="both"
               className="lg:col-span-2"
             >
@@ -371,10 +550,7 @@ export function KalshiVsPolymarketDashboardMockup() {
                 config={PRICE_CHART_CONFIG}
                 className="aspect-auto h-full min-h-[16rem] w-full px-2 py-2 sm:px-3"
               >
-                <LineChart
-                  data={mock.priceHistory}
-                  margin={{ top: 10, right: 12, left: 0, bottom: 4 }}
-                >
+                <LineChart data={mock.priceHistory} margin={{ top: 10, right: 12, left: 0, bottom: 4 }}>
                   <CartesianGrid vertical={false} strokeDasharray="3 3" />
                   <XAxis dataKey="label" tickLine={false} axisLine={false} tickMargin={8} minTickGap={28} />
                   <YAxis
@@ -406,13 +582,18 @@ export function KalshiVsPolymarketDashboardMockup() {
             </MockCard>
 
             <MockCard title="Order book" description="Yes bids vs implied asks" venue="kalshi">
-              <HubKalshiLiveDemoOrderbookChart className="min-h-[16rem]" levels={mock.kalshiBook} />
+              <HubKalshiLiveDemoOrderbookChart
+                className="min-h-[16rem]"
+                levels={mock.kalshiBook}
+                flashKeys={kalshiFlash}
+              />
             </MockCard>
             <MockCard title="Order book" description="CLOB bids and asks" venue="polymarket">
               <HubPolymarketLiveOrderbookDepthChart
                 className="min-h-[16rem]"
                 bids={mock.polyBids}
                 asks={mock.polyAsks}
+                flashKeys={polyFlash}
               />
             </MockCard>
 
@@ -431,13 +612,21 @@ export function KalshiVsPolymarketDashboardMockup() {
                     tickFormatter={(value) => `${value}¢`}
                   />
                   <ChartTooltip content={<ChartTooltipContent />} />
-                  <Line type="monotone" dataKey="kalshi" stroke="var(--color-kalshi)" strokeWidth={2} dot={false} />
+                  <Line
+                    type="monotone"
+                    dataKey="kalshi"
+                    stroke="var(--color-kalshi)"
+                    strokeWidth={2}
+                    dot={false}
+                    isAnimationActive={false}
+                  />
                   <Line
                     type="monotone"
                     dataKey="polymarket"
                     stroke="var(--color-polymarket)"
                     strokeWidth={2}
                     dot={false}
+                    isAnimationActive={false}
                   />
                 </LineChart>
               </ChartContainer>
@@ -448,10 +637,7 @@ export function KalshiVsPolymarketDashboardMockup() {
                 config={LIQUIDITY_CHART_CONFIG}
                 className="aspect-auto h-full min-h-[16rem] w-full px-2 py-2 sm:px-3"
               >
-                <AreaChart
-                  data={mock.liquiditySeries}
-                  margin={{ top: 8, right: 12, left: 0, bottom: 4 }}
-                >
+                <AreaChart data={mock.liquiditySeries} margin={{ top: 8, right: 12, left: 0, bottom: 4 }}>
                   <CartesianGrid vertical={false} strokeDasharray="3 3" />
                   <XAxis dataKey="label" tickLine={false} axisLine={false} tickMargin={8} minTickGap={28} />
                   <YAxis
@@ -468,6 +654,7 @@ export function KalshiVsPolymarketDashboardMockup() {
                     fill="var(--color-kalshi)"
                     fillOpacity={0.18}
                     strokeWidth={2}
+                    isAnimationActive={false}
                   />
                   <Area
                     type="monotone"
@@ -476,6 +663,7 @@ export function KalshiVsPolymarketDashboardMockup() {
                     fill="var(--color-polymarket)"
                     fillOpacity={0.14}
                     strokeWidth={2}
+                    isAnimationActive={false}
                   />
                 </AreaChart>
               </ChartContainer>
@@ -495,7 +683,13 @@ export function KalshiVsPolymarketDashboardMockup() {
                   </thead>
                   <tbody>
                     {mock.tape.map((row) => (
-                      <tr key={row.id} className="border-b border-border/40 last:border-0">
+                      <tr
+                        key={row.id}
+                        className={cn(
+                          "border-b border-border/40 last:border-0 transition-colors duration-500",
+                          row.fresh && "bg-emerald-500/10",
+                        )}
+                      >
                         <td className="px-3 py-2 tabular-nums text-muted-foreground">{row.time}</td>
                         <td className="px-3 py-2">
                           <VenueBadge venue={row.venue} />
@@ -546,7 +740,7 @@ export function KalshiVsPolymarketDashboardMockup() {
                       />
                     }
                   />
-                  <Bar dataKey="size" radius={4}>
+                  <Bar dataKey="size" radius={4} isAnimationActive animationDuration={450}>
                     {mock.holders.map((row) => (
                       <Cell
                         key={row.name}
