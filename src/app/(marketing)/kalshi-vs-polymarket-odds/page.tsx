@@ -151,7 +151,7 @@ function CompareHero() {
           </span>
           <span className="leading-tight">{copy.hero.eyebrow}</span>
         </p>
-        <div className="flex w-full flex-col items-center gap-4 text-center">
+        <div className="flex w-full flex-col items-center gap-4 pb-16 text-center">
           <h1 className="max-w-4xl text-balance text-3xl font-medium tracking-tighter text-primary md:text-4xl lg:text-5xl">
             {copy.hero.title}
           </h1>
