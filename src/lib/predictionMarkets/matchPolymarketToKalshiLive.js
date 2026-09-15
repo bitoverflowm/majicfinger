@@ -378,7 +378,7 @@ export function rankKalshiCandidatesForPolymarket(polymarket, suggestions) {
 }
 
 const KALSHI_NO_MATCH_MESSAGE =
-  "No Kalshi market was automatically matched for this event. Search Kalshi below to pick one, or try another Polymarket market.";
+  "No Kalshi market was automatically matched for this event. Search Kalshi by name or ticker, or try another Polymarket market.";
 
 /**
  * Opaque 400s from Kalshi search (query too long, nested `bad_request`, etc.).
