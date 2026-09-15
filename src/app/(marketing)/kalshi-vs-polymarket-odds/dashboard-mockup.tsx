@@ -495,23 +495,8 @@ export function KalshiVsPolymarketDashboardMockup() {
               </p>
             </div>
             <div className="flex shrink-0 flex-wrap items-center gap-2">
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                className="h-8 gap-1.5 border-emerald-500/40 bg-emerald-500/10 px-3 text-xs font-medium text-foreground hover:bg-emerald-500/15"
-                asChild
-              >
-                <Link href="#pricing">
-                  <span
-                    className="size-2 shrink-0 animate-pulse rounded-full bg-emerald-500"
-                    aria-hidden
-                  />
-                  Start live feed
-                </Link>
-              </Button>
               <Button type="button" size="sm" className="h-8 px-3 text-xs" asChild>
-                <Link href="#pricing">Get full access now</Link>
+                <Link href="#pricing">Create your Dashboard</Link>
               </Button>
             </div>
           </div>

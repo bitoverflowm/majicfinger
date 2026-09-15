@@ -32,7 +32,7 @@ export const kalshiVsPolymarketLanding = {
     description:
       "Search for an event in plain English or enter a market ticker. Find matching markets across Kalshi and Polymarket, then compare live odds, charts and trading activity in one view.",
     compareCta: {
-      label: "Compare markets",
+      label: "Click to Begin",
       href: "#compare",
       requiresAuth: false,
       ariaLabel: "Scroll to the live Kalshi and Polymarket comparison",
@@ -122,10 +122,10 @@ export const kalshiVsPolymarketLanding = {
       },
     ] satisfies HubCard[],
     primaryCta: {
-      label: "Try the dashboard preview",
+      label: "Check it out",
       href: "#demo",
       requiresAuth: false,
-      ariaLabel: "Try the free live dashboard preview",
+      ariaLabel: "Check out the live dashboard preview",
     } satisfies HubCta,
     secondaryCta: {
       label: "View Lychee plans",
@@ -133,8 +133,6 @@ export const kalshiVsPolymarketLanding = {
       requiresAuth: false,
       ariaLabel: "View Lychee plans",
     } satisfies HubCta,
-    helper:
-      "The preview is free and temporary. Register and choose a paid plan to save your dashboard.",
   },
   platform: {
     eyebrow: "GO DEEPER WITH LYCHEE",

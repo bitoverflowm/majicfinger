@@ -229,9 +229,6 @@ function DashboardConversionSection() {
           <HubCtaButton cta={copy.dashboard.primaryCta} variant="primary" />
           <HubCtaButton cta={copy.dashboard.secondaryCta} variant="secondary" />
         </div>
-        <p className="mx-auto max-w-2xl text-center text-sm text-muted-foreground">
-          {copy.dashboard.helper}
-        </p>
       </div>
     </section>
   );

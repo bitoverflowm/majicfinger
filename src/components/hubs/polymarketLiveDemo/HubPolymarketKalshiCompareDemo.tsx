@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import Link from "next/link";
-import { Check, Clock, GitMerge, Loader2, RefreshCw, Undo2 } from "lucide-react";
+import { Check, Clock, GitMerge, Loader2, RefreshCw, Share2, Undo2 } from "lucide-react";
 
 import { PolymarketLiveSearch } from "@/components/connectData/polymarketLive/PolymarketLiveSearch";
 import { MarketTickerSearch } from "@/components/connectData/MarketTickerSearch";
@@ -58,6 +58,7 @@ import {
   COMPARE_FEATURED_LIMIT,
   CompareFeaturedSkeletonList,
 } from "@/components/hubs/polymarketLiveDemo/HubPolymarketKalshiCompareDemoSkeleton";
+import { CompareShareDialog } from "@/components/hubs/polymarketLiveDemo/CompareShareDialog";
 
 type CompareFeaturedCard = {
   id: string;
@@ -681,6 +682,61 @@ function filterByInterval(
   });
 }
 
+/** Clip both series to the overlapping time window so the X-axis lines up. */
+function alignCompareSeries(
+  poly: Record<string, unknown>[],
+  kalshi: Record<string, unknown>[],
+): { poly: Record<string, unknown>[]; kalshi: Record<string, unknown>[] } {
+  if (!poly.length || !kalshi.length) return { poly, kalshi };
+
+  let polyMin = Infinity;
+  let kalshiMin = Infinity;
+  let polyMax = -Infinity;
+  let kalshiMax = -Infinity;
+  for (const row of poly) {
+    const ts = parseTs(row);
+    if (ts == null) continue;
+    if (ts < polyMin) polyMin = ts;
+    if (ts > polyMax) polyMax = ts;
+  }
+  for (const row of kalshi) {
+    const ts = parseTs(row);
+    if (ts == null) continue;
+    if (ts < kalshiMin) kalshiMin = ts;
+    if (ts > kalshiMax) kalshiMax = ts;
+  }
+  if (
+    !Number.isFinite(polyMin) ||
+    !Number.isFinite(kalshiMin) ||
+    polyMax < kalshiMin ||
+    kalshiMax < polyMin
+  ) {
+    return { poly, kalshi };
+  }
+
+  const start = Math.max(polyMin, kalshiMin);
+  const end = Math.max(polyMax, kalshiMax);
+  const keep = (row: Record<string, unknown>) => {
+    const ts = parseTs(row);
+    return ts != null && ts >= start && ts <= end;
+  };
+  const nextPoly = poly.filter(keep);
+  const nextKalshi = kalshi.filter(keep);
+  if (nextPoly.length < 2 || nextKalshi.length < 2) return { poly, kalshi };
+  return { poly: nextPoly, kalshi: nextKalshi };
+}
+
+function toSharePoints(rows: Record<string, unknown>[]): { t: number; v: number }[] {
+  const points: { t: number; v: number }[] = [];
+  for (const row of rows) {
+    const t = parseTs(row);
+    const v = Number(row._probability_pct);
+    if (t == null || !Number.isFinite(v)) continue;
+    points.push({ t, v });
+  }
+  return points;
+}
+
 function isOpaqueHttpErrorMessage(raw: string): boolean {
   const msg = String(raw || "")
     .trim()
@@ -786,8 +842,9 @@ async function fetchPolymarketPricesHistory(
 ): Promise<Record<string, unknown>[]> {
   // 1-minute CLOB bars fill the liveline the way Kalshi trade prints do.
   // `max` (hourly) covers older archive if the market is longer-lived.
-  const [minuteResult, archiveResult] = await Promise.allSettled([
+  const [minuteResult, weekResult, archiveResult] = await Promise.allSettled([
     fetchPolymarketClobHistory(tokenId, { interval: "1d", fidelity: 1 }, signal),
+    fetchPolymarketClobHistory(tokenId, { interval: "1w", fidelity: 5 }, signal),
     fetchPolymarketClobHistory(tokenId, { interval: "max", fidelity: 60 }, signal),
   ]);
   if (signal.aborted) return [];
@@ -801,7 +858,10 @@ async function fetchPolymarketPricesHistory(
       signal,
     );
   }
-  const archiveRows = archiveResult.status === "fulfilled" ? archiveResult.value : [];
+  const archiveRows = [
+    ...(weekResult.status === "fulfilled" ? weekResult.value : []),
+    ...(archiveResult.status === "fulfilled" ? archiveResult.value : []),
+  ];
   const merged = [...archiveRows, ...minuteRows];
   if (merged.length) return merged;
   if (minuteResult.status === "rejected") throw minuteResult.reason;
@@ -1583,6 +1643,7 @@ export function HubPolymarketKalshiCompareDemo() {
   const [seriesError, setSeriesError] = useState<string | null>(null);
   const [interval, setIntervalId] = useState<IntervalId>("1d");
   const [chartsMerged, setChartsMerged] = useState(false);
+  const [shareOpen, setShareOpen] = useState(false);
   const [editingCounterpart, setEditingCounterpart] = useState(false);
   const [nowMs, setNowMs] = useState(() => Date.now());
 
@@ -2036,13 +2097,17 @@ export function HubPolymarketKalshiCompareDemo() {
     };
   }, [inView, selectedTicker]);
 
-  const polyFiltered = useMemo(
+  const polyInterval = useMemo(
     () => filterByInterval(polyPoints, interval),
     [polyPoints, interval],
   );
-  const kalshiFiltered = useMemo(
+  const kalshiInterval = useMemo(
     () => filterByInterval(kalshiPoints, interval),
     [kalshiPoints, interval],
+  );
+  const { poly: polyFiltered, kalshi: kalshiFiltered } = useMemo(
+    () => alignCompareSeries(polyInterval, kalshiInterval),
+    [kalshiInterval, polyInterval],
   );
 
   const polySeries = useMemo(
@@ -2542,15 +2607,25 @@ export function HubPolymarketKalshiCompareDemo() {
                     </Tooltip>
                   </TooltipProvider>
                 </div>
-                {marketCountdownLabel ? (
-                  <p
-                    className="inline-flex items-center gap-1.5 text-[11px] tabular-nums text-muted-foreground"
-                    aria-live="polite"
+                <div className="flex items-center gap-2">
+                  {marketCountdownLabel ? (
+                    <p
+                      className="inline-flex items-center gap-1.5 text-[11px] tabular-nums text-muted-foreground"
+                      aria-live="polite"
+                    >
+                      <Clock className="size-3.5 shrink-0" aria-hidden />
+                      {marketCountdownLabel}
+                    </p>
+                  ) : null}
+                  <button
+                    type="button"
+                    onClick={() => setShareOpen(true)}
+                    className="inline-flex h-8 items-center gap-1.5 rounded-md border border-border/70 bg-background px-2.5 text-[11px] font-medium text-muted-foreground transition-colors hover:text-foreground"
                   >
-                    <Clock className="size-3.5 shrink-0" aria-hidden />
-                    {marketCountdownLabel}
-                  </p>
-                ) : null}
+                    <Share2 className="size-3.5" aria-hidden />
+                    Share
+                  </button>
+                </div>
               </div>
 
               {chartsMerged ? (
@@ -2918,6 +2993,21 @@ export function HubPolymarketKalshiCompareDemo() {
           </>
         )}
       </Card>
+      <CompareShareDialog
+        open={shareOpen}
+        onOpenChange={setShareOpen}
+        headlineDefault={parentTitle}
+        kalshiTitle={matchFromKalshi ? parentTitle : counterpartTitle}
+        polyTitle={matchFromKalshi ? counterpartTitle : parentTitle}
+        kalshiMeta={matchFromKalshi ? parentMeta : counterpartMeta}
+        polyMeta={matchFromKalshi ? counterpartMeta : parentMeta}
+        kalshiYesPct={kalshiYesPct}
+        polyYesPct={polyYesPct}
+        countdownLabel={marketCountdownLabel}
+        intervalLabel={INTERVALS.find((item) => item.id === interval)?.label ?? "All"}
+        polyPoints={toSharePoints(polyFiltered)}
+        kalshiPoints={toSharePoints(kalshiFiltered)}
+      />
     </div>
   );
 }
