@@ -165,6 +165,43 @@ function formatMarketCountdown(msLeft: number): string {
   return hours ? `${days}d ${hours}h` : `${days}d`;
 }
 
+function CompareChildSideToggle({
+  yesLabel,
+  noLabel,
+  side,
+  onChange,
+}: {
+  yesLabel: string;
+  noLabel: string;
+  side: "yes" | "no";
+  onChange: (side: "yes" | "no") => void;
+}) {
+  return (
+    <div
+      className="inline-flex h-7 max-w-full items-center rounded-md border border-border/70 bg-muted/40 p-0.5"
+      role="group"
+      aria-label="Child market side to compare"
+    >
+      {(["yes", "no"] as const).map((id) => (
+        <button
+          key={id}
+          type="button"
+          aria-pressed={side === id}
+          onClick={() => onChange(id)}
+          className={cn(
+            "h-6 max-w-[11rem] truncate rounded px-2 text-[11px] font-medium transition-colors",
+            side === id
+              ? "bg-background text-foreground shadow-sm"
+              : "text-muted-foreground hover:text-foreground",
+          )}
+        >
+          {id === "yes" ? `YES · ${yesLabel}` : `NO · ${noLabel}`}
+        </button>
+      ))}
+    </div>
+  );
+}
+
 function CompareSelectedSummary({
   platform,
   imageUrl,
@@ -175,6 +212,10 @@ function CompareSelectedSummary({
   no,
   yesPct,
   onChange,
+  childSide,
+  nativeYes,
+  nativeNo,
+  onChildSideChange,
 }: {
   platform: string;
   imageUrl: string;
@@ -185,38 +226,58 @@ function CompareSelectedSummary({
   no: string;
   yesPct: number | null;
   onChange: () => void;
+  childSide: "yes" | "no";
+  nativeYes: string;
+  nativeNo: string;
+  onChildSideChange: (side: "yes" | "no") => void;
 }) {
   return (
-    <div className="flex items-center gap-2.5 rounded-lg border border-border/70 bg-background px-3 py-2">
-      <div className="relative size-10 shrink-0 overflow-hidden rounded-md border border-border/60 bg-muted">
-        {imageUrl ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img src={imageUrl} alt="" className="size-full object-cover" />
-        ) : (
-          <div className="flex size-full items-center justify-center text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
-            {fallback}
-          </div>
-        )}
+    <div className="flex flex-col gap-2 rounded-lg border border-border/70 bg-background px-3 py-2">
+      <div className="flex items-center gap-2.5">
+        <div className="relative size-10 shrink-0 overflow-hidden rounded-md border border-border/60 bg-muted">
+          {imageUrl ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={imageUrl} alt="" className="size-full object-cover" />
+          ) : (
+            <div className="flex size-full items-center justify-center text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+              {fallback}
+            </div>
+          )}
+        </div>
+        <div className="min-w-0 flex-1">
+          <p className="text-[11px] font-medium leading-none text-muted-foreground">
+            Comparison · {platform}
+          </p>
+          <p className="mt-0.5 truncate text-sm font-semibold leading-tight text-foreground">
+            {title}
+          </p>
+          <p className="mt-0.5 truncate text-[11px] leading-snug text-muted-foreground">
+            {meta ? `${meta} · ` : null}
+            YES = {yes}
+            {yesPct != null ? ` · ${formatPct(yesPct)}` : ""}
+            {" · "}
+            NO = {no}
+            {yesPct != null ? ` · ${formatPct(100 - yesPct)}` : ""}
+          </p>
+        </div>
+        <Button type="button" size="sm" variant="ghost" className="h-7 shrink-0 px-2 text-xs" onClick={onChange}>
+          Change
+        </Button>
       </div>
-      <div className="min-w-0 flex-1">
-        <p className="text-[11px] font-medium leading-none text-muted-foreground">
-          Comparison · {platform}
-        </p>
-        <p className="mt-0.5 truncate text-sm font-semibold leading-tight text-foreground">
-          {title}
-        </p>
-        <p className="mt-0.5 truncate text-[11px] leading-snug text-muted-foreground">
-          {meta ? `${meta} · ` : null}
-          YES = {yes}
-          {yesPct != null ? ` · ${formatPct(yesPct)}` : ""}
-          {" · "}
-          NO = {no}
-          {yesPct != null ? ` · ${formatPct(100 - yesPct)}` : ""}
-        </p>
+      <div className="flex flex-col gap-1 sm:flex-row sm:flex-wrap sm:items-center sm:gap-2.5 sm:pl-[3.25rem]">
+        <p className="text-[11px] text-muted-foreground">Match parent YES to</p>
+        <CompareChildSideToggle
+          yesLabel={nativeYes}
+          noLabel={nativeNo}
+          side={childSide}
+          onChange={onChildSideChange}
+        />
+        {childSide === "no" ? (
+          <p className="text-[11px] text-muted-foreground">
+            Using this market’s NO ({nativeNo}).
+          </p>
+        ) : null}
       </div>
-      <Button type="button" size="sm" variant="ghost" className="h-7 shrink-0 px-2 text-xs" onClick={onChange}>
-        Change
-      </Button>
     </div>
   );
 }
@@ -427,21 +488,62 @@ function CompareChartBody({
   );
 }
 
-function yesTokenId(market: Record<string, unknown> | null): string {
+function polyOutcomeTokenId(
+  market: Record<string, unknown> | null,
+  side: "yes" | "no",
+): string {
   if (!market) return "";
   const pairs = Array.isArray(market.outcomePairs)
     ? (market.outcomePairs as Array<{ tokenId?: string; outcome?: string }>)
     : [];
   if (pairs.length) {
     const yes = pairs.find((p) => String(p.outcome || "").toLowerCase() === "yes");
-    if (yes?.tokenId) return String(yes.tokenId).trim();
-    if (pairs[0]?.tokenId) return String(pairs[0].tokenId).trim();
+    const no = pairs.find((p) => String(p.outcome || "").toLowerCase() === "no");
+    if (side === "yes") {
+      return String(yes?.tokenId || pairs[0]?.tokenId || "").trim();
+    }
+    return String(no?.tokenId || pairs[1]?.tokenId || "").trim();
   }
   const outcomes = Array.isArray(market.outcomes) ? market.outcomes.map(String) : [];
   const tokens = Array.isArray(market.tokenIds) ? market.tokenIds.map(String) : [];
   const yesIdx = outcomes.findIndex((o) => o.toLowerCase() === "yes");
-  if (yesIdx >= 0 && tokens[yesIdx]) return tokens[yesIdx];
-  return tokens[0] || "";
+  const noIdx = outcomes.findIndex((o) => o.toLowerCase() === "no");
+  if (side === "yes") {
+    if (yesIdx >= 0 && tokens[yesIdx]) return tokens[yesIdx];
+    return tokens[0] || "";
+  }
+  if (noIdx >= 0 && tokens[noIdx]) return tokens[noIdx];
+  return tokens[1] || "";
+}
+
+function resolvePolyChildToken(
+  market: Record<string, unknown> | null,
+  side: "yes" | "no",
+): { tokenId: string; invert: boolean } {
+  const yesId = polyOutcomeTokenId(market, "yes");
+  const noId = polyOutcomeTokenId(market, "no");
+  if (side !== "no") return { tokenId: yesId, invert: false };
+  if (noId && noId !== yesId) return { tokenId: noId, invert: false };
+  return { tokenId: yesId, invert: true };
+}
+
+function invertPctPoints(rows: Record<string, unknown>[]): Record<string, unknown>[] {
+  return rows.map((row) => {
+    const value = Number(row._probability_pct);
+    if (!Number.isFinite(value)) return row;
+    const pct = Math.max(0, Math.min(100, 100 - value));
+    return {
+      ...row,
+      _probability_pct: pct,
+      price: pct / 100,
+      yes_price_dollars: pct / 100,
+    };
+  });
+}
+
+function invertPctPoint(row: Record<string, unknown> | null): Record<string, unknown> | null {
+  if (!row) return null;
+  return invertPctPoints([row])[0] || null;
 }
 
 function polyConditionId(market: Record<string, unknown> | null): string {
@@ -656,6 +758,17 @@ function yesOutcomesLikelySame(parentYes: string, childYes: string): boolean {
   let overlap = 0;
   for (const token of parentTokens) if (childTokens.has(token)) overlap += 1;
   return overlap > 0;
+}
+
+function swapYesNoLabels(labels: YesNoLabels): YesNoLabels {
+  return { yes: labels.no, no: labels.yes, named: labels.named };
+}
+
+function preferredChildSide(parentYes: string, child: YesNoLabels): "yes" | "no" {
+  const yesAligned = yesOutcomesLikelySame(parentYes, child.yes);
+  const noAligned = yesOutcomesLikelySame(parentYes, child.no);
+  if (!yesAligned && noAligned) return "no";
+  return "yes";
 }
 
 function formatAgo(iso: string | null): string {
@@ -1645,6 +1758,7 @@ export function HubPolymarketKalshiCompareDemo() {
   const [chartsMerged, setChartsMerged] = useState(false);
   const [shareOpen, setShareOpen] = useState(false);
   const [editingCounterpart, setEditingCounterpart] = useState(false);
+  const [childSide, setChildSide] = useState<"yes" | "no">("yes");
   const [nowMs, setNowMs] = useState(() => Date.now());
 
   const polySocketStop = useRef<(() => void) | null>(null);
@@ -1683,6 +1797,7 @@ export function HubPolymarketKalshiCompareDemo() {
     setChartsMerged(false);
     setKalshiAnchor(null);
     setEditingCounterpart(false);
+    setChildSide("yes");
     setMarkets?.([]);
   }, [setMarkets]);
 
@@ -1725,6 +1840,7 @@ export function HubPolymarketKalshiCompareDemo() {
       setMatchError(null);
       setEmptyMessage(null);
       setEditingCounterpart(false);
+      setChildSide("yes");
       setSeriesError(null);
       setMarkets?.([]);
 
@@ -1868,6 +1984,28 @@ export function HubPolymarketKalshiCompareDemo() {
   );
 
   useEffect(() => {
+    if (kalshiAnchor) {
+      if (!polyMarket) {
+        setChildSide("yes");
+        return;
+      }
+      const parent = kalshiYesNoLabels({ title: kalshiAnchor.title }, kalshiAnchor.title);
+      setChildSide(preferredChildSide(parent.yes, polymarketYesNoLabels(polyMarket)));
+      return;
+    }
+    if (!selectedTicker) {
+      setChildSide("yes");
+      return;
+    }
+    setChildSide(
+      preferredChildSide(
+        polymarketYesNoLabels(polyMarket).yes,
+        kalshiYesNoLabels(selectedCandidate?.market, selectedCandidate?.market.title),
+      ),
+    );
+  }, [kalshiAnchor, polyKey, selectedTicker]);
+
+  useEffect(() => {
     if (!polyKey && !kalshiAnchor) return undefined;
     setNowMs(Date.now());
     const id = window.setInterval(() => setNowMs(Date.now()), 1000);
@@ -1882,12 +2020,13 @@ export function HubPolymarketKalshiCompareDemo() {
     }
     if (!inView) return undefined;
 
-    const tokenId = yesTokenId(polyMarket);
+    const polyChildSide = kalshiAnchor ? childSide : "yes";
+    const { tokenId, invert } = resolvePolyChildToken(polyMarket, polyChildSide);
     const conditionId = polyConditionId(polyMarket);
     if (!tokenId) {
       setPolyPoints([]);
       setPolyLoading(false);
-      setSeriesError("This Polymarket market has no YES token to chart.");
+      setSeriesError("This Polymarket market has no outcome token to chart.");
       return undefined;
     }
 
@@ -1916,7 +2055,8 @@ export function HubPolymarketKalshiCompareDemo() {
         const tradePts = trades
           .map((row) => polymarketTradeToPoint(row, tokenId))
           .filter(Boolean) as Record<string, unknown>[];
-        setPolyPoints((prev) => mergePctPoints(histPts, [...tradePts, ...prev]));
+        const merged = mergePctPoints(histPts, tradePts);
+        setPolyPoints(invert ? invertPctPoints(merged) : merged);
       })
       .catch((err) => {
         if (ac.signal.aborted || (err instanceof DOMException && err.name === "AbortError")) return;
@@ -1927,7 +2067,7 @@ export function HubPolymarketKalshiCompareDemo() {
       });
 
     return () => ac.abort();
-  }, [inView, polyKey, polyMarket]);
+  }, [childSide, inView, kalshiAnchor, polyKey, polyMarket]);
 
   useEffect(() => {
     if (!selectedTicker) {
@@ -1975,7 +2115,8 @@ export function HubPolymarketKalshiCompareDemo() {
 
     if (!inView || !polyMarket) return undefined;
 
-    const tokenId = yesTokenId(polyMarket);
+    const polyChildSide = kalshiAnchor ? childSide : "yes";
+    const { tokenId, invert } = resolvePolyChildToken(polyMarket, polyChildSide);
     if (!tokenId) return undefined;
 
     polySocketStop.current = openPolymarketLastTradeSocket({
@@ -1983,7 +2124,7 @@ export function HubPolymarketKalshiCompareDemo() {
       onTrade: (row) => {
         const asset = String(row.asset_id || "");
         if (asset && asset !== tokenId) return;
-        const point = toPctPoint(
+        const raw = toPctPoint(
           {
             created_time: row.timestamp || row.time || new Date().toISOString(),
             price: row.price,
@@ -1993,6 +2134,7 @@ export function HubPolymarketKalshiCompareDemo() {
           },
           "Polymarket",
         );
+        const point = invert ? invertPctPoint(raw) : raw;
         if (!point) return;
         setPolyPoints((prev) => mergePctPoints(prev, [point]));
       },
@@ -2002,7 +2144,7 @@ export function HubPolymarketKalshiCompareDemo() {
       polySocketStop.current?.();
       polySocketStop.current = null;
     };
-  }, [inView, polyMarket]);
+  }, [childSide, inView, kalshiAnchor, polyMarket]);
 
   // Poll Polymarket trades (Data API) so the liveline stays in sync with Kalshi's REST poll.
   useEffect(() => {
@@ -2013,7 +2155,8 @@ export function HubPolymarketKalshiCompareDemo() {
 
     if (!inView || !polyMarket) return undefined;
 
-    const tokenId = yesTokenId(polyMarket);
+    const polyChildSide = kalshiAnchor ? childSide : "yes";
+    const { tokenId, invert } = resolvePolyChildToken(polyMarket, polyChildSide);
     const conditionId = polyConditionId(polyMarket);
     if (!tokenId) return undefined;
 
@@ -2034,8 +2177,9 @@ export function HubPolymarketKalshiCompareDemo() {
             ...history.map((row) => toPctPoint(row, "Polymarket")),
             ...trades.map((row) => polymarketTradeToPoint(row, tokenId)),
           ].filter(Boolean) as Record<string, unknown>[];
-          if (mapped.length) {
-            setPolyPoints((prev) => mergePctPoints(prev, mapped));
+          const next = invert ? invertPctPoints(mapped) : mapped;
+          if (next.length) {
+            setPolyPoints((prev) => mergePctPoints(prev, next));
           }
         } catch {
           /* ignore poll errors */
@@ -2049,7 +2193,7 @@ export function HubPolymarketKalshiCompareDemo() {
         polyPollTimer.current = null;
       }
     };
-  }, [inView, polyMarket]);
+  }, [childSide, inView, kalshiAnchor, polyMarket]);
 
   // Live Kalshi poll while a matched ticker is in view.
   useEffect(() => {
@@ -2101,10 +2245,11 @@ export function HubPolymarketKalshiCompareDemo() {
     () => filterByInterval(polyPoints, interval),
     [polyPoints, interval],
   );
-  const kalshiInterval = useMemo(
-    () => filterByInterval(kalshiPoints, interval),
-    [kalshiPoints, interval],
-  );
+  const kalshiInterval = useMemo(() => {
+    const rows = filterByInterval(kalshiPoints, interval);
+    if (!kalshiAnchor && childSide === "no") return invertPctPoints(rows);
+    return rows;
+  }, [childSide, interval, kalshiAnchor, kalshiPoints]);
   const { poly: polyFiltered, kalshi: kalshiFiltered } = useMemo(
     () => alignCompareSeries(polyInterval, kalshiInterval),
     [kalshiInterval, polyInterval],
@@ -2148,16 +2293,17 @@ export function HubPolymarketKalshiCompareDemo() {
   }, [polyFiltered]);
 
   const kalshiYesPct = useMemo(() => {
+    const invert = !kalshiAnchor && childSide === "no";
     if (kalshiMarket) {
       const fromMarket = impliedChancePctFromMarketRow(kalshiMarket);
-      if (fromMarket != null) return fromMarket;
+      if (fromMarket != null) return invert ? 100 - fromMarket : fromMarket;
     }
     const last = kalshiFiltered[kalshiFiltered.length - 1];
     if (last && Number.isFinite(Number(last._probability_pct))) {
       return Number(last._probability_pct);
     }
     return null;
-  }, [kalshiFiltered, kalshiMarket]);
+  }, [childSide, kalshiAnchor, kalshiFiltered, kalshiMarket]);
 
   const divergence =
     polyYesPct != null && kalshiYesPct != null ? polyYesPct - kalshiYesPct : null;
@@ -2221,7 +2367,7 @@ export function HubPolymarketKalshiCompareDemo() {
     !hasCounterpart &&
     ((matchFromKalshi && polyMatchList.length === 0) ||
       (!matchFromKalshi && kalshiMatchList.length === 0));
-  const counterpartYesNo = matchFromKalshi
+  const counterpartNativeYesNo = matchFromKalshi
     ? polymarketYesNoLabels(polyMarket)
     : kalshiYesNoLabels(
         {
@@ -2232,6 +2378,8 @@ export function HubPolymarketKalshiCompareDemo() {
         },
         selectedCandidate?.market.title,
       );
+  const counterpartYesNo =
+    childSide === "no" ? swapYesNoLabels(counterpartNativeYesNo) : counterpartNativeYesNo;
   const counterpartTitle = matchFromKalshi
     ? String(polyMarket?.title || polyMarket?.slug || "Market")
     : String(kalshiMarket?.title || selectedCandidate?.market.title || selectedTicker || "Market");
@@ -2391,6 +2539,10 @@ export function HubPolymarketKalshiCompareDemo() {
                   no={counterpartYesNo.no}
                   yesPct={counterpartYesPct}
                   onChange={() => setEditingCounterpart(true)}
+                  childSide={childSide}
+                  nativeYes={counterpartNativeYesNo.yes}
+                  nativeNo={counterpartNativeYesNo.no}
+                  onChildSideChange={setChildSide}
                 />
               )}
 
@@ -2799,26 +2951,20 @@ export function HubPolymarketKalshiCompareDemo() {
                     </tr>
                     <tr>
                       <td className="px-3 py-2 text-muted-foreground">YES means</td>
-                      <td className="px-3 py-2">{polymarketYesNoLabels(polyMarket).yes}</td>
                       <td className="px-3 py-2">
-                        {
-                          kalshiYesNoLabels(
-                            kalshiMarket || selectedCandidate?.market,
-                            kalshiAnchor?.title,
-                          ).yes
-                        }
+                        {(matchFromKalshi ? counterpartYesNo : parentYesNo).yes}
+                      </td>
+                      <td className="px-3 py-2">
+                        {(matchFromKalshi ? parentYesNo : counterpartYesNo).yes}
                       </td>
                     </tr>
                     <tr>
                       <td className="px-3 py-2 text-muted-foreground">NO means</td>
-                      <td className="px-3 py-2">{polymarketYesNoLabels(polyMarket).no}</td>
                       <td className="px-3 py-2">
-                        {
-                          kalshiYesNoLabels(
-                            kalshiMarket || selectedCandidate?.market,
-                            kalshiAnchor?.title,
-                          ).no
-                        }
+                        {(matchFromKalshi ? counterpartYesNo : parentYesNo).no}
+                      </td>
+                      <td className="px-3 py-2">
+                        {(matchFromKalshi ? parentYesNo : counterpartYesNo).no}
                       </td>
                     </tr>
                     <tr>
