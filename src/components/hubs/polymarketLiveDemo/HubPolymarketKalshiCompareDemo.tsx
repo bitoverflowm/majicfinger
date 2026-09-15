@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import Link from "next/link";
-import { Check, Clock, Loader2, RefreshCw, Undo2 } from "lucide-react";
+import { Check, Clock, GitMerge, Loader2, RefreshCw, Undo2 } from "lucide-react";
 
 import { PolymarketLiveSearch } from "@/components/connectData/polymarketLive/PolymarketLiveSearch";
 import { MarketTickerSearch } from "@/components/connectData/MarketTickerSearch";
@@ -48,6 +48,12 @@ import {
   formatPolymarketVolume,
 } from "@/lib/polymarketLive/polymarketPublicSearch";
 import { cn } from "@/lib/utils";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import {
   COMPARE_FEATURED_LIMIT,
   CompareFeaturedSkeletonList,
@@ -1576,6 +1582,7 @@ export function HubPolymarketKalshiCompareDemo() {
   const [kalshiLoading, setKalshiLoading] = useState(false);
   const [seriesError, setSeriesError] = useState<string | null>(null);
   const [interval, setIntervalId] = useState<IntervalId>("1d");
+  const [chartsMerged, setChartsMerged] = useState(false);
   const [editingCounterpart, setEditingCounterpart] = useState(false);
   const [nowMs, setNowMs] = useState(() => Date.now());
 
@@ -1612,6 +1619,7 @@ export function HubPolymarketKalshiCompareDemo() {
     setPolyLoading(false);
     setKalshiLoading(false);
     setSeriesError(null);
+    setChartsMerged(false);
     setKalshiAnchor(null);
     setEditingCounterpart(false);
     setMarkets?.([]);
@@ -2061,6 +2069,10 @@ export function HubPolymarketKalshiCompareDemo() {
     ],
     [kalshiFiltered],
   );
+  const mergedSeries = useMemo(
+    () => [...polySeries, ...kalshiSeries],
+    [kalshiSeries, polySeries],
+  );
 
   const polyYesPct = useMemo(() => {
     const last = polyFiltered[polyFiltered.length - 1];
@@ -2486,26 +2498,49 @@ export function HubPolymarketKalshiCompareDemo() {
               {seriesError ? <p className="text-sm text-destructive">{seriesError}</p> : null}
 
               <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2">
-                <div
-                  className="inline-flex h-8 items-center rounded-md border border-border/70 bg-background p-0.5"
-                  role="group"
-                  aria-label="Comparison interval"
-                >
-                  {INTERVALS.map((item) => (
-                    <button
-                      key={item.id}
-                      type="button"
-                      onClick={() => setIntervalId(item.id)}
-                      className={cn(
-                        "h-7 rounded px-2.5 text-[11px] font-medium transition-colors",
-                        interval === item.id
-                          ? "bg-muted text-foreground shadow-sm"
-                          : "text-muted-foreground hover:text-foreground",
-                      )}
-                    >
-                      {item.label}
-                    </button>
-                  ))}
+                <div className="flex items-center gap-2">
+                  <div
+                    className="inline-flex h-8 items-center rounded-md border border-border/70 bg-background p-0.5"
+                    role="group"
+                    aria-label="Comparison interval"
+                  >
+                    {INTERVALS.map((item) => (
+                      <button
+                        key={item.id}
+                        type="button"
+                        onClick={() => setIntervalId(item.id)}
+                        className={cn(
+                          "h-7 rounded px-2.5 text-[11px] font-medium transition-colors",
+                          interval === item.id
+                            ? "bg-muted text-foreground shadow-sm"
+                            : "text-muted-foreground hover:text-foreground",
+                        )}
+                      >
+                        {item.label}
+                      </button>
+                    ))}
+                  </div>
+                  <TooltipProvider delayDuration={200}>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <button
+                          type="button"
+                          aria-pressed={chartsMerged}
+                          aria-label="Merge charts into one chart"
+                          onClick={() => setChartsMerged((current) => !current)}
+                          className={cn(
+                            "inline-flex size-8 items-center justify-center rounded-md border border-border/70 bg-background text-muted-foreground transition-colors hover:text-foreground",
+                            chartsMerged && "bg-muted text-foreground shadow-sm",
+                          )}
+                        >
+                          <GitMerge className="size-3.5" aria-hidden />
+                        </button>
+                      </TooltipTrigger>
+                      <TooltipContent side="bottom" className="text-xs">
+                        Merge charts into one chart
+                      </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
                 </div>
                 {marketCountdownLabel ? (
                   <p
@@ -2518,6 +2553,58 @@ export function HubPolymarketKalshiCompareDemo() {
                 ) : null}
               </div>
 
+              {chartsMerged ? (
+                <div className="flex flex-col overflow-hidden rounded-xl border border-border/70 bg-background">
+                  <div className="flex shrink-0 items-center gap-4 border-b border-border/50 px-3 py-2">
+                    <span className="inline-flex items-center gap-2">
+                      <span
+                        className="size-2.5 shrink-0 rounded-full"
+                        style={{ backgroundColor: POLYMARKET_BLUE }}
+                        aria-hidden
+                      />
+                      <p className="text-xs font-semibold text-foreground">Polymarket</p>
+                    </span>
+                    <span className="inline-flex items-center gap-2">
+                      <span
+                        className="size-2.5 shrink-0 rounded-full"
+                        style={{ backgroundColor: KALSHI_GREEN }}
+                        aria-hidden
+                      />
+                      <p className="text-xs font-semibold text-foreground">Kalshi</p>
+                    </span>
+                  </div>
+                  <div className="h-[26rem] min-h-0 w-full shrink-0 sm:h-[32rem]">
+                    <CompareChartBody
+                      pending={
+                        (polyChartPending || kalshiChartPending) &&
+                        polyFiltered.length === 0 &&
+                        kalshiFiltered.length === 0
+                      }
+                      hasData={polyFiltered.length > 0 || kalshiFiltered.length > 0}
+                      waitingMessage={
+                        polyMarket || selectedTicker
+                          ? "No chart at present"
+                          : "Pick markets above to plot this chart"
+                      }
+                    >
+                      <HubKalshiLiveDemoTradesLiveline
+                        series={mergedSeries}
+                        persistHistory
+                        fullHistory={interval === "6h" || interval === "1d" || interval === "all"}
+                        fill
+                        fixedValueDomain={{ min: 0, max: 100 }}
+                        formatValue={(v) => `${v.toFixed(1)}%`}
+                        parseRowValue={(row) => {
+                          const n = Number(row._probability_pct);
+                          return Number.isFinite(n) ? n : null;
+                        }}
+                        className="h-full min-h-0"
+                        emptyMessage="No chart at present"
+                      />
+                    </CompareChartBody>
+                  </div>
+                </div>
+              ) : (
               <div className="grid gap-3 sm:grid-cols-2">
                 <div className="flex flex-col overflow-hidden rounded-xl border border-border/70 bg-background">
                   <div className="flex shrink-0 items-center gap-2 border-b border-border/50 px-3 py-2">
@@ -2593,6 +2680,7 @@ export function HubPolymarketKalshiCompareDemo() {
                   </div>
                 </div>
               </div>
+              )}
 
               {divergence != null ? (
                 <p className="text-sm text-muted-foreground">
