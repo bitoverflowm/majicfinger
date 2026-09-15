@@ -2592,7 +2592,6 @@ export function HubPolymarketKalshiCompareDemo() {
                         persistHistory
                         fullHistory={interval === "6h" || interval === "1d" || interval === "all"}
                         fill
-                        fixedValueDomain={{ min: 0, max: 100 }}
                         formatValue={(v) => `${v.toFixed(1)}%`}
                         parseRowValue={(row) => {
                           const n = Number(row._probability_pct);

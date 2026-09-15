@@ -140,7 +140,7 @@ function renderSection(section: HubSection) {
 
 function CompareHero() {
   return (
-    <section id="compare" className="relative w-full scroll-mt-28 overflow-visible">
+    <section className="relative w-full overflow-visible">
       <div className="relative z-10 mx-auto flex w-full max-w-[73rem] flex-col items-center gap-6 px-6 pb-4 pt-32 md:gap-8 md:pb-6 md:pt-32">
         <p className="inline-flex h-8 max-w-full items-center gap-2 rounded-full border border-border bg-accent px-3 text-center text-sm text-foreground">
           <span className="relative flex h-2.5 w-2.5 shrink-0">
@@ -156,12 +156,15 @@ function CompareHero() {
           <p className="max-w-2xl text-balance text-base font-medium leading-relaxed tracking-tight text-muted-foreground md:text-lg">
             {copy.hero.description}
           </p>
-          <p className="text-sm font-medium text-foreground md:text-base">
-            {copy.hero.trustLine}
-          </p>
+          <div className="flex flex-col items-center gap-3 pt-1">
+            <HubCtaButton cta={copy.hero.compareCta} variant="primary" />
+            <p className="text-sm font-medium text-foreground md:text-base">
+              {copy.hero.trustLine}
+            </p>
+          </div>
         </div>
 
-        <div className="w-full max-w-[70rem]">
+        <div id="compare" className="w-full max-w-[70rem] scroll-mt-28">
           <KalshiVsPolymarketCompareTool />
         </div>
 

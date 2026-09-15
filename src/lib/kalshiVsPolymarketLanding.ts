@@ -31,6 +31,12 @@ export const kalshiVsPolymarketLanding = {
     title: "Compare Kalshi and Polymarket Odds in Real Time",
     description:
       "Search for an event in plain English or enter a market ticker. Find matching markets across Kalshi and Polymarket, then compare live odds, charts and trading activity in one view.",
+    compareCta: {
+      label: "Compare markets",
+      href: "#compare",
+      requiresAuth: false,
+      ariaLabel: "Scroll to the live Kalshi and Polymarket comparison",
+    } satisfies HubCta,
     trustLine: "Free to use. No signup required.",
     belowTool:
       "Want to monitor the situation your way? Create your own custom dashboard for the markets that matter to you.",
