@@ -3,6 +3,7 @@
 import dynamic from "next/dynamic";
 
 import { HubPolymarketLiveDemoProvider } from "@/components/hubs/polymarketLiveDemo/HubPolymarketLiveDemoSelection";
+import { HubPolymarketKalshiCompareDemoSkeleton } from "@/components/hubs/polymarketLiveDemo/HubPolymarketKalshiCompareDemoSkeleton";
 
 const HubPolymarketKalshiCompareDemo = dynamic(
   () =>
@@ -11,9 +12,7 @@ const HubPolymarketKalshiCompareDemo = dynamic(
     ),
   {
     ssr: false,
-    loading: () => (
-      <div className="h-[28rem] w-full animate-pulse rounded-xl bg-muted/40 ring-1 ring-border/50" />
-    ),
+    loading: () => <HubPolymarketKalshiCompareDemoSkeleton />,
   },
 );
 

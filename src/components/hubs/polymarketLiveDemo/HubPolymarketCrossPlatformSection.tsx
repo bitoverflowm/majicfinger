@@ -7,6 +7,7 @@ import { ArrowRightIcon } from "@radix-ui/react-icons";
 
 import { HubCtaButton } from "@/components/hubs/HubCtaButton";
 import { HubLazyWhenVisible } from "@/components/hubs/HubLazyWhenVisible";
+import { HubPolymarketKalshiCompareDemoSkeleton } from "@/components/hubs/polymarketLiveDemo/HubPolymarketKalshiCompareDemoSkeleton";
 import { INTEGRATION_LOGO_STRIP } from "@/lib/integrations/integration-logo-strip";
 import { PRIMARY_INTEGRATION_HUB_PATHS } from "@/lib/integrations/marketing-catalog";
 import { cn } from "@/lib/utils";
@@ -22,9 +23,7 @@ const HubPolymarketKalshiCompareDemo = dynamic(
     ),
   {
     ssr: false,
-    loading: () => (
-      <div className="h-[28rem] w-full animate-pulse rounded-xl bg-muted/40 ring-1 ring-border/50" />
-    ),
+    loading: () => <HubPolymarketKalshiCompareDemoSkeleton />,
   },
 );
 
@@ -184,9 +183,7 @@ export function HubPolymarketCrossPlatformSection({
 
           <HubLazyWhenVisible
             rootMargin="320px 0px"
-            fallback={
-              <div className="h-[28rem] w-full animate-pulse rounded-xl bg-muted/40 ring-1 ring-border/50" />
-            }
+            fallback={<HubPolymarketKalshiCompareDemoSkeleton />}
           >
             <div className="rounded-xl border border-border/70 bg-background/80 p-3 sm:p-4">
               <HubPolymarketKalshiCompareDemo />

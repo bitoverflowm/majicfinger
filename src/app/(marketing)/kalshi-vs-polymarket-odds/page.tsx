@@ -172,7 +172,6 @@ function CompareHero() {
             {copy.hero.belowTool}
           </p>
           <HubCtaButton cta={copy.hero.cta} variant="primary" />
-          <p className="text-sm text-muted-foreground">{copy.hero.ctaHelper}</p>
         </div>
       </div>
     </section>

@@ -37,8 +37,10 @@ import {
   isPolymarketPublicSearchEligible,
 } from "@/lib/polymarketLive/polymarketPublicSearch";
 import { cn } from "@/lib/utils";
-
-const COMPARE_FEATURED_LIMIT = 10;
+import {
+  COMPARE_FEATURED_LIMIT,
+  CompareFeaturedSkeletonList,
+} from "@/components/hubs/polymarketLiveDemo/HubPolymarketKalshiCompareDemoSkeleton";
 
 type CompareFeaturedCard = {
   id: string;
@@ -470,7 +472,7 @@ function CompareFeaturedTags({
   return (
     <div className="flex min-w-0 flex-nowrap items-center gap-1.5">
       {featured ? (
-        <span className="inline-flex shrink-0 items-center rounded bg-magenta-400 px-1.5 py-0.5 text-[10px] font-medium leading-none text-white">
+        <span className="inline-flex shrink-0 items-center rounded bg-fuchsia-500 px-1.5 py-0.5 text-[10px] font-medium leading-none text-white">
           Featured
         </span>
       ) : null}
@@ -551,26 +553,6 @@ function CompareMarketCard({
         </span>
       </div>
     </button>
-  );
-}
-
-function CompareFeaturedSkeletonList() {
-  return (
-    <div className="grid auto-rows-fr gap-1.5 p-2" aria-hidden>
-      {Array.from({ length: COMPARE_FEATURED_LIMIT }).map((_, index) => (
-        <div
-          key={index}
-          className="flex h-[4.75rem] animate-pulse items-center gap-2 rounded-md border border-border/60 bg-background/80 p-1.5"
-        >
-          <div className="size-11 shrink-0 rounded-md bg-muted" />
-          <div className="min-w-0 flex-1 space-y-1 py-0.5">
-            <div className="h-2.5 w-4/5 rounded bg-muted" />
-            <div className="h-2.5 w-2/3 rounded bg-muted" />
-            <div className="h-2.5 w-1/3 rounded bg-muted" />
-          </div>
-        </div>
-      ))}
-    </div>
   );
 }
 

@@ -40,8 +40,6 @@ export const kalshiVsPolymarketLanding = {
       requiresAuth: false,
       ariaLabel: "Open the free live dashboard preview",
     } satisfies HubCta,
-    ctaHelper:
-      "Opens a free dashboard preview. Saving requires a paid Lychee plan.",
   },
   bento: {
     id: "features",
