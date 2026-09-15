@@ -31,10 +31,10 @@ import {
   matchTierLabel,
   polymarketOutcomeShape,
 } from "@/lib/predictionMarkets/matchPolymarketToKalshiLive";
+import { findPolymarketLiveMatchesForKalshi } from "@/lib/predictionMarkets/matchKalshiToPolymarketLive";
 import { trackPolymarketLiveHubEvent } from "@/lib/analytics/polymarketLiveHubEvents";
 import {
   formatPolymarketVolume,
-  isPolymarketPublicSearchEligible,
 } from "@/lib/polymarketLive/polymarketPublicSearch";
 import { cn } from "@/lib/utils";
 import {
@@ -65,6 +65,7 @@ type CompareKalshiFeaturedCard = {
   status?: string;
   tags?: string[];
   eventTitle?: string;
+  seriesTicker?: string;
 };
 
 type PinnedKalshiFeatured = {
@@ -172,6 +173,7 @@ function normalizeCompareKalshiFeaturedCard(raw: unknown): CompareKalshiFeatured
     featured: row.featured === true,
     status: String(row.status || "").trim() || undefined,
     eventTitle: String(row.eventTitle || "").trim() || undefined,
+    seriesTicker: String(row.seriesTicker || "").trim().toUpperCase() || undefined,
     tags: Array.isArray(row.tags)
       ? row.tags.map((tag) => String(tag).trim()).filter(Boolean).slice(0, 4)
       : [],
@@ -461,58 +463,6 @@ async function fetchKalshiTrades(
     (row: unknown) => row && typeof row === "object",
   ) as Record<string, unknown>[];
 }
-
-async function fetchPolymarketMatchesForKalshi(
-  query: string,
-  signal: AbortSignal,
-): Promise<HubPolymarketLiveDemoMarket[]> {
-  const params = new URLSearchParams({
-    query: "metadataSuggestions",
-    q: query,
-    limit_per_type: "12",
-    search_tags: "true",
-    search_profiles: "false",
-    keep_closed_markets: "0",
-  });
-  const res = await fetch(`/api/integrations/polymarket?${params.toString()}`, {
-    credentials: "same-origin",
-    headers: { Accept: "application/json" },
-    signal,
-  });
-  const data = await res.json().catch(() => ({}));
-  if (!res.ok) {
-    throw new Error(
-      typeof data?.message === "string" ? data.message : "Polymarket search failed",
-    );
-  }
-  const list = Array.isArray(data?.suggestions) ? data.suggestions : [];
-  const markets: HubPolymarketLiveDemoMarket[] = [];
-  const seen = new Set<string>();
-  const push = (market: HubPolymarketLiveDemoMarket | null | undefined) => {
-    if (!market) return;
-    const key = polymarketRealtimeMarketKey(market);
-    if (!key || seen.has(key)) return;
-    seen.add(key);
-    markets.push(market);
-  };
-  for (const row of list) {
-    if (!row || typeof row !== "object") continue;
-    const item = row as Record<string, unknown>;
-    const entity = String(item.entity || "");
-    const closed = item.closed === true || item.closed === "true";
-    if (entity === "market" && !closed) {
-      push(polymarketRealtimeMarketFromSuggestion(item) as HubPolymarketLiveDemoMarket | null);
-    } else if (entity === "event") {
-      for (const nested of polymarketRealtimeMarketsFromEventSuggestion(
-        item,
-      ) as HubPolymarketLiveDemoMarket[]) {
-        push(nested);
-      }
-    }
-  }
-  return markets.slice(0, 6);
-}
-
 
 function CompareFeaturedTags({
   tags,
@@ -1007,7 +957,9 @@ export function HubPolymarketKalshiCompareDemo() {
   const [manualOpen, setManualOpen] = useState(false);
   const [manualTickers, setManualTickers] = useState("");
   const [kalshiAnchor, setKalshiAnchor] = useState<PinnedKalshiFeatured | null>(null);
-  const [polyCandidates, setPolyCandidates] = useState<HubPolymarketLiveDemoMarket[]>([]);
+  const [polyCandidates, setPolyCandidates] = useState<
+    Awaited<ReturnType<typeof findPolymarketLiveMatchesForKalshi>>["candidates"]
+  >([]);
 
   const [kalshiMarket, setKalshiMarket] = useState<Record<string, unknown> | null>(null);
   const [polyPoints, setPolyPoints] = useState<Record<string, unknown>[]>([]);
@@ -1081,41 +1033,38 @@ export function HubPolymarketKalshiCompareDemo() {
       setSeriesError(null);
       setMarkets?.([]);
 
-      const query = card.title.trim();
-      if (!isPolymarketPublicSearchEligible(query)) {
-        setMatchLoading(false);
-        setEmptyMessage(
-          "That Kalshi market does not have a title we can search on Polymarket.",
-        );
-        setManualOpen(true);
-        return;
-      }
-
       trackPolymarketLiveHubEvent("polymarket_kalshi_compare_attempt", {
-        query,
+        query: card.title,
         candidateCount: 0,
         hasPreselected: false,
         origin: "kalshi",
       });
 
-      void fetchPolymarketMatchesForKalshi(query, ac.signal)
-        .then((matches) => {
+      void findPolymarketLiveMatchesForKalshi(
+        {
+          ticker: card.ticker,
+          seriesTicker: card.seriesTicker,
+          title: card.title,
+          eventTitle: card.eventTitle,
+          tags: card.tags,
+        },
+        { signal: ac.signal },
+      )
+        .then((result) => {
           if (ac.signal.aborted) return;
-          setPolyCandidates(matches);
-          if (!matches.length) {
-            setEmptyMessage(
-              "Couldn’t find a Polymarket market for that Kalshi contract. Search Polymarket manually, or try another Kalshi market.",
-            );
-            setManualOpen(true);
-            return;
-          }
+          setPolyCandidates(result.candidates);
+          setEmptyMessage(result.emptyMessage);
+          if (!result.candidates.length) setManualOpen(true);
           trackPolymarketLiveHubEvent("polymarket_kalshi_compare_match", {
             ticker: card.ticker,
-            auto: matches.length === 1,
+            auto: Boolean(result.preselected),
             origin: "kalshi",
-            candidateCount: matches.length,
+            candidateCount: result.candidates.length,
+            query: result.query,
           });
-          if (matches.length === 1 && matches[0]) applyPolyMatch(matches[0]);
+          if (result.preselected?.market) {
+            applyPolyMatch(result.preselected.market as HubPolymarketLiveDemoMarket);
+          }
         })
         .catch((err) => {
           if (ac.signal.aborted || (err instanceof DOMException && err.name === "AbortError")) {
@@ -1582,17 +1531,18 @@ export function HubPolymarketKalshiCompareDemo() {
             <div className="space-y-2">
               <p className="text-xs font-medium text-muted-foreground">
                 {selectedPolyKey &&
-                polyCandidates.some((item) => polymarketRealtimeMarketKey(item) === selectedPolyKey)
-                  ? polyCandidates.length === 1
-                    ? "Matched Polymarket market"
-                    : "Select the correct Polymarket market"
+                polyCandidates.some(
+                  (item) => polymarketRealtimeMarketKey(item.market) === selectedPolyKey,
+                )
+                  ? "Matched Polymarket market"
                   : "Select the correct Polymarket market"}
               </p>
               <div className="grid gap-2">
                 {polyCandidates.map((candidate) => {
-                  const key = polymarketRealtimeMarketKey(candidate);
+                  const market = candidate.market as HubPolymarketLiveDemoMarket;
+                  const key = polymarketRealtimeMarketKey(market);
                   const selected = Boolean(key) && key === selectedPolyKey;
-                  const volume = formatPolymarketVolume(candidate.volume24h);
+                  const volume = formatPolymarketVolume(market.volume24h);
                   return (
                     <label
                       key={key}
@@ -1608,11 +1558,25 @@ export function HubPolymarketKalshiCompareDemo() {
                         name="polymarket-match"
                         className="mt-1 size-4 accent-secondary"
                         checked={selected}
-                        onChange={() => applyPolyMatch(candidate)}
+                        onChange={() => applyPolyMatch(market)}
                       />
                       <span className="min-w-0 flex-1">
-                        <span className="text-sm font-medium text-foreground">
-                          {String(candidate.title || candidate.slug || "Market")}
+                        <span className="flex flex-wrap items-center gap-2">
+                          <span className="text-sm font-medium text-foreground">
+                            {String(market.title || market.slug || "Market")}
+                          </span>
+                          <span
+                            className={cn(
+                              "rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide",
+                              candidate.tier === "exact"
+                                ? "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300"
+                                : candidate.tier === "close"
+                                  ? "bg-sky-500/15 text-sky-700 dark:text-sky-300"
+                                  : "bg-amber-500/15 text-amber-700 dark:text-amber-300",
+                            )}
+                          >
+                            {matchTierLabel(candidate.tier)}
+                          </span>
                         </span>
                         <span className="mt-0.5 block text-[10px] text-muted-foreground">
                           {volume ? `24h vol ${volume}` : "Polymarket"}

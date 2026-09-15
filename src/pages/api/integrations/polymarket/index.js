@@ -17,6 +17,7 @@ const CLOB_BASE = polymarketApiBase("POLYMARKET_CLOB_API_URL", "https://clob.pol
 const EVENTS_PARAMS = [
   "limit", "offset", "order", "ascending",
   "id", "tag_id", "exclude_tag_id", "slug", "tag_slug", "related_tags",
+  "series_id", "series_slug",
   "active", "archived", "featured", "cyom", "include_chat", "include_template",
   "recurrence", "closed", "liquidity_min", "liquidity_max", "volume_min", "volume_max",
   "start_date_min", "start_date_max", "end_date_min", "end_date_max",
