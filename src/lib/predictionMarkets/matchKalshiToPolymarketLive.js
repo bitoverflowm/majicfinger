@@ -163,7 +163,10 @@ export function preferredKalshiSearchText(kalshi) {
   const eventTitle = str(kalshi?.eventTitle);
   const parts = title.split(/\s+[—–]\s+/);
   if (parts.length > 1) {
+    const eventPart = str(parts[0]);
     const marketPart = str(parts[parts.length - 1]);
+    // "Ito vs Knutson — Gabriela Knutson wins" → search the matchup, not only the YES player.
+    if (/\bvs\.?\b/i.test(eventPart) && eventPart.length >= 6) return eventPart;
     if (marketPart.length >= 12) return marketPart;
   }
   return eventTitle || title;
@@ -207,7 +210,18 @@ export function polymarketMatchQueriesFromKalshi(kalshi) {
     queries.push(next);
   };
   push(pattern);
-  if (!pattern) push(cleanKalshiTextForPolymarketSearch(preferredKalshiSearchText(source)));
+  if (!pattern) {
+    push(cleanKalshiTextForPolymarketSearch(preferredKalshiSearchText(source)));
+    const title = str(source.title);
+    const parts = title.split(/\s+[—–]\s+/);
+    if (parts.length > 1) {
+      push(cleanKalshiTextForPolymarketSearch(parts[0]));
+      push(cleanKalshiTextForPolymarketSearch(parts[parts.length - 1]));
+    }
+    if (source.eventTitle && str(source.eventTitle) !== title) {
+      push(cleanKalshiTextForPolymarketSearch(source.eventTitle));
+    }
+  }
   return queries;
 }
 
@@ -374,6 +388,20 @@ export function scoreKalshiToPolymarketPair(kalshi, polymarket, opts = {}) {
   if (overlap >= 0.4) reasons.push("Strong title overlap");
   else if (overlap >= 0.2) reasons.push("Partial title overlap");
 
+  const nameTokens = (tokens) =>
+    tokens.filter((token) => token.length >= 3 && !/^(yes|no|win|wins|will|the|and|vs)$/.test(token));
+  const kalshiNames = new Set(nameTokens(kalshiTokens));
+  const polyNames = nameTokens(polyTokens);
+  let nameHits = 0;
+  for (const token of polyNames) if (kalshiNames.has(token)) nameHits += 1;
+  if (nameHits >= 2) {
+    score += 0.28;
+    reasons.push("Matching names in both titles");
+  } else if (nameHits === 1) {
+    score += 0.1;
+    reasons.push("Shared name token");
+  }
+
   const inferred = inferKalshiAssetHorizon(source);
   const polyHorizon = polymarketHorizonFromSlug(str(market.slug), str(market.title) || str(market.eventTitle));
   const pBlob = polyHay.toLowerCase();
@@ -436,7 +464,7 @@ export function scoreKalshiToPolymarketPair(kalshi, polymarket, opts = {}) {
   const sameHorizon = Boolean(inferred.horizon && polyHorizon && inferred.horizon === polyHorizon);
   if (score >= 0.72 && (!inferred.horizon || sameHorizon)) tier = "exact";
   else if (score >= 0.48) tier = "close";
-  else if (score >= 0.26) tier = "related";
+  else if (score >= 0.18) tier = "related";
 
   return { market, score, tier, reasons };
 }
@@ -620,7 +648,7 @@ export async function findPolymarketLiveMatchesForKalshi(kalshi, opts = {}) {
   }
 
   if (!merged.length) {
-    for (const q of queries.slice(0, 2)) {
+    for (const q of queries.slice(0, 3)) {
       const body = await fetchSuggestions(q, opts.signal);
       for (const market of flattenPolymarketSuggestionsToMarkets(body?.suggestions)) {
         pushMarket(market);

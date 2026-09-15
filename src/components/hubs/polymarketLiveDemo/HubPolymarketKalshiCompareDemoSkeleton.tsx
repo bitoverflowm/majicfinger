@@ -51,16 +51,19 @@ function CompareFeaturedColumnSkeleton({ label }: { label: string }) {
 
 export function HubPolymarketKalshiCompareDemoSkeleton() {
   return (
-    <div className="space-y-5" aria-busy="true" aria-live="polite">
+    <div
+      className="overflow-hidden rounded-xl border border-border/70 bg-muted/15 px-4 py-5 sm:px-5 sm:py-6"
+      aria-busy="true"
+      aria-live="polite"
+    >
       <span className="sr-only">Loading comparison markets</span>
-      <div className="rounded-xl border border-border/70 bg-muted/15 px-4 py-5 sm:px-5 sm:py-6">
-        <div className="space-y-3 text-left">
+      <div className="space-y-3 text-left">
           <div className="space-y-1 text-center">
             <p className="text-sm font-medium text-foreground">
               Find a Polymarket market to compare with Kalshi Live
             </p>
             <p className="text-sm text-muted-foreground">
-              Search in plain English, then we&apos;ll match it against Kalshi.
+              Search by name or ticker, then we&apos;ll match it against Kalshi.
             </p>
           </div>
           <div className="relative mx-auto w-full max-w-2xl">
@@ -70,7 +73,7 @@ export function HubPolymarketKalshiCompareDemoSkeleton() {
             />
             <div className="flex h-9 w-full items-center rounded-lg border border-border bg-background py-2 pl-9 pr-3">
               <span className="text-xs text-muted-foreground">
-                Search Polymarket markets in plain English…
+                Search Polymarket by name or ticker…
               </span>
             </div>
           </div>
@@ -84,7 +87,6 @@ export function HubPolymarketKalshiCompareDemoSkeleton() {
             </div>
           </div>
         </div>
-      </div>
     </div>
   );
 }

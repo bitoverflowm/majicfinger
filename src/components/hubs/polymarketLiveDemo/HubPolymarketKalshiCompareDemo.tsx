@@ -2,15 +2,11 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import Link from "next/link";
-import { Loader2, RefreshCw, Search, Undo2 } from "lucide-react";
+import { Loader2, RefreshCw, Undo2 } from "lucide-react";
 
 import { PolymarketLiveSearch } from "@/components/connectData/polymarketLive/PolymarketLiveSearch";
 import { MarketTickerSearch } from "@/components/connectData/MarketTickerSearch";
 import { HubKalshiLiveDemoTradesLiveline } from "@/components/hubs/kalshiLiveDemo/HubKalshiLiveDemoTradesLiveline";
-import {
-  defaultSeriesColorToken,
-  resolveDemoChartColor,
-} from "@/components/hubs/kalshiLiveDemo/demoChartColors";
 import {
   featuredPolymarketMarketToDemoMarket,
   useHubPolymarketLiveDemo,
@@ -22,6 +18,14 @@ import {
   polymarketRealtimeMarketsFromEventSuggestion,
 } from "@/lib/polymarketLive/polymarketRealtimeCompose";
 import { Button } from "@/components/ui/button";
+import {
+  Card,
+  CardAction,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import { fetchKalshiLiveMarket } from "@/lib/kalshiLive/fetchKalshiLiveMarket";
 import { impliedChancePctFromMarketRow } from "@/lib/kalshiLive/eventCandlesticksPowerMove";
 import { openPolymarketLastTradeSocket } from "@/lib/polymarketLive/openPolymarketMarketSocket";
@@ -71,6 +75,12 @@ type CompareKalshiFeaturedCard = {
 type PinnedKalshiFeatured = {
   ticker: string;
   title: string;
+  eventTitle?: string;
+  seriesTicker?: string;
+  lastPriceDollars?: number | null;
+  volume24h?: number | null;
+  status?: string;
+  tags?: string[];
 };
 
 function compareFeaturedKey(market: CompareFeaturedCard) {
@@ -182,8 +192,10 @@ function normalizeCompareKalshiFeaturedCard(raw: unknown): CompareKalshiFeatured
 
 type IntervalId = "15m" | "1h" | "6h" | "1d" | "all";
 
-/** Kalshi brand-forward green for the comparison line. */
-const KALSHI_LINE_GREEN = "#22c55e";
+/** Kalshi brand green / Polymarket brand blue for compare chrome and charts. */
+const KALSHI_GREEN = "#28CC95";
+const POLYMARKET_BLUE = "#2E5CFF";
+const KALSHI_LINE_GREEN = KALSHI_GREEN;
 const INTERVALS: { id: IntervalId; label: "15m" | "1h" | "6h" | "1d" | "All"; ms: number | null }[] = [
   { id: "15m", label: "15m", ms: 15 * 60 * 1000 },
   { id: "1h", label: "1h", ms: 60 * 60 * 1000 },
@@ -326,6 +338,130 @@ function toPctPoint(row: Record<string, unknown>, platform: string): Record<stri
 function formatPct(value: number | null | undefined): string {
   if (value == null || !Number.isFinite(value)) return "—";
   return `${value.toFixed(1)}%`;
+}
+
+function formatMatchScore(score: number | null | undefined): string {
+  if (score == null || !Number.isFinite(score)) return "—";
+  return `${Math.round(Math.max(0, Math.min(1, score)) * 100)}% match`;
+}
+
+type YesNoLabels = {
+  yes: string;
+  no: string;
+  named: boolean;
+};
+
+function polymarketYesNoLabels(market: Record<string, unknown> | null | undefined): YesNoLabels {
+  const pairs = Array.isArray(market?.outcomePairs)
+    ? (market?.outcomePairs as Array<{ outcome?: string }>)
+        .map((row) => String(row?.outcome || "").trim())
+        .filter(Boolean)
+    : [];
+  const outcomes = Array.isArray(market?.outcomes)
+    ? market.outcomes.map((row) => String(row || "").trim()).filter(Boolean)
+    : [];
+  const labels = pairs.length ? pairs : outcomes;
+  const yesIdx = labels.findIndex((label) => label.toLowerCase() === "yes");
+  const noIdx = labels.findIndex((label) => label.toLowerCase() === "no");
+  if (yesIdx >= 0 && noIdx >= 0) {
+    return { yes: labels[yesIdx] || "Yes", no: labels[noIdx] || "No", named: false };
+  }
+  if (labels.length >= 2) {
+    return { yes: labels[0]!, no: labels[1]!, named: true };
+  }
+  if (labels.length === 1) {
+    return { yes: labels[0]!, no: `Not ${labels[0]}`, named: true };
+  }
+  return { yes: "Yes", no: "No", named: false };
+}
+
+function opponentFromVsTitle(title: string, yesName: string): string {
+  const vs = title.match(/(.+?)\s+vs\.?\s+(.+?)(?:\s+[—–-]|$)/i);
+  if (!vs) return "";
+  const left = String(vs[1] || "").trim();
+  const right = String(vs[2] || "").trim();
+  const yesKey = yesName.toLowerCase();
+  const leftKey = left.toLowerCase();
+  const rightKey = right.toLowerCase();
+  if (rightKey && (yesKey.includes(rightKey) || rightKey.includes(yesKey))) return left;
+  if (leftKey && (yesKey.includes(leftKey) || leftKey.includes(yesKey))) return right;
+  return "";
+}
+
+function isKalshiStrikeSubtitle(text: string): boolean {
+  const value = text.trim();
+  if (!value) return false;
+  return (
+    /target\s*price|strike|^\$?\d[\d,]*(?:\.\d+)?$/i.test(value) ||
+    /^tbd$/i.test(value)
+  );
+}
+
+function kalshiYesNoLabels(
+  market: Record<string, unknown> | null | undefined,
+  fallbackTitle?: string,
+): YesNoLabels {
+  const yesSubRaw = String(
+    market?.yes_sub_title || market?.yes_subtitle || market?.yesSubtitle || "",
+  ).trim();
+  const noSubRaw = String(
+    market?.no_sub_title || market?.no_subtitle || market?.noSubtitle || "",
+  ).trim();
+  const yesSub = isKalshiStrikeSubtitle(yesSubRaw) ? "" : yesSubRaw;
+  const noSub = isKalshiStrikeSubtitle(noSubRaw) ? "" : noSubRaw;
+  const title = String(market?.title || fallbackTitle || "").trim();
+  const distinctNo = noSub && noSub.toLowerCase() !== yesSub.toLowerCase() ? noSub : "";
+  if (yesSub) {
+    const vsNo =
+      opponentFromVsTitle(title, yesSub) || opponentFromVsTitle(fallbackTitle || "", yesSub);
+    return {
+      yes: yesSub,
+      no: distinctNo || (vsNo ? `${vsNo} wins` : `Not: ${yesSub}`),
+      named: true,
+    };
+  }
+  if (title) {
+    const parts = title.split(/\s[—–-]\s/).map((part) => part.trim()).filter(Boolean);
+    const yesFromTitle = (parts.length > 1 ? parts[parts.length - 1] : title).replace(/\?\s*$/, "");
+    if (/\?$/.test(title) || /\bup\b|\bdown\b/i.test(yesFromTitle)) {
+      const noFromUp = yesFromTitle.replace(/\bup\b/i, "down");
+      return {
+        yes: yesFromTitle,
+        no: noFromUp !== yesFromTitle ? noFromUp : "No",
+        named: true,
+      };
+    }
+    const noFromWin = yesFromTitle.replace(/\bwins?\??$/i, "does not win");
+    return {
+      yes: yesFromTitle,
+      no: noFromWin !== yesFromTitle ? noFromWin : `No — ${yesFromTitle}`,
+      named: !/^(yes|no)$/i.test(yesFromTitle),
+    };
+  }
+  return { yes: "Yes", no: "No", named: false };
+}
+
+function outcomeCompareKey(label: string): string {
+  return label
+    .toLowerCase()
+    .replace(/[^a-z0-9\s]/g, " ")
+    .replace(/\b(wins?|will|the|a|an|yes|no|price|up|down)\b/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function yesOutcomesLikelySame(parentYes: string, childYes: string): boolean {
+  const parent = outcomeCompareKey(parentYes);
+  const child = outcomeCompareKey(childYes);
+  if (!parent || !child) return true;
+  if (parent === child) return true;
+  if (parent.includes(child) || child.includes(parent)) return true;
+  const parentTokens = new Set(parent.split(" ").filter((token) => token.length > 2));
+  const childTokens = new Set(child.split(" ").filter((token) => token.length > 2));
+  if (!parentTokens.size || !childTokens.size) return true;
+  let overlap = 0;
+  for (const token of parentTokens) if (childTokens.has(token)) overlap += 1;
+  return overlap > 0;
 }
 
 function formatAgo(iso: string | null): string {
@@ -820,7 +956,7 @@ function ComparePolymarketMarketSearch({
           Find a Polymarket market to compare with Kalshi Live
         </p>
         <p className="text-sm text-muted-foreground">
-          Search in plain English, then we&apos;ll match it against Kalshi.
+          Search by name or ticker, then we&apos;ll match it against Kalshi.
         </p>
       </div>
       <PolymarketLiveSearch
@@ -832,7 +968,7 @@ function ComparePolymarketMarketSearch({
         limitPerType={50}
         className="mx-auto w-full max-w-2xl"
         resultsClassName="max-h-56 flex-none"
-        placeholder="Search Polymarket markets in plain English…"
+        placeholder="Search Polymarket by name or ticker…"
         onSelect={handleSearchSelection}
         onSubmitAll={handleSearchAll}
         onFocus={() => {
@@ -939,6 +1075,101 @@ function ComparePolymarketMarketSearch({
   );
 }
 
+function CompareCounterpartSearch({
+  matchFromKalshi,
+  hasMatches,
+  onPolySelect,
+  onKalshiSelect,
+}: {
+  matchFromKalshi: boolean;
+  hasMatches: boolean;
+  onPolySelect: (market: HubPolymarketLiveDemoMarket) => void;
+  onKalshiSelect: (ticker: string, title: string) => void;
+}) {
+  const [manualTickers, setManualTickers] = useState("");
+  const counterpart = matchFromKalshi ? "Polymarket" : "Kalshi";
+  return (
+    <div className="space-y-2">
+      <p className="text-xs font-medium text-muted-foreground">
+        {hasMatches
+          ? `None of these? Search ${counterpart} by name or ticker`
+          : `Search ${counterpart} by name or ticker`}
+      </p>
+      {matchFromKalshi ? (
+        <PolymarketLiveSearch
+          layout="panel"
+          dismissAfterSelect
+          searchTags
+          searchProfiles={false}
+          keepClosedMarkets={false}
+          limitPerType={50}
+          className="w-full"
+          resultsClassName="max-h-56 flex-none"
+          placeholder="Search Polymarket by name or ticker…"
+          onSelect={(suggestion) => {
+            const entity = String(suggestion?.entity || "");
+            if (entity === "event") {
+              const nested = polymarketRealtimeMarketsFromEventSuggestion(
+                suggestion,
+              ) as HubPolymarketLiveDemoMarket[];
+              if (nested[0]) onPolySelect(nested[0]);
+              return;
+            }
+            if (entity !== "market") return;
+            const market = polymarketRealtimeMarketFromSuggestion(suggestion) as
+              | HubPolymarketLiveDemoMarket
+              | null;
+            if (market) onPolySelect(market);
+          }}
+          onSubmitAll={(suggestions) => {
+            for (const suggestion of suggestions || []) {
+              if (suggestion?.entity === "market") {
+                const market = polymarketRealtimeMarketFromSuggestion(suggestion) as
+                  | HubPolymarketLiveDemoMarket
+                  | null;
+                if (market) {
+                  onPolySelect(market);
+                  return;
+                }
+              }
+            }
+            for (const suggestion of suggestions || []) {
+              if (suggestion?.entity === "event") {
+                const nested = polymarketRealtimeMarketsFromEventSuggestion(
+                  suggestion,
+                ) as HubPolymarketLiveDemoMarket[];
+                if (nested[0]) {
+                  onPolySelect(nested[0]);
+                  return;
+                }
+              }
+            }
+          }}
+        />
+      ) : (
+        <MarketTickerSearch
+          value={manualTickers}
+          onChange={setManualTickers}
+          onSelectionsChange={(selections) => {
+            const s = selections?.[0];
+            const ticker = String(s?.ticker || "").trim().toUpperCase();
+            if (!ticker) return;
+            onKalshiSelect(ticker, String(s?.title || ticker));
+          }}
+          maxTickers={1}
+          dataSource="live"
+          searchScope="markets"
+          showCutoffNotes={false}
+          showHelperText={false}
+          required={false}
+          placeholder="Search Kalshi by name or ticker…"
+          className="w-full"
+        />
+      )}
+    </div>
+  );
+}
+
 export function HubPolymarketKalshiCompareDemo() {
   const selection = useHubPolymarketLiveDemo();
   const polyMarket = selection?.markets?.[0] || null;
@@ -954,8 +1185,6 @@ export function HubPolymarketKalshiCompareDemo() {
   >([]);
   const [selectedTicker, setSelectedTicker] = useState<string>("");
   const [emptyMessage, setEmptyMessage] = useState<string | null>(null);
-  const [manualOpen, setManualOpen] = useState(false);
-  const [manualTickers, setManualTickers] = useState("");
   const [kalshiAnchor, setKalshiAnchor] = useState<PinnedKalshiFeatured | null>(null);
   const [polyCandidates, setPolyCandidates] = useState<
     Awaited<ReturnType<typeof findPolymarketLiveMatchesForKalshi>>["candidates"]
@@ -992,8 +1221,6 @@ export function HubPolymarketKalshiCompareDemo() {
     setPolyCandidates([]);
     setSelectedTicker("");
     setEmptyMessage(null);
-    setManualOpen(false);
-    setManualTickers("");
     setKalshiMarket(null);
     setPolyPoints([]);
     setKalshiPoints([]);
@@ -1012,6 +1239,7 @@ export function HubPolymarketKalshiCompareDemo() {
         title: String(market.title || ""),
         conditionId: String(market.conditionId || market.id || ""),
       });
+      setEmptyMessage(null);
       setMarkets([market]);
     },
     [setMarkets],
@@ -1022,14 +1250,22 @@ export function HubPolymarketKalshiCompareDemo() {
       matchAbort.current?.abort();
       const ac = new AbortController();
       matchAbort.current = ac;
-      setKalshiAnchor({ ticker: card.ticker, title: card.title });
+      setKalshiAnchor({
+        ticker: card.ticker,
+        title: card.title,
+        eventTitle: card.eventTitle,
+        seriesTicker: card.seriesTicker,
+        lastPriceDollars: card.lastPriceDollars,
+        volume24h: card.volume24h,
+        status: card.status,
+        tags: card.tags,
+      });
       setSelectedTicker(card.ticker);
       setCandidates([]);
       setPolyCandidates([]);
       setMatchLoading(true);
       setMatchError(null);
       setEmptyMessage(null);
-      setManualOpen(false);
       setSeriesError(null);
       setMarkets?.([]);
 
@@ -1054,7 +1290,6 @@ export function HubPolymarketKalshiCompareDemo() {
           if (ac.signal.aborted) return;
           setPolyCandidates(result.candidates);
           setEmptyMessage(result.emptyMessage);
-          if (!result.candidates.length) setManualOpen(true);
           trackPolymarketLiveHubEvent("polymarket_kalshi_compare_match", {
             ticker: card.ticker,
             auto: Boolean(result.preselected),
@@ -1077,7 +1312,6 @@ export function HubPolymarketKalshiCompareDemo() {
             ),
           );
           setPolyCandidates([]);
-          setManualOpen(true);
         })
         .finally(() => {
           if (!ac.signal.aborted) setMatchLoading(false);
@@ -1126,7 +1360,6 @@ export function HubPolymarketKalshiCompareDemo() {
     setSelectedTicker("");
     setKalshiMarket(null);
     setKalshiPoints([]);
-    setManualOpen(false);
     setSeriesError(null);
 
     void findKalshiLiveMatchesForPolymarket(polyMarket, { signal: ac.signal })
@@ -1139,7 +1372,6 @@ export function HubPolymarketKalshiCompareDemo() {
         });
         setCandidates(result.candidates);
         setEmptyMessage(result.emptyMessage);
-        if (!result.candidates.length) setManualOpen(true);
         if (result.preselected) {
           trackPolymarketLiveHubEvent("polymarket_kalshi_compare_match", {
             tier: result.preselected.tier,
@@ -1162,7 +1394,6 @@ export function HubPolymarketKalshiCompareDemo() {
           humanizeMatchError(err instanceof Error ? err.message : "Match search failed"),
         );
         setCandidates([]);
-        setManualOpen(true);
       })
       .finally(() => {
         if (!ac.signal.aborted) setMatchLoading(false);
@@ -1248,7 +1479,6 @@ export function HubPolymarketKalshiCompareDemo() {
       .catch((err) => {
         if (ac.signal.aborted || (err instanceof DOMException && err.name === "AbortError")) return;
         setSeriesError(humanizeSeriesError(err));
-        setManualOpen(true);
       })
       .finally(() => {
         if (!ac.signal.aborted) setKalshiLoading(false);
@@ -1353,8 +1583,7 @@ export function HubPolymarketKalshiCompareDemo() {
       {
         id: "polymarket",
         label: "Polymarket",
-        colorToken: defaultSeriesColorToken(0),
-        color: resolveDemoChartColor(defaultSeriesColorToken(0)),
+        color: POLYMARKET_BLUE,
         trades: polyFiltered,
       },
     ],
@@ -1413,399 +1642,419 @@ export function HubPolymarketKalshiCompareDemo() {
   const polyFieldsPending = !polyMarket || (polyLoading && polyYesPct == null);
   const matchFromKalshi = Boolean(kalshiAnchor);
   const selectedPolyKey = polyMarket ? polymarketRealtimeMarketKey(polyMarket) : "";
-  const counterpartName = matchFromKalshi ? "Polymarket" : "Kalshi";
-  const manualSearchLabel = `Search ${counterpartName} manually`;
+  const parentYesNo = matchFromKalshi
+    ? kalshiYesNoLabels(
+        {
+          ...(kalshiMarket || {}),
+          yesSubtitle: selectedCandidate?.market.yesSubtitle,
+          noSubtitle: selectedCandidate?.market.noSubtitle,
+          title: kalshiMarket?.title || kalshiAnchor?.title,
+        },
+        kalshiAnchor?.title,
+      )
+    : polymarketYesNoLabels(polyMarket);
+  const parentYesPct = matchFromKalshi
+    ? kalshiYesPct ??
+      (kalshiAnchor?.lastPriceDollars != null && Number.isFinite(kalshiAnchor.lastPriceDollars)
+        ? kalshiAnchor.lastPriceDollars * 100
+        : null)
+    : polyYesPct;
+  const parentTitle = matchFromKalshi
+    ? kalshiAnchor?.title || selectedTicker || "Market"
+    : String(polyMarket?.title || polyMarket?.slug || "Market");
+  const parentMeta = matchFromKalshi
+    ? [kalshiAnchor?.ticker || selectedTicker, kalshiAnchor?.status || kalshiMarket?.status]
+        .map((value) => String(value || "").trim())
+        .filter(Boolean)
+        .join(" · ")
+    : [String(polyMarket?.slug || ""), polyMarket?.closed ? "Closed" : polyMarket ? "Live" : ""]
+        .map((value) => String(value || "").trim())
+        .filter(Boolean)
+        .join(" · ");
+  const polyMatchList = polyCandidates.slice(0, 3);
+  const kalshiMatchList = candidates.slice(0, 3);
+  const showEmptyMatchNote =
+    !matchLoading &&
+    !matchError &&
+    ((matchFromKalshi && polyMatchList.length === 0) ||
+      (!matchFromKalshi && kalshiMatchList.length === 0));
 
   return (
-    <div ref={rootRef} className="space-y-5">
-      {!polyMarket && !kalshiAnchor ? (
-        <div className="rounded-xl border border-border/70 bg-muted/15 px-4 py-5 sm:px-5 sm:py-6">
-          <ComparePolymarketMarketSearch
-            onSelectKalshiFeatured={startFromKalshi}
-            kalshiPickLoading={matchLoading}
-          />
-        </div>
-      ) : (
-        <>
-          <div className="flex items-start justify-between gap-3 rounded-xl border border-border/60 bg-muted/10 px-3 py-2.5 text-sm">
-            <div className="min-w-0">
-              {matchFromKalshi ? (
-                <>
-                  <span className="text-muted-foreground">Kalshi selected: </span>
-                  <span className="font-medium text-foreground">
-                    {kalshiAnchor?.title || selectedTicker || "Market"}
-                  </span>
-                </>
-              ) : (
-                <>
-                  <span className="text-muted-foreground">Polymarket selected: </span>
-                  <span className="font-medium text-foreground">
-                    {String(polyMarket?.title || polyMarket?.slug || "Market")}
-                  </span>
-                </>
+    <div ref={rootRef}>
+      <Card className="overflow-hidden rounded-xl border-border/70 bg-muted/15 text-foreground shadow-none dark:border-border/70 dark:bg-muted/10 dark:text-foreground">
+        {!polyMarket && !kalshiAnchor ? (
+          <CardContent className="px-4 py-5 sm:px-5 sm:py-6">
+            <ComparePolymarketMarketSearch
+              onSelectKalshiFeatured={startFromKalshi}
+              kalshiPickLoading={matchLoading}
+            />
+          </CardContent>
+        ) : (
+          <>
+            <CardHeader
+              className={cn(
+                "border-b p-4 text-white sm:px-5",
+                matchFromKalshi ? "bg-[#28CC95]" : "bg-[#2E5CFF]",
               )}
-              {polyMarket && !shape.isBinary ? (
-                <p className="mt-1 text-[11px] text-amber-600 dark:text-amber-400">
-                  Multi-outcome market — comparison uses the YES (or first) outcome only.
-                </p>
-              ) : null}
-            </div>
-            <Button
-              type="button"
-              size="sm"
-              variant="ghost"
-              className="h-8 shrink-0 gap-1.5 px-2 text-xs"
-              onClick={startOver}
             >
-              <Undo2 className="size-3.5" aria-hidden />
-              Start over
-            </Button>
-          </div>
-
-          {matchLoading ? (
-            <div className="flex items-center gap-2 text-sm text-muted-foreground">
-              <Loader2 className="size-4 animate-spin" aria-hidden />
-              {matchFromKalshi
-                ? "Searching Polymarket for comparable markets…"
-                : "Searching Kalshi Live for comparable markets…"}
-            </div>
-          ) : null}
-
-          {matchError ? (
-            <div className="space-y-3 rounded-xl border border-border/70 bg-muted/15 px-4 py-4">
-              <p className="text-sm text-destructive">{matchError}</p>
-              <div className="flex flex-wrap gap-2">
+              <CardTitle className="text-base text-white">
+                Parent market · {matchFromKalshi ? "Kalshi" : "Polymarket"}
+              </CardTitle>
+              <CardDescription className="text-white/85">
+                <span className="block font-medium text-white">{parentTitle}</span>
+                {parentMeta ? <span className="mt-0.5 block font-mono text-[11px]">{parentMeta}</span> : null}
+                <span className="mt-1.5 block">
+                  YES = {parentYesNo.yes}
+                  {parentYesPct != null ? ` · ${formatPct(parentYesPct)}` : ""}
+                </span>
+                <span className="block">
+                  NO = {parentYesNo.no}
+                  {parentYesPct != null ? ` · ${formatPct(100 - parentYesPct)}` : ""}
+                </span>
+              </CardDescription>
+              <CardAction>
                 <Button
                   type="button"
                   size="sm"
-                  variant="outline"
-                  className="gap-1.5"
+                  variant="ghost"
+                  className="h-8 gap-1.5 px-2 text-xs text-white hover:bg-white/15 hover:text-white"
                   onClick={startOver}
                 >
                   <Undo2 className="size-3.5" aria-hidden />
                   Start over
                 </Button>
-                <Button
-                  type="button"
-                  size="sm"
-                  variant="outline"
-                  className="gap-1.5"
-                  onClick={() => setManualOpen(true)}
-                >
-                  <Search className="size-3.5" aria-hidden />
-                  {manualSearchLabel}
-                </Button>
-              </div>
-            </div>
-          ) : null}
+              </CardAction>
+            </CardHeader>
+            <CardContent className="space-y-5 px-4 py-4 sm:px-5 sm:py-5">
+              {matchLoading ? (
+                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <Loader2 className="size-4 animate-spin" aria-hidden />
+                  {matchFromKalshi
+                    ? "Searching Polymarket for comparable markets…"
+                    : "Searching Kalshi Live for comparable markets…"}
+                </div>
+              ) : null}
 
-          {emptyMessage && !matchLoading && !matchError ? (
-            <div className="space-y-3 rounded-xl border border-border/70 bg-muted/15 px-4 py-4">
-              <p className="text-sm text-muted-foreground">{emptyMessage}</p>
-              <div className="flex flex-wrap gap-2">
-                <Button
-                  type="button"
-                  size="sm"
-                  variant="outline"
-                  className="gap-1.5"
-                  onClick={startOver}
-                >
-                  <Undo2 className="size-3.5" aria-hidden />
-                  Start over
-                </Button>
-                <Button
-                  type="button"
-                  size="sm"
-                  variant="outline"
-                  className="gap-1.5"
-                  onClick={() => setManualOpen(true)}
-                >
-                  <Search className="size-3.5" aria-hidden />
-                  {manualSearchLabel}
-                </Button>
-              </div>
-            </div>
-          ) : null}
+              {matchError ? <p className="text-sm text-destructive">{matchError}</p> : null}
 
-          {matchFromKalshi && polyCandidates.length > 0 ? (
-            <div className="space-y-2">
-              <p className="text-xs font-medium text-muted-foreground">
-                {selectedPolyKey &&
-                polyCandidates.some(
-                  (item) => polymarketRealtimeMarketKey(item.market) === selectedPolyKey,
-                )
-                  ? "Matched Polymarket market"
-                  : "Select the correct Polymarket market"}
-              </p>
-              <div className="grid gap-2">
-                {polyCandidates.map((candidate) => {
-                  const market = candidate.market as HubPolymarketLiveDemoMarket;
-                  const key = polymarketRealtimeMarketKey(market);
-                  const selected = Boolean(key) && key === selectedPolyKey;
-                  const volume = formatPolymarketVolume(market.volume24h);
-                  return (
-                    <label
-                      key={key}
-                      className={cn(
-                        "flex cursor-pointer items-start gap-2.5 rounded-lg border p-3 transition-colors",
-                        selected
-                          ? "border-secondary/40 bg-secondary/10"
-                          : "border-border/60 bg-background hover:bg-muted/30",
-                      )}
-                    >
-                      <input
-                        type="radio"
-                        name="polymarket-match"
-                        className="mt-1 size-4 accent-secondary"
-                        checked={selected}
-                        onChange={() => applyPolyMatch(market)}
-                      />
-                      <span className="min-w-0 flex-1">
-                        <span className="flex flex-wrap items-center gap-2">
-                          <span className="text-sm font-medium text-foreground">
-                            {String(market.title || market.slug || "Market")}
-                          </span>
-                          <span
-                            className={cn(
-                              "rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide",
-                              candidate.tier === "exact"
-                                ? "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300"
-                                : candidate.tier === "close"
-                                  ? "bg-sky-500/15 text-sky-700 dark:text-sky-300"
-                                  : "bg-amber-500/15 text-amber-700 dark:text-amber-300",
-                            )}
-                          >
-                            {matchTierLabel(candidate.tier)}
-                          </span>
-                        </span>
-                        <span className="mt-0.5 block text-[10px] text-muted-foreground">
-                          {volume ? `24h vol ${volume}` : "Polymarket"}
-                        </span>
-                      </span>
-                    </label>
-                  );
-                })}
-              </div>
-              <Button
-                type="button"
-                size="sm"
-                variant="ghost"
-                className="h-8 gap-1.5 px-2 text-xs"
-                onClick={() => setManualOpen((v) => !v)}
-              >
-                <Search className="size-3.5" aria-hidden />
-                {manualSearchLabel}
-              </Button>
-            </div>
-          ) : null}
-
-          {!matchFromKalshi && candidates.length > 0 ? (
-            <div className="space-y-2">
-              <p className="text-xs font-medium text-muted-foreground">
-                {selectedCandidate && !candidates.slice(1).some((c) => c.score > selectedCandidate.score - 0.05)
-                  ? "Matched Kalshi market"
-                  : "Select the correct Kalshi market"}
-              </p>
-              <div className="grid gap-2">
-                {candidates.slice(0, 6).map((candidate) => {
-                  const selected = candidate.market.marketTicker === selectedTicker;
-                  return (
-                    <label
-                      key={candidate.market.marketTicker}
-                      className={cn(
-                        "flex cursor-pointer items-start gap-2.5 rounded-lg border p-3 transition-colors",
-                        selected
-                          ? "border-secondary/40 bg-secondary/10"
-                          : "border-border/60 bg-background hover:bg-muted/30",
-                      )}
-                    >
-                      <input
-                        type="radio"
-                        name="kalshi-match"
-                        className="mt-1 size-4 accent-secondary"
-                        checked={selected}
-                        onChange={() => setSelectedTicker(candidate.market.marketTicker)}
-                      />
-                      <span className="min-w-0 flex-1">
-                        <span className="flex flex-wrap items-center gap-2">
-                          <span className="text-sm font-medium text-foreground">
-                            {candidate.market.title}
-                          </span>
-                          <span
-                            className={cn(
-                              "rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide",
-                              candidate.tier === "exact"
-                                ? "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300"
-                                : candidate.tier === "close"
-                                  ? "bg-sky-500/15 text-sky-700 dark:text-sky-300"
-                                  : "bg-amber-500/15 text-amber-700 dark:text-amber-300",
-                            )}
-                          >
-                            {matchTierLabel(candidate.tier)}
-                          </span>
-                        </span>
-                        <span className="mt-0.5 block font-mono text-[10px] text-muted-foreground">
-                          {candidate.market.marketTicker}
-                          {candidate.market.chancePct != null
-                            ? ` · ${candidate.market.chancePct.toFixed(1)}% YES`
-                            : ""}
-                        </span>
-                      </span>
-                    </label>
-                  );
-                })}
-              </div>
-              <Button
-                type="button"
-                size="sm"
-                variant="ghost"
-                className="h-8 gap-1.5 px-2 text-xs"
-                onClick={() => setManualOpen((v) => !v)}
-              >
-                <Search className="size-3.5" aria-hidden />
-                Search Kalshi manually
-              </Button>
-            </div>
-          ) : null}
-
-          {manualOpen ? (
-            <div className="rounded-xl border border-border/70 bg-muted/10 p-3">
-              {matchFromKalshi ? (
-                <>
-                  <p className="mb-2 text-xs font-medium text-muted-foreground">
-                    Search Polymarket in plain English
+              {matchFromKalshi && polyMatchList.length > 0 ? (
+                <div className="space-y-2">
+                  <p className="text-xs font-medium text-muted-foreground">
+                    Found the following matching Polymarket markets
                   </p>
-                  <PolymarketLiveSearch
-                    layout="panel"
-                    dismissAfterSelect
-                    searchTags
-                    searchProfiles={false}
-                    keepClosedMarkets={false}
-                    limitPerType={50}
-                    className="w-full"
-                    resultsClassName="max-h-56 flex-none"
-                    placeholder="Search Polymarket markets in plain English…"
-                    onSelect={(suggestion) => {
-                      const entity = String(suggestion?.entity || "");
-                      if (entity === "event") {
-                        const nested = polymarketRealtimeMarketsFromEventSuggestion(
-                          suggestion,
-                        ) as HubPolymarketLiveDemoMarket[];
-                        if (nested[0]) applyPolyMatch(nested[0]);
-                        return;
-                      }
-                      if (entity !== "market") return;
-                      const market = polymarketRealtimeMarketFromSuggestion(suggestion) as
-                        | HubPolymarketLiveDemoMarket
-                        | null;
-                      if (market) applyPolyMatch(market);
-                    }}
-                    onSubmitAll={(suggestions) => {
-                      for (const suggestion of suggestions || []) {
-                        if (suggestion?.entity === "market") {
-                          const market = polymarketRealtimeMarketFromSuggestion(
-                            suggestion,
-                          ) as HubPolymarketLiveDemoMarket | null;
-                          if (market) {
-                            applyPolyMatch(market);
-                            return;
-                          }
-                        }
-                      }
-                      for (const suggestion of suggestions || []) {
-                        if (suggestion?.entity === "event") {
-                          const nested = polymarketRealtimeMarketsFromEventSuggestion(
-                            suggestion,
-                          ) as HubPolymarketLiveDemoMarket[];
-                          if (nested[0]) applyPolyMatch(nested[0]);
-                          return;
-                        }
-                      }
-                    }}
-                  />
-                </>
-              ) : (
-                <>
-                  <p className="mb-2 text-xs font-medium text-muted-foreground">
-                    Search Kalshi by event name
-                  </p>
-                  <MarketTickerSearch
-                    value={manualTickers}
-                    onChange={setManualTickers}
-                    onSelectionsChange={(selections) => {
-                      const s = selections?.[0];
-                      const ticker = String(s?.ticker || "").trim().toUpperCase();
-                      if (!ticker) return;
-                      setSelectedTicker(ticker);
-                      setCandidates((prev) => {
-                        if (prev.some((c) => c.market.marketTicker === ticker)) return prev;
-                        return [
-                          {
-                            market: {
-                              marketTicker: ticker,
-                              title: String(s?.title || ticker),
-                              raw: {},
-                            },
-                            score: 0.5,
-                            tier: "related" as const,
-                            reasons: ["Manually selected"],
-                            warnings: [
-                              "Manual selection — verify event, resolution window, and settlement rules",
-                            ],
-                          },
-                          ...prev,
-                        ];
-                      });
-                      setEmptyMessage(null);
-                    }}
-                    maxTickers={1}
-                    dataSource="live"
-                    searchScope="events_semantic"
-                    showCutoffNotes={false}
-                    required={false}
-                    placeholder="Search Kalshi events in natural language"
-                    className="w-full"
-                  />
-                </>
-              )}
-            </div>
-          ) : null}
-
-          {selectedTicker && relatedWarning ? (
-            <p className="rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-800 dark:text-amber-200">
-              These markets cover a similar event but may use different rules or resolution
-              criteria.
-            </p>
-          ) : null}
-
-          <div className="space-y-4">
-              {seriesError ? (
-                <div className="space-y-3 rounded-xl border border-destructive/30 bg-destructive/5 px-4 py-4">
-                  <p className="text-sm text-destructive">{seriesError}</p>
-                  <div className="flex flex-wrap gap-2">
-                    <Button
-                      type="button"
-                      size="sm"
-                      variant="outline"
-                      className="gap-1.5"
-                      onClick={startOver}
-                    >
-                      <Undo2 className="size-3.5" aria-hidden />
-                      Start over
-                    </Button>
-                    <Button
-                      type="button"
-                      size="sm"
-                      variant="outline"
-                      className="gap-1.5"
-                      onClick={() => setManualOpen(true)}
-                    >
-                      <Search className="size-3.5" aria-hidden />
-                      Search {counterpartName} manually
-                    </Button>
+                  <div className="grid gap-2">
+                    {polyMatchList.map((candidate) => {
+                      const market = candidate.market as HubPolymarketLiveDemoMarket;
+                      const key = polymarketRealtimeMarketKey(market);
+                      const selected = Boolean(key) && key === selectedPolyKey;
+                      const labels = polymarketYesNoLabels(market);
+                      const aligned = yesOutcomesLikelySame(parentYesNo.yes, labels.yes);
+                      return (
+                        <label
+                          key={key}
+                          className={cn(
+                            "flex cursor-pointer items-start gap-2.5 rounded-lg border p-3 transition-colors",
+                            selected
+                              ? "border-[#2E5CFF]/50 bg-[#2E5CFF]/10"
+                              : "border-border/60 bg-background hover:bg-muted/30",
+                          )}
+                        >
+                          <input
+                            type="radio"
+                            name="polymarket-match"
+                            className="mt-1 size-4 accent-[#2E5CFF]"
+                            checked={selected}
+                            onChange={() => applyPolyMatch(market)}
+                          />
+                          <span className="min-w-0 flex-1 space-y-1">
+                            <span className="flex flex-wrap items-center gap-2">
+                              <span className="text-sm font-medium text-foreground">
+                                {String(market.title || market.slug || "Market")}
+                              </span>
+                              <span className="rounded-full bg-muted px-2 py-0.5 text-[10px] font-semibold text-foreground">
+                                {formatMatchScore(candidate.score)}
+                              </span>
+                              <span
+                                className={cn(
+                                  "rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide",
+                                  candidate.tier === "exact"
+                                    ? "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300"
+                                    : candidate.tier === "close"
+                                      ? "bg-sky-500/15 text-sky-700 dark:text-sky-300"
+                                      : "bg-amber-500/15 text-amber-700 dark:text-amber-300",
+                                )}
+                              >
+                                {matchTierLabel(candidate.tier)}
+                              </span>
+                            </span>
+                            <span className="block text-[11px] text-muted-foreground">
+                              YES = {labels.yes}
+                              {selected && polyYesPct != null ? ` · ${formatPct(polyYesPct)}` : ""}
+                              {" · "}
+                              NO = {labels.no}
+                              {selected && polyYesPct != null ? ` · ${formatPct(100 - polyYesPct)}` : ""}
+                            </span>
+                            {!aligned ? (
+                              <span className="block text-[11px] text-amber-700 dark:text-amber-300">
+                                YES on this market is {labels.yes}, not the parent YES ({parentYesNo.yes}).
+                              </span>
+                            ) : null}
+                          </span>
+                        </label>
+                      );
+                    })}
                   </div>
                 </div>
               ) : null}
+
+              {!matchFromKalshi && kalshiMatchList.length > 0 ? (
+                <div className="space-y-2">
+                  <p className="text-xs font-medium text-muted-foreground">
+                    Found the following matching Kalshi markets
+                  </p>
+                  <div className="grid gap-2">
+                    {kalshiMatchList.map((candidate) => {
+                      const selected = candidate.market.marketTicker === selectedTicker;
+                      const labels = kalshiYesNoLabels(candidate.market, candidate.market.title);
+                      const aligned = yesOutcomesLikelySame(parentYesNo.yes, labels.yes);
+                      return (
+                        <label
+                          key={candidate.market.marketTicker}
+                          className={cn(
+                            "flex cursor-pointer items-start gap-2.5 rounded-lg border p-3 transition-colors",
+                            selected
+                              ? "border-[#28CC95]/50 bg-[#28CC95]/10"
+                              : "border-border/60 bg-background hover:bg-muted/30",
+                          )}
+                        >
+                          <input
+                            type="radio"
+                            name="kalshi-match"
+                            className="mt-1 size-4 accent-[#28CC95]"
+                            checked={selected}
+                            onChange={() => {
+                              setEmptyMessage(null);
+                              setSelectedTicker(candidate.market.marketTicker);
+                            }}
+                          />
+                          <span className="min-w-0 flex-1 space-y-1">
+                            <span className="flex flex-wrap items-center gap-2">
+                              <span className="text-sm font-medium text-foreground">
+                                {candidate.market.title}
+                              </span>
+                              <span className="rounded-full bg-muted px-2 py-0.5 text-[10px] font-semibold text-foreground">
+                                {formatMatchScore(candidate.score)}
+                              </span>
+                              <span
+                                className={cn(
+                                  "rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide",
+                                  candidate.tier === "exact"
+                                    ? "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300"
+                                    : candidate.tier === "close"
+                                      ? "bg-sky-500/15 text-sky-700 dark:text-sky-300"
+                                      : "bg-amber-500/15 text-amber-700 dark:text-amber-300",
+                                )}
+                              >
+                                {matchTierLabel(candidate.tier)}
+                              </span>
+                            </span>
+                            <span className="block font-mono text-[10px] text-muted-foreground">
+                              {candidate.market.marketTicker}
+                            </span>
+                            <span className="block text-[11px] text-muted-foreground">
+                              YES = {labels.yes}
+                              {candidate.market.chancePct != null
+                                ? ` · ${candidate.market.chancePct.toFixed(1)}%`
+                                : ""}
+                              {" · "}
+                              NO = {labels.no}
+                            </span>
+                            {!aligned ? (
+                              <span className="block text-[11px] text-amber-700 dark:text-amber-300">
+                                YES on this market is {labels.yes}, not the parent YES ({parentYesNo.yes}).
+                              </span>
+                            ) : null}
+                          </span>
+                        </label>
+                      );
+                    })}
+                  </div>
+                </div>
+              ) : null}
+
+              {showEmptyMatchNote ? (
+                <p className="text-sm text-muted-foreground">
+                  {emptyMessage ||
+                    `No automatic ${matchFromKalshi ? "Polymarket" : "Kalshi"} match yet. Search by name or ticker below.`}
+                </p>
+              ) : null}
+
+              <CompareCounterpartSearch
+                matchFromKalshi={matchFromKalshi}
+                hasMatches={
+                  matchFromKalshi ? polyMatchList.length > 0 : kalshiMatchList.length > 0
+                }
+                onPolySelect={applyPolyMatch}
+                onKalshiSelect={(ticker, title) => {
+                  setSelectedTicker(ticker);
+                  setEmptyMessage(null);
+                  setCandidates((prev) => {
+                    if (prev.some((c) => c.market.marketTicker === ticker)) return prev;
+                    return [
+                      {
+                        market: {
+                          marketTicker: ticker,
+                          title,
+                          raw: {},
+                        },
+                        score: 0.5,
+                        tier: "related" as const,
+                        reasons: ["Manually selected"],
+                        warnings: [
+                          "Manual selection — verify event, resolution window, and settlement rules",
+                        ],
+                      },
+                      ...prev,
+                    ];
+                  });
+                }}
+              />
+
+              {polyMarket && !shape.isBinary ? (
+                <p className="text-[11px] text-amber-600 dark:text-amber-400">
+                  Multi-outcome market — comparison uses the first listed outcome as YES.
+                </p>
+              ) : null}
+
+              {selectedTicker && relatedWarning ? (
+                <p className="rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-800 dark:text-amber-200">
+                  These markets cover a similar event but may use different rules or resolution
+                  criteria.
+                </p>
+              ) : null}
+
+              {seriesError ? <p className="text-sm text-destructive">{seriesError}</p> : null}
+
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div
+                  className="inline-flex h-8 items-center rounded-md border border-border/70 bg-background p-0.5"
+                  role="group"
+                  aria-label="Comparison interval"
+                >
+                  {INTERVALS.map((item) => (
+                    <button
+                      key={item.id}
+                      type="button"
+                      onClick={() => setIntervalId(item.id)}
+                      className={cn(
+                        "h-7 rounded px-2.5 text-[11px] font-medium transition-colors",
+                        interval === item.id
+                          ? "bg-muted text-foreground shadow-sm"
+                          : "text-muted-foreground hover:text-foreground",
+                      )}
+                    >
+                      {item.label}
+                    </button>
+                  ))}
+                </div>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  className="h-8"
+                  onClick={() => setLivePaused((v) => !v)}
+                >
+                  {livePaused ? "Resume live" : "Pause live"}
+                </Button>
+              </div>
+
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div className="flex flex-col overflow-hidden rounded-xl border border-border/70 bg-background">
+                  <div className="flex shrink-0 items-center gap-2 border-b border-border/50 px-3 py-2">
+                    <span
+                      className="size-2.5 shrink-0 rounded-full"
+                      style={{ backgroundColor: POLYMARKET_BLUE }}
+                      aria-hidden
+                    />
+                    <p className="text-xs font-semibold text-foreground">Polymarket</p>
+                  </div>
+                  <div className="h-56 min-h-0 w-full shrink-0 sm:h-64">
+                    <CompareChartBody
+                      pending={polyChartPending}
+                      hasData={polyFiltered.length > 0}
+                      waitingMessage={
+                        polyMarket
+                          ? "No chart at present"
+                          : "Pick a Polymarket match above to plot this chart"
+                      }
+                    >
+                      <HubKalshiLiveDemoTradesLiveline
+                        series={polySeries}
+                        persistHistory
+                        fullHistory={interval === "all"}
+                        fill
+                        fixedValueDomain={{ min: 0, max: 100 }}
+                        formatValue={(v) => `${v.toFixed(1)}%`}
+                        parseRowValue={(row) => {
+                          const n = Number(row._probability_pct);
+                          return Number.isFinite(n) ? n : null;
+                        }}
+                        className="h-full min-h-0"
+                        emptyMessage="No chart at present"
+                      />
+                    </CompareChartBody>
+                  </div>
+                </div>
+
+                <div className="flex flex-col overflow-hidden rounded-xl border border-border/70 bg-background">
+                  <div className="flex shrink-0 items-center gap-2 border-b border-border/50 px-3 py-2">
+                    <span
+                      className="size-2.5 shrink-0 rounded-full"
+                      style={{ backgroundColor: KALSHI_GREEN }}
+                      aria-hidden
+                    />
+                    <p className="text-xs font-semibold text-foreground">Kalshi</p>
+                  </div>
+                  <div className="h-56 min-h-0 w-full shrink-0 sm:h-64">
+                    <CompareChartBody
+                      pending={kalshiChartPending}
+                      hasData={kalshiFiltered.length > 0}
+                      waitingMessage={
+                        selectedTicker
+                          ? "No chart at present"
+                          : "Pick a Kalshi match above to plot this chart"
+                      }
+                    >
+                      <HubKalshiLiveDemoTradesLiveline
+                        series={kalshiSeries}
+                        persistHistory
+                        fullHistory={interval === "all"}
+                        fill
+                        fixedValueDomain={{ min: 0, max: 100 }}
+                        formatValue={(v) => `${v.toFixed(1)}%`}
+                        parseRowValue={(row) => {
+                          const n = Number(row._probability_pct);
+                          return Number.isFinite(n) ? n : null;
+                        }}
+                        className="h-full min-h-0"
+                        emptyMessage="No chart at present"
+                      />
+                    </CompareChartBody>
+                  </div>
+                </div>
+              </div>
+
+              {divergence != null ? (
+                <p className="text-sm text-muted-foreground">
+                  Polymarket is pricing YES{" "}
+                  <span className="font-medium text-foreground">
+                    {Math.abs(divergence).toFixed(1)} percentage points{" "}
+                    {divergence >= 0 ? "higher" : "lower"}
+                  </span>{" "}
+                  than Kalshi. Descriptive only — not an arbitrage signal.
+                </p>
+              ) : null}
+
               <div className="overflow-hidden rounded-xl border border-border/70">
                 <table className="w-full text-left text-xs sm:text-sm">
                   <thead className="bg-muted/30 text-muted-foreground">
@@ -1834,6 +2083,30 @@ export function HubPolymarketKalshiCompareDemo() {
                               "—",
                           )}
                         </ComparePendingValue>
+                      </td>
+                    </tr>
+                    <tr>
+                      <td className="px-3 py-2 text-muted-foreground">YES means</td>
+                      <td className="px-3 py-2">{polymarketYesNoLabels(polyMarket).yes}</td>
+                      <td className="px-3 py-2">
+                        {
+                          kalshiYesNoLabels(
+                            kalshiMarket || selectedCandidate?.market,
+                            kalshiAnchor?.title,
+                          ).yes
+                        }
+                      </td>
+                    </tr>
+                    <tr>
+                      <td className="px-3 py-2 text-muted-foreground">NO means</td>
+                      <td className="px-3 py-2">{polymarketYesNoLabels(polyMarket).no}</td>
+                      <td className="px-3 py-2">
+                        {
+                          kalshiYesNoLabels(
+                            kalshiMarket || selectedCandidate?.market,
+                            kalshiAnchor?.title,
+                          ).no
+                        }
                       </td>
                     </tr>
                     <tr>
@@ -1911,126 +2184,6 @@ export function HubPolymarketKalshiCompareDemo() {
                 </table>
               </div>
 
-              {divergence != null ? (
-                <p className="text-sm text-muted-foreground">
-                  Polymarket is pricing YES{" "}
-                  <span className="font-medium text-foreground">
-                    {Math.abs(divergence).toFixed(1)} percentage points{" "}
-                    {divergence >= 0 ? "higher" : "lower"}
-                  </span>{" "}
-                  than Kalshi. Descriptive only — not an arbitrage signal.
-                </p>
-              ) : null}
-
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <div
-                  className="inline-flex h-8 items-center rounded-md border border-border/70 bg-background p-0.5"
-                  role="group"
-                  aria-label="Comparison interval"
-                >
-                  {INTERVALS.map((item) => (
-                    <button
-                      key={item.id}
-                      type="button"
-                      onClick={() => setIntervalId(item.id)}
-                      className={cn(
-                        "h-7 rounded px-2.5 text-[11px] font-medium transition-colors",
-                        interval === item.id
-                          ? "bg-muted text-foreground shadow-sm"
-                          : "text-muted-foreground hover:text-foreground",
-                      )}
-                    >
-                      {item.label}
-                    </button>
-                  ))}
-                </div>
-                <Button
-                  type="button"
-                  size="sm"
-                  variant="outline"
-                  className="h-8"
-                  onClick={() => setLivePaused((v) => !v)}
-                >
-                  {livePaused ? "Resume live" : "Pause live"}
-                </Button>
-              </div>
-
-              <div className="grid gap-3 sm:grid-cols-2">
-                <div className="flex flex-col overflow-hidden rounded-xl border border-border/70 bg-muted/10">
-                  <div className="flex shrink-0 items-center gap-2 border-b border-border/50 px-3 py-2">
-                    <span
-                      className="size-2.5 shrink-0 rounded-full"
-                      style={{ backgroundColor: resolveDemoChartColor(defaultSeriesColorToken(0)) }}
-                      aria-hidden
-                    />
-                    <p className="text-xs font-semibold text-foreground">Polymarket</p>
-                  </div>
-                  <div className="h-56 min-h-0 w-full shrink-0 sm:h-64">
-                    <CompareChartBody
-                      pending={polyChartPending}
-                      hasData={polyFiltered.length > 0}
-                      waitingMessage={
-                        polyMarket
-                          ? "No chart at present"
-                          : "Search Polymarket above to plot this chart"
-                      }
-                    >
-                      <HubKalshiLiveDemoTradesLiveline
-                        series={polySeries}
-                        persistHistory
-                        fullHistory={interval === "all"}
-                        fill
-                        fixedValueDomain={{ min: 0, max: 100 }}
-                        formatValue={(v) => `${v.toFixed(1)}%`}
-                        parseRowValue={(row) => {
-                          const n = Number(row._probability_pct);
-                          return Number.isFinite(n) ? n : null;
-                        }}
-                        className="h-full min-h-0"
-                        emptyMessage="No chart at present"
-                      />
-                    </CompareChartBody>
-                  </div>
-                </div>
-
-                <div className="flex flex-col overflow-hidden rounded-xl border border-border/70 bg-muted/10">
-                  <div className="flex shrink-0 items-center gap-2 border-b border-border/50 px-3 py-2">
-                    <span
-                      className="size-2.5 shrink-0 rounded-full"
-                      style={{ backgroundColor: KALSHI_LINE_GREEN }}
-                      aria-hidden
-                    />
-                    <p className="text-xs font-semibold text-foreground">Kalshi</p>
-                  </div>
-                  <div className="h-56 min-h-0 w-full shrink-0 sm:h-64">
-                    <CompareChartBody
-                      pending={kalshiChartPending}
-                      hasData={kalshiFiltered.length > 0}
-                      waitingMessage={
-                        selectedTicker
-                          ? "No chart at present"
-                          : "Search Kalshi above to plot this chart"
-                      }
-                    >
-                      <HubKalshiLiveDemoTradesLiveline
-                        series={kalshiSeries}
-                        persistHistory
-                        fullHistory={interval === "all"}
-                        fill
-                        fixedValueDomain={{ min: 0, max: 100 }}
-                        formatValue={(v) => `${v.toFixed(1)}%`}
-                        parseRowValue={(row) => {
-                          const n = Number(row._probability_pct);
-                          return Number.isFinite(n) ? n : null;
-                        }}
-                        className="h-full min-h-0"
-                        emptyMessage="No chart at present"
-                      />
-                    </CompareChartBody>
-                  </div>
-                </div>
-              </div>
-
               <div className="grid gap-3 sm:grid-cols-2">
                 {(
                   [
@@ -2043,8 +2196,7 @@ export function HubPolymarketKalshiCompareDemo() {
                           ? `24h notional ≈ $${Number(polyMarket.volume24h).toLocaleString()}`
                           : "Volume metric: platform 24h notional (USDC)",
                       lastPrice: formatPct(polyYesPct),
-                      lastSize:
-                        polyLast?.size != null ? String(polyLast.size) : "—",
+                      lastSize: polyLast?.size != null ? String(polyLast.size) : "—",
                       since: formatAgo(String(polyLast?.created_time || "") || null),
                     },
                     {
@@ -2125,9 +2277,10 @@ export function HubPolymarketKalshiCompareDemo() {
                   <Link href="#polymarket-live-pricing">Add Both to a Live Dashboard</Link>
                 </Button>
               </div>
-            </div>
-        </>
-      )}
+            </CardContent>
+          </>
+        )}
+      </Card>
     </div>
   );
 }

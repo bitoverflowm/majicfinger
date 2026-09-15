@@ -185,9 +185,7 @@ export function HubPolymarketCrossPlatformSection({
             rootMargin="320px 0px"
             fallback={<HubPolymarketKalshiCompareDemoSkeleton />}
           >
-            <div className="rounded-xl border border-border/70 bg-background/80 p-3 sm:p-4">
-              <HubPolymarketKalshiCompareDemo />
-            </div>
+            <HubPolymarketKalshiCompareDemo />
           </HubLazyWhenVisible>
         </div>
 

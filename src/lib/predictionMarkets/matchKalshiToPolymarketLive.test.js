@@ -6,6 +6,7 @@ import {
   inferKalshiAssetHorizon,
   preferredKalshiSearchText,
   polymarketHorizonFromSlug,
+  polymarketMatchQueriesFromKalshi,
   polymarketSeriesSlugFromKalshi,
   rankPolymarketCandidatesForKalshi,
   scoreKalshiToPolymarketPair,
@@ -199,4 +200,57 @@ const kalshi15m = {
   });
   assert.equal(result.candidates.length, 0);
   assert.equal(result.preselected, null);
+}
+
+{
+  const tennis = {
+    ticker: "KXWTACHALLENGERMATCH-26SEP15ITOKNU-KNU",
+    seriesTicker: "KXWTACHALLENGERMATCH",
+    title: "Ito vs Knutson — Gabriela Knutson wins",
+    eventTitle: "Ito vs Knutson",
+    tags: ["Sports", "Tennis"],
+  };
+  const queries = polymarketMatchQueriesFromKalshi(tennis);
+  assert.equal(queries[0], "Ito vs Knutson");
+  assert.ok(queries.includes("Gabriela Knutson wins"));
+
+  const scored = scoreKalshiToPolymarketPair(tennis, {
+    title: "Caldas da Rainha: Aoi Ito vs Gabriela Knutson",
+    slug: "caldas-da-rainha-aoi-ito-vs-gabriela-knutson",
+    outcomes: ["Aoi Ito", "Gabriela Knutson"],
+    closed: false,
+  });
+  assert.notEqual(scored.tier, "none");
+  assert.ok(scored.score >= 0.18);
+
+  const result = await findPolymarketLiveMatchesForKalshi(tennis, {
+    fetchEventsBySeries: async () => {
+      throw new Error("tennis should not use crypto series lookup");
+    },
+    fetchSuggestions: async (q) => {
+      assert.match(String(q), /Ito vs Knutson|Gabriela Knutson/i);
+      return {
+        suggestions: [
+          {
+            entity: "market",
+            id: "tennis-1",
+            slug: "caldas-da-rainha-aoi-ito-vs-gabriela-knutson",
+            title: "Caldas da Rainha: Aoi Ito vs Gabriela Knutson",
+            closed: false,
+            raw: {
+              slug: "caldas-da-rainha-aoi-ito-vs-gabriela-knutson",
+              question: "Caldas da Rainha: Aoi Ito vs Gabriela Knutson",
+              conditionId: "0xtennis",
+              closed: false,
+              clobTokenIds: '["tok-ito","tok-knutson"]',
+              outcomes: '["Aoi Ito","Gabriela Knutson"]',
+            },
+          },
+        ],
+      };
+    },
+  });
+  assert.equal(result.candidates.length, 1);
+  assert.equal(result.preselected, null);
+  assert.match(String(result.candidates[0]?.market.title), /Aoi Ito vs Gabriela Knutson/);
 }

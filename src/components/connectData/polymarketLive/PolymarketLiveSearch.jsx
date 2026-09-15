@@ -64,6 +64,106 @@ function suggestionKey(s) {
 }
 
 /**
+ * Slug, numeric Gamma id, CLOB token id, or condition id — resolve directly instead of relying on public-search.
+ * @param {string} raw
+ * @returns {{ type: "slug" | "id" | "conditionId" | "tokenId"; value: string } | null}
+ */
+function looksLikeExactPolymarketRef(raw) {
+  const t = String(raw || "").trim();
+  if (!t || /\s/.test(t)) return null;
+  if (/^0x[a-fA-F0-9]{64}$/.test(t)) return { type: "conditionId", value: t };
+  if (/^\d{20,}$/.test(t)) return { type: "tokenId", value: t };
+  if (/^\d{5,}$/.test(t)) return { type: "id", value: t };
+  if (/^[a-z0-9]+(?:-[a-z0-9]+){1,}$/i.test(t)) return { type: "slug", value: t };
+  return null;
+}
+
+/**
+ * @param {Record<string, unknown>} row
+ * @param {"market" | "event"} entity
+ * @returns {PolymarketPublicSearchSuggestion | null}
+ */
+function suggestionFromGammaRow(row, entity) {
+  if (!row || typeof row !== "object") return null;
+  const id = String(row.id || "").trim();
+  const slug = String(row.slug || "").trim();
+  const title = String(row.question || row.title || row.ticker || slug || id).trim();
+  if (!id && !slug) return null;
+  return {
+    entity,
+    id: id || undefined,
+    slug: slug || undefined,
+    ticker: slug || id || undefined,
+    title: title || slug || id,
+    conditionId: row.conditionId != null ? String(row.conditionId) : undefined,
+    closed: row.closed ?? null,
+    active: row.active ?? null,
+    volume: row.volume ?? null,
+    volume24hr: row.volume24hr ?? null,
+    raw: row,
+  };
+}
+
+/**
+ * @param {{ type: "slug" | "id" | "conditionId" | "tokenId"; value: string }} ref
+ * @param {AbortSignal} signal
+ * @returns {Promise<PolymarketPublicSearchSuggestion[]>}
+ */
+async function fetchExactPolymarketSuggestions(ref, signal) {
+  /** @param {string} query @param {Record<string, string>} extra */
+  const load = async (query, extra) => {
+    const params = new URLSearchParams({ query, skipFlatten: "true", ...extra });
+    const res = await fetch(`/api/integrations/polymarket?${params.toString()}`, {
+      headers: { Accept: "application/json" },
+      credentials: "same-origin",
+      signal,
+    });
+    if (!res.ok) return null;
+    const data = await res.json().catch(() => null);
+    if (Array.isArray(data)) return data.find((row) => row && typeof row === "object") || null;
+    return data && typeof data === "object" ? data : null;
+  };
+
+  /** @type {PolymarketPublicSearchSuggestion[]} */
+  const out = [];
+  const push = (row, entity) => {
+    const suggestion = suggestionFromGammaRow(row, entity);
+    if (suggestion) out.push(suggestion);
+  };
+
+  try {
+    if (ref.type === "slug") {
+      push(await load("getMarketBySlug", { slug: ref.value }), "market");
+      push(await load("getEventBySlug", { slug: ref.value }), "event");
+    } else if (ref.type === "id") {
+      push(await load("getMarket", { id: ref.value }), "market");
+      push(await load("getEvent", { id: ref.value }), "event");
+    } else if (ref.type === "tokenId") {
+      push(await load("getMarketByToken", { token_id: ref.value }), "market");
+    } else {
+      const params = new URLSearchParams({
+        query: "metadataResolve",
+        entity: "market",
+        conditionId: ref.value,
+      });
+      const res = await fetch(`/api/integrations/polymarket?${params.toString()}`, {
+        headers: { Accept: "application/json" },
+        credentials: "same-origin",
+        signal,
+      });
+      if (res.ok) {
+        const payload = await res.json().catch(() => ({}));
+        const market = payload?.market || payload?.marketsByConditionId?.[0];
+        push(market, "market");
+      }
+    }
+  } catch (e) {
+    if (e instanceof DOMException && e.name === "AbortError") throw e;
+  }
+  return out;
+}
+
+/**
  * Polymarket Gamma `/public-search` suggestions for Connect home.
  *
  * Default: Enter pulls all current matches; clicking a suggestion pulls that hit only.
@@ -174,12 +274,36 @@ export function PolymarketLiveSearch({
       if (mySeq !== suggestSeqRef.current) return;
 
       if (!res.ok) {
+        const exactRef = looksLikeExactPolymarketRef(trimmed);
+        if (exactRef) {
+          const exactHits = await fetchExactPolymarketSuggestions(exactRef, ac.signal);
+          if (mySeq !== suggestSeqRef.current) return;
+          let exactList = exactHits;
+          if (entitiesKey) {
+            const allow = new Set(entitiesKey.split(","));
+            exactList = exactList.filter((s) => allow.has(s?.entity));
+          }
+          if (!keepClosedMarkets) {
+            exactList = exactList.filter((s) => s?.closed !== true && s?.closed !== "true");
+          }
+          if (exactList.length) {
+            setSuggestions(exactList);
+            if (!dismissedRef.current) setSuggestOpen(true);
+            return;
+          }
+        }
         setSuggestions([]);
         setSuggestOpen(false);
         setError(typeof data?.message === "string" ? data.message : "Search failed");
         return;
       }
       let list = Array.isArray(data?.suggestions) ? data.suggestions : [];
+      const exactRef = looksLikeExactPolymarketRef(trimmed);
+      if (exactRef) {
+        const exactHits = await fetchExactPolymarketSuggestions(exactRef, ac.signal);
+        if (mySeq !== suggestSeqRef.current) return;
+        list = [...exactHits, ...list];
+      }
       if (entitiesKey) {
         const allow = new Set(entitiesKey.split(","));
         list = list.filter((s) => allow.has(s?.entity));
@@ -187,6 +311,13 @@ export function PolymarketLiveSearch({
       if (!keepClosedMarkets) {
         list = list.filter((s) => s?.closed !== true && s?.closed !== "true");
       }
+      const seen = new Set();
+      list = list.filter((s) => {
+        const key = suggestionKey(s);
+        if (seen.has(key)) return false;
+        seen.add(key);
+        return true;
+      });
       setSuggestions(list);
       if (!dismissedRef.current) setSuggestOpen(true);
     } catch (e) {
@@ -486,7 +617,7 @@ export function PolymarketLiveSearch({
             "flex h-9 w-full rounded-lg border border-border bg-background py-2 pl-9 pr-3 text-xs text-foreground ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
             busy && "opacity-70",
           )}
-          aria-label="Polymarket natural language search"
+          aria-label="Polymarket search by name or ticker"
         />
 
         {!isPanel ? (
