@@ -37,6 +37,7 @@ import {
 import { fetchKalshiLiveMarket } from "@/lib/kalshiLive/fetchKalshiLiveMarket";
 import { impliedChancePctFromMarketRow } from "@/lib/kalshiLive/eventCandlesticksPowerMove";
 import { openPolymarketLastTradeSocket } from "@/lib/polymarketLive/openPolymarketMarketSocket";
+import { normalizePolymarketRealtimeHistoryRows } from "@/lib/polymarketLive/polymarketRealtimeSeed";
 import {
   findKalshiLiveMatchesForPolymarket,
   matchTierLabel,
@@ -605,6 +606,69 @@ function humanizeSeriesError(err: unknown): string {
 
 const POLY_TRADE_HISTORY_LIMIT = 1000;
 
+async function fetchPolymarketClobHistory(
+  tokenId: string,
+  opts: { interval: string; fidelity: number },
+  signal: AbortSignal,
+): Promise<Record<string, unknown>[]> {
+  const res = await fetch("/api/integrations/polymarket?query=getBatchPricesHistory", {
+    method: "POST",
+    credentials: "same-origin",
+    headers: { Accept: "application/json", "Content-Type": "application/json" },
+    signal,
+    body: JSON.stringify({
+      markets: [tokenId],
+      interval: opts.interval,
+      fidelity: opts.fidelity,
+    }),
+  });
+  const payload = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    throw taggedError(
+      typeof payload?.message === "string"
+        ? payload.message
+        : typeof payload?.error === "string"
+          ? payload.error
+          : "Failed to load Polymarket history",
+      "polymarket_history",
+      res.status,
+    );
+  }
+  const rows = normalizePolymarketRealtimeHistoryRows(payload);
+  const forToken = rows.filter(
+    (row) => !row.asset_id || String(row.asset_id) === tokenId,
+  );
+  return forToken.length ? forToken : rows;
+}
+
+async function fetchPolymarketPricesHistory(
+  tokenId: string,
+  signal: AbortSignal,
+): Promise<Record<string, unknown>[]> {
+  // 1-minute CLOB bars fill the liveline the way Kalshi trade prints do.
+  // `max` (hourly) covers older archive if the market is longer-lived.
+  const [minuteResult, archiveResult] = await Promise.allSettled([
+    fetchPolymarketClobHistory(tokenId, { interval: "1d", fidelity: 1 }, signal),
+    fetchPolymarketClobHistory(tokenId, { interval: "max", fidelity: 60 }, signal),
+  ]);
+  if (signal.aborted) return [];
+
+  let minuteRows =
+    minuteResult.status === "fulfilled" ? minuteResult.value : [];
+  if (!minuteRows.length && !signal.aborted) {
+    minuteRows = await fetchPolymarketClobHistory(
+      tokenId,
+      { interval: "1h", fidelity: 1 },
+      signal,
+    );
+  }
+  const archiveRows = archiveResult.status === "fulfilled" ? archiveResult.value : [];
+  const merged = [...archiveRows, ...minuteRows];
+  if (merged.length) return merged;
+  if (minuteResult.status === "rejected") throw minuteResult.reason;
+  return [];
+}
+
 async function fetchPolymarketTrades(
   conditionId: string,
   tokenId: string,
@@ -614,7 +678,7 @@ async function fetchPolymarketTrades(
     query: "getTradesByMarket",
     market: conditionId,
     limit: String(POLY_TRADE_HISTORY_LIMIT),
-    takerOnly: "true",
+    takerOnly: "false",
     skipFlatten: "true",
   });
   const res = await fetch(`/api/integrations/polymarket?${params.toString()}`, {
@@ -1615,12 +1679,6 @@ export function HubPolymarketKalshiCompareDemo() {
       setSeriesError("This Polymarket market has no YES token to chart.");
       return undefined;
     }
-    if (!conditionId) {
-      setPolyPoints([]);
-      setPolyLoading(false);
-      setSeriesError("This Polymarket market has no condition ID to load trades.");
-      return undefined;
-    }
 
     polyHistAbort.current?.abort();
     const ac = new AbortController();
@@ -1628,13 +1686,26 @@ export function HubPolymarketKalshiCompareDemo() {
     setPolyPoints([]);
     setPolyLoading(true);
 
-    void fetchPolymarketTrades(conditionId, tokenId, ac.signal)
-      .then((polyTrades) => {
+    void Promise.all([
+      fetchPolymarketPricesHistory(tokenId, ac.signal),
+      conditionId
+        ? fetchPolymarketTrades(conditionId, tokenId, ac.signal).catch((err) => {
+            if (ac.signal.aborted || (err instanceof DOMException && err.name === "AbortError")) {
+              throw err;
+            }
+            return [] as Record<string, unknown>[];
+          })
+        : Promise.resolve([] as Record<string, unknown>[]),
+    ])
+      .then(([history, trades]) => {
         if (ac.signal.aborted) return;
-        const mapped = polyTrades
+        const histPts = history
+          .map((row) => toPctPoint(row, "Polymarket"))
+          .filter(Boolean) as Record<string, unknown>[];
+        const tradePts = trades
           .map((row) => polymarketTradeToPoint(row, tokenId))
           .filter(Boolean) as Record<string, unknown>[];
-        setPolyPoints((prev) => mergePctPoints(mapped, prev));
+        setPolyPoints((prev) => mergePctPoints(histPts, [...tradePts, ...prev]));
       })
       .catch((err) => {
         if (ac.signal.aborted || (err instanceof DOMException && err.name === "AbortError")) return;
@@ -1733,19 +1804,25 @@ export function HubPolymarketKalshiCompareDemo() {
 
     const tokenId = yesTokenId(polyMarket);
     const conditionId = polyConditionId(polyMarket);
-    if (!tokenId || !conditionId) return undefined;
+    if (!tokenId) return undefined;
 
     polyPollTimer.current = setInterval(() => {
       void (async () => {
         try {
-          const trades = await fetchPolymarketTrades(
-            conditionId,
-            tokenId,
-            new AbortController().signal,
-          );
-          const mapped = trades
-            .map((row) => polymarketTradeToPoint(row, tokenId))
-            .filter(Boolean) as Record<string, unknown>[];
+          const [history, trades] = await Promise.all([
+            fetchPolymarketClobHistory(
+              tokenId,
+              { interval: "1h", fidelity: 1 },
+              new AbortController().signal,
+            ),
+            conditionId
+              ? fetchPolymarketTrades(conditionId, tokenId, new AbortController().signal)
+              : Promise.resolve([] as Record<string, unknown>[]),
+          ]);
+          const mapped = [
+            ...history.map((row) => toPctPoint(row, "Polymarket")),
+            ...trades.map((row) => polymarketTradeToPoint(row, tokenId)),
+          ].filter(Boolean) as Record<string, unknown>[];
           if (mapped.length) {
             setPolyPoints((prev) => mergePctPoints(prev, mapped));
           }
@@ -2231,7 +2308,7 @@ export function HubPolymarketKalshiCompareDemo() {
                       <HubKalshiLiveDemoTradesLiveline
                         series={polySeries}
                         persistHistory
-                        fullHistory={interval === "all"}
+                        fullHistory={interval === "6h" || interval === "1d" || interval === "all"}
                         fill
                         fixedValueDomain={{ min: 0, max: 100 }}
                         formatValue={(v) => `${v.toFixed(1)}%`}
@@ -2268,7 +2345,7 @@ export function HubPolymarketKalshiCompareDemo() {
                       <HubKalshiLiveDemoTradesLiveline
                         series={kalshiSeries}
                         persistHistory
-                        fullHistory={interval === "all"}
+                        fullHistory={interval === "6h" || interval === "1d" || interval === "all"}
                         fill
                         fixedValueDomain={{ min: 0, max: 100 }}
                         formatValue={(v) => `${v.toFixed(1)}%`}
