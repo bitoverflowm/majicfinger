@@ -525,7 +525,7 @@ function CompareFeaturedTags({
   return (
     <div className="flex min-w-0 flex-nowrap items-center gap-1.5">
       {featured ? (
-        <span className="inline-flex shrink-0 items-center rounded bg-fuchsia-500 px-1.5 py-0.5 text-[10px] font-medium leading-none text-white">
+        <span className="inline-flex shrink-0 items-center rounded px-1.5 py-0.5 text-[10px] font-medium leading-none text-fuchsia-500 ring-1 ring-fuchsia-500">
           Featured
         </span>
       ) : null}
