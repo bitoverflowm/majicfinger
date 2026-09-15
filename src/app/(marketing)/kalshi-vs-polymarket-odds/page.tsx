@@ -1,12 +1,10 @@
 import type { Metadata } from "next";
-import Image from "next/image";
 import Link from "next/link";
 
 import { KalshiVsPolymarketCompareTool } from "./compare-tool";
 import { KalshiVsPolymarketDashboardMockupLazy } from "./dashboard-mockup-lazy";
 import { HubCtaButton } from "@/components/hubs/HubCtaButton";
 import { HubHashScrollManager } from "@/components/hubs/HubHashScrollManager";
-import { SafariBrowserFrame } from "@/components/hubs/kalshiLiveDemo/SafariBrowserFrame";
 import { HubSectionRenderer } from "@/components/hubs/HubSections";
 import { BentoSection } from "@/components/sections/bento-section";
 import { FAQSection } from "@/components/sections/faq-section";
@@ -236,25 +234,6 @@ function DashboardConversionSection() {
   );
 }
 
-function WorkspaceVisual() {
-  return (
-    <div className="w-full px-6 pb-16 sm:px-8 md:px-10 md:pb-24">
-      <SafariBrowserFrame
-        url="lycheedata.com/dashboard"
-        className="mx-auto w-full max-w-5xl"
-      >
-        <Image
-          src="/landing_dashboard.png"
-          alt="Lychee workspace with prediction market charts and live data"
-          width={1600}
-          height={900}
-          className="h-auto w-full"
-        />
-      </SafariBrowserFrame>
-    </div>
-  );
-}
-
 export default function KalshiVsPolymarketOddsPage() {
   return (
     <>
@@ -297,16 +276,13 @@ export default function KalshiVsPolymarketOddsPage() {
 
         <DashboardConversionSection />
 
-        <div>
-          {renderSection({
-            type: "cards",
-            eyebrow: copy.platform.eyebrow,
-            title: copy.platform.title,
-            intro: copy.platform.intro,
-            cards: [...copy.platform.cards],
-          })}
-          <WorkspaceVisual />
-        </div>
+        {renderSection({
+          type: "cards",
+          eyebrow: copy.platform.eyebrow,
+          title: copy.platform.title,
+          intro: copy.platform.intro,
+          cards: [...copy.platform.cards],
+        })}
 
         <div>
           {renderSection({

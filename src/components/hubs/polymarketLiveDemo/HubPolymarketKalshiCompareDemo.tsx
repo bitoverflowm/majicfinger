@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import Link from "next/link";
-import { Check, Loader2, RefreshCw, Undo2 } from "lucide-react";
+import { Check, Clock, Loader2, RefreshCw, Undo2 } from "lucide-react";
 
 import { PolymarketLiveSearch } from "@/components/connectData/polymarketLive/PolymarketLiveSearch";
 import { MarketTickerSearch } from "@/components/connectData/MarketTickerSearch";
@@ -63,6 +63,7 @@ type CompareFeaturedCard = {
   imageUrl?: string;
   tags?: string[];
   eventTitle?: string;
+  endDate?: string;
   outcomes: { tokenId: string; outcome: string; lastPrice: number | null }[];
 };
 
@@ -77,6 +78,7 @@ type CompareKalshiFeaturedCard = {
   tags?: string[];
   eventTitle?: string;
   seriesTicker?: string;
+  closeTime?: string;
 };
 
 type PinnedKalshiFeatured = {
@@ -89,6 +91,7 @@ type PinnedKalshiFeatured = {
   status?: string;
   tags?: string[];
   imageUrl?: string;
+  closeTime?: string;
 };
 
 function marketImageUrl(
@@ -108,6 +111,107 @@ function marketImageUrl(
     if (url) return url;
   }
   return "";
+}
+
+function parseMarketEndMs(row: Record<string, unknown> | null | undefined): number | null {
+  if (!row) return null;
+  const raw =
+    row.endDate ??
+    row.endDateIso ??
+    row.end_date ??
+    row.endTime ??
+    row.close_time ??
+    row.close_ts ??
+    row.closeTime ??
+    row.expiration_time ??
+    row.expected_expiration_time ??
+    row.expirationTime;
+  if (raw == null || raw === "") return null;
+  if (typeof raw === "number" && Number.isFinite(raw)) {
+    return raw > 1e12 ? raw : raw * 1000;
+  }
+  const text = String(raw).trim();
+  if (/^\d+(\.\d+)?$/.test(text)) {
+    const n = Number(text);
+    if (!Number.isFinite(n) || n <= 0) return null;
+    return n > 1e12 ? n : n * 1000;
+  }
+  const ms = Date.parse(text);
+  return Number.isFinite(ms) ? ms : null;
+}
+
+function formatMarketCountdown(msLeft: number): string {
+  const totalSec = Math.max(0, Math.floor(msLeft / 1000));
+  if (totalSec < 60) return `${totalSec}s`;
+  const totalMin = Math.floor(totalSec / 60);
+  if (totalMin < 60) {
+    const seconds = totalSec % 60;
+    return seconds ? `${totalMin}m ${seconds}s` : `${totalMin}m`;
+  }
+  const totalHr = Math.floor(totalMin / 60);
+  if (totalHr < 48) {
+    const minutes = totalMin % 60;
+    return minutes ? `${totalHr}h ${minutes}m` : `${totalHr}h`;
+  }
+  const days = Math.floor(totalHr / 24);
+  const hours = totalHr % 24;
+  return hours ? `${days}d ${hours}h` : `${days}d`;
+}
+
+function CompareSelectedSummary({
+  platform,
+  imageUrl,
+  fallback,
+  title,
+  meta,
+  yes,
+  no,
+  yesPct,
+  onChange,
+}: {
+  platform: string;
+  imageUrl: string;
+  fallback: string;
+  title: string;
+  meta: string;
+  yes: string;
+  no: string;
+  yesPct: number | null;
+  onChange: () => void;
+}) {
+  return (
+    <div className="flex items-center gap-2.5 rounded-lg border border-border/70 bg-background px-3 py-2">
+      <div className="relative size-10 shrink-0 overflow-hidden rounded-md border border-border/60 bg-muted">
+        {imageUrl ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={imageUrl} alt="" className="size-full object-cover" />
+        ) : (
+          <div className="flex size-full items-center justify-center text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+            {fallback}
+          </div>
+        )}
+      </div>
+      <div className="min-w-0 flex-1">
+        <p className="text-[11px] font-medium leading-none text-muted-foreground">
+          Comparison · {platform}
+        </p>
+        <p className="mt-0.5 truncate text-sm font-semibold leading-tight text-foreground">
+          {title}
+        </p>
+        <p className="mt-0.5 truncate text-[11px] leading-snug text-muted-foreground">
+          {meta ? `${meta} · ` : null}
+          YES = {yes}
+          {yesPct != null ? ` · ${formatPct(yesPct)}` : ""}
+          {" · "}
+          NO = {no}
+          {yesPct != null ? ` · ${formatPct(100 - yesPct)}` : ""}
+        </p>
+      </div>
+      <Button type="button" size="sm" variant="ghost" className="h-7 shrink-0 px-2 text-xs" onClick={onChange}>
+        Change
+      </Button>
+    </div>
+  );
 }
 
 function compareFeaturedKey(market: CompareFeaturedCard) {
@@ -185,6 +289,7 @@ function normalizeCompareFeaturedCard(raw: unknown): CompareFeaturedCard | null 
       ? row.tags.map((tag) => String(tag).trim()).filter(Boolean).slice(0, 4)
       : [],
     eventTitle: String(row.eventTitle || "").trim() || undefined,
+    endDate: String(row.endDate || row.endDateIso || row.endTime || "").trim() || undefined,
     outcomes,
   };
 }
@@ -211,6 +316,15 @@ function normalizeCompareKalshiFeaturedCard(raw: unknown): CompareKalshiFeatured
     status: String(row.status || "").trim() || undefined,
     eventTitle: String(row.eventTitle || "").trim() || undefined,
     seriesTicker: String(row.seriesTicker || "").trim().toUpperCase() || undefined,
+    closeTime:
+      String(
+        row.closeTime ||
+          row.close_time ||
+          (row.raw && typeof row.raw === "object"
+            ? (row.raw as Record<string, unknown>).close_time
+            : "") ||
+          "",
+      ).trim() || undefined,
     tags: Array.isArray(row.tags)
       ? row.tags.map((tag) => String(tag).trim()).filter(Boolean).slice(0, 4)
       : [],
@@ -1462,6 +1576,8 @@ export function HubPolymarketKalshiCompareDemo() {
   const [kalshiLoading, setKalshiLoading] = useState(false);
   const [seriesError, setSeriesError] = useState<string | null>(null);
   const [interval, setIntervalId] = useState<IntervalId>("1d");
+  const [editingCounterpart, setEditingCounterpart] = useState(false);
+  const [nowMs, setNowMs] = useState(() => Date.now());
 
   const polySocketStop = useRef<(() => void) | null>(null);
   const pollTimer = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -1497,6 +1613,7 @@ export function HubPolymarketKalshiCompareDemo() {
     setKalshiLoading(false);
     setSeriesError(null);
     setKalshiAnchor(null);
+    setEditingCounterpart(false);
     setMarkets?.([]);
   }, [setMarkets]);
 
@@ -1509,6 +1626,7 @@ export function HubPolymarketKalshiCompareDemo() {
         conditionId: String(market.conditionId || market.id || ""),
       });
       setEmptyMessage(null);
+      setEditingCounterpart(false);
       setMarkets([market]);
     },
     [setMarkets],
@@ -1529,6 +1647,7 @@ export function HubPolymarketKalshiCompareDemo() {
         status: card.status,
         tags: card.tags,
         imageUrl: card.imageUrl,
+        closeTime: card.closeTime,
       });
       setSelectedTicker(card.ticker);
       setCandidates([]);
@@ -1536,6 +1655,7 @@ export function HubPolymarketKalshiCompareDemo() {
       setMatchLoading(true);
       setMatchError(null);
       setEmptyMessage(null);
+      setEditingCounterpart(false);
       setSeriesError(null);
       setMarkets?.([]);
 
@@ -1677,6 +1797,13 @@ export function HubPolymarketKalshiCompareDemo() {
     () => candidates.find((c) => c.market.marketTicker === selectedTicker) || null,
     [candidates, selectedTicker],
   );
+
+  useEffect(() => {
+    if (!polyKey && !kalshiAnchor) return undefined;
+    setNowMs(Date.now());
+    const id = window.setInterval(() => setNowMs(Date.now()), 1000);
+    return () => window.clearInterval(id);
+  }, [kalshiAnchor, polyKey]);
 
   useEffect(() => {
     if (!polyMarket || !polyKey) {
@@ -1899,7 +2026,7 @@ export function HubPolymarketKalshiCompareDemo() {
         pollTimer.current = null;
       }
     };
-  }, [inView, livePaused, selectedTicker]);
+  }, [inView, selectedTicker]);
 
   const polyFiltered = useMemo(
     () => filterByInterval(polyPoints, interval),
@@ -2007,13 +2134,70 @@ export function HubPolymarketKalshiCompareDemo() {
     ? marketImageUrl(kalshiAnchor as Record<string, unknown> | null, kalshiMarket)
     : marketImageUrl(polyMarket, selection?.metadataRows?.[0]);
   const parentFallback = matchFromKalshi ? "KS" : "PM";
+  const hasCounterpart = matchFromKalshi ? Boolean(polyMarket) : Boolean(selectedTicker);
+  const showCounterpartSearch = !hasCounterpart || editingCounterpart;
   const polyMatchList = polyCandidates.slice(0, 3);
   const kalshiMatchList = candidates.slice(0, 3);
   const showEmptyMatchNote =
     !matchLoading &&
     !matchError &&
+    !hasCounterpart &&
     ((matchFromKalshi && polyMatchList.length === 0) ||
       (!matchFromKalshi && kalshiMatchList.length === 0));
+  const counterpartYesNo = matchFromKalshi
+    ? polymarketYesNoLabels(polyMarket)
+    : kalshiYesNoLabels(
+        {
+          ...(kalshiMarket || {}),
+          yesSubtitle: selectedCandidate?.market.yesSubtitle,
+          noSubtitle: selectedCandidate?.market.noSubtitle,
+          title: kalshiMarket?.title || selectedCandidate?.market.title,
+        },
+        selectedCandidate?.market.title,
+      );
+  const counterpartTitle = matchFromKalshi
+    ? String(polyMarket?.title || polyMarket?.slug || "Market")
+    : String(kalshiMarket?.title || selectedCandidate?.market.title || selectedTicker || "Market");
+  const counterpartMeta = matchFromKalshi
+    ? [String(polyMarket?.slug || ""), polyMarket?.closed ? "Closed" : polyMarket ? "Live" : ""]
+        .map((value) => String(value || "").trim())
+        .filter(Boolean)
+        .join(" · ")
+    : [selectedTicker, String(kalshiMarket?.status || selectedCandidate?.market.status || "")]
+        .map((value) => String(value || "").trim())
+        .filter(Boolean)
+        .join(" · ");
+  const counterpartImageUrl = matchFromKalshi
+    ? marketImageUrl(polyMarket, selection?.metadataRows?.[0])
+    : marketImageUrl(
+        kalshiMarket,
+        selectedCandidate?.market as unknown as Record<string, unknown>,
+        selectedCandidate?.market.raw,
+      );
+  const counterpartYesPct = matchFromKalshi ? polyYesPct : kalshiYesPct;
+  const polyEndMs =
+    parseMarketEndMs(polyMarket as Record<string, unknown> | null | undefined) ??
+    parseMarketEndMs(selection?.metadataRows?.[0]) ??
+    parseMarketEndMs(
+      polyCandidates.find(
+        (candidate) =>
+          polymarketRealtimeMarketKey(candidate.market as HubPolymarketLiveDemoMarket) ===
+          selectedPolyKey,
+      )?.market as Record<string, unknown> | undefined,
+    );
+  const kalshiEndMs =
+    parseMarketEndMs(kalshiMarket) ??
+    parseMarketEndMs(kalshiAnchor as Record<string, unknown> | null) ??
+    parseMarketEndMs(selectedCandidate?.market as unknown as Record<string, unknown> | undefined) ??
+    parseMarketEndMs(selectedCandidate?.market.raw);
+  const marketEndTimes = [polyEndMs, kalshiEndMs].filter((n): n is number => n != null);
+  const upcomingEndMs = marketEndTimes.filter((n) => n > nowMs).sort((a, b) => a - b)[0];
+  const marketCountdownLabel =
+    marketEndTimes.length === 0
+      ? null
+      : upcomingEndMs == null
+        ? "Market ended"
+        : `Market ending in ${formatMarketCountdown(upcomingEndMs - nowMs)}`;
 
   return (
     <div ref={rootRef}>
@@ -2090,33 +2274,48 @@ export function HubPolymarketKalshiCompareDemo() {
 
               {matchError ? <p className="text-sm text-destructive">{matchError}</p> : null}
 
-              <CompareCounterpartSearch
-                matchFromKalshi={matchFromKalshi}
-                onPolySelect={applyPolyMatch}
-                onKalshiSelect={(ticker, title) => {
-                  setSelectedTicker(ticker);
-                  setEmptyMessage(null);
-                  setCandidates((prev) => {
-                    if (prev.some((c) => c.market.marketTicker === ticker)) return prev;
-                    return [
-                      {
-                        market: {
-                          marketTicker: ticker,
-                          title,
-                          raw: {},
+              {showCounterpartSearch ? (
+                <CompareCounterpartSearch
+                  matchFromKalshi={matchFromKalshi}
+                  onPolySelect={applyPolyMatch}
+                  onKalshiSelect={(ticker, title) => {
+                    setSelectedTicker(ticker);
+                    setEmptyMessage(null);
+                    setEditingCounterpart(false);
+                    setCandidates((prev) => {
+                      if (prev.some((c) => c.market.marketTicker === ticker)) return prev;
+                      return [
+                        {
+                          market: {
+                            marketTicker: ticker,
+                            title,
+                            raw: {},
+                          },
+                          score: 0.5,
+                          tier: "related" as const,
+                          reasons: ["Manually selected"],
+                          warnings: [
+                            "Manual selection — verify event, resolution window, and settlement rules",
+                          ],
                         },
-                        score: 0.5,
-                        tier: "related" as const,
-                        reasons: ["Manually selected"],
-                        warnings: [
-                          "Manual selection — verify event, resolution window, and settlement rules",
-                        ],
-                      },
-                      ...prev,
-                    ];
-                  });
-                }}
-              />
+                        ...prev,
+                      ];
+                    });
+                  }}
+                />
+              ) : (
+                <CompareSelectedSummary
+                  platform={matchFromKalshi ? "Polymarket" : "Kalshi"}
+                  imageUrl={counterpartImageUrl}
+                  fallback={matchFromKalshi ? "PM" : "KS"}
+                  title={counterpartTitle}
+                  meta={counterpartMeta}
+                  yes={counterpartYesNo.yes}
+                  no={counterpartYesNo.no}
+                  yesPct={counterpartYesPct}
+                  onChange={() => setEditingCounterpart(true)}
+                />
+              )}
 
               {showEmptyMatchNote ? (
                 <p className="text-sm text-muted-foreground">
@@ -2125,7 +2324,7 @@ export function HubPolymarketKalshiCompareDemo() {
                 </p>
               ) : null}
 
-              {matchFromKalshi && polyMatchList.length > 0 ? (
+              {showCounterpartSearch && matchFromKalshi && polyMatchList.length > 0 ? (
                 <div className="space-y-2">
                   <p className="text-xs font-medium text-muted-foreground">
                     Found the following matching Polymarket markets
@@ -2195,7 +2394,7 @@ export function HubPolymarketKalshiCompareDemo() {
                 </div>
               ) : null}
 
-              {!matchFromKalshi && kalshiMatchList.length > 0 ? (
+              {showCounterpartSearch && !matchFromKalshi && kalshiMatchList.length > 0 ? (
                 <div className="space-y-2">
                   <p className="text-xs font-medium text-muted-foreground">
                     Found the following matching Kalshi markets
@@ -2222,6 +2421,7 @@ export function HubPolymarketKalshiCompareDemo() {
                             checked={selected}
                             onChange={() => {
                               setEmptyMessage(null);
+                              setEditingCounterpart(false);
                               setSelectedTicker(candidate.market.marketTicker);
                             }}
                           />
@@ -2285,7 +2485,7 @@ export function HubPolymarketKalshiCompareDemo() {
 
               {seriesError ? <p className="text-sm text-destructive">{seriesError}</p> : null}
 
-              <div className="flex flex-wrap items-center justify-between gap-2">
+              <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2">
                 <div
                   className="inline-flex h-8 items-center rounded-md border border-border/70 bg-background p-0.5"
                   role="group"
@@ -2307,15 +2507,15 @@ export function HubPolymarketKalshiCompareDemo() {
                     </button>
                   ))}
                 </div>
-                <Button
-                  type="button"
-                  size="sm"
-                  variant="outline"
-                  className="h-8"
-                  onClick={() => setLivePaused((v) => !v)}
-                >
-                  {livePaused ? "Resume live" : "Pause live"}
-                </Button>
+                {marketCountdownLabel ? (
+                  <p
+                    className="inline-flex items-center gap-1.5 text-[11px] tabular-nums text-muted-foreground"
+                    aria-live="polite"
+                  >
+                    <Clock className="size-3.5 shrink-0" aria-hidden />
+                    {marketCountdownLabel}
+                  </p>
+                ) : null}
               </div>
 
               <div className="grid gap-3 sm:grid-cols-2">

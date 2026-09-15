@@ -70,6 +70,7 @@ let discoveryInflight = null;
  *   eventTitle?: string;
  *   tags?: string[];
  *   raw: Record<string, unknown>;
+ *   closeTime?: string;
  * }} FeaturedKalshiMarket
  */
 
@@ -357,6 +358,9 @@ function toFeaturedMarket(market, extra = {}) {
     tags,
     seriesTitle: extra.seriesTitle || undefined,
     category: extra.category || undefined,
+    closeTime:
+      String(market.close_time || market.close_ts || market.expiration_time || "").trim() ||
+      undefined,
     raw: market,
   };
 }

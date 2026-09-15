@@ -43,6 +43,7 @@ let featuredCache = null;
  *   imageUrl?: string;
  *   tags?: string[];
  *   eventTitle?: string;
+ *   endDate?: string;
  *   outcomes: FeaturedPolymarketOutcome[];
  * }} FeaturedPolymarketMarket
  */
@@ -195,6 +196,8 @@ export function normalizePolymarketFeaturedMarket(raw, extra = {}) {
     imageUrl: extra.imageUrl || firstImageUrl(market) || undefined,
     tags: extra.tags?.length ? extra.tags : tagLabelsFrom(market),
     eventTitle: extra.eventTitle || undefined,
+    endDate:
+      String(market.endDate || market.endDateIso || market.endTime || "").trim() || undefined,
     outcomes: paired,
   };
 }
