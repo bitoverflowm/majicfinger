@@ -18,6 +18,7 @@ import { clampCardGridRowLimit } from "@/lib/dashboardCardGrid";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { AnimatedThemeToggler } from "@/components/ui/animated-theme-toggler";
+import { THEME_TOGGLE_BUTTON_CLASS } from "@/components/theme-toggle";
 import {
   getChartCardHeadingPublicClassName,
   getChartCardHeadingPublicStyle,
@@ -315,7 +316,7 @@ export default function PublicDashboardEmbedClient({
   return (
     <div className="relative w-full px-6 py-10 sm:px-10">
       <div className="absolute right-4 top-4 z-20 flex items-center gap-2">
-        <AnimatedThemeToggler className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-input bg-background hover:bg-accent hover:text-accent-foreground" />
+        <AnimatedThemeToggler className={THEME_TOGGLE_BUTTON_CLASS} />
       </div>
       <div
         className="relative overflow-hidden rounded-lg p-8"

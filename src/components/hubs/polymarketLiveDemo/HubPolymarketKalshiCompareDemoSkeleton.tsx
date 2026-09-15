@@ -20,7 +20,6 @@ export function CompareFeaturedSkeletonList() {
             </div>
           </div>
           <div className="flex h-full shrink-0 flex-col items-end justify-center gap-1">
-            <div className="h-2 w-7 rounded bg-muted" />
             <div className="h-4 w-10 rounded bg-muted" />
             <div className="h-3.5 w-12 rounded bg-muted" />
           </div>
@@ -35,9 +34,15 @@ function CompareFeaturedColumnSkeleton({ label }: { label: string }) {
     <div className="flex h-full min-w-0 flex-col overflow-hidden rounded-xl border border-border/70 bg-muted/20">
       <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border/60 px-3 py-2">
         <p className="text-xs font-medium text-muted-foreground">{label}</p>
-        <span className="inline-flex size-6 items-center justify-center" aria-hidden>
-          <span className="size-3.5 animate-pulse rounded bg-muted" />
-        </span>
+        <div className="flex items-center gap-1.5">
+          <span className="inline-flex items-center gap-0.5 text-[9px] font-medium text-muted-foreground">
+            <span className="size-1.5 animate-pulse rounded-full bg-green-500" aria-hidden />
+            Live
+          </span>
+          <span className="inline-flex size-6 items-center justify-center" aria-hidden>
+            <span className="size-3.5 animate-pulse rounded bg-muted" />
+          </span>
+        </div>
       </div>
       <CompareFeaturedSkeletonList />
     </div>

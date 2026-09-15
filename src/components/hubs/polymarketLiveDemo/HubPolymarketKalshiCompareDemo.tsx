@@ -532,7 +532,7 @@ function CompareFeaturedTags({
       {list.map((tag) => (
         <span
           key={tag}
-          className="inline-flex shrink-0 items-center rounded bg-muted/80 px-1.5 py-0.5 text-[10px] font-medium leading-none text-muted-foreground ring-1 ring-border/50"
+          className="inline-flex shrink-0 items-center rounded bg-muted/80 px-1.5 py-0.5 text-[10px] font-medium leading-none text-muted-foreground ring-1 ring-current"
         >
           {tag}
         </span>
@@ -588,10 +588,6 @@ function CompareMarketCard({
         <CompareFeaturedTags tags={tags} featured={featured} />
       </div>
       <div className="flex h-full shrink-0 flex-col items-end justify-center gap-0.5">
-        <span className="inline-flex items-center gap-0.5 text-[9px] font-medium text-muted-foreground">
-          <span className="size-1.5 animate-pulse rounded-full bg-green-500" aria-hidden />
-          Live
-        </span>
         <span className="text-[10px] leading-none text-muted-foreground">
           {priceLabel}{" "}
           <span className="text-base font-semibold tabular-nums leading-none text-foreground">
@@ -630,26 +626,34 @@ function CompareFeaturedColumn({
     <div className="flex h-full min-w-0 flex-col overflow-hidden rounded-xl border border-border/70 bg-muted/20">
       <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border/60 px-3 py-2">
         <p className="text-xs font-medium text-muted-foreground">{label}</p>
-        {loading ? (
-          <span className="inline-flex items-center gap-1.5 text-xs text-muted-foreground">
-            <Loader2 className="size-3.5 animate-spin" aria-hidden />
-            Loading…
+        <div className="flex items-center gap-1.5">
+          <span className="inline-flex items-center gap-0.5 text-[9px] font-medium text-muted-foreground">
+            <span className="size-1.5 animate-pulse rounded-full bg-green-500" aria-hidden />
+            Live
           </span>
-        ) : (
-          <button
-            type="button"
-            onClick={onRefresh}
-            disabled={loading || refreshing}
-            className="inline-flex size-6 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:opacity-50"
-            aria-label={`Show different ${label} markets`}
-            title={`Show different ${label} markets`}
-          >
-            <RefreshCw
-              className={cn("size-3.5", refreshing && "animate-spin")}
-              aria-hidden
-            />
-          </button>
-        )}
+          {loading ? (
+            <span
+              className="inline-flex size-6 items-center justify-center text-muted-foreground"
+              aria-label={`Loading ${label} markets`}
+            >
+              <Loader2 className="size-3.5 animate-spin" aria-hidden />
+            </span>
+          ) : (
+            <button
+              type="button"
+              onClick={onRefresh}
+              disabled={loading || refreshing}
+              className="inline-flex size-6 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:opacity-50"
+              aria-label={`Show different ${label} markets`}
+              title={`Show different ${label} markets`}
+            >
+              <RefreshCw
+                className={cn("size-3.5", refreshing && "animate-spin")}
+                aria-hidden
+              />
+            </button>
+          )}
+        </div>
       </div>
       {loading ? (
         <CompareFeaturedSkeletonList />
