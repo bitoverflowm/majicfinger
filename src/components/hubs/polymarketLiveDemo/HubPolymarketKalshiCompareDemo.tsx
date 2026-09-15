@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import Link from "next/link";
-import { Loader2, RefreshCw, Undo2 } from "lucide-react";
+import { Check, Loader2, RefreshCw, Undo2 } from "lucide-react";
 
 import { PolymarketLiveSearch } from "@/components/connectData/polymarketLive/PolymarketLiveSearch";
 import { MarketTickerSearch } from "@/components/connectData/MarketTickerSearch";
@@ -26,10 +26,17 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { fetchKalshiLiveMarket } from "@/lib/kalshiLive/fetchKalshiLiveMarket";
 import { impliedChancePctFromMarketRow } from "@/lib/kalshiLive/eventCandlesticksPowerMove";
 import { openPolymarketLastTradeSocket } from "@/lib/polymarketLive/openPolymarketMarketSocket";
-import { normalizePolymarketRealtimeHistoryRows } from "@/lib/polymarketLive/polymarketRealtimeSeed";
 import {
   findKalshiLiveMatchesForPolymarket,
   matchTierLabel,
@@ -296,6 +303,14 @@ function yesTokenId(market: Record<string, unknown> | null): string {
   return tokens[0] || "";
 }
 
+function polyConditionId(market: Record<string, unknown> | null): string {
+  if (!market) return "";
+  const fromField = String(market.conditionId || "").trim();
+  if (fromField) return fromField;
+  const id = String(market.id || "").trim();
+  return /^0x[a-fA-F0-9]{64}$/.test(id) ? id : "";
+}
+
 function parseTs(row: Record<string, unknown>): number | null {
   const raw = row.created_time ?? row.time ?? row.timestamp ?? row.created_ts ?? row.ts ?? row.t;
   if (typeof raw === "number" && Number.isFinite(raw)) {
@@ -333,6 +348,44 @@ function toPctPoint(row: Record<string, unknown>, platform: string): Record<stri
     _platform: platform,
     _probability_pct: pct,
   };
+}
+
+function mergePctPoints(
+  prev: Record<string, unknown>[],
+  next: Record<string, unknown>[],
+  max = 2000,
+): Record<string, unknown>[] {
+  const byKey = new Map<string, Record<string, unknown>>();
+  for (const row of [...prev, ...next]) {
+    const key = [
+      String(row.created_time || row.timestamp || ""),
+      String(row.price ?? ""),
+      String(row.size ?? ""),
+      String(row.transaction_hash ?? row.transactionHash ?? ""),
+    ].join("|");
+    if (!key.replace(/\|/g, "")) continue;
+    byKey.set(key, row);
+  }
+  return [...byKey.values()]
+    .sort((a, b) => (parseTs(a) || 0) - (parseTs(b) || 0))
+    .slice(-max);
+}
+
+function polymarketTradeToPoint(
+  row: Record<string, unknown>,
+  tokenId: string,
+): Record<string, unknown> | null {
+  const asset = String(row.asset || row.asset_id || "").trim();
+  if (asset && tokenId && asset !== tokenId) return null;
+  return toPctPoint(
+    {
+      ...row,
+      asset_id: asset || tokenId,
+      created_time: row.created_time || row.timestamp || row.time,
+      transaction_hash: row.transaction_hash ?? row.transactionHash ?? "",
+    },
+    "Polymarket",
+  );
 }
 
 function formatPct(value: number | null | undefined): string {
@@ -531,7 +584,11 @@ function humanizeSeriesError(err: unknown): string {
   if (/too many requests|rate limit/i.test(raw)) {
     return "Kalshi data is rate-limited. Wait a moment, then try again.";
   }
-  if (code === "polymarket_history" || /this polymarket market has no yes token/i.test(raw)) {
+  if (
+    code === "polymarket_history" ||
+    code === "polymarket_trades" ||
+    /this polymarket market has no yes token/i.test(raw)
+  ) {
     if (/no YES token/i.test(raw)) return raw;
     return "This Polymarket market does not exist (or could not be loaded). Pick another Polymarket market.";
   }
@@ -546,42 +603,57 @@ function humanizeSeriesError(err: unknown): string {
   return raw || "Failed to load comparison series";
 }
 
-async function fetchPolymarketHistory(
+const POLY_TRADE_HISTORY_LIMIT = 1000;
+
+async function fetchPolymarketTrades(
+  conditionId: string,
   tokenId: string,
   signal: AbortSignal,
 ): Promise<Record<string, unknown>[]> {
-  // Pull a wide archive once; interval buttons filter client-side (same as prices demo cache).
-  const res = await fetch("/api/integrations/polymarket?query=getBatchPricesHistory", {
-    method: "POST",
+  const params = new URLSearchParams({
+    query: "getTradesByMarket",
+    market: conditionId,
+    limit: String(POLY_TRADE_HISTORY_LIMIT),
+    takerOnly: "true",
+    skipFlatten: "true",
+  });
+  const res = await fetch(`/api/integrations/polymarket?${params.toString()}`, {
     credentials: "same-origin",
-    headers: { Accept: "application/json", "Content-Type": "application/json" },
+    headers: { Accept: "application/json" },
     signal,
-    body: JSON.stringify({
-      markets: [tokenId],
-      interval: "max",
-      fidelity: 60,
-    }),
   });
   const payload = await res.json().catch(() => ({}));
   if (!res.ok) {
     throw taggedError(
-      typeof payload?.error === "string" ? payload.error : "Failed to load Polymarket history",
-      "polymarket_history",
+      typeof payload?.message === "string"
+        ? payload.message
+        : typeof payload?.error === "string"
+          ? payload.error
+          : "Failed to load Polymarket trades",
+      "polymarket_trades",
       res.status,
     );
   }
-  const rows = normalizePolymarketRealtimeHistoryRows(payload);
-  const forToken = rows.filter(
-    (row) => !row.asset_id || String(row.asset_id) === tokenId,
-  );
-  return forToken.length ? forToken : rows;
+  const rows = Array.isArray(payload)
+    ? payload
+    : Array.isArray((payload as { trades?: unknown[] })?.trades)
+      ? (payload as { trades: unknown[] }).trades
+      : [];
+  return rows.filter((row): row is Record<string, unknown> => {
+    if (!row || typeof row !== "object") return false;
+    const asset = String(
+      (row as Record<string, unknown>).asset || (row as Record<string, unknown>).asset_id || "",
+    ).trim();
+    if (asset && tokenId && asset !== tokenId) return false;
+    return true;
+  });
 }
 
 async function fetchKalshiTrades(
   ticker: string,
   signal: AbortSignal,
 ): Promise<Record<string, unknown>[]> {
-  const qs = new URLSearchParams({ ticker, limit: "200" });
+  const qs = new URLSearchParams({ ticker, limit: "1000" });
   const res = await fetch(`/api/integrations/kalshi-live/markets/trades?${qs.toString()}`, {
     credentials: "same-origin",
     headers: { Accept: "application/json" },
@@ -756,6 +828,127 @@ function CompareFeaturedColumn({
   );
 }
 
+type CompareEventPickerState = {
+  title: string;
+  markets: HubPolymarketLiveDemoMarket[];
+};
+
+function compareMarketLabel(market: HubPolymarketLiveDemoMarket) {
+  return String(market.title || market.slug || market.id || "Market");
+}
+
+function compareMarketOutcomeLine(market: HubPolymarketLiveDemoMarket) {
+  const labels = polymarketYesNoLabels(market);
+  return `YES = ${labels.yes} · NO = ${labels.no}`;
+}
+
+function eventPickerFromPolymarketSuggestion(
+  suggestion: Record<string, unknown>,
+):
+  | { picker: CompareEventPickerState }
+  | { market: HubPolymarketLiveDemoMarket }
+  | { error: string } {
+  const nested = polymarketRealtimeMarketsFromEventSuggestion(
+    suggestion,
+  ) as HubPolymarketLiveDemoMarket[];
+  if (!nested.length) {
+    return { error: "That event does not include any streamable markets with outcome token IDs." };
+  }
+  if (nested.length === 1) return { market: nested[0]! };
+  return {
+    picker: {
+      title: String(suggestion.title || "Select event markets"),
+      markets: nested,
+    },
+  };
+}
+
+function ComparePolymarketEventMarketDialog({
+  picker,
+  onClose,
+  onSelect,
+}: {
+  picker: CompareEventPickerState | null;
+  onClose: () => void;
+  onSelect: (market: HubPolymarketLiveDemoMarket) => void;
+}) {
+  const [selectedKey, setSelectedKey] = useState("");
+
+  useEffect(() => {
+    setSelectedKey("");
+  }, [picker?.title, picker?.markets]);
+
+  const selected =
+    picker?.markets.find((market) => polymarketRealtimeMarketKey(market) === selectedKey) || null;
+
+  return (
+    <Dialog
+      open={Boolean(picker)}
+      onOpenChange={(open) => {
+        if (!open) onClose();
+      }}
+    >
+      <DialogContent className="flex max-h-[85vh] flex-col gap-3 overflow-hidden sm:max-w-xl">
+        <DialogHeader className="shrink-0">
+          <DialogTitle>{picker?.title || "Select event markets"}</DialogTitle>
+          <DialogDescription className="text-left">
+            This is an event with multiple markets. Pick the specific market you want to compare.
+          </DialogDescription>
+        </DialogHeader>
+        <div className="min-h-0 flex-1 space-y-1 overflow-y-auto pr-1">
+          {(picker?.markets || []).map((market) => {
+            const key = polymarketRealtimeMarketKey(market);
+            const checked = key === selectedKey;
+            return (
+              <label
+                key={key}
+                className={cn(
+                  "flex cursor-pointer items-start gap-2.5 rounded-lg border p-2.5",
+                  checked ? "border-secondary/35 bg-secondary/10" : "border-border/60",
+                )}
+              >
+                <input
+                  type="radio"
+                  name="compare-event-market"
+                  className="mt-1 size-4 accent-[#2E5CFF]"
+                  checked={checked}
+                  onChange={() => setSelectedKey(key)}
+                />
+                <span className="min-w-0">
+                  <span className="block text-xs font-medium text-foreground">
+                    {compareMarketLabel(market)}
+                  </span>
+                  <span className="mt-0.5 block text-[10px] text-muted-foreground">
+                    {compareMarketOutcomeLine(market)}
+                  </span>
+                </span>
+              </label>
+            );
+          })}
+        </div>
+        <DialogFooter className="shrink-0 items-center border-t border-border/60 pt-3 sm:justify-between">
+          <p className="text-[11px] text-muted-foreground">
+            {selected
+              ? `Compare ${compareMarketLabel(selected)}`
+              : "Pick a market to continue."}
+          </p>
+          <Button
+            type="button"
+            className="gap-1.5"
+            disabled={!selected}
+            onClick={() => {
+              if (selected) onSelect(selected);
+            }}
+          >
+            <Check className="size-3.5" aria-hidden />
+            Use this market
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 function ComparePolymarketMarketSearch({
   onSelectKalshiFeatured,
   kalshiPickLoading,
@@ -766,10 +959,7 @@ function ComparePolymarketMarketSearch({
   const selection = useHubPolymarketLiveDemo();
   const selectMarket = selection?.selectMarket;
   const [error, setError] = useState("");
-  const [eventTitle, setEventTitle] = useState("");
-  const [eventMarkets, setEventMarkets] = useState<HubPolymarketLiveDemoMarket[] | null>(
-    null,
-  );
+  const [eventPicker, setEventPicker] = useState<CompareEventPickerState | null>(null);
   const [featured, setFeatured] = useState<CompareFeaturedCard[]>([]);
   const [featuredLoading, setFeaturedLoading] = useState(true);
   const [featuredRefreshing, setFeaturedRefreshing] = useState(false);
@@ -868,8 +1058,7 @@ function ComparePolymarketMarketSearch({
         conditionId: String(market.conditionId || market.id || ""),
       });
       selectMarket(market);
-      setEventMarkets(null);
-      setEventTitle("");
+      setEventPicker(null);
       setError("");
     },
     [selectMarket],
@@ -899,19 +1088,16 @@ function ComparePolymarketMarketSearch({
       setError("");
       const entity = String(suggestion?.entity || "");
       if (entity === "event") {
-        const nested = polymarketRealtimeMarketsFromEventSuggestion(
-          suggestion,
-        ) as HubPolymarketLiveDemoMarket[];
-        if (!nested.length) {
-          setError("That event does not include any streamable markets with outcome token IDs.");
+        const resolved = eventPickerFromPolymarketSuggestion(suggestion);
+        if ("error" in resolved) {
+          setError(resolved.error);
           return;
         }
-        if (nested.length === 1) {
-          applyMarket(nested[0]!, "compare_search");
+        if ("market" in resolved) {
+          applyMarket(resolved.market, "compare_search");
           return;
         }
-        setEventTitle(String(suggestion.title || "Select a market in this event"));
-        setEventMarkets(nested);
+        setEventPicker(resolved.picker);
         return;
       }
       if (entity !== "market") {
@@ -1050,27 +1236,11 @@ function ComparePolymarketMarketSearch({
         </div>
       </div>
       {error ? <p className="text-center text-sm text-destructive">{error}</p> : null}
-      {eventMarkets?.length ? (
-        <div className="space-y-2 rounded-lg border border-border/60 bg-background/80 p-3">
-          <p className="text-xs font-medium text-muted-foreground">{eventTitle}</p>
-          <ul className="grid gap-1.5">
-            {eventMarkets.slice(0, 8).map((market) => {
-              const key = polymarketRealtimeMarketKey(market);
-              return (
-                <li key={key}>
-                  <button
-                    type="button"
-                    className="w-full rounded-md border border-border/60 bg-muted/20 px-3 py-2 text-left text-sm text-foreground transition-colors hover:bg-muted/40"
-                    onClick={() => applyMarket(market, "compare_search")}
-                  >
-                    {String(market.title || market.slug || "Market")}
-                  </button>
-                </li>
-              );
-            })}
-          </ul>
-        </div>
-      ) : null}
+      <ComparePolymarketEventMarketDialog
+        picker={eventPicker}
+        onClose={() => setEventPicker(null)}
+        onSelect={(market) => applyMarket(market, "compare_search")}
+      />
     </div>
   );
 }
@@ -1087,7 +1257,36 @@ function CompareCounterpartSearch({
   onKalshiSelect: (ticker: string, title: string) => void;
 }) {
   const [manualTickers, setManualTickers] = useState("");
+  const [eventPicker, setEventPicker] = useState<CompareEventPickerState | null>(null);
+  const [searchError, setSearchError] = useState("");
   const counterpart = matchFromKalshi ? "Polymarket" : "Kalshi";
+
+  const handlePolySuggestion = useCallback(
+    (suggestion: Record<string, unknown>) => {
+      setSearchError("");
+      const entity = String(suggestion?.entity || "");
+      if (entity === "event") {
+        const resolved = eventPickerFromPolymarketSuggestion(suggestion);
+        if ("error" in resolved) {
+          setSearchError(resolved.error);
+          return;
+        }
+        if ("market" in resolved) {
+          onPolySelect(resolved.market);
+          return;
+        }
+        setEventPicker(resolved.picker);
+        return;
+      }
+      if (entity !== "market") return;
+      const market = polymarketRealtimeMarketFromSuggestion(suggestion) as
+        | HubPolymarketLiveDemoMarket
+        | null;
+      if (market) onPolySelect(market);
+    },
+    [onPolySelect],
+  );
+
   return (
     <div className="space-y-2">
       <p className="text-xs font-medium text-muted-foreground">
@@ -1096,56 +1295,43 @@ function CompareCounterpartSearch({
           : `Search ${counterpart} by name or ticker`}
       </p>
       {matchFromKalshi ? (
-        <PolymarketLiveSearch
-          layout="panel"
-          dismissAfterSelect
-          searchTags
-          searchProfiles={false}
-          keepClosedMarkets={false}
-          limitPerType={50}
-          className="w-full"
-          resultsClassName="max-h-56 flex-none"
-          placeholder="Search Polymarket by name or ticker…"
-          onSelect={(suggestion) => {
-            const entity = String(suggestion?.entity || "");
-            if (entity === "event") {
-              const nested = polymarketRealtimeMarketsFromEventSuggestion(
-                suggestion,
-              ) as HubPolymarketLiveDemoMarket[];
-              if (nested[0]) onPolySelect(nested[0]);
-              return;
-            }
-            if (entity !== "market") return;
-            const market = polymarketRealtimeMarketFromSuggestion(suggestion) as
-              | HubPolymarketLiveDemoMarket
-              | null;
-            if (market) onPolySelect(market);
-          }}
-          onSubmitAll={(suggestions) => {
-            for (const suggestion of suggestions || []) {
-              if (suggestion?.entity === "market") {
-                const market = polymarketRealtimeMarketFromSuggestion(suggestion) as
-                  | HubPolymarketLiveDemoMarket
-                  | null;
-                if (market) {
-                  onPolySelect(market);
+        <>
+          <PolymarketLiveSearch
+            layout="panel"
+            dismissAfterSelect
+            searchTags
+            searchProfiles={false}
+            keepClosedMarkets={false}
+            limitPerType={50}
+            className="w-full"
+            resultsClassName="max-h-56 flex-none"
+            placeholder="Search Polymarket by name or ticker…"
+            onSelect={handlePolySuggestion}
+            onSubmitAll={(suggestions) => {
+              for (const suggestion of suggestions || []) {
+                if (suggestion?.entity === "market") {
+                  handlePolySuggestion(suggestion);
                   return;
                 }
               }
-            }
-            for (const suggestion of suggestions || []) {
-              if (suggestion?.entity === "event") {
-                const nested = polymarketRealtimeMarketsFromEventSuggestion(
-                  suggestion,
-                ) as HubPolymarketLiveDemoMarket[];
-                if (nested[0]) {
-                  onPolySelect(nested[0]);
+              for (const suggestion of suggestions || []) {
+                if (suggestion?.entity === "event") {
+                  handlePolySuggestion(suggestion);
                   return;
                 }
               }
-            }
-          }}
-        />
+            }}
+          />
+          {searchError ? <p className="text-xs text-destructive">{searchError}</p> : null}
+          <ComparePolymarketEventMarketDialog
+            picker={eventPicker}
+            onClose={() => setEventPicker(null)}
+            onSelect={(market) => {
+              setEventPicker(null);
+              onPolySelect(market);
+            }}
+          />
+        </>
       ) : (
         <MarketTickerSearch
           value={manualTickers}
@@ -1201,6 +1387,7 @@ export function HubPolymarketKalshiCompareDemo() {
 
   const polySocketStop = useRef<(() => void) | null>(null);
   const pollTimer = useRef<ReturnType<typeof setInterval> | null>(null);
+  const polyPollTimer = useRef<ReturnType<typeof setInterval> | null>(null);
   const matchAbort = useRef<AbortController | null>(null);
   const polyHistAbort = useRef<AbortController | null>(null);
   const kalshiSeriesAbort = useRef<AbortController | null>(null);
@@ -1214,6 +1401,10 @@ export function HubPolymarketKalshiCompareDemo() {
     if (pollTimer.current) {
       clearInterval(pollTimer.current);
       pollTimer.current = null;
+    }
+    if (polyPollTimer.current) {
+      clearInterval(polyPollTimer.current);
+      polyPollTimer.current = null;
     }
     setMatchLoading(false);
     setMatchError(null);
@@ -1338,6 +1529,7 @@ export function HubPolymarketKalshiCompareDemo() {
       kalshiSeriesAbort.current?.abort();
       polySocketStop.current?.();
       if (pollTimer.current) clearInterval(pollTimer.current);
+      if (polyPollTimer.current) clearInterval(polyPollTimer.current);
     };
   }, []);
 
@@ -1416,26 +1608,33 @@ export function HubPolymarketKalshiCompareDemo() {
     if (!inView) return undefined;
 
     const tokenId = yesTokenId(polyMarket);
+    const conditionId = polyConditionId(polyMarket);
     if (!tokenId) {
       setPolyPoints([]);
       setPolyLoading(false);
       setSeriesError("This Polymarket market has no YES token to chart.");
       return undefined;
     }
+    if (!conditionId) {
+      setPolyPoints([]);
+      setPolyLoading(false);
+      setSeriesError("This Polymarket market has no condition ID to load trades.");
+      return undefined;
+    }
 
     polyHistAbort.current?.abort();
     const ac = new AbortController();
     polyHistAbort.current = ac;
+    setPolyPoints([]);
     setPolyLoading(true);
 
-    void fetchPolymarketHistory(tokenId, ac.signal)
-      .then((polyHist) => {
+    void fetchPolymarketTrades(conditionId, tokenId, ac.signal)
+      .then((polyTrades) => {
         if (ac.signal.aborted) return;
-        setPolyPoints(
-          polyHist
-            .map((row) => toPctPoint(row, "Polymarket"))
-            .filter(Boolean) as Record<string, unknown>[],
-        );
+        const mapped = polyTrades
+          .map((row) => polymarketTradeToPoint(row, tokenId))
+          .filter(Boolean) as Record<string, unknown>[];
+        setPolyPoints((prev) => mergePctPoints(mapped, prev));
       })
       .catch((err) => {
         if (ac.signal.aborted || (err instanceof DOMException && err.name === "AbortError")) return;
@@ -1513,13 +1712,54 @@ export function HubPolymarketKalshiCompareDemo() {
           "Polymarket",
         );
         if (!point) return;
-        setPolyPoints((prev) => [...prev.slice(-2000), point]);
+        setPolyPoints((prev) => mergePctPoints(prev, [point]));
       },
     });
 
     return () => {
       polySocketStop.current?.();
       polySocketStop.current = null;
+    };
+  }, [inView, livePaused, polyMarket]);
+
+  // Poll Polymarket trades (Data API) so the liveline stays in sync with Kalshi's REST poll.
+  useEffect(() => {
+    if (polyPollTimer.current) {
+      clearInterval(polyPollTimer.current);
+      polyPollTimer.current = null;
+    }
+
+    if (!inView || livePaused || !polyMarket) return undefined;
+
+    const tokenId = yesTokenId(polyMarket);
+    const conditionId = polyConditionId(polyMarket);
+    if (!tokenId || !conditionId) return undefined;
+
+    polyPollTimer.current = setInterval(() => {
+      void (async () => {
+        try {
+          const trades = await fetchPolymarketTrades(
+            conditionId,
+            tokenId,
+            new AbortController().signal,
+          );
+          const mapped = trades
+            .map((row) => polymarketTradeToPoint(row, tokenId))
+            .filter(Boolean) as Record<string, unknown>[];
+          if (mapped.length) {
+            setPolyPoints((prev) => mergePctPoints(prev, mapped));
+          }
+        } catch {
+          /* ignore poll errors */
+        }
+      })();
+    }, 12_000);
+
+    return () => {
+      if (polyPollTimer.current) {
+        clearInterval(polyPollTimer.current);
+        polyPollTimer.current = null;
+      }
     };
   }, [inView, livePaused, polyMarket]);
 
