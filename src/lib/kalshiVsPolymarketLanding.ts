@@ -39,9 +39,9 @@ export const kalshiVsPolymarketLanding = {
     } satisfies HubCta,
     trustLine: "Free to use. No signup required.",
     belowTool:
-      "Want to monitor the situation your way? Create your own custom dashboard for the markets that matter to you.",
+      "Build your edge with the full Lychee platform. Connect live and historical data across Kalshi, Polymarket, News, Twitter, and more. Test your ideas, build your own analysis, and turn your findings into custom charts, live dashboards, and shareable research—all without writing code.",
     cta: {
-      label: "Monitor on a live dashboard",
+      label: "Access Now",
       href: "#demo",
       requiresAuth: false,
       ariaLabel: "Open the free live dashboard preview",

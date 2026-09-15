@@ -31,6 +31,8 @@ type HubKalshiLiveDemoTradesLivelineProps = {
   onChangeSeriesColor?: (id: string, tokenId: DemoChartColorTokenId) => void;
   className?: string;
   paused?: boolean;
+  /** Liveline breathing-line placeholder while the feed has not arrived. */
+  loading?: boolean;
   /** Shorter canvas for hero / compact embeds. */
   compact?: boolean;
   /**
@@ -299,6 +301,7 @@ export const HubKalshiLiveDemoTradesLiveline = forwardRef<
   onChangeSeriesColor,
   className,
   paused = false,
+  loading = false,
   compact = false,
   fill = false,
   persistHistory = false,
@@ -416,7 +419,8 @@ export const HubKalshiLiveDemoTradesLiveline = forwardRef<
     }
   }, [mapped.series, plotSeries, visible]);
 
-  if (!mapped.series.some((s) => s.data.length)) {
+  const hasPoints = mapped.series.some((s) => s.data.length);
+  if (!hasPoints && !loading) {
     return (
       <div ref={ref} className={className}>
         <p className="px-3 py-8 text-center text-sm text-muted-foreground">
@@ -444,7 +448,7 @@ export const HubKalshiLiveDemoTradesLiveline = forwardRef<
           className={cn("shrink-0", compact && "py-1")}
         />
       ) : null}
-      {!primary ? (
+      {!primary && !loading ? (
         <p className="flex flex-1 items-center justify-center px-3 py-8 text-center text-sm text-muted-foreground">
           All series hidden — click a legend item to show it again.
         </p>
@@ -457,8 +461,8 @@ export const HubKalshiLiveDemoTradesLiveline = forwardRef<
           )}
         >
           <Liveline
-            data={primary.data}
-            value={primary.value}
+            data={primary?.data ?? []}
+            value={primary?.value ?? 0}
             series={
               plotSeries.length > 1
                 ? plotSeries.map((s) => ({
@@ -470,12 +474,18 @@ export const HubKalshiLiveDemoTradesLiveline = forwardRef<
                   }))
                 : undefined
             }
-            color={primary.color}
+            color={
+              primary?.color ??
+              mapped.series[0]?.color ??
+              demoChartCssVar(defaultSeriesColorToken(0))
+            }
             theme={dark ? "dark" : "light"}
             momentum
             scrub
             badge
+            loading={loading}
             paused={paused}
+            emptyText={loading ? undefined : emptyMessage}
             seriesToggleCompact={false}
             window={windowSecs}
             formatValue={(v) => formatTick(Number(v))}

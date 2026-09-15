@@ -83,6 +83,41 @@ import {
 }
 
 {
+  const ranked = rankKalshiCandidatesForPolymarket(
+    {
+      title: "Fed rate hike in 2026",
+      outcomes: ["Yes", "No"],
+      endDateIso: "2026-12-31T00:00:00Z",
+    },
+    [
+      {
+        ticker: "FEDHIKE",
+        title: "Fed rate hike",
+        markets: [
+          {
+            ticker: "FEDHIKE-26DEC31",
+            yes_sub_title: "Before 2027",
+            status: "finalized",
+            close_time: "2026-12-31T00:00:00Z",
+          },
+          {
+            ticker: "FEDHIKE-27DEC31",
+            yes_sub_title: "Fed hike by 2027",
+            status: "active",
+            close_time: "2027-12-31T00:00:00Z",
+          },
+        ],
+      },
+    ],
+  );
+  assert.equal(
+    ranked.some((c) => c.market.marketTicker === "FEDHIKE-26DEC31"),
+    false,
+  );
+  assert.ok(ranked.some((c) => c.market.marketTicker === "FEDHIKE-27DEC31"));
+}
+
+{
   assert.equal(KALSHI_EMBEDDING_SEARCH_QUERY_MAX, 128);
   assert.equal(clipKalshiEmbeddingSearchQuery("a".repeat(128)).length, 128);
   assert.ok(clipKalshiEmbeddingSearchQuery("a".repeat(200)).length <= 128);

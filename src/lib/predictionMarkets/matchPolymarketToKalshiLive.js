@@ -196,6 +196,12 @@ export function polymarketOutcomeShape(polymarket) {
   };
 }
 
+function isKalshiSuggestionListed(status) {
+  const s = str(status).toLowerCase();
+  if (!s) return true;
+  return !["closed", "determined", "finalized", "settled", "inactive", "deactivated"].includes(s);
+}
+
 /**
  * Flatten embedding suggestions into market-level candidates.
  * @param {import("@/lib/kalshiLive/kalshiLiveEmbeddingSearch").KalshiEmbeddingSearchSuggestion[]} suggestions
@@ -221,6 +227,7 @@ export function flattenKalshiEmbeddingSuggestionsToMarkets(suggestions) {
       const row = /** @type {Record<string, unknown>} */ (raw);
       const marketTicker = str(row.ticker).toUpperCase();
       if (!marketTicker || seen.has(marketTicker)) continue;
+      if (!isKalshiSuggestionListed(row.status)) continue;
       seen.add(marketTicker);
 
       const yesSub = str(row.yes_sub_title || row.yes_subtitle || row.subtitle);
