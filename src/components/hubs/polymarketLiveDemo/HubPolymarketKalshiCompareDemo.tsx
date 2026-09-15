@@ -373,12 +373,14 @@ function taggedError(message: string, code: string, status?: number): Error {
   return err;
 }
 
-function humanizeMatchError(raw: string): string {
+function humanizeMatchError(raw: string, side: "kalshi" | "polymarket" = "kalshi"): string {
+  const other = side === "kalshi" ? "Kalshi" : "Polymarket";
+  const origin = side === "kalshi" ? "Polymarket" : "Kalshi";
   if (/too many requests|rate limit/i.test(raw)) {
-    return "Kalshi search is rate-limited. Wait a moment, then try again or search Kalshi manually.";
+    return `${other} search is rate-limited. Wait a moment, then try again or search ${other} manually.`;
   }
   if (isOpaqueHttpErrorMessage(raw) || /failed to fetch|network|search failed/i.test(raw)) {
-    return "We couldn’t search Kalshi for a matching market. Search Kalshi manually, or try another Polymarket market.";
+    return `We couldn’t search ${other} for a matching market. Search ${other} manually, or try another ${origin} market.`;
   }
   return raw;
 }
@@ -458,6 +460,57 @@ async function fetchKalshiTrades(
   return (Array.isArray(body?.trades) ? body.trades : []).filter(
     (row: unknown) => row && typeof row === "object",
   ) as Record<string, unknown>[];
+}
+
+async function fetchPolymarketMatchesForKalshi(
+  query: string,
+  signal: AbortSignal,
+): Promise<HubPolymarketLiveDemoMarket[]> {
+  const params = new URLSearchParams({
+    query: "metadataSuggestions",
+    q: query,
+    limit_per_type: "12",
+    search_tags: "true",
+    search_profiles: "false",
+    keep_closed_markets: "0",
+  });
+  const res = await fetch(`/api/integrations/polymarket?${params.toString()}`, {
+    credentials: "same-origin",
+    headers: { Accept: "application/json" },
+    signal,
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    throw new Error(
+      typeof data?.message === "string" ? data.message : "Polymarket search failed",
+    );
+  }
+  const list = Array.isArray(data?.suggestions) ? data.suggestions : [];
+  const markets: HubPolymarketLiveDemoMarket[] = [];
+  const seen = new Set<string>();
+  const push = (market: HubPolymarketLiveDemoMarket | null | undefined) => {
+    if (!market) return;
+    const key = polymarketRealtimeMarketKey(market);
+    if (!key || seen.has(key)) return;
+    seen.add(key);
+    markets.push(market);
+  };
+  for (const row of list) {
+    if (!row || typeof row !== "object") continue;
+    const item = row as Record<string, unknown>;
+    const entity = String(item.entity || "");
+    const closed = item.closed === true || item.closed === "true";
+    if (entity === "market" && !closed) {
+      push(polymarketRealtimeMarketFromSuggestion(item) as HubPolymarketLiveDemoMarket | null);
+    } else if (entity === "event") {
+      for (const nested of polymarketRealtimeMarketsFromEventSuggestion(
+        item,
+      ) as HubPolymarketLiveDemoMarket[]) {
+        push(nested);
+      }
+    }
+  }
+  return markets.slice(0, 6);
 }
 
 
@@ -614,9 +667,11 @@ function CompareFeaturedColumn({
 }
 
 function ComparePolymarketMarketSearch({
-  onPinKalshiTicker,
+  onSelectKalshiFeatured,
+  kalshiPickLoading,
 }: {
-  onPinKalshiTicker?: (pin: PinnedKalshiFeatured) => void;
+  onSelectKalshiFeatured?: (card: CompareKalshiFeaturedCard) => void;
+  kalshiPickLoading?: boolean;
 }) {
   const selection = useHubPolymarketLiveDemo();
   const selectMarket = selection?.selectMarket;
@@ -633,7 +688,6 @@ function ComparePolymarketMarketSearch({
   const [kalshiFeaturedLoading, setKalshiFeaturedLoading] = useState(true);
   const [kalshiFeaturedRefreshing, setKalshiFeaturedRefreshing] = useState(false);
   const [kalshiFeaturedError, setKalshiFeaturedError] = useState<string | null>(null);
-  const [kalshiPickLoading, setKalshiPickLoading] = useState(false);
 
   const loadFeatured = useCallback(async (opts?: { excludeIds?: string[] }) => {
     const exclude = opts?.excludeIds || [];
@@ -744,68 +798,10 @@ function ComparePolymarketMarketSearch({
   );
 
   const selectKalshiFeatured = useCallback(
-    async (card: CompareKalshiFeaturedCard) => {
-      const query = card.title.trim();
-      if (!isPolymarketPublicSearchEligible(query)) {
-        setError("That Kalshi market does not have a title we can search on Polymarket.");
-        return;
-      }
-      setKalshiPickLoading(true);
-      setError("");
-      onPinKalshiTicker?.({ ticker: card.ticker, title: card.title });
-      try {
-        const params = new URLSearchParams({
-          query: "metadataSuggestions",
-          q: query,
-          limit_per_type: "12",
-          search_tags: "true",
-          search_profiles: "false",
-          keep_closed_markets: "0",
-        });
-        const res = await fetch(`/api/integrations/polymarket?${params.toString()}`, {
-          credentials: "same-origin",
-          headers: { Accept: "application/json" },
-        });
-        const data = await res.json().catch(() => ({}));
-        if (!res.ok) {
-          throw new Error(
-            typeof data?.message === "string" ? data.message : "Polymarket search failed",
-          );
-        }
-        const list = Array.isArray(data?.suggestions) ? data.suggestions : [];
-        const marketHit = list.find(
-          (row: Record<string, unknown>) =>
-            row?.entity === "market" && row?.closed !== true && row?.closed !== "true",
-        );
-        if (marketHit) {
-          const market = polymarketRealtimeMarketFromSuggestion(marketHit) as
-            | HubPolymarketLiveDemoMarket
-            | null;
-          if (!market) {
-            setError("That Polymarket match does not expose streamable outcome token IDs.");
-            return;
-          }
-          applyMarket(market, "compare_kalshi_featured");
-          return;
-        }
-        const eventHit = list.find((row: Record<string, unknown>) => row?.entity === "event");
-        if (eventHit) {
-          const nested = polymarketRealtimeMarketsFromEventSuggestion(
-            eventHit,
-          ) as HubPolymarketLiveDemoMarket[];
-          if (nested[0]) {
-            applyMarket(nested[0], "compare_kalshi_featured");
-            return;
-          }
-        }
-        setError("Couldn’t find a Polymarket market for that Kalshi contract. Try search above.");
-      } catch (e) {
-        setError(e instanceof Error ? e.message : "Polymarket search failed");
-      } finally {
-        setKalshiPickLoading(false);
-      }
+    (card: CompareKalshiFeaturedCard) => {
+      onSelectKalshiFeatured?.(card);
     },
-    [applyMarket, onPinKalshiTicker],
+    [onSelectKalshiFeatured],
   );
 
   const handleSearchSelection = useCallback(
@@ -955,7 +951,7 @@ function ComparePolymarketMarketSearch({
                     price={formatCompareFeaturedPrice(market.lastPriceDollars)}
                     volume={formatCompareKalshiVolume(market.volume24h)}
                     disabled={kalshiPickLoading}
-                    onClick={() => void selectKalshiFeatured(market)}
+                    onClick={() => selectKalshiFeatured(market)}
                   />
                 </li>
               ))}
@@ -1006,6 +1002,8 @@ export function HubPolymarketKalshiCompareDemo() {
   const [emptyMessage, setEmptyMessage] = useState<string | null>(null);
   const [manualOpen, setManualOpen] = useState(false);
   const [manualTickers, setManualTickers] = useState("");
+  const [kalshiAnchor, setKalshiAnchor] = useState<PinnedKalshiFeatured | null>(null);
+  const [polyCandidates, setPolyCandidates] = useState<HubPolymarketLiveDemoMarket[]>([]);
 
   const [kalshiMarket, setKalshiMarket] = useState<Record<string, unknown> | null>(null);
   const [polyPoints, setPolyPoints] = useState<Record<string, unknown>[]>([]);
@@ -1021,11 +1019,6 @@ export function HubPolymarketKalshiCompareDemo() {
   const matchAbort = useRef<AbortController | null>(null);
   const polyHistAbort = useRef<AbortController | null>(null);
   const kalshiSeriesAbort = useRef<AbortController | null>(null);
-  const pinnedKalshiRef = useRef<PinnedKalshiFeatured | null>(null);
-
-  const pinKalshiTicker = useCallback((pin: PinnedKalshiFeatured) => {
-    pinnedKalshiRef.current = pin;
-  }, []);
 
   const startOver = useCallback(() => {
     matchAbort.current?.abort();
@@ -1040,6 +1033,7 @@ export function HubPolymarketKalshiCompareDemo() {
     setMatchLoading(false);
     setMatchError(null);
     setCandidates([]);
+    setPolyCandidates([]);
     setSelectedTicker("");
     setEmptyMessage(null);
     setManualOpen(false);
@@ -1050,9 +1044,94 @@ export function HubPolymarketKalshiCompareDemo() {
     setPolyLoading(false);
     setKalshiLoading(false);
     setSeriesError(null);
-    pinnedKalshiRef.current = null;
+    setKalshiAnchor(null);
     setMarkets?.([]);
   }, [setMarkets]);
+
+  const applyPolyMatch = useCallback(
+    (market: HubPolymarketLiveDemoMarket) => {
+      if (!setMarkets) return;
+      trackPolymarketLiveHubEvent("polymarket_live_market_selected", {
+        source: "compare_kalshi_featured",
+        title: String(market.title || ""),
+        conditionId: String(market.conditionId || market.id || ""),
+      });
+      setMarkets([market]);
+    },
+    [setMarkets],
+  );
+
+  const startFromKalshi = useCallback(
+    (card: CompareKalshiFeaturedCard) => {
+      matchAbort.current?.abort();
+      const ac = new AbortController();
+      matchAbort.current = ac;
+      setKalshiAnchor({ ticker: card.ticker, title: card.title });
+      setSelectedTicker(card.ticker);
+      setCandidates([]);
+      setPolyCandidates([]);
+      setMatchLoading(true);
+      setMatchError(null);
+      setEmptyMessage(null);
+      setManualOpen(false);
+      setSeriesError(null);
+      setMarkets?.([]);
+
+      const query = card.title.trim();
+      if (!isPolymarketPublicSearchEligible(query)) {
+        setMatchLoading(false);
+        setEmptyMessage(
+          "That Kalshi market does not have a title we can search on Polymarket.",
+        );
+        setManualOpen(true);
+        return;
+      }
+
+      trackPolymarketLiveHubEvent("polymarket_kalshi_compare_attempt", {
+        query,
+        candidateCount: 0,
+        hasPreselected: false,
+        origin: "kalshi",
+      });
+
+      void fetchPolymarketMatchesForKalshi(query, ac.signal)
+        .then((matches) => {
+          if (ac.signal.aborted) return;
+          setPolyCandidates(matches);
+          if (!matches.length) {
+            setEmptyMessage(
+              "Couldn’t find a Polymarket market for that Kalshi contract. Search Polymarket manually, or try another Kalshi market.",
+            );
+            setManualOpen(true);
+            return;
+          }
+          trackPolymarketLiveHubEvent("polymarket_kalshi_compare_match", {
+            ticker: card.ticker,
+            auto: matches.length === 1,
+            origin: "kalshi",
+            candidateCount: matches.length,
+          });
+          if (matches.length === 1 && matches[0]) applyPolyMatch(matches[0]);
+        })
+        .catch((err) => {
+          if (ac.signal.aborted || (err instanceof DOMException && err.name === "AbortError")) {
+            return;
+          }
+          setMatchError(
+            humanizeMatchError(
+              err instanceof Error ? err.message : "Polymarket search failed",
+              "polymarket",
+            ),
+          );
+          setPolyCandidates([]);
+          setManualOpen(true);
+        })
+        .finally(() => {
+          if (!ac.signal.aborted) setMatchLoading(false);
+        });
+    },
+    [applyPolyMatch, setMarkets],
+  );
 
   useEffect(() => {
     const el = rootRef.current;
@@ -1075,8 +1154,9 @@ export function HubPolymarketKalshiCompareDemo() {
     };
   }, []);
 
-  // Match when Polymarket selection changes and section is in view.
+  // Match Kalshi only when the user started from a Polymarket market.
   useEffect(() => {
+    if (kalshiAnchor) return undefined;
     if (!inView || !polyMarket || !polyKey) {
       setCandidates([]);
       setSelectedTicker("");
@@ -1104,36 +1184,10 @@ export function HubPolymarketKalshiCompareDemo() {
           candidateCount: result.candidates.length,
           hasPreselected: Boolean(result.preselected),
         });
-        const pinned = pinnedKalshiRef.current;
-        pinnedKalshiRef.current = null;
-        let nextCandidates = result.candidates;
-        if (pinned?.ticker && !nextCandidates.some((c) => c.market.marketTicker === pinned.ticker)) {
-          nextCandidates = [
-            {
-              market: {
-                marketTicker: pinned.ticker,
-                title: pinned.title || pinned.ticker,
-                raw: {},
-              },
-              score: 1,
-              tier: "exact" as const,
-              reasons: ["Selected from featured Kalshi markets"],
-              warnings: [],
-            },
-            ...nextCandidates,
-          ];
-        }
-        setCandidates(nextCandidates);
-        setEmptyMessage(pinned?.ticker ? null : result.emptyMessage);
-        if (!nextCandidates.length) setManualOpen(true);
-        if (pinned?.ticker) {
-          trackPolymarketLiveHubEvent("polymarket_kalshi_compare_match", {
-            tier: "exact",
-            ticker: pinned.ticker,
-            auto: true,
-          });
-          setSelectedTicker(pinned.ticker);
-        } else if (result.preselected) {
+        setCandidates(result.candidates);
+        setEmptyMessage(result.emptyMessage);
+        if (!result.candidates.length) setManualOpen(true);
+        if (result.preselected) {
           trackPolymarketLiveHubEvent("polymarket_kalshi_compare_match", {
             tier: result.preselected.tier,
             ticker: result.preselected.market.marketTicker,
@@ -1151,27 +1205,6 @@ export function HubPolymarketKalshiCompareDemo() {
       })
       .catch((err) => {
         if (ac.signal.aborted || (err instanceof DOMException && err.name === "AbortError")) return;
-        const pinned = pinnedKalshiRef.current;
-        pinnedKalshiRef.current = null;
-        if (pinned?.ticker) {
-          setSelectedTicker(pinned.ticker);
-          setCandidates([
-            {
-              market: {
-                marketTicker: pinned.ticker,
-                title: pinned.title || pinned.ticker,
-                raw: {},
-              },
-              score: 1,
-              tier: "exact",
-              reasons: ["Selected from featured Kalshi markets"],
-              warnings: [],
-            },
-          ]);
-          setMatchError(null);
-          setManualOpen(false);
-          return;
-        }
         setMatchError(
           humanizeMatchError(err instanceof Error ? err.message : "Match search failed"),
         );
@@ -1183,7 +1216,7 @@ export function HubPolymarketKalshiCompareDemo() {
       });
 
     return () => ac.abort();
-  }, [inView, polyKey, polyMarket]);
+  }, [inView, kalshiAnchor, polyKey, polyMarket]);
 
   const selectedCandidate = useMemo(
     () => candidates.find((c) => c.market.marketTicker === selectedTicker) || null,
@@ -1416,30 +1449,49 @@ export function HubPolymarketKalshiCompareDemo() {
   const shape = polymarketOutcomeShape(polyMarket || {});
 
   const relatedWarning =
+    !kalshiAnchor &&
     selectedCandidate &&
     (selectedCandidate.tier === "related" || selectedCandidate.tier === "close");
 
-  const polyChartPending = polyLoading && !polyFiltered.length;
+  const polyChartPending = Boolean(polyMarket) && polyLoading && !polyFiltered.length;
   const kalshiChartPending =
-    (matchLoading || kalshiLoading) && !kalshiFiltered.length;
+    (kalshiLoading || (!kalshiAnchor && matchLoading)) && !kalshiFiltered.length;
   const kalshiFieldsPending = !selectedTicker || (kalshiLoading && !kalshiMarket);
-  const polyFieldsPending = polyLoading && polyYesPct == null;
+  const polyFieldsPending = !polyMarket || (polyLoading && polyYesPct == null);
+  const matchFromKalshi = Boolean(kalshiAnchor);
+  const selectedPolyKey = polyMarket ? polymarketRealtimeMarketKey(polyMarket) : "";
+  const counterpartName = matchFromKalshi ? "Polymarket" : "Kalshi";
+  const manualSearchLabel = `Search ${counterpartName} manually`;
 
   return (
     <div ref={rootRef} className="space-y-5">
-      {!polyMarket ? (
+      {!polyMarket && !kalshiAnchor ? (
         <div className="rounded-xl border border-border/70 bg-muted/15 px-4 py-5 sm:px-5 sm:py-6">
-          <ComparePolymarketMarketSearch onPinKalshiTicker={pinKalshiTicker} />
+          <ComparePolymarketMarketSearch
+            onSelectKalshiFeatured={startFromKalshi}
+            kalshiPickLoading={matchLoading}
+          />
         </div>
       ) : (
         <>
           <div className="flex items-start justify-between gap-3 rounded-xl border border-border/60 bg-muted/10 px-3 py-2.5 text-sm">
             <div className="min-w-0">
-              <span className="text-muted-foreground">Polymarket selected: </span>
-              <span className="font-medium text-foreground">
-                {String(polyMarket.title || polyMarket.slug || "Market")}
-              </span>
-              {!shape.isBinary ? (
+              {matchFromKalshi ? (
+                <>
+                  <span className="text-muted-foreground">Kalshi selected: </span>
+                  <span className="font-medium text-foreground">
+                    {kalshiAnchor?.title || selectedTicker || "Market"}
+                  </span>
+                </>
+              ) : (
+                <>
+                  <span className="text-muted-foreground">Polymarket selected: </span>
+                  <span className="font-medium text-foreground">
+                    {String(polyMarket?.title || polyMarket?.slug || "Market")}
+                  </span>
+                </>
+              )}
+              {polyMarket && !shape.isBinary ? (
                 <p className="mt-1 text-[11px] text-amber-600 dark:text-amber-400">
                   Multi-outcome market — comparison uses the YES (or first) outcome only.
                 </p>
@@ -1460,13 +1512,15 @@ export function HubPolymarketKalshiCompareDemo() {
           {matchLoading ? (
             <div className="flex items-center gap-2 text-sm text-muted-foreground">
               <Loader2 className="size-4 animate-spin" aria-hidden />
-              Searching Kalshi Live for comparable markets…
+              {matchFromKalshi
+                ? "Searching Polymarket for comparable markets…"
+                : "Searching Kalshi Live for comparable markets…"}
             </div>
           ) : null}
 
           {matchError ? (
             <div className="space-y-3 rounded-xl border border-border/70 bg-muted/15 px-4 py-4">
-              <p className="text-sm text-destructive">{humanizeMatchError(matchError)}</p>
+              <p className="text-sm text-destructive">{matchError}</p>
               <div className="flex flex-wrap gap-2">
                 <Button
                   type="button"
@@ -1486,7 +1540,7 @@ export function HubPolymarketKalshiCompareDemo() {
                   onClick={() => setManualOpen(true)}
                 >
                   <Search className="size-3.5" aria-hidden />
-                  Search Kalshi manually
+                  {manualSearchLabel}
                 </Button>
               </div>
             </div>
@@ -1514,13 +1568,70 @@ export function HubPolymarketKalshiCompareDemo() {
                   onClick={() => setManualOpen(true)}
                 >
                   <Search className="size-3.5" aria-hidden />
-                  Search Kalshi manually
+                  {manualSearchLabel}
                 </Button>
               </div>
             </div>
           ) : null}
 
-          {candidates.length > 0 ? (
+          {matchFromKalshi && polyCandidates.length > 0 ? (
+            <div className="space-y-2">
+              <p className="text-xs font-medium text-muted-foreground">
+                {selectedPolyKey &&
+                polyCandidates.some((item) => polymarketRealtimeMarketKey(item) === selectedPolyKey)
+                  ? polyCandidates.length === 1
+                    ? "Matched Polymarket market"
+                    : "Select the correct Polymarket market"
+                  : "Select the correct Polymarket market"}
+              </p>
+              <div className="grid gap-2">
+                {polyCandidates.map((candidate) => {
+                  const key = polymarketRealtimeMarketKey(candidate);
+                  const selected = Boolean(key) && key === selectedPolyKey;
+                  const volume = formatPolymarketVolume(candidate.volume24h);
+                  return (
+                    <label
+                      key={key}
+                      className={cn(
+                        "flex cursor-pointer items-start gap-2.5 rounded-lg border p-3 transition-colors",
+                        selected
+                          ? "border-secondary/40 bg-secondary/10"
+                          : "border-border/60 bg-background hover:bg-muted/30",
+                      )}
+                    >
+                      <input
+                        type="radio"
+                        name="polymarket-match"
+                        className="mt-1 size-4 accent-secondary"
+                        checked={selected}
+                        onChange={() => applyPolyMatch(candidate)}
+                      />
+                      <span className="min-w-0 flex-1">
+                        <span className="text-sm font-medium text-foreground">
+                          {String(candidate.title || candidate.slug || "Market")}
+                        </span>
+                        <span className="mt-0.5 block text-[10px] text-muted-foreground">
+                          {volume ? `24h vol ${volume}` : "Polymarket"}
+                        </span>
+                      </span>
+                    </label>
+                  );
+                })}
+              </div>
+              <Button
+                type="button"
+                size="sm"
+                variant="ghost"
+                className="h-8 gap-1.5 px-2 text-xs"
+                onClick={() => setManualOpen((v) => !v)}
+              >
+                <Search className="size-3.5" aria-hidden />
+                {manualSearchLabel}
+              </Button>
+            </div>
+          ) : null}
+
+          {!matchFromKalshi && candidates.length > 0 ? (
             <div className="space-y-2">
               <p className="text-xs font-medium text-muted-foreground">
                 {selectedCandidate && !candidates.slice(1).some((c) => c.score > selectedCandidate.score - 0.05)
@@ -1591,46 +1702,104 @@ export function HubPolymarketKalshiCompareDemo() {
 
           {manualOpen ? (
             <div className="rounded-xl border border-border/70 bg-muted/10 p-3">
-              <p className="mb-2 text-xs font-medium text-muted-foreground">
-                Search Kalshi by event name
-              </p>
-              <MarketTickerSearch
-                value={manualTickers}
-                onChange={setManualTickers}
-                onSelectionsChange={(selections) => {
-                  const s = selections?.[0];
-                  const ticker = String(s?.ticker || "").trim().toUpperCase();
-                  if (!ticker) return;
-                  setSelectedTicker(ticker);
-                  setCandidates((prev) => {
-                    if (prev.some((c) => c.market.marketTicker === ticker)) return prev;
-                    return [
-                      {
-                        market: {
-                          marketTicker: ticker,
-                          title: String(s?.title || ticker),
-                          raw: {},
-                        },
-                        score: 0.5,
-                        tier: "related" as const,
-                        reasons: ["Manually selected"],
-                        warnings: [
-                          "Manual selection — verify event, resolution window, and settlement rules",
-                        ],
-                      },
-                      ...prev,
-                    ];
-                  });
-                  setEmptyMessage(null);
-                }}
-                maxTickers={1}
-                dataSource="live"
-                searchScope="events_semantic"
-                showCutoffNotes={false}
-                required={false}
-                placeholder="Search Kalshi events in natural language"
-                className="w-full"
-              />
+              {matchFromKalshi ? (
+                <>
+                  <p className="mb-2 text-xs font-medium text-muted-foreground">
+                    Search Polymarket in plain English
+                  </p>
+                  <PolymarketLiveSearch
+                    layout="panel"
+                    dismissAfterSelect
+                    searchTags
+                    searchProfiles={false}
+                    keepClosedMarkets={false}
+                    limitPerType={50}
+                    className="w-full"
+                    resultsClassName="max-h-56 flex-none"
+                    placeholder="Search Polymarket markets in plain English…"
+                    onSelect={(suggestion) => {
+                      const entity = String(suggestion?.entity || "");
+                      if (entity === "event") {
+                        const nested = polymarketRealtimeMarketsFromEventSuggestion(
+                          suggestion,
+                        ) as HubPolymarketLiveDemoMarket[];
+                        if (nested[0]) applyPolyMatch(nested[0]);
+                        return;
+                      }
+                      if (entity !== "market") return;
+                      const market = polymarketRealtimeMarketFromSuggestion(suggestion) as
+                        | HubPolymarketLiveDemoMarket
+                        | null;
+                      if (market) applyPolyMatch(market);
+                    }}
+                    onSubmitAll={(suggestions) => {
+                      for (const suggestion of suggestions || []) {
+                        if (suggestion?.entity === "market") {
+                          const market = polymarketRealtimeMarketFromSuggestion(
+                            suggestion,
+                          ) as HubPolymarketLiveDemoMarket | null;
+                          if (market) {
+                            applyPolyMatch(market);
+                            return;
+                          }
+                        }
+                      }
+                      for (const suggestion of suggestions || []) {
+                        if (suggestion?.entity === "event") {
+                          const nested = polymarketRealtimeMarketsFromEventSuggestion(
+                            suggestion,
+                          ) as HubPolymarketLiveDemoMarket[];
+                          if (nested[0]) applyPolyMatch(nested[0]);
+                          return;
+                        }
+                      }
+                    }}
+                  />
+                </>
+              ) : (
+                <>
+                  <p className="mb-2 text-xs font-medium text-muted-foreground">
+                    Search Kalshi by event name
+                  </p>
+                  <MarketTickerSearch
+                    value={manualTickers}
+                    onChange={setManualTickers}
+                    onSelectionsChange={(selections) => {
+                      const s = selections?.[0];
+                      const ticker = String(s?.ticker || "").trim().toUpperCase();
+                      if (!ticker) return;
+                      setSelectedTicker(ticker);
+                      setCandidates((prev) => {
+                        if (prev.some((c) => c.market.marketTicker === ticker)) return prev;
+                        return [
+                          {
+                            market: {
+                              marketTicker: ticker,
+                              title: String(s?.title || ticker),
+                              raw: {},
+                            },
+                            score: 0.5,
+                            tier: "related" as const,
+                            reasons: ["Manually selected"],
+                            warnings: [
+                              "Manual selection — verify event, resolution window, and settlement rules",
+                            ],
+                          },
+                          ...prev,
+                        ];
+                      });
+                      setEmptyMessage(null);
+                    }}
+                    maxTickers={1}
+                    dataSource="live"
+                    searchScope="events_semantic"
+                    showCutoffNotes={false}
+                    required={false}
+                    placeholder="Search Kalshi events in natural language"
+                    className="w-full"
+                  />
+                </>
+              )}
             </div>
           ) : null}
 
@@ -1664,7 +1833,7 @@ export function HubPolymarketKalshiCompareDemo() {
                       onClick={() => setManualOpen(true)}
                     >
                       <Search className="size-3.5" aria-hidden />
-                      Search Kalshi manually
+                      Search {counterpartName} manually
                     </Button>
                   </div>
                 </div>
@@ -1682,7 +1851,7 @@ export function HubPolymarketKalshiCompareDemo() {
                     <tr>
                       <td className="px-3 py-2 text-muted-foreground">Market</td>
                       <td className="px-3 py-2 font-medium text-foreground">
-                        {String(polyMarket.title || "—")}
+                        {String(polyMarket?.title || "—")}
                       </td>
                       <td className="px-3 py-2 font-medium text-foreground">
                         <ComparePendingValue
@@ -1692,6 +1861,7 @@ export function HubPolymarketKalshiCompareDemo() {
                           {String(
                             kalshiMarket?.title ||
                               selectedCandidate?.market.title ||
+                              kalshiAnchor?.title ||
                               selectedTicker ||
                               "—",
                           )}
@@ -1742,7 +1912,7 @@ export function HubPolymarketKalshiCompareDemo() {
                       <td className="px-3 py-2">
                         <ComparePendingValue pending={polyChartPending} skeletonClassName="h-3 w-36">
                           {polyFiltered.length} prints in view
-                          {polyMarket.volume24h != null
+                          {polyMarket?.volume24h != null
                             ? ` · 24h vol $${Number(polyMarket.volume24h).toLocaleString()}`
                             : ""}
                         </ComparePendingValue>
@@ -1761,7 +1931,7 @@ export function HubPolymarketKalshiCompareDemo() {
                     <tr>
                       <td className="px-3 py-2 text-muted-foreground">Status</td>
                       <td className="px-3 py-2">
-                        {polyMarket.closed ? "Closed" : "Live"}
+                        {polyMarket?.closed ? "Closed" : polyMarket ? "Live" : "—"}
                       </td>
                       <td className="px-3 py-2">
                         <ComparePendingValue pending={kalshiFieldsPending && !selectedCandidate?.market.status}>
@@ -1831,7 +2001,11 @@ export function HubPolymarketKalshiCompareDemo() {
                     <CompareChartBody
                       pending={polyChartPending}
                       hasData={polyFiltered.length > 0}
-                      waitingMessage="No chart at present"
+                      waitingMessage={
+                        polyMarket
+                          ? "No chart at present"
+                          : "Search Polymarket above to plot this chart"
+                      }
                     >
                       <HubKalshiLiveDemoTradesLiveline
                         series={polySeries}
@@ -1897,7 +2071,7 @@ export function HubPolymarketKalshiCompareDemo() {
                       pending: polyFieldsPending || polyChartPending,
                       trades: polyFiltered.length,
                       volumeLabel:
-                        polyMarket.volume24h != null
+                        polyMarket?.volume24h != null
                           ? `24h notional ≈ $${Number(polyMarket.volume24h).toLocaleString()}`
                           : "Volume metric: platform 24h notional (USDC)",
                       lastPrice: formatPct(polyYesPct),

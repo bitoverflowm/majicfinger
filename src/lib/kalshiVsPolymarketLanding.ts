@@ -33,13 +33,15 @@ export const kalshiVsPolymarketLanding = {
       "Search for an event in plain English or enter a market ticker. Find matching markets across Kalshi and Polymarket, then compare live odds, charts and trading activity in one view.",
     trustLine: "Free to use. No signup required.",
     belowTool:
-      "Want to keep following this event? Open your comparison in a live dashboard and arrange the view around what matters to you.",
+      "Want to monitor the situation your way? Create your own custom dashboard for the markets that matter to you.",
     cta: {
       label: "Monitor on a live dashboard",
       href: "#demo",
       requiresAuth: false,
       ariaLabel: "Open the free live dashboard preview",
     } satisfies HubCta,
+    ctaHelper:
+      "customize charts, execute quant operations, analyze historical data, and gain your edge by being informed with deep data insights.",
   },
   bento: {
     id: "features",
