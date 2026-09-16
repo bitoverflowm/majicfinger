@@ -323,7 +323,12 @@ function readCompareNumericVolume(...values: unknown[]) {
   return null;
 }
 
-function readComparePolymarketVolume(
+function formatCompareDollarVolume(value: number | null) {
+  if (value == null) return "—";
+  return `$${value.toLocaleString(undefined, { maximumFractionDigits: 2 })}`;
+}
+
+function readComparePolymarketVolume24h(
   market: Record<string, unknown> | null | undefined,
   metadata?: Record<string, unknown> | null,
 ) {
@@ -331,19 +336,39 @@ function readComparePolymarketVolume(
     market?.volume24h,
     market?.volume24hr,
     market?.volume24hrClob,
-    market?.volumeNum,
-    market?.volume,
     metadata?.volume24hr,
     metadata?.volume24hrClob,
     metadata?.volume24h,
-    metadata?.volumeNum,
-    metadata?.volume,
   );
 }
 
-function formatComparePolymarketActivityVolume(value: number | null) {
-  if (value == null) return "—";
-  return `$${value.toLocaleString(undefined, { maximumFractionDigits: 2 })}`;
+function readComparePolymarketVolumeTotal(
+  market: Record<string, unknown> | null | undefined,
+  metadata?: Record<string, unknown> | null,
+) {
+  return readCompareNumericVolume(
+    market?.volume,
+    market?.volumeNum,
+    market?.volumeClob,
+    metadata?.volume,
+    metadata?.volumeNum,
+    metadata?.volumeClob,
+  );
+}
+
+function readCompareKalshiVolume24h(
+  market: Record<string, unknown> | null | undefined,
+  fallback24h?: number | null,
+) {
+  return readCompareNumericVolume(
+    market?.volume_24h_fp,
+    market?.volume_24h,
+    fallback24h,
+  );
+}
+
+function readCompareKalshiVolumeTotal(market: Record<string, unknown> | null | undefined) {
+  return readCompareNumericVolume(market?.volume_fp, market?.volume);
 }
 
 function shuffleCompareFeatured<T>(items: T[], count: number): T[] {
@@ -2633,12 +2658,17 @@ export function HubPolymarketKalshiCompareDemo() {
     (!matchFromKalshi && !selectedTicker && matchLoading);
   const kalshiFieldsPending = !selectedTicker || (kalshiLoading && !kalshiMarket);
   const polyFieldsPending = !polyMarket || (polyLoading && polyYesPct == null);
-  const polyVolume = readComparePolymarketVolume(
-    polyMarket,
-    selection?.metadataRows?.[0],
+  const polyMeta = selection?.metadataRows?.[0];
+  const polyVolume24h = readComparePolymarketVolume24h(polyMarket, polyMeta);
+  const polyVolumeTotal = readComparePolymarketVolumeTotal(polyMarket, polyMeta);
+  const polyMetaLoading = Boolean(polyMarket) && Boolean(selection?.metadataLoading);
+  const polyVolume24hPending = polyVolume24h == null && polyMetaLoading;
+  const polyVolumeTotalPending = polyVolumeTotal == null && polyMetaLoading;
+  const kalshiVolume24h = readCompareKalshiVolume24h(
+    kalshiMarket,
+    kalshiAnchor?.volume24h ?? null,
   );
-  const polyVolumePending =
-    Boolean(polyMarket) && polyVolume == null && Boolean(selection?.metadataLoading);
+  const kalshiVolumeTotal = readCompareKalshiVolumeTotal(kalshiMarket);
   const selectedPolyKey = polyMarket ? polymarketRealtimeMarketKey(polyMarket) : "";
   const parentYesNo = matchFromKalshi
     ? kalshiYesNoLabels(
@@ -3227,19 +3257,41 @@ export function HubPolymarketKalshiCompareDemo() {
                       <td className="px-3 py-2">
                         <ComparePendingValue pending={polyChartPending} skeletonClassName="h-3 w-36">
                           {polyFiltered.length} prints in view
-                          {polyVolume != null
-                            ? ` · 24h vol ${formatComparePolymarketActivityVolume(polyVolume)}`
-                            : ""}
                         </ComparePendingValue>
                       </td>
                       <td className="px-3 py-2">
                         <ComparePendingValue pending={kalshiFieldsPending || kalshiChartPending} skeletonClassName="h-3 w-36">
                           {kalshiFiltered.length} trades in view
-                          {kalshiMarket?.volume != null
-                            ? ` · vol ${Number(kalshiMarket.volume).toLocaleString()} contracts`
-                            : kalshiMarket?.volume_fp != null
-                              ? ` · vol ${Number(kalshiMarket.volume_fp).toLocaleString()} contracts`
-                              : ""}
+                        </ComparePendingValue>
+                      </td>
+                    </tr>
+                    <tr>
+                      <td className="px-3 py-2 text-muted-foreground">24h volume</td>
+                      <td className="px-3 py-2">
+                        <ComparePendingValue pending={polyFieldsPending || polyVolume24hPending}>
+                          {polyVolume24h == null
+                            ? "—"
+                            : `${formatCompareDollarVolume(polyVolume24h)} (USDC)`}
+                        </ComparePendingValue>
+                      </td>
+                      <td className="px-3 py-2">
+                        <ComparePendingValue pending={kalshiFieldsPending}>
+                          {formatCompareDollarVolume(kalshiVolume24h)}
+                        </ComparePendingValue>
+                      </td>
+                    </tr>
+                    <tr>
+                      <td className="px-3 py-2 text-muted-foreground">Total volume</td>
+                      <td className="px-3 py-2">
+                        <ComparePendingValue pending={polyFieldsPending || polyVolumeTotalPending}>
+                          {polyVolumeTotal == null
+                            ? "—"
+                            : `${formatCompareDollarVolume(polyVolumeTotal)} (USDC)`}
+                        </ComparePendingValue>
+                      </td>
+                      <td className="px-3 py-2">
+                        <ComparePendingValue pending={kalshiFieldsPending}>
+                          {formatCompareDollarVolume(kalshiVolumeTotal)}
                         </ComparePendingValue>
                       </td>
                     </tr>
@@ -3265,8 +3317,12 @@ export function HubPolymarketKalshiCompareDemo() {
                       platform: "Polymarket",
                       pending: polyFieldsPending || polyChartPending,
                       trades: polyFiltered.length,
-                      volumePending: polyVolumePending,
-                      volumeLabel: formatComparePolymarketActivityVolume(polyVolume),
+                      volume24hPending: polyVolume24hPending,
+                      volumeTotalPending: polyVolumeTotalPending,
+                      volume24hLabel: "24h volume (USDC)",
+                      volume24hValue: formatCompareDollarVolume(polyVolume24h),
+                      volumeTotalLabel: "Total volume (USDC)",
+                      volumeTotalValue: formatCompareDollarVolume(polyVolumeTotal),
                       lastPrice: formatPct(polyYesPct),
                       lastSize: polyLast?.size != null ? String(polyLast.size) : "—",
                       since: formatAgo(String(polyLast?.created_time || "") || null),
@@ -3275,13 +3331,12 @@ export function HubPolymarketKalshiCompareDemo() {
                       platform: "Kalshi",
                       pending: kalshiFieldsPending || kalshiChartPending,
                       trades: kalshiFiltered.length,
-                      volumePending: false,
-                      volumeLabel:
-                        kalshiMarket?.volume != null || kalshiMarket?.volume_fp != null
-                          ? Number(
-                              kalshiMarket.volume ?? kalshiMarket.volume_fp,
-                            ).toLocaleString()
-                          : "—",
+                      volume24hPending: false,
+                      volumeTotalPending: false,
+                      volume24hLabel: "24h volume",
+                      volume24hValue: formatCompareDollarVolume(kalshiVolume24h),
+                      volumeTotalLabel: "Total volume",
+                      volumeTotalValue: formatCompareDollarVolume(kalshiVolumeTotal),
                       lastPrice: formatPct(kalshiYesPct),
                       lastSize:
                         kalshiLast?.count != null || kalshiLast?.count_fp != null
@@ -3306,13 +3361,24 @@ export function HubPolymarketKalshiCompareDemo() {
                         </dd>
                       </div>
                       <div className="flex justify-between gap-2">
-                        <dt className="text-muted-foreground">Volume</dt>
+                        <dt className="text-muted-foreground">{panel.volume24hLabel}</dt>
                         <dd className="font-medium tabular-nums text-foreground">
                           <ComparePendingValue
-                            pending={panel.pending || panel.volumePending}
+                            pending={panel.pending || panel.volume24hPending}
                             skeletonClassName="h-3 w-16"
                           >
-                            {panel.volumeLabel}
+                            {panel.volume24hValue}
+                          </ComparePendingValue>
+                        </dd>
+                      </div>
+                      <div className="flex justify-between gap-2">
+                        <dt className="text-muted-foreground">{panel.volumeTotalLabel}</dt>
+                        <dd className="font-medium tabular-nums text-foreground">
+                          <ComparePendingValue
+                            pending={panel.pending || panel.volumeTotalPending}
+                            skeletonClassName="h-3 w-16"
+                          >
+                            {panel.volumeTotalValue}
                           </ComparePendingValue>
                         </dd>
                       </div>
