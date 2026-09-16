@@ -90,7 +90,7 @@ export function normalizeKalshiLiveCandlestickRow(marketTicker, candle) {
 }
 
 /**
- * @param {{ market_ticker?: string; marketTicker?: string; candlesticks?: unknown[] }[]} marketGroups
+ * @param {unknown} marketGroups
  */
 export function flattenKalshiLiveCandlestickGroups(marketGroups) {
   /** @type {Record<string, unknown>[]} */

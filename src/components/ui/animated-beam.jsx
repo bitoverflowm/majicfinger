@@ -5,8 +5,11 @@ import { motion } from "framer-motion";
 
 import { cn } from "@/lib/utils";
 
+/**
+ * @param {{ className?: string; containerRef: any; fromRef: any; toRef: any; curvature?: number; reverse?: boolean; duration?: number; delay?: number; pathColor?: string; pathWidth?: number; pathOpacity?: number; gradientStartColor?: string; gradientStopColor?: string; startXOffset?: number; startYOffset?: number; endXOffset?: number; endYOffset?: number }} props
+ */
 export const AnimatedBeam = ({
-  className,
+  className = "",
   containerRef,
   fromRef,
   toRef,

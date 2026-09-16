@@ -1,8 +1,11 @@
 import { cn } from "@/lib/utils";
 
+/**
+ * @param {{ className?: string; reverse?: boolean; pauseOnHover?: boolean; children?: import("react").ReactNode; vertical?: boolean; repeat?: number; [key: string]: unknown }} [props]
+ */
 export default function Marquee({
-  className,
-  reverse,
+  className = "",
+  reverse = false,
   pauseOnHover = false,
   children,
   vertical = false,

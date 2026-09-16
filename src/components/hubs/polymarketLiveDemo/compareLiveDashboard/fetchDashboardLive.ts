@@ -253,7 +253,7 @@ async function fetchKalshiCandles(ticker: string, signal: AbortSignal): Promise<
       signal,
     )) as { markets?: unknown };
     return flattenKalshiLiveCandlestickGroups(body?.markets)
-      .map((row: Record<string, unknown>) => candleFromKalshi(row))
+      .map((row) => candleFromKalshi(row as Record<string, unknown>))
       .filter(Boolean) as CandlePoint[];
   };
   try {
@@ -278,8 +278,8 @@ async function fetchPolyHistory(tokenId: string, signal: AbortSignal): Promise<P
   const rows = normalizePolymarketRealtimeHistoryRows(payload);
   const points: PricePoint[] = [];
   for (const row of rows) {
-    const t = parseTs(row.timestamp ?? row.t ?? row.time);
-    const pct = priceToPct(row.price ?? row.p ?? row.yes_price_dollars);
+    const t = parseTs(row.timestamp ?? row.time);
+    const pct = priceToPct(row.price);
     if (t == null || pct == null) continue;
     points.push({ t, v: pct });
   }

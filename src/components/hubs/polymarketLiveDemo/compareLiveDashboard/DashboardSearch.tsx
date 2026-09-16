@@ -568,7 +568,9 @@ export function DashboardSearch({
                         : null,
                   };
                 })
-                .filter(Boolean)
+                .filter(
+                  (item): item is FeaturedPoly["outcomes"][number] => item != null,
+                )
             : [];
           const id = String(row.id || row.conditionId || row.slug || "").trim();
           const title = String(row.title || "").trim() || id;

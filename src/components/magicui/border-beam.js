@@ -1,7 +1,10 @@
 import { cn } from "@/lib/utils";
 
+/**
+ * @param {{ className?: string; size?: number; duration?: number; anchor?: number; borderWidth?: number; colorFrom?: string; colorTo?: string; delay?: number }} [props]
+ */
 export const BorderBeam = ({
-  className,
+  className = "",
   size = 200,
   duration = 15,
   anchor = 90,

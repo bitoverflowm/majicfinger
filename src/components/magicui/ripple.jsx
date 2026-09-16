@@ -3,13 +3,16 @@
 import { cn } from "@/lib/utils";
 import React from "react";
 
+/**
+ * @param {{ mainCircleSize?: number; mainCircleOpacity?: number; numCircles?: number; circleSizeStep?: number; className?: string; circleClassName?: string }} [props]
+ */
 export default function Ripple({
   mainCircleSize = 210,
   mainCircleOpacity = 0.24,
   numCircles = 8,
   circleSizeStep = 70,
-  className,
-  circleClassName,
+  className = "",
+  circleClassName = "",
 }) {
   return (
     <div

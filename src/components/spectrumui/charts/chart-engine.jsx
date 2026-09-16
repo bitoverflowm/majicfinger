@@ -170,7 +170,10 @@ function SkeletonGrid({ height, reduce }) {
   );
 }
 
-export function ChartSkeleton({ variant = "grid", height = 300, className }) {
+/**
+ * @param {{ variant?: string; height?: number; className?: string }} [props]
+ */
+export function ChartSkeleton({ variant = "grid", height = 300, className = "" }) {
   const reduce = usePrefersReducedMotion();
   return (
     <div className={cn("relative w-full overflow-hidden", className)} style={{ height }} aria-hidden>
