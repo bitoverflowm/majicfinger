@@ -10,6 +10,7 @@ import { HubLazyWhenVisible } from "@/components/hubs/HubLazyWhenVisible";
 import { HubPolymarketKalshiCompareDemoSkeleton } from "@/components/hubs/polymarketLiveDemo/HubPolymarketKalshiCompareDemoSkeleton";
 import { INTEGRATION_LOGO_STRIP } from "@/lib/integrations/integration-logo-strip";
 import { PRIMARY_INTEGRATION_HUB_PATHS } from "@/lib/integrations/marketing-catalog";
+import { KALSHI_VS_POLYMARKET_PATH, KALSHI_VS_POLYMARKET_RELATED_HUB } from "@/lib/kalshiVsPolymarketLanding";
 import { cn } from "@/lib/utils";
 import type {
   HubCrossPlatformResearchCard,
@@ -176,9 +177,25 @@ export function HubPolymarketCrossPlatformSection({
             ) : null}
             {section.compareIntro ? (
               <p className="text-sm leading-relaxed text-muted-foreground text-pretty">
-                {section.compareIntro}
+                {section.compareIntro}{" "}
+                <Link
+                  href={KALSHI_VS_POLYMARKET_PATH}
+                  className="font-medium text-foreground underline-offset-2 hover:underline"
+                >
+                  Open the full Kalshi vs Polymarket tool
+                </Link>
+                .
               </p>
-            ) : null}
+            ) : (
+              <p className="text-sm leading-relaxed text-muted-foreground">
+                <Link
+                  href={KALSHI_VS_POLYMARKET_PATH}
+                  className="font-medium text-foreground underline-offset-2 hover:underline"
+                >
+                  Open the full Kalshi vs Polymarket tool
+                </Link>
+              </p>
+            )}
           </div>
 
           <HubLazyWhenVisible
@@ -256,5 +273,6 @@ export function defaultPolymarketCrossPlatformCards(): HubCrossPlatformResearchC
         "Explore Kalshi markets and trades across the platform’s complete historical lifecycle.",
       href: PRIMARY_INTEGRATION_HUB_PATHS.kalshiHistorical,
     },
+    { ...KALSHI_VS_POLYMARKET_RELATED_HUB },
   ];
 }

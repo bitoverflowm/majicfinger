@@ -51,6 +51,7 @@ export type ProductsNavProduct = {
 
 export type ProductsNavData = {
   integrations: ProductsNavHub[];
+  tools: ProductsNavProduct[];
   products: ProductsNavProduct[];
 };
 
@@ -158,14 +159,23 @@ export function getProductsNavData(): ProductsNavData {
 
   return {
     integrations: [...predictionMarketIntegrations, ...otherIntegrations],
-    products: [
+    tools: [
       {
         id: "compare-markets",
-        label: "Compare markets",
+        label: "Kalshi vs Polymarket",
         href: "/kalshi-vs-polymarket-odds",
         description:
           "Compare live Kalshi and Polymarket odds, charts, and trading activity.",
       },
+      {
+        id: "polymarket-metadata",
+        label: "Polymarket metadata",
+        href: "/polymarket-metadata",
+        description:
+          "Look up Polymarket market IDs, event IDs, slugs, and token identifiers.",
+      },
+    ],
+    products: [
       {
         id: "charts",
         label: "Charts",

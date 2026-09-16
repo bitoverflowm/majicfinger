@@ -1,3 +1,5 @@
+import Link from "next/link";
+
 import { SectionHeader } from "@/components/section-header";
 import { siteConfig } from "@/lib/config";
 
@@ -18,7 +20,14 @@ export function GrowthSection() {
             {title}
           </h2>
           <p className="text-muted-foreground text-center text-balance font-medium">
-            {description}
+            {description}{" "}
+            <Link
+              href="/kalshi-vs-polymarket-odds"
+              className="font-medium text-foreground underline-offset-4 hover:underline"
+            >
+              Compare Kalshi vs Polymarket live odds
+            </Link>
+            .
           </p>
         </SectionHeader>
 

@@ -26,6 +26,9 @@ export const revalidate = 300;
 
 export const metadata: Metadata = {
   metadataBase: new URL(SITE),
+  applicationName: "Lychee Kalshi vs Polymarket Odds Comparison",
+  category: "Finance",
+  authors: [{ name: "LycheeData", url: SITE }],
   title: { absolute: copy.seoTitle },
   description: copy.metaDescription,
   keywords: [...copy.keywords],
@@ -50,7 +53,7 @@ export const metadata: Metadata = {
     type: "website",
     url: KALSHI_VS_POLYMARKET_CANONICAL,
     siteName: "Lychee",
-    locale: "en",
+    locale: "en_US",
     images: [
       {
         url: copy.ogImage,
@@ -62,9 +65,14 @@ export const metadata: Metadata = {
   },
   twitter: {
     card: "summary_large_image",
+    site: "@misterrpink1",
+    creator: "@misterrpink1",
     title: copy.ogTitle,
     description: copy.ogDescription,
     images: [{ url: copy.ogImage, alt: copy.ogImageAlt }],
+  },
+  other: {
+    "content-language": "en",
   },
 };
 
@@ -74,7 +82,14 @@ const webPageLd = {
   name: copy.seoTitle,
   description: copy.metaDescription,
   url: KALSHI_VS_POLYMARKET_CANONICAL,
+  inLanguage: "en",
   isPartOf: { "@type": "WebSite", name: "Lychee", url: SITE },
+  primaryImageOfPage: {
+    "@type": "ImageObject",
+    url: `${SITE}${copy.ogImage}`,
+    width: 1200,
+    height: 630,
+  },
   publisher: {
     "@type": "Organization",
     name: "LycheeData",
@@ -86,10 +101,11 @@ const softwareApplicationLd = {
   "@context": "https://schema.org",
   "@type": "SoftwareApplication",
   name: "Kalshi vs Polymarket Odds Comparison",
-  applicationCategory: "BusinessApplication",
+  applicationCategory: "FinanceApplication",
   operatingSystem: "Web",
   description: copy.metaDescription,
   url: KALSHI_VS_POLYMARKET_CANONICAL,
+  featureList: copy.bento.items.map((item) => item.title),
   offers: {
     "@type": "Offer",
     price: "0",
@@ -101,6 +117,52 @@ const softwareApplicationLd = {
     url: SITE,
   },
 };
+
+const howToLd = {
+  "@context": "https://schema.org",
+  "@type": "HowTo",
+  name: "How to compare Kalshi and Polymarket odds",
+  description: copy.hero.description,
+  url: KALSHI_VS_POLYMARKET_CANONICAL,
+  step: [
+    {
+      "@type": "HowToStep",
+      position: 1,
+      name: "Search a market",
+      text: "Search for an event in plain English or enter a Kalshi or Polymarket market ticker.",
+    },
+    {
+      "@type": "HowToStep",
+      position: 2,
+      name: "Match the other venue",
+      text: "Review scored matching markets on the other platform, search for a closer contract, and pick the specific event market if needed.",
+    },
+    {
+      "@type": "HowToStep",
+      position: 3,
+      name: "Align YES and NO",
+      text: "Reverse YES/NO if the counterpart contract is closer on the opposite side, then compare live odds, charts, and trading activity.",
+    },
+  ],
+};
+
+const relatedItemListLd = {
+  "@context": "https://schema.org",
+  "@type": "ItemList",
+  name: copy.related.title,
+  itemListElement: copy.related.links.map((link, index) => ({
+    "@type": "ListItem",
+    position: index + 1,
+    name: link.title,
+    url: canonicalUrlForRelated(link.href),
+    description: link.description,
+  })),
+};
+
+function canonicalUrlForRelated(href: string) {
+  if (href.startsWith("http://") || href.startsWith("https://")) return href;
+  return `${SITE}${href.startsWith("/") ? href : `/${href}`}`;
+}
 
 const faqLd = {
   "@context": "https://schema.org",
@@ -253,6 +315,14 @@ export default function KalshiVsPolymarketOddsPage() {
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(faqLd) }}
+      />
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(howToLd) }}
+      />
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(relatedItemListLd) }}
       />
       <script
         type="application/ld+json"

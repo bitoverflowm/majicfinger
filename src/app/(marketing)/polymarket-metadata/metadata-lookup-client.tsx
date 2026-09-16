@@ -6,6 +6,7 @@ import Link from "next/link";
 import { AnimatePresence, motion } from "framer-motion";
 import { Check, Copy, Loader2, Search } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { kalshiVsPolymarketCompareHref } from "@/lib/kalshiVsPolymarketLanding";
 import {
   buildMostNeededView,
   cardEntityPillClass,
@@ -49,6 +50,31 @@ function ExploreEntityButton({ entity }: { entity: "event" | "market" }) {
       prefetch={false}
     >
       {label}
+    </Link>
+  );
+}
+
+function CompareToKalshiButton({
+  slug,
+  conditionId,
+  id,
+  eventSlug,
+  eventId,
+}: {
+  slug?: string | null;
+  conditionId?: string | null;
+  id?: string | null;
+  eventSlug?: string | null;
+  eventId?: string | null;
+}) {
+  const href = kalshiVsPolymarketCompareHref({ slug, conditionId, id, eventSlug, eventId });
+  return (
+    <Link
+      href={href}
+      className="inline-flex shrink-0 items-center justify-center rounded-full border border-border bg-background px-4 py-2 text-xs font-semibold text-foreground shadow-sm transition-colors hover:bg-muted"
+      prefetch={false}
+    >
+      Compare to Kalshi
     </Link>
   );
 }
@@ -156,7 +182,14 @@ function MarketSummaryCard({
             {model.title}
           </h4>
         </div>
-        <ExploreEntityButton entity="market" />
+        <div className="flex flex-wrap items-center justify-end gap-2">
+          <CompareToKalshiButton
+            slug={model.slug}
+            conditionId={model.conditionId}
+            id={model.entityId}
+          />
+          <ExploreEntityButton entity="market" />
+        </div>
       </div>
       <dl className="space-y-2.5">
         {model.entityId ? (
@@ -241,7 +274,16 @@ function MostNeededMetadataSection({ view }: { view: MostNeededView }) {
             </span>
             <h4 className="text-base font-semibold leading-snug text-foreground">{view.primary.title}</h4>
           </div>
-          <ExploreEntityButton entity="event" />
+          <div className="flex flex-wrap items-center justify-end gap-2">
+            <CompareToKalshiButton
+              eventSlug={view.primary.slug}
+              eventId={view.primary.entityId}
+              slug={view.subMarkets[0]?.slug}
+              conditionId={view.subMarkets[0]?.conditionId}
+              id={view.subMarkets[0]?.entityId}
+            />
+            <ExploreEntityButton entity="event" />
+          </div>
         </div>
         <dl className="space-y-2.5">
           {view.primary.entityId ? (

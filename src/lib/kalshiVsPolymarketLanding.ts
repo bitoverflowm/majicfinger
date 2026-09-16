@@ -6,6 +6,37 @@ export const KALSHI_VS_POLYMARKET_CANONICAL = canonicalUrl(
   KALSHI_VS_POLYMARKET_PATH,
 );
 
+export const KALSHI_VS_POLYMARKET_RELATED_HUB = {
+  id: "kalshi-vs-polymarket",
+  title: "Kalshi vs Polymarket",
+  description:
+    "Compare live Kalshi and Polymarket odds, charts, and trading activity for the same event.",
+  href: KALSHI_VS_POLYMARKET_PATH,
+} as const;
+
+/** Deep-link into the live compare tool with a Polymarket market already selected. */
+export function kalshiVsPolymarketCompareHref(input: {
+  slug?: string | null;
+  conditionId?: string | null;
+  id?: string | null;
+  eventSlug?: string | null;
+  eventId?: string | null;
+} = {}) {
+  const params = new URLSearchParams();
+  const slug = String(input.slug || "").trim();
+  const conditionId = String(input.conditionId || "").trim();
+  const id = String(input.id || "").trim();
+  const eventSlug = String(input.eventSlug || "").trim();
+  const eventId = String(input.eventId || "").trim();
+  if (slug) params.set("pm", slug);
+  else if (conditionId) params.set("pm", conditionId);
+  else if (id) params.set("pm", id);
+  if (eventSlug) params.set("pe", eventSlug);
+  else if (eventId) params.set("pe", eventId);
+  const qs = params.toString();
+  return `${KALSHI_VS_POLYMARKET_PATH}${qs ? `?${qs}` : ""}#compare`;
+}
+
 export const kalshiVsPolymarketLanding = {
   seoTitle: "Kalshi vs Polymarket: Free Live Odds Comparison | Lychee",
   metaDescription:
@@ -13,9 +44,9 @@ export const kalshiVsPolymarketLanding = {
   ogTitle: "Kalshi vs Polymarket: Compare Live Odds for Free",
   ogDescription:
     "Find matching markets. Compare live odds, charts and trading activity. Open a dashboard preview, then save your workspace with a paid Lychee plan.",
-  ogImage: "/ogImage2.png",
+  ogImage: "/og-kalshi-vs-polymarket.png",
   ogImageAlt:
-    "Kalshi vs Polymarket. Live. Compare odds, charts and activity for free.",
+    "Kalshi vs Polymarket live odds comparison on Lychee. Overlay charts, YES prices, and spread in one view.",
   navLabel: "Compare markets",
   keywords: [
     "Kalshi vs Polymarket",
@@ -25,6 +56,8 @@ export const kalshiVsPolymarketLanding = {
     "Kalshi live data",
     "Polymarket live data",
     "prediction market arbitrage",
+    "Kalshi Polymarket match",
+    "compare prediction market odds",
   ],
   hero: {
     eyebrow: "Real time Polymarket vs Kalshi",

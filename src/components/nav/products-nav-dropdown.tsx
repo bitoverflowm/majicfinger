@@ -149,6 +149,25 @@ function DesktopProductsPanel({
 
           <div>
             <p className="mb-3 font-mono text-[10px] font-medium uppercase tracking-[0.14em] text-muted-foreground">
+              Tools
+            </p>
+            <ul className="space-y-0.5">
+              {data.tools.map((tool) => (
+                <li key={tool.id}>
+                  <Link
+                    href={tool.href}
+                    className="block rounded-md px-3 py-2.5 transition-colors hover:bg-accent hover:text-accent-foreground"
+                  >
+                    <span className="text-sm font-medium text-foreground">{tool.label}</span>
+                    <span className="mt-0.5 block text-xs leading-snug text-muted-foreground">
+                      {tool.description}
+                    </span>
+                  </Link>
+                </li>
+              ))}
+            </ul>
+
+            <p className="mb-3 mt-5 font-mono text-[10px] font-medium uppercase tracking-[0.14em] text-muted-foreground">
               Products
             </p>
             <ul className="space-y-0.5">
@@ -335,7 +354,23 @@ function MobileProductsSection({ data }: { data: ProductsNavData }) {
       </div>
 
       <div>
-        <p className="mb-2 text-xs font-semibold text-foreground">Platform</p>
+        <p className="mb-2 text-xs font-semibold text-foreground">Tools</p>
+        <ul className="space-y-1">
+          {data.tools.map((tool) => (
+            <li key={tool.id}>
+              <Link
+                href={tool.href}
+                className="text-sm text-foreground/80 hover:text-secondary"
+              >
+                {tool.label}
+              </Link>
+            </li>
+          ))}
+        </ul>
+      </div>
+
+      <div>
+        <p className="mb-2 text-xs font-semibold text-foreground">Products</p>
         <ul className="space-y-1">
           {data.products.map((product) => (
             <li key={product.id}>

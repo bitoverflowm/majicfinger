@@ -164,6 +164,7 @@ export const siteConfig = {
         { id: 2, title: "Pricing", url: "#pricing" },
         { id: 3, title: "Dashboard", url: "/dashboard" },
         { id: 4, title: "Charts", url: "/charts" },
+        { id: 20, title: "Kalshi vs Polymarket", url: "/kalshi-vs-polymarket-odds" },
       ],
     },
     {
@@ -184,8 +185,8 @@ export const siteConfig = {
     {
       title: "Our tools",
       links: [
-        { id: 14, title: "Polymarket metadata", url: "/polymarket-metadata" },
         { id: 19, title: "Kalshi vs Polymarket", url: "/kalshi-vs-polymarket-odds" },
+        { id: 14, title: "Polymarket metadata", url: "/polymarket-metadata" },
         { id: 15, title: "Kalshi Historical Data", url: "/kalshi-historical-data" },
         { id: 16, title: "Kalshi Live Data", url: "/kalshi-live-data" },
         { id: 17, title: "Polymarket Live Data", url: "/polymarket-live-data" },

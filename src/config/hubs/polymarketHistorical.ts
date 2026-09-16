@@ -517,6 +517,13 @@ export const polymarketHistoricalHub: HubPageConfig = {
             "Monitor current Kalshi markets, prices, trades, order books, candlesticks, volume, and open interest.",
           href: "/kalshi-live-data",
         },
+        {
+          id: "kalshi-vs-polymarket",
+          title: "Kalshi vs Polymarket",
+          description:
+            "Compare live Kalshi and Polymarket odds, charts, and trading activity for the same event.",
+          href: "/kalshi-vs-polymarket-odds",
+        },
       ],
       compareEyebrow: "COMPARE PREDICTION MARKETS",
       compareTitle: "Compare the Same Event Across Exchanges",

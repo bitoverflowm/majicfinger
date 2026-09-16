@@ -495,6 +495,13 @@ export const polymarketLiveHub: HubPageConfig = {
             "Explore Kalshi markets and trades across the platform’s complete historical lifecycle.",
           href: "/kalshi-historical-data",
         },
+        {
+          id: "kalshi-vs-polymarket",
+          title: "Kalshi vs Polymarket",
+          description:
+            "Compare live Kalshi and Polymarket odds, charts, and trading activity for the same event.",
+          href: "/kalshi-vs-polymarket-odds",
+        },
       ],
       compareEyebrow: "COMPARE PREDICTION MARKETS",
       compareTitle: "See How the Same Event Is Trading on Polymarket and Kalshi",

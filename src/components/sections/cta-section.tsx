@@ -37,6 +37,12 @@ export function CTASection() {
               <span className="max-w-md text-center text-sm text-muted-foreground dark:text-white/90">
                 {ctaSection.subtext}
               </span>
+              <Link
+                href="/kalshi-vs-polymarket-odds"
+                className="text-sm font-medium text-foreground underline-offset-4 hover:underline dark:text-white"
+              >
+                Compare Kalshi vs Polymarket odds
+              </Link>
             </div>
           </div>
         </div>

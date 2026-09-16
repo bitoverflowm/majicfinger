@@ -308,6 +308,51 @@ export default function PolymarketMetadataPage() {
               <h2 className="text-xl font-semibold tracking-tight text-foreground">
                 Learn More and Dive Deeper to Get Your Edge
               </h2>
+              <ul className="space-y-2 text-base font-medium leading-relaxed">
+                <li>
+                  <Link
+                    href="/kalshi-vs-polymarket-odds"
+                    className="text-foreground underline-offset-4 hover:underline"
+                    prefetch={false}
+                  >
+                    Kalshi vs Polymarket odds comparison
+                  </Link>
+                  <span className="text-muted-foreground">
+                    {" "}
+                    — match a Polymarket market to Kalshi and compare live odds.
+                  </span>
+                </li>
+                <li>
+                  <Link
+                    href="/polymarket-live-data"
+                    className="text-foreground underline-offset-4 hover:underline"
+                    prefetch={false}
+                  >
+                    Polymarket live data
+                  </Link>
+                  <span className="text-muted-foreground"> — prices, trades, order books, and holders.</span>
+                </li>
+                <li>
+                  <Link
+                    href="/kalshi-live-data"
+                    className="text-foreground underline-offset-4 hover:underline"
+                    prefetch={false}
+                  >
+                    Kalshi live data
+                  </Link>
+                  <span className="text-muted-foreground"> — live Kalshi markets, trades, and order books.</span>
+                </li>
+                <li>
+                  <Link
+                    href="/polymarket-historical-data"
+                    className="text-foreground underline-offset-4 hover:underline"
+                    prefetch={false}
+                  >
+                    Polymarket historical data
+                  </Link>
+                  <span className="text-muted-foreground"> — archived markets, trades, and resolutions.</span>
+                </li>
+              </ul>
             </div>
           </div>
 
