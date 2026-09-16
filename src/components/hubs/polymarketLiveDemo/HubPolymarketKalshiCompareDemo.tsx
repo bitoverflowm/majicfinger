@@ -1,12 +1,12 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import Link from "next/link";
 import { AlertTriangle, Check, Clock, GitMerge, Loader2, RefreshCw, Share2, Undo2 } from "lucide-react";
 
 import { PolymarketLiveSearch } from "@/components/connectData/polymarketLive/PolymarketLiveSearch";
 import { MarketTickerSearch } from "@/components/connectData/MarketTickerSearch";
 import { HubKalshiLiveDemoTradesLiveline } from "@/components/hubs/kalshiLiveDemo/HubKalshiLiveDemoTradesLiveline";
+import { HubCtaButton } from "@/components/hubs/HubCtaButton";
 import {
   featuredPolymarketMarketToDemoMarket,
   useHubPolymarketLiveDemo,
@@ -306,6 +306,44 @@ function formatCompareCompactNumber(value: number | null | undefined) {
 function formatCompareKalshiVolume(value: number | null | undefined) {
   const formatted = formatCompareCompactNumber(value);
   return formatted === "—" ? "—" : `$${formatted}`;
+}
+
+function readCompareNumericVolume(...values: unknown[]) {
+  for (const value of values) {
+    if (value == null || value === "") continue;
+    if (typeof value === "number") {
+      if (Number.isFinite(value) && value >= 0) return value;
+      continue;
+    }
+    const raw = String(value).replace(/,/g, "").trim();
+    if (!raw) continue;
+    const n = Number(raw);
+    if (Number.isFinite(n) && n >= 0) return n;
+  }
+  return null;
+}
+
+function readComparePolymarketVolume(
+  market: Record<string, unknown> | null | undefined,
+  metadata?: Record<string, unknown> | null,
+) {
+  return readCompareNumericVolume(
+    market?.volume24h,
+    market?.volume24hr,
+    market?.volume24hrClob,
+    market?.volumeNum,
+    market?.volume,
+    metadata?.volume24hr,
+    metadata?.volume24hrClob,
+    metadata?.volume24h,
+    metadata?.volumeNum,
+    metadata?.volume,
+  );
+}
+
+function formatComparePolymarketActivityVolume(value: number | null) {
+  if (value == null) return "—";
+  return `$${value.toLocaleString(undefined, { maximumFractionDigits: 2 })}`;
 }
 
 function shuffleCompareFeatured<T>(items: T[], count: number): T[] {
@@ -2595,6 +2633,12 @@ export function HubPolymarketKalshiCompareDemo() {
     (!matchFromKalshi && !selectedTicker && matchLoading);
   const kalshiFieldsPending = !selectedTicker || (kalshiLoading && !kalshiMarket);
   const polyFieldsPending = !polyMarket || (polyLoading && polyYesPct == null);
+  const polyVolume = readComparePolymarketVolume(
+    polyMarket,
+    selection?.metadataRows?.[0],
+  );
+  const polyVolumePending =
+    Boolean(polyMarket) && polyVolume == null && Boolean(selection?.metadataLoading);
   const selectedPolyKey = polyMarket ? polymarketRealtimeMarketKey(polyMarket) : "";
   const parentYesNo = matchFromKalshi
     ? kalshiYesNoLabels(
@@ -3183,8 +3227,8 @@ export function HubPolymarketKalshiCompareDemo() {
                       <td className="px-3 py-2">
                         <ComparePendingValue pending={polyChartPending} skeletonClassName="h-3 w-36">
                           {polyFiltered.length} prints in view
-                          {polyMarket?.volume24h != null
-                            ? ` · 24h vol $${Number(polyMarket.volume24h).toLocaleString()}`
+                          {polyVolume != null
+                            ? ` · 24h vol ${formatComparePolymarketActivityVolume(polyVolume)}`
                             : ""}
                         </ComparePendingValue>
                       </td>
@@ -3221,10 +3265,8 @@ export function HubPolymarketKalshiCompareDemo() {
                       platform: "Polymarket",
                       pending: polyFieldsPending || polyChartPending,
                       trades: polyFiltered.length,
-                      volumeLabel:
-                        polyMarket?.volume24h != null
-                          ? `24h notional ≈ $${Number(polyMarket.volume24h).toLocaleString()}`
-                          : "Volume metric: platform 24h notional (USDC)",
+                      volumePending: polyVolumePending,
+                      volumeLabel: formatComparePolymarketActivityVolume(polyVolume),
                       lastPrice: formatPct(polyYesPct),
                       lastSize: polyLast?.size != null ? String(polyLast.size) : "—",
                       since: formatAgo(String(polyLast?.created_time || "") || null),
@@ -3233,12 +3275,13 @@ export function HubPolymarketKalshiCompareDemo() {
                       platform: "Kalshi",
                       pending: kalshiFieldsPending || kalshiChartPending,
                       trades: kalshiFiltered.length,
+                      volumePending: false,
                       volumeLabel:
                         kalshiMarket?.volume != null || kalshiMarket?.volume_fp != null
-                          ? `Contract volume ${Number(
+                          ? Number(
                               kalshiMarket.volume ?? kalshiMarket.volume_fp,
-                            ).toLocaleString()}`
-                          : "Volume metric: Kalshi contracts (not USDC)",
+                            ).toLocaleString()
+                          : "—",
                       lastPrice: formatPct(kalshiYesPct),
                       lastSize:
                         kalshiLast?.count != null || kalshiLast?.count_fp != null
@@ -3264,8 +3307,11 @@ export function HubPolymarketKalshiCompareDemo() {
                       </div>
                       <div className="flex justify-between gap-2">
                         <dt className="text-muted-foreground">Volume</dt>
-                        <dd className="max-w-[60%] text-right font-medium text-foreground">
-                          <ComparePendingValue pending={panel.pending} skeletonClassName="h-3 w-28">
+                        <dd className="font-medium tabular-nums text-foreground">
+                          <ComparePendingValue
+                            pending={panel.pending || panel.volumePending}
+                            skeletonClassName="h-3 w-16"
+                          >
                             {panel.volumeLabel}
                           </ComparePendingValue>
                         </dd>
@@ -3299,13 +3345,33 @@ export function HubPolymarketKalshiCompareDemo() {
                 ))}
               </div>
 
-              <div className="flex flex-wrap items-center justify-center gap-3 pt-1">
-                <Button type="button" size="sm" asChild>
-                  <Link href="#polymarket-live-pricing">Compare Markets in Lychee</Link>
-                </Button>
-                <Button type="button" size="sm" variant="outline" asChild>
-                  <Link href="#polymarket-live-pricing">Add Both to a Live Dashboard</Link>
-                </Button>
+              <div className="mx-auto flex max-w-2xl flex-col items-center gap-3 pt-2 text-center">
+                <p className="text-sm font-medium leading-relaxed text-foreground md:text-base">
+                  You’ve compared the odds. Now follow the action.
+                </p>
+                <p className="text-sm leading-relaxed text-muted-foreground md:text-base text-pretty">
+                  Bring these markets into one live dashboard. Add more Kalshi and Polymarket markets,
+                  track prices and order books, and customize your charts—all in one view.
+                </p>
+                <div className="flex flex-wrap items-center justify-center gap-3 pt-1">
+                  <HubCtaButton
+                    cta={{
+                      label: "Monitor these markets →",
+                      href: "#demo",
+                      requiresAuth: false,
+                      ariaLabel: "Open the free live dashboard preview",
+                    }}
+                    variant="primary"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShareOpen(true)}
+                    className="inline-flex h-8 items-center gap-1.5 rounded-md border border-border/70 bg-background px-2.5 text-[11px] font-medium text-muted-foreground transition-colors hover:text-foreground"
+                  >
+                    <Share2 className="size-3.5" aria-hidden />
+                    Share
+                  </button>
+                </div>
               </div>
             </CardContent>
           </>
