@@ -80,85 +80,150 @@ export type DashboardWidgetId =
   | "trades"
   | "holders"
   | "watchlist"
-  | "heatmap";
+  | "heatmap"
+  | "stats"
+  | "summary";
+
+export type DashboardIntervalId = "15m" | "1h" | "6h" | "1d" | "all";
+
+export type DashboardWidgetLayout = "full" | "half" | "custom";
+
+export type DashboardWidgetVenue = "kalshi" | "poly" | "both";
 
 export type DashboardWidget = {
-  id: DashboardWidgetId;
+  id: string;
+  type: DashboardWidgetId;
   title: string;
   description: string;
-  span: 1 | 2;
+  layout: DashboardWidgetLayout;
+  width: number;
   height: number;
+  venue?: DashboardWidgetVenue;
 };
+
+export const DASHBOARD_INTERVALS: {
+  id: DashboardIntervalId;
+  label: "15m" | "1h" | "6h" | "1d" | "All";
+  ms: number | null;
+}[] = [
+  { id: "15m", label: "15m", ms: 15 * 60 * 1000 },
+  { id: "1h", label: "1h", ms: 60 * 60 * 1000 },
+  { id: "6h", label: "6h", ms: 6 * 60 * 60 * 1000 },
+  { id: "1d", label: "1d", ms: 24 * 60 * 60 * 1000 },
+  { id: "all", label: "All", ms: null },
+];
+
+export const MERGED_LIVELINE_HEIGHT = 500;
+export const SPLIT_LIVELINE_HEIGHT = 320;
 
 export const DEFAULT_WIDGETS: DashboardWidget[] = [
   {
     id: "liveline",
+    type: "liveline",
     title: "Live YES overlay",
     description: "Kalshi and Polymarket prints on one tape.",
-    span: 2,
-    height: 280,
+    layout: "full",
+    width: 0,
+    height: MERGED_LIVELINE_HEIGHT,
+    venue: "both",
+  },
+  {
+    id: "stats",
+    type: "stats",
+    title: "Market stats",
+    description: "Live KPIs for the two contracts in this comparison.",
+    layout: "full",
+    width: 0,
+    height: 360,
+  },
+  {
+    id: "summary",
+    type: "summary",
+    title: "Comparison summary",
+    description: "The same side-by-side snapshot from the compare view.",
+    layout: "full",
+    width: 0,
+    height: 380,
   },
   {
     id: "market-candles",
+    type: "market-candles",
     title: "Market chart",
     description: "OHLC candles with volume.",
-    span: 2,
+    layout: "full",
+    width: 0,
     height: 340,
   },
   {
     id: "area",
+    type: "area",
     title: "Price summary",
     description: "Both venues as a shared area series.",
-    span: 1,
+    layout: "half",
+    width: 0,
     height: 260,
   },
   {
     id: "indicators",
+    type: "indicators",
     title: "Indicators",
     description: "Close, RSI, and MACD on one axis.",
-    span: 1,
+    layout: "half",
+    width: 0,
     height: 260,
   },
   {
     id: "depth",
+    type: "depth",
     title: "Depth",
     description: "Cumulative bid and ask liquidity.",
-    span: 1,
+    layout: "half",
+    width: 0,
     height: 280,
   },
   {
     id: "orderbook",
+    type: "orderbook",
     title: "Order books",
     description: "Resting bids and asks, venue by venue.",
-    span: 1,
+    layout: "half",
+    width: 0,
     height: 280,
   },
   {
     id: "trades",
+    type: "trades",
     title: "Recent trades",
     description: "Merged execution tape.",
-    span: 1,
+    layout: "half",
+    width: 0,
     height: 280,
   },
   {
     id: "holders",
+    type: "holders",
     title: "Holders",
     description: "Polymarket top holders for this market.",
-    span: 1,
+    layout: "half",
+    width: 0,
     height: 280,
   },
   {
     id: "watchlist",
+    type: "watchlist",
     title: "Venue watchlist",
     description: "Last, spread, and 24h volume.",
-    span: 1,
+    layout: "half",
+    width: 0,
     height: 240,
   },
   {
     id: "heatmap",
+    type: "heatmap",
     title: "Liquidity map",
     description: "Where size and movement concentrate.",
-    span: 1,
+    layout: "half",
+    width: 0,
     height: 240,
   },
 ];

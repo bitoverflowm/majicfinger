@@ -508,13 +508,31 @@ export function PortfolioDonut({
   );
 }
 
-export function onResizePointerDown(height: number, onChange: (next: number) => void) {
-  return (event: ReactPointerEvent<HTMLDivElement>) => {
+type ResizeEdge = "s" | "e" | "se";
+
+export function BoxResizeHandles({
+  onChange,
+}: {
+  onChange: (next: { width: number; height: number }) => void;
+}) {
+  const start = (edge: ResizeEdge) => (event: ReactPointerEvent<HTMLDivElement>) => {
     event.preventDefault();
+    event.stopPropagation();
+    const box = event.currentTarget.closest("[data-dash-widget]") as HTMLElement | null;
+    if (!box) return;
+    const parent = box.parentElement;
+    const startW = box.offsetWidth;
+    const startH = box.offsetHeight;
+    const startX = event.clientX;
     const startY = event.clientY;
-    const startH = height;
+    const maxW = Math.max(240, parent?.clientWidth || startW);
     const move = (ev: PointerEvent) => {
-      onChange(Math.max(180, Math.min(640, startH + (ev.clientY - startY))));
+      const dw = edge === "s" ? 0 : ev.clientX - startX;
+      const dh = edge === "e" ? 0 : ev.clientY - startY;
+      onChange({
+        width: Math.round(Math.max(240, Math.min(maxW, startW + dw))),
+        height: Math.round(Math.max(180, Math.min(1200, startH + dh))),
+      });
     };
     const up = () => {
       window.removeEventListener("pointermove", move);
@@ -523,4 +541,24 @@ export function onResizePointerDown(height: number, onChange: (next: number) => 
     window.addEventListener("pointermove", move);
     window.addEventListener("pointerup", up);
   };
+
+  return (
+    <>
+      <div
+        className="absolute inset-y-3 right-0 z-10 w-2 cursor-ew-resize touch-none hover:bg-secondary/30"
+        onPointerDown={start("e")}
+        aria-hidden
+      />
+      <div
+        className="absolute inset-x-3 bottom-0 z-10 h-2 cursor-ns-resize touch-none hover:bg-secondary/30"
+        onPointerDown={start("s")}
+        aria-hidden
+      />
+      <div
+        className="absolute bottom-0 right-0 z-20 size-3.5 cursor-nwse-resize touch-none rounded-br-xl hover:bg-secondary/40"
+        onPointerDown={start("se")}
+        aria-hidden
+      />
+    </>
+  );
 }
