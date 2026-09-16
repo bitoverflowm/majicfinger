@@ -2,7 +2,6 @@
 
 import dynamic from "next/dynamic";
 
-import { HubPolymarketLiveDemoProvider } from "@/components/hubs/polymarketLiveDemo/HubPolymarketLiveDemoSelection";
 import { HubPolymarketKalshiCompareDemoSkeleton } from "@/components/hubs/polymarketLiveDemo/HubPolymarketKalshiCompareDemoSkeleton";
 
 const HubPolymarketKalshiCompareDemo = dynamic(
@@ -17,9 +16,5 @@ const HubPolymarketKalshiCompareDemo = dynamic(
 );
 
 export function KalshiVsPolymarketCompareTool() {
-  return (
-    <HubPolymarketLiveDemoProvider>
-      <HubPolymarketKalshiCompareDemo />
-    </HubPolymarketLiveDemoProvider>
-  );
+  return <HubPolymarketKalshiCompareDemo />;
 }

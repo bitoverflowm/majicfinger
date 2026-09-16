@@ -6,7 +6,8 @@ import { AlertTriangle, Check, Clock, GitMerge, Loader2, RefreshCw, Share2, Undo
 import { PolymarketLiveSearch } from "@/components/connectData/polymarketLive/PolymarketLiveSearch";
 import { MarketTickerSearch } from "@/components/connectData/MarketTickerSearch";
 import { HubKalshiLiveDemoTradesLiveline } from "@/components/hubs/kalshiLiveDemo/HubKalshiLiveDemoTradesLiveline";
-import { HubCtaButton } from "@/components/hubs/HubCtaButton";
+import { useCompareLiveDashboardOptional } from "@/components/hubs/polymarketLiveDemo/compareLiveDashboard/CompareLiveDashboardContext";
+import { OpenLiveDashboardButton } from "@/components/hubs/polymarketLiveDemo/compareLiveDashboard/OpenLiveDashboardButton";
 import {
   featuredPolymarketMarketToDemoMarket,
   useHubPolymarketLiveDemo,
@@ -1985,6 +1986,7 @@ function CompareCounterpartSearch({
 }
 
 export function HubPolymarketKalshiCompareDemo() {
+  const dashboard = useCompareLiveDashboardOptional();
   const selection = useHubPolymarketLiveDemo();
   const polyMarket = selection?.markets?.[0] || null;
   const setMarkets = selection?.setMarkets;
@@ -2705,6 +2707,34 @@ export function HubPolymarketKalshiCompareDemo() {
   const parentFallback = matchFromKalshi ? "KS" : "PM";
   const hasCounterpart = matchFromKalshi ? Boolean(polyMarket) : Boolean(selectedTicker);
   const showCounterpartSearch = !hasCounterpart || editingCounterpart;
+
+  useEffect(() => {
+    const publish = dashboard?.setLandingPair;
+    if (!publish) return;
+    if (!polyMarket || !selectedTicker) {
+      publish(null);
+      return;
+    }
+    publish({
+      kalshiTicker: selectedTicker,
+      kalshiTitle: matchFromKalshi
+        ? kalshiAnchor?.title || selectedTicker
+        : String(kalshiMarket?.title || selectedCandidate?.market.title || selectedTicker),
+      polyMarket,
+      polyTitle: String(polyMarket.title || polyMarket.slug || "Polymarket"),
+      childSide,
+      matchFromKalshi,
+    });
+  }, [
+    childSide,
+    dashboard?.setLandingPair,
+    kalshiAnchor?.title,
+    kalshiMarket?.title,
+    matchFromKalshi,
+    polyMarket,
+    selectedCandidate?.market.title,
+    selectedTicker,
+  ]);
   const polyMatchList = polyCandidates.slice(0, 3);
   const kalshiMatchList = candidates.slice(0, 3);
   const showPolyMatchPicker =
@@ -3420,14 +3450,9 @@ export function HubPolymarketKalshiCompareDemo() {
                   track prices and order books, and customize your charts—all in one view.
                 </p>
                 <div className="flex flex-wrap items-center justify-center gap-3 pt-1">
-                  <HubCtaButton
-                    cta={{
-                      label: "Open my live dashboard →",
-                      href: "#demo",
-                      requiresAuth: false,
-                      ariaLabel: "Open my live dashboard",
-                    }}
-                    variant="primary"
+                  <OpenLiveDashboardButton
+                    label="Open my live dashboard →"
+                    ariaLabel="Open my live dashboard"
                   />
                   <button
                     type="button"

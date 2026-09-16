@@ -2,8 +2,10 @@ import type { Metadata } from "next";
 import Link from "next/link";
 
 import { KalshiVsPolymarketCompareTool } from "./compare-tool";
+import { CompareLiveDashboardShell } from "./compare-live-dashboard-shell";
 import { KalshiVsPolymarketDashboardMockupLazy } from "./dashboard-mockup-lazy";
 import { HubCtaButton } from "@/components/hubs/HubCtaButton";
+import { OpenLiveDashboardButton } from "@/components/hubs/polymarketLiveDemo/compareLiveDashboard/OpenLiveDashboardButton";
 import { HubHashScrollManager } from "@/components/hubs/HubHashScrollManager";
 import { HubSectionRenderer } from "@/components/hubs/HubSections";
 import { BentoSection } from "@/components/sections/bento-section";
@@ -226,7 +228,10 @@ function DashboardConversionSection() {
           ))}
         </ul>
         <div className="flex flex-wrap items-center justify-center gap-3 pt-2">
-          <HubCtaButton cta={copy.dashboard.primaryCta} variant="primary" />
+          <OpenLiveDashboardButton
+            label={copy.dashboard.primaryCta.label}
+            ariaLabel={copy.dashboard.primaryCta.ariaLabel}
+          />
           <HubCtaButton cta={copy.dashboard.secondaryCta} variant="secondary" />
         </div>
       </div>
@@ -254,6 +259,7 @@ export default function KalshiVsPolymarketOddsPage() {
         dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbLd) }}
       />
 
+      <CompareLiveDashboardShell>
       <HubHashScrollManager />
 
       <main className="flex min-h-screen w-full flex-col items-stretch divide-y divide-border bg-background font-sans antialiased theme-landing scroll-smooth">
@@ -342,6 +348,7 @@ export default function KalshiVsPolymarketOddsPage() {
 
         <FooterSection />
       </main>
+      </CompareLiveDashboardShell>
     </>
   );
 }
