@@ -85,6 +85,7 @@ export function CompareMarketPrefill() {
   const appliedKey = useRef("");
 
   useEffect(() => {
+    if (!params) return;
     const pm = String(params.get("pm") || params.get("market") || "").trim();
     const pe = String(params.get("pe") || params.get("event") || "").trim();
     const key = `${pm}|${pe}`;
