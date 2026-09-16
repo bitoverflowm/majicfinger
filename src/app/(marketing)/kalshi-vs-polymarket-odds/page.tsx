@@ -141,7 +141,7 @@ function renderSection(section: HubSection) {
 function CompareHero() {
   return (
     <section className="relative w-full overflow-visible">
-      <div className="relative z-10 mx-auto flex w-full max-w-[73rem] flex-col items-center gap-6 px-6 pb-4 pt-32 md:gap-8 md:pb-6 md:pt-32">
+      <div className="relative z-10 mx-auto flex w-full max-w-[73rem] flex-col items-center gap-6 px-6 pb-8 pt-32 md:gap-8 md:pb-12 md:pt-32">
         <p className="inline-flex h-8 max-w-full items-center gap-2 rounded-full border border-border bg-accent px-3 text-center text-sm text-foreground">
           <span className="relative flex h-2.5 w-2.5 shrink-0">
             <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-500/60" />
@@ -168,7 +168,7 @@ function CompareHero() {
           <KalshiVsPolymarketCompareTool />
         </div>
 
-        <div className="flex max-w-2xl flex-col items-center gap-3 pb-8 text-center">
+        <div className="flex max-w-2xl flex-col items-center gap-4 py-16 text-center md:gap-5 md:py-24">
           <p className="text-sm leading-relaxed text-muted-foreground md:text-base text-pretty">
             {copy.hero.belowTool}
           </p>

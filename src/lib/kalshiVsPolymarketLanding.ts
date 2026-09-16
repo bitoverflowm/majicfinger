@@ -42,9 +42,9 @@ export const kalshiVsPolymarketLanding = {
       "Build your edge with the full Lychee platform. Connect live and historical data across Kalshi, Polymarket, News, Twitter, and more. Test your ideas, build your own analysis, and turn your findings into custom charts, live dashboards, and shareable research—all without writing code.",
     cta: {
       label: "Access Now",
-      href: "#demo",
+      href: "#compare-pricing",
       requiresAuth: false,
-      ariaLabel: "Open the free live dashboard preview",
+      ariaLabel: "View Lychee plans",
     } satisfies HubCta,
     ctaHelper:
       "customize charts, execute quant operations, analyze historical data, and gain your edge by being informed with deep data insights.",

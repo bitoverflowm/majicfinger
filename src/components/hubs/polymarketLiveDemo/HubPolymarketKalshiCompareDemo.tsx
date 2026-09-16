@@ -3422,10 +3422,10 @@ export function HubPolymarketKalshiCompareDemo() {
                 <div className="flex flex-wrap items-center justify-center gap-3 pt-1">
                   <HubCtaButton
                     cta={{
-                      label: "Monitor these markets →",
+                      label: "Open my live dashboard →",
                       href: "#demo",
                       requiresAuth: false,
-                      ariaLabel: "Open the free live dashboard preview",
+                      ariaLabel: "Open my live dashboard",
                     }}
                     variant="primary"
                   />
@@ -3438,6 +3438,10 @@ export function HubPolymarketKalshiCompareDemo() {
                     Share
                   </button>
                 </div>
+                <p className="max-w-lg text-[11px] leading-relaxed text-muted-foreground text-pretty sm:text-xs">
+                  Your selected markets, already loaded. Add more and make it yours. Orderbooks, spreads,
+                  liquidity, historical prices, live quant analysis, and more.
+                </p>
               </div>
             </CardContent>
           </>
