@@ -232,7 +232,13 @@ function asPolyDemo(
   return featuredPolymarketMarketToDemoMarket(market as Record<string, unknown>);
 }
 
-function CompareMatchPills({ score, tier }: { score: number; tier: string }) {
+function CompareMatchPills({
+  score,
+  tier,
+}: {
+  score: number;
+  tier: "exact" | "close" | "related" | "none";
+}) {
   return (
     <>
       <span className="rounded-full bg-muted px-2 py-0.5 text-[10px] font-semibold text-foreground">
