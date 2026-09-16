@@ -64,6 +64,21 @@ function layout(items, width, height, gap) {
 /**
  * Spectrum Market Heatmap (squarified treemap).
  * Vendored from https://ui.spectrumhq.in/charts/heatmap with Lychee tooltip/color hooks.
+ *
+ * @param {object} props
+ * @param {string} [props.className]
+ * @param {Array<{ label: string; name?: string; weight: number; change: number }>} [props.data]
+ * @param {number} [props.height]
+ * @param {number} [props.cap]
+ * @param {"diverging" | "positive" | "negative"} [props.scaleMode]
+ * @param {string} [props.metricLabel]
+ * @param {string} [props.title]
+ * @param {string} [props.subtitle]
+ * @param {string} [props.status]
+ * @param {() => void} [props.onRetry]
+ * @param {string} [props.upColor]
+ * @param {string} [props.downColor]
+ * @param {(payload: unknown) => void} [props.onTileHover]
  */
 export function MarketHeatmap({
   className,
