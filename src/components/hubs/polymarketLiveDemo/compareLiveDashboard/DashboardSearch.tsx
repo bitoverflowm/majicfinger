@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState, type ReactNode } from "react";
-import { Loader2, RefreshCw } from "lucide-react";
+import { Check, Loader2, RefreshCw } from "lucide-react";
 
 import { PolymarketLiveSearch } from "@/components/connectData/polymarketLive/PolymarketLiveSearch";
 import {
@@ -58,6 +58,57 @@ function formatKalshiVol(value: number | null | undefined) {
   return `$${value.toLocaleString(undefined, { maximumFractionDigits: 0 })}`;
 }
 
+function GateOption({
+  selected,
+  title,
+  onSelect,
+  children,
+}: {
+  selected: boolean;
+  title: string;
+  onSelect: () => void;
+  children: ReactNode;
+}) {
+  return (
+    <label
+      className={cn(
+        "flex cursor-pointer flex-col rounded-2xl border p-4 text-left transition-colors",
+        selected
+          ? "border-secondary bg-secondary/10 ring-2 ring-secondary/40"
+          : "border-border/70 bg-background hover:border-border hover:bg-muted/40",
+      )}
+    >
+      <input
+        type="radio"
+        name="dashboard-gate-choice"
+        className="sr-only"
+        checked={selected}
+        onChange={onSelect}
+      />
+      <span className="flex items-center gap-2.5">
+        <span
+          className={cn(
+            "flex size-5 shrink-0 items-center justify-center rounded-full border transition-colors",
+            selected
+              ? "border-secondary bg-secondary text-primary-foreground"
+              : "border-muted-foreground/40 bg-background text-transparent",
+          )}
+          aria-hidden
+        >
+          <Check className="size-3 stroke-[2.5]" />
+        </span>
+        <span className="min-w-0 flex-1 text-sm font-medium text-foreground">{title}</span>
+        {selected ? (
+          <span className="shrink-0 rounded-full bg-secondary px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-primary-foreground">
+            Selected
+          </span>
+        ) : null}
+      </span>
+      <span className="mt-3 block">{children}</span>
+    </label>
+  );
+}
+
 export function DashboardGate({
   pair,
   onKeep,
@@ -68,62 +119,179 @@ export function DashboardGate({
   onNewSearch: () => void;
 }) {
   const [choice, setChoice] = useState<"keep" | "new">("keep");
+  const [suggestions, setSuggestions] = useState<{ venue: "Kalshi" | "Polymarket"; title: string }[]>(
+    [],
+  );
+
+  const current = pair.matchFromKalshi
+    ? [
+        {
+          venue: "Kalshi" as const,
+          color: KALSHI_GREEN,
+          title: pair.kalshiTitle,
+          meta: pair.kalshiTicker,
+        },
+        {
+          venue: "Polymarket" as const,
+          color: POLYMARKET_BLUE,
+          title: pair.polyTitle,
+          meta: String(pair.polyMarket.slug || pair.polyMarket.id || ""),
+        },
+      ]
+    : [
+        {
+          venue: "Polymarket" as const,
+          color: POLYMARKET_BLUE,
+          title: pair.polyTitle,
+          meta: String(pair.polyMarket.slug || pair.polyMarket.id || ""),
+        },
+        {
+          venue: "Kalshi" as const,
+          color: KALSHI_GREEN,
+          title: pair.kalshiTitle,
+          meta: pair.kalshiTicker,
+        },
+      ];
+
+  useEffect(() => {
+    const ac = new AbortController();
+    const skip = new Set(
+      [pair.kalshiTitle, pair.polyTitle, pair.kalshiTicker, String(pair.polyMarket.slug || "")]
+        .map((value) => value.trim().toLowerCase())
+        .filter(Boolean),
+    );
+
+    async function load() {
+      try {
+        const [polyRes, kalshiRes] = await Promise.all([
+          fetch("/api/integrations/polymarket-live/markets/featured?limit=6", {
+            credentials: "same-origin",
+            headers: { Accept: "application/json" },
+            signal: ac.signal,
+          }),
+          fetch("/api/integrations/kalshi-live/markets/featured?limit=6&source=discovery&v=3", {
+            credentials: "same-origin",
+            headers: { Accept: "application/json" },
+            signal: ac.signal,
+          }),
+        ]);
+        const polyBody = await polyRes.json().catch(() => ({}));
+        const kalshiBody = await kalshiRes.json().catch(() => ({}));
+        const poly = (Array.isArray(polyBody?.markets) ? polyBody.markets : [])
+          .map((row: Record<string, unknown>) => String(row.title || "").trim())
+          .filter((title: string) => title && !skip.has(title.toLowerCase()));
+        const kalshi = (Array.isArray(kalshiBody?.markets) ? kalshiBody.markets : [])
+          .map((row: Record<string, unknown>) => String(row.title || "").trim())
+          .filter((title: string) => title && !skip.has(title.toLowerCase()));
+        const mixed: { venue: "Kalshi" | "Polymarket"; title: string }[] = [];
+        for (let i = 0; i < 3; i += 1) {
+          if (poly[i]) mixed.push({ venue: "Polymarket", title: poly[i] });
+          if (kalshi[i]) mixed.push({ venue: "Kalshi", title: kalshi[i] });
+        }
+        if (!ac.signal.aborted) setSuggestions(mixed.slice(0, 4));
+      } catch {
+        if (!ac.signal.aborted) setSuggestions([]);
+      }
+    }
+
+    void load();
+    return () => ac.abort();
+  }, [pair.kalshiTicker, pair.kalshiTitle, pair.polyMarket.slug, pair.polyTitle]);
+
   return (
-    <div className="mx-auto flex max-w-2xl flex-col items-center gap-6 px-4 py-10 text-center">
-      <div className="space-y-2">
-        <p className="text-[0.7rem] font-semibold uppercase tracking-[0.18em] text-secondary">
-          Live dashboard
-        </p>
-        <h2 className="text-balance text-2xl font-semibold tracking-tight text-foreground">
-          Use the markets you already have open?
-        </h2>
-        <p className="text-pretty text-sm leading-relaxed text-muted-foreground">
-          You’re already comparing these contracts. Open them as a live workspace, or start a
-          fresh search.
-        </p>
-      </div>
-      <div className="grid w-full gap-3 sm:grid-cols-2">
-        <button
-          type="button"
-          onClick={() => setChoice("keep")}
-          className={cn(
-            "rounded-2xl border p-4 text-left transition-colors",
-            choice === "keep"
-              ? "border-secondary/40 bg-secondary/10"
-              : "border-border/70 bg-background hover:bg-muted/40",
-          )}
+    <div className="grid h-full min-h-0 w-full flex-1 place-items-center px-4 py-10">
+      <div className="mx-auto flex w-full max-w-3xl flex-col items-center gap-6 text-center">
+        <div className="space-y-2">
+          <p className="text-[0.7rem] font-semibold uppercase tracking-[0.18em] text-secondary">
+            Live dashboard
+          </p>
+          <h2 className="text-balance text-2xl font-semibold tracking-tight text-foreground">
+            Use the markets you already have open?
+          </h2>
+          <p className="text-pretty text-sm leading-relaxed text-muted-foreground">
+            You’re already comparing these contracts. Open them as a live workspace, or start a
+            fresh search.
+          </p>
+        </div>
+        <div
+          className="grid w-full gap-3 sm:grid-cols-2"
+          role="radiogroup"
+          aria-label="Choose how to start the live dashboard"
         >
-          <p className="text-sm font-medium text-foreground">Keep this comparison</p>
-          <p className="mt-2 line-clamp-2 text-[12px] leading-relaxed text-muted-foreground">
-            {pair.kalshiTitle}
-          </p>
-          <p className="mt-1 line-clamp-2 text-[12px] leading-relaxed text-muted-foreground">
-            {pair.polyTitle}
-          </p>
-        </button>
-        <button
+          <GateOption
+            selected={choice === "keep"}
+            title="Keep this comparison"
+            onSelect={() => setChoice("keep")}
+          >
+            <span className="block text-left">
+              <span className="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+                Currently selected
+              </span>
+              <span className="mt-2 flex flex-col gap-2">
+                {current.map((row) => (
+                  <span key={`${row.venue}-${row.meta || row.title}`} className="block">
+                    <span
+                      className="text-[10px] font-semibold uppercase tracking-wide"
+                      style={{ color: row.color }}
+                    >
+                      {row.venue}
+                    </span>
+                    <span className="mt-0.5 line-clamp-2 block text-[12px] font-medium leading-snug text-foreground">
+                      {row.title}
+                    </span>
+                    {row.meta ? (
+                      <span className="mt-0.5 line-clamp-1 block font-mono text-[10px] text-muted-foreground">
+                        {row.meta}
+                      </span>
+                    ) : null}
+                  </span>
+                ))}
+              </span>
+            </span>
+          </GateOption>
+          <GateOption
+            selected={choice === "new"}
+            title="Make a new search"
+            onSelect={() => setChoice("new")}
+          >
+            <span className="block text-left">
+              <span className="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+                Suggested markets
+              </span>
+              <span className="mt-2 flex flex-col gap-1.5">
+                {suggestions.length ? (
+                  suggestions.map((row) => (
+                    <span key={`${row.venue}-${row.title}`} className="block">
+                      <span
+                        className="text-[10px] font-semibold uppercase tracking-wide"
+                        style={{
+                          color: row.venue === "Kalshi" ? KALSHI_GREEN : POLYMARKET_BLUE,
+                        }}
+                      >
+                        {row.venue}
+                      </span>
+                      <span className="line-clamp-1 block text-[12px] leading-snug text-muted-foreground">
+                        {row.title}
+                      </span>
+                    </span>
+                  ))
+                ) : (
+                  <span className="block text-[12px] leading-relaxed text-muted-foreground">
+                    Pick another Kalshi or Polymarket market and we’ll match the other venue.
+                  </span>
+                )}
+              </span>
+            </span>
+          </GateOption>
+        </div>
+        <Button
           type="button"
-          onClick={() => setChoice("new")}
-          className={cn(
-            "rounded-2xl border p-4 text-left transition-colors",
-            choice === "new"
-              ? "border-secondary/40 bg-secondary/10"
-              : "border-border/70 bg-background hover:bg-muted/40",
-          )}
+          className="h-10 rounded-full px-6"
+          onClick={() => (choice === "keep" ? onKeep() : onNewSearch())}
         >
-          <p className="text-sm font-medium text-foreground">Make a new search</p>
-          <p className="mt-2 text-[12px] leading-relaxed text-muted-foreground">
-            Pick another Kalshi or Polymarket market and we’ll match the other venue.
-          </p>
-        </button>
+          {choice === "keep" ? "Continue with this comparison" : "Search for a new market"}
+        </Button>
       </div>
-      <Button
-        type="button"
-        className="h-10 rounded-full px-6"
-        onClick={() => (choice === "keep" ? onKeep() : onNewSearch())}
-      >
-        Continue
-      </Button>
     </div>
   );
 }
@@ -351,7 +519,7 @@ export function DashboardSearch({
   );
 
   return (
-    <div className="mx-auto w-full max-w-4xl space-y-5 px-4 py-8">
+    <div className="mx-auto flex min-h-full w-full max-w-4xl flex-1 flex-col space-y-5 px-4 py-8">
       <div className="space-y-2 text-center">
         <p className="text-[0.7rem] font-semibold uppercase tracking-[0.18em] text-secondary">
           Build a live dashboard

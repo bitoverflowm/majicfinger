@@ -103,9 +103,10 @@ export function CompareLiveDashboardPopout() {
     >
       <DialogContent
         className={cn(
-          "flex max-h-[94vh] w-[min(100vw-0.75rem,92rem)] max-w-none flex-col gap-0 overflow-hidden border-0 bg-transparent p-0 shadow-none sm:rounded-xl",
+          "flex h-[94vh] min-h-[94vh] max-h-[94vh] w-[min(100vw-0.75rem,92rem)] max-w-none flex-col gap-0 overflow-hidden border-0 bg-transparent p-0 shadow-none sm:rounded-xl",
           "[&>button]:right-2 [&>button]:top-2 [&>button]:z-20 [&>button]:rounded-full [&>button]:bg-background/90 [&>button]:p-1.5 [&>button]:opacity-100 [&>button]:shadow-sm",
         )}
+        style={{ height: "94vh" }}
       >
         <DialogHeader className="sr-only">
           <DialogTitle>Live Kalshi vs Polymarket dashboard</DialogTitle>
@@ -115,8 +116,11 @@ export function CompareLiveDashboardPopout() {
         </DialogHeader>
         <SafariBrowserFrame
           url={addressUrl}
-          className="max-h-[94vh]"
-          bodyClassName="max-h-[calc(94vh-52px)] flex flex-col"
+          className="h-full min-h-0 flex-1"
+          bodyClassName={cn(
+            "flex min-h-0 flex-1 flex-col",
+            stage === "gate" || stage === "boot" ? "overflow-hidden" : "overflow-y-auto",
+          )}
         >
           {stage === "gate" && landing.pair ? (
             <DashboardGate
@@ -127,7 +131,7 @@ export function CompareLiveDashboardPopout() {
           ) : null}
           {stage === "search" ? <DashboardSearch onReady={startBoard} /> : null}
           {stage === "boot" ? (
-            <AiPixelLoader className="flex-1" label="Laying out the live workspace" />
+            <AiPixelLoader className="h-full min-h-0 flex-1" label="Laying out the live workspace" />
           ) : null}
           {stage === "board" && pair ? (
             <DashboardBoard
