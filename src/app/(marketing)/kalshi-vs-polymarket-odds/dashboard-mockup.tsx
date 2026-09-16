@@ -37,13 +37,19 @@ type HolderRow = {
   share: number;
 };
 type PolyLevel = { price: number; size: number };
+type KalshiBookRow = {
+  ticker: string;
+  side: string;
+  price_dollars: number;
+  quantity_fp: number;
+};
 
 type MockDashboard = {
   kalshiPrice: number;
   polyPrice: number;
   kalshiCandles: Record<string, unknown>[];
   polyCandles: Record<string, unknown>[];
-  kalshiBook: Record<string, unknown>[];
+  kalshiBook: KalshiBookRow[];
   polyBids: PolyLevel[];
   polyAsks: PolyLevel[];
   spreadSeries: DualSeriesPoint[];
@@ -262,7 +268,7 @@ function buildMockDashboard(): MockDashboard {
     });
   }
 
-  const kalshiBook: Record<string, unknown>[] = [];
+  const kalshiBook: KalshiBookRow[] = [];
   for (let i = 0; i < 11; i += 1) {
     const yesPrice = Number((kalshiMid - 0.01 * (i + 1)).toFixed(2));
     const noPrice = Number((1 - (kalshiMid + 0.01 * (i + 1))).toFixed(2));
