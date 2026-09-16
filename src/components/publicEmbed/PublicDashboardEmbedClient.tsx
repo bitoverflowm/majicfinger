@@ -41,6 +41,12 @@ import { publicEmbedOutboundLinkProps } from "@/components/publicEmbed/publicEmb
 import { DashboardCardGridSection } from "@/components/dashboardComposer/DashboardCardGridSection";
 import { RunForYourselfButton } from "@/components/runYourself/RunForYourselfButton";
 import { useTelegramContentTracker } from "@/hooks/useTelegramContentTracker";
+import {
+  isCompareNarrativeRow,
+  isKalshiPolymarketCompareLayout,
+  readComparePairFromLayout,
+} from "@/lib/kalshiPolymarketCompareDashboard";
+import { CompareLiveDashboardSession } from "@/components/hubs/polymarketLiveDemo/compareLiveDashboard/CompareLiveDashboardSession";
 
 const SITE = process.env.NEXT_PUBLIC_SITE_URL || "https://lycheedata.com";
 
@@ -99,7 +105,7 @@ type Payload = {
     page_subheading?: string;
     dashboard_name?: string;
     theme?: { background?: string; background_color?: string };
-    layout?: { rows?: Row[] };
+    layout?: { kind?: string; compare?: { pair?: unknown }; rows?: Row[] };
     owner_handle?: string;
     owner_profile_pic?: string | null;
     tags?: string[];
@@ -307,6 +313,8 @@ export default function PublicDashboardEmbedClient({
 
   const d = payload.data;
   const rows = Array.isArray(d.layout?.rows) ? d.layout.rows : [];
+  const isCompareLayout = isKalshiPolymarketCompareLayout(d.layout);
+  const comparePair = readComparePairFromLayout(d.layout);
   const bg = d.theme?.background_color || "";
   const showDots = d.theme?.background === "dotPattern";
   const ownerHandle = d.owner_handle || username;
@@ -452,7 +460,18 @@ export default function PublicDashboardEmbedClient({
               </div>
             </div>
 
+          {isCompareLayout ? (
+            <CompareLiveDashboardSession
+              initialPair={comparePair}
+              handleUrl={`${String(SITE).replace(/^https?:\/\//, "").replace(/\/$/, "")}/${username}/dashboards/${slug}`}
+              onUpgrade={() => {}}
+              readOnly
+              className="min-h-[min(72vh,56rem)] border-border/50"
+            />
+          ) : null}
+
           {rows.map((row) => {
+            if (isCompareLayout && isCompareNarrativeRow(row)) return null;
             if (row.type === "cardGrid") {
               const sheetRows = Array.isArray(row.sheetRows)
                 ? (row.sheetRows as object[])

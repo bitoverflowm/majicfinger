@@ -2,6 +2,8 @@
  * SEO completeness checks for publishing a dashboard.
  * Ensures crawlers receive H1, meta description, and substantive content.
  */
+import { isKalshiPolymarketCompareLayout } from "@/lib/kalshiPolymarketCompareDashboard";
+
 export function collectChartIdsFromLayout(layout) {
   const ids = new Set();
   if (!layout || typeof layout !== "object") return ids;
@@ -32,7 +34,7 @@ export function validateDashboardPublishSeo({ layout, page_heading, page_subhead
     if (row?.type === "text" && String(row.body || "").trim()) textBlocks += 1;
   }
 
-  if (chartIds.size === 0 && textBlocks === 0) {
+  if (chartIds.size === 0 && textBlocks === 0 && !isKalshiPolymarketCompareLayout(layout)) {
     return "Add at least one chart or narrative text block before publishing.";
   }
 

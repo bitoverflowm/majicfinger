@@ -39,6 +39,7 @@ import {
   MERGED_LIVELINE_HEIGHT,
   POLYMARKET_BLUE,
   SPLIT_LIVELINE_HEIGHT,
+  type CompareWorkspaceActions,
   type DashboardIntervalId,
   type DashboardLiveState,
   type DashboardPair,
@@ -308,12 +309,16 @@ export function DashboardBoard({
   generating,
   onUpgrade,
   handleUrl,
+  workspace,
+  readOnly = false,
 }: {
   pair: DashboardPair;
   state: DashboardLiveState;
   generating: boolean;
   onUpgrade: () => void;
   handleUrl: string;
+  workspace?: CompareWorkspaceActions;
+  readOnly?: boolean;
 }) {
   const [widgets, setWidgets] = useState<DashboardWidget[]>(DEFAULT_WIDGETS);
   const [addOpen, setAddOpen] = useState(false);
@@ -416,32 +421,44 @@ export function DashboardBoard({
           >
             {tabLabel}
           </button>
-          <button
-            type="button"
-            onClick={() => setAddOpen(true)}
-            className="mb-0.5 inline-flex items-center gap-1 rounded-t-lg px-2.5 py-2 text-[12px] text-muted-foreground hover:bg-muted/50 hover:text-foreground"
-          >
-            <Plus className="size-3.5" />
-            Add another tab
-          </button>
+          {readOnly ? null : (
+            <button
+              type="button"
+              onClick={() => setAddOpen(true)}
+              className="mb-0.5 inline-flex items-center gap-1 rounded-t-lg px-2.5 py-2 text-[12px] text-muted-foreground hover:bg-muted/50 hover:text-foreground"
+            >
+              <Plus className="size-3.5" />
+              Add another tab
+            </button>
+          )}
         </div>
         <div className="mb-0.5 flex shrink-0 items-center gap-1 pb-0.5">
-          <button
-            type="button"
-            onClick={() => setSaveOpen(true)}
-            className="inline-flex h-8 items-center gap-1.5 rounded-md px-2.5 text-[12px] font-medium text-muted-foreground hover:bg-muted/50 hover:text-foreground"
-          >
-            <Save className="size-3.5" />
-            Save
-          </button>
-          <button
-            type="button"
-            onClick={() => setPublishOpen(true)}
-            className="inline-flex h-8 items-center gap-1.5 rounded-md px-2.5 text-[12px] font-medium text-muted-foreground hover:bg-muted/50 hover:text-foreground"
-          >
-            <Globe className="size-3.5" />
-            Publish
-          </button>
+          {readOnly ? null : (
+            <>
+              <button
+                type="button"
+                onClick={() => {
+                  if (workspace?.canWrite) workspace.onSave();
+                  else setSaveOpen(true);
+                }}
+                className="inline-flex h-8 items-center gap-1.5 rounded-md px-2.5 text-[12px] font-medium text-muted-foreground hover:bg-muted/50 hover:text-foreground"
+              >
+                <Save className="size-3.5" />
+                Save
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  if (workspace?.canWrite) workspace.onPublish();
+                  else setPublishOpen(true);
+                }}
+                className="inline-flex h-8 items-center gap-1.5 rounded-md px-2.5 text-[12px] font-medium text-muted-foreground hover:bg-muted/50 hover:text-foreground"
+              >
+                <Globe className="size-3.5" />
+                Publish
+              </button>
+            </>
+          )}
           <button
             type="button"
             onClick={() => setShareOpen(true)}
@@ -643,21 +660,84 @@ export function DashboardBoard({
 
       <Dialog open={addOpen} onOpenChange={setAddOpen}>
         <DialogContent overlayClassName="z-[80]" className="z-[80] sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle>Add another tab</DialogTitle>
-            <DialogDescription>
-              Extra tabs, blank pages, and more comparisons are Pro features.
-            </DialogDescription>
-          </DialogHeader>
-          <p className="text-sm leading-relaxed text-muted-foreground">
-            Keep multiple live workspaces open, mix Kalshi and Polymarket pages, and come back to the
-            layout you built.
-          </p>
-          <DialogFooter>
-            <Button type="button" onClick={onUpgrade}>
-              Get full access to Lychee now
-            </Button>
-          </DialogFooter>
+          {workspace?.canWrite ? (
+            <>
+              <DialogHeader>
+                <DialogTitle>Add another tab</DialogTitle>
+                <DialogDescription>
+                  Open another comparison, a blank dashboard, or a sheet in this workspace.
+                </DialogDescription>
+              </DialogHeader>
+              <div className="flex flex-col gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="justify-start"
+                  onClick={() => {
+                    setAddOpen(false);
+                    workspace.onAddComparison();
+                  }}
+                >
+                  Kalshi vs Polymarket comparison
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="justify-start"
+                  onClick={() => {
+                    setAddOpen(false);
+                    workspace.onAddBlank();
+                  }}
+                >
+                  Blank dashboard
+                </Button>
+                {workspace.onAddSheet ? (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="justify-start"
+                    onClick={() => {
+                      setAddOpen(false);
+                      workspace.onAddSheet?.();
+                    }}
+                  >
+                    Sheet
+                  </Button>
+                ) : null}
+                {workspace.onAddChart ? (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="justify-start"
+                    onClick={() => {
+                      setAddOpen(false);
+                      workspace.onAddChart?.();
+                    }}
+                  >
+                    Chart
+                  </Button>
+                ) : null}
+              </div>
+            </>
+          ) : (
+            <>
+              <DialogHeader>
+                <DialogTitle>Add another tab</DialogTitle>
+                <DialogDescription>
+                  Extra tabs, blank pages, and more comparisons are Pro features.
+                </DialogDescription>
+              </DialogHeader>
+              <p className="text-sm leading-relaxed text-muted-foreground">
+                Keep multiple live workspaces open, mix Kalshi and Polymarket pages, and come back to the
+                layout you built.
+              </p>
+              <DialogFooter>
+                <Button type="button" onClick={onUpgrade}>
+                  Get full access to Lychee now
+                </Button>
+              </DialogFooter>
+            </>
+          )}
         </DialogContent>
       </Dialog>
 

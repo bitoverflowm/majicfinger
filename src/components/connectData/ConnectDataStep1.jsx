@@ -7,6 +7,7 @@ import {
   ArrowUpFromLine,
   Braces,
   BookOpen,
+  Columns2,
   ExternalLink,
   FileImage,
   FilePlus2,
@@ -58,6 +59,8 @@ import {
   kalshiLiveCaption,
   useKalshiHistoricalCutoffDisplay,
 } from "@/hooks/useKalshiHistoricalCutoffDisplay";
+import { KALSHI_VS_POLYMARKET_PATH } from "@/lib/kalshiVsPolymarketLanding";
+import { startKalshiPolymarketCompareDashboard } from "@/lib/kalshiPolymarketCompareDashboard";
 
 /** Wireframe order + News API (platform integration roadmap). */
 const CONNECT_INTEGRATION_ORDER = [
@@ -801,6 +804,10 @@ export default function ConnectDataStep1({
 
   const activate = onActivateWorkspace || requestConnectWorkspace;
 
+  const openKalshiPolymarketCompareBoilerplate = useCallback(() => {
+    startKalshiPolymarketCompareDashboard(context);
+  }, [context]);
+
   const connectFlowStep = useMemo(
     () =>
       deriveConnectFlowStep({
@@ -1073,6 +1080,39 @@ export default function ConnectDataStep1({
                   )}
                 </div>
               ))}
+              <div className={embeddedDemo ? "pt-1" : "pt-2"}>
+                <SectionTitle
+                  compact={embeddedDemo}
+                  className={embeddedDemo ? "mb-1" : connectHubSectionTitleClass}
+                >
+                  Dashboard boilerplates
+                </SectionTitle>
+                <div className={integrationsColClass}>
+                  {embeddedDemo ? (
+                    <PillLink
+                      href={KALSHI_VS_POLYMARKET_PATH}
+                      className={hubIntegrationSurfaceClass}
+                      icon={<Columns2 className={hubGlyphClass} strokeWidth={iconStroke} />}
+                      iconClassName="bg-gradient-to-r from-[#28CC95] to-[#2E5CFF] text-white [&_svg]:text-white"
+                      iconSlotClassName={embeddedDemo ? undefined : connectHubIconSlotResponsive}
+                      labelClassName={embeddedDemo ? undefined : connectHubPillLabelScale}
+                      label="Kalshi vs Polymarket Compare"
+                      title="Open the Kalshi vs Polymarket comparison landing page"
+                    />
+                  ) : (
+                    <PillButton
+                      className={hubIntegrationSurfaceClass}
+                      icon={<Columns2 className={hubGlyphClass} strokeWidth={iconStroke} />}
+                      iconClassName="bg-gradient-to-r from-[#28CC95] to-[#2E5CFF] text-white [&_svg]:text-white"
+                      iconSlotClassName={embeddedDemo ? undefined : connectHubIconSlotResponsive}
+                      labelClassName={embeddedDemo ? undefined : connectHubPillLabelScale}
+                      label="Kalshi vs Polymarket Compare"
+                      title="Create a live Kalshi vs Polymarket comparison dashboard you can save and publish"
+                      onClick={openKalshiPolymarketCompareBoilerplate}
+                    />
+                  )}
+                </div>
+              </div>
             </div>
           </section>
 

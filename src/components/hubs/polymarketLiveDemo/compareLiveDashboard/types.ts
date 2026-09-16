@@ -18,6 +18,16 @@ export type LandingComparison = {
   pair: DashboardPair | null;
 };
 
+export type CompareWorkspaceActions = {
+  canWrite: boolean;
+  onSave: () => void;
+  onPublish: () => void;
+  onAddComparison: () => void;
+  onAddBlank: () => void;
+  onAddSheet?: () => void;
+  onAddChart?: () => void;
+};
+
 export type BookLevel = {
   price: number;
   size: number;

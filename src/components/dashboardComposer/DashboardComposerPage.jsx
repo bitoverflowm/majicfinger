@@ -55,6 +55,17 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { scrollToPricingSection } from "@/lib/scrollToPricing";
+import { normalizeChartEmbedSlug } from "@/lib/chartEmbedSlug";
+import { CONNECT_HOME_CENTER_VIEW } from "@/lib/connectHomeFlow";
+import { connectHomeAddBlankSheet } from "@/lib/connectHomeAddBlankSheet";
+import {
+  applyComparePairToDraft,
+  isCompareNarrativeRow,
+  isKalshiPolymarketCompareLayout,
+  readComparePairFromLayout,
+  startKalshiPolymarketCompareDashboard,
+} from "@/lib/kalshiPolymarketCompareDashboard";
+import { CompareLiveDashboardSession } from "@/components/hubs/polymarketLiveDemo/compareLiveDashboard/CompareLiveDashboardSession";
 import {
   getPageTextBlockEditorClasses,
   getPageTextBlockEditorStyle,
@@ -212,6 +223,12 @@ export default function DashboardComposerPage({ user }) {
     setConnectPowerMove,
     liveFeedActions,
     liveFeedState,
+    workspaceWriteLocked,
+    requestSaveProjectDialog,
+    setRightPanelTab,
+    setRightPanelOpen,
+    setConnectHomeCenterView,
+    addNewChartAndActivate,
   } = ctx;
   const polymarketLiveRealtimeSession =
     ctx.providerValue?.polymarketLiveRealtimeSession || null;
@@ -595,6 +612,124 @@ export default function DashboardComposerPage({ user }) {
   const draftRef = useRef(draft);
   draftRef.current = draft;
 
+  const isCompareLayout = isKalshiPolymarketCompareLayout(draft?.layout);
+  const comparePair = readComparePairFromLayout(draft?.layout);
+  const compareHandleUrl = useMemo(() => {
+    const username = String(userHandle || "").trim().replace(/^@/, "") || "you";
+    const slug =
+      normalizeChartEmbedSlug(String(draft?.public_slug || draft?.dashboard_name || "").trim()) ||
+      "kalshi-vs-polymarket";
+    return `lycheedata.com/${username}/dashboards/${slug}`;
+  }, [userHandle, draft?.public_slug, draft?.dashboard_name]);
+
+  const onComparePairChange = useCallback(
+    (pair) => {
+      setChartDashboardDraft((prev) => applyComparePairToDraft(prev, pair));
+    },
+    [setChartDashboardDraft],
+  );
+
+  const persistCompareDashboard = useCallback(
+    async ({ silent = false } = {}) => {
+      if (isDemo) {
+        setDemoDashboardDialogOpen(true);
+        return false;
+      }
+      if (workspaceWriteLocked) {
+        toast.error("Upgrade to save dashboards.");
+        return false;
+      }
+      if (!hasDbUser || !user?.userId) {
+        toast.error("Sign in to save.");
+        return false;
+      }
+      const current = draftRef.current;
+      if (!current) return false;
+      if (!current.data_set_id) {
+        toast.message("Save this project first so the dashboard can be stored.");
+        requestSaveProjectDialog?.();
+        return false;
+      }
+      const result = await persistChartDashboardDraft({ draft: current, userId: user.userId });
+      if (!result.ok) {
+        toast.error(result.message || "Save failed");
+        return false;
+      }
+      if (result.created) {
+        setChartDashboardDraft((prev) => mergeCreatedChartDashboardDraft(prev, result.created));
+        setActiveChartDashboardId?.(String(result.created._id));
+      }
+      setRefetchChartDashboardsTick?.((t) => (t || 0) + 1);
+      if (!silent) toast.success("Dashboard saved");
+      return true;
+    },
+    [
+      hasDbUser,
+      isDemo,
+      requestSaveProjectDialog,
+      setActiveChartDashboardId,
+      setChartDashboardDraft,
+      setRefetchChartDashboardsTick,
+      user?.userId,
+      workspaceWriteLocked,
+    ],
+  );
+
+  const compareWorkspace = useMemo(
+    () => ({
+      canWrite: !isDemo && !workspaceWriteLocked && !!hasDbUser,
+      onSave: () => {
+        void persistCompareDashboard();
+      },
+      onPublish: () => {
+        if (isDemo) {
+          setDemoDashboardDialogOpen(true);
+          return;
+        }
+        if (workspaceWriteLocked) {
+          toast.error("Upgrade to publish dashboards.");
+          return;
+        }
+        setRightPanelTab?.("export");
+        setRightPanelOpen?.(true);
+        const slug = String(draftRef.current?.public_slug || "").trim();
+        if (slug) {
+          requestSaveProjectDialog?.({ intent: "publish-dashboard" });
+        } else {
+          toast.message("Set a URL slug in Export, then publish.");
+        }
+      },
+      onAddComparison: () => {
+        void persistCompareDashboard({ silent: true }).finally(() => {
+          startKalshiPolymarketCompareDashboard(ctx);
+        });
+      },
+      onAddBlank: handleCreateNew,
+      onAddSheet: () => connectHomeAddBlankSheet(ctx),
+      onAddChart: () => {
+        setLoadedChartMeta?.(null);
+        addNewChartAndActivate?.();
+        setConnectHomeCenterView?.(CONNECT_HOME_CENTER_VIEW.CHARTS);
+        setRightPanelTab?.("charts");
+        setRightPanelOpen?.(true);
+      },
+    }),
+    [
+      addNewChartAndActivate,
+      ctx,
+      handleCreateNew,
+      hasDbUser,
+      isDemo,
+      persistCompareDashboard,
+      requestSaveProjectDialog,
+      setConnectHomeCenterView,
+      setLoadedChartMeta,
+      setRightPanelOpen,
+      setRightPanelTab,
+      workspaceWriteLocked,
+    ],
+  );
+
   /** Presence-only deps: avoid clearing actions on every draft object identity change (sidebar typing). */
   const draftPresent = Boolean(draft);
   useLayoutEffect(() => {
@@ -866,7 +1001,19 @@ export default function DashboardComposerPage({ user }) {
             </div>
           ) : null}
 
+          {isCompareLayout ? (
+            <CompareLiveDashboardSession
+              initialPair={comparePair}
+              handleUrl={compareHandleUrl}
+              onUpgrade={() => scrollToPricingSection()}
+              onPairChange={onComparePairChange}
+              workspace={compareWorkspace}
+              className="min-h-[min(72vh,56rem)]"
+            />
+          ) : null}
+
           {rows.map((row) => {
+            if (isCompareLayout && isCompareNarrativeRow(row)) return null;
             if (row.type === "cards" && Array.isArray(row.columns)) {
               const cols = row.columns || [];
               return (

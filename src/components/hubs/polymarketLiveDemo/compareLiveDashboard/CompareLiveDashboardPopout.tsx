@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useMemo } from "react";
 
 import { SafariBrowserFrame } from "@/components/hubs/kalshiLiveDemo/SafariBrowserFrame";
 import {
@@ -15,14 +15,8 @@ import { useUser } from "@/lib/hooks";
 import { scrollToHashSection } from "@/lib/scrollToHashSection";
 import { cn } from "@/lib/utils";
 
-import { AiPixelLoader } from "./AiGenerating";
+import { CompareLiveDashboardSession } from "./CompareLiveDashboardSession";
 import { useCompareLiveDashboard } from "./CompareLiveDashboardContext";
-import { DashboardBoard } from "./DashboardBoard";
-import { DashboardGate, DashboardSearch } from "./DashboardSearch";
-import { INITIAL_LIVE_STATE, loadDashboardLive } from "./fetchDashboardLive";
-import type { DashboardLiveState, DashboardPair } from "./types";
-
-type Stage = "gate" | "search" | "boot" | "board";
 
 export function CompareLiveDashboardPopout() {
   const { open, closeDashboard, landing } = useCompareLiveDashboard();
@@ -32,53 +26,6 @@ export function CompareLiveDashboardPopout() {
       .trim()
       .replace(/^@/, "") || "you";
 
-  const [stage, setStage] = useState<Stage>("search");
-  const [pair, setPair] = useState<DashboardPair | null>(null);
-  const [state, setState] = useState<DashboardLiveState>(INITIAL_LIVE_STATE);
-  const abortRef = useRef<AbortController | null>(null);
-
-  const reset = useCallback(() => {
-    abortRef.current?.abort();
-    abortRef.current = null;
-    setPair(null);
-    setState(INITIAL_LIVE_STATE);
-    setStage(landing.pair ? "gate" : "search");
-  }, [landing.pair]);
-
-  useEffect(() => {
-    if (!open) {
-      abortRef.current?.abort();
-      abortRef.current = null;
-      return;
-    }
-    setState(INITIAL_LIVE_STATE);
-    setPair(null);
-    setStage(landing.pair ? "gate" : "search");
-  }, [landing.pair, open]);
-
-  const startBoard = useCallback((next: DashboardPair) => {
-    abortRef.current?.abort();
-    const ac = new AbortController();
-    abortRef.current = ac;
-    setPair(next);
-    setState({
-      ...INITIAL_LIVE_STATE,
-      steps: INITIAL_LIVE_STATE.steps.map((step) => ({
-        ...step,
-        status: "queued",
-        startedAt: null,
-        endedAt: null,
-        result: "",
-      })),
-    });
-    setStage("boot");
-    window.setTimeout(() => {
-      if (ac.signal.aborted) return;
-      setStage("board");
-      void loadDashboardLive(next, ac.signal, setState);
-    }, 1400);
-  }, []);
-
   const onUpgrade = useCallback(() => {
     closeDashboard();
     window.setTimeout(() => scrollToHashSection("#compare-pricing"), 80);
@@ -86,19 +33,16 @@ export function CompareLiveDashboardPopout() {
 
   const addressUrl = useMemo(() => {
     const slug =
-      normalizeChartEmbedSlug(pair?.kalshiTitle || pair?.polyTitle || "") ||
+      normalizeChartEmbedSlug(landing.pair?.kalshiTitle || landing.pair?.polyTitle || "") ||
       "kalshi-vs-polymarket";
     return `lycheedata.com/${username}/${slug}`;
-  }, [pair?.kalshiTitle, pair?.polyTitle, username]);
+  }, [landing.pair?.kalshiTitle, landing.pair?.polyTitle, username]);
 
   return (
     <Dialog
       open={open}
       onOpenChange={(next) => {
-        if (!next) {
-          closeDashboard();
-          reset();
-        }
+        if (!next) closeDashboard();
       }}
     >
       <DialogContent
@@ -117,29 +61,14 @@ export function CompareLiveDashboardPopout() {
         <SafariBrowserFrame
           url={addressUrl}
           className="h-full min-h-0 flex-1"
-          bodyClassName={cn(
-            "flex min-h-0 flex-1 flex-col",
-            stage === "gate" || stage === "boot" ? "overflow-hidden" : "overflow-y-auto",
-          )}
+          bodyClassName="flex min-h-0 flex-1 flex-col overflow-y-auto"
         >
-          {stage === "gate" && landing.pair ? (
-            <DashboardGate
-              pair={landing.pair}
-              onKeep={() => startBoard(landing.pair!)}
-              onNewSearch={() => setStage("search")}
-            />
-          ) : null}
-          {stage === "search" ? <DashboardSearch onReady={startBoard} /> : null}
-          {stage === "boot" ? (
-            <AiPixelLoader className="h-full min-h-0 flex-1" label="Laying out the live workspace" />
-          ) : null}
-          {stage === "board" && pair ? (
-            <DashboardBoard
-              pair={pair}
-              state={state}
-              generating={state.steps.some((step) => step.status === "queued" || step.status === "running")}
-              onUpgrade={onUpgrade}
+          {open ? (
+            <CompareLiveDashboardSession
+              initialPair={landing.pair}
               handleUrl={addressUrl}
+              onUpgrade={onUpgrade}
+              className="min-h-0 flex-1 rounded-none border-0"
             />
           ) : null}
         </SafariBrowserFrame>
