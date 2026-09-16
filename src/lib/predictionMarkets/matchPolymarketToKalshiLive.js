@@ -37,6 +37,7 @@ import { impliedChancePctFromMarketRow } from "@/lib/kalshiLive/eventCandlestick
  *   chancePct?: number | null;
  *   volume?: number | null;
  *   suggestionTitle?: string;
+ *   eventTitle?: string;
  *   raw: Record<string, unknown>;
  * }} KalshiMatchCandidateMarket
  */
@@ -218,6 +219,11 @@ export function flattenKalshiEmbeddingSuggestionsToMarkets(suggestions) {
     const seriesTicker = str(suggestion?.ticker);
     const eventTicker = str(suggestion?.eventTicker);
     const suggestionTitle = str(suggestion?.title);
+    const eventTitle = str(
+      suggestion?.raw && typeof suggestion.raw === "object"
+        ? suggestion.raw.event_title || suggestion.raw.eventTitle
+        : "",
+    );
     const category = str(suggestion?.category);
 
     if (!markets.length) continue;
@@ -255,6 +261,7 @@ export function flattenKalshiEmbeddingSuggestionsToMarkets(suggestions) {
               ? Number(row.volume)
               : null,
         suggestionTitle: suggestionTitle || undefined,
+        eventTitle: eventTitle || undefined,
         raw: row,
       });
     }
@@ -274,7 +281,7 @@ export function scorePolymarketKalshiMarketPair(polymarket, kalshi) {
     [polyTitle, ...(Array.isArray(polymarket?.tags) ? polymarket.tags : [])].join(" "),
   );
   const kalshiTokens = tokenizeMatchText(
-    [kalshi.title, kalshi.suggestionTitle, kalshi.yesSubtitle, kalshi.noSubtitle, kalshi.category]
+    [kalshi.title, kalshi.suggestionTitle, kalshi.eventTitle, kalshi.yesSubtitle, kalshi.noSubtitle, kalshi.category]
       .filter(Boolean)
       .join(" "),
   );

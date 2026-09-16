@@ -1,8 +1,8 @@
 "use client";
 
-import { useMemo, useState, type CSSProperties } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import { DragDropContext, Draggable, Droppable, type DropResult } from "@hello-pangea/dnd";
-import { Columns2, GitMerge, GripVertical, Plus, X } from "lucide-react";
+import { Columns2, GitMerge, Globe, GripVertical, Plus, Save, Share2, X } from "lucide-react";
 
 import { HubKalshiLiveDemoTradesLiveline } from "@/components/hubs/kalshiLiveDemo/HubKalshiLiveDemoTradesLiveline";
 import { MarketHeatmap } from "@/components/spectrumui/charts/market-heatmap";
@@ -19,7 +19,7 @@ import {
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 
-import { AgentSteps } from "./AiGenerating";
+import { DashboardShareDialog } from "./DashboardShareDialog";
 import {
   AreaSummaryChart,
   BoxResizeHandles,
@@ -83,6 +83,94 @@ function widgetLayout(widget: DashboardWidget): DashboardWidget["layout"] {
   return "half";
 }
 
+function minWidgetHeight(widget: DashboardWidget) {
+  return widgetType(widget) === "heatmap" ? 320 : 180;
+}
+
+function bookSideSize(levels: { size: number }[]) {
+  return levels.reduce((sum, level) => sum + (Number(level.size) || 0), 0);
+}
+
+function liquidityMapTiles(state: DashboardLiveState) {
+  const kalshiChange = (state.kalshiLastPct ?? 50) - 50;
+  const polyChange = (state.polyLastPct ?? 50) - 50;
+  const tiles = [
+    {
+      label: "Poly bids",
+      name: "Polymarket bid size",
+      weight: bookSideSize(state.polyBook.bids),
+      change: polyChange,
+    },
+    {
+      label: "Poly asks",
+      name: "Polymarket ask size",
+      weight: bookSideSize(state.polyBook.asks),
+      change: polyChange,
+    },
+    {
+      label: "Kalshi bids",
+      name: "Kalshi bid size",
+      weight: bookSideSize(state.kalshiBook.bids),
+      change: kalshiChange,
+    },
+    {
+      label: "Kalshi asks",
+      name: "Kalshi ask size",
+      weight: bookSideSize(state.kalshiBook.asks),
+      change: kalshiChange,
+    },
+  ].filter((tile) => tile.weight > 0);
+  if (tiles.length) return tiles;
+  return [
+    {
+      label: "Poly 24h",
+      name: "Polymarket 24h volume",
+      weight: Math.max(1, state.polyVolume24h || 0),
+      change: polyChange,
+    },
+    {
+      label: "Kalshi 24h",
+      name: "Kalshi 24h volume",
+      weight: Math.max(1, state.kalshiVolume24h || 0),
+      change: kalshiChange,
+    },
+  ];
+}
+
+const HEATMAP_LEGEND_RESERVE = 56;
+
+function FillLiquidityMap({
+  data,
+}: {
+  data: { label: string; name: string; weight: number; change: number }[];
+}) {
+  const hostRef = useRef<HTMLDivElement>(null);
+  const [plotH, setPlotH] = useState(240);
+  useLayoutEffect(() => {
+    const el = hostRef.current;
+    if (!el) return;
+    const apply = () => {
+      setPlotH(Math.max(160, Math.round(el.clientHeight - HEATMAP_LEGEND_RESERVE)));
+    };
+    apply();
+    const ro = new ResizeObserver(apply);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+  return (
+    <div ref={hostRef} className="flex h-full min-h-0 w-full flex-1 flex-col overflow-hidden">
+      <MarketHeatmap
+        data={data}
+        height={plotH}
+        title=""
+        subtitle=""
+        metricLabel="vs 50¢"
+        status="ready"
+      />
+    </div>
+  );
+}
+
 function widgetBoxStyle(widget: DashboardWidget): CSSProperties {
   const layout = widgetLayout(widget);
   const mergedDefault =
@@ -90,7 +178,10 @@ function widgetBoxStyle(widget: DashboardWidget): CSSProperties {
     widgetVenue(widget) === "both" &&
     layout !== "custom" &&
     widget.height < MERGED_LIVELINE_HEIGHT;
-  const height = mergedDefault ? MERGED_LIVELINE_HEIGHT : widget.height;
+  const height = Math.max(
+    minWidgetHeight(widget),
+    mergedDefault ? MERGED_LIVELINE_HEIGHT : widget.height,
+  );
   if (layout === "custom") {
     return { width: widget.width, height, maxWidth: "100%", flex: "0 0 auto" };
   }
@@ -117,6 +208,27 @@ function filterRowsByInterval(
     const ts = Date.parse(String(row.created_time || row.time || ""));
     return Number.isFinite(ts) && ts >= cutoff;
   });
+}
+
+function tradeRowsToPoints(rows: Record<string, unknown>[]): { t: number; v: number }[] {
+  const out: { t: number; v: number }[] = [];
+  for (const row of rows) {
+    const t = Date.parse(String(row.created_time || row.time || ""));
+    const dollars = Number(row.yes_price_dollars ?? row.price);
+    if (!Number.isFinite(t) || !Number.isFinite(dollars)) continue;
+    out.push({ t, v: dollars <= 1.5 ? dollars * 100 : dollars });
+  }
+  return out;
+}
+
+function filterPointsByInterval(
+  points: { t: number; v: number }[],
+  interval: DashboardIntervalId,
+): { t: number; v: number }[] {
+  const spec = DASHBOARD_INTERVALS.find((item) => item.id === interval);
+  if (!spec?.ms) return points;
+  const cutoff = Date.now() - spec.ms;
+  return points.filter((point) => point.t >= cutoff);
 }
 
 function splitLivelineWidgets(widgets: DashboardWidget[]): DashboardWidget[] {
@@ -194,19 +306,40 @@ export function DashboardBoard({
   state,
   generating,
   onUpgrade,
+  handleUrl,
 }: {
   pair: DashboardPair;
   state: DashboardLiveState;
   generating: boolean;
   onUpgrade: () => void;
+  handleUrl: string;
 }) {
   const [widgets, setWidgets] = useState<DashboardWidget[]>(DEFAULT_WIDGETS);
   const [addOpen, setAddOpen] = useState(false);
+  const [saveOpen, setSaveOpen] = useState(false);
+  const [publishOpen, setPublishOpen] = useState(false);
+  const [shareOpen, setShareOpen] = useState(false);
   const [holder, setHolder] = useState<HolderRow | null>(null);
   const [portfolio, setPortfolio] = useState<Record<string, unknown>[] | null>(null);
   const [portfolioLoading, setPortfolioLoading] = useState(false);
   const [venue, setVenue] = useState<"kalshi" | "poly">("kalshi");
   const [interval, setInterval] = useState<DashboardIntervalId>("1d");
+
+  useEffect(() => {
+    setWidgets((prev) => {
+      let changed = false;
+      const next = prev.map((widget) => {
+        if (widgetType(widget) !== "heatmap") return widget;
+        const fresh = DEFAULT_WIDGETS.find((item) => item.id === "heatmap");
+        if (!fresh) return widget;
+        const height = Math.max(widget.height, minWidgetHeight(widget), fresh.height);
+        if (widget.description === fresh.description && widget.height === height) return widget;
+        changed = true;
+        return { ...widget, description: fresh.description, height };
+      });
+      return changed ? next : prev;
+    });
+  }, []);
 
   const tabLabel = `${shortTitle(pair.kalshiTitle, 22)} vs ${shortTitle(pair.polyTitle, 22)}`;
   const live = livelineSeriesFromState(state);
@@ -221,6 +354,18 @@ export function DashboardBoard({
     }),
     [interval, live.kalshi, live.poly],
   );
+  const shareKalshiPoints = useMemo(
+    () => tradeRowsToPoints(filteredLive.kalshi),
+    [filteredLive.kalshi],
+  );
+  const sharePolyPoints = useMemo(() => {
+    const fromTrades = tradeRowsToPoints(filteredLive.poly);
+    if (fromTrades.length) return fromTrades;
+    return filterPointsByInterval(
+      state.polyHistory.map((point) => ({ t: point.t, v: point.v })),
+      interval,
+    );
+  }, [filteredLive.poly, interval, state.polyHistory]);
   const historyAsPoints = useMemo(
     () =>
       state.polyHistory.map((point) => ({
@@ -255,42 +400,7 @@ export function DashboardBoard({
     }
   };
 
-  const heatmapData = useMemo(() => {
-    const items = [
-      {
-        label: "Kalshi 24h",
-        name: "Kalshi volume",
-        weight: Math.max(1, state.kalshiVolume24h || 1),
-        change: (state.kalshiLastPct || 50) - 50,
-      },
-      {
-        label: "Poly 24h",
-        name: "Polymarket volume",
-        weight: Math.max(1, state.polyVolume24h || 1),
-        change: (state.polyLastPct || 50) - 50,
-      },
-      {
-        label: "Kalshi book",
-        name: "Bid depth",
-        weight: Math.max(
-          1,
-          state.kalshiBook.bids.reduce((sum, l) => sum + l.size, 0),
-        ),
-        change: -(state.kalshiSpread || 0),
-      },
-      {
-        label: "Poly book",
-        name: "Ask depth",
-        weight: Math.max(
-          1,
-          state.polyBook.asks.reduce((sum, l) => sum + l.size, 0) +
-            state.polyBook.bids.reduce((sum, l) => sum + l.size, 0),
-        ),
-        change: -(state.polySpread || 0),
-      },
-    ];
-    return items;
-  }, [state]);
+  const heatmapData = useMemo(() => liquidityMapTiles(state), [state]);
 
   const candles = venue === "kalshi" ? state.kalshiCandles : state.polyCandles;
   const depthBook = venue === "kalshi" ? state.kalshiBook : state.polyBook;
@@ -298,20 +408,48 @@ export function DashboardBoard({
   return (
     <div className="flex min-h-0 flex-1 flex-col">
       <div className="flex items-end gap-1 border-b border-border/60 px-2 pt-2">
-        <button
-          type="button"
-          className="relative -mb-px rounded-t-lg border border-border/70 border-b-background bg-background px-3 py-2 text-[12px] font-medium text-foreground"
-        >
-          {tabLabel}
-        </button>
-        <button
-          type="button"
-          onClick={() => setAddOpen(true)}
-          className="mb-0.5 inline-flex items-center gap-1 rounded-t-lg px-2.5 py-2 text-[12px] text-muted-foreground hover:bg-muted/50 hover:text-foreground"
-        >
-          <Plus className="size-3.5" />
-          Add another tab
-        </button>
+        <div className="flex min-w-0 flex-1 items-end gap-1">
+          <button
+            type="button"
+            className="relative -mb-px rounded-t-lg border border-border/70 border-b-background bg-background px-3 py-2 text-[12px] font-medium text-foreground"
+          >
+            {tabLabel}
+          </button>
+          <button
+            type="button"
+            onClick={() => setAddOpen(true)}
+            className="mb-0.5 inline-flex items-center gap-1 rounded-t-lg px-2.5 py-2 text-[12px] text-muted-foreground hover:bg-muted/50 hover:text-foreground"
+          >
+            <Plus className="size-3.5" />
+            Add another tab
+          </button>
+        </div>
+        <div className="mb-0.5 flex shrink-0 items-center gap-1 pb-0.5">
+          <button
+            type="button"
+            onClick={() => setSaveOpen(true)}
+            className="inline-flex h-8 items-center gap-1.5 rounded-md px-2.5 text-[12px] font-medium text-muted-foreground hover:bg-muted/50 hover:text-foreground"
+          >
+            <Save className="size-3.5" />
+            Save
+          </button>
+          <button
+            type="button"
+            onClick={() => setPublishOpen(true)}
+            className="inline-flex h-8 items-center gap-1.5 rounded-md px-2.5 text-[12px] font-medium text-muted-foreground hover:bg-muted/50 hover:text-foreground"
+          >
+            <Globe className="size-3.5" />
+            Publish
+          </button>
+          <button
+            type="button"
+            onClick={() => setShareOpen(true)}
+            className="inline-flex h-8 items-center gap-1.5 rounded-md border border-border/70 bg-background px-2.5 text-[12px] font-medium text-foreground hover:bg-muted/40"
+          >
+            <Share2 className="size-3.5" />
+            Share
+          </button>
+        </div>
       </div>
 
       <div className={cn("grid min-h-0 flex-1 gap-0", generating && "lg:grid-cols-[16.5rem_minmax(0,1fr)]")}>
@@ -463,7 +601,7 @@ export function DashboardBoard({
                               <X className="size-3.5" />
                             </button>
                           </header>
-                          <div className="min-h-0 flex-1 overflow-hidden p-2">
+                          <div className="flex min-h-0 flex-1 flex-col overflow-hidden p-2">
                             <WidgetBody
                               widget={widget}
                               pair={pair}
@@ -479,6 +617,7 @@ export function DashboardBoard({
                             />
                           </div>
                           <BoxResizeHandles
+                            minHeight={minWidgetHeight(widget)}
                             onChange={({ width, height }) => {
                               setWidgets((prev) =>
                                 prev.map((item) =>
@@ -502,32 +641,80 @@ export function DashboardBoard({
       </div>
 
       <Dialog open={addOpen} onOpenChange={setAddOpen}>
-        <DialogContent className="sm:max-w-md">
+        <DialogContent overlayClassName="z-[80]" className="z-[80] sm:max-w-md">
           <DialogHeader>
             <DialogTitle>Add another tab</DialogTitle>
             <DialogDescription>
-              Extra tabs, blank pages, and more comparisons are part of Lychee Pro.
+              Extra tabs, blank pages, and more comparisons are Pro features.
             </DialogDescription>
           </DialogHeader>
-          <div className="grid gap-2">
-            {[
-              { id: "single", label: "Another single market" },
-              { id: "blank", label: "Blank page" },
-              { id: "compare", label: "Another comparison" },
-            ].map((option) => (
-              <button
-                key={option.id}
-                type="button"
-                className="rounded-xl border border-border/70 px-3 py-3 text-left text-sm hover:bg-muted/40"
-                onClick={onUpgrade}
-              >
-                {option.label}
-                <span className="mt-0.5 block text-[11px] text-muted-foreground">Requires Lychee Pro</span>
-              </button>
-            ))}
-          </div>
+          <p className="text-sm leading-relaxed text-muted-foreground">
+            Keep multiple live workspaces open, mix Kalshi and Polymarket pages, and come back to the
+            layout you built.
+          </p>
+          <DialogFooter>
+            <Button type="button" onClick={onUpgrade}>
+              Get full access to Lychee now
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <Dialog open={saveOpen} onOpenChange={setSaveOpen}>
+        <DialogContent overlayClassName="z-[80]" className="z-[80] sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Save this dashboard</DialogTitle>
+            <DialogDescription>Saving a live workspace is a Pro feature.</DialogDescription>
+          </DialogHeader>
+          <p className="text-sm leading-relaxed text-muted-foreground">
+            Keep this comparison, your widget layout, and the markets you picked so you can reopen it
+            anytime.
+          </p>
+          <DialogFooter>
+            <Button type="button" onClick={onUpgrade}>
+              Get full access to Lychee now
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={publishOpen} onOpenChange={setPublishOpen}>
+        <DialogContent overlayClassName="z-[80]" className="z-[80] sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Publish under your handle</DialogTitle>
+            <DialogDescription>
+              Share your analysis and dashboard with your audience at {handleUrl}.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3 text-sm leading-relaxed text-muted-foreground">
+            <p>
+              Put this live workspace on a public page under your handle so readers can follow the same
+              markets, charts, and order books you arranged.
+            </p>
+            <p>
+              Elite users can add a custom domain and their own branding on top of Lychee — a research
+              desk that looks like it belongs to you.
+            </p>
+          </div>
+          <DialogFooter>
+            <Button type="button" onClick={onUpgrade}>
+              Get full access to Lychee now
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <DashboardShareDialog
+        open={shareOpen}
+        onOpenChange={setShareOpen}
+        pair={pair}
+        state={state}
+        widgets={widgets}
+        intervalLabel={DASHBOARD_INTERVALS.find((item) => item.id === interval)?.label ?? "All"}
+        kalshiPoints={shareKalshiPoints}
+        polyPoints={sharePolyPoints}
+        handleUrl={handleUrl}
+      />
 
       <Dialog
         open={Boolean(holder)}
@@ -621,7 +808,7 @@ function WidgetBody({
         fill
         persistHistory
         fullHistory={interval === "6h" || interval === "1d" || interval === "all"}
-        fixedValueDomain={series.length > 1 ? { min: 0, max: 100 } : undefined}
+        formatValue={(value) => `${value.toFixed(1)}¢`}
         className="h-full min-h-0"
       />
     );
@@ -819,14 +1006,7 @@ function WidgetBody({
       return <ChartSkeleton height={220} variant="grid" />;
     }
     return (
-      <MarketHeatmap
-        data={heatmapData}
-        height={200}
-        title=""
-        subtitle=""
-        metricLabel="vs 50¢"
-        status="ready"
-      />
+      <FillLiquidityMap data={heatmapData} />
     );
   }
 

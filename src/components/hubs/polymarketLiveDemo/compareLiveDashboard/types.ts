@@ -221,10 +221,10 @@ export const DEFAULT_WIDGETS: DashboardWidget[] = [
     id: "heatmap",
     type: "heatmap",
     title: "Liquidity map",
-    description: "Where size and movement concentrate.",
+    description: "Tile size is resting bid/ask size. Color is that venue’s YES last vs 50¢.",
     layout: "half",
     width: 0,
-    height: 240,
+    height: 360,
   },
 ];
 

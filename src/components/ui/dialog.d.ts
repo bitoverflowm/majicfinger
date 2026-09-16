@@ -12,8 +12,9 @@ export declare const DialogOverlay: React.ForwardRefExoticComponent<
 >;
 
 export declare const DialogContent: React.ForwardRefExoticComponent<
-  React.ComponentPropsWithoutRef<typeof DialogPrimitive.Content> &
-    React.RefAttributes<React.ElementRef<typeof DialogPrimitive.Content>>
+  React.ComponentPropsWithoutRef<typeof DialogPrimitive.Content> & {
+    overlayClassName?: string;
+  } & React.RefAttributes<React.ElementRef<typeof DialogPrimitive.Content>>
 >;
 
 export declare function DialogHeader({

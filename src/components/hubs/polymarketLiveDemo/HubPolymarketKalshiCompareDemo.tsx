@@ -636,6 +636,47 @@ function ComparePolyMatchPicker({
   );
 }
 
+function distinctKalshiText(value: string, seen: string[]): boolean {
+  const text = value.trim();
+  if (!text) return false;
+  const key = text.toLowerCase();
+  return !seen.some((item) => item.trim().toLowerCase() === key);
+}
+
+function kalshiCandidateContext(market: KalshiMatchCandidate["market"] | null | undefined) {
+  if (!market) {
+    return { heading: "", outcome: "", displayTitle: "", category: "", closes: "" };
+  }
+  const strike = String(market.yesSubtitle || "").trim();
+  const eventTitle = String(market.eventTitle || "").trim();
+  const seriesTitle = String(market.suggestionTitle || "").trim();
+  const rawTitle = String(
+    market.raw && typeof market.raw === "object" ? (market.raw as { title?: unknown }).title || "" : "",
+  ).trim();
+  const heading =
+    (distinctKalshiText(eventTitle, [strike]) && eventTitle) ||
+    (distinctKalshiText(seriesTitle, [strike, eventTitle]) && seriesTitle) ||
+    (distinctKalshiText(rawTitle, [strike, eventTitle, seriesTitle]) && rawTitle) ||
+    strike ||
+    String(market.title || "").trim() ||
+    market.marketTicker;
+  const headingLower = heading.toLowerCase();
+  const outcome = distinctKalshiText(strike, [heading]) && !headingLower.includes(strike.toLowerCase())
+    ? strike
+    : "";
+  const closeMs = Date.parse(String(market.closeTime || ""));
+  const closes = Number.isFinite(closeMs)
+    ? new Date(closeMs).toLocaleDateString(undefined, { month: "short", day: "numeric" })
+    : "";
+  return {
+    heading,
+    outcome,
+    displayTitle: outcome ? `${heading} — ${outcome}` : heading,
+    category: String(market.category || "").trim(),
+    closes,
+  };
+}
+
 function CompareKalshiMatchPicker({
   candidates,
   selectedTicker,
@@ -653,6 +694,7 @@ function CompareKalshiMatchPicker({
         const selected = candidate.market.marketTicker === selectedTicker;
         const labels = kalshiYesNoLabels(candidate.market, candidate.market.title);
         const aligned = yesOutcomesLikelySame(parentYes, labels.yes);
+        const context = kalshiCandidateContext(candidate.market);
         return (
           <label
             key={candidate.market.marketTicker}
@@ -672,11 +714,20 @@ function CompareKalshiMatchPicker({
             />
             <span className="min-w-0 flex-1 space-y-0.5">
               <span className="flex flex-wrap items-center gap-1.5">
-                <span className="text-xs font-medium text-foreground">{candidate.market.title}</span>
+                <span className="text-xs font-medium leading-snug text-foreground">
+                  {context.heading}
+                </span>
                 <CompareMatchPills score={candidate.score} tier={candidate.tier} />
               </span>
+              {context.outcome ? (
+                <span className="block text-[12px] font-medium text-foreground/90">
+                  {context.outcome}
+                </span>
+              ) : null}
               <span className="block font-mono text-[10px] text-muted-foreground">
                 {candidate.market.marketTicker}
+                {context.category ? ` · ${context.category}` : ""}
+                {context.closes ? ` · Closes ${context.closes}` : ""}
               </span>
               <span className="block text-[11px] text-muted-foreground">
                 YES = {labels.yes}
@@ -2719,7 +2770,8 @@ export function HubPolymarketKalshiCompareDemo() {
       kalshiTicker: selectedTicker,
       kalshiTitle: matchFromKalshi
         ? kalshiAnchor?.title || selectedTicker
-        : String(kalshiMarket?.title || selectedCandidate?.market.title || selectedTicker),
+        : kalshiCandidateContext(selectedCandidate?.market).displayTitle ||
+          String(kalshiMarket?.title || selectedTicker),
       polyMarket,
       polyTitle: String(polyMarket.title || polyMarket.slug || "Polymarket"),
       childSide,
@@ -2732,7 +2784,7 @@ export function HubPolymarketKalshiCompareDemo() {
     kalshiMarket?.title,
     matchFromKalshi,
     polyMarket,
-    selectedCandidate?.market.title,
+    selectedCandidate,
     selectedTicker,
   ]);
   const polyMatchList = polyCandidates.slice(0, 3);
@@ -2765,7 +2817,8 @@ export function HubPolymarketKalshiCompareDemo() {
     childSide === "no" ? swapYesNoLabels(counterpartNativeYesNo) : counterpartNativeYesNo;
   const counterpartTitle = matchFromKalshi
     ? String(polyMarket?.title || polyMarket?.slug || "Market")
-    : String(kalshiMarket?.title || selectedCandidate?.market.title || selectedTicker || "Market");
+    : kalshiCandidateContext(selectedCandidate?.market).displayTitle ||
+      String(kalshiMarket?.title || selectedTicker || "Market");
   const counterpartMeta = matchFromKalshi
     ? [String(polyMarket?.slug || ""), polyMarket?.closed ? "Closed" : polyMarket ? "Live" : ""]
         .map((value) => String(value || "").trim())
@@ -3216,8 +3269,8 @@ export function HubPolymarketKalshiCompareDemo() {
                           skeletonClassName="h-3.5 w-40 max-w-full"
                         >
                           {String(
-                            kalshiMarket?.title ||
-                              selectedCandidate?.market.title ||
+                            kalshiCandidateContext(selectedCandidate?.market).displayTitle ||
+                              kalshiMarket?.title ||
                               kalshiAnchor?.title ||
                               selectedTicker ||
                               "—",

@@ -512,8 +512,10 @@ type ResizeEdge = "s" | "e" | "se";
 
 export function BoxResizeHandles({
   onChange,
+  minHeight = 180,
 }: {
   onChange: (next: { width: number; height: number }) => void;
+  minHeight?: number;
 }) {
   const start = (edge: ResizeEdge) => (event: ReactPointerEvent<HTMLDivElement>) => {
     event.preventDefault();
@@ -531,7 +533,7 @@ export function BoxResizeHandles({
       const dh = edge === "e" ? 0 : ev.clientY - startY;
       onChange({
         width: Math.round(Math.max(240, Math.min(maxW, startW + dw))),
-        height: Math.round(Math.max(180, Math.min(1200, startH + dh))),
+        height: Math.round(Math.max(minHeight, Math.min(1200, startH + dh))),
       });
     };
     const up = () => {

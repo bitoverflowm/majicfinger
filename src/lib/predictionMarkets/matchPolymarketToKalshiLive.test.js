@@ -66,6 +66,7 @@ import {
         title: "Fed funds rate",
         eventTicker: "FED-26MAR",
         category: "Economics",
+        raw: { event_title: "Will the Fed funds rate be above 5% in March?" },
         markets: [
           {
             ticker: "FED-26MAR-T5.00",
@@ -80,6 +81,11 @@ import {
   );
   assert.ok(ranked.length >= 1);
   assert.ok(ranked[0].market.marketTicker.includes("FED"));
+  assert.equal(ranked[0].market.suggestionTitle, "Fed funds rate");
+  assert.equal(
+    ranked[0].market.eventTitle,
+    "Will the Fed funds rate be above 5% in March?",
+  );
 }
 
 {

@@ -139,6 +139,7 @@ export function CompareLiveDashboardPopout() {
               state={state}
               generating={state.steps.some((step) => step.status === "queued" || step.status === "running")}
               onUpgrade={onUpgrade}
+              handleUrl={addressUrl}
             />
           ) : null}
         </SafariBrowserFrame>
