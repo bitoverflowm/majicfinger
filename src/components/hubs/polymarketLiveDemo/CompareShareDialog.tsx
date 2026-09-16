@@ -20,7 +20,6 @@ import { cn } from "@/lib/utils";
 
 const POLY = "#2E5CFF";
 const KALSHI = "#28CC95";
-const LYCHEE_RED = "#E11D48";
 
 export type CompareShareMode = "chart" | "details" | "both";
 
@@ -120,7 +119,7 @@ export function CompareShareDialog({
       `Kalshi ${formatPct(kalshiYesPct)}  ·  Polymarket ${formatPct(polyYesPct)}`,
       spreadLine,
       "",
-      "Generated with Lychee Data. Compare it yourself:",
+      "Created with Lychee. Compare it yourself:",
       KALSHI_VS_POLYMARKET_CANONICAL,
     ].join("\n");
   }, [headlineDefault, kalshiYesPct, polyYesPct, spread]);
@@ -294,15 +293,15 @@ export function CompareShareDialog({
               />
             </div>
             <div className="grid grid-cols-2 gap-2">
-              <Button type="button" variant="secondary" onClick={handleX} disabled={busy != null}>
+              <Button type="button" variant="outline" onClick={handleX} disabled={busy != null}>
                 {busy === "x" ? <Loader2 className="size-4 animate-spin" /> : null}
                 Post to X
               </Button>
-              <Button type="button" variant="secondary" onClick={handleLinkedIn} disabled={busy != null}>
+              <Button type="button" variant="outline" onClick={handleLinkedIn} disabled={busy != null}>
                 {busy === "linkedin" ? <Loader2 className="size-4 animate-spin" /> : null}
                 LinkedIn
               </Button>
-              <Button type="button" variant="secondary" onClick={handleNativeShare} disabled={busy != null}>
+              <Button type="button" variant="outline" onClick={handleNativeShare} disabled={busy != null}>
                 {busy === "native" ? <Loader2 className="size-4 animate-spin" /> : <Share2 className="size-4" />}
                 IG / TikTok
               </Button>
@@ -343,14 +342,15 @@ export function CompareShareDialog({
                 />
                 <div className="flex items-center justify-between px-14 pt-12">
                   <div className="flex items-center gap-4">
-                    <span
-                      className="flex size-14 items-center justify-center rounded-full text-xl font-black"
-                      style={{ background: LYCHEE_RED }}
-                    >
-                      L
-                    </span>
+                    <img
+                      src="/logo.png"
+                      alt=""
+                      width={56}
+                      height={56}
+                      className="size-14 rounded-full object-contain"
+                    />
                     <div>
-                      <p className="text-2xl font-semibold tracking-tight">Lychee Data</p>
+                      <p className="text-2xl font-semibold tracking-tight">Created with Lychee</p>
                       <p className="text-lg uppercase tracking-[0.22em] text-white/45">Live comparison</p>
                     </div>
                   </div>
@@ -419,8 +419,7 @@ export function CompareShareDialog({
                 <div className="mt-auto px-14 pb-12 pt-8">
                   <div className="flex items-end justify-between gap-8 border-t border-white/10 pt-7">
                     <div>
-                      <p className="text-xl text-white/50">Generated with</p>
-                      <p className="text-3xl font-semibold">Lychee Data</p>
+                      <p className="text-3xl font-semibold">Created with Lychee</p>
                     </div>
                     <div className="text-right">
                       <p className="text-xl text-white/50">Compare it yourself</p>
