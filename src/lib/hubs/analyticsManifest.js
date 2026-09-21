@@ -11,6 +11,7 @@ const HUB_PATHS = Object.values(INTEGRATION_HUBS).map((hub) => {
 
 /** Standalone marketing pages outside INTEGRATION_HUBS. */
 const MARKETING_PAGES = [
+  { path: "/kalshi-vs-polymarket-odds", name: "Kalshi vs Polymarket" },
   { path: "/polymarket-metadata", name: "Polymarket Metadata Lookup" },
   { path: "/dashboards-gallery", name: "Dashboards Gallery" },
   { path: "/csv-exports", name: "CSV Exports" },

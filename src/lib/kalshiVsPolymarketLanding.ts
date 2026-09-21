@@ -69,6 +69,11 @@ export const kalshiVsPolymarketLanding = {
       href: "#compare",
       requiresAuth: false,
       ariaLabel: "Scroll to the live Kalshi and Polymarket comparison",
+      eventLabel: "kalshi_vs_polymarket_hero_begin",
+      tracking: {
+        page: KALSHI_VS_POLYMARKET_PATH,
+        destination: "#compare",
+      },
     } satisfies HubCta,
     trustLine: "Free to use. No signup required.",
     belowTool:
@@ -78,6 +83,11 @@ export const kalshiVsPolymarketLanding = {
       href: "#compare-pricing",
       requiresAuth: false,
       ariaLabel: "View Lychee plans",
+      eventLabel: "kalshi_vs_polymarket_hero_access",
+      tracking: {
+        page: KALSHI_VS_POLYMARKET_PATH,
+        destination: "#compare-pricing",
+      },
     } satisfies HubCta,
     ctaHelper:
       "customize charts, execute quant operations, analyze historical data, and gain your edge by being informed with deep data insights.",
@@ -159,12 +169,22 @@ export const kalshiVsPolymarketLanding = {
       href: "#demo",
       requiresAuth: false,
       ariaLabel: "Check out the live dashboard preview",
+      eventLabel: "kalshi_vs_polymarket_dashboard_preview",
+      tracking: {
+        page: KALSHI_VS_POLYMARKET_PATH,
+        destination: "#demo",
+      },
     } satisfies HubCta,
     secondaryCta: {
       label: "View Lychee plans",
       href: "#pricing",
       requiresAuth: false,
       ariaLabel: "View Lychee plans",
+      eventLabel: "kalshi_vs_polymarket_dashboard_pricing",
+      tracking: {
+        page: KALSHI_VS_POLYMARKET_PATH,
+        destination: "#pricing",
+      },
     } satisfies HubCta,
   },
   platform: {
@@ -284,12 +304,22 @@ export const kalshiVsPolymarketLanding = {
       href: "#compare",
       requiresAuth: false,
       ariaLabel: "Compare Kalshi and Polymarket markets for free",
+      eventLabel: "kalshi_vs_polymarket_closing_compare",
+      tracking: {
+        page: KALSHI_VS_POLYMARKET_PATH,
+        destination: "#compare",
+      },
     } satisfies HubCta,
     secondaryCta: {
       label: "View Lychee plans",
       href: "#pricing",
       requiresAuth: false,
       ariaLabel: "View Lychee plans",
+      eventLabel: "kalshi_vs_polymarket_closing_pricing",
+      tracking: {
+        page: KALSHI_VS_POLYMARKET_PATH,
+        destination: "#pricing",
+      },
     } satisfies HubCta,
     supportLine:
       "No signup needed to compare. Save your dashboard when you’re ready with a paid Lychee plan.",
