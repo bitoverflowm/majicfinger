@@ -91,7 +91,7 @@ export function useMDXComponents(components?: MDXComponents): MDXComponents {
       if (!src) return null;
       const isExternal = src.startsWith("http");
       return (
-        <span className="block my-6 rounded-xl overflow-hidden border border-border bg-muted/30">
+        <span className="block my-6 overflow-hidden rounded-xl">
           <Image
             src={src}
             alt={alt || ""}

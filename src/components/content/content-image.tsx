@@ -32,7 +32,7 @@ export function ContentImage({
 
   return (
     <figure className={cn("my-8", className)}>
-      <div className="relative w-full overflow-hidden rounded-xl border border-border bg-muted/30">
+      <div className="relative w-full overflow-hidden rounded-xl">
         <Image
           src={src}
           alt={alt}
