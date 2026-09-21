@@ -5,7 +5,12 @@ import {
   type EnrichedTweet,
   type TweetProps,
 } from "react-tweet"
-import { getTweet, type Tweet } from "react-tweet/api"
+import {
+  getTweet,
+  type MediaAnimatedGif,
+  type MediaVideo,
+  type Tweet,
+} from "react-tweet/api"
 
 import { pickMp4Variant, proxiedTweetMediaUrl } from "@/components/magicui/tweet-media-video"
 import { cn } from "@/lib/utils"
@@ -189,10 +194,10 @@ export const TweetBody = ({ tweet }: { tweet: EnrichedTweet }) => (
 export const TweetMedia = ({ tweet }: { tweet: EnrichedTweet }) => {
   if (!tweet.video && !tweet.photos) return null
   const videoMedia = tweet.mediaDetails?.find(
-    (media) => media.type === "video" || media.type === "animated_gif"
+    (media): media is MediaVideo | MediaAnimatedGif =>
+      media.type === "video" || media.type === "animated_gif"
   )
-  const mp4FromDetails =
-    videoMedia && videoMedia.type !== "photo" ? getMp4Video(videoMedia) : undefined
+  const mp4FromDetails = videoMedia ? getMp4Video(videoMedia) : undefined
   const mp4FromVariants = pickMp4Variant(tweet.video?.variants)
   const videoSrc = mp4FromDetails?.url ?? mp4FromVariants?.src
   const videoType = mp4FromDetails?.content_type ?? mp4FromVariants?.type ?? "video/mp4"
@@ -208,7 +213,6 @@ export const TweetMedia = ({ tweet }: { tweet: EnrichedTweet }) => {
           playsInline
           controls
           preload="auto"
-          referrerPolicy="no-referrer"
           className="w-full rounded-xl border border-border bg-black shadow-sm"
         >
           <source src={proxiedTweetMediaUrl(videoSrc)} type={videoType} />
