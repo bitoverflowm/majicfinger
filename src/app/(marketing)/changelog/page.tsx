@@ -1,8 +1,11 @@
 import Link from "next/link";
 import { CTASection } from "@/components/sections/cta-section";
 import { FooterSection } from "@/components/sections/footer-section";
+import { TweetCard } from "@/components/content/TweetCard";
+import { CHANGELOG_ENTRY_EXTRAS } from "@/lib/content/changelogEntryExtras";
 import { getFeatureReleaseContent } from "@/lib/content/featureReleases";
 import { canonicalUrl } from "@/lib/site";
+import type { ContentItem } from "@/lib/content/types";
 
 const PAGE_TITLE = "Lychee Changelog: Product Updates & Feature Releases";
 const PAGE_DESCRIPTION =
@@ -38,6 +41,81 @@ function formatDate(dateStr: string | undefined) {
   });
 }
 
+function ChangelogRelease({ item }: { item: ContentItem }) {
+  const publishedAt = item.frontmatter?.publishedAt;
+  const description =
+    item.frontmatter?.description || item.frontmatter?.summary || item.excerpt || "";
+  const extras = CHANGELOG_ENTRY_EXTRAS[item.slug];
+  const title = item.frontmatter?.title || item.slug;
+
+  if (extras) {
+    return (
+      <li>
+        <article className="flex flex-col gap-4 px-1 py-6 sm:flex-row sm:items-start sm:gap-6 sm:px-2">
+          <time
+            dateTime={publishedAt}
+            className="shrink-0 pt-0.5 text-sm tabular-nums text-muted-foreground sm:w-36"
+          >
+            {formatDate(publishedAt) || "—"}
+          </time>
+          <div className="min-w-0 flex-1 space-y-4">
+            <div className="space-y-1.5">
+              <h2 className="text-base font-medium text-foreground">{title}</h2>
+              {description ? (
+                <p className="text-sm leading-relaxed text-muted-foreground">{description}</p>
+              ) : null}
+            </div>
+            {extras.tweetId ? (
+              <TweetCard id={extras.tweetId} className="my-0 justify-start" />
+            ) : null}
+            {extras.links?.length ? (
+              <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+                {extras.links.map((link) => (
+                  <Link
+                    key={link.href}
+                    href={link.href}
+                    className="text-sm font-medium text-foreground underline-offset-4 hover:underline"
+                    prefetch={false}
+                  >
+                    {link.label}
+                  </Link>
+                ))}
+              </div>
+            ) : null}
+          </div>
+        </article>
+      </li>
+    );
+  }
+
+  return (
+    <li>
+      <Link
+        href={`/guides/${item.slug}`}
+        className="group flex flex-col gap-1 px-1 py-5 transition-colors hover:bg-muted/40 sm:flex-row sm:items-baseline sm:gap-6 sm:px-2"
+        prefetch={false}
+      >
+        <time
+          dateTime={publishedAt}
+          className="shrink-0 text-sm tabular-nums text-muted-foreground sm:w-36"
+        >
+          {formatDate(publishedAt) || "—"}
+        </time>
+        <span className="min-w-0 flex-1 space-y-1">
+          <span className="block text-base font-medium text-foreground group-hover:text-primary">
+            {title}
+          </span>
+          {description ? (
+            <span className="block text-sm leading-relaxed text-muted-foreground line-clamp-2">
+              {description}
+            </span>
+          ) : null}
+        </span>
+      </Link>
+    </li>
+  );
+}
+
 export default function ChangelogPage() {
   const releases = getFeatureReleaseContent();
 
@@ -56,37 +134,9 @@ export default function ChangelogPage() {
 
         {releases.length > 0 ? (
           <ol className="space-y-0 divide-y divide-border border-y border-border">
-            {releases.map((item) => {
-              const publishedAt = item.frontmatter?.publishedAt;
-              const description =
-                item.frontmatter?.description || item.frontmatter?.summary || item.excerpt || "";
-              return (
-                <li key={`${item.contentType}-${item.slug}`}>
-                  <Link
-                    href={`/guides/${item.slug}`}
-                    className="group flex flex-col gap-1 px-1 py-5 transition-colors hover:bg-muted/40 sm:flex-row sm:items-baseline sm:gap-6 sm:px-2"
-                    prefetch={false}
-                  >
-                    <time
-                      dateTime={publishedAt}
-                      className="shrink-0 text-sm tabular-nums text-muted-foreground sm:w-36"
-                    >
-                      {formatDate(publishedAt) || "—"}
-                    </time>
-                    <span className="min-w-0 flex-1 space-y-1">
-                      <span className="block text-base font-medium text-foreground group-hover:text-primary">
-                        {item.frontmatter?.title || item.slug}
-                      </span>
-                      {description ? (
-                        <span className="block text-sm leading-relaxed text-muted-foreground line-clamp-2">
-                          {description}
-                        </span>
-                      ) : null}
-                    </span>
-                  </Link>
-                </li>
-              );
-            })}
+            {releases.map((item) => (
+              <ChangelogRelease key={`${item.contentType}-${item.slug}`} item={item} />
+            ))}
           </ol>
         ) : (
           <p className="py-12 text-center text-muted-foreground">

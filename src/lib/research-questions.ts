@@ -16,6 +16,13 @@ export type ResearchQuestion = {
 
 export const researchQuestions: ResearchQuestion[] = [
   {
+    question: "How do Kalshi and Polymarket odds compare live?",
+    href: "/kalshi-vs-polymarket-odds",
+    status: "published",
+    type: "Guide",
+    badges: ["Kalshi", "Polymarket", "Live Odds"],
+  },
+  {
     question: "Are 90% Kalshi political markets actually accurate?",
     href: "/guides/kalshi-political-prediction-market-accuracy",
     status: "published",
@@ -58,6 +65,13 @@ export const researchQuestions: ResearchQuestion[] = [
     badges: ["Polymarket Historical", "Charts", "Guide"],
   },
   {
+    question: "Where do Kalshi and Polymarket prices disagree?",
+    href: "/kalshi-vs-polymarket-odds",
+    status: "published",
+    type: "Guide",
+    badges: ["Kalshi", "Polymarket", "Cross-Market"],
+  },
+  {
     question: "Which Polymarket markets are moving fastest right now?",
     href: "#demo",
     status: "coming_soon",
@@ -77,13 +91,6 @@ export const researchQuestions: ResearchQuestion[] = [
     status: "coming_soon",
     type: "Dashboard",
     badges: ["Live Feeds", "Trader Dashboard"],
-  },
-  {
-    question: "Where do Kalshi and Polymarket prices disagree?",
-    href: "#demo",
-    status: "coming_soon",
-    type: "Research",
-    badges: ["Cross-Market", "Arbitrage", "Research"],
   },
   {
     question: "Which markets changed after major news events?",

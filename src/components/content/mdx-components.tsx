@@ -3,6 +3,7 @@ import Image from "next/image";
 import { TypographyInlineCode, VideoEmbed, YouTube } from "@/components/ui";
 import { cn } from "@/lib/utils";
 import { ContentImage } from "./content-image";
+import { TweetCard } from "./TweetCard";
 import { LYCHEE_CONTENT_TYPE, ArticleDivider } from "./article-prose";
 import { ArticleTable } from "./ArticleTable";
 import { KalshiHistoricalDataQuery } from "./KalshiHistoricalDataQuery";
@@ -71,6 +72,7 @@ function MdxHr() {
  * - VideoEmbed: iframe embed with full embed URL (any provider)
  * - YouTube: `<YouTube videoId="..." />` — id or watch/youtu.be URL
  * - Inline code: backticks or `<TypographyInlineCode>` (shadcn-style muted pill)
+ * - TweetCard: `<TweetCard id="..." />` or `<TweetCard url="https://x.com/.../status/..." />`
  * - PublicChart: `<PublicChart username="..." slug="..." />`
  * - KalshiHistoricalDataQuery: `<KalshiHistoricalDataQuery />` — Kalshi markets/trades query builder
  * - PolymarketHistoricalDataQuery: `<PolymarketHistoricalDataQuery />` — Polymarket markets/trades query builder
@@ -104,6 +106,7 @@ export function useMDXComponents(components?: MDXComponents): MDXComponents {
       );
     },
     ContentImage,
+    TweetCard,
     VideoEmbed,
     YouTube,
     PublicChart,

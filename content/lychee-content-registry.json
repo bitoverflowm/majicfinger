@@ -123,7 +123,6 @@
       "integrationHub": "polymarket-live",
       "integrationTopic": "overview"
     },
-
     {
       "slug": "polymarket-live-prices",
       "contentClass": "guide",
@@ -135,6 +134,13 @@
       "contentClass": "guide",
       "integrationHub": "platform",
       "integrationTopic": "general"
+    },
+    {
+      "slug": "compare-kalshi-polymarket-odds",
+      "contentClass": "changelog",
+      "integrationHub": "platform",
+      "integrationTopic": "general",
+      "publishedAt": "2026-09-18"
     },
     {
       "slug": "embed-interactive-charts",

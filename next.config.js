@@ -63,7 +63,7 @@ const nextConfig = {
       },
     ]
   },
-  transpilePackages: ["@nivo", "@duckdb/duckdb-wasm", "apache-arrow"],
+  transpilePackages: ["@nivo", "@duckdb/duckdb-wasm", "apache-arrow", "react-tweet"],
   experimental: {
     esmExternals: 'loose',
   },
