@@ -1,7 +1,13 @@
 import { Suspense } from "react"
-import { enrichTweet, type EnrichedTweet, type TweetProps } from "react-tweet"
+import {
+  enrichTweet,
+  getMp4Video,
+  type EnrichedTweet,
+  type TweetProps,
+} from "react-tweet"
 import { getTweet, type Tweet } from "react-tweet/api"
 
+import { pickMp4Variant, proxiedTweetMediaUrl } from "@/components/magicui/tweet-media-video"
 import { cn } from "@/lib/utils"
 
 interface TwitterIconProps {
@@ -145,7 +151,7 @@ export const TweetHeader = ({ tweet }: { tweet: EnrichedTweet }) => (
 )
 
 export const TweetBody = ({ tweet }: { tweet: EnrichedTweet }) => (
-  <div className="text-[15px] leading-relaxed tracking-normal break-words">
+  <div className="whitespace-pre-wrap text-[15px] leading-relaxed tracking-normal break-words">
     {tweet.entities.map((entity, idx) => {
       switch (entity.type) {
         case "url":
@@ -168,7 +174,9 @@ export const TweetBody = ({ tweet }: { tweet: EnrichedTweet }) => (
             <span
               key={idx}
               className="text-foreground text-[15px] font-normal"
-              dangerouslySetInnerHTML={{ __html: entity.text }}
+              dangerouslySetInnerHTML={{
+                __html: entity.text.replace(/\n/g, "<br />"),
+              }}
             />
           )
         default:
@@ -180,22 +188,34 @@ export const TweetBody = ({ tweet }: { tweet: EnrichedTweet }) => (
 
 export const TweetMedia = ({ tweet }: { tweet: EnrichedTweet }) => {
   if (!tweet.video && !tweet.photos) return null
+  const videoMedia = tweet.mediaDetails?.find(
+    (media) => media.type === "video" || media.type === "animated_gif"
+  )
+  const mp4FromDetails =
+    videoMedia && videoMedia.type !== "photo" ? getMp4Video(videoMedia) : undefined
+  const mp4FromVariants = pickMp4Variant(tweet.video?.variants)
+  const videoSrc = mp4FromDetails?.url ?? mp4FromVariants?.src
+  const videoType = mp4FromDetails?.content_type ?? mp4FromVariants?.type ?? "video/mp4"
+
   return (
-    <div className="flex flex-1 items-center justify-center">
-      {tweet.video && (
+    <div className="flex w-full flex-1 items-center justify-center">
+      {videoSrc ? (
         <video
-          poster={tweet.video.poster}
+          poster={tweet.video?.poster}
           autoPlay
-          loop
           muted
+          loop
           playsInline
-          className="rounded-xl border shadow-sm"
+          controls
+          preload="auto"
+          referrerPolicy="no-referrer"
+          className="w-full rounded-xl border border-border bg-black shadow-sm"
         >
-          <source src={tweet.video.variants[0].src} type="video/mp4" />
+          <source src={proxiedTweetMediaUrl(videoSrc)} type={videoType} />
           Your browser does not support the video tag.
         </video>
-      )}
-      {tweet.photos && (
+      ) : null}
+      {!tweet.video && tweet.photos && (
         <div className="relative flex transform-gpu snap-x snap-mandatory gap-4 overflow-x-auto">
           <div className="shrink-0 snap-center sm:w-2" />
           {tweet.photos.map((photo) => (
