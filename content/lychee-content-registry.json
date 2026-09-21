@@ -106,11 +106,24 @@
       "integrationTopic": "api"
     },
     {
+      "slug": "how-to-compare-kalshi-polymarket-odds",
+      "contentClass": "guide",
+      "integrationHub": "kalshi-live",
+      "integrationTopic": "overview"
+    },
+    {
+      "slug": "how-to-compare-kalshi-polymarket-odds",
+      "contentClass": "guide",
+      "integrationHub": "polymarket-live",
+      "integrationTopic": "overview"
+    },
+    {
       "slug": "polymarket-odds-over-time",
       "contentClass": "guide",
       "integrationHub": "polymarket-live",
       "integrationTopic": "overview"
     },
+
     {
       "slug": "polymarket-live-prices",
       "contentClass": "guide",
