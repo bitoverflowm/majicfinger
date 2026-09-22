@@ -6,6 +6,7 @@ import {
   projectRowObjectsToColumnSet,
   resolveChartSheetId,
 } from "./chartSnapshotDataDeps.js";
+import { collectSheetIdOrderColumnNames } from "./sheetIdOrder.js";
 
 function test(name, fn) {
   try {
@@ -154,4 +155,21 @@ test("candlestick snapshots still allow scoped markets axes on sheet-1", () => {
   assert.ok(cols.get("sheet-1")?.has("yes_sub_title"));
   assert.ok(cols.get("sheet-21")?.has("end_period_ts"));
   assert.equal(cols.get("sheet-21")?.has("yes_sub_title"), false);
+});
+
+test("public chart projection keeps sheet id order column", () => {
+  const sheet = {
+    dataTypes: { id: "id", label: "string", market_share: "number" },
+    data: [
+      { id: 2, label: "10,000 ≤ v < 100,000", market_share: 25, extra: "drop-me" },
+      { id: 0, label: "v = 0", market_share: 18, extra: "drop-me" },
+    ],
+  };
+  const colSet = new Set(["label", "market_share"]);
+  for (const name of collectSheetIdOrderColumnNames(sheet)) colSet.add(name);
+  const projected = projectRowObjectsToColumnSet(sheet.data, colSet);
+  assert.equal(projected[0].id, 2);
+  assert.equal(projected[1].id, 0);
+  assert.equal(projected[0].label, "10,000 ≤ v < 100,000");
+  assert.equal(projected[0].extra, undefined);
 });

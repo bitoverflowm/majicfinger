@@ -8,7 +8,7 @@ import { ChartBuilderProvider, ChartCanvas } from "@/components/chartView";
 import { PublicChartPageSkeleton } from "@/components/publicEmbed/ChartEmbedSkeleton";
 import { UserAvatar } from "@/components/ui/user-avatar";
 import { normalizeBuilderSnapshot } from "@/lib/chartBundle";
-import { resolveEmbedActiveSheetId } from "@/lib/chartSnapshotDataDeps";
+import { publicChartSheetsForWorkspace } from "@/lib/publicChartEmbedWorkspace";
 import { publicEmbedOutboundLinkProps } from "@/components/publicEmbed/publicEmbedOutboundLink";
 import { RunForYourselfButton } from "@/components/runYourself/RunForYourselfButton";
 import { useTelegramContentTracker } from "@/hooks/useTelegramContentTracker";
@@ -27,18 +27,23 @@ function DataSheetsLoader({
   dataSheets?: Record<string, any>;
   chartSnapshot?: Record<string, unknown> | null;
 }) {
-  const { setDataSheets, setActiveSheetId, setConnectedData } = useMyStateV2();
+  const ctx = useMyStateV2() as {
+    setDataSheets?: (sheets: Record<string, unknown>) => void;
+    setActiveSheetId?: (id: string) => void;
+    setConnectedData?: (rows: unknown[]) => void;
+    setDataTypes?: (types: Record<string, string>) => void;
+  };
   useLayoutEffect(() => {
-    const incomingSheets =
-      dataSheets && typeof dataSheets === "object" && Object.keys(dataSheets).length
-        ? dataSheets
-        : { "sheet-1": { name: "Sheet 1", data: Array.isArray(rows) ? rows : [], provenance: null } };
-    setDataSheets?.(incomingSheets);
-    const activeId = resolveEmbedActiveSheetId(incomingSheets, chartSnapshot);
-    setActiveSheetId?.(activeId);
-    const activeRows = Array.isArray(incomingSheets?.[activeId]?.data) ? incomingSheets[activeId].data : [];
-    setConnectedData?.(activeRows.length ? activeRows : Array.isArray(rows) ? rows : []);
-  }, [rows, dataSheets, chartSnapshot, setDataSheets, setActiveSheetId, setConnectedData]);
+    const { incomingSheets, activeId, orderedRows, dataTypes } = publicChartSheetsForWorkspace(
+      rows,
+      dataSheets,
+      chartSnapshot,
+    );
+    ctx.setDataSheets?.(incomingSheets);
+    ctx.setActiveSheetId?.(activeId);
+    ctx.setConnectedData?.(orderedRows);
+    if (dataTypes) ctx.setDataTypes?.(dataTypes);
+  }, [rows, dataSheets, chartSnapshot, ctx.setDataSheets, ctx.setActiveSheetId, ctx.setConnectedData, ctx.setDataTypes]);
   return null;
 }
 

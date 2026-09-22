@@ -48,6 +48,7 @@ import "@/lib/liveFeeds/registry.orderbook.node.test.js";
 import "@/lib/sheetOperations/aggregateBucketRows.test.js";
 import "@/lib/sheetOperations/compileBandsConfigToCompose.test.js";
 import "@/lib/sheetOperations/aggregateBandRows.test.js";
+import "@/lib/sheetIdOrder.test.js";
 import "@/lib/sheetOperations/computeSummaryRow.test.js";
 import "@/lib/sheetOperations/computeMultiSheetSummary.test.js";
 import "@/lib/dataLake/restoreQuantAthenaReplayConfig.test.js";

@@ -6,6 +6,7 @@ import {
   primarySheetIdForChartSnapshot,
   projectRowObjectsToColumnSet,
 } from "@/lib/chartSnapshotDataDeps";
+import { collectSheetIdOrderColumnNames, orderSheetRowsByDataTypes } from "@/lib/sheetIdOrder";
 import { rehydrateQuantAthenaSheetServer } from "@/lib/dataLake/rehydrateQuantAthenaSheet";
 import {
   buildRehydrateSheetRequestBody,
@@ -35,6 +36,16 @@ export function sheetNeedsLakeRehydrate(sheet) {
   const have = Array.isArray(sheet.data) ? sheet.data.length : 0;
   if (full > 0 && have > 0 && have < full) return true;
   return false;
+}
+
+function projectPublicChartSheetRows(sheet, colSet) {
+  let rows = Array.isArray(sheet?.data) ? sheet.data : [];
+  if (colSet && colSet.size > 0) {
+    const nextSet = new Set(colSet);
+    for (const name of collectSheetIdOrderColumnNames(sheet)) nextSet.add(name);
+    rows = projectRowObjectsToColumnSet(rows, nextSet);
+  }
+  return orderSheetRowsByDataTypes(rows, sheet?.dataTypes);
 }
 
 function isJoinDependencyOfAnotherCandidate(sheetId, candidates, dataSheets) {
@@ -99,7 +110,7 @@ export async function hydrateDataSetForPublicChartViewer(chartLean, dataSetLean)
       });
       const json = await runRehydrateSheetCore(body, access);
       let rows = Array.isArray(json?.rows) ? json.rows : [];
-      if (colSet && colSet.size > 0) rows = projectRowObjectsToColumnSet(rows, colSet);
+      rows = projectPublicChartSheetRows({ ...sheet, data: rows }, colSet);
       dataSheets[sheetId] = {
         ...sheet,
         data: rows,
@@ -132,8 +143,7 @@ export async function hydrateDataSetForPublicChartViewer(chartLean, dataSetLean)
         dataSheets,
         groupColumnFilterValues: groupColumnFilterValues || undefined,
       });
-      let trimmed = rows;
-      if (colSet && colSet.size > 0) trimmed = projectRowObjectsToColumnSet(rows, colSet);
+      const trimmed = projectPublicChartSheetRows({ ...sheet, data: rows }, colSet);
       dataSheets[sheetId] = {
         ...sheet,
         data: trimmed,
@@ -154,20 +164,18 @@ export async function hydrateDataSetForPublicChartViewer(chartLean, dataSetLean)
     if (!colSet || colSet.size === 0 || !Array.isArray(sheet?.data)) continue;
     dataSheets[sheetId] = {
       ...sheet,
-      data: projectRowObjectsToColumnSet(sheet.data, colSet),
+      data: projectPublicChartSheetRows(sheet, colSet),
     };
   }
 
   if (!Object.keys(dataSheets).length && Array.isArray(out.data) && out.data.length) {
     const pCols = colsBySheet.get(primaryId);
-    if (pCols && pCols.size > 0) {
-      out.data = projectRowObjectsToColumnSet(out.data, pCols);
-    }
+    out.data = projectPublicChartSheetRows({ data: out.data, dataTypes: out.dataTypes }, pCols);
   } else {
-    const primaryRows = dataSheets[primaryId]?.data;
+    const primarySheet = dataSheets[primaryId];
+    const primaryRows = primarySheet?.data;
     if (Array.isArray(primaryRows) && primaryRows.length) {
-      const pCols = colsBySheet.get(primaryId);
-      out.data = pCols && pCols.size > 0 ? projectRowObjectsToColumnSet(primaryRows, pCols) : primaryRows;
+      out.data = projectPublicChartSheetRows(primarySheet, colsBySheet.get(primaryId));
     }
   }
 

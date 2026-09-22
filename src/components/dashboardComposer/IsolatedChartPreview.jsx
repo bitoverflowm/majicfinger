@@ -9,6 +9,7 @@ import {
   dataSheetsReferencedBySnapshot,
   getChartWorkspaceDependencyState,
 } from "@/lib/chartSnapshotDataDeps";
+import { publicChartSheetsForWorkspace } from "@/lib/publicChartEmbedWorkspace";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -23,18 +24,17 @@ import { mapSavedChartsToPickerOptions } from "@/lib/dashboardChartPickerLabels"
 import { getLocalDashboardChart, isLocalDashboardChartId } from "@/lib/localDashboardCharts";
 
 function DataSheetsLoader({ rows, dataSheets }) {
-  const { setDataSheets, setActiveSheetId, setConnectedData } = useMyStateV2();
+  const { setDataSheets, setActiveSheetId, setConnectedData, setDataTypes } = useMyStateV2();
   useEffect(() => {
-    const incomingSheets =
-      dataSheets && typeof dataSheets === "object" && Object.keys(dataSheets).length
-        ? dataSheets
-        : { "sheet-1": { name: "Sheet 1", data: Array.isArray(rows) ? rows : [], provenance: null } };
+    const { incomingSheets, activeId, orderedRows, dataTypes } = publicChartSheetsForWorkspace(
+      rows,
+      dataSheets,
+    );
     setDataSheets?.(incomingSheets);
-    const firstId = Object.keys(incomingSheets)[0] || "sheet-1";
-    setActiveSheetId?.(firstId);
-    const firstRows = Array.isArray(incomingSheets?.[firstId]?.data) ? incomingSheets[firstId].data : [];
-    setConnectedData?.(firstRows.length ? firstRows : Array.isArray(rows) ? rows : []);
-  }, [rows, dataSheets, setDataSheets, setActiveSheetId, setConnectedData]);
+    setActiveSheetId?.(activeId);
+    setConnectedData?.(orderedRows);
+    if (dataTypes) setDataTypes?.(dataTypes);
+  }, [rows, dataSheets, setDataSheets, setActiveSheetId, setConnectedData, setDataTypes]);
   return null;
 }
 

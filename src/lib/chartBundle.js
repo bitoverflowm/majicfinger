@@ -4,10 +4,27 @@ import {
   inferSheetIdForChartColumns,
   primarySheetIdForChartSnapshot,
 } from "@/lib/chartSnapshotDataDeps";
+import { orderSheetRowsByDataTypes } from "@/lib/sheetIdOrder";
 
 /** Per-series line colors in the builder UI are keyed as `line:0`, not as sheet columns; keep them when sanitizing snapshots. */
 function isLineSeriesInstanceOverrideKey(rawKey) {
   return /^line:\d+$/.test(String(rawKey || "").trim());
+}
+
+function orderPublicChartDataSheets(dataSheets) {
+  if (!dataSheets || typeof dataSheets !== "object") return dataSheets || {};
+  const out = {};
+  for (const [sid, sheet] of Object.entries(dataSheets)) {
+    if (!sheet || typeof sheet !== "object") {
+      out[sid] = sheet;
+      continue;
+    }
+    out[sid] = {
+      ...sheet,
+      data: orderSheetRowsByDataTypes(sheet.data, sheet.dataTypes),
+    };
+  }
+  return out;
 }
 
 function stripInternalFromRows(rows) {
@@ -314,11 +331,16 @@ export function buildPublicChartBundle(chartLean, dataSetLean) {
   };
 
   const rows = primaryRows.length ? primaryRows : primarySheetExists ? [] : rowsForFallback;
+  const orderedSheets = orderPublicChartDataSheets(dataSheets);
+  const orderedRows = orderSheetRowsByDataTypes(
+    stripInternalFromRows(rows),
+    orderedSheets[primaryId]?.dataTypes,
+  );
 
   return {
     chart: publicChart,
-    rows: stripInternalFromRows(rows),
-    dataSheets,
+    rows: orderedRows,
+    dataSheets: orderedSheets,
     rechartsBuilder,
   };
 }

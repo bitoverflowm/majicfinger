@@ -2961,15 +2961,16 @@ export function ChartCanvas() {
 
     const idOrderCol = findSheetIdOrderColumn(dataTypes);
     const xColName = stripSheetScopedColumnKey(xKey);
-    // When sheet has an `_id` order column and X is a label/category (not the id itself),
-    // keep the sheet's id-enforced row order instead of sorting labels A→Z.
+    const sheetOrdered = orderSheetRowsByDataTypes(plotRows, dataTypes);
+    // When sheet has an `_id` order column (or recovered volume-band order) and X is a
+    // label/category (not the id itself), keep that order instead of sorting labels A→Z.
     if (
-      idOrderCol &&
+      (idOrderCol || sheetOrdered !== plotRows) &&
       xColName !== idOrderCol &&
       xKey !== idOrderCol &&
       (xAxisType === "string" || xIsCategoricalLabel)
     ) {
-      return sortXDir === "desc" ? [...plotRows].reverse() : plotRows;
+      return sortXDir === "desc" ? [...sheetOrdered].reverse() : sheetOrdered;
     }
 
     return [...plotRows].sort((a, b) => {

@@ -13,23 +13,23 @@ import {
   HubHeroChartEmbedSkeleton,
 } from "@/components/publicEmbed/ChartEmbedSkeleton";
 import { normalizeBuilderSnapshot } from "@/lib/chartBundle";
-import { resolveEmbedActiveSheetId } from "@/lib/chartSnapshotDataDeps";
+import { publicChartSheetsForWorkspace } from "@/lib/publicChartEmbedWorkspace";
 import { inferDefaultBuilderSnapshot } from "@/lib/inferDefaultBuilderSnapshot";
 import { cn } from "@/lib/utils";
 
 function DataSheetsLoader({ rows, dataSheets, chartSnapshot }) {
-  const { setDataSheets, setActiveSheetId, setConnectedData } = useMyStateV2();
+  const { setDataSheets, setActiveSheetId, setConnectedData, setDataTypes } = useMyStateV2();
   useLayoutEffect(() => {
-    const incomingSheets =
-      dataSheets && typeof dataSheets === "object" && Object.keys(dataSheets).length
-        ? dataSheets
-        : { "sheet-1": { name: "Sheet 1", data: Array.isArray(rows) ? rows : [], provenance: null } };
+    const { incomingSheets, activeId, orderedRows, dataTypes } = publicChartSheetsForWorkspace(
+      rows,
+      dataSheets,
+      chartSnapshot,
+    );
     setDataSheets?.(incomingSheets);
-    const activeId = resolveEmbedActiveSheetId(incomingSheets, chartSnapshot);
     setActiveSheetId?.(activeId);
-    const activeRows = Array.isArray(incomingSheets?.[activeId]?.data) ? incomingSheets[activeId].data : [];
-    setConnectedData?.(activeRows.length ? activeRows : Array.isArray(rows) ? rows : []);
-  }, [rows, dataSheets, chartSnapshot, setDataSheets, setActiveSheetId, setConnectedData]);
+    setConnectedData?.(orderedRows);
+    if (dataTypes) setDataTypes?.(dataTypes);
+  }, [rows, dataSheets, chartSnapshot, setDataSheets, setActiveSheetId, setConnectedData, setDataTypes]);
   return null;
 }
 

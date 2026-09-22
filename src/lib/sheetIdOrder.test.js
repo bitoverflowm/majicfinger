@@ -1,9 +1,11 @@
 import assert from "node:assert/strict";
 import {
+  collectSheetIdOrderColumnNames,
   findSheetIdOrderColumn,
   isNumberLikeSheetDataType,
   isSheetIdDataType,
   mergeDetectedDataTypesPreservingId,
+  orderRowsByVolumeBandPresets,
   orderSheetRowsByDataTypes,
   sortRowsByIdColumn,
   toAgGridCellDataType,
@@ -49,6 +51,41 @@ test("orderSheetRowsByDataTypes uses typed id column", () => {
   assert.equal(out[0].id, 0);
   assert.equal(out[0].volume, 0);
   assert.equal(out[2].id, 2);
+});
+
+test("orderRowsByVolumeBandPresets restores definition order when id is missing", () => {
+  const rows = [
+    { band: "10,000 ≤ volume < 100,000", label: "10,000 ≤ v < 100,000", market_share: 25 },
+    { band: "volume ≥ 100,000,000", label: "v ≥ 100,000,000", market_share: 0.01 },
+    { band: "0 < volume < 10,000", label: "0 < v < 10,000", market_share: 45 },
+    { band: "volume = 0", label: "v = 0", market_share: 18 },
+  ];
+  const out = orderRowsByVolumeBandPresets(rows);
+  assert.equal(out[0].band, "volume = 0");
+  assert.equal(out[1].band, "0 < volume < 10,000");
+  assert.equal(out[2].band, "10,000 ≤ volume < 100,000");
+  assert.equal(out[3].band, "volume ≥ 100,000,000");
+});
+
+test("orderSheetRowsByDataTypes recovers band order when typed id column was stripped", () => {
+  const rows = [
+    { band: "1,000,000 ≤ volume < 10,000,000", label: "1,000,000 ≤ v < 10,000,000" },
+    { band: "volume = 0", label: "v = 0" },
+    { band: "0 < volume < 10,000", label: "0 < v < 10,000" },
+  ];
+  const out = orderSheetRowsByDataTypes(rows, { id: "id" });
+  assert.equal(out[0].label, "v = 0");
+  assert.equal(out[1].label, "0 < v < 10,000");
+  assert.equal(out[2].label, "1,000,000 ≤ v < 10,000,000");
+});
+
+test("collectSheetIdOrderColumnNames includes typed id even when rows dropped it", () => {
+  const names = collectSheetIdOrderColumnNames({
+    dataTypes: { id: "id", volume: "number" },
+    data: [{ band: "volume = 0", volume: 0 }],
+  });
+  assert.ok(names.includes("id"));
+  assert.ok(names.includes("_id"));
 });
 
 test("mergeDetectedDataTypesPreservingId keeps user id and promotes id columns", () => {
