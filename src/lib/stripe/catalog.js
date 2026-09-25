@@ -18,15 +18,15 @@ function planHref(name, cycle) {
  * matching test price so 4242… works without live Payment Links.
  */
 export const CHECKOUT_PLANS = [
-  { key: "basic_weekly", tier: "basic", cycle: "weekly", mode: "subscription", amount: 499, interval: "week", label: "Basic weekly", href: planHref("basic", "weekly") },
-  { key: "basic_monthly", tier: "basic", cycle: "monthly", mode: "subscription", amount: 1999, interval: "month", label: "Basic monthly", href: planHref("basic", "monthly") },
-  { key: "basic_annual", tier: "basic", cycle: "annual", mode: "subscription", amount: 19999, interval: "year", label: "Basic annual", href: planHref("basic", "annual") },
-  { key: "pro_weekly", tier: "pro", cycle: "weekly", mode: "subscription", amount: 999, interval: "week", label: "Pro weekly", href: planHref("pro", "weekly") },
-  { key: "pro_monthly", tier: "pro", cycle: "monthly", mode: "subscription", amount: 3999, interval: "month", label: "Pro monthly", href: planHref("pro", "monthly") },
-  { key: "pro_annual", tier: "pro", cycle: "annual", mode: "subscription", amount: 39999, interval: "year", label: "Pro annual", href: planHref("pro", "annual") },
-  { key: "elite_weekly", tier: "elite", cycle: "weekly", mode: "subscription", amount: 1999, interval: "week", label: "Elite weekly", href: planHref("elite", "weekly") },
-  { key: "elite_monthly", tier: "elite", cycle: "monthly", mode: "subscription", amount: 7999, interval: "month", label: "Elite monthly", href: planHref("elite", "monthly") },
-  { key: "elite_annual", tier: "elite", cycle: "annual", mode: "subscription", amount: 79999, interval: "year", label: "Elite annual", href: planHref("elite", "annual") },
+  { key: "basic_weekly", tier: "basic", cycle: "weekly", mode: "subscription", amount: 499, interval: "week", label: "Basic weekly", href: planHref("basic", "weekly"), priceId: "price_1TKZCwILjX7EMe6xchbsFVX4" },
+  { key: "basic_monthly", tier: "basic", cycle: "monthly", mode: "subscription", amount: 1999, interval: "month", label: "Basic monthly", href: planHref("basic", "monthly"), priceId: "price_1TKZOTILjX7EMe6xzf0YXusA" },
+  { key: "basic_annual", tier: "basic", cycle: "annual", mode: "subscription", amount: 19999, interval: "year", label: "Basic annual", href: planHref("basic", "annual"), priceId: "price_1TKZSNILjX7EMe6xls8YOG7H" },
+  { key: "pro_weekly", tier: "pro", cycle: "weekly", mode: "subscription", amount: 999, interval: "week", label: "Pro weekly", href: planHref("pro", "weekly"), priceId: "price_1TKZIgILjX7EMe6xkBmtDZc4" },
+  { key: "pro_monthly", tier: "pro", cycle: "monthly", mode: "subscription", amount: 3999, interval: "month", label: "Pro monthly", href: planHref("pro", "monthly"), priceId: "price_1TKZPNILjX7EMe6xRWpxeCbn" },
+  { key: "pro_annual", tier: "pro", cycle: "annual", mode: "subscription", amount: 39999, interval: "year", label: "Pro annual", href: planHref("pro", "annual"), priceId: "price_1TKZQfILjX7EMe6xV8ozoQam" },
+  { key: "elite_weekly", tier: "elite", cycle: "weekly", mode: "subscription", amount: 1999, interval: "week", label: "Elite weekly", href: planHref("elite", "weekly"), priceId: "price_1TKZLxILjX7EMe6xW9cV0TKs" },
+  { key: "elite_monthly", tier: "elite", cycle: "monthly", mode: "subscription", amount: 7999, interval: "month", label: "Elite monthly", href: planHref("elite", "monthly"), priceId: "price_1TKZNEILjX7EMe6xmMqNWFQZ" },
+  { key: "elite_annual", tier: "elite", cycle: "annual", mode: "subscription", amount: 79999, interval: "year", label: "Elite annual", href: planHref("elite", "annual"), priceId: "price_1TKZTGILjX7EMe6xMaDZA8SE" },
   {
     key: "lifetime",
     tier: "elite",
@@ -36,6 +36,7 @@ export const CHECKOUT_PLANS = [
     interval: null,
     label: "Lifetime access",
     href: landingPageV2Config.lifetimeAccess?.href || "",
+    priceId: "price_1T68YMILjX7EMe6x0N5glBuL",
   },
 ];
 
@@ -150,6 +151,11 @@ export async function resolveCheckoutPrice(plan) {
     if (isStripeTestKey()) {
       const priceId = await ensureTestPrice(stripe, plan);
       return { priceId, extras: { allow_promotion_codes: true }, fallbackUrl };
+    }
+    // Live prices are the same ones already sold by the Payment Links.
+    // Resolving them here avoids a Payment Link list call on every checkout.
+    if (plan.priceId) {
+      return { priceId: plan.priceId, extras: {}, fallbackUrl };
     }
     if (plan.href) {
       const fromLink = await priceFromPaymentLink(stripe, plan.href);

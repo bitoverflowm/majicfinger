@@ -24,24 +24,23 @@ export default async function handler(req, res) {
   }
 
   const fallbackUrl = plan.href || "";
-  if (!process.env.STRIPE_SECRET_KEY || !process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY) {
+  if (!process.env.STRIPE_SECRET_KEY) {
     await notifyCheckoutAlert({
       title: "Embedded checkout is missing Stripe keys",
       fields: {
         Plan: plan.key,
-        "Secret key": process.env.STRIPE_SECRET_KEY ? "set" : "missing",
-        "Publishable key": process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY ? "set" : "missing",
+        "Secret key": "missing",
         Fallback: fallbackUrl ? "payment link" : "none",
       },
     });
-    if (fallbackUrl) return res.status(200).json({ fallbackUrl });
+    if (fallbackUrl) return res.status(200).json({ fallbackUrl, reason: "missing_secret_key" });
     return res.status(500).json({ error: "Checkout is not configured" });
   }
 
   try {
     const resolved = await resolveCheckoutPrice(plan);
     if (!resolved?.priceId) {
-      if (fallbackUrl) return res.status(200).json({ fallbackUrl });
+      if (fallbackUrl) return res.status(200).json({ fallbackUrl, reason: "missing_price" });
       return res.status(500).json({ error: "Could not start checkout" });
     }
 
@@ -69,31 +68,42 @@ export default async function handler(req, res) {
       throw new Error("Stripe did not return a client secret");
     }
 
-    await dbConnect();
-    await CheckoutAttempt.create({
-      attemptId,
-      stripeSessionId: session.id,
-      planKey: plan.key,
-      priceId: resolved.priceId,
-      mode: plan.mode,
-      referral: referral || undefined,
-      status: "open",
-      granted: false,
-      expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
-    });
-
     res.setHeader("Set-Cookie", attemptCookieHeader(attemptId));
+    try {
+      await dbConnect();
+      await CheckoutAttempt.create({
+        attemptId,
+        stripeSessionId: session.id,
+        planKey: plan.key,
+        priceId: resolved.priceId,
+        mode: plan.mode,
+        referral: referral || undefined,
+        status: "open",
+        granted: false,
+        expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+      });
+    } catch (err) {
+      await notifyCheckoutAlert({
+        title: "Checkout session created but was not saved",
+        fields: {
+          Plan: plan.key,
+          "Stripe session": session.id,
+          Error: err?.message || String(err),
+        },
+      });
+    }
     return res.status(200).json({ clientSecret: session.client_secret });
   } catch (err) {
+    const message = err?.message || String(err);
     await notifyCheckoutAlert({
       title: "Could not create embedded checkout",
       fields: {
         Plan: plan.key,
-        Error: err?.message || String(err),
+        Error: message,
         Fallback: fallbackUrl ? "payment link" : "none",
       },
     });
-    if (fallbackUrl) return res.status(200).json({ fallbackUrl });
+    if (fallbackUrl) return res.status(200).json({ fallbackUrl, reason: message });
     return res.status(500).json({ error: "Could not start checkout" });
   }
 }
