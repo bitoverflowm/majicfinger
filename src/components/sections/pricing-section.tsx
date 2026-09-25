@@ -124,25 +124,26 @@ export function PricingSection({
             price: tier.priceMonthly ?? "",
             suffix: "one-time",
             note: null as string | null,
-            href: tier.hrefMonthly,
+            href: `/checkout?plan=${encodeURIComponent(tier.name.toLowerCase())}`,
           },
         };
       }
 
+      const planSlug = encodeURIComponent(tier.name.toLowerCase());
       const display =
         billingCycle === "weekly"
           ? {
               price: tier.priceWeekly ?? tier.priceMonthly ?? "",
               suffix: "week",
               note: "billed weekly",
-              href: tier.hrefWeekly,
+              href: `/checkout?plan=${planSlug}&cycle=weekly`,
             }
           : billingCycle === "monthly"
             ? {
                 price: tier.priceMonthly ?? "",
                 suffix: "month",
                 note: "billed monthly",
-                href: tier.hrefMonthly,
+                href: `/checkout?plan=${planSlug}&cycle=monthly`,
               }
             : {
                 price: annualPriceAsMonthlyDisplay(tier.priceAnnual ?? ""),
@@ -150,7 +151,7 @@ export function PricingSection({
                 note: tier.priceAnnual
                   ? `billed annually at ${tier.priceAnnual}/year`
                   : "billed annually",
-                href: tier.hrefAnnual,
+                href: `/checkout?plan=${encodeURIComponent(tier.name.toLowerCase())}&cycle=annual`,
               };
 
       return { ...tier, display };
@@ -250,8 +251,6 @@ export function PricingSection({
               <div className="flex flex-col gap-2 p-4">
                 <a
                   href={tier.display.href}
-                  target="_blank"
-                  rel="noopener noreferrer"
                   className={cn(
                     "h-10 w-full flex items-center justify-center text-sm font-normal tracking-wide rounded-full px-4 cursor-pointer transition-all ease-out active:scale-95",
                     tier.isPopular
@@ -360,9 +359,7 @@ export function PricingSection({
                   </div>
                 </div>
                 <a
-                  href={lifetimeAccess.href}
-                  target="_blank"
-                  rel="noopener noreferrer"
+                  href="/checkout?plan=lifetime"
                   className="flex h-11 w-full items-center justify-center rounded-full bg-secondary px-4 text-sm font-medium tracking-wide text-white shadow-[inset_0_1px_2px_rgba(255,255,255,0.25),0_3px_3px_-1.5px_rgba(16,24,40,0.24)] transition-all ease-out hover:opacity-95 active:scale-[0.98]"
                 >
                   {lifetimeAccess.buttonText}

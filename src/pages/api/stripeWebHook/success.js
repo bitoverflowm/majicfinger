@@ -1,6 +1,8 @@
 import dbConnect from "@/lib/dbConnect";
 import User from "@/models/Users";
+import CheckoutAttempt from "@/models/CheckoutAttempt";
 import { notifySignup } from "@/lib/telegram/trackEvent";
+import { notifyCheckoutAlert } from "@/lib/telegram/checkoutAlert";
 import { buffer } from "micro";
 
 export const config = {
@@ -122,13 +124,21 @@ export default async function handler(req, res) {
   try {
     switch (event.type) {
       case "checkout.session.completed":
-        await handleCheckoutCompleted(data);
-        break;
       case "checkout.session.async_payment_succeeded":
-        await handleCheckoutCompleted(data);
+        await grantEmbeddedCheckoutSession(data);
+        await reconcileEmbeddedCheckout(data);
         break;
       case "checkout.session.async_payment_failed":
         await handleCheckoutPaymentFailed(data);
+        await notifyCheckoutAlert({
+          title: "Checkout payment failed",
+          fields: {
+            Email: data?.customer_details?.email,
+            "Stripe session": data?.id,
+            Attempt: data?.metadata?.checkoutAttemptId,
+            Mode: data?.mode,
+          },
+        });
         break;
       case "checkout.session.expired":
         await handleCheckoutExpired(data);
@@ -176,10 +186,99 @@ export default async function handler(req, res) {
     }
   } catch (err) {
     console.error("Webhook handler error:", err);
+    await notifyCheckoutAlert({
+      title: "Stripe webhook failed",
+      fields: {
+        Event: event?.type,
+        Error: err?.message || String(err),
+        "Stripe id": data?.id,
+        Attempt: data?.metadata?.checkoutAttemptId,
+      },
+    });
     return res.status(500).json({ error: err.message });
   }
 
   res.status(200).json({ received: true });
+}
+
+function checkoutBillingEmail(session) {
+  return normalizeEmail(session?.customer_details?.email || session?.customer_email);
+}
+
+function checkoutCustomerId(session) {
+  if (!session?.customer) return "";
+  return typeof session.customer === "string" ? session.customer : session.customer.id || "";
+}
+
+function sessionIsPaid(session) {
+  return session?.payment_status === "paid" || session?.payment_status === "no_payment_required";
+}
+
+async function reconcileEmbeddedCheckout(session) {
+  const attemptId = session?.metadata?.checkoutAttemptId;
+  if (!attemptId || !sessionIsPaid(session)) return;
+  const attempt = await CheckoutAttempt.findOne({ attemptId });
+  if (!attempt?.loginEmail) return;
+  const { reconcileCheckoutIdentity } = await import("@/lib/stripe/checkoutLink");
+  await reconcileCheckoutIdentity(attemptId, attempt.loginEmail);
+}
+
+/**
+ * Grant a paid Checkout Session once. Payment Links (no attempt id) keep the
+ * previous webhook behavior. Embedded attempts are claimed so login and the
+ * webhook cannot both add netPay.
+ */
+export async function grantEmbeddedCheckoutSession(session) {
+  const attemptId = session?.metadata?.checkoutAttemptId || "";
+  if (attemptId && !sessionIsPaid(session)) return { ok: false, reason: "unpaid" };
+
+  if (attemptId) {
+    const claimed = await CheckoutAttempt.findOneAndUpdate(
+      { attemptId, granted: { $ne: true } },
+      {
+        $set: {
+          granted: true,
+          grantFinished: false,
+          status: "paid",
+          billingEmail: checkoutBillingEmail(session) || undefined,
+          stripeCustomerId: checkoutCustomerId(session) || undefined,
+        },
+      },
+      { new: true },
+    );
+    if (!claimed) {
+      const existing = await CheckoutAttempt.findOne({ attemptId });
+      if (existing?.granted) {
+        for (let i = 0; i < 20; i += 1) {
+          const fresh = await CheckoutAttempt.findOne({ attemptId });
+          if (fresh?.grantFinished || fresh?.lastError) break;
+          await new Promise((resolve) => setTimeout(resolve, 300));
+        }
+        return { ok: true, already: true };
+      }
+    }
+  }
+
+  try {
+    const result = await handleCheckoutCompleted(session);
+    if (attemptId && result?.ok === false) {
+      await CheckoutAttempt.updateOne(
+        { attemptId },
+        { $set: { lastError: result.reason || "grant_failed", grantFinished: true } },
+      );
+    } else if (attemptId) {
+      await CheckoutAttempt.updateOne({ attemptId }, { $set: { grantFinished: true } });
+    }
+    return result || { ok: true };
+  } catch (err) {
+    if (attemptId) {
+      await CheckoutAttempt.updateOne(
+        { attemptId },
+        { $set: { granted: false, grantFinished: true, lastError: err?.message || "grant_threw" } },
+      );
+    }
+    throw err;
+  }
 }
 
 async function handleCheckoutCompleted(session) {
@@ -187,7 +286,7 @@ async function handleCheckoutCompleted(session) {
     const amount = session.amount_total;
     if (amount === 0) {
       console.warn("Skipping payment with amount_total 0 (trial may use subscription mode)");
-      return;
+      return { ok: true, skipped: "zero_amount" };
     }
     const mapping = resolvePlan({ amount, mode: "payment" });
     if (!mapping) {
@@ -195,13 +294,30 @@ async function handleCheckoutCompleted(session) {
         `[Stripe Webhook] Unrecognized one-time payment amount: ${amount} cents. ` +
         `Add to PLAN_MAP or verify Stripe price. User may not get access.`
       );
-      return;
+      await notifyCheckoutAlert({
+        title: "Unrecognized one-time payment amount",
+        fields: {
+          Amount: amount,
+          Email: session?.customer_details?.email,
+          "Stripe session": session?.id,
+          Attempt: session?.metadata?.checkoutAttemptId,
+        },
+      });
+      return { ok: false, reason: "unrecognized_amount" };
     }
     const email = session.customer_details?.email;
     const name = session.customer_details?.name;
     if (!email) {
       console.warn("No email in checkout session");
-      return;
+      await notifyCheckoutAlert({
+        title: "Checkout completed without an email",
+        fields: {
+          "Stripe session": session?.id,
+          Attempt: session?.metadata?.checkoutAttemptId,
+          Mode: session?.mode,
+        },
+      });
+      return { ok: false, reason: "no_email" };
     }
     await updateUserPayment(email, name, amount, {
       tier: mapping.tier,
@@ -214,6 +330,7 @@ async function handleCheckoutCompleted(session) {
       nextPaymentDate: null,
       subscriptionStartedAt: new Date(),
     });
+    return { ok: true };
   } else if (session.mode === "subscription" && session.subscription) {
     const stripe = require("stripe")(process.env.STRIPE_SECRET_KEY);
     const sub = await resolveSubscriptionFromCheckoutSession(session, stripe);
@@ -226,8 +343,24 @@ async function handleCheckoutCompleted(session) {
           stripeSubscriptionId: typeof session.subscription === "string" ? session.subscription : session.subscription?.id || null,
           nextPaymentDate: null,
         });
+        await notifyCheckoutAlert({
+          title: "Subscription checkout missing subscription details",
+          fields: {
+            Email: email,
+            "Stripe session": session?.id,
+            Attempt: session?.metadata?.checkoutAttemptId,
+          },
+        });
+        return { ok: true, warning: "subscription_unresolved" };
       }
-      return;
+      await notifyCheckoutAlert({
+        title: "Subscription checkout missing email and subscription",
+        fields: {
+          "Stripe session": session?.id,
+          Attempt: session?.metadata?.checkoutAttemptId,
+        },
+      });
+      return { ok: false, reason: "no_email" };
     }
     const isActive = sub.status === "active" || sub.status === "trialing";
     if (email && isActive) {
@@ -245,8 +378,22 @@ async function handleCheckoutCompleted(session) {
         nextPaymentDate: sub.current_period_end ? new Date(sub.current_period_end * 1000) : null,
         subscriptionStartedAt: sub.start_date ? new Date(sub.start_date * 1000) : new Date(),
       });
+      if (!mapping) return { ok: false, reason: "unrecognized_amount" };
+      return { ok: true };
+    }
+    if (!email) {
+      await notifyCheckoutAlert({
+        title: "Subscription checkout completed without an email",
+        fields: {
+          "Stripe session": session?.id,
+          Attempt: session?.metadata?.checkoutAttemptId,
+          "Subscription status": sub?.status,
+        },
+      });
+      return { ok: false, reason: "no_email" };
     }
   }
+  return { ok: true };
 }
 
 async function handleSubscriptionChange(subscription, eventType) {
@@ -289,6 +436,14 @@ async function handlePaymentFailed(invoice) {
   await updateUserSubscriptionStatus(customerEmail, {
     status: "payment_failed",
   });
+  await notifyCheckoutAlert({
+    title: "Invoice payment failed",
+    fields: {
+      Email: customerEmail,
+      Invoice: invoice?.id,
+      "Stripe customer": invoice?.customer,
+    },
+  });
 }
 
 function mapSubscriptionToTier(subscription) {
@@ -303,6 +458,15 @@ function mapSubscriptionToTier(subscription) {
     `[Stripe Webhook] Unrecognized subscription amount: ${amount} cents, interval: ${interval}. ` +
     `Add to PLAN_MAP or use price ID mapping. User may not get access.`
   );
+  notifyCheckoutAlert({
+    title: "Unrecognized subscription amount",
+    fields: {
+      Amount: amount,
+      Interval: interval,
+      "Stripe subscription": subscription?.id,
+      "Stripe customer": subscription?.customer,
+    },
+  }).catch((err) => console.error("[telegram] checkout alert failed", err));
   return null;
 }
 

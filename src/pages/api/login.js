@@ -11,6 +11,8 @@ import {
 } from '@/lib/devLoginBypass'
 import { notifySignup } from '@/lib/telegram/trackEvent'
 import { extractClientMeta } from '@/lib/analytics/requestClientMeta'
+import { attachCheckoutToEmail } from '@/lib/stripe/checkoutLink'
+import { appendSetCookie, clearAttemptCookieHeader } from '@/lib/stripe/checkoutCookies'
 
 function escapeRegex(s) {
   return String(s).replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
@@ -75,7 +77,8 @@ export default async (req, res) => {
         return res.status(400).send('Invalid dev bypass email')
       }
       const defaultName = defaultNameForDevBypassEmail(canonicalEmail)
-      let user = await User.findOne({ email: canonicalEmail })
+      const linked = await attachCheckoutToEmail(req, canonicalEmail)
+      let user = linked?.user || (await User.findOne({ email: canonicalEmail }))
       if (!user) {
         user = await User.create({
           name: (req.body.name && String(req.body.name).trim()) || defaultName,
@@ -97,6 +100,7 @@ export default async (req, res) => {
         issuer: 'dev-bypass-' + canonicalEmail,
       }
       await setLoginSession(res, session)
+      if (linked?.clearCookie) appendSetCookie(res, clearAttemptCookieHeader())
       return res.status(200).send({ done: true, user })
     }
 
@@ -104,7 +108,8 @@ export default async (req, res) => {
     if (!didToken) return res.status(401).send('Missing authorization')
     const metadata = await magic.users.getMetadataByToken(didToken)
     const normalizedEmail = normalizeEmail(metadata.email)
-    let user = await findUserByEmailInsensitive(normalizedEmail)
+    const linked = await attachCheckoutToEmail(req, normalizedEmail)
+    let user = linked?.user || (await findUserByEmailInsensitive(normalizedEmail))
 
     if (!user) {
       user = await User.create({
@@ -123,13 +128,15 @@ export default async (req, res) => {
         method: 'magic link',
         geo: extractClientMeta(req),
       }).catch((err) => console.error('[telegram] signup notify failed', err))
-      const newSession = { ...metadata, userId: String(user._id), name: user.name }
+      const newSession = { ...metadata, userId: String(user._id), name: user.name, email: user.email }
       await setLoginSession(res, newSession)
+      if (linked?.clearCookie) appendSetCookie(res, clearAttemptCookieHeader())
       return res.status(200).send({ done: true, newUser: user })
     }
 
-    const session = { ...metadata, userId: String(user._id), name: user.name }
+    const session = { ...metadata, userId: String(user._id), name: user.name, email: user.email }
     await setLoginSession(res, session)
+    if (linked?.clearCookie) appendSetCookie(res, clearAttemptCookieHeader())
     return res.status(200).send({ done: true, session, user })
   } catch (error) {
     console.error(error)

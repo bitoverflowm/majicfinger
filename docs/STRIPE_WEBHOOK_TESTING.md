@@ -49,12 +49,22 @@ STRIPE_SECRET_KEY=sk_test_xxx    # Stripe test mode key
 
 ### Run a test checkout
 
+Use `npm run dev` (the dev database). Do not use `npm run dev:prod-db` — a test webhook would write into production users.
+
+Pricing buttons open embedded checkout on `/checkout`. With `sk_test_...`, the server creates matching test prices automatically. You still need `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY=pk_test_...`.
+
 1. Start your app: `npm run dev`
-2. Go to your landing page
-3. Use Stripe test card: `4242 4242 4242 4242`
-4. Complete a checkout (Basic monthly, Premium, or Lifetime)
-5. Watch the `stripe listen` terminal – you should see events
-6. Check your database – the user's `lifetimeMember`, `subscriptionTier`, `subscriptionStatus` should be updated
+2. In another terminal: `stripe listen --forward-to localhost:3000/api/stripeWebHook/success`
+3. Put that `whsec_...` in `STRIPE_WEBHOOK_SECRET` and restart `npm run dev`
+4. Go to pricing and choose a plan
+5. Use Stripe test card: `4242 4242 4242 4242`, any future expiry, any CVC, any postal code
+6. On the return page, finish Magic Link login
+7. Watch the `stripe listen` terminal – you should see `checkout.session.completed`
+8. Check the database – one user, with `subscriptionTier`, `subscriptionStatus: "active"`, and `stripeCustomerId`
+
+To test the email mismatch: pay with one email in checkout, then Magic Link a different email in the same browser. The user document should keep the Magic Link address in `email` and the Stripe address in `billing_email`. A successful link sends a Telegram "Checkout update" in production. Failures send "Checkout issue".
+
+Card that requires 3D Secure: `4000 0000 0000 3220`.
 
 ---
 
@@ -121,7 +131,7 @@ Before going live:
 | User pays but no access | Amount not in AMOUNT_MAP; check Stripe price and add to map |
 | "Unrecognized payment amount" in logs | Add the amount (in cents) to AMOUNT_MAP |
 | Webhook returns 400 | Wrong `STRIPE_WEBHOOK_SECRET` or payload tampering |
-| User not found | Checkout email must match Magic/auth email; ensure same email is used |
+| User not found | Old Payment Links still grant access on the Stripe email. Embedded checkout links a different Magic Link email only in the same browser (see the test above). |
 
 ---
 
