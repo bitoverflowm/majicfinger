@@ -116,15 +116,11 @@ function SectionTitle({ children }) {
   return <h3 className="text-base font-semibold tracking-tight text-foreground">{children}</h3>;
 }
 
-function BulletList({ items }) {
+function ColumnCard({ children, className = "" }) {
   return (
-    <ul className="space-y-2.5 pl-4 text-sm leading-relaxed text-muted-foreground">
-      {items.map((item) => (
-        <li key={item} className="list-disc pl-1 marker:text-foreground/40">
-          {item}
-        </li>
-      ))}
-    </ul>
+    <div className={`flex h-full flex-col gap-2.5 rounded-xl border border-border bg-card p-4 ${className}`}>
+      {children}
+    </div>
   );
 }
 
@@ -191,7 +187,7 @@ export default function CheckoutWelcome({ preview = false, name = "" }) {
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogContent
         overlayClassName="z-[1000]"
-        className="z-[1001] flex max-h-[min(88vh,820px)] max-w-2xl flex-col gap-0 overflow-hidden p-0 sm:max-w-2xl"
+        className="z-[1001] flex max-h-[min(90vh,900px)] w-[min(96vw,68rem)] max-w-5xl flex-col gap-0 overflow-hidden p-0 sm:max-w-5xl"
       >
         <DialogHeader className="space-y-1 border-b border-border px-6 pb-4 pt-6 pr-12 text-left">
           <DialogTitle className="text-xl leading-snug">{opening}</DialogTitle>
@@ -208,72 +204,87 @@ export default function CheckoutWelcome({ preview = false, name = "" }) {
             <p>
               I built Lychee because I was tired of writing custom code every time I needed data for my research.
             </p>
-            <p>Since then, it’s grown into a workspace where you can answer your own questions about the markets:</p>
-            <BulletList
-              items={[
+            <p>Since then, it’s grown into a workspace where you can:</p>
+            <ul className="pl-4 text-sm leading-snug text-muted-foreground">
+              {[
+                "Answer your own questions about the markets",
                 "Explore historical and live data from Kalshi and Polymarket.",
                 "Turn that data into your own charts and visualizations.",
                 "Run your analysis directly in your browser.",
                 "Build custom dashboards to follow the markets that matter to you, your way.",
-              ]}
-            />
+                "Share everything with your own audience",
+              ].map((item) => (
+                <li key={item} className="list-disc pl-1 marker:text-foreground/40">
+                  {item}
+                </li>
+              ))}
+            </ul>
             <p className="font-semibold text-foreground">All without writing a single line of code.</p>
           </div>
 
-          <div className="space-y-2">
-            <SectionTitle>Have a question, or something isn’t working as expected?</SectionTitle>
-            <p>
-              Email me directly at <MailLink>kash@lycheedata.com</MailLink>. Tell me what you’re trying to do, and I’ll help you find a way forward.
-            </p>
-          </div>
-
-          <div className="space-y-3 rounded-xl border border-border bg-muted/40 p-4">
-            <SectionTitle>Let’s pull your first dataset.</SectionTitle>
-            <p>
-              Start with a guided walkthrough: <span className="font-medium text-foreground">find the top 10 Kalshi weather markets by all-time trading volume</span> using Kalshi Historical Data.
-            </p>
-            <p>We’ll walk you through the steps, then you can explore the results yourself.</p>
-            <div className="flex flex-col gap-2 pt-1 sm:flex-row sm:items-center">
-              <Button type="button" onClick={pullFirstDataset}>
-                Pull my first dataset →
-              </Button>
-              <Button type="button" variant="ghost" onClick={() => setOpen(false)}>
-                Skip and explore on my own
-              </Button>
+          <div className="space-y-4">
+            <h2 className="text-center text-lg font-semibold tracking-tight text-foreground">Where to go from here</h2>
+            <div className="grid gap-3 md:grid-cols-2">
+              <ColumnCard className="bg-muted/40">
+                <SectionTitle>Let’s pull your first dataset.</SectionTitle>
+                <p>
+                  Start with a guided walkthrough: <span className="font-medium text-foreground">find the top 10 Kalshi weather markets by all-time trading volume</span> using Kalshi Historical Data.
+                </p>
+                <p>We’ll walk you through the steps, then you can explore the results yourself.</p>
+                <div className="mt-auto flex flex-col gap-2 pt-1">
+                  <Button type="button" onClick={pullFirstDataset} className="w-fit">
+                    Pull my first dataset →
+                  </Button>
+                  <Button type="button" variant="ghost" className="w-fit px-0" onClick={() => setOpen(false)}>
+                    Skip and explore on my own
+                  </Button>
+                </div>
+              </ColumnCard>
+              <ColumnCard>
+                <SectionTitle>Have a question, or something isn’t working as expected?</SectionTitle>
+                <p>
+                  Email me directly at <MailLink>kash@lycheedata.com</MailLink>. Tell me what you’re trying to do, and I’ll help you find a way forward.
+                </p>
+              </ColumnCard>
             </div>
-          </div>
-
-          <div className="space-y-3">
-            <SectionTitle>See what we’ve uncovered with Lychee</SectionTitle>
-            <p>Explore the questions, methods, and findings behind our research:</p>
-            <ul className="space-y-2 pl-4">
-              {RESEARCH.map((item) => (
-                <li key={item.href} className="list-disc pl-1 marker:text-foreground/40">
-                  <ExternalLink href={item.href}>{item.title}</ExternalLink>
-                </li>
-              ))}
-            </ul>
-          </div>
-
-          <div className="space-y-3">
-            <h3 className="text-base font-bold tracking-tight text-foreground">Learn something new</h3>
-            <p>Our latest guides walk through the data, tools, and concepts:</p>
-            <ul className="space-y-2 pl-4">
-              {GUIDES.map((item) => (
-                <li key={item.href} className="list-disc pl-1 marker:text-foreground/40">
-                  <ExternalLink href={item.href}>{item.title}</ExternalLink>
-                </li>
-              ))}
-            </ul>
-          </div>
-
-          <div className="space-y-3">
-            <SectionTitle>Help shape what comes next</SectionTitle>
-            <p>Here’s what’s on the roadmap:</p>
-            <BulletList items={ROADMAP} />
-            <p>
-              Have something you’d love us to build? <MailLink>Email me</MailLink>. I’d love to hear what would make Lychee more useful to you.
-            </p>
+            <div className="grid gap-3 lg:grid-cols-3">
+              <ColumnCard>
+                <SectionTitle>See what we’ve uncovered with Lychee</SectionTitle>
+                <p>Explore the questions, methods, and findings behind our research:</p>
+                <ul className="space-y-1.5 pl-4">
+                  {RESEARCH.map((item) => (
+                    <li key={item.href} className="list-disc pl-1 marker:text-foreground/40">
+                      <ExternalLink href={item.href}>{item.title}</ExternalLink>
+                    </li>
+                  ))}
+                </ul>
+              </ColumnCard>
+              <ColumnCard>
+                <h3 className="text-base font-bold tracking-tight text-foreground">Learn something new</h3>
+                <p>Our latest guides walk through the data, tools, and concepts:</p>
+                <ul className="space-y-1.5 pl-4">
+                  {GUIDES.map((item) => (
+                    <li key={item.href} className="list-disc pl-1 marker:text-foreground/40">
+                      <ExternalLink href={item.href}>{item.title}</ExternalLink>
+                    </li>
+                  ))}
+                </ul>
+              </ColumnCard>
+              <ColumnCard>
+                <SectionTitle>Help shape what comes next</SectionTitle>
+                <p>Here’s what’s on the roadmap:</p>
+                <ul className="space-y-1.5 pl-4">
+                  {ROADMAP.map((item) => (
+                    <li key={item} className="list-disc pl-1 leading-snug marker:text-foreground/40">
+                      {item}
+                    </li>
+                  ))}
+                </ul>
+                <p>
+                  Have something you’d love us to build? <MailLink>Email me</MailLink>. I’d love to hear what would make Lychee more useful to you.
+                </p>
+              </ColumnCard>
+            </div>
           </div>
 
           <div className="space-y-1 border-t border-border pt-4 text-foreground">
