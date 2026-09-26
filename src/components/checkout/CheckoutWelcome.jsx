@@ -244,17 +244,17 @@ export default function CheckoutWelcome({ name = "", tier = "" }) {
   };
 
   return (
-    <div className="flex h-[calc(100svh-5rem)] min-h-0 -my-1 flex-col bg-background sm:h-[calc(100svh-4.5rem)] md:h-[calc(100svh-4rem)]">
+    <div className="flex h-[calc(100svh-2rem)] min-h-0 -my-1 flex-col bg-background">
       <div
         role="tablist"
         aria-label="Workspace"
-        className="flex shrink-0 items-end gap-0.5 border-b border-border bg-muted/40 px-2 pt-2"
+        className="flex shrink-0 items-center gap-1.5 px-2 py-1.5"
       >
         <button
           type="button"
           role="tab"
           aria-selected="true"
-          className="rounded-t-md border border-b-0 border-border bg-background px-4 py-2 text-sm font-medium text-foreground"
+          className="inline-flex h-7 items-center rounded-md border border-border bg-card px-2.5 text-xs font-medium text-foreground shadow-sm"
         >
           Welcome
         </button>
@@ -264,7 +264,7 @@ export default function CheckoutWelcome({ name = "", tier = "" }) {
           aria-selected="false"
           aria-label="Open integrations"
           onClick={leaveToIntegrations}
-          className="mb-1 rounded-md px-3 py-1 text-base leading-none text-muted-foreground transition-colors hover:bg-background hover:text-foreground"
+          className="inline-flex h-7 w-7 items-center justify-center rounded-md border border-border bg-background text-sm leading-none text-muted-foreground shadow-sm transition-colors hover:bg-muted hover:text-foreground"
         >
           +
         </button>

@@ -385,14 +385,11 @@ const DashBody = ({ user }) => {
         {!isDemo && (
           <>
             <header
-              className="fixed top-0 left-0 right-0 z-30 border-b border-border bg-white shadow-sm dark:bg-slate-950 dark:shadow-none"
+              className="fixed top-0 left-0 right-0 z-30 border-b border-border bg-white shadow-sm dark:bg-black dark:shadow-none"
             >
               <Nav />
             </header>
-            <div
-              className="min-h-[5rem] shrink-0 sm:min-h-[4.5rem] md:h-16"
-              aria-hidden
-            />
+            <div className="h-8 shrink-0" aria-hidden />
           </>
         )}
         {rightPanelOpen && <Separator className="shrink-0" />}

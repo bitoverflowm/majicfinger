@@ -48,7 +48,7 @@ export function ConnectHomeFlowSteps({
       aria-label="Platform steps"
       className={cn(
         "flex flex-col",
-        sticky && "sticky top-[4.5rem] z-10 self-start",
+        sticky && "sticky top-8 z-10 self-start",
         collapsible && "overflow-visible",
         collapsible && !isExpanded && "w-0 min-w-0",
         className,

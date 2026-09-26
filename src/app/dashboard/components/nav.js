@@ -19,7 +19,7 @@ import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTr
 import { toast } from "sonner"
 import { AnimatedThemeToggler } from "@/components/ui/animated-theme-toggler"
 import { Progress } from "@/components/ui/progress"
-import { Pause, Play, RotateCw, Square, ExternalLink, Loader2, ChevronDown, ChevronUp, X } from "lucide-react"
+import { Eraser, Pause, Play, RotateCw, Square, ExternalLink, Loader2, ChevronDown, ChevronUp, X } from "lucide-react"
 import { inferDefaultBuilderSnapshot, isPlaceholderChartSheet } from "@/lib/inferDefaultBuilderSnapshot"
 import { normalizeBuilderSnapshot } from "@/lib/chartBundle"
 import {
@@ -1489,13 +1489,13 @@ const Nav = () => {
 
   return (
     <>
-    <div className="w-full flex flex-col items-start gap-2 px-2 py-4 sm:flex-row sm:items-center sm:justify-between sm:gap-2 md:h-16">
-          <div className="flex min-w-0 flex-1 items-center gap-2.5 pl-2">
+    <div className="flex h-8 w-full items-center justify-between gap-2 px-2">
+          <div className="flex min-w-0 flex-1 items-center gap-2 pl-1">
             <Link
               href="/dashboard"
-              className="flex min-w-0 items-center gap-2 rounded-md outline-none ring-offset-background focus-visible:ring-2 focus-visible:ring-ring"
+              className="flex min-w-0 items-center gap-1.5 rounded-md outline-none ring-offset-background focus-visible:ring-2 focus-visible:ring-ring"
             >
-              <span className="flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded-full ring-1 ring-border">
+              <span className="flex h-5 w-5 shrink-0 items-center justify-center overflow-hidden rounded-full ring-1 ring-border">
                 <Image
                   src="/logo.png"
                   width={32}
@@ -1504,17 +1504,19 @@ const Nav = () => {
                   className="size-full object-cover"
                 />
               </span>
-              <span className="flex min-w-0 items-baseline gap-1.5 overflow-hidden">
-                <span className="shrink-0 text-sm font-semibold text-foreground">Lychee</span>
-                {navSubPage ? (
-                  <>
-                    <span className="shrink-0 text-sm font-medium text-muted-foreground" aria-hidden>
-                      /
-                    </span>
-                    <span className="truncate text-sm font-semibold text-foreground">{navSubPage}</span>
-                  </>
-                ) : null}
-              </span>
+              {viewing !== "welcome" ? (
+                <span className="flex min-w-0 items-baseline gap-1.5 overflow-hidden">
+                  <span className="shrink-0 text-xs font-semibold text-foreground">Lychee</span>
+                  {navSubPage ? (
+                    <>
+                      <span className="shrink-0 text-xs font-medium text-muted-foreground" aria-hidden>
+                        /
+                      </span>
+                      <span className="truncate text-xs font-semibold text-foreground">{navSubPage}</span>
+                    </>
+                  ) : null}
+                </span>
+              ) : null}
             </Link>
             {loadedDataMeta?.data_set_name ? (
               <>
@@ -1529,21 +1531,9 @@ const Nav = () => {
                 </span>
               </>
             ) : null}
-            {user ? (
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                className="ml-1 h-7 shrink-0 gap-1 px-2 text-xs font-medium"
-                onClick={handleClearWorkspace}
-                title="Clear pulled data, sheets, and integration state from memory"
-              >
-                Clear workspace
-              </Button>
-            ) : null}
           </div>
           { user ? (
-              <div className="flex w-full flex-wrap items-center justify-end gap-2 sm:w-auto sm:ml-auto sm:flex-nowrap">
+              <div className="flex w-auto flex-nowrap items-center justify-end gap-1.5 sm:ml-auto">
                   {hasAnyStream && (
                     <div className="flex items-center gap-1 shrink-0 rounded-md border bg-muted/50 px-1 py-0.5">
                       {streamSheetIds.length > 1 && (
@@ -1560,16 +1550,16 @@ const Nav = () => {
                           ))}
                         </select>
                       )}
-                      <Button variant="ghost" size="icon" className="h-7 w-7" title="Pause" disabled={!currentStreamState?.isRunning || currentStreamState?.isPaused} onClick={() => liveStreamActions?.pause?.(effectiveStreamSheetId)}>
+                      <Button variant="ghost" size="icon" className="h-6 w-6" title="Pause" disabled={!currentStreamState?.isRunning || currentStreamState?.isPaused} onClick={() => liveStreamActions?.pause?.(effectiveStreamSheetId)}>
                         <Pause className="h-3.5 w-3.5" />
                       </Button>
-                      <Button variant="ghost" size="icon" className="h-7 w-7" title={currentStreamState?.isPaused ? "Resume" : "Start"} onClick={() => liveStreamActions?.resume?.(effectiveStreamSheetId)}>
+                      <Button variant="ghost" size="icon" className="h-6 w-6" title={currentStreamState?.isPaused ? "Resume" : "Start"} onClick={() => liveStreamActions?.resume?.(effectiveStreamSheetId)}>
                         <Play className="h-3.5 w-3.5" />
                       </Button>
-                      <Button variant="ghost" size="icon" className="h-7 w-7" title="Restart" onClick={() => liveStreamActions?.restart?.(effectiveStreamSheetId)}>
+                      <Button variant="ghost" size="icon" className="h-6 w-6" title="Restart" onClick={() => liveStreamActions?.restart?.(effectiveStreamSheetId)}>
                         <RotateCw className="h-3.5 w-3.5" />
                       </Button>
-                      <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive hover:text-destructive" title="Stop" onClick={() => liveStreamActions?.stop?.(effectiveStreamSheetId)}>
+                      <Button variant="ghost" size="icon" className="h-6 w-6 text-destructive hover:text-destructive" title="Stop" onClick={() => liveStreamActions?.stop?.(effectiveStreamSheetId)}>
                         <Square className="h-3.5 w-3.5" />
                       </Button>
                     </div>
@@ -1583,7 +1573,7 @@ const Nav = () => {
                       <Button
                         variant="outline"
                         size="sm"
-                        className="h-7 gap-1 px-2 text-xs font-medium"
+                        className="h-6 gap-1 px-3 text-[9px] font-medium leading-none"
                         onClick={handleStartNewProject}
                       >
                         New Project
@@ -1764,7 +1754,7 @@ const Nav = () => {
                       >
                         {showProjectToolbar ? (
                           <DialogTrigger asChild>
-                            <Button variant="outline" size="sm" className="h-7 gap-1 px-2 text-xs font-medium">
+                            <Button variant="outline" size="sm" className="h-6 gap-1 px-3 text-[9px] font-medium leading-none">
                               Save Project
                             </Button>
                           </DialogTrigger>
@@ -1840,10 +1830,29 @@ const Nav = () => {
                         </DialogContent>
                       </Dialog>
                   )}
+                  <TooltipProvider delayDuration={200}>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          className="h-6 w-6 shrink-0"
+                          onClick={handleClearWorkspace}
+                          aria-label="Clear workspace"
+                        >
+                          <Eraser className="h-3.5 w-3.5" />
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent side="bottom" sideOffset={6} className="z-[100] text-xs">
+                        Clear workspace
+                      </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
                   <Sheet open={isOpen} onOpenChange={setIsOpen}>
                     <SheetTrigger asChild>
-                      <Button variant="outline" size="sm" className="h-7 gap-1 px-2 text-xs font-medium">
-                        Your Projects
+                      <Button variant="ghost" size="sm" className="h-6 gap-1 px-3 text-[9px] font-medium leading-none">
+                        Projects
                         {savedWorkCountLoading ? (
                           <span
                             className="ml-0.5 inline-flex h-4 w-4 shrink-0 items-center justify-center"
@@ -1858,7 +1867,7 @@ const Nav = () => {
                         )}
                       </Button>
                     </SheetTrigger>
-                        <SheetContent side={'left'} className="w-[1000px]! sm:max-w-4xl flex flex-col">
+                        <SheetContent side={'left'} className="flex w-[1000px]! flex-col bg-white sm:max-w-4xl dark:bg-black">
                           <SheetHeader>
                             <SheetTitle>Your Saved Work</SheetTitle>
                             <SheetDescription>
@@ -2206,14 +2215,15 @@ const Nav = () => {
                   </AlertDialog>
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
-                      <Button variant="secondary" size="icon" className="rounded-full h-9 w-9 overflow-hidden">
+                      <Button variant="ghost" size="icon" className="h-6 w-6 overflow-hidden rounded-full border-0 bg-transparent p-0 shadow-none hover:bg-transparent">
                         <UserAvatar
                           src={profilePic}
                           handle={userHandle}
                           name={user?.name}
                           email={user?.email}
-                          size={36}
-                          className="h-9 w-9"
+                          size={24}
+                          className="h-6 w-6 border-0"
+                          fallbackClassName="border-0 bg-transparent dark:bg-transparent"
                         />
                       </Button>
                   </DropdownMenuTrigger>
@@ -2227,7 +2237,7 @@ const Nav = () => {
                       <DropdownMenuItem onClick={()=>handleLogout()}>Logout</DropdownMenuItem>
                   </DropdownMenuContent>
               </DropdownMenu>
-                <AnimatedThemeToggler className="h-9 w-9 shrink-0 rounded-md border border-input bg-background hover:bg-accent hover:text-accent-foreground inline-flex items-center justify-center" />
+                <AnimatedThemeToggler className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-md border-0 bg-transparent hover:bg-accent hover:text-accent-foreground" />
               </div>
             ) : (
               <div className="flex w-full items-center justify-end gap-2 sm:w-auto sm:ml-auto">
@@ -2237,7 +2247,7 @@ const Nav = () => {
                   </span>
                 )}
                 <Button variant="default" size="sm" onClick={() => router.push('/login')}>Log In</Button>
-                <AnimatedThemeToggler className="h-9 w-9 shrink-0 rounded-md border border-input bg-background hover:bg-accent hover:text-accent-foreground inline-flex items-center justify-center" />
+                <AnimatedThemeToggler className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-md border-0 bg-transparent hover:bg-accent hover:text-accent-foreground" />
               </div>
             )}
     </div>
