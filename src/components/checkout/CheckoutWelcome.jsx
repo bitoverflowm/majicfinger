@@ -38,11 +38,27 @@ function burstConfetti() {
   }, 260);
 }
 
-export default function CheckoutWelcome() {
+export default function CheckoutWelcome({ preview = false }) {
   const [open, setOpen] = useState(false);
   const [tier, setTier] = useState("");
 
   useEffect(() => {
+    if (preview) {
+      setTier("Pro");
+      setOpen(true);
+      burstConfetti();
+      return;
+    }
+
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("welcome") === "1") {
+      const fromQuery = String(params.get("tier") || "Pro").trim();
+      setTier(fromQuery ? fromQuery.charAt(0).toUpperCase() + fromQuery.slice(1) : "Pro");
+      setOpen(true);
+      burstConfetti();
+      return;
+    }
+
     let raw = "";
     try {
       raw = sessionStorage.getItem(CHECKOUT_WELCOME_KEY) || "";
@@ -60,7 +76,7 @@ export default function CheckoutWelcome() {
     setTier(String(parsed?.tier || "").trim());
     setOpen(true);
     burstConfetti();
-  }, []);
+  }, [preview]);
 
   const membership = tier ? `${tier} membership` : "membership";
 

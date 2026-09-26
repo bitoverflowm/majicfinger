@@ -38,7 +38,7 @@ async function availableHandle(except) {
   return randomUserHandle();
 }
 
-export default function CheckoutAccountStep({ onComplete, preview = false }) {
+export default function CheckoutAccountStep({ onComplete }) {
   const { data: user, isLoading } = useSWR("/api/user", userSwrFetcher);
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
@@ -88,13 +88,13 @@ export default function CheckoutAccountStep({ onComplete, preview = false }) {
   }, []);
 
   useEffect(() => {
-    if (preview || isLoading || !user?.user_name || finished.current) return;
+    if (isLoading || !user?.user_name || finished.current) return;
     finished.current = true;
     onComplete?.({
       planKey: "",
       subscriptionTier: user.subscriptionTier || "",
     });
-  }, [isLoading, onComplete, preview, user]);
+  }, [isLoading, onComplete, user]);
 
   const checkHandle = useCallback((value) => {
     const v = String(value || "").trim();
@@ -154,7 +154,6 @@ export default function CheckoutAccountStep({ onComplete, preview = false }) {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (preview) return;
     setError("");
     if (checkingHandle || handleTaken || String(handle || "").trim().length < 3) {
       setError("Choose an available handle.");
@@ -219,7 +218,7 @@ export default function CheckoutAccountStep({ onComplete, preview = false }) {
     }
   };
 
-  const signedIn = !preview && Boolean(user?.email);
+  const signedIn = Boolean(user?.email);
   const needsProfile = signedIn && !String(user?.user_name || "").trim();
 
   return (
@@ -245,7 +244,7 @@ export default function CheckoutAccountStep({ onComplete, preview = false }) {
               Then pick the handle and avatar people will see on Lychee.
             </p>
           </div>
-          {!preview && (isLoading || (signedIn && user?.user_name) || loading) ? (
+          {isLoading || (signedIn && user?.user_name) || loading ? (
             <div className="space-y-3">
               <p className="text-center text-sm text-muted-foreground">
                 {loading ? "Finishing your account…" : isLoading ? "Loading…" : "Opening your dashboard…"}
