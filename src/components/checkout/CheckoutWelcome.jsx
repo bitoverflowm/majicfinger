@@ -183,12 +183,12 @@ function MailLink({ children }) {
 }
 
 function SectionTitle({ children }) {
-  return <h3 className="text-base font-semibold tracking-tight text-foreground">{children}</h3>;
+  return <h3 className="text-lg font-semibold tracking-tighter text-foreground">{children}</h3>;
 }
 
-function ColumnCard({ children, className = "" }) {
+function BentoCell({ children }) {
   return (
-    <div className={`flex flex-col gap-2.5 rounded-xl border border-border bg-card p-4 ${className}`}>
+    <div className="relative flex h-full flex-col gap-3 p-5 lg:p-6 before:absolute before:bottom-0 before:left-0 before:h-px before:w-full before:bg-border last:before:hidden lg:before:bottom-auto lg:before:left-auto lg:before:right-0 lg:before:top-0 lg:before:h-full lg:before:w-px">
       {children}
     </div>
   );
@@ -204,7 +204,7 @@ function PosterRow({ title, description, items }) {
       <Carousel opts={{ align: "start", containScroll: "trimSnaps" }} className="group/row">
         <CarouselContent className="-ml-3">
           {items.map((item) => (
-            <CarouselItem key={item.href} className="basis-[78%] pl-3 sm:basis-[46%]">
+            <CarouselItem key={item.href} className="basis-[42%] pl-3 sm:basis-[30%] lg:basis-[22%]">
               <a
                 href={item.href}
                 target="_blank"
@@ -217,7 +217,7 @@ function PosterRow({ title, description, items }) {
                     src={item.image}
                     alt=""
                     fill
-                    sizes="(max-width: 1024px) 70vw, 280px"
+                    sizes="(max-width: 640px) 42vw, (max-width: 1024px) 30vw, 220px"
                     className="object-cover transition duration-500 group-hover/card:scale-[1.04]"
                   />
                 </div>
@@ -237,7 +237,7 @@ export function WorkspaceStartTabs({ welcomeActive, onOpenWelcome, onOpenIntegra
     <div
       role="tablist"
       aria-label="Workspace"
-      className="flex shrink-0 items-center gap-1.5 px-2 py-1.5"
+      className="flex shrink-0 items-center gap-1.5 p-6"
     >
       <button
         type="button"
@@ -342,14 +342,14 @@ export default function CheckoutWelcome({ name = "", tier = "", celebrate = fals
 
           <div className="space-y-4">
             <h2 className="text-center text-lg font-semibold tracking-tight text-foreground">Where to go from here</h2>
-            <div className="grid items-start gap-3 lg:grid-cols-3">
-              <ColumnCard className="bg-muted/40">
+            <div className="grid grid-cols-1 items-stretch overflow-hidden border border-border lg:grid-cols-3">
+              <BentoCell>
                 <SectionTitle>Let’s pull your first dataset.</SectionTitle>
                 <p>
                   Start with a guided walkthrough: <span className="font-medium text-foreground">find the top 10 Kalshi weather markets by all-time trading volume</span> using Kalshi Historical Data.
                 </p>
                 <p>We’ll walk you through the steps, then you can explore the results yourself.</p>
-                <div className="mt-auto flex flex-row flex-wrap items-center gap-2 pt-1">
+                <div className="mt-auto flex flex-row flex-wrap items-center gap-2 pt-2">
                   <Button type="button" onClick={pullFirstDataset} className="w-fit">
                     Pull my first dataset →
                   </Button>
@@ -357,14 +357,14 @@ export default function CheckoutWelcome({ name = "", tier = "", celebrate = fals
                     Skip and explore on my own
                   </Button>
                 </div>
-              </ColumnCard>
-              <ColumnCard>
+              </BentoCell>
+              <BentoCell>
                 <SectionTitle>Have a question, or something isn’t working as expected?</SectionTitle>
                 <p>
                   Email me directly at <MailLink>kash@lycheedata.com</MailLink>. Tell me what you’re trying to do, and I’ll help you find a way forward.
                 </p>
-              </ColumnCard>
-              <ColumnCard>
+              </BentoCell>
+              <BentoCell>
                 <SectionTitle>Help shape what comes next</SectionTitle>
                 <p>Here’s what’s on the roadmap:</p>
                 <ul className="space-y-1.5 pl-4">
@@ -374,10 +374,10 @@ export default function CheckoutWelcome({ name = "", tier = "", celebrate = fals
                     </li>
                   ))}
                 </ul>
-                <p>
+                <p className="mt-auto pt-2">
                   Have something you’d love us to build? <MailLink>Email me</MailLink>. I’d love to hear what would make Lychee more useful to you.
                 </p>
-              </ColumnCard>
+              </BentoCell>
             </div>
             <div className="min-w-0 space-y-5">
               <PosterRow

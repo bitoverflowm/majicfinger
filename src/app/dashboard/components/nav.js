@@ -45,7 +45,6 @@ import {
 } from "@/lib/dashboardPublishCache"
 import { buildProjectDeltaPayload, prepareProjectDataPayload, PROJECT_PREVIEW_ROW_LIMIT } from "@/lib/projectPersistence"
 import { buildProjectLiveFeedSourceFromSheets } from "@/lib/liveFeeds/projectLiveFeedSource"
-import { isConnectIntegrationWorkspace } from "@/lib/connectHomeWorkspace"
 import { prepareLargeJsonBody } from "@/lib/gzipJsonTransport"
 import {
   ELITE_WORKSPACE_CAP_BYTES,
@@ -294,7 +293,6 @@ const Nav = () => {
   const setRightPanelTab = contextStateV2?.setRightPanelTab
   const setRightPanelOpen = contextStateV2?.setRightPanelOpen
   const setConnectPowerMove = contextStateV2?.setConnectPowerMove
-  const connectWorkspace = contextStateV2?.connectWorkspace
   const connectedData = contextStateV2?.connectedData
   const dataSetName = contextStateV2?.dataSetName
   const setDataSetName = contextStateV2?.setDataSetName
@@ -1450,38 +1448,6 @@ const Nav = () => {
   }, [saveIsOpen, loadedDataMeta?.data_set_name]);
 
 
-  const connectBreadcrumbLabel =
-    viewing === "connectDataHome" && isConnectIntegrationWorkspace(connectWorkspace)
-      ? "Integrate"
-      : "Connect";
-
-  const navSubPage =
-    viewing === "welcome"
-      ? "Welcome"
-      : viewing === "dashboardComposer"
-      ? "Dashboard"
-      : viewing === "charts"
-        ? "Charts"
-        : viewing === "connectDataHome"
-          ? connectBreadcrumbLabel
-          : viewing === "dataStart" || viewing === "integrations"
-            ? "Data"
-            : viewing === "ai"
-              ? "AI"
-              : viewing === "scrape"
-                ? "Scrape"
-                : viewing === "presentation"
-                  ? "Presentation"
-                  : viewing === "pricing"
-                    ? "Pricing"
-                    : viewing === "profilePage"
-                      ? "Profile"
-                      : viewing === "manageAccount"
-                        ? "Billing"
-                        : viewing
-                          ? String(viewing).charAt(0).toUpperCase() + String(viewing).slice(1)
-                          : null;
-
   const showUnsavedFlag = connectedData && connectedData.length > 0 && !loadedDataMeta?.data_set_name && !loadedChartMeta?.chart_name;
   const upgradeSummary = largeProjectUpgradeSummary || currentAdvancedStorageSummary;
   const upgradeLargestSheet = upgradeSummary?.largestSheet;
@@ -1504,19 +1470,6 @@ const Nav = () => {
                   className="size-full object-cover"
                 />
               </span>
-              {viewing !== "welcome" ? (
-                <span className="flex min-w-0 items-baseline gap-1.5 overflow-hidden">
-                  <span className="shrink-0 text-xs font-semibold text-foreground">Lychee</span>
-                  {navSubPage ? (
-                    <>
-                      <span className="shrink-0 text-xs font-medium text-muted-foreground" aria-hidden>
-                        /
-                      </span>
-                      <span className="truncate text-xs font-semibold text-foreground">{navSubPage}</span>
-                    </>
-                  ) : null}
-                </span>
-              ) : null}
             </Link>
             {loadedDataMeta?.data_set_name ? (
               <>
