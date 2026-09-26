@@ -1,10 +1,20 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Image from "next/image";
 import confetti from "canvas-confetti";
+import { X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
+  Carousel,
+  CarouselContent,
+  CarouselItem,
+  CarouselNext,
+  CarouselPrevious,
+} from "@/components/ui/carousel";
+import {
   Dialog,
+  DialogClose,
   DialogContent,
   DialogDescription,
   DialogHeader,
@@ -24,18 +34,22 @@ const RESEARCH = [
   {
     title: "Why Random Sampling Matters: A Polymarket Case Study",
     href: "/guides/random-sampling-data-analysis",
+    image: "/images/guides/random-sampling-data-analysis/main.png",
   },
   {
     title: "When Do Prediction Markets Become Accurate?",
     href: "/guides/kalshi-historical-political-prediction-market-accuracy-lifecycle",
+    image: "/images/guides/kalshi-historical-political-prediction-market-accuracy-lifecycle/main.png",
   },
   {
     title: "Are 90% Prediction Markets Reliable?",
     href: "/guides/kalshi-political-prediction-market-accuracy",
+    image: "/images/guides/kalshi-political-prediction-market-accuracy/main.png",
   },
   {
     title: "Political Prediction Markets: What Historical Data Reveals",
     href: "/guides/kalshi-political-prediction-markets-analysis",
+    image: "/images/guides/kalshi-political-prediction-markets-analysis/main.png",
   },
 ];
 
@@ -43,18 +57,22 @@ const GUIDES = [
   {
     title: "How to Compare Kalshi and Polymarket Odds",
     href: "/guides/how-to-compare-kalshi-polymarket-odds",
+    image: "/images/guides/kalshi-polymarket-odds-comparison/main.png",
   },
   {
     title: "How to Build a Kalshi Weather Volatility Chart",
     href: "/guides/kalshi-weather-volatility-chart",
+    image: "/images/guides/kalshi-weather-volatility-chart/main.png",
   },
   {
     title: "How to Build a Kalshi Weather Probability Calibration Chart",
     href: "/guides/kalshi-weather-probability-calibration-chart",
+    image: "/images/guides/kalshi-weather-probability-calibration-chart/main.png",
   },
   {
     title: "How to Build a Kalshi Weather Probability Convergence Chart",
     href: "/guides/kalshi-weather-probability-convergence-chart",
+    image: "/images/guides/kalshi-weather-probability-convergence-chart/main.png",
   },
 ];
 
@@ -88,19 +106,6 @@ function burstConfetti() {
   }, 260);
 }
 
-function ExternalLink({ href, children }) {
-  return (
-    <a
-      href={href}
-      target="_blank"
-      rel="noopener noreferrer"
-      className="text-foreground underline decoration-border underline-offset-4 transition-colors hover:decoration-foreground"
-    >
-      {children}
-    </a>
-  );
-}
-
 function MailLink({ children }) {
   return (
     <a
@@ -118,8 +123,46 @@ function SectionTitle({ children }) {
 
 function ColumnCard({ children, className = "" }) {
   return (
-    <div className={`flex h-full flex-col gap-2.5 rounded-xl border border-border bg-card p-4 ${className}`}>
+    <div className={`flex flex-col gap-2.5 rounded-xl border border-border bg-card p-4 ${className}`}>
       {children}
+    </div>
+  );
+}
+
+function PosterRow({ title, description, items }) {
+  return (
+    <div className="min-w-0 space-y-2">
+      <div className="space-y-0.5">
+        <h3 className="text-base font-semibold tracking-tight text-foreground">{title}</h3>
+        <p className="text-sm leading-snug">{description}</p>
+      </div>
+      <Carousel opts={{ align: "start", containScroll: "trimSnaps" }} className="group/row">
+        <CarouselContent className="-ml-3">
+          {items.map((item) => (
+            <CarouselItem key={item.href} className="basis-[78%] pl-3 sm:basis-[46%]">
+              <a
+                href={item.href}
+                target="_blank"
+                rel="noopener noreferrer"
+                aria-label={item.title}
+                className="group/card block overflow-hidden rounded-lg border border-border bg-muted shadow-sm outline-none transition duration-300 group-hover/card:border-foreground/30 group-hover/card:shadow-md group-focus-visible/card:ring-2 group-focus-visible/card:ring-ring"
+              >
+                <div className="relative aspect-video">
+                  <Image
+                    src={item.image}
+                    alt=""
+                    fill
+                    sizes="(max-width: 1024px) 70vw, 280px"
+                    className="object-cover transition duration-500 group-hover/card:scale-[1.04]"
+                  />
+                </div>
+              </a>
+            </CarouselItem>
+          ))}
+        </CarouselContent>
+        <CarouselPrevious className="left-1 top-1/2 z-10 size-8 border-0 bg-black/75 text-white shadow-md hover:bg-black hover:text-white disabled:pointer-events-none disabled:opacity-0" />
+        <CarouselNext className="right-1 top-1/2 z-10 size-8 border-0 bg-black/75 text-white shadow-md hover:bg-black hover:text-white disabled:pointer-events-none disabled:opacity-0" />
+      </Carousel>
     </div>
   );
 }
@@ -187,13 +230,17 @@ export default function CheckoutWelcome({ preview = false, name = "" }) {
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogContent
         overlayClassName="z-[1000]"
-        className="z-[1001] flex max-h-[min(90vh,900px)] w-[min(96vw,68rem)] max-w-5xl flex-col gap-0 overflow-hidden p-0 sm:max-w-5xl"
+        className="z-[1001] flex max-h-[min(90vh,900px)] w-[min(96vw,90rem)] max-w-[90rem] flex-col gap-0 overflow-hidden p-0 sm:max-w-[90rem] [&>button]:hidden"
       >
-        <DialogHeader className="space-y-1 border-b border-border px-6 pb-4 pt-6 pr-12 text-left">
+        <DialogHeader className="relative space-y-1 border-b border-border px-6 py-4 pr-12 text-left">
           <DialogTitle className="text-xl leading-snug">{opening}</DialogTitle>
           <DialogDescription className="sr-only">
             A note from Kash about your new workspace.
           </DialogDescription>
+          <DialogClose className="absolute right-4 top-1/2 -translate-y-1/2 rounded-sm opacity-70 ring-offset-white transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-slate-950 focus:ring-offset-2 disabled:pointer-events-none dark:ring-offset-slate-950 dark:focus:ring-slate-300">
+            <X className="h-4 w-4" />
+            <span className="sr-only">Close</span>
+          </DialogClose>
         </DialogHeader>
         <div className="min-h-0 flex-1 space-y-6 overflow-y-auto px-6 py-5 text-sm leading-relaxed text-muted-foreground">
           <div className="space-y-3">
@@ -224,18 +271,18 @@ export default function CheckoutWelcome({ preview = false, name = "" }) {
 
           <div className="space-y-4">
             <h2 className="text-center text-lg font-semibold tracking-tight text-foreground">Where to go from here</h2>
-            <div className="grid gap-3 md:grid-cols-2">
+            <div className="grid items-start gap-3 lg:grid-cols-3">
               <ColumnCard className="bg-muted/40">
                 <SectionTitle>Let’s pull your first dataset.</SectionTitle>
                 <p>
                   Start with a guided walkthrough: <span className="font-medium text-foreground">find the top 10 Kalshi weather markets by all-time trading volume</span> using Kalshi Historical Data.
                 </p>
                 <p>We’ll walk you through the steps, then you can explore the results yourself.</p>
-                <div className="mt-auto flex flex-col gap-2 pt-1">
+                <div className="mt-auto flex flex-row flex-wrap items-center gap-2 pt-1">
                   <Button type="button" onClick={pullFirstDataset} className="w-fit">
                     Pull my first dataset →
                   </Button>
-                  <Button type="button" variant="ghost" className="w-fit px-0" onClick={() => setOpen(false)}>
+                  <Button type="button" variant="ghost" className="w-fit" onClick={() => setOpen(false)}>
                     Skip and explore on my own
                   </Button>
                 </div>
@@ -245,30 +292,6 @@ export default function CheckoutWelcome({ preview = false, name = "" }) {
                 <p>
                   Email me directly at <MailLink>kash@lycheedata.com</MailLink>. Tell me what you’re trying to do, and I’ll help you find a way forward.
                 </p>
-              </ColumnCard>
-            </div>
-            <div className="grid gap-3 lg:grid-cols-3">
-              <ColumnCard>
-                <SectionTitle>See what we’ve uncovered with Lychee</SectionTitle>
-                <p>Explore the questions, methods, and findings behind our research:</p>
-                <ul className="space-y-1.5 pl-4">
-                  {RESEARCH.map((item) => (
-                    <li key={item.href} className="list-disc pl-1 marker:text-foreground/40">
-                      <ExternalLink href={item.href}>{item.title}</ExternalLink>
-                    </li>
-                  ))}
-                </ul>
-              </ColumnCard>
-              <ColumnCard>
-                <h3 className="text-base font-bold tracking-tight text-foreground">Learn something new</h3>
-                <p>Our latest guides walk through the data, tools, and concepts:</p>
-                <ul className="space-y-1.5 pl-4">
-                  {GUIDES.map((item) => (
-                    <li key={item.href} className="list-disc pl-1 marker:text-foreground/40">
-                      <ExternalLink href={item.href}>{item.title}</ExternalLink>
-                    </li>
-                  ))}
-                </ul>
               </ColumnCard>
               <ColumnCard>
                 <SectionTitle>Help shape what comes next</SectionTitle>
@@ -285,12 +308,29 @@ export default function CheckoutWelcome({ preview = false, name = "" }) {
                 </p>
               </ColumnCard>
             </div>
+            <div className="min-w-0 space-y-5">
+              <PosterRow
+                title="See what we’ve uncovered with Lychee"
+                description="Explore the questions, methods, and findings behind our research."
+                items={RESEARCH}
+              />
+              <PosterRow
+                title="Learn something new"
+                description="Our latest guides walk through the data, tools, and concepts."
+                items={GUIDES}
+              />
+            </div>
           </div>
 
           <div className="space-y-1 border-t border-border pt-4 text-foreground">
             <p>Make yourself at home. Bring a question. See where the data takes you.</p>
             <p className="pt-3 font-medium">Kash</p>
             <p className="text-muted-foreground">Founder, Lychee</p>
+            <div className="pt-4">
+              <Button type="button" onClick={() => setOpen(false)}>
+                Head to your Workspace
+              </Button>
+            </div>
           </div>
         </div>
       </DialogContent>
