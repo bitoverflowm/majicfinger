@@ -1456,7 +1456,9 @@ const Nav = () => {
       : "Connect";
 
   const navSubPage =
-    viewing === "dashboardComposer"
+    viewing === "welcome"
+      ? "Welcome"
+      : viewing === "dashboardComposer"
       ? "Dashboard"
       : viewing === "charts"
         ? "Charts"

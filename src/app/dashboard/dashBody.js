@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback, useRef } from "react";
+import { useEffect, useState, useCallback, useRef, useLayoutEffect } from "react";
 import Link from "next/link";
 
 import { useMyStateV2  } from '@/context/stateContextV2'
@@ -21,7 +21,8 @@ import { PricingSection } from "@/components/sections/pricing-section";
 import EasyLychee from "@/components/easyLychee";
 import { Separator } from "@/components/ui/separator";
 import { ProfilePictureUploader } from "@/components/profile/ProfilePictureUploader";
-import CheckoutWelcome from "@/components/checkout/CheckoutWelcome";
+import CheckoutWelcome, { takeCheckoutWelcome, workspaceWelcomePending } from "@/components/checkout/CheckoutWelcome";
+import { membershipTierLabel } from "@/lib/membershipLabel";
 
 import { cn } from "@/lib/utils";
 
@@ -82,6 +83,9 @@ const DashBody = ({ user }) => {
     const [subscribedAt, setSubscribedAt] = useState(null);
     /** True only after a successful `/api/users/:id` GET — used so Connect hub does not flash handle setup while handle is unknown. */
     const [userProfileFetchOk, setUserProfileFetchOk] = useState(false);
+    const [entryReady, setEntryReady] = useState(false);
+    const [welcomeTier, setWelcomeTier] = useState("");
+    const welcomedRef = useRef(false);
     const hasDbBackedUserId =
       typeof user?.userId === "string" &&
       user.userId !== "dev-bypass-no-db" &&
@@ -143,6 +147,17 @@ const DashBody = ({ user }) => {
         void consumeRunYourselfInteractiveSession();
       }
     }, [viewingForkProject, user, contextStateV2]);
+
+    useLayoutEffect(() => {
+        if (welcomedRef.current) return;
+        welcomedRef.current = true;
+        const welcome = takeCheckoutWelcome();
+        if (welcome?.tier) setWelcomeTier(welcome.tier);
+        if (!isDemo && (workspaceWelcomePending() || welcome)) {
+            setViewing?.("welcome");
+        }
+        setEntryReady(true);
+    }, [setViewing, isDemo]);
 
     useEffect(() => {
         if (viewing === "upload") {
@@ -382,7 +397,21 @@ const DashBody = ({ user }) => {
         )}
         {rightPanelOpen && <Separator className="shrink-0" />}
         <div className="relative z-0 flex min-h-0 min-w-0 flex-1 flex-col py-1">
-                {viewing === 'connectDataHome' && (
+                {entryReady && viewing === "welcome" && (
+                  <CheckoutWelcome
+                    name={user?.name}
+                    tier={
+                      welcomeTier ||
+                      membershipTierLabel({
+                        subscriptionTier:
+                          isLifeTimeMember || user?.lifetimeMember
+                            ? "lifetime"
+                            : subscriptionTier || user?.subscriptionTier,
+                      })
+                    }
+                  />
+                )}
+                {entryReady && viewing === 'connectDataHome' && (
                   <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
                     <ConnectHomeShell
                       user={user}
@@ -544,7 +573,6 @@ const DashBody = ({ user }) => {
           {content}
         </div>
         {paywallOverlay}
-        <CheckoutWelcome name={user?.name} />
       </div>
     );
 }

@@ -1,9 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import Image from "next/image";
 import confetti from "canvas-confetti";
-import { X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Carousel,
@@ -12,20 +11,13 @@ import {
   CarouselNext,
   CarouselPrevious,
 } from "@/components/ui/carousel";
-import {
-  Dialog,
-  DialogClose,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
 import { useMyStateV2 } from "@/context/stateContextV2";
 import { useUser } from "@/lib/hooks";
 import { KALSHI_GUIDED_WEATHER_WORKFLOW_ID } from "@/lib/guidedWorkflows/kalshiHistorical/stepIds";
 import { requestKalshiHistoricalGuidedWorkflow } from "@/lib/guidedWorkflows/pendingLaunch";
 
 export const CHECKOUT_WELCOME_KEY = "lycheeCheckoutWelcome";
+const WORKSPACE_WELCOME_SEEN_KEY = "lycheeWorkspaceWelcomeSeen";
 
 const CONFETTI_COLORS = ["#e11d48", "#fb7185", "#fda4af", "#fbbf24", "#fde68a", "#ffffff"];
 const MAILTO = "mailto:kash@lycheedata.com";
@@ -93,6 +85,60 @@ export function rememberCheckoutWelcome(tier) {
   } catch {
     // Private mode can block storage. The dashboard still loads.
   }
+}
+
+/** Read the one-time post-checkout welcome, if this visit should open on it. */
+export function takeCheckoutWelcome() {
+  if (typeof window === "undefined") return null;
+  const params = new URLSearchParams(window.location.search);
+  const fromQuery = params.get("welcome") === "1";
+  let hadStored = false;
+  let storedTier = "";
+  try {
+    const raw = sessionStorage.getItem(CHECKOUT_WELCOME_KEY) || "";
+    if (raw) {
+      hadStored = true;
+      sessionStorage.removeItem(CHECKOUT_WELCOME_KEY);
+      const parsed = JSON.parse(raw);
+      storedTier = String(parsed?.tier || "").trim();
+    }
+  } catch {
+    hadStored = false;
+  }
+  if (fromQuery) {
+    const rawTier = String(params.get("tier") || storedTier || "Pro").trim();
+    const tier = rawTier ? rawTier.charAt(0).toUpperCase() + rawTier.slice(1) : "Pro";
+    return { tier };
+  }
+  if (!hadStored) return null;
+  return { tier: storedTier };
+}
+
+/** True until this browser has left the welcome page once. */
+export function workspaceWelcomePending() {
+  if (typeof window === "undefined") return false;
+  try {
+    return localStorage.getItem(WORKSPACE_WELCOME_SEEN_KEY) !== "1";
+  } catch {
+    return true;
+  }
+}
+
+export function markWorkspaceWelcomeSeen() {
+  try {
+    localStorage.setItem(WORKSPACE_WELCOME_SEEN_KEY, "1");
+  } catch {
+    // Private mode can block storage. This visit still leaves the welcome page.
+  }
+}
+
+function clearWelcomeSearch() {
+  const url = new URL(window.location.href);
+  if (!url.searchParams.has("welcome") && !url.searchParams.has("tier")) return;
+  url.searchParams.delete("welcome");
+  url.searchParams.delete("tier");
+  const search = url.searchParams.toString();
+  window.history.replaceState(null, "", url.pathname + (search ? `?${search}` : "") + url.hash);
 }
 
 function burstConfetti() {
@@ -167,47 +213,13 @@ function PosterRow({ title, description, items }) {
   );
 }
 
-export default function CheckoutWelcome({ preview = false, name = "" }) {
+export default function CheckoutWelcome({ name = "", tier = "" }) {
   const context = useMyStateV2();
   const sessionUser = useUser();
-  const [open, setOpen] = useState(false);
-  const [tier, setTier] = useState("");
 
   useEffect(() => {
-    if (preview) {
-      setTier("Pro");
-      setOpen(true);
-      burstConfetti();
-      return;
-    }
-
-    const params = new URLSearchParams(window.location.search);
-    if (params.get("welcome") === "1") {
-      const fromQuery = String(params.get("tier") || "Pro").trim();
-      setTier(fromQuery ? fromQuery.charAt(0).toUpperCase() + fromQuery.slice(1) : "Pro");
-      setOpen(true);
-      burstConfetti();
-      return;
-    }
-
-    let raw = "";
-    try {
-      raw = sessionStorage.getItem(CHECKOUT_WELCOME_KEY) || "";
-      if (raw) sessionStorage.removeItem(CHECKOUT_WELCOME_KEY);
-    } catch {
-      return;
-    }
-    if (!raw) return;
-    let parsed = {};
-    try {
-      parsed = JSON.parse(raw);
-    } catch {
-      parsed = {};
-    }
-    setTier(String(parsed?.tier || "").trim());
-    setOpen(true);
     burstConfetti();
-  }, [preview]);
+  }, []);
 
   const displayName = String(name || sessionUser?.name || "").trim();
   const tierLabel = String(tier || "").trim() || "Lychee";
@@ -215,34 +227,51 @@ export default function CheckoutWelcome({ preview = false, name = "" }) {
     ? `You’re in, ${displayName}. Welcome to Lychee.`
     : "You’re in. Welcome to Lychee.";
 
+  const leaveToIntegrations = () => {
+    markWorkspaceWelcomeSeen();
+    clearWelcomeSearch();
+    context?.setViewing?.("connectDataHome");
+  };
+
   const pullFirstDataset = () => {
-    if (context?.requestConnectWorkspace) {
-      requestKalshiHistoricalGuidedWorkflow(KALSHI_GUIDED_WEATHER_WORKFLOW_ID);
-      context.setViewing?.("connectDataHome");
-      context.setIntegrationSidebar?.("kalshiHistorical");
-      context.setRightPanelOpen?.(false);
-      context.requestConnectWorkspace("kalshiHistorical");
-    }
-    setOpen(false);
+    markWorkspaceWelcomeSeen();
+    clearWelcomeSearch();
+    requestKalshiHistoricalGuidedWorkflow(KALSHI_GUIDED_WEATHER_WORKFLOW_ID);
+    context?.setIntegrationSidebar?.("kalshiHistorical");
+    context?.setRightPanelOpen?.(false);
+    context?.requestConnectWorkspace?.("kalshiHistorical");
+    context?.setViewing?.("connectDataHome");
   };
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
-      <DialogContent
-        overlayClassName="z-[1000]"
-        className="z-[1001] flex max-h-[min(90vh,900px)] w-[min(96vw,90rem)] max-w-[90rem] flex-col gap-0 overflow-hidden p-0 sm:max-w-[90rem] [&>button]:hidden"
+    <div className="flex h-[calc(100svh-5rem)] min-h-0 -my-1 flex-col bg-background sm:h-[calc(100svh-4.5rem)] md:h-[calc(100svh-4rem)]">
+      <div
+        role="tablist"
+        aria-label="Workspace"
+        className="flex shrink-0 items-end gap-0.5 border-b border-border bg-muted/40 px-2 pt-2"
       >
-        <DialogHeader className="relative space-y-1 border-b border-border px-6 py-4 pr-12 text-left">
-          <DialogTitle className="text-xl leading-snug">{opening}</DialogTitle>
-          <DialogDescription className="sr-only">
-            A note from Kash about your new workspace.
-          </DialogDescription>
-          <DialogClose className="absolute right-4 top-1/2 -translate-y-1/2 rounded-sm opacity-70 ring-offset-white transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-slate-950 focus:ring-offset-2 disabled:pointer-events-none dark:ring-offset-slate-950 dark:focus:ring-slate-300">
-            <X className="h-4 w-4" />
-            <span className="sr-only">Close</span>
-          </DialogClose>
-        </DialogHeader>
-        <div className="min-h-0 flex-1 space-y-6 overflow-y-auto px-6 py-5 text-sm leading-relaxed text-muted-foreground">
+        <button
+          type="button"
+          role="tab"
+          aria-selected="true"
+          className="rounded-t-md border border-b-0 border-border bg-background px-4 py-2 text-sm font-medium text-foreground"
+        >
+          Welcome
+        </button>
+        <button
+          type="button"
+          role="tab"
+          aria-selected="false"
+          aria-label="Open integrations"
+          onClick={leaveToIntegrations}
+          className="mb-1 rounded-md px-3 py-1 text-base leading-none text-muted-foreground transition-colors hover:bg-background hover:text-foreground"
+        >
+          +
+        </button>
+      </div>
+      <div className="min-h-0 flex-1 overflow-y-auto">
+        <div className="mx-auto w-full max-w-[90rem] space-y-6 px-6 py-6 text-sm leading-relaxed text-muted-foreground">
+          <h1 className="text-xl font-semibold leading-snug tracking-tight text-foreground">{opening}</h1>
           <div className="space-y-3">
             <p>
               Your account is verified, your {tierLabel} subscription is active, and your workspace is ready.
@@ -282,7 +311,7 @@ export default function CheckoutWelcome({ preview = false, name = "" }) {
                   <Button type="button" onClick={pullFirstDataset} className="w-fit">
                     Pull my first dataset →
                   </Button>
-                  <Button type="button" variant="ghost" className="w-fit" onClick={() => setOpen(false)}>
+                  <Button type="button" variant="ghost" className="w-fit" onClick={leaveToIntegrations}>
                     Skip and explore on my own
                   </Button>
                 </div>
@@ -327,13 +356,13 @@ export default function CheckoutWelcome({ preview = false, name = "" }) {
             <p className="pt-3 font-medium">Kash</p>
             <p className="text-muted-foreground">Founder, Lychee</p>
             <div className="pt-4">
-              <Button type="button" onClick={() => setOpen(false)}>
+              <Button type="button" onClick={leaveToIntegrations}>
                 Head to your Workspace
               </Button>
             </div>
           </div>
         </div>
-      </DialogContent>
-    </Dialog>
+      </div>
+    </div>
   );
 }
