@@ -1,13 +1,14 @@
 "use client";
 
 import { useCallback } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import CheckoutAccountStep from "@/components/checkout/CheckoutAccountStep";
 import { rememberCheckoutWelcome } from "@/components/checkout/CheckoutWelcome";
 import { membershipTierLabel } from "@/lib/membershipLabel";
 
 export default function CheckoutReturnPage() {
   const router = useRouter();
+  const preview = useSearchParams().get("preview") === "1";
 
   const finish = useCallback(async ({ planKey, subscriptionTier } = {}) => {
     let key = planKey || "";
@@ -32,7 +33,7 @@ export default function CheckoutReturnPage() {
 
   return (
     <div className="flex min-h-screen w-screen">
-      <CheckoutAccountStep onComplete={finish} />
+      <CheckoutAccountStep onComplete={finish} preview={preview} />
     </div>
   );
 }

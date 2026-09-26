@@ -38,11 +38,11 @@ async function availableHandle(except) {
   return randomUserHandle();
 }
 
-export default function CheckoutAccountStep({ onComplete }) {
+export default function CheckoutAccountStep({ onComplete, preview = false }) {
   const { data: user, isLoading } = useSWR("/api/user", userSwrFetcher);
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
-  const [handle, setHandle] = useState(() => randomUserHandle());
+  const [handle, setHandle] = useState("");
   const [file, setFile] = useState(null);
   const [handleTaken, setHandleTaken] = useState(false);
   const [checkingHandle, setCheckingHandle] = useState(false);
@@ -69,7 +69,8 @@ export default function CheckoutAccountStep({ onComplete }) {
 
   useEffect(() => {
     let cancelled = false;
-    const seeded = handle;
+    const seeded = randomUserHandle();
+    setHandle((current) => (handleTouched.current ? current : seeded));
     (async () => {
       try {
         const res = await fetch(`/api/users/checkUserhandle?userHandle=${encodeURIComponent(seeded)}`);
@@ -84,18 +85,16 @@ export default function CheckoutAccountStep({ onComplete }) {
     return () => {
       cancelled = true;
     };
-    // Seed once. Later edits are the user's.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
-    if (isLoading || !user?.user_name || finished.current) return;
+    if (preview || isLoading || !user?.user_name || finished.current) return;
     finished.current = true;
     onComplete?.({
       planKey: "",
       subscriptionTier: user.subscriptionTier || "",
     });
-  }, [isLoading, onComplete, user]);
+  }, [isLoading, onComplete, preview, user]);
 
   const checkHandle = useCallback((value) => {
     const v = String(value || "").trim();
@@ -155,6 +154,7 @@ export default function CheckoutAccountStep({ onComplete }) {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    if (preview) return;
     setError("");
     if (checkingHandle || handleTaken || String(handle || "").trim().length < 3) {
       setError("Choose an available handle.");
@@ -219,7 +219,7 @@ export default function CheckoutAccountStep({ onComplete }) {
     }
   };
 
-  const signedIn = Boolean(user?.email);
+  const signedIn = !preview && Boolean(user?.email);
   const needsProfile = signedIn && !String(user?.user_name || "").trim();
 
   return (
@@ -245,7 +245,7 @@ export default function CheckoutAccountStep({ onComplete }) {
               Then pick the handle and avatar people will see on Lychee.
             </p>
           </div>
-          {isLoading || (signedIn && user?.user_name) || loading ? (
+          {!preview && (isLoading || (signedIn && user?.user_name) || loading) ? (
             <div className="space-y-3">
               <p className="text-center text-sm text-muted-foreground">
                 {loading ? "Finishing your account…" : isLoading ? "Loading…" : "Opening your dashboard…"}
@@ -283,6 +283,9 @@ export default function CheckoutAccountStep({ onComplete }) {
               )}
               <div className="space-y-2">
                 <Label htmlFor="checkout-handle">Handle</Label>
+                <p className="text-xs text-muted-foreground">
+                  This is the handle people will see if you choose to publish your research, charts or dashboards.
+                </p>
                 <div className="relative">
                   <Input
                     id="checkout-handle"
