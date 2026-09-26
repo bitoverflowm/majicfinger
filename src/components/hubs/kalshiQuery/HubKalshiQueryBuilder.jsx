@@ -60,6 +60,11 @@ import {
   KALSHI_WORKFLOW_ICONS,
 } from "@/lib/guidedWorkflows/kalshiHistorical";
 import { buildGuidedSnapshot } from "@/lib/guidedWorkflows/snapshot";
+import {
+  clearPendingKalshiHistoricalGuidedWorkflow,
+  KALSHI_GUIDED_START_EVENT,
+  readPendingKalshiHistoricalGuidedWorkflow,
+} from "@/lib/guidedWorkflows/pendingLaunch";
 import { KALSHI_GUIDED_TARGETS } from "@/lib/guidedWorkflows/targets";
 import { GUIDED_TARGET_ATTR } from "@/lib/guidedWorkflows/types";
 import { useMyStateV2 } from "@/context/stateContextV2";
@@ -730,6 +735,33 @@ function HubKalshiQueryBuilderInner({
     setError(null);
     setGuidedStartTick((t) => t + 1);
   }, []);
+
+  useEffect(() => {
+    if (!connectHome) return undefined;
+    let alive = true;
+    const startQueued = () => {
+      const id = readPendingKalshiHistoricalGuidedWorkflow();
+      if (!id) return;
+      clearPendingKalshiHistoricalGuidedWorkflow();
+      handleStartGuidedWorkflow(id);
+    };
+    const queuedNow = readPendingKalshiHistoricalGuidedWorkflow();
+    if (queuedNow) {
+      queueMicrotask(() => {
+        if (!alive) return;
+        startQueued();
+      });
+    }
+    const onStart = () => {
+      if (!alive) return;
+      startQueued();
+    };
+    window.addEventListener(KALSHI_GUIDED_START_EVENT, onStart);
+    return () => {
+      alive = false;
+      window.removeEventListener(KALSHI_GUIDED_START_EVENT, onStart);
+    };
+  }, [connectHome, handleStartGuidedWorkflow]);
 
   const cancelToStartingView = useCallback(() => {
     guidedInlinePullWorkflowIdRef.current = null;

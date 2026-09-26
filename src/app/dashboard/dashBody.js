@@ -544,7 +544,7 @@ const DashBody = ({ user }) => {
           {content}
         </div>
         {paywallOverlay}
-        <CheckoutWelcome />
+        <CheckoutWelcome name={user?.name} />
       </div>
     );
 }
