@@ -17,6 +17,7 @@ import { KALSHI_GUIDED_WEATHER_WORKFLOW_ID } from "@/lib/guidedWorkflows/kalshiH
 import { requestKalshiHistoricalGuidedWorkflow } from "@/lib/guidedWorkflows/pendingLaunch";
 
 export const CHECKOUT_WELCOME_KEY = "lycheeCheckoutWelcome";
+const CHECKOUT_CELEBRATE_KEY = "lycheeCheckoutCelebrate";
 const WORKSPACE_WELCOME_SEEN_KEY = "lycheeWorkspaceWelcomeSeen";
 
 const CONFETTI_COLORS = ["#e11d48", "#fb7185", "#fda4af", "#fbbf24", "#fde68a", "#ffffff"];
@@ -82,14 +83,23 @@ export function rememberCheckoutWelcome(tier) {
       CHECKOUT_WELCOME_KEY,
       JSON.stringify({ tier: String(tier || "").trim() }),
     );
+    sessionStorage.setItem(CHECKOUT_CELEBRATE_KEY, "1");
   } catch {
     // Private mode can block storage. The dashboard still loads.
   }
 }
 
+/** Dev Strict Mode mounts twice; keep the consumed checkout payload for the second read. */
+let stagedCheckoutWelcome;
+
 /** Read the one-time post-checkout welcome, if this visit should open on it. */
 export function takeCheckoutWelcome() {
   if (typeof window === "undefined") return null;
+  if (stagedCheckoutWelcome !== undefined) {
+    const staged = stagedCheckoutWelcome;
+    stagedCheckoutWelcome = undefined;
+    return staged;
+  }
   const params = new URLSearchParams(window.location.search);
   const fromQuery = params.get("welcome") === "1";
   let hadStored = false;
@@ -98,6 +108,7 @@ export function takeCheckoutWelcome() {
     const raw = sessionStorage.getItem(CHECKOUT_WELCOME_KEY) || "";
     if (raw) {
       hadStored = true;
+      sessionStorage.setItem(CHECKOUT_CELEBRATE_KEY, "1");
       sessionStorage.removeItem(CHECKOUT_WELCOME_KEY);
       const parsed = JSON.parse(raw);
       storedTier = String(parsed?.tier || "").trim();
@@ -105,13 +116,19 @@ export function takeCheckoutWelcome() {
   } catch {
     hadStored = false;
   }
+  let result = null;
   if (fromQuery) {
     const rawTier = String(params.get("tier") || storedTier || "Pro").trim();
     const tier = rawTier ? rawTier.charAt(0).toUpperCase() + rawTier.slice(1) : "Pro";
-    return { tier };
+    result = { tier, celebrate: hadStored };
+  } else if (hadStored) {
+    result = { tier: storedTier, celebrate: true };
   }
-  if (!hadStored) return null;
-  return { tier: storedTier };
+  stagedCheckoutWelcome = result;
+  queueMicrotask(() => {
+    if (stagedCheckoutWelcome === result) stagedCheckoutWelcome = undefined;
+  });
+  return result;
 }
 
 /** True until this browser has left the welcome page once. */
@@ -140,6 +157,8 @@ function clearWelcomeSearch() {
   const search = url.searchParams.toString();
   window.history.replaceState(null, "", url.pathname + (search ? `?${search}` : "") + url.hash);
 }
+
+let welcomeConfettiPlayed = false;
 
 function burstConfetti() {
   const base = { colors: CONFETTI_COLORS, startVelocity: 42, gravity: 0.9, ticks: 220, scalar: 1 };
@@ -213,13 +232,61 @@ function PosterRow({ title, description, items }) {
   );
 }
 
-export default function CheckoutWelcome({ name = "", tier = "" }) {
+export function WorkspaceStartTabs({ welcomeActive, onOpenWelcome, onOpenIntegrations }) {
+  return (
+    <div
+      role="tablist"
+      aria-label="Workspace"
+      className="flex shrink-0 items-center gap-1.5 px-2 py-1.5"
+    >
+      <button
+        type="button"
+        role="tab"
+        aria-selected={welcomeActive}
+        onClick={onOpenWelcome}
+        className={
+          welcomeActive
+            ? "inline-flex h-7 items-center rounded-md border border-border bg-card px-2.5 text-xs font-medium text-foreground shadow-sm"
+            : "inline-flex h-7 items-center rounded-md border border-border bg-background px-2.5 text-xs font-medium text-muted-foreground shadow-sm transition-colors hover:bg-muted hover:text-foreground"
+        }
+      >
+        Welcome
+      </button>
+      <button
+        type="button"
+        role="tab"
+        aria-selected={false}
+        aria-label="Open integrations"
+        onClick={onOpenIntegrations}
+        className="inline-flex h-7 w-7 items-center justify-center rounded-md border border-border bg-background text-sm leading-none text-muted-foreground shadow-sm transition-colors hover:bg-muted hover:text-foreground"
+      >
+        +
+      </button>
+    </div>
+  );
+}
+
+export default function CheckoutWelcome({ name = "", tier = "", celebrate = false }) {
   const context = useMyStateV2();
   const sessionUser = useUser();
 
   useEffect(() => {
+    if (welcomeConfettiPlayed) return;
+    let celebrateNow = celebrate;
+    try {
+      if (sessionStorage.getItem(CHECKOUT_CELEBRATE_KEY) === "1") celebrateNow = true;
+    } catch {
+      celebrateNow = celebrate;
+    }
+    if (!celebrateNow) return;
+    welcomeConfettiPlayed = true;
+    try {
+      sessionStorage.removeItem(CHECKOUT_CELEBRATE_KEY);
+    } catch {
+      // The in-memory flag still blocks a second burst this visit.
+    }
     burstConfetti();
-  }, []);
+  }, [celebrate]);
 
   const displayName = String(name || sessionUser?.name || "").trim();
   const tierLabel = String(tier || "").trim() || "Lychee";
@@ -244,31 +311,6 @@ export default function CheckoutWelcome({ name = "", tier = "" }) {
   };
 
   return (
-    <div className="flex h-[calc(100svh-2rem)] min-h-0 -my-1 flex-col bg-background">
-      <div
-        role="tablist"
-        aria-label="Workspace"
-        className="flex shrink-0 items-center gap-1.5 px-2 py-1.5"
-      >
-        <button
-          type="button"
-          role="tab"
-          aria-selected="true"
-          className="inline-flex h-7 items-center rounded-md border border-border bg-card px-2.5 text-xs font-medium text-foreground shadow-sm"
-        >
-          Welcome
-        </button>
-        <button
-          type="button"
-          role="tab"
-          aria-selected="false"
-          aria-label="Open integrations"
-          onClick={leaveToIntegrations}
-          className="inline-flex h-7 w-7 items-center justify-center rounded-md border border-border bg-background text-sm leading-none text-muted-foreground shadow-sm transition-colors hover:bg-muted hover:text-foreground"
-        >
-          +
-        </button>
-      </div>
       <div className="min-h-0 flex-1 overflow-y-auto">
         <div className="mx-auto w-full max-w-[90rem] space-y-6 px-6 py-6 text-sm leading-relaxed text-muted-foreground">
           <h1 className="text-xl font-semibold leading-snug tracking-tight text-foreground">{opening}</h1>
@@ -363,6 +405,5 @@ export default function CheckoutWelcome({ name = "", tier = "" }) {
           </div>
         </div>
       </div>
-    </div>
   );
 }

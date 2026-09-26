@@ -1851,20 +1851,8 @@ const Nav = () => {
                   </TooltipProvider>
                   <Sheet open={isOpen} onOpenChange={setIsOpen}>
                     <SheetTrigger asChild>
-                      <Button variant="ghost" size="sm" className="h-6 gap-1 px-3 text-[9px] font-medium leading-none">
+                      <Button variant="ghost" size="sm" className="h-6 px-3 text-[9px] font-medium leading-none">
                         Projects
-                        {savedWorkCountLoading ? (
-                          <span
-                            className="ml-0.5 inline-flex h-4 w-4 shrink-0 items-center justify-center"
-                            aria-label="Loading saved work"
-                          >
-                            <Loader2 className="h-3 w-3 animate-spin text-muted-foreground" />
-                          </span>
-                        ) : (
-                          <Badge variant="secondary" className="ml-0.5 h-4 min-h-4 px-1 py-0 text-[9px] leading-none">
-                            {projectRows.length}
-                          </Badge>
-                        )}
                       </Button>
                     </SheetTrigger>
                         <SheetContent side={'left'} className="flex w-[1000px]! flex-col bg-white sm:max-w-4xl dark:bg-black">
@@ -2237,7 +2225,7 @@ const Nav = () => {
                       <DropdownMenuItem onClick={()=>handleLogout()}>Logout</DropdownMenuItem>
                   </DropdownMenuContent>
               </DropdownMenu>
-                <AnimatedThemeToggler className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-md border-0 bg-transparent hover:bg-accent hover:text-accent-foreground" />
+                <AnimatedThemeToggler className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-md border-0 bg-transparent hover:bg-accent hover:text-accent-foreground [&_svg]:size-3.5" />
               </div>
             ) : (
               <div className="flex w-full items-center justify-end gap-2 sm:w-auto sm:ml-auto">
@@ -2247,7 +2235,7 @@ const Nav = () => {
                   </span>
                 )}
                 <Button variant="default" size="sm" onClick={() => router.push('/login')}>Log In</Button>
-                <AnimatedThemeToggler className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-md border-0 bg-transparent hover:bg-accent hover:text-accent-foreground" />
+                <AnimatedThemeToggler className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-md border-0 bg-transparent hover:bg-accent hover:text-accent-foreground [&_svg]:size-3.5" />
               </div>
             )}
     </div>

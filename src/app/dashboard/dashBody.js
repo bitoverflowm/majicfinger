@@ -21,7 +21,7 @@ import { PricingSection } from "@/components/sections/pricing-section";
 import EasyLychee from "@/components/easyLychee";
 import { Separator } from "@/components/ui/separator";
 import { ProfilePictureUploader } from "@/components/profile/ProfilePictureUploader";
-import CheckoutWelcome, { takeCheckoutWelcome, workspaceWelcomePending } from "@/components/checkout/CheckoutWelcome";
+import CheckoutWelcome, { takeCheckoutWelcome, workspaceWelcomePending, WorkspaceStartTabs } from "@/components/checkout/CheckoutWelcome";
 import { membershipTierLabel } from "@/lib/membershipLabel";
 
 import { cn } from "@/lib/utils";
@@ -85,6 +85,7 @@ const DashBody = ({ user }) => {
     const [userProfileFetchOk, setUserProfileFetchOk] = useState(false);
     const [entryReady, setEntryReady] = useState(false);
     const [welcomeTier, setWelcomeTier] = useState("");
+    const [celebrateCheckout, setCelebrateCheckout] = useState(false);
     const welcomedRef = useRef(false);
     const hasDbBackedUserId =
       typeof user?.userId === "string" &&
@@ -153,6 +154,7 @@ const DashBody = ({ user }) => {
         welcomedRef.current = true;
         const welcome = takeCheckoutWelcome();
         if (welcome?.tier) setWelcomeTier(welcome.tier);
+        if (welcome?.celebrate) setCelebrateCheckout(true);
         if (!isDemo && (workspaceWelcomePending() || welcome)) {
             setViewing?.("welcome");
         }
@@ -394,28 +396,37 @@ const DashBody = ({ user }) => {
         )}
         {rightPanelOpen && <Separator className="shrink-0" />}
         <div className="relative z-0 flex min-h-0 min-w-0 flex-1 flex-col py-1">
-                {entryReady && viewing === "welcome" && (
-                  <CheckoutWelcome
-                    name={user?.name}
-                    tier={
-                      welcomeTier ||
-                      membershipTierLabel({
-                        subscriptionTier:
-                          isLifeTimeMember || user?.lifetimeMember
-                            ? "lifetime"
-                            : subscriptionTier || user?.subscriptionTier,
-                      })
-                    }
-                  />
-                )}
-                {entryReady && viewing === 'connectDataHome' && (
-                  <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
-                    <ConnectHomeShell
-                      user={user}
-                      userProfileFetchOk={userProfileFetchOk}
-                      startNew={startNew}
-                      setStartNew={setStartNew}
+                {entryReady && (viewing === "welcome" || viewing === "connectDataHome") && (
+                  <div className="flex h-[calc(100svh-2rem)] min-h-0 -my-1 flex-col bg-background">
+                    <WorkspaceStartTabs
+                      welcomeActive={viewing === "welcome"}
+                      onOpenWelcome={() => setViewing?.("welcome")}
+                      onOpenIntegrations={() => setViewing?.("connectDataHome")}
                     />
+                    {viewing === "welcome" ? (
+                      <CheckoutWelcome
+                        name={user?.name}
+                        celebrate={celebrateCheckout}
+                        tier={
+                          welcomeTier ||
+                          membershipTierLabel({
+                            subscriptionTier:
+                              isLifeTimeMember || user?.lifetimeMember
+                                ? "lifetime"
+                                : subscriptionTier || user?.subscriptionTier,
+                          })
+                        }
+                      />
+                    ) : (
+                      <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
+                        <ConnectHomeShell
+                          user={user}
+                          userProfileFetchOk={userProfileFetchOk}
+                          startNew={startNew}
+                          setStartNew={setStartNew}
+                        />
+                      </div>
+                    )}
                   </div>
                 )}
                 { !isDemo && (viewing === 'dataStart' || viewing === 'charts' || viewing === 'dashboardComposer') && (

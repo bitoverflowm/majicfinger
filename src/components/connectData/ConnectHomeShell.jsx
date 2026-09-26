@@ -15,8 +15,6 @@ import { connectHomeAnySheetHasData, isConnectUserDataPullActive } from "@/lib/c
 import {
   connectDemoWorkspaceSectionClass,
   connectHubDemoLayoutClass,
-  connectHubFlowStepsViewportCollapsedClass,
-  connectHubFlowStepsViewportFixedClass,
   connectHubHubSnapClass,
   connectHubLayoutClass,
   connectHubPageClass,
@@ -46,7 +44,7 @@ import { ConnectHomeFlowSteps } from "@/components/connectData/ConnectHomeFlowSt
 import { ConnectHomeKalshiGuidedHost } from "@/components/connectData/ConnectHomeKalshiGuidedHost";
 
 /** Match Connect hub + nav header white; override AG Grid Balham grey canvas. */
-const CONNECT_HOME_SURFACE = "bg-white dark:bg-slate-950";
+const CONNECT_HOME_SURFACE = "bg-white dark:bg-background";
 const CONNECT_HOME_GRID_SURFACE =
   "[&_.ag-theme-balham]:bg-white [&_.ag-theme-balham]:[--ag-background-color:#ffffff] [&_.ag-theme-balham]:[--ag-odd-row-background-color:#ffffff] [&_.ag-theme-balham]:[--ag-header-background-color:#ffffff] [&_.ag-theme-balham]:[--ag-subheader-background-color:#ffffff]";
 
@@ -71,8 +69,6 @@ export default function ConnectHomeShell({ user, userProfileFetchOk, startNew, s
   const setRightPanelOpen = context?.setRightPanelOpen;
   const setRightPanelTab = context?.setRightPanelTab;
   const setConnectHomeLeftNavOpen = context?.setConnectHomeLeftNavOpen;
-  const connectHomeFlowStepsOpen = context?.connectHomeFlowStepsOpen !== false;
-  const setConnectHomeFlowStepsOpen = context?.setConnectHomeFlowStepsOpen;
 
   const scrollRef = useRef(null);
   const shellMainRef = useRef(null);
@@ -432,7 +428,7 @@ export default function ConnectHomeShell({ user, userProfileFetchOk, startNew, s
   return (
     <main
       ref={shellMainRef}
-      className="relative flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-white dark:bg-slate-950"
+      className="relative flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-white dark:bg-background"
     >
       <ConnectHomeKalshiGuidedHost />
       {useFixedViewport ? (
@@ -466,24 +462,6 @@ export default function ConnectHomeShell({ user, userProfileFetchOk, startNew, s
         )}
       >
         <div className={connectHubPageClass(true, { embeddedDemo: isDemo })}>
-          {!isDemo ? (
-            <ConnectHomeFlowSteps
-              currentStep={connectFlowStep}
-              collapsible
-              fixedRail
-              expanded={connectHomeFlowStepsOpen}
-              onExpandedChange={setConnectHomeFlowStepsOpen}
-              showGoToWorkspace={hasSheetData}
-              onGoToWorkspace={handleGoToWorkspace}
-              className={cn(
-                connectHubFlowStepsViewportFixedClass,
-                !connectHomeFlowStepsOpen &&
-                  cn(connectHubFlowStepsViewportCollapsedClass, "!w-0 !min-w-0"),
-                panelsVisible && connectHomeAnalyzeActive && "hidden",
-              )}
-            />
-          ) : null}
-
           <div
             className={
               isDemo
@@ -491,7 +469,7 @@ export default function ConnectHomeShell({ user, userProfileFetchOk, startNew, s
                 : connectHubLayoutClass({
                     fixedRail: true,
                     withAppSidebar: false,
-                    flowStepsExpanded: connectHomeFlowStepsOpen,
+                    flowStepsExpanded: false,
                   })
             }
           >

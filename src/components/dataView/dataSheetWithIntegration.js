@@ -1544,7 +1544,7 @@ export default function DataSheetWithIntegration({
       // In demo embeds, treat this component as the "viewport" for the right panel.
       // The parent container should clip overflow; we still set relative here so `absolute` works.
       isDemo && "relative",
-      connectHomeMode && "bg-white dark:bg-slate-950",
+      connectHomeMode && "bg-white dark:bg-background",
       connectHomeMode && connectHomeGridSurface,
       connectHomeAnalyzeDashboard &&
         !showConnectIntegrationIntro &&
@@ -1643,7 +1643,7 @@ export default function DataSheetWithIntegration({
                 ? "flex min-h-0 flex-col overflow-hidden"
                 : "overflow-auto"),
             effectiveDashboardMode && "scroll-pb-40",
-            connectHomeMode && "bg-white dark:bg-slate-950",
+            connectHomeMode && "bg-white dark:bg-background",
           )}
         >
           {connectHomeSheetLayoutLive && !connectHomeAnalyzeLocked ? (

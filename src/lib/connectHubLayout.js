@@ -12,7 +12,7 @@ export function connectHubPageClass(embeddedInShell = false, { embeddedDemo = fa
     "mx-auto w-full max-w-7xl pb-20 sm:pb-24",
     embeddedInShell ? "pt-2 sm:pt-3 md:pt-4" : "pt-12 sm:pt-16 md:pt-20",
     embeddedInShell
-      ? "pl-4 pr-6 sm:pl-5 sm:pr-8 md:pl-6 md:pr-12 lg:pl-8 lg:pr-16 xl:pl-10 xl:pr-20 2xl:pl-12 2xl:pr-28"
+      ? "px-4 sm:px-6 md:px-8 lg:px-10 xl:px-12"
       : "px-6 sm:px-10 md:px-16 lg:px-24 xl:px-32 2xl:px-40",
   );
 }
@@ -102,7 +102,7 @@ export const connectHubHubSnapClass = "snap-start snap-always";
 
 /** Fixed Step 2 shell — fills Connect home / demo card without document scroll. */
 export const connectHubAnalyzeViewportClass =
-  "relative flex min-h-0 flex-1 flex-col overflow-hidden bg-white dark:bg-slate-950";
+  "relative flex min-h-0 flex-1 flex-col overflow-hidden bg-white dark:bg-background";
 
 /**
  * Kalshi / lake compose scroller (fixed viewport).
@@ -177,7 +177,7 @@ const connectHubFlowStepsStickyCore = cn(
   "hidden md:block",
   "sticky z-30 w-[8.5rem] self-start lg:w-[10rem] xl:w-[11rem]",
   connectHubFlowStepsTopClass,
-  "bg-white dark:bg-slate-950",
+  "bg-white dark:bg-background",
 );
 
 /** Sticky step rail — in-flow on analyze layout; scrolls away with workspace block. */
@@ -188,7 +188,7 @@ export const connectHubFlowStepsViewportFixedClass = cn(
   "hidden md:block",
   "fixed z-30",
   connectHubFlowStepsTopClass,
-  "bg-white dark:bg-slate-950",
+  "bg-white dark:bg-background",
   "left-[max(1rem,calc((100vw-min(100vw,80rem))/2+1rem))] sm:left-[max(1.25rem,calc((100vw-min(100vw,80rem))/2+1.25rem))] md:left-[max(1.5rem,calc((100vw-min(100vw,80rem))/2+1.5rem))] lg:left-[max(2rem,calc((100vw-min(100vw,80rem))/2+2rem))] xl:left-[max(2.5rem,calc((100vw-min(100vw,80rem))/2+2.5rem))] 2xl:left-[max(3rem,calc((100vw-min(100vw,80rem))/2+3rem))]",
 );
 
