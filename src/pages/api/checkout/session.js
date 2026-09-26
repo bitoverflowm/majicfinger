@@ -11,6 +11,36 @@ import {
 import { attemptCookieHeader } from "@/lib/stripe/checkoutCookies";
 import { notifyCheckoutAlert } from "@/lib/telegram/checkoutAlert";
 
+function brandingForTheme(theme) {
+  if (theme === "dark") {
+    return {
+      background_color: "#1c1c1e",
+      button_color: "#f4f4f5",
+      border_style: "rounded",
+      font_family: "inter",
+    };
+  }
+  return {
+    background_color: "#ffffff",
+    button_color: "#171717",
+    border_style: "rounded",
+    font_family: "inter",
+  };
+}
+
+async function createThemedCheckoutSession(stripe, params, theme) {
+  try {
+    return await stripe.checkout.sessions.create({
+      ...params,
+      branding_settings: brandingForTheme(theme),
+    });
+  } catch (err) {
+    const msg = `${err?.message || ""} ${err?.param || ""}`.toLowerCase();
+    if (!msg.includes("branding")) throw err;
+    return stripe.checkout.sessions.create(params);
+  }
+}
+
 export default async function handler(req, res) {
   if (req.method !== "POST") return res.status(405).end();
 
@@ -48,7 +78,8 @@ export default async function handler(req, res) {
     const referral = cleanReferral(req.body?.referral);
     const origin = requestOrigin(req);
     const stripe = getStripe();
-    const session = await stripe.checkout.sessions.create({
+    const theme = req.body?.theme === "dark" ? "dark" : "light";
+    const sessionParams = {
       ui_mode: "embedded",
       mode: plan.mode,
       line_items: [{ price: resolved.priceId, quantity: 1 }],
@@ -62,7 +93,8 @@ export default async function handler(req, res) {
       },
       ...(plan.mode === "payment" ? { customer_creation: "always" } : {}),
       ...resolved.extras,
-    });
+    };
+    const session = await createThemedCheckoutSession(stripe, sessionParams, theme);
 
     if (!session?.client_secret) {
       throw new Error("Stripe did not return a client secret");

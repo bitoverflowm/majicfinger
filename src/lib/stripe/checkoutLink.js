@@ -255,7 +255,11 @@ export async function attachCheckoutToEmail(req, loginEmail) {
     await grantEmbeddedCheckoutSession(session);
     const user = await reconcileCheckoutIdentity(attemptId, login);
     const fresh = await CheckoutAttempt.findOne({ attemptId });
-    return { user, clearCookie: fresh?.status === "linked" };
+    return {
+      user,
+      clearCookie: fresh?.status === "linked",
+      planKey: fresh?.planKey || attempt.planKey || null,
+    };
   } catch (err) {
     await notifyCheckoutAlert({
       title: "Could not attach checkout to Magic Link login",

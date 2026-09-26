@@ -21,6 +21,7 @@ import { PricingSection } from "@/components/sections/pricing-section";
 import EasyLychee from "@/components/easyLychee";
 import { Separator } from "@/components/ui/separator";
 import { ProfilePictureUploader } from "@/components/profile/ProfilePictureUploader";
+import CheckoutWelcome from "@/components/checkout/CheckoutWelcome";
 
 import { cn } from "@/lib/utils";
 
@@ -74,6 +75,8 @@ const DashBody = ({ user }) => {
     const [usernameExists, setUsernameExists] = useState(false);
     const [isCheckingHandle, setIsCheckingHandle] = useState(false);
     const [subscriptionTier, setSubscriptionTier] = useState(null);
+    const [accountEmail, setAccountEmail] = useState("");
+    const [billingEmail, setBillingEmail] = useState("");
     const [billingCycle, setBillingCycle] = useState(null);
     const [subscriptionStatus, setSubscriptionStatus] = useState(null);
     const [subscribedAt, setSubscribedAt] = useState(null);
@@ -264,6 +267,8 @@ const DashBody = ({ user }) => {
                 if (data.success) {
                     setUserHandle(data.data.user_name);
                     setProfilePic?.(data.data.profile_pic);
+                    setAccountEmail(data.data.email || "");
+                    setBillingEmail(data.data.billing_email || data.data.email || "");
                     setIsLifeTimeMember(data.data.lifetimeMember);
                     setSubscriptionTier(data.data.subscriptionTier || null);
                     setBillingCycle(data.data.billingCycle || null);
@@ -479,9 +484,25 @@ const DashBody = ({ user }) => {
                           Subscribed on: {subscribedAt ? new Date(subscribedAt).toLocaleDateString() : "N/A"}
                         </div>
                     </div>
+                    <div className="mb-6 max-w-xl space-y-4 rounded-lg border border-border bg-background p-4 text-sm text-foreground">
+                        <div>
+                            <div className="text-muted-foreground">Login email</div>
+                            <div className="mt-1 font-medium">{accountEmail || user?.email || "—"}</div>
+                        </div>
+                        <div className="flex flex-wrap items-center justify-between gap-3">
+                            <div>
+                                <div className="text-muted-foreground">Your billing email</div>
+                                <div className="mt-1 font-medium">{billingEmail || accountEmail || user?.email || "—"}</div>
+                            </div>
+                            <a
+                                className="inline-flex h-9 shrink-0 items-center rounded-md bg-primary px-3 text-sm font-medium text-primary-foreground"
+                                href="https://billing.stripe.com/p/login/14k6sm3PU1cTd44fYY"
+                            >
+                                Change subscription
+                            </a>
+                        </div>
+                    </div>
                     <div>Hi, I am working on making this page more useful</div>
-                    <div>For now I have enabled managed billing using Stripe click here: </div>
-                    <Link className="bg-black text-white hover:cursor-pointer" href="https://billing.stripe.com/p/login/14k6sm3PU1cTd44fYY">Customer Portal</Link>
                 </div>}
         </div>
       </>
@@ -523,6 +544,7 @@ const DashBody = ({ user }) => {
           {content}
         </div>
         {paywallOverlay}
+        <CheckoutWelcome />
       </div>
     );
 }

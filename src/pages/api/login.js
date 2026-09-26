@@ -101,7 +101,7 @@ export default async (req, res) => {
       }
       await setLoginSession(res, session)
       if (linked?.clearCookie) appendSetCookie(res, clearAttemptCookieHeader())
-      return res.status(200).send({ done: true, user })
+      return res.status(200).send({ done: true, user, planKey: linked?.planKey || null })
     }
 
     const didToken = req.headers.authorization?.slice(7)
@@ -131,13 +131,13 @@ export default async (req, res) => {
       const newSession = { ...metadata, userId: String(user._id), name: user.name, email: user.email }
       await setLoginSession(res, newSession)
       if (linked?.clearCookie) appendSetCookie(res, clearAttemptCookieHeader())
-      return res.status(200).send({ done: true, newUser: user })
+      return res.status(200).send({ done: true, newUser: user, planKey: linked?.planKey || null })
     }
 
     const session = { ...metadata, userId: String(user._id), name: user.name, email: user.email }
     await setLoginSession(res, session)
     if (linked?.clearCookie) appendSetCookie(res, clearAttemptCookieHeader())
-    return res.status(200).send({ done: true, session, user })
+    return res.status(200).send({ done: true, session, user, planKey: linked?.planKey || null })
   } catch (error) {
     console.error(error)
     // Dev-only: if login failed (e.g. DB unreachable due to VPN), log in anyway so you can test Polymarket with VPN on

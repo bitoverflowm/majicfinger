@@ -10,7 +10,11 @@ export default async function handler(req, res) {
     if (!session?.email) return res.status(401).json({ ok: false });
     const linked = await attachCheckoutToEmail(req, session.email);
     if (linked?.clearCookie) appendSetCookie(res, clearAttemptCookieHeader());
-    return res.status(200).json({ ok: true, linked: !!linked?.user });
+    return res.status(200).json({
+      ok: true,
+      linked: !!linked?.user,
+      planKey: linked?.planKey || null,
+    });
   } catch (err) {
     console.error("[checkout] claim failed:", err?.message || err);
     return res.status(401).json({ ok: false });

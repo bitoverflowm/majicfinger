@@ -64,6 +64,7 @@ export default async function user(req, res) {
       if (dbUser.subscriptionStatus != null) payload.subscriptionStatus = dbUser.subscriptionStatus;
       if (dbUser.subscribedAt != null) payload.subscribedAt = dbUser.subscribedAt;
       if (dbUser.user_name != null) payload.user_name = dbUser.user_name;
+      payload.billing_email = dbUser.billing_email || dbUser.email || payload.email || "";
       if (dbUser.run_yourself_used_at != null) {
         payload.run_yourself_used_at = dbUser.run_yourself_used_at;
       }

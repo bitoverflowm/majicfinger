@@ -47,6 +47,51 @@ async function fileToSquareAvatarBlob(file, { size = 256, type = "image/webp", q
   }
 }
 
+export async function uploadProfilePictureFile(file) {
+  const blob = await fileToSquareAvatarBlob(file, { size: 256, type: "image/webp", quality: 0.9 });
+
+  const presignRes = await fetch("/api/users/profile-picture/presign", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    credentials: "include",
+    body: JSON.stringify({
+      contentType: blob.type,
+      contentLength: blob.size,
+    }),
+  });
+  const presignJson = await presignRes.json().catch(() => null);
+  if (!presignRes.ok || !presignJson?.success) {
+    throw new Error(presignJson?.message || "Failed to start upload");
+  }
+
+  const { uploadUrl, key, publicUrl, contentType } = presignJson.data || {};
+  if (!uploadUrl || !key || !publicUrl) throw new Error("Upload init missing fields");
+
+  const putRes = await fetch(uploadUrl, {
+    method: "PUT",
+    headers: {
+      "Content-Type": contentType || blob.type,
+    },
+    body: blob,
+  });
+  if (!putRes.ok) {
+    throw new Error("Upload failed");
+  }
+
+  const commitRes = await fetch("/api/users/profile-picture/commit", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    credentials: "include",
+    body: JSON.stringify({ key, publicUrl }),
+  });
+  const commitJson = await commitRes.json().catch(() => null);
+  if (!commitRes.ok || !commitJson?.success) {
+    throw new Error(commitJson?.message || "Failed to save profile picture");
+  }
+
+  return commitJson?.data?.profile_pic || publicUrl;
+}
+
 export function ProfilePictureUploader({
   userId,
   handle,
@@ -97,50 +142,10 @@ export function ProfilePictureUploader({
     }
     setBusy(true);
     try {
-      const blob = await fileToSquareAvatarBlob(file, { size: 256, type: "image/webp", quality: 0.9 });
-
-      const presignRes = await fetch("/api/users/profile-picture/presign", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify({
-          contentType: blob.type,
-          contentLength: blob.size,
-        }),
-      });
-      const presignJson = await presignRes.json().catch(() => null);
-      if (!presignRes.ok || !presignJson?.success) {
-        throw new Error(presignJson?.message || "Failed to start upload");
-      }
-
-      const { uploadUrl, key, publicUrl, contentType } = presignJson.data || {};
-      if (!uploadUrl || !key || !publicUrl) throw new Error("Upload init missing fields");
-
-      const putRes = await fetch(uploadUrl, {
-        method: "PUT",
-        headers: {
-          "Content-Type": contentType || blob.type,
-        },
-        body: blob,
-      });
-      if (!putRes.ok) {
-        throw new Error("Upload failed");
-      }
-
-      const commitRes = await fetch("/api/users/profile-picture/commit", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify({ key, publicUrl }),
-      });
-      const commitJson = await commitRes.json().catch(() => null);
-      if (!commitRes.ok || !commitJson?.success) {
-        throw new Error(commitJson?.message || "Failed to save profile picture");
-      }
-
+      const savedUrl = await uploadProfilePictureFile(file);
       toast.success("Profile picture updated");
       setFile(null);
-      if (typeof onUpdated === "function") onUpdated(commitJson?.data?.profile_pic || publicUrl);
+      if (typeof onUpdated === "function") onUpdated(savedUrl);
     } catch (e) {
       toast.error(e?.message || "Profile picture upload failed");
     } finally {
