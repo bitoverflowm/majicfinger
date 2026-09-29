@@ -1,7 +1,15 @@
 "use client";
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
-import { BarChart3, Database, Table2 } from "lucide-react";
+import { BarChart3, Copy, Database, MoreVertical, Pencil, Table2 } from "lucide-react";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { DestructiveConfirmMenuItem } from "@/components/ui/destructive-confirm-menu-item";
+import { duplicateTabName } from "@/lib/workspaceStartTabs";
 import { cn } from "@/lib/utils";
 
 const WorkspaceCanvasContext = createContext(null);
@@ -32,6 +40,7 @@ export function WorkspaceCanvasProvider({ pageId, children }) {
   const [tool, setTool] = useState("select");
   const [blocksByPage, setBlocksByPage] = useState({});
   const [selectedId, setSelectedId] = useState(null);
+  const [renameId, setRenameId] = useState(null);
   const blocks = blocksByPage[pageId] || [];
 
   const updateBlock = useCallback(
@@ -73,6 +82,43 @@ export function WorkspaceCanvasProvider({ pageId, children }) {
     [pageId],
   );
 
+  const duplicateBlock = useCallback(
+    (id) => {
+      const source = blocks.find((block) => block.id === id);
+      if (!source) return;
+      const nextId = newId();
+      const label = source.type === "text" ? source.body : source.title;
+      const names = blocks.map((block) => (block.type === "text" ? block.body : block.title));
+      const nextLabel = duplicateTabName(label, names);
+      setBlocksByPage((prev) => {
+        const list = prev[pageId] || [];
+        const current = list.find((block) => block.id === id) || source;
+        const copy = {
+          ...current,
+          id: nextId,
+          x: current.x + 24,
+          y: current.y + 24,
+          title: current.type === "text" ? current.title : nextLabel,
+          body: current.type === "text" ? nextLabel : current.body,
+        };
+        return { ...prev, [pageId]: [...list, copy] };
+      });
+      setSelectedId(nextId);
+    },
+    [blocks, pageId],
+  );
+
+  const removeBlock = useCallback(
+    (id) => {
+      setBlocksByPage((prev) => ({
+        ...prev,
+        [pageId]: (prev[pageId] || []).filter((block) => block.id !== id),
+      }));
+      setSelectedId((current) => (current === id ? null : current));
+    },
+    [pageId],
+  );
+
   useEffect(() => {
     setSelectedId(null);
   }, [pageId]);
@@ -84,10 +130,14 @@ export function WorkspaceCanvasProvider({ pageId, children }) {
       blocks,
       selectedId,
       setSelectedId,
+      renameId,
+      setRenameId,
       addBlock,
       updateBlock,
+      duplicateBlock,
+      removeBlock,
     }),
-    [addBlock, blocks, selectedId, tool, updateBlock],
+    [addBlock, blocks, duplicateBlock, removeBlock, renameId, selectedId, tool, updateBlock],
   );
 
   return <WorkspaceCanvasContext.Provider value={value}>{children}</WorkspaceCanvasContext.Provider>;
@@ -185,12 +235,33 @@ function BlockBody({ block, onChange }) {
   );
 }
 
+function blockLabel(block) {
+  return block.type === "text" ? block.body || "Text" : block.title || "Element";
+}
+
 function CanvasBlock({ block, selected, onSelect, onChange }) {
+  const canvas = useWorkspaceCanvas();
   const dragRef = useRef(null);
+  const rootRef = useRef(null);
+  const [menuOpen, setMenuOpen] = useState(false);
+
+  useEffect(() => {
+    if (canvas?.renameId !== block.id) return;
+    const el = rootRef.current?.querySelector("[data-editable]");
+    if (el instanceof HTMLElement) {
+      el.focus();
+      const range = document.createRange();
+      range.selectNodeContents(el);
+      const selection = window.getSelection();
+      selection?.removeAllRanges();
+      selection?.addRange(range);
+    }
+    canvas?.setRenameId?.(null);
+  }, [block.id, canvas?.renameId, canvas?.setRenameId]);
 
   const onPointerDown = (e) => {
     if (e.button !== 0) return;
-    if (e.target.closest("[data-resize]")) return;
+    if (e.target.closest("[data-resize],[data-block-menu]")) return;
     e.currentTarget.setPointerCapture(e.pointerId);
     dragRef.current = {
       mode: "move",
@@ -249,19 +320,60 @@ function CanvasBlock({ block, selected, onSelect, onChange }) {
 
   return (
     <div
+      ref={rootRef}
       role="group"
       aria-label={block.title || block.body || block.type}
       onPointerDown={onPointerDown}
       onPointerMove={onPointerMove}
       onPointerUp={onPointerUp}
       className={cn(
-        "group pointer-events-auto absolute flex flex-col overflow-hidden rounded-xl border bg-background shadow-sm",
+        "group/block pointer-events-auto absolute flex flex-col overflow-hidden rounded-xl border bg-background shadow-sm",
         selected
           ? "border-[#0d99ff] ring-2 ring-[#0d99ff]/25"
           : "border-border/70 hover:border-[#0d99ff]",
       )}
       style={{ left: block.x, top: block.y, width: block.w, height: block.h }}
     >
+      <DropdownMenu open={menuOpen} onOpenChange={setMenuOpen}>
+        <DropdownMenuTrigger asChild>
+          <button
+            type="button"
+            data-block-menu=""
+            aria-label={`Actions for ${blockLabel(block)}`}
+            className={cn(
+              "absolute right-1.5 top-1.5 z-10 inline-flex size-5 translate-x-1 items-center justify-center rounded-sm bg-background/80 text-muted-foreground opacity-0 transition-[opacity,transform] duration-200 ease-out hover:bg-muted hover:text-foreground",
+              "pointer-events-none group-hover/block:pointer-events-auto group-hover/block:translate-x-0 group-hover/block:opacity-100 group-focus-within/block:pointer-events-auto group-focus-within/block:translate-x-0 group-focus-within/block:opacity-100 data-[state=open]:pointer-events-auto data-[state=open]:translate-x-0 data-[state=open]:opacity-100",
+            )}
+            onPointerDown={(event) => event.stopPropagation()}
+            onClick={(event) => {
+              event.stopPropagation();
+              onSelect(block.id);
+            }}
+          >
+            <MoreVertical className="size-3.5" />
+          </button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end" sideOffset={6} className="z-[520] w-48 rounded-xl p-1 shadow-lg">
+          <DropdownMenuItem
+            className="gap-2.5 rounded-md px-2 py-2 text-[13px]"
+            onSelect={() => canvas?.duplicateBlock?.(block.id)}
+          >
+            <Copy className="size-4 text-muted-foreground" />
+            Duplicate
+          </DropdownMenuItem>
+          <DropdownMenuItem
+            className="gap-2.5 rounded-md px-2 py-2 text-[13px]"
+            onSelect={() => {
+              onSelect(block.id);
+              canvas?.setRenameId?.(block.id);
+            }}
+          >
+            <Pencil className="size-4 text-muted-foreground" />
+            Rename
+          </DropdownMenuItem>
+          <DestructiveConfirmMenuItem onConfirm={() => canvas?.removeBlock?.(block.id)} />
+        </DropdownMenuContent>
+      </DropdownMenu>
       <BlockBody block={block} onChange={onChange} />
       <button
         type="button"
@@ -271,7 +383,7 @@ function CanvasBlock({ block, selected, onSelect, onChange }) {
         onPointerMove={onPointerMove}
         onPointerUp={onPointerUp}
         className={cn(
-          "absolute bottom-1 right-1 size-3 cursor-nwse-resize rounded-sm border border-[#0d99ff] bg-white opacity-0 shadow-sm group-hover:opacity-100",
+          "absolute bottom-1 right-1 size-3 cursor-nwse-resize rounded-sm border border-[#0d99ff] bg-white opacity-0 shadow-sm group-hover/block:opacity-100",
           selected && "opacity-100",
         )}
       />
