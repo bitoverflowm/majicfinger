@@ -401,16 +401,21 @@ function RightChromeControls({ onLogout, expanded }) {
   );
 }
 
-function LeftChromeHeader({ dashboardName, expanded, onToggle }) {
+function LeftChromeHeader({ dashboardName, expanded, onToggle, onOpenDashboard }) {
   return (
     <div className={cn("flex h-10 shrink-0 items-center gap-2 pl-1.5 pr-1", expanded && "border-b border-black/[0.06] dark:border-white/10")}>
       <span className="mr-1 flex size-[22px] shrink-0 overflow-hidden rounded-full">
         <Image src="/logo.png" width={22} height={22} alt="Lychee" className="size-full object-cover" />
       </span>
       {dashboardName ? (
-        <span className="min-w-0 flex-1 truncate text-[13px] font-medium tracking-[-0.01em]" title={dashboardName}>
+        <button
+          type="button"
+          onClick={onOpenDashboard}
+          title={dashboardName}
+          className="min-w-0 flex-1 truncate rounded-md px-1 py-0.5 text-left text-[13px] font-medium tracking-[-0.01em] hover:bg-black/[0.05] dark:hover:bg-white/10"
+        >
           {dashboardName}
-        </span>
+        </button>
       ) : null}
       <button
         type="button"
@@ -441,6 +446,18 @@ export default function FigmaNavChrome({ onLogout }) {
 
   const toggle = () => setExpanded?.(!expanded);
 
+  const openMainDashboard = () => {
+    const onStartDashboard = ctx?.viewing === "welcome" || !loadedName;
+    if (onStartDashboard) {
+      ctx?.setViewing?.("welcome");
+      return;
+    }
+    ctx?.setConnectHomeCenterView?.(CONNECT_HOME_CENTER_VIEW.DASHBOARD);
+    if (ctx?.viewing !== "connectDataHome") {
+      ctx?.setViewing?.("dashboardComposer");
+    }
+  };
+
   return (
     <>
       {expanded ? (
@@ -459,7 +476,12 @@ export default function FigmaNavChrome({ onLogout }) {
           expanded ? "bottom-2 top-2 w-[260px]" : "top-2 h-10 w-auto max-w-[min(280px,calc(100vw-18rem))]",
         )}
       >
-        <LeftChromeHeader dashboardName={dashboardName} expanded={expanded} onToggle={toggle} />
+        <LeftChromeHeader
+          dashboardName={dashboardName}
+          expanded={expanded}
+          onToggle={toggle}
+          onOpenDashboard={openMainDashboard}
+        />
         {expanded ? <DashboardLayerTree /> : null}
       </aside>
 

@@ -403,7 +403,9 @@ const DashBody = ({ user }) => {
         {!isDemo && (
           <>
             <Nav />
-            {!navChromeExpanded && <div className="h-14 shrink-0" aria-hidden />}
+            {!navChromeExpanded && (
+              <div className="h-14 shrink-0 bg-background" aria-hidden />
+            )}
           </>
         )}
         {rightPanelOpen && <Separator className="shrink-0" />}
