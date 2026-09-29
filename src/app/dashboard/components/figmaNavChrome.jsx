@@ -407,9 +407,11 @@ function LeftChromeHeader({ dashboardName, expanded, onToggle }) {
       <span className="mr-1 flex size-[22px] shrink-0 overflow-hidden rounded-full">
         <Image src="/logo.png" width={22} height={22} alt="Lychee" className="size-full object-cover" />
       </span>
-      <span className="min-w-0 flex-1 truncate text-[13px] font-medium tracking-[-0.01em]" title={dashboardName}>
-        {dashboardName}
-      </span>
+      {dashboardName ? (
+        <span className="min-w-0 flex-1 truncate text-[13px] font-medium tracking-[-0.01em]" title={dashboardName}>
+          {dashboardName}
+        </span>
+      ) : null}
       <button
         type="button"
         onClick={onToggle}
@@ -429,7 +431,13 @@ export default function FigmaNavChrome({ onLogout }) {
   const setExpanded = ctx?.setNavChromeExpanded;
 
   const loadedName = String(ctx?.loadedDataMeta?.data_set_name || "").trim();
-  const dashboardName = ctx?.viewing === "welcome" || !loadedName ? "Welcome" : loadedName;
+  const startTabs = Array.isArray(ctx?.workspaceStartTabs) ? ctx.workspaceStartTabs : [];
+  const activeStartTab = startTabs.find((tab) => tab.id === ctx?.activeWorkspaceStartTabId);
+  const welcomeTab = startTabs.find((tab) => tab.id === "welcome");
+  const dashboardName =
+    ctx?.viewing === "welcome" && activeStartTab?.name
+      ? activeStartTab.name
+      : loadedName || welcomeTab?.name || (ctx?.welcomeTabRemoved ? "" : "Welcome");
 
   const toggle = () => setExpanded?.(!expanded);
 

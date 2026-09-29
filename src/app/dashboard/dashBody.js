@@ -22,6 +22,7 @@ import EasyLychee from "@/components/easyLychee";
 import { Separator } from "@/components/ui/separator";
 import { ProfilePictureUploader } from "@/components/profile/ProfilePictureUploader";
 import CheckoutWelcome, { takeCheckoutWelcome, workspaceWelcomePending, WorkspaceStartTabs } from "@/components/checkout/CheckoutWelcome";
+import { loadWorkspaceStartTabs } from "@/lib/workspaceStartTabs";
 import { membershipTierLabel } from "@/lib/membershipLabel";
 
 import { cn } from "@/lib/utils";
@@ -161,6 +162,20 @@ const DashBody = ({ user }) => {
         }
         setEntryReady(true);
     }, [setViewing, isDemo]);
+
+    const startTabsUserRef = useRef(null);
+    useLayoutEffect(() => {
+        const userId = user?.userId || "local";
+        if (startTabsUserRef.current === userId) return;
+        startTabsUserRef.current = userId;
+        const stored = loadWorkspaceStartTabs(user?.userId);
+        contextStateV2?.setWorkspaceStartTabs?.(stored.tabs);
+        contextStateV2?.setWelcomeTabRemoved?.(stored.welcomeRemoved);
+        contextStateV2?.setActiveWorkspaceStartTabId?.(stored.activeId);
+        if (!stored.tabs.length) {
+            setViewing?.("connectDataHome");
+        }
+    }, [user?.userId, contextStateV2, setViewing]);
 
     useEffect(() => {
         if (viewing === "upload") {
