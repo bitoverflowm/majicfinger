@@ -11,11 +11,18 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { DestructiveConfirmMenuItem } from "@/components/ui/destructive-confirm-menu-item";
 import { cn } from "@/lib/utils";
 import {
   WELCOME_START_TAB_ID,
   duplicateTabName,
+  newBlankTabName,
   newStartTabId,
   saveWorkspaceStartTabs,
 } from "@/lib/workspaceStartTabs";
@@ -282,6 +289,7 @@ function StartTabChip({ tab, selected, userId, onSelect }) {
     const copy = {
       id: newStartTabId(),
       name: duplicateTabName(tab.name, state.tabs.map((item) => item.name)),
+      blank: !!tab.blank,
     };
     const index = state.tabs.findIndex((item) => item.id === tab.id);
     const at = index < 0 ? state.tabs.length : index + 1;
@@ -322,7 +330,7 @@ function StartTabChip({ tab, selected, userId, onSelect }) {
   };
 
   return (
-    <div className="group/tab relative inline-flex">
+    <div className="group/tab relative inline-flex shrink-0">
       {renaming ? (
         <input
           ref={inputRef}
@@ -405,7 +413,7 @@ function StartTabChip({ tab, selected, userId, onSelect }) {
   );
 }
 
-export function WorkspaceStartTabs({ welcomeActive, onOpenWelcome, onOpenIntegrations }) {
+export function WorkspaceStartTabs({ welcomeActive, onOpenWelcome }) {
   const context = useMyStateV2();
   const sessionUser = useUser();
   const tabs = Array.isArray(context?.workspaceStartTabs) ? context.workspaceStartTabs : [];
@@ -416,11 +424,30 @@ export function WorkspaceStartTabs({ welcomeActive, onOpenWelcome, onOpenIntegra
     onOpenWelcome?.();
   };
 
+  const addBlankTab = () => {
+    const state = {
+      welcomeRemoved: !!context?.welcomeTabRemoved,
+      tabs,
+      activeId: activeId || null,
+    };
+    const tab = {
+      id: newStartTabId(),
+      name: newBlankTabName(tabs.map((item) => item.name)),
+      blank: true,
+    };
+    const next = { ...state, tabs: [...tabs, tab], activeId: tab.id };
+    context?.setWorkspaceStartTabs?.(next.tabs);
+    context?.setWelcomeTabRemoved?.(next.welcomeRemoved);
+    context?.setActiveWorkspaceStartTabId?.(next.activeId);
+    saveWorkspaceStartTabs(sessionUser?.userId, next);
+    onOpenWelcome?.();
+  };
+
   return (
     <div
       role="tablist"
       aria-label="Workspace"
-      className="flex shrink-0 items-center gap-1.5 p-6"
+      className="flex shrink-0 flex-nowrap items-center gap-1.5 overflow-x-auto p-6"
     >
       {tabs.map((tab) => (
         <StartTabChip
@@ -431,16 +458,23 @@ export function WorkspaceStartTabs({ welcomeActive, onOpenWelcome, onOpenIntegra
           onSelect={selectTab}
         />
       ))}
-      <button
-        type="button"
-        role="tab"
-        aria-selected={false}
-        aria-label="Open integrations"
-        onClick={onOpenIntegrations}
-        className="inline-flex h-7 w-7 items-center justify-center rounded-md border border-border bg-background text-sm leading-none text-muted-foreground shadow-sm transition-colors hover:bg-muted hover:text-foreground"
-      >
-        +
-      </button>
+      <TooltipProvider delayDuration={300}>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <button
+              type="button"
+              aria-label="New tab"
+              onClick={addBlankTab}
+              className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-md border border-border bg-background text-sm leading-none text-muted-foreground shadow-sm transition-colors hover:bg-muted hover:text-foreground"
+            >
+              +
+            </button>
+          </TooltipTrigger>
+          <TooltipContent side="bottom" sideOffset={6} className="text-xs">
+            New tab
+          </TooltipContent>
+        </Tooltip>
+      </TooltipProvider>
     </div>
   );
 }

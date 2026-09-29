@@ -26,7 +26,7 @@ function sanitizeTabs(tabs, welcomeRemoved) {
     if (!id || !name || seen.has(id)) continue;
     if (welcomeRemoved && id === WELCOME_START_TAB_ID) continue;
     seen.add(id);
-    clean.push({ id, name });
+    clean.push({ id, name, blank: !!tab.blank });
   }
   if (!welcomeRemoved && !seen.has(WELCOME_START_TAB_ID)) {
     clean.unshift({ id: WELCOME_START_TAB_ID, name: "Welcome" });
@@ -67,6 +67,15 @@ export function saveWorkspaceStartTabs(userId, state) {
 
 export function newStartTabId() {
   return `tab-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`;
+}
+
+export function newBlankTabName(existingNames) {
+  const taken = new Set(
+    (existingNames || []).map((name) => String(name || "").trim().toLowerCase()),
+  );
+  let n = 1;
+  while (taken.has(`untitled ${n}`)) n += 1;
+  return `Untitled ${n}`;
 }
 
 export function duplicateTabName(name, existingNames) {

@@ -27,6 +27,7 @@ import { membershipTierLabel } from "@/lib/membershipLabel";
 
 import { WorkspaceComposerDockProvider } from "@/components/dashboardComposer/workspaceComposerDock";
 import { WorkspaceCanvas } from "@/components/dashboardComposer/workspaceCanvas";
+import { BlankDashboardEmpty } from "@/components/dashboardComposer/blankDashboardEmpty";
 import { cn } from "@/lib/utils";
 
 import { debounce } from "@/lib/debounce";
@@ -423,9 +424,13 @@ const DashBody = ({ user }) => {
                     <WorkspaceStartTabs
                       welcomeActive={viewing === "welcome"}
                       onOpenWelcome={() => setViewing?.("welcome")}
-                      onOpenIntegrations={() => setViewing?.("connectDataHome")}
                     />
-                    {viewing === "welcome" ? (
+                    {viewing === "welcome" &&
+                    (contextStateV2?.workspaceStartTabs || []).find(
+                      (tab) => tab.id === contextStateV2?.activeWorkspaceStartTabId,
+                    )?.blank ? (
+                      <BlankDashboardEmpty />
+                    ) : viewing === "welcome" ? (
                       <CheckoutWelcome
                         name={user?.name}
                         celebrate={celebrateCheckout}
