@@ -10,6 +10,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { DestructiveConfirmMenuItem } from "@/components/ui/destructive-confirm-menu-item";
 import { duplicateTabName } from "@/lib/workspaceStartTabs";
+import { DashboardSheetGrid } from "@/components/dashboardComposer/dashboardSheetGrid";
 import { cn } from "@/lib/utils";
 
 const WorkspaceCanvasContext = createContext(null);
@@ -19,7 +20,7 @@ export function useWorkspaceCanvas() {
 }
 
 const BLOCK_SIZE = {
-  sheet: { w: 440, h: 240 },
+  sheet: { w: 560, h: 360 },
   source: { w: 280, h: 112 },
   chart: { w: 440, h: 260 },
   text: { w: 320, h: 88 },
@@ -188,11 +189,7 @@ function BlockBody({ block, onChange }) {
             className="min-w-0 flex-1 text-[13px] font-semibold text-foreground"
           />
         </div>
-        <div className="grid min-h-0 flex-1 grid-cols-4 gap-px bg-border p-px">
-          {Array.from({ length: 12 }, (_, i) => (
-            <div key={i} className="bg-background" />
-          ))}
-        </div>
+        <DashboardSheetGrid block={block} onChange={onChange} />
       </div>
     );
   }
@@ -261,7 +258,12 @@ function CanvasBlock({ block, selected, onSelect, onChange }) {
 
   const onPointerDown = (e) => {
     if (e.button !== 0) return;
-    if (e.target instanceof Element && e.target.closest("[data-resize],[data-block-menu],[role='menu'],[role='menuitem']")) {
+    if (
+      e.target instanceof Element &&
+      e.target.closest(
+        "[data-sheet-grid],[data-resize],[data-block-menu],[role='menu'],[role='menuitem'],.gdg-style,.gdg-unstyle,textarea,input",
+      )
+    ) {
       return;
     }
     e.currentTarget.setPointerCapture(e.pointerId);
