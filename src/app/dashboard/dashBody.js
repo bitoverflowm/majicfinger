@@ -42,6 +42,7 @@ const DashBody = ({ user }) => {
     const requestConnectWorkspace = contextStateV2?.requestConnectWorkspace
 
     const viewing = contextStateV2?.viewing
+    const navChromeExpanded = !!contextStateV2?.navChromeExpanded
     const rightPanelOpen = contextStateV2?.rightPanelOpen
     //const savedDataSets = contextStateV2?.savedDataSets
     const setSavedDataSets = contextStateV2?.setSavedDataSets
@@ -386,18 +387,19 @@ const DashBody = ({ user }) => {
       <>
         {!isDemo && (
           <>
-            <header
-              className="fixed top-0 left-0 right-0 z-30 border-b border-border bg-white shadow-sm dark:bg-black dark:shadow-none"
-            >
-              <Nav />
-            </header>
-            <div className="h-8 shrink-0" aria-hidden />
+            <Nav />
+            {!navChromeExpanded && <div className="h-14 shrink-0" aria-hidden />}
           </>
         )}
         {rightPanelOpen && <Separator className="shrink-0" />}
         <div className="relative z-0 flex min-h-0 min-w-0 flex-1 flex-col py-1">
                 {entryReady && (viewing === "welcome" || viewing === "connectDataHome") && (
-                  <div className="flex h-[calc(100svh-2rem)] min-h-0 -my-1 flex-col bg-background">
+                  <div
+                    className={cn(
+                      "flex min-h-0 -my-1 flex-col bg-background",
+                      navChromeExpanded ? "h-svh" : "h-[calc(100svh-3.5rem)]",
+                    )}
+                  >
                     <WorkspaceStartTabs
                       welcomeActive={viewing === "welcome"}
                       onOpenWelcome={() => setViewing?.("welcome")}
@@ -576,8 +578,13 @@ const DashBody = ({ user }) => {
     return isDemo ? (
       <div className="flex h-full min-h-0 min-w-0 flex-1 flex-col">{content}</div>
     ) : (
-      <div className="relative flex min-h-svh min-w-0 flex-col">
-        <div className="flex min-h-0 min-w-0 flex-1 flex-col">
+      <div className="relative flex min-h-svh min-w-0 flex-col bg-[#f5f5f5] dark:bg-[#1e1e1e]">
+        <div
+          className={cn(
+            "flex min-h-0 min-w-0 flex-1 flex-col transition-[padding] duration-200 ease-out",
+            navChromeExpanded && "lg:px-[276px]",
+          )}
+        >
           {content}
         </div>
         {paywallOverlay}

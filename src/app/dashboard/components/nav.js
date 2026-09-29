@@ -72,6 +72,7 @@ import {
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
 import { UserAvatar } from "@/components/ui/user-avatar"
 import { endAuthenticatedSession } from "@/lib/analytics/authJourneyClient"
+import FigmaNavChrome from "./figmaNavChrome"
 
 function attachPublicAssetsToProjectRow(row) {
   row.publicCharts = (row.charts || []).filter((c) => c?.is_public && c?.public_slug)
@@ -1455,7 +1456,9 @@ const Nav = () => {
 
   return (
     <>
-    <div className="flex h-8 w-full items-center justify-between gap-2 px-2">
+    <FigmaNavChrome onLogout={() => { void handleLogout(); }} />
+    {/* Legacy toolbar stays mounted so save, clear-workspace, and projects can be restored. */}
+    <div className="hidden" aria-hidden="true">
           <div className="flex min-w-0 flex-1 items-center gap-2 pl-1">
             <Link
               href="/dashboard"
