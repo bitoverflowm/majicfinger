@@ -33,9 +33,9 @@ const CHROME_SURFACE = cn(
 
 function SidebarToggleIcon({ className }) {
   return (
-    <svg viewBox="0 0 16 16" className={className} fill="none" aria-hidden>
-      <rect x="1.25" y="2.25" width="5.5" height="11.5" rx="1.2" stroke="currentColor" strokeWidth="1.25" />
-      <rect x="9.25" y="2.25" width="5.5" height="11.5" rx="1.2" stroke="currentColor" strokeWidth="1.25" />
+    <svg viewBox="0 0 28 20" className={cn("h-3.5 w-5", className)} fill="none" aria-hidden>
+      <rect x="1" y="1" width="26" height="18" rx="2" stroke="currentColor" strokeWidth="2" />
+      <path d="M9 1v18" stroke="currentColor" strokeWidth="2" />
     </svg>
   );
 }
@@ -417,7 +417,7 @@ function LeftChromeHeader({ dashboardName, expanded, onToggle }) {
         aria-label={expanded ? "Collapse navigation" : "Expand navigation"}
         className="inline-flex size-7 shrink-0 items-center justify-center rounded-md text-neutral-700 hover:bg-black/[0.05] dark:text-neutral-200 dark:hover:bg-white/10"
       >
-        <SidebarToggleIcon className="size-4" />
+        <SidebarToggleIcon />
       </button>
     </div>
   );
