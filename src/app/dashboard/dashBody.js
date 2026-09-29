@@ -25,6 +25,7 @@ import CheckoutWelcome, { takeCheckoutWelcome, workspaceWelcomePending, Workspac
 import { loadWorkspaceStartTabs } from "@/lib/workspaceStartTabs";
 import { membershipTierLabel } from "@/lib/membershipLabel";
 
+import { WorkspaceComposerDockProvider } from "@/components/dashboardComposer/workspaceComposerDock";
 import { cn } from "@/lib/utils";
 
 import { debounce } from "@/lib/debounce";
@@ -399,7 +400,7 @@ const DashBody = ({ user }) => {
 
 
     const content = (
-      <>
+      <WorkspaceComposerDockProvider>
         {!isDemo && (
           <>
             <Nav />
@@ -561,7 +562,7 @@ const DashBody = ({ user }) => {
                     <div>Hi, I am working on making this page more useful</div>
                 </div>}
         </div>
-      </>
+      </WorkspaceComposerDockProvider>
     );
 
     const paywallOverlay =

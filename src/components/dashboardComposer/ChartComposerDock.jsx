@@ -263,9 +263,6 @@ export function ChartComposerDock({ editorInset = null }) {
     return resolveFormatDockTarget(t, chartDashboardDraft, setChartDashboardDraft);
   }, [cardGridComposerDock, chartDashboardDraft, isCardGridTextTarget, pageFormatDockTarget, setChartDashboardDraft]);
 
-  if (!chartDashboardDraft) {
-    return null;
-  }
   const layoutActions = dashboardComposerLayoutActions;
 
   const barPositionStyle = editorInset

@@ -97,7 +97,7 @@ import {
 import OpenApiPanelTab from "@/components/dataView/OpenApiPanelTab";
 import ExportPanel from "@/components/dataView/ExportPanel";
 import DashboardComposerPage from "@/components/dashboardComposer/DashboardComposerPage";
-import { ChartComposerDock } from "@/components/dashboardComposer/ChartComposerDock";
+import { useDashboardDockInset } from "@/components/dashboardComposer/workspaceComposerDock";
 import {
   getPageTextBlockSidebarClasses,
   getPageTextBlockSidebarStyle,
@@ -1360,6 +1360,7 @@ export default function DataSheetWithIntegration({
       window.removeEventListener("scroll", update, true);
     };
   }, [effectiveDashboardMode, rightPanelOpen, isPanelOpen, drawerExpanded, isPanelClosing]);
+  useDashboardDockInset(effectiveDashboardMode ? mainColumnRect : null);
   const panelAnimatingOpen = isPanelOpen && !isPanelClosing;
   const chartSheetIds = useMemo(() => Object.keys(chartSheets || {}), [chartSheets]);
   const chartSnapshotSeed = useMemo(() => {
@@ -2907,7 +2908,6 @@ export default function DataSheetWithIntegration({
           onOpen={handleOpenApiPanelFromTab}
         />
       ) : null}
-      {effectiveDashboardMode ? <ChartComposerDock editorInset={mainColumnRect} /> : null}
     </div>
   );
   return (

@@ -21,7 +21,6 @@ import {
   createEmptyDashboardLayout,
   DASH_CARD_CELL_CLASS,
   DASH_CARDS_GRID_CLASS,
-  DEFAULT_CHART_CARD_ROW_SPAN,
 } from "@/lib/dashboardLayoutDefaults";
 import {
   flattenDashboardLayers,
@@ -85,11 +84,6 @@ import {
   getFreeTextRowEditorClasses,
   getFreeTextRowEditorStyle,
 } from "@/lib/dashboardFreeTextTheme";
-import {
-  createCardGridRow,
-  getSheetColumnNames,
-  inferCardGridFieldMappings,
-} from "@/lib/dashboardCardGrid";
 import { DashboardCardGridSection } from "./DashboardCardGridSection";
 import {
   collectEventCandlestickMarketSheets,
@@ -99,21 +93,6 @@ import {
   resolveLiveMarketCardCopy,
 } from "@/lib/kalshiLive/eventCandlesticksPowerMove";
 
-function rid(prefix) {
-  return `${prefix}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 9)}`;
-}
-
-function clampChartColSpan(n) {
-  const x = Number(n);
-  if (!Number.isFinite(x)) return 12;
-  return Math.min(12, Math.max(1, Math.round(x)));
-}
-
-function sumChartRowColSpans(columns) {
-  if (!Array.isArray(columns)) return 0;
-  return columns.reduce((s, c) => s + clampChartColSpan(c?.colSpan), 0);
-}
-
 const TAG_STYLES = [
   "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border-emerald-500/30",
   "bg-sky-500/15 text-sky-700 dark:text-sky-300 border-sky-500/30",
@@ -122,69 +101,6 @@ const TAG_STYLES = [
   "bg-rose-500/15 text-rose-700 dark:text-rose-300 border-rose-500/30",
   "bg-lime-500/15 text-lime-800 dark:text-lime-300 border-lime-500/30",
 ];
-
-function emptyColumn(overrides = {}) {
-  return {
-    id: rid("col"),
-    chart_id: null,
-    colSpan: 12,
-    rowSpan: DEFAULT_CHART_CARD_ROW_SPAN,
-    h2: "",
-    caption: "",
-    microtext: "",
-    link: { mode: "none", url: "" },
-    ...overrides,
-  };
-}
-
-/**
- * Append a chart slot using a 12-col grid: fill the last `cards` row if sum(colSpan) < 12;
- * if the row is a single full-width chart (12), split to 6+6; otherwise start a new row.
- * @returns {{ rows: object[], selection: { rowId: string, colId: string } }}
- */
-function computeRowsAfterAddChart(layout) {
-  const base = layout && typeof layout === "object" ? layout : createEmptyDashboardLayout();
-  const rows = Array.isArray(base.rows) ? [...base.rows] : [];
-
-  let lastCardsIdx = -1;
-  for (let i = rows.length - 1; i >= 0; i--) {
-    if (rows[i]?.type === "cards" && Array.isArray(rows[i].columns)) {
-      lastCardsIdx = i;
-      break;
-    }
-  }
-
-  if (lastCardsIdx < 0) {
-    const rowId = rid("row");
-    const col = emptyColumn({ colSpan: 12 });
-    rows.push({ id: rowId, type: "cards", columns: [col] });
-    return { rows, selection: { rowId, colId: col.id } };
-  }
-
-  const row = rows[lastCardsIdx];
-  const cols = Array.isArray(row.columns) ? [...row.columns] : [];
-  const sum = sumChartRowColSpans(cols);
-
-  if (sum < 12) {
-    const remaining = 12 - sum;
-    const col = emptyColumn({ colSpan: remaining });
-    const updatedRow = { ...row, columns: [...cols, col] };
-    rows[lastCardsIdx] = updatedRow;
-    return { rows, selection: { rowId: row.id, colId: col.id } };
-  }
-
-  if (sum === 12 && cols.length === 1 && clampChartColSpan(cols[0].colSpan) === 12) {
-    const first = { ...cols[0], colSpan: 6 };
-    const col = emptyColumn({ colSpan: 6 });
-    rows[lastCardsIdx] = { ...row, columns: [first, col] };
-    return { rows, selection: { rowId: row.id, colId: col.id } };
-  }
-
-  const rowId = rid("row");
-  const col = emptyColumn({ colSpan: 12 });
-  rows.push({ id: rowId, type: "cards", columns: [col] });
-  return { rows, selection: { rowId, colId: col.id } };
-}
 
 export default function DashboardComposerPage({ user }) {
   const ctx = useMyStateV2() ?? {};
@@ -209,7 +125,6 @@ export default function DashboardComposerPage({ user }) {
     setPageFormatDockTarget,
     setChartComposerDock,
     setChartPickerEmphasis,
-    setDashboardComposerLayoutActions,
     savedCharts,
     setSavedCharts,
     setChartSheets,
@@ -479,98 +394,6 @@ export default function DashboardComposerPage({ user }) {
     [updateRow],
   );
 
-  /** Add Chart: pack into the last 12-col cards row when possible; otherwise new row. */
-  const addChart = useCallback(() => {
-    setPageFormatDockTarget?.(null);
-    setCardGridComposerDock?.(null);
-    const layout = draftRef.current?.layout;
-    const { rows: nextRows, selection } = computeRowsAfterAddChart(layout);
-    setSelectedDashboardCard?.(selection);
-    setChartComposerDock?.(selection);
-    setChartPickerEmphasis?.(selection);
-    setChartDashboardDraft((d) => {
-      const cur = d || {};
-      const curLayout = cur.layout || createEmptyDashboardLayout();
-      return {
-        ...cur,
-        layout: {
-          ...curLayout,
-          rows: nextRows,
-        },
-      };
-    });
-  }, [
-    setPageFormatDockTarget,
-    setCardGridComposerDock,
-    setSelectedDashboardCard,
-    setChartComposerDock,
-    setChartPickerEmphasis,
-    setChartDashboardDraft,
-  ]);
-
-  const addTextBlock = useCallback(
-    (textVariant) => {
-      setPageFormatDockTarget?.(null);
-      setCardGridComposerDock?.(null);
-      const variant = textVariant === "heading" ? "heading" : "paragraph";
-      const newRow = {
-        id: rid("row"),
-        type: "text",
-        textVariant: variant,
-        body: DASHBOARD_FREE_TEXT_PLACEHOLDER,
-      };
-      setChartDashboardDraft((d) => {
-        const cur = d || {};
-        const layout = cur.layout || createEmptyDashboardLayout();
-        return {
-          ...cur,
-          layout: {
-            ...layout,
-            rows: [...layout.rows, newRow],
-          },
-        };
-      });
-    },
-    [setPageFormatDockTarget, setCardGridComposerDock, setChartDashboardDraft],
-  );
-
-  const addCardGrid = useCallback(() => {
-    setPageFormatDockTarget?.(null);
-    setSelectedDashboardCard?.(null);
-    setChartComposerDock?.(null);
-    setChartPickerEmphasis?.(null);
-
-    const sheets = dataSheets && typeof dataSheets === "object" ? dataSheets : {};
-    const sheetIds = Object.keys(sheets);
-    const firstSheetId = sheetIds[0] || "";
-    const sheet = firstSheetId ? sheets[firstSheetId] : null;
-    const sheetRows = Array.isArray(sheet?.data) ? sheet.data : [];
-    const columns = getSheetColumnNames(sheet, sheetRows);
-    const fields = inferCardGridFieldMappings(columns, sheetRows);
-    const newRow = createCardGridRow({ sheetId: firstSheetId, fields });
-
-    setCardGridComposerDock?.({ rowId: newRow.id });
-    setChartDashboardDraft((d) => {
-      const cur = d || {};
-      const layout = cur.layout || createEmptyDashboardLayout();
-      return {
-        ...cur,
-        layout: {
-          ...layout,
-          rows: [...layout.rows, newRow],
-        },
-      };
-    });
-  }, [
-    dataSheets,
-    setPageFormatDockTarget,
-    setSelectedDashboardCard,
-    setChartComposerDock,
-    setChartPickerEmphasis,
-    setCardGridComposerDock,
-    setChartDashboardDraft,
-  ]);
-
   const handleCreateNew = () => {
     if (isDemo) {
       setDemoDashboardDialogOpen(true);
@@ -729,21 +552,6 @@ export default function DashboardComposerPage({ user }) {
       workspaceWriteLocked,
     ],
   );
-
-  /** Presence-only deps: avoid clearing actions on every draft object identity change (sidebar typing). */
-  const draftPresent = Boolean(draft);
-  useLayoutEffect(() => {
-    if (!draftPresent) {
-      setDashboardComposerLayoutActions?.(null);
-      return undefined;
-    }
-    setDashboardComposerLayoutActions?.({
-      addChart,
-      addText: addTextBlock,
-      addCards: addCardGrid,
-    });
-    return () => setDashboardComposerLayoutActions?.(null);
-  }, [draftPresent, addChart, addTextBlock, addCardGrid, setDashboardComposerLayoutActions]);
 
   useEffect(() => {
     if (!dashboardLoadReady || !draft || !hasDbUser || !user?.userId) return;

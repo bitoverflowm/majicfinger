@@ -490,7 +490,7 @@ export default function CheckoutWelcome({ name = "", tier = "", celebrate = fals
   };
 
   return (
-      <div className="min-h-0 flex-1 overflow-y-auto">
+      <div className="min-h-0 flex-1 overflow-y-auto pb-24">
         <div className="mx-auto w-full max-w-[90rem] space-y-6 px-6 py-6 text-sm leading-relaxed text-muted-foreground">
           <h1 className="text-xl font-semibold leading-snug tracking-tight text-foreground">{opening}</h1>
           <div className="space-y-3">
