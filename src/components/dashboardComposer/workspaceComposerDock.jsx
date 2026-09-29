@@ -10,7 +10,8 @@ import {
   getSheetColumnNames,
   inferCardGridFieldMappings,
 } from "@/lib/dashboardCardGrid";
-import { ChartComposerDock } from "@/components/dashboardComposer/ChartComposerDock";
+import { WorkspaceCanvasProvider } from "@/components/dashboardComposer/workspaceCanvas";
+import { WorkspaceDock } from "@/components/dashboardComposer/workspaceDock";
 
 const DockInsetContext = createContext(() => {});
 
@@ -180,12 +181,19 @@ export function useDashboardDockInset(inset) {
  * Later views can opt out by not wrapping with this provider.
  */
 export function WorkspaceComposerDockProvider({ children }) {
-  const [inset, setInset] = useState(null);
+  const ctx = useMyStateV2();
+  const pageId =
+    ctx?.viewing === "welcome"
+      ? `welcome:${ctx?.activeWorkspaceStartTabId || "welcome"}`
+      : ctx?.viewing || "workspace";
+  const [, setInset] = useState(null);
   useRegisterComposerLayoutActions();
   return (
     <DockInsetContext.Provider value={setInset}>
-      {children}
-      <ChartComposerDock editorInset={inset} />
+      <WorkspaceCanvasProvider pageId={pageId}>
+        {children}
+        <WorkspaceDock />
+      </WorkspaceCanvasProvider>
     </DockInsetContext.Provider>
   );
 }

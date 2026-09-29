@@ -26,6 +26,7 @@ import { loadWorkspaceStartTabs } from "@/lib/workspaceStartTabs";
 import { membershipTierLabel } from "@/lib/membershipLabel";
 
 import { WorkspaceComposerDockProvider } from "@/components/dashboardComposer/workspaceComposerDock";
+import { WorkspaceCanvas } from "@/components/dashboardComposer/workspaceCanvas";
 import { cn } from "@/lib/utils";
 
 import { debounce } from "@/lib/debounce";
@@ -411,6 +412,7 @@ const DashBody = ({ user }) => {
         )}
         {rightPanelOpen && <Separator className="shrink-0" />}
         <div className="relative z-0 flex min-h-0 min-w-0 flex-1 flex-col py-1">
+                <WorkspaceCanvas />
                 {entryReady && (viewing === "welcome" || viewing === "connectDataHome") && (
                   <div
                     className={cn(
