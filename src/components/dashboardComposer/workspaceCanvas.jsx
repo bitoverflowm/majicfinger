@@ -261,7 +261,9 @@ function CanvasBlock({ block, selected, onSelect, onChange }) {
 
   const onPointerDown = (e) => {
     if (e.button !== 0) return;
-    if (e.target.closest("[data-resize],[data-block-menu]")) return;
+    if (e.target instanceof Element && e.target.closest("[data-resize],[data-block-menu],[role='menu'],[role='menuitem']")) {
+      return;
+    }
     e.currentTarget.setPointerCapture(e.pointerId);
     dragRef.current = {
       mode: "move",
@@ -353,7 +355,13 @@ function CanvasBlock({ block, selected, onSelect, onChange }) {
             <MoreVertical className="size-3.5" />
           </button>
         </DropdownMenuTrigger>
-        <DropdownMenuContent align="end" sideOffset={6} className="z-[520] w-48 rounded-xl p-1 shadow-lg">
+        <DropdownMenuContent
+          align="end"
+          sideOffset={6}
+          className="z-[520] w-48 rounded-xl p-1 shadow-lg"
+          onPointerDown={(event) => event.stopPropagation()}
+          onClick={(event) => event.stopPropagation()}
+        >
           <DropdownMenuItem
             className="gap-2.5 rounded-md px-2 py-2 text-[13px]"
             onSelect={() => canvas?.duplicateBlock?.(block.id)}
