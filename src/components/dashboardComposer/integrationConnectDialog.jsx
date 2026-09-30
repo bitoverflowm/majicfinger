@@ -2,13 +2,14 @@
 
 import { createContext, useContext, useEffect, useMemo, useRef, useState } from "react";
 import Image from "next/image";
-import { Database } from "lucide-react";
+import { ArrowRight, Check, Database } from "lucide-react";
 import {
   Dialog,
   DialogContent,
   DialogDescription,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   KALSHI_HISTORICAL_DEEP_CAPTION,
@@ -158,19 +159,24 @@ function PreviewBody({ row, description }) {
 function PreviewPane({ row, description }) {
   const signature = `${row?.id || ""}\0${description || ""}`;
   const latestRef = useRef({ signature, row, description });
+  const paneRef = useRef(null);
   const [leaving, setLeaving] = useState(null);
 
   useEffect(() => {
     if (latestRef.current.signature === signature) return undefined;
     const previous = latestRef.current;
     latestRef.current = { signature, row, description };
+    if (paneRef.current) paneRef.current.scrollTop = 0;
     setLeaving(previous);
     const timer = window.setTimeout(() => setLeaving(null), 520);
     return () => window.clearTimeout(timer);
   }, [signature, row, description]);
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col justify-center overflow-y-auto bg-[#e6edf3] p-6 dark:bg-[#1c232b]">
+    <div
+      ref={paneRef}
+      className="flex min-h-0 flex-1 flex-col justify-start overflow-y-auto bg-[#e6edf3] px-6 pb-6 pt-12 dark:bg-[#1c232b]"
+    >
       <div className="flex items-center gap-2 text-[13px] font-semibold text-foreground">
         <Database className="size-4 text-muted-foreground" aria-hidden />
         What this looks like in Lychee
@@ -234,7 +240,7 @@ function pillCaption(row, cutoffLabel) {
   return succinctDescription(row.description);
 }
 
-function IntegrationOption({ row, active, onSelect, onHover, cutoffLabel, cutoffLoading }) {
+function IntegrationOption({ row, active, hovered, onSelect, onHover, cutoffLabel, cutoffLoading }) {
   const liveCaption = cutoffCaption(row, cutoffLabel);
   const caption = pillCaption(row, cutoffLabel);
   return (
@@ -245,14 +251,16 @@ function IntegrationOption({ row, active, onSelect, onHover, cutoffLabel, cutoff
       onClick={() => onSelect(row.id)}
       onMouseEnter={() => onHover?.(row.id)}
       className={cn(
-        "flex w-full items-start gap-3 rounded-xl border px-3 py-3 text-left transition-colors",
+        "flex w-full items-start gap-3 rounded-xl border px-3 py-3 text-left transition-colors duration-200",
         active
-          ? "border-secondary bg-secondary/10 ring-2 ring-secondary/30"
-          : "border-border/70 bg-background hover:bg-muted/40",
+          ? "border-[#2f6fed] bg-[#e7f0ff] dark:border-blue-400 dark:bg-blue-500/15"
+          : hovered
+            ? "border-foreground/20 bg-muted"
+            : "border-border/70 bg-background",
       )}
     >
       <Logo row={row} />
-      <span className="min-w-0">
+      <span className="min-w-0 flex-1">
         <span className="flex flex-wrap items-center gap-2">
           <span className="text-[13px] font-semibold text-foreground">{row.name}</span>
           {REALTIME_IDS.has(row.id) ? <RealTimeTag /> : null}
@@ -265,6 +273,9 @@ function IntegrationOption({ row, active, onSelect, onHover, cutoffLabel, cutoff
           </span>
         )}
       </span>
+      {active ? (
+        <Check className="ml-1 size-4 shrink-0 self-center text-[#2f6fed] dark:text-blue-400" aria-hidden />
+      ) : null}
     </button>
   );
 }
@@ -276,16 +287,20 @@ export function IntegrationConnectDialog({ open, onOpenChange }) {
   const listed = new Set([...PRIMARY_ORDER, ...BETA_ORDER]);
   const comingSoon = rows.filter((row) => !listed.has(row.id));
   const selectable = [...primary, ...beta];
-  const [selectedId, setSelectedId] = useState(primary[0]?.id || null);
+  const [selectedId, setSelectedId] = useState(null);
   const [hoveredId, setHoveredId] = useState(null);
-  const selected = selectable.find((row) => row.id === selectedId) || primary[0] || null;
+  const selected = selectable.find((row) => row.id === selectedId) || null;
   const hovered = rows.find((row) => row.id === hoveredId) || null;
-  const shown = hovered || selected;
+  const shown = hovered || selected || primary[0] || null;
   const { cutoffLabel, loading: cutoffLoading } = useKalshiHistoricalCutoffDisplay();
 
   useEffect(() => {
-    if (!open) return;
-    prefetchIntegrationPreviews();
+    if (open) {
+      prefetchIntegrationPreviews();
+      return;
+    }
+    setSelectedId(null);
+    setHoveredId(null);
   }, [open]);
 
   return (
@@ -304,13 +319,14 @@ export function IntegrationConnectDialog({ open, onOpenChange }) {
                 Pick a source. You’ll shape the pull in the next step.
               </DialogDescription>
             </div>
-            <div className="min-h-0 flex-1 space-y-2 overflow-y-auto px-6 pb-6">
+            <div className="min-h-0 flex-1 space-y-2 overflow-y-auto px-6 pb-4">
               <div role="listbox" aria-label="Integrations" className="space-y-2">
                 {primary.map((row) => (
                   <IntegrationOption
                     key={row.id}
                     row={row}
                     active={row.id === selected?.id}
+                    hovered={row.id === hoveredId && row.id !== selected?.id}
                     onSelect={setSelectedId}
                     onHover={setHoveredId}
                     cutoffLabel={cutoffLabel}
@@ -329,6 +345,7 @@ export function IntegrationConnectDialog({ open, onOpenChange }) {
                         key={row.id}
                         row={row}
                         active={row.id === selected?.id}
+                        hovered={row.id === hoveredId && row.id !== selected?.id}
                         onSelect={setSelectedId}
                         onHover={setHoveredId}
                         cutoffLabel={cutoffLabel}
@@ -348,7 +365,12 @@ export function IntegrationConnectDialog({ open, onOpenChange }) {
                       <div
                         key={row.id}
                         onMouseEnter={() => setHoveredId(row.id)}
-                        className="flex items-start gap-3 rounded-xl border border-border/60 bg-muted/20 px-3 py-3"
+                        className={cn(
+                          "flex items-start gap-3 rounded-xl border px-3 py-3 transition-colors duration-200",
+                          hoveredId === row.id
+                            ? "border-foreground/20 bg-muted"
+                            : "border-border/60 bg-muted/20",
+                        )}
                       >
                         <Logo row={row} />
                         <span className="min-w-0 flex-1">
@@ -368,6 +390,17 @@ export function IntegrationConnectDialog({ open, onOpenChange }) {
                 </div>
               ) : null}
             </div>
+            {selected ? (
+              <div className="flex shrink-0 items-center justify-end gap-2 px-6 py-4">
+                <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+                  Previous
+                </Button>
+                <Button type="button" className="bg-[#2f6fed] text-white hover:bg-[#2f6fed]/90">
+                  Start building
+                  <ArrowRight />
+                </Button>
+              </div>
+            ) : null}
           </div>
           {shown ? (
             <PreviewPane row={shown} description={hovered?.description || ""} />
