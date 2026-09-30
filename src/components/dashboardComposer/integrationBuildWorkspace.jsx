@@ -12,7 +12,8 @@ import {
   saveSearch,
   usesExactUniverse,
 } from "@/components/dashboardComposer/integrationBuildCatalog";
-import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
+import { Accordion, AccordionContent, AccordionItem } from "@/components/ui/accordion";
+import * as AccordionPrimitive from "@radix-ui/react-accordion";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
@@ -253,9 +254,17 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
     setHidden((current) => {
       const next = new Set(current);
       if (next.has(id)) next.delete(id);
-      else if ((pull?.columns.length || 0) - next.size > 1) next.add(id);
+      else next.add(id);
       return next;
     });
+  }
+
+  function selectAllColumns() {
+    setHidden(new Set());
+  }
+
+  function deselectAllColumns() {
+    setHidden(new Set((pull?.columns || []).map((column) => column.id)));
   }
 
   function onSave() {
@@ -389,14 +398,34 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
 
           <Accordion type="single" collapsible defaultValue="columns">
             <AccordionItem value="columns" className="border-0">
-              <AccordionTrigger className="py-1 text-[12px] font-semibold text-foreground hover:no-underline">
-                <span className="flex min-w-0 flex-1 items-center justify-between pr-2">
-                  <span>Columns</span>
-                  <span className="text-[11px] font-normal text-muted-foreground">
-                    {Math.max(0, (pull?.columns.length || 0) - hidden.size)} selected
-                  </span>
+              <AccordionPrimitive.Header className="flex items-center gap-2 py-1 text-[12px]">
+                <span className="font-semibold text-foreground">Columns</span>
+                <button
+                  type="button"
+                  disabled={!pull?.columns.length || hidden.size === 0}
+                  onClick={selectAllColumns}
+                  className="text-[11px] font-medium text-[#0d99ff] disabled:pointer-events-none disabled:text-muted-foreground/50"
+                >
+                  Select all
+                </button>
+                <button
+                  type="button"
+                  disabled={!pull?.columns.length || hidden.size >= (pull?.columns.length || 0)}
+                  onClick={deselectAllColumns}
+                  className="text-[11px] font-medium text-[#0d99ff] disabled:pointer-events-none disabled:text-muted-foreground/50"
+                >
+                  Deselect all
+                </button>
+                <span className="ml-auto text-[11px] font-normal text-muted-foreground">
+                  {Math.max(0, (pull?.columns.length || 0) - hidden.size)} selected
                 </span>
-              </AccordionTrigger>
+                <AccordionPrimitive.Trigger
+                  className="inline-flex size-5 shrink-0 items-center justify-center text-foreground [&[data-state=open]>svg]:rotate-180"
+                  aria-label="Columns"
+                >
+                  <ChevronDown className="size-4 transition-transform duration-200" />
+                </AccordionPrimitive.Trigger>
+              </AccordionPrimitive.Header>
               <AccordionContent className="pb-1">
                 <div className="max-h-72 space-y-0.5 overflow-y-auto pr-1">
                   {(pull?.columns || []).map((column) => (
@@ -484,8 +513,12 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
             <p className="text-[13px] text-muted-foreground">{error}</p>
           ) : loading ? (
             <SkeletonRows />
-          ) : (
+          ) : shownColumns.length ? (
             <IntegrationBuildGrid columns={shownColumns} rows={filteredRows} />
+          ) : (
+            <div className="flex h-full items-center justify-center rounded-xl border border-border/70 bg-background text-[13px] text-muted-foreground shadow-sm">
+              Select at least one column to preview.
+            </div>
           )}
         </div>
       </section>
