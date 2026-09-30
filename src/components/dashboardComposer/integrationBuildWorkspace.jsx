@@ -348,7 +348,7 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
             <ArrowLeft className="size-4" />
           </button>
           <p className="text-[13px] leading-relaxed text-muted-foreground">
-            {source.name}. This preview is the first table, the same one shown beside the source list.
+            Pull {source.name} data based on your criteria.
           </p>
         </div>
         <div className="min-h-0 flex-1 space-y-5 overflow-y-auto px-4 pb-4">
@@ -441,35 +441,48 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
 
           <Accordion type="single" collapsible defaultValue="columns">
             <AccordionItem value="columns" className="border-0">
-              <AccordionPrimitive.Header className="flex items-center gap-2 py-1 text-[12px]">
-                <span className="font-semibold text-foreground">Columns</span>
-                <button
-                  type="button"
-                  disabled={!pull?.columns.length || hidden.size === 0}
-                  onClick={selectAllColumns}
-                  className="text-[11px] font-medium text-[#0d99ff] disabled:pointer-events-none disabled:text-muted-foreground/50"
-                >
-                  Select all
-                </button>
-                <button
-                  type="button"
-                  disabled={!pull?.columns.length || hidden.size >= (pull?.columns.length || 0)}
-                  onClick={deselectAllColumns}
-                  className="text-[11px] font-medium text-[#0d99ff] disabled:pointer-events-none disabled:text-muted-foreground/50"
-                >
-                  Deselect all
-                </button>
-                <span className="ml-auto text-[11px] font-normal text-muted-foreground">
-                  {Math.max(0, (pull?.columns.length || 0) - hidden.size)} selected
-                </span>
+              <AccordionPrimitive.Header className="flex">
                 <AccordionPrimitive.Trigger
-                  className="inline-flex size-5 shrink-0 items-center justify-center text-foreground [&[data-state=open]>svg]:rotate-180"
+                  className="flex w-full items-center gap-2 rounded-lg bg-zinc-200/80 px-2.5 py-1.5 text-left text-[12px] font-semibold text-foreground dark:bg-zinc-800 [&[data-state=open]>svg]:rotate-180"
                   aria-label="Columns"
                 >
-                  <ChevronDown className="size-4 transition-transform duration-200" />
+                  <span>Columns</span>
+                  <span className="ml-auto text-[11px] font-normal text-muted-foreground">
+                    {Math.max(0, (pull?.columns.length || 0) - hidden.size)} selected
+                  </span>
+                  <ChevronDown className="size-4 shrink-0 transition-transform duration-200" />
                 </AccordionPrimitive.Trigger>
               </AccordionPrimitive.Header>
-              <AccordionContent className="pb-1">
+              <AccordionContent className="pb-0 pt-2">
+                <div className="rounded-lg border border-border/70 px-2 py-2">
+                  <div className="mb-2 flex items-center gap-1.5">
+                  <button
+                    type="button"
+                    aria-pressed={Boolean(pull?.columns.length) && hidden.size === 0}
+                    onClick={selectAllColumns}
+                    className={cn(
+                      "inline-flex rounded-full border px-2.5 py-0.5 text-[11px] font-medium transition-colors",
+                      pull?.columns.length && hidden.size === 0
+                        ? "border-[#0d99ff]/40 bg-[#0d99ff]/10 text-[#0d99ff]"
+                        : "border-border/70 bg-background text-muted-foreground hover:bg-muted/50",
+                    )}
+                  >
+                    Select all
+                  </button>
+                  <button
+                    type="button"
+                    aria-pressed={Boolean(pull?.columns.length) && hidden.size >= pull.columns.length}
+                    onClick={deselectAllColumns}
+                    className={cn(
+                      "inline-flex rounded-full border px-2.5 py-0.5 text-[11px] font-medium transition-colors",
+                      pull?.columns.length && hidden.size >= pull.columns.length
+                        ? "border-[#0d99ff]/40 bg-[#0d99ff]/10 text-[#0d99ff]"
+                        : "border-border/70 bg-background text-muted-foreground hover:bg-muted/50",
+                    )}
+                  >
+                    Deselect all
+                  </button>
+                </div>
                 <div className="max-h-72 space-y-0.5 overflow-y-auto pr-1">
                   {(pull?.columns || []).map((column) => (
                     <ColumnOption
@@ -479,6 +492,7 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
                       onToggle={() => toggleColumn(column.id)}
                     />
                   ))}
+                </div>
                 </div>
               </AccordionContent>
             </AccordionItem>

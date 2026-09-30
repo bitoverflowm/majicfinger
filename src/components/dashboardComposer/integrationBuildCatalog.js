@@ -59,7 +59,7 @@ export const BUILD_SOURCES = {
     tables: {
       markets: {
         label: "Markets search",
-        description: "Each row is a Kalshi contract from the deep history, highest volume first.",
+        description: "Each row represents a Kalshi market contract.",
       },
       trades: {
         label: "Trades search",
