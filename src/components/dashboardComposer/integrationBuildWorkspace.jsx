@@ -115,6 +115,7 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
   const user = useUser();
   const planLimit = user === undefined ? null : getHistoricalPullRowLimit(user);
   const [tableId, setTableId] = useState(source?.defaultTable || tableIds[0]);
+  const [groupId, setGroupId] = useState(source?.defaultGroup || "");
   const [pull, setPull] = useState(null);
   const [loading, setLoading] = useState(true);
   const [progress, setProgress] = useState(8);
@@ -127,8 +128,26 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
   const [universe, setUniverse] = useState(null);
   const [counting, setCounting] = useState(false);
 
+  const groups = source?.groups || null;
+  const visibleTableIds = groups
+    ? tableIds.filter((id) => (groupId === "realtime" ? tables[id].realtime : tables[id].group === groupId))
+    : tableIds;
   const table = tables[tableId];
   const exactUniverse = usesExactUniverse(integrationId);
+
+  useEffect(() => {
+    const next = BUILD_SOURCES[integrationId];
+    setGroupId(next?.defaultGroup || "");
+    setTableId(next?.defaultTable || Object.keys(next?.tables || {})[0] || "");
+  }, [integrationId]);
+
+  function selectGroup(nextGroup) {
+    setGroupId(nextGroup);
+    const ids = tableIds.filter((id) =>
+      nextGroup === "realtime" ? tables[id].realtime : tables[id].group === nextGroup,
+    );
+    if (!ids.includes(tableId)) setTableId(ids[0] || tableId);
+  }
 
   useEffect(() => {
     let cancel = false;
@@ -334,6 +353,30 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
         </div>
         <div className="min-h-0 flex-1 space-y-5 overflow-y-auto px-4 pb-4">
           <div>
+            {groups ? (
+              <div className="mb-2 flex flex-wrap gap-1.5" role="tablist" aria-label="Kalshi Live">
+                {groups.map((group) => {
+                  const selected = groupId === group.id;
+                  return (
+                    <button
+                      key={group.id}
+                      type="button"
+                      role="tab"
+                      aria-selected={selected}
+                      onClick={() => selectGroup(group.id)}
+                      className={cn(
+                        "inline-flex rounded-full border px-2.5 py-1 text-[11px] font-medium transition-colors",
+                        selected
+                          ? "border-[#0d99ff]/40 bg-[#0d99ff]/10 text-[#0d99ff]"
+                          : "border-border/70 bg-background text-muted-foreground hover:bg-muted/50 hover:text-foreground",
+                      )}
+                    >
+                      {group.label}
+                    </button>
+                  );
+                })}
+              </div>
+            ) : null}
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <button
@@ -348,7 +391,7 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
                 </button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="start" className="z-[580] w-[300px]">
-                {tableIds.map((id) => (
+                {visibleTableIds.map((id) => (
                   <DropdownMenuItem key={id} onSelect={() => setTableId(id)}>
                     <span>
                       <span className="block text-[13px] font-medium">{tables[id].label}</span>

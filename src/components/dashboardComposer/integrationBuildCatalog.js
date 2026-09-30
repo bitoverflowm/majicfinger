@@ -4,11 +4,51 @@
  */
 import { fetchAthenaLakeSample } from "@/lib/dataLake/fetchAthenaSample";
 import { getColumnMetaForLakeTable, isDateLikeColumnName } from "@/lib/dataLake/lakeTableColumns";
+import { flattenKalshiHistoricalV2CandlestickGroups } from "@/lib/kalshiHistoricalV2/normalizeHistoricalCandlestickRow";
 import { KALSHI_HISTORICAL_V2_TRADES_COLUMNS } from "@/lib/kalshiHistoricalV2/historicalTradesColumns";
+import {
+  getKalshiLiveColumnsForEndpoint,
+  getKalshiLiveRealtimeEndpointIds,
+  KALSHI_LIVE_CONNECT_ENDPOINTS,
+  KALSHI_LIVE_ENDPOINT_CATEGORIES,
+} from "@/config/kalshiLiveConnect";
+import { KALSHI_LIVE_CANDLESTICK_COLUMNS } from "@/lib/kalshiLive/candlesticksColumns";
+import { flattenKalshiLiveCandlestickGroups } from "@/lib/kalshiLive/normalizeCandlestickRow";
 import { KALSHI_LIVE_MARKETS_COLUMNS } from "@/lib/kalshiLive/marketsColumns";
+import { normalizeKalshiLiveMarketRow } from "@/lib/kalshiLive/normalizeMarketRow";
+import { normalizeKalshiLiveSeriesRow } from "@/lib/kalshiLive/normalizeSeriesRow";
+import { normalizeKalshiLiveTradeRow } from "@/lib/kalshiLive/normalizeTradeRow";
+import { normalizeKalshiLiveOrderbook } from "@/lib/kalshiLive/normalizeOrderbookRow";
+import { normalizeKalshiLiveEventRow } from "@/lib/kalshiLive/normalizeEventRow";
+import { projectKalshiLiveEventForecastRows } from "@/lib/kalshiLive/normalizeEventForecastRow";
+import { normalizeKalshiLiveLeaderboardRow } from "@/lib/kalshiLive/normalizeLeaderboardRow";
+import { normalizeKalshiLiveHolderProfileRow } from "@/lib/kalshiLive/normalizeHolderProfileRow";
+import { normalizeKalshiLiveHolderTradeRow } from "@/lib/kalshiLive/normalizeHolderTradeRow";
+import { normalizeKalshiLiveSearchTradersRow } from "@/lib/kalshiLive/normalizeSearchTradersRow";
+import { getKalshiLiveSearchTradersColumns } from "@/lib/kalshiLive/searchTradersColumns";
 import { MARKETS_RESPONSE_FIELDS } from "@/components/integrationsView/integrationPlayground/integrations/polymarket/config";
 
 export const PREVIEW_ROW_CAP = 50;
+
+function kalshiLiveSource() {
+  const realtime = getKalshiLiveRealtimeEndpointIds();
+  const tables = {};
+  for (const endpoint of KALSHI_LIVE_CONNECT_ENDPOINTS) {
+    tables[endpoint.id] = {
+      label: endpoint.title,
+      description: endpoint.description,
+      group: endpoint.category || "markets",
+      realtime: realtime.has(endpoint.id),
+    };
+  }
+  return {
+    name: "Kalshi Live",
+    defaultGroup: "markets",
+    defaultTable: "markets",
+    groups: KALSHI_LIVE_ENDPOINT_CATEGORIES,
+    tables,
+  };
+}
 
 const SAVED_SEARCHES_KEY = "lycheeIntegrationSavedSearches";
 
@@ -39,18 +79,13 @@ export const BUILD_SOURCES = {
         label: "Trades search",
         description: "Recent fills up to the live cutoff.",
       },
-    },
-  },
-  kalshiLive: {
-    name: "Kalshi Live",
-    defaultTable: "markets",
-    tables: {
-      markets: {
-        label: "Markets search",
-        description: "Open Kalshi markets on the live book.",
+      candlesticks: {
+        label: "Candlesticks search",
+        description: "One-minute candles for a recent Kalshi market, up to the live cutoff.",
       },
     },
   },
+  kalshiLive: kalshiLiveSource(),
   polymarketHistorical: {
     name: "Polymarket Historical",
     defaultTable: "markets",
@@ -349,11 +384,78 @@ async function kalshiHistoricalTrades() {
   };
 }
 
+const KALSHI_V2_MARKET_DEFAULTS = new Set([
+  "ticker",
+  "yes_sub_title",
+  "status",
+  "last_price_dollars",
+  "yes_bid_dollars",
+  "volume_fp",
+  "close_time",
+]);
+
+function declaredColumns(meta, defaults) {
+  const on = new Set(defaults);
+  return meta.map((entry) => {
+    const raw = String(entry.type || "").toLowerCase();
+    const type =
+      raw === "boolean"
+        ? "boolean"
+        : raw === "timestamp"
+          ? "date"
+          : raw === "int" || raw === "number" || raw === "nullable_number"
+            ? "number"
+            : "text";
+    return {
+      id: entry.name,
+      title: entry.label ? titleFor(entry.label) : titleFor(entry.name),
+      type,
+      description: entry.description || "",
+      defaultOn: on.has(entry.name),
+    };
+  });
+}
+
+function kalshiV2MarketColumns() {
+  return declaredColumns(KALSHI_LIVE_MARKETS_COLUMNS, KALSHI_V2_MARKET_DEFAULTS);
+}
+
+const KALSHI_V2_TRADE_DEFAULTS = [
+  "created_time",
+  "ticker",
+  "taker_outcome_side",
+  "yes_price_dollars",
+  "count_fp",
+];
+
+function kalshiV2TradeColumns() {
+  return declaredColumns(KALSHI_HISTORICAL_V2_TRADES_COLUMNS, KALSHI_V2_TRADE_DEFAULTS);
+}
+
+const KALSHI_V2_CANDLE_DEFAULTS = [
+  "market_ticker",
+  "end_period_ts",
+  "price_open_dollars",
+  "price_high_dollars",
+  "price_low_dollars",
+  "price_close_dollars",
+  "volume_fp",
+];
+
+function kalshiV2CandlestickColumns() {
+  return declaredColumns(KALSHI_LIVE_CANDLESTICK_COLUMNS, KALSHI_V2_CANDLE_DEFAULTS);
+}
+
+function unixSeconds(value) {
+  if (value == null || value === "") return null;
+  const n = Number(value);
+  if (Number.isFinite(n) && n > 1e9) return Math.floor(n > 1e12 ? n / 1000 : n);
+  const ms = Date.parse(String(value));
+  return Number.isFinite(ms) ? Math.floor(ms / 1000) : null;
+}
+
 async function kalshiV2Markets() {
-  const columns = catalogColumns(
-    KALSHI_LIVE_MARKETS_COLUMNS,
-    ["ticker", "yes_sub_title", "status", "last_price_dollars", "yes_bid_dollars", "volume_fp", "close_time"],
-  );
+  const columns = kalshiV2MarketColumns();
   const json = await getJson(
     `/api/integrations/kalshi-live/historical/markets?discovery=1&ticker_scope=general&limit=${PREVIEW_ROW_CAP}&mve_filter=exclude`,
   );
@@ -366,13 +468,7 @@ async function kalshiV2Markets() {
 }
 
 async function kalshiV2Trades() {
-  const columns = catalogColumns(KALSHI_HISTORICAL_V2_TRADES_COLUMNS, [
-    "created_time",
-    "ticker",
-    "taker_outcome_side",
-    "yes_price_dollars",
-    "count_fp",
-  ]);
+  const columns = kalshiV2TradeColumns();
   const json = await getJson(`/api/integrations/kalshi-live/historical/trades?limit=${PREVIEW_ROW_CAP}`);
   const trades = Array.isArray(json.trades) ? json.trades : [];
   return {
@@ -382,20 +478,205 @@ async function kalshiV2Trades() {
   };
 }
 
-async function kalshiLiveMarkets() {
-  const columns = catalogColumns(
-    KALSHI_LIVE_MARKETS_COLUMNS,
-    ["ticker", "yes_sub_title", "status", "last_price_dollars", "yes_bid_dollars", "yes_ask_dollars", "volume_fp"],
+async function kalshiV2Candlesticks() {
+  const columns = kalshiV2CandlestickColumns();
+  const marketsJson = await getJson(
+    `/api/integrations/kalshi-live/historical/markets?discovery=1&ticker_scope=general&limit=5&mve_filter=exclude`,
   );
+  const markets = Array.isArray(marketsJson.markets) ? marketsJson.markets : [];
+  const market = markets.find((entry) => entry?.ticker && unixSeconds(entry.close_time));
+  if (!market) return { columns, rows: [], capped: false };
+  const end = unixSeconds(market.close_time);
+  const open = unixSeconds(market.open_time);
+  let start = end - PREVIEW_ROW_CAP * 60;
+  if (open && open > start && open < end) start = open;
   const json = await getJson(
-    `/api/integrations/kalshi-live/markets?discovery=1&limit=${PREVIEW_ROW_CAP}&status=open&mve_filter=exclude`,
+    `/api/integrations/kalshi-live/historical/markets/candlesticks?ticker=${encodeURIComponent(market.ticker)}&start_ts=${start}&end_ts=${end}&period_interval=1`,
   );
-  const markets = Array.isArray(json.markets) ? json.markets : [];
+  const groups = Array.isArray(json.markets)
+    ? json.markets
+    : [{ market_ticker: market.ticker, candlesticks: json.candlesticks || [] }];
+  const flat = flattenKalshiHistoricalV2CandlestickGroups(groups);
   return {
     columns,
-    rows: projectRows(columns, markets),
-    capped: Boolean(json.cursor) || markets.length >= PREVIEW_ROW_CAP,
+    rows: projectRows(columns, flat),
+    capped: flat.length >= PREVIEW_ROW_CAP,
   };
+}
+
+const KALSHI_LIVE_DEFAULTS = {
+  markets: ["ticker", "yes_sub_title", "status", "last_price_dollars", "yes_bid_dollars", "yes_ask_dollars", "volume_fp"],
+  series: ["ticker", "title", "category", "frequency", "volume_fp"],
+  candlesticks: ["market_ticker", "end_period_ts", "price_open_dollars", "price_high_dollars", "price_low_dollars", "price_close_dollars", "volume_fp"],
+  trades: ["created_time", "ticker", "taker_outcome_side", "yes_price_dollars", "count_fp"],
+  orderbook: ["ticker", "side", "price_dollars", "quantity_fp", "level_index"],
+  events: ["event_ticker", "series_ticker", "title", "sub_title", "mutually_exclusive"],
+  event_candlesticks: ["market_ticker", "end_period_ts", "price_open_dollars", "price_high_dollars", "price_low_dollars", "price_close_dollars", "volume_fp"],
+  multivariate_events: ["event_ticker", "series_ticker", "title", "sub_title"],
+  event_forecast: ["event_ticker", "end_period_ts", "percentile_pct", "numerical_forecast", "formatted_forecast"],
+  leaderboard: ["rank", "nickname", "value", "metric_name", "time_period"],
+  holder_profile: ["nickname", "follower_count", "following_count", "description", "joined_at"],
+  trades_by_holder: ["create_date", "ticker", "price_dollars", "count_fp", "taker_side", "taker_nickname"],
+  search_traders: ["nickname", "volume", "pnl", "dollars_traded", "num_markets_traded"],
+};
+
+function kalshiLiveColumns(endpointId) {
+  const meta =
+    endpointId === "search_traders"
+      ? getKalshiLiveSearchTradersColumns({ includeMetrics: true, includeHoldings: true })
+      : getKalshiLiveColumnsForEndpoint(endpointId);
+  const defaults = KALSHI_LIVE_DEFAULTS[endpointId] || meta.slice(0, 6).map((entry) => entry.name);
+  return declaredColumns(meta, defaults);
+}
+
+function previewPack(columns, rows) {
+  return {
+    columns,
+    rows: projectRows(columns, rows),
+    capped: rows.length >= PREVIEW_ROW_CAP,
+  };
+}
+
+async function openLiveMarket() {
+  const json = await getJson(
+    `/api/integrations/kalshi-live/markets?discovery=1&limit=1&status=open&mve_filter=exclude`,
+  );
+  return (Array.isArray(json.markets) ? json.markets : [])[0] || null;
+}
+
+async function openLiveEvent() {
+  const json = await getJson(
+    `/api/integrations/kalshi-live/events?limit=1&status=open&with_nested_markets=1&with_milestones=1`,
+  );
+  return (Array.isArray(json.events) ? json.events : [])[0] || null;
+}
+
+async function kalshiLiveRows(endpointId) {
+  if (endpointId === "markets") {
+    const json = await getJson(
+      `/api/integrations/kalshi-live/markets?discovery=1&limit=${PREVIEW_ROW_CAP}&status=open&mve_filter=exclude`,
+    );
+    return (Array.isArray(json.markets) ? json.markets : []).map((row) => normalizeKalshiLiveMarketRow(row));
+  }
+  if (endpointId === "series") {
+    const json = await getJson("/api/integrations/kalshi-live/series/list?include_volume=true");
+    const series = Array.isArray(json.series) ? json.series : [];
+    return series.slice(0, PREVIEW_ROW_CAP).map((row) => normalizeKalshiLiveSeriesRow(row));
+  }
+  if (endpointId === "candlesticks") {
+    const listed = await getJson(
+      `/api/integrations/kalshi-live/markets?discovery=1&limit=8&status=open&mve_filter=exclude`,
+    );
+    const markets = Array.isArray(listed.markets) ? listed.markets : [];
+    const end = Math.floor(Date.now() / 1000);
+    const start = end - PREVIEW_ROW_CAP * 60;
+    let fallback = [];
+    for (const market of markets) {
+      if (!market?.ticker) continue;
+      const json = await getJson(
+        `/api/integrations/kalshi-live/markets/candlesticks?market_tickers=${encodeURIComponent(market.ticker)}&start_ts=${start}&end_ts=${end}&period_interval=1&per_ticker=1`,
+      );
+      const rows = flattenKalshiLiveCandlestickGroups(json.markets);
+      if (rows.length > fallback.length) fallback = rows;
+      if (rows.length >= 8) return rows;
+    }
+    return fallback;
+  }
+  if (endpointId === "trades") {
+    const market = await openLiveMarket();
+    if (!market?.ticker) return [];
+    const json = await getJson(
+      `/api/integrations/kalshi-live/markets/trades?ticker=${encodeURIComponent(market.ticker)}&limit=${PREVIEW_ROW_CAP}`,
+    );
+    return (Array.isArray(json.trades) ? json.trades : []).map((row) => normalizeKalshiLiveTradeRow(row));
+  }
+  if (endpointId === "orderbook") {
+    const market = await openLiveMarket();
+    if (!market?.ticker) return [];
+    const json = await getJson(
+      `/api/integrations/kalshi-live/markets/orderbook?ticker=${encodeURIComponent(market.ticker)}&depth=20`,
+    );
+    return normalizeKalshiLiveOrderbook(json.ticker || market.ticker, json.orderbook_fp);
+  }
+  if (endpointId === "events" || endpointId === "multivariate_events") {
+    const path =
+      endpointId === "events"
+        ? `/api/integrations/kalshi-live/events?limit=${PREVIEW_ROW_CAP}&status=open&with_nested_markets=1&with_milestones=1`
+        : `/api/integrations/kalshi-live/events/multivariate?limit=${PREVIEW_ROW_CAP}&with_nested_markets=1`;
+    const json = await getJson(path);
+    const events = Array.isArray(json.events) ? json.events : [];
+    return events.map((row) => normalizeKalshiLiveEventRow(row));
+  }
+  if (endpointId === "event_candlesticks") {
+    const event = await openLiveEvent();
+    if (!event?.event_ticker || !event?.series_ticker) return [];
+    const end = Math.floor(Date.now() / 1000);
+    const start = end - 3600;
+    const json = await getJson(
+      `/api/integrations/kalshi-live/events/candlesticks?ticker=${encodeURIComponent(event.event_ticker)}&series_ticker=${encodeURIComponent(event.series_ticker)}&start_ts=${start}&end_ts=${end}&period_interval=60`,
+    );
+    const tickers = Array.isArray(json.market_tickers) ? json.market_tickers : [];
+    const sticks = Array.isArray(json.market_candlesticks) ? json.market_candlesticks : [];
+    return flattenKalshiLiveCandlestickGroups(
+      tickers.map((ticker, index) => ({
+        market_ticker: ticker,
+        candlesticks: Array.isArray(sticks[index]) ? sticks[index] : [],
+      })),
+    );
+  }
+  if (endpointId === "event_forecast") {
+    const event = await openLiveEvent();
+    if (!event?.event_ticker || !event?.series_ticker) return [];
+    const end = Math.floor(Date.now() / 1000);
+    const start = end - 6 * 3600;
+    const params = new URLSearchParams({
+      ticker: event.event_ticker,
+      series_ticker: event.series_ticker,
+      start_ts: String(start),
+      end_ts: String(end),
+      period_interval: "60",
+    });
+    for (const percentile of [1000, 2500, 5000, 7500, 9000]) params.append("percentiles", String(percentile));
+    const json = await getJson(`/api/integrations/kalshi-live/events/forecast-percentile-history?${params.toString()}`);
+    return projectKalshiLiveEventForecastRows(json.forecast_history);
+  }
+  if (endpointId === "leaderboard") {
+    const json = await getJson(
+      `/api/integrations/kalshi-live/social/leaderboard?metric_name=projected_pnl&time_period=all_time&limit=${PREVIEW_ROW_CAP}`,
+    );
+    const ranks = Array.isArray(json.rank_list) ? json.rank_list : [];
+    return ranks.map((row) =>
+      normalizeKalshiLiveLeaderboardRow(row, { metricName: "projected_pnl", timePeriod: "all_time" }),
+    );
+  }
+  if (endpointId === "holder_profile") {
+    const board = await getJson(
+      "/api/integrations/kalshi-live/social/leaderboard?metric_name=projected_pnl&time_period=all_time&limit=1",
+    );
+    const nickname = board.rank_list?.[0]?.nickname;
+    if (!nickname) return [];
+    const json = await getJson(
+      `/api/integrations/kalshi-live/social/profile?nickname=${encodeURIComponent(nickname)}`,
+    );
+    return [normalizeKalshiLiveHolderProfileRow(json)];
+  }
+  if (endpointId === "trades_by_holder") {
+    const json = await getJson(`/api/integrations/kalshi-live/social/trades?page_size=${PREVIEW_ROW_CAP}`);
+    return (Array.isArray(json.trades) ? json.trades : []).map((row) => normalizeKalshiLiveHolderTradeRow(row));
+  }
+  if (endpointId === "search_traders") {
+    const json = await getJson(`/api/integrations/kalshi-live/search/social-profiles?query=ka&limit=${PREVIEW_ROW_CAP}`);
+    return (Array.isArray(json.profiles) ? json.profiles : []).map((row) =>
+      normalizeKalshiLiveSearchTradersRow(row, null, null, { includeMetrics: true, includeHoldings: true }),
+    );
+  }
+  return [];
+}
+
+async function kalshiLiveEndpoint(endpointId) {
+  const columns = kalshiLiveColumns(endpointId);
+  const rows = await kalshiLiveRows(endpointId);
+  return previewPack(columns, rows);
 }
 
 async function polymarketHistoricalMarkets() {
@@ -585,7 +866,13 @@ const LOADERS = {
   "kalshiHistorical:trades": kalshiHistoricalTrades,
   "kalshiHistoricalV2:markets": kalshiV2Markets,
   "kalshiHistoricalV2:trades": kalshiV2Trades,
-  "kalshiLive:markets": kalshiLiveMarkets,
+  "kalshiHistoricalV2:candlesticks": kalshiV2Candlesticks,
+  ...Object.fromEntries(
+    KALSHI_LIVE_CONNECT_ENDPOINTS.map((endpoint) => [
+      `kalshiLive:${endpoint.id}`,
+      () => kalshiLiveEndpoint(endpoint.id),
+    ]),
+  ),
   "polymarketHistorical:markets": polymarketHistoricalMarkets,
   "polymarketHistorical:trades": polymarketHistoricalTrades,
   "polymarket:markets": polymarketLiveMarkets,
