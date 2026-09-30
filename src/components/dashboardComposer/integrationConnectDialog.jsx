@@ -17,6 +17,7 @@ import {
   kalshiLiveCaption,
   useKalshiHistoricalCutoffDisplay,
 } from "@/hooks/useKalshiHistoricalCutoffDisplay";
+import { IntegrationBuildWorkspace } from "@/components/dashboardComposer/integrationBuildWorkspace";
 import { IntegrationSamplePreview } from "@/components/dashboardComposer/integrationPreviewView";
 import {
   isLivePreviewId,
@@ -289,6 +290,7 @@ export function IntegrationConnectDialog({ open, onOpenChange }) {
   const selectable = [...primary, ...beta];
   const [selectedId, setSelectedId] = useState(null);
   const [hoveredId, setHoveredId] = useState(null);
+  const [phase, setPhase] = useState("pick");
   const selected = selectable.find((row) => row.id === selectedId) || null;
   const hovered = rows.find((row) => row.id === hoveredId) || null;
   const shown = hovered || selected || primary[0] || null;
@@ -301,14 +303,26 @@ export function IntegrationConnectDialog({ open, onOpenChange }) {
     }
     setSelectedId(null);
     setHoveredId(null);
+    setPhase("pick");
   }, [open]);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
         overlayClassName="z-[560] bg-black/40"
-        className="z-[560] flex max-h-[min(880px,92vh)] w-[min(980px,calc(100vw-2rem))] max-w-none flex-col gap-0 overflow-hidden border-border/70 p-0 shadow-xl sm:rounded-2xl"
+        className={cn(
+          "z-[560] flex max-w-none flex-col gap-0 overflow-hidden border-border/70 p-0 shadow-xl sm:rounded-2xl",
+          phase === "build"
+            ? "h-[min(900px,94vh)] w-[min(1180px,calc(100vw-1.5rem))]"
+            : "max-h-[min(880px,92vh)] w-[min(980px,calc(100vw-2rem))]",
+        )}
       >
+        {phase === "build" && selected ? (
+          <>
+            <DialogTitle className="sr-only">{selected.name} preview</DialogTitle>
+            <IntegrationBuildWorkspace integrationId={selected.id} />
+          </>
+        ) : (
         <div className="grid min-h-0 flex-1 md:grid-cols-[minmax(0,1.05fr)_minmax(0,0.95fr)]">
           <div className="flex min-h-0 flex-col bg-background">
             <div className="px-6 pb-3 pt-6 pr-12">
@@ -395,7 +409,11 @@ export function IntegrationConnectDialog({ open, onOpenChange }) {
                 <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
                   Previous
                 </Button>
-                <Button type="button" className="bg-[#2f6fed] text-white hover:bg-[#2f6fed]/90">
+                <Button
+                  type="button"
+                  className="bg-[#2f6fed] text-white hover:bg-[#2f6fed]/90"
+                  onClick={() => setPhase("build")}
+                >
                   Start building
                   <ArrowRight />
                 </Button>
@@ -406,6 +424,7 @@ export function IntegrationConnectDialog({ open, onOpenChange }) {
             <PreviewPane row={shown} description={hovered?.description || ""} />
           ) : null}
         </div>
+        )}
       </DialogContent>
     </Dialog>
   );
