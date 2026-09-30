@@ -3,6 +3,10 @@
  * One table is loaded at a time, capped at 50 rows. Types are a first pass.
  */
 import { fetchAthenaLakeSample } from "@/lib/dataLake/fetchAthenaSample";
+import { getColumnMetaForLakeTable, isDateLikeColumnName } from "@/lib/dataLake/lakeTableColumns";
+import { KALSHI_HISTORICAL_V2_TRADES_COLUMNS } from "@/lib/kalshiHistoricalV2/historicalTradesColumns";
+import { KALSHI_LIVE_MARKETS_COLUMNS } from "@/lib/kalshiLive/marketsColumns";
+import { MARKETS_RESPONSE_FIELDS } from "@/components/integrationsView/integrationPlayground/integrations/polymarket/config";
 
 export const PREVIEW_ROW_CAP = 50;
 
@@ -110,8 +114,6 @@ const TITLE = {
   count: "Size",
   yes_price: "Yes price",
   taker_side: "Side",
-  created_time: "Time",
-  timestamp: "Time",
   maker: "Maker",
   taker: "Taker",
   maker_amount: "Maker amount",
@@ -124,11 +126,144 @@ const TITLE = {
 };
 
 function titleFor(id) {
-  return TITLE[id] || id.replace(/_/g, " ").replace(/\b\w/g, (letter) => letter.toUpperCase());
+  if (TITLE[id]) return TITLE[id];
+  return String(id)
+    .replace(/_/g, " ")
+    .replace(/([a-z0-9])([A-Z])/g, "$1 $2")
+    .replace(/\b\w/g, (letter) => letter.toUpperCase());
 }
 
-function column(id, type, scale) {
-  return { id, title: titleFor(id), type, ...(scale ? { scale } : {}) };
+function column(id, type, scale, defaultOn = true, description = "") {
+  return { id, title: titleFor(id), type, defaultOn, description, ...(scale ? { scale } : {}) };
+}
+
+const KALSHI_HISTORICAL_MARKET_FIELDS = [
+  ["ticker", "text", "Ticker", "Unique market identifier (e.g., PRES-2024-DJT)"],
+  ["kalshi_event_ticker_category", "text", "Event ticker simplified", "Simplified ticker parsed from event_ticker."],
+  ["event_ticker", "text", "Event ticker", "Parent event identifier, used for categorization."],
+  ["kalshi_taxonomy_category", "text", "Category", "Market category bucket (Sports, Weather, Politics, Crypto, …)."],
+  ["market_type", "text", "Market type", "Market type (typically binary)."],
+  ["title", "text", "Title", "Human-readable market title."],
+  ["yes_sub_title", "text", "Yes sub title", "Label for the Yes outcome."],
+  ["no_sub_title", "text", "No sub title", "Label for the No outcome."],
+  ["status", "text", "Status", "Market status: open, closed, finalized."],
+  ["yes_bid", "number", "Yes bid", "Best bid price for Yes contracts (cents, 1–99)."],
+  ["yes_ask", "number", "Yes ask", "Best ask price for Yes contracts (cents, 1–99)."],
+  ["no_bid", "number", "No bid", "Best bid price for No contracts (cents, 1–99)."],
+  ["no_ask", "number", "No ask", "Best ask price for No contracts (cents, 1–99)."],
+  ["last_price", "number", "Last price", "Last traded price (cents, 1–99)."],
+  ["volume", "number", "Volume", "Total contracts traded."],
+  ["volume_24h", "number", "Volume 24h", "Contracts traded in the last 24 hours."],
+  ["open_interest", "number", "Open interest", "Outstanding contracts."],
+  ["result", "text", "Result", "Market outcome: yes, no, or empty if unresolved."],
+  ["created_time", "date", "Created time", "When the market was created."],
+  ["open_time", "date", "Open time", "When trading opened."],
+  ["close_time", "date", "Close time", "When trading closed."],
+  ["_fetched_at", "date", "Fetched at", "When this record was fetched."],
+];
+
+const KALSHI_HISTORICAL_MARKET_DEFAULTS = new Set([
+  "ticker",
+  "title",
+  "status",
+  "last_price",
+  "yes_bid",
+  "volume",
+  "close_time",
+]);
+
+function kalshiHistoricalMarketColumns() {
+  return KALSHI_HISTORICAL_MARKET_FIELDS.map(([id, type, title, description]) => ({
+    id,
+    title,
+    type,
+    description,
+    defaultOn: KALSHI_HISTORICAL_MARKET_DEFAULTS.has(id),
+    ...(LAKE_CENTS.has(id) ? { scale: "cents" } : {}),
+  }));
+}
+
+const LAKE_COMPUTED = new Set(["kalshi_event_ticker_category", "kalshi_taxonomy_category"]);
+const LAKE_CENTS = new Set(["last_price", "yes_bid", "yes_ask", "no_bid", "no_ask", "yes_price", "no_price"]);
+
+function uiType(rawType, name) {
+  const type = String(rawType || "").toLowerCase();
+  if (type === "boolean") return "boolean";
+  if (type === "timestamp" || (type !== "string" && isDateLikeColumnName(name))) return "date";
+  if (type === "string") {
+    if (isDateLikeColumnName(name)) return "date";
+    return "text";
+  }
+  if (type === "bigint" || type === "int" || type === "double" || type === "number") return "number";
+  return "text";
+}
+
+function catalogColumns(meta, defaults, { cents = false } = {}) {
+  const on = new Set(defaults);
+  return meta.map((entry) => {
+    const id = entry.name;
+    const scale = cents && LAKE_CENTS.has(id) ? "cents" : undefined;
+    return column(id, uiType(entry.type, id), scale, on.has(id));
+  });
+}
+
+function lakeColumns(lake, table, defaults) {
+  const meta = getColumnMetaForLakeTable(lake, table).filter((entry) => !LAKE_COMPUTED.has(entry.name));
+  return catalogColumns(meta, defaults, { cents: lake === "kalshi" });
+}
+
+function cellValue(value) {
+  if (value == null) return "";
+  if (typeof value === "object") return JSON.stringify(value);
+  return value;
+}
+
+function projectRows(columns, records) {
+  return records.slice(0, PREVIEW_ROW_CAP).map((record) => {
+    const row = {};
+    for (const entry of columns) row[entry.id] = cellValue(record?.[entry.id]);
+    return row;
+  });
+}
+
+const POLYMARKET_LIVE_NUMBER = /volume|liquidity|fee|price|spread|score|bound|size|tick|delay|liveness|change|line|reward|bond/i;
+const POLYMARKET_LIVE_BOOL = new Set([
+  "active",
+  "closed",
+  "new",
+  "featured",
+  "archived",
+  "restricted",
+  "wideFormat",
+  "ready",
+  "funded",
+  "acceptingOrders",
+  "notificationsEnabled",
+  "commentsEnabled",
+  "hasReviewedDates",
+  "readyForCron",
+  "automaticallyResolved",
+  "automaticallyActive",
+  "clearBookOnStart",
+  "manualActivation",
+  "negRiskOther",
+  "pendingDeployment",
+  "deploying",
+  "rfqEnabled",
+  "enableOrderBook",
+  "fpmmLive",
+  "winner",
+]);
+
+function polymarketLiveColumns(defaults) {
+  const on = new Set(defaults);
+  return MARKETS_RESPONSE_FIELDS.map((name) => {
+    let type = "text";
+    if (POLYMARKET_LIVE_BOOL.has(name)) type = "boolean";
+    else if (isDateLikeColumnName(name)) type = "date";
+    else if (POLYMARKET_LIVE_NUMBER.test(name)) type = "number";
+    return column(name, type, undefined, on.has(name));
+  });
 }
 
 const pullCache = new Map();
@@ -179,224 +314,148 @@ async function postAthena(body) {
   });
 }
 
-function pick(row, ids) {
-  const out = {};
-  for (const id of ids) out[id] = row?.[id] ?? "";
-  return out;
-}
-
 async function kalshiHistoricalMarkets() {
+  const columns = kalshiHistoricalMarketColumns();
   const rows = await postAthena({
     lake: "kalshi",
     table: "markets",
     queryType: "compose",
     limit: PREVIEW_ROW_CAP,
     compose: {
-      select: ["ticker", "title", "status", "last_price", "yes_bid", "volume", "close_time"].map((name) => ({
-        column: name,
-        alias: name,
-      })),
+      select: columns.map((entry) => ({ column: entry.id, alias: entry.id })),
       groupByAliases: [],
       orderBy: [{ alias: "volume", direction: "desc" }],
     },
   });
   return {
-    columns: [
-      column("ticker", "text"),
-      column("title", "text"),
-      column("status", "text"),
-      column("last_price", "number", "cents"),
-      column("yes_bid", "number", "cents"),
-      column("volume", "number"),
-      column("close_time", "date"),
-    ],
+    columns,
     rows: rows.slice(0, PREVIEW_ROW_CAP),
     capped: rows.length >= PREVIEW_ROW_CAP,
   };
 }
 
 async function kalshiHistoricalTrades() {
+  const columns = lakeColumns("kalshi", "trades", ["created_time", "ticker", "taker_side", "yes_price", "count"]);
   const rows = await postAthena({
     lake: "kalshi",
     table: "trades",
     limit: PREVIEW_ROW_CAP,
-    columns: ["ticker", "count", "yes_price", "taker_side", "created_time"],
+    columns: columns.map((entry) => entry.id),
   });
   return {
-    columns: [
-      column("created_time", "date"),
-      column("ticker", "text"),
-      column("taker_side", "text"),
-      column("yes_price", "number", "cents"),
-      column("count", "number"),
-    ],
-    rows: rows.slice(0, PREVIEW_ROW_CAP).map((row) => ({
-      created_time: row.created_time,
-      ticker: row.ticker,
-      taker_side: row.taker_side,
-      yes_price: row.yes_price,
-      count: row.count,
-    })),
+    columns,
+    rows: rows.slice(0, PREVIEW_ROW_CAP),
     capped: rows.length >= PREVIEW_ROW_CAP,
   };
 }
 
 async function kalshiV2Markets() {
+  const columns = catalogColumns(
+    KALSHI_LIVE_MARKETS_COLUMNS,
+    ["ticker", "yes_sub_title", "status", "last_price_dollars", "yes_bid_dollars", "volume_fp", "close_time"],
+  );
   const json = await getJson(
     `/api/integrations/kalshi-live/historical/markets?discovery=1&ticker_scope=general&limit=${PREVIEW_ROW_CAP}&mve_filter=exclude`,
   );
   const markets = Array.isArray(json.markets) ? json.markets : [];
-  const ids = ["ticker", "title", "status", "last_price", "yes_bid", "volume", "close_time"];
   return {
-    columns: [
-      column("ticker", "text"),
-      column("title", "text"),
-      column("status", "text"),
-      column("last_price", "number"),
-      column("yes_bid", "number"),
-      column("volume", "number"),
-      column("close_time", "date"),
-    ],
-    rows: markets.slice(0, PREVIEW_ROW_CAP).map((market) =>
-      pick(
-        {
-          ticker: market.ticker,
-          title: market.title,
-          status: market.status,
-          last_price: market.last_price_dollars,
-          yes_bid: market.yes_bid_dollars,
-          volume: market.volume_fp,
-          close_time: market.close_time,
-        },
-        ids,
-      ),
-    ),
+    columns,
+    rows: projectRows(columns, markets),
     capped: Boolean(json.cursor) || markets.length >= PREVIEW_ROW_CAP,
   };
 }
 
 async function kalshiV2Trades() {
+  const columns = catalogColumns(KALSHI_HISTORICAL_V2_TRADES_COLUMNS, [
+    "created_time",
+    "ticker",
+    "taker_outcome_side",
+    "yes_price_dollars",
+    "count_fp",
+  ]);
   const json = await getJson(`/api/integrations/kalshi-live/historical/trades?limit=${PREVIEW_ROW_CAP}`);
   const trades = Array.isArray(json.trades) ? json.trades : [];
   return {
-    columns: [
-      column("created_time", "date"),
-      column("ticker", "text"),
-      column("taker_side", "text"),
-      column("yes_price", "number"),
-      column("count", "number"),
-    ],
-    rows: trades.slice(0, PREVIEW_ROW_CAP).map((trade) => ({
-      created_time: trade.created_time,
-      ticker: trade.ticker,
-      taker_side: trade.taker_side,
-      yes_price: trade.yes_price_dollars,
-      count: trade.count_fp,
-    })),
+    columns,
+    rows: projectRows(columns, trades),
     capped: Boolean(json.cursor) || trades.length >= PREVIEW_ROW_CAP,
   };
 }
 
 async function kalshiLiveMarkets() {
+  const columns = catalogColumns(
+    KALSHI_LIVE_MARKETS_COLUMNS,
+    ["ticker", "yes_sub_title", "status", "last_price_dollars", "yes_bid_dollars", "yes_ask_dollars", "volume_fp"],
+  );
   const json = await getJson(
     `/api/integrations/kalshi-live/markets?discovery=1&limit=${PREVIEW_ROW_CAP}&status=open&mve_filter=exclude`,
   );
   const markets = Array.isArray(json.markets) ? json.markets : [];
   return {
-    columns: [
-      column("ticker", "text"),
-      column("title", "text"),
-      column("status", "text"),
-      column("last_price", "number"),
-      column("yes_bid", "number"),
-      column("yes_ask", "number"),
-      column("volume", "number"),
-    ],
-    rows: markets.slice(0, PREVIEW_ROW_CAP).map((market) => ({
-      ticker: market.ticker,
-      title: market.title,
-      status: market.status,
-      last_price: market.last_price_dollars,
-      yes_bid: market.yes_bid_dollars,
-      yes_ask: market.yes_ask_dollars,
-      volume: market.volume_fp ?? market.volume_24h_fp,
-    })),
+    columns,
+    rows: projectRows(columns, markets),
     capped: Boolean(json.cursor) || markets.length >= PREVIEW_ROW_CAP,
   };
 }
 
 async function polymarketHistoricalMarkets() {
+  const columns = lakeColumns("polymarket", "markets", [
+    "question",
+    "volume",
+    "liquidity",
+    "outcome_prices",
+    "closed",
+    "end_date",
+  ]);
   const rows = await postAthena({
     lake: "polymarket",
     table: "markets",
     queryType: "compose",
     limit: PREVIEW_ROW_CAP,
     compose: {
-      select: ["question", "volume", "liquidity", "outcome_prices", "closed", "end_date"].map((name) => ({
-        column: name,
-        alias: name,
-      })),
+      select: columns.map((entry) => ({ column: entry.id, alias: entry.id })),
       groupByAliases: [],
       orderBy: [{ alias: "volume", direction: "desc" }],
     },
   });
   return {
-    columns: [
-      column("question", "text"),
-      column("volume", "number"),
-      column("liquidity", "number"),
-      column("outcome_prices", "text"),
-      column("closed", "boolean"),
-      column("end_date", "date"),
-    ],
+    columns,
     rows: rows.slice(0, PREVIEW_ROW_CAP),
     capped: rows.length >= PREVIEW_ROW_CAP,
   };
 }
 
 async function polymarketHistoricalTrades() {
+  const columns = lakeColumns("polymarket", "trades", [
+    "timestamp",
+    "maker",
+    "taker",
+    "maker_amount",
+    "taker_amount",
+    "fee",
+  ]);
   const rows = await postAthena({
     lake: "polymarket",
     table: "trades",
     limit: PREVIEW_ROW_CAP,
-    columns: ["timestamp", "maker", "taker", "maker_amount", "taker_amount", "fee"],
+    columns: columns.map((entry) => entry.id),
   });
   return {
-    columns: [
-      column("timestamp", "date"),
-      column("maker", "text"),
-      column("taker", "text"),
-      column("maker_amount", "number"),
-      column("taker_amount", "number"),
-      column("fee", "number"),
-    ],
+    columns,
     rows: rows.slice(0, PREVIEW_ROW_CAP),
     capped: rows.length >= PREVIEW_ROW_CAP,
   };
 }
 
 async function polymarketLiveMarkets() {
+  const columns = polymarketLiveColumns(["question", "volume", "liquidity", "outcomePrices", "closed", "endDate"]);
   const json = await getJson(
     `/api/integrations/polymarket?query=listMarkets&limit=${PREVIEW_ROW_CAP}&order=volumeNum&ascending=false`,
   );
   const markets = Array.isArray(json) ? json : [];
   return {
-    columns: [
-      column("question", "text"),
-      column("volume", "number"),
-      column("liquidity", "number"),
-      column("outcome_prices", "text"),
-      column("closed", "boolean"),
-      column("end_date", "date"),
-    ],
-    rows: markets.slice(0, PREVIEW_ROW_CAP).map((market) => ({
-      question: market.question,
-      volume: market.volumeNum ?? market.volume,
-      liquidity: market.liquidityNum ?? market.liquidity,
-      outcome_prices: market.outcomePrices,
-      closed: market.closed,
-      end_date: market.endDate,
-    })),
+    columns,
+    rows: projectRows(columns, markets),
     capped: markets.length >= PREVIEW_ROW_CAP,
   };
 }

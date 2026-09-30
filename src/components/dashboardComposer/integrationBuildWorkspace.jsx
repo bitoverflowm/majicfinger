@@ -12,6 +12,7 @@ import {
   saveSearch,
   usesExactUniverse,
 } from "@/components/dashboardComposer/integrationBuildCatalog";
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
@@ -35,6 +36,55 @@ function humanHistoryLabel(label) {
     .replace(/\s+/g, " ")
     .replace(/\s·\s·/g, " · ")
     .trim();
+}
+
+function ColumnOption({ column, checked, onToggle }) {
+  const [open, setOpen] = useState(false);
+  const [typed, setTyped] = useState("");
+  const description = column.description || "";
+
+  useEffect(() => {
+    if (!open || !description) return undefined;
+    let index = 0;
+    setTyped("");
+    const timer = window.setInterval(() => {
+      index += 1;
+      setTyped(description.slice(0, index));
+      if (index >= description.length) window.clearInterval(timer);
+    }, 14);
+    return () => window.clearInterval(timer);
+  }, [open, description]);
+
+  return (
+    <div
+      onMouseEnter={() => setOpen(true)}
+      onMouseLeave={() => setOpen(false)}
+      className="rounded-lg px-1 py-0.5 transition-colors hover:bg-muted/60"
+    >
+      <label className="flex items-center gap-2 py-1 text-[13px]">
+        <Checkbox checked={checked} onCheckedChange={onToggle} />
+        <span className="min-w-0 flex-1 truncate text-foreground">{column.title}</span>
+        <span className="text-[10px] uppercase tracking-wide text-muted-foreground">{column.type}</span>
+      </label>
+      {description ? (
+        <div
+          className={cn(
+            "grid transition-[grid-template-rows,opacity] duration-300 ease-out",
+            open ? "grid-rows-[1fr] opacity-100" : "grid-rows-[0fr] opacity-0",
+          )}
+        >
+          <p className="overflow-hidden pl-6 text-[11px] leading-relaxed text-muted-foreground">
+            <span className="block pb-1">
+              {typed}
+              {open && typed.length < description.length ? (
+                <span className="ml-px inline-block w-px animate-pulse bg-current align-[-1px]">&nbsp;</span>
+              ) : null}
+            </span>
+          </p>
+        </div>
+      ) : null}
+    </div>
+  );
 }
 
 function SkeletonRows() {
@@ -97,7 +147,7 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
         if (cancel) return;
         setProgress(100);
         setPull(result);
-        setHidden(new Set());
+        setHidden(new Set(result.columns.filter((column) => column.defaultOn === false).map((column) => column.id)));
         setFilterColumn(result.columns[0]?.id || "");
       })
       .catch((err) => {
@@ -337,21 +387,30 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
             </DropdownMenu>
           </div>
 
-          <section>
-            <p className="mb-2 text-[12px] font-semibold text-foreground">Columns</p>
-            <div className="space-y-1.5">
-              {(pull?.columns || []).map((column) => (
-                <label key={column.id} className="flex items-center gap-2 rounded-lg px-1 py-1 text-[13px]">
-                  <Checkbox
-                    checked={!hidden.has(column.id)}
-                    onCheckedChange={() => toggleColumn(column.id)}
-                  />
-                  <span className="min-w-0 flex-1 truncate text-foreground">{column.title}</span>
-                  <span className="text-[10px] uppercase tracking-wide text-muted-foreground">{column.type}</span>
-                </label>
-              ))}
-            </div>
-          </section>
+          <Accordion type="single" collapsible defaultValue="columns">
+            <AccordionItem value="columns" className="border-0">
+              <AccordionTrigger className="py-1 text-[12px] font-semibold text-foreground hover:no-underline">
+                <span className="flex min-w-0 flex-1 items-center justify-between pr-2">
+                  <span>Columns</span>
+                  <span className="text-[11px] font-normal text-muted-foreground">
+                    {Math.max(0, (pull?.columns.length || 0) - hidden.size)} selected
+                  </span>
+                </span>
+              </AccordionTrigger>
+              <AccordionContent className="pb-1">
+                <div className="max-h-72 space-y-0.5 overflow-y-auto pr-1">
+                  {(pull?.columns || []).map((column) => (
+                    <ColumnOption
+                      key={column.id}
+                      column={column}
+                      checked={!hidden.has(column.id)}
+                      onToggle={() => toggleColumn(column.id)}
+                    />
+                  ))}
+                </div>
+              </AccordionContent>
+            </AccordionItem>
+          </Accordion>
 
           <section>
             <p className="mb-2 text-[12px] font-semibold text-foreground">Filters</p>
