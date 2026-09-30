@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, useContext, useMemo, useState } from "react";
+import { createContext, useContext, useEffect, useMemo, useRef, useState } from "react";
 import Image from "next/image";
 import { Database } from "lucide-react";
 import {
@@ -243,22 +243,23 @@ function PreviewTable({ item }) {
   );
 }
 
-function PreviewPane({ row, description }) {
-  const frames = PREVIEWS[row?.id] || [
-    {
-      title: row?.name || "Sheet",
-      caption: "A typical sheet from this source",
-      columns: ["Field", "Value"],
-      rows: [["—", "—"]],
-    },
-  ];
-
+function previewFrames(row) {
   return (
-    <div className="flex min-h-0 flex-1 flex-col justify-center overflow-y-auto bg-[#e6edf3] p-6 dark:bg-[#1c232b]">
-      <div className="flex items-center gap-2 text-[13px] font-semibold text-foreground">
-        <Database className="size-4 text-muted-foreground" aria-hidden />
-        What this looks like in Lychee
-      </div>
+    PREVIEWS[row?.id] || [
+      {
+        title: row?.name || "Sheet",
+        caption: "A typical sheet from this source",
+        columns: ["Field", "Value"],
+        rows: [["—", "—"]],
+      },
+    ]
+  );
+}
+
+function PreviewBody({ row, description }) {
+  const frames = previewFrames(row);
+  return (
+    <>
       {description ? (
         <p className="mt-3 text-[13px] leading-relaxed text-foreground/90">{description}</p>
       ) : null}
@@ -266,6 +267,47 @@ function PreviewPane({ row, description }) {
         {frames.map((item) => (
           <PreviewTable key={item.title} item={item} />
         ))}
+      </div>
+    </>
+  );
+}
+
+function PreviewPane({ row, description }) {
+  const signature = `${row?.id || ""}\0${description || ""}`;
+  const latestRef = useRef({ signature, row, description });
+  const [leaving, setLeaving] = useState(null);
+
+  useEffect(() => {
+    if (latestRef.current.signature === signature) return undefined;
+    const previous = latestRef.current;
+    latestRef.current = { signature, row, description };
+    setLeaving(previous);
+    const timer = window.setTimeout(() => setLeaving(null), 520);
+    return () => window.clearTimeout(timer);
+  }, [signature, row, description]);
+
+  return (
+    <div className="flex min-h-0 flex-1 flex-col justify-center overflow-y-auto bg-[#e6edf3] p-6 dark:bg-[#1c232b]">
+      <div className="flex items-center gap-2 text-[13px] font-semibold text-foreground">
+        <Database className="size-4 text-muted-foreground" aria-hidden />
+        What this looks like in Lychee
+      </div>
+      <div className="relative">
+        {leaving ? (
+          <div
+            key={leaving.signature}
+            className="pointer-events-none absolute inset-x-0 top-0 animate-out fade-out duration-500 ease-out fill-mode-forwards motion-reduce:animate-none"
+            aria-hidden
+          >
+            <PreviewBody row={leaving.row} description={leaving.description} />
+          </div>
+        ) : null}
+        <div
+          key={signature}
+          className="animate-in fade-in duration-500 ease-out motion-reduce:animate-none"
+        >
+          <PreviewBody row={row} description={description} />
+        </div>
       </div>
     </div>
   );
