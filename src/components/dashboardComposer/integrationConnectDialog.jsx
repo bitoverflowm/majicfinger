@@ -16,6 +16,11 @@ import {
   kalshiLiveCaption,
   useKalshiHistoricalCutoffDisplay,
 } from "@/hooks/useKalshiHistoricalCutoffDisplay";
+import { IntegrationSamplePreview } from "@/components/dashboardComposer/integrationPreviewView";
+import {
+  isLivePreviewId,
+  prefetchIntegrationPreviews,
+} from "@/components/dashboardComposer/integrationPreviewSample";
 import { buildIntegrationPickerRows } from "@/lib/connectIntegrationPickerRows";
 import { cn } from "@/lib/utils";
 
@@ -25,103 +30,8 @@ export function useIntegrationConnect() {
   return useContext(IntegrationConnectContext);
 }
 
-/** Typical sheet snapshots. These illustrate the pull; they are not live data. */
+/** Static snapshots for sources we are not sampling yet. */
 const PREVIEWS = {
-  polymarket: [
-    {
-      title: "Live markets",
-      caption: "Yes price and volume as the book moves",
-      columns: ["Market", "Yes", "Volume"],
-      rows: [
-        ["Fed decision this year", "62¢", "$4.2M"],
-        ["Bitcoin above $100k", "41¢", "$18.6M"],
-        ["Senate control", "54¢", "$9.1M"],
-        ["Recession in 2026", "28¢", "$2.4M"],
-      ],
-    },
-    {
-      title: "Price stream",
-      caption: "Token prices from the live feed",
-      columns: ["Time", "Outcome", "Price"],
-      rows: [
-        ["12:01:04", "Yes", "0.62"],
-        ["12:01:09", "Yes", "0.63"],
-        ["12:01:14", "No", "0.37"],
-        ["12:01:22", "Yes", "0.61"],
-      ],
-    },
-  ],
-  polymarketHistorical: [
-    {
-      title: "Historical prices",
-      caption: "Time series you can chart or export",
-      columns: ["Timestamp", "Outcome", "Price"],
-      rows: [
-        ["2024-11-05 18:00", "Yes", "0.51"],
-        ["2024-11-05 20:00", "Yes", "0.74"],
-        ["2024-11-05 22:00", "Yes", "0.91"],
-        ["2024-11-06 01:00", "Yes", "0.98"],
-      ],
-    },
-    {
-      title: "Market snapshot",
-      caption: "One row per contract in the pull",
-      columns: ["Market", "Volume", "Close"],
-      rows: [
-        ["Election winner", "$86.4M", "0.98"],
-        ["Popular vote margin", "$12.1M", "0.44"],
-        ["Turnout above 65%", "$3.8M", "0.22"],
-      ],
-    },
-  ],
-  kalshiHistorical: [
-    {
-      title: "Markets",
-      caption: "Ticker, book, and volume from the deep history",
-      columns: ["Ticker", "Yes bid", "Volume"],
-      rows: [
-        ["KXHIGHNY-24DEC", "0.42", "18,420"],
-        ["PRESWIN-2024", "0.61", "240,118"],
-        ["FEDRATE-25MAR", "0.33", "9,804"],
-        ["CPIYOY-25JAN", "0.55", "4,221"],
-      ],
-    },
-    {
-      title: "Trades",
-      caption: "Each fill, ready for a sheet",
-      columns: ["Time", "Ticker", "Price", "Size"],
-      rows: [
-        ["2024-12-01 14:02", "KXHIGHNY", "0.41", "20"],
-        ["2024-12-01 14:06", "KXHIGHNY", "0.44", "50"],
-        ["2024-12-01 14:11", "KXHIGHNY", "0.43", "10"],
-      ],
-    },
-  ],
-  kalshiHistoricalV2: [
-    {
-      title: "Recent history",
-      caption: "Markets up to the live cutoff",
-      columns: ["Ticker", "Status", "Last", "Volume"],
-      rows: [
-        ["KXFED-26JUN", "open", "0.38", "12,044"],
-        ["KXBTCD-26", "open", "0.47", "31,880"],
-        ["KXHIGHCHI", "closed", "1.00", "6,102"],
-      ],
-    },
-  ],
-  kalshiLive: [
-    {
-      title: "Live book",
-      caption: "Bids and asks updating in place",
-      columns: ["Ticker", "Yes bid", "Yes ask", "Volume"],
-      rows: [
-        ["KXFED-26JUN", "0.37", "0.39", "12,044"],
-        ["KXBTCD-26", "0.46", "0.48", "31,880"],
-        ["KXHIGHNY", "0.22", "0.25", "4,510"],
-        ["KXCPI-26MAR", "0.58", "0.61", "8,933"],
-      ],
-    },
-  ],
   binance: [
     {
       title: "Spot markets",
@@ -263,11 +173,15 @@ function PreviewBody({ row, description }) {
       {description ? (
         <p className="mt-3 text-[13px] leading-relaxed text-foreground/90">{description}</p>
       ) : null}
-      <div className="mt-5 space-y-3">
-        {frames.map((item) => (
-          <PreviewTable key={item.title} item={item} />
-        ))}
-      </div>
+      {isLivePreviewId(row?.id) ? (
+        <IntegrationSamplePreview integrationId={row.id} />
+      ) : (
+        <div className="mt-5 space-y-3">
+          {frames.map((item) => (
+            <PreviewTable key={item.title} item={item} />
+          ))}
+        </div>
+      )}
     </>
   );
 }
@@ -400,11 +314,16 @@ export function IntegrationConnectDialog({ open, onOpenChange }) {
   const shown = hovered || selected;
   const { cutoffLabel, loading: cutoffLoading } = useKalshiHistoricalCutoffDisplay();
 
+  useEffect(() => {
+    if (!open) return;
+    prefetchIntegrationPreviews();
+  }, [open]);
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
         overlayClassName="z-[560] bg-black/40"
-        className="z-[560] flex max-h-[min(760px,90vh)] w-[min(980px,calc(100vw-2rem))] max-w-none flex-col gap-0 overflow-hidden border-border/70 p-0 shadow-xl sm:rounded-2xl"
+        className="z-[560] flex max-h-[min(880px,92vh)] w-[min(980px,calc(100vw-2rem))] max-w-none flex-col gap-0 overflow-hidden border-border/70 p-0 shadow-xl sm:rounded-2xl"
       >
         <div className="grid min-h-0 flex-1 md:grid-cols-[minmax(0,1.05fr)_minmax(0,0.95fr)]">
           <div className="flex min-h-0 flex-col bg-background">
