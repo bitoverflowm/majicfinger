@@ -10,6 +10,8 @@ const SAMPLE_IDS = [
   "kalshiLive",
   "polymarketHistorical",
   "polymarket",
+  "chainlink",
+  "binance",
 ];
 
 const resolved = new Map();
@@ -23,7 +25,7 @@ function readSessionCache() {
     const parsed = JSON.parse(raw);
     if (!parsed || typeof parsed !== "object") return;
     for (const id of SAMPLE_IDS) {
-      if (parsed[id]?.tables) resolved.set(id, parsed[id]);
+      if (parsed[id]?.tables && quoteSampleReady(id, parsed[id])) resolved.set(id, parsed[id]);
     }
   } catch {
     /* ignore */
@@ -464,12 +466,241 @@ async function loadPolymarketLive() {
   };
 }
 
+const RTDS_URL = "wss://ws-live-data.polymarket.com";
+const QUOTE_PAIRS = [
+  { id: "btc", title: "Bitcoin", tile: "BT", binance: "btcusdt", chainlink: "btc/usd" },
+  { id: "eth", title: "Ethereum", tile: "ET", binance: "ethusdt", chainlink: "eth/usd" },
+  { id: "sol", title: "Solana", tile: "SO", binance: "solusdt", chainlink: "sol/usd" },
+  { id: "xrp", title: "XRP", tile: "XR", binance: "xrpusdt", chainlink: "xrp/usd" },
+];
+
+export function formatUsd(value) {
+  const n = num(value);
+  if (n == null) return "—";
+  const digits = n >= 1000 ? 0 : n >= 1 ? 2 : 4;
+  return new Intl.NumberFormat("en", {
+    style: "currency",
+    currency: "USD",
+    minimumFractionDigits: digits,
+    maximumFractionDigits: digits,
+  }).format(n);
+}
+
+let binanceQuoteTask = null;
+let chainlinkQuoteTask = null;
+
+function sampleBinanceQuotes() {
+  if (!binanceQuoteTask) {
+    binanceQuoteTask = collectQuoteFeed({
+      feed: "binance",
+      subscriptions: QUOTE_PAIRS.map((pair) => ({
+        topic: "crypto_prices",
+        type: "update",
+        filters: JSON.stringify([pair.binance]),
+      })),
+      stopAt: QUOTE_PAIRS.length,
+      timeoutMs: 5000,
+    }).catch((error) => {
+      binanceQuoteTask = null;
+      throw error;
+    });
+  }
+  return binanceQuoteTask;
+}
+
+function sampleChainlinkQuotes() {
+  if (!chainlinkQuoteTask) {
+    chainlinkQuoteTask = Promise.all(
+      QUOTE_PAIRS.map((pair) =>
+        collectQuoteFeed({
+          feed: "chainlink",
+          subscriptions: [
+            {
+              topic: "crypto_prices_chainlink",
+              type: "*",
+              filters: JSON.stringify({ symbol: pair.chainlink }),
+            },
+          ],
+          stopAt: 3,
+          timeoutMs: 5000,
+        }).catch(() => new Map()),
+      ),
+    )
+      .then((maps) => {
+        const merged = new Map();
+        for (const map of maps) {
+          for (const [id, quote] of map) merged.set(id, quote);
+        }
+        if (!merged.size) throw new Error("No live prices came through");
+        return merged;
+      })
+      .catch((error) => {
+        chainlinkQuoteTask = null;
+        throw error;
+      });
+  }
+  return chainlinkQuoteTask;
+}
+
+function collectQuoteFeed({ feed, subscriptions, stopAt, timeoutMs }) {
+  return new Promise((resolve, reject) => {
+    if (typeof WebSocket === "undefined") {
+      reject(new Error("Live prices are only available in the browser"));
+      return;
+    }
+    const quotes = new Map();
+    let ws;
+    let ping;
+    let settled = false;
+    const finish = () => {
+      if (settled) return;
+      settled = true;
+      window.clearTimeout(timer);
+      if (ping) window.clearInterval(ping);
+      try {
+        ws?.close();
+      } catch {
+        /* ignore */
+      }
+      if (!quotes.size) {
+        reject(new Error("No live prices came through"));
+        return;
+      }
+      resolve(quotes);
+    };
+    const timer = window.setTimeout(finish, timeoutMs);
+    try {
+      ws = new WebSocket(RTDS_URL);
+    } catch {
+      finish();
+      return;
+    }
+    ws.onopen = () => {
+      ws.send(JSON.stringify({ action: "subscribe", subscriptions }));
+      ping = window.setInterval(() => {
+        if (ws.readyState === WebSocket.OPEN) ws.send("PING");
+      }, 4000);
+    };
+    ws.onmessage = (event) => {
+      let msg;
+      try {
+        msg = JSON.parse(event.data);
+      } catch {
+        return;
+      }
+      if (!msg?.payload) return;
+      const topicFeed = msg.topic === "crypto_prices" ? "binance" : msg.topic === "crypto_prices_chainlink" ? "chainlink" : null;
+      if (topicFeed !== feed) return;
+      const symbol = String(msg.payload.symbol || "").toLowerCase();
+      const pair = QUOTE_PAIRS.find((item) => item.binance === symbol || item.chainlink === symbol);
+      if (!pair) return;
+      const history = Array.isArray(msg.payload.data) ? msg.payload.data : null;
+      if (history?.length) {
+        const series = history.map((point) => num(point?.value)).filter((value) => value != null);
+        const last = history[history.length - 1];
+        const price = num(last?.value);
+        if (price == null) return;
+        quotes.set(pair.id, { price, at: num(last?.timestamp) || Date.now(), series: series.slice(-16) });
+      } else {
+        const price = num(msg.payload.value);
+        if (price == null) return;
+        const prev = quotes.get(pair.id);
+        const series = [...(prev?.series || []), price].slice(-16);
+        quotes.set(pair.id, { price, at: num(msg.payload.timestamp) || Date.now(), series });
+      }
+      const ticks = quotes.get(pair.id)?.series.length || 0;
+      const enough = feed === "binance" ? quotes.size >= stopAt : ticks >= stopAt;
+      if (enough) finish();
+    };
+    ws.onerror = () => {
+      if (!settled && !quotes.size) {
+        settled = true;
+        window.clearTimeout(timer);
+        if (ping) window.clearInterval(ping);
+        reject(new Error("Could not reach the live price feed"));
+      } else {
+        finish();
+      }
+    };
+  });
+}
+
+function quoteMove(series) {
+  if (!series || series.length < 2) return { tone: "flat", sentence: "latest tick" };
+  const first = series[0];
+  const last = series[series.length - 1];
+  if (!first) return { tone: "flat", sentence: "latest tick" };
+  const pct = ((last - first) / first) * 100;
+  if (Math.abs(pct) < 0.005) return { tone: "flat", sentence: "unchanged in this sample" };
+  const tone = pct > 0 ? "up" : "down";
+  const body = `${pct > 0 ? "+" : ""}${pct.toFixed(2)}% across this sample`;
+  return { tone, sentence: body };
+}
+
+function quotesPreview(feed, byFeed) {
+  const key = feed === "binance" ? "binance" : "chainlink";
+  const rows = QUOTE_PAIRS.map((pair) => {
+    const hit = byFeed[key].get(pair.id);
+    if (!hit) return null;
+    return {
+      tile: pair.tile,
+      title: pair.title,
+      subtitle: feed === "binance" ? pair.binance.toUpperCase() : pair.chainlink.toUpperCase(),
+      price: hit.price,
+      updatedAt: hit.at,
+      series: hit.series,
+    };
+  }).filter(Boolean);
+  if (!rows.length) throw new Error("No live prices came through");
+  const cards = rows.slice(0, 2).map((row) => {
+    const move = quoteMove(row.series);
+    return {
+      label: row.title,
+      value: formatUsd(row.price),
+      sentence: move.sentence,
+      tone: move.tone,
+      series: row.series,
+    };
+  });
+  cards.push({
+    label: "Feeds",
+    value: String(rows.length),
+    sentence: feed === "binance" ? "spot pairs in this sample" : "oracle pairs in this sample",
+    tone: "flat",
+    series: [],
+  });
+  return {
+    tables: [
+      {
+        kind: "quotes",
+        title: feed === "binance" ? "Spot markets" : "Oracle feeds",
+        caption:
+          feed === "binance"
+            ? "Latest Binance prices on the live feed"
+            : "Latest Chainlink answers on the live feed",
+        rows,
+      },
+    ],
+    stats: cards,
+  };
+}
+
+async function loadBinance() {
+  return quotesPreview("binance", { binance: await sampleBinanceQuotes() });
+}
+
+async function loadChainlink() {
+  return quotesPreview("chainlink", { chainlink: await sampleChainlinkQuotes() });
+}
+
 const LOADERS = {
   kalshiHistorical: loadKalshiHistorical,
   kalshiHistoricalV2: loadKalshiHistoricalV2,
   kalshiLive: loadKalshiLive,
   polymarketHistorical: loadPolymarketHistorical,
   polymarket: loadPolymarketLive,
+  chainlink: loadChainlink,
+  binance: loadBinance,
 };
 
 export function isLivePreviewId(id) {
@@ -480,9 +711,14 @@ export function getCachedIntegrationPreview(id) {
   return resolved.get(id) || null;
 }
 
+function quoteSampleReady(id, data) {
+  if (id !== "chainlink" && id !== "binance") return true;
+  return (data?.tables?.[0]?.rows?.length || 0) >= 4;
+}
+
 export function loadIntegrationPreview(id) {
   if (!LOADERS[id]) return Promise.resolve(null);
-  if (resolved.has(id)) return Promise.resolve(resolved.get(id));
+  if (resolved.has(id) && quoteSampleReady(id, resolved.get(id))) return Promise.resolve(resolved.get(id));
   if (!inflight.has(id)) {
     const task = LOADERS[id]()
       .then((data) => {

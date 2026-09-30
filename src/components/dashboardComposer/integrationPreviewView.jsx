@@ -6,6 +6,7 @@ import { cn } from "@/lib/utils";
 import {
   formatCompact,
   formatProb,
+  formatUsd,
   getCachedIntegrationPreview,
   loadIntegrationPreview,
 } from "@/components/dashboardComposer/integrationPreviewSample";
@@ -277,10 +278,56 @@ function StatusTable({ table }) {
   );
 }
 
+function formatAgo(ms) {
+  const at = Number(ms);
+  if (!Number.isFinite(at)) return "—";
+  const delta = Date.now() - at;
+  if (delta < 15000) return "just now";
+  if (delta < 60000) return `${Math.max(1, Math.round(delta / 1000))}s ago`;
+  if (delta < 3600000) return `${Math.round(delta / 60000)}m ago`;
+  return `${Math.round(delta / 3600000)}h ago`;
+}
+
+function QuoteTable({ table }) {
+  return (
+    <Card title={table.title} caption={table.caption}>
+      <table className="w-full text-left">
+        <thead>
+          <tr className="border-b border-border/50 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+            <th className="px-3 py-2 font-semibold">Asset</th>
+            <th className="px-3 py-2 font-semibold">Price</th>
+            <th className="px-3 py-2 text-right font-semibold">Updated</th>
+          </tr>
+        </thead>
+        <tbody>
+          {table.rows.map((row) => (
+            <tr key={row.subtitle} className="border-b border-border/40 last:border-0">
+              <td className="px-3 py-2.5">
+                <div className="flex items-center gap-2">
+                  <span className="flex size-7 shrink-0 items-center justify-center rounded-md bg-muted text-[10px] font-semibold text-foreground">
+                    {row.tile}
+                  </span>
+                  <span className="min-w-0">
+                    <span className="block truncate text-[12px] font-medium text-foreground">{row.title}</span>
+                    <span className="block truncate font-mono text-[10px] text-muted-foreground">{row.subtitle}</span>
+                  </span>
+                </div>
+              </td>
+              <td className="px-3 py-2.5 font-mono text-[12px] font-medium text-foreground">{formatUsd(row.price)}</td>
+              <td className="px-3 py-2.5 text-right text-[11px] text-muted-foreground">{formatAgo(row.updatedAt)}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </Card>
+  );
+}
+
 function PreviewTableView({ table }) {
   if (table.kind === "watchlist") return <WatchlistTable table={table} />;
   if (table.kind === "audit") return <AuditTable table={table} />;
   if (table.kind === "status") return <StatusTable table={table} />;
+  if (table.kind === "quotes") return <QuoteTable table={table} />;
   return <RankTable table={table} />;
 }
 

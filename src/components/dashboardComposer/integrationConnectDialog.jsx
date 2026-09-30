@@ -30,35 +30,6 @@ export function useIntegrationConnect() {
   return useContext(IntegrationConnectContext);
 }
 
-/** Static snapshots for sources we are not sampling yet. */
-const PREVIEWS = {
-  binance: [
-    {
-      title: "Spot markets",
-      caption: "Price and 24h change",
-      columns: ["Symbol", "Price", "24h"],
-      rows: [
-        ["BTCUSDT", "64,210", "+1.2%"],
-        ["ETHUSDT", "3,188", "−0.4%"],
-        ["SOLUSDT", "148.20", "+3.1%"],
-        ["BNBUSDT", "582.40", "+0.6%"],
-      ],
-    },
-  ],
-  chainlink: [
-    {
-      title: "Oracle feeds",
-      caption: "Latest answer on each pair",
-      columns: ["Pair", "Price", "Updated"],
-      rows: [
-        ["ETH / USD", "3,210.44", "12s ago"],
-        ["BTC / USD", "64,188.02", "9s ago"],
-        ["LINK / USD", "14.82", "15s ago"],
-      ],
-    },
-  ],
-};
-
 const PRIMARY_ORDER = [
   "kalshiHistorical",
   "kalshiHistoricalV2",
@@ -154,16 +125,14 @@ function PreviewTable({ item }) {
 }
 
 function previewFrames(row) {
-  return (
-    PREVIEWS[row?.id] || [
-      {
-        title: row?.name || "Sheet",
-        caption: "A typical sheet from this source",
-        columns: ["Field", "Value"],
-        rows: [["—", "—"]],
-      },
-    ]
-  );
+  return [
+    {
+      title: row?.name || "Sheet",
+      caption: "A typical sheet from this source",
+      columns: ["Field", "Value"],
+      rows: [["—", "—"]],
+    },
+  ];
 }
 
 function PreviewBody({ row, description }) {
