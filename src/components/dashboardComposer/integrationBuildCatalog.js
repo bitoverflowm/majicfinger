@@ -2,6 +2,7 @@
  * Default preview pulls for the build workspace.
  * One table is loaded at a time, capped at 50 rows. Types are a first pass.
  */
+import { fetchAthenaLakeSample } from "@/lib/dataLake/fetchAthenaSample";
 
 export const PREVIEW_ROW_CAP = 50;
 
@@ -131,6 +132,19 @@ function column(id, type, scale) {
 }
 
 const pullCache = new Map();
+const countCache = new Map();
+const countValues = new Map();
+
+const EXACT_UNIVERSE = {
+  kalshiHistorical: "kalshi",
+  polymarketHistorical: "polymarket",
+};
+
+export const APPROXIMATE_UNIVERSE = 1_000_000;
+
+export function usesExactUniverse(integrationId) {
+  return Boolean(EXACT_UNIVERSE[integrationId]);
+}
 
 function num(raw) {
   if (typeof raw === "number" && Number.isFinite(raw)) return raw;
@@ -519,6 +533,59 @@ const LOADERS = {
   "chainlink:prices": () => livePrices("chainlink"),
   "binance:prices": () => livePrices("binance"),
 };
+
+function universeCountKey(integrationId, tableId, filter) {
+  const lake = EXACT_UNIVERSE[integrationId];
+  if (!lake || (tableId !== "markets" && tableId !== "trades")) return "";
+  const column = String(filter?.column || "").trim();
+  const value = String(filter?.value || "").trim();
+  const narrowed = Boolean(column && value);
+  return `${lake}:${tableId}:${narrowed ? `${column}\0${value.toLowerCase()}` : ""}`;
+}
+
+export function peekBuildUniverseCount(integrationId, tableId, filter) {
+  const key = universeCountKey(integrationId, tableId, filter);
+  if (!key || !countValues.has(key)) return null;
+  return countValues.get(key);
+}
+
+export function loadBuildUniverseCount(integrationId, tableId, filter) {
+  const lake = EXACT_UNIVERSE[integrationId];
+  const key = universeCountKey(integrationId, tableId, filter);
+  if (!key) return Promise.resolve(null);
+  if (countValues.has(key)) return Promise.resolve(countValues.get(key));
+  if (!countCache.has(key)) {
+    const column = String(filter?.column || "").trim();
+    const value = String(filter?.value || "").trim();
+    const narrowed = Boolean(column && value);
+    const body = {
+      lake,
+      table: tableId,
+      queryType: "count",
+      countAlias: "row_count",
+      limit: 1,
+      caseSensitive: false,
+      filters: narrowed
+        ? { and: [{ column, kind: "string", op: "contains", value }], or: [] }
+        : null,
+    };
+    countCache.set(
+      key,
+      fetchAthenaLakeSample(body, { maxWaitMs: 180000, pollIntervalMs: 800 })
+        .then((result) => {
+          const total = Number(result.rows?.[0]?.[0]);
+          if (!Number.isFinite(total)) throw new Error("Count missing");
+          countValues.set(key, total);
+          return total;
+        })
+        .catch((error) => {
+          countCache.delete(key);
+          throw error;
+        }),
+    );
+  }
+  return countCache.get(key);
+}
 
 export function loadBuildPreview(integrationId, tableId) {
   const key = `${integrationId}:${tableId}`;

@@ -1,13 +1,16 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { ChevronDown, History } from "lucide-react";
+import { ArrowLeft, ChevronDown, History } from "lucide-react";
 import { IntegrationBuildGrid } from "@/components/dashboardComposer/integrationBuildGrid";
 import {
   BUILD_SOURCES,
   loadBuildPreview,
+  loadBuildUniverseCount,
+  peekBuildUniverseCount,
   readSavedSearches,
   saveSearch,
+  usesExactUniverse,
 } from "@/components/dashboardComposer/integrationBuildCatalog";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -21,7 +24,9 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import { useMyStateV2 } from "@/context/stateContextV2";
+import { getHistoricalPullRowLimit } from "@/lib/athenaEntitlement";
 import { listConnectHomeSheetHistory, requestCardSummaryLabel } from "@/lib/connectHomeRequestHistory";
+import { useUser } from "@/lib/hooks";
 import { cn } from "@/lib/utils";
 
 function humanHistoryLabel(label) {
@@ -51,11 +56,13 @@ function SkeletonRows() {
   );
 }
 
-export function IntegrationBuildWorkspace({ integrationId }) {
+export function IntegrationBuildWorkspace({ integrationId, onBack }) {
   const source = BUILD_SOURCES[integrationId];
   const tables = source?.tables || {};
   const tableIds = Object.keys(tables);
   const ctx = useMyStateV2?.() ?? {};
+  const user = useUser();
+  const planLimit = user === undefined ? null : getHistoricalPullRowLimit(user);
   const [tableId, setTableId] = useState(source?.defaultTable || tableIds[0]);
   const [pull, setPull] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -66,8 +73,11 @@ export function IntegrationBuildWorkspace({ integrationId }) {
   const [filterValue, setFilterValue] = useState("");
   const [saved, setSaved] = useState(() => readSavedSearches());
   const [visibleCount, setVisibleCount] = useState(0);
+  const [universe, setUniverse] = useState(null);
+  const [counting, setCounting] = useState(false);
 
   const table = tables[tableId];
+  const exactUniverse = usesExactUniverse(integrationId);
 
   useEffect(() => {
     let cancel = false;
@@ -77,6 +87,8 @@ export function IntegrationBuildWorkspace({ integrationId }) {
     setPull(null);
     setVisibleCount(0);
     setFilterValue("");
+    setUniverse(null);
+    setCounting(usesExactUniverse(integrationId));
     const timer = window.setInterval(() => {
       setProgress((current) => (current >= 88 ? current : current + Math.random() * 8));
     }, 280);
@@ -113,6 +125,43 @@ export function IntegrationBuildWorkspace({ integrationId }) {
     }, 45);
     return () => window.clearInterval(timer);
   }, [loading, pull]);
+
+  useEffect(() => {
+    if (!exactUniverse) {
+      setUniverse(null);
+      setCounting(false);
+      return undefined;
+    }
+    const query = filterValue.trim();
+    const column = (pull?.columns || []).find((item) => item.id === filterColumn);
+    if (query && !column) return undefined;
+    const narrowed = query && column?.type === "text" ? { column: filterColumn, value: query } : null;
+    const known = peekBuildUniverseCount(integrationId, tableId, narrowed);
+    if (typeof known === "number") {
+      setUniverse(known);
+      setCounting(false);
+      return undefined;
+    }
+    let cancel = false;
+    setUniverse(null);
+    setCounting(true);
+    const timer = window.setTimeout(() => {
+      loadBuildUniverseCount(integrationId, tableId, narrowed)
+        .then((total) => {
+          if (!cancel) setUniverse(total);
+        })
+        .catch(() => {
+          if (!cancel) setUniverse(null);
+        })
+        .finally(() => {
+          if (!cancel) setCounting(false);
+        });
+    }, narrowed ? 350 : 0);
+    return () => {
+      cancel = true;
+      window.clearTimeout(timer);
+    };
+  }, [exactUniverse, integrationId, tableId, filterColumn, filterValue, pull]);
 
   const shownColumns = useMemo(
     () =>
@@ -180,23 +229,33 @@ export function IntegrationBuildWorkspace({ integrationId }) {
     setFilterValue(entry.filterValue || "");
   }
 
-  const loadedCount = pull?.rows?.length || 0;
+  const shown = loading ? 0 : filteredRows.length;
+  const shownLabel = `Previewing ${shown.toLocaleString()} ${shown === 1 ? "row" : "rows"}`;
+  const planClause = typeof planLimit === "number" ? ` · plan limit ${planLimit.toLocaleString()}` : "";
   const previewLine = loading
     ? "Loading the first 50 rows"
-    : filterValue.trim()
-      ? `Previewing ${filteredRows.length} of ${loadedCount} rows${pull?.capped ? ". More rows are available." : ""}`
-      : visibleCount < loadedCount
-        ? `Previewing ${visibleCount} of ${loadedCount} rows`
-        : pull?.capped
-          ? `Previewing ${loadedCount} rows. More rows are available.`
-          : `Previewing ${loadedCount} rows`;
+    : !exactUniverse
+      ? `${shownLabel} of 1,000,000+ rows available${planClause}`
+      : typeof universe === "number" && !counting
+        ? `${shownLabel} of ${universe.toLocaleString()}${planClause}`
+        : counting
+          ? `${shownLabel} of …${planClause}`
+          : `${shownLabel}. More rows are available.${planClause}`;
 
   if (!source) return null;
 
   return (
     <div className="flex min-h-0 flex-1 bg-background">
       <aside className="flex w-[340px] shrink-0 flex-col border-r border-border/70">
-        <div className="px-4 pb-3 pt-5 pr-12">
+        <div className="px-4 pb-3 pt-4 pr-12">
+          <button
+            type="button"
+            onClick={onBack}
+            className="mb-2 inline-flex size-8 items-center justify-center rounded-lg text-foreground transition-colors hover:bg-muted"
+            aria-label="Back to integrations"
+          >
+            <ArrowLeft className="size-4" />
+          </button>
           <p className="text-[13px] leading-relaxed text-muted-foreground">
             {source.name}. This preview is the first table, the same one shown beside the source list.
           </p>
@@ -320,7 +379,7 @@ export function IntegrationBuildWorkspace({ integrationId }) {
       <section className="flex min-h-0 min-w-0 flex-1 flex-col bg-[#e6edf3] dark:bg-[#1c232b]">
         <div className="flex items-center justify-between gap-3 px-5 pb-2 pr-12 pt-5">
           <h2 className="text-[15px] font-semibold text-foreground">Preview</h2>
-          <p className="text-[12px] text-muted-foreground">{previewLine}</p>
+          <p className="text-right text-[12px] text-muted-foreground">{previewLine}</p>
         </div>
         <div className="h-1 w-full bg-black/5 dark:bg-white/10">
           <div

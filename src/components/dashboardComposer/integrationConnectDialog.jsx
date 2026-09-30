@@ -320,7 +320,7 @@ export function IntegrationConnectDialog({ open, onOpenChange }) {
         {phase === "build" && selected ? (
           <>
             <DialogTitle className="sr-only">{selected.name} preview</DialogTitle>
-            <IntegrationBuildWorkspace integrationId={selected.id} />
+            <IntegrationBuildWorkspace integrationId={selected.id} onBack={() => setPhase("pick")} />
           </>
         ) : (
         <div className="grid min-h-0 flex-1 md:grid-cols-[minmax(0,1.05fr)_minmax(0,0.95fr)]">

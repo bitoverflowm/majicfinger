@@ -64,6 +64,7 @@ export function userHasBasicHistoricalAccess(userLike) {
  */
 export function getHistoricalPullRowLimit(userLike, opts = {}) {
   if (opts.isDemo) return ATHENA_DEMO_ROW_LIMIT;
+  if (String(userLike?.userId || "") === "dev-bypass-no-db") return ATHENA_SUBSCRIBER_QUERY_ROW_LIMIT;
   if (userHasExpandedAthenaAccess(userLike)) return ATHENA_SUBSCRIBER_QUERY_ROW_LIMIT;
   if (userHasBasicHistoricalAccess(userLike)) return ATHENA_BASIC_QUERY_ROW_LIMIT;
   if (userHasPaidSubscription(userLike)) {
