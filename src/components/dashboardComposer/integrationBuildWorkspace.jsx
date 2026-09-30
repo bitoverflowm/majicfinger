@@ -231,16 +231,29 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
 
   const shown = loading ? 0 : filteredRows.length;
   const shownLabel = `Previewing ${shown.toLocaleString()} ${shown === 1 ? "row" : "rows"}`;
-  const planClause = typeof planLimit === "number" ? ` · plan limit ${planLimit.toLocaleString()}` : "";
   const previewLine = loading
     ? "Loading the first 50 rows"
     : !exactUniverse
-      ? `${shownLabel} of 1,000,000+ rows available${planClause}`
+      ? `${shownLabel} of 1,000,000+ rows available`
       : typeof universe === "number" && !counting
-        ? `${shownLabel} of ${universe.toLocaleString()}${planClause}`
+        ? `${shownLabel} of ${universe.toLocaleString()}`
         : counting
-          ? `${shownLabel} of …${planClause}`
-          : `${shownLabel}. More rows are available.${planClause}`;
+          ? `${shownLabel} of …`
+          : `${shownLabel}. More rows are available.`;
+  const availableRows = !exactUniverse
+    ? Number.POSITIVE_INFINITY
+    : typeof universe === "number" && !counting
+      ? universe
+      : null;
+  const importedRows =
+    typeof planLimit === "number" && availableRows != null ? Math.min(availableRows, planLimit) : null;
+  const usesFullPlan = importedRows != null && planLimit > 0 && importedRows >= planLimit;
+  const planFill = (() => {
+    if (importedRows == null || !planLimit) return 0;
+    const ratio = Math.min(100, (importedRows / planLimit) * 100);
+    if (ratio <= 0 || ratio >= 100) return ratio;
+    return Math.max(ratio, 8);
+  })();
 
   if (!source) return null;
 
@@ -377,9 +390,29 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
       </aside>
 
       <section className="flex min-h-0 min-w-0 flex-1 flex-col bg-[#e6edf3] dark:bg-[#1c232b]">
-        <div className="flex items-center justify-between gap-3 px-5 pb-2 pr-12 pt-5">
-          <h2 className="text-[15px] font-semibold text-foreground">Preview</h2>
-          <p className="text-right text-[12px] text-muted-foreground">{previewLine}</p>
+        <div className="flex items-start justify-between gap-3 px-5 pb-2 pr-12 pt-5">
+          <h2 className="pt-0.5 text-[15px] font-semibold text-foreground">Preview</h2>
+          <div className="flex min-w-0 flex-col items-end">
+            <p className="text-right text-[12px] text-muted-foreground">{previewLine}</p>
+            {typeof planLimit === "number" ? (
+              <div className="mt-1.5 w-full max-w-[280px]">
+                <p className="text-right text-[11px] text-muted-foreground">
+                  {importedRows == null
+                    ? `… / ${planLimit.toLocaleString()} plan limit`
+                    : `${importedRows.toLocaleString()} rows will be imported / ${planLimit.toLocaleString()} plan limit`}
+                </p>
+                <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-black/10 dark:bg-white/10">
+                  <div
+                    className={cn(
+                      "h-full rounded-full transition-[width] duration-500",
+                      importedRows == null ? "bg-transparent" : usesFullPlan ? "bg-red-500/75" : "bg-emerald-500/80",
+                    )}
+                    style={{ width: `${planFill}%` }}
+                  />
+                </div>
+              </div>
+            ) : null}
+          </div>
         </div>
         <div className="h-1 w-full bg-black/5 dark:bg-white/10">
           <div
