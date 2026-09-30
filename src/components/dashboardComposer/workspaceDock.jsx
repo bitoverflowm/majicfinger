@@ -9,6 +9,7 @@ import {
 } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import { useWorkspaceCanvas } from "@/components/dashboardComposer/workspaceCanvas";
+import { useIntegrationConnect } from "@/components/dashboardComposer/integrationConnectDialog";
 
 const TOOLS = [
   { id: "select", label: "Selection tool", icon: MousePointer2, action: "select" },
@@ -21,6 +22,7 @@ const TOOLS = [
 
 export function WorkspaceDock() {
   const canvas = useWorkspaceCanvas();
+  const connect = useIntegrationConnect();
   const tool = canvas?.tool || "select";
 
   return (
@@ -50,6 +52,7 @@ export function WorkspaceDock() {
                       aria-pressed={item.action === "select" ? selected : undefined}
                       onClick={() => {
                         if (item.action === "select") canvas?.setTool?.("select");
+                        else if (item.id === "source") connect?.open?.();
                         else if (item.action === "add") canvas?.addBlock?.(item.id);
                         else canvas?.setTool?.("select");
                       }}

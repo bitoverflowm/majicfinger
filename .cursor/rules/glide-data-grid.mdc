@@ -1,0 +1,12 @@
+---
+description: Glide Data Grid is the default for viewing and editing data sheets. Do not add new AG Grid usage.
+alwaysApply: true
+---
+
+# Data sheets use Glide Data Grid
+
+Glide Data Grid (`@glideapps/glide-data-grid`, https://docs.grid.glideapps.com/) is the default way to view and edit data sheets.
+
+- New sheet UI goes on Glide, including the blank-dashboard **Add data sheet** flow.
+- Do not add AG Grid (`ag-grid-react`) to new work, and do not extend existing AG Grid screens unless the user explicitly asks.
+- Leave current AG Grid code in place until the user asks to phase it out. That migration is later, one step at a time.

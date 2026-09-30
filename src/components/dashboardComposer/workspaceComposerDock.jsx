@@ -12,6 +12,7 @@ import {
 } from "@/lib/dashboardCardGrid";
 import { WorkspaceCanvasProvider } from "@/components/dashboardComposer/workspaceCanvas";
 import { WorkspaceDock } from "@/components/dashboardComposer/workspaceDock";
+import { IntegrationConnectProvider } from "@/components/dashboardComposer/integrationConnectDialog";
 
 const DockInsetContext = createContext(() => {});
 
@@ -191,8 +192,10 @@ export function WorkspaceComposerDockProvider({ children }) {
   return (
     <DockInsetContext.Provider value={setInset}>
       <WorkspaceCanvasProvider pageId={pageId}>
-        {children}
-        <WorkspaceDock />
+        <IntegrationConnectProvider>
+          {children}
+          <WorkspaceDock />
+        </IntegrationConnectProvider>
       </WorkspaceCanvasProvider>
     </DockInsetContext.Provider>
   );

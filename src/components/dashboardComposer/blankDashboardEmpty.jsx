@@ -11,6 +11,7 @@ import { useMyStateV2 } from "@/context/stateContextV2";
 import { connectHomeAnySheetHasData } from "@/lib/connectHomePullDestination";
 import { cn } from "@/lib/utils";
 import { useWorkspaceCanvas } from "@/components/dashboardComposer/workspaceCanvas";
+import { useIntegrationConnect } from "@/components/dashboardComposer/integrationConnectDialog";
 
 const CHART_LOCKED_TIP = "Upload or connect data before adding a chart.";
 
@@ -50,6 +51,7 @@ function ActionButton({ icon: Icon, label, onClick, filled, disabled, tip }) {
 /** Empty state for a blank dashboard tab. Hidden once the page has canvas blocks. */
 export function BlankDashboardEmpty() {
   const canvas = useWorkspaceCanvas();
+  const connect = useIntegrationConnect();
   const ctx = useMyStateV2();
   const canChart = connectHomeAnySheetHasData(ctx?.dataSheets, ctx?.connectedData);
 
@@ -75,7 +77,7 @@ export function BlankDashboardEmpty() {
             <ActionButton
               icon={Database}
               label="Integration"
-              onClick={() => canvas?.addBlock?.("source")}
+              onClick={() => connect?.open?.()}
             />
             <ActionButton
               icon={Type}
