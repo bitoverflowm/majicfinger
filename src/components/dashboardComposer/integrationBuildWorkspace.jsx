@@ -185,6 +185,20 @@ function sheetsFromBlocks(blocks, used) {
     });
 }
 
+async function mapPool(items, limit, fn) {
+  const out = new Array(items.length);
+  let cursor = 0;
+  async function worker() {
+    while (cursor < items.length) {
+      const index = cursor;
+      cursor += 1;
+      out[index] = await fn(items[index], index);
+    }
+  }
+  await Promise.all(Array.from({ length: Math.min(limit, items.length) }, () => worker()));
+  return out;
+}
+
 function withFunctionColumn(columns, rows, enabled, formula, sheets, sheetId) {
   if (!enabled) return { columns, rows, highlight: "", error: "", references: [] };
   const evaluated = evaluateColumnFormula(formula, columns, rows, { sheets, sheetId });
@@ -369,6 +383,7 @@ function EnrichStep({
   onHoverFunction,
   onFunctionHelp,
   onSaveAndRun,
+  running,
 }) {
   const joinOpen = picked === "join";
   const functionOpen = picked === "function";
@@ -533,10 +548,11 @@ function EnrichStep({
         </Button>
         <Button
           type="button"
+          disabled={running}
           onClick={onSaveAndRun}
-          className="bg-[#0d99ff] text-white hover:bg-[#0d99ff]/90"
+          className="bg-[#0d99ff] text-white hover:bg-[#0d99ff]/90 disabled:opacity-60"
         >
-          Save and run
+          {running ? "Running trades…" : "Save and run"}
         </Button>
       </div>
     </>
@@ -585,6 +601,7 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
   const [joinTarget, setJoinTarget] = useState("");
   const [joinTab, setJoinTab] = useState("markets");
   const [tradePreview, setTradePreview] = useState({ status: "idle", ticker: "", columns: [], rows: [], error: "" });
+  const [running, setRunning] = useState(false);
   const [hoverFunction, setHoverFunction] = useState(false);
   const [functionTarget, setFunctionTarget] = useState("");
   const [functionFormula, setFunctionFormula] = useState("");
@@ -1226,7 +1243,10 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
     };
   };
 
-  function onSaveAndRun() {
+  async function onSaveAndRun() {
+    if (running) return;
+    setRunning(true);
+    try {
     const sheets = [];
     if (marketsGrid.columns.length) {
       sheets.push({
@@ -1242,20 +1262,32 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
     if (joinCommitted && tradePreview.columns.length) {
       const tickers = joinedMarkets.map((market) => market.ticker).filter(Boolean);
       const list = tickers.length ? tickers : previewTicker ? [previewTicker] : [];
-      list.forEach((ticker) => {
-        const own = ticker === previewTicker;
+      const pulled = await mapPool(list, 4, async (ticker) => {
+        if (ticker === previewTicker) {
+          return { ticker, columns: tradePreview.columns, rows: tradePreview.rows };
+        }
+        try {
+          const result = await loadKalshiHistoricalTradesForTicker(ticker);
+          return { ticker, columns: result.columns?.length ? result.columns : tradePreview.columns, rows: result.rows || [] };
+        } catch {
+          return { ticker, columns: tradePreview.columns, rows: [] };
+        }
+      });
+      pulled.forEach((item) => {
+        const own = item.ticker === previewTicker;
         const withFormula = functionOnTrades && (functionTarget !== "trades" || own);
-        const columns = withFormula && tradesGrid.columns.length ? tradesGrid.columns : tradePreview.columns;
-        const rows = own ? (withFormula && tradesGrid.rows.length ? tradesGrid.rows : tradePreview.rows) : [];
-        if (!columns.length) return;
+        const shaped = withFormula
+          ? withFunctionColumn(item.columns, item.rows, true, functionFormula, formulaSheets, "trades")
+          : { columns: item.columns, rows: item.rows };
+        if (!shaped.columns.length) return;
         sheets.push({
-          id: `run-trades-${String(ticker).replace(/[^A-Za-z0-9]+/g, "-")}`,
-          title: `Trades · ${ticker}`,
-          columns,
-          rows,
+          id: `run-trades-${String(item.ticker).replace(/[^A-Za-z0-9]+/g, "-")}`,
+          title: `Trades · ${item.ticker}`,
+          columns: shaped.columns,
+          rows: shaped.rows,
           span: "half",
           table: "trades",
-          summary: `Kalshi Historical · trades · ${ticker}`,
+          summary: `Kalshi Historical · trades · ${item.ticker}`,
         });
       });
     }
@@ -1273,6 +1305,35 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
     if (!sheets.length) return;
 
     canvas?.placeIntegrationSheets?.(sheets);
+    const joinRecord = joinCommitted
+      ? {
+          target: "kalshiHistoricalTrades",
+          tickers: joinedMarkets.map((market) => market.ticker).filter(Boolean),
+          previewTicker,
+        }
+      : null;
+    canvas?.registerTables?.(
+      sheets.map((sheet) => ({
+        id: sheet.id,
+        title: sheet.title,
+        kind: "query",
+        columns: (sheet.columns || []).map((column) => ({
+          id: column.id,
+          title: column.title,
+          type: column.type,
+          ...(column.scale ? { scale: column.scale } : {}),
+        })),
+        rows: sheet.rows || [],
+        query: {
+          summary: sheet.summary,
+          integrationId,
+          tableId: sheet.table,
+          formula: functionActive ? functionFormula : "",
+          join: joinRecord,
+          athena: lockedQuery?.athena || athenaRequest(),
+        },
+      })),
+    );
     const historyId = `run-${Date.now().toString(36)}`;
     appendQueryHistory({
       id: historyId,
@@ -1319,6 +1380,9 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
       return next;
     });
     connect?.close?.();
+    } finally {
+      setRunning(false);
+    }
   }
 
   if (!source) return null;
@@ -1404,6 +1468,7 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
             onHoverFunction={setHoverFunction}
             onFunctionHelp={() => setFunctionHelp(true)}
             onSaveAndRun={onSaveAndRun}
+            running={running}
           />
         ) : (
         <>

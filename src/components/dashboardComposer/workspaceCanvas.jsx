@@ -9,10 +9,17 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { DestructiveConfirmMenuItem } from "@/components/ui/destructive-confirm-menu-item";
-import { duplicateTabName } from "@/lib/workspaceStartTabs";
+import { useMyStateV2 } from "@/context/stateContextV2";
+import { duplicateTabName, saveWorkspaceStartTabs } from "@/lib/workspaceStartTabs";
 import { DashboardSheetGrid } from "@/components/dashboardComposer/dashboardSheetGrid";
 import { layoutRunSheets } from "@/components/dashboardComposer/integrationRunSheets";
 import { useUser } from "@/lib/hooks";
+import {
+  createWorkspaceDashboard,
+  loadCurrentWorkspaceDashboard,
+  saveWorkspaceDashboard,
+} from "@/lib/workspaceDashboardClient";
+import { pageIdForTab, tabIdFromPage } from "@/lib/workspaceDashboardDocument";
 import { cn } from "@/lib/utils";
 
 const WorkspaceCanvasContext = createContext(null);
@@ -53,36 +60,227 @@ function readCanvasBlocks(key) {
   }
 }
 
+function collectLocalBlocks(userId) {
+  if (typeof localStorage === "undefined") return {};
+  const prefix = `lycheeWorkspaceCanvas:v1:${userId}:`;
+  const blocks = {};
+  for (let index = 0; index < localStorage.length; index += 1) {
+    const key = localStorage.key(index);
+    if (!key?.startsWith(prefix)) continue;
+    const list = readCanvasBlocks(key);
+    if (list.length) blocks[tabIdFromPage(key.slice(prefix.length))] = list;
+  }
+  return blocks;
+}
+
+function blocksByPageFromDoc(doc) {
+  const map = {};
+  const blocks = doc?.blocks && typeof doc.blocks === "object" ? doc.blocks : {};
+  for (const [tabId, list] of Object.entries(blocks)) {
+    if (Array.isArray(list)) map[pageIdForTab(tabId)] = list;
+  }
+  return map;
+}
+
+function blocksForDocument(blocksByPage) {
+  const blocks = {};
+  for (const [page, list] of Object.entries(blocksByPage || {})) {
+    if (!Array.isArray(list) || !list.length) continue;
+    blocks[tabIdFromPage(page)] = list;
+  }
+  return blocks;
+}
+
+function dashboardDocKey(userId) {
+  return `lycheeWorkspaceDashboardDoc:v1:${userId || "local"}`;
+}
+
+function readLocalDashboard(userId) {
+  if (typeof localStorage === "undefined") return null;
+  try {
+    const parsed = JSON.parse(localStorage.getItem(dashboardDocKey(userId)) || "null");
+    return parsed && typeof parsed === "object" ? parsed : null;
+  } catch {
+    return null;
+  }
+}
+
+function writeLocalDashboard(userId, draft) {
+  if (typeof localStorage === "undefined") return;
+  try {
+    localStorage.setItem(dashboardDocKey(userId), JSON.stringify(draft));
+  } catch {
+    // Private mode can block storage.
+  }
+}
+
 export function WorkspaceCanvasProvider({ pageId, children }) {
   const user = useUser();
+  const ctx = useMyStateV2();
   const owner = user === undefined ? "" : user?.userId || "local";
   const storageKey = owner ? canvasStorageKey(owner, pageId) : "";
   const [tool, setTool] = useState("select");
   const [blocksByPage, setBlocksByPage] = useState({});
-  const [readyKey, setReadyKey] = useState("");
+  const [tables, setTables] = useState([]);
+  const [ready, setReady] = useState(false);
   const [selectedId, setSelectedId] = useState(null);
   const [renameId, setRenameId] = useState(null);
   const blocks = blocksByPage[pageId] || [];
+  const docIdRef = useRef("");
+  const lastPayloadRef = useRef("");
+  const draftRef = useRef(null);
+
+  const tabs = Array.isArray(ctx?.workspaceStartTabs) ? ctx.workspaceStartTabs : [];
+  const activeTabId = ctx?.activeWorkspaceStartTabId || "welcome";
+  const welcomeRemoved = !!ctx?.welcomeTabRemoved;
+
+  function draftFromState(nextBlocks, nextTables) {
+    return {
+      name: "Untitled",
+      active_tab_id: activeTabId,
+      welcome_removed: welcomeRemoved,
+      tabs: tabs.length ? tabs : [{ id: "welcome", name: "Welcome", blank: false }],
+      blocks: blocksForDocument(nextBlocks),
+      tables: nextTables,
+      charts: [],
+    };
+  }
 
   useEffect(() => {
-    if (!storageKey) return undefined;
-    const loaded = readCanvasBlocks(storageKey);
-    setBlocksByPage((prev) => {
-      if ((prev[pageId] || []).length) return prev;
-      return { ...prev, [pageId]: loaded };
+    if (!owner) return undefined;
+    if (owner === "local") {
+      const loaded = readCanvasBlocks(storageKey);
+      setBlocksByPage((prev) => ((prev[pageId] || []).length ? prev : { ...prev, [pageId]: loaded }));
+      setReady(true);
+      return undefined;
+    }
+
+    let cancel = false;
+    setReady(false);
+    (async () => {
+      const loaded = await loadCurrentWorkspaceDashboard();
+      if (cancel) return;
+      let doc = loaded.ok ? loaded.data : null;
+      if (loaded.ok && !doc) {
+        const seeded = {
+          name: "Untitled",
+          active_tab_id: activeTabId,
+          welcome_removed: welcomeRemoved,
+          tabs: tabs.length ? tabs : [{ id: "welcome", name: "Welcome", blank: false }],
+          blocks: collectLocalBlocks(owner),
+          tables: [],
+          charts: [],
+        };
+        const created = await createWorkspaceDashboard(seeded);
+        if (cancel) return;
+        doc = created.ok ? created.data : null;
+      }
+      if (!doc) {
+        const localDoc = readLocalDashboard(owner);
+        const blocks = localDoc?.blocks && Object.keys(localDoc.blocks).length ? localDoc.blocks : collectLocalBlocks(owner);
+        doc = {
+          name: localDoc?.name || "Untitled",
+          active_tab_id: localDoc?.active_tab_id || activeTabId,
+          welcome_removed: localDoc?.welcome_removed || welcomeRemoved,
+          tabs: localDoc?.tabs?.length ? localDoc.tabs : tabs,
+          blocks,
+          tables: Array.isArray(localDoc?.tables) ? localDoc.tables : [],
+          charts: [],
+        };
+      }
+      const nextBlocks = blocksByPageFromDoc(doc);
+      const nextTables = Array.isArray(doc.tables) ? doc.tables : [];
+      const payload = JSON.stringify({
+        tabs: doc.tabs,
+        active_tab_id: doc.active_tab_id,
+        blocks: doc.blocks,
+        tables: nextTables,
+      });
+      lastPayloadRef.current = payload;
+      docIdRef.current = String(doc._id || "");
+      writeLocalDashboard(owner, {
+        name: doc.name,
+        active_tab_id: doc.active_tab_id,
+        welcome_removed: doc.welcome_removed,
+        tabs: doc.tabs,
+        blocks: doc.blocks,
+        tables: nextTables,
+        charts: [],
+      });
+      setTables(nextTables);
+      setBlocksByPage((prev) => ({ ...nextBlocks, ...prev }));
+      if (Array.isArray(doc.tabs) && doc.tabs.length) {
+        ctx?.setWorkspaceStartTabs?.(doc.tabs);
+        ctx?.setWelcomeTabRemoved?.(!!doc.welcome_removed);
+        ctx?.setActiveWorkspaceStartTabId?.(doc.active_tab_id || doc.tabs[0].id);
+        saveWorkspaceStartTabs(owner, {
+          tabs: doc.tabs,
+          welcomeRemoved: !!doc.welcome_removed,
+          activeId: doc.active_tab_id || doc.tabs[0].id,
+        });
+      }
+      setReady(true);
+    })();
+    return () => {
+      cancel = true;
+    };
+    // Load once per signed-in user. Tab edits after that are saved by the effect below.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [owner]);
+
+  useEffect(() => {
+    if (!ready || !owner || owner === "local") return undefined;
+    const draft = draftFromState(blocksByPage, tables);
+    draftRef.current = draft;
+    writeLocalDashboard(owner, draft);
+    const payload = JSON.stringify({
+      tabs: draft.tabs,
+      active_tab_id: draft.active_tab_id,
+      blocks: draft.blocks,
+      tables: draft.tables,
     });
-    setReadyKey(storageKey);
-    return undefined;
-  }, [pageId, storageKey]);
+    if (payload === lastPayloadRef.current) return undefined;
+    const timer = window.setTimeout(() => {
+      const finish = (id) => {
+        docIdRef.current = id;
+        lastPayloadRef.current = payload;
+      };
+      if (!docIdRef.current) {
+        createWorkspaceDashboard(draft)
+          .then((result) => {
+            if (result.ok && result.data?._id) finish(String(result.data._id));
+          })
+          .catch(() => {});
+        return;
+      }
+      saveWorkspaceDashboard(docIdRef.current, draft)
+        .then((result) => {
+          if (result.ok) lastPayloadRef.current = payload;
+        })
+        .catch(() => {});
+    }, 700);
+    return () => window.clearTimeout(timer);
+  }, [activeTabId, blocksByPage, owner, ready, tables, tabs, welcomeRemoved]);
 
   useEffect(() => {
-    if (!storageKey || readyKey !== storageKey) return;
+    if (!ready || !storageKey) return;
     try {
       localStorage.setItem(storageKey, JSON.stringify(blocks));
     } catch {
-      // Private mode can block storage. The sheets still stay on screen this visit.
+      // The full dashboard document is the copy that survives a reload.
     }
-  }, [blocks, readyKey, storageKey]);
+  }, [blocks, ready, storageKey]);
+
+  useEffect(() => {
+    const flush = () => {
+      const id = docIdRef.current;
+      const draft = draftRef.current;
+      if (!id || !draft || owner === "local") return;
+      saveWorkspaceDashboard(id, draft, { keepalive: true }).catch(() => {});
+    };
+    window.addEventListener("pagehide", flush);
+    return () => window.removeEventListener("pagehide", flush);
+  }, [owner]);
 
   const updateBlock = useCallback(
     (id, patch) => {
@@ -96,6 +294,17 @@ export function WorkspaceCanvasProvider({ pageId, children }) {
     },
     [pageId],
   );
+
+  const registerTables = useCallback((incoming) => {
+    const list = Array.isArray(incoming) ? incoming : [];
+    setTables((prev) => {
+      const map = new Map((prev || []).map((table) => [table.id, table]));
+      for (const table of list) {
+        if (table?.id) map.set(table.id, table);
+      }
+      return [...map.values()];
+    });
+  }, []);
 
   const placeIntegrationSheets = useCallback(
     (sheets) => {
@@ -190,11 +399,12 @@ export function WorkspaceCanvasProvider({ pageId, children }) {
       setRenameId,
       addBlock,
       placeIntegrationSheets,
+      registerTables,
       updateBlock,
       duplicateBlock,
       removeBlock,
     }),
-    [addBlock, blocks, duplicateBlock, placeIntegrationSheets, removeBlock, renameId, selectedId, tool, updateBlock],
+    [addBlock, blocks, duplicateBlock, placeIntegrationSheets, registerTables, removeBlock, renameId, selectedId, tool, updateBlock],
   );
 
   return <WorkspaceCanvasContext.Provider value={value}>{children}</WorkspaceCanvasContext.Provider>;
@@ -441,17 +651,14 @@ function CanvasBlock({ block, selected, onSelect, onChange }) {
         </DropdownMenuContent>
       </DropdownMenu>
       <BlockBody block={block} onChange={onChange} />
-      <button
-        type="button"
+      <div
         data-resize=""
-        aria-label="Resize"
+        aria-hidden="true"
         onPointerDown={onResizeDown}
         onPointerMove={onPointerMove}
         onPointerUp={onPointerUp}
-        className={cn(
-          "absolute bottom-1 right-1 size-3 cursor-nwse-resize rounded-sm border border-[#0d99ff] bg-white opacity-0 shadow-sm group-hover/block:opacity-100",
-          selected && "opacity-100",
-        )}
+        className="absolute bottom-0 right-0 z-10 size-4"
+        style={{ cursor: "nwse-resize" }}
       />
     </div>
   );
@@ -470,14 +677,30 @@ export function WorkspaceCanvas() {
     return () => window.removeEventListener("keydown", onKey);
   }, [canvas]);
 
+  const scrollerRef = useRef(null);
+
+  useEffect(() => {
+    const scroller = scrollerRef.current;
+    if (!scroller) return undefined;
+    const onWheel = (event) => {
+      if (Math.abs(event.deltaX) > Math.abs(event.deltaY)) return;
+      if (scroller.scrollHeight <= scroller.clientHeight + 1) return;
+      event.preventDefault();
+      event.stopPropagation();
+      scroller.scrollTop += event.deltaY;
+    };
+    scroller.addEventListener("wheel", onWheel, { passive: false, capture: true });
+    return () => scroller.removeEventListener("wheel", onWheel, { capture: true });
+  }, [blocks.length]);
+
   if (!blocks.length) return null;
 
   return (
-    <div className="pointer-events-none absolute inset-0 z-20 overflow-auto">
+    <div ref={scrollerRef} className="pointer-events-auto absolute inset-0 z-20 overflow-auto">
       <div
         className="relative min-h-full min-w-full"
         style={{
-          height: blocks.reduce((max, block) => Math.max(max, (block.y || 0) + (block.h || 0) + 32), 0),
+          height: blocks.reduce((max, block) => Math.max(max, (block.y || 0) + (block.h || 0) + 120), 0),
           width: blocks.reduce((max, block) => Math.max(max, (block.x || 0) + (block.w || 0) + 32), 0),
         }}
       >
