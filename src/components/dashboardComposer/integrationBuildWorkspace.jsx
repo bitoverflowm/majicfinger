@@ -3,6 +3,7 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { ArrowLeft, ChevronDown, History } from "lucide-react";
 import { IntegrationBuildGrid } from "@/components/dashboardComposer/integrationBuildGrid";
+import { FunctionExplainer, FunctionExplainerTabs } from "@/components/dashboardComposer/integrationFunctionExplainer";
 import { JoinExplainer, JoinExplainerTabs } from "@/components/dashboardComposer/integrationJoinExplainer";
 import { SpectrumLoadingState } from "@/components/ui/spectrum-loading-state";
 import {
@@ -32,6 +33,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { useMyStateV2 } from "@/context/stateContextV2";
 import { getHistoricalPullRowLimit, getJoinMarketCap } from "@/lib/athenaEntitlement";
+import { evaluateColumnFormula } from "@/lib/columnFormula";
 import { listConnectHomeSheetHistory, requestCardSummaryLabel } from "@/lib/connectHomeRequestHistory";
 import { useUser } from "@/lib/hooks";
 import {
@@ -115,6 +117,45 @@ function WaitingToConnectTag() {
 
 const PREVIEW_TRADE_LOCK =
   "You can only view 1 market trade in preview mode; execute the query to run the full pipeline.";
+
+const FUNCTION_COLUMN_ID = "__function";
+const FUNCTION_EQUATION_HINT = "Enter your equation, like = Yes Price + No Price.";
+
+function withFunctionColumn(columns, rows, enabled, name, formula) {
+  if (!enabled) return { columns, rows, highlight: "", error: "", sample: "" };
+  const evaluated = evaluateColumnFormula(formula, columns, rows);
+  const first = evaluated.values[0];
+  const sample =
+    evaluated.error || !String(formula || "").trim() || first == null || first === ""
+      ? ""
+      : typeof first === "number"
+        ? String(Math.round(first * 10000) / 10000)
+        : String(first);
+  return {
+    columns: [...columns, { id: FUNCTION_COLUMN_ID, title: name.trim() || "Column", type: evaluated.type === "text" ? "text" : "number" }],
+    rows: rows.map((row, index) => ({ ...row, [FUNCTION_COLUMN_ID]: evaluated.values[index] })),
+    highlight: FUNCTION_COLUMN_ID,
+    error: evaluated.error,
+    sample,
+  };
+}
+
+function functionChoices({ joinActive, previewTicker, sheetTitle }) {
+  const sheet = { id: "markets", title: sheetTitle, detail: "Add a column on this sheet." };
+  const created = { id: "new", title: "New table", detail: "Create a tab and add the column there." };
+  if (!joinActive) return [sheet, created];
+  return [
+    { ...sheet, detail: "Add a column on the markets sheet." },
+    {
+      id: "trades",
+      title: previewTicker ? `Trades · ${previewTicker}` : "This trades table",
+      detail: "Add a column on the trades sheet you can preview.",
+    },
+    { id: "trades-all", title: "All trades tables", detail: "Add the column on every trades sheet." },
+    { id: "all", title: "All tables", detail: "Add the column on markets and every trades sheet." },
+    created,
+  ];
+}
 
 function sheetTabClass(selected) {
   return cn(
@@ -232,8 +273,53 @@ const ENRICH_OPTIONS = [
   { id: "function", title: "Function" },
 ];
 
-function EnrichStep({ onBack, picked, onPick, joinTarget, onJoinTarget, onClear, marketCap, queryRows, sheetCount, onHoverJoin }) {
+function FunctionDestinationTabs({ sheetTitle, joinCommitted, previewTicker, functionTab, joinTab, columnName, onMarkets, onTrades, onNew }) {
+  const newLabel = columnName.trim() || "New table";
+  return (
+    <div className="overflow-hidden px-4 pb-1 pt-4">
+      <div className="flex">
+        <button type="button" onClick={onMarkets} className={sheetTabClass(functionTab !== "new" && joinTab === "markets")}>
+          {sheetTitle}
+        </button>
+        {joinCommitted && previewTicker ? (
+          <button type="button" onClick={onTrades} className={sheetTabClass(functionTab !== "new" && joinTab === previewTicker)}>
+            {previewTicker}
+          </button>
+        ) : null}
+        <button type="button" onClick={onNew} className={sheetTabClass(functionTab === "new")}>
+          {newLabel}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function EnrichStep({
+  onBack,
+  picked,
+  onPick,
+  joinTarget,
+  onJoinTarget,
+  onClear,
+  marketCap,
+  queryRows,
+  sheetCount,
+  onHoverJoin,
+  functionTables,
+  functionTarget,
+  onFunctionTarget,
+  onClearFunction,
+  functionName,
+  onFunctionName,
+  functionFormula,
+  onFunctionFormula,
+  functionError,
+  functionSample,
+  functionScopeNote,
+  onHoverFunction,
+}) {
   const joinOpen = picked === "join";
+  const functionOpen = picked === "function";
   const queryRowCount = typeof queryRows === "number" ? queryRows : sheetCount;
   return (
     <>
@@ -248,11 +334,12 @@ function EnrichStep({ onBack, picked, onPick, joinTarget, onJoinTarget, onClear,
         {ENRICH_OPTIONS.map((option) => {
           const selected = picked === option.id;
           const isJoin = option.id === "join";
+          const isFunction = option.id === "function";
           return (
             <div
               key={option.id}
-              onMouseEnter={isJoin ? () => onHoverJoin(true) : undefined}
-              onMouseLeave={isJoin ? () => onHoverJoin(false) : undefined}
+              onMouseEnter={isJoin ? () => onHoverJoin(true) : isFunction ? () => onHoverFunction(true) : undefined}
+              onMouseLeave={isJoin ? () => onHoverJoin(false) : isFunction ? () => onHoverFunction(false) : undefined}
             >
               <label
                 className={cn(
@@ -318,6 +405,76 @@ function EnrichStep({ onBack, picked, onPick, joinTarget, onJoinTarget, onClear,
                     </div>
                   </div>
                 </div>
+              ) : isFunction ? (
+                <div
+                  className={cn(
+                    "grid transition-[grid-template-rows,opacity] duration-300 ease-out",
+                    functionOpen ? "grid-rows-[1fr] opacity-100" : "grid-rows-[0fr] opacity-0",
+                  )}
+                >
+                  <div className={cn("overflow-hidden", functionOpen ? "" : "pointer-events-none")}>
+                    <div className="mt-2 rounded-lg border border-border/70 px-2.5 py-2">
+                      <div className="flex items-center justify-between gap-2">
+                        <p className="text-[11px] font-semibold text-foreground">Add column to</p>
+                        <button
+                          type="button"
+                          onClick={onClearFunction}
+                          className="text-[11px] font-medium text-muted-foreground hover:text-foreground"
+                        >
+                          Clear
+                        </button>
+                      </div>
+                      <div className="mt-1.5 flex flex-col gap-1.5">
+                        {functionTables.map((table) => (
+                          <button
+                            key={table.id}
+                            type="button"
+                            aria-pressed={functionTarget === table.id}
+                            onClick={() => onFunctionTarget(table.id)}
+                            className={cn(
+                              "flex w-full flex-col rounded-lg border px-2.5 py-2 text-left transition-colors",
+                              functionTarget === table.id
+                                ? "border-[#0d99ff]/40 bg-[#0d99ff]/10"
+                                : "border-border/70 bg-background hover:bg-muted/50",
+                            )}
+                          >
+                            <span className="text-[13px] font-semibold text-foreground">{table.title}</span>
+                            <span className="text-[11px] font-normal text-muted-foreground">{table.detail}</span>
+                          </button>
+                        ))}
+                      </div>
+                      {functionTarget ? (
+                        <div className="mt-2 space-y-2">
+                          <label className="block">
+                            <span className="text-[11px] font-semibold text-foreground">Column name</span>
+                            <Input
+                              value={functionName}
+                              onChange={(event) => onFunctionName(event.target.value)}
+                              placeholder="Column"
+                              className="mt-1 h-8 text-[13px]"
+                            />
+                          </label>
+                          <label className="block">
+                            <span className="text-[11px] font-semibold text-foreground">Equation</span>
+                            <Input
+                              value={functionFormula}
+                              onChange={(event) => onFunctionFormula(event.target.value)}
+                              placeholder="= Yes Price + No Price"
+                              title={FUNCTION_EQUATION_HINT}
+                              className="mt-1 h-8 font-mono text-[13px]"
+                            />
+                          </label>
+                          <p className="text-[11px] leading-relaxed text-muted-foreground" title={FUNCTION_EQUATION_HINT}>
+                            {FUNCTION_EQUATION_HINT}
+                          </p>
+                          {functionError ? <p className="text-[11px] leading-relaxed text-red-600 dark:text-red-400">{functionError}</p> : null}
+                          {functionSample ? <p className="text-[11px] text-muted-foreground">First row: {functionSample}</p> : null}
+                          {functionScopeNote ? <p className="text-[11px] leading-relaxed text-muted-foreground">{functionScopeNote}</p> : null}
+                        </div>
+                      ) : null}
+                    </div>
+                  </div>
+                </div>
               ) : null}
             </div>
           );
@@ -372,6 +529,12 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
   const [joinTarget, setJoinTarget] = useState("");
   const [joinTab, setJoinTab] = useState("markets");
   const [tradePreview, setTradePreview] = useState({ status: "idle", ticker: "", columns: [], rows: [], error: "" });
+  const [hoverFunction, setHoverFunction] = useState(false);
+  const [functionTarget, setFunctionTarget] = useState("");
+  const [functionName, setFunctionName] = useState("");
+  const [functionFormula, setFunctionFormula] = useState("");
+  const [functionTab, setFunctionTab] = useState("");
+  const [functionScrollKey, setFunctionScrollKey] = useState(0);
   const [visibleCount, setVisibleCount] = useState(0);
   const [universe, setUniverse] = useState(null);
   const [counting, setCounting] = useState(false);
@@ -816,10 +979,39 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
   })();
 
   const canProceed = Boolean(pull) && !loading && !error && shownColumns.length > 0;
-  const showJoinSheets = step === "enrich" && enrichPick === "join" && joinTarget === "kalshiHistoricalTrades";
-  const showJoinExplainer = step === "enrich" && hoverJoin && !showJoinSheets;
+  const joinCommitted = step === "enrich" && joinTarget === "kalshiHistoricalTrades";
+  const showFunctionExplainer = step === "enrich" && hoverFunction && !functionTarget;
+  const showJoinExplainer = step === "enrich" && hoverJoin && !joinCommitted && !showFunctionExplainer;
+  const showJoinSheets = joinCommitted && !showFunctionExplainer && !showJoinExplainer;
+  const functionActive = step === "enrich" && enrichPick === "function" && Boolean(functionTarget) && !showFunctionExplainer;
+  const functionOnMarkets = functionActive && (functionTarget === "markets" || functionTarget === "all");
+  const functionOnTrades = functionActive && (functionTarget === "trades" || functionTarget === "trades-all" || functionTarget === "all");
+  const functionOnNew = functionActive && functionTarget === "new";
+  const marketsGrid = withFunctionColumn(shownColumns, filteredRows, functionOnMarkets, functionName, functionFormula);
+  const tradesGrid = withFunctionColumn(tradePreview.columns, tradePreview.rows, functionOnTrades, functionName, functionFormula);
+  const newTableGrid = withFunctionColumn(shownColumns, filteredRows, functionOnNew, functionName, functionFormula);
+  const formulaView = functionOnNew
+    ? newTableGrid
+    : showJoinSheets && joinTab === previewTicker && functionOnTrades
+      ? tradesGrid
+      : functionOnMarkets
+        ? marketsGrid
+        : functionOnTrades
+          ? tradesGrid
+          : null;
+  const formulaChecksTrades = formulaView === tradesGrid && functionOnTrades;
+  const formulaReady = Boolean(formulaView) && (!formulaChecksTrades || tradePreview.status === "ready");
+  const functionScopeNote =
+    functionTarget === "trades-all"
+      ? "Preview shows the column on the first trades sheet. The same column is added on every trades sheet when you run the pull."
+      : functionTarget === "all"
+        ? "Preview shows the column on the sheet you're looking at. The same column is added on every sheet when you run the pull."
+        : "";
+  const sheetTitle = tableId === "markets" ? "Markets" : tables[tableId]?.label || "This sheet";
   const paneLine = (() => {
+    if (showFunctionExplainer) return "Illustration. The column is added when you pick a sheet.";
     if (showJoinExplainer) return "Illustration. No trades are loaded until you run the pull.";
+    if (functionOnNew && functionTab === "new") return "New table. This sheet is created when you run the pull.";
     if (!showJoinSheets || joinTab === "markets") return previewLineShown;
     if (joinTab !== previewTicker) return PREVIEW_TRADE_LOCK;
     if (tradePreview.status === "loading") return "Loading trades for the first market";
@@ -827,6 +1019,22 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
     const count = tradePreview.rows.length;
     return `Previewing ${count.toLocaleString()} ${count === 1 ? "trade" : "trades"} of ${previewTicker}`;
   })();
+
+  function chooseFunctionTarget(id) {
+    setHoverFunction(false);
+    setFunctionTarget(id);
+    setFunctionScrollKey((key) => key + 1);
+    if (id === "new") {
+      setFunctionTab("new");
+      return;
+    }
+    setFunctionTab("");
+    if (id === "trades" || id === "trades-all") {
+      if (previewTicker) setJoinTab(previewTicker);
+      return;
+    }
+    setJoinTab("markets");
+  }
 
   if (!source) return null;
 
@@ -837,6 +1045,7 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
           <EnrichStep
             onBack={() => {
               setHoverJoin(false);
+              setHoverFunction(false);
               setStep("query");
             }}
             picked={enrichPick}
@@ -848,11 +1057,32 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
               setEnrichPick("");
               setJoinTarget("");
               setJoinTab("markets");
+              setFunctionTab("");
+              setFunctionTarget((current) => (current === "trades" || current === "trades-all" || current === "all" ? "" : current));
             }}
             marketCap={marketCap}
             queryRows={queryRows}
             sheetCount={sheetCount}
             onHoverJoin={setHoverJoin}
+            functionTables={functionChoices({ joinActive: joinCommitted, previewTicker, sheetTitle })}
+            functionTarget={functionTarget}
+            onFunctionTarget={chooseFunctionTarget}
+            onClearFunction={() => {
+              setHoverFunction(false);
+              setEnrichPick("");
+              setFunctionTarget("");
+              setFunctionName("");
+              setFunctionFormula("");
+              setFunctionTab("");
+            }}
+            functionName={functionName}
+            onFunctionName={setFunctionName}
+            functionFormula={functionFormula}
+            onFunctionFormula={setFunctionFormula}
+            functionError={formulaReady ? formulaView.error : ""}
+            functionSample={formulaReady ? formulaView.sample : ""}
+            functionScopeNote={functionActive ? functionScopeNote : ""}
+            onHoverFunction={setHoverFunction}
           />
         ) : (
         <>
@@ -1076,7 +1306,7 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
           <h2 className="pt-0.5 text-[15px] font-semibold text-foreground">Preview</h2>
           <div className="flex min-w-0 flex-col items-end">
             <p className="text-right text-[12px] text-muted-foreground">{paneLine}</p>
-            {typeof planLimit === "number" && !(showJoinSheets && joinTab !== "markets") ? (
+            {typeof planLimit === "number" && !(showJoinSheets && joinTab !== "markets") && !(functionOnNew && functionTab === "new") ? (
               <div className="mt-1.5 w-full max-w-[280px]">
                 <p className="text-right text-[11px] text-muted-foreground">
                   {importedRows == null
@@ -1104,20 +1334,57 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
             style={{ width: `${Math.min(100, progress)}%` }}
           />
         </div>
-        {showJoinSheets ? (
+        {showFunctionExplainer ? (
+          <FunctionExplainerTabs sheetTitle={sheetTitle} />
+        ) : showJoinExplainer ? (
+          <JoinExplainerTabs />
+        ) : functionOnNew ? (
+          <FunctionDestinationTabs
+            sheetTitle={sheetTitle}
+            joinCommitted={joinCommitted}
+            previewTicker={previewTicker}
+            functionTab={functionTab}
+            joinTab={joinTab}
+            columnName={functionName}
+            onMarkets={() => {
+              setFunctionTab("");
+              setJoinTab("markets");
+            }}
+            onTrades={() => {
+              setFunctionTab("");
+              if (previewTicker) setJoinTab(previewTicker);
+            }}
+            onNew={() => {
+              setFunctionTab("new");
+              setFunctionScrollKey((key) => key + 1);
+            }}
+          />
+        ) : showJoinSheets ? (
           <JoinSheetTabs
             markets={joinedMarkets}
             active={joinTab}
             previewTicker={previewTicker}
             sheetCount={sheetCount}
-            onSelect={setJoinTab}
+            onSelect={(tab) => {
+              setJoinTab(tab);
+              if ((tab === "markets" && functionOnMarkets) || (tab === previewTicker && functionOnTrades)) {
+                setFunctionScrollKey((key) => key + 1);
+              }
+            }}
           />
-        ) : showJoinExplainer ? (
-          <JoinExplainerTabs />
         ) : null}
         <div className="min-h-0 flex-1 p-4">
-          {showJoinExplainer ? (
+          {showFunctionExplainer ? (
+            <FunctionExplainer />
+          ) : showJoinExplainer ? (
             <JoinExplainer />
+          ) : functionOnNew && functionTab === "new" && newTableGrid.columns.length ? (
+            <IntegrationBuildGrid
+              columns={newTableGrid.columns}
+              rows={newTableGrid.rows}
+              highlightColumnId={newTableGrid.highlight}
+              scrollToken={functionScrollKey}
+            />
           ) : showJoinSheets && !previewTicker ? (
             <div className="flex h-full items-center justify-center rounded-xl border border-border/70 bg-background px-6 text-center text-[13px] leading-relaxed text-muted-foreground shadow-sm">
               This query has no market tickers to attach trades to.
@@ -1132,8 +1399,13 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
             </div>
           ) : showJoinSheets && joinTab === previewTicker && tradePreview.status === "error" ? (
             <p className="text-[13px] text-muted-foreground">{tradePreview.error}</p>
-          ) : showJoinSheets && joinTab === previewTicker && tradePreview.columns.length ? (
-            <IntegrationBuildGrid columns={tradePreview.columns} rows={tradePreview.rows} />
+          ) : showJoinSheets && joinTab === previewTicker && tradesGrid.columns.length ? (
+            <IntegrationBuildGrid
+              columns={tradesGrid.columns}
+              rows={tradesGrid.rows}
+              highlightColumnId={tradesGrid.highlight}
+              scrollToken={functionScrollKey}
+            />
           ) : priceWaiting ? (
             <div className="flex h-full items-center justify-center">
               <WaitingToConnectTag />
@@ -1147,8 +1419,13 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
                 <SkeletonRows />
               </div>
             </div>
-          ) : shownColumns.length ? (
-            <IntegrationBuildGrid columns={shownColumns} rows={filteredRows} />
+          ) : marketsGrid.columns.length ? (
+            <IntegrationBuildGrid
+              columns={marketsGrid.columns}
+              rows={marketsGrid.rows}
+              highlightColumnId={marketsGrid.highlight}
+              scrollToken={functionScrollKey}
+            />
           ) : (
             <div className="flex h-full items-center justify-center rounded-xl border border-border/70 bg-background text-[13px] text-muted-foreground shadow-sm">
               Select at least one column to preview.

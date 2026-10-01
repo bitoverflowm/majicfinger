@@ -79,9 +79,25 @@ function displayFor(value, column) {
   return String(value);
 }
 
-export default function IntegrationBuildGridInner({ columns, rows }) {
+const HIGHLIGHT_THEME = {
+  light: {
+    bgCell: "#e7f3ff",
+    bgHeader: "#d7ebff",
+    bgHeaderHovered: "#c5e4ff",
+    textHeader: "#0b3a66",
+  },
+  dark: {
+    bgCell: "rgba(13, 153, 255, 0.18)",
+    bgHeader: "rgba(13, 153, 255, 0.32)",
+    bgHeaderHovered: "rgba(13, 153, 255, 0.42)",
+    textHeader: "#e8f4ff",
+  },
+};
+
+export default function IntegrationBuildGridInner({ columns, rows, highlightColumnId = "", scrollToken = 0 }) {
   const dark = useHtmlDarkClass();
   const frameRef = useRef(null);
+  const editorRef = useRef(null);
   const [size, setSize] = useState({ width: 0, height: 0 });
   const [fontFamily, setFontFamily] = useState("ui-sans-serif, system-ui, sans-serif");
   const gridColumns = useMemo(
@@ -90,9 +106,16 @@ export default function IntegrationBuildGridInner({ columns, rows }) {
         id: column.id,
         title: column.title,
         width:
-          column.id === "title" || column.id === "question" ? 280 : column.type === "date" ? 188 : 140,
+          column.id === highlightColumnId
+            ? Math.max(168, Math.min(280, String(column.title || "").length * 8 + 28))
+            : column.id === "title" || column.id === "question"
+              ? 280
+              : column.type === "date"
+                ? 188
+                : 140,
+        themeOverride: column.id === highlightColumnId ? HIGHLIGHT_THEME[dark ? "dark" : "light"] : undefined,
       })),
-    [columns],
+    [columns, dark, highlightColumnId],
   );
 
   useEffect(() => {
@@ -113,12 +136,29 @@ export default function IntegrationBuildGridInner({ columns, rows }) {
     return () => observer.disconnect();
   }, []);
 
+  const highlightIndex = highlightColumnId ? columns.findIndex((column) => column.id === highlightColumnId) : -1;
+
+  useEffect(() => {
+    if (highlightIndex < 0 || size.width <= 0) return undefined;
+    let cancelled = false;
+    const run = () => {
+      if (!cancelled) editorRef.current?.scrollTo(highlightIndex, 0, "horizontal", 16, 0, { hAlign: "end" });
+    };
+    const frame = window.requestAnimationFrame(run);
+    const timer = window.setTimeout(run, 80);
+    return () => {
+      cancelled = true;
+      window.cancelAnimationFrame(frame);
+      window.clearTimeout(timer);
+    };
+  }, [highlightIndex, scrollToken, size.width]);
+
   const getCellContent = useCallback(
     ([col, row]) => {
       const column = columns[col];
       const raw = rows[row]?.[column?.id];
       const display = displayFor(raw, column);
-      if (column?.type === "number") {
+      if (column?.type === "number" && raw != null && raw !== "") {
         const parsed = Number(raw);
         const n = column.scale === "cents" && Number.isFinite(parsed) ? parsed / 100 : parsed;
         return {
@@ -148,6 +188,7 @@ export default function IntegrationBuildGridInner({ columns, rows }) {
     <div ref={frameRef} data-sheet-grid="" className="h-full min-h-0 w-full overflow-hidden rounded-xl border border-border/70 bg-background shadow-sm">
       {size.width > 0 && size.height > 0 ? (
         <DataEditor
+          ref={editorRef}
           width={size.width}
           height={size.height}
           columns={gridColumns}
