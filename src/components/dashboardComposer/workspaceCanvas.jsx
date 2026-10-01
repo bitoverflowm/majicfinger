@@ -123,12 +123,14 @@ export function WorkspaceCanvasProvider({ pageId, children }) {
   const [blocksByPage, setBlocksByPage] = useState({});
   const [tables, setTables] = useState([]);
   const [ready, setReady] = useState(false);
+  const [dashboardName, setDashboardName] = useState("Untitled");
   const [selectedId, setSelectedId] = useState(null);
   const [renameId, setRenameId] = useState(null);
   const blocks = blocksByPage[pageId] || [];
   const docIdRef = useRef("");
   const lastPayloadRef = useRef("");
   const draftRef = useRef(null);
+  const pendingSelectRef = useRef("");
 
   const tabs = Array.isArray(ctx?.workspaceStartTabs) ? ctx.workspaceStartTabs : [];
   const activeTabId = ctx?.activeWorkspaceStartTabId || "welcome";
@@ -136,7 +138,7 @@ export function WorkspaceCanvasProvider({ pageId, children }) {
 
   function draftFromState(nextBlocks, nextTables) {
     return {
-      name: "Untitled",
+      name: String(dashboardName || "").trim().slice(0, 120) || "Untitled",
       active_tab_id: activeTabId,
       welcome_removed: welcomeRemoved,
       tabs: tabs.length ? tabs : [{ id: "welcome", name: "Welcome", blank: false }],
@@ -191,6 +193,7 @@ export function WorkspaceCanvasProvider({ pageId, children }) {
       const nextBlocks = blocksByPageFromDoc(doc);
       const nextTables = Array.isArray(doc.tables) ? doc.tables : [];
       const payload = JSON.stringify({
+        name: doc.name,
         tabs: doc.tabs,
         active_tab_id: doc.active_tab_id,
         blocks: doc.blocks,
@@ -198,6 +201,7 @@ export function WorkspaceCanvasProvider({ pageId, children }) {
       });
       lastPayloadRef.current = payload;
       docIdRef.current = String(doc._id || "");
+      setDashboardName(String(doc.name || "").trim() || "Untitled");
       writeLocalDashboard(owner, {
         name: doc.name,
         active_tab_id: doc.active_tab_id,
@@ -234,6 +238,7 @@ export function WorkspaceCanvasProvider({ pageId, children }) {
     draftRef.current = draft;
     writeLocalDashboard(owner, draft);
     const payload = JSON.stringify({
+      name: draft.name,
       tabs: draft.tabs,
       active_tab_id: draft.active_tab_id,
       blocks: draft.blocks,
@@ -260,7 +265,7 @@ export function WorkspaceCanvasProvider({ pageId, children }) {
         .catch(() => {});
     }, 700);
     return () => window.clearTimeout(timer);
-  }, [activeTabId, blocksByPage, owner, ready, tables, tabs, welcomeRemoved]);
+  }, [activeTabId, blocksByPage, dashboardName, owner, ready, tables, tabs, welcomeRemoved]);
 
   useEffect(() => {
     if (!ready || !storageKey) return;
@@ -385,16 +390,65 @@ export function WorkspaceCanvasProvider({ pageId, children }) {
   );
 
   useEffect(() => {
+    if (pendingSelectRef.current) {
+      setSelectedId(pendingSelectRef.current);
+      pendingSelectRef.current = "";
+      return;
+    }
     setSelectedId(null);
   }, [pageId]);
+
+  const pageIdRef = useRef(pageId);
+  pageIdRef.current = pageId;
+
+  const focusBlock = useCallback((id, nextPageId) => {
+    if (nextPageId && nextPageId !== pageIdRef.current) pendingSelectRef.current = id || "";
+    setSelectedId(id || null);
+  }, []);
+
+  const renameDashboard = useCallback((next) => {
+    setDashboardName(String(next || "").trim().slice(0, 120) || "Untitled");
+  }, []);
+
+  const saveNow = useCallback(async () => {
+    const draft = draftFromState(blocksByPage, tables);
+    draftRef.current = draft;
+    if (!owner || owner === "local") {
+      writeLocalDashboard(owner || "local", draft);
+      return { ok: true };
+    }
+    writeLocalDashboard(owner, draft);
+    const payload = JSON.stringify({
+      name: draft.name,
+      tabs: draft.tabs,
+      active_tab_id: draft.active_tab_id,
+      blocks: draft.blocks,
+      tables: draft.tables,
+    });
+    if (!docIdRef.current) {
+      const created = await createWorkspaceDashboard(draft);
+      if (!created.ok || !created.data?._id) return { ok: false };
+      docIdRef.current = String(created.data._id);
+      lastPayloadRef.current = payload;
+      return { ok: true };
+    }
+    const saved = await saveWorkspaceDashboard(docIdRef.current, draft);
+    if (saved.ok) lastPayloadRef.current = payload;
+    return { ok: !!saved.ok };
+  }, [blocksByPage, dashboardName, owner, tables, tabs, activeTabId, welcomeRemoved]);
 
   const value = useMemo(
     () => ({
       tool,
       setTool,
+      dashboardName,
+      renameDashboard,
+      saveNow,
       blocks,
+      blocksByPage,
       selectedId,
       setSelectedId,
+      focusBlock,
       renameId,
       setRenameId,
       addBlock,
@@ -404,7 +458,7 @@ export function WorkspaceCanvasProvider({ pageId, children }) {
       duplicateBlock,
       removeBlock,
     }),
-    [addBlock, blocks, duplicateBlock, placeIntegrationSheets, registerTables, removeBlock, renameId, selectedId, tool, updateBlock],
+    [addBlock, blocks, blocksByPage, dashboardName, duplicateBlock, focusBlock, placeIntegrationSheets, registerTables, removeBlock, renameDashboard, renameId, saveNow, selectedId, tool, updateBlock],
   );
 
   return <WorkspaceCanvasContext.Provider value={value}>{children}</WorkspaceCanvasContext.Provider>;
@@ -592,6 +646,7 @@ function CanvasBlock({ block, selected, onSelect, onChange }) {
     <div
       ref={rootRef}
       role="group"
+      data-block-id={block.id}
       aria-label={block.title || block.body || block.type}
       onPointerDown={onPointerDown}
       onPointerMove={onPointerMove}
@@ -668,6 +723,7 @@ function CanvasBlock({ block, selected, onSelect, onChange }) {
 export function WorkspaceCanvas() {
   const canvas = useWorkspaceCanvas();
   const blocks = canvas?.blocks || [];
+  const scrollerRef = useRef(null);
 
   useEffect(() => {
     const onKey = (e) => {
@@ -677,7 +733,13 @@ export function WorkspaceCanvas() {
     return () => window.removeEventListener("keydown", onKey);
   }, [canvas]);
 
-  const scrollerRef = useRef(null);
+  useEffect(() => {
+    const id = canvas?.selectedId;
+    const scroller = scrollerRef.current;
+    if (!id || !scroller) return;
+    const el = scroller.querySelector(`[data-block-id="${CSS.escape(id)}"]`);
+    if (el instanceof HTMLElement) el.scrollIntoView({ block: "nearest" });
+  }, [canvas?.selectedId]);
 
   useEffect(() => {
     const scroller = scrollerRef.current;

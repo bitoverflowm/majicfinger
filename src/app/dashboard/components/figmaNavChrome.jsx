@@ -1,9 +1,9 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
-import { BarChart3, ChevronDown, ChevronRight, Play, RotateCw, Square, Table2, Type } from "lucide-react";
+import { BarChart3, Check, ChevronDown, ChevronRight, Database, Play, RotateCw, Save, Square, Table2, Type } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -18,7 +18,8 @@ import { AnimatedThemeToggler } from "@/components/ui/animated-theme-toggler";
 import { UserAvatar } from "@/components/ui/user-avatar";
 import { useUser } from "@/lib/hooks";
 import { useMyStateV2 } from "@/context/stateContextV2";
-import { CONNECT_HOME_CENTER_VIEW } from "@/lib/connectHomeFlow";
+import { useWorkspaceCanvas } from "@/components/dashboardComposer/workspaceCanvas";
+import { pageIdForTab } from "@/lib/workspaceDashboardDocument";
 import { DASHBOARD_FREE_TEXT_PLACEHOLDER } from "@/lib/dashboardFreeTextTheme";
 import { cn } from "@/lib/utils";
 
@@ -48,36 +49,60 @@ function textBlockLabel(row) {
   return body.length > 48 ? `${body.slice(0, 48)}…` : body;
 }
 
-function workspaceTargets(viewing) {
-  return (
-    viewing === "connectDataHome" ||
-    viewing === "dataStart" ||
-    viewing === "charts" ||
-    viewing === "dashboardComposer"
-  );
+function blockLabel(block) {
+  if (block?.type === "text") return textBlockLabel(block);
+  const title = String(block?.title || "").trim();
+  if (title) return title;
+  if (block?.type === "chart") return "Chart";
+  if (block?.type === "source") return "Data source";
+  return "Data sheet";
+}
+
+function layersFromBlocks(blocks) {
+  const list = Array.isArray(blocks) ? blocks : [];
+  const item = (block) => ({ id: block.id, name: blockLabel(block), type: block.type });
+  return {
+    sheets: list.filter((block) => block?.type === "sheet").map(item),
+    sources: list.filter((block) => block?.type === "source").map(item),
+    charts: list.filter((block) => block?.type === "chart").map(item),
+    texts: list.filter((block) => block?.type === "text").map(item),
+  };
 }
 
 /**
- * One parent tab until dashboards persist multiple tabs.
- * Children mirror the sheet tabs, chart tabs, and dashboard text blocks.
+ * Sidebar lists each dashboard tab, then the sheets, charts, and text on that tab.
  */
 function useDashboardTabTree() {
   const ctx = useMyStateV2();
+  const canvas = useWorkspaceCanvas();
   const dataSheets = ctx?.dataSheets;
   const chartSheets = ctx?.chartSheets;
   const rows = ctx?.chartDashboardDraft?.layout?.rows;
+  const startTabs = ctx?.workspaceStartTabs;
+  const blocksByPage = canvas?.blocksByPage;
 
   return useMemo(() => {
+    if (Array.isArray(startTabs) && startTabs.length && blocksByPage) {
+      return startTabs.map((tab) => ({
+        id: tab.id,
+        name: String(tab.name || "").trim() || "Tab",
+        pageId: pageIdForTab(tab.id),
+        ...layersFromBlocks(blocksByPage[pageIdForTab(tab.id)]),
+      }));
+    }
+
     const sheets = Object.entries(dataSheets && typeof dataSheets === "object" ? dataSheets : {}).map(
       ([id, sheet]) => ({
         id,
         name: String(sheet?.name || "").trim() || "Sheet",
+        type: "sheet",
       }),
     );
     const charts = Object.entries(chartSheets && typeof chartSheets === "object" ? chartSheets : {}).map(
       ([id, sheet]) => ({
         id,
         name: String(sheet?.name || "").trim() || "Chart",
+        type: "chart",
       }),
     );
     const texts = (Array.isArray(rows) ? rows : [])
@@ -85,18 +110,21 @@ function useDashboardTabTree() {
       .map((row) => ({
         id: String(row.id),
         name: textBlockLabel(row),
+        type: "text",
       }));
 
     return [
       {
         id: "tab-1",
         name: "Tab 1",
+        pageId: "",
         sheets,
+        sources: [],
         charts,
         texts,
       },
     ];
-  }, [chartSheets, dataSheets, rows]);
+  }, [blocksByPage, chartSheets, dataSheets, rows, startTabs]);
 }
 
 function LayerRow({ active, icon: Icon, label, title, nested, onClick }) {
@@ -121,84 +149,63 @@ function LayerRow({ active, icon: Icon, label, title, nested, onClick }) {
 
 function DashboardLayerTree() {
   const ctx = useMyStateV2();
+  const canvas = useWorkspaceCanvas();
   const tabs = useDashboardTabTree();
-  const [openTabs, setOpenTabs] = useState(() => ({ "tab-1": true }));
-  const [pickedKey, setPickedKey] = useState(null);
+  const [openTabs, setOpenTabs] = useState({});
 
   const viewing = ctx?.viewing;
-  const activeSheetId = ctx?.activeSheetId;
-  const activeChartSheetId = ctx?.activeChartSheetId;
-  const centerView = ctx?.connectHomeCenterView;
-  const chartSheets = ctx?.chartSheets || {};
+  const activeTabId = ctx?.activeWorkspaceStartTabId;
+  const selectedId = canvas?.selectedId;
 
-  const focusSurface = (center) => {
-    if (!workspaceTargets(viewing)) return;
-    if (viewing === "connectDataHome") {
-      ctx?.setConnectHomeCenterView?.(center);
-      return;
-    }
-    if (center === CONNECT_HOME_CENTER_VIEW.SHEET) ctx?.setViewing?.("dataStart");
-    else if (center === CONNECT_HOME_CENTER_VIEW.CHARTS) ctx?.setViewing?.("charts");
-    else if (center === CONNECT_HOME_CENTER_VIEW.DASHBOARD) ctx?.setViewing?.("dashboardComposer");
+  const openTab = (tab) => {
+    setOpenTabs((prev) => ({ ...prev, [tab.id]: true }));
+    if (!tab.pageId) return;
+    ctx?.setViewing?.("welcome");
+    ctx?.setActiveWorkspaceStartTabId?.(tab.id);
   };
 
-  const openSheet = (id) => {
-    setPickedKey(`sheet:${id}`);
-    ctx?.setActiveSheetId?.(id);
-    focusSurface(CONNECT_HOME_CENTER_VIEW.SHEET);
+  const openBlock = (tab, blockId) => {
+    openTab(tab);
+    canvas?.focusBlock?.(blockId, tab.pageId);
   };
 
-  const openChart = async (id) => {
-    setPickedKey(`chart:${id}`);
-    if (typeof ctx?.chartSnapshotFlusher === "function") {
-      try {
-        await ctx.chartSnapshotFlusher();
-      } catch {
-        // Keep the existing chart tab if the flush fails.
-      }
-    }
-    const sheet = chartSheets?.[id];
-    ctx?.setActiveChartSheetId?.(id);
-    ctx?.setLoadedChartBuilderSnapshot?.(sheet?.snapshot ?? null);
-    ctx?.setLoadedChartMeta?.(sheet?.chartMeta ?? null);
-    focusSurface(CONNECT_HOME_CENTER_VIEW.CHARTS);
-  };
-
-  const openText = (id) => {
-    setPickedKey(`text:${id}`);
-    focusSurface(CONNECT_HOME_CENTER_VIEW.DASHBOARD);
-  };
-
-  const sheetActive = (id) =>
-    pickedKey === `sheet:${id}` ||
-    (pickedKey == null &&
-      viewing !== "welcome" &&
-      id === activeSheetId &&
-      (centerView === CONNECT_HOME_CENTER_VIEW.SHEET || viewing === "dataStart"));
-
-  const chartActive = (id) =>
-    pickedKey === `chart:${id}` ||
-    (pickedKey == null &&
-      viewing !== "welcome" &&
-      id === activeChartSheetId &&
-      (centerView === CONNECT_HOME_CENTER_VIEW.CHARTS || viewing === "charts"));
+  const blockActive = (tab, id) =>
+    viewing === "welcome" && tab.id === activeTabId && id === selectedId;
 
   return (
     <div className="flex min-h-0 flex-1 flex-col overflow-y-auto px-1.5 py-2">
       {tabs.map((tab) => {
         const open = openTabs[tab.id] !== false;
-        const empty = tab.sheets.length + tab.charts.length + tab.texts.length === 0;
+        const count = tab.sheets.length + tab.sources.length + tab.charts.length + tab.texts.length;
+        const tabActive = viewing === "welcome" && tab.id === activeTabId;
         return (
           <div key={tab.id}>
-            <button
-              type="button"
-              aria-expanded={open}
-              onClick={() => setOpenTabs((prev) => ({ ...prev, [tab.id]: !open }))}
-              className="flex h-7 w-full items-center gap-1 rounded-md px-1.5 text-left text-[12px] font-medium text-neutral-800 hover:bg-black/[0.04] dark:text-neutral-100 dark:hover:bg-white/[0.06]"
+            <div
+              className={cn(
+                "flex h-7 w-full items-center gap-0.5 rounded-md pr-1.5",
+                tabActive && "bg-[#e5f4ff] dark:bg-[#0d99ff]/20",
+              )}
             >
-              <ChevronRight className={cn("size-3 shrink-0 text-neutral-500 transition-transform", open && "rotate-90")} />
-              <span className="min-w-0 flex-1 truncate">{tab.name}</span>
-            </button>
+              <button
+                type="button"
+                aria-expanded={open}
+                aria-label={open ? `Collapse ${tab.name}` : `Expand ${tab.name}`}
+                onClick={() => setOpenTabs((prev) => ({ ...prev, [tab.id]: !open }))}
+                className="inline-flex size-6 shrink-0 items-center justify-center rounded-md text-neutral-500 hover:bg-black/[0.04] dark:hover:bg-white/[0.06]"
+              >
+                <ChevronRight className={cn("size-3 transition-transform", open && "rotate-90")} />
+              </button>
+              <button
+                type="button"
+                onClick={() => openTab(tab)}
+                className={cn(
+                  "min-w-0 flex-1 truncate text-left text-[12px] font-medium",
+                  tabActive ? "text-[#0d99ff] dark:text-[#8ecaff]" : "text-neutral-800 dark:text-neutral-100",
+                )}
+              >
+                {tab.name}
+              </button>
+            </div>
             {open ? (
               <div className="pb-1">
                 {tab.sheets.map((sheet) => (
@@ -208,8 +215,19 @@ function DashboardLayerTree() {
                     icon={Table2}
                     label={sheet.name}
                     title="Data sheet"
-                    active={sheetActive(sheet.id)}
-                    onClick={() => openSheet(sheet.id)}
+                    active={blockActive(tab, sheet.id)}
+                    onClick={() => openBlock(tab, sheet.id)}
+                  />
+                ))}
+                {tab.sources.map((source) => (
+                  <LayerRow
+                    key={`source-${source.id}`}
+                    nested
+                    icon={Database}
+                    label={source.name}
+                    title="Data source"
+                    active={blockActive(tab, source.id)}
+                    onClick={() => openBlock(tab, source.id)}
                   />
                 ))}
                 {tab.charts.map((chart) => (
@@ -219,10 +237,8 @@ function DashboardLayerTree() {
                     icon={BarChart3}
                     label={chart.name}
                     title="Chart"
-                    active={chartActive(chart.id)}
-                    onClick={() => {
-                      void openChart(chart.id);
-                    }}
+                    active={blockActive(tab, chart.id)}
+                    onClick={() => openBlock(tab, chart.id)}
                   />
                 ))}
                 {tab.texts.map((text) => (
@@ -232,11 +248,11 @@ function DashboardLayerTree() {
                     icon={Type}
                     label={text.name}
                     title="Text"
-                    active={pickedKey === `text:${text.id}`}
-                    onClick={() => openText(text.id)}
+                    active={blockActive(tab, text.id)}
+                    onClick={() => openBlock(tab, text.id)}
                   />
                 ))}
-                {empty ? (
+                {count === 0 ? (
                   <p className="px-7 py-1 text-[11px] text-neutral-500">Nothing in this tab yet</p>
                 ) : null}
               </div>
@@ -371,6 +387,35 @@ function AccountMenu({ onLogout }) {
   );
 }
 
+function SaveDashboardButton() {
+  const canvas = useWorkspaceCanvas();
+  const [state, setState] = useState("idle");
+
+  const onClick = async () => {
+    if (state === "saving") return;
+    setState("saving");
+    const result = await canvas?.saveNow?.();
+    setState(result?.ok ? "saved" : "idle");
+    if (result?.ok) window.setTimeout(() => setState((current) => (current === "saved" ? "idle" : current)), 1400);
+  };
+
+  const saved = state === "saved";
+  return (
+    <button
+      type="button"
+      aria-label={saved ? "Saved" : "Save dashboard"}
+      title={saved ? "Saved" : "Save"}
+      disabled={state === "saving"}
+      onClick={() => {
+        void onClick();
+      }}
+      className="inline-flex size-7 items-center justify-center rounded-md text-neutral-700 hover:bg-black/[0.05] disabled:opacity-60 dark:text-neutral-200 dark:hover:bg-white/10"
+    >
+      {saved ? <Check className="size-4" aria-hidden /> : <Save className="size-4" aria-hidden />}
+    </button>
+  );
+}
+
 function RightChromeControls({ onLogout, expanded }) {
   const user = useUser();
   const router = useRouter();
@@ -389,6 +434,7 @@ function RightChromeControls({ onLogout, expanded }) {
           Log In
         </Button>
       )}
+      <SaveDashboardButton />
       <AnimatedThemeToggler className="inline-flex size-7 items-center justify-center rounded-md text-neutral-700 hover:bg-black/[0.05] dark:text-neutral-200 dark:hover:bg-white/10 [&_svg]:size-4" />
       <LiveTransportControls />
       <button
@@ -401,22 +447,57 @@ function RightChromeControls({ onLogout, expanded }) {
   );
 }
 
-function LeftChromeHeader({ dashboardName, expanded, onToggle, onOpenDashboard }) {
+function DashboardNameField({ name, onCommit }) {
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState(name);
+
+  useEffect(() => {
+    if (!editing) setDraft(name);
+  }, [editing, name]);
+
+  if (editing) {
+    return (
+      <input
+        autoFocus
+        aria-label="Dashboard name"
+        value={draft}
+        maxLength={120}
+        onChange={(event) => setDraft(event.target.value)}
+        onBlur={() => {
+          onCommit(draft);
+          setEditing(false);
+        }}
+        onKeyDown={(event) => {
+          if (event.key === "Enter") event.currentTarget.blur();
+          if (event.key === "Escape") {
+            setDraft(name);
+            setEditing(false);
+          }
+        }}
+        className="min-w-0 flex-1 rounded-md bg-transparent px-1 py-0.5 text-[13px] font-medium tracking-[-0.01em] outline-none ring-1 ring-[#0d99ff]"
+      />
+    );
+  }
+
+  return (
+    <button
+      type="button"
+      title={name}
+      onClick={() => setEditing(true)}
+      className="min-w-0 flex-1 truncate rounded-md px-1 py-0.5 text-left text-[13px] font-medium tracking-[-0.01em] hover:bg-black/[0.05] dark:hover:bg-white/10"
+    >
+      {name}
+    </button>
+  );
+}
+
+function LeftChromeHeader({ dashboardName, expanded, onToggle, onRename }) {
   return (
     <div className={cn("flex h-10 shrink-0 items-center gap-2 pl-1.5 pr-1", expanded && "border-b border-black/[0.06] dark:border-white/10")}>
       <span className="mr-1 flex size-[22px] shrink-0 overflow-hidden rounded-full">
         <Image src="/logo.png" width={22} height={22} alt="Lychee" className="size-full object-cover" />
       </span>
-      {dashboardName ? (
-        <button
-          type="button"
-          onClick={onOpenDashboard}
-          title={dashboardName}
-          className="min-w-0 flex-1 truncate rounded-md px-1 py-0.5 text-left text-[13px] font-medium tracking-[-0.01em] hover:bg-black/[0.05] dark:hover:bg-white/10"
-        >
-          {dashboardName}
-        </button>
-      ) : null}
+      <DashboardNameField name={dashboardName} onCommit={onRename} />
       <button
         type="button"
         onClick={onToggle}
@@ -432,31 +513,12 @@ function LeftChromeHeader({ dashboardName, expanded, onToggle, onOpenDashboard }
 
 export default function FigmaNavChrome({ onLogout }) {
   const ctx = useMyStateV2();
+  const canvas = useWorkspaceCanvas();
   const expanded = !!ctx?.navChromeExpanded;
   const setExpanded = ctx?.setNavChromeExpanded;
-
-  const loadedName = String(ctx?.loadedDataMeta?.data_set_name || "").trim();
-  const startTabs = Array.isArray(ctx?.workspaceStartTabs) ? ctx.workspaceStartTabs : [];
-  const activeStartTab = startTabs.find((tab) => tab.id === ctx?.activeWorkspaceStartTabId);
-  const welcomeTab = startTabs.find((tab) => tab.id === "welcome");
-  const dashboardName =
-    ctx?.viewing === "welcome" && activeStartTab?.name
-      ? activeStartTab.name
-      : loadedName || welcomeTab?.name || (ctx?.welcomeTabRemoved ? "" : "Welcome");
+  const dashboardName = canvas?.dashboardName || "Untitled";
 
   const toggle = () => setExpanded?.(!expanded);
-
-  const openMainDashboard = () => {
-    const onStartDashboard = ctx?.viewing === "welcome" || !loadedName;
-    if (onStartDashboard) {
-      ctx?.setViewing?.("welcome");
-      return;
-    }
-    ctx?.setConnectHomeCenterView?.(CONNECT_HOME_CENTER_VIEW.DASHBOARD);
-    if (ctx?.viewing !== "connectDataHome") {
-      ctx?.setViewing?.("dashboardComposer");
-    }
-  };
 
   return (
     <>
@@ -480,7 +542,7 @@ export default function FigmaNavChrome({ onLogout }) {
           dashboardName={dashboardName}
           expanded={expanded}
           onToggle={toggle}
-          onOpenDashboard={openMainDashboard}
+          onRename={(next) => canvas?.renameDashboard?.(next)}
         />
         {expanded ? <DashboardLayerTree /> : null}
       </aside>
