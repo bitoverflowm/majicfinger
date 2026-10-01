@@ -3,6 +3,7 @@
 import { motion, useReducedMotion } from "framer-motion";
 
 import { BorderBeam } from "@/components/magicui/border-beam";
+import { FlickeringGrid } from "@/components/ui/flickering-grid";
 import { cn } from "@/lib/utils";
 
 const KALSHI = "#28CC95";
@@ -70,53 +71,53 @@ export function JoinExplainer() {
   const reduce = useReducedMotion();
 
   return (
-    <div className="relative flex h-full min-h-[280px] flex-col justify-center overflow-hidden rounded-xl border border-border/70 bg-background px-5 py-6 shadow-sm">
-      <BorderBeam size={90} duration={8} borderWidth={1.2} colorFrom={KALSHI} colorTo="#0d99ff" />
-      <p className="relative z-10 max-w-xl text-[13px] leading-relaxed text-muted-foreground">{JOIN_EXPLAINER_COPY}</p>
-      <div className="relative z-10 mt-5">
-        <div className="mb-1.5 grid grid-cols-[minmax(0,8.5rem)_2rem_minmax(0,1fr)] gap-x-0">
-          <p className="text-[11px] font-semibold text-foreground">Markets</p>
-          <span />
-          <p className="text-[11px] font-semibold text-foreground">Trades tables</p>
-        </div>
-        <div className="flex flex-col">
+    <div className="relative flex h-full min-h-[280px] items-center justify-center overflow-hidden rounded-xl border border-border/70 bg-background shadow-sm">
+      <FlickeringGrid
+        className="absolute inset-0 [mask-image:radial-gradient(ellipse_at_center,black,transparent_75%)]"
+        squareSize={3}
+        gridGap={5}
+        flickerChance={0.16}
+        color="rgb(40, 204, 149)"
+        maxOpacity={0.2}
+      />
+      <div className="relative z-10 flex w-full max-w-2xl flex-col items-center gap-5 px-6 py-8">
+        <p className="max-w-md text-center text-[13px] leading-relaxed text-muted-foreground">{JOIN_EXPLAINER_COPY}</p>
+        <div className="flex w-full flex-col gap-2">
           {SAMPLE.map((market, index) => (
-            <div key={market.ticker} className="grid grid-cols-[minmax(0,8.5rem)_2rem_minmax(0,1fr)] items-stretch">
-              <div
-                className={cn(
-                  "flex min-h-[52px] items-center border-x border-b border-border/70 bg-background px-2",
-                  index === 0 && "border-t",
-                )}
-              >
-                <span className="truncate font-mono text-[11px] text-foreground">{market.ticker}</span>
+            <div key={market.ticker} className="grid grid-cols-[minmax(0,1fr)_2.5rem_minmax(0,1.15fr)] items-center gap-x-2">
+              <div className="rounded-xl border border-[#28CC95]/50 bg-[#28CC95]/10 px-3 py-2 shadow-sm backdrop-blur-md">
+                <p className="truncate font-mono text-[10px] text-foreground">{market.ticker}</p>
               </div>
-              <div className="flex items-center">
+              <div className="relative h-px overflow-hidden bg-border">
                 <motion.span
-                  className="h-px w-full origin-left bg-[#28CC95]"
-                  initial={reduce ? false : { scaleX: 0 }}
-                  animate={{ scaleX: 1 }}
-                  transition={{ delay: 0.15 + index * 0.1, duration: 0.35 }}
+                  className="absolute inset-y-0 left-0 bg-[#28CC95]"
+                  initial={reduce ? false : { width: "0%" }}
+                  animate={{ width: "100%" }}
+                  transition={{ delay: 0.15 + index * 0.1, duration: 0.4 }}
                 />
               </div>
               <motion.div
-                className="mb-1.5 overflow-hidden border border-border/70 bg-background"
-                initial={reduce ? false : { opacity: 0, x: 8 }}
+                className="relative overflow-hidden rounded-xl border border-border/70 bg-background/90 shadow-sm backdrop-blur-md"
+                initial={reduce ? false : { opacity: 0, x: 12 }}
                 animate={{ opacity: 1, x: 0 }}
-                transition={{ delay: 0.28 + index * 0.1, duration: 0.3 }}
+                transition={{ delay: 0.28 + index * 0.1, duration: 0.35 }}
               >
-                <p className="border-b border-border/60 px-2 py-1 text-[11px] font-semibold text-foreground">
+                <BorderBeam size={70} duration={8} delay={index * 1.4} borderWidth={1.2} colorFrom={KALSHI} colorTo="#0d99ff" />
+                <p className="border-b border-border/60 px-2.5 py-1 text-[11px] font-semibold text-foreground">
                   Trades · <span className="font-mono font-medium">{market.ticker}</span>
                 </p>
-                {market.fills.map((fill) => (
-                  <div
-                    key={fill.join("-")}
-                    className="flex items-center justify-between px-2 py-0.5 font-mono text-[10px] text-muted-foreground"
-                  >
-                    <span>{fill[0]}</span>
-                    <span className="text-foreground">{fill[1]}</span>
-                    <span>{fill[2]}</span>
-                  </div>
-                ))}
+                <div className="flex flex-col gap-1 p-1.5">
+                  {market.fills.map((fill) => (
+                    <div
+                      key={fill.join("-")}
+                      className="flex items-center justify-between rounded-lg border border-border/60 bg-background px-2 py-1 font-mono text-[10px]"
+                    >
+                      <span className="text-muted-foreground">{fill[0]}</span>
+                      <span>{fill[1]}</span>
+                      <span>{fill[2]}</span>
+                    </div>
+                  ))}
+                </div>
               </motion.div>
             </div>
           ))}
