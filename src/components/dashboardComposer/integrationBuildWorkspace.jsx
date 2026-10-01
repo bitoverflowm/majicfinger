@@ -240,14 +240,14 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
       setCounting(false);
       return undefined;
     }
-    const guidedAnd = guidedFilters
+    const guided = guidedFilters
       ? buildKalshiHistoricalFilterPredicates(pull?.columns || [], attributeFilters)
       : null;
     const query = filterValue.trim();
     const column = (pull?.columns || []).find((item) => item.id === filterColumn);
     if (!guidedFilters && query && !column) return undefined;
     const narrowed = guidedFilters
-      ? { and: guidedAnd || [] }
+      ? { and: guided?.and || [], or: guided?.or || [] }
       : query && column?.type === "text"
         ? { column: filterColumn, value: query }
         : null;
@@ -303,8 +303,8 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
     if (!guidedFilters) return undefined;
     const columns = pull?.columns;
     if (!columns?.length) return undefined;
-    const and = buildKalshiHistoricalFilterPredicates(columns, attributeFilters);
-    if (!and.length) {
+    const predicates = buildKalshiHistoricalFilterPredicates(columns, attributeFilters);
+    if (!predicates.and.length && !predicates.or.length) {
       setPreviewRefreshing(false);
       if (usingFilteredSample.current) {
         usingFilteredSample.current = false;
@@ -315,7 +315,7 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
     let cancel = false;
     setPreviewRefreshing(true);
     const timer = window.setTimeout(() => {
-      loadKalshiHistoricalMarketsPreview(and)
+      loadKalshiHistoricalMarketsPreview(predicates)
         .then((result) => {
           if (cancel) return;
           usingFilteredSample.current = true;

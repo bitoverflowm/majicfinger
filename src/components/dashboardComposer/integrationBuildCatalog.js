@@ -349,9 +349,10 @@ async function postAthena(body) {
   });
 }
 
-function kalshiHistoricalMarketsCompose(andPredicates) {
+function kalshiHistoricalMarketsCompose(predicates) {
   const columns = kalshiHistoricalMarketColumns();
-  const and = Array.isArray(andPredicates) ? andPredicates : [];
+  const and = Array.isArray(predicates) ? predicates : Array.isArray(predicates?.and) ? predicates.and : [];
+  const or = Array.isArray(predicates) ? [] : Array.isArray(predicates?.or) ? predicates.or : [];
   return {
     columns,
     request: {
@@ -360,7 +361,7 @@ function kalshiHistoricalMarketsCompose(andPredicates) {
       queryType: "compose",
       limit: PREVIEW_ROW_CAP,
       caseSensitive: false,
-      filters: and.length ? { and, or: [] } : null,
+      filters: and.length || or.length ? { and, or } : null,
       compose: {
         select: columns.map((entry) => ({ column: entry.id, alias: entry.id })),
         groupByAliases: [],
@@ -909,8 +910,10 @@ const LOADERS = {
 function universeCountKey(integrationId, tableId, filter) {
   const lake = EXACT_UNIVERSE[integrationId];
   if (!lake || (tableId !== "markets" && tableId !== "trades")) return "";
-  if (Array.isArray(filter?.and)) {
-    return `${lake}:${tableId}:${filter.and.length ? JSON.stringify(filter.and) : ""}`;
+  if (Array.isArray(filter?.and) || Array.isArray(filter?.or)) {
+    const and = Array.isArray(filter?.and) ? filter.and : [];
+    const or = Array.isArray(filter?.or) ? filter.or : [];
+    return `${lake}:${tableId}:${and.length || or.length ? JSON.stringify({ and, or }) : ""}`;
   }
   const column = String(filter?.column || "").trim();
   const value = String(filter?.value || "").trim();
@@ -931,10 +934,11 @@ export function loadBuildUniverseCount(integrationId, tableId, filter) {
   if (countValues.has(key)) return Promise.resolve(countValues.get(key));
   if (!countCache.has(key)) {
     const andFilters = Array.isArray(filter?.and) ? filter.and : null;
+    const orFilters = Array.isArray(filter?.or) ? filter.or : [];
     const column = String(filter?.column || "").trim();
     const value = String(filter?.value || "").trim();
-    const narrowed = andFilters ? andFilters.length > 0 : Boolean(column && value);
-    const virtualFilter = (andFilters || []).some(
+    const narrowed = andFilters ? andFilters.length > 0 || orFilters.length > 0 : Boolean(column && value);
+    const virtualFilter = [...(andFilters || []), ...orFilters].some(
       (predicate) =>
         predicate?.column === "kalshi_taxonomy_category" || predicate?.column === "kalshi_event_ticker_category",
     );
@@ -945,7 +949,7 @@ export function loadBuildUniverseCount(integrationId, tableId, filter) {
           queryType: "compose",
           limit: 1,
           caseSensitive: false,
-          filters: { and: andFilters, or: [] },
+          filters: { and: andFilters || [], or: orFilters },
           compose: {
             select: [{ column: "ticker", alias: "row_count", aggregate: "count" }],
             groupByAliases: [],
@@ -958,8 +962,8 @@ export function loadBuildUniverseCount(integrationId, tableId, filter) {
           countAlias: "row_count",
           limit: 1,
           caseSensitive: false,
-          filters: andFilters?.length
-            ? { and: andFilters, or: [] }
+          filters: andFilters?.length || orFilters.length
+            ? { and: andFilters || [], or: orFilters }
             : narrowed
               ? { and: [{ column, kind: "string", op: "contains", value }], or: [] }
               : null,
