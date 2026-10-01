@@ -1,12 +1,13 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { ArrowLeft, ChevronDown, History } from "lucide-react";
 import { IntegrationBuildGrid } from "@/components/dashboardComposer/integrationBuildGrid";
 import {
   BUILD_SOURCES,
   loadBuildPreview,
   loadBuildUniverseCount,
+  loadKalshiHistoricalMarketsPreview,
   peekBuildUniverseCount,
   readSavedSearches,
   saveSearch,
@@ -29,6 +30,11 @@ import { useMyStateV2 } from "@/context/stateContextV2";
 import { getHistoricalPullRowLimit } from "@/lib/athenaEntitlement";
 import { listConnectHomeSheetHistory, requestCardSummaryLabel } from "@/lib/connectHomeRequestHistory";
 import { useUser } from "@/lib/hooks";
+import {
+  buildKalshiHistoricalFilterPredicates,
+  KalshiHistoricalAttributeFilters,
+  rowMatchesKalshiHistoricalFilters,
+} from "@/components/dashboardComposer/kalshiHistoricalAttributes";
 import { cn } from "@/lib/utils";
 
 function humanHistoryLabel(label) {
@@ -88,6 +94,18 @@ function ColumnOption({ column, checked, onToggle }) {
   );
 }
 
+function WaitingToConnectTag() {
+  return (
+    <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-500/10 px-2 py-1 text-[11px] font-semibold text-amber-700 dark:text-amber-300">
+      <span className="relative flex size-1.5" aria-hidden>
+        <span className="absolute inline-flex size-full animate-ping rounded-full bg-amber-500 opacity-75" />
+        <span className="relative inline-flex size-1.5 rounded-full bg-amber-500" />
+      </span>
+      Waiting to connect to data source
+    </span>
+  );
+}
+
 function SkeletonRows() {
   return (
     <div className="overflow-hidden rounded-xl border border-border/70 bg-background shadow-sm">
@@ -120,9 +138,15 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
   const [loading, setLoading] = useState(true);
   const [progress, setProgress] = useState(8);
   const [error, setError] = useState("");
+  const [priceWaiting, setPriceWaiting] = useState(false);
   const [hidden, setHidden] = useState(() => new Set());
   const [filterColumn, setFilterColumn] = useState("");
   const [filterValue, setFilterValue] = useState("");
+  const [attributeFilters, setAttributeFilters] = useState({});
+  const [previewRefreshing, setPreviewRefreshing] = useState(false);
+  const [revealKey, setRevealKey] = useState(0);
+  const baseRowsRef = useRef([]);
+  const usingFilteredSample = useRef(false);
   const [saved, setSaved] = useState(() => readSavedSearches());
   const [visibleCount, setVisibleCount] = useState(0);
   const [universe, setUniverse] = useState(null);
@@ -134,6 +158,7 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
     : tableIds;
   const table = tables[tableId];
   const exactUniverse = usesExactUniverse(integrationId);
+  const guidedFilters = integrationId === "kalshiHistorical" && tableId === "markets";
 
   useEffect(() => {
     const next = BUILD_SOURCES[integrationId];
@@ -153,10 +178,14 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
     let cancel = false;
     setLoading(true);
     setError("");
+    setPriceWaiting(false);
     setProgress(12);
     setPull(null);
     setVisibleCount(0);
     setFilterValue("");
+    setAttributeFilters({});
+    setPreviewRefreshing(false);
+    usingFilteredSample.current = false;
     setUniverse(null);
     setCounting(usesExactUniverse(integrationId));
     const timer = window.setInterval(() => {
@@ -166,12 +195,21 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
       .then((result) => {
         if (cancel) return;
         setProgress(100);
+        baseRowsRef.current = result.rows;
         setPull(result);
+        setRevealKey((key) => key + 1);
         setHidden(new Set(result.columns.filter((column) => column.defaultOn === false).map((column) => column.id)));
         setFilterColumn(result.columns[0]?.id || "");
       })
       .catch((err) => {
-        if (!cancel) setError(err instanceof Error ? err.message : "Pull failed");
+        if (cancel) return;
+        const message = err instanceof Error ? err.message : "Pull failed";
+        const priceFeed = integrationId === "chainlink" || integrationId === "binance";
+        if (priceFeed && /live price/i.test(message)) {
+          setPriceWaiting(true);
+          return;
+        }
+        setError(message);
       })
       .finally(() => {
         window.clearInterval(timer);
@@ -194,7 +232,7 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
       });
     }, 45);
     return () => window.clearInterval(timer);
-  }, [loading, pull]);
+  }, [loading, revealKey]);
 
   useEffect(() => {
     if (!exactUniverse) {
@@ -202,10 +240,17 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
       setCounting(false);
       return undefined;
     }
+    const guidedAnd = guidedFilters
+      ? buildKalshiHistoricalFilterPredicates(pull?.columns || [], attributeFilters)
+      : null;
     const query = filterValue.trim();
     const column = (pull?.columns || []).find((item) => item.id === filterColumn);
-    if (query && !column) return undefined;
-    const narrowed = query && column?.type === "text" ? { column: filterColumn, value: query } : null;
+    if (!guidedFilters && query && !column) return undefined;
+    const narrowed = guidedFilters
+      ? { and: guidedAnd || [] }
+      : query && column?.type === "text"
+        ? { column: filterColumn, value: query }
+        : null;
     const known = peekBuildUniverseCount(integrationId, tableId, narrowed);
     if (typeof known === "number") {
       setUniverse(known);
@@ -231,7 +276,7 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
       cancel = true;
       window.clearTimeout(timer);
     };
-  }, [exactUniverse, integrationId, tableId, filterColumn, filterValue, pull]);
+  }, [exactUniverse, integrationId, tableId, filterColumn, filterValue, pull?.columns, guidedFilters, attributeFilters]);
 
   const shownColumns = useMemo(
     () =>
@@ -248,10 +293,45 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
 
   const filteredRows = useMemo(() => {
     const rows = (pull?.rows || []).slice(0, visibleCount);
+    if (guidedFilters) return rows.filter((row) => rowMatchesKalshiHistoricalFilters(row, pull?.columns, attributeFilters));
     const query = filterValue.trim().toLowerCase();
     if (!query || !filterColumn) return rows;
     return rows.filter((row) => String(row[filterColumn] ?? "").toLowerCase().includes(query));
-  }, [pull, visibleCount, filterColumn, filterValue]);
+  }, [pull, visibleCount, filterColumn, filterValue, guidedFilters, attributeFilters]);
+
+  useEffect(() => {
+    if (!guidedFilters) return undefined;
+    const columns = pull?.columns;
+    if (!columns?.length) return undefined;
+    const and = buildKalshiHistoricalFilterPredicates(columns, attributeFilters);
+    if (!and.length) {
+      setPreviewRefreshing(false);
+      if (usingFilteredSample.current) {
+        usingFilteredSample.current = false;
+        setPull((current) => (current ? { ...current, rows: baseRowsRef.current } : current));
+      }
+      return undefined;
+    }
+    let cancel = false;
+    setPreviewRefreshing(true);
+    const timer = window.setTimeout(() => {
+      loadKalshiHistoricalMarketsPreview(and)
+        .then((result) => {
+          if (cancel) return;
+          usingFilteredSample.current = true;
+          setPull((current) => (current ? { ...current, rows: result.rows } : current));
+          setVisibleCount(result.rows.length);
+        })
+        .catch(() => {})
+        .finally(() => {
+          if (!cancel) setPreviewRefreshing(false);
+        });
+    }, 400);
+    return () => {
+      cancel = true;
+      window.clearTimeout(timer);
+    };
+  }, [guidedFilters, attributeFilters, pull?.columns]);
 
   const history = useMemo(() => {
     const entries = listConnectHomeSheetHistory(ctx?.dataSheets || {});
@@ -295,6 +375,7 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
       hidden: [...hidden],
       filterColumn,
       filterValue,
+      attributeFilters,
       savedAt: Date.now(),
     };
     setSaved(saveSearch(entry));
@@ -305,6 +386,7 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
     setHidden(new Set(entry.hidden || []));
     setFilterColumn(entry.filterColumn || "");
     setFilterValue(entry.filterValue || "");
+    setAttributeFilters(entry.attributeFilters || {});
   }
 
   const shown = loading ? 0 : filteredRows.length;
@@ -318,6 +400,7 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
         : counting
           ? `${shownLabel} of …`
           : `${shownLabel}. More rows are available.`;
+  const previewLineShown = previewRefreshing && !loading ? `${previewLine} · updating` : previewLine;
   const availableRows = !exactUniverse
     ? Number.POSITIVE_INFINITY
     : typeof universe === "number" && !counting
@@ -498,31 +581,39 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
             </AccordionItem>
           </Accordion>
 
-          <section>
-            <p className="mb-2 text-[12px] font-semibold text-foreground">Filters</p>
-            <p className="mb-2 text-[12px] leading-relaxed text-muted-foreground">
-              Keep rows whose column contains this text. This narrows the preview you are looking at.
-            </p>
-            <div className="space-y-2">
-              <select
-                value={filterColumn}
-                onChange={(event) => setFilterColumn(event.target.value)}
-                className="h-9 w-full rounded-lg border border-border/70 bg-background px-2 text-[13px]"
-              >
-                {(pull?.columns || []).map((column) => (
-                  <option key={column.id} value={column.id}>
-                    {column.title}
-                  </option>
-                ))}
-              </select>
-              <Input
-                value={filterValue}
-                placeholder="Contains…"
-                onChange={(event) => setFilterValue(event.target.value)}
-                className="h-9"
-              />
-            </div>
-          </section>
+          {guidedFilters ? (
+            <KalshiHistoricalAttributeFilters
+              columns={pull?.columns || []}
+              filters={attributeFilters}
+              onChange={setAttributeFilters}
+            />
+          ) : (
+            <section>
+              <p className="mb-2 text-[12px] font-semibold text-foreground">Filters</p>
+              <p className="mb-2 text-[12px] leading-relaxed text-muted-foreground">
+                Keep rows whose column contains this text. This narrows the preview you are looking at.
+              </p>
+              <div className="space-y-2">
+                <select
+                  value={filterColumn}
+                  onChange={(event) => setFilterColumn(event.target.value)}
+                  className="h-9 w-full rounded-lg border border-border/70 bg-background px-2 text-[13px]"
+                >
+                  {(pull?.columns || []).map((column) => (
+                    <option key={column.id} value={column.id}>
+                      {column.title}
+                    </option>
+                  ))}
+                </select>
+                <Input
+                  value={filterValue}
+                  placeholder="Contains…"
+                  onChange={(event) => setFilterValue(event.target.value)}
+                  className="h-9"
+                />
+              </div>
+            </section>
+          )}
         </div>
         <div className="flex items-center justify-end gap-2 border-t border-border/70 px-4 py-3">
           <Button type="button" variant="outline" onClick={onSave} disabled={loading || !pull}>
@@ -538,7 +629,7 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
         <div className="flex items-start justify-between gap-3 px-5 pb-2 pr-12 pt-5">
           <h2 className="pt-0.5 text-[15px] font-semibold text-foreground">Preview</h2>
           <div className="flex min-w-0 flex-col items-end">
-            <p className="text-right text-[12px] text-muted-foreground">{previewLine}</p>
+            <p className="text-right text-[12px] text-muted-foreground">{previewLineShown}</p>
             {typeof planLimit === "number" ? (
               <div className="mt-1.5 w-full max-w-[280px]">
                 <p className="text-right text-[11px] text-muted-foreground">
@@ -566,10 +657,19 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
           />
         </div>
         <div className="min-h-0 flex-1 p-4">
-          {error ? (
+          {priceWaiting ? (
+            <div className="flex h-full items-center justify-center">
+              <WaitingToConnectTag />
+            </div>
+          ) : error ? (
             <p className="text-[13px] text-muted-foreground">{error}</p>
           ) : loading ? (
-            <SkeletonRows />
+            <div className="flex h-full flex-col gap-3">
+              {integrationId === "chainlink" || integrationId === "binance" ? <WaitingToConnectTag /> : null}
+              <div className="min-h-0 flex-1">
+                <SkeletonRows />
+              </div>
+            </div>
           ) : shownColumns.length ? (
             <IntegrationBuildGrid columns={shownColumns} rows={filteredRows} />
           ) : (

@@ -349,24 +349,50 @@ async function postAthena(body) {
   });
 }
 
-async function kalshiHistoricalMarkets() {
+function kalshiHistoricalMarketsCompose(andPredicates) {
   const columns = kalshiHistoricalMarketColumns();
-  const rows = await postAthena({
-    lake: "kalshi",
-    table: "markets",
-    queryType: "compose",
-    limit: PREVIEW_ROW_CAP,
-    compose: {
-      select: columns.map((entry) => ({ column: entry.id, alias: entry.id })),
-      groupByAliases: [],
-      orderBy: [{ alias: "volume", direction: "desc" }],
+  const and = Array.isArray(andPredicates) ? andPredicates : [];
+  return {
+    columns,
+    request: {
+      lake: "kalshi",
+      table: "markets",
+      queryType: "compose",
+      limit: PREVIEW_ROW_CAP,
+      caseSensitive: false,
+      filters: and.length ? { and, or: [] } : null,
+      compose: {
+        select: columns.map((entry) => ({ column: entry.id, alias: entry.id })),
+        groupByAliases: [],
+        orderBy: [{ alias: "volume", direction: "desc" }],
+      },
     },
-  });
+  };
+}
+
+async function kalshiHistoricalMarkets() {
+  const { columns, request } = kalshiHistoricalMarketsCompose();
+  const rows = await postAthena(request);
   return {
     columns,
     rows: rows.slice(0, PREVIEW_ROW_CAP),
     capped: rows.length >= PREVIEW_ROW_CAP,
   };
+}
+
+export function loadKalshiHistoricalMarketsPreview(andPredicates) {
+  const { request } = kalshiHistoricalMarketsCompose(andPredicates);
+  return fetchAthenaLakeSample(request, { maxWaitMs: 180000, pollIntervalMs: 800 }).then((result) => {
+    const names = result.columns || [];
+    const rows = (result.rows || []).map((cells) => {
+      const row = {};
+      names.forEach((name, index) => {
+        row[name] = cells[index];
+      });
+      return row;
+    });
+    return { rows: rows.slice(0, PREVIEW_ROW_CAP) };
+  });
 }
 
 async function kalshiHistoricalTrades() {
@@ -883,6 +909,9 @@ const LOADERS = {
 function universeCountKey(integrationId, tableId, filter) {
   const lake = EXACT_UNIVERSE[integrationId];
   if (!lake || (tableId !== "markets" && tableId !== "trades")) return "";
+  if (Array.isArray(filter?.and)) {
+    return `${lake}:${tableId}:${filter.and.length ? JSON.stringify(filter.and) : ""}`;
+  }
   const column = String(filter?.column || "").trim();
   const value = String(filter?.value || "").trim();
   const narrowed = Boolean(column && value);
@@ -901,20 +930,40 @@ export function loadBuildUniverseCount(integrationId, tableId, filter) {
   if (!key) return Promise.resolve(null);
   if (countValues.has(key)) return Promise.resolve(countValues.get(key));
   if (!countCache.has(key)) {
+    const andFilters = Array.isArray(filter?.and) ? filter.and : null;
     const column = String(filter?.column || "").trim();
     const value = String(filter?.value || "").trim();
-    const narrowed = Boolean(column && value);
-    const body = {
-      lake,
-      table: tableId,
-      queryType: "count",
-      countAlias: "row_count",
-      limit: 1,
-      caseSensitive: false,
-      filters: narrowed
-        ? { and: [{ column, kind: "string", op: "contains", value }], or: [] }
-        : null,
-    };
+    const narrowed = andFilters ? andFilters.length > 0 : Boolean(column && value);
+    const virtualFilter = (andFilters || []).some(
+      (predicate) =>
+        predicate?.column === "kalshi_taxonomy_category" || predicate?.column === "kalshi_event_ticker_category",
+    );
+    const body = virtualFilter
+      ? {
+          lake,
+          table: tableId,
+          queryType: "compose",
+          limit: 1,
+          caseSensitive: false,
+          filters: { and: andFilters, or: [] },
+          compose: {
+            select: [{ column: "ticker", alias: "row_count", aggregate: "count" }],
+            groupByAliases: [],
+          },
+        }
+      : {
+          lake,
+          table: tableId,
+          queryType: "count",
+          countAlias: "row_count",
+          limit: 1,
+          caseSensitive: false,
+          filters: andFilters?.length
+            ? { and: andFilters, or: [] }
+            : narrowed
+              ? { and: [{ column, kind: "string", op: "contains", value }], or: [] }
+              : null,
+        };
     countCache.set(
       key,
       fetchAthenaLakeSample(body, { maxWaitMs: 180000, pollIntervalMs: 800 })

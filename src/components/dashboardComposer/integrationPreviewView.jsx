@@ -9,6 +9,7 @@ import {
   formatUsd,
   getCachedIntegrationPreview,
   loadIntegrationPreview,
+  notifyLivePricesUnreachable,
 } from "@/components/dashboardComposer/integrationPreviewSample";
 
 function displayTile(row) {
@@ -323,6 +324,22 @@ function QuoteTable({ table }) {
   );
 }
 
+function WaitingToConnectTag() {
+  return (
+    <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-500/10 px-2 py-1 text-[11px] font-semibold text-amber-700 dark:text-amber-300">
+      <span className="relative flex size-1.5" aria-hidden>
+        <span className="absolute inline-flex size-full animate-ping rounded-full bg-amber-500 opacity-75" />
+        <span className="relative inline-flex size-1.5 rounded-full bg-amber-500" />
+      </span>
+      Waiting to connect to data source
+    </span>
+  );
+}
+
+function isPriceFeed(integrationId) {
+  return integrationId === "chainlink" || integrationId === "binance";
+}
+
 function PreviewTableView({ table }) {
   if (table.kind === "watchlist") return <WatchlistTable table={table} />;
   if (table.kind === "audit") return <AuditTable table={table} />;
@@ -347,7 +364,9 @@ export function IntegrationSamplePreview({ integrationId }) {
     setState({ status: "loading", data: null, error: "" });
     loadIntegrationPreview(integrationId).then(
       (data) => {
-        if (!cancel) setState({ status: "ready", data, error: "" });
+        if (cancel) return;
+        if (isPriceFeed(integrationId) && data?.unreachable) notifyLivePricesUnreachable();
+        setState({ status: "ready", data, error: "" });
       },
       (error) => {
         if (!cancel) {
@@ -367,6 +386,7 @@ export function IntegrationSamplePreview({ integrationId }) {
   if (state.status === "loading") {
     return (
       <div className="mt-5 space-y-3">
+        {isPriceFeed(integrationId) ? <WaitingToConnectTag /> : null}
         <Skeleton className="h-40 w-full rounded-xl bg-background/80" />
         <div className="grid grid-cols-2 gap-2">
           <Skeleton className="h-20 rounded-xl bg-background/80" />
@@ -377,11 +397,25 @@ export function IntegrationSamplePreview({ integrationId }) {
   }
 
   if (state.status === "error") {
+    if (isPriceFeed(integrationId)) {
+      return (
+        <div className="mt-5">
+          <WaitingToConnectTag />
+        </div>
+      );
+    }
     return <p className="mt-5 text-[12px] text-muted-foreground">{state.error}</p>;
   }
 
   const data = state.data;
   if (!data) return null;
+  if (data.waiting) {
+    return (
+      <div className="mt-5">
+        <WaitingToConnectTag />
+      </div>
+    );
+  }
 
   return (
     <div className="mt-5 space-y-3">

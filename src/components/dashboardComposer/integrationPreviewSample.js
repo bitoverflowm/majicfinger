@@ -1,7 +1,11 @@
+"use client";
+
 /**
  * Small, real samples for the integration dialog preview.
  * Deep-history pulls go through Athena once per tab; live sources use the existing proxies.
  */
+
+import { toast } from "sonner";
 
 const CACHE_KEY = "lycheeIntegrationPreviewSamples:v3";
 const SAMPLE_IDS = [
@@ -685,12 +689,39 @@ function quotesPreview(feed, byFeed) {
   };
 }
 
+const LIVE_PRICE_TOAST_KEY = "lycheeLivePriceProblemToast";
+
+/** One toast per browser session, and only for a socket that never opened. Timeouts stay quiet. */
+export function notifyLivePricesUnreachable() {
+  try {
+    if (sessionStorage.getItem(LIVE_PRICE_TOAST_KEY) === "1") return;
+    sessionStorage.setItem(LIVE_PRICE_TOAST_KEY, "1");
+  } catch {
+    return;
+  }
+  toast.error("Problem getting live prices, check your internet connection");
+}
+
+function priceFeedUnreachable(error) {
+  const message = error instanceof Error ? error.message : "";
+  return message === "Could not reach the live price feed" || message === "Live prices are only available in the browser";
+}
+
+async function loadQuotePreview(feed) {
+  try {
+    const quotes = feed === "binance" ? await sampleBinanceQuotes() : await sampleChainlinkQuotes();
+    return quotesPreview(feed, { [feed]: quotes });
+  } catch (error) {
+    return { waiting: true, unreachable: priceFeedUnreachable(error) };
+  }
+}
+
 async function loadBinance() {
-  return quotesPreview("binance", { binance: await sampleBinanceQuotes() });
+  return loadQuotePreview("binance");
 }
 
 async function loadChainlink() {
-  return quotesPreview("chainlink", { chainlink: await sampleChainlinkQuotes() });
+  return loadQuotePreview("chainlink");
 }
 
 const LOADERS = {
@@ -722,9 +753,16 @@ export function loadIntegrationPreview(id) {
   if (!inflight.has(id)) {
     const task = LOADERS[id]()
       .then((data) => {
+        if (data?.waiting) return data;
         resolved.set(id, data);
         writeSessionCache();
         return data;
+      })
+      .catch((error) => {
+        if (id === "chainlink" || id === "binance") {
+          return { waiting: true, unreachable: priceFeedUnreachable(error) };
+        }
+        throw error;
       })
       .finally(() => {
         inflight.delete(id);
@@ -735,5 +773,7 @@ export function loadIntegrationPreview(id) {
 }
 
 export function prefetchIntegrationPreviews() {
-  for (const id of SAMPLE_IDS) loadIntegrationPreview(id);
+  for (const id of SAMPLE_IDS) {
+    loadIntegrationPreview(id).catch(() => {});
+  }
 }
