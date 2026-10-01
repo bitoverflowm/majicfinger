@@ -8,11 +8,7 @@ export const LARGE_PULL_PARSE_BATCH_SIZE = 5000;
 /** Yield so React can paint between heavy Athena phases. */
 export function yieldToUi() {
   return new Promise((resolve) => {
-    if (typeof requestAnimationFrame === "function") {
-      requestAnimationFrame(() => setTimeout(resolve, 0));
-    } else {
-      setTimeout(resolve, 0);
-    }
+    setTimeout(resolve, 0);
   });
 }
 

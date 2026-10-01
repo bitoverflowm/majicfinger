@@ -12,6 +12,7 @@ import {
   loadBuildPreview,
   loadBuildUniverseCount,
   loadKalshiHistoricalMarketsPreview,
+  loadAthenaComposeRows,
   loadKalshiHistoricalTradesForTicker,
   peekBuildUniverseCount,
   appendQueryHistory,
@@ -552,7 +553,7 @@ function EnrichStep({
           onClick={onSaveAndRun}
           className="bg-[#0d99ff] text-white hover:bg-[#0d99ff]/90 disabled:opacity-60"
         >
-          {running ? "Running trades…" : "Save and run"}
+          {running ? "Running…" : "Save and run"}
         </Button>
       </div>
     </>
@@ -1243,31 +1244,77 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
     };
   };
 
+  function tickersFromRows(rows, cap) {
+    const seen = new Set();
+    const tickers = [];
+    for (const row of rows || []) {
+      const ticker = String(row?.ticker || "").trim();
+      if (!ticker || seen.has(ticker)) continue;
+      seen.add(ticker);
+      tickers.push(ticker);
+      if (tickers.length >= cap) break;
+    }
+    return tickers;
+  }
+
+  function marketsRequestForRun() {
+    const request = lockedQuery?.athena || athenaRequest();
+    if (!request?.compose?.select || !joinCommitted) return request;
+    const select = request.compose.select;
+    if (select.some((entry) => entry.column === "ticker" || entry.alias === "ticker")) return request;
+    return {
+      ...request,
+      compose: {
+        ...request.compose,
+        select: [{ column: "ticker", alias: "ticker" }, ...select],
+      },
+    };
+  }
+
   async function onSaveAndRun() {
     if (running) return;
     setRunning(true);
     try {
+    const sheetCap = typeof planLimit === "number" && planLimit > 0 ? planLimit : getHistoricalPullRowLimit(user);
+    const marketsRequest = marketsRequestForRun();
+    let marketRows = filteredRows;
+    if (marketsRequest && integrationId === "kalshiHistorical") {
+      try {
+        const pulledMarkets = await loadAthenaComposeRows(marketsRequest);
+        if (pulledMarkets.rows?.length) marketRows = pulledMarkets.rows;
+      } catch {
+        marketRows = filteredRows;
+      }
+    }
+    const runMarkets = withFunctionColumn(
+      shownColumns,
+      marketRows,
+      functionOnMarkets,
+      functionFormula,
+      formulaSheets,
+      "markets",
+    );
     const sheets = [];
-    if (marketsGrid.columns.length) {
+    let runTickers = [];
+    if (runMarkets.columns.length) {
       sheets.push({
         id: "run-markets",
         title: sheetTitle,
-        columns: marketsGrid.columns,
-        rows: marketsGrid.rows,
+        columns: runMarkets.columns,
+        rows: runMarkets.rows,
         span: "full",
         table: tableId || "markets",
         summary: lockedQuery?.label || describeSearch(),
       });
     }
     if (joinCommitted && tradePreview.columns.length) {
-      const tickers = joinedMarkets.map((market) => market.ticker).filter(Boolean);
-      const list = tickers.length ? tickers : previewTicker ? [previewTicker] : [];
+      const fromRun = tickersFromRows(marketRows, marketCap);
+      const fallback = joinedMarkets.map((market) => market.ticker).filter(Boolean);
+      const list = fromRun.length ? fromRun : fallback.length ? fallback : previewTicker ? [previewTicker] : [];
+      runTickers = list;
       const pulled = await mapPool(list, 4, async (ticker) => {
-        if (ticker === previewTicker) {
-          return { ticker, columns: tradePreview.columns, rows: tradePreview.rows };
-        }
         try {
-          const result = await loadKalshiHistoricalTradesForTicker(ticker);
+          const result = await loadKalshiHistoricalTradesForTicker(ticker, sheetCap);
           return { ticker, columns: result.columns?.length ? result.columns : tradePreview.columns, rows: result.rows || [] };
         } catch {
           return { ticker, columns: tradePreview.columns, rows: [] };
@@ -1308,7 +1355,7 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
     const joinRecord = joinCommitted
       ? {
           target: "kalshiHistoricalTrades",
-          tickers: joinedMarkets.map((market) => market.ticker).filter(Boolean),
+          tickers: runTickers,
           previewTicker,
         }
       : null;
@@ -1353,7 +1400,7 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
       join: joinCommitted
         ? {
             target: "kalshiHistoricalTrades",
-            tickers: joinedMarkets.map((market) => market.ticker).filter(Boolean),
+            tickers: runTickers,
             previewTicker,
           }
         : null,

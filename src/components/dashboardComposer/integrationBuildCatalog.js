@@ -418,18 +418,32 @@ export function buildKalshiHistoricalMarketsRequest({ predicates, sortKeys, colu
 
 const KALSHI_TRADE_PREVIEW_FIELDS = ["created_time", "ticker", "taker_side", "yes_price", "no_price", "count"];
 
+function rowsFromAthenaCells(result, limit) {
+  const names = result?.columns || [];
+  const cap = Number.isFinite(limit) && limit > 0 ? Math.floor(limit) : Infinity;
+  return (result?.rows || []).slice(0, cap).map((cells) => {
+    const row = {};
+    names.forEach((name, index) => {
+      row[name] = cells[index];
+    });
+    return row;
+  });
+}
+
 /**
- * Preview trades for one market ticker. The sheet is a filtered trades pull, not a
- * markets⋈trades join, so Athena only reads fills for that ticker.
+ * Trades for one market ticker. Preview calls omit `limit` and stay at PREVIEW_ROW_CAP.
+ * Save and run passes the plan row cap so Elite gets the full pull and other tiers
+ * stop at their sheet cap.
  */
-export function loadKalshiHistoricalTradesForTicker(ticker) {
+export function loadKalshiHistoricalTradesForTicker(ticker, limit = PREVIEW_ROW_CAP) {
   const catalog = lakeColumns("kalshi", "trades", KALSHI_TRADE_PREVIEW_FIELDS);
   const columns = KALSHI_TRADE_PREVIEW_FIELDS.map((id) => catalog.find((entry) => entry.id === id)).filter(Boolean);
+  const rowLimit = Math.max(1, Math.floor(Number(limit) || PREVIEW_ROW_CAP));
   const request = {
     lake: "kalshi",
     table: "trades",
     queryType: "compose",
-    limit: PREVIEW_ROW_CAP,
+    limit: rowLimit,
     caseSensitive: false,
     filters: {
       and: [{ column: "ticker", kind: "string", op: "eq", value: String(ticker || "") }],
@@ -440,17 +454,21 @@ export function loadKalshiHistoricalTradesForTicker(ticker) {
       orderBy: [{ alias: "created_time", direction: "desc" }],
     },
   };
-  return fetchAthenaLakeSample(request, { maxWaitMs: 180000, pollIntervalMs: 800 }).then((result) => {
-    const names = result.columns || [];
-    const rows = (result.rows || []).map((cells) => {
-      const row = {};
-      names.forEach((name, index) => {
-        row[name] = cells[index];
-      });
-      return row;
-    });
-    return { columns, rows: rows.slice(0, PREVIEW_ROW_CAP) };
-  });
+  const maxWaitMs = rowLimit > PREVIEW_ROW_CAP ? 600000 : 180000;
+  return fetchAthenaLakeSample(request, { maxWaitMs, pollIntervalMs: 800 }).then((result) => ({
+    columns,
+    rows: rowsFromAthenaCells(result, rowLimit),
+  }));
+}
+
+/** Run a locked compose request. Preview stays on its own 50-row fetch. */
+export function loadAthenaComposeRows(request) {
+  const rowLimit = Number(request?.limit);
+  const cap = Number.isFinite(rowLimit) && rowLimit > 0 ? Math.floor(rowLimit) : undefined;
+  return fetchAthenaLakeSample(cap ? { ...request, limit: cap } : request, {
+    maxWaitMs: 600000,
+    pollIntervalMs: 800,
+  }).then((result) => ({ rows: rowsFromAthenaCells(result, cap) }));
 }
 
 export function loadKalshiHistoricalMarketsPreview(predicates, sortKeys) {

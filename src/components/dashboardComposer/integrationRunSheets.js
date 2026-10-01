@@ -10,7 +10,7 @@ function asDate(value) {
   return Number.isNaN(date.getTime()) ? null : date;
 }
 
-function displayCell(value, column) {
+export function displayCell(value, column) {
   const type = column?.type;
   if (value == null || value === "") return "";
   if (type === "boolean") return value === true || value === "true" || value === "True" ? "Yes" : "No";

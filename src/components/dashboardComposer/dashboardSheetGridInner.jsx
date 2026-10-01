@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { DataEditor, GridCellKind } from "@glideapps/glide-data-grid";
 import "@glideapps/glide-data-grid/dist/index.css";
 import { useHtmlDarkClass } from "@/hooks/use-html-dark-class";
+import { useReadyTradeSheet } from "@/components/dashboardComposer/fullTradeSheet";
 
 const ROW_COUNT = 24;
 
@@ -104,7 +105,8 @@ export default function DashboardSheetGridInner({ block, onChange }) {
   const [fontFamily, setFontFamily] = useState("ui-sans-serif, system-ui, sans-serif");
   const columns = useMemo(() => columnsOf(block), [block?.columns]);
   const cells = block?.cells || {};
-  const rows = rowCountOf(cells);
+  const fullSheet = useReadyTradeSheet(block?.id);
+  const rows = fullSheet ? fullSheet.rows.length : rowCountOf(cells);
 
   useEffect(() => {
     const next = getComputedStyle(document.body).fontFamily;
@@ -128,7 +130,9 @@ export default function DashboardSheetGridInner({ block, onChange }) {
 
   const getCellContent = useCallback(
     ([col, row]) => {
-      const value = String(cells[`${col},${row}`] ?? "");
+      const value = fullSheet
+        ? String(fullSheet.rows[row]?.[col] ?? "")
+        : String(cells[`${col},${row}`] ?? "");
       return {
         kind: GridCellKind.Text,
         data: value,
@@ -136,20 +140,25 @@ export default function DashboardSheetGridInner({ block, onChange }) {
         allowOverlay: true,
       };
     },
-    [cells],
+    [cells, fullSheet],
   );
 
   const onCellEdited = useCallback(
     ([col, row], newValue) => {
       if (newValue.kind !== GridCellKind.Text) return;
+      const value = String(newValue.data ?? "");
+      if (fullSheet) {
+        const line = fullSheet.rows[row];
+        if (line) line[col] = value;
+        return;
+      }
       const key = `${col},${row}`;
       const next = { ...cells };
-      const value = String(newValue.data ?? "");
       if (value) next[key] = value;
       else delete next[key];
       onChange?.({ cells: next });
     },
-    [cells, onChange],
+    [cells, fullSheet, onChange],
   );
 
   const onColumnResize = useCallback(
@@ -169,6 +178,7 @@ export default function DashboardSheetGridInner({ block, onChange }) {
         <DataEditor
           width={size.width}
           height={size.height}
+          initialSize={[size.width, size.height]}
           columns={columns}
           rows={rows}
           getCellContent={getCellContent}

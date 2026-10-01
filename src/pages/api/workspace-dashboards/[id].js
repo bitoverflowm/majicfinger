@@ -13,6 +13,10 @@ async function sessionUserId(req) {
   }
 }
 
+export const config = {
+  api: { bodyParser: { sizeLimit: "16mb" } },
+};
+
 export default async function handler(req, res) {
   if (req.method !== "GET" && req.method !== "PUT") {
     res.setHeader("Allow", "GET, PUT");

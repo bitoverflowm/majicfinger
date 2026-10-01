@@ -1,19 +1,29 @@
 "use client";
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
-import { BarChart3, Copy, Database, MoreVertical, Pencil, Table2 } from "lucide-react";
+import { createPortal } from "react-dom";
+import { BarChart3, Copy, Database, Maximize2, MoreVertical, Pencil, Table2, X } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { DestructiveConfirmMenuItem } from "@/components/ui/destructive-confirm-menu-item";
 import { useMyStateV2 } from "@/context/stateContextV2";
 import { duplicateTabName, saveWorkspaceStartTabs } from "@/lib/workspaceStartTabs";
 import { DashboardSheetGrid } from "@/components/dashboardComposer/dashboardSheetGrid";
+import { SheetBlockChart } from "@/components/dashboardComposer/sheetBlockChart";
 import { layoutRunSheets } from "@/components/dashboardComposer/integrationRunSheets";
+import { packClippedBlocks, snapBlockPosition } from "@/components/dashboardComposer/clipLayout";
 import { useUser } from "@/lib/hooks";
+import { getHistoricalPullRowLimit } from "@/lib/athenaEntitlement";
+import {
+  ensureFullTradeSheet,
+  tradeTickerFromBlock,
+  useTradeSheetLabel,
+} from "@/components/dashboardComposer/fullTradeSheet";
 import {
   createWorkspaceDashboard,
   loadCurrentWorkspaceDashboard,
@@ -277,6 +287,17 @@ export function WorkspaceCanvasProvider({ pageId, children }) {
   }, [blocks, ready, storageKey]);
 
   useEffect(() => {
+    if (!ready || user === undefined) return undefined;
+    const cap = getHistoricalPullRowLimit(user);
+    for (const block of blocks) {
+      const ticker = tradeTickerFromBlock(block);
+      if (!ticker || !block.columns?.length) continue;
+      ensureFullTradeSheet(block.id, ticker, block.columns, cap);
+    }
+    return undefined;
+  }, [blocks, ready, user]);
+
+  useEffect(() => {
     const flush = () => {
       const id = docIdRef.current;
       const draft = draftRef.current;
@@ -378,6 +399,34 @@ export function WorkspaceCanvasProvider({ pageId, children }) {
     [blocks, pageId],
   );
 
+  const createChartFromBlock = useCallback(
+    (id) => {
+      const sheet = blocks.find((block) => block.id === id && block.type === "sheet");
+      if (!sheet) return;
+      const chartId = newId();
+      setBlocksByPage((prev) => {
+        const list = prev[pageId] || [];
+        const current = list.find((block) => block.id === id) || sheet;
+        const chart = {
+          id: chartId,
+          type: "chart",
+          source: "sheet-chart",
+          sourceSheetId: current.id,
+          x: current.x,
+          y: current.y,
+          w: 540,
+          h: 360,
+          title: `${current.title || "Sheet"} chart`,
+          body: "",
+        };
+        return { ...prev, [pageId]: packClippedBlocks([...list, chart]) };
+      });
+      setSelectedId(chartId);
+      setTool("select");
+    },
+    [blocks, pageId],
+  );
+
   const removeBlock = useCallback(
     (id) => {
       setBlocksByPage((prev) => ({
@@ -457,8 +506,9 @@ export function WorkspaceCanvasProvider({ pageId, children }) {
       updateBlock,
       duplicateBlock,
       removeBlock,
+      createChartFromBlock,
     }),
-    [addBlock, blocks, blocksByPage, dashboardName, duplicateBlock, focusBlock, placeIntegrationSheets, registerTables, removeBlock, renameDashboard, renameId, saveNow, selectedId, tool, updateBlock],
+    [addBlock, blocks, blocksByPage, createChartFromBlock, dashboardName, duplicateBlock, focusBlock, placeIntegrationSheets, registerTables, removeBlock, renameDashboard, renameId, saveNow, selectedId, tool, updateBlock],
   );
 
   return <WorkspaceCanvasContext.Provider value={value}>{children}</WorkspaceCanvasContext.Provider>;
@@ -485,6 +535,34 @@ function EditableText({ value, onChange, className, placeholder }) {
   );
 }
 
+function filledRowCount(cells) {
+  const rows = new Set();
+  for (const key of Object.keys(cells || {})) {
+    const row = Number(String(key).split(",")[1]);
+    if (Number.isFinite(row)) rows.add(row);
+  }
+  return rows.size;
+}
+
+function SheetBlockBody({ block, onChange }) {
+  const label = useTradeSheetLabel(block.id, filledRowCount(block.cells));
+  return (
+    <div className="flex min-h-0 flex-1 flex-col">
+      <div className="flex items-center gap-2 border-b border-border/70 px-3 py-2">
+        <Table2 className="size-3.5 text-muted-foreground" aria-hidden />
+        <EditableText
+          value={block.title}
+          placeholder="Data sheet"
+          onChange={(title) => onChange({ title })}
+          className="min-w-0 flex-1 text-[13px] font-semibold text-foreground"
+        />
+        <span className="shrink-0 pr-4 text-[12px] tabular-nums text-muted-foreground">{label}</span>
+      </div>
+      <DashboardSheetGrid block={block} onChange={onChange} />
+    </div>
+  );
+}
+
 function BlockBody({ block, onChange }) {
   if (block.type === "text") {
     return (
@@ -498,20 +576,7 @@ function BlockBody({ block, onChange }) {
   }
 
   if (block.type === "sheet") {
-    return (
-      <div className="flex min-h-0 flex-1 flex-col">
-        <div className="flex items-center gap-2 border-b border-border/70 px-3 py-2">
-          <Table2 className="size-3.5 text-muted-foreground" aria-hidden />
-          <EditableText
-            value={block.title}
-            placeholder="Data sheet"
-            onChange={(title) => onChange({ title })}
-            className="min-w-0 flex-1 text-[13px] font-semibold text-foreground"
-          />
-        </div>
-        <DashboardSheetGrid block={block} onChange={onChange} />
-      </div>
-    );
+    return <SheetBlockBody block={block} onChange={onChange} />;
   }
 
   if (block.type === "source") {
@@ -536,6 +601,12 @@ function BlockBody({ block, onChange }) {
     );
   }
 
+  return <ChartBlockBody block={block} onChange={onChange} />;
+}
+
+function ChartBlockBody({ block, onChange }) {
+  const canvas = useWorkspaceCanvas();
+  const source = block.sourceSheetId ? (canvas?.blocks || []).find((item) => item.id === block.sourceSheetId) : null;
   return (
     <div className="flex min-h-0 flex-1 flex-col">
       <div className="flex items-center gap-2 px-3 py-2">
@@ -547,7 +618,11 @@ function BlockBody({ block, onChange }) {
           className="min-w-0 flex-1 text-[13px] font-semibold text-foreground"
         />
       </div>
-      <div className="mx-3 mb-3 min-h-16 flex-1 rounded-lg bg-muted/40" />
+      {block.sourceSheetId ? (
+        <SheetBlockChart sheet={source?.type === "sheet" ? source : null} />
+      ) : (
+        <div className="mx-3 mb-3 min-h-16 flex-1 rounded-lg bg-muted/40" />
+      )}
     </div>
   );
 }
@@ -556,11 +631,48 @@ function blockLabel(block) {
   return block.type === "text" ? block.body || "Text" : block.title || "Element";
 }
 
+function SheetFullscreen({ block, onChange, onClose }) {
+  useEffect(() => {
+    const onKey = (event) => {
+      if (event.key !== "Escape") return;
+      event.preventDefault();
+      event.stopPropagation();
+      onClose();
+    };
+    window.addEventListener("keydown", onKey, true);
+    return () => window.removeEventListener("keydown", onKey, true);
+  }, [onClose]);
+
+  const label = useTradeSheetLabel(block.id, filledRowCount(block.cells));
+  return createPortal(
+    <div className="fixed inset-0 z-[640] flex flex-col bg-background">
+      <div className="flex items-center gap-3 border-b border-border/70 px-4 py-3">
+        <Table2 className="size-4 text-muted-foreground" aria-hidden />
+        <span className="min-w-0 flex-1 truncate text-[15px] font-semibold">{block.title || "Data sheet"}</span>
+        <span className="text-[12px] tabular-nums text-muted-foreground">{label}</span>
+        <button
+          type="button"
+          onClick={onClose}
+          className="inline-flex h-8 items-center gap-1.5 rounded-md border border-border/70 px-2.5 text-[13px] font-medium hover:bg-muted"
+        >
+          <X className="size-3.5" aria-hidden />
+          Close
+        </button>
+      </div>
+      <div className="flex min-h-0 flex-1 flex-col p-4">
+        <DashboardSheetGrid block={block} onChange={onChange} />
+      </div>
+    </div>,
+    document.body,
+  );
+}
+
 function CanvasBlock({ block, selected, onSelect, onChange }) {
   const canvas = useWorkspaceCanvas();
   const dragRef = useRef(null);
   const rootRef = useRef(null);
   const [menuOpen, setMenuOpen] = useState(false);
+  const [fullscreen, setFullscreen] = useState(false);
 
   useEffect(() => {
     if (canvas?.renameId !== block.id) return;
@@ -626,20 +738,35 @@ function CanvasBlock({ block, selected, onSelect, onChange }) {
         if (active instanceof HTMLElement && e.currentTarget.contains(active)) active.blur();
       }
       drag.moved = true;
+      drag.nextX = Math.max(0, drag.origX + dx);
+      drag.nextY = Math.max(0, drag.origY + dy);
       onChange({
-        x: Math.max(0, drag.origX + dx),
-        y: Math.max(0, drag.origY + dy),
+        x: drag.nextX,
+        y: drag.nextY,
       });
       return;
     }
-    onChange({
-      w: Math.max(160, drag.origW + (e.clientX - drag.x)),
-      h: Math.max(72, drag.origH + (e.clientY - drag.y)),
-    });
+    const w = Math.max(160, drag.origW + (e.clientX - drag.x));
+    const h = Math.max(72, drag.origH + (e.clientY - drag.y));
+    if (!drag.moved && Math.hypot(e.clientX - drag.x, e.clientY - drag.y) < 4) return;
+    drag.moved = true;
+    drag.nextW = w;
+    drag.nextH = h;
+    onChange({ w, h });
   };
 
   const onPointerUp = () => {
+    const drag = dragRef.current;
     dragRef.current = null;
+    if (!drag?.moved) return;
+    const others = canvas?.blocks || [];
+    if (drag.mode === "move") {
+      onChange(snapBlockPosition({ ...block, x: drag.nextX ?? block.x, y: drag.nextY ?? block.y }, others));
+      return;
+    }
+    if (drag.mode === "resize") {
+      onChange(snapBlockPosition({ ...block, w: drag.nextW ?? block.w, h: drag.nextH ?? block.h }, others));
+    }
   };
 
   return (
@@ -685,6 +812,25 @@ function CanvasBlock({ block, selected, onSelect, onChange }) {
           onPointerDown={(event) => event.stopPropagation()}
           onClick={(event) => event.stopPropagation()}
         >
+          {block.type === "sheet" ? (
+            <>
+              <DropdownMenuItem
+                className="gap-2.5 rounded-md px-2 py-2 text-[13px]"
+                onSelect={() => setFullscreen(true)}
+              >
+                <Maximize2 className="size-4 text-muted-foreground" />
+                Full screen
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                className="gap-2.5 rounded-md px-2 py-2 text-[13px]"
+                onSelect={() => canvas?.createChartFromBlock?.(block.id)}
+              >
+                <BarChart3 className="size-4 text-muted-foreground" />
+                Create chart
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+            </>
+          ) : null}
           <DropdownMenuItem
             className="gap-2.5 rounded-md px-2 py-2 text-[13px]"
             onSelect={() => canvas?.duplicateBlock?.(block.id)}
@@ -705,7 +851,11 @@ function CanvasBlock({ block, selected, onSelect, onChange }) {
           <DestructiveConfirmMenuItem onConfirm={() => canvas?.removeBlock?.(block.id)} />
         </DropdownMenuContent>
       </DropdownMenu>
-      <BlockBody block={block} onChange={onChange} />
+      {fullscreen && block.type === "sheet" ? (
+        <SheetFullscreen block={block} onChange={onChange} onClose={() => setFullscreen(false)} />
+      ) : (
+        <BlockBody block={block} onChange={onChange} />
+      )}
       <div
         data-resize=""
         aria-hidden="true"

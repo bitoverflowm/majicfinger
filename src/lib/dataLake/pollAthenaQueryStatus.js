@@ -5,6 +5,28 @@
 
 import { yieldToUi } from "@/lib/dataLake/largeAthenaPull";
 
+async function fetchPageWithRetry(url, signal) {
+  let lastError = null;
+  for (let attempt = 0; attempt < 4; attempt += 1) {
+    if (signal?.aborted) throw new DOMException("Aborted", "AbortError");
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 20000);
+    const onAbort = () => controller.abort();
+    signal?.addEventListener("abort", onAbort, { once: true });
+    try {
+      return await fetch(url, { method: "GET", credentials: "same-origin", signal: controller.signal });
+    } catch (error) {
+      lastError = error;
+      if (signal?.aborted) throw error;
+      await sleep(400 * (attempt + 1), signal);
+    } finally {
+      clearTimeout(timer);
+      signal?.removeEventListener("abort", onAbort);
+    }
+  }
+  throw lastError || new Error("Athena page timed out");
+}
+
 function sleep(ms, signal) {
   return new Promise((resolve, reject) => {
     if (signal?.aborted) {
@@ -62,11 +84,10 @@ export async function pollAthenaQueryUntilDone(queryExecutionId, rowLimit, opts 
   while (Date.now() < deadline) {
     if (signal?.aborted) throw new DOMException("Aborted", "AbortError");
 
-    const stRes = await fetch(`/api/data-lake/athena-query/status?${pollQ.toString()}`, {
-      method: "GET",
-      credentials: "same-origin",
+    const stRes = await fetchPageWithRetry(
+      `/api/data-lake/athena-query/status?${pollQ.toString()}`,
       signal,
-    });
+    );
 
     let j = {};
     try {
@@ -132,11 +153,10 @@ export async function pollAthenaQueryUntilDone(queryExecutionId, rowLimit, opts 
     });
     if (athenaPageToken) pageQ.set("athenaPageToken", athenaPageToken);
 
-    const pageRes = await fetch(`/api/data-lake/athena-query/status?${pageQ.toString()}`, {
-      method: "GET",
-      credentials: "same-origin",
+    const pageRes = await fetchPageWithRetry(
+      `/api/data-lake/athena-query/status?${pageQ.toString()}`,
       signal,
-    });
+    );
 
     let pageJson = {};
     try {

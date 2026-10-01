@@ -1,4 +1,9 @@
+import { ATHENA_SUBSCRIBER_QUERY_ROW_LIMIT } from "@/config/dataLakeParquetSamples";
+
 /** Shape of the dashboard project the editor saves. Tabs share one document. */
+
+const MAX_SAVED_ROWS = ATHENA_SUBSCRIBER_QUERY_ROW_LIMIT;
+const MAX_SAVED_CELLS = ATHENA_SUBSCRIBER_QUERY_ROW_LIMIT * 32;
 
 export function emptyWorkspaceDashboard() {
   return {
@@ -26,7 +31,7 @@ function cleanCells(cells) {
   const out = {};
   let count = 0;
   for (const [key, value] of Object.entries(cells)) {
-    if (count >= 4000) break;
+    if (count >= MAX_SAVED_CELLS) break;
     if (!/^\d+,\d+$/.test(key)) continue;
     const text = cleanText(value, 500);
     if (!text) continue;
@@ -50,6 +55,7 @@ function cleanBlock(block) {
     id,
     type: cleanText(block.type || "sheet", 20) || "sheet",
     ...(block.source ? { source: cleanText(block.source, 40) } : {}),
+    ...(block.sourceSheetId ? { sourceSheetId: cleanText(block.sourceSheetId, 80) } : {}),
     x: num(block.x),
     y: num(block.y),
     w: Math.max(120, num(block.w, 320)),
@@ -73,7 +79,7 @@ function cleanTable(table) {
         ...(column?.scale ? { scale: cleanText(column.scale, 20) } : {}),
       }))
     : [];
-  const rows = Array.isArray(table.rows) ? table.rows.slice(0, 500) : [];
+  const rows = Array.isArray(table.rows) ? table.rows.slice(0, MAX_SAVED_ROWS) : [];
   const query = table.query && typeof table.query === "object" ? table.query : null;
   return {
     id,
