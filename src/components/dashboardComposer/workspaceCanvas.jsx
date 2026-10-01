@@ -11,6 +11,8 @@ import {
 import { DestructiveConfirmMenuItem } from "@/components/ui/destructive-confirm-menu-item";
 import { duplicateTabName } from "@/lib/workspaceStartTabs";
 import { DashboardSheetGrid } from "@/components/dashboardComposer/dashboardSheetGrid";
+import { layoutRunSheets } from "@/components/dashboardComposer/integrationRunSheets";
+import { useUser } from "@/lib/hooks";
 import { cn } from "@/lib/utils";
 
 const WorkspaceCanvasContext = createContext(null);
@@ -37,12 +39,50 @@ function newId() {
   return `block-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`;
 }
 
+function canvasStorageKey(userId, pageId) {
+  return `lycheeWorkspaceCanvas:v1:${userId || "local"}:${pageId || "workspace"}`;
+}
+
+function readCanvasBlocks(key) {
+  if (typeof localStorage === "undefined") return [];
+  try {
+    const parsed = JSON.parse(localStorage.getItem(key) || "[]");
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
 export function WorkspaceCanvasProvider({ pageId, children }) {
+  const user = useUser();
+  const owner = user === undefined ? "" : user?.userId || "local";
+  const storageKey = owner ? canvasStorageKey(owner, pageId) : "";
   const [tool, setTool] = useState("select");
   const [blocksByPage, setBlocksByPage] = useState({});
+  const [readyKey, setReadyKey] = useState("");
   const [selectedId, setSelectedId] = useState(null);
   const [renameId, setRenameId] = useState(null);
   const blocks = blocksByPage[pageId] || [];
+
+  useEffect(() => {
+    if (!storageKey) return undefined;
+    const loaded = readCanvasBlocks(storageKey);
+    setBlocksByPage((prev) => {
+      if ((prev[pageId] || []).length) return prev;
+      return { ...prev, [pageId]: loaded };
+    });
+    setReadyKey(storageKey);
+    return undefined;
+  }, [pageId, storageKey]);
+
+  useEffect(() => {
+    if (!storageKey || readyKey !== storageKey) return;
+    try {
+      localStorage.setItem(storageKey, JSON.stringify(blocks));
+    } catch {
+      // Private mode can block storage. The sheets still stay on screen this visit.
+    }
+  }, [blocks, readyKey, storageKey]);
 
   const updateBlock = useCallback(
     (id, patch) => {
@@ -53,6 +93,21 @@ export function WorkspaceCanvasProvider({ pageId, children }) {
           [pageId]: list.map((block) => (block.id === id ? { ...block, ...patch } : block)),
         };
       });
+    },
+    [pageId],
+  );
+
+  const placeIntegrationSheets = useCallback(
+    (sheets) => {
+      const incoming = Array.isArray(sheets) ? sheets : [];
+      setBlocksByPage((prev) => {
+        const kept = (prev[pageId] || []).filter((block) => block.source !== "integration-run");
+        const originY = kept.reduce((max, block) => Math.max(max, (block.y || 0) + (block.h || 0) + 24), 88);
+        const placed = layoutRunSheets(incoming, { originY: kept.length ? originY : 88 });
+        return { ...prev, [pageId]: [...kept, ...placed] };
+      });
+      setSelectedId(incoming[0]?.id || null);
+      setTool("select");
     },
     [pageId],
   );
@@ -134,11 +189,12 @@ export function WorkspaceCanvasProvider({ pageId, children }) {
       renameId,
       setRenameId,
       addBlock,
+      placeIntegrationSheets,
       updateBlock,
       duplicateBlock,
       removeBlock,
     }),
-    [addBlock, blocks, duplicateBlock, removeBlock, renameId, selectedId, tool, updateBlock],
+    [addBlock, blocks, duplicateBlock, placeIntegrationSheets, removeBlock, renameId, selectedId, tool, updateBlock],
   );
 
   return <WorkspaceCanvasContext.Provider value={value}>{children}</WorkspaceCanvasContext.Provider>;
@@ -417,7 +473,14 @@ export function WorkspaceCanvas() {
   if (!blocks.length) return null;
 
   return (
-    <div className="pointer-events-none absolute inset-0 z-20 overflow-hidden">
+    <div className="pointer-events-none absolute inset-0 z-20 overflow-auto">
+      <div
+        className="relative min-h-full min-w-full"
+        style={{
+          height: blocks.reduce((max, block) => Math.max(max, (block.y || 0) + (block.h || 0) + 32), 0),
+          width: blocks.reduce((max, block) => Math.max(max, (block.x || 0) + (block.w || 0) + 32), 0),
+        }}
+      >
       {blocks.map((block) => (
         <CanvasBlock
           key={block.id}
@@ -427,6 +490,7 @@ export function WorkspaceCanvas() {
           onChange={(patch) => canvas.updateBlock(block.id, patch)}
         />
       ))}
+      </div>
     </div>
   );
 }

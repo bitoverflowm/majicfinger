@@ -14,6 +14,7 @@ import {
   loadKalshiHistoricalMarketsPreview,
   loadKalshiHistoricalTradesForTicker,
   peekBuildUniverseCount,
+  appendQueryHistory,
   readSavedSearches,
   saveSearch,
   usesExactUniverse,
@@ -45,6 +46,8 @@ import {
   sortSummary,
 } from "@/components/dashboardComposer/kalshiHistoricalAttributes";
 import { cn } from "@/lib/utils";
+import { useIntegrationConnect } from "@/components/dashboardComposer/integrationConnectDialog";
+import { sheetRecords } from "@/components/dashboardComposer/integrationRunSheets";
 import { useWorkspaceCanvas } from "@/components/dashboardComposer/workspaceCanvas";
 
 function humanHistoryLabel(label) {
@@ -365,6 +368,7 @@ function EnrichStep({
   functionScopeNote,
   onHoverFunction,
   onFunctionHelp,
+  onSaveAndRun,
 }) {
   const joinOpen = picked === "join";
   const functionOpen = picked === "function";
@@ -523,9 +527,16 @@ function EnrichStep({
           );
         })}
       </fieldset>
-      <div className="flex items-center justify-start border-t border-border/70 px-4 py-3">
+      <div className="flex items-center justify-between border-t border-border/70 px-4 py-3">
         <Button type="button" variant="outline" onClick={onBack}>
           Previous
+        </Button>
+        <Button
+          type="button"
+          onClick={onSaveAndRun}
+          className="bg-[#0d99ff] text-white hover:bg-[#0d99ff]/90"
+        >
+          Save and run
         </Button>
       </div>
     </>
@@ -545,6 +556,7 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
   const ctx = useMyStateV2?.() ?? {};
   const user = useUser();
   const canvas = useWorkspaceCanvas();
+  const connect = useIntegrationConnect();
   const planLimit = user === undefined ? null : getHistoricalPullRowLimit(user);
   const [tableId, setTableId] = useState(source?.defaultTable || tableIds[0]);
   const [groupId, setGroupId] = useState(source?.defaultGroup || "");
@@ -1214,6 +1226,101 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
     };
   };
 
+  function onSaveAndRun() {
+    const sheets = [];
+    if (marketsGrid.columns.length) {
+      sheets.push({
+        id: "run-markets",
+        title: sheetTitle,
+        columns: marketsGrid.columns,
+        rows: marketsGrid.rows,
+        span: "full",
+        table: tableId || "markets",
+        summary: lockedQuery?.label || describeSearch(),
+      });
+    }
+    if (joinCommitted && tradePreview.columns.length) {
+      const tickers = joinedMarkets.map((market) => market.ticker).filter(Boolean);
+      const list = tickers.length ? tickers : previewTicker ? [previewTicker] : [];
+      list.forEach((ticker) => {
+        const own = ticker === previewTicker;
+        const withFormula = functionOnTrades && (functionTarget !== "trades" || own);
+        const columns = withFormula && tradesGrid.columns.length ? tradesGrid.columns : tradePreview.columns;
+        const rows = own ? (withFormula && tradesGrid.rows.length ? tradesGrid.rows : tradePreview.rows) : [];
+        if (!columns.length) return;
+        sheets.push({
+          id: `run-trades-${String(ticker).replace(/[^A-Za-z0-9]+/g, "-")}`,
+          title: `Trades · ${ticker}`,
+          columns,
+          rows,
+          span: "half",
+          table: "trades",
+          summary: `Kalshi Historical · trades · ${ticker}`,
+        });
+      });
+    }
+    if (functionOnNew && newTableGrid.columns.length) {
+      sheets.push({
+        id: "run-column",
+        title: "Column",
+        columns: newTableGrid.columns,
+        rows: newTableGrid.rows,
+        span: sheets.some((sheet) => sheet.span !== "full") || sheets.length ? "half" : "full",
+        table: tableId || "markets",
+        summary: functionFormula.trim() ? `Function · ${functionFormula.trim()}` : "Function column",
+      });
+    }
+    if (!sheets.length) return;
+
+    canvas?.placeIntegrationSheets?.(sheets);
+    const historyId = `run-${Date.now().toString(36)}`;
+    appendQueryHistory({
+      id: historyId,
+      savedAt: Date.now(),
+      label: lockedQuery?.label || describeSearch(),
+      fingerprint: lockedQuery?.fingerprint || "",
+      integrationId,
+      tableId,
+      sheets: sheets.map((sheet) => ({
+        id: sheet.id,
+        title: sheet.title,
+        table: sheet.table,
+        rowCount: sheet.rows.length,
+        summary: sheet.summary,
+      })),
+      athena: lockedQuery?.athena || athenaRequest(),
+      join: joinCommitted
+        ? {
+            target: "kalshiHistoricalTrades",
+            tickers: joinedMarkets.map((market) => market.ticker).filter(Boolean),
+            previewTicker,
+          }
+        : null,
+      formula: functionActive ? functionFormula : "",
+    });
+    ctx?.setDataSheets?.((prev) => {
+      const next = { ...(prev || {}) };
+      for (const sheet of sheets) {
+        next[sheet.id] = {
+          name: sheet.title,
+          data: sheetRecords(sheet.columns, sheet.rows),
+          storageMode: "inline",
+          provenance: { lake: "kalshi", table: sheet.table, querySummary: sheet.summary },
+          requestCards: [
+            {
+              id: `${historyId}:${sheet.id}`,
+              lake: "kalshi",
+              table: sheet.table,
+              querySummary: sheet.summary,
+            },
+          ],
+        };
+      }
+      return next;
+    });
+    connect?.close?.();
+  }
+
   if (!source) return null;
 
   return (
@@ -1296,6 +1403,7 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
             functionScopeNote={functionActive ? functionScopeNote : ""}
             onHoverFunction={setHoverFunction}
             onFunctionHelp={() => setFunctionHelp(true)}
+            onSaveAndRun={onSaveAndRun}
           />
         ) : (
         <>

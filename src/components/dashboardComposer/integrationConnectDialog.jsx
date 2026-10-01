@@ -432,7 +432,7 @@ export function IntegrationConnectDialog({ open, onOpenChange }) {
 
 export function IntegrationConnectProvider({ children }) {
   const [open, setOpen] = useState(false);
-  const value = useMemo(() => ({ open: () => setOpen(true) }), []);
+  const value = useMemo(() => ({ open: () => setOpen(true), close: () => setOpen(false) }), []);
   return (
     <IntegrationConnectContext.Provider value={value}>
       {children}

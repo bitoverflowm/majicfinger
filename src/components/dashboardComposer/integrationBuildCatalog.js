@@ -51,6 +51,7 @@ function kalshiLiveSource() {
 }
 
 const SAVED_SEARCHES_KEY = "lycheeIntegrationSavedSearches";
+const QUERY_HISTORY_KEY = "lycheeIntegrationQueryHistory";
 
 export const BUILD_SOURCES = {
   kalshiHistorical: {
@@ -1084,5 +1085,23 @@ export function saveSearch(entry) {
   );
   const next = [entry, ...previous].slice(0, 40);
   localStorage.setItem(SAVED_SEARCHES_KEY, JSON.stringify(next));
+  return next;
+}
+
+export function readQueryHistory() {
+  if (typeof localStorage === "undefined") return [];
+  try {
+    const parsed = JSON.parse(localStorage.getItem(QUERY_HISTORY_KEY) || "[]");
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
+/** Executed pulls. Kept apart from Saved searches. */
+export function appendQueryHistory(entry) {
+  const previous = readQueryHistory().filter((item) => item.id !== entry.id);
+  const next = [entry, ...previous].slice(0, 80);
+  localStorage.setItem(QUERY_HISTORY_KEY, JSON.stringify(next));
   return next;
 }
