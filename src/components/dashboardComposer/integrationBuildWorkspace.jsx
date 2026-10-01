@@ -31,7 +31,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import { useMyStateV2 } from "@/context/stateContextV2";
-import { getHistoricalPullRowLimit, getJoinMarketCap, joinTierLabel } from "@/lib/athenaEntitlement";
+import { getHistoricalPullRowLimit, getJoinMarketCap } from "@/lib/athenaEntitlement";
 import { listConnectHomeSheetHistory, requestCardSummaryLabel } from "@/lib/connectHomeRequestHistory";
 import { useUser } from "@/lib/hooks";
 import {
@@ -165,7 +165,7 @@ function JoinSheetTabs({ markets, active, previewTicker, sheetCount, onSelect })
   const plusSelected = hidden > 0 && active !== "markets" && !visible.some((market) => market.ticker === active);
 
   return (
-    <div ref={frameRef} className="relative overflow-hidden px-4 pb-1">
+    <div ref={frameRef} className="relative overflow-hidden px-4 pb-1 pt-4">
       <div ref={measureRef} className="pointer-events-none invisible absolute left-0 top-0 flex" aria-hidden>
         <button type="button" data-tab className={sheetTabClass(false)}>
           Markets
@@ -232,9 +232,9 @@ const ENRICH_OPTIONS = [
   { id: "function", title: "Function" },
 ];
 
-function EnrichStep({ onBack, picked, onPick, joinTarget, onJoinTarget, tierLabel, marketCap, queryRows, hasRowLimit, sheetCount, onHoverJoin }) {
+function EnrichStep({ onBack, picked, onPick, joinTarget, onJoinTarget, onClear, marketCap, queryRows, sheetCount, onHoverJoin }) {
   const joinOpen = picked === "join";
-  const cappedByTier = typeof queryRows === "number" && queryRows > marketCap;
+  const queryRowCount = typeof queryRows === "number" ? queryRows : sheetCount;
   return (
     <>
       <div className="px-4 pb-3 pt-4 pr-12">
@@ -281,7 +281,16 @@ function EnrichStep({ onBack, picked, onPick, joinTarget, onJoinTarget, tierLabe
                 >
                   <div className={cn("overflow-hidden", joinOpen ? "" : "pointer-events-none")}>
                     <div className="mt-2 rounded-lg border border-border/70 px-2.5 py-2">
-                      <p className="text-[11px] font-semibold text-foreground">Join to</p>
+                      <div className="flex items-center justify-between gap-2">
+                        <p className="text-[11px] font-semibold text-foreground">Join to</p>
+                        <button
+                          type="button"
+                          onClick={onClear}
+                          className="text-[11px] font-medium text-muted-foreground hover:text-foreground"
+                        >
+                          Clear
+                        </button>
+                      </div>
                       <button
                         type="button"
                         aria-pressed={joinTarget === "kalshiHistoricalTrades"}
@@ -297,27 +306,14 @@ function EnrichStep({ onBack, picked, onPick, joinTarget, onJoinTarget, tierLabe
                         <span className="text-[11px] font-normal text-muted-foreground">Fills for each market in this query.</span>
                       </button>
                       <p className="mt-2 text-[11px] leading-relaxed text-muted-foreground">
-                        {tierLabel} includes trades for {marketCap.toLocaleString()} markets at a time.
-                        {hasRowLimit && typeof queryRows === "number" ? (
-                          cappedByTier
-                            ? ` This query is limited to ${Number(queryRows).toLocaleString()} rows, so the first ${marketCap.toLocaleString()} get a trades sheet.`
-                            : ` This query is limited to ${Number(queryRows).toLocaleString()} ${queryRows === 1 ? "row" : "rows"}, so ${sheetCount.toLocaleString()} trades ${sheetCount === 1 ? "sheet" : "sheets"} will be created.`
-                        ) : typeof queryRows === "number" ? (
-                          cappedByTier
-                            ? ` This query matches ${queryRows.toLocaleString()} markets, so the first ${marketCap.toLocaleString()} get a trades sheet.`
-                            : ` This query has ${queryRows.toLocaleString()} ${queryRows === 1 ? "market" : "markets"}, and each one gets a trades sheet.`
-                        ) : null}{" "}
-                        {tierLabel === "Elite" ? (
-                          "More than 50 markets is an enterprise pull."
-                        ) : (
-                          <>
-                            <a href="/checkout" className="font-medium text-[#0d99ff] underline-offset-2 hover:underline">
-                              Upgrade
-                            </a>{" "}
-                            for more. Elite includes 50. More than 50 is an enterprise pull.
-                          </>
-                        )}{" "}
-                        The preview loads 50 trades for the first market.
+                        You have {queryRowCount.toLocaleString()} {queryRowCount === 1 ? "row" : "rows"} in your markets query. So{" "}
+                        {sheetCount.toLocaleString()} trade {sheetCount === 1 ? "sheet" : "sheets"} will be created for each market.
+                        <span className="mt-2 block">
+                          Your plan allows {marketCap.toLocaleString()} sheet pulls at once.
+                        </span>
+                        <a href="/checkout" className="mt-2 block font-medium text-[#0d99ff] underline-offset-2 hover:underline">
+                          Upgrade to increase your limit.
+                        </a>
                       </p>
                     </div>
                   </div>
@@ -327,7 +323,7 @@ function EnrichStep({ onBack, picked, onPick, joinTarget, onJoinTarget, tierLabe
           );
         })}
       </fieldset>
-      <div className="flex items-center justify-end border-t border-border/70 px-4 py-3">
+      <div className="flex items-center justify-start border-t border-border/70 px-4 py-3">
         <Button type="button" variant="outline" onClick={onBack}>
           Previous
         </Button>
@@ -566,7 +562,6 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
   }, [guidedFilters, pull, attributeFilters, sortKeys, rowLimit]);
 
   const marketCap = getJoinMarketCap(user);
-  const tierLabel = joinTierLabel(user);
   const requestedMarketLimit = Number(rowLimit);
   const hasRowLimit = Number.isFinite(requestedMarketLimit) && requestedMarketLimit > 0;
   const queryRows = hasRowLimit
@@ -847,10 +842,14 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
             onPick={setEnrichPick}
             joinTarget={joinTarget}
             onJoinTarget={setJoinTarget}
-            tierLabel={tierLabel}
+            onClear={() => {
+              setHoverJoin(false);
+              setEnrichPick("");
+              setJoinTarget("");
+              setJoinTab("markets");
+            }}
             marketCap={marketCap}
             queryRows={queryRows}
-            hasRowLimit={hasRowLimit}
             sheetCount={sheetCount}
             onHoverJoin={setHoverJoin}
           />
