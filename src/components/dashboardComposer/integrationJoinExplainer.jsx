@@ -1,133 +1,126 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
+import { motion, useReducedMotion } from "framer-motion";
 
 import { BorderBeam } from "@/components/magicui/border-beam";
-import { FlickeringGrid } from "@/components/ui/flickering-grid";
 import { cn } from "@/lib/utils";
 
 const KALSHI = "#28CC95";
 
-const FALLBACK_MARKETS = [
-  { ticker: "KXNBA-25-IND", title: "Indiana Pacers win the NBA Finals" },
-  { ticker: "PRES-2024-DJT", title: "Republican wins the Presidency" },
-  { ticker: "KXMAYORNYC-25-D", title: "Democrat wins the NYC Mayor race" },
+/** Illustration only. These rows are not loaded from Athena. */
+const SAMPLE = [
+  {
+    ticker: "MARKET-A",
+    fills: [
+      ["14:02", "Yes", "63¢"],
+      ["14:01", "No", "37¢"],
+    ],
+  },
+  {
+    ticker: "MARKET-B",
+    fills: [
+      ["09:15", "Yes", "48¢"],
+      ["09:14", "Yes", "47¢"],
+    ],
+  },
+  {
+    ticker: "MARKET-C",
+    fills: [
+      ["18:40", "No", "22¢"],
+      ["18:39", "Yes", "78¢"],
+    ],
+  },
 ];
 
-const SAMPLE_FILLS = [
-  { time: "14:02", side: "Yes", price: "63¢", count: "120" },
-  { time: "14:02", side: "No", price: "37¢", count: "40" },
-  { time: "14:01", side: "Yes", price: "62¢", count: "15" },
-];
+export const JOIN_EXPLAINER_COPY =
+  "Join lets you join your current data table with another data source, like trades.";
+
+function tabClass(selected) {
+  return cn(
+    "relative -ml-px shrink-0 border border-border/70 px-2 py-1 text-left text-[11px] font-medium leading-none first:ml-0",
+    selected ? "z-10 border-[#0d99ff] bg-[#0d99ff]/10 text-[#0d99ff]" : "bg-background text-muted-foreground",
+  );
+}
+
+/** The tab that appears while Join is hovered. It is not a real sheet. */
+export function JoinExplainerTabs() {
+  const reduce = useReducedMotion();
+  return (
+    <div className="overflow-hidden px-4 pb-1 pt-4">
+      <div className="flex">
+        <span className={tabClass(false)}>Markets</span>
+        <motion.span
+          initial={reduce ? false : { clipPath: "inset(0 100% 0 0)", opacity: 0 }}
+          animate={{ clipPath: "inset(0 0% 0 0)", opacity: 1 }}
+          transition={{ duration: 0.45, ease: "easeOut" }}
+          className={tabClass(true)}
+        >
+          Trades
+        </motion.span>
+      </div>
+    </div>
+  );
+}
 
 /**
- * Hover explanation for Join. Plays in the preview pane.
- * One market you kept becomes its own trades sheet.
+ * Hover explanation for Join. Plays inside the new Trades tab.
+ * Every market cell points at its own trades table. Nothing here is queried.
  */
-export function JoinExplainer({ markets }) {
+export function JoinExplainer() {
   const reduce = useReducedMotion();
-  const rows = (markets || []).slice(0, 3);
-  const shown = rows.length ? rows : FALLBACK_MARKETS;
-  const [step, setStep] = useState(reduce ? 2 : 0);
-
-  useEffect(() => {
-    if (reduce) return undefined;
-    const timer = window.setInterval(() => setStep((current) => (current + 1) % 3), 1700);
-    return () => window.clearInterval(timer);
-  }, [reduce]);
-
-  const active = shown[Math.min(step, shown.length - 1)] || shown[0];
 
   return (
-    <div className="relative flex h-full min-h-[280px] items-center justify-center overflow-hidden rounded-xl border border-border/70 bg-background shadow-sm">
-      <FlickeringGrid
-        className="absolute inset-0 [mask-image:radial-gradient(ellipse_at_center,black,transparent_75%)]"
-        squareSize={3}
-        gridGap={5}
-        flickerChance={0.16}
-        color="rgb(40, 204, 149)"
-        maxOpacity={0.2}
-      />
-      <div className="relative z-10 flex w-full max-w-2xl flex-col items-center gap-5 px-6 py-8">
-        <div className="flex w-full items-center justify-center gap-3 sm:gap-5">
-          <div className="w-[46%] max-w-[240px] overflow-hidden rounded-xl border border-border/70 bg-background/85 shadow-sm backdrop-blur-md">
-            <p className="border-b border-border/60 px-3 py-1.5 text-[11px] font-semibold text-foreground">Markets you kept</p>
-            <div className="flex flex-col gap-1 p-2">
-              {shown.map((market, index) => {
-                const on = step >= 1 ? market.ticker === active.ticker : index === 0;
-                return (
-                  <div
-                    key={market.ticker}
-                    className={cn(
-                      "rounded-lg border px-2 py-1.5 transition-colors duration-300",
-                      on ? "border-[#28CC95]/50 bg-[#28CC95]/10" : "border-border/70 bg-background/70",
-                    )}
-                  >
-                    <p className="truncate font-mono text-[10px] text-foreground">{market.ticker}</p>
-                    <p className="truncate text-[10px] text-muted-foreground">{market.title}</p>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-          <div className="relative h-px w-10 shrink-0 overflow-hidden bg-border sm:w-16">
-            <motion.span
-              className="absolute inset-y-0 left-0 bg-[#28CC95]"
-              initial={false}
-              animate={{ width: step >= 1 ? "100%" : "0%" }}
-              transition={{ duration: 0.45 }}
-            />
-          </div>
-          <div className="relative w-[46%] max-w-[240px]">
-            <AnimatePresence mode="wait">
-              {step >= 2 || reduce ? (
-                <motion.div
-                  key={active.ticker}
-                  initial={reduce ? false : { opacity: 0, x: 16, scale: 0.96 }}
-                  animate={{ opacity: 1, x: 0, scale: 1 }}
-                  exit={{ opacity: 0, x: -8 }}
-                  transition={{ duration: 0.35 }}
-                  className="overflow-hidden rounded-xl border border-border/70 bg-background/90 shadow-sm backdrop-blur-md"
-                >
-                  <BorderBeam size={80} duration={7} borderWidth={1.2} colorFrom={KALSHI} colorTo="#0d99ff" />
-                  <p className="border-b border-border/60 px-3 py-1.5 text-[11px] font-semibold text-foreground">
-                    Trades · <span className="font-mono font-medium">{active.ticker}</span>
-                  </p>
-                  <div className="flex flex-col gap-1 p-2">
-                    {SAMPLE_FILLS.map((fill, index) => (
-                      <motion.div
-                        key={`${active.ticker}-${index}`}
-                        initial={reduce ? false : { opacity: 0, y: 6 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        transition={{ delay: index * 0.08, duration: 0.25 }}
-                        className="flex items-center justify-between rounded-lg border border-border/60 bg-background px-2 py-1 font-mono text-[10px]"
-                      >
-                        <span className="text-muted-foreground">{fill.time}</span>
-                        <span>{fill.side}</span>
-                        <span>{fill.price}</span>
-                        <span className="text-muted-foreground">{fill.count}</span>
-                      </motion.div>
-                    ))}
-                  </div>
-                </motion.div>
-              ) : (
-                <motion.div
-                  key="waiting"
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  exit={{ opacity: 0 }}
-                  className="flex h-[148px] items-center justify-center rounded-xl border border-dashed border-border/80 bg-background/50 text-[11px] text-muted-foreground"
-                >
-                  A trades sheet per market
-                </motion.div>
-              )}
-            </AnimatePresence>
-          </div>
+    <div className="relative flex h-full min-h-[280px] flex-col justify-center overflow-hidden rounded-xl border border-border/70 bg-background px-5 py-6 shadow-sm">
+      <BorderBeam size={90} duration={8} borderWidth={1.2} colorFrom={KALSHI} colorTo="#0d99ff" />
+      <p className="relative z-10 max-w-xl text-[13px] leading-relaxed text-muted-foreground">{JOIN_EXPLAINER_COPY}</p>
+      <div className="relative z-10 mt-5">
+        <div className="mb-1.5 grid grid-cols-[minmax(0,8.5rem)_2rem_minmax(0,1fr)] gap-x-0">
+          <p className="text-[11px] font-semibold text-foreground">Markets</p>
+          <span />
+          <p className="text-[11px] font-semibold text-foreground">Trades tables</p>
         </div>
-        <p className="max-w-md text-center text-[13px] leading-relaxed text-muted-foreground">
-          Each market you kept gets its own trades sheet. The market table stays as it is.
-        </p>
+        <div className="flex flex-col">
+          {SAMPLE.map((market, index) => (
+            <div key={market.ticker} className="grid grid-cols-[minmax(0,8.5rem)_2rem_minmax(0,1fr)] items-stretch">
+              <div
+                className={cn(
+                  "flex min-h-[52px] items-center border-x border-b border-border/70 bg-background px-2",
+                  index === 0 && "border-t",
+                )}
+              >
+                <span className="truncate font-mono text-[11px] text-foreground">{market.ticker}</span>
+              </div>
+              <div className="flex items-center">
+                <motion.span
+                  className="h-px w-full origin-left bg-[#28CC95]"
+                  initial={reduce ? false : { scaleX: 0 }}
+                  animate={{ scaleX: 1 }}
+                  transition={{ delay: 0.15 + index * 0.1, duration: 0.35 }}
+                />
+              </div>
+              <motion.div
+                className="mb-1.5 overflow-hidden border border-border/70 bg-background"
+                initial={reduce ? false : { opacity: 0, x: 8 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ delay: 0.28 + index * 0.1, duration: 0.3 }}
+              >
+                <p className="border-b border-border/60 px-2 py-1 text-[11px] font-semibold text-foreground">
+                  Trades · <span className="font-mono font-medium">{market.ticker}</span>
+                </p>
+                {market.fills.map((fill) => (
+                  <div
+                    key={fill.join("-")}
+                    className="flex items-center justify-between px-2 py-0.5 font-mono text-[10px] text-muted-foreground"
+                  >
+                    <span>{fill[0]}</span>
+                    <span className="text-foreground">{fill[1]}</span>
+                    <span>{fill[2]}</span>
+                  </div>
+                ))}
+              </motion.div>
+            </div>
+          ))}
+        </div>
       </div>
     </div>
   );

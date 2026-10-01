@@ -3,7 +3,7 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { ArrowLeft, ChevronDown, History } from "lucide-react";
 import { IntegrationBuildGrid } from "@/components/dashboardComposer/integrationBuildGrid";
-import { JoinExplainer } from "@/components/dashboardComposer/integrationJoinExplainer";
+import { JoinExplainer, JoinExplainerTabs } from "@/components/dashboardComposer/integrationJoinExplainer";
 import { SpectrumLoadingState } from "@/components/ui/spectrum-loading-state";
 import {
   BUILD_SOURCES,
@@ -819,6 +819,7 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
   const showJoinSheets = step === "enrich" && enrichPick === "join" && joinTarget === "kalshiHistoricalTrades";
   const showJoinExplainer = step === "enrich" && hoverJoin && !showJoinSheets;
   const paneLine = (() => {
+    if (showJoinExplainer) return "Illustration. No trades are loaded until you run the pull.";
     if (!showJoinSheets || joinTab === "markets") return previewLineShown;
     if (joinTab !== previewTicker) return PREVIEW_TRADE_LOCK;
     if (tradePreview.status === "loading") return "Loading trades for the first market";
@@ -1111,10 +1112,12 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
             sheetCount={sheetCount}
             onSelect={setJoinTab}
           />
+        ) : showJoinExplainer ? (
+          <JoinExplainerTabs />
         ) : null}
         <div className="min-h-0 flex-1 p-4">
           {showJoinExplainer ? (
-            <JoinExplainer markets={queriedMarkets} />
+            <JoinExplainer />
           ) : showJoinSheets && !previewTicker ? (
             <div className="flex h-full items-center justify-center rounded-xl border border-border/70 bg-background px-6 text-center text-[13px] leading-relaxed text-muted-foreground shadow-sm">
               This query has no market tickers to attach trades to.
