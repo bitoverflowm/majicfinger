@@ -130,58 +130,55 @@ function SkeletonRows() {
 }
 
 const ENRICH_OPTIONS = [
-  { id: "summarize", title: "Summarize", detail: "Group rows and total a column." },
-  { id: "ifElse", title: "If else", detail: "Add a column from a condition." },
-  { id: "join", title: "Join", detail: "Combine this pull with another table." },
-  { id: "sample", title: "Random sample", detail: "Keep a random subset of rows." },
-  { id: "bucket", title: "Bucketing", detail: "Band a number column into ranges." },
+  { id: "summarize", title: "Summarize" },
+  { id: "ifElse", title: "If else" },
+  { id: "join", title: "Join" },
+  { id: "sample", title: "Random sample" },
+  { id: "bucket", title: "Bucketing" },
+  { id: "function", title: "Function" },
 ];
 
 function EnrichStep({ onBack }) {
-  const [picked, setPicked] = useState(null);
+  const [picked, setPicked] = useState("");
   return (
     <>
       <div className="px-4 pb-3 pt-4 pr-12">
-        <button
-          type="button"
-          onClick={onBack}
-          className="mb-2 inline-flex size-8 items-center justify-center rounded-lg text-foreground transition-colors hover:bg-muted"
-          aria-label="Back to search"
-        >
-          <ArrowLeft className="size-4" />
-        </button>
         <h2 className="text-[15px] font-semibold text-foreground">Enrich your data</h2>
         <p className="mt-1 text-[13px] leading-relaxed text-muted-foreground">
           Add a step on top of this pull. The preview stays on the rows you queried.
         </p>
       </div>
-      <div className="min-h-0 flex-1 space-y-2 overflow-y-auto px-4 pb-4">
+      <fieldset className="min-h-0 flex-1 space-y-2 overflow-y-auto px-4 pb-4">
+        <legend className="sr-only">Enrichment</legend>
         {ENRICH_OPTIONS.map((option) => {
-          const open = picked === option.id;
+          const selected = picked === option.id;
           return (
-            <div key={option.id}>
-              <button
-                type="button"
-                aria-pressed={open}
-                onClick={() => setPicked(open ? null : option.id)}
-                className={cn(
-                  "flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-left text-[13px] font-semibold transition-colors",
-                  open
-                    ? "bg-[#0d99ff]/10 text-[#0d99ff]"
-                    : "bg-zinc-200/80 text-foreground hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700",
-                )}
-              >
-                <span>{option.title}</span>
-                <ChevronDown className={cn("ml-auto size-4 shrink-0 text-muted-foreground transition-transform duration-200", open && "rotate-180")} />
-              </button>
-              {open ? (
-                <div className="mt-2 rounded-lg border border-border/70 px-2.5 py-2 text-[12px] leading-relaxed text-muted-foreground">
-                  {option.detail}
-                </div>
-              ) : null}
-            </div>
+            <label
+              key={option.id}
+              className={cn(
+                "flex cursor-pointer items-center gap-2.5 rounded-lg border px-2.5 py-2 text-[13px] font-semibold transition-colors",
+                selected
+                  ? "border-[#0d99ff]/40 bg-[#0d99ff]/10 text-[#0d99ff]"
+                  : "border-border/70 bg-background text-foreground hover:bg-muted/50",
+              )}
+            >
+              <input
+                type="radio"
+                name="enrichment"
+                value={option.id}
+                checked={selected}
+                onChange={() => setPicked(option.id)}
+                className="size-3.5 accent-[#0d99ff]"
+              />
+              {option.title}
+            </label>
           );
         })}
+      </fieldset>
+      <div className="flex items-center justify-end border-t border-border/70 px-4 py-3">
+        <Button type="button" variant="outline" onClick={onBack}>
+          Previous
+        </Button>
       </div>
     </>
   );
