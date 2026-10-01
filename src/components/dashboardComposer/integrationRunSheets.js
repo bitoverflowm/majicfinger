@@ -30,6 +30,10 @@ export function displayCell(value, column) {
   return String(value);
 }
 
+export function displayMatrix(columns, rows) {
+  return (rows || []).map((row) => (columns || []).map((column) => displayCell(row?.[column.id], column)));
+}
+
 export function sheetRecords(columns, rows) {
   return (rows || []).map((row) => {
     const record = {};
@@ -94,6 +98,8 @@ export function layoutRunSheets(sheets, { originY = 88 } = {}) {
       title: sheet.title || "Sheet",
       columns,
       cells,
+      ...(sheet.rowCount ? { rowCount: sheet.rowCount } : {}),
+      ...(sheet.pull ? { pull: sheet.pull } : {}),
     };
     blocks.push(block);
     if (full) y += fullH + gap;

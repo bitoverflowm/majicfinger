@@ -164,6 +164,15 @@ function pump() {
   }
 }
 
+export function rememberTradeSheet(blockId, ticker, columns, rows, limit) {
+  const key = `${titlesKey(columns)}:${limit}`;
+  const ready = { status: "ready", ticker, rows, rowCount: rows.length, key };
+  memory.set(blockId, ready);
+  emit();
+  void writeCached(ticker, { key, rows });
+  return ready;
+}
+
 export function ensureFullTradeSheet(blockId, ticker, columns, limit) {
   const current = memory.get(blockId);
   if (current?.status === "ready" && current.ticker === ticker) return inflight.get(blockId) || Promise.resolve(current);

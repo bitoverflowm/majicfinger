@@ -41,6 +41,56 @@ function cleanCells(cells) {
   return out;
 }
 
+function cleanPoint(point, kind) {
+  if (!point || typeof point !== "object") return null;
+  if (kind === "trade-price") {
+    const time = Number(point.time);
+    const price = Number(point.price);
+    if (!Number.isFinite(time) || !Number.isFinite(price)) return null;
+    const size = Number(point.size);
+    return { time, price, size: Number.isFinite(size) ? size : 0 };
+  }
+  const value = Number(point.value);
+  if (!Number.isFinite(value)) return null;
+  return { label: cleanText(point.label, 80), value };
+}
+
+function cleanChartSnapshot(chart) {
+  if (!chart || typeof chart !== "object") return null;
+  const kind = chart.kind === "trade-price" || chart.kind === "sheet-series" ? chart.kind : "";
+  if (!kind) return null;
+  const points = (Array.isArray(chart.points) ? chart.points : []).slice(0, 200).map((point) => cleanPoint(point, kind)).filter(Boolean);
+  if (!points.length) return null;
+  return {
+    kind,
+    points,
+    ...(chart.valueTitle ? { valueTitle: cleanText(chart.valueTitle, 120) } : {}),
+    ...(chart.labelTitle ? { labelTitle: cleanText(chart.labelTitle, 120) } : {}),
+    ...(chart.sizeTitle ? { sizeTitle: cleanText(chart.sizeTitle, 40) } : {}),
+    ...(chart.seriesKind === "line" || chart.seriesKind === "bar" ? { seriesKind: chart.seriesKind } : {}),
+  };
+}
+
+function cleanPull(pull) {
+  if (!pull || typeof pull !== "object") return null;
+  const lake = cleanText(pull.lake, 40);
+  const table = cleanText(pull.table, 40);
+  if (!lake || !table) return null;
+  const ticker = cleanText(pull.ticker, 80);
+  const limit = Math.floor(num(pull.limit, 0));
+  return {
+    lake,
+    table,
+    ...(ticker ? { ticker } : {}),
+    ...(limit > 0 ? { limit: Math.min(limit, MAX_SAVED_ROWS) } : {}),
+  };
+}
+
+function tradeTickerFromTitle(title) {
+  const match = String(title || "").match(/^Trades\s·\s(.+)$/);
+  return match ? match[1].trim() : "";
+}
+
 function cleanBlock(block) {
   if (!block || typeof block !== "object") return null;
   const id = cleanText(block.id, 80);
@@ -51,19 +101,29 @@ function cleanBlock(block) {
         width: Math.max(40, num(column?.width, 120)),
       }))
     : [];
+  const title = cleanText(block.title, 200);
+  const type = cleanText(block.type || "sheet", 20) || "sheet";
+  const chart = type === "chart" ? cleanChartSnapshot(block.chart) : null;
+  const pull = type === "sheet"
+    ? cleanPull(block.pull) || (tradeTickerFromTitle(title) ? { lake: "kalshi", table: "trades", ticker: tradeTickerFromTitle(title) } : null)
+    : null;
+  const rowCount = Math.floor(num(block.rowCount, 0));
   return {
     id,
-    type: cleanText(block.type || "sheet", 20) || "sheet",
+    type,
     ...(block.source ? { source: cleanText(block.source, 40) } : {}),
     ...(block.sourceSheetId ? { sourceSheetId: cleanText(block.sourceSheetId, 80) } : {}),
     x: num(block.x),
     y: num(block.y),
     w: Math.max(120, num(block.w, 320)),
     h: Math.max(72, num(block.h, 200)),
-    title: cleanText(block.title, 200),
+    title,
     body: cleanText(block.body, 4000),
     columns,
     cells: cleanCells(block.cells),
+    ...(rowCount > 0 ? { rowCount } : {}),
+    ...(pull ? { pull } : {}),
+    ...(chart ? { chart } : {}),
   };
 }
 
@@ -79,16 +139,56 @@ function cleanTable(table) {
         ...(column?.scale ? { scale: cleanText(column.scale, 20) } : {}),
       }))
     : [];
-  const rows = Array.isArray(table.rows) ? table.rows.slice(0, MAX_SAVED_ROWS) : [];
-  const query = table.query && typeof table.query === "object" ? table.query : null;
+  const title = cleanText(table.title, 200);
+  const ticker = tradeTickerFromTitle(title);
+  const storedRows = Array.isArray(table.rows) ? table.rows : [];
+  const rowCap = ticker ? 50 : MAX_SAVED_ROWS;
+  const rows = storedRows.slice(0, rowCap);
+  const rowCount = Math.max(rows.length, Math.floor(num(table.rowCount, 0)));
+  const query = cleanQuery(table.query, title, rowCount);
   return {
     id,
-    title: cleanText(table.title, 200),
+    title,
     kind: cleanText(table.kind || "query", 20) || "query",
     columns,
     rows,
+    ...(rowCount > rows.length ? { rowCount } : {}),
     ...(query ? { query } : {}),
   };
+}
+
+function cleanQuery(query, title, rowCount) {
+  const source = query && typeof query === "object" ? query : {};
+  const ticker = tradeTickerFromTitle(title);
+  const join = source.join && typeof source.join === "object"
+    ? {
+        target: cleanText(source.join.target, 80),
+        tickers: (Array.isArray(source.join.tickers) ? source.join.tickers : []).slice(0, 80).map((item) => cleanText(item, 80)).filter(Boolean),
+        ...(source.join.previewTicker ? { previewTicker: cleanText(source.join.previewTicker, 80) } : {}),
+      }
+    : null;
+  const base = {
+    summary: cleanText(source.summary, 300),
+    integrationId: cleanText(source.integrationId, 80),
+    tableId: ticker ? "trades" : cleanText(source.tableId, 40),
+    formula: cleanText(source.formula, 500),
+    ...(join ? { join } : {}),
+  };
+  if (ticker) {
+    const limit = Math.floor(num(source.pull?.limit || source.limit, 0));
+    return {
+      ...base,
+      pull: {
+        lake: "kalshi",
+        table: "trades",
+        ticker,
+        ...(limit > 0 ? { limit: Math.min(limit, MAX_SAVED_ROWS) } : {}),
+      },
+      ...(rowCount > 0 ? { rowCount } : {}),
+    };
+  }
+  if (source.athena && typeof source.athena === "object") return { ...base, athena: source.athena };
+  return base.summary || base.integrationId ? base : null;
 }
 
 export function sanitizeWorkspaceDashboard(input) {
@@ -114,6 +214,21 @@ export function sanitizeWorkspaceDashboard(input) {
   }
 
   const tables = (Array.isArray(source.tables) ? source.tables : []).map(cleanTable).filter(Boolean).slice(0, 80);
+  const sheetsById = new Map();
+  for (const list of Object.values(blocks)) {
+    for (const block of list) {
+      if (block.type === "sheet") sheetsById.set(block.id, block);
+    }
+  }
+  for (const table of tables) {
+    const sheet = sheetsById.get(table.id);
+    if (!sheet) continue;
+    if (sheet.rowCount > (table.rowCount || table.rows.length)) {
+      table.rowCount = sheet.rowCount;
+      if (table.query) table.query.rowCount = sheet.rowCount;
+    }
+    if (sheet.pull?.limit && table.query?.pull && !table.query.pull.limit) table.query.pull.limit = sheet.pull.limit;
+  }
   const active = cleanText(source.active_tab_id, 80);
   return {
     name: cleanText(source.name, 120) || "Untitled",
@@ -122,8 +237,24 @@ export function sanitizeWorkspaceDashboard(input) {
     tabs,
     blocks,
     tables,
-    charts: [],
+    charts: chartsFromBlocks(blocks),
   };
+}
+
+function chartsFromBlocks(blocks) {
+  const charts = [];
+  for (const list of Object.values(blocks || {})) {
+    for (const block of list || []) {
+      if (block.type !== "chart") continue;
+      charts.push({
+        id: block.id,
+        title: block.title,
+        ...(block.sourceSheetId ? { sourceSheetId: block.sourceSheetId } : {}),
+        ...(block.chart ? { chart: block.chart } : {}),
+      });
+    }
+  }
+  return charts;
 }
 
 export function tabIdFromPage(pageId) {

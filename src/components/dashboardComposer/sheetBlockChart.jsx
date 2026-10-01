@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useMemo } from "react";
 import { Bar, BarChart, CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { useReadyTradeSheet, tradeTickerFromBlock } from "@/components/dashboardComposer/fullTradeSheet";
 import { TradePriceChart } from "@/components/dashboardComposer/tradePriceChart";
@@ -97,30 +98,56 @@ function matrixFromCells(sheet) {
   return rows;
 }
 
-export function SheetBlockChart({ sheet }) {
+export function SheetBlockChart({ sheet, snapshot, onSnapshot }) {
   const fullSheet = useReadyTradeSheet(sheet?.id);
-  if (isTradeSheet(sheet)) {
-    return <TradePriceChart columns={sheet.columns} rows={fullSheet?.rows || matrixFromCells(sheet)} />;
+  const trade = isTradeSheet(sheet);
+  const series = useMemo(() => (trade ? null : chartSeriesFromSheet(sheet)), [sheet, trade]);
+  const seriesKey = series ? `${series.kind}|${series.data.length}|${series.data[0]?.label}|${series.data[series.data.length - 1]?.value}` : "";
+  useEffect(() => {
+    if (!series) return;
+    onSnapshot?.({
+      kind: "sheet-series",
+      seriesKind: series.kind,
+      valueTitle: series.valueTitle,
+      labelTitle: series.labelTitle,
+      points: series.data,
+    });
+  }, [onSnapshot, series, seriesKey]);
+
+  if (trade) {
+    if (fullSheet?.rows?.length) {
+      return <TradePriceChart columns={sheet.columns} rows={fullSheet.rows} onSeries={onSnapshot} />;
+    }
+    if (snapshot?.kind === "trade-price" && snapshot.points?.length) {
+      return <TradePriceChart preset={snapshot} />;
+    }
+    return <TradePriceChart columns={sheet.columns} rows={matrixFromCells(sheet)} />;
   }
-  const series = chartSeriesFromSheet(sheet);
-  if (!sheet) {
-    return <p className="px-3 text-[12px] text-muted-foreground">The source table is no longer on this tab.</p>;
+  if (!sheet && snapshot?.kind === "trade-price" && snapshot.points?.length) {
+    return <TradePriceChart preset={snapshot} />;
   }
-  if (!series) {
-    return <p className="px-3 text-[12px] text-muted-foreground">This table has no numeric column to chart yet.</p>;
+  const drawn = series || (snapshot?.kind === "sheet-series" && snapshot.points?.length
+    ? { data: snapshot.points, valueTitle: snapshot.valueTitle, labelTitle: snapshot.labelTitle, kind: snapshot.seriesKind || "bar", truncated: false }
+    : null);
+  if (!drawn) {
+    return (
+      <p className="px-3 text-[12px] text-muted-foreground">
+        {sheet ? "This table has no numeric column to chart yet." : "The source table is no longer on this tab."}
+      </p>
+    );
   }
 
-  const Chart = series.kind === "line" ? LineChart : BarChart;
+  const Chart = drawn.kind === "line" ? LineChart : BarChart;
   return (
     <div className="flex min-h-0 flex-1 flex-col px-2 pb-2">
       <p className="px-1 pb-1 text-[11px] text-muted-foreground">
-        {series.valueTitle}
-        {series.labelTitle ? ` by ${series.labelTitle}` : ""}
-        {series.truncated ? " · first 80 rows" : ""}
+        {drawn.valueTitle}
+        {drawn.labelTitle ? ` by ${drawn.labelTitle}` : ""}
+        {drawn.truncated ? " · first 80 rows" : ""}
       </p>
       <div className="min-h-0 flex-1">
         <ResponsiveContainer width="100%" height="100%">
-          <Chart data={series.data} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
+          <Chart data={drawn.data} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
             <CartesianGrid vertical={false} stroke="rgba(0,0,0,0.06)" />
             <XAxis dataKey="label" tick={{ fontSize: 10 }} interval="preserveStartEnd" minTickGap={24} />
             <YAxis
@@ -129,10 +156,10 @@ export function SheetBlockChart({ sheet }) {
               tickFormatter={(value) => new Intl.NumberFormat("en", { notation: "compact", maximumFractionDigits: 1 }).format(value)}
             />
             <Tooltip />
-            {series.kind === "line" ? (
-              <Line type="monotone" dataKey="value" name={series.valueTitle} stroke="#0d99ff" strokeWidth={2} dot={false} />
+            {drawn.kind === "line" ? (
+              <Line type="monotone" dataKey="value" name={drawn.valueTitle} stroke="#0d99ff" strokeWidth={2} dot={false} />
             ) : (
-              <Bar dataKey="value" name={series.valueTitle} fill="#0d99ff" radius={[3, 3, 0, 0]} />
+              <Bar dataKey="value" name={drawn.valueTitle} fill="#0d99ff" radius={[3, 3, 0, 0]} />
             )}
           </Chart>
         </ResponsiveContainer>

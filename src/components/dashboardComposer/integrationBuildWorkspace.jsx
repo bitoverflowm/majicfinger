@@ -3,6 +3,8 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { ArrowLeft, ChevronDown, History, Info } from "lucide-react";
 import { IntegrationBuildGrid } from "@/components/dashboardComposer/integrationBuildGrid";
+import { displayMatrix } from "@/components/dashboardComposer/integrationRunSheets";
+import { rememberTradeSheet } from "@/components/dashboardComposer/fullTradeSheet";
 import { FunctionExplainer, FunctionExplainerTabs } from "@/components/dashboardComposer/integrationFunctionExplainer";
 import { JoinExplainer, JoinExplainerTabs } from "@/components/dashboardComposer/integrationJoinExplainer";
 import { SpectrumLoadingState } from "@/components/ui/spectrum-loading-state";
@@ -1327,11 +1329,19 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
           ? withFunctionColumn(item.columns, item.rows, true, functionFormula, formulaSheets, "trades")
           : { columns: item.columns, rows: item.rows };
         if (!shaped.columns.length) return;
+        const id = `run-trades-${String(item.ticker).replace(/[^A-Za-z0-9]+/g, "-")}`;
+        const fullRows = shaped.rows || [];
+        const pull = { lake: "kalshi", table: "trades", ticker: item.ticker, limit: sheetCap };
+        if (fullRows.length > 50) {
+          rememberTradeSheet(id, item.ticker, shaped.columns, displayMatrix(shaped.columns, fullRows), sheetCap);
+        }
         sheets.push({
-          id: `run-trades-${String(item.ticker).replace(/[^A-Za-z0-9]+/g, "-")}`,
+          id,
           title: `Trades · ${item.ticker}`,
           columns: shaped.columns,
-          rows: shaped.rows,
+          rows: fullRows.slice(0, 50),
+          rowCount: fullRows.length,
+          pull,
           span: "half",
           table: "trades",
           summary: `Kalshi Historical · trades · ${item.ticker}`,
@@ -1371,14 +1381,24 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
           ...(column.scale ? { scale: column.scale } : {}),
         })),
         rows: sheet.rows || [],
-        query: {
-          summary: sheet.summary,
-          integrationId,
-          tableId: sheet.table,
-          formula: functionActive ? functionFormula : "",
-          join: joinRecord,
-          athena: lockedQuery?.athena || athenaRequest(),
-        },
+        rowCount: sheet.rowCount || (sheet.rows || []).length,
+        query: sheet.pull
+          ? {
+              summary: sheet.summary,
+              integrationId,
+              tableId: "trades",
+              formula: functionActive ? functionFormula : "",
+              join: joinRecord,
+              pull: sheet.pull,
+            }
+          : {
+              summary: sheet.summary,
+              integrationId,
+              tableId: sheet.table,
+              formula: functionActive ? functionFormula : "",
+              join: joinRecord,
+              athena: lockedQuery?.athena || athenaRequest(),
+            },
       })),
     );
     const historyId = `run-${Date.now().toString(36)}`;

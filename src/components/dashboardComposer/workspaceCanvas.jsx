@@ -292,10 +292,24 @@ export function WorkspaceCanvasProvider({ pageId, children }) {
     for (const block of blocks) {
       const ticker = tradeTickerFromBlock(block);
       if (!ticker || !block.columns?.length) continue;
-      ensureFullTradeSheet(block.id, ticker, block.columns, cap);
+      const limit = block.pull?.limit || cap;
+      ensureFullTradeSheet(block.id, ticker, block.columns, limit).then((sheet) => {
+        if (sheet?.status !== "ready") return;
+        setBlocksByPage((prev) => {
+          const list = prev[pageId] || [];
+          const current = list.find((item) => item.id === block.id);
+          if (!current) return prev;
+          const pull = { lake: "kalshi", table: "trades", ticker, limit };
+          if (current.rowCount === sheet.rowCount && current.pull?.ticker === ticker && current.pull?.limit === limit) return prev;
+          return {
+            ...prev,
+            [pageId]: list.map((item) => (item.id === block.id ? { ...item, rowCount: sheet.rowCount, pull } : item)),
+          };
+        });
+      });
     }
     return undefined;
-  }, [blocks, ready, user]);
+  }, [blocks, pageId, ready, user]);
 
   useEffect(() => {
     const flush = () => {
@@ -535,6 +549,13 @@ function EditableText({ value, onChange, className, placeholder }) {
   );
 }
 
+function chartSnapshotKey(chart) {
+  const points = chart?.points;
+  if (!points?.length) return "";
+  const last = points[points.length - 1];
+  return `${chart.kind}|${points.length}|${last.time || last.label}|${last.price ?? last.value}|${chart.sizeTitle || ""}`;
+}
+
 function filledRowCount(cells) {
   const rows = new Set();
   for (const key of Object.keys(cells || {})) {
@@ -545,7 +566,7 @@ function filledRowCount(cells) {
 }
 
 function SheetBlockBody({ block, onChange }) {
-  const label = useTradeSheetLabel(block.id, filledRowCount(block.cells));
+  const label = useTradeSheetLabel(block.id, Math.max(filledRowCount(block.cells), Number(block.rowCount) || 0));
   return (
     <div className="flex min-h-0 flex-1 flex-col">
       <div className="flex items-center gap-2 border-b border-border/70 px-3 py-2">
@@ -619,7 +640,14 @@ function ChartBlockBody({ block, onChange }) {
         />
       </div>
       {block.sourceSheetId ? (
-        <SheetBlockChart sheet={source?.type === "sheet" ? source : null} />
+        <SheetBlockChart
+          sheet={source?.type === "sheet" ? source : null}
+          snapshot={block.chart}
+          onSnapshot={(chart) => {
+            if (chartSnapshotKey(block.chart) === chartSnapshotKey(chart)) return;
+            onChange({ chart });
+          }}
+        />
       ) : (
         <div className="mx-3 mb-3 min-h-16 flex-1 rounded-lg bg-muted/40" />
       )}
@@ -643,7 +671,7 @@ function SheetFullscreen({ block, onChange, onClose }) {
     return () => window.removeEventListener("keydown", onKey, true);
   }, [onClose]);
 
-  const label = useTradeSheetLabel(block.id, filledRowCount(block.cells));
+  const label = useTradeSheetLabel(block.id, Math.max(filledRowCount(block.cells), Number(block.rowCount) || 0));
   return createPortal(
     <div className="fixed inset-0 z-[640] flex flex-col bg-background">
       <div className="flex items-center gap-3 border-b border-border/70 px-4 py-3">

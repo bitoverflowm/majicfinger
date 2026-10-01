@@ -74,10 +74,16 @@ function HoverCapture({ active, payload, onHover }) {
   return null;
 }
 
-export function TradePriceChart({ columns, rows }) {
+export function TradePriceChart({ columns, rows, preset, onSeries }) {
   const gradientId = useId().replace(/:/g, "");
-  const { points, sizeTitle } = useMemo(() => bucketYesPrice(columns, rows), [columns, rows]);
+  const computed = useMemo(() => bucketYesPrice(columns, rows), [columns, rows]);
+  const points = preset?.points?.length ? preset.points : computed.points;
+  const sizeTitle = preset?.points?.length ? preset.sizeTitle || "" : computed.sizeTitle;
   const [hover, setHover] = useState(null);
+  useEffect(() => {
+    if (preset?.points?.length || !computed.points.length) return;
+    onSeries?.({ kind: "trade-price", points: computed.points, sizeTitle: computed.sizeTitle });
+  }, [computed, onSeries, preset]);
   const onHover = useCallback((point) => {
     setHover((current) => (current?.time === point?.time ? current : point));
   }, []);
