@@ -5,7 +5,28 @@
  * `evaluateColumnFormula` later without changing the sheet UI.
  */
 
-const FUNCTIONS = new Set(["ROUND", "ABS", "MIN", "MAX", "IF", "SUM", "AVERAGE", "AND", "OR", "NOT", "CONCAT"]);
+export const FORMULA_FUNCTIONS = [
+  { name: "SUM", format: "SUM(value1, value2, ...)", description: "Adds every value you list." },
+  { name: "AVERAGE", format: "AVERAGE(value1, value2, ...)", description: "Average of the values you list." },
+  { name: "MIN", format: "MIN(value1, value2, ...)", description: "The smallest value." },
+  { name: "MAX", format: "MAX(value1, value2, ...)", description: "The largest value." },
+  { name: "ROUND", format: "ROUND(value, digits)", description: "Rounds a value. Digits is optional and defaults to 0." },
+  { name: "ABS", format: "ABS(value)", description: "Turns a negative value positive." },
+  { name: "IF", format: "IF(condition, when true, when false)", description: "Returns one result when the condition is true, and the other when it is false." },
+  { name: "AND", format: "AND(condition1, condition2, ...)", description: "True only when every condition is true." },
+  { name: "OR", format: "OR(condition1, condition2, ...)", description: "True when any condition is true." },
+  { name: "NOT", format: "NOT(condition)", description: "Flips true and false." },
+  { name: "CONCAT", format: "CONCAT(value1, value2, ...)", description: "Joins text into one value." },
+];
+
+const FUNCTIONS = new Set(FORMULA_FUNCTIONS.map((item) => item.name));
+
+export const FORMULA_REFERENCE_NOTES = [
+  { format: "Yes price + No price", description: "Uses the named column on this row. Names match the sheet, not A1 or B1." },
+  { format: "Yes price[2]", description: "One cell. The number is the row on the left of the sheet." },
+  { format: "'Other sheet'!Yes price", description: "A column on another sheet in this preview, or a sheet already on the dashboard." },
+  { format: "'Other sheet'!Yes price[2]", description: "One cell on another sheet." },
+];
 
 function formulaValue(column, raw) {
   if (raw == null || raw === "") return null;
@@ -20,11 +41,56 @@ function formulaValue(column, raw) {
   return text;
 }
 
-function substituteColumns(input, columns) {
+function titlesMatch(input, index, title) {
+  if (!title || input.length < index + title.length) return false;
+  if (input.slice(index, index + title.length).toLowerCase() !== title.toLowerCase()) return false;
+  const prev = index > 0 ? input[index - 1] : "";
+  const next = input[index + title.length] || "";
+  if (/[A-Za-z0-9_]/.test(prev)) return false;
+  if (next && next !== "!" && next !== "[" && /[A-Za-z0-9_]/.test(next)) return false;
+  return true;
+}
+
+function readCellRow(input, index) {
+  if (input[index] !== "[") return { row: null, next: index };
+  const end = input.indexOf("]", index + 1);
+  if (end < 0) throw new Error("A cell reference is missing its closing bracket.");
+  const row = Number(input.slice(index + 1, end).trim());
+  if (!Number.isInteger(row) || row < 1) throw new Error("A cell reference needs a row number, like Yes price[2].");
+  return { row, next: end + 1 };
+}
+
+function findSheet(input, index, sheets) {
+  if (input[index] === "'") {
+    const end = input.indexOf("'", index + 1);
+    if (end < 0 || input[end + 1] !== "!") return null;
+    const title = input.slice(index + 1, end);
+    const sheet = sheets.find((item) => item.title.toLowerCase() === title.toLowerCase());
+    if (!sheet) throw new Error(`Can't find a sheet named "${title}".`);
+    return { sheet, next: end + 2 };
+  }
+  const sorted = sheets.slice().sort((a, b) => b.title.length - a.title.length);
+  for (const sheet of sorted) {
+    if (!titlesMatch(input, index, sheet.title)) continue;
+    if (input[index + sheet.title.length] !== "!") continue;
+    return { sheet, next: index + sheet.title.length + 1 };
+  }
+  return null;
+}
+
+function findColumn(input, index, columns) {
   const sorted = columns
-    .filter((column) => column?.title)
+    .filter((column) => column?.title && column.id !== "__function")
     .slice()
     .sort((a, b) => b.title.length - a.title.length);
+  for (const column of sorted) {
+    if (titlesMatch(input, index, column.title)) return column;
+  }
+  return null;
+}
+
+function substituteColumns(input, columns, sheets, sheetId) {
+  const knownSheets = (sheets || []).filter((sheet) => sheet?.title);
   const refs = [];
   let out = "";
   let i = 0;
@@ -36,27 +102,29 @@ function substituteColumns(input, columns) {
       i = j + 1;
       continue;
     }
-    const rest = input.slice(i);
-    let matched = null;
-    for (const column of sorted) {
-      if (rest.length < column.title.length) continue;
-      if (rest.slice(0, column.title.length).toLowerCase() !== column.title.toLowerCase()) continue;
-      const prev = i > 0 ? input[i - 1] : "";
-      const next = input[i + column.title.length] || "";
-      if (/[A-Za-z0-9_]/.test(prev) || /[A-Za-z0-9_]/.test(next)) continue;
-      matched = column;
-      break;
-    }
-    if (matched) {
+    const sheetHit = findSheet(input, i, knownSheets);
+    const columnAt = sheetHit ? sheetHit.next : i;
+    let cursor = columnAt;
+    if (sheetHit) while (input[cursor] === " ") cursor += 1;
+    const pool = sheetHit ? sheetHit.sheet.columns : columns;
+    const column = findColumn(input, cursor, pool || []);
+    if (sheetHit && !column) throw new Error(`Can't find that column on ${sheetHit.sheet.title}.`);
+    if (column) {
+      const cell = readCellRow(input, cursor + column.title.length);
       out += ` #${refs.length} `;
-      refs.push(matched);
-      i += matched.title.length;
+      refs.push({ column, sheetId: sheetHit?.sheet.id || sheetId, row: cell.row });
+      i = cell.next;
       continue;
     }
     out += input[i];
     i += 1;
   }
   return { expr: out, refs };
+}
+
+function sheetRows(sheets, sheetId, fallbackRows) {
+  const sheet = (sheets || []).find((item) => item.id === sheetId);
+  return sheet?.rows || fallbackRows;
 }
 
 function tokenize(expr) {
@@ -320,16 +388,42 @@ function evalNode(node, scope) {
   return null;
 }
 
-export function evaluateColumnFormula(formula, columns, rows) {
+export function listFormulaReferences(formula, columns, rows, options = {}) {
   const raw = String(formula || "").trim();
   const body = raw.startsWith("=") ? raw.slice(1).trim() : raw;
-  const blank = { values: rows.map(() => null), error: "", type: "number" };
+  if (!body) return [];
+  try {
+    return substituteColumns(body, columns, options.sheets, options.sheetId).refs;
+  } catch {
+    return [];
+  }
+}
+
+export function formulaSuggestions(formula, caret) {
+  const source = String(formula || "");
+  const at = Math.max(0, Math.min(source.length, caret ?? source.length));
+  const word = source.slice(0, at).match(/[A-Za-z][A-Za-z0-9]*$/);
+  if (!word) return [];
+  const typed = word[0];
+  return FORMULA_FUNCTIONS.filter((item) => item.name.toLowerCase().startsWith(typed.toLowerCase()))
+    .slice(0, 6)
+    .map((item) => ({ ...item, from: at - typed.length, to: at }));
+}
+
+export function evaluateColumnFormula(formula, columns, rows, options = {}) {
+  const raw = String(formula || "").trim();
+  const body = raw.startsWith("=") ? raw.slice(1).trim() : raw;
+  const blank = { values: rows.map(() => null), error: "", type: "number", references: [] };
   if (!body) return blank;
   try {
-    const { expr, refs } = substituteColumns(body, columns);
+    const { expr, refs } = substituteColumns(body, columns, options.sheets, options.sheetId);
     const ast = parseExpression(tokenize(expr));
-    const values = rows.map((row) => {
-      const scope = refs.map((column) => formulaValue(column, row?.[column.id]));
+    const values = rows.map((row, rowIndex) => {
+      const scope = refs.map((ref) => {
+        const sourceRows = sheetRows(options.sheets, ref.sheetId, rows);
+        const sourceRow = ref.row == null ? sourceRows[rowIndex] : sourceRows[ref.row - 1];
+        return formulaValue(ref.column, sourceRow?.[ref.column.id]);
+      });
       try {
         const value = evalNode(ast, scope);
         if (typeof value === "number" && !Number.isFinite(value)) return null;
@@ -339,8 +433,13 @@ export function evaluateColumnFormula(formula, columns, rows) {
       }
     });
     const type = values.some((value) => typeof value === "string") ? "text" : "number";
-    return { values, error: "", type };
+    return { values, error: "", type, references: refs };
   } catch (err) {
-    return { values: rows.map(() => null), error: err?.message || "Can't read that equation.", type: "number" };
+    return {
+      values: rows.map(() => null),
+      error: err?.message || "Can't read that equation.",
+      type: "number",
+      references: listFormulaReferences(formula, columns, rows, options),
+    };
   }
 }

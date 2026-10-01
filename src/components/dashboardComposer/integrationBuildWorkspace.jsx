@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
-import { ArrowLeft, ChevronDown, History } from "lucide-react";
+import { ArrowLeft, ChevronDown, History, Info } from "lucide-react";
 import { IntegrationBuildGrid } from "@/components/dashboardComposer/integrationBuildGrid";
 import { FunctionExplainer, FunctionExplainerTabs } from "@/components/dashboardComposer/integrationFunctionExplainer";
 import { JoinExplainer, JoinExplainerTabs } from "@/components/dashboardComposer/integrationJoinExplainer";
@@ -33,7 +33,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { useMyStateV2 } from "@/context/stateContextV2";
 import { getHistoricalPullRowLimit, getJoinMarketCap } from "@/lib/athenaEntitlement";
-import { evaluateColumnFormula } from "@/lib/columnFormula";
+import { evaluateColumnFormula, FORMULA_FUNCTIONS, FORMULA_REFERENCE_NOTES, formulaSuggestions } from "@/lib/columnFormula";
 import { listConnectHomeSheetHistory, requestCardSummaryLabel } from "@/lib/connectHomeRequestHistory";
 import { useUser } from "@/lib/hooks";
 import {
@@ -45,6 +45,7 @@ import {
   sortSummary,
 } from "@/components/dashboardComposer/kalshiHistoricalAttributes";
 import { cn } from "@/lib/utils";
+import { useWorkspaceCanvas } from "@/components/dashboardComposer/workspaceCanvas";
 
 function humanHistoryLabel(label) {
   return String(label || "")
@@ -119,24 +120,77 @@ const PREVIEW_TRADE_LOCK =
   "You can only view 1 market trade in preview mode; execute the query to run the full pipeline.";
 
 const FUNCTION_COLUMN_ID = "__function";
-const FUNCTION_EQUATION_HINT = "Enter your equation, like = Yes Price + No Price.";
 
-function withFunctionColumn(columns, rows, enabled, name, formula) {
-  if (!enabled) return { columns, rows, highlight: "", error: "", sample: "" };
-  const evaluated = evaluateColumnFormula(formula, columns, rows);
-  const first = evaluated.values[0];
-  const sample =
-    evaluated.error || !String(formula || "").trim() || first == null || first === ""
-      ? ""
-      : typeof first === "number"
-        ? String(Math.round(first * 10000) / 10000)
-        : String(first);
+function formulaExamples(columns) {
+  const numbers = (columns || []).filter((column) => column.type === "number" && column.id !== FUNCTION_COLUMN_ID);
+  const text = (columns || []).find((column) => column.type === "text" && column.id !== "ticker" && column.id !== "title");
+  const first = numbers[0]?.title;
+  const second = numbers[1]?.title;
+  const examples = [];
+  if (first && second) examples.push(`= ${first} + ${second}`);
+  if (first) examples.push(`= ROUND(${first}, 0)`);
+  if (first) examples.push(`= ABS(${first})`);
+  if (text?.title && first) examples.push(`= IF(${text.title} = "finalized", ${first}, 0)`);
+  if (!examples.length) examples.push("= Yes Price + No Price");
+  return examples;
+}
+
+function referenceText({ column, row, sheetTitle, sameSheet }) {
+  const cell = row == null ? column.title : `${column.title}[${row}]`;
+  if (sameSheet) return cell;
+  const quoted = /[^A-Za-z0-9_]/.test(sheetTitle || "");
+  const sheet = quoted ? `'${sheetTitle}'` : sheetTitle;
+  return `${sheet}!${cell}`;
+}
+
+function sheetsFromBlocks(blocks, used) {
+  return (blocks || [])
+    .filter((block) => block?.type === "sheet")
+    .map((block) => {
+      const sourceColumns =
+        Array.isArray(block.columns) && block.columns.length
+          ? block.columns
+          : [{ title: "A" }, { title: "B" }, { title: "C" }, { title: "D" }];
+      const columns = sourceColumns.map((column, index) => ({
+        id: `col-${index}`,
+        title: String(column?.title || "").trim() || `Column ${index + 1}`,
+        type: "text",
+      }));
+      const cells = block.cells || {};
+      let maxRow = -1;
+      for (const key of Object.keys(cells)) {
+        const row = Number(String(key).split(",")[1]);
+        if (Number.isFinite(row)) maxRow = Math.max(maxRow, row);
+      }
+      const rows = Array.from({ length: Math.max(maxRow + 1, 0) }, (_, row) => {
+        const record = {};
+        columns.forEach((column, col) => {
+          const value = cells[`${col},${row}`];
+          if (value != null && value !== "") record[column.id] = value;
+        });
+        return record;
+      });
+      const base = String(block.title || "Data sheet").trim() || "Data sheet";
+      let title = base;
+      let n = 2;
+      while (used.has(title.toLowerCase())) {
+        title = `${base} ${n}`;
+        n += 1;
+      }
+      used.add(title.toLowerCase());
+      return { id: block.id, title, columns, rows };
+    });
+}
+
+function withFunctionColumn(columns, rows, enabled, formula, sheets, sheetId) {
+  if (!enabled) return { columns, rows, highlight: "", error: "", references: [] };
+  const evaluated = evaluateColumnFormula(formula, columns, rows, { sheets, sheetId });
   return {
-    columns: [...columns, { id: FUNCTION_COLUMN_ID, title: name.trim() || "Column", type: evaluated.type === "text" ? "text" : "number" }],
+    columns: [...columns, { id: FUNCTION_COLUMN_ID, title: "Column", type: evaluated.type === "text" ? "text" : "number" }],
     rows: rows.map((row, index) => ({ ...row, [FUNCTION_COLUMN_ID]: evaluated.values[index] })),
     highlight: FUNCTION_COLUMN_ID,
     error: evaluated.error,
-    sample,
+    references: evaluated.references || [],
   };
 }
 
@@ -273,8 +327,7 @@ const ENRICH_OPTIONS = [
   { id: "function", title: "Function" },
 ];
 
-function FunctionDestinationTabs({ sheetTitle, joinCommitted, previewTicker, functionTab, joinTab, columnName, onMarkets, onTrades, onNew }) {
-  const newLabel = columnName.trim() || "New table";
+function FunctionDestinationTabs({ sheetTitle, joinCommitted, previewTicker, functionTab, joinTab, onMarkets, onTrades, onNew }) {
   return (
     <div className="overflow-hidden px-4 pb-1 pt-4">
       <div className="flex">
@@ -287,7 +340,7 @@ function FunctionDestinationTabs({ sheetTitle, joinCommitted, previewTicker, fun
           </button>
         ) : null}
         <button type="button" onClick={onNew} className={sheetTabClass(functionTab === "new")}>
-          {newLabel}
+          Column
         </button>
       </div>
     </div>
@@ -309,14 +362,9 @@ function EnrichStep({
   functionTarget,
   onFunctionTarget,
   onClearFunction,
-  functionName,
-  onFunctionName,
-  functionFormula,
-  onFunctionFormula,
-  functionError,
-  functionSample,
   functionScopeNote,
   onHoverFunction,
+  onFunctionHelp,
 }) {
   const joinOpen = picked === "join";
   const functionOpen = picked === "function";
@@ -338,12 +386,17 @@ function EnrichStep({
           return (
             <div
               key={option.id}
-              onMouseEnter={isJoin ? () => onHoverJoin(true) : isFunction ? () => onHoverFunction(true) : undefined}
-              onMouseLeave={isJoin ? () => onHoverJoin(false) : isFunction ? () => onHoverFunction(false) : undefined}
+              onMouseEnter={isJoin ? () => onHoverJoin(true) : undefined}
+              onMouseLeave={isJoin ? () => onHoverJoin(false) : undefined}
             >
+              <div
+                className="flex items-center gap-1.5"
+                onMouseEnter={isFunction ? () => onHoverFunction(true) : undefined}
+                onMouseLeave={isFunction ? () => onHoverFunction(false) : undefined}
+              >
               <label
                 className={cn(
-                  "flex cursor-pointer items-center gap-2.5 rounded-lg border px-2.5 py-2 text-[13px] font-semibold transition-colors",
+                  "flex min-w-0 flex-1 cursor-pointer items-center gap-2.5 rounded-lg border px-2.5 py-2 text-[13px] font-semibold transition-colors",
                   selected
                     ? "border-[#0d99ff]/40 bg-[#0d99ff]/10 text-[#0d99ff]"
                     : "border-border/70 bg-background text-foreground hover:bg-muted/50",
@@ -359,6 +412,17 @@ function EnrichStep({
                 />
                 {option.title}
               </label>
+              {isFunction ? (
+                <button
+                  type="button"
+                  aria-label="Functions we support"
+                  onClick={onFunctionHelp}
+                  className="inline-flex size-8 shrink-0 items-center justify-center rounded-lg border border-border/70 text-muted-foreground transition-colors hover:bg-muted/50 hover:text-foreground"
+                >
+                  <Info className="size-3.5" />
+                </button>
+              ) : null}
+              </div>
               {isJoin ? (
                 <div
                   className={cn(
@@ -445,30 +509,9 @@ function EnrichStep({
                       </div>
                       {functionTarget ? (
                         <div className="mt-2 space-y-2">
-                          <label className="block">
-                            <span className="text-[11px] font-semibold text-foreground">Column name</span>
-                            <Input
-                              value={functionName}
-                              onChange={(event) => onFunctionName(event.target.value)}
-                              placeholder="Column"
-                              className="mt-1 h-8 text-[13px]"
-                            />
-                          </label>
-                          <label className="block">
-                            <span className="text-[11px] font-semibold text-foreground">Equation</span>
-                            <Input
-                              value={functionFormula}
-                              onChange={(event) => onFunctionFormula(event.target.value)}
-                              placeholder="= Yes Price + No Price"
-                              title={FUNCTION_EQUATION_HINT}
-                              className="mt-1 h-8 font-mono text-[13px]"
-                            />
-                          </label>
-                          <p className="text-[11px] leading-relaxed text-muted-foreground" title={FUNCTION_EQUATION_HINT}>
-                            {FUNCTION_EQUATION_HINT}
+                          <p className="text-[11px] leading-relaxed text-muted-foreground">
+                            Type the equation in the new column, like = Yes Price + No Price. Click a column or a cell to drop it in.
                           </p>
-                          {functionError ? <p className="text-[11px] leading-relaxed text-red-600 dark:text-red-400">{functionError}</p> : null}
-                          {functionSample ? <p className="text-[11px] text-muted-foreground">First row: {functionSample}</p> : null}
                           {functionScopeNote ? <p className="text-[11px] leading-relaxed text-muted-foreground">{functionScopeNote}</p> : null}
                         </div>
                       ) : null}
@@ -501,6 +544,7 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
   const tableIds = Object.keys(tables);
   const ctx = useMyStateV2?.() ?? {};
   const user = useUser();
+  const canvas = useWorkspaceCanvas();
   const planLimit = user === undefined ? null : getHistoricalPullRowLimit(user);
   const [tableId, setTableId] = useState(source?.defaultTable || tableIds[0]);
   const [groupId, setGroupId] = useState(source?.defaultGroup || "");
@@ -531,10 +575,15 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
   const [tradePreview, setTradePreview] = useState({ status: "idle", ticker: "", columns: [], rows: [], error: "" });
   const [hoverFunction, setHoverFunction] = useState(false);
   const [functionTarget, setFunctionTarget] = useState("");
-  const [functionName, setFunctionName] = useState("");
   const [functionFormula, setFunctionFormula] = useState("");
   const [functionTab, setFunctionTab] = useState("");
   const [functionScrollKey, setFunctionScrollKey] = useState(0);
+  const [formulaFocused, setFormulaFocused] = useState(false);
+  const [formulaCaret, setFormulaCaret] = useState(0);
+  const [formulaFocusToken, setFormulaFocusToken] = useState(0);
+  const [functionHelp, setFunctionHelp] = useState(false);
+  const formulaCaretRef = useRef(0);
+  const blurToken = useRef(0);
   const [visibleCount, setVisibleCount] = useState(0);
   const [universe, setUniverse] = useState(null);
   const [counting, setCounting] = useState(false);
@@ -980,16 +1029,58 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
 
   const canProceed = Boolean(pull) && !loading && !error && shownColumns.length > 0;
   const joinCommitted = step === "enrich" && joinTarget === "kalshiHistoricalTrades";
-  const showFunctionExplainer = step === "enrich" && hoverFunction && !functionTarget;
+  const showFunctionExplainer = step === "enrich" && hoverFunction;
   const showJoinExplainer = step === "enrich" && hoverJoin && !joinCommitted && !showFunctionExplainer;
   const showJoinSheets = joinCommitted && !showFunctionExplainer && !showJoinExplainer;
   const functionActive = step === "enrich" && enrichPick === "function" && Boolean(functionTarget) && !showFunctionExplainer;
   const functionOnMarkets = functionActive && (functionTarget === "markets" || functionTarget === "all");
   const functionOnTrades = functionActive && (functionTarget === "trades" || functionTarget === "trades-all" || functionTarget === "all");
   const functionOnNew = functionActive && functionTarget === "new";
-  const marketsGrid = withFunctionColumn(shownColumns, filteredRows, functionOnMarkets, functionName, functionFormula);
-  const tradesGrid = withFunctionColumn(tradePreview.columns, tradePreview.rows, functionOnTrades, functionName, functionFormula);
-  const newTableGrid = withFunctionColumn(shownColumns, filteredRows, functionOnNew, functionName, functionFormula);
+  const sheetTitle = tableId === "markets" ? "Markets" : tables[tableId]?.label || "This sheet";
+  const formulaSheets = useMemo(() => {
+    const used = new Set();
+    const list = [];
+    const push = (sheet) => {
+      const title = String(sheet.title || "Sheet");
+      if (used.has(title.toLowerCase())) return;
+      used.add(title.toLowerCase());
+      list.push(sheet);
+    };
+    if (shownColumns.length) push({ id: "markets", title: sheetTitle, columns: shownColumns, rows: filteredRows });
+    if (tradePreview.columns.length && previewTicker) {
+      push({ id: "trades", title: previewTicker, columns: tradePreview.columns, rows: tradePreview.rows });
+    }
+    for (const sheet of sheetsFromBlocks(canvas?.blocks, used)) list.push(sheet);
+    return list;
+  }, [shownColumns, filteredRows, tradePreview.columns, tradePreview.rows, previewTicker, sheetTitle, canvas?.blocks]);
+  const visibleSheetId =
+    functionOnNew && functionTab === "new" ? "new" : showJoinSheets && joinTab === previewTicker ? "trades" : "markets";
+  const columnOnVisible =
+    (visibleSheetId === "markets" && functionOnMarkets) ||
+    (visibleSheetId === "trades" && functionOnTrades) ||
+    (visibleSheetId === "new" && functionOnNew);
+  const editSheetId = columnOnVisible ? visibleSheetId : functionOnNew ? "new" : functionOnTrades && !functionOnMarkets ? "trades" : "markets";
+  const editBase =
+    editSheetId === "trades"
+      ? { columns: tradePreview.columns, rows: tradePreview.rows, sheetId: "trades" }
+      : { columns: shownColumns, rows: filteredRows, sheetId: editSheetId === "new" ? "new" : "markets" };
+  const marketsGrid = withFunctionColumn(
+    shownColumns,
+    filteredRows,
+    functionOnMarkets,
+    functionFormula,
+    formulaSheets,
+    "markets",
+  );
+  const tradesGrid = withFunctionColumn(
+    tradePreview.columns,
+    tradePreview.rows,
+    functionOnTrades,
+    functionFormula,
+    formulaSheets,
+    "trades",
+  );
+  const newTableGrid = withFunctionColumn(shownColumns, filteredRows, functionOnNew, functionFormula, formulaSheets, "new");
   const formulaView = functionOnNew
     ? newTableGrid
     : showJoinSheets && joinTab === previewTicker && functionOnTrades
@@ -1007,7 +1098,6 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
       : functionTarget === "all"
         ? "Preview shows the column on the sheet you're looking at. The same column is added on every sheet when you run the pull."
         : "";
-  const sheetTitle = tableId === "markets" ? "Markets" : tables[tableId]?.label || "This sheet";
   const paneLine = (() => {
     if (showFunctionExplainer) return "Illustration. The column is added when you pick a sheet.";
     if (showJoinExplainer) return "Illustration. No trades are loaded until you run the pull.";
@@ -1024,6 +1114,7 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
     setHoverFunction(false);
     setFunctionTarget(id);
     setFunctionScrollKey((key) => key + 1);
+    setFormulaFocused(false);
     if (id === "new") {
       setFunctionTab("new");
       return;
@@ -1036,10 +1127,125 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
     setJoinTab("markets");
   }
 
+  function insertReference(text) {
+    setFunctionFormula((current) => {
+      const at = Math.max(0, Math.min(current.length, formulaCaretRef.current));
+      const prefix = current.slice(0, at);
+      const suffix = current.slice(at);
+      const lead = current.trim() ? "" : "= ";
+      const spacer = prefix && !lead && !/[\s(,+\-*/^=<>!]$/.test(prefix) ? " " : "";
+      const chunk = `${lead}${spacer}${text}`;
+      formulaCaretRef.current = prefix.length + chunk.length;
+      setFormulaCaret(formulaCaretRef.current);
+      return `${prefix}${chunk}${suffix}`;
+    });
+    setFormulaFocused(true);
+    setFormulaFocusToken((token) => token + 1);
+  }
+
+  function acceptFormulaPick(pick, sheetId) {
+    if (!functionActive) return;
+    if (pick.self) {
+      setFormulaFocused(true);
+      setFormulaFocusToken((token) => token + 1);
+      return;
+    }
+    const sameSheet = sheetId === editSheetId || (editSheetId === "new" && sheetId === "markets");
+    const sheet = formulaSheets.find((item) => item.id === sheetId);
+    insertReference(referenceText({ column: pick.column, row: pick.row, sheetTitle: sheet?.title || sheetTitle, sameSheet }));
+  }
+
+  function applySuggestion(item) {
+    setFunctionFormula((current) => `${current.slice(0, item.from)}${item.name}(${current.slice(item.to)}`);
+    formulaCaretRef.current = item.from + item.name.length + 1;
+    setFormulaCaret(formulaCaretRef.current);
+    setFormulaFocused(true);
+    setFormulaFocusToken((token) => token + 1);
+  }
+
+  const formulaEditorFor = (sheetId, bar) =>
+    functionActive && (bar ? editSheetId !== sheetId && visibleSheetId === sheetId : editSheetId === sheetId)
+      ? {
+          bar,
+          value: functionFormula,
+          error: formulaReady && editSheetId === (bar ? editSheetId : sheetId) ? formulaView?.error || "" : "",
+          examples: formulaExamples(editBase.columns),
+          suggestions: formulaSuggestions(functionFormula, formulaCaret),
+          focusToken: formulaFocusToken,
+          onChange: setFunctionFormula,
+          onFocus: () => {
+            blurToken.current += 1;
+            setFormulaFocused(true);
+          },
+          onBlur: () => {
+            const token = blurToken.current;
+            window.setTimeout(() => {
+              if (blurToken.current !== token) return;
+              setFormulaFocused(false);
+            }, 220);
+          },
+          onCaret: (caret) => {
+            formulaCaretRef.current = caret;
+            setFormulaCaret(caret);
+          },
+          onPickSuggestion: applySuggestion,
+        }
+      : null;
+
+  const referencesFor = (sheetId) => {
+    if (!formulaFocused) return { referencedColumnIds: [], referencedCells: [] };
+    const refs = (formulaView?.references || []).filter(
+      (ref) => ref.sheetId === sheetId || (sheetId === "new" && ref.sheetId === "markets") || (sheetId === "markets" && ref.sheetId === "new"),
+    );
+    return {
+      referencedColumnIds: refs.filter((ref) => ref.row == null).map((ref) => ref.column.id),
+      referencedCells: refs.filter((ref) => ref.row != null).map((ref) => ({ columnId: ref.column.id, row: ref.row })),
+    };
+  };
+
   if (!source) return null;
 
   return (
-    <div className="flex min-h-0 flex-1 bg-background">
+    <div className="relative flex min-h-0 flex-1 bg-background">
+      {functionHelp ? (
+        <div className="absolute inset-0 z-30 flex items-center justify-center bg-black/40 p-6" onClick={() => setFunctionHelp(false)}>
+          <div
+            role="dialog"
+            aria-labelledby="function-help-title"
+            className="max-h-full w-full max-w-lg overflow-auto rounded-xl border border-border/70 bg-background p-5 shadow-xl"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="flex items-start justify-between gap-3">
+              <h2 id="function-help-title" className="text-[15px] font-semibold text-foreground">
+                Functions
+              </h2>
+              <button type="button" onClick={() => setFunctionHelp(false)} className="text-[12px] font-medium text-muted-foreground hover:text-foreground">
+                Close
+              </button>
+            </div>
+            <p className="mt-2 text-[13px] leading-relaxed text-muted-foreground">
+              Type these in the new column. Use the column names you see, and click a column or cell to drop it into the equation.
+            </p>
+            <ul className="mt-4 space-y-3">
+              {FORMULA_FUNCTIONS.map((item) => (
+                <li key={item.name}>
+                  <p className="font-mono text-[12px] font-semibold text-foreground">{item.format}</p>
+                  <p className="text-[12px] leading-snug text-muted-foreground">{item.description}</p>
+                </li>
+              ))}
+            </ul>
+            <h3 className="mt-5 text-[13px] font-semibold text-foreground">References</h3>
+            <ul className="mt-2 space-y-3">
+              {FORMULA_REFERENCE_NOTES.map((item) => (
+                <li key={item.format}>
+                  <p className="font-mono text-[12px] font-semibold text-foreground">{item.format}</p>
+                  <p className="text-[12px] leading-snug text-muted-foreground">{item.description}</p>
+                </li>
+              ))}
+            </ul>
+          </div>
+        </div>
+      ) : null}
       <aside className="flex w-[340px] shrink-0 flex-col border-r border-border/70">
         {step === "enrich" && lockedQuery ? (
           <EnrichStep
@@ -1071,18 +1277,13 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
               setHoverFunction(false);
               setEnrichPick("");
               setFunctionTarget("");
-              setFunctionName("");
               setFunctionFormula("");
               setFunctionTab("");
+              setFormulaFocused(false);
             }}
-            functionName={functionName}
-            onFunctionName={setFunctionName}
-            functionFormula={functionFormula}
-            onFunctionFormula={setFunctionFormula}
-            functionError={formulaReady ? formulaView.error : ""}
-            functionSample={formulaReady ? formulaView.sample : ""}
             functionScopeNote={functionActive ? functionScopeNote : ""}
             onHoverFunction={setHoverFunction}
+            onFunctionHelp={() => setFunctionHelp(true)}
           />
         ) : (
         <>
@@ -1345,7 +1546,6 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
             previewTicker={previewTicker}
             functionTab={functionTab}
             joinTab={joinTab}
-            columnName={functionName}
             onMarkets={() => {
               setFunctionTab("");
               setJoinTab("markets");
@@ -1384,6 +1584,9 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
               rows={newTableGrid.rows}
               highlightColumnId={newTableGrid.highlight}
               scrollToken={functionScrollKey}
+              {...referencesFor("new")}
+              formulaEditor={formulaEditorFor("new", false)}
+              onFormulaPick={(pick) => acceptFormulaPick(pick, "new")}
             />
           ) : showJoinSheets && !previewTicker ? (
             <div className="flex h-full items-center justify-center rounded-xl border border-border/70 bg-background px-6 text-center text-[13px] leading-relaxed text-muted-foreground shadow-sm">
@@ -1405,6 +1608,9 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
               rows={tradesGrid.rows}
               highlightColumnId={tradesGrid.highlight}
               scrollToken={functionScrollKey}
+              {...referencesFor("trades")}
+              formulaEditor={formulaEditorFor("trades", false) || formulaEditorFor("trades", true)}
+              onFormulaPick={(pick) => acceptFormulaPick(pick, "trades")}
             />
           ) : priceWaiting ? (
             <div className="flex h-full items-center justify-center">
@@ -1425,6 +1631,9 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
               rows={marketsGrid.rows}
               highlightColumnId={marketsGrid.highlight}
               scrollToken={functionScrollKey}
+              {...referencesFor("markets")}
+              formulaEditor={formulaEditorFor("markets", false) || formulaEditorFor("markets", true)}
+              onFormulaPick={(pick) => acceptFormulaPick(pick, "markets")}
             />
           ) : (
             <div className="flex h-full items-center justify-center rounded-xl border border-border/70 bg-background text-[13px] text-muted-foreground shadow-sm">

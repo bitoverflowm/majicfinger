@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { DataEditor, GridCellKind } from "@glideapps/glide-data-grid";
 import "@glideapps/glide-data-grid/dist/index.css";
+import { FormulaHeaderEditor } from "@/components/dashboardComposer/integrationFormulaEditor";
 import { useHtmlDarkClass } from "@/hooks/use-html-dark-class";
 
 function themeFor(dark, fontFamily) {
@@ -94,10 +95,41 @@ const HIGHLIGHT_THEME = {
   },
 };
 
-export default function IntegrationBuildGridInner({ columns, rows, highlightColumnId = "", scrollToken = 0 }) {
+const REF_THEME = {
+  light: {
+    bgCell: "#fff6d8",
+    bgHeader: "#ffe8a3",
+    bgHeaderHovered: "#ffdf80",
+    textHeader: "#6a4b00",
+  },
+  dark: {
+    bgCell: "rgba(255, 196, 64, 0.16)",
+    bgHeader: "rgba(255, 196, 64, 0.32)",
+    bgHeaderHovered: "rgba(255, 196, 64, 0.42)",
+    textHeader: "#ffe7a3",
+  },
+};
+
+function columnTheme(columnId, highlightColumnId, referencedColumnIds, dark) {
+  if (columnId && columnId === highlightColumnId) return HIGHLIGHT_THEME[dark ? "dark" : "light"];
+  if (referencedColumnIds?.includes(columnId)) return REF_THEME[dark ? "dark" : "light"];
+  return undefined;
+}
+
+export default function IntegrationBuildGridInner({
+  columns,
+  rows,
+  highlightColumnId = "",
+  scrollToken = 0,
+  referencedColumnIds = [],
+  referencedCells = [],
+  formulaEditor = null,
+  onFormulaPick,
+}) {
   const dark = useHtmlDarkClass();
   const frameRef = useRef(null);
   const editorRef = useRef(null);
+  const gridSlotRef = useRef(null);
   const [size, setSize] = useState({ width: 0, height: 0 });
   const [fontFamily, setFontFamily] = useState("ui-sans-serif, system-ui, sans-serif");
   const gridColumns = useMemo(
@@ -107,15 +139,15 @@ export default function IntegrationBuildGridInner({ columns, rows, highlightColu
         title: column.title,
         width:
           column.id === highlightColumnId
-            ? Math.max(168, Math.min(280, String(column.title || "").length * 8 + 28))
+            ? Math.max(220, Math.min(360, String(formulaEditor?.value || column.title || "").length * 7.2 + 36))
             : column.id === "title" || column.id === "question"
               ? 280
               : column.type === "date"
                 ? 188
                 : 140,
-        themeOverride: column.id === highlightColumnId ? HIGHLIGHT_THEME[dark ? "dark" : "light"] : undefined,
+        themeOverride: columnTheme(column.id, highlightColumnId, referencedColumnIds, dark),
       })),
-    [columns, dark, highlightColumnId],
+    [columns, dark, highlightColumnId, referencedColumnIds, formulaEditor?.value],
   );
 
   useEffect(() => {
@@ -124,7 +156,7 @@ export default function IntegrationBuildGridInner({ columns, rows, highlightColu
   }, []);
 
   useEffect(() => {
-    const el = frameRef.current;
+    const el = gridSlotRef.current;
     if (!el) return undefined;
     const measure = () => {
       const rect = el.getBoundingClientRect();
@@ -137,27 +169,67 @@ export default function IntegrationBuildGridInner({ columns, rows, highlightColu
   }, []);
 
   const highlightIndex = highlightColumnId ? columns.findIndex((column) => column.id === highlightColumnId) : -1;
+  const [formulaBox, setFormulaBox] = useState(null);
+
+  const formulaHeader = Boolean(formulaEditor) && !formulaEditor?.bar;
+  const placeFormula = useCallback(() => {
+    if (!formulaHeader || highlightIndex < 0) {
+      setFormulaBox(null);
+      return;
+    }
+    const frame = gridSlotRef.current;
+    if (!frame) return;
+    const scrollLeft = frame.querySelector(".dvn-scroller")?.scrollLeft || 0;
+    let x = 46;
+    for (let index = 0; index < highlightIndex; index += 1) x += gridColumns[index]?.width || 0;
+    const next = {
+      x: x - scrollLeft,
+      y: 0,
+      width: gridColumns[highlightIndex]?.width || 220,
+      height: 32,
+    };
+    setFormulaBox((prev) =>
+      prev && prev.x === next.x && prev.y === next.y && prev.width === next.width && prev.height === next.height ? prev : next,
+    );
+  }, [formulaHeader, gridColumns, highlightIndex]);
+
+  useEffect(() => {
+    if (!formulaHeader || highlightIndex < 0) return undefined;
+    let frame = 0;
+    const tick = () => {
+      placeFormula();
+      frame = window.requestAnimationFrame(tick);
+    };
+    frame = window.requestAnimationFrame(tick);
+    return () => window.cancelAnimationFrame(frame);
+  }, [formulaHeader, highlightIndex, placeFormula]);
 
   useEffect(() => {
     if (highlightIndex < 0 || size.width <= 0) return undefined;
     let cancelled = false;
     const run = () => {
-      if (!cancelled) editorRef.current?.scrollTo(highlightIndex, 0, "horizontal", 16, 0, { hAlign: "end" });
+      if (cancelled) return;
+      editorRef.current?.scrollTo(highlightIndex, 0, "horizontal", 16, 0, { hAlign: "end" });
+      placeFormula();
     };
     const frame = window.requestAnimationFrame(run);
-    const timer = window.setTimeout(run, 80);
+    const timer = window.setTimeout(run, 90);
     return () => {
       cancelled = true;
       window.cancelAnimationFrame(frame);
       window.clearTimeout(timer);
     };
-  }, [highlightIndex, scrollToken, size.width]);
+  }, [highlightIndex, scrollToken, size.width, placeFormula]);
+
+  const referencedKey = referencedCells.map((cell) => `${cell.columnId}:${cell.row}`).join("|");
 
   const getCellContent = useCallback(
     ([col, row]) => {
       const column = columns[col];
       const raw = rows[row]?.[column?.id];
       const display = displayFor(raw, column);
+      const referenced = referencedCells.some((cell) => cell.columnId === column?.id && cell.row === row + 1);
+      const themeOverride = referenced ? REF_THEME[dark ? "dark" : "light"] : undefined;
       if (column?.type === "number" && raw != null && raw !== "") {
         const parsed = Number(raw);
         const n = column.scale === "cents" && Number.isFinite(parsed) ? parsed / 100 : parsed;
@@ -167,11 +239,12 @@ export default function IntegrationBuildGridInner({ columns, rows, highlightColu
           displayData: display,
           allowOverlay: false,
           readonly: true,
+          themeOverride,
         };
       }
       if (column?.type === "boolean") {
         const on = raw === true || raw === "true" || raw === "True";
-        return { kind: GridCellKind.Boolean, data: on, allowOverlay: false, readonly: true };
+        return { kind: GridCellKind.Boolean, data: on, allowOverlay: false, readonly: true, themeOverride };
       }
       return {
         kind: GridCellKind.Text,
@@ -179,32 +252,59 @@ export default function IntegrationBuildGridInner({ columns, rows, highlightColu
         displayData: display,
         allowOverlay: false,
         readonly: true,
+        themeOverride,
       };
     },
-    [columns, rows],
+    [columns, rows, dark, referencedKey],
   );
 
+  const reportPick = useCallback(
+    (index, row) => {
+      const column = columns[index];
+      if (!column) return;
+      onFormulaPick?.({
+        column,
+        row: row == null ? null : row + 1,
+        self: column.id === highlightColumnId,
+      });
+    },
+    [columns, highlightColumnId, onFormulaPick],
+  );
+
+  const gridHeight = size.height;
+
   return (
-    <div ref={frameRef} data-sheet-grid="" className="h-full min-h-0 w-full overflow-hidden rounded-xl border border-border/70 bg-background shadow-sm">
-      {size.width > 0 && size.height > 0 ? (
-        <DataEditor
-          ref={editorRef}
-          width={size.width}
-          height={size.height}
-          columns={gridColumns}
-          rows={rows.length}
-          getCellContent={getCellContent}
-          rowMarkers="number"
-          rowMarkerWidth={46}
-          headerHeight={32}
-          rowHeight={28}
-          theme={themeFor(dark, fontFamily)}
-          smoothScrollX
-          smoothScrollY
-          getCellsForSelection
-          rangeSelect="cell"
-        />
+    <div ref={frameRef} data-sheet-grid="" className="relative flex h-full min-h-0 w-full flex-col overflow-hidden rounded-xl border border-border/70 bg-background shadow-sm">
+      {formulaEditor?.bar ? (
+        <div className="z-20 shrink-0 border-b border-border/70 px-2 py-2">
+          <FormulaHeaderEditor bar {...formulaEditor} />
+        </div>
       ) : null}
+      <div ref={gridSlotRef} className="relative min-h-0 flex-1">
+        {gridHeight > 0 && size.width > 0 ? (
+          <DataEditor
+            ref={editorRef}
+            width={size.width}
+            height={gridHeight}
+            columns={gridColumns}
+            rows={rows.length}
+            getCellContent={getCellContent}
+            rowMarkers="number"
+            rowMarkerWidth={46}
+            headerHeight={32}
+            rowHeight={28}
+            theme={themeFor(dark, fontFamily)}
+            smoothScrollX
+            smoothScrollY
+            getCellsForSelection
+            rangeSelect="cell"
+            onVisibleRegionChanged={placeFormula}
+            onHeaderClicked={(index) => reportPick(index, null)}
+            onCellClicked={([index, row]) => reportPick(index, row)}
+          />
+        ) : null}
+        {formulaEditor && !formulaEditor.bar ? <FormulaHeaderEditor box={formulaBox} {...formulaEditor} /> : null}
+      </div>
     </div>
   );
 }
