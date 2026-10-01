@@ -497,28 +497,40 @@ function AttributeFields({ column, filters, onChange }) {
 
 export function KalshiHistoricalAttributeFilters({ columns, filters, onChange }) {
   return (
-    <Accordion type="single" collapsible className="space-y-2">
-      {(columns || []).map((column) => {
-        const summary = attributeSummary(column, filters);
-        return (
-          <AccordionItem key={column.id} value={column.id} className="border-0">
-            <AccordionPrimitive.Header className="flex">
-              <AccordionPrimitive.Trigger
-                className="flex w-full items-center gap-2 rounded-lg bg-zinc-200/80 px-2.5 py-1.5 text-left text-[12px] font-semibold text-foreground dark:bg-zinc-800 [&[data-state=open]>svg]:rotate-180"
-              >
-                <span className="min-w-0 truncate">{column.title} Attributes</span>
-                <span className="ml-auto max-w-[42%] truncate text-[11px] font-normal text-[#0d99ff]">{summary}</span>
-                <ChevronDown className="size-4 shrink-0 text-muted-foreground transition-transform duration-200" />
-              </AccordionPrimitive.Trigger>
-            </AccordionPrimitive.Header>
-            <AccordionContent className="pb-0 pt-2">
-              <div className="rounded-lg border border-border/70 px-2 py-2">
-                <AttributeFields column={column} filters={filters} onChange={onChange} />
-              </div>
-            </AccordionContent>
-          </AccordionItem>
-        );
-      })}
+    <Accordion type="single" collapsible defaultValue="market" className="space-y-2">
+      <AccordionItem value="market" className="border-0">
+        <AccordionPrimitive.Header className="flex">
+          <AccordionPrimitive.Trigger className="flex w-full items-center gap-2 rounded-lg bg-zinc-200/80 px-2.5 py-1.5 text-left text-[12px] font-semibold text-foreground dark:bg-zinc-800 [&[data-state=open]>svg]:rotate-180">
+            <span className="min-w-0 truncate">Market attributes</span>
+            <ChevronDown className="ml-auto size-4 shrink-0 text-muted-foreground transition-transform duration-200" />
+          </AccordionPrimitive.Trigger>
+        </AccordionPrimitive.Header>
+        <AccordionContent className="pb-0 pt-2">
+          <div className="rounded-lg border border-border/70 px-2 py-2">
+            <Accordion type="single" collapsible className="space-y-2">
+              {(columns || []).map((column) => {
+                const summary = attributeSummary(column, filters);
+                return (
+                  <AccordionItem key={column.id} value={column.id} className="border-0">
+                    <AccordionPrimitive.Header className="flex">
+                      <AccordionPrimitive.Trigger className="flex w-full items-center gap-2 rounded-lg bg-zinc-200/80 px-2.5 py-1.5 text-left text-[12px] font-semibold text-foreground dark:bg-zinc-800 [&[data-state=open]>svg]:rotate-180">
+                        <span className="min-w-0 truncate">{column.title}</span>
+                        <span className="ml-auto max-w-[42%] truncate text-[11px] font-normal text-[#0d99ff]">{summary}</span>
+                        <ChevronDown className="size-4 shrink-0 text-muted-foreground transition-transform duration-200" />
+                      </AccordionPrimitive.Trigger>
+                    </AccordionPrimitive.Header>
+                    <AccordionContent className="pb-0 pt-2">
+                      <div className="rounded-lg border border-border/70 px-2 py-2">
+                        <AttributeFields column={column} filters={filters} onChange={onChange} />
+                      </div>
+                    </AccordionContent>
+                  </AccordionItem>
+                );
+              })}
+            </Accordion>
+          </div>
+        </AccordionContent>
+      </AccordionItem>
     </Accordion>
   );
 }
