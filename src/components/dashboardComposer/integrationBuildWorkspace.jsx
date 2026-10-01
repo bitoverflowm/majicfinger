@@ -34,6 +34,7 @@ import {
   buildKalshiHistoricalFilterPredicates,
   KalshiHistoricalAttributeFilters,
   rowMatchesKalshiHistoricalFilters,
+  sortKalshiHistoricalRows,
 } from "@/components/dashboardComposer/kalshiHistoricalAttributes";
 import { cn } from "@/lib/utils";
 
@@ -143,6 +144,8 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
   const [filterColumn, setFilterColumn] = useState("");
   const [filterValue, setFilterValue] = useState("");
   const [attributeFilters, setAttributeFilters] = useState({});
+  const [sortKeys, setSortKeys] = useState([]);
+  const [rowLimit, setRowLimit] = useState("");
   const [previewRefreshing, setPreviewRefreshing] = useState(false);
   const [revealKey, setRevealKey] = useState(0);
   const baseRowsRef = useRef([]);
@@ -184,6 +187,8 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
     setVisibleCount(0);
     setFilterValue("");
     setAttributeFilters({});
+    setSortKeys([]);
+    setRowLimit("");
     setPreviewRefreshing(false);
     usingFilteredSample.current = false;
     setUniverse(null);
@@ -292,19 +297,25 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
   );
 
   const filteredRows = useMemo(() => {
+    if (guidedFilters) {
+      const matched = (pull?.rows || []).filter((row) => rowMatchesKalshiHistoricalFilters(row, pull?.columns, attributeFilters));
+      const sorted = sortKalshiHistoricalRows(matched, pull?.columns, sortKeys);
+      const limit = Number(rowLimit);
+      const capped = Number.isFinite(limit) && limit > 0 ? sorted.slice(0, limit) : sorted;
+      return capped.slice(0, visibleCount);
+    }
     const rows = (pull?.rows || []).slice(0, visibleCount);
-    if (guidedFilters) return rows.filter((row) => rowMatchesKalshiHistoricalFilters(row, pull?.columns, attributeFilters));
     const query = filterValue.trim().toLowerCase();
     if (!query || !filterColumn) return rows;
     return rows.filter((row) => String(row[filterColumn] ?? "").toLowerCase().includes(query));
-  }, [pull, visibleCount, filterColumn, filterValue, guidedFilters, attributeFilters]);
+  }, [pull, visibleCount, filterColumn, filterValue, guidedFilters, attributeFilters, sortKeys, rowLimit]);
 
   useEffect(() => {
     if (!guidedFilters) return undefined;
     const columns = pull?.columns;
     if (!columns?.length) return undefined;
     const predicates = buildKalshiHistoricalFilterPredicates(columns, attributeFilters);
-    if (!predicates.and.length && !predicates.or.length) {
+    if (!predicates.and.length && !predicates.or.length && !sortKeys.length) {
       setPreviewRefreshing(false);
       if (usingFilteredSample.current) {
         usingFilteredSample.current = false;
@@ -315,7 +326,7 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
     let cancel = false;
     setPreviewRefreshing(true);
     const timer = window.setTimeout(() => {
-      loadKalshiHistoricalMarketsPreview(predicates)
+      loadKalshiHistoricalMarketsPreview(predicates, sortKeys)
         .then((result) => {
           if (cancel) return;
           usingFilteredSample.current = true;
@@ -331,7 +342,7 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
       cancel = true;
       window.clearTimeout(timer);
     };
-  }, [guidedFilters, attributeFilters, pull?.columns]);
+  }, [guidedFilters, attributeFilters, pull?.columns, sortKeys]);
 
   const history = useMemo(() => {
     const entries = listConnectHomeSheetHistory(ctx?.dataSheets || {});
@@ -376,6 +387,8 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
       filterColumn,
       filterValue,
       attributeFilters,
+      sortKeys,
+      rowLimit,
       savedAt: Date.now(),
     };
     setSaved(saveSearch(entry));
@@ -387,6 +400,8 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
     setFilterColumn(entry.filterColumn || "");
     setFilterValue(entry.filterValue || "");
     setAttributeFilters(entry.attributeFilters || {});
+    setSortKeys(Array.isArray(entry.sortKeys) ? entry.sortKeys : []);
+    setRowLimit(entry.rowLimit || "");
   }
 
   const shown = loading ? 0 : filteredRows.length;
@@ -406,8 +421,11 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
     : typeof universe === "number" && !counting
       ? universe
       : null;
+  const requestedLimit = Number(rowLimit);
   const importedRows =
-    typeof planLimit === "number" && availableRows != null ? Math.min(availableRows, planLimit) : null;
+    typeof planLimit === "number" && availableRows != null
+      ? Math.min(availableRows, planLimit, Number.isFinite(requestedLimit) && requestedLimit > 0 ? requestedLimit : Infinity)
+      : null;
   const usesFullPlan = importedRows != null && planLimit > 0 && importedRows >= planLimit;
   const planFill = (() => {
     if (importedRows == null || !planLimit) return 0;
@@ -586,6 +604,10 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
               columns={pull?.columns || []}
               filters={attributeFilters}
               onChange={setAttributeFilters}
+              sorts={sortKeys}
+              onSorts={setSortKeys}
+              rowLimit={rowLimit}
+              onRowLimit={setRowLimit}
             />
           ) : (
             <section>

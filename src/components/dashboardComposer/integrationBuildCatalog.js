@@ -349,10 +349,15 @@ async function postAthena(body) {
   });
 }
 
-function kalshiHistoricalMarketsCompose(predicates) {
+function kalshiHistoricalMarketsCompose(predicates, sortKeys) {
   const columns = kalshiHistoricalMarketColumns();
   const and = Array.isArray(predicates) ? predicates : Array.isArray(predicates?.and) ? predicates.and : [];
   const or = Array.isArray(predicates) ? [] : Array.isArray(predicates?.or) ? predicates.or : [];
+  const orderBy = Array.isArray(sortKeys) && sortKeys.length
+    ? sortKeys
+        .filter((sort) => columns.some((column) => column.id === sort.columnId))
+        .map((sort) => ({ alias: sort.columnId, direction: sort.direction === "asc" ? "asc" : "desc" }))
+    : [{ alias: "volume", direction: "desc" }];
   return {
     columns,
     request: {
@@ -365,7 +370,7 @@ function kalshiHistoricalMarketsCompose(predicates) {
       compose: {
         select: columns.map((entry) => ({ column: entry.id, alias: entry.id })),
         groupByAliases: [],
-        orderBy: [{ alias: "volume", direction: "desc" }],
+        orderBy: orderBy.length ? orderBy : [{ alias: "volume", direction: "desc" }],
       },
     },
   };
@@ -381,8 +386,8 @@ async function kalshiHistoricalMarkets() {
   };
 }
 
-export function loadKalshiHistoricalMarketsPreview(andPredicates) {
-  const { request } = kalshiHistoricalMarketsCompose(andPredicates);
+export function loadKalshiHistoricalMarketsPreview(predicates, sortKeys) {
+  const { request } = kalshiHistoricalMarketsCompose(predicates, sortKeys);
   return fetchAthenaLakeSample(request, { maxWaitMs: 180000, pollIntervalMs: 800 }).then((result) => {
     const names = result.columns || [];
     const rows = (result.rows || []).map((cells) => {

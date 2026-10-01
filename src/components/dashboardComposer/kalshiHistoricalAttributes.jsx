@@ -250,6 +250,42 @@ function patchFilter(filters, column, patch) {
   return { ...filters, [column.id]: { ...(filters?.[column.id] || {}), ...patch } };
 }
 
+function compareSortValue(left, right, spec) {
+  if (spec?.kind === "number") return Number(left) - Number(right);
+  if (spec?.kind === "date") return (lakeTimeMs(left) || 0) - (lakeTimeMs(right) || 0);
+  return String(left).localeCompare(String(right), undefined, { numeric: true, sensitivity: "base" });
+}
+
+export function sortKalshiHistoricalRows(rows, columns, sorts) {
+  if (!Array.isArray(sorts) || !sorts.length) return rows;
+  const specs = new Map((columns || []).map((column) => [column.id, kalshiHistoricalAttributeSpec(column)]));
+  return rows.slice().sort((leftRow, rightRow) => {
+    for (const sort of sorts) {
+      const left = leftRow?.[sort.columnId];
+      const right = rightRow?.[sort.columnId];
+      const leftMissing = left == null || left === "";
+      const rightMissing = right == null || right === "";
+      if (leftMissing || rightMissing) {
+        if (leftMissing && rightMissing) continue;
+        return leftMissing ? 1 : -1;
+      }
+      const compared = compareSortValue(left, right, specs.get(sort.columnId));
+      if (compared) return sort.direction === "asc" ? compared : -compared;
+    }
+    return 0;
+  });
+}
+
+export function sortSummary(columns, sorts) {
+  if (!Array.isArray(sorts) || !sorts.length) return "";
+  return sorts
+    .map((sort) => {
+      const title = (columns || []).find((column) => column.id === sort.columnId)?.title || sort.columnId;
+      return `${title} ${sort.direction === "asc" ? "↑" : "↓"}`;
+    })
+    .join(", ");
+}
+
 function KeywordField({ label, placeholder, tags, draft, onChange }) {
   const [clearArmed, setClearArmed] = useState(false);
   const list = Array.isArray(tags) ? tags : [];
@@ -495,18 +531,160 @@ function AttributeFields({ column, filters, onChange }) {
   );
 }
 
-export function KalshiHistoricalAttributeFilters({ columns, filters, onChange }) {
+const parentTriggerClass =
+  "flex w-full items-center gap-2 rounded-lg bg-zinc-200/80 px-2.5 py-1.5 text-left text-[12px] font-semibold text-foreground dark:bg-zinc-800 [&[data-state=open]>svg]:rotate-180";
+
+function ParentSection({ value, title, summary, children }) {
+  return (
+    <AccordionItem value={value} className="border-0">
+      <AccordionPrimitive.Header className="flex">
+        <AccordionPrimitive.Trigger className={parentTriggerClass}>
+          <span className="min-w-0 truncate">{title}</span>
+          {summary ? (
+            <span className="ml-auto max-w-[42%] truncate text-[11px] font-normal text-[#0d99ff]">{summary}</span>
+          ) : null}
+          <ChevronDown className={cn("size-4 shrink-0 text-muted-foreground transition-transform duration-200", !summary && "ml-auto")} />
+        </AccordionPrimitive.Trigger>
+      </AccordionPrimitive.Header>
+      <AccordionContent className="pb-0 pt-2">
+        <div className="rounded-lg border border-border/70 px-2 py-2">{children}</div>
+      </AccordionContent>
+    </AccordionItem>
+  );
+}
+
+function SortField({ columns, sorts, onChange }) {
+  const [draft, setDraft] = useState("");
+  const [clearArmed, setClearArmed] = useState(false);
+  const list = Array.isArray(sorts) ? sorts : [];
+  const trimmed = draft.trim().toLowerCase();
+  const taken = new Set(list.map((sort) => sort.columnId));
+  const matches = trimmed
+    ? (columns || [])
+        .filter((column) => !taken.has(column.id))
+        .filter((column) => column.title.toLowerCase().includes(trimmed) || column.id.toLowerCase().includes(trimmed))
+        .sort((left, right) => {
+          const leftExact = left.title.toLowerCase() === trimmed;
+          const rightExact = right.title.toLowerCase() === trimmed;
+          if (leftExact !== rightExact) return leftExact ? -1 : 1;
+          return left.title.localeCompare(right.title);
+        })
+        .slice(0, 6)
+    : [];
+
+  function add(column) {
+    onChange([...list, { columnId: column.id, direction: "desc" }]);
+    setDraft("");
+    setClearArmed(false);
+  }
+
+  return (
+    <div>
+      <p className="mb-1 text-[11px] text-muted-foreground">First tag is the main sort. Each next tag sorts within that.</p>
+      <div className="flex min-h-9 w-full flex-wrap items-center gap-1 rounded-md border border-input bg-background px-2 py-1 text-foreground shadow-sm focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-background">
+        {list.map((sort, index) => {
+          const title = (columns || []).find((column) => column.id === sort.columnId)?.title || sort.columnId;
+          const descending = sort.direction !== "asc";
+          return (
+            <span
+              key={sort.columnId}
+              className="inline-flex max-w-full items-center gap-0.5 rounded-full border border-border/70 bg-background py-0.5 pl-2 pr-1 text-[12px] text-foreground"
+            >
+              <span className="text-muted-foreground">{index + 1}</span>
+              <span className="max-w-[8rem] truncate">{title}</span>
+              <button
+                type="button"
+                aria-label={descending ? `Sort ${title} descending` : `Sort ${title} ascending`}
+                onMouseDown={(event) => event.preventDefault()}
+                onClick={() =>
+                  onChange(list.map((item) => (item.columnId === sort.columnId ? { ...item, direction: descending ? "asc" : "desc" } : item)))
+                }
+                className="rounded-full px-0.5 text-muted-foreground hover:bg-muted hover:text-foreground"
+              >
+                {descending ? "↓" : "↑"}
+              </button>
+              <button
+                type="button"
+                aria-label={`Remove ${title}`}
+                onMouseDown={(event) => event.preventDefault()}
+                onClick={() => {
+                  onChange(list.filter((item) => item.columnId !== sort.columnId));
+                  setClearArmed(false);
+                }}
+                className="rounded-full p-0.5 text-muted-foreground hover:bg-muted hover:text-foreground"
+              >
+                <X className="size-3" />
+              </button>
+            </span>
+          );
+        })}
+        <input
+          value={draft}
+          placeholder={list.length ? "" : "Sort by…"}
+          onChange={(event) => {
+            setDraft(event.target.value);
+            setClearArmed(false);
+          }}
+          onKeyDown={(event) => {
+            if (event.key === "Enter") {
+              event.preventDefault();
+              if (matches[0]) add(matches[0]);
+              return;
+            }
+            if (event.key !== "Backspace" || draft || !list.length) return;
+            event.preventDefault();
+            onChange(list.slice(0, -1));
+            setClearArmed(false);
+          }}
+          className="min-w-[5rem] flex-1 bg-transparent py-0.5 text-[13px] outline-none placeholder:text-muted-foreground"
+        />
+        {list.length || draft ? (
+          <button
+            type="button"
+            aria-label={clearArmed ? "Confirm clear all" : "Clear all"}
+            onMouseDown={(event) => event.preventDefault()}
+            onClick={() => {
+              if (!clearArmed) {
+                setClearArmed(true);
+                return;
+              }
+              onChange([]);
+              setDraft("");
+              setClearArmed(false);
+            }}
+            className={cn(
+              "inline-flex shrink-0 items-center rounded-md p-0.5 text-muted-foreground hover:bg-muted hover:text-foreground",
+              clearArmed && "gap-px bg-red-500/10 text-red-500 hover:bg-red-500/15 hover:text-red-500",
+            )}
+          >
+            <X className="size-3.5" />
+            {clearArmed ? <X className="size-3.5" /> : null}
+          </button>
+        ) : null}
+      </div>
+      {matches.length ? (
+        <div className="mt-1 overflow-hidden rounded-lg border border-border/70 bg-background shadow-sm">
+          {matches.map((column) => (
+            <button
+              key={column.id}
+              type="button"
+              onMouseDown={(event) => event.preventDefault()}
+              onClick={() => add(column)}
+              className="flex w-full items-center px-3 py-2 text-left text-[13px] text-foreground hover:bg-muted/50"
+            >
+              Create &quot;{column.title}&quot;
+            </button>
+          ))}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+export function KalshiHistoricalAttributeFilters({ columns, filters, onChange, sorts, onSorts, rowLimit, onRowLimit }) {
   return (
     <Accordion type="single" collapsible defaultValue="market" className="space-y-2">
-      <AccordionItem value="market" className="border-0">
-        <AccordionPrimitive.Header className="flex">
-          <AccordionPrimitive.Trigger className="flex w-full items-center gap-2 rounded-lg bg-zinc-200/80 px-2.5 py-1.5 text-left text-[12px] font-semibold text-foreground dark:bg-zinc-800 [&[data-state=open]>svg]:rotate-180">
-            <span className="min-w-0 truncate">Market attributes</span>
-            <ChevronDown className="ml-auto size-4 shrink-0 text-muted-foreground transition-transform duration-200" />
-          </AccordionPrimitive.Trigger>
-        </AccordionPrimitive.Header>
-        <AccordionContent className="pb-0 pt-2">
-          <div className="rounded-lg border border-border/70 px-2 py-2">
+      <ParentSection value="market" title="Market attributes">
             <Accordion type="single" collapsible className="space-y-2">
               {(columns || []).map((column) => {
                 const summary = attributeSummary(column, filters);
@@ -528,9 +706,22 @@ export function KalshiHistoricalAttributeFilters({ columns, filters, onChange })
                 );
               })}
             </Accordion>
-          </div>
-        </AccordionContent>
-      </AccordionItem>
+      </ParentSection>
+      <ParentSection value="sort" title="Sort" summary={sortSummary(columns, sorts)}>
+        <SortField columns={columns} sorts={sorts} onChange={onSorts} />
+      </ParentSection>
+      <ParentSection value="limit" title="Limit" summary={rowLimit ? Number(rowLimit).toLocaleString() : ""}>
+        <label className="block text-[11px] text-muted-foreground">
+          Rows
+          <Input
+            value={rowLimit || ""}
+            inputMode="numeric"
+            placeholder="Rows"
+            onChange={(event) => onRowLimit(event.target.value.replace(/[^\d]/g, ""))}
+            className="mt-1 h-9"
+          />
+        </label>
+      </ParentSection>
     </Accordion>
   );
 }
