@@ -579,6 +579,7 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
   const [functionTab, setFunctionTab] = useState("");
   const [functionScrollKey, setFunctionScrollKey] = useState(0);
   const [formulaFocused, setFormulaFocused] = useState(false);
+  const [formulaEditing, setFormulaEditing] = useState(false);
   const [formulaCaret, setFormulaCaret] = useState(0);
   const [formulaFocusToken, setFormulaFocusToken] = useState(0);
   const [functionHelp, setFunctionHelp] = useState(false);
@@ -1115,6 +1116,7 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
     setFunctionTarget(id);
     setFunctionScrollKey((key) => key + 1);
     setFormulaFocused(false);
+    setFormulaEditing(true);
     if (id === "new") {
       setFunctionTab("new");
       return;
@@ -1145,7 +1147,9 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
 
   function acceptFormulaPick(pick, sheetId) {
     if (!functionActive) return;
-    if (pick.self) {
+    if (pick.self || !formulaEditing) {
+      if (!pick.self) return;
+      setFormulaEditing(true);
       setFormulaFocused(true);
       setFormulaFocusToken((token) => token + 1);
       return;
@@ -1163,8 +1167,14 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
     setFormulaFocusToken((token) => token + 1);
   }
 
+  function commitFormula() {
+    blurToken.current += 1;
+    setFormulaFocused(false);
+    setFormulaEditing(false);
+  }
+
   const formulaEditorFor = (sheetId, bar) =>
-    functionActive && (bar ? editSheetId !== sheetId && visibleSheetId === sheetId : editSheetId === sheetId)
+    formulaEditing && functionActive && (bar ? editSheetId !== sheetId && visibleSheetId === sheetId : editSheetId === sheetId)
       ? {
           bar,
           value: functionFormula,
@@ -1189,6 +1199,7 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
             setFormulaCaret(caret);
           },
           onPickSuggestion: applySuggestion,
+          onCommit: commitFormula,
         }
       : null;
 
@@ -1280,6 +1291,7 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
               setFunctionFormula("");
               setFunctionTab("");
               setFormulaFocused(false);
+              setFormulaEditing(false);
             }}
             functionScopeNote={functionActive ? functionScopeNote : ""}
             onHoverFunction={setHoverFunction}

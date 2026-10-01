@@ -75,6 +75,7 @@ export function FormulaHeaderEditor({
   onBlur,
   onCaret,
   onPickSuggestion,
+  onCommit,
 }) {
   const inputRef = useRef(null);
   const [focused, setFocused] = useState(false);
@@ -126,6 +127,12 @@ export function FormulaHeaderEditor({
             onBlur();
           }}
           onSelect={(event) => onCaret(event.target.selectionStart || 0)}
+          onKeyDown={(event) => {
+            if (event.key !== "Enter") return;
+            event.preventDefault();
+            event.stopPropagation();
+            onCommit?.();
+          }}
           onKeyUp={(event) => onCaret(event.currentTarget.selectionStart || 0)}
           placeholder={focused ? "= Yes Price + No Price" : ""}
           className="h-full w-full border border-[#0d99ff] bg-[#d7ebff]/95 px-2 font-mono text-[12px] text-[#0b3a66] outline-none placeholder:text-[#0b3a66]/45 dark:bg-[#0d99ff]/25 dark:text-[#e8f4ff] dark:placeholder:text-[#e8f4ff]/50"
