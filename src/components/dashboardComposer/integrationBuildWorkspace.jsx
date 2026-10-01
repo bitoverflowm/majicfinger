@@ -540,7 +540,7 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
             </DropdownMenu>
           </div>
 
-          <Accordion type="single" collapsible defaultValue="columns">
+          <Accordion type="single" collapsible defaultValue="columns" className="space-y-2">
             <AccordionItem value="columns" className="border-0">
               <AccordionPrimitive.Header className="flex">
                 <AccordionPrimitive.Trigger
@@ -597,19 +597,20 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
                 </div>
               </AccordionContent>
             </AccordionItem>
+            {guidedFilters ? (
+              <KalshiHistoricalAttributeFilters
+                columns={pull?.columns || []}
+                filters={attributeFilters}
+                onChange={setAttributeFilters}
+                sorts={sortKeys}
+                onSorts={setSortKeys}
+                rowLimit={rowLimit}
+                onRowLimit={setRowLimit}
+              />
+            ) : null}
           </Accordion>
 
-          {guidedFilters ? (
-            <KalshiHistoricalAttributeFilters
-              columns={pull?.columns || []}
-              filters={attributeFilters}
-              onChange={setAttributeFilters}
-              sorts={sortKeys}
-              onSorts={setSortKeys}
-              rowLimit={rowLimit}
-              onRowLimit={setRowLimit}
-            />
-          ) : (
+          {guidedFilters ? null : (
             <section>
               <p className="mb-2 text-[12px] font-semibold text-foreground">Filters</p>
               <p className="mb-2 text-[12px] leading-relaxed text-muted-foreground">

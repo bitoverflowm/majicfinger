@@ -340,6 +340,32 @@ body {
   }
 }
 
+@keyframes lychee-pixel-on {
+  0%,
+  100% {
+    opacity: 0.15;
+  }
+  40% {
+    opacity: 1;
+  }
+}
+
+@keyframes lychee-shimmer-text {
+  0% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: -200% 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .lychee-pixel {
+    animation: none !important;
+    opacity: 0.9 !important;
+  }
+}
+
 @keyframes link-arrow-nudge-right {
   0%,
   100% {

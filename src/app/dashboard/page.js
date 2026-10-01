@@ -16,7 +16,7 @@ import { RunYourselfLoaderGate } from './RunYourselfLoaderGate';
 import { HubQueryLoaderGate } from './HubQueryLoaderGate';
 
 import { Toaster } from "@/components/ui/sonner"
-import { Progress } from "@/components/ui/progress"
+import { SpectrumLoadingState } from "@/components/ui/spectrum-loading-state"
 
 import { userSwrFetcher } from "@/lib/hooks"
 import { AuthenticatedJourneyInit } from "@/components/analytics/AuthenticatedJourneyInit"
@@ -24,8 +24,7 @@ import { AuthenticatedJourneyInit } from "@/components/analytics/AuthenticatedJo
 function DashboardLoading() {
     return (
         <div className="flex min-h-svh w-full flex-col items-center justify-center gap-3 bg-background px-6 text-muted-foreground">
-            <p className="text-sm font-medium">Loading…</p>
-            <Progress indeterminate className="h-2.5 w-full max-w-xs" indicatorClassName="bg-primary" />
+            <SpectrumLoadingState label="Loading" />
         </div>
     )
 }

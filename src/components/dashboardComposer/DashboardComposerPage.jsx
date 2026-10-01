@@ -42,7 +42,7 @@ import { IsolatedChartPreview } from "./IsolatedChartPreview";
 import DotPattern from "@/components/magicui/dot-pattern";
 import { Plus } from "lucide-react";
 import { toast } from "sonner";
-import { Progress } from "@/components/ui/progress";
+import { SpectrumLoadingState } from "@/components/ui/spectrum-loading-state";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -208,7 +208,6 @@ export default function DashboardComposerPage({ user }) {
 
   const displayPageSubheading = livePageSubheading ?? draft?.page_subheading ?? "";
 
-  const [dashboardLoadProgress, setDashboardLoadProgress] = useState(8);
   const [dashboardLoadStage, setDashboardLoadStage] = useState("Loading dashboard");
   /** Block autosave toasts / writes until dashboard + project hydration finish. */
   const [dashboardLoadReady, setDashboardLoadReady] = useState(true);
@@ -239,13 +238,11 @@ export default function DashboardComposerPage({ user }) {
     if (!activeChartDashboardId || !hasDbUser) return;
     let cancelled = false;
     setDashboardLoadReady(false);
-    setDashboardLoadProgress(12);
     setDashboardLoadStage("Loading dashboard");
     (async () => {
       try {
         const res = await fetch(`/api/chart-dashboards/${activeChartDashboardId}`);
         if (!cancelled) {
-          setDashboardLoadProgress(48);
           setDashboardLoadStage("Reading saved layout");
         }
         const j = await res.json();
@@ -255,7 +252,6 @@ export default function DashboardComposerPage({ user }) {
           return;
         }
         if (cancelled) return;
-        setDashboardLoadProgress(82);
         setDashboardLoadStage("Applying dashboard");
         const d = j.data;
         setSelectedDashboardCard?.(null);
@@ -322,7 +318,6 @@ export default function DashboardComposerPage({ user }) {
           });
         }
 
-        if (!cancelled) setDashboardLoadProgress(100);
       } catch {
         if (!cancelled) {
           toast.error("Failed to load dashboard");
@@ -639,17 +634,7 @@ export default function DashboardComposerPage({ user }) {
     if (activeChartDashboardId && hasDbUser) {
       return (
         <div className="flex min-h-[50vh] flex-col items-center justify-center gap-3 px-6">
-          <p className="text-center text-sm font-medium text-muted-foreground">{dashboardLoadStage}</p>
-          <div className="w-full max-w-md space-y-1.5">
-            <Progress
-              value={dashboardLoadProgress}
-              className="h-2.5 w-full"
-              indicatorClassName="bg-primary"
-            />
-            <p className="text-center text-xs text-muted-foreground">
-              {Math.max(1, Math.min(100, dashboardLoadProgress))}%
-            </p>
-          </div>
+          <SpectrumLoadingState label={dashboardLoadStage} />
         </div>
       );
     }
