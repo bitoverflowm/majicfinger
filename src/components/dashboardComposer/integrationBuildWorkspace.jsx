@@ -5,6 +5,7 @@ import { ArrowLeft, ChevronDown, History } from "lucide-react";
 import { IntegrationBuildGrid } from "@/components/dashboardComposer/integrationBuildGrid";
 import {
   BUILD_SOURCES,
+  buildKalshiHistoricalMarketsRequest,
   loadBuildPreview,
   loadBuildUniverseCount,
   loadKalshiHistoricalMarketsPreview,
@@ -31,10 +32,12 @@ import { getHistoricalPullRowLimit } from "@/lib/athenaEntitlement";
 import { listConnectHomeSheetHistory, requestCardSummaryLabel } from "@/lib/connectHomeRequestHistory";
 import { useUser } from "@/lib/hooks";
 import {
+  attributeSummary,
   buildKalshiHistoricalFilterPredicates,
   KalshiHistoricalAttributeFilters,
   rowMatchesKalshiHistoricalFilters,
   sortKalshiHistoricalRows,
+  sortSummary,
 } from "@/components/dashboardComposer/kalshiHistoricalAttributes";
 import { cn } from "@/lib/utils";
 
@@ -126,6 +129,70 @@ function SkeletonRows() {
   );
 }
 
+const ENRICH_OPTIONS = [
+  { id: "summarize", title: "Summarize", detail: "Group rows and total a column." },
+  { id: "ifElse", title: "If else", detail: "Add a column from a condition." },
+  { id: "join", title: "Join", detail: "Combine this pull with another table." },
+  { id: "sample", title: "Random sample", detail: "Keep a random subset of rows." },
+  { id: "bucket", title: "Bucketing", detail: "Band a number column into ranges." },
+];
+
+function EnrichStep({ onBack }) {
+  const [picked, setPicked] = useState(null);
+  return (
+    <>
+      <div className="px-4 pb-3 pt-4 pr-12">
+        <button
+          type="button"
+          onClick={onBack}
+          className="mb-2 inline-flex size-8 items-center justify-center rounded-lg text-foreground transition-colors hover:bg-muted"
+          aria-label="Back to search"
+        >
+          <ArrowLeft className="size-4" />
+        </button>
+        <h2 className="text-[15px] font-semibold text-foreground">Enrich your data</h2>
+        <p className="mt-1 text-[13px] leading-relaxed text-muted-foreground">
+          Add a step on top of this pull. The preview stays on the rows you queried.
+        </p>
+      </div>
+      <div className="min-h-0 flex-1 space-y-2 overflow-y-auto px-4 pb-4">
+        {ENRICH_OPTIONS.map((option) => {
+          const open = picked === option.id;
+          return (
+            <div key={option.id}>
+              <button
+                type="button"
+                aria-pressed={open}
+                onClick={() => setPicked(open ? null : option.id)}
+                className={cn(
+                  "flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-left text-[13px] font-semibold transition-colors",
+                  open
+                    ? "bg-[#0d99ff]/10 text-[#0d99ff]"
+                    : "bg-zinc-200/80 text-foreground hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700",
+                )}
+              >
+                <span>{option.title}</span>
+                <ChevronDown className={cn("ml-auto size-4 shrink-0 text-muted-foreground transition-transform duration-200", open && "rotate-180")} />
+              </button>
+              {open ? (
+                <div className="mt-2 rounded-lg border border-border/70 px-2.5 py-2 text-[12px] leading-relaxed text-muted-foreground">
+                  {option.detail}
+                </div>
+              ) : null}
+            </div>
+          );
+        })}
+      </div>
+    </>
+  );
+}
+
+function formatSavedAt(savedAt) {
+  const date = new Date(savedAt);
+  if (Number.isNaN(date.getTime())) return "";
+  return date.toLocaleString(undefined, { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
+}
+
 export function IntegrationBuildWorkspace({ integrationId, onBack }) {
   const source = BUILD_SOURCES[integrationId];
   const tables = source?.tables || {};
@@ -151,6 +218,10 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
   const baseRowsRef = useRef([]);
   const usingFilteredSample = useRef(false);
   const [saved, setSaved] = useState(() => readSavedSearches());
+  const [step, setStep] = useState("query");
+  const [lockedQuery, setLockedQuery] = useState(null);
+  const [justSaved, setJustSaved] = useState(false);
+  const restoreRef = useRef(null);
   const [visibleCount, setVisibleCount] = useState(0);
   const [universe, setUniverse] = useState(null);
   const [counting, setCounting] = useState(false);
@@ -203,8 +274,21 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
         baseRowsRef.current = result.rows;
         setPull(result);
         setRevealKey((key) => key + 1);
-        setHidden(new Set(result.columns.filter((column) => column.defaultOn === false).map((column) => column.id)));
-        setFilterColumn(result.columns[0]?.id || "");
+        const pending = restoreRef.current;
+        const restoring = pending && pending.tableId === tableId && pending.integrationId === integrationId;
+        if (restoring) restoreRef.current = null;
+        setHidden(
+          restoring
+            ? new Set(pending.hidden || [])
+            : new Set(result.columns.filter((column) => column.defaultOn === false).map((column) => column.id)),
+        );
+        setFilterColumn((restoring && pending.filterColumn) || result.columns[0]?.id || "");
+        if (restoring) {
+          setFilterValue(pending.filterValue || "");
+          setAttributeFilters(pending.attributeFilters || {});
+          setSortKeys(Array.isArray(pending.sortKeys) ? pending.sortKeys : []);
+          setRowLimit(pending.rowLimit || "");
+        }
       })
       .catch((err) => {
         if (cancel) return;
@@ -377,31 +461,93 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
     setHidden(new Set((pull?.columns || []).map((column) => column.id)));
   }
 
-  function onSave() {
-    const entry = {
-      id: `${integrationId}:${tableId}:${Date.now()}`,
+  function describeSearch() {
+    const columns = pull?.columns || [];
+    const parts = [];
+    for (const column of columns) {
+      const summary = attributeSummary(column, attributeFilters);
+      if (summary) parts.push(`${column.title} ${summary}`);
+    }
+    const sort = sortSummary(columns, sortKeys);
+    if (sort) parts.push(sort);
+    if (rowLimit) parts.push(`${Number(rowLimit).toLocaleString()} rows`);
+    if (!parts.length) {
+      const visible = columns.filter((column) => !hidden.has(column.id)).length;
+      parts.push(`${visible} ${visible === 1 ? "column" : "columns"}`);
+    }
+    return `${table?.label || "Search"} · ${parts.join(" · ")}`;
+  }
+
+  function athenaRequest() {
+    if (!guidedFilters || !pull?.columns?.length) return null;
+    const predicates = buildKalshiHistoricalFilterPredicates(pull.columns, attributeFilters);
+    const columnIds = pull.columns.filter((column) => !hidden.has(column.id)).map((column) => column.id);
+    const requested = Number(rowLimit);
+    const caps = [];
+    if (typeof planLimit === "number" && planLimit > 0) caps.push(planLimit);
+    if (Number.isFinite(requested) && requested > 0) caps.push(requested);
+    return buildKalshiHistoricalMarketsRequest({
+      predicates,
+      sortKeys,
+      columnIds,
+      limit: caps.length ? Math.min(...caps) : undefined,
+    });
+  }
+
+  function querySnapshot() {
+    const hiddenIds = [...hidden].sort();
+    const fingerprint = JSON.stringify({
       integrationId,
       tableId,
-      label: table?.label || "Search",
-      hidden: [...hidden],
+      hidden: hiddenIds,
       filterColumn,
       filterValue,
       attributeFilters,
       sortKeys,
       rowLimit,
-      savedAt: Date.now(),
+    });
+    return {
+      integrationId,
+      tableId,
+      label: describeSearch(),
+      hidden: hiddenIds,
+      filterColumn,
+      filterValue,
+      attributeFilters,
+      sortKeys,
+      rowLimit,
+      athena: athenaRequest(),
+      fingerprint,
     };
+  }
+
+  function onSave() {
+    const snapshot = querySnapshot();
+    const entry = { ...snapshot, id: `${integrationId}:${tableId}:${Date.now()}`, savedAt: Date.now() };
     setSaved(saveSearch(entry));
+    setJustSaved(true);
+    window.setTimeout(() => setJustSaved(false), 1600);
   }
 
   function applySaved(entry) {
-    setTableId(entry.tableId);
+    setStep("query");
+    if (!entry || entry.integrationId !== integrationId) return;
+    if (entry.tableId && entry.tableId !== tableId) {
+      restoreRef.current = entry;
+      setTableId(entry.tableId);
+      return;
+    }
     setHidden(new Set(entry.hidden || []));
     setFilterColumn(entry.filterColumn || "");
     setFilterValue(entry.filterValue || "");
     setAttributeFilters(entry.attributeFilters || {});
     setSortKeys(Array.isArray(entry.sortKeys) ? entry.sortKeys : []);
     setRowLimit(entry.rowLimit || "");
+  }
+
+  function onNext() {
+    setLockedQuery({ ...querySnapshot(), lockedAt: Date.now() });
+    setStep("enrich");
   }
 
   const shown = loading ? 0 : filteredRows.length;
@@ -434,11 +580,17 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
     return Math.max(ratio, 8);
   })();
 
+  const canProceed = Boolean(pull) && !loading && !error && shownColumns.length > 0;
+
   if (!source) return null;
 
   return (
     <div className="flex min-h-0 flex-1 bg-background">
       <aside className="flex w-[340px] shrink-0 flex-col border-r border-border/70">
+        {step === "enrich" && lockedQuery ? (
+          <EnrichStep onBack={() => setStep("query")} />
+        ) : (
+        <>
         <div className="px-4 pb-3 pt-4 pr-12">
           <button
             type="button"
@@ -517,9 +669,13 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
                 <DropdownMenuLabel>Saved searches</DropdownMenuLabel>
                 {savedForSource.length ? (
                   savedForSource.map((entry) => (
-                    <DropdownMenuItem key={entry.id} onSelect={() => applySaved(entry)}>
-                      {entry.label}
-                      {entry.filterValue ? ` · ${entry.filterValue}` : ""}
+                    <DropdownMenuItem key={entry.id} onSelect={() => applySaved(entry)} title={entry.label}>
+                      <span className="min-w-0">
+                        <span className="block truncate text-[13px]">{entry.label || "Saved search"}</span>
+                        {entry.savedAt ? (
+                          <span className="block text-[11px] text-muted-foreground">{formatSavedAt(entry.savedAt)}</span>
+                        ) : null}
+                      </span>
                     </DropdownMenuItem>
                   ))
                 ) : (
@@ -639,13 +795,15 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
           )}
         </div>
         <div className="flex items-center justify-end gap-2 border-t border-border/70 px-4 py-3">
-          <Button type="button" variant="outline" onClick={onSave} disabled={loading || !pull}>
-            Save search
+          <Button type="button" variant="outline" onClick={onSave} disabled={!canProceed}>
+            {justSaved ? "Saved" : "Save search"}
           </Button>
-          <Button type="button" disabled>
+          <Button type="button" onClick={onNext} disabled={!canProceed}>
             Next
           </Button>
         </div>
+        </>
+        )}
       </aside>
 
       <section className="flex min-h-0 min-w-0 flex-1 flex-col bg-[#e6edf3] dark:bg-[#1c232b]">

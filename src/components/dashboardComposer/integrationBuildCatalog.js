@@ -386,6 +386,33 @@ async function kalshiHistoricalMarkets() {
   };
 }
 
+/**
+ * The compose body Next and Save search lock in.
+ * Preview fetches stay capped at PREVIEW_ROW_CAP; this request uses the import limit
+ * and the columns the user left visible (plus any column used to sort).
+ */
+export function buildKalshiHistoricalMarketsRequest({ predicates, sortKeys, columnIds, limit } = {}) {
+  const { columns, request } = kalshiHistoricalMarketsCompose(predicates, sortKeys);
+  const wanted = new Set(Array.isArray(columnIds) ? columnIds : []);
+  for (const sort of Array.isArray(sortKeys) ? sortKeys : []) {
+    if (sort?.columnId) wanted.add(sort.columnId);
+  }
+  const selectColumns = wanted.size ? columns.filter((column) => wanted.has(column.id)) : columns;
+  const select = (selectColumns.length ? selectColumns : columns).map((entry) => ({
+    column: entry.id,
+    alias: entry.id,
+  }));
+  const rowLimit = Number(limit);
+  return {
+    ...request,
+    limit: Number.isFinite(rowLimit) && rowLimit > 0 ? Math.floor(rowLimit) : request.limit,
+    compose: {
+      ...request.compose,
+      select,
+    },
+  };
+}
+
 export function loadKalshiHistoricalMarketsPreview(predicates, sortKeys) {
   const { request } = kalshiHistoricalMarketsCompose(predicates, sortKeys);
   return fetchAthenaLakeSample(request, { maxWaitMs: 180000, pollIntervalMs: 800 }).then((result) => {
@@ -1013,7 +1040,10 @@ export function readSavedSearches() {
 }
 
 export function saveSearch(entry) {
-  const next = [entry, ...readSavedSearches().filter((item) => item.id !== entry.id)].slice(0, 40);
+  const previous = readSavedSearches().filter(
+    (item) => item.id !== entry.id && (!entry.fingerprint || item.fingerprint !== entry.fingerprint),
+  );
+  const next = [entry, ...previous].slice(0, 40);
   localStorage.setItem(SAVED_SEARCHES_KEY, JSON.stringify(next));
   return next;
 }
