@@ -148,6 +148,8 @@ const TITLE = {
   end_date: "End date",
   count: "Size",
   yes_price: "Yes price",
+  no_price: "No price",
+  created_time: "Created time",
   taker_side: "Side",
   maker: "Maker",
   taker: "Taker",
@@ -411,6 +413,43 @@ export function buildKalshiHistoricalMarketsRequest({ predicates, sortKeys, colu
       select,
     },
   };
+}
+
+const KALSHI_TRADE_PREVIEW_FIELDS = ["created_time", "ticker", "taker_side", "yes_price", "no_price", "count"];
+
+/**
+ * Preview trades for one market ticker. The sheet is a filtered trades pull, not a
+ * markets⋈trades join, so Athena only reads fills for that ticker.
+ */
+export function loadKalshiHistoricalTradesForTicker(ticker) {
+  const catalog = lakeColumns("kalshi", "trades", KALSHI_TRADE_PREVIEW_FIELDS);
+  const columns = KALSHI_TRADE_PREVIEW_FIELDS.map((id) => catalog.find((entry) => entry.id === id)).filter(Boolean);
+  const request = {
+    lake: "kalshi",
+    table: "trades",
+    queryType: "compose",
+    limit: PREVIEW_ROW_CAP,
+    caseSensitive: false,
+    filters: {
+      and: [{ column: "ticker", kind: "string", op: "eq", value: String(ticker || "") }],
+    },
+    compose: {
+      select: columns.map((entry) => ({ column: entry.id, alias: entry.id })),
+      groupByAliases: [],
+      orderBy: [{ alias: "created_time", direction: "desc" }],
+    },
+  };
+  return fetchAthenaLakeSample(request, { maxWaitMs: 180000, pollIntervalMs: 800 }).then((result) => {
+    const names = result.columns || [];
+    const rows = (result.rows || []).map((cells) => {
+      const row = {};
+      names.forEach((name, index) => {
+        row[name] = cells[index];
+      });
+      return row;
+    });
+    return { columns, rows: rows.slice(0, PREVIEW_ROW_CAP) };
+  });
 }
 
 export function loadKalshiHistoricalMarketsPreview(predicates, sortKeys) {

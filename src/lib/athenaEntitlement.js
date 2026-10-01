@@ -58,6 +58,30 @@ export function userHasBasicHistoricalAccess(userLike) {
 }
 
 /**
+ * How many markets may each get their own trades sheet in one pull.
+ * Basic is 5, Pro is 10, Elite is 50. More than 50 is an enterprise pull.
+ */
+export function getJoinMarketCap(userLike) {
+  if (!userLike || typeof userLike !== "object") return 5;
+  if (String(userLike.userId || "") === "dev-bypass-no-db") return 50;
+  if (isOwnerFullAccessUser(userLike) || userLike.lifetimeMember) return 50;
+  const tier = normalizedSubscriptionTier(userLike);
+  if (tier === "elite" || tier === "premium") return 50;
+  if (tier === "pro") return 10;
+  return 5;
+}
+
+export function joinTierLabel(userLike) {
+  if (!userLike || typeof userLike !== "object") return "Basic";
+  if (String(userLike.userId || "") === "dev-bypass-no-db") return "Elite";
+  if (isOwnerFullAccessUser(userLike) || userLike.lifetimeMember) return "Elite";
+  const tier = normalizedSubscriptionTier(userLike);
+  if (tier === "elite" || tier === "premium") return "Elite";
+  if (tier === "pro") return "Pro";
+  return "Basic";
+}
+
+/**
  * Client + UI: per-request row cap for historical Kalshi / Polymarket pulls.
  * @param {object | null | undefined} userLike
  * @param {{ isDemo?: boolean }} [opts]

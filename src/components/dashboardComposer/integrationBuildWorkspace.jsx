@@ -1,14 +1,17 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { ArrowLeft, ChevronDown, History } from "lucide-react";
 import { IntegrationBuildGrid } from "@/components/dashboardComposer/integrationBuildGrid";
+import { JoinExplainer } from "@/components/dashboardComposer/integrationJoinExplainer";
+import { SpectrumLoadingState } from "@/components/ui/spectrum-loading-state";
 import {
   BUILD_SOURCES,
   buildKalshiHistoricalMarketsRequest,
   loadBuildPreview,
   loadBuildUniverseCount,
   loadKalshiHistoricalMarketsPreview,
+  loadKalshiHistoricalTradesForTicker,
   peekBuildUniverseCount,
   readSavedSearches,
   saveSearch,
@@ -28,7 +31,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import { useMyStateV2 } from "@/context/stateContextV2";
-import { getHistoricalPullRowLimit } from "@/lib/athenaEntitlement";
+import { getHistoricalPullRowLimit, getJoinMarketCap, joinTierLabel } from "@/lib/athenaEntitlement";
 import { listConnectHomeSheetHistory, requestCardSummaryLabel } from "@/lib/connectHomeRequestHistory";
 import { useUser } from "@/lib/hooks";
 import {
@@ -110,6 +113,97 @@ function WaitingToConnectTag() {
   );
 }
 
+const PREVIEW_TRADE_LOCK =
+  "You can only view 1 market trade in preview mode; execute the query to run the full pipeline.";
+
+function sheetTabClass(selected) {
+  return cn(
+    "relative -ml-px max-w-[11rem] shrink-0 truncate border border-border/70 px-2 py-1 text-left text-[11px] font-medium leading-none first:ml-0",
+    selected
+      ? "z-10 border-[#0d99ff] bg-[#0d99ff]/10 text-[#0d99ff]"
+      : "bg-background text-muted-foreground hover:text-foreground",
+  );
+}
+
+function JoinSheetTabs({ markets, active, previewTicker, sheetCount, onSelect }) {
+  const frameRef = useRef(null);
+  const measureRef = useRef(null);
+  const [shownTrades, setShownTrades] = useState(markets.length);
+  const totalSheets = Math.max(Number(sheetCount) || 0, markets.length);
+  const marketKey = markets.map((market) => market.ticker).join("\n");
+
+  useLayoutEffect(() => {
+    const frame = frameRef.current;
+    const measure = measureRef.current;
+    if (!frame || !measure) return undefined;
+    const fit = () => {
+      const available = frame.clientWidth;
+      const nodes = [...measure.querySelectorAll("[data-tab]")];
+      const plusWidth = measure.querySelector("[data-plus]")?.offsetWidth || 0;
+      const marketWidth = nodes[0]?.offsetWidth || 0;
+      const tradeWidths = nodes.slice(1).map((node) => node.offsetWidth);
+      let best = 0;
+      for (let count = 0; count <= tradeWidths.length; count += 1) {
+        const hidden = totalSheets - count;
+        const width =
+          marketWidth +
+          tradeWidths.slice(0, count).reduce((sum, value) => sum + value, 0) +
+          (hidden > 0 ? plusWidth : 0);
+        if (width <= available + 1) best = count;
+        else break;
+      }
+      setShownTrades(best);
+    };
+    fit();
+    const observer = new ResizeObserver(fit);
+    observer.observe(frame);
+    return () => observer.disconnect();
+  }, [marketKey, totalSheets]);
+
+  const visible = markets.slice(0, shownTrades);
+  const hidden = Math.max(0, totalSheets - visible.length);
+  const plusSelected = hidden > 0 && active !== "markets" && !visible.some((market) => market.ticker === active);
+
+  return (
+    <div ref={frameRef} className="relative overflow-hidden px-4 pb-1">
+      <div ref={measureRef} className="pointer-events-none invisible absolute left-0 top-0 flex" aria-hidden>
+        <button type="button" data-tab className={sheetTabClass(false)}>
+          Markets
+        </button>
+        {markets.map((market) => (
+          <button key={market.ticker} type="button" data-tab className={sheetTabClass(false)}>
+            Trades · {market.ticker}
+          </button>
+        ))}
+        <button type="button" data-plus className={sheetTabClass(false)}>
+          +{totalSheets}
+        </button>
+      </div>
+      <div className="flex animate-[fadeIn_280ms_ease-out]">
+        <button type="button" onClick={() => onSelect("markets")} className={sheetTabClass(active === "markets")}>
+          Markets
+        </button>
+        {visible.map((market) => (
+          <button
+            key={market.ticker}
+            type="button"
+            title={market.ticker === previewTicker ? market.title : PREVIEW_TRADE_LOCK}
+            onClick={() => onSelect(market.ticker)}
+            className={sheetTabClass(active === market.ticker)}
+          >
+            Trades · {market.ticker}
+          </button>
+        ))}
+        {hidden > 0 ? (
+          <button type="button" title={PREVIEW_TRADE_LOCK} onClick={() => onSelect("more")} className={sheetTabClass(plusSelected || active === "more")}>
+            +{hidden}
+          </button>
+        ) : null}
+      </div>
+    </div>
+  );
+}
+
 function SkeletonRows() {
   return (
     <div className="overflow-hidden rounded-xl border border-border/70 bg-background shadow-sm">
@@ -130,16 +224,17 @@ function SkeletonRows() {
 }
 
 const ENRICH_OPTIONS = [
+  { id: "join", title: "Join" },
   { id: "summarize", title: "Summarize" },
   { id: "ifElse", title: "If else" },
-  { id: "join", title: "Join" },
   { id: "sample", title: "Random sample" },
   { id: "bucket", title: "Bucketing" },
   { id: "function", title: "Function" },
 ];
 
-function EnrichStep({ onBack }) {
-  const [picked, setPicked] = useState("");
+function EnrichStep({ onBack, picked, onPick, joinTarget, onJoinTarget, tierLabel, marketCap, queryRows, hasRowLimit, sheetCount, onHoverJoin }) {
+  const joinOpen = picked === "join";
+  const cappedByTier = typeof queryRows === "number" && queryRows > marketCap;
   return (
     <>
       <div className="px-4 pb-3 pt-4 pr-12">
@@ -152,26 +247,83 @@ function EnrichStep({ onBack }) {
         <legend className="sr-only">Enrichment</legend>
         {ENRICH_OPTIONS.map((option) => {
           const selected = picked === option.id;
+          const isJoin = option.id === "join";
           return (
-            <label
+            <div
               key={option.id}
-              className={cn(
-                "flex cursor-pointer items-center gap-2.5 rounded-lg border px-2.5 py-2 text-[13px] font-semibold transition-colors",
-                selected
-                  ? "border-[#0d99ff]/40 bg-[#0d99ff]/10 text-[#0d99ff]"
-                  : "border-border/70 bg-background text-foreground hover:bg-muted/50",
-              )}
+              onMouseEnter={isJoin ? () => onHoverJoin(true) : undefined}
+              onMouseLeave={isJoin ? () => onHoverJoin(false) : undefined}
             >
-              <input
-                type="radio"
-                name="enrichment"
-                value={option.id}
-                checked={selected}
-                onChange={() => setPicked(option.id)}
-                className="size-3.5 accent-[#0d99ff]"
-              />
-              {option.title}
-            </label>
+              <label
+                className={cn(
+                  "flex cursor-pointer items-center gap-2.5 rounded-lg border px-2.5 py-2 text-[13px] font-semibold transition-colors",
+                  selected
+                    ? "border-[#0d99ff]/40 bg-[#0d99ff]/10 text-[#0d99ff]"
+                    : "border-border/70 bg-background text-foreground hover:bg-muted/50",
+                )}
+              >
+                <input
+                  type="radio"
+                  name="enrichment"
+                  value={option.id}
+                  checked={selected}
+                  onChange={() => onPick(option.id)}
+                  className="size-3.5 accent-[#0d99ff]"
+                />
+                {option.title}
+              </label>
+              {isJoin ? (
+                <div
+                  className={cn(
+                    "grid transition-[grid-template-rows,opacity] duration-300 ease-out",
+                    joinOpen ? "grid-rows-[1fr] opacity-100" : "grid-rows-[0fr] opacity-0",
+                  )}
+                >
+                  <div className={cn("overflow-hidden", joinOpen ? "" : "pointer-events-none")}>
+                    <div className="mt-2 rounded-lg border border-border/70 px-2.5 py-2">
+                      <p className="text-[11px] font-semibold text-foreground">Join to</p>
+                      <button
+                        type="button"
+                        aria-pressed={joinTarget === "kalshiHistoricalTrades"}
+                        onClick={() => onJoinTarget("kalshiHistoricalTrades")}
+                        className={cn(
+                          "mt-1.5 flex w-full flex-col rounded-lg border px-2.5 py-2 text-left transition-colors",
+                          joinTarget === "kalshiHistoricalTrades"
+                            ? "border-[#0d99ff]/40 bg-[#0d99ff]/10"
+                            : "border-border/70 bg-background hover:bg-muted/50",
+                        )}
+                      >
+                        <span className="text-[13px] font-semibold text-foreground">Kalshi Historical Trades</span>
+                        <span className="text-[11px] font-normal text-muted-foreground">Fills for each market in this query.</span>
+                      </button>
+                      <p className="mt-2 text-[11px] leading-relaxed text-muted-foreground">
+                        {tierLabel} includes trades for {marketCap.toLocaleString()} markets at a time.
+                        {hasRowLimit && typeof queryRows === "number" ? (
+                          cappedByTier
+                            ? ` This query is limited to ${Number(queryRows).toLocaleString()} rows, so the first ${marketCap.toLocaleString()} get a trades sheet.`
+                            : ` This query is limited to ${Number(queryRows).toLocaleString()} ${queryRows === 1 ? "row" : "rows"}, so ${sheetCount.toLocaleString()} trades ${sheetCount === 1 ? "sheet" : "sheets"} will be created.`
+                        ) : typeof queryRows === "number" ? (
+                          cappedByTier
+                            ? ` This query matches ${queryRows.toLocaleString()} markets, so the first ${marketCap.toLocaleString()} get a trades sheet.`
+                            : ` This query has ${queryRows.toLocaleString()} ${queryRows === 1 ? "market" : "markets"}, and each one gets a trades sheet.`
+                        ) : null}{" "}
+                        {tierLabel === "Elite" ? (
+                          "More than 50 markets is an enterprise pull."
+                        ) : (
+                          <>
+                            <a href="/checkout" className="font-medium text-[#0d99ff] underline-offset-2 hover:underline">
+                              Upgrade
+                            </a>{" "}
+                            for more. Elite includes 50. More than 50 is an enterprise pull.
+                          </>
+                        )}{" "}
+                        The preview loads 50 trades for the first market.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              ) : null}
+            </div>
           );
         })}
       </fieldset>
@@ -219,6 +371,11 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
   const [lockedQuery, setLockedQuery] = useState(null);
   const [justSaved, setJustSaved] = useState(false);
   const restoreRef = useRef(null);
+  const [enrichPick, setEnrichPick] = useState("");
+  const [hoverJoin, setHoverJoin] = useState(false);
+  const [joinTarget, setJoinTarget] = useState("");
+  const [joinTab, setJoinTab] = useState("markets");
+  const [tradePreview, setTradePreview] = useState({ status: "idle", ticker: "", columns: [], rows: [], error: "" });
   const [visibleCount, setVisibleCount] = useState(0);
   const [universe, setUniverse] = useState(null);
   const [counting, setCounting] = useState(false);
@@ -391,6 +548,66 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
     return rows.filter((row) => String(row[filterColumn] ?? "").toLowerCase().includes(query));
   }, [pull, visibleCount, filterColumn, filterValue, guidedFilters, attributeFilters, sortKeys, rowLimit]);
 
+  const queriedMarkets = useMemo(() => {
+    if (!guidedFilters) return [];
+    const matched = (pull?.rows || []).filter((row) => rowMatchesKalshiHistoricalFilters(row, pull?.columns, attributeFilters));
+    const sorted = sortKalshiHistoricalRows(matched, pull?.columns, sortKeys);
+    const limit = Number(rowLimit);
+    const capped = Number.isFinite(limit) && limit > 0 ? sorted.slice(0, limit) : sorted;
+    const seen = new Set();
+    const markets = [];
+    for (const row of capped) {
+      const ticker = String(row?.ticker || "").trim();
+      if (!ticker || seen.has(ticker)) continue;
+      seen.add(ticker);
+      markets.push({ ticker, title: String(row?.title || ticker) });
+    }
+    return markets;
+  }, [guidedFilters, pull, attributeFilters, sortKeys, rowLimit]);
+
+  const marketCap = getJoinMarketCap(user);
+  const tierLabel = joinTierLabel(user);
+  const requestedMarketLimit = Number(rowLimit);
+  const hasRowLimit = Number.isFinite(requestedMarketLimit) && requestedMarketLimit > 0;
+  const queryRows = hasRowLimit
+    ? typeof universe === "number"
+      ? Math.min(universe, requestedMarketLimit)
+      : requestedMarketLimit
+    : typeof universe === "number"
+      ? universe
+      : null;
+  const sheetCount = Math.min(queryRows == null ? queriedMarkets.length : queryRows, marketCap);
+  const joinedMarkets = queriedMarkets.slice(0, marketCap);
+  const previewTicker = joinedMarkets[0]?.ticker || "";
+
+  useEffect(() => {
+    if (joinTarget !== "kalshiHistoricalTrades" || !previewTicker) {
+      if (!previewTicker) setTradePreview({ status: "idle", ticker: "", columns: [], rows: [], error: "" });
+      return undefined;
+    }
+    let cancel = false;
+    setJoinTab(previewTicker);
+    setTradePreview({ status: "loading", ticker: previewTicker, columns: [], rows: [], error: "" });
+    loadKalshiHistoricalTradesForTicker(previewTicker)
+      .then((result) => {
+        if (cancel) return;
+        setTradePreview({ status: "ready", ticker: previewTicker, columns: result.columns, rows: result.rows, error: "" });
+      })
+      .catch((err) => {
+        if (cancel) return;
+        setTradePreview({
+          status: "error",
+          ticker: previewTicker,
+          columns: [],
+          rows: [],
+          error: err instanceof Error ? err.message : "Trades preview failed",
+        });
+      });
+    return () => {
+      cancel = true;
+    };
+  }, [joinTarget, previewTicker]);
+
   useEffect(() => {
     if (!guidedFilters) return undefined;
     const columns = pull?.columns;
@@ -502,6 +719,7 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
       attributeFilters,
       sortKeys,
       rowLimit,
+      joinTarget,
     });
     return {
       integrationId,
@@ -514,6 +732,14 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
       sortKeys,
       rowLimit,
       athena: athenaRequest(),
+      join:
+        joinTarget === "kalshiHistoricalTrades"
+          ? {
+              target: "kalshiHistoricalTrades",
+              tickers: joinedMarkets.map((market) => market.ticker),
+              previewTicker,
+            }
+          : null,
       fingerprint,
     };
   }
@@ -548,6 +774,19 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
   }
 
   const shown = loading ? 0 : filteredRows.length;
+  const emptyRefresh = previewRefreshing && !loading && shownColumns.length > 0 && filteredRows.length === 0;
+
+  useEffect(() => {
+    if (!emptyRefresh) return undefined;
+    setProgress(12);
+    const timer = window.setInterval(() => {
+      setProgress((current) => (current >= 88 ? current : current + Math.random() * 8));
+    }, 280);
+    return () => {
+      window.clearInterval(timer);
+      setProgress(100);
+    };
+  }, [emptyRefresh]);
   const shownLabel = `Previewing ${shown.toLocaleString()} ${shown === 1 ? "row" : "rows"}`;
   const previewLine = loading
     ? "Loading the first 50 rows"
@@ -558,7 +797,11 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
         : counting
           ? `${shownLabel} of …`
           : `${shownLabel}. More rows are available.`;
-  const previewLineShown = previewRefreshing && !loading ? `${previewLine} · updating` : previewLine;
+  const previewLineShown = emptyRefresh
+    ? "Loading the first 50 rows"
+    : previewRefreshing && !loading
+      ? `${previewLine} · updating`
+      : previewLine;
   const availableRows = !exactUniverse
     ? Number.POSITIVE_INFINITY
     : typeof universe === "number" && !counting
@@ -578,6 +821,16 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
   })();
 
   const canProceed = Boolean(pull) && !loading && !error && shownColumns.length > 0;
+  const showJoinSheets = step === "enrich" && enrichPick === "join" && joinTarget === "kalshiHistoricalTrades";
+  const showJoinExplainer = step === "enrich" && hoverJoin && !showJoinSheets;
+  const paneLine = (() => {
+    if (!showJoinSheets || joinTab === "markets") return previewLineShown;
+    if (joinTab !== previewTicker) return PREVIEW_TRADE_LOCK;
+    if (tradePreview.status === "loading") return "Loading trades for the first market";
+    if (tradePreview.status === "error") return tradePreview.error;
+    const count = tradePreview.rows.length;
+    return `Previewing ${count.toLocaleString()} ${count === 1 ? "trade" : "trades"} of ${previewTicker}`;
+  })();
 
   if (!source) return null;
 
@@ -585,7 +838,22 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
     <div className="flex min-h-0 flex-1 bg-background">
       <aside className="flex w-[340px] shrink-0 flex-col border-r border-border/70">
         {step === "enrich" && lockedQuery ? (
-          <EnrichStep onBack={() => setStep("query")} />
+          <EnrichStep
+            onBack={() => {
+              setHoverJoin(false);
+              setStep("query");
+            }}
+            picked={enrichPick}
+            onPick={setEnrichPick}
+            joinTarget={joinTarget}
+            onJoinTarget={setJoinTarget}
+            tierLabel={tierLabel}
+            marketCap={marketCap}
+            queryRows={queryRows}
+            hasRowLimit={hasRowLimit}
+            sheetCount={sheetCount}
+            onHoverJoin={setHoverJoin}
+          />
         ) : (
         <>
         <div className="px-4 pb-3 pt-4 pr-12">
@@ -807,8 +1075,8 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
         <div className="flex items-start justify-between gap-3 px-5 pb-2 pr-12 pt-5">
           <h2 className="pt-0.5 text-[15px] font-semibold text-foreground">Preview</h2>
           <div className="flex min-w-0 flex-col items-end">
-            <p className="text-right text-[12px] text-muted-foreground">{previewLineShown}</p>
-            {typeof planLimit === "number" ? (
+            <p className="text-right text-[12px] text-muted-foreground">{paneLine}</p>
+            {typeof planLimit === "number" && !(showJoinSheets && joinTab !== "markets") ? (
               <div className="mt-1.5 w-full max-w-[280px]">
                 <p className="text-right text-[11px] text-muted-foreground">
                   {importedRows == null
@@ -825,23 +1093,52 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
                   />
                 </div>
               </div>
+            ) : showJoinSheets && joinTab === previewTicker ? (
+              <p className="mt-1 text-right text-[11px] text-muted-foreground">Preview only. This sheet is created when you run the pull.</p>
             ) : null}
           </div>
         </div>
         <div className="h-1 w-full bg-black/5 dark:bg-white/10">
           <div
-            className={cn("h-full bg-[#0d99ff] transition-[width] duration-300", loading ? "" : "opacity-0")}
+            className={cn("h-full bg-[#0d99ff] transition-[width] duration-300", loading || emptyRefresh ? "" : "opacity-0")}
             style={{ width: `${Math.min(100, progress)}%` }}
           />
         </div>
+        {showJoinSheets ? (
+          <JoinSheetTabs
+            markets={joinedMarkets}
+            active={joinTab}
+            previewTicker={previewTicker}
+            sheetCount={sheetCount}
+            onSelect={setJoinTab}
+          />
+        ) : null}
         <div className="min-h-0 flex-1 p-4">
-          {priceWaiting ? (
+          {showJoinExplainer ? (
+            <JoinExplainer markets={queriedMarkets} />
+          ) : showJoinSheets && !previewTicker ? (
+            <div className="flex h-full items-center justify-center rounded-xl border border-border/70 bg-background px-6 text-center text-[13px] leading-relaxed text-muted-foreground shadow-sm">
+              This query has no market tickers to attach trades to.
+            </div>
+          ) : showJoinSheets && joinTab !== "markets" && joinTab !== previewTicker ? (
+            <div className="flex h-full items-center justify-center rounded-xl border border-border/70 bg-background px-6 text-center text-[13px] leading-relaxed text-muted-foreground shadow-sm">
+              {PREVIEW_TRADE_LOCK}
+            </div>
+          ) : showJoinSheets && joinTab === previewTicker && tradePreview.status === "loading" ? (
+            <div className="flex h-full items-center justify-center">
+              <SpectrumLoadingState label="Loading trades" />
+            </div>
+          ) : showJoinSheets && joinTab === previewTicker && tradePreview.status === "error" ? (
+            <p className="text-[13px] text-muted-foreground">{tradePreview.error}</p>
+          ) : showJoinSheets && joinTab === previewTicker && tradePreview.columns.length ? (
+            <IntegrationBuildGrid columns={tradePreview.columns} rows={tradePreview.rows} />
+          ) : priceWaiting ? (
             <div className="flex h-full items-center justify-center">
               <WaitingToConnectTag />
             </div>
           ) : error ? (
             <p className="text-[13px] text-muted-foreground">{error}</p>
-          ) : loading ? (
+          ) : loading || emptyRefresh ? (
             <div className="flex h-full flex-col gap-3">
               {integrationId === "chainlink" || integrationId === "binance" ? <WaitingToConnectTag /> : null}
               <div className="min-h-0 flex-1">
