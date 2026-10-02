@@ -31,6 +31,7 @@ import {
   saveWorkspaceDashboard,
 } from "@/lib/workspaceDashboardClient";
 import { pageIdForTab, tabIdFromPage } from "@/lib/workspaceDashboardDocument";
+import { SpectrumLoadingState } from "@/components/ui/spectrum-loading-state";
 import { cn } from "@/lib/utils";
 
 const WorkspaceCanvasContext = createContext(null);
@@ -529,6 +530,7 @@ export function WorkspaceCanvasProvider({ pageId, readOnly = false, children }) 
       saveNow,
       readOnly,
       ready,
+      pageId,
       previewTabs,
       previewActiveId,
       blocks,
@@ -546,7 +548,7 @@ export function WorkspaceCanvasProvider({ pageId, readOnly = false, children }) 
       removeBlock,
       createChartFromBlock,
     }),
-    [addBlock, blocks, blocksByPage, createChartFromBlock, dashboardName, duplicateBlock, focusBlock, placeIntegrationSheets, previewActiveId, previewTabs, readOnly, ready, registerTables, removeBlock, renameDashboard, renameId, saveNow, selectedId, tool, updateBlock],
+    [addBlock, blocks, blocksByPage, createChartFromBlock, dashboardName, duplicateBlock, focusBlock, pageId, placeIntegrationSheets, previewActiveId, previewTabs, readOnly, ready, registerTables, removeBlock, renameDashboard, renameId, saveNow, selectedId, tool, updateBlock],
   );
 
   return <WorkspaceCanvasContext.Provider value={value}>{children}</WorkspaceCanvasContext.Provider>;
@@ -594,7 +596,22 @@ function filledRowCount(cells) {
   return rows.size;
 }
 
-function SheetBlockBody({ block, onChange }) {
+function SheetSkeleton() {
+  return (
+    <div className="min-h-0 flex-1 overflow-hidden" aria-hidden>
+      {Array.from({ length: 8 }, (_, index) => (
+        <div key={index} className="flex items-center gap-3 border-b border-border/40 px-3 py-2.5 last:border-0">
+          <span className="w-5 text-[12px] text-muted-foreground/70">{index + 1}</span>
+          <span className="h-3 animate-pulse rounded bg-muted" style={{ width: `${42 - index * 2}%`, animationDelay: `${index * 70}ms` }} />
+          <span className="h-3 w-[16%] animate-pulse rounded bg-muted" style={{ animationDelay: `${index * 90}ms` }} />
+          <span className="h-3 flex-1 animate-pulse rounded bg-muted" style={{ animationDelay: `${index * 110}ms` }} />
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function SheetBlockBody({ block, onChange, booting }) {
   const canvas = useWorkspaceCanvas();
   const label = useTradeSheetLabel(block.id, Math.max(filledRowCount(block.cells), Number(block.rowCount) || 0));
   return (
@@ -607,14 +624,16 @@ function SheetBlockBody({ block, onChange }) {
           onChange={(title) => onChange({ title })}
           className="min-w-0 flex-1 text-[13px] font-semibold text-foreground"
         />
-        <span className={cn("shrink-0 text-[12px] tabular-nums text-muted-foreground", canvas?.readOnly ? "pr-1" : "pr-4")}>{label}</span>
+        <span className={cn("shrink-0 text-[12px] tabular-nums text-muted-foreground", canvas?.readOnly ? "pr-1" : "pr-4")}>
+          {booting ? "Loading…" : label}
+        </span>
       </div>
-      <DashboardSheetGrid block={block} onChange={onChange} readOnly={!!canvas?.readOnly} />
+      {booting ? <SheetSkeleton /> : <DashboardSheetGrid block={block} onChange={onChange} readOnly={!!canvas?.readOnly} />}
     </div>
   );
 }
 
-function BlockBody({ block, onChange }) {
+function BlockBody({ block, onChange, booting }) {
   if (block.type === "text") {
     return (
       <EditableText
@@ -627,7 +646,7 @@ function BlockBody({ block, onChange }) {
   }
 
   if (block.type === "sheet") {
-    return <SheetBlockBody block={block} onChange={onChange} />;
+    return <SheetBlockBody block={block} onChange={onChange} booting={booting} />;
   }
 
   if (block.type === "source") {
@@ -734,7 +753,7 @@ function SheetFullscreen({ block, onChange, onClose }) {
   );
 }
 
-function CanvasBlock({ block, selected, onSelect, onChange }) {
+function CanvasBlock({ block, selected, onSelect, onChange, booting = false }) {
   const canvas = useWorkspaceCanvas();
   const readOnly = !!canvas?.readOnly;
   const dragRef = useRef(null);
@@ -925,7 +944,7 @@ function CanvasBlock({ block, selected, onSelect, onChange }) {
       {fullscreen && block.type === "sheet" && !readOnly ? (
         <SheetFullscreen block={block} onChange={onChange} onClose={() => setFullscreen(false)} />
       ) : (
-        <BlockBody block={block} onChange={onChange} />
+        <BlockBody block={block} onChange={onChange} booting={booting} />
       )}
       {readOnly ? null : (
       <div
@@ -942,11 +961,44 @@ function CanvasBlock({ block, selected, onSelect, onChange }) {
   );
 }
 
+function sheetsTopToBottom(blocks) {
+  return (blocks || [])
+    .filter((block) => block.type === "sheet")
+    .slice()
+    .sort((a, b) => (a.y || 0) - (b.y || 0) || (a.x || 0) - (b.x || 0));
+}
+
 /** Freeform blocks for the dashboard currently on screen. */
 export function WorkspaceCanvas() {
   const canvas = useWorkspaceCanvas();
   const blocks = canvas?.blocks || [];
   const scrollerRef = useRef(null);
+  const blocksRef = useRef(blocks);
+  blocksRef.current = blocks;
+  const [bootingIds, setBootingIds] = useState(() => new Set());
+
+  useEffect(() => {
+    if (!canvas?.ready) return undefined;
+    const ids = sheetsTopToBottom(blocksRef.current).map((block) => block.id);
+    if (!ids.length) {
+      setBootingIds(new Set());
+      return undefined;
+    }
+    setBootingIds(new Set(ids));
+    const timers = ids.map((id, index) =>
+      window.setTimeout(() => {
+        setBootingIds((current) => {
+          if (!current.has(id)) return current;
+          const next = new Set(current);
+          next.delete(id);
+          return next;
+        });
+      }, 320 + index * 460),
+    );
+    return () => {
+      for (const timer of timers) window.clearTimeout(timer);
+    };
+  }, [canvas?.ready, canvas?.pageId]);
 
   useEffect(() => {
     const onKey = (e) => {
@@ -1000,6 +1052,14 @@ export function WorkspaceCanvas() {
     return () => scroller.removeEventListener("wheel", onWheel, { capture: true });
   }, [blocks.length]);
 
+  if (!canvas?.ready) {
+    return (
+      <div className="pointer-events-none absolute inset-0 z-20 flex items-center justify-center">
+        <SpectrumLoadingState label="Loading dashboard" />
+      </div>
+    );
+  }
+
   if (!blocks.length) return null;
 
   return (
@@ -1015,6 +1075,7 @@ export function WorkspaceCanvas() {
         <CanvasBlock
           key={block.id}
           block={block}
+          booting={bootingIds.has(block.id)}
           selected={canvas.selectedId === block.id}
           onSelect={canvas.setSelectedId}
           onChange={(patch) => canvas.updateBlock(block.id, patch)}
