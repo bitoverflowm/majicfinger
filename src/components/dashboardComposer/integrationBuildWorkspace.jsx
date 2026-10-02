@@ -308,7 +308,7 @@ function sheetTabClass(selected) {
   );
 }
 
-function JoinSheetTabs({ markets, active, previewTicker, sheetCount, onSelect }) {
+function JoinSheetTabs({ markets, active, previewTicker, sheetCount, onSelect, extras = [] }) {
   const frameRef = useRef(null);
   const measureRef = useRef(null);
   const [shownTrades, setShownTrades] = useState(markets.length);
@@ -323,6 +323,7 @@ function JoinSheetTabs({ markets, active, previewTicker, sheetCount, onSelect })
       const available = frame.clientWidth;
       const nodes = [...measure.querySelectorAll("[data-tab]")];
       const plusWidth = measure.querySelector("[data-plus]")?.offsetWidth || 0;
+      const extraWidth = [...measure.querySelectorAll("[data-extra]")].reduce((sum, node) => sum + node.offsetWidth, 0);
       const marketWidth = nodes[0]?.offsetWidth || 0;
       const tradeWidths = nodes.slice(1).map((node) => node.offsetWidth);
       let best = 0;
@@ -330,6 +331,7 @@ function JoinSheetTabs({ markets, active, previewTicker, sheetCount, onSelect })
         const hidden = totalSheets - count;
         const width =
           marketWidth +
+          extraWidth +
           tradeWidths.slice(0, count).reduce((sum, value) => sum + value, 0) +
           (hidden > 0 ? plusWidth : 0);
         if (width <= available + 1) best = count;
@@ -341,11 +343,12 @@ function JoinSheetTabs({ markets, active, previewTicker, sheetCount, onSelect })
     const observer = new ResizeObserver(fit);
     observer.observe(frame);
     return () => observer.disconnect();
-  }, [marketKey, totalSheets]);
+  }, [marketKey, totalSheets, extras.length]);
 
   const visible = markets.slice(0, shownTrades);
   const hidden = Math.max(0, totalSheets - visible.length);
-  const plusSelected = hidden > 0 && active !== "markets" && !visible.some((market) => market.ticker === active);
+  const extraIds = new Set(extras.map((tab) => tab.id));
+  const plusSelected = hidden > 0 && active !== "markets" && !extraIds.has(active) && !visible.some((market) => market.ticker === active);
 
   return (
     <div ref={frameRef} className="relative overflow-hidden px-4 pb-1 pt-4">
@@ -353,6 +356,11 @@ function JoinSheetTabs({ markets, active, previewTicker, sheetCount, onSelect })
         <button type="button" data-tab className={sheetTabClass(false)}>
           Markets
         </button>
+        {extras.map((tab) => (
+          <button key={tab.id} type="button" data-extra className={sheetTabClass(false)}>
+            {tab.title}
+          </button>
+        ))}
         {markets.map((market) => (
           <button key={market.ticker} type="button" data-tab className={sheetTabClass(false)}>
             Trades · {market.ticker}
@@ -366,6 +374,11 @@ function JoinSheetTabs({ markets, active, previewTicker, sheetCount, onSelect })
         <button type="button" onClick={() => onSelect("markets")} className={sheetTabClass(active === "markets")}>
           Markets
         </button>
+        {extras.map((tab) => (
+          <button key={tab.id} type="button" onClick={() => onSelect(tab.id)} className={sheetTabClass(active === tab.id)}>
+            {tab.title}
+          </button>
+        ))}
         {visible.map((market) => (
           <button
             key={market.ticker}
@@ -415,51 +428,16 @@ const ENRICH_OPTIONS = [
   { id: "function", title: "Function" },
 ];
 
-function SummaryPreviewTabs({ sheetTitle, active, onSummary, onSource, resultTitle = "Summary" }) {
+function ResultSheetTabs({ tabs, active, onSelect }) {
+  if (tabs.length < 2) return null;
   return (
     <div className="overflow-hidden px-4 pb-1 pt-4">
       <div className="flex">
-        <button type="button" onClick={onSource} className={sheetTabClass(active === "source")}>
-          {sheetTitle}
-        </button>
-        <button type="button" onClick={onSummary} className={sheetTabClass(active === "summary")}>
-          {resultTitle}
-        </button>
-      </div>
-    </div>
-  );
-}
-
-function TradesJoinPreviewTabs({ active, onSelect }) {
-  return (
-    <div className="overflow-hidden px-4 pb-1 pt-4">
-      <div className="flex animate-[fadeIn_280ms_ease-out]">
-        <button type="button" onClick={() => onSelect("trades")} className={sheetTabClass(active === "trades")}>
-          Trades
-        </button>
-        <button type="button" onClick={() => onSelect("markets")} className={sheetTabClass(active === "markets")}>
-          Markets
-        </button>
-      </div>
-    </div>
-  );
-}
-
-function FunctionDestinationTabs({ sheetTitle, joinCommitted, previewTicker, functionTab, joinTab, onMarkets, onTrades, onNew }) {
-  return (
-    <div className="overflow-hidden px-4 pb-1 pt-4">
-      <div className="flex">
-        <button type="button" onClick={onMarkets} className={sheetTabClass(functionTab !== "new" && joinTab === "markets")}>
-          {sheetTitle}
-        </button>
-        {joinCommitted && previewTicker ? (
-          <button type="button" onClick={onTrades} className={sheetTabClass(functionTab !== "new" && joinTab === previewTicker)}>
-            {previewTicker}
+        {tabs.map((tab) => (
+          <button key={tab.id} type="button" onClick={() => onSelect(tab.id)} className={sheetTabClass(active === tab.id)}>
+            {tab.title}
           </button>
-        ) : null}
-        <button type="button" onClick={onNew} className={sheetTabClass(functionTab === "new")}>
-          Column
-        </button>
+        ))}
       </div>
     </div>
   );
@@ -524,11 +502,12 @@ function EnrichStep({
   sampleError = "",
   onClearSample,
 }) {
-  const joinOpen = showJoinBuilder && picked === "join";
-  const functionOpen = showFunctionBuilder && picked === "function";
-  const summarizeOpen = showSummarizeBuilder && picked === "summarize";
-  const bucketOpen = picked === "bucket";
-  const sampleOpen = picked === "sample";
+  const chosen = picked instanceof Set ? picked : new Set(picked ? [picked] : []);
+  const joinOpen = showJoinBuilder && chosen.has("join");
+  const functionOpen = showFunctionBuilder && chosen.has("function");
+  const summarizeOpen = showSummarizeBuilder && chosen.has("summarize");
+  const bucketOpen = chosen.has("bucket");
+  const sampleOpen = chosen.has("sample");
   const tradesJoin = joinMode === "trades";
   const marketTargetOn = joinTarget === "kalshiHistoricalMarkets";
   const hiddenMarketColumns = marketColumnHidden || new Set();
@@ -539,13 +518,13 @@ function EnrichStep({
       <div className="px-4 pb-3 pt-4 pr-12">
         <h2 className="text-[15px] font-semibold text-foreground">Enrich your data</h2>
         <p className="mt-1 text-[13px] leading-relaxed text-muted-foreground">
-          Add a step on top of this pull. The preview stays on the rows you queried.
+          Add steps on top of this pull. You can combine them. The preview stays on the rows you queried.
         </p>
       </div>
       <fieldset className="min-h-0 flex-1 space-y-2 overflow-y-auto px-4 pb-4">
         <legend className="sr-only">Enrichment</legend>
         {ENRICH_OPTIONS.map((option) => {
-          const selected = picked === option.id;
+          const selected = chosen.has(option.id);
           const isJoin = option.id === "join";
           const isFunction = option.id === "function";
           const isSummarize = option.id === "summarize";
@@ -558,7 +537,7 @@ function EnrichStep({
                   aria-disabled="true"
                   className="flex min-w-0 flex-1 cursor-not-allowed items-center gap-2.5 rounded-lg border border-border/70 bg-background px-2.5 py-2 text-[13px] font-semibold text-muted-foreground"
                 >
-                  <span className="size-3.5 shrink-0 rounded-full border border-border" />
+                  <span className="size-3.5 shrink-0 rounded-[3px] border border-border" />
                   <span className="min-w-0 flex-1">{option.title}</span>
                   <span className="shrink-0 rounded-full bg-muted px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground">Coming soon</span>
                 </div>
@@ -599,8 +578,7 @@ function EnrichStep({
                 )}
               >
                 <input
-                  type="radio"
-                  name="enrichment"
+                  type="checkbox"
                   value={option.id}
                   checked={selected}
                   onChange={() => onPick(option.id)}
@@ -941,7 +919,9 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
   const [lockedQuery, setLockedQuery] = useState(null);
   const [justSaved, setJustSaved] = useState(false);
   const restoreRef = useRef(null);
-  const [enrichPick, setEnrichPick] = useState("");
+  const [enrichPicks, setEnrichPicks] = useState(() => new Set());
+  const [previewSheet, setPreviewSheet] = useState("source");
+  const [formulaOwner, setFormulaOwner] = useState("");
   const [hoverJoin, setHoverJoin] = useState(false);
   const [joinTarget, setJoinTarget] = useState("");
   const [joinPlacement, setJoinPlacement] = useState("");
@@ -1432,7 +1412,9 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
 
   function onNext() {
     setLockedQuery({ ...querySnapshot(), lockedAt: Date.now() });
-    setEnrichPick("");
+    setEnrichPicks(new Set());
+    setPreviewSheet("source");
+    setFormulaOwner("");
     setHoverJoin(false);
     setHoverFunction(false);
     setJoinTarget("");
@@ -1512,14 +1494,15 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
   })();
 
   const canProceed = Boolean(pull) && !loading && !error && shownColumns.length > 0;
-  const joinCommitted = marketsQuery && step === "enrich" && joinTarget === "kalshiHistoricalTrades";
+  const joinOn = step === "enrich" && enrichPicks.has("join");
+  const joinCommitted = marketsQuery && joinOn && joinTarget === "kalshiHistoricalTrades";
   const tradesQuery = integrationId === "kalshiHistorical" && tableId === "trades";
   const marketColumnList = useMemo(() => kalshiHistoricalMarketColumnList(), []);
   const selectedMarketColumns = useMemo(
     () => marketColumnList.filter((column) => !marketColumnHidden.has(column.id)),
     [marketColumnList, marketColumnHidden],
   );
-  const tradesJoinPicked = tradesQuery && step === "enrich" && joinTarget === "kalshiHistoricalMarkets";
+  const tradesJoinPicked = tradesQuery && joinOn && joinTarget === "kalshiHistoricalMarkets";
   const tradesJoinReady = tradesJoinPicked && Boolean(joinPlacement) && selectedMarketColumns.length > 0;
   const kalshiEnrich = marketsQuery || tradesQuery;
   const showSampleExplainer = kalshiEnrich && step === "enrich" && hoverSample;
@@ -1538,11 +1521,14 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
     !showSampleExplainer &&
     !showBucketExplainer;
   const enrichExplainer = showSampleExplainer || showBucketExplainer || showSummarizeExplainer || showFunctionExplainer || showJoinExplainer;
-  const summaryActive = kalshiEnrich && step === "enrich" && enrichPick === "summarize" && !enrichExplainer;
-  const bucketActive = kalshiEnrich && step === "enrich" && enrichPick === "bucket" && !enrichExplainer;
-  const sampleActive = kalshiEnrich && step === "enrich" && enrichPick === "sample" && !enrichExplainer;
+  const summarizeOn = kalshiEnrich && step === "enrich" && enrichPicks.has("summarize");
+  const bucketOn = kalshiEnrich && step === "enrich" && enrichPicks.has("bucket");
+  const sampleOn = kalshiEnrich && step === "enrich" && enrichPicks.has("sample");
+  const summaryActive = summarizeOn && !enrichExplainer && previewSheet === "summary";
+  const bucketActive = bucketOn && !enrichExplainer && previewSheet === "buckets";
+  const sampleActive = sampleOn && !enrichExplainer && previewSheet === "source";
   const showJoinSheets = joinCommitted && !showFunctionExplainer && !showJoinExplainer;
-  const functionActive = step === "enrich" && enrichPick === "function" && Boolean(functionTarget) && !showFunctionExplainer;
+  const functionActive = step === "enrich" && enrichPicks.has("function") && Boolean(functionTarget) && !showFunctionExplainer;
   const functionOnMarkets = functionActive && (functionTarget === "markets" || functionTarget === "all");
   const functionOnTrades = functionActive && (functionTarget === "trades" || functionTarget === "trades-all" || functionTarget === "all");
   const functionOnNew = functionActive && functionTarget === "new";
@@ -1616,7 +1602,7 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
     metadataRows,
   ]);
   const visibleSheetId =
-    functionOnNew && functionTab === "new" ? "new" : showJoinSheets && joinTab === previewTicker ? "trades" : "markets";
+    previewSheet === "column" && functionOnNew ? "new" : showJoinSheets && previewSheet === previewTicker ? "trades" : "markets";
   const columnOnVisible =
     (visibleSheetId === "markets" && functionOnMarkets) ||
     (visibleSheetId === "trades" && functionOnTrades) ||
@@ -1667,8 +1653,31 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
       : functionTarget === "all"
         ? "Preview shows the column on the sheet you're looking at. The same column is added on every sheet when you run the pull."
         : "";
-  const summarySourceColumns = tradeJoinBase.columns.length ? tradeJoinBase.columns : shownColumns;
-  const summarySourceRows = tradeJoinBase.columns.length ? tradeJoinBase.rows : filteredRows;
+  const previewBaseColumns = tradeJoinBase.columns.length ? tradeJoinBase.columns : shownColumns;
+  const previewBaseRows = tradeJoinBase.columns.length ? tradeJoinBase.rows : filteredRows;
+  const sampleSizeError = validateRandomSampleSizeInput(sampleSize, {
+    maxSize: typeof planLimit === "number" && planLimit > 0 ? planLimit : undefined,
+    required: sampleOn,
+  });
+  const sampleSizeNumber = sampleSizeError ? 0 : Math.floor(Number(sampleSize));
+  const samplePreviewRows = useMemo(() => {
+    if (!sampleSizeNumber) return [];
+    return previewRandomSample(previewBaseRows, {
+      size: Math.min(sampleSizeNumber, previewBaseRows.length, PREVIEW_ROW_CAP),
+      mode: sampleMode,
+      seed: sampleMode === "seeded" ? sampleSeed : `draw-${sampleShuffle}`,
+    });
+  }, [sampleSizeNumber, previewBaseRows, sampleMode, sampleSeed, sampleShuffle]);
+  const summarySourceGrid = withFunctionColumn(
+    previewBaseColumns,
+    sampleOn && sampleSizeNumber > 0 && !sampleSizeError ? samplePreviewRows : previewBaseRows,
+    functionOnMarkets,
+    functionFormula,
+    formulaSheets,
+    "markets",
+  );
+  const summarySourceColumns = summarySourceGrid.columns;
+  const summarySourceRows = summarySourceGrid.rows;
   const summaryMeasure = (() => {
     const preferred = tradesQuery ? ["Size", "Yes price", "No price"] : ["Volume", "Last price", "Yes bid"];
     for (const title of preferred) {
@@ -1725,19 +1734,6 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
       bucketValueColumnId,
     ],
   );
-  const sampleSizeError = validateRandomSampleSizeInput(sampleSize, {
-    maxSize: typeof planLimit === "number" && planLimit > 0 ? planLimit : undefined,
-    required: enrichPick === "sample",
-  });
-  const sampleSizeNumber = sampleSizeError ? 0 : Math.floor(Number(sampleSize));
-  const samplePreviewRows = useMemo(() => {
-    if (!sampleSizeNumber) return [];
-    return previewRandomSample(summarySourceRows, {
-      size: Math.min(sampleSizeNumber, summarySourceRows.length, PREVIEW_ROW_CAP),
-      mode: sampleMode,
-      seed: sampleMode === "seeded" ? sampleSeed : `draw-${sampleShuffle}`,
-    });
-  }, [sampleSizeNumber, summarySourceRows, sampleMode, sampleSeed, sampleShuffle]);
   const paneLine = (() => {
     if (showSampleExplainer) return "Illustration. A random subset of this query is drawn when you run the pull.";
     if (showBucketExplainer) return "Illustration. The bucket sheet is created when you run the pull.";
@@ -1746,22 +1742,24 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
       const shown = samplePreviewRows.length;
       return `Previewing ${shown.toLocaleString()} of the rows on screen. Save and run draws ${sampleSizeNumber.toLocaleString()} ${sampleMode === "seeded" ? "seeded" : "new"} rows from the full query.`;
     }
-    if (bucketActive && bucketTab === "buckets") {
+    if (bucketActive) {
       if (!bucketView.ready) return "Choose a column to bucket. The result is a new sheet.";
       const count = bucketView.rows.length;
       return `Previewing ${count.toLocaleString()} ${count === 1 ? "bucket" : "buckets"} from the rows on screen. Save and run buckets the imported rows.`;
     }
     if (showSummarizeExplainer) return "Illustration. The summary sheet is created when you run the pull.";
     if (showFunctionExplainer) return "Illustration. The column is added when you pick a sheet.";
-    if (summaryActive && summaryTab === "summary") return "Summary sheet. Totals here use the preview rows. Save and run totals the imported rows.";
-    if (summaryActive) return "Click a column or a cell to drop it into the summary.";
+    if (summaryActive) return "Summary sheet. Totals here use the preview rows. Save and run totals the imported rows.";
+    if (summarizeOn && !enrichExplainer && previewSheet === "source" && formulaOwner === "summary" && !sampleActive) {
+      return "Click a column or a cell to drop it into the summary.";
+    }
     if (showJoinExplainer) {
       return tradesQuery
         ? "Illustration. No market metadata is loaded until you run the pull."
         : "Illustration. No trades are loaded until you run the pull.";
     }
-    if (functionOnNew && functionTab === "new") return "New table. This sheet is created when you run the pull.";
-    if (tradesJoinReady && joinPlacement === "sheet" && metadataTab === "markets") {
+    if (previewSheet === "column" && functionOnNew) return "New table. This sheet is created when you run the pull.";
+    if (previewSheet === "markets-meta" && tradesJoinReady && joinPlacement === "sheet") {
       if (marketPreview.status === "loading") return "Loading market metadata";
       if (marketPreview.status === "error") return marketPreview.error;
       const count = metadataRows.length;
@@ -1792,6 +1790,7 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
     if (nextMode === "time") setBucketInterval("day");
     setBucketGroupBy((current) => current.filter((item) => item !== id));
     setBucketTab("buckets");
+    setPreviewSheet("buckets");
   }
 
   function chooseBucketMetric(id) {
@@ -1811,18 +1810,24 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
     setHoverFunction(false);
     setFunctionTarget(id);
     setFunctionScrollKey((key) => key + 1);
+    setFormulaOwner("function");
     setFormulaFocused(false);
     setFormulaEditing(true);
     if (id === "new") {
       setFunctionTab("new");
+      setPreviewSheet("column");
       return;
     }
     setFunctionTab("");
     if (id === "trades" || id === "trades-all") {
-      if (previewTicker) setJoinTab(previewTicker);
+      if (previewTicker) {
+        setJoinTab(previewTicker);
+        setPreviewSheet(previewTicker);
+      } else setPreviewSheet("source");
       return;
     }
     setJoinTab("markets");
+    setPreviewSheet("source");
     if (tradesQuery && joinPlacement === "sheet") setMetadataTab("trades");
   }
 
@@ -1888,6 +1893,8 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
   function focusSummaryCell(columnId, row) {
     setSummaryFocus({ columnId, row });
     setSummaryTab("summary");
+    setPreviewSheet("summary");
+    setFormulaOwner("summary");
     setFormulaEditing(true);
     setFormulaFocused(true);
     const key = summaryCellKey(columnId, row);
@@ -1897,7 +1904,8 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
   }
 
   function acceptFormulaPick(pick, sheetId) {
-    if (summaryActive) {
+    const summaryOwnsFormula = summarizeOn && !enrichExplainer && (previewSheet === "summary" || formulaOwner === "summary");
+    if (summaryOwnsFormula) {
       if (sheetId === "summary") {
         focusSummaryCell(pick.column.id, Math.max(0, (pick.row || 1) - 1));
         return;
@@ -1991,7 +1999,7 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
 
   function marketsRequestForRun() {
     let request = lockedQuery?.athena || athenaRequest();
-    if (enrichPick === "sample" && sampleSizeNumber > 0 && !sampleSizeError) {
+    if (enrichPicks.has("sample") && sampleSizeNumber > 0 && !sampleSizeError) {
       request = attachRandomSample(request, {
         size: sampleSizeNumber,
         mode: sampleMode,
@@ -2076,11 +2084,11 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
       });
     }
     if (metadataSheet?.columns?.length) sheets.push(metadataSheet);
-    if (enrichPick === "summarize") {
+    if (enrichPicks.has("summarize")) {
       const built = buildSummaryGrid({
         cells: summaryCells,
-        columns: primaryColumns,
-        rows: primaryRows,
+        columns: runMarkets.columns,
+        rows: runMarkets.rows,
         sheets: formulaSheets,
         focus: summaryFocus,
       });
@@ -2094,10 +2102,10 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
         summary: "Summary",
       });
     }
-    if (enrichPick === "bucket") {
+    if (enrichPicks.has("bucket")) {
       const built = buildBucketGrid({
-        columns: primaryColumns,
-        rows: primaryRows,
+        columns: runMarkets.columns,
+        rows: runMarkets.rows,
         bucketColumnId,
         mode: bucketMode,
         timeInterval: bucketInterval,
@@ -2235,9 +2243,9 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
       athena: lockedQuery?.athena || athenaRequest(),
       join: joinRecord,
       formula: functionActive ? functionFormula : "",
-      summaryCells: enrichPick === "summarize" ? summaryCells : null,
+      summaryCells: enrichPicks.has("summarize") ? summaryCells : null,
       bucket:
-        enrichPick === "bucket"
+        enrichPicks.has("bucket")
           ? {
               bucketColumnId,
               mode: bucketMode,
@@ -2249,7 +2257,7 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
             }
           : null,
       randomSample:
-        enrichPick === "sample" && sampleSizeNumber > 0
+        enrichPicks.has("sample") && sampleSizeNumber > 0
           ? { size: sampleSizeNumber, mode: sampleMode, seed: sampleMode === "seeded" ? sampleSeed : "" }
           : null,
     };
@@ -2284,6 +2292,101 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
       setRunning(false);
     }
   }
+
+  function dropEnrich(id) {
+    setEnrichPicks((current) => {
+      if (!current.has(id)) return current;
+      const next = new Set(current);
+      next.delete(id);
+      return next;
+    });
+    setPreviewSheet((current) => {
+      if (id === "summarize" && current === "summary") return "source";
+      if (id === "bucket" && current === "buckets") return "source";
+      if (id === "function" && current === "column") return "source";
+      if (id === "join" && current !== "summary" && current !== "buckets" && current !== "column") return "source";
+      return current;
+    });
+    if (id === "summarize") setFormulaOwner((owner) => (owner === "summary" ? "" : owner));
+    if (id === "function") setFormulaOwner((owner) => (owner === "function" ? "" : owner));
+  }
+
+  function showPreview(id) {
+    setPreviewSheet(id);
+    if (id === "summary") {
+      setFormulaOwner("summary");
+      setSummaryTab("summary");
+    }
+    if (id === "buckets") setBucketTab("buckets");
+    if (id === "column") {
+      setFunctionTab("new");
+      setFormulaOwner("function");
+    } else setFunctionTab("");
+    if (id === "source") {
+      setJoinTab("markets");
+      if (tradesQuery && joinPlacement === "sheet") setMetadataTab("trades");
+    } else if (id === "markets-meta") setMetadataTab("markets");
+    else if (id !== "summary" && id !== "buckets" && id !== "column") setJoinTab(id);
+    setFunctionScrollKey((key) => key + 1);
+  }
+
+  const previewTabs = [{ id: "source", title: sheetTitle }];
+  if (summarizeOn) previewTabs.push({ id: "summary", title: "Summary" });
+  if (bucketOn) previewTabs.push({ id: "buckets", title: "Buckets" });
+  if (functionOnNew) previewTabs.push({ id: "column", title: "Column" });
+  if (tradesJoinReady && joinPlacement === "sheet") previewTabs.push({ id: "markets-meta", title: "Markets" });
+  const joinExtras = previewTabs.filter((tab) => tab.id !== "source");
+  const summaryOnSource =
+    formulaEditing && summarizeOn && !enrichExplainer && formulaOwner === "summary" && previewSheet !== "summary" && previewSheet !== "buckets" && previewSheet !== "markets-meta";
+  const summarySourceEditor = summaryOnSource
+    ? {
+        bar: true,
+        value: summaryFormula,
+        error: summaryView.error,
+        examples: summaryFocus.columnId === "value" ? summaryExamples(summarySourceColumns, summaryMeasure) : [],
+        suggestions: summaryFocus.columnId === "value" ? formulaSuggestions(summaryFormula, formulaCaret) : [],
+        placeholder: summaryFocus.columnId === "label" ? "Label" : undefined,
+        focusToken: formulaFocusToken,
+        onChange: updateSummaryInput,
+        onFocus: () => {
+          blurToken.current += 1;
+          setFormulaFocused(true);
+          setFormulaOwner("summary");
+        },
+        onBlur: () => {
+          const token = blurToken.current;
+          window.setTimeout(() => {
+            if (blurToken.current !== token) return;
+            setFormulaFocused(false);
+          }, 220);
+        },
+        onCaret: (caret) => {
+          formulaCaretRef.current = caret;
+          setFormulaCaret(caret);
+        },
+        onPickSuggestion: (item) => {
+          const row = summaryFocus.row;
+          const columnId = summaryFocus.columnId === "label" ? "value" : summaryFocus.columnId;
+          setSummaryCells((current) => {
+            const key = summaryCellKey(columnId, row);
+            const value = current[key] || "";
+            const next = `${value.slice(0, item.from)}${item.name}(${value.slice(item.to)}`;
+            formulaCaretRef.current = item.from + item.name.length + 1;
+            setFormulaCaret(formulaCaretRef.current);
+            return assignSummaryInput(current, row, columnId, next).cells;
+          });
+          if (summaryFocus.columnId === "label") setSummaryFocus({ columnId: "value", row });
+          setFormulaFocused(true);
+          setFormulaFocusToken((token) => token + 1);
+        },
+        onCommit: () => {
+          setFormulaFocused(false);
+          setFormulaEditing(false);
+          setSummaryTab("summary");
+          setPreviewSheet("summary");
+        },
+      }
+    : null;
 
   if (!source) return null;
 
@@ -2336,33 +2439,49 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
               setHoverFunction(false);
               setStep("query");
             }}
-            picked={enrichPick}
+            picked={enrichPicks}
             onPick={(id) => {
+              const turningOn = !enrichPicks.has(id);
+              setEnrichPicks((current) => {
+                const next = new Set(current);
+                if (turningOn) next.add(id);
+                else next.delete(id);
+                return next;
+              });
+              if (!turningOn) {
+                dropEnrich(id);
+                return;
+              }
               if (id === "summarize") {
                 setHoverSummarize(false);
                 setSummaryTab("summary");
+                setPreviewSheet("summary");
+                setFormulaOwner("summary");
                 setSummaryFocus({ columnId: "value", row: 0 });
                 setFormulaEditing(true);
                 setFormulaFocused(true);
-                formulaCaretRef.current = (summaryCells[summaryCellKey("label", 0)] || "").length;
+                formulaCaretRef.current = (summaryCells[summaryCellKey("value", 0)] || "").length;
                 setFormulaFocusToken((token) => token + 1);
               }
               if (id === "bucket") {
                 setHoverBucket(false);
                 setBucketTab("buckets");
+                setPreviewSheet("buckets");
               }
               if (id === "sample") {
                 setHoverSample(false);
+                setPreviewSheet("source");
                 setSampleMode((current) => current || "seeded");
                 setSampleSeed((current) => current || generateRandomSampleSeed());
               }
-              setEnrichPick(id);
+              if (id === "function") setHoverFunction(false);
+              if (id === "join") setHoverJoin(false);
             }}
             joinTarget={joinTarget}
             onJoinTarget={setJoinTarget}
             onClear={() => {
               setHoverJoin(false);
-              setEnrichPick("");
+              dropEnrich("join");
               setJoinTarget("");
               setJoinPlacement("");
               setMetadataTab("trades");
@@ -2380,7 +2499,7 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
             onFunctionTarget={chooseFunctionTarget}
             onClearFunction={() => {
               setHoverFunction(false);
-              setEnrichPick("");
+              dropEnrich("function");
               setFunctionTarget("");
               setFunctionFormula("");
               setFunctionTab("");
@@ -2392,7 +2511,7 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
             onHoverSummarize={setHoverSummarize}
             onClearSummary={() => {
               setHoverSummarize(false);
-              setEnrichPick("");
+              dropEnrich("summarize");
               setSummaryCells({});
               setSummaryFocus({ columnId: "value", row: 0 });
               setSummaryTab("summary");
@@ -2412,6 +2531,7 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
               setHoverJoin(false);
               setJoinPlacement(placement);
               setMetadataTab(placement === "sheet" ? "markets" : "trades");
+              setPreviewSheet(placement === "sheet" ? "markets-meta" : "source");
               setFunctionScrollKey((key) => key + 1);
             }}
             marketColumns={marketColumnList}
@@ -2448,7 +2568,7 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
             onBucketValueColumn={setBucketValueColumnId}
             onClearBucket={() => {
               setHoverBucket(false);
-              setEnrichPick("");
+              dropEnrich("bucket");
               setBucketColumnId("");
               setBucketMode("category");
               setBucketInterval("day");
@@ -2462,10 +2582,10 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
             onSampleSize={setSampleSize}
             sampleMode={sampleMode}
             onSampleMode={chooseSampleMode}
-            sampleError={enrichPick === "sample" ? sampleSizeError : ""}
+            sampleError={sampleOn ? sampleSizeError : ""}
             onClearSample={() => {
               setHoverSample(false);
-              setEnrichPick("");
+              dropEnrich("sample");
               setSampleSize("100");
               setSampleMode("seeded");
               setSampleSeed("");
@@ -2707,11 +2827,11 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
             !showJoinExplainer &&
             !showBucketExplainer &&
             !showSampleExplainer &&
-            !(functionOnNew && functionTab === "new") &&
-            !(summaryActive && summaryTab === "summary") &&
-            !(bucketActive && bucketTab === "buckets") &&
+            !(functionOnNew && (functionTab === "new" || previewSheet === "column")) &&
+            !summaryActive &&
+            !bucketActive &&
             !sampleActive &&
-            !(tradesJoinReady && joinPlacement === "sheet" && metadataTab === "markets") ? (
+            !(previewSheet === "markets-meta" && tradesJoinReady && joinPlacement === "sheet") ? (
               <div className="mt-1.5 w-full max-w-[280px]">
                 <p className="text-right text-[11px] text-muted-foreground">
                   {importedRows == null
@@ -2730,11 +2850,11 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
               </div>
             ) : showJoinSheets && joinTab === previewTicker ? (
               <p className="mt-1 text-right text-[11px] text-muted-foreground">Preview only. This sheet is created when you run the pull.</p>
-            ) : tradesJoinReady && joinPlacement === "sheet" && metadataTab === "markets" ? (
+            ) : previewSheet === "markets-meta" && tradesJoinReady && joinPlacement === "sheet" ? (
               <p className="mt-1 text-right text-[11px] text-muted-foreground">Preview only. This sheet is created when you run the pull.</p>
-            ) : summaryActive && summaryTab === "summary" ? (
+            ) : summaryActive ? (
               <p className="mt-1 text-right text-[11px] text-muted-foreground">Preview only. This sheet is created when you run the pull.</p>
-            ) : bucketActive && bucketTab === "buckets" ? (
+            ) : bucketActive ? (
               <p className="mt-1 text-right text-[11px] text-muted-foreground">Preview only. This sheet is created when you run the pull.</p>
             ) : sampleActive ? (
               <p className="mt-1 text-right text-[11px] text-muted-foreground">Preview shuffles the rows on screen. The full sample is drawn when you run the pull.</p>
@@ -2753,66 +2873,20 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
           <BucketExplainerTabs sheetTitle={sheetTitle} />
         ) : showFunctionExplainer ? (
           <FunctionExplainerTabs sheetTitle={sheetTitle} />
-        ) : summaryActive ? (
-          <SummaryPreviewTabs
-            sheetTitle={sheetTitle}
-            active={summaryTab}
-            onSummary={() => setSummaryTab("summary")}
-            onSource={() => setSummaryTab("source")}
-          />
-        ) : bucketActive ? (
-          <SummaryPreviewTabs
-            sheetTitle={sheetTitle}
-            resultTitle="Buckets"
-            active={bucketTab === "buckets" ? "summary" : "source"}
-            onSummary={() => setBucketTab("buckets")}
-            onSource={() => setBucketTab("source")}
-          />
         ) : showJoinExplainer ? (
           <JoinExplainerTabs source={tradesQuery ? "trades" : "markets"} />
-        ) : functionOnNew ? (
-          <FunctionDestinationTabs
-            sheetTitle={sheetTitle}
-            joinCommitted={joinCommitted}
-            previewTicker={previewTicker}
-            functionTab={functionTab}
-            joinTab={joinTab}
-            onMarkets={() => {
-              setFunctionTab("");
-              setJoinTab("markets");
-              if (tradesQuery && joinPlacement === "sheet") setMetadataTab("trades");
-            }}
-            onTrades={() => {
-              setFunctionTab("");
-              if (previewTicker) setJoinTab(previewTicker);
-            }}
-            onNew={() => {
-              setFunctionTab("new");
-              setFunctionScrollKey((key) => key + 1);
-            }}
-          />
-        ) : tradesJoinReady && joinPlacement === "sheet" ? (
-          <TradesJoinPreviewTabs
-            active={metadataTab}
-            onSelect={(tab) => {
-              setMetadataTab(tab);
-              setFunctionScrollKey((key) => key + 1);
-            }}
-          />
         ) : showJoinSheets ? (
           <JoinSheetTabs
             markets={joinedMarkets}
-            active={joinTab}
+            extras={joinExtras}
+            active={previewSheet === "source" ? "markets" : previewSheet}
             previewTicker={previewTicker}
             sheetCount={sheetCount}
-            onSelect={(tab) => {
-              setJoinTab(tab);
-              if ((tab === "markets" && functionOnMarkets) || (tab === previewTicker && functionOnTrades)) {
-                setFunctionScrollKey((key) => key + 1);
-              }
-            }}
+            onSelect={(tab) => showPreview(tab === "markets" ? "source" : tab)}
           />
-        ) : null}
+        ) : (
+          <ResultSheetTabs tabs={previewTabs} active={previewSheet} onSelect={showPreview} />
+        )}
         <div className="min-h-0 flex-1 p-4">
           {showSummarizeExplainer ? (
             <SummarizeExplainer measure={summaryMeasure} />
@@ -2822,7 +2896,7 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
             <SampleExplainer />
           ) : showFunctionExplainer ? (
             <FunctionExplainer />
-          ) : bucketActive && bucketTab === "buckets" ? (
+          ) : bucketActive ? (
             bucketView.ready ? (
               <IntegrationBuildGrid
                 columns={bucketView.columns}
@@ -2841,9 +2915,16 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
                 {sampleSizeError}
               </div>
             ) : (
-              <IntegrationBuildGrid columns={shownColumns} rows={samplePreviewRows} scrollToken={sampleShuffle} />
+              <IntegrationBuildGrid
+                columns={summarySourceColumns}
+                rows={summarySourceRows}
+                highlightColumnId={summarySourceGrid.highlight || ""}
+                scrollToken={sampleShuffle}
+                formulaEditor={summarySourceEditor}
+                onFormulaPick={(pick) => acceptFormulaPick(pick, "markets")}
+              />
             )
-          ) : summaryActive && summaryTab === "summary" ? (
+          ) : summaryActive ? (
             <IntegrationBuildGrid
               columns={summaryView.columns}
               rows={summaryView.rows}
@@ -2905,69 +2986,9 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
               }
               onFormulaPick={(pick) => acceptFormulaPick(pick, "summary")}
             />
-          ) : summaryActive ? (
-            <IntegrationBuildGrid
-              columns={marketsGrid.columns}
-              rows={marketsGrid.rows}
-              highlightColumnIds={(summaryView.references || []).filter((ref) => ref.row == null).map((ref) => ref.column.id)}
-              referencedCells={(summaryView.references || [])
-                .filter((ref) => ref.row != null)
-                .map((ref) => ({ columnId: ref.column.id, row: ref.row }))}
-              scrollToken={functionScrollKey}
-              formulaEditor={
-                formulaEditing
-                  ? {
-                      bar: true,
-                      value: summaryFormula,
-                      error: summaryView.error,
-                      examples: summaryFocus.columnId === "value" ? summaryExamples(summarySourceColumns, summaryMeasure) : [],
-                      suggestions: summaryFocus.columnId === "value" ? formulaSuggestions(summaryFormula, formulaCaret) : [],
-                      placeholder: summaryFocus.columnId === "label" ? "Label" : undefined,
-                      focusToken: formulaFocusToken,
-                      onChange: updateSummaryInput,
-                      onFocus: () => {
-                        blurToken.current += 1;
-                        setFormulaFocused(true);
-                      },
-                      onBlur: () => {
-                        const token = blurToken.current;
-                        window.setTimeout(() => {
-                          if (blurToken.current !== token) return;
-                          setFormulaFocused(false);
-                        }, 220);
-                      },
-                      onCaret: (caret) => {
-                        formulaCaretRef.current = caret;
-                        setFormulaCaret(caret);
-                      },
-                      onPickSuggestion: (item) => {
-                        const row = summaryFocus.row;
-                        const columnId = summaryFocus.columnId === "label" ? "value" : summaryFocus.columnId;
-                        setSummaryCells((current) => {
-                          const key = summaryCellKey(columnId, row);
-                          const value = current[key] || "";
-                          const next = `${value.slice(0, item.from)}${item.name}(${value.slice(item.to)}`;
-                          formulaCaretRef.current = item.from + item.name.length + 1;
-                          setFormulaCaret(formulaCaretRef.current);
-                          return assignSummaryInput(current, row, columnId, next).cells;
-                        });
-                        if (summaryFocus.columnId === "label") setSummaryFocus({ columnId: "value", row });
-                        setFormulaFocused(true);
-                        setFormulaFocusToken((token) => token + 1);
-                      },
-                      onCommit: () => {
-                        setFormulaFocused(false);
-                        setFormulaEditing(false);
-                        setSummaryTab("summary");
-                      },
-                    }
-                  : null
-              }
-              onFormulaPick={(pick) => acceptFormulaPick(pick, "markets")}
-            />
           ) : showJoinExplainer ? (
             <JoinExplainer source={tradesQuery ? "trades" : "markets"} />
-          ) : functionOnNew && functionTab === "new" && newTableGrid.columns.length ? (
+          ) : previewSheet === "column" && functionOnNew && newTableGrid.columns.length ? (
             <IntegrationBuildGrid
               columns={newTableGrid.columns}
               rows={newTableGrid.rows}
@@ -2998,10 +3019,10 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
               highlightColumnId={tradesGrid.highlight}
               scrollToken={functionScrollKey}
               {...referencesFor("trades")}
-              formulaEditor={formulaEditorFor("trades", false) || formulaEditorFor("trades", true)}
+              formulaEditor={summarySourceEditor || formulaEditorFor("trades", false) || formulaEditorFor("trades", true)}
               onFormulaPick={(pick) => acceptFormulaPick(pick, "trades")}
             />
-          ) : tradesJoinReady && joinPlacement === "sheet" && metadataTab === "markets" ? (
+          ) : previewSheet === "markets-meta" && tradesJoinReady && joinPlacement === "sheet" ? (
             marketPreview.status === "loading" ? (
               <div className="flex h-full items-center justify-center">
                 <SpectrumLoadingState label="Loading market metadata" />
@@ -3039,10 +3060,21 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
               columns={marketsGrid.columns}
               rows={marketsGrid.rows}
               highlightColumnId={marketsGrid.highlight || (tradesJoinReady && joinPlacement === "merge" ? tradeJoinBase.highlightIds[0] || "" : "")}
-              highlightColumnIds={tradesJoinReady && joinPlacement === "merge" ? tradeJoinBase.highlightIds : []}
+              highlightColumnIds={
+                summaryOnSource
+                  ? (summaryView.references || []).filter((ref) => ref.row == null).map((ref) => ref.column.id)
+                  : tradesJoinReady && joinPlacement === "merge"
+                    ? tradeJoinBase.highlightIds
+                    : []
+              }
+              referencedCells={
+                summaryOnSource
+                  ? (summaryView.references || []).filter((ref) => ref.row != null).map((ref) => ({ columnId: ref.column.id, row: ref.row }))
+                  : referencesFor("markets").referencedCells
+              }
               scrollToken={functionScrollKey}
-              {...referencesFor("markets")}
-              formulaEditor={formulaEditorFor("markets", false) || formulaEditorFor("markets", true)}
+              {...(summaryOnSource ? {} : referencesFor("markets"))}
+              formulaEditor={summarySourceEditor || formulaEditorFor("markets", false) || formulaEditorFor("markets", true)}
               onFormulaPick={(pick) => acceptFormulaPick(pick, "markets")}
             />
           ) : (
