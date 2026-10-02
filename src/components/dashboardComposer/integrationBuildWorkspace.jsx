@@ -2923,7 +2923,11 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
                         setFormulaFocused(true);
                         setFormulaFocusToken((token) => token + 1);
                       },
-                      onCommit: () => setFormulaFocused(false),
+                      onCommit: () => {
+                        setFormulaFocused(false);
+                        setFormulaEditing(false);
+                        setSummaryTab("summary");
+                      },
                     }
                   : null
               }
