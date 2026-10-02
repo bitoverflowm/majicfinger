@@ -1691,10 +1691,10 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
         cells: summaryCells,
         columns: summarySourceColumns,
         rows: summarySourceRows,
-        sheets: formulaSheets,
+        sheets: enrichmentSheets,
         focus: summaryFocus,
       }),
-    [summaryCells, summarySourceColumns, summarySourceRows, formulaSheets, summaryFocus],
+    [summaryCells, summarySourceColumns, summarySourceRows, enrichmentSheets, summaryFocus],
   );
   const summaryFormula = summaryCells[summaryCellKey(summaryFocus.columnId, summaryFocus.row)] || "";
   useEffect(() => {
@@ -1734,6 +1734,36 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
       bucketValueColumnId,
     ],
   );
+  const enrichmentSheets = useMemo(() => {
+    const list = formulaSheets.map((sheet) =>
+      sheet.id === "markets" && functionOnMarkets
+        ? { ...sheet, columns: summarySourceColumns, rows: summarySourceRows }
+        : sheet,
+    );
+    const titles = new Set(list.map((sheet) => String(sheet.title || "").toLowerCase()));
+    const push = (sheet) => {
+      const title = String(sheet.title || "").toLowerCase();
+      if (!sheet.columns?.length || titles.has(title)) return;
+      titles.add(title);
+      list.push(sheet);
+    };
+    if (bucketOn && bucketView.ready) {
+      push({ id: "buckets", title: "Buckets", columns: bucketView.columns, rows: bucketView.rows });
+    }
+    if (functionOnNew && newTableGrid.columns.length) {
+      push({ id: "new", title: "Column", columns: newTableGrid.columns, rows: newTableGrid.rows });
+    }
+    return list;
+  }, [
+    formulaSheets,
+    functionOnMarkets,
+    summarySourceColumns,
+    summarySourceRows,
+    bucketOn,
+    bucketView,
+    functionOnNew,
+    newTableGrid,
+  ]);
   const paneLine = (() => {
     if (showSampleExplainer) return "Illustration. A random subset of this query is drawn when you run the pull.";
     if (showBucketExplainer) return "Illustration. The bucket sheet is created when you run the pull.";
@@ -1744,6 +1774,7 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
     }
     if (bucketActive) {
       if (!bucketView.ready) return "Choose a column to bucket. The result is a new sheet.";
+      if (summarizeOn && formulaOwner === "summary" && formulaEditing) return "Click a column on Buckets to drop it into the summary.";
       const count = bucketView.rows.length;
       return `Previewing ${count.toLocaleString()} ${count === 1 ? "bucket" : "buckets"} from the rows on screen. Save and run buckets the imported rows.`;
     }

@@ -33,6 +33,13 @@ assert.equal(label.value, "Total size");
 const other = evaluateCellFormula("= SUM(Trades!Size)", { columns: [], rows: [], sheets, sheetId: "summary" });
 assert.equal(other.value, 40);
 
+const buckets = [
+  { id: "buckets", title: "Buckets", columns: [{ id: "count", title: "Count", type: "number" }], rows: [{ count: 4 }, { count: 3 }, { count: 3 }] },
+];
+const bucketSum = evaluateCellFormula("= SUM(Buckets!Count)", { columns, rows, sheets: [...sheets, ...buckets], sheetId: "markets" });
+assert.equal(bucketSum.error, "");
+assert.equal(bucketSum.value, 10);
+
 const perRow = evaluateColumnFormula("= SUM(Yes price, Size)", columns, rows, { sheets, sheetId: "markets" });
 assert.deepEqual(perRow.values, [73, 73, 27]);
 assert.equal(perRow.error, "");
