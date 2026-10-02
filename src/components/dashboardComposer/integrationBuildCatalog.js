@@ -356,6 +356,19 @@ export function polymarketHistoricalColumnList(table) {
   return polymarketHistoricalColumns(table);
 }
 
+/** Outcome token ids stored on a market's clob_token_ids or a trade's asset id. USDC (0) is not a market. */
+export function polymarketTokenIds(value) {
+  const seen = new Set();
+  const ids = [];
+  for (const match of String(value ?? "").matchAll(/\d{2,}/g)) {
+    const id = match[0];
+    if (id === "0" || seen.has(id)) continue;
+    seen.add(id);
+    ids.push(id);
+  }
+  return ids;
+}
+
 function cellValue(value) {
   if (value == null) return "";
   if (typeof value === "object") return JSON.stringify(value);
@@ -685,6 +698,100 @@ function loadLakeHistoricalPreview(compose) {
     });
     return { rows: rows.slice(0, PREVIEW_ROW_CAP) };
   });
+}
+
+function polymarketTradeColumns() {
+  return polymarketHistoricalColumns("trades").filter((column) => column.defaultOn);
+}
+
+/**
+ * Trades for one Polymarket market. A fill matches when the maker or taker asset
+ * is one of that market's outcome token ids.
+ */
+export function loadPolymarketHistoricalTradesForTokens(tokens, limit = PREVIEW_ROW_CAP) {
+  const columns = polymarketTradeColumns();
+  const unique = [];
+  const seen = new Set();
+  for (const raw of tokens || []) {
+    for (const token of polymarketTokenIds(raw)) {
+      if (seen.has(token)) continue;
+      seen.add(token);
+      unique.push(token);
+    }
+  }
+  const rowLimit = Math.max(1, Math.floor(Number(limit) || PREVIEW_ROW_CAP));
+  if (!unique.length) return Promise.resolve({ columns, rows: [] });
+  const or = unique.slice(0, 24).flatMap((token) => [
+    { column: "maker_asset_id", kind: "string", op: "eq", value: token },
+    { column: "taker_asset_id", kind: "string", op: "eq", value: token },
+  ]);
+  const request = {
+    lake: "polymarket",
+    table: "trades",
+    queryType: "compose",
+    limit: rowLimit,
+    caseSensitive: false,
+    filters: { and: [], or },
+    compose: {
+      select: columns.map((entry) => ({ column: entry.id, alias: entry.id })),
+      groupByAliases: [],
+      orderBy: [{ alias: "timestamp", direction: "desc" }],
+    },
+  };
+  const maxWaitMs = rowLimit > PREVIEW_ROW_CAP ? 600000 : 180000;
+  return fetchAthenaLakeSample(request, { maxWaitMs, pollIntervalMs: 800 }).then((result) => ({
+    columns,
+    rows: rowsFromAthenaCells(result, rowLimit),
+  }));
+}
+
+/**
+ * Markets whose outcome tokens appear on these trades. One row per market.
+ */
+export async function loadPolymarketHistoricalMarketsForTokens(tokens) {
+  const unique = [];
+  const seen = new Set();
+  for (const raw of tokens || []) {
+    for (const token of polymarketTokenIds(raw)) {
+      if (seen.has(token)) continue;
+      seen.add(token);
+      unique.push(token);
+    }
+  }
+  const columns = polymarketHistoricalColumns("markets");
+  if (!unique.length) return { columns, rows: [] };
+  const rows = [];
+  const seenRow = new Set();
+  const chunkSize = 20;
+  for (let start = 0; start < unique.length; start += chunkSize) {
+    const chunk = unique.slice(start, start + chunkSize);
+    const request = {
+      lake: "polymarket",
+      table: "markets",
+      queryType: "compose",
+      limit: Math.max(chunk.length, 25),
+      caseSensitive: false,
+      filters: {
+        or: chunk.map((token) => ({ column: "clob_token_ids", kind: "string", op: "contains", value: token })),
+      },
+      compose: {
+        select: columns.map((entry) => ({ column: entry.id, alias: entry.id })),
+        groupByAliases: [],
+        orderBy: [{ alias: "volume", direction: "desc" }],
+      },
+    };
+    const result = await fetchAthenaLakeSample(request, {
+      maxWaitMs: unique.length > chunkSize ? 600000 : 180000,
+      pollIntervalMs: 800,
+    });
+    for (const row of rowsFromAthenaCells(result)) {
+      const key = String(row.condition_id || row.id || "").trim();
+      if (key && seenRow.has(key)) continue;
+      if (key) seenRow.add(key);
+      rows.push(row);
+    }
+  }
+  return { columns, rows };
 }
 
 export function loadKalshiHistoricalPreview(table, predicates, sortKeys) {

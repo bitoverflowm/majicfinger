@@ -25,6 +25,10 @@ import {
   loadAthenaComposeRows,
   loadKalshiHistoricalMarketsForTickers,
   loadKalshiHistoricalTradesForTicker,
+  loadPolymarketHistoricalMarketsForTokens,
+  loadPolymarketHistoricalTradesForTokens,
+  polymarketHistoricalColumnList,
+  polymarketTokenIds,
   peekBuildUniverseCount,
   usesExactUniverse,
 } from "@/components/dashboardComposer/integrationBuildCatalog";
@@ -288,11 +292,68 @@ function orderMarketsByTickers(rows, tickers) {
   return ordered;
 }
 
-function attachMarketMetadata(tradeColumns, tradeRows, marketColumns, marketRows) {
-  const byTicker = new Map();
+function polymarketMarketKey(row) {
+  return String(row?.condition_id || row?.id || "").trim();
+}
+
+function polymarketMarketLabel(row) {
+  const slug = String(row?.slug || "").trim();
+  if (slug) return slug;
+  const question = String(row?.question || "").trim();
+  if (!question) {
+    const key = polymarketMarketKey(row);
+    return key.length > 12 ? `${key.slice(0, 10)}…` : key;
+  }
+  return question.length > 48 ? `${question.slice(0, 46)}…` : question;
+}
+
+function polymarketTradeTokens(row) {
+  return [...polymarketTokenIds(row?.maker_asset_id), ...polymarketTokenIds(row?.taker_asset_id)];
+}
+
+function matchPolymarketTrade(row, marketRows) {
+  const tokens = new Set(polymarketTradeTokens(row));
+  if (!tokens.size) return {};
+  return (marketRows || []).find((market) => polymarketTokenIds(market?.clob_token_ids).some((token) => tokens.has(token))) || {};
+}
+
+function orderPolymarketMarkets(marketRows, tradeRows) {
+  const tokenOrder = [];
+  const seenToken = new Set();
+  for (const row of tradeRows || []) {
+    for (const token of polymarketTradeTokens(row)) {
+      if (seenToken.has(token)) continue;
+      seenToken.add(token);
+      tokenOrder.push(token);
+    }
+  }
+  const ranked = [];
+  const used = new Set();
+  for (const token of tokenOrder) {
+    for (const row of marketRows || []) {
+      const key = polymarketMarketKey(row);
+      if (!key || used.has(key)) continue;
+      if (!polymarketTokenIds(row?.clob_token_ids).includes(token)) continue;
+      used.add(key);
+      ranked.push(row);
+    }
+  }
   for (const row of marketRows || []) {
-    const ticker = String(row?.ticker || "").trim();
-    if (ticker && !byTicker.has(ticker)) byTicker.set(ticker, row);
+    const key = polymarketMarketKey(row);
+    if (key && used.has(key)) continue;
+    if (key) used.add(key);
+    ranked.push(row);
+  }
+  return ranked;
+}
+
+function attachMarketMetadata(tradeColumns, tradeRows, marketColumns, marketRows, match) {
+  const byTicker = new Map();
+  if (!match) {
+    for (const row of marketRows || []) {
+      const ticker = String(row?.ticker || "").trim();
+      if (ticker && !byTicker.has(ticker)) byTicker.set(ticker, row);
+    }
   }
   const taken = new Set((tradeColumns || []).map((column) => column.id));
   const added = [];
@@ -310,7 +371,7 @@ function attachMarketMetadata(tradeColumns, tradeRows, marketColumns, marketRows
     added.push({ ...column, sourceId: column.id });
   }
   const rows = (tradeRows || []).map((row) => {
-    const market = byTicker.get(String(row?.ticker || "").trim()) || {};
+    const market = match ? match(row, marketRows) : byTicker.get(String(row?.ticker || "").trim()) || {};
     const next = { ...row };
     for (const column of added) next[column.id] = market[column.sourceId] ?? "";
     return next;
@@ -429,7 +490,7 @@ function JoinSheetTabs({ markets, active, previewTicker, sheetCount, onSelect, e
         ))}
         {markets.map((market) => (
           <button key={market.ticker} type="button" data-tab className={sheetTabClass(false)}>
-            Trades · {market.ticker}
+            Trades · {market.label || market.ticker}
           </button>
         ))}
         <button type="button" data-plus className={sheetTabClass(false)}>
@@ -453,7 +514,7 @@ function JoinSheetTabs({ markets, active, previewTicker, sheetCount, onSelect, e
             onClick={() => onSelect(market.ticker)}
             className={sheetTabClass(active === market.ticker)}
           >
-            Trades · {market.ticker}
+            Trades · {market.label || market.ticker}
           </button>
         ))}
         {hidden > 0 ? (
@@ -536,6 +597,7 @@ function EnrichStep({
   showJoinBuilder = true,
   showFunctionBuilder = true,
   joinMode = "markets",
+  joinLake = "kalshi",
   joinPlacement = "",
   onJoinPlacement,
   marketColumns = [],
@@ -586,7 +648,13 @@ function EnrichStep({
   const bucketOpen = chosen.has("bucket") && !foldedIds.has("bucket");
   const sampleOpen = chosen.has("sample") && !foldedIds.has("sample");
   const tradesJoin = joinMode === "trades";
-  const marketTargetOn = joinTarget === "kalshiHistoricalMarkets";
+  const polymarketJoin = joinLake === "polymarket";
+  const tradesTarget = polymarketJoin ? "polymarketHistoricalTrades" : "kalshiHistoricalTrades";
+  const marketsTarget = polymarketJoin ? "polymarketHistoricalMarkets" : "kalshiHistoricalMarkets";
+  const venueName = polymarketJoin ? "Polymarket" : "Kalshi";
+  const rowNoun = polymarketJoin ? "market" : "ticker";
+  const matchNoun = polymarketJoin ? "outcome token" : "ticker";
+  const marketTargetOn = joinTarget === marketsTarget;
   const hiddenMarketColumns = marketColumnHidden || new Set();
   const selectedMarketCount = marketColumns.filter((column) => !hiddenMarketColumns.has(column.id)).length;
   const queryRowCount = typeof queryRows === "number" ? queryRows : sheetCount;
@@ -653,7 +721,7 @@ function EnrichStep({
               : isSummarize
                 ? summaryLines
                 : isJoin
-                  ? [joinTarget ? (tradesJoin && marketTargetOn ? `Markets · ${joinPlacement === "sheet" ? "separate sheet" : joinPlacement === "merge" ? "onto each trade" : "choose where columns go"} · ${selectedMarketCount} columns` : "Kalshi Historical Trades") : "Choose a table to join"]
+                  ? [joinTarget ? (tradesJoin && marketTargetOn ? `Markets · ${joinPlacement === "sheet" ? "separate sheet" : joinPlacement === "merge" ? "onto each trade" : "choose where columns go"} · ${selectedMarketCount} columns` : `${venueName} Historical Trades`) : "Choose a table to join"]
                   : isSample
                     ? [`${sampleSize || "…"} ${sampleMode} rows`]
                     : [];
@@ -735,7 +803,7 @@ function EnrichStep({
                         <button
                           type="button"
                           aria-pressed={marketTargetOn}
-                          onClick={() => onJoinTarget("kalshiHistoricalMarkets")}
+                          onClick={() => onJoinTarget(marketsTarget)}
                           className={cn(
                             "mt-1.5 flex w-full flex-col rounded-lg border px-2.5 py-2 text-left transition-colors",
                             marketTargetOn
@@ -743,22 +811,24 @@ function EnrichStep({
                               : "border-border/70 bg-background hover:bg-muted/50",
                           )}
                         >
-                          <span className="text-[13px] font-semibold text-foreground">Kalshi Historical Markets</span>
-                          <span className="text-[11px] font-normal text-muted-foreground">Market metadata for each ticker in this query.</span>
+                          <span className="text-[13px] font-semibold text-foreground">{venueName} Historical Markets</span>
+                          <span className="text-[11px] font-normal text-muted-foreground">
+                            Market metadata for each {rowNoun} in this query.
+                          </span>
                         </button>
                       ) : (
                         <button
                           type="button"
-                          aria-pressed={joinTarget === "kalshiHistoricalTrades"}
-                          onClick={() => onJoinTarget("kalshiHistoricalTrades")}
+                          aria-pressed={joinTarget === tradesTarget}
+                          onClick={() => onJoinTarget(tradesTarget)}
                           className={cn(
                             "mt-1.5 flex w-full flex-col rounded-lg border px-2.5 py-2 text-left transition-colors",
-                            joinTarget === "kalshiHistoricalTrades"
+                            joinTarget === tradesTarget
                               ? "border-[#0d99ff]/40 bg-[#0d99ff]/10"
                               : "border-border/70 bg-background hover:bg-muted/50",
                           )}
                         >
-                          <span className="text-[13px] font-semibold text-foreground">Kalshi Historical Trades</span>
+                          <span className="text-[13px] font-semibold text-foreground">{venueName} Historical Trades</span>
                           <span className="text-[11px] font-normal text-muted-foreground">Fills for each market in this query.</span>
                         </button>
                       )}
@@ -772,7 +842,7 @@ function EnrichStep({
                               </span>
                             </div>
                             <p className="mt-1 text-[11px] leading-relaxed text-muted-foreground">
-                              Choose the market attributes to bring in. Each trade matches a market on ticker.
+                              Choose the market attributes to bring in. Each trade matches a market on {matchNoun}.
                             </p>
                             <div className="mt-2 flex items-center gap-1.5">
                               <button
@@ -816,7 +886,7 @@ function EnrichStep({
                             >
                               <span className="text-[13px] font-semibold text-foreground">Separate sheet</span>
                               <span className="text-[11px] font-normal text-muted-foreground">
-                                One new Markets tab, with one row for each ticker.
+                                One new Markets tab, with one row for each {rowNoun}.
                               </span>
                             </button>
                             <button
@@ -839,7 +909,7 @@ function EnrichStep({
                         </div>
                       ) : tradesJoin ? (
                         <p className="mt-2 text-[11px] leading-relaxed text-muted-foreground">
-                          You have {queryRowCount.toLocaleString()} {queryRowCount === 1 ? "row" : "rows"} in this trades query. Markets are matched by ticker.
+                          You have {queryRowCount.toLocaleString()} {queryRowCount === 1 ? "row" : "rows"} in this trades query. Markets are matched by {matchNoun}.
                         </p>
                       ) : (
                         <p className="mt-2 text-[11px] leading-relaxed text-muted-foreground">
@@ -1164,8 +1234,14 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
     : tableIds;
   const table = tables[tableId];
   const exactUniverse = usesExactUniverse(integrationId);
-  const marketsQuery = integrationId === "kalshiHistorical" && tableId === "markets";
   const polymarketHistorical = integrationId === "polymarketHistorical";
+  const historicalLake = polymarketHistorical || integrationId === "kalshiHistorical";
+  const marketsQuery = historicalLake && tableId === "markets";
+  const tradesQuery = historicalLake && tableId === "trades";
+  const joinTradesTarget = polymarketHistorical ? "polymarketHistoricalTrades" : "kalshiHistoricalTrades";
+  const joinMarketsTarget = polymarketHistorical ? "polymarketHistoricalMarkets" : "kalshiHistoricalMarkets";
+  const venueLabel = polymarketHistorical ? "Polymarket Historical" : "Kalshi Historical";
+  const lakeId = polymarketHistorical ? "polymarket" : "kalshi";
   const guidedFilters =
     (integrationId === "kalshiHistorical" && (tableId === "markets" || tableId === "trades")) ||
     (polymarketHistorical && (tableId === "markets" || tableId === "trades" || tableId === "blocks"));
@@ -1343,13 +1419,21 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
     const seen = new Set();
     const markets = [];
     for (const row of capped) {
+      if (polymarketHistorical) {
+        const ticker = polymarketMarketKey(row);
+        const tokens = polymarketTokenIds(row?.clob_token_ids);
+        if (!ticker || !tokens.length || seen.has(ticker)) continue;
+        seen.add(ticker);
+        markets.push({ ticker, title: String(row?.question || polymarketMarketLabel(row)), label: polymarketMarketLabel(row), tokens });
+        continue;
+      }
       const ticker = String(row?.ticker || "").trim();
       if (!ticker || seen.has(ticker)) continue;
       seen.add(ticker);
-      markets.push({ ticker, title: String(row?.title || ticker) });
+      markets.push({ ticker, title: String(row?.title || ticker), label: ticker, tokens: [] });
     }
     return markets;
-  }, [guidedFilters, pull, attributeFilters, sortKeys, rowLimit]);
+  }, [guidedFilters, pull, attributeFilters, sortKeys, rowLimit, polymarketHistorical]);
 
   const marketCap = getJoinMarketCap(user);
   const requestedMarketLimit = Number(rowLimit);
@@ -1364,16 +1448,21 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
   const sheetCount = Math.min(queryRows == null ? queriedMarkets.length : queryRows, marketCap);
   const joinedMarkets = queriedMarkets.slice(0, marketCap);
   const previewTicker = joinedMarkets[0]?.ticker || "";
+  const previewLabel = joinedMarkets[0]?.label || previewTicker;
+  const previewTokenKey = (joinedMarkets[0]?.tokens || []).join("|");
 
   useEffect(() => {
-    if (joinTarget !== "kalshiHistoricalTrades" || !previewTicker) {
+    if (joinTarget !== joinTradesTarget || !previewTicker) {
       if (!previewTicker) setTradePreview({ status: "idle", ticker: "", columns: [], rows: [], error: "" });
       return undefined;
     }
     let cancel = false;
     setJoinTab(previewTicker);
     setTradePreview({ status: "loading", ticker: previewTicker, columns: [], rows: [], error: "" });
-    loadKalshiHistoricalTradesForTicker(previewTicker)
+    const load = polymarketHistorical
+      ? loadPolymarketHistoricalTradesForTokens(previewTokenKey ? previewTokenKey.split("|") : [])
+      : loadKalshiHistoricalTradesForTicker(previewTicker);
+    load
       .then((result) => {
         if (cancel) return;
         setTradePreview({ status: "ready", ticker: previewTicker, columns: result.columns, rows: result.rows, error: "" });
@@ -1391,29 +1480,39 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
     return () => {
       cancel = true;
     };
-  }, [joinTarget, previewTicker]);
+  }, [joinTarget, joinTradesTarget, previewTicker, previewTokenKey, polymarketHistorical]);
 
   useEffect(() => {
-    if (integrationId !== "kalshiHistorical" || tableId !== "trades" || joinTarget !== "kalshiHistoricalMarkets") {
+    if (!tradesQuery || joinTarget !== joinMarketsTarget) {
       setMarketPreview((current) => (current.status === "idle" ? current : { status: "idle", key: "", columns: [], rows: [], error: "" }));
       return undefined;
     }
     const tickers = [];
+    const tokens = [];
     const seen = new Set();
     for (const row of filteredRows) {
+      if (polymarketHistorical) {
+        for (const token of polymarketTradeTokens(row)) {
+          if (seen.has(token)) continue;
+          seen.add(token);
+          tokens.push(token);
+        }
+        continue;
+      }
       const ticker = String(row?.ticker || "").trim();
       if (!ticker || seen.has(ticker)) continue;
       seen.add(ticker);
       tickers.push(ticker);
     }
-    const key = tickers.join("\n");
+    const key = polymarketHistorical ? tokens.join("\n") : tickers.join("\n");
     if (!key) {
       setMarketPreview({ status: "ready", key: "", columns: [], rows: [], error: "" });
       return undefined;
     }
     let cancel = false;
     setMarketPreview({ status: "loading", key, columns: [], rows: [], error: "" });
-    loadKalshiHistoricalMarketsForTickers(tickers)
+    const load = polymarketHistorical ? loadPolymarketHistoricalMarketsForTokens(tokens) : loadKalshiHistoricalMarketsForTickers(tickers);
+    load
       .then((result) => {
         if (cancel) return;
         setMarketPreview({ status: "ready", key, columns: result.columns || [], rows: result.rows || [], error: "" });
@@ -1431,7 +1530,7 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
     return () => {
       cancel = true;
     };
-  }, [integrationId, tableId, joinTarget, filteredRows]);
+  }, [tradesQuery, joinTarget, joinMarketsTarget, polymarketHistorical, filteredRows]);
 
   const previewRequestKey = useMemo(() => {
     if (!guidedFilters || !pull?.columns?.length) return "";
@@ -1583,9 +1682,9 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
       rowLimit,
       athena: athenaRequest(),
       join:
-        joinTarget === "kalshiHistoricalTrades"
+        joinTarget === joinTradesTarget
           ? {
-              target: "kalshiHistoricalTrades",
+              target: joinTradesTarget,
               tickers: joinedMarkets.map((market) => market.ticker),
               previewTicker,
             }
@@ -1637,7 +1736,9 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
     setJoinTarget("");
     setJoinPlacement("");
     setMetadataTab("trades");
-    setMarketColumnHidden(defaultMarketColumnHidden(kalshiHistoricalMarketColumnList()));
+    setMarketColumnHidden(
+      defaultMarketColumnHidden(polymarketHistorical ? polymarketHistoricalColumnList("markets") : kalshiHistoricalMarketColumnList()),
+    );
     setJoinTab("markets");
     setFunctionItems([createFunctionItem()]);
     setActiveFunctionId("");
@@ -1712,23 +1813,25 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
 
   const canProceed = Boolean(pull) && !loading && !error && shownColumns.length > 0;
   const joinOn = step === "enrich" && enrichPicks.has("join");
-  const joinCommitted = marketsQuery && joinOn && joinTarget === "kalshiHistoricalTrades";
-  const tradesQuery = integrationId === "kalshiHistorical" && tableId === "trades";
-  const marketColumnList = useMemo(() => kalshiHistoricalMarketColumnList(), []);
+  const joinCommitted = marketsQuery && joinOn && joinTarget === joinTradesTarget;
+  const marketColumnList = useMemo(
+    () => (polymarketHistorical ? polymarketHistoricalColumnList("markets") : kalshiHistoricalMarketColumnList()),
+    [polymarketHistorical],
+  );
   const selectedMarketColumns = useMemo(
     () => marketColumnList.filter((column) => !marketColumnHidden.has(column.id)),
     [marketColumnList, marketColumnHidden],
   );
-  const tradesJoinPicked = tradesQuery && joinOn && joinTarget === "kalshiHistoricalMarkets";
+  const tradesJoinPicked = tradesQuery && joinOn && joinTarget === joinMarketsTarget;
   const tradesJoinReady = tradesJoinPicked && Boolean(joinPlacement) && selectedMarketColumns.length > 0;
-  const kalshiEnrich = marketsQuery || tradesQuery;
-  const showSampleExplainer = kalshiEnrich && step === "enrich" && hoverSample && !enrichPicks.has("sample");
-  const showBucketExplainer = kalshiEnrich && step === "enrich" && hoverBucket && !enrichPicks.has("bucket") && !showSampleExplainer;
-  const showSummarizeExplainer = kalshiEnrich && step === "enrich" && hoverSummarize && !enrichPicks.has("summarize") && !showSampleExplainer && !showBucketExplainer;
+  const historicalEnrich = marketsQuery || tradesQuery;
+  const showSampleExplainer = historicalEnrich && step === "enrich" && hoverSample && !enrichPicks.has("sample");
+  const showBucketExplainer = historicalEnrich && step === "enrich" && hoverBucket && !enrichPicks.has("bucket") && !showSampleExplainer;
+  const showSummarizeExplainer = historicalEnrich && step === "enrich" && hoverSummarize && !enrichPicks.has("summarize") && !showSampleExplainer && !showBucketExplainer;
   const showFunctionExplainer =
-    kalshiEnrich && step === "enrich" && hoverFunction && !enrichPicks.has("function") && !showSummarizeExplainer && !showSampleExplainer && !showBucketExplainer;
+    historicalEnrich && step === "enrich" && hoverFunction && !enrichPicks.has("function") && !showSummarizeExplainer && !showSampleExplainer && !showBucketExplainer;
   const showJoinExplainer =
-    kalshiEnrich &&
+    historicalEnrich &&
     step === "enrich" &&
     hoverJoin &&
     !enrichPicks.has("join") &&
@@ -1739,9 +1842,9 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
     !showSampleExplainer &&
     !showBucketExplainer;
   const enrichExplainer = showSampleExplainer || showBucketExplainer || showSummarizeExplainer || showFunctionExplainer || showJoinExplainer;
-  const summarizeOn = kalshiEnrich && step === "enrich" && enrichPicks.has("summarize");
-  const bucketOn = kalshiEnrich && step === "enrich" && enrichPicks.has("bucket");
-  const sampleOn = kalshiEnrich && step === "enrich" && enrichPicks.has("sample");
+  const summarizeOn = historicalEnrich && step === "enrich" && enrichPicks.has("summarize");
+  const bucketOn = historicalEnrich && step === "enrich" && enrichPicks.has("bucket");
+  const sampleOn = historicalEnrich && step === "enrich" && enrichPicks.has("sample");
   const summaryActive = summarizeOn && !enrichExplainer && previewSheet === "summary";
   const bucketPreviewId = previewSheet.startsWith("bucket:") ? previewSheet.slice("bucket:".length) : "";
   const bucketActive = bucketOn && !enrichExplainer && Boolean(bucketPreviewId);
@@ -1765,6 +1868,7 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
   const functionActive = liveFunctions.length > 0;
   const sheetTitle = tableId === "markets" ? "Markets" : tableId === "trades" ? "Trades" : tables[tableId]?.label || "This sheet";
   const metadataRows = useMemo(() => {
+    if (polymarketHistorical) return orderPolymarketMarkets(marketPreview.rows, filteredRows);
     const tickers = [];
     const seen = new Set();
     for (const row of filteredRows) {
@@ -1774,29 +1878,37 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
       tickers.push(ticker);
     }
     return orderMarketsByTickers(marketPreview.rows, tickers);
-  }, [filteredRows, marketPreview.rows]);
+  }, [filteredRows, marketPreview.rows, polymarketHistorical]);
   const tradeJoinBase = useMemo(() => {
     if (
       !(
         tradesQuery &&
         joinPlacement === "merge" &&
-        joinTarget === "kalshiHistoricalMarkets" &&
+        joinTarget === joinMarketsTarget &&
         selectedMarketColumns.length &&
         marketPreview.status === "ready"
       )
     ) {
       return { columns: shownColumns, rows: filteredRows, highlightIds: [] };
     }
-    return attachMarketMetadata(shownColumns, filteredRows, selectedMarketColumns, marketPreview.rows);
+    return attachMarketMetadata(
+      shownColumns,
+      filteredRows,
+      selectedMarketColumns,
+      marketPreview.rows,
+      polymarketHistorical ? matchPolymarketTrade : undefined,
+    );
   }, [
     tradesQuery,
     joinPlacement,
     joinTarget,
+    joinMarketsTarget,
     selectedMarketColumns,
     marketPreview.status,
     marketPreview.rows,
     shownColumns,
     filteredRows,
+    polymarketHistorical,
   ]);
   const formulaSheets = useMemo(() => {
     const used = new Set();
@@ -1811,7 +1923,7 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
       push({ id: "markets", title: sheetTitle, columns: tradeJoinBase.columns, rows: tradeJoinBase.rows });
     }
     if (tradePreview.columns.length && previewTicker) {
-      push({ id: "trades", title: previewTicker, columns: tradePreview.columns, rows: tradePreview.rows });
+      push({ id: "trades", title: previewLabel || previewTicker, columns: tradePreview.columns, rows: tradePreview.rows });
     }
     if (tradesQuery && joinPlacement === "sheet" && selectedMarketColumns.length && marketPreview.status === "ready") {
       push({ id: "market-metadata", title: "Markets", columns: selectedMarketColumns, rows: metadataRows });
@@ -1824,6 +1936,7 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
     tradePreview.columns,
     tradePreview.rows,
     previewTicker,
+    previewLabel,
     sheetTitle,
     canvas?.blocks,
     tradesQuery,
@@ -2030,7 +2143,7 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
     if (tradesJoinReady && joinPlacement === "merge") {
       if (marketPreview.status === "loading") return "Loading market metadata";
       if (marketPreview.status === "error") return marketPreview.error;
-      return "Highlighted columns are market metadata joined by ticker.";
+      return `Highlighted columns are market metadata joined by ${polymarketHistorical ? "outcome token" : "ticker"}.`;
     }
     if (tradesJoinPicked && !joinPlacement) return "Choose where the market columns go. The preview updates here.";
     if (tradesJoinPicked && !selectedMarketColumns.length) return "Choose at least one market column.";
@@ -2039,7 +2152,7 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
     if (tradePreview.status === "loading") return "Loading trades for the first market";
     if (tradePreview.status === "error") return tradePreview.error;
     const count = tradePreview.rows.length;
-    return `Previewing ${count.toLocaleString()} ${count === 1 ? "trade" : "trades"} of ${previewTicker}`;
+    return `Previewing ${count.toLocaleString()} ${count === 1 ? "trade" : "trades"} of ${previewLabel}`;
   })();
 
   function chooseBucketColumn(bucketId, columnId) {
@@ -2276,15 +2389,34 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
       });
     }
     if (!request?.compose?.select || !joinCommitted) return request;
+    const needed = polymarketHistorical ? ["condition_id", "clob_token_ids"] : ["ticker"];
     const select = request.compose.select;
-    if (select.some((entry) => entry.column === "ticker" || entry.alias === "ticker")) return request;
+    const missing = needed.filter((id) => !select.some((entry) => entry.column === id || entry.alias === id));
+    if (!missing.length) return request;
     return {
       ...request,
       compose: {
         ...request.compose,
-        select: [{ column: "ticker", alias: "ticker" }, ...select],
+        select: [...missing.map((id) => ({ column: id, alias: id })), ...select],
       },
     };
+  }
+
+  function joinMarketsFromRows(rows, cap) {
+    if (!polymarketHistorical) {
+      return tickersFromRows(rows, cap).map((ticker) => ({ ticker, label: ticker, tokens: [] }));
+    }
+    const seen = new Set();
+    const list = [];
+    for (const row of rows || []) {
+      const ticker = polymarketMarketKey(row);
+      const tokens = polymarketTokenIds(row?.clob_token_ids);
+      if (!ticker || !tokens.length || seen.has(ticker)) continue;
+      seen.add(ticker);
+      list.push({ ticker, label: polymarketMarketLabel(row), tokens });
+      if (list.length >= cap) break;
+    }
+    return list;
   }
 
   async function onSaveAndRun() {
@@ -2294,7 +2426,7 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
     const sheetCap = typeof planLimit === "number" && planLimit > 0 ? planLimit : getHistoricalPullRowLimit(user);
     const marketsRequest = marketsRequestForRun();
     let marketRows = filteredRows;
-    if (marketsRequest && integrationId === "kalshiHistorical") {
+    if (marketsRequest && historicalLake) {
       try {
         const pulledMarkets = await loadAthenaComposeRows(marketsRequest);
         if (pulledMarkets.rows?.length) marketRows = pulledMarkets.rows;
@@ -2307,16 +2439,26 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
     let metadataSheet = null;
     let joinedTickers = [];
     if (tradesJoinReady) {
-      joinedTickers = tickersFromRows(marketRows, Number.MAX_SAFE_INTEGER);
       let joinedMarketRows = marketPreview.status === "ready" ? marketPreview.rows : [];
       try {
-        const result = await loadKalshiHistoricalMarketsForTickers(joinedTickers);
+        const result = polymarketHistorical
+          ? await loadPolymarketHistoricalMarketsForTokens(marketRows.flatMap((row) => polymarketTradeTokens(row)))
+          : await loadKalshiHistoricalMarketsForTickers(tickersFromRows(marketRows, Number.MAX_SAFE_INTEGER));
         if (Array.isArray(result.rows)) joinedMarketRows = result.rows;
       } catch {
         joinedMarketRows = marketPreview.status === "ready" ? marketPreview.rows : [];
       }
+      joinedTickers = polymarketHistorical
+        ? joinedMarketRows.map((row) => polymarketMarketKey(row)).filter(Boolean)
+        : tickersFromRows(marketRows, Number.MAX_SAFE_INTEGER);
       if (joinPlacement === "merge") {
-        const merged = attachMarketMetadata(shownColumns, marketRows, selectedMarketColumns, joinedMarketRows);
+        const merged = attachMarketMetadata(
+          shownColumns,
+          marketRows,
+          selectedMarketColumns,
+          joinedMarketRows,
+          polymarketHistorical ? matchPolymarketTrade : undefined,
+        );
         primaryColumns = merged.columns;
         primaryRows = merged.rows;
       } else {
@@ -2324,10 +2466,10 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
           id: "run-market-metadata",
           title: "Markets",
           columns: selectedMarketColumns,
-          rows: orderMarketsByTickers(joinedMarketRows, joinedTickers),
+          rows: polymarketHistorical ? orderPolymarketMarkets(joinedMarketRows, marketRows) : orderMarketsByTickers(joinedMarketRows, joinedTickers),
           span: "full",
           table: "markets",
-          summary: "Kalshi Historical · markets · joined by ticker",
+          summary: `${venueLabel} · markets · joined by ${polymarketHistorical ? "outcome token" : "ticker"}`,
         };
       }
     }
@@ -2425,16 +2567,17 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
       });
     }
     if (joinCommitted && tradePreview.columns.length) {
-      const fromRun = tickersFromRows(marketRows, marketCap);
-      const fallback = joinedMarkets.map((market) => market.ticker).filter(Boolean);
-      const list = fromRun.length ? fromRun : fallback.length ? fallback : previewTicker ? [previewTicker] : [];
-      runTickers = list;
-      const pulled = await mapPool(list, 4, async (ticker) => {
+      const fromRun = joinMarketsFromRows(marketRows, marketCap);
+      const list = fromRun.length ? fromRun : joinedMarkets.slice(0, marketCap);
+      runTickers = list.map((market) => market.ticker);
+      const pulled = await mapPool(list, 4, async (market) => {
         try {
-          const result = await loadKalshiHistoricalTradesForTicker(ticker, sheetCap);
-          return { ticker, columns: result.columns?.length ? result.columns : tradePreview.columns, rows: result.rows || [] };
+          const result = polymarketHistorical
+            ? await loadPolymarketHistoricalTradesForTokens(market.tokens, sheetCap)
+            : await loadKalshiHistoricalTradesForTicker(market.ticker, sheetCap);
+          return { ...market, columns: result.columns?.length ? result.columns : tradePreview.columns, rows: result.rows || [] };
         } catch {
-          return { ticker, columns: tradePreview.columns, rows: [] };
+          return { ...market, columns: tradePreview.columns, rows: [] };
         }
       });
       pulled.forEach((item) => {
@@ -2446,20 +2589,20 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
         if (!shaped.columns.length) return;
         const id = `run-trades-${String(item.ticker).replace(/[^A-Za-z0-9]+/g, "-")}`;
         const fullRows = shaped.rows || [];
-        const pull = { lake: "kalshi", table: "trades", ticker: item.ticker, limit: sheetCap };
+        const pull = { lake: lakeId, table: "trades", ticker: item.ticker, tokens: item.tokens, limit: sheetCap };
         if (fullRows.length > 50) {
           rememberTradeSheet(id, item.ticker, shaped.columns, displayMatrix(shaped.columns, fullRows), sheetCap, accountId);
         }
         sheets.push({
           id,
-          title: `Trades · ${item.ticker}`,
+          title: `Trades · ${item.label || item.ticker}`,
           columns: shaped.columns,
           rows: fullRows.slice(0, 50),
           rowCount: fullRows.length,
           pull,
           span: "half",
           table: "trades",
-          summary: `Kalshi Historical · trades · ${item.ticker}`,
+          summary: `${venueLabel} · trades · ${item.label || item.ticker}`,
         });
       });
     }
@@ -2480,13 +2623,13 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
     canvas?.placeIntegrationSheets?.(sheets);
     const joinRecord = joinCommitted
       ? {
-          target: "kalshiHistoricalTrades",
+          target: joinTradesTarget,
           tickers: runTickers,
           previewTicker,
         }
       : tradesJoinReady
         ? {
-            target: "kalshiHistoricalMarkets",
+            target: joinMarketsTarget,
             placement: joinPlacement,
             columns: selectedMarketColumns.map((column) => column.id),
             tickers: joinedTickers,
@@ -2784,7 +2927,7 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
               setJoinTarget("");
               setJoinPlacement("");
               setMetadataTab("trades");
-              setMarketColumnHidden(defaultMarketColumnHidden(kalshiHistoricalMarketColumnList()));
+              setMarketColumnHidden(defaultMarketColumnHidden(marketColumnList));
               setJoinTab("markets");
               setFunctionItems((list) =>
                 list.map((item) =>
@@ -2796,7 +2939,7 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
             queryRows={queryRows}
             sheetCount={sheetCount}
             onHoverJoin={setHoverJoin}
-            functionTables={functionChoices({ joinActive: joinCommitted, previewTicker, sheetTitle })}
+            functionTables={functionChoices({ joinActive: joinCommitted, previewTicker: previewLabel, sheetTitle })}
             functionTarget={functionTarget}
             onFunctionTarget={chooseFunctionTarget}
             onClearFunction={() => {
@@ -2820,13 +2963,14 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
               setFormulaFocused(false);
             }}
             summaryNote={`New sheet. Write a name in Label, and an equation in Value, like = SUM(${summaryMeasure}). Click a column on ${sheetTitle}, Buckets, or any other sheet to drop it in.`}
-            showSummarizeBuilder={kalshiEnrich}
+            showSummarizeBuilder={historicalEnrich}
             onFunctionHelp={() => setFunctionHelp(true)}
             onSaveAndRun={onSaveAndRun}
             running={running}
             showJoinBuilder={marketsQuery || tradesQuery}
             showFunctionBuilder={marketsQuery || tradesQuery}
             joinMode={tradesQuery ? "trades" : "markets"}
+            joinLake={polymarketHistorical ? "polymarket" : "kalshi"}
             joinPlacement={joinPlacement}
             onJoinPlacement={(placement) => {
               setHoverJoin(false);
@@ -3248,7 +3392,7 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
           ) : showSampleExplainer ? (
             <SampleExplainer />
           ) : showFunctionExplainer ? (
-            <FunctionExplainer />
+            <FunctionExplainer venue={polymarketHistorical ? "polymarket" : "kalshi"} />
           ) : bucketActive && visibleBucket ? (
             visibleBucket.ready ? (
               <IntegrationBuildGrid
@@ -3348,7 +3492,7 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
               onFormulaPick={(pick) => acceptFormulaPick(pick, "summary")}
             />
           ) : showJoinExplainer ? (
-            <JoinExplainer source={tradesQuery ? "trades" : "markets"} />
+            <JoinExplainer source={tradesQuery ? "trades" : "markets"} venue={polymarketHistorical ? "polymarket" : "kalshi"} />
           ) : previewSheet.startsWith("column:") && functionOnNew && newTableGrid.columns.length ? (
             <IntegrationBuildGrid
               columns={newTableGrid.columns}
@@ -3361,7 +3505,9 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
             />
           ) : showJoinSheets && !previewTicker ? (
             <div className="flex h-full items-center justify-center rounded-xl border border-border/70 bg-background px-6 text-center text-[13px] leading-relaxed text-muted-foreground shadow-sm">
-              This query has no market tickers to attach trades to.
+              {polymarketHistorical
+                ? "This query has no markets with outcome tokens to attach trades to."
+                : "This query has no market tickers to attach trades to."}
             </div>
           ) : showJoinSheets && joinTab !== "markets" && joinTab !== previewTicker ? (
             <div className="flex h-full items-center justify-center rounded-xl border border-border/70 bg-background px-6 text-center text-[13px] leading-relaxed text-muted-foreground shadow-sm">

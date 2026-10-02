@@ -4,7 +4,7 @@ import { buildBucketGrid, bucketModesForColumn, suggestedNumericBucketSize } fro
 import { assignSummaryInput, describeSummaryFormula, settleSummaryCells, summaryCellKey } from "@/components/dashboardComposer/summarySheet";
 import { attachRandomSample, previewRandomSample } from "@/components/dashboardComposer/randomSampleRequest";
 import { normalizeRandomSampleConfig } from "@/lib/dataLake/randomSample";
-import { polymarketHistoricalColumnList } from "@/components/dashboardComposer/integrationBuildCatalog";
+import { polymarketHistoricalColumnList, polymarketTokenIds } from "@/components/dashboardComposer/integrationBuildCatalog";
 import {
   POLYMARKET_BLOCKS_CONNECT_COLUMNS,
   POLYMARKET_MARKETS_CONNECT_COLUMNS,
@@ -149,5 +149,8 @@ const isoSql = buildComposeFiltersWhereSql({
   table: "blocks",
 });
 assert.ok(isoSql.includes("from_iso8601_timestamp"));
+
+assert.deepEqual(polymarketTokenIds('["0","123456789","123456789"]'), ["123456789"]);
+assert.deepEqual(polymarketTokenIds("0"), []);
 
 console.log("enrichPreview.test.js ok");

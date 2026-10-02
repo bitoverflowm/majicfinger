@@ -7,6 +7,22 @@ import { FlickeringGrid } from "@/components/ui/flickering-grid";
 import { cn } from "@/lib/utils";
 
 const KALSHI = "#28CC95";
+const POLYMARKET = "#2E5CFF";
+
+function venueStyle(venue) {
+  const polymarket = venue === "polymarket";
+  return {
+    accent: polymarket ? POLYMARKET : KALSHI,
+    flicker: polymarket ? "rgb(46, 92, 255)" : "rgb(40, 204, 149)",
+    name: polymarket ? "Polymarket Historical" : "Kalshi Historical",
+  };
+}
+
+function shownPrice(price, venue) {
+  if (venue !== "polymarket") return price;
+  const cents = Number(String(price).replace("¢", ""));
+  return Number.isFinite(cents) ? (cents / 100).toFixed(2) : price;
+}
 
 /** Illustration only. These rows are not loaded from Athena. */
 const SAMPLE = [
@@ -98,8 +114,13 @@ export function JoinExplainerTabs({ source = "markets" }) {
   );
 }
 
-function TradesJoinExplainer() {
+function TradesJoinExplainer({ venue = "kalshi" }) {
   const reduce = useReducedMotion();
+  const style = venueStyle(venue);
+  const copy =
+    venue === "polymarket"
+      ? "Join lets you join this trades table with Polymarket Historical markets and bring market metadata onto each fill."
+      : TRADES_JOIN_EXPLAINER_COPY;
   return (
     <div className="relative flex h-full min-h-[280px] items-center justify-center overflow-hidden rounded-xl border border-border/70 bg-background shadow-sm">
       <FlickeringGrid
@@ -107,23 +128,27 @@ function TradesJoinExplainer() {
         squareSize={3}
         gridGap={5}
         flickerChance={0.16}
-        color="rgb(40, 204, 149)"
+        color={style.flicker}
         maxOpacity={0.2}
       />
       <div className="relative z-10 flex w-full max-w-2xl flex-col items-center gap-5 px-6 py-8">
-        <p className="max-w-md text-center text-[13px] leading-relaxed text-muted-foreground">{TRADES_JOIN_EXPLAINER_COPY}</p>
+        <p className="max-w-md text-center text-[13px] leading-relaxed text-muted-foreground">{copy}</p>
         <div className="flex w-full flex-col gap-2">
           {TRADE_SAMPLE.map((trade, index) => (
             <div key={trade.ticker} className="grid grid-cols-[minmax(0,1fr)_2.5rem_minmax(0,1.15fr)] items-center gap-x-2">
-              <div className="rounded-xl border border-[#28CC95]/50 bg-[#28CC95]/10 px-3 py-2 shadow-sm backdrop-blur-md">
+              <div
+                className="rounded-xl border px-3 py-2 shadow-sm backdrop-blur-md"
+                style={{ borderColor: `${style.accent}80`, backgroundColor: `${style.accent}1a` }}
+              >
                 <p className="font-mono text-[10px] text-foreground">
-                  {trade.fill[0]} · {trade.fill[1]} · {trade.fill[2]}
+                  {trade.fill[0]} · {trade.fill[1]} · {shownPrice(trade.fill[2], venue)}
                 </p>
                 <p className="truncate font-mono text-[10px] text-muted-foreground">{trade.ticker}</p>
               </div>
               <div className="relative h-px overflow-hidden bg-border">
                 <motion.span
-                  className="absolute inset-y-0 left-0 bg-[#28CC95]"
+                  className="absolute inset-y-0 left-0"
+                  style={{ backgroundColor: style.accent }}
                   initial={reduce ? false : { width: "0%" }}
                   animate={{ width: "100%" }}
                   transition={{ delay: 0.15 + index * 0.1, duration: 0.4 }}
@@ -135,7 +160,7 @@ function TradesJoinExplainer() {
                 animate={{ opacity: 1, x: 0 }}
                 transition={{ delay: 0.28 + index * 0.1, duration: 0.35 }}
               >
-                <BorderBeam size={70} duration={8} delay={index * 1.4} borderWidth={1.2} colorFrom={KALSHI} colorTo="#0d99ff" />
+                <BorderBeam size={70} duration={8} delay={index * 1.4} borderWidth={1.2} colorFrom={style.accent} colorTo="#0d99ff" />
                 <p className="border-b border-border/60 px-2.5 py-1 text-[11px] font-semibold text-foreground">
                   Markets · <span className="font-mono font-medium">{trade.ticker}</span>
                 </p>
@@ -159,8 +184,9 @@ function TradesJoinExplainer() {
   );
 }
 
-function MarketsJoinExplainer() {
+function MarketsJoinExplainer({ venue = "kalshi" }) {
   const reduce = useReducedMotion();
+  const style = venueStyle(venue);
 
   return (
     <div className="relative flex h-full min-h-[280px] items-center justify-center overflow-hidden rounded-xl border border-border/70 bg-background shadow-sm">
@@ -169,7 +195,7 @@ function MarketsJoinExplainer() {
         squareSize={3}
         gridGap={5}
         flickerChance={0.16}
-        color="rgb(40, 204, 149)"
+        color={style.flicker}
         maxOpacity={0.2}
       />
       <div className="relative z-10 flex w-full max-w-2xl flex-col items-center gap-5 px-6 py-8">
@@ -177,12 +203,16 @@ function MarketsJoinExplainer() {
         <div className="flex w-full flex-col gap-2">
           {SAMPLE.map((market, index) => (
             <div key={market.ticker} className="grid grid-cols-[minmax(0,1fr)_2.5rem_minmax(0,1.15fr)] items-center gap-x-2">
-              <div className="rounded-xl border border-[#28CC95]/50 bg-[#28CC95]/10 px-3 py-2 shadow-sm backdrop-blur-md">
+              <div
+                className="rounded-xl border px-3 py-2 shadow-sm backdrop-blur-md"
+                style={{ borderColor: `${style.accent}80`, backgroundColor: `${style.accent}1a` }}
+              >
                 <p className="truncate font-mono text-[10px] text-foreground">{market.ticker}</p>
               </div>
               <div className="relative h-px overflow-hidden bg-border">
                 <motion.span
-                  className="absolute inset-y-0 left-0 bg-[#28CC95]"
+                  className="absolute inset-y-0 left-0"
+                  style={{ backgroundColor: style.accent }}
                   initial={reduce ? false : { width: "0%" }}
                   animate={{ width: "100%" }}
                   transition={{ delay: 0.15 + index * 0.1, duration: 0.4 }}
@@ -194,7 +224,7 @@ function MarketsJoinExplainer() {
                 animate={{ opacity: 1, x: 0 }}
                 transition={{ delay: 0.28 + index * 0.1, duration: 0.35 }}
               >
-                <BorderBeam size={70} duration={8} delay={index * 1.4} borderWidth={1.2} colorFrom={KALSHI} colorTo="#0d99ff" />
+                <BorderBeam size={70} duration={8} delay={index * 1.4} borderWidth={1.2} colorFrom={style.accent} colorTo="#0d99ff" />
                 <p className="border-b border-border/60 px-2.5 py-1 text-[11px] font-semibold text-foreground">
                   Trades · <span className="font-mono font-medium">{market.ticker}</span>
                 </p>
@@ -206,7 +236,7 @@ function MarketsJoinExplainer() {
                     >
                       <span className="text-muted-foreground">{fill[0]}</span>
                       <span>{fill[1]}</span>
-                      <span>{fill[2]}</span>
+                      <span>{shownPrice(fill[2], venue)}</span>
                     </div>
                   ))}
                 </div>
@@ -220,7 +250,7 @@ function MarketsJoinExplainer() {
 }
 
 /** Markets points each contract at its trades. Trades points each fill at market metadata. */
-export function JoinExplainer({ source = "markets" }) {
-  if (source === "trades") return <TradesJoinExplainer />;
-  return <MarketsJoinExplainer />;
+export function JoinExplainer({ source = "markets", venue = "kalshi" }) {
+  if (source === "trades") return <TradesJoinExplainer venue={venue} />;
+  return <MarketsJoinExplainer venue={venue} />;
 }
