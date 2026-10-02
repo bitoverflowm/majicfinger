@@ -80,7 +80,7 @@ function findSheet(input, index, sheets) {
 
 function findColumn(input, index, columns) {
   const sorted = columns
-    .filter((column) => column?.title && column.id !== "__function")
+    .filter((column) => column?.title)
     .slice()
     .sort((a, b) => b.title.length - a.title.length);
   for (const column of sorted) {

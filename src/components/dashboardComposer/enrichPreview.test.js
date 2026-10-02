@@ -96,6 +96,7 @@ assert.deepEqual(
 assert.equal(describeSummaryFormula("= SUM(Size)"), "Sum of Size");
 assert.equal(describeSummaryFormula("= AVERAGE(Yes price)"), "Average of Yes price");
 assert.equal(describeSummaryFormula("= AVERAGE(Size"), "Average of Size");
+assert.equal(describeSummaryFormula("= SUM(Buckets!Count)"), "Sum of Count on Buckets");
 
 const moved = assignSummaryInput({}, 2, "label", "= AVERAGE(Size)");
 assert.equal(moved.columnId, "value");

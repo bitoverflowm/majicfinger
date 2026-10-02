@@ -25,15 +25,14 @@ export function describeSummaryFormula(formula) {
   const args = call[2]
     .replace(/\)\s*$/, "")
     .split(",")
-    .map((part) =>
-      part
-        .trim()
-        .replace(/^'(.*)'!/, "$1 ")
-        .replace(/!/g, " ")
-        .replace(/\[(\d+)\]/g, " row $1")
-        .replace(/\s+/g, " ")
-        .trim(),
-    )
+    .map((part) => {
+      const text = part.trim().replace(/\[(\d+)\]/g, " row $1").replace(/\s+/g, " ").trim();
+      const cross = text.match(/^(?:'([^']+)'|([^!]+))!(.+)$/);
+      if (!cross) return text;
+      const sheet = (cross[1] || cross[2] || "").trim();
+      const column = cross[3].trim();
+      return column && sheet ? `${column} on ${sheet}` : text;
+    })
     .filter(Boolean);
   return args.length ? `${title} of ${args.join(", ")}` : title;
 }
