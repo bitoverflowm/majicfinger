@@ -1040,6 +1040,8 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
   const [sortKeys, setSortKeys] = useState([]);
   const [rowLimit, setRowLimit] = useState("");
   const [previewRefreshing, setPreviewRefreshing] = useState(false);
+  const [settledPreviewKey, setSettledPreviewKey] = useState("");
+  const [previewSearchError, setPreviewSearchError] = useState("");
   const [revealKey, setRevealKey] = useState(0);
   const baseRowsRef = useRef([]);
   const usingFilteredSample = useRef(false);
@@ -1274,6 +1276,10 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
       : query && column?.type === "text"
         ? { column: filterColumn, value: query }
         : null;
+    if (guidedFilters && ((narrowed?.and?.length || 0) > 0 || (narrowed?.or?.length || 0) > 0)) {
+      setCounting(false);
+      return undefined;
+    }
     const known = peekBuildUniverseCount(integrationId, tableId, narrowed);
     if (typeof known === "number") {
       setUniverse(known);
@@ -1427,13 +1433,22 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
     };
   }, [integrationId, tableId, joinTarget, filteredRows]);
 
+  const previewRequestKey = useMemo(() => {
+    if (!guidedFilters || !pull?.columns?.length) return "";
+    const predicates = buildKalshiHistoricalFilterPredicates(pull.columns, attributeFilters);
+    if (!predicates.and.length && !predicates.or.length && !sortKeys.length) return "";
+    return JSON.stringify({ integrationId, tableId, predicates, sortKeys });
+  }, [guidedFilters, pull?.columns, attributeFilters, sortKeys, integrationId, tableId]);
+
   useEffect(() => {
     if (!guidedFilters) return undefined;
     const columns = pull?.columns;
     if (!columns?.length) return undefined;
     const predicates = buildKalshiHistoricalFilterPredicates(columns, attributeFilters);
-    if (!predicates.and.length && !predicates.or.length && !sortKeys.length) {
+    if (!previewRequestKey) {
       setPreviewRefreshing(false);
+      setPreviewSearchError("");
+      setSettledPreviewKey("");
       if (usingFilteredSample.current) {
         usingFilteredSample.current = false;
         setPull((current) => (current ? { ...current, rows: baseRowsRef.current } : current));
@@ -1441,6 +1456,8 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
       return undefined;
     }
     let cancel = false;
+    const key = previewRequestKey;
+    setPreviewSearchError("");
     setPreviewRefreshing(true);
     const timer = window.setTimeout(() => {
       (polymarketHistorical ? loadPolymarketHistoricalPreview : loadKalshiHistoricalPreview)(tableId, predicates, sortKeys)
@@ -1450,16 +1467,21 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
           setPull((current) => (current ? { ...current, rows: result.rows } : current));
           setVisibleCount(result.rows.length);
         })
-        .catch(() => {})
+        .catch((err) => {
+          if (cancel) return;
+          setPreviewSearchError(err instanceof Error ? err.message : "Could not search for matching rows");
+        })
         .finally(() => {
-          if (!cancel) setPreviewRefreshing(false);
+          if (cancel) return;
+          setSettledPreviewKey(key);
+          setPreviewRefreshing(false);
         });
     }, 400);
     return () => {
       cancel = true;
       window.clearTimeout(timer);
     };
-  }, [guidedFilters, attributeFilters, pull?.columns, sortKeys, tableId, polymarketHistorical]);
+  }, [guidedFilters, attributeFilters, pull?.columns, sortKeys, tableId, polymarketHistorical, previewRequestKey]);
 
   const accountId = user?.userId || "";
 
@@ -1636,7 +1658,9 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
   }
 
   const shown = loading ? 0 : filteredRows.length;
-  const emptyRefresh = previewRefreshing && !loading && shownColumns.length > 0 && filteredRows.length === 0;
+  const searchingPreview = Boolean(previewRequestKey) && previewRequestKey !== settledPreviewKey;
+  const noMatchingRows = !loading && !searchingPreview && !previewSearchError && Boolean(previewRequestKey) && shown === 0;
+  const emptyRefresh = !loading && shownColumns.length > 0 && shown === 0 && searchingPreview;
 
   useEffect(() => {
     if (!emptyRefresh) return undefined;
@@ -1660,10 +1684,14 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
           ? `${shownLabel} of …`
           : `${shownLabel}. More rows are available.`;
   const previewLineShown = emptyRefresh
-    ? "Loading the first 50 rows"
-    : previewRefreshing && !loading
-      ? `${previewLine} · updating`
-      : previewLine;
+    ? "Searching for matching rows"
+    : previewSearchError && shown === 0
+      ? previewSearchError
+      : noMatchingRows
+        ? "No rows found matching your criteria"
+        : previewRefreshing && !loading
+          ? `${previewLine} · updating`
+          : previewLine;
   const availableRows = !exactUniverse
     ? Number.POSITIVE_INFINITY
     : typeof universe === "number" && !counting
@@ -3387,9 +3415,18 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
             </div>
           ) : error ? (
             <p className="text-[13px] text-muted-foreground">{error}</p>
+          ) : previewSearchError && shown === 0 ? (
+            <div className="flex h-full items-center justify-center rounded-xl border border-border/70 bg-background px-6 text-center text-[13px] leading-relaxed text-muted-foreground shadow-sm">
+              {previewSearchError}
+            </div>
+          ) : noMatchingRows ? (
+            <div className="flex h-full items-center justify-center rounded-xl border border-border/70 bg-background px-6 text-center text-[13px] leading-relaxed text-muted-foreground shadow-sm">
+              No rows found matching your criteria.
+            </div>
           ) : loading || emptyRefresh ? (
             <div className="flex h-full flex-col gap-3">
               {integrationId === "chainlink" || integrationId === "binance" ? <WaitingToConnectTag /> : null}
+              {emptyRefresh ? <p className="text-[13px] text-muted-foreground">Searching for matching rows</p> : null}
               <div className="min-h-0 flex-1">
                 <SkeletonRows />
               </div>

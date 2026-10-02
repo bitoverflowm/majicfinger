@@ -292,7 +292,7 @@ export function validateAthenaLakeQueryBody(body, access) {
         }
       }
       if (kind === "string") {
-        if (String(value).trim().length === 0) {
+        if (String(value).trim().length === 0 && op !== "neq") {
           throw new AthenaLakeRequestError("Invalid string filter value", { statusCode: 400, code: "BAD_REQUEST" });
         }
       }
