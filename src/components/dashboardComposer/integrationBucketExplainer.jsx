@@ -9,12 +9,20 @@ import { cn } from "@/lib/utils";
 const ROWS = [
   ["Dec 1", "10"],
   ["Dec 1", "25"],
+  ["Dec 1", "8"],
+  ["Dec 1", "4"],
   ["Dec 2", "5"],
+  ["Dec 2", "12"],
+  ["Dec 2", "3"],
+  ["Dec 3", "15"],
+  ["Dec 3", "7"],
+  ["Dec 3", "6"],
 ];
 
 const BUCKETS = [
-  ["Dec 1", "2", "35"],
-  ["Dec 2", "1", "5"],
+  ["Dec 1", "4", "47"],
+  ["Dec 2", "3", "20"],
+  ["Dec 3", "3", "28"],
 ];
 
 function tabClass(selected) {
@@ -59,16 +67,16 @@ export function BucketExplainer({ measure = "Size" }) {
         <p className="max-w-md text-center text-[13px] leading-relaxed text-muted-foreground">
           Bucketing adds a new sheet. Group rows by exact values, numeric ranges, or time intervals, then count, sum, average, min, or max inside each bucket.
         </p>
-        <div className="flex items-stretch gap-3">
+        <div className="flex items-center gap-3">
           <div className="overflow-hidden rounded-xl border border-border/70 bg-background/90 shadow-sm backdrop-blur-md">
             <div className="grid grid-cols-[4.5rem_3.5rem] border-b border-border/60 bg-muted/40 text-[10px] font-semibold text-muted-foreground">
-              <span className="px-2.5 py-1.5">Date</span>
-              <span className="px-2 py-1.5 text-right">{measure}</span>
+              <span className="px-2.5 py-1">Date</span>
+              <span className="px-2 py-1 text-right">{measure}</span>
             </div>
             {ROWS.map((row, index) => (
               <div key={`${row[0]}-${index}`} className="grid grid-cols-[4.5rem_3.5rem] border-b border-border/50 font-mono text-[10px] last:border-b-0">
-                <span className="px-2.5 py-1.5 text-foreground">{row[0]}</span>
-                <span className="px-2 py-1.5 text-right">{row[1]}</span>
+                <span className="px-2.5 py-1 text-foreground">{row[0]}</span>
+                <span className="px-2 py-1 text-right">{row[1]}</span>
               </div>
             ))}
           </div>

@@ -28,7 +28,7 @@ export function SampleExplainer() {
       />
       <div className="relative z-10 flex w-full max-w-xl flex-col items-center gap-4 px-6 py-8">
         <p className="max-w-md text-center text-[13px] leading-relaxed text-muted-foreground">
-          Random sample asks Athena for a subset of this query. Seeded keeps the same rows on every pull. Unseeded draws a new set each time.
+          Random sample draws a random subset of this query. Seeded keeps the same rows every time. Unseeded draws a new set each time.
         </p>
         <div className="relative w-full max-w-xs overflow-hidden rounded-xl border border-border/70 bg-background/90 shadow-sm">
           <BorderBeam size={70} duration={8} borderWidth={1.2} colorFrom="#0d99ff" colorTo="#7cc4ff" />

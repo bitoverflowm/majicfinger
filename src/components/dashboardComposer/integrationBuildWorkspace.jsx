@@ -1727,12 +1727,12 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
     });
   }, [sampleSizeNumber, summarySourceRows, sampleMode, sampleSeed, sampleShuffle]);
   const paneLine = (() => {
-    if (showSampleExplainer) return "Illustration. Athena draws the sample when you run the pull.";
+    if (showSampleExplainer) return "Illustration. A random subset of this query is drawn when you run the pull.";
     if (showBucketExplainer) return "Illustration. The bucket sheet is created when you run the pull.";
     if (sampleActive) {
       if (sampleSizeError) return sampleSizeError;
       const shown = samplePreviewRows.length;
-      return `Previewing ${shown.toLocaleString()} of the rows on screen. Save and run asks Athena for ${sampleSizeNumber.toLocaleString()} ${sampleMode === "seeded" ? "seeded" : "new"} rows.`;
+      return `Previewing ${shown.toLocaleString()} of the rows on screen. Save and run draws ${sampleSizeNumber.toLocaleString()} ${sampleMode === "seeded" ? "seeded" : "new"} rows from the full query.`;
     }
     if (bucketActive && bucketTab === "buckets") {
       if (!bucketView.ready) return "Choose a column to bucket. The result is a new sheet.";
@@ -2709,7 +2709,7 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
             ) : bucketActive && bucketTab === "buckets" ? (
               <p className="mt-1 text-right text-[11px] text-muted-foreground">Preview only. This sheet is created when you run the pull.</p>
             ) : sampleActive ? (
-              <p className="mt-1 text-right text-[11px] text-muted-foreground">Preview shuffles the rows on screen. Athena draws the full sample when you run the pull.</p>
+              <p className="mt-1 text-right text-[11px] text-muted-foreground">Preview shuffles the rows on screen. The full sample is drawn when you run the pull.</p>
             ) : null}
           </div>
         </div>
