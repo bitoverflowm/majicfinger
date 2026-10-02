@@ -8,6 +8,17 @@ async function readJson(res) {
   }
 }
 
+export async function loadWorkspaceDashboardPreview() {
+  const res = await fetch("/api/workspace-dashboards/preview", { credentials: "include" });
+  const json = await readJson(res);
+  if (res.status === 401) return { ok: false, unauthorized: true };
+  if (res.status === 404) return { ok: true, data: null };
+  if (!res.ok || !json?.success) {
+    return { ok: false, message: json?.message || "Could not load the preview." };
+  }
+  return { ok: true, data: json.data || null };
+}
+
 export async function loadCurrentWorkspaceDashboard() {
   const res = await fetch("/api/workspace-dashboards/current", { credentials: "include" });
   const json = await readJson(res);

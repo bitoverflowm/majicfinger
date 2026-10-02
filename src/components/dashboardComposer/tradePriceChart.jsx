@@ -38,7 +38,7 @@ function bucketYesPrice(columns, rows) {
   const timeIndex = columnIndex(columns, (title) => title.includes("created"));
   const priceIndex = columnIndex(columns, (title) => title === "yes price");
   const sizeIndex = columnIndex(columns, (title) => title === "size" || title === "volume");
-  const sizeTitle = sizeIndex >= 0 ? columns[sizeIndex]?.title || "Size" : "";
+  const sizeTitle = sizeIndex >= 0 ? "Volume" : "";
   if (timeIndex < 0 || priceIndex < 0) return { points: [], sizeTitle };
 
   const samples = [];
@@ -100,9 +100,9 @@ export function TradePriceChart({ columns, rows, preset, onSeries }) {
           <p className="text-[22px] font-semibold leading-none tabular-nums text-foreground">{Math.round(active.price)}¢</p>
           <p className="mt-1 truncate text-[11px] text-muted-foreground">{formatWhen(active.time)}</p>
         </div>
-        {sizeTitle ? (
+        {sizeTitle || active?.size ? (
           <p className="shrink-0 text-right text-[11px] text-muted-foreground">
-            {sizeTitle} <span className="font-medium tabular-nums text-foreground">{formatCompact(active.size)}</span>
+            Volume <span className="font-medium tabular-nums text-foreground">{formatCompact(active.size || 0)}</span>
           </p>
         ) : null}
       </div>

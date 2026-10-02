@@ -416,6 +416,38 @@ function SaveDashboardButton() {
   );
 }
 
+function PreviewDashboardButton() {
+  const canvas = useWorkspaceCanvas();
+  const router = useRouter();
+  const [busy, setBusy] = useState(false);
+
+  const onClick = async () => {
+    if (busy) return;
+    setBusy(true);
+    try {
+      await canvas?.saveNow?.();
+      router.push("/dashboard/preview");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <button
+      type="button"
+      aria-label="Preview dashboard"
+      title="Preview"
+      disabled={busy}
+      onClick={() => {
+        void onClick();
+      }}
+      className="inline-flex size-7 items-center justify-center rounded-md text-neutral-700 hover:bg-black/[0.05] disabled:opacity-60 dark:text-neutral-200 dark:hover:bg-white/10"
+    >
+      <Play className="size-4" aria-hidden />
+    </button>
+  );
+}
+
 function RightChromeControls({ onLogout, expanded }) {
   const user = useUser();
   const router = useRouter();
@@ -435,6 +467,7 @@ function RightChromeControls({ onLogout, expanded }) {
         </Button>
       )}
       <SaveDashboardButton />
+      <PreviewDashboardButton />
       <AnimatedThemeToggler className="inline-flex size-7 items-center justify-center rounded-md text-neutral-700 hover:bg-black/[0.05] dark:text-neutral-200 dark:hover:bg-white/10 [&_svg]:size-4" />
       <LiveTransportControls />
       <button

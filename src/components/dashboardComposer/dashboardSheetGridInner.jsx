@@ -98,7 +98,7 @@ function themeFor(dark, fontFamily) {
   };
 }
 
-export default function DashboardSheetGridInner({ block, onChange }) {
+export default function DashboardSheetGridInner({ block, onChange, readOnly = false }) {
   const dark = useHtmlDarkClass();
   const frameRef = useRef(null);
   const [size, setSize] = useState({ width: 0, height: 0 });
@@ -182,8 +182,8 @@ export default function DashboardSheetGridInner({ block, onChange }) {
           columns={columns}
           rows={rows}
           getCellContent={getCellContent}
-          onCellEdited={onCellEdited}
-          onColumnResize={onColumnResize}
+          onCellEdited={readOnly ? undefined : onCellEdited}
+          onColumnResize={readOnly ? undefined : onColumnResize}
           rowMarkers="number"
           headerHeight={32}
           rowHeight={28}

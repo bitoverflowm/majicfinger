@@ -7,6 +7,6 @@ const DashboardSheetGridInner = dynamic(() => import("./dashboardSheetGridInner"
 });
 
 /** Editable blank sheet for the new dashboard. Legacy AG Grid is unchanged. */
-export function DashboardSheetGrid({ block, onChange }) {
-  return <DashboardSheetGridInner block={block} onChange={onChange} />;
+export function DashboardSheetGrid({ block, onChange, readOnly = false }) {
+  return <DashboardSheetGridInner block={block} onChange={onChange} readOnly={readOnly} />;
 }

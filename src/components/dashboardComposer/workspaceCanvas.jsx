@@ -27,6 +27,7 @@ import {
 import {
   createWorkspaceDashboard,
   loadCurrentWorkspaceDashboard,
+  loadWorkspaceDashboardPreview,
   saveWorkspaceDashboard,
 } from "@/lib/workspaceDashboardClient";
 import { pageIdForTab, tabIdFromPage } from "@/lib/workspaceDashboardDocument";
@@ -124,7 +125,7 @@ function writeLocalDashboard(userId, draft) {
   }
 }
 
-export function WorkspaceCanvasProvider({ pageId, children }) {
+export function WorkspaceCanvasProvider({ pageId, readOnly = false, children }) {
   const user = useUser();
   const ctx = useMyStateV2();
   const owner = user === undefined ? "" : user?.userId || "local";
@@ -134,6 +135,8 @@ export function WorkspaceCanvasProvider({ pageId, children }) {
   const [tables, setTables] = useState([]);
   const [ready, setReady] = useState(false);
   const [dashboardName, setDashboardName] = useState("Untitled");
+  const [previewTabs, setPreviewTabs] = useState([]);
+  const [previewActiveId, setPreviewActiveId] = useState("");
   const [selectedId, setSelectedId] = useState(null);
   const [renameId, setRenameId] = useState(null);
   const blocks = blocksByPage[pageId] || [];
@@ -170,9 +173,25 @@ export function WorkspaceCanvasProvider({ pageId, children }) {
     let cancel = false;
     setReady(false);
     (async () => {
-      const loaded = await loadCurrentWorkspaceDashboard();
+      const loaded = readOnly ? await loadWorkspaceDashboardPreview() : await loadCurrentWorkspaceDashboard();
       if (cancel) return;
       let doc = loaded.ok ? loaded.data : null;
+      if (readOnly) {
+        if (!doc) {
+          setReady(true);
+          return;
+        }
+        const nextBlocks = blocksByPageFromDoc(doc);
+        lastPayloadRef.current = JSON.stringify({ name: doc.name, blocks: doc.blocks });
+        docIdRef.current = String(doc._id || "");
+        setDashboardName(String(doc.name || "").trim() || "Untitled");
+        setPreviewTabs(Array.isArray(doc.tabs) ? doc.tabs : []);
+        setPreviewActiveId(doc.active_tab_id || doc.tabs?.[0]?.id || "");
+        setTables(Array.isArray(doc.tables) ? doc.tables : []);
+        setBlocksByPage(nextBlocks);
+        setReady(true);
+        return;
+      }
       if (loaded.ok && !doc) {
         const seeded = {
           name: "Untitled",
@@ -243,7 +262,7 @@ export function WorkspaceCanvasProvider({ pageId, children }) {
   }, [owner]);
 
   useEffect(() => {
-    if (!ready || !owner || owner === "local") return undefined;
+    if (readOnly || !ready || !owner || owner === "local") return undefined;
     const draft = draftFromState(blocksByPage, tables);
     draftRef.current = draft;
     writeLocalDashboard(owner, draft);
@@ -275,16 +294,16 @@ export function WorkspaceCanvasProvider({ pageId, children }) {
         .catch(() => {});
     }, 700);
     return () => window.clearTimeout(timer);
-  }, [activeTabId, blocksByPage, dashboardName, owner, ready, tables, tabs, welcomeRemoved]);
+  }, [activeTabId, blocksByPage, dashboardName, owner, readOnly, ready, tables, tabs, welcomeRemoved]);
 
   useEffect(() => {
-    if (!ready || !storageKey) return;
+    if (readOnly || !ready || !storageKey) return;
     try {
       localStorage.setItem(storageKey, JSON.stringify(blocks));
     } catch {
       // The full dashboard document is the copy that survives a reload.
     }
-  }, [blocks, ready, storageKey]);
+  }, [blocks, readOnly, ready, storageKey]);
 
   useEffect(() => {
     if (!ready || user === undefined) return undefined;
@@ -312,6 +331,7 @@ export function WorkspaceCanvasProvider({ pageId, children }) {
   }, [blocks, pageId, ready, user]);
 
   useEffect(() => {
+    if (readOnly) return undefined;
     const flush = () => {
       const id = docIdRef.current;
       const draft = draftRef.current;
@@ -320,7 +340,7 @@ export function WorkspaceCanvasProvider({ pageId, children }) {
     };
     window.addEventListener("pagehide", flush);
     return () => window.removeEventListener("pagehide", flush);
-  }, [owner]);
+  }, [owner, readOnly]);
 
   const updateBlock = useCallback(
     (id, patch) => {
@@ -507,6 +527,10 @@ export function WorkspaceCanvasProvider({ pageId, children }) {
       dashboardName,
       renameDashboard,
       saveNow,
+      readOnly,
+      ready,
+      previewTabs,
+      previewActiveId,
       blocks,
       blocksByPage,
       selectedId,
@@ -522,19 +546,24 @@ export function WorkspaceCanvasProvider({ pageId, children }) {
       removeBlock,
       createChartFromBlock,
     }),
-    [addBlock, blocks, blocksByPage, createChartFromBlock, dashboardName, duplicateBlock, focusBlock, placeIntegrationSheets, registerTables, removeBlock, renameDashboard, renameId, saveNow, selectedId, tool, updateBlock],
+    [addBlock, blocks, blocksByPage, createChartFromBlock, dashboardName, duplicateBlock, focusBlock, placeIntegrationSheets, previewActiveId, previewTabs, readOnly, ready, registerTables, removeBlock, renameDashboard, renameId, saveNow, selectedId, tool, updateBlock],
   );
 
   return <WorkspaceCanvasContext.Provider value={value}>{children}</WorkspaceCanvasContext.Provider>;
 }
 
 function EditableText({ value, onChange, className, placeholder }) {
+  const canvas = useWorkspaceCanvas();
   const ref = useRef(null);
   useEffect(() => {
+    if (canvas?.readOnly) return;
     const el = ref.current;
     if (!el || document.activeElement === el) return;
     if (el.textContent !== value) el.textContent = value || "";
-  }, [value]);
+  }, [canvas?.readOnly, value]);
+  if (canvas?.readOnly) {
+    return <div className={className}>{value || placeholder || ""}</div>;
+  }
   return (
     <div
       ref={ref}
@@ -566,6 +595,7 @@ function filledRowCount(cells) {
 }
 
 function SheetBlockBody({ block, onChange }) {
+  const canvas = useWorkspaceCanvas();
   const label = useTradeSheetLabel(block.id, Math.max(filledRowCount(block.cells), Number(block.rowCount) || 0));
   return (
     <div className="flex min-h-0 flex-1 flex-col">
@@ -577,9 +607,9 @@ function SheetBlockBody({ block, onChange }) {
           onChange={(title) => onChange({ title })}
           className="min-w-0 flex-1 text-[13px] font-semibold text-foreground"
         />
-        <span className="shrink-0 pr-4 text-[12px] tabular-nums text-muted-foreground">{label}</span>
+        <span className={cn("shrink-0 text-[12px] tabular-nums text-muted-foreground", canvas?.readOnly ? "pr-1" : "pr-4")}>{label}</span>
       </div>
-      <DashboardSheetGrid block={block} onChange={onChange} />
+      <DashboardSheetGrid block={block} onChange={onChange} readOnly={!!canvas?.readOnly} />
     </div>
   );
 }
@@ -644,6 +674,7 @@ function ChartBlockBody({ block, onChange }) {
           sheet={source?.type === "sheet" ? source : null}
           snapshot={block.chart}
           onSnapshot={(chart) => {
+            if (canvas?.readOnly) return;
             if (chartSnapshotKey(block.chart) === chartSnapshotKey(chart)) return;
             onChange({ chart });
           }}
@@ -673,14 +704,22 @@ function SheetFullscreen({ block, onChange, onClose }) {
 
   const label = useTradeSheetLabel(block.id, Math.max(filledRowCount(block.cells), Number(block.rowCount) || 0));
   return createPortal(
-    <div className="fixed inset-0 z-[640] flex flex-col bg-background">
+    <div
+      data-sheet-fullscreen=""
+      className="fixed inset-0 z-[640] flex flex-col bg-background"
+      onPointerDown={(event) => event.stopPropagation()}
+    >
       <div className="flex items-center gap-3 border-b border-border/70 px-4 py-3">
         <Table2 className="size-4 text-muted-foreground" aria-hidden />
         <span className="min-w-0 flex-1 truncate text-[15px] font-semibold">{block.title || "Data sheet"}</span>
         <span className="text-[12px] tabular-nums text-muted-foreground">{label}</span>
         <button
           type="button"
-          onClick={onClose}
+          onPointerDown={(event) => event.stopPropagation()}
+          onClick={(event) => {
+            event.stopPropagation();
+            onClose();
+          }}
           className="inline-flex h-8 items-center gap-1.5 rounded-md border border-border/70 px-2.5 text-[13px] font-medium hover:bg-muted"
         >
           <X className="size-3.5" aria-hidden />
@@ -697,6 +736,7 @@ function SheetFullscreen({ block, onChange, onClose }) {
 
 function CanvasBlock({ block, selected, onSelect, onChange }) {
   const canvas = useWorkspaceCanvas();
+  const readOnly = !!canvas?.readOnly;
   const dragRef = useRef(null);
   const rootRef = useRef(null);
   const [menuOpen, setMenuOpen] = useState(false);
@@ -717,11 +757,11 @@ function CanvasBlock({ block, selected, onSelect, onChange }) {
   }, [block.id, canvas?.renameId, canvas?.setRenameId]);
 
   const onPointerDown = (e) => {
-    if (e.button !== 0) return;
+    if (readOnly || e.button !== 0) return;
     if (
       e.target instanceof Element &&
       e.target.closest(
-        "[data-sheet-grid],[data-resize],[data-block-menu],[role='menu'],[role='menuitem'],.gdg-style,.gdg-unstyle,textarea,input",
+        "[data-sheet-fullscreen],[data-sheet-grid],[data-resize],[data-block-menu],[role='menu'],[role='menuitem'],.gdg-style,.gdg-unstyle,textarea,input",
       )
     ) {
       return;
@@ -803,17 +843,19 @@ function CanvasBlock({ block, selected, onSelect, onChange }) {
       role="group"
       data-block-id={block.id}
       aria-label={block.title || block.body || block.type}
-      onPointerDown={onPointerDown}
-      onPointerMove={onPointerMove}
-      onPointerUp={onPointerUp}
+      onPointerDown={readOnly ? undefined : onPointerDown}
+      onPointerMove={readOnly ? undefined : onPointerMove}
+      onPointerUp={readOnly ? undefined : onPointerUp}
       className={cn(
-        "group/block pointer-events-auto absolute flex flex-col overflow-hidden rounded-xl border bg-background shadow-sm",
-        selected
+        "pointer-events-auto absolute flex flex-col overflow-hidden rounded-xl border bg-background shadow-sm",
+        readOnly ? "border-border/70" : "group/block",
+        !readOnly && selected
           ? "border-[#0d99ff] ring-2 ring-[#0d99ff]/25"
-          : "border-border/70 hover:border-[#0d99ff]",
+          : !readOnly && "border-border/70 hover:border-[#0d99ff]",
       )}
       style={{ left: block.x, top: block.y, width: block.w, height: block.h }}
     >
+      {readOnly ? null : (
       <DropdownMenu open={menuOpen} onOpenChange={setMenuOpen}>
         <DropdownMenuTrigger asChild>
           <button
@@ -879,11 +921,13 @@ function CanvasBlock({ block, selected, onSelect, onChange }) {
           <DestructiveConfirmMenuItem onConfirm={() => canvas?.removeBlock?.(block.id)} />
         </DropdownMenuContent>
       </DropdownMenu>
-      {fullscreen && block.type === "sheet" ? (
+      )}
+      {fullscreen && block.type === "sheet" && !readOnly ? (
         <SheetFullscreen block={block} onChange={onChange} onClose={() => setFullscreen(false)} />
       ) : (
         <BlockBody block={block} onChange={onChange} />
       )}
+      {readOnly ? null : (
       <div
         data-resize=""
         aria-hidden="true"
@@ -893,6 +937,7 @@ function CanvasBlock({ block, selected, onSelect, onChange }) {
         className="absolute bottom-0 right-0 z-10 size-4"
         style={{ cursor: "nwse-resize" }}
       />
+      )}
     </div>
   );
 }
