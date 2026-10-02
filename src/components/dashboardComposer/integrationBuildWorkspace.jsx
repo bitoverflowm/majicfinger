@@ -10,16 +10,13 @@ import { JoinExplainer, JoinExplainerTabs } from "@/components/dashboardComposer
 import { SpectrumLoadingState } from "@/components/ui/spectrum-loading-state";
 import {
   BUILD_SOURCES,
-  buildKalshiHistoricalMarketsRequest,
+  buildKalshiHistoricalRequest,
   loadBuildPreview,
   loadBuildUniverseCount,
-  loadKalshiHistoricalMarketsPreview,
+  loadKalshiHistoricalPreview,
   loadAthenaComposeRows,
   loadKalshiHistoricalTradesForTicker,
   peekBuildUniverseCount,
-  appendQueryHistory,
-  readSavedSearches,
-  saveSearch,
   usesExactUniverse,
 } from "@/components/dashboardComposer/integrationBuildCatalog";
 import { Accordion, AccordionContent, AccordionItem } from "@/components/ui/accordion";
@@ -38,8 +35,14 @@ import { Input } from "@/components/ui/input";
 import { useMyStateV2 } from "@/context/stateContextV2";
 import { getHistoricalPullRowLimit, getJoinMarketCap } from "@/lib/athenaEntitlement";
 import { evaluateColumnFormula, FORMULA_FUNCTIONS, FORMULA_REFERENCE_NOTES, formulaSuggestions } from "@/lib/columnFormula";
-import { listConnectHomeSheetHistory, requestCardSummaryLabel } from "@/lib/connectHomeRequestHistory";
 import { useUser } from "@/lib/hooks";
+import {
+  discardSharedQueryStorage,
+  loadWorkspaceQueries,
+  readUserQueryCache,
+  saveWorkspaceQuery,
+  writeUserQueryCache,
+} from "@/lib/workspaceQueryClient";
 import {
   attributeSummary,
   buildKalshiHistoricalFilterPredicates,
@@ -53,12 +56,11 @@ import { useIntegrationConnect } from "@/components/dashboardComposer/integratio
 import { sheetRecords } from "@/components/dashboardComposer/integrationRunSheets";
 import { useWorkspaceCanvas } from "@/components/dashboardComposer/workspaceCanvas";
 
-function humanHistoryLabel(label) {
-  return String(label || "")
-    .replace(/\b(select|where|from|group by|order by)\b/gi, "")
-    .replace(/\s+/g, " ")
-    .replace(/\s·\s·/g, " · ")
-    .trim();
+function rememberEntry(list, entry, limit, byFingerprint) {
+  const previous = (list || []).filter(
+    (item) => item.id !== entry.id && (!byFingerprint || !entry.fingerprint || item.fingerprint !== entry.fingerprint),
+  );
+  return [entry, ...previous].slice(0, limit);
 }
 
 function ColumnOption({ column, checked, onToggle }) {
@@ -387,9 +389,10 @@ function EnrichStep({
   onFunctionHelp,
   onSaveAndRun,
   running,
+  showBuilders = true,
 }) {
-  const joinOpen = picked === "join";
-  const functionOpen = picked === "function";
+  const joinOpen = showBuilders && picked === "join";
+  const functionOpen = showBuilders && picked === "function";
   const queryRowCount = typeof queryRows === "number" ? queryRows : sheetCount;
   return (
     <>
@@ -594,7 +597,8 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
   const [revealKey, setRevealKey] = useState(0);
   const baseRowsRef = useRef([]);
   const usingFilteredSample = useRef(false);
-  const [saved, setSaved] = useState(() => readSavedSearches());
+  const [saved, setSaved] = useState([]);
+  const [pulls, setPulls] = useState([]);
   const [step, setStep] = useState("query");
   const [lockedQuery, setLockedQuery] = useState(null);
   const [justSaved, setJustSaved] = useState(false);
@@ -627,7 +631,8 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
     : tableIds;
   const table = tables[tableId];
   const exactUniverse = usesExactUniverse(integrationId);
-  const guidedFilters = integrationId === "kalshiHistorical" && tableId === "markets";
+  const marketsQuery = integrationId === "kalshiHistorical" && tableId === "markets";
+  const guidedFilters = integrationId === "kalshiHistorical" && (tableId === "markets" || tableId === "trades");
 
   useEffect(() => {
     const next = BUILD_SOURCES[integrationId];
@@ -768,7 +773,7 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
         .filter((column) => !hidden.has(column.id))
         .map((column) =>
           integrationId === "kalshiHistorical" &&
-          (column.id === "last_price" || column.id === "yes_bid" || column.id === "yes_price")
+          (column.id === "last_price" || column.id === "yes_bid" || column.id === "yes_price" || column.id === "no_price")
             ? { ...column, scale: "cents" }
             : column,
         ),
@@ -864,7 +869,7 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
     let cancel = false;
     setPreviewRefreshing(true);
     const timer = window.setTimeout(() => {
-      loadKalshiHistoricalMarketsPreview(predicates, sortKeys)
+      loadKalshiHistoricalPreview(tableId === "trades" ? "trades" : "markets", predicates, sortKeys)
         .then((result) => {
           if (cancel) return;
           usingFilteredSample.current = true;
@@ -880,23 +885,30 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
       cancel = true;
       window.clearTimeout(timer);
     };
-  }, [guidedFilters, attributeFilters, pull?.columns, sortKeys]);
+  }, [guidedFilters, attributeFilters, pull?.columns, sortKeys, tableId]);
 
-  const history = useMemo(() => {
-    const entries = listConnectHomeSheetHistory(ctx?.dataSheets || {});
-    const items = [];
-    for (const entry of entries) {
-      for (const card of entry.cards) {
-        const raw = requestCardSummaryLabel(card, entry.sheet);
-        const label = humanHistoryLabel(raw);
-        if (!label) continue;
-        items.push({ id: card.id, label });
-      }
-    }
-    return items.slice(0, 12);
-  }, [ctx?.dataSheets]);
+  const accountId = user?.userId || "";
+
+  useEffect(() => {
+    setSaved([]);
+    setPulls([]);
+    if (!accountId) return undefined;
+    discardSharedQueryStorage();
+    let cancel = false;
+    loadWorkspaceQueries().then((result) => {
+      if (cancel) return;
+      const next = result.ok ? { saved: result.saved, pulls: result.pulls } : readUserQueryCache(accountId);
+      setSaved(next.saved);
+      setPulls(next.pulls);
+      if (result.ok) writeUserQueryCache(accountId, next);
+    });
+    return () => {
+      cancel = true;
+    };
+  }, [accountId]);
 
   const savedForSource = saved.filter((item) => item.integrationId === integrationId);
+  const pullsForSource = pulls.filter((item) => item.integrationId === integrationId);
 
   function toggleColumn(id) {
     setHidden((current) => {
@@ -940,7 +952,8 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
     const caps = [];
     if (typeof planLimit === "number" && planLimit > 0) caps.push(planLimit);
     if (Number.isFinite(requested) && requested > 0) caps.push(requested);
-    return buildKalshiHistoricalMarketsRequest({
+    return buildKalshiHistoricalRequest({
+      table: tableId === "trades" ? "trades" : "markets",
       predicates,
       sortKeys,
       columnIds,
@@ -987,9 +1000,18 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
   function onSave() {
     const snapshot = querySnapshot();
     const entry = { ...snapshot, id: `${integrationId}:${tableId}:${Date.now()}`, savedAt: Date.now() };
-    setSaved(saveSearch(entry));
+    setSaved((current) => {
+      const next = rememberEntry(current, entry, 40, true);
+      if (accountId) writeUserQueryCache(accountId, { saved: next, pulls });
+      return next;
+    });
     setJustSaved(true);
     window.setTimeout(() => setJustSaved(false), 1600);
+    if (!accountId) return;
+    saveWorkspaceQuery("saved", entry).then((result) => {
+      if (result.ok) return;
+      setSaved((current) => current.filter((item) => item.id !== entry.id));
+    });
   }
 
   function applySaved(entry) {
@@ -1061,15 +1083,15 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
   })();
 
   const canProceed = Boolean(pull) && !loading && !error && shownColumns.length > 0;
-  const joinCommitted = step === "enrich" && joinTarget === "kalshiHistoricalTrades";
-  const showFunctionExplainer = step === "enrich" && hoverFunction;
-  const showJoinExplainer = step === "enrich" && hoverJoin && !joinCommitted && !showFunctionExplainer;
+  const joinCommitted = marketsQuery && step === "enrich" && joinTarget === "kalshiHistoricalTrades";
+  const showFunctionExplainer = marketsQuery && step === "enrich" && hoverFunction;
+  const showJoinExplainer = marketsQuery && step === "enrich" && hoverJoin && !joinCommitted && !showFunctionExplainer;
   const showJoinSheets = joinCommitted && !showFunctionExplainer && !showJoinExplainer;
   const functionActive = step === "enrich" && enrichPick === "function" && Boolean(functionTarget) && !showFunctionExplainer;
   const functionOnMarkets = functionActive && (functionTarget === "markets" || functionTarget === "all");
   const functionOnTrades = functionActive && (functionTarget === "trades" || functionTarget === "trades-all" || functionTarget === "all");
   const functionOnNew = functionActive && functionTarget === "new";
-  const sheetTitle = tableId === "markets" ? "Markets" : tables[tableId]?.label || "This sheet";
+  const sheetTitle = tableId === "markets" ? "Markets" : tableId === "trades" ? "Trades" : tables[tableId]?.label || "This sheet";
   const formulaSheets = useMemo(() => {
     const used = new Set();
     const list = [];
@@ -1300,7 +1322,7 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
     let runTickers = [];
     if (runMarkets.columns.length) {
       sheets.push({
-        id: "run-markets",
+        id: tableId === "trades" ? "run-trades" : "run-markets",
         title: sheetTitle,
         columns: runMarkets.columns,
         rows: runMarkets.rows,
@@ -1333,7 +1355,7 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
         const fullRows = shaped.rows || [];
         const pull = { lake: "kalshi", table: "trades", ticker: item.ticker, limit: sheetCap };
         if (fullRows.length > 50) {
-          rememberTradeSheet(id, item.ticker, shaped.columns, displayMatrix(shaped.columns, fullRows), sheetCap);
+          rememberTradeSheet(id, item.ticker, shaped.columns, displayMatrix(shaped.columns, fullRows), sheetCap, accountId);
         }
         sheets.push({
           id,
@@ -1402,7 +1424,7 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
       })),
     );
     const historyId = `run-${Date.now().toString(36)}`;
-    appendQueryHistory({
+    const pullEntry = {
       id: historyId,
       savedAt: Date.now(),
       label: lockedQuery?.label || describeSearch(),
@@ -1425,7 +1447,13 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
           }
         : null,
       formula: functionActive ? functionFormula : "",
+    };
+    setPulls((current) => {
+      const next = rememberEntry(current, pullEntry, 80, false);
+      if (accountId) writeUserQueryCache(accountId, { saved, pulls: next });
+      return next;
     });
+    if (accountId) saveWorkspaceQuery("pull", pullEntry);
     ctx?.setDataSheets?.((prev) => {
       const next = { ...(prev || {}) };
       for (const sheet of sheets) {
@@ -1536,6 +1564,7 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
             onFunctionHelp={() => setFunctionHelp(true)}
             onSaveAndRun={onSaveAndRun}
             running={running}
+            showBuilders={marketsQuery}
           />
         ) : (
         <>
@@ -1631,14 +1660,19 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
                 )}
                 <DropdownMenuSeparator />
                 <DropdownMenuLabel>Earlier pulls</DropdownMenuLabel>
-                {history.length ? (
-                  history.map((entry) => (
-                    <DropdownMenuItem key={entry.id} disabled>
-                      {entry.label}
+                {pullsForSource.length ? (
+                  pullsForSource.map((entry) => (
+                    <DropdownMenuItem key={entry.id} disabled title={entry.label}>
+                      <span className="min-w-0">
+                        <span className="block truncate text-[13px]">{entry.label || "Earlier pull"}</span>
+                        {entry.savedAt ? (
+                          <span className="block text-[11px] text-muted-foreground">{formatSavedAt(entry.savedAt)}</span>
+                        ) : null}
+                      </span>
                     </DropdownMenuItem>
                   ))
                 ) : (
-                  <DropdownMenuItem disabled>No earlier pulls in this workspace</DropdownMenuItem>
+                  <DropdownMenuItem disabled>No earlier pulls for this account</DropdownMenuItem>
                 )}
               </DropdownMenuContent>
             </DropdownMenu>
@@ -1710,6 +1744,7 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
                 onSorts={setSortKeys}
                 rowLimit={rowLimit}
                 onRowLimit={setRowLimit}
+                sectionTitle={tableId === "trades" ? "Trade attributes" : "Market attributes"}
               />
             ) : null}
           </Accordion>

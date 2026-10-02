@@ -1,8 +1,10 @@
 import mongoose from "mongoose";
-import { getLoginSession } from "@/lib/auth";
+import { getLoginSession, setLoginSession } from "@/lib/auth";
 import dbConnect from "@/lib/dbConnect";
 import User from "@/models/Users";
 import { isOwnerFullAccessUser } from "@/lib/ownerFullAccess";
+import { DEV_LOGIN_BYPASS_EMAIL } from "@/lib/devLoginBypass";
+import { adoptDevBypassWorkspace } from "@/lib/adoptDevBypassWorkspace";
 
 function escapeRegex(s) {
   return String(s).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
@@ -19,6 +21,29 @@ function userEntitlementScore(user) {
   return score;
 }
 
+async function promoteDevBypassSession(res, session) {
+  if (process.env.NODE_ENV === "production") return null;
+  const email = String(session?.email || "").trim().toLowerCase();
+  if (email !== DEV_LOGIN_BYPASS_EMAIL.toLowerCase()) return null;
+  try {
+    await dbConnect();
+    const dbUser = await User.findOne({ email: DEV_LOGIN_BYPASS_EMAIL });
+    if (!dbUser) return null;
+    const userId = String(dbUser._id);
+    await adoptDevBypassWorkspace(userId);
+    const next = {
+      email: dbUser.email,
+      name: dbUser.name || session.name,
+      userId,
+      issuer: session.issuer,
+    };
+    await setLoginSession(res, next);
+    return { ...session, ...next };
+  } catch {
+    return null;
+  }
+}
+
 export default async function user(req, res) {
   let session;
   try {
@@ -31,7 +56,8 @@ export default async function user(req, res) {
     return res.status(200).json({ user: null });
   }
   if (String(session?.userId || "") === "dev-bypass-no-db") {
-    return res.status(200).json({ user: session });
+    const promoted = await promoteDevBypassSession(res, session);
+    return res.status(200).json({ user: promoted || session });
   }
 
   try {
@@ -58,6 +84,12 @@ export default async function user(req, res) {
 
     if (dbUser) {
       payload.userId = String(dbUser._id);
+      if (
+        process.env.NODE_ENV !== "production" &&
+        String(dbUser.email || "").toLowerCase() === DEV_LOGIN_BYPASS_EMAIL.toLowerCase()
+      ) {
+        await adoptDevBypassWorkspace(payload.userId).catch(() => {});
+      }
       payload.lifetimeMember = !!dbUser.lifetimeMember;
       if (dbUser.subscriptionTier != null) payload.subscriptionTier = dbUser.subscriptionTier;
       if (dbUser.billingCycle != null) payload.billingCycle = dbUser.billingCycle;

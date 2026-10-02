@@ -99,41 +99,52 @@ function formatRows(columns, names, rawRows) {
   return rows;
 }
 
+function cacheId(userId, ticker) {
+  const owner = String(userId || "");
+  if (!owner || owner === "local") return "";
+  return `${owner}:${ticker}`;
+}
+
 function openDb() {
   return new Promise((resolve, reject) => {
-    const request = indexedDB.open("lycheeFullTradeSheets", 1);
+    const request = indexedDB.open("lycheeFullTradeSheets", 2);
     request.onupgradeneeded = () => {
       const db = request.result;
-      if (!db.objectStoreNames.contains("sheets")) db.createObjectStore("sheets");
+      if (db.objectStoreNames.contains("sheets")) db.deleteObjectStore("sheets");
+      db.createObjectStore("sheets");
     };
     request.onsuccess = () => resolve(request.result);
     request.onerror = () => reject(request.error);
   });
 }
 
-async function readCached(ticker, key) {
+async function readCached(userId, ticker, key) {
+  const id = cacheId(userId, ticker);
+  if (!id) return null;
   try {
     const db = await openDb();
     const record = await new Promise((resolve, reject) => {
       const tx = db.transaction("sheets", "readonly");
-      const request = tx.objectStore("sheets").get(ticker);
+      const request = tx.objectStore("sheets").get(id);
       request.onsuccess = () => resolve(request.result || null);
       request.onerror = () => reject(request.error);
     });
     db.close();
-    if (!record || record.key !== key || !Array.isArray(record.rows) || record.rows.length <= 50) return null;
+    if (!record || record.userId !== userId || record.key !== key || !Array.isArray(record.rows) || record.rows.length <= 50) return null;
     return record;
   } catch {
     return null;
   }
 }
 
-async function writeCached(ticker, record) {
+async function writeCached(userId, ticker, record) {
+  const id = cacheId(userId, ticker);
+  if (!id) return;
   try {
     const db = await openDb();
     await new Promise((resolve, reject) => {
       const tx = db.transaction("sheets", "readwrite");
-      tx.objectStore("sheets").put(record, ticker);
+      tx.objectStore("sheets").put({ ...record, userId }, id);
       tx.oncomplete = () => resolve();
       tx.onerror = () => reject(tx.error);
     });
@@ -164,30 +175,34 @@ function pump() {
   }
 }
 
-export function rememberTradeSheet(blockId, ticker, columns, rows, limit) {
+export function rememberTradeSheet(blockId, ticker, columns, rows, limit, userId) {
   const key = `${titlesKey(columns)}:${limit}`;
-  const ready = { status: "ready", ticker, rows, rowCount: rows.length, key };
+  const ready = { status: "ready", ticker, rows, rowCount: rows.length, key, userId: userId || "" };
   memory.set(blockId, ready);
   emit();
-  void writeCached(ticker, { key, rows });
+  void writeCached(userId, ticker, { key, rows });
   return ready;
 }
 
-export function ensureFullTradeSheet(blockId, ticker, columns, limit) {
+export function ensureFullTradeSheet(blockId, ticker, columns, limit, userId) {
+  const owner = userId || "";
   const current = memory.get(blockId);
-  if (current?.status === "ready" && current.ticker === ticker) return inflight.get(blockId) || Promise.resolve(current);
-  if (current?.status === "error") return Promise.resolve(current);
-  if (inflight.has(blockId)) return inflight.get(blockId);
-  const job = pullTradeSheet(blockId, ticker, columns, limit).finally(() => inflight.delete(blockId));
-  inflight.set(blockId, job);
+  if (current?.status === "ready" && current.ticker === ticker && current.userId === owner) {
+    return inflight.get(`${owner}:${blockId}`) || Promise.resolve(current);
+  }
+  if (current?.status === "error" && current.userId === owner) return Promise.resolve(current);
+  const flightKey = `${owner}:${blockId}`;
+  if (inflight.has(flightKey)) return inflight.get(flightKey);
+  const job = pullTradeSheet(blockId, ticker, columns, limit, owner).finally(() => inflight.delete(flightKey));
+  inflight.set(flightKey, job);
   return job;
 }
 
-async function pullTradeSheet(blockId, ticker, columns, limit) {
+async function pullTradeSheet(blockId, ticker, columns, limit, userId) {
   const key = `${titlesKey(columns)}:${limit}`;
-  const cached = await readCached(ticker, key);
+  const cached = await readCached(userId, ticker, key);
   if (cached) {
-    const ready = { status: "ready", ticker, rows: cached.rows, rowCount: cached.rows.length };
+    const ready = { status: "ready", ticker, rows: cached.rows, rowCount: cached.rows.length, userId };
     memory.set(blockId, ready);
     emit();
     return ready;
@@ -227,14 +242,14 @@ async function pullTradeSheet(blockId, ticker, columns, limit) {
         },
       );
       const rows = formatRows(columns, result.columns || [], result.rows || []);
-      return { status: "ready", ticker, rows, rowCount: rows.length, key };
+      return { status: "ready", ticker, rows, rowCount: rows.length, key, userId };
     });
     memory.set(blockId, ready);
     emit();
-    void writeCached(ticker, { key, rows: ready.rows });
+    void writeCached(userId, ticker, { key, rows: ready.rows });
     return ready;
   } catch {
-    const failed = { status: "error", ticker };
+    const failed = { status: "error", ticker, userId };
     memory.set(blockId, failed);
     emit();
     return failed;

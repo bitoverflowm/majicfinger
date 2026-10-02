@@ -312,7 +312,7 @@ export function WorkspaceCanvasProvider({ pageId, readOnly = false, children }) 
       const ticker = tradeTickerFromBlock(block);
       if (!ticker || !block.columns?.length) continue;
       const limit = block.pull?.limit || cap;
-      ensureFullTradeSheet(block.id, ticker, block.columns, limit).then((sheet) => {
+      ensureFullTradeSheet(block.id, ticker, block.columns, limit, owner).then((sheet) => {
         if (sheet?.status !== "ready") return;
         setBlocksByPage((prev) => {
           const list = prev[pageId] || [];

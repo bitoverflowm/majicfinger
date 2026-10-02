@@ -50,9 +50,6 @@ function kalshiLiveSource() {
   };
 }
 
-const SAVED_SEARCHES_KEY = "lycheeIntegrationSavedSearches";
-const QUERY_HISTORY_KEY = "lycheeIntegrationQueryHistory";
-
 export const BUILD_SOURCES = {
   kalshiHistorical: {
     name: "Kalshi Historical",
@@ -221,6 +218,43 @@ function kalshiHistoricalMarketColumns() {
   }));
 }
 
+const KALSHI_HISTORICAL_TRADE_FIELDS = [
+  ["trade_id", "text", "Trade id", "Unique trade identifier."],
+  ["ticker", "text", "Ticker", "Market ticker this trade belongs to."],
+  ["count", "number", "Size", "Number of contracts traded."],
+  ["yes_price", "number", "Yes price", "Yes contract price (cents, 1–99)."],
+  ["no_price", "number", "No price", "No contract price (cents, 1–99), always 100 − yes price."],
+  ["taker_side", "text", "Side", "Which side the taker bought: yes or no."],
+  ["created_time", "date", "Created time", "When the trade occurred."],
+  ["_fetched_at", "date", "Fetched at", "When this record was fetched."],
+];
+
+const KALSHI_HISTORICAL_TRADE_DEFAULTS = new Set([
+  "trade_id",
+  "ticker",
+  "count",
+  "yes_price",
+  "no_price",
+  "taker_side",
+  "created_time",
+  "_fetched_at",
+]);
+
+function kalshiHistoricalTradeColumns() {
+  return KALSHI_HISTORICAL_TRADE_FIELDS.map(([id, type, title, description]) => ({
+    id,
+    title,
+    type,
+    description,
+    defaultOn: KALSHI_HISTORICAL_TRADE_DEFAULTS.has(id),
+    ...(LAKE_CENTS.has(id) ? { scale: "cents" } : {}),
+  }));
+}
+
+function kalshiHistoricalColumns(table) {
+  return table === "trades" ? kalshiHistoricalTradeColumns() : kalshiHistoricalMarketColumns();
+}
+
 const LAKE_COMPUTED = new Set(["kalshi_event_ticker_category", "kalshi_taxonomy_category"]);
 const LAKE_CENTS = new Set(["last_price", "yes_bid", "yes_ask", "no_bid", "no_ask", "yes_price", "no_price"]);
 
@@ -352,20 +386,21 @@ async function postAthena(body) {
   });
 }
 
-function kalshiHistoricalMarketsCompose(predicates, sortKeys) {
-  const columns = kalshiHistoricalMarketColumns();
+function kalshiHistoricalCompose(table, predicates, sortKeys) {
+  const columns = kalshiHistoricalColumns(table);
   const and = Array.isArray(predicates) ? predicates : Array.isArray(predicates?.and) ? predicates.and : [];
   const or = Array.isArray(predicates) ? [] : Array.isArray(predicates?.or) ? predicates.or : [];
+  const fallback = table === "trades" ? { alias: "created_time", direction: "desc" } : { alias: "volume", direction: "desc" };
   const orderBy = Array.isArray(sortKeys) && sortKeys.length
     ? sortKeys
         .filter((sort) => columns.some((column) => column.id === sort.columnId))
         .map((sort) => ({ alias: sort.columnId, direction: sort.direction === "asc" ? "asc" : "desc" }))
-    : [{ alias: "volume", direction: "desc" }];
+    : [fallback];
   return {
     columns,
     request: {
       lake: "kalshi",
-      table: "markets",
+      table: table === "trades" ? "trades" : "markets",
       queryType: "compose",
       limit: PREVIEW_ROW_CAP,
       caseSensitive: false,
@@ -373,10 +408,14 @@ function kalshiHistoricalMarketsCompose(predicates, sortKeys) {
       compose: {
         select: columns.map((entry) => ({ column: entry.id, alias: entry.id })),
         groupByAliases: [],
-        orderBy: orderBy.length ? orderBy : [{ alias: "volume", direction: "desc" }],
+        orderBy: orderBy.length ? orderBy : [fallback],
       },
     },
   };
+}
+
+function kalshiHistoricalMarketsCompose(predicates, sortKeys) {
+  return kalshiHistoricalCompose("markets", predicates, sortKeys);
 }
 
 async function kalshiHistoricalMarkets() {
@@ -394,8 +433,8 @@ async function kalshiHistoricalMarkets() {
  * Preview fetches stay capped at PREVIEW_ROW_CAP; this request uses the import limit
  * and the columns the user left visible (plus any column used to sort).
  */
-export function buildKalshiHistoricalMarketsRequest({ predicates, sortKeys, columnIds, limit } = {}) {
-  const { columns, request } = kalshiHistoricalMarketsCompose(predicates, sortKeys);
+export function buildKalshiHistoricalRequest({ table = "markets", predicates, sortKeys, columnIds, limit } = {}) {
+  const { columns, request } = kalshiHistoricalCompose(table, predicates, sortKeys);
   const wanted = new Set(Array.isArray(columnIds) ? columnIds : []);
   for (const sort of Array.isArray(sortKeys) ? sortKeys : []) {
     if (sort?.columnId) wanted.add(sort.columnId);
@@ -471,8 +510,12 @@ export function loadAthenaComposeRows(request) {
   }).then((result) => ({ rows: rowsFromAthenaCells(result, cap) }));
 }
 
-export function loadKalshiHistoricalMarketsPreview(predicates, sortKeys) {
-  const { request } = kalshiHistoricalMarketsCompose(predicates, sortKeys);
+export function buildKalshiHistoricalMarketsRequest(args = {}) {
+  return buildKalshiHistoricalRequest({ ...args, table: "markets" });
+}
+
+export function loadKalshiHistoricalPreview(table, predicates, sortKeys) {
+  const { request } = kalshiHistoricalCompose(table, predicates, sortKeys);
   return fetchAthenaLakeSample(request, { maxWaitMs: 180000, pollIntervalMs: 800 }).then((result) => {
     const names = result.columns || [];
     const rows = (result.rows || []).map((cells) => {
@@ -486,14 +529,13 @@ export function loadKalshiHistoricalMarketsPreview(predicates, sortKeys) {
   });
 }
 
+export function loadKalshiHistoricalMarketsPreview(predicates, sortKeys) {
+  return loadKalshiHistoricalPreview("markets", predicates, sortKeys);
+}
+
 async function kalshiHistoricalTrades() {
-  const columns = lakeColumns("kalshi", "trades", ["created_time", "ticker", "taker_side", "yes_price", "count"]);
-  const rows = await postAthena({
-    lake: "kalshi",
-    table: "trades",
-    limit: PREVIEW_ROW_CAP,
-    columns: columns.map((entry) => entry.id),
-  });
+  const { columns, request } = kalshiHistoricalCompose("trades");
+  const rows = await postAthena(request);
   return {
     columns,
     rows: rows.slice(0, PREVIEW_ROW_CAP),
@@ -1087,39 +1129,3 @@ export function loadBuildPreview(integrationId, tableId) {
   });
 }
 
-export function readSavedSearches() {
-  if (typeof localStorage === "undefined") return [];
-  try {
-    const parsed = JSON.parse(localStorage.getItem(SAVED_SEARCHES_KEY) || "[]");
-    return Array.isArray(parsed) ? parsed : [];
-  } catch {
-    return [];
-  }
-}
-
-export function saveSearch(entry) {
-  const previous = readSavedSearches().filter(
-    (item) => item.id !== entry.id && (!entry.fingerprint || item.fingerprint !== entry.fingerprint),
-  );
-  const next = [entry, ...previous].slice(0, 40);
-  localStorage.setItem(SAVED_SEARCHES_KEY, JSON.stringify(next));
-  return next;
-}
-
-export function readQueryHistory() {
-  if (typeof localStorage === "undefined") return [];
-  try {
-    const parsed = JSON.parse(localStorage.getItem(QUERY_HISTORY_KEY) || "[]");
-    return Array.isArray(parsed) ? parsed : [];
-  } catch {
-    return [];
-  }
-}
-
-/** Executed pulls. Kept apart from Saved searches. */
-export function appendQueryHistory(entry) {
-  const previous = readQueryHistory().filter((item) => item.id !== entry.id);
-  const next = [entry, ...previous].slice(0, 80);
-  localStorage.setItem(QUERY_HISTORY_KEY, JSON.stringify(next));
-  return next;
-}

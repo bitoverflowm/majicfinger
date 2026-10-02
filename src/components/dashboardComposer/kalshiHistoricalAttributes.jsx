@@ -45,9 +45,13 @@ const ENUM_OPTIONS = {
     ["no", "No"],
     ["", "Unresolved"],
   ],
+  taker_side: [
+    ["yes", "Yes"],
+    ["no", "No"],
+  ],
 };
 
-const CENTS_COLUMNS = new Set(["yes_bid", "yes_ask", "no_bid", "no_ask", "last_price"]);
+const CENTS_COLUMNS = new Set(["yes_bid", "yes_ask", "no_bid", "no_ask", "last_price", "yes_price", "no_price"]);
 
 export function kalshiHistoricalAttributeSpec(column) {
   if (ENUM_OPTIONS[column?.id]) return { kind: "enum", options: ENUM_OPTIONS[column.id] };
@@ -648,10 +652,19 @@ function SortField({ columns, sorts, onChange }) {
   );
 }
 
-export function KalshiHistoricalAttributeFilters({ columns, filters, onChange, sorts, onSorts, rowLimit, onRowLimit }) {
+export function KalshiHistoricalAttributeFilters({
+  columns,
+  filters,
+  onChange,
+  sorts,
+  onSorts,
+  rowLimit,
+  onRowLimit,
+  sectionTitle = "Market attributes",
+}) {
   return (
     <>
-      <ParentSection value="market" title="Market attributes">
+      <ParentSection value="attributes" title={sectionTitle}>
             <Accordion type="single" collapsible className="space-y-2">
               {(columns || []).map((column) => {
                 const summary = attributeSummary(column, filters);
