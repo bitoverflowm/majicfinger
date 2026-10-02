@@ -1032,6 +1032,14 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
 
   function onNext() {
     setLockedQuery({ ...querySnapshot(), lockedAt: Date.now() });
+    setEnrichPick("");
+    setHoverJoin(false);
+    setHoverFunction(false);
+    setJoinTarget("");
+    setJoinTab("markets");
+    setFunctionTarget("");
+    setFunctionFormula("");
+    setFunctionTab("");
     setStep("enrich");
   }
 
@@ -1084,8 +1092,9 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
 
   const canProceed = Boolean(pull) && !loading && !error && shownColumns.length > 0;
   const joinCommitted = marketsQuery && step === "enrich" && joinTarget === "kalshiHistoricalTrades";
-  const showFunctionExplainer = marketsQuery && step === "enrich" && hoverFunction;
-  const showJoinExplainer = marketsQuery && step === "enrich" && hoverJoin && !joinCommitted && !showFunctionExplainer;
+  const tradesQuery = integrationId === "kalshiHistorical" && tableId === "trades";
+  const showFunctionExplainer = (marketsQuery || tradesQuery) && step === "enrich" && hoverFunction;
+  const showJoinExplainer = (marketsQuery || tradesQuery) && step === "enrich" && hoverJoin && !joinCommitted && !showFunctionExplainer;
   const showJoinSheets = joinCommitted && !showFunctionExplainer && !showJoinExplainer;
   const functionActive = step === "enrich" && enrichPick === "function" && Boolean(functionTarget) && !showFunctionExplainer;
   const functionOnMarkets = functionActive && (functionTarget === "markets" || functionTarget === "all");
@@ -1155,7 +1164,11 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
         : "";
   const paneLine = (() => {
     if (showFunctionExplainer) return "Illustration. The column is added when you pick a sheet.";
-    if (showJoinExplainer) return "Illustration. No trades are loaded until you run the pull.";
+    if (showJoinExplainer) {
+      return tradesQuery
+        ? "Illustration. No market metadata is loaded until you run the pull."
+        : "Illustration. No trades are loaded until you run the pull.";
+    }
     if (functionOnNew && functionTab === "new") return "New table. This sheet is created when you run the pull.";
     if (!showJoinSheets || joinTab === "markets") return previewLineShown;
     if (joinTab !== previewTicker) return PREVIEW_TRADE_LOCK;
@@ -1825,7 +1838,7 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
         {showFunctionExplainer ? (
           <FunctionExplainerTabs sheetTitle={sheetTitle} />
         ) : showJoinExplainer ? (
-          <JoinExplainerTabs />
+          <JoinExplainerTabs source={tradesQuery ? "trades" : "markets"} />
         ) : functionOnNew ? (
           <FunctionDestinationTabs
             sheetTitle={sheetTitle}
@@ -1864,7 +1877,7 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
           {showFunctionExplainer ? (
             <FunctionExplainer />
           ) : showJoinExplainer ? (
-            <JoinExplainer />
+            <JoinExplainer source={tradesQuery ? "trades" : "markets"} />
           ) : functionOnNew && functionTab === "new" && newTableGrid.columns.length ? (
             <IntegrationBuildGrid
               columns={newTableGrid.columns}
