@@ -1,7 +1,6 @@
 "use client";
 
 import { createContext, useContext, useEffect, useMemo, useRef, useState } from "react";
-import Image from "next/image";
 import { ArrowRight, Check, Database } from "lucide-react";
 import {
   Dialog,
@@ -52,6 +51,36 @@ const LOGO_BG = {
   binance: "bg-black",
 };
 
+const LOGO_MARK = {
+  kalshiHistorical: "KH",
+  kalshiHistoricalV2: "KH",
+  kalshiLive: "K",
+  polymarket: "P",
+  polymarketHistorical: "PH",
+  chainlink: "CL",
+  binance: "B",
+  coinGecko: "CG",
+  geckoDex: "GT",
+  twitter: "X",
+  wallStreetBets: "WSB",
+  productHunt: "Pr",
+  shortSqueeze: "SS",
+  secEdgar: "SEC",
+  censusGov: "US",
+  crunchbase: "CB",
+  hackerNews: "HN",
+  usTreasuries: "UT",
+};
+
+function logoMark(row) {
+  if (LOGO_MARK[row?.id]) return LOGO_MARK[row.id];
+  const words = String(row?.name || "")
+    .split(/\s+/)
+    .filter(Boolean);
+  if (words.length > 1) return words.map((word) => word[0]).join("").slice(0, 3).toUpperCase();
+  return (words[0] || "?").slice(0, 1).toUpperCase();
+}
+
 function rowsInOrder(rows, ids) {
   const byId = new Map(rows.map((row) => [row.id, row]));
   return ids.map((id) => byId.get(id)).filter(Boolean);
@@ -59,28 +88,45 @@ function rowsInOrder(rows, ids) {
 
 function Logo({ row }) {
   const brandBg = LOGO_BG[row.id];
-  if (row.logoPath) {
+  const mark = logoMark(row);
+  const [loaded, setLoaded] = useState(false);
+  const imgRef = useRef(null);
+  useEffect(() => {
+    const node = imgRef.current;
+    if (node?.complete && node.naturalWidth > 0) setLoaded(true);
+  }, [row.logoPath]);
+  const markClass = brandBg
+    ? "text-[11px] font-semibold tracking-tight text-white"
+    : "text-[13px] font-semibold text-foreground";
+
+  if (!row.logoPath) {
     return (
-      <span
-        className={cn(
-          "relative flex size-9 shrink-0 overflow-hidden rounded-lg",
-          brandBg || "border border-border/70 bg-background",
-        )}
-      >
-        <Image
-          src={row.logoPath}
-          alt=""
-          fill
-          className="object-contain p-1"
-          sizes="36px"
-        />
+      <span className="flex size-9 shrink-0 items-center justify-center rounded-lg border border-border/70 bg-muted text-[13px] font-semibold text-foreground">
+        {mark}
       </span>
     );
   }
-  const letter = (row.name || "?").slice(0, 1).toUpperCase();
+
   return (
-    <span className="flex size-9 shrink-0 items-center justify-center rounded-lg border border-border/70 bg-muted text-[13px] font-semibold text-foreground">
-      {letter}
+    <span
+      className={cn(
+        "relative flex size-9 shrink-0 overflow-hidden rounded-lg",
+        brandBg || "border border-border/70 bg-background",
+      )}
+    >
+      <span className={cn("absolute inset-0 flex items-center justify-center", markClass, loaded && "opacity-0")} aria-hidden>
+        {mark}
+      </span>
+      <img
+        src={row.logoPath}
+        alt=""
+        width={36}
+        height={36}
+        decoding="async"
+        ref={imgRef}
+        onLoad={() => setLoaded(true)}
+        className={cn("size-full object-contain p-1", loaded ? "opacity-100" : "opacity-0")}
+      />
     </span>
   );
 }
