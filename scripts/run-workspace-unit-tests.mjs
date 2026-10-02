@@ -68,6 +68,7 @@ import "@/lib/connectHomePullDestination.test.js";
 import "@/lib/connectHomeAddBlankSheet.test.js";
 import "@/lib/workspaceQueryRecord.test.js";
 import "@/lib/columnFormula.summary.test.js";
+import "@/components/dashboardComposer/enrichPreview.test.js";
 import "@/lib/kalshiPolymarketCompareDashboard.test.js";
 import "@/lib/parseSheetImportText.test.js";
 import "@/lib/sheetOperations/quant/quantOperations.test.js";

@@ -7,10 +7,14 @@ import { displayMatrix } from "@/components/dashboardComposer/integrationRunShee
 import { rememberTradeSheet } from "@/components/dashboardComposer/fullTradeSheet";
 import { FunctionExplainer, FunctionExplainerTabs } from "@/components/dashboardComposer/integrationFunctionExplainer";
 import { SummarizeExplainer, SummarizeExplainerTabs } from "@/components/dashboardComposer/integrationSummarizeExplainer";
+import { BucketExplainer, BucketExplainerTabs } from "@/components/dashboardComposer/integrationBucketExplainer";
+import { SampleExplainer } from "@/components/dashboardComposer/integrationSampleExplainer";
+import { BucketEnrichPanel, SampleEnrichPanel } from "@/components/dashboardComposer/integrationEnrichPanels";
 import { JoinExplainer, JoinExplainerTabs } from "@/components/dashboardComposer/integrationJoinExplainer";
 import { SpectrumLoadingState } from "@/components/ui/spectrum-loading-state";
 import {
   BUILD_SOURCES,
+  PREVIEW_ROW_CAP,
   buildKalshiHistoricalRequest,
   loadBuildPreview,
   loadBuildUniverseCount,
@@ -58,6 +62,9 @@ import { cn } from "@/lib/utils";
 import { useIntegrationConnect } from "@/components/dashboardComposer/integrationConnectDialog";
 import { sheetRecords } from "@/components/dashboardComposer/integrationRunSheets";
 import { buildSummaryGrid, SUMMARY_ROW_COUNT, summaryCellKey, summaryExamples } from "@/components/dashboardComposer/summarySheet";
+import { buildBucketGrid, defaultBucketMode, suggestedNumericBucketSize } from "@/components/dashboardComposer/bucketSheet";
+import { attachRandomSample, previewRandomSample } from "@/components/dashboardComposer/randomSampleRequest";
+import { generateRandomSampleSeed, validateRandomSampleSizeInput } from "@/lib/dataLake/randomSample";
 import { useWorkspaceCanvas } from "@/components/dashboardComposer/workspaceCanvas";
 
 function rememberEntry(list, entry, limit, byFingerprint) {
@@ -402,13 +409,13 @@ function SkeletonRows() {
 const ENRICH_OPTIONS = [
   { id: "join", title: "Join" },
   { id: "summarize", title: "Summarize" },
-  { id: "ifElse", title: "If else" },
+  { id: "ifElse", title: "If else", comingSoon: true },
   { id: "sample", title: "Random sample" },
   { id: "bucket", title: "Bucketing" },
   { id: "function", title: "Function" },
 ];
 
-function SummaryPreviewTabs({ sheetTitle, active, onSummary, onSource }) {
+function SummaryPreviewTabs({ sheetTitle, active, onSummary, onSource, resultTitle = "Summary" }) {
   return (
     <div className="overflow-hidden px-4 pb-1 pt-4">
       <div className="flex">
@@ -416,7 +423,7 @@ function SummaryPreviewTabs({ sheetTitle, active, onSummary, onSource }) {
           {sheetTitle}
         </button>
         <button type="button" onClick={onSummary} className={sheetTabClass(active === "summary")}>
-          Summary
+          {resultTitle}
         </button>
       </div>
     </div>
@@ -492,10 +499,36 @@ function EnrichStep({
   onToggleMarketColumn,
   onMarketColumnsAll,
   onMarketColumnsNone,
+  onHoverBucket,
+  onHoverSample,
+  bucketColumns = [],
+  bucketColumnId = "",
+  onBucketColumn,
+  bucketMode = "category",
+  onBucketMode,
+  bucketInterval = "day",
+  onBucketInterval,
+  bucketNumericSize = "",
+  onBucketNumericSize,
+  bucketGroupBy = [],
+  onToggleBucketGroup,
+  bucketMetric = "count",
+  onBucketMetric,
+  bucketValueColumnId = "",
+  onBucketValueColumn,
+  onClearBucket,
+  sampleSize = "",
+  onSampleSize,
+  sampleMode = "seeded",
+  onSampleMode,
+  sampleError = "",
+  onClearSample,
 }) {
   const joinOpen = showJoinBuilder && picked === "join";
   const functionOpen = showFunctionBuilder && picked === "function";
   const summarizeOpen = showSummarizeBuilder && picked === "summarize";
+  const bucketOpen = picked === "bucket";
+  const sampleOpen = picked === "sample";
   const tradesJoin = joinMode === "trades";
   const marketTargetOn = joinTarget === "kalshiHistoricalMarkets";
   const hiddenMarketColumns = marketColumnHidden || new Set();
@@ -516,21 +549,47 @@ function EnrichStep({
           const isJoin = option.id === "join";
           const isFunction = option.id === "function";
           const isSummarize = option.id === "summarize";
+          const isBucket = option.id === "bucket";
+          const isSample = option.id === "sample";
+          if (option.comingSoon) {
+            return (
+              <div key={option.id} className="flex items-center gap-1.5">
+                <div
+                  aria-disabled="true"
+                  className="flex min-w-0 flex-1 cursor-not-allowed items-center gap-2.5 rounded-lg border border-border/70 bg-background px-2.5 py-2 text-[13px] font-semibold text-muted-foreground"
+                >
+                  <span className="size-3.5 shrink-0 rounded-full border border-border" />
+                  <span className="min-w-0 flex-1">{option.title}</span>
+                  <span className="shrink-0 rounded-full bg-muted px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground">Coming soon</span>
+                </div>
+              </div>
+            );
+          }
+          const hoverOn = isFunction
+            ? () => onHoverFunction(true)
+            : isSummarize
+              ? () => onHoverSummarize(true)
+              : isBucket
+                ? () => onHoverBucket(true)
+                : isSample
+                  ? () => onHoverSample(true)
+                  : undefined;
+          const hoverOff = isFunction
+            ? () => onHoverFunction(false)
+            : isSummarize
+              ? () => onHoverSummarize(false)
+              : isBucket
+                ? () => onHoverBucket(false)
+                : isSample
+                  ? () => onHoverSample(false)
+                  : undefined;
           return (
             <div
               key={option.id}
               onMouseEnter={isJoin ? () => onHoverJoin(true) : undefined}
               onMouseLeave={isJoin ? () => onHoverJoin(false) : undefined}
             >
-              <div
-                className="flex items-center gap-1.5"
-                onMouseEnter={
-                  isFunction ? () => onHoverFunction(true) : isSummarize ? () => onHoverSummarize(true) : undefined
-                }
-                onMouseLeave={
-                  isFunction ? () => onHoverFunction(false) : isSummarize ? () => onHoverSummarize(false) : undefined
-                }
-              >
+              <div className="flex items-center gap-1.5" onMouseEnter={hoverOn} onMouseLeave={hoverOff}>
               <label
                 className={cn(
                   "flex min-w-0 flex-1 cursor-pointer items-center gap-2.5 rounded-lg border px-2.5 py-2 text-[13px] font-semibold transition-colors",
@@ -776,6 +835,52 @@ function EnrichStep({
                     </div>
                   </div>
                 </div>
+              ) : isBucket ? (
+                <div
+                  className={cn(
+                    "grid transition-[grid-template-rows,opacity] duration-300 ease-out",
+                    bucketOpen ? "grid-rows-[1fr] opacity-100" : "grid-rows-[0fr] opacity-0",
+                  )}
+                >
+                  <div className={cn("overflow-hidden", bucketOpen ? "" : "pointer-events-none")}>
+                    <BucketEnrichPanel
+                      columns={bucketColumns}
+                      bucketColumnId={bucketColumnId}
+                      onBucketColumn={onBucketColumn}
+                      mode={bucketMode}
+                      onMode={onBucketMode}
+                      timeInterval={bucketInterval}
+                      onTimeInterval={onBucketInterval}
+                      numericSize={bucketNumericSize}
+                      onNumericSize={onBucketNumericSize}
+                      groupByIds={bucketGroupBy}
+                      onToggleGroupBy={onToggleBucketGroup}
+                      metric={bucketMetric}
+                      onMetric={onBucketMetric}
+                      valueColumnId={bucketValueColumnId}
+                      onValueColumn={onBucketValueColumn}
+                      onClear={onClearBucket}
+                    />
+                  </div>
+                </div>
+              ) : isSample ? (
+                <div
+                  className={cn(
+                    "grid transition-[grid-template-rows,opacity] duration-300 ease-out",
+                    sampleOpen ? "grid-rows-[1fr] opacity-100" : "grid-rows-[0fr] opacity-0",
+                  )}
+                >
+                  <div className={cn("overflow-hidden", sampleOpen ? "" : "pointer-events-none")}>
+                    <SampleEnrichPanel
+                      size={sampleSize}
+                      onSize={onSampleSize}
+                      mode={sampleMode}
+                      onMode={onSampleMode}
+                      error={sampleError}
+                      onClear={onClearSample}
+                    />
+                  </div>
+                </div>
               ) : null}
             </div>
           );
@@ -848,6 +953,20 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
   const [running, setRunning] = useState(false);
   const [hoverFunction, setHoverFunction] = useState(false);
   const [hoverSummarize, setHoverSummarize] = useState(false);
+  const [hoverBucket, setHoverBucket] = useState(false);
+  const [hoverSample, setHoverSample] = useState(false);
+  const [bucketColumnId, setBucketColumnId] = useState("");
+  const [bucketMode, setBucketMode] = useState("category");
+  const [bucketInterval, setBucketInterval] = useState("day");
+  const [bucketNumericSize, setBucketNumericSize] = useState("");
+  const [bucketGroupBy, setBucketGroupBy] = useState([]);
+  const [bucketMetric, setBucketMetric] = useState("count");
+  const [bucketValueColumnId, setBucketValueColumnId] = useState("");
+  const [bucketTab, setBucketTab] = useState("buckets");
+  const [sampleSize, setSampleSize] = useState("100");
+  const [sampleMode, setSampleMode] = useState("seeded");
+  const [sampleSeed, setSampleSeed] = useState("");
+  const [sampleShuffle, setSampleShuffle] = useState(0);
   const [summaryCells, setSummaryCells] = useState({});
   const [summaryFocus, setSummaryFocus] = useState({ columnId: "label", row: 0 });
   const [summaryTab, setSummaryTab] = useState("summary");
@@ -1325,6 +1444,20 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
     setFunctionFormula("");
     setFunctionTab("");
     setHoverSummarize(false);
+    setHoverBucket(false);
+    setHoverSample(false);
+    setBucketColumnId("");
+    setBucketMode("category");
+    setBucketInterval("day");
+    setBucketNumericSize("");
+    setBucketGroupBy([]);
+    setBucketMetric("count");
+    setBucketValueColumnId("");
+    setBucketTab("buckets");
+    setSampleSize("100");
+    setSampleMode("seeded");
+    setSampleSeed("");
+    setSampleShuffle(0);
     setSummaryCells({});
     setSummaryFocus({ columnId: "label", row: 0 });
     setSummaryTab("summary");
@@ -1389,8 +1522,11 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
   const tradesJoinPicked = tradesQuery && step === "enrich" && joinTarget === "kalshiHistoricalMarkets";
   const tradesJoinReady = tradesJoinPicked && Boolean(joinPlacement) && selectedMarketColumns.length > 0;
   const kalshiEnrich = marketsQuery || tradesQuery;
-  const showSummarizeExplainer = kalshiEnrich && step === "enrich" && hoverSummarize;
-  const showFunctionExplainer = kalshiEnrich && step === "enrich" && hoverFunction && !showSummarizeExplainer;
+  const showSampleExplainer = kalshiEnrich && step === "enrich" && hoverSample;
+  const showBucketExplainer = kalshiEnrich && step === "enrich" && hoverBucket && !showSampleExplainer;
+  const showSummarizeExplainer = kalshiEnrich && step === "enrich" && hoverSummarize && !showSampleExplainer && !showBucketExplainer;
+  const showFunctionExplainer =
+    kalshiEnrich && step === "enrich" && hoverFunction && !showSummarizeExplainer && !showSampleExplainer && !showBucketExplainer;
   const showJoinExplainer =
     kalshiEnrich &&
     step === "enrich" &&
@@ -1398,8 +1534,13 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
     !joinCommitted &&
     !tradesJoinPicked &&
     !showFunctionExplainer &&
-    !showSummarizeExplainer;
-  const summaryActive = kalshiEnrich && step === "enrich" && enrichPick === "summarize" && !showSummarizeExplainer && !showFunctionExplainer && !showJoinExplainer;
+    !showSummarizeExplainer &&
+    !showSampleExplainer &&
+    !showBucketExplainer;
+  const enrichExplainer = showSampleExplainer || showBucketExplainer || showSummarizeExplainer || showFunctionExplainer || showJoinExplainer;
+  const summaryActive = kalshiEnrich && step === "enrich" && enrichPick === "summarize" && !enrichExplainer;
+  const bucketActive = kalshiEnrich && step === "enrich" && enrichPick === "bucket" && !enrichExplainer;
+  const sampleActive = kalshiEnrich && step === "enrich" && enrichPick === "sample" && !enrichExplainer;
   const showJoinSheets = joinCommitted && !showFunctionExplainer && !showJoinExplainer;
   const functionActive = step === "enrich" && enrichPick === "function" && Boolean(functionTarget) && !showFunctionExplainer;
   const functionOnMarkets = functionActive && (functionTarget === "markets" || functionTarget === "all");
@@ -1547,7 +1688,57 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
     [summaryCells, summarySourceColumns, summarySourceRows, formulaSheets, summaryFocus],
   );
   const summaryFormula = summaryCells[summaryCellKey(summaryFocus.columnId, summaryFocus.row)] || "";
+  const bucketView = useMemo(
+    () =>
+      buildBucketGrid({
+        columns: summarySourceColumns,
+        rows: summarySourceRows,
+        bucketColumnId,
+        mode: bucketMode,
+        timeInterval: bucketInterval,
+        numericBucketSize: bucketNumericSize,
+        groupByIds: bucketGroupBy,
+        metric: bucketMetric,
+        valueColumnId: bucketValueColumnId,
+      }),
+    [
+      summarySourceColumns,
+      summarySourceRows,
+      bucketColumnId,
+      bucketMode,
+      bucketInterval,
+      bucketNumericSize,
+      bucketGroupBy,
+      bucketMetric,
+      bucketValueColumnId,
+    ],
+  );
+  const sampleSizeError = validateRandomSampleSizeInput(sampleSize, {
+    maxSize: typeof planLimit === "number" && planLimit > 0 ? planLimit : undefined,
+    required: enrichPick === "sample",
+  });
+  const sampleSizeNumber = sampleSizeError ? 0 : Math.floor(Number(sampleSize));
+  const samplePreviewRows = useMemo(() => {
+    if (!sampleSizeNumber) return [];
+    return previewRandomSample(summarySourceRows, {
+      size: Math.min(sampleSizeNumber, summarySourceRows.length, PREVIEW_ROW_CAP),
+      mode: sampleMode,
+      seed: sampleMode === "seeded" ? sampleSeed : `draw-${sampleShuffle}`,
+    });
+  }, [sampleSizeNumber, summarySourceRows, sampleMode, sampleSeed, sampleShuffle]);
   const paneLine = (() => {
+    if (showSampleExplainer) return "Illustration. Athena draws the sample when you run the pull.";
+    if (showBucketExplainer) return "Illustration. The bucket sheet is created when you run the pull.";
+    if (sampleActive) {
+      if (sampleSizeError) return sampleSizeError;
+      const shown = samplePreviewRows.length;
+      return `Previewing ${shown.toLocaleString()} of the rows on screen. Save and run asks Athena for ${sampleSizeNumber.toLocaleString()} ${sampleMode === "seeded" ? "seeded" : "new"} rows.`;
+    }
+    if (bucketActive && bucketTab === "buckets") {
+      if (!bucketView.ready) return "Choose a column to bucket. The result is a new sheet.";
+      const count = bucketView.rows.length;
+      return `Previewing ${count.toLocaleString()} ${count === 1 ? "bucket" : "buckets"} from the rows on screen. Save and run buckets the imported rows.`;
+    }
     if (showSummarizeExplainer) return "Illustration. The summary sheet is created when you run the pull.";
     if (showFunctionExplainer) return "Illustration. The column is added when you pick a sheet.";
     if (summaryActive && summaryTab === "summary") return "Summary sheet. Totals here use the preview rows. Save and run totals the imported rows.";
@@ -1578,6 +1769,31 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
     const count = tradePreview.rows.length;
     return `Previewing ${count.toLocaleString()} ${count === 1 ? "trade" : "trades"} of ${previewTicker}`;
   })();
+
+  function chooseBucketColumn(id) {
+    setHoverBucket(false);
+    setBucketColumnId(id);
+    const column = shownColumns.find((item) => item.id === id);
+    const nextMode = defaultBucketMode(column);
+    setBucketMode(nextMode);
+    if (nextMode === "number") setBucketNumericSize(String(suggestedNumericBucketSize(filteredRows, id)));
+    if (nextMode === "time") setBucketInterval("day");
+    setBucketGroupBy((current) => current.filter((item) => item !== id));
+    setBucketTab("buckets");
+  }
+
+  function chooseBucketMetric(id) {
+    setBucketMetric(id);
+    if (id === "count" || bucketValueColumnId) return;
+    const next = shownColumns.find((column) => column.type === "number" && column.id !== bucketColumnId);
+    if (next) setBucketValueColumnId(next.id);
+  }
+
+  function chooseSampleMode(mode) {
+    setSampleMode(mode);
+    if (mode === "seeded" && !sampleSeed) setSampleSeed(generateRandomSampleSeed());
+    if (mode === "unseeded") setSampleShuffle((token) => token + 1);
+  }
 
   function chooseFunctionTarget(id) {
     setHoverFunction(false);
@@ -1746,7 +1962,14 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
   }
 
   function marketsRequestForRun() {
-    const request = lockedQuery?.athena || athenaRequest();
+    let request = lockedQuery?.athena || athenaRequest();
+    if (enrichPick === "sample" && sampleSizeNumber > 0 && !sampleSizeError) {
+      request = attachRandomSample(request, {
+        size: sampleSizeNumber,
+        mode: sampleMode,
+        seed: sampleMode === "seeded" ? sampleSeed || generateRandomSampleSeed() : "",
+      });
+    }
     if (!request?.compose?.select || !joinCommitted) return request;
     const select = request.compose.select;
     if (select.some((entry) => entry.column === "ticker" || entry.alias === "ticker")) return request;
@@ -1842,6 +2065,30 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
         table: "summary",
         summary: "Summary",
       });
+    }
+    if (enrichPick === "bucket") {
+      const built = buildBucketGrid({
+        columns: primaryColumns,
+        rows: primaryRows,
+        bucketColumnId,
+        mode: bucketMode,
+        timeInterval: bucketInterval,
+        numericBucketSize: bucketNumericSize,
+        groupByIds: bucketGroupBy,
+        metric: bucketMetric,
+        valueColumnId: bucketValueColumnId,
+      });
+      if (built.ready) {
+        sheets.push({
+          id: "run-buckets",
+          title: "Buckets",
+          columns: built.columns,
+          rows: built.rows,
+          span: sheets.length ? "half" : "full",
+          table: "buckets",
+          summary: "Buckets",
+        });
+      }
     }
     if (joinCommitted && tradePreview.columns.length) {
       const fromRun = tickersFromRows(marketRows, marketCap);
@@ -1961,6 +2208,22 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
       join: joinRecord,
       formula: functionActive ? functionFormula : "",
       summaryCells: enrichPick === "summarize" ? summaryCells : null,
+      bucket:
+        enrichPick === "bucket"
+          ? {
+              bucketColumnId,
+              mode: bucketMode,
+              timeInterval: bucketInterval,
+              numericBucketSize: bucketNumericSize,
+              groupByIds: bucketGroupBy,
+              metric: bucketMetric,
+              valueColumnId: bucketValueColumnId,
+            }
+          : null,
+      randomSample:
+        enrichPick === "sample" && sampleSizeNumber > 0
+          ? { size: sampleSizeNumber, mode: sampleMode, seed: sampleMode === "seeded" ? sampleSeed : "" }
+          : null,
     };
     setPulls((current) => {
       const next = rememberEntry(current, pullEntry, 80, false);
@@ -2056,6 +2319,15 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
                 formulaCaretRef.current = (summaryCells[summaryCellKey("label", 0)] || "").length;
                 setFormulaFocusToken((token) => token + 1);
               }
+              if (id === "bucket") {
+                setHoverBucket(false);
+                setBucketTab("buckets");
+              }
+              if (id === "sample") {
+                setHoverSample(false);
+                setSampleMode((current) => current || "seeded");
+                setSampleSeed((current) => current || generateRandomSampleSeed());
+              }
               setEnrichPick(id);
             }}
             joinTarget={joinTarget}
@@ -2127,6 +2399,50 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
             }}
             onMarketColumnsAll={() => setMarketColumnHidden(new Set())}
             onMarketColumnsNone={() => setMarketColumnHidden(new Set(marketColumnList.map((column) => column.id)))}
+            onHoverBucket={setHoverBucket}
+            onHoverSample={setHoverSample}
+            bucketColumns={shownColumns}
+            bucketColumnId={bucketColumnId}
+            onBucketColumn={chooseBucketColumn}
+            bucketMode={bucketMode}
+            onBucketMode={setBucketMode}
+            bucketInterval={bucketInterval}
+            onBucketInterval={setBucketInterval}
+            bucketNumericSize={bucketNumericSize}
+            onBucketNumericSize={setBucketNumericSize}
+            bucketGroupBy={bucketGroupBy}
+            onToggleBucketGroup={(id) =>
+              setBucketGroupBy((current) => (current.includes(id) ? current.filter((item) => item !== id) : [...current, id]))
+            }
+            bucketMetric={bucketMetric}
+            onBucketMetric={chooseBucketMetric}
+            bucketValueColumnId={bucketValueColumnId}
+            onBucketValueColumn={setBucketValueColumnId}
+            onClearBucket={() => {
+              setHoverBucket(false);
+              setEnrichPick("");
+              setBucketColumnId("");
+              setBucketMode("category");
+              setBucketInterval("day");
+              setBucketNumericSize("");
+              setBucketGroupBy([]);
+              setBucketMetric("count");
+              setBucketValueColumnId("");
+              setBucketTab("buckets");
+            }}
+            sampleSize={sampleSize}
+            onSampleSize={setSampleSize}
+            sampleMode={sampleMode}
+            onSampleMode={chooseSampleMode}
+            sampleError={enrichPick === "sample" ? sampleSizeError : ""}
+            onClearSample={() => {
+              setHoverSample(false);
+              setEnrichPick("");
+              setSampleSize("100");
+              setSampleMode("seeded");
+              setSampleSeed("");
+              setSampleShuffle(0);
+            }}
           />
         ) : (
         <>
@@ -2361,8 +2677,12 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
             !showSummarizeExplainer &&
             !showFunctionExplainer &&
             !showJoinExplainer &&
+            !showBucketExplainer &&
+            !showSampleExplainer &&
             !(functionOnNew && functionTab === "new") &&
             !(summaryActive && summaryTab === "summary") &&
+            !(bucketActive && bucketTab === "buckets") &&
+            !sampleActive &&
             !(tradesJoinReady && joinPlacement === "sheet" && metadataTab === "markets") ? (
               <div className="mt-1.5 w-full max-w-[280px]">
                 <p className="text-right text-[11px] text-muted-foreground">
@@ -2386,6 +2706,10 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
               <p className="mt-1 text-right text-[11px] text-muted-foreground">Preview only. This sheet is created when you run the pull.</p>
             ) : summaryActive && summaryTab === "summary" ? (
               <p className="mt-1 text-right text-[11px] text-muted-foreground">Preview only. This sheet is created when you run the pull.</p>
+            ) : bucketActive && bucketTab === "buckets" ? (
+              <p className="mt-1 text-right text-[11px] text-muted-foreground">Preview only. This sheet is created when you run the pull.</p>
+            ) : sampleActive ? (
+              <p className="mt-1 text-right text-[11px] text-muted-foreground">Preview shuffles the rows on screen. Athena draws the full sample when you run the pull.</p>
             ) : null}
           </div>
         </div>
@@ -2397,6 +2721,8 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
         </div>
         {showSummarizeExplainer ? (
           <SummarizeExplainerTabs sheetTitle={sheetTitle} />
+        ) : showBucketExplainer ? (
+          <BucketExplainerTabs sheetTitle={sheetTitle} />
         ) : showFunctionExplainer ? (
           <FunctionExplainerTabs sheetTitle={sheetTitle} />
         ) : summaryActive ? (
@@ -2405,6 +2731,14 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
             active={summaryTab}
             onSummary={() => setSummaryTab("summary")}
             onSource={() => setSummaryTab("source")}
+          />
+        ) : bucketActive ? (
+          <SummaryPreviewTabs
+            sheetTitle={sheetTitle}
+            resultTitle="Buckets"
+            active={bucketTab === "buckets" ? "summary" : "source"}
+            onSummary={() => setBucketTab("buckets")}
+            onSource={() => setBucketTab("source")}
           />
         ) : showJoinExplainer ? (
           <JoinExplainerTabs source={tradesQuery ? "trades" : "markets"} />
@@ -2454,8 +2788,33 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
         <div className="min-h-0 flex-1 p-4">
           {showSummarizeExplainer ? (
             <SummarizeExplainer measure={summaryMeasure} />
+          ) : showBucketExplainer ? (
+            <BucketExplainer measure={summaryMeasure} />
+          ) : showSampleExplainer ? (
+            <SampleExplainer />
           ) : showFunctionExplainer ? (
             <FunctionExplainer />
+          ) : bucketActive && bucketTab === "buckets" ? (
+            bucketView.ready ? (
+              <IntegrationBuildGrid
+                columns={bucketView.columns}
+                rows={bucketView.rows}
+                highlightColumnId={bucketView.metricId}
+                scrollToken={functionScrollKey}
+              />
+            ) : (
+              <div className="flex h-full items-center justify-center rounded-xl border border-border/70 bg-background px-6 text-center text-[13px] leading-relaxed text-muted-foreground shadow-sm">
+                Choose a column to bucket. Each group becomes a row on a new Buckets sheet.
+              </div>
+            )
+          ) : sampleActive ? (
+            sampleSizeError ? (
+              <div className="flex h-full items-center justify-center rounded-xl border border-border/70 bg-background px-6 text-center text-[13px] leading-relaxed text-muted-foreground shadow-sm">
+                {sampleSizeError}
+              </div>
+            ) : (
+              <IntegrationBuildGrid columns={shownColumns} rows={samplePreviewRows} scrollToken={sampleShuffle} />
+            )
           ) : summaryActive && summaryTab === "summary" ? (
             <IntegrationBuildGrid
               columns={summaryView.columns}

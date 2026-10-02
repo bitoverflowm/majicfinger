@@ -84,7 +84,7 @@ export function temporalToMs(value) {
     const year = Number(yearOnly[1]);
     if (Number.isFinite(year)) return Date.UTC(year, 0, 1);
   }
-  if (/^\d+(\.\d+)?$/.test(s)) {
+  if (/^[+-]?\d+(?:\.\d+)?(?:e[+-]?\d+)?$/i.test(s)) {
     return epochNumberToMs(Number(s));
   }
   // Bucket labels like "0-10" / "90-100" are categorical numeric ranges, not dates.
