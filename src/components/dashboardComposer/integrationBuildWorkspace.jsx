@@ -16,10 +16,12 @@ import {
   BUILD_SOURCES,
   PREVIEW_ROW_CAP,
   buildKalshiHistoricalRequest,
+  buildPolymarketHistoricalRequest,
   loadBuildPreview,
   loadBuildUniverseCount,
   kalshiHistoricalMarketColumnList,
   loadKalshiHistoricalPreview,
+  loadPolymarketHistoricalPreview,
   loadAthenaComposeRows,
   loadKalshiHistoricalMarketsForTickers,
   loadKalshiHistoricalTradesForTicker,
@@ -61,7 +63,7 @@ import {
 import { cn } from "@/lib/utils";
 import { useIntegrationConnect } from "@/components/dashboardComposer/integrationConnectDialog";
 import { sheetRecords } from "@/components/dashboardComposer/integrationRunSheets";
-import { assignSummaryInput, buildSummaryGrid, settleSummaryCells, SUMMARY_ROW_COUNT, summaryCellKey, summaryExamples } from "@/components/dashboardComposer/summarySheet";
+import { assignSummaryInput, buildSummaryGrid, describeSummaryFormula, settleSummaryCells, SUMMARY_ROW_COUNT, summaryCellKey, summaryExamples } from "@/components/dashboardComposer/summarySheet";
 import { buildBucketGrid, defaultBucketMode, suggestedNumericBucketSize } from "@/components/dashboardComposer/bucketSheet";
 import { attachRandomSample, previewRandomSample } from "@/components/dashboardComposer/randomSampleRequest";
 import { generateRandomSampleSeed, validateRandomSampleSizeInput } from "@/lib/dataLake/randomSample";
@@ -139,6 +141,52 @@ const PREVIEW_TRADE_LOCK =
   "You can only view 1 market trade in preview mode; execute the query to run the full pipeline.";
 
 const FUNCTION_COLUMN_ID = "__function";
+
+function createBucketItem() {
+  return {
+    id: `b-${Math.random().toString(36).slice(2, 8)}`,
+    columnId: "",
+    mode: "category",
+    interval: "day",
+    numericSize: "",
+    groupBy: [],
+    metric: "count",
+    valueColumnId: "",
+  };
+}
+
+function createFunctionItem() {
+  return {
+    id: `f-${Math.random().toString(36).slice(2, 8)}`,
+    target: "",
+    formula: "",
+  };
+}
+
+function functionColumnId(index) {
+  return index === 0 ? FUNCTION_COLUMN_ID : `${FUNCTION_COLUMN_ID}_${index + 1}`;
+}
+
+function functionColumnTitle(index) {
+  return index === 0 ? "Column" : `Column ${index + 1}`;
+}
+
+function bucketSheetTitle(item, columns, index, total) {
+  const column = (columns || []).find((entry) => entry.id === item.columnId);
+  if (total <= 1) return "Buckets";
+  return column ? `Buckets · ${column.title}` : `Buckets ${index + 1}`;
+}
+
+function bucketBlurb(item, columns) {
+  const column = (columns || []).find((entry) => entry.id === item.columnId);
+  if (!column) return "Choose a column";
+  const how = item.mode === "time" ? item.interval : item.mode === "number" ? `ranges of ${item.numericSize || "…"}` : "exact values";
+  const metric =
+    item.metric === "count"
+      ? "Count"
+      : `${item.metric} of ${(columns || []).find((entry) => entry.id === item.valueColumnId)?.title || "…"}`;
+  return `${column.title} · ${how} · ${metric}`;
+}
 
 function formulaExamples(columns) {
   const numbers = (columns || []).filter((column) => column.type === "number" && column.id !== FUNCTION_COLUMN_ID);
@@ -270,16 +318,34 @@ function attachMarketMetadata(tradeColumns, tradeRows, marketColumns, marketRows
   return { columns: [...(tradeColumns || []), ...added], rows, highlightIds: added.map((column) => column.id) };
 }
 
-function withFunctionColumn(columns, rows, enabled, formula, sheets, sheetId) {
+function withFunctionColumn(columns, rows, enabled, formula, sheets, sheetId, columnMeta) {
   if (!enabled) return { columns, rows, highlight: "", error: "", references: [] };
   const evaluated = evaluateColumnFormula(formula, columns, rows, { sheets, sheetId });
+  const id = columnMeta?.id || FUNCTION_COLUMN_ID;
+  const title = columnMeta?.title || "Column";
   return {
-    columns: [...columns, { id: FUNCTION_COLUMN_ID, title: "Column", type: evaluated.type === "text" ? "text" : "number" }],
-    rows: rows.map((row, index) => ({ ...row, [FUNCTION_COLUMN_ID]: evaluated.values[index] })),
-    highlight: FUNCTION_COLUMN_ID,
+    columns: [...columns, { id, title, type: evaluated.type === "text" ? "text" : "number" }],
+    rows: rows.map((row, index) => ({ ...row, [id]: evaluated.values[index] })),
+    highlight: id,
     error: evaluated.error,
     references: evaluated.references || [],
   };
+}
+
+function applyFunctionColumns(columns, rows, items, sheets, sheetId, activeId) {
+  let currentColumns = columns;
+  let currentRows = rows;
+  let active = { highlight: "", error: "", references: [] };
+  items.forEach((item) => {
+    const next = withFunctionColumn(currentColumns, currentRows, true, item.formula, sheets, sheetId, {
+      id: item.columnId,
+      title: item.columnTitle,
+    });
+    currentColumns = next.columns;
+    currentRows = next.rows;
+    if (!activeId || item.id === activeId) active = next;
+  });
+  return { columns: currentColumns, rows: currentRows, highlight: active.highlight, error: active.error, references: active.references };
 }
 
 function functionChoices({ joinActive, previewTicker, sheetTitle }) {
@@ -501,13 +567,24 @@ function EnrichStep({
   onSampleMode,
   sampleError = "",
   onClearSample,
+  folded,
+  onToggleFold,
+  bucketItems = [],
+  onAddBucket,
+  onRemoveBucket,
+  functionItems = [],
+  onAddFunction,
+  onRemoveFunction,
+  onFocusFunction,
+  summaryLines = [],
 }) {
   const chosen = picked instanceof Set ? picked : new Set(picked ? [picked] : []);
-  const joinOpen = showJoinBuilder && chosen.has("join");
-  const functionOpen = showFunctionBuilder && chosen.has("function");
-  const summarizeOpen = showSummarizeBuilder && chosen.has("summarize");
-  const bucketOpen = chosen.has("bucket");
-  const sampleOpen = chosen.has("sample");
+  const foldedIds = folded instanceof Set ? folded : new Set();
+  const joinOpen = showJoinBuilder && chosen.has("join") && !foldedIds.has("join");
+  const functionOpen = showFunctionBuilder && chosen.has("function") && !foldedIds.has("function");
+  const summarizeOpen = showSummarizeBuilder && chosen.has("summarize") && !foldedIds.has("summarize");
+  const bucketOpen = chosen.has("bucket") && !foldedIds.has("bucket");
+  const sampleOpen = chosen.has("sample") && !foldedIds.has("sample");
   const tradesJoin = joinMode === "trades";
   const marketTargetOn = joinTarget === "kalshiHistoricalMarkets";
   const hiddenMarketColumns = marketColumnHidden || new Set();
@@ -544,15 +621,17 @@ function EnrichStep({
               </div>
             );
           }
-          const hoverOn = isFunction
-            ? () => onHoverFunction(true)
-            : isSummarize
-              ? () => onHoverSummarize(true)
-              : isBucket
-                ? () => onHoverBucket(true)
-                : isSample
-                  ? () => onHoverSample(true)
-                  : undefined;
+          const hoverOn = selected
+            ? undefined
+            : isFunction
+              ? () => onHoverFunction(true)
+              : isSummarize
+                ? () => onHoverSummarize(true)
+                : isBucket
+                  ? () => onHoverBucket(true)
+                  : isSample
+                    ? () => onHoverSample(true)
+                    : undefined;
           const hoverOff = isFunction
             ? () => onHoverFunction(false)
             : isSummarize
@@ -562,10 +641,26 @@ function EnrichStep({
                 : isSample
                   ? () => onHoverSample(false)
                   : undefined;
+          const folded = selected && foldedIds.has(option.id);
+          const lines = isBucket
+            ? bucketItems.map((item) => bucketBlurb(item, bucketColumns))
+            : isFunction
+              ? functionItems.map((item, index) => {
+                  const where = functionTables.find((table) => table.id === item.target)?.title;
+                  const equation = item.formula.trim() || "No equation yet";
+                  return where ? `${functionColumnTitle(index)} · ${where} · ${equation}` : `${functionColumnTitle(index)} · Choose a sheet`;
+                })
+              : isSummarize
+                ? summaryLines
+                : isJoin
+                  ? [joinTarget ? (tradesJoin && marketTargetOn ? `Markets · ${joinPlacement === "sheet" ? "separate sheet" : joinPlacement === "merge" ? "onto each trade" : "choose where columns go"} · ${selectedMarketCount} columns` : "Kalshi Historical Trades") : "Choose a table to join"]
+                  : isSample
+                    ? [`${sampleSize || "…"} ${sampleMode} rows`]
+                    : [];
           return (
             <div
               key={option.id}
-              onMouseEnter={isJoin ? () => onHoverJoin(true) : undefined}
+              onMouseEnter={!selected && isJoin ? () => onHoverJoin(true) : undefined}
               onMouseLeave={isJoin ? () => onHoverJoin(false) : undefined}
             >
               <div className="flex items-center gap-1.5" onMouseEnter={hoverOn} onMouseLeave={hoverOff}>
@@ -586,6 +681,17 @@ function EnrichStep({
                 />
                 {option.title}
               </label>
+              {selected ? (
+                <button
+                  type="button"
+                  aria-expanded={!folded}
+                  aria-label={folded ? `Expand ${option.title}` : `Collapse ${option.title}`}
+                  onClick={() => onToggleFold(option.id)}
+                  className="inline-flex size-8 shrink-0 items-center justify-center rounded-lg border border-border/70 text-muted-foreground transition-colors hover:bg-muted/50 hover:text-foreground"
+                >
+                  <ChevronDown className={cn("size-3.5 transition-transform", folded ? "-rotate-90" : "rotate-0")} />
+                </button>
+              ) : null}
               {isFunction || isSummarize ? (
                 <button
                   type="button"
@@ -597,6 +703,15 @@ function EnrichStep({
                 </button>
               ) : null}
               </div>
+              {folded && lines.length ? (
+                <div className="mt-1 space-y-0.5 px-1">
+                  {lines.map((line, index) => (
+                    <p key={`${option.id}-${index}`} className="truncate text-[11px] leading-relaxed text-muted-foreground">
+                      {line}
+                    </p>
+                  ))}
+                </div>
+              ) : null}
               {isJoin ? (
                 <div
                   className={cn(
@@ -749,45 +864,52 @@ function EnrichStep({
                   )}
                 >
                   <div className={cn("overflow-hidden", functionOpen ? "" : "pointer-events-none")}>
-                    <div className="mt-2 rounded-lg border border-border/70 px-2.5 py-2">
-                      <div className="flex items-center justify-between gap-2">
-                        <p className="text-[11px] font-semibold text-foreground">Add column to</p>
-                        <button
-                          type="button"
-                          onClick={onClearFunction}
-                          className="text-[11px] font-medium text-muted-foreground hover:text-foreground"
-                        >
-                          Clear
-                        </button>
-                      </div>
-                      <div className="mt-1.5 flex flex-col gap-1.5">
-                        {functionTables.map((table) => (
+                    {functionItems.map((item, index) => (
+                      <div key={item.id} className="mt-2 rounded-lg border border-border/70 px-2.5 py-2" onClick={() => onFocusFunction(item.id)}>
+                        <div className="flex items-center justify-between gap-2">
+                          <p className="text-[11px] font-semibold text-foreground">{functionColumnTitle(index)}</p>
                           <button
-                            key={table.id}
                             type="button"
-                            aria-pressed={functionTarget === table.id}
-                            onClick={() => onFunctionTarget(table.id)}
-                            className={cn(
-                              "flex w-full flex-col rounded-lg border px-2.5 py-2 text-left transition-colors",
-                              functionTarget === table.id
-                                ? "border-[#0d99ff]/40 bg-[#0d99ff]/10"
-                                : "border-border/70 bg-background hover:bg-muted/50",
-                            )}
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              if (functionItems.length > 1) onRemoveFunction(item.id);
+                              else onClearFunction();
+                            }}
+                            className="text-[11px] font-medium text-muted-foreground hover:text-foreground"
                           >
-                            <span className="text-[13px] font-semibold text-foreground">{table.title}</span>
-                            <span className="text-[11px] font-normal text-muted-foreground">{table.detail}</span>
+                            {functionItems.length > 1 ? "Remove" : "Clear"}
                           </button>
-                        ))}
-                      </div>
-                      {functionTarget ? (
-                        <div className="mt-2 space-y-2">
-                          <p className="text-[11px] leading-relaxed text-muted-foreground">
-                            Type the equation in the new column, like = Yes Price + No Price. Click a column or a cell to drop it in.
-                          </p>
-                          {functionScopeNote ? <p className="text-[11px] leading-relaxed text-muted-foreground">{functionScopeNote}</p> : null}
                         </div>
-                      ) : null}
-                    </div>
+                        <div className="mt-1.5 flex flex-col gap-1.5">
+                          {functionTables.map((table) => (
+                            <button
+                              key={table.id}
+                              type="button"
+                              aria-pressed={item.target === table.id}
+                              onClick={() => onFunctionTarget(item.id, table.id)}
+                              className={cn(
+                                "flex w-full flex-col rounded-lg border px-2.5 py-2 text-left transition-colors",
+                                item.target === table.id
+                                  ? "border-[#0d99ff]/40 bg-[#0d99ff]/10"
+                                  : "border-border/70 bg-background hover:bg-muted/50",
+                              )}
+                            >
+                              <span className="text-[13px] font-semibold text-foreground">{table.title}</span>
+                              <span className="text-[11px] font-normal text-muted-foreground">{table.detail}</span>
+                            </button>
+                          ))}
+                        </div>
+                        {item.target ? (
+                          <p className="mt-2 text-[11px] leading-relaxed text-muted-foreground">
+                            {item.formula.trim() ? item.formula : "Type the equation in the column, like = Yes Price + No Price. Click a column or a cell to drop it in."}
+                          </p>
+                        ) : null}
+                      </div>
+                    ))}
+                    <button type="button" onClick={onAddFunction} className="mt-2 text-[12px] font-medium text-[#0d99ff]">
+                      Add another column
+                    </button>
+                    {functionScopeNote ? <p className="mt-2 text-[11px] leading-relaxed text-muted-foreground">{functionScopeNote}</p> : null}
                   </div>
                 </div>
               ) : isSummarize ? (
@@ -821,24 +943,32 @@ function EnrichStep({
                   )}
                 >
                   <div className={cn("overflow-hidden", bucketOpen ? "" : "pointer-events-none")}>
-                    <BucketEnrichPanel
-                      columns={bucketColumns}
-                      bucketColumnId={bucketColumnId}
-                      onBucketColumn={onBucketColumn}
-                      mode={bucketMode}
-                      onMode={onBucketMode}
-                      timeInterval={bucketInterval}
-                      onTimeInterval={onBucketInterval}
-                      numericSize={bucketNumericSize}
-                      onNumericSize={onBucketNumericSize}
-                      groupByIds={bucketGroupBy}
-                      onToggleGroupBy={onToggleBucketGroup}
-                      metric={bucketMetric}
-                      onMetric={onBucketMetric}
-                      valueColumnId={bucketValueColumnId}
-                      onValueColumn={onBucketValueColumn}
-                      onClear={onClearBucket}
-                    />
+                    {bucketItems.map((item, index) => (
+                      <BucketEnrichPanel
+                        key={item.id}
+                        title={bucketItems.length > 1 ? `Bucket ${index + 1}` : "Bucket sheet"}
+                        clearLabel={bucketItems.length > 1 ? "Remove" : "Clear"}
+                        columns={bucketColumns}
+                        bucketColumnId={item.columnId}
+                        onBucketColumn={(columnId) => onBucketColumn(item.id, columnId)}
+                        mode={item.mode}
+                        onMode={(mode) => onBucketMode(item.id, mode)}
+                        timeInterval={item.interval}
+                        onTimeInterval={(interval) => onBucketInterval(item.id, interval)}
+                        numericSize={item.numericSize}
+                        onNumericSize={(size) => onBucketNumericSize(item.id, size)}
+                        groupByIds={item.groupBy}
+                        onToggleGroupBy={(columnId) => onToggleBucketGroup(item.id, columnId)}
+                        metric={item.metric}
+                        onMetric={(metric) => onBucketMetric(item.id, metric)}
+                        valueColumnId={item.valueColumnId}
+                        onValueColumn={(columnId) => onBucketValueColumn(item.id, columnId)}
+                        onClear={() => (bucketItems.length > 1 ? onRemoveBucket(item.id) : onClearBucket())}
+                      />
+                    ))}
+                    <button type="button" onClick={onAddBucket} className="mt-2 text-[12px] font-medium text-[#0d99ff]">
+                      Add another bucket
+                    </button>
                   </div>
                 </div>
               ) : isSample ? (
@@ -935,14 +1065,9 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
   const [hoverSummarize, setHoverSummarize] = useState(false);
   const [hoverBucket, setHoverBucket] = useState(false);
   const [hoverSample, setHoverSample] = useState(false);
-  const [bucketColumnId, setBucketColumnId] = useState("");
-  const [bucketMode, setBucketMode] = useState("category");
-  const [bucketInterval, setBucketInterval] = useState("day");
-  const [bucketNumericSize, setBucketNumericSize] = useState("");
-  const [bucketGroupBy, setBucketGroupBy] = useState([]);
-  const [bucketMetric, setBucketMetric] = useState("count");
-  const [bucketValueColumnId, setBucketValueColumnId] = useState("");
-  const [bucketTab, setBucketTab] = useState("buckets");
+  const [bucketItems, setBucketItems] = useState(() => [createBucketItem()]);
+  const [activeBucketId, setActiveBucketId] = useState("");
+  const [enrichFolded, setEnrichFolded] = useState(() => new Set());
   const [sampleSize, setSampleSize] = useState("100");
   const [sampleMode, setSampleMode] = useState("seeded");
   const [sampleSeed, setSampleSeed] = useState("");
@@ -950,20 +1075,86 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
   const [summaryCells, setSummaryCells] = useState({});
   const [summaryFocus, setSummaryFocus] = useState({ columnId: "value", row: 0 });
   const [summaryTab, setSummaryTab] = useState("summary");
-  const [functionTarget, setFunctionTarget] = useState("");
-  const [functionFormula, setFunctionFormula] = useState("");
-  const [functionTab, setFunctionTab] = useState("");
+  const [functionItems, setFunctionItems] = useState(() => [createFunctionItem()]);
+  const [activeFunctionId, setActiveFunctionId] = useState("");
   const [functionScrollKey, setFunctionScrollKey] = useState(0);
   const [formulaFocused, setFormulaFocused] = useState(false);
   const [formulaEditing, setFormulaEditing] = useState(false);
   const [formulaCaret, setFormulaCaret] = useState(0);
   const [formulaFocusToken, setFormulaFocusToken] = useState(0);
   const [functionHelp, setFunctionHelp] = useState(false);
-  const formulaCaretRef = useRef(0);
-  const blurToken = useRef(0);
   const [visibleCount, setVisibleCount] = useState(0);
   const [universe, setUniverse] = useState(null);
   const [counting, setCounting] = useState(false);
+  const formulaCaretRef = useRef(0);
+  const blurToken = useRef(0);
+  const activeBucket = bucketItems.find((item) => item.id === activeBucketId) || bucketItems[0];
+  const bucketColumnId = activeBucket?.columnId || "";
+  const bucketMode = activeBucket?.mode || "category";
+  const bucketInterval = activeBucket?.interval || "day";
+  const bucketNumericSize = activeBucket?.numericSize || "";
+  const bucketGroupBy = activeBucket?.groupBy || [];
+  const bucketMetric = activeBucket?.metric || "count";
+  const bucketValueColumnId = activeBucket?.valueColumnId || "";
+  const activeFunction = functionItems.find((item) => item.id === activeFunctionId) || functionItems[0];
+  const functionTarget = activeFunction?.target || "";
+  const functionFormula = activeFunction?.formula || "";
+  const functionTab = previewSheet.startsWith("column:") ? "new" : "";
+
+  function patchBucket(id, patch) {
+    setBucketItems((list) => list.map((item) => (item.id === id ? { ...item, ...patch } : item)));
+  }
+
+  function setFunctionFormula(value) {
+    setFunctionItems((list) => {
+      const id = list.some((item) => item.id === activeFunctionId) ? activeFunctionId : list[0]?.id;
+      return list.map((item) => {
+        if (item.id !== id) return item;
+        const formula = typeof value === "function" ? value(item.formula) : value;
+        return { ...item, formula };
+      });
+    });
+  }
+
+  function setFunctionTarget(value) {
+    setFunctionItems((list) => {
+      const id = list.some((item) => item.id === activeFunctionId) ? activeFunctionId : list[0]?.id;
+      return list.map((item) => {
+        if (item.id !== id) return item;
+        const target = typeof value === "function" ? value(item.target) : value;
+        return { ...item, target };
+      });
+    });
+  }
+
+  function setFunctionTab(value) {
+    const next = typeof value === "function" ? value(functionTab) : value;
+    if (next === "new") {
+      const id = functionItems.some((item) => item.id === activeFunctionId) ? activeFunctionId : functionItems[0]?.id;
+      if (id) setPreviewSheet(`column:${id}`);
+      return;
+    }
+    setPreviewSheet((current) => (current.startsWith("column:") ? "source" : current));
+  }
+
+  function setBucketTab(value) {
+    const next = typeof value === "function" ? value("buckets") : value;
+    if (next === "buckets") {
+      const id = bucketItems.some((item) => item.id === activeBucketId) ? activeBucketId : bucketItems[0]?.id;
+      if (id) setPreviewSheet(`bucket:${id}`);
+      return;
+    }
+    setPreviewSheet("source");
+  }
+
+  function toggleEnrichFold(id) {
+    setEnrichFolded((current) => {
+      const next = new Set(current);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
 
   const groups = source?.groups || null;
   const visibleTableIds = groups
@@ -972,7 +1163,10 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
   const table = tables[tableId];
   const exactUniverse = usesExactUniverse(integrationId);
   const marketsQuery = integrationId === "kalshiHistorical" && tableId === "markets";
-  const guidedFilters = integrationId === "kalshiHistorical" && (tableId === "markets" || tableId === "trades");
+  const polymarketHistorical = integrationId === "polymarketHistorical";
+  const guidedFilters =
+    (integrationId === "kalshiHistorical" && (tableId === "markets" || tableId === "trades")) ||
+    (polymarketHistorical && (tableId === "markets" || tableId === "trades" || tableId === "blocks"));
 
   useEffect(() => {
     const next = BUILD_SOURCES[integrationId];
@@ -1249,7 +1443,7 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
     let cancel = false;
     setPreviewRefreshing(true);
     const timer = window.setTimeout(() => {
-      loadKalshiHistoricalPreview(tableId === "trades" ? "trades" : "markets", predicates, sortKeys)
+      (polymarketHistorical ? loadPolymarketHistoricalPreview : loadKalshiHistoricalPreview)(tableId, predicates, sortKeys)
         .then((result) => {
           if (cancel) return;
           usingFilteredSample.current = true;
@@ -1265,7 +1459,7 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
       cancel = true;
       window.clearTimeout(timer);
     };
-  }, [guidedFilters, attributeFilters, pull?.columns, sortKeys, tableId]);
+  }, [guidedFilters, attributeFilters, pull?.columns, sortKeys, tableId, polymarketHistorical]);
 
   const accountId = user?.userId || "";
 
@@ -1332,13 +1526,14 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
     const caps = [];
     if (typeof planLimit === "number" && planLimit > 0) caps.push(planLimit);
     if (Number.isFinite(requested) && requested > 0) caps.push(requested);
-    return buildKalshiHistoricalRequest({
-      table: tableId === "trades" ? "trades" : "markets",
+    const request = {
+      table: tableId,
       predicates,
       sortKeys,
       columnIds,
       limit: caps.length ? Math.min(...caps) : undefined,
-    });
+    };
+    return polymarketHistorical ? buildPolymarketHistoricalRequest(request) : buildKalshiHistoricalRequest(request);
   }
 
   function querySnapshot() {
@@ -1422,20 +1617,14 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
     setMetadataTab("trades");
     setMarketColumnHidden(defaultMarketColumnHidden(kalshiHistoricalMarketColumnList()));
     setJoinTab("markets");
-    setFunctionTarget("");
-    setFunctionFormula("");
-    setFunctionTab("");
+    setFunctionItems([createFunctionItem()]);
+    setActiveFunctionId("");
     setHoverSummarize(false);
     setHoverBucket(false);
     setHoverSample(false);
-    setBucketColumnId("");
-    setBucketMode("category");
-    setBucketInterval("day");
-    setBucketNumericSize("");
-    setBucketGroupBy([]);
-    setBucketMetric("count");
-    setBucketValueColumnId("");
-    setBucketTab("buckets");
+    setBucketItems([createBucketItem()]);
+    setActiveBucketId("");
+    setEnrichFolded(new Set());
     setSampleSize("100");
     setSampleMode("seeded");
     setSampleSeed("");
@@ -1505,15 +1694,16 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
   const tradesJoinPicked = tradesQuery && joinOn && joinTarget === "kalshiHistoricalMarkets";
   const tradesJoinReady = tradesJoinPicked && Boolean(joinPlacement) && selectedMarketColumns.length > 0;
   const kalshiEnrich = marketsQuery || tradesQuery;
-  const showSampleExplainer = kalshiEnrich && step === "enrich" && hoverSample;
-  const showBucketExplainer = kalshiEnrich && step === "enrich" && hoverBucket && !showSampleExplainer;
-  const showSummarizeExplainer = kalshiEnrich && step === "enrich" && hoverSummarize && !showSampleExplainer && !showBucketExplainer;
+  const showSampleExplainer = kalshiEnrich && step === "enrich" && hoverSample && !enrichPicks.has("sample");
+  const showBucketExplainer = kalshiEnrich && step === "enrich" && hoverBucket && !enrichPicks.has("bucket") && !showSampleExplainer;
+  const showSummarizeExplainer = kalshiEnrich && step === "enrich" && hoverSummarize && !enrichPicks.has("summarize") && !showSampleExplainer && !showBucketExplainer;
   const showFunctionExplainer =
-    kalshiEnrich && step === "enrich" && hoverFunction && !showSummarizeExplainer && !showSampleExplainer && !showBucketExplainer;
+    kalshiEnrich && step === "enrich" && hoverFunction && !enrichPicks.has("function") && !showSummarizeExplainer && !showSampleExplainer && !showBucketExplainer;
   const showJoinExplainer =
     kalshiEnrich &&
     step === "enrich" &&
     hoverJoin &&
+    !enrichPicks.has("join") &&
     !joinCommitted &&
     !tradesJoinPicked &&
     !showFunctionExplainer &&
@@ -1525,13 +1715,26 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
   const bucketOn = kalshiEnrich && step === "enrich" && enrichPicks.has("bucket");
   const sampleOn = kalshiEnrich && step === "enrich" && enrichPicks.has("sample");
   const summaryActive = summarizeOn && !enrichExplainer && previewSheet === "summary";
-  const bucketActive = bucketOn && !enrichExplainer && previewSheet === "buckets";
+  const bucketPreviewId = previewSheet.startsWith("bucket:") ? previewSheet.slice("bucket:".length) : "";
+  const bucketActive = bucketOn && !enrichExplainer && Boolean(bucketPreviewId);
   const sampleActive = sampleOn && !enrichExplainer && previewSheet === "source";
   const showJoinSheets = joinCommitted && !showFunctionExplainer && !showJoinExplainer;
-  const functionActive = step === "enrich" && enrichPicks.has("function") && Boolean(functionTarget) && !showFunctionExplainer;
-  const functionOnMarkets = functionActive && (functionTarget === "markets" || functionTarget === "all");
-  const functionOnTrades = functionActive && (functionTarget === "trades" || functionTarget === "trades-all" || functionTarget === "all");
-  const functionOnNew = functionActive && functionTarget === "new";
+  const liveFunctions = step === "enrich" && enrichPicks.has("function") && !showFunctionExplainer ? functionItems.filter((item) => item.target) : [];
+  const functionsForSheet = (kind, own = true) =>
+    liveFunctions
+      .map((item) => ({ ...item, index: functionItems.findIndex((entry) => entry.id === item.id) }))
+      .filter((item) => {
+        if (item.target === "all") return kind !== "new";
+        if (kind === "markets") return item.target === "markets";
+        if (kind === "trades") return item.target === "trades-all" || (item.target === "trades" && own);
+        if (kind === "new") return item.target === "new";
+        return false;
+      })
+      .map((item) => ({ ...item, columnId: functionColumnId(item.index), columnTitle: functionColumnTitle(item.index) }));
+  const functionOnMarkets = functionsForSheet("markets").length > 0;
+  const functionOnTrades = functionsForSheet("trades").length > 0;
+  const functionOnNew = functionsForSheet("new").length > 0;
+  const functionActive = liveFunctions.length > 0;
   const sheetTitle = tableId === "markets" ? "Markets" : tableId === "trades" ? "Trades" : tables[tableId]?.label || "This sheet";
   const metadataRows = useMemo(() => {
     const tickers = [];
@@ -1602,7 +1805,7 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
     metadataRows,
   ]);
   const visibleSheetId =
-    previewSheet === "column" && functionOnNew ? "new" : showJoinSheets && previewSheet === previewTicker ? "trades" : "markets";
+    previewSheet.startsWith("column:") && functionOnNew ? "new" : showJoinSheets && previewSheet === previewTicker ? "trades" : "markets";
   const columnOnVisible =
     (visibleSheetId === "markets" && functionOnMarkets) ||
     (visibleSheetId === "trades" && functionOnTrades) ||
@@ -1612,29 +1815,30 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
     editSheetId === "trades"
       ? { columns: tradePreview.columns, rows: tradePreview.rows, sheetId: "trades" }
       : { columns: tradeJoinBase.columns, rows: tradeJoinBase.rows, sheetId: editSheetId === "new" ? "new" : "markets" };
-  const marketsGrid = withFunctionColumn(
+  const marketsGrid = applyFunctionColumns(
     tradeJoinBase.columns,
     tradeJoinBase.rows,
-    functionOnMarkets,
-    functionFormula,
+    functionsForSheet("markets"),
     formulaSheets,
     "markets",
+    activeFunction?.id,
   );
-  const tradesGrid = withFunctionColumn(
+  const tradesGrid = applyFunctionColumns(
     tradePreview.columns,
     tradePreview.rows,
-    functionOnTrades,
-    functionFormula,
+    functionsForSheet("trades"),
     formulaSheets,
     "trades",
+    activeFunction?.id,
   );
-  const newTableGrid = withFunctionColumn(
+  const newTableItem = functionsForSheet("new").find((item) => previewSheet === `column:${item.id}`) || functionsForSheet("new")[0];
+  const newTableGrid = applyFunctionColumns(
     tradeJoinBase.columns,
     tradeJoinBase.rows,
-    functionOnNew,
-    functionFormula,
+    newTableItem ? [newTableItem] : [],
     formulaSheets,
     "new",
+    newTableItem?.id,
   );
   const formulaView = functionOnNew
     ? newTableGrid
@@ -1668,13 +1872,13 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
       seed: sampleMode === "seeded" ? sampleSeed : `draw-${sampleShuffle}`,
     });
   }, [sampleSizeNumber, previewBaseRows, sampleMode, sampleSeed, sampleShuffle]);
-  const summarySourceGrid = withFunctionColumn(
+  const summarySourceGrid = applyFunctionColumns(
     previewBaseColumns,
     sampleOn && sampleSizeNumber > 0 && !sampleSizeError ? samplePreviewRows : previewBaseRows,
-    functionOnMarkets,
-    functionFormula,
+    functionsForSheet("markets"),
     formulaSheets,
     "markets",
+    activeFunction?.id,
   );
   const summarySourceColumns = summarySourceGrid.columns;
   const summarySourceRows = summarySourceGrid.rows;
@@ -1698,31 +1902,25 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
     }
     setSummaryCells(settled);
   }, [summaryCells, summaryFocus]);
-  const bucketView = useMemo(
+  const bucketViews = useMemo(
     () =>
-      buildBucketGrid({
-        columns: summarySourceColumns,
-        rows: summarySourceRows,
-        bucketColumnId,
-        mode: bucketMode,
-        timeInterval: bucketInterval,
-        numericBucketSize: bucketNumericSize,
-        groupByIds: bucketGroupBy,
-        metric: bucketMetric,
-        valueColumnId: bucketValueColumnId,
+      bucketItems.map((item, index) => {
+        const built = buildBucketGrid({
+          columns: summarySourceColumns,
+          rows: summarySourceRows,
+          bucketColumnId: item.columnId,
+          mode: item.mode,
+          timeInterval: item.interval,
+          numericBucketSize: item.numericSize,
+          groupByIds: item.groupBy,
+          metric: item.metric,
+          valueColumnId: item.valueColumnId,
+        });
+        return { ...built, id: item.id, title: bucketSheetTitle(item, summarySourceColumns, index, bucketItems.length) };
       }),
-    [
-      summarySourceColumns,
-      summarySourceRows,
-      bucketColumnId,
-      bucketMode,
-      bucketInterval,
-      bucketNumericSize,
-      bucketGroupBy,
-      bucketMetric,
-      bucketValueColumnId,
-    ],
+    [bucketItems, summarySourceColumns, summarySourceRows],
   );
+  const visibleBucket = bucketViews.find((view) => view.id === bucketPreviewId) || null;
   const enrichmentSheets = useMemo(() => {
     const list = formulaSheets.map((sheet) =>
       sheet.id === "markets" && functionOnMarkets
@@ -1736,12 +1934,13 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
       titles.add(title);
       list.push(sheet);
     };
-    if (bucketOn && bucketView.ready) {
-      push({ id: "buckets", title: "Buckets", columns: bucketView.columns, rows: bucketView.rows });
-    }
-    if (functionOnNew && newTableGrid.columns.length) {
-      push({ id: "new", title: "Column", columns: newTableGrid.columns, rows: newTableGrid.rows });
-    }
+    bucketViews.forEach((view) => {
+      if (bucketOn && view.ready) push({ id: view.id, title: view.title, columns: view.columns, rows: view.rows });
+    });
+    functionsForSheet("new").forEach((item) => {
+      const built = applyFunctionColumns(summarySourceColumns, summarySourceRows, [item], formulaSheets, "new", item.id);
+      if (built.columns.length) push({ id: item.id, title: item.columnTitle, columns: built.columns, rows: built.rows });
+    });
     return list;
   }, [
     formulaSheets,
@@ -1749,9 +1948,13 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
     summarySourceColumns,
     summarySourceRows,
     bucketOn,
-    bucketView,
-    functionOnNew,
-    newTableGrid,
+    bucketViews,
+    formulaSheets,
+    summarySourceColumns,
+    summarySourceRows,
+    functionItems,
+    activeFunctionId,
+    previewSheet,
   ]);
   const summaryView = useMemo(
     () =>
@@ -1773,9 +1976,9 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
       return `Previewing ${shown.toLocaleString()} of the rows on screen. Save and run draws ${sampleSizeNumber.toLocaleString()} ${sampleMode === "seeded" ? "seeded" : "new"} rows from the full query.`;
     }
     if (bucketActive) {
-      if (!bucketView.ready) return "Choose a column to bucket. The result is a new sheet.";
-      if (summarizeOn && formulaOwner === "summary" && formulaEditing) return "Click a column on Buckets to drop it into the summary.";
-      const count = bucketView.rows.length;
+      if (!visibleBucket?.ready) return "Choose a column to bucket. The result is a new sheet.";
+      if (summarizeOn && formulaOwner === "summary" && formulaEditing) return `Click a column on ${visibleBucket.title} to drop it into the summary.`;
+      const count = visibleBucket.rows.length;
       return `Previewing ${count.toLocaleString()} ${count === 1 ? "bucket" : "buckets"} from the rows on screen. Save and run buckets the imported rows.`;
     }
     if (showSummarizeExplainer) return "Illustration. The summary sheet is created when you run the pull.";
@@ -1789,7 +1992,7 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
         ? "Illustration. No market metadata is loaded until you run the pull."
         : "Illustration. No trades are loaded until you run the pull.";
     }
-    if (previewSheet === "column" && functionOnNew) return "New table. This sheet is created when you run the pull.";
+    if (previewSheet.startsWith("column:") && functionOnNew) return "New table. This sheet is created when you run the pull.";
     if (previewSheet === "markets-meta" && tradesJoinReady && joinPlacement === "sheet") {
       if (marketPreview.status === "loading") return "Loading market metadata";
       if (marketPreview.status === "error") return marketPreview.error;
@@ -1811,24 +2014,30 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
     return `Previewing ${count.toLocaleString()} ${count === 1 ? "trade" : "trades"} of ${previewTicker}`;
   })();
 
-  function chooseBucketColumn(id) {
+  function chooseBucketColumn(bucketId, columnId) {
     setHoverBucket(false);
-    setBucketColumnId(id);
-    const column = shownColumns.find((item) => item.id === id);
+    setActiveBucketId(bucketId);
+    const column = (summarySourceColumns.length ? summarySourceColumns : shownColumns).find((item) => item.id === columnId);
     const nextMode = defaultBucketMode(column);
-    setBucketMode(nextMode);
-    if (nextMode === "number") setBucketNumericSize(String(suggestedNumericBucketSize(filteredRows, id)));
-    if (nextMode === "time") setBucketInterval("day");
-    setBucketGroupBy((current) => current.filter((item) => item !== id));
-    setBucketTab("buckets");
-    setPreviewSheet("buckets");
+    patchBucket(bucketId, {
+      columnId,
+      mode: nextMode,
+      numericSize: nextMode === "number" ? String(suggestedNumericBucketSize(filteredRows, columnId)) : "",
+      interval: nextMode === "time" ? "day" : "day",
+      groupBy: (bucketItems.find((item) => item.id === bucketId)?.groupBy || []).filter((entry) => entry !== columnId),
+    });
+    setPreviewSheet(`bucket:${bucketId}`);
   }
 
-  function chooseBucketMetric(id) {
-    setBucketMetric(id);
-    if (id === "count" || bucketValueColumnId) return;
-    const next = shownColumns.find((column) => column.type === "number" && column.id !== bucketColumnId);
-    if (next) setBucketValueColumnId(next.id);
+  function chooseBucketMetric(bucketId, metricId) {
+    const item = bucketItems.find((entry) => entry.id === bucketId);
+    const patch = { metric: metricId };
+    if (metricId !== "count" && item && !item.valueColumnId) {
+      const next = shownColumns.find((column) => column.type === "number" && column.id !== item.columnId);
+      if (next) patch.valueColumnId = next.id;
+    }
+    patchBucket(bucketId, patch);
+    setActiveBucketId(bucketId);
   }
 
   function chooseSampleMode(mode) {
@@ -1837,20 +2046,21 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
     if (mode === "unseeded") setSampleShuffle((token) => token + 1);
   }
 
-  function chooseFunctionTarget(id) {
+  function chooseFunctionTarget(itemId, targetId) {
+    const target = targetId || itemId;
+    const id = targetId ? itemId : activeFunction?.id || functionItems[0]?.id;
     setHoverFunction(false);
-    setFunctionTarget(id);
+    setActiveFunctionId(id);
+    setFunctionItems((list) => list.map((item) => (item.id === id ? { ...item, target } : item)));
     setFunctionScrollKey((key) => key + 1);
     setFormulaOwner("function");
     setFormulaFocused(false);
     setFormulaEditing(true);
-    if (id === "new") {
-      setFunctionTab("new");
-      setPreviewSheet("column");
+    if (target === "new") {
+      setPreviewSheet(`column:${id}`);
       return;
     }
-    setFunctionTab("");
-    if (id === "trades" || id === "trades-all") {
+    if (target === "trades" || target === "trades-all") {
       if (previewTicker) {
         setJoinTab(previewTicker);
         setPreviewSheet(previewTicker);
@@ -2093,13 +2303,13 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
         };
       }
     }
-    const runMarkets = withFunctionColumn(
+    const runMarkets = applyFunctionColumns(
       primaryColumns,
       primaryRows,
-      functionOnMarkets,
-      functionFormula,
+      functionsForSheet("markets"),
       formulaSheets,
       "markets",
+      activeFunction?.id,
     );
     const sheets = [];
     let runTickers = [];
@@ -2115,46 +2325,52 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
       });
     }
     if (metadataSheet?.columns?.length) sheets.push(metadataSheet);
-    let bucketBuilt = null;
+    const bucketBuilt = [];
     if (enrichPicks.has("bucket")) {
-      bucketBuilt = buildBucketGrid({
-        columns: runMarkets.columns,
-        rows: runMarkets.rows,
-        bucketColumnId,
-        mode: bucketMode,
-        timeInterval: bucketInterval,
-        numericBucketSize: bucketNumericSize,
-        groupByIds: bucketGroupBy,
-        metric: bucketMetric,
-        valueColumnId: bucketValueColumnId,
-      });
-      if (bucketBuilt.ready) {
+      bucketItems.forEach((item, index) => {
+        const built = buildBucketGrid({
+          columns: runMarkets.columns,
+          rows: runMarkets.rows,
+          bucketColumnId: item.columnId,
+          mode: item.mode,
+          timeInterval: item.interval,
+          numericBucketSize: item.numericSize,
+          groupByIds: item.groupBy,
+          metric: item.metric,
+          valueColumnId: item.valueColumnId,
+        });
+        if (!built.ready) return;
+        const title = bucketSheetTitle(item, runMarkets.columns, index, bucketItems.length);
+        bucketBuilt.push({ id: item.id, title, built });
         sheets.push({
-          id: "run-buckets",
-          title: "Buckets",
-          columns: bucketBuilt.columns,
-          rows: bucketBuilt.rows,
+          id: `run-buckets-${item.id}`,
+          title,
+          columns: built.columns,
+          rows: built.rows,
           span: sheets.length ? "half" : "full",
           table: "buckets",
-          summary: "Buckets",
+          summary: title,
         });
-      }
+      });
     }
-    const runColumn = functionOnNew
-      ? withFunctionColumn(primaryColumns, primaryRows, true, functionFormula, formulaSheets, "new")
-      : null;
+    const runColumns = functionsForSheet("new").map((item) => ({
+      item,
+      built: applyFunctionColumns(primaryColumns, primaryRows, [item], formulaSheets, "new", item.id),
+    }));
     if (enrichPicks.has("summarize")) {
       const runFormulaSheets = formulaSheets
         .filter((sheet) => sheet.id !== "buckets" && sheet.id !== "new" && sheet.id !== "market-metadata")
         .map((sheet) =>
           sheet.id === "markets" ? { ...sheet, title: sheetTitle, columns: runMarkets.columns, rows: runMarkets.rows } : sheet,
         );
-      if (bucketBuilt?.ready) {
-        runFormulaSheets.push({ id: "buckets", title: "Buckets", columns: bucketBuilt.columns, rows: bucketBuilt.rows });
-      }
-      if (runColumn?.columns?.length) {
-        runFormulaSheets.push({ id: "new", title: "Column", columns: runColumn.columns, rows: runColumn.rows });
-      }
+      bucketBuilt.forEach((entry) => {
+        runFormulaSheets.push({ id: entry.id, title: entry.title, columns: entry.built.columns, rows: entry.built.rows });
+      });
+      runColumns.forEach((entry) => {
+        if (entry.built.columns.length) {
+          runFormulaSheets.push({ id: entry.item.id, title: entry.item.columnTitle, columns: entry.built.columns, rows: entry.built.rows });
+        }
+      });
       if (metadataSheet?.columns?.length) {
         runFormulaSheets.push({
           id: "market-metadata",
@@ -2195,9 +2411,9 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
       });
       pulled.forEach((item) => {
         const own = item.ticker === previewTicker;
-        const withFormula = functionOnTrades && (functionTarget !== "trades" || own);
-        const shaped = withFormula
-          ? withFunctionColumn(item.columns, item.rows, true, functionFormula, formulaSheets, "trades")
+        const tradeFunctions = functionsForSheet("trades", own);
+        const shaped = tradeFunctions.length
+          ? applyFunctionColumns(item.columns, item.rows, tradeFunctions, formulaSheets, "trades", activeFunction?.id)
           : { columns: item.columns, rows: item.rows };
         if (!shaped.columns.length) return;
         const id = `run-trades-${String(item.ticker).replace(/[^A-Za-z0-9]+/g, "-")}`;
@@ -2219,17 +2435,18 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
         });
       });
     }
-    if (runColumn?.columns?.length) {
+    runColumns.forEach((entry) => {
+      if (!entry.built.columns.length) return;
       sheets.push({
-        id: "run-column",
-        title: "Column",
-        columns: runColumn.columns,
-        rows: runColumn.rows,
+        id: `run-column-${entry.item.id}`,
+        title: entry.item.columnTitle,
+        columns: entry.built.columns,
+        rows: entry.built.rows,
         span: sheets.some((sheet) => sheet.span !== "full") || sheets.length ? "half" : "full",
         table: tableId || "markets",
-        summary: functionFormula.trim() ? `Function · ${functionFormula.trim()}` : "Function column",
+        summary: entry.item.formula.trim() ? `Function · ${entry.item.formula.trim()}` : "Function column",
       });
-    }
+    });
     if (!sheets.length) return;
 
     canvas?.placeIntegrationSheets?.(sheets);
@@ -2298,18 +2515,8 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
       join: joinRecord,
       formula: functionActive ? functionFormula : "",
       summaryCells: enrichPicks.has("summarize") ? summaryCells : null,
-      bucket:
-        enrichPicks.has("bucket")
-          ? {
-              bucketColumnId,
-              mode: bucketMode,
-              timeInterval: bucketInterval,
-              numericBucketSize: bucketNumericSize,
-              groupByIds: bucketGroupBy,
-              metric: bucketMetric,
-              valueColumnId: bucketValueColumnId,
-            }
-          : null,
+      bucket: enrichPicks.has("bucket") ? bucketItems : null,
+      functions: enrichPicks.has("function") ? functionItems : null,
       randomSample:
         enrichPicks.has("sample") && sampleSizeNumber > 0
           ? { size: sampleSizeNumber, mode: sampleMode, seed: sampleMode === "seeded" ? sampleSeed : "" }
@@ -2356,9 +2563,9 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
     });
     setPreviewSheet((current) => {
       if (id === "summarize" && current === "summary") return "source";
-      if (id === "bucket" && current === "buckets") return "source";
-      if (id === "function" && current === "column") return "source";
-      if (id === "join" && current !== "summary" && current !== "buckets" && current !== "column") return "source";
+      if (id === "bucket" && current.startsWith("bucket:")) return "source";
+      if (id === "function" && current.startsWith("column:")) return "source";
+      if (id === "join" && current !== "summary" && !current.startsWith("bucket:") && !current.startsWith("column:")) return "source";
       return current;
     });
     if (id === "summarize") setFormulaOwner((owner) => (owner === "summary" ? "" : owner));
@@ -2371,23 +2578,25 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
       setFormulaOwner("summary");
       setSummaryTab("summary");
     }
-    if (id === "buckets") setBucketTab("buckets");
-    if (id === "column") {
-      setFunctionTab("new");
+    if (id.startsWith("bucket:")) setActiveBucketId(id.slice("bucket:".length));
+    if (id.startsWith("column:")) {
+      setActiveFunctionId(id.slice("column:".length));
       setFormulaOwner("function");
-    } else setFunctionTab("");
+    }
     if (id === "source") {
       setJoinTab("markets");
       if (tradesQuery && joinPlacement === "sheet") setMetadataTab("trades");
     } else if (id === "markets-meta") setMetadataTab("markets");
-    else if (id !== "summary" && id !== "buckets" && id !== "column") setJoinTab(id);
+    else if (!id.startsWith("bucket:") && !id.startsWith("column:") && id !== "summary") setJoinTab(id);
     setFunctionScrollKey((key) => key + 1);
   }
 
   const previewTabs = [{ id: "source", title: sheetTitle }];
   if (summarizeOn) previewTabs.push({ id: "summary", title: "Summary" });
-  if (bucketOn) previewTabs.push({ id: "buckets", title: "Buckets" });
-  if (functionOnNew) previewTabs.push({ id: "column", title: "Column" });
+  if (bucketOn) bucketViews.forEach((view) => previewTabs.push({ id: `bucket:${view.id}`, title: view.title }));
+  if (functionOnNew) {
+    functionsForSheet("new").forEach((item) => previewTabs.push({ id: `column:${item.id}`, title: item.columnTitle }));
+  }
   if (tradesJoinReady && joinPlacement === "sheet") previewTabs.push({ id: "markets-meta", title: "Markets" });
   const joinExtras = previewTabs.filter((tab) => tab.id !== "source");
   const summaryOnSource =
@@ -2506,6 +2715,11 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
                 dropEnrich(id);
                 return;
               }
+              setEnrichFolded((current) => {
+                const next = new Set(current);
+                next.delete(id);
+                return next;
+              });
               if (id === "summarize") {
                 setHoverSummarize(false);
                 setSummaryTab("summary");
@@ -2519,8 +2733,11 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
               }
               if (id === "bucket") {
                 setHoverBucket(false);
-                setBucketTab("buckets");
-                setPreviewSheet("buckets");
+                const first = bucketItems[0]?.id;
+                if (first) {
+                  setActiveBucketId(first);
+                  setPreviewSheet(`bucket:${first}`);
+                }
               }
               if (id === "sample") {
                 setHoverSample(false);
@@ -2541,8 +2758,11 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
               setMetadataTab("trades");
               setMarketColumnHidden(defaultMarketColumnHidden(kalshiHistoricalMarketColumnList()));
               setJoinTab("markets");
-              setFunctionTab("");
-              setFunctionTarget((current) => (current === "trades" || current === "trades-all" || current === "all" ? "" : current));
+              setFunctionItems((list) =>
+                list.map((item) =>
+                  item.target === "trades" || item.target === "trades-all" || item.target === "all" ? { ...item, target: "" } : item,
+                ),
+              );
             }}
             marketCap={marketCap}
             queryRows={queryRows}
@@ -2554,9 +2774,8 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
             onClearFunction={() => {
               setHoverFunction(false);
               dropEnrich("function");
-              setFunctionTarget("");
-              setFunctionFormula("");
-              setFunctionTab("");
+              setFunctionItems([createFunctionItem()]);
+              setActiveFunctionId("");
               setFormulaFocused(false);
               setFormulaEditing(false);
             }}
@@ -2604,34 +2823,86 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
             onHoverBucket={setHoverBucket}
             onHoverSample={setHoverSample}
             bucketColumns={summarySourceColumns}
-            bucketColumnId={bucketColumnId}
+            bucketItems={bucketItems}
             onBucketColumn={chooseBucketColumn}
-            bucketMode={bucketMode}
-            onBucketMode={setBucketMode}
-            bucketInterval={bucketInterval}
-            onBucketInterval={setBucketInterval}
-            bucketNumericSize={bucketNumericSize}
-            onBucketNumericSize={setBucketNumericSize}
-            bucketGroupBy={bucketGroupBy}
-            onToggleBucketGroup={(id) =>
-              setBucketGroupBy((current) => (current.includes(id) ? current.filter((item) => item !== id) : [...current, id]))
-            }
-            bucketMetric={bucketMetric}
+            onBucketMode={(bucketId, mode) => {
+              setActiveBucketId(bucketId);
+              patchBucket(bucketId, { mode });
+            }}
+            onBucketInterval={(bucketId, interval) => patchBucket(bucketId, { interval })}
+            onBucketNumericSize={(bucketId, numericSize) => patchBucket(bucketId, { numericSize })}
+            onToggleBucketGroup={(bucketId, columnId) => {
+              const item = bucketItems.find((entry) => entry.id === bucketId);
+              const groupBy = item?.groupBy.includes(columnId)
+                ? item.groupBy.filter((entry) => entry !== columnId)
+                : [...(item?.groupBy || []), columnId];
+              patchBucket(bucketId, { groupBy });
+            }}
             onBucketMetric={chooseBucketMetric}
-            bucketValueColumnId={bucketValueColumnId}
-            onBucketValueColumn={setBucketValueColumnId}
+            onBucketValueColumn={(bucketId, valueColumnId) => patchBucket(bucketId, { valueColumnId })}
+            onAddBucket={() => {
+              const item = createBucketItem();
+              setBucketItems((list) => [...list, item]);
+              setActiveBucketId(item.id);
+              setPreviewSheet(`bucket:${item.id}`);
+              setEnrichFolded((current) => {
+                const next = new Set(current);
+                next.delete("bucket");
+                return next;
+              });
+            }}
+            onRemoveBucket={(bucketId) => {
+              setBucketItems((list) => {
+                const next = list.filter((item) => item.id !== bucketId);
+                return next.length ? next : [createBucketItem()];
+              });
+              setPreviewSheet((current) => (current === `bucket:${bucketId}` ? "source" : current));
+            }}
             onClearBucket={() => {
               setHoverBucket(false);
               dropEnrich("bucket");
-              setBucketColumnId("");
-              setBucketMode("category");
-              setBucketInterval("day");
-              setBucketNumericSize("");
-              setBucketGroupBy([]);
-              setBucketMetric("count");
-              setBucketValueColumnId("");
-              setBucketTab("buckets");
+              setBucketItems([createBucketItem()]);
+              setActiveBucketId("");
             }}
+            folded={enrichFolded}
+            onToggleFold={toggleEnrichFold}
+            functionItems={functionItems}
+            onAddFunction={() => {
+              const item = createFunctionItem();
+              setFunctionItems((list) => [...list, item]);
+              setActiveFunctionId(item.id);
+              setFormulaOwner("function");
+              setFormulaEditing(true);
+              setEnrichFolded((current) => {
+                const next = new Set(current);
+                next.delete("function");
+                return next;
+              });
+            }}
+            onRemoveFunction={(functionId) => {
+              setFunctionItems((list) => {
+                const next = list.filter((item) => item.id !== functionId);
+                return next.length ? next : [createFunctionItem()];
+              });
+              setPreviewSheet((current) => (current === `column:${functionId}` ? "source" : current));
+            }}
+            onFocusFunction={(functionId) => {
+              setActiveFunctionId(functionId);
+              setFormulaOwner("function");
+              setFormulaEditing(true);
+              const item = functionItems.find((entry) => entry.id === functionId);
+              if (item?.target === "new") setPreviewSheet(`column:${functionId}`);
+              setFunctionScrollKey((key) => key + 1);
+            }}
+            summaryLines={(() => {
+              const lines = [];
+              for (let row = 0; row < 8; row += 1) {
+                const value = String(summaryCells[summaryCellKey("value", row)] || "").trim();
+                const label = String(summaryCells[summaryCellKey("label", row)] || "").trim();
+                if (value.startsWith("=")) lines.push(label || describeSummaryFormula(value) || value);
+              }
+              return lines.length ? lines : ["No equations yet"];
+            })()}
             sampleSize={sampleSize}
             onSampleSize={setSampleSize}
             sampleMode={sampleMode}
@@ -2824,7 +3095,7 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
                 onSorts={setSortKeys}
                 rowLimit={rowLimit}
                 onRowLimit={setRowLimit}
-                sectionTitle={tableId === "trades" ? "Trade attributes" : "Market attributes"}
+                sectionTitle={tableId === "trades" ? "Trade attributes" : tableId === "blocks" ? "Block attributes" : "Market attributes"}
               />
             ) : null}
           </Accordion>
@@ -2881,7 +3152,7 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
             !showJoinExplainer &&
             !showBucketExplainer &&
             !showSampleExplainer &&
-            !(functionOnNew && (functionTab === "new" || previewSheet === "column")) &&
+            !(functionOnNew && previewSheet.startsWith("column:")) &&
             !summaryActive &&
             !bucketActive &&
             !sampleActive &&
@@ -2950,21 +3221,21 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
             <SampleExplainer />
           ) : showFunctionExplainer ? (
             <FunctionExplainer />
-          ) : bucketActive ? (
-            bucketView.ready ? (
+          ) : bucketActive && visibleBucket ? (
+            visibleBucket.ready ? (
               <IntegrationBuildGrid
-                columns={bucketView.columns}
-                rows={bucketView.rows}
-                highlightColumnId={bucketView.metricId}
+                columns={visibleBucket.columns}
+                rows={visibleBucket.rows}
+                highlightColumnId={visibleBucket.metricId}
                 highlightColumnIds={(summaryView.references || [])
-                  .filter((ref) => ref.sheetId === "buckets" && ref.row == null)
+                  .filter((ref) => ref.sheetId === visibleBucket.id && ref.row == null)
                   .map((ref) => ref.column.id)}
                 referencedCells={(summaryView.references || [])
-                  .filter((ref) => ref.sheetId === "buckets" && ref.row != null)
+                  .filter((ref) => ref.sheetId === visibleBucket.id && ref.row != null)
                   .map((ref) => ({ columnId: ref.column.id, row: ref.row }))}
                 scrollToken={functionScrollKey}
-                formulaEditor={summarySourceEditor || formulaEditorFor("buckets", true)}
-                onFormulaPick={(pick) => acceptFormulaPick(pick, "buckets")}
+                formulaEditor={summarySourceEditor || formulaEditorFor(visibleBucket.id, true)}
+                onFormulaPick={(pick) => acceptFormulaPick(pick, visibleBucket.id)}
               />
             ) : (
               <div className="flex h-full items-center justify-center rounded-xl border border-border/70 bg-background px-6 text-center text-[13px] leading-relaxed text-muted-foreground shadow-sm">
@@ -3050,7 +3321,7 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
             />
           ) : showJoinExplainer ? (
             <JoinExplainer source={tradesQuery ? "trades" : "markets"} />
-          ) : previewSheet === "column" && functionOnNew && newTableGrid.columns.length ? (
+          ) : previewSheet.startsWith("column:") && functionOnNew && newTableGrid.columns.length ? (
             <IntegrationBuildGrid
               columns={newTableGrid.columns}
               rows={newTableGrid.rows}

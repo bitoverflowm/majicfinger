@@ -29,6 +29,8 @@ function choiceClass(on) {
 const fieldClass = "mt-1 h-8 w-full rounded-lg border border-border/70 bg-background px-2 text-[12px] text-foreground";
 
 export function BucketEnrichPanel({
+  title = "Bucket sheet",
+  clearLabel = "Clear",
   columns,
   bucketColumnId,
   onBucketColumn,
@@ -53,9 +55,9 @@ export function BucketEnrichPanel({
   return (
     <div className="mt-2 rounded-lg border border-border/70 px-2.5 py-2">
       <div className="flex items-center justify-between gap-2">
-        <p className="text-[11px] font-semibold text-foreground">Bucket sheet</p>
+        <p className="text-[11px] font-semibold text-foreground">{title}</p>
         <button type="button" onClick={onClear} className="text-[11px] font-medium text-muted-foreground hover:text-foreground">
-          Clear
+          {clearLabel}
         </button>
       </div>
       <p className="mt-1 text-[11px] leading-relaxed text-muted-foreground">

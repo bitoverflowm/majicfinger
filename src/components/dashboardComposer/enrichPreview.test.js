@@ -4,6 +4,13 @@ import { buildBucketGrid, bucketModesForColumn, suggestedNumericBucketSize } fro
 import { assignSummaryInput, describeSummaryFormula, settleSummaryCells, summaryCellKey } from "@/components/dashboardComposer/summarySheet";
 import { attachRandomSample, previewRandomSample } from "@/components/dashboardComposer/randomSampleRequest";
 import { normalizeRandomSampleConfig } from "@/lib/dataLake/randomSample";
+import { polymarketHistoricalColumnList } from "@/components/dashboardComposer/integrationBuildCatalog";
+import {
+  POLYMARKET_BLOCKS_CONNECT_COLUMNS,
+  POLYMARKET_MARKETS_CONNECT_COLUMNS,
+  POLYMARKET_TRADES_CONNECT_COLUMNS,
+} from "@/lib/polymarketConnectColumns";
+import { buildComposeFiltersWhereSql } from "@/lib/dataLake/composeWherePredicateSql";
 
 const columns = [
   { id: "created_time", title: "Created time", type: "date" },
@@ -121,5 +128,26 @@ assert.equal(renamed.cells[summaryCellKey("label", 0)], "Average of Size");
 const settled = settleSummaryCells({ [summaryCellKey("label", 1)]: "= SUM(Size)" });
 assert.equal(settled[summaryCellKey("value", 1)], "= SUM(Size)");
 assert.equal(settled[summaryCellKey("label", 1)], "Sum of Size");
+
+for (const [table, expected] of [
+  ["markets", POLYMARKET_MARKETS_CONNECT_COLUMNS],
+  ["trades", POLYMARKET_TRADES_CONNECT_COLUMNS],
+  ["blocks", POLYMARKET_BLOCKS_CONNECT_COLUMNS],
+]) {
+  const columns = polymarketHistoricalColumnList(table);
+  assert.deepEqual(columns.map((column) => column.id), expected.map((column) => column.name));
+  assert.ok(columns.every((column) => column.description));
+}
+const blockColumns = polymarketHistoricalColumnList("blocks");
+assert.equal(blockColumns.find((column) => column.id === "timestamp").dateEpoch, "iso");
+assert.equal(polymarketHistoricalColumnList("markets").find((column) => column.id === "end_date").dateEpoch, "unix");
+assert.equal(polymarketHistoricalColumnList("markets").find((column) => column.id === "active").type, "boolean");
+
+const isoSql = buildComposeFiltersWhereSql({
+  filters: { and: [{ column: "timestamp", kind: "date", op: "gt", value: 1705276800000 }], or: [] },
+  lake: "polymarket",
+  table: "blocks",
+});
+assert.ok(isoSql.includes("from_iso8601_timestamp"));
 
 console.log("enrichPreview.test.js ok");

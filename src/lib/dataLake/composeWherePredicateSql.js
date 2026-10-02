@@ -9,6 +9,7 @@ import {
   KALSHI_VIRTUAL_TAXONOMY_CATEGORY_COLUMN,
 } from "@/lib/kalshi/kalshiTaxonomySql";
 import { resolveAthenaTableName } from "@/lib/dataLake/athenaTableMap";
+import { columnHiveTypeForLakeTable } from "@/lib/dataLake/lakeTableColumns";
 
 const KALSHI_VIRTUAL_CATEGORY = "kalshi_event_ticker_category";
 
@@ -223,8 +224,13 @@ export function buildComposeFiltersWhereSql(opts) {
     }
 
     if (p.kind === "date") {
-      const colMs = `CASE WHEN ${colSql} < 1000000000000 THEN ${colSql} * 1000 ELSE ${colSql} END`;
       const opSql = p.op === "gt" ? ">" : p.op === "lt" ? "<" : p.op === "eq" ? "=" : "<>";
+      const hive = columnHiveTypeForLakeTable(L, T, colName);
+      if (hive === "string") {
+        const seconds = Number(p.value) / 1000;
+        return `from_iso8601_timestamp(${colSql}) ${opSql} from_unixtime(${Number.isFinite(seconds) ? seconds : 0})`;
+      }
+      const colMs = `CASE WHEN ${colSql} < 1000000000000 THEN ${colSql} * 1000 ELSE ${colSql} END`;
       return `${colMs} ${opSql} ${Number(p.value)}`;
     }
 

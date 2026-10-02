@@ -27,6 +27,11 @@ import { normalizeKalshiLiveHolderTradeRow } from "@/lib/kalshiLive/normalizeHol
 import { normalizeKalshiLiveSearchTradersRow } from "@/lib/kalshiLive/normalizeSearchTradersRow";
 import { getKalshiLiveSearchTradersColumns } from "@/lib/kalshiLive/searchTradersColumns";
 import { MARKETS_RESPONSE_FIELDS } from "@/components/integrationsView/integrationPlayground/integrations/polymarket/config";
+import {
+  POLYMARKET_BLOCKS_CONNECT_COLUMNS,
+  POLYMARKET_MARKETS_CONNECT_COLUMNS,
+  POLYMARKET_TRADES_CONNECT_COLUMNS,
+} from "@/lib/polymarketConnectColumns";
 
 export const PREVIEW_ROW_CAP = 50;
 
@@ -90,11 +95,15 @@ export const BUILD_SOURCES = {
     tables: {
       markets: {
         label: "Markets search",
-        description: "Each row is a Polymarket market from the historical lake, highest volume first.",
+        description: "Each row is a Polymarket prediction market.",
       },
       trades: {
         label: "Trades search",
-        description: "Each row is an on-chain fill from the historical lake.",
+        description: "Each row is an OrderFilled event from the Polygon blockchain.",
+      },
+      blocks: {
+        label: "Blocks search",
+        description: "Each row maps a Polygon block number to its timestamp.",
       },
     },
   },
@@ -144,6 +153,23 @@ const TITLE = {
   closed: "Closed",
   outcome_prices: "Outcome prices",
   end_date: "End date",
+  id: "Id",
+  condition_id: "Condition id",
+  slug: "Slug",
+  outcomes: "Outcomes",
+  clob_token_ids: "CLOB token ids",
+  active: "Active",
+  created_at: "Created at",
+  market_maker_address: "Market maker",
+  block_number: "Block number",
+  transaction_hash: "Transaction",
+  log_index: "Log index",
+  order_hash: "Order hash",
+  maker_asset_id: "Maker asset",
+  taker_asset_id: "Taker asset",
+  timestamp: "Timestamp",
+  _fetched_at: "Fetched at",
+  _contract: "Contract",
   count: "Size",
   yes_price: "Yes price",
   no_price: "No price",
@@ -289,6 +315,47 @@ function lakeColumns(lake, table, defaults) {
   return catalogColumns(meta, defaults, { cents: lake === "kalshi" });
 }
 
+const POLYMARKET_CONNECT_COLUMNS = {
+  markets: POLYMARKET_MARKETS_CONNECT_COLUMNS,
+  trades: POLYMARKET_TRADES_CONNECT_COLUMNS,
+  blocks: POLYMARKET_BLOCKS_CONNECT_COLUMNS,
+};
+
+const POLYMARKET_HISTORICAL_DEFAULTS = {
+  markets: new Set(["question", "volume", "liquidity", "outcome_prices", "closed", "end_date"]),
+  trades: new Set(["timestamp", "maker", "taker", "maker_amount", "taker_amount", "fee"]),
+  blocks: new Set(["block_number", "timestamp"]),
+};
+
+/** Epoch unit the Attributes date filter should send. Kalshi dates stay nanoseconds. */
+const POLYMARKET_DATE_EPOCH = {
+  markets: { end_date: "unix", created_at: "unix", _fetched_at: "ns" },
+  trades: { timestamp: "unix", _fetched_at: "ns" },
+  blocks: { timestamp: "iso" },
+};
+
+function polymarketHistoricalColumns(table) {
+  const key = table === "trades" || table === "blocks" ? table : "markets";
+  const described = new Map(POLYMARKET_CONNECT_COLUMNS[key].map((entry) => [entry.name, entry.description]));
+  const defaults = POLYMARKET_HISTORICAL_DEFAULTS[key];
+  const epochs = POLYMARKET_DATE_EPOCH[key];
+  return getColumnMetaForLakeTable("polymarket", key).map((entry) => {
+    const dateEpoch = epochs[entry.name];
+    return {
+      id: entry.name,
+      title: titleFor(entry.name),
+      type: dateEpoch ? "date" : uiType(entry.type, entry.name),
+      description: described.get(entry.name) || "",
+      defaultOn: defaults.has(entry.name),
+      ...(dateEpoch ? { dateEpoch } : {}),
+    };
+  });
+}
+
+export function polymarketHistoricalColumnList(table) {
+  return polymarketHistoricalColumns(table);
+}
+
 function cellValue(value) {
   if (value == null) return "";
   if (typeof value === "object") return JSON.stringify(value);
@@ -391,11 +458,9 @@ async function postAthena(body) {
   });
 }
 
-function kalshiHistoricalCompose(table, predicates, sortKeys) {
-  const columns = kalshiHistoricalColumns(table);
+function lakeHistoricalCompose({ lake, table, columns, predicates, sortKeys, fallback }) {
   const and = Array.isArray(predicates) ? predicates : Array.isArray(predicates?.and) ? predicates.and : [];
   const or = Array.isArray(predicates) ? [] : Array.isArray(predicates?.or) ? predicates.or : [];
-  const fallback = table === "trades" ? { alias: "created_time", direction: "desc" } : { alias: "volume", direction: "desc" };
   const orderBy = Array.isArray(sortKeys) && sortKeys.length
     ? sortKeys
         .filter((sort) => columns.some((column) => column.id === sort.columnId))
@@ -404,8 +469,8 @@ function kalshiHistoricalCompose(table, predicates, sortKeys) {
   return {
     columns,
     request: {
-      lake: "kalshi",
-      table: table === "trades" ? "trades" : "markets",
+      lake,
+      table,
       queryType: "compose",
       limit: PREVIEW_ROW_CAP,
       caseSensitive: false,
@@ -417,6 +482,36 @@ function kalshiHistoricalCompose(table, predicates, sortKeys) {
       },
     },
   };
+}
+
+function kalshiHistoricalCompose(table, predicates, sortKeys) {
+  const trades = table === "trades";
+  return lakeHistoricalCompose({
+    lake: "kalshi",
+    table: trades ? "trades" : "markets",
+    columns: kalshiHistoricalColumns(table),
+    predicates,
+    sortKeys,
+    fallback: trades ? { alias: "created_time", direction: "desc" } : { alias: "volume", direction: "desc" },
+  });
+}
+
+function polymarketHistoricalCompose(table, predicates, sortKeys) {
+  const key = table === "trades" || table === "blocks" ? table : "markets";
+  const fallback =
+    key === "trades"
+      ? { alias: "timestamp", direction: "desc" }
+      : key === "blocks"
+        ? { alias: "block_number", direction: "desc" }
+        : { alias: "volume", direction: "desc" };
+  return lakeHistoricalCompose({
+    lake: "polymarket",
+    table: key,
+    columns: polymarketHistoricalColumns(key),
+    predicates,
+    sortKeys,
+    fallback,
+  });
 }
 
 function kalshiHistoricalMarketsCompose(predicates, sortKeys) {
@@ -438,8 +533,7 @@ async function kalshiHistoricalMarkets() {
  * Preview fetches stay capped at PREVIEW_ROW_CAP; this request uses the import limit
  * and the columns the user left visible (plus any column used to sort).
  */
-export function buildKalshiHistoricalRequest({ table = "markets", predicates, sortKeys, columnIds, limit } = {}) {
-  const { columns, request } = kalshiHistoricalCompose(table, predicates, sortKeys);
+function finishHistoricalRequest({ columns, request, sortKeys, columnIds, limit }) {
   const wanted = new Set(Array.isArray(columnIds) ? columnIds : []);
   for (const sort of Array.isArray(sortKeys) ? sortKeys : []) {
     if (sort?.columnId) wanted.add(sort.columnId);
@@ -458,6 +552,16 @@ export function buildKalshiHistoricalRequest({ table = "markets", predicates, so
       select,
     },
   };
+}
+
+export function buildKalshiHistoricalRequest({ table = "markets", predicates, sortKeys, columnIds, limit } = {}) {
+  const { columns, request } = kalshiHistoricalCompose(table, predicates, sortKeys);
+  return finishHistoricalRequest({ columns, request, sortKeys, columnIds, limit });
+}
+
+export function buildPolymarketHistoricalRequest({ table = "markets", predicates, sortKeys, columnIds, limit } = {}) {
+  const { columns, request } = polymarketHistoricalCompose(table, predicates, sortKeys);
+  return finishHistoricalRequest({ columns, request, sortKeys, columnIds, limit });
 }
 
 const KALSHI_TRADE_PREVIEW_FIELDS = ["created_time", "ticker", "taker_side", "yes_price", "no_price", "count"];
@@ -569,9 +673,8 @@ export function buildKalshiHistoricalMarketsRequest(args = {}) {
   return buildKalshiHistoricalRequest({ ...args, table: "markets" });
 }
 
-export function loadKalshiHistoricalPreview(table, predicates, sortKeys) {
-  const { request } = kalshiHistoricalCompose(table, predicates, sortKeys);
-  return fetchAthenaLakeSample(request, { maxWaitMs: 180000, pollIntervalMs: 800 }).then((result) => {
+function loadLakeHistoricalPreview(compose) {
+  return fetchAthenaLakeSample(compose.request, { maxWaitMs: 180000, pollIntervalMs: 800 }).then((result) => {
     const names = result.columns || [];
     const rows = (result.rows || []).map((cells) => {
       const row = {};
@@ -582,6 +685,14 @@ export function loadKalshiHistoricalPreview(table, predicates, sortKeys) {
     });
     return { rows: rows.slice(0, PREVIEW_ROW_CAP) };
   });
+}
+
+export function loadKalshiHistoricalPreview(table, predicates, sortKeys) {
+  return loadLakeHistoricalPreview(kalshiHistoricalCompose(table, predicates, sortKeys));
+}
+
+export function loadPolymarketHistoricalPreview(table, predicates, sortKeys) {
+  return loadLakeHistoricalPreview(polymarketHistoricalCompose(table, predicates, sortKeys));
 }
 
 export function loadKalshiHistoricalMarketsPreview(predicates, sortKeys) {
@@ -893,26 +1004,9 @@ async function kalshiLiveEndpoint(endpointId) {
   return previewPack(columns, rows);
 }
 
-async function polymarketHistoricalMarkets() {
-  const columns = lakeColumns("polymarket", "markets", [
-    "question",
-    "volume",
-    "liquidity",
-    "outcome_prices",
-    "closed",
-    "end_date",
-  ]);
-  const rows = await postAthena({
-    lake: "polymarket",
-    table: "markets",
-    queryType: "compose",
-    limit: PREVIEW_ROW_CAP,
-    compose: {
-      select: columns.map((entry) => ({ column: entry.id, alias: entry.id })),
-      groupByAliases: [],
-      orderBy: [{ alias: "volume", direction: "desc" }],
-    },
-  });
+async function polymarketHistoricalTable(table) {
+  const { columns, request } = polymarketHistoricalCompose(table);
+  const rows = await postAthena(request);
   return {
     columns,
     rows: rows.slice(0, PREVIEW_ROW_CAP),
@@ -920,26 +1014,16 @@ async function polymarketHistoricalMarkets() {
   };
 }
 
-async function polymarketHistoricalTrades() {
-  const columns = lakeColumns("polymarket", "trades", [
-    "timestamp",
-    "maker",
-    "taker",
-    "maker_amount",
-    "taker_amount",
-    "fee",
-  ]);
-  const rows = await postAthena({
-    lake: "polymarket",
-    table: "trades",
-    limit: PREVIEW_ROW_CAP,
-    columns: columns.map((entry) => entry.id),
-  });
-  return {
-    columns,
-    rows: rows.slice(0, PREVIEW_ROW_CAP),
-    capped: rows.length >= PREVIEW_ROW_CAP,
-  };
+function polymarketHistoricalMarkets() {
+  return polymarketHistoricalTable("markets");
+}
+
+function polymarketHistoricalTrades() {
+  return polymarketHistoricalTable("trades");
+}
+
+function polymarketHistoricalBlocks() {
+  return polymarketHistoricalTable("blocks");
 }
 
 async function polymarketLiveMarkets() {
@@ -1089,6 +1173,7 @@ const LOADERS = {
   ),
   "polymarketHistorical:markets": polymarketHistoricalMarkets,
   "polymarketHistorical:trades": polymarketHistoricalTrades,
+  "polymarketHistorical:blocks": polymarketHistoricalBlocks,
   "polymarket:markets": polymarketLiveMarkets,
   "chainlink:prices": () => livePrices("chainlink"),
   "binance:prices": () => livePrices("binance"),
@@ -1096,7 +1181,8 @@ const LOADERS = {
 
 function universeCountKey(integrationId, tableId, filter) {
   const lake = EXACT_UNIVERSE[integrationId];
-  if (!lake || (tableId !== "markets" && tableId !== "trades")) return "";
+  const tables = lake === "polymarket" ? ["markets", "trades", "blocks"] : ["markets", "trades"];
+  if (!lake || !tables.includes(tableId)) return "";
   if (Array.isArray(filter?.and) || Array.isArray(filter?.or)) {
     const and = Array.isArray(filter?.and) ? filter.and : [];
     const or = Array.isArray(filter?.or) ? filter.or : [];

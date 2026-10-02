@@ -53,11 +53,25 @@ const ENUM_OPTIONS = {
 
 const CENTS_COLUMNS = new Set(["yes_bid", "yes_ask", "no_bid", "no_ask", "last_price", "yes_price", "no_price"]);
 
+const BOOLEAN_OPTIONS = [
+  ["true", "Yes"],
+  ["false", "No"],
+];
+
 export function kalshiHistoricalAttributeSpec(column) {
   if (ENUM_OPTIONS[column?.id]) return { kind: "enum", options: ENUM_OPTIONS[column.id] };
+  if (column?.type === "boolean") return { kind: "boolean", options: BOOLEAN_OPTIONS };
   if (column?.type === "number") return { kind: "number", cents: CENTS_COLUMNS.has(column.id) };
-  if (column?.type === "date") return { kind: "date" };
+  if (column?.type === "date") return { kind: "date", epoch: column.dateEpoch || "ns" };
   return { kind: "text" };
+}
+
+function booleanValue(raw) {
+  if (raw === true || raw === false) return raw;
+  const text = String(raw ?? "").trim().toLowerCase();
+  if (text === "true" || text === "1") return true;
+  if (text === "false" || text === "0") return false;
+  return null;
 }
 
 function readFilter(filters, column) {
@@ -87,7 +101,7 @@ function isMissingValue(raw) {
 function isActive(spec, filter) {
   if (!filter) return false;
   if (filter.excludeNull) return true;
-  if (spec.kind === "enum") return Array.isArray(filter.include) && filter.include.length > 0;
+  if (spec.kind === "enum" || spec.kind === "boolean") return Array.isArray(filter.include) && filter.include.length > 0;
   if (spec.kind === "number") return String(filter.min || "").trim() !== "" || String(filter.max || "").trim() !== "";
   if (spec.kind === "date") return Boolean(filter.from) || Boolean(filter.to);
   return textTerms(filter.containsTags, filter.contains).length > 0 || textTerms(filter.excludesTags, filter.excludes).length > 0;
@@ -101,6 +115,11 @@ function lakeTimeMs(value) {
   }
   const date = new Date(value);
   return Number.isNaN(date.getTime()) ? null : date.getTime();
+}
+
+function dateBound(ms, epoch, edge) {
+  if (epoch === "unix" || epoch === "iso") return edge === "start" ? ms - 1 : ms + 1;
+  return edge === "start" ? ms * 1e6 - 1e6 : ms * 1e6 + 1e6;
 }
 
 function dayBounds(isoDate) {
@@ -121,7 +140,7 @@ export function attributeSummary(column, filters) {
   const filter = readFilter(filters, column);
   if (!isActive(spec, filter)) return "";
   const parts = [];
-  if (spec.kind === "enum" && filter.include?.length) {
+  if ((spec.kind === "enum" || spec.kind === "boolean") && filter.include?.length && !(spec.kind === "boolean" && filter.include.length >= spec.options.length)) {
     parts.push(
       filter.include
         .map((value) => spec.options.find((option) => option[0] === value)?.[1] || value || "Unresolved")
@@ -157,6 +176,10 @@ export function rowMatchesKalshiHistoricalFilters(row, columns, filters) {
     if (filter.excludeNull && isMissingValue(raw)) return false;
     if (spec.kind === "enum") {
       if (filter.include?.length && !filter.include.includes(String(raw ?? ""))) return false;
+      continue;
+    }
+    if (spec.kind === "boolean") {
+      if (filter.include?.length === 1 && booleanValue(raw) !== (filter.include[0] === "true")) return false;
       continue;
     }
     if (spec.kind === "text") {
@@ -198,13 +221,20 @@ export function buildKalshiHistoricalFilterPredicates(columns, filters) {
     const filter = readFilter(filters, column);
     if (!isActive(spec, filter)) continue;
     if (filter.excludeNull) {
-      const kind = spec.kind === "number" ? "number" : spec.kind === "date" ? "date" : "string";
+      const kind =
+        spec.kind === "number" ? "number" : spec.kind === "date" ? "date" : spec.kind === "boolean" ? "boolean" : "string";
       and.push({ column: column.id, kind, op: "is_not_null", value: null });
       if (kind === "string") and.push({ column: column.id, kind: "string", op: "neq", value: "" });
     }
     if (spec.kind === "enum") {
       if (filter.include?.length) {
         and.push({ column: column.id, kind: "string", op: "in", value: quoteInList(filter.include) });
+      }
+      continue;
+    }
+    if (spec.kind === "boolean") {
+      if (filter.include?.length === 1) {
+        and.push({ column: column.id, kind: "boolean", op: "eq", value: filter.include[0] === "true" });
       }
       continue;
     }
@@ -236,11 +266,11 @@ export function buildKalshiHistoricalFilterPredicates(columns, filters) {
     }
     if (filter.from) {
       const bounds = dayBounds(filter.from);
-      if (bounds) and.push({ column: column.id, kind: "date", op: "gt", value: bounds.start * 1e6 - 1e6 });
+      if (bounds) and.push({ column: column.id, kind: "date", op: "gt", value: dateBound(bounds.start, spec.epoch, "start") });
     }
     if (filter.to) {
       const bounds = dayBounds(filter.to);
-      if (bounds) and.push({ column: column.id, kind: "date", op: "lt", value: bounds.end * 1e6 + 1e6 });
+      if (bounds) and.push({ column: column.id, kind: "date", op: "lt", value: dateBound(bounds.end, spec.epoch, "end") });
     }
   }
   // Compose filters can OR one group. One column with several contains tags
@@ -441,7 +471,7 @@ function AttributeFields({ column, filters, onChange }) {
       onChange={(next) => onChange(patchFilter(filters, column, { excludeNull: next }))}
     />
   );
-  if (spec.kind === "enum") {
+  if (spec.kind === "enum" || spec.kind === "boolean") {
     return (
       <div className="space-y-2">
         <IncludeField
