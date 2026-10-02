@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 
 function TypingGhost({ examples }) {
-  const list = examples?.length ? examples : ["= Yes Price + No Price"];
+  const list = examples == null ? ["= Yes Price + No Price"] : examples;
   const key = list.join("\n");
   const [text, setText] = useState("");
   const indexRef = useRef(0);
@@ -11,6 +11,7 @@ function TypingGhost({ examples }) {
   const deletingRef = useRef(false);
 
   useEffect(() => {
+    if (!key) return undefined;
     const samples = key.split("\n");
     const timer = window.setInterval(() => {
       const sample = samples[indexRef.current % samples.length];
@@ -30,6 +31,7 @@ function TypingGhost({ examples }) {
     return () => window.clearInterval(timer);
   }, [key]);
 
+  if (!list.length) return null;
   return (
     <span className="pointer-events-none absolute inset-0 flex items-center truncate px-2 font-mono text-[12px] text-[#0b3a66]/70 dark:text-[#e8f4ff]/70">
       {text}
@@ -76,6 +78,7 @@ export function FormulaHeaderEditor({
   onCaret,
   onPickSuggestion,
   onCommit,
+  placeholder,
 }) {
   const inputRef = useRef(null);
   const [focused, setFocused] = useState(false);
@@ -134,7 +137,7 @@ export function FormulaHeaderEditor({
             onCommit?.();
           }}
           onKeyUp={(event) => onCaret(event.currentTarget.selectionStart || 0)}
-          placeholder={focused ? "= Yes Price + No Price" : ""}
+          placeholder={focused ? (placeholder ?? "= Yes Price + No Price") : ""}
           className="h-full w-full border border-[#0d99ff] bg-[#d7ebff]/95 px-2 font-mono text-[12px] text-[#0b3a66] outline-none placeholder:text-[#0b3a66]/45 dark:bg-[#0d99ff]/25 dark:text-[#e8f4ff] dark:placeholder:text-[#e8f4ff]/50"
         />
       </div>

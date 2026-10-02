@@ -61,7 +61,7 @@ import {
 import { cn } from "@/lib/utils";
 import { useIntegrationConnect } from "@/components/dashboardComposer/integrationConnectDialog";
 import { sheetRecords } from "@/components/dashboardComposer/integrationRunSheets";
-import { buildSummaryGrid, SUMMARY_ROW_COUNT, summaryCellKey, summaryExamples } from "@/components/dashboardComposer/summarySheet";
+import { assignSummaryInput, buildSummaryGrid, settleSummaryCells, SUMMARY_ROW_COUNT, summaryCellKey, summaryExamples } from "@/components/dashboardComposer/summarySheet";
 import { buildBucketGrid, defaultBucketMode, suggestedNumericBucketSize } from "@/components/dashboardComposer/bucketSheet";
 import { attachRandomSample, previewRandomSample } from "@/components/dashboardComposer/randomSampleRequest";
 import { generateRandomSampleSeed, validateRandomSampleSizeInput } from "@/lib/dataLake/randomSample";
@@ -968,7 +968,7 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
   const [sampleSeed, setSampleSeed] = useState("");
   const [sampleShuffle, setSampleShuffle] = useState(0);
   const [summaryCells, setSummaryCells] = useState({});
-  const [summaryFocus, setSummaryFocus] = useState({ columnId: "label", row: 0 });
+  const [summaryFocus, setSummaryFocus] = useState({ columnId: "value", row: 0 });
   const [summaryTab, setSummaryTab] = useState("summary");
   const [functionTarget, setFunctionTarget] = useState("");
   const [functionFormula, setFunctionFormula] = useState("");
@@ -1459,7 +1459,7 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
     setSampleSeed("");
     setSampleShuffle(0);
     setSummaryCells({});
-    setSummaryFocus({ columnId: "label", row: 0 });
+    setSummaryFocus({ columnId: "value", row: 0 });
     setSummaryTab("summary");
     setStep("enrich");
   }
@@ -1688,6 +1688,18 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
     [summaryCells, summarySourceColumns, summarySourceRows, formulaSheets, summaryFocus],
   );
   const summaryFormula = summaryCells[summaryCellKey(summaryFocus.columnId, summaryFocus.row)] || "";
+  useEffect(() => {
+    const settled = settleSummaryCells(summaryCells);
+    if (settled === summaryCells) return;
+    const label = summaryCells[summaryCellKey("label", summaryFocus.row)] || "";
+    if (summaryFocus.columnId === "label" && String(label).trim().startsWith("=")) {
+      setSummaryFocus({ columnId: "value", row: summaryFocus.row });
+      formulaCaretRef.current = String(settled[summaryCellKey("value", summaryFocus.row)] || "").length;
+      setFormulaCaret(formulaCaretRef.current);
+      setFormulaFocusToken((token) => token + 1);
+    }
+    setSummaryCells(settled);
+  }, [summaryCells, summaryFocus]);
   const bucketView = useMemo(
     () =>
       buildBucketGrid({
@@ -1814,24 +1826,40 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
     if (tradesQuery && joinPlacement === "sheet") setMetadataTab("trades");
   }
 
-  function insertSummaryReference(text) {
-    const key = summaryCellKey(summaryFocus.columnId, summaryFocus.row);
-    setSummaryCells((current) => {
-      const value = current[key] || "";
-      if (!value.trim()) {
-        formulaCaretRef.current = `= SUM(${text})`.length;
-        setFormulaCaret(formulaCaretRef.current);
-        return { ...current, [key]: `= SUM(${text})` };
-      }
-      const at = Math.max(0, Math.min(value.length, formulaCaretRef.current));
-      const prefix = value.slice(0, at);
-      const suffix = value.slice(at);
-      const spacer = prefix && !/[\s(,+\-*/^=<>!]$/.test(prefix) ? " " : "";
-      const chunk = `${spacer}${text}`;
-      formulaCaretRef.current = prefix.length + chunk.length;
+  function updateSummaryInput(value) {
+    const row = summaryFocus.row;
+    const columnId = summaryFocus.columnId;
+    if (columnId === "label" && String(value).trim().startsWith("=")) {
+      setSummaryFocus({ columnId: "value", row });
+      formulaCaretRef.current = String(value).length;
       setFormulaCaret(formulaCaretRef.current);
-      return { ...current, [key]: `${prefix}${chunk}${suffix}` };
+      setFormulaFocusToken((token) => token + 1);
+    }
+    setSummaryCells((current) => assignSummaryInput(current, row, columnId, value).cells);
+  }
+
+  function insertSummaryReference(text) {
+    const row = summaryFocus.row;
+    setSummaryCells((current) => {
+      const existing = current[summaryCellKey("value", row)] || "";
+      let formula;
+      if (!existing.trim()) {
+        formula = `= SUM(${text})`;
+        formulaCaretRef.current = formula.length;
+      } else {
+        const at =
+          summaryFocus.columnId === "value" ? Math.max(0, Math.min(existing.length, formulaCaretRef.current)) : existing.length;
+        const prefix = existing.slice(0, at);
+        const suffix = existing.slice(at);
+        const spacer = prefix && !/[\s(,+\-*/^=<>!]$/.test(prefix) ? " " : "";
+        const chunk = `${spacer}${text}`;
+        formula = `${prefix}${chunk}${suffix}`;
+        formulaCaretRef.current = prefix.length + chunk.length;
+      }
+      setFormulaCaret(formulaCaretRef.current);
+      return assignSummaryInput(current, row, "value", formula).cells;
     });
+    setSummaryFocus({ columnId: "value", row });
     setFormulaFocused(true);
     setFormulaEditing(true);
     setFormulaFocusToken((token) => token + 1);
@@ -2313,7 +2341,7 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
               if (id === "summarize") {
                 setHoverSummarize(false);
                 setSummaryTab("summary");
-                setSummaryFocus({ columnId: "label", row: 0 });
+                setSummaryFocus({ columnId: "value", row: 0 });
                 setFormulaEditing(true);
                 setFormulaFocused(true);
                 formulaCaretRef.current = (summaryCells[summaryCellKey("label", 0)] || "").length;
@@ -2366,12 +2394,12 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
               setHoverSummarize(false);
               setEnrichPick("");
               setSummaryCells({});
-              setSummaryFocus({ columnId: "label", row: 0 });
+              setSummaryFocus({ columnId: "value", row: 0 });
               setSummaryTab("summary");
               setFormulaEditing(false);
               setFormulaFocused(false);
             }}
-            summaryNote={`New sheet. Click a cell and type an equation, like = SUM(${summaryMeasure}). Click a column on ${sheetTitle} to drop it in.`}
+            summaryNote={`New sheet. Write a name in Label, and an equation in Value, like = SUM(${summaryMeasure}). Click a column on ${sheetTitle} to drop it in.`}
             showSummarizeBuilder={kalshiEnrich}
             onFunctionHelp={() => setFunctionHelp(true)}
             onSaveAndRun={onSaveAndRun}
@@ -2827,14 +2855,12 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
                   ? {
                       value: summaryFormula,
                       error: summaryView.error,
-                      examples: summaryExamples(summarySourceColumns, summaryMeasure),
-                      suggestions: formulaSuggestions(summaryFormula, formulaCaret),
+                      examples: summaryFocus.columnId === "value" ? summaryExamples(summarySourceColumns, summaryMeasure) : [],
+                      suggestions: summaryFocus.columnId === "value" ? formulaSuggestions(summaryFormula, formulaCaret) : [],
+                      placeholder: summaryFocus.columnId === "label" ? "Label" : undefined,
                       focusToken: formulaFocusToken,
                       row: summaryFocus.row,
-                      onChange: (value) => {
-                        const key = summaryCellKey(summaryFocus.columnId, summaryFocus.row);
-                        setSummaryCells((current) => ({ ...current, [key]: value }));
-                      },
+                      onChange: updateSummaryInput,
                       onFocus: () => {
                         blurToken.current += 1;
                         setFormulaFocused(true);
@@ -2851,13 +2877,17 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
                         setFormulaCaret(caret);
                       },
                       onPickSuggestion: (item) => {
-                        const key = summaryCellKey(summaryFocus.columnId, summaryFocus.row);
+                        const row = summaryFocus.row;
+                        const columnId = summaryFocus.columnId === "label" ? "value" : summaryFocus.columnId;
                         setSummaryCells((current) => {
+                          const key = summaryCellKey(columnId, row);
                           const value = current[key] || "";
+                          const next = `${value.slice(0, item.from)}${item.name}(${value.slice(item.to)}`;
                           formulaCaretRef.current = item.from + item.name.length + 1;
                           setFormulaCaret(formulaCaretRef.current);
-                          return { ...current, [key]: `${value.slice(0, item.from)}${item.name}(${value.slice(item.to)}` };
+                          return assignSummaryInput(current, row, columnId, next).cells;
                         });
+                        if (summaryFocus.columnId === "label") setSummaryFocus({ columnId: "value", row });
                         setFormulaFocused(true);
                         setFormulaFocusToken((token) => token + 1);
                       },
@@ -2890,13 +2920,11 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
                       bar: true,
                       value: summaryFormula,
                       error: summaryView.error,
-                      examples: summaryExamples(summarySourceColumns, summaryMeasure),
-                      suggestions: formulaSuggestions(summaryFormula, formulaCaret),
+                      examples: summaryFocus.columnId === "value" ? summaryExamples(summarySourceColumns, summaryMeasure) : [],
+                      suggestions: summaryFocus.columnId === "value" ? formulaSuggestions(summaryFormula, formulaCaret) : [],
+                      placeholder: summaryFocus.columnId === "label" ? "Label" : undefined,
                       focusToken: formulaFocusToken,
-                      onChange: (value) => {
-                        const key = summaryCellKey(summaryFocus.columnId, summaryFocus.row);
-                        setSummaryCells((current) => ({ ...current, [key]: value }));
-                      },
+                      onChange: updateSummaryInput,
                       onFocus: () => {
                         blurToken.current += 1;
                         setFormulaFocused(true);
@@ -2913,13 +2941,17 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
                         setFormulaCaret(caret);
                       },
                       onPickSuggestion: (item) => {
-                        const key = summaryCellKey(summaryFocus.columnId, summaryFocus.row);
+                        const row = summaryFocus.row;
+                        const columnId = summaryFocus.columnId === "label" ? "value" : summaryFocus.columnId;
                         setSummaryCells((current) => {
+                          const key = summaryCellKey(columnId, row);
                           const value = current[key] || "";
+                          const next = `${value.slice(0, item.from)}${item.name}(${value.slice(item.to)}`;
                           formulaCaretRef.current = item.from + item.name.length + 1;
                           setFormulaCaret(formulaCaretRef.current);
-                          return { ...current, [key]: `${value.slice(0, item.from)}${item.name}(${value.slice(item.to)}` };
+                          return assignSummaryInput(current, row, columnId, next).cells;
                         });
+                        if (summaryFocus.columnId === "label") setSummaryFocus({ columnId: "value", row });
                         setFormulaFocused(true);
                         setFormulaFocusToken((token) => token + 1);
                       },

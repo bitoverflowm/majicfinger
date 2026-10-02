@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 
 import { buildBucketGrid, bucketModesForColumn, suggestedNumericBucketSize } from "@/components/dashboardComposer/bucketSheet";
+import { assignSummaryInput, describeSummaryFormula, settleSummaryCells, summaryCellKey } from "@/components/dashboardComposer/summarySheet";
 import { attachRandomSample, previewRandomSample } from "@/components/dashboardComposer/randomSampleRequest";
 import { normalizeRandomSampleConfig } from "@/lib/dataLake/randomSample";
 
@@ -91,5 +92,33 @@ assert.deepEqual(
   previewRandomSample(rows, { size: 2, mode: "seeded", seed: "s_preview" }).map((row) => row.ticker),
   preview.map((row) => row.ticker),
 );
+
+assert.equal(describeSummaryFormula("= SUM(Size)"), "Sum of Size");
+assert.equal(describeSummaryFormula("= AVERAGE(Yes price)"), "Average of Yes price");
+assert.equal(describeSummaryFormula("= AVERAGE(Size"), "Average of Size");
+
+const moved = assignSummaryInput({}, 2, "label", "= AVERAGE(Size)");
+assert.equal(moved.columnId, "value");
+assert.equal(moved.cells[summaryCellKey("value", 2)], "= AVERAGE(Size)");
+assert.equal(moved.cells[summaryCellKey("label", 2)], "Average of Size");
+
+const kept = assignSummaryInput({ [summaryCellKey("label", 0)]: "Contracts" }, 0, "label", "= SUM(Size)");
+assert.equal(kept.cells[summaryCellKey("label", 0)], "Contracts");
+assert.equal(kept.cells[summaryCellKey("value", 0)], "= SUM(Size)");
+
+const renamed = assignSummaryInput(
+  {
+    [summaryCellKey("label", 0)]: "Sum of Size",
+    [summaryCellKey("value", 0)]: "= SUM(Size)",
+  },
+  0,
+  "value",
+  "= AVERAGE(Size)",
+);
+assert.equal(renamed.cells[summaryCellKey("label", 0)], "Average of Size");
+
+const settled = settleSummaryCells({ [summaryCellKey("label", 1)]: "= SUM(Size)" });
+assert.equal(settled[summaryCellKey("value", 1)], "= SUM(Size)");
+assert.equal(settled[summaryCellKey("label", 1)], "Sum of Size");
 
 console.log("enrichPreview.test.js ok");
