@@ -218,6 +218,11 @@ function kalshiHistoricalMarketColumns() {
   }));
 }
 
+/** Every Kalshi Historical market attribute the trades join can bring in. */
+export function kalshiHistoricalMarketColumnList() {
+  return kalshiHistoricalMarketColumns();
+}
+
 const KALSHI_HISTORICAL_TRADE_FIELDS = [
   ["trade_id", "text", "Trade id", "Unique trade identifier."],
   ["ticker", "text", "Ticker", "Market ticker this trade belongs to."],
@@ -498,6 +503,56 @@ export function loadKalshiHistoricalTradesForTicker(ticker, limit = PREVIEW_ROW_
     columns,
     rows: rowsFromAthenaCells(result, rowLimit),
   }));
+}
+
+/**
+ * Market metadata for the tickers in a trades pull. One row per ticker.
+ * Large ticker lists are queried in chunks so the IN list stays valid.
+ */
+export async function loadKalshiHistoricalMarketsForTickers(tickers) {
+  const unique = [];
+  const seen = new Set();
+  for (const raw of tickers || []) {
+    const ticker = String(raw || "").trim();
+    if (!ticker || seen.has(ticker)) continue;
+    seen.add(ticker);
+    unique.push(ticker);
+  }
+  const columns = kalshiHistoricalMarketColumns();
+  if (!unique.length) return { columns, rows: [] };
+  const rows = [];
+  const seenRow = new Set();
+  const chunkSize = 40;
+  for (let start = 0; start < unique.length; start += chunkSize) {
+    const chunk = unique.slice(start, start + chunkSize);
+    const value = chunk.map((ticker) => `"${ticker.replace(/"/g, "")}"`).join(", ");
+    const request = {
+      lake: "kalshi",
+      table: "markets",
+      queryType: "compose",
+      limit: chunk.length,
+      caseSensitive: false,
+      filters: {
+        and: [{ column: "ticker", kind: "string", op: "in", value }],
+      },
+      compose: {
+        select: columns.map((entry) => ({ column: entry.id, alias: entry.id })),
+        groupByAliases: [],
+        orderBy: [{ alias: "volume", direction: "desc" }],
+      },
+    };
+    const result = await fetchAthenaLakeSample(request, {
+      maxWaitMs: unique.length > chunkSize ? 600000 : 180000,
+      pollIntervalMs: 800,
+    });
+    for (const row of rowsFromAthenaCells(result, chunk.length)) {
+      const ticker = String(row.ticker || "").trim();
+      if (ticker && seenRow.has(ticker)) continue;
+      if (ticker) seenRow.add(ticker);
+      rows.push(row);
+    }
+  }
+  return { columns, rows };
 }
 
 /** Run a locked compose request. Preview stays on its own 50-row fetch. */

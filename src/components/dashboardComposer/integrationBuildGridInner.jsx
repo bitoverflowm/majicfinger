@@ -110,8 +110,10 @@ const REF_THEME = {
   },
 };
 
-function columnTheme(columnId, highlightColumnId, referencedColumnIds, dark) {
-  if (columnId && columnId === highlightColumnId) return HIGHLIGHT_THEME[dark ? "dark" : "light"];
+function columnTheme(columnId, highlightColumnId, highlightColumnIds, referencedColumnIds, dark) {
+  if (columnId && (columnId === highlightColumnId || highlightColumnIds?.includes(columnId))) {
+    return HIGHLIGHT_THEME[dark ? "dark" : "light"];
+  }
   if (referencedColumnIds?.includes(columnId)) return REF_THEME[dark ? "dark" : "light"];
   return undefined;
 }
@@ -120,6 +122,7 @@ export default function IntegrationBuildGridInner({
   columns,
   rows,
   highlightColumnId = "",
+  highlightColumnIds = [],
   scrollToken = 0,
   referencedColumnIds = [],
   referencedCells = [],
@@ -145,9 +148,9 @@ export default function IntegrationBuildGridInner({
               : column.type === "date"
                 ? 188
                 : 140,
-        themeOverride: columnTheme(column.id, highlightColumnId, referencedColumnIds, dark),
+        themeOverride: columnTheme(column.id, highlightColumnId, highlightColumnIds, referencedColumnIds, dark),
       })),
-    [columns, dark, highlightColumnId, referencedColumnIds, formulaEditor?.value],
+    [columns, dark, highlightColumnId, highlightColumnIds, referencedColumnIds, formulaEditor?.value],
   );
 
   useEffect(() => {

@@ -8,6 +8,7 @@ export function IntegrationBuildGrid({
   columns,
   rows,
   highlightColumnId = "",
+  highlightColumnIds = [],
   scrollToken = 0,
   referencedColumnIds = [],
   referencedCells = [],
@@ -19,6 +20,7 @@ export function IntegrationBuildGrid({
       columns={columns}
       rows={rows}
       highlightColumnId={highlightColumnId}
+      highlightColumnIds={highlightColumnIds}
       scrollToken={scrollToken}
       referencedColumnIds={referencedColumnIds}
       referencedCells={referencedCells}
