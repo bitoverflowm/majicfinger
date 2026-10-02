@@ -6,6 +6,7 @@ import { IntegrationBuildGrid } from "@/components/dashboardComposer/integration
 import { displayMatrix } from "@/components/dashboardComposer/integrationRunSheets";
 import { rememberTradeSheet } from "@/components/dashboardComposer/fullTradeSheet";
 import { FunctionExplainer, FunctionExplainerTabs } from "@/components/dashboardComposer/integrationFunctionExplainer";
+import { SummarizeExplainer, SummarizeExplainerTabs } from "@/components/dashboardComposer/integrationSummarizeExplainer";
 import { JoinExplainer, JoinExplainerTabs } from "@/components/dashboardComposer/integrationJoinExplainer";
 import { SpectrumLoadingState } from "@/components/ui/spectrum-loading-state";
 import {
@@ -56,6 +57,7 @@ import {
 import { cn } from "@/lib/utils";
 import { useIntegrationConnect } from "@/components/dashboardComposer/integrationConnectDialog";
 import { sheetRecords } from "@/components/dashboardComposer/integrationRunSheets";
+import { buildSummaryGrid, SUMMARY_ROW_COUNT, summaryCellKey, summaryExamples } from "@/components/dashboardComposer/summarySheet";
 import { useWorkspaceCanvas } from "@/components/dashboardComposer/workspaceCanvas";
 
 function rememberEntry(list, entry, limit, byFingerprint) {
@@ -406,6 +408,21 @@ const ENRICH_OPTIONS = [
   { id: "function", title: "Function" },
 ];
 
+function SummaryPreviewTabs({ sheetTitle, active, onSummary, onSource }) {
+  return (
+    <div className="overflow-hidden px-4 pb-1 pt-4">
+      <div className="flex">
+        <button type="button" onClick={onSource} className={sheetTabClass(active === "source")}>
+          {sheetTitle}
+        </button>
+        <button type="button" onClick={onSummary} className={sheetTabClass(active === "summary")}>
+          Summary
+        </button>
+      </div>
+    </div>
+  );
+}
+
 function TradesJoinPreviewTabs({ active, onSelect }) {
   return (
     <div className="overflow-hidden px-4 pb-1 pt-4">
@@ -458,6 +475,10 @@ function EnrichStep({
   onClearFunction,
   functionScopeNote,
   onHoverFunction,
+  onHoverSummarize,
+  onClearSummary,
+  summaryNote = "",
+  showSummarizeBuilder = false,
   onFunctionHelp,
   onSaveAndRun,
   running,
@@ -474,6 +495,7 @@ function EnrichStep({
 }) {
   const joinOpen = showJoinBuilder && picked === "join";
   const functionOpen = showFunctionBuilder && picked === "function";
+  const summarizeOpen = showSummarizeBuilder && picked === "summarize";
   const tradesJoin = joinMode === "trades";
   const marketTargetOn = joinTarget === "kalshiHistoricalMarkets";
   const hiddenMarketColumns = marketColumnHidden || new Set();
@@ -493,6 +515,7 @@ function EnrichStep({
           const selected = picked === option.id;
           const isJoin = option.id === "join";
           const isFunction = option.id === "function";
+          const isSummarize = option.id === "summarize";
           return (
             <div
               key={option.id}
@@ -501,8 +524,12 @@ function EnrichStep({
             >
               <div
                 className="flex items-center gap-1.5"
-                onMouseEnter={isFunction ? () => onHoverFunction(true) : undefined}
-                onMouseLeave={isFunction ? () => onHoverFunction(false) : undefined}
+                onMouseEnter={
+                  isFunction ? () => onHoverFunction(true) : isSummarize ? () => onHoverSummarize(true) : undefined
+                }
+                onMouseLeave={
+                  isFunction ? () => onHoverFunction(false) : isSummarize ? () => onHoverSummarize(false) : undefined
+                }
               >
               <label
                 className={cn(
@@ -522,7 +549,7 @@ function EnrichStep({
                 />
                 {option.title}
               </label>
-              {isFunction ? (
+              {isFunction || isSummarize ? (
                 <button
                   type="button"
                   aria-label="Functions we support"
@@ -726,6 +753,29 @@ function EnrichStep({
                     </div>
                   </div>
                 </div>
+              ) : isSummarize ? (
+                <div
+                  className={cn(
+                    "grid transition-[grid-template-rows,opacity] duration-300 ease-out",
+                    summarizeOpen ? "grid-rows-[1fr] opacity-100" : "grid-rows-[0fr] opacity-0",
+                  )}
+                >
+                  <div className={cn("overflow-hidden", summarizeOpen ? "" : "pointer-events-none")}>
+                    <div className="mt-2 rounded-lg border border-border/70 px-2.5 py-2">
+                      <div className="flex items-center justify-between gap-2">
+                        <p className="text-[11px] font-semibold text-foreground">Summary sheet</p>
+                        <button
+                          type="button"
+                          onClick={onClearSummary}
+                          className="text-[11px] font-medium text-muted-foreground hover:text-foreground"
+                        >
+                          Clear
+                        </button>
+                      </div>
+                      <p className="mt-1 text-[11px] leading-relaxed text-muted-foreground">{summaryNote}</p>
+                    </div>
+                  </div>
+                </div>
               ) : null}
             </div>
           );
@@ -797,6 +847,10 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
   const [tradePreview, setTradePreview] = useState({ status: "idle", ticker: "", columns: [], rows: [], error: "" });
   const [running, setRunning] = useState(false);
   const [hoverFunction, setHoverFunction] = useState(false);
+  const [hoverSummarize, setHoverSummarize] = useState(false);
+  const [summaryCells, setSummaryCells] = useState({});
+  const [summaryFocus, setSummaryFocus] = useState({ columnId: "label", row: 0 });
+  const [summaryTab, setSummaryTab] = useState("summary");
   const [functionTarget, setFunctionTarget] = useState("");
   const [functionFormula, setFunctionFormula] = useState("");
   const [functionTab, setFunctionTab] = useState("");
@@ -1270,6 +1324,10 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
     setFunctionTarget("");
     setFunctionFormula("");
     setFunctionTab("");
+    setHoverSummarize(false);
+    setSummaryCells({});
+    setSummaryFocus({ columnId: "label", row: 0 });
+    setSummaryTab("summary");
     setStep("enrich");
   }
 
@@ -1330,9 +1388,18 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
   );
   const tradesJoinPicked = tradesQuery && step === "enrich" && joinTarget === "kalshiHistoricalMarkets";
   const tradesJoinReady = tradesJoinPicked && Boolean(joinPlacement) && selectedMarketColumns.length > 0;
-  const showFunctionExplainer = (marketsQuery || tradesQuery) && step === "enrich" && hoverFunction;
+  const kalshiEnrich = marketsQuery || tradesQuery;
+  const showSummarizeExplainer = kalshiEnrich && step === "enrich" && hoverSummarize;
+  const showFunctionExplainer = kalshiEnrich && step === "enrich" && hoverFunction && !showSummarizeExplainer;
   const showJoinExplainer =
-    (marketsQuery || tradesQuery) && step === "enrich" && hoverJoin && !joinCommitted && !tradesJoinPicked && !showFunctionExplainer;
+    kalshiEnrich &&
+    step === "enrich" &&
+    hoverJoin &&
+    !joinCommitted &&
+    !tradesJoinPicked &&
+    !showFunctionExplainer &&
+    !showSummarizeExplainer;
+  const summaryActive = kalshiEnrich && step === "enrich" && enrichPick === "summarize" && !showSummarizeExplainer && !showFunctionExplainer && !showJoinExplainer;
   const showJoinSheets = joinCommitted && !showFunctionExplainer && !showJoinExplainer;
   const functionActive = step === "enrich" && enrichPick === "function" && Boolean(functionTarget) && !showFunctionExplainer;
   const functionOnMarkets = functionActive && (functionTarget === "markets" || functionTarget === "all");
@@ -1459,8 +1526,32 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
       : functionTarget === "all"
         ? "Preview shows the column on the sheet you're looking at. The same column is added on every sheet when you run the pull."
         : "";
+  const summarySourceColumns = tradeJoinBase.columns.length ? tradeJoinBase.columns : shownColumns;
+  const summarySourceRows = tradeJoinBase.columns.length ? tradeJoinBase.rows : filteredRows;
+  const summaryMeasure = (() => {
+    const preferred = tradesQuery ? ["Size", "Yes price", "No price"] : ["Volume", "Last price", "Yes bid"];
+    for (const title of preferred) {
+      if (summarySourceColumns.some((column) => column.title === title)) return title;
+    }
+    return summarySourceColumns.find((column) => column.type === "number" && column.id !== FUNCTION_COLUMN_ID)?.title || (tradesQuery ? "Size" : "Volume");
+  })();
+  const summaryView = useMemo(
+    () =>
+      buildSummaryGrid({
+        cells: summaryCells,
+        columns: summarySourceColumns,
+        rows: summarySourceRows,
+        sheets: formulaSheets,
+        focus: summaryFocus,
+      }),
+    [summaryCells, summarySourceColumns, summarySourceRows, formulaSheets, summaryFocus],
+  );
+  const summaryFormula = summaryCells[summaryCellKey(summaryFocus.columnId, summaryFocus.row)] || "";
   const paneLine = (() => {
+    if (showSummarizeExplainer) return "Illustration. The summary sheet is created when you run the pull.";
     if (showFunctionExplainer) return "Illustration. The column is added when you pick a sheet.";
+    if (summaryActive && summaryTab === "summary") return "Summary sheet. Totals here use the preview rows. Save and run totals the imported rows.";
+    if (summaryActive) return "Click a column or a cell to drop it into the summary.";
     if (showJoinExplainer) {
       return tradesQuery
         ? "Illustration. No market metadata is loaded until you run the pull."
@@ -1507,7 +1598,34 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
     if (tradesQuery && joinPlacement === "sheet") setMetadataTab("trades");
   }
 
+  function insertSummaryReference(text) {
+    const key = summaryCellKey(summaryFocus.columnId, summaryFocus.row);
+    setSummaryCells((current) => {
+      const value = current[key] || "";
+      if (!value.trim()) {
+        formulaCaretRef.current = `= SUM(${text})`.length;
+        setFormulaCaret(formulaCaretRef.current);
+        return { ...current, [key]: `= SUM(${text})` };
+      }
+      const at = Math.max(0, Math.min(value.length, formulaCaretRef.current));
+      const prefix = value.slice(0, at);
+      const suffix = value.slice(at);
+      const spacer = prefix && !/[\s(,+\-*/^=<>!]$/.test(prefix) ? " " : "";
+      const chunk = `${spacer}${text}`;
+      formulaCaretRef.current = prefix.length + chunk.length;
+      setFormulaCaret(formulaCaretRef.current);
+      return { ...current, [key]: `${prefix}${chunk}${suffix}` };
+    });
+    setFormulaFocused(true);
+    setFormulaEditing(true);
+    setFormulaFocusToken((token) => token + 1);
+  }
+
   function insertReference(text) {
+    if (summaryActive) {
+      insertSummaryReference(text);
+      return;
+    }
     setFunctionFormula((current) => {
       const at = Math.max(0, Math.min(current.length, formulaCaretRef.current));
       const prefix = current.slice(0, at);
@@ -1523,7 +1641,29 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
     setFormulaFocusToken((token) => token + 1);
   }
 
+  function focusSummaryCell(columnId, row) {
+    setSummaryFocus({ columnId, row });
+    setSummaryTab("summary");
+    setFormulaEditing(true);
+    setFormulaFocused(true);
+    const key = summaryCellKey(columnId, row);
+    formulaCaretRef.current = (summaryCells[key] || "").length;
+    setFormulaCaret(formulaCaretRef.current);
+    setFormulaFocusToken((token) => token + 1);
+  }
+
   function acceptFormulaPick(pick, sheetId) {
+    if (summaryActive) {
+      if (sheetId === "summary") {
+        focusSummaryCell(pick.column.id, Math.max(0, (pick.row || 1) - 1));
+        return;
+      }
+      if (!formulaEditing && !summaryFormula) return;
+      const sameSheet = sheetId === "markets" || (editSheetId === "new" && sheetId === "markets");
+      const sheet = formulaSheets.find((item) => item.id === sheetId);
+      insertSummaryReference(referenceText({ column: pick.column, row: pick.row, sheetTitle: sheet?.title || sheetTitle, sameSheet }));
+      return;
+    }
     if (!functionActive) return;
     if (pick.self || !formulaEditing) {
       if (!pick.self) return;
@@ -1685,6 +1825,24 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
       });
     }
     if (metadataSheet?.columns?.length) sheets.push(metadataSheet);
+    if (enrichPick === "summarize") {
+      const built = buildSummaryGrid({
+        cells: summaryCells,
+        columns: primaryColumns,
+        rows: primaryRows,
+        sheets: formulaSheets,
+        focus: summaryFocus,
+      });
+      sheets.push({
+        id: "run-summary",
+        title: "Summary",
+        columns: built.columns,
+        rows: built.rows,
+        span: sheets.length ? "half" : "full",
+        table: "summary",
+        summary: "Summary",
+      });
+    }
     if (joinCommitted && tradePreview.columns.length) {
       const fromRun = tickersFromRows(marketRows, marketCap);
       const fallback = joinedMarkets.map((market) => market.ticker).filter(Boolean);
@@ -1802,6 +1960,7 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
       athena: lockedQuery?.athena || athenaRequest(),
       join: joinRecord,
       formula: functionActive ? functionFormula : "",
+      summaryCells: enrichPick === "summarize" ? summaryCells : null,
     };
     setPulls((current) => {
       const next = rememberEntry(current, pullEntry, 80, false);
@@ -1887,7 +2046,18 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
               setStep("query");
             }}
             picked={enrichPick}
-            onPick={setEnrichPick}
+            onPick={(id) => {
+              if (id === "summarize") {
+                setHoverSummarize(false);
+                setSummaryTab("summary");
+                setSummaryFocus({ columnId: "label", row: 0 });
+                setFormulaEditing(true);
+                setFormulaFocused(true);
+                formulaCaretRef.current = (summaryCells[summaryCellKey("label", 0)] || "").length;
+                setFormulaFocusToken((token) => token + 1);
+              }
+              setEnrichPick(id);
+            }}
             joinTarget={joinTarget}
             onJoinTarget={setJoinTarget}
             onClear={() => {
@@ -1919,6 +2089,18 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
             }}
             functionScopeNote={functionActive ? functionScopeNote : ""}
             onHoverFunction={setHoverFunction}
+            onHoverSummarize={setHoverSummarize}
+            onClearSummary={() => {
+              setHoverSummarize(false);
+              setEnrichPick("");
+              setSummaryCells({});
+              setSummaryFocus({ columnId: "label", row: 0 });
+              setSummaryTab("summary");
+              setFormulaEditing(false);
+              setFormulaFocused(false);
+            }}
+            summaryNote={`New sheet. Click a cell and type an equation, like = SUM(${summaryMeasure}). Click a column on ${sheetTitle} to drop it in.`}
+            showSummarizeBuilder={kalshiEnrich}
             onFunctionHelp={() => setFunctionHelp(true)}
             onSaveAndRun={onSaveAndRun}
             running={running}
@@ -2176,7 +2358,11 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
             <p className="text-right text-[12px] text-muted-foreground">{paneLine}</p>
             {typeof planLimit === "number" &&
             !(showJoinSheets && joinTab !== "markets") &&
+            !showSummarizeExplainer &&
+            !showFunctionExplainer &&
+            !showJoinExplainer &&
             !(functionOnNew && functionTab === "new") &&
+            !(summaryActive && summaryTab === "summary") &&
             !(tradesJoinReady && joinPlacement === "sheet" && metadataTab === "markets") ? (
               <div className="mt-1.5 w-full max-w-[280px]">
                 <p className="text-right text-[11px] text-muted-foreground">
@@ -2198,6 +2384,8 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
               <p className="mt-1 text-right text-[11px] text-muted-foreground">Preview only. This sheet is created when you run the pull.</p>
             ) : tradesJoinReady && joinPlacement === "sheet" && metadataTab === "markets" ? (
               <p className="mt-1 text-right text-[11px] text-muted-foreground">Preview only. This sheet is created when you run the pull.</p>
+            ) : summaryActive && summaryTab === "summary" ? (
+              <p className="mt-1 text-right text-[11px] text-muted-foreground">Preview only. This sheet is created when you run the pull.</p>
             ) : null}
           </div>
         </div>
@@ -2207,8 +2395,17 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
             style={{ width: `${Math.min(100, progress)}%` }}
           />
         </div>
-        {showFunctionExplainer ? (
+        {showSummarizeExplainer ? (
+          <SummarizeExplainerTabs sheetTitle={sheetTitle} />
+        ) : showFunctionExplainer ? (
           <FunctionExplainerTabs sheetTitle={sheetTitle} />
+        ) : summaryActive ? (
+          <SummaryPreviewTabs
+            sheetTitle={sheetTitle}
+            active={summaryTab}
+            onSummary={() => setSummaryTab("summary")}
+            onSource={() => setSummaryTab("source")}
+          />
         ) : showJoinExplainer ? (
           <JoinExplainerTabs source={tradesQuery ? "trades" : "markets"} />
         ) : functionOnNew ? (
@@ -2255,8 +2452,124 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
           />
         ) : null}
         <div className="min-h-0 flex-1 p-4">
-          {showFunctionExplainer ? (
+          {showSummarizeExplainer ? (
+            <SummarizeExplainer measure={summaryMeasure} />
+          ) : showFunctionExplainer ? (
             <FunctionExplainer />
+          ) : summaryActive && summaryTab === "summary" ? (
+            <IntegrationBuildGrid
+              columns={summaryView.columns}
+              rows={summaryView.rows}
+              highlightColumnId={summaryFocus.columnId}
+              activeCell={summaryFocus}
+              scrollToken={functionScrollKey}
+              formulaEditor={
+                formulaEditing
+                  ? {
+                      value: summaryFormula,
+                      error: summaryView.error,
+                      examples: summaryExamples(summarySourceColumns, summaryMeasure),
+                      suggestions: formulaSuggestions(summaryFormula, formulaCaret),
+                      focusToken: formulaFocusToken,
+                      row: summaryFocus.row,
+                      onChange: (value) => {
+                        const key = summaryCellKey(summaryFocus.columnId, summaryFocus.row);
+                        setSummaryCells((current) => ({ ...current, [key]: value }));
+                      },
+                      onFocus: () => {
+                        blurToken.current += 1;
+                        setFormulaFocused(true);
+                      },
+                      onBlur: () => {
+                        const token = blurToken.current;
+                        window.setTimeout(() => {
+                          if (blurToken.current !== token) return;
+                          setFormulaFocused(false);
+                        }, 220);
+                      },
+                      onCaret: (caret) => {
+                        formulaCaretRef.current = caret;
+                        setFormulaCaret(caret);
+                      },
+                      onPickSuggestion: (item) => {
+                        const key = summaryCellKey(summaryFocus.columnId, summaryFocus.row);
+                        setSummaryCells((current) => {
+                          const value = current[key] || "";
+                          formulaCaretRef.current = item.from + item.name.length + 1;
+                          setFormulaCaret(formulaCaretRef.current);
+                          return { ...current, [key]: `${value.slice(0, item.from)}${item.name}(${value.slice(item.to)}` };
+                        });
+                        setFormulaFocused(true);
+                        setFormulaFocusToken((token) => token + 1);
+                      },
+                      onCommit: () => {
+                        setFormulaFocused(false);
+                        setSummaryFocus((focus) => ({
+                          ...focus,
+                          row: Math.min(SUMMARY_ROW_COUNT - 1, focus.row + 1),
+                        }));
+                        setFormulaEditing(true);
+                        setFormulaFocusToken((token) => token + 1);
+                      },
+                    }
+                  : null
+              }
+              onFormulaPick={(pick) => acceptFormulaPick(pick, "summary")}
+            />
+          ) : summaryActive ? (
+            <IntegrationBuildGrid
+              columns={marketsGrid.columns}
+              rows={marketsGrid.rows}
+              highlightColumnIds={(summaryView.references || []).filter((ref) => ref.row == null).map((ref) => ref.column.id)}
+              referencedCells={(summaryView.references || [])
+                .filter((ref) => ref.row != null)
+                .map((ref) => ({ columnId: ref.column.id, row: ref.row }))}
+              scrollToken={functionScrollKey}
+              formulaEditor={
+                formulaEditing
+                  ? {
+                      bar: true,
+                      value: summaryFormula,
+                      error: summaryView.error,
+                      examples: summaryExamples(summarySourceColumns, summaryMeasure),
+                      suggestions: formulaSuggestions(summaryFormula, formulaCaret),
+                      focusToken: formulaFocusToken,
+                      onChange: (value) => {
+                        const key = summaryCellKey(summaryFocus.columnId, summaryFocus.row);
+                        setSummaryCells((current) => ({ ...current, [key]: value }));
+                      },
+                      onFocus: () => {
+                        blurToken.current += 1;
+                        setFormulaFocused(true);
+                      },
+                      onBlur: () => {
+                        const token = blurToken.current;
+                        window.setTimeout(() => {
+                          if (blurToken.current !== token) return;
+                          setFormulaFocused(false);
+                        }, 220);
+                      },
+                      onCaret: (caret) => {
+                        formulaCaretRef.current = caret;
+                        setFormulaCaret(caret);
+                      },
+                      onPickSuggestion: (item) => {
+                        const key = summaryCellKey(summaryFocus.columnId, summaryFocus.row);
+                        setSummaryCells((current) => {
+                          const value = current[key] || "";
+                          formulaCaretRef.current = item.from + item.name.length + 1;
+                          setFormulaCaret(formulaCaretRef.current);
+                          return { ...current, [key]: `${value.slice(0, item.from)}${item.name}(${value.slice(item.to)}` };
+                        });
+                        setFormulaFocused(true);
+                        setFormulaFocusToken((token) => token + 1);
+                      },
+                      onCommit: () => setFormulaFocused(false),
+                    }
+                  : null
+              }
+              onFormulaPick={(pick) => acceptFormulaPick(pick, "markets")}
+            />
           ) : showJoinExplainer ? (
             <JoinExplainer source={tradesQuery ? "trades" : "markets"} />
           ) : functionOnNew && functionTab === "new" && newTableGrid.columns.length ? (

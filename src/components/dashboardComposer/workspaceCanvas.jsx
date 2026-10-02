@@ -968,6 +968,28 @@ export function WorkspaceCanvas() {
     const scroller = scrollerRef.current;
     if (!scroller) return undefined;
     const onWheel = (event) => {
+      const grid = event.target instanceof Element ? event.target.closest("[data-sheet-grid]") : null;
+      if (grid) {
+        const inner = grid.querySelector(".dvn-scroller");
+        if (inner instanceof HTMLElement) {
+          const vertical = Math.abs(event.deltaY) >= Math.abs(event.deltaX);
+          const maxTop = inner.scrollHeight - inner.clientHeight;
+          const maxLeft = inner.scrollWidth - inner.clientWidth;
+          const canY =
+            vertical &&
+            ((event.deltaY > 0 && inner.scrollTop < maxTop - 1) || (event.deltaY < 0 && inner.scrollTop > 0));
+          const canX =
+            !vertical &&
+            ((event.deltaX > 0 && inner.scrollLeft < maxLeft - 1) || (event.deltaX < 0 && inner.scrollLeft > 0));
+          if (canY || canX) {
+            event.preventDefault();
+            event.stopPropagation();
+            if (canY) inner.scrollTop += event.deltaY;
+            else inner.scrollLeft += event.deltaX;
+            return;
+          }
+        }
+      }
       if (Math.abs(event.deltaX) > Math.abs(event.deltaY)) return;
       if (scroller.scrollHeight <= scroller.clientHeight + 1) return;
       event.preventDefault();

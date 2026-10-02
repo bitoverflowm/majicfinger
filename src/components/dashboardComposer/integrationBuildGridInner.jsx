@@ -123,6 +123,7 @@ export default function IntegrationBuildGridInner({
   rows,
   highlightColumnId = "",
   highlightColumnIds = [],
+  activeCell = null,
   scrollToken = 0,
   referencedColumnIds = [],
   referencedCells = [],
@@ -172,6 +173,7 @@ export default function IntegrationBuildGridInner({
   }, []);
 
   const highlightIndex = highlightColumnId ? columns.findIndex((column) => column.id === highlightColumnId) : -1;
+  const formulaRow = Number.isInteger(formulaEditor?.row) ? formulaEditor.row : null;
   const [formulaBox, setFormulaBox] = useState(null);
 
   const formulaHeader = Boolean(formulaEditor) && !formulaEditor?.bar;
@@ -182,19 +184,21 @@ export default function IntegrationBuildGridInner({
     }
     const frame = gridSlotRef.current;
     if (!frame) return;
-    const scrollLeft = frame.querySelector(".dvn-scroller")?.scrollLeft || 0;
+    const scroller = frame.querySelector(".dvn-scroller");
+    const scrollLeft = scroller?.scrollLeft || 0;
+    const scrollTop = scroller?.scrollTop || 0;
     let x = 46;
     for (let index = 0; index < highlightIndex; index += 1) x += gridColumns[index]?.width || 0;
     const next = {
       x: x - scrollLeft,
-      y: 0,
+      y: formulaRow == null ? 0 : 32 + formulaRow * 28 - scrollTop,
       width: gridColumns[highlightIndex]?.width || 220,
-      height: 32,
+      height: formulaRow == null ? 32 : 28,
     };
     setFormulaBox((prev) =>
       prev && prev.x === next.x && prev.y === next.y && prev.width === next.width && prev.height === next.height ? prev : next,
     );
-  }, [formulaHeader, gridColumns, highlightIndex]);
+  }, [formulaHeader, formulaRow, gridColumns, highlightIndex]);
 
   useEffect(() => {
     if (!formulaHeader || highlightIndex < 0) return undefined;
@@ -212,7 +216,10 @@ export default function IntegrationBuildGridInner({
     let cancelled = false;
     const run = () => {
       if (cancelled) return;
-      editorRef.current?.scrollTo(highlightIndex, 0, "horizontal", 16, 0, { hAlign: "end" });
+      editorRef.current?.scrollTo(highlightIndex, formulaRow ?? 0, formulaRow == null ? "horizontal" : "both", 16, 0, {
+        hAlign: "end",
+        vAlign: "start",
+      });
       placeFormula();
     };
     const frame = window.requestAnimationFrame(run);
@@ -222,7 +229,7 @@ export default function IntegrationBuildGridInner({
       window.cancelAnimationFrame(frame);
       window.clearTimeout(timer);
     };
-  }, [highlightIndex, scrollToken, size.width, placeFormula]);
+  }, [formulaRow, highlightIndex, scrollToken, size.width, placeFormula]);
 
   const referencedKey = referencedCells.map((cell) => `${cell.columnId}:${cell.row}`).join("|");
 
@@ -231,8 +238,13 @@ export default function IntegrationBuildGridInner({
       const column = columns[col];
       const raw = rows[row]?.[column?.id];
       const display = displayFor(raw, column);
+      const active = activeCell?.columnId === column?.id && activeCell?.row === row;
       const referenced = referencedCells.some((cell) => cell.columnId === column?.id && cell.row === row + 1);
-      const themeOverride = referenced ? REF_THEME[dark ? "dark" : "light"] : undefined;
+      const themeOverride = active
+        ? HIGHLIGHT_THEME[dark ? "dark" : "light"]
+        : referenced
+          ? REF_THEME[dark ? "dark" : "light"]
+          : undefined;
       if (column?.type === "number" && raw != null && raw !== "") {
         const parsed = Number(raw);
         const n = column.scale === "cents" && Number.isFinite(parsed) ? parsed / 100 : parsed;
@@ -258,7 +270,7 @@ export default function IntegrationBuildGridInner({
         themeOverride,
       };
     },
-    [columns, rows, dark, referencedKey],
+    [activeCell, columns, rows, dark, referencedKey],
   );
 
   const reportPick = useCallback(

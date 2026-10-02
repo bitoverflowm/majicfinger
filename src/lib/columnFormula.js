@@ -324,8 +324,21 @@ function isTruthy(value) {
   return false;
 }
 
+function flattenCallValues(values) {
+  const flat = [];
+  for (const value of values) {
+    if (Array.isArray(value)) flat.push(...value);
+    else flat.push(value);
+  }
+  return flat;
+}
+
 function evalCall(node, scope) {
-  const values = node.args.map((arg) => evalNode(arg, scope));
+  const rawValues = node.args.map((arg) => evalNode(arg, scope));
+  const values =
+    node.name === "SUM" || node.name === "AVERAGE" || node.name === "MIN" || node.name === "MAX"
+      ? flattenCallValues(rawValues)
+      : rawValues;
   if (node.name === "ABS") {
     if (values.length !== 1) throw new Error("ABS needs one value.");
     return Math.abs(asNumber(values[0]));
@@ -408,6 +421,61 @@ export function formulaSuggestions(formula, caret) {
   return FORMULA_FUNCTIONS.filter((item) => item.name.toLowerCase().startsWith(typed.toLowerCase()))
     .slice(0, 6)
     .map((item) => ({ ...item, from: at - typed.length, to: at }));
+}
+
+/**
+ * One summary cell. A column name with no row, like Size, is every value in that column
+ * so SUM, AVERAGE, MIN, and MAX can total it. Size[2] is still one cell.
+ * Plain text is kept as written. A leading = marks an equation.
+ */
+export function evaluateCellFormula(formula, options = {}) {
+  const raw = String(formula ?? "");
+  const trimmed = raw.trim();
+  if (!trimmed) return { value: "", error: "", type: "text", references: [] };
+  if (!trimmed.startsWith("=")) return { value: raw, error: "", type: "text", references: [] };
+  const body = trimmed.slice(1).trim();
+  if (!body) return { value: "", error: "", type: "text", references: [] };
+  try {
+    const columns = options.columns || [];
+    const rows = options.rows || [];
+    const { expr, refs } = substituteColumns(body, columns, options.sheets, options.sheetId);
+    const ast = parseExpression(tokenize(expr));
+    const scope = refs.map((ref) => {
+      const sourceRows = sheetRows(options.sheets, ref.sheetId, rows);
+      if (ref.row == null) {
+        return sourceRows
+          .map((row) => formulaValue(ref.column, row?.[ref.column.id]))
+          .filter((value) => value != null && value !== "");
+      }
+      const sourceRow = sourceRows[ref.row - 1];
+      return formulaValue(ref.column, sourceRow?.[ref.column.id]);
+    });
+    const value = evalNode(ast, scope);
+    if (Array.isArray(value)) {
+      return {
+        value: "",
+        error: "Use SUM, AVERAGE, MIN, or MAX around a whole column.",
+        type: "number",
+        references: refs,
+      };
+    }
+    if (typeof value === "number" && !Number.isFinite(value)) {
+      return { value: "", error: "", type: "number", references: refs };
+    }
+    return {
+      value: value == null ? "" : value,
+      error: "",
+      type: typeof value === "string" ? "text" : "number",
+      references: refs,
+    };
+  } catch (err) {
+    return {
+      value: "",
+      error: err instanceof Error ? err.message : "That equation isn't valid.",
+      type: "number",
+      references: [],
+    };
+  }
 }
 
 export function evaluateColumnFormula(formula, columns, rows, options = {}) {
