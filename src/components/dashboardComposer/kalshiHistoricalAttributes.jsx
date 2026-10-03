@@ -59,6 +59,9 @@ const BOOLEAN_OPTIONS = [
 ];
 
 export function kalshiHistoricalAttributeSpec(column) {
+  if (Array.isArray(column?.enumOptions) && column.enumOptions.length) {
+    return { kind: "enum", options: column.enumOptions };
+  }
   if (ENUM_OPTIONS[column?.id]) return { kind: "enum", options: ENUM_OPTIONS[column.id] };
   if (column?.type === "boolean") return { kind: "boolean", options: BOOLEAN_OPTIONS };
   if (column?.type === "number") return { kind: "number", cents: column.scale === "cents" || CENTS_COLUMNS.has(column.id) };

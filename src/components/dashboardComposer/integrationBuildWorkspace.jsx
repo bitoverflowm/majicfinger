@@ -17,6 +17,8 @@ import {
   PREVIEW_ROW_CAP,
   loadBuildPreview,
   loadBuildUniverseCount,
+  loadKalshiLiveMarketByTicker,
+  loadKalshiLiveMarketsForScope,
   kalshiHistoricalMarketColumnList,
   loadAthenaComposeRows,
   peekBuildUniverseCount,
@@ -52,6 +54,8 @@ import {
   attributeSummary,
   AttributeFilters,
   buildAttributePredicates,
+  rowMatchesAttributes,
+  sortAttributeRows,
   sortSummary,
 } from "@/components/dashboardComposer/integrationAttributes";
 import { integrationProfile } from "@/components/dashboardComposer/integrationSource";
@@ -67,6 +71,7 @@ import { useWorkspaceCanvas } from "@/components/dashboardComposer/workspaceCanv
 import { kalshiSourceCutoffCaption, useKalshiHistoricalCutoffDisplay } from "@/hooks/useKalshiHistoricalCutoffDisplay";
 import { Skeleton } from "@/components/ui/skeleton";
 import { createRunReporter, describeComposePhase } from "@/components/dashboardComposer/integrationRunFeed";
+import { KalshiLiveMarketPicker, kalshiLiveMarketAttributeColumns } from "@/components/dashboardComposer/kalshiLiveMarketPicker";
 
 function rememberEntry(list, entry, limit, byFingerprint) {
   const previous = (list || []).filter(
@@ -1088,6 +1093,8 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
   const [formulaFocusToken, setFormulaFocusToken] = useState(0);
   const [functionHelp, setFunctionHelp] = useState(false);
   const [visibleCount, setVisibleCount] = useState(0);
+  const [livePicks, setLivePicks] = useState([]);
+  const liveFetchRef = useRef(new Set());
   const [universe, setUniverse] = useState(null);
   const [counting, setCounting] = useState(false);
   const formulaCaretRef = useRef(0);
@@ -1177,6 +1184,7 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
   const venueLabel = profile.historical ? profile.label : "Historical";
   const lakeId = profile.lakeId || "";
   const guidedFilters = profile.guidedTables.includes(tableId);
+  const liveMarketSearch = integrationId === "kalshiLive" && tableId === "markets";
 
   useEffect(() => {
     const next = BUILD_SOURCES[integrationId];
@@ -1204,6 +1212,8 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
     setAttributeFilters({});
     setSortKeys([]);
     setRowLimit("");
+    setLivePicks([]);
+    liveFetchRef.current = new Set();
     setPreviewRefreshing(false);
     usingFilteredSample.current = false;
     setUniverse(null);
@@ -1321,7 +1331,83 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
     [pull, hidden, profile.priceColumns],
   );
 
+  const livePickRows = useMemo(() => {
+    const seen = new Set();
+    const rows = [];
+    for (const pick of livePicks) {
+      for (const row of pick.rows || []) {
+        const ticker = String(row?.ticker || "").trim();
+        if (ticker && seen.has(ticker)) continue;
+        if (ticker) seen.add(ticker);
+        rows.push(row);
+      }
+    }
+    return rows;
+  }, [livePicks]);
+
+  const liveAttributeColumns = useMemo(
+    () => (liveMarketSearch ? kalshiLiveMarketAttributeColumns(pull?.columns || []) : []),
+    [liveMarketSearch, pull?.columns],
+  );
+
+  const liveDisplayRows = useMemo(() => {
+    if (!liveMarketSearch || !livePicks.length) return null;
+    const matched = livePickRows.filter((row) => rowMatchesAttributes(row, liveAttributeColumns, attributeFilters));
+    const sorted = sortAttributeRows(matched, liveAttributeColumns, sortKeys);
+    const limit = Number(rowLimit);
+    return Number.isFinite(limit) && limit > 0 ? sorted.slice(0, limit) : sorted;
+  }, [liveMarketSearch, livePicks.length, livePickRows, liveAttributeColumns, attributeFilters, sortKeys, rowLimit]);
+
+  useEffect(() => {
+    if (!liveDisplayRows) return;
+    setVisibleCount(liveDisplayRows.length);
+  }, [liveDisplayRows]);
+
+  function addLivePick(pick) {
+    if (!pick?.id || liveFetchRef.current.has(pick.id)) return;
+    liveFetchRef.current.add(pick.id);
+    setLivePicks((prev) => (prev.some((item) => item.id === pick.id) ? prev : [...prev, { ...pick, status: "loading", rows: [], error: "" }]));
+    const load =
+      pick.kind === "market"
+        ? loadKalshiLiveMarketByTicker(pick.ticker).then((row) => (row ? [row] : []))
+        : loadKalshiLiveMarketsForScope({
+            seriesTicker: pick.kind === "series" ? pick.ticker : "",
+            eventTicker: pick.kind === "event" ? pick.ticker : "",
+          });
+    load
+      .then((rows) => {
+        const ready = Array.isArray(rows) ? rows : [];
+        setLivePicks((list) =>
+          list.map((item) =>
+            item.id === pick.id
+              ? {
+                  ...item,
+                  status: ready.length ? "ready" : "error",
+                  rows: ready,
+                  error: ready.length ? "" : "No markets returned",
+                }
+              : item,
+          ),
+        );
+      })
+      .catch((err) => {
+        setLivePicks((list) =>
+          list.map((item) =>
+            item.id === pick.id
+              ? { ...item, status: "error", rows: [], error: err instanceof Error ? err.message : "Market request failed" }
+              : item,
+          ),
+        );
+      });
+  }
+
+  function removeLivePick(id) {
+    liveFetchRef.current.delete(id);
+    setLivePicks((prev) => prev.filter((item) => item.id !== id));
+  }
+
   const filteredRows = useMemo(() => {
+    if (liveDisplayRows) return liveDisplayRows.slice(0, visibleCount);
     if (guidedFilters) {
       const key = historicalPreviewRequestKey({
         guidedFilters,
@@ -1343,7 +1429,7 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
     const query = filterValue.trim().toLowerCase();
     if (!query || !filterColumn) return rows;
     return rows.filter((row) => String(row[filterColumn] ?? "").toLowerCase().includes(query));
-  }, [pull, visibleCount, filterColumn, filterValue, guidedFilters, attributeFilters, sortKeys, rowLimit, integrationId, tableId, settledPreviewKey, previewSearchError]);
+  }, [pull, visibleCount, filterColumn, filterValue, guidedFilters, attributeFilters, sortKeys, rowLimit, integrationId, tableId, settledPreviewKey, previewSearchError, liveDisplayRows]);
 
   const queriedMarkets = useMemo(() => {
     if (!guidedFilters) return [];
@@ -1690,9 +1776,16 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
     };
   }, [emptyRefresh]);
   const shownLabel = `Previewing ${shown.toLocaleString()} ${shown === 1 ? "row" : "rows"}`;
+  const livePickLoading = livePicks.some((pick) => pick.status === "loading");
   const previewLine = loading
     ? "Loading the first 50 rows"
-    : !exactUniverse
+    : liveMarketSearch && livePicks.length
+      ? livePickLoading
+        ? shown
+          ? `${shownLabel} · still loading markets`
+          : "Loading the markets you added"
+        : `${shownLabel} from the markets you added`
+      : !exactUniverse
       ? `${shownLabel} of 1,000,000+ rows available`
       : typeof universe === "number" && !counting
         ? `${shownLabel} of ${universe.toLocaleString()}`
@@ -1708,11 +1801,13 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
         : previewRefreshing && !loading
           ? `${previewLine} · updating`
           : previewLine;
-  const availableRows = !exactUniverse
-    ? Number.POSITIVE_INFINITY
-    : typeof universe === "number" && !counting
-      ? universe
-      : null;
+  const availableRows = liveMarketSearch && livePicks.length
+    ? (liveDisplayRows || []).length
+    : !exactUniverse
+      ? Number.POSITIVE_INFINITY
+      : typeof universe === "number" && !counting
+        ? universe
+        : null;
   const requestedLimit = Number(rowLimit);
   const importedRows =
     typeof planLimit === "number" && availableRows != null
@@ -2377,7 +2472,7 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
     planned.push({ id: "place", name: "place_sheets", status: "pending", args: { tab: sheetTitle } });
     reporter.plan(planned, { title: `${venueLabel} · ${sheetTitle}` });
     connect?.close?.();
-    let marketRows = filteredRows;
+    let marketRows = liveMarketSearch && livePicks.length ? liveDisplayRows || [] : filteredRows;
     reporter.start("source");
     if (marketsRequest && historicalLake) {
       try {
@@ -2462,11 +2557,12 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
         table: tableId || "markets",
         summary: lockedQuery?.label || describeSearch(),
         composeRequest: marketsRequest,
-        attributeLines: (pull?.columns || []).flatMap((column) => {
+        keepAllRows: Boolean(liveMarketSearch && livePicks.length),
+        attributeLines: (liveMarketSearch ? liveAttributeColumns : pull?.columns || []).flatMap((column) => {
           const summary = attributeSummary(column, attributeFilters);
           return summary ? [`${column.title} ${summary}`] : [];
         }),
-        sortLine: sortSummary(pull?.columns || [], sortKeys),
+        sortLine: sortSummary(liveMarketSearch ? liveAttributeColumns : pull?.columns || [], sortKeys),
       });
     }
     if (metadataSheet?.columns?.length) sheets.push(metadataSheet);
@@ -3246,6 +3342,10 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
             </DropdownMenu>
           </div>
 
+          {liveMarketSearch ? (
+            <KalshiLiveMarketPicker picks={livePicks} onAdd={addLivePick} onRemove={removeLivePick} />
+          ) : null}
+
           <Accordion type="single" collapsible defaultValue="columns" className="space-y-2">
             <AccordionItem value="columns" className="border-0">
               <AccordionPrimitive.Header className="flex">
@@ -3303,9 +3403,9 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
                 </div>
               </AccordionContent>
             </AccordionItem>
-            {guidedFilters ? (
+            {guidedFilters || liveMarketSearch ? (
               <AttributeFilters
-                columns={pull?.columns || []}
+                columns={liveMarketSearch ? liveAttributeColumns : pull?.columns || []}
                 filters={attributeFilters}
                 onChange={setAttributeFilters}
                 sorts={sortKeys}
@@ -3317,7 +3417,7 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
             ) : null}
           </Accordion>
 
-          {guidedFilters ? null : (
+          {guidedFilters || liveMarketSearch ? null : (
             <section>
               <p className="mb-2 text-[12px] font-semibold text-foreground">Filters</p>
               <p className="mb-2 text-[12px] leading-relaxed text-muted-foreground">

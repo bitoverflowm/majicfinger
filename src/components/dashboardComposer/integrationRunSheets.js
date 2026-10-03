@@ -76,7 +76,7 @@ export function layoutRunSheets(sheets, { originY = 88 } = {}) {
       width: columnWidth(column),
     }));
     const cells = {};
-    const previewRows = (sheet.rows || []).slice(0, 50);
+    const previewRows = sheet.keepAllRows ? sheet.rows || [] : (sheet.rows || []).slice(0, 50);
     const rowCount = Math.max(previewRows.length, Math.floor(Number(sheet.rowCount) || 0), (sheet.rows || []).length);
     previewRows.forEach((row, rowIndex) => {
       (sheet.columns || []).forEach((column, columnIndex) => {

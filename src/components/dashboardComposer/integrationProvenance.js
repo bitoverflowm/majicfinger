@@ -67,6 +67,7 @@ export function stampRunSheets(sheets, { integrationId } = {}) {
   return list.map((sheet) => {
     const rows = Array.isArray(sheet?.rows) ? sheet.rows : [];
     const rowCount = Math.max(rows.length, Math.floor(Number(sheet?.rowCount) || 0));
+    const kept = sheet?.keepAllRows ? rows.length : PREVIEW_CAP;
     let provenance = sheet?.provenance || null;
     if (!provenance && sheet?.enrichment) {
       provenance = enrichmentProvenance({
@@ -86,7 +87,7 @@ export function stampRunSheets(sheets, { integrationId } = {}) {
     }
     return {
       ...sheet,
-      rows: rows.slice(0, PREVIEW_CAP),
+      rows: rows.slice(0, kept),
       rowCount,
       provenance,
     };

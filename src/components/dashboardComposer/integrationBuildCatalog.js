@@ -1042,6 +1042,44 @@ async function openLiveEvent() {
   return (Array.isArray(json.events) ? json.events : [])[0] || null;
 }
 
+/** One market. Re-request this for each tagged ticker so a sheet can pass the list cap of 1000. */
+export async function loadKalshiLiveMarketByTicker(ticker) {
+  const id = String(ticker || "").trim();
+  if (!id) return null;
+  const json = await getJson(`/api/integrations/kalshi-live/markets/get?ticker=${encodeURIComponent(id)}`);
+  const market = json?.market && typeof json.market === "object" ? json.market : json;
+  const row = normalizeKalshiLiveMarketRow(market);
+  return String(row?.ticker || "").trim() ? row : null;
+}
+
+/**
+ * Every market in one series or one event, via GET /markets.
+ * Paginates past the 1000-row page size. Stops at 20,000 rows.
+ */
+export async function loadKalshiLiveMarketsForScope({ seriesTicker = "", eventTicker = "" } = {}) {
+  const series = String(seriesTicker || "").trim();
+  const event = String(eventTicker || "").trim();
+  if (!series && !event) return [];
+  const rows = [];
+  let cursor = "";
+  for (let page = 0; page < 20; page += 1) {
+    const params = new URLSearchParams({
+      discovery: "1",
+      limit: "1000",
+      mve_filter: "exclude",
+    });
+    if (series) params.set("series_ticker", series);
+    if (event) params.set("event_ticker", event);
+    if (cursor) params.set("cursor", cursor);
+    const json = await getJson(`/api/integrations/kalshi-live/markets?${params}`);
+    const markets = Array.isArray(json.markets) ? json.markets : [];
+    rows.push(...markets.map((row) => normalizeKalshiLiveMarketRow(row)));
+    cursor = String(json.cursor || "").trim();
+    if (!cursor || !markets.length || rows.length >= 20_000) break;
+  }
+  return rows.filter((row) => String(row?.ticker || "").trim());
+}
+
 async function kalshiLiveRows(endpointId) {
   if (endpointId === "markets") {
     const json = await getJson(
