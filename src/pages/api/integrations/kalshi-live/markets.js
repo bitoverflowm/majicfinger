@@ -64,6 +64,7 @@ export default async function handler(req, res) {
           minCreatedTs: parseUnixParam(req, "min_created_ts"),
           maxCreatedTs: parseUnixParam(req, "max_created_ts"),
           minUpdatedTs: parseUnixParam(req, "min_updated_ts"),
+          maxUpdatedTs: parseUnixParam(req, "max_updated_ts"),
           minCloseTs: parseUnixParam(req, "min_close_ts"),
           maxCloseTs: parseUnixParam(req, "max_close_ts"),
           minSettledTs: parseUnixParam(req, "min_settled_ts"),

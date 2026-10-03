@@ -652,7 +652,7 @@ function SortField({ columns, sorts, onChange }) {
   const [clearArmed, setClearArmed] = useState(false);
   const list = Array.isArray(sorts) ? sorts : [];
   const taken = new Set(list.map((sort) => sort.columnId));
-  const available = (columns || []).filter((column) => !taken.has(column.id));
+  const available = (columns || []).filter((column) => !column.queryOnly && !taken.has(column.id));
 
   function add(columnId) {
     if (!columnId || taken.has(columnId)) return;
@@ -770,6 +770,9 @@ export function KalshiHistoricalAttributeFilters({
                     </AccordionPrimitive.Header>
                     <AccordionContent className="pb-0 pt-2">
                       <div className="rounded-lg border border-border/70 px-2 py-2">
+                        {column.description ? (
+                          <p className="mb-2 text-[11px] leading-relaxed text-muted-foreground">{column.description}</p>
+                        ) : null}
                         <AttributeFields column={column} filters={filters} onChange={onChange} />
                       </div>
                     </AccordionContent>

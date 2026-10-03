@@ -13,6 +13,7 @@ import { parseMarketTickerList } from "@/lib/kalshiLive/marketTickerSearch";
  *   minCreatedTs?: number | "";
  *   maxCreatedTs?: number | "";
  *   minUpdatedTs?: number | "";
+ *   maxUpdatedTs?: number | "";
  *   minCloseTs?: number | "";
  *   maxCloseTs?: number | "";
  *   minSettledTs?: number | "";
@@ -97,13 +98,20 @@ export function hasKalshiLiveMarketsDiscoverySettledRange(params) {
 }
 
 /**
+ * @param {KalshiLiveMarketsDiscoveryParams} params
+ */
+export function hasKalshiLiveMarketsDiscoveryUpdatedRange(params) {
+  return toUnix(params.minUpdatedTs) != null || toUnix(params.maxUpdatedTs) != null;
+}
+
+/**
  * Compute which discovery fields should be disabled given current selections.
  * @param {KalshiLiveMarketsDiscoveryParams} params
  * @returns {KalshiLiveMarketsDiscoveryFieldLocks}
  */
 export function getKalshiLiveMarketsDiscoveryFieldLocks(params) {
   const status = String(params.status || "").trim();
-  const hasUpdated = toUnix(params.minUpdatedTs) != null;
+  const hasUpdated = hasKalshiLiveMarketsDiscoveryUpdatedRange(params);
   const hasCreated = hasKalshiLiveMarketsDiscoveryCreatedRange(params);
   const hasClose = hasKalshiLiveMarketsDiscoveryCloseRange(params);
   const hasSettled = hasKalshiLiveMarketsDiscoverySettledRange(params);
@@ -232,15 +240,15 @@ export function validateKalshiLiveMarketsDiscoveryPull(params) {
     return "Maximum 100 market tickers in the Tickers filter.";
   }
 
-  const hasUpdated = toUnix(params.minUpdatedTs) != null;
+  const hasUpdated = hasKalshiLiveMarketsDiscoveryUpdatedRange(params);
   const hasCreated = hasKalshiLiveMarketsDiscoveryCreatedRange(params);
   const hasClose = hasKalshiLiveMarketsDiscoveryCloseRange(params);
   const hasSettled = hasKalshiLiveMarketsDiscoverySettledRange(params);
-  const mve = normalizeKalshiLiveMveFilter(params.mveFilter);
+  const mve = params.mveFilter === "any" ? "any" : normalizeKalshiLiveMveFilter(params.mveFilter);
 
   if (hasUpdated) {
     if (mve !== KALSHI_LIVE_MVE_FILTER_EXCLUDE) {
-      return "Updated After requires Multivariate Events = Exclude.";
+      return "Updated time requires Multivariate Events = Exclude.";
     }
     if (
       status ||
@@ -250,7 +258,7 @@ export function validateKalshiLiveMarketsDiscoveryPull(params) {
       hasClose ||
       hasSettled
     ) {
-      return "Updated After is incompatible with other filters except Series Ticker (with Multivariate Events = Exclude).";
+      return "Updated time is incompatible with other filters except Series Ticker (with Multivariate Events = Exclude).";
     }
   }
 
@@ -305,9 +313,8 @@ export function buildKalshiLiveMarketsDiscoveryQueryParams(params, opts = {}) {
   const status = String(params.status || "").trim();
   if (status) out.status = status;
 
-  const mve = normalizeKalshiLiveMveFilter(params.mveFilter);
-  // Always send mve_filter so Updated After + series_ticker stay valid; default exclude.
-  out.mve_filter = mve;
+  const mve = params.mveFilter === "any" ? "" : normalizeKalshiLiveMveFilter(params.mveFilter);
+  if (mve) out.mve_filter = mve;
 
   const eventTicker = String(params.eventTicker || "").trim().toUpperCase();
   if (eventTicker) out.event_ticker = eventTicker;
@@ -322,6 +329,7 @@ export function buildKalshiLiveMarketsDiscoveryQueryParams(params, opts = {}) {
     ["min_created_ts", params.minCreatedTs],
     ["max_created_ts", params.maxCreatedTs],
     ["min_updated_ts", params.minUpdatedTs],
+    ["max_updated_ts", params.maxUpdatedTs],
     ["min_close_ts", params.minCloseTs],
     ["max_close_ts", params.maxCloseTs],
     ["min_settled_ts", params.minSettledTs],
@@ -370,6 +378,7 @@ export function emptyKalshiLiveMarketsDiscoveryParams() {
     minCreatedTs: "",
     maxCreatedTs: "",
     minUpdatedTs: "",
+    maxUpdatedTs: "",
     minCloseTs: "",
     maxCloseTs: "",
     minSettledTs: "",

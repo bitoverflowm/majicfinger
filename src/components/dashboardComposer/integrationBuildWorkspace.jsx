@@ -72,6 +72,13 @@ import { kalshiSourceCutoffCaption, useKalshiHistoricalCutoffDisplay } from "@/h
 import { Skeleton } from "@/components/ui/skeleton";
 import { createRunReporter, describeComposePhase } from "@/components/dashboardComposer/integrationRunFeed";
 import { KalshiLiveMarketPicker, kalshiLiveMarketAttributeColumns } from "@/components/dashboardComposer/kalshiLiveMarketPicker";
+import {
+  kalshiLiveDiscoveryFromFilters,
+  kalshiLiveDiscoveryIsNarrow,
+  kalshiLiveFilterQueryError,
+  KALSHI_LIVE_MARKET_SCAN_CAP,
+  scanKalshiLiveMarkets,
+} from "@/lib/kalshiLive/liveMarketAttributeQuery";
 
 function rememberEntry(list, entry, limit, byFingerprint) {
   const previous = (list || []).filter(
@@ -1094,6 +1101,7 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
   const [functionHelp, setFunctionHelp] = useState(false);
   const [visibleCount, setVisibleCount] = useState(0);
   const [livePicks, setLivePicks] = useState([]);
+  const [liveScan, setLiveScan] = useState({ status: "idle", rows: [], error: "", exhausted: true, truncated: false });
   const liveFetchRef = useRef(new Set());
   const [universe, setUniverse] = useState(null);
   const [counting, setCounting] = useState(false);
@@ -1213,6 +1221,7 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
     setSortKeys([]);
     setRowLimit("");
     setLivePicks([]);
+    setLiveScan({ status: "idle", rows: [], error: "", exhausted: true, truncated: false });
     liveFetchRef.current = new Set();
     setPreviewRefreshing(false);
     usingFilteredSample.current = false;
@@ -1349,19 +1358,132 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
     () => (liveMarketSearch ? kalshiLiveMarketAttributeColumns(pull?.columns || []) : []),
     [liveMarketSearch, pull?.columns],
   );
-
-  const liveDisplayRows = useMemo(() => {
-    if (!liveMarketSearch || !livePicks.length) return null;
-    const matched = livePickRows.filter((row) => rowMatchesAttributes(row, liveAttributeColumns, attributeFilters));
-    const sorted = sortAttributeRows(matched, liveAttributeColumns, sortKeys);
-    const limit = Number(rowLimit);
-    return Number.isFinite(limit) && limit > 0 ? sorted.slice(0, limit) : sorted;
-  }, [liveMarketSearch, livePicks.length, livePickRows, liveAttributeColumns, attributeFilters, sortKeys, rowLimit]);
+  const liveClientColumns = useMemo(
+    () => liveAttributeColumns.filter((column) => !column.queryOnly),
+    [liveAttributeColumns],
+  );
+  const liveFiltersActive = liveAttributeColumns.some((column) => attributeSummary(column, attributeFilters));
+  const liveNarrow = liveMarketSearch && kalshiLiveDiscoveryIsNarrow(attributeFilters);
+  const liveBookScan =
+    liveMarketSearch && !livePicks.length && (liveFiltersActive || sortKeys.length > 0 || String(rowLimit || "").trim() !== "");
+  const liveScopeScan = liveMarketSearch && liveNarrow && livePicks.some((pick) => pick.kind === "series" || pick.kind === "event");
 
   useEffect(() => {
-    if (!liveDisplayRows) return;
-    setVisibleCount(liveDisplayRows.length);
-  }, [liveDisplayRows]);
+    if (!liveBookScan && !liveScopeScan) {
+      setLiveScan((current) => (current.status === "idle" ? current : { status: "idle", rows: [], error: "", exhausted: true, truncated: false }));
+      return undefined;
+    }
+    const ac = new AbortController();
+    const timer = window.setTimeout(() => {
+      const queryError = kalshiLiveFilterQueryError(attributeFilters);
+      if (queryError) {
+        setLiveScan({ status: "error", rows: [], error: queryError, exhausted: true, truncated: false });
+        return;
+      }
+      const discovery = kalshiLiveDiscoveryFromFilters(attributeFilters);
+      const requested = Number(rowLimit);
+      const importCap = Math.min(
+        KALSHI_LIVE_MARKET_SCAN_CAP,
+        typeof planLimit === "number" && planLimit > 0 ? planLimit : KALSHI_LIVE_MARKET_SCAN_CAP,
+        Number.isFinite(requested) && requested > 0 && !sortKeys.length ? requested : KALSHI_LIVE_MARKET_SCAN_CAP,
+      );
+      const match = (row) => rowMatchesAttributes(row, liveClientColumns, attributeFilters);
+      setLiveScan((current) => ({ ...current, status: "loading", error: "" }));
+      const scopes = livePicks.filter((pick) => pick.kind === "series" || pick.kind === "event");
+      const run = async () => {
+        if (!scopes.length) {
+          return scanKalshiLiveMarkets({
+            discovery,
+            limit: importCap,
+            signal: ac.signal,
+            match,
+            onPage: (info) => {
+              if (!ac.signal.aborted) {
+                setLiveScan({ status: "loading", rows: info.rows, error: "", exhausted: info.exhausted, truncated: info.truncated });
+              }
+            },
+          });
+        }
+        const rows = [];
+        let exhausted = true;
+        for (const pick of scopes) {
+          const scoped = { ...discovery };
+          if (pick.kind === "series" && !scoped.seriesTicker) scoped.seriesTicker = pick.ticker;
+          if (pick.kind === "event" && !scoped.eventTicker) scoped.eventTicker = pick.ticker;
+          const page = await scanKalshiLiveMarkets({
+            discovery: scoped,
+            limit: Math.max(1, importCap - rows.length),
+            signal: ac.signal,
+            match,
+          });
+          if (page.error) return page;
+          rows.push(...page.rows);
+          if (!page.exhausted) exhausted = false;
+          if (rows.length >= importCap) break;
+        }
+        const seen = new Set(rows.map((row) => String(row.ticker || "")));
+        for (const pick of livePicks) {
+          if (pick.kind !== "market") continue;
+          for (const row of pick.rows || []) {
+            const ticker = String(row?.ticker || "");
+            if (!ticker || seen.has(ticker) || !match(row)) continue;
+            seen.add(ticker);
+            rows.push(row);
+          }
+        }
+        return { rows, exhausted, error: "" };
+      };
+      run()
+        .then((result) => {
+          if (ac.signal.aborted) return;
+          setLiveScan({
+            status: result.error ? "error" : "ready",
+            rows: result.rows || [],
+            error: result.error || "",
+            exhausted: result.exhausted !== false,
+            truncated: Boolean(result.truncated),
+          });
+        })
+        .catch((err) => {
+          if (ac.signal.aborted || err?.name === "AbortError") return;
+          setLiveScan({
+            status: "error",
+            rows: [],
+            error: err instanceof Error ? err.message : "Market request failed",
+            exhausted: true,
+            truncated: false,
+          });
+        });
+    }, 400);
+    return () => {
+      window.clearTimeout(timer);
+      ac.abort();
+    };
+  }, [liveBookScan, liveScopeScan, attributeFilters, livePicks, liveClientColumns, rowLimit, sortKeys, planLimit]);
+
+  const liveMatchedRows = useMemo(() => {
+    if (!liveMarketSearch) return null;
+    const fromScan = liveBookScan || liveScopeScan;
+    const source = fromScan ? liveScan.rows : livePicks.length ? livePickRows : null;
+    if (!source) return null;
+    const matched = fromScan ? source : source.filter((row) => rowMatchesAttributes(row, liveClientColumns, attributeFilters));
+    const sorted = sortAttributeRows(matched, liveClientColumns, sortKeys);
+    const requested = Number(rowLimit);
+    const caps = [KALSHI_LIVE_MARKET_SCAN_CAP];
+    if (typeof planLimit === "number" && planLimit > 0) caps.push(planLimit);
+    if (Number.isFinite(requested) && requested > 0) caps.push(requested);
+    return sorted.slice(0, Math.min(...caps));
+  }, [liveMarketSearch, liveBookScan, liveScopeScan, liveScan.rows, livePicks.length, livePickRows, liveClientColumns, attributeFilters, sortKeys, rowLimit, planLimit]);
+
+  const livePreviewRows = useMemo(
+    () => (liveMatchedRows ? liveMatchedRows.slice(0, PREVIEW_ROW_CAP) : null),
+    [liveMatchedRows],
+  );
+
+  useEffect(() => {
+    if (!livePreviewRows) return;
+    setVisibleCount(livePreviewRows.length);
+  }, [livePreviewRows]);
 
   function addLivePick(pick) {
     if (!pick?.id || liveFetchRef.current.has(pick.id)) return;
@@ -1407,7 +1529,7 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
   }
 
   const filteredRows = useMemo(() => {
-    if (liveDisplayRows) return liveDisplayRows.slice(0, visibleCount);
+    if (livePreviewRows) return livePreviewRows.slice(0, visibleCount);
     if (guidedFilters) {
       const key = historicalPreviewRequestKey({
         guidedFilters,
@@ -1429,7 +1551,7 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
     const query = filterValue.trim().toLowerCase();
     if (!query || !filterColumn) return rows;
     return rows.filter((row) => String(row[filterColumn] ?? "").toLowerCase().includes(query));
-  }, [pull, visibleCount, filterColumn, filterValue, guidedFilters, attributeFilters, sortKeys, rowLimit, integrationId, tableId, settledPreviewKey, previewSearchError, liveDisplayRows]);
+  }, [pull, visibleCount, filterColumn, filterValue, guidedFilters, attributeFilters, sortKeys, rowLimit, integrationId, tableId, settledPreviewKey, previewSearchError, livePreviewRows]);
 
   const queriedMarkets = useMemo(() => {
     if (!guidedFilters) return [];
@@ -1777,15 +1899,22 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
   }, [emptyRefresh]);
   const shownLabel = `Previewing ${shown.toLocaleString()} ${shown === 1 ? "row" : "rows"}`;
   const livePickLoading = livePicks.some((pick) => pick.status === "loading");
+  const liveUpdating = liveScan.status === "loading" || livePickLoading;
+  const liveScanNote =
+    liveScan.status === "ready" && liveScan.truncated
+      ? ` Scan stopped at ${KALSHI_LIVE_MARKET_SCAN_CAP.toLocaleString()} markets.`
+      : "";
   const previewLine = loading
     ? "Loading the first 50 rows"
-    : liveMarketSearch && livePicks.length
-      ? livePickLoading
-        ? shown
-          ? `${shownLabel} · still loading markets`
-          : "Loading the markets you added"
-        : `${shownLabel} from the markets you added`
-      : !exactUniverse
+    : liveScan.status === "error"
+      ? liveScan.error
+      : liveMatchedRows
+        ? liveUpdating
+          ? shown
+            ? `${shownLabel} of ${liveMatchedRows.length.toLocaleString()} matching · updating`
+            : "Updating the markets"
+          : `Previewing ${shown.toLocaleString()} of ${liveMatchedRows.length.toLocaleString()} matching ${liveMatchedRows.length === 1 ? "row" : "rows"}.${liveScanNote}`
+        : !exactUniverse
       ? `${shownLabel} of 1,000,000+ rows available`
       : typeof universe === "number" && !counting
         ? `${shownLabel} of ${universe.toLocaleString()}`
@@ -1801,8 +1930,8 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
         : previewRefreshing && !loading
           ? `${previewLine} · updating`
           : previewLine;
-  const availableRows = liveMarketSearch && livePicks.length
-    ? (liveDisplayRows || []).length
+  const availableRows = liveMatchedRows
+    ? liveMatchedRows.length
     : !exactUniverse
       ? Number.POSITIVE_INFINITY
       : typeof universe === "number" && !counting
@@ -2472,7 +2601,7 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
     planned.push({ id: "place", name: "place_sheets", status: "pending", args: { tab: sheetTitle } });
     reporter.plan(planned, { title: `${venueLabel} · ${sheetTitle}` });
     connect?.close?.();
-    let marketRows = liveMarketSearch && livePicks.length ? liveDisplayRows || [] : filteredRows;
+    let marketRows = liveMatchedRows ? liveMatchedRows : filteredRows;
     reporter.start("source");
     if (marketsRequest && historicalLake) {
       try {
@@ -2557,7 +2686,7 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
         table: tableId || "markets",
         summary: lockedQuery?.label || describeSearch(),
         composeRequest: marketsRequest,
-        keepAllRows: Boolean(liveMarketSearch && livePicks.length),
+        keepAllRows: Boolean(liveMatchedRows),
         attributeLines: (liveMarketSearch ? liveAttributeColumns : pull?.columns || []).flatMap((column) => {
           const summary = attributeSummary(column, attributeFilters);
           return summary ? [`${column.title} ${summary}`] : [];

@@ -1,19 +1,17 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { AnimatePresence, motion } from "framer-motion";
 import { Loader2, Search, X } from "lucide-react";
 import { isKalshiEmbeddingSearchEligible } from "@/lib/kalshiLive/kalshiLiveEmbeddingSearch";
+import { KALSHI_LIVE_QUERY_ATTRIBUTE_COLUMNS } from "@/lib/kalshiLive/liveMarketAttributeQuery";
 import { cn } from "@/lib/utils";
 
 const STATUS_OPTIONS = [
-  ["unopened", "Unopened"],
-  ["open", "Open"],
-  ["paused", "Paused"],
-  ["closed", "Closed"],
-  ["settled", "Settled"],
   ["initialized", "Initialized"],
   ["inactive", "Inactive"],
   ["active", "Active"],
+  ["closed", "Closed"],
   ["determined", "Determined"],
   ["disputed", "Disputed"],
   ["amended", "Amended"],
@@ -32,15 +30,34 @@ const RESULT_OPTIONS = [
   ["", "Unresolved"],
 ];
 
-/** Live market columns, with the choices that actually appear on a market row. */
+const SETTLEMENT_BOUNDS_OPTIONS = [
+  ["default", "Default"],
+  ["floor", "Floor"],
+];
+
+const STRIKE_OPTIONS = [
+  ["greater", "Greater"],
+  ["greater_or_equal", "Greater or equal"],
+  ["less", "Less"],
+  ["less_or_equal", "Less or equal"],
+  ["between", "Between"],
+  ["functional", "Functional"],
+  ["custom", "Custom"],
+  ["structured", "Structured"],
+];
+
+/** Response columns plus the request filters that are not fields on the market. */
 export function kalshiLiveMarketAttributeColumns(columns) {
-  return (columns || []).map((column) => {
+  const shaped = (columns || []).map((column) => {
     if (column.id === "status") return { ...column, enumOptions: STATUS_OPTIONS };
     if (column.id === "market_type") return { ...column, enumOptions: MARKET_TYPE_OPTIONS };
     if (column.id === "result") return { ...column, enumOptions: RESULT_OPTIONS };
+    if (column.id === "settlement_bounds_type") return { ...column, enumOptions: SETTLEMENT_BOUNDS_OPTIONS };
+    if (column.id === "strike_type") return { ...column, enumOptions: STRIKE_OPTIONS };
     if (column.type === "date") return { ...column, dateEpoch: "iso" };
     return column;
   });
+  return [...KALSHI_LIVE_QUERY_ATTRIBUTE_COLUMNS, ...shaped];
 }
 
 function seriesTickerOf(suggestion) {
@@ -136,17 +153,17 @@ export function KalshiLiveMarketPicker({ picks, onAdd, onRemove }) {
   }
 
   const typed = query.trim();
-  const hint =
-    typed && !isKalshiEmbeddingSearchEligible(typed)
-      ? "Use a word with at least 5 letters."
-      : "";
+  const eligible = isKalshiEmbeddingSearchEligible(typed);
 
   return (
     <section className="space-y-2">
       <p className="text-[12px] font-semibold text-foreground">Markets</p>
       <div className="relative">
-        <Search className="pointer-events-none absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
+        <span className="pointer-events-none absolute left-3 top-1/2 z-[1] flex h-4 w-4 -translate-y-1/2 items-center justify-center text-muted-foreground">
+          {loading ? <Loader2 className="h-4 w-4 animate-spin text-primary" aria-hidden /> : <Search className="h-4 w-4" aria-hidden />}
+        </span>
         <input
+          type="search"
           value={query}
           onChange={(event) => setQuery(event.target.value)}
           onFocus={() => {
@@ -154,60 +171,93 @@ export function KalshiLiveMarketPicker({ picks, onAdd, onRemove }) {
           }}
           placeholder="Search anything — series, markets, topics…"
           aria-label="Search Kalshi markets"
-          className="h-9 w-full rounded-lg border border-border/70 bg-background pl-8 pr-8 text-[13px] outline-none placeholder:text-muted-foreground focus:border-[#0d99ff]/50"
+          autoComplete="off"
+          className="flex h-9 w-full rounded-lg border border-border bg-background py-2 pl-9 pr-3 text-xs text-foreground ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
         />
-        {loading ? <Loader2 className="absolute right-2.5 top-1/2 size-3.5 -translate-y-1/2 animate-spin text-muted-foreground" /> : null}
-      </div>
-      {hint ? <p className="text-[11px] text-muted-foreground">{hint}</p> : null}
-      {error ? <p className="text-[11px] text-red-600 dark:text-red-400">{error}</p> : null}
-      {open && suggestions.length ? (
-        <div className="max-h-72 space-y-2 overflow-y-auto rounded-lg border border-border/70 p-2">
-          {suggestions.map((suggestion) => {
-            const series = seriesTickerOf(suggestion);
-            const event = String(suggestion.eventTicker || "").trim();
-            const markets = (Array.isArray(suggestion.markets) ? suggestion.markets : [])
-              .map((market) => ({ market, ticker: nestedTicker(market) }))
-              .filter((item) => item.ticker);
-            const seriesId = series ? `series:${series}` : "";
-            const eventId = event ? `event:${event}` : "";
-            return (
-              <div key={`${suggestion.ticker}:${event}`} className="rounded-lg px-1 py-1">
-                <p className="truncate text-[13px] font-medium text-foreground">{suggestion.title || suggestion.ticker}</p>
-                {suggestion.subtitle ? <p className="truncate text-[11px] text-muted-foreground">{suggestion.subtitle}</p> : null}
-                <div className="mt-1.5 flex flex-wrap gap-1">
-                  {series ? (
-                    <ScopeButton
-                      added={picked.has(seriesId)}
-                      onClick={() =>
-                        add({
-                          id: seriesId,
-                          kind: "series",
-                          ticker: series,
-                          label: suggestion.title || series,
-                        })
-                      }
-                    >
-                      All markets in series
-                    </ScopeButton>
-                  ) : null}
-                  {event ? (
-                    <ScopeButton
-                      added={picked.has(eventId)}
-                      onClick={() =>
-                        add({
-                          id: eventId,
-                          kind: "event",
-                          ticker: event,
-                          label: suggestion.title || event,
-                        })
-                      }
-                    >
-                      All markets in event
-                    </ScopeButton>
-                  ) : null}
-                </div>
-                {markets.length ? (
-                  <div className="mt-1 max-h-28 space-y-0.5 overflow-y-auto">
+        <AnimatePresence>
+          {open && !loading && eligible && !suggestions.length ? (
+            <motion.p
+              key="no-matches"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="absolute left-0 right-0 top-full z-50 mt-1 rounded-lg border border-border bg-popover px-3 py-2 text-xs text-muted-foreground shadow-md"
+            >
+              No matches for &ldquo;{typed}&rdquo;
+            </motion.p>
+          ) : null}
+        </AnimatePresence>
+        <AnimatePresence>
+          {open && suggestions.length ? (
+            <motion.ul
+              key="suggestions"
+              role="listbox"
+              initial={{ opacity: 0, y: -4 }}
+              animate={{ opacity: 1, y: 0, transition: { duration: 0.18 } }}
+              exit={{ opacity: 0, y: -4, transition: { duration: 0.12 } }}
+              className="absolute left-0 right-0 top-full z-50 mt-1 max-h-72 overflow-auto rounded-lg border border-border bg-popover py-1 shadow-md"
+            >
+              {suggestions.map((suggestion) => {
+                const series = seriesTickerOf(suggestion);
+                const event = String(suggestion.eventTicker || "").trim();
+                const markets = (Array.isArray(suggestion.markets) ? suggestion.markets : [])
+                  .map((market) => ({ market, ticker: nestedTicker(market) }))
+                  .filter((item) => item.ticker);
+                const seriesId = series ? `series:${series}` : "";
+                const eventId = event ? `event:${event}` : "";
+                return (
+                  <motion.li
+                    key={`${suggestion.ticker}:${event}`}
+                    role="option"
+                    initial={{ opacity: 0, y: 4 }}
+                    animate={{ opacity: 1, y: 0, transition: { duration: 0.16 } }}
+                    className="border-b border-border/60 last:border-b-0"
+                  >
+                    <div className="flex flex-col gap-0.5 px-3 py-2">
+                      <span className="line-clamp-2 text-sm font-medium text-foreground">{suggestion.title || suggestion.ticker}</span>
+                      {suggestion.subtitle ? (
+                        <span className="line-clamp-1 text-xs text-muted-foreground">{suggestion.subtitle}</span>
+                      ) : null}
+                      <span className="text-xs text-muted-foreground">
+                        <span className="rounded bg-violet-500/15 px-1.5 py-0.5 font-mono text-[0.65rem] font-medium tracking-wide text-violet-900 ring-1 ring-violet-600/25 dark:bg-violet-400/15 dark:text-violet-100 dark:ring-violet-400/35">
+                          Series
+                        </span>
+                        {series || suggestion.ticker ? ` · ${series || suggestion.ticker}` : ""}
+                        {markets.length ? ` · ${markets.length} ${markets.length === 1 ? "market" : "markets"}` : ""}
+                      </span>
+                      <span className="mt-1 flex flex-wrap gap-x-3 gap-y-1">
+                        {series ? (
+                          <ScopeButton
+                            added={picked.has(seriesId)}
+                            onClick={() =>
+                              add({
+                                id: seriesId,
+                                kind: "series",
+                                ticker: series,
+                                label: suggestion.title || series,
+                              })
+                            }
+                          >
+                            All markets in series
+                          </ScopeButton>
+                        ) : null}
+                        {event ? (
+                          <ScopeButton
+                            added={picked.has(eventId)}
+                            onClick={() =>
+                              add({
+                                id: eventId,
+                                kind: "event",
+                                ticker: event,
+                                label: suggestion.title || event,
+                              })
+                            }
+                          >
+                            All markets in event
+                          </ScopeButton>
+                        ) : null}
+                      </span>
+                    </div>
                     {markets.map(({ market, ticker }) => {
                       const id = `market:${ticker}`;
                       const added = picked.has(id);
@@ -216,29 +266,26 @@ export function KalshiLiveMarketPicker({ picks, onAdd, onRemove }) {
                           key={ticker}
                           type="button"
                           disabled={added}
+                          onMouseDown={(eventClick) => eventClick.preventDefault()}
                           onClick={() => add({ id, kind: "market", ticker, label: nestedLabel(market) })}
-                          className={cn(
-                            "flex w-full items-center rounded-md px-1.5 py-1 text-left text-[12px]",
-                            added
-                              ? "text-muted-foreground"
-                              : "text-foreground hover:bg-muted/60",
-                          )}
+                          className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm hover:bg-accent disabled:opacity-50"
                         >
-                          <span className="min-w-0 flex-1 truncate">{nestedLabel(market)}</span>
-                          <span className="shrink-0 pl-2 text-[11px] text-muted-foreground">{added ? "Added" : "Add"}</span>
+                          <span className="min-w-0 flex-1 truncate text-foreground">{nestedLabel(market)}</span>
+                          <span className="shrink-0 text-xs text-muted-foreground">{added ? "Added" : "Add"}</span>
                         </button>
                       );
                     })}
-                  </div>
-                ) : null}
-              </div>
-            );
-          })}
-        </div>
+                  </motion.li>
+                );
+              })}
+            </motion.ul>
+          ) : null}
+        </AnimatePresence>
+      </div>
+      {typed && !eligible ? (
+        <p className="text-[10px] leading-snug text-muted-foreground">Type at least one word with 5+ letters to search.</p>
       ) : null}
-      {open && !loading && !suggestions.length && isKalshiEmbeddingSearchEligible(typed) ? (
-        <p className="text-[11px] text-muted-foreground">No markets matched that search.</p>
-      ) : null}
+      {error ? <p className="text-xs text-destructive">{error}</p> : null}
       {picks?.length ? (
         <div className="flex flex-wrap gap-1.5">
           {picks.map((pick) => (
@@ -279,13 +326,9 @@ function ScopeButton({ added, onClick, children }) {
     <button
       type="button"
       disabled={added}
+      onMouseDown={(event) => event.preventDefault()}
       onClick={onClick}
-      className={cn(
-        "inline-flex rounded-full border px-2 py-0.5 text-[11px] font-medium",
-        added
-          ? "border-[#0d99ff]/40 bg-[#0d99ff]/10 text-[#0d99ff]"
-          : "border-border/70 bg-background text-foreground hover:bg-muted/50",
-      )}
+      className="text-xs font-medium text-foreground hover:underline disabled:text-muted-foreground disabled:no-underline"
     >
       {added ? "Added" : children}
     </button>
