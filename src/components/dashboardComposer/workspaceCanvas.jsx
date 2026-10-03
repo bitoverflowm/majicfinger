@@ -32,6 +32,7 @@ import {
 } from "@/lib/workspaceDashboardClient";
 import { pageIdForTab, tabIdFromPage } from "@/lib/workspaceDashboardDocument";
 import { SpectrumLoadingState } from "@/components/ui/spectrum-loading-state";
+import { RunProgressCard } from "@/components/dashboardComposer/integrationRunProgress";
 import { cn } from "@/lib/utils";
 
 const WorkspaceCanvasContext = createContext(null);
@@ -140,6 +141,7 @@ export function WorkspaceCanvasProvider({ pageId, readOnly = false, children }) 
   const [previewActiveId, setPreviewActiveId] = useState("");
   const [selectedId, setSelectedId] = useState(null);
   const [renameId, setRenameId] = useState(null);
+  const [runFeed, setRunFeed] = useState(null);
   const blocks = blocksByPage[pageId] || [];
   const docIdRef = useRef("");
   const lastPayloadRef = useRef("");
@@ -356,6 +358,11 @@ export function WorkspaceCanvasProvider({ pageId, readOnly = false, children }) 
     [pageId],
   );
 
+  const reportRun = useCallback((next) => {
+    setRunFeed((current) => (typeof next === "function" ? next(current) : next));
+  }, []);
+  const dismissRun = useCallback(() => setRunFeed(null), []);
+
   const registerTables = useCallback((incoming) => {
     const list = Array.isArray(incoming) ? incoming : [];
     setTables((prev) => {
@@ -543,12 +550,15 @@ export function WorkspaceCanvasProvider({ pageId, readOnly = false, children }) 
       addBlock,
       placeIntegrationSheets,
       registerTables,
+      runFeed,
+      reportRun,
+      dismissRun,
       updateBlock,
       duplicateBlock,
       removeBlock,
       createChartFromBlock,
     }),
-    [addBlock, blocks, blocksByPage, createChartFromBlock, dashboardName, duplicateBlock, focusBlock, pageId, placeIntegrationSheets, previewActiveId, previewTabs, readOnly, ready, registerTables, removeBlock, renameDashboard, renameId, saveNow, selectedId, tool, updateBlock],
+    [addBlock, blocks, blocksByPage, createChartFromBlock, dashboardName, dismissRun, duplicateBlock, focusBlock, pageId, placeIntegrationSheets, previewActiveId, previewTabs, readOnly, ready, registerTables, removeBlock, renameDashboard, renameId, reportRun, runFeed, saveNow, selectedId, tool, updateBlock],
   );
 
   return <WorkspaceCanvasContext.Provider value={value}>{children}</WorkspaceCanvasContext.Provider>;
@@ -1060,9 +1070,12 @@ export function WorkspaceCanvas() {
     );
   }
 
-  if (!blocks.length) return null;
+  const progress = canvas.runFeed ? <RunProgressCard feed={canvas.runFeed} onDismiss={canvas.dismissRun} /> : null;
+
+  if (!blocks.length) return progress;
 
   return (
+    <>
     <div ref={scrollerRef} className="pointer-events-auto absolute inset-0 z-20 overflow-auto">
       <div
         className="relative min-h-full min-w-full"
@@ -1083,5 +1096,7 @@ export function WorkspaceCanvas() {
       ))}
       </div>
     </div>
+    {progress}
+    </>
   );
 }

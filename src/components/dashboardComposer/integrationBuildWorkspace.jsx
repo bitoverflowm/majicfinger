@@ -72,6 +72,7 @@ import { buildBucketGrid, defaultBucketMode, suggestedNumericBucketSize } from "
 import { attachRandomSample, previewRandomSample } from "@/components/dashboardComposer/randomSampleRequest";
 import { generateRandomSampleSeed, validateRandomSampleSizeInput } from "@/lib/dataLake/randomSample";
 import { useWorkspaceCanvas } from "@/components/dashboardComposer/workspaceCanvas";
+import { createRunReporter, describeComposePhase } from "@/components/dashboardComposer/integrationRunFeed";
 
 function rememberEntry(list, entry, limit, byFingerprint) {
   const previous = (list || []).filter(
@@ -2422,31 +2423,82 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
   async function onSaveAndRun() {
     if (running) return;
     setRunning(true);
+    const reporter = createRunReporter((feed) => canvas?.reportRun?.(feed));
     try {
     const sheetCap = typeof planLimit === "number" && planLimit > 0 ? planLimit : getHistoricalPullRowLimit(user);
     const marketsRequest = marketsRequestForRun();
+    const sourceTable = `${lakeId}.${tableId || "sheet"}`;
+    const planned = [
+      {
+        id: "source",
+        name: `compose_${tableId || "sheet"}`,
+        status: "pending",
+        args: { lake: lakeId, table: tableId, limit: Number.isFinite(sheetCap) ? sheetCap : undefined },
+      },
+    ];
+    if (tradesJoinReady) {
+      planned.push({
+        id: "join-markets",
+        name: "compose_markets",
+        status: "pending",
+        args: { lake: lakeId, table: "markets", match: polymarketHistorical ? "outcome token" : "ticker" },
+      });
+    }
+    if (joinCommitted) {
+      planned.push({
+        id: "join-trades",
+        name: "compose_trades",
+        status: "pending",
+        args: { lake: lakeId, table: "trades", sheets: Math.min(joinedMarkets.length || marketCap, marketCap) },
+      });
+    }
+    if (enrichPicks.has("bucket")) planned.push({ id: "buckets", name: "bucket_rows", status: "pending" });
+    if (enrichPicks.has("summarize")) planned.push({ id: "summary", name: "summarize", status: "pending" });
+    if (enrichPicks.has("function")) planned.push({ id: "functions", name: "function_columns", status: "pending" });
+    planned.push({ id: "place", name: "place_sheets", status: "pending", args: { tab: sheetTitle } });
+    reporter.plan(planned, { title: `${venueLabel} · ${sheetTitle}` });
+    connect?.close?.();
     let marketRows = filteredRows;
+    reporter.start("source");
     if (marketsRequest && historicalLake) {
       try {
-        const pulledMarkets = await loadAthenaComposeRows(marketsRequest);
+        const pulledMarkets = await loadAthenaComposeRows(marketsRequest, {
+          onPhase: (info) => reporter.note("source", describeComposePhase(info, { table: sourceTable, limit: sheetCap })),
+        });
         if (pulledMarkets.rows?.length) marketRows = pulledMarkets.rows;
-      } catch {
+        reporter.succeed("source", { result: `${marketRows.length.toLocaleString()} rows from ${sourceTable}` });
+      } catch (err) {
         marketRows = filteredRows;
+        reporter.succeed("source", {
+          result: `${filteredRows.length.toLocaleString()} rows already on screen. ${err instanceof Error ? err.message : "The compose did not finish."}`,
+        });
       }
+    } else {
+      reporter.succeed("source", { result: `${marketRows.length.toLocaleString()} rows from ${sourceTable}` });
     }
     let primaryColumns = shownColumns;
     let primaryRows = marketRows;
     let metadataSheet = null;
     let joinedTickers = [];
     if (tradesJoinReady) {
+      reporter.start("join-markets");
       let joinedMarketRows = marketPreview.status === "ready" ? marketPreview.rows : [];
+      const marketTable = `${lakeId}.markets`;
       try {
         const result = polymarketHistorical
-          ? await loadPolymarketHistoricalMarketsForTokens(marketRows.flatMap((row) => polymarketTradeTokens(row)))
-          : await loadKalshiHistoricalMarketsForTickers(tickersFromRows(marketRows, Number.MAX_SAFE_INTEGER));
+          ? await loadPolymarketHistoricalMarketsForTokens(marketRows.flatMap((row) => polymarketTradeTokens(row)), {
+              onPhase: (info) => reporter.note("join-markets", describeComposePhase(info, { table: marketTable })),
+            })
+          : await loadKalshiHistoricalMarketsForTickers(tickersFromRows(marketRows, Number.MAX_SAFE_INTEGER), {
+              onPhase: (info) => reporter.note("join-markets", describeComposePhase(info, { table: marketTable })),
+            });
         if (Array.isArray(result.rows)) joinedMarketRows = result.rows;
-      } catch {
+        reporter.succeed("join-markets", { result: `${joinedMarketRows.length.toLocaleString()} markets from ${marketTable}` });
+      } catch (err) {
         joinedMarketRows = marketPreview.status === "ready" ? marketPreview.rows : [];
+        reporter.succeed("join-markets", {
+          result: `${joinedMarketRows.length.toLocaleString()} markets already loaded. ${err instanceof Error ? err.message : ""}`.trim(),
+        });
       }
       joinedTickers = polymarketHistorical
         ? joinedMarketRows.map((row) => polymarketMarketKey(row)).filter(Boolean)
@@ -2497,6 +2549,7 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
     if (metadataSheet?.columns?.length) sheets.push(metadataSheet);
     const bucketBuilt = [];
     if (enrichPicks.has("bucket")) {
+      reporter.start("buckets");
       bucketItems.forEach((item, index) => {
         const built = buildBucketGrid({
           columns: runMarkets.columns,
@@ -2522,12 +2575,18 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
           summary: title,
         });
       });
+      reporter.succeed("buckets", {
+        result: bucketBuilt.length
+          ? `${bucketBuilt.length.toLocaleString()} bucket ${bucketBuilt.length === 1 ? "sheet" : "sheets"} from ${runMarkets.rows.length.toLocaleString()} rows`
+          : "No buckets to build",
+      });
     }
     const runColumns = functionsForSheet("new").map((item) => ({
       item,
       built: applyFunctionColumns(primaryColumns, primaryRows, [item], formulaSheets, "new", item.id),
     }));
     if (enrichPicks.has("summarize")) {
+      reporter.start("summary");
       const runFormulaSheets = formulaSheets
         .filter((sheet) => sheet.id !== "buckets" && sheet.id !== "new" && sheet.id !== "market-metadata")
         .map((sheet) =>
@@ -2565,18 +2624,48 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
         table: "summary",
         summary: "Summary",
       });
+      reporter.succeed("summary", { result: `Summary over ${runMarkets.rows.length.toLocaleString()} rows` });
     }
     if (joinCommitted && tradePreview.columns.length) {
+      reporter.start("join-trades");
       const fromRun = joinMarketsFromRows(marketRows, marketCap);
       const list = fromRun.length ? fromRun : joinedMarkets.slice(0, marketCap);
       runTickers = list.map((market) => market.ticker);
+      const tradeTable = `${lakeId}.trades`;
+      reporter.setChildren(
+        "join-trades",
+        list.map((market) => ({
+          id: market.ticker,
+          name: market.label || market.ticker,
+          status: "pending",
+          parallel: true,
+          args: { table: tradeTable, limit: sheetCap },
+        })),
+      );
+      reporter.note("join-trades", `Composing ${list.length.toLocaleString()} ${tradeTable} ${list.length === 1 ? "sheet" : "sheets"}`);
       const pulled = await mapPool(list, 4, async (market) => {
+        const childName = market.label || market.ticker;
+        reporter.patchChild("join-trades", market.ticker, { status: "running", result: `Composing ${tradeTable}` });
         try {
+          const onPhase = (info) =>
+            reporter.patchChild("join-trades", market.ticker, {
+              status: "running",
+              result: describeComposePhase(info, { table: `${tradeTable} · ${childName}`, limit: sheetCap }),
+            });
           const result = polymarketHistorical
-            ? await loadPolymarketHistoricalTradesForTokens(market.tokens, sheetCap)
-            : await loadKalshiHistoricalTradesForTicker(market.ticker, sheetCap);
-          return { ...market, columns: result.columns?.length ? result.columns : tradePreview.columns, rows: result.rows || [] };
-        } catch {
+            ? await loadPolymarketHistoricalTradesForTokens(market.tokens, sheetCap, { onPhase })
+            : await loadKalshiHistoricalTradesForTicker(market.ticker, sheetCap, { onPhase });
+          const rows = result.rows || [];
+          reporter.patchChild("join-trades", market.ticker, {
+            status: "success",
+            result: `${rows.length.toLocaleString()} rows`,
+          });
+          return { ...market, columns: result.columns?.length ? result.columns : tradePreview.columns, rows };
+        } catch (err) {
+          reporter.patchChild("join-trades", market.ticker, {
+            status: "error",
+            result: err instanceof Error ? err.message : "Trades compose failed",
+          });
           return { ...market, columns: tradePreview.columns, rows: [] };
         }
       });
@@ -2605,7 +2694,15 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
           summary: `${venueLabel} · trades · ${item.label || item.ticker}`,
         });
       });
+      const tradeSheets = sheets.filter((sheet) => sheet.table === "trades").length;
+      const tradeRows = pulled.reduce((sum, item) => sum + (item.rows?.length || 0), 0);
+      reporter.succeed("join-trades", {
+        result: `${tradeSheets.toLocaleString()} trade ${tradeSheets === 1 ? "sheet" : "sheets"} · ${tradeRows.toLocaleString()} rows from ${tradeTable}`,
+      });
+    } else if (joinCommitted) {
+      reporter.succeed("join-trades", { result: "No trade preview to compose" });
     }
+    if (enrichPicks.has("function")) reporter.start("functions");
     runColumns.forEach((entry) => {
       if (!entry.built.columns.length) return;
       sheets.push({
@@ -2618,8 +2715,19 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
         summary: entry.item.formula.trim() ? `Function · ${entry.item.formula.trim()}` : "Function column",
       });
     });
-    if (!sheets.length) return;
+    if (enrichPicks.has("function")) {
+      reporter.succeed("functions", {
+        result: runColumns.length
+          ? `${runColumns.length.toLocaleString()} column ${runColumns.length === 1 ? "equation" : "equations"} on ${runMarkets.rows.length.toLocaleString()} rows`
+          : "No function columns to add",
+      });
+    }
+    if (!sheets.length) {
+      reporter.fail("place", "Nothing to place on this tab");
+      return;
+    }
 
+    reporter.start("place");
     canvas?.placeIntegrationSheets?.(sheets);
     const joinRecord = joinCommitted
       ? {
@@ -2693,11 +2801,9 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
           ? { size: sampleSizeNumber, mode: sampleMode, seed: sampleMode === "seeded" ? sampleSeed : "" }
           : null,
     };
-    setPulls((current) => {
-      const next = rememberEntry(current, pullEntry, 80, false);
-      if (accountId) writeUserQueryCache(accountId, { saved, pulls: next });
-      return next;
-    });
+    const nextPulls = rememberEntry(pulls, pullEntry, 80, false);
+    if (accountId) writeUserQueryCache(accountId, { saved, pulls: nextPulls });
+    setPulls(nextPulls);
     if (accountId) saveWorkspaceQuery("pull", pullEntry);
     ctx?.setDataSheets?.((prev) => {
       const next = { ...(prev || {}) };
@@ -2719,7 +2825,12 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
       }
       return next;
     });
-    connect?.close?.();
+    reporter.succeed("place", {
+      result: `${sheets.length.toLocaleString()} ${sheets.length === 1 ? "sheet" : "sheets"} on this tab`,
+    });
+    reporter.finish();
+    } catch (err) {
+      reporter.fail(null, err instanceof Error ? err.message : "The pull failed");
     } finally {
       setRunning(false);
     }

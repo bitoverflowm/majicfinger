@@ -596,7 +596,7 @@ function rowsFromAthenaCells(result, limit) {
  * Save and run passes the plan row cap so Elite gets the full pull and other tiers
  * stop at their sheet cap.
  */
-export function loadKalshiHistoricalTradesForTicker(ticker, limit = PREVIEW_ROW_CAP) {
+export function loadKalshiHistoricalTradesForTicker(ticker, limit = PREVIEW_ROW_CAP, options = {}) {
   const catalog = lakeColumns("kalshi", "trades", KALSHI_TRADE_PREVIEW_FIELDS);
   const columns = KALSHI_TRADE_PREVIEW_FIELDS.map((id) => catalog.find((entry) => entry.id === id)).filter(Boolean);
   const rowLimit = Math.max(1, Math.floor(Number(limit) || PREVIEW_ROW_CAP));
@@ -616,7 +616,7 @@ export function loadKalshiHistoricalTradesForTicker(ticker, limit = PREVIEW_ROW_
     },
   };
   const maxWaitMs = rowLimit > PREVIEW_ROW_CAP ? 600000 : 180000;
-  return fetchAthenaLakeSample(request, { maxWaitMs, pollIntervalMs: 800 }).then((result) => ({
+  return fetchAthenaLakeSample(request, { maxWaitMs, pollIntervalMs: 800, onPhase: options.onPhase }).then((result) => ({
     columns,
     rows: rowsFromAthenaCells(result, rowLimit),
   }));
@@ -626,7 +626,7 @@ export function loadKalshiHistoricalTradesForTicker(ticker, limit = PREVIEW_ROW_
  * Market metadata for the tickers in a trades pull. One row per ticker.
  * Large ticker lists are queried in chunks so the IN list stays valid.
  */
-export async function loadKalshiHistoricalMarketsForTickers(tickers) {
+export async function loadKalshiHistoricalMarketsForTickers(tickers, options = {}) {
   const unique = [];
   const seen = new Set();
   for (const raw of tickers || []) {
@@ -661,6 +661,7 @@ export async function loadKalshiHistoricalMarketsForTickers(tickers) {
     const result = await fetchAthenaLakeSample(request, {
       maxWaitMs: unique.length > chunkSize ? 600000 : 180000,
       pollIntervalMs: 800,
+      onPhase: (info) => options.onPhase?.({ ...info, chunk: Math.floor(start / chunkSize) + 1, chunks: Math.ceil(unique.length / chunkSize) }),
     });
     for (const row of rowsFromAthenaCells(result, chunk.length)) {
       const ticker = String(row.ticker || "").trim();
@@ -673,12 +674,13 @@ export async function loadKalshiHistoricalMarketsForTickers(tickers) {
 }
 
 /** Run a locked compose request. Preview stays on its own 50-row fetch. */
-export function loadAthenaComposeRows(request) {
+export function loadAthenaComposeRows(request, options = {}) {
   const rowLimit = Number(request?.limit);
   const cap = Number.isFinite(rowLimit) && rowLimit > 0 ? Math.floor(rowLimit) : undefined;
   return fetchAthenaLakeSample(cap ? { ...request, limit: cap } : request, {
     maxWaitMs: 600000,
     pollIntervalMs: 800,
+    onPhase: options.onPhase,
   }).then((result) => ({ rows: rowsFromAthenaCells(result, cap) }));
 }
 
@@ -708,7 +710,7 @@ function polymarketTradeColumns() {
  * Trades for one Polymarket market. A fill matches when the maker or taker asset
  * is one of that market's outcome token ids.
  */
-export function loadPolymarketHistoricalTradesForTokens(tokens, limit = PREVIEW_ROW_CAP) {
+export function loadPolymarketHistoricalTradesForTokens(tokens, limit = PREVIEW_ROW_CAP, options = {}) {
   const columns = polymarketTradeColumns();
   const unique = [];
   const seen = new Set();
@@ -739,7 +741,7 @@ export function loadPolymarketHistoricalTradesForTokens(tokens, limit = PREVIEW_
     },
   };
   const maxWaitMs = rowLimit > PREVIEW_ROW_CAP ? 600000 : 180000;
-  return fetchAthenaLakeSample(request, { maxWaitMs, pollIntervalMs: 800 }).then((result) => ({
+  return fetchAthenaLakeSample(request, { maxWaitMs, pollIntervalMs: 800, onPhase: options.onPhase }).then((result) => ({
     columns,
     rows: rowsFromAthenaCells(result, rowLimit),
   }));
@@ -748,7 +750,7 @@ export function loadPolymarketHistoricalTradesForTokens(tokens, limit = PREVIEW_
 /**
  * Markets whose outcome tokens appear on these trades. One row per market.
  */
-export async function loadPolymarketHistoricalMarketsForTokens(tokens) {
+export async function loadPolymarketHistoricalMarketsForTokens(tokens, options = {}) {
   const unique = [];
   const seen = new Set();
   for (const raw of tokens || []) {
@@ -783,6 +785,7 @@ export async function loadPolymarketHistoricalMarketsForTokens(tokens) {
     const result = await fetchAthenaLakeSample(request, {
       maxWaitMs: unique.length > chunkSize ? 600000 : 180000,
       pollIntervalMs: 800,
+      onPhase: (info) => options.onPhase?.({ ...info, chunk: Math.floor(start / chunkSize) + 1, chunks: Math.ceil(unique.length / chunkSize) }),
     });
     for (const row of rowsFromAthenaCells(result)) {
       const key = String(row.condition_id || row.id || "").trim();

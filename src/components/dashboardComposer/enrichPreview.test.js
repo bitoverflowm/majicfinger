@@ -5,6 +5,7 @@ import { assignSummaryInput, describeSummaryFormula, settleSummaryCells, summary
 import { attachRandomSample, previewRandomSample } from "@/components/dashboardComposer/randomSampleRequest";
 import { normalizeRandomSampleConfig } from "@/lib/dataLake/randomSample";
 import { polymarketHistoricalColumnList, polymarketTokenIds } from "@/components/dashboardComposer/integrationBuildCatalog";
+import { createRunReporter, describeComposePhase } from "@/components/dashboardComposer/integrationRunFeed";
 import {
   POLYMARKET_BLOCKS_CONNECT_COLUMNS,
   POLYMARKET_MARKETS_CONNECT_COLUMNS,
@@ -152,5 +153,25 @@ assert.ok(isoSql.includes("from_iso8601_timestamp"));
 
 assert.deepEqual(polymarketTokenIds('["0","123456789","123456789"]'), ["123456789"]);
 assert.deepEqual(polymarketTokenIds("0"), []);
+
+assert.equal(
+  describeComposePhase({ phase: "polling" }, { table: "polymarket.markets" }),
+  "Composing polymarket.markets",
+);
+assert.equal(
+  describeComposePhase({ phase: "downloading_page", processed: 1200, total: 50000 }, { table: "polymarket.trades" }),
+  "Downloading 1,200 of 50,000 rows from polymarket.trades",
+);
+
+const published = [];
+const reporter = createRunReporter((feed) => published.push(feed));
+reporter.plan([{ id: "source", name: "compose_markets", status: "pending", args: { table: "markets" } }]);
+reporter.start("source");
+reporter.note("source", "Composing polymarket.markets");
+reporter.succeed("source", { result: "50 rows from polymarket.markets" });
+reporter.finish();
+assert.equal(published.at(-1).status, "done");
+assert.equal(published.at(-1).steps[0].status, "success");
+assert.equal(published.at(-1).steps[0].result, "50 rows from polymarket.markets");
 
 console.log("enrichPreview.test.js ok");
