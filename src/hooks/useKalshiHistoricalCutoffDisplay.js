@@ -158,3 +158,11 @@ export function kalshiLiveCaption(cutoffLabel) {
 
 export const KALSHI_HISTORICAL_DEEP_CAPTION =
   "Deep historical data: Kalshi Launch - Dec 2025";
+
+/** Same cutoff lines the integration picker uses. */
+export function kalshiSourceCutoffCaption(integrationId, cutoffLabel) {
+  if (integrationId === "kalshiHistorical") return KALSHI_HISTORICAL_DEEP_CAPTION;
+  if (integrationId === "kalshiHistoricalV2") return kalshiHistoricalV2Caption(cutoffLabel);
+  if (integrationId === "kalshiLive") return kalshiLiveCaption(cutoffLabel);
+  return "";
+}

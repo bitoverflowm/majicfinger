@@ -64,6 +64,8 @@ import { buildBucketGrid, defaultBucketMode, suggestedNumericBucketSize } from "
 import { attachRandomSample, previewRandomSample } from "@/components/dashboardComposer/randomSampleRequest";
 import { generateRandomSampleSeed, validateRandomSampleSizeInput } from "@/lib/dataLake/randomSample";
 import { useWorkspaceCanvas } from "@/components/dashboardComposer/workspaceCanvas";
+import { kalshiSourceCutoffCaption, useKalshiHistoricalCutoffDisplay } from "@/hooks/useKalshiHistoricalCutoffDisplay";
+import { Skeleton } from "@/components/ui/skeleton";
 import { createRunReporter, describeComposePhase } from "@/components/dashboardComposer/integrationRunFeed";
 
 function rememberEntry(list, entry, limit, byFingerprint) {
@@ -1014,6 +1016,9 @@ function historicalPreviewRequestKey({ guidedFilters, columns, attributeFilters,
 
 export function IntegrationBuildWorkspace({ integrationId, onBack }) {
   const source = BUILD_SOURCES[integrationId];
+  const cutoff = useKalshiHistoricalCutoffDisplay();
+  const cutoffCaption = kalshiSourceCutoffCaption(integrationId, cutoff.cutoffLabel);
+  const cutoffPending = cutoff.loading && integrationId !== "kalshiHistorical" && Boolean(cutoffCaption);
   const tables = source?.tables || {};
   const tableIds = Object.keys(tables);
   const ctx = useMyStateV2?.() ?? {};
@@ -3138,6 +3143,11 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
           <p className="text-[13px] leading-relaxed text-muted-foreground">
             Pull {source.name} data based on your criteria.
           </p>
+          {cutoffPending ? (
+            <Skeleton className="mt-1.5 h-3.5 w-56 bg-muted-foreground/20" />
+          ) : cutoffCaption ? (
+            <p className="mt-1 text-[13px] leading-relaxed text-muted-foreground">{cutoffCaption}</p>
+          ) : null}
         </div>
         <div className="min-h-0 flex-1 space-y-5 overflow-y-auto px-4 pb-4">
           <div>
