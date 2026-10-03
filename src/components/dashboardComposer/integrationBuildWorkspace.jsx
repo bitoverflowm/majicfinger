@@ -15,20 +15,10 @@ import { SpectrumLoadingState } from "@/components/ui/spectrum-loading-state";
 import {
   BUILD_SOURCES,
   PREVIEW_ROW_CAP,
-  buildKalshiHistoricalRequest,
-  buildPolymarketHistoricalRequest,
   loadBuildPreview,
   loadBuildUniverseCount,
   kalshiHistoricalMarketColumnList,
-  loadKalshiHistoricalPreview,
-  loadPolymarketHistoricalPreview,
   loadAthenaComposeRows,
-  loadKalshiHistoricalMarketsForTickers,
-  loadKalshiHistoricalTradesForTicker,
-  loadPolymarketHistoricalMarketsForTokens,
-  loadPolymarketHistoricalTradesForTokens,
-  polymarketHistoricalColumnList,
-  polymarketTokenIds,
   peekBuildUniverseCount,
   usesExactUniverse,
 } from "@/components/dashboardComposer/integrationBuildCatalog";
@@ -60,10 +50,12 @@ import {
 } from "@/lib/workspaceQueryClient";
 import {
   attributeSummary,
-  buildKalshiHistoricalFilterPredicates,
-  KalshiHistoricalAttributeFilters,
+  AttributeFilters,
+  buildAttributePredicates,
   sortSummary,
-} from "@/components/dashboardComposer/kalshiHistoricalAttributes";
+} from "@/components/dashboardComposer/integrationAttributes";
+import { integrationProfile } from "@/components/dashboardComposer/integrationSource";
+import { requestCardForSheet, stampRunSheets } from "@/components/dashboardComposer/integrationProvenance";
 import { cn } from "@/lib/utils";
 import { useIntegrationConnect } from "@/components/dashboardComposer/integrationConnectDialog";
 import { sheetRecords } from "@/components/dashboardComposer/integrationRunSheets";
@@ -270,82 +262,6 @@ async function mapPool(items, limit, fn) {
 
 function defaultMarketColumnHidden(columns) {
   return new Set((columns || []).filter((column) => !column.defaultOn).map((column) => column.id));
-}
-
-function orderMarketsByTickers(rows, tickers) {
-  const byTicker = new Map();
-  for (const row of rows || []) {
-    const ticker = String(row?.ticker || "").trim();
-    if (ticker && !byTicker.has(ticker)) byTicker.set(ticker, row);
-  }
-  const ordered = [];
-  const used = new Set();
-  for (const ticker of tickers || []) {
-    const row = byTicker.get(ticker);
-    if (!row || used.has(ticker)) continue;
-    used.add(ticker);
-    ordered.push(row);
-  }
-  for (const [ticker, row] of byTicker) {
-    if (used.has(ticker)) continue;
-    ordered.push(row);
-  }
-  return ordered;
-}
-
-function polymarketMarketKey(row) {
-  return String(row?.condition_id || row?.id || "").trim();
-}
-
-function polymarketMarketLabel(row) {
-  const slug = String(row?.slug || "").trim();
-  if (slug) return slug;
-  const question = String(row?.question || "").trim();
-  if (!question) {
-    const key = polymarketMarketKey(row);
-    return key.length > 12 ? `${key.slice(0, 10)}…` : key;
-  }
-  return question.length > 48 ? `${question.slice(0, 46)}…` : question;
-}
-
-function polymarketTradeTokens(row) {
-  return [...polymarketTokenIds(row?.maker_asset_id), ...polymarketTokenIds(row?.taker_asset_id)];
-}
-
-function matchPolymarketTrade(row, marketRows) {
-  const tokens = new Set(polymarketTradeTokens(row));
-  if (!tokens.size) return {};
-  return (marketRows || []).find((market) => polymarketTokenIds(market?.clob_token_ids).some((token) => tokens.has(token))) || {};
-}
-
-function orderPolymarketMarkets(marketRows, tradeRows) {
-  const tokenOrder = [];
-  const seenToken = new Set();
-  for (const row of tradeRows || []) {
-    for (const token of polymarketTradeTokens(row)) {
-      if (seenToken.has(token)) continue;
-      seenToken.add(token);
-      tokenOrder.push(token);
-    }
-  }
-  const ranked = [];
-  const used = new Set();
-  for (const token of tokenOrder) {
-    for (const row of marketRows || []) {
-      const key = polymarketMarketKey(row);
-      if (!key || used.has(key)) continue;
-      if (!polymarketTokenIds(row?.clob_token_ids).includes(token)) continue;
-      used.add(key);
-      ranked.push(row);
-    }
-  }
-  for (const row of marketRows || []) {
-    const key = polymarketMarketKey(row);
-    if (key && used.has(key)) continue;
-    if (key) used.add(key);
-    ranked.push(row);
-  }
-  return ranked;
 }
 
 function attachMarketMetadata(tradeColumns, tradeRows, marketColumns, marketRows, match) {
@@ -1091,7 +1007,7 @@ function formatSavedAt(savedAt) {
 /** Identity of the archive preview. Empty means the first unfiltered 50. */
 function historicalPreviewRequestKey({ guidedFilters, columns, attributeFilters, sortKeys, integrationId, tableId }) {
   if (!guidedFilters || !columns?.length) return "";
-  const predicates = buildKalshiHistoricalFilterPredicates(columns, attributeFilters);
+  const predicates = buildAttributePredicates(columns, attributeFilters);
   if (!predicates.and.length && !predicates.or.length && !sortKeys.length) return "";
   return JSON.stringify({ integrationId, tableId, predicates, sortKeys });
 }
@@ -1245,17 +1161,17 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
     : tableIds;
   const table = tables[tableId];
   const exactUniverse = usesExactUniverse(integrationId);
-  const polymarketHistorical = integrationId === "polymarketHistorical";
-  const historicalLake = polymarketHistorical || integrationId === "kalshiHistorical";
+  const profile = integrationProfile(integrationId);
+  const join = profile.join;
+  const polymarketHistorical = profile.venue === "polymarket";
+  const historicalLake = profile.historical;
   const marketsQuery = historicalLake && tableId === "markets";
   const tradesQuery = historicalLake && tableId === "trades";
-  const joinTradesTarget = polymarketHistorical ? "polymarketHistoricalTrades" : "kalshiHistoricalTrades";
-  const joinMarketsTarget = polymarketHistorical ? "polymarketHistoricalMarkets" : "kalshiHistoricalMarkets";
-  const venueLabel = polymarketHistorical ? "Polymarket Historical" : "Kalshi Historical";
-  const lakeId = polymarketHistorical ? "polymarket" : "kalshi";
-  const guidedFilters =
-    (integrationId === "kalshiHistorical" && (tableId === "markets" || tableId === "trades")) ||
-    (polymarketHistorical && (tableId === "markets" || tableId === "trades" || tableId === "blocks"));
+  const joinTradesTarget = join?.tradesTarget || "";
+  const joinMarketsTarget = join?.marketsTarget || "";
+  const venueLabel = profile.historical ? profile.label : "Historical";
+  const lakeId = profile.lakeId || "";
+  const guidedFilters = profile.guidedTables.includes(tableId);
 
   useEffect(() => {
     const next = BUILD_SOURCES[integrationId];
@@ -1353,7 +1269,7 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
       return undefined;
     }
     const guided = guidedFilters
-      ? buildKalshiHistoricalFilterPredicates(pull?.columns || [], attributeFilters)
+      ? buildAttributePredicates(pull?.columns || [], attributeFilters)
       : null;
     const query = filterValue.trim();
     const column = (pull?.columns || []).find((item) => item.id === filterColumn);
@@ -1395,12 +1311,9 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
       (pull?.columns || [])
         .filter((column) => !hidden.has(column.id))
         .map((column) =>
-          integrationId === "kalshiHistorical" &&
-          (column.id === "last_price" || column.id === "yes_bid" || column.id === "yes_price" || column.id === "no_price")
-            ? { ...column, scale: "cents" }
-            : column,
+          profile.priceColumns.includes(column.id) ? { ...column, scale: "cents" } : column,
         ),
-    [pull, hidden, integrationId],
+    [pull, hidden, profile.priceColumns],
   );
 
   const filteredRows = useMemo(() => {
@@ -1440,24 +1353,8 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
     if (key && (key !== settledPreviewKey || previewSearchError)) return [];
     const limit = Number(rowLimit);
     const capped = Number.isFinite(limit) && limit > 0 ? (pull?.rows || []).slice(0, limit) : pull?.rows || [];
-    const seen = new Set();
-    const markets = [];
-    for (const row of capped) {
-      if (polymarketHistorical) {
-        const ticker = polymarketMarketKey(row);
-        const tokens = polymarketTokenIds(row?.clob_token_ids);
-        if (!ticker || !tokens.length || seen.has(ticker)) continue;
-        seen.add(ticker);
-        markets.push({ ticker, title: String(row?.question || polymarketMarketLabel(row)), label: polymarketMarketLabel(row), tokens });
-        continue;
-      }
-      const ticker = String(row?.ticker || "").trim();
-      if (!ticker || seen.has(ticker)) continue;
-      seen.add(ticker);
-      markets.push({ ticker, title: String(row?.title || ticker), label: ticker, tokens: [] });
-    }
-    return markets;
-  }, [guidedFilters, pull, attributeFilters, sortKeys, rowLimit, polymarketHistorical, integrationId, tableId, settledPreviewKey, previewSearchError]);
+    return join ? join.marketsFromRows(capped, Number.MAX_SAFE_INTEGER) : [];
+  }, [guidedFilters, pull, attributeFilters, sortKeys, rowLimit, join, integrationId, tableId, settledPreviewKey, previewSearchError]);
 
   const marketCap = getJoinMarketCap(user);
   const requestedMarketLimit = Number(rowLimit);
@@ -1480,12 +1377,11 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
       if (!previewTicker) setTradePreview({ status: "idle", ticker: "", columns: [], rows: [], error: "" });
       return undefined;
     }
+    const load = join?.loadTrades({ ticker: previewTicker, tokens: previewTokenKey ? previewTokenKey.split("|") : [] });
+    if (!load) return undefined;
     let cancel = false;
     setJoinTab(previewTicker);
     setTradePreview({ status: "loading", ticker: previewTicker, columns: [], rows: [], error: "" });
-    const load = polymarketHistorical
-      ? loadPolymarketHistoricalTradesForTokens(previewTokenKey ? previewTokenKey.split("|") : [])
-      : loadKalshiHistoricalTradesForTicker(previewTicker);
     load
       .then((result) => {
         if (cancel) return;
@@ -1504,38 +1400,22 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
     return () => {
       cancel = true;
     };
-  }, [joinTarget, joinTradesTarget, previewTicker, previewTokenKey, polymarketHistorical]);
+  }, [join, joinTarget, joinTradesTarget, previewTicker, previewTokenKey]);
 
   useEffect(() => {
     if (!tradesQuery || joinTarget !== joinMarketsTarget) {
       setMarketPreview((current) => (current.status === "idle" ? current : { status: "idle", key: "", columns: [], rows: [], error: "" }));
       return undefined;
     }
-    const tickers = [];
-    const tokens = [];
-    const seen = new Set();
-    for (const row of filteredRows) {
-      if (polymarketHistorical) {
-        for (const token of polymarketTradeTokens(row)) {
-          if (seen.has(token)) continue;
-          seen.add(token);
-          tokens.push(token);
-        }
-        continue;
-      }
-      const ticker = String(row?.ticker || "").trim();
-      if (!ticker || seen.has(ticker)) continue;
-      seen.add(ticker);
-      tickers.push(ticker);
-    }
-    const key = polymarketHistorical ? tokens.join("\n") : tickers.join("\n");
-    if (!key) {
+    const keys = join ? filteredRows.flatMap((row) => join.tradeKeys(row)) : [];
+    const key = keys.join("\n");
+    if (!key || !join) {
       setMarketPreview({ status: "ready", key: "", columns: [], rows: [], error: "" });
       return undefined;
     }
     let cancel = false;
     setMarketPreview({ status: "loading", key, columns: [], rows: [], error: "" });
-    const load = polymarketHistorical ? loadPolymarketHistoricalMarketsForTokens(tokens) : loadKalshiHistoricalMarketsForTickers(tickers);
+    const load = join.loadMarkets(filteredRows);
     load
       .then((result) => {
         if (cancel) return;
@@ -1554,7 +1434,7 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
     return () => {
       cancel = true;
     };
-  }, [tradesQuery, joinTarget, joinMarketsTarget, polymarketHistorical, filteredRows]);
+  }, [tradesQuery, join, joinTarget, joinMarketsTarget, filteredRows]);
 
   const previewRequestKey = useMemo(
     () =>
@@ -1570,10 +1450,10 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
   );
 
   useEffect(() => {
-    if (!guidedFilters) return undefined;
+    if (!guidedFilters || !join) return undefined;
     const columns = pull?.columns;
     if (!columns?.length) return undefined;
-    const predicates = buildKalshiHistoricalFilterPredicates(columns, attributeFilters);
+    const predicates = buildAttributePredicates(columns, attributeFilters);
     if (!previewRequestKey) {
       setPreviewRefreshing(false);
       setPreviewSearchError("");
@@ -1589,7 +1469,7 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
     setPreviewSearchError("");
     setPreviewRefreshing(true);
     const timer = window.setTimeout(() => {
-      (polymarketHistorical ? loadPolymarketHistoricalPreview : loadKalshiHistoricalPreview)(tableId, predicates, sortKeys)
+      join.loadPreview(tableId, predicates, sortKeys)
         .then((result) => {
           if (cancel) return;
           usingFilteredSample.current = true;
@@ -1610,7 +1490,7 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
       cancel = true;
       window.clearTimeout(timer);
     };
-  }, [guidedFilters, attributeFilters, pull?.columns, sortKeys, tableId, polymarketHistorical, previewRequestKey]);
+  }, [guidedFilters, join, attributeFilters, pull?.columns, sortKeys, tableId, previewRequestKey]);
 
   const accountId = user?.userId || "";
 
@@ -1670,8 +1550,8 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
   }
 
   function athenaRequest() {
-    if (!guidedFilters || !pull?.columns?.length) return null;
-    const predicates = buildKalshiHistoricalFilterPredicates(pull.columns, attributeFilters);
+    if (!guidedFilters || !join || !pull?.columns?.length) return null;
+    const predicates = buildAttributePredicates(pull.columns, attributeFilters);
     const columnIds = pull.columns.filter((column) => !hidden.has(column.id)).map((column) => column.id);
     const requested = Number(rowLimit);
     const caps = [];
@@ -1684,7 +1564,7 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
       columnIds,
       limit: caps.length ? Math.min(...caps) : undefined,
     };
-    return polymarketHistorical ? buildPolymarketHistoricalRequest(request) : buildKalshiHistoricalRequest(request);
+    return join.buildRequest(request);
   }
 
   function querySnapshot() {
@@ -1767,7 +1647,7 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
     setJoinPlacement("");
     setMetadataTab("trades");
     setMarketColumnHidden(
-      defaultMarketColumnHidden(polymarketHistorical ? polymarketHistoricalColumnList("markets") : kalshiHistoricalMarketColumnList()),
+      defaultMarketColumnHidden(join?.marketColumns?.() || []),
     );
     setJoinTab("markets");
     setFunctionItems([createFunctionItem()]);
@@ -1843,16 +1723,13 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
 
   const canProceed = Boolean(pull) && !loading && !error && shownColumns.length > 0;
   const joinOn = step === "enrich" && enrichPicks.has("join");
-  const joinCommitted = marketsQuery && joinOn && joinTarget === joinTradesTarget;
-  const marketColumnList = useMemo(
-    () => (polymarketHistorical ? polymarketHistoricalColumnList("markets") : kalshiHistoricalMarketColumnList()),
-    [polymarketHistorical],
-  );
+  const joinCommitted = marketsQuery && joinOn && Boolean(join) && joinTarget === joinTradesTarget;
+  const marketColumnList = useMemo(() => join?.marketColumns?.() || [], [join]);
   const selectedMarketColumns = useMemo(
     () => marketColumnList.filter((column) => !marketColumnHidden.has(column.id)),
     [marketColumnList, marketColumnHidden],
   );
-  const tradesJoinPicked = tradesQuery && joinOn && joinTarget === joinMarketsTarget;
+  const tradesJoinPicked = tradesQuery && joinOn && Boolean(join) && joinTarget === joinMarketsTarget;
   const tradesJoinReady = tradesJoinPicked && Boolean(joinPlacement) && selectedMarketColumns.length > 0;
   const historicalEnrich = marketsQuery || tradesQuery;
   const showSampleExplainer = historicalEnrich && step === "enrich" && hoverSample && !enrichPicks.has("sample");
@@ -1898,17 +1775,10 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
   const functionActive = liveFunctions.length > 0;
   const sheetTitle = tableId === "markets" ? "Markets" : tableId === "trades" ? "Trades" : tables[tableId]?.label || "This sheet";
   const metadataRows = useMemo(() => {
-    if (polymarketHistorical) return orderPolymarketMarkets(marketPreview.rows, filteredRows);
-    const tickers = [];
-    const seen = new Set();
-    for (const row of filteredRows) {
-      const ticker = String(row?.ticker || "").trim();
-      if (!ticker || seen.has(ticker)) continue;
-      seen.add(ticker);
-      tickers.push(ticker);
-    }
-    return orderMarketsByTickers(marketPreview.rows, tickers);
-  }, [filteredRows, marketPreview.rows, polymarketHistorical]);
+    if (!join) return marketPreview.rows || [];
+    const tickers = filteredRows.map((row) => join.marketKey(row)).filter(Boolean);
+    return join.orderMarkets(marketPreview.rows, filteredRows, tickers);
+  }, [filteredRows, join, marketPreview.rows]);
   const tradeJoinBase = useMemo(() => {
     if (
       !(
@@ -1926,7 +1796,7 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
       filteredRows,
       selectedMarketColumns,
       marketPreview.rows,
-      polymarketHistorical ? matchPolymarketTrade : undefined,
+      join?.matchTrade,
     );
   }, [
     tradesQuery,
@@ -2396,19 +2266,6 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
     };
   };
 
-  function tickersFromRows(rows, cap) {
-    const seen = new Set();
-    const tickers = [];
-    for (const row of rows || []) {
-      const ticker = String(row?.ticker || "").trim();
-      if (!ticker || seen.has(ticker)) continue;
-      seen.add(ticker);
-      tickers.push(ticker);
-      if (tickers.length >= cap) break;
-    }
-    return tickers;
-  }
-
   function marketsRequestForRun() {
     let request = lockedQuery?.athena || athenaRequest();
     if (enrichPicks.has("sample") && sampleSizeNumber > 0 && !sampleSizeError) {
@@ -2419,7 +2276,7 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
       });
     }
     if (!request?.compose?.select || !joinCommitted) return request;
-    const needed = polymarketHistorical ? ["condition_id", "clob_token_ids"] : ["ticker"];
+    const needed = join?.ensureColumns || ["ticker"];
     const select = request.compose.select;
     const missing = needed.filter((id) => !select.some((entry) => entry.column === id || entry.alias === id));
     if (!missing.length) return request;
@@ -2433,20 +2290,8 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
   }
 
   function joinMarketsFromRows(rows, cap) {
-    if (!polymarketHistorical) {
-      return tickersFromRows(rows, cap).map((ticker) => ({ ticker, label: ticker, tokens: [] }));
-    }
-    const seen = new Set();
-    const list = [];
-    for (const row of rows || []) {
-      const ticker = polymarketMarketKey(row);
-      const tokens = polymarketTokenIds(row?.clob_token_ids);
-      if (!ticker || !tokens.length || seen.has(ticker)) continue;
-      seen.add(ticker);
-      list.push({ ticker, label: polymarketMarketLabel(row), tokens });
-      if (list.length >= cap) break;
-    }
-    return list;
+    if (!join) return [];
+    return join.marketsFromRows(rows, cap);
   }
 
   function openPullTab() {
@@ -2549,19 +2394,17 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
     let primaryRows = marketRows;
     let metadataSheet = null;
     let joinedTickers = [];
-    if (tradesJoinReady) {
+    let joinedMarketRequest = null;
+    if (tradesJoinReady && join) {
       reporter.start("join-markets");
       let joinedMarketRows = marketPreview.status === "ready" ? marketPreview.rows : [];
       const marketTable = `${lakeId}.markets`;
       try {
-        const result = polymarketHistorical
-          ? await loadPolymarketHistoricalMarketsForTokens(marketRows.flatMap((row) => polymarketTradeTokens(row)), {
-              onPhase: (info) => reporter.note("join-markets", describeComposePhase(info, { table: marketTable })),
-            })
-          : await loadKalshiHistoricalMarketsForTickers(tickersFromRows(marketRows, Number.MAX_SAFE_INTEGER), {
-              onPhase: (info) => reporter.note("join-markets", describeComposePhase(info, { table: marketTable })),
-            });
+        const result = await join.loadMarkets(marketRows, {
+          onPhase: (info) => reporter.note("join-markets", describeComposePhase(info, { table: marketTable })),
+        });
         if (Array.isArray(result.rows)) joinedMarketRows = result.rows;
+        if (result.request) joinedMarketRequest = result.request;
         reporter.succeed("join-markets", { result: `${joinedMarketRows.length.toLocaleString()} markets from ${marketTable}` });
       } catch (err) {
         joinedMarketRows = marketPreview.status === "ready" ? marketPreview.rows : [];
@@ -2569,16 +2412,14 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
           result: `${joinedMarketRows.length.toLocaleString()} markets already loaded. ${err instanceof Error ? err.message : ""}`.trim(),
         });
       }
-      joinedTickers = polymarketHistorical
-        ? joinedMarketRows.map((row) => polymarketMarketKey(row)).filter(Boolean)
-        : tickersFromRows(marketRows, Number.MAX_SAFE_INTEGER);
+      joinedTickers = joinedMarketRows.map((row) => join.marketKey(row)).filter(Boolean);
       if (joinPlacement === "merge") {
         const merged = attachMarketMetadata(
           shownColumns,
           marketRows,
           selectedMarketColumns,
           joinedMarketRows,
-          polymarketHistorical ? matchPolymarketTrade : undefined,
+          join?.matchTrade,
         );
         primaryColumns = merged.columns;
         primaryRows = merged.rows;
@@ -2587,10 +2428,12 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
           id: "run-market-metadata",
           title: "Markets",
           columns: selectedMarketColumns,
-          rows: polymarketHistorical ? orderPolymarketMarkets(joinedMarketRows, marketRows) : orderMarketsByTickers(joinedMarketRows, joinedTickers),
+          rows: join.orderMarkets(joinedMarketRows, marketRows, joinedTickers),
           span: "full",
           table: "markets",
-          summary: `${venueLabel} · markets · joined by ${polymarketHistorical ? "outcome token" : "ticker"}`,
+          summary: `${venueLabel} · markets · joined by ${join.matchNoun}`,
+          composeRequest: joinedMarketRequest,
+          joinMeta: { match: join.match, role: "markets" },
         };
       }
     }
@@ -2613,6 +2456,12 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
         span: "full",
         table: tableId || "markets",
         summary: lockedQuery?.label || describeSearch(),
+        composeRequest: marketsRequest,
+        attributeLines: (pull?.columns || []).flatMap((column) => {
+          const summary = attributeSummary(column, attributeFilters);
+          return summary ? [`${column.title} ${summary}`] : [];
+        }),
+        sortLine: sortSummary(pull?.columns || [], sortKeys),
       });
     }
     if (metadataSheet?.columns?.length) sheets.push(metadataSheet);
@@ -2642,6 +2491,7 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
           span: sheets.length ? "half" : "full",
           table: "buckets",
           summary: title,
+          enrichment: { operation: "bucket", detail: { column: title } },
         });
       });
       reporter.succeed("buckets", {
@@ -2692,6 +2542,7 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
         span: sheets.length ? "half" : "full",
         table: "summary",
         summary: "Summary",
+        enrichment: { operation: "summary" },
       });
       reporter.succeed("summary", { result: `Summary over ${runMarkets.rows.length.toLocaleString()} rows` });
     }
@@ -2721,15 +2572,13 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
               status: "running",
               result: describeComposePhase(info, { table: `${tradeTable} · ${childName}`, limit: sheetCap }),
             });
-          const result = polymarketHistorical
-            ? await loadPolymarketHistoricalTradesForTokens(market.tokens, sheetCap, { onPhase })
-            : await loadKalshiHistoricalTradesForTicker(market.ticker, sheetCap, { onPhase });
+          const result = await join.loadTrades(market, sheetCap, { onPhase });
           const rows = result.rows || [];
           reporter.patchChild("join-trades", market.ticker, {
             status: "success",
             result: `${rows.length.toLocaleString()} rows`,
           });
-          return { ...market, columns: result.columns?.length ? result.columns : tradePreview.columns, rows };
+          return { ...market, columns: result.columns?.length ? result.columns : tradePreview.columns, rows, request: result.request };
         } catch (err) {
           reporter.patchChild("join-trades", market.ticker, {
             status: "error",
@@ -2761,6 +2610,7 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
           span: "half",
           table: "trades",
           summary: `${venueLabel} · trades · ${item.label || item.ticker}`,
+          composeRequest: item.request,
         });
       });
       const tradeSheets = sheets.filter((sheet) => sheet.table === "trades").length;
@@ -2782,6 +2632,7 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
         span: sheets.some((sheet) => sheet.span !== "full") || sheets.length ? "half" : "full",
         table: tableId || "markets",
         summary: entry.item.formula.trim() ? `Function · ${entry.item.formula.trim()}` : "Function column",
+        enrichment: { operation: "function", detail: entry.item.formula.trim() ? { formula: entry.item.formula.trim() } : {} },
       });
     });
     if (enrichPicks.has("function")) {
@@ -2798,7 +2649,8 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
 
     reporter.start("place");
     const placement = placementRef.current;
-    canvas?.placeIntegrationSheets?.(sheets, {
+    const placedSheets = stampRunSheets(sheets, { integrationId });
+    canvas?.placeIntegrationSheets?.(placedSheets, {
       pageId: placement.pageId || undefined,
       append: placement.append,
     });
@@ -2817,36 +2669,32 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
           }
         : null;
     canvas?.registerTables?.(
-      sheets.map((sheet) => ({
-        id: sheet.id,
-        title: sheet.title,
-        kind: "query",
-        columns: (sheet.columns || []).map((column) => ({
-          id: column.id,
-          title: column.title,
-          type: column.type,
-          ...(column.scale ? { scale: column.scale } : {}),
-        })),
-        rows: sheet.rows || [],
-        rowCount: sheet.rowCount || (sheet.rows || []).length,
-        query: sheet.pull
-          ? {
-              summary: sheet.summary,
-              integrationId,
-              tableId: "trades",
-              formula: functionActive ? functionFormula : "",
-              join: joinRecord,
-              pull: sheet.pull,
-            }
-          : {
-              summary: sheet.summary,
-              integrationId,
-              tableId: sheet.table,
-              formula: functionActive ? functionFormula : "",
-              join: joinRecord,
-              athena: lockedQuery?.athena || athenaRequest(),
-            },
-      })),
+      placedSheets.map((sheet) => {
+        const athena = sheet.composeRequest || (!sheet.pull ? lockedQuery?.athena || athenaRequest() : null);
+        return {
+          id: sheet.id,
+          title: sheet.title,
+          kind: "query",
+          columns: (sheet.columns || []).map((column) => ({
+            id: column.id,
+            title: column.title,
+            type: column.type,
+            ...(column.scale ? { scale: column.scale } : {}),
+          })),
+          rows: sheet.rows || [],
+          rowCount: sheet.rowCount || (sheet.rows || []).length,
+          query: {
+            summary: sheet.summary,
+            integrationId,
+            tableId: sheet.pull ? "trades" : sheet.table,
+            formula: functionActive ? functionFormula : "",
+            join: joinRecord,
+            ...(sheet.pull ? { pull: sheet.pull } : {}),
+            ...(athena ? { athena } : {}),
+            ...(sheet.provenance ? { provenance: sheet.provenance } : {}),
+          },
+        };
+      }),
     );
     const historyId = `run-${Date.now().toString(36)}`;
     const pullEntry = {
@@ -2856,11 +2704,11 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
       fingerprint: lockedQuery?.fingerprint || "",
       integrationId,
       tableId,
-      sheets: sheets.map((sheet) => ({
+      sheets: placedSheets.map((sheet) => ({
         id: sheet.id,
         title: sheet.title,
         table: sheet.table,
-        rowCount: sheet.rows.length,
+        rowCount: sheet.rowCount || sheet.rows.length,
         summary: sheet.summary,
       })),
       athena: lockedQuery?.athena || athenaRequest(),
@@ -2880,30 +2728,29 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
     if (accountId) saveWorkspaceQuery("pull", pullEntry);
     ctx?.setDataSheets?.((prev) => {
       const next = { ...(prev || {}) };
-      for (const sheet of sheets) {
+      for (const sheet of placedSheets) {
+        const card = requestCardForSheet(sheet, historyId);
+        const lakeBacked = sheet.provenance?.kind === "compose";
         next[sheet.id] = {
           name: sheet.title,
           data: sheetRecords(sheet.columns, sheet.rows),
-          storageMode: "inline",
-          provenance: { lake: "kalshi", table: sheet.table, querySummary: sheet.summary },
-          requestCards: [
-            {
-              id: `${historyId}:${sheet.id}`,
-              lake: "kalshi",
-              table: sheet.table,
-              querySummary: sheet.summary,
-            },
-          ],
+          storageMode: lakeBacked ? "provenance" : "inline",
+          previewRowCount: (sheet.rows || []).length,
+          rowCount: sheet.rowCount || (sheet.rows || []).length,
+          fullRowCount: sheet.rowCount || (sheet.rows || []).length,
+          rehydrationStatus: lakeBacked ? "pending" : "complete",
+          provenance: sheet.provenance,
+          requestCards: card ? [card] : [],
         };
       }
       return next;
     });
     reporter.succeed("place", {
       result: placement.pageId
-        ? `${sheets.length.toLocaleString()} ${sheets.length === 1 ? "sheet" : "sheets"} on a new tab`
+        ? `${placedSheets.length.toLocaleString()} ${placedSheets.length === 1 ? "sheet" : "sheets"} on a new tab`
         : placement.append
-          ? `${sheets.length.toLocaleString()} ${sheets.length === 1 ? "sheet" : "sheets"} added on this tab`
-          : `${sheets.length.toLocaleString()} ${sheets.length === 1 ? "sheet" : "sheets"} on this tab`,
+          ? `${placedSheets.length.toLocaleString()} ${placedSheets.length === 1 ? "sheet" : "sheets"} added on this tab`
+          : `${placedSheets.length.toLocaleString()} ${placedSheets.length === 1 ? "sheet" : "sheets"} on this tab`,
     });
     reporter.finish();
     } catch (err) {
@@ -3447,7 +3294,7 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
               </AccordionContent>
             </AccordionItem>
             {guidedFilters ? (
-              <KalshiHistoricalAttributeFilters
+              <AttributeFilters
                 columns={pull?.columns || []}
                 filters={attributeFilters}
                 onChange={setAttributeFilters}

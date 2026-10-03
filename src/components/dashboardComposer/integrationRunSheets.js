@@ -76,7 +76,9 @@ export function layoutRunSheets(sheets, { originY = 88 } = {}) {
       width: columnWidth(column),
     }));
     const cells = {};
-    (sheet.rows || []).forEach((row, rowIndex) => {
+    const previewRows = (sheet.rows || []).slice(0, 50);
+    const rowCount = Math.max(previewRows.length, Math.floor(Number(sheet.rowCount) || 0), (sheet.rows || []).length);
+    previewRows.forEach((row, rowIndex) => {
       (sheet.columns || []).forEach((column, columnIndex) => {
         const text = displayCell(row?.[column.id], column);
         if (text) cells[`${columnIndex},${rowIndex}`] = text;
@@ -98,8 +100,9 @@ export function layoutRunSheets(sheets, { originY = 88 } = {}) {
       title: sheet.title || "Sheet",
       columns,
       cells,
-      ...(sheet.rowCount ? { rowCount: sheet.rowCount } : {}),
+      ...(rowCount ? { rowCount } : {}),
       ...(sheet.pull ? { pull: sheet.pull } : {}),
+      ...(sheet.provenance ? { provenance: sheet.provenance } : {}),
     };
     blocks.push(block);
     if (full) y += fullH + gap;

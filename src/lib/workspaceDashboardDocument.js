@@ -91,6 +91,48 @@ function tradeTickerFromTitle(title) {
   return match ? match[1].trim() : "";
 }
 
+function cleanProvenance(value) {
+  if (!value || typeof value !== "object") return null;
+  const kind = cleanText(value.kind, 40);
+  if (kind !== "compose" && kind !== "enrichment") return null;
+  const lake = cleanText(value.lake, 40);
+  const table = cleanText(value.table, 40);
+  const summary = cleanText(value.summary, 300);
+  const integrationId = cleanText(value.integrationId, 80);
+  const operation = cleanText(value.operation, 40);
+  const parentSheetId = cleanText(value.parentSheetId, 80);
+  const sortLine = cleanText(value.sortLine, 200);
+  const limit = Math.floor(num(value.composeAthenaRowLimit, 0));
+  const attributeLines = Array.isArray(value.attributeLines)
+    ? value.attributeLines.slice(0, 24).map((line) => cleanText(line, 200)).filter(Boolean)
+    : [];
+  const join = value.join && typeof value.join === "object"
+    ? {
+        match: cleanText(value.join.match, 40),
+        ...(value.join.role ? { role: cleanText(value.join.role, 40) } : {}),
+        ...(value.join.key ? { key: cleanText(value.join.key, 160) } : {}),
+      }
+    : null;
+  return {
+    kind,
+    ...(lake ? { lake } : {}),
+    ...(table ? { table } : {}),
+    ...(value.composeSpec && typeof value.composeSpec === "object" ? { composeSpec: value.composeSpec } : {}),
+    ...(value.composeFilters && typeof value.composeFilters === "object" ? { composeFilters: value.composeFilters } : {}),
+    ...(limit > 0 ? { composeAthenaRowLimit: Math.min(limit, MAX_SAVED_ROWS) } : {}),
+    serverSheetJoins: Array.isArray(value.serverSheetJoins) ? value.serverSheetJoins.slice(0, 40) : [],
+    browserSheetJoins: Array.isArray(value.browserSheetJoins) ? value.browserSheetJoins.slice(0, 40) : [],
+    ...(summary ? { summary } : {}),
+    ...(integrationId ? { integrationId } : {}),
+    ...(operation ? { operation } : {}),
+    ...(parentSheetId ? { parentSheetId } : {}),
+    ...(sortLine ? { sortLine } : {}),
+    ...(attributeLines.length ? { attributeLines } : {}),
+    ...(join && join.match ? { join } : {}),
+    ...(value.detail && typeof value.detail === "object" ? { detail: value.detail } : {}),
+  };
+}
+
 function cleanBlock(block) {
   if (!block || typeof block !== "object") return null;
   const id = cleanText(block.id, 80);
@@ -104,8 +146,10 @@ function cleanBlock(block) {
   const title = cleanText(block.title, 200);
   const type = cleanText(block.type || "sheet", 20) || "sheet";
   const chart = type === "chart" ? cleanChartSnapshot(block.chart) : null;
+  const provenance = cleanProvenance(block.provenance);
+  const ticker = tradeTickerFromTitle(title);
   const pull = type === "sheet"
-    ? cleanPull(block.pull) || (tradeTickerFromTitle(title) ? { lake: "kalshi", table: "trades", ticker: tradeTickerFromTitle(title) } : null)
+    ? cleanPull(block.pull) || (ticker ? { lake: provenance?.lake || "kalshi", table: provenance?.table || "trades", ticker } : null)
     : null;
   const rowCount = Math.floor(num(block.rowCount, 0));
   return {
@@ -123,6 +167,7 @@ function cleanBlock(block) {
     cells: cleanCells(block.cells),
     ...(rowCount > 0 ? { rowCount } : {}),
     ...(pull ? { pull } : {}),
+    ...(provenance ? { provenance } : {}),
     ...(chart ? { chart } : {}),
   };
 }
@@ -142,7 +187,8 @@ function cleanTable(table) {
   const title = cleanText(table.title, 200);
   const ticker = tradeTickerFromTitle(title);
   const storedRows = Array.isArray(table.rows) ? table.rows : [];
-  const rowCap = ticker ? 50 : MAX_SAVED_ROWS;
+  const recipe = table.query?.provenance?.kind === "compose" || table.provenance?.kind === "compose";
+  const rowCap = ticker || recipe ? 50 : MAX_SAVED_ROWS;
   const rows = storedRows.slice(0, rowCap);
   const rowCount = Math.max(rows.length, Math.floor(num(table.rowCount, 0)));
   const query = cleanQuery(table.query, title, rowCount);
@@ -174,20 +220,28 @@ function cleanQuery(query, title, rowCount) {
     formula: cleanText(source.formula, 500),
     ...(join ? { join } : {}),
   };
+  const provenance = cleanProvenance(source.provenance);
   if (ticker) {
-    const limit = Math.floor(num(source.pull?.limit || source.limit, 0));
+    const limit = Math.floor(num(source.pull?.limit || source.limit || provenance?.composeAthenaRowLimit, 0));
+    const lake = cleanText(source.pull?.lake || source.athena?.lake || provenance?.lake, 40) || "kalshi";
+    const table = cleanText(source.pull?.table || provenance?.table, 40) || "trades";
     return {
       ...base,
       pull: {
-        lake: "kalshi",
-        table: "trades",
+        lake,
+        table,
         ticker,
         ...(limit > 0 ? { limit: Math.min(limit, MAX_SAVED_ROWS) } : {}),
       },
+      ...(source.athena && typeof source.athena === "object" ? { athena: source.athena } : {}),
+      ...(provenance ? { provenance } : {}),
       ...(rowCount > 0 ? { rowCount } : {}),
     };
   }
-  if (source.athena && typeof source.athena === "object") return { ...base, athena: source.athena };
+  if (source.athena && typeof source.athena === "object") {
+    return { ...base, athena: source.athena, ...(provenance ? { provenance } : {}) };
+  }
+  if (provenance) return { ...base, provenance };
   return base.summary || base.integrationId ? base : null;
 }
 

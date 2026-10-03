@@ -14,6 +14,7 @@ import {
   fetchAthenaQueryResultRows,
 } from "@/lib/dataLake/runAthenaSelect";
 import { finalizeRehydrateSheetResult } from "@/lib/dataLake/rehydrateSheetFinalize";
+import { readRecipeCache, recipeCacheable, recipeCacheKey, writeRecipeCache } from "@/lib/dataLake/recipeResultCache";
 export {
   buildRehydrateSheetRequestBody,
   resolvePreviewRowCountForRehydrate,
@@ -369,6 +370,18 @@ export async function runRehydrateSheetCore(body, access, opts = {}) {
     Math.min(Math.max(5000, parseInt(process.env.DATA_LAKE_ATHENA_MAX_WAIT_MS || "45000", 10) || 45000), 120000);
 
   const hasServerDeps = Array.isArray(provenance.serverSheetJoins) && provenance.serverSheetJoins.length > 0;
+  const cacheBody = {
+    lake: provenance.lake,
+    table: provenance.table,
+    queryType: "compose",
+    limit,
+    compose: provenance.composeSpec || {},
+    filters: provenance.composeFilters || null,
+    caseSensitive: true,
+  };
+  const cacheKey = !hasServerDeps && recipeCacheable(cacheBody) ? recipeCacheKey(cacheBody) : "";
+  const cached = readRecipeCache(cacheKey);
+  if (cached) return cached;
   const result = hasServerDeps
     ? await runComposeWithSheetGraph({ provenance, body, access, limit, maxWaitMs })
     : await (async () => {
@@ -402,5 +415,7 @@ export async function runRehydrateSheetCore(body, access, opts = {}) {
         });
       })();
 
-  return finalizeRehydrateSheetResult(body, result, limit);
+  const finished = finalizeRehydrateSheetResult(body, result, limit);
+  if (cacheKey) writeRecipeCache(cacheKey, finished);
+  return finished;
 }

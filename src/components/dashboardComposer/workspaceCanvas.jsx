@@ -545,6 +545,7 @@ export function WorkspaceCanvasProvider({ pageId, readOnly = false, children }) 
       previewActiveId,
       blocks,
       blocksByPage,
+      tables,
       selectedId,
       setSelectedId,
       focusBlock,
@@ -561,7 +562,7 @@ export function WorkspaceCanvasProvider({ pageId, readOnly = false, children }) 
       removeBlock,
       createChartFromBlock,
     }),
-    [addBlock, blocks, blocksByPage, createChartFromBlock, dashboardName, dismissRun, duplicateBlock, focusBlock, pageId, placeIntegrationSheets, previewActiveId, previewTabs, readOnly, ready, registerTables, removeBlock, renameDashboard, renameId, reportRun, runFeed, saveNow, selectedId, tool, updateBlock],
+    [addBlock, blocks, blocksByPage, createChartFromBlock, dashboardName, dismissRun, duplicateBlock, focusBlock, pageId, placeIntegrationSheets, previewActiveId, previewTabs, readOnly, ready, registerTables, removeBlock, renameDashboard, renameId, reportRun, runFeed, saveNow, selectedId, tables, tool, updateBlock],
   );
 
   return <WorkspaceCanvasContext.Provider value={value}>{children}</WorkspaceCanvasContext.Provider>;

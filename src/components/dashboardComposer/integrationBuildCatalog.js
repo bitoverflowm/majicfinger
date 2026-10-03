@@ -59,6 +59,15 @@ export const BUILD_SOURCES = {
   kalshiHistorical: {
     name: "Kalshi Historical",
     defaultTable: "markets",
+    flow: {
+      lakeId: "kalshi",
+      venue: "kalshi",
+      historical: true,
+      guidedTables: ["markets", "trades"],
+      priceScale: "cents",
+      priceColumns: ["last_price", "yes_bid", "yes_price", "no_price"],
+      join: "ticker",
+    },
     tables: {
       markets: {
         label: "Markets search",
@@ -92,6 +101,15 @@ export const BUILD_SOURCES = {
   polymarketHistorical: {
     name: "Polymarket Historical",
     defaultTable: "markets",
+    flow: {
+      lakeId: "polymarket",
+      venue: "polymarket",
+      historical: true,
+      guidedTables: ["markets", "trades", "blocks"],
+      priceScale: "decimal",
+      priceColumns: [],
+      join: "outcomeToken",
+    },
     tables: {
       markets: {
         label: "Markets search",
@@ -619,6 +637,7 @@ export function loadKalshiHistoricalTradesForTicker(ticker, limit = PREVIEW_ROW_
   return fetchAthenaLakeSample(request, { maxWaitMs, pollIntervalMs: 800, onPhase: options.onPhase }).then((result) => ({
     columns,
     rows: rowsFromAthenaCells(result, rowLimit),
+    request,
   }));
 }
 
@@ -670,7 +689,25 @@ export async function loadKalshiHistoricalMarketsForTickers(tickers, options = {
       rows.push(row);
     }
   }
-  return { columns, rows };
+  return {
+    columns,
+    rows,
+    request: {
+      lake: "kalshi",
+      table: "markets",
+      queryType: "compose",
+      limit: unique.length,
+      caseSensitive: false,
+      filters: {
+        and: [{ column: "ticker", kind: "string", op: "in", value: unique.map((ticker) => `"${ticker.replace(/"/g, "")}"`).join(", ") }],
+      },
+      compose: {
+        select: columns.map((entry) => ({ column: entry.id, alias: entry.id })),
+        groupByAliases: [],
+        orderBy: [{ alias: "volume", direction: "desc" }],
+      },
+    },
+  };
 }
 
 /** Run a locked compose request. Preview stays on its own 50-row fetch. */
@@ -744,6 +781,7 @@ export function loadPolymarketHistoricalTradesForTokens(tokens, limit = PREVIEW_
   return fetchAthenaLakeSample(request, { maxWaitMs, pollIntervalMs: 800, onPhase: options.onPhase }).then((result) => ({
     columns,
     rows: rowsFromAthenaCells(result, rowLimit),
+    request,
   }));
 }
 
@@ -794,7 +832,25 @@ export async function loadPolymarketHistoricalMarketsForTokens(tokens, options =
       rows.push(row);
     }
   }
-  return { columns, rows };
+  return {
+    columns,
+    rows,
+    request: {
+      lake: "polymarket",
+      table: "markets",
+      queryType: "compose",
+      limit: Math.max(unique.length, 25),
+      caseSensitive: false,
+      filters: {
+        or: unique.map((token) => ({ column: "clob_token_ids", kind: "string", op: "contains", value: token })),
+      },
+      compose: {
+        select: columns.map((entry) => ({ column: entry.id, alias: entry.id })),
+        groupByAliases: [],
+        orderBy: [{ alias: "volume", direction: "desc" }],
+      },
+    },
+  };
 }
 
 export function loadKalshiHistoricalPreview(table, predicates, sortKeys) {

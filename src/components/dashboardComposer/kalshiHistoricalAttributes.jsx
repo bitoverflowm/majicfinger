@@ -61,7 +61,7 @@ const BOOLEAN_OPTIONS = [
 export function kalshiHistoricalAttributeSpec(column) {
   if (ENUM_OPTIONS[column?.id]) return { kind: "enum", options: ENUM_OPTIONS[column.id] };
   if (column?.type === "boolean") return { kind: "boolean", options: BOOLEAN_OPTIONS };
-  if (column?.type === "number") return { kind: "number", cents: CENTS_COLUMNS.has(column.id) };
+  if (column?.type === "number") return { kind: "number", cents: column.scale === "cents" || CENTS_COLUMNS.has(column.id) };
   if (column?.type === "date") return { kind: "date", epoch: column.dateEpoch || "ns" };
   return { kind: "text" };
 }

@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { BarChart3, Check, ChevronDown, ChevronRight, Database, Play, RotateCw, Save, Square, Table2, Type } from "lucide-react";
+import { ProvenanceMapButton } from "@/components/dashboardComposer/provenanceMap";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -467,6 +468,7 @@ function RightChromeControls({ onLogout, expanded }) {
         </Button>
       )}
       <SaveDashboardButton />
+      <ProvenanceMapButton />
       <PreviewDashboardButton />
       <AnimatedThemeToggler className="inline-flex size-7 items-center justify-center rounded-md text-neutral-700 hover:bg-black/[0.05] dark:text-neutral-200 dark:hover:bg-white/10 [&_svg]:size-4" />
       <LiveTransportControls />

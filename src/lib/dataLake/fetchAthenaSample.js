@@ -20,6 +20,7 @@ import { pollAthenaQueryUntilDone } from "@/lib/dataLake/pollAthenaQueryStatus";
 import {
   LARGE_ATHENA_PULL_THRESHOLD,
 } from "@/lib/dataLake/largeAthenaPull";
+import { readRecipeCache, recipeCacheable, recipeCacheKey, writeRecipeCache } from "@/lib/dataLake/recipeResultCache";
 
 export async function fetchAthenaLakeSample(
   {
@@ -40,6 +41,20 @@ export async function fetchAthenaLakeSample(
   pollOpts = {},
 ) {
   const { signal, pollIntervalMs = 900, maxWaitMs = 180000, onPhase: userOnPhase } = pollOpts;
+  const cacheBody = {
+    lake,
+    table,
+    queryType,
+    limit,
+    columns,
+    compose,
+    filters,
+    caseSensitive,
+    demo,
+  };
+  const cacheKey = recipeCacheable(cacheBody) ? recipeCacheKey(cacheBody) : "";
+  const cached = readRecipeCache(cacheKey);
+  if (cached) return cached;
 
   const isCompose = queryType === "compose";
   let lim;
@@ -110,10 +125,12 @@ export async function fetchAthenaLakeSample(
     },
   });
 
-  return {
+  const payload = {
     ...result,
     sql: startJson.sql || undefined,
     primaryJoinExpanded: startJson.primaryJoinExpanded === true,
     expandedJoinRowCap: startJson.expandedJoinRowCap ?? null,
   };
+  if (cacheKey) writeRecipeCache(cacheKey, payload);
+  return payload;
 }
