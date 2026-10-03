@@ -21,13 +21,13 @@ import { PricingSection } from "@/components/sections/pricing-section";
 import EasyLychee from "@/components/easyLychee";
 import { Separator } from "@/components/ui/separator";
 import { ProfilePictureUploader } from "@/components/profile/ProfilePictureUploader";
-import CheckoutWelcome, { takeCheckoutWelcome, workspaceWelcomePending, WorkspaceStartTabs } from "@/components/checkout/CheckoutWelcome";
+import CheckoutWelcome, { takeCheckoutWelcome, workspaceWelcomePending } from "@/components/checkout/CheckoutWelcome";
 import { loadWorkspaceStartTabs } from "@/lib/workspaceStartTabs";
 import { membershipTierLabel } from "@/lib/membershipLabel";
 
 import { WorkspaceComposerDockProvider } from "@/components/dashboardComposer/workspaceComposerDock";
 import { WorkspaceCanvas } from "@/components/dashboardComposer/workspaceCanvas";
-import { BlankDashboardEmpty } from "@/components/dashboardComposer/blankDashboardEmpty";
+import { WorkspaceWelcomeLayer } from "@/components/dashboardComposer/blankDashboardEmpty";
 import { cn } from "@/lib/utils";
 
 import { debounce } from "@/lib/debounce";
@@ -415,22 +415,10 @@ const DashBody = ({ user }) => {
         <div className="relative z-0 flex min-h-0 min-w-0 flex-1 flex-col py-1">
                 <WorkspaceCanvas />
                 {entryReady && (viewing === "welcome" || viewing === "connectDataHome") && (
-                  <div
-                    className={cn(
-                      "flex min-h-0 -my-1 flex-col bg-background",
-                      navChromeExpanded ? "h-svh" : "h-[calc(100svh-3.5rem)]",
-                    )}
-                  >
-                    <WorkspaceStartTabs
-                      welcomeActive={viewing === "welcome"}
-                      onOpenWelcome={() => setViewing?.("welcome")}
-                    />
-                    {viewing === "welcome" &&
-                    (contextStateV2?.workspaceStartTabs || []).find(
-                      (tab) => tab.id === contextStateV2?.activeWorkspaceStartTabId,
-                    )?.blank ? (
-                      <BlankDashboardEmpty />
-                    ) : viewing === "welcome" ? (
+                  <WorkspaceWelcomeLayer
+                    viewing={viewing}
+                    navChromeExpanded={navChromeExpanded}
+                    checkout={
                       <CheckoutWelcome
                         name={user?.name}
                         celebrate={celebrateCheckout}
@@ -444,7 +432,8 @@ const DashBody = ({ user }) => {
                           })
                         }
                       />
-                    ) : (
+                    }
+                    connectHome={
                       <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
                         <ConnectHomeShell
                           user={user}
@@ -453,8 +442,8 @@ const DashBody = ({ user }) => {
                           setStartNew={setStartNew}
                         />
                       </div>
-                    )}
-                  </div>
+                    }
+                  />
                 )}
                 { !isDemo && (viewing === 'dataStart' || viewing === 'charts' || viewing === 'dashboardComposer') && (
                   <div className="flex min-h-0 flex-1 flex-col overflow-hidden">

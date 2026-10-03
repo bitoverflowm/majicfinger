@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
+import { createContext, useCallback, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { BarChart3, Copy, Database, Maximize2, MoreVertical, Pencil, Table2, X } from "lucide-react";
 import {
@@ -643,8 +643,34 @@ function SheetBlockBody({ block, onChange, booting }) {
   );
 }
 
+function TextSkeleton() {
+  return (
+    <div className="flex flex-col gap-2 px-3 py-3" aria-hidden>
+      <span className="h-3 w-[72%] animate-pulse rounded bg-muted" />
+      <span className="h-3 w-[54%] animate-pulse rounded bg-muted" style={{ animationDelay: "80ms" }} />
+      <span className="h-3 w-[36%] animate-pulse rounded bg-muted" style={{ animationDelay: "160ms" }} />
+    </div>
+  );
+}
+
+function ChartSkeleton() {
+  const bars = [42, 68, 50, 84, 58, 74];
+  return (
+    <div className="mx-3 mb-3 flex min-h-16 flex-1 items-end gap-2" aria-hidden>
+      {bars.map((height, index) => (
+        <span
+          key={height}
+          className="flex-1 animate-pulse rounded-t bg-muted"
+          style={{ height: `${height}%`, animationDelay: `${index * 80}ms` }}
+        />
+      ))}
+    </div>
+  );
+}
+
 function BlockBody({ block, onChange, booting }) {
   if (block.type === "text") {
+    if (booting) return <TextSkeleton />;
     return (
       <EditableText
         value={block.body}
@@ -681,10 +707,10 @@ function BlockBody({ block, onChange, booting }) {
     );
   }
 
-  return <ChartBlockBody block={block} onChange={onChange} />;
+  return <ChartBlockBody block={block} onChange={onChange} booting={booting} />;
 }
 
-function ChartBlockBody({ block, onChange }) {
+function ChartBlockBody({ block, onChange, booting }) {
   const canvas = useWorkspaceCanvas();
   const source = block.sourceSheetId ? (canvas?.blocks || []).find((item) => item.id === block.sourceSheetId) : null;
   return (
@@ -698,7 +724,9 @@ function ChartBlockBody({ block, onChange }) {
           className="min-w-0 flex-1 text-[13px] font-semibold text-foreground"
         />
       </div>
-      {block.sourceSheetId ? (
+      {booting ? (
+        <ChartSkeleton />
+      ) : block.sourceSheetId ? (
         <SheetBlockChart
           sheet={source?.type === "sheet" ? source : null}
           snapshot={block.chart}
@@ -971,11 +999,8 @@ function CanvasBlock({ block, selected, onSelect, onChange, booting = false }) {
   );
 }
 
-function sheetsTopToBottom(blocks) {
-  return (blocks || [])
-    .filter((block) => block.type === "sheet")
-    .slice()
-    .sort((a, b) => (a.y || 0) - (b.y || 0) || (a.x || 0) - (b.x || 0));
+function blocksTopToBottom(blocks) {
+  return (blocks || []).slice().sort((a, b) => (a.y || 0) - (b.y || 0) || (a.x || 0) - (b.x || 0));
 }
 
 /** Freeform blocks for the dashboard currently on screen. */
@@ -987,9 +1012,9 @@ export function WorkspaceCanvas() {
   blocksRef.current = blocks;
   const [bootingIds, setBootingIds] = useState(() => new Set());
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (!canvas?.ready) return undefined;
-    const ids = sheetsTopToBottom(blocksRef.current).map((block) => block.id);
+    const ids = blocksTopToBottom(blocksRef.current).map((block) => block.id);
     if (!ids.length) {
       setBootingIds(new Set());
       return undefined;

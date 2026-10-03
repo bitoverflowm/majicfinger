@@ -12,6 +12,7 @@ import { connectHomeAnySheetHasData } from "@/lib/connectHomePullDestination";
 import { cn } from "@/lib/utils";
 import { useWorkspaceCanvas } from "@/components/dashboardComposer/workspaceCanvas";
 import { useIntegrationConnect } from "@/components/dashboardComposer/integrationConnectDialog";
+import { WorkspaceStartTabs } from "@/components/checkout/CheckoutWelcome";
 
 const CHART_LOCKED_TIP = "Upload or connect data before adding a chart.";
 
@@ -48,14 +49,14 @@ function ActionButton({ icon: Icon, label, onClick, filled, disabled, tip }) {
   );
 }
 
-/** Empty state for a blank dashboard tab. Hidden once the page has canvas blocks. */
+/** Empty state for a blank dashboard tab. Hidden while a saved dashboard is loading or already has blocks. */
 export function BlankDashboardEmpty() {
   const canvas = useWorkspaceCanvas();
   const connect = useIntegrationConnect();
   const ctx = useMyStateV2();
   const canChart = connectHomeAnySheetHasData(ctx?.dataSheets, ctx?.connectedData);
 
-  if ((canvas?.blocks || []).length > 0) return null;
+  if (!canvas?.ready || canvas?.runFeed || (canvas?.blocks || []).length > 0) return null;
 
   return (
     <div className="flex min-h-0 flex-1 items-center justify-center bg-background px-6 pb-24">
@@ -94,6 +95,35 @@ export function BlankDashboardEmpty() {
           </div>
         </TooltipProvider>
       </div>
+    </div>
+  );
+}
+
+/**
+ * Tab bar over the canvas. A saved dashboard stays visible while it loads.
+ * The empty card appears only after we know this tab has no blocks.
+ */
+export function WorkspaceWelcomeLayer({ viewing, navChromeExpanded, checkout, connectHome }) {
+  const canvas = useWorkspaceCanvas();
+  const ctx = useMyStateV2();
+  const active = (ctx?.workspaceStartTabs || []).find((tab) => tab.id === ctx?.activeWorkspaceStartTabId);
+  const blankTab = viewing === "welcome" && !!active?.blank;
+  const showEmpty = blankTab && !!canvas?.ready && !(canvas?.blocks || []).length && !canvas?.runFeed;
+  const cover = !blankTab || showEmpty;
+
+  return (
+    <div
+      className={cn(
+        "flex min-h-0 -my-1 flex-col",
+        cover
+          ? cn("bg-background", navChromeExpanded ? "h-svh" : "h-[calc(100svh-3.5rem)]")
+          : "pointer-events-none absolute inset-0 z-30",
+      )}
+    >
+      <div className={cover ? undefined : "pointer-events-auto"}>
+        <WorkspaceStartTabs welcomeActive={viewing === "welcome"} onOpenWelcome={() => ctx?.setViewing?.("welcome")} />
+      </div>
+      {blankTab ? showEmpty ? <BlankDashboardEmpty /> : null : viewing === "welcome" ? checkout : connectHome}
     </div>
   );
 }
