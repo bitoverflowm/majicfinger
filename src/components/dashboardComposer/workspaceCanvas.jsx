@@ -16,7 +16,7 @@ import { duplicateTabName, saveWorkspaceStartTabs } from "@/lib/workspaceStartTa
 import { DashboardSheetGrid } from "@/components/dashboardComposer/dashboardSheetGrid";
 import { SheetBlockChart } from "@/components/dashboardComposer/sheetBlockChart";
 import { layoutRunSheets } from "@/components/dashboardComposer/integrationRunSheets";
-import { packClippedBlocks, snapBlockPosition } from "@/components/dashboardComposer/clipLayout";
+import { CLIP, packClippedBlocks, snapBlockPosition } from "@/components/dashboardComposer/clipLayout";
 import { useUser } from "@/lib/hooks";
 import { getHistoricalPullRowLimit } from "@/lib/athenaEntitlement";
 import {
@@ -375,13 +375,16 @@ export function WorkspaceCanvasProvider({ pageId, readOnly = false, children }) 
   }, []);
 
   const placeIntegrationSheets = useCallback(
-    (sheets) => {
+    (sheets, options) => {
       const incoming = Array.isArray(sheets) ? sheets : [];
+      const targetId = options?.pageId || pageId;
+      const append = options?.append === true;
       setBlocksByPage((prev) => {
-        const kept = (prev[pageId] || []).filter((block) => block.source !== "integration-run");
+        const existing = prev[targetId] || [];
+        const kept = append ? existing : existing.filter((block) => block.source !== "integration-run");
         const originY = kept.reduce((max, block) => Math.max(max, (block.y || 0) + (block.h || 0) + 24), 88);
         const placed = layoutRunSheets(incoming, { originY: kept.length ? originY : 88 });
-        return { ...prev, [pageId]: [...kept, ...placed] };
+        return { ...prev, [targetId]: [...kept, ...placed] };
       });
       setSelectedId(incoming[0]?.id || null);
       setTool("select");
@@ -864,7 +867,7 @@ function CanvasBlock({ block, selected, onSelect, onChange, booting = false }) {
       }
       drag.moved = true;
       drag.nextX = Math.max(0, drag.origX + dx);
-      drag.nextY = Math.max(0, drag.origY + dy);
+      drag.nextY = Math.max(CLIP.originY, drag.origY + dy);
       onChange({
         x: drag.nextX,
         y: drag.nextY,
@@ -1089,7 +1092,7 @@ export function WorkspaceCanvas() {
 
   if (!canvas?.ready) {
     return (
-      <div className="pointer-events-none absolute inset-0 z-20 flex items-center justify-center">
+      <div className="pointer-events-none absolute inset-x-0 bottom-0 top-[var(--dashboard-tab-clearance,0px)] z-20 flex items-center justify-center">
         <SpectrumLoadingState label="Loading dashboard" />
       </div>
     );

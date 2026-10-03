@@ -407,12 +407,12 @@ const DashBody = ({ user }) => {
           <>
             <Nav />
             {!navChromeExpanded && (
-              <div className="h-14 shrink-0 bg-background" aria-hidden />
+              <div className="h-14 shrink-0" aria-hidden />
             )}
           </>
         )}
         {rightPanelOpen && <Separator className="shrink-0" />}
-        <div className="relative z-0 flex min-h-0 min-w-0 flex-1 flex-col py-1">
+        <div className="relative z-0 flex min-h-0 min-w-0 flex-1 flex-col py-1 [--dashboard-tab-clearance:2.75rem]">
                 <WorkspaceCanvas />
                 {entryReady && (viewing === "welcome" || viewing === "connectDataHome") && (
                   <WorkspaceWelcomeLayer

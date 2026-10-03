@@ -59,7 +59,7 @@ export function BlankDashboardEmpty() {
   if (!canvas?.ready || canvas?.runFeed || (canvas?.blocks || []).length > 0) return null;
 
   return (
-    <div className="flex min-h-0 flex-1 items-center justify-center bg-background px-6 pb-24">
+    <div className="pointer-events-auto flex min-h-0 flex-1 items-center justify-center px-6 pb-24">
       <div className="flex w-full max-w-xl flex-col items-center rounded-xl border border-border/70 bg-background px-8 py-10 text-center shadow-sm">
         <div className="mb-5 flex size-14 items-center justify-center rounded-full bg-muted/70 text-muted-foreground">
           <LayoutGrid className="size-6" strokeWidth={1.75} aria-hidden />
@@ -109,7 +109,7 @@ export function WorkspaceWelcomeLayer({ viewing, navChromeExpanded, checkout, co
   const active = (ctx?.workspaceStartTabs || []).find((tab) => tab.id === ctx?.activeWorkspaceStartTabId);
   const blankTab = viewing === "welcome" && !!active?.blank;
   const showEmpty = blankTab && !!canvas?.ready && !(canvas?.blocks || []).length && !canvas?.runFeed;
-  const cover = !blankTab || showEmpty;
+  const cover = !blankTab;
 
   return (
     <div

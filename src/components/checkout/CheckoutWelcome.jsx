@@ -447,7 +447,7 @@ export function WorkspaceStartTabs({ welcomeActive, onOpenWelcome }) {
     <div
       role="tablist"
       aria-label="Workspace"
-      className="relative z-30 flex shrink-0 flex-nowrap items-center gap-1.5 overflow-x-auto bg-background p-6"
+      className="relative z-30 flex h-11 shrink-0 flex-nowrap items-center gap-1.5 overflow-x-auto px-4"
     >
       {tabs.map((tab) => (
         <StartTabChip

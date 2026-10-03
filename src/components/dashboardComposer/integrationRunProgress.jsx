@@ -149,10 +149,10 @@ export function RunProgressCard({ feed, onDismiss }) {
   if (!feed?.steps?.length) return null;
   const elapsed = formatElapsed((feed.completedAt || now) - (feed.startedAt || now));
   return (
-    <div className="pointer-events-none absolute inset-0 z-30">
+    <div className="pointer-events-none absolute inset-x-0 bottom-0 top-[var(--dashboard-tab-clearance,0px)] z-30 flex items-center justify-center p-6">
       <section
         data-run-progress=""
-        className="pointer-events-auto absolute left-4 top-16 flex max-h-[min(72vh,680px)] w-[min(440px,calc(100%-2rem))] flex-col overflow-hidden rounded-xl border border-border/70 bg-background shadow-sm"
+        className="pointer-events-auto flex max-h-[min(72vh,680px)] w-[min(440px,calc(100%-2rem))] flex-col overflow-hidden rounded-xl border border-border/70 bg-background shadow-sm"
       >
         <header className="flex items-start justify-between gap-3 border-b border-border/70 px-4 py-3">
           <div className="min-w-0">

@@ -46,6 +46,8 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import { useMyStateV2 } from "@/context/stateContextV2";
+import { pageIdForTab } from "@/lib/workspaceDashboardDocument";
+import { newBlankTabName, newStartTabId, saveWorkspaceStartTabs } from "@/lib/workspaceStartTabs";
 import { getHistoricalPullRowLimit, getJoinMarketCap } from "@/lib/athenaEntitlement";
 import { evaluateColumnFormula, FORMULA_FUNCTIONS, FORMULA_REFERENCE_NOTES, formulaSuggestions } from "@/lib/columnFormula";
 import { useUser } from "@/lib/hooks";
@@ -60,8 +62,6 @@ import {
   attributeSummary,
   buildKalshiHistoricalFilterPredicates,
   KalshiHistoricalAttributeFilters,
-  rowMatchesKalshiHistoricalFilters,
-  sortKalshiHistoricalRows,
   sortSummary,
 } from "@/components/dashboardComposer/kalshiHistoricalAttributes";
 import { cn } from "@/lib/utils";
@@ -1088,6 +1088,14 @@ function formatSavedAt(savedAt) {
   return date.toLocaleString(undefined, { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
 }
 
+/** Identity of the archive preview. Empty means the first unfiltered 50. */
+function historicalPreviewRequestKey({ guidedFilters, columns, attributeFilters, sortKeys, integrationId, tableId }) {
+  if (!guidedFilters || !columns?.length) return "";
+  const predicates = buildKalshiHistoricalFilterPredicates(columns, attributeFilters);
+  if (!predicates.and.length && !predicates.or.length && !sortKeys.length) return "";
+  return JSON.stringify({ integrationId, tableId, predicates, sortKeys });
+}
+
 export function IntegrationBuildWorkspace({ integrationId, onBack }) {
   const source = BUILD_SOURCES[integrationId];
   const tables = source?.tables || {};
@@ -1134,6 +1142,8 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
   const [joinTab, setJoinTab] = useState("markets");
   const [tradePreview, setTradePreview] = useState({ status: "idle", ticker: "", columns: [], rows: [], error: "" });
   const [running, setRunning] = useState(false);
+  const [placementPrompt, setPlacementPrompt] = useState(false);
+  const placementRef = useRef({ pageId: "", append: false });
   const [hoverFunction, setHoverFunction] = useState(false);
   const [hoverSummarize, setHoverSummarize] = useState(false);
   const [hoverBucket, setHoverBucket] = useState(false);
@@ -1353,10 +1363,6 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
       : query && column?.type === "text"
         ? { column: filterColumn, value: query }
         : null;
-    if (guidedFilters && ((narrowed?.and?.length || 0) > 0 || (narrowed?.or?.length || 0) > 0)) {
-      setCounting(false);
-      return undefined;
-    }
     const known = peekBuildUniverseCount(integrationId, tableId, narrowed);
     if (typeof known === "number") {
       setUniverse(known);
@@ -1399,24 +1405,41 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
 
   const filteredRows = useMemo(() => {
     if (guidedFilters) {
-      const matched = (pull?.rows || []).filter((row) => rowMatchesKalshiHistoricalFilters(row, pull?.columns, attributeFilters));
-      const sorted = sortKalshiHistoricalRows(matched, pull?.columns, sortKeys);
+      const key = historicalPreviewRequestKey({
+        guidedFilters,
+        columns: pull?.columns,
+        attributeFilters,
+        sortKeys,
+        integrationId,
+        tableId,
+      });
+      // A changed attribute, sort, or table waits for a new archive sample.
+      // The rows already on screen are a different query.
+      const waitingOnArchive = Boolean(key) && (key !== settledPreviewKey || Boolean(previewSearchError));
+      const source = waitingOnArchive ? [] : pull?.rows || [];
       const limit = Number(rowLimit);
-      const capped = Number.isFinite(limit) && limit > 0 ? sorted.slice(0, limit) : sorted;
+      const capped = Number.isFinite(limit) && limit > 0 ? source.slice(0, limit) : source;
       return capped.slice(0, visibleCount);
     }
     const rows = (pull?.rows || []).slice(0, visibleCount);
     const query = filterValue.trim().toLowerCase();
     if (!query || !filterColumn) return rows;
     return rows.filter((row) => String(row[filterColumn] ?? "").toLowerCase().includes(query));
-  }, [pull, visibleCount, filterColumn, filterValue, guidedFilters, attributeFilters, sortKeys, rowLimit]);
+  }, [pull, visibleCount, filterColumn, filterValue, guidedFilters, attributeFilters, sortKeys, rowLimit, integrationId, tableId, settledPreviewKey, previewSearchError]);
 
   const queriedMarkets = useMemo(() => {
     if (!guidedFilters) return [];
-    const matched = (pull?.rows || []).filter((row) => rowMatchesKalshiHistoricalFilters(row, pull?.columns, attributeFilters));
-    const sorted = sortKalshiHistoricalRows(matched, pull?.columns, sortKeys);
+    const key = historicalPreviewRequestKey({
+      guidedFilters,
+      columns: pull?.columns,
+      attributeFilters,
+      sortKeys,
+      integrationId,
+      tableId,
+    });
+    if (key && (key !== settledPreviewKey || previewSearchError)) return [];
     const limit = Number(rowLimit);
-    const capped = Number.isFinite(limit) && limit > 0 ? sorted.slice(0, limit) : sorted;
+    const capped = Number.isFinite(limit) && limit > 0 ? (pull?.rows || []).slice(0, limit) : pull?.rows || [];
     const seen = new Set();
     const markets = [];
     for (const row of capped) {
@@ -1434,7 +1457,7 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
       markets.push({ ticker, title: String(row?.title || ticker), label: ticker, tokens: [] });
     }
     return markets;
-  }, [guidedFilters, pull, attributeFilters, sortKeys, rowLimit, polymarketHistorical]);
+  }, [guidedFilters, pull, attributeFilters, sortKeys, rowLimit, polymarketHistorical, integrationId, tableId, settledPreviewKey, previewSearchError]);
 
   const marketCap = getJoinMarketCap(user);
   const requestedMarketLimit = Number(rowLimit);
@@ -1533,12 +1556,18 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
     };
   }, [tradesQuery, joinTarget, joinMarketsTarget, polymarketHistorical, filteredRows]);
 
-  const previewRequestKey = useMemo(() => {
-    if (!guidedFilters || !pull?.columns?.length) return "";
-    const predicates = buildKalshiHistoricalFilterPredicates(pull.columns, attributeFilters);
-    if (!predicates.and.length && !predicates.or.length && !sortKeys.length) return "";
-    return JSON.stringify({ integrationId, tableId, predicates, sortKeys });
-  }, [guidedFilters, pull?.columns, attributeFilters, sortKeys, integrationId, tableId]);
+  const previewRequestKey = useMemo(
+    () =>
+      historicalPreviewRequestKey({
+        guidedFilters,
+        columns: pull?.columns,
+        attributeFilters,
+        sortKeys,
+        integrationId,
+        tableId,
+      }),
+    [guidedFilters, pull?.columns, attributeFilters, sortKeys, integrationId, tableId],
+  );
 
   useEffect(() => {
     if (!guidedFilters) return undefined;
@@ -2420,6 +2449,46 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
     return list;
   }
 
+  function openPullTab() {
+    const tabs = Array.isArray(ctx?.workspaceStartTabs) ? ctx.workspaceStartTabs : [];
+    const tab = {
+      id: newStartTabId(),
+      name: newBlankTabName(tabs.map((item) => item.name)),
+      blank: true,
+    };
+    const nextTabs = [...tabs, tab];
+    ctx?.setWorkspaceStartTabs?.(nextTabs);
+    ctx?.setWelcomeTabRemoved?.(!!ctx?.welcomeTabRemoved);
+    ctx?.setActiveWorkspaceStartTabId?.(tab.id);
+    ctx?.setViewing?.("welcome");
+    saveWorkspaceStartTabs(user?.userId || "local", {
+      welcomeRemoved: !!ctx?.welcomeTabRemoved,
+      tabs: nextTabs,
+      activeId: tab.id,
+    });
+    return pageIdForTab(tab.id);
+  }
+
+  function requestSaveAndRun() {
+    if (running) return;
+    if ((canvas?.blocks || []).length > 0) {
+      setPlacementPrompt(true);
+      return;
+    }
+    placementRef.current = { pageId: "", append: false };
+    void onSaveAndRun();
+  }
+
+  function confirmPlacement(choice) {
+    setPlacementPrompt(false);
+    if (choice === "new") {
+      placementRef.current = { pageId: openPullTab(), append: false };
+    } else {
+      placementRef.current = { pageId: "", append: true };
+    }
+    void onSaveAndRun();
+  }
+
   async function onSaveAndRun() {
     if (running) return;
     setRunning(true);
@@ -2728,7 +2797,11 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
     }
 
     reporter.start("place");
-    canvas?.placeIntegrationSheets?.(sheets);
+    const placement = placementRef.current;
+    canvas?.placeIntegrationSheets?.(sheets, {
+      pageId: placement.pageId || undefined,
+      append: placement.append,
+    });
     const joinRecord = joinCommitted
       ? {
           target: joinTradesTarget,
@@ -2826,7 +2899,11 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
       return next;
     });
     reporter.succeed("place", {
-      result: `${sheets.length.toLocaleString()} ${sheets.length === 1 ? "sheet" : "sheets"} on this tab`,
+      result: placement.pageId
+        ? `${sheets.length.toLocaleString()} ${sheets.length === 1 ? "sheet" : "sheets"} on a new tab`
+        : placement.append
+          ? `${sheets.length.toLocaleString()} ${sheets.length === 1 ? "sheet" : "sheets"} added on this tab`
+          : `${sheets.length.toLocaleString()} ${sheets.length === 1 ? "sheet" : "sheets"} on this tab`,
     });
     reporter.finish();
     } catch (err) {
@@ -3076,7 +3153,7 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
             summaryNote={`New sheet. Write a name in Label, and an equation in Value, like = SUM(${summaryMeasure}). Click a column on ${sheetTitle}, Buckets, or any other sheet to drop it in.`}
             showSummarizeBuilder={historicalEnrich}
             onFunctionHelp={() => setFunctionHelp(true)}
-            onSaveAndRun={onSaveAndRun}
+            onSaveAndRun={requestSaveAndRun}
             running={running}
             showJoinBuilder={marketsQuery || tradesQuery}
             showFunctionBuilder={marketsQuery || tradesQuery}
@@ -3717,6 +3794,33 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
           )}
         </div>
       </section>
+      {placementPrompt ? (
+        <div className="absolute inset-0 z-30 flex items-center justify-center bg-black/40 p-6">
+          <div
+            role="dialog"
+            aria-labelledby="pull-destination-title"
+            className="w-full max-w-md rounded-xl border border-border/70 bg-background p-6 shadow-sm"
+          >
+            <h2 id="pull-destination-title" className="text-[15px] font-semibold text-foreground">
+              This tab already has data
+            </h2>
+            <p className="mt-2 text-[13px] leading-relaxed text-muted-foreground">
+              Place this pull on the same tab, under what is already here, or start a new tab for it.
+            </p>
+            <div className="mt-5 flex items-center justify-end gap-2">
+              <Button type="button" variant="outline" onClick={() => setPlacementPrompt(false)}>
+                Cancel
+              </Button>
+              <Button type="button" variant="outline" onClick={() => confirmPlacement("same")}>
+                Same tab
+              </Button>
+              <Button type="button" className="bg-[#0d99ff] text-white hover:bg-[#0d99ff]/90" onClick={() => confirmPlacement("new")}>
+                New tab
+              </Button>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }
