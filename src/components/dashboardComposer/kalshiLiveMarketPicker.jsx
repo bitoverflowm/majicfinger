@@ -148,7 +148,21 @@ function mergeSearchSuggestions(marketHits, seriesHits, trimmed) {
     }
     deduped.push(item);
   }
-  return deduped.slice(0, 24);
+  return deduped;
+}
+
+function marketHitFromSuggestion(item) {
+  const ticker = String(item?.ticker || "").trim().toUpperCase();
+  if (!ticker) return null;
+  return {
+    kind: "market",
+    ticker,
+    title: String(item?.title || ticker).trim() || ticker,
+    subtitle: String(item?.subtitle || "").trim() || undefined,
+    status: String(item?.status || "").trim() || undefined,
+    openTime: String(item?.openTime || "").trim() || undefined,
+    closeTime: String(item?.closeTime || "").trim() || undefined,
+  };
 }
 
 const inputClassName =
@@ -163,12 +177,18 @@ export function KalshiLiveMarketPicker({ picks, onAdd, onRemove }) {
   const [suggestions, setSuggestions] = useState([]);
   const [expanded, setExpanded] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState("");
   const [box, setBox] = useState(null);
   const [seriesModal, setSeriesModal] = useState(null);
   const [overflowOpen, setOverflowOpen] = useState(false);
   const anchorRef = useRef(null);
   const portalInputRef = useRef(null);
+  const listRef = useRef(null);
+  const suggestionsRef = useRef(suggestions);
+  suggestionsRef.current = suggestions;
+  const scrollTopRef = useRef(0);
+  const pageRef = useRef({ term: "", cursor: "", hasMore: false, loading: false });
   const seq = useRef(0);
   const abortRef = useRef(null);
   const picked = new Set((picks || []).map((pick) => pick.id));
@@ -183,14 +203,21 @@ export function KalshiLiveMarketPicker({ picks, onAdd, onRemove }) {
     const dialog = el.closest("[role='dialog']");
     const limitRight = dialog ? dialog.getBoundingClientRect().right - 20 : window.innerWidth - 20;
     const width = Math.min(720, Math.max(rect.width, limitRight - rect.left));
-    setBox({ top: rect.top, left: rect.left, width });
+    const dialogBottom = dialog ? dialog.getBoundingClientRect().bottom : window.innerHeight;
+    const listTop = rect.bottom + 4;
+    const listMax = Math.max(180, Math.min(dialogBottom, window.innerHeight) - listTop - 16);
+    setBox({ top: rect.top, left: rect.left, width, listMax });
   }, []);
 
   useLayoutEffect(() => {
     if (!expanded) return undefined;
     measure();
     const frame = window.requestAnimationFrame(() => portalInputRef.current?.focus());
-    const onReflow = () => measure();
+    const onReflow = (event) => {
+      const list = listRef.current;
+      if (list && event?.target && (event.target === list || list.contains(event.target))) return;
+      measure();
+    };
     window.addEventListener("resize", onReflow);
     window.addEventListener("scroll", onReflow, true);
     return () => {
@@ -204,9 +231,12 @@ export function KalshiLiveMarketPicker({ picks, onAdd, onRemove }) {
     const term = query.trim();
     const mySeq = ++seq.current;
     abortRef.current?.abort();
+    scrollTopRef.current = 0;
+    pageRef.current = { term, cursor: "", hasMore: false, loading: false };
     if (term.length < 2) {
       setSuggestions([]);
       setLoading(false);
+      setLoadingMore(false);
       setError("");
       return undefined;
     }
@@ -214,12 +244,15 @@ export function KalshiLiveMarketPicker({ picks, onAdd, onRemove }) {
     abortRef.current = ac;
     const timer = window.setTimeout(async () => {
       setLoading(true);
+      setLoadingMore(false);
       setError("");
       try {
         const marketHits = [];
         const seriesHits = [];
+        let nextCursor = "";
+        let hasMore = false;
         const tasks = [
-          fetch(`/api/integrations/kalshi-live/search/suggestions?${new URLSearchParams({ q: term, mode: "market_search" })}`, {
+          fetch(`/api/integrations/kalshi-live/search/suggestions?${new URLSearchParams({ q: term, mode: "market_search", limit: "20" })}`, {
             headers: { Accept: "application/json" },
             credentials: "same-origin",
             signal: ac.signal,
@@ -228,18 +261,11 @@ export function KalshiLiveMarketPicker({ picks, onAdd, onRemove }) {
             if (!res.ok || ac.signal.aborted) return;
             const list = Array.isArray(data?.suggestions) ? data.suggestions : [];
             for (const item of list) {
-              const ticker = String(item?.ticker || "").trim().toUpperCase();
-              if (!ticker) continue;
-              marketHits.push({
-                kind: "market",
-                ticker,
-                title: String(item?.title || ticker).trim() || ticker,
-                subtitle: String(item?.subtitle || "").trim() || undefined,
-                status: String(item?.status || "").trim() || undefined,
-                openTime: String(item?.openTime || "").trim() || undefined,
-                closeTime: String(item?.closeTime || "").trim() || undefined,
-              });
+              const hit = marketHitFromSuggestion(item);
+              if (hit) marketHits.push(hit);
             }
+            nextCursor = String(data?.cursor || "").trim();
+            hasMore = !!data?.hasMore && !!nextCursor;
           }),
         ];
         if (isKalshiEmbeddingSearchEligible(term)) {
@@ -268,6 +294,7 @@ export function KalshiLiveMarketPicker({ picks, onAdd, onRemove }) {
         }
         await Promise.allSettled(tasks);
         if (mySeq !== seq.current || ac.signal.aborted) return;
+        pageRef.current = { term, cursor: nextCursor, hasMore, loading: false };
         setSuggestions(mergeSearchSuggestions(marketHits, seriesHits, term));
       } catch (err) {
         if (err instanceof DOMException && err.name === "AbortError") return;
@@ -283,6 +310,67 @@ export function KalshiLiveMarketPicker({ picks, onAdd, onRemove }) {
       ac.abort();
     };
   }, [query]);
+
+  const loadMoreMarkets = useCallback(async () => {
+    const page = pageRef.current;
+    if (!page.hasMore || page.loading || !page.cursor || page.term.length < 2) return;
+    if ((suggestionsRef.current || []).filter((item) => item.kind === "market").length >= 240) {
+      page.hasMore = false;
+      return;
+    }
+    page.loading = true;
+    setLoadingMore(true);
+    const term = page.term;
+    try {
+      let cursor = page.cursor;
+      const collected = [];
+      let hasMore = page.hasMore;
+      for (let attempt = 0; attempt < 4 && cursor && hasMore; attempt += 1) {
+        const params = new URLSearchParams({ q: term, limit: "20", cursor });
+        const res = await fetch(`/api/integrations/kalshi-live/search/suggestions?${params}`, {
+          headers: { Accept: "application/json" },
+          credentials: "same-origin",
+        });
+        const data = await res.json().catch(() => ({}));
+        if (pageRef.current.term !== term) return;
+        if (!res.ok) {
+          hasMore = false;
+          cursor = "";
+          setError(typeof data?.error === "string" ? data.error : "Search failed");
+          break;
+        }
+        const hits = (Array.isArray(data?.suggestions) ? data.suggestions : [])
+          .map((item) => marketHitFromSuggestion(item))
+          .filter(Boolean);
+        collected.push(...hits);
+        const nextCursor = String(data?.cursor || "").trim();
+        hasMore = !!data?.hasMore && !!nextCursor && nextCursor !== cursor;
+        cursor = hasMore ? nextCursor : "";
+        if (collected.length) break;
+      }
+      if (pageRef.current.term !== term) return;
+      pageRef.current = { term, cursor, hasMore, loading: false };
+      if (collected.length) {
+        const markets = [];
+        const series = [];
+        for (const item of suggestionsRef.current || []) {
+          if (item.kind === "series") series.push(item);
+          else markets.push(item);
+        }
+        setSuggestions(mergeSearchSuggestions([...markets, ...collected], series, term));
+      }
+    } catch (err) {
+      if (pageRef.current.term === term) {
+        pageRef.current.loading = false;
+        setError(err instanceof Error ? err.message : "Search failed");
+      }
+    } finally {
+      if (pageRef.current.term === term) {
+        pageRef.current.loading = false;
+        setLoadingMore(false);
+      }
+    }
+  }, []);
 
   function addMarket(market) {
     const ticker = String(market?.ticker || "").trim().toUpperCase();
@@ -314,6 +402,15 @@ export function KalshiLiveMarketPicker({ picks, onAdd, onRemove }) {
     else addMarket(suggestion);
   }
 
+  useLayoutEffect(() => {
+    const list = listRef.current;
+    if (!list) return;
+    if (scrollTopRef.current) list.scrollTop = scrollTopRef.current;
+    const page = pageRef.current;
+    if (!expanded || loading || loadingMore || !page.hasMore) return;
+    if (list.scrollHeight - list.scrollTop - list.clientHeight < 80) void loadMoreMarkets();
+  }, [suggestions, expanded, loading, loadingMore, loadMoreMarkets]);
+
   const typed = query.trim();
   const showList = expanded && typed.length >= 2;
   const visiblePicks = (picks || []).slice(0, 8);
@@ -338,11 +435,18 @@ export function KalshiLiveMarketPicker({ picks, onAdd, onRemove }) {
     return (
       <motion.ul
         key="suggestions"
+        ref={listRef}
         role="listbox"
         initial={{ opacity: 0, y: -4 }}
         animate={{ opacity: 1, y: 0 }}
         exit={{ opacity: 0, y: -4 }}
-        className="absolute left-0 right-0 top-full z-10 mt-1 max-h-[min(28rem,60vh)] overflow-auto rounded-lg border border-border bg-popover py-1 shadow-md"
+        onScroll={(event) => {
+          const el = event.currentTarget;
+          scrollTopRef.current = el.scrollTop;
+          if (el.scrollHeight - el.scrollTop - el.clientHeight < 120) void loadMoreMarkets();
+        }}
+        style={{ maxHeight: box?.listMax || 320 }}
+        className="absolute left-0 right-0 top-full z-10 mt-1 overflow-y-auto overscroll-contain rounded-lg border border-border bg-popover py-1 shadow-md"
       >
         {suggestions.map((suggestion) => {
           const marketCount = Array.isArray(suggestion.markets) ? suggestion.markets.length : 0;
@@ -385,9 +489,15 @@ export function KalshiLiveMarketPicker({ picks, onAdd, onRemove }) {
             </li>
           );
         })}
+        {loadingMore ? (
+          <li className="flex items-center gap-2 px-3 py-2 text-xs text-muted-foreground">
+            <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden />
+            Loading more markets
+          </li>
+        ) : null}
       </motion.ul>
     );
-  }, [showList, loading, suggestions, typed, picked, atCap]);
+  }, [showList, loading, loadingMore, suggestions, typed, picked, atCap, box?.listMax, loadMoreMarkets]);
 
   const searchField = (portal) => (
     <div className="relative">

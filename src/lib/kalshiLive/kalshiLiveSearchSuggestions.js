@@ -229,19 +229,25 @@ async function searchByTicker(q, tokens) {
   return scored;
 }
 
-/** @param {string[]} tokens */
-async function searchByText(tokens) {
+/**
+ * Walk open events until enough text matches are collected.
+ * Pass `cursor` to continue a previous walk for infinite scroll.
+ *
+ * @param {string[]} tokens
+ * @param {{ cursor?: string; limit?: number; maxPages?: number; budgetMs?: number }} [opts]
+ * @returns {Promise<{ suggestions: ({ score: number } & KalshiLiveSearchSuggestion)[]; cursor: string; hasMore: boolean }>}
+ */
+async function searchByText(tokens, opts = {}) {
   /** @type {Map<string, { score: number } & KalshiLiveSearchSuggestion>} */
   const byTicker = new Map();
-  const deadline = Date.now() + SEARCH_BUDGET_MS;
-  let cursor = "";
+  const matchLimit = Math.max(1, Math.floor(Number(opts.limit) || SUGGESTION_LIMIT));
+  const maxPages = Math.max(1, Math.floor(Number(opts.maxPages) || MAX_EVENT_PAGES));
+  const deadline = Date.now() + (Number(opts.budgetMs) || SEARCH_BUDGET_MS);
+  let cursor = String(opts.cursor || "").trim();
   let pages = 0;
+  let exhausted = false;
 
-  while (
-    byTicker.size < SUGGESTION_LIMIT &&
-    pages < MAX_EVENT_PAGES &&
-    Date.now() < deadline
-  ) {
+  while (byTicker.size < matchLimit && pages < maxPages && Date.now() < deadline) {
     /** @type {Record<string, string>} */
     const params = {
       status: "open",
@@ -268,58 +274,118 @@ async function searchByText(tokens) {
     }
 
     pages += 1;
-    cursor = String(body?.cursor || "").trim();
-    if (!cursor || events.length === 0) break;
+    const next = String(body?.cursor || "").trim();
+    if (!next || events.length === 0) {
+      exhausted = true;
+      cursor = "";
+      break;
+    }
+    cursor = next;
   }
 
-  return [...byTicker.values()];
+  return {
+    suggestions: [...byTicker.values()],
+    cursor: exhausted ? "" : cursor,
+    hasMore: !exhausted && Boolean(cursor),
+  };
+}
+
+/**
+ * @param {({ score: number } & KalshiLiveSearchSuggestion)[]} scored
+ * @param {number} [limit]
+ */
+function rankSuggestions(scored, limit) {
+  const ranked = scored.sort((a, b) => b.score - a.score);
+  const sliced = Number.isFinite(limit) ? ranked.slice(0, limit) : ranked;
+  return sliced.map(({ score: _score, ...rest }) => rest);
 }
 
 /**
  * @param {string} q
- * @returns {Promise<{ suggestions: KalshiLiveSearchSuggestion[] }>}
+ * @param {{ cursor?: string; limit?: number }} [opts]
+ * `cursor` continues a previous text scan. `limit` asks for a page of matches
+ * and a cursor for the next page. Omit both for the original 12-result lookup.
+ * @returns {Promise<{ suggestions: KalshiLiveSearchSuggestion[]; cursor?: string; hasMore?: boolean }>}
  */
-export async function fetchKalshiLiveSearchSuggestions(q) {
+export async function fetchKalshiLiveSearchSuggestions(q, opts = {}) {
   const trimmed = String(q || "").trim();
   const tokens = tokenizeQuery(trimmed);
   if (tokens.length === 0) {
-    return { suggestions: [] };
+    return { suggestions: [], cursor: "", hasMore: false };
   }
 
-  const cacheKey = `v3:${tokens.join(" ")}`;
-  const cached = suggestionCache.get(cacheKey);
-  if (cached && Date.now() - cached.at < CACHE_TTL_MS) {
-    return { suggestions: cached.suggestions };
+  const resumeCursor = String(opts.cursor || "").trim();
+  const paginated = Boolean(resumeCursor) || Number(opts.limit) > 0;
+  const pageLimit = Math.min(40, Math.max(1, Math.floor(Number(opts.limit) || 20)));
+
+  if (resumeCursor) {
+    const text = await searchByText(tokens, {
+      cursor: resumeCursor,
+      limit: pageLimit,
+      maxPages: 4,
+      budgetMs: 3500,
+    });
+    return {
+      suggestions: rankSuggestions(text.suggestions),
+      cursor: text.cursor,
+      hasMore: text.hasMore,
+    };
+  }
+
+  if (!paginated) {
+    const cacheKey = `v3:${tokens.join(" ")}`;
+    const cached = suggestionCache.get(cacheKey);
+    if (cached && Date.now() - cached.at < CACHE_TTL_MS) {
+      return { suggestions: cached.suggestions };
+    }
+
+    /** @type {({ score: number } & KalshiLiveSearchSuggestion)[]} */
+    let scored = [];
+    if (isTickerLike(trimmed)) scored = await searchByTicker(trimmed, tokens);
+    if (!isTickerLike(trimmed) || scored.length === 0) {
+      const text = await searchByText(tokens);
+      const merged = new Map(scored.map((item) => [item.ticker, item]));
+      for (const hit of text.suggestions) {
+        const prev = merged.get(hit.ticker);
+        if (!prev || hit.score > prev.score) merged.set(hit.ticker, hit);
+      }
+      scored = [...merged.values()];
+    }
+
+    const suggestions = rankSuggestions(scored, SUGGESTION_LIMIT);
+    suggestionCache.set(cacheKey, { at: Date.now(), suggestions });
+    if (suggestionCache.size > CACHE_MAX) {
+      const oldest = suggestionCache.keys().next().value;
+      if (oldest) suggestionCache.delete(oldest);
+    }
+    return { suggestions };
   }
 
   /** @type {({ score: number } & KalshiLiveSearchSuggestion)[]} */
   let scored = [];
+  if (isTickerLike(trimmed)) scored = await searchByTicker(trimmed, tokens);
 
-  if (isTickerLike(trimmed)) {
-    scored = await searchByTicker(trimmed, tokens);
-  }
-
-  // Text scan when the query is natural language, or ticker lookup found nothing.
+  let cursor = "";
+  let hasMore = false;
   if (!isTickerLike(trimmed) || scored.length === 0) {
-    const textHits = await searchByText(tokens);
-    const merged = new Map(scored.map((s) => [s.ticker, s]));
-    for (const hit of textHits) {
+    const text = await searchByText(tokens, {
+      limit: pageLimit,
+      maxPages: 4,
+      budgetMs: 3500,
+    });
+    const merged = new Map(scored.map((item) => [item.ticker, item]));
+    for (const hit of text.suggestions) {
       const prev = merged.get(hit.ticker);
       if (!prev || hit.score > prev.score) merged.set(hit.ticker, hit);
     }
     scored = [...merged.values()];
+    cursor = text.cursor;
+    hasMore = text.hasMore;
   }
 
-  const suggestions = scored
-    .sort((a, b) => b.score - a.score)
-    .slice(0, SUGGESTION_LIMIT)
-    .map(({ score: _s, ...rest }) => rest);
-
-  suggestionCache.set(cacheKey, { at: Date.now(), suggestions });
-  if (suggestionCache.size > CACHE_MAX) {
-    const oldest = suggestionCache.keys().next().value;
-    if (oldest) suggestionCache.delete(oldest);
-  }
-
-  return { suggestions };
+  return {
+    suggestions: rankSuggestions(scored),
+    cursor,
+    hasMore,
+  };
 }
