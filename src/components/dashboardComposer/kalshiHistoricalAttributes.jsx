@@ -1,11 +1,15 @@
 "use client";
 
 import { useState } from "react";
-import { ChevronDown, X } from "lucide-react";
+import { format } from "date-fns";
+import { Calendar as CalendarIcon, ChevronDown, X } from "lucide-react";
 import * as AccordionPrimitive from "@radix-ui/react-accordion";
 import { Accordion, AccordionContent, AccordionItem } from "@/components/ui/accordion";
+import { Button } from "@/components/ui/button";
+import { Calendar } from "@/components/ui/calendar";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
 
 /**
@@ -125,6 +129,31 @@ function dateBound(ms, epoch, edge) {
   return edge === "start" ? ms * 1e6 - 1e6 : ms * 1e6 + 1e6;
 }
 
+function dateFromIso(iso) {
+  const [year, month, day] = String(iso || "").split("-").map(Number);
+  if (!year || !month || !day) return undefined;
+  return new Date(year, month - 1, day);
+}
+
+function isoFromDate(date) {
+  if (!(date instanceof Date) || Number.isNaN(date.getTime())) return "";
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${date.getFullYear()}-${month}-${day}`;
+}
+
+function formatAttributeDate(iso) {
+  const date = dateFromIso(iso);
+  return date ? format(date, "LLL dd, y") : "";
+}
+
+function formatAttributeRange(from, to) {
+  const start = formatAttributeDate(from);
+  const end = formatAttributeDate(to);
+  if (start && end) return `${start} – ${end}`;
+  return start || end || "Pick a date range";
+}
+
 function dayBounds(isoDate) {
   const [year, month, day] = String(isoDate).split("-").map(Number);
   if (!year || !month || !day) return null;
@@ -157,9 +186,9 @@ export function attributeSummary(column, filters) {
     else if (min) parts.push(`≥ ${min}${unit}`);
     else if (max) parts.push(`≤ ${max}${unit}`);
   } else if (spec.kind === "date") {
-    if (filter.from && filter.to) parts.push(`${filter.from} – ${filter.to}`);
-    else if (filter.from) parts.push(`From ${filter.from}`);
-    else if (filter.to) parts.push(`Until ${filter.to}`);
+    if (filter.from && filter.to) parts.push(formatAttributeRange(filter.from, filter.to));
+    else if (filter.from) parts.push(`From ${formatAttributeDate(filter.from)}`);
+    else if (filter.to) parts.push(`Until ${formatAttributeDate(filter.to)}`);
   } else if (spec.kind === "text") {
     const include = textTerms(filter.containsTags, filter.contains);
     const exclude = textTerms(filter.excludesTags, filter.excludes);
@@ -465,6 +494,50 @@ function ExcludeNullField({ checked, onChange }) {
   );
 }
 
+function DateRangeField({ from, to, onChange }) {
+  const start = dateFromIso(from);
+  const end = dateFromIso(to);
+  const selected = start || end ? { from: start, to: end } : undefined;
+  return (
+    <Popover>
+      <PopoverTrigger asChild>
+        <Button
+          type="button"
+          variant="outline"
+          className={cn(
+            "h-9 w-full justify-start rounded-lg px-2.5 text-left text-[13px] font-normal",
+            !selected && "text-muted-foreground",
+          )}
+        >
+          <CalendarIcon className="size-3.5 shrink-0 opacity-70" />
+          <span className="min-w-0 flex-1 truncate">{formatAttributeRange(from, to)}</span>
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent align="start" className="z-[620] w-auto p-0">
+        <Calendar
+          mode="range"
+          numberOfMonths={2}
+          selected={selected}
+          defaultMonth={start || end}
+          onSelect={(range) => onChange({ from: isoFromDate(range?.from), to: isoFromDate(range?.to) })}
+        />
+        {selected ? (
+          <div className="border-t border-border/70 p-2">
+            <Button
+              type="button"
+              variant="ghost"
+              className="h-7 w-full text-[11px]"
+              onClick={() => onChange({ from: "", to: "" })}
+            >
+              Clear dates
+            </Button>
+          </div>
+        ) : null}
+      </PopoverContent>
+    </Popover>
+  );
+}
+
 function AttributeFields({ column, filters, onChange }) {
   const spec = kalshiHistoricalAttributeSpec(column);
   const filter = readFilter(filters, column) || {};
@@ -519,26 +592,11 @@ function AttributeFields({ column, filters, onChange }) {
   if (spec.kind === "date") {
     return (
       <div className="space-y-2">
-      <div className="grid grid-cols-2 gap-2">
-        <label className="block text-[11px] text-muted-foreground">
-          From
-          <Input
-            type="date"
-            value={filter.from || ""}
-            onChange={(event) => onChange(patchFilter(filters, column, { from: event.target.value }))}
-            className="mt-1 h-9"
-          />
-        </label>
-        <label className="block text-[11px] text-muted-foreground">
-          To
-          <Input
-            type="date"
-            value={filter.to || ""}
-            onChange={(event) => onChange(patchFilter(filters, column, { to: event.target.value }))}
-            className="mt-1 h-9"
-          />
-        </label>
-      </div>
+        <DateRangeField
+          from={filter.from || ""}
+          to={filter.to || ""}
+          onChange={({ from, to }) => onChange(patchFilter(filters, column, { from, to }))}
+        />
         {excludeNull}
       </div>
     );
