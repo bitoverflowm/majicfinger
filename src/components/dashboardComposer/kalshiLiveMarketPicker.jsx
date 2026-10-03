@@ -209,6 +209,49 @@ export function KalshiLiveMarketPicker({ picks, onAdd, onRemove }) {
     setBox({ top: rect.top, left: rect.left, width, listMax });
   }, []);
 
+  useEffect(() => {
+    if (!expanded) return undefined;
+    const root = anchorRef.current?.closest("[role='dialog']");
+    const locked = [];
+    const lock = (node) => {
+      if (!(node instanceof HTMLElement)) return;
+      locked.push([node, node.style.overflow]);
+      node.style.overflow = "hidden";
+    };
+    lock(document.documentElement);
+    lock(document.body);
+    if (root) {
+      for (const node of root.querySelectorAll("*")) {
+        if (!(node instanceof HTMLElement)) continue;
+        const style = window.getComputedStyle(node);
+        if (/(auto|scroll)/.test(style.overflowY) || /(auto|scroll)/.test(style.overflowX)) lock(node);
+      }
+    }
+    const blockBackgroundScroll = (event) => {
+      const target = event.target;
+      const series = document.querySelector("[data-kalshi-series-picker]");
+      if (series && target instanceof Node && series.contains(target)) return;
+      const list = target instanceof Element ? target.closest("[data-kalshi-search-results]") : null;
+      event.stopPropagation();
+      if (!list) {
+        event.preventDefault();
+        return;
+      }
+      if (event.type !== "wheel") return;
+      const dy = event.deltaY || 0;
+      const atTop = list.scrollTop <= 0;
+      const atBottom = list.scrollTop + list.clientHeight >= list.scrollHeight - 1;
+      if ((dy < 0 && atTop) || (dy > 0 && atBottom)) event.preventDefault();
+    };
+    document.addEventListener("wheel", blockBackgroundScroll, { capture: true, passive: false });
+    document.addEventListener("touchmove", blockBackgroundScroll, { capture: true, passive: false });
+    return () => {
+      for (const [node, previous] of locked) node.style.overflow = previous;
+      document.removeEventListener("wheel", blockBackgroundScroll, { capture: true });
+      document.removeEventListener("touchmove", blockBackgroundScroll, { capture: true });
+    };
+  }, [expanded]);
+
   useLayoutEffect(() => {
     if (!expanded) return undefined;
     measure();
@@ -436,6 +479,7 @@ export function KalshiLiveMarketPicker({ picks, onAdd, onRemove }) {
       <motion.ul
         key="suggestions"
         ref={listRef}
+        data-kalshi-search-results=""
         role="listbox"
         initial={{ opacity: 0, y: -4 }}
         animate={{ opacity: 1, y: 0 }}
@@ -446,7 +490,7 @@ export function KalshiLiveMarketPicker({ picks, onAdd, onRemove }) {
           if (el.scrollHeight - el.scrollTop - el.clientHeight < 120) void loadMoreMarkets();
         }}
         style={{ maxHeight: box?.listMax || 320 }}
-        className="absolute left-0 right-0 top-full z-10 mt-1 overflow-y-auto overscroll-contain rounded-lg border border-border bg-popover py-1 shadow-md"
+        className="absolute left-0 right-0 top-full z-10 mt-1 overflow-y-auto overscroll-none rounded-lg border border-border bg-popover py-1 shadow-md"
       >
         {suggestions.map((suggestion) => {
           const marketCount = Array.isArray(suggestion.markets) ? suggestion.markets.length : 0;
@@ -530,8 +574,19 @@ export function KalshiLiveMarketPicker({ picks, onAdd, onRemove }) {
             if (expanded && first) chooseSuggestion(first);
           }
         }}
-        className={cn(inputClassName, atCap && "opacity-70")}
+        className={cn(inputClassName, portal && "pr-8", atCap && "opacity-70")}
       />
+      {portal ? (
+        <button
+          type="button"
+          aria-label="Close search"
+          className="absolute right-2 top-1/2 z-[1] -translate-y-1/2 rounded-sm p-0.5 text-muted-foreground hover:text-foreground"
+          onMouseDown={(event) => event.preventDefault()}
+          onClick={() => setExpanded(false)}
+        >
+          <X className="h-3.5 w-3.5" aria-hidden />
+        </button>
+      ) : null}
       <AnimatePresence>{portal ? suggestionList : null}</AnimatePresence>
     </div>
   );
@@ -618,7 +673,7 @@ export function KalshiLiveMarketPicker({ picks, onAdd, onRemove }) {
             if (!open) setSeriesModal(null);
           }}
         >
-          <DialogContent overlayClassName="z-[700]" className="z-[700] max-h-[85vh] max-w-lg overflow-hidden sm:max-w-xl">
+          <DialogContent data-kalshi-series-picker="" overlayClassName="z-[700]" className="z-[700] max-h-[85vh] max-w-lg overflow-hidden sm:max-w-xl">
             <DialogHeader>
               <DialogTitle className="pr-6 text-base">{seriesModal?.title || "Select markets"}</DialogTitle>
               <DialogDescription>
