@@ -175,6 +175,16 @@ const PREVIEW_TRADE_LOCK =
 const PREVIEW_JOIN_LOCK =
   "Preview shows the first market. Run the pull to build a sheet for every market in this join.";
 
+function liveJoinSheetNote(marketCount, sourceCount) {
+  const markets = Number(marketCount) || 0;
+  const sources = Number(sourceCount) || 0;
+  const sheets = markets * sources;
+  if (!sheets) return PREVIEW_JOIN_LOCK;
+  const sourceLabel = sources === 1 ? "1 source" : `${sources} sources`;
+  const marketLabel = markets === 1 ? "1 market" : `${markets.toLocaleString()} markets`;
+  return `${sheets.toLocaleString()} sheets: ${sourceLabel} for each of ${marketLabel}. Preview shows the first market. Run the pull to build the rest.`;
+}
+
 const FUNCTION_COLUMN_ID = "__function";
 
 function createBucketItem() {
@@ -511,40 +521,217 @@ function liveJoinTasks({ targets, preview, ticker, marketCount }) {
   return tasks;
 }
 
-function LiveJoinTabs({ targets, active, extraCount, onSelect }) {
+function liveJoinSheets(targets, markets, previewTicker) {
+  const sheets = [];
+  for (const market of markets || []) {
+    const previewable = Boolean(previewTicker) && market.ticker === previewTicker;
+    for (const target of targets || []) {
+      sheets.push({
+        key: `${target.id}:${market.ticker}`,
+        selectId: previewable ? `live:${target.id}` : `live:locked:${target.id}:${market.ticker}`,
+        title: `${target.title} · ${market.label || market.ticker}`,
+        live: isRealtimeEnabled("kalshiLive", target.id),
+        previewable,
+      });
+    }
+  }
+  return sheets;
+}
+
+function LiveJoinTabButton({ sheet, selected, onClick, title, measure = false }) {
   return (
-    <div className="overflow-hidden px-4 pb-1 pt-4">
+    <button
+      type="button"
+      data-tab={measure ? "" : undefined}
+      title={title || sheet.title}
+      onClick={onClick}
+      className={cn(sheetTabClass(selected), "inline-flex max-w-[14rem] items-center gap-1.5")}
+    >
+      <span className="min-w-0 truncate">{sheet.title}</span>
+      {sheet.live ? (
+        <span className="shrink-0 rounded-full bg-emerald-500/15 px-1.5 py-px text-[8px] font-semibold uppercase tracking-wide text-emerald-700 dark:text-emerald-300">
+          Live
+        </span>
+      ) : null}
+    </button>
+  );
+}
+
+function liveJoinFocus(previewSheet) {
+  const value = String(previewSheet || "");
+  if (!value.startsWith("live:locked:")) return { target: "", ticker: "" };
+  const rest = value.slice("live:locked:".length);
+  const splitAt = rest.indexOf(":");
+  if (splitAt < 0) return { target: rest, ticker: "" };
+  return { target: rest.slice(0, splitAt), ticker: rest.slice(splitAt + 1) };
+}
+
+function LiveJoinPlan({ markets, targets, previewTicker, focusTicker, focusTarget }) {
+  const list = markets || [];
+  const sources = targets || [];
+  const sheetCount = list.length * sources.length;
+  const preview = list.find((market) => market.ticker === previewTicker) || list[0];
+  const later = list.filter((market) => market.ticker !== preview?.ticker);
+
+  return (
+    <div className="flex h-full min-h-0 flex-col overflow-hidden rounded-xl border border-border/70 bg-background shadow-sm">
+      <div className="border-b border-border/70 px-4 py-3">
+        <p className="text-[13px] font-semibold text-foreground">
+          {sheetCount.toLocaleString()} {sheetCount === 1 ? "sheet" : "sheets"} in this pull
+        </p>
+        <p className="mt-0.5 text-[12px] leading-relaxed text-muted-foreground">
+          {sources.length.toLocaleString()} {sources.length === 1 ? "source" : "sources"} for each of {list.length.toLocaleString()}{" "}
+          {list.length === 1 ? "market" : "markets"}. The tabs show the first market. The rest are built when you run the pull.
+        </p>
+      </div>
+      <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4">
+        <ol>
+          {preview ? (
+            <LiveJoinPlanMarket
+              market={preview}
+              targets={sources}
+              index={0}
+              mode="preview"
+              focusTicker={focusTicker}
+              focusTarget={focusTarget}
+            />
+          ) : null}
+          {later.map((market, index) => (
+            <LiveJoinPlanMarket
+              key={market.ticker}
+              market={market}
+              targets={sources}
+              index={index + 1}
+              mode="run"
+              last={index === later.length - 1}
+              focusTicker={focusTicker}
+              focusTarget={focusTarget}
+            />
+          ))}
+        </ol>
+      </div>
+    </div>
+  );
+}
+
+function LiveJoinPlanMarket({ market, targets, index, mode, last = false, focusTicker, focusTarget }) {
+  const focusedMarket = focusTicker === market.ticker;
+  return (
+    <li
+      className="relative pb-4 pl-6 last:pb-0"
+      style={{ animation: `joinSheetIn 460ms ease-out ${index * 70}ms both` }}
+    >
+      <span
+        className={cn(
+          "absolute left-0 top-1.5 size-2.5 rounded-full ring-4",
+          mode === "preview" ? "bg-[#0d99ff] ring-[#0d99ff]/15" : "bg-foreground/70 ring-foreground/10",
+        )}
+      />
+      {last ? null : <span className="absolute left-[4px] top-4 h-[calc(100%-0.25rem)] w-px bg-border" />}
+      <div className="flex min-w-0 items-baseline gap-2">
+        <p className="min-w-0 truncate font-mono text-[12px] font-medium text-foreground">{market.ticker}</p>
+        <span className="shrink-0 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+          {mode === "preview" ? "In the tabs" : "On run"}
+        </span>
+      </div>
+      {market.title && market.title !== market.ticker ? (
+        <p className="mt-0.5 truncate text-[12px] text-muted-foreground">{market.title}</p>
+      ) : null}
+      <ul className="mt-2 flex flex-wrap gap-1.5">
+        {(targets || []).map((target, sourceIndex) => {
+          const live = isRealtimeEnabled("kalshiLive", target.id);
+          const focused = focusedMarket && focusTarget === target.id;
+          return (
+            <li
+              key={target.id}
+              title={target.detail || target.title}
+              style={{ animation: `fadeIn 380ms ease-out ${index * 70 + sourceIndex * 45 + 90}ms both` }}
+              className={cn(
+                "inline-flex max-w-full items-center gap-1.5 rounded-full border px-2 py-1 text-[11px]",
+                focused ? "border-[#0d99ff] bg-[#0d99ff]/10 text-[#0d99ff]" : "border-border/70 bg-muted/30 text-foreground",
+              )}
+            >
+              <span className={cn("size-1.5 shrink-0 rounded-full", live ? "bg-emerald-500" : "bg-muted-foreground/50")} />
+              <span className="truncate">{target.title}</span>
+              {live ? <span className="shrink-0 text-[9px] font-semibold uppercase tracking-wide text-emerald-700 dark:text-emerald-300">Live</span> : null}
+            </li>
+          );
+        })}
+      </ul>
+    </li>
+  );
+}
+
+function LiveJoinTabs({ targets, markets, active, previewTicker, onSelect }) {
+  const frameRef = useRef(null);
+  const measureRef = useRef(null);
+  const sheets = liveJoinSheets(targets, markets, previewTicker);
+  const sheetKey = sheets.map((sheet) => sheet.key).join("\n");
+  const [shown, setShown] = useState(sheets.length);
+  const note = liveJoinSheetNote(markets?.length || 0, targets?.length || 0);
+
+  useLayoutEffect(() => {
+    const frame = frameRef.current;
+    const measure = measureRef.current;
+    if (!frame || !measure) return undefined;
+    const fit = () => {
+      const available = frame.clientWidth;
+      const marketWidth = measure.querySelector("[data-markets]")?.offsetWidth || 0;
+      const widths = [...measure.querySelectorAll("[data-tab]")].map((node) => node.offsetWidth);
+      const plusWidth = measure.querySelector("[data-plus]")?.offsetWidth || 0;
+      let best = 0;
+      for (let count = 0; count <= widths.length; count += 1) {
+        const hidden = widths.length - count;
+        const width = marketWidth + widths.slice(0, count).reduce((sum, value) => sum + value, 0) + (hidden > 0 ? plusWidth : 0);
+        if (width <= available + 1) best = count;
+        else break;
+      }
+      setShown(best);
+    };
+    fit();
+    const observer = new ResizeObserver(fit);
+    observer.observe(frame);
+    return () => observer.disconnect();
+  }, [sheetKey]);
+
+  const visible = sheets.slice(0, shown);
+  const hidden = Math.max(0, sheets.length - visible.length);
+  const plusSelected = hidden > 0 && (active === "live:more" || String(active).startsWith("live:locked:")) && !visible.some((sheet) => sheet.selectId === active);
+
+  return (
+    <div ref={frameRef} className="relative overflow-hidden px-4 pb-1 pt-4">
+      <div ref={measureRef} className="pointer-events-none invisible absolute left-0 top-0 flex" aria-hidden>
+        <button type="button" data-markets className={sheetTabClass(false)}>
+          Markets
+        </button>
+        {sheets.map((sheet) => (
+          <LiveJoinTabButton key={sheet.key} sheet={sheet} selected={false} measure />
+        ))}
+        <button type="button" data-plus className={sheetTabClass(false)}>
+          +{sheets.length}
+        </button>
+      </div>
       <div className="flex animate-[fadeIn_280ms_ease-out]">
         <button type="button" onClick={() => onSelect("source")} className={sheetTabClass(active === "source")}>
           Markets
         </button>
-        {targets.map((target) => {
-          const live = isRealtimeEnabled("kalshiLive", target.id);
-          return (
-            <button
-              key={target.id}
-              type="button"
-              onClick={() => onSelect(`live:${target.id}`)}
-              className={cn(sheetTabClass(active === `live:${target.id}`), "inline-flex max-w-none items-center gap-1.5")}
-              title={live ? `${target.title} can keep updating after you run the pull` : target.title}
-            >
-              <span className="max-w-[8rem] truncate">{target.title}</span>
-              {live ? (
-                <span className="rounded-full bg-emerald-500/15 px-1.5 py-px text-[8px] font-semibold uppercase tracking-wide text-emerald-700 dark:text-emerald-300">
-                  Live
-                </span>
-              ) : null}
-            </button>
-          );
-        })}
-        {extraCount > 0 ? (
+        {visible.map((sheet) => (
+          <LiveJoinTabButton
+            key={sheet.key}
+            sheet={sheet}
+            selected={active === sheet.selectId}
+            title={sheet.previewable ? sheet.title : note}
+            onClick={() => onSelect(sheet.selectId)}
+          />
+        ))}
+        {hidden > 0 ? (
           <button
             type="button"
-            title={PREVIEW_JOIN_LOCK}
+            title="Sheets created when you run the pull"
             onClick={() => onSelect("live:more")}
-            className={sheetTabClass(active === "live:more")}
+            className={sheetTabClass(plusSelected || active === "live:more")}
           >
-            +{extraCount}
+            +{hidden}
           </button>
         ) : null}
       </div>
@@ -3559,7 +3746,11 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
       return;
     }
     setLiveJoinIds(new Set(KALSHI_LIVE_MARKET_JOINS.map((item) => item.id)));
-    setPreviewSheet((current) => (String(current).startsWith("live:") && current !== "live:more" ? current : "live:trades"));
+    setPreviewSheet((current) => {
+      const value = String(current);
+      if (value.startsWith("live:") && value !== "live:more" && !value.startsWith("live:locked:")) return current;
+      return "live:trades";
+    });
   }
 
   function dropEnrich(id) {
@@ -4233,8 +4424,9 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
         ) : liveJoinReady ? (
           <LiveJoinTabs
             targets={liveJoinTargets}
+            markets={liveJoinMarkets}
             active={previewSheet}
-            extraCount={Math.max(0, liveJoinMarkets.length - 1)}
+            previewTicker={livePreviewTicker}
             onSelect={showPreview}
           />
         ) : showJoinSheets ? (
@@ -4358,10 +4550,14 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
             />
           ) : showJoinExplainer ? (
             <JoinExplainer source={tradesQuery ? "trades" : "markets"} venue={polymarketHistorical ? "polymarket" : "kalshi"} live={liveMarketSearch} />
-          ) : previewSheet === "live:more" ? (
-            <div className="flex h-full items-center justify-center rounded-xl border border-border/70 bg-background px-6 text-center text-[13px] leading-relaxed text-muted-foreground shadow-sm">
-              {PREVIEW_JOIN_LOCK}
-            </div>
+          ) : previewSheet === "live:more" || previewSheet.startsWith("live:locked:") ? (
+            <LiveJoinPlan
+              markets={liveJoinMarkets}
+              targets={liveJoinTargets}
+              previewTicker={livePreviewTicker}
+              focusTicker={liveJoinFocus(previewSheet).ticker}
+              focusTarget={liveJoinFocus(previewSheet).target}
+            />
           ) : previewSheet.startsWith("live:") ? (
             (() => {
               const kind = previewSheet.slice("live:".length);

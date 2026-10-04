@@ -1,9 +1,12 @@
 "use client";
 
-import { useEffect, useMemo } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import { Bar, BarChart, CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { useReadyTradeSheet, tradeTickerFromBlock } from "@/components/dashboardComposer/fullTradeSheet";
-import { TradePriceChart } from "@/components/dashboardComposer/tradePriceChart";
+import { isOrderBookSheet, rowsToOrderBook } from "@/components/dashboardComposer/orderBookLadder";
+import { ohlcRowsToCandles, rangesForCandles, tradesToCandles } from "@/components/dashboardComposer/tradeMarketCandles";
+import { MarketChart } from "@/components/spectrumui/charts/market-chart";
+import { OrderBookChart } from "@/components/spectrumui/charts/order-book-chart";
 
 function parseChartNumber(value) {
   const raw = String(value ?? "")
@@ -75,6 +78,21 @@ export function chartSeriesFromSheet(block) {
   };
 }
 
+function isCandleSheet(sheet) {
+  if (!sheet) return false;
+  const table = String(sheet.table || "");
+  if (table === "candlesticks" || table === "event_candlesticks") return true;
+  if (/^candlesticks\s·/i.test(String(sheet.title || ""))) return true;
+  const ids = new Set((sheet.columns || []).map((column) => String(column?.id || "")));
+  return ids.has("price_open_dollars") && ids.has("price_close_dollars");
+}
+
+function sheetSymbol(sheet) {
+  const title = String(sheet?.title || "");
+  const match = title.match(/^(?:Trades|Candlesticks|Order book)\s·\s(.+)$/i);
+  return match ? match[1].trim() : tradeTickerFromBlock(sheet);
+}
+
 function isTradeSheet(sheet) {
   if (!sheet) return false;
   if (tradeTickerFromBlock(sheet)) return true;
@@ -98,10 +116,107 @@ function matrixFromCells(sheet) {
   return rows;
 }
 
-export function SheetBlockChart({ sheet, snapshot, onSnapshot }) {
+function candlesFromPreset(preset) {
+  if (preset?.kind === "trade-market" && preset.candles?.length) {
+    return { candles: preset.candles, volumeLabel: preset.volumeLabel || "Count fp", symbol: preset.symbol || "", mode: preset.mode || "trades" };
+  }
+  if (preset?.kind === "trade-price" && preset.points?.length) {
+    return {
+      candles: preset.points.map((point) => ({
+        t: point.time,
+        open: point.price,
+        high: point.price,
+        low: point.price,
+        close: point.price,
+        volume: point.size || 0,
+      })),
+      volumeLabel: preset.sizeTitle || "Volume",
+      symbol: "",
+      mode: "trades",
+    };
+  }
+  return null;
+}
+
+function TradeMarketChart({ sheet, rows, live, snapshot, onSnapshot, mode = "trades" }) {
+  const built = useMemo(
+    () => (mode === "ohlc" ? ohlcRowsToCandles(sheet?.columns, rows) : tradesToCandles(sheet?.columns, rows)),
+    [mode, rows, sheet?.columns],
+  );
+  const preset = candlesFromPreset(snapshot);
+  const candles = live || built.candles.length ? built.candles : preset?.candles || [];
+  const volumeLabel = built.volumeLabel || preset?.volumeLabel || (mode === "ohlc" ? "Volume fp" : "Count fp");
+  const ranges = useMemo(() => rangesForCandles(candles), [candles]);
+  const symbol = sheetSymbol(sheet) || preset?.symbol || "";
+  const candleKey = candles.length
+    ? `${candles.length}|${candles[candles.length - 1].t}|${candles[candles.length - 1].close}|${candles[candles.length - 1].volume}`
+    : "";
+  const sentKey = useRef("");
+  useEffect(() => {
+    if (live || !candleKey || !built.candles.length || sentKey.current === candleKey) return;
+    sentKey.current = candleKey;
+    onSnapshot?.({
+      kind: "trade-market",
+      candles: built.candles,
+      volumeLabel,
+      symbol,
+      mode,
+    });
+  }, [built.candles, candleKey, live, mode, onSnapshot, symbol, volumeLabel]);
+
+  return (
+    <MarketChart
+      data={candles}
+      symbol={symbol}
+      name={mode === "ohlc" ? "Price" : "Yes"}
+      volumeLabel={volumeLabel || (mode === "ohlc" ? "Volume fp" : "Count fp")}
+      ranges={ranges}
+      defaultRange="All"
+      live={live}
+      status={candles.length ? "ready" : "empty"}
+      emptyLabel={mode === "ohlc" ? "This candlestick sheet has no price bars yet." : "This trades sheet has no yes price to chart yet."}
+    />
+  );
+}
+
+function OrderBookSheetChart({ sheet, rows, live, snapshot, onSnapshot }) {
+  const built = useMemo(() => rowsToOrderBook(sheet?.columns, rows), [rows, sheet?.columns]);
+  const saved = snapshot?.kind === "order-book" ? snapshot : null;
+  const book = built.bids.length || built.asks.length ? built : saved || built;
+  const symbol = sheetSymbol(sheet) || saved?.symbol || "";
+  const bookKey = `${book.bids.length}|${book.asks.length}|${book.bids[0]?.price}|${book.bids[0]?.size}|${book.asks[0]?.price}|${book.asks[0]?.size}|${book.bids[book.bids.length - 1]?.total ?? 0}|${book.asks[book.asks.length - 1]?.total ?? 0}`;
+  const sentKey = useRef("");
+  useEffect(() => {
+    if (live || (!book.bids.length && !book.asks.length) || sentKey.current === bookKey) return;
+    sentKey.current = bookKey;
+    onSnapshot?.({
+      kind: "order-book",
+      bids: book.bids,
+      asks: book.asks,
+      mid: book.mid,
+      symbol,
+    });
+  }, [book, bookKey, live, onSnapshot, symbol]);
+
+  return (
+    <OrderBookChart
+      book={book}
+      symbol={symbol}
+      live={live}
+      status={book.bids.length || book.asks.length ? "ready" : "empty"}
+    />
+  );
+}
+
+export function SheetBlockChart({ sheet, snapshot, onSnapshot, live = false }) {
   const fullSheet = useReadyTradeSheet(sheet?.id);
-  const trade = isTradeSheet(sheet);
-  const series = useMemo(() => (trade ? null : chartSeriesFromSheet(sheet)), [sheet, trade]);
+  const orderBook = isOrderBookSheet(sheet) || snapshot?.kind === "order-book";
+  const candle = !orderBook && (isCandleSheet(sheet) || snapshot?.mode === "ohlc");
+  const trade = !orderBook && !candle && (isTradeSheet(sheet) || snapshot?.kind === "trade-market" || snapshot?.kind === "trade-price");
+  const series = useMemo(
+    () => (trade || candle || orderBook ? null : chartSeriesFromSheet(sheet)),
+    [candle, orderBook, sheet, trade],
+  );
   const seriesKey = series ? `${series.kind}|${series.data.length}|${series.data[0]?.label}|${series.data[series.data.length - 1]?.value}` : "";
   useEffect(() => {
     if (!series) return;
@@ -114,17 +229,31 @@ export function SheetBlockChart({ sheet, snapshot, onSnapshot }) {
     });
   }, [onSnapshot, series, seriesKey]);
 
-  if (trade) {
-    if (fullSheet?.rows?.length) {
-      return <TradePriceChart columns={sheet.columns} rows={fullSheet.rows} onSeries={onSnapshot} />;
-    }
-    if (snapshot?.kind === "trade-price" && snapshot.points?.length) {
-      return <TradePriceChart preset={snapshot} />;
-    }
-    return <TradePriceChart columns={sheet.columns} rows={matrixFromCells(sheet)} />;
+  if (orderBook) {
+    return (
+      <OrderBookSheetChart
+        sheet={sheet}
+        rows={matrixFromCells(sheet)}
+        live={live}
+        snapshot={snapshot}
+        onSnapshot={onSnapshot}
+      />
+    );
   }
-  if (!sheet && snapshot?.kind === "trade-price" && snapshot.points?.length) {
-    return <TradePriceChart preset={snapshot} />;
+
+  if (trade || candle) {
+    const liveRows = matrixFromCells(sheet);
+    const rows = live && liveRows.length ? liveRows : !candle && fullSheet?.rows?.length ? fullSheet.rows : liveRows;
+    return (
+      <TradeMarketChart
+        sheet={sheet}
+        rows={rows}
+        live={live && liveRows.length > 0}
+        snapshot={snapshot}
+        onSnapshot={onSnapshot}
+        mode={candle ? "ohlc" : "trades"}
+      />
+    );
   }
   const drawn = series || (snapshot?.kind === "sheet-series" && snapshot.points?.length
     ? { data: snapshot.points, valueTitle: snapshot.valueTitle, labelTitle: snapshot.labelTitle, kind: snapshot.seriesKind || "bar", truncated: false }

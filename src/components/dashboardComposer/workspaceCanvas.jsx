@@ -14,6 +14,7 @@ import { DestructiveConfirmMenuItem } from "@/components/ui/destructive-confirm-
 import { useMyStateV2 } from "@/context/stateContextV2";
 import { duplicateTabName, saveWorkspaceStartTabs } from "@/lib/workspaceStartTabs";
 import { DashboardSheetGrid } from "@/components/dashboardComposer/dashboardSheetGrid";
+import { isOrderBookSheet } from "@/components/dashboardComposer/orderBookLadder";
 import { SheetBlockChart } from "@/components/dashboardComposer/sheetBlockChart";
 import { layoutRunSheets } from "@/components/dashboardComposer/integrationRunSheets";
 import { CLIP, packClippedBlocks, snapBlockPosition } from "@/components/dashboardComposer/clipLayout";
@@ -317,6 +318,27 @@ export function WorkspaceCanvasProvider({ pageId, readOnly = false, children }) 
       // The full dashboard document is the copy that survives a reload.
     }
   }, [blocks, readOnly, ready, storageKey]);
+
+  useEffect(() => {
+    if (!ready) return;
+    const now = Date.now();
+    setBlocksByPage((prev) => {
+      let changed = false;
+      const next = {};
+      for (const [page, list] of Object.entries(prev || {})) {
+        if (!Array.isArray(list)) {
+          next[page] = list;
+          continue;
+        }
+        next[page] = list.map((block) => {
+          if (block?.type !== "sheet" || block.source !== "integration-run" || block.pulledAt) return block;
+          changed = true;
+          return { ...block, pulledAt: now };
+        });
+      }
+      return changed ? next : prev;
+    });
+  }, [ready]);
 
   useEffect(() => {
     if (!ready || user === undefined) return undefined;
@@ -651,10 +673,35 @@ function EditableText({ value, onChange, className, placeholder }) {
 }
 
 function chartSnapshotKey(chart) {
+  if (chart?.kind === "order-book") {
+    const bid = chart.bids?.[0];
+    const ask = chart.asks?.[0];
+    const bidDepth = chart.bids?.[chart.bids.length - 1]?.total ?? 0;
+    const askDepth = chart.asks?.[chart.asks.length - 1]?.total ?? 0;
+    return `order-book|${chart.bids?.length || 0}|${chart.asks?.length || 0}|${bid?.price}|${bid?.size}|${ask?.price}|${ask?.size}|${bidDepth}|${askDepth}|${chart.symbol || ""}`;
+  }
+  const candles = chart?.candles;
+  if (candles?.length) {
+    const last = candles[candles.length - 1];
+    return `${chart.kind}|${candles.length}|${last.t}|${last.close}|${last.volume}|${chart.volumeLabel || ""}`;
+  }
   const points = chart?.points;
   if (!points?.length) return "";
   const last = points[points.length - 1];
   return `${chart.kind}|${points.length}|${last.time || last.label}|${last.price ?? last.value}|${chart.sizeTitle || ""}`;
+}
+
+function formatPulledAt(value) {
+  const time = Number(value);
+  if (!Number.isFinite(time) || time <= 0) return "";
+  const date = new Date(time);
+  if (Number.isNaN(date.getTime())) return "";
+  return date.toLocaleString(undefined, {
+    month: "short",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  });
 }
 
 function filledRowCount(cells) {
@@ -696,6 +743,8 @@ function SheetBlockBody({ block, onChange, booting }) {
   const canvas = useWorkspaceCanvas();
   const view = liveBlock(block, canvas);
   const running = !!liveSession(canvas, block.id)?.running;
+  const hasRealtime = !canvas?.readOnly && !!realtimeSheetForBlock(block, canvas?.blocks || []);
+  const pulled = formatPulledAt(block.pulledAt);
   const label = useTradeSheetLabel(block.id, Math.max(filledRowCount(view.cells), Number(block.rowCount) || 0));
   return (
     <div className="flex min-h-0 flex-1 flex-col">
@@ -705,11 +754,33 @@ function SheetBlockBody({ block, onChange, booting }) {
           value={block.title}
           placeholder="Data sheet"
           onChange={(title) => onChange({ title })}
-          className="min-w-0 flex-1 text-[13px] font-semibold text-foreground"
+          className="min-w-0 flex-1 truncate text-[13px] font-semibold text-foreground"
         />
         {running ? <span className="shrink-0 text-[11px] font-medium text-emerald-600">Live</span> : null}
-        <span className={cn("shrink-0 text-[12px] tabular-nums text-muted-foreground", canvas?.readOnly ? "pr-1" : "pr-8")}>
-          {booting ? "Loading…" : label}
+        <span
+          className={cn(
+            "flex shrink-0 items-center text-[12px] tabular-nums text-muted-foreground transition-[padding] duration-200 ease-out",
+            canvas?.readOnly ? "pr-1" : "pr-8",
+            hasRealtime &&
+              (running
+                ? "pr-[3.75rem]"
+                : "group-hover/block:pr-[3.75rem] group-focus-within/block:pr-[3.75rem]"),
+          )}
+        >
+          <span>{booting ? "Loading…" : label}</span>
+          {pulled ? (
+            <span
+              className={cn(
+                "grid grid-cols-[0fr] opacity-0 transition-[grid-template-columns,opacity] duration-200 ease-out",
+                "group-hover/block:grid-cols-[1fr] group-hover/block:opacity-100",
+                "group-focus-within/block:grid-cols-[1fr] group-focus-within/block:opacity-100",
+              )}
+            >
+              <span className="min-w-0 overflow-hidden">
+                <span className="whitespace-nowrap pl-2">Pulled {pulled}</span>
+              </span>
+            </span>
+          ) : null}
         </span>
       </div>
       {booting ? <SheetSkeleton /> : <DashboardSheetGrid block={view} onChange={onChange} readOnly={!!canvas?.readOnly} />}
@@ -790,7 +861,7 @@ function ChartBlockBody({ block, onChange, booting }) {
   const sourceSession = source ? liveSession(canvas, source.id) : null;
   const sourceView = source?.type === "sheet" ? liveBlock(source, canvas) : null;
   const chartSheet =
-    sourceView && sourceSession?.running
+    sourceView && sourceSession?.running && !isOrderBookSheet(sourceView)
       ? { ...sourceView, cells: tailCells(sourceView.cells, 80) }
       : sourceView;
   return (
@@ -810,6 +881,7 @@ function ChartBlockBody({ block, onChange, booting }) {
       ) : block.sourceSheetId ? (
         <SheetBlockChart
           sheet={chartSheet}
+          live={!!sourceSession?.running}
           snapshot={block.chart}
           onSnapshot={(chart) => {
             if (canvas?.readOnly) return;
@@ -930,7 +1002,7 @@ function CanvasBlock({ block, selected, spotlight = false, onSelect, onChange, b
     if (
       e.target instanceof Element &&
       e.target.closest(
-        "[data-sheet-fullscreen],[data-sheet-grid],[data-resize],[data-block-menu],[data-realtime-toggle],[role='menu'],[role='menuitem'],.gdg-style,.gdg-unstyle,textarea,input",
+        "[data-sheet-fullscreen],[data-sheet-grid],[data-sheet-chart],[data-resize],[data-block-menu],[data-realtime-toggle],[role='menu'],[role='menuitem'],.gdg-style,.gdg-unstyle,textarea,input",
       )
     ) {
       return;

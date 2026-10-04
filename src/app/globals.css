@@ -321,6 +321,17 @@ body {
   }
 }
 
+@keyframes joinSheetIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
 @keyframes fadeOut {
   from {
     opacity: 1;

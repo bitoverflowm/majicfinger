@@ -108,6 +108,7 @@ export function layoutRunSheets(sheets, { originY = 88 } = {}) {
       ...(sheet.table ? { table: sheet.table } : {}),
       ...(sheet.pull ? { pull: sheet.pull } : {}),
       ...(sheet.provenance ? { provenance: sheet.provenance } : {}),
+      pulledAt: Number(sheet.pulledAt) || Date.now(),
     };
     blocks.push(block);
     if (full) y += fullH + gap;
