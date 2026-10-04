@@ -191,7 +191,7 @@ const inputClassName =
  * Kalshi Live market search. Focusing the field expands it over the preview so
  * suggestions match the legacy ticker search. A series opens the market picker.
  */
-export function KalshiLiveMarketPicker({ picks, onAdd, onRemove }) {
+export function KalshiLiveMarketPicker({ picks, onAdd, onRemove, intent = "markets" }) {
   const [query, setQuery] = useState("");
   const [suggestions, setSuggestions] = useState([]);
   const [expanded, setExpanded] = useState(false);
@@ -470,9 +470,25 @@ export function KalshiLiveMarketPicker({ picks, onAdd, onRemove }) {
     });
   }
 
+  function addSeries(series) {
+    const ticker = String(series?.ticker || "").trim().toUpperCase();
+    if (!ticker || picked.has(`series:${ticker}`) || atCap) return;
+    onAdd?.({
+      id: `series:${ticker}`,
+      kind: "series",
+      ticker,
+      label: series.title || ticker,
+      title: series.title || ticker,
+    });
+  }
+
   function chooseSuggestion(suggestion) {
     if (!suggestion || atCap) return;
     setExpanded(false);
+    if (intent === "series") {
+      if (suggestion.kind === "series") addSeries(suggestion);
+      return;
+    }
     if (suggestion.kind === "series") openSeries(suggestion);
     else addMarket(suggestion);
   }
@@ -492,8 +508,9 @@ export function KalshiLiveMarketPicker({ picks, onAdd, onRemove }) {
   const hiddenPicks = (picks || []).slice(8);
 
   const suggestionList = useMemo(() => {
+    const visibleSuggestions = suggestions.filter((suggestion) => intent !== "series" || suggestion.kind === "series");
     if (!showList) return null;
-    if (!loading && !suggestions.length) {
+    if (!loading && !visibleSuggestions.length) {
       return (
         <motion.p
           key="no-matches"
@@ -506,7 +523,7 @@ export function KalshiLiveMarketPicker({ picks, onAdd, onRemove }) {
         </motion.p>
       );
     }
-    if (!suggestions.length) return null;
+    if (!visibleSuggestions.length) return null;
     return (
       <motion.ul
         key="suggestions"
@@ -524,7 +541,7 @@ export function KalshiLiveMarketPicker({ picks, onAdd, onRemove }) {
         style={{ maxHeight: box?.listMax || 320 }}
         className="mt-1 overflow-y-auto overscroll-contain rounded-lg border border-border bg-popover py-1 shadow-md"
       >
-        {suggestions.map((suggestion) => {
+        {visibleSuggestions.map((suggestion) => {
           const marketCount = Array.isArray(suggestion.markets) ? suggestion.markets.length : 0;
           const seriesTiming = suggestion.kind === "series" ? aggregateKalshiMarketTiming(suggestion.markets) : null;
           const kindLabel = suggestion.kind === "market" ? "Market" : "Series";
@@ -573,7 +590,7 @@ export function KalshiLiveMarketPicker({ picks, onAdd, onRemove }) {
         ) : null}
       </motion.ul>
     );
-  }, [showList, loading, loadingMore, suggestions, typed, picked, atCap, box?.listMax, loadMoreMarkets]);
+  }, [intent, showList, loading, loadingMore, suggestions, typed, picked, atCap, box?.listMax, loadMoreMarkets]);
 
   const searchField = (portal) => (
     <div data-search-field="">
@@ -586,8 +603,8 @@ export function KalshiLiveMarketPicker({ picks, onAdd, onRemove }) {
           type="text"
           value={query}
           disabled={atCap}
-          placeholder={SEARCH_PLACEHOLDER}
-          aria-label="Search Kalshi markets"
+          placeholder={intent === "series" ? "Search a series ticker" : SEARCH_PLACEHOLDER}
+          aria-label={intent === "series" ? "Search Kalshi series" : "Search Kalshi markets"}
           autoComplete="off"
           onChange={(event) => {
             setQuery(event.target.value);
@@ -629,7 +646,7 @@ export function KalshiLiveMarketPicker({ picks, onAdd, onRemove }) {
     <TooltipProvider delayDuration={200}>
       <section className="space-y-2">
         <div className="flex items-center justify-between gap-2">
-          <p className="text-[12px] font-semibold text-foreground">Markets</p>
+          <p className="text-[12px] font-semibold text-foreground">{intent === "series" ? "Series" : "Markets"}</p>
           {(picks || []).length ? (
             <span className="text-[10px] text-muted-foreground">{picks.length} selected</span>
           ) : null}
@@ -658,7 +675,9 @@ export function KalshiLiveMarketPicker({ picks, onAdd, onRemove }) {
             )
           : null}
         <p className="text-[10px] leading-snug text-muted-foreground">
-          If you don&apos;t know your ticker, search anything and suggestions will populate.
+          {intent === "series"
+            ? "Search a series ticker. This adds the series, not the markets inside it."
+            : "If you don't know your ticker, search anything and suggestions will populate."}
         </p>
         {error ? <p className="text-xs text-destructive">{error}</p> : null}
         {picks?.length ? (
@@ -678,7 +697,7 @@ export function KalshiLiveMarketPicker({ picks, onAdd, onRemove }) {
                 </PopoverTrigger>
                 <PopoverContent side="bottom" align="start" className="z-[620] max-h-80 w-80 overflow-y-auto p-2">
                   <p className="px-1 pb-1.5 text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
-                    {picks.length} markets selected
+                    {picks.length} {intent === "series" ? "series" : "markets"} selected
                   </p>
                   <ul className="space-y-0.5">
                     {picks.map((pick) => (

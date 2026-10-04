@@ -19,6 +19,7 @@ import {
   loadBuildPreview,
   loadBuildUniverseCount,
   KALSHI_LIVE_MARKET_JOINS,
+  loadKalshiLiveDirect,
   loadKalshiLiveMarketByTicker,
   loadKalshiLiveMarketJoin,
   loadKalshiLiveMarketsForScope,
@@ -78,6 +79,14 @@ import { isRealtimeEnabled } from "@/lib/realtime/endpointRegistry";
 import { Skeleton } from "@/components/ui/skeleton";
 import { createRunReporter, describeComposePhase } from "@/components/dashboardComposer/integrationRunFeed";
 import { KalshiLiveMarketPicker, kalshiLiveMarketAttributeColumns } from "@/components/dashboardComposer/kalshiLiveMarketPicker";
+import { KalshiLiveDirectQuery } from "@/components/dashboardComposer/kalshiLiveDirectQuery";
+import {
+  defaultKalshiLiveDirectQuery,
+  directMarketTickers,
+  directSeriesTickers,
+  isKalshiLiveDirectTable,
+  kalshiLiveDirectScopeError,
+} from "@/components/dashboardComposer/kalshiLiveDirectScope";
 import {
   describeKalshiLiveServerFilters,
   KALSHI_LIVE_QUERY_ATTRIBUTE_COLUMNS,
@@ -1439,6 +1448,8 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
   const [functionHelp, setFunctionHelp] = useState(false);
   const [visibleCount, setVisibleCount] = useState(0);
   const [livePicks, setLivePicks] = useState([]);
+  const [directQuery, setDirectQuery] = useState(() => defaultKalshiLiveDirectQuery("trades"));
+  const [directPreview, setDirectPreview] = useState({ status: "idle", rows: [], error: "", ticker: "" });
   const [liveScan, setLiveScan] = useState({ status: "idle", rows: [], error: "", exhausted: true, truncated: false });
   const liveFetchRef = useRef(new Set());
   const [universe, setUniverse] = useState(null);
@@ -1531,6 +1542,7 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
   const lakeId = profile.lakeId || "";
   const guidedFilters = profile.guidedTables.includes(tableId);
   const liveMarketSearch = integrationId === "kalshiLive" && tableId === "markets";
+  const liveDirect = integrationId === "kalshiLive" && isKalshiLiveDirectTable(tableId);
 
   useEffect(() => {
     const next = BUILD_SOURCES[integrationId];
@@ -1559,6 +1571,8 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
     setSortKeys([]);
     setRowLimit("");
     setLivePicks([]);
+    setDirectQuery(defaultKalshiLiveDirectQuery(tableId));
+    setDirectPreview({ status: "idle", rows: [], error: "", ticker: "" });
     setLiveScan({ status: "idle", rows: [], error: "", exhausted: true, truncated: false });
     liveFetchRef.current = new Set();
     setPreviewRefreshing(false);
@@ -1998,7 +2012,89 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
     setLivePicks((prev) => prev.filter((item) => item.id !== id));
   }
 
+  function addDirectPick(pick) {
+    if (tableId === "series" && pick?.kind === "series") {
+      setLivePicks((prev) => (prev.some((item) => item.id === pick.id) ? prev : [...prev, { ...pick, status: "ready", rows: [], error: "" }]));
+      return;
+    }
+    addLivePick(pick);
+  }
+
+  const directMarkets = useMemo(
+    () => (liveDirect && tableId !== "series" ? directMarketTickers(livePicks) : []),
+    [liveDirect, livePicks, tableId],
+  );
+  const directSeries = useMemo(
+    () => (liveDirect && tableId === "series" && directQuery.mode !== "discover" ? directSeriesTickers(livePicks) : []),
+    [directQuery.mode, liveDirect, livePicks, tableId],
+  );
+
+  useEffect(() => {
+    if (!liveDirect) return undefined;
+    const discover = tableId === "series" && directQuery.mode === "discover";
+    const ticker = directMarkets[0]?.ticker || "";
+    if (discover) {
+      if (!String(directQuery.category || "").trim()) {
+        setDirectPreview({ status: "idle", rows: [], error: "", ticker: "" });
+        return undefined;
+      }
+    } else if (tableId === "series") {
+      if (!directSeries.length) {
+        setDirectPreview({ status: "idle", rows: [], error: "", ticker: "" });
+        return undefined;
+      }
+    } else if (!ticker) {
+      setDirectPreview({ status: "idle", rows: [], error: "", ticker: "" });
+      return undefined;
+    }
+    let cancel = false;
+    setDirectPreview({ status: "loading", rows: [], error: "", ticker });
+    const spec = discover
+      ? {
+          mode: "discover",
+          category: directQuery.category,
+          tag: directQuery.tag,
+          includeProductMetadata: directQuery.includeProductMetadata,
+          minUpdatedTs: directQuery.minUpdatedTs,
+          limit: PREVIEW_ROW_CAP,
+        }
+      : tableId === "series"
+        ? {
+            mode: "tickers",
+            tickers: directQuery.sheetMode === "per_series" ? directSeries.slice(0, 1) : directSeries,
+            limit: PREVIEW_ROW_CAP,
+          }
+        : {
+            ticker,
+            minTs: directQuery.minTs,
+            maxTs: directQuery.maxTs,
+            period: directQuery.period,
+            depth: Number(directQuery.depth),
+            limit: PREVIEW_ROW_CAP,
+          };
+    loadKalshiLiveDirect(tableId, spec)
+      .then((result) => {
+        if (cancel) return;
+        const rows = result?.rows || [];
+        setDirectPreview({ status: "ready", rows, error: "", ticker: ticker || directSeries[0] || "" });
+        setVisibleCount(rows.length);
+      })
+      .catch((err) => {
+        if (cancel) return;
+        setDirectPreview({
+          status: "error",
+          rows: [],
+          error: err instanceof Error ? err.message : "The pull failed",
+          ticker: "",
+        });
+      });
+    return () => {
+      cancel = true;
+    };
+  }, [directMarkets, directQuery, directSeries, liveDirect, tableId]);
+
   const filteredRows = useMemo(() => {
+    if (liveDirect && directPreview.status !== "idle") return (directPreview.rows || []).slice(0, visibleCount);
     if (livePreviewRows) return livePreviewRows.slice(0, visibleCount);
     if (guidedFilters) {
       const key = historicalPreviewRequestKey({
@@ -2026,7 +2122,7 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
     const query = filterValue.trim().toLowerCase();
     if (!query || !filterColumn) return rows;
     return rows.filter((row) => String(row[filterColumn] ?? "").toLowerCase().includes(query));
-  }, [pull, visibleCount, filterColumn, filterValue, guidedFilters, attributeFilters, sortKeys, rowLimit, integrationId, tableId, settledPreviewKey, previewSearchError, livePreviewRows, liveMarketSearch, liveNarrowing]);
+  }, [directPreview.rows, directPreview.status, pull, visibleCount, filterColumn, filterValue, guidedFilters, attributeFilters, sortKeys, rowLimit, integrationId, tableId, settledPreviewKey, previewSearchError, livePreviewRows, liveMarketSearch, liveDirect, liveNarrowing]);
 
   const queriedMarkets = useMemo(() => {
     if (!guidedFilters) return [];
@@ -2445,9 +2541,14 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
   }
   const livePickAwaitingRows = liveMarketSearch && !loading && shown === 0 && livePicks.some((pick) => pick.status === "loading");
   const liveScanWaiting = liveMarketSearch && liveScan.status === "loading" && shown === 0;
+  const directLoading = liveDirect && directPreview.status === "loading";
+  const directExtra =
+    liveDirect && directPreview.status === "ready" && tableId !== "series" && directMarkets.length > 1
+      ? ` The other ${directMarkets.length - 1} ${directMarkets.length === 2 ? "market is" : "markets are"} pulled when you run.`
+      : "";
 
   useEffect(() => {
-    if (!emptyRefresh && !livePickAwaitingRows && !liveScanWaiting) return undefined;
+    if (!emptyRefresh && !livePickAwaitingRows && !liveScanWaiting && !directLoading) return undefined;
     setProgress(12);
     const timer = window.setInterval(() => {
       setProgress((current) => (current >= 88 ? current : current + Math.random() * 8));
@@ -2456,7 +2557,7 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
       window.clearInterval(timer);
       setProgress(100);
     };
-  }, [emptyRefresh, livePickAwaitingRows, liveScanWaiting]);
+  }, [directLoading, emptyRefresh, livePickAwaitingRows, liveScanWaiting]);
   const shownLabel = `Previewing ${shown.toLocaleString()} ${shown === 1 ? "row" : "rows"}`;
   const livePickLoading = livePicks.some((pick) => pick.status === "loading");
   const liveUpdating = liveScan.status === "loading" || livePickLoading;
@@ -2475,6 +2576,12 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
   const previewIsEmpty = previewSampleEmpty || liveSettledEmpty;
   const previewLine = loading
     ? "Loading the first 50 rows"
+    : liveDirect && directPreview.status === "error"
+      ? directPreview.error
+      : liveDirect && directPreview.status === "loading"
+        ? "Loading this pull"
+        : liveDirect && directPreview.status === "ready"
+          ? `Previewing ${shown.toLocaleString()} ${shown === 1 ? "row" : "rows"}.${directExtra}`
     : liveScan.status === "error" && !liveScan.rows?.length
       ? liveScan.error
       : liveMatchedRows
@@ -3290,7 +3397,7 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
           result: `${filteredRows.length.toLocaleString()} rows already on screen. ${err instanceof Error ? err.message : "The compose did not finish."}`,
         });
       }
-    } else {
+    } else if (!liveDirect) {
       if (enrichPicks.has("sample") && sampleSizeNumber > 0 && !sampleSizeError) {
         marketRows = previewRandomSample(marketRows, {
           size: sampleSizeNumber,
@@ -3357,7 +3464,111 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
     );
     const sheets = [];
     let runTickers = [];
-    if (runMarkets.columns.length) {
+    if (liveDirect) {
+      const scopeError = kalshiLiveDirectScopeError(tableId, livePicks, directQuery);
+      if (scopeError) {
+        reporter.fail("source", scopeError);
+        return;
+      }
+      if (livePicks.some((pick) => pick.status === "loading")) {
+        reporter.fail("source", "Wait for the selected markets to finish loading.");
+        return;
+      }
+      const limit = Number.isFinite(sheetCap) ? sheetCap : PREVIEW_ROW_CAP;
+      const shape = (loaded) => {
+        const available = loaded?.columns || [];
+        const columns = shownColumns.filter((column) => available.some((item) => item.id === column.id));
+        return { columns: columns.length ? columns : available, rows: loaded?.rows || [] };
+      };
+      const titleFor = { trades: "Trades", orderbook: "Order book", candlesticks: "Candlesticks", series: "Series" };
+      const label = titleFor[tableId] || sheetTitle;
+      let built = [];
+      if (tableId === "series" && directQuery.mode === "discover") {
+        const loaded = await loadKalshiLiveDirect("series", { ...directQuery, mode: "discover", limit });
+        const shaped = shape(loaded);
+        built = [
+          {
+            id: "run-live-series",
+            title: "Series",
+            columns: shaped.columns,
+            rows: shaped.rows,
+            span: "full",
+            table: "series",
+            summary: `Kalshi Live · Series · ${directQuery.category}${directQuery.tag ? ` · ${directQuery.tag}` : ""}`,
+          },
+        ];
+      } else if (tableId === "series") {
+        const tickers = directSeriesTickers(livePicks);
+        if (directQuery.sheetMode === "per_series") {
+          const pulled = await mapPool(tickers, 3, (ticker) =>
+            loadKalshiLiveDirect("series", { mode: "tickers", tickers: [ticker], limit: 1 }).then((result) => ({
+              ticker,
+              ...shape(result),
+            })),
+          );
+          built = pulled.map((item) => ({
+            id: `run-live-series-${String(item.ticker).replace(/[^A-Za-z0-9]+/g, "-")}`,
+            title: `Series · ${item.ticker}`,
+            columns: item.columns,
+            rows: item.rows,
+            span: pulled.length > 1 ? "half" : "full",
+            table: "series",
+            summary: `Kalshi Live · Series · ${item.ticker}`,
+          }));
+        } else {
+          const loaded = await loadKalshiLiveDirect("series", { mode: "tickers", tickers, limit });
+          const shaped = shape(loaded);
+          built = [
+            {
+              id: "run-live-series",
+              title: "Series",
+              columns: shaped.columns,
+              rows: shaped.rows,
+              span: "full",
+              table: "series",
+              summary: `Kalshi Live · Series · ${tickers.join(", ")}`,
+            },
+          ];
+        }
+      } else {
+        const markets = directMarketTickers(livePicks);
+        const pulled = await mapPool(markets, 3, (market) =>
+          loadKalshiLiveDirect(tableId, {
+            ticker: market.ticker,
+            limit,
+            minTs: directQuery.minTs,
+            maxTs: directQuery.maxTs,
+            period: directQuery.period,
+            depth: Number(directQuery.depth),
+          }).then((result) => ({ market, ...shape(result) })),
+        );
+        built = pulled
+          .filter((item) => item.columns.length)
+          .map((item) => {
+            const id = `run-live-${tableId}-${String(item.market.ticker).replace(/[^A-Za-z0-9]+/g, "-")}`;
+            const fullRows = item.rows || [];
+            if ((tableId === "trades" || tableId === "candlesticks") && fullRows.length > PREVIEW_ROW_CAP) {
+              rememberTradeSheet(id, item.market.ticker, item.columns, displayMatrix(item.columns, fullRows), limit, accountId);
+            }
+            return {
+              id,
+              title: `${label} · ${item.market.label || item.market.ticker}`,
+              columns: item.columns,
+              rows: fullRows.slice(0, PREVIEW_ROW_CAP),
+              rowCount: fullRows.length,
+              span: pulled.length > 1 ? "half" : "full",
+              table: tableId,
+              pull: { ticker: item.market.ticker, table: tableId },
+              summary: `Kalshi Live · ${label} · ${item.market.ticker}`,
+            };
+          });
+      }
+      const directRows = built.reduce((sum, sheet) => sum + (sheet.rowCount || sheet.rows.length), 0);
+      reporter.succeed("source", {
+        result: `${built.length.toLocaleString()} ${built.length === 1 ? "sheet" : "sheets"} · ${directRows.toLocaleString()} rows`,
+      });
+      sheets.push(...built.filter((sheet) => sheet.columns.length));
+    } else if (runMarkets.columns.length) {
       sheets.push({
         id: tableId === "trades" ? "run-trades" : "run-markets",
         title: sheetTitle,
@@ -4242,6 +4453,16 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
           {liveMarketSearch ? (
             <KalshiLiveMarketPicker picks={livePicks} onAdd={addLivePick} onRemove={removeLivePick} />
           ) : null}
+          {liveDirect ? (
+            <KalshiLiveDirectQuery
+              tableId={tableId}
+              picks={livePicks}
+              onAdd={addDirectPick}
+              onRemove={removeLivePick}
+              query={directQuery}
+              onChange={setDirectQuery}
+            />
+          ) : null}
 
           <Accordion type="single" collapsible defaultValue="columns" className="space-y-2">
             <AccordionItem value="columns" className="border-0">
@@ -4314,7 +4535,7 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
             ) : null}
           </Accordion>
 
-          {guidedFilters || liveMarketSearch ? null : (
+          {guidedFilters || liveMarketSearch || liveDirect ? null : (
             <section>
               <p className="mb-2 text-[12px] font-semibold text-foreground">Filters</p>
               <p className="mb-2 text-[12px] leading-relaxed text-muted-foreground">
@@ -4409,7 +4630,10 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
         </div>
         <div className="h-1 w-full bg-black/5 dark:bg-white/10">
           <div
-            className={cn("h-full bg-[#0d99ff] transition-[width] duration-300", loading || emptyRefresh || livePickAwaitingRows || liveScanWaiting ? "" : "opacity-0")}
+            className={cn(
+              "h-full bg-[#0d99ff] transition-[width] duration-300",
+              loading || emptyRefresh || livePickAwaitingRows || liveScanWaiting || directLoading ? "" : "opacity-0",
+            )}
             style={{ width: `${Math.min(100, progress)}%` }}
           />
         </div>
@@ -4677,7 +4901,7 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
                 Refresh
               </Button>
             </div>
-          ) : loading || emptyRefresh || livePickAwaitingRows || liveScanWaiting ? (
+          ) : loading || emptyRefresh || livePickAwaitingRows || liveScanWaiting || directLoading ? (
             <div className="flex h-full flex-col gap-3">
               {integrationId === "chainlink" || integrationId === "binance" ? <WaitingToConnectTag /> : null}
               {livePickAwaitingRows ? (

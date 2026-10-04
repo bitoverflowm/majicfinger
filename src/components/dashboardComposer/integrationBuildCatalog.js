@@ -12,7 +12,7 @@ import {
   KALSHI_LIVE_CONNECT_ENDPOINTS,
   KALSHI_LIVE_ENDPOINT_CATEGORIES,
 } from "@/config/kalshiLiveConnect";
-import { KALSHI_CANDLESTICK_MAX_CANDLES } from "@/lib/kalshiLive/candlestickCompose";
+import { KALSHI_CANDLESTICK_MAX_CANDLES, clampCandlestickWindowToKalshiCap } from "@/lib/kalshiLive/candlestickCompose";
 import { KALSHI_LIVE_CANDLESTICK_COLUMNS } from "@/lib/kalshiLive/candlesticksColumns";
 import { flattenKalshiLiveCandlestickGroups } from "@/lib/kalshiLive/normalizeCandlestickRow";
 import { KALSHI_LIVE_MARKETS_COLUMNS } from "@/lib/kalshiLive/marketsColumns";
@@ -1382,8 +1382,9 @@ export const KALSHI_LIVE_MARKET_JOINS = [
   },
 ];
 
-function liveJoinColumns(endpointId) {
+function liveJoinColumns(endpointId, options) {
   const columns = kalshiLiveColumns(endpointId);
+  if (options?.allColumns) return columns;
   const selected = columns.filter((column) => column.defaultOn);
   return selected.length ? selected : columns;
 }
@@ -1411,14 +1412,16 @@ async function getJsonRetry(url) {
  * Live trades for one market. Preview stays at PREVIEW_ROW_CAP.
  * Save and run passes the plan row cap and follows Kalshi's cursor.
  */
-export async function loadKalshiLiveTradesForTicker(ticker, limit = PREVIEW_ROW_CAP) {
-  const columns = liveJoinColumns("trades");
+export async function loadKalshiLiveTradesForTicker(ticker, limit = PREVIEW_ROW_CAP, range = {}, options) {
+  const columns = liveJoinColumns("trades", options);
   const rowLimit = Math.max(1, Math.floor(Number(limit) || PREVIEW_ROW_CAP));
   const rows = [];
   let cursor = "";
   for (let page = 0; page < 500 && rows.length < rowLimit; page += 1) {
     const ask = Math.min(1000, rowLimit - rows.length);
     const params = new URLSearchParams({ ticker: String(ticker || ""), limit: String(ask) });
+    if (Number.isFinite(Number(range.minTs))) params.set("min_ts", String(Math.floor(Number(range.minTs))));
+    if (Number.isFinite(Number(range.maxTs))) params.set("max_ts", String(Math.floor(Number(range.maxTs))));
     if (cursor) params.set("cursor", cursor);
     const json = await getJsonRetry(`/api/integrations/kalshi-live/markets/trades?${params}`);
     const batch = (Array.isArray(json.trades) ? json.trades : []).map((row) => normalizeKalshiLiveTradeRow(row));
@@ -1430,9 +1433,11 @@ export async function loadKalshiLiveTradesForTicker(ticker, limit = PREVIEW_ROW_
 }
 
 /** Current order book for one market. Depth 100 is Kalshi's maximum. */
-export async function loadKalshiLiveOrderbookForTicker(ticker) {
-  const columns = liveJoinColumns("orderbook");
-  const params = new URLSearchParams({ ticker: String(ticker || ""), depth: "100" });
+export async function loadKalshiLiveOrderbookForTicker(ticker, depth = 100, options) {
+  const columns = liveJoinColumns("orderbook", options);
+  const rawDepth = Number(depth);
+  const levels = Number.isFinite(rawDepth) ? Math.max(0, Math.min(100, Math.floor(rawDepth))) : 100;
+  const params = new URLSearchParams({ ticker: String(ticker || ""), depth: String(levels) });
   const json = await getJsonRetry(`/api/integrations/kalshi-live/markets/orderbook?${params}`);
   const rows = normalizeKalshiLiveOrderbook(json.ticker || ticker, json.orderbook_fp);
   return { columns, rows: projectLiveJoinRows(columns, rows, rows.length || 1) };
@@ -1442,16 +1447,18 @@ export async function loadKalshiLiveOrderbookForTicker(ticker) {
  * One-minute candles for one market. Kalshi allows 5,000 candles in a request,
  * so a plan limit above that still stops there.
  */
-export async function loadKalshiLiveCandlesticksForTicker(ticker, limit = PREVIEW_ROW_CAP) {
-  const columns = liveJoinColumns("candlesticks");
+export async function loadKalshiLiveCandlesticksForTicker(ticker, limit = PREVIEW_ROW_CAP, window = {}, options) {
+  const columns = liveJoinColumns("candlesticks", options);
+  const period = [1, 60, 1440].includes(Number(window.period)) ? Number(window.period) : 1;
   const rowLimit = Math.max(1, Math.min(KALSHI_CANDLESTICK_MAX_CANDLES, Math.floor(Number(limit) || PREVIEW_ROW_CAP)));
-  const end = Math.floor(Date.now() / 1000);
-  const start = end - rowLimit * 60;
+  const end = Math.floor(Number(window.maxTs) || Date.now() / 1000);
+  const start = Math.floor(Number(window.minTs) || end - rowLimit * period * 60);
+  const clamped = clampCandlestickWindowToKalshiCap(start, end, period);
   const params = new URLSearchParams({
     market_tickers: String(ticker || ""),
-    start_ts: String(start),
-    end_ts: String(end),
-    period_interval: "1",
+    start_ts: String(clamped.start_ts),
+    end_ts: String(clamped.end_ts),
+    period_interval: String(period),
     per_ticker: "1",
   });
   const json = await getJsonRetry(`/api/integrations/kalshi-live/markets/candlesticks?${params}`);
@@ -1463,6 +1470,55 @@ export function loadKalshiLiveMarketJoin(id, ticker, limit = PREVIEW_ROW_CAP) {
   if (id === "orderbook") return loadKalshiLiveOrderbookForTicker(ticker);
   if (id === "candlesticks") return loadKalshiLiveCandlesticksForTicker(ticker, limit);
   return loadKalshiLiveTradesForTicker(ticker, limit);
+}
+
+/** One series row per ticker. Volume is included so the Volume column is filled. */
+export async function loadKalshiLiveSeriesByTickers(tickers) {
+  const columns = kalshiLiveColumns("series");
+  const rows = [];
+  for (const ticker of tickers || []) {
+    const id = String(ticker || "").trim();
+    if (!id) continue;
+    const json = await getJsonRetry(
+      `/api/integrations/kalshi-live/series?series_ticker=${encodeURIComponent(id)}&include_volume=true`,
+    );
+    const series = json?.series && typeof json.series === "object" ? json.series : json;
+    rows.push(normalizeKalshiLiveSeriesRow(series));
+  }
+  return { columns, rows: projectLiveJoinRows(columns, rows, rows.length || 1) };
+}
+
+/** Series list for one category. Tag is optional. */
+export async function loadKalshiLiveSeriesDiscovery(spec = {}, limit = PREVIEW_ROW_CAP) {
+  const columns = kalshiLiveColumns("series");
+  const params = new URLSearchParams();
+  if (spec.category) params.set("category", String(spec.category));
+  if (spec.tag) params.set("tags", String(spec.tag));
+  params.set("include_volume", "true");
+  params.set("include_product_metadata", spec.includeProductMetadata ? "true" : "false");
+  if (Number.isFinite(Number(spec.minUpdatedTs)) && Number(spec.minUpdatedTs) > 0) {
+    params.set("min_updated_ts", String(Math.floor(Number(spec.minUpdatedTs))));
+  }
+  const json = await getJsonRetry(`/api/integrations/kalshi-live/series/list?${params}`);
+  const series = Array.isArray(json.series) ? json.series : [];
+  const rows = series.map((row) => normalizeKalshiLiveSeriesRow(row));
+  const cap = Math.max(1, Math.floor(Number(limit) || PREVIEW_ROW_CAP));
+  return { columns, rows: projectLiveJoinRows(columns, rows, cap) };
+}
+
+/**
+ * One-off Kalshi Live pull. Trades, candlesticks, and the order book are one market.
+ * Series is either a ticker list or a category discovery.
+ */
+export function loadKalshiLiveDirect(tableId, spec = {}) {
+  const limit = spec.limit || PREVIEW_ROW_CAP;
+  const options = { allColumns: true };
+  if (tableId === "trades") return loadKalshiLiveTradesForTicker(spec.ticker, limit, spec, options);
+  if (tableId === "orderbook") return loadKalshiLiveOrderbookForTicker(spec.ticker, spec.depth, options);
+  if (tableId === "candlesticks") return loadKalshiLiveCandlesticksForTicker(spec.ticker, limit, spec, options);
+  if (tableId === "series" && spec.mode === "discover") return loadKalshiLiveSeriesDiscovery(spec, limit);
+  if (tableId === "series") return loadKalshiLiveSeriesByTickers(spec.tickers || []);
+  return Promise.resolve({ columns: [], rows: [] });
 }
 
 const LOADERS = {
