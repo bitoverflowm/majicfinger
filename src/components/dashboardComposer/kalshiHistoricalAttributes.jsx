@@ -637,6 +637,19 @@ function AttributeFields({ column, filters, onChange }) {
       </div>
     );
   }
+  if (column.exactTickers) {
+    return (
+      <KeywordField
+        label="Exact match"
+        placeholder="Add a market ticker"
+        tags={filter.containsTags}
+        draft={filter.contains || ""}
+        onChange={({ tags, draft }) =>
+          onChange(patchFilter(filters, column, { containsTags: tags, contains: draft }))
+        }
+      />
+    );
+  }
   return (
     <div className="space-y-2">
       <KeywordField

@@ -68,16 +68,27 @@ const STRIKE_OPTIONS = [
 
 /** Response columns plus the request filters that are not fields on the market. */
 export function kalshiLiveMarketAttributeColumns(columns) {
-  const shaped = (columns || []).map((column) => {
-    if (column.id === "status") return { ...column, enumOptions: STATUS_OPTIONS };
-    if (column.id === "market_type") return { ...column, enumOptions: MARKET_TYPE_OPTIONS };
-    if (column.id === "result") return { ...column, enumOptions: RESULT_OPTIONS };
-    if (column.id === "settlement_bounds_type") return { ...column, enumOptions: SETTLEMENT_BOUNDS_OPTIONS };
-    if (column.id === "strike_type") return { ...column, enumOptions: STRIKE_OPTIONS };
-    if (column.type === "date") return { ...column, dateEpoch: "iso" };
-    return column;
-  });
-  return [...KALSHI_LIVE_QUERY_ATTRIBUTE_COLUMNS, ...shaped];
+  const shaped = (columns || [])
+    .filter((column) => column.id !== "ticker")
+    .map((column) => {
+      if (column.id === "status") return { ...column, enumOptions: STATUS_OPTIONS };
+      if (column.id === "market_type") return { ...column, enumOptions: MARKET_TYPE_OPTIONS };
+      if (column.id === "result") return { ...column, enumOptions: RESULT_OPTIONS };
+      if (column.id === "settlement_bounds_type") return { ...column, enumOptions: SETTLEMENT_BOUNDS_OPTIONS };
+      if (column.id === "strike_type") return { ...column, enumOptions: STRIKE_OPTIONS };
+      if (column.type === "date") return { ...column, dateEpoch: "iso" };
+      return column;
+    });
+  const ticker = (columns || []).find((column) => column.id === "ticker") || { id: "ticker", type: "text" };
+  const containing = {
+    ...ticker,
+    title: "Market ticker containing",
+    description: "Add one or more. A market stays when its ticker contains any of these.",
+  };
+  const query = KALSHI_LIVE_QUERY_ATTRIBUTE_COLUMNS.flatMap((column) =>
+    column.id === "tickers" ? [column, containing] : [column],
+  );
+  return [...query, ...shaped];
 }
 
 const MAX_MARKETS = 100;

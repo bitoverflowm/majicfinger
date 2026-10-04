@@ -237,7 +237,7 @@ export function validateKalshiLiveMarketsDiscoveryPull(params) {
 
   const marketTickers = parseMarketTickerList(params.tickers);
   if (marketTickers.length > 100) {
-    return "Maximum 100 market tickers in the Tickers filter.";
+    return "Market ticker accepts up to 100 exact tickers.";
   }
 
   const hasUpdated = hasKalshiLiveMarketsDiscoveryUpdatedRange(params);

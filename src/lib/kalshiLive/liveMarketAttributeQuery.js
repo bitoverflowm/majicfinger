@@ -46,10 +46,11 @@ export const KALSHI_LIVE_QUERY_ATTRIBUTE_COLUMNS = [
   },
   {
     id: "tickers",
-    title: "Tickers",
+    title: "Market ticker",
     type: "text",
     queryOnly: true,
-    description: "Sent as tickers. Comma-separated market tickers, up to 100.",
+    exactTickers: true,
+    description: "Add one or more market tickers. One ticker loads that market. Two or more are sent together as exact matches.",
   },
   {
     id: "mve_filter",
@@ -85,6 +86,20 @@ function oneTicker(filter) {
   return isValidMarketTickerToken(list[0]) ? list[0].toUpperCase() : "";
 }
 
+function exactMarketTickers(filter) {
+  const seen = new Set();
+  const out = [];
+  for (const term of terms(filter).flatMap((value) => value.split(/[\s,]+/))) {
+    const token = String(term || "").trim();
+    if (!isValidMarketTickerToken(token)) continue;
+    const key = token.toUpperCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push(key);
+  }
+  return out;
+}
+
 function unixFromIso(iso, edge) {
   const [year, month, day] = String(iso || "").split("-").map(Number);
   if (!year || !month || !day) return "";
@@ -111,21 +126,14 @@ export function kalshiLiveDiscoveryFromFilters(filters) {
   const listing = Array.isArray(source.listing_status?.include) ? source.listing_status.include.filter(Boolean) : [];
   if (listing.length === 1) params.status = String(listing[0]);
 
-  const tickerTerms = terms(source.tickers).flatMap((term) => term.split(/[\s,]+/)).map((term) => term.trim()).filter(Boolean);
-  const tickerList = [];
-  const seen = new Set();
-  for (const term of tickerTerms) {
-    if (!isValidMarketTickerToken(term)) continue;
-    const key = term.toUpperCase();
-    if (seen.has(key)) continue;
-    seen.add(key);
-    tickerList.push(key);
-  }
-  if (tickerList.length) params.tickers = tickerList.join(",");
-
   const mve = Array.isArray(source.mve_filter?.include) ? source.mve_filter.include.filter(Boolean) : [];
   if (mve.length === 1) params.mveFilter = mve[0] === "only" ? "only" : "exclude";
   else if (mve.length > 1) params.mveFilter = "any";
+
+  const tickerList = exactMarketTickers(source.tickers);
+  if (tickerList.length === 1) params.ticker = tickerList[0];
+  else if (tickerList.length > 1) params.tickers = tickerList.join(",");
+  if (tickerList.length && !mve.length) params.mveFilter = "any";
 
   for (const [columnId, [minKey, maxKey]] of Object.entries(DATE_QUERY)) {
     const filter = source[columnId];
@@ -155,6 +163,9 @@ export function kalshiLiveFilterQueryError(filters) {
   if (eventTerms.length > 1 && eventTerms.every((term) => isValidMarketTickerToken(term))) {
     return "Event ticker accepts a single ticker.";
   }
+  const marketTickers = terms(source.tickers).flatMap((term) => term.split(/[\s,]+/)).map((term) => term.trim()).filter(Boolean);
+  const invalidTicker = marketTickers.find((term) => !isValidMarketTickerToken(term));
+  if (invalidTicker) return "Market ticker needs an exact ticker. Use Market ticker containing for part of a name.";
   return validateKalshiLiveMarketsDiscoveryPull(kalshiLiveDiscoveryFromFilters(source)) || "";
 }
 
@@ -164,6 +175,7 @@ export function kalshiLiveDiscoveryIsNarrow(filters) {
     params.status ||
       params.eventTicker ||
       params.seriesTicker ||
+      params.ticker ||
       params.tickers ||
       params.minCreatedTs ||
       params.maxCreatedTs ||
@@ -193,7 +205,8 @@ export function describeKalshiLiveServerFilters(params) {
   if (source.status) parts.push("listing status");
   if (source.seriesTicker) parts.push("series ticker");
   if (source.eventTicker) parts.push("event ticker");
-  if (source.tickers) parts.push("tickers");
+  if (source.ticker) parts.push("market ticker");
+  else if (source.tickers) parts.push("market tickers");
   if (source.mveFilter === "only") parts.push("multivariate events");
   return parts;
 }
@@ -269,11 +282,78 @@ async function getJson(url, signal) {
  *   }) => void,
  * }} args
  */
+function considerRow(raw, matched, cap, explain, match) {
+  const row = normalizeKalshiLiveMarketRow(raw);
+  if (!String(row.ticker || "").trim()) return null;
+  const reason = typeof explain === "function" ? String(explain(row) || "") : "";
+  const rejected = typeof explain === "function" ? Boolean(reason) : Boolean(match) && !match(row);
+  if (rejected) {
+    return {
+      dropped: {
+        ticker: String(row.ticker || "").trim(),
+        label: marketLabel(row),
+        reason: reason || "does not match",
+      },
+    };
+  }
+  if (matched.length < cap) matched.push(row);
+  return { kept: true };
+}
+
 export async function scanKalshiLiveMarkets({ discovery, limit, signal, match, explain, onPage }) {
   const err = validateKalshiLiveMarketsDiscoveryPull(discovery);
   if (err) return { rows: [], scanned: 0, exhausted: true, truncated: false, error: err };
 
   const cap = Math.max(1, Math.min(KALSHI_LIVE_MARKET_SCAN_CAP, Math.floor(Number(limit) || KALSHI_LIVE_MARKET_SCAN_CAP)));
+  const singleTicker = String(discovery?.ticker || "").trim();
+  if (singleTicker) {
+    let retries = 0;
+    let json;
+    for (;;) {
+      if (signal?.aborted) throw abortError();
+      try {
+        json = await getJson(`/api/integrations/kalshi-live/markets/get?ticker=${encodeURIComponent(singleTicker)}`, signal);
+        break;
+      } catch (error) {
+        if (error?.name === "AbortError") throw error;
+        if (isKalshiRateLimitError(error) && retries < MAX_RATE_RETRIES) {
+          const waitMs = kalshiRetryDelayMs(error, retries);
+          retries += 1;
+          onPage?.({
+            rows: [],
+            scanned: 0,
+            exhausted: false,
+            truncated: false,
+            dropped: [],
+            droppedCount: 0,
+            waiting: true,
+            waitMs,
+            page: 0,
+          });
+          await sleep(waitMs, signal);
+          continue;
+        }
+        throw error;
+      }
+    }
+    const matched = [];
+    const market = json?.market && typeof json.market === "object" ? json.market : null;
+    const verdict = market ? considerRow(market, matched, cap, explain, match) : null;
+    const dropped = verdict?.dropped ? [verdict.dropped] : [];
+    onPage?.({
+      rows: matched.slice(),
+      scanned: market ? 1 : 0,
+      exhausted: true,
+      truncated: false,
+      dropped,
+      droppedCount: dropped.length,
+      waiting: false,
+      waitMs: 0,
+      page: 1,
+    });
+    return { rows: matched, scanned: market ? 1 : 0, exhausted: true, truncated: false, error: "" };
+  }
+
   const matched = [];
   let scanned = 0;
   let cursor = "";

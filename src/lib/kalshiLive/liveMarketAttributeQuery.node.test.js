@@ -51,6 +51,34 @@ test("rate limit retry uses Retry-After, then backs off", () => {
   assert.equal(kalshiRetryDelayMs({}, 2), 6_000);
 });
 
+test("one market ticker is sent on its own", () => {
+  const params = kalshiLiveDiscoveryFromFilters({
+    tickers: { containsTags: ["kxhighny-25jan01-t77"] },
+  });
+  assert.equal(params.ticker, "KXHIGHNY-25JAN01-T77");
+  assert.equal(params.tickers, "");
+  assert.equal(params.mveFilter, "any");
+  assert.deepEqual(describeKalshiLiveServerFilters(params), ["market ticker"]);
+});
+
+test("several market tickers are sent together as exact matches", () => {
+  const params = kalshiLiveDiscoveryFromFilters({
+    tickers: { containsTags: ["KXHIGHNY-25JAN01-T77", "KXBTC-26"] },
+  });
+  assert.equal(params.ticker || "", "");
+  assert.equal(params.tickers, "KXHIGHNY-25JAN01-T77,KXBTC-26");
+  assert.deepEqual(describeKalshiLiveServerFilters(params), ["market tickers"]);
+});
+
+test("a partial ticker stays off the markets request", () => {
+  const params = kalshiLiveDiscoveryFromFilters({
+    ticker: { containsTags: ["HIGH"] },
+  });
+  assert.equal(params.ticker || "", "");
+  assert.equal(params.tickers, "");
+  assert.equal(describeKalshiLiveServerFilters(params).includes("market ticker"), false);
+});
+
 test("date presets are windows through today", () => {
   const now = new Date(2026, 9, 4, 16, 0, 0);
   assert.deepEqual(dateRangePreset("past-24h", now), { from: "2026-10-03", to: "2026-10-04" });
