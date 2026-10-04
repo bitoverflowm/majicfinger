@@ -2058,7 +2058,6 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
   const tradesJoinPicked = tradesQuery && joinOn && Boolean(join) && joinTarget === joinMarketsTarget;
   const tradesJoinReady = tradesJoinPicked && Boolean(joinPlacement) && selectedMarketColumns.length > 0;
   const historicalEnrich = marketsQuery || tradesQuery;
-  const sheetEnrich = historicalEnrich || liveMarketSearch;
   const liveJoinList = useMemo(() => {
     if (!liveMarketSearch) return [];
     const source = liveMatchedRows || filteredRows;
@@ -2119,14 +2118,14 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
     };
   }, [liveMarketSearch, step, enrichPicks, liveJoinKey, livePreviewTicker]);
 
-  const showSampleExplainer = sheetEnrich && step === "enrich" && hoverSample && !enrichPicks.has("sample");
-  const showBucketExplainer = sheetEnrich && step === "enrich" && hoverBucket && !enrichPicks.has("bucket") && !showSampleExplainer;
-  const showSummarizeExplainer = sheetEnrich && step === "enrich" && hoverSummarize && !enrichPicks.has("summarize") && !showSampleExplainer && !showBucketExplainer;
+  const showSampleExplainer = step === "enrich" && hoverSample && !enrichPicks.has("sample");
+  const showBucketExplainer = step === "enrich" && hoverBucket && !enrichPicks.has("bucket") && !showSampleExplainer;
+  const showSummarizeExplainer = step === "enrich" && hoverSummarize && !enrichPicks.has("summarize") && !showSampleExplainer && !showBucketExplainer;
   const showFunctionExplainer =
-    sheetEnrich && step === "enrich" && hoverFunction && !enrichPicks.has("function") && !showSummarizeExplainer && !showSampleExplainer && !showBucketExplainer;
+    step === "enrich" && hoverFunction && !enrichPicks.has("function") && !showSummarizeExplainer && !showSampleExplainer && !showBucketExplainer;
   const liveJoinReady = liveMarketSearch && joinOn && liveJoinTargets.length > 0;
   const showJoinExplainer =
-    sheetEnrich &&
+    (historicalEnrich || liveMarketSearch) &&
     step === "enrich" &&
     hoverJoin &&
     !enrichPicks.has("join") &&
@@ -2138,9 +2137,9 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
     !showSampleExplainer &&
     !showBucketExplainer;
   const enrichExplainer = showSampleExplainer || showBucketExplainer || showSummarizeExplainer || showFunctionExplainer || showJoinExplainer;
-  const summarizeOn = sheetEnrich && step === "enrich" && enrichPicks.has("summarize");
-  const bucketOn = sheetEnrich && step === "enrich" && enrichPicks.has("bucket");
-  const sampleOn = sheetEnrich && step === "enrich" && enrichPicks.has("sample");
+  const summarizeOn = step === "enrich" && enrichPicks.has("summarize");
+  const bucketOn = step === "enrich" && enrichPicks.has("bucket");
+  const sampleOn = step === "enrich" && enrichPicks.has("sample");
   const summaryActive = summarizeOn && !enrichExplainer && previewSheet === "summary";
   const bucketPreviewId = previewSheet.startsWith("bucket:") ? previewSheet.slice("bucket:".length) : "";
   const bucketActive = bucketOn && !enrichExplainer && Boolean(bucketPreviewId);
@@ -2403,7 +2402,7 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
     if (sampleActive) {
       if (sampleSizeError) return sampleSizeError;
       const shown = samplePreviewRows.length;
-      return `Previewing ${shown.toLocaleString()} of the rows on screen. Save and run draws ${sampleSizeNumber.toLocaleString()} ${sampleMode === "seeded" ? "seeded" : "new"} rows from the full query.`;
+      return `Previewing ${shown.toLocaleString()} of the rows on screen. Save and run draws ${sampleSizeNumber.toLocaleString()} ${sampleMode === "seeded" ? "seeded" : "new"} rows from ${historicalLake ? "the full query" : "the imported rows"}.`;
     }
     if (bucketActive) {
       if (!visibleBucket?.ready) return "Choose a column to bucket. The result is a new sheet.";
@@ -2788,6 +2787,13 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
         });
       }
     } else {
+      if (enrichPicks.has("sample") && sampleSizeNumber > 0 && !sampleSizeError) {
+        marketRows = previewRandomSample(marketRows, {
+          size: sampleSizeNumber,
+          mode: sampleMode,
+          seed: sampleMode === "seeded" ? sampleSeed || generateRandomSampleSeed() : `draw-${Date.now()}`,
+        });
+      }
       reporter.succeed("source", { result: `${marketRows.length.toLocaleString()} rows from ${sourceTable}` });
     }
     let primaryColumns = shownColumns;
@@ -3478,12 +3484,12 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
               setFormulaFocused(false);
             }}
             summaryNote={`New sheet. Write a name in Label, and an equation in Value, like = SUM(${summaryMeasure}). Click a column on ${sheetTitle}, Buckets, or any other sheet to drop it in.`}
-            showSummarizeBuilder={sheetEnrich}
+            showSummarizeBuilder
             onFunctionHelp={() => setFunctionHelp(true)}
             onSaveAndRun={requestSaveAndRun}
             running={running}
             showJoinBuilder={marketsQuery || tradesQuery || liveMarketSearch}
-            showFunctionBuilder={sheetEnrich}
+            showFunctionBuilder
             joinMode={liveMarketSearch ? "live" : tradesQuery ? "trades" : "markets"}
             liveJoinIds={liveJoinIds}
             onToggleLiveJoin={toggleLiveJoin}
