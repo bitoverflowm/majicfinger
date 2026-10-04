@@ -453,6 +453,7 @@ export function KalshiLiveMarketPicker({ picks, onAdd, onRemove }) {
 
   function chooseSuggestion(suggestion) {
     if (!suggestion || atCap) return;
+    setExpanded(false);
     if (suggestion.kind === "series") openSeries(suggestion);
     else addMarket(suggestion);
   }
@@ -556,49 +557,51 @@ export function KalshiLiveMarketPicker({ picks, onAdd, onRemove }) {
   }, [showList, loading, loadingMore, suggestions, typed, picked, atCap, box?.listMax, loadMoreMarkets]);
 
   const searchField = (portal) => (
-    <div className="relative">
-      <span className="pointer-events-none absolute left-3 top-1/2 z-[1] flex h-4 w-4 -translate-y-1/2 items-center justify-center text-muted-foreground">
-        {loading ? <Loader2 className="h-4 w-4 animate-spin text-primary" aria-hidden /> : <Search className="h-4 w-4" aria-hidden />}
-      </span>
-      <input
-        ref={portal ? portalInputRef : undefined}
-        type="text"
-        value={query}
-        disabled={atCap}
-        placeholder={SEARCH_PLACEHOLDER}
-        aria-label="Search Kalshi markets"
-        autoComplete="off"
-        onChange={(event) => {
-          setQuery(event.target.value);
-          setError("");
-          if (!expanded) setExpanded(true);
-        }}
-        onFocus={() => setExpanded(true)}
-        onKeyDown={(event) => {
-          if (event.key === "Escape") {
-            event.preventDefault();
-            setExpanded(false);
-            return;
-          }
-          if (event.key === "Enter") {
-            event.preventDefault();
-            const first = suggestions[0];
-            if (expanded && first) chooseSuggestion(first);
-          }
-        }}
-        className={cn(inputClassName, portal && "pr-8", atCap && "opacity-70")}
-      />
-      {portal ? (
-        <button
-          type="button"
-          aria-label="Close search"
-          className="absolute right-2 top-1/2 z-[1] -translate-y-1/2 rounded-sm p-0.5 text-muted-foreground hover:text-foreground"
-          onMouseDown={(event) => event.preventDefault()}
-          onClick={() => setExpanded(false)}
-        >
-          <X className="h-3.5 w-3.5" aria-hidden />
-        </button>
-      ) : null}
+    <div data-search-field="">
+      <div className="relative">
+        <span className="pointer-events-none absolute left-3 top-1/2 z-[1] flex h-4 w-4 -translate-y-1/2 items-center justify-center text-muted-foreground">
+          {loading ? <Loader2 className="h-4 w-4 animate-spin text-primary" aria-hidden /> : <Search className="h-4 w-4" aria-hidden />}
+        </span>
+        <input
+          ref={portal ? portalInputRef : undefined}
+          type="text"
+          value={query}
+          disabled={atCap}
+          placeholder={SEARCH_PLACEHOLDER}
+          aria-label="Search Kalshi markets"
+          autoComplete="off"
+          onChange={(event) => {
+            setQuery(event.target.value);
+            setError("");
+            if (!expanded) setExpanded(true);
+          }}
+          onFocus={() => setExpanded(true)}
+          onKeyDown={(event) => {
+            if (event.key === "Escape") {
+              event.preventDefault();
+              setExpanded(false);
+              return;
+            }
+            if (event.key === "Enter") {
+              event.preventDefault();
+              const first = suggestions[0];
+              if (expanded && first) chooseSuggestion(first);
+            }
+          }}
+          className={cn(inputClassName, portal && "pr-8", atCap && "opacity-70")}
+        />
+        {portal ? (
+          <button
+            type="button"
+            aria-label="Close search"
+            className="absolute right-2 top-1/2 z-[1] -translate-y-1/2 rounded-sm p-0.5 text-muted-foreground hover:text-foreground"
+            onMouseDown={(event) => event.preventDefault()}
+            onClick={() => setExpanded(false)}
+          >
+            <X className="h-3.5 w-3.5" aria-hidden />
+          </button>
+        ) : null}
+      </div>
       <AnimatePresence>{portal ? suggestionList : null}</AnimatePresence>
     </div>
   );
@@ -677,11 +680,7 @@ export function KalshiLiveMarketPicker({ picks, onAdd, onRemove }) {
               </Popover>
             ) : null}
           </div>
-        ) : (
-          <p className="text-[11px] leading-relaxed text-muted-foreground">
-            Add a market, or open a series and choose the markets to include. The preview updates as you add them.
-          </p>
-        )}
+        ) : null}
 
         <Dialog
           open={!!seriesModal}

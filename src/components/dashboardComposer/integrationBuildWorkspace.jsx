@@ -1885,9 +1885,10 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
   const searchingPreview = Boolean(previewRequestKey) && previewRequestKey !== settledPreviewKey;
   const noMatchingRows = !loading && !searchingPreview && !previewSearchError && Boolean(previewRequestKey) && shown === 0;
   const emptyRefresh = !loading && shownColumns.length > 0 && shown === 0 && searchingPreview;
+  const livePickAwaitingRows = liveMarketSearch && !loading && shown === 0 && livePicks.some((pick) => pick.status === "loading");
 
   useEffect(() => {
-    if (!emptyRefresh) return undefined;
+    if (!emptyRefresh && !livePickAwaitingRows) return undefined;
     setProgress(12);
     const timer = window.setInterval(() => {
       setProgress((current) => (current >= 88 ? current : current + Math.random() * 8));
@@ -1896,7 +1897,7 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
       window.clearInterval(timer);
       setProgress(100);
     };
-  }, [emptyRefresh]);
+  }, [emptyRefresh, livePickAwaitingRows]);
   const shownLabel = `Previewing ${shown.toLocaleString()} ${shown === 1 ? "row" : "rows"}`;
   const livePickLoading = livePicks.some((pick) => pick.status === "loading");
   const liveUpdating = liveScan.status === "loading" || livePickLoading;
@@ -1909,11 +1910,13 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
     : liveScan.status === "error"
       ? liveScan.error
       : liveMatchedRows
-        ? liveUpdating
-          ? shown
-            ? `${shownLabel} of ${liveMatchedRows.length.toLocaleString()} matching · updating`
-            : "Updating the markets"
-          : `Previewing ${shown.toLocaleString()} of ${liveMatchedRows.length.toLocaleString()} matching ${liveMatchedRows.length === 1 ? "row" : "rows"}.${liveScanNote}`
+        ? livePickAwaitingRows
+          ? "Loading data"
+          : liveUpdating
+            ? shown
+              ? `${shownLabel} of ${liveMatchedRows.length.toLocaleString()} matching · updating`
+              : "Updating the markets"
+            : `Previewing ${shown.toLocaleString()} of ${liveMatchedRows.length.toLocaleString()} matching ${liveMatchedRows.length === 1 ? "row" : "rows"}.${liveScanNote}`
         : !exactUniverse
       ? `${shownLabel} of 1,000,000+ rows available`
       : typeof universe === "number" && !counting
@@ -3634,7 +3637,7 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
         </div>
         <div className="h-1 w-full bg-black/5 dark:bg-white/10">
           <div
-            className={cn("h-full bg-[#0d99ff] transition-[width] duration-300", loading || emptyRefresh ? "" : "opacity-0")}
+            className={cn("h-full bg-[#0d99ff] transition-[width] duration-300", loading || emptyRefresh || livePickAwaitingRows ? "" : "opacity-0")}
             style={{ width: `${Math.min(100, progress)}%` }}
           />
         </div>
@@ -3843,10 +3846,14 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
             <div className="flex h-full items-center justify-center rounded-xl border border-border/70 bg-background px-6 text-center text-[13px] leading-relaxed text-muted-foreground shadow-sm">
               No rows found matching your criteria.
             </div>
-          ) : loading || emptyRefresh ? (
+          ) : loading || emptyRefresh || livePickAwaitingRows ? (
             <div className="flex h-full flex-col gap-3">
               {integrationId === "chainlink" || integrationId === "binance" ? <WaitingToConnectTag /> : null}
-              {emptyRefresh ? <p className="text-[13px] text-muted-foreground">Searching for matching rows</p> : null}
+              {livePickAwaitingRows ? (
+                <p className="text-[13px] text-muted-foreground">Loading data</p>
+              ) : emptyRefresh ? (
+                <p className="text-[13px] text-muted-foreground">Searching for matching rows</p>
+              ) : null}
               <div className="min-h-0 flex-1">
                 <SkeletonRows />
               </div>
