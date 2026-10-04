@@ -1,80 +1,105 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
-import { cn } from "@/lib/utils";
+import { ToolChips } from "@/components/spectrumui/blocks/ai-assistants/tool-chips";
 
-const VISIBLE_CAP = 4;
+function queryToolName(source) {
+  const label = String(source || "").toLowerCase();
+  if (label.includes("kalshi")) return "query_kalshi_markets";
+  if (label.includes("polymarket")) return "query_polymarket_markets";
+  if (label.includes("chainlink")) return "query_chainlink";
+  if (label.includes("binance")) return "query_binance";
+  const slug = label.replace(/[^a-z0-9]+/g, "_").replace(/^_|_$/g, "");
+  return slug ? `query_${slug}` : "query_markets";
+}
+
+function tickerLine(item) {
+  const parts = [item.ticker, item.label, item.reason].map((part) => String(part || "").trim()).filter(Boolean);
+  return parts.join(" · ");
+}
 
 /**
- * Shows markets leaving a live scan. Each line flashes red, then collapses.
+ * Agent-style steps for a live market scan.
+ * Query the source, match the user's requirements, then show how many markets were removed.
  */
-export function LiveFilterTape({ token, items, extra }) {
-  const queueRef = useRef([]);
-  const seenRef = useRef(0);
-  const [visible, setVisible] = useState([]);
-  const [more, setMore] = useState(0);
+export function MarketScanSteps({
+  source,
+  status,
+  scanned = 0,
+  removedCount = 0,
+  removed = [],
+  waiting = false,
+  note = "",
+  error = "",
+  startedAt = 0,
+  completedAt = 0,
+  request = "GET /markets",
+  serverFilters = [],
+  requirements = [],
+}) {
+  if (!startedAt || status === "idle") return null;
 
-  useEffect(() => {
-    if (!token) {
-      seenRef.current = 0;
-      queueRef.current = [];
-      setVisible([]);
-      setMore(0);
-      return undefined;
-    }
-    if (token !== seenRef.current) {
-      seenRef.current = token;
-      const batch = Array.isArray(items) ? items : [];
-      queueRef.current.push(
-        ...batch.map((item, index) => ({
-          ...item,
-          key: `${token}-${index}-${item.ticker || index}`,
-        })),
-      );
-      setMore(Number(extra) > 0 ? Number(extra) : 0);
-    }
-    if (!(Number(extra) > 0)) return undefined;
-    const clearMore = window.setTimeout(() => setMore(0), 1800);
-    return () => window.clearTimeout(clearMore);
-  }, [token, items, extra]);
+  const sourceName = source || "the source";
+  const done = status === "ready" || status === "error";
+  const stamp = done ? { startedAt, completedAt: completedAt || undefined } : { startedAt };
+  const requirementsLabel = requirements.filter(Boolean);
+  const calls = [];
 
-  useEffect(() => {
-    const timer = window.setInterval(() => {
-      const next = queueRef.current.shift();
-      if (!next) return;
-      setVisible((current) => [...current, { ...next, leaving: false }].slice(-VISIBLE_CAP));
-      window.setTimeout(() => {
-        setVisible((current) => current.map((item) => (item.key === next.key ? { ...item, leaving: true } : item)));
-      }, 560);
-      window.setTimeout(() => {
-        setVisible((current) => current.filter((item) => item.key !== next.key));
-      }, 1100);
-    }, 180);
-    return () => window.clearInterval(timer);
-  }, []);
+  const queryStatus = status === "error" && !scanned ? "error" : scanned > 0 || done ? "success" : "running";
+  const queryResult = waiting
+    ? note || `${sourceName} asked for a pause. Continuing in a moment.`
+    : status === "error" && error
+      ? error
+      : scanned
+        ? `Queried markets directly from ${sourceName}. Read ${scanned.toLocaleString()} markets.`
+        : `Querying markets directly from ${sourceName}.`;
+  calls.push({
+    id: "query",
+    name: queryToolName(sourceName),
+    status: waiting ? "running" : queryStatus,
+    ...stamp,
+    completedAt: done ? stamp.completedAt : undefined,
+    args: {
+      source: sourceName,
+      request,
+      ...(serverFilters.length ? { includes: serverFilters.join(", ") } : {}),
+    },
+    result: queryResult,
+  });
 
-  if (!visible.length && !more) return null;
+  if (requirementsLabel.length || removedCount > 0) {
+    calls.push({
+      id: "match",
+      name: "match_requirements",
+      status: scanned ? (done ? "success" : "running") : "pending",
+      ...(scanned && done ? stamp : scanned ? { startedAt } : {}),
+      args: requirementsLabel.length ? { requirements: requirementsLabel.join(", ") } : undefined,
+      result: requirementsLabel.length
+        ? `Filtering through the markets to match your requirements: ${requirementsLabel.join(", ")}.`
+        : "Filtering through the markets to match your requirements.",
+    });
+  }
 
-  return (
-    <div className="mb-2 space-y-1" aria-live="polite">
-      {visible.map((item) => (
-        <div
-          key={item.key}
-          className={cn(
-            "overflow-hidden border-l-2 border-red-500 bg-red-500/10 px-2 text-[12px] leading-5 text-foreground transition-all duration-500",
-            item.leaving ? "max-h-0 py-0 opacity-0" : "max-h-8 py-1 opacity-100",
-          )}
-        >
-          <span className="block truncate">
-            Removing unmatching ticker {item.ticker}
-            {item.label ? ` · ${item.label}` : ""}
-            {item.reason ? ` · ${item.reason}` : ""}
-          </span>
-        </div>
-      ))}
-      {more > 0 ? (
-        <p className="text-[11px] text-muted-foreground">and {more.toLocaleString()} more on this page</p>
-      ) : null}
-    </div>
-  );
+  if (removedCount > 0 || (scanned > 0 && requirementsLabel.length)) {
+    const listed = (removed || []).map(tickerLine).filter(Boolean);
+    const hidden = Math.max(0, removedCount - listed.length);
+    const detail = [
+      removedCount
+        ? `Removed ${removedCount.toLocaleString()} ${removedCount === 1 ? "market" : "markets"} outside your requirements.`
+        : "Checking which markets fall outside your requirements.",
+      listed.length ? listed.join("\n") : "",
+      hidden > 0 ? `and ${hidden.toLocaleString()} more` : "",
+    ]
+      .filter(Boolean)
+      .join("\n\n");
+    calls.push({
+      id: "remove",
+      name: removedCount ? `removed_${removedCount}_markets` : "remove_outside_requirements",
+      status: done ? "success" : scanned ? "running" : "pending",
+      ...(scanned && done ? stamp : scanned ? { startedAt } : {}),
+      args: removedCount ? { removed: removedCount } : undefined,
+      result: detail,
+    });
+  }
+
+  return <ToolChips calls={calls} className="mb-3 max-w-full" />;
 }

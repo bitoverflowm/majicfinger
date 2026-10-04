@@ -61,7 +61,7 @@ import {
   sortAttributeRows,
   sortSummary,
 } from "@/components/dashboardComposer/integrationAttributes";
-import { LiveFilterTape } from "@/components/dashboardComposer/liveFilterTape";
+import { MarketScanSteps } from "@/components/dashboardComposer/liveFilterTape";
 import { integrationProfile } from "@/components/dashboardComposer/integrationSource";
 import { requestCardForSheet, stampRunSheets } from "@/components/dashboardComposer/integrationProvenance";
 import { cn } from "@/lib/utils";
@@ -1508,19 +1508,30 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
         .filter((column) => attributeSummary(column, attributeFilters))
         .map((column) => column.title || column.id);
       const server = describeKalshiLiveServerFilters(discovery);
-      const startBits = [];
-      if (server.length) startBits.push(`Request includes ${server.join(", ")}.`);
-      if (localTitles.length) startBits.push(`${localTitles.join(", ")} checked on each market.`);
+      const request = discovery.ticker
+        ? `GET /markets/${discovery.ticker}`
+        : discovery.tickers
+          ? `GET /markets?tickers=${discovery.tickers}`
+          : "GET /markets";
       setLiveScan({
         status: "loading",
         rows: [],
         error: "",
         exhausted: false,
         truncated: false,
-        note: startBits.join(" ") || "Starting the market scan.",
+        note: `Querying markets directly from ${profile.label}.`,
         dropped: [],
         droppedCount: 0,
         dropToken: 0,
+        scanned: 0,
+        removed: [],
+        removedCount: 0,
+        waiting: false,
+        startedAt: Date.now(),
+        completedAt: 0,
+        request,
+        serverFilters: server,
+        requirements: localTitles,
       });
       const scopes = livePicks.filter((pick) => pick.kind === "series" || pick.kind === "event");
       let carried = [];
@@ -1538,6 +1549,15 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
           dropped: info.waiting ? current.dropped : info.dropped || [],
           droppedCount: info.waiting ? current.droppedCount : info.droppedCount || 0,
           dropToken: info.waiting ? current.dropToken : dropSerial,
+          scanned: info.scanned || 0,
+          removed: info.waiting ? current.removed || [] : [...(current.removed || []), ...(info.dropped || [])].slice(-40),
+          removedCount: info.waiting ? current.removedCount || 0 : (current.removedCount || 0) + (info.droppedCount || 0),
+          waiting: Boolean(info.waiting),
+          startedAt: current.startedAt,
+          completedAt: 0,
+          request: current.request,
+          serverFilters: current.serverFilters,
+          requirements: current.requirements,
         }));
       };
       const run = async () => {
@@ -1590,10 +1610,19 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
             error: result.error || "",
             exhausted: result.exhausted !== false,
             truncated: Boolean(result.truncated),
-            note: result.error ? current.note || "" : `Read ${Number(result.scanned || 0).toLocaleString()} markets.`,
+            note: result.error ? current.note || "" : `Read ${Number(result.scanned || current.scanned || 0).toLocaleString()} markets.`,
             dropped: current.dropped || [],
             droppedCount: current.droppedCount || 0,
             dropToken: current.dropToken || 0,
+            scanned: result.scanned || current.scanned || 0,
+            removed: current.removed || [],
+            removedCount: current.removedCount || 0,
+            waiting: false,
+            startedAt: current.startedAt,
+            completedAt: Date.now(),
+            request: current.request,
+            serverFilters: current.serverFilters,
+            requirements: current.requirements,
           }));
         })
         .catch((err) => {
@@ -1608,6 +1637,15 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
             dropped: current.dropped || [],
             droppedCount: current.droppedCount || 0,
             dropToken: current.dropToken || 0,
+            scanned: current.scanned || 0,
+            removed: current.removed || [],
+            removedCount: current.removedCount || 0,
+            waiting: false,
+            startedAt: current.startedAt,
+            completedAt: Date.now(),
+            request: current.request,
+            serverFilters: current.serverFilters,
+            requirements: current.requirements,
           }));
         });
     }, 400);
@@ -2216,9 +2254,11 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
         ? livePickAwaitingRows
           ? "Loading data"
           : liveUpdating
-            ? shown
-              ? `${shownLabel} of ${liveMatchedRows.length.toLocaleString()} matching · ${liveScan.note || "updating"}`
-              : liveScan.note || "Checking markets"
+            ? liveScan.waiting
+              ? liveScan.note || "Slowing down."
+              : shown
+                ? `${shownLabel} of ${liveMatchedRows.length.toLocaleString()} matching`
+                : "Checking markets"
             : liveScan.status === "error"
               ? `${liveScan.error} ${liveMatchedRows.length.toLocaleString()} matching ${liveMatchedRows.length === 1 ? "row" : "rows"} kept.`
               : `Previewing ${shown.toLocaleString()} of ${liveMatchedRows.length.toLocaleString()} matching ${liveMatchedRows.length === 1 ? "row" : "rows"}.${liveScanNote}`
@@ -2230,10 +2270,20 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
           ? `${shownLabel} of …`
           : `${shownLabel}. More rows are available.`;
   const liveRemovalTape = liveMarketSearch ? (
-    <LiveFilterTape
-      token={liveScan.dropToken || 0}
-      items={liveScan.dropped || []}
-      extra={Math.max(0, (liveScan.droppedCount || 0) - (liveScan.dropped || []).length)}
+    <MarketScanSteps
+      source={profile.label}
+      status={liveScan.status}
+      scanned={liveScan.scanned || 0}
+      removedCount={liveScan.removedCount || 0}
+      removed={liveScan.removed || []}
+      waiting={Boolean(liveScan.waiting)}
+      note={liveScan.note || ""}
+      error={liveScan.error || ""}
+      startedAt={liveScan.startedAt || 0}
+      completedAt={liveScan.completedAt || 0}
+      request={liveScan.request || "GET /markets"}
+      serverFilters={liveScan.serverFilters || []}
+      requirements={liveScan.requirements || []}
     />
   ) : null;
   const liveEmptyLine =
