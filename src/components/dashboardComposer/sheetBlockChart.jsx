@@ -168,6 +168,7 @@ function TradeMarketChart({ sheet, rows, live, snapshot, onSnapshot, mode = "tra
     <MarketChart
       data={candles}
       symbol={symbol}
+      variant={mode === "ohlc" ? "candles" : "area"}
       name={mode === "ohlc" ? "Price" : "Yes"}
       volumeLabel={volumeLabel || (mode === "ohlc" ? "Volume fp" : "Count fp")}
       ranges={ranges}

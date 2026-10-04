@@ -22,7 +22,43 @@ const KEYFRAMES = `
   70% { r: 12; opacity: 0; }
   100% { r: 12; opacity: 0; }
 }
+@keyframes spectrum-mc-draw {
+  from { stroke-dashoffset: 1; }
+  to { stroke-dashoffset: 0; }
+}
 `;
+
+function monotonePath(points) {
+  const n = points.length;
+  if (!n) return "";
+  if (n === 1) return `M${points[0].x},${points[0].y}`;
+  const dx = [];
+  const slope = [];
+  for (let i = 0; i < n - 1; i += 1) {
+    dx[i] = points[i + 1].x - points[i].x;
+    slope[i] = dx[i] === 0 ? 0 : (points[i + 1].y - points[i].y) / dx[i];
+  }
+  const tangent = new Array(n);
+  tangent[0] = slope[0];
+  tangent[n - 1] = slope[n - 2];
+  for (let i = 1; i < n - 1; i += 1) {
+    if (slope[i - 1] * slope[i] <= 0) tangent[i] = 0;
+    else {
+      const w1 = 2 * dx[i] + dx[i - 1];
+      const w2 = dx[i] + 2 * dx[i - 1];
+      tangent[i] = (w1 + w2) / (w1 / slope[i - 1] + w2 / slope[i]);
+    }
+  }
+  let d = `M${points[0].x},${points[0].y}`;
+  for (let i = 0; i < n - 1; i += 1) {
+    const c1x = points[i].x + dx[i] / 3;
+    const c1y = points[i].y + (tangent[i] * dx[i]) / 3;
+    const c2x = points[i + 1].x - dx[i] / 3;
+    const c2y = points[i + 1].y - (tangent[i + 1] * dx[i]) / 3;
+    d += `C${c1x.toFixed(2)},${c1y.toFixed(2)} ${c2x.toFixed(2)},${c2y.toFixed(2)} ${points[i + 1].x.toFixed(2)},${points[i + 1].y.toFixed(2)}`;
+  }
+  return d;
+}
 
 function formatSignedPct(value) {
   const n = Number(value);
@@ -143,7 +179,8 @@ function formatWhen(time) {
 }
 
 /**
- * Spectrum market chart: price candles with a volume pane underneath.
+ * Spectrum market chart. `variant="area"` is the line with a fill split around the
+ * first price. `variant="candles"` draws OHLC bars. Volume stays in the pane either way.
  * `live` marks a feed that is already updating `data`. It does not invent prices.
  */
 export function MarketChart({
@@ -151,6 +188,7 @@ export function MarketChart({
   data = [],
   symbol = "",
   name = "Yes",
+  variant = "candles",
   volumeLabel = "Vol",
   formatVolume = formatCountFp,
   ranges = [],
@@ -159,6 +197,7 @@ export function MarketChart({
   status = "ready",
   emptyLabel = "This sheet has no price to chart yet.",
 }) {
+  const uid = React.useId().replace(/:/g, "");
   const reduce = usePrefersReducedMotion();
   const [plotRef, box] = useBox();
   const [rangeLabel, setRangeLabel] = React.useState(defaultRange);
@@ -214,12 +253,14 @@ export function MarketChart({
     let lo = Infinity;
     let hi = -Infinity;
     for (const candle of view) {
-      if (candle.low < lo) lo = candle.low;
-      if (candle.high > hi) hi = candle.high;
+      const low = variant === "area" ? candle.close : candle.low;
+      const high = variant === "area" ? candle.close : candle.high;
+      if (low < lo) lo = low;
+      if (high > hi) hi = high;
     }
     const pad = (hi - lo) * 0.16 || Math.abs(hi) * 0.04 || 0.02;
     return [lo - pad, hi + pad];
-  }, [n, view]);
+  }, [n, variant, view]);
   const [domLo, domHi] = domain;
   const priceY = (v) => priceY1 - ((v - domLo) / (domHi - domLo || 1)) * priceH;
   const maxVolume = view.reduce((max, candle) => Math.max(max, candle.volume), 1);
@@ -227,6 +268,13 @@ export function MarketChart({
   const active = hoverIndex != null ? view[hoverIndex] : null;
   const shown = active || last;
   const baseline = first?.close ?? 0;
+  const areaPoints = view.map((candle, i) => ({ x: cx(i), y: priceY(candle.close) }));
+  const linePath = variant === "area" ? monotonePath(areaPoints) : "";
+  const baselineY = priceY(baseline);
+  const areaPath =
+    variant === "area" && linePath && areaPoints.length
+      ? `${linePath}L${areaPoints[areaPoints.length - 1].x},${baselineY}L${areaPoints[0].x},${baselineY}Z`
+      : "";
   const delta = baseline ? (((shown?.close ?? 0) - baseline) / baseline) * 100 : 0;
   const up = delta >= 0;
   const dirColor = up ? "var(--spectrum-chart-up)" : "var(--spectrum-chart-down)";
@@ -313,13 +361,20 @@ export function MarketChart({
             aria-hidden={!active}
           >
             {active ? (
-              <>
-                <span>O {formatPrice(active.open)}</span>
-                <span>H {formatPrice(active.high)}</span>
-                <span>L {formatPrice(active.low)}</span>
-                <span style={{ color: dirColor }}>C {formatPrice(active.close)}</span>
-                <span className="text-neutral-400">{formatWhen(active.t)}</span>
-              </>
+              variant === "area" ? (
+                <>
+                  <span style={{ color: dirColor }}>{formatPrice(active.close)}</span>
+                  <span className="text-neutral-400">{formatWhen(active.t)}</span>
+                </>
+              ) : (
+                <>
+                  <span>O {formatPrice(active.open)}</span>
+                  <span>H {formatPrice(active.high)}</span>
+                  <span>L {formatPrice(active.low)}</span>
+                  <span style={{ color: dirColor }}>C {formatPrice(active.close)}</span>
+                  <span className="text-neutral-400">{formatWhen(active.t)}</span>
+                </>
+              )
             ) : null}
           </p>
         </div>
@@ -358,27 +413,82 @@ export function MarketChart({
               );
             })}
 
-            {view.map((candle, i) => {
-              const isUp = candle.close >= candle.open;
-              const color = isUp ? "var(--spectrum-chart-up)" : "var(--spectrum-chart-down)";
-              const x = cx(i);
-              const top = Math.min(priceY(candle.open), priceY(candle.close));
-              const bodyH = Math.max(1.25, Math.abs(priceY(candle.close) - priceY(candle.open)));
-              const dim = hoverIndex != null && hoverIndex !== i;
-              return (
-                <g key={candle.t} style={{ opacity: dim ? 0.35 : 1 }}>
-                  <line
-                    x1={x}
-                    x2={x}
-                    y1={priceY(candle.high)}
-                    y2={priceY(candle.low)}
-                    stroke={color}
-                    strokeWidth={1}
-                  />
-                  <rect x={x - bodyW / 2} y={top} width={bodyW} height={bodyH} rx={1} fill={color} />
-                </g>
-              );
-            })}
+            {variant === "area" ? (
+              <g key={range?.label || "all"}>
+                <defs>
+                  <linearGradient id={`${uid}-up`} x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor="var(--spectrum-chart-up)" stopOpacity={0.28} />
+                    <stop offset="100%" stopColor="var(--spectrum-chart-up)" stopOpacity={0} />
+                  </linearGradient>
+                  <linearGradient id={`${uid}-down`} x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor="var(--spectrum-chart-down)" stopOpacity={0} />
+                    <stop offset="100%" stopColor="var(--spectrum-chart-down)" stopOpacity={0.28} />
+                  </linearGradient>
+                  <clipPath id={`${uid}-above`}>
+                    <rect x={plotX0} y={priceY0 - 40} width={plotW} height={Math.max(0, baselineY - priceY0 + 40)} />
+                  </clipPath>
+                  <clipPath id={`${uid}-below`}>
+                    <rect x={plotX0} y={baselineY} width={plotW} height={Math.max(0, priceY1 - baselineY + 40)} />
+                  </clipPath>
+                </defs>
+                <path d={areaPath} fill={`url(#${uid}-up)`} clipPath={`url(#${uid}-above)`} />
+                <path d={areaPath} fill={`url(#${uid}-down)`} clipPath={`url(#${uid}-below)`} />
+                <line
+                  x1={plotX0}
+                  x2={plotX1}
+                  y1={baselineY}
+                  y2={baselineY}
+                  stroke="currentColor"
+                  strokeOpacity={0.35}
+                  strokeDasharray="3 3"
+                />
+                <path
+                  d={linePath}
+                  fill="none"
+                  stroke="var(--spectrum-chart-up)"
+                  strokeWidth={2}
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  clipPath={`url(#${uid}-above)`}
+                  pathLength={1}
+                  style={
+                    reduce
+                      ? undefined
+                      : { strokeDasharray: 1, animation: "spectrum-mc-draw 900ms cubic-bezier(0.22, 1, 0.36, 1) both" }
+                  }
+                />
+                <path
+                  d={linePath}
+                  fill="none"
+                  stroke="var(--spectrum-chart-down)"
+                  strokeWidth={2}
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  clipPath={`url(#${uid}-below)`}
+                  pathLength={1}
+                  style={
+                    reduce
+                      ? undefined
+                      : { strokeDasharray: 1, animation: "spectrum-mc-draw 900ms cubic-bezier(0.22, 1, 0.36, 1) both" }
+                  }
+                />
+              </g>
+            ) : (
+              view.map((candle, i) => {
+                const isUp = candle.close >= candle.open;
+                const color = isUp ? "var(--spectrum-chart-up)" : "var(--spectrum-chart-down)";
+                const x = cx(i);
+                const top = Math.min(priceY(candle.open), priceY(candle.close));
+                const bodyH = Math.max(1.25, Math.abs(priceY(candle.close) - priceY(candle.open)));
+                const dim = hoverIndex != null && hoverIndex !== i;
+                return (
+                  <g key={candle.t} style={{ opacity: dim ? 0.35 : 1 }}>
+                    <line x1={x} x2={x} y1={priceY(candle.high)} y2={priceY(candle.low)} stroke={color} strokeWidth={1} />
+                    <rect x={x - bodyW / 2} y={top} width={bodyW} height={bodyH} rx={1} fill={color} />
+                  </g>
+                );
+              })
+            )}
 
             {showVolume
               ? view.map((candle, i) => {
@@ -407,15 +517,17 @@ export function MarketChart({
 
             {last ? (
               <g>
-                <line
-                  x1={plotX0}
-                  x2={plotX1}
-                  y1={priceY(last.close)}
-                  y2={priceY(last.close)}
-                  stroke={lastColor}
-                  strokeOpacity={0.55}
-                  strokeDasharray="4 4"
-                />
+                {variant === "candles" ? (
+                  <line
+                    x1={plotX0}
+                    x2={plotX1}
+                    y1={priceY(last.close)}
+                    y2={priceY(last.close)}
+                    stroke={lastColor}
+                    strokeOpacity={0.55}
+                    strokeDasharray="4 4"
+                  />
+                ) : null}
                 {live && !reduce ? (
                   <circle cx={cx(n - 1)} cy={priceY(last.close)} r={3.5} fill={lastColor}>
                     <animate attributeName="opacity" values="1;0.35;1" dur="1.6s" repeatCount="indefinite" />
@@ -442,7 +554,11 @@ export function MarketChart({
                   cy={priceY(view[hoverIndex].close)}
                   r={4}
                   fill="var(--spectrum-chart-surface)"
-                  stroke={view[hoverIndex].close >= view[hoverIndex].open ? "var(--spectrum-chart-up)" : "var(--spectrum-chart-down)"}
+                  stroke={
+                    (variant === "area" ? view[hoverIndex].close >= baseline : view[hoverIndex].close >= view[hoverIndex].open)
+                      ? "var(--spectrum-chart-up)"
+                      : "var(--spectrum-chart-down)"
+                  }
                   strokeWidth={2}
                 />
               </g>
