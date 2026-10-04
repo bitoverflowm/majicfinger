@@ -874,7 +874,16 @@ function ChartBlockBody({ block, onChange, booting }) {
           onChange={(title) => onChange({ title })}
           className="min-w-0 flex-1 text-[13px] font-semibold text-foreground"
         />
-        {sourceSession?.running ? <span className="shrink-0 pr-8 text-[11px] font-medium text-emerald-600">Live</span> : null}
+        {sourceSession?.running ? (
+          <span
+            className={cn(
+              "shrink-0 text-[11px] font-medium text-emerald-600",
+              canvas?.readOnly ? "pr-1" : "pr-[3.75rem]",
+            )}
+          >
+            Live
+          </span>
+        ) : null}
       </div>
       {booting ? (
         <ChartSkeleton />
