@@ -11,6 +11,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { cellMatchesTextTerm, columnUsesWholeTerm } from "@/lib/textTermMatch";
+import { DATE_RANGE_PRESETS, dateRangePreset } from "@/components/dashboardComposer/dateRangePresets";
 import { cn } from "@/lib/utils";
 
 /**
@@ -200,49 +201,69 @@ export function attributeSummary(column, filters) {
   return parts.join(" · ");
 }
 
-export function rowMatchesKalshiHistoricalFilters(row, columns, filters) {
+function formatFilterNumber(value) {
+  const n = Number(value);
+  if (!Number.isFinite(n)) return String(value ?? "");
+  return n.toLocaleString("en-US", { maximumFractionDigits: 2 });
+}
+
+function dateWindowLabel(filter) {
+  if (filter?.from && filter?.to) return formatAttributeRange(filter.from, filter.to);
+  if (filter?.from) return `after ${formatAttributeDate(filter.from)}`;
+  if (filter?.to) return `before ${formatAttributeDate(filter.to)}`;
+  return "the selected range";
+}
+
+/** Empty string when the row matches. Otherwise the first filter it fails. */
+export function attributeMismatchReason(row, columns, filters) {
   for (const column of columns || []) {
     const spec = kalshiHistoricalAttributeSpec(column);
     const filter = readFilter(filters, column);
     if (!isActive(spec, filter)) continue;
     const raw = row?.[column.id];
-    if (filter.excludeNull && isMissingValue(raw)) return false;
+    const title = column.title || column.id;
+    if (filter.excludeNull && isMissingValue(raw)) return `${title} is empty`;
     if (spec.kind === "enum") {
-      if (filter.include?.length && !filter.include.includes(String(raw ?? ""))) return false;
+      if (filter.include?.length && !filter.include.includes(String(raw ?? ""))) {
+        return `${title} is ${raw == null || raw === "" ? "empty" : String(raw)}`;
+      }
       continue;
     }
     if (spec.kind === "boolean") {
-      if (filter.include?.length === 1 && booleanValue(raw) !== (filter.include[0] === "true")) return false;
+      if (filter.include?.length === 1 && booleanValue(raw) !== (filter.include[0] === "true")) return `${title} does not match`;
       continue;
     }
     if (spec.kind === "text") {
       const include = textTerms(filter.containsTags, filter.contains);
       const exclude = textTerms(filter.excludesTags, filter.excludes);
-      if (include.length && !include.some((term) => cellMatchesTextTerm(column.id, raw, term))) return false;
-      if (exclude.some((term) => cellMatchesTextTerm(column.id, raw, term))) return false;
+      if (include.length && !include.some((term) => cellMatchesTextTerm(column.id, raw, term))) return `${title} does not match`;
+      if (exclude.some((term) => cellMatchesTextTerm(column.id, raw, term))) return `${title} is excluded`;
       continue;
     }
     if (spec.kind === "number") {
       const n = Number(raw);
       const min = String(filter.min || "").trim();
       const max = String(filter.max || "").trim();
-      if (!Number.isFinite(n)) return false;
-      if (min !== "" && n < Number(min)) return false;
-      if (max !== "" && n > Number(max)) return false;
+      if (!Number.isFinite(n)) return `${title} is empty`;
+      if (min !== "" && n < Number(min)) return `${title} is ${formatFilterNumber(n)}, under ${formatFilterNumber(min)}`;
+      if (max !== "" && n > Number(max)) return `${title} is ${formatFilterNumber(n)}, over ${formatFilterNumber(max)}`;
       continue;
     }
     const ms = lakeTimeMs(raw);
-    if (ms == null) return false;
-    if (filter.from) {
-      const bounds = dayBounds(filter.from);
-      if (bounds && ms < bounds.start) return false;
-    }
-    if (filter.to) {
-      const bounds = dayBounds(filter.to);
-      if (bounds && ms > bounds.end) return false;
+    if (ms == null) return `${title} is empty`;
+    const outside =
+      (filter.from && dayBounds(filter.from) && ms < dayBounds(filter.from).start) ||
+      (filter.to && dayBounds(filter.to) && ms > dayBounds(filter.to).end);
+    if (outside) {
+      const when = format(new Date(ms), "LLL dd, y");
+      return `${title} is ${when}, outside ${dateWindowLabel(filter)}`;
     }
   }
-  return true;
+  return "";
+}
+
+export function rowMatchesKalshiHistoricalFilters(row, columns, filters) {
+  return !attributeMismatchReason(row, columns, filters);
 }
 
 export function buildKalshiHistoricalFilterPredicates(columns, filters) {
@@ -516,11 +537,24 @@ function DateRangeField({ from, to, onChange }) {
         </Button>
       </PopoverTrigger>
       <PopoverContent align="start" className="z-[620] w-auto p-0">
+        <div className="flex max-w-[34rem] flex-wrap gap-1.5 border-b border-border/70 p-2">
+          {DATE_RANGE_PRESETS.map((preset) => (
+            <button
+              key={preset.id}
+              type="button"
+              className="rounded-full border border-border/70 bg-background px-2 py-1 text-[11px] text-foreground hover:bg-muted"
+              onClick={() => onChange(dateRangePreset(preset.id))}
+            >
+              {preset.label}
+            </button>
+          ))}
+        </div>
         <Calendar
+          key={`${from || ""}|${to || ""}`}
           mode="range"
           numberOfMonths={2}
           selected={selected}
-          defaultMonth={start || end}
+          defaultMonth={end || start}
           onSelect={(range) => onChange({ from: isoFromDate(range?.from), to: isoFromDate(range?.to) })}
         />
         {selected ? (

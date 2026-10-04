@@ -12,7 +12,7 @@ export const KALSHI_LIVE_MARKETS_COLUMNS = [
   { name: "no_sub_title", type: "string", description: "Shortened title for the no side of this market." },
   { name: "created_time", type: "timestamp", description: "When the market was created. A range is sent as min_created_ts and max_created_ts." },
   { name: "updated_time", type: "timestamp", description: "Last non-trading metadata update. A range is sent as min_updated_ts and max_updated_ts." },
-  { name: "open_time", type: "timestamp", description: "When the market opens." },
+  { name: "open_time", type: "timestamp", description: "When the market opens. The markets request has no open-time parameter, so this range is checked on each market as it comes back." },
   { name: "close_time", type: "timestamp", description: "When the market closes. A range is sent as min_close_ts and max_close_ts." },
   { name: "latest_expiration_time", type: "timestamp", description: "Latest possible time for this market to expire." },
   {
@@ -41,7 +41,7 @@ export const KALSHI_LIVE_MARKETS_COLUMNS = [
   { name: "no_bid_dollars", type: "number", description: "Highest NO buy offer, in dollars." },
   { name: "no_ask_dollars", type: "number", description: "Lowest NO sell offer, in dollars." },
   { name: "last_price_dollars", type: "number", description: "Last traded YES contract, in dollars." },
-  { name: "volume_fp", type: "number", description: "Lifetime volume (contracts)" },
+  { name: "volume_fp", type: "number", description: "Lifetime volume (contracts). Checked on each market as it comes back." },
   { name: "volume_24h_fp", type: "number", description: "24h volume (contracts)" },
   { name: "result", type: "string", description: "Settlement result: yes, no, scalar, or unresolved." },
   { name: "can_close_early", type: "boolean", description: "Whether the market can close early" },

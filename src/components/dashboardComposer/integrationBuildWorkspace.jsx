@@ -53,6 +53,7 @@ import {
   writeUserQueryCache,
 } from "@/lib/workspaceQueryClient";
 import {
+  attributeMismatchReason,
   attributeSummary,
   AttributeFilters,
   buildAttributePredicates,
@@ -60,6 +61,7 @@ import {
   sortAttributeRows,
   sortSummary,
 } from "@/components/dashboardComposer/integrationAttributes";
+import { LiveFilterTape } from "@/components/dashboardComposer/liveFilterTape";
 import { integrationProfile } from "@/components/dashboardComposer/integrationSource";
 import { requestCardForSheet, stampRunSheets } from "@/components/dashboardComposer/integrationProvenance";
 import { cn } from "@/lib/utils";
@@ -76,12 +78,26 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { createRunReporter, describeComposePhase } from "@/components/dashboardComposer/integrationRunFeed";
 import { KalshiLiveMarketPicker, kalshiLiveMarketAttributeColumns } from "@/components/dashboardComposer/kalshiLiveMarketPicker";
 import {
+  describeKalshiLiveServerFilters,
   kalshiLiveDiscoveryFromFilters,
   kalshiLiveDiscoveryIsNarrow,
   kalshiLiveFilterQueryError,
   KALSHI_LIVE_MARKET_SCAN_CAP,
   scanKalshiLiveMarkets,
 } from "@/lib/kalshiLive/liveMarketAttributeQuery";
+
+function liveScanStatusNote(info, discovery, localTitles) {
+  if (info?.waiting) {
+    const seconds = Math.max(1, Math.ceil((info.waitMs || 1000) / 1000));
+    return `Slowing down. Continuing in ${seconds}s.`;
+  }
+  const server = describeKalshiLiveServerFilters(discovery);
+  const titles = Array.isArray(localTitles) ? localTitles.filter(Boolean) : [];
+  const bits = [`Read ${Number(info?.scanned || 0).toLocaleString()} markets`];
+  if (server.length) bits.push(`request includes ${server.join(", ")}`);
+  if (titles.length) bits.push(`${titles.join(", ")} checked on each market`);
+  return `${bits.join(". ")}.`;
+}
 
 function rememberEntry(list, entry, limit, byFingerprint) {
   const previous = (list || []).filter(
@@ -1465,14 +1481,18 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
 
   useEffect(() => {
     if (!liveBookScan && !liveScopeScan) {
-      setLiveScan((current) => (current.status === "idle" ? current : { status: "idle", rows: [], error: "", exhausted: true, truncated: false }));
+      setLiveScan((current) =>
+        current.status === "idle"
+          ? current
+          : { status: "idle", rows: [], error: "", exhausted: true, truncated: false, note: "", dropped: [], droppedCount: 0, dropToken: 0 },
+      );
       return undefined;
     }
     const ac = new AbortController();
     const timer = window.setTimeout(() => {
       const queryError = kalshiLiveFilterQueryError(attributeFilters);
       if (queryError) {
-        setLiveScan({ status: "error", rows: [], error: queryError, exhausted: true, truncated: false });
+        setLiveScan({ status: "error", rows: [], error: queryError, exhausted: true, truncated: false, note: "", dropped: [], droppedCount: 0, dropToken: 0 });
         return;
       }
       const discovery = kalshiLiveDiscoveryFromFilters(attributeFilters);
@@ -1482,72 +1502,113 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
         typeof planLimit === "number" && planLimit > 0 ? planLimit : KALSHI_LIVE_MARKET_SCAN_CAP,
         Number.isFinite(requested) && requested > 0 && !sortKeys.length ? requested : KALSHI_LIVE_MARKET_SCAN_CAP,
       );
-      const match = (row) => rowMatchesAttributes(row, liveClientColumns, attributeFilters);
-      setLiveScan((current) => ({ ...current, status: "loading", error: "" }));
+      const explain = (row) => attributeMismatchReason(row, liveClientColumns, attributeFilters);
+      const match = (row) => !explain(row);
+      const localTitles = liveClientColumns
+        .filter((column) => attributeSummary(column, attributeFilters))
+        .map((column) => column.title || column.id);
+      const server = describeKalshiLiveServerFilters(discovery);
+      const startBits = [];
+      if (server.length) startBits.push(`Request includes ${server.join(", ")}.`);
+      if (localTitles.length) startBits.push(`${localTitles.join(", ")} checked on each market.`);
+      setLiveScan({
+        status: "loading",
+        rows: [],
+        error: "",
+        exhausted: false,
+        truncated: false,
+        note: startBits.join(" ") || "Starting the market scan.",
+        dropped: [],
+        droppedCount: 0,
+        dropToken: 0,
+      });
       const scopes = livePicks.filter((pick) => pick.kind === "series" || pick.kind === "event");
+      let carried = [];
+      let dropSerial = 0;
+      const publish = (info) => {
+        if (ac.signal.aborted) return;
+        if (!info.waiting) dropSerial += 1;
+        setLiveScan((current) => ({
+          status: "loading",
+          rows: scopes.length ? [...carried, ...(info.rows || [])] : info.rows,
+          error: "",
+          exhausted: info.exhausted,
+          truncated: info.truncated,
+          note: liveScanStatusNote(info, discovery, localTitles),
+          dropped: info.waiting ? current.dropped : info.dropped || [],
+          droppedCount: info.waiting ? current.droppedCount : info.droppedCount || 0,
+          dropToken: info.waiting ? current.dropToken : dropSerial,
+        }));
+      };
       const run = async () => {
         if (!scopes.length) {
           return scanKalshiLiveMarkets({
             discovery,
             limit: importCap,
             signal: ac.signal,
-            match,
-            onPage: (info) => {
-              if (!ac.signal.aborted) {
-                setLiveScan({ status: "loading", rows: info.rows, error: "", exhausted: info.exhausted, truncated: info.truncated });
-              }
-            },
+            explain,
+            onPage: publish,
           });
         }
-        const rows = [];
         let exhausted = true;
+        let scanned = 0;
         for (const pick of scopes) {
           const scoped = { ...discovery };
           if (pick.kind === "series" && !scoped.seriesTicker) scoped.seriesTicker = pick.ticker;
           if (pick.kind === "event" && !scoped.eventTicker) scoped.eventTicker = pick.ticker;
           const page = await scanKalshiLiveMarkets({
             discovery: scoped,
-            limit: Math.max(1, importCap - rows.length),
+            limit: Math.max(1, importCap - carried.length),
             signal: ac.signal,
-            match,
+            explain,
+            onPage: publish,
           });
           if (page.error) return page;
-          rows.push(...page.rows);
+          carried = [...carried, ...page.rows];
+          scanned += page.scanned || 0;
           if (!page.exhausted) exhausted = false;
-          if (rows.length >= importCap) break;
+          if (carried.length >= importCap) break;
         }
-        const seen = new Set(rows.map((row) => String(row.ticker || "")));
+        const seen = new Set(carried.map((row) => String(row.ticker || "")));
         for (const pick of livePicks) {
           if (pick.kind !== "market") continue;
           for (const row of pick.rows || []) {
             const ticker = String(row?.ticker || "");
             if (!ticker || seen.has(ticker) || !match(row)) continue;
             seen.add(ticker);
-            rows.push(row);
+            carried.push(row);
           }
         }
-        return { rows, exhausted, error: "" };
+        return { rows: carried, exhausted, scanned, error: "" };
       };
       run()
         .then((result) => {
           if (ac.signal.aborted) return;
-          setLiveScan({
+          setLiveScan((current) => ({
             status: result.error ? "error" : "ready",
             rows: result.rows || [],
             error: result.error || "",
             exhausted: result.exhausted !== false,
             truncated: Boolean(result.truncated),
-          });
+            note: result.error ? current.note || "" : `Read ${Number(result.scanned || 0).toLocaleString()} markets.`,
+            dropped: current.dropped || [],
+            droppedCount: current.droppedCount || 0,
+            dropToken: current.dropToken || 0,
+          }));
         })
         .catch((err) => {
           if (ac.signal.aborted || err?.name === "AbortError") return;
-          setLiveScan({
+          setLiveScan((current) => ({
             status: "error",
-            rows: [],
+            rows: current.rows || [],
             error: err instanceof Error ? err.message : "Market request failed",
             exhausted: true,
             truncated: false,
-          });
+            note: current.note || "",
+            dropped: current.dropped || [],
+            droppedCount: current.droppedCount || 0,
+            dropToken: current.dropToken || 0,
+          }));
         });
     }, 400);
     return () => {
@@ -2149,16 +2210,18 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
   const previewIsEmpty = previewSampleEmpty || liveSettledEmpty;
   const previewLine = loading
     ? "Loading the first 50 rows"
-    : liveScan.status === "error"
+    : liveScan.status === "error" && !liveScan.rows?.length
       ? liveScan.error
       : liveMatchedRows
         ? livePickAwaitingRows
           ? "Loading data"
           : liveUpdating
             ? shown
-              ? `${shownLabel} of ${liveMatchedRows.length.toLocaleString()} matching · updating`
-              : "Updating the markets"
-            : `Previewing ${shown.toLocaleString()} of ${liveMatchedRows.length.toLocaleString()} matching ${liveMatchedRows.length === 1 ? "row" : "rows"}.${liveScanNote}`
+              ? `${shownLabel} of ${liveMatchedRows.length.toLocaleString()} matching · ${liveScan.note || "updating"}`
+              : liveScan.note || "Checking markets"
+            : liveScan.status === "error"
+              ? `${liveScan.error} ${liveMatchedRows.length.toLocaleString()} matching ${liveMatchedRows.length === 1 ? "row" : "rows"} kept.`
+              : `Previewing ${shown.toLocaleString()} of ${liveMatchedRows.length.toLocaleString()} matching ${liveMatchedRows.length === 1 ? "row" : "rows"}.${liveScanNote}`
         : !exactUniverse
       ? `${shownLabel} of 1,000,000+ rows available`
       : typeof universe === "number" && !counting
@@ -2166,12 +2229,23 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
         : counting
           ? `${shownLabel} of …`
           : `${shownLabel}. More rows are available.`;
+  const liveRemovalTape = liveMarketSearch ? (
+    <LiveFilterTape
+      token={liveScan.dropToken || 0}
+      items={liveScan.dropped || []}
+      extra={Math.max(0, (liveScan.droppedCount || 0) - (liveScan.dropped || []).length)}
+    />
+  ) : null;
+  const liveEmptyLine =
+    liveMarketSearch && liveScan.truncated
+      ? `No data found in the first ${KALSHI_LIVE_MARKET_SCAN_CAP.toLocaleString()} markets.`
+      : "No data found";
   const previewLineShown = emptyRefresh
     ? "Searching for matching rows"
     : previewSearchError && settledRowCount === 0
       ? previewSearchError
       : previewIsEmpty
-        ? "No data found"
+        ? liveEmptyLine
         : previewRefreshing && !loading
           ? `${previewLine} · updating`
           : previewLine;
@@ -4315,18 +4389,25 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
               ) : emptyRefresh ? (
                 <p className="text-[13px] text-muted-foreground">Searching for matching rows</p>
               ) : null}
+              {liveRemovalTape}
               <div className="min-h-0 flex-1">
                 <SkeletonRows />
               </div>
             </div>
           ) : previewIsEmpty ? (
-            <div className="flex h-full flex-col items-center justify-center gap-3 rounded-xl border border-border/70 bg-background px-6 text-center shadow-sm">
-              <p className="text-[13px] leading-relaxed text-muted-foreground">No data found</p>
-              <Button type="button" variant="outline" onClick={refreshPreview}>
-                Refresh
-              </Button>
+            <div className="flex h-full flex-col">
+              {liveRemovalTape}
+              <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-3 rounded-xl border border-border/70 bg-background px-6 text-center shadow-sm">
+                <p className="text-[13px] leading-relaxed text-muted-foreground">{liveEmptyLine}</p>
+                <Button type="button" variant="outline" onClick={refreshPreview}>
+                  Refresh
+                </Button>
+              </div>
             </div>
           ) : marketsGrid.columns.length ? (
+            <div className="flex h-full min-h-0 flex-col">
+              {liveRemovalTape}
+              <div className="min-h-0 flex-1">
             <IntegrationBuildGrid
               columns={marketsGrid.columns}
               rows={marketsGrid.rows}
@@ -4348,6 +4429,8 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
               formulaEditor={summarySourceEditor || formulaEditorFor("markets", false) || formulaEditorFor("markets", true)}
               onFormulaPick={(pick) => acceptFormulaPick(pick, "markets")}
             />
+              </div>
+            </div>
           ) : (
             <div className="flex h-full items-center justify-center rounded-xl border border-border/70 bg-background text-[13px] text-muted-foreground shadow-sm">
               Select at least one column to preview.

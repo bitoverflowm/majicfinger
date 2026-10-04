@@ -1,4 +1,5 @@
 export {
+  attributeMismatchReason,
   attributeSummary,
   buildKalshiHistoricalFilterPredicates as buildAttributePredicates,
   KalshiHistoricalAttributeFilters as AttributeFilters,
