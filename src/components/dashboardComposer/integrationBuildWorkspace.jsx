@@ -79,6 +79,7 @@ import { createRunReporter, describeComposePhase } from "@/components/dashboardC
 import { KalshiLiveMarketPicker, kalshiLiveMarketAttributeColumns } from "@/components/dashboardComposer/kalshiLiveMarketPicker";
 import {
   describeKalshiLiveServerFilters,
+  KALSHI_LIVE_QUERY_ATTRIBUTE_COLUMNS,
   kalshiLiveDiscoveryFromFilters,
   kalshiLiveDiscoveryIsNarrow,
   kalshiLiveFilterQueryError,
@@ -1467,7 +1468,7 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
 
   const liveAttributeColumns = useMemo(
     () => (liveMarketSearch ? kalshiLiveMarketAttributeColumns(pull?.columns || []) : []),
-    [liveMarketSearch, pull?.columns],
+    [liveMarketSearch, pull?.columns, KALSHI_LIVE_QUERY_ATTRIBUTE_COLUMNS],
   );
   const liveClientColumns = useMemo(
     () => liveAttributeColumns.filter((column) => !column.queryOnly),

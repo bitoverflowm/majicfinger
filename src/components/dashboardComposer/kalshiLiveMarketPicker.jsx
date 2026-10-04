@@ -84,15 +84,19 @@ export function kalshiLiveMarketAttributeColumns(columns) {
     ...ticker,
     title: "Market ticker containing",
     description: "Add one or more. A market stays when its ticker contains any of these.",
+    panel: "market-ticker",
+    panelTitle: "Market ticker",
   };
   const query = KALSHI_LIVE_QUERY_ATTRIBUTE_COLUMNS.flatMap((column) =>
-    column.id === "tickers" ? [column, containing] : [column],
+    column.id === "tickers" ? [{ ...column, panel: "market-ticker", panelTitle: "Market ticker" }, containing] : [column],
   );
   const ordered = [...query, ...shaped];
-  return [
-    ...ordered.filter((column) => column.type === "date"),
-    ...ordered.filter((column) => column.type !== "date"),
-  ];
+  const dates = ordered.filter((column) => column.type === "date");
+  const rest = ordered.filter((column) => column.type !== "date");
+  const leadIds = ["tickers", "ticker", "volume_fp", "volume_24h_fp", "yes_sub_title", "no_sub_title"];
+  const lead = leadIds.map((id) => rest.find((column) => column.id === id)).filter(Boolean);
+  const leadSet = new Set(leadIds);
+  return [...dates, ...lead, ...rest.filter((column) => !leadSet.has(column.id))];
 }
 
 const MAX_MARKETS = 100;

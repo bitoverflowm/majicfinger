@@ -804,6 +804,24 @@ function SortField({ columns, sorts, onChange }) {
   );
 }
 
+function attributePanels(columns) {
+  const panels = [];
+  for (const column of columns || []) {
+    const previous = panels[panels.length - 1];
+    if (column.panel && previous?.panel === column.panel) {
+      previous.columns.push(column);
+      continue;
+    }
+    panels.push({
+      panel: column.panel || "",
+      id: column.panel || column.id,
+      title: column.panelTitle || column.title,
+      columns: [column],
+    });
+  }
+  return panels;
+}
+
 export function KalshiHistoricalAttributeFilters({
   columns,
   filters,
@@ -818,23 +836,27 @@ export function KalshiHistoricalAttributeFilters({
     <>
       <ParentSection value="attributes" title={sectionTitle}>
             <Accordion type="single" collapsible className="space-y-2">
-              {(columns || []).map((column) => {
-                const summary = attributeSummary(column, filters);
+              {attributePanels(columns).map((panel) => {
+                const summary = panel.columns.map((column) => attributeSummary(column, filters)).filter(Boolean).join(" · ");
                 return (
-                  <AccordionItem key={column.id} value={column.id} className="border-0">
+                  <AccordionItem key={panel.id} value={panel.id} className="border-0">
                     <AccordionPrimitive.Header className="flex">
                       <AccordionPrimitive.Trigger className="flex w-full items-center gap-2 rounded-lg bg-zinc-200/80 px-2.5 py-1.5 text-left text-[12px] font-semibold text-foreground dark:bg-zinc-800 [&[data-state=open]>svg]:rotate-180">
-                        <span className="min-w-0 truncate">{column.title}</span>
+                        <span className="min-w-0 truncate">{panel.title}</span>
                         <span className="ml-auto max-w-[42%] truncate text-[11px] font-normal text-[#0d99ff]">{summary}</span>
                         <ChevronDown className="size-4 shrink-0 text-muted-foreground transition-transform duration-200" />
                       </AccordionPrimitive.Trigger>
                     </AccordionPrimitive.Header>
                     <AccordionContent className="pb-0 pt-2">
-                      <div className="rounded-lg border border-border/70 px-2 py-2">
-                        {column.description ? (
-                          <p className="mb-2 text-[11px] leading-relaxed text-muted-foreground">{column.description}</p>
-                        ) : null}
-                        <AttributeFields column={column} filters={filters} onChange={onChange} />
+                      <div className="space-y-3 rounded-lg border border-border/70 px-2 py-2">
+                        {panel.columns.map((column, index) => (
+                          <div key={column.id} className={index > 0 ? "border-t border-border/70 pt-3" : undefined}>
+                            {column.description ? (
+                              <p className="mb-2 text-[11px] leading-relaxed text-muted-foreground">{column.description}</p>
+                            ) : null}
+                            <AttributeFields column={column} filters={filters} onChange={onChange} />
+                          </div>
+                        ))}
                       </div>
                     </AccordionContent>
                   </AccordionItem>

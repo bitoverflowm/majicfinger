@@ -50,7 +50,7 @@ export const KALSHI_LIVE_QUERY_ATTRIBUTE_COLUMNS = [
     type: "text",
     queryOnly: true,
     exactTickers: true,
-    description: "Add one or more market tickers. One ticker loads that market. Two or more are sent together as exact matches.",
+    description: "Know your tickers exactly? Add one or more tickers below.",
   },
   {
     id: "mve_filter",
