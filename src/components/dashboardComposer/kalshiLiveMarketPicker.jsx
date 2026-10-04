@@ -83,7 +83,7 @@ export function kalshiLiveMarketAttributeColumns(columns) {
   const containing = {
     ...ticker,
     title: "Market ticker containing",
-    description: "Add one or more. A market stays when its ticker contains any of these.",
+    description: "Use the below to find tickers that match a pattern you are interested in.",
     panel: "market-ticker",
     panelTitle: "Market ticker",
   };

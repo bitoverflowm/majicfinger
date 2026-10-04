@@ -1468,7 +1468,7 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
 
   const liveAttributeColumns = useMemo(
     () => (liveMarketSearch ? kalshiLiveMarketAttributeColumns(pull?.columns || []) : []),
-    [liveMarketSearch, pull?.columns, KALSHI_LIVE_QUERY_ATTRIBUTE_COLUMNS],
+    [liveMarketSearch, pull?.columns, KALSHI_LIVE_QUERY_ATTRIBUTE_COLUMNS, kalshiLiveMarketAttributeColumns],
   );
   const liveClientColumns = useMemo(
     () => liveAttributeColumns.filter((column) => !column.queryOnly),
