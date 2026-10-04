@@ -218,8 +218,6 @@ export function KalshiLiveMarketPicker({ picks, onAdd, onRemove }) {
       locked.push([node, node.style.overflow]);
       node.style.overflow = "hidden";
     };
-    lock(document.documentElement);
-    lock(document.body);
     if (root) {
       for (const node of root.querySelectorAll("*")) {
         if (!(node instanceof HTMLElement)) continue;
@@ -229,19 +227,18 @@ export function KalshiLiveMarketPicker({ picks, onAdd, onRemove }) {
     }
     const blockBackgroundScroll = (event) => {
       const target = event.target;
-      const series = document.querySelector("[data-kalshi-series-picker]");
-      if (series && target instanceof Node && series.contains(target)) return;
-      const list = target instanceof Element ? target.closest("[data-kalshi-search-results]") : null;
-      event.stopPropagation();
-      if (!list) {
+      if (!(target instanceof Element)) {
         event.preventDefault();
         return;
       }
-      if (event.type !== "wheel") return;
-      const dy = event.deltaY || 0;
-      const atTop = list.scrollTop <= 0;
-      const atBottom = list.scrollTop + list.clientHeight >= list.scrollHeight - 1;
-      if ((dy < 0 && atTop) || (dy > 0 && atBottom)) event.preventDefault();
+      if (target.closest("[data-kalshi-series-picker]")) return;
+      const panel = target.closest("[data-kalshi-search-panel]");
+      if (!panel) {
+        event.preventDefault();
+        return;
+      }
+      if (target.closest("[data-kalshi-search-results]")) return;
+      event.preventDefault();
     };
     document.addEventListener("wheel", blockBackgroundScroll, { capture: true, passive: false });
     document.addEventListener("touchmove", blockBackgroundScroll, { capture: true, passive: false });
@@ -251,6 +248,21 @@ export function KalshiLiveMarketPicker({ picks, onAdd, onRemove }) {
       document.removeEventListener("touchmove", blockBackgroundScroll, { capture: true });
     };
   }, [expanded]);
+
+  useEffect(() => {
+    const list = listRef.current;
+    if (!expanded || !list) return undefined;
+    const onWheel = (event) => {
+      const delta = event.deltaMode === 1 ? event.deltaY * 16 : event.deltaMode === 2 ? event.deltaY * list.clientHeight : event.deltaY;
+      const max = Math.max(0, list.scrollHeight - list.clientHeight);
+      const next = Math.max(0, Math.min(max, list.scrollTop + delta));
+      if (next !== list.scrollTop) list.scrollTop = next;
+      event.preventDefault();
+      event.stopPropagation();
+    };
+    list.addEventListener("wheel", onWheel, { passive: false });
+    return () => list.removeEventListener("wheel", onWheel);
+  }, [expanded, suggestions, box?.listMax]);
 
   useLayoutEffect(() => {
     if (!expanded) return undefined;
@@ -468,7 +480,7 @@ export function KalshiLiveMarketPicker({ picks, onAdd, onRemove }) {
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
-          className="absolute left-0 right-0 top-full z-10 mt-1 rounded-lg border border-border bg-popover px-3 py-2 text-xs text-muted-foreground shadow-md"
+          className="mt-1 rounded-lg border border-border bg-popover px-3 py-2 text-xs text-muted-foreground shadow-md"
         >
           No matches for &ldquo;{typed}&rdquo;
         </motion.p>
@@ -490,7 +502,7 @@ export function KalshiLiveMarketPicker({ picks, onAdd, onRemove }) {
           if (el.scrollHeight - el.scrollTop - el.clientHeight < 120) void loadMoreMarkets();
         }}
         style={{ maxHeight: box?.listMax || 320 }}
-        className="absolute left-0 right-0 top-full z-10 mt-1 overflow-y-auto overscroll-none rounded-lg border border-border bg-popover py-1 shadow-md"
+        className="mt-1 overflow-y-auto overscroll-contain rounded-lg border border-border bg-popover py-1 shadow-md"
       >
         {suggestions.map((suggestion) => {
           const marketCount = Array.isArray(suggestion.markets) ? suggestion.markets.length : 0;
@@ -609,10 +621,14 @@ export function KalshiLiveMarketPicker({ picks, onAdd, onRemove }) {
                 <button
                   type="button"
                   aria-label="Close market search"
-                  className="fixed inset-0 z-[600] cursor-default bg-black/25"
+                  className="pointer-events-auto fixed inset-0 z-[600] cursor-default bg-black/25"
                   onMouseDown={() => setExpanded(false)}
                 />
-                <div className="fixed z-[610]" style={{ top: box.top, left: box.left, width: box.width }}>
+                <div
+                  data-kalshi-search-panel=""
+                  className="pointer-events-auto fixed z-[610]"
+                  style={{ top: box.top, left: box.left, width: box.width }}
+                >
                   {searchField(true)}
                 </div>
               </>,
