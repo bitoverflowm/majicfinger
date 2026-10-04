@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
-import { BarChart3, Check, ChevronDown, ChevronRight, Database, Play, RotateCw, Save, Square, Table2, Type } from "lucide-react";
+import { BarChart3, Check, ChevronDown, ChevronRight, Database, Play, Radio, RotateCw, Save, Square, Table2, Type } from "lucide-react";
 import { ProvenanceMapButton } from "@/components/dashboardComposer/provenanceMap";
 
 import { Button } from "@/components/ui/button";
@@ -21,6 +21,7 @@ import { useUser } from "@/lib/hooks";
 import { useMyStateV2 } from "@/context/stateContextV2";
 import { useWorkspaceCanvas } from "@/components/dashboardComposer/workspaceCanvas";
 import { pageIdForTab } from "@/lib/workspaceDashboardDocument";
+import { realtimeAssets } from "@/lib/realtime/sheetRealtime";
 import { DASHBOARD_FREE_TEXT_PLACEHOLDER } from "@/lib/dashboardFreeTextTheme";
 import { cn } from "@/lib/utils";
 
@@ -349,6 +350,53 @@ function LiveTransportControls() {
   );
 }
 
+function RealtimeSidePanel() {
+  const canvas = useWorkspaceCanvas();
+  const assets = useMemo(
+    () => realtimeAssets(canvas?.blocksByPage || {}, canvas?.realtimeById || {}),
+    [canvas?.blocksByPage, canvas?.realtimeById],
+  );
+
+  return (
+    <div className="flex min-h-0 flex-1 flex-col">
+      <div className="flex h-9 shrink-0 items-center border-b border-black/[0.06] px-2 dark:border-white/10">
+        <span className="inline-flex h-7 items-center gap-1.5 rounded-md bg-[#e5f4ff] px-2 text-[12px] font-medium text-[#0d99ff] dark:bg-[#0d99ff]/20 dark:text-[#8ecaff]">
+          <Radio className="size-3.5" aria-hidden />
+          Realtime
+          {assets.length ? <span className="tabular-nums">{assets.length}</span> : null}
+        </span>
+      </div>
+      <div className="min-h-0 flex-1 overflow-y-auto px-1.5 py-2">
+        {assets.length ? (
+          assets.map((asset) => (
+            <button
+              key={`${asset.pageId}-${asset.kind}-${asset.id}`}
+              type="button"
+              onClick={() => canvas?.revealBlock?.(asset.id, asset.pageId)}
+              className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left hover:bg-black/[0.04] dark:hover:bg-white/[0.06]"
+            >
+              {asset.kind === "chart" ? (
+                <BarChart3 className="size-3.5 shrink-0 text-neutral-500" aria-hidden />
+              ) : (
+                <Table2 className="size-3.5 shrink-0 text-neutral-500" aria-hidden />
+              )}
+              <span className="min-w-0 flex-1">
+                <span className="block truncate text-[12px] font-medium text-neutral-800 dark:text-neutral-100">{asset.title}</span>
+                <span className="block truncate text-[11px] text-neutral-500">{asset.detail}</span>
+              </span>
+              <span className="size-1.5 shrink-0 rounded-full bg-emerald-500" aria-hidden />
+            </button>
+          ))
+        ) : (
+          <p className="px-2 py-1 text-[12px] leading-relaxed text-neutral-500">
+            Sheets you start from the dashboard show up here while they are pulling.
+          </p>
+        )}
+      </div>
+    </div>
+  );
+}
+
 function AccountMenu({ onLogout }) {
   const user = useUser();
   const ctx = useMyStateV2();
@@ -592,6 +640,7 @@ export default function FigmaNavChrome({ onLogout }) {
         <div className={cn("flex h-10 shrink-0 items-center px-1.5", expanded && "border-b border-black/[0.06] dark:border-white/10")}>
           <RightChromeControls onLogout={onLogout} expanded={expanded} />
         </div>
+        {expanded ? <RealtimeSidePanel /> : null}
       </aside>
     </>
   );

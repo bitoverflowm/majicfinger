@@ -90,6 +90,8 @@ export function stampRunSheets(sheets, { integrationId } = {}) {
       rows: rows.slice(0, kept),
       rowCount,
       provenance,
+      integrationId: integrationId || sheet.integrationId || provenance?.integrationId || "",
+      table: sheet.table || provenance?.table || "",
     };
   });
 }

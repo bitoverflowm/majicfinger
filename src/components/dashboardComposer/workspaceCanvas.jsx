@@ -2,7 +2,7 @@
 
 import { createContext, useCallback, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { BarChart3, Copy, Database, Maximize2, MoreVertical, Pencil, Table2, X } from "lucide-react";
+import { BarChart3, Copy, Database, Maximize2, MoreVertical, Pencil, Play, Square, Table2, X } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -31,6 +31,8 @@ import {
   saveWorkspaceDashboard,
 } from "@/lib/workspaceDashboardClient";
 import { pageIdForTab, tabIdFromPage } from "@/lib/workspaceDashboardDocument";
+import { useSheetRealtime } from "@/components/dashboardComposer/sheetRealtimeSession";
+import { realtimeSessionKey, realtimeSheetForBlock, tailCells } from "@/lib/realtime/sheetRealtime";
 import { SpectrumLoadingState } from "@/components/ui/spectrum-loading-state";
 import { RunProgressCard } from "@/components/dashboardComposer/integrationRunProgress";
 import { cn } from "@/lib/utils";
@@ -147,6 +149,14 @@ export function WorkspaceCanvasProvider({ pageId, readOnly = false, children }) 
   const lastPayloadRef = useRef("");
   const draftRef = useRef(null);
   const pendingSelectRef = useRef("");
+  const pendingRevealRef = useRef("");
+  const ctxRef = useRef(ctx);
+  ctxRef.current = ctx;
+  const blocksByPageRef = useRef(blocksByPage);
+  blocksByPageRef.current = blocksByPage;
+  const { realtimeById, startSheetRealtime, stopSheetRealtime } = useSheetRealtime(blocksByPage, pageId);
+  const [spotlightId, setSpotlightId] = useState(null);
+  const [revealNonce, setRevealNonce] = useState(0);
 
   const tabs = Array.isArray(ctx?.workspaceStartTabs) ? ctx.workspaceStartTabs : [];
   const activeTabId = ctx?.activeWorkspaceStartTabId || "welcome";
@@ -500,6 +510,46 @@ export function WorkspaceCanvasProvider({ pageId, readOnly = false, children }) 
     setSelectedId(id || null);
   }, []);
 
+  const revealBlock = useCallback((id, nextPageId) => {
+    if (!id) return;
+    let page = nextPageId || pageIdRef.current;
+    if (!nextPageId) {
+      for (const [pageKey, list] of Object.entries(blocksByPageRef.current || {})) {
+        if ((list || []).some((block) => block.id === id)) {
+          page = pageKey;
+          break;
+        }
+      }
+    }
+    setSelectedId(id);
+    if (page !== pageIdRef.current) {
+      pendingRevealRef.current = id;
+      pendingSelectRef.current = id;
+      ctxRef.current?.setViewing?.("welcome");
+      ctxRef.current?.setActiveWorkspaceStartTabId?.(tabIdFromPage(page));
+      return;
+    }
+    pendingRevealRef.current = "";
+    setSpotlightId(id);
+    setRevealNonce((nonce) => nonce + 1);
+  }, []);
+
+  useEffect(() => {
+    const id = pendingRevealRef.current;
+    if (!id) return undefined;
+    if (!(blocksByPage[pageId] || []).some((block) => block.id === id)) return undefined;
+    pendingRevealRef.current = "";
+    setSpotlightId(id);
+    setRevealNonce((nonce) => nonce + 1);
+    return undefined;
+  }, [blocksByPage, pageId]);
+
+  useEffect(() => {
+    if (!spotlightId) return undefined;
+    const timer = window.setTimeout(() => setSpotlightId(null), 1800);
+    return () => window.clearTimeout(timer);
+  }, [spotlightId, revealNonce]);
+
   const renameDashboard = useCallback((next) => {
     setDashboardName(String(next || "").trim().slice(0, 120) || "Untitled");
   }, []);
@@ -549,6 +599,12 @@ export function WorkspaceCanvasProvider({ pageId, readOnly = false, children }) 
       selectedId,
       setSelectedId,
       focusBlock,
+      revealBlock,
+      spotlightId,
+      revealNonce,
+      realtimeById,
+      startSheetRealtime,
+      stopSheetRealtime,
       renameId,
       setRenameId,
       addBlock,
@@ -562,7 +618,7 @@ export function WorkspaceCanvasProvider({ pageId, readOnly = false, children }) 
       removeBlock,
       createChartFromBlock,
     }),
-    [addBlock, blocks, blocksByPage, createChartFromBlock, dashboardName, dismissRun, duplicateBlock, focusBlock, pageId, placeIntegrationSheets, previewActiveId, previewTabs, readOnly, ready, registerTables, removeBlock, renameDashboard, renameId, reportRun, runFeed, saveNow, selectedId, tables, tool, updateBlock],
+    [addBlock, blocks, blocksByPage, createChartFromBlock, dashboardName, dismissRun, duplicateBlock, focusBlock, pageId, placeIntegrationSheets, previewActiveId, previewTabs, readOnly, ready, realtimeById, registerTables, removeBlock, renameDashboard, renameId, reportRun, revealBlock, revealNonce, runFeed, saveNow, selectedId, spotlightId, startSheetRealtime, stopSheetRealtime, tables, tool, updateBlock],
   );
 
   return <WorkspaceCanvasContext.Provider value={value}>{children}</WorkspaceCanvasContext.Provider>;
@@ -625,9 +681,22 @@ function SheetSkeleton() {
   );
 }
 
+function liveSession(canvas, blockId) {
+  if (!canvas?.realtimeById || !blockId) return null;
+  return canvas.realtimeById[realtimeSessionKey(canvas.pageId, blockId)] || null;
+}
+
+function liveBlock(block, canvas) {
+  const liveCells = liveSession(canvas, block?.id)?.liveCells;
+  if (!liveCells) return block;
+  return { ...block, cells: liveCells };
+}
+
 function SheetBlockBody({ block, onChange, booting }) {
   const canvas = useWorkspaceCanvas();
-  const label = useTradeSheetLabel(block.id, Math.max(filledRowCount(block.cells), Number(block.rowCount) || 0));
+  const view = liveBlock(block, canvas);
+  const running = !!liveSession(canvas, block.id)?.running;
+  const label = useTradeSheetLabel(block.id, Math.max(filledRowCount(view.cells), Number(block.rowCount) || 0));
   return (
     <div className="flex min-h-0 flex-1 flex-col">
       <div className="flex items-center gap-2 border-b border-border/70 px-3 py-2">
@@ -638,11 +707,12 @@ function SheetBlockBody({ block, onChange, booting }) {
           onChange={(title) => onChange({ title })}
           className="min-w-0 flex-1 text-[13px] font-semibold text-foreground"
         />
-        <span className={cn("shrink-0 text-[12px] tabular-nums text-muted-foreground", canvas?.readOnly ? "pr-1" : "pr-4")}>
+        {running ? <span className="shrink-0 text-[11px] font-medium text-emerald-600">Live</span> : null}
+        <span className={cn("shrink-0 text-[12px] tabular-nums text-muted-foreground", canvas?.readOnly ? "pr-1" : "pr-8")}>
           {booting ? "Loading…" : label}
         </span>
       </div>
-      {booting ? <SheetSkeleton /> : <DashboardSheetGrid block={block} onChange={onChange} readOnly={!!canvas?.readOnly} />}
+      {booting ? <SheetSkeleton /> : <DashboardSheetGrid block={view} onChange={onChange} readOnly={!!canvas?.readOnly} />}
     </div>
   );
 }
@@ -717,6 +787,12 @@ function BlockBody({ block, onChange, booting }) {
 function ChartBlockBody({ block, onChange, booting }) {
   const canvas = useWorkspaceCanvas();
   const source = block.sourceSheetId ? (canvas?.blocks || []).find((item) => item.id === block.sourceSheetId) : null;
+  const sourceSession = source ? liveSession(canvas, source.id) : null;
+  const sourceView = source?.type === "sheet" ? liveBlock(source, canvas) : null;
+  const chartSheet =
+    sourceView && sourceSession?.running
+      ? { ...sourceView, cells: tailCells(sourceView.cells, 80) }
+      : sourceView;
   return (
     <div className="flex min-h-0 flex-1 flex-col">
       <div className="flex items-center gap-2 px-3 py-2">
@@ -727,12 +803,13 @@ function ChartBlockBody({ block, onChange, booting }) {
           onChange={(title) => onChange({ title })}
           className="min-w-0 flex-1 text-[13px] font-semibold text-foreground"
         />
+        {sourceSession?.running ? <span className="shrink-0 pr-8 text-[11px] font-medium text-emerald-600">Live</span> : null}
       </div>
       {booting ? (
         <ChartSkeleton />
       ) : block.sourceSheetId ? (
         <SheetBlockChart
-          sheet={source?.type === "sheet" ? source : null}
+          sheet={chartSheet}
           snapshot={block.chart}
           onSnapshot={(chart) => {
             if (canvas?.readOnly) return;
@@ -795,7 +872,38 @@ function SheetFullscreen({ block, onChange, onClose }) {
   );
 }
 
-function CanvasBlock({ block, selected, onSelect, onChange, booting = false }) {
+function RealtimeToggle({ block }) {
+  const canvas = useWorkspaceCanvas();
+  const match = realtimeSheetForBlock(block, canvas?.blocks || []);
+  if (!match || canvas?.readOnly) return null;
+  const session = liveSession(canvas, match.sheet.id);
+  const running = !!session?.running;
+  return (
+    <button
+      type="button"
+      data-realtime-toggle=""
+      title={running ? "Stop realtime" : session?.status || "Start realtime"}
+      aria-label={running ? "Stop realtime" : "Start realtime"}
+      aria-pressed={running}
+      className={cn(
+        "absolute right-8 top-1.5 z-10 inline-flex size-5 items-center justify-center rounded-sm bg-background/80 transition-opacity duration-200",
+        running
+          ? "text-emerald-600 opacity-100"
+          : "pointer-events-none text-muted-foreground opacity-0 group-hover/block:pointer-events-auto group-hover/block:opacity-100 group-focus-within/block:pointer-events-auto group-focus-within/block:opacity-100",
+      )}
+      onPointerDown={(event) => event.stopPropagation()}
+      onClick={(event) => {
+        event.stopPropagation();
+        if (running) canvas?.stopSheetRealtime?.(match.sheet.id);
+        else canvas?.startSheetRealtime?.(match.sheet.id);
+      }}
+    >
+      {running ? <Square className="size-3" /> : <Play className="size-3" />}
+    </button>
+  );
+}
+
+function CanvasBlock({ block, selected, spotlight = false, onSelect, onChange, booting = false }) {
   const canvas = useWorkspaceCanvas();
   const readOnly = !!canvas?.readOnly;
   const dragRef = useRef(null);
@@ -822,7 +930,7 @@ function CanvasBlock({ block, selected, onSelect, onChange, booting = false }) {
     if (
       e.target instanceof Element &&
       e.target.closest(
-        "[data-sheet-fullscreen],[data-sheet-grid],[data-resize],[data-block-menu],[role='menu'],[role='menuitem'],.gdg-style,.gdg-unstyle,textarea,input",
+        "[data-sheet-fullscreen],[data-sheet-grid],[data-resize],[data-block-menu],[data-realtime-toggle],[role='menu'],[role='menuitem'],.gdg-style,.gdg-unstyle,textarea,input",
       )
     ) {
       return;
@@ -910,12 +1018,15 @@ function CanvasBlock({ block, selected, onSelect, onChange, booting = false }) {
       className={cn(
         "pointer-events-auto absolute flex flex-col overflow-hidden rounded-xl border bg-background shadow-sm",
         readOnly ? "border-border/70" : "group/block",
-        !readOnly && selected
-          ? "border-[#0d99ff] ring-2 ring-[#0d99ff]/25"
-          : !readOnly && "border-border/70 hover:border-[#0d99ff]",
+        !readOnly && spotlight
+          ? "border-emerald-500 ring-2 ring-emerald-400/80"
+          : !readOnly && selected
+            ? "border-[#0d99ff] ring-2 ring-[#0d99ff]/25"
+            : !readOnly && "border-border/70 hover:border-[#0d99ff]",
       )}
       style={{ left: block.x, top: block.y, width: block.w, height: block.h }}
     >
+      {readOnly ? null : <RealtimeToggle block={block} />}
       {readOnly ? null : (
       <DropdownMenu open={menuOpen} onOpenChange={setMenuOpen}>
         <DropdownMenuTrigger asChild>
@@ -1015,6 +1126,7 @@ export function WorkspaceCanvas() {
   const blocksRef = useRef(blocks);
   blocksRef.current = blocks;
   const [bootingIds, setBootingIds] = useState(() => new Set());
+  const skipNearestScrollRef = useRef(false);
 
   useLayoutEffect(() => {
     if (!canvas?.ready) return undefined;
@@ -1048,8 +1160,21 @@ export function WorkspaceCanvas() {
   }, [canvas]);
 
   useEffect(() => {
+    const id = canvas?.spotlightId;
+    const scroller = scrollerRef.current;
+    if (!canvas?.revealNonce || !id || !scroller) return;
+    skipNearestScrollRef.current = true;
+    const el = scroller.querySelector(`[data-block-id="${CSS.escape(id)}"]`);
+    if (el instanceof HTMLElement) el.scrollIntoView({ behavior: "smooth", block: "center" });
+  }, [canvas?.revealNonce, canvas?.spotlightId, canvas?.pageId]);
+
+  useEffect(() => {
     const id = canvas?.selectedId;
     const scroller = scrollerRef.current;
+    if (skipNearestScrollRef.current) {
+      skipNearestScrollRef.current = false;
+      return;
+    }
     if (!id || !scroller) return;
     const el = scroller.querySelector(`[data-block-id="${CSS.escape(id)}"]`);
     if (el instanceof HTMLElement) el.scrollIntoView({ block: "nearest" });
@@ -1119,6 +1244,7 @@ export function WorkspaceCanvas() {
           block={block}
           booting={bootingIds.has(block.id)}
           selected={canvas.selectedId === block.id}
+          spotlight={canvas.spotlightId === block.id}
           onSelect={canvas.setSelectedId}
           onChange={(patch) => canvas.updateBlock(block.id, patch)}
         />

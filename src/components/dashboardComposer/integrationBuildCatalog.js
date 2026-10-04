@@ -1565,14 +1565,17 @@ export function loadBuildUniverseCount(integrationId, tableId, filter) {
   return countCache.get(key);
 }
 
-export function loadBuildPreview(integrationId, tableId) {
+export function loadBuildPreview(integrationId, tableId, options = {}) {
   const key = `${integrationId}:${tableId}`;
   const loader = LOADERS[key];
   if (!loader) return Promise.reject(new Error("This table is not available yet"));
-  if (!pullCache.has(key)) pullCache.set(key, loader());
-  return pullCache.get(key).catch((error) => {
-    pullCache.delete(key);
-    throw error;
-  });
+  if (options.fresh || !pullCache.has(key)) {
+    const pending = loader().catch((error) => {
+      if (pullCache.get(key) === pending) pullCache.delete(key);
+      throw error;
+    });
+    pullCache.set(key, pending);
+  }
+  return pullCache.get(key);
 }
 

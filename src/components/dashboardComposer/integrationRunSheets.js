@@ -72,8 +72,11 @@ export function layoutRunSheets(sheets, { originY = 88 } = {}) {
 
   sheets.forEach((sheet, index) => {
     const columns = (sheet.columns || []).map((column) => ({
+      ...(column.id ? { id: column.id } : {}),
       title: column.title || " ",
       width: columnWidth(column),
+      ...(column.type ? { type: column.type } : {}),
+      ...(column.scale ? { scale: column.scale } : {}),
     }));
     const cells = {};
     const previewRows = sheet.keepAllRows ? sheet.rows || [] : (sheet.rows || []).slice(0, 50);
@@ -101,6 +104,8 @@ export function layoutRunSheets(sheets, { originY = 88 } = {}) {
       columns,
       cells,
       ...(rowCount ? { rowCount } : {}),
+      ...(sheet.integrationId ? { integrationId: sheet.integrationId } : {}),
+      ...(sheet.table ? { table: sheet.table } : {}),
       ...(sheet.pull ? { pull: sheet.pull } : {}),
       ...(sheet.provenance ? { provenance: sheet.provenance } : {}),
     };

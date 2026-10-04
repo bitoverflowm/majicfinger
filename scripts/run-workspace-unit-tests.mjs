@@ -46,6 +46,7 @@ import "@/lib/liveFeeds/publicChartLivePublish.test.js";
 import "@/lib/liveFeeds/registry.trades.node.test.js";
 import "@/lib/liveFeeds/registry.orderbook.node.test.js";
 import "@/lib/realtime/endpointRegistry.node.test.js";
+import "@/lib/realtime/sheetRealtime.node.test.js";
 import "@/lib/sheetOperations/aggregateBucketRows.test.js";
 import "@/lib/sheetOperations/compileBandsConfigToCompose.test.js";
 import "@/lib/sheetOperations/aggregateBandRows.test.js";

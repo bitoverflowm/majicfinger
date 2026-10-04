@@ -138,13 +138,21 @@ function cleanBlock(block) {
   const id = cleanText(block.id, 80);
   if (!id) return null;
   const columns = Array.isArray(block.columns)
-    ? block.columns.slice(0, 80).map((column) => ({
-        title: cleanText(column?.title, 120) || " ",
-        width: Math.max(40, num(column?.width, 120)),
-      }))
+    ? block.columns.slice(0, 80).map((column) => {
+        const id = cleanText(column?.id, 80);
+        const typeName = cleanText(column?.type, 20);
+        return {
+          ...(id ? { id } : {}),
+          title: cleanText(column?.title, 120) || " ",
+          width: Math.max(40, num(column?.width, 120)),
+          ...(typeName ? { type: typeName } : {}),
+        };
+      })
     : [];
   const title = cleanText(block.title, 200);
   const type = cleanText(block.type || "sheet", 20) || "sheet";
+  const integrationId = cleanText(block.integrationId || block.provenance?.integrationId, 80);
+  const table = cleanText(block.table || block.provenance?.table || block.pull?.table, 40);
   const chart = type === "chart" ? cleanChartSnapshot(block.chart) : null;
   const provenance = cleanProvenance(block.provenance);
   const ticker = tradeTickerFromTitle(title);
@@ -166,6 +174,8 @@ function cleanBlock(block) {
     columns,
     cells: cleanCells(block.cells),
     ...(rowCount > 0 ? { rowCount } : {}),
+    ...(integrationId ? { integrationId } : {}),
+    ...(table ? { table } : {}),
     ...(pull ? { pull } : {}),
     ...(provenance ? { provenance } : {}),
     ...(chart ? { chart } : {}),

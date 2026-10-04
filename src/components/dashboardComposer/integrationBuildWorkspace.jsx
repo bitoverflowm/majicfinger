@@ -71,6 +71,7 @@ import { attachRandomSample, previewRandomSample } from "@/components/dashboardC
 import { generateRandomSampleSeed, validateRandomSampleSizeInput } from "@/lib/dataLake/randomSample";
 import { useWorkspaceCanvas } from "@/components/dashboardComposer/workspaceCanvas";
 import { kalshiSourceCutoffCaption, useKalshiHistoricalCutoffDisplay } from "@/hooks/useKalshiHistoricalCutoffDisplay";
+import { isRealtimeEnabled } from "@/lib/realtime/endpointRegistry";
 import { Skeleton } from "@/components/ui/skeleton";
 import { createRunReporter, describeComposePhase } from "@/components/dashboardComposer/integrationRunFeed";
 import { KalshiLiveMarketPicker, kalshiLiveMarketAttributeColumns } from "@/components/dashboardComposer/kalshiLiveMarketPicker";
@@ -1142,11 +1143,13 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
   const [sortKeys, setSortKeys] = useState([]);
   const [rowLimit, setRowLimit] = useState("");
   const [previewRefreshing, setPreviewRefreshing] = useState(false);
+  const [previewRefreshNonce, setPreviewRefreshNonce] = useState(0);
   const [settledPreviewKey, setSettledPreviewKey] = useState("");
   const [previewSearchError, setPreviewSearchError] = useState("");
   const [revealKey, setRevealKey] = useState(0);
   const baseRowsRef = useRef([]);
   const usingFilteredSample = useRef(false);
+  const appliedPreviewNonce = useRef(0);
   const [saved, setSaved] = useState([]);
   const [pulls, setPulls] = useState([]);
   const [step, setStep] = useState("query");
@@ -1551,7 +1554,7 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
       window.clearTimeout(timer);
       ac.abort();
     };
-  }, [liveBookScan, liveScopeScan, attributeFilters, livePicks, liveClientColumns, rowLimit, sortKeys, planLimit]);
+  }, [liveBookScan, liveScopeScan, attributeFilters, livePicks, liveClientColumns, rowLimit, sortKeys, planLimit, previewRefreshNonce]);
 
   const liveMatchedRows = useMemo(() => {
     if (!liveMarketSearch) return null;
@@ -1576,6 +1579,55 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
     if (!livePreviewRows) return;
     setVisibleCount(livePreviewRows.length);
   }, [livePreviewRows]);
+
+  const liveNarrowing = liveBookScan || liveScopeScan || livePicks.length > 0;
+  const hadLiveNarrowing = useRef(false);
+  const appliedLiveNonce = useRef(0);
+
+  useEffect(() => {
+    if (!liveMarketSearch) return undefined;
+    const previousHad = hadLiveNarrowing.current;
+    const previousNonce = appliedLiveNonce.current;
+    const nonceBumped = previewRefreshNonce !== previousNonce;
+    const leftNarrowing = previousHad && !liveNarrowing;
+    hadLiveNarrowing.current = liveNarrowing;
+    if (liveNarrowing) {
+      if (nonceBumped) appliedLiveNonce.current = previewRefreshNonce;
+      return undefined;
+    }
+    if (!leftNarrowing && !nonceBumped) return undefined;
+    appliedLiveNonce.current = previewRefreshNonce;
+    const cached = baseRowsRef.current;
+    if (cached.length) setVisibleCount(cached.length);
+    let cancel = false;
+    let settled = false;
+    setPreviewSearchError("");
+    setPreviewRefreshing(true);
+    loadBuildPreview(integrationId, tableId, { fresh: true })
+      .then((result) => {
+        if (cancel) return;
+        const rows = Array.isArray(result?.rows) ? result.rows : [];
+        baseRowsRef.current = rows;
+        setPull((current) => (current ? { ...current, rows } : current));
+        setVisibleCount(rows.length);
+      })
+      .catch((err) => {
+        if (cancel) return;
+        setPreviewSearchError(err instanceof Error ? err.message : "Could not load preview rows");
+      })
+      .finally(() => {
+        settled = true;
+        if (cancel) return;
+        setPreviewRefreshing(false);
+      });
+    return () => {
+      cancel = true;
+      if (!settled) {
+        hadLiveNarrowing.current = previousHad;
+        appliedLiveNonce.current = previousNonce;
+      }
+    };
+  }, [liveMarketSearch, liveNarrowing, previewRefreshNonce, integrationId, tableId]);
 
   function addLivePick(pick) {
     if (!pick?.id || liveFetchRef.current.has(pick.id)) return;
@@ -1639,11 +1691,16 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
       const capped = Number.isFinite(limit) && limit > 0 ? source.slice(0, limit) : source;
       return capped.slice(0, visibleCount);
     }
-    const rows = (pull?.rows || []).slice(0, visibleCount);
+    const rowsAll = pull?.rows || [];
+    const revealCap =
+      visibleCount === 0 && liveMarketSearch && !liveNarrowing && hadLiveNarrowing.current
+        ? rowsAll.length
+        : visibleCount;
+    const rows = rowsAll.slice(0, revealCap);
     const query = filterValue.trim().toLowerCase();
     if (!query || !filterColumn) return rows;
     return rows.filter((row) => String(row[filterColumn] ?? "").toLowerCase().includes(query));
-  }, [pull, visibleCount, filterColumn, filterValue, guidedFilters, attributeFilters, sortKeys, rowLimit, integrationId, tableId, settledPreviewKey, previewSearchError, livePreviewRows]);
+  }, [pull, visibleCount, filterColumn, filterValue, guidedFilters, attributeFilters, sortKeys, rowLimit, integrationId, tableId, settledPreviewKey, previewSearchError, livePreviewRows, liveMarketSearch, liveNarrowing]);
 
   const queriedMarkets = useMemo(() => {
     if (!guidedFilters) return [];
@@ -1760,15 +1817,41 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
     if (!columns?.length) return undefined;
     const predicates = buildAttributePredicates(columns, attributeFilters);
     if (!previewRequestKey) {
-      setPreviewRefreshing(false);
+      const nonceBumped = previewRefreshNonce !== appliedPreviewNonce.current;
+      const leaveFilter = usingFilteredSample.current;
+      if (!nonceBumped && !leaveFilter) {
+        setPreviewRefreshing(false);
+        setPreviewSearchError("");
+        setSettledPreviewKey("");
+        return undefined;
+      }
+      appliedPreviewNonce.current = previewRefreshNonce;
+      let cancel = false;
       setPreviewSearchError("");
       setSettledPreviewKey("");
-      if (usingFilteredSample.current) {
-        usingFilteredSample.current = false;
-        setPull((current) => (current ? { ...current, rows: baseRowsRef.current } : current));
-      }
-      return undefined;
+      setPreviewRefreshing(true);
+      loadBuildPreview(integrationId, tableId, { fresh: true })
+        .then((result) => {
+          if (cancel) return;
+          const rows = Array.isArray(result?.rows) ? result.rows : [];
+          usingFilteredSample.current = false;
+          baseRowsRef.current = rows;
+          setPull((current) => (current ? { ...current, rows } : current));
+          setVisibleCount(rows.length);
+        })
+        .catch((err) => {
+          if (cancel) return;
+          setPreviewSearchError(err instanceof Error ? err.message : "Could not load preview rows");
+        })
+        .finally(() => {
+          if (cancel) return;
+          setPreviewRefreshing(false);
+        });
+      return () => {
+        cancel = true;
+      };
     }
+    appliedPreviewNonce.current = previewRefreshNonce;
     let cancel = false;
     const key = previewRequestKey;
     setPreviewSearchError("");
@@ -1777,9 +1860,10 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
       join.loadPreview(tableId, predicates, sortKeys)
         .then((result) => {
           if (cancel) return;
+          const rows = Array.isArray(result?.rows) ? result.rows : [];
           usingFilteredSample.current = true;
-          setPull((current) => (current ? { ...current, rows: result.rows } : current));
-          setVisibleCount(result.rows.length);
+          setPull((current) => (current ? { ...current, rows } : current));
+          setVisibleCount(rows.length);
         })
         .catch((err) => {
           if (cancel) return;
@@ -1795,7 +1879,33 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
       cancel = true;
       window.clearTimeout(timer);
     };
-  }, [guidedFilters, join, attributeFilters, pull?.columns, sortKeys, tableId, previewRequestKey]);
+  }, [guidedFilters, join, attributeFilters, pull?.columns, sortKeys, tableId, previewRequestKey, previewRefreshNonce, integrationId]);
+
+  useEffect(() => {
+    if (!previewRefreshNonce || guidedFilters || liveMarketSearch) return undefined;
+    let cancel = false;
+    setPreviewSearchError("");
+    setPreviewRefreshing(true);
+    loadBuildPreview(integrationId, tableId, { fresh: true })
+      .then((result) => {
+        if (cancel) return;
+        const rows = Array.isArray(result?.rows) ? result.rows : [];
+        baseRowsRef.current = rows;
+        setPull((current) => (current ? { ...current, rows, columns: result.columns || current.columns } : result));
+        setVisibleCount(rows.length);
+      })
+      .catch((err) => {
+        if (cancel) return;
+        setPreviewSearchError(err instanceof Error ? err.message : "Could not load preview rows");
+      })
+      .finally(() => {
+        if (cancel) return;
+        setPreviewRefreshing(false);
+      });
+    return () => {
+      cancel = true;
+    };
+  }, [previewRefreshNonce, guidedFilters, liveMarketSearch, integrationId, tableId]);
 
   const accountId = user?.userId || "";
 
@@ -1977,12 +2087,41 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
 
   const shown = loading ? 0 : filteredRows.length;
   const searchingPreview = Boolean(previewRequestKey) && previewRequestKey !== settledPreviewKey;
-  const noMatchingRows = !loading && !searchingPreview && !previewSearchError && Boolean(previewRequestKey) && shown === 0;
-  const emptyRefresh = !loading && shownColumns.length > 0 && shown === 0 && searchingPreview;
+  const reloadingUnfiltered = guidedFilters && !previewRequestKey && (previewRefreshing || usingFilteredSample.current);
+  const settledRowCount = Array.isArray(pull?.rows) ? pull.rows.length : null;
+  const noMatchingRows =
+    !loading &&
+    !searchingPreview &&
+    !previewRefreshing &&
+    !previewSearchError &&
+    Boolean(previewRequestKey) &&
+    settledRowCount === 0 &&
+    shownColumns.length > 0;
+  const unfilteredEmpty =
+    !loading &&
+    !searchingPreview &&
+    !previewRefreshing &&
+    !previewSearchError &&
+    !reloadingUnfiltered &&
+    !liveNarrowing &&
+    !previewRequestKey &&
+    settledRowCount === 0 &&
+    shownColumns.length > 0;
+  const previewSampleEmpty = noMatchingRows || unfilteredEmpty;
+  const emptyRefresh =
+    !loading &&
+    shownColumns.length > 0 &&
+    settledRowCount === 0 &&
+    (searchingPreview || reloadingUnfiltered || previewRefreshing);
+
+  function refreshPreview() {
+    setPreviewRefreshNonce((nonce) => nonce + 1);
+  }
   const livePickAwaitingRows = liveMarketSearch && !loading && shown === 0 && livePicks.some((pick) => pick.status === "loading");
+  const liveScanWaiting = liveMarketSearch && liveScan.status === "loading" && shown === 0;
 
   useEffect(() => {
-    if (!emptyRefresh && !livePickAwaitingRows) return undefined;
+    if (!emptyRefresh && !livePickAwaitingRows && !liveScanWaiting) return undefined;
     setProgress(12);
     const timer = window.setInterval(() => {
       setProgress((current) => (current >= 88 ? current : current + Math.random() * 8));
@@ -1991,7 +2130,7 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
       window.clearInterval(timer);
       setProgress(100);
     };
-  }, [emptyRefresh, livePickAwaitingRows]);
+  }, [emptyRefresh, livePickAwaitingRows, liveScanWaiting]);
   const shownLabel = `Previewing ${shown.toLocaleString()} ${shown === 1 ? "row" : "rows"}`;
   const livePickLoading = livePicks.some((pick) => pick.status === "loading");
   const liveUpdating = liveScan.status === "loading" || livePickLoading;
@@ -1999,6 +2138,15 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
     liveScan.status === "ready" && liveScan.truncated
       ? ` Scan stopped at ${KALSHI_LIVE_MARKET_SCAN_CAP.toLocaleString()} markets.`
       : "";
+  const liveSettledEmpty =
+    liveMarketSearch &&
+    Array.isArray(livePreviewRows) &&
+    livePreviewRows.length === 0 &&
+    !loading &&
+    !liveUpdating &&
+    !previewRefreshing &&
+    liveScan.status !== "error";
+  const previewIsEmpty = previewSampleEmpty || liveSettledEmpty;
   const previewLine = loading
     ? "Loading the first 50 rows"
     : liveScan.status === "error"
@@ -2020,20 +2168,22 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
           : `${shownLabel}. More rows are available.`;
   const previewLineShown = emptyRefresh
     ? "Searching for matching rows"
-    : previewSearchError && shown === 0
+    : previewSearchError && settledRowCount === 0
       ? previewSearchError
-      : noMatchingRows
-        ? "No rows found matching your criteria"
+      : previewIsEmpty
+        ? "No data found"
         : previewRefreshing && !loading
           ? `${previewLine} · updating`
           : previewLine;
-  const availableRows = liveMatchedRows
-    ? liveMatchedRows.length
-    : !exactUniverse
-      ? Number.POSITIVE_INFINITY
-      : typeof universe === "number" && !counting
-        ? universe
-        : null;
+  const availableRows = previewIsEmpty
+    ? 0
+    : liveMatchedRows
+      ? liveMatchedRows.length
+      : !exactUniverse
+        ? Number.POSITIVE_INFINITY
+        : typeof universe === "number" && !counting
+          ? universe
+          : null;
   const requestedLimit = Number(rowLimit);
   const importedRows =
     typeof planLimit === "number" && availableRows != null
@@ -2916,6 +3066,7 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
           rowCount: fullRows.length,
           span: "half",
           table: item.target.id,
+          pull: { ticker: item.market.ticker, table: item.target.id },
           summary: `Kalshi Live · ${item.target.title} · ${item.market.label || item.market.ticker}`,
         });
       });
@@ -3847,7 +3998,14 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
 
       <section className="flex min-h-0 min-w-0 flex-1 flex-col bg-[#e6edf3] dark:bg-[#1c232b]">
         <div className="flex items-start justify-between gap-3 px-5 pb-2 pr-12 pt-5">
-          <h2 className="pt-0.5 text-[15px] font-semibold text-foreground">Preview</h2>
+          <div className="min-w-0 pt-0.5">
+            <h2 className="text-[15px] font-semibold text-foreground">Preview</h2>
+            {isRealtimeEnabled(integrationId, previewSheet.startsWith("live:") ? previewSheet.slice("live:".length) : tableId) ? (
+              <p className="mt-1 max-w-md text-[12px] leading-relaxed text-muted-foreground">
+                This endpoint qualifies for a realtime pull. Preview stays a snapshot. After you run it, start realtime from the sheet on the dashboard.
+              </p>
+            ) : null}
+          </div>
           <div className="flex min-w-0 flex-col items-end">
             <p className="text-right text-[12px] text-muted-foreground">{paneLine}</p>
             {typeof planLimit === "number" &&
@@ -3893,7 +4051,7 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
         </div>
         <div className="h-1 w-full bg-black/5 dark:bg-white/10">
           <div
-            className={cn("h-full bg-[#0d99ff] transition-[width] duration-300", loading || emptyRefresh || livePickAwaitingRows ? "" : "opacity-0")}
+            className={cn("h-full bg-[#0d99ff] transition-[width] duration-300", loading || emptyRefresh || livePickAwaitingRows || liveScanWaiting ? "" : "opacity-0")}
             style={{ width: `${Math.min(100, progress)}%` }}
           />
         </div>
@@ -4142,15 +4300,14 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
             </div>
           ) : error ? (
             <p className="text-[13px] text-muted-foreground">{error}</p>
-          ) : previewSearchError && shown === 0 ? (
-            <div className="flex h-full items-center justify-center rounded-xl border border-border/70 bg-background px-6 text-center text-[13px] leading-relaxed text-muted-foreground shadow-sm">
-              {previewSearchError}
+          ) : previewSearchError && settledRowCount === 0 ? (
+            <div className="flex h-full flex-col items-center justify-center gap-3 rounded-xl border border-border/70 bg-background px-6 text-center shadow-sm">
+              <p className="text-[13px] leading-relaxed text-muted-foreground">{previewSearchError}</p>
+              <Button type="button" variant="outline" onClick={refreshPreview}>
+                Refresh
+              </Button>
             </div>
-          ) : noMatchingRows ? (
-            <div className="flex h-full items-center justify-center rounded-xl border border-border/70 bg-background px-6 text-center text-[13px] leading-relaxed text-muted-foreground shadow-sm">
-              No rows found matching your criteria.
-            </div>
-          ) : loading || emptyRefresh || livePickAwaitingRows ? (
+          ) : loading || emptyRefresh || livePickAwaitingRows || liveScanWaiting ? (
             <div className="flex h-full flex-col gap-3">
               {integrationId === "chainlink" || integrationId === "binance" ? <WaitingToConnectTag /> : null}
               {livePickAwaitingRows ? (
@@ -4161,6 +4318,13 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
               <div className="min-h-0 flex-1">
                 <SkeletonRows />
               </div>
+            </div>
+          ) : previewIsEmpty ? (
+            <div className="flex h-full flex-col items-center justify-center gap-3 rounded-xl border border-border/70 bg-background px-6 text-center shadow-sm">
+              <p className="text-[13px] leading-relaxed text-muted-foreground">No data found</p>
+              <Button type="button" variant="outline" onClick={refreshPreview}>
+                Refresh
+              </Button>
             </div>
           ) : marketsGrid.columns.length ? (
             <IntegrationBuildGrid
