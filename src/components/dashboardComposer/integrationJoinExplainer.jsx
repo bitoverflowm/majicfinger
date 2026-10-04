@@ -92,9 +92,31 @@ function tabClass(selected) {
   );
 }
 
+const LIVE_DESTINATIONS = ["Trades", "Order book", "Candlesticks"];
+
 /** The tab that appears while Join is hovered. It is not a real sheet. */
-export function JoinExplainerTabs({ source = "markets" }) {
+export function JoinExplainerTabs({ source = "markets", live = false }) {
   const reduce = useReducedMotion();
+  if (live) {
+    return (
+      <div className="overflow-hidden px-4 pb-1 pt-4">
+        <div className="flex">
+          <span className={tabClass(false)}>Markets</span>
+          {LIVE_DESTINATIONS.map((title, index) => (
+            <motion.span
+              key={title}
+              initial={reduce ? false : { clipPath: "inset(0 100% 0 0)", opacity: 0 }}
+              animate={{ clipPath: "inset(0 0% 0 0)", opacity: 1 }}
+              transition={{ duration: 0.4, delay: 0.12 * index, ease: "easeOut" }}
+              className={tabClass(index === LIVE_DESTINATIONS.length - 1)}
+            >
+              {title}
+            </motion.span>
+          ))}
+        </div>
+      </div>
+    );
+  }
   const from = source === "trades" ? "Trades" : "Markets";
   const to = source === "trades" ? "Markets" : "Trades";
   return (
@@ -249,8 +271,103 @@ function MarketsJoinExplainer({ venue = "kalshi" }) {
   );
 }
 
+const LIVE_SAMPLE = [
+  {
+    title: "Trades",
+    rows: [
+      ["14:02", "Yes", "63¢"],
+      ["14:01", "No", "37¢"],
+    ],
+  },
+  {
+    title: "Order book",
+    rows: [
+      ["Yes", "64¢", "120"],
+      ["No", "36¢", "80"],
+    ],
+  },
+  {
+    title: "Candlesticks",
+    rows: [
+      ["14:00", "Open", "61¢"],
+      ["14:01", "Close", "63¢"],
+    ],
+  },
+];
+
+/** One market fans out to the live sheets that hang off its ticker. */
+export function LiveMarketsJoinExplainer() {
+  const reduce = useReducedMotion();
+  const style = venueStyle("kalshi");
+  return (
+    <div className="relative flex h-full min-h-[280px] items-center justify-center overflow-hidden rounded-xl border border-border/70 bg-background shadow-sm">
+      <FlickeringGrid
+        className="absolute inset-0 [mask-image:radial-gradient(ellipse_at_center,black,transparent_75%)]"
+        squareSize={3}
+        gridGap={5}
+        flickerChance={0.16}
+        color={style.flicker}
+        maxOpacity={0.2}
+      />
+      <div className="relative z-10 flex w-full max-w-2xl flex-col items-center gap-5 px-6 py-8">
+        <p className="max-w-md text-center text-[13px] leading-relaxed text-muted-foreground">
+          Join attaches every market in this pull to the live data on its ticker. Pick trades, the order book, candlesticks, or all of them.
+        </p>
+        <div className="grid w-full grid-cols-[minmax(0,0.8fr)_2.5rem_minmax(0,1.15fr)] items-center gap-x-2 gap-y-2">
+          <div
+            className="row-span-3 rounded-xl border px-3 py-3 shadow-sm backdrop-blur-md"
+            style={{ borderColor: `${style.accent}80`, backgroundColor: `${style.accent}1a`, gridRow: "span 3" }}
+          >
+            <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Markets</p>
+            <p className="mt-1 truncate font-mono text-[11px] text-foreground">MARKET-A</p>
+          </div>
+          {LIVE_SAMPLE.map((sheet, index) => (
+            <div key={sheet.title} className="contents">
+              <div className="relative h-px overflow-hidden bg-border">
+                <motion.span
+                  className="absolute inset-y-0 left-0"
+                  style={{ backgroundColor: style.accent }}
+                  initial={reduce ? false : { width: "0%" }}
+                  animate={{ width: "100%" }}
+                  transition={{ delay: 0.12 + index * 0.12, duration: 0.4 }}
+                />
+              </div>
+              <motion.div
+                className="relative overflow-hidden rounded-xl border border-border/70 bg-background/90 shadow-sm backdrop-blur-md"
+                initial={reduce ? false : { opacity: 0, x: 12 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ delay: 0.24 + index * 0.12, duration: 0.35 }}
+              >
+                <BorderBeam size={70} duration={8} delay={index * 1.2} borderWidth={1.2} colorFrom={style.accent} colorTo="#0d99ff" />
+                <p className="border-b border-border/60 px-2.5 py-1 text-[11px] font-semibold text-foreground">
+                  {sheet.title} · <span className="font-mono font-medium">MARKET-A</span>
+                </p>
+                <div className="flex flex-col gap-1 p-1.5">
+                  {sheet.rows.map((row) => (
+                    <div
+                      key={row.join("-")}
+                      className="flex items-center justify-between rounded-lg border border-border/60 bg-background px-2 py-1 font-mono text-[10px]"
+                    >
+                      {row.map((cell) => (
+                        <span key={cell} className="text-foreground">
+                          {cell}
+                        </span>
+                      ))}
+                    </div>
+                  ))}
+                </div>
+              </motion.div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 /** Markets points each contract at its trades. Trades points each fill at market metadata. */
-export function JoinExplainer({ source = "markets", venue = "kalshi" }) {
+export function JoinExplainer({ source = "markets", venue = "kalshi", live = false }) {
+  if (live) return <LiveMarketsJoinExplainer />;
   if (source === "trades") return <TradesJoinExplainer venue={venue} />;
   return <MarketsJoinExplainer venue={venue} />;
 }

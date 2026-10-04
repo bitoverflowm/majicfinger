@@ -136,23 +136,32 @@ export default function IntegrationBuildGridInner({
   const gridSlotRef = useRef(null);
   const [size, setSize] = useState({ width: 0, height: 0 });
   const [fontFamily, setFontFamily] = useState("ui-sans-serif, system-ui, sans-serif");
+  const [columnWidths, setColumnWidths] = useState({});
   const gridColumns = useMemo(
     () =>
       columns.map((column) => ({
         id: column.id,
         title: column.title,
         width:
-          column.id === highlightColumnId
+          columnWidths[column.id] ??
+          (column.id === highlightColumnId
             ? Math.max(220, Math.min(360, String(formulaEditor?.value || column.title || "").length * 7.2 + 36))
             : column.id === "title" || column.id === "question"
               ? 280
               : column.type === "date"
                 ? 188
-                : 140,
+                : 140),
         themeOverride: columnTheme(column.id, highlightColumnId, highlightColumnIds, referencedColumnIds, dark),
       })),
-    [columns, dark, highlightColumnId, highlightColumnIds, referencedColumnIds, formulaEditor?.value],
+    [columnWidths, columns, dark, highlightColumnId, highlightColumnIds, referencedColumnIds, formulaEditor?.value],
   );
+
+  const onColumnResize = useCallback((column, newSize) => {
+    const id = column?.id;
+    if (!id) return;
+    const width = Math.round(newSize);
+    setColumnWidths((prev) => (prev[id] === width ? prev : { ...prev, [id]: width }));
+  }, []);
 
   useEffect(() => {
     const next = getComputedStyle(document.body).fontFamily;
@@ -313,6 +322,9 @@ export default function IntegrationBuildGridInner({
             smoothScrollY
             getCellsForSelection
             rangeSelect="cell"
+            minColumnWidth={64}
+            maxColumnWidth={1600}
+            onColumnResize={onColumnResize}
             onVisibleRegionChanged={placeFormula}
             onHeaderClicked={(index) => reportPick(index, null)}
             onCellClicked={([index, row]) => reportPick(index, row)}
