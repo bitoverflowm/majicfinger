@@ -10,6 +10,7 @@ import { Calendar } from "@/components/ui/calendar";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { cellMatchesTextTerm, columnUsesWholeTerm } from "@/lib/textTermMatch";
 import { cn } from "@/lib/utils";
 
 /**
@@ -215,11 +216,10 @@ export function rowMatchesKalshiHistoricalFilters(row, columns, filters) {
       continue;
     }
     if (spec.kind === "text") {
-      const text = String(raw ?? "").toLowerCase();
-      const include = textTerms(filter.containsTags, filter.contains).map((term) => term.toLowerCase());
-      const exclude = textTerms(filter.excludesTags, filter.excludes).map((term) => term.toLowerCase());
-      if (include.length && !include.some((term) => text.includes(term))) return false;
-      if (exclude.some((term) => text.includes(term))) return false;
+      const include = textTerms(filter.containsTags, filter.contains);
+      const exclude = textTerms(filter.excludesTags, filter.excludes);
+      if (include.length && !include.some((term) => cellMatchesTextTerm(column.id, raw, term))) return false;
+      if (exclude.some((term) => cellMatchesTextTerm(column.id, raw, term))) return false;
       continue;
     }
     if (spec.kind === "number") {
@@ -273,15 +273,17 @@ export function buildKalshiHistoricalFilterPredicates(columns, filters) {
     if (spec.kind === "text") {
       const include = textTerms(filter.containsTags, filter.contains);
       const exclude = textTerms(filter.excludesTags, filter.excludes);
+      const includeOp = columnUsesWholeTerm(column.id) ? "contains_word" : "contains";
+      const excludeOp = columnUsesWholeTerm(column.id) ? "not_contains_word" : "not_contains";
       if (include.length === 1) {
-        and.push({ column: column.id, kind: "string", op: "contains", value: include[0] });
+        and.push({ column: column.id, kind: "string", op: includeOp, value: include[0] });
       } else if (include.length > 1) {
         includeGroups.push(
-          include.map((value) => ({ column: column.id, kind: "string", op: "contains", value })),
+          include.map((value) => ({ column: column.id, kind: "string", op: includeOp, value })),
         );
       }
       for (const value of exclude) {
-        and.push({ column: column.id, kind: "string", op: "not_contains", value });
+        and.push({ column: column.id, kind: "string", op: excludeOp, value });
       }
       continue;
     }

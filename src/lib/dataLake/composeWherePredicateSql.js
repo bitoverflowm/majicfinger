@@ -10,6 +10,7 @@ import {
 } from "@/lib/kalshi/kalshiTaxonomySql";
 import { resolveAthenaTableName } from "@/lib/dataLake/athenaTableMap";
 import { columnHiveTypeForLakeTable } from "@/lib/dataLake/lakeTableColumns";
+import { textTermRegexpSource } from "@/lib/textTermMatch";
 
 const KALSHI_VIRTUAL_CATEGORY = "kalshi_event_ticker_category";
 
@@ -248,6 +249,11 @@ export function buildComposeFiltersWhereSql(opts) {
     }
 
     const colMaybeLower = caseSensitive ? colSql : `LOWER(${colSql})`;
+    if (p.op === "contains_word" || p.op === "not_contains_word") {
+      const pattern = textTermRegexpSource(p.value);
+      const expr = `regexp_like(${colMaybeLower}, '${escapeSqlString(pattern)}')`;
+      return p.op === "not_contains_word" ? `(NOT ${expr})` : expr;
+    }
     if (p.op === "contains" || p.op === "not_contains") {
       const pattern = `%${escapeLike(p.value)}%`;
       const litMaybeLower = caseSensitive ? `'${escapeSqlString(pattern)}'` : `LOWER('${escapeSqlString(pattern)}')`;

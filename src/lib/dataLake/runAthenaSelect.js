@@ -24,6 +24,7 @@ import {
   KALSHI_TRADES_RESOLVED_MARKETS_JOIN_PRESET_CENT,
 } from "./lakeTableColumns";
 import { parseRandomSampleSize } from "./randomSample";
+import { textTermRegexpSource } from "../textTermMatch";
 
 function getRegion() {
   return process.env.AWS_REGION || process.env.AWS_DEFAULT_REGION || "us-east-1";
@@ -208,6 +209,11 @@ export async function startAthenaBoundedQuery({
 
     // string
     const colMaybeLower = caseSensitive ? colSql : `LOWER(${colSql})`;
+    if (p.op === "contains_word" || p.op === "not_contains_word") {
+      const pattern = textTermRegexpSource(p.value);
+      const expr = `regexp_like(${colMaybeLower}, '${escapeSqlString(pattern)}')`;
+      return p.op === "not_contains_word" ? `(NOT ${expr})` : expr;
+    }
     if (p.op === "contains" || p.op === "not_contains") {
       const pattern = `%${escapeLike(p.value)}%`;
       const litMaybeLower = caseSensitive ? `'${escapeSqlString(pattern)}'` : `LOWER('${escapeSqlString(pattern)}')`;

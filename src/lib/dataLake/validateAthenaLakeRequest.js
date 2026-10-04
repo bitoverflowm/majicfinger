@@ -224,7 +224,7 @@ export function validateAthenaLakeQueryBody(body, access) {
           throw new AthenaLakeRequestError("Invalid number filter operator", { statusCode: 400, code: "BAD_REQUEST" });
         }
       } else if (kind === "string") {
-        if (!["contains", "not_contains", "eq", "neq", "in", "not_in", "is_null", "is_not_null"].includes(op)) {
+        if (!["contains", "not_contains", "contains_word", "not_contains_word", "eq", "neq", "in", "not_in", "is_null", "is_not_null"].includes(op)) {
           throw new AthenaLakeRequestError("Invalid string filter operator", { statusCode: 400, code: "BAD_REQUEST" });
         }
       }
