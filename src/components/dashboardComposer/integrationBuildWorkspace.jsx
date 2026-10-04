@@ -2274,6 +2274,7 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
       source={profile.label}
       status={liveScan.status}
       scanned={liveScan.scanned || 0}
+      kept={Array.isArray(liveScan.rows) ? liveScan.rows.length : 0}
       removedCount={liveScan.removedCount || 0}
       removed={liveScan.removed || []}
       waiting={Boolean(liveScan.waiting)}

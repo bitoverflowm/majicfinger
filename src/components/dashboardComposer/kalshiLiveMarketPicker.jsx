@@ -88,7 +88,11 @@ export function kalshiLiveMarketAttributeColumns(columns) {
   const query = KALSHI_LIVE_QUERY_ATTRIBUTE_COLUMNS.flatMap((column) =>
     column.id === "tickers" ? [column, containing] : [column],
   );
-  return [...query, ...shaped];
+  const ordered = [...query, ...shaped];
+  return [
+    ...ordered.filter((column) => column.type === "date"),
+    ...ordered.filter((column) => column.type !== "date"),
+  ];
 }
 
 const MAX_MARKETS = 100;

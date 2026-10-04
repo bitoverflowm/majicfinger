@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { dateRangePreset } from "@/components/dashboardComposer/dateRangePresets.js";
+import { activeDateRangePreset, dateRangePreset, matchingDateRangePreset } from "@/components/dashboardComposer/dateRangePresets.js";
 import {
   describeKalshiLiveServerFilters,
   kalshiLiveDiscoveryFromFilters,
@@ -87,4 +87,10 @@ test("date presets are windows through today", () => {
   assert.deepEqual(dateRangePreset("past-month", now), { from: "2026-09-04", to: "2026-10-04" });
   assert.deepEqual(dateRangePreset("this-quarter", now), { from: "2026-10-01", to: "2026-10-04" });
   assert.deepEqual(dateRangePreset("this-year", now), { from: "2026-01-01", to: "2026-10-04" });
+  assert.equal(matchingDateRangePreset("2026-10-03", "2026-10-04", now)?.short, "24h");
+  assert.equal(matchingDateRangePreset("2026-10-01", "2026-10-04", now)?.short, "3d");
+  assert.equal(matchingDateRangePreset("2026-10-01", "2026-10-04", now)?.id, "past-3d");
+  assert.equal(matchingDateRangePreset("2026-10-01", "2026-10-05", now), null);
+  assert.equal(matchingDateRangePreset("2026-01-01", "2026-10-04", now)?.short, "YTD");
+  assert.equal(activeDateRangePreset("2026-10-01", "2026-10-04", "this-quarter", now)?.short, "Q4");
 });

@@ -11,7 +11,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { cellMatchesTextTerm, columnUsesWholeTerm } from "@/lib/textTermMatch";
-import { DATE_RANGE_PRESETS, dateRangePreset } from "@/components/dashboardComposer/dateRangePresets";
+import { DATE_RANGE_PRESETS, activeDateRangePreset, dateRangePreset } from "@/components/dashboardComposer/dateRangePresets";
 import { cn } from "@/lib/utils";
 
 /**
@@ -188,7 +188,8 @@ export function attributeSummary(column, filters) {
     else if (min) parts.push(`≥ ${min}${unit}`);
     else if (max) parts.push(`≤ ${max}${unit}`);
   } else if (spec.kind === "date") {
-    if (filter.from && filter.to) parts.push(formatAttributeRange(filter.from, filter.to));
+    const preset = filter.from && filter.to ? activeDateRangePreset(filter.from, filter.to, filter.preset) : null;
+    if (filter.from && filter.to) parts.push(preset ? `${preset.short} · ${formatAttributeRange(filter.from, filter.to)}` : formatAttributeRange(filter.from, filter.to));
     else if (filter.from) parts.push(`From ${formatAttributeDate(filter.from)}`);
     else if (filter.to) parts.push(`Until ${formatAttributeDate(filter.to)}`);
   } else if (spec.kind === "text") {
@@ -517,10 +518,11 @@ function ExcludeNullField({ checked, onChange }) {
   );
 }
 
-function DateRangeField({ from, to, onChange }) {
+function DateRangeField({ from, to, presetId, onChange }) {
   const start = dateFromIso(from);
   const end = dateFromIso(to);
   const selected = start || end ? { from: start, to: end } : undefined;
+  const preset = activeDateRangePreset(from, to, presetId);
   return (
     <Popover>
       <PopoverTrigger asChild>
@@ -534,20 +536,29 @@ function DateRangeField({ from, to, onChange }) {
         >
           <CalendarIcon className="size-3.5 shrink-0 opacity-70" />
           <span className="min-w-0 flex-1 truncate">{formatAttributeRange(from, to)}</span>
+          {preset ? <span className="shrink-0 text-[11px] font-medium text-muted-foreground">{preset.short}</span> : null}
         </Button>
       </PopoverTrigger>
       <PopoverContent align="start" className="z-[620] w-auto p-0">
         <div className="flex max-w-[34rem] flex-wrap gap-1.5 border-b border-border/70 p-2">
-          {DATE_RANGE_PRESETS.map((preset) => (
-            <button
-              key={preset.id}
-              type="button"
-              className="rounded-full border border-border/70 bg-background px-2 py-1 text-[11px] text-foreground hover:bg-muted"
-              onClick={() => onChange(dateRangePreset(preset.id))}
-            >
-              {preset.label}
-            </button>
-          ))}
+          {DATE_RANGE_PRESETS.map((item) => {
+            const active = preset?.id === item.id;
+            return (
+              <button
+                key={item.id}
+                type="button"
+                className={cn(
+                  "rounded-full border px-2 py-1 text-[11px]",
+                  active
+                    ? "border-foreground bg-foreground text-background"
+                    : "border-border/70 bg-background text-foreground hover:bg-muted",
+                )}
+                onClick={() => onChange({ ...dateRangePreset(item.id), preset: item.id })}
+              >
+                {item.label}
+              </button>
+            );
+          })}
         </div>
         <Calendar
           key={`${from || ""}|${to || ""}`}
@@ -555,7 +566,7 @@ function DateRangeField({ from, to, onChange }) {
           numberOfMonths={2}
           selected={selected}
           defaultMonth={end || start}
-          onSelect={(range) => onChange({ from: isoFromDate(range?.from), to: isoFromDate(range?.to) })}
+          onSelect={(range) => onChange({ from: isoFromDate(range?.from), to: isoFromDate(range?.to), preset: "" })}
         />
         {selected ? (
           <div className="border-t border-border/70 p-2">
@@ -563,7 +574,7 @@ function DateRangeField({ from, to, onChange }) {
               type="button"
               variant="ghost"
               className="h-7 w-full text-[11px]"
-              onClick={() => onChange({ from: "", to: "" })}
+              onClick={() => onChange({ from: "", to: "", preset: "" })}
             >
               Clear dates
             </Button>
@@ -631,7 +642,8 @@ function AttributeFields({ column, filters, onChange }) {
         <DateRangeField
           from={filter.from || ""}
           to={filter.to || ""}
-          onChange={({ from, to }) => onChange(patchFilter(filters, column, { from, to }))}
+          presetId={filter.preset || ""}
+          onChange={({ from, to, preset }) => onChange(patchFilter(filters, column, { from, to, preset: preset || "" }))}
         />
         {excludeNull}
       </div>

@@ -2,16 +2,6 @@
 
 import { ToolChips } from "@/components/spectrumui/blocks/ai-assistants/tool-chips";
 
-function queryToolName(source) {
-  const label = String(source || "").toLowerCase();
-  if (label.includes("kalshi")) return "query_kalshi_markets";
-  if (label.includes("polymarket")) return "query_polymarket_markets";
-  if (label.includes("chainlink")) return "query_chainlink";
-  if (label.includes("binance")) return "query_binance";
-  const slug = label.replace(/[^a-z0-9]+/g, "_").replace(/^_|_$/g, "");
-  return slug ? `query_${slug}` : "query_markets";
-}
-
 function tickerLine(item) {
   const parts = [item.ticker, item.label, item.reason].map((part) => String(part || "").trim()).filter(Boolean);
   return parts.join(" · ");
@@ -25,6 +15,7 @@ export function MarketScanSteps({
   source,
   status,
   scanned = 0,
+  kept = 0,
   removedCount = 0,
   removed = [],
   waiting = false,
@@ -50,11 +41,14 @@ export function MarketScanSteps({
     : status === "error" && error
       ? error
       : scanned
-        ? `Queried markets directly from ${sourceName}. Read ${scanned.toLocaleString()} markets.`
+        ? `Queried markets directly from ${sourceName}. Parsed ${scanned.toLocaleString()} markets.`
         : `Querying markets directly from ${sourceName}.`;
+  const parsedLabel = scanned
+    ? `${scanned.toLocaleString()} ${scanned === 1 ? "market" : "markets"} parsed`
+    : "Parsing markets";
   calls.push({
     id: "query",
-    name: queryToolName(sourceName),
+    name: parsedLabel,
     status: waiting ? "running" : queryStatus,
     ...stamp,
     completedAt: done ? stamp.completedAt : undefined,
@@ -79,13 +73,13 @@ export function MarketScanSteps({
     });
   }
 
-  if (removedCount > 0 || (scanned > 0 && requirementsLabel.length)) {
+  const mismatched = Math.max(Number(removedCount) || 0, Math.max(0, scanned - kept));
+  if (mismatched > 0 || (scanned > 0 && requirementsLabel.length)) {
     const listed = (removed || []).map(tickerLine).filter(Boolean);
-    const hidden = Math.max(0, removedCount - listed.length);
+    const hidden = Math.max(0, mismatched - listed.length);
+    const removedLabel = `${mismatched.toLocaleString()} mismatched ${mismatched === 1 ? "row" : "rows"} removed`;
     const detail = [
-      removedCount
-        ? `Removed ${removedCount.toLocaleString()} ${removedCount === 1 ? "market" : "markets"} outside your requirements.`
-        : "Checking which markets fall outside your requirements.",
+      removedLabel,
       listed.length ? listed.join("\n") : "",
       hidden > 0 ? `and ${hidden.toLocaleString()} more` : "",
     ]
@@ -93,10 +87,10 @@ export function MarketScanSteps({
       .join("\n\n");
     calls.push({
       id: "remove",
-      name: removedCount ? `removed_${removedCount}_markets` : "remove_outside_requirements",
+      name: removedLabel,
       status: done ? "success" : scanned ? "running" : "pending",
       ...(scanned && done ? stamp : scanned ? { startedAt } : {}),
-      args: removedCount ? { removed: removedCount } : undefined,
+      args: mismatched ? { removed: mismatched } : undefined,
       result: detail,
     });
   }
