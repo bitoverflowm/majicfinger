@@ -82,7 +82,7 @@ export function KalshiLiveTimestampPicker({
           </span>
         </Button>
       </PopoverTrigger>
-      <PopoverContent className="w-auto p-3" align="start">
+      <PopoverContent className="z-[620] w-auto p-3" align="start">
         <Calendar
           mode="single"
           selected={date}

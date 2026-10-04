@@ -10,6 +10,7 @@ import { Calendar } from "@/components/ui/calendar";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { KalshiLiveTimestampPicker } from "@/components/connectData/kalshiLive/KalshiLiveTimestampPicker";
 import { cellMatchesTextTerm, columnUsesWholeTerm } from "@/lib/textTermMatch";
 import { DATE_RANGE_PRESETS, activeDateRangePreset, dateRangePreset } from "@/components/dashboardComposer/dateRangePresets";
 import { cn } from "@/lib/utils";
@@ -65,6 +66,10 @@ const BOOLEAN_OPTIONS = [
 ];
 
 export function kalshiHistoricalAttributeSpec(column) {
+  if (column?.control === "updated-after") return { kind: "updated-after" };
+  if (column?.control === "category") {
+    return { kind: "enum", options: column.enumOptions || [], single: true, loading: Boolean(column.enumLoading) };
+  }
   if (Array.isArray(column?.enumOptions) && column.enumOptions.length) {
     return { kind: "enum", options: column.enumOptions };
   }
@@ -112,6 +117,7 @@ function isActive(spec, filter) {
   if (filter.excludeNull) return true;
   if (spec.kind === "enum" || spec.kind === "boolean") return Array.isArray(filter.include) && filter.include.length > 0;
   if (spec.kind === "number") return String(filter.min || "").trim() !== "" || String(filter.max || "").trim() !== "";
+  if (spec.kind === "updated-after") return Number(filter.minUpdatedTs) > 0;
   if (spec.kind === "date") return Boolean(filter.from) || Boolean(filter.to);
   return textTerms(filter.containsTags, filter.contains).length > 0 || textTerms(filter.excludesTags, filter.excludes).length > 0;
 }
@@ -187,6 +193,9 @@ export function attributeSummary(column, filters) {
     if (min && max) parts.push(`${min}${unit}–${max}${unit}`);
     else if (min) parts.push(`≥ ${min}${unit}`);
     else if (max) parts.push(`≤ ${max}${unit}`);
+  } else if (spec.kind === "updated-after") {
+    const seconds = Number(filter.minUpdatedTs);
+    if (Number.isFinite(seconds) && seconds > 0) parts.push(format(new Date(seconds * 1000), "LLL dd, y h:mm a"));
   } else if (spec.kind === "date") {
     const preset = filter.from && filter.to ? activeDateRangePreset(filter.from, filter.to, filter.preset) : null;
     if (filter.from && filter.to) parts.push(preset ? `${preset.short} · ${formatAttributeRange(filter.from, filter.to)}` : formatAttributeRange(filter.from, filter.to));
@@ -250,6 +259,12 @@ export function attributeMismatchReason(row, columns, filters) {
       if (max !== "" && n > Number(max)) return `${title} is ${formatFilterNumber(n)}, over ${formatFilterNumber(max)}`;
       continue;
     }
+    if (spec.kind === "updated-after") {
+      const min = Number(filter.minUpdatedTs) * 1000;
+      const updatedMs = lakeTimeMs(raw);
+      if (updatedMs == null || updatedMs < min) return `${title} is before the selected time`;
+      continue;
+    }
     const ms = lakeTimeMs(raw);
     if (ms == null) return `${title} is empty`;
     const outside =
@@ -309,6 +324,7 @@ export function buildKalshiHistoricalFilterPredicates(columns, filters) {
       }
       continue;
     }
+    if (spec.kind === "updated-after") continue;
     if (spec.kind === "number") {
       const min = String(filter.min || "").trim();
       const max = String(filter.max || "").trim();
@@ -342,7 +358,7 @@ function patchFilter(filters, column, patch) {
 
 function compareSortValue(left, right, spec) {
   if (spec?.kind === "number") return Number(left) - Number(right);
-  if (spec?.kind === "date") return (lakeTimeMs(left) || 0) - (lakeTimeMs(right) || 0);
+  if (spec?.kind === "date" || spec?.kind === "updated-after") return (lakeTimeMs(left) || 0) - (lakeTimeMs(right) || 0);
   return String(left).localeCompare(String(right), undefined, { numeric: true, sensitivity: "base" });
 }
 
@@ -594,6 +610,36 @@ function AttributeFields({ column, filters, onChange }) {
       onChange={(next) => onChange(patchFilter(filters, column, { excludeNull: next }))}
     />
   );
+  if (spec.kind === "enum" && spec.single) {
+    const selected = Array.isArray(filter.include)
+      ? String(filter.include.find((value) => String(value || "").trim()) || "")
+      : "";
+    return (
+      <select
+        aria-label="Series category"
+        value={selected}
+        onChange={(event) =>
+          onChange(patchFilter(filters, column, { include: event.target.value ? [event.target.value] : [] }))
+        }
+        className="h-9 w-full rounded-lg border border-border/70 bg-background px-2 text-[13px] text-foreground"
+      >
+        <option value="">{spec.loading ? "Loading categories…" : "Select a category"}</option>
+        {spec.options.map(([value, label]) => (
+          <option key={value || "empty"} value={value}>
+            {label}
+          </option>
+        ))}
+      </select>
+    );
+  }
+  if (spec.kind === "updated-after") {
+    return (
+      <KalshiLiveTimestampPicker
+        value={filter.minUpdatedTs ?? ""}
+        onChange={(minUpdatedTs) => onChange(patchFilter(filters, column, { minUpdatedTs }))}
+      />
+    );
+  }
   if (spec.kind === "enum" || spec.kind === "boolean") {
     return (
       <div className="space-y-2">

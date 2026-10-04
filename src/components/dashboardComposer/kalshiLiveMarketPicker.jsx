@@ -603,8 +603,8 @@ export function KalshiLiveMarketPicker({ picks, onAdd, onRemove, intent = "marke
           type="text"
           value={query}
           disabled={atCap}
-          placeholder={intent === "series" ? "Search a series ticker" : SEARCH_PLACEHOLDER}
-          aria-label={intent === "series" ? "Search Kalshi series" : "Search Kalshi markets"}
+          placeholder={intent === "series" ? "Search for a series" : SEARCH_PLACEHOLDER}
+          aria-label={intent === "series" ? "Search for a series" : "Search Kalshi markets"}
           autoComplete="off"
           onChange={(event) => {
             setQuery(event.target.value);
@@ -646,7 +646,7 @@ export function KalshiLiveMarketPicker({ picks, onAdd, onRemove, intent = "marke
     <TooltipProvider delayDuration={200}>
       <section className="space-y-2">
         <div className="flex items-center justify-between gap-2">
-          <p className="text-[12px] font-semibold text-foreground">{intent === "series" ? "Series" : "Markets"}</p>
+          <p className="text-[12px] font-semibold text-foreground">{intent === "series" ? "Search for a series" : "Markets"}</p>
           {(picks || []).length ? (
             <span className="text-[10px] text-muted-foreground">{picks.length} selected</span>
           ) : null}
@@ -659,7 +659,7 @@ export function KalshiLiveMarketPicker({ picks, onAdd, onRemove, intent = "marke
               <>
                 <button
                   type="button"
-                  aria-label="Close market search"
+                  aria-label={intent === "series" ? "Close series search" : "Close market search"}
                   className="pointer-events-auto fixed inset-0 z-[600] cursor-default bg-black/25"
                   onMouseDown={() => setExpanded(false)}
                 />
@@ -676,7 +676,7 @@ export function KalshiLiveMarketPicker({ picks, onAdd, onRemove, intent = "marke
           : null}
         <p className="text-[10px] leading-snug text-muted-foreground">
           {intent === "series"
-            ? "Search a series ticker. This adds the series, not the markets inside it."
+            ? "Search for a series by name. This adds the series, not the markets inside it."
             : "If you don't know your ticker, search anything and suggestions will populate."}
         </p>
         {error ? <p className="text-xs text-destructive">{error}</p> : null}

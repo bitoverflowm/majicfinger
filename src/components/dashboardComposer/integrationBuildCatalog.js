@@ -1508,7 +1508,7 @@ export async function loadKalshiLiveSeriesDiscovery(spec = {}, limit = PREVIEW_R
 
 /**
  * One-off Kalshi Live pull. Trades, candlesticks, and the order book are one market.
- * Series is either a ticker list or a category discovery.
+ * Series is a ticker list, or a category discovery when no tickers are selected.
  */
 export function loadKalshiLiveDirect(tableId, spec = {}) {
   const limit = spec.limit || PREVIEW_ROW_CAP;

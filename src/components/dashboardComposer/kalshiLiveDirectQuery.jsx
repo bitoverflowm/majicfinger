@@ -1,9 +1,7 @@
 "use client";
 
-import { KalshiLiveSeriesDiscoveryFields } from "@/components/connectData/kalshiLive/KalshiLiveSeriesDiscoveryFields";
 import { KalshiLiveMarketPicker } from "@/components/dashboardComposer/kalshiLiveMarketPicker";
 import { KALSHI_LIVE_CANDLESTICK_PERIOD_OPTIONS } from "@/lib/kalshiLive/candlesticksColumns";
-import { cn } from "@/lib/utils";
 
 function pad(value) {
   return String(value).padStart(2, "0");
@@ -51,68 +49,18 @@ function RangeFields({ query, onChange }) {
   );
 }
 
-function ModeSwitch({ value, onChange, options }) {
-  return (
-    <div className="flex rounded-lg bg-muted/60 p-0.5">
-      {options.map((option) => (
-        <button
-          key={option.id}
-          type="button"
-          onClick={() => onChange(option.id)}
-          className={cn(
-            "flex-1 rounded-md px-2 py-1 text-[11px] font-medium",
-            value === option.id ? "bg-background text-foreground shadow-sm" : "text-muted-foreground",
-          )}
-        >
-          {option.label}
-        </button>
-      ))}
-    </div>
-  );
-}
-
 /**
  * Query controls for a Kalshi Live market endpoint pulled on its own.
  * The markets join stays on the Markets endpoint.
+ * Series is one search: tickers hit the series endpoint, and a category with no tickers discovers.
  */
 export function KalshiLiveDirectQuery({ tableId, picks, onAdd, onRemove, query, onChange }) {
   if (tableId === "series") {
     return (
       <div className="space-y-3">
-        <ModeSwitch
-          value={query.mode}
-          onChange={(mode) => onChange({ ...query, mode })}
-          options={[
-            { id: "tickers", label: "Specific series" },
-            { id: "discover", label: "Discover" },
-          ]}
-        />
-        {query.mode === "discover" ? (
-          <KalshiLiveSeriesDiscoveryFields
-            category={query.category}
-            onCategoryChange={(category) => onChange({ ...query, category, tag: "" })}
-            tag={query.tag}
-            onTagChange={(tag) => onChange({ ...query, tag })}
-            includeProductMetadata={query.includeProductMetadata}
-            onIncludeProductMetadataChange={(includeProductMetadata) => onChange({ ...query, includeProductMetadata })}
-            minUpdatedTs={query.minUpdatedTs}
-            onMinUpdatedTsChange={(minUpdatedTs) => onChange({ ...query, minUpdatedTs })}
-          />
-        ) : (
-          <>
-            <KalshiLiveMarketPicker intent="series" picks={picks} onAdd={onAdd} onRemove={onRemove} />
-            <ModeSwitch
-              value={query.sheetMode}
-              onChange={(sheetMode) => onChange({ ...query, sheetMode })}
-              options={[
-                { id: "combined", label: "One sheet" },
-                { id: "per_series", label: "Sheet per series" },
-              ]}
-            />
-          </>
-        )}
+        <KalshiLiveMarketPicker intent="series" picks={picks} onAdd={onAdd} onRemove={onRemove} />
         <p className="text-[11px] leading-relaxed text-muted-foreground">
-          This pulls series on their own. It does not open the markets inside a series. That search stays on Markets.
+          Search for a series by name. Selected series are pulled onto one sheet. With no series selected, a category under Series attributes discovers series in that category.
         </p>
       </div>
     );

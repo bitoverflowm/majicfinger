@@ -58,6 +58,7 @@ import { LIVE_FEED_REGISTRY } from "@/lib/liveFeeds/registry";
  */
 export const KALSHI_LIVE_ENDPOINT_CATEGORIES = [
   { id: "markets", label: "Markets" },
+  { id: "series", label: "Series" },
   { id: "events", label: "Events" },
   { id: "holders", label: "Traders" },
   { id: "realtime", label: "Real-Time" },
@@ -101,10 +102,10 @@ export const KALSHI_LIVE_CONNECT_ENDPOINTS = [
   },
   {
     id: "series",
-    category: "markets",
+    category: "series",
     title: "Series",
     description:
-      "Search a specific series or discover series based on series characteristics",
+      "Search for a series by name, or discover series by category and other attributes.",
   },
   {
     id: "candlesticks",

@@ -5,6 +5,9 @@ import {
   directSeriesTickers,
   isKalshiLiveDirectTable,
   kalshiLiveDirectScopeError,
+  kalshiLiveSeriesAttributeColumns,
+  seriesDiscoveryCategory,
+  seriesUpdatedAfter,
 } from "./kalshiLiveDirectScope.js";
 
 assert.equal(isKalshiLiveDirectTable("trades"), true);
@@ -26,8 +29,31 @@ assert.deepEqual(
 assert.deepEqual(directSeriesTickers(picks), ["SER-1"]);
 assert.equal(kalshiLiveDirectScopeError("trades", [], query), "Add at least one market ticker.");
 assert.equal(kalshiLiveDirectScopeError("trades", [{ status: "loading", kind: "market", ticker: "MKT-1", rows: [] }], query), "");
-assert.equal(kalshiLiveDirectScopeError("series", picks, { mode: "tickers" }), "");
-assert.equal(kalshiLiveDirectScopeError("series", [], { mode: "discover", category: "" }), "Select a category to discover series.");
-assert.equal(kalshiLiveDirectScopeError("series", [], { mode: "discover", category: "Sports" }), "");
+assert.equal(kalshiLiveDirectScopeError("series", picks, query, {}), "");
+assert.equal(kalshiLiveDirectScopeError("series", [], query, {}), "Search for a series or select a category.");
+assert.equal(kalshiLiveDirectScopeError("series", [], query, { category: { include: ["Sports"] } }), "");
+assert.equal(seriesDiscoveryCategory({ category: { include: ["", "Crypto"] } }), "Crypto");
+assert.equal(seriesUpdatedAfter({ last_updated_ts: { minUpdatedTs: 1700000000 } }), 1700000000);
+assert.equal(seriesUpdatedAfter({}), "");
+
+const seriesColumns = [
+  { id: "ticker", type: "text", title: "Ticker" },
+  { id: "title", type: "text", title: "Title" },
+  { id: "category", type: "text", title: "Category", description: "Category this series belongs to" },
+  { id: "volume_fp", type: "number", title: "Volume" },
+  { id: "last_updated_ts", type: "date", title: "Last Updated Ts" },
+];
+const shaped = kalshiLiveSeriesAttributeColumns(seriesColumns, ["Crypto", "Sports"]);
+assert.deepEqual(
+  shaped.map((column) => column.id),
+  ["category", "last_updated_ts", "ticker", "title", "volume_fp"],
+);
+assert.equal(shaped[0].control, "category");
+assert.deepEqual(shaped[0].enumOptions, [
+  ["Crypto", "Crypto"],
+  ["Sports", "Sports"],
+]);
+assert.equal(shaped[1].control, "updated-after");
+assert.equal(shaped[1].title, "Last updated after");
 
 console.log("kalshi live direct query ok");

@@ -56,18 +56,56 @@ export function directSeriesTickers(picks) {
   return tickers;
 }
 
+/** First selected category. The series list endpoint takes one category. */
+export function seriesDiscoveryCategory(filters) {
+  const include = filters?.category?.include;
+  if (!Array.isArray(include)) return "";
+  return String(include.find((value) => String(value || "").trim()) || "").trim();
+}
+
+/** Unix seconds for "last updated after", or "" when unset. */
+export function seriesUpdatedAfter(filters) {
+  const raw = Number(filters?.last_updated_ts?.minUpdatedTs);
+  return Number.isFinite(raw) && raw > 0 ? Math.floor(raw) : "";
+}
+
+/**
+ * Category first, then the discover "last updated after" time, then the other columns.
+ * @param {Array<{ id: string, title?: string, type?: string, description?: string }>} columns
+ * @param {string[]} categories
+ * @param {{ loading?: boolean }} [opts]
+ */
+export function kalshiLiveSeriesAttributeColumns(columns, categories = [], opts = {}) {
+  const list = Array.isArray(columns) ? columns : [];
+  const byId = new Map(list.map((column) => [column.id, column]));
+  const category = {
+    ...(byId.get("category") || { id: "category", type: "text", title: "Category" }),
+    title: "Category",
+    control: "category",
+    enumLoading: Boolean(opts.loading),
+    enumOptions: (categories || []).map((name) => [name, name]),
+  };
+  const updated = {
+    ...(byId.get("last_updated_ts") || { id: "last_updated_ts", type: "date", title: "Last updated after" }),
+    title: "Last updated after",
+    control: "updated-after",
+    description: "Only series whose metadata was updated after this time.",
+  };
+  const rest = list.filter((column) => column.id !== "category" && column.id !== "last_updated_ts");
+  return [category, updated, ...rest];
+}
+
 /**
  * Empty when the pull can run. A loading pick is not an error yet.
+ * Series runs from tickers, or from a category when no tickers are selected.
  * @returns {string}
  */
-export function kalshiLiveDirectScopeError(tableId, picks, query) {
+export function kalshiLiveDirectScopeError(tableId, picks, _query, filters) {
   const loading = (picks || []).some((pick) => pick?.status === "loading");
-  if (tableId === "series" && query?.mode === "discover") {
-    return String(query?.category || "").trim() ? "" : "Select a category to discover series.";
-  }
   if (tableId === "series") {
     if (directSeriesTickers(picks).length) return "";
-    return loading ? "" : "Add at least one series.";
+    if (seriesDiscoveryCategory(filters)) return "";
+    return loading ? "" : "Search for a series or select a category.";
   }
   if (directMarketTickers(picks).length) return "";
   return loading ? "" : "Add at least one market ticker.";
