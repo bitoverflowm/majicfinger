@@ -12,6 +12,7 @@ import { SampleExplainer } from "@/components/dashboardComposer/integrationSampl
 import { BucketEnrichPanel, SampleEnrichPanel } from "@/components/dashboardComposer/integrationEnrichPanels";
 import { JoinExplainer, JoinExplainerTabs } from "@/components/dashboardComposer/integrationJoinExplainer";
 import { SpectrumLoadingState } from "@/components/ui/spectrum-loading-state";
+import { TaskRows } from "@/components/spectrumui/blocks/ai-assistants/task-rows";
 import {
   BUILD_SOURCES,
   PREVIEW_ROW_CAP,
@@ -481,6 +482,35 @@ function JoinSheetTabs({ markets, active, previewTicker, sheetCount, onSelect, e
   );
 }
 
+function liveJoinTasks({ targets, preview, ticker, marketCount }) {
+  const count = Number(marketCount) || 0;
+  const tasks = [
+    {
+      id: "markets",
+      title: count === 1 ? "1 market matched" : `${count.toLocaleString()} markets matched`,
+      detail: ticker,
+      status: "completed",
+      note: `The preview joins the first market, ${ticker}. The other markets are attached when you run the pull.`,
+    },
+  ];
+  for (const target of targets || []) {
+    const state = preview?.[target.id];
+    const status = state?.status === "ready" ? "completed" : state?.status === "error" ? "failed" : "running";
+    const rows = Array.isArray(state?.rows) ? state.rows.length : 0;
+    const live = isRealtimeEnabled("kalshiLive", target.id);
+    tasks.push({
+      id: target.id,
+      title: `${target.title} for ${ticker}`,
+      detail: status === "completed" ? `${rows.toLocaleString()} ${rows === 1 ? "row" : "rows"}` : live ? "Live" : "",
+      status,
+      note: [target.detail, live ? "This endpoint can keep updating on the dashboard after you run the pull. The preview stays a snapshot." : "", state?.error || ""]
+        .filter(Boolean)
+        .join("\n"),
+    });
+  }
+  return tasks;
+}
+
 function LiveJoinTabs({ targets, active, extraCount, onSelect }) {
   return (
     <div className="overflow-hidden px-4 pb-1 pt-4">
@@ -488,16 +518,25 @@ function LiveJoinTabs({ targets, active, extraCount, onSelect }) {
         <button type="button" onClick={() => onSelect("source")} className={sheetTabClass(active === "source")}>
           Markets
         </button>
-        {targets.map((target) => (
-          <button
-            key={target.id}
-            type="button"
-            onClick={() => onSelect(`live:${target.id}`)}
-            className={sheetTabClass(active === `live:${target.id}`)}
-          >
-            {target.title}
-          </button>
-        ))}
+        {targets.map((target) => {
+          const live = isRealtimeEnabled("kalshiLive", target.id);
+          return (
+            <button
+              key={target.id}
+              type="button"
+              onClick={() => onSelect(`live:${target.id}`)}
+              className={cn(sheetTabClass(active === `live:${target.id}`), "inline-flex max-w-none items-center gap-1.5")}
+              title={live ? `${target.title} can keep updating after you run the pull` : target.title}
+            >
+              <span className="max-w-[8rem] truncate">{target.title}</span>
+              {live ? (
+                <span className="rounded-full bg-emerald-500/15 px-1.5 py-px text-[8px] font-semibold uppercase tracking-wide text-emerald-700 dark:text-emerald-300">
+                  Live
+                </span>
+              ) : null}
+            </button>
+          );
+        })}
         {extraCount > 0 ? (
           <button
             type="button"
@@ -2372,23 +2411,25 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
       ids.map(async (id) => {
         try {
           const result = await loadKalshiLiveMarketJoin(id, livePreviewTicker, PREVIEW_ROW_CAP);
-          return [id, { status: "ready", columns: result.columns || [], rows: result.rows || [], error: "" }];
+          if (cancel) return;
+          setLiveJoinPreview((current) => ({
+            ...current,
+            [id]: { status: "ready", columns: result.columns || [], rows: result.rows || [], error: "" },
+          }));
         } catch (err) {
-          return [
-            id,
-            {
+          if (cancel) return;
+          setLiveJoinPreview((current) => ({
+            ...current,
+            [id]: {
               status: "error",
               columns: [],
               rows: [],
               error: err instanceof Error ? err.message : "Join preview failed",
             },
-          ];
+          }));
         }
       }),
-    ).then((entries) => {
-      if (cancel) return;
-      setLiveJoinPreview(Object.fromEntries(entries));
-    });
+    );
     return () => {
       cancel = true;
     };
@@ -4335,8 +4376,15 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
               }
               if (!preview || preview.status === "loading") {
                 return (
-                  <div className="flex h-full items-center justify-center">
-                    <SpectrumLoadingState label={`Loading ${label.toLowerCase()}`} />
+                  <div className="flex h-full items-start justify-center pt-6">
+                    <TaskRows
+                      tasks={liveJoinTasks({
+                        targets: liveJoinTargets,
+                        preview: liveJoinPreview,
+                        ticker: livePreviewTicker,
+                        marketCount: liveJoinMarkets.length,
+                      })}
+                    />
                   </div>
                 );
               }
