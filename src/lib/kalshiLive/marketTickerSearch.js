@@ -13,8 +13,8 @@ export {
   isKalshiMarketLiveStatus,
 } from "@/lib/kalshiLive/kalshiMarketTiming";
 
-/** Strict ticker token: letters, digits, hyphens (Kalshi market tickers). */
-export const MARKET_TICKER_TOKEN_RE = /^[A-Z0-9][A-Z0-9-]{0,63}$/i;
+/** Ticker token: letters, digits, hyphens, and a decimal strike such as T5.0. */
+export const MARKET_TICKER_TOKEN_RE = /^[A-Z0-9][A-Z0-9.-]{0,80}$/i;
 
 /**
  * @typedef {{

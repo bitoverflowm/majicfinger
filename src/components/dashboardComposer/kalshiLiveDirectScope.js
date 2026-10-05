@@ -1,6 +1,33 @@
 /** One-off Kalshi Live market endpoints. These are not the markets join. */
 
+import { KALSHI_LIVE_CANDLESTICK_PERIOD_OPTIONS } from "@/lib/kalshiLive/candlesticksColumns";
+import { dateRangePreset } from "@/components/dashboardComposer/dateRangePresets";
+
 export const KALSHI_LIVE_DIRECT_TABLES = ["series", "candlesticks", "trades", "orderbook"];
+
+const DIRECT_MARKET_TABLES = ["trades", "candlesticks", "orderbook"];
+
+const TRADE_ENUMS = {
+  taker_outcome_side: [
+    ["yes", "Yes"],
+    ["no", "No"],
+  ],
+  taker_book_side: [
+    ["bid", "Bid"],
+    ["ask", "Ask"],
+  ],
+  taker_side: [
+    ["yes", "Yes"],
+    ["no", "No"],
+  ],
+};
+
+const ORDERBOOK_ENUMS = {
+  side: [
+    ["yes", "Yes"],
+    ["no", "No"],
+  ],
+};
 
 const DAY = 24 * 60 * 60;
 
@@ -20,7 +47,7 @@ export function defaultKalshiLiveDirectQuery(tableId, now = Date.now()) {
     tag: "",
     includeProductMetadata: false,
     minUpdatedTs: "",
-    sheetMode: "combined",
+    sheetMode: tableId === "series" ? "combined" : "sheet",
   };
 }
 
@@ -101,6 +128,95 @@ export function kalshiLiveSeriesAttributeColumns(columns, categories = [], opts 
   };
   const rest = list.filter((column) => column.id !== "category" && column.id !== "last_updated_ts");
   return [category, updated, ...rest];
+}
+
+function isoDayUnix(iso, edge) {
+  const [year, month, day] = String(iso || "").split("-").map(Number);
+  if (!year || !month || !day) return null;
+  const date =
+    edge === "end" ? new Date(year, month - 1, day, 23, 59, 59) : new Date(year, month - 1, day, 0, 0, 0);
+  const seconds = Math.floor(date.getTime() / 1000);
+  return Number.isFinite(seconds) ? seconds : null;
+}
+
+/** Past 24 hours, plus period or depth, so the attribute list opens on the same window the pull uses. */
+export function defaultDirectAttributeFilters(tableId, now = new Date()) {
+  if (!DIRECT_MARKET_TABLES.includes(tableId)) return {};
+  const range = dateRangePreset("past-24h", now);
+  const filters = {
+    time_range: { from: range?.from || "", to: range?.to || "", preset: "past-24h" },
+  };
+  if (tableId === "candlesticks") filters.period_interval = { value: "60" };
+  if (tableId === "orderbook") filters.depth = { value: "20" };
+  return filters;
+}
+
+/**
+ * Query controls first, then every response column with a control that matches its type.
+ * The date range, period, and depth are the request. They are not columns on the sheet.
+ */
+export function kalshiLiveDirectAttributeColumns(tableId, columns) {
+  if (!DIRECT_MARKET_TABLES.includes(tableId)) return [];
+  const enums = tableId === "trades" ? TRADE_ENUMS : tableId === "orderbook" ? ORDERBOOK_ENUMS : {};
+  const shaped = (columns || []).map((column) => {
+    if (enums[column.id]) return { ...column, enumOptions: enums[column.id] };
+    if (column.type === "date") {
+      return { ...column, dateEpoch: column.id === "end_period_ts" ? "unix" : "iso" };
+    }
+    return column;
+  });
+  const query = [
+    {
+      id: "time_range",
+      title: "Date range",
+      type: "date",
+      queryOnly: true,
+      control: "query-range",
+      description:
+        tableId === "orderbook"
+          ? "The order book is the current book. Depth is what this pull sends."
+          : "Start and end of this pull.",
+    },
+  ];
+  if (tableId === "candlesticks") {
+    query.push({
+      id: "period_interval",
+      title: "Period",
+      type: "text",
+      queryOnly: true,
+      control: "period",
+      enumOptions: KALSHI_LIVE_CANDLESTICK_PERIOD_OPTIONS.map((option) => [String(option.value), option.label]),
+      description: "Candle size sent with the pull.",
+    });
+  }
+  if (tableId === "orderbook") {
+    query.push({
+      id: "depth",
+      title: "Depth",
+      type: "number",
+      queryOnly: true,
+      control: "depth",
+      description: "Price levels to pull on each side. 0 to 100.",
+    });
+  }
+  return [...query, ...shaped];
+}
+
+/** Unix window, candle period, and book depth read from the attribute filters. */
+export function directPullWindow(tableId, filters, fallback = {}) {
+  const range = filters?.time_range || {};
+  const ranged = tableId === "trades" || tableId === "candlesticks";
+  const minFromRange = ranged ? isoDayUnix(range.from, "start") : null;
+  const maxFromRange = ranged ? isoDayUnix(range.to, "end") : null;
+  const periodRaw = Number(filters?.period_interval?.value);
+  const depthRaw = filters?.depth?.value;
+  const depth = depthRaw === "" || depthRaw == null ? Number(fallback.depth) : Number(depthRaw);
+  return {
+    minTs: minFromRange ?? fallback.minTs,
+    maxTs: maxFromRange ?? fallback.maxTs,
+    period: Number.isFinite(periodRaw) && periodRaw > 0 ? periodRaw : fallback.period,
+    depth: Number.isFinite(depth) ? depth : Number(fallback.depth),
+  };
 }
 
 /**

@@ -150,24 +150,65 @@ function mergeSearchSuggestions(marketHits, seriesHits, trimmed) {
     if (aExact !== bExact) return aExact - bExact;
     if (a.kind !== b.kind) {
       if (tickerLike) return a.kind === "market" ? -1 : 1;
-      return a.kind === "series" ? -1 : 1;
+      const rank = (kind) => (kind === "market" ? 2 : kind === "event" ? 1 : 0);
+      return rank(a.kind) - rank(b.kind);
     }
     return 0;
   });
   const seenMarkets = new Set();
-  const seenSeries = new Set();
+  const seenScope = new Set();
   const deduped = [];
   for (const item of next) {
     if (item.kind === "market") {
       if (seenMarkets.has(item.ticker)) continue;
       seenMarkets.add(item.ticker);
     } else {
-      if (seenSeries.has(item.ticker)) continue;
-      seenSeries.add(item.ticker);
+      const key = `${item.kind}:${item.ticker}`;
+      if (seenScope.has(key)) continue;
+      seenScope.add(key);
     }
     deduped.push(item);
   }
   return deduped;
+}
+
+function scopeKindLabel(kind) {
+  return kind === "event" ? "event" : "series";
+}
+
+/** Markets already on the suggestion, or every market in that series or event. */
+async function loadScopeMarkets(suggestion) {
+  const known = Array.isArray(suggestion?.markets) ? suggestion.markets : [];
+  if (known.length) return known;
+  const eventTicker = suggestion?.kind === "event" ? String(suggestion.ticker || "").trim() : "";
+  const seriesTicker =
+    suggestion?.kind === "series"
+      ? String(suggestion.ticker || "").trim()
+      : String(suggestion?.seriesTicker || "").trim();
+  if (!eventTicker && !seriesTicker) return [];
+  const rows = [];
+  let cursor = "";
+  for (let page = 0; page < 5 && rows.length < 1000; page += 1) {
+    const params = new URLSearchParams({
+      discovery: "1",
+      limit: "200",
+      mve_filter: "exclude",
+    });
+    if (eventTicker) params.set("event_ticker", eventTicker);
+    else params.set("series_ticker", seriesTicker);
+    if (cursor) params.set("cursor", cursor);
+    const res = await fetch(`/api/integrations/kalshi-live/markets?${params}`, {
+      headers: { Accept: "application/json" },
+      credentials: "same-origin",
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data?.error || "Could not load markets");
+    const markets = Array.isArray(data?.markets) ? data.markets : [];
+    rows.push(...markets);
+    cursor = String(data?.cursor || "").trim();
+    if (!cursor || !markets.length) break;
+  }
+  return normalizeSeriesMarketsForPicker(rows);
 }
 
 function marketHitFromSuggestion(item) {
@@ -210,6 +251,7 @@ export function KalshiLiveMarketPicker({ picks, onAdd, onRemove, intent = "marke
   const pageRef = useRef({ term: "", cursor: "", hasMore: false, loading: false });
   const seq = useRef(0);
   const abortRef = useRef(null);
+  const scopeRequest = useRef(0);
   const picked = new Set((picks || []).map((pick) => pick.id));
   const atCap = (picks || []).length >= MAX_MARKETS;
   const seriesPickerRemaining = Math.max(0, MAX_MARKETS - (picks || []).length);
@@ -353,15 +395,35 @@ export function KalshiLiveMarketPicker({ picks, onAdd, onRemove, intent = "marke
               if (!res.ok || ac.signal.aborted) return;
               const list = Array.isArray(data?.suggestions) ? data.suggestions : [];
               for (const item of list) {
-                const ticker = String(item?.ticker || "").trim().toUpperCase();
-                if (!ticker) continue;
-                seriesHits.push({
-                  kind: "series",
-                  ticker,
-                  title: String(item?.title || item?.ticker || "Series").trim(),
-                  subtitle: String(item?.subtitle || "").trim() || undefined,
-                  markets: normalizeSeriesMarketsForPicker(item?.markets),
-                });
+                const seriesTicker = String(item?.ticker || "").trim().toUpperCase();
+                const eventTicker = String(item?.eventTicker || "").trim().toUpperCase();
+                if (!seriesTicker && !eventTicker) continue;
+                const markets = normalizeSeriesMarketsForPicker(item?.markets);
+                const eventMarkets = eventTicker
+                  ? markets.filter((market) => String(market.eventTicker || "").toUpperCase() === eventTicker)
+                  : [];
+                const eventTitle = String(item?.raw?.event_title || "").trim();
+                if (eventTicker) {
+                  seriesHits.push({
+                    kind: "event",
+                    ticker: eventTicker,
+                    seriesTicker,
+                    title: eventTitle || String(item?.title || eventTicker).trim(),
+                    subtitle: [seriesTicker && seriesTicker !== eventTicker ? seriesTicker : "", String(item?.subtitle || "").trim()]
+                      .filter(Boolean)
+                      .join(" · ") || undefined,
+                    markets: eventMarkets.length ? eventMarkets : markets,
+                  });
+                }
+                if (seriesTicker && seriesTicker !== eventTicker) {
+                  seriesHits.push({
+                    kind: "series",
+                    ticker: seriesTicker,
+                    title: String(item?.title || item?.ticker || "Series").trim(),
+                    subtitle: String(item?.subtitle || "").trim() || undefined,
+                    markets: eventTicker ? [] : markets,
+                  });
+                }
               }
             }),
           );
@@ -428,8 +490,8 @@ export function KalshiLiveMarketPicker({ picks, onAdd, onRemove, intent = "marke
         const markets = [];
         const series = [];
         for (const item of suggestionsRef.current || []) {
-          if (item.kind === "series") series.push(item);
-          else markets.push(item);
+          if (item.kind === "market") markets.push(item);
+          else series.push(item);
         }
         setSuggestions(mergeSearchSuggestions([...markets, ...collected], series, term));
       }
@@ -462,12 +524,30 @@ export function KalshiLiveMarketPicker({ picks, onAdd, onRemove, intent = "marke
     });
   }
 
-  function openSeries(series) {
+  function openScope(suggestion) {
+    const scope = suggestion.kind === "event" ? "event" : "series";
+    const known = Array.isArray(suggestion.markets) ? suggestion.markets : [];
+    const request = ++scopeRequest.current;
     setSeriesModal({
-      title: series.title || series.ticker || "Select markets",
-      markets: Array.isArray(series.markets) ? series.markets : [],
+      title: suggestion.title || suggestion.ticker || "Select markets",
+      scope,
+      markets: known,
       selected: new Set(),
+      loading: known.length === 0,
+      error: "",
     });
+    if (known.length) return;
+    loadScopeMarkets(suggestion)
+      .then((markets) => {
+        if (scopeRequest.current !== request) return;
+        setSeriesModal((current) => (current ? { ...current, markets, loading: false, error: "" } : current));
+      })
+      .catch((err) => {
+        if (scopeRequest.current !== request) return;
+        setSeriesModal((current) =>
+          current ? { ...current, loading: false, error: err instanceof Error ? err.message : "Could not load markets" } : current,
+        );
+      });
   }
 
   function addSeries(series) {
@@ -489,7 +569,7 @@ export function KalshiLiveMarketPicker({ picks, onAdd, onRemove, intent = "marke
       if (suggestion.kind === "series") addSeries(suggestion);
       return;
     }
-    if (suggestion.kind === "series") openSeries(suggestion);
+    if (suggestion.kind === "series" || suggestion.kind === "event") openScope(suggestion);
     else addMarket(suggestion);
   }
 
@@ -543,12 +623,14 @@ export function KalshiLiveMarketPicker({ picks, onAdd, onRemove, intent = "marke
       >
         {visibleSuggestions.map((suggestion) => {
           const marketCount = Array.isArray(suggestion.markets) ? suggestion.markets.length : 0;
-          const seriesTiming = suggestion.kind === "series" ? aggregateKalshiMarketTiming(suggestion.markets) : null;
-          const kindLabel = suggestion.kind === "market" ? "Market" : "Series";
+          const seriesTiming = suggestion.kind === "market" ? null : aggregateKalshiMarketTiming(suggestion.markets);
+          const kindLabel = suggestion.kind === "market" ? "Market" : suggestion.kind === "event" ? "Event" : "Series";
           const kindBadgeClass =
             suggestion.kind === "market"
               ? "bg-emerald-500/15 text-emerald-900 ring-emerald-600/25 dark:bg-emerald-400/15 dark:text-emerald-100 dark:ring-emerald-400/35"
-              : "bg-violet-500/15 text-violet-900 ring-violet-600/25 dark:bg-violet-400/15 dark:text-violet-100 dark:ring-violet-400/35";
+              : suggestion.kind === "event"
+                ? "bg-sky-500/15 text-sky-900 ring-sky-600/25 dark:bg-sky-400/15 dark:text-sky-100 dark:ring-sky-400/35"
+                : "bg-violet-500/15 text-violet-900 ring-violet-600/25 dark:bg-violet-400/15 dark:text-violet-100 dark:ring-violet-400/35";
           const added = suggestion.kind === "market" && picked.has(`market:${suggestion.ticker}`);
           return (
             <li key={`${suggestion.kind}:${suggestion.ticker}:${marketCount}`} role="option">
@@ -730,8 +812,12 @@ export function KalshiLiveMarketPicker({ picks, onAdd, onRemove, intent = "marke
             <DialogHeader>
               <DialogTitle className="pr-6 text-base">{seriesModal?.title || "Select markets"}</DialogTitle>
               <DialogDescription>
-                Select up to {seriesPickerRemaining} market{seriesPickerRemaining === 1 ? "" : "s"} to add to your ticker list.
-                {seriesModal?.markets?.length ? ` ${seriesModal.markets.length} markets in this series.` : ""}
+                {seriesModal?.loading
+                  ? `Loading markets in this ${scopeKindLabel(seriesModal?.scope)}.`
+                  : `Select all or pick the markets you want. Each market gets its own sheet.`}
+                {seriesModal?.markets?.length
+                  ? ` ${seriesModal.markets.length} market${seriesModal.markets.length === 1 ? "" : "s"} in this ${scopeKindLabel(seriesModal.scope)}.`
+                  : ""}
               </DialogDescription>
             </DialogHeader>
             {(seriesModal?.markets || []).length > 0 ? (
@@ -768,8 +854,15 @@ export function KalshiLiveMarketPicker({ picks, onAdd, onRemove, intent = "marke
               </div>
             ) : null}
             <div className="max-h-[min(24rem,50vh)] space-y-1 overflow-auto pr-1">
-              {(seriesModal?.markets || []).length === 0 ? (
-                <p className="text-sm text-muted-foreground">No markets available for this series.</p>
+              {seriesModal?.loading ? (
+                <p className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  Loading markets
+                </p>
+              ) : seriesModal?.error ? (
+                <p className="text-sm text-muted-foreground">{seriesModal.error}</p>
+              ) : (seriesModal?.markets || []).length === 0 ? (
+                <p className="text-sm text-muted-foreground">No markets available for this {scopeKindLabel(seriesModal?.scope)}.</p>
               ) : (
                 (seriesModal?.markets || []).map((market) => {
                   const checked = seriesModal?.selected.has(market.ticker);

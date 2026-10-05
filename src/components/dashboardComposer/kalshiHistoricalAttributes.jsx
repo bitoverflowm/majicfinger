@@ -66,6 +66,9 @@ const BOOLEAN_OPTIONS = [
 ];
 
 export function kalshiHistoricalAttributeSpec(column) {
+  if (column?.control === "query-range") return { kind: "query-range" };
+  if (column?.control === "period") return { kind: "period", options: column.enumOptions || [] };
+  if (column?.control === "depth") return { kind: "depth" };
   if (column?.control === "updated-after") return { kind: "updated-after" };
   if (column?.control === "category") {
     return { kind: "enum", options: column.enumOptions || [], loading: Boolean(column.enumLoading) };
@@ -118,7 +121,8 @@ function isActive(spec, filter) {
   if (spec.kind === "enum" || spec.kind === "boolean") return Array.isArray(filter.include) && filter.include.length > 0;
   if (spec.kind === "number") return String(filter.min || "").trim() !== "" || String(filter.max || "").trim() !== "";
   if (spec.kind === "updated-after") return Number(filter.minUpdatedTs) > 0;
-  if (spec.kind === "date") return Boolean(filter.from) || Boolean(filter.to);
+  if (spec.kind === "query-range" || spec.kind === "date") return Boolean(filter.from) || Boolean(filter.to);
+  if (spec.kind === "period" || spec.kind === "depth") return String(filter.value ?? "").trim() !== "";
   return textTerms(filter.containsTags, filter.contains).length > 0 || textTerms(filter.excludesTags, filter.excludes).length > 0;
 }
 
@@ -196,11 +200,16 @@ export function attributeSummary(column, filters) {
   } else if (spec.kind === "updated-after") {
     const seconds = Number(filter.minUpdatedTs);
     if (Number.isFinite(seconds) && seconds > 0) parts.push(format(new Date(seconds * 1000), "LLL dd, y h:mm a"));
-  } else if (spec.kind === "date") {
+  } else if (spec.kind === "query-range" || spec.kind === "date") {
     const preset = filter.from && filter.to ? activeDateRangePreset(filter.from, filter.to, filter.preset) : null;
     if (filter.from && filter.to) parts.push(preset ? `${preset.short} · ${formatAttributeRange(filter.from, filter.to)}` : formatAttributeRange(filter.from, filter.to));
     else if (filter.from) parts.push(`From ${formatAttributeDate(filter.from)}`);
     else if (filter.to) parts.push(`Until ${formatAttributeDate(filter.to)}`);
+  } else if (spec.kind === "period") {
+    const label = spec.options.find((option) => option[0] === String(filter.value))?.[1] || filter.value;
+    if (label) parts.push(String(label));
+  } else if (spec.kind === "depth") {
+    if (String(filter.value ?? "").trim() !== "") parts.push(String(filter.value));
   } else if (spec.kind === "text") {
     const include = textTerms(filter.containsTags, filter.contains);
     const exclude = textTerms(filter.excludesTags, filter.excludes);
@@ -227,6 +236,7 @@ function dateWindowLabel(filter) {
 /** Empty string when the row matches. Otherwise the first filter it fails. */
 export function attributeMismatchReason(row, columns, filters) {
   for (const column of columns || []) {
+    if (column.queryOnly) continue;
     const spec = kalshiHistoricalAttributeSpec(column);
     const filter = readFilter(filters, column);
     if (!isActive(spec, filter)) continue;
@@ -286,6 +296,7 @@ export function buildKalshiHistoricalFilterPredicates(columns, filters) {
   const and = [];
   const includeGroups = [];
   for (const column of columns || []) {
+    if (column.queryOnly) continue;
     const spec = kalshiHistoricalAttributeSpec(column);
     const filter = readFilter(filters, column);
     if (!isActive(spec, filter)) continue;
@@ -627,6 +638,44 @@ function AttributeFields({ column, filters, onChange }) {
       <KalshiLiveTimestampPicker
         value={filter.minUpdatedTs ?? ""}
         onChange={(minUpdatedTs) => onChange(patchFilter(filters, column, { minUpdatedTs }))}
+      />
+    );
+  }
+  if (spec.kind === "query-range") {
+    return (
+      <DateRangeField
+        from={filter.from || ""}
+        to={filter.to || ""}
+        presetId={filter.preset || ""}
+        onChange={({ from, to, preset }) => onChange(patchFilter(filters, column, { from, to, preset: preset || "" }))}
+      />
+    );
+  }
+  if (spec.kind === "period") {
+    return (
+      <select
+        aria-label="Period"
+        value={String(filter.value ?? "")}
+        onChange={(event) => onChange(patchFilter(filters, column, { value: event.target.value }))}
+        className="h-9 w-full rounded-lg border border-border/70 bg-background px-2 text-[13px]"
+      >
+        {spec.options.map(([value, label]) => (
+          <option key={value} value={value}>
+            {label}
+          </option>
+        ))}
+      </select>
+    );
+  }
+  if (spec.kind === "depth") {
+    return (
+      <Input
+        aria-label="Depth"
+        value={filter.value ?? ""}
+        inputMode="numeric"
+        placeholder="Depth"
+        onChange={(event) => onChange(patchFilter(filters, column, { value: event.target.value.replace(/[^\d]/g, "") }))}
+        className="h-9"
       />
     );
   }

@@ -87,6 +87,9 @@ import {
   directSeriesTickers,
   isKalshiLiveDirectTable,
   kalshiLiveDirectScopeError,
+  defaultDirectAttributeFilters,
+  directPullWindow,
+  kalshiLiveDirectAttributeColumns,
   kalshiLiveSeriesAttributeColumns,
   seriesDiscoveryCategories,
   seriesUpdatedAfter,
@@ -187,19 +190,6 @@ function WaitingToConnectTag() {
 
 const PREVIEW_TRADE_LOCK =
   "You can only view 1 market trade in preview mode; execute the query to run the full pipeline.";
-
-const PREVIEW_JOIN_LOCK =
-  "Preview shows the first market. Run the pull to build a sheet for every market in this join.";
-
-function liveJoinSheetNote(marketCount, sourceCount) {
-  const markets = Number(marketCount) || 0;
-  const sources = Number(sourceCount) || 0;
-  const sheets = markets * sources;
-  if (!sheets) return PREVIEW_JOIN_LOCK;
-  const sourceLabel = sources === 1 ? "1 source" : `${sources} sources`;
-  const marketLabel = markets === 1 ? "1 market" : `${markets.toLocaleString()} markets`;
-  return `${sheets.toLocaleString()} sheets: ${sourceLabel} for each of ${marketLabel}. Preview shows the first market. Run the pull to build the rest.`;
-}
 
 const FUNCTION_COLUMN_ID = "__function";
 
@@ -416,12 +406,34 @@ function sheetTabClass(selected) {
   );
 }
 
-function JoinSheetTabs({ markets, active, previewTicker, sheetCount, onSelect, extras = [] }) {
+function SheetTabButton({ tab, selected, measure = false, onClick }) {
+  return (
+    <button
+      type="button"
+      data-tab={measure ? "" : undefined}
+      title={tab.queued ? "Created when you run the pull" : tab.title}
+      onClick={onClick}
+      className={cn(sheetTabClass(selected), tab.live && "inline-flex max-w-[14rem] items-center gap-1.5")}
+    >
+      <span className="min-w-0 truncate">{tab.title}</span>
+      {tab.live ? (
+        <span className="shrink-0 rounded-full bg-emerald-500/15 px-1.5 py-px text-[8px] font-semibold uppercase tracking-wide text-emerald-700 dark:text-emerald-300">
+          Live
+        </span>
+      ) : null}
+    </button>
+  );
+}
+
+/** Tabs that fit, then +n. The rest open as a list. Queued tabs are sheets built on run, not previewed. */
+function SheetTabBar({ tabs, active, onSelect }) {
   const frameRef = useRef(null);
   const measureRef = useRef(null);
-  const [shownTrades, setShownTrades] = useState(markets.length);
-  const totalSheets = Math.max(Number(sheetCount) || 0, markets.length);
-  const marketKey = markets.map((market) => market.ticker).join("\n");
+  const [open, setOpen] = useState(false);
+  const [shown, setShown] = useState(tabs.length);
+  const preview = tabs.filter((tab) => !tab.queued);
+  const queued = tabs.filter((tab) => tab.queued);
+  const tabKey = tabs.map((tab) => `${tab.id}:${tab.title}:${tab.queued ? 1 : 0}`).join("\n");
 
   useLayoutEffect(() => {
     const frame = frameRef.current;
@@ -429,83 +441,109 @@ function JoinSheetTabs({ markets, active, previewTicker, sheetCount, onSelect, e
     if (!frame || !measure) return undefined;
     const fit = () => {
       const available = frame.clientWidth;
-      const nodes = [...measure.querySelectorAll("[data-tab]")];
+      const widths = [...measure.querySelectorAll("[data-tab]")].map((node) => node.offsetWidth);
       const plusWidth = measure.querySelector("[data-plus]")?.offsetWidth || 0;
-      const extraWidth = [...measure.querySelectorAll("[data-extra]")].reduce((sum, node) => sum + node.offsetWidth, 0);
-      const marketWidth = nodes[0]?.offsetWidth || 0;
-      const tradeWidths = nodes.slice(1).map((node) => node.offsetWidth);
       let best = 0;
-      for (let count = 0; count <= tradeWidths.length; count += 1) {
-        const hidden = totalSheets - count;
-        const width =
-          marketWidth +
-          extraWidth +
-          tradeWidths.slice(0, count).reduce((sum, value) => sum + value, 0) +
-          (hidden > 0 ? plusWidth : 0);
+      for (let count = 0; count <= widths.length; count += 1) {
+        const hidden = widths.length - count + queued.length;
+        const width = widths.slice(0, count).reduce((sum, value) => sum + value, 0) + (hidden > 0 ? plusWidth : 0);
         if (width <= available + 1) best = count;
         else break;
       }
-      setShownTrades(best);
+      setShown(best);
     };
     fit();
     const observer = new ResizeObserver(fit);
     observer.observe(frame);
     return () => observer.disconnect();
-  }, [marketKey, totalSheets, extras.length]);
+  }, [tabKey, queued.length]);
 
-  const visible = markets.slice(0, shownTrades);
-  const hidden = Math.max(0, totalSheets - visible.length);
-  const extraIds = new Set(extras.map((tab) => tab.id));
-  const plusSelected = hidden > 0 && active !== "markets" && !extraIds.has(active) && !visible.some((market) => market.ticker === active);
+  let visible = preview.slice(0, shown);
+  let overflow = preview.slice(shown);
+  const activeHidden = overflow.find((tab) => tab.id === active);
+  if (activeHidden) {
+    overflow = overflow.filter((tab) => tab.id !== active);
+    if (visible.length) visible = [...visible.slice(0, -1), activeHidden];
+    else visible = [activeHidden];
+  }
+  const hidden = [...overflow, ...queued];
+  useEffect(() => {
+    if (!hidden.length) setOpen(false);
+  }, [hidden.length]);
+  useEffect(() => {
+    if (!open) return undefined;
+    const close = (event) => {
+      if (!frameRef.current?.contains(event.target)) setOpen(false);
+    };
+    document.addEventListener("pointerdown", close);
+    return () => document.removeEventListener("pointerdown", close);
+  }, [open]);
+
+  if (preview.length < 2 && !queued.length) return null;
 
   return (
-    <div ref={frameRef} className="relative overflow-hidden px-4 pb-1 pt-4">
-      <div ref={measureRef} className="pointer-events-none invisible absolute left-0 top-0 flex" aria-hidden>
-        <button type="button" data-tab className={sheetTabClass(false)}>
-          Markets
-        </button>
-        {extras.map((tab) => (
-          <button key={tab.id} type="button" data-extra className={sheetTabClass(false)}>
-            {tab.title}
-          </button>
-        ))}
-        {markets.map((market) => (
-          <button key={market.ticker} type="button" data-tab className={sheetTabClass(false)}>
-            Trades · {market.label || market.ticker}
-          </button>
+    <div ref={frameRef} className="relative px-4 pb-1 pt-4">
+      <div ref={measureRef} className="pointer-events-none invisible absolute left-0 top-0 flex h-0 overflow-hidden" aria-hidden>
+        {preview.map((tab) => (
+          <SheetTabButton key={tab.id} tab={tab} selected={false} measure />
         ))}
         <button type="button" data-plus className={sheetTabClass(false)}>
-          +{totalSheets}
+          +{Math.max(hidden.length, tabs.length)}
         </button>
       </div>
-      <div className="flex animate-[fadeIn_280ms_ease-out]">
-        <button type="button" onClick={() => onSelect("markets")} className={sheetTabClass(active === "markets")}>
-          Markets
-        </button>
-        {extras.map((tab) => (
-          <button key={tab.id} type="button" onClick={() => onSelect(tab.id)} className={sheetTabClass(active === tab.id)}>
-            {tab.title}
-          </button>
+      <div className="flex">
+        {visible.map((tab) => (
+          <SheetTabButton key={tab.id} tab={tab} selected={active === tab.id} onClick={() => onSelect(tab.id)} />
         ))}
-        {visible.map((market) => (
+        {hidden.length ? (
           <button
-            key={market.ticker}
             type="button"
-            title={market.ticker === previewTicker ? market.title : PREVIEW_TRADE_LOCK}
-            onClick={() => onSelect(market.ticker)}
-            className={sheetTabClass(active === market.ticker)}
+            aria-expanded={open}
+            onClick={() => setOpen((value) => !value)}
+            className={sheetTabClass(open)}
           >
-            Trades · {market.label || market.ticker}
-          </button>
-        ))}
-        {hidden > 0 ? (
-          <button type="button" title={PREVIEW_TRADE_LOCK} onClick={() => onSelect("more")} className={sheetTabClass(plusSelected || active === "more")}>
-            +{hidden}
+            +{hidden.length}
           </button>
         ) : null}
       </div>
+      {open && hidden.length ? (
+        <div className="absolute right-4 top-full z-20 mt-1 max-h-72 w-72 overflow-y-auto rounded-lg border border-border/70 bg-background py-1 shadow-md">
+          <p className="px-2.5 py-1.5 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Other sheets</p>
+          {hidden.map((tab) => (
+            <button
+              key={tab.id}
+              type="button"
+              onClick={() => {
+                if (tab.queued) return;
+                onSelect(tab.id);
+                setOpen(false);
+              }}
+              className={cn(
+                "flex w-full items-center gap-2 px-2.5 py-1.5 text-left text-[12px]",
+                tab.queued ? "cursor-default text-muted-foreground" : "text-foreground hover:bg-muted/60",
+              )}
+            >
+              <span className="min-w-0 flex-1 truncate">{tab.title}</span>
+              {tab.queued ? <span className="shrink-0 text-[10px] uppercase tracking-wide">On run</span> : null}
+            </button>
+          ))}
+        </div>
+      ) : null}
     </div>
   );
+}
+
+function JoinSheetTabs({ markets, active, previewTicker, onSelect, extras = [] }) {
+  const preview = markets.find((market) => market.ticker === previewTicker) || markets[0];
+  const tabs = [
+    { id: "markets", title: "Markets" },
+    ...extras.map((tab) => ({ id: tab.id, title: tab.title })),
+    ...(preview ? [{ id: preview.ticker, title: `Trades · ${preview.label || preview.ticker}` }] : []),
+    ...markets
+      .filter((market) => market.ticker !== preview?.ticker)
+      .map((market) => ({ id: market.ticker, title: `Trades · ${market.label || market.ticker}`, queued: true })),
+  ];
+  return <SheetTabBar tabs={tabs} active={active} onSelect={onSelect} />;
 }
 
 function liveJoinTasks({ targets, preview, ticker, marketCount }) {
@@ -552,25 +590,6 @@ function liveJoinSheets(targets, markets, previewTicker) {
     }
   }
   return sheets;
-}
-
-function LiveJoinTabButton({ sheet, selected, onClick, title, measure = false }) {
-  return (
-    <button
-      type="button"
-      data-tab={measure ? "" : undefined}
-      title={title || sheet.title}
-      onClick={onClick}
-      className={cn(sheetTabClass(selected), "inline-flex max-w-[14rem] items-center gap-1.5")}
-    >
-      <span className="min-w-0 truncate">{sheet.title}</span>
-      {sheet.live ? (
-        <span className="shrink-0 rounded-full bg-emerald-500/15 px-1.5 py-px text-[8px] font-semibold uppercase tracking-wide text-emerald-700 dark:text-emerald-300">
-          Live
-        </span>
-      ) : null}
-    </button>
-  );
 }
 
 function liveJoinFocus(previewSheet) {
@@ -679,90 +698,18 @@ function LiveJoinPlanMarket({ market, targets, index, mode, last = false, focusT
 }
 
 function LiveJoinTabs({ targets, markets, active, previewTicker, onSelect, sampleTab = null }) {
-  const frameRef = useRef(null);
-  const measureRef = useRef(null);
   const sheets = liveJoinSheets(targets, markets, previewTicker);
-  const sheetKey = sheets.map((sheet) => sheet.key).join("\n");
-  const [shown, setShown] = useState(sheets.length);
-  const note = liveJoinSheetNote(markets?.length || 0, targets?.length || 0);
-
-  useLayoutEffect(() => {
-    const frame = frameRef.current;
-    const measure = measureRef.current;
-    if (!frame || !measure) return undefined;
-    const fit = () => {
-      const available = frame.clientWidth;
-      const marketWidth = (measure.querySelector("[data-markets]")?.offsetWidth || 0) + (measure.querySelector("[data-sample]")?.offsetWidth || 0);
-      const widths = [...measure.querySelectorAll("[data-tab]")].map((node) => node.offsetWidth);
-      const plusWidth = measure.querySelector("[data-plus]")?.offsetWidth || 0;
-      let best = 0;
-      for (let count = 0; count <= widths.length; count += 1) {
-        const hidden = widths.length - count;
-        const width = marketWidth + widths.slice(0, count).reduce((sum, value) => sum + value, 0) + (hidden > 0 ? plusWidth : 0);
-        if (width <= available + 1) best = count;
-        else break;
-      }
-      setShown(best);
-    };
-    fit();
-    const observer = new ResizeObserver(fit);
-    observer.observe(frame);
-    return () => observer.disconnect();
-  }, [sheetKey, sampleTab?.id]);
-
-  const visible = sheets.slice(0, shown);
-  const hidden = Math.max(0, sheets.length - visible.length);
-  const plusSelected = hidden > 0 && (active === "live:more" || String(active).startsWith("live:locked:")) && !visible.some((sheet) => sheet.selectId === active);
-
-  return (
-    <div ref={frameRef} className="relative overflow-hidden px-4 pb-1 pt-4">
-      <div ref={measureRef} className="pointer-events-none invisible absolute left-0 top-0 flex" aria-hidden>
-        <button type="button" data-markets className={sheetTabClass(false)}>
-          Markets
-        </button>
-        {sampleTab ? (
-          <button type="button" data-sample className={sheetTabClass(false)}>
-            {sampleTab.title}
-          </button>
-        ) : null}
-        {sheets.map((sheet) => (
-          <LiveJoinTabButton key={sheet.key} sheet={sheet} selected={false} measure />
-        ))}
-        <button type="button" data-plus className={sheetTabClass(false)}>
-          +{sheets.length}
-        </button>
-      </div>
-      <div className="flex animate-[fadeIn_280ms_ease-out]">
-        <button type="button" onClick={() => onSelect("source")} className={sheetTabClass(active === "source")}>
-          Markets
-        </button>
-        {sampleTab ? (
-          <button type="button" onClick={() => onSelect(sampleTab.id)} className={sheetTabClass(active === sampleTab.id)}>
-            {sampleTab.title}
-          </button>
-        ) : null}
-        {visible.map((sheet) => (
-          <LiveJoinTabButton
-            key={sheet.key}
-            sheet={sheet}
-            selected={active === sheet.selectId}
-            title={sheet.previewable ? sheet.title : note}
-            onClick={() => onSelect(sheet.selectId)}
-          />
-        ))}
-        {hidden > 0 ? (
-          <button
-            type="button"
-            title="Sheets created when you run the pull"
-            onClick={() => onSelect("live:more")}
-            className={sheetTabClass(plusSelected || active === "live:more")}
-          >
-            +{hidden}
-          </button>
-        ) : null}
-      </div>
-    </div>
-  );
+  const tabs = [
+    { id: "source", title: "Markets" },
+    ...(sampleTab ? [{ id: sampleTab.id, title: sampleTab.title }] : []),
+    ...sheets.map((sheet) => ({
+      id: sheet.selectId,
+      title: sheet.title,
+      queued: !sheet.previewable,
+      live: sheet.live,
+    })),
+  ];
+  return <SheetTabBar tabs={tabs} active={active} onSelect={onSelect} />;
 }
 
 function SkeletonRows() {
@@ -794,18 +741,7 @@ const ENRICH_OPTIONS = [
 ];
 
 function ResultSheetTabs({ tabs, active, onSelect }) {
-  if (tabs.length < 2) return null;
-  return (
-    <div className="overflow-hidden px-4 pb-1 pt-4">
-      <div className="flex overflow-x-auto">
-        {tabs.map((tab) => (
-          <button key={tab.id} type="button" onClick={() => onSelect(tab.id)} className={sheetTabClass(active === tab.id)}>
-            {tab.title}
-          </button>
-        ))}
-      </div>
-    </div>
-  );
+  return <SheetTabBar tabs={tabs} active={active} onSelect={onSelect} />;
 }
 
 function EnrichStep({
@@ -1728,7 +1664,7 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
     setPull(null);
     setVisibleCount(0);
     setFilterValue("");
-    setAttributeFilters({});
+    setAttributeFilters(defaultDirectAttributeFilters(tableId));
     setSortKeys([]);
     setRowLimit("");
     setLivePicks([]);
@@ -1870,6 +1806,18 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
   const liveAttributeColumns = useMemo(
     () => (liveMarketSearch ? kalshiLiveMarketAttributeColumns(pull?.columns || []) : []),
     [liveMarketSearch, pull?.columns, KALSHI_LIVE_QUERY_ATTRIBUTE_COLUMNS, kalshiLiveMarketAttributeColumns],
+  );
+  const directAttributeColumns = useMemo(
+    () => (liveDirect && tableId !== "series" ? kalshiLiveDirectAttributeColumns(tableId, pull?.columns || []) : []),
+    [liveDirect, tableId, pull?.columns],
+  );
+  const directRowColumns = useMemo(
+    () => directAttributeColumns.filter((column) => !column.queryOnly),
+    [directAttributeColumns],
+  );
+  const directWindow = useMemo(
+    () => directPullWindow(tableId, attributeFilters, directQuery),
+    [tableId, attributeFilters, directQuery],
   );
   const seriesAttributeColumns = useMemo(
     () =>
@@ -2232,10 +2180,10 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
             }
         : {
             ticker,
-            minTs: directQuery.minTs,
-            maxTs: directQuery.maxTs,
-            period: directQuery.period,
-            depth: Number(directQuery.depth),
+            minTs: directWindow.minTs,
+            maxTs: directWindow.maxTs,
+            period: directWindow.period,
+            depth: directWindow.depth,
             limit: PREVIEW_ROW_CAP,
           };
     loadKalshiLiveDirect(tableId, spec)
@@ -2257,7 +2205,7 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
     return () => {
       cancel = true;
     };
-  }, [directMarkets, directQuery, directSeries, liveDirect, planLimit, seriesCategoryKey, seriesMinUpdatedTs, seriesProductMetadata, tableId]);
+  }, [directMarkets, directSeries, directWindow.minTs, directWindow.maxTs, directWindow.period, directWindow.depth, liveDirect, planLimit, seriesCategoryKey, seriesMinUpdatedTs, seriesProductMetadata, tableId]);
 
   const seriesImportRows = useMemo(() => {
     if (!(liveDirect && tableId === "series" && directPreview.status === "ready")) return null;
@@ -2274,6 +2222,11 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
       return limited;
     };
     if (seriesImportRows) return capPreview(seriesImportRows.slice(0, Math.min(visibleCount, PREVIEW_ROW_CAP)));
+    if (liveDirect && tableId !== "series" && directPreview.status !== "idle") {
+      const matched = (directPreview.rows || []).filter((row) => rowMatchesAttributes(row, directRowColumns, attributeFilters));
+      const sorted = sortAttributeRows(matched, directRowColumns, sortKeys);
+      return capPreview(sorted.slice(0, visibleCount));
+    }
     if (liveDirect && directPreview.status !== "idle") return capPreview((directPreview.rows || []).slice(0, visibleCount));
     if (livePreviewRows) return capPreview(livePreviewRows.slice(0, visibleCount));
     if (guidedFilters) {
@@ -2302,7 +2255,7 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
     const query = filterValue.trim().toLowerCase();
     const matched = !query || !filterColumn ? rows : rows.filter((row) => String(row[filterColumn] ?? "").toLowerCase().includes(query));
     return capPreview(matched);
-  }, [directPreview.rows, directPreview.status, pull, visibleCount, filterColumn, filterValue, guidedFilters, attributeFilters, sortKeys, rowLimit, integrationId, tableId, settledPreviewKey, previewSearchError, livePreviewRows, liveMarketSearch, liveDirect, liveNarrowing, seriesAttributeColumns, seriesImportRows]);
+  }, [directPreview.rows, directPreview.status, directRowColumns, pull, visibleCount, filterColumn, filterValue, guidedFilters, attributeFilters, sortKeys, rowLimit, integrationId, tableId, settledPreviewKey, previewSearchError, livePreviewRows, liveMarketSearch, liveDirect, liveNarrowing, seriesAttributeColumns, seriesImportRows]);
 
   const queriedMarkets = useMemo(() => {
     if (!guidedFilters) return [];
@@ -2724,7 +2677,7 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
   const directLoading = liveDirect && directPreview.status === "loading";
   const directExtra =
     liveDirect && directPreview.status === "ready" && tableId !== "series" && directMarkets.length > 1
-      ? ` The other ${directMarkets.length - 1} ${directMarkets.length === 2 ? "market is" : "markets are"} pulled when you run.`
+      ? ` Each market gets its own sheet. The other ${directMarkets.length - 1} ${directMarkets.length === 2 ? "is" : "are"} created when you run.`
       : "";
 
   useEffect(() => {
@@ -2979,12 +2932,9 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
 
   useEffect(() => {
     if (!seriesJoinOn || !seriesJoinTickers.length) return;
-    if (seriesMarketLayout === "combined") {
-      if (previewSheet.startsWith("series-market:")) setPreviewSheet("series-markets");
-      return;
-    }
-    if (previewSheet === "series-markets" || (previewSheet.startsWith("series-market:") && !seriesJoinTickers.some((item) => item.ticker === previewSheet.slice("series-market:".length)))) {
-      setPreviewSheet(`series-market:${seriesJoinTickers[0].ticker}`);
+    const firstId = seriesMarketLayout === "combined" ? "series-markets" : `series-market:${seriesJoinTickers[0].ticker}`;
+    if (previewSheet === "series-markets" || previewSheet.startsWith("series-market:")) {
+      if (previewSheet !== firstId) setPreviewSheet(firstId);
     }
   }, [seriesJoinOn, seriesJoinKey, seriesJoinTickers, seriesMarketLayout, previewSheet]);
 
@@ -3964,17 +3914,20 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
           loadKalshiLiveDirect(tableId, {
             ticker: market.ticker,
             limit,
-            minTs: directQuery.minTs,
-            maxTs: directQuery.maxTs,
-            period: directQuery.period,
-            depth: Number(directQuery.depth),
+            minTs: directWindow.minTs,
+            maxTs: directWindow.maxTs,
+            period: directWindow.period,
+            depth: directWindow.depth,
           }).then((result) => ({ market, ...shape(result) })),
         );
         built = pulled
           .filter((item) => item.columns.length)
           .map((item) => {
             const id = `run-live-${tableId}-${String(item.market.ticker).replace(/[^A-Za-z0-9]+/g, "-")}`;
-            const fullRows = item.rows || [];
+            const matched = (item.rows || []).filter((row) => rowMatchesAttributes(row, directRowColumns, attributeFilters));
+            const sorted = sortAttributeRows(matched, directRowColumns, sortKeys);
+            const requested = Number(rowLimit);
+            const fullRows = Number.isFinite(requested) && requested > 0 ? sorted.slice(0, Math.min(requested, limit)) : sorted;
             if ((tableId === "trades" || tableId === "candlesticks") && fullRows.length > PREVIEW_ROW_CAP) {
               rememberTradeSheet(id, item.market.ticker, item.columns, displayMatrix(item.columns, fullRows), limit, accountId);
             }
@@ -4563,18 +4516,53 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
     setFunctionScrollKey((key) => key + 1);
   }
 
-  const previewTabs = [{ id: "source", title: sheetTitle }];
-  if (seriesJoinOn) {
-    if (!seriesJoinTickers.length || seriesMarketLayout === "combined") {
+  const previewTabs = [
+    {
+      id: "source",
+      title:
+        liveDirect && tableId !== "series" && directMarkets[0]
+          ? `${sheetTitle} · ${directMarkets[0].ticker}`
+          : sheetTitle,
+    },
+  ];
+  if (liveDirect && tableId !== "series" && directMarkets.length > 1) {
+    directMarkets.slice(1).forEach((market) => {
+      previewTabs.push({
+        id: `run:direct:${market.ticker}`,
+        title: `${sheetTitle} · ${market.ticker}`,
+        queued: true,
+      });
+    });
+  }
+  if (seriesJoinOn && seriesJoinTickers.length) {
+    if (seriesMarketLayout === "combined") {
       previewTabs.push({ id: "series-markets", title: "Markets" });
     } else {
-      seriesJoinTickers.forEach((item) => {
-        previewTabs.push({ id: `series-market:${item.ticker}`, title: `Markets · ${item.ticker}` });
+      const [first, ...rest] = seriesJoinTickers;
+      previewTabs.push({ id: `series-market:${first.ticker}`, title: `Markets · ${first.ticker}` });
+      rest.forEach((item) => {
+        previewTabs.push({ id: `run:series-market:${item.ticker}`, title: `Markets · ${item.ticker}`, queued: true });
       });
     }
+  } else if (seriesJoinOn) {
+    previewTabs.push({ id: "series-markets", title: "Markets" });
   }
   if (marketDownstream) {
     liveJoinTargets.forEach((item) => previewTabs.push({ id: `live:${item.id}`, title: item.title }));
+    const seen = new Set();
+    const extraMarkets = [];
+    for (const row of seriesMarketView.rows || []) {
+      const ticker = String(row?.ticker || "").trim();
+      if (!ticker || ticker === joinPreviewTicker || seen.has(ticker)) continue;
+      seen.add(ticker);
+      extraMarkets.push(ticker);
+      if (extraMarkets.length >= Math.max(0, marketCap - 1)) break;
+    }
+    for (const ticker of extraMarkets) {
+      liveJoinTargets.forEach((item) => {
+        previewTabs.push({ id: `run:${item.id}:${ticker}`, title: `${item.title} · ${ticker}`, queued: true });
+      });
+    }
   }
   if (sampleOn) previewTabs.push({ id: "sample", title: "Random sample" });
   if (summarizeOn) previewTabs.push({ id: "summary", title: "Summary" });
@@ -5063,8 +5051,6 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
               picks={livePicks}
               onAdd={addDirectPick}
               onRemove={removeLivePick}
-              query={directQuery}
-              onChange={setDirectQuery}
             />
           ) : null}
 
@@ -5125,9 +5111,17 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
                 </div>
               </AccordionContent>
             </AccordionItem>
-            {guidedFilters || liveMarketSearch || liveSeriesSearch ? (
+            {guidedFilters || liveMarketSearch || liveDirect ? (
               <AttributeFilters
-                columns={liveSeriesSearch ? seriesAttributeColumns : liveMarketSearch ? liveAttributeColumns : pull?.columns || []}
+                columns={
+                  liveSeriesSearch
+                    ? seriesAttributeColumns
+                    : liveMarketSearch
+                      ? liveAttributeColumns
+                      : liveDirect && tableId !== "series"
+                        ? directAttributeColumns
+                        : pull?.columns || []
+                }
                 filters={attributeFilters}
                 onChange={setAttributeFilters}
                 sorts={sortKeys}
@@ -5139,9 +5133,13 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
                     ? "Series attributes"
                     : tableId === "trades"
                       ? "Trade attributes"
-                      : tableId === "blocks"
-                        ? "Block attributes"
-                        : "Market attributes"
+                      : tableId === "candlesticks"
+                        ? "Candlestick attributes"
+                        : tableId === "orderbook"
+                          ? "Orderbook attributes"
+                          : tableId === "blocks"
+                            ? "Block attributes"
+                            : "Market attributes"
                 }
               />
             ) : null}
