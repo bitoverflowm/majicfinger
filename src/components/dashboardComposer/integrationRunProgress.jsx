@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { Check, ChevronDown, CircleDashed, X } from "lucide-react";
+import { composeFailureMessage } from "@/components/dashboardComposer/integrationRunFeed";
 import { cn } from "@/lib/utils";
 
 const KEYFRAMES = `
@@ -111,7 +112,7 @@ function StepRow({ step, last, compact, now }) {
             <div className="overflow-hidden">
               {step.result ? (
                 <p className="mt-2 rounded-lg bg-black/[0.03] px-2.5 py-2 text-[12px] leading-[1.6] text-neutral-600 dark:bg-white/[0.04] dark:text-neutral-400">
-                  {step.result}
+                  {composeFailureMessage(step.result)}
                 </p>
               ) : null}
               {step.children?.length ? (
@@ -125,7 +126,7 @@ function StepRow({ step, last, compact, now }) {
                           <span className="ml-auto font-mono text-[9px] uppercase tracking-wide text-neutral-400 dark:text-neutral-600">parallel</span>
                         ) : null}
                       </div>
-                      {child.result ? <p className="mt-1 text-[11px] leading-[1.5] text-neutral-500">{child.result}</p> : null}
+                      {child.result ? <p className="mt-1 text-[11px] leading-[1.5] text-neutral-500">{composeFailureMessage(child.result)}</p> : null}
                     </div>
                   ))}
                 </div>
@@ -138,7 +139,7 @@ function StepRow({ step, last, compact, now }) {
   );
 }
 
-export function RunProgressCard({ feed, onDismiss }) {
+export function RunProgressCard({ feed, onDismiss, onReplay }) {
   const [now, setNow] = useState(() => Date.now());
   const live = feed?.status === "running";
   useEffect(() => {
@@ -162,9 +163,20 @@ export function RunProgressCard({ feed, onDismiss }) {
           <div className="flex shrink-0 items-center gap-2">
             <span className="font-mono text-[11px] tabular-nums text-neutral-400">{elapsed}</span>
             {feed.status === "running" ? null : (
-              <button type="button" onClick={onDismiss} className="rounded-md px-1.5 py-0.5 text-[12px] font-medium text-muted-foreground hover:bg-muted/60 hover:text-foreground">
-                Close
-              </button>
+              <>
+                {feed.status === "error" && onReplay ? (
+                  <button
+                    type="button"
+                    onClick={onReplay}
+                    className="rounded-md bg-foreground px-2 py-0.5 text-[12px] font-medium text-background hover:opacity-90"
+                  >
+                    Replay
+                  </button>
+                ) : null}
+                <button type="button" onClick={onDismiss} className="rounded-md px-1.5 py-0.5 text-[12px] font-medium text-muted-foreground hover:bg-muted/60 hover:text-foreground">
+                  Close
+                </button>
+              </>
             )}
           </div>
         </header>

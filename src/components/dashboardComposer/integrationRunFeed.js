@@ -6,6 +6,17 @@ function cloneStep(step) {
   };
 }
 
+const CONNECTION_FAILURE = /fetch failed|failed to fetch|load failed|networkerror|network request failed|enotfound|econnrefused|econnreset|etimedout|eai_again|socket hang up|connect timeout|und_err/i;
+
+/** A transport failure, as opposed to a query the server actually rejected. */
+export function composeFailureMessage(message) {
+  const text = String(message || "").trim();
+  if (!text) return "";
+  const explainsRows = /rows|sheets|already/i.test(text);
+  if (CONNECTION_FAILURE.test(text) && !explainsRows) return "Check connection / internet connection";
+  return text;
+}
+
 /** Live sentences for an Athena compose poll. */
 export function describeComposePhase(info, { table, limit } = {}) {
   const name = table || "this table";
@@ -73,7 +84,7 @@ export function createRunReporter(publish) {
       const step = find(id) || feed.steps.find((item) => item.status === "running") || feed.steps.find((item) => item.status === "pending");
       if (step) {
         step.status = "error";
-        step.result = message || "This step failed";
+        step.result = composeFailureMessage(message) || "This step failed";
         step.completedAt = Date.now();
       }
       feed.status = "error";

@@ -5,7 +5,7 @@ import { assignSummaryInput, describeSummaryFormula, settleSummaryCells, summary
 import { attachRandomSample, previewRandomSample } from "@/components/dashboardComposer/randomSampleRequest";
 import { normalizeRandomSampleConfig } from "@/lib/dataLake/randomSample";
 import { polymarketHistoricalColumnList, polymarketTokenIds } from "@/components/dashboardComposer/integrationBuildCatalog";
-import { createRunReporter, describeComposePhase } from "@/components/dashboardComposer/integrationRunFeed";
+import { composeFailureMessage, createRunReporter, describeComposePhase } from "@/components/dashboardComposer/integrationRunFeed";
 import {
   POLYMARKET_BLOCKS_CONNECT_COLUMNS,
   POLYMARKET_MARKETS_CONNECT_COLUMNS,
@@ -173,5 +173,21 @@ reporter.finish();
 assert.equal(published.at(-1).status, "done");
 assert.equal(published.at(-1).steps[0].status, "success");
 assert.equal(published.at(-1).steps[0].result, "50 rows from polymarket.markets");
+
+assert.equal(composeFailureMessage("fetch failed"), "Check connection / internet connection");
+assert.equal(composeFailureMessage("Failed to fetch"), "Check connection / internet connection");
+assert.equal(composeFailureMessage("ticker is required"), "ticker is required");
+assert.equal(
+  composeFailureMessage("12 rows already on screen. fetch failed"),
+  "12 rows already on screen. fetch failed",
+);
+
+const failed = [];
+const failedRun = createRunReporter((feed) => failed.push(feed));
+failedRun.plan([{ id: "source", name: "compose_series", status: "pending", args: { table: "series" } }]);
+failedRun.start("source");
+failedRun.fail("source", "fetch failed");
+assert.equal(failed.at(-1).status, "error");
+assert.equal(failed.at(-1).steps[0].result, "Check connection / internet connection");
 
 console.log("enrichPreview.test.js ok");

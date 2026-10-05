@@ -837,6 +837,7 @@ function EnrichStep({
   joinMode = "markets",
   seriesMarketLayout = "sheet",
   onSeriesMarketLayout,
+  marketsDetected = false,
   liveJoinIds,
   onToggleLiveJoin,
   onSelectAllLiveJoins,
@@ -1123,11 +1124,11 @@ function EnrichStep({
                                   ? " One Markets sheet."
                                   : ` ${sheetCount.toLocaleString()} Markets ${sheetCount === 1 ? "sheet" : "sheets"}.`}
                               </p>
+                              {marketsDetected ? (
                               <div className="border-t border-border/70 pt-3">
-                                <p className="text-[11px] font-semibold text-foreground">Join these markets</p>
+                                <p className="text-[11px] font-semibold text-foreground">Market Detected</p>
                                 <p className="mt-1 text-[11px] leading-relaxed text-muted-foreground">
-                                  This pull now has markets, so each market can join to trades, the order book, or candlesticks. The preview uses the first market. Save and run joins{" "}
-                                  {marketCap.toLocaleString()} markets at a time.
+                                  Join the markets you just pulled to their Trades, Orderbook or Candlesticks.
                                 </p>
                                 <div className="mt-1.5 flex items-center gap-1.5">
                                   <button
@@ -1161,6 +1162,7 @@ function EnrichStep({
                                   })}
                                 </div>
                               </div>
+                              ) : null}
                             </>
                           ) : (
                             <p className="text-[11px] leading-relaxed text-muted-foreground">
@@ -1547,6 +1549,10 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
   const [joinTarget, setJoinTarget] = useState("");
   const [seriesMarketLayout, setSeriesMarketLayout] = useState("sheet");
   const [seriesMarketPreview, setSeriesMarketPreview] = useState({ status: "idle", ticker: "", columns: [], rows: [], error: "" });
+  const seriesMarketCacheRef = useRef(new Map());
+  const seriesMarketVisibleKey = useRef("");
+  const liveJoinCacheRef = useRef(new Map());
+  const liveJoinVisibleTicker = useRef("");
   const [liveJoinIds, setLiveJoinIds] = useState(() => new Set());
   const [liveJoinPreview, setLiveJoinPreview] = useState({});
   const [joinPlacement, setJoinPlacement] = useState("");
@@ -1560,6 +1566,7 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
   const [sampleSavePrompt, setSampleSavePrompt] = useState(false);
   const placementRef = useRef({ pageId: "", append: false });
   const sampleKeepRef = useRef("both");
+  const runLockRef = useRef(false);
   const [hoverFunction, setHoverFunction] = useState(false);
   const [hoverSummarize, setHoverSummarize] = useState(false);
   const [hoverBucket, setHoverBucket] = useState(false);
@@ -2864,12 +2871,16 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
   const liveJoinMarkets = liveJoinList.slice(0, marketCap);
   const seriesJoinTickers = useMemo(() => {
     if (!liveSeriesSearch) return [];
-    const source = seriesImportRows || [];
     const requested = Number(rowLimit);
-    const limited = Number.isFinite(requested) && requested > 0 ? source.slice(0, requested) : source;
+    // A category or ticker search is the full series set. Otherwise the rows already on the Series sheet are the pull.
+    const source = Array.isArray(seriesImportRows)
+      ? Number.isFinite(requested) && requested > 0
+        ? seriesImportRows.slice(0, requested)
+        : seriesImportRows
+      : filteredRows;
     const seen = new Set();
     const list = [];
-    for (const row of limited) {
+    for (const row of source) {
       const ticker = String(row?.ticker || "").trim();
       if (!ticker || seen.has(ticker)) continue;
       seen.add(ticker);
@@ -2877,7 +2888,7 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
       if (list.length >= marketCap) break;
     }
     return list;
-  }, [liveSeriesSearch, seriesImportRows, rowLimit, marketCap]);
+  }, [liveSeriesSearch, seriesImportRows, filteredRows, rowLimit, marketCap]);
   const seriesJoinKey = seriesJoinTickers.map((item) => item.ticker).join("\0");
   const liveJoinKey = [...liveJoinIds].sort().join(",");
   const liveJoinTargets = KALSHI_LIVE_MARKET_JOINS.filter((item) => liveJoinIds.has(item.id));
@@ -2895,48 +2906,75 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
   );
   const marketDownstream = allowsMarketDownstreamJoin(nativePullFlags, enrichmentFlags);
   const seriesMarketSheet = previewSheet === "series-markets" || previewSheet.startsWith("series-market:");
-  const downstreamPreviewTicker = String(seriesMarketPreview.rows?.[0]?.ticker || "").trim();
+  const seriesMarketRequestFor = (sheet) => {
+    const liveFollowUp = sheet.startsWith("live:");
+    const activeTicker = sheet.startsWith("series-market:")
+      ? sheet.slice("series-market:".length)
+      : liveFollowUp && seriesMarketLayout !== "combined"
+        ? seriesJoinTickers[0]?.ticker || ""
+        : "";
+    const combined = sheet === "series-markets" || (liveFollowUp && seriesMarketLayout === "combined");
+    if (!seriesJoinOn || (!activeTicker && !combined)) return null;
+    return {
+      key: combined ? `combined:${seriesJoinKey}` : `sheet:${seriesJoinKey}:${activeTicker}`,
+      activeTicker,
+      combined,
+    };
+  };
+  const seriesMarketRequest = seriesMarketRequestFor(previewSheet);
+  const cachedSeriesMarkets = seriesMarketRequest ? seriesMarketCacheRef.current.get(seriesMarketRequest.key) : null;
+  const seriesMarketView = cachedSeriesMarkets || seriesMarketPreview;
+  const marketsDetected = useMemo(() => {
+    if (!seriesJoinOn || !seriesJoinKey) return false;
+    const keys = [`combined:${seriesJoinKey}`, ...seriesJoinTickers.map((item) => `sheet:${seriesJoinKey}:${item.ticker}`)];
+    return keys.some((key) => {
+      const hit = seriesMarketCacheRef.current.get(key);
+      return hit?.status === "ready" && (hit.rows?.length || 0) > 0;
+    });
+  }, [seriesJoinOn, seriesJoinKey, seriesJoinTickers, seriesMarketPreview]);
+  const downstreamPreviewTicker = String(seriesMarketView.rows?.[0]?.ticker || "").trim();
   const joinPreviewTicker = liveMarketSearch ? livePreviewTicker : marketDownstream ? downstreamPreviewTicker : "";
 
   useEffect(() => {
-    if (step !== "enrich" || !enrichPicks.has("join") || !liveJoinKey || !joinPreviewTicker) {
-      setLiveJoinPreview((current) => (Object.keys(current).length ? {} : current));
-      return undefined;
-    }
-    let cancel = false;
+    if (step !== "enrich" || !enrichPicks.has("join") || !liveJoinKey || !joinPreviewTicker) return undefined;
     const ids = liveJoinKey.split(",");
     const ticker = joinPreviewTicker;
-    setLiveJoinPreview(() => {
-      const next = {};
-      for (const id of ids) next[id] = { status: "loading", columns: [], rows: [], error: "" };
-      return next;
+    liveJoinVisibleTicker.current = ticker;
+    const next = {};
+    const missing = [];
+    for (const id of ids) {
+      const cacheKey = `${ticker}:${id}`;
+      const hit = liveJoinCacheRef.current.get(cacheKey);
+      if (hit?.status === "ready" || hit?.status === "error" || hit?.status === "loading") {
+        next[id] = hit;
+      } else {
+        const loading = { status: "loading", columns: [], rows: [], error: "" };
+        liveJoinCacheRef.current.set(cacheKey, loading);
+        next[id] = loading;
+        missing.push(id);
+      }
+    }
+    setLiveJoinPreview(next);
+    missing.forEach((id) => {
+      const cacheKey = `${ticker}:${id}`;
+      loadKalshiLiveMarketJoin(id, ticker, PREVIEW_ROW_CAP)
+        .then((result) => {
+          const ready = { status: "ready", columns: result.columns || [], rows: result.rows || [], error: "" };
+          liveJoinCacheRef.current.set(cacheKey, ready);
+          if (liveJoinVisibleTicker.current === ticker) setLiveJoinPreview((current) => ({ ...current, [id]: ready }));
+        })
+        .catch((err) => {
+          const failed = {
+            status: "error",
+            columns: [],
+            rows: [],
+            error: err instanceof Error ? err.message : "Join preview failed",
+          };
+          liveJoinCacheRef.current.set(cacheKey, failed);
+          if (liveJoinVisibleTicker.current === ticker) setLiveJoinPreview((current) => ({ ...current, [id]: failed }));
+        });
     });
-    Promise.all(
-      ids.map(async (id) => {
-        try {
-          const result = await loadKalshiLiveMarketJoin(id, ticker, PREVIEW_ROW_CAP);
-          if (cancel) return;
-          setLiveJoinPreview((current) => ({
-            ...current,
-            [id]: { status: "ready", columns: result.columns || [], rows: result.rows || [], error: "" },
-          }));
-        } catch (err) {
-          if (cancel) return;
-          setLiveJoinPreview((current) => ({
-            ...current,
-            [id]: {
-              status: "error",
-              columns: [],
-              rows: [],
-              error: err instanceof Error ? err.message : "Join preview failed",
-            },
-          }));
-        }
-      }),
-    );
-    return () => {
-      cancel = true;
-    };
+    return undefined;
   }, [step, enrichPicks, liveJoinKey, joinPreviewTicker]);
 
   useEffect(() => {
@@ -2951,21 +2989,28 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
   }, [seriesJoinOn, seriesJoinKey, seriesJoinTickers, seriesMarketLayout, previewSheet]);
 
   useEffect(() => {
-    const liveFollowUp = previewSheet.startsWith("live:");
-    const activeTicker = previewSheet.startsWith("series-market:")
-      ? previewSheet.slice("series-market:".length)
-      : liveFollowUp && seriesMarketLayout !== "combined"
-        ? seriesJoinTickers[0]?.ticker || ""
-        : "";
-    const combined = previewSheet === "series-markets" || (liveFollowUp && seriesMarketLayout === "combined");
-    if (!seriesJoinOn || (!activeTicker && !combined)) {
-      setSeriesMarketPreview((current) =>
-        current.status === "idle" ? current : { status: "idle", ticker: "", columns: [], rows: [], error: "" },
-      );
+    const request = seriesMarketRequestFor(previewSheet);
+    const activeTicker = request?.activeTicker || "";
+    const combined = Boolean(request?.combined);
+    const key = request?.key || "";
+    seriesMarketVisibleKey.current = key;
+    if (!key) return undefined;
+    const cached = seriesMarketCacheRef.current.get(key);
+    if (cached?.status === "ready" || cached?.status === "error") {
+      setSeriesMarketPreview(cached);
       return undefined;
     }
-    let cancel = false;
-    setSeriesMarketPreview({ status: "loading", ticker: activeTicker || "combined", columns: [], rows: [], error: "" });
+    if (cached?.status === "loading") {
+      setSeriesMarketPreview(cached);
+      return undefined;
+    }
+    const loading = { status: "loading", ticker: activeTicker || "combined", columns: [], rows: [], error: "" };
+    seriesMarketCacheRef.current.set(key, loading);
+    setSeriesMarketPreview(loading);
+    const apply = (next) => {
+      seriesMarketCacheRef.current.set(key, next);
+      if (seriesMarketVisibleKey.current === key) setSeriesMarketPreview(next);
+    };
     (async () => {
       try {
         if (combined) {
@@ -2974,20 +3019,17 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
           for (const item of seriesJoinTickers) {
             if (rows.length >= PREVIEW_ROW_CAP) break;
             const result = await loadKalshiLiveSeriesMarkets(item.ticker, PREVIEW_ROW_CAP - rows.length);
-            if (cancel) return;
             if (result.columns?.length) columns = result.columns;
             for (const row of result.rows || []) {
               rows.push(row);
               if (rows.length >= PREVIEW_ROW_CAP) break;
             }
           }
-          if (cancel) return;
-          setSeriesMarketPreview({ status: "ready", ticker: "combined", columns, rows, error: "" });
+          apply({ status: "ready", ticker: "combined", columns, rows, error: "" });
           return;
         }
         const result = await loadKalshiLiveSeriesMarkets(activeTicker, PREVIEW_ROW_CAP);
-        if (cancel) return;
-        setSeriesMarketPreview({
+        apply({
           status: "ready",
           ticker: activeTicker,
           columns: result.columns || [],
@@ -2995,8 +3037,7 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
           error: "",
         });
       } catch (err) {
-        if (cancel) return;
-        setSeriesMarketPreview({
+        apply({
           status: "error",
           ticker: activeTicker || "combined",
           columns: [],
@@ -3005,9 +3046,7 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
         });
       }
     })();
-    return () => {
-      cancel = true;
-    };
+    return undefined;
   }, [seriesJoinOn, seriesJoinKey, previewSheet, seriesJoinTickers, seriesMarketLayout]);
 
   const showSampleExplainer = step === "enrich" && hoverSample && !enrichPicks.has("sample");
@@ -3328,10 +3367,10 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
     }
     if (seriesMarketSheet && seriesJoinOn) {
       if (!seriesJoinTickers.length) return "Search for a series or select a category. Markets join uses those series.";
-      if (seriesMarketPreview.status === "loading" || seriesMarketPreview.status === "idle") return "Loading markets for this series";
-      if (seriesMarketPreview.status === "error") return seriesMarketPreview.error;
-      const count = seriesMarketPreview.rows.length;
-      const scope = previewSheet === "series-markets" ? "these series" : seriesMarketPreview.ticker || "this series";
+      if (seriesMarketView.status === "loading" || seriesMarketView.status === "idle") return "Loading markets for this series";
+      if (seriesMarketView.status === "error") return seriesMarketView.error;
+      const count = seriesMarketView.rows.length;
+      const scope = previewSheet === "series-markets" ? "these series" : seriesMarketView.ticker || "this series";
       return `Previewing ${count.toLocaleString()} ${count === 1 ? "market" : "markets"} from ${scope}. Save and run uses your plan limit.`;
     }
     if (previewSheet.startsWith("column:") && functionOnNew) return "New table. This sheet is created when you run the pull.";
@@ -3652,7 +3691,9 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
   }
 
   async function onSaveAndRun() {
-    if (running) return;
+    if (running || runLockRef.current) return;
+    runLockRef.current = true;
+    canvas?.armReplay?.(onSaveAndRun);
     setRunning(true);
     const reporter = createRunReporter((feed) => canvas?.reportRun?.(feed));
     try {
@@ -4450,6 +4491,7 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
     } catch (err) {
       reporter.fail(null, err instanceof Error ? err.message : "The pull failed");
     } finally {
+      runLockRef.current = false;
       setRunning(false);
     }
   }
@@ -4761,6 +4803,7 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
             showFunctionBuilder
             joinMode={liveSeriesSearch ? "series" : liveMarketSearch ? "live" : tradesQuery ? "trades" : "markets"}
             seriesMarketLayout={seriesMarketLayout}
+            marketsDetected={marketsDetected}
             onSeriesMarketLayout={(layout) => {
               setSeriesMarketLayout(layout);
               if (joinTarget !== "kalshiLiveSeriesMarkets") return;
@@ -5365,21 +5408,21 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
               <div className="flex h-full items-center justify-center rounded-xl border border-border/70 bg-background px-6 text-center text-[13px] leading-relaxed text-muted-foreground shadow-sm">
                 Search for a series or select a category. Markets join uses those series.
               </div>
-            ) : seriesMarketPreview.status === "loading" || seriesMarketPreview.status === "idle" ? (
+            ) : seriesMarketView.status === "loading" || seriesMarketView.status === "idle" ? (
               <div className="flex h-full items-center justify-center">
                 <SpectrumLoadingState label="Loading markets" />
               </div>
-            ) : seriesMarketPreview.status === "error" ? (
-              <p className="text-[13px] text-muted-foreground">{seriesMarketPreview.error}</p>
-            ) : seriesMarketPreview.rows.length ? (
+            ) : seriesMarketView.status === "error" ? (
+              <p className="text-[13px] text-muted-foreground">{seriesMarketView.error}</p>
+            ) : seriesMarketView.rows.length ? (
               <IntegrationBuildGrid
-                columns={seriesMarketPreview.columns}
-                rows={seriesMarketPreview.rows}
-                highlightColumnId={seriesMarketPreview.columns[0]?.id || ""}
+                columns={seriesMarketView.columns}
+                rows={seriesMarketView.rows}
+                highlightColumnId={seriesMarketView.columns[0]?.id || ""}
               />
             ) : (
               <div className="flex h-full items-center justify-center rounded-xl border border-border/70 bg-background px-6 text-center text-[13px] leading-relaxed text-muted-foreground shadow-sm">
-                No markets for {previewSheet === "series-markets" ? "these series" : seriesMarketPreview.ticker || "this series"}.
+                No markets for {previewSheet === "series-markets" ? "these series" : seriesMarketView.ticker || "this series"}.
               </div>
             )
           ) : previewSheet === "live:more" || previewSheet.startsWith("live:locked:") ? (
@@ -5410,7 +5453,7 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
                         targets: liveJoinTargets,
                         preview: liveJoinPreview,
                         ticker: joinPreviewTicker,
-                        marketCount: liveMarketSearch ? liveJoinMarkets.length : Math.max(seriesMarketPreview.rows?.length || 0, 1),
+                        marketCount: liveMarketSearch ? liveJoinMarkets.length : Math.max(seriesMarketView.rows?.length || 0, 1),
                       })}
                     />
                   </div>

@@ -145,6 +145,8 @@ export function WorkspaceCanvasProvider({ pageId, readOnly = false, children }) 
   const [selectedId, setSelectedId] = useState(null);
   const [renameId, setRenameId] = useState(null);
   const [runFeed, setRunFeed] = useState(null);
+  const [replayReady, setReplayReady] = useState(false);
+  const replayRunRef = useRef(null);
   const blocks = blocksByPage[pageId] || [];
   const docIdRef = useRef("");
   const lastPayloadRef = useRef("");
@@ -393,7 +395,19 @@ export function WorkspaceCanvasProvider({ pageId, readOnly = false, children }) 
   const reportRun = useCallback((next) => {
     setRunFeed((current) => (typeof next === "function" ? next(current) : next));
   }, []);
-  const dismissRun = useCallback(() => setRunFeed(null), []);
+  const armReplay = useCallback((fn) => {
+    replayRunRef.current = typeof fn === "function" ? fn : null;
+    setReplayReady(Boolean(replayRunRef.current));
+  }, []);
+  const replayRun = useCallback(() => {
+    const fn = replayRunRef.current;
+    if (fn) void fn();
+  }, []);
+  const dismissRun = useCallback(() => {
+    replayRunRef.current = null;
+    setReplayReady(false);
+    setRunFeed(null);
+  }, []);
 
   const registerTables = useCallback((incoming) => {
     const list = Array.isArray(incoming) ? incoming : [];
@@ -634,13 +648,16 @@ export function WorkspaceCanvasProvider({ pageId, readOnly = false, children }) 
       registerTables,
       runFeed,
       reportRun,
+      replayReady,
+      armReplay,
+      replayRun,
       dismissRun,
       updateBlock,
       duplicateBlock,
       removeBlock,
       createChartFromBlock,
     }),
-    [addBlock, blocks, blocksByPage, createChartFromBlock, dashboardName, dismissRun, duplicateBlock, focusBlock, pageId, placeIntegrationSheets, previewActiveId, previewTabs, readOnly, ready, realtimeById, registerTables, removeBlock, renameDashboard, renameId, reportRun, revealBlock, revealNonce, runFeed, saveNow, selectedId, spotlightId, startSheetRealtime, stopSheetRealtime, tables, tool, updateBlock],
+    [addBlock, armReplay, blocks, blocksByPage, createChartFromBlock, dashboardName, dismissRun, duplicateBlock, focusBlock, pageId, placeIntegrationSheets, previewActiveId, previewTabs, readOnly, ready, realtimeById, registerTables, removeBlock, renameDashboard, renameId, replayReady, replayRun, reportRun, revealBlock, revealNonce, runFeed, saveNow, selectedId, spotlightId, startSheetRealtime, stopSheetRealtime, tables, tool, updateBlock],
   );
 
   return <WorkspaceCanvasContext.Provider value={value}>{children}</WorkspaceCanvasContext.Provider>;
@@ -1305,7 +1322,9 @@ export function WorkspaceCanvas() {
     );
   }
 
-  const progress = canvas.runFeed ? <RunProgressCard feed={canvas.runFeed} onDismiss={canvas.dismissRun} /> : null;
+  const progress = canvas.runFeed ? (
+    <RunProgressCard feed={canvas.runFeed} onDismiss={canvas.dismissRun} onReplay={canvas.replayReady ? canvas.replayRun : undefined} />
+  ) : null;
 
   if (!blocks.length) return progress;
 
