@@ -160,7 +160,11 @@ function sheetFacts(block, table, dataSheet) {
   const filterText = describeFilters(filters);
   const sortLine = String(provenance?.sortLine || describeSort(provenance?.composeSpec || athena?.compose) || "").trim();
   const limit = Number(provenance?.composeAthenaRowLimit || athena?.limit || pull?.limit || 0) || 0;
-  const enrichment = provenance?.kind === "enrichment" ? provenance.operation || "enrichment" : enrichmentFromTitle(block?.title, block?.source);
+  const enrichment = provenance?.sample
+    ? "sample"
+    : provenance?.kind === "enrichment"
+      ? provenance.operation || "enrichment"
+      : enrichmentFromTitle(block?.title, block?.source);
   const summary = String(provenance?.summary || query.summary || "").trim();
   const detail = enrichmentDetail(provenance?.detail);
   const parentSheetId = String(provenance?.parentSheetId || "").trim();
@@ -223,6 +227,7 @@ function enrichmentDetail(detail) {
   if (!detail || typeof detail !== "object") return "";
   if (detail.formula) return String(detail.formula);
   if (detail.column) return String(detail.column);
+  if (detail.size) return `${Number(detail.size).toLocaleString()} ${detail.mode === "unseeded" ? "unseeded" : "seeded"} rows`;
   return "";
 }
 

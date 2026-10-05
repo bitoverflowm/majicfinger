@@ -23,6 +23,8 @@ export function composeProvenance(request, extra = {}) {
     ...(Array.isArray(extra.attributeLines) && extra.attributeLines.length ? { attributeLines: extra.attributeLines.map(String) } : {}),
     ...(extra.sortLine ? { sortLine: String(extra.sortLine) } : {}),
     ...(extra.parentSheetId ? { parentSheetId: String(extra.parentSheetId) } : {}),
+    ...(extra.parentQuery && typeof extra.parentQuery === "object" ? { parentQuery: extra.parentQuery } : {}),
+    ...(extra.sample && typeof extra.sample === "object" ? { sample: extra.sample } : {}),
     ...(join ? { join } : {}),
   };
 }
@@ -69,10 +71,27 @@ export function stampRunSheets(sheets, { integrationId } = {}) {
     const rowCount = Math.max(rows.length, Math.floor(Number(sheet?.rowCount) || 0));
     const kept = sheet?.keepAllRows ? rows.length : PREVIEW_CAP;
     let provenance = sheet?.provenance || null;
-    if (!provenance && sheet?.enrichment) {
+    if (!provenance && sheet?.enrichment?.operation === "sample" && sheet?.composeRequest) {
+      const detail = sheet.enrichment.detail && typeof sheet.enrichment.detail === "object" ? sheet.enrichment.detail : {};
+      provenance = composeProvenance(sheet.composeRequest, {
+        integrationId: integrationId || sheet.integrationId,
+        summary: sheet.summary,
+        attributeLines: sheet.attributeLines,
+        sortLine: sheet.sortLine,
+        parentSheetId: sheet.enrichment.parentSheetId || "",
+        parentQuery: detail.parentQuery || null,
+        sample: {
+          size: detail.size,
+          mode: detail.mode,
+          seed: detail.seed || "",
+          engine: detail.engine || "athena",
+        },
+      });
+    } else if (!provenance && sheet?.enrichment) {
       provenance = enrichmentProvenance({
         ...sheet.enrichment,
-        parentSheetId: sheet.enrichment.parentSheetId || parentId,
+        parentSheetId:
+          sheet.enrichment.operation === "sample" ? sheet.enrichment.parentSheetId || "" : sheet.enrichment.parentSheetId || parentId,
         summary: sheet.summary,
       });
     } else if (!provenance && (sheet?.composeRequest || sheet?.pull)) {

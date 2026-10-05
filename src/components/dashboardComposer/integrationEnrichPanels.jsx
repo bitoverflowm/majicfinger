@@ -173,7 +173,7 @@ export function SampleEnrichPanel({ size, onSize, mode, onMode, error, onClear }
         </button>
       </div>
       <p className="mt-1 text-[11px] leading-relaxed text-muted-foreground">
-        Draws this many rows from your query. Seeded keeps the same rows on the next pull. Unseeded draws a new set each time.
+        Draws this many rows from your query. The parent query stays on the first preview tab, and this sample is the next tab. Seeded keeps the same rows on the next pull. Unseeded draws a new set each time.
       </p>
       <label className="mt-2 block text-[11px] font-semibold text-foreground">
         Sample size

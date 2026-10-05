@@ -1057,16 +1057,17 @@ export async function loadKalshiLiveMarketByTicker(ticker) {
  * Every market in one series or one event, via GET /markets.
  * Paginates past the 1000-row page size. Stops at 20,000 rows.
  */
-export async function loadKalshiLiveMarketsForScope({ seriesTicker = "", eventTicker = "" } = {}) {
+export async function loadKalshiLiveMarketsForScope({ seriesTicker = "", eventTicker = "", limit = 20000 } = {}) {
   const series = String(seriesTicker || "").trim();
   const event = String(eventTicker || "").trim();
   if (!series && !event) return [];
+  const cap = Math.max(1, Math.floor(Number(limit) || 20000));
   const rows = [];
   let cursor = "";
-  for (let page = 0; page < 20; page += 1) {
+  for (let page = 0; page < 20 && rows.length < cap; page += 1) {
     const params = new URLSearchParams({
       discovery: "1",
-      limit: "1000",
+      limit: String(Math.min(1000, cap - rows.length)),
       mve_filter: "exclude",
     });
     if (series) params.set("series_ticker", series);
@@ -1076,9 +1077,16 @@ export async function loadKalshiLiveMarketsForScope({ seriesTicker = "", eventTi
     const markets = Array.isArray(json.markets) ? json.markets : [];
     rows.push(...markets.map((row) => normalizeKalshiLiveMarketRow(row)));
     cursor = String(json.cursor || "").trim();
-    if (!cursor || !markets.length || rows.length >= 20_000) break;
+    if (!cursor || !markets.length) break;
   }
-  return rows.filter((row) => String(row?.ticker || "").trim());
+  return rows.filter((row) => String(row?.ticker || "").trim()).slice(0, cap);
+}
+
+/** Markets inside one series. Kalshi accepts one series_ticker per request. */
+export async function loadKalshiLiveSeriesMarkets(seriesTicker, limit = PREVIEW_ROW_CAP) {
+  const columns = kalshiLiveColumns("markets");
+  const rows = await loadKalshiLiveMarketsForScope({ seriesTicker, limit });
+  return { columns, rows: projectLiveJoinRows(columns, rows, rows.length || 1) };
 }
 
 async function kalshiLiveRows(endpointId) {
