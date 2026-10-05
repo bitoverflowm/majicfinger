@@ -674,11 +674,11 @@ export function KalshiLiveMarketPicker({ picks, onAdd, onRemove, intent = "marke
               document.body,
             )
           : null}
-        <p className="text-[10px] leading-snug text-muted-foreground">
-          {intent === "series"
-            ? "Search for a series by name. This adds the series, not the markets inside it."
-            : "If you don't know your ticker, search anything and suggestions will populate."}
-        </p>
+        {intent === "series" ? null : (
+          <p className="text-[10px] leading-snug text-muted-foreground">
+            If you don't know your ticker, search anything and suggestions will populate.
+          </p>
+        )}
         {error ? <p className="text-xs text-destructive">{error}</p> : null}
         {picks?.length ? (
           <div className="flex flex-wrap gap-1 pt-0.5">

@@ -1488,22 +1488,48 @@ export async function loadKalshiLiveSeriesByTickers(tickers) {
   return { columns, rows: projectLiveJoinRows(columns, rows, rows.length || 1) };
 }
 
-/** Series list for one category. Tag is optional. */
+/** Series list for one or more categories. Each category is its own list request. */
 export async function loadKalshiLiveSeriesDiscovery(spec = {}, limit = PREVIEW_ROW_CAP) {
   const columns = kalshiLiveColumns("series");
-  const params = new URLSearchParams();
-  if (spec.category) params.set("category", String(spec.category));
-  if (spec.tag) params.set("tags", String(spec.tag));
-  params.set("include_volume", "true");
-  params.set("include_product_metadata", spec.includeProductMetadata ? "true" : "false");
-  if (Number.isFinite(Number(spec.minUpdatedTs)) && Number(spec.minUpdatedTs) > 0) {
-    params.set("min_updated_ts", String(Math.floor(Number(spec.minUpdatedTs))));
+  const requested = Array.isArray(spec.categories)
+    ? spec.categories
+    : spec.category
+      ? [spec.category]
+      : [];
+  const categories = [];
+  const seenCategories = new Set();
+  for (const value of requested) {
+    const name = String(value || "").trim();
+    if (!name || seenCategories.has(name)) continue;
+    seenCategories.add(name);
+    categories.push(name);
   }
-  const json = await getJsonRetry(`/api/integrations/kalshi-live/series/list?${params}`);
-  const series = Array.isArray(json.series) ? json.series : [];
-  const rows = series.map((row) => normalizeKalshiLiveSeriesRow(row));
   const cap = Math.max(1, Math.floor(Number(limit) || PREVIEW_ROW_CAP));
-  return { columns, rows: projectLiveJoinRows(columns, rows, cap) };
+  const seenTickers = new Set();
+  const rows = [];
+  for (const category of categories) {
+    const params = new URLSearchParams();
+    params.set("category", category);
+    if (spec.tag) params.set("tags", String(spec.tag));
+    params.set("include_volume", "true");
+    params.set("include_product_metadata", spec.includeProductMetadata ? "true" : "false");
+    if (Number.isFinite(Number(spec.minUpdatedTs)) && Number(spec.minUpdatedTs) > 0) {
+      params.set("min_updated_ts", String(Math.floor(Number(spec.minUpdatedTs))));
+    }
+    const json = await getJsonRetry(`/api/integrations/kalshi-live/series/list?${params}`);
+    const series = Array.isArray(json.series) ? json.series : [];
+    let taken = 0;
+    for (const raw of series) {
+      const row = normalizeKalshiLiveSeriesRow(raw);
+      const ticker = String(row.ticker || "").trim();
+      if (ticker && seenTickers.has(ticker)) continue;
+      if (ticker) seenTickers.add(ticker);
+      rows.push(row);
+      taken += 1;
+      if (taken >= cap) break;
+    }
+  }
+  return { columns, rows: projectLiveJoinRows(columns, rows, rows.length || 1) };
 }
 
 /**

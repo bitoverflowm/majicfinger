@@ -56,14 +56,7 @@ function RangeFields({ query, onChange }) {
  */
 export function KalshiLiveDirectQuery({ tableId, picks, onAdd, onRemove, query, onChange }) {
   if (tableId === "series") {
-    return (
-      <div className="space-y-3">
-        <KalshiLiveMarketPicker intent="series" picks={picks} onAdd={onAdd} onRemove={onRemove} />
-        <p className="text-[11px] leading-relaxed text-muted-foreground">
-          Search for a series by name. Selected series are pulled onto one sheet. With no series selected, a category under Series attributes discovers series in that category.
-        </p>
-      </div>
-    );
+    return <KalshiLiveMarketPicker intent="series" picks={picks} onAdd={onAdd} onRemove={onRemove} />;
   }
 
   const noun = tableId === "orderbook" ? "order book" : tableId === "candlesticks" ? "candlesticks" : "trades";

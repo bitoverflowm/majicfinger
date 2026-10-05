@@ -87,7 +87,7 @@ import {
   isKalshiLiveDirectTable,
   kalshiLiveDirectScopeError,
   kalshiLiveSeriesAttributeColumns,
-  seriesDiscoveryCategory,
+  seriesDiscoveryCategories,
   seriesUpdatedAfter,
 } from "@/components/dashboardComposer/kalshiLiveDirectScope";
 import { fetchKalshiLiveTagsByCategories } from "@/lib/kalshiLive/seriesDiscovery";
@@ -1741,7 +1741,8 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
         : [],
     [liveSeriesSearch, pull?.columns, seriesCategoryState],
   );
-  const seriesCategory = seriesDiscoveryCategory(attributeFilters);
+  const seriesCategories = seriesDiscoveryCategories(attributeFilters);
+  const seriesCategoryKey = seriesCategories.join("\0");
   const seriesMinUpdatedTs = seriesUpdatedAfter(attributeFilters);
   const seriesProductMetadata = liveSeriesSearch && !hidden.has("product_metadata");
   const liveClientColumns = useMemo(
@@ -2067,7 +2068,7 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
     if (!liveDirect) return undefined;
     const ticker = directMarkets[0]?.ticker || "";
     if (tableId === "series") {
-      if (!directSeries.length && !seriesCategory) {
+      if (!directSeries.length && !seriesCategories.length) {
         setDirectPreview({ status: "idle", rows: [], error: "", ticker: "" });
         return undefined;
       }
@@ -2084,7 +2085,7 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
           ? { mode: "tickers", tickers: directSeries, limit: seriesPreviewCap }
           : {
               mode: "discover",
-              category: seriesCategory,
+              categories: seriesCategories,
               includeProductMetadata: seriesProductMetadata,
               minUpdatedTs: seriesMinUpdatedTs,
               limit: seriesPreviewCap,
@@ -2116,7 +2117,7 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
     return () => {
       cancel = true;
     };
-  }, [directMarkets, directQuery, directSeries, liveDirect, seriesCategory, seriesMinUpdatedTs, seriesProductMetadata, tableId]);
+  }, [directMarkets, directQuery, directSeries, liveDirect, seriesCategoryKey, seriesMinUpdatedTs, seriesProductMetadata, tableId]);
 
   const filteredRows = useMemo(() => {
     if (liveDirect && tableId === "series" && directPreview.status === "ready") {
@@ -3519,14 +3520,14 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
       let built = [];
       if (tableId === "series") {
         const tickers = directSeriesTickers(livePicks);
-        const category = seriesDiscoveryCategory(attributeFilters);
+        const categories = seriesDiscoveryCategories(attributeFilters);
         const loaded = await loadKalshiLiveDirect(
           "series",
           tickers.length
             ? { mode: "tickers", tickers, limit }
             : {
                 mode: "discover",
-                category,
+                categories,
                 includeProductMetadata: !hidden.has("product_metadata"),
                 minUpdatedTs: seriesUpdatedAfter(attributeFilters),
                 limit,
@@ -3549,7 +3550,7 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
             rows,
             span: "full",
             table: "series",
-            summary: tickers.length ? `Kalshi Live · Series · ${tickers.join(", ")}` : `Kalshi Live · Series · ${category}`,
+            summary: tickers.length ? `Kalshi Live · Series · ${tickers.join(", ")}` : `Kalshi Live · Series · ${categories.join(", ")}`,
             attributeLines,
             sortLine: sortSummary(seriesAttributeColumns, sortKeys),
           },

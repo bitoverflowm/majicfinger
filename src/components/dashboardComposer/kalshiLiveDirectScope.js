@@ -56,11 +56,19 @@ export function directSeriesTickers(picks) {
   return tickers;
 }
 
-/** First selected category. The series list endpoint takes one category. */
-export function seriesDiscoveryCategory(filters) {
+/** Selected series categories. The list endpoint takes one category, so each is requested on its own. */
+export function seriesDiscoveryCategories(filters) {
   const include = filters?.category?.include;
-  if (!Array.isArray(include)) return "";
-  return String(include.find((value) => String(value || "").trim()) || "").trim();
+  if (!Array.isArray(include)) return [];
+  const seen = new Set();
+  const categories = [];
+  for (const value of include) {
+    const name = String(value || "").trim();
+    if (!name || seen.has(name)) continue;
+    seen.add(name);
+    categories.push(name);
+  }
+  return categories;
 }
 
 /** Unix seconds for "last updated after", or "" when unset. */
@@ -104,7 +112,7 @@ export function kalshiLiveDirectScopeError(tableId, picks, _query, filters) {
   const loading = (picks || []).some((pick) => pick?.status === "loading");
   if (tableId === "series") {
     if (directSeriesTickers(picks).length) return "";
-    if (seriesDiscoveryCategory(filters)) return "";
+    if (seriesDiscoveryCategories(filters).length) return "";
     return loading ? "" : "Search for a series or select a category.";
   }
   if (directMarketTickers(picks).length) return "";

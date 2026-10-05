@@ -6,7 +6,7 @@ import {
   isKalshiLiveDirectTable,
   kalshiLiveDirectScopeError,
   kalshiLiveSeriesAttributeColumns,
-  seriesDiscoveryCategory,
+  seriesDiscoveryCategories,
   seriesUpdatedAfter,
 } from "./kalshiLiveDirectScope.js";
 
@@ -32,7 +32,8 @@ assert.equal(kalshiLiveDirectScopeError("trades", [{ status: "loading", kind: "m
 assert.equal(kalshiLiveDirectScopeError("series", picks, query, {}), "");
 assert.equal(kalshiLiveDirectScopeError("series", [], query, {}), "Search for a series or select a category.");
 assert.equal(kalshiLiveDirectScopeError("series", [], query, { category: { include: ["Sports"] } }), "");
-assert.equal(seriesDiscoveryCategory({ category: { include: ["", "Crypto"] } }), "Crypto");
+assert.deepEqual(seriesDiscoveryCategories({ category: { include: ["", "Crypto", "Sports", "Crypto"] } }), ["Crypto", "Sports"]);
+assert.equal(kalshiLiveDirectScopeError("series", [], query, { category: { include: ["Sports", "Business"] } }), "");
 assert.equal(seriesUpdatedAfter({ last_updated_ts: { minUpdatedTs: 1700000000 } }), 1700000000);
 assert.equal(seriesUpdatedAfter({}), "");
 

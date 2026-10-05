@@ -68,7 +68,7 @@ const BOOLEAN_OPTIONS = [
 export function kalshiHistoricalAttributeSpec(column) {
   if (column?.control === "updated-after") return { kind: "updated-after" };
   if (column?.control === "category") {
-    return { kind: "enum", options: column.enumOptions || [], single: true, loading: Boolean(column.enumLoading) };
+    return { kind: "enum", options: column.enumOptions || [], loading: Boolean(column.enumLoading) };
   }
   if (Array.isArray(column?.enumOptions) && column.enumOptions.length) {
     return { kind: "enum", options: column.enumOptions };
@@ -610,26 +610,16 @@ function AttributeFields({ column, filters, onChange }) {
       onChange={(next) => onChange(patchFilter(filters, column, { excludeNull: next }))}
     />
   );
-  if (spec.kind === "enum" && spec.single) {
-    const selected = Array.isArray(filter.include)
-      ? String(filter.include.find((value) => String(value || "").trim()) || "")
-      : "";
+  if (spec.kind === "enum" && column.control === "category") {
+    if (spec.loading && !spec.options.length) {
+      return <p className="text-[11px] text-muted-foreground">Loading categories…</p>;
+    }
     return (
-      <select
-        aria-label="Series category"
-        value={selected}
-        onChange={(event) =>
-          onChange(patchFilter(filters, column, { include: event.target.value ? [event.target.value] : [] }))
-        }
-        className="h-9 w-full rounded-lg border border-border/70 bg-background px-2 text-[13px] text-foreground"
-      >
-        <option value="">{spec.loading ? "Loading categories…" : "Select a category"}</option>
-        {spec.options.map(([value, label]) => (
-          <option key={value || "empty"} value={value}>
-            {label}
-          </option>
-        ))}
-      </select>
+      <IncludeField
+        options={spec.options}
+        selected={filter.include || []}
+        onChange={(include) => onChange(patchFilter(filters, column, { include }))}
+      />
     );
   }
   if (spec.kind === "updated-after") {
