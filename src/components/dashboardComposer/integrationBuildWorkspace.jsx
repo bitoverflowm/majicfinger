@@ -91,6 +91,8 @@ import {
   seriesDiscoveryCategories,
   seriesUpdatedAfter,
 } from "@/components/dashboardComposer/kalshiLiveDirectScope";
+import { allowsMarketDownstreamJoin, pullKindFlags, withJoinFlags } from "@/components/dashboardComposer/pullKindFlags";
+import { kalshiLiveEndpointHasRealtimeFeed } from "@/config/kalshiLiveConnect";
 import { fetchKalshiLiveTagsByCategories } from "@/lib/kalshiLive/seriesDiscovery";
 import {
   describeKalshiLiveServerFilters,
@@ -1083,9 +1085,6 @@ function EnrichStep({
                           </button>
                           {seriesMarketsOn ? (
                             <>
-                              <p className="text-[11px] leading-relaxed text-muted-foreground">
-                                Kalshi takes one series ticker per markets request, so this pull loops the series in your query. The preview shows 50 markets per sheet. Save and run uses your plan limit.
-                              </p>
                               <button
                                 type="button"
                                 aria-pressed={seriesMarketLayout === "sheet"}
@@ -1124,6 +1123,44 @@ function EnrichStep({
                                   ? " One Markets sheet."
                                   : ` ${sheetCount.toLocaleString()} Markets ${sheetCount === 1 ? "sheet" : "sheets"}.`}
                               </p>
+                              <div className="border-t border-border/70 pt-3">
+                                <p className="text-[11px] font-semibold text-foreground">Join these markets</p>
+                                <p className="mt-1 text-[11px] leading-relaxed text-muted-foreground">
+                                  This pull now has markets, so each market can join to trades, the order book, or candlesticks. The preview uses the first market. Save and run joins{" "}
+                                  {marketCap.toLocaleString()} markets at a time.
+                                </p>
+                                <div className="mt-1.5 flex items-center gap-1.5">
+                                  <button
+                                    type="button"
+                                    onClick={onSelectAllLiveJoins}
+                                    className="inline-flex rounded-full border border-border/70 bg-background px-2.5 py-0.5 text-[11px] font-medium text-muted-foreground transition-colors hover:bg-muted/50"
+                                  >
+                                    {liveSelected.size === KALSHI_LIVE_MARKET_JOINS.length ? "Deselect all" : "Select all"}
+                                  </button>
+                                </div>
+                                <div className="mt-1.5 space-y-1.5">
+                                  {KALSHI_LIVE_MARKET_JOINS.map((item) => {
+                                    const on = liveSelected.has(item.id);
+                                    return (
+                                      <button
+                                        key={item.id}
+                                        type="button"
+                                        aria-pressed={on}
+                                        onClick={() => onToggleLiveJoin?.(item.id)}
+                                        className={cn(
+                                          "flex w-full flex-col rounded-lg border px-2.5 py-2 text-left transition-colors",
+                                          on
+                                            ? "border-[#0d99ff]/40 bg-[#0d99ff]/10"
+                                            : "border-border/70 bg-background hover:bg-muted/50",
+                                        )}
+                                      >
+                                        <span className="text-[13px] font-semibold text-foreground">{item.title}</span>
+                                        <span className="text-[11px] font-normal text-muted-foreground">{item.detail}</span>
+                                      </button>
+                                    );
+                                  })}
+                                </div>
+                              </div>
                             </>
                           ) : (
                             <p className="text-[11px] leading-relaxed text-muted-foreground">
@@ -2846,13 +2883,29 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
   const liveJoinTargets = KALSHI_LIVE_MARKET_JOINS.filter((item) => liveJoinIds.has(item.id));
   const livePreviewTicker = liveJoinMarkets[0]?.ticker || "";
 
+  const nativePullFlags = useMemo(
+    () => pullKindFlags(tableId, { realtime: integrationId === "kalshiLive" && kalshiLiveEndpointHasRealtimeFeed(tableId) }),
+    [integrationId, tableId],
+  );
+
+  const seriesJoinOn = liveSeriesSearch && joinOn && joinTarget === "kalshiLiveSeriesMarkets";
+  const enrichmentFlags = useMemo(
+    () => withJoinFlags(nativePullFlags, { markets: seriesJoinOn }),
+    [nativePullFlags, seriesJoinOn],
+  );
+  const marketDownstream = allowsMarketDownstreamJoin(nativePullFlags, enrichmentFlags);
+  const seriesMarketSheet = previewSheet === "series-markets" || previewSheet.startsWith("series-market:");
+  const downstreamPreviewTicker = String(seriesMarketPreview.rows?.[0]?.ticker || "").trim();
+  const joinPreviewTicker = liveMarketSearch ? livePreviewTicker : marketDownstream ? downstreamPreviewTicker : "";
+
   useEffect(() => {
-    if (!liveMarketSearch || step !== "enrich" || !enrichPicks.has("join") || !liveJoinKey || !livePreviewTicker) {
+    if (step !== "enrich" || !enrichPicks.has("join") || !liveJoinKey || !joinPreviewTicker) {
       setLiveJoinPreview((current) => (Object.keys(current).length ? {} : current));
       return undefined;
     }
     let cancel = false;
     const ids = liveJoinKey.split(",");
+    const ticker = joinPreviewTicker;
     setLiveJoinPreview(() => {
       const next = {};
       for (const id of ids) next[id] = { status: "loading", columns: [], rows: [], error: "" };
@@ -2861,7 +2914,7 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
     Promise.all(
       ids.map(async (id) => {
         try {
-          const result = await loadKalshiLiveMarketJoin(id, livePreviewTicker, PREVIEW_ROW_CAP);
+          const result = await loadKalshiLiveMarketJoin(id, ticker, PREVIEW_ROW_CAP);
           if (cancel) return;
           setLiveJoinPreview((current) => ({
             ...current,
@@ -2884,10 +2937,7 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
     return () => {
       cancel = true;
     };
-  }, [liveMarketSearch, step, enrichPicks, liveJoinKey, livePreviewTicker]);
-
-  const seriesJoinOn = liveSeriesSearch && joinOn && joinTarget === "kalshiLiveSeriesMarkets";
-  const seriesMarketSheet = previewSheet === "series-markets" || previewSheet.startsWith("series-market:");
+  }, [step, enrichPicks, liveJoinKey, joinPreviewTicker]);
 
   useEffect(() => {
     if (!seriesJoinOn || !seriesJoinTickers.length) return;
@@ -2901,8 +2951,13 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
   }, [seriesJoinOn, seriesJoinKey, seriesJoinTickers, seriesMarketLayout, previewSheet]);
 
   useEffect(() => {
-    const activeTicker = previewSheet.startsWith("series-market:") ? previewSheet.slice("series-market:".length) : "";
-    const combined = previewSheet === "series-markets";
+    const liveFollowUp = previewSheet.startsWith("live:");
+    const activeTicker = previewSheet.startsWith("series-market:")
+      ? previewSheet.slice("series-market:".length)
+      : liveFollowUp && seriesMarketLayout !== "combined"
+        ? seriesJoinTickers[0]?.ticker || ""
+        : "";
+    const combined = previewSheet === "series-markets" || (liveFollowUp && seriesMarketLayout === "combined");
     if (!seriesJoinOn || (!activeTicker && !combined)) {
       setSeriesMarketPreview((current) =>
         current.status === "idle" ? current : { status: "idle", ticker: "", columns: [], rows: [], error: "" },
@@ -2953,7 +3008,7 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
     return () => {
       cancel = true;
     };
-  }, [seriesJoinOn, seriesJoinKey, previewSheet, seriesJoinTickers]);
+  }, [seriesJoinOn, seriesJoinKey, previewSheet, seriesJoinTickers, seriesMarketLayout]);
 
   const showSampleExplainer = step === "enrich" && hoverSample && !enrichPicks.has("sample");
   const showBucketExplainer = step === "enrich" && hoverBucket && !enrichPicks.has("bucket") && !showSampleExplainer;
@@ -3259,6 +3314,17 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
       return tradesQuery
         ? "Illustration. No market metadata is loaded until you run the pull."
         : "Illustration. No trades are loaded until you run the pull.";
+    }
+    if (previewSheet.startsWith("live:") && (liveJoinReady || marketDownstream)) {
+      const kind = previewSheet.slice("live:".length);
+      const preview = liveJoinPreview[kind];
+      const title = KALSHI_LIVE_MARKET_JOINS.find((item) => item.id === kind)?.title || "this join";
+      const ticker = joinPreviewTicker;
+      if (!ticker) return `Loading the first market for ${title.toLowerCase()}`;
+      if (!preview || preview.status === "loading") return `Loading ${title.toLowerCase()} for ${ticker}`;
+      if (preview.status === "error") return preview.error;
+      const count = preview.rows?.length || 0;
+      return `Previewing ${count.toLocaleString()} ${title.toLowerCase()} ${count === 1 ? "row" : "rows"} for ${ticker}. Save and run joins the markets in this pull.`;
     }
     if (seriesMarketSheet && seriesJoinOn) {
       if (!seriesJoinTickers.length) return "Search for a series or select a category. Markets join uses those series.";
@@ -3652,13 +3718,13 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
         args: { layout: seriesMarketLayout, series: seriesJoinTickers.length },
       });
     }
-    if (liveJoinReady) {
+    if (liveJoinReady || (marketDownstream && liveJoinTargets.length)) {
       planned.push({
         id: "join-live",
         name: "compose_live_joins",
         status: "pending",
         args: {
-          sheets: liveJoinMarkets.length * liveJoinTargets.length,
+          sheets: (liveJoinReady ? liveJoinMarkets.length : marketCap) * liveJoinTargets.length,
           sources: liveJoinTargets.map((item) => item.title).join(", "),
         },
       });
@@ -3793,6 +3859,7 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
       });
     };
     let runTickers = [];
+    let downstreamJoinMarkets = [];
     if (liveDirect) {
       const scopeError = kalshiLiveDirectScopeError(tableId, livePicks, directQuery, attributeFilters);
       if (scopeError) {
@@ -3920,6 +3987,16 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
         const unique = seriesJoinTickers.map((item) => item.ticker);
         reporter.start("join-series-markets");
         const marketLimit = Number.isFinite(sheetCap) ? sheetCap : PREVIEW_ROW_CAP;
+        const seenMarkets = [];
+        const rememberMarkets = (rows) => {
+          if (!liveJoinTargets.length) return;
+          for (const row of rows || []) {
+            const ticker = String(row?.ticker || "").trim();
+            if (!ticker || seenMarkets.some((item) => item.ticker === ticker)) continue;
+            seenMarkets.push({ ticker, label: ticker, title: String(row?.yes_sub_title || ticker) });
+            if (seenMarkets.length >= marketCap) return;
+          }
+        };
         try {
           if (seriesMarketLayout === "combined") {
             const rows = [];
@@ -3931,6 +4008,7 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
               rows.push(...(result.rows || []));
             }
             const fullRows = rows.slice(0, marketLimit);
+            rememberMarkets(fullRows);
             const id = "run-series-markets";
             if (columns.length && fullRows.length > PREVIEW_ROW_CAP) {
               rememberTradeSheet(id, unique.join(","), columns, displayMatrix(columns, fullRows), marketLimit, accountId);
@@ -3956,6 +4034,7 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
               if (!item.columns?.length) continue;
               const id = `run-series-markets-${String(item.ticker).replace(/[^A-Za-z0-9]+/g, "-")}`;
               const fullRows = item.rows || [];
+              rememberMarkets(fullRows);
               if (fullRows.length > PREVIEW_ROW_CAP) {
                 rememberTradeSheet(id, item.ticker, item.columns, displayMatrix(item.columns, fullRows), marketLimit, accountId);
               }
@@ -3972,6 +4051,7 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
               });
             }
           }
+          downstreamJoinMarkets = seenMarkets;
           reporter.succeed("join-series-markets", {
             result: `${unique.length.toLocaleString()} series`,
           });
@@ -4019,9 +4099,13 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
       });
     }
     if (metadataSheet?.columns?.length) sheets.push(metadataSheet);
-    if (liveJoinReady && liveJoinMarkets.length) {
+    const joinMarketsForRun = liveJoinReady ? liveJoinMarkets : downstreamJoinMarkets;
+    if (liveJoinTargets.length && (liveJoinReady || marketDownstream)) {
       reporter.start("join-live");
-      const jobs = liveJoinMarkets.flatMap((market) => liveJoinTargets.map((target) => ({ market, target })));
+      if (!joinMarketsForRun.length) {
+        reporter.succeed("join-live", { result: "0 sheets" });
+      } else {
+      const jobs = joinMarketsForRun.flatMap((market) => liveJoinTargets.map((target) => ({ market, target })));
       reporter.setChildren(
         "join-live",
         jobs.map((job) => ({
@@ -4072,6 +4156,7 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
       reporter.succeed("join-live", {
         result: `${liveSheets.toLocaleString()} ${liveSheets === 1 ? "sheet" : "sheets"} · ${liveRows.toLocaleString()} rows`,
       });
+      }
     }
     const bucketBuilt = [];
     if (enrichPicks.has("bucket")) {
@@ -4445,6 +4530,9 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
         previewTabs.push({ id: `series-market:${item.ticker}`, title: `Markets · ${item.ticker}` });
       });
     }
+  }
+  if (marketDownstream) {
+    liveJoinTargets.forEach((item) => previewTabs.push({ id: `live:${item.id}`, title: item.title }));
   }
   if (sampleOn) previewTabs.push({ id: "sample", title: "Random sample" });
   if (summarizeOn) previewTabs.push({ id: "summary", title: "Summary" });
@@ -5307,7 +5395,7 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
               const kind = previewSheet.slice("live:".length);
               const preview = liveJoinPreview[kind];
               const label = KALSHI_LIVE_MARKET_JOINS.find((item) => item.id === kind)?.title || "data";
-              if (!livePreviewTicker) {
+              if (!joinPreviewTicker) {
                 return (
                   <div className="flex h-full items-center justify-center rounded-xl border border-border/70 bg-background px-6 text-center text-[13px] leading-relaxed text-muted-foreground shadow-sm">
                     This pull has no market tickers to join.
@@ -5321,8 +5409,8 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
                       tasks={liveJoinTasks({
                         targets: liveJoinTargets,
                         preview: liveJoinPreview,
-                        ticker: livePreviewTicker,
-                        marketCount: liveJoinMarkets.length,
+                        ticker: joinPreviewTicker,
+                        marketCount: liveMarketSearch ? liveJoinMarkets.length : Math.max(seriesMarketPreview.rows?.length || 0, 1),
                       })}
                     />
                   </div>
