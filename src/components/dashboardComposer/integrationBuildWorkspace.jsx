@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
-import { ArrowLeft, ChevronDown, History, Info } from "lucide-react";
+import { ArrowLeft, Check, ChevronDown, History, Info } from "lucide-react";
 import { IntegrationBuildGrid } from "@/components/dashboardComposer/integrationBuildGrid";
 import { displayMatrix } from "@/components/dashboardComposer/integrationRunSheets";
 import { rememberTradeSheet } from "@/components/dashboardComposer/fullTradeSheet";
@@ -996,13 +996,21 @@ function EnrichStep({
                     : "border-border/70 bg-background text-foreground hover:bg-muted/50",
                 )}
               >
-                <input
-                  type="checkbox"
-                  value={option.id}
-                  checked={selected}
-                  onChange={() => onPick(option.id)}
-                  className="size-3.5 accent-[#0d99ff]"
-                />
+                <span
+                  className={cn(
+                    "relative inline-flex size-3.5 shrink-0 items-center justify-center rounded-[3px] border",
+                    selected ? "border-[#0d99ff] bg-[#0d99ff]" : "border-border bg-background",
+                  )}
+                >
+                  <input
+                    type="checkbox"
+                    value={option.id}
+                    checked={selected}
+                    onChange={() => onPick(option.id)}
+                    className="absolute inset-0 cursor-pointer opacity-0"
+                  />
+                  <Check className={cn("size-2.5 text-white", selected ? "opacity-100" : "opacity-0")} strokeWidth={3} />
+                </span>
                 {option.title}
               </label>
               {selected ? (
