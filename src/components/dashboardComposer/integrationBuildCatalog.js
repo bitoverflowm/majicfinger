@@ -1386,7 +1386,7 @@ export const KALSHI_LIVE_MARKET_JOINS = [
   {
     id: "candlesticks",
     title: "Candlesticks",
-    detail: "One-minute price candles for each market.",
+    detail: "Price candles for each market.",
   },
 ];
 
@@ -1475,10 +1475,27 @@ export async function loadKalshiLiveCandlesticksForTicker(ticker, limit = PREVIE
   return { columns, rows: projectLiveJoinRows(columns, rows, rowLimit) };
 }
 
-export function loadKalshiLiveMarketJoin(id, ticker, limit = PREVIEW_ROW_CAP) {
-  if (id === "orderbook") return loadKalshiLiveOrderbookForTicker(ticker);
-  if (id === "candlesticks") return loadKalshiLiveCandlesticksForTicker(ticker, limit);
-  return loadKalshiLiveTradesForTicker(ticker, limit);
+export function loadKalshiLiveMarketJoin(id, ticker, limit = PREVIEW_ROW_CAP, window = {}) {
+  const spec = window && typeof window === "object" ? window : {};
+  if (id === "orderbook") return loadKalshiLiveOrderbookForTicker(ticker, spec.depth);
+  if (id === "candlesticks") return loadKalshiLiveCandlesticksForTicker(ticker, limit, spec);
+  return loadKalshiLiveTradesForTicker(ticker, limit, spec);
+}
+
+/** Market metadata for one ticker, and its series when the market belongs to one. */
+export async function loadKalshiLiveParentContext(ticker, { series = false } = {}) {
+  const marketColumns = kalshiLiveColumns("markets");
+  const seriesColumns = kalshiLiveColumns("series");
+  const row = await loadKalshiLiveMarketByTicker(ticker);
+  if (!row) return { marketColumns, market: null, seriesColumns, series: null, seriesTicker: "" };
+  const [market] = projectLiveJoinRows(marketColumns, [row], 1);
+  const eventTicker = String(row.event_ticker || "").trim();
+  if (!series || !eventTicker) return { marketColumns, market, seriesColumns, series: null, seriesTicker: "" };
+  const events = await loadKalshiLiveEventsByTickers([eventTicker]);
+  const seriesTicker = String(events.rows?.[0]?.series_ticker || "").trim();
+  if (!seriesTicker) return { marketColumns, market, seriesColumns, series: null, seriesTicker: "" };
+  const loaded = await loadKalshiLiveSeriesByTickers([seriesTicker]);
+  return { marketColumns, market, seriesColumns: loaded.columns || seriesColumns, series: loaded.rows?.[0] || null, seriesTicker };
 }
 
 /** One series row per ticker. Volume is included so the Volume column is filled. */

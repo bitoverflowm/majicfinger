@@ -2,6 +2,7 @@ export {
   attributeMismatchReason,
   attributeSummary,
   buildKalshiHistoricalFilterPredicates as buildAttributePredicates,
+  JoinSourceFields,
   KalshiHistoricalAttributeFilters as AttributeFilters,
   kalshiHistoricalAttributeSpec as attributeSpec,
   rowMatchesKalshiHistoricalFilters as rowMatchesAttributes,

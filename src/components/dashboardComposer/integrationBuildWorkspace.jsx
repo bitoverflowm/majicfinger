@@ -22,6 +22,7 @@ import {
   loadKalshiLiveDirect,
   loadKalshiLiveMarketByTicker,
   loadKalshiLiveMarketJoin,
+  loadKalshiLiveParentContext,
   loadKalshiLiveMarketsForScope,
   loadKalshiLiveSeriesMarkets,
   loadKalshiLiveEventMarkets,
@@ -60,6 +61,7 @@ import {
   attributeMismatchReason,
   attributeSummary,
   AttributeFilters,
+  JoinSourceFields,
   buildAttributePredicates,
   rowMatchesAttributes,
   sortAttributeRows,
@@ -752,6 +754,46 @@ function ResultSheetTabs({ tabs, active, onSelect }) {
   return <SheetTabBar tabs={tabs} active={active} onSelect={onSelect} />;
 }
 
+function choiceClass(on) {
+  return cn(
+    "flex w-full flex-col rounded-lg border px-2.5 py-2 text-left transition-colors",
+    on ? "border-[#0d99ff]/40 bg-[#0d99ff]/10" : "border-border/70 bg-background hover:bg-muted/50",
+  );
+}
+
+function joinPullWindow(id, filters) {
+  return directPullWindow(id, filters || defaultDirectAttributeFilters(id), {});
+}
+
+function joinWindowSignature(id, filters) {
+  const spec = joinPullWindow(id, filters);
+  return [spec.minTs ?? "", spec.maxTs ?? "", spec.period ?? "", spec.depth ?? ""].join(":");
+}
+
+function LiveJoinList({ choices, selected, onToggle, windows, onWindow }) {
+  return (
+    <div className="space-y-1.5">
+      {choices.map((item) => {
+        const on = selected.has(item.id);
+        const filters = windows?.[item.id] || defaultDirectAttributeFilters(item.id);
+        return (
+          <div key={item.id}>
+            <button type="button" aria-pressed={on} onClick={() => onToggle?.(item.id)} className={choiceClass(on)}>
+              <span className="text-[13px] font-semibold text-foreground">{item.title}</span>
+              {item.detail ? <span className="text-[11px] font-normal text-muted-foreground">{item.detail}</span> : null}
+            </button>
+            {on ? (
+              <div className="mt-1.5 rounded-lg border border-border/70 px-2 py-2">
+                <JoinSourceFields tableId={item.id} filters={filters} onChange={(next) => onWindow?.(item.id, next)} />
+              </div>
+            ) : null}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 function EnrichStep({
   onBack,
   picked,
@@ -783,8 +825,20 @@ function EnrichStep({
   onSeriesMarketLayout,
   marketsDetected = false,
   liveJoinIds,
+  liveJoinChoices,
   onToggleLiveJoin,
   onSelectAllLiveJoins,
+  fanoutParents,
+  onToggleFanoutParent,
+  fanoutSeriesMarkets = false,
+  onToggleFanoutSeriesMarkets,
+  fanoutSeriesReady = false,
+  fanoutSeriesMissing = false,
+  fanoutMarketsDetected = false,
+  detectedJoinIds,
+  onToggleDetectedJoin,
+  joinWindows,
+  onJoinWindow,
   joinLake = "kalshi",
   joinPlacement = "",
   onJoinPlacement,
@@ -837,13 +891,17 @@ function EnrichStep({
   const sampleOpen = chosen.has("sample") && !foldedIds.has("sample");
   const tradesJoin = joinMode === "trades";
   const liveJoin = joinMode === "live";
+  const fanoutJoin = joinMode === "fanout";
   const seriesJoin = joinMode === "series" || joinMode === "events";
   const listNoun = joinMode === "events" ? "event" : "series";
   const listPlural = joinMode === "events" ? "events" : "series";
   const scopeJoinId = joinMode === "events" ? "kalshiLiveEventMarkets" : "kalshiLiveSeriesMarkets";
   const seriesMarketsOn = seriesJoin && joinTarget === scopeJoinId;
   const liveSelected = liveJoinIds instanceof Set ? liveJoinIds : new Set();
-  const liveJoinTitles = KALSHI_LIVE_MARKET_JOINS.filter((item) => liveSelected.has(item.id)).map((item) => item.title);
+  const joinChoices = Array.isArray(liveJoinChoices) && liveJoinChoices.length ? liveJoinChoices : KALSHI_LIVE_MARKET_JOINS;
+  const liveJoinTitles = joinChoices.filter((item) => liveSelected.has(item.id)).map((item) => item.title);
+  const parentPicks = fanoutParents instanceof Set ? fanoutParents : new Set();
+  const detectedSelected = detectedJoinIds instanceof Set ? detectedJoinIds : new Set();
   const polymarketJoin = joinLake === "polymarket";
   const tradesTarget = polymarketJoin ? "polymarketHistoricalTrades" : "kalshiHistoricalTrades";
   const marketsTarget = polymarketJoin ? "polymarketHistoricalMarkets" : "kalshiHistoricalMarkets";
@@ -918,7 +976,13 @@ function EnrichStep({
                 ? summaryLines
                 : isJoin
                   ? [
-                      liveJoin
+                      fanoutJoin
+                        ? [
+                            parentPicks.has("market") ? "Parent market" : "",
+                            parentPicks.has("series") ? "Parent series" : "",
+                            ...liveJoinTitles,
+                          ].filter(Boolean).join(", ") || "Choose what to join"
+                        : liveJoin
                         ? liveJoinTitles.length
                           ? liveJoinTitles.join(", ")
                           : "Choose a source to join"
@@ -1013,7 +1077,78 @@ function EnrichStep({
                           Clear
                         </button>
                       </div>
-                      {seriesJoin ? (
+                      {fanoutJoin ? (
+                        <div className="mt-1.5 space-y-3">
+                          <div className="space-y-1.5">
+                            <button
+                              type="button"
+                              aria-pressed={parentPicks.has("market")}
+                              onClick={() => onToggleFanoutParent?.("market")}
+                              className={choiceClass(parentPicks.has("market"))}
+                            >
+                              <span className="text-[13px] font-semibold text-foreground">Parent market</span>
+                              <span className="text-[11px] font-normal text-muted-foreground">Metadata for this market.</span>
+                            </button>
+                            <button
+                              type="button"
+                              aria-pressed={parentPicks.has("series")}
+                              onClick={() => onToggleFanoutParent?.("series")}
+                              className={choiceClass(parentPicks.has("series"))}
+                            >
+                              <span className="text-[13px] font-semibold text-foreground">Parent series</span>
+                              <span className="text-[11px] font-normal text-muted-foreground">The series this market belongs to.</span>
+                            </button>
+                            {parentPicks.has("series") && fanoutSeriesMissing ? (
+                              <p className="text-[11px] leading-relaxed text-muted-foreground">This market is not part of a series.</p>
+                            ) : null}
+                            {parentPicks.has("series") && !fanoutSeriesReady && !fanoutSeriesMissing ? (
+                              <p className="text-[11px] leading-relaxed text-muted-foreground">Looking up this series.</p>
+                            ) : null}
+                            {parentPicks.has("series") && fanoutSeriesReady ? (
+                              <button
+                                type="button"
+                                aria-pressed={fanoutSeriesMarkets}
+                                onClick={() => onToggleFanoutSeriesMarkets?.()}
+                                className={choiceClass(fanoutSeriesMarkets)}
+                              >
+                                <span className="text-[13px] font-semibold text-foreground">Markets in this series</span>
+                                <span className="text-[11px] font-normal text-muted-foreground">Metadata for every market in this series.</span>
+                              </button>
+                            ) : null}
+                          </div>
+                          {fanoutMarketsDetected ? (
+                            <div className="border-t border-border/70 pt-3">
+                              <p className="text-[11px] font-semibold text-foreground">Market detected</p>
+                              <p className="mt-1 text-[11px] leading-relaxed text-muted-foreground">
+                                Trades, order book, or candlesticks for the other markets in this series.
+                              </p>
+                              <div className="mt-1.5">
+                                <LiveJoinList
+                                  choices={KALSHI_LIVE_MARKET_JOINS}
+                                  selected={detectedSelected}
+                                  onToggle={onToggleDetectedJoin}
+                                  windows={joinWindows}
+                                  onWindow={onJoinWindow}
+                                />
+                              </div>
+                            </div>
+                          ) : null}
+                          {joinChoices.length ? (
+                            <div className="border-t border-border/70 pt-3">
+                              <p className="text-[11px] font-semibold text-foreground">Also on this market</p>
+                              <div className="mt-1.5">
+                                <LiveJoinList
+                                  choices={joinChoices}
+                                  selected={liveSelected}
+                                  onToggle={onToggleLiveJoin}
+                                  windows={joinWindows}
+                                  onWindow={onJoinWindow}
+                                />
+                              </div>
+                            </div>
+                          ) : null}
+                        </div>
+                      ) : seriesJoin ? (
                         <div className="mt-1.5 space-y-1.5">
                           <button
                             type="button"
@@ -1086,27 +1221,14 @@ function EnrichStep({
                                     {liveSelected.size === KALSHI_LIVE_MARKET_JOINS.length ? "Deselect all" : "Select all"}
                                   </button>
                                 </div>
-                                <div className="mt-1.5 space-y-1.5">
-                                  {KALSHI_LIVE_MARKET_JOINS.map((item) => {
-                                    const on = liveSelected.has(item.id);
-                                    return (
-                                      <button
-                                        key={item.id}
-                                        type="button"
-                                        aria-pressed={on}
-                                        onClick={() => onToggleLiveJoin?.(item.id)}
-                                        className={cn(
-                                          "flex w-full flex-col rounded-lg border px-2.5 py-2 text-left transition-colors",
-                                          on
-                                            ? "border-[#0d99ff]/40 bg-[#0d99ff]/10"
-                                            : "border-border/70 bg-background hover:bg-muted/50",
-                                        )}
-                                      >
-                                        <span className="text-[13px] font-semibold text-foreground">{item.title}</span>
-                                        <span className="text-[11px] font-normal text-muted-foreground">{item.detail}</span>
-                                      </button>
-                                    );
-                                  })}
+                                <div className="mt-1.5">
+                                  <LiveJoinList
+                                    choices={KALSHI_LIVE_MARKET_JOINS}
+                                    selected={liveSelected}
+                                    onToggle={onToggleLiveJoin}
+                                    windows={joinWindows}
+                                    onWindow={onJoinWindow}
+                                  />
                                 </div>
                               </div>
                               ) : null}
@@ -1128,26 +1250,13 @@ function EnrichStep({
                               {liveSelected.size === KALSHI_LIVE_MARKET_JOINS.length ? "Deselect all" : "Select all"}
                             </button>
                           </div>
-                          {KALSHI_LIVE_MARKET_JOINS.map((item) => {
-                            const on = liveSelected.has(item.id);
-                            return (
-                              <button
-                                key={item.id}
-                                type="button"
-                                aria-pressed={on}
-                                onClick={() => onToggleLiveJoin?.(item.id)}
-                                className={cn(
-                                  "flex w-full flex-col rounded-lg border px-2.5 py-2 text-left transition-colors",
-                                  on
-                                    ? "border-[#0d99ff]/40 bg-[#0d99ff]/10"
-                                    : "border-border/70 bg-background hover:bg-muted/50",
-                                )}
-                              >
-                                <span className="text-[13px] font-semibold text-foreground">{item.title}</span>
-                                <span className="text-[11px] font-normal text-muted-foreground">{item.detail}</span>
-                              </button>
-                            );
-                          })}
+                          <LiveJoinList
+                            choices={KALSHI_LIVE_MARKET_JOINS}
+                            selected={liveSelected}
+                            onToggle={onToggleLiveJoin}
+                            windows={joinWindows}
+                            onWindow={onJoinWindow}
+                          />
                           <p className="pt-1 text-[11px] leading-relaxed text-muted-foreground">
                             You have {queryRowCount.toLocaleString()} {queryRowCount === 1 ? "market" : "markets"} in this pull. Your plan joins{" "}
                             {marketCap.toLocaleString()} at a time, and each one gets its own sheet for every source you pick. The preview shows the first market.
@@ -1266,7 +1375,7 @@ function EnrichStep({
                         <p className="mt-2 text-[11px] leading-relaxed text-muted-foreground">
                           You have {queryRowCount.toLocaleString()} {queryRowCount === 1 ? "row" : "rows"} in this trades query. Markets are matched by {matchNoun}.
                         </p>
-                      ) : liveJoin || seriesJoin ? null : (
+                      ) : liveJoin || seriesJoin || fanoutJoin ? null : (
                         <p className="mt-2 text-[11px] leading-relaxed text-muted-foreground">
                           You have {queryRowCount.toLocaleString()} {queryRowCount === 1 ? "row" : "rows"} in your markets query. So{" "}
                           {sheetCount.toLocaleString()} trade {sheetCount === 1 ? "sheet" : "sheets"} will be created for each market.
@@ -1502,6 +1611,28 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
   const liveJoinVisibleTicker = useRef("");
   const [liveJoinIds, setLiveJoinIds] = useState(() => new Set());
   const [liveJoinPreview, setLiveJoinPreview] = useState({});
+  const [fanoutParents, setFanoutParents] = useState(() => new Set());
+  const [fanoutSeriesMarkets, setFanoutSeriesMarkets] = useState(false);
+  const [detectedJoinIds, setDetectedJoinIds] = useState(() => new Set());
+  const [joinWindows, setJoinWindows] = useState({});
+  const [parentLink, setParentLink] = useState({
+    status: "idle",
+    ticker: "",
+    market: null,
+    marketColumns: [],
+    series: null,
+    seriesColumns: [],
+    seriesTicker: "",
+    error: "",
+  });
+  const [fanoutSeriesMarketPreview, setFanoutSeriesMarketPreview] = useState({
+    status: "idle",
+    seriesTicker: "",
+    columns: [],
+    rows: [],
+    error: "",
+  });
+  const [detectedJoinPreview, setDetectedJoinPreview] = useState({});
   const [joinPlacement, setJoinPlacement] = useState("");
   const [metadataTab, setMetadataTab] = useState("trades");
   const [marketColumnHidden, setMarketColumnHidden] = useState(() => defaultMarketColumnHidden(kalshiHistoricalMarketColumnList()));
@@ -2687,6 +2818,20 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
     setJoinTarget("");
     setLiveJoinIds(new Set());
     setLiveJoinPreview({});
+    setFanoutParents(new Set());
+    setFanoutSeriesMarkets(false);
+    setDetectedJoinIds(new Set());
+    setDetectedJoinPreview({});
+    setParentLink({
+      status: "idle",
+      ticker: "",
+      market: null,
+      marketColumns: [],
+      series: null,
+      seriesColumns: [],
+      seriesTicker: "",
+      error: "",
+    });
     setJoinPlacement("");
     setMetadataTab("trades");
     setMarketColumnHidden(
@@ -2931,7 +3076,15 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
   const seriesJoinKey = seriesJoinTickers.map((item) => item.ticker).join("\0");
   const liveJoinKey = [...liveJoinIds].sort().join(",");
   const liveJoinTargets = KALSHI_LIVE_MARKET_JOINS.filter((item) => liveJoinIds.has(item.id));
+  const detectedJoinKey = [...detectedJoinIds].sort().join(",");
+  const detectedTargets = KALSHI_LIVE_MARKET_JOINS.filter((item) => detectedJoinIds.has(item.id));
   const livePreviewTicker = liveJoinMarkets[0]?.ticker || "";
+  const fanoutTicker = liveMarketFanout
+    ? directMarkets[0]?.ticker || sampleMarketTicker || String(directPreview.ticker || "").trim()
+    : "";
+  const fanoutParentKey = [...fanoutParents].sort().join(",");
+  const liveJoinWindowKey = liveJoinTargets.map((item) => `${item.id}:${joinWindowSignature(item.id, joinWindows[item.id])}`).join("|");
+  const detectedWindowKey = detectedTargets.map((item) => `${item.id}:${joinWindowSignature(item.id, joinWindows[item.id])}`).join("|");
 
   const nativePullFlags = useMemo(
     () => pullKindFlags(tableId, { realtime: integrationId === "kalshiLive" && kalshiLiveEndpointHasRealtimeFeed(tableId) }),
@@ -2942,11 +3095,16 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
   const listNoun = liveEventSearch ? "event" : "series";
   const listPlural = liveEventSearch ? "events" : "series";
   const seriesJoinOn = (liveSeriesSearch || liveEventSearch) && joinOn && joinTarget === scopeJoinId;
+  const fanoutJoinOn = liveMarketFanout && joinOn;
   const enrichmentFlags = useMemo(
-    () => withJoinFlags(nativePullFlags, { markets: seriesJoinOn }),
-    [nativePullFlags, seriesJoinOn],
+    () =>
+      withJoinFlags(nativePullFlags, {
+        markets: seriesJoinOn || (fanoutJoinOn && fanoutSeriesMarkets && Boolean(parentLink.seriesTicker)),
+        series: fanoutJoinOn && fanoutParents.has("series") && Boolean(parentLink.seriesTicker),
+      }),
+    [nativePullFlags, seriesJoinOn, fanoutJoinOn, fanoutSeriesMarkets, fanoutParentKey, parentLink.seriesTicker],
   );
-  const marketDownstream = allowsMarketDownstreamJoin(nativePullFlags, enrichmentFlags);
+  const marketDownstream = allowsMarketDownstreamJoin(nativePullFlags, enrichmentFlags) && !liveMarketFanout;
   const seriesMarketSheet = previewSheet === "series-markets" || previewSheet.startsWith("series-market:");
   const seriesMarketRequestFor = (sheet) => {
     const liveFollowUp = sheet.startsWith("live:");
@@ -2976,17 +3134,21 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
     });
   }, [seriesJoinOn, seriesJoinKey, seriesJoinTickers, seriesMarketPreview, liveEventSearch]);
   const downstreamPreviewTicker = String(seriesMarketView.rows?.[0]?.ticker || "").trim();
-  const joinPreviewTicker = liveMarketSearch ? livePreviewTicker : marketDownstream ? downstreamPreviewTicker : "";
+  const joinPreviewTicker = liveMarketSearch ? livePreviewTicker : marketDownstream ? downstreamPreviewTicker : fanoutTicker;
+  const fanoutMarketsDetected =
+    fanoutJoinOn && fanoutSeriesMarkets && fanoutSeriesMarketPreview.status === "ready" && (fanoutSeriesMarketPreview.rows?.length || 0) > 0;
+  const detectedPreviewTicker = String(fanoutSeriesMarketPreview.rows?.[0]?.ticker || "").trim();
 
   useEffect(() => {
     if (step !== "enrich" || !enrichPicks.has("join") || !liveJoinKey || !joinPreviewTicker) return undefined;
     const ids = liveJoinKey.split(",");
     const ticker = joinPreviewTicker;
-    liveJoinVisibleTicker.current = ticker;
+    const viewToken = `${ticker}|${liveJoinWindowKey}`;
+    liveJoinVisibleTicker.current = viewToken;
     const next = {};
     const missing = [];
     for (const id of ids) {
-      const cacheKey = `${ticker}:${id}`;
+      const cacheKey = `${ticker}:${id}:${joinWindowSignature(id, joinWindows[id])}`;
       const hit = liveJoinCacheRef.current.get(cacheKey);
       if (hit?.status === "ready" || hit?.status === "error" || hit?.status === "loading") {
         next[id] = hit;
@@ -2999,12 +3161,12 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
     }
     setLiveJoinPreview(next);
     missing.forEach((id) => {
-      const cacheKey = `${ticker}:${id}`;
-      loadKalshiLiveMarketJoin(id, ticker, PREVIEW_ROW_CAP)
+      const cacheKey = `${ticker}:${id}:${joinWindowSignature(id, joinWindows[id])}`;
+      loadKalshiLiveMarketJoin(id, ticker, PREVIEW_ROW_CAP, joinPullWindow(id, joinWindows[id]))
         .then((result) => {
           const ready = { status: "ready", columns: result.columns || [], rows: result.rows || [], error: "" };
           liveJoinCacheRef.current.set(cacheKey, ready);
-          if (liveJoinVisibleTicker.current === ticker) setLiveJoinPreview((current) => ({ ...current, [id]: ready }));
+          if (liveJoinVisibleTicker.current === viewToken) setLiveJoinPreview((current) => ({ ...current, [id]: ready }));
         })
         .catch((err) => {
           const failed = {
@@ -3014,11 +3176,137 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
             error: err instanceof Error ? err.message : "Join preview failed",
           };
           liveJoinCacheRef.current.set(cacheKey, failed);
-          if (liveJoinVisibleTicker.current === ticker) setLiveJoinPreview((current) => ({ ...current, [id]: failed }));
+          if (liveJoinVisibleTicker.current === viewToken) setLiveJoinPreview((current) => ({ ...current, [id]: failed }));
         });
     });
     return undefined;
-  }, [step, enrichPicks, liveJoinKey, joinPreviewTicker]);
+  }, [step, enrichPicks, liveJoinKey, joinPreviewTicker, liveJoinWindowKey, joinWindows]);
+
+  useEffect(() => {
+    if (!fanoutJoinOn || (!fanoutParents.has("market") && !fanoutParents.has("series")) || !fanoutTicker) {
+      setParentLink({
+        status: "idle",
+        ticker: "",
+        market: null,
+        marketColumns: [],
+        series: null,
+        seriesColumns: [],
+        seriesTicker: "",
+        error: "",
+      });
+      return undefined;
+    }
+    let cancelled = false;
+    const ticker = fanoutTicker;
+    const wantSeries = fanoutParents.has("series");
+    setParentLink((current) => ({ ...current, status: "loading", ticker, error: "" }));
+    loadKalshiLiveParentContext(ticker, { series: wantSeries })
+      .then((result) => {
+        if (cancelled) return;
+        setParentLink({
+          status: "ready",
+          ticker,
+          market: result.market || null,
+          marketColumns: result.marketColumns || [],
+          series: result.series || null,
+          seriesColumns: result.seriesColumns || [],
+          seriesTicker: result.seriesTicker || "",
+          error: "",
+        });
+      })
+      .catch((err) => {
+        if (cancelled) return;
+        setParentLink({
+          status: "error",
+          ticker,
+          market: null,
+          marketColumns: [],
+          series: null,
+          seriesColumns: [],
+          seriesTicker: "",
+          error: err instanceof Error ? err.message : "Parent lookup failed",
+        });
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [fanoutJoinOn, fanoutParentKey, fanoutTicker]);
+
+  useEffect(() => {
+    if (!fanoutJoinOn || !fanoutSeriesMarkets || parentLink.status !== "ready" || !parentLink.seriesTicker) return undefined;
+    let cancelled = false;
+    const seriesTicker = parentLink.seriesTicker;
+    setFanoutSeriesMarketPreview({ status: "loading", seriesTicker, columns: [], rows: [], error: "" });
+    loadKalshiLiveSeriesMarkets(seriesTicker, PREVIEW_ROW_CAP)
+      .then((result) => {
+        if (cancelled) return;
+        setFanoutSeriesMarketPreview({
+          status: "ready",
+          seriesTicker,
+          columns: result.columns || [],
+          rows: result.rows || [],
+          error: "",
+        });
+      })
+      .catch((err) => {
+        if (cancelled) return;
+        setFanoutSeriesMarketPreview({
+          status: "error",
+          seriesTicker,
+          columns: [],
+          rows: [],
+          error: err instanceof Error ? err.message : "Series markets failed",
+        });
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [fanoutJoinOn, fanoutSeriesMarkets, parentLink.status, parentLink.seriesTicker]);
+
+  useEffect(() => {
+    if (!fanoutMarketsDetected || !detectedJoinKey || !detectedPreviewTicker) return undefined;
+    let cancelled = false;
+    const ids = detectedJoinKey.split(",");
+    const ticker = detectedPreviewTicker;
+    const next = {};
+    const missing = [];
+    for (const id of ids) {
+      const cacheKey = `${ticker}:${id}:${joinWindowSignature(id, joinWindows[id])}`;
+      const hit = liveJoinCacheRef.current.get(cacheKey);
+      if (hit?.status === "ready" || hit?.status === "error" || hit?.status === "loading") next[id] = hit;
+      else {
+        const loading = { status: "loading", columns: [], rows: [], error: "" };
+        liveJoinCacheRef.current.set(cacheKey, loading);
+        next[id] = loading;
+        missing.push(id);
+      }
+    }
+    setDetectedJoinPreview(next);
+    missing.forEach((id) => {
+      const cacheKey = `${ticker}:${id}:${joinWindowSignature(id, joinWindows[id])}`;
+      loadKalshiLiveMarketJoin(id, ticker, PREVIEW_ROW_CAP, joinPullWindow(id, joinWindows[id]))
+        .then((result) => {
+          if (cancelled) return;
+          const ready = { status: "ready", columns: result.columns || [], rows: result.rows || [], error: "" };
+          liveJoinCacheRef.current.set(cacheKey, ready);
+          setDetectedJoinPreview((current) => ({ ...current, [id]: ready }));
+        })
+        .catch((err) => {
+          if (cancelled) return;
+          const failed = {
+            status: "error",
+            columns: [],
+            rows: [],
+            error: err instanceof Error ? err.message : "Join preview failed",
+          };
+          liveJoinCacheRef.current.set(cacheKey, failed);
+          setDetectedJoinPreview((current) => ({ ...current, [id]: failed }));
+        });
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [fanoutMarketsDetected, detectedJoinKey, detectedPreviewTicker, detectedWindowKey, joinWindows]);
 
   useEffect(() => {
     if (!seriesJoinOn || !seriesJoinTickers.length) return;
@@ -3097,7 +3385,7 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
     step === "enrich" && hoverFunction && !enrichPicks.has("function") && !showSummarizeExplainer && !showSampleExplainer && !showBucketExplainer;
   const liveJoinReady = liveMarketSearch && joinOn && liveJoinTargets.length > 0;
   const showJoinExplainer =
-    (historicalEnrich || liveMarketSearch || liveSeriesSearch || liveEventSearch) &&
+    (historicalEnrich || liveMarketSearch || liveSeriesSearch || liveEventSearch || liveMarketFanout) &&
     step === "enrich" &&
     hoverJoin &&
     !enrichPicks.has("join") &&
@@ -3390,12 +3678,42 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
       return "Click a column or a cell to drop it into the summary.";
     }
     if (showJoinExplainer) {
+      if (liveMarketFanout) return "Illustration. Join this market to its metadata, its series, or the other data on the same ticker.";
       if (liveSeriesSearch || liveEventSearch) return `Illustration. Markets inside these ${listPlural} load after you choose Join.`;
       return tradesQuery
         ? "Illustration. No market metadata is loaded until you run the pull."
         : "Illustration. No trades are loaded until you run the pull.";
     }
-    if (previewSheet.startsWith("live:") && (liveJoinReady || marketDownstream)) {
+    if (previewSheet === "parent-market" && fanoutJoinOn) {
+      if (!fanoutTicker) return "This pull has no market ticker yet.";
+      if (parentLink.status === "loading" || parentLink.status === "idle") return "Loading this market";
+      if (parentLink.status === "error") return parentLink.error;
+      return parentLink.market ? "Previewing 1 market." : "No market metadata for this ticker.";
+    }
+    if (previewSheet === "parent-series" && fanoutJoinOn) {
+      if (!fanoutTicker) return "This pull has no market ticker yet.";
+      if (parentLink.status === "loading" || parentLink.status === "idle") return "Loading this series";
+      if (parentLink.status === "error") return parentLink.error;
+      if (!parentLink.seriesTicker) return "This market is not part of a series.";
+      return parentLink.series ? `Previewing 1 series, ${parentLink.seriesTicker}.` : "No series row for this market.";
+    }
+    if (previewSheet === "fanout-markets" && fanoutJoinOn) {
+      if (fanoutSeriesMarketPreview.status === "loading" || fanoutSeriesMarketPreview.status === "idle") return "Loading markets in this series";
+      if (fanoutSeriesMarketPreview.status === "error") return fanoutSeriesMarketPreview.error;
+      const count = fanoutSeriesMarketPreview.rows.length;
+      return `Previewing ${count.toLocaleString()} ${count === 1 ? "market" : "markets"} in ${parentLink.seriesTicker}. Save and run uses your plan limit.`;
+    }
+    if (previewSheet.startsWith("djoin:") && fanoutMarketsDetected) {
+      const kind = previewSheet.slice("djoin:".length);
+      const preview = detectedJoinPreview[kind];
+      const title = KALSHI_LIVE_MARKET_JOINS.find((item) => item.id === kind)?.title || "this join";
+      if (!detectedPreviewTicker) return `Loading the first market for ${title.toLowerCase()}`;
+      if (!preview || preview.status === "loading") return `Loading ${title.toLowerCase()} for ${detectedPreviewTicker}`;
+      if (preview.status === "error") return preview.error;
+      const count = preview.rows?.length || 0;
+      return `Previewing ${count.toLocaleString()} ${title.toLowerCase()} ${count === 1 ? "row" : "rows"} for ${detectedPreviewTicker}. Save and run covers the other markets in this series.`;
+    }
+    if (previewSheet.startsWith("live:") && (liveJoinReady || marketDownstream || (fanoutJoinOn && liveJoinTargets.length))) {
       const kind = previewSheet.slice("live:".length);
       const preview = liveJoinPreview[kind];
       const title = KALSHI_LIVE_MARKET_JOINS.find((item) => item.id === kind)?.title || "this join";
@@ -4247,8 +4565,129 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
       });
     }
     if (metadataSheet?.columns?.length) sheets.push(metadataSheet);
-    const joinMarketsForRun = liveJoinReady ? liveJoinMarkets : downstreamJoinMarkets;
-    if (liveJoinTargets.length && (liveJoinReady || marketDownstream)) {
+    const fanoutRunMarkets =
+      liveMarketFanout && enrichPicks.has("join")
+        ? directMarkets.length
+          ? directMarkets
+          : fanoutTicker
+            ? [{ ticker: fanoutTicker, label: fanoutTicker, title: fanoutTicker }]
+            : []
+        : [];
+    if (fanoutRunMarkets.length && (fanoutParents.has("market") || fanoutParents.has("series") || fanoutSeriesMarkets)) {
+      reporter.start("join-parent");
+      try {
+        const contexts = await mapPool(fanoutRunMarkets, 3, (market) =>
+          loadKalshiLiveParentContext(market.ticker, { series: fanoutParents.has("series") || fanoutSeriesMarkets }).then((result) => ({
+            market,
+            ...result,
+          })),
+        );
+        if (fanoutParents.has("market")) {
+          contexts.forEach((item) => {
+            if (!item.market) return;
+            const slug = String(item.market.ticker || item.ticker).replace(/[^A-Za-z0-9]+/g, "-");
+            sheets.push({
+              id: `run-parent-market-${slug}`,
+              title: `Market · ${item.market.ticker || item.ticker}`,
+              columns: item.marketColumns || [],
+              rows: [item.market],
+              rowCount: 1,
+              span: "half",
+              table: "markets",
+              summary: `Kalshi Live · Market · ${item.market.ticker || item.ticker}`,
+            });
+          });
+        }
+        if (fanoutParents.has("series")) {
+          const seen = new Set();
+          contexts.forEach((item) => {
+            const seriesTicker = String(item.seriesTicker || "").trim();
+            if (!seriesTicker || seen.has(seriesTicker) || !item.series) return;
+            seen.add(seriesTicker);
+            sheets.push({
+              id: `run-parent-series-${seriesTicker.replace(/[^A-Za-z0-9]+/g, "-")}`,
+              title: `Series · ${seriesTicker}`,
+              columns: item.seriesColumns || [],
+              rows: [item.series],
+              rowCount: 1,
+              span: "half",
+              table: "series",
+              summary: `Kalshi Live · Series · ${seriesTicker}`,
+            });
+          });
+        }
+        if (fanoutSeriesMarkets) {
+          const seriesTickers = [...new Set(contexts.map((item) => String(item.seriesTicker || "").trim()).filter(Boolean))];
+          for (const seriesTicker of seriesTickers) {
+            const result = await loadKalshiLiveSeriesMarkets(seriesTicker, Number.isFinite(sheetCap) ? sheetCap : PREVIEW_ROW_CAP);
+            const fullRows = result.rows || [];
+            if (result.columns?.length) {
+              const id = `run-fanout-markets-${seriesTicker.replace(/[^A-Za-z0-9]+/g, "-")}`;
+              if (fullRows.length > PREVIEW_ROW_CAP) {
+                rememberTradeSheet(id, seriesTicker, result.columns, displayMatrix(result.columns, fullRows), sheetCap, accountId);
+              }
+              sheets.push({
+                id,
+                title: `Markets · ${seriesTicker}`,
+                columns: result.columns,
+                rows: fullRows.slice(0, PREVIEW_ROW_CAP),
+                rowCount: fullRows.length,
+                span: "full",
+                table: "markets",
+                pull: { table: "markets", seriesTicker },
+                summary: `Kalshi Live · Markets · ${seriesTicker}`,
+              });
+            }
+            if (detectedTargets.length && fullRows.length) {
+              const scopeMarkets = [];
+              for (const row of fullRows) {
+                const ticker = String(row?.ticker || "").trim();
+                if (!ticker || scopeMarkets.some((item) => item.ticker === ticker)) continue;
+                scopeMarkets.push({ ticker, label: ticker, title: String(row?.yes_sub_title || ticker) });
+                if (scopeMarkets.length >= marketCap) break;
+              }
+              const jobs = scopeMarkets.flatMap((market) => detectedTargets.map((target) => ({ market, target })));
+              const pulled = await mapPool(jobs, 3, async (job) => {
+                const resultJoin = await loadKalshiLiveMarketJoin(
+                  job.target.id,
+                  job.market.ticker,
+                  sheetCap,
+                  joinPullWindow(job.target.id, joinWindows[job.target.id]),
+                );
+                return { ...job, columns: resultJoin.columns || [], rows: resultJoin.rows || [] };
+              });
+              pulled.forEach((item) => {
+                if (!item.columns.length) return;
+                const slug = `${item.target.id}-${String(item.market.ticker).replace(/[^A-Za-z0-9]+/g, "-")}`;
+                const id = `run-djoin-${slug}`;
+                const rows = item.rows || [];
+                if (rows.length > PREVIEW_ROW_CAP) {
+                  rememberTradeSheet(id, item.market.ticker, item.columns, displayMatrix(item.columns, rows), sheetCap, accountId);
+                }
+                sheets.push({
+                  id,
+                  title: `${item.target.title} · ${item.market.label || item.market.ticker}`,
+                  columns: item.columns,
+                  rows: rows.slice(0, PREVIEW_ROW_CAP),
+                  rowCount: rows.length,
+                  span: "half",
+                  table: item.target.id,
+                  pull: { ticker: item.market.ticker, table: item.target.id },
+                  summary: `Kalshi Live · ${item.target.title} · ${item.market.label || item.market.ticker}`,
+                });
+              });
+            }
+          }
+        }
+        reporter.succeed("join-parent", { result: `${fanoutRunMarkets.length.toLocaleString()} ${fanoutRunMarkets.length === 1 ? "market" : "markets"}` });
+      } catch (err) {
+        reporter.fail("join-parent", err instanceof Error ? err.message : "Parent join failed");
+        return;
+      }
+    }
+    const fanoutAssociated = fanoutRunMarkets.length && liveJoinTargets.length ? fanoutRunMarkets : [];
+    const joinMarketsForRun = liveJoinReady ? liveJoinMarkets : marketDownstream ? downstreamJoinMarkets : fanoutAssociated;
+    if (liveJoinTargets.length && (liveJoinReady || marketDownstream || fanoutAssociated.length)) {
       reporter.start("join-live");
       if (!joinMarketsForRun.length) {
         reporter.succeed("join-live", { result: "0 sheets" });
@@ -4267,7 +4706,12 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
         const childId = `${job.target.id}:${job.market.ticker}`;
         reporter.patchChild("join-live", childId, { status: "running", result: `Pulling ${job.target.title}` });
         try {
-          const result = await loadKalshiLiveMarketJoin(job.target.id, job.market.ticker, sheetCap);
+          const result = await loadKalshiLiveMarketJoin(
+            job.target.id,
+            job.market.ticker,
+            sheetCap,
+            joinPullWindow(job.target.id, joinWindows[job.target.id]),
+          );
           const rows = result.rows || [];
           reporter.patchChild("join-live", childId, { status: "success", result: `${rows.length.toLocaleString()} rows` });
           return { ...job, columns: result.columns || [], rows };
@@ -4603,6 +5047,42 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
     }
   }
 
+  function toggleFanoutParent(id) {
+    setHoverJoin(false);
+    const next = new Set(fanoutParents);
+    const turningOn = !next.has(id);
+    if (turningOn) next.add(id);
+    else next.delete(id);
+    setFanoutParents(next);
+    if (!next.has("series")) setFanoutSeriesMarkets(false);
+    if (turningOn) setPreviewSheet(id === "series" ? "parent-series" : "parent-market");
+    else if ((id === "market" && previewSheet === "parent-market") || (id === "series" && (previewSheet === "parent-series" || previewSheet === "fanout-markets" || previewSheet.startsWith("djoin:")))) {
+      setPreviewSheet("source");
+    }
+  }
+
+  function toggleFanoutSeriesMarkets() {
+    setHoverJoin(false);
+    setFanoutSeriesMarkets((on) => {
+      const next = !on;
+      if (next) setPreviewSheet("fanout-markets");
+      else if (previewSheet === "fanout-markets" || previewSheet.startsWith("djoin:")) setPreviewSheet("parent-series");
+      return next;
+    });
+  }
+
+  function toggleDetectedJoin(id) {
+    setHoverJoin(false);
+    setDetectedJoinIds((current) => {
+      const next = new Set(current);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      if (next.has(id)) setPreviewSheet(`djoin:${id}`);
+      else if (previewSheet === `djoin:${id}`) setPreviewSheet("fanout-markets");
+      return next;
+    });
+  }
+
   function toggleLiveJoin(id) {
     setHoverJoin(false);
     const next = new Set(liveJoinIds);
@@ -4685,6 +5165,35 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
         id: `run:direct:${market.ticker}`,
         title: `${sheetTitle} · ${market.ticker}`,
         queued: true,
+      });
+    });
+  }
+  if (fanoutJoinOn && fanoutParents.has("market")) {
+    previewTabs.push({ id: "parent-market", title: "Market" });
+  }
+  if (fanoutJoinOn && fanoutParents.has("series") && parentLink.seriesTicker) {
+    previewTabs.push({ id: "parent-series", title: `Series · ${parentLink.seriesTicker}` });
+  }
+  if (fanoutJoinOn && fanoutSeriesMarkets && parentLink.seriesTicker) {
+    previewTabs.push({ id: "fanout-markets", title: `Markets · ${parentLink.seriesTicker}` });
+  }
+  if (fanoutJoinOn && liveJoinTargets.length) {
+    liveJoinTargets.forEach((item) => previewTabs.push({ id: `live:${item.id}`, title: item.title }));
+  }
+  if (fanoutMarketsDetected && detectedTargets.length) {
+    detectedTargets.forEach((item) => previewTabs.push({ id: `djoin:${item.id}`, title: `${item.title} · series` }));
+    const seen = new Set();
+    const extra = [];
+    for (const row of fanoutSeriesMarketPreview.rows || []) {
+      const ticker = String(row?.ticker || "").trim();
+      if (!ticker || ticker === detectedPreviewTicker || seen.has(ticker)) continue;
+      seen.add(ticker);
+      extra.push(ticker);
+      if (extra.length >= Math.max(0, marketCap - 1)) break;
+    }
+    extra.forEach((ticker) => {
+      detectedTargets.forEach((item) => {
+        previewTabs.push({ id: `run:djoin:${item.id}:${ticker}`, title: `${item.title} · ${ticker}`, queued: true });
       });
     });
   }
@@ -4891,6 +5400,10 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
               setJoinTarget("");
               setLiveJoinIds(new Set());
               setLiveJoinPreview({});
+              setFanoutParents(new Set());
+              setFanoutSeriesMarkets(false);
+              setDetectedJoinIds(new Set());
+              setDetectedJoinPreview({});
               setJoinPlacement("");
               setMetadataTab("trades");
               setMarketColumnHidden(defaultMarketColumnHidden(marketColumnList));
@@ -4941,9 +5454,9 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
             onFunctionHelp={() => setFunctionHelp(true)}
             onSaveAndRun={requestSaveAndRun}
             running={running}
-            showJoinBuilder={marketsQuery || tradesQuery || liveMarketSearch || liveSeriesSearch || liveEventSearch}
+            showJoinBuilder={marketsQuery || tradesQuery || liveMarketSearch || liveSeriesSearch || liveEventSearch || liveMarketFanout}
             showFunctionBuilder
-            joinMode={liveEventSearch ? "events" : liveSeriesSearch ? "series" : liveMarketSearch ? "live" : tradesQuery ? "trades" : "markets"}
+            joinMode={liveMarketFanout ? "fanout" : liveEventSearch ? "events" : liveSeriesSearch ? "series" : liveMarketSearch ? "live" : tradesQuery ? "trades" : "markets"}
             seriesMarketLayout={seriesMarketLayout}
             marketsDetected={marketsDetected}
             onSeriesMarketLayout={(layout) => {
@@ -4956,8 +5469,20 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
               setPreviewSheet(`series-market:${seriesJoinTickers[0].ticker}`);
             }}
             liveJoinIds={liveJoinIds}
+            liveJoinChoices={liveMarketFanout ? KALSHI_LIVE_MARKET_JOINS.filter((item) => item.id !== tableId) : undefined}
             onToggleLiveJoin={toggleLiveJoin}
             onSelectAllLiveJoins={selectAllLiveJoins}
+            fanoutParents={fanoutParents}
+            onToggleFanoutParent={toggleFanoutParent}
+            fanoutSeriesMarkets={fanoutSeriesMarkets}
+            onToggleFanoutSeriesMarkets={toggleFanoutSeriesMarkets}
+            fanoutSeriesReady={Boolean(parentLink.seriesTicker) && parentLink.status !== "idle" && parentLink.status !== "error"}
+            fanoutSeriesMissing={parentLink.status === "ready" && fanoutParents.has("series") && !parentLink.seriesTicker}
+            fanoutMarketsDetected={fanoutMarketsDetected}
+            detectedJoinIds={detectedJoinIds}
+            onToggleDetectedJoin={toggleDetectedJoin}
+            joinWindows={joinWindows}
+            onJoinWindow={(id, filters) => setJoinWindows((current) => ({ ...current, [id]: filters }))}
             joinLake={polymarketHistorical ? "polymarket" : "kalshi"}
             joinPlacement={joinPlacement}
             onJoinPlacement={(placement) => {
@@ -5367,6 +5892,7 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
             !bucketActive &&
             !sampleActive &&
             !(seriesMarketSheet && seriesJoinOn) &&
+            !(fanoutJoinOn && (previewSheet === "parent-market" || previewSheet === "parent-series" || previewSheet === "fanout-markets" || previewSheet.startsWith("djoin:") || previewSheet.startsWith("live:"))) &&
             !(previewSheet === "markets-meta" && tradesJoinReady && joinPlacement === "sheet") ? (
               <div className="mt-1.5 w-full max-w-[280px]">
                 <p className="text-right text-[11px] text-muted-foreground">
@@ -5386,6 +5912,8 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
               </div>
             ) : seriesMarketSheet && seriesJoinOn ? (
               <p className="mt-1 text-right text-[11px] text-muted-foreground">Preview only. Save and run uses your plan limit on each Markets sheet.</p>
+            ) : fanoutJoinOn && (previewSheet === "parent-market" || previewSheet === "parent-series" || previewSheet === "fanout-markets" || previewSheet.startsWith("djoin:") || previewSheet.startsWith("live:")) ? (
+              <p className="mt-1 text-right text-[11px] text-muted-foreground">Preview only. Save and run creates this sheet.</p>
             ) : showJoinSheets && joinTab === previewTicker ? (
               <p className="mt-1 text-right text-[11px] text-muted-foreground">Preview only. This sheet is created when you run the pull.</p>
             ) : previewSheet === "markets-meta" && tradesJoinReady && joinPlacement === "sheet" ? (
@@ -5421,6 +5949,13 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
             <div className="flex">
               <span className={sheetTabClass(false)}>{liveEventSearch ? "Events" : "Series"}</span>
               <span className={sheetTabClass(true)}>Markets</span>
+            </div>
+          </div>
+        ) : showJoinExplainer && liveMarketFanout ? (
+          <div className="overflow-hidden px-4 pb-1 pt-4">
+            <div className="flex">
+              <span className={sheetTabClass(false)}>{sheetTitle}</span>
+              <span className={sheetTabClass(true)}>Market</span>
             </div>
           </div>
         ) : showJoinExplainer ? (
@@ -5559,8 +6094,109 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
                 ? "Join these events to the markets inside them. Kalshi takes one event ticker per request, so the pull loops the events in this query."
                 : "Join these series to the markets inside them. Kalshi takes one series ticker per request, so the pull loops the series in this query."}
             </div>
+          ) : showJoinExplainer && liveMarketFanout ? (
+            <div className="flex h-full items-center justify-center rounded-xl border border-border/70 bg-background px-6 text-center text-[13px] leading-relaxed text-muted-foreground shadow-sm">
+              Join this market to its metadata, its series, or the trades, order book, and candlesticks on the same ticker.
+            </div>
           ) : showJoinExplainer ? (
             <JoinExplainer source={tradesQuery ? "trades" : "markets"} venue={polymarketHistorical ? "polymarket" : "kalshi"} live={liveMarketSearch} />
+          ) : previewSheet === "parent-market" && fanoutJoinOn ? (
+            !fanoutTicker ? (
+              <div className="flex h-full items-center justify-center rounded-xl border border-border/70 bg-background px-6 text-center text-[13px] leading-relaxed text-muted-foreground shadow-sm">
+                This pull has no market ticker yet.
+              </div>
+            ) : parentLink.status === "loading" || parentLink.status === "idle" ? (
+              <div className="flex h-full items-center justify-center">
+                <SpectrumLoadingState label="Loading this market" />
+              </div>
+            ) : parentLink.status === "error" ? (
+              <p className="text-[13px] text-muted-foreground">{parentLink.error}</p>
+            ) : parentLink.market ? (
+              <IntegrationBuildGrid
+                columns={parentLink.marketColumns}
+                rows={[parentLink.market]}
+                highlightColumnId={parentLink.marketColumns[0]?.id || ""}
+              />
+            ) : (
+              <div className="flex h-full items-center justify-center rounded-xl border border-border/70 bg-background px-6 text-center text-[13px] leading-relaxed text-muted-foreground shadow-sm">
+                No market metadata for this ticker.
+              </div>
+            )
+          ) : previewSheet === "parent-series" && fanoutJoinOn ? (
+            !fanoutTicker ? (
+              <div className="flex h-full items-center justify-center rounded-xl border border-border/70 bg-background px-6 text-center text-[13px] leading-relaxed text-muted-foreground shadow-sm">
+                This pull has no market ticker yet.
+              </div>
+            ) : parentLink.status === "loading" || parentLink.status === "idle" ? (
+              <div className="flex h-full items-center justify-center">
+                <SpectrumLoadingState label="Loading this series" />
+              </div>
+            ) : parentLink.status === "error" ? (
+              <p className="text-[13px] text-muted-foreground">{parentLink.error}</p>
+            ) : !parentLink.seriesTicker ? (
+              <div className="flex h-full items-center justify-center rounded-xl border border-border/70 bg-background px-6 text-center text-[13px] leading-relaxed text-muted-foreground shadow-sm">
+                This market is not part of a series.
+              </div>
+            ) : parentLink.series ? (
+              <IntegrationBuildGrid
+                columns={parentLink.seriesColumns}
+                rows={[parentLink.series]}
+                highlightColumnId={parentLink.seriesColumns[0]?.id || ""}
+              />
+            ) : (
+              <div className="flex h-full items-center justify-center rounded-xl border border-border/70 bg-background px-6 text-center text-[13px] leading-relaxed text-muted-foreground shadow-sm">
+                No series row for this market.
+              </div>
+            )
+          ) : previewSheet === "fanout-markets" && fanoutJoinOn ? (
+            fanoutSeriesMarketPreview.status === "loading" || fanoutSeriesMarketPreview.status === "idle" ? (
+              <div className="flex h-full items-center justify-center">
+                <SpectrumLoadingState label="Loading markets" />
+              </div>
+            ) : fanoutSeriesMarketPreview.status === "error" ? (
+              <p className="text-[13px] text-muted-foreground">{fanoutSeriesMarketPreview.error}</p>
+            ) : fanoutSeriesMarketPreview.rows.length ? (
+              <IntegrationBuildGrid
+                columns={fanoutSeriesMarketPreview.columns}
+                rows={fanoutSeriesMarketPreview.rows.slice(0, PREVIEW_ROW_CAP)}
+                highlightColumnId={fanoutSeriesMarketPreview.columns[0]?.id || ""}
+              />
+            ) : (
+              <div className="flex h-full items-center justify-center rounded-xl border border-border/70 bg-background px-6 text-center text-[13px] leading-relaxed text-muted-foreground shadow-sm">
+                No markets in this series.
+              </div>
+            )
+          ) : previewSheet.startsWith("djoin:") ? (
+            (() => {
+              const kind = previewSheet.slice("djoin:".length);
+              const preview = detectedJoinPreview[kind];
+              const label = KALSHI_LIVE_MARKET_JOINS.find((item) => item.id === kind)?.title || "data";
+              if (!detectedPreviewTicker) {
+                return (
+                  <div className="flex h-full items-center justify-center rounded-xl border border-border/70 bg-background px-6 text-center text-[13px] leading-relaxed text-muted-foreground shadow-sm">
+                    This series has no markets to join.
+                  </div>
+                );
+              }
+              if (!preview || preview.status === "loading") {
+                return (
+                  <div className="flex h-full items-center justify-center">
+                    <SpectrumLoadingState label={`Loading ${label.toLowerCase()}`} />
+                  </div>
+                );
+              }
+              if (preview.status === "error") return <p className="text-[13px] text-muted-foreground">{preview.error}</p>;
+              if (!preview.rows?.length) {
+                return (
+                  <div className="flex h-full items-center justify-center rounded-xl border border-border/70 bg-background px-6 text-center text-[13px] leading-relaxed text-muted-foreground shadow-sm">
+                    No {label.toLowerCase()} rows for {detectedPreviewTicker}.
+                  </div>
+                );
+              }
+              return (
+                <IntegrationBuildGrid columns={preview.columns} rows={preview.rows} highlightColumnId={preview.columns[0]?.id || ""} />
+              );
+            })()
           ) : seriesMarketSheet && seriesJoinOn ? (
             !seriesJoinTickers.length ? (
               <div className="flex h-full items-center justify-center rounded-xl border border-border/70 bg-background px-6 text-center text-[13px] leading-relaxed text-muted-foreground shadow-sm">
@@ -5625,7 +6261,7 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
               if (!preview.rows?.length) {
                 return (
                   <div className="flex h-full items-center justify-center rounded-xl border border-border/70 bg-background px-6 text-center text-[13px] leading-relaxed text-muted-foreground shadow-sm">
-                    No {label.toLowerCase()} rows for {livePreviewTicker}.
+                    No {label.toLowerCase()} rows for {joinPreviewTicker}.
                   </div>
                 );
               }

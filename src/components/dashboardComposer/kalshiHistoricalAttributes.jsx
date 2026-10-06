@@ -13,6 +13,7 @@ import { Popover, PopoverClose, PopoverContent, PopoverTrigger } from "@/compone
 import { KalshiLiveTimestampPicker } from "@/components/connectData/kalshiLive/KalshiLiveTimestampPicker";
 import { cellMatchesTextTerm, columnUsesWholeTerm } from "@/lib/textTermMatch";
 import { DATE_RANGE_PRESETS, activeDateRangePreset, dateRangePreset } from "@/components/dashboardComposer/dateRangePresets";
+import { KALSHI_LIVE_CANDLESTICK_PERIOD_OPTIONS } from "@/lib/kalshiLive/candlesticksColumns";
 import { cn } from "@/lib/utils";
 
 /**
@@ -618,6 +619,54 @@ function DateRangeField({ from, to, presetId, onChange }) {
         ) : null}
       </PopoverContent>
     </Popover>
+  );
+}
+
+/** Date range, period, and depth for a trades, order book, or candlestick join. */
+export function JoinSourceFields({ tableId, filters, onChange }) {
+  const current = filters || {};
+  const range = current.time_range || {};
+  const setRange = ({ from, to, preset }) => onChange({ ...current, time_range: { from, to, preset: preset || "" } });
+  if (tableId === "orderbook") {
+    return (
+      <label className="block text-[11px] text-muted-foreground">
+        Depth
+        <Input
+          aria-label="Depth"
+          value={current.depth?.value ?? ""}
+          inputMode="numeric"
+          placeholder="Depth"
+          onChange={(event) => onChange({ ...current, depth: { value: event.target.value.replace(/[^\d]/g, "") } })}
+          className="mt-1 h-9"
+        />
+      </label>
+    );
+  }
+  if (tableId !== "trades" && tableId !== "candlesticks") return null;
+  return (
+    <div className="space-y-2">
+      <div>
+        <p className="mb-1 text-[11px] text-muted-foreground">Date range</p>
+        <DateRangeField from={range.from || ""} to={range.to || ""} presetId={range.preset || ""} onChange={setRange} />
+      </div>
+      {tableId === "candlesticks" ? (
+        <label className="block text-[11px] text-muted-foreground">
+          Period
+          <select
+            aria-label="Period"
+            value={String(current.period_interval?.value ?? "60")}
+            onChange={(event) => onChange({ ...current, period_interval: { value: event.target.value } })}
+            className="mt-1 h-9 w-full rounded-lg border border-border/70 bg-background px-2 text-[13px] text-foreground"
+          >
+            {KALSHI_LIVE_CANDLESTICK_PERIOD_OPTIONS.map((option) => (
+              <option key={option.value} value={String(option.value)}>
+                {option.label}
+              </option>
+            ))}
+          </select>
+        </label>
+      ) : null}
+    </div>
   );
 }
 
