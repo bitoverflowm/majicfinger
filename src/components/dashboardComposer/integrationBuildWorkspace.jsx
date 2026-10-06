@@ -428,6 +428,18 @@ function functionChoices({ joinActive, previewTicker, sheetTitle }) {
   ];
 }
 
+function EndpointLiveTag() {
+  return (
+    <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-emerald-500/10 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-emerald-700 dark:text-emerald-300">
+      <span className="relative flex size-1.5" aria-hidden>
+        <span className="absolute inline-flex size-full animate-ping rounded-full bg-emerald-500 opacity-75" />
+        <span className="relative inline-flex size-1.5 rounded-full bg-emerald-500" />
+      </span>
+      Live
+    </span>
+  );
+}
+
 function sheetTabClass(selected) {
   return cn(
     "relative -ml-px max-w-[11rem] shrink-0 truncate border border-border/70 px-2 py-1 text-left text-[11px] font-medium leading-none first:ml-0",
@@ -1948,7 +1960,7 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
 
   const groups = source?.groups || null;
   const visibleTableIds = groups
-    ? tableIds.filter((id) => (groupId === "realtime" ? tables[id].realtime : tables[id].group === groupId))
+    ? tableIds.filter((id) => tables[id].group === groupId)
     : tableIds;
   const table = tables[tableId];
   const exactUniverse = usesExactUniverse(integrationId);
@@ -1994,11 +2006,17 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
     setTableId(next?.defaultTable || Object.keys(next?.tables || {})[0] || "");
   }, [integrationId]);
 
+  useEffect(() => {
+    if (!groups?.length || groups.some((group) => group.id === groupId)) return;
+    const nextGroup = groups[0].id;
+    setGroupId(nextGroup);
+    const ids = tableIds.filter((id) => tables[id].group === nextGroup);
+    setTableId((current) => (ids.includes(current) ? current : ids[0] || current));
+  }, [groupId, groups, tableId, tableIds, tables]);
+
   function selectGroup(nextGroup) {
     setGroupId(nextGroup);
-    const ids = tableIds.filter((id) =>
-      nextGroup === "realtime" ? tables[id].realtime : tables[id].group === nextGroup,
-    );
+    const ids = tableIds.filter((id) => tables[id].group === nextGroup);
     if (!ids.includes(tableId)) setTableId(ids[0] || tableId);
   }
 
@@ -2026,7 +2044,7 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
     const timer = window.setInterval(() => {
       setProgress((current) => (current >= 88 ? current : current + Math.random() * 8));
     }, 280);
-    loadBuildPreview(integrationId, tableId)
+    loadBuildPreview(integrationId, tableId, tableId === "event_forecast" ? { fresh: true } : undefined)
       .then((result) => {
         if (cancel) return;
         setProgress(100);
@@ -3368,8 +3386,14 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
       requirements={liveScan.requirements || []}
     />
   ) : null;
-  const liveEmptyLine =
-    liveMarketSearch && liveScan.truncated
+  const forecastNeedsPick =
+    liveForecast &&
+    directPreview.status === "idle" &&
+    !forecastTargets.events.length &&
+    !forecastTargets.seriesTickers.length;
+  const liveEmptyLine = forecastNeedsPick
+    ? "Event or series required to get an event forecast. Use the search in the control panel."
+    : liveMarketSearch && liveScan.truncated
       ? `No data found in the first ${KALSHI_LIVE_MARKET_SCAN_CAP.toLocaleString()} markets.`
       : "No data found";
   const previewLineShown = emptyRefresh
@@ -6557,8 +6581,11 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
                   type="button"
                   className="flex w-full items-center justify-between rounded-xl border border-border/70 bg-background px-3 py-2.5 text-left shadow-sm transition-colors hover:bg-muted/50"
                 >
-                  <span>
-                    <span className="block text-[13px] font-semibold text-foreground">{table?.label}</span>
+                  <span className="min-w-0">
+                    <span className="flex flex-wrap items-center gap-1.5">
+                      <span className="text-[13px] font-semibold text-foreground">{table?.label}</span>
+                      {table?.realtime ? <EndpointLiveTag /> : null}
+                    </span>
                     <span className="mt-0.5 block text-[12px] leading-relaxed text-muted-foreground">{table?.description}</span>
                   </span>
                   <ChevronDown className="ml-2 size-4 shrink-0 text-muted-foreground" />
@@ -6567,8 +6594,11 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
               <DropdownMenuContent align="start" className="z-[580] w-[300px]">
                 {visibleTableIds.map((id) => (
                   <DropdownMenuItem key={id} onSelect={() => setTableId(id)}>
-                    <span>
-                      <span className="block text-[13px] font-medium">{tables[id].label}</span>
+                    <span className="min-w-0">
+                      <span className="flex flex-wrap items-center gap-1.5">
+                        <span className="text-[13px] font-medium">{tables[id].label}</span>
+                        {tables[id].realtime ? <EndpointLiveTag /> : null}
+                      </span>
                       <span className="block text-[11px] text-muted-foreground">{tables[id].description}</span>
                     </span>
                   </DropdownMenuItem>
@@ -7354,10 +7384,12 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
             <div className="flex h-full flex-col">
               {liveRemovalTape}
               <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-3 rounded-xl border border-border/70 bg-background px-6 text-center shadow-sm">
-                <p className="text-[13px] leading-relaxed text-muted-foreground">{liveEmptyLine}</p>
-                <Button type="button" variant="outline" onClick={refreshPreview}>
-                  Refresh
-                </Button>
+                <p className="max-w-md text-[13px] leading-relaxed text-muted-foreground">{liveEmptyLine}</p>
+                {forecastNeedsPick ? null : (
+                  <Button type="button" variant="outline" onClick={refreshPreview}>
+                    Refresh
+                  </Button>
+                )}
               </div>
             </div>
           ) : marketsGrid.columns.length ? (

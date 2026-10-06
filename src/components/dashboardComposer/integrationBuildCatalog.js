@@ -1166,26 +1166,7 @@ async function kalshiLiveRows(endpointId) {
       })),
     );
   }
-  if (endpointId === "event_forecast") {
-    try {
-      const event = await openLiveEvent();
-      if (!event?.event_ticker || !event?.series_ticker) return [];
-      const end = Math.floor(Date.now() / 1000);
-      const start = end - 6 * 3600;
-      const params = new URLSearchParams({
-        ticker: event.event_ticker,
-        series_ticker: event.series_ticker,
-        start_ts: String(start),
-        end_ts: String(end),
-        period_interval: "60",
-      });
-      for (const percentile of [1000, 2500, 5000, 7500, 9000]) params.append("percentiles", String(percentile));
-      const json = await getJson(`/api/integrations/kalshi-live/events/forecast-percentile-history?${params.toString()}`);
-      return projectKalshiLiveEventForecastRows(json.forecast_history);
-    } catch {
-      return [];
-    }
-  }
+  if (endpointId === "event_forecast") return [];
   if (endpointId === "leaderboard") {
     const json = await getJson(
       `/api/integrations/kalshi-live/social/leaderboard?metric_name=projected_pnl&time_period=all_time&limit=${PREVIEW_ROW_CAP}`,

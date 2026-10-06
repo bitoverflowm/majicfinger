@@ -53,15 +53,13 @@ import { LIVE_FEED_REGISTRY } from "@/lib/liveFeeds/registry";
 /**
  * Top-level Kalshi Live endpoint groups (hub column tags).
  * Endpoints are filtered by `category` so Markets / Events / … stay organized.
- * "Real-Time" lists endpoints that have an editor live-feed pull enabled
- * (see LIVE_FEED_REGISTRY) — they still also appear under their primary category.
+ * A live-feed pull (LIVE_FEED_REGISTRY) stays in its own category and is marked there.
  */
 export const KALSHI_LIVE_ENDPOINT_CATEGORIES = [
   { id: "markets", label: "Markets" },
   { id: "series", label: "Series" },
   { id: "events", label: "Events" },
   { id: "holders", label: "Traders" },
-  { id: "realtime", label: "Real-Time" },
 ];
 
 export const KALSHI_LIVE_DEFAULT_ENDPOINT_CATEGORY = "markets";
@@ -188,10 +186,6 @@ export const KALSHI_LIVE_CONNECT_ENDPOINTS = [
 /** @param {string} categoryId */
 export function getKalshiLiveEndpointsForCategory(categoryId) {
   const cat = String(categoryId || KALSHI_LIVE_DEFAULT_ENDPOINT_CATEGORY).trim();
-  if (cat === "realtime") {
-    const realtimeIds = getKalshiLiveRealtimeEndpointIds();
-    return KALSHI_LIVE_CONNECT_ENDPOINTS.filter((ep) => realtimeIds.has(ep.id));
-  }
   return KALSHI_LIVE_CONNECT_ENDPOINTS.filter((ep) => (ep.category || "markets") === cat);
 }
 
