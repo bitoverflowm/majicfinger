@@ -7,10 +7,16 @@ import {
   KALSHI_LIVE_LEADERBOARD_TIME_PERIOD_OPTIONS,
 } from "@/lib/kalshiLive/leaderboardColumns";
 import { dateRangePreset } from "@/components/dashboardComposer/dateRangePresets";
+import {
+  KALSHI_LIVE_EVENT_FORECAST_PERIOD_OPTIONS,
+  normalizeForecastApiPercentiles,
+} from "@/lib/kalshiLive/eventForecastColumns";
 
 export const KALSHI_LIVE_TRADER_TABLES = ["leaderboard", "holder_profile", "trades_by_holder", "search_traders"];
 
-export const KALSHI_LIVE_DIRECT_TABLES = ["series", "events", "candlesticks", "trades", "orderbook", ...KALSHI_LIVE_TRADER_TABLES];
+export const KALSHI_LIVE_DIRECT_TABLES = ["series", "events", "event_forecast", "candlesticks", "trades", "orderbook", ...KALSHI_LIVE_TRADER_TABLES];
+
+export const KALSHI_LIVE_FORECAST_DEFAULT_PERCENTILES = [1000, 2500, 5000, 7500, 9000];
 
 const EVENT_STATUSES = [
   ["unopened", "Unopened"],
@@ -481,6 +487,14 @@ export function defaultDirectAttributeFilters(tableId, now = new Date()) {
   if (tableId === "search_traders") {
     return { include_metrics: { include: ["true"] } };
   }
+  if (tableId === "event_forecast") {
+    const range = dateRangePreset("past-24h", now);
+    return {
+      percentiles: { contains: "", containsTags: KALSHI_LIVE_FORECAST_DEFAULT_PERCENTILES.map(String) },
+      time_range: { from: range?.from || "", to: range?.to || "", preset: "past-24h" },
+      period_interval: { value: "60" },
+    };
+  }
   if (!DIRECT_MARKET_TABLES.includes(tableId)) return {};
   const range = dateRangePreset("past-24h", now);
   const filters = {
@@ -495,6 +509,85 @@ export function defaultDirectAttributeFilters(tableId, now = new Date()) {
  * Query controls first, then every response column with a control that matches its type.
  * The date range, period, and depth are the request. They are not columns on the sheet.
  */
+/** Forecast request controls stay above the forecast row columns. */
+export function kalshiLiveEventForecastAttributeColumns(columns) {
+  const query = [
+    {
+      id: "percentiles",
+      title: "Percentiles",
+      type: "text",
+      queryOnly: true,
+      exactTickers: true,
+      placeholder: "0 to 9999",
+      description: "Up to 10 percentile values, from 0 to 9999.",
+    },
+    {
+      id: "time_range",
+      title: "Date range",
+      type: "date",
+      queryOnly: true,
+      control: "query-range",
+      description: "Start and end of the forecast data",
+    },
+    {
+      id: "period_interval",
+      title: "Period",
+      type: "enum",
+      queryOnly: true,
+      control: "period",
+      enumOptions: KALSHI_LIVE_EVENT_FORECAST_PERIOD_OPTIONS.map((option) => [String(option.value), option.label]),
+      description: "Length of each forecast period. 5 seconds, 1 minute, 1 hour, or 1 day.",
+    },
+  ];
+  const provided = (columns || []).filter((column) => column?.id && column.id !== "period_interval");
+  const rest = provided.length
+    ? provided
+    : [
+        { id: "event_ticker", title: "Event ticker", type: "text", description: "The event ticker this forecast is for." },
+        { id: "end_period_ts", title: "End period", type: "date", description: "Unix timestamp for the inclusive end of the forecast period." },
+        { id: "percentile", title: "Percentile", type: "number", description: "The percentile value, from 0 to 9999." },
+        { id: "raw_numerical_forecast", title: "Raw numerical forecast", type: "number", description: "The raw numerical forecast value." },
+        { id: "numerical_forecast", title: "Numerical forecast", type: "number", description: "The processed numerical forecast value." },
+        { id: "formatted_forecast", title: "Formatted forecast", type: "text", description: "The human-readable formatted forecast value." },
+      ];
+  return [...query, ...rest];
+}
+
+export function forecastPercentileValues(filters) {
+  const tags = Array.isArray(filters?.percentiles?.containsTags) ? filters.percentiles.containsTags : [];
+  const draft = String(filters?.percentiles?.contains || "").trim();
+  const raw = [...tags, draft].map((value) => Number(String(value).replace(/[^\d]/g, ""))).filter((value) => Number.isFinite(value));
+  const normalized = normalizeForecastApiPercentiles(raw);
+  return normalized.length ? normalized : [...KALSHI_LIVE_FORECAST_DEFAULT_PERCENTILES];
+}
+
+/** Event and series picks the forecast pull can resolve. An event keeps its series ticker. */
+export function forecastPullTargets(picks) {
+  const events = [];
+  const seriesTickers = [];
+  const seenEvents = new Set();
+  const seenSeries = new Set();
+  for (const pick of picks || []) {
+    const ticker = String(pick?.ticker || "").trim();
+    if (!ticker) continue;
+    if (pick?.kind === "series") {
+      if (seenSeries.has(ticker)) continue;
+      seenSeries.add(ticker);
+      seriesTickers.push(ticker);
+      continue;
+    }
+    if (pick?.kind !== "event") continue;
+    if (seenEvents.has(ticker)) continue;
+    seenEvents.add(ticker);
+    events.push({
+      eventTicker: ticker,
+      seriesTicker: String(pick.seriesTicker || "").trim(),
+      title: String(pick.title || ticker),
+    });
+  }
+  return { events, seriesTickers };
+}
+
 export function kalshiLiveDirectAttributeColumns(tableId, columns) {
   if (!DIRECT_MARKET_TABLES.includes(tableId)) return [];
   const enums = tableId === "trades" ? TRADE_ENUMS : tableId === "orderbook" ? ORDERBOOK_ENUMS : {};
@@ -547,7 +640,7 @@ export function kalshiLiveDirectAttributeColumns(tableId, columns) {
 /** Unix window, candle period, and book depth read from the attribute filters. */
 export function directPullWindow(tableId, filters, fallback = {}) {
   const range = filters?.time_range || {};
-  const ranged = tableId === "trades" || tableId === "candlesticks";
+  const ranged = tableId === "trades" || tableId === "candlesticks" || tableId === "event_forecast";
   const minFromRange = ranged ? isoDayUnix(range.from, "start") : null;
   const maxFromRange = ranged ? isoDayUnix(range.to, "end") : null;
   const periodRaw = Number(filters?.period_interval?.value);
@@ -556,7 +649,10 @@ export function directPullWindow(tableId, filters, fallback = {}) {
   return {
     minTs: minFromRange ?? fallback.minTs,
     maxTs: maxFromRange ?? fallback.maxTs,
-    period: Number.isFinite(periodRaw) && periodRaw > 0 ? periodRaw : fallback.period,
+    period:
+      Number.isFinite(periodRaw) && (tableId === "event_forecast" ? periodRaw >= 0 : periodRaw > 0)
+        ? periodRaw
+        : fallback.period,
     depth: Number.isFinite(depth) ? depth : Number(fallback.depth),
   };
 }
@@ -588,6 +684,11 @@ export function kalshiLiveDirectScopeError(tableId, picks, _query, filters) {
     if (eventSeriesTicker(filters)) return "";
     if (eventClosesAfter(filters) || seriesUpdatedAfter(filters)) return "";
     return loading ? "" : "Search for an event or select a status.";
+  }
+  if (tableId === "event_forecast") {
+    const targets = forecastPullTargets(picks);
+    if (targets.events.length || targets.seriesTickers.length) return "";
+    return loading ? "" : "Search for an event or a series.";
   }
   if (directMarketTickers(picks).length) return "";
   return loading ? "" : "Add at least one market ticker.";

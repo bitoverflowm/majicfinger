@@ -20,6 +20,9 @@ import {
   traderSearchQuery,
   seriesDiscoveryCategories,
   seriesUpdatedAfter,
+  forecastPercentileValues,
+  forecastPullTargets,
+  kalshiLiveEventForecastAttributeColumns,
 } from "./kalshiLiveDirectScope.js";
 
 assert.equal(isKalshiLiveDirectTable("trades"), true);
@@ -163,5 +166,28 @@ assert.equal(eventAttributes[1].exactTickers, true);
 assert.equal(eventAttributes[2].queryOnly, true);
 assert.equal(eventAttributes[3].control, "updated-after");
 assert.equal(eventAttributes[6].dateEpoch, "iso");
+
+assert.equal(isKalshiLiveDirectTable("event_forecast"), true);
+assert.equal(kalshiLiveDirectScopeError("event_forecast", [], {}, {}), "Search for an event or a series.");
+assert.equal(
+  kalshiLiveDirectScopeError("event_forecast", [{ kind: "event", ticker: "KXHIGHNY-25JAN01" }], {}, {}),
+  "",
+);
+assert.deepEqual(forecastPullTargets([{ kind: "series", ticker: "KXHIGHNY" }, { kind: "event", ticker: "KXHIGHNY-25JAN01", seriesTicker: "KXHIGHNY" }]), {
+  events: [{ eventTicker: "KXHIGHNY-25JAN01", seriesTicker: "KXHIGHNY", title: "KXHIGHNY-25JAN01" }],
+  seriesTickers: ["KXHIGHNY"],
+});
+assert.deepEqual(forecastPercentileValues({ percentiles: { containsTags: ["5000", "2500", "5000"], contains: "12" } }), [12, 2500, 5000]);
+const forecastAttributes = kalshiLiveEventForecastAttributeColumns([
+  { id: "event_ticker", title: "Event ticker" },
+  { id: "period_interval", title: "Period interval" },
+  { id: "numerical_forecast", title: "Numerical forecast" },
+]);
+assert.deepEqual(
+  forecastAttributes.map((column) => column.id),
+  ["percentiles", "time_range", "period_interval", "event_ticker", "numerical_forecast"],
+);
+assert.equal(directPullWindow("event_forecast", { period_interval: { value: "0" } }, { period: 60 }).period, 0);
+assert.equal(directPullWindow("candlesticks", { period_interval: { value: "0" } }, { period: 60 }).period, 60);
 
 console.log("kalshi live direct query ok");

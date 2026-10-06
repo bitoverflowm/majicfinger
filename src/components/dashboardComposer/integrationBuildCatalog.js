@@ -22,6 +22,7 @@ import { normalizeKalshiLiveTradeRow } from "@/lib/kalshiLive/normalizeTradeRow"
 import { normalizeKalshiLiveOrderbook } from "@/lib/kalshiLive/normalizeOrderbookRow";
 import { normalizeKalshiLiveEventRow } from "@/lib/kalshiLive/normalizeEventRow";
 import { projectKalshiLiveEventForecastRows } from "@/lib/kalshiLive/normalizeEventForecastRow";
+import { inferSeriesTickerFromEvent } from "@/lib/kalshiLive/eventCandlesticksCompose";
 import { normalizeKalshiLiveLeaderboardRow } from "@/lib/kalshiLive/normalizeLeaderboardRow";
 import { normalizeKalshiLiveHolderProfileRow } from "@/lib/kalshiLive/normalizeHolderProfileRow";
 import { normalizeKalshiLiveHolderTradeRow } from "@/lib/kalshiLive/normalizeHolderTradeRow";
@@ -1008,7 +1009,7 @@ const KALSHI_LIVE_DEFAULTS = {
   events: ["event_ticker", "series_ticker", "title", "sub_title", "mutually_exclusive"],
   event_candlesticks: ["market_ticker", "end_period_ts", "price_open_dollars", "price_high_dollars", "price_low_dollars", "price_close_dollars", "volume_fp"],
   multivariate_events: ["event_ticker", "series_ticker", "title", "sub_title"],
-  event_forecast: ["event_ticker", "end_period_ts", "percentile_pct", "numerical_forecast", "formatted_forecast"],
+  event_forecast: ["event_ticker", "end_period_ts", "period_interval", "percentile", "raw_numerical_forecast", "numerical_forecast", "formatted_forecast"],
   leaderboard: ["rank", "nickname", "value", "metric_name", "time_period"],
   holder_profile: ["nickname", "follower_count", "following_count", "description", "joined_at"],
   trades_by_holder: ["create_date", "ticker", "price_dollars", "count_fp", "taker_side", "taker_nickname"],
@@ -1166,20 +1167,24 @@ async function kalshiLiveRows(endpointId) {
     );
   }
   if (endpointId === "event_forecast") {
-    const event = await openLiveEvent();
-    if (!event?.event_ticker || !event?.series_ticker) return [];
-    const end = Math.floor(Date.now() / 1000);
-    const start = end - 6 * 3600;
-    const params = new URLSearchParams({
-      ticker: event.event_ticker,
-      series_ticker: event.series_ticker,
-      start_ts: String(start),
-      end_ts: String(end),
-      period_interval: "60",
-    });
-    for (const percentile of [1000, 2500, 5000, 7500, 9000]) params.append("percentiles", String(percentile));
-    const json = await getJson(`/api/integrations/kalshi-live/events/forecast-percentile-history?${params.toString()}`);
-    return projectKalshiLiveEventForecastRows(json.forecast_history);
+    try {
+      const event = await openLiveEvent();
+      if (!event?.event_ticker || !event?.series_ticker) return [];
+      const end = Math.floor(Date.now() / 1000);
+      const start = end - 6 * 3600;
+      const params = new URLSearchParams({
+        ticker: event.event_ticker,
+        series_ticker: event.series_ticker,
+        start_ts: String(start),
+        end_ts: String(end),
+        period_interval: "60",
+      });
+      for (const percentile of [1000, 2500, 5000, 7500, 9000]) params.append("percentiles", String(percentile));
+      const json = await getJson(`/api/integrations/kalshi-live/events/forecast-percentile-history?${params.toString()}`);
+      return projectKalshiLiveEventForecastRows(json.forecast_history);
+    } catch {
+      return [];
+    }
   }
   if (endpointId === "leaderboard") {
     const json = await getJson(
@@ -1533,32 +1538,47 @@ export async function loadKalshiLiveSeriesDiscovery(spec = {}, limit = PREVIEW_R
     seenCategories.add(name);
     categories.push(name);
   }
+  const keep = typeof spec.match === "function" ? spec.match : null;
+  const scopes = categories.length ? categories : spec.unscoped ? [""] : [];
   const cap = Math.max(1, Math.floor(Number(limit) || PREVIEW_ROW_CAP));
+  const maxPages = keep || spec.unscoped ? Math.min(8, Math.max(1, Math.floor(Number(spec.maxPages) || 8))) : 1;
   const seenTickers = new Set();
   const rows = [];
-  for (const category of categories) {
-    const params = new URLSearchParams();
-    params.set("category", category);
-    if (spec.tag) params.set("tags", String(spec.tag));
-    params.set("include_volume", "true");
-    params.set("include_product_metadata", spec.includeProductMetadata ? "true" : "false");
-    if (Number.isFinite(Number(spec.minUpdatedTs)) && Number(spec.minUpdatedTs) > 0) {
-      params.set("min_updated_ts", String(Math.floor(Number(spec.minUpdatedTs))));
-    }
-    const json = await getJsonRetry(`/api/integrations/kalshi-live/series/list?${params}`);
-    const series = Array.isArray(json.series) ? json.series : [];
-    let taken = 0;
-    for (const raw of series) {
-      const row = normalizeKalshiLiveSeriesRow(raw);
-      const ticker = String(row.ticker || "").trim();
-      if (ticker && seenTickers.has(ticker)) continue;
-      if (ticker) seenTickers.add(ticker);
-      rows.push(row);
-      taken += 1;
-      if (taken >= cap) break;
+  let truncated = false;
+  for (const category of scopes) {
+    if (rows.length >= cap) break;
+    let cursor = "";
+    for (let page = 0; page < maxPages && rows.length < cap; page += 1) {
+      const params = new URLSearchParams();
+      if (category) params.set("category", category);
+      if (spec.tag) params.set("tags", String(spec.tag));
+      params.set("include_volume", "true");
+      params.set("include_product_metadata", spec.includeProductMetadata ? "true" : "false");
+      if (Number.isFinite(Number(spec.minUpdatedTs)) && Number(spec.minUpdatedTs) > 0) {
+        params.set("min_updated_ts", String(Math.floor(Number(spec.minUpdatedTs))));
+      }
+      if (cursor) params.set("cursor", cursor);
+      const json = await getJsonRetry(`/api/integrations/kalshi-live/series/list?${params}`);
+      const series = Array.isArray(json.series) ? json.series : [];
+      for (const raw of series) {
+        const row = normalizeKalshiLiveSeriesRow(raw);
+        if (keep && !keep(row)) continue;
+        const ticker = String(row.ticker || "").trim();
+        if (ticker && seenTickers.has(ticker)) continue;
+        if (ticker) seenTickers.add(ticker);
+        rows.push(row);
+        if (rows.length >= cap) break;
+      }
+      cursor = String(json.cursor || "").trim();
+      if (rows.length >= cap) {
+        if (cursor) truncated = true;
+        break;
+      }
+      if (!cursor || !series.length) break;
+      if (page === maxPages - 1 && cursor) truncated = true;
     }
   }
-  return { columns, rows: projectLiveJoinRows(columns, rows, rows.length || 1) };
+  return { columns, rows: projectLiveJoinRows(columns, rows, rows.length || 1), truncated };
 }
 
 /** One event row per ticker. */
@@ -1587,6 +1607,7 @@ export async function loadKalshiLiveEventsDiscovery(spec = {}, limit = PREVIEW_R
       ? [String(spec.seriesTicker)]
       : [""];
   const cap = Math.max(1, Math.floor(Number(limit) || PREVIEW_ROW_CAP));
+  const keep = typeof spec.match === "function" ? spec.match : null;
   const seen = new Set();
   const rows = [];
   let truncated = false;
@@ -1609,6 +1630,7 @@ export async function loadKalshiLiveEventsDiscovery(spec = {}, limit = PREVIEW_R
       const events = Array.isArray(json.events) ? json.events : [];
       for (const raw of events) {
         const row = normalizeKalshiLiveEventRow(raw);
+        if (keep && !keep(row)) continue;
         const ticker = String(row.event_ticker || "").trim();
         if (ticker && seen.has(ticker)) continue;
         if (ticker) seen.add(ticker);
@@ -1782,6 +1804,113 @@ export async function loadKalshiLiveTraderSearch(spec = {}) {
   return { columns, rows: projectLiveJoinRows(columns, records, records.length || 1), truncated };
 }
 
+const FORECAST_PERIODS = new Set([0, 1, 60, 1440]);
+const EVENT_CANDLE_PERIODS = new Set([1, 60, 1440]);
+
+async function fetchKalshiLiveEventForecastRows(target, spec) {
+  const eventTicker = String(target.eventTicker || "").trim();
+  const seriesTicker = String(target.seriesTicker || "").trim() || inferSeriesTickerFromEvent(eventTicker);
+  if (!eventTicker || !seriesTicker) return [];
+  const end = Number(spec.maxTs) > 0 ? Math.floor(Number(spec.maxTs)) : Math.floor(Date.now() / 1000);
+  const start = Number(spec.minTs) > 0 ? Math.floor(Number(spec.minTs)) : end - 24 * 3600;
+  const period = FORECAST_PERIODS.has(Number(spec.period)) ? Number(spec.period) : 60;
+  const percentiles = (Array.isArray(spec.percentiles) ? spec.percentiles : [1000, 2500, 5000, 7500, 9000])
+    .map((value) => Math.floor(Number(value)))
+    .filter((value) => value >= 0 && value <= 9999)
+    .slice(0, 10);
+  const params = new URLSearchParams({
+    ticker: eventTicker,
+    series_ticker: seriesTicker,
+    start_ts: String(start),
+    end_ts: String(end),
+    period_interval: String(period),
+  });
+  for (const percentile of percentiles.length ? percentiles : [1000, 2500, 5000, 7500, 9000]) {
+    params.append("percentiles", String(percentile));
+  }
+  const json = await getJsonRetry(`/api/integrations/kalshi-live/events/forecast-percentile-history?${params}`);
+  return projectKalshiLiveEventForecastRows(json.forecast_history).map((row) => ({
+    ...row,
+    event_ticker: row.event_ticker || eventTicker,
+  }));
+}
+
+/** Forecast history for chosen events, or for the events inside a chosen series. */
+export async function loadKalshiLiveEventForecast(spec = {}) {
+  const columns = kalshiLiveColumns("event_forecast");
+  const seen = new Set();
+  const targets = [];
+  for (const event of Array.isArray(spec.events) ? spec.events : []) {
+    const eventTicker = String(event.eventTicker || event.ticker || "").trim();
+    if (!eventTicker || seen.has(eventTicker)) continue;
+    seen.add(eventTicker);
+    targets.push({
+      eventTicker,
+      seriesTicker: String(event.seriesTicker || "").trim() || inferSeriesTickerFromEvent(eventTicker),
+    });
+  }
+  for (const series of Array.isArray(spec.seriesTickers) ? spec.seriesTickers : []) {
+    const ticker = String(series || "").trim();
+    if (!ticker) continue;
+    const discovered = await loadKalshiLiveEventsDiscovery(
+      { seriesTickers: [ticker], statuses: [""], maxPages: 2 },
+      spec.eventCap || 25,
+    );
+    for (const row of discovered.rows || []) {
+      const eventTicker = String(row.event_ticker || "").trim();
+      if (!eventTicker || seen.has(eventTicker)) continue;
+      seen.add(eventTicker);
+      targets.push({
+        eventTicker,
+        seriesTicker: String(row.series_ticker || ticker).trim() || ticker,
+      });
+    }
+  }
+  const cap = Math.max(1, Math.floor(Number(spec.limit) || PREVIEW_ROW_CAP));
+  const eventCap = spec.previewFirst ? 1 : targets.length;
+  const rows = [];
+  for (const target of targets.slice(0, eventCap)) {
+    const batch = await fetchKalshiLiveEventForecastRows(target, spec);
+    rows.push(...batch);
+    if (rows.length >= cap) break;
+  }
+  return {
+    columns,
+    rows: projectLiveJoinRows(columns, rows, cap),
+    truncated: targets.length > eventCap || rows.length > cap,
+    events: targets,
+  };
+}
+
+/** Candlesticks for every market inside one event. */
+export async function loadKalshiLiveEventCandlesticks(spec = {}) {
+  const columns = kalshiLiveColumns("event_candlesticks");
+  const eventTicker = String(spec.eventTicker || "").trim();
+  const seriesTicker = String(spec.seriesTicker || "").trim() || inferSeriesTickerFromEvent(eventTicker);
+  if (!eventTicker || !seriesTicker) return { columns, rows: [], truncated: false };
+  const end = Number(spec.maxTs) > 0 ? Math.floor(Number(spec.maxTs)) : Math.floor(Date.now() / 1000);
+  const start = Number(spec.minTs) > 0 ? Math.floor(Number(spec.minTs)) : end - 24 * 3600;
+  const period = EVENT_CANDLE_PERIODS.has(Number(spec.period)) ? Number(spec.period) : 60;
+  const params = new URLSearchParams({
+    ticker: eventTicker,
+    series_ticker: seriesTicker,
+    start_ts: String(start),
+    end_ts: String(end),
+    period_interval: String(period),
+  });
+  const json = await getJsonRetry(`/api/integrations/kalshi-live/events/candlesticks?${params}`);
+  const tickers = Array.isArray(json.market_tickers) ? json.market_tickers : [];
+  const sticks = Array.isArray(json.market_candlesticks) ? json.market_candlesticks : [];
+  const flat = flattenKalshiLiveCandlestickGroups(
+    tickers.map((ticker, index) => ({
+      market_ticker: ticker,
+      candlesticks: Array.isArray(sticks[index]) ? sticks[index] : [],
+    })),
+  );
+  const cap = Math.max(1, Math.floor(Number(spec.limit) || PREVIEW_ROW_CAP));
+  return { columns, rows: projectLiveJoinRows(columns, flat, cap), truncated: flat.length > cap };
+}
+
 /**
  * One-off Kalshi Live pull. Trades, candlesticks, and the order book are one market.
  * Series is a ticker list, or a category discovery when no tickers are selected.
@@ -1798,6 +1927,7 @@ export function loadKalshiLiveDirect(tableId, spec = {}) {
   if (tableId === "series") return loadKalshiLiveSeriesByTickers(spec.tickers || []);
   if (tableId === "events" && spec.mode === "discover") return loadKalshiLiveEventsDiscovery(spec, limit);
   if (tableId === "events") return loadKalshiLiveEventsByTickers(spec.tickers || [], spec);
+  if (tableId === "event_forecast") return loadKalshiLiveEventForecast(spec);
   if (tableId === "leaderboard") return loadKalshiLiveLeaderboard(spec);
   if (tableId === "search_traders") return loadKalshiLiveTraderSearch(spec);
   if (tableId === "holder_profile") return loadKalshiLiveHolderProfiles(spec.nicknames || []);

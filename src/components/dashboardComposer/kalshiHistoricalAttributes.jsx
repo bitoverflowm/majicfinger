@@ -14,6 +14,7 @@ import { KalshiLiveTimestampPicker } from "@/components/connectData/kalshiLive/K
 import { cellMatchesTextTerm, columnUsesWholeTerm } from "@/lib/textTermMatch";
 import { DATE_RANGE_PRESETS, activeDateRangePreset, dateRangePreset } from "@/components/dashboardComposer/dateRangePresets";
 import { KALSHI_LIVE_CANDLESTICK_PERIOD_OPTIONS } from "@/lib/kalshiLive/candlesticksColumns";
+import { KALSHI_LIVE_EVENT_FORECAST_PERIOD_OPTIONS } from "@/lib/kalshiLive/eventForecastColumns";
 import { cn } from "@/lib/utils";
 
 /**
@@ -640,6 +641,62 @@ export function JoinSourceFields({ tableId, filters, onChange }) {
           className="mt-1 h-9"
         />
       </label>
+    );
+  }
+  if (tableId === "event_candlesticks" || tableId === "event_forecast") {
+    const periodOptions =
+      tableId === "event_forecast"
+        ? KALSHI_LIVE_EVENT_FORECAST_PERIOD_OPTIONS.map((option) => [String(option.value), option.label])
+        : KALSHI_LIVE_CANDLESTICK_PERIOD_OPTIONS.map((option) => [String(option.value), option.label]);
+    const percentileTags = Array.isArray(current.percentiles?.containsTags) ? current.percentiles.containsTags : [];
+    const percentileDraft = String(current.percentiles?.contains || "");
+    const percentileText = percentileTags.length
+      ? `${percentileTags.join(", ")}${percentileDraft ? `, ${percentileDraft}` : ""}`
+      : percentileDraft;
+    return (
+      <div className="space-y-2">
+        <div>
+          <p className="mb-1 text-[11px] text-muted-foreground">Date range</p>
+          <DateRangeField from={range.from || ""} to={range.to || ""} presetId={range.preset || ""} onChange={setRange} />
+        </div>
+        <label className="block text-[11px] text-muted-foreground">
+          Period
+          <select
+            aria-label="Period"
+            value={String(current.period_interval?.value ?? "60")}
+            onChange={(event) => onChange({ ...current, period_interval: { value: event.target.value } })}
+            className="mt-1 h-9 w-full rounded-lg border border-border/70 bg-background px-2 text-[13px] text-foreground"
+          >
+            {periodOptions.map(([value, label]) => (
+              <option key={value} value={value}>
+                {label}
+              </option>
+            ))}
+          </select>
+        </label>
+        {tableId === "event_forecast" ? (
+          <label className="block text-[11px] text-muted-foreground">
+            Percentiles
+            <Input
+              aria-label="Percentiles"
+              value={percentileText}
+              placeholder="1000, 2500, 5000, 7500, 9000"
+              onChange={(event) => {
+                const parts = event.target.value.split(",");
+                const tags = parts
+                  .slice(0, -1)
+                  .map((part) => part.trim())
+                  .filter(Boolean);
+                onChange({
+                  ...current,
+                  percentiles: { contains: (parts[parts.length - 1] || "").trim(), containsTags: tags },
+                });
+              }}
+              className="mt-1 h-9"
+            />
+          </label>
+        ) : null}
+      </div>
     );
   }
   if (tableId !== "trades" && tableId !== "candlesticks") return null;

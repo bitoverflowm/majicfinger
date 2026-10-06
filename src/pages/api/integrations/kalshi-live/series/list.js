@@ -37,6 +37,8 @@ export default async function handler(req, res) {
   if (minUpdated && Number.isFinite(Number(minUpdated))) {
     qs.set("min_updated_ts", String(Math.floor(Number(minUpdated))));
   }
+  const cursor = firstQuery(req.query.cursor);
+  if (cursor) qs.set("cursor", cursor);
 
   const url = `${kalshiLiveUrl("series")}?${qs.toString()}`;
 

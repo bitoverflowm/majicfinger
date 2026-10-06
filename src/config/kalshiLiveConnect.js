@@ -183,14 +183,6 @@ export const KALSHI_LIVE_CONNECT_ENDPOINTS = [
     description:
       "Public social trade activity — optionally filter by nickname, series, event, or minimum amount.",
   },
-  {
-    id: "search_traders",
-    category: "holders",
-    title: "Search by trader nickname",
-    selectedTitle: "Search by trader nickname",
-    description:
-      "Find public trader profiles by nickname. Optionally add shared metrics and holdings.",
-  },
 ];
 
 /** @param {string} categoryId */

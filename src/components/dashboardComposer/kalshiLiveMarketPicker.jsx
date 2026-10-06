@@ -25,6 +25,7 @@ import {
   normalizeSeriesMarketsForPicker,
 } from "@/lib/kalshiLive/marketTickerSearch";
 import { KALSHI_LIVE_QUERY_ATTRIBUTE_COLUMNS } from "@/lib/kalshiLive/liveMarketAttributeQuery";
+import { inferSeriesTickerFromEvent } from "@/lib/kalshiLive/eventCandlesticksCompose";
 import { cn } from "@/lib/utils";
 
 const STATUS_OPTIONS = [
@@ -569,6 +570,7 @@ export function KalshiLiveMarketPicker({ picks, onAdd, onRemove, intent = "marke
       id: `event:${ticker}`,
       kind: "event",
       ticker,
+      seriesTicker: String(event.seriesTicker || "").trim().toUpperCase() || inferSeriesTickerFromEvent(ticker),
       label: event.title || ticker,
       title: event.title || ticker,
     });
@@ -583,6 +585,11 @@ export function KalshiLiveMarketPicker({ picks, onAdd, onRemove, intent = "marke
     }
     if (intent === "events") {
       if (suggestion.kind === "event") addEvent(suggestion);
+      return;
+    }
+    if (intent === "forecast") {
+      if (suggestion.kind === "series") addSeries(suggestion);
+      else if (suggestion.kind === "event") addEvent(suggestion);
       return;
     }
     if (suggestion.kind === "series" || suggestion.kind === "event") openScope(suggestion);
@@ -607,6 +614,7 @@ export function KalshiLiveMarketPicker({ picks, onAdd, onRemove, intent = "marke
     const visibleSuggestions = suggestions.filter((suggestion) => {
       if (intent === "series") return suggestion.kind === "series";
       if (intent === "events") return suggestion.kind === "event";
+      if (intent === "forecast") return suggestion.kind === "event" || suggestion.kind === "series";
       return true;
     });
     if (!showList) return null;
@@ -705,8 +713,25 @@ export function KalshiLiveMarketPicker({ picks, onAdd, onRemove, intent = "marke
           type="text"
           value={query}
           disabled={atCap}
-          placeholder={intent === "events" ? "Search for an event" : intent === "series" ? "Search for a series" : SEARCH_PLACEHOLDER}
-          aria-label={intent === "events" ? "Search for an event" : intent === "series" ? "Search for a series" : "Search Kalshi markets"}
+          placeholder={
+            intent === "forecast"
+              ? "Search for an event or a series"
+              : intent === "events"
+                ? "Search for an event"
+                : intent === "series"
+                  ? "Search for a series"
+                  : SEARCH_PLACEHOLDER
+          }
+          aria-label={
+            intent === "forecast"
+              ? "Search for an event or a series"
+              : intent === "events"
+                ? "Search for an event"
+                : intent === "series"
+                  ? "Search for a series"
+                  : "Search Kalshi markets"
+          }
+          aria-required={intent === "forecast" ? true : undefined}
           autoComplete="off"
           onChange={(event) => {
             setQuery(event.target.value);
@@ -722,6 +747,20 @@ export function KalshiLiveMarketPicker({ picks, onAdd, onRemove, intent = "marke
             }
             if (event.key === "Enter") {
               event.preventDefault();
+              if (intent === "forecast") {
+                const match = suggestions.find((item) => item.kind === "event" || item.kind === "series");
+                if (expanded && match) {
+                  chooseSuggestion(match);
+                  return;
+                }
+                const token = query.trim().toUpperCase();
+                if (!token) return;
+                if (token.includes("-")) addEvent({ ticker: token, title: token, seriesTicker: inferSeriesTickerFromEvent(token) });
+                else addSeries({ ticker: token, title: token });
+                setQuery("");
+                setExpanded(false);
+                return;
+              }
               const first = suggestions[0];
               if (expanded && first) chooseSuggestion(first);
             }
@@ -748,7 +787,10 @@ export function KalshiLiveMarketPicker({ picks, onAdd, onRemove, intent = "marke
     <TooltipProvider delayDuration={200}>
       <section className="space-y-2">
         <div className="flex items-center justify-between gap-2">
-          <p className="text-[12px] font-semibold text-foreground">{intent === "events" ? "Search for an event" : intent === "series" ? "Search for a series" : "Markets"}</p>
+          <p className="text-[12px] font-semibold text-foreground">
+            {intent === "forecast" ? "Search for an event or a series" : intent === "events" ? "Search for an event" : intent === "series" ? "Search for a series" : "Markets"}
+            {intent === "forecast" ? <span className="text-destructive"> *</span> : null}
+          </p>
           {(picks || []).length ? (
             <span className="text-[10px] text-muted-foreground">{picks.length} selected</span>
           ) : null}
