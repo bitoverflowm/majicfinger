@@ -365,6 +365,129 @@ export function LiveMarketsJoinExplainer() {
   );
 }
 
+const FANOUT_HERE = {
+  candlesticks: "Candlesticks",
+  trades: "Trades",
+  orderbook: "Order book",
+};
+
+const FANOUT_LEAVES = ["Trades", "Order book", "Candlesticks"];
+
+function fanoutHere(tableId) {
+  return FANOUT_HERE[tableId] || "This pull";
+}
+
+function fanoutAlso(tableId) {
+  const here = fanoutHere(tableId);
+  return FANOUT_LEAVES.filter((title) => title !== here);
+}
+
+function RouteChip({ label, hint, delay, accent, active = false }) {
+  const reduce = useReducedMotion();
+  return (
+    <motion.div
+      initial={reduce ? false : { opacity: 0, y: 8 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ delay, duration: 0.35, ease: "easeOut" }}
+      className={cn(
+        "relative overflow-hidden rounded-lg border px-2.5 py-1.5 shadow-sm backdrop-blur-md",
+        active ? "" : "border-border/70 bg-background/90",
+      )}
+      style={active ? { borderColor: `${accent}80`, backgroundColor: `${accent}1a` } : undefined}
+    >
+      {active ? <BorderBeam size={48} duration={8} delay={delay} borderWidth={1.2} colorFrom={accent} colorTo="#0d99ff" /> : null}
+      <p className="text-[12px] font-semibold leading-none text-foreground">{label}</p>
+      {hint ? <p className="mt-1 text-[10px] leading-snug text-muted-foreground">{hint}</p> : null}
+    </motion.div>
+  );
+}
+
+/** Hover illustration for a candlestick, trade, or order book pull. */
+export function FanoutJoinExplainerTabs({ tableId = "candlesticks" }) {
+  const reduce = useReducedMotion();
+  const tabs = [fanoutHere(tableId), "Market", "Series", "Markets", ...fanoutAlso(tableId)];
+  return (
+    <div className="overflow-hidden px-4 pb-1 pt-4">
+      <div className="flex">
+        {tabs.map((title, index) =>
+          index === 0 ? (
+            <span key={title} className={tabClass(false)}>
+              {title}
+            </span>
+          ) : (
+            <motion.span
+              key={title}
+              initial={reduce ? false : { clipPath: "inset(0 100% 0 0)", opacity: 0 }}
+              animate={{ clipPath: "inset(0 0% 0 0)", opacity: 1 }}
+              transition={{ duration: 0.4, delay: 0.1 * index, ease: "easeOut" }}
+              className={tabClass(index === tabs.length - 1)}
+            >
+              {title}
+            </motion.span>
+          ),
+        )}
+      </div>
+    </div>
+  );
+}
+
+/** The sheets a candlestick, trade, or order book pull can open. */
+export function FanoutJoinExplainer({ tableId = "candlesticks" }) {
+  const reduce = useReducedMotion();
+  const style = venueStyle("kalshi");
+  const here = fanoutHere(tableId);
+  const also = fanoutAlso(tableId);
+  return (
+    <div className="relative flex h-full min-h-[280px] items-center justify-center overflow-hidden rounded-xl border border-border/70 bg-background shadow-sm">
+      <FlickeringGrid
+        className="absolute inset-0 [mask-image:radial-gradient(ellipse_at_center,black,transparent_75%)]"
+        squareSize={3}
+        gridGap={5}
+        flickerChance={0.16}
+        color={style.flicker}
+        maxOpacity={0.2}
+      />
+      <div className="relative z-10 flex w-full max-w-xl flex-col gap-4 px-6 py-6">
+        <p className="text-center text-[13px] leading-relaxed text-muted-foreground">
+          From {here.toLowerCase()}, join the parent market, its series, every market in that series, and the trades, order book, and candlesticks on those markets.
+        </p>
+        <div className="flex flex-col gap-2">
+          <RouteChip label={here} hint="This pull" delay={0.05} accent={style.accent} active />
+          <div className="ml-3 flex flex-col gap-2 border-l border-border/70 pl-3">
+            <RouteChip label="Parent market" hint="Metadata for this market" delay={0.16} accent={style.accent} />
+            <div className="flex flex-col gap-2">
+              <RouteChip label="Parent series" hint="The series this market belongs to" delay={0.28} accent={style.accent} />
+              <div className="ml-3 flex flex-col gap-2 border-l border-border/70 pl-3">
+                <RouteChip label="Markets" hint="Every market in the series" delay={0.4} accent={style.accent} />
+                <div className="flex flex-wrap gap-1.5">
+                  {FANOUT_LEAVES.map((title, index) => (
+                    <RouteChip key={title} label={title} delay={0.52 + index * 0.08} accent={style.accent} active={title !== here} />
+                  ))}
+                </div>
+              </div>
+            </div>
+            <div className="flex flex-col gap-1.5">
+              <motion.p
+                className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground"
+                initial={reduce ? false : { opacity: 0 }}
+                animate={{ opacity: 1 }}
+                transition={{ delay: 0.64, duration: 0.3 }}
+              >
+                On this market
+              </motion.p>
+              <div className="flex flex-wrap gap-1.5">
+                {also.map((title, index) => (
+                  <RouteChip key={title} label={title} delay={0.72 + index * 0.08} accent={style.accent} active />
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 /** Markets points each contract at its trades. Trades points each fill at market metadata. */
 export function JoinExplainer({ source = "markets", venue = "kalshi", live = false }) {
   if (live) return <LiveMarketsJoinExplainer />;

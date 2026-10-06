@@ -10,7 +10,7 @@ import { SummarizeExplainer, SummarizeExplainerTabs } from "@/components/dashboa
 import { BucketExplainer, BucketExplainerTabs } from "@/components/dashboardComposer/integrationBucketExplainer";
 import { SampleExplainer } from "@/components/dashboardComposer/integrationSampleExplainer";
 import { BucketEnrichPanel, SampleEnrichPanel } from "@/components/dashboardComposer/integrationEnrichPanels";
-import { JoinExplainer, JoinExplainerTabs } from "@/components/dashboardComposer/integrationJoinExplainer";
+import { FanoutJoinExplainer, FanoutJoinExplainerTabs, JoinExplainer, JoinExplainerTabs } from "@/components/dashboardComposer/integrationJoinExplainer";
 import { SpectrumLoadingState } from "@/components/ui/spectrum-loading-state";
 import { TaskRows } from "@/components/spectrumui/blocks/ai-assistants/task-rows";
 import {
@@ -3678,7 +3678,10 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
       return "Click a column or a cell to drop it into the summary.";
     }
     if (showJoinExplainer) {
-      if (liveMarketFanout) return "Illustration. Join this market to its metadata, its series, or the other data on the same ticker.";
+      if (liveMarketFanout) {
+        const here = tableId === "trades" ? "trades" : tableId === "orderbook" ? "the order book" : "candlesticks";
+        return `Illustration. From ${here}, the route runs through the parent market, its series, and the trades, order book, and candlesticks on those markets.`;
+      }
       if (liveSeriesSearch || liveEventSearch) return `Illustration. Markets inside these ${listPlural} load after you choose Join.`;
       return tradesQuery
         ? "Illustration. No market metadata is loaded until you run the pull."
@@ -5952,12 +5955,7 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
             </div>
           </div>
         ) : showJoinExplainer && liveMarketFanout ? (
-          <div className="overflow-hidden px-4 pb-1 pt-4">
-            <div className="flex">
-              <span className={sheetTabClass(false)}>{sheetTitle}</span>
-              <span className={sheetTabClass(true)}>Market</span>
-            </div>
-          </div>
+          <FanoutJoinExplainerTabs tableId={tableId} />
         ) : showJoinExplainer ? (
           <JoinExplainerTabs source={tradesQuery ? "trades" : "markets"} live={liveMarketSearch} />
         ) : liveJoinReady ? (
@@ -6095,9 +6093,7 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
                 : "Join these series to the markets inside them. Kalshi takes one series ticker per request, so the pull loops the series in this query."}
             </div>
           ) : showJoinExplainer && liveMarketFanout ? (
-            <div className="flex h-full items-center justify-center rounded-xl border border-border/70 bg-background px-6 text-center text-[13px] leading-relaxed text-muted-foreground shadow-sm">
-              Join this market to its metadata, its series, or the trades, order book, and candlesticks on the same ticker.
-            </div>
+            <FanoutJoinExplainer tableId={tableId} />
           ) : showJoinExplainer ? (
             <JoinExplainer source={tradesQuery ? "trades" : "markets"} venue={polymarketHistorical ? "polymarket" : "kalshi"} live={liveMarketSearch} />
           ) : previewSheet === "parent-market" && fanoutJoinOn ? (
