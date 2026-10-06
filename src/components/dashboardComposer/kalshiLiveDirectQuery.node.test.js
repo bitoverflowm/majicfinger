@@ -23,6 +23,8 @@ import {
   forecastPercentileValues,
   forecastPullTargets,
   kalshiLiveEventForecastAttributeColumns,
+  kalshiLiveMultivariateAttributeColumns,
+  multivariateCollectionTicker,
 } from "./kalshiLiveDirectScope.js";
 
 assert.equal(isKalshiLiveDirectTable("trades"), true);
@@ -189,5 +191,40 @@ assert.deepEqual(
 );
 assert.equal(directPullWindow("event_forecast", { period_interval: { value: "0" } }, { period: 60 }).period, 0);
 assert.equal(directPullWindow("candlesticks", { period_interval: { value: "0" } }, { period: 60 }).period, 60);
+assert.equal(directPullWindow("event_candlesticks", { period_interval: { value: "0" } }, { period: 60 }).period, 60);
+
+assert.equal(isKalshiLiveDirectTable("event_candlesticks"), true);
+assert.equal(isKalshiLiveDirectTable("multivariate_events"), true);
+assert.equal(kalshiLiveDirectScopeError("event_candlesticks", [], {}, {}), "Search for an event.");
+assert.equal(
+  kalshiLiveDirectScopeError("event_candlesticks", [{ kind: "event", ticker: "KXHIGHNY-26OCT07" }], {}, {}),
+  "",
+);
+assert.equal(defaultDirectAttributeFilters("event_candlesticks", new Date("2026-10-06T12:00:00Z")).period_interval.value, "60");
+const eventCandleAttributes = kalshiLiveDirectAttributeColumns("event_candlesticks", [
+  { id: "market_ticker", title: "Market ticker" },
+  { id: "end_period_ts", type: "date", title: "End" },
+]);
+assert.deepEqual(eventCandleAttributes.slice(0, 2).map((column) => column.id), ["time_range", "period_interval"]);
+assert.equal(eventCandleAttributes[1].queryOnly, true);
+
+const multivariateAttributes = kalshiLiveMultivariateAttributeColumns([
+  { id: "event_ticker", title: "Event ticker" },
+  { id: "title", title: "Title" },
+]);
+assert.deepEqual(multivariateAttributes.map((column) => column.id), ["series_ticker", "collection_ticker", "event_ticker", "title"]);
+assert.equal(multivariateAttributes[0].exactTickers, true);
+assert.equal(multivariateAttributes[1].queryOnly, true);
+assert.equal(multivariateCollectionTicker({ collection_ticker: { containsTags: ["KXCOMBO"] } }), "KXCOMBO");
+assert.equal(
+  kalshiLiveDirectScopeError(
+    "multivariate_events",
+    [{ kind: "series", ticker: "KXHIGHNY" }],
+    {},
+    { collection_ticker: { containsTags: ["KXCOMBO"] } },
+  ),
+  "Use either a series or a collection ticker.",
+);
+assert.equal(kalshiLiveDirectScopeError("multivariate_events", [], {}, {}), "");
 
 console.log("kalshi live direct query ok");

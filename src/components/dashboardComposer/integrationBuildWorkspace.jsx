@@ -124,6 +124,8 @@ import {
   kalshiLiveEventForecastAttributeColumns,
   forecastPercentileValues,
   forecastPullTargets,
+  kalshiLiveMultivariateAttributeColumns,
+  multivariateCollectionTicker,
 } from "@/components/dashboardComposer/kalshiLiveDirectScope";
 import { allowsMarketDownstreamJoin, pullKindFlags, withJoinFlags } from "@/components/dashboardComposer/pullKindFlags";
 import { kalshiLiveEndpointHasRealtimeFeed } from "@/config/kalshiLiveConnect";
@@ -2081,7 +2083,9 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
   const liveTrader = integrationId === "kalshiLive" && isKalshiLiveTraderTable(tableId);
   const liveTraderList = liveTrader && (tableId === "leaderboard" || tableId === "search_traders");
   const liveForecast = integrationId === "kalshiLive" && tableId === "event_forecast";
-  const liveMarketFanout = liveDirect && !liveSeriesSearch && !liveEventSearch && !liveTrader && !liveForecast;
+  const liveEventCandles = integrationId === "kalshiLive" && tableId === "event_candlesticks";
+  const liveMultivariate = integrationId === "kalshiLive" && tableId === "multivariate_events";
+  const liveMarketFanout = liveDirect && !liveSeriesSearch && !liveEventSearch && !liveTrader && !liveForecast && !liveEventCandles && !liveMultivariate;
 
   useEffect(() => {
     if (!liveSeriesSearch) return undefined;
@@ -2145,7 +2149,13 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
     const timer = window.setInterval(() => {
       setProgress((current) => (current >= 88 ? current : current + Math.random() * 8));
     }, 280);
-    loadBuildPreview(integrationId, tableId, tableId === "event_forecast" ? { fresh: true } : undefined)
+    const skipIdleSample =
+      tableId === "event_forecast" ||
+      tableId === "event_candlesticks" ||
+      tableId === "candlesticks" ||
+      tableId === "trades" ||
+      tableId === "orderbook";
+    loadBuildPreview(integrationId, tableId, skipIdleSample ? { fresh: true } : undefined)
       .then((result) => {
         if (cancel) return;
         setProgress(100);
@@ -2274,8 +2284,8 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
     [liveMarketSearch, pull?.columns, KALSHI_LIVE_QUERY_ATTRIBUTE_COLUMNS, kalshiLiveMarketAttributeColumns],
   );
   const directAttributeColumns = useMemo(
-    () => (liveMarketFanout ? kalshiLiveDirectAttributeColumns(tableId, pull?.columns || []) : []),
-    [liveMarketFanout, tableId, pull?.columns],
+    () => ((liveMarketFanout || liveEventCandles) ? kalshiLiveDirectAttributeColumns(tableId, pull?.columns || []) : []),
+    [liveEventCandles, liveMarketFanout, tableId, pull?.columns],
   );
   const forecastAttributeColumns = useMemo(
     () => (liveForecast ? kalshiLiveEventForecastAttributeColumns(pull?.columns || []) : []),
@@ -2306,6 +2316,14 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
     () => (liveEventSearch ? kalshiLiveEventAttributeColumns(pull?.columns || []) : []),
     [liveEventSearch, pull?.columns],
   );
+  const multivariateAttributeColumns = useMemo(
+    () => (liveMultivariate ? kalshiLiveMultivariateAttributeColumns(pull?.columns || []) : []),
+    [liveMultivariate, pull?.columns],
+  );
+  const multivariateRowColumns = useMemo(
+    () => multivariateAttributeColumns.filter((column) => !column.queryOnly),
+    [multivariateAttributeColumns],
+  );
   const traderAttributeColumns = useMemo(
     () => (liveTrader ? kalshiLiveTraderAttributeColumns(tableId, pull?.columns || []) : []),
     [liveTrader, tableId, pull?.columns],
@@ -2330,9 +2348,11 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
   const eventSeries = eventSeriesTicker(attributeFilters);
   const eventSeriesKey = eventSeriesTickers(attributeFilters).join("\0");
   const eventMinCloseTs = eventClosesAfter(attributeFilters);
-  const eventIncludeMarkets = liveEventSearch && !hidden.has("markets");
+  const eventIncludeMarkets = (liveEventSearch || liveMultivariate) && !hidden.has("markets");
   const eventIncludeMilestones = liveEventSearch && !hidden.has("milestones");
   const eventColumnFilterKey = columnFilterKey(eventAttributeColumns, attributeFilters, ["series_ticker", "last_updated_ts"]);
+  const multivariateCollection = multivariateCollectionTicker(attributeFilters);
+  const multivariateColumnFilterKey = columnFilterKey(multivariateAttributeColumns, attributeFilters, ["series_ticker", "collection_ticker"]);
   const seriesColumnFilterKey = columnFilterKey(seriesAttributeColumns, attributeFilters, ["category", "last_updated_ts"]);
   const liveClientColumns = useMemo(
     () => liveAttributeColumns.filter((column) => !column.queryOnly),
@@ -2638,7 +2658,9 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
 
   function addDirectPick(pick) {
     const forecastPick = tableId === "event_forecast" && (pick?.kind === "event" || pick?.kind === "series");
-    if ((tableId === "series" && pick?.kind === "series") || (tableId === "events" && pick?.kind === "event") || forecastPick) {
+    const eventCandlePick = tableId === "event_candlesticks" && pick?.kind === "event";
+    const multivariatePick = tableId === "multivariate_events" && pick?.kind === "series";
+    if ((tableId === "series" && pick?.kind === "series") || (tableId === "events" && pick?.kind === "event") || forecastPick || eventCandlePick || multivariatePick) {
       setLivePicks((prev) => (prev.some((item) => item.id === pick.id) ? prev : [...prev, { ...pick, status: "ready", rows: [], error: "" }]));
       return;
     }
@@ -2656,6 +2678,20 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
   const directEvents = useMemo(
     () => (liveDirect && tableId === "events" ? directEventTickers(livePicks) : []),
     [liveDirect, livePicks, tableId],
+  );
+  const eventCandleEvents = useMemo(() => {
+    if (!liveEventCandles) return [];
+    return livePicks
+      .filter((pick) => pick?.kind === "event" && String(pick.ticker || "").trim())
+      .map((pick) => ({
+        eventTicker: String(pick.ticker).trim(),
+        seriesTicker: String(pick.seriesTicker || "").trim(),
+        title: String(pick.title || pick.ticker || "").trim(),
+      }));
+  }, [liveEventCandles, livePicks]);
+  const multivariateSeries = useMemo(
+    () => (liveMultivariate ? directSeriesTickers(livePicks) : []),
+    [liveMultivariate, livePicks],
   );
   const forecastTargets = useMemo(
     () => (liveForecast ? forecastPullTargets(livePicks) : { events: [], seriesTickers: [] }),
@@ -2686,6 +2722,21 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
         setDirectPreview({ status: "idle", rows: [], error: "", ticker: "" });
         return undefined;
       }
+    } else if (tableId === "event_candlesticks") {
+      if (!eventCandleEvents.length) {
+        setDirectPreview({ status: "idle", rows: [], error: "", ticker: "" });
+        return undefined;
+      }
+    } else if (tableId === "multivariate_events") {
+      const seriesList = multivariateSeries.length ? multivariateSeries : eventSeriesTickers(attributeFilters);
+      if (seriesList.length && multivariateCollection) {
+        setDirectPreview({ status: "error", rows: [], error: "Use either a series or a collection ticker.", ticker: "" });
+        return undefined;
+      }
+      if (!seriesList.length && !multivariateCollection && !multivariateColumnFilterKey) {
+        setDirectPreview({ status: "idle", rows: [], error: "", ticker: "" });
+        return undefined;
+      }
     } else if (isKalshiLiveTraderTable(tableId)) {
       const directed =
         tableId === "leaderboard" ||
@@ -2707,6 +2758,9 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
       : null;
     const eventMatch = eventColumnFilterKey
       ? (row) => rowMatchesAttributes(row, eventAttributeColumns, attributeFilters)
+      : null;
+    const multivariateMatch = multivariateColumnFilterKey
+      ? (row) => rowMatchesAttributes(row, multivariateRowColumns, attributeFilters)
       : null;
     // The series list is the whole result. The grid still shows PREVIEW_ROW_CAP.
     const seriesFetchCap = typeof planLimit === "number" && planLimit > 0 ? planLimit : PREVIEW_ROW_CAP;
@@ -2782,7 +2836,25 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
                         limit: PREVIEW_ROW_CAP,
                         previewFirst: true,
                       }
-                    : {
+                    : tableId === "event_candlesticks"
+                      ? {
+                          eventTicker: eventCandleEvents[0]?.eventTicker || "",
+                          seriesTicker: eventCandleEvents[0]?.seriesTicker || "",
+                          minTs: directWindow.minTs,
+                          maxTs: directWindow.maxTs,
+                          period: directWindow.period || 60,
+                          limit: PREVIEW_ROW_CAP,
+                        }
+                      : tableId === "multivariate_events"
+                        ? {
+                            seriesTickers: multivariateSeries.length ? multivariateSeries : eventSeriesTickers(attributeFilters),
+                            collectionTicker: multivariateSeries.length || eventSeriesTickers(attributeFilters).length ? "" : multivariateCollection,
+                            includeMarkets: eventIncludeMarkets,
+                            match: multivariateMatch,
+                            maxPages: multivariateMatch ? 10 : 2,
+                            limit: multivariateMatch ? traderCap(PREVIEW_ROW_CAP) : seriesFetchCap,
+                          }
+                        : {
                       ticker,
                       minTs: directWindow.minTs,
                       maxTs: directWindow.maxTs,
@@ -2806,7 +2878,7 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
             status: "ready",
             rows,
             error: "",
-            ticker: ticker || directSeries[0] || directEvents[0] || forecastTargets.events[0]?.eventTicker || forecastTargets.seriesTickers[0] || "",
+            ticker: ticker || directSeries[0] || directEvents[0] || eventCandleEvents[0]?.eventTicker || multivariateSeries[0] || forecastTargets.events[0]?.eventTicker || forecastTargets.seriesTickers[0] || "",
             truncated: Boolean(result?.truncated),
             visibility: result?.visibility || "",
             events: Array.isArray(result?.events) ? result.events : [],
@@ -2827,7 +2899,7 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
       cancel = true;
       window.clearTimeout(timer);
     };
-  }, [directEvents, directMarkets, directSeries, directWindow.depth, directWindow.maxTs, directWindow.minTs, directWindow.period, eventAttributeColumns, eventColumnFilterKey, eventIncludeMarkets, eventIncludeMilestones, eventMinCloseTs, eventSeriesKey, eventStatusKey, forecastPercentileKey, forecastTargets, holderEventTicker, holderMinAmount, holderNicknameKey, holderSeriesTicker, liveDirect, planLimit, rowLimit, sampleMarketTicker, seriesAttributeColumns, seriesCategoryKey, seriesColumnFilterKey, seriesMinUpdatedTs, seriesProductMetadata, tableId, traderCategoryKey, traderHoldingsOn, traderMetric, traderMetricsOn, traderPeriod, traderProfileKey, traderQuery]);
+  }, [directEvents, directMarkets, directSeries, directWindow.depth, directWindow.maxTs, directWindow.minTs, directWindow.period, eventAttributeColumns, eventCandleEvents, eventColumnFilterKey, eventIncludeMarkets, eventIncludeMilestones, eventMinCloseTs, eventSeriesKey, eventStatusKey, forecastPercentileKey, forecastTargets, holderEventTicker, holderMinAmount, holderNicknameKey, holderSeriesTicker, liveDirect, multivariateCollection, multivariateColumnFilterKey, multivariateRowColumns, multivariateSeries, planLimit, rowLimit, sampleMarketTicker, seriesAttributeColumns, seriesCategoryKey, seriesColumnFilterKey, seriesMinUpdatedTs, seriesProductMetadata, tableId, traderCategoryKey, traderHoldingsOn, traderMetric, traderMetricsOn, traderPeriod, traderProfileKey, traderQuery]);
 
   const seriesImportRows = useMemo(() => {
     if (!(liveDirect && tableId === "series" && directPreview.status === "ready")) return null;
@@ -2862,14 +2934,16 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
           ? traderAttributeColumns
           : liveForecast
             ? forecastRowColumns
-            : liveMarketFanout
-              ? directRowColumns
-              : null;
+            : liveMultivariate
+              ? multivariateRowColumns
+              : liveMarketFanout || liveEventCandles
+                ? directRowColumns
+                : null;
     if (!columns?.length) return null;
     if (!columnFilterKey(columns, attributeFilters) && !sortKeys.length) return null;
     const matched = (pull?.rows || []).filter((row) => rowMatchesAttributes(row, columns, attributeFilters));
     return sortAttributeRows(matched, columns, sortKeys);
-  }, [attributeFilters, directPreview.status, directRowColumns, eventAttributeColumns, forecastRowColumns, liveDirect, liveEventSearch, liveForecast, liveMarketFanout, liveSeriesSearch, liveTrader, pull?.rows, seriesAttributeColumns, sortKeys, traderAttributeColumns]);
+  }, [attributeFilters, directPreview.status, directRowColumns, eventAttributeColumns, forecastRowColumns, liveDirect, liveEventCandles, liveEventSearch, liveForecast, liveMarketFanout, liveMultivariate, liveSeriesSearch, liveTrader, multivariateRowColumns, pull?.rows, seriesAttributeColumns, sortKeys, traderAttributeColumns]);
 
   const filteredRows = useMemo(() => {
     const requested = Number(rowLimit);
@@ -2878,8 +2952,8 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
       return limited;
     };
     if (listImportRows) return capPreview(listImportRows.slice(0, Math.min(visibleCount, PREVIEW_ROW_CAP)));
-    if ((liveMarketFanout || liveForecast) && directPreview.status !== "idle") {
-      const columns = liveForecast ? forecastRowColumns : directRowColumns;
+    if ((liveMarketFanout || liveForecast || liveEventCandles || liveMultivariate) && directPreview.status !== "idle") {
+      const columns = liveForecast ? forecastRowColumns : liveMultivariate ? multivariateRowColumns : directRowColumns;
       const matched = (directPreview.rows || []).filter((row) => rowMatchesAttributes(row, columns, attributeFilters));
       const sorted = sortAttributeRows(matched, columns, sortKeys);
       return capPreview(sorted.slice(0, visibleCount));
@@ -2913,7 +2987,7 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
     const query = filterValue.trim().toLowerCase();
     const matched = !query || !filterColumn ? rows : rows.filter((row) => String(row[filterColumn] ?? "").toLowerCase().includes(query));
     return capPreview(matched);
-  }, [directPreview.rows, directPreview.status, directRowColumns, forecastRowColumns, pull, visibleCount, filterColumn, filterValue, guidedFilters, attributeFilters, sortKeys, rowLimit, integrationId, tableId, settledPreviewKey, previewSearchError, livePreviewRows, liveMarketSearch, liveDirect, liveForecast, liveMarketFanout, liveNarrowing, seriesAttributeColumns, listImportRows, idleAttributeRows]);
+  }, [directPreview.rows, directPreview.status, directRowColumns, forecastRowColumns, pull, visibleCount, filterColumn, filterValue, guidedFilters, attributeFilters, sortKeys, rowLimit, integrationId, tableId, settledPreviewKey, previewSearchError, livePreviewRows, liveMarketSearch, liveDirect, liveEventCandles, liveForecast, liveMarketFanout, liveMultivariate, liveNarrowing, multivariateRowColumns, seriesAttributeColumns, listImportRows, idleAttributeRows]);
 
   const queriedMarkets = useMemo(() => {
     if (!guidedFilters) return [];
@@ -3354,13 +3428,15 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
   const columnScanPending =
     liveDirect &&
     directPreview.status === "idle" &&
-    (Boolean(eventColumnFilterKey) || Boolean(seriesColumnFilterKey));
+    (Boolean(eventColumnFilterKey) || Boolean(seriesColumnFilterKey) || Boolean(multivariateColumnFilterKey));
   const directLoading =
     liveDirect &&
     (directPreview.status === "loading" || (columnScanPending && !idleAttributeRows?.length));
   const directExtra =
     liveMarketFanout && directPreview.status === "ready" && directMarkets.length > 1
       ? ` Each market gets its own sheet. The other ${directMarkets.length - 1} ${directMarkets.length === 2 ? "is" : "are"} created when you run.`
+      : liveEventCandles && directPreview.status === "ready" && eventCandleEvents.length > 1
+        ? ` Each event gets its own sheet. The other ${eventCandleEvents.length - 1} ${eventCandleEvents.length === 2 ? "is" : "are"} created when you run.`
       : tableId === "trades_by_holder" &&
           directPreview.status === "ready" &&
           !directPreview.rows.length &&
@@ -3394,13 +3470,18 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
     !liveUpdating &&
     !previewRefreshing &&
     liveScan.status !== "error";
-  const previewIsEmpty = previewSampleEmpty || liveSettledEmpty;
+  const directedShown = liveDirect && directPreview.status === "ready" && shown > 0;
+  const previewIsEmpty = !directedShown && (previewSampleEmpty || liveSettledEmpty);
   // The grid never shows more than 50. The import count is the known size of this pull
   // (the rows in hand, a counted match, or a historical universe), then capped by the plan and row limit.
   const previewShown = Math.min(shown, PREVIEW_ROW_CAP);
-  const directReadyCount = (liveMarketFanout || liveForecast) && directPreview.status === "ready"
+  const directReadyCount = (liveMarketFanout || liveForecast || liveEventCandles || liveMultivariate) && directPreview.status === "ready"
     ? (directPreview.rows || []).filter((row) =>
-        rowMatchesAttributes(row, liveForecast ? forecastRowColumns : directRowColumns, attributeFilters),
+        rowMatchesAttributes(
+          row,
+          liveForecast ? forecastRowColumns : liveMultivariate ? multivariateRowColumns : directRowColumns,
+          attributeFilters,
+        ),
       ).length
     : null;
   const directCountOpen =
@@ -3409,7 +3490,7 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
       (liveForecast && Boolean(directPreview.truncated) && !(Number(rowLimit) > 0)));
   const columnScanOpen =
     Boolean(directPreview.truncated) &&
-    (Boolean(eventColumnFilterKey) || Boolean(seriesColumnFilterKey)) &&
+    (Boolean(eventColumnFilterKey) || Boolean(seriesColumnFilterKey) || Boolean(multivariateColumnFilterKey)) &&
     !(Number(rowLimit) > 0);
   const pullTotal = previewIsEmpty
     ? 0
@@ -3488,13 +3569,32 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
       requirements={liveScan.requirements || []}
     />
   ) : null;
-  const forecastNeedsPick =
-    liveForecast &&
-    directPreview.status === "idle" &&
-    !forecastTargets.events.length &&
-    !forecastTargets.seriesTickers.length;
-  const liveEmptyLine = forecastNeedsPick
-    ? "Event or series required to get an event forecast. Use the search in the control panel."
+  const marketTickerRequired = liveMarketFanout && (tableId === "trades" || tableId === "candlesticks" || tableId === "orderbook");
+  const needsTickerSearch =
+    (marketTickerRequired && !directMarkets.length) ||
+    (liveEventCandles && !eventCandleEvents.length) ||
+    (liveForecast && !forecastTargets.events.length && !forecastTargets.seriesTickers.length);
+  const multivariateCenterSearch =
+    liveMultivariate &&
+    !loading &&
+    directPreview.status !== "loading" &&
+    !multivariateSeries.length &&
+    !eventSeriesTickers(attributeFilters).length &&
+    !multivariateCollection &&
+    shown === 0 &&
+    !error;
+  const centerSearch = needsTickerSearch || multivariateCenterSearch;
+  const tickerPrompt = marketTickerRequired && !directMarkets.length
+    ? "Market ticker required"
+    : liveEventCandles && !eventCandleEvents.length
+      ? "Event and series required"
+      : liveForecast && !forecastTargets.events.length && !forecastTargets.seriesTickers.length
+        ? "Event or series required"
+        : multivariateCenterSearch
+          ? "Search for a series"
+          : "";
+  const liveEmptyLine = tickerPrompt
+    ? tickerPrompt
     : liveMarketSearch && liveScan.truncated
       ? `No data found in the first ${KALSHI_LIVE_MARKET_SCAN_CAP.toLocaleString()} markets.`
       : "No data found";
@@ -5288,6 +5388,71 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
           summary: `Kalshi Live · Event forecast · ${ticker}`,
           sourceRows: rows,
         }));
+      } else if (tableId === "event_candlesticks") {
+        const pulled = await mapPool(eventCandleEvents, 3, (event) =>
+          loadKalshiLiveDirect("event_candlesticks", {
+            eventTicker: event.eventTicker,
+            seriesTicker: event.seriesTicker,
+            minTs: directWindow.minTs,
+            maxTs: directWindow.maxTs,
+            period: directWindow.period || 60,
+            limit,
+          }).then((result) => ({ event, ...shape(result) })),
+        );
+        built = pulled
+          .filter((item) => item.columns.length)
+          .map((item) => {
+            const matched = (item.rows || []).filter((row) => rowMatchesAttributes(row, directRowColumns, attributeFilters));
+            const sorted = sortAttributeRows(matched, directRowColumns, sortKeys);
+            const requested = Number(rowLimit);
+            const fullRows = Number.isFinite(requested) && requested > 0 ? sorted.slice(0, Math.min(requested, limit)) : sorted;
+            const ticker = item.event.eventTicker;
+            return {
+              id: pulled.length === 1 ? "run-live-event-candlesticks" : `run-live-event-candlesticks-${ticker.replace(/[^A-Za-z0-9]+/g, "-")}`,
+              title: pulled.length === 1 ? "Event candlesticks" : `Event candlesticks · ${ticker}`,
+              columns: item.columns,
+              rows: fullRows.slice(0, PREVIEW_ROW_CAP),
+              rowCount: fullRows.length,
+              span: pulled.length > 1 ? "half" : "full",
+              table: "event_candlesticks",
+              summary: `Kalshi Live · Event candlesticks · ${ticker}`,
+              sourceRows: fullRows,
+            };
+          });
+      } else if (tableId === "multivariate_events") {
+        const loaded = await loadKalshiLiveDirect("multivariate_events", {
+          seriesTickers: multivariateSeries.length ? multivariateSeries : eventSeriesTickers(attributeFilters),
+          collectionTicker: multivariateSeries.length || eventSeriesTickers(attributeFilters).length ? "" : multivariateCollection,
+          includeMarkets: eventIncludeMarkets,
+          match: multivariateColumnFilterKey
+            ? (row) => rowMatchesAttributes(row, multivariateRowColumns, attributeFilters)
+            : null,
+          maxPages: 25,
+          limit,
+        });
+        const shaped = shape(loaded);
+        const matched = shaped.rows.filter((row) => rowMatchesAttributes(row, multivariateRowColumns, attributeFilters));
+        const sorted = sortAttributeRows(matched, multivariateRowColumns, sortKeys);
+        const requested = Number(rowLimit);
+        const rows = Number.isFinite(requested) && requested > 0 ? sorted.slice(0, Math.min(requested, limit)) : sorted;
+        const attributeLines = multivariateAttributeColumns.flatMap((column) => {
+          const summary = attributeSummary(column, attributeFilters);
+          return summary ? [`${column.title} ${summary}`] : [];
+        });
+        built = [
+          {
+            id: "run-live-multivariate-events",
+            title: "Multivariate events",
+            columns: shaped.columns,
+            rows,
+            span: "full",
+            table: "multivariate_events",
+            summary: `Kalshi Live · Multivariate events${multivariateSeries.length ? ` · ${multivariateSeries.join(", ")}` : multivariateCollection ? ` · ${multivariateCollection}` : ""}`,
+            attributeLines,
+            sortLine: sortSummary(multivariateAttributeColumns, sortKeys),
+            sourceRows: rows,
+          },
+        ];
       } else {
         const markets = directMarketTickers(livePicks);
         const pulled = await mapPool(markets, 3, (market) =>
@@ -7011,7 +7176,7 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
           {liveMarketSearch ? (
             <KalshiLiveMarketPicker picks={livePicks} onAdd={addLivePick} onRemove={removeLivePick} />
           ) : null}
-          {liveDirect ? (
+          {liveDirect && !centerSearch ? (
             <KalshiLiveDirectQuery
               tableId={tableId}
               picks={livePicks}
@@ -7088,9 +7253,11 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
                         ? traderAttributeColumns
                         : liveForecast
                           ? forecastAttributeColumns
+                          : liveMultivariate
+                            ? multivariateAttributeColumns
                           : liveMarketSearch
                           ? liveAttributeColumns
-                          : liveMarketFanout
+                          : liveMarketFanout || liveEventCandles
                             ? directAttributeColumns
                             : pull?.columns || []
                 }
@@ -7107,6 +7274,10 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
                       ? "Event attributes"
                       : tableId === "event_forecast"
                         ? "Forecast attributes"
+                        : tableId === "event_candlesticks"
+                          ? "Event candlestick attributes"
+                          : tableId === "multivariate_events"
+                            ? "Multivariate event attributes"
                         : tableId === "leaderboard"
                         ? "Leaderboard attributes"
                         : tableId === "search_traders"
@@ -7729,6 +7900,21 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
             </div>
           ) : error ? (
             <p className="text-[13px] text-muted-foreground">{error}</p>
+          ) : centerSearch ? (
+            <div className="flex h-full flex-col items-center justify-center rounded-xl border border-border/70 bg-background px-6 shadow-sm">
+              <div className="flex w-full max-w-lg flex-col items-center gap-4 text-center">
+                <p className="text-[15px] font-medium text-foreground">{tickerPrompt}</p>
+                <div className="w-full text-left">
+                  <KalshiLiveDirectQuery
+                    tableId={tableId}
+                    picks={livePicks}
+                    onAdd={addDirectPick}
+                    onRemove={removeLivePick}
+                    required={needsTickerSearch}
+                  />
+                </div>
+              </div>
+            </div>
           ) : previewSearchError && settledRowCount === 0 ? (
             <div className="flex h-full flex-col items-center justify-center gap-3 rounded-xl border border-border/70 bg-background px-6 text-center shadow-sm">
               <p className="text-[13px] leading-relaxed text-muted-foreground">{previewSearchError}</p>
@@ -7754,7 +7940,7 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
               {liveRemovalTape}
               <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-3 rounded-xl border border-border/70 bg-background px-6 text-center shadow-sm">
                 <p className="max-w-md text-[13px] leading-relaxed text-muted-foreground">{liveEmptyLine}</p>
-                {forecastNeedsPick ? null : (
+                {tickerPrompt ? null : (
                   <Button type="button" variant="outline" onClick={refreshPreview}>
                     Refresh
                   </Button>

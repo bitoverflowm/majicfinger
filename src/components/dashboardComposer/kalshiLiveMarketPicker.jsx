@@ -233,7 +233,7 @@ const inputClassName =
  * Kalshi Live market search. Focusing the field expands it over the preview so
  * suggestions match the legacy ticker search. A series opens the market picker.
  */
-export function KalshiLiveMarketPicker({ picks, onAdd, onRemove, intent = "markets" }) {
+export function KalshiLiveMarketPicker({ picks, onAdd, onRemove, intent = "markets", required = false }) {
   const [query, setQuery] = useState("");
   const [suggestions, setSuggestions] = useState([]);
   const [expanded, setExpanded] = useState(false);
@@ -731,7 +731,7 @@ export function KalshiLiveMarketPicker({ picks, onAdd, onRemove, intent = "marke
                   ? "Search for a series"
                   : "Search Kalshi markets"
           }
-          aria-required={intent === "forecast" ? true : undefined}
+          aria-required={intent === "forecast" || required ? true : undefined}
           autoComplete="off"
           onChange={(event) => {
             setQuery(event.target.value);
@@ -747,16 +747,19 @@ export function KalshiLiveMarketPicker({ picks, onAdd, onRemove, intent = "marke
             }
             if (event.key === "Enter") {
               event.preventDefault();
-              if (intent === "forecast") {
-                const match = suggestions.find((item) => item.kind === "event" || item.kind === "series");
+              if (intent === "forecast" || (intent === "events" && required)) {
+                const match = suggestions.find((item) =>
+                  intent === "events" ? item.kind === "event" : item.kind === "event" || item.kind === "series",
+                );
                 if (expanded && match) {
                   chooseSuggestion(match);
                   return;
                 }
                 const token = query.trim().toUpperCase();
                 if (!token) return;
-                if (token.includes("-")) addEvent({ ticker: token, title: token, seriesTicker: inferSeriesTickerFromEvent(token) });
-                else addSeries({ ticker: token, title: token });
+                if (intent === "events" || token.includes("-")) {
+                  addEvent({ ticker: token, title: token, seriesTicker: inferSeriesTickerFromEvent(token) });
+                } else addSeries({ ticker: token, title: token });
                 setQuery("");
                 setExpanded(false);
                 return;
@@ -789,7 +792,7 @@ export function KalshiLiveMarketPicker({ picks, onAdd, onRemove, intent = "marke
         <div className="flex items-center justify-between gap-2">
           <p className="text-[12px] font-semibold text-foreground">
             {intent === "forecast" ? "Search for an event or a series" : intent === "events" ? "Search for an event" : intent === "series" ? "Search for a series" : "Markets"}
-            {intent === "forecast" ? <span className="text-destructive"> *</span> : null}
+            {intent === "forecast" || required ? <span className="text-destructive"> *</span> : null}
           </p>
           {(picks || []).length ? (
             <span className="text-[10px] text-muted-foreground">{picks.length} selected</span>

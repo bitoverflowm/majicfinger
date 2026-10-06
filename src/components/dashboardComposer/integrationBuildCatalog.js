@@ -23,6 +23,7 @@ import { normalizeKalshiLiveOrderbook } from "@/lib/kalshiLive/normalizeOrderboo
 import { normalizeKalshiLiveEventRow } from "@/lib/kalshiLive/normalizeEventRow";
 import { projectKalshiLiveEventForecastRows } from "@/lib/kalshiLive/normalizeEventForecastRow";
 import { inferSeriesTickerFromEvent } from "@/lib/kalshiLive/eventCandlesticksCompose";
+import { buildKalshiLiveMultivariateEventsDiscoveryQueryParams } from "@/lib/kalshiLive/multivariateEventsDiscovery";
 import { normalizeKalshiLiveLeaderboardRow } from "@/lib/kalshiLive/normalizeLeaderboardRow";
 import { normalizeKalshiLiveHolderProfileRow } from "@/lib/kalshiLive/normalizeHolderProfileRow";
 import { normalizeKalshiLiveHolderTradeRow } from "@/lib/kalshiLive/normalizeHolderTradeRow";
@@ -1033,20 +1034,6 @@ function previewPack(columns, rows) {
   };
 }
 
-async function openLiveMarket() {
-  const json = await getJson(
-    `/api/integrations/kalshi-live/markets?discovery=1&limit=1&status=open&mve_filter=exclude`,
-  );
-  return (Array.isArray(json.markets) ? json.markets : [])[0] || null;
-}
-
-async function openLiveEvent() {
-  const json = await getJson(
-    `/api/integrations/kalshi-live/events?limit=1&status=open&with_nested_markets=1&with_milestones=1`,
-  );
-  return (Array.isArray(json.events) ? json.events : [])[0] || null;
-}
-
 /** One market. Re-request this for each tagged ticker so a sheet can pass the list cap of 1000. */
 export async function loadKalshiLiveMarketByTicker(ticker) {
   const id = String(ticker || "").trim();
@@ -1105,40 +1092,13 @@ async function kalshiLiveRows(endpointId) {
     const series = Array.isArray(json.series) ? json.series : [];
     return series.slice(0, PREVIEW_ROW_CAP).map((row) => normalizeKalshiLiveSeriesRow(row));
   }
-  if (endpointId === "candlesticks") {
-    const listed = await getJson(
-      `/api/integrations/kalshi-live/markets?discovery=1&limit=8&status=open&mve_filter=exclude`,
-    );
-    const markets = Array.isArray(listed.markets) ? listed.markets : [];
-    const end = Math.floor(Date.now() / 1000);
-    const start = end - PREVIEW_ROW_CAP * 60;
-    let fallback = [];
-    for (const market of markets) {
-      if (!market?.ticker) continue;
-      const json = await getJson(
-        `/api/integrations/kalshi-live/markets/candlesticks?market_tickers=${encodeURIComponent(market.ticker)}&start_ts=${start}&end_ts=${end}&period_interval=1&per_ticker=1`,
-      );
-      const rows = flattenKalshiLiveCandlestickGroups(json.markets);
-      if (rows.length > fallback.length) fallback = rows;
-      if (rows.length >= 8) return rows;
-    }
-    return fallback;
-  }
-  if (endpointId === "trades") {
-    const market = await openLiveMarket();
-    if (!market?.ticker) return [];
-    const json = await getJson(
-      `/api/integrations/kalshi-live/markets/trades?ticker=${encodeURIComponent(market.ticker)}&limit=${PREVIEW_ROW_CAP}`,
-    );
-    return (Array.isArray(json.trades) ? json.trades : []).map((row) => normalizeKalshiLiveTradeRow(row));
-  }
-  if (endpointId === "orderbook") {
-    const market = await openLiveMarket();
-    if (!market?.ticker) return [];
-    const json = await getJson(
-      `/api/integrations/kalshi-live/markets/orderbook?ticker=${encodeURIComponent(market.ticker)}&depth=20`,
-    );
-    return normalizeKalshiLiveOrderbook(json.ticker || market.ticker, json.orderbook_fp);
+  if (
+    endpointId === "candlesticks" ||
+    endpointId === "trades" ||
+    endpointId === "orderbook" ||
+    endpointId === "event_candlesticks"
+  ) {
+    return [];
   }
   if (endpointId === "events" || endpointId === "multivariate_events") {
     const path =
@@ -1148,23 +1108,6 @@ async function kalshiLiveRows(endpointId) {
     const json = await getJson(path);
     const events = Array.isArray(json.events) ? json.events : [];
     return events.map((row) => normalizeKalshiLiveEventRow(row));
-  }
-  if (endpointId === "event_candlesticks") {
-    const event = await openLiveEvent();
-    if (!event?.event_ticker || !event?.series_ticker) return [];
-    const end = Math.floor(Date.now() / 1000);
-    const start = end - 3600;
-    const json = await getJson(
-      `/api/integrations/kalshi-live/events/candlesticks?ticker=${encodeURIComponent(event.event_ticker)}&series_ticker=${encodeURIComponent(event.series_ticker)}&start_ts=${start}&end_ts=${end}&period_interval=60`,
-    );
-    const tickers = Array.isArray(json.market_tickers) ? json.market_tickers : [];
-    const sticks = Array.isArray(json.market_candlesticks) ? json.market_candlesticks : [];
-    return flattenKalshiLiveCandlestickGroups(
-      tickers.map((ticker, index) => ({
-        market_ticker: ticker,
-        candlesticks: Array.isArray(sticks[index]) ? sticks[index] : [],
-      })),
-    );
   }
   if (endpointId === "event_forecast") return [];
   if (endpointId === "leaderboard") {
@@ -1892,6 +1835,52 @@ export async function loadKalshiLiveEventCandlesticks(spec = {}) {
   return { columns, rows: projectLiveJoinRows(columns, flat, cap), truncated: flat.length > cap };
 }
 
+/** Multivariate events. One series ticker per request. A collection ticker is the other filter. */
+export async function loadKalshiLiveMultivariate(spec = {}) {
+  const columns = kalshiLiveColumns("multivariate_events");
+  const cap = Math.max(1, Math.floor(Number(spec.limit) || PREVIEW_ROW_CAP));
+  const seriesTickers = Array.isArray(spec.seriesTickers) ? spec.seriesTickers.filter(Boolean) : [];
+  const collection = String(spec.collectionTicker || "").trim();
+  const requests = seriesTickers.length
+    ? seriesTickers.map((seriesTicker) => ({ seriesTicker, collectionTicker: "" }))
+    : [{ seriesTicker: "", collectionTicker: collection }];
+  const keep = typeof spec.match === "function" ? spec.match : null;
+  const seen = new Set();
+  const rows = [];
+  let truncated = false;
+  const maxPages = Math.max(1, Math.min(25, Math.floor(Number(spec.maxPages) || 2)));
+  for (const request of requests) {
+    if (rows.length >= cap) break;
+    let cursor = "";
+    for (let page = 0; page < maxPages && rows.length < cap; page += 1) {
+      const params = buildKalshiLiveMultivariateEventsDiscoveryQueryParams(request, {
+        limit: 100,
+        withNestedMarkets: Boolean(spec.includeMarkets),
+      });
+      if (cursor) params.cursor = cursor;
+      const json = await getJsonRetry(`/api/integrations/kalshi-live/events/multivariate?${new URLSearchParams(params)}`);
+      const events = Array.isArray(json.events) ? json.events : [];
+      for (const raw of events) {
+        const row = normalizeKalshiLiveEventRow(raw);
+        if (keep && !keep(row)) continue;
+        const ticker = String(row.event_ticker || "").trim();
+        if (ticker && seen.has(ticker)) continue;
+        if (ticker) seen.add(ticker);
+        rows.push(row);
+        if (rows.length >= cap) break;
+      }
+      cursor = String(json.cursor || "").trim();
+      if (rows.length >= cap) {
+        if (cursor) truncated = true;
+        break;
+      }
+      if (!cursor || !events.length) break;
+      if (page === maxPages - 1 && cursor) truncated = true;
+    }
+  }
+  return { columns, rows: projectLiveJoinRows(columns, rows, rows.length || 1), truncated };
+}
+
 /**
  * One-off Kalshi Live pull. Trades, candlesticks, and the order book are one market.
  * Series is a ticker list, or a category discovery when no tickers are selected.
@@ -1909,6 +1898,8 @@ export function loadKalshiLiveDirect(tableId, spec = {}) {
   if (tableId === "events" && spec.mode === "discover") return loadKalshiLiveEventsDiscovery(spec, limit);
   if (tableId === "events") return loadKalshiLiveEventsByTickers(spec.tickers || [], spec);
   if (tableId === "event_forecast") return loadKalshiLiveEventForecast(spec);
+  if (tableId === "event_candlesticks") return loadKalshiLiveEventCandlesticks(spec);
+  if (tableId === "multivariate_events") return loadKalshiLiveMultivariate(spec);
   if (tableId === "leaderboard") return loadKalshiLiveLeaderboard(spec);
   if (tableId === "search_traders") return loadKalshiLiveTraderSearch(spec);
   if (tableId === "holder_profile") return loadKalshiLiveHolderProfiles(spec.nicknames || []);

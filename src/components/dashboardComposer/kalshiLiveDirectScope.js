@@ -14,7 +14,7 @@ import {
 
 export const KALSHI_LIVE_TRADER_TABLES = ["leaderboard", "holder_profile", "trades_by_holder", "search_traders"];
 
-export const KALSHI_LIVE_DIRECT_TABLES = ["series", "events", "event_forecast", "candlesticks", "trades", "orderbook", ...KALSHI_LIVE_TRADER_TABLES];
+export const KALSHI_LIVE_DIRECT_TABLES = ["series", "events", "event_forecast", "event_candlesticks", "multivariate_events", "candlesticks", "trades", "orderbook", ...KALSHI_LIVE_TRADER_TABLES];
 
 export const KALSHI_LIVE_FORECAST_DEFAULT_PERCENTILES = [1000, 2500, 5000, 7500, 9000];
 
@@ -495,6 +495,13 @@ export function defaultDirectAttributeFilters(tableId, now = new Date()) {
       period_interval: { value: "60" },
     };
   }
+  if (tableId === "event_candlesticks") {
+    const range = dateRangePreset("past-24h", now);
+    return {
+      time_range: { from: range?.from || "", to: range?.to || "", preset: "past-24h" },
+      period_interval: { value: "60" },
+    };
+  }
   if (!DIRECT_MARKET_TABLES.includes(tableId)) return {};
   const range = dateRangePreset("past-24h", now);
   const filters = {
@@ -588,8 +595,36 @@ export function forecastPullTargets(picks) {
   return { events, seriesTickers };
 }
 
+/** One collection ticker from the multivariate attribute, or "". */
+export function multivariateCollectionTicker(filters) {
+  const filter = filters?.collection_ticker;
+  const tag = Array.isArray(filter?.containsTags) ? filter.containsTags[0] : "";
+  return String(tag || filter?.contains || filter?.value || "").trim();
+}
+
+/** Series and collection first, then the other multivariate columns. */
+export function kalshiLiveMultivariateAttributeColumns(columns) {
+  const list = Array.isArray(columns) ? columns : [];
+  const series = {
+    ...(list.find((column) => column.id === "series_ticker") || { id: "series_ticker", type: "text", title: "Series ticker" }),
+    title: "Series ticker",
+    exactTickers: true,
+    description: "One series. The API takes one series ticker per request.",
+  };
+  const collection = {
+    id: "collection_ticker",
+    title: "Collection ticker",
+    type: "text",
+    queryOnly: true,
+    exactTickers: true,
+    description: "One collection ticker. Use this or a series, not both.",
+  };
+  const rest = list.filter((column) => column.id !== "series_ticker" && column.id !== "collection_ticker");
+  return [series, collection, ...rest];
+}
+
 export function kalshiLiveDirectAttributeColumns(tableId, columns) {
-  if (!DIRECT_MARKET_TABLES.includes(tableId)) return [];
+  if (tableId !== "event_candlesticks" && !DIRECT_MARKET_TABLES.includes(tableId)) return [];
   const enums = tableId === "trades" ? TRADE_ENUMS : tableId === "orderbook" ? ORDERBOOK_ENUMS : {};
   const shaped = (columns || []).map((column) => {
     if (enums[column.id]) return { ...column, enumOptions: enums[column.id] };
@@ -613,7 +648,7 @@ export function kalshiLiveDirectAttributeColumns(tableId, columns) {
             : "Start and end of candlestick data",
     },
   ];
-  if (tableId === "candlesticks") {
+  if (tableId === "candlesticks" || tableId === "event_candlesticks") {
     query.push({
       id: "period_interval",
       title: "Period",
@@ -640,7 +675,7 @@ export function kalshiLiveDirectAttributeColumns(tableId, columns) {
 /** Unix window, candle period, and book depth read from the attribute filters. */
 export function directPullWindow(tableId, filters, fallback = {}) {
   const range = filters?.time_range || {};
-  const ranged = tableId === "trades" || tableId === "candlesticks" || tableId === "event_forecast";
+  const ranged = tableId === "trades" || tableId === "candlesticks" || tableId === "event_candlesticks" || tableId === "event_forecast";
   const minFromRange = ranged ? isoDayUnix(range.from, "start") : null;
   const maxFromRange = ranged ? isoDayUnix(range.to, "end") : null;
   const periodRaw = Number(filters?.period_interval?.value);
@@ -689,6 +724,16 @@ export function kalshiLiveDirectScopeError(tableId, picks, _query, filters) {
     const targets = forecastPullTargets(picks);
     if (targets.events.length || targets.seriesTickers.length) return "";
     return loading ? "" : "Search for an event or a series.";
+  }
+  if (tableId === "event_candlesticks") {
+    if (directEventTickers(picks).length) return "";
+    return loading ? "" : "Search for an event.";
+  }
+  if (tableId === "multivariate_events") {
+    const collection = multivariateCollectionTicker(filters);
+    const series = directSeriesTickers(picks).length > 0 || eventSeriesTickers(filters).length > 0;
+    if (collection && series) return "Use either a series or a collection ticker.";
+    return "";
   }
   if (directMarketTickers(picks).length) return "";
   return loading ? "" : "Add at least one market ticker.";
