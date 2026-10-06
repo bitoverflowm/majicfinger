@@ -1,12 +1,12 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { CalendarIcon } from "lucide-react";
+import { CalendarIcon, X } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
 import { Input } from "@/components/ui/input";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Popover, PopoverClose, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
 
 function wallTimeToUnixSeconds(date, timeStr) {
@@ -82,7 +82,16 @@ export function KalshiLiveTimestampPicker({
           </span>
         </Button>
       </PopoverTrigger>
-      <PopoverContent className="z-[620] w-auto p-3" align="start">
+      <PopoverContent className="z-[620] w-auto p-3 pt-2" align="start">
+        <div className="mb-1 flex justify-end">
+          <PopoverClose
+            type="button"
+            aria-label="Close"
+            className="inline-flex size-6 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+          >
+            <X className="size-3.5" />
+          </PopoverClose>
+        </div>
         <Calendar
           mode="single"
           selected={date}

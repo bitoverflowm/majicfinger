@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Popover, PopoverClose, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { KalshiLiveTimestampPicker } from "@/components/connectData/kalshiLive/KalshiLiveTimestampPicker";
 import { cellMatchesTextTerm, columnUsesWholeTerm } from "@/lib/textTermMatch";
 import { DATE_RANGE_PRESETS, activeDateRangePreset, dateRangePreset } from "@/components/dashboardComposer/dateRangePresets";
@@ -567,7 +567,8 @@ function DateRangeField({ from, to, presetId, onChange }) {
         </Button>
       </PopoverTrigger>
       <PopoverContent align="start" className="z-[620] w-auto p-0">
-        <div className="flex max-w-[34rem] flex-wrap gap-1.5 border-b border-border/70 p-2">
+        <div className="flex items-start gap-1 border-b border-border/70 p-2">
+          <div className="flex max-w-[32rem] flex-wrap gap-1.5">
           {DATE_RANGE_PRESETS.map((item) => {
             const active = preset?.id === item.id;
             return (
@@ -586,6 +587,14 @@ function DateRangeField({ from, to, presetId, onChange }) {
               </button>
             );
           })}
+          </div>
+          <PopoverClose
+            type="button"
+            aria-label="Close"
+            className="inline-flex size-6 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+          >
+            <X className="size-3.5" />
+          </PopoverClose>
         </div>
         <Calendar
           key={`${from || ""}|${to || ""}`}
