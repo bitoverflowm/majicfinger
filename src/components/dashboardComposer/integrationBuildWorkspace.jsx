@@ -26,6 +26,7 @@ import {
   loadKalshiLiveMarketsForScope,
   loadKalshiLiveSeriesMarkets,
   loadKalshiLiveEventMarkets,
+  loadKalshiLiveEventsByTickers,
   loadKalshiLiveEventForecast,
   loadKalshiLiveEventCandlesticks,
   loadKalshiLiveHolderProfiles,
@@ -837,6 +838,8 @@ function EnrichStep({
   onToggleTraderJoin,
   eventExtraJoinIds,
   onToggleEventExtraJoin,
+  forecastJoinIds,
+  onToggleForecastJoin,
   onClear,
   marketCap,
   queryRows,
@@ -934,6 +937,10 @@ function EnrichStep({
   const traderKinds = ["profile", "trades"].filter((id) => traderPicked.has(id));
   const eventExtra = eventExtraJoinIds || new Set();
   const eventExtraOn = joinMode === "events" && (eventExtra.has("candlesticks") || eventExtra.has("forecast"));
+  const forecastPicked = forecastJoinIds instanceof Set ? forecastJoinIds : new Set();
+  const forecastJoin = joinMode === "forecast";
+  const forecastJoinOn =
+    forecastJoin && (forecastPicked.has("events") || forecastPicked.has("candlesticks") || forecastPicked.has("markets"));
   const seriesJoin = joinMode === "series" || joinMode === "events";
   const listNoun = joinMode === "events" ? "event" : "series";
   const listPlural = joinMode === "events" ? "events" : "series";
@@ -1269,6 +1276,90 @@ function EnrichStep({
                             </span>
                           </p>
                         </div>
+                      ) : forecastJoin ? (
+                        <div className="mt-1.5 space-y-1.5">
+                          {[
+                            ["events", "Events", "The event record for each selected event."],
+                            ["candlesticks", "Event candlesticks", "Candles for the markets inside each event."],
+                            ["markets", "Markets", "Every market inside each selected event."],
+                          ].map(([id, title, detail]) => (
+                            <div key={id}>
+                              <button
+                                type="button"
+                                aria-pressed={forecastPicked.has(id)}
+                                onClick={() => onToggleForecastJoin?.(id)}
+                                className={choiceClass(forecastPicked.has(id))}
+                              >
+                                <span className="text-[13px] font-semibold text-foreground">{title}</span>
+                                <span className="text-[11px] font-normal text-muted-foreground">{detail}</span>
+                              </button>
+                              {id === "candlesticks" && forecastPicked.has("candlesticks") ? (
+                                <div className="mt-1.5 rounded-lg border border-border/70 px-2 py-2">
+                                  <JoinSourceFields
+                                    tableId="event_candlesticks"
+                                    filters={joinWindows?.event_candlesticks || defaultDirectAttributeFilters("candlesticks")}
+                                    onChange={(next) => onJoinWindow?.("event_candlesticks", next)}
+                                  />
+                                </div>
+                              ) : null}
+                            </div>
+                          ))}
+                          {forecastJoinOn ? (
+                            <>
+                              <button
+                                type="button"
+                                aria-pressed={seriesMarketLayout === "sheet"}
+                                onClick={() => onSeriesMarketLayout?.("sheet")}
+                                className={choiceClass(seriesMarketLayout === "sheet")}
+                              >
+                                <span className="text-[13px] font-semibold text-foreground">Sheet per event</span>
+                                <span className="text-[11px] font-normal text-muted-foreground">Each event gets its own tab.</span>
+                              </button>
+                              <button
+                                type="button"
+                                aria-pressed={seriesMarketLayout === "combined"}
+                                onClick={() => onSeriesMarketLayout?.("combined")}
+                                className={choiceClass(seriesMarketLayout === "combined")}
+                              >
+                                <span className="text-[13px] font-semibold text-foreground">One sheet</span>
+                                <span className="text-[11px] font-normal text-muted-foreground">Every event lands on one tab for each join.</span>
+                              </button>
+                              <p className="text-[11px] leading-relaxed text-muted-foreground">
+                                {queryRowCount.toLocaleString()} {queryRowCount === 1 ? "event" : "events"} in this pull. The preview shows the first event.
+                              </p>
+                              {forecastPicked.has("markets") && marketsDetected ? (
+                                <div className="border-t border-border/70 pt-3">
+                                  <p className="text-[11px] font-semibold text-foreground">Market Detected</p>
+                                  <p className="mt-1 text-[11px] leading-relaxed text-muted-foreground">
+                                    Join the markets you just pulled to their Trades, Orderbook or Candlesticks.
+                                  </p>
+                                  <div className="mt-1.5 flex items-center gap-1.5">
+                                    <button
+                                      type="button"
+                                      onClick={onSelectAllLiveJoins}
+                                      className="inline-flex rounded-full border border-border/70 bg-background px-2.5 py-0.5 text-[11px] font-medium text-muted-foreground transition-colors hover:bg-muted/50"
+                                    >
+                                      {liveSelected.size === KALSHI_LIVE_MARKET_JOINS.length ? "Deselect all" : "Select all"}
+                                    </button>
+                                  </div>
+                                  <div className="mt-1.5">
+                                    <LiveJoinList
+                                      choices={KALSHI_LIVE_MARKET_JOINS}
+                                      selected={liveSelected}
+                                      onToggle={onToggleLiveJoin}
+                                      windows={joinWindows}
+                                      onWindow={onJoinWindow}
+                                    />
+                                  </div>
+                                </div>
+                              ) : null}
+                            </>
+                          ) : (
+                            <p className="text-[11px] leading-relaxed text-muted-foreground">
+                              Join the selected events to their event record, candlesticks, or markets.
+                            </p>
+                          )}
+                        </div>
                       ) : seriesJoin ? (
                         <div className="mt-1.5 space-y-1.5">
                           <button
@@ -1550,7 +1641,7 @@ function EnrichStep({
                         <p className="mt-2 text-[11px] leading-relaxed text-muted-foreground">
                           You have {queryRowCount.toLocaleString()} {queryRowCount === 1 ? "row" : "rows"} in this trades query. Markets are matched by {matchNoun}.
                         </p>
-                      ) : liveJoin || seriesJoin || fanoutJoin || traderJoin ? null : (
+                      ) : liveJoin || seriesJoin || fanoutJoin || traderJoin || forecastJoin ? null : (
                         <p className="mt-2 text-[11px] leading-relaxed text-muted-foreground">
                           You have {queryRowCount.toLocaleString()} {queryRowCount === 1 ? "row" : "rows"} in your markets query. So{" "}
                           {sheetCount.toLocaleString()} trade {sheetCount === 1 ? "sheet" : "sheets"} will be created for each market.
@@ -1734,6 +1825,13 @@ function historicalPreviewRequestKey({ guidedFilters, columns, attributeFilters,
   return JSON.stringify({ integrationId, tableId, predicates, sortKeys });
 }
 
+function eventRelatedTitle(kind) {
+  if (kind === "forecast") return "Event forecast";
+  if (kind === "events") return "Events";
+  if (kind === "markets") return "Markets";
+  return "Event candlesticks";
+}
+
 function eventExtraSheetParts(previewSheet) {
   const sheet = String(previewSheet || "");
   if (!sheet.startsWith("event-extra:")) return null;
@@ -1811,6 +1909,7 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
   const [seriesMarketPreview, setSeriesMarketPreview] = useState({ status: "idle", ticker: "", columns: [], rows: [], error: "" });
   const [traderJoinIds, setTraderJoinIds] = useState(() => new Set());
   const [eventExtraJoinIds, setEventExtraJoinIds] = useState(() => new Set());
+  const [forecastJoinIds, setForecastJoinIds] = useState(() => new Set());
   const [eventExtraPreview, setEventExtraPreview] = useState({});
   const eventExtraPreviewRef = useRef({});
   eventExtraPreviewRef.current = eventExtraPreview;
@@ -2034,7 +2133,9 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
     setRowLimit("");
     setLivePicks([]);
     setDirectQuery(defaultKalshiLiveDirectQuery(tableId));
-    setDirectPreview({ status: "idle", rows: [], error: "", ticker: "" });
+    setDirectPreview({ status: "idle", rows: [], error: "", ticker: "", events: [] });
+    setForecastJoinIds(new Set());
+    setEventExtraPreview({});
     setLiveScan({ status: "idle", rows: [], error: "", exhausted: true, truncated: false });
     liveFetchRef.current = new Set();
     setPreviewRefreshing(false);
@@ -2695,7 +2796,7 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
       setDirectPreview((current) =>
         traderTable && current.status === "ready"
           ? current
-          : { status: "loading", rows: current.rows || [], error: "", ticker },
+          : { status: "loading", rows: current.rows || [], error: "", ticker, events: current.events || [] },
       );
       loadKalshiLiveDirect(tableId, spec)
         .then((result) => {
@@ -2708,6 +2809,7 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
             ticker: ticker || directSeries[0] || directEvents[0] || forecastTargets.events[0]?.eventTicker || forecastTargets.seriesTickers[0] || "",
             truncated: Boolean(result?.truncated),
             visibility: result?.visibility || "",
+            events: Array.isArray(result?.events) ? result.events : [],
           });
           setVisibleCount(Math.min(rows.length, PREVIEW_ROW_CAP));
         })
@@ -3425,6 +3527,9 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
   const traderJoinOn = liveTraderList && joinOn && traderJoinKinds.length > 0;
   const eventExtraKinds = ["candlesticks", "forecast"].filter((kind) => eventExtraJoinIds.has(kind));
   const eventExtraOn = liveEventSearch && joinOn && eventExtraKinds.length > 0;
+  const forecastJoinKinds = ["events", "candlesticks", "markets"].filter((kind) => forecastJoinIds.has(kind));
+  const forecastJoinOn = liveForecast && joinOn && forecastJoinKinds.length > 0;
+  const relatedExtraOn = eventExtraOn || forecastJoinOn;
   const joinCommitted = marketsQuery && joinOn && Boolean(join) && joinTarget === joinTradesTarget;
   const marketColumnList = useMemo(() => join?.marketColumns?.() || [], [join]);
   const selectedMarketColumns = useMemo(
@@ -3477,6 +3582,25 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
     }
     return list;
   }, [liveSeriesSearch, liveEventSearch, listImportRows, filteredRows, rowLimit, marketCap]);
+  const forecastJoinEvents = useMemo(() => {
+    if (!liveForecast) return [];
+    const resolved = Array.isArray(directPreview.events) ? directPreview.events : [];
+    const source = resolved.length ? resolved : forecastTargets.events;
+    const seen = new Set();
+    const list = [];
+    for (const event of source) {
+      const ticker = String(event?.eventTicker || event?.ticker || "").trim();
+      if (!ticker || seen.has(ticker)) continue;
+      seen.add(ticker);
+      list.push({
+        ticker,
+        title: String(event?.title || ticker),
+        seriesTicker: String(event?.seriesTicker || event?.series_ticker || "").trim(),
+      });
+      if (list.length >= marketCap) break;
+    }
+    return list;
+  }, [liveForecast, directPreview.events, forecastTargets, marketCap]);
   const seriesJoinKey = seriesJoinTickers.map((item) => item.ticker).join("\0");
   const liveJoinKey = [...liveJoinIds].sort().join(",");
   const liveJoinTargets = KALSHI_LIVE_MARKET_JOINS.filter((item) => liveJoinIds.has(item.id));
@@ -3503,10 +3627,10 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
   const enrichmentFlags = useMemo(
     () =>
       withJoinFlags(nativePullFlags, {
-        markets: seriesJoinOn || (fanoutJoinOn && fanoutSeriesMarkets && Boolean(parentLink.seriesTicker)),
+        markets: seriesJoinOn || forecastJoinIds.has("markets") || (fanoutJoinOn && fanoutSeriesMarkets && Boolean(parentLink.seriesTicker)),
         series: fanoutJoinOn && fanoutParents.has("series") && Boolean(parentLink.seriesTicker),
       }),
-    [nativePullFlags, seriesJoinOn, fanoutJoinOn, fanoutSeriesMarkets, fanoutParentKey, parentLink.seriesTicker],
+    [nativePullFlags, seriesJoinOn, fanoutJoinOn, fanoutSeriesMarkets, fanoutParentKey, parentLink.seriesTicker, forecastJoinIds],
   );
   const marketDownstream = allowsMarketDownstreamJoin(nativePullFlags, enrichmentFlags) && !liveMarketFanout;
   const seriesMarketSheet = previewSheet === "series-markets" || previewSheet.startsWith("series-market:");
@@ -3538,7 +3662,13 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
     });
   }, [seriesJoinOn, seriesJoinKey, seriesJoinTickers, seriesMarketPreview, liveEventSearch]);
   const downstreamPreviewTicker = String(seriesMarketView.rows?.[0]?.ticker || "").trim();
-  const joinPreviewTicker = liveMarketSearch ? livePreviewTicker : marketDownstream ? downstreamPreviewTicker : fanoutTicker;
+  const forecastMarketPreview = eventExtraPreview[`markets:${forecastJoinEvents[0]?.ticker || ""}`];
+  const forecastMarketsDetected =
+    forecastJoinIds.has("markets") && forecastMarketPreview?.status === "ready" && (forecastMarketPreview.rows?.length || 0) > 0;
+  const forecastDownstreamTicker = forecastMarketsDetected ? String(forecastMarketPreview.rows?.[0]?.ticker || "").trim() : "";
+  const joinPreviewTicker = liveMarketSearch
+    ? livePreviewTicker
+    : (marketDownstream && downstreamPreviewTicker) || forecastDownstreamTicker || fanoutTicker;
   const fanoutMarketsDetected =
     fanoutJoinOn && fanoutSeriesMarkets && fanoutSeriesMarketPreview.status === "ready" && (fanoutSeriesMarketPreview.rows?.length || 0) > 0;
   const detectedPreviewTicker = String(fanoutSeriesMarketPreview.rows?.[0]?.ticker || "").trim();
@@ -3855,7 +3985,7 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
     .join("|");
   useEffect(() => {
     if (!eventExtraOn || !seriesJoinTickers.length) {
-      setEventExtraPreview({});
+      if (!forecastJoinOn) setEventExtraPreview({});
       return undefined;
     }
     const first = seriesJoinTickers[0];
@@ -3932,7 +4062,89 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
     return () => {
       cancel = true;
     };
-  }, [eventExtraOn, eventExtraKey, seriesJoinTickers]);
+  }, [eventExtraOn, eventExtraKey, seriesJoinTickers, forecastJoinOn]);
+
+  const forecastJoinKey = forecastJoinKinds
+    .map((kind) =>
+      kind === "candlesticks"
+        ? `candlesticks:${joinWindowSignature("candlesticks", joinWindows.event_candlesticks)}`
+        : kind,
+    )
+    .join("|");
+  useEffect(() => {
+    if (!forecastJoinOn || !forecastJoinEvents.length) {
+      if (!eventExtraOn) setEventExtraPreview({});
+      return undefined;
+    }
+    const first = forecastJoinEvents[0];
+    const kinds = forecastJoinKinds;
+    let cancel = false;
+    setEventExtraPreview((current) => {
+      const next = {};
+      for (const kind of kinds) {
+        const key = `${kind}:${first.ticker}`;
+        const cached = current[key];
+        next[key] =
+          cached?.status === "ready" && cached.ticker === first.ticker && cached.windowKey === forecastJoinKey
+            ? cached
+            : { status: "loading", ticker: first.ticker, columns: cached?.columns || [], rows: cached?.rows || [], error: "" };
+      }
+      return next;
+    });
+    kinds.forEach((kind) => {
+      const key = `${kind}:${first.ticker}`;
+      const cached = eventExtraPreviewRef.current[key];
+      if (cached?.status === "ready" && cached.ticker === first.ticker && cached.windowKey === forecastJoinKey) return;
+      const filters = joinWindows.event_candlesticks;
+      const window = joinPullWindow("candlesticks", filters);
+      const period = !window.period || window.period === 0 ? 60 : window.period;
+      const load =
+        kind === "events"
+          ? loadKalshiLiveEventsByTickers([first.ticker])
+          : kind === "markets"
+            ? loadKalshiLiveEventMarkets(first.ticker, PREVIEW_ROW_CAP)
+            : loadKalshiLiveEventCandlesticks({
+                eventTicker: first.ticker,
+                seriesTicker: first.seriesTicker,
+                minTs: window.minTs,
+                maxTs: window.maxTs,
+                period,
+                limit: PREVIEW_ROW_CAP,
+              });
+      load
+        .then((result) => {
+          if (cancel) return;
+          setEventExtraPreview((current) => ({
+            ...current,
+            [key]: {
+              status: "ready",
+              ticker: first.ticker,
+              windowKey: forecastJoinKey,
+              columns: result.columns || [],
+              rows: result.rows || [],
+              error: "",
+            },
+          }));
+        })
+        .catch((err) => {
+          if (cancel) return;
+          setEventExtraPreview((current) => ({
+            ...current,
+            [key]: {
+              status: "error",
+              ticker: first.ticker,
+              windowKey: forecastJoinKey,
+              columns: [],
+              rows: [],
+              error: err instanceof Error ? err.message : "This event did not load",
+            },
+          }));
+        });
+    });
+    return () => {
+      cancel = true;
+    };
+  }, [forecastJoinOn, forecastJoinKey, forecastJoinEvents, eventExtraOn]);
 
   const showSampleExplainer = step === "enrich" && hoverSample && !enrichPicks.has("sample");
   const showBucketExplainer = step === "enrich" && hoverBucket && !enrichPicks.has("bucket") && !showSampleExplainer;
@@ -3941,7 +4153,7 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
     step === "enrich" && hoverFunction && !enrichPicks.has("function") && !showSummarizeExplainer && !showSampleExplainer && !showBucketExplainer;
   const liveJoinReady = liveMarketSearch && joinOn && liveJoinTargets.length > 0;
   const showJoinExplainer =
-    (historicalEnrich || liveMarketSearch || liveSeriesSearch || liveEventSearch || liveMarketFanout || liveTraderList) &&
+    (historicalEnrich || liveMarketSearch || liveSeriesSearch || liveEventSearch || liveMarketFanout || liveTraderList || liveForecast) &&
     step === "enrich" &&
     hoverJoin &&
     !enrichPicks.has("join") &&
@@ -4295,15 +4507,26 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
       const noun = count === 1 ? kind : `${kind}s`;
       return `Previewing ${count.toLocaleString()} ${noun} for ${preview.nickname || traderJoinNames[0]}. Save and run covers the other traders.`;
     }
-    if ((previewSheet.startsWith("event-extra:") ) && eventExtraOn) {
+    if (previewSheet.startsWith("event-extra:") && relatedExtraOn) {
       const parts = eventExtraSheetParts(previewSheet);
-      const preview = parts ? eventExtraPreview[`${parts.kind}:${parts.ticker || seriesJoinTickers[0]?.ticker || ""}`] : null;
-      const label = parts?.kind === "forecast" ? "event forecast" : "event candlesticks";
-      if (!seriesJoinTickers.length) return "Search for an event. These joins use those events.";
+      const events = forecastJoinOn ? forecastJoinEvents : seriesJoinTickers;
+      const preview = parts ? eventExtraPreview[`${parts.kind}:${parts.ticker || events[0]?.ticker || ""}`] : null;
+      const label = eventRelatedTitle(parts?.kind).toLowerCase();
+      if (!events.length) return "Search for an event or a series. These joins use those events.";
       if (!preview || preview.status === "loading" || preview.status === "idle") return `Loading ${label}`;
       if (preview.status === "error") return preview.error;
       const count = preview.rows.length;
-      return `Previewing ${count.toLocaleString()} ${label} ${count === 1 ? "row" : "rows"} for ${preview.ticker}. Save and run covers the other events.`;
+      const noun =
+        parts?.kind === "events"
+          ? count === 1
+            ? "event"
+            : "events"
+          : parts?.kind === "markets"
+            ? count === 1
+              ? "market"
+              : "markets"
+            : `${label} ${count === 1 ? "row" : "rows"}`;
+      return `Previewing ${count.toLocaleString()} ${noun} for ${preview.ticker}. Save and run covers the other events.`;
     }
     if (seriesMarketSheet && seriesJoinOn) {
       if (!seriesJoinTickers.length) {
@@ -4719,6 +4942,14 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
         args: { events: seriesJoinTickers.length, targets: eventExtraKinds.join("+") },
       });
     }
+    if (liveForecast && enrichPicks.has("join") && forecastJoinKinds.length && forecastJoinEvents.length) {
+      planned.push({
+        id: "join-forecast-related",
+        name: "compose_forecast_related",
+        status: "pending",
+        args: { events: forecastJoinEvents.length, targets: forecastJoinKinds.join("+") },
+      });
+    }
     if (liveJoinReady || (marketDownstream && liveJoinTargets.length)) {
       planned.push({
         id: "join-live",
@@ -4880,6 +5111,7 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
       const titleFor = { trades: "Trades", orderbook: "Order book", candlesticks: "Candlesticks", series: "Series", events: "Events" };
       const label = titleFor[tableId] || sheetTitle;
       let built = [];
+      let forecastRunEvents = forecastJoinEvents;
       if (tableId === "series") {
         const tickers = directSeriesTickers(livePicks);
         const categories = seriesDiscoveryCategories(attributeFilters);
@@ -5026,6 +5258,15 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
           previewFirst: false,
           eventCap: 25,
         });
+        if (Array.isArray(loaded.events) && loaded.events.length) {
+          forecastRunEvents = loaded.events
+            .map((event) => ({
+              ticker: String(event.eventTicker || event.ticker || "").trim(),
+              seriesTicker: String(event.seriesTicker || "").trim(),
+              title: String(event.title || event.eventTicker || event.ticker || "").trim(),
+            }))
+            .filter((event) => event.ticker);
+        }
         const shaped = shape(loaded);
         const matched = shaped.rows.filter((row) => rowMatchesAttributes(row, forecastRowColumns, attributeFilters));
         const sorted = sortAttributeRows(matched, forecastRowColumns, sortKeys);
@@ -5276,6 +5517,76 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
             reporter.fail(stepId, err instanceof Error ? err.message : `${title} join failed`);
             return;
           }
+        }
+      }
+      if (tableId === "event_forecast" && enrichPicks.has("join") && forecastJoinKinds.length && forecastRunEvents.length) {
+        const marketLimit = Number.isFinite(sheetCap) ? sheetCap : PREVIEW_ROW_CAP;
+        reporter.start("join-forecast-related");
+        try {
+          const filters = joinWindows.event_candlesticks;
+          const window = joinPullWindow("candlesticks", filters);
+          const period = !window.period || window.period === 0 ? 60 : window.period;
+          const loadOne = (kind, item) =>
+            kind === "events"
+              ? loadKalshiLiveEventsByTickers([item.ticker])
+              : kind === "markets"
+                ? loadKalshiLiveEventMarkets(item.ticker, marketLimit)
+                : loadKalshiLiveEventCandlesticks({
+                    eventTicker: item.ticker,
+                    seriesTicker: item.seriesTicker,
+                    minTs: window.minTs,
+                    maxTs: window.maxTs,
+                    period,
+                    limit: marketLimit,
+                  });
+          for (const kind of forecastJoinKinds) {
+            const title = eventRelatedTitle(kind);
+            const table = kind === "events" ? "events" : kind === "markets" ? "markets" : "event_candlesticks";
+            if (seriesMarketLayout === "combined") {
+              const rows = [];
+              let columns = [];
+              for (const item of forecastRunEvents) {
+                if (rows.length >= marketLimit) break;
+                const result = await loadOne(kind, item);
+                if (result.columns?.length) columns = result.columns;
+                rows.push(...(result.rows || []));
+              }
+              const fullRows = rows.slice(0, marketLimit);
+              if (columns.length) {
+                sheets.push({
+                  id: `run-forecast-${kind}`,
+                  title,
+                  columns,
+                  rows: fullRows.slice(0, PREVIEW_ROW_CAP),
+                  rowCount: fullRows.length,
+                  span: "full",
+                  table,
+                  summary: `Kalshi Live · ${title}`,
+                });
+              }
+            } else {
+              for (const item of forecastRunEvents) {
+                const result = await loadOne(kind, item);
+                if (!result.columns?.length) continue;
+                const fullRows = result.rows || [];
+                const safe = String(item.ticker).replace(/[^A-Za-z0-9]+/g, "-");
+                sheets.push({
+                  id: `run-forecast-${kind}-${safe}`,
+                  title: `${title} · ${item.ticker}`,
+                  columns: result.columns,
+                  rows: fullRows.slice(0, PREVIEW_ROW_CAP),
+                  rowCount: fullRows.length,
+                  span: forecastRunEvents.length > 1 ? "half" : "full",
+                  table,
+                  summary: `Kalshi Live · ${title} · ${item.ticker}`,
+                });
+              }
+            }
+          }
+          reporter.succeed("join-forecast-related", { result: `${forecastRunEvents.length.toLocaleString()} events` });
+        } catch (err) {
+          reporter.fail("join-forecast-related", err instanceof Error ? err.message : "Event forecast join failed");
+          return;
         }
       }
       if (liveTraderList && enrichPicks.has("join") && traderJoinKinds.length) {
@@ -6041,8 +6352,29 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
   } else if (seriesJoinOn) {
     previewTabs.push({ id: "series-markets", title: "Markets" });
   }
+  if (forecastJoinOn && forecastJoinEvents.length) {
+    const [first, ...rest] = forecastJoinEvents;
+    if (seriesMarketLayout === "combined") {
+      forecastJoinKinds.forEach((kind) => {
+        previewTabs.push({ id: `event-extra:${kind}`, title: eventRelatedTitle(kind) });
+      });
+    } else {
+      forecastJoinKinds.forEach((kind) => {
+        previewTabs.push({ id: `event-extra:${kind}:${first.ticker}`, title: `${eventRelatedTitle(kind)} · ${first.ticker}` });
+      });
+      rest.forEach((item) => {
+        forecastJoinKinds.forEach((kind) => {
+          previewTabs.push({
+            id: `run:event-extra:${kind}:${item.ticker}`,
+            title: `${eventRelatedTitle(kind)} · ${item.ticker}`,
+            queued: true,
+          });
+        });
+      });
+    }
+  }
   if (eventExtraOn && seriesJoinTickers.length) {
-    const extraLabel = (kind) => (kind === "forecast" ? "Event forecast" : "Event candlesticks");
+    const extraLabel = (kind) => eventRelatedTitle(kind);
     const [first, ...rest] = seriesJoinTickers;
     if (seriesMarketLayout === "combined") {
       eventExtraKinds.forEach((kind) => {
@@ -6240,6 +6572,26 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
             joinTarget={joinTarget}
             traderJoinIds={traderJoinIds}
             eventExtraJoinIds={eventExtraJoinIds}
+            forecastJoinIds={forecastJoinIds}
+            onToggleForecastJoin={(id) => {
+              const next = new Set(forecastJoinIds);
+              if (next.has(id)) next.delete(id);
+              else next.add(id);
+              setForecastJoinIds(next);
+              const ticker = forecastJoinEvents[0]?.ticker || "";
+              const sheetFor = (kind) =>
+                !ticker || seriesMarketLayout === "combined" ? `event-extra:${kind}` : `event-extra:${kind}:${ticker}`;
+              if (next.has(id)) {
+                setPreviewSheet(sheetFor(id));
+                return;
+              }
+              const remain = ["events", "candlesticks", "markets"].filter((kind) => next.has(kind));
+              if (remain.length && previewSheet.startsWith(`event-extra:${id}`)) {
+                setPreviewSheet(sheetFor(remain[0]));
+                return;
+              }
+              if (!remain.length && previewSheet.startsWith("event-extra:")) setPreviewSheet("source");
+            }}
             onToggleEventExtraJoin={(id) => {
               const next = new Set(eventExtraJoinIds);
               if (next.has(id)) next.delete(id);
@@ -6299,6 +6651,7 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
               setTraderJoinIds(new Set());
               setTraderJoinPreview({});
               setEventExtraJoinIds(new Set());
+              setForecastJoinIds(new Set());
               setEventExtraPreview({});
               setLiveJoinIds(new Set());
               setLiveJoinPreview({});
@@ -6320,7 +6673,9 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
             queryRows={
               liveTraderList
                 ? traderJoinNames.length
-                : liveSeriesSearch || liveEventSearch
+                : liveForecast
+                  ? forecastJoinEvents.length
+                  : liveSeriesSearch || liveEventSearch
                   ? seriesJoinTickers.length
                   : liveMarketSearch
                     ? liveJoinList.length
@@ -6364,11 +6719,11 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
             onFunctionHelp={() => setFunctionHelp(true)}
             onSaveAndRun={requestSaveAndRun}
             running={running}
-            showJoinBuilder={marketsQuery || tradesQuery || liveMarketSearch || liveSeriesSearch || liveEventSearch || liveMarketFanout || liveTraderList}
+            showJoinBuilder={marketsQuery || tradesQuery || liveMarketSearch || liveSeriesSearch || liveEventSearch || liveMarketFanout || liveTraderList || liveForecast}
             showFunctionBuilder
-            joinMode={liveMarketFanout ? "fanout" : liveTraderList ? "traders" : liveEventSearch ? "events" : liveSeriesSearch ? "series" : liveMarketSearch ? "live" : tradesQuery ? "trades" : "markets"}
+            joinMode={liveForecast ? "forecast" : liveMarketFanout ? "fanout" : liveTraderList ? "traders" : liveEventSearch ? "events" : liveSeriesSearch ? "series" : liveMarketSearch ? "live" : tradesQuery ? "trades" : "markets"}
             seriesMarketLayout={seriesMarketLayout}
-            marketsDetected={marketsDetected}
+            marketsDetected={marketsDetected || forecastMarketsDetected}
             onSeriesMarketLayout={(layout) => {
               setSeriesMarketLayout(layout);
               if (traderJoinKinds.length) {
@@ -6382,8 +6737,8 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
                 return;
               }
               const extra = eventExtraSheetParts(previewSheet);
-              if (extra && eventExtraKinds.includes(extra.kind)) {
-                const ticker = seriesJoinTickers[0]?.ticker || "";
+              if (extra && (eventExtraKinds.includes(extra.kind) || forecastJoinKinds.includes(extra.kind))) {
+                const ticker = (forecastJoinKinds.includes(extra.kind) ? forecastJoinEvents : seriesJoinTickers)[0]?.ticker || "";
                 setPreviewSheet(!ticker || layout === "combined" ? `event-extra:${extra.kind}` : `event-extra:${extra.kind}:${ticker}`);
                 return;
               }
@@ -6838,7 +7193,7 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
             !bucketActive &&
             !sampleActive &&
             !(seriesMarketSheet && seriesJoinOn) &&
-            !previewSheet.startsWith("event-extra:") &&
+            !(previewSheet.startsWith("event-extra:") && relatedExtraOn) &&
             !(previewSheet === "trader-join" || previewSheet.startsWith("trader-join:")) &&
             !(fanoutJoinOn && (previewSheet === "parent-market" || previewSheet === "parent-series" || previewSheet === "fanout-markets" || previewSheet.startsWith("djoin:") || previewSheet.startsWith("live:"))) &&
             !(previewSheet === "markets-meta" && tradesJoinReady && joinPlacement === "sheet") ? (
@@ -6858,7 +7213,7 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
                   />
                 </div>
               </div>
-            ) : previewSheet.startsWith("event-extra:") && eventExtraOn ? (
+            ) : previewSheet.startsWith("event-extra:") && relatedExtraOn ? (
               <p className="mt-1 text-right text-[11px] text-muted-foreground">Preview only. Save and run covers the other events.</p>
             ) : seriesMarketSheet && seriesJoinOn ? (
               <p className="mt-1 text-right text-[11px] text-muted-foreground">Preview only. Save and run uses your plan limit on each Markets sheet.</p>
@@ -6896,6 +7251,15 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
           <FunctionExplainerTabs sheetTitle={sheetTitle} />
         ) : showJoinExplainer && liveTraderList ? (
           <TraderJoinExplainerTabs title={tableId === "search_traders" ? "Traders" : "Leaderboard"} />
+        ) : showJoinExplainer && liveForecast ? (
+          <div className="overflow-hidden px-4 pb-1 pt-4">
+            <div className="flex">
+              <span className={sheetTabClass(true)}>Event forecast</span>
+              <span className={sheetTabClass(false)}>Events</span>
+              <span className={sheetTabClass(false)}>Event candlesticks</span>
+              <span className={sheetTabClass(false)}>Markets</span>
+            </div>
+          </div>
         ) : showJoinExplainer && (liveSeriesSearch || liveEventSearch) ? (
           <div className="overflow-hidden px-4 pb-1 pt-4">
             <div className="flex">
@@ -7037,6 +7401,10 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
             />
           ) : showJoinExplainer && liveTraderList ? (
             <TraderJoinExplainer title={tableId === "search_traders" ? "Traders" : "Leaderboard"} />
+          ) : showJoinExplainer && liveForecast ? (
+            <div className="flex h-full items-center justify-center rounded-xl border border-border/70 bg-background px-6 text-center text-[13px] leading-relaxed text-muted-foreground shadow-sm">
+              Join the selected events to their event record, candlesticks, or markets. Each join uses that event ticker.
+            </div>
           ) : showJoinExplainer && (liveSeriesSearch || liveEventSearch) ? (
             <div className="flex h-full items-center justify-center rounded-xl border border-border/70 bg-background px-6 text-center text-[13px] leading-relaxed text-muted-foreground shadow-sm">
               {liveEventSearch
@@ -7180,16 +7548,17 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
                 </div>
               );
             })()
-          ) : previewSheet.startsWith("event-extra:") && eventExtraOn ? (
+          ) : previewSheet.startsWith("event-extra:") && relatedExtraOn ? (
             (() => {
               const parts = eventExtraSheetParts(previewSheet);
-              const ticker = parts?.ticker || seriesJoinTickers[0]?.ticker || "";
+              const events = forecastJoinOn ? forecastJoinEvents : seriesJoinTickers;
+              const ticker = parts?.ticker || events[0]?.ticker || "";
               const preview = parts ? eventExtraPreview[`${parts.kind}:${ticker}`] : null;
-              const label = parts?.kind === "forecast" ? "event forecast" : "event candlesticks";
-              if (!seriesJoinTickers.length) {
+              const label = eventRelatedTitle(parts?.kind).toLowerCase();
+              if (!events.length) {
                 return (
                   <div className="flex h-full items-center justify-center rounded-xl border border-border/70 bg-background px-6 text-center text-[13px] leading-relaxed text-muted-foreground shadow-sm">
-                    Search for an event. These joins use those events.
+                    Search for an event or a series. These joins use those events.
                   </div>
                 );
               }
