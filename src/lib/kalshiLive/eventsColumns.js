@@ -42,7 +42,7 @@ export const KALSHI_LIVE_EVENTS_COLUMNS = [
   {
     name: "markets",
     type: "string",
-    description: "JSON array of markets (when include markets / nested row mode)",
+    description: "Markets in this event.",
   },
   {
     name: "product_metadata",
@@ -68,7 +68,7 @@ export const KALSHI_LIVE_EVENTS_COLUMNS = [
   {
     name: "milestones",
     type: "string",
-    description: "JSON array of related milestones (requested when this column is selected)",
+    description: "Related milestones.",
   },
 ];
 

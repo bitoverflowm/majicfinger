@@ -562,11 +562,27 @@ export function KalshiLiveMarketPicker({ picks, onAdd, onRemove, intent = "marke
     });
   }
 
+  function addEvent(event) {
+    const ticker = String(event?.ticker || "").trim().toUpperCase();
+    if (!ticker || picked.has(`event:${ticker}`) || atCap) return;
+    onAdd?.({
+      id: `event:${ticker}`,
+      kind: "event",
+      ticker,
+      label: event.title || ticker,
+      title: event.title || ticker,
+    });
+  }
+
   function chooseSuggestion(suggestion) {
     if (!suggestion || atCap) return;
     setExpanded(false);
     if (intent === "series") {
       if (suggestion.kind === "series") addSeries(suggestion);
+      return;
+    }
+    if (intent === "events") {
+      if (suggestion.kind === "event") addEvent(suggestion);
       return;
     }
     if (suggestion.kind === "series" || suggestion.kind === "event") openScope(suggestion);
@@ -588,7 +604,11 @@ export function KalshiLiveMarketPicker({ picks, onAdd, onRemove, intent = "marke
   const hiddenPicks = (picks || []).slice(8);
 
   const suggestionList = useMemo(() => {
-    const visibleSuggestions = suggestions.filter((suggestion) => intent !== "series" || suggestion.kind === "series");
+    const visibleSuggestions = suggestions.filter((suggestion) => {
+      if (intent === "series") return suggestion.kind === "series";
+      if (intent === "events") return suggestion.kind === "event";
+      return true;
+    });
     if (!showList) return null;
     if (!loading && !visibleSuggestions.length) {
       return (
@@ -685,8 +705,8 @@ export function KalshiLiveMarketPicker({ picks, onAdd, onRemove, intent = "marke
           type="text"
           value={query}
           disabled={atCap}
-          placeholder={intent === "series" ? "Search for a series" : SEARCH_PLACEHOLDER}
-          aria-label={intent === "series" ? "Search for a series" : "Search Kalshi markets"}
+          placeholder={intent === "events" ? "Search for an event" : intent === "series" ? "Search for a series" : SEARCH_PLACEHOLDER}
+          aria-label={intent === "events" ? "Search for an event" : intent === "series" ? "Search for a series" : "Search Kalshi markets"}
           autoComplete="off"
           onChange={(event) => {
             setQuery(event.target.value);
@@ -728,7 +748,7 @@ export function KalshiLiveMarketPicker({ picks, onAdd, onRemove, intent = "marke
     <TooltipProvider delayDuration={200}>
       <section className="space-y-2">
         <div className="flex items-center justify-between gap-2">
-          <p className="text-[12px] font-semibold text-foreground">{intent === "series" ? "Search for a series" : "Markets"}</p>
+          <p className="text-[12px] font-semibold text-foreground">{intent === "events" ? "Search for an event" : intent === "series" ? "Search for a series" : "Markets"}</p>
           {(picks || []).length ? (
             <span className="text-[10px] text-muted-foreground">{picks.length} selected</span>
           ) : null}
@@ -741,7 +761,7 @@ export function KalshiLiveMarketPicker({ picks, onAdd, onRemove, intent = "marke
               <>
                 <button
                   type="button"
-                  aria-label={intent === "series" ? "Close series search" : "Close market search"}
+                  aria-label={intent === "events" ? "Close event search" : intent === "series" ? "Close series search" : "Close market search"}
                   className="pointer-events-auto fixed inset-0 z-[600] cursor-default bg-black/25"
                   onMouseDown={() => setExpanded(false)}
                 />
@@ -756,7 +776,7 @@ export function KalshiLiveMarketPicker({ picks, onAdd, onRemove, intent = "marke
               document.body,
             )
           : null}
-        {intent === "series" ? null : (
+        {intent === "series" || intent === "events" ? null : (
           <p className="text-[10px] leading-snug text-muted-foreground">
             If you don't know your ticker, search anything and suggestions will populate.
           </p>
@@ -779,7 +799,7 @@ export function KalshiLiveMarketPicker({ picks, onAdd, onRemove, intent = "marke
                 </PopoverTrigger>
                 <PopoverContent side="bottom" align="start" className="z-[620] max-h-80 w-80 overflow-y-auto p-2">
                   <p className="px-1 pb-1.5 text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
-                    {picks.length} {intent === "series" ? "series" : "markets"} selected
+                    {picks.length} {intent === "events" ? "events" : intent === "series" ? "series" : "markets"} selected
                   </p>
                   <ul className="space-y-0.5">
                     {picks.map((pick) => (

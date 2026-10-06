@@ -28,7 +28,7 @@ export const KALSHI_LIVE_QUERY_ATTRIBUTE_COLUMNS = [
     title: "Series ticker",
     type: "text",
     queryOnly: true,
-    description: "Sent as series_ticker. One series ticker. Pulls every market in that series.",
+    description: "Markets in one series.",
   },
   {
     id: "listing_status",
@@ -42,7 +42,7 @@ export const KALSHI_LIVE_QUERY_ATTRIBUTE_COLUMNS = [
       ["closed", "Closed"],
       ["settled", "Settled"],
     ],
-    description: "Sent as status. unopened, open, paused, closed, or settled. One value. This is the request filter, separate from the market's lifecycle Status.",
+    description: "Whether a market is unopened, open, paused, closed, or settled.",
   },
   {
     id: "tickers",
@@ -61,7 +61,7 @@ export const KALSHI_LIVE_QUERY_ATTRIBUTE_COLUMNS = [
       ["exclude", "Exclude"],
       ["only", "Only"],
     ],
-    description: "Sent as mve_filter. Exclude leaves combo markets out. Only returns combo markets.",
+    description: "Combo markets. Exclude leaves them out. Only keeps them.",
   },
 ];
 

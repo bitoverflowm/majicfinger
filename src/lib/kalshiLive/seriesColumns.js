@@ -26,7 +26,7 @@ export const KALSHI_LIVE_SERIES_COLUMNS = [
     type: "number",
     label: "Volume",
     description:
-      "Total contracts traded across all events in this series. Requested from the API when Volume is selected.",
+      "Total contracts traded across all events in this series.",
   },
   { name: "last_updated_ts", type: "timestamp", description: "When series metadata was last updated (ISO 8601)" },
 ];

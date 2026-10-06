@@ -3,7 +3,14 @@
 import { KALSHI_LIVE_CANDLESTICK_PERIOD_OPTIONS } from "@/lib/kalshiLive/candlesticksColumns";
 import { dateRangePreset } from "@/components/dashboardComposer/dateRangePresets";
 
-export const KALSHI_LIVE_DIRECT_TABLES = ["series", "candlesticks", "trades", "orderbook"];
+export const KALSHI_LIVE_DIRECT_TABLES = ["series", "events", "candlesticks", "trades", "orderbook"];
+
+const EVENT_STATUSES = [
+  ["unopened", "Unopened"],
+  ["open", "Open"],
+  ["closed", "Closed"],
+  ["settled", "Settled"],
+];
 
 const DIRECT_MARKET_TABLES = ["trades", "candlesticks", "orderbook"];
 
@@ -47,7 +54,7 @@ export function defaultKalshiLiveDirectQuery(tableId, now = Date.now()) {
     tag: "",
     includeProductMetadata: false,
     minUpdatedTs: "",
-    sheetMode: tableId === "series" ? "combined" : "sheet",
+    sheetMode: tableId === "series" || tableId === "events" ? "combined" : "sheet",
   };
 }
 
@@ -68,6 +75,19 @@ export function directMarketTickers(picks) {
     }
   }
   return markets;
+}
+
+export function directEventTickers(picks) {
+  const seen = new Set();
+  const tickers = [];
+  for (const pick of picks || []) {
+    if (pick?.kind !== "event") continue;
+    const ticker = String(pick.ticker || "").trim();
+    if (!ticker || seen.has(ticker)) continue;
+    seen.add(ticker);
+    tickers.push(ticker);
+  }
+  return tickers;
 }
 
 export function directSeriesTickers(picks) {
@@ -96,6 +116,86 @@ export function seriesDiscoveryCategories(filters) {
     categories.push(name);
   }
   return categories;
+}
+
+/** Selected event statuses. The list endpoint takes one status, so each is requested on its own. */
+export function eventDiscoveryStatuses(filters) {
+  const include = filters?.status?.include;
+  if (!Array.isArray(include)) return [];
+  const allowed = new Set(EVENT_STATUSES.map(([value]) => value));
+  const seen = new Set();
+  const statuses = [];
+  for (const value of include) {
+    const name = String(value || "").trim();
+    if (!name || !allowed.has(name) || seen.has(name)) continue;
+    seen.add(name);
+    statuses.push(name);
+  }
+  return statuses;
+}
+
+/** Series tickers from the events attribute. The list endpoint takes one, so each is requested on its own. */
+export function eventSeriesTickers(filters) {
+  const filter = filters?.series_ticker;
+  const tags = Array.isArray(filter?.containsTags) ? filter.containsTags : [];
+  const draft = String(filter?.contains || "").trim();
+  const seen = new Set();
+  const tickers = [];
+  for (const value of [...tags, draft]) {
+    const ticker = String(value || "").trim().toUpperCase();
+    if (!ticker || seen.has(ticker)) continue;
+    seen.add(ticker);
+    tickers.push(ticker);
+  }
+  return tickers;
+}
+
+/** One series ticker from the events attribute, or "". */
+export function eventSeriesTicker(filters) {
+  return eventSeriesTickers(filters)[0] || "";
+}
+
+/** Unix seconds for "closes after", or "" when unset. */
+export function eventClosesAfter(filters) {
+  const raw = Number(filters?.min_close_ts?.minUpdatedTs);
+  return Number.isFinite(raw) && raw > 0 ? Math.floor(raw) : "";
+}
+
+/** Status first, then the series, then the two discover times, then the other columns. */
+export function kalshiLiveEventAttributeColumns(columns) {
+  const list = Array.isArray(columns) ? columns : [];
+  const byId = new Map(list.map((column) => [column.id, column]));
+  const status = {
+    id: "status",
+    title: "Status",
+    type: "text",
+    queryOnly: true,
+    control: "category",
+    enumOptions: EVENT_STATUSES,
+  };
+  const series = {
+    ...(byId.get("series_ticker") || { id: "series_ticker", type: "text", title: "Series ticker" }),
+    title: "Series ticker",
+    exactTickers: true,
+  };
+  const closes = {
+    id: "min_close_ts",
+    title: "Closes after",
+    type: "date",
+    queryOnly: true,
+    control: "updated-after",
+    description: "Only events with a market that closes after this time.",
+  };
+  const updated = {
+    ...(byId.get("last_updated_ts") || { id: "last_updated_ts", type: "date", title: "Last updated after" }),
+    title: "Last updated after",
+    control: "updated-after",
+    description: "Only events whose metadata was updated after this time.",
+  };
+  const rest = list
+    .filter((column) => column.id !== "series_ticker" && column.id !== "last_updated_ts")
+    .map((column) => (column.type === "date" ? { ...column, dateEpoch: "iso" } : column));
+  return [status, series, closes, updated, ...rest];
 }
 
 /** Unix seconds for "last updated after", or "" when unset. */
@@ -173,9 +273,11 @@ export function kalshiLiveDirectAttributeColumns(tableId, columns) {
       queryOnly: true,
       control: "query-range",
       description:
-        tableId === "orderbook"
-          ? "The order book is the current book. Depth is what this pull sends."
-          : "Start and end of this pull.",
+        tableId === "trades"
+          ? "Start and end of trade data"
+          : tableId === "orderbook"
+            ? "Start and end of order book data"
+            : "Start and end of candlestick data",
     },
   ];
   if (tableId === "candlesticks") {
@@ -186,7 +288,7 @@ export function kalshiLiveDirectAttributeColumns(tableId, columns) {
       queryOnly: true,
       control: "period",
       enumOptions: KALSHI_LIVE_CANDLESTICK_PERIOD_OPTIONS.map((option) => [String(option.value), option.label]),
-      description: "Candle size sent with the pull.",
+      description: "Candle Size",
     });
   }
   if (tableId === "orderbook") {
@@ -196,7 +298,7 @@ export function kalshiLiveDirectAttributeColumns(tableId, columns) {
       type: "number",
       queryOnly: true,
       control: "depth",
-      description: "Price levels to pull on each side. 0 to 100.",
+      description: "Price levels on each side. 0 to 100.",
     });
   }
   return [...query, ...shaped];
@@ -230,6 +332,13 @@ export function kalshiLiveDirectScopeError(tableId, picks, _query, filters) {
     if (directSeriesTickers(picks).length) return "";
     if (seriesDiscoveryCategories(filters).length) return "";
     return loading ? "" : "Search for a series or select a category.";
+  }
+  if (tableId === "events") {
+    if (directEventTickers(picks).length) return "";
+    if (eventDiscoveryStatuses(filters).length) return "";
+    if (eventSeriesTicker(filters)) return "";
+    if (eventClosesAfter(filters) || seriesUpdatedAfter(filters)) return "";
+    return loading ? "" : "Search for an event or select a status.";
   }
   if (directMarketTickers(picks).length) return "";
   return loading ? "" : "Add at least one market ticker.";

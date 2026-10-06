@@ -2,19 +2,26 @@ import assert from "node:assert/strict";
 import {
   defaultDirectAttributeFilters,
   defaultKalshiLiveDirectQuery,
+  directEventTickers,
   directMarketTickers,
   directPullWindow,
   directSeriesTickers,
+  eventClosesAfter,
+  eventDiscoveryStatuses,
+  eventSeriesTickers,
   isKalshiLiveDirectTable,
   kalshiLiveDirectAttributeColumns,
   kalshiLiveDirectScopeError,
+  kalshiLiveEventAttributeColumns,
   kalshiLiveSeriesAttributeColumns,
   seriesDiscoveryCategories,
   seriesUpdatedAfter,
 } from "./kalshiLiveDirectScope.js";
 
 assert.equal(isKalshiLiveDirectTable("trades"), true);
+assert.equal(isKalshiLiveDirectTable("events"), true);
 assert.equal(isKalshiLiveDirectTable("markets"), false);
+assert.equal(defaultKalshiLiveDirectQuery("events").sheetMode, "combined");
 
 const query = defaultKalshiLiveDirectQuery("trades", Date.parse("2026-10-04T12:00:00Z"));
 assert.equal(query.maxTs - query.minTs, 24 * 60 * 60);
@@ -104,5 +111,35 @@ assert.ok(windowed.maxTs > windowed.minTs);
 const bookWindow = directPullWindow("orderbook", { depth: { value: "5" }, time_range: seeded.time_range }, query);
 assert.equal(bookWindow.depth, 5);
 assert.equal(bookWindow.minTs, query.minTs);
+
+const eventPicks = [{ kind: "event", ticker: "KXTRUMP-1" }];
+assert.deepEqual(directEventTickers(eventPicks), ["KXTRUMP-1"]);
+assert.equal(kalshiLiveDirectScopeError("events", [], query, {}), "Search for an event or select a status.");
+assert.equal(kalshiLiveDirectScopeError("events", eventPicks, query, {}), "");
+assert.equal(kalshiLiveDirectScopeError("events", [], query, { status: { include: ["open", "closed"] } }), "");
+assert.deepEqual(eventDiscoveryStatuses({ status: { include: ["open", "nope", "open", "settled"] } }), ["open", "settled"]);
+assert.deepEqual(eventSeriesTickers({ series_ticker: { containsTags: ["kxnba", "KXNBA"], contains: "kxcpi" } }), ["KXNBA", "KXCPI"]);
+assert.equal(eventClosesAfter({ min_close_ts: { minUpdatedTs: 1700000000 } }), 1700000000);
+assert.equal(kalshiLiveDirectScopeError("events", [], query, { min_close_ts: { minUpdatedTs: 1700000000 } }), "");
+
+const eventColumns = [
+  { id: "event_ticker", type: "text", title: "Event ticker" },
+  { id: "series_ticker", type: "text", title: "Series ticker" },
+  { id: "title", type: "text", title: "Title" },
+  { id: "strike_date", type: "date", title: "Strike date" },
+  { id: "mutually_exclusive", type: "boolean", title: "Mutually exclusive" },
+  { id: "last_updated_ts", type: "date", title: "Last Updated Ts" },
+];
+const eventAttributes = kalshiLiveEventAttributeColumns(eventColumns);
+assert.deepEqual(
+  eventAttributes.map((column) => column.id),
+  ["status", "series_ticker", "min_close_ts", "last_updated_ts", "event_ticker", "title", "strike_date", "mutually_exclusive"],
+);
+assert.equal(eventAttributes[0].queryOnly, true);
+assert.equal(eventAttributes[0].control, "category");
+assert.equal(eventAttributes[1].exactTickers, true);
+assert.equal(eventAttributes[2].queryOnly, true);
+assert.equal(eventAttributes[3].control, "updated-after");
+assert.equal(eventAttributes[6].dateEpoch, "iso");
 
 console.log("kalshi live direct query ok");

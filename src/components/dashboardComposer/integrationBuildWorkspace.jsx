@@ -24,6 +24,7 @@ import {
   loadKalshiLiveMarketJoin,
   loadKalshiLiveMarketsForScope,
   loadKalshiLiveSeriesMarkets,
+  loadKalshiLiveEventMarkets,
   kalshiHistoricalMarketColumnList,
   loadAthenaComposeRows,
   peekBuildUniverseCount,
@@ -85,17 +86,24 @@ import {
   defaultKalshiLiveDirectQuery,
   directMarketTickers,
   directSeriesTickers,
+  directEventTickers,
   isKalshiLiveDirectTable,
   kalshiLiveDirectScopeError,
   defaultDirectAttributeFilters,
   directPullWindow,
   kalshiLiveDirectAttributeColumns,
   kalshiLiveSeriesAttributeColumns,
+  kalshiLiveEventAttributeColumns,
   seriesDiscoveryCategories,
   seriesUpdatedAfter,
+  eventDiscoveryStatuses,
+  eventSeriesTicker,
+  eventSeriesTickers,
+  eventClosesAfter,
 } from "@/components/dashboardComposer/kalshiLiveDirectScope";
 import { allowsMarketDownstreamJoin, pullKindFlags, withJoinFlags } from "@/components/dashboardComposer/pullKindFlags";
 import { kalshiLiveEndpointHasRealtimeFeed } from "@/config/kalshiLiveConnect";
+import { KALSHI_CANDLESTICK_MAX_CANDLES } from "@/lib/kalshiLive/candlestickCompose";
 import { fetchKalshiLiveTagsByCategories } from "@/lib/kalshiLive/seriesDiscovery";
 import {
   describeKalshiLiveServerFilters,
@@ -829,8 +837,11 @@ function EnrichStep({
   const sampleOpen = chosen.has("sample") && !foldedIds.has("sample");
   const tradesJoin = joinMode === "trades";
   const liveJoin = joinMode === "live";
-  const seriesJoin = joinMode === "series";
-  const seriesMarketsOn = seriesJoin && joinTarget === "kalshiLiveSeriesMarkets";
+  const seriesJoin = joinMode === "series" || joinMode === "events";
+  const listNoun = joinMode === "events" ? "event" : "series";
+  const listPlural = joinMode === "events" ? "events" : "series";
+  const scopeJoinId = joinMode === "events" ? "kalshiLiveEventMarkets" : "kalshiLiveSeriesMarkets";
+  const seriesMarketsOn = seriesJoin && joinTarget === scopeJoinId;
   const liveSelected = liveJoinIds instanceof Set ? liveJoinIds : new Set();
   const liveJoinTitles = KALSHI_LIVE_MARKET_JOINS.filter((item) => liveSelected.has(item.id)).map((item) => item.title);
   const polymarketJoin = joinLake === "polymarket";
@@ -1007,7 +1018,7 @@ function EnrichStep({
                           <button
                             type="button"
                             aria-pressed={seriesMarketsOn}
-                            onClick={() => onJoinTarget("kalshiLiveSeriesMarkets")}
+                            onClick={() => onJoinTarget(scopeJoinId)}
                             className={cn(
                               "flex w-full flex-col rounded-lg border px-2.5 py-2 text-left transition-colors",
                               seriesMarketsOn
@@ -1017,7 +1028,7 @@ function EnrichStep({
                           >
                             <span className="text-[13px] font-semibold text-foreground">Markets</span>
                             <span className="text-[11px] font-normal text-muted-foreground">
-                              Every market inside the series in this pull.
+                              Every market inside the {listPlural} in this pull.
                             </span>
                           </button>
                           {seriesMarketsOn ? (
@@ -1033,9 +1044,9 @@ function EnrichStep({
                                     : "border-border/70 bg-background hover:bg-muted/50",
                                 )}
                               >
-                                <span className="text-[13px] font-semibold text-foreground">Sheet per series</span>
+                                <span className="text-[13px] font-semibold text-foreground">Sheet per {listNoun}</span>
                                 <span className="text-[11px] font-normal text-muted-foreground">
-                                  Each series gets its own Markets tab.
+                                  Each {listNoun} gets its own Markets tab.
                                 </span>
                               </button>
                               <button
@@ -1051,11 +1062,11 @@ function EnrichStep({
                               >
                                 <span className="text-[13px] font-semibold text-foreground">One sheet</span>
                                 <span className="text-[11px] font-normal text-muted-foreground">
-                                  Markets from every series land on one tab.
+                                  Markets from every {listNoun} land on one tab.
                                 </span>
                               </button>
                               <p className="text-[11px] leading-relaxed text-muted-foreground">
-                                {queryRowCount.toLocaleString()} series in this pull.
+                                {queryRowCount.toLocaleString()} {queryRowCount === 1 ? listNoun : listPlural} in this pull.
                                 {seriesMarketLayout === "combined"
                                   ? " One Markets sheet."
                                   : ` ${sheetCount.toLocaleString()} Markets ${sheetCount === 1 ? "sheet" : "sheets"}.`}
@@ -1623,7 +1634,9 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
   const guidedFilters = profile.guidedTables.includes(tableId);
   const liveMarketSearch = integrationId === "kalshiLive" && tableId === "markets";
   const liveSeriesSearch = integrationId === "kalshiLive" && tableId === "series";
+  const liveEventSearch = integrationId === "kalshiLive" && tableId === "events";
   const liveDirect = integrationId === "kalshiLive" && isKalshiLiveDirectTable(tableId);
+  const liveMarketFanout = liveDirect && !liveSeriesSearch && !liveEventSearch;
 
   useEffect(() => {
     if (!liveSeriesSearch) return undefined;
@@ -1808,8 +1821,8 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
     [liveMarketSearch, pull?.columns, KALSHI_LIVE_QUERY_ATTRIBUTE_COLUMNS, kalshiLiveMarketAttributeColumns],
   );
   const directAttributeColumns = useMemo(
-    () => (liveDirect && tableId !== "series" ? kalshiLiveDirectAttributeColumns(tableId, pull?.columns || []) : []),
-    [liveDirect, tableId, pull?.columns],
+    () => (liveMarketFanout ? kalshiLiveDirectAttributeColumns(tableId, pull?.columns || []) : []),
+    [liveMarketFanout, tableId, pull?.columns],
   );
   const directRowColumns = useMemo(
     () => directAttributeColumns.filter((column) => !column.queryOnly),
@@ -1828,10 +1841,21 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
         : [],
     [liveSeriesSearch, pull?.columns, seriesCategoryState],
   );
+  const eventAttributeColumns = useMemo(
+    () => (liveEventSearch ? kalshiLiveEventAttributeColumns(pull?.columns || []) : []),
+    [liveEventSearch, pull?.columns],
+  );
   const seriesCategories = seriesDiscoveryCategories(attributeFilters);
   const seriesCategoryKey = seriesCategories.join("\0");
   const seriesMinUpdatedTs = seriesUpdatedAfter(attributeFilters);
   const seriesProductMetadata = liveSeriesSearch && !hidden.has("product_metadata");
+  const eventStatuses = eventDiscoveryStatuses(attributeFilters);
+  const eventStatusKey = eventStatuses.join("\0");
+  const eventSeries = eventSeriesTicker(attributeFilters);
+  const eventSeriesKey = eventSeriesTickers(attributeFilters).join("\0");
+  const eventMinCloseTs = eventClosesAfter(attributeFilters);
+  const eventIncludeMarkets = liveEventSearch && !hidden.has("markets");
+  const eventIncludeMilestones = liveEventSearch && !hidden.has("milestones");
   const liveClientColumns = useMemo(
     () => liveAttributeColumns.filter((column) => !column.queryOnly),
     [liveAttributeColumns],
@@ -2135,7 +2159,7 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
   }
 
   function addDirectPick(pick) {
-    if (tableId === "series" && pick?.kind === "series") {
+    if ((tableId === "series" && pick?.kind === "series") || (tableId === "events" && pick?.kind === "event")) {
       setLivePicks((prev) => (prev.some((item) => item.id === pick.id) ? prev : [...prev, { ...pick, status: "ready", rows: [], error: "" }]));
       return;
     }
@@ -2143,19 +2167,33 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
   }
 
   const directMarkets = useMemo(
-    () => (liveDirect && tableId !== "series" ? directMarketTickers(livePicks) : []),
-    [liveDirect, livePicks, tableId],
+    () => (liveMarketFanout ? directMarketTickers(livePicks) : []),
+    [liveMarketFanout, livePicks],
   );
   const directSeries = useMemo(
     () => (liveDirect && tableId === "series" ? directSeriesTickers(livePicks) : []),
     [liveDirect, livePicks, tableId],
   );
+  const directEvents = useMemo(
+    () => (liveDirect && tableId === "events" ? directEventTickers(livePicks) : []),
+    [liveDirect, livePicks, tableId],
+  );
+  const sampleMarketTicker = useMemo(() => {
+    if (!liveMarketFanout) return "";
+    const row = pull?.rows?.[0];
+    return String(row?.market_ticker || row?.ticker || "").trim();
+  }, [liveMarketFanout, pull?.rows]);
 
   useEffect(() => {
     if (!liveDirect) return undefined;
-    const ticker = directMarkets[0]?.ticker || "";
+    const ticker = directMarkets[0]?.ticker || sampleMarketTicker;
     if (tableId === "series") {
       if (!directSeries.length && !seriesCategories.length) {
+        setDirectPreview({ status: "idle", rows: [], error: "", ticker: "" });
+        return undefined;
+      }
+    } else if (tableId === "events") {
+      if (!directEvents.length && !eventStatuses.length && !eventSeries && !eventMinCloseTs && !seriesMinUpdatedTs) {
         setDirectPreview({ status: "idle", rows: [], error: "", ticker: "" });
         return undefined;
       }
@@ -2178,20 +2216,45 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
               minUpdatedTs: seriesMinUpdatedTs,
               limit: seriesFetchCap,
             }
-        : {
-            ticker,
-            minTs: directWindow.minTs,
-            maxTs: directWindow.maxTs,
-            period: directWindow.period,
-            depth: directWindow.depth,
-            limit: PREVIEW_ROW_CAP,
-          };
+        : tableId === "events"
+          ? directEvents.length
+            ? {
+                mode: "tickers",
+                tickers: directEvents,
+                includeMarkets: eventIncludeMarkets,
+                includeMilestones: eventIncludeMilestones,
+                limit: seriesFetchCap,
+              }
+            : {
+                mode: "discover",
+                statuses: eventStatuses,
+                seriesTickers: eventSeriesTickers(attributeFilters),
+                minCloseTs: eventMinCloseTs,
+                minUpdatedTs: seriesMinUpdatedTs,
+                includeMarkets: eventIncludeMarkets,
+                includeMilestones: eventIncludeMilestones,
+                limit: seriesFetchCap,
+              }
+          : {
+              ticker,
+              minTs: directWindow.minTs,
+              maxTs: directWindow.maxTs,
+              period: directWindow.period,
+              depth: directWindow.depth,
+              limit: tableId === "candlesticks" ? KALSHI_CANDLESTICK_MAX_CANDLES : PREVIEW_ROW_CAP,
+            };
     loadKalshiLiveDirect(tableId, spec)
       .then((result) => {
         if (cancel) return;
         const rows = result?.rows || [];
-        setDirectPreview({ status: "ready", rows, error: "", ticker: ticker || directSeries[0] || "" });
-        setVisibleCount(tableId === "series" ? Math.min(rows.length, PREVIEW_ROW_CAP) : rows.length);
+        setDirectPreview({
+          status: "ready",
+          rows,
+          error: "",
+          ticker: ticker || directSeries[0] || directEvents[0] || "",
+          truncated: Boolean(result?.truncated),
+        });
+        setVisibleCount(Math.min(rows.length, PREVIEW_ROW_CAP));
       })
       .catch((err) => {
         if (cancel) return;
@@ -2205,7 +2268,7 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
     return () => {
       cancel = true;
     };
-  }, [directMarkets, directSeries, directWindow.minTs, directWindow.maxTs, directWindow.period, directWindow.depth, liveDirect, planLimit, seriesCategoryKey, seriesMinUpdatedTs, seriesProductMetadata, tableId]);
+  }, [directMarkets, directSeries, directEvents, directWindow.minTs, directWindow.maxTs, directWindow.period, directWindow.depth, eventIncludeMarkets, eventIncludeMilestones, eventMinCloseTs, eventSeriesKey, eventStatusKey, liveDirect, planLimit, sampleMarketTicker, seriesCategoryKey, seriesMinUpdatedTs, seriesProductMetadata, tableId]);
 
   const seriesImportRows = useMemo(() => {
     if (!(liveDirect && tableId === "series" && directPreview.status === "ready")) return null;
@@ -2214,6 +2277,14 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
     );
     return sortAttributeRows(matched, seriesAttributeColumns, sortKeys);
   }, [attributeFilters, directPreview.rows, directPreview.status, liveDirect, seriesAttributeColumns, sortKeys, tableId]);
+  const eventImportRows = useMemo(() => {
+    if (!(liveDirect && tableId === "events" && directPreview.status === "ready")) return null;
+    const matched = (directPreview.rows || []).filter((row) =>
+      rowMatchesAttributes(row, eventAttributeColumns, attributeFilters),
+    );
+    return sortAttributeRows(matched, eventAttributeColumns, sortKeys);
+  }, [attributeFilters, directPreview.rows, directPreview.status, eventAttributeColumns, liveDirect, sortKeys, tableId]);
+  const listImportRows = tableId === "events" ? eventImportRows : seriesImportRows;
 
   const filteredRows = useMemo(() => {
     const requested = Number(rowLimit);
@@ -2221,8 +2292,8 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
       const limited = Number.isFinite(requested) && requested > 0 ? rows.slice(0, requested) : rows;
       return limited;
     };
-    if (seriesImportRows) return capPreview(seriesImportRows.slice(0, Math.min(visibleCount, PREVIEW_ROW_CAP)));
-    if (liveDirect && tableId !== "series" && directPreview.status !== "idle") {
+    if (listImportRows) return capPreview(listImportRows.slice(0, Math.min(visibleCount, PREVIEW_ROW_CAP)));
+    if (liveMarketFanout && directPreview.status !== "idle") {
       const matched = (directPreview.rows || []).filter((row) => rowMatchesAttributes(row, directRowColumns, attributeFilters));
       const sorted = sortAttributeRows(matched, directRowColumns, sortKeys);
       return capPreview(sorted.slice(0, visibleCount));
@@ -2255,7 +2326,7 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
     const query = filterValue.trim().toLowerCase();
     const matched = !query || !filterColumn ? rows : rows.filter((row) => String(row[filterColumn] ?? "").toLowerCase().includes(query));
     return capPreview(matched);
-  }, [directPreview.rows, directPreview.status, directRowColumns, pull, visibleCount, filterColumn, filterValue, guidedFilters, attributeFilters, sortKeys, rowLimit, integrationId, tableId, settledPreviewKey, previewSearchError, livePreviewRows, liveMarketSearch, liveDirect, liveNarrowing, seriesAttributeColumns, seriesImportRows]);
+  }, [directPreview.rows, directPreview.status, directRowColumns, pull, visibleCount, filterColumn, filterValue, guidedFilters, attributeFilters, sortKeys, rowLimit, integrationId, tableId, settledPreviewKey, previewSearchError, livePreviewRows, liveMarketSearch, liveDirect, liveMarketFanout, liveNarrowing, seriesAttributeColumns, listImportRows]);
 
   const queriedMarkets = useMemo(() => {
     if (!guidedFilters) return [];
@@ -2676,7 +2747,7 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
   const liveScanWaiting = liveMarketSearch && liveScan.status === "loading" && shown === 0;
   const directLoading = liveDirect && directPreview.status === "loading";
   const directExtra =
-    liveDirect && directPreview.status === "ready" && tableId !== "series" && directMarkets.length > 1
+    liveMarketFanout && directPreview.status === "ready" && directMarkets.length > 1
       ? ` Each market gets its own sheet. The other ${directMarkets.length - 1} ${directMarkets.length === 2 ? "is" : "are"} created when you run.`
       : "";
 
@@ -2691,7 +2762,6 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
       setProgress(100);
     };
   }, [directLoading, emptyRefresh, livePickAwaitingRows, liveScanWaiting]);
-  const shownLabel = `Previewing ${shown.toLocaleString()} ${shown === 1 ? "row" : "rows"}`;
   const livePickLoading = livePicks.some((pick) => pick.status === "loading");
   const liveUpdating = liveScan.status === "loading" || livePickLoading;
   const liveScanNote =
@@ -2707,37 +2777,62 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
     !previewRefreshing &&
     liveScan.status !== "error";
   const previewIsEmpty = previewSampleEmpty || liveSettledEmpty;
+  // The grid never shows more than 50. The import count is the known size of this pull
+  // (the rows in hand, a counted match, or a historical universe), then capped by the plan and row limit.
+  const previewShown = Math.min(shown, PREVIEW_ROW_CAP);
+  const directReadyCount = liveMarketFanout && directPreview.status === "ready" ? directPreview.rows.length : null;
+  const directCountOpen = directReadyCount != null && tableId === "trades" && Boolean(directPreview.truncated);
+  const pullTotal = previewIsEmpty
+    ? 0
+    : Array.isArray(listImportRows)
+      ? listImportRows.length
+      : directCountOpen
+        ? null
+        : directReadyCount != null
+          ? directReadyCount
+          : Array.isArray(liveMatchedRows)
+            ? liveMatchedRows.length
+            : exactUniverse
+              ? typeof universe === "number" && !counting
+                ? universe
+                : null
+              : liveDirect && (directPreview.status === "loading" || directPreview.status === "error")
+                ? null
+                : settledRowCount;
+  const pullTotalText = Number.isFinite(pullTotal)
+    ? `${pullTotal.toLocaleString()}${Array.isArray(listImportRows) && directPreview.truncated ? "+" : ""}`
+    : "";
+  const previewCountLine = (() => {
+    const noun = previewShown === 1 ? "row" : "rows";
+    const head = `Previewing ${previewShown.toLocaleString()} ${noun}`;
+    if (pullTotal == null) return `${head} of …`;
+    if (pullTotal > previewShown) {
+      const totalNoun = pullTotal === 1 ? "row" : "rows";
+      return `Previewing ${previewShown.toLocaleString()} of ${pullTotalText} ${totalNoun}.`;
+    }
+    return `${head}.`;
+  })();
   const previewLine = loading
     ? "Loading the first 50 rows"
     : liveDirect && directPreview.status === "error"
       ? directPreview.error
       : liveDirect && directPreview.status === "loading"
         ? "Loading this pull"
-        : liveDirect && directPreview.status === "ready"
-          ? tableId === "series" && seriesImportRows && seriesImportRows.length > shown
-            ? `Previewing ${shown.toLocaleString()} of ${seriesImportRows.length.toLocaleString()} ${seriesImportRows.length === 1 ? "row" : "rows"}`
-            : `Previewing ${shown.toLocaleString()} ${shown === 1 ? "row" : "rows"}.${directExtra}`
-    : liveScan.status === "error" && !liveScan.rows?.length
-      ? liveScan.error
-      : liveMatchedRows
-        ? livePickAwaitingRows
-          ? "Loading data"
-          : liveUpdating
-            ? liveScan.waiting
-              ? liveScan.note || "Slowing down."
-              : shown
-                ? `${shownLabel} of ${liveMatchedRows.length.toLocaleString()} matching`
-                : "Checking markets"
-            : liveScan.status === "error"
-              ? `${liveScan.error} ${liveMatchedRows.length.toLocaleString()} matching ${liveMatchedRows.length === 1 ? "row" : "rows"} kept.`
-              : `Previewing ${shown.toLocaleString()} of ${liveMatchedRows.length.toLocaleString()} matching ${liveMatchedRows.length === 1 ? "row" : "rows"}.${liveScanNote}`
-        : !exactUniverse
-      ? `${shownLabel} of 1,000,000+ rows available`
-      : typeof universe === "number" && !counting
-        ? `${shownLabel} of ${universe.toLocaleString()}`
-        : counting
-          ? `${shownLabel} of …`
-          : `${shownLabel}. More rows are available.`;
+        : liveScan.status === "error" && !liveScan.rows?.length
+          ? liveScan.error
+          : liveMatchedRows
+            ? livePickAwaitingRows
+              ? "Loading data"
+              : liveUpdating
+                ? liveScan.waiting
+                  ? liveScan.note || "Slowing down."
+                  : shown
+                    ? previewCountLine
+                    : "Checking markets"
+                : liveScan.status === "error"
+                  ? `${liveScan.error} ${liveMatchedRows.length.toLocaleString()} matching ${liveMatchedRows.length === 1 ? "row" : "rows"} kept.`
+                  : `${previewCountLine}${liveScanNote}`
+            : `${previewCountLine}${directExtra}`;
   const liveRemovalTape = liveMarketSearch ? (
     <MarketScanSteps
       source={profile.label}
@@ -2769,17 +2864,7 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
         : previewRefreshing && !loading
           ? `${previewLine} · updating`
           : previewLine;
-  const availableRows = previewIsEmpty
-    ? 0
-    : seriesImportRows
-      ? seriesImportRows.length
-      : liveMatchedRows
-      ? liveMatchedRows.length
-      : !exactUniverse
-        ? Number.POSITIVE_INFINITY
-        : typeof universe === "number" && !counting
-          ? universe
-          : null;
+  const availableRows = pullTotal;
   const requestedLimit = Number(rowLimit);
   const importedRows =
     typeof planLimit === "number" && availableRows != null
@@ -2823,25 +2908,26 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
   }, [liveMarketSearch, liveMatchedRows, filteredRows]);
   const liveJoinMarkets = liveJoinList.slice(0, marketCap);
   const seriesJoinTickers = useMemo(() => {
-    if (!liveSeriesSearch) return [];
+    if (!liveSeriesSearch && !liveEventSearch) return [];
     const requested = Number(rowLimit);
-    // A category or ticker search is the full series set. Otherwise the rows already on the Series sheet are the pull.
-    const source = Array.isArray(seriesImportRows)
+    // A directed search is the full set. Otherwise the rows already on the sheet are the pull.
+    const source = Array.isArray(listImportRows)
       ? Number.isFinite(requested) && requested > 0
-        ? seriesImportRows.slice(0, requested)
-        : seriesImportRows
+        ? listImportRows.slice(0, requested)
+        : listImportRows
       : filteredRows;
+    const field = liveEventSearch ? "event_ticker" : "ticker";
     const seen = new Set();
     const list = [];
     for (const row of source) {
-      const ticker = String(row?.ticker || "").trim();
+      const ticker = String(row?.[field] || "").trim();
       if (!ticker || seen.has(ticker)) continue;
       seen.add(ticker);
       list.push({ ticker, title: String(row?.title || ticker) });
       if (list.length >= marketCap) break;
     }
     return list;
-  }, [liveSeriesSearch, seriesImportRows, filteredRows, rowLimit, marketCap]);
+  }, [liveSeriesSearch, liveEventSearch, listImportRows, filteredRows, rowLimit, marketCap]);
   const seriesJoinKey = seriesJoinTickers.map((item) => item.ticker).join("\0");
   const liveJoinKey = [...liveJoinIds].sort().join(",");
   const liveJoinTargets = KALSHI_LIVE_MARKET_JOINS.filter((item) => liveJoinIds.has(item.id));
@@ -2852,7 +2938,10 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
     [integrationId, tableId],
   );
 
-  const seriesJoinOn = liveSeriesSearch && joinOn && joinTarget === "kalshiLiveSeriesMarkets";
+  const scopeJoinId = liveEventSearch ? "kalshiLiveEventMarkets" : "kalshiLiveSeriesMarkets";
+  const listNoun = liveEventSearch ? "event" : "series";
+  const listPlural = liveEventSearch ? "events" : "series";
+  const seriesJoinOn = (liveSeriesSearch || liveEventSearch) && joinOn && joinTarget === scopeJoinId;
   const enrichmentFlags = useMemo(
     () => withJoinFlags(nativePullFlags, { markets: seriesJoinOn }),
     [nativePullFlags, seriesJoinOn],
@@ -2869,7 +2958,7 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
     const combined = sheet === "series-markets" || (liveFollowUp && seriesMarketLayout === "combined");
     if (!seriesJoinOn || (!activeTicker && !combined)) return null;
     return {
-      key: combined ? `combined:${seriesJoinKey}` : `sheet:${seriesJoinKey}:${activeTicker}`,
+      key: combined ? `${liveEventSearch ? "event:" : ""}combined:${seriesJoinKey}` : `${liveEventSearch ? "event:" : ""}sheet:${seriesJoinKey}:${activeTicker}`,
       activeTicker,
       combined,
     };
@@ -2879,12 +2968,13 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
   const seriesMarketView = cachedSeriesMarkets || seriesMarketPreview;
   const marketsDetected = useMemo(() => {
     if (!seriesJoinOn || !seriesJoinKey) return false;
-    const keys = [`combined:${seriesJoinKey}`, ...seriesJoinTickers.map((item) => `sheet:${seriesJoinKey}:${item.ticker}`)];
+    const prefix = liveEventSearch ? "event:" : "";
+    const keys = [`${prefix}combined:${seriesJoinKey}`, ...seriesJoinTickers.map((item) => `${prefix}sheet:${seriesJoinKey}:${item.ticker}`)];
     return keys.some((key) => {
       const hit = seriesMarketCacheRef.current.get(key);
       return hit?.status === "ready" && (hit.rows?.length || 0) > 0;
     });
-  }, [seriesJoinOn, seriesJoinKey, seriesJoinTickers, seriesMarketPreview]);
+  }, [seriesJoinOn, seriesJoinKey, seriesJoinTickers, seriesMarketPreview, liveEventSearch]);
   const downstreamPreviewTicker = String(seriesMarketView.rows?.[0]?.ticker || "").trim();
   const joinPreviewTicker = liveMarketSearch ? livePreviewTicker : marketDownstream ? downstreamPreviewTicker : "";
 
@@ -2961,6 +3051,7 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
       seriesMarketCacheRef.current.set(key, next);
       if (seriesMarketVisibleKey.current === key) setSeriesMarketPreview(next);
     };
+    const loadScopeMarkets = liveEventSearch ? loadKalshiLiveEventMarkets : loadKalshiLiveSeriesMarkets;
     (async () => {
       try {
         if (combined) {
@@ -2968,7 +3059,7 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
           let columns = [];
           for (const item of seriesJoinTickers) {
             if (rows.length >= PREVIEW_ROW_CAP) break;
-            const result = await loadKalshiLiveSeriesMarkets(item.ticker, PREVIEW_ROW_CAP - rows.length);
+            const result = await loadScopeMarkets(item.ticker, PREVIEW_ROW_CAP - rows.length);
             if (result.columns?.length) columns = result.columns;
             for (const row of result.rows || []) {
               rows.push(row);
@@ -2978,7 +3069,7 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
           apply({ status: "ready", ticker: "combined", columns, rows, error: "" });
           return;
         }
-        const result = await loadKalshiLiveSeriesMarkets(activeTicker, PREVIEW_ROW_CAP);
+        const result = await loadScopeMarkets(activeTicker, PREVIEW_ROW_CAP);
         apply({
           status: "ready",
           ticker: activeTicker,
@@ -2997,7 +3088,7 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
       }
     })();
     return undefined;
-  }, [seriesJoinOn, seriesJoinKey, previewSheet, seriesJoinTickers, seriesMarketLayout]);
+  }, [seriesJoinOn, seriesJoinKey, previewSheet, seriesJoinTickers, seriesMarketLayout, liveEventSearch]);
 
   const showSampleExplainer = step === "enrich" && hoverSample && !enrichPicks.has("sample");
   const showBucketExplainer = step === "enrich" && hoverBucket && !enrichPicks.has("bucket") && !showSampleExplainer;
@@ -3006,7 +3097,7 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
     step === "enrich" && hoverFunction && !enrichPicks.has("function") && !showSummarizeExplainer && !showSampleExplainer && !showBucketExplainer;
   const liveJoinReady = liveMarketSearch && joinOn && liveJoinTargets.length > 0;
   const showJoinExplainer =
-    (historicalEnrich || liveMarketSearch || liveSeriesSearch) &&
+    (historicalEnrich || liveMarketSearch || liveSeriesSearch || liveEventSearch) &&
     step === "enrich" &&
     hoverJoin &&
     !enrichPicks.has("join") &&
@@ -3299,7 +3390,7 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
       return "Click a column or a cell to drop it into the summary.";
     }
     if (showJoinExplainer) {
-      if (liveSeriesSearch) return "Illustration. Markets inside these series load after you choose Join.";
+      if (liveSeriesSearch || liveEventSearch) return `Illustration. Markets inside these ${listPlural} load after you choose Join.`;
       return tradesQuery
         ? "Illustration. No market metadata is loaded until you run the pull."
         : "Illustration. No trades are loaded until you run the pull.";
@@ -3316,11 +3407,15 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
       return `Previewing ${count.toLocaleString()} ${title.toLowerCase()} ${count === 1 ? "row" : "rows"} for ${ticker}. Save and run joins the markets in this pull.`;
     }
     if (seriesMarketSheet && seriesJoinOn) {
-      if (!seriesJoinTickers.length) return "Search for a series or select a category. Markets join uses those series.";
-      if (seriesMarketView.status === "loading" || seriesMarketView.status === "idle") return "Loading markets for this series";
+      if (!seriesJoinTickers.length) {
+        return liveEventSearch
+          ? "Search for an event or select a status. Markets join uses those events."
+          : "Search for a series or select a category. Markets join uses those series.";
+      }
+      if (seriesMarketView.status === "loading" || seriesMarketView.status === "idle") return `Loading markets for this ${listNoun}`;
       if (seriesMarketView.status === "error") return seriesMarketView.error;
       const count = seriesMarketView.rows.length;
-      const scope = previewSheet === "series-markets" ? "these series" : seriesMarketView.ticker || "this series";
+      const scope = previewSheet === "series-markets" ? `these ${listPlural}` : seriesMarketView.ticker || `this ${listNoun}`;
       return `Previewing ${count.toLocaleString()} ${count === 1 ? "market" : "markets"} from ${scope}. Save and run uses your plan limit.`;
     }
     if (previewSheet.startsWith("column:") && functionOnNew) return "New table. This sheet is created when you run the pull.";
@@ -3701,7 +3796,7 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
         args: { lake: lakeId, table: "trades", sheets: Math.min(joinedMarkets.length || marketCap, marketCap) },
       });
     }
-    if (liveSeriesSearch && enrichPicks.has("join") && joinTarget === "kalshiLiveSeriesMarkets" && seriesJoinTickers.length) {
+    if ((liveSeriesSearch || liveEventSearch) && enrichPicks.has("join") && joinTarget === scopeJoinId && seriesJoinTickers.length) {
       planned.push({
         id: "join-series-markets",
         name: "compose_series_markets",
@@ -3867,7 +3962,7 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
         const columns = shownColumns.filter((column) => available.some((item) => item.id === column.id));
         return { columns: columns.length ? columns : available, rows: loaded?.rows || [] };
       };
-      const titleFor = { trades: "Trades", orderbook: "Order book", candlesticks: "Candlesticks", series: "Series" };
+      const titleFor = { trades: "Trades", orderbook: "Order book", candlesticks: "Candlesticks", series: "Series", events: "Events" };
       const label = titleFor[tableId] || sheetTitle;
       let built = [];
       if (tableId === "series") {
@@ -3905,6 +4000,56 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
             summary: tickers.length ? `Kalshi Live · Series · ${tickers.join(", ")}` : `Kalshi Live · Series · ${categories.join(", ")}`,
             attributeLines,
             sortLine: sortSummary(seriesAttributeColumns, sortKeys),
+            sourceRows: rows,
+          },
+        ];
+      } else if (tableId === "events") {
+        const tickers = directEventTickers(livePicks);
+        const statuses = eventDiscoveryStatuses(attributeFilters);
+        const seriesTicker = eventSeriesTicker(attributeFilters);
+        const loaded = await loadKalshiLiveDirect(
+          "events",
+          tickers.length
+            ? {
+                mode: "tickers",
+                tickers,
+                includeMarkets: !hidden.has("markets"),
+                includeMilestones: !hidden.has("milestones"),
+                limit,
+              }
+            : {
+                mode: "discover",
+                statuses,
+                seriesTickers: eventSeriesTickers(attributeFilters),
+                minCloseTs: eventClosesAfter(attributeFilters),
+                minUpdatedTs: seriesUpdatedAfter(attributeFilters),
+                includeMarkets: !hidden.has("markets"),
+                includeMilestones: !hidden.has("milestones"),
+                limit,
+              },
+        );
+        const shaped = shape(loaded);
+        const matched = shaped.rows.filter((row) => rowMatchesAttributes(row, eventAttributeColumns, attributeFilters));
+        const sorted = sortAttributeRows(matched, eventAttributeColumns, sortKeys);
+        const requested = Number(rowLimit);
+        const rows = Number.isFinite(requested) && requested > 0 ? sorted.slice(0, Math.min(requested, limit)) : sorted;
+        const attributeLines = eventAttributeColumns.flatMap((column) => {
+          const summary = attributeSummary(column, attributeFilters);
+          return summary ? [`${column.title} ${summary}`] : [];
+        });
+        built = [
+          {
+            id: "run-live-events",
+            title: "Events",
+            columns: shaped.columns,
+            rows,
+            span: "full",
+            table: "events",
+            summary: tickers.length
+              ? `Kalshi Live · Events · ${tickers.join(", ")}`
+              : `Kalshi Live · Events · ${[...statuses, seriesTicker].filter(Boolean).join(", ") || "discovery"}`,
+            attributeLines,
+            sortLine: sortSummary(eventAttributeColumns, sortKeys),
             sourceRows: rows,
           },
         ];
@@ -3961,7 +4106,15 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
                     categories: seriesDiscoveryCategories(attributeFilters),
                     minUpdatedTs: seriesUpdatedAfter(attributeFilters),
                   }
-                : { ticker: sheet.pull?.ticker || "", directQuery },
+                : sheet.table === "events"
+                  ? {
+                      tickers: directEventTickers(livePicks),
+                      statuses: eventDiscoveryStatuses(attributeFilters),
+                      seriesTicker: eventSeriesTicker(attributeFilters),
+                      minCloseTs: eventClosesAfter(attributeFilters),
+                      minUpdatedTs: seriesUpdatedAfter(attributeFilters),
+                    }
+                  : { ticker: sheet.pull?.ticker || "", directQuery },
             ),
             table: sheet.table,
             span: sheet.span,
@@ -3977,8 +4130,9 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
         sheets.push(...directParents.map(({ sourceRows, ...sheet }) => sheet));
       }
       directSamples.forEach((sheet) => pushSampleSheet(sheet));
-      if (tableId === "series" && enrichPicks.has("join") && joinTarget === "kalshiLiveSeriesMarkets" && seriesJoinTickers.length) {
+      if ((tableId === "series" || tableId === "events") && enrichPicks.has("join") && joinTarget === scopeJoinId && seriesJoinTickers.length) {
         const unique = seriesJoinTickers.map((item) => item.ticker);
+        const loadScopeMarkets = tableId === "events" ? loadKalshiLiveEventMarkets : loadKalshiLiveSeriesMarkets;
         reporter.start("join-series-markets");
         const marketLimit = Number.isFinite(sheetCap) ? sheetCap : PREVIEW_ROW_CAP;
         const seenMarkets = [];
@@ -3997,7 +4151,7 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
             let columns = [];
             for (const ticker of unique) {
               if (rows.length >= marketLimit) break;
-              const result = await loadKalshiLiveSeriesMarkets(ticker, marketLimit - rows.length);
+              const result = await loadScopeMarkets(ticker, marketLimit - rows.length);
               if (result.columns?.length) columns = result.columns;
               rows.push(...(result.rows || []));
             }
@@ -4017,12 +4171,12 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
                 span: "full",
                 table: "markets",
                 summary: `Kalshi Live · Markets · ${unique.join(", ")}`,
-                pull: { table: "markets", seriesTickers: unique },
+                pull: tableId === "events" ? { table: "markets", eventTickers: unique } : { table: "markets", seriesTickers: unique },
               });
             }
           } else {
             const pulled = await mapPool(unique, 2, (ticker) =>
-              loadKalshiLiveSeriesMarkets(ticker, marketLimit).then((result) => ({ ticker, ...result })),
+              loadScopeMarkets(ticker, marketLimit).then((result) => ({ ticker, ...result })),
             );
             for (const item of pulled) {
               if (!item.columns?.length) continue;
@@ -4041,13 +4195,13 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
                 span: unique.length > 1 ? "half" : "full",
                 table: "markets",
                 summary: `Kalshi Live · Markets · ${item.ticker}`,
-                pull: { table: "markets", seriesTicker: item.ticker },
+                pull: tableId === "events" ? { table: "markets", eventTicker: item.ticker } : { table: "markets", seriesTicker: item.ticker },
               });
             }
           }
           downstreamJoinMarkets = seenMarkets;
           reporter.succeed("join-series-markets", {
-            result: `${unique.length.toLocaleString()} series`,
+            result: `${unique.length.toLocaleString()} ${listPlural}`,
           });
         } catch (err) {
           reporter.fail("join-series-markets", err instanceof Error ? err.message : "Markets join failed");
@@ -4520,12 +4674,12 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
     {
       id: "source",
       title:
-        liveDirect && tableId !== "series" && directMarkets[0]
+        liveMarketFanout && directMarkets[0]
           ? `${sheetTitle} · ${directMarkets[0].ticker}`
           : sheetTitle,
     },
   ];
-  if (liveDirect && tableId !== "series" && directMarkets.length > 1) {
+  if (liveMarketFanout && directMarkets.length > 1) {
     directMarkets.slice(1).forEach((market) => {
       previewTabs.push({
         id: `run:direct:${market.ticker}`,
@@ -4724,7 +4878,7 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
             joinTarget={joinTarget}
             onJoinTarget={(id) => {
               setJoinTarget(id);
-              if (id !== "kalshiLiveSeriesMarkets") return;
+              if (id !== "kalshiLiveSeriesMarkets" && id !== "kalshiLiveEventMarkets") return;
               if (!seriesJoinTickers.length || seriesMarketLayout === "combined") {
                 setPreviewSheet("series-markets");
                 return;
@@ -4748,9 +4902,9 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
               );
             }}
             marketCap={marketCap}
-            queryRows={liveSeriesSearch ? seriesJoinTickers.length : liveMarketSearch ? liveJoinList.length : queryRows}
+            queryRows={liveSeriesSearch || liveEventSearch ? seriesJoinTickers.length : liveMarketSearch ? liveJoinList.length : queryRows}
             sheetCount={
-              liveSeriesSearch
+              liveSeriesSearch || liveEventSearch
                 ? seriesMarketLayout === "combined"
                   ? Math.min(1, seriesJoinTickers.length)
                   : seriesJoinTickers.length
@@ -4787,14 +4941,14 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
             onFunctionHelp={() => setFunctionHelp(true)}
             onSaveAndRun={requestSaveAndRun}
             running={running}
-            showJoinBuilder={marketsQuery || tradesQuery || liveMarketSearch || liveSeriesSearch}
+            showJoinBuilder={marketsQuery || tradesQuery || liveMarketSearch || liveSeriesSearch || liveEventSearch}
             showFunctionBuilder
-            joinMode={liveSeriesSearch ? "series" : liveMarketSearch ? "live" : tradesQuery ? "trades" : "markets"}
+            joinMode={liveEventSearch ? "events" : liveSeriesSearch ? "series" : liveMarketSearch ? "live" : tradesQuery ? "trades" : "markets"}
             seriesMarketLayout={seriesMarketLayout}
             marketsDetected={marketsDetected}
             onSeriesMarketLayout={(layout) => {
               setSeriesMarketLayout(layout);
-              if (joinTarget !== "kalshiLiveSeriesMarkets") return;
+              if (joinTarget !== "kalshiLiveSeriesMarkets" && joinTarget !== "kalshiLiveEventMarkets") return;
               if (!seriesJoinTickers.length || layout === "combined") {
                 setPreviewSheet("series-markets");
                 return;
@@ -5116,11 +5270,13 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
                 columns={
                   liveSeriesSearch
                     ? seriesAttributeColumns
-                    : liveMarketSearch
-                      ? liveAttributeColumns
-                      : liveDirect && tableId !== "series"
-                        ? directAttributeColumns
-                        : pull?.columns || []
+                    : liveEventSearch
+                      ? eventAttributeColumns
+                      : liveMarketSearch
+                        ? liveAttributeColumns
+                        : liveMarketFanout
+                          ? directAttributeColumns
+                          : pull?.columns || []
                 }
                 filters={attributeFilters}
                 onChange={setAttributeFilters}
@@ -5131,7 +5287,9 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
                 sectionTitle={
                   liveSeriesSearch
                     ? "Series attributes"
-                    : tableId === "trades"
+                    : liveEventSearch
+                      ? "Event attributes"
+                      : tableId === "trades"
                       ? "Trade attributes"
                       : tableId === "candlesticks"
                         ? "Candlestick attributes"
@@ -5214,7 +5372,7 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
                 <p className="text-right text-[11px] text-muted-foreground">
                   {importedRows == null
                     ? `… / ${planLimit.toLocaleString()} plan limit`
-                    : `${importedRows.toLocaleString()} rows will be imported / ${planLimit.toLocaleString()} plan limit`}
+                    : `${importedRows.toLocaleString()} ${importedRows === 1 ? "row" : "rows"} will be imported / ${planLimit.toLocaleString()} plan limit`}
                 </p>
                 <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-black/10 dark:bg-white/10">
                   <div
@@ -5258,10 +5416,10 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
           <BucketExplainerTabs sheetTitle={sheetTitle} />
         ) : showFunctionExplainer ? (
           <FunctionExplainerTabs sheetTitle={sheetTitle} />
-        ) : showJoinExplainer && liveSeriesSearch ? (
+        ) : showJoinExplainer && (liveSeriesSearch || liveEventSearch) ? (
           <div className="overflow-hidden px-4 pb-1 pt-4">
             <div className="flex">
-              <span className={sheetTabClass(false)}>Series</span>
+              <span className={sheetTabClass(false)}>{liveEventSearch ? "Events" : "Series"}</span>
               <span className={sheetTabClass(true)}>Markets</span>
             </div>
           </div>
@@ -5395,16 +5553,20 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
               }
               onFormulaPick={(pick) => acceptFormulaPick(pick, "summary")}
             />
-          ) : showJoinExplainer && liveSeriesSearch ? (
+          ) : showJoinExplainer && (liveSeriesSearch || liveEventSearch) ? (
             <div className="flex h-full items-center justify-center rounded-xl border border-border/70 bg-background px-6 text-center text-[13px] leading-relaxed text-muted-foreground shadow-sm">
-              Join these series to the markets inside them. Kalshi takes one series ticker per request, so the pull loops the series in this query.
+              {liveEventSearch
+                ? "Join these events to the markets inside them. Kalshi takes one event ticker per request, so the pull loops the events in this query."
+                : "Join these series to the markets inside them. Kalshi takes one series ticker per request, so the pull loops the series in this query."}
             </div>
           ) : showJoinExplainer ? (
             <JoinExplainer source={tradesQuery ? "trades" : "markets"} venue={polymarketHistorical ? "polymarket" : "kalshi"} live={liveMarketSearch} />
           ) : seriesMarketSheet && seriesJoinOn ? (
             !seriesJoinTickers.length ? (
               <div className="flex h-full items-center justify-center rounded-xl border border-border/70 bg-background px-6 text-center text-[13px] leading-relaxed text-muted-foreground shadow-sm">
-                Search for a series or select a category. Markets join uses those series.
+                {liveEventSearch
+                  ? "Search for an event or select a status. Markets join uses those events."
+                  : "Search for a series or select a category. Markets join uses those series."}
               </div>
             ) : seriesMarketView.status === "loading" || seriesMarketView.status === "idle" ? (
               <div className="flex h-full items-center justify-center">
@@ -5420,7 +5582,7 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
               />
             ) : (
               <div className="flex h-full items-center justify-center rounded-xl border border-border/70 bg-background px-6 text-center text-[13px] leading-relaxed text-muted-foreground shadow-sm">
-                No markets for {previewSheet === "series-markets" ? "these series" : seriesMarketView.ticker || "this series"}.
+                No markets for {previewSheet === "series-markets" ? `these ${listPlural}` : seriesMarketView.ticker || `this ${listNoun}`}.
               </div>
             )
           ) : previewSheet === "live:more" || previewSheet.startsWith("live:locked:") ? (

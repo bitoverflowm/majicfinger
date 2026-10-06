@@ -1437,7 +1437,8 @@ export async function loadKalshiLiveTradesForTicker(ticker, limit = PREVIEW_ROW_
     cursor = String(json.cursor || "").trim();
     if (!cursor || !batch.length) break;
   }
-  return { columns, rows: projectLiveJoinRows(columns, rows, rowLimit) };
+  const truncated = rows.length >= rowLimit && Boolean(cursor);
+  return { columns, rows: projectLiveJoinRows(columns, rows, rowLimit), truncated };
 }
 
 /** Current order book for one market. Depth 100 is Kalshi's maximum. */
@@ -1540,9 +1541,84 @@ export async function loadKalshiLiveSeriesDiscovery(spec = {}, limit = PREVIEW_R
   return { columns, rows: projectLiveJoinRows(columns, rows, rows.length || 1) };
 }
 
+/** One event row per ticker. */
+export async function loadKalshiLiveEventsByTickers(tickers, spec = {}) {
+  const columns = kalshiLiveColumns("events");
+  const rows = [];
+  for (const ticker of tickers || []) {
+    const id = String(ticker || "").trim();
+    if (!id) continue;
+    const params = new URLSearchParams({ ticker: id });
+    if (spec.includeMarkets) params.set("with_nested_markets", "true");
+    const json = await getJsonRetry(`/api/integrations/kalshi-live/events/get?${params}`);
+    const event = json?.event && typeof json.event === "object" ? json.event : json;
+    rows.push(normalizeKalshiLiveEventRow(event, { markets: json?.markets || event?.markets }));
+  }
+  return { columns, rows: projectLiveJoinRows(columns, rows, rows.length || 1) };
+}
+
+/** Event list. Each status is its own request. Pages continue until the cap. */
+export async function loadKalshiLiveEventsDiscovery(spec = {}, limit = PREVIEW_ROW_CAP) {
+  const columns = kalshiLiveColumns("events");
+  const statuses = Array.isArray(spec.statuses) && spec.statuses.length ? spec.statuses : [""];
+  const seriesTickers = Array.isArray(spec.seriesTickers) && spec.seriesTickers.length
+    ? spec.seriesTickers
+    : spec.seriesTicker
+      ? [String(spec.seriesTicker)]
+      : [""];
+  const cap = Math.max(1, Math.floor(Number(limit) || PREVIEW_ROW_CAP));
+  const seen = new Set();
+  const rows = [];
+  let truncated = false;
+  const maxPages = Math.max(1, Math.min(25, Math.floor(Number(spec.maxPages) || 25)));
+  for (const seriesTicker of seriesTickers) {
+  if (rows.length >= cap) break;
+  for (const status of statuses) {
+    if (rows.length >= cap) break;
+    let cursor = "";
+    for (let page = 0; page < maxPages && rows.length < cap; page += 1) {
+      const params = new URLSearchParams({ limit: "200" });
+      if (status) params.set("status", status);
+      if (seriesTicker) params.set("series_ticker", String(seriesTicker));
+      if (Number(spec.minCloseTs) > 0) params.set("min_close_ts", String(Math.floor(Number(spec.minCloseTs))));
+      if (Number(spec.minUpdatedTs) > 0) params.set("min_updated_ts", String(Math.floor(Number(spec.minUpdatedTs))));
+      if (spec.includeMarkets) params.set("with_nested_markets", "true");
+      if (spec.includeMilestones) params.set("with_milestones", "true");
+      if (cursor) params.set("cursor", cursor);
+      const json = await getJsonRetry(`/api/integrations/kalshi-live/events?${params}`);
+      const events = Array.isArray(json.events) ? json.events : [];
+      for (const raw of events) {
+        const row = normalizeKalshiLiveEventRow(raw);
+        const ticker = String(row.event_ticker || "").trim();
+        if (ticker && seen.has(ticker)) continue;
+        if (ticker) seen.add(ticker);
+        rows.push(row);
+        if (rows.length >= cap) break;
+      }
+      cursor = String(json.cursor || "").trim();
+      if (rows.length >= cap) {
+        if (cursor) truncated = true;
+        break;
+      }
+      if (!cursor || !events.length) break;
+      if (page === maxPages - 1) truncated = true;
+    }
+  }
+  }
+  return { columns, rows: projectLiveJoinRows(columns, rows, rows.length || 1), truncated };
+}
+
+/** Markets inside one event. Kalshi accepts one event_ticker per request. */
+export async function loadKalshiLiveEventMarkets(eventTicker, limit = PREVIEW_ROW_CAP) {
+  const columns = kalshiLiveColumns("markets");
+  const rows = await loadKalshiLiveMarketsForScope({ eventTicker, limit });
+  return { columns, rows: projectLiveJoinRows(columns, rows, rows.length || 1) };
+}
+
 /**
  * One-off Kalshi Live pull. Trades, candlesticks, and the order book are one market.
  * Series is a ticker list, or a category discovery when no tickers are selected.
+ * Events is a ticker list, or a status and series discovery when no tickers are selected.
  */
 export function loadKalshiLiveDirect(tableId, spec = {}) {
   const limit = spec.limit || PREVIEW_ROW_CAP;
@@ -1552,6 +1628,8 @@ export function loadKalshiLiveDirect(tableId, spec = {}) {
   if (tableId === "candlesticks") return loadKalshiLiveCandlesticksForTicker(spec.ticker, limit, spec, options);
   if (tableId === "series" && spec.mode === "discover") return loadKalshiLiveSeriesDiscovery(spec, limit);
   if (tableId === "series") return loadKalshiLiveSeriesByTickers(spec.tickers || []);
+  if (tableId === "events" && spec.mode === "discover") return loadKalshiLiveEventsDiscovery(spec, limit);
+  if (tableId === "events") return loadKalshiLiveEventsByTickers(spec.tickers || [], spec);
   return Promise.resolve({ columns: [], rows: [] });
 }
 

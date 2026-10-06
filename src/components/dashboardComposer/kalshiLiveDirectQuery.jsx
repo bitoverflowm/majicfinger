@@ -12,6 +12,9 @@ export function KalshiLiveDirectQuery({ tableId, picks, onAdd, onRemove }) {
   if (tableId === "series") {
     return <KalshiLiveMarketPicker intent="series" picks={picks} onAdd={onAdd} onRemove={onRemove} />;
   }
+  if (tableId === "events") {
+    return <KalshiLiveMarketPicker intent="events" picks={picks} onAdd={onAdd} onRemove={onRemove} />;
+  }
 
   return <KalshiLiveMarketPicker picks={picks} onAdd={onAdd} onRemove={onRemove} />;
 }
