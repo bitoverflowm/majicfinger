@@ -14,13 +14,35 @@ import {
   kalshiLiveDirectScopeError,
   kalshiLiveEventAttributeColumns,
   kalshiLiveSeriesAttributeColumns,
+  kalshiLiveTraderAttributeColumns,
+  leaderboardMetric,
+  traderNicknamesFromRows,
+  traderSearchQuery,
   seriesDiscoveryCategories,
   seriesUpdatedAfter,
 } from "./kalshiLiveDirectScope.js";
 
 assert.equal(isKalshiLiveDirectTable("trades"), true);
 assert.equal(isKalshiLiveDirectTable("events"), true);
+assert.equal(isKalshiLiveDirectTable("leaderboard"), true);
 assert.equal(isKalshiLiveDirectTable("markets"), false);
+assert.equal(kalshiLiveDirectScopeError("leaderboard", [], {}, {}), "");
+assert.equal(kalshiLiveDirectScopeError("search_traders", [], {}, {}), "Search for a trader.");
+assert.equal(kalshiLiveDirectScopeError("search_traders", [], {}, { nickname_query: { contains: "ka" } }), "");
+assert.equal(kalshiLiveDirectScopeError("holder_profile", [], {}, {}), "Add a trader nickname.");
+assert.equal(leaderboardMetric({}), "projected_pnl");
+assert.equal(traderSearchQuery({ nickname_query: { containsTags: ["ada"] } }), "ada");
+assert.deepEqual(traderNicknamesFromRows([{ nickname: "Ada" }, { nickname: "ada" }, { nickname: "Bea" }], 2), ["Ada", "Bea"]);
+const boardAttributes = kalshiLiveTraderAttributeColumns("leaderboard", [
+  { id: "rank", type: "number", title: "Rank" },
+  { id: "metric_name", type: "text", title: "Rank order" },
+]);
+assert.deepEqual(
+  boardAttributes.map((column) => column.id),
+  ["metric_name", "time_period", "category", "rank"],
+);
+assert.equal(boardAttributes[0].queryOnly, true);
+assert.equal(defaultDirectAttributeFilters("leaderboard").time_period.value, "all_time");
 assert.equal(defaultKalshiLiveDirectQuery("events").sheetMode, "combined");
 
 const query = defaultKalshiLiveDirectQuery("trades", Date.parse("2026-10-04T12:00:00Z"));

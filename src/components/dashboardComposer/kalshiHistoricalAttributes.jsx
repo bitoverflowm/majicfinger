@@ -712,7 +712,7 @@ function AttributeFields({ column, filters, onChange }) {
   if (spec.kind === "period") {
     return (
       <select
-        aria-label="Period"
+        aria-label={column.ariaLabel || column.title || "Period"}
         value={String(filter.value ?? "")}
         onChange={(event) => onChange(patchFilter(filters, column, { value: event.target.value }))}
         className="h-9 w-full rounded-lg border border-border/70 bg-background px-2 text-[13px]"
@@ -796,7 +796,7 @@ function AttributeFields({ column, filters, onChange }) {
     return (
       <KeywordField
         label="Exact match"
-        placeholder="Add a market ticker"
+        placeholder={column.placeholder || "Add a market ticker"}
         tags={filter.containsTags}
         draft={filter.contains || ""}
         onChange={({ tags, draft }) =>

@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { DataEditor, GridCellKind } from "@glideapps/glide-data-grid";
 import "@glideapps/glide-data-grid/dist/index.css";
 import { useHtmlDarkClass } from "@/hooks/use-html-dark-class";
-import { useReadyTradeSheet } from "@/components/dashboardComposer/fullTradeSheet";
+import { useReadyTradeSheet, usesHistoricalTradeSheet } from "@/components/dashboardComposer/fullTradeSheet";
 
 const ROW_COUNT = 24;
 
@@ -105,7 +105,8 @@ export default function DashboardSheetGridInner({ block, onChange, readOnly = fa
   const [fontFamily, setFontFamily] = useState("ui-sans-serif, system-ui, sans-serif");
   const columns = useMemo(() => columnsOf(block), [block?.columns]);
   const cells = block?.cells || {};
-  const fullSheet = useReadyTradeSheet(block?.id);
+  const storedSheet = useReadyTradeSheet(block?.id);
+  const fullSheet = usesHistoricalTradeSheet(block) ? storedSheet : null;
   const rows = fullSheet ? fullSheet.rows.length : rowCountOf(cells);
 
   useEffect(() => {

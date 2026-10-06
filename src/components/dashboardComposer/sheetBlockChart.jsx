@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef } from "react";
 import { Bar, BarChart, CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
-import { useReadyTradeSheet, tradeTickerFromBlock } from "@/components/dashboardComposer/fullTradeSheet";
+import { useReadyTradeSheet, tradeTickerFromBlock, usesHistoricalTradeSheet } from "@/components/dashboardComposer/fullTradeSheet";
 import { isOrderBookSheet, rowsToOrderBook } from "@/components/dashboardComposer/orderBookLadder";
 import { ohlcRowsToCandles, rangesForCandles, tradesToCandles } from "@/components/dashboardComposer/tradeMarketCandles";
 import { MarketChart } from "@/components/spectrumui/charts/market-chart";
@@ -210,7 +210,8 @@ function OrderBookSheetChart({ sheet, rows, live, snapshot, onSnapshot }) {
 }
 
 export function SheetBlockChart({ sheet, snapshot, onSnapshot, live = false }) {
-  const fullSheet = useReadyTradeSheet(sheet?.id);
+  const storedSheet = useReadyTradeSheet(sheet?.id);
+  const fullSheet = usesHistoricalTradeSheet(sheet) ? storedSheet : null;
   const orderBook = isOrderBookSheet(sheet) || snapshot?.kind === "order-book";
   const candle = !orderBook && (isCandleSheet(sheet) || snapshot?.mode === "ohlc");
   const trade = !orderBook && !candle && (isTradeSheet(sheet) || snapshot?.kind === "trade-market" || snapshot?.kind === "trade-price");

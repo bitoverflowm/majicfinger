@@ -53,18 +53,18 @@ export const KALSHI_LIVE_LEADERBOARD_COLUMNS = [
   {
     name: "metric_name",
     type: "string",
-    description: "Rank-order metric requested (API metric_name)",
+    description: "Metric these ranks use",
     label: "rank order",
   },
   {
     name: "time_period",
     type: "string",
-    description: "Time period filter applied to the leaderboard",
+    description: "Window these ranks cover",
   },
   {
     name: "category",
     type: "string",
-    description: "Optional category filter applied to the leaderboard",
+    description: "Market category for these ranks",
   },
 ];
 

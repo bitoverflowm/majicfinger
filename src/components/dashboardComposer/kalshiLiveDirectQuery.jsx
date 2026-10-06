@@ -1,6 +1,7 @@
 "use client";
 
 import { KalshiLiveMarketPicker } from "@/components/dashboardComposer/kalshiLiveMarketPicker";
+import { isKalshiLiveTraderTable } from "@/components/dashboardComposer/kalshiLiveDirectScope";
 
 /**
  * Query controls for a Kalshi Live market endpoint pulled on its own.
@@ -9,6 +10,7 @@ import { KalshiLiveMarketPicker } from "@/components/dashboardComposer/kalshiLiv
  * Trades, candlesticks, and the order book keep their date range, period, and depth in attributes.
  */
 export function KalshiLiveDirectQuery({ tableId, picks, onAdd, onRemove }) {
+  if (isKalshiLiveTraderTable(tableId)) return null;
   if (tableId === "series") {
     return <KalshiLiveMarketPicker intent="series" picks={picks} onAdd={onAdd} onRemove={onRemove} />;
   }

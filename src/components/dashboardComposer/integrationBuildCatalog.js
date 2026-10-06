@@ -25,7 +25,10 @@ import { projectKalshiLiveEventForecastRows } from "@/lib/kalshiLive/normalizeEv
 import { normalizeKalshiLiveLeaderboardRow } from "@/lib/kalshiLive/normalizeLeaderboardRow";
 import { normalizeKalshiLiveHolderProfileRow } from "@/lib/kalshiLive/normalizeHolderProfileRow";
 import { normalizeKalshiLiveHolderTradeRow } from "@/lib/kalshiLive/normalizeHolderTradeRow";
-import { normalizeKalshiLiveSearchTradersRow } from "@/lib/kalshiLive/normalizeSearchTradersRow";
+import {
+  normalizeKalshiLiveSearchTradersRow,
+  projectKalshiLiveSearchTradersRows,
+} from "@/lib/kalshiLive/normalizeSearchTradersRow";
 import { getKalshiLiveSearchTradersColumns } from "@/lib/kalshiLive/searchTradersColumns";
 import { MARKETS_RESPONSE_FIELDS } from "@/components/integrationsView/integrationPlayground/integrations/polymarket/config";
 import {
@@ -1632,10 +1635,158 @@ export async function loadKalshiLiveEventMarkets(eventTicker, limit = PREVIEW_RO
   return { columns, rows: projectLiveJoinRows(columns, rows, rows.length || 1) };
 }
 
+async function mapLimit(items, limit, fn) {
+  const list = Array.isArray(items) ? items : [];
+  const out = new Array(list.length);
+  let next = 0;
+  const workers = Array.from({ length: Math.min(Math.max(1, limit), list.length) }, async () => {
+    while (next < list.length) {
+      const index = next;
+      next += 1;
+      out[index] = await fn(list[index], index);
+    }
+  });
+  await Promise.all(workers);
+  return out;
+}
+
+/** Social leaderboard. One category per request. The endpoint returns at most 100 ranks. */
+export async function loadKalshiLiveLeaderboard(spec = {}) {
+  const columns = kalshiLiveColumns("leaderboard");
+  const metric = String(spec.metric || "projected_pnl");
+  const timePeriod = String(spec.timePeriod || "all_time");
+  const categories = Array.isArray(spec.categories) && spec.categories.length ? spec.categories : [""];
+  const cap = Math.min(100, Math.max(1, Math.floor(Number(spec.limit) || PREVIEW_ROW_CAP)));
+  const rows = [];
+  const seen = new Set();
+  for (const category of categories) {
+    if (rows.length >= cap) break;
+    const params = new URLSearchParams({
+      metric_name: metric,
+      time_period: timePeriod,
+      limit: String(Math.min(100, cap)),
+    });
+    if (category) params.set("category", category);
+    const json = await getJsonRetry(`/api/integrations/kalshi-live/social/leaderboard?${params}`);
+    const ranks = Array.isArray(json.rank_list) ? json.rank_list : [];
+    for (const raw of ranks) {
+      const row = normalizeKalshiLiveLeaderboardRow(raw, { metricName: metric, timePeriod, category });
+      const key = String(row.nickname || row.social_id || "").toLowerCase();
+      if (key && seen.has(key)) continue;
+      if (key) seen.add(key);
+      rows.push(row);
+      if (rows.length >= cap) break;
+    }
+  }
+  return { columns, rows: projectLiveJoinRows(columns, rows, rows.length || 1) };
+}
+
+/** Public profile rows. One nickname per request. */
+export async function loadKalshiLiveHolderProfiles(nicknames = []) {
+  const columns = kalshiLiveColumns("holder_profile");
+  const names = [...new Set((nicknames || []).map((name) => String(name || "").trim()).filter(Boolean))];
+  const rows = [];
+  for (const nickname of names) {
+    const json = await getJsonRetry(
+      `/api/integrations/kalshi-live/social/profile?nickname=${encodeURIComponent(nickname)}`,
+    );
+    rows.push(normalizeKalshiLiveHolderProfileRow(json));
+  }
+  return { columns, rows: projectLiveJoinRows(columns, rows, rows.length || 1) };
+}
+
+/**
+ * Public social trades. Nickname, series, and event are optional.
+ * A page that still has a cursor past the cap is marked truncated.
+ */
+export async function loadKalshiLiveHolderTrades(spec = {}) {
+  const columns = kalshiLiveColumns("trades_by_holder");
+  const nicknames = Array.isArray(spec.nicknames) && spec.nicknames.length ? spec.nicknames : [""];
+  const cap = Math.max(1, Math.floor(Number(spec.limit) || PREVIEW_ROW_CAP));
+  const rows = [];
+  let visibility = "";
+  let truncated = false;
+  for (const nickname of nicknames) {
+    let cursor = "";
+    for (let page = 0; page < 40 && rows.length < cap; page += 1) {
+      const params = new URLSearchParams({
+        page_size: String(Math.min(200, cap - rows.length)),
+      });
+      if (nickname) params.set("nickname", nickname);
+      if (spec.seriesTicker) params.set("series_ticker", spec.seriesTicker);
+      if (spec.eventTicker) params.set("event_ticker", spec.eventTicker);
+      if (spec.minAmount != null && spec.minAmount !== "") params.set("min_amount", String(spec.minAmount));
+      if (cursor) params.set("cursor", cursor);
+      const json = await getJsonRetry(`/api/integrations/kalshi-live/social/trades?${params}`);
+      if (json.visibility_state) visibility = String(json.visibility_state);
+      const batch = Array.isArray(json.trades) ? json.trades : [];
+      for (const raw of batch) {
+        rows.push(normalizeKalshiLiveHolderTradeRow(raw));
+        if (rows.length >= cap) break;
+      }
+      cursor = String(json.cursor || "").trim();
+      if (rows.length >= cap && cursor) truncated = true;
+      if (!cursor || !batch.length) break;
+    }
+  }
+  return {
+    columns,
+    rows: projectLiveJoinRows(columns, rows, rows.length || 1),
+    truncated,
+    visibility,
+  };
+}
+
+/** Nickname search, then shared metrics and holdings for the profiles that come back. */
+export async function loadKalshiLiveTraderSearch(spec = {}) {
+  const columns = kalshiLiveColumns("search_traders");
+  const query = String(spec.query || "").trim();
+  if (query.length < 2) return { columns, rows: [] };
+  const includeMetrics = spec.includeMetrics !== false;
+  const includeHoldings = Boolean(spec.includeHoldings);
+  const cap = Math.min(500, Math.max(1, Math.floor(Number(spec.limit) || PREVIEW_ROW_CAP)));
+  const profiles = [];
+  let cursor = "";
+  let truncated = false;
+  for (let page = 0; page < 8 && profiles.length < cap; page += 1) {
+    const params = new URLSearchParams({
+      query,
+      limit: String(Math.min(100, cap - profiles.length)),
+    });
+    if (cursor) params.set("cursor", cursor);
+    const json = await getJsonRetry(`/api/integrations/kalshi-live/search/social-profiles?${params}`);
+    const batch = Array.isArray(json.profiles) ? json.profiles : [];
+    profiles.push(...batch);
+    cursor = String(json.cursor || "").trim();
+    if (profiles.length >= cap && cursor) truncated = true;
+    if (!cursor || !batch.length) break;
+  }
+  const sliced = profiles.slice(0, cap);
+  const enriched = await mapLimit(sliced, 4, async (profile) => {
+    const nickname = String(profile?.nickname || "").trim();
+    let metrics = null;
+    let holdingsPayload = null;
+    if (nickname && includeMetrics) {
+      metrics = await getJson(
+        `/api/integrations/kalshi-live/social/profile/metrics?nickname=${encodeURIComponent(nickname)}`,
+      ).catch(() => null);
+    }
+    if (nickname && includeHoldings) {
+      holdingsPayload = await getJson(
+        `/api/integrations/kalshi-live/social/profile/holdings?nickname=${encodeURIComponent(nickname)}&limit=100`,
+      ).catch(() => null);
+    }
+    return { profile, metrics, holdingsPayload };
+  });
+  const records = projectKalshiLiveSearchTradersRows(enriched, undefined, { includeMetrics, includeHoldings });
+  return { columns, rows: projectLiveJoinRows(columns, records, records.length || 1), truncated };
+}
+
 /**
  * One-off Kalshi Live pull. Trades, candlesticks, and the order book are one market.
  * Series is a ticker list, or a category discovery when no tickers are selected.
  * Events is a ticker list, or a status and series discovery when no tickers are selected.
+ * Traders covers the leaderboard, a nickname search, a public profile, and public trades.
  */
 export function loadKalshiLiveDirect(tableId, spec = {}) {
   const limit = spec.limit || PREVIEW_ROW_CAP;
@@ -1647,6 +1798,10 @@ export function loadKalshiLiveDirect(tableId, spec = {}) {
   if (tableId === "series") return loadKalshiLiveSeriesByTickers(spec.tickers || []);
   if (tableId === "events" && spec.mode === "discover") return loadKalshiLiveEventsDiscovery(spec, limit);
   if (tableId === "events") return loadKalshiLiveEventsByTickers(spec.tickers || [], spec);
+  if (tableId === "leaderboard") return loadKalshiLiveLeaderboard(spec);
+  if (tableId === "search_traders") return loadKalshiLiveTraderSearch(spec);
+  if (tableId === "holder_profile") return loadKalshiLiveHolderProfiles(spec.nicknames || []);
+  if (tableId === "trades_by_holder") return loadKalshiLiveHolderTrades(spec);
   return Promise.resolve({ columns: [], rows: [] });
 }
 

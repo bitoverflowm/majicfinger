@@ -35,6 +35,16 @@ export function tradeTickerFromBlock(block) {
   return match ? match[1].trim() : "";
 }
 
+/** Kalshi Historical trades can grow past the preview from the lake. Live sheets keep the rows they were pulled with. */
+export function usesHistoricalTradeSheet(block) {
+  if (!tradeTickerFromBlock(block)) return false;
+  if (block.integrationId === "kalshiLive") return false;
+  const integrationId = String(block.integrationId || "");
+  if (integrationId === "kalshiHistorical" || integrationId === "polymarketHistorical") return true;
+  const lake = String(block.pull?.lake || "");
+  return lake === "kalshi" || lake === "polymarket";
+}
+
 export function useReadyTradeSheet(blockId) {
   return useSyncExternalStore(
     subscribe,

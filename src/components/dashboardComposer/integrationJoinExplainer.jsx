@@ -488,6 +488,64 @@ export function FanoutJoinExplainer({ tableId = "candlesticks" }) {
   );
 }
 
+/** Hover illustration for a leaderboard or trader search. */
+export function TraderJoinExplainerTabs({ title = "Leaderboard" }) {
+  const reduce = useReducedMotion();
+  const tabs = [title, "Profile", "Trades"];
+  return (
+    <div className="overflow-hidden px-4 pb-1 pt-4">
+      <div className="flex">
+        {tabs.map((label, index) =>
+          index === 0 ? (
+            <span key={label} className={tabClass(false)}>
+              {label}
+            </span>
+          ) : (
+            <motion.span
+              key={label}
+              initial={reduce ? false : { clipPath: "inset(0 100% 0 0)", opacity: 0 }}
+              animate={{ clipPath: "inset(0 0% 0 0)", opacity: 1 }}
+              transition={{ duration: 0.4, delay: 0.12 * index, ease: "easeOut" }}
+              className={tabClass(index === tabs.length - 1)}
+            >
+              {label}
+            </motion.span>
+          ),
+        )}
+      </div>
+    </div>
+  );
+}
+
+/** A nickname list can open each trader's profile and their public trades. */
+export function TraderJoinExplainer({ title = "Leaderboard" }) {
+  const style = venueStyle("kalshi");
+  return (
+    <div className="relative flex h-full min-h-[280px] items-center justify-center overflow-hidden rounded-xl border border-border/70 bg-background shadow-sm">
+      <FlickeringGrid
+        className="absolute inset-0 [mask-image:radial-gradient(ellipse_at_center,black,transparent_75%)]"
+        squareSize={3}
+        gridGap={5}
+        flickerChance={0.16}
+        color={style.flicker}
+        maxOpacity={0.2}
+      />
+      <div className="relative z-10 flex w-full max-w-md flex-col gap-4 px-6 py-6">
+        <p className="text-center text-[13px] leading-relaxed text-muted-foreground">
+          From this {title.toLowerCase()}, open each trader&apos;s profile or their public trades.
+        </p>
+        <div className="flex flex-col gap-2">
+          <RouteChip label={title} hint="Traders in this list" delay={0.05} accent={style.accent} active />
+          <div className="ml-3 flex flex-col gap-2 border-l border-border/70 pl-3">
+            <RouteChip label="Profile" hint="Public profile for each trader" delay={0.2} accent={style.accent} />
+            <RouteChip label="Trades" hint="Public trades for each trader" delay={0.34} accent={style.accent} />
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 /** Markets points each contract at its trades. Trades points each fill at market metadata. */
 export function JoinExplainer({ source = "markets", venue = "kalshi", live = false }) {
   if (live) return <LiveMarketsJoinExplainer />;

@@ -1,9 +1,16 @@
 /** One-off Kalshi Live market endpoints. These are not the markets join. */
 
 import { KALSHI_LIVE_CANDLESTICK_PERIOD_OPTIONS } from "@/lib/kalshiLive/candlesticksColumns";
+import { KALSHI_LIVE_SERIES_CATEGORY_OPTIONS } from "@/lib/kalshiLive/kalshiLiveCategories";
+import {
+  KALSHI_LIVE_LEADERBOARD_METRIC_OPTIONS,
+  KALSHI_LIVE_LEADERBOARD_TIME_PERIOD_OPTIONS,
+} from "@/lib/kalshiLive/leaderboardColumns";
 import { dateRangePreset } from "@/components/dashboardComposer/dateRangePresets";
 
-export const KALSHI_LIVE_DIRECT_TABLES = ["series", "events", "candlesticks", "trades", "orderbook"];
+export const KALSHI_LIVE_TRADER_TABLES = ["leaderboard", "holder_profile", "trades_by_holder", "search_traders"];
+
+export const KALSHI_LIVE_DIRECT_TABLES = ["series", "events", "candlesticks", "trades", "orderbook", ...KALSHI_LIVE_TRADER_TABLES];
 
 const EVENT_STATUSES = [
   ["unopened", "Unopened"],
@@ -42,6 +49,10 @@ export function isKalshiLiveDirectTable(tableId) {
   return KALSHI_LIVE_DIRECT_TABLES.includes(tableId);
 }
 
+export function isKalshiLiveTraderTable(tableId) {
+  return KALSHI_LIVE_TRADER_TABLES.includes(tableId);
+}
+
 export function defaultKalshiLiveDirectQuery(tableId, now = Date.now()) {
   const maxTs = Math.floor(now / 1000);
   return {
@@ -54,7 +65,7 @@ export function defaultKalshiLiveDirectQuery(tableId, now = Date.now()) {
     tag: "",
     includeProductMetadata: false,
     minUpdatedTs: "",
-    sheetMode: tableId === "series" || tableId === "events" ? "combined" : "sheet",
+    sheetMode: tableId === "series" || tableId === "events" || isKalshiLiveTraderTable(tableId) ? "combined" : "sheet",
   };
 }
 
@@ -239,8 +250,237 @@ function isoDayUnix(iso, edge) {
   return Number.isFinite(seconds) ? seconds : null;
 }
 
+function optionPairs(options) {
+  return (options || []).map((option) => [option.value, option.label]);
+}
+
+function exactTerms(filter, { upper = false } = {}) {
+  const tags = Array.isArray(filter?.containsTags) ? filter.containsTags : [];
+  const draft = String(filter?.contains || "").trim();
+  const seen = new Set();
+  const terms = [];
+  for (const value of [...tags, draft]) {
+    const text = String(value || "").trim();
+    const term = upper ? text.toUpperCase() : text;
+    const key = term.toLowerCase();
+    if (!term || seen.has(key)) continue;
+    seen.add(key);
+    terms.push(term);
+  }
+  return terms;
+}
+
+function booleanOn(filter, fallback) {
+  const include = Array.isArray(filter?.include) ? filter.include : [];
+  if (!include.length) return fallback;
+  if (include.includes("false") && !include.includes("true")) return false;
+  return include.includes("true");
+}
+
+/** Rank order, window, and category for the social leaderboard. */
+export function leaderboardMetric(filters) {
+  const value = String(filters?.metric_name?.value || "").trim();
+  return KALSHI_LIVE_LEADERBOARD_METRIC_OPTIONS.some((option) => option.value === value) ? value : "projected_pnl";
+}
+
+export function leaderboardTimePeriod(filters) {
+  const value = String(filters?.time_period?.value || "").trim();
+  return KALSHI_LIVE_LEADERBOARD_TIME_PERIOD_OPTIONS.some((option) => option.value === value) ? value : "all_time";
+}
+
+export function leaderboardCategories(filters) {
+  return seriesDiscoveryCategories({ category: filters?.category });
+}
+
+/** Nickname text for social profile search. The search needs at least two characters. */
+export function traderSearchQuery(filters) {
+  return exactTerms(filters?.nickname_query)[0] || "";
+}
+
+export function traderIncludeMetrics(filters) {
+  return booleanOn(filters?.include_metrics, true);
+}
+
+export function traderIncludeHoldings(filters) {
+  return booleanOn(filters?.include_holdings, false);
+}
+
+export function traderProfileNicknames(filters) {
+  return exactTerms(filters?.nicknames);
+}
+
+export function holderTradeNicknames(filters) {
+  return exactTerms(filters?.nickname);
+}
+
+export function holderTradeSeries(filters) {
+  return exactTerms(filters?.series_ticker, { upper: true })[0] || "";
+}
+
+export function holderTradeEvent(filters) {
+  return exactTerms(filters?.event_ticker, { upper: true })[0] || "";
+}
+
+export function holderTradesMinAmount(filters) {
+  const raw = filters?.min_amount?.min;
+  if (raw == null || String(raw).trim() === "") return null;
+  const amount = Number(raw);
+  return Number.isFinite(amount) && amount >= 0 ? amount : null;
+}
+
+/** Nicknames already on a leaderboard or search sheet. */
+export function traderNicknamesFromRows(rows, cap = Infinity) {
+  const seen = new Set();
+  const names = [];
+  for (const row of rows || []) {
+    const name = String(row?.nickname || "").trim();
+    const key = name.toLowerCase();
+    if (!name || seen.has(key)) continue;
+    seen.add(key);
+    names.push(name);
+    if (names.length >= cap) break;
+  }
+  return names;
+}
+
+const YES_NO = [
+  ["true", "Yes"],
+  ["false", "No"],
+];
+
+/** Query controls first. Rank order, window, and category are the leaderboard. They stay off the attribute filter of the sheet columns. */
+export function kalshiLiveTraderAttributeColumns(tableId, columns) {
+  const list = Array.isArray(columns) ? columns : [];
+  if (tableId === "leaderboard") {
+    const query = [
+      {
+        id: "metric_name",
+        title: "Rank order",
+        type: "text",
+        queryOnly: true,
+        control: "period",
+        ariaLabel: "Rank order",
+        enumOptions: optionPairs(KALSHI_LIVE_LEADERBOARD_METRIC_OPTIONS),
+        description: "Metric these ranks use.",
+      },
+      {
+        id: "time_period",
+        title: "Time period",
+        type: "text",
+        queryOnly: true,
+        control: "period",
+        ariaLabel: "Time period",
+        enumOptions: optionPairs(KALSHI_LIVE_LEADERBOARD_TIME_PERIOD_OPTIONS),
+        description: "Window these ranks cover.",
+      },
+      {
+        id: "category",
+        title: "Category",
+        type: "text",
+        queryOnly: true,
+        control: "category",
+        enumOptions: KALSHI_LIVE_SERIES_CATEGORY_OPTIONS.map((option) => [option.value, option.label]),
+        description: "Market category for these ranks.",
+      },
+    ];
+    const rest = list.filter((column) => !["metric_name", "time_period", "category"].includes(column.id));
+    return [...query, ...rest];
+  }
+  if (tableId === "search_traders") {
+    const query = [
+      {
+        id: "nickname_query",
+        title: "Search for a trader",
+        type: "text",
+        queryOnly: true,
+        description: "Public nickname.",
+      },
+      {
+        id: "include_metrics",
+        title: "Metrics",
+        type: "boolean",
+        queryOnly: true,
+        enumOptions: YES_NO,
+        description: "Shared volume, PnL, and markets traded.",
+      },
+      {
+        id: "include_holdings",
+        title: "Holdings",
+        type: "boolean",
+        queryOnly: true,
+        enumOptions: YES_NO,
+        description: "Open positions, one row per market.",
+      },
+    ];
+    return [...query, ...list];
+  }
+  if (tableId === "holder_profile") {
+    return [
+      {
+        id: "nicknames",
+        title: "Nickname",
+        type: "text",
+        queryOnly: true,
+        exactTickers: true,
+        placeholder: "Add a nickname",
+        description: "Public display name.",
+      },
+      ...list.filter((column) => column.id !== "nickname"),
+    ];
+  }
+  if (tableId === "trades_by_holder") {
+    return [
+      {
+        id: "nickname",
+        title: "Nickname",
+        type: "text",
+        queryOnly: true,
+        exactTickers: true,
+        placeholder: "Add a nickname",
+        description: "Public display name. Some traders keep their trades private.",
+      },
+      {
+        id: "series_ticker",
+        title: "Series ticker",
+        type: "text",
+        queryOnly: true,
+        exactTickers: true,
+        placeholder: "Add a series ticker",
+        description: "Trades in this series.",
+      },
+      {
+        id: "event_ticker",
+        title: "Event ticker",
+        type: "text",
+        queryOnly: true,
+        exactTickers: true,
+        placeholder: "Add an event ticker",
+        description: "Trades in this event.",
+      },
+      {
+        id: "min_amount",
+        title: "Minimum size",
+        type: "number",
+        queryOnly: true,
+        description: "Smallest trade size.",
+      },
+      ...list,
+    ];
+  }
+  return list;
+}
+
 /** Past 24 hours, plus period or depth, so the attribute list opens on the same window the pull uses. */
 export function defaultDirectAttributeFilters(tableId, now = new Date()) {
+  if (tableId === "leaderboard") {
+    return {
+      metric_name: { value: "projected_pnl" },
+      time_period: { value: "all_time" },
+    };
+  }
+  if (tableId === "search_traders") {
+    return { include_metrics: { include: ["true"] } };
+  }
   if (!DIRECT_MARKET_TABLES.includes(tableId)) return {};
   const range = dateRangePreset("past-24h", now);
   const filters = {
@@ -328,6 +568,15 @@ export function directPullWindow(tableId, filters, fallback = {}) {
  */
 export function kalshiLiveDirectScopeError(tableId, picks, _query, filters) {
   const loading = (picks || []).some((pick) => pick?.status === "loading");
+  if (tableId === "leaderboard" || tableId === "trades_by_holder") return "";
+  if (tableId === "search_traders") {
+    if (traderSearchQuery(filters).length >= 2) return "";
+    return "Search for a trader.";
+  }
+  if (tableId === "holder_profile") {
+    if (traderProfileNicknames(filters).length) return "";
+    return loading ? "" : "Add a trader nickname.";
+  }
   if (tableId === "series") {
     if (directSeriesTickers(picks).length) return "";
     if (seriesDiscoveryCategories(filters).length) return "";

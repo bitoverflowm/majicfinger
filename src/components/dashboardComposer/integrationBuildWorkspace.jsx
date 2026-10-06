@@ -10,7 +10,7 @@ import { SummarizeExplainer, SummarizeExplainerTabs } from "@/components/dashboa
 import { BucketExplainer, BucketExplainerTabs } from "@/components/dashboardComposer/integrationBucketExplainer";
 import { SampleExplainer } from "@/components/dashboardComposer/integrationSampleExplainer";
 import { BucketEnrichPanel, SampleEnrichPanel } from "@/components/dashboardComposer/integrationEnrichPanels";
-import { FanoutJoinExplainer, FanoutJoinExplainerTabs, JoinExplainer, JoinExplainerTabs } from "@/components/dashboardComposer/integrationJoinExplainer";
+import { FanoutJoinExplainer, FanoutJoinExplainerTabs, JoinExplainer, JoinExplainerTabs, TraderJoinExplainer, TraderJoinExplainerTabs } from "@/components/dashboardComposer/integrationJoinExplainer";
 import { SpectrumLoadingState } from "@/components/ui/spectrum-loading-state";
 import { TaskRows } from "@/components/spectrumui/blocks/ai-assistants/task-rows";
 import {
@@ -26,6 +26,8 @@ import {
   loadKalshiLiveMarketsForScope,
   loadKalshiLiveSeriesMarkets,
   loadKalshiLiveEventMarkets,
+  loadKalshiLiveHolderProfiles,
+  loadKalshiLiveHolderTrades,
   kalshiHistoricalMarketColumnList,
   loadAthenaComposeRows,
   peekBuildUniverseCount,
@@ -102,6 +104,20 @@ import {
   eventSeriesTicker,
   eventSeriesTickers,
   eventClosesAfter,
+  isKalshiLiveTraderTable,
+  kalshiLiveTraderAttributeColumns,
+  leaderboardMetric,
+  leaderboardTimePeriod,
+  leaderboardCategories,
+  traderSearchQuery,
+  traderIncludeMetrics,
+  traderIncludeHoldings,
+  traderProfileNicknames,
+  holderTradeNicknames,
+  holderTradeSeries,
+  holderTradeEvent,
+  holderTradesMinAmount,
+  traderNicknamesFromRows,
 } from "@/components/dashboardComposer/kalshiLiveDirectScope";
 import { allowsMarketDownstreamJoin, pullKindFlags, withJoinFlags } from "@/components/dashboardComposer/pullKindFlags";
 import { kalshiLiveEndpointHasRealtimeFeed } from "@/config/kalshiLiveConnect";
@@ -892,6 +908,7 @@ function EnrichStep({
   const tradesJoin = joinMode === "trades";
   const liveJoin = joinMode === "live";
   const fanoutJoin = joinMode === "fanout";
+  const traderJoin = joinMode === "traders";
   const seriesJoin = joinMode === "series" || joinMode === "events";
   const listNoun = joinMode === "events" ? "event" : "series";
   const listPlural = joinMode === "events" ? "events" : "series";
@@ -1146,6 +1163,69 @@ function EnrichStep({
                                 />
                               </div>
                             </div>
+                          ) : null}
+                        </div>
+                      ) : traderJoin ? (
+                        <div className="mt-1.5 space-y-1.5">
+                          <button
+                            type="button"
+                            aria-pressed={joinTarget === "kalshiLiveTraderProfile"}
+                            onClick={() => onJoinTarget("kalshiLiveTraderProfile")}
+                            className={cn(
+                              "flex w-full flex-col rounded-lg border px-2.5 py-2 text-left transition-colors",
+                              joinTarget === "kalshiLiveTraderProfile"
+                                ? "border-[#0d99ff]/40 bg-[#0d99ff]/10"
+                                : "border-border/70 bg-background hover:bg-muted/50",
+                            )}
+                          >
+                            <span className="text-[13px] font-semibold text-foreground">Profile</span>
+                            <span className="text-[11px] font-normal text-muted-foreground">Public profile for each trader.</span>
+                          </button>
+                          <button
+                            type="button"
+                            aria-pressed={joinTarget === "kalshiLiveTraderTrades"}
+                            onClick={() => onJoinTarget("kalshiLiveTraderTrades")}
+                            className={cn(
+                              "flex w-full flex-col rounded-lg border px-2.5 py-2 text-left transition-colors",
+                              joinTarget === "kalshiLiveTraderTrades"
+                                ? "border-[#0d99ff]/40 bg-[#0d99ff]/10"
+                                : "border-border/70 bg-background hover:bg-muted/50",
+                            )}
+                          >
+                            <span className="text-[13px] font-semibold text-foreground">Trades</span>
+                            <span className="text-[11px] font-normal text-muted-foreground">Public trades for each trader.</span>
+                          </button>
+                          {joinTarget === "kalshiLiveTraderProfile" || joinTarget === "kalshiLiveTraderTrades" ? (
+                            <>
+                              <button
+                                type="button"
+                                aria-pressed={seriesMarketLayout === "sheet"}
+                                onClick={() => onSeriesMarketLayout?.("sheet")}
+                                className={cn(
+                                  "flex w-full flex-col rounded-lg border px-2.5 py-2 text-left transition-colors",
+                                  seriesMarketLayout === "sheet"
+                                    ? "border-[#0d99ff]/40 bg-[#0d99ff]/10"
+                                    : "border-border/70 bg-background hover:bg-muted/50",
+                                )}
+                              >
+                                <span className="text-[13px] font-semibold text-foreground">Sheet per trader</span>
+                                <span className="text-[11px] font-normal text-muted-foreground">Each trader gets their own tab.</span>
+                              </button>
+                              <button
+                                type="button"
+                                aria-pressed={seriesMarketLayout === "combined"}
+                                onClick={() => onSeriesMarketLayout?.("combined")}
+                                className={cn(
+                                  "flex w-full flex-col rounded-lg border px-2.5 py-2 text-left transition-colors",
+                                  seriesMarketLayout === "combined"
+                                    ? "border-[#0d99ff]/40 bg-[#0d99ff]/10"
+                                    : "border-border/70 bg-background hover:bg-muted/50",
+                                )}
+                              >
+                                <span className="text-[13px] font-semibold text-foreground">One sheet</span>
+                                <span className="text-[11px] font-normal text-muted-foreground">Every trader lands on one tab.</span>
+                              </button>
+                            </>
                           ) : null}
                         </div>
                       ) : seriesJoin ? (
@@ -1605,6 +1685,7 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
   const [joinTarget, setJoinTarget] = useState("");
   const [seriesMarketLayout, setSeriesMarketLayout] = useState("sheet");
   const [seriesMarketPreview, setSeriesMarketPreview] = useState({ status: "idle", ticker: "", columns: [], rows: [], error: "" });
+  const [traderJoinPreview, setTraderJoinPreview] = useState({ status: "idle", nickname: "", columns: [], rows: [], error: "" });
   const seriesMarketCacheRef = useRef(new Map());
   const seriesMarketVisibleKey = useRef("");
   const liveJoinCacheRef = useRef(new Map());
@@ -1767,7 +1848,9 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
   const liveSeriesSearch = integrationId === "kalshiLive" && tableId === "series";
   const liveEventSearch = integrationId === "kalshiLive" && tableId === "events";
   const liveDirect = integrationId === "kalshiLive" && isKalshiLiveDirectTable(tableId);
-  const liveMarketFanout = liveDirect && !liveSeriesSearch && !liveEventSearch;
+  const liveTrader = integrationId === "kalshiLive" && isKalshiLiveTraderTable(tableId);
+  const liveTraderList = liveTrader && (tableId === "leaderboard" || tableId === "search_traders");
+  const liveMarketFanout = liveDirect && !liveSeriesSearch && !liveEventSearch && !liveTrader;
 
   useEffect(() => {
     if (!liveSeriesSearch) return undefined;
@@ -1976,6 +2059,21 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
     () => (liveEventSearch ? kalshiLiveEventAttributeColumns(pull?.columns || []) : []),
     [liveEventSearch, pull?.columns],
   );
+  const traderAttributeColumns = useMemo(
+    () => (liveTrader ? kalshiLiveTraderAttributeColumns(tableId, pull?.columns || []) : []),
+    [liveTrader, tableId, pull?.columns],
+  );
+  const traderMetric = leaderboardMetric(attributeFilters);
+  const traderPeriod = leaderboardTimePeriod(attributeFilters);
+  const traderCategoryKey = leaderboardCategories(attributeFilters).join("\0");
+  const traderQuery = traderSearchQuery(attributeFilters);
+  const traderMetricsOn = traderIncludeMetrics(attributeFilters);
+  const traderHoldingsOn = traderIncludeHoldings(attributeFilters);
+  const traderProfileKey = traderProfileNicknames(attributeFilters).join("\0");
+  const holderNicknameKey = holderTradeNicknames(attributeFilters).join("\0");
+  const holderSeriesTicker = holderTradeSeries(attributeFilters);
+  const holderEventTicker = holderTradeEvent(attributeFilters);
+  const holderMinAmount = holderTradesMinAmount(attributeFilters);
   const seriesCategories = seriesDiscoveryCategories(attributeFilters);
   const seriesCategoryKey = seriesCategories.join("\0");
   const seriesMinUpdatedTs = seriesUpdatedAfter(attributeFilters);
@@ -2328,14 +2426,35 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
         setDirectPreview({ status: "idle", rows: [], error: "", ticker: "" });
         return undefined;
       }
+    } else if (isKalshiLiveTraderTable(tableId)) {
+      const directed =
+        tableId === "leaderboard" ||
+        tableId === "trades_by_holder" ||
+        (tableId === "search_traders" && traderQuery.length >= 2) ||
+        (tableId === "holder_profile" && Boolean(traderProfileKey));
+      if (!directed) {
+        setDirectPreview({ status: "idle", rows: [], error: "", ticker: "" });
+        return undefined;
+      }
     } else if (!ticker) {
       setDirectPreview({ status: "idle", rows: [], error: "", ticker: "" });
       return undefined;
     }
     let cancel = false;
-    setDirectPreview({ status: "loading", rows: [], error: "", ticker });
+    const traderTable = isKalshiLiveTraderTable(tableId);
+    if (!traderTable) setDirectPreview({ status: "loading", rows: [], error: "", ticker });
+    const timer = traderTable
+      ? window.setTimeout(() => {
+          if (cancel) return;
+          setDirectPreview((current) =>
+            current.status === "ready" ? current : { status: "loading", rows: [], error: "", ticker: "" },
+          );
+        }, 220)
+      : 0;
     // The series list is the whole result. The grid still shows PREVIEW_ROW_CAP.
     const seriesFetchCap = typeof planLimit === "number" && planLimit > 0 ? planLimit : PREVIEW_ROW_CAP;
+    const askedRows = Number(rowLimit);
+    const traderCap = (max) => Math.min(max, Number.isFinite(askedRows) && askedRows > 0 ? askedRows : max);
     const spec =
       tableId === "series"
         ? directSeries.length
@@ -2366,14 +2485,38 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
                 includeMilestones: eventIncludeMilestones,
                 limit: seriesFetchCap,
               }
-          : {
-              ticker,
-              minTs: directWindow.minTs,
-              maxTs: directWindow.maxTs,
-              period: directWindow.period,
-              depth: directWindow.depth,
-              limit: tableId === "candlesticks" ? KALSHI_CANDLESTICK_MAX_CANDLES : PREVIEW_ROW_CAP,
-            };
+          : tableId === "leaderboard"
+            ? {
+                metric: traderMetric,
+                timePeriod: traderPeriod,
+                categories: leaderboardCategories(attributeFilters),
+                limit: traderCap(100),
+              }
+            : tableId === "search_traders"
+              ? {
+                  query: traderQuery,
+                  includeMetrics: traderMetricsOn,
+                  includeHoldings: traderHoldingsOn,
+                  limit: traderCap(50),
+                }
+              : tableId === "holder_profile"
+                ? { nicknames: traderProfileNicknames(attributeFilters), limit: traderCap(50) }
+                : tableId === "trades_by_holder"
+                  ? {
+                      nicknames: holderTradeNicknames(attributeFilters),
+                      seriesTicker: holderSeriesTicker,
+                      eventTicker: holderEventTicker,
+                      minAmount: holderMinAmount,
+                      limit: traderCap(50),
+                    }
+                  : {
+                      ticker,
+                      minTs: directWindow.minTs,
+                      maxTs: directWindow.maxTs,
+                      period: directWindow.period,
+                      depth: directWindow.depth,
+                      limit: tableId === "candlesticks" ? KALSHI_CANDLESTICK_MAX_CANDLES : PREVIEW_ROW_CAP,
+                    };
     loadKalshiLiveDirect(tableId, spec)
       .then((result) => {
         if (cancel) return;
@@ -2384,6 +2527,7 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
           error: "",
           ticker: ticker || directSeries[0] || directEvents[0] || "",
           truncated: Boolean(result?.truncated),
+          visibility: result?.visibility || "",
         });
         setVisibleCount(Math.min(rows.length, PREVIEW_ROW_CAP));
       })
@@ -2398,8 +2542,9 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
       });
     return () => {
       cancel = true;
+      if (timer) window.clearTimeout(timer);
     };
-  }, [directMarkets, directSeries, directEvents, directWindow.minTs, directWindow.maxTs, directWindow.period, directWindow.depth, eventIncludeMarkets, eventIncludeMilestones, eventMinCloseTs, eventSeriesKey, eventStatusKey, liveDirect, planLimit, sampleMarketTicker, seriesCategoryKey, seriesMinUpdatedTs, seriesProductMetadata, tableId]);
+  }, [directMarkets, directSeries, directEvents, directWindow.minTs, directWindow.maxTs, directWindow.period, directWindow.depth, eventIncludeMarkets, eventIncludeMilestones, eventMinCloseTs, eventSeriesKey, eventStatusKey, holderEventTicker, holderMinAmount, holderNicknameKey, holderSeriesTicker, liveDirect, planLimit, rowLimit, sampleMarketTicker, seriesCategoryKey, seriesMinUpdatedTs, seriesProductMetadata, tableId, traderCategoryKey, traderHoldingsOn, traderMetric, traderMetricsOn, traderPeriod, traderProfileKey, traderQuery]);
 
   const seriesImportRows = useMemo(() => {
     if (!(liveDirect && tableId === "series" && directPreview.status === "ready")) return null;
@@ -2415,7 +2560,14 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
     );
     return sortAttributeRows(matched, eventAttributeColumns, sortKeys);
   }, [attributeFilters, directPreview.rows, directPreview.status, eventAttributeColumns, liveDirect, sortKeys, tableId]);
-  const listImportRows = tableId === "events" ? eventImportRows : seriesImportRows;
+  const traderImportRows = useMemo(() => {
+    if (!(liveTrader && directPreview.status === "ready")) return null;
+    const matched = (directPreview.rows || []).filter((row) =>
+      rowMatchesAttributes(row, traderAttributeColumns, attributeFilters),
+    );
+    return sortAttributeRows(matched, traderAttributeColumns, sortKeys);
+  }, [attributeFilters, directPreview.rows, directPreview.status, liveTrader, sortKeys, traderAttributeColumns]);
+  const listImportRows = tableId === "events" ? eventImportRows : liveTrader ? traderImportRows : seriesImportRows;
 
   const filteredRows = useMemo(() => {
     const requested = Number(rowLimit);
@@ -2476,6 +2628,11 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
   }, [guidedFilters, pull, attributeFilters, sortKeys, rowLimit, join, integrationId, tableId, settledPreviewKey, previewSearchError]);
 
   const marketCap = getJoinMarketCap(user);
+  const traderJoinNames = useMemo(() => {
+    if (!liveTraderList) return [];
+    const source = Array.isArray(traderImportRows) ? traderImportRows : filteredRows;
+    return traderNicknamesFromRows(source, marketCap);
+  }, [filteredRows, liveTraderList, marketCap, traderImportRows]);
   const requestedMarketLimit = Number(rowLimit);
   const hasRowLimit = Number.isFinite(requestedMarketLimit) && requestedMarketLimit > 0;
   const queryRows = hasRowLimit
@@ -2894,7 +3051,13 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
   const directExtra =
     liveMarketFanout && directPreview.status === "ready" && directMarkets.length > 1
       ? ` Each market gets its own sheet. The other ${directMarkets.length - 1} ${directMarkets.length === 2 ? "is" : "are"} created when you run.`
-      : "";
+      : tableId === "trades_by_holder" &&
+          directPreview.status === "ready" &&
+          !directPreview.rows.length &&
+          directPreview.visibility &&
+          !/^(public|visible)$/i.test(directPreview.visibility)
+        ? " These trades are private."
+        : "";
 
   useEffect(() => {
     if (!emptyRefresh && !livePickAwaitingRows && !liveScanWaiting && !directLoading) return undefined;
@@ -2930,7 +3093,12 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
   const pullTotal = previewIsEmpty
     ? 0
     : Array.isArray(listImportRows)
-      ? listImportRows.length
+      ? liveTrader &&
+        (tableId === "trades_by_holder" || tableId === "search_traders") &&
+        directPreview.truncated &&
+        !(Number(rowLimit) > 0)
+        ? null
+        : listImportRows.length
       : directCountOpen
         ? null
         : directReadyCount != null
@@ -3025,6 +3193,8 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
 
   const canProceed = Boolean(pull) && !loading && !error && shownColumns.length > 0;
   const joinOn = step === "enrich" && enrichPicks.has("join");
+  const traderJoinOn =
+    liveTraderList && joinOn && (joinTarget === "kalshiLiveTraderProfile" || joinTarget === "kalshiLiveTraderTrades");
   const joinCommitted = marketsQuery && joinOn && Boolean(join) && joinTarget === joinTradesTarget;
   const marketColumnList = useMemo(() => join?.marketColumns?.() || [], [join]);
   const selectedMarketColumns = useMemo(
@@ -3378,6 +3548,45 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
     return undefined;
   }, [seriesJoinOn, seriesJoinKey, previewSheet, seriesJoinTickers, seriesMarketLayout, liveEventSearch]);
 
+  const traderJoinKey = `${joinTarget}:${traderJoinNames[0] || ""}`;
+  useEffect(() => {
+    if (!traderJoinOn || !traderJoinNames.length) {
+      setTraderJoinPreview({ status: "idle", nickname: "", columns: [], rows: [], error: "" });
+      return undefined;
+    }
+    const nickname = traderJoinNames[0];
+    let cancel = false;
+    setTraderJoinPreview({ status: "loading", nickname, columns: [], rows: [], error: "" });
+    const load =
+      joinTarget === "kalshiLiveTraderTrades"
+        ? loadKalshiLiveHolderTrades({ nicknames: [nickname], limit: PREVIEW_ROW_CAP })
+        : loadKalshiLiveHolderProfiles([nickname]);
+    load
+      .then((result) => {
+        if (cancel) return;
+        setTraderJoinPreview({
+          status: "ready",
+          nickname,
+          columns: result.columns || [],
+          rows: result.rows || [],
+          error: "",
+        });
+      })
+      .catch((err) => {
+        if (cancel) return;
+        setTraderJoinPreview({
+          status: "error",
+          nickname,
+          columns: [],
+          rows: [],
+          error: err instanceof Error ? err.message : "This trader did not load",
+        });
+      });
+    return () => {
+      cancel = true;
+    };
+  }, [traderJoinOn, traderJoinKey, traderJoinNames, joinTarget]);
+
   const showSampleExplainer = step === "enrich" && hoverSample && !enrichPicks.has("sample");
   const showBucketExplainer = step === "enrich" && hoverBucket && !enrichPicks.has("bucket") && !showSampleExplainer;
   const showSummarizeExplainer = step === "enrich" && hoverSummarize && !enrichPicks.has("summarize") && !showSampleExplainer && !showBucketExplainer;
@@ -3385,7 +3594,7 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
     step === "enrich" && hoverFunction && !enrichPicks.has("function") && !showSummarizeExplainer && !showSampleExplainer && !showBucketExplainer;
   const liveJoinReady = liveMarketSearch && joinOn && liveJoinTargets.length > 0;
   const showJoinExplainer =
-    (historicalEnrich || liveMarketSearch || liveSeriesSearch || liveEventSearch || liveMarketFanout) &&
+    (historicalEnrich || liveMarketSearch || liveSeriesSearch || liveEventSearch || liveMarketFanout || liveTraderList) &&
     step === "enrich" &&
     hoverJoin &&
     !enrichPicks.has("join") &&
@@ -3683,6 +3892,7 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
         return `Illustration. From ${here}, the route runs through the parent market, its series, and the trades, order book, and candlesticks on those markets.`;
       }
       if (liveSeriesSearch || liveEventSearch) return `Illustration. Markets inside these ${listPlural} load after you choose Join.`;
+      if (liveTraderList) return "Illustration. Each trader in this list can open a profile and their public trades.";
       return tradesQuery
         ? "Illustration. No market metadata is loaded until you run the pull."
         : "Illustration. No trades are loaded until you run the pull.";
@@ -3726,6 +3936,15 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
       if (preview.status === "error") return preview.error;
       const count = preview.rows?.length || 0;
       return `Previewing ${count.toLocaleString()} ${title.toLowerCase()} ${count === 1 ? "row" : "rows"} for ${ticker}. Save and run joins the markets in this pull.`;
+    }
+    if ((previewSheet === "trader-join" || previewSheet.startsWith("trader-join:")) && traderJoinOn) {
+      if (!traderJoinNames.length) return "This list has no nicknames yet.";
+      if (traderJoinPreview.status === "loading" || traderJoinPreview.status === "idle") return "Loading this trader";
+      if (traderJoinPreview.status === "error") return traderJoinPreview.error;
+      const count = traderJoinPreview.rows.length;
+      const kind = joinTarget === "kalshiLiveTraderTrades" ? "trade" : "profile";
+      const noun = count === 1 ? kind : `${kind}s`;
+      return `Previewing ${count.toLocaleString()} ${noun} for ${traderJoinPreview.nickname || traderJoinNames[0]}. Save and run covers the other traders.`;
     }
     if (seriesMarketSheet && seriesJoinOn) {
       if (!seriesJoinTickers.length) {
@@ -4117,6 +4336,14 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
         args: { lake: lakeId, table: "trades", sheets: Math.min(joinedMarkets.length || marketCap, marketCap) },
       });
     }
+    if (liveTraderList && enrichPicks.has("join") && (joinTarget === "kalshiLiveTraderProfile" || joinTarget === "kalshiLiveTraderTrades")) {
+      planned.push({
+        id: "join-traders",
+        name: "compose_trader_join",
+        status: "pending",
+        args: { traders: traderJoinNames.length, target: joinTarget === "kalshiLiveTraderTrades" ? "trades" : "profile" },
+      });
+    }
     if ((liveSeriesSearch || liveEventSearch) && enrichPicks.has("join") && joinTarget === scopeJoinId && seriesJoinTickers.length) {
       planned.push({
         id: "join-series-markets",
@@ -4374,6 +4601,52 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
             sourceRows: rows,
           },
         ];
+      } else if (isKalshiLiveTraderTable(tableId)) {
+        const asked = Number(rowLimit);
+        const userCap = Number.isFinite(asked) && asked > 0 ? asked : limit;
+        const endpointCap = tableId === "leaderboard" ? 100 : tableId === "search_traders" ? 500 : tableId === "trades_by_holder" ? 5000 : userCap;
+        const loaded = await loadKalshiLiveDirect(tableId, {
+          metric: traderMetric,
+          timePeriod: traderPeriod,
+          categories: leaderboardCategories(attributeFilters),
+          query: traderQuery,
+          includeMetrics: traderMetricsOn,
+          includeHoldings: traderHoldingsOn,
+          nicknames: tableId === "holder_profile" ? traderProfileNicknames(attributeFilters) : holderTradeNicknames(attributeFilters),
+          seriesTicker: holderSeriesTicker,
+          eventTicker: holderEventTicker,
+          minAmount: holderMinAmount,
+          limit: Math.min(limit, userCap, endpointCap),
+        });
+        const shaped = shape(loaded);
+        const matched = shaped.rows.filter((row) => rowMatchesAttributes(row, traderAttributeColumns, attributeFilters));
+        const sorted = sortAttributeRows(matched, traderAttributeColumns, sortKeys);
+        const requested = Number(rowLimit);
+        const rows = Number.isFinite(requested) && requested > 0 ? sorted.slice(0, Math.min(requested, limit)) : sorted;
+        const attributeLines = traderAttributeColumns.flatMap((column) => {
+          const summary = attributeSummary(column, attributeFilters);
+          return summary ? [`${column.title} ${summary}`] : [];
+        });
+        const titles = {
+          leaderboard: "Leaderboard",
+          search_traders: "Traders",
+          holder_profile: "Profile",
+          trades_by_holder: "Trader trades",
+        };
+        built = [
+          {
+            id: `run-live-${tableId}`,
+            title: titles[tableId] || sheetTitle,
+            columns: shaped.columns,
+            rows,
+            span: "full",
+            table: tableId,
+            summary: `Kalshi Live · ${titles[tableId] || sheetTitle}`,
+            attributeLines,
+            sortLine: sortSummary(traderAttributeColumns, sortKeys),
+            sourceRows: rows,
+          },
+        ];
       } else {
         const markets = directMarketTickers(livePicks);
         const pulled = await mapPool(markets, 3, (market) =>
@@ -4526,6 +4799,62 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
           });
         } catch (err) {
           reporter.fail("join-series-markets", err instanceof Error ? err.message : "Markets join failed");
+          return;
+        }
+      }
+      if (liveTraderList && enrichPicks.has("join") && (joinTarget === "kalshiLiveTraderProfile" || joinTarget === "kalshiLiveTraderTrades")) {
+        const names = traderNicknamesFromRows(directParents[0]?.sourceRows || directParents[0]?.rows || [], marketCap);
+        const tradesJoin = joinTarget === "kalshiLiveTraderTrades";
+        reporter.start("join-traders");
+        try {
+          const marketLimit = Number.isFinite(sheetCap) ? sheetCap : PREVIEW_ROW_CAP;
+          if (!names.length) {
+            reporter.succeed("join-traders", { result: "No nicknames in this list" });
+          } else if (seriesMarketLayout === "combined") {
+            const loaded = tradesJoin
+              ? await loadKalshiLiveHolderTrades({ nicknames: names, limit: marketLimit })
+              : await loadKalshiLiveHolderProfiles(names);
+            const fullRows = loaded.rows || [];
+            if (loaded.columns?.length) {
+              sheets.push({
+                id: tradesJoin ? "run-trader-trades" : "run-trader-profiles",
+                title: tradesJoin ? "Trader trades" : "Profile",
+                columns: loaded.columns,
+                rows: fullRows.slice(0, PREVIEW_ROW_CAP),
+                rowCount: fullRows.length,
+                span: "full",
+                table: tradesJoin ? "trades_by_holder" : "holder_profile",
+                summary: `Kalshi Live · ${tradesJoin ? "Trader trades" : "Profile"} · ${names.join(", ")}`,
+              });
+            }
+          } else {
+            const pulled = await mapPool(names, 3, (nickname) =>
+              (tradesJoin
+                ? loadKalshiLiveHolderTrades({ nicknames: [nickname], limit: marketLimit })
+                : loadKalshiLiveHolderProfiles([nickname])
+              ).then((result) => ({ nickname, ...result })),
+            );
+            for (const item of pulled) {
+              if (!item.columns?.length) continue;
+              const safe = String(item.nickname).replace(/[^A-Za-z0-9]+/g, "-");
+              const fullRows = item.rows || [];
+              sheets.push({
+                id: `run-trader-${tradesJoin ? "trades" : "profile"}-${safe}`,
+                title: `${tradesJoin ? "Trader trades" : "Profile"} · ${item.nickname}`,
+                columns: item.columns,
+                rows: fullRows.slice(0, PREVIEW_ROW_CAP),
+                rowCount: fullRows.length,
+                span: pulled.length > 1 ? "half" : "full",
+                table: tradesJoin ? "trades_by_holder" : "holder_profile",
+                summary: `Kalshi Live · ${item.nickname}`,
+              });
+            }
+          }
+          reporter.succeed("join-traders", {
+            result: `${names.length.toLocaleString()} ${names.length === 1 ? "trader" : "traders"}`,
+          });
+        } catch (err) {
+          reporter.fail("join-traders", err instanceof Error ? err.message : "Trader join failed");
           return;
         }
       }
@@ -5200,6 +5529,20 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
       });
     });
   }
+  if (traderJoinOn && traderJoinNames.length) {
+    const label = joinTarget === "kalshiLiveTraderTrades" ? "Trader trades" : "Profile";
+    if (seriesMarketLayout === "combined") {
+      previewTabs.push({ id: "trader-join", title: label });
+    } else {
+      const [first, ...rest] = traderJoinNames;
+      previewTabs.push({ id: `trader-join:${first}`, title: `${label} · ${first}` });
+      rest.forEach((name) => {
+        previewTabs.push({ id: `run:trader-join:${name}`, title: `${label} · ${name}`, queued: true });
+      });
+    }
+  } else if (traderJoinOn) {
+    previewTabs.push({ id: "trader-join", title: joinTarget === "kalshiLiveTraderTrades" ? "Trader trades" : "Profile" });
+  }
   if (seriesJoinOn && seriesJoinTickers.length) {
     if (seriesMarketLayout === "combined") {
       previewTabs.push({ id: "series-markets", title: "Markets" });
@@ -5390,6 +5733,14 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
             joinTarget={joinTarget}
             onJoinTarget={(id) => {
               setJoinTarget(id);
+              if (id === "kalshiLiveTraderProfile" || id === "kalshiLiveTraderTrades") {
+                if (!traderJoinNames.length || seriesMarketLayout === "combined") {
+                  setPreviewSheet("trader-join");
+                  return;
+                }
+                setPreviewSheet(`trader-join:${traderJoinNames[0]}`);
+                return;
+              }
               if (id !== "kalshiLiveSeriesMarkets" && id !== "kalshiLiveEventMarkets") return;
               if (!seriesJoinTickers.length || seriesMarketLayout === "combined") {
                 setPreviewSheet("series-markets");
@@ -5457,13 +5808,21 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
             onFunctionHelp={() => setFunctionHelp(true)}
             onSaveAndRun={requestSaveAndRun}
             running={running}
-            showJoinBuilder={marketsQuery || tradesQuery || liveMarketSearch || liveSeriesSearch || liveEventSearch || liveMarketFanout}
+            showJoinBuilder={marketsQuery || tradesQuery || liveMarketSearch || liveSeriesSearch || liveEventSearch || liveMarketFanout || liveTraderList}
             showFunctionBuilder
-            joinMode={liveMarketFanout ? "fanout" : liveEventSearch ? "events" : liveSeriesSearch ? "series" : liveMarketSearch ? "live" : tradesQuery ? "trades" : "markets"}
+            joinMode={liveMarketFanout ? "fanout" : liveTraderList ? "traders" : liveEventSearch ? "events" : liveSeriesSearch ? "series" : liveMarketSearch ? "live" : tradesQuery ? "trades" : "markets"}
             seriesMarketLayout={seriesMarketLayout}
             marketsDetected={marketsDetected}
             onSeriesMarketLayout={(layout) => {
               setSeriesMarketLayout(layout);
+              if (joinTarget === "kalshiLiveTraderProfile" || joinTarget === "kalshiLiveTraderTrades") {
+                if (!traderJoinNames.length || layout === "combined") {
+                  setPreviewSheet("trader-join");
+                  return;
+                }
+                setPreviewSheet(`trader-join:${traderJoinNames[0]}`);
+                return;
+              }
               if (joinTarget !== "kalshiLiveSeriesMarkets" && joinTarget !== "kalshiLiveEventMarkets") return;
               if (!seriesJoinTickers.length || layout === "combined") {
                 setPreviewSheet("series-markets");
@@ -5800,7 +6159,9 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
                     ? seriesAttributeColumns
                     : liveEventSearch
                       ? eventAttributeColumns
-                      : liveMarketSearch
+                      : liveTrader
+                        ? traderAttributeColumns
+                        : liveMarketSearch
                         ? liveAttributeColumns
                         : liveMarketFanout
                           ? directAttributeColumns
@@ -5817,6 +6178,14 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
                     ? "Series attributes"
                     : liveEventSearch
                       ? "Event attributes"
+                      : tableId === "leaderboard"
+                        ? "Leaderboard attributes"
+                        : tableId === "search_traders"
+                          ? "Trader attributes"
+                          : tableId === "holder_profile"
+                            ? "Profile attributes"
+                            : tableId === "trades_by_holder"
+                              ? "Trader trade attributes"
                       : tableId === "trades"
                       ? "Trade attributes"
                       : tableId === "candlesticks"
@@ -5895,6 +6264,7 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
             !bucketActive &&
             !sampleActive &&
             !(seriesMarketSheet && seriesJoinOn) &&
+            !(previewSheet === "trader-join" || previewSheet.startsWith("trader-join:")) &&
             !(fanoutJoinOn && (previewSheet === "parent-market" || previewSheet === "parent-series" || previewSheet === "fanout-markets" || previewSheet.startsWith("djoin:") || previewSheet.startsWith("live:"))) &&
             !(previewSheet === "markets-meta" && tradesJoinReady && joinPlacement === "sheet") ? (
               <div className="mt-1.5 w-full max-w-[280px]">
@@ -5947,6 +6317,8 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
           <BucketExplainerTabs sheetTitle={sheetTitle} />
         ) : showFunctionExplainer ? (
           <FunctionExplainerTabs sheetTitle={sheetTitle} />
+        ) : showJoinExplainer && liveTraderList ? (
+          <TraderJoinExplainerTabs title={tableId === "search_traders" ? "Traders" : "Leaderboard"} />
         ) : showJoinExplainer && (liveSeriesSearch || liveEventSearch) ? (
           <div className="overflow-hidden px-4 pb-1 pt-4">
             <div className="flex">
@@ -6086,6 +6458,8 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
               }
               onFormulaPick={(pick) => acceptFormulaPick(pick, "summary")}
             />
+          ) : showJoinExplainer && liveTraderList ? (
+            <TraderJoinExplainer title={tableId === "search_traders" ? "Traders" : "Leaderboard"} />
           ) : showJoinExplainer && (liveSeriesSearch || liveEventSearch) ? (
             <div className="flex h-full items-center justify-center rounded-xl border border-border/70 bg-background px-6 text-center text-[13px] leading-relaxed text-muted-foreground shadow-sm">
               {liveEventSearch
@@ -6193,6 +6567,30 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
                 <IntegrationBuildGrid columns={preview.columns} rows={preview.rows} highlightColumnId={preview.columns[0]?.id || ""} />
               );
             })()
+          ) : (previewSheet === "trader-join" || previewSheet.startsWith("trader-join:")) && traderJoinOn ? (
+            !traderJoinNames.length ? (
+              <div className="flex h-full items-center justify-center rounded-xl border border-border/70 bg-background px-6 text-center text-[13px] leading-relaxed text-muted-foreground shadow-sm">
+                This list has no nicknames yet.
+              </div>
+            ) : traderJoinPreview.status === "loading" || traderJoinPreview.status === "idle" ? (
+              <div className="flex h-full items-center justify-center">
+                <SpectrumLoadingState label="Loading this trader" />
+              </div>
+            ) : traderJoinPreview.status === "error" ? (
+              <p className="text-[13px] text-muted-foreground">{traderJoinPreview.error}</p>
+            ) : traderJoinPreview.rows.length ? (
+              <IntegrationBuildGrid
+                columns={traderJoinPreview.columns}
+                rows={traderJoinPreview.rows.slice(0, PREVIEW_ROW_CAP)}
+                highlightColumnId={traderJoinPreview.columns[0]?.id || ""}
+              />
+            ) : (
+              <div className="flex h-full items-center justify-center rounded-xl border border-border/70 bg-background px-6 text-center text-[13px] leading-relaxed text-muted-foreground shadow-sm">
+                {joinTarget === "kalshiLiveTraderTrades"
+                  ? `No public trades for ${traderJoinPreview.nickname || "this trader"}.`
+                  : `No profile for ${traderJoinPreview.nickname || "this trader"}.`}
+              </div>
+            )
           ) : seriesMarketSheet && seriesJoinOn ? (
             !seriesJoinTickers.length ? (
               <div className="flex h-full items-center justify-center rounded-xl border border-border/70 bg-background px-6 text-center text-[13px] leading-relaxed text-muted-foreground shadow-sm">

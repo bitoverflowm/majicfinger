@@ -23,6 +23,7 @@ import { getHistoricalPullRowLimit } from "@/lib/athenaEntitlement";
 import {
   ensureFullTradeSheet,
   tradeTickerFromBlock,
+  usesHistoricalTradeSheet,
   useTradeSheetLabel,
 } from "@/components/dashboardComposer/fullTradeSheet";
 import {
@@ -346,8 +347,8 @@ export function WorkspaceCanvasProvider({ pageId, readOnly = false, children }) 
     if (!ready || user === undefined) return undefined;
     const cap = getHistoricalPullRowLimit(user);
     for (const block of blocks) {
+      if (!usesHistoricalTradeSheet(block) || !block.columns?.length) continue;
       const ticker = tradeTickerFromBlock(block);
-      if (!ticker || !block.columns?.length) continue;
       const limit = block.pull?.limit || cap;
       ensureFullTradeSheet(block.id, ticker, block.columns, limit, owner).then((sheet) => {
         if (sheet?.status !== "ready") return;
@@ -762,7 +763,8 @@ function SheetBlockBody({ block, onChange, booting }) {
   const running = !!liveSession(canvas, block.id)?.running;
   const hasRealtime = !canvas?.readOnly && !!realtimeSheetForBlock(block, canvas?.blocks || []);
   const pulled = formatPulledAt(block.pulledAt);
-  const label = useTradeSheetLabel(block.id, Math.max(filledRowCount(view.cells), Number(block.rowCount) || 0));
+  const shownCount = Math.max(filledRowCount(view.cells), Number(block.rowCount) || 0);
+  const label = useTradeSheetLabel(usesHistoricalTradeSheet(block) ? block.id : "", shownCount);
   return (
     <div className="flex min-h-0 flex-1 flex-col">
       <div className="flex items-center gap-2 border-b border-border/70 px-3 py-2">
@@ -938,7 +940,8 @@ function SheetFullscreen({ block, onChange, onClose }) {
     return () => window.removeEventListener("keydown", onKey, true);
   }, [onClose]);
 
-  const label = useTradeSheetLabel(block.id, Math.max(filledRowCount(block.cells), Number(block.rowCount) || 0));
+  const shownCount = Math.max(filledRowCount(block.cells), Number(block.rowCount) || 0);
+  const label = useTradeSheetLabel(usesHistoricalTradeSheet(block) ? block.id : "", shownCount);
   return createPortal(
     <div
       data-sheet-fullscreen=""
