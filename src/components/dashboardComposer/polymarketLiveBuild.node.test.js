@@ -26,6 +26,14 @@ assert.equal(endpoints.find((endpoint) => endpoint.id === "getTraderLeaderboard"
 assert.equal(endpoints.find((endpoint) => endpoint.id === "getOrderbooks")?.realtime, true);
 assert.equal(endpoints.find((endpoint) => endpoint.id === "getEvents")?.realtime, false);
 assert.ok(polymarketLiveRealtimeEndpointIds().includes("getBatchPricesHistory"));
+assert.ok(polymarketLiveRealtimeEndpointIds().includes("getTradesByMarket"));
+assert.equal(endpoints.find((endpoint) => endpoint.id === "getBatchPricesHistory")?.title, "Price History");
+assert.equal(endpoints.find((endpoint) => endpoint.id === "getTradesByMarket")?.title, "Trade History");
+assert.equal(endpoints.find((endpoint) => endpoint.id === "getTradesByMarket")?.category, "markets");
+assert.equal(
+  ids.indexOf("getTradesByMarket"),
+  ids.indexOf("getBatchPricesHistory") + 1,
+);
 
 assert.equal(polymarketLiveBuildRequirement("getEvents"), null);
 assert.equal(polymarketLiveBuildRequirement("getOrderbooks")?.prompt, "Token required");

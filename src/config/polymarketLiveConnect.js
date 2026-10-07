@@ -247,8 +247,8 @@ export const POLYMARKET_LIVE_CONNECT_ENDPOINTS = [
   {
     id: POLYMARKET_PRICES_HISTORY_ENDPOINT_ID,
     category: "trades",
-    title: "Trade History",
-    description: "Get trade history by markets aka Price history",
+    title: "Price History",
+    description: "Historical prices for a market over time.",
   },
   {
     id: POLYMARKET_MARKETS_BY_EVENTS_ENDPOINT_ID,

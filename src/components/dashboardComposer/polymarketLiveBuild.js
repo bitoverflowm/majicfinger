@@ -26,6 +26,7 @@ const BUILD_GROUP = {
   getSpreads: "markets",
   getLastTradePrices: "markets",
   getBatchPricesHistory: "markets",
+  getTradesByMarket: "markets",
   series: "series",
   getEvents: "events",
   getLiveVolumeForEvent: "events",
@@ -43,7 +44,8 @@ const BUILD_GROUP = {
 /**
  * HTTP endpoints that seed an enabled CLOB socket.
  * book / best_bid_ask / tick_size_change → orderbooks.
- * price_change / last_trade_price / candlesticks → prices and trade history.
+ * price_change / candlesticks → price history.
+ * last_trade_price → executed trade history.
  */
 const REALTIME_ENDPOINTS = new Set([
   "getOrderbooks",
@@ -52,6 +54,7 @@ const REALTIME_ENDPOINTS = new Set([
   "getSpreads",
   "getLastTradePrices",
   "getBatchPricesHistory",
+  "getTradesByMarket",
 ]);
 
 /** @type {Record<string, { kind: "token" | "event" | "address"; prompt: string }>} */
@@ -64,6 +67,7 @@ const REQUIREMENTS = {
   getSpreads: { kind: "token", prompt: "Token required" },
   getLastTradePrices: { kind: "token", prompt: "Token required" },
   getBatchPricesHistory: { kind: "token", prompt: "Token required" },
+  getTradesByMarket: { kind: "token", prompt: "Token required" },
   getLiveVolumeForEvent: { kind: "event", prompt: "Event required" },
   getHoldersByMarkets: { kind: "token", prompt: "Market required" },
   getPublicProfiles: { kind: "address", prompt: "Wallet address required" },
@@ -92,6 +96,13 @@ const PREFERRED_COLUMNS = [
   "pnl",
 ];
 
+const BUILD_COPY = {
+  getTradesByMarket: {
+    title: "Trade History",
+    description: "Executed trades for a market, with price, size, side, and time.",
+  },
+};
+
 const ADDRESS_QUERIES = {
   getPublicProfiles: "getPublicProfile",
   getCurrentPositions: "getCurrentPositions",
@@ -108,9 +119,10 @@ export function polymarketLiveRealtimeEndpointIds() {
 
 export function polymarketLiveBuildEndpoints() {
   const groupOrder = { markets: 0, series: 1, events: 2, holders: 3 };
-  return POLYMARKET_LIVE_CONNECT_ENDPOINTS.filter((endpoint) => BUILD_GROUP[endpoint.id])
+  const endpoints = POLYMARKET_LIVE_CONNECT_ENDPOINTS.filter((endpoint) => BUILD_GROUP[endpoint.id])
     .map((endpoint) => ({
       ...endpoint,
+      ...(BUILD_COPY[endpoint.id] || {}),
       category: BUILD_GROUP[endpoint.id],
       realtime: REALTIME_ENDPOINTS.has(endpoint.id),
     }))
@@ -119,6 +131,13 @@ export function polymarketLiveBuildEndpoints() {
       if (group) return group;
       return (REQUIREMENTS[a.id] ? 1 : 0) - (REQUIREMENTS[b.id] ? 1 : 0);
     });
+  const priceIndex = endpoints.findIndex((endpoint) => endpoint.id === "getBatchPricesHistory");
+  const tradeIndex = endpoints.findIndex((endpoint) => endpoint.id === "getTradesByMarket");
+  if (priceIndex >= 0 && tradeIndex >= 0 && tradeIndex !== priceIndex + 1) {
+    const [trade] = endpoints.splice(tradeIndex, 1);
+    endpoints.splice(priceIndex + 1, 0, trade);
+  }
+  return endpoints;
 }
 
 /**
@@ -409,6 +428,15 @@ async function tokenRows(endpointId, pick) {
   if (endpointId === "getBatchPricesHistory") {
     const data = await polymarketPost("getBatchPricesHistory", { markets: tokens.slice(0, 1), interval: "1h" });
     return flattenHistory(data, market);
+  }
+  if (endpointId === "getTradesByMarket") {
+    if (!market.conditionId) throw new Error("This market has no condition id.");
+    const data = await polymarketGet("getTradesByMarket", {
+      market: market.conditionId,
+      limit: "50",
+      takerOnly: "true",
+    });
+    return objectRows(data).map((row) => stampMarket(row, market));
   }
   if (endpointId === "getOpenInterestCompose") {
     const data = await polymarketGet("getOpenInterest", { market: market.conditionId });
