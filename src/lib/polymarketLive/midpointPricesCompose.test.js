@@ -53,9 +53,9 @@ test("midpoint prices flatten to one row per market", () => {
     condition_id: "0xabc",
     token_id: "yes-token",
     outcome: "Yes",
-    midpoint_price: "0.46",
+    midpoint_price: 0.46,
   });
-  assert.equal(rows[1].midpoint_price, "0.62");
+  assert.equal(rows[1].midpoint_price, 0.62);
 });
 
 test("midpoint prices project selected columns", () => {
@@ -64,5 +64,11 @@ test("midpoint prices project selected columns", () => {
     [{ id: "1", tokenIds: ["token"] }],
     ["market_id", "midpoint_price"],
   );
-  assert.deepEqual(rows, [{ market_id: "1", midpoint_price: "0.25" }]);
+  assert.deepEqual(rows, [{ market_id: "1", midpoint_price: 0.25 }]);
+  const fromLiveField = flattenMidpointPricesRows(
+    { token: { mid: "0.9995" } },
+    [{ id: "2", tokenIds: ["token"] }],
+    ["midpoint_price"],
+  );
+  assert.equal(fromLiveField[0].midpoint_price, 0.9995);
 });

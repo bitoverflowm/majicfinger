@@ -1,5 +1,7 @@
 /**
- * Polymarket Live — Market Price (CLOB POST /prices).
+ * Polymarket Live — Market Price.
+ * One token and one side uses GET /price. Several pairs use POST /prices.
+ * GET /prices?token_ids&sides still returns Invalid payload.
  * Each discovered Gamma market becomes one row using its primary outcome token.
  */
 
@@ -36,8 +38,8 @@ export const POLYMARKET_MARKET_PRICES_COLUMNS = [
   { name: "condition_id", type: "string", description: "Market condition id" },
   { name: "token_id", type: "string", description: "Primary CLOB outcome token id" },
   { name: "outcome", type: "string", description: "Primary outcome label (usually Yes)" },
-  { name: "buy_price", type: "number", description: "Current BUY price" },
-  { name: "sell_price", type: "number", description: "Current SELL price" },
+  { name: "buy_price", type: "number", description: "Best price to buy" },
+  { name: "sell_price", type: "number", description: "Best price to sell" },
 ];
 
 export const POLYMARKET_MARKET_PRICES_DEFAULT_COLUMNS = [
@@ -118,6 +120,12 @@ export function marketPriceRefFromListMarketsRow(row) {
   return orderbooksMarketRefFromListMarketsRow(row);
 }
 
+function marketPriceNumber(value) {
+  if (value == null || value === "") return "";
+  const n = Number(value);
+  return Number.isFinite(n) ? n : value;
+}
+
 /**
  * Flatten a CLOB /prices response into one row per selected market.
  *
@@ -150,8 +158,8 @@ export function flattenMarketPricesRows(payload, refs, selectedColumns) {
       condition_id: String(ref.conditionId || "").trim(),
       token_id: tokenId,
       outcome: String(ref.outcomes?.[0] || "").trim(),
-      buy_price: tokenPrices.BUY ?? tokenPrices.buy ?? "",
-      sell_price: tokenPrices.SELL ?? tokenPrices.sell ?? "",
+      buy_price: marketPriceNumber(tokenPrices.BUY ?? tokenPrices.buy),
+      sell_price: marketPriceNumber(tokenPrices.SELL ?? tokenPrices.sell),
     };
     if (!selectedSet) return [row];
     /** @type {Record<string, unknown>} */

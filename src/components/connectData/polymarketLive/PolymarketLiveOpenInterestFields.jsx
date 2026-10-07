@@ -190,7 +190,7 @@ export function PolymarketLiveOpenInterestFields({
           <p className="text-[11px] leading-snug text-muted-foreground dark:text-slate-400">
             Search and add one or more markets, then press Go. We pass each market&apos;s condition
             id (<span className="font-mono text-[10px]">0x…</span>) to{" "}
-            <span className="font-mono text-[10px]">GET /oi</span>.
+            <span className="font-mono text-[10px]">GET /v2/oi</span>.
           </p>
           <PolymarketLiveSearch
             entities={["market"]}
@@ -267,8 +267,8 @@ export function PolymarketLiveOpenInterestFields({
         <div className="space-y-4 rounded-xl border border-border/60 bg-muted/10 p-3 text-foreground">
           <p className="text-[11px] leading-snug text-muted-foreground dark:text-slate-400">
             Same market discovery as Get Market/Markets. We resolve each selection to a condition id
-            and call <span className="font-mono text-[10px]">GET /oi?market=…</span>. Leave markets
-            empty to request open interest without a market filter.
+            and call <span className="font-mono text-[10px]">GET /v2/oi?condition=…</span>. Leave markets
+            empty for the single global open-interest figure.
           </p>
 
           <div className="space-y-1.5">

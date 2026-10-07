@@ -1,6 +1,6 @@
 /**
- * Polymarket Live — Get Open Interest (Data API GET /oi).
- * Markets are selected via NL search / advanced picker; condition ids (0x…) are passed as `market`.
+ * Polymarket Live — Get Open Interest (Data API GET /v2/oi).
+ * Pass condition ids as `condition` (at most 20 per request). Omit them for the global figure.
  */
 
 /** @typedef {"search" | "advanced"} PolymarketOpenInterestComposeMode */
@@ -24,8 +24,8 @@
 export const POLYMARKET_OPEN_INTEREST_COMPOSE_ENDPOINT_ID = "getOpenInterestCompose";
 
 export const POLYMARKET_OPEN_INTEREST_COMPOSE_COLUMNS = [
-  { name: "market", type: "string", description: "Condition ID (0x…)" },
-  { name: "value", type: "number", description: "Open interest value" },
+  { name: "market", type: "string", description: "Condition id this row answers for. GLOBAL is the market-wide figure." },
+  { name: "value", type: "number", description: "Priced gross open interest in USDC. Zero when nothing is held." },
   { name: "market_id", type: "string", description: "Gamma market id (when known)" },
   { name: "market_slug", type: "string", description: "Market slug (when known)" },
   { name: "market_title", type: "string", description: "Market question / title (when known)" },
@@ -83,9 +83,33 @@ export function normalizePolymarketOpenInterestComposeState(raw) {
 }
 
 /**
- * @param {PolymarketOpenInterestComposeState} state
- * @returns {string[]}
+ * Data API `/v2/oi` rows. Accepts the `{ data }` envelope, a skip-flatten wrapper, or a flat list.
+ * `condition_id` is also copied to `market` so older sheets keep the condition id column.
+ * @param {unknown} payload
+ * @returns {Record<string, unknown>[]}
  */
+export function openInterestRowsFromPayload(payload) {
+  const wrapped = Array.isArray(payload) && payload.length === 1 ? payload[0] : payload;
+  const list = Array.isArray(wrapped?.data)
+    ? wrapped.data
+    : Array.isArray(payload)
+      ? payload
+      : wrapped && typeof wrapped === "object"
+        ? [wrapped]
+        : [];
+  return list
+    .filter((row) => row && typeof row === "object")
+    .map((row) => {
+      const conditionId = String(row.condition_id || row.conditionId || row.market || "").trim();
+      return {
+        condition_id: conditionId,
+        market: conditionId,
+        value: row.value ?? "",
+      };
+    })
+    .filter((row) => row.condition_id || row.value !== "");
+}
+
 export function conditionIdsFromOpenInterestCompose(state) {
   const s = normalizePolymarketOpenInterestComposeState(state);
   return [

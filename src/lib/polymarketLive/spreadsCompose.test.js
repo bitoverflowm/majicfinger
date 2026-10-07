@@ -53,9 +53,9 @@ test("spreads flatten to one row per market", () => {
     condition_id: "0xabc",
     token_id: "yes-token",
     outcome: "Yes",
-    spread: "0.02",
+    spread: 0.02,
   });
-  assert.equal(rows[1].spread, "0.015");
+  assert.equal(rows[1].spread, 0.015);
 });
 
 test("spreads project selected columns", () => {
@@ -64,5 +64,5 @@ test("spreads project selected columns", () => {
     [{ id: "1", tokenIds: ["token"] }],
     ["market_id", "spread"],
   );
-  assert.deepEqual(rows, [{ market_id: "1", spread: "0.04" }]);
+  assert.deepEqual(rows, [{ market_id: "1", spread: 0.04 }]);
 });

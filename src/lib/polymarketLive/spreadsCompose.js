@@ -1,5 +1,6 @@
 /**
- * Polymarket Live — Spreads (CLOB POST /spreads).
+ * Polymarket Live — Spreads.
+ * One token uses GET /spread. Several tokens use POST /spreads.
  * Uses the same market discovery and primary-token convention as Market Price.
  */
 
@@ -52,6 +53,13 @@ export function normalizePolymarketSpreadsComposeState(raw) {
 export const spreadRefFromSuggestion = marketPriceRefFromSuggestion;
 export const spreadRefFromListMarketsRow = marketPriceRefFromListMarketsRow;
 
+function spreadNumber(value) {
+  const raw = value && typeof value === "object" ? value.spread : value;
+  if (raw == null || raw === "") return "";
+  const n = Number(raw);
+  return Number.isFinite(n) ? n : raw;
+}
+
 /**
  * @param {unknown} payload
  * @param {PolymarketSpreadMarketRef[]} refs
@@ -78,7 +86,7 @@ export function flattenSpreadsRows(payload, refs, selectedColumns) {
       condition_id: String(ref.conditionId || "").trim(),
       token_id: tokenId,
       outcome: String(ref.outcomes?.[0] || "").trim(),
-      spread: spreads[tokenId] ?? "",
+      spread: spreadNumber(spreads[tokenId]),
     };
     if (!selectedSet) return [row];
     /** @type {Record<string, unknown>} */

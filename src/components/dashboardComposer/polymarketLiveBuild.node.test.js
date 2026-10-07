@@ -8,6 +8,10 @@ import {
   polymarketLiveRealtimeEndpointIds,
   polymarketPickFromSuggestion,
   POLYMARKET_CLOSED_ORDERBOOK_MESSAGE,
+  polymarketJoinChoices,
+  polymarketJoinPickFromRow,
+  polymarketMarketFanout,
+  polymarketRowsForMarket,
 } from "./polymarketLiveBuild.js";
 import {
   flattenPolymarketMarket,
@@ -21,16 +25,20 @@ import {
   samplingMarketAttributeColumns,
   samplingMarketFiltersActive,
 } from "../../lib/polymarketLive/polymarketSamplingScan.js";
+import { openInterestRowsFromPayload } from "../../lib/polymarketLive/openInterestCompose.js";
 import {
   defaultPolymarketQuoteFilters,
-  polymarketBookDepth,
   polymarketHistoryBody,
+  polymarketHistoryFidelityOptions,
   polymarketQuoteAttributeColumns,
   polymarketQuoteRequestKey,
   polymarketQuoteTarget,
   polymarketQuoteTokens,
+  polymarketTokenBucketOptions,
+  polymarketHolderLimit,
+  polymarketHolderQuery,
+  polymarketTokenHistoryParams,
   polymarketTradeQuery,
-  sliceBookLevels,
 } from "../../lib/polymarketLive/polymarketQuoteQuery.js";
 
 const endpoints = polymarketLiveBuildEndpoints();
@@ -53,10 +61,52 @@ assert.ok(polymarketLiveRealtimeEndpointIds().includes("getBatchPricesHistory"))
 assert.ok(polymarketLiveRealtimeEndpointIds().includes("getTradesByMarket"));
 assert.equal(endpoints.find((endpoint) => endpoint.id === "getBatchPricesHistory")?.title, "Price History");
 assert.equal(endpoints.find((endpoint) => endpoint.id === "getTradesByMarket")?.title, "Trade History");
+assert.equal(
+  endpoints.find((endpoint) => endpoint.id === "getOrderbooks")?.description,
+  "The buy and sell prices, and the size available at each price.",
+);
+assert.equal(
+  endpoints.find((endpoint) => endpoint.id === "getMarketPrices")?.description,
+  "The best price to buy and the best price to sell.",
+);
+assert.equal(
+  endpoints.find((endpoint) => endpoint.id === "getMidpointPrices")?.description,
+  "The price halfway between the best buy and the best sell.",
+);
+assert.equal(
+  endpoints.find((endpoint) => endpoint.id === "getSpreads")?.description,
+  "Spread is the difference between the best ask and best bid prices for a given market",
+);
+assert.equal(endpoints.find((endpoint) => endpoint.id === "getTickSize")?.title, "Tick Size");
+assert.equal(
+  endpoints.find((endpoint) => endpoint.id === "getTickSize")?.description,
+  "The smallest price step for an outcome.",
+);
+assert.equal(endpoints.find((endpoint) => endpoint.id === "getTickSize")?.realtime, false);
+assert.equal(ids.indexOf("getTickSize"), ids.indexOf("getSpreads") + 1);
+assert.equal(
+  endpoints.find((endpoint) => endpoint.id === "getMarkets")?.description,
+  "Find markets by search, or discover markets that fit your criteria",
+);
+assert.equal(
+  endpoints
+    .filter((endpoint) => endpoint.id !== "getMarkets")
+    .some((endpoint) => /discover|clob|single sheet/i.test(endpoint.description)),
+  false,
+);
 assert.equal(endpoints.find((endpoint) => endpoint.id === "getTradesByMarket")?.category, "markets");
+assert.equal(endpoints.find((endpoint) => endpoint.id === "getTokenPriceHistory")?.title, "Token Price History");
+assert.equal(
+  endpoints.find((endpoint) => endpoint.id === "getTokenPriceHistory")?.description,
+  "The price of one outcome over time, and how wide each point is.",
+);
+assert.equal(
+  ids.indexOf("getTokenPriceHistory"),
+  ids.indexOf("getBatchPricesHistory") + 1,
+);
 assert.equal(
   ids.indexOf("getTradesByMarket"),
-  ids.indexOf("getBatchPricesHistory") + 1,
+  ids.indexOf("getTokenPriceHistory") + 1,
 );
 
 assert.equal(polymarketLiveBuildRequirement("getEvents"), null);
@@ -94,6 +144,32 @@ assert.equal(
   POLYMARKET_CLOSED_ORDERBOOK_MESSAGE,
   "Market is closed so no live orderbook snapshot is available.",
 );
+for (const id of [
+  "getOrderbooks",
+  "getMarketPrices",
+  "getMidpointPrices",
+  "getSpreads",
+  "getTickSize",
+  "getLastTradePrices",
+  "getBatchPricesHistory",
+  "getTokenPriceHistory",
+  "getTradesByMarket",
+  "getOpenInterestCompose",
+  "getHoldersByMarkets",
+]) {
+  assert.equal(polymarketMarketFanout(id), true);
+}
+assert.equal(polymarketMarketFanout("getMarkets"), false);
+const rain = { id: "market:1", entityId: "1", title: "Will it rain?", label: "Will it rain?" };
+const shine = { id: "market:2", entityId: "2", title: "Will it shine?", label: "Will it shine?" };
+const splitRows = [
+  { market_id: "1", market_title: "Will it rain?", price: 0.4 },
+  { market_id: "2", market_title: "Will it shine?", price: 0.6 },
+];
+assert.equal(polymarketRowsForMarket(splitRows, rain, [rain, shine]).length, 1);
+assert.equal(polymarketRowsForMarket(splitRows, shine, [rain, shine])[0].price, 0.6);
+assert.equal(polymarketRowsForMarket(splitRows, rain, [rain]).length, 2);
+assert.equal(polymarketRowsForMarket([{ price: 0.2 }, { price: 0.8 }], rain, [rain, shine]).length, 0);
 assert.equal(polymarketPickFromSuggestion({ entity: "tag", title: "Sports" }), null);
 
 const marketColumns = polymarketLiveBuildColumns("getMarkets");
@@ -156,15 +232,49 @@ assert.equal(samplingMarketFiltersActive(samplingOrdered, { question: { contains
 assert.equal(samplingMarketFiltersActive(samplingOrdered, {}), false);
 
 const bookColumns = polymarketQuoteAttributeColumns("getOrderbooks", polymarketLiveBuildColumns("getOrderbooks"));
-assert.deepEqual(bookColumns.slice(0, 3).map((column) => column.id), ["quote_outcome", "book_side", "depth"]);
-assert.equal(bookColumns[2].queryOnly, true);
+assert.deepEqual(bookColumns.slice(0, 2).map((column) => column.id), ["quote_outcome", "book_side"]);
+assert.equal(bookColumns.some((column) => column.id === "depth"), false);
+assert.equal(bookColumns.find((column) => column.id === "book_side")?.queryOnly, true);
+assert.notEqual(bookColumns[2]?.id, "depth");
 assert.equal(bookColumns.find((column) => column.id === "price")?.type, "number");
 assert.equal(polymarketLiveBuildColumns("getOrderbooks").find((column) => column.id === "side")?.defaultOn, true);
-assert.equal(defaultPolymarketQuoteFilters("getOrderbooks").depth.value, "20");
+assert.equal(defaultPolymarketQuoteFilters("getOrderbooks").depth, undefined);
 assert.equal(defaultPolymarketQuoteFilters("getBatchPricesHistory").interval.value, "1d");
 assert.equal(defaultPolymarketQuoteFilters("getTradesByMarket").taker_only.include[0], "true");
-assert.deepEqual(polymarketQuoteAttributeColumns("getTradesByMarket", []).slice(0, 3).map((column) => column.id), ["trade_side", "taker_only", "time_range"]);
+assert.equal(defaultPolymarketQuoteFilters("getTradesByMarket").quote_outcome.value, "both");
+assert.equal(defaultPolymarketQuoteFilters("getTradesByMarket").filter_type.value, "TOKENS");
+assert.deepEqual(
+  polymarketQuoteAttributeColumns("getTradesByMarket", polymarketLiveBuildColumns("getTradesByMarket")).slice(0, 5).map((column) => column.id),
+  ["quote_outcome", "trade_side", "taker_only", "filter_type", "filter_amount"],
+);
+assert.equal(polymarketQuoteAttributeColumns("getTradesByMarket", []).some((column) => column.id === "time_range"), false);
+assert.equal(polymarketLiveBuildColumns("getTradesByMarket").find((column) => column.id === "timestamp")?.type, "text");
+assert.equal(polymarketLiveBuildColumns("getTradesByMarket").find((column) => column.id === "observed_at")?.defaultOn, true);
+assert.deepEqual(polymarketTradeQuery({ trade_side: { value: "BUY" }, taker_only: { include: ["false"] }, filter_type: { value: "CASH" }, filter_amount: { value: "1.5" } }), {
+  side: "BUY",
+  taker_only: "false",
+  filter_type: "CASH",
+  filter_amount: "1.5",
+});
+assert.equal("start" in polymarketTradeQuery({ time_range: { from: "2026-10-01", to: "2026-10-07" } }), false);
 assert.equal(polymarketQuoteAttributeColumns("getOpenInterestCompose", [{ id: "value", type: "string", title: "Value" }])[0].type, "number");
+assert.equal(
+  endpoints.find((endpoint) => endpoint.id === "getOpenInterestCompose")?.description,
+  "The dollar value of shares still held in a market.",
+);
+const oiRows = openInterestRowsFromPayload({
+  data: [
+    { condition_id: "0xabc", value: 0 },
+    { condition_id: "GLOBAL", value: 12.5 },
+  ],
+});
+assert.equal(oiRows[0].market, "0xabc");
+assert.equal(oiRows[0].value, 0);
+assert.equal(oiRows[1].condition_id, "GLOBAL");
+assert.equal(
+  openInterestRowsFromPayload([{ data: [{ condition_id: "0xdef", value: 3 }] }])[0].market,
+  "0xdef",
+);
 const bookDefaults = defaultPolymarketQuoteFilters("getOrderbooks");
 const bookKey = polymarketQuoteRequestKey("getOrderbooks", bookDefaults, "", 500000);
 assert.notEqual(polymarketQuoteRequestKey("getOrderbooks", { ...bookDefaults, book_side: { value: "buy" } }, "", 500000), bookKey);
@@ -172,16 +282,124 @@ assert.equal(polymarketQuoteRequestKey("getOrderbooks", { ...bookDefaults, price
 assert.equal(polymarketQuoteTarget("", 500000, 50, 10000), 50);
 assert.equal(polymarketQuoteTarget("200", 500000, 50, 10000), 200);
 assert.equal(polymarketQuoteTarget("999999", 500, 50, 10000), 500);
-assert.equal(polymarketBookDepth({ depth: { value: "" } }), 100);
-assert.equal(polymarketBookDepth({ depth: { value: "5" } }), 5);
-assert.equal(sliceBookLevels({ bids: [1, 2, 3], asks: [4, 5] }, 2).bids.length, 2);
 assert.deepEqual(polymarketHistoryBody({ interval: { value: "1h" }, fidelity: { value: "60" } }), { interval: "1h", fidelity: 60 });
 assert.equal(polymarketHistoryBody({ interval: { value: "1d" }, time_range: { from: "2026-10-01", to: "2026-10-02" } }).interval, undefined);
+assert.equal(polymarketHistoryBody({ interval: { value: "1w" }, fidelity: { value: "1" } }).fidelity, 5);
+assert.equal(polymarketHistoryBody({ interval: { value: "1m" }, fidelity: { value: "" } }).fidelity, 10);
+assert.equal(polymarketHistoryBody({ interval: { value: "max" }, fidelity: { value: "1" } }).fidelity, 10);
+assert.equal(polymarketHistoryBody({ interval: { value: "1d" }, time_range: { from: "2026-10-01", to: "2026-10-07" }, fidelity: { value: "1" } }).fidelity, 1);
+assert.deepEqual(polymarketHistoryFidelityOptions("1w", false).map((option) => option[0]), ["5", "15", "60", "240", "1440"]);
+assert.equal(polymarketHistoryFidelityOptions("1m", false).some((option) => option[0] === "1" || option[0] === "5"), false);
+assert.equal(polymarketHistoryFidelityOptions("1d", true).some((option) => option[0] === "1"), true);
+assert.equal(polymarketMarketFanout("getTokenPriceHistory"), true);
+assert.equal(polymarketMarketFanout("getTickSize"), true);
+assert.equal(polymarketLiveBuildRequirement("getTickSize")?.kind, "token");
+assert.equal(polymarketLiveBuildColumns("getTickSize").find((column) => column.id === "minimum_tick_size")?.type, "number");
+assert.equal(polymarketQuoteAttributeColumns("getTickSize", polymarketLiveBuildColumns("getTickSize"))[0]?.id, "quote_outcome");
+assert.equal(defaultPolymarketQuoteFilters("getTickSize").quote_outcome.value, "both");
+assert.equal(polymarketLiveBuildRequirement("getTokenPriceHistory")?.kind, "token");
+const tokenColumns = polymarketLiveBuildColumns("getTokenPriceHistory");
+assert.deepEqual(
+  ["timestamp", "price", "resolution_seconds"].every((id) => tokenColumns.some((column) => column.id === id)),
+  true,
+);
+const tokenAttributes = polymarketQuoteAttributeColumns("getTokenPriceHistory", tokenColumns);
+assert.deepEqual(tokenAttributes.slice(0, 5).map((column) => column.id), ["quote_outcome", "interval", "time_range", "bucket_seconds", "as_of"]);
+assert.deepEqual(tokenAttributes.find((column) => column.id === "time_range")?.rangePresetIds, ["past-24h", "past-3d", "past-7d"]);
+assert.equal(polymarketTokenBucketOptions("1w", false, false).some((option) => option[0] === "60"), false);
+assert.equal(polymarketTokenBucketOptions("1m", false, false).some((option) => option[0] === "300"), false);
+assert.equal(polymarketTokenBucketOptions("1d", true, false).some((option) => option[0] === "60"), true);
+assert.deepEqual(polymarketTokenHistoryParams({ interval: { value: "1d" }, bucket_seconds: { value: "60" } }), { interval: "1d", bucket_seconds: "60" });
+assert.equal(polymarketTokenHistoryParams({ interval: { value: "1w" }, bucket_seconds: { value: "60" } }).bucket_seconds, "300");
+assert.equal(polymarketTokenHistoryParams({ as_of: { value: "2026-10-07" }, interval: { value: "1d" }, time_range: { from: "2026-10-01", to: "2026-10-02" } }).interval, undefined);
+assert.equal(polymarketTokenHistoryParams({ as_of: { value: "2026-10-07" } }).as_of > 0, true);
+assert.throws(
+  () => polymarketTokenHistoryParams({ time_range: { from: "2026-01-01", to: "2026-10-07" } }),
+  /15 days/,
+);
 assert.equal(polymarketTradeQuery({ trade_side: { value: "BUY" }, taker_only: { include: ["false"] } }).side, "BUY");
-assert.equal(polymarketTradeQuery({ trade_side: { value: "BUY" }, taker_only: { include: ["false"] } }).takerOnly, "false");
+assert.equal(polymarketTradeQuery({ trade_side: { value: "BUY" }, taker_only: { include: ["false"] } }).taker_only, "false");
 assert.deepEqual(
   polymarketQuoteTokens({ tokenIds: ["yes-token", "no-token"], outcomes: ["Yes", "No"] }, "no").map((pair) => pair.tokenId),
   ["no-token"],
+);
+
+const marketJoins = polymarketJoinChoices("getMarkets");
+const joinIds = [
+  "getOrderbooks",
+  "getMarketPrices",
+  "getMidpointPrices",
+  "getSpreads",
+  "getTickSize",
+  "getLastTradePrices",
+  "getBatchPricesHistory",
+  "getTokenPriceHistory",
+  "getTradesByMarket",
+  "getOpenInterestCompose",
+  "getHoldersByMarkets",
+];
+assert.deepEqual(
+  marketJoins.map((item) => item.id),
+  joinIds,
+);
+assert.equal(marketJoins.some((item) => item.id === "parent-market"), false);
+assert.equal(polymarketJoinChoices("getSamplingMarkets").length, marketJoins.length);
+assert.equal(marketJoins.find((item) => item.id === "getTradesByMarket")?.title, "Trade History");
+assert.equal(marketJoins.find((item) => item.id === "getOrderbooks")?.realtime, true);
+assert.equal(marketJoins.find((item) => item.id === "getTickSize")?.realtime, false);
+const bookJoins = polymarketJoinChoices("getOrderbooks");
+assert.equal(bookJoins[0]?.id, "parent-market");
+assert.equal(bookJoins.some((item) => item.id === "getOrderbooks"), false);
+assert.equal(bookJoins.some((item) => item.id === "getSpreads"), true);
+assert.equal(bookJoins.some((item) => item.id === "getOpenInterestCompose"), true);
+assert.equal(bookJoins.some((item) => item.id === "getHoldersByMarkets"), true);
+const holderJoins = polymarketJoinChoices("getHoldersByMarkets");
+assert.equal(holderJoins[0]?.id, "parent-market");
+assert.equal(holderJoins.some((item) => item.id === "getHoldersByMarkets"), false);
+assert.equal(holderJoins.some((item) => item.id === "getTradesByMarket"), true);
+assert.deepEqual(polymarketJoinChoices("series"), []);
+const holders = endpoints.find((endpoint) => endpoint.id === "getHoldersByMarkets");
+assert.equal(holders?.title, "Top Holders");
+assert.equal(holders?.category, "holders");
+assert.equal(holders?.realtime, false);
+assert.equal(holders?.description, "The largest holders of a market, and how many shares each one holds.");
+const holderColumns = polymarketLiveBuildColumns("getHoldersByMarkets");
+assert.equal(holderColumns.find((column) => column.id === "amount")?.type, "number");
+assert.equal(holderColumns.find((column) => column.id === "total_pnl")?.type, "number");
+assert.equal(holderColumns.find((column) => column.id === "verified")?.type, "boolean");
+const holderAttrs = polymarketQuoteAttributeColumns("getHoldersByMarkets", holderColumns);
+assert.deepEqual(holderAttrs.slice(0, 3).map((column) => column.id), ["quote_outcome", "min_balance", "include_pnl"]);
+assert.equal(holderAttrs[1]?.queryOnly, true);
+assert.equal(defaultPolymarketQuoteFilters("getHoldersByMarkets").quote_outcome.value, "both");
+assert.equal(defaultPolymarketQuoteFilters("getHoldersByMarkets").min_balance.value, "");
+assert.deepEqual(defaultPolymarketQuoteFilters("getHoldersByMarkets").include_pnl.include, ["false"]);
+assert.deepEqual(polymarketHolderQuery({ min_balance: { value: "" }, include_pnl: { include: ["false"] } }), {});
+assert.equal(polymarketHolderQuery({ min_balance: { value: "10" }, include_pnl: { include: ["true"] } }).min_balance, "10");
+assert.equal(polymarketHolderQuery({ min_balance: { value: "10" }, include_pnl: { include: ["true"] } }).include_pnl, "true");
+assert.equal(polymarketHolderLimit({ include_pnl: { include: ["false"] } }, "50", 10000), 50);
+assert.equal(polymarketHolderLimit({ include_pnl: { include: ["true"] } }, "500", 10000), 100);
+assert.equal(polymarketHolderLimit({ include_pnl: { include: ["false"] } }, "5000", 10000), 1000);
+const holderKey = JSON.parse(polymarketQuoteRequestKey("getHoldersByMarkets", { quote_outcome: { value: "yes" }, min_balance: { value: "5" }, include_pnl: { include: ["true"] } }, "20", 10000));
+assert.equal(holderKey.outcome, "yes");
+assert.equal(holderKey.min, "5");
+assert.equal(holderKey.limit, 20);
+const joinedPick = polymarketJoinPickFromRow({
+  id: "5156688",
+  conditionId: "0xabc",
+  question: "Will the price of Bitcoin be above $74,000 on October 7?",
+  slug: "bitcoin-above-74k-on-october-7-2026",
+  clobTokenIds: '["yes-token","no-token"]',
+  outcomes: '["Yes","No"]',
+  closed: "false",
+});
+assert.equal(joinedPick.entityId, "5156688");
+assert.equal(joinedPick.conditionId, "0xabc");
+assert.deepEqual(joinedPick.tokenIds, ["yes-token", "no-token"]);
+assert.equal(joinedPick.closed, false);
+assert.equal(polymarketJoinPickFromRow({ question: "No identity" }), null);
+assert.equal(
+  polymarketJoinPickFromRow({ condition_id: "0xdef", market_slug: "sample-market", question: "Sample", token_ids: "a, b" }).tokenIds.join(","),
+  "a,b",
 );
 
 console.log("polymarket live build ok");

@@ -488,6 +488,204 @@ export function FanoutJoinExplainer({ tableId = "candlesticks" }) {
   );
 }
 
+const POLYMARKET_LIVE_SHEETS = [
+  {
+    title: "Orderbook",
+    rows: [
+      ["Yes", "0.64", "120"],
+      ["No", "0.36", "80"],
+    ],
+  },
+  {
+    title: "Trade History",
+    rows: [
+      ["14:02", "Yes", "0.63"],
+      ["14:01", "No", "0.37"],
+    ],
+  },
+  {
+    title: "Price History",
+    rows: [
+      ["14:00", "0.61"],
+      ["14:01", "0.63"],
+    ],
+  },
+];
+
+const POLYMARKET_LIVE_TABS = ["Orderbook", "Trade History", "Price History", "Spreads", "Top Holders"];
+
+function polymarketFanoutLeaves(title) {
+  const here = String(title || "").toLowerCase();
+  return ["Orderbook", "Spreads", "Open interest", "Price history", "Trade history", "Top holders"].filter((label) => !here.includes(label.toLowerCase()));
+}
+
+/** Tabs that appear while Join is hovered on a Polymarket market pull. */
+export function PolymarketLiveJoinExplainerTabs() {
+  const reduce = useReducedMotion();
+  return (
+    <div className="overflow-hidden px-4 pb-1 pt-4">
+      <div className="flex">
+        <span className={tabClass(false)}>Markets</span>
+        {POLYMARKET_LIVE_TABS.map((title, index) => (
+          <motion.span
+            key={title}
+            initial={reduce ? false : { clipPath: "inset(0 100% 0 0)", opacity: 0 }}
+            animate={{ clipPath: "inset(0 0% 0 0)", opacity: 1 }}
+            transition={{ duration: 0.4, delay: 0.12 * index, ease: "easeOut" }}
+            className={tabClass(index === POLYMARKET_LIVE_TABS.length - 1)}
+          >
+            {title}
+          </motion.span>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+/** A Polymarket market pull fans out to a sheet per source, per market. */
+export function PolymarketLiveJoinExplainer() {
+  const reduce = useReducedMotion();
+  const style = venueStyle("polymarket");
+  return (
+    <div className="relative flex h-full min-h-[280px] items-center justify-center overflow-hidden rounded-xl border border-border/70 bg-background shadow-sm">
+      <FlickeringGrid
+        className="absolute inset-0 [mask-image:radial-gradient(ellipse_at_center,black,transparent_75%)]"
+        squareSize={3}
+        gridGap={5}
+        flickerChance={0.16}
+        color={style.flicker}
+        maxOpacity={0.2}
+      />
+      <div className="relative z-10 flex w-full max-w-2xl flex-col items-center gap-5 px-6 py-8">
+        <p className="max-w-md text-center text-[13px] leading-relaxed text-muted-foreground">
+          Join attaches every market in this pull to its order book, prices, history, trades, spreads, top holders, and the other market sources. Each market keeps its own sheet.
+        </p>
+        <div className="grid w-full grid-cols-[minmax(0,0.8fr)_2.5rem_minmax(0,1.15fr)] items-center gap-x-2 gap-y-2">
+          <div
+            className="row-span-3 rounded-xl border px-3 py-3 shadow-sm backdrop-blur-md"
+            style={{ borderColor: `${style.accent}80`, backgroundColor: `${style.accent}1a`, gridRow: "span 3" }}
+          >
+            <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Markets</p>
+            <p className="mt-1 truncate font-mono text-[11px] text-foreground">MARKET-A</p>
+          </div>
+          {POLYMARKET_LIVE_SHEETS.map((sheet, index) => (
+            <div key={sheet.title} className="contents">
+              <div className="relative h-px overflow-hidden bg-border">
+                <motion.span
+                  className="absolute inset-y-0 left-0"
+                  style={{ backgroundColor: style.accent }}
+                  initial={reduce ? false : { width: "0%" }}
+                  animate={{ width: "100%" }}
+                  transition={{ delay: 0.12 + index * 0.12, duration: 0.4 }}
+                />
+              </div>
+              <motion.div
+                className="relative overflow-hidden rounded-xl border border-border/70 bg-background/90 shadow-sm backdrop-blur-md"
+                initial={reduce ? false : { opacity: 0, x: 12 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ delay: 0.24 + index * 0.12, duration: 0.35 }}
+              >
+                <BorderBeam size={70} duration={8} delay={index * 1.2} borderWidth={1.2} colorFrom={style.accent} colorTo="#0d99ff" />
+                <p className="border-b border-border/60 px-2.5 py-1 text-[11px] font-semibold text-foreground">
+                  {sheet.title} · <span className="font-mono font-medium">MARKET-A</span>
+                </p>
+                <div className="flex flex-col gap-1 p-1.5">
+                  {sheet.rows.map((row) => (
+                    <div
+                      key={row.join("-")}
+                      className="flex items-center justify-between rounded-lg border border-border/60 bg-background px-2 py-1 font-mono text-[10px]"
+                    >
+                      {row.map((cell) => (
+                        <span key={cell} className="text-foreground">
+                          {cell}
+                        </span>
+                      ))}
+                    </div>
+                  ))}
+                </div>
+              </motion.div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/** Tabs that appear while Join is hovered on an order book, trade, or price pull. */
+export function PolymarketFanoutJoinExplainerTabs({ title = "This pull" }) {
+  const reduce = useReducedMotion();
+  const tabs = [title, "Parent market", ...polymarketFanoutLeaves(title).slice(0, 3)];
+  return (
+    <div className="overflow-hidden px-4 pb-1 pt-4">
+      <div className="flex">
+        {tabs.map((label, index) =>
+          index === 0 ? (
+            <span key={label} className={tabClass(false)}>
+              {label}
+            </span>
+          ) : (
+            <motion.span
+              key={label}
+              initial={reduce ? false : { clipPath: "inset(0 100% 0 0)", opacity: 0 }}
+              animate={{ clipPath: "inset(0 0% 0 0)", opacity: 1 }}
+              transition={{ duration: 0.4, delay: 0.1 * index, ease: "easeOut" }}
+              className={tabClass(index === tabs.length - 1)}
+            >
+              {label}
+            </motion.span>
+          ),
+        )}
+      </div>
+    </div>
+  );
+}
+
+/** An order book, trade, or price pull can open the parent market and every other source. */
+export function PolymarketFanoutJoinExplainer({ title = "This pull" }) {
+  const reduce = useReducedMotion();
+  const style = venueStyle("polymarket");
+  const leaves = polymarketFanoutLeaves(title);
+  return (
+    <div className="relative flex h-full min-h-[280px] items-center justify-center overflow-hidden rounded-xl border border-border/70 bg-background shadow-sm">
+      <FlickeringGrid
+        className="absolute inset-0 [mask-image:radial-gradient(ellipse_at_center,black,transparent_75%)]"
+        squareSize={3}
+        gridGap={5}
+        flickerChance={0.16}
+        color={style.flicker}
+        maxOpacity={0.2}
+      />
+      <div className="relative z-10 flex w-full max-w-xl flex-col gap-4 px-6 py-6">
+        <p className="text-center text-[13px] leading-relaxed text-muted-foreground">
+          From {title.toLowerCase()}, join the parent market and the other sources on that market. Each source is its own sheet, and each market stays on its own sheet.
+        </p>
+        <div className="flex flex-col gap-2">
+          <RouteChip label={title} hint="This pull" delay={0.05} accent={style.accent} active />
+          <div className="ml-3 flex flex-col gap-2 border-l border-border/70 pl-3">
+            <RouteChip label="Parent market" hint="The market this pull belongs to" delay={0.18} accent={style.accent} />
+            <div className="flex flex-col gap-1.5">
+              <motion.p
+                className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground"
+                initial={reduce ? false : { opacity: 0 }}
+                animate={{ opacity: 1 }}
+                transition={{ delay: 0.32, duration: 0.3 }}
+              >
+                Also on this market
+              </motion.p>
+              <div className="flex flex-wrap gap-1.5">
+                {leaves.map((label, index) => (
+                  <RouteChip key={label} label={label} delay={0.4 + index * 0.08} accent={style.accent} active />
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 /** Hover illustration for a leaderboard or trader search. */
 export function TraderJoinExplainerTabs({ title = "Leaderboard" }) {
   const reduce = useReducedMotion();

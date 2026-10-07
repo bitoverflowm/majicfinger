@@ -71,6 +71,8 @@ const BOOLEAN_OPTIONS = [
 export function kalshiHistoricalAttributeSpec(column) {
   if (column?.control === "tag-picker") return { kind: "tag-picker" };
   if (column?.control === "query-range") return { kind: "query-range" };
+  if (column?.control === "query-instant") return { kind: "query-instant" };
+  if (column?.control === "query-number") return { kind: "query-number" };
   if (column?.control === "period") return { kind: "period", options: column.enumOptions || [] };
   if (column?.control === "depth") return { kind: "depth" };
   if (column?.control === "updated-after") return { kind: "updated-after" };
@@ -126,7 +128,8 @@ function isActive(spec, filter) {
   if (spec.kind === "number") return String(filter.min || "").trim() !== "" || String(filter.max || "").trim() !== "";
   if (spec.kind === "updated-after") return Number(filter.minUpdatedTs) > 0;
   if (spec.kind === "query-range" || spec.kind === "date") return Boolean(filter.from) || Boolean(filter.to);
-  if (spec.kind === "period" || spec.kind === "depth") return String(filter.value ?? "").trim() !== "";
+  if (spec.kind === "query-instant") return Boolean(String(filter.value || "").trim());
+  if (spec.kind === "period" || spec.kind === "depth" || spec.kind === "query-number") return String(filter.value ?? "").trim() !== "";
   if (spec.kind === "tag-picker") return Array.isArray(filter.selectedTags) && filter.selectedTags.length > 0;
   return textTerms(filter.containsTags, filter.contains).length > 0 || textTerms(filter.excludesTags, filter.excludes).length > 0;
 }
@@ -205,6 +208,8 @@ export function attributeSummary(column, filters) {
   } else if (spec.kind === "updated-after") {
     const seconds = Number(filter.minUpdatedTs);
     if (Number.isFinite(seconds) && seconds > 0) parts.push(format(new Date(seconds * 1000), "LLL dd, y h:mm a"));
+  } else if (spec.kind === "query-instant") {
+    if (filter.value) parts.push(formatAttributeDate(filter.value));
   } else if (spec.kind === "query-range" || spec.kind === "date") {
     const preset = filter.from && filter.to ? activeDateRangePreset(filter.from, filter.to, filter.preset) : null;
     if (filter.from && filter.to) parts.push(preset ? `${preset.short} · ${formatAttributeRange(filter.from, filter.to)}` : formatAttributeRange(filter.from, filter.to));
@@ -213,7 +218,7 @@ export function attributeSummary(column, filters) {
   } else if (spec.kind === "period") {
     const label = spec.options.find((option) => option[0] === String(filter.value))?.[1] || filter.value;
     if (label) parts.push(String(label));
-  } else if (spec.kind === "depth") {
+  } else if (spec.kind === "depth" || spec.kind === "query-number") {
     if (String(filter.value ?? "").trim() !== "") parts.push(String(filter.value));
   } else if (spec.kind === "tag-picker") {
     const labels = (Array.isArray(filter.selectedTags) ? filter.selectedTags : [])
@@ -562,11 +567,14 @@ function ExcludeNullField({ checked, onChange }) {
   );
 }
 
-function DateRangeField({ from, to, presetId, onChange }) {
+function DateRangeField({ from, to, presetId, onChange, presetIds }) {
   const start = dateFromIso(from);
   const end = dateFromIso(to);
   const selected = start || end ? { from: start, to: end } : undefined;
   const preset = activeDateRangePreset(from, to, presetId);
+  const presets = Array.isArray(presetIds) && presetIds.length
+    ? DATE_RANGE_PRESETS.filter((item) => presetIds.includes(item.id))
+    : DATE_RANGE_PRESETS;
   return (
     <Popover>
       <PopoverTrigger asChild>
@@ -586,7 +594,7 @@ function DateRangeField({ from, to, presetId, onChange }) {
       <PopoverContent align="start" className="z-[620] w-auto p-0">
         <div className="flex items-start gap-1 border-b border-border/70 p-2">
           <div className="flex max-w-[32rem] flex-wrap gap-1.5">
-          {DATE_RANGE_PRESETS.map((item) => {
+          {presets.map((item) => {
             const active = preset?.id === item.id;
             return (
               <button
@@ -781,21 +789,65 @@ function AttributeFields({ column, filters, onChange }) {
       />
     );
   }
+  if (spec.kind === "query-instant") {
+    const selected = dateFromIso(filter.value);
+    return (
+      <Popover>
+        <PopoverTrigger asChild>
+          <Button
+            type="button"
+            variant="outline"
+            className={cn(
+              "h-9 w-full justify-start rounded-lg px-2.5 text-left text-[13px] font-normal",
+              !selected && "text-muted-foreground",
+            )}
+          >
+            <CalendarIcon className="size-3.5 shrink-0 opacity-70" />
+            <span className="min-w-0 flex-1 truncate">{selected ? formatAttributeDate(filter.value) : "Pick a moment"}</span>
+          </Button>
+        </PopoverTrigger>
+        <PopoverContent align="start" className="z-[620] w-auto p-0">
+          <Calendar
+            mode="single"
+            selected={selected}
+            defaultMonth={selected}
+            onSelect={(date) => onChange(patchFilter(filters, column, { value: isoFromDate(date) }))}
+          />
+          {selected ? (
+            <div className="border-t border-border/70 p-2">
+              <Button
+                type="button"
+                variant="ghost"
+                className="h-7 w-full text-[11px]"
+                onClick={() => onChange(patchFilter(filters, column, { value: "" }))}
+              >
+                Clear moment
+              </Button>
+            </div>
+          ) : null}
+        </PopoverContent>
+      </Popover>
+    );
+  }
   if (spec.kind === "query-range") {
     return (
       <DateRangeField
         from={filter.from || ""}
         to={filter.to || ""}
         presetId={filter.preset || ""}
+        presetIds={column.rangePresetIds}
         onChange={({ from, to, preset }) => onChange(patchFilter(filters, column, { from, to, preset: preset || "" }))}
       />
     );
   }
   if (spec.kind === "period") {
+    const optionValues = spec.options.map(([value]) => value);
+    const current = String(filter.value ?? "");
+    const selectedValue = optionValues.includes(current) ? current : (optionValues[0] ?? "");
     return (
       <select
         aria-label={column.ariaLabel || column.title || "Period"}
-        value={String(filter.value ?? "")}
+        value={selectedValue}
         onChange={(event) => onChange(patchFilter(filters, column, { value: event.target.value }))}
         className="h-9 w-full rounded-lg border border-border/70 bg-background px-2 text-[13px]"
       >
@@ -815,6 +867,21 @@ function AttributeFields({ column, filters, onChange }) {
         inputMode="numeric"
         placeholder="Depth"
         onChange={(event) => onChange(patchFilter(filters, column, { value: event.target.value.replace(/[^\d]/g, "") }))}
+        className="h-9"
+      />
+    );
+  }
+  if (spec.kind === "query-number") {
+    const label = column.ariaLabel || column.title || "Value";
+    return (
+      <Input
+        aria-label={label}
+        value={filter.value ?? ""}
+        inputMode="decimal"
+        placeholder="0.01"
+        onChange={(event) =>
+          onChange(patchFilter(filters, column, { value: event.target.value.replace(/[^\d.]/g, "").replace(/(\..*)\./g, "$1") }))
+        }
         className="h-9"
       />
     );

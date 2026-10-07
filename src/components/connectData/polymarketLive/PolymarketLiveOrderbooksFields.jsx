@@ -305,7 +305,7 @@ export function PolymarketLiveOrderbooksFields({
         <div className="space-y-4 rounded-xl border border-border/60 bg-muted/10 p-3 text-foreground">
           <p className="text-[11px] leading-snug text-muted-foreground dark:text-slate-400">
             Find markets that match your filters, resolve each market’s CLOB token ids, then pull
-            orderbooks (GET for one market, POST for many).
+            orderbooks. One token uses GET /book. Several tokens use POST /books.
           </p>
 
           {sideFields}

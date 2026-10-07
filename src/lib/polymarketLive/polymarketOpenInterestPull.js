@@ -7,6 +7,7 @@ import {
 import {
   normalizePolymarketOpenInterestComposeState,
   openInterestMarketRefFromSuggestion,
+  openInterestRowsFromPayload,
 } from "@/lib/polymarketLive/openInterestCompose";
 import { resolveHoldersMarketConditionIds } from "@/lib/polymarketLive/polymarketHoldersByMarketsPull";
 
@@ -25,14 +26,17 @@ export function flattenPolymarketOpenInterestPayloadToRows(payload, opts = {}) {
     : [];
   const selectedSet = selected.length ? new Set(selected) : null;
   const metaByCid = opts.marketMetaByConditionId || {};
+  const metaByLower = new Map(
+    Object.entries(metaByCid).map(([key, value]) => [key.toLowerCase(), value]),
+  );
 
   /** @type {Record<string, unknown>[]} */
   const rows = [];
-  for (const item of arr) {
+  for (const item of openInterestRowsFromPayload(arr.length ? arr : payload)) {
     if (!item || typeof item !== "object") continue;
     const rowIn = /** @type {Record<string, unknown>} */ (item);
-    const cid = String(rowIn.market || rowIn.conditionId || "").trim();
-    const meta = cid ? metaByCid[cid] : null;
+    const cid = String(rowIn.condition_id || rowIn.market || rowIn.conditionId || "").trim();
+    const meta = cid ? metaByCid[cid] || metaByLower.get(cid.toLowerCase()) || null : null;
     const row = {
       market: cid || rowIn.market || "",
       value: rowIn.value ?? "",
@@ -92,7 +96,7 @@ export async function fetchPolymarketOpenInterestRows(compose, opts = {}) {
   }
 
   const params = new URLSearchParams({ query: "getOpenInterest" });
-  if (conditionIds.length) params.set("market", conditionIds.join(","));
+  if (conditionIds.length) params.set("condition", conditionIds.join(","));
   const selected = Array.isArray(opts.selectedColumns) ? opts.selectedColumns : [];
   if (selected.length) {
     const fields = new Set(selected);

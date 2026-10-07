@@ -231,10 +231,10 @@ export const ENDPOINTS = [
   {
     query: "getOpenInterest",
     name: "Get open interest",
-    description: "Open interest; optional market condition IDs.",
+    description: "Priced gross open interest in USDC. Pass up to 20 condition ids, or omit them for the global figure.",
     group: "markets",
     params: [
-      { key: "market", label: "Condition ID(s)", required: false, type: "text", hint: "Comma-separated; omit for all" },
+      { key: "market", label: "Condition ID(s)", required: false, type: "text", hint: "Comma-separated condition ids, at most 20. Omit for the global figure." },
     ],
   },
   {

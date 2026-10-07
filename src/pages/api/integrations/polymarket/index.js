@@ -372,10 +372,12 @@ async function fetchJson(url, opts = {}) {
 }
 
 /**
- * CLOB batch token endpoints. The documented GET/query-parameter variants of
- * these routes reject every request with `Invalid payload`; only the POST body
- * form works, so all batch reads go through POST regardless of how the caller
- * reached this proxy.
+ * CLOB batch token endpoints. GET /prices?token_ids&sides and
+ * GET /midpoints?token_ids and GET /last-trades-prices?token_ids still
+ * answer `Invalid payload`, so more than one price, midpoint, or last trade
+ * goes through POST. One price uses GET /price. One midpoint uses
+ * GET /midpoint. One spread uses GET /spread. One last trade uses
+ * GET /last-trade-price.
  */
 const CLOB_BATCH_TOKEN_PATHS = {
   getOrderBooks: "books",
@@ -400,6 +402,93 @@ async function postClobTokenBatch(path, payload) {
     },
     body: JSON.stringify(payload),
   });
+}
+
+/**
+ * One token and one side: GET /price, shaped like the /prices map.
+ * Several pairs: POST /prices. The query-parameter GET stays unused.
+ * @param {{ token_id: string, side?: string }[]} pairs
+ */
+async function fetchMarketPrices(pairs) {
+  const rows = (Array.isArray(pairs) ? pairs : [])
+    .map((row) => ({
+      token_id: String(row?.token_id || "").trim(),
+      side: String(row?.side || "").trim().toUpperCase(),
+    }))
+    .filter((row) => row.token_id);
+  if (rows.length === 1) {
+    const row = rows[0];
+    if (row.side !== "BUY" && row.side !== "SELL") {
+      throw new Error("side must be BUY or SELL");
+    }
+    const body = await fetchJson(
+      `${CLOB_BASE}/price?token_id=${encodeURIComponent(row.token_id)}&side=${encodeURIComponent(row.side)}`,
+    );
+    return { [row.token_id]: { [row.side]: body?.price } };
+  }
+  return postClobTokenBatch(
+    "prices",
+    rows.map((row) => ({ token_id: row.token_id, side: row.side })),
+  );
+}
+
+/**
+ * One token: GET /midpoint, shaped like the /midpoints map.
+ * Several tokens: POST /midpoints. Side is not part of the midpoint.
+ * @param {string[]} tokenIds
+ */
+async function fetchMidpointPrices(tokenIds) {
+  const ids = [...new Set((Array.isArray(tokenIds) ? tokenIds : []).map((id) => String(id || "").trim()).filter(Boolean))];
+  if (ids.length === 1) {
+    const body = await fetchJson(`${CLOB_BASE}/midpoint?token_id=${encodeURIComponent(ids[0])}`);
+    const price = body?.mid ?? body?.mid_price ?? body?.price ?? "";
+    return { [ids[0]]: price };
+  }
+  return postClobTokenBatch(
+    "midpoints",
+    ids.map((token_id) => ({ token_id })),
+  );
+}
+
+/**
+ * One token: GET /spread, shaped like the /spreads map.
+ * Several tokens: POST /spreads. Side is not part of the spread.
+ * @param {string[]} tokenIds
+ */
+async function fetchSpreads(tokenIds) {
+  const ids = [...new Set((Array.isArray(tokenIds) ? tokenIds : []).map((id) => String(id || "").trim()).filter(Boolean))];
+  if (ids.length === 1) {
+    const body = await fetchJson(`${CLOB_BASE}/spread?token_id=${encodeURIComponent(ids[0])}`);
+    return { [ids[0]]: body?.spread ?? "" };
+  }
+  return postClobTokenBatch(
+    "spreads",
+    ids.map((token_id) => ({ token_id })),
+  );
+}
+
+/**
+ * One token: GET /last-trade-price, shaped like the /last-trades-prices array.
+ * Several tokens: POST /last-trades-prices. The query-parameter GET still
+ * returns Invalid payload. At most 500 tokens per call.
+ * @param {string[]} tokenIds
+ */
+async function fetchLastTradePrices(tokenIds) {
+  const ids = [...new Set((Array.isArray(tokenIds) ? tokenIds : []).map((id) => String(id || "").trim()).filter(Boolean))].slice(0, 500);
+  if (ids.length === 1) {
+    const body = await fetchJson(`${CLOB_BASE}/last-trade-price?token_id=${encodeURIComponent(ids[0])}`);
+    return [{ token_id: ids[0], price: body?.price ?? "", side: body?.side ?? "" }];
+  }
+  const rows = [];
+  for (let i = 0; i < ids.length; i += 500) {
+    const chunk = ids.slice(i, i + 500);
+    const body = await postClobTokenBatch(
+      "last-trades-prices",
+      chunk.map((token_id) => ({ token_id })),
+    );
+    if (Array.isArray(body)) rows.push(...body);
+  }
+  return rows;
 }
 
 /** Polymarket prices-history: startTs/endTs are Unix epoch seconds (UTC instant); API types them as number (double). */
@@ -996,6 +1085,30 @@ export default async function handler(req, res) {
         if (interval) payload.interval = interval;
         const fidelity = Number(rawBody.fidelity);
         if (Number.isFinite(fidelity) && fidelity > 0) payload.fidelity = Math.floor(fidelity);
+        const rangeStart = Number(payload.start_ts);
+        const rangeEnd = Number(payload.end_ts);
+        const hasRange = Number.isFinite(rangeStart) && rangeStart > 0 && Number.isFinite(rangeEnd) && rangeEnd > rangeStart;
+        if (hasRange) delete payload.interval;
+        if (hasRange && rangeEnd - rangeStart > PRICES_HISTORY_MAX_CHUNK_SEC) {
+          const history = {};
+          for (const marketId of markets) {
+            const merged = [];
+            for (let cursor = rangeStart; cursor < rangeEnd; ) {
+              const chunkEnd = Math.min(cursor + PRICES_HISTORY_MAX_CHUNK_SEC, rangeEnd);
+              if (chunkEnd <= cursor) break;
+              const part = await fetchPolymarketPricesHistoryRaw(marketId, {
+                startTsStr: String(cursor),
+                endTsStr: String(chunkEnd),
+                interval: "",
+                fidelity: payload.fidelity || "",
+              });
+              merged.push(...part);
+              cursor = chunkEnd;
+            }
+            history[marketId] = dedupeHistoryByT(merged);
+          }
+          return res.status(200).json({ history });
+        }
 
         const data = await fetchJson(`${CLOB_BASE}/batch-prices-history`, {
           method: "POST",
@@ -1061,7 +1174,16 @@ export default async function handler(req, res) {
           message: `A maximum of ${CLOB_BATCH_TOKEN_LIMIT} token IDs may be requested per call`,
         });
       }
-      const data = await postClobTokenBatch(clobPath, payload);
+      const tokenIds = payload.map((row) => row.token_id);
+      const data = query === "getMarketPrices"
+        ? await fetchMarketPrices(payload)
+        : query === "getMidpointPrices"
+          ? await fetchMidpointPrices(tokenIds)
+          : query === "getSpreads"
+            ? await fetchSpreads(tokenIds)
+            : query === "getLastTradePrices"
+              ? await fetchLastTradePrices(tokenIds)
+              : await postClobTokenBatch(clobPath, payload);
       return res.status(200).json(data);
     } catch (e) {
       const msg = e instanceof Error ? e.message : "Request failed";
@@ -1291,8 +1413,8 @@ export default async function handler(req, res) {
         break;
       }
       case "getMarketPrices": {
-        const tokenIds = String(req.query.token_ids || "").trim();
-        const sides = String(req.query.sides || "").trim();
+        const tokenIds = String(req.query.token_ids || req.query.token_id || req.query.tokenId || "").trim();
+        const sides = String(req.query.sides || req.query.side || "").trim();
         if (!tokenIds) {
           return res.status(400).json({
             message: "Missing required parameter: token_ids",
@@ -1320,14 +1442,13 @@ export default async function handler(req, res) {
             message: `A maximum of ${CLOB_BATCH_TOKEN_LIMIT} token IDs may be requested per call`,
           });
         }
-        data = await postClobTokenBatch(
-          "prices",
+        data = await fetchMarketPrices(
           tokenList.map((token_id, i) => ({ token_id, side: sideList[i] })),
         );
         break;
       }
       case "getMidpointPrices": {
-        const tokenIds = String(req.query.token_ids || "").trim();
+        const tokenIds = String(req.query.token_ids || req.query.token_id || req.query.tokenId || "").trim();
         if (!tokenIds) {
           return res.status(400).json({
             message: "Missing required parameter: token_ids",
@@ -1339,14 +1460,45 @@ export default async function handler(req, res) {
             message: `A maximum of ${CLOB_BATCH_TOKEN_LIMIT} token IDs may be requested per call`,
           });
         }
-        data = await postClobTokenBatch(
-          "midpoints",
-          tokenList.map((token_id) => ({ token_id })),
-        );
+        data = await fetchMidpointPrices(tokenList);
+        break;
+      }
+      case "getTickSize": {
+        const tokenId = String(req.query.token_id || req.query.tokenId || "").trim();
+        if (!tokenId) return res.status(400).json({ message: "Missing required parameter: token_id" });
+        try {
+          data = await fetchJson(`${CLOB_BASE}/tick-size?token_id=${encodeURIComponent(tokenId)}`);
+        } catch (err) {
+          const text = err instanceof Error ? err.message : "Tick size request failed";
+          let parsed = null;
+          try {
+            parsed = JSON.parse(text);
+          } catch {
+            parsed = null;
+          }
+          const detail = parsed && typeof parsed.error === "string" ? parsed.error : text;
+          return res.status(400).json({ message: detail });
+        }
+        break;
+      }
+      case "getSpreads": {
+        const tokenIds = String(req.query.token_ids || req.query.token_id || req.query.tokenId || "").trim();
+        if (!tokenIds) {
+          return res.status(400).json({
+            message: "Missing required parameter: token_ids",
+          });
+        }
+        const tokenList = tokenIds.split(",").map((v) => v.trim()).filter(Boolean);
+        if (tokenList.length > CLOB_BATCH_TOKEN_LIMIT) {
+          return res.status(400).json({
+            message: `A maximum of ${CLOB_BATCH_TOKEN_LIMIT} token IDs may be requested per call`,
+          });
+        }
+        data = await fetchSpreads(tokenList);
         break;
       }
       case "getLastTradePrices": {
-        const tokenIds = String(req.query.token_ids || "").trim();
+        const tokenIds = String(req.query.token_ids || req.query.token_id || req.query.tokenId || "").trim();
         if (!tokenIds) {
           return res.status(400).json({
             message: "Missing required parameter: token_ids",
@@ -1358,10 +1510,7 @@ export default async function handler(req, res) {
             message: `A maximum of ${CLOB_BATCH_TOKEN_LIMIT} token IDs may be requested per call`,
           });
         }
-        data = await postClobTokenBatch(
-          "last-trades-prices",
-          tokenList.map((token_id) => ({ token_id })),
-        );
+        data = await fetchLastTradePrices(tokenList);
         break;
       }
       case "getMarket": {
@@ -1717,8 +1866,45 @@ export default async function handler(req, res) {
         break;
       }
       case "getOpenInterest": {
-        const market = req.query.market || "";
-        data = await fetchJson(`${DATA_API_BASE}/oi${market ? `?market=${encodeURIComponent(market)}` : ""}`);
+        const raw = String(
+          req.query.condition || req.query.condition_id || req.query.conditionId || req.query.market || "",
+        ).trim();
+        const ids = [...new Set(raw.split(",").map((part) => part.trim()).filter(Boolean))];
+        const chunks = ids.length ? [] : [[]];
+        for (let i = 0; i < ids.length; i += 20) chunks.push(ids.slice(i, i + 20));
+        const readOpenInterest = async (url) => {
+          try {
+            return await fetchJson(url);
+          } catch (err) {
+            const text = String(err?.message || "");
+            let parsed = null;
+            try {
+              parsed = JSON.parse(text);
+            } catch {
+              parsed = null;
+            }
+            const detail = parsed && typeof parsed === "object" ? parsed.error || parsed.message : "";
+            if (detail) {
+              const parameter = parsed.parameter ? ` (${parsed.parameter})` : "";
+              throw new Error(`${detail}${parameter}`);
+            }
+            throw err;
+          }
+        };
+        const rows = [];
+        for (const chunk of chunks) {
+          const url = chunk.length
+            ? `${DATA_API_BASE}/v2/oi?condition=${encodeURIComponent(chunk.join(","))}`
+            : `${DATA_API_BASE}/v2/oi`;
+          const body = await readOpenInterest(url);
+          const list = Array.isArray(body?.data) ? body.data : [];
+          for (const row of list) {
+            if (!row || typeof row !== "object") continue;
+            const conditionId = String(row.condition_id || row.conditionId || "").trim();
+            rows.push({ condition_id: conditionId, market: conditionId, value: row.value });
+          }
+        }
+        data = rows;
         break;
       }
       case "getLiveVolume": {
@@ -1798,22 +1984,135 @@ export default async function handler(req, res) {
         data = rows;
         break;
       }
+      case "getTokenPriceHistory": {
+        const tokenId = String(req.query.token_id || req.query.tokenId || "").trim();
+        if (!tokenId) return res.status(400).json({ message: "Missing required parameter: token_id" });
+        const asOf = toUnixSeconds(req.query.as_of || req.query.asOf);
+        const start = toUnixSeconds(req.query.start);
+        const end = toUnixSeconds(req.query.end);
+        const interval = String(req.query.interval || "").trim();
+        const bucketRaw = String(req.query.bucket_seconds || req.query.bucketSeconds || "").trim();
+        const wanted = Math.min(10000, Math.max(1, Number(req.query.limit) || 10000));
+        const base = new URLSearchParams();
+        base.set("token_id", tokenId);
+        if (asOf) {
+          base.set("as_of", asOf);
+        } else if (start) {
+          if (end && Number(end) <= Number(start)) {
+            return res.status(400).json({ message: "Invalid time range: end must be after start." });
+          }
+          const windowEnd = end ? Number(end) : Math.floor(Date.now() / 1000);
+          if (windowEnd - Number(start) > 15 * 24 * 3600) {
+            return res.status(400).json({
+              message: "A start and end window can cover at most 15 days. Use the 1 month or max interval for a longer history.",
+            });
+          }
+          base.set("start", start);
+          if (end) base.set("end", end);
+        } else if (interval) {
+          base.set("interval", interval);
+        } else {
+          return res.status(400).json({
+            message: "Choose a date range, an interval, or an as-of moment.",
+          });
+        }
+        if (!asOf && bucketRaw) base.set("bucket_seconds", bucketRaw);
+        const points = [];
+        let cursor = "";
+        for (let page = 0; page < 20 && points.length < wanted; page += 1) {
+          const params = new URLSearchParams(base);
+          params.set("limit", String(Math.min(10000, wanted - points.length)));
+          if (cursor) params.set("cursor", cursor);
+          let body;
+          try {
+            body = await fetchJson(`${DATA_API_BASE}/v2/prices-history?${params.toString()}`);
+          } catch (err) {
+            const text = err instanceof Error ? err.message : "Token price history request failed";
+            let parsed = null;
+            try {
+              parsed = JSON.parse(text);
+            } catch {
+              parsed = null;
+            }
+            const detail = parsed && typeof parsed.error === "string" ? parsed.error : text;
+            return res.status(400).json({ message: detail });
+          }
+          const list = Array.isArray(body?.data) ? body.data : [];
+          points.push(...list);
+          const next = body?.pagination?.next_cursor;
+          if (!next || body?.pagination?.has_more !== true || !list.length) break;
+          cursor = String(next);
+        }
+        data = points.slice(0, wanted);
+        break;
+      }
       case "getTradesByMarket": {
-        const market = req.query.market;
-        if (!market) return res.status(400).json({ message: "Missing required parameter: market (condition ID from List markets)" });
+        const condition = String(req.query.condition || req.query.condition_id || req.query.conditionId || req.query.market || "").trim();
+        if (!condition) return res.status(400).json({ message: "Missing required parameter: condition (condition id from the market)" });
         const tradesParams = new URLSearchParams();
-        tradesParams.set("market", String(market));
-        const limit = req.query.limit;
-        const offset = req.query.offset;
-        const side = req.query.side;
-        const takerOnly = req.query.takerOnly;
-        if (limit !== undefined && limit !== "") tradesParams.set("limit", String(limit));
-        if (offset !== undefined && offset !== "") tradesParams.set("offset", String(offset));
+        tradesParams.set("condition", condition);
+        const limit = Math.min(1000, Math.max(1, Number(req.query.limit) || 50));
+        tradesParams.set("limit", String(limit));
+        const cursor = String(req.query.cursor || "").trim();
+        if (cursor) tradesParams.set("cursor", cursor);
+        const side = String(req.query.side || "").trim().toUpperCase();
         if (side === "BUY" || side === "SELL") tradesParams.set("side", side);
-        if (takerOnly === "true" || takerOnly === "false") tradesParams.set("takerOnly", takerOnly);
-        if (req.query.start != null && String(req.query.start).trim() !== "") tradesParams.set("start", String(req.query.start));
-        if (req.query.end != null && String(req.query.end).trim() !== "") tradesParams.set("end", String(req.query.end));
-        data = await fetchJson(`${DATA_API_BASE}/trades?${tradesParams.toString()}`);
+        const takerOnly = String(req.query.taker_only ?? req.query.takerOnly ?? "").trim();
+        if (takerOnly === "true" || takerOnly === "false") tradesParams.set("taker_only", takerOnly);
+        const filterType = String(req.query.filter_type || req.query.filterType || "").trim().toUpperCase();
+        if (filterType === "CASH" || filterType === "TOKENS") tradesParams.set("filter_type", filterType);
+        const filterAmount = String(req.query.filter_amount ?? req.query.filterAmount ?? "").trim();
+        if (filterAmount !== "" && Number.isFinite(Number(filterAmount)) && Number(filterAmount) >= 0) {
+          tradesParams.set("filter_amount", filterAmount);
+        }
+        let body;
+        try {
+          body = await fetchJson(`${DATA_API_BASE}/v2/trades?${tradesParams.toString()}`);
+        } catch (err) {
+          const text = err instanceof Error ? err.message : "Trade history request failed";
+          let parsed = null;
+          try {
+            parsed = JSON.parse(text);
+          } catch {
+            parsed = null;
+          }
+          const detail = parsed && typeof parsed.error === "string" ? parsed.error : text;
+          return res.status(400).json({ message: detail });
+        }
+        data = body && typeof body === "object" ? body : { data: [], pagination: { next_cursor: null, has_more: false } };
+        break;
+      }
+      case "getHoldersByMarket": {
+        const condition = String(req.query.condition || req.query.condition_id || req.query.conditionId || "").trim();
+        if (!condition) return res.status(400).json({ message: "Missing required parameter: condition (condition id from the market)" });
+        const pnl = String(req.query.include_pnl ?? req.query.includePnl ?? "").trim() === "true";
+        const cap = pnl ? 100 : 1000;
+        const holderParams = new URLSearchParams();
+        holderParams.set("condition", condition);
+        const limit = Math.min(cap, Math.max(1, Number(req.query.limit) || 50));
+        holderParams.set("limit", String(limit));
+        const minBalance = String(req.query.min_balance ?? req.query.minBalance ?? "").trim();
+        if (minBalance !== "" && Number.isFinite(Number(minBalance)) && Number(minBalance) >= 0) {
+          holderParams.set("min_balance", minBalance);
+        }
+        if (pnl) holderParams.set("include_pnl", "true");
+        const cursor = String(req.query.cursor || "").trim();
+        if (cursor) holderParams.set("cursor", cursor);
+        let body;
+        try {
+          body = await fetchJson(`${DATA_API_BASE}/v2/holders?${holderParams.toString()}`);
+        } catch (err) {
+          const text = err instanceof Error ? err.message : "Holders request failed";
+          let parsed = null;
+          try {
+            parsed = JSON.parse(text);
+          } catch {
+            parsed = null;
+          }
+          const detail = parsed && typeof parsed.error === "string" ? parsed.error : text;
+          return res.status(400).json({ message: detail });
+        }
+        data = body && typeof body === "object" ? body : { data: [], pagination: { next_cursor: null, has_more: false } };
         break;
       }
       case "getTradesByUser": {

@@ -59,10 +59,10 @@ test("last trade prices flatten to one row per market", () => {
     condition_id: "0xabc",
     token_id: "yes-token",
     outcome: "Yes",
-    last_trade_price: "0.45",
+    last_trade_price: 0.45,
     last_trade_side: "BUY",
   });
-  assert.equal(rows[1].last_trade_price, "0.52");
+  assert.equal(rows[1].last_trade_price, 0.52);
   assert.equal(rows[1].last_trade_side, "SELL");
 });
 
@@ -134,7 +134,7 @@ test("last trade prices fall back to token order for non Yes/No outcomes", () =>
     bothRows.map((row) => [row.outcome, row.token_id, row.last_trade_price]),
     [
       ["Team Liquid", "liquid-token", ""],
-      ["Aurora", "aurora-token", "0.02"],
+      ["Aurora", "aurora-token", 0.02],
     ],
   );
 });
@@ -154,7 +154,7 @@ test("last trade prices tolerate Gamma json string refs", () => {
   );
   assert.deepEqual(
     rows.map((row) => [row.outcome, row.token_id, row.last_trade_price]),
-    [["No", "no-token", "0.85"]],
+    [["No", "no-token", 0.85]],
   );
 });
 
@@ -165,6 +165,6 @@ test("last trade prices project selected columns", () => {
     ["market_id", "last_trade_price", "last_trade_side"],
   );
   assert.deepEqual(rows, [
-    { market_id: "1", last_trade_price: "0.7", last_trade_side: "BUY" },
+    { market_id: "1", last_trade_price: 0.7, last_trade_side: "BUY" },
   ]);
 });

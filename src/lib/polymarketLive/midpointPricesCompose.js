@@ -1,5 +1,7 @@
 /**
- * Polymarket Live — Midpoint Prices (CLOB POST /midpoints).
+ * Polymarket Live — Midpoint Prices.
+ * One token uses GET /midpoint. Several tokens use POST /midpoints.
+ * GET /midpoints?token_ids still returns Invalid payload.
  * Uses the same market discovery and primary-token convention as Market Price.
  */
 
@@ -55,6 +57,15 @@ export function normalizePolymarketMidpointPricesComposeState(raw) {
 export const midpointPriceRefFromSuggestion = marketPriceRefFromSuggestion;
 export const midpointPriceRefFromListMarketsRow = marketPriceRefFromListMarketsRow;
 
+function midpointPriceNumber(value) {
+  const raw = value && typeof value === "object"
+    ? value.mid ?? value.mid_price ?? value.midpoint ?? value.price
+    : value;
+  if (raw == null || raw === "") return "";
+  const n = Number(raw);
+  return Number.isFinite(n) ? n : raw;
+}
+
 /**
  * @param {unknown} payload
  * @param {PolymarketMidpointPriceMarketRef[]} refs
@@ -81,7 +92,7 @@ export function flattenMidpointPricesRows(payload, refs, selectedColumns) {
       condition_id: String(ref.conditionId || "").trim(),
       token_id: tokenId,
       outcome: String(ref.outcomes?.[0] || "").trim(),
-      midpoint_price: prices[tokenId] ?? "",
+      midpoint_price: midpointPriceNumber(prices[tokenId]),
     };
     if (!selectedSet) return [row];
     /** @type {Record<string, unknown>} */

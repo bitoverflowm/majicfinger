@@ -196,18 +196,23 @@ async function fetchOrderBookGet(tokenId) {
 async function fetchOrderBooksPost(tokenIds) {
   const unique = [...new Set(tokenIds.map((t) => String(t || "").trim()).filter(Boolean))];
   if (!unique.length) return [];
-  const params = new URLSearchParams({ query: "getOrderBooks" });
-  const res = await fetch(`/api/integrations/polymarket?${params.toString()}`, {
-    method: "POST",
-    headers: { Accept: "application/json", "Content-Type": "application/json" },
-    credentials: "same-origin",
-    body: JSON.stringify(unique.map((token_id) => ({ token_id }))),
-  });
-  const data = await res.json().catch(() => ({}));
-  if (!res.ok) {
-    throw new Error(typeof data?.message === "string" ? data.message : "Order books request failed");
+  const books = [];
+  for (let i = 0; i < unique.length; i += 500) {
+    const chunk = unique.slice(i, i + 500);
+    const params = new URLSearchParams({ query: "getOrderBooks" });
+    const res = await fetch(`/api/integrations/polymarket?${params.toString()}`, {
+      method: "POST",
+      headers: { Accept: "application/json", "Content-Type": "application/json" },
+      credentials: "same-origin",
+      body: JSON.stringify(chunk.map((token_id) => ({ token_id }))),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      throw new Error(typeof data?.message === "string" ? data.message : "Order books request failed");
+    }
+    books.push(...asObjectList(data));
   }
-  return asObjectList(data);
+  return books;
 }
 
 /**
@@ -215,20 +220,24 @@ async function fetchOrderBooksPost(tokenIds) {
  * @param {boolean} usePost
  * @returns {Promise<Record<string, unknown>[]>}
  */
-async function fetchBooksForMarket(ref, usePost) {
-  const tokenIds = parseTokenIdList(ref.tokenIds);
-  if (!tokenIds.length) {
-    throw new Error("Market is missing CLOB token ids");
-  }
-  if (!usePost) {
-    /** @type {Record<string, unknown>[]} */
+async function fetchBooksByToken(tokenIds) {
+  const unique = [...new Set(tokenIds.map((tokenId) => String(tokenId || "").trim()).filter(Boolean))];
+  if (unique.length === 1) return [await fetchOrderBookGet(unique[0])];
+  try {
+    return await fetchOrderBooksPost(unique);
+  } catch (error) {
     const books = [];
-    for (const tokenId of tokenIds) {
-      books.push(await fetchOrderBookGet(tokenId));
+    let lastError = error;
+    for (const tokenId of unique) {
+      try {
+        books.push(await fetchOrderBookGet(tokenId));
+      } catch (single) {
+        lastError = single;
+      }
     }
+    if (!books.length) throw lastError;
     return books;
   }
-  return fetchOrderBooksPost(tokenIds);
 }
 
 /**
@@ -296,7 +305,12 @@ export async function fetchPolymarketOrderbooksRows(compose, opts = {}) {
     throw new Error("Select at least one market with CLOB token ids.");
   }
 
-  const usePost = unique.length > 1;
+  const books = await fetchBooksByToken(unique.flatMap((ref) => parseTokenIdList(ref.tokenIds)));
+  const bookByAsset = new Map();
+  for (const book of books) {
+    const assetId = String(book?.asset_id || book?.assetId || "").trim();
+    if (assetId) bookByAsset.set(assetId, book);
+  }
   /** @type {Record<string, unknown>[]} */
   const allRows = [];
   /** @type {Record<string, unknown>[]} */
@@ -332,10 +346,13 @@ export async function fetchPolymarketOrderbooksRows(compose, opts = {}) {
     );
 
     try {
-      const books = await fetchBooksForMarket(ref, usePost);
+      const marketBooks = parseTokenIdList(ref.tokenIds)
+        .map((tokenId) => bookByAsset.get(tokenId))
+        .filter(Boolean);
+      if (!marketBooks.length) throw new Error("No orderbook exists for the requested token id.");
       /** @type {Record<string, unknown>[]} */
       const rows = [];
-      for (const book of books) {
+      for (const book of marketBooks) {
         rows.push(
           ...expandOrderBookSummaryToRows(book, {
             side,

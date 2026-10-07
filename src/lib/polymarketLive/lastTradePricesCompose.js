@@ -1,5 +1,8 @@
 /**
- * Polymarket Live — Last Trade Prices (CLOB POST /last-trades-prices).
+ * Polymarket Live — Last Trade Prices.
+ * One token uses GET /last-trade-price. Several tokens use POST /last-trades-prices.
+ * GET /last-trades-prices?token_ids still returns Invalid payload.
+ * A token with no trades comes back as price "0.5" and a blank side.
  * Uses the same market discovery as Market Price, with a request-wide
  * Yes / No / both outcome selection.
  */
@@ -30,7 +33,7 @@ export const POLYMARKET_LAST_TRADE_PRICES_COLUMNS = [
   { name: "token_id", type: "string", description: "Selected CLOB outcome token id" },
   { name: "outcome", type: "string", description: "Selected outcome label (Yes or No)" },
   { name: "last_trade_price", type: "number", description: "Most recent trade price" },
-  { name: "last_trade_side", type: "string", description: "Most recent trade side (BUY or SELL)" },
+  { name: "last_trade_side", type: "string", description: "BUY, SELL, or blank when the token has no trades" },
 ];
 
 export const POLYMARKET_LAST_TRADE_PRICES_DEFAULT_COLUMNS = [
@@ -107,6 +110,12 @@ export function selectLastTradePriceOutcomeTokens(refs, outcomeSelection = "yes"
   return pairs;
 }
 
+function lastTradePriceNumber(value) {
+  if (value == null || value === "") return "";
+  const n = Number(value);
+  return Number.isFinite(n) ? n : value;
+}
+
 /**
  * @param {unknown} payload
  * @param {PolymarketLastTradePriceMarketRef[]} refs
@@ -144,8 +153,8 @@ export function flattenLastTradePricesRows(
         condition_id: String(ref.conditionId || "").trim(),
         token_id: tokenId,
         outcome,
-        last_trade_price: trade.price ?? "",
-        last_trade_side: trade.side ?? "",
+        last_trade_price: lastTradePriceNumber(trade.price),
+        last_trade_side: trade.side == null ? "" : String(trade.side),
       };
       if (!selectedSet) return row;
       /** @type {Record<string, unknown>} */

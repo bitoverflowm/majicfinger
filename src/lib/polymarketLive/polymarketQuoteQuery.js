@@ -1,6 +1,7 @@
 /**
  * Query controls for Polymarket market pulls that start from a picked market.
- * Outcome, side, depth, interval, and the trade window are the request.
+ * Outcome, side, interval, and the trade window are the request.
+ * Orderbook depth is not an API parameter. The book comes back whole.
  * They sit above the response columns and are not columns on the sheet.
  */
 
@@ -11,11 +12,20 @@ export const POLYMARKET_QUOTE_TABLES = [
   "getMarketPrices",
   "getMidpointPrices",
   "getSpreads",
+  "getTickSize",
   "getLastTradePrices",
   "getBatchPricesHistory",
+  "getTokenPriceHistory",
   "getTradesByMarket",
   "getOpenInterestCompose",
+  "getHoldersByMarkets",
 ];
+
+/** CLOB and Data API both reject an explicit window longer than this. */
+export const POLYMARKET_PRICES_HISTORY_MAX_SPAN_SEC = 15 * 24 * 3600;
+
+/** Presets whose window fits inside the 15-day start/end cap. */
+export const POLYMARKET_TOKEN_HISTORY_PRESET_IDS = ["past-24h", "past-3d", "past-7d"];
 
 const OUTCOME_OPTIONS = [
   ["both", "Yes and No"],
@@ -69,12 +79,26 @@ const COLUMN_TYPES = {
   last_trade_price: "number",
   p: "number",
   t: "number",
+  price: "number",
+  resolution_seconds: "number",
   value: "number",
   outcomeIndex: "number",
   min_order_size: "number",
   tick_size: "number",
+  minimum_tick_size: "number",
   neg_risk: "boolean",
   timestamp: "date",
+  amount: "number",
+  outcome_index: "number",
+  display_username_public: "boolean",
+  verified: "boolean",
+  avg_price: "number",
+  entry_cost_usdc: "number",
+  current_price: "number",
+  current_value: "number",
+  realized_pnl: "number",
+  unrealized_pnl: "number",
+  total_pnl: "number",
 };
 
 const DEFAULT_COLUMNS = {
@@ -82,10 +106,13 @@ const DEFAULT_COLUMNS = {
   getMarketPrices: ["market_title", "outcome", "buy_price", "sell_price", "token_id", "market_slug"],
   getMidpointPrices: ["market_title", "outcome", "midpoint_price", "token_id", "condition_id", "market_slug"],
   getSpreads: ["market_title", "outcome", "spread", "token_id", "condition_id", "market_slug"],
+  getTickSize: ["market_title", "outcome", "minimum_tick_size", "token_id", "condition_id", "market_slug"],
   getLastTradePrices: ["market_title", "outcome", "last_trade_price", "last_trade_side", "token_id", "market_slug"],
   getBatchPricesHistory: ["market_title", "outcome", "timestamp", "p", "t", "token_id"],
-  getTradesByMarket: ["timestamp", "outcome", "side", "price", "size", "title"],
+  getTokenPriceHistory: ["market_title", "outcome", "observed_at", "price", "resolution_seconds", "timestamp"],
+  getTradesByMarket: ["observed_at", "outcome", "side", "price", "size", "title"],
   getOpenInterestCompose: ["market_title", "value", "market", "market_slug"],
+  getHoldersByMarkets: ["market_title", "outcome", "name", "amount", "proxy_wallet", "pseudonym"],
 };
 
 /**
@@ -124,7 +151,46 @@ function outcomeControl(description) {
   };
 }
 
-function historyControls() {
+/**
+ * Smallest fidelity, in minutes, that this interval actually serves.
+ * 1 week rejects anything under 5. 1 month rejects anything under 10.
+ * All and max accept a finer value and then serve 10 minutes anyway.
+ * A start/end window accepts 1 minute through the 15-day cap.
+ * @param {unknown} interval
+ * @param {boolean} hasRange
+ */
+export function polymarketHistoryFidelityFloor(interval, hasRange) {
+  if (hasRange) return 1;
+  const value = String(interval || "").trim().toLowerCase();
+  if (value === "1w") return 5;
+  if (value === "1m" || value === "all" || value === "max") return 10;
+  return 1;
+}
+
+/**
+ * @param {unknown} interval
+ * @param {boolean} hasRange
+ */
+export function polymarketHistoryFidelityOptions(interval, hasRange) {
+  const floor = polymarketHistoryFidelityFloor(interval, hasRange);
+  return FIDELITY_OPTIONS.filter((option) => {
+    if (!option[0]) return floor <= 1;
+    return Number(option[0]) >= floor;
+  });
+}
+
+/**
+ * @param {Record<string, any>} [filters]
+ */
+function historyHasRange(filters) {
+  return Boolean(filters?.time_range?.from && filters?.time_range?.to);
+}
+
+/**
+ * @param {Record<string, any>} [filters]
+ */
+function historyControls(filters) {
+  const interval = String(filters?.interval?.value || "1d");
   return [
     outcomeControl("Yes, No, or both outcome tokens."),
     {
@@ -135,7 +201,7 @@ function historyControls() {
       control: "period",
       ariaLabel: "Interval",
       enumOptions: INTERVAL_OPTIONS,
-      description: "History window. A date range replaces this.",
+      description: "The window when no date range is set.",
     },
     {
       id: "time_range",
@@ -143,7 +209,7 @@ function historyControls() {
       type: "date",
       queryOnly: true,
       control: "query-range",
-      description: "Start and end. When both are set, they replace the interval.",
+      description: "Start and end, with the shortcuts. A range replaces the interval. Longer than 15 days is read in 15-day pieces.",
     },
     {
       id: "fidelity",
@@ -152,14 +218,195 @@ function historyControls() {
       queryOnly: true,
       control: "period",
       ariaLabel: "Fidelity",
-      enumOptions: FIDELITY_OPTIONS,
-      description: "Bucket size. Default follows the interval.",
+      enumOptions: polymarketHistoryFidelityOptions(interval, historyHasRange(filters)),
+      description: "Minutes between prices. 1 week needs at least 5. 1 month, all, and max need at least 10.",
+    },
+  ];
+}
+
+/**
+ * Smallest bucket, in seconds, that this token-history window accepts.
+ * A start/end window accepts 1 minute. 1 week floors at 5 minutes.
+ * 1 month, all, and max floor at 10 minutes.
+ * @param {unknown} interval
+ * @param {boolean} hasRange
+ */
+export function polymarketTokenBucketFloor(interval, hasRange) {
+  if (hasRange) return 60;
+  const value = String(interval || "").trim().toLowerCase();
+  if (value === "1w") return 300;
+  if (value === "1m" || value === "all" || value === "max") return 600;
+  return 60;
+}
+
+const TOKEN_BUCKET_OPTIONS = [
+  ["", "Default"],
+  ["60", "1 minute"],
+  ["300", "5 minutes"],
+  ["600", "10 minutes"],
+  ["1800", "30 minutes"],
+  ["10800", "3 hours"],
+  ["43200", "12 hours"],
+  ["86400", "1 day"],
+];
+
+/**
+ * @param {unknown} interval
+ * @param {boolean} hasRange
+ * @param {boolean} hasAsOf
+ */
+export function polymarketTokenBucketOptions(interval, hasRange, hasAsOf) {
+  if (hasAsOf) return [["", "Default"]];
+  const floor = polymarketTokenBucketFloor(interval, hasRange);
+  return TOKEN_BUCKET_OPTIONS.filter((option) => !option[0] || Number(option[0]) >= floor);
+}
+
+/**
+ * @param {Record<string, any>} [filters]
+ */
+function tokenHistoryControls(filters) {
+  const interval = String(filters?.interval?.value || "1d");
+  const hasRange = historyHasRange(filters);
+  const hasAsOf = Boolean(String(filters?.as_of?.value || "").trim());
+  return [
+    outcomeControl("Yes, No, or both outcome tokens."),
+    {
+      id: "interval",
+      title: "Interval",
+      type: "text",
+      queryOnly: true,
+      control: "period",
+      ariaLabel: "Interval",
+      enumOptions: INTERVAL_OPTIONS,
+      description: "The window when no date range is set. 1 month and max cover more than 15 days.",
+    },
+    {
+      id: "time_range",
+      title: "Date range",
+      type: "date",
+      queryOnly: true,
+      control: "query-range",
+      rangePresetIds: POLYMARKET_TOKEN_HISTORY_PRESET_IDS,
+      description: "Start and end, at most 15 days, with the shortcuts. A range replaces the interval.",
+    },
+    {
+      id: "bucket_seconds",
+      title: "Bucket",
+      type: "text",
+      queryOnly: true,
+      control: "period",
+      ariaLabel: "Bucket",
+      enumOptions: polymarketTokenBucketOptions(interval, hasRange, hasAsOf),
+      description: "Seconds in each point. The default follows the window. 1 week needs at least 5 minutes. 1 month, all, and max need at least 10 minutes.",
+    },
+    {
+      id: "as_of",
+      title: "As of",
+      type: "date",
+      queryOnly: true,
+      control: "query-instant",
+      description: "The latest price at or before this moment. This replaces the date range and the interval.",
+    },
+  ];
+}
+
+export const TOKEN_PRICE_HISTORY_COLUMNS = [
+  { name: "market_id", type: "string", description: "Gamma market id" },
+  { name: "market_title", type: "string", description: "Market question / title" },
+  { name: "market_slug", type: "string", description: "Market slug" },
+  { name: "condition_id", type: "string", description: "Market condition id" },
+  { name: "token_id", type: "string", description: "CLOB outcome token / asset id" },
+  { name: "outcome", type: "string", description: "Selected outcome label" },
+  { name: "observed_at", type: "string", description: "When this price was observed, in UTC" },
+  { name: "price", type: "number", description: "Price from 0 to 1" },
+  { name: "resolution_seconds", type: "number", description: "Width of the window this price was observed in. 0 is an exact tick." },
+  { name: "timestamp", type: "string", description: "That same observation time, in epoch seconds" },
+];
+
+export const TICK_SIZE_COLUMNS = [
+  { name: "market_id", type: "string", description: "Market id" },
+  { name: "market_title", type: "string", description: "Market question" },
+  { name: "market_slug", type: "string", description: "Market slug" },
+  { name: "condition_id", type: "string", description: "Market condition id" },
+  { name: "token_id", type: "string", description: "CLOB outcome token" },
+  { name: "outcome", type: "string", description: "Selected outcome label" },
+  { name: "minimum_tick_size", type: "number", description: "Smallest price step for this outcome" },
+];
+
+export const TRADE_COLUMNS = [
+  { name: "market_id", type: "string", description: "Market id" },
+  { name: "market_title", type: "string", description: "Market question" },
+  { name: "market_slug", type: "string", description: "Market slug" },
+  { name: "title", type: "string", description: "Market question on the trade" },
+  { name: "slug", type: "string", description: "Market slug on the trade" },
+  { name: "event_slug", type: "string", description: "Parent event slug" },
+  { name: "condition_id", type: "string", description: "Market condition id" },
+  { name: "token_id", type: "string", description: "CLOB outcome token that traded" },
+  { name: "outcome", type: "string", description: "Outcome that traded" },
+  { name: "outcome_index", type: "number", description: "Index of that outcome. 999 means it could not be labeled." },
+  { name: "side", type: "string", description: "BUY or SELL, from the wallet that filled" },
+  { name: "price", type: "number", description: "Execution price per share" },
+  { name: "size", type: "number", description: "Filled quantity in shares" },
+  { name: "observed_at", type: "string", description: "When the trade settled, in UTC" },
+  { name: "timestamp", type: "string", description: "That same settlement time, in epoch seconds" },
+  { name: "proxy_wallet", type: "string", description: "Wallet that filled the trade" },
+  { name: "name", type: "string", description: "Display name of that wallet" },
+  { name: "pseudonym", type: "string", description: "Generated handle when the wallet has no display name" },
+  { name: "transaction_hash", type: "string", description: "Hash of the settling transaction" },
+];
+
+export const HOLDER_COLUMNS = [
+  { name: "market_title", type: "string", description: "Market question" },
+  { name: "outcome", type: "string", description: "Outcome this holder is in" },
+  { name: "name", type: "string", description: "Display name of that wallet" },
+  { name: "amount", type: "number", description: "Shares held. With profit on, this is the size of that side." },
+  { name: "proxy_wallet", type: "string", description: "Wallet that holds the position" },
+  { name: "pseudonym", type: "string", description: "Generated handle when the wallet has no display name" },
+  { name: "market_id", type: "string", description: "Market id" },
+  { name: "market_slug", type: "string", description: "Market slug" },
+  { name: "condition_id", type: "string", description: "Market condition id" },
+  { name: "token_id", type: "string", description: "Outcome token this position is in" },
+  { name: "outcome_index", type: "number", description: "Index of that outcome. 999 means it could not be labeled." },
+  { name: "bio", type: "string", description: "Profile bio" },
+  { name: "display_username_public", type: "boolean", description: "Whether the display name is public" },
+  { name: "profile_image", type: "string", description: "Profile image URL" },
+  { name: "profile_image_optimized", type: "string", description: "Optimized profile image. This endpoint leaves it empty." },
+  { name: "verified", type: "boolean", description: "Whether the profile is verified" },
+  { name: "avg_price", type: "number", description: "Average entry price. Present when profit is included." },
+  { name: "entry_cost_usdc", type: "number", description: "Cost of the position in USDC. Present when profit is included." },
+  { name: "current_price", type: "number", description: "Current price of the outcome. Present when profit is included." },
+  { name: "current_value", type: "number", description: "Current value of the position. Present when profit is included." },
+  { name: "realized_pnl", type: "number", description: "Profit already taken. Present when profit is included." },
+  { name: "unrealized_pnl", type: "number", description: "Profit still in the position. Present when profit is included." },
+  { name: "total_pnl", type: "number", description: "Realized plus unrealized profit. Present when profit is included." },
+];
+
+function holderControls() {
+  return [
+    outcomeControl("Yes, No, or both outcomes."),
+    {
+      id: "min_balance",
+      title: "Minimum balance",
+      type: "number",
+      queryOnly: true,
+      control: "query-number",
+      ariaLabel: "Minimum balance",
+      description: "Smallest position to include, in shares. Blank uses 0.",
+    },
+    {
+      id: "include_pnl",
+      title: "Include profit",
+      type: "boolean",
+      queryOnly: true,
+      enumOptions: YES_NO,
+      description: "Adds average price, entry cost, current value, and profit. At most 100 holders per outcome.",
     },
   ];
 }
 
 function tradeControls() {
   return [
+    outcomeControl("Yes, No, or both outcomes."),
     {
       id: "trade_side",
       title: "Side",
@@ -176,15 +423,29 @@ function tradeControls() {
       type: "boolean",
       queryOnly: true,
       enumOptions: YES_NO,
-      description: "Trades that take liquidity.",
+      description: "Each fill once, on the side that took liquidity.",
     },
     {
-      id: "time_range",
-      title: "Date range",
-      type: "date",
+      id: "filter_type",
+      title: "Size unit",
+      type: "text",
       queryOnly: true,
-      control: "query-range",
-      description: "Start and end of executed trades.",
+      control: "period",
+      ariaLabel: "Trade size unit",
+      enumOptions: [
+        ["TOKENS", "Shares"],
+        ["CASH", "Cash"],
+      ],
+      description: "Whether the minimum size is counted in shares or in cash.",
+    },
+    {
+      id: "filter_amount",
+      title: "Minimum size",
+      type: "number",
+      queryOnly: true,
+      control: "query-number",
+      ariaLabel: "Minimum trade size",
+      description: "Smallest trade to include. Blank uses 0.01.",
     },
   ];
 }
@@ -193,13 +454,14 @@ function tradeControls() {
  * @param {string} tableId
  * @param {Array<Record<string, unknown>>} columns
  */
-export function polymarketQuoteAttributeColumns(tableId, columns) {
+export function polymarketQuoteAttributeColumns(tableId, columns, filters) {
   if (!isPolymarketQuoteTable(tableId)) return columns || [];
   const shaped = (columns || []).map((column) => {
-    const type = polymarketQuoteColumnType(column.id) || column.type;
+    const mapped = polymarketQuoteColumnType(column.id);
+    const type = column.type === "text" ? "text" : mapped || column.type;
     const next = { ...column, type };
     if (column.id === "side" || column.id === "last_trade_side") next.enumOptions = SIDE_ENUM;
-    if (column.id === "timestamp") next.dateEpoch = "unix";
+    if (column.id === "timestamp" && type !== "text") next.dateEpoch = "unix";
     return next;
   });
   if (tableId === "getOrderbooks") {
@@ -219,22 +481,16 @@ export function polymarketQuoteAttributeColumns(tableId, columns) {
         ],
         description: "Bid levels, ask levels, or both.",
       },
-      {
-        id: "depth",
-        title: "Depth",
-        type: "number",
-        queryOnly: true,
-        control: "depth",
-        description: "Price levels on each side. Blank keeps 100.",
-      },
       ...shaped,
     ];
   }
-  if (tableId === "getMarketPrices" || tableId === "getMidpointPrices" || tableId === "getSpreads" || tableId === "getLastTradePrices") {
+  if (tableId === "getMarketPrices" || tableId === "getMidpointPrices" || tableId === "getSpreads" || tableId === "getTickSize" || tableId === "getLastTradePrices") {
     return [outcomeControl("Yes, No, or both outcomes."), ...shaped];
   }
-  if (tableId === "getBatchPricesHistory") return [...historyControls(), ...shaped];
+  if (tableId === "getBatchPricesHistory") return [...historyControls(filters), ...shaped];
+  if (tableId === "getTokenPriceHistory") return [...tokenHistoryControls(filters), ...shaped];
   if (tableId === "getTradesByMarket") return [...tradeControls(), ...shaped];
+  if (tableId === "getHoldersByMarkets") return [...holderControls(), ...shaped];
   return shaped;
 }
 
@@ -246,10 +502,9 @@ export function defaultPolymarketQuoteFilters(tableId) {
     return {
       quote_outcome: { value: "both" },
       book_side: { value: "both" },
-      depth: { value: "20" },
     };
   }
-  if (tableId === "getMarketPrices" || tableId === "getMidpointPrices" || tableId === "getSpreads" || tableId === "getLastTradePrices") {
+  if (tableId === "getMarketPrices" || tableId === "getMidpointPrices" || tableId === "getSpreads" || tableId === "getTickSize" || tableId === "getLastTradePrices") {
     return { quote_outcome: { value: "both" } };
   }
   if (tableId === "getBatchPricesHistory") {
@@ -260,11 +515,29 @@ export function defaultPolymarketQuoteFilters(tableId) {
       time_range: { from: "", to: "", preset: "" },
     };
   }
+  if (tableId === "getTokenPriceHistory") {
+    return {
+      quote_outcome: { value: "yes" },
+      interval: { value: "1d" },
+      bucket_seconds: { value: "" },
+      time_range: { from: "", to: "", preset: "" },
+      as_of: { value: "" },
+    };
+  }
   if (tableId === "getTradesByMarket") {
     return {
+      quote_outcome: { value: "both" },
       trade_side: { value: "" },
       taker_only: { include: ["true"] },
-      time_range: { from: "", to: "", preset: "" },
+      filter_type: { value: "TOKENS" },
+      filter_amount: { value: "" },
+    };
+  }
+  if (tableId === "getHoldersByMarkets") {
+    return {
+      quote_outcome: { value: "both" },
+      min_balance: { value: "" },
+      include_pnl: { include: ["false"] },
     };
   }
   return {};
@@ -297,7 +570,6 @@ export function polymarketQuoteRequestKey(tableId, filters, rowLimit, planLimit)
   const parts = { outcome: String(source.quote_outcome?.value || "") };
   if (tableId === "getOrderbooks") {
     parts.side = String(source.book_side?.value || "");
-    parts.depth = String(source.depth?.value || "");
   }
   if (tableId === "getBatchPricesHistory") {
     parts.interval = String(source.interval?.value || "");
@@ -306,14 +578,60 @@ export function polymarketQuoteRequestKey(tableId, filters, rowLimit, planLimit)
     parts.to = String(source.time_range?.to || "");
     parts.limit = polymarketQuoteTarget(rowLimit, planLimit, 50, 2000);
   }
+  if (tableId === "getTokenPriceHistory") {
+    parts.interval = String(source.interval?.value || "");
+    parts.bucket = String(source.bucket_seconds?.value || "");
+    parts.from = String(source.time_range?.from || "");
+    parts.to = String(source.time_range?.to || "");
+    parts.asOf = String(source.as_of?.value || "");
+    parts.limit = polymarketQuoteTarget(rowLimit, planLimit, 50, 10000);
+  }
   if (tableId === "getTradesByMarket") {
     parts.side = String(source.trade_side?.value || "");
     parts.taker = Array.isArray(source.taker_only?.include) ? source.taker_only.include.join(",") : "";
-    parts.from = String(source.time_range?.from || "");
-    parts.to = String(source.time_range?.to || "");
+    parts.unit = String(source.filter_type?.value || "");
+    parts.min = String(source.filter_amount?.value || "");
     parts.limit = polymarketQuoteTarget(rowLimit, planLimit, 50, 10000);
   }
+  if (tableId === "getHoldersByMarkets") {
+    parts.min = String(source.min_balance?.value || "");
+    parts.pnl = Array.isArray(source.include_pnl?.include) ? source.include_pnl.include.join(",") : "";
+    parts.limit = polymarketHolderLimit(source, rowLimit, planLimit);
+  }
   return JSON.stringify(parts);
+}
+
+/**
+ * Include profit asks for one extra set of columns and caps the page at 100.
+ * @param {Record<string, any>} filters
+ */
+export function polymarketHolderPnl(filters) {
+  const include = Array.isArray(filters?.include_pnl?.include) ? filters.include_pnl.include : [];
+  return include.length === 1 && include[0] === "true";
+}
+
+/**
+ * @param {Record<string, any>} filters
+ * @returns {Record<string, string>}
+ */
+export function polymarketHolderQuery(filters) {
+  const amount = String(filters?.min_balance?.value ?? "").trim();
+  /** @type {Record<string, string>} */
+  const params = {};
+  if (amount !== "" && Number.isFinite(Number(amount)) && Number(amount) >= 0) params.min_balance = amount;
+  if (polymarketHolderPnl(filters)) params.include_pnl = "true";
+  return params;
+}
+
+/**
+ * Holders per outcome token. Profit pages stop at 100. Every other page stops at 1000.
+ * @param {Record<string, any>} filters
+ * @param {unknown} rowLimit
+ * @param {unknown} planLimit
+ */
+export function polymarketHolderLimit(filters, rowLimit, planLimit) {
+  const cap = polymarketHolderPnl(filters) ? 100 : 1000;
+  return polymarketQuoteTarget(rowLimit, planLimit, 50, cap);
 }
 
 /**
@@ -336,33 +654,6 @@ export function polymarketBookSide(filters) {
   return "both";
 }
 
-/**
- * Blank keeps 100 levels on each side. A number is capped at 100.
- * @param {Record<string, any>} filters
- */
-export function polymarketBookDepth(filters) {
-  const raw = String(filters?.depth?.value ?? "").trim();
-  if (!raw) return 100;
-  const depth = Number(raw);
-  if (!Number.isFinite(depth) || depth <= 0) return 100;
-  return Math.min(100, Math.floor(depth));
-}
-
-/**
- * @param {unknown} book
- * @param {number} depth
- */
-export function sliceBookLevels(book, depth) {
-  if (!book || typeof book !== "object") return book;
-  const source = /** @type {Record<string, unknown>} */ (book);
-  const keep = Number.isFinite(depth) && depth > 0 ? depth : 100;
-  return {
-    ...source,
-    bids: Array.isArray(source.bids) ? source.bids.slice(0, keep) : source.bids,
-    asks: Array.isArray(source.asks) ? source.asks.slice(0, keep) : source.asks,
-  };
-}
-
 function dayUnix(iso, edge) {
   const [year, month, day] = String(iso || "").split("-").map(Number);
   if (!year || !month || !day) return null;
@@ -377,18 +668,58 @@ function dayUnix(iso, edge) {
 export function polymarketHistoryBody(filters) {
   const start = dayUnix(filters?.time_range?.from, "start");
   const end = dayUnix(filters?.time_range?.to, "end");
+  const hasRange = Boolean(start && end && end > start);
+  const interval = String(filters?.interval?.value || "1d").trim();
   /** @type {Record<string, string | number>} */
   const body = {};
-  if (start && end && end > start) {
+  if (hasRange) {
     body.start_ts = start;
     body.end_ts = end;
-  } else {
-    const interval = String(filters?.interval?.value || "1d").trim();
-    if (interval) body.interval = interval;
+  } else if (interval) {
+    body.interval = interval;
   }
-  const fidelity = Number(filters?.fidelity?.value);
-  if (Number.isFinite(fidelity) && fidelity > 0) body.fidelity = Math.floor(fidelity);
+  const floor = polymarketHistoryFidelityFloor(hasRange ? "" : interval, hasRange);
+  const asked = Number(filters?.fidelity?.value);
+  const fidelity = Number.isFinite(asked) && asked > 0 ? Math.floor(asked) : 0;
+  const used = fidelity > 0 ? Math.max(fidelity, floor) : floor > 1 ? floor : 0;
+  if (used > 0) body.fidelity = used;
   return body;
+}
+
+/**
+ * One window per request: as_of, or start with an optional end, or interval.
+ * @param {Record<string, any>} filters
+ * @returns {Record<string, string>}
+ */
+export function polymarketTokenHistoryParams(filters) {
+  const asOf = dayUnix(filters?.as_of?.value, "end");
+  const start = dayUnix(filters?.time_range?.from, "start");
+  const end = dayUnix(filters?.time_range?.to, "end");
+  const interval = String(filters?.interval?.value || "1d").trim();
+  /** @type {Record<string, string>} */
+  const params = {};
+  if (asOf) {
+    params.as_of = String(asOf);
+    return params;
+  }
+  const now = Math.floor(Date.now() / 1000);
+  if (start && (!end || end > start)) {
+    const windowEnd = end && end > start ? end : now;
+    if (windowEnd - start > POLYMARKET_PRICES_HISTORY_MAX_SPAN_SEC) {
+      throw new Error("A start and end window can cover at most 15 days. Use the 1 month or max interval for a longer history.");
+    }
+    params.start = String(start);
+    if (end && end > start) params.end = String(end);
+  } else if (interval) {
+    params.interval = interval;
+  }
+  const floor = polymarketTokenBucketFloor(params.interval || "", Boolean(params.start));
+  const asked = Number(filters?.bucket_seconds?.value);
+  if (Number.isFinite(asked) && asked > 0) {
+    const bucket = Math.max(60, Math.min(86400, Math.floor(asked)));
+    params.bucket_seconds = String(Math.max(bucket, floor));
+  }
+  return params;
 }
 
 /**
@@ -397,14 +728,14 @@ export function polymarketHistoryBody(filters) {
 export function polymarketTradeQuery(filters) {
   const side = String(filters?.trade_side?.value || "").trim().toUpperCase();
   const include = Array.isArray(filters?.taker_only?.include) ? filters.taker_only.include : [];
-  const start = dayUnix(filters?.time_range?.from, "start");
-  const end = dayUnix(filters?.time_range?.to, "end");
+  const unit = String(filters?.filter_type?.value || "").trim().toUpperCase();
+  const amount = String(filters?.filter_amount?.value ?? "").trim();
   /** @type {Record<string, string>} */
   const params = {};
   if (side === "BUY" || side === "SELL") params.side = side;
-  if (include.length === 1) params.takerOnly = include[0] === "true" ? "true" : "false";
-  if (start) params.start = String(start);
-  if (end) params.end = String(end);
+  if (include.length === 1) params.taker_only = include[0] === "true" ? "true" : "false";
+  if (unit === "CASH" || unit === "TOKENS") params.filter_type = unit;
+  if (amount !== "" && Number.isFinite(Number(amount)) && Number(amount) >= 0) params.filter_amount = amount;
   return params;
 }
 

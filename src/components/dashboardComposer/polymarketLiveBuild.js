@@ -6,20 +6,27 @@
  */
 import { getPolymarketLiveColumnsForEndpoint, POLYMARKET_LIVE_CONNECT_ENDPOINTS } from "@/config/polymarketLiveConnect";
 import { flattenLastTradePricesRows } from "@/lib/polymarketLive/lastTradePricesCompose";
+import { openInterestRowsFromPayload } from "@/lib/polymarketLive/openInterestCompose";
 import { expandOrderBookSummaryToRows, orderbooksMarketRefFromSuggestion, parseOutcomeList, parseTokenIdList } from "@/lib/polymarketLive/orderbooksCompose";
 import { flattenPolymarketMarket, polymarketMarketExtraColumns } from "@/lib/polymarketLive/polymarketMarketScan";
 import {
+  defaultPolymarketQuoteFilters,
+  HOLDER_COLUMNS,
   isPolymarketQuoteTable,
-  polymarketBookDepth,
   polymarketBookSide,
   polymarketHistoryBody,
+  polymarketHolderLimit,
+  polymarketHolderQuery,
   polymarketQuoteColumnType,
   polymarketQuoteDefaultColumns,
   polymarketQuoteOutcome,
   polymarketQuoteTarget,
   polymarketQuoteTokens,
+  polymarketTokenHistoryParams,
   polymarketTradeQuery,
-  sliceBookLevels,
+  TICK_SIZE_COLUMNS,
+  TOKEN_PRICE_HISTORY_COLUMNS,
+  TRADE_COLUMNS,
 } from "@/lib/polymarketLive/polymarketQuoteQuery";
 import { flattenSamplingMarket, samplingMarketSheetColumns } from "@/lib/polymarketLive/polymarketSamplingScan";
 
@@ -81,8 +88,10 @@ const REQUIREMENTS = {
   getOrderbooks: { kind: "token", prompt: "Market required" },
   getMidpointPrices: { kind: "token", prompt: "Market required" },
   getSpreads: { kind: "token", prompt: "Market required" },
+  getTickSize: { kind: "token", prompt: "Market required" },
   getLastTradePrices: { kind: "token", prompt: "Market required" },
   getBatchPricesHistory: { kind: "token", prompt: "Market required" },
+  getTokenPriceHistory: { kind: "token", prompt: "Market required" },
   getTradesByMarket: { kind: "token", prompt: "Market required" },
   getLiveVolumeForEvent: { kind: "event", prompt: "Event required" },
   getHoldersByMarkets: { kind: "token", prompt: "Market required" },
@@ -113,9 +122,70 @@ const PREFERRED_COLUMNS = [
 ];
 
 const BUILD_COPY = {
+  getSamplingMarkets: {
+    description: "Markets that are open and can be traded right now.",
+  },
+  getOrderbooks: {
+    description: "The buy and sell prices, and the size available at each price.",
+  },
+  getMarketPrices: {
+    description: "The best price to buy and the best price to sell.",
+  },
+  getMidpointPrices: {
+    description: "The price halfway between the best buy and the best sell.",
+  },
+  getLastTradePrices: {
+    description: "The price and side of the most recent trade.",
+  },
+  getBatchPricesHistory: {
+    description: "How a market's price has moved over time.",
+  },
   getTradesByMarket: {
     title: "Trade History",
-    description: "Executed trades for a market, with price, size, side, and time.",
+    description: "Each executed trade, with its price, size, side, and time.",
+  },
+  getOpenInterestCompose: {
+    description: "The dollar value of shares still held in a market.",
+  },
+  getMarketsByEvents: {
+    description: "The markets that belong to an event.",
+  },
+  getEvents: {
+    description: "Events, with their title, volume, and whether they are still open.",
+  },
+  series: {
+    description: "A group of related events, with its title and volume.",
+  },
+  getLiveVolumeForEvent: {
+    description: "How much is trading on an event right now, including each market.",
+  },
+  getHoldersByMarkets: {
+    title: "Top Holders",
+    description: "The largest holders of a market, and how many shares each one holds.",
+  },
+  getPublicProfiles: {
+    description: "A trader's public name and profile.",
+  },
+  getCurrentPositions: {
+    description: "Positions a trader still has open.",
+  },
+  getClosedPositions: {
+    description: "Positions a trader has already closed.",
+  },
+  getUserActivity: {
+    description: "A trader's recent trades and other account activity.",
+  },
+  getHolderPositionValue: {
+    description: "The total value of a trader's open positions.",
+  },
+  getHolderTrades: {
+    description: "Trades a trader has made.",
+  },
+  getHolderTradedMarkets: {
+    description: "How many markets a trader has traded.",
+  },
+  getTraderLeaderboard: {
+    description: "Traders ranked by profit or by trading volume.",
   },
 };
 
@@ -147,11 +217,31 @@ export function polymarketLiveBuildEndpoints() {
       if (group) return group;
       return (REQUIREMENTS[a.id] ? 1 : 0) - (REQUIREMENTS[b.id] ? 1 : 0);
     });
+  const spreadAt = endpoints.findIndex((endpoint) => endpoint.id === "getSpreads");
+  if (spreadAt >= 0 && !endpoints.some((endpoint) => endpoint.id === "getTickSize")) {
+    endpoints.splice(spreadAt + 1, 0, {
+      id: "getTickSize",
+      title: "Tick Size",
+      description: "The smallest price step for an outcome.",
+      category: "markets",
+      realtime: false,
+    });
+  }
   const priceIndex = endpoints.findIndex((endpoint) => endpoint.id === "getBatchPricesHistory");
   const tradeIndex = endpoints.findIndex((endpoint) => endpoint.id === "getTradesByMarket");
   if (priceIndex >= 0 && tradeIndex >= 0 && tradeIndex !== priceIndex + 1) {
     const [trade] = endpoints.splice(tradeIndex, 1);
     endpoints.splice(priceIndex + 1, 0, trade);
+  }
+  const historyAt = endpoints.findIndex((endpoint) => endpoint.id === "getBatchPricesHistory");
+  if (historyAt >= 0 && !endpoints.some((endpoint) => endpoint.id === "getTokenPriceHistory")) {
+    endpoints.splice(historyAt + 1, 0, {
+      id: "getTokenPriceHistory",
+      title: "Token Price History",
+      description: "The price of one outcome over time, and how wide each point is.",
+      category: "markets",
+      realtime: false,
+    });
   }
   return endpoints;
 }
@@ -218,9 +308,86 @@ export function polymarketPickFromSuggestion(suggestion) {
 export const POLYMARKET_CLOSED_ORDERBOOK_MESSAGE =
   "Market is closed so no live orderbook snapshot is available.";
 
-/** Market-scoped pulls. Each selected market becomes its own sheet. */
+/** Price, trade, and other market pulls. Each selected market is its own sheet. */
 export function polymarketMarketFanout(tableId) {
   return isPolymarketQuoteTable(tableId) || tableId === "getHoldersByMarkets";
+}
+
+/** Downstream market sources a pull can join. Order matches the Markets menu. */
+const POLYMARKET_JOIN_IDS = [
+  "getOrderbooks",
+  "getMarketPrices",
+  "getMidpointPrices",
+  "getSpreads",
+  "getTickSize",
+  "getLastTradePrices",
+  "getBatchPricesHistory",
+  "getTokenPriceHistory",
+  "getTradesByMarket",
+  "getOpenInterestCompose",
+  "getHoldersByMarkets",
+];
+
+export const POLYMARKET_PARENT_MARKET_JOIN = {
+  id: "parent-market",
+  title: "Parent market",
+  detail: "The market this pull belongs to.",
+  realtime: false,
+};
+
+let polymarketJoinCache = null;
+
+/** Titles and sentences come from the builder menu so the join list stays in step with it. */
+export function polymarketLiveMarketJoins() {
+  if (polymarketJoinCache) return polymarketJoinCache;
+  const byId = new Map(polymarketLiveBuildEndpoints().map((endpoint) => [endpoint.id, endpoint]));
+  polymarketJoinCache = POLYMARKET_JOIN_IDS.map((id) => {
+    const endpoint = byId.get(id);
+    return {
+      id,
+      title: endpoint?.title || id,
+      detail: endpoint?.description || "",
+      realtime: Boolean(endpoint?.realtime),
+    };
+  });
+  return polymarketJoinCache;
+}
+
+/**
+ * Find markets and sampling markets join every downstream source.
+ * A downstream pull joins the parent market and every other source.
+ * @param {string} tableId
+ */
+export function polymarketJoinChoices(tableId) {
+  const joins = polymarketLiveMarketJoins().filter((item) => item.id !== tableId);
+  if (tableId === "getMarkets" || tableId === "getSamplingMarkets") return joins;
+  if (isPolymarketQuoteTable(tableId)) return [POLYMARKET_PARENT_MARKET_JOIN, ...joins];
+  return [];
+}
+
+/**
+ * A market row from Find markets or sampling, shaped like a search pick.
+ * @param {Record<string, unknown>} row
+ */
+export function polymarketJoinPickFromRow(row) {
+  if (!row || typeof row !== "object") return null;
+  const entityId = String(row.id || row.market_id || "").trim();
+  const conditionId = String(row.conditionId || row.condition_id || "").trim();
+  const slug = String(row.slug || row.market_slug || "").trim();
+  const title = String(row.question || row.market_title || row.title || slug || entityId || conditionId).trim();
+  if (!entityId && !conditionId && !slug) return null;
+  return {
+    id: `market:${entityId || conditionId || slug}`,
+    kind: "market",
+    entityId,
+    slug,
+    title,
+    label: title.slice(0, 80),
+    conditionId,
+    tokenIds: parseTokenIdList(row.clobTokenIds || row.clob_token_ids || row.token_ids || row.tokenIds),
+    outcomes: parseOutcomeList(row.outcomes),
+    closed: row.closed === true || row.closed === "true",
+  };
 }
 
 export function polymarketPickMatchesRow(pick, row) {
@@ -240,10 +407,23 @@ export function polymarketRowsForMarket(rows, pick, picks) {
   const list = Array.isArray(rows) ? rows : [];
   const selected = (Array.isArray(picks) ? picks : []).filter(Boolean);
   if (!pick || selected.length < 2) return list;
-  const matched = list.filter((row) => polymarketPickMatchesRow(pick, row));
-  const anyClaimed = list.some((row) => selected.some((item) => polymarketPickMatchesRow(item, row)));
-  if (!anyClaimed && String(selected[0]?.id || "") === String(pick.id || "")) return list;
-  return matched;
+  return list.filter((row) => polymarketPickMatchesRow(pick, row));
+}
+
+/** Keep each market's own newest rows. A shared cap would blend markets into one sheet. */
+function takePerMarket(rows, limit) {
+  const groups = new Map();
+  const order = [];
+  for (const row of rows) {
+    const key = String(row?.condition_id || row?.market_id || row?.market_slug || "");
+    if (!groups.has(key)) {
+      groups.set(key, []);
+      order.push(key);
+    }
+    const bucket = groups.get(key);
+    if (bucket.length < limit) bucket.push(row);
+  }
+  return order.flatMap((key) => groups.get(key));
 }
 
 function marketIsClosed(value) {
@@ -272,7 +452,26 @@ function columnType(raw) {
   return "text";
 }
 
+function sheetColumns(endpointId, entries) {
+  const defaults = new Set(polymarketQuoteDefaultColumns(endpointId));
+  return entries.map((entry) => {
+    const column = {
+      id: entry.name,
+      title: titleFor(entry.name),
+      type: entry.name === "observed_at" ? "date" : columnType(entry.type),
+      description: entry.description || "",
+      defaultOn: defaults.has(entry.name),
+    };
+    if (entry.name === "observed_at") column.dateEpoch = "iso";
+    return column;
+  });
+}
+
 export function polymarketLiveBuildColumns(endpointId) {
+  if (endpointId === "getTickSize") return sheetColumns(endpointId, TICK_SIZE_COLUMNS);
+  if (endpointId === "getTokenPriceHistory") return sheetColumns(endpointId, TOKEN_PRICE_HISTORY_COLUMNS);
+  if (endpointId === "getTradesByMarket") return sheetColumns(endpointId, TRADE_COLUMNS);
+  if (endpointId === "getHoldersByMarkets") return sheetColumns(endpointId, HOLDER_COLUMNS);
   const meta = getPolymarketLiveColumnsForEndpoint(endpointId);
   const names = meta.map((entry) => entry.name);
   const preferred = PREFERRED_COLUMNS.filter((name) => names.includes(name));
@@ -376,6 +575,40 @@ function objectRows(payload) {
   return [];
 }
 
+function tradePage(payload) {
+  const root = Array.isArray(payload) ? payload[0] : payload;
+  const rows = Array.isArray(root?.data)
+    ? root.data.filter((item) => item && typeof item === "object")
+    : objectRows(payload);
+  const cursor = root?.pagination?.next_cursor ? String(root.pagination.next_cursor) : "";
+  return { rows, cursor };
+}
+
+function tradeSheetRow(row, market) {
+  const seconds = Number(row.timestamp);
+  const index = row.outcome_index ?? row.outcomeIndex;
+  return stampMarket(
+    {
+      title: row.title || "",
+      slug: row.slug || "",
+      event_slug: row.event_slug || row.eventSlug || "",
+      token_id: String(row.token_id || row.asset || ""),
+      outcome: row.outcome || "",
+      outcome_index: index == null || index === "" ? "" : asNum(index),
+      side: row.side || "",
+      price: asNum(row.price),
+      size: asNum(row.size),
+      timestamp: Number.isFinite(seconds) ? String(seconds) : "",
+      observed_at: Number.isFinite(seconds) ? new Date(seconds * 1000).toISOString() : "",
+      proxy_wallet: row.proxy_wallet || row.proxyWallet || "",
+      name: row.name || "",
+      pseudonym: row.pseudonym || "",
+      transaction_hash: row.transaction_hash || row.transactionHash || "",
+    },
+    market,
+  );
+}
+
 async function resolveMarket(pick) {
   if (!pick) return null;
   const closedKnown = pick.closed === true || pick.closed === false;
@@ -415,21 +648,6 @@ function stampMarket(row, market) {
   };
 }
 
-function flattenHolders(payload) {
-  const rows = [];
-  for (const entry of objectRows(payload)) {
-    const holders = Array.isArray(entry.holders) ? entry.holders : [];
-    if (!holders.length) {
-      rows.push(entry);
-      continue;
-    }
-    for (const holder of holders) {
-      if (holder && typeof holder === "object") rows.push({ token: entry.token, ...holder });
-    }
-  }
-  return rows;
-}
-
 function asNum(value) {
   if (value == null || value === "") return "";
   const n = Number(value);
@@ -448,7 +666,7 @@ function asRecord(data) {
 function quoteScalar(value) {
   if (value && typeof value === "object" && !Array.isArray(value)) {
     const row = /** @type {Record<string, unknown>} */ (value);
-    return row.mid ?? row.midpoint ?? row.price ?? row.spread ?? "";
+    return row.mid ?? row.mid_price ?? row.midpoint ?? row.price ?? row.spread ?? "";
   }
   return value ?? "";
 }
@@ -494,19 +712,120 @@ function unwrapBooks(payload) {
   return pages.filter((page) => page && typeof page === "object" && (page.bids || page.asks || page.asset_id));
 }
 
+const ORDER_BOOK_BATCH = 500;
+
+async function loadOrderBookPages(pairs) {
+  if (pairs.length === 1) {
+    try {
+      const payload = await polymarketGet("getOrderBook", { token_id: pairs[0].tokenId });
+      return unwrapBooks(payload);
+    } catch (error) {
+      if (pairs[0].market?.closed === true || isMissingOrderbookError(error)) {
+        throw new Error(
+          pairs[0].market?.closed === true
+            ? POLYMARKET_CLOSED_ORDERBOOK_MESSAGE
+            : "No orderbook exists for the requested token id.",
+        );
+      }
+      throw error;
+    }
+  }
+  const pages = [];
+  for (let i = 0; i < pairs.length; i += ORDER_BOOK_BATCH) {
+    const chunk = pairs.slice(i, i + ORDER_BOOK_BATCH);
+    const payload = await polymarketPost(
+      "getOrderBooks",
+      chunk.map((pair) => ({ token_id: pair.tokenId })),
+    );
+    pages.push(...unwrapBooks(payload));
+  }
+  if (!pages.length) throw new Error("No orderbook exists for the requested token id.");
+  return pages;
+}
+
+function holderGroups(payload) {
+  const body = asRecord(payload);
+  return Array.isArray(body?.data) ? body.data : [];
+}
+
+function holderOutcome(market, tokenId, index) {
+  const ids = Array.isArray(market?.tokenIds) ? market.tokenIds.map(String) : [];
+  const names = Array.isArray(market?.outcomes) ? market.outcomes.map(String) : [];
+  const at = ids.findIndex((id) => id === String(tokenId || ""));
+  if (at >= 0 && names[at]) return names[at];
+  const numeric = Number(index);
+  if (numeric === 0 && names[0]) return names[0];
+  if (numeric === 1 && names[1]) return names[1];
+  return "";
+}
+
+async function holderRows(markets, filters, options) {
+  const selected = markets.filter((market) => market.conditionId);
+  if (!selected.length) throw new Error("This market has no condition id.");
+  const query = polymarketHolderQuery(filters);
+  const limit = polymarketHolderLimit(filters, options.rowLimit, options.planLimit);
+  const outcome = polymarketQuoteOutcome(filters);
+  const rows = [];
+  for (const market of selected) {
+    const payload = await polymarketGet("getHoldersByMarket", {
+      condition: market.conditionId,
+      limit: String(limit),
+      ...query,
+    });
+    const allowed = new Set(polymarketQuoteTokens(marketRef(market), outcome).map((pair) => String(pair.tokenId)));
+    for (const group of holderGroups(payload)) {
+      const tokenId = String(group?.token_id || group?.tokenId || "");
+      if (outcome !== "both" && allowed.size && !allowed.has(tokenId)) continue;
+      const holders = Array.isArray(group?.holders) ? group.holders : [];
+      for (const holder of holders) {
+        if (!holder || typeof holder !== "object") continue;
+        rows.push(
+          stampMarket(
+            {
+              token_id: tokenId,
+              outcome: holderOutcome(market, tokenId, holder.outcome_index),
+              outcome_index: asNum(holder.outcome_index),
+              proxy_wallet: holder.proxy_wallet || "",
+              name: holder.name || "",
+              pseudonym: holder.pseudonym || "",
+              bio: holder.bio || "",
+              amount: asNum(holder.amount),
+              display_username_public: holder.display_username_public === true,
+              profile_image: holder.profile_image || "",
+              profile_image_optimized: holder.profile_image_optimized || "",
+              verified: holder.verified === true,
+              avg_price: asNum(holder.avg_price),
+              entry_cost_usdc: asNum(holder.entry_cost_usdc),
+              current_price: asNum(holder.current_price),
+              current_value: asNum(holder.current_value),
+              realized_pnl: asNum(holder.realized_pnl),
+              unrealized_pnl: asNum(holder.unrealized_pnl),
+              total_pnl: asNum(holder.total_pnl),
+            },
+            market,
+          ),
+        );
+      }
+    }
+  }
+  return rows;
+}
+
 async function quoteRows(endpointId, picks, options = {}) {
   const markets = await quoteMarkets(picks);
   const filters = options.filters || {};
+  if (endpointId === "getHoldersByMarkets") return holderRows(markets, filters, options);
   if (endpointId === "getOpenInterestCompose") {
-    const rows = [];
-    await Promise.all(
-      markets.map(async (market) => {
-        if (!market.conditionId) return;
-        const data = await polymarketGet("getOpenInterest", { market: market.conditionId });
-        for (const row of objectRows(data)) rows.push(stampMarket({ ...row, value: asNum(row.value) }, market));
-      }),
-    );
-    return rows;
+    const selected = markets.filter((market) => market.conditionId);
+    if (!selected.length) throw new Error("This market has no condition id.");
+    const byCondition = new Map(selected.map((market) => [String(market.conditionId).toLowerCase(), market]));
+    const data = await polymarketGet("getOpenInterest", {
+      condition: selected.map((market) => market.conditionId).join(","),
+    });
+    return openInterestRowsFromPayload(data).map((row) => {
+      const market = byCondition.get(String(row.condition_id || "").toLowerCase());
+      return stampMarket({ ...row, value: asNum(row.value) }, market);
+    });
   }
   const bookMarkets =
     endpointId === "getOrderbooks" ? markets.filter((market) => market.closed !== true) : markets;
@@ -517,30 +836,16 @@ async function quoteRows(endpointId, picks, options = {}) {
   if (!pairs.length) throw new Error("This market has no CLOB token id.");
   if (endpointId === "getOrderbooks") {
     const side = polymarketBookSide(filters);
-    const depth = polymarketBookDepth(filters);
-    const books = await Promise.all(
-      pairs.map(async (pair) => {
-        try {
-          const payload = await polymarketGet("getOrderBook", { token_id: pair.tokenId });
-          return unwrapBooks(payload).flatMap((page) =>
-            expandOrderBookSummaryToRows(sliceBookLevels(page, depth), {
-              side,
-              marketMeta: marketRef(pair.market),
-            }),
-          );
-        } catch (error) {
-          if (pair.market?.closed === true || isMissingOrderbookError(error)) {
-            throw new Error(
-              pair.market?.closed === true
-                ? POLYMARKET_CLOSED_ORDERBOOK_MESSAGE
-                : "No orderbook exists for the requested token id.",
-            );
-          }
-          throw error;
-        }
-      }),
-    );
-    return books.flat().map((row) => ({
+    const pages = await loadOrderBookPages(pairs);
+    const byToken = new Map(pairs.map((pair) => [String(pair.tokenId), pair]));
+    return pages.flatMap((page) => {
+      const assetId = String(page?.asset_id || page?.assetId || "").trim();
+      const pair = byToken.get(assetId);
+      return expandOrderBookSummaryToRows(page, {
+        side,
+        marketMeta: marketRef(pair?.market),
+      });
+    }).map((row) => ({
       ...row,
       price: asNum(row.price),
       size: asNum(row.size),
@@ -550,13 +855,21 @@ async function quoteRows(endpointId, picks, options = {}) {
     }));
   }
   if (endpointId === "getMarketPrices") {
-    const data = await polymarketPost(
-      "getMarketPrices",
-      pairs.flatMap((pair) => [
-        { token_id: pair.tokenId, side: "BUY" },
-        { token_id: pair.tokenId, side: "SELL" },
-      ]),
-    );
+    const requests = pairs.flatMap((pair) => [
+      { token_id: pair.tokenId, side: "BUY" },
+      { token_id: pair.tokenId, side: "SELL" },
+    ]);
+    let data;
+    try {
+      data = requests.length === 1
+        ? await polymarketGet("getMarketPrices", requests[0])
+        : await polymarketPost("getMarketPrices", requests);
+    } catch (error) {
+      if (isMissingOrderbookError(error)) {
+        throw new Error("No orderbook exists for the requested token id.");
+      }
+      throw error;
+    }
     const map = asRecord(data) || {};
     return pairs.map((pair) => {
       const prices = map[pair.tokenId] && typeof map[pair.tokenId] === "object" ? map[pair.tokenId] : {};
@@ -566,15 +879,59 @@ async function quoteRows(endpointId, picks, options = {}) {
       });
     });
   }
-  if (endpointId === "getMidpointPrices" || endpointId === "getSpreads") {
-    const query = endpointId === "getMidpointPrices" ? "getMidpointPrices" : "getSpreads";
-    const data = await polymarketPost(query, pairs.map((pair) => ({ token_id: pair.tokenId })));
+  if (endpointId === "getMidpointPrices") {
+    const tokenIds = pairs.map((pair) => pair.tokenId);
+    let data;
+    try {
+      data = tokenIds.length === 1
+        ? await polymarketGet("getMidpointPrices", { token_id: tokenIds[0] })
+        : await polymarketPost("getMidpointPrices", tokenIds.map((token_id) => ({ token_id })));
+    } catch (error) {
+      if (isMissingOrderbookError(error)) {
+        throw new Error("No orderbook exists for the requested token id.");
+      }
+      throw error;
+    }
     const map = asRecord(data) || {};
-    const field = endpointId === "getMidpointPrices" ? "midpoint_price" : "spread";
-    return pairs.map((pair) => stampedQuote(pair, { [field]: asNum(quoteScalar(map[pair.tokenId])) }));
+    return pairs.map((pair) => stampedQuote(pair, { midpoint_price: asNum(quoteScalar(map[pair.tokenId])) }));
+  }
+  if (endpointId === "getSpreads") {
+    const tokenIds = pairs.map((pair) => pair.tokenId);
+    let data;
+    try {
+      data = tokenIds.length === 1
+        ? await polymarketGet("getSpreads", { token_id: tokenIds[0] })
+        : await polymarketPost("getSpreads", tokenIds.map((token_id) => ({ token_id })));
+    } catch (error) {
+      if (isMissingOrderbookError(error)) {
+        throw new Error("No orderbook exists for the requested token id.");
+      }
+      throw error;
+    }
+    const map = asRecord(data) || {};
+    return pairs.map((pair) => stampedQuote(pair, { spread: asNum(quoteScalar(map[pair.tokenId])) }));
+  }
+  if (endpointId === "getTickSize") {
+    const rows = [];
+    for (const pair of pairs) {
+      const data = await polymarketGet("getTickSize", { token_id: pair.tokenId });
+      const record = asRecord(data) || {};
+      rows.push(stampedQuote(pair, { minimum_tick_size: asNum(record.minimum_tick_size) }));
+    }
+    return rows;
   }
   if (endpointId === "getLastTradePrices") {
-    const data = await polymarketPost("getLastTradePrices", pairs.map((pair) => ({ token_id: pair.tokenId })));
+    let data;
+    try {
+      data = pairs.length === 1
+        ? await polymarketGet("getLastTradePrices", { token_id: pairs[0].tokenId })
+        : await polymarketPost("getLastTradePrices", pairs.map((pair) => ({ token_id: pair.tokenId })));
+    } catch (error) {
+      if (isMissingOrderbookError(error)) {
+        throw new Error("No orderbook exists for the requested token id.");
+      }
+      throw error;
+    }
     const payload = Array.isArray(data) ? data : [];
     return flattenLastTradePricesRows(payload, markets.map(marketRef), undefined, polymarketQuoteOutcome(filters)).map((row) => ({
       ...row,
@@ -589,37 +946,67 @@ async function quoteRows(endpointId, picks, options = {}) {
       payloads.push(await polymarketPost("getBatchPricesHistory", { markets: tokens.slice(index, index + 20), ...body }));
     }
     const target = polymarketQuoteTarget(options.rowLimit, options.planLimit, 50, 2000);
-    return historyRows(payloads, pairs).slice(0, target);
+    return takePerMarket(historyRows(payloads, pairs), target);
+  }
+  if (endpointId === "getTokenPriceHistory") {
+    const params = polymarketTokenHistoryParams(filters);
+    const target = polymarketQuoteTarget(options.rowLimit, options.planLimit, 50, 10000);
+    const rows = [];
+    for (const pair of pairs) {
+      const data = await polymarketGet("getTokenPriceHistory", {
+        token_id: pair.tokenId,
+        limit: String(Math.min(10000, target)),
+        ...params,
+      });
+      const points = Array.isArray(data) ? data : [];
+      for (const point of points) {
+        if (!point || typeof point !== "object") continue;
+        const seconds = Number(point.timestamp);
+        rows.push(
+          stampMarket(
+            {
+              token_id: pair.tokenId,
+              outcome: pair.outcome || "",
+              timestamp: Number.isFinite(seconds) ? String(seconds) : "",
+              observed_at: Number.isFinite(seconds) ? new Date(seconds * 1000).toISOString() : "",
+              price: asNum(point.price),
+              resolution_seconds: asNum(point.resolution_seconds),
+            },
+            pair.market,
+          ),
+        );
+      }
+    }
+    rows.sort((a, b) => Number(b.timestamp) - Number(a.timestamp));
+    return takePerMarket(rows, target);
   }
   if (endpointId === "getTradesByMarket") {
     const tradable = markets.filter((market) => market.conditionId);
     if (!tradable.length) throw new Error("This market has no condition id.");
     const params = polymarketTradeQuery(filters);
     const target = polymarketQuoteTarget(options.rowLimit, options.planLimit, 50, 10000);
-    const perMarket = Math.max(1, Math.ceil(target / tradable.length));
+    const tokenIds = new Set(pairs.map((pair) => String(pair.tokenId)));
+    const narrow = polymarketQuoteOutcome(filters) !== "both";
     const collected = [];
     for (const market of tradable) {
-      let offset = 0;
+      let cursor = "";
       let got = 0;
-      while (got < perMarket && offset <= 10000) {
-        const pageSize = Math.min(500, perMarket - got);
+      for (let page = 0; page < 20 && got < target; page += 1) {
         const data = await polymarketGet("getTradesByMarket", {
-          market: market.conditionId,
-          limit: String(pageSize),
-          offset: String(offset),
+          condition: market.conditionId,
+          limit: String(narrow ? 1000 : Math.min(1000, target - got)),
+          ...(cursor ? { cursor } : {}),
           ...params,
         });
-        const page = objectRows(data).map((row) =>
-          stampMarket({ ...row, price: asNum(row.price), size: asNum(row.size), outcomeIndex: asNum(row.outcomeIndex) }, market),
-        );
-        if (!page.length) break;
-        collected.push(...page);
-        got += page.length;
-        if (page.length < pageSize) break;
-        offset += page.length;
+        const unpacked = tradePage(data);
+        const matched = unpacked.rows.filter((row) => tokenIds.has(String(row.token_id || row.asset || "")));
+        collected.push(...matched.map((row) => tradeSheetRow(row, market)));
+        got += matched.length;
+        if (!unpacked.cursor || !unpacked.rows.length) break;
+        cursor = unpacked.cursor;
       }
     }
-    return collected.slice(0, target);
+    return collected;
   }
   return [];
 }
@@ -653,17 +1040,6 @@ function historyRows(payloads, pairs) {
   }
   rows.sort((a, b) => Number(b.t) - Number(a.t));
   return rows;
-}
-
-async function tokenRows(endpointId, pick) {
-  const market = await resolveMarket(pick);
-  const tokens = (market?.tokenIds || []).slice(0, 2);
-  if (!tokens.length) throw new Error("This market has no CLOB token id.");
-  if (endpointId === "getHoldersByMarkets") {
-    const data = await polymarketGet("getTopHolders", { market: market.conditionId, limit: "20" });
-    return flattenHolders(data).map((row) => stampMarket(row, market));
-  }
-  return [];
 }
 
 async function discoveryRows(endpointId) {
@@ -736,11 +1112,6 @@ async function directedRows(endpointId, picks, options = {}) {
     return objectRows(data);
   }
   if (isPolymarketQuoteTable(endpointId)) return quoteRows(endpointId, picks, options);
-  if (endpointId === "getHoldersByMarkets") {
-    const rows = [];
-    for (const item of picks) rows.push(...(await tokenRows(endpointId, item)));
-    return rows;
-  }
   return discoveryRows(endpointId);
 }
 
@@ -758,4 +1129,50 @@ export function loadPolymarketLiveTable(endpointId, picks = [], options = {}) {
     .catch((error) => {
       throw error instanceof Error ? error : new Error("Pull failed");
     });
+}
+
+function shownJoinColumns(columns) {
+  const list = Array.isArray(columns) ? columns : [];
+  const on = list.filter((column) => column.defaultOn);
+  return on.length ? on : list;
+}
+
+/**
+ * One joined sheet for one market. Parent market is the market record.
+ * Every other source uses the same pull as opening that endpoint, with its default filters.
+ * @param {string} endpointId
+ * @param {Record<string, unknown>} pick
+ */
+export async function loadPolymarketLiveJoin(endpointId, pick, options = {}) {
+  if (!pick) throw new Error("Choose a market before joining.");
+  if (endpointId === POLYMARKET_PARENT_MARKET_JOIN.id) {
+    let row = null;
+    if (pick.entityId) {
+      try {
+        row = objectRows(await polymarketGet("getMarket", { id: pick.entityId }))[0] || null;
+      } catch {
+        row = null;
+      }
+    }
+    if (!row && pick.slug) {
+      try {
+        row = objectRows(await polymarketGet("getMarketBySlug", { slug: pick.slug }))[0] || null;
+      } catch {
+        row = null;
+      }
+    }
+    if (!row && pick.conditionId) {
+      row = objectRows(await polymarketGet("listMarkets", { condition_ids: pick.conditionId, limit: "1", closed: "true" }))[0] || null;
+    }
+    if (!row) throw new Error("No market metadata for this market.");
+    const columns = shownJoinColumns(polymarketLiveBuildColumns("getMarkets"));
+    return { columns, rows: projectRows([row], columns, true, 1) };
+  }
+  const limit = Math.max(1, Number(options.rowLimit) || 50);
+  const packed = await loadPolymarketLiveTable(endpointId, [pick], {
+    rowLimit: limit,
+    planLimit: Number(options.planLimit) || limit,
+    filters: defaultPolymarketQuoteFilters(endpointId),
+  });
+  return { columns: shownJoinColumns(packed.columns), rows: packed.rows || [] };
 }
