@@ -51,6 +51,18 @@ import {
   polymarketMatchEstimate,
   scanPolymarketMarkets,
 } from "@/lib/polymarketLive/polymarketMarketScan";
+import {
+  POLYMARKET_SAMPLING_SCAN_CAP,
+  samplingMarketAttributeColumns,
+  samplingMarketFiltersActive,
+  scanSamplingMarkets,
+} from "@/lib/polymarketLive/polymarketSamplingScan";
+import {
+  defaultPolymarketQuoteFilters,
+  isPolymarketQuoteTable,
+  polymarketQuoteAttributeColumns,
+  polymarketQuoteRequestKey,
+} from "@/lib/polymarketLive/polymarketQuoteQuery";
 import { Accordion, AccordionContent, AccordionItem } from "@/components/ui/accordion";
 import * as AccordionPrimitive from "@radix-ui/react-accordion";
 import { Button } from "@/components/ui/button";
@@ -2111,10 +2123,22 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
     () => (polymarketLive && tableId === "getMarkets" ? polymarketMarketAttributeColumns(pull?.columns || []) : []),
     [polymarketLive, tableId, pull?.columns],
   );
+  const polymarketSamplingColumns = useMemo(
+    () => (polymarketLive && tableId === "getSamplingMarkets" ? samplingMarketAttributeColumns(pull?.columns || []) : []),
+    [polymarketLive, tableId, pull?.columns],
+  );
+  const polymarketQuoteColumns = useMemo(
+    () => (polymarketLive && isPolymarketQuoteTable(tableId) ? polymarketQuoteAttributeColumns(tableId, pull?.columns || []) : []),
+    [polymarketLive, tableId, pull?.columns],
+  );
+  const polymarketQuoteKey = polymarketQuoteRequestKey(tableId, attributeFilters, rowLimit, planLimit);
+  const polymarketSamplingLimit = Number(rowLimit);
   const polymarketExplore =
     polymarketLive &&
-    tableId === "getMarkets" &&
-    polymarketMarketFiltersActive(polymarketMarketColumns, attributeFilters);
+    ((tableId === "getMarkets" && polymarketMarketFiltersActive(polymarketMarketColumns, attributeFilters)) ||
+      (tableId === "getSamplingMarkets" &&
+        (samplingMarketFiltersActive(polymarketSamplingColumns, attributeFilters) ||
+          (Number.isFinite(polymarketSamplingLimit) && polymarketSamplingLimit > PREVIEW_ROW_CAP))));
 
   useEffect(() => {
     if (!liveSeriesSearch) return undefined;
@@ -2161,7 +2185,11 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
     setPull(null);
     setVisibleCount(0);
     setFilterValue("");
-    setAttributeFilters(defaultDirectAttributeFilters(tableId));
+    setAttributeFilters(
+      integrationId === "polymarket" && isPolymarketQuoteTable(tableId)
+        ? defaultPolymarketQuoteFilters(tableId)
+        : defaultDirectAttributeFilters(tableId),
+    );
     setSortKeys([]);
     setRowLimit("");
     setLivePicks([]);
@@ -2186,7 +2214,13 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
       tableId === "candlesticks" ||
       tableId === "trades" ||
       tableId === "orderbook";
-    loadBuildPreview(integrationId, tableId, skipIdleSample || (integrationId === "polymarket" && tableId === "getMarkets") ? { fresh: true } : undefined)
+    loadBuildPreview(
+      integrationId,
+      tableId,
+      skipIdleSample || (integrationId === "polymarket" && (tableId === "getMarkets" || tableId === "getSamplingMarkets"))
+        ? { fresh: true }
+        : undefined,
+    )
       .then((result) => {
         if (cancel) return;
         setProgress(100);
@@ -2236,24 +2270,31 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
       return undefined;
     }
     let cancel = false;
-    setPolymarketDirected({ status: "loading", rows: [], error: "" });
-    loadPolymarketLiveTable(tableId, livePicks)
-      .then((result) => {
-        if (cancel) return;
-        setPolymarketDirected({ status: "ready", rows: result.rows || [], error: "" });
+    const timer = window.setTimeout(() => {
+      setPolymarketDirected({ status: "loading", rows: [], error: "" });
+      loadPolymarketLiveTable(tableId, livePicks, {
+        filters: attributeFilters,
+        rowLimit,
+        planLimit,
       })
-      .catch((err) => {
-        if (cancel) return;
-        setPolymarketDirected({
-          status: "error",
-          rows: [],
-          error: err instanceof Error ? err.message : "Pull failed",
+        .then((result) => {
+          if (cancel) return;
+          setPolymarketDirected({ status: "ready", rows: result.rows || [], error: "" });
+        })
+        .catch((err) => {
+          if (cancel) return;
+          setPolymarketDirected({
+            status: "error",
+            rows: [],
+            error: err instanceof Error ? err.message : "Pull failed",
+          });
         });
-      });
+    }, isPolymarketQuoteTable(tableId) ? 280 : 0);
     return () => {
       cancel = true;
+      window.clearTimeout(timer);
     };
-  }, [livePicks, polymarketLive, tableId]);
+  }, [livePicks, polymarketLive, polymarketQuoteKey, tableId]);
 
   useEffect(() => {
     if (!polymarketExplore) {
@@ -2262,14 +2303,17 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
     }
     const ac = new AbortController();
     const timer = window.setTimeout(() => {
+      const samplingTable = tableId === "getSamplingMarkets";
       const requested = Number(rowLimit);
-      const plan = typeof planLimit === "number" && planLimit > 0 ? planLimit : POLYMARKET_MARKET_SCAN_CAP;
+      const scanCap = samplingTable ? POLYMARKET_SAMPLING_SCAN_CAP : POLYMARKET_MARKET_SCAN_CAP;
+      const plan = typeof planLimit === "number" && planLimit > 0 ? planLimit : scanCap;
       const target = Math.min(
-        POLYMARKET_MARKET_SCAN_CAP,
+        scanCap,
         plan,
         Number.isFinite(requested) && requested > 0 ? requested : PREVIEW_ROW_CAP,
       );
-      const columns = polymarketMarketColumns;
+      const columns = samplingTable ? polymarketSamplingColumns : polymarketMarketColumns;
+      const scan = samplingTable ? scanSamplingMarkets : scanPolymarketMarkets;
       const requirements = columns
         .filter((column) => attributeSummary(column, attributeFilters))
         .map((column) => column.title || column.id);
@@ -2283,11 +2327,11 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
         waiting: false,
         startedAt: Date.now(),
         completedAt: 0,
-        request: "GET /markets/keyset",
+        request: samplingTable ? "GET /sampling-markets" : "GET /markets/keyset",
         serverFilters: [],
         requirements,
       });
-      scanPolymarketMarkets({
+      scan({
         filters: attributeFilters,
         columns,
         target,
@@ -2345,7 +2389,7 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
       ac.abort();
       window.clearTimeout(timer);
     };
-  }, [attributeFilters, planLimit, polymarketExplore, polymarketMarketColumns, rowLimit]);
+  }, [attributeFilters, planLimit, polymarketExplore, polymarketMarketColumns, polymarketSamplingColumns, rowLimit, tableId]);
 
   useEffect(() => {
     if (loading || !pull?.rows) return undefined;
@@ -3107,7 +3151,7 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
       return limited;
     };
     if (polymarketLive) {
-      const scanning = tableId === "getMarkets" && polymarketScan.status !== "idle";
+      const scanning = (tableId === "getMarkets" || tableId === "getSamplingMarkets") && polymarketScan.status !== "idle";
       const waiting = polymarketDirected.status === "loading" || (polymarketRequirement && polymarketDirected.status === "idle");
       const source = scanning
         ? polymarketScan.rows || []
@@ -3116,7 +3160,13 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
           : waiting
             ? []
             : pull?.rows || [];
-      const columns = scanning ? polymarketMarketColumns : pull?.columns || [];
+      const columns = scanning
+        ? tableId === "getSamplingMarkets"
+          ? polymarketSamplingColumns
+          : polymarketMarketColumns
+        : polymarketQuoteColumns.length
+          ? polymarketQuoteColumns
+          : pull?.columns || [];
       const matched = scanning ? source : source.filter((row) => rowMatchesAttributes(row, columns, attributeFilters));
       const sorted = sortAttributeRows(matched, columns, sortKeys);
       return capPreview(sorted.slice(0, PREVIEW_ROW_CAP));
@@ -3157,7 +3207,7 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
     const query = filterValue.trim().toLowerCase();
     const matched = !query || !filterColumn ? rows : rows.filter((row) => String(row[filterColumn] ?? "").toLowerCase().includes(query));
     return capPreview(matched);
-  }, [directPreview.rows, directPreview.status, directRowColumns, forecastRowColumns, pull, visibleCount, filterColumn, filterValue, guidedFilters, attributeFilters, sortKeys, rowLimit, integrationId, tableId, settledPreviewKey, previewSearchError, livePreviewRows, liveMarketSearch, liveDirect, liveEventCandles, liveForecast, liveMarketFanout, liveMultivariate, liveNarrowing, multivariateRowColumns, seriesAttributeColumns, listImportRows, idleAttributeRows, polymarketLive, polymarketDirected, polymarketRequirement, polymarketScan, polymarketMarketColumns]);
+  }, [directPreview.rows, directPreview.status, directRowColumns, forecastRowColumns, pull, visibleCount, filterColumn, filterValue, guidedFilters, attributeFilters, sortKeys, rowLimit, integrationId, tableId, settledPreviewKey, previewSearchError, livePreviewRows, liveMarketSearch, liveDirect, liveEventCandles, liveForecast, liveMarketFanout, liveMultivariate, liveNarrowing, multivariateRowColumns, seriesAttributeColumns, listImportRows, idleAttributeRows, polymarketLive, polymarketDirected, polymarketRequirement, polymarketScan, polymarketMarketColumns, polymarketSamplingColumns, polymarketQuoteColumns]);
 
   const queriedMarkets = useMemo(() => {
     if (!guidedFilters) return [];
@@ -3648,7 +3698,9 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
   // (the rows in hand, a counted match, or a historical universe), then capped by the plan and row limit.
   const previewShown = Math.min(shown, PREVIEW_ROW_CAP);
   const polymarketReadyCount =
-    polymarketLive && tableId === "getMarkets" && polymarketScan.status === "ready"
+    polymarketLive &&
+    (tableId === "getMarkets" || tableId === "getSamplingMarkets") &&
+    polymarketScan.status === "ready"
       ? (polymarketScan.rows || []).length
       : polymarketLive && polymarketDirected.status === "ready"
         ? (polymarketDirected.rows || []).length
@@ -7494,6 +7546,10 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
                             ? directAttributeColumns
                             : tableId === "getMarkets" && polymarketMarketColumns.length
                               ? polymarketMarketColumns
+                              : tableId === "getSamplingMarkets" && polymarketSamplingColumns.length
+                                ? polymarketSamplingColumns
+                                : polymarketQuoteColumns.length
+                                  ? polymarketQuoteColumns
                             : pull?.columns || []
                 }
                 filters={attributeFilters}

@@ -255,8 +255,13 @@ export function attributeMismatchReason(row, columns, filters) {
     const title = column.title || column.id;
     if (filter.excludeNull && isMissingValue(raw)) return `${title} is empty`;
     if (spec.kind === "enum") {
-      if (filter.include?.length && !filter.include.includes(String(raw ?? ""))) {
-        return `${title} is ${raw == null || raw === "" ? "empty" : String(raw)}`;
+      if (filter.include?.length) {
+        const rawText = String(raw ?? "");
+        const parts = column.control === "category"
+          ? rawText.split(",").map((part) => part.trim()).filter(Boolean)
+          : [rawText];
+        const hit = filter.include.some((value) => parts.includes(value));
+        if (!hit) return `${title} is ${rawText.trim() ? rawText : "empty"}`;
       }
       continue;
     }
@@ -1071,7 +1076,7 @@ export function KalshiHistoricalAttributeFilters({
                       <div className="space-y-3 rounded-lg border border-border/70 px-2 py-2">
                         {panel.columns.map((column, index) => (
                           <div key={column.id} className={index > 0 ? "border-t border-border/70 pt-3" : undefined}>
-                            {column.description && column.control !== "tag-picker" ? (
+                            {column.description && column.control !== "tag-picker" && column.control !== "category" ? (
                               <p className="mb-2 text-[11px] leading-relaxed text-muted-foreground">{column.description}</p>
                             ) : null}
                             <AttributeFields column={column} filters={filters} onChange={onChange} />

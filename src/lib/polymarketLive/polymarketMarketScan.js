@@ -98,6 +98,7 @@ const FRONT = [
   "clobTokenIds",
   "questionID",
   "tags",
+  "category",
   "liquidityNum",
   "volumeNum",
   "startDate",
@@ -113,6 +114,27 @@ const FRONT = [
 ];
 
 const QUERY_ONLY = new Set(["decimalized", "locale", "related_tags"]);
+
+/** Gamma tag ids for the categories Polymarket uses to browse markets. */
+export const POLYMARKET_MARKET_CATEGORIES = [
+  { id: "2", slug: "politics", label: "Politics" },
+  { id: "1", slug: "sports", label: "Sports" },
+  { id: "21", slug: "crypto", label: "Crypto" },
+  { id: "120", slug: "finance", label: "Finance" },
+  { id: "100265", slug: "geopolitics", label: "Geopolitics" },
+  { id: "1013", slug: "earnings", label: "Earnings" },
+  { id: "1401", slug: "tech", label: "Tech" },
+  { id: "596", slug: "pop-culture", label: "Culture" },
+  { id: "101970", slug: "world", label: "World" },
+  { id: "100328", slug: "economy", label: "Economy" },
+  { id: "103037", slug: "climate-science", label: "Climate & Science" },
+  { id: "144", slug: "elections", label: "Elections" },
+  { id: "107", slug: "business", label: "Business" },
+  { id: "439", slug: "ai", label: "AI" },
+];
+
+const CATEGORY_BY_SLUG = new Map(POLYMARKET_MARKET_CATEGORIES.map((item) => [item.slug, item.label]));
+const CATEGORY_ID_BY_LABEL = new Map(POLYMARKET_MARKET_CATEGORIES.map((item) => [item.label, item.id]));
 
 function sleep(ms, signal) {
   return new Promise((resolve, reject) => {
@@ -169,7 +191,24 @@ export function flattenPolymarketMarket(record) {
     if (prefix) out[prefix] = value == null ? "" : value;
   };
   walk(source, "");
+  if (!String(out.category || "").trim()) {
+    const derived = categoryLabelsFromTags(source.tags);
+    if (derived) out.category = derived;
+  }
   return out;
+}
+
+function categoryLabelsFromTags(tags) {
+  if (!Array.isArray(tags)) return "";
+  const labels = [];
+  for (const tag of tags) {
+    const slug = String(tag?.slug || "").trim().toLowerCase();
+    const rawLabel = String(tag?.label || "").trim();
+    const label = CATEGORY_BY_SLUG.get(slug) || (CATEGORY_ID_BY_LABEL.has(rawLabel) ? rawLabel : "");
+    if (!label || labels.includes(label)) continue;
+    labels.push(label);
+  }
+  return labels.join(", ");
 }
 
 export function polymarketMarketExtraColumns(existingIds) {
@@ -193,6 +232,14 @@ export function polymarketMarketAttributeColumns(columns) {
     let next = column;
     if (id === "startDate" || id === "endDate") next = { ...next, control: "query-range", type: "date" };
     else if (id === "tags") next = { ...next, control: "tag-picker", description: "" };
+    else if (id === "category") {
+      next = {
+        ...next,
+        control: "category",
+        description: "",
+        enumOptions: POLYMARKET_MARKET_CATEGORIES.map((item) => [item.label, item.label]),
+      };
+    }
     else if (NUMBER_IDS.has(id)) next = { ...next, type: "number" };
     else if (BOOLEAN_IDS.has(id)) next = { ...next, type: "boolean" };
     if (QUERY_ONLY.has(id)) next = { ...next, queryOnly: true };
@@ -281,8 +328,11 @@ export function polymarketMarketServerParams(filters, tags = []) {
   if (end.to) params.end_date_max = isoEdge(end.to, "end");
 
   const fromFilter = Array.isArray(source.tags?.selectedTags) ? source.tags.selectedTags : [];
+  const categoryIds = (Array.isArray(source.category?.include) ? source.category.include : [])
+    .map((label) => CATEGORY_ID_BY_LABEL.get(String(label || "").trim()) || "");
   const tagIds = [...fromFilter, ...(Array.isArray(tags) ? tags : [])]
     .map((tag) => String(tag?.id || "").trim())
+    .concat(categoryIds)
     .filter((id, index, list) => /^\d+$/.test(id) && list.indexOf(id) === index);
   if (tagIds.length) {
     params.tag_id = tagIds.join(",");

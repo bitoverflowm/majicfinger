@@ -5,8 +5,23 @@
  * badged on the HTTP endpoints that seed them.
  */
 import { getPolymarketLiveColumnsForEndpoint, POLYMARKET_LIVE_CONNECT_ENDPOINTS } from "@/config/polymarketLiveConnect";
+import { flattenLastTradePricesRows } from "@/lib/polymarketLive/lastTradePricesCompose";
 import { expandOrderBookSummaryToRows, orderbooksMarketRefFromSuggestion, parseOutcomeList, parseTokenIdList } from "@/lib/polymarketLive/orderbooksCompose";
 import { flattenPolymarketMarket, polymarketMarketExtraColumns } from "@/lib/polymarketLive/polymarketMarketScan";
+import {
+  isPolymarketQuoteTable,
+  polymarketBookDepth,
+  polymarketBookSide,
+  polymarketHistoryBody,
+  polymarketQuoteColumnType,
+  polymarketQuoteDefaultColumns,
+  polymarketQuoteOutcome,
+  polymarketQuoteTarget,
+  polymarketQuoteTokens,
+  polymarketTradeQuery,
+  sliceBookLevels,
+} from "@/lib/polymarketLive/polymarketQuoteQuery";
+import { flattenSamplingMarket, samplingMarketSheetColumns } from "@/lib/polymarketLive/polymarketSamplingScan";
 
 export const POLYMARKET_LIVE_BUILD_CATEGORIES = [
   { id: "markets", label: "Markets" },
@@ -61,14 +76,14 @@ const REALTIME_ENDPOINTS = new Set([
 /** @type {Record<string, { kind: "token" | "event" | "address"; prompt: string }>} */
 const REQUIREMENTS = {
   getMarketsByEvents: { kind: "event", prompt: "Event required" },
-  getOpenInterestCompose: { kind: "token", prompt: "Token required" },
-  getMarketPrices: { kind: "token", prompt: "Token required" },
-  getOrderbooks: { kind: "token", prompt: "Token required" },
-  getMidpointPrices: { kind: "token", prompt: "Token required" },
-  getSpreads: { kind: "token", prompt: "Token required" },
-  getLastTradePrices: { kind: "token", prompt: "Token required" },
-  getBatchPricesHistory: { kind: "token", prompt: "Token required" },
-  getTradesByMarket: { kind: "token", prompt: "Token required" },
+  getOpenInterestCompose: { kind: "token", prompt: "Market required" },
+  getMarketPrices: { kind: "token", prompt: "Market required" },
+  getOrderbooks: { kind: "token", prompt: "Market required" },
+  getMidpointPrices: { kind: "token", prompt: "Market required" },
+  getSpreads: { kind: "token", prompt: "Market required" },
+  getLastTradePrices: { kind: "token", prompt: "Market required" },
+  getBatchPricesHistory: { kind: "token", prompt: "Market required" },
+  getTradesByMarket: { kind: "token", prompt: "Market required" },
   getLiveVolumeForEvent: { kind: "event", prompt: "Event required" },
   getHoldersByMarkets: { kind: "token", prompt: "Market required" },
   getPublicProfiles: { kind: "address", prompt: "Wallet address required" },
@@ -227,6 +242,25 @@ export function polymarketLiveBuildColumns(endpointId) {
     description: entry.description || "",
     defaultOn: defaults.has(entry.name),
   }));
+  if (isPolymarketQuoteTable(endpointId)) {
+    const defaults = new Set(polymarketQuoteDefaultColumns(endpointId));
+    return columns.map((column) => {
+      const type = polymarketQuoteColumnType(column.id) || column.type;
+      const next = { ...column, type, defaultOn: defaults.has(column.id) };
+      if (column.id === "side" || column.id === "last_trade_side") {
+        next.enumOptions = [
+          ["BUY", "Buy"],
+          ["SELL", "Sell"],
+        ];
+      }
+      if (column.id === "timestamp") next.dateEpoch = "unix";
+      return next;
+    });
+  }
+  if (String(endpointId) === "getSamplingMarkets") {
+    const defaults = new Set(["question", "market_slug", "condition_id", "accepting_orders", "end_date_iso", "tags"]);
+    return samplingMarketSheetColumns(columns).map((column) => ({ ...column, defaultOn: defaults.has(column.id) }));
+  }
   if (String(endpointId) !== "getMarkets") return columns;
   return [...columns, ...polymarketMarketExtraColumns(columns.map((column) => column.id)).filter((column) => !column.queryOnly)];
 }
@@ -237,9 +271,15 @@ function cellValue(value) {
   return value;
 }
 
-function projectRows(rows, columns, flatten) {
-  return (Array.isArray(rows) ? rows : []).slice(0, 50).map((row) => {
-    const source = flatten ? flattenPolymarketMarket(row) : row && typeof row === "object" ? row : {};
+function projectRows(rows, columns, flatten, limit = 50) {
+  return (Array.isArray(rows) ? rows : []).slice(0, limit).map((row) => {
+    const source = flatten === "sampling"
+      ? flattenSamplingMarket(row)
+      : flatten
+        ? flattenPolymarketMarket(row)
+        : row && typeof row === "object"
+          ? row
+          : {};
     /** @type {Record<string, unknown>} */
     const out = {};
     for (const column of columns) {
@@ -252,7 +292,8 @@ function projectRows(rows, columns, flatten) {
 
 function pack(endpointId, rows) {
   const columns = polymarketLiveBuildColumns(endpointId);
-  const projected = projectRows(rows, columns, endpointId === "getMarkets");
+  const limit = isPolymarketQuoteTable(endpointId) ? Math.max(Array.isArray(rows) ? rows.length : 0, 1) : 50;
+  const projected = projectRows(rows, columns, endpointId === "getSamplingMarkets" ? "sampling" : endpointId === "getMarkets", limit);
   return {
     columns,
     rows: projected,
@@ -345,106 +386,219 @@ function flattenHolders(payload) {
   return rows;
 }
 
-function flattenHistory(payload, market) {
-  const root = payload && typeof payload === "object" ? payload : {};
-  const history = root.history && typeof root.history === "object" ? root.history : root;
-  const rows = [];
-  for (const [tokenId, points] of Object.entries(history)) {
-    if (!Array.isArray(points)) continue;
-    points.forEach((point, index) => {
-      if (!point || typeof point !== "object") return;
-      const seconds = Number(point.t);
-      rows.push(
-        stampMarket(
-          {
-            token_id: tokenId,
-            outcome: market?.outcomes?.[index] || market?.outcomes?.[0] || "",
-            t: Number.isFinite(seconds) ? seconds : "",
-            timestamp: Number.isFinite(seconds) ? new Date(seconds * 1000).toISOString() : "",
-            p: point.p ?? "",
-          },
-          market,
-        ),
-      );
-    });
-  }
-  return rows.slice(-50);
+function asNum(value) {
+  if (value == null || value === "") return "";
+  const n = Number(value);
+  return Number.isFinite(n) ? n : value;
 }
 
-function flattenTokenPayload(data, tokens, market) {
+function asRecord(data) {
   if (Array.isArray(data)) {
-    return data.map((row, index) =>
-      stampMarket(
-        { ...(row && typeof row === "object" ? row : { value: row }), token_id: tokens[index] || row?.token_id || "" },
-        market,
-      ),
-    );
+    const first = data[0];
+    if (data.length === 1 && first && typeof first === "object" && !Array.isArray(first) && !first.bids && !first.price) return first;
+    return null;
   }
-  if (data && typeof data === "object") {
-    const entries = Object.entries(data).filter(([key]) => key !== "error" && key !== "message");
-    if (entries.length) {
-      return entries.map(([tokenId, value]) =>
-        stampMarket(
-          {
-            token_id: tokenId,
-            ...(value && typeof value === "object" && !Array.isArray(value) ? value : { value }),
-          },
-          market,
-        ),
-      );
+  return data && typeof data === "object" ? data : null;
+}
+
+function quoteScalar(value) {
+  if (value && typeof value === "object" && !Array.isArray(value)) {
+    const row = /** @type {Record<string, unknown>} */ (value);
+    return row.mid ?? row.midpoint ?? row.price ?? row.spread ?? "";
+  }
+  return value ?? "";
+}
+
+function marketRef(market) {
+  return {
+    id: market?.entityId || "",
+    slug: market?.slug || "",
+    conditionId: market?.conditionId || "",
+    title: market?.title || "",
+    tokenIds: market?.tokenIds || [],
+    outcomes: market?.outcomes || [],
+  };
+}
+
+async function quoteMarkets(picks) {
+  const selected = (Array.isArray(picks) ? picks : []).filter(Boolean).slice(0, 20);
+  const markets = [];
+  for (const pick of selected) markets.push(await resolveMarket(pick));
+  return markets.filter(Boolean);
+}
+
+function quotePairs(markets, filters) {
+  const outcome = polymarketQuoteOutcome(filters);
+  return markets.flatMap((market) =>
+    polymarketQuoteTokens(marketRef(market), outcome).map((pair) => ({ ...pair, market })),
+  );
+}
+
+function stampedQuote(pair, extra) {
+  return stampMarket(
+    {
+      token_id: pair.tokenId,
+      outcome: pair.outcome,
+      ...extra,
+    },
+    pair.market,
+  );
+}
+
+function unwrapBooks(payload) {
+  const pages = Array.isArray(payload) ? payload : [payload];
+  return pages.filter((page) => page && typeof page === "object" && (page.bids || page.asks || page.asset_id));
+}
+
+async function quoteRows(endpointId, picks, options = {}) {
+  const markets = await quoteMarkets(picks);
+  const filters = options.filters || {};
+  if (endpointId === "getOpenInterestCompose") {
+    const rows = [];
+    await Promise.all(
+      markets.map(async (market) => {
+        if (!market.conditionId) return;
+        const data = await polymarketGet("getOpenInterest", { market: market.conditionId });
+        for (const row of objectRows(data)) rows.push(stampMarket({ ...row, value: asNum(row.value) }, market));
+      }),
+    );
+    return rows;
+  }
+  const pairs = quotePairs(markets, filters);
+  if (!pairs.length) throw new Error("This market has no CLOB token id.");
+  if (endpointId === "getOrderbooks") {
+    const side = polymarketBookSide(filters);
+    const depth = polymarketBookDepth(filters);
+    const books = await Promise.all(
+      pairs.map(async (pair) => {
+        const payload = await polymarketGet("getOrderBook", { token_id: pair.tokenId });
+        return unwrapBooks(payload).flatMap((page) =>
+          expandOrderBookSummaryToRows(sliceBookLevels(page, depth), {
+            side,
+            marketMeta: marketRef(pair.market),
+          }),
+        );
+      }),
+    );
+    return books.flat().map((row) => ({
+      ...row,
+      price: asNum(row.price),
+      size: asNum(row.size),
+      last_trade_price: asNum(row.last_trade_price),
+      min_order_size: asNum(row.min_order_size),
+      tick_size: asNum(row.tick_size),
+    }));
+  }
+  if (endpointId === "getMarketPrices") {
+    const data = await polymarketPost(
+      "getMarketPrices",
+      pairs.flatMap((pair) => [
+        { token_id: pair.tokenId, side: "BUY" },
+        { token_id: pair.tokenId, side: "SELL" },
+      ]),
+    );
+    const map = asRecord(data) || {};
+    return pairs.map((pair) => {
+      const prices = map[pair.tokenId] && typeof map[pair.tokenId] === "object" ? map[pair.tokenId] : {};
+      return stampedQuote(pair, {
+        buy_price: asNum(prices.BUY ?? prices.buy),
+        sell_price: asNum(prices.SELL ?? prices.sell),
+      });
+    });
+  }
+  if (endpointId === "getMidpointPrices" || endpointId === "getSpreads") {
+    const query = endpointId === "getMidpointPrices" ? "getMidpointPrices" : "getSpreads";
+    const data = await polymarketPost(query, pairs.map((pair) => ({ token_id: pair.tokenId })));
+    const map = asRecord(data) || {};
+    const field = endpointId === "getMidpointPrices" ? "midpoint_price" : "spread";
+    return pairs.map((pair) => stampedQuote(pair, { [field]: asNum(quoteScalar(map[pair.tokenId])) }));
+  }
+  if (endpointId === "getLastTradePrices") {
+    const data = await polymarketPost("getLastTradePrices", pairs.map((pair) => ({ token_id: pair.tokenId })));
+    const payload = Array.isArray(data) ? data : [];
+    return flattenLastTradePricesRows(payload, markets.map(marketRef), undefined, polymarketQuoteOutcome(filters)).map((row) => ({
+      ...row,
+      last_trade_price: asNum(row.last_trade_price),
+    }));
+  }
+  if (endpointId === "getBatchPricesHistory") {
+    const tokens = [...new Set(pairs.map((pair) => pair.tokenId))];
+    const body = polymarketHistoryBody(filters);
+    const payloads = [];
+    for (let index = 0; index < tokens.length; index += 20) {
+      payloads.push(await polymarketPost("getBatchPricesHistory", { markets: tokens.slice(index, index + 20), ...body }));
+    }
+    const target = polymarketQuoteTarget(options.rowLimit, options.planLimit, 50, 2000);
+    return historyRows(payloads, pairs).slice(0, target);
+  }
+  if (endpointId === "getTradesByMarket") {
+    const tradable = markets.filter((market) => market.conditionId);
+    if (!tradable.length) throw new Error("This market has no condition id.");
+    const params = polymarketTradeQuery(filters);
+    const target = polymarketQuoteTarget(options.rowLimit, options.planLimit, 50, 10000);
+    const perMarket = Math.max(1, Math.ceil(target / tradable.length));
+    const collected = [];
+    for (const market of tradable) {
+      let offset = 0;
+      let got = 0;
+      while (got < perMarket && offset <= 10000) {
+        const pageSize = Math.min(500, perMarket - got);
+        const data = await polymarketGet("getTradesByMarket", {
+          market: market.conditionId,
+          limit: String(pageSize),
+          offset: String(offset),
+          ...params,
+        });
+        const page = objectRows(data).map((row) =>
+          stampMarket({ ...row, price: asNum(row.price), size: asNum(row.size), outcomeIndex: asNum(row.outcomeIndex) }, market),
+        );
+        if (!page.length) break;
+        collected.push(...page);
+        got += page.length;
+        if (page.length < pageSize) break;
+        offset += page.length;
+      }
+    }
+    return collected.slice(0, target);
+  }
+  return [];
+}
+
+function historyRows(payloads, pairs) {
+  const byToken = new Map(pairs.map((pair) => [pair.tokenId, pair]));
+  const rows = [];
+  for (const payload of payloads) {
+    const root = payload && typeof payload === "object" ? payload : {};
+    const history = root.history && typeof root.history === "object" ? root.history : root;
+    for (const [tokenId, points] of Object.entries(history)) {
+      if (!Array.isArray(points)) continue;
+      const pair = byToken.get(tokenId);
+      for (const point of points) {
+        if (!point || typeof point !== "object") continue;
+        const seconds = Number(point.t);
+        rows.push(
+          stampMarket(
+            {
+              token_id: tokenId,
+              outcome: pair?.outcome || "",
+              t: Number.isFinite(seconds) ? seconds : "",
+              timestamp: Number.isFinite(seconds) ? new Date(seconds * 1000).toISOString() : "",
+              p: asNum(point.p),
+            },
+            pair?.market,
+          ),
+        );
+      }
     }
   }
-  return objectRows(data).map((row, index) => stampMarket({ ...row, token_id: tokens[index] || "" }, market));
+  rows.sort((a, b) => Number(b.t) - Number(a.t));
+  return rows;
 }
 
 async function tokenRows(endpointId, pick) {
   const market = await resolveMarket(pick);
   const tokens = (market?.tokenIds || []).slice(0, 2);
   if (!tokens.length) throw new Error("This market has no CLOB token id.");
-  if (endpointId === "getOrderbooks") {
-    const books = await Promise.all(tokens.map((tokenId) => polymarketGet("getOrderBook", { token_id: tokenId })));
-    const meta = {
-      id: market.entityId,
-      slug: market.slug,
-      conditionId: market.conditionId,
-      title: market.title,
-      tokenIds: market.tokenIds,
-      outcomes: market.outcomes,
-    };
-    return books.flatMap((book) => {
-      const pages = Array.isArray(book) ? book : [book];
-      return pages.flatMap((page) => expandOrderBookSummaryToRows(page, { marketMeta: meta }));
-    });
-  }
-  if (endpointId === "getMarketPrices") {
-    const data = await polymarketGet("getMarketPrices", {
-      token_ids: tokens.join(","),
-      sides: tokens.map(() => "BUY").join(","),
-    });
-    return flattenTokenPayload(data, tokens, market).map((row) => ({ ...row, side: row.side || "BUY" }));
-  }
-  if (endpointId === "getMidpointPrices" || endpointId === "getSpreads" || endpointId === "getLastTradePrices") {
-    const query = endpointId === "getMidpointPrices" ? "getMidpointPrices" : endpointId === "getSpreads" ? "getSpreads" : "getLastTradePrices";
-    const data = await polymarketPost(query, tokens.map((token_id) => ({ token_id })));
-    return flattenTokenPayload(data, tokens, market);
-  }
-  if (endpointId === "getBatchPricesHistory") {
-    const data = await polymarketPost("getBatchPricesHistory", { markets: tokens.slice(0, 1), interval: "1h" });
-    return flattenHistory(data, market);
-  }
-  if (endpointId === "getTradesByMarket") {
-    if (!market.conditionId) throw new Error("This market has no condition id.");
-    const data = await polymarketGet("getTradesByMarket", {
-      market: market.conditionId,
-      limit: "50",
-      takerOnly: "true",
-    });
-    return objectRows(data).map((row) => stampMarket(row, market));
-  }
-  if (endpointId === "getOpenInterestCompose") {
-    const data = await polymarketGet("getOpenInterest", { market: market.conditionId });
-    return objectRows(data).map((row) => stampMarket(row, market));
-  }
   if (endpointId === "getHoldersByMarkets") {
     const data = await polymarketGet("getTopHolders", { market: market.conditionId, limit: "20" });
     return flattenHolders(data).map((row) => stampMarket(row, market));
@@ -466,7 +620,8 @@ async function discoveryRows(endpointId) {
   }
   if (endpointId === "getSamplingMarkets") {
     const page = await polymarketGet("getSamplingMarkets");
-    return objectRows(page?.data || page);
+    const body = Array.isArray(page) ? page[0] : page;
+    return objectRows(body?.data || body);
   }
   if (endpointId === "getEvents") {
     return objectRows(await polymarketGet("listEvents", { limit: "50", closed: "false", order: "volume", ascending: "false" }));
@@ -480,7 +635,7 @@ async function discoveryRows(endpointId) {
   return [];
 }
 
-async function directedRows(endpointId, picks) {
+async function directedRows(endpointId, picks, options = {}) {
   const pick = picks[0];
   if (!pick) return discoveryRows(endpointId);
   if (endpointId === "getMarkets" || endpointId === "getSamplingMarkets") {
@@ -520,6 +675,7 @@ async function directedRows(endpointId, picks) {
     const data = await polymarketGet(ADDRESS_QUERIES[endpointId], { user: pick.address, address: pick.address, limit: "50" });
     return objectRows(data);
   }
+  if (isPolymarketQuoteTable(endpointId)) return quoteRows(endpointId, picks, options);
   if (REQUIREMENTS[endpointId]?.kind === "token") return tokenRows(endpointId, pick);
   return discoveryRows(endpointId);
 }
@@ -528,12 +684,12 @@ async function directedRows(endpointId, picks) {
  * @param {string} endpointId
  * @param {Array<Record<string, unknown>>} [picks]
  */
-export function loadPolymarketLiveTable(endpointId, picks = []) {
+export function loadPolymarketLiveTable(endpointId, picks = [], options = {}) {
   const requirement = REQUIREMENTS[endpointId];
   if (requirement && !picks.length) {
     return Promise.resolve(pack(endpointId, []));
   }
-  return directedRows(endpointId, picks)
+  return directedRows(endpointId, picks, options)
     .then((rows) => pack(endpointId, rows))
     .catch((error) => {
       throw error instanceof Error ? error : new Error("Pull failed");

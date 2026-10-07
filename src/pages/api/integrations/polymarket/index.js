@@ -1811,6 +1811,8 @@ export default async function handler(req, res) {
         if (offset !== undefined && offset !== "") tradesParams.set("offset", String(offset));
         if (side === "BUY" || side === "SELL") tradesParams.set("side", side);
         if (takerOnly === "true" || takerOnly === "false") tradesParams.set("takerOnly", takerOnly);
+        if (req.query.start != null && String(req.query.start).trim() !== "") tradesParams.set("start", String(req.query.start));
+        if (req.query.end != null && String(req.query.end).trim() !== "") tradesParams.set("end", String(req.query.end));
         data = await fetchJson(`${DATA_API_BASE}/trades?${tradesParams.toString()}`);
         break;
       }
