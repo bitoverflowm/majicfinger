@@ -200,9 +200,8 @@ export const POLYMARKET_LIVE_CONNECT_ENDPOINTS = [
   {
     id: POLYMARKET_MARKETS_COMPOSE_ENDPOINT_ID,
     category: "markets",
-    title: "Get Market/Markets",
-    description:
-      "Discover market(s) with natural language, id, slug, or token — or list markets by volume, tag, dates, and other filters.",
+    title: "Find markets",
+    description: "Find markets by search, or discover markets that fit your criteria",
   },
   {
     id: POLYMARKET_SAMPLING_MARKETS_ENDPOINT_ID,

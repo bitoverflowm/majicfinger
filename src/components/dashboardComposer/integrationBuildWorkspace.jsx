@@ -3579,9 +3579,12 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
   const pullTotalText = Number.isFinite(pullTotal)
     ? `${pullTotal.toLocaleString()}${Array.isArray(listImportRows) && directPreview.truncated ? "+" : ""}`
     : "";
+  const polymarketMarketUniverse =
+    polymarketLive && tableId === "getMarkets" && polymarketDirected.status !== "ready" && previewShown > 0;
   const previewCountLine = (() => {
     const noun = previewShown === 1 ? "row" : "rows";
     const head = `Previewing ${previewShown.toLocaleString()} ${noun}`;
+    if (polymarketMarketUniverse) return `${head} of 10M + rows`;
     if (pullTotal == null) return `${head} of …`;
     if (pullTotal > previewShown) {
       const totalNoun = pullTotal === 1 ? "row" : "rows";
