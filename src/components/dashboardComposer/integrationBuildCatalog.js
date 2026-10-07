@@ -34,12 +34,39 @@ import {
 import { getKalshiLiveSearchTradersColumns } from "@/lib/kalshiLive/searchTradersColumns";
 import { MARKETS_RESPONSE_FIELDS } from "@/components/integrationsView/integrationPlayground/integrations/polymarket/config";
 import {
+  loadPolymarketLiveTable,
+  POLYMARKET_LIVE_BUILD_CATEGORIES,
+  polymarketLiveBuildEndpoints,
+  polymarketLiveRealtimeEndpointIds,
+} from "@/components/dashboardComposer/polymarketLiveBuild";
+import {
   POLYMARKET_BLOCKS_CONNECT_COLUMNS,
   POLYMARKET_MARKETS_CONNECT_COLUMNS,
   POLYMARKET_TRADES_CONNECT_COLUMNS,
 } from "@/lib/polymarketConnectColumns";
 
 export const PREVIEW_ROW_CAP = 50;
+
+function polymarketLiveSource() {
+  const realtime = new Set(polymarketLiveRealtimeEndpointIds());
+  /** @type {Record<string, { label: string; description: string; group: string; realtime?: boolean }>} */
+  const tables = {};
+  for (const endpoint of polymarketLiveBuildEndpoints()) {
+    tables[endpoint.id] = {
+      label: endpoint.title || endpoint.label,
+      description: endpoint.description,
+      group: endpoint.category,
+      realtime: realtime.has(endpoint.id),
+    };
+  }
+  return {
+    name: "Polymarket Live",
+    defaultGroup: "markets",
+    defaultTable: "getMarkets",
+    groups: POLYMARKET_LIVE_BUILD_CATEGORIES,
+    tables,
+  };
+}
 
 function kalshiLiveSource() {
   const realtime = getKalshiLiveRealtimeEndpointIds();
@@ -131,16 +158,7 @@ export const BUILD_SOURCES = {
       },
     },
   },
-  polymarket: {
-    name: "Polymarket Live",
-    defaultTable: "markets",
-    tables: {
-      markets: {
-        label: "Markets search",
-        description: "Live Polymarket markets, busiest volume first.",
-      },
-    },
-  },
+  polymarket: polymarketLiveSource(),
   chainlink: {
     name: "Chainlink",
     defaultTable: "prices",
@@ -1922,7 +1940,13 @@ const LOADERS = {
   "polymarketHistorical:markets": polymarketHistoricalMarkets,
   "polymarketHistorical:trades": polymarketHistoricalTrades,
   "polymarketHistorical:blocks": polymarketHistoricalBlocks,
-  "polymarket:markets": polymarketLiveMarkets,
+  "polymarket:markets": () => loadPolymarketLiveTable("getMarkets", []),
+  ...Object.fromEntries(
+    polymarketLiveBuildEndpoints().map((endpoint) => [
+      `polymarket:${endpoint.id}`,
+      () => loadPolymarketLiveTable(endpoint.id, []),
+    ]),
+  ),
   "chainlink:prices": () => livePrices("chainlink"),
   "binance:prices": () => livePrices("binance"),
 };

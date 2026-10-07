@@ -36,6 +36,13 @@ import {
   peekBuildUniverseCount,
   usesExactUniverse,
 } from "@/components/dashboardComposer/integrationBuildCatalog";
+import {
+  loadPolymarketLiveTable,
+  polymarketLiveBuildRequirement,
+  polymarketLiveBuildSearch,
+  polymarketPickFromSuggestion,
+} from "@/components/dashboardComposer/polymarketLiveBuild";
+import { PolymarketLiveBuildSearch } from "@/components/dashboardComposer/polymarketLiveBuildSearch";
 import { Accordion, AccordionContent, AccordionItem } from "@/components/ui/accordion";
 import * as AccordionPrimitive from "@radix-ui/react-accordion";
 import { Button } from "@/components/ui/button";
@@ -1985,6 +1992,7 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
   const [seriesCategoryState, setSeriesCategoryState] = useState({ status: "idle", categories: [] });
   const [directQuery, setDirectQuery] = useState(() => defaultKalshiLiveDirectQuery("trades"));
   const [directPreview, setDirectPreview] = useState({ status: "idle", rows: [], error: "", ticker: "" });
+  const [polymarketDirected, setPolymarketDirected] = useState({ status: "idle", rows: [], error: "" });
   const [liveScan, setLiveScan] = useState({ status: "idle", rows: [], error: "", exhausted: true, truncated: false });
   const liveFetchRef = useRef(new Set());
   const [universe, setUniverse] = useState(null);
@@ -2086,6 +2094,10 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
   const liveEventCandles = integrationId === "kalshiLive" && tableId === "event_candlesticks";
   const liveMultivariate = integrationId === "kalshiLive" && tableId === "multivariate_events";
   const liveMarketFanout = liveDirect && !liveSeriesSearch && !liveEventSearch && !liveTrader && !liveForecast && !liveEventCandles && !liveMultivariate;
+  const polymarketLive = integrationId === "polymarket";
+  const polymarketRequirement = polymarketLive ? polymarketLiveBuildRequirement(tableId) : null;
+  const polymarketSearch = polymarketLive ? polymarketLiveBuildSearch(tableId) : null;
+  const polymarketCenterSearch = Boolean(polymarketRequirement) && livePicks.length === 0;
 
   useEffect(() => {
     if (!liveSeriesSearch) return undefined;
@@ -2138,6 +2150,7 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
     setLivePicks([]);
     setDirectQuery(defaultKalshiLiveDirectQuery(tableId));
     setDirectPreview({ status: "idle", rows: [], error: "", ticker: "", events: [] });
+    setPolymarketDirected({ status: "idle", rows: [], error: "" });
     setForecastJoinIds(new Set());
     setEventExtraPreview({});
     setLiveScan({ status: "idle", rows: [], error: "", exhausted: true, truncated: false });
@@ -2197,6 +2210,32 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
       window.clearInterval(timer);
     };
   }, [integrationId, tableId]);
+
+  useEffect(() => {
+    if (!polymarketLive) return undefined;
+    if (!livePicks.length) {
+      setPolymarketDirected({ status: "idle", rows: [], error: "" });
+      return undefined;
+    }
+    let cancel = false;
+    setPolymarketDirected({ status: "loading", rows: [], error: "" });
+    loadPolymarketLiveTable(tableId, livePicks)
+      .then((result) => {
+        if (cancel) return;
+        setPolymarketDirected({ status: "ready", rows: result.rows || [], error: "" });
+      })
+      .catch((err) => {
+        if (cancel) return;
+        setPolymarketDirected({
+          status: "error",
+          rows: [],
+          error: err instanceof Error ? err.message : "Pull failed",
+        });
+      });
+    return () => {
+      cancel = true;
+    };
+  }, [livePicks, polymarketLive, tableId]);
 
   useEffect(() => {
     if (loading || !pull?.rows) return undefined;
@@ -2656,6 +2695,12 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
     setLivePicks((prev) => prev.filter((item) => item.id !== id));
   }
 
+  function addPolymarketPick(suggestion) {
+    const pick = polymarketPickFromSuggestion(suggestion);
+    if (!pick) return;
+    setLivePicks((prev) => (prev.some((item) => item.id === pick.id) ? prev : [...prev, pick]));
+  }
+
   function addDirectPick(pick) {
     const forecastPick = tableId === "event_forecast" && (pick?.kind === "event" || pick?.kind === "series");
     const eventCandlePick = tableId === "event_candlesticks" && pick?.kind === "event";
@@ -2951,6 +2996,14 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
       const limited = Number.isFinite(requested) && requested > 0 ? rows.slice(0, requested) : rows;
       return limited;
     };
+    if (polymarketLive) {
+      const waiting = polymarketDirected.status === "loading" || (polymarketRequirement && polymarketDirected.status === "idle");
+      const source = polymarketDirected.status === "ready" ? polymarketDirected.rows || [] : waiting ? [] : pull?.rows || [];
+      const columns = pull?.columns || [];
+      const matched = source.filter((row) => rowMatchesAttributes(row, columns, attributeFilters));
+      const sorted = sortAttributeRows(matched, columns, sortKeys);
+      return capPreview(sorted.slice(0, PREVIEW_ROW_CAP));
+    }
     if (listImportRows) return capPreview(listImportRows.slice(0, Math.min(visibleCount, PREVIEW_ROW_CAP)));
     if ((liveMarketFanout || liveForecast || liveEventCandles || liveMultivariate) && directPreview.status !== "idle") {
       const columns = liveForecast ? forecastRowColumns : liveMultivariate ? multivariateRowColumns : directRowColumns;
@@ -2987,7 +3040,7 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
     const query = filterValue.trim().toLowerCase();
     const matched = !query || !filterColumn ? rows : rows.filter((row) => String(row[filterColumn] ?? "").toLowerCase().includes(query));
     return capPreview(matched);
-  }, [directPreview.rows, directPreview.status, directRowColumns, forecastRowColumns, pull, visibleCount, filterColumn, filterValue, guidedFilters, attributeFilters, sortKeys, rowLimit, integrationId, tableId, settledPreviewKey, previewSearchError, livePreviewRows, liveMarketSearch, liveDirect, liveEventCandles, liveForecast, liveMarketFanout, liveMultivariate, liveNarrowing, multivariateRowColumns, seriesAttributeColumns, listImportRows, idleAttributeRows]);
+  }, [directPreview.rows, directPreview.status, directRowColumns, forecastRowColumns, pull, visibleCount, filterColumn, filterValue, guidedFilters, attributeFilters, sortKeys, rowLimit, integrationId, tableId, settledPreviewKey, previewSearchError, livePreviewRows, liveMarketSearch, liveDirect, liveEventCandles, liveForecast, liveMarketFanout, liveMultivariate, liveNarrowing, multivariateRowColumns, seriesAttributeColumns, listImportRows, idleAttributeRows, polymarketLive, polymarketDirected, polymarketRequirement]);
 
   const queriedMarkets = useMemo(() => {
     if (!guidedFilters) return [];
@@ -3443,6 +3496,8 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
           directPreview.visibility &&
           !/^(public|visible)$/i.test(directPreview.visibility)
         ? " These trades are private."
+        : polymarketLive && polymarketDirected.status === "ready" && livePicks.length > 1
+          ? " Previewing the first selection."
         : "";
 
   useEffect(() => {
@@ -3475,6 +3530,8 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
   // The grid never shows more than 50. The import count is the known size of this pull
   // (the rows in hand, a counted match, or a historical universe), then capped by the plan and row limit.
   const previewShown = Math.min(shown, PREVIEW_ROW_CAP);
+  const polymarketReadyCount =
+    polymarketLive && polymarketDirected.status === "ready" ? (polymarketDirected.rows || []).length : null;
   const directReadyCount = (liveMarketFanout || liveForecast || liveEventCandles || liveMultivariate) && directPreview.status === "ready"
     ? (directPreview.rows || []).filter((row) =>
         rowMatchesAttributes(
@@ -3514,6 +3571,8 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
                 : null
               : liveDirect && (directPreview.status === "loading" || directPreview.status === "error")
                 ? null
+                : polymarketReadyCount != null
+                  ? polymarketReadyCount
                 : Array.isArray(idleAttributeRows)
                   ? idleAttributeRows.length
                   : settledRowCount;
@@ -3593,7 +3652,9 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
         : multivariateCenterSearch
           ? "Search for a series"
           : "";
-  const liveEmptyLine = tickerPrompt
+  const liveEmptyLine = polymarketCenterSearch
+    ? polymarketRequirement.prompt
+    : tickerPrompt
     ? tickerPrompt
     : liveMarketSearch && liveScan.truncated
       ? `No data found in the first ${KALSHI_LIVE_MARKET_SCAN_CAP.toLocaleString()} markets.`
@@ -7071,7 +7132,7 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
         <div className="min-h-0 flex-1 space-y-5 overflow-y-auto px-4 pb-4">
           <div>
             {groups ? (
-              <div className="mb-2 flex flex-wrap gap-1.5" role="tablist" aria-label="Kalshi Live">
+              <div className="mb-2 flex flex-wrap gap-1.5" role="tablist" aria-label={source?.name || "Integration"}>
                 {groups.map((group) => {
                   const selected = groupId === group.id;
                   return (
@@ -7184,6 +7245,15 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
               onRemove={removeLivePick}
             />
           ) : null}
+          {polymarketSearch && !polymarketCenterSearch ? (
+            <PolymarketLiveBuildSearch
+              picks={livePicks}
+              onAdd={addPolymarketPick}
+              onRemove={removeLivePick}
+              entities={polymarketSearch.entities}
+              placeholder={polymarketSearch.placeholder}
+            />
+          ) : null}
 
           <Accordion type="single" collapsible defaultValue="columns" className="space-y-2">
             <AccordionItem value="columns" className="border-0">
@@ -7242,7 +7312,7 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
                 </div>
               </AccordionContent>
             </AccordionItem>
-            {guidedFilters || liveMarketSearch || liveDirect ? (
+            {guidedFilters || liveMarketSearch || liveDirect || polymarketLive ? (
               <AttributeFilters
                 columns={
                   liveSeriesSearch
@@ -7294,13 +7364,15 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
                           ? "Orderbook attributes"
                           : tableId === "blocks"
                             ? "Block attributes"
+                            : polymarketLive
+                              ? "Attributes"
                             : "Market attributes"
                 }
               />
             ) : null}
           </Accordion>
 
-          {guidedFilters || liveMarketSearch || liveDirect ? null : (
+          {guidedFilters || liveMarketSearch || liveDirect || polymarketLive ? null : (
             <section>
               <p className="mb-2 text-[12px] font-semibold text-foreground">Filters</p>
               <p className="mb-2 text-[12px] leading-relaxed text-muted-foreground">
@@ -7898,8 +7970,24 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
             <div className="flex h-full items-center justify-center">
               <WaitingToConnectTag />
             </div>
-          ) : error ? (
-            <p className="text-[13px] text-muted-foreground">{error}</p>
+          ) : error || polymarketDirected.status === "error" ? (
+            <p className="text-[13px] text-muted-foreground">{error || polymarketDirected.error}</p>
+          ) : polymarketCenterSearch ? (
+            <div className="flex h-full flex-col items-center justify-center rounded-xl border border-border/70 bg-background px-6 shadow-sm">
+              <div className="flex w-full max-w-lg flex-col items-center gap-4 text-center">
+                <p className="text-[15px] font-medium text-foreground">{polymarketRequirement.prompt}</p>
+                <div className="w-full text-left">
+                  <PolymarketLiveBuildSearch
+                    picks={livePicks}
+                    onAdd={addPolymarketPick}
+                    onRemove={removeLivePick}
+                    entities={polymarketSearch?.entities || ["market"]}
+                    placeholder={polymarketSearch?.placeholder || "Search for a market"}
+                    required
+                  />
+                </div>
+              </div>
+            </div>
           ) : centerSearch ? (
             <div className="flex h-full flex-col items-center justify-center rounded-xl border border-border/70 bg-background px-6 shadow-sm">
               <div className="flex w-full max-w-lg flex-col items-center gap-4 text-center">
@@ -7922,7 +8010,7 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
                 Refresh
               </Button>
             </div>
-          ) : loading || emptyRefresh || livePickAwaitingRows || liveScanWaiting || directLoading ? (
+          ) : loading || emptyRefresh || livePickAwaitingRows || liveScanWaiting || directLoading || polymarketDirected.status === "loading" ? (
             <div className="flex h-full flex-col gap-3">
               {integrationId === "chainlink" || integrationId === "binance" ? <WaitingToConnectTag /> : null}
               {livePickAwaitingRows ? (
