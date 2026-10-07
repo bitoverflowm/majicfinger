@@ -30,6 +30,17 @@ const MARKETS_PARAMS = [
   "start_date_min", "start_date_max", "end_date_min", "end_date_max",
   "tag_id", "related_tags", "cyom", "uma_resolution_status", "game_id", "sports_market_types",
   "rewards_min_size", "question_ids", "include_tag", "closed",
+  "decimalized", "tag_match", "rfq_enabled", "locale",
+];
+
+const MARKETS_KEYSET_PARAMS = [
+  "limit", "order", "ascending", "after_cursor",
+  "id", "slug", "closed", "decimalized",
+  "clob_token_ids", "condition_ids", "question_ids",
+  "liquidity_num_min", "liquidity_num_max", "volume_num_min", "volume_num_max",
+  "start_date_min", "start_date_max", "end_date_min", "end_date_max",
+  "tag_id", "related_tags", "tag_match", "cyom", "rfq_enabled",
+  "uma_resolution_status", "game_id", "sports_market_types", "include_tag", "locale",
 ];
 
 const SERIES_PARAMS = [
@@ -1244,6 +1255,20 @@ export default async function handler(req, res) {
         data = await fetchJson(`${GAMMA_BASE}/markets?${sp}`);
         break;
       }
+      case "listMarketsKeyset": {
+        const sp = buildSearchParams(MARKETS_KEYSET_PARAMS, req.query);
+        for (const key of ["id", "slug", "clob_token_ids", "condition_ids", "question_ids", "sports_market_types", "tag_id"]) {
+          const raw = req.query[key];
+          if (typeof raw === "string" && raw.includes(",")) {
+            sp.delete(key);
+            for (const part of raw.split(",").map((s) => s.trim()).filter(Boolean)) {
+              sp.append(key, part);
+            }
+          }
+        }
+        data = await fetchJson(`${GAMMA_BASE}/markets/keyset?${sp}`);
+        break;
+      }
       case "getSamplingMarkets": {
         const nextCursor = String(req.query.next_cursor || "").trim();
         const sp = new URLSearchParams();
@@ -1863,6 +1888,10 @@ export default async function handler(req, res) {
     const fieldsFilter = fieldsParam
       ? String(fieldsParam).split(",").map((f) => f.trim()).filter(Boolean)
       : null;
+
+    if (query === "listMarketsKeyset") {
+      return res.status(200).json(data && typeof data === "object" ? data : { markets: [], next_cursor: "" });
+    }
 
     let result;
     if (skipFlatten) {

@@ -6,6 +6,7 @@
  */
 import { getPolymarketLiveColumnsForEndpoint, POLYMARKET_LIVE_CONNECT_ENDPOINTS } from "@/config/polymarketLiveConnect";
 import { expandOrderBookSummaryToRows, orderbooksMarketRefFromSuggestion, parseOutcomeList, parseTokenIdList } from "@/lib/polymarketLive/orderbooksCompose";
+import { flattenPolymarketMarket, polymarketMarketExtraColumns } from "@/lib/polymarketLive/polymarketMarketScan";
 
 export const POLYMARKET_LIVE_BUILD_CATEGORIES = [
   { id: "markets", label: "Markets" },
@@ -219,13 +220,15 @@ export function polymarketLiveBuildColumns(endpointId) {
   const names = meta.map((entry) => entry.name);
   const preferred = PREFERRED_COLUMNS.filter((name) => names.includes(name));
   const defaults = new Set([...preferred, ...names.filter((name) => !preferred.includes(name))].slice(0, 6));
-  return meta.map((entry) => ({
+  const columns = meta.map((entry) => ({
     id: entry.name,
     title: titleFor(entry.name),
     type: columnType(entry.type),
     description: entry.description || "",
     defaultOn: defaults.has(entry.name),
   }));
+  if (String(endpointId) !== "getMarkets") return columns;
+  return [...columns, ...polymarketMarketExtraColumns(columns.map((column) => column.id)).filter((column) => !column.queryOnly)];
 }
 
 function cellValue(value) {
@@ -234,9 +237,9 @@ function cellValue(value) {
   return value;
 }
 
-function projectRows(rows, columns) {
+function projectRows(rows, columns, flatten) {
   return (Array.isArray(rows) ? rows : []).slice(0, 50).map((row) => {
-    const source = row && typeof row === "object" ? row : {};
+    const source = flatten ? flattenPolymarketMarket(row) : row && typeof row === "object" ? row : {};
     /** @type {Record<string, unknown>} */
     const out = {};
     for (const column of columns) {
@@ -249,7 +252,7 @@ function projectRows(rows, columns) {
 
 function pack(endpointId, rows) {
   const columns = polymarketLiveBuildColumns(endpointId);
-  const projected = projectRows(rows, columns);
+  const projected = projectRows(rows, columns, endpointId === "getMarkets");
   return {
     columns,
     rows: projected,
@@ -451,7 +454,15 @@ async function tokenRows(endpointId, pick) {
 
 async function discoveryRows(endpointId) {
   if (endpointId === "getMarkets") {
-    return objectRows(await polymarketGet("listMarkets", { limit: "50", closed: "false", order: "volume24hr", ascending: "false" }));
+    return objectRows(
+      await polymarketGet("listMarkets", {
+        limit: "50",
+        closed: "false",
+        order: "volume24hr",
+        ascending: "false",
+        include_tag: "true",
+      }),
+    );
   }
   if (endpointId === "getSamplingMarkets") {
     const page = await polymarketGet("getSamplingMarkets");

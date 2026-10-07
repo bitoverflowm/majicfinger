@@ -43,6 +43,13 @@ import {
   polymarketPickFromSuggestion,
 } from "@/components/dashboardComposer/polymarketLiveBuild";
 import { PolymarketLiveBuildSearch } from "@/components/dashboardComposer/polymarketLiveBuildSearch";
+import { PolymarketTagPicker } from "@/components/connectData/polymarketLive/PolymarketTagPicker";
+import {
+  POLYMARKET_MARKET_SCAN_CAP,
+  polymarketMarketAttributeColumns,
+  polymarketMarketFiltersActive,
+  scanPolymarketMarkets,
+} from "@/lib/polymarketLive/polymarketMarketScan";
 import { Accordion, AccordionContent, AccordionItem } from "@/components/ui/accordion";
 import * as AccordionPrimitive from "@radix-ui/react-accordion";
 import { Button } from "@/components/ui/button";
@@ -1993,6 +2000,8 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
   const [directQuery, setDirectQuery] = useState(() => defaultKalshiLiveDirectQuery("trades"));
   const [directPreview, setDirectPreview] = useState({ status: "idle", rows: [], error: "", ticker: "" });
   const [polymarketDirected, setPolymarketDirected] = useState({ status: "idle", rows: [], error: "" });
+  const [polymarketScan, setPolymarketScan] = useState({ status: "idle", rows: [], error: "" });
+  const [polymarketMarketTags, setPolymarketMarketTags] = useState([]);
   const [liveScan, setLiveScan] = useState({ status: "idle", rows: [], error: "", exhausted: true, truncated: false });
   const liveFetchRef = useRef(new Set());
   const [universe, setUniverse] = useState(null);
@@ -2098,6 +2107,14 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
   const polymarketRequirement = polymarketLive ? polymarketLiveBuildRequirement(tableId) : null;
   const polymarketSearch = polymarketLive ? polymarketLiveBuildSearch(tableId) : null;
   const polymarketCenterSearch = Boolean(polymarketRequirement) && livePicks.length === 0;
+  const polymarketMarketColumns = useMemo(
+    () => (polymarketLive && tableId === "getMarkets" ? polymarketMarketAttributeColumns(pull?.columns || []) : []),
+    [polymarketLive, tableId, pull?.columns],
+  );
+  const polymarketExplore =
+    polymarketLive &&
+    tableId === "getMarkets" &&
+    polymarketMarketFiltersActive(polymarketMarketColumns, attributeFilters, polymarketMarketTags);
 
   useEffect(() => {
     if (!liveSeriesSearch) return undefined;
@@ -2151,6 +2168,8 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
     setDirectQuery(defaultKalshiLiveDirectQuery(tableId));
     setDirectPreview({ status: "idle", rows: [], error: "", ticker: "", events: [] });
     setPolymarketDirected({ status: "idle", rows: [], error: "" });
+    setPolymarketScan({ status: "idle", rows: [], error: "" });
+    setPolymarketMarketTags([]);
     setForecastJoinIds(new Set());
     setEventExtraPreview({});
     setLiveScan({ status: "idle", rows: [], error: "", exhausted: true, truncated: false });
@@ -2168,7 +2187,7 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
       tableId === "candlesticks" ||
       tableId === "trades" ||
       tableId === "orderbook";
-    loadBuildPreview(integrationId, tableId, skipIdleSample ? { fresh: true } : undefined)
+    loadBuildPreview(integrationId, tableId, skipIdleSample || (integrationId === "polymarket" && tableId === "getMarkets") ? { fresh: true } : undefined)
       .then((result) => {
         if (cancel) return;
         setProgress(100);
@@ -2236,6 +2255,98 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
       cancel = true;
     };
   }, [livePicks, polymarketLive, tableId]);
+
+  useEffect(() => {
+    if (!polymarketExplore) {
+      setPolymarketScan((current) => (current.status === "idle" ? current : { status: "idle", rows: [], error: "" }));
+      return undefined;
+    }
+    const ac = new AbortController();
+    const timer = window.setTimeout(() => {
+      const requested = Number(rowLimit);
+      const plan = typeof planLimit === "number" && planLimit > 0 ? planLimit : POLYMARKET_MARKET_SCAN_CAP;
+      const target = Math.min(
+        POLYMARKET_MARKET_SCAN_CAP,
+        plan,
+        Number.isFinite(requested) && requested > 0 ? requested : PREVIEW_ROW_CAP,
+      );
+      const columns = polymarketMarketColumns;
+      const requirements = columns
+        .filter((column) => attributeSummary(column, attributeFilters))
+        .map((column) => column.title || column.id);
+      if (polymarketMarketTags.length) requirements.push("Tags");
+      setPolymarketScan({
+        status: "loading",
+        rows: [],
+        error: "",
+        scanned: 0,
+        removed: [],
+        removedCount: 0,
+        waiting: false,
+        startedAt: Date.now(),
+        completedAt: 0,
+        request: "GET /markets/keyset",
+        serverFilters: [],
+        requirements,
+      });
+      scanPolymarketMarkets({
+        filters: attributeFilters,
+        tags: polymarketMarketTags,
+        columns,
+        target,
+        signal: ac.signal,
+        match: (row) => rowMatchesAttributes(row, columns, attributeFilters),
+        explain: (row) => attributeMismatchReason(row, columns, attributeFilters),
+        onProgress: (info) => {
+          if (ac.signal.aborted) return;
+          setPolymarketScan((current) => ({
+            ...current,
+            status: "loading",
+            rows: info.rows || [],
+            scanned: info.scanned || 0,
+            removed: info.removed || [],
+            removedCount: info.removedCount || 0,
+            waiting: Boolean(info.waiting),
+            note: info.note || "",
+            request: info.request || current.request,
+            serverFilters: info.serverFilters || [],
+            requirements,
+          }));
+        },
+      })
+        .then((result) => {
+          if (ac.signal.aborted) return;
+          setPolymarketScan((current) => ({
+            ...current,
+            status: "ready",
+            rows: result.rows,
+            error: "",
+            scanned: result.scanned,
+            removed: result.removed,
+            removedCount: result.removedCount,
+            waiting: false,
+            completedAt: Date.now(),
+            truncated: result.truncated,
+            request: result.request,
+            serverFilters: result.serverFilters,
+          }));
+        })
+        .catch((error) => {
+          if (ac.signal.aborted || error?.name === "AbortError") return;
+          setPolymarketScan((current) => ({
+            ...current,
+            status: "error",
+            error: error instanceof Error ? error.message : "Pull failed",
+            waiting: false,
+            completedAt: Date.now(),
+          }));
+        });
+    }, 400);
+    return () => {
+      ac.abort();
+      window.clearTimeout(timer);
+    };
+  }, [attributeFilters, planLimit, polymarketExplore, polymarketMarketColumns, polymarketMarketTags, rowLimit]);
 
   useEffect(() => {
     if (loading || !pull?.rows) return undefined;
@@ -2997,10 +3108,17 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
       return limited;
     };
     if (polymarketLive) {
+      const scanning = tableId === "getMarkets" && polymarketScan.status !== "idle";
       const waiting = polymarketDirected.status === "loading" || (polymarketRequirement && polymarketDirected.status === "idle");
-      const source = polymarketDirected.status === "ready" ? polymarketDirected.rows || [] : waiting ? [] : pull?.rows || [];
-      const columns = pull?.columns || [];
-      const matched = source.filter((row) => rowMatchesAttributes(row, columns, attributeFilters));
+      const source = scanning
+        ? polymarketScan.rows || []
+        : polymarketDirected.status === "ready"
+          ? polymarketDirected.rows || []
+          : waiting
+            ? []
+            : pull?.rows || [];
+      const columns = scanning ? polymarketMarketColumns : pull?.columns || [];
+      const matched = scanning ? source : source.filter((row) => rowMatchesAttributes(row, columns, attributeFilters));
       const sorted = sortAttributeRows(matched, columns, sortKeys);
       return capPreview(sorted.slice(0, PREVIEW_ROW_CAP));
     }
@@ -3040,7 +3158,7 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
     const query = filterValue.trim().toLowerCase();
     const matched = !query || !filterColumn ? rows : rows.filter((row) => String(row[filterColumn] ?? "").toLowerCase().includes(query));
     return capPreview(matched);
-  }, [directPreview.rows, directPreview.status, directRowColumns, forecastRowColumns, pull, visibleCount, filterColumn, filterValue, guidedFilters, attributeFilters, sortKeys, rowLimit, integrationId, tableId, settledPreviewKey, previewSearchError, livePreviewRows, liveMarketSearch, liveDirect, liveEventCandles, liveForecast, liveMarketFanout, liveMultivariate, liveNarrowing, multivariateRowColumns, seriesAttributeColumns, listImportRows, idleAttributeRows, polymarketLive, polymarketDirected, polymarketRequirement]);
+  }, [directPreview.rows, directPreview.status, directRowColumns, forecastRowColumns, pull, visibleCount, filterColumn, filterValue, guidedFilters, attributeFilters, sortKeys, rowLimit, integrationId, tableId, settledPreviewKey, previewSearchError, livePreviewRows, liveMarketSearch, liveDirect, liveEventCandles, liveForecast, liveMarketFanout, liveMultivariate, liveNarrowing, multivariateRowColumns, seriesAttributeColumns, listImportRows, idleAttributeRows, polymarketLive, polymarketDirected, polymarketRequirement, polymarketScan, polymarketMarketColumns]);
 
   const queriedMarkets = useMemo(() => {
     if (!guidedFilters) return [];
@@ -3531,7 +3649,11 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
   // (the rows in hand, a counted match, or a historical universe), then capped by the plan and row limit.
   const previewShown = Math.min(shown, PREVIEW_ROW_CAP);
   const polymarketReadyCount =
-    polymarketLive && polymarketDirected.status === "ready" ? (polymarketDirected.rows || []).length : null;
+    polymarketLive && tableId === "getMarkets" && polymarketScan.status === "ready"
+      ? (polymarketScan.rows || []).length
+      : polymarketLive && polymarketDirected.status === "ready"
+        ? (polymarketDirected.rows || []).length
+        : null;
   const directReadyCount = (liveMarketFanout || liveForecast || liveEventCandles || liveMultivariate) && directPreview.status === "ready"
     ? (directPreview.rows || []).filter((row) =>
         rowMatchesAttributes(
@@ -3580,7 +3702,11 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
     ? `${pullTotal.toLocaleString()}${Array.isArray(listImportRows) && directPreview.truncated ? "+" : ""}`
     : "";
   const polymarketMarketUniverse =
-    polymarketLive && tableId === "getMarkets" && polymarketDirected.status !== "ready" && previewShown > 0;
+    polymarketLive &&
+    tableId === "getMarkets" &&
+    polymarketScan.status === "idle" &&
+    polymarketDirected.status !== "ready" &&
+    previewShown > 0;
   const previewCountLine = (() => {
     const noun = previewShown === 1 ? "row" : "rows";
     const head = `Previewing ${previewShown.toLocaleString()} ${noun}`;
@@ -3613,6 +3739,25 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
                   ? `${liveScan.error} ${liveMatchedRows.length.toLocaleString()} matching ${liveMatchedRows.length === 1 ? "row" : "rows"} kept.`
                   : `${previewCountLine}${liveScanNote}`
             : `${previewCountLine}${directExtra}`;
+  const polymarketScanWaiting = polymarketExplore && polymarketScan.status === "loading" && shown === 0;
+  const polymarketRemovalTape = polymarketExplore ? (
+    <MarketScanSteps
+      source="Polymarket"
+      status={polymarketScan.status}
+      scanned={polymarketScan.scanned || 0}
+      kept={Array.isArray(polymarketScan.rows) ? polymarketScan.rows.length : 0}
+      removedCount={polymarketScan.removedCount || 0}
+      removed={polymarketScan.removed || []}
+      waiting={Boolean(polymarketScan.waiting)}
+      note={polymarketScan.note || ""}
+      error={polymarketScan.error || ""}
+      startedAt={polymarketScan.startedAt || 0}
+      completedAt={polymarketScan.completedAt || 0}
+      request={polymarketScan.request || "GET /markets/keyset"}
+      serverFilters={polymarketScan.serverFilters || []}
+      requirements={polymarketScan.requirements || []}
+    />
+  ) : null;
   const liveRemovalTape = liveMarketSearch ? (
     <MarketScanSteps
       source={profile.label}
@@ -5131,7 +5276,11 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
     planned.push({ id: "place", name: "place_sheets", status: "pending", args: { tab: sheetTitle } });
     reporter.plan(planned, { title: `${venueLabel} · ${sheetTitle}` });
     connect?.close?.();
-    let marketRows = liveMatchedRows ? liveMatchedRows : filteredRows;
+    let marketRows = liveMatchedRows
+      ? liveMatchedRows
+      : polymarketScan.status !== "idle" && polymarketScan.rows?.length
+        ? polymarketScan.rows
+        : filteredRows;
     let sampledRows = null;
     reporter.start("source");
     if (historicalLake && (parentRequest || sampledRequest)) {
@@ -7315,6 +7464,12 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
                 </div>
               </AccordionContent>
             </AccordionItem>
+            {tableId === "getMarkets" && polymarketLive ? (
+              <div className="space-y-2">
+                <p className="text-[12px] font-semibold text-foreground">Tags</p>
+                <PolymarketTagPicker tags={polymarketMarketTags} onChange={setPolymarketMarketTags} />
+              </div>
+            ) : null}
             {guidedFilters || liveMarketSearch || liveDirect || polymarketLive ? (
               <AttributeFilters
                 columns={
@@ -7332,6 +7487,8 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
                           ? liveAttributeColumns
                           : liveMarketFanout || liveEventCandles
                             ? directAttributeColumns
+                            : tableId === "getMarkets" && polymarketMarketColumns.length
+                              ? polymarketMarketColumns
                             : pull?.columns || []
                 }
                 filters={attributeFilters}
@@ -8013,7 +8170,7 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
                 Refresh
               </Button>
             </div>
-          ) : loading || emptyRefresh || livePickAwaitingRows || liveScanWaiting || directLoading || polymarketDirected.status === "loading" ? (
+          ) : loading || emptyRefresh || livePickAwaitingRows || liveScanWaiting || polymarketScanWaiting || directLoading || polymarketDirected.status === "loading" ? (
             <div className="flex h-full flex-col gap-3">
               {integrationId === "chainlink" || integrationId === "binance" ? <WaitingToConnectTag /> : null}
               {livePickAwaitingRows ? (
@@ -8022,6 +8179,7 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
                 <p className="text-[13px] text-muted-foreground">Searching for matching rows</p>
               ) : null}
               {liveRemovalTape}
+              {polymarketRemovalTape}
               <div className="min-h-0 flex-1">
                 <SkeletonRows />
               </div>
@@ -8029,6 +8187,7 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
           ) : previewIsEmpty ? (
             <div className="flex h-full flex-col">
               {liveRemovalTape}
+              {polymarketRemovalTape}
               <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-3 rounded-xl border border-border/70 bg-background px-6 text-center shadow-sm">
                 <p className="max-w-md text-[13px] leading-relaxed text-muted-foreground">{liveEmptyLine}</p>
                 {tickerPrompt ? null : (
@@ -8041,6 +8200,7 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
           ) : marketsGrid.columns.length ? (
             <div className="flex h-full min-h-0 flex-col">
               {liveRemovalTape}
+              {polymarketRemovalTape}
               <div className="min-h-0 flex-1">
             <IntegrationBuildGrid
               columns={marketsGrid.columns}

@@ -8,6 +8,11 @@ import {
   polymarketLiveRealtimeEndpointIds,
   polymarketPickFromSuggestion,
 } from "./polymarketLiveBuild.js";
+import {
+  flattenPolymarketMarket,
+  polymarketMarketAttributeColumns,
+  polymarketMarketServerParams,
+} from "../../lib/polymarketLive/polymarketMarketScan.js";
 
 const endpoints = polymarketLiveBuildEndpoints();
 const ids = endpoints.map((endpoint) => endpoint.id);
@@ -57,5 +62,30 @@ assert.equal(pick?.kind, "market");
 assert.equal(pick?.label, "Will it rain?");
 assert.deepEqual(pick?.tokenIds, ["111"]);
 assert.equal(polymarketPickFromSuggestion({ entity: "tag", title: "Sports" }), null);
+
+const marketColumns = polymarketLiveBuildColumns("getMarkets");
+assert.ok(marketColumns.some((column) => column.id === "tags"));
+assert.ok(marketColumns.some((column) => column.id === "feeSchedule_rate"));
+const flat = flattenPolymarketMarket({
+  id: "1",
+  question: "Will it rain?",
+  tags: [{ id: "4", label: "Politics" }],
+  feeSchedule: { rate: 0.04, takerOnly: true },
+  imageOptimized: { id: "img" },
+});
+assert.equal(flat.tags, "Politics");
+assert.equal(flat.feeSchedule_rate, 0.04);
+assert.equal(flat.imageOptimized_id, "img");
+const ordered = polymarketMarketAttributeColumns(marketColumns);
+assert.ok(ordered.findIndex((column) => column.id === "id") < ordered.findIndex((column) => column.id === "question"));
+assert.equal(ordered.find((column) => column.id === "startDate")?.control, "query-range");
+const server = polymarketMarketServerParams(
+  { volumeNum: { min: "10", max: "20" }, slug: { containsTags: ["trump"] } },
+  [{ id: "9", label: "Politics" }],
+);
+assert.equal(server.params.volume_num_min, "10");
+assert.equal(server.params.tag_id, "9");
+assert.equal(server.params.include_tag, "true");
+assert.equal(server.params.slug, undefined);
 
 console.log("polymarket live build ok");
