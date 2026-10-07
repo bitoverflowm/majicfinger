@@ -7,6 +7,7 @@ import {
   polymarketLiveBuildSearch,
   polymarketLiveRealtimeEndpointIds,
   polymarketPickFromSuggestion,
+  POLYMARKET_CLOSED_ORDERBOOK_MESSAGE,
 } from "./polymarketLiveBuild.js";
 import {
   flattenPolymarketMarket,
@@ -79,6 +80,20 @@ const pick = polymarketPickFromSuggestion({
 assert.equal(pick?.kind, "market");
 assert.equal(pick?.label, "Will it rain?");
 assert.deepEqual(pick?.tokenIds, ["111"]);
+assert.equal(pick?.closed, false);
+const closedPick = polymarketPickFromSuggestion({
+  entity: "market",
+  id: "2",
+  title: "Already settled",
+  closed: true,
+  conditionId: "0xdef",
+  raw: { clobTokenIds: ["222"], closed: true },
+});
+assert.equal(closedPick?.closed, true);
+assert.equal(
+  POLYMARKET_CLOSED_ORDERBOOK_MESSAGE,
+  "Market is closed so no live orderbook snapshot is available.",
+);
 assert.equal(polymarketPickFromSuggestion({ entity: "tag", title: "Sports" }), null);
 
 const marketColumns = polymarketLiveBuildColumns("getMarkets");

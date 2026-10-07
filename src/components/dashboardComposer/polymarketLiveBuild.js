@@ -211,7 +211,49 @@ export function polymarketPickFromSuggestion(suggestion) {
     tokenIds: Array.isArray(ref?.tokenIds) ? ref.tokenIds : [],
     outcomes: Array.isArray(ref?.outcomes) ? ref.outcomes : [],
     address,
+    closed: marketIsClosed(suggestion) || marketIsClosed(suggestion.raw),
   };
+}
+
+export const POLYMARKET_CLOSED_ORDERBOOK_MESSAGE =
+  "Market is closed so no live orderbook snapshot is available.";
+
+/** Market-scoped pulls. Each selected market becomes its own sheet. */
+export function polymarketMarketFanout(tableId) {
+  return isPolymarketQuoteTable(tableId) || tableId === "getHoldersByMarkets";
+}
+
+export function polymarketPickMatchesRow(pick, row) {
+  if (!pick || !row || typeof row !== "object") return false;
+  const title = String(row.market_title || "").trim();
+  const id = String(row.market_id || "").trim();
+  const slug = String(row.market_slug || "").trim();
+  const condition = String(row.condition_id || row.conditionId || "").trim();
+  if (id && String(pick.entityId || "") === id) return true;
+  if (condition && String(pick.conditionId || "") === condition) return true;
+  if (slug && String(pick.slug || "") === slug) return true;
+  if (title && (title === String(pick.title || "") || title === String(pick.label || ""))) return true;
+  return false;
+}
+
+export function polymarketRowsForMarket(rows, pick, picks) {
+  const list = Array.isArray(rows) ? rows : [];
+  const selected = (Array.isArray(picks) ? picks : []).filter(Boolean);
+  if (!pick || selected.length < 2) return list;
+  const matched = list.filter((row) => polymarketPickMatchesRow(pick, row));
+  const anyClaimed = list.some((row) => selected.some((item) => polymarketPickMatchesRow(item, row)));
+  if (!anyClaimed && String(selected[0]?.id || "") === String(pick.id || "")) return list;
+  return matched;
+}
+
+function marketIsClosed(value) {
+  if (!value || typeof value !== "object") return value === true || value === "true";
+  return value.closed === true || value.closed === "true";
+}
+
+function isMissingOrderbookError(error) {
+  const text = error instanceof Error ? error.message : String(error || "");
+  return /no orderbook exists/i.test(text);
 }
 
 function titleFor(name) {
@@ -336,7 +378,8 @@ function objectRows(payload) {
 
 async function resolveMarket(pick) {
   if (!pick) return null;
-  if (pick.tokenIds?.length && pick.conditionId) return pick;
+  const closedKnown = pick.closed === true || pick.closed === false;
+  if (pick.tokenIds?.length && pick.conditionId && closedKnown) return pick;
   const params = pick.entityId
     ? { id: pick.entityId, limit: "1" }
     : pick.slug
@@ -358,6 +401,7 @@ async function resolveMarket(pick) {
     conditionId: String(row.conditionId || row.condition_id || pick.conditionId || ""),
     tokenIds,
     outcomes: parseOutcomeList(row.outcomes),
+    closed: marketIsClosed(row) || pick.closed === true,
   };
 }
 
@@ -464,20 +508,36 @@ async function quoteRows(endpointId, picks, options = {}) {
     );
     return rows;
   }
-  const pairs = quotePairs(markets, filters);
+  const bookMarkets =
+    endpointId === "getOrderbooks" ? markets.filter((market) => market.closed !== true) : markets;
+  if (endpointId === "getOrderbooks" && markets.length && !bookMarkets.length) {
+    throw new Error(POLYMARKET_CLOSED_ORDERBOOK_MESSAGE);
+  }
+  const pairs = quotePairs(bookMarkets, filters);
   if (!pairs.length) throw new Error("This market has no CLOB token id.");
   if (endpointId === "getOrderbooks") {
     const side = polymarketBookSide(filters);
     const depth = polymarketBookDepth(filters);
     const books = await Promise.all(
       pairs.map(async (pair) => {
-        const payload = await polymarketGet("getOrderBook", { token_id: pair.tokenId });
-        return unwrapBooks(payload).flatMap((page) =>
-          expandOrderBookSummaryToRows(sliceBookLevels(page, depth), {
-            side,
-            marketMeta: marketRef(pair.market),
-          }),
-        );
+        try {
+          const payload = await polymarketGet("getOrderBook", { token_id: pair.tokenId });
+          return unwrapBooks(payload).flatMap((page) =>
+            expandOrderBookSummaryToRows(sliceBookLevels(page, depth), {
+              side,
+              marketMeta: marketRef(pair.market),
+            }),
+          );
+        } catch (error) {
+          if (pair.market?.closed === true || isMissingOrderbookError(error)) {
+            throw new Error(
+              pair.market?.closed === true
+                ? POLYMARKET_CLOSED_ORDERBOOK_MESSAGE
+                : "No orderbook exists for the requested token id.",
+            );
+          }
+          throw error;
+        }
       }),
     );
     return books.flat().map((row) => ({
@@ -676,7 +736,11 @@ async function directedRows(endpointId, picks, options = {}) {
     return objectRows(data);
   }
   if (isPolymarketQuoteTable(endpointId)) return quoteRows(endpointId, picks, options);
-  if (REQUIREMENTS[endpointId]?.kind === "token") return tokenRows(endpointId, pick);
+  if (endpointId === "getHoldersByMarkets") {
+    const rows = [];
+    for (const item of picks) rows.push(...(await tokenRows(endpointId, item)));
+    return rows;
+  }
   return discoveryRows(endpointId);
 }
 

@@ -38,9 +38,12 @@ import {
 } from "@/components/dashboardComposer/integrationBuildCatalog";
 import {
   loadPolymarketLiveTable,
+  POLYMARKET_CLOSED_ORDERBOOK_MESSAGE,
   polymarketLiveBuildRequirement,
   polymarketLiveBuildSearch,
+  polymarketMarketFanout,
   polymarketPickFromSuggestion,
+  polymarketRowsForMarket,
 } from "@/components/dashboardComposer/polymarketLiveBuild";
 import { PolymarketLiveBuildSearch } from "@/components/dashboardComposer/polymarketLiveBuildSearch";
 import {
@@ -2119,6 +2122,10 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
   const polymarketRequirement = polymarketLive ? polymarketLiveBuildRequirement(tableId) : null;
   const polymarketSearch = polymarketLive ? polymarketLiveBuildSearch(tableId) : null;
   const polymarketCenterSearch = Boolean(polymarketRequirement) && livePicks.length === 0;
+  const polymarketFanoutOn = polymarketLive && polymarketMarketFanout(tableId) && livePicks.length > 1;
+  const polymarketActivePick = polymarketFanoutOn
+    ? livePicks.find((pick) => previewSheet === `polymarket:${pick.id}`) || livePicks[0]
+    : null;
   const polymarketMarketColumns = useMemo(
     () => (polymarketLive && tableId === "getMarkets" ? polymarketMarketAttributeColumns(pull?.columns || []) : []),
     [polymarketLive, tableId, pull?.columns],
@@ -2295,6 +2302,12 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
       window.clearTimeout(timer);
     };
   }, [livePicks, polymarketLive, polymarketQuoteKey, tableId]);
+
+  useEffect(() => {
+    if (!previewSheet.startsWith("polymarket:")) return;
+    const id = previewSheet.slice("polymarket:".length);
+    if (!livePicks.some((pick) => pick.id === id)) setPreviewSheet("source");
+  }, [livePicks, previewSheet]);
 
   useEffect(() => {
     if (!polymarketExplore) {
@@ -3144,6 +3157,13 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
     return sortAttributeRows(matched, columns, sortKeys);
   }, [attributeFilters, directPreview.status, directRowColumns, eventAttributeColumns, forecastRowColumns, liveDirect, liveEventCandles, liveEventSearch, liveForecast, liveMarketFanout, liveMultivariate, liveSeriesSearch, liveTrader, multivariateRowColumns, pull?.rows, seriesAttributeColumns, sortKeys, traderAttributeColumns]);
 
+  const polymarketSheetSource = useMemo(() => {
+    if (!polymarketLive || polymarketDirected.status !== "ready") return null;
+    const rows = polymarketDirected.rows || [];
+    if (!polymarketFanoutOn || !polymarketActivePick) return rows;
+    return polymarketRowsForMarket(rows, polymarketActivePick, livePicks);
+  }, [livePicks, polymarketActivePick, polymarketDirected.rows, polymarketDirected.status, polymarketFanoutOn, polymarketLive]);
+
   const filteredRows = useMemo(() => {
     const requested = Number(rowLimit);
     const capPreview = (rows) => {
@@ -3156,7 +3176,7 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
       const source = scanning
         ? polymarketScan.rows || []
         : polymarketDirected.status === "ready"
-          ? polymarketDirected.rows || []
+          ? polymarketSheetSource || []
           : waiting
             ? []
             : pull?.rows || [];
@@ -3207,7 +3227,7 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
     const query = filterValue.trim().toLowerCase();
     const matched = !query || !filterColumn ? rows : rows.filter((row) => String(row[filterColumn] ?? "").toLowerCase().includes(query));
     return capPreview(matched);
-  }, [directPreview.rows, directPreview.status, directRowColumns, forecastRowColumns, pull, visibleCount, filterColumn, filterValue, guidedFilters, attributeFilters, sortKeys, rowLimit, integrationId, tableId, settledPreviewKey, previewSearchError, livePreviewRows, liveMarketSearch, liveDirect, liveEventCandles, liveForecast, liveMarketFanout, liveMultivariate, liveNarrowing, multivariateRowColumns, seriesAttributeColumns, listImportRows, idleAttributeRows, polymarketLive, polymarketDirected, polymarketRequirement, polymarketScan, polymarketMarketColumns, polymarketSamplingColumns, polymarketQuoteColumns]);
+  }, [directPreview.rows, directPreview.status, directRowColumns, forecastRowColumns, pull, visibleCount, filterColumn, filterValue, guidedFilters, attributeFilters, sortKeys, rowLimit, integrationId, tableId, settledPreviewKey, previewSearchError, livePreviewRows, liveMarketSearch, liveDirect, liveEventCandles, liveForecast, liveMarketFanout, liveMultivariate, liveNarrowing, multivariateRowColumns, seriesAttributeColumns, listImportRows, idleAttributeRows, polymarketLive, polymarketDirected, polymarketRequirement, polymarketScan, polymarketMarketColumns, polymarketSamplingColumns, polymarketQuoteColumns, polymarketSheetSource]);
 
   const queriedMarkets = useMemo(() => {
     if (!guidedFilters) return [];
@@ -3663,8 +3683,8 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
           directPreview.visibility &&
           !/^(public|visible)$/i.test(directPreview.visibility)
         ? " These trades are private."
-        : polymarketLive && polymarketDirected.status === "ready" && livePicks.length > 1
-          ? " Previewing the first selection."
+        : polymarketFanoutOn && polymarketDirected.status === "ready"
+          ? " Each market gets its own sheet."
         : "";
 
   useEffect(() => {
@@ -3703,7 +3723,7 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
     polymarketScan.status === "ready"
       ? (polymarketScan.rows || []).length
       : polymarketLive && polymarketDirected.status === "ready"
-        ? (polymarketDirected.rows || []).length
+        ? (polymarketSheetSource || polymarketDirected.rows || []).length
         : null;
   const directReadyCount = (liveMarketFanout || liveForecast || liveEventCandles || liveMultivariate) && directPreview.status === "ready"
     ? (directPreview.rows || []).filter((row) =>
@@ -3863,7 +3883,14 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
         : multivariateCenterSearch
           ? "Search for a series"
           : "";
-  const liveEmptyLine = polymarketCenterSearch
+  const polymarketClosedSheet =
+    tableId === "getOrderbooks" &&
+    polymarketActivePick?.closed === true &&
+    polymarketDirected.status === "ready" &&
+    shown === 0;
+  const liveEmptyLine = polymarketClosedSheet
+    ? POLYMARKET_CLOSED_ORDERBOOK_MESSAGE
+    : polymarketCenterSearch
     ? polymarketRequirement.prompt
     : tickerPrompt
     ? tickerPrompt
@@ -6091,6 +6118,39 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
           return;
         }
       }
+    } else if (polymarketLive && polymarketMarketFanout(tableId) && livePicks.length > 1 && keepParentDataset && shownColumns.length) {
+      const matchColumns = polymarketQuoteColumns.length ? polymarketQuoteColumns : pull?.columns || [];
+      const requested = Number(rowLimit);
+      const limit = Number.isFinite(sheetCap) ? sheetCap : PREVIEW_ROW_CAP;
+      livePicks.forEach((pick) => {
+        const matched = polymarketRowsForMarket(polymarketDirected.rows || [], pick, livePicks).filter((row) =>
+          rowMatchesAttributes(row, matchColumns, attributeFilters),
+        );
+        const sorted = sortAttributeRows(matched, matchColumns, sortKeys);
+        const fullRows =
+          Number.isFinite(requested) && requested > 0 ? sorted.slice(0, Math.min(requested, limit)) : sorted.slice(0, limit);
+        if (!fullRows.length) return;
+        const label = pick.label || pick.title || "Market";
+        const safe = String(pick.id || label).replace(/[^A-Za-z0-9]+/g, "-");
+        const built = applyFunctionColumns(
+          shownColumns,
+          fullRows.slice(0, PREVIEW_ROW_CAP),
+          functionsForSheet("markets"),
+          formulaSheets,
+          "markets",
+          activeFunction?.id,
+        );
+        sheets.push({
+          id: `run-polymarket-${tableId}-${safe}`,
+          title: `${sheetTitle} · ${label}`,
+          columns: built.columns.length ? built.columns : shownColumns,
+          rows: built.rows,
+          rowCount: fullRows.length,
+          span: "half",
+          table: tableId,
+          summary: `Polymarket Live · ${sheetTitle} · ${label}`,
+        });
+      });
     } else if (runMarkets.columns.length && keepParentDataset) {
       sheets.push({
         id: tableId === "trades" ? "run-trades" : "run-markets",
@@ -6711,7 +6771,7 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
       setJoinTab("markets");
       if (tradesQuery && joinPlacement === "sheet") setMetadataTab("trades");
     } else if (id === "markets-meta") setMetadataTab("markets");
-    else if (!id.startsWith("bucket:") && !id.startsWith("column:") && id !== "summary") setJoinTab(id);
+    else if (!id.startsWith("bucket:") && !id.startsWith("column:") && !id.startsWith("polymarket:") && id !== "summary") setJoinTab(id);
     setFunctionScrollKey((key) => key + 1);
   }
 
@@ -6721,9 +6781,19 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
       title:
         liveMarketFanout && directMarkets[0]
           ? `${sheetTitle} · ${directMarkets[0].ticker}`
-          : sheetTitle,
+          : polymarketFanoutOn && livePicks[0]
+            ? `${sheetTitle} · ${livePicks[0].label || livePicks[0].title || "Market"}`
+            : sheetTitle,
     },
   ];
+  if (polymarketFanoutOn) {
+    livePicks.slice(1).forEach((pick) => {
+      previewTabs.push({
+        id: `polymarket:${pick.id}`,
+        title: `${sheetTitle} · ${pick.label || pick.title || "Market"}`,
+      });
+    });
+  }
   if (liveMarketFanout && directMarkets.length > 1) {
     directMarkets.slice(1).forEach((market) => {
       previewTabs.push({
