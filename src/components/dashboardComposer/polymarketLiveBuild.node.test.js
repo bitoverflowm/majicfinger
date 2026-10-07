@@ -21,6 +21,7 @@ assert.ok(ids.includes("getEvents"));
 assert.ok(ids.includes("series"));
 assert.ok(ids.includes("getTraderLeaderboard"));
 assert.equal(endpoints.find((endpoint) => endpoint.id === "getOrderbooks")?.category, "markets");
+assert.equal(endpoints.find((endpoint) => endpoint.id === "getMarketsByEvents")?.category, "events");
 assert.equal(endpoints.find((endpoint) => endpoint.id === "getTraderLeaderboard")?.category, "holders");
 assert.equal(endpoints.find((endpoint) => endpoint.id === "getOrderbooks")?.realtime, true);
 assert.equal(endpoints.find((endpoint) => endpoint.id === "getEvents")?.realtime, false);

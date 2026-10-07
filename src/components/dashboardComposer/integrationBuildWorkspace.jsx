@@ -7175,7 +7175,7 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
                   <ChevronDown className="ml-2 size-4 shrink-0 text-muted-foreground" />
                 </button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="start" className="z-[580] w-[300px]">
+              <DropdownMenuContent align="start" className="z-[580] max-h-[var(--radix-dropdown-menu-content-available-height)] w-[300px] overflow-y-auto">
                 {visibleTableIds.map((id) => (
                   <DropdownMenuItem key={id} onSelect={() => setTableId(id)}>
                     <span className="min-w-0">

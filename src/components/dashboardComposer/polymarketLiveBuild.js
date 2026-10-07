@@ -18,7 +18,7 @@ export const POLYMARKET_LIVE_BUILD_CATEGORIES = [
 const BUILD_GROUP = {
   getMarkets: "markets",
   getSamplingMarkets: "markets",
-  getMarketsByEvents: "markets",
+  getMarketsByEvents: "events",
   getOpenInterestCompose: "markets",
   getMarketPrices: "markets",
   getOrderbooks: "markets",
