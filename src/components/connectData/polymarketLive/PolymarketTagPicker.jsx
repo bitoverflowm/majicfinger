@@ -72,9 +72,10 @@ function mergeTagOptions(...lists) {
  *   onChange: (tags: PolymarketTagOption[]) => void;
  *   disabled?: boolean;
  *   className?: string;
+ *   hideLabel?: boolean;
  * }} props
  */
-export function PolymarketTagPicker({ tags, onChange, disabled = false, className }) {
+export function PolymarketTagPicker({ tags, onChange, disabled = false, className, hideLabel = false }) {
   const [tagCatalog, setTagCatalog] = useState(/** @type {PolymarketTagOption[]} */ ([]));
   const [tagsLoading, setTagsLoading] = useState(false);
   const [tagsLoadingMore, setTagsLoadingMore] = useState(false);
@@ -388,7 +389,7 @@ export function PolymarketTagPicker({ tags, onChange, disabled = false, classNam
 
   return (
     <div className={cn("space-y-1.5", className)}>
-      <Label className="text-[11px] text-foreground">Tags</Label>
+      {hideLabel ? null : <Label className="text-[11px] text-foreground">Tags</Label>}
       <Popover open={tagPickerOpen} onOpenChange={handleTagPickerOpenChange}>
         <PopoverTrigger asChild>
           <Button

@@ -43,11 +43,12 @@ import {
   polymarketPickFromSuggestion,
 } from "@/components/dashboardComposer/polymarketLiveBuild";
 import { PolymarketLiveBuildSearch } from "@/components/dashboardComposer/polymarketLiveBuildSearch";
-import { PolymarketTagPicker } from "@/components/connectData/polymarketLive/PolymarketTagPicker";
 import {
   POLYMARKET_MARKET_SCAN_CAP,
+  formatPolymarketMatchEstimate,
   polymarketMarketAttributeColumns,
   polymarketMarketFiltersActive,
+  polymarketMatchEstimate,
   scanPolymarketMarkets,
 } from "@/lib/polymarketLive/polymarketMarketScan";
 import { Accordion, AccordionContent, AccordionItem } from "@/components/ui/accordion";
@@ -2001,7 +2002,6 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
   const [directPreview, setDirectPreview] = useState({ status: "idle", rows: [], error: "", ticker: "" });
   const [polymarketDirected, setPolymarketDirected] = useState({ status: "idle", rows: [], error: "" });
   const [polymarketScan, setPolymarketScan] = useState({ status: "idle", rows: [], error: "" });
-  const [polymarketMarketTags, setPolymarketMarketTags] = useState([]);
   const [liveScan, setLiveScan] = useState({ status: "idle", rows: [], error: "", exhausted: true, truncated: false });
   const liveFetchRef = useRef(new Set());
   const [universe, setUniverse] = useState(null);
@@ -2114,7 +2114,7 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
   const polymarketExplore =
     polymarketLive &&
     tableId === "getMarkets" &&
-    polymarketMarketFiltersActive(polymarketMarketColumns, attributeFilters, polymarketMarketTags);
+    polymarketMarketFiltersActive(polymarketMarketColumns, attributeFilters);
 
   useEffect(() => {
     if (!liveSeriesSearch) return undefined;
@@ -2169,7 +2169,6 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
     setDirectPreview({ status: "idle", rows: [], error: "", ticker: "", events: [] });
     setPolymarketDirected({ status: "idle", rows: [], error: "" });
     setPolymarketScan({ status: "idle", rows: [], error: "" });
-    setPolymarketMarketTags([]);
     setForecastJoinIds(new Set());
     setEventExtraPreview({});
     setLiveScan({ status: "idle", rows: [], error: "", exhausted: true, truncated: false });
@@ -2274,7 +2273,6 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
       const requirements = columns
         .filter((column) => attributeSummary(column, attributeFilters))
         .map((column) => column.title || column.id);
-      if (polymarketMarketTags.length) requirements.push("Tags");
       setPolymarketScan({
         status: "loading",
         rows: [],
@@ -2291,7 +2289,6 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
       });
       scanPolymarketMarkets({
         filters: attributeFilters,
-        tags: polymarketMarketTags,
         columns,
         target,
         signal: ac.signal,
@@ -2306,6 +2303,7 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
             scanned: info.scanned || 0,
             removed: info.removed || [],
             removedCount: info.removedCount || 0,
+            exhausted: Boolean(info.exhausted),
             waiting: Boolean(info.waiting),
             note: info.note || "",
             request: info.request || current.request,
@@ -2324,6 +2322,7 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
             scanned: result.scanned,
             removed: result.removed,
             removedCount: result.removedCount,
+            exhausted: Boolean(result.exhausted),
             waiting: false,
             completedAt: Date.now(),
             truncated: result.truncated,
@@ -2346,7 +2345,7 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
       ac.abort();
       window.clearTimeout(timer);
     };
-  }, [attributeFilters, planLimit, polymarketExplore, polymarketMarketColumns, polymarketMarketTags, rowLimit]);
+  }, [attributeFilters, planLimit, polymarketExplore, polymarketMarketColumns, rowLimit]);
 
   useEffect(() => {
     if (loading || !pull?.rows) return undefined;
@@ -3707,10 +3706,22 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
     polymarketScan.status === "idle" &&
     polymarketDirected.status !== "ready" &&
     previewShown > 0;
+  const polymarketMatchGuess =
+    polymarketLive && tableId === "getMarkets" && polymarketScan.status !== "idle"
+      ? polymarketMatchEstimate({
+          scanned: polymarketScan.scanned,
+          removedCount: polymarketScan.removedCount,
+          exhausted: polymarketScan.exhausted,
+        })
+      : null;
+  const polymarketMatchGuessText = formatPolymarketMatchEstimate(polymarketMatchGuess);
   const previewCountLine = (() => {
     const noun = previewShown === 1 ? "row" : "rows";
     const head = `Previewing ${previewShown.toLocaleString()} ${noun}`;
     if (polymarketMarketUniverse) return `${head} of 10M + rows`;
+    if (polymarketMatchGuessText && previewShown > 0 && polymarketMatchGuess.total >= previewShown) {
+      return `Previewing ${previewShown.toLocaleString()} of ${polymarketMatchGuessText} matching`;
+    }
     if (pullTotal == null) return `${head} of …`;
     if (pullTotal > previewShown) {
       const totalNoun = pullTotal === 1 ? "row" : "rows";
@@ -7464,12 +7475,6 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
                 </div>
               </AccordionContent>
             </AccordionItem>
-            {tableId === "getMarkets" && polymarketLive ? (
-              <div className="space-y-2">
-                <p className="text-[12px] font-semibold text-foreground">Tags</p>
-                <PolymarketTagPicker tags={polymarketMarketTags} onChange={setPolymarketMarketTags} />
-              </div>
-            ) : null}
             {guidedFilters || liveMarketSearch || liveDirect || polymarketLive ? (
               <AttributeFilters
                 columns={

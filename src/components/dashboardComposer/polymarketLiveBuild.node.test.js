@@ -10,8 +10,10 @@ import {
 } from "./polymarketLiveBuild.js";
 import {
   flattenPolymarketMarket,
+  formatPolymarketMatchEstimate,
   polymarketMarketAttributeColumns,
   polymarketMarketServerParams,
+  polymarketMatchEstimate,
 } from "../../lib/polymarketLive/polymarketMarketScan.js";
 
 const endpoints = polymarketLiveBuildEndpoints();
@@ -79,6 +81,7 @@ assert.equal(flat.imageOptimized_id, "img");
 const ordered = polymarketMarketAttributeColumns(marketColumns);
 assert.ok(ordered.findIndex((column) => column.id === "id") < ordered.findIndex((column) => column.id === "question"));
 assert.equal(ordered.find((column) => column.id === "startDate")?.control, "query-range");
+assert.equal(ordered.find((column) => column.id === "tags")?.control, "tag-picker");
 const server = polymarketMarketServerParams(
   { volumeNum: { min: "10", max: "20" }, slug: { containsTags: ["trump"] } },
   [{ id: "9", label: "Politics" }],
@@ -87,5 +90,9 @@ assert.equal(server.params.volume_num_min, "10");
 assert.equal(server.params.tag_id, "9");
 assert.equal(server.params.include_tag, "true");
 assert.equal(server.params.slug, undefined);
+const trumpGuess = polymarketMatchEstimate({ scanned: 3193, removedCount: 3143, exhausted: false });
+assert.equal(formatPolymarketMatchEstimate(trumpGuess), "~157,000");
+assert.equal(polymarketMatchEstimate({ scanned: 40, removedCount: 10, exhausted: false }), null);
+assert.equal(formatPolymarketMatchEstimate(polymarketMatchEstimate({ scanned: 80, removedCount: 30, exhausted: true })), "50");
 
 console.log("polymarket live build ok");

@@ -11,6 +11,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Popover, PopoverClose, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { KalshiLiveTimestampPicker } from "@/components/connectData/kalshiLive/KalshiLiveTimestampPicker";
+import { PolymarketTagPicker } from "@/components/connectData/polymarketLive/PolymarketTagPicker";
 import { cellMatchesTextTerm, columnUsesWholeTerm } from "@/lib/textTermMatch";
 import { DATE_RANGE_PRESETS, activeDateRangePreset, dateRangePreset } from "@/components/dashboardComposer/dateRangePresets";
 import { KALSHI_LIVE_CANDLESTICK_PERIOD_OPTIONS } from "@/lib/kalshiLive/candlesticksColumns";
@@ -68,6 +69,7 @@ const BOOLEAN_OPTIONS = [
 ];
 
 export function kalshiHistoricalAttributeSpec(column) {
+  if (column?.control === "tag-picker") return { kind: "tag-picker" };
   if (column?.control === "query-range") return { kind: "query-range" };
   if (column?.control === "period") return { kind: "period", options: column.enumOptions || [] };
   if (column?.control === "depth") return { kind: "depth" };
@@ -125,6 +127,7 @@ function isActive(spec, filter) {
   if (spec.kind === "updated-after") return Number(filter.minUpdatedTs) > 0;
   if (spec.kind === "query-range" || spec.kind === "date") return Boolean(filter.from) || Boolean(filter.to);
   if (spec.kind === "period" || spec.kind === "depth") return String(filter.value ?? "").trim() !== "";
+  if (spec.kind === "tag-picker") return Array.isArray(filter.selectedTags) && filter.selectedTags.length > 0;
   return textTerms(filter.containsTags, filter.contains).length > 0 || textTerms(filter.excludesTags, filter.excludes).length > 0;
 }
 
@@ -212,6 +215,11 @@ export function attributeSummary(column, filters) {
     if (label) parts.push(String(label));
   } else if (spec.kind === "depth") {
     if (String(filter.value ?? "").trim() !== "") parts.push(String(filter.value));
+  } else if (spec.kind === "tag-picker") {
+    const labels = (Array.isArray(filter.selectedTags) ? filter.selectedTags : [])
+      .map((tag) => tag?.label || tag?.slug || tag?.id)
+      .filter(Boolean);
+    if (labels.length) parts.push(labels.join(", "));
   } else if (spec.kind === "text") {
     const include = textTerms(filter.containsTags, filter.contains);
     const exclude = textTerms(filter.excludesTags, filter.excludes);
@@ -242,6 +250,7 @@ export function attributeMismatchReason(row, columns, filters) {
     const spec = kalshiHistoricalAttributeSpec(column);
     const filter = readFilter(filters, column);
     if (!isActive(spec, filter)) continue;
+    if (spec.kind === "tag-picker") continue;
     const raw = row?.[column.id];
     const title = column.title || column.id;
     if (filter.excludeNull && isMissingValue(raw)) return `${title} is empty`;
@@ -302,6 +311,7 @@ export function buildKalshiHistoricalFilterPredicates(columns, filters) {
     const spec = kalshiHistoricalAttributeSpec(column);
     const filter = readFilter(filters, column);
     if (!isActive(spec, filter)) continue;
+    if (spec.kind === "tag-picker") continue;
     if (filter.excludeNull) {
       const kind =
         spec.kind === "number" ? "number" : spec.kind === "date" ? "date" : spec.kind === "boolean" ? "boolean" : "string";
@@ -736,6 +746,16 @@ function AttributeFields({ column, filters, onChange }) {
       onChange={(next) => onChange(patchFilter(filters, column, { excludeNull: next }))}
     />
   );
+  if (spec.kind === "tag-picker") {
+    const selected = Array.isArray(filter.selectedTags) ? filter.selectedTags : [];
+    return (
+      <PolymarketTagPicker
+        hideLabel
+        tags={selected}
+        onChange={(selectedTags) => onChange(patchFilter(filters, column, { selectedTags }))}
+      />
+    );
+  }
   if (spec.kind === "enum" && column.control === "category") {
     if (spec.loading && !spec.options.length) {
       return <p className="text-[11px] text-muted-foreground">Loading categories…</p>;
@@ -1051,7 +1071,7 @@ export function KalshiHistoricalAttributeFilters({
                       <div className="space-y-3 rounded-lg border border-border/70 px-2 py-2">
                         {panel.columns.map((column, index) => (
                           <div key={column.id} className={index > 0 ? "border-t border-border/70 pt-3" : undefined}>
-                            {column.description ? (
+                            {column.description && column.control !== "tag-picker" ? (
                               <p className="mb-2 text-[11px] leading-relaxed text-muted-foreground">{column.description}</p>
                             ) : null}
                             <AttributeFields column={column} filters={filters} onChange={onChange} />

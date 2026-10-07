@@ -5,6 +5,40 @@
  */
 
 export const POLYMARKET_MARKET_SCAN_CAP = 20_000;
+/** Open catalog size used when a filtered walk stops before the last page. */
+export const POLYMARKET_MARKET_UNIVERSE = 10_000_000;
+const ESTIMATE_MIN_SCAN = 200;
+
+/**
+ * Project how many markets could match.
+ * A finished walk is exact. An early stop scales the observed hit rate to the catalog.
+ * @param {{ scanned?: number, removedCount?: number, exhausted?: boolean }} sample
+ * @returns {{ total: number, estimated: boolean } | null}
+ */
+export function polymarketMatchEstimate(sample = {}) {
+  const seen = Math.max(0, Number(sample.scanned) || 0);
+  const removed = Math.max(0, Number(sample.removedCount) || 0);
+  const matches = Math.max(0, seen - removed);
+  if (seen <= 0) return null;
+  if (sample.exhausted) return { total: matches, estimated: false };
+  if (seen < ESTIMATE_MIN_SCAN) return null;
+  const projected = Math.round((matches / seen) * POLYMARKET_MARKET_UNIVERSE);
+  const total = Math.max(matches, Math.min(POLYMARKET_MARKET_UNIVERSE, projected));
+  return { total, estimated: true };
+}
+
+/** Compact label for the preview line. Estimates are rounded and marked. */
+export function formatPolymarketMatchEstimate(estimate) {
+  if (!estimate || !Number.isFinite(estimate.total)) return "";
+  const { total, estimated } = estimate;
+  if (!estimated) return total.toLocaleString();
+  if (total >= POLYMARKET_MARKET_UNIVERSE) return "10M +";
+  let rounded = total;
+  if (total >= 1_000_000) rounded = Math.round(total / 100_000) * 100_000;
+  else if (total >= 10_000) rounded = Math.round(total / 1_000) * 1_000;
+  else if (total >= 1_000) rounded = Math.round(total / 100) * 100;
+  return `~${rounded.toLocaleString()}`;
+}
 const PAGE_SIZE = 100;
 const PAGE_GAP_MS = 400;
 const MAX_RATE_RETRIES = 6;
@@ -158,6 +192,7 @@ export function polymarketMarketAttributeColumns(columns) {
     const id = column.id;
     let next = column;
     if (id === "startDate" || id === "endDate") next = { ...next, control: "query-range", type: "date" };
+    else if (id === "tags") next = { ...next, control: "tag-picker", description: "" };
     else if (NUMBER_IDS.has(id)) next = { ...next, type: "number" };
     else if (BOOLEAN_IDS.has(id)) next = { ...next, type: "boolean" };
     if (QUERY_ONLY.has(id)) next = { ...next, queryOnly: true };
@@ -245,7 +280,10 @@ export function polymarketMarketServerParams(filters, tags = []) {
   if (end.from) params.end_date_min = isoEdge(end.from, "start");
   if (end.to) params.end_date_max = isoEdge(end.to, "end");
 
-  const tagIds = (Array.isArray(tags) ? tags : []).map((tag) => String(tag.id || "").trim()).filter((id) => /^\d+$/.test(id));
+  const fromFilter = Array.isArray(source.tags?.selectedTags) ? source.tags.selectedTags : [];
+  const tagIds = [...fromFilter, ...(Array.isArray(tags) ? tags : [])]
+    .map((tag) => String(tag?.id || "").trim())
+    .filter((id, index, list) => /^\d+$/.test(id) && list.indexOf(id) === index);
   if (tagIds.length) {
     params.tag_id = tagIds.join(",");
     described.push(`${tagIds.length} ${tagIds.length === 1 ? "tag" : "tags"}`);
@@ -276,6 +314,8 @@ export function polymarketMarketServerParams(filters, tags = []) {
 }
 
 export function polymarketMarketFiltersActive(columns, filters, tags) {
+  const selected = filters?.tags?.selectedTags;
+  if (Array.isArray(selected) && selected.length) return true;
   if (Array.isArray(tags) && tags.length) return true;
   return (columns || []).some((column) => {
     const filter = filters?.[column.id];
