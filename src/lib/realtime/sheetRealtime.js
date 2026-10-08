@@ -245,10 +245,23 @@ function firstColumnValue(block, ids, titlePattern) {
   return String(block?.cells?.[`${index},0`] || "").trim();
 }
 
+const FIELD_ALIASES = {
+  token_id: ["asset_id", "assetId"],
+  asset_id: ["token_id"],
+  p: ["price", "last_trade_price"],
+  price: ["p"],
+  timestamp: ["time", "t"],
+  time: ["timestamp"],
+  side: ["last_trade_side"],
+};
+
 function recordValue(record, column) {
   if (!record || typeof record !== "object") return "";
   const id = String(column?.id || "");
   if (id && record[id] != null && record[id] !== "") return record[id];
+  for (const key of FIELD_ALIASES[id] || []) {
+    if (record[key] != null && record[key] !== "") return record[key];
+  }
   const wanted = String(column?.title || "").trim().toLowerCase();
   if (!wanted) return "";
   for (const key of Object.keys(record)) {
@@ -304,4 +317,40 @@ function maxRow(cells) {
     if (Number.isFinite(row)) max = Math.max(max, row);
   }
   return max;
+}
+
+/**
+ * Append live cells under the rows already on the sheet.
+ * Rows at or below `protectThrough` stay. Only newer live rows are limited to `cap`.
+ * @param {Record<string, string>} existing
+ * @param {Record<string, string>} added
+ * @param {number} [cap]
+ * @param {number} [protectThrough]
+ */
+export function appendLiveCells(existing, added, cap = 120, protectThrough = -1) {
+  const base = maxRow(existing) + 1;
+  const next = { ...(existing || {}) };
+  for (const [key, value] of Object.entries(added || {})) {
+    if (value == null || value === "") continue;
+    const [col, row] = String(key).split(",");
+    next[`${col},${base + Number(row || 0)}`] = value;
+  }
+  const rows = [];
+  for (const key of Object.keys(next)) {
+    const index = Number(String(key).split(",")[1]);
+    if (Number.isFinite(index) && !rows.includes(index)) rows.push(index);
+  }
+  rows.sort((a, b) => a - b);
+  const floor = Number(protectThrough);
+  const safeFloor = Number.isFinite(floor) ? floor : -1;
+  const droppable = rows.filter((index) => index > safeFloor);
+  const limit = Math.max(0, Math.floor(Number(cap) || 0));
+  if (droppable.length <= limit) return next;
+  const keepNew = new Set(droppable.slice(droppable.length - limit));
+  const kept = {};
+  for (const [key, value] of Object.entries(next)) {
+    const index = Number(String(key).split(",")[1]);
+    if (index <= safeFloor || keepNew.has(index)) kept[key] = value;
+  }
+  return kept;
 }

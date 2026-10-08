@@ -58,7 +58,10 @@ test("polymarket socket feeds are on and playground names resolve", () => {
   assert.equal(isRealtimeEnabled("polymarket", "new_market"), false);
   assert.equal(isRealtimeEnabled("polymarket", "wsMarketResolved"), false);
   assert.equal(isRealtimeEnabled("polymarket", "getMarkets"), false);
-  assert.equal(isRealtimeEnabled("polymarket", "getOrderbooks"), false);
+  assert.equal(getRealtimeEndpoint("polymarket", "getOrderbooks")?.endpoint, "book");
+  assert.equal(getRealtimeEndpoint("polymarket", "getBatchPricesHistory")?.endpoint, "price_change");
+  assert.equal(getRealtimeEndpoint("polymarket", "getTradesByMarket")?.endpoint, "last_trade_price");
+  assert.equal(getRealtimeEndpoint("polymarket", "getMarketPrices")?.endpoint, "best_bid_ask");
 });
 
 test("chainlink and binance prices resolve by table id and by symbol", () => {

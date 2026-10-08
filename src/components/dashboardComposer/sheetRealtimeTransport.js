@@ -4,6 +4,7 @@ import { flattenKalshiLiveCandlestickGroups } from "@/lib/kalshiLive/normalizeCa
 import { normalizeKalshiLiveOrderbook } from "@/lib/kalshiLive/normalizeOrderbookRow";
 import { normalizeKalshiLiveTradeRow } from "@/lib/kalshiLive/normalizeTradeRow";
 import {
+  appendLiveCells,
   cellsFromRecords,
   patchPriceCells,
   priceSymbolsForSheet,
@@ -223,6 +224,7 @@ function startPolymarketSocket(block, def, handlers) {
   }
   let stopped = false;
   let cells = { ...(block.cells || {}) };
+  const protectedThrough = maxRow(block.cells);
   let ping = 0;
   let wrote = false;
   const ws = new WebSocket(def.socketUrl);
@@ -268,7 +270,7 @@ function startPolymarketSocket(block, def, handlers) {
       return;
     }
     wrote = true;
-    cells = appendCells(cells, added, 120);
+    cells = appendLiveCells(cells, added, 120, protectedThrough);
     handlers.onStatus("Receiving data");
     handlers.onCells(cells);
   };
@@ -310,28 +312,6 @@ function polymarketRecords(endpoint, msg) {
     return [{ asset_id: msg.asset_id || msg.price_changes?.[0]?.asset_id, price, time }];
   }
   return [];
-}
-
-function appendCells(existing, added, cap) {
-  const base = maxRow(existing) + 1;
-  const next = { ...existing };
-  for (const [key, value] of Object.entries(added)) {
-    const [col, row] = String(key).split(",");
-    next[`${col},${base + Number(row || 0)}`] = value;
-  }
-  const rows = [];
-  for (const key of Object.keys(next)) {
-    const index = Number(String(key).split(",")[1]);
-    if (Number.isFinite(index) && !rows.includes(index)) rows.push(index);
-  }
-  rows.sort((a, b) => a - b);
-  if (rows.length <= cap) return next;
-  const drop = new Set(rows.slice(0, rows.length - cap));
-  const kept = {};
-  for (const [key, value] of Object.entries(next)) {
-    if (!drop.has(Number(String(key).split(",")[1]))) kept[key] = value;
-  }
-  return kept;
 }
 
 function maxRow(cells) {

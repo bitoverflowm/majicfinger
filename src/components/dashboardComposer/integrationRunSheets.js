@@ -24,7 +24,7 @@ export function displayCell(value, column) {
     if (column.scale === "cents") return `${Math.round(n)}¢`;
     // Unix seconds (the price-history T column) sit near 1.8 billion. Compact
     // notation rounds every point in a multi-year window to the same "1.8B".
-    if (column.exact) return Number.isInteger(n) ? String(n) : String(Math.round(n * 10000) / 10000);
+    if (column.exact || column.id === "t") return Number.isInteger(n) ? String(n) : String(Math.round(n * 10000) / 10000);
     if (Math.abs(n) >= 1000) {
       return new Intl.NumberFormat("en", { notation: "compact", maximumFractionDigits: 1 }).format(n);
     }

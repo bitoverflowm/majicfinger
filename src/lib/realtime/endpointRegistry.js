@@ -75,15 +75,15 @@ const KALSHI_POLL_API_ROUTES = {
  */
 const POLYMARKET_SOCKET_FEEDS = {
   book: {
-    aliases: ["wsOrderbookSnapshot"],
+    aliases: ["wsOrderbookSnapshot", "getOrderbooks"],
     seedQuery: "getOrderBooks",
   },
   price_change: {
-    aliases: ["wsPrice"],
+    aliases: ["wsPrice", "getBatchPricesHistory"],
     seedQuery: "getBatchPricesHistory",
   },
   last_trade_price: {
-    aliases: ["wsLastTradePrice"],
+    aliases: ["wsLastTradePrice", "getLastTradePrices", "getTradesByMarket"],
     seedQuery: "getBatchPricesHistory",
   },
   candlesticks: {
@@ -96,7 +96,7 @@ const POLYMARKET_SOCKET_FEEDS = {
     seedQuery: "getOrderBooks",
   },
   best_bid_ask: {
-    aliases: ["wsBestBidAsk"],
+    aliases: ["wsBestBidAsk", "getMarketPrices", "getMidpointPrices", "getSpreads"],
     seedQuery: "getOrderBooks",
     note: "Subscribe sets custom_feature_enabled so the market channel emits best_bid_ask.",
   },

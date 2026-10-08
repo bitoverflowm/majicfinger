@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
-import { BarChart3, Check, ChevronDown, ChevronRight, Database, Play, Radio, RotateCw, Save, Square, Table2, Type } from "lucide-react";
+import { BarChart3, Check, ChevronDown, ChevronRight, Database, Eye, Play, Radio, RotateCcw, RotateCw, Save, Square, Table2, Type } from "lucide-react";
 import { ProvenanceMapButton } from "@/components/dashboardComposer/provenanceMap";
 
 import { Button } from "@/components/ui/button";
@@ -22,6 +22,7 @@ import { useMyStateV2 } from "@/context/stateContextV2";
 import { useWorkspaceCanvas } from "@/components/dashboardComposer/workspaceCanvas";
 import { pageIdForTab } from "@/lib/workspaceDashboardDocument";
 import { realtimeAssets } from "@/lib/realtime/sheetRealtime";
+import { realtimeSheets, showRealtimeMenu } from "@/components/dashboardComposer/realtimeMode";
 import { DASHBOARD_FREE_TEXT_PLACEHOLDER } from "@/lib/dashboardFreeTextTheme";
 import { cn } from "@/lib/utils";
 
@@ -162,6 +163,10 @@ function DashboardLayerTree() {
   const openTab = (tab) => {
     setOpenTabs((prev) => ({ ...prev, [tab.id]: true }));
     if (!tab.pageId) return;
+    if (canvas?.requestTab) {
+      canvas.requestTab(tab.id);
+      return;
+    }
     ctx?.setViewing?.("welcome");
     ctx?.setActiveWorkspaceStartTabId?.(tab.id);
   };
@@ -492,8 +497,91 @@ function PreviewDashboardButton() {
       }}
       className="inline-flex size-7 items-center justify-center rounded-md text-neutral-700 hover:bg-black/[0.05] disabled:opacity-60 dark:text-neutral-200 dark:hover:bg-white/10"
     >
-      <Play className="size-4" aria-hidden />
+      <Eye className="size-4" aria-hidden />
     </button>
+  );
+}
+
+const CHROME_ICON =
+  "inline-flex size-7 items-center justify-center rounded-md text-neutral-700 hover:bg-black/[0.05] disabled:opacity-60 dark:text-neutral-200 dark:hover:bg-white/10";
+
+function ReplayTabButton() {
+  const canvas = useWorkspaceCanvas();
+  const replaying = canvas?.runFeed?.status === "running" && canvas?.runFeed?.title === "Replay queries";
+  const busy = canvas?.runFeed?.status === "running";
+  return (
+    <button
+      type="button"
+      aria-label="Replay all queries in tab"
+      title="Replay all queries in tab"
+      disabled={busy || !canvas?.replayTab}
+      onClick={() => canvas?.replayTab?.()}
+      className={CHROME_ICON}
+    >
+      <RotateCcw className={cn("size-4", replaying && "animate-spin")} aria-hidden />
+    </button>
+  );
+}
+
+function RealtimeModeButton() {
+  const canvas = useWorkspaceCanvas();
+  const ctx = useMyStateV2();
+  const tabs = (Array.isArray(ctx?.workspaceStartTabs) ? ctx.workspaceStartTabs : []).map((tab) => {
+    const pageId = pageIdForTab(tab.id);
+    return {
+      id: tab.id,
+      name: String(tab.name || "").trim() || "Tab",
+      pageId,
+      current: pageId === canvas?.pageId,
+      on: !!canvas?.realtimeModeByPage?.[pageId],
+      canStart: realtimeSheets(canvas?.blocksByPage?.[pageId]).length > 0,
+    };
+  });
+  const current = tabs.find((tab) => tab.current);
+  const on = !!current?.on;
+  const menu = showRealtimeMenu(tabs);
+  const runningElsewhere = tabs.filter((tab) => tab.on);
+  const idle = tabs.filter((tab) => !tab.on && tab.canStart);
+
+  return (
+    <div className="flex items-center">
+      <button
+        type="button"
+        aria-label={on ? "Stop realtime mode" : "Realtime mode"}
+        title={on ? "Stop realtime mode" : "Realtime mode"}
+        aria-pressed={on}
+        disabled={!on && !current?.canStart}
+        onClick={() => {
+          if (on) canvas?.stopRealtimeMode?.(canvas.pageId);
+          else canvas?.startRealtimeMode?.(canvas?.pageId);
+        }}
+        className={cn(CHROME_ICON, on && "text-emerald-600 dark:text-emerald-400")}
+      >
+        {on ? <Square className="size-3.5" aria-hidden /> : <Play className="size-4" aria-hidden />}
+      </button>
+      {menu ? (
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <button type="button" aria-label="Realtime mode on other tabs" title="Realtime tabs" className={cn(CHROME_ICON, "w-5")}>
+              <ChevronDown className="size-3.5" aria-hidden />
+            </button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="w-64">
+            {runningElsewhere.map((tab) => (
+              <DropdownMenuItem key={`stop-${tab.id}`} onSelect={() => canvas?.stopRealtimeMode?.(tab.pageId)}>
+                Stop realtime · {tab.name}
+              </DropdownMenuItem>
+            ))}
+            {runningElsewhere.length && idle.length ? <DropdownMenuSeparator /> : null}
+            {idle.map((tab) => (
+              <DropdownMenuItem key={`start-${tab.id}`} onSelect={() => canvas?.startRealtimeMode?.(tab.pageId)}>
+                Start realtime · {tab.name}
+              </DropdownMenuItem>
+            ))}
+          </DropdownMenuContent>
+        </DropdownMenu>
+      ) : null}
+    </div>
   );
 }
 
@@ -518,6 +606,8 @@ function RightChromeControls({ onLogout, expanded }) {
       <SaveDashboardButton />
       <ProvenanceMapButton />
       <PreviewDashboardButton />
+      <ReplayTabButton />
+      <RealtimeModeButton />
       <AnimatedThemeToggler className="inline-flex size-7 items-center justify-center rounded-md text-neutral-700 hover:bg-black/[0.05] dark:text-neutral-200 dark:hover:bg-white/10 [&_svg]:size-4" />
       <LiveTransportControls />
       <button

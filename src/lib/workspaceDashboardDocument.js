@@ -71,18 +71,61 @@ function cleanChartSnapshot(chart) {
   };
 }
 
+function cleanTokenList(tokens) {
+  if (!Array.isArray(tokens)) return [];
+  const out = [];
+  for (const token of tokens) {
+    const text = cleanText(token, 120).trim();
+    if (!text || out.includes(text)) continue;
+    out.push(text);
+    if (out.length >= 40) break;
+  }
+  return out;
+}
+
+function cleanTickerList(value) {
+  if (!Array.isArray(value)) return [];
+  return value.map((item) => cleanText(item, 80).trim()).filter(Boolean).slice(0, 40);
+}
+
+function cleanTime(value) {
+  const n = Number(value);
+  return Number.isFinite(n) && n > 0 ? n : 0;
+}
+
 function cleanPull(pull) {
   if (!pull || typeof pull !== "object") return null;
-  const lake = cleanText(pull.lake, 40);
-  const table = cleanText(pull.table, 40);
-  if (!lake || !table) return null;
-  const ticker = cleanText(pull.ticker, 80);
+  const lake = cleanText(pull.lake, 40).trim();
+  const table = cleanText(pull.table, 40).trim();
+  const ticker = cleanText(pull.ticker, 180).trim();
+  const tokens = cleanTokenList(pull.tokens);
+  const eventTicker = cleanText(pull.eventTicker, 80).trim();
+  const seriesTicker = cleanText(pull.seriesTicker, 80).trim();
+  const eventTickers = cleanTickerList(pull.eventTickers);
+  const seriesTickers = cleanTickerList(pull.seriesTickers);
+  const outcome = cleanText(pull.outcome, 80).trim();
+  const status = cleanText(pull.status, 40).trim();
+  const openAt = cleanTime(pull.openAt);
+  const closeAt = cleanTime(pull.closeAt);
+  if (!table || (!lake && !ticker && !tokens.length && !eventTicker && !seriesTicker && !eventTickers.length && !seriesTickers.length)) {
+    return null;
+  }
   const limit = Math.floor(num(pull.limit, 0));
   return {
-    lake,
+    ...(lake ? { lake } : {}),
     table,
     ...(ticker ? { ticker } : {}),
+    ...(tokens.length ? { tokens } : {}),
+    ...(eventTicker ? { eventTicker } : {}),
+    ...(seriesTicker ? { seriesTicker } : {}),
+    ...(eventTickers.length ? { eventTickers } : {}),
+    ...(seriesTickers.length ? { seriesTickers } : {}),
     ...(limit > 0 ? { limit: Math.min(limit, MAX_SAVED_ROWS) } : {}),
+    ...(pull.closed === true ? { closed: true } : {}),
+    ...(outcome ? { outcome } : {}),
+    ...(status ? { status } : {}),
+    ...(openAt ? { openAt } : {}),
+    ...(closeAt ? { closeAt } : {}),
   };
 }
 
@@ -146,6 +189,7 @@ function cleanBlock(block) {
           title: cleanText(column?.title, 120) || " ",
           width: Math.max(40, num(column?.width, 120)),
           ...(typeName ? { type: typeName } : {}),
+          ...(column?.exact ? { exact: true } : {}),
         };
       })
     : [];

@@ -6,16 +6,18 @@ import { realtimeSessionKey, realtimeTargetForBlock } from "@/lib/realtime/sheet
 import { closedLifeMessage, sheetLife } from "@/lib/markets/marketLife";
 
 /**
- * Live pulls stay off the saved dashboard document. Ticks update this session,
- * and the sheet and its charts read it while the pull is running.
+ * Live ticks update this session and are written onto the sheet, so stopping
+ * the pull keeps the rows that arrived. Charts read the same cells.
  */
-export function useSheetRealtime(blocksByPage, pageId) {
+export function useSheetRealtime(blocksByPage, pageId, onLiveCells) {
   const [realtimeById, setRealtimeById] = useState({});
   const stopsRef = useRef(new Map());
   const pagesRef = useRef(blocksByPage);
   pagesRef.current = blocksByPage;
   const pageRef = useRef(pageId);
   pageRef.current = pageId;
+  const onLiveCellsRef = useRef(onLiveCells);
+  onLiveCellsRef.current = onLiveCells;
 
   const findBlock = useCallback((id) => {
     const pages = pagesRef.current || {};
@@ -40,14 +42,32 @@ export function useSheetRealtime(blocksByPage, pageId) {
     });
   }, []);
 
+  const stopPageRealtime = useCallback((targetPageId) => {
+    const prefix = `${targetPageId || ""}:`;
+    for (const key of [...stopsRef.current.keys()]) {
+      if (String(key).startsWith(prefix)) stopSheetRealtime(key);
+    }
+    setRealtimeById((current) => {
+      const next = { ...current };
+      let changed = false;
+      for (const key of Object.keys(next)) {
+        if (!String(key).startsWith(prefix)) continue;
+        delete next[key];
+        changed = true;
+      }
+      return changed ? next : current;
+    });
+  }, [stopSheetRealtime]);
+
   const startSheetRealtime = useCallback(
-    (id) => {
+    (id, explicitPageId) => {
       const block = findBlock(id);
       const sheet = block?.type === "chart" ? findBlock(block.sourceSheetId) : block;
       if (!sheet || sheet.type !== "sheet") return;
       const def = realtimeTargetForBlock(sheet);
       if (!def) return;
-      const key = realtimeSessionKey(pageRef.current, sheet.id);
+      const page = explicitPageId || pageRef.current;
+      const key = realtimeSessionKey(page, sheet.id);
       const life = sheetLife(sheet);
       stopsRef.current.get(key)?.();
       stopsRef.current.delete(key);
@@ -78,6 +98,7 @@ export function useSheetRealtime(blocksByPage, pageId) {
           });
         },
         onCells(liveCells) {
+          onLiveCellsRef.current?.(page, sheet.id, liveCells);
           setRealtimeById((current) => {
             const session = current[key];
             if (!session?.running) return current;
@@ -138,5 +159,5 @@ export function useSheetRealtime(blocksByPage, pageId) {
     [],
   );
 
-  return { realtimeById, startSheetRealtime, stopSheetRealtime };
+  return { realtimeById, startSheetRealtime, stopSheetRealtime, stopPageRealtime };
 }

@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import {
+  appendLiveCells,
   cellsFromRecords,
   patchPriceCells,
   priceSymbolsForSheet,
@@ -70,6 +71,19 @@ test("price ticks update the matching symbol and charts can follow the tail", ()
   assert.equal(next["1,0"], "64,000");
   const tailed = tailCells({ "0,0": "a", "0,1": "b", "0,2": "c" }, 2);
   assert.deepEqual(tailed, { "0,0": "b", "0,1": "c" });
+});
+
+test("live ticks append without dropping the rows already on the sheet", () => {
+  const existing = { "0,0": "old", "0,1": "older" };
+  const next = appendLiveCells(existing, { "0,0": "tick" }, 1, 1);
+  assert.equal(next["0,0"], "old");
+  assert.equal(next["0,1"], "older");
+  assert.equal(next["0,2"], "tick");
+  const capped = appendLiveCells(next, { "0,0": "newer" }, 1, 1);
+  assert.equal(capped["0,0"], "old");
+  assert.equal(capped["0,1"], "older");
+  assert.equal(capped["0,2"], undefined);
+  assert.equal(capped["0,3"], "newer");
 });
 
 test("polled rows land on columns by id", () => {

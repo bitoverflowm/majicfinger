@@ -80,6 +80,14 @@ export function createRunReporter(publish) {
       step.completedAt = Date.now();
       push();
     },
+    miss(id, message) {
+      const step = find(id);
+      if (!step) return;
+      step.status = "error";
+      step.result = composeFailureMessage(message) || "This step failed";
+      step.completedAt = Date.now();
+      push();
+    },
     fail(id, message) {
       const step = find(id) || feed.steps.find((item) => item.status === "running") || feed.steps.find((item) => item.status === "pending");
       if (step) {

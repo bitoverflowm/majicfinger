@@ -34,7 +34,9 @@ import {
 } from "@/lib/workspaceDashboardClient";
 import { pageIdForTab, tabIdFromPage } from "@/lib/workspaceDashboardDocument";
 import { useSheetRealtime } from "@/components/dashboardComposer/sheetRealtimeSession";
-import { realtimeSessionKey, realtimeSheetForBlock, tailCells } from "@/lib/realtime/sheetRealtime";
+import { realtimeSessionKey, realtimeSheetForBlock, realtimeTargetForBlock, sheetAssetIds, tailCells } from "@/lib/realtime/sheetRealtime";
+import { replayTabSheets } from "@/components/dashboardComposer/replayTabQueries";
+import { createRunReporter } from "@/components/dashboardComposer/integrationRunFeed";
 import { closedLifeMessage, lifeCountdown, sheetLife } from "@/lib/markets/marketLife";
 import { SpectrumLoadingState } from "@/components/ui/spectrum-loading-state";
 import { RunProgressCard } from "@/components/dashboardComposer/integrationRunProgress";
@@ -159,7 +161,26 @@ export function WorkspaceCanvasProvider({ pageId, readOnly = false, children }) 
   ctxRef.current = ctx;
   const blocksByPageRef = useRef(blocksByPage);
   blocksByPageRef.current = blocksByPage;
-  const { realtimeById, startSheetRealtime, stopSheetRealtime } = useSheetRealtime(blocksByPage, pageId);
+  const commitLiveCells = useCallback((targetPageId, sheetId, cells) => {
+    if (!targetPageId || !sheetId || !cells) return;
+    const rowCount = filledRowCount(cells);
+    setBlocksByPage((prev) => {
+      const list = prev[targetPageId] || [];
+      const current = list.find((block) => block.id === sheetId);
+      if (!current || current.type !== "sheet") return prev;
+      return {
+        ...prev,
+        [targetPageId]: list.map((block) => (block.id === sheetId ? { ...block, cells, rowCount } : block)),
+      };
+    });
+  }, []);
+  const { realtimeById, startSheetRealtime, stopSheetRealtime, stopPageRealtime } = useSheetRealtime(blocksByPage, pageId, commitLiveCells);
+  const [realtimeModeByPage, setRealtimeModeByPage] = useState({});
+  const realtimeModeRef = useRef(realtimeModeByPage);
+  realtimeModeRef.current = realtimeModeByPage;
+  const [leavePrompt, setLeavePrompt] = useState(null);
+  const leavePromptRef = useRef(null);
+  leavePromptRef.current = leavePrompt;
   const [spotlightId, setSpotlightId] = useState(null);
   const [revealNonce, setRevealNonce] = useState(0);
 
@@ -548,6 +569,96 @@ export function WorkspaceCanvasProvider({ pageId, readOnly = false, children }) 
     setSelectedId(id || null);
   }, []);
 
+  const switchTab = useCallback((tabId, revealId) => {
+    if (revealId) {
+      pendingRevealRef.current = revealId;
+      pendingSelectRef.current = revealId;
+      setSelectedId(revealId);
+    }
+    ctxRef.current?.setViewing?.("welcome");
+    ctxRef.current?.setActiveWorkspaceStartTabId?.(tabId);
+  }, []);
+
+  const requestTab = useCallback((tabId, revealId) => {
+    if (!tabId) return;
+    const nextPage = pageIdForTab(tabId);
+    if (nextPage === pageIdRef.current) {
+      if (revealId) {
+        setSelectedId(revealId);
+        setSpotlightId(revealId);
+        setRevealNonce((nonce) => nonce + 1);
+      }
+      return;
+    }
+    if (realtimeModeRef.current[pageIdRef.current]) {
+      setLeavePrompt({ tabId, revealId: revealId || "" });
+      return;
+    }
+    switchTab(tabId, revealId);
+  }, [switchTab]);
+
+  const startRealtimeMode = useCallback((targetPageId) => {
+    const page = targetPageId || pageIdRef.current;
+    const sheets = (blocksByPageRef.current[page] || []).filter((block) => block?.type === "sheet" && realtimeTargetForBlock(block));
+    if (!sheets.length) return;
+    setRealtimeModeByPage((prev) => (prev[page] ? prev : { ...prev, [page]: true }));
+    for (const sheet of sheets) startSheetRealtime(sheet.id, page);
+  }, [startSheetRealtime]);
+
+  const stopRealtimeMode = useCallback((targetPageId) => {
+    const page = targetPageId || pageIdRef.current;
+    setRealtimeModeByPage((prev) => {
+      if (!prev[page]) return prev;
+      const next = { ...prev };
+      delete next[page];
+      return next;
+    });
+    stopPageRealtime(page);
+  }, [stopPageRealtime]);
+
+  const resolveLeave = useCallback((choice) => {
+    const prompt = leavePromptRef.current;
+    setLeavePrompt(null);
+    if (!prompt) return;
+    if (choice === "stop") stopRealtimeMode(pageIdRef.current);
+    switchTab(prompt.tabId, prompt.revealId);
+  }, [stopRealtimeMode, switchTab]);
+
+  const replayTab = useCallback(() => {
+    if (readOnly) return;
+    const page = pageIdRef.current;
+    const reporter = createRunReporter((feed) => {
+      setRunFeed(feed);
+    });
+    const planLimit = getHistoricalPullRowLimit(user);
+    void replayTabSheets(blocksByPageRef.current[page] || [], {
+      planLimit,
+      reporter,
+      onSheet(id, cells, rowCount) {
+        setBlocksByPage((prev) => {
+          const list = prev[page] || [];
+          const current = list.find((block) => block.id === id);
+          if (!current) return prev;
+          const tokens = sheetAssetIds({ ...current, cells });
+          const table = current.table || current.pull?.table || "";
+          const pull = table
+            ? {
+                ...(current.pull || {}),
+                table,
+                ...(tokens.length ? { tokens } : {}),
+              }
+            : current.pull;
+          return {
+            ...prev,
+            [page]: list.map((block) =>
+              block.id === id ? { ...block, cells, rowCount, pulledAt: Date.now(), ...(pull ? { pull } : {}) } : block,
+            ),
+          };
+        });
+      },
+    });
+  }, [readOnly, user]);
+
   const revealBlock = useCallback((id, nextPageId) => {
     if (!id) return;
     let page = nextPageId || pageIdRef.current;
@@ -559,18 +670,15 @@ export function WorkspaceCanvasProvider({ pageId, readOnly = false, children }) 
         }
       }
     }
-    setSelectedId(id);
     if (page !== pageIdRef.current) {
-      pendingRevealRef.current = id;
-      pendingSelectRef.current = id;
-      ctxRef.current?.setViewing?.("welcome");
-      ctxRef.current?.setActiveWorkspaceStartTabId?.(tabIdFromPage(page));
+      requestTab(tabIdFromPage(page), id);
       return;
     }
     pendingRevealRef.current = "";
+    setSelectedId(id);
     setSpotlightId(id);
     setRevealNonce((nonce) => nonce + 1);
-  }, []);
+  }, [requestTab]);
 
   useEffect(() => {
     const id = pendingRevealRef.current;
@@ -641,6 +749,13 @@ export function WorkspaceCanvasProvider({ pageId, readOnly = false, children }) 
       spotlightId,
       revealNonce,
       realtimeById,
+      realtimeModeByPage,
+      startRealtimeMode,
+      stopRealtimeMode,
+      requestTab,
+      resolveLeave,
+      leavePrompt,
+      replayTab,
       startSheetRealtime,
       stopSheetRealtime,
       renameId,
@@ -659,10 +774,46 @@ export function WorkspaceCanvasProvider({ pageId, readOnly = false, children }) 
       removeBlock,
       createChartFromBlock,
     }),
-    [addBlock, armReplay, blocks, blocksByPage, createChartFromBlock, dashboardName, dismissRun, duplicateBlock, focusBlock, pageId, placeIntegrationSheets, previewActiveId, previewTabs, readOnly, ready, realtimeById, registerTables, removeBlock, renameDashboard, renameId, replayReady, replayRun, reportRun, revealBlock, revealNonce, runFeed, saveNow, selectedId, spotlightId, startSheetRealtime, stopSheetRealtime, tables, tool, updateBlock],
+    [addBlock, armReplay, blocks, blocksByPage, createChartFromBlock, dashboardName, dismissRun, duplicateBlock, focusBlock, leavePrompt, pageId, placeIntegrationSheets, previewActiveId, previewTabs, readOnly, ready, realtimeById, realtimeModeByPage, registerTables, removeBlock, renameDashboard, renameId, replayReady, replayRun, replayTab, reportRun, requestTab, resolveLeave, revealBlock, revealNonce, runFeed, saveNow, selectedId, spotlightId, startRealtimeMode, startSheetRealtime, stopRealtimeMode, stopSheetRealtime, tables, tool, updateBlock],
   );
 
-  return <WorkspaceCanvasContext.Provider value={value}>{children}</WorkspaceCanvasContext.Provider>;
+  return (
+    <WorkspaceCanvasContext.Provider value={value}>
+      {children}
+      {leavePrompt ? (
+        <div className="fixed inset-0 z-[700] flex items-center justify-center bg-black/40 p-6">
+          <div
+            role="dialog"
+            aria-labelledby="realtime-leave-title"
+            className="w-full max-w-md rounded-xl border border-border/70 bg-background p-6 shadow-sm"
+          >
+            <h2 id="realtime-leave-title" className="text-[15px] font-semibold text-foreground">
+              Realtime mode is on
+            </h2>
+            <p className="mt-2 text-[13px] leading-relaxed text-muted-foreground">
+              This tab is still pulling live data. Stop the pulls, or keep them running while you leave.
+            </p>
+            <div className="mt-5 flex items-center justify-end gap-2">
+              <button
+                type="button"
+                className="inline-flex h-8 items-center rounded-md border border-border/70 px-3 text-[13px] font-medium hover:bg-muted"
+                onClick={() => resolveLeave("stop")}
+              >
+                Stop pulls
+              </button>
+              <button
+                type="button"
+                className="inline-flex h-8 items-center rounded-md bg-[#0d99ff] px-3 text-[13px] font-medium text-white hover:bg-[#0b87e0]"
+                onClick={() => resolveLeave("keep")}
+              >
+                Keep running
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+    </WorkspaceCanvasContext.Provider>
+  );
 }
 
 function EditableText({ value, onChange, className, placeholder }) {
@@ -967,7 +1118,8 @@ function SheetFullscreen({ block, onChange, onClose }) {
     return () => window.removeEventListener("keydown", onKey, true);
   }, [onClose]);
 
-  const shownCount = Math.max(filledRowCount(block.cells), Number(block.rowCount) || 0);
+  const view = liveBlock(block, canvas);
+  const shownCount = Math.max(filledRowCount(view.cells), Number(block.rowCount) || 0);
   const label = useTradeSheetLabel(usesHistoricalTradeSheet(block) ? block.id : "", shownCount);
   return createPortal(
     <div
@@ -998,7 +1150,7 @@ function SheetFullscreen({ block, onChange, onClose }) {
         enabled={!!realtimeSheetForBlock(block, canvas?.blocks || [])}
       />
       <div className="flex min-h-0 flex-1 flex-col p-4">
-        <DashboardSheetGrid block={block} onChange={onChange} />
+        <DashboardSheetGrid block={view} onChange={onChange} />
       </div>
     </div>,
     document.body,

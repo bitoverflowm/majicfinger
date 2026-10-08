@@ -34,6 +34,7 @@ import {
   CarouselPrevious,
 } from "@/components/ui/carousel";
 import { useMyStateV2 } from "@/context/stateContextV2";
+import { useWorkspaceCanvas } from "@/components/dashboardComposer/workspaceCanvas";
 import { useUser } from "@/lib/hooks";
 import { KALSHI_GUIDED_WEATHER_WORKFLOW_ID } from "@/lib/guidedWorkflows/kalshiHistorical/stepIds";
 import { requestKalshiHistoricalGuidedWorkflow } from "@/lib/guidedWorkflows/pendingLaunch";
@@ -415,11 +416,16 @@ function StartTabChip({ tab, selected, userId, onSelect }) {
 
 export function WorkspaceStartTabs({ welcomeActive, onOpenWelcome }) {
   const context = useMyStateV2();
+  const canvas = useWorkspaceCanvas();
   const sessionUser = useUser();
   const tabs = Array.isArray(context?.workspaceStartTabs) ? context.workspaceStartTabs : [];
   const activeId = context?.activeWorkspaceStartTabId;
 
   const selectTab = (id) => {
+    if (canvas?.requestTab) {
+      canvas.requestTab(id);
+      return;
+    }
     context?.setActiveWorkspaceStartTabId?.(id);
     onOpenWelcome?.();
   };
@@ -435,11 +441,15 @@ export function WorkspaceStartTabs({ welcomeActive, onOpenWelcome }) {
       name: newBlankTabName(tabs.map((item) => item.name)),
       blank: true,
     };
-    const next = { ...state, tabs: [...tabs, tab], activeId: tab.id };
+    const next = { ...state, tabs: [...tabs, tab] };
     context?.setWorkspaceStartTabs?.(next.tabs);
     context?.setWelcomeTabRemoved?.(next.welcomeRemoved);
-    context?.setActiveWorkspaceStartTabId?.(next.activeId);
-    saveWorkspaceStartTabs(sessionUser?.userId, next);
+    saveWorkspaceStartTabs(sessionUser?.userId, { ...next, activeId: activeId || null });
+    if (canvas?.requestTab) {
+      canvas.requestTab(tab.id);
+      return;
+    }
+    context?.setActiveWorkspaceStartTabId?.(tab.id);
     onOpenWelcome?.();
   };
 

@@ -72,7 +72,7 @@ function displayFor(value, column) {
     if (!Number.isFinite(n)) return String(value);
     if (column.scale === "cents") n = n / 100;
     if (column.scale === "cents") return `${Math.round(n * 100)}¢`;
-    if (column.exact) return Number.isInteger(n) ? String(n) : String(Math.round(n * 10000) / 10000);
+    if (column.exact || column.id === "t") return Number.isInteger(n) ? String(n) : String(Math.round(n * 10000) / 10000);
     if (Math.abs(n) >= 1000) {
       return new Intl.NumberFormat("en", { notation: "compact", maximumFractionDigits: 1 }).format(n);
     }
