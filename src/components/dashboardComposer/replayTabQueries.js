@@ -45,12 +45,16 @@ export function polymarketReplayPick(block) {
   const tokenIds = sheetAssetIds(block);
   if (!ticker && !tokenIds.length) return null;
   const outcome = String(pull.outcome || "").trim();
+  const rawTitle = String(block?.pull?.marketTitle || block?.title || "").split("·").pop()?.trim() || "";
+  const title = /^(price history|token price history|trade history|order book|orderbook|tick size|open interest|top holders|market price|midpoint|spreads|last trade)$/i.test(rawTitle)
+    ? ""
+    : rawTitle;
   return {
     slug: /^\d+$/.test(ticker) ? "" : ticker,
     entityId: /^\d+$/.test(ticker) ? ticker : "",
     tokenIds,
     ...(outcome ? { outcomes: [outcome] } : {}),
-    title: String(block.title || "").split("·").pop()?.trim() || ticker,
+    title,
     closed: pull.closed === true,
     outcome,
     startedAt: pull.openAt || null,

@@ -663,13 +663,16 @@ async function resolveMarket(pick) {
   if (!pick) return null;
   const closedKnown = pick.closed === true || pick.closed === false;
   if (pick.tokenIds?.length && pick.conditionId && closedKnown) return pick;
+  const tokenId = Array.isArray(pick.tokenIds) ? pick.tokenIds.map((token) => String(token || "").trim()).find(Boolean) : "";
   const params = pick.entityId
     ? { id: pick.entityId, limit: "1" }
     : pick.slug
       ? { slug: pick.slug, limit: "1" }
       : pick.conditionId
         ? { condition_ids: pick.conditionId, limit: "1" }
-        : null;
+        : tokenId
+          ? { clob_token_ids: tokenId, limit: "1" }
+          : null;
   if (!params) return pick;
   const data = await polymarketGet("listMarkets", params);
   const row = objectRows(data)[0];
@@ -689,6 +692,31 @@ async function resolveMarket(pick) {
     closesAt: marketLifeFromRow(row).closesAt || pick.closesAt || null,
     startedAt: marketLifeFromRow(row).startedAt || pick.startedAt || null,
     outcome: marketLifeFromRow(row).outcome || pick.outcome || "",
+  };
+}
+
+/** Title, outcome side, and trading window for one Polymarket token. */
+export async function polymarketMarketMeta(tokenId) {
+  const token = String(tokenId || "").trim();
+  if (!token) return null;
+  const data = await polymarketGet("listMarkets", { clob_token_ids: token, limit: "1" });
+  const row = objectRows(data)[0];
+  if (!row) return null;
+  const life = marketLifeFromRow(row);
+  const tokenIds = parseTokenIdList(row.clobTokenIds || row.clob_token_ids);
+  const outcomes = parseOutcomeList(row.outcomes);
+  const index = tokenIds.findIndex((id) => id === token);
+  const side = index >= 0 ? String(outcomes[index] || "").trim() : "";
+  const closed = marketIsClosed(row);
+  return {
+    marketTitle: String(row.question || row.groupItemTitle || "").trim(),
+    ticker: String(row.slug || row.id || "").trim(),
+    side: side && !side.startsWith("[") ? side : "",
+    openAt: life.startedAt ? life.startedAt * 1000 : 0,
+    closeAt: life.closesAt ? life.closesAt * 1000 : 0,
+    closed,
+    outcome: closed ? life.outcome : "",
+    status: closed ? "closed" : "active",
   };
 }
 

@@ -1,12 +1,24 @@
 import assert from "node:assert/strict";
 
-import { showRealtimeMenu } from "./realtimeMode.js";
+import { showRealtimeMenu, tabHasLiveMarket } from "./realtimeMode.js";
 import { cellsFromQueryRows, polymarketReplayPick, sheetReplayKind } from "./replayTabQueries.js";
 
 assert.equal(showRealtimeMenu([{ current: true, on: true }, { current: false, on: false }]), false);
 assert.equal(showRealtimeMenu([{ current: true, on: false }, { current: false, on: true }]), true);
 assert.equal(showRealtimeMenu([{ current: true, on: true }, { current: false, on: true }]), true);
 assert.equal(showRealtimeMenu([{ current: true, on: false }]), false);
+assert.equal(
+  tabHasLiveMarket([
+    { type: "sheet", integrationId: "polymarket", table: "getBatchPricesHistory", pull: { closed: true, closeAt: 1 } },
+  ]),
+  false,
+);
+assert.equal(
+  tabHasLiveMarket([
+    { type: "sheet", integrationId: "polymarket", table: "getBatchPricesHistory", pull: { closed: false, closeAt: Date.parse("2026-11-01T00:00:00Z") } },
+  ]),
+  true,
+);
 
 const history = {
   type: "sheet",

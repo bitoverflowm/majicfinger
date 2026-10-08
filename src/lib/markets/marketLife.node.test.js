@@ -7,6 +7,8 @@ import {
   lifeOfMarket,
   presetWithinLife,
   sheetLife,
+  sheetMarketCaption,
+  sheetMarketClosed,
 } from "./marketLife.js";
 
 const openAt = Date.parse("2026-04-01T15:00:00Z");
@@ -60,4 +62,30 @@ const now = Date.parse("2026-10-08T12:00:00Z");
   assert.equal(life.stopped, true);
   assert.equal(life.outcome, "No");
   console.log("ok sheet life reads the saved pull");
+}
+
+{
+  const now = Date.parse("2026-10-08T12:00:00Z");
+  const open = Date.parse("2026-09-25T04:02:11Z");
+  const close = Date.parse("2026-11-01T03:59:59Z");
+  const live = {
+    title: "Price History",
+    columns: [{ id: "outcome" }],
+    cells: { "0,0": "Yes" },
+    pull: { marketTitle: "Will WTI hit $150 in October?", side: "Yes", closed: false, openAt: open, closeAt: close },
+  };
+  const caption = sheetMarketCaption(live, now);
+  assert.equal(caption.includes("Will WTI hit $150 in October?"), true);
+  assert.equal(caption.includes("Yes"), true);
+  assert.equal(caption.includes("Closes in"), true);
+  assert.equal(sheetMarketClosed(live), false);
+  const ended = {
+    title: "Price History",
+    pull: { marketTitle: "Bitcoin above $74,000", closed: true, openAt, closeAt, outcome: "Yes" },
+  };
+  const closedCaption = sheetMarketCaption(ended, now);
+  assert.equal(closedCaption.includes("Closes in"), false);
+  assert.equal(closedCaption.includes("–"), true);
+  assert.equal(sheetMarketClosed(ended), true);
+  console.log("ok sheet caption names the market and its window");
 }

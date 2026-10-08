@@ -22,7 +22,7 @@ import { useMyStateV2 } from "@/context/stateContextV2";
 import { useWorkspaceCanvas } from "@/components/dashboardComposer/workspaceCanvas";
 import { pageIdForTab } from "@/lib/workspaceDashboardDocument";
 import { realtimeAssets } from "@/lib/realtime/sheetRealtime";
-import { realtimeSheets, showRealtimeMenu } from "@/components/dashboardComposer/realtimeMode";
+import { showRealtimeMenu, tabHasLiveMarket } from "@/components/dashboardComposer/realtimeMode";
 import { DASHBOARD_FREE_TEXT_PLACEHOLDER } from "@/lib/dashboardFreeTextTheme";
 import { cn } from "@/lib/utils";
 
@@ -534,7 +534,7 @@ function RealtimeModeButton() {
       pageId,
       current: pageId === canvas?.pageId,
       on: !!canvas?.realtimeModeByPage?.[pageId],
-      canStart: realtimeSheets(canvas?.blocksByPage?.[pageId]).length > 0,
+      canStart: tabHasLiveMarket(canvas?.blocksByPage?.[pageId]),
     };
   });
   const current = tabs.find((tab) => tab.current);
@@ -543,12 +543,14 @@ function RealtimeModeButton() {
   const runningElsewhere = tabs.filter((tab) => tab.on);
   const idle = tabs.filter((tab) => !tab.on && tab.canStart);
 
+  const idleHint = !on && !current?.canStart ? "no live markets in your current tab" : "";
   return (
     <div className="flex items-center">
+      <span className="inline-flex" title={idleHint || undefined}>
       <button
         type="button"
-        aria-label={on ? "Stop realtime mode" : "Realtime mode"}
-        title={on ? "Stop realtime mode" : "Realtime mode"}
+        aria-label={on ? "Stop realtime mode" : idleHint || "Realtime mode"}
+        title={on ? "Stop realtime mode" : idleHint || "Realtime mode"}
         aria-pressed={on}
         disabled={!on && !current?.canStart}
         onClick={() => {
@@ -559,6 +561,7 @@ function RealtimeModeButton() {
       >
         {on ? <Square className="size-3.5" aria-hidden /> : <Play className="size-4" aria-hidden />}
       </button>
+      </span>
       {menu ? (
         <DropdownMenu>
           <DropdownMenuTrigger asChild>

@@ -184,6 +184,82 @@ export function closedLifeMessage(outcome) {
 }
 
 /**
+ * @param {number | null | undefined} ms
+ * @returns {string}
+ */
+export function formatLifeDay(ms) {
+  if (!Number.isFinite(ms)) return "";
+  const date = new Date(ms);
+  if (Number.isNaN(date.getTime())) return "";
+  return date.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
+}
+
+function genericMarketLabel(value) {
+  return /^(price history|token price history|trade history|order book|orderbook|tick size|open interest|top holders|market price|midpoint|spreads|last trade|data sheet)$/i.test(
+    String(value || "").trim(),
+  );
+}
+
+/**
+ * The market question, not the sheet's own name.
+ * @param {object | null | undefined} block
+ */
+export function sheetMarketName(block) {
+  const saved = String(block?.pull?.marketTitle || "").trim();
+  if (saved && !genericMarketLabel(saved)) return saved;
+  const fromCell = firstCell(block, ["market_title", "question", "yes_sub_title"]);
+  const sheetTitle = String(block?.title || "").trim();
+  if (fromCell && fromCell !== sheetTitle && !genericMarketLabel(fromCell)) return fromCell;
+  const ticker = String(block?.pull?.ticker || "").trim();
+  if (ticker && !/^\d+$/.test(ticker) && ticker !== sheetTitle && !genericMarketLabel(ticker)) return ticker;
+  const tail = sheetTitle.split("·").pop()?.trim() || "";
+  if (tail && tail !== sheetTitle && !genericMarketLabel(tail)) return tail;
+  return "";
+}
+
+/**
+ * The outcome this sheet is looking at, such as Yes or No.
+ * @param {object | null | undefined} block
+ */
+export function sheetMarketSide(block) {
+  const saved = formatMarketOutcome(block?.pull?.side);
+  if (saved) return saved;
+  return formatMarketOutcome(firstCell(block, ["outcome"]));
+}
+
+/**
+ * Name, outcome, and the trading window. Live markets include the start and the time left.
+ * Closed markets include the start and the end.
+ * @param {object | null | undefined} block
+ * @param {number} [now]
+ */
+export function sheetMarketCaption(block, now = Date.now()) {
+  const name = sheetMarketName(block);
+  const side = sheetMarketSide(block);
+  const life = sheetLife(block);
+  const bits = [];
+  if (name) bits.push(name);
+  if (side && side.toLowerCase() !== name.toLowerCase()) bits.push(side);
+  if (life?.stopped) {
+    const start = formatLifeDay(life.openMs);
+    const end = formatLifeDay(life.closeMs);
+    if (start && end) bits.push(`${start} – ${end}`);
+    else if (start || end) bits.push(start || end);
+  } else if (life?.openMs || life?.closeMs) {
+    const start = formatLifeDay(life.openMs);
+    if (start) bits.push(start);
+    const countdown = lifeCountdown(life, now);
+    if (countdown) bits.push(countdown);
+  }
+  return bits.join(" · ");
+}
+
+/** A realtime sheet whose market has already stopped cannot play. */
+export function sheetMarketClosed(block) {
+  return !!sheetLife(block)?.stopped;
+}
+
+/**
  * Fields stored on a dashboard sheet so play mode knows whether the market can stream.
  * @param {Record<string, unknown> | null | undefined} source
  */

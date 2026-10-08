@@ -37,7 +37,8 @@ import { useSheetRealtime } from "@/components/dashboardComposer/sheetRealtimeSe
 import { realtimeSessionKey, realtimeSheetForBlock, realtimeTargetForBlock, sheetAssetIds, tailCells } from "@/lib/realtime/sheetRealtime";
 import { replayTabSheets } from "@/components/dashboardComposer/replayTabQueries";
 import { createRunReporter } from "@/components/dashboardComposer/integrationRunFeed";
-import { closedLifeMessage, lifeCountdown, sheetLife } from "@/lib/markets/marketLife";
+import { closedLifeMessage, lifeCountdown, sheetLife, sheetMarketCaption, sheetMarketClosed } from "@/lib/markets/marketLife";
+import { lookupSheetMarket, marketMetaComplete, marketMetaPatch } from "@/components/dashboardComposer/sheetMarketLookup";
 import { SpectrumLoadingState } from "@/components/ui/spectrum-loading-state";
 import { RunProgressCard } from "@/components/dashboardComposer/integrationRunProgress";
 import { cn } from "@/lib/utils";
@@ -599,7 +600,9 @@ export function WorkspaceCanvasProvider({ pageId, readOnly = false, children }) 
 
   const startRealtimeMode = useCallback((targetPageId) => {
     const page = targetPageId || pageIdRef.current;
-    const sheets = (blocksByPageRef.current[page] || []).filter((block) => block?.type === "sheet" && realtimeTargetForBlock(block));
+    const sheets = (blocksByPageRef.current[page] || []).filter(
+      (block) => block?.type === "sheet" && realtimeTargetForBlock(block) && !sheetMarketClosed(block),
+    );
     if (!sheets.length) return;
     setRealtimeModeByPage((prev) => (prev[page] ? prev : { ...prev, [page]: true }));
     for (const sheet of sheets) startSheetRealtime(sheet.id, page);
@@ -928,11 +931,62 @@ function liveBlock(block, canvas) {
   return { ...block, cells: liveCells };
 }
 
+const rememberedMarkets = new Set();
+
+function useRememberMarket(block) {
+  const canvas = useWorkspaceCanvas();
+  const complete = marketMetaComplete(block);
+  const updateRef = useRef(canvas?.updateBlock);
+  updateRef.current = canvas?.updateBlock;
+  const stopRef = useRef(canvas?.stopSheetRealtime);
+  stopRef.current = canvas?.stopSheetRealtime;
+  const blockRef = useRef(block);
+  blockRef.current = block;
+  useEffect(() => {
+    const snapshot = blockRef.current;
+    if (canvas?.readOnly || complete || snapshot?.type !== "sheet" || rememberedMarkets.has(snapshot.id)) return undefined;
+    rememberedMarkets.add(snapshot.id);
+    void lookupSheetMarket(snapshot)
+      .then((meta) => {
+        if (!meta) {
+          rememberedMarkets.delete(snapshot.id);
+          return;
+        }
+        updateRef.current?.(snapshot.id, marketMetaPatch(snapshot, meta));
+        if (meta.closed) stopRef.current?.(snapshot.id);
+      })
+      .catch(() => {
+        rememberedMarkets.delete(snapshot.id);
+      });
+    return undefined;
+  }, [block?.id, canvas?.readOnly, complete]);
+}
+
+function SheetMarketCaption({ block }) {
+  const life = sheetLife(block);
+  const ticking = !!(life && !life.stopped && life.closeMs && life.closeMs > Date.now());
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    if (!ticking) return undefined;
+    const timer = window.setInterval(() => setNow(Date.now()), 30000);
+    return () => window.clearInterval(timer);
+  }, [ticking, life?.closeMs]);
+  const caption = sheetMarketCaption(block, now);
+  if (!caption) return <span className="min-w-0 flex-1" />;
+  return (
+    <span className="min-w-0 flex-1 truncate text-[12px] font-normal text-muted-foreground" title={caption}>
+      {caption}
+    </span>
+  );
+}
+
 function SheetBlockBody({ block, onChange, booting }) {
   const canvas = useWorkspaceCanvas();
+  useRememberMarket(block);
   const view = liveBlock(block, canvas);
   const running = !!liveSession(canvas, block.id)?.running;
-  const hasRealtime = !canvas?.readOnly && !!realtimeSheetForBlock(block, canvas?.blocks || []);
+  const closed = sheetMarketClosed(block);
+  const hasRealtime = !canvas?.readOnly && !closed && !!realtimeSheetForBlock(block, canvas?.blocks || []);
   const pulled = formatPulledAt(block.pulledAt);
   const shownCount = Math.max(filledRowCount(view.cells), Number(block.rowCount) || 0);
   const label = useTradeSheetLabel(usesHistoricalTradeSheet(block) ? block.id : "", shownCount);
@@ -944,8 +998,9 @@ function SheetBlockBody({ block, onChange, booting }) {
           value={block.title}
           placeholder="Data sheet"
           onChange={(title) => onChange({ title })}
-          className="min-w-0 flex-1 truncate text-[13px] font-semibold text-foreground"
+          className="w-fit max-w-[40%] shrink-0 truncate text-[13px] font-semibold text-foreground"
         />
+        <SheetMarketCaption block={block} />
         {running ? <span className="shrink-0 text-[11px] font-medium text-emerald-600">Live</span> : null}
         <span
           className={cn(
@@ -1129,7 +1184,8 @@ function SheetFullscreen({ block, onChange, onClose }) {
     >
       <div className="flex items-center gap-3 border-b border-border/70 px-4 py-3">
         <Table2 className="size-4 text-muted-foreground" aria-hidden />
-        <span className="min-w-0 flex-1 truncate text-[15px] font-semibold">{block.title || "Data sheet"}</span>
+        <span className="w-fit max-w-[40%] shrink-0 truncate text-[15px] font-semibold">{block.title || "Data sheet"}</span>
+        <SheetMarketCaption block={block} />
         <span className="text-[12px] tabular-nums text-muted-foreground">{label}</span>
         <button
           type="button"
@@ -1160,9 +1216,9 @@ function SheetFullscreen({ block, onChange, onClose }) {
 function RealtimeToggle({ block }) {
   const canvas = useWorkspaceCanvas();
   const match = realtimeSheetForBlock(block, canvas?.blocks || []);
-  if (!match || canvas?.readOnly) return null;
-  const session = liveSession(canvas, match.sheet.id);
+  const session = match ? liveSession(canvas, match.sheet.id) : null;
   const running = !!session?.running;
+  if (!match || canvas?.readOnly || (sheetMarketClosed(match.sheet) && !running)) return null;
   return (
     <button
       type="button"

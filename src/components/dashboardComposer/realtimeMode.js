@@ -1,8 +1,14 @@
+import { sheetMarketClosed } from "@/lib/markets/marketLife";
 import { realtimeTargetForBlock } from "@/lib/realtime/sheetRealtime";
 
 /** Sheets on a tab that can open a live pull. Charts follow the sheet they are attached to. */
 export function realtimeSheets(blocks) {
   return (blocks || []).filter((block) => block?.type === "sheet" && realtimeTargetForBlock(block));
+}
+
+/** Closed markets have no live pull. A tab can play only when one of these is still trading. */
+export function tabHasLiveMarket(blocks) {
+  return realtimeSheets(blocks).some((block) => !sheetMarketClosed(block));
 }
 
 /**

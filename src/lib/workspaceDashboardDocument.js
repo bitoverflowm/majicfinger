@@ -103,6 +103,8 @@ function cleanPull(pull) {
   const seriesTicker = cleanText(pull.seriesTicker, 80).trim();
   const eventTickers = cleanTickerList(pull.eventTickers);
   const seriesTickers = cleanTickerList(pull.seriesTickers);
+  const marketTitle = cleanText(pull.marketTitle, 200).trim();
+  const side = cleanText(pull.side, 40).trim();
   const outcome = cleanText(pull.outcome, 80).trim();
   const status = cleanText(pull.status, 40).trim();
   const openAt = cleanTime(pull.openAt);
@@ -115,13 +117,15 @@ function cleanPull(pull) {
     ...(lake ? { lake } : {}),
     table,
     ...(ticker ? { ticker } : {}),
+    ...(marketTitle ? { marketTitle } : {}),
+    ...(side ? { side } : {}),
     ...(tokens.length ? { tokens } : {}),
     ...(eventTicker ? { eventTicker } : {}),
     ...(seriesTicker ? { seriesTicker } : {}),
     ...(eventTickers.length ? { eventTickers } : {}),
     ...(seriesTickers.length ? { seriesTickers } : {}),
     ...(limit > 0 ? { limit: Math.min(limit, MAX_SAVED_ROWS) } : {}),
-    ...(pull.closed === true ? { closed: true } : {}),
+    ...(pull.closed === true || pull.closed === false ? { closed: pull.closed === true } : {}),
     ...(outcome ? { outcome } : {}),
     ...(status ? { status } : {}),
     ...(openAt ? { openAt } : {}),
