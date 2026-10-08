@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 
+import { displayCell } from "./integrationRunSheets.js";
 import {
   polymarketLiveBuildColumns,
   polymarketLiveBuildEndpoints,
@@ -241,6 +242,11 @@ assert.equal(bookColumns.find((column) => column.id === "price")?.type, "number"
 assert.equal(polymarketLiveBuildColumns("getOrderbooks").find((column) => column.id === "side")?.defaultOn, true);
 assert.equal(defaultPolymarketQuoteFilters("getOrderbooks").depth, undefined);
 assert.equal(defaultPolymarketQuoteFilters("getBatchPricesHistory").interval.value, "1d");
+const historyT = polymarketLiveBuildColumns("getBatchPricesHistory").find((column) => column.id === "t");
+assert.equal(historyT?.exact, true);
+assert.equal(displayCell(1791417327, historyT), "1791417327");
+assert.equal(displayCell(1791417267, historyT), "1791417267");
+assert.equal(displayCell(1800000000, { id: "volume", type: "number" }), "1.8B");
 assert.equal(defaultPolymarketQuoteFilters("getTradesByMarket").taker_only.include[0], "true");
 assert.equal(defaultPolymarketQuoteFilters("getTradesByMarket").quote_outcome.value, "both");
 assert.equal(defaultPolymarketQuoteFilters("getTradesByMarket").filter_type.value, "TOKENS");

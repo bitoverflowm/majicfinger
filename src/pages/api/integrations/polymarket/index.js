@@ -2005,7 +2005,7 @@ export default async function handler(req, res) {
         const end = toUnixSeconds(req.query.end);
         const interval = String(req.query.interval || "").trim();
         const bucketRaw = String(req.query.bucket_seconds || req.query.bucketSeconds || "").trim();
-        const wanted = Math.min(10000, Math.max(1, Number(req.query.limit) || 10000));
+        const wanted = Math.min(500000, Math.max(1, Number(req.query.limit) || 10000));
         const base = new URLSearchParams();
         base.set("token_id", tokenId);
         if (asOf) {
@@ -2032,7 +2032,8 @@ export default async function handler(req, res) {
         if (!asOf && bucketRaw) base.set("bucket_seconds", bucketRaw);
         const points = [];
         let cursor = "";
-        for (let page = 0; page < 20 && points.length < wanted; page += 1) {
+        const maxPages = Math.max(20, Math.ceil(wanted / 1000));
+        for (let page = 0; page < maxPages && points.length < wanted; page += 1) {
           const params = new URLSearchParams(base);
           params.set("limit", String(Math.min(10000, wanted - points.length)));
           if (cursor) params.set("cursor", cursor);

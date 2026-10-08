@@ -412,6 +412,27 @@ export function polymarketRowsForMarket(rows, pick, picks) {
   return list.filter((row) => polymarketPickMatchesRow(pick, row));
 }
 
+/**
+ * A preview with no row limit stays at the fallback (50).
+ * A save-and-run passes the plan as rowLimit, so the ceiling is the plan.
+ * @param {unknown} planLimit
+ * @param {number} endpointCap
+ */
+function quotePullCap(planLimit, endpointCap) {
+  const plan = Number(planLimit);
+  if (Number.isFinite(plan) && plan > endpointCap) return Math.floor(plan);
+  return endpointCap;
+}
+
+/** Rows requested for this pull. An empty row limit is the preview size. */
+function pullSize(options, fallback = 50) {
+  const requested = Number(options?.rowLimit);
+  const plan = Number(options?.planLimit);
+  const asked = Number.isFinite(requested) && requested > 0 ? Math.floor(requested) : fallback;
+  const planCap = Number.isFinite(plan) && plan > 0 ? Math.floor(plan) : asked;
+  return Math.max(1, Math.min(planCap, asked));
+}
+
 /** Keep each market's own newest rows. A shared cap would blend markets into one sheet. */
 function takePerMarket(rows, limit) {
   const groups = new Map();
@@ -523,6 +544,7 @@ export function polymarketLiveBuildColumns(endpointId) {
         ];
       }
       if (column.id === "timestamp") next.dateEpoch = "unix";
+      if (column.id === "t") next.exact = true;
       return next;
     });
   }
@@ -561,7 +583,7 @@ function projectRows(rows, columns, flatten, limit = 50) {
 
 function pack(endpointId, rows) {
   const columns = polymarketLiveBuildColumns(endpointId);
-  const limit = isPolymarketQuoteTable(endpointId) ? Math.max(Array.isArray(rows) ? rows.length : 0, 1) : 50;
+  const limit = Math.max(Array.isArray(rows) ? rows.length : 0, 1);
   const projected = projectRows(rows, columns, endpointId === "getSamplingMarkets" ? "sampling" : endpointId === "getMarkets", limit);
   return {
     columns,
@@ -985,17 +1007,17 @@ async function quoteRows(endpointId, picks, options = {}) {
         payloads.push(await polymarketPost("getBatchPricesHistory", { markets: group.tokens.slice(index, index + 20), ...group.body }));
       }
     }
-    const target = polymarketQuoteTarget(options.rowLimit, options.planLimit, 50, 2000);
+    const target = polymarketQuoteTarget(options.rowLimit, options.planLimit, 50, quotePullCap(options.planLimit, 2000));
     return takePerMarket(historyRows(payloads, pairs), target);
   }
   if (endpointId === "getTokenPriceHistory") {
-    const target = polymarketQuoteTarget(options.rowLimit, options.planLimit, 50, 10000);
+    const target = polymarketQuoteTarget(options.rowLimit, options.planLimit, 50, quotePullCap(options.planLimit, 10000));
     const rows = [];
     for (const pair of pairs) {
       const params = polymarketTokenHistoryParams(filters, pair.market);
-      const data = await polymarketGet("getTokenPriceHistory", {
+        const data = await polymarketGet("getTokenPriceHistory", {
         token_id: pair.tokenId,
-        limit: String(Math.min(10000, target)),
+        limit: String(target),
         ...params,
       });
       const points = Array.isArray(data) ? data : [];
@@ -1024,17 +1046,19 @@ async function quoteRows(endpointId, picks, options = {}) {
     const tradable = markets.filter((market) => market.conditionId);
     if (!tradable.length) throw new Error("This market has no condition id.");
     const params = polymarketTradeQuery(filters);
-    const target = polymarketQuoteTarget(options.rowLimit, options.planLimit, 50, 10000);
+    const target = polymarketQuoteTarget(options.rowLimit, options.planLimit, 50, quotePullCap(options.planLimit, 10000));
     const tokenIds = new Set(pairs.map((pair) => String(pair.tokenId)));
     const narrow = polymarketQuoteOutcome(filters) !== "both";
+    const pageCap = 1000;
+    const maxPages = Math.max(20, Math.ceil(target / pageCap));
     const collected = [];
     for (const market of tradable) {
       let cursor = "";
       let got = 0;
-      for (let page = 0; page < 20 && got < target; page += 1) {
+      for (let page = 0; page < maxPages && got < target; page += 1) {
         const data = await polymarketGet("getTradesByMarket", {
           condition: market.conditionId,
-          limit: String(narrow ? 1000 : Math.min(1000, target - got)),
+          limit: String(narrow ? pageCap : Math.min(pageCap, target - got)),
           ...(cursor ? { cursor } : {}),
           ...params,
         });
@@ -1082,40 +1106,70 @@ function historyRows(payloads, pairs) {
   return rows;
 }
 
-async function discoveryRows(endpointId) {
-  if (endpointId === "getMarkets") {
-    return objectRows(
-      await polymarketGet("listMarkets", {
-        limit: "50",
-        closed: "false",
-        order: "volume24hr",
-        ascending: "false",
-        include_tag: "true",
+async function pagedObjects(query, params, target) {
+  const pageSize = Math.min(100, Math.max(1, target));
+  const rows = [];
+  const seen = new Set();
+  for (let offset = 0; rows.length < target; offset += pageSize) {
+    const page = objectRows(
+      await polymarketGet(query, {
+        ...params,
+        limit: String(Math.min(pageSize, target - rows.length)),
+        offset: String(offset),
       }),
+    );
+    let added = 0;
+    for (const row of page) {
+      const id = String(row.id || row.slug || row.conditionId || "");
+      if (id && seen.has(id)) continue;
+      if (id) seen.add(id);
+      rows.push(row);
+      added += 1;
+      if (rows.length >= target) break;
+    }
+    if (!page.length || added === 0 || page.length < pageSize) break;
+  }
+  return rows;
+}
+
+async function discoveryRows(endpointId, options = {}) {
+  const target = pullSize(options, 50);
+  if (endpointId === "getMarkets") {
+    return pagedObjects(
+      "listMarkets",
+      { closed: "false", order: "volume24hr", ascending: "false", include_tag: "true" },
+      target,
     );
   }
   if (endpointId === "getSamplingMarkets") {
     const page = await polymarketGet("getSamplingMarkets");
     const body = Array.isArray(page) ? page[0] : page;
-    return objectRows(body?.data || body);
+    return objectRows(body?.data || body).slice(0, target);
   }
   if (endpointId === "getEvents") {
-    return objectRows(await polymarketGet("listEvents", { limit: "50", closed: "false", order: "volume", ascending: "false" }));
+    return pagedObjects("listEvents", { closed: "false", order: "volume", ascending: "false" }, target);
   }
   if (endpointId === "series") {
-    return objectRows(await polymarketGet("listSeries", { limit: "50", closed: "false" }));
+    return pagedObjects("listSeries", { closed: "false" }, target);
   }
   if (endpointId === "getTraderLeaderboard") {
-    return objectRows(await polymarketGet("getTraderLeaderboard", { category: "OVERALL", timePeriod: "DAY", orderBy: "PNL", limit: "50" }));
+    return objectRows(
+      await polymarketGet("getTraderLeaderboard", {
+        category: "OVERALL",
+        timePeriod: "DAY",
+        orderBy: "PNL",
+        limit: String(Math.min(50, target)),
+      }),
+    );
   }
   return [];
 }
 
 async function directedRows(endpointId, picks, options = {}) {
   const pick = picks[0];
-  if (!pick) return discoveryRows(endpointId);
+  if (!pick) return discoveryRows(endpointId, options);
   if (endpointId === "getMarkets" || endpointId === "getSamplingMarkets") {
-    if (pick.kind !== "market") return discoveryRows(endpointId);
+    if (pick.kind !== "market") return discoveryRows(endpointId, options);
     const market = await resolveMarket(pick);
     const data = market?.entityId
       ? await polymarketGet("getMarket", { id: market.entityId })
@@ -1123,7 +1177,7 @@ async function directedRows(endpointId, picks, options = {}) {
     return objectRows(data);
   }
   if (endpointId === "getEvents") {
-    if (!pick.entityId) return discoveryRows(endpointId);
+    if (!pick.entityId) return discoveryRows(endpointId, options);
     return objectRows(await polymarketGet("getEvent", { id: pick.entityId }));
   }
   if (endpointId === "getMarketsByEvents" || endpointId === "getLiveVolumeForEvent") {
@@ -1141,18 +1195,22 @@ async function directedRows(endpointId, picks, options = {}) {
         category: "OVERALL",
         timePeriod: "DAY",
         orderBy: "PNL",
-        limit: "50",
+        limit: String(Math.min(50, pullSize(options, 50))),
         user: pick.address,
       }),
     );
   }
   if (ADDRESS_QUERIES[endpointId]) {
     if (!/^0x[a-fA-F0-9]{40}$/.test(pick.address || "")) throw new Error("Search for a trader wallet.");
-    const data = await polymarketGet(ADDRESS_QUERIES[endpointId], { user: pick.address, address: pick.address, limit: "50" });
+    const data = await polymarketGet(ADDRESS_QUERIES[endpointId], {
+      user: pick.address,
+      address: pick.address,
+      limit: String(Math.min(10000, pullSize(options, 50))),
+    });
     return objectRows(data);
   }
   if (isPolymarketQuoteTable(endpointId)) return quoteRows(endpointId, picks, options);
-  return discoveryRows(endpointId);
+  return discoveryRows(endpointId, options);
 }
 
 /**

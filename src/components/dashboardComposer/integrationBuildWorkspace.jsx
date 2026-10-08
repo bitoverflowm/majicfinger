@@ -3874,6 +3874,8 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
                 : null
               : liveDirect && (directPreview.status === "loading" || directPreview.status === "error")
                 ? null
+                : polymarketLive && !(Number(rowLimit) > 0) && polymarketReadyCount != null && polymarketReadyCount >= PREVIEW_ROW_CAP
+                  ? null
                 : polymarketReadyCount != null
                   ? polymarketReadyCount
                 : Array.isArray(idleAttributeRows)
@@ -5577,7 +5579,59 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
         : filteredRows;
     let sampledRows = null;
     reporter.start("source");
-    if (historicalLake && (parentRequest || sampledRequest)) {
+    if (polymarketLive) {
+      const asked = Number(rowLimit);
+      const importLimit =
+        Number.isFinite(asked) && asked > 0 && Number.isFinite(sheetCap)
+          ? Math.min(asked, sheetCap)
+          : Number.isFinite(sheetCap)
+            ? sheetCap
+            : PREVIEW_ROW_CAP;
+      try {
+        const columnsFor = (rows) => {
+          if (tableId === "getSamplingMarkets") return polymarketSamplingColumns;
+          if (tableId === "getMarkets") return polymarketMarketColumns;
+          if (polymarketQuoteColumns.length) return polymarketQuoteColumns;
+          return pull?.columns || [];
+        };
+        let pulled = [];
+        if ((tableId === "getMarkets" || tableId === "getSamplingMarkets") && !livePicks.length) {
+          const samplingTable = tableId === "getSamplingMarkets";
+          const columns = samplingTable ? polymarketSamplingColumns : polymarketMarketColumns;
+          const scanCap = samplingTable ? POLYMARKET_SAMPLING_SCAN_CAP : POLYMARKET_MARKET_SCAN_CAP;
+          const scan = samplingTable ? scanSamplingMarkets : scanPolymarketMarkets;
+          const result = await scan({
+            filters: attributeFilters,
+            columns,
+            target: Math.min(scanCap, importLimit),
+            match: (row) => rowMatchesAttributes(row, columns, attributeFilters),
+            explain: (row) => attributeMismatchReason(row, columns, attributeFilters),
+            onProgress: (info) => {
+              const kept = Array.isArray(info?.rows) ? info.rows.length : 0;
+              reporter.note("source", `Read ${Number(info?.scanned || 0).toLocaleString()} · kept ${kept.toLocaleString()}`);
+            },
+          });
+          pulled = sortAttributeRows(result.rows || [], columns, sortKeys);
+        } else {
+          const result = await loadPolymarketLiveTable(tableId, livePicks, {
+            filters: attributeFilters,
+            rowLimit: importLimit,
+            planLimit: sheetCap,
+          });
+          const columns = columnsFor(result.rows);
+          const matched = (result.rows || []).filter((row) => rowMatchesAttributes(row, columns, attributeFilters));
+          pulled = sortAttributeRows(matched, columns, sortKeys);
+        }
+        marketRows = pulled;
+        reporter.succeed("source", {
+          result: `${marketRows.length.toLocaleString()} rows from ${sourceTable}`,
+        });
+      } catch (err) {
+        reporter.succeed("source", {
+          result: `${marketRows.length.toLocaleString()} rows already on screen. ${err instanceof Error ? err.message : "The pull did not finish."}`,
+        });
+      }
+    } else if (historicalLake && (parentRequest || sampledRequest)) {
       const pullCompose = async (request) => {
         const pulled = await loadAthenaComposeRows(request, {
           onPhase: (info) => reporter.note("source", describeComposePhase(info, { table: sourceTable, limit: sheetCap })),
@@ -5888,7 +5942,7 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
           id: entries.length === 1 ? "run-live-event-forecast" : `run-live-event-forecast-${ticker.replace(/[^A-Za-z0-9]+/g, "-")}`,
           title: entries.length === 1 ? "Event forecast" : `Event forecast · ${ticker}`,
           columns: shaped.columns,
-          rows: rows.slice(0, PREVIEW_ROW_CAP),
+          rows: rows,
           rowCount: rows.length,
           span: entries.length > 1 ? "half" : "full",
           table: "event_forecast",
@@ -5918,7 +5972,7 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
               id: pulled.length === 1 ? "run-live-event-candlesticks" : `run-live-event-candlesticks-${ticker.replace(/[^A-Za-z0-9]+/g, "-")}`,
               title: pulled.length === 1 ? "Event candlesticks" : `Event candlesticks · ${ticker}`,
               columns: item.columns,
-              rows: fullRows.slice(0, PREVIEW_ROW_CAP),
+              rows: fullRows,
               rowCount: fullRows.length,
               span: pulled.length > 1 ? "half" : "full",
               table: "event_candlesticks",
@@ -5987,7 +6041,7 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
               id,
               title: `${label} · ${item.market.label || item.market.ticker}`,
               columns: item.columns,
-              rows: fullRows.slice(0, PREVIEW_ROW_CAP),
+              rows: fullRows,
               rowCount: fullRows.length,
               span: pulled.length > 1 ? "half" : "full",
               table: tableId,
@@ -6073,7 +6127,7 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
                 id,
                 title: "Markets",
                 columns,
-                rows: fullRows.slice(0, PREVIEW_ROW_CAP),
+                rows: fullRows,
                 rowCount: fullRows.length,
                 span: "full",
                 table: "markets",
@@ -6097,7 +6151,7 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
                 id,
                 title: `Markets · ${item.ticker}`,
                 columns: item.columns,
-                rows: fullRows.slice(0, PREVIEW_ROW_CAP),
+                rows: fullRows,
                 rowCount: fullRows.length,
                 span: unique.length > 1 ? "half" : "full",
                 table: "markets",
@@ -6159,7 +6213,7 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
                   id: `run-event-${kind}`,
                   title,
                   columns,
-                  rows: fullRows.slice(0, PREVIEW_ROW_CAP),
+                  rows: fullRows,
                   rowCount: fullRows.length,
                   span: "full",
                   table: kind === "forecast" ? "event_forecast" : "event_candlesticks",
@@ -6176,7 +6230,7 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
                   id: `run-event-${kind}-${safe}`,
                   title: `${title} · ${item.ticker}`,
                   columns: result.columns,
-                  rows: fullRows.slice(0, PREVIEW_ROW_CAP),
+                  rows: fullRows,
                   rowCount: fullRows.length,
                   span: seriesJoinTickers.length > 1 ? "half" : "full",
                   table: kind === "forecast" ? "event_forecast" : "event_candlesticks",
@@ -6229,7 +6283,7 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
                   id: `run-forecast-${kind}`,
                   title,
                   columns,
-                  rows: fullRows.slice(0, PREVIEW_ROW_CAP),
+                  rows: fullRows,
                   rowCount: fullRows.length,
                   span: "full",
                   table,
@@ -6246,7 +6300,7 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
                   id: `run-forecast-${kind}-${safe}`,
                   title: `${title} · ${item.ticker}`,
                   columns: result.columns,
-                  rows: fullRows.slice(0, PREVIEW_ROW_CAP),
+                  rows: fullRows,
                   rowCount: fullRows.length,
                   span: forecastRunEvents.length > 1 ? "half" : "full",
                   table,
@@ -6282,7 +6336,7 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
                     id: tradesJoin ? "run-trader-trades" : "run-trader-profiles",
                     title: label,
                     columns: loaded.columns,
-                    rows: fullRows.slice(0, PREVIEW_ROW_CAP),
+                    rows: fullRows,
                     rowCount: fullRows.length,
                     span: "full",
                     table: tradesJoin ? "trades_by_holder" : "holder_profile",
@@ -6304,7 +6358,7 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
                     id: `run-trader-${kind}-${safe}`,
                     title: `${label} · ${item.nickname}`,
                     columns: item.columns,
-                    rows: fullRows.slice(0, PREVIEW_ROW_CAP),
+                    rows: fullRows,
                     rowCount: fullRows.length,
                     span: pulled.length > 1 ? "half" : "full",
                     table: tradesJoin ? "trades_by_holder" : "holder_profile",
@@ -6327,7 +6381,7 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
       const requested = Number(rowLimit);
       const limit = Number.isFinite(sheetCap) ? sheetCap : PREVIEW_ROW_CAP;
       livePicks.forEach((pick) => {
-        const matched = polymarketRowsForMarket(polymarketDirected.rows || [], pick, livePicks).filter((row) =>
+        const matched = polymarketRowsForMarket(marketRows, pick, livePicks).filter((row) =>
           rowMatchesAttributes(row, matchColumns, attributeFilters),
         );
         const sorted = sortAttributeRows(matched, matchColumns, sortKeys);
@@ -6338,7 +6392,7 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
         const safe = String(pick.id || label).replace(/[^A-Za-z0-9]+/g, "-");
         const built = applyFunctionColumns(
           shownColumns,
-          fullRows.slice(0, PREVIEW_ROW_CAP),
+          fullRows,
           functionsForSheet("markets"),
           formulaSheets,
           "markets",
@@ -6367,7 +6421,7 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
         pull: livePicks.length === 1 ? { table: tableId || "markets", ticker: livePicks[0].ticker || livePicks[0].slug || "", tokens: livePicks[0].tokenIds || [], ...lifePull(livePicks[0]) } : undefined,
         summary: lockedQuery?.label || describeSearch(),
         composeRequest: marketsRequest,
-        keepAllRows: Boolean(liveMatchedRows),
+        keepAllRows: true,
         attributeLines: (liveMarketSearch ? liveAttributeColumns : pull?.columns || []).flatMap((column) => {
           const summary = attributeSummary(column, attributeFilters);
           return summary ? [`${column.title} ${summary}`] : [];
@@ -6461,7 +6515,7 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
                 id,
                 title: `Markets · ${seriesTicker}`,
                 columns: result.columns,
-                rows: fullRows.slice(0, PREVIEW_ROW_CAP),
+                rows: fullRows,
                 rowCount: fullRows.length,
                 span: "full",
                 table: "markets",
@@ -6499,7 +6553,7 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
                   id,
                   title: `${item.target.title} · ${item.market.label || item.market.ticker}`,
                   columns: item.columns,
-                  rows: rows.slice(0, PREVIEW_ROW_CAP),
+                  rows: rows,
                   rowCount: rows.length,
                   span: "half",
                   table: item.target.id,
@@ -6574,7 +6628,7 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
           id,
           title: `${item.target.title} · ${item.market.label || item.market.ticker}`,
           columns: item.columns,
-          rows: fullRows.slice(0, PREVIEW_ROW_CAP),
+          rows: fullRows,
           rowCount: fullRows.length,
           span: "half",
           table: item.target.id,
@@ -6728,7 +6782,7 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
           id,
           title: `Trades · ${item.label || item.ticker}`,
           columns: shaped.columns,
-          rows: fullRows.slice(0, 50),
+          rows: fullRows,
           rowCount: fullRows.length,
           pull,
           span: "half",
@@ -6773,7 +6827,14 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
 
     reporter.start("place");
     const placement = placementRef.current;
-    const placedSheets = stampRunSheets(sheets, { integrationId });
+    const placedSheets = stampRunSheets(
+      sheets.map((sheet) => {
+        const rows = Array.isArray(sheet?.rows) ? sheet.rows : [];
+        const rowCount = Math.max(rows.length, Math.floor(Number(sheet?.rowCount) || 0));
+        return { ...sheet, rows, rowCount, keepAllRows: true };
+      }),
+      { integrationId },
+    );
     canvas?.placeIntegrationSheets?.(placedSheets, {
       pageId: placement.pageId || undefined,
       append: placement.append,
