@@ -201,7 +201,7 @@ function historyControls(filters) {
       control: "period",
       ariaLabel: "Interval",
       enumOptions: INTERVAL_OPTIONS,
-      description: "The window when no date range is set.",
+      description: "The window when no dates are set. A closed market uses the last part of its own trading, not today.",
     },
     {
       id: "time_range",
@@ -209,7 +209,7 @@ function historyControls(filters) {
       type: "date",
       queryOnly: true,
       control: "query-range",
-      description: "Start and end, with the shortcuts. A range replaces the interval. Longer than 15 days is read in 15-day pieces.",
+      description: "Start and end. The shortcuts are the last 24 hours, 3 days, or 7 days before a closed market ended, and before today while it is still open. A range replaces the interval.",
     },
     {
       id: "fidelity",
@@ -278,7 +278,7 @@ function tokenHistoryControls(filters) {
       control: "period",
       ariaLabel: "Interval",
       enumOptions: INTERVAL_OPTIONS,
-      description: "The window when no date range is set. 1 month and max cover more than 15 days.",
+      description: "The window when no dates are set. A closed market uses the last part of its own trading, not today. 1 month and max cover more than 15 days on an open market.",
     },
     {
       id: "time_range",
@@ -287,7 +287,7 @@ function tokenHistoryControls(filters) {
       queryOnly: true,
       control: "query-range",
       rangePresetIds: POLYMARKET_TOKEN_HISTORY_PRESET_IDS,
-      description: "Start and end, at most 15 days, with the shortcuts. A range replaces the interval.",
+      description: "Start and end, at most 15 days. The shortcuts end when a closed market stopped trading, and end today while it is still open. A range replaces the interval.",
     },
     {
       id: "bucket_seconds",
@@ -654,6 +654,68 @@ export function polymarketBookSide(filters) {
   return "both";
 }
 
+const INTERVAL_SPAN_SEC = {
+  "1h": 3600,
+  "6h": 6 * 3600,
+  "1d": 86400,
+  "1w": 7 * 86400,
+  "1m": 30 * 86400,
+};
+
+const PRESET_SPAN_SEC = {
+  "past-24h": 86400,
+  "past-3d": 3 * 86400,
+  "past-7d": 7 * 86400,
+  "past-month": 30 * 86400,
+};
+
+/**
+ * When the market has already stopped trading, history ends there.
+ * An end date still in the future belongs to an open market.
+ * @param {{ closed?: boolean; endedAt?: number } | null | undefined} market
+ * @returns {number | null}
+ */
+export function polymarketMarketEndedAt(market) {
+  if (!market || market.closed === false) return null;
+  const seconds = Number(market.endedAt);
+  if (!Number.isFinite(seconds) || seconds <= 0) return null;
+  const ended = Math.floor(seconds);
+  if (ended * 1000 > Date.now()) return null;
+  return ended;
+}
+
+/**
+ * Calendar day of the close, for the date shortcuts in the builder.
+ * @param {{ closed?: boolean; endedAt?: number } | null | undefined} market
+ * @returns {string}
+ */
+export function polymarketMarketAnchorDate(market) {
+  const ended = polymarketMarketEndedAt(market);
+  if (!ended) return "";
+  return new Date(ended * 1000).toISOString().slice(0, 10);
+}
+
+/**
+ * A window that ends when this market stopped, capped for the token-history endpoint.
+ * @param {{ closed?: boolean; endedAt?: number; startedAt?: number } | null | undefined} market
+ * @param {string} interval
+ * @param {number} [cap]
+ * @returns {{ start: number; end: number } | null}
+ */
+function marketLifeWindow(market, interval, cap) {
+  const ended = polymarketMarketEndedAt(market);
+  if (!ended) return null;
+  const started = Number(market?.startedAt);
+  const hasStart = Number.isFinite(started) && started > 0 && started < ended;
+  const span = interval === "all" || interval === "max"
+    ? (hasStart ? ended - started : 365 * 86400)
+    : INTERVAL_SPAN_SEC[interval];
+  if (!span) return null;
+  const width = cap ? Math.min(span, cap) : span;
+  const start = Math.max(hasStart ? started : 0, ended - width);
+  return { start, end: ended };
+}
+
 function dayUnix(iso, edge) {
   const [year, month, day] = String(iso || "").split("-").map(Number);
   if (!year || !month || !day) return null;
@@ -664,38 +726,57 @@ function dayUnix(iso, edge) {
 
 /**
  * @param {Record<string, any>} filters
+ * @param {{ closed?: boolean; endedAt?: number; startedAt?: number } | null} [market]
  */
-export function polymarketHistoryBody(filters) {
-  const start = dayUnix(filters?.time_range?.from, "start");
-  const end = dayUnix(filters?.time_range?.to, "end");
-  const hasRange = Boolean(start && end && end > start);
+export function polymarketHistoryBody(filters, market) {
+  const preset = String(filters?.time_range?.preset || "");
+  const ended = polymarketMarketEndedAt(market);
+  const presetSpan = PRESET_SPAN_SEC[preset];
+  const explicitStart = dayUnix(filters?.time_range?.from, "start");
+  const explicitEnd = dayUnix(filters?.time_range?.to, "end");
+  const hasExplicitRange = Boolean(explicitStart && explicitEnd && explicitEnd > explicitStart);
   const interval = String(filters?.interval?.value || "1d").trim();
   /** @type {Record<string, string | number>} */
   const body = {};
-  if (hasRange) {
-    body.start_ts = start;
-    body.end_ts = end;
-  } else if (interval) {
-    body.interval = interval;
+  if (preset && ended && presetSpan) {
+    body.start_ts = Math.max(0, ended - presetSpan);
+    body.end_ts = ended;
+  } else if (hasExplicitRange) {
+    body.start_ts = explicitStart;
+    body.end_ts = explicitEnd;
+  } else {
+    const life = marketLifeWindow(market, interval);
+    if (life) {
+      body.start_ts = life.start;
+      body.end_ts = life.end;
+    } else if (interval) {
+      body.interval = interval;
+    }
   }
-  const floor = polymarketHistoryFidelityFloor(hasRange ? "" : interval, hasRange);
+  const derived = body.start_ts != null && Boolean(ended) && !hasExplicitRange;
+  const floor = polymarketHistoryFidelityFloor(interval, hasExplicitRange && !derived);
   const asked = Number(filters?.fidelity?.value);
   const fidelity = Number.isFinite(asked) && asked > 0 ? Math.floor(asked) : 0;
-  const used = fidelity > 0 ? Math.max(fidelity, floor) : floor > 1 ? floor : 0;
+  const used = fidelity > 0 ? Math.max(fidelity, floor) : derived ? Math.max(floor, 1) : floor > 1 ? floor : 0;
   if (used > 0) body.fidelity = used;
   return body;
 }
 
 /**
  * One window per request: as_of, or start with an optional end, or interval.
+ * A closed market's interval ends when that market stopped trading.
  * @param {Record<string, any>} filters
+ * @param {{ closed?: boolean; endedAt?: number; startedAt?: number } | null} [market]
  * @returns {Record<string, string>}
  */
-export function polymarketTokenHistoryParams(filters) {
+export function polymarketTokenHistoryParams(filters, market) {
   const asOf = dayUnix(filters?.as_of?.value, "end");
   const start = dayUnix(filters?.time_range?.from, "start");
   const end = dayUnix(filters?.time_range?.to, "end");
   const interval = String(filters?.interval?.value || "1d").trim();
+  const preset = String(filters?.time_range?.preset || "");
+  const ended = polymarketMarketEndedAt(market);
+  const presetSpan = PRESET_SPAN_SEC[preset];
   /** @type {Record<string, string>} */
   const params = {};
   if (asOf) {
@@ -703,17 +784,29 @@ export function polymarketTokenHistoryParams(filters) {
     return params;
   }
   const now = Math.floor(Date.now() / 1000);
-  if (start && (!end || end > start)) {
+  const hasExplicitRange = Boolean(start && (!end || end > start));
+  if (preset && ended && presetSpan) {
+    const width = Math.min(presetSpan, POLYMARKET_PRICES_HISTORY_MAX_SPAN_SEC);
+    params.start = String(Math.max(0, ended - width));
+    params.end = String(ended);
+  } else if (hasExplicitRange) {
     const windowEnd = end && end > start ? end : now;
     if (windowEnd - start > POLYMARKET_PRICES_HISTORY_MAX_SPAN_SEC) {
       throw new Error("A start and end window can cover at most 15 days. Use the 1 month or max interval for a longer history.");
     }
     params.start = String(start);
     if (end && end > start) params.end = String(end);
-  } else if (interval) {
-    params.interval = interval;
+  } else {
+    const life = marketLifeWindow(market, interval, POLYMARKET_PRICES_HISTORY_MAX_SPAN_SEC);
+    if (life) {
+      params.start = String(life.start);
+      params.end = String(life.end);
+    } else if (interval) {
+      params.interval = interval;
+    }
   }
-  const floor = polymarketTokenBucketFloor(params.interval || "", Boolean(params.start));
+  const derived = Boolean(params.start) && !hasExplicitRange;
+  const floor = polymarketTokenBucketFloor(interval, Boolean(params.start) && !derived);
   const asked = Number(filters?.bucket_seconds?.value);
   if (Number.isFinite(asked) && asked > 0) {
     const bucket = Math.max(60, Math.min(86400, Math.floor(asked)));

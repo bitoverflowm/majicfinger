@@ -743,7 +743,7 @@ function flattenPublicSearchToSuggestions(searchPayload, max = 28, opts = {}) {
             volume24hr: m.volume24hr ?? null,
             active: m.active ?? null,
             closed: m.closed ?? null,
-            live: m.fpmmLive ?? null,
+            live: isSearchRowClosed(m.closed) ? false : m.acceptingOrders === true || m.live === true ? true : null,
             archived: m.archived ?? null,
             featured: m.featured ?? null,
             new: m.new ?? null,
@@ -830,21 +830,34 @@ async function runMetadataSuggestions(rawQ, limitPerType, opts = {}) {
     opts.keepClosedMarkets === "true" ||
     opts.keepClosedMarkets === "1" ||
     opts.keepClosedMarkets === 1;
-  const ps = new URLSearchParams();
-  ps.set("q", trimmed);
-  ps.set("limit_per_type", String(cap));
-  ps.set("search_tags", searchTags ? "true" : "false");
-  ps.set("search_profiles", searchProfiles ? "true" : "false");
-  ps.set("keep_closed_markets", keepClosed ? "1" : "0");
-  const publicSearch = await fetchJson(`${GAMMA_BASE}/public-search?${ps.toString()}`);
+  const max = Math.min(200, Math.max(40, cap * 3));
+  const loadSearch = (extra) => {
+    const ps = new URLSearchParams();
+    ps.set("q", trimmed);
+    ps.set("limit_per_type", String(cap));
+    ps.set("search_tags", searchTags ? "true" : "false");
+    ps.set("search_profiles", searchProfiles ? "true" : "false");
+    for (const [key, value] of Object.entries(extra)) ps.set(key, value);
+    return fetchJson(`${GAMMA_BASE}/public-search?${ps.toString()}`);
+  };
+  const openSearch = await loadSearch({ keep_closed_markets: "0", events_status: "active" });
+  const openSuggestions = flattenPublicSearchToSuggestions(openSearch, max, { excludeClosed: true });
+  const closedExtra = [];
+  if (keepClosed) {
+    const closedSearch = await loadSearch({ keep_closed_markets: "1" });
+    const seen = new Set(openSuggestions.map((row) => `${row.entity}:${row.id || ""}:${row.slug || ""}`));
+    for (const row of flattenPublicSearchToSuggestions(closedSearch, max)) {
+      if (!isSearchRowClosed(row.closed)) continue;
+      const key = `${row.entity}:${row.id || ""}:${row.slug || ""}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      closedExtra.push(row);
+    }
+  }
   return {
     query: trimmed,
-    suggestions: flattenPublicSearchToSuggestions(
-      publicSearch,
-      Math.min(200, Math.max(40, cap * 3)),
-      { excludeClosed: !keepClosed },
-    ),
-    publicSearch,
+    suggestions: [...openSuggestions.slice(0, max), ...closedExtra.slice(0, 24)],
+    publicSearch: openSearch,
   };
 }
 

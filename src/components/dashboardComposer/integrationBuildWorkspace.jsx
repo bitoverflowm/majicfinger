@@ -71,6 +71,7 @@ import {
   polymarketQuoteAttributeColumns,
   polymarketQuoteRequestKey,
 } from "@/lib/polymarketLive/polymarketQuoteQuery";
+import { defaultLifeRange, lifeOfMarket, lifePull } from "@/lib/markets/marketLife";
 import { Accordion, AccordionContent, AccordionItem } from "@/components/ui/accordion";
 import * as AccordionPrimitive from "@radix-ui/react-accordion";
 import { Button } from "@/components/ui/button";
@@ -1970,6 +1971,15 @@ function columnFilterKey(columns, filters, skipIds = []) {
     .join("\n");
 }
 
+function withMarketLifeBounds(columns, life) {
+  if (!life || (!life.earliest && !life.latest)) return columns;
+  return columns.map((column) =>
+    column?.id === "time_range" || column?.control === "query-range" || column?.control === "query-instant"
+      ? { ...column, rangeAnchor: life.stopped ? life.latest : "", rangeBounds: life }
+      : column,
+  );
+}
+
 export function IntegrationBuildWorkspace({ integrationId, onBack }) {
   const source = BUILD_SOURCES[integrationId];
   const cutoff = useKalshiHistoricalCutoffDisplay();
@@ -2211,10 +2221,33 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
     () => (polymarketLive && tableId === "getSamplingMarkets" ? samplingMarketAttributeColumns(pull?.columns || []) : []),
     [polymarketLive, tableId, pull?.columns],
   );
-  const polymarketQuoteColumns = useMemo(
-    () => (polymarketLive && isPolymarketQuoteTable(tableId) ? polymarketQuoteAttributeColumns(tableId, pull?.columns || [], attributeFilters) : []),
-    [polymarketLive, tableId, pull?.columns, attributeFilters],
-  );
+  const focusedMarket = polymarketLive
+    ? polymarketActivePick || (livePicks.length === 1 ? livePicks[0] : null)
+    : livePicks.length === 1
+      ? livePicks[0]
+      : null;
+  const focusedLife = useMemo(() => lifeOfMarket(focusedMarket), [focusedMarket]);
+  const focusedKey = focusedMarket?.id || focusedMarket?.ticker || "";
+  useEffect(() => {
+    const datesFollowMarket =
+      (polymarketLive && (tableId === "getBatchPricesHistory" || tableId === "getTokenPriceHistory")) ||
+      (!polymarketLive && ["trades", "candlesticks", "orderbook", "event_candlesticks", "event_forecast"].includes(tableId));
+    if (!datesFollowMarket || livePicks.length !== 1 || !focusedLife) return undefined;
+    const maxDays = tableId === "getTokenPriceHistory" ? 15 : undefined;
+    const next = defaultLifeRange(focusedLife, { maxDays });
+    if (!next?.from || !next.to) return undefined;
+    setAttributeFilters((current) => {
+      const range = current?.time_range || {};
+      if (range.from === next.from && range.to === next.to && range.preset === next.preset) return current;
+      return { ...(current || {}), time_range: next };
+    });
+    return undefined;
+  }, [focusedKey, focusedLife, livePicks.length, polymarketLive, tableId]);
+  const polymarketQuoteColumns = useMemo(() => {
+    if (!polymarketLive || !isPolymarketQuoteTable(tableId)) return [];
+    const columns = polymarketQuoteAttributeColumns(tableId, pull?.columns || [], attributeFilters);
+    return withMarketLifeBounds(columns, focusedLife);
+  }, [attributeFilters, focusedLife, polymarketLive, pull?.columns, tableId]);
   const polymarketQuoteKey = polymarketQuoteRequestKey(tableId, attributeFilters, rowLimit, planLimit);
   const polymarketSamplingLimit = Number(rowLimit);
   const polymarketExplore =
@@ -2567,12 +2600,12 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
     [liveMarketSearch, pull?.columns, KALSHI_LIVE_QUERY_ATTRIBUTE_COLUMNS, kalshiLiveMarketAttributeColumns],
   );
   const directAttributeColumns = useMemo(
-    () => ((liveMarketFanout || liveEventCandles) ? kalshiLiveDirectAttributeColumns(tableId, pull?.columns || []) : []),
-    [liveEventCandles, liveMarketFanout, tableId, pull?.columns],
+    () => withMarketLifeBounds((liveMarketFanout || liveEventCandles) ? kalshiLiveDirectAttributeColumns(tableId, pull?.columns || []) : [], focusedLife),
+    [focusedLife, liveEventCandles, liveMarketFanout, tableId, pull?.columns],
   );
   const forecastAttributeColumns = useMemo(
-    () => (liveForecast ? kalshiLiveEventForecastAttributeColumns(pull?.columns || []) : []),
-    [liveForecast, pull?.columns],
+    () => withMarketLifeBounds(liveForecast ? kalshiLiveEventForecastAttributeColumns(pull?.columns || []) : [], focusedLife),
+    [focusedLife, liveForecast, pull?.columns],
   );
   const forecastRowColumns = useMemo(
     () => forecastAttributeColumns.filter((column) => !column.queryOnly),
@@ -5958,7 +5991,7 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
               rowCount: fullRows.length,
               span: pulled.length > 1 ? "half" : "full",
               table: tableId,
-              pull: { ticker: item.market.ticker, table: tableId },
+              pull: { ticker: item.market.ticker, table: tableId, ...lifePull(item.market) },
               summary: `Kalshi Live · ${label} · ${item.market.ticker}`,
               sourceRows: fullRows,
             };
@@ -6319,6 +6352,7 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
           rowCount: fullRows.length,
           span: "half",
           table: tableId,
+          pull: { table: tableId, ticker: pick.slug || pick.entityId || "", tokens: pick.tokenIds || [], ...lifePull(pick) },
           summary: `Polymarket Live · ${sheetTitle} · ${label}`,
         });
       });
@@ -6330,6 +6364,7 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
         rows: runMarkets.rows,
         span: "full",
         table: tableId || "markets",
+        pull: livePicks.length === 1 ? { table: tableId || "markets", ticker: livePicks[0].ticker || livePicks[0].slug || "", tokens: livePicks[0].tokenIds || [], ...lifePull(livePicks[0]) } : undefined,
         summary: lockedQuery?.label || describeSearch(),
         composeRequest: marketsRequest,
         keepAllRows: Boolean(liveMatchedRows),
@@ -6468,7 +6503,7 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
                   rowCount: rows.length,
                   span: "half",
                   table: item.target.id,
-                  pull: { ticker: item.market.ticker, table: item.target.id },
+                  pull: { ticker: item.market.ticker, table: item.target.id, tokens: item.market.pick?.tokenIds || [], ...lifePull(item.market.pick || item.market) },
                   summary: `Kalshi Live · ${item.target.title} · ${item.market.label || item.market.ticker}`,
                 });
               });
@@ -6543,7 +6578,7 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
           rowCount: fullRows.length,
           span: "half",
           table: item.target.id,
-          pull: { ticker: item.market.ticker, table: item.target.id },
+          pull: { ticker: item.market.ticker, table: item.target.id, tokens: item.market.pick?.tokenIds || [], ...lifePull(item.market.pick || item.market) },
           summary: `${polymarketJoinActive ? "Polymarket Live" : "Kalshi Live"} · ${item.target.title} · ${item.market.label || item.market.ticker}`,
         });
       });

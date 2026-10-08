@@ -79,15 +79,25 @@ export function directMarketTickers(picks) {
   const seen = new Set();
   const markets = [];
   for (const pick of picks || []) {
-    const fromRows = (pick?.rows || []).map((row) => String(row?.ticker || "").trim()).filter(Boolean);
-    const list = fromRows.length ? fromRows : pick?.kind === "market" && pick.ticker ? [String(pick.ticker).trim()] : [];
-    for (const ticker of list) {
+    const rows = Array.isArray(pick?.rows) ? pick.rows : [];
+    const entries = rows.length
+      ? rows.map((row) => ({ ticker: String(row?.ticker || "").trim(), row }))
+      : pick?.kind === "market" && pick.ticker
+        ? [{ ticker: String(pick.ticker).trim(), row: null }]
+        : [];
+    for (const entry of entries) {
+      const ticker = entry.ticker;
       if (!ticker || seen.has(ticker)) continue;
       seen.add(ticker);
+      const row = entry.row || {};
       markets.push({
         ticker,
-        label: ticker,
-        title: String(pick?.title || ticker),
+        label: String(pick?.label || ticker),
+        title: String(row.yes_sub_title || pick?.title || ticker),
+        openTime: row.open_time || row.openTime || pick?.openTime,
+        closeTime: row.close_time || row.closeTime || pick?.closeTime,
+        status: row.status || pick?.marketStatus,
+        result: row.result || pick?.result,
       });
     }
   }

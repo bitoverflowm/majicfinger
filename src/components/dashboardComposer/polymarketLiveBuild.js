@@ -302,6 +302,7 @@ export function polymarketPickFromSuggestion(suggestion) {
     outcomes: Array.isArray(ref?.outcomes) ? ref.outcomes : [],
     address,
     closed: marketIsClosed(suggestion) || marketIsClosed(suggestion.raw),
+    ...marketLifeFromRow(suggestion),
   };
 }
 
@@ -387,6 +388,7 @@ export function polymarketJoinPickFromRow(row) {
     tokenIds: parseTokenIdList(row.clobTokenIds || row.clob_token_ids || row.token_ids || row.tokenIds),
     outcomes: parseOutcomeList(row.outcomes),
     closed: row.closed === true || row.closed === "true",
+    ...marketLifeFromRow(row),
   };
 }
 
@@ -424,6 +426,32 @@ function takePerMarket(rows, limit) {
     if (bucket.length < limit) bucket.push(row);
   }
   return order.flatMap((key) => groups.get(key));
+}
+
+function lifeSeconds(value) {
+  if (value == null || value === "") return null;
+  if (typeof value === "number" && Number.isFinite(value)) {
+    const seconds = value > 1e12 ? Math.floor(value / 1000) : Math.floor(value);
+    return seconds > 0 ? seconds : null;
+  }
+  const parsed = Date.parse(String(value).trim().replace(" ", "T").replace(/\+00$/, "Z"));
+  if (!Number.isFinite(parsed)) return null;
+  const seconds = Math.floor(parsed / 1000);
+  return seconds > 0 ? seconds : null;
+}
+
+function marketLifeFromRow(row) {
+  const source = row && typeof row === "object" ? row : {};
+  const raw = source.raw && typeof source.raw === "object" ? source.raw : source;
+  const closesAt = lifeSeconds(raw.closedTime || raw.closed_time || raw.endDate || raw.end_date || raw.endDateIso || source.closesAt || source.endedAt);
+  const startedAt = lifeSeconds(raw.startDate || raw.start_date || source.startedAt);
+  const outcome = String(raw.result || raw.outcome || source.outcome || "").trim();
+  return {
+    endedAt: closesAt && closesAt * 1000 <= Date.now() ? closesAt : null,
+    closesAt: closesAt || null,
+    startedAt: startedAt || null,
+    outcome: outcome && !outcome.startsWith("[") ? outcome : "",
+  };
 }
 
 function marketIsClosed(value) {
@@ -635,6 +663,10 @@ async function resolveMarket(pick) {
     tokenIds,
     outcomes: parseOutcomeList(row.outcomes),
     closed: marketIsClosed(row) || pick.closed === true,
+    endedAt: marketLifeFromRow(row).endedAt || pick.endedAt || null,
+    closesAt: marketLifeFromRow(row).closesAt || pick.closesAt || null,
+    startedAt: marketLifeFromRow(row).startedAt || pick.startedAt || null,
+    outcome: marketLifeFromRow(row).outcome || pick.outcome || "",
   };
 }
 
@@ -939,20 +971,28 @@ async function quoteRows(endpointId, picks, options = {}) {
     }));
   }
   if (endpointId === "getBatchPricesHistory") {
-    const tokens = [...new Set(pairs.map((pair) => pair.tokenId))];
-    const body = polymarketHistoryBody(filters);
+    const groups = new Map();
+    for (const pair of pairs) {
+      const body = polymarketHistoryBody(filters, pair.market);
+      const key = JSON.stringify(body);
+      const group = groups.get(key) || { body, tokens: [] };
+      if (!group.tokens.includes(pair.tokenId)) group.tokens.push(pair.tokenId);
+      groups.set(key, group);
+    }
     const payloads = [];
-    for (let index = 0; index < tokens.length; index += 20) {
-      payloads.push(await polymarketPost("getBatchPricesHistory", { markets: tokens.slice(index, index + 20), ...body }));
+    for (const group of groups.values()) {
+      for (let index = 0; index < group.tokens.length; index += 20) {
+        payloads.push(await polymarketPost("getBatchPricesHistory", { markets: group.tokens.slice(index, index + 20), ...group.body }));
+      }
     }
     const target = polymarketQuoteTarget(options.rowLimit, options.planLimit, 50, 2000);
     return takePerMarket(historyRows(payloads, pairs), target);
   }
   if (endpointId === "getTokenPriceHistory") {
-    const params = polymarketTokenHistoryParams(filters);
     const target = polymarketQuoteTarget(options.rowLimit, options.planLimit, 50, 10000);
     const rows = [];
     for (const pair of pairs) {
+      const params = polymarketTokenHistoryParams(filters, pair.market);
       const data = await polymarketGet("getTokenPriceHistory", {
         token_id: pair.tokenId,
         limit: String(Math.min(10000, target)),

@@ -101,6 +101,21 @@ export function polymarketSelectionTokenSet(items) {
  * @param {Set<string> | null | undefined} tokenSet
  * @returns {boolean}
  */
+/**
+ * Open markets first. Gamma ranks old closed markets ahead of markets that are still trading.
+ * @param {PolymarketPublicSearchSuggestion[]} suggestions
+ */
+export function polymarketSuggestionsOpenFirst(suggestions) {
+  const list = Array.isArray(suggestions) ? suggestions : [];
+  const open = [];
+  const closed = [];
+  for (const item of list) {
+    if (item?.closed === true || item?.closed === "true") closed.push(item);
+    else open.push(item);
+  }
+  return [...open, ...closed];
+}
+
 export function isPolymarketSelectionMatch(item, tokenSet) {
   if (!tokenSet || tokenSet.size === 0) return false;
   return polymarketSelectionTokens(item).some((token) => tokenSet.has(token));
@@ -114,10 +129,11 @@ export function isPolymarketSelectionMatch(item, tokenSet) {
 export function polymarketSuggestionStatusTags(s) {
   /** @type {string[]} */
   const tags = [];
-  if (s?.live === true) tags.push("Live");
-  if (s?.closed === true) tags.push("Closed");
+  const closed = s?.closed === true || s?.closed === "true";
+  if (closed) tags.push("Closed");
+  else if (s?.live === true) tags.push("Live");
   else if (s?.active === true) tags.push("Active");
-  else if (s?.active === false && s?.closed !== true) tags.push("Inactive");
+  else if (s?.active === false) tags.push("Inactive");
   if (s?.archived === true) tags.push("Archived");
   if (s?.featured === true) tags.push("Featured");
   if (s?.new === true) tags.push("New");

@@ -9,6 +9,7 @@ import {
   isPolymarketPublicSearchEligible,
   isPolymarketSelectionMatch,
   polymarketSelectionTokenSet,
+  polymarketSuggestionsOpenFirst,
   polymarketSuggestionStatusTags,
 } from "@/lib/polymarketLive/polymarketPublicSearch";
 import { cn } from "@/lib/utils";
@@ -287,7 +288,7 @@ export function PolymarketLiveSearch({
             exactList = exactList.filter((s) => s?.closed !== true && s?.closed !== "true");
           }
           if (exactList.length) {
-            setSuggestions(exactList);
+            setSuggestions(polymarketSuggestionsOpenFirst(exactList));
             if (!dismissedRef.current) setSuggestOpen(true);
             return;
           }
@@ -318,7 +319,7 @@ export function PolymarketLiveSearch({
         seen.add(key);
         return true;
       });
-      setSuggestions(list);
+      setSuggestions(polymarketSuggestionsOpenFirst(list));
       if (!dismissedRef.current) setSuggestOpen(true);
     } catch (e) {
       if (e instanceof DOMException && e.name === "AbortError") return;

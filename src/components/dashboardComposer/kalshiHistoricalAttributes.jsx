@@ -14,6 +14,7 @@ import { KalshiLiveTimestampPicker } from "@/components/connectData/kalshiLive/K
 import { PolymarketTagPicker } from "@/components/connectData/polymarketLive/PolymarketTagPicker";
 import { cellMatchesTextTerm, columnUsesWholeTerm } from "@/lib/textTermMatch";
 import { DATE_RANGE_PRESETS, activeDateRangePreset, dateRangePreset } from "@/components/dashboardComposer/dateRangePresets";
+import { clampLifeRange, presetWithinLife } from "@/lib/markets/marketLife";
 import { KALSHI_LIVE_CANDLESTICK_PERIOD_OPTIONS } from "@/lib/kalshiLive/candlesticksColumns";
 import { KALSHI_LIVE_EVENT_FORECAST_PERIOD_OPTIONS } from "@/lib/kalshiLive/eventForecastColumns";
 import { cn } from "@/lib/utils";
@@ -567,11 +568,36 @@ function ExcludeNullField({ checked, onChange }) {
   );
 }
 
-function DateRangeField({ from, to, presetId, onChange, presetIds }) {
+const TRADING_PRESET_LABELS = {
+  "past-24h": "Last 24 hours of trading",
+  "past-3d": "Last 3 days of trading",
+  "past-7d": "Last 7 days of trading",
+  "past-month": "Last month of trading",
+};
+
+function calendarLimit(bounds) {
+  const before = bounds?.earliest ? dateFromIso(bounds.earliest) : undefined;
+  const after = bounds?.latest ? dateFromIso(bounds.latest) : undefined;
+  const disabled = before || after ? { ...(before ? { before } : {}), ...(after ? { after } : {}) } : undefined;
+  return { disabled, fromDate: before, toDate: after };
+}
+
+function DateRangeField({ from, to, presetId, onChange, presetIds, anchor, bounds }) {
   const start = dateFromIso(from);
   const end = dateFromIso(to);
   const selected = start || end ? { from: start, to: end } : undefined;
-  const preset = activeDateRangePreset(from, to, presetId);
+  const bounded = Boolean(bounds?.earliest || bounds?.latest);
+  const anchorDate = anchor ? new Date(`${anchor}T12:00:00`) : new Date();
+  const now = Number.isNaN(anchorDate.getTime()) ? new Date() : anchorDate;
+  const preset = presetId === "market-life"
+    ? { id: "market-life", short: "Life", label: "Full trading life" }
+    : activeDateRangePreset(from, to, presetId, now);
+  const emptyLabel = bounds?.stopped && bounds.earliest && bounds.latest
+    ? formatAttributeRange(bounds.earliest, bounds.latest)
+    : anchor
+      ? `Ends ${formatAttributeDate(anchor)}`
+      : "Pick a date range";
+  const limit = calendarLimit(bounds);
   const presets = Array.isArray(presetIds) && presetIds.length
     ? DATE_RANGE_PRESETS.filter((item) => presetIds.includes(item.id))
     : DATE_RANGE_PRESETS;
@@ -587,7 +613,7 @@ function DateRangeField({ from, to, presetId, onChange, presetIds }) {
           )}
         >
           <CalendarIcon className="size-3.5 shrink-0 opacity-70" />
-          <span className="min-w-0 flex-1 truncate">{formatAttributeRange(from, to)}</span>
+          <span className="min-w-0 flex-1 truncate">{selected ? formatAttributeRange(from, to) : emptyLabel}</span>
           {preset ? <span className="shrink-0 text-[11px] font-medium text-muted-foreground">{preset.short}</span> : null}
         </Button>
       </PopoverTrigger>
@@ -606,12 +632,31 @@ function DateRangeField({ from, to, presetId, onChange, presetIds }) {
                     ? "border-foreground bg-foreground text-background"
                     : "border-border/70 bg-background text-foreground hover:bg-muted",
                 )}
-                onClick={() => onChange({ ...dateRangePreset(item.id), preset: item.id })}
+                onClick={() => {
+                  const next = bounded
+                    ? presetWithinLife(item.id, bounds, now)
+                    : { ...dateRangePreset(item.id, now), preset: item.id };
+                  if (next) onChange(next);
+                }}
               >
-                {item.label}
+                {bounded && TRADING_PRESET_LABELS[item.id] ? TRADING_PRESET_LABELS[item.id] : item.label}
               </button>
             );
           })}
+          {bounds?.stopped && bounds.earliest && bounds.latest ? (
+            <button
+              type="button"
+              className={cn(
+                "rounded-full border px-2 py-1 text-[11px]",
+                preset?.id === "market-life"
+                  ? "border-foreground bg-foreground text-background"
+                  : "border-border/70 bg-background text-foreground hover:bg-muted",
+              )}
+              onClick={() => onChange({ from: bounds.earliest, to: bounds.latest, preset: "market-life" })}
+            >
+              Full trading life
+            </button>
+          ) : null}
           </div>
           <PopoverClose
             type="button"
@@ -626,8 +671,14 @@ function DateRangeField({ from, to, presetId, onChange, presetIds }) {
           mode="range"
           numberOfMonths={2}
           selected={selected}
-          defaultMonth={end || start}
-          onSelect={(range) => onChange({ from: isoFromDate(range?.from), to: isoFromDate(range?.to), preset: "" })}
+          defaultMonth={end || start || (anchor ? now : undefined) || limit.fromDate}
+          disabled={limit.disabled}
+          fromDate={limit.fromDate}
+          toDate={limit.toDate}
+          onSelect={(range) => {
+            const next = clampLifeRange(isoFromDate(range?.from), isoFromDate(range?.to), bounds);
+            onChange({ ...next, preset: "" });
+          }}
         />
         {selected ? (
           <div className="border-t border-border/70 p-2">
@@ -635,9 +686,22 @@ function DateRangeField({ from, to, presetId, onChange, presetIds }) {
               type="button"
               variant="ghost"
               className="h-7 w-full text-[11px]"
-              onClick={() => onChange({ from: "", to: "", preset: "" })}
+              onClick={() => {
+                if (bounds?.stopped && bounds.earliest && bounds.latest) {
+                  onChange({ from: bounds.earliest, to: bounds.latest, preset: "market-life" });
+                  return;
+                }
+                if (bounded) {
+                  const next = presetWithinLife("past-24h", bounds, now);
+                  if (next) {
+                    onChange(next);
+                    return;
+                  }
+                }
+                onChange({ from: "", to: "", preset: "" });
+              }}
             >
-              Clear dates
+              {bounded ? "Reset dates" : "Clear dates"}
             </Button>
           </div>
         ) : null}
@@ -811,6 +875,9 @@ function AttributeFields({ column, filters, onChange }) {
             mode="single"
             selected={selected}
             defaultMonth={selected}
+            disabled={calendarLimit(column.rangeBounds).disabled}
+            fromDate={calendarLimit(column.rangeBounds).fromDate}
+            toDate={calendarLimit(column.rangeBounds).toDate}
             onSelect={(date) => onChange(patchFilter(filters, column, { value: isoFromDate(date) }))}
           />
           {selected ? (
@@ -836,6 +903,8 @@ function AttributeFields({ column, filters, onChange }) {
         to={filter.to || ""}
         presetId={filter.preset || ""}
         presetIds={column.rangePresetIds}
+        anchor={column.rangeAnchor}
+        bounds={column.rangeBounds}
         onChange={({ from, to, preset }) => onChange(patchFilter(filters, column, { from, to, preset: preset || "" }))}
       />
     );

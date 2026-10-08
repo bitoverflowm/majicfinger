@@ -35,6 +35,7 @@ import {
 import { pageIdForTab, tabIdFromPage } from "@/lib/workspaceDashboardDocument";
 import { useSheetRealtime } from "@/components/dashboardComposer/sheetRealtimeSession";
 import { realtimeSessionKey, realtimeSheetForBlock, tailCells } from "@/lib/realtime/sheetRealtime";
+import { closedLifeMessage, lifeCountdown, sheetLife } from "@/lib/markets/marketLife";
 import { SpectrumLoadingState } from "@/components/ui/spectrum-loading-state";
 import { RunProgressCard } from "@/components/dashboardComposer/integrationRunProgress";
 import { cn } from "@/lib/utils";
@@ -751,6 +752,25 @@ function liveSession(canvas, blockId) {
   return canvas.realtimeById[realtimeSessionKey(canvas.pageId, blockId)] || null;
 }
 
+function MarketLifeBar({ sheet, session, enabled }) {
+  const life = sheetLife(sheet);
+  const streaming = !!session?.running;
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    if (!streaming || !life?.closeMs) return undefined;
+    const timer = window.setInterval(() => setNow(Date.now()), 30000);
+    return () => window.clearInterval(timer);
+  }, [streaming, life?.closeMs]);
+  if (!enabled && !session?.notice) return null;
+  const countdown = streaming ? lifeCountdown(life, now) : "";
+  const notice = session?.notice || (life?.stopped ? closedLifeMessage(life?.outcome) : "");
+  if (notice && (session?.closed || life?.stopped)) {
+    return <div className="border-b border-border/70 bg-muted/70 px-3 py-1.5 text-[12px] leading-5 text-foreground">{notice}</div>;
+  }
+  if (!countdown) return null;
+  return <div className="border-b border-border/70 px-3 py-1 text-[12px] text-muted-foreground">{countdown}</div>;
+}
+
 function liveBlock(block, canvas) {
   const liveCells = liveSession(canvas, block?.id)?.liveCells;
   if (!liveCells) return block;
@@ -802,6 +822,7 @@ function SheetBlockBody({ block, onChange, booting }) {
           ) : null}
         </span>
       </div>
+      <MarketLifeBar sheet={block} session={liveSession(canvas, block.id)} enabled={hasRealtime} />
       {booting ? <SheetSkeleton /> : <DashboardSheetGrid block={view} onChange={onChange} readOnly={!!canvas?.readOnly} />}
     </div>
   );
@@ -904,6 +925,11 @@ function ChartBlockBody({ block, onChange, booting }) {
           </span>
         ) : null}
       </div>
+      <MarketLifeBar
+        sheet={source}
+        session={sourceSession}
+        enabled={!!source && !!realtimeSheetForBlock(source, canvas?.blocks || [])}
+      />
       {booting ? (
         <ChartSkeleton />
       ) : block.sourceSheetId ? (
@@ -929,6 +955,7 @@ function blockLabel(block) {
 }
 
 function SheetFullscreen({ block, onChange, onClose }) {
+  const canvas = useWorkspaceCanvas();
   useEffect(() => {
     const onKey = (event) => {
       if (event.key !== "Escape") return;
@@ -965,6 +992,11 @@ function SheetFullscreen({ block, onChange, onClose }) {
           Close
         </button>
       </div>
+      <MarketLifeBar
+        sheet={block}
+        session={liveSession(canvas, block.id)}
+        enabled={!!realtimeSheetForBlock(block, canvas?.blocks || [])}
+      />
       <div className="flex min-h-0 flex-1 flex-col p-4">
         <DashboardSheetGrid block={block} onChange={onChange} />
       </div>

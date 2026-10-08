@@ -30,6 +30,7 @@ import {
   defaultPolymarketQuoteFilters,
   polymarketHistoryBody,
   polymarketHistoryFidelityOptions,
+  polymarketMarketAnchorDate,
   polymarketQuoteAttributeColumns,
   polymarketQuoteRequestKey,
   polymarketQuoteTarget,
@@ -288,6 +289,52 @@ assert.equal(polymarketHistoryBody({ interval: { value: "1w" }, fidelity: { valu
 assert.equal(polymarketHistoryBody({ interval: { value: "1m" }, fidelity: { value: "" } }).fidelity, 10);
 assert.equal(polymarketHistoryBody({ interval: { value: "max" }, fidelity: { value: "1" } }).fidelity, 10);
 assert.equal(polymarketHistoryBody({ interval: { value: "1d" }, time_range: { from: "2026-10-01", to: "2026-10-07" }, fidelity: { value: "1" } }).fidelity, 1);
+const closedMarket = {
+  closed: true,
+  endedAt: Math.floor(Date.parse("2022-03-16T11:14:35Z") / 1000),
+  startedAt: Math.floor(Date.parse("2022-03-02T19:23:10.922Z") / 1000),
+};
+const closedDay = polymarketHistoryBody({ interval: { value: "1d" } }, closedMarket);
+assert.equal(closedDay.interval, undefined);
+assert.equal(closedDay.end_ts, closedMarket.endedAt);
+assert.equal(closedDay.start_ts, closedMarket.endedAt - 86400);
+const closedWeek = polymarketHistoryBody(
+  { interval: { value: "1d" }, time_range: { from: "2026-10-01", to: "2026-10-08", preset: "past-7d" } },
+  closedMarket,
+);
+assert.equal(closedWeek.end_ts, closedMarket.endedAt);
+assert.equal(closedWeek.start_ts, closedMarket.endedAt - 7 * 86400);
+const explicitHistory = polymarketHistoryBody(
+  { interval: { value: "1d" }, time_range: { from: "2022-03-10", to: "2022-03-15" } },
+  closedMarket,
+);
+assert.equal(explicitHistory.interval, undefined);
+assert.notEqual(explicitHistory.end_ts, closedMarket.endedAt);
+assert.equal(polymarketHistoryBody({ interval: { value: "1d" } }, { closed: false, endedAt: closedMarket.endedAt }).interval, "1d");
+assert.equal(polymarketMarketAnchorDate(closedMarket), "2022-03-16");
+assert.equal(polymarketMarketAnchorDate({ closed: false, endedAt: closedMarket.endedAt }), "");
+const oilPick = polymarketPickFromSuggestion({
+  entity: "market",
+  id: "241830",
+  slug: "oil",
+  title: "Oil",
+  closed: true,
+  raw: { closedTime: "2022-03-16 11:14:35+00", startDate: "2022-03-02T19:23:10.922Z", closed: true },
+});
+assert.equal(oilPick.endedAt, closedMarket.endedAt);
+assert.equal(oilPick.startedAt, closedMarket.startedAt);
+const tokenDay = polymarketTokenHistoryParams({ interval: { value: "1d" } }, closedMarket);
+assert.equal(tokenDay.interval, undefined);
+assert.equal(Number(tokenDay.end), closedMarket.endedAt);
+assert.equal(Number(tokenDay.end) - Number(tokenDay.start), 86400);
+const tokenMonth = polymarketTokenHistoryParams({ interval: { value: "1m" } }, closedMarket);
+assert.ok(Number(tokenMonth.end) - Number(tokenMonth.start) <= 15 * 86400);
+const tokenMax = polymarketTokenHistoryParams({ interval: { value: "max" } }, closedMarket);
+assert.equal(Number(tokenMax.start), closedMarket.startedAt);
+assert.equal(Number(tokenMax.end), closedMarket.endedAt);
+const longClosed = { closed: true, endedAt: closedMarket.endedAt, startedAt: closedMarket.endedAt - 40 * 86400 };
+const tokenLong = polymarketTokenHistoryParams({ interval: { value: "max" } }, longClosed);
+assert.equal(Number(tokenLong.end) - Number(tokenLong.start), 15 * 86400);
 assert.deepEqual(polymarketHistoryFidelityOptions("1w", false).map((option) => option[0]), ["5", "15", "60", "240", "1440"]);
 assert.equal(polymarketHistoryFidelityOptions("1m", false).some((option) => option[0] === "1" || option[0] === "5"), false);
 assert.equal(polymarketHistoryFidelityOptions("1d", true).some((option) => option[0] === "1"), true);

@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { startSheetRealtimeTransport } from "@/components/dashboardComposer/sheetRealtimeTransport";
 import { realtimeSessionKey, realtimeTargetForBlock } from "@/lib/realtime/sheetRealtime";
+import { closedLifeMessage, sheetLife } from "@/lib/markets/marketLife";
 
 /**
  * Live pulls stay off the saved dashboard document. Ticks update this session,
@@ -47,12 +48,27 @@ export function useSheetRealtime(blocksByPage, pageId) {
       const def = realtimeTargetForBlock(sheet);
       if (!def) return;
       const key = realtimeSessionKey(pageRef.current, sheet.id);
+      const life = sheetLife(sheet);
       stopsRef.current.get(key)?.();
       stopsRef.current.delete(key);
+      if (life?.stopped) {
+        setRealtimeById((current) => ({
+          ...current,
+          [key]: {
+            running: false,
+            closed: true,
+            notice: closedLifeMessage(life.outcome),
+            status: "Market closed",
+            liveCells: current[key]?.liveCells || null,
+          },
+        }));
+        return;
+      }
       setRealtimeById((current) => ({
         ...current,
-        [key]: { running: true, status: "Starting", liveCells: null },
+        [key]: { running: true, status: "Starting", liveCells: null, closesAt: life?.closeMs || null, closed: false, notice: "" },
       }));
+      let watch = 0;
       const handle = startSheetRealtimeTransport(sheet, def, {
         onStatus(status) {
           setRealtimeById((current) => {
@@ -77,7 +93,29 @@ export function useSheetRealtime(blocksByPage, pageId) {
           }));
         },
       });
-      stopsRef.current.set(key, handle.stop);
+      const stop = () => {
+        window.clearInterval(watch);
+        handle.stop();
+      };
+      if (life?.closeMs && life.closeMs > Date.now()) {
+        watch = window.setInterval(() => {
+          if (Date.now() < life.closeMs) return;
+          stop();
+          stopsRef.current.delete(key);
+          setRealtimeById((current) => ({
+            ...current,
+            [key]: {
+              running: false,
+              closed: true,
+              notice: closedLifeMessage(life.outcome),
+              status: "Market closed",
+              liveCells: current[key]?.liveCells || null,
+              closesAt: life.closeMs,
+            },
+          }));
+        }, 15000);
+      }
+      stopsRef.current.set(key, stop);
     },
     [findBlock],
   );
