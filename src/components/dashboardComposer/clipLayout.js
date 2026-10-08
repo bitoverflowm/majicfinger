@@ -52,6 +52,26 @@ export function isWideBlock(block) {
   return spanOf(block) >= CLIP.cols;
 }
 
+function placeChartRow(placed, charts, y) {
+  let col = 0;
+  let rowHeight = 0;
+  let rowY = y;
+  for (const chart of charts) {
+    const span = 6;
+    if (col > 0 && col + span > CLIP.cols) {
+      y = rowY + rowHeight + CLIP.gap;
+      col = 0;
+      rowHeight = 0;
+      rowY = y;
+    }
+    const height = chart.h || CLIP.rowH;
+    placed.push({ ...chart, x: xForCol(col), y: rowY, w: widthForSpan(span), h: height });
+    col += span;
+    rowHeight = Math.max(rowHeight, height);
+  }
+  return col > 0 ? rowY + rowHeight + CLIP.gap : y;
+}
+
 function overlaps(block, x, y, w, h, others) {
   const right = x + w;
   const bottom = y + h;
@@ -93,7 +113,9 @@ export function packClippedBlocks(blocks) {
 
   for (const block of ordered) {
     if (block.type === "chart" && block.sourceSheetId) {
-      charts.set(block.sourceSheetId, block);
+      const list = charts.get(block.sourceSheetId) || [];
+      list.push(block);
+      charts.set(block.sourceSheetId, list);
       continue;
     }
     if (block.type === "sheet" && isWideBlock(block)) wideSheets.push(block);
@@ -108,25 +130,23 @@ export function packClippedBlocks(blocks) {
     const height = sheet.h || 420;
     placed.push({ ...sheet, x: CLIP.x0, y, w: widthForSpan(CLIP.cols), h: height });
     y += height + CLIP.gap;
-    const chart = charts.get(sheet.id);
-    if (chart) {
-      placed.push({ ...chart, x: CLIP.x0, y, w: widthForSpan(CLIP.cols), h: 320 });
+    const attached = charts.get(sheet.id) || [];
+    charts.delete(sheet.id);
+    if (attached.length === 1) {
+      placed.push({ ...attached[0], x: CLIP.x0, y, w: widthForSpan(CLIP.cols), h: 320 });
       y += 320 + CLIP.gap;
-      charts.delete(sheet.id);
+    } else if (attached.length > 1) {
+      y = placeChartRow(placed, attached, y);
     }
   }
 
   const rows = [];
   for (const sheet of sheets) {
-    const chart = charts.get(sheet.id);
-    if (chart) {
-      rows.push([sheet, chart]);
-      charts.delete(sheet.id);
-    } else {
-      rows.push([sheet]);
-    }
+    const attached = charts.get(sheet.id) || [];
+    charts.delete(sheet.id);
+    rows.push(attached.length ? [sheet, ...attached] : [sheet]);
   }
-  for (const chart of charts.values()) extras.push(chart);
+  for (const attached of charts.values()) extras.push(...attached);
 
   let col = 0;
   let rowHeight = 0;

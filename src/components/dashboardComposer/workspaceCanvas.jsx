@@ -15,6 +15,7 @@ import { useMyStateV2 } from "@/context/stateContextV2";
 import { duplicateTabName, saveWorkspaceStartTabs } from "@/lib/workspaceStartTabs";
 import { DashboardSheetGrid } from "@/components/dashboardComposer/dashboardSheetGrid";
 import { isOrderBookSheet } from "@/components/dashboardComposer/orderBookLadder";
+import { isPriceHistorySheet } from "@/components/dashboardComposer/priceHistorySeries";
 import { SheetBlockChart } from "@/components/dashboardComposer/sheetBlockChart";
 import { layoutRunSheets } from "@/components/dashboardComposer/integrationRunSheets";
 import { CLIP, packClippedBlocks, snapBlockPosition } from "@/components/dashboardComposer/clipLayout";
@@ -38,7 +39,7 @@ import { realtimeSessionKey, realtimeSheetForBlock, realtimeTargetForBlock, shee
 import { replayTabSheets } from "@/components/dashboardComposer/replayTabQueries";
 import { createRunReporter } from "@/components/dashboardComposer/integrationRunFeed";
 import { closedLifeMessage, lifeCountdown, sheetLife, sheetMarketCaption, sheetMarketClosed } from "@/lib/markets/marketLife";
-import { lookupSheetMarket, marketMetaComplete, marketMetaPatch } from "@/components/dashboardComposer/sheetMarketLookup";
+import { enqueueMarketLookup, lookupSheetMarket, marketMetaComplete, marketMetaPatch } from "@/components/dashboardComposer/sheetMarketLookup";
 import { SpectrumLoadingState } from "@/components/ui/spectrum-loading-state";
 import { RunProgressCard } from "@/components/dashboardComposer/integrationRunProgress";
 import { cn } from "@/lib/utils";
@@ -518,23 +519,38 @@ export function WorkspaceCanvasProvider({ pageId, readOnly = false, children }) 
     (id) => {
       const sheet = blocks.find((block) => block.id === id && block.type === "sheet");
       if (!sheet) return;
+      const orderBook = isOrderBookSheet(sheet);
+      const base = String(sheet.title || "Sheet").replace(/\s+chart$/, "").trim();
+      const specs = orderBook
+        ? [
+            {
+              chartView: "order-book",
+              title: /^order\s*books?/i.test(base) ? base : `${base} order book`,
+            },
+            {
+              chartView: "depth",
+              title: /^order\s*books?/i.test(base) ? base.replace(/^order\s*books?(\(s\))?/i, "Depth") : `${base} depth`,
+            },
+          ]
+        : [{ chartView: "", title: `${base} chart` }];
       const chartId = newId();
       setBlocksByPage((prev) => {
         const list = prev[pageId] || [];
         const current = list.find((block) => block.id === id) || sheet;
-        const chart = {
-          id: chartId,
+        const charts = specs.map((spec, index) => ({
+          id: index === 0 ? chartId : newId(),
           type: "chart",
           source: "sheet-chart",
           sourceSheetId: current.id,
+          ...(spec.chartView ? { chartView: spec.chartView } : {}),
           x: current.x,
-          y: current.y,
+          y: (current.y || 0) + index,
           w: 540,
           h: 360,
-          title: `${current.title || "Sheet"} chart`,
+          title: spec.title,
           body: "",
-        };
-        return { ...prev, [pageId]: packClippedBlocks([...list, chart]) };
+        }));
+        return { ...prev, [pageId]: packClippedBlocks([...list, ...charts]) };
       });
       setSelectedId(chartId);
       setTool("select");
@@ -946,7 +962,7 @@ function useRememberMarket(block) {
     const snapshot = blockRef.current;
     if (canvas?.readOnly || complete || snapshot?.type !== "sheet" || rememberedMarkets.has(snapshot.id)) return undefined;
     rememberedMarkets.add(snapshot.id);
-    void lookupSheetMarket(snapshot)
+    void enqueueMarketLookup(() => lookupSheetMarket(snapshot))
       .then((meta) => {
         if (!meta) {
           rememberedMarkets.delete(snapshot.id);
@@ -1107,7 +1123,7 @@ function ChartBlockBody({ block, onChange, booting }) {
   const sourceSession = source ? liveSession(canvas, source.id) : null;
   const sourceView = source?.type === "sheet" ? liveBlock(source, canvas) : null;
   const chartSheet =
-    sourceView && sourceSession?.running && !isOrderBookSheet(sourceView)
+    sourceView && sourceSession?.running && !isOrderBookSheet(sourceView) && !isPriceHistorySheet(sourceView)
       ? { ...sourceView, cells: tailCells(sourceView.cells, 80) }
       : sourceView;
   return (
@@ -1142,6 +1158,7 @@ function ChartBlockBody({ block, onChange, booting }) {
         <SheetBlockChart
           sheet={chartSheet}
           live={!!sourceSession?.running}
+          view={block.chartView || ""}
           snapshot={block.chart}
           onSnapshot={(chart) => {
             if (canvas?.readOnly) return;

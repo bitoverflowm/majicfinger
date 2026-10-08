@@ -7,6 +7,7 @@ import { BarChart3, Check, ChevronDown, ChevronRight, Database, Eye, Play, Radio
 import { ProvenanceMapButton } from "@/components/dashboardComposer/provenanceMap";
 
 import { Button } from "@/components/ui/button";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -311,6 +312,7 @@ function LiveTransportControls() {
   return (
     <div className="flex items-center">
       {targets.length > 1 ? (
+        <ChromeTip label="Choose which live feed to control">
         <select
           className="mr-0.5 max-w-[88px] truncate bg-transparent text-[11px] text-neutral-600 outline-none dark:text-neutral-300"
           value={active.key}
@@ -323,34 +325,38 @@ function LiveTransportControls() {
             </option>
           ))}
         </select>
+        </ChromeTip>
       ) : null}
+      <ChromeTip label="Resume this live feed">
       <button
         type="button"
         className={iconButton}
-        title={state?.isPaused ? "Play" : "Play"}
-        aria-label="Play"
+        aria-label="Resume this live feed"
         onClick={() => actions?.resume?.(active.id)}
       >
         <Play className="size-4" />
       </button>
+      </ChromeTip>
+      <ChromeTip label="Stop this live feed">
       <button
         type="button"
         className={iconButton}
-        title="Stop"
-        aria-label="Stop"
+        aria-label="Stop this live feed"
         onClick={() => actions?.stop?.(active.id)}
       >
         <Square className="size-3.5" />
       </button>
+      </ChromeTip>
+      <ChromeTip label="Restart this live feed">
       <button
         type="button"
         className={iconButton}
-        title="Replay"
-        aria-label="Replay"
+        aria-label="Restart this live feed"
         onClick={() => actions?.restart?.(active.id)}
       >
         <RotateCw className="size-3.5" />
       </button>
+      </ChromeTip>
     </div>
   );
 }
@@ -409,6 +415,7 @@ function AccountMenu({ onLogout }) {
   const profilePic = ctx?.profilePic;
 
   return (
+    <ChromeTip label="Account, billing, and logout">
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
         <button
@@ -438,6 +445,7 @@ function AccountMenu({ onLogout }) {
         <DropdownMenuItem onClick={() => onLogout?.()}>Logout</DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>
+    </ChromeTip>
   );
 }
 
@@ -454,11 +462,12 @@ function SaveDashboardButton() {
   };
 
   const saved = state === "saved";
+  const label = state === "saving" ? "Saving this dashboard" : saved ? "Dashboard saved" : "Save this dashboard";
   return (
+    <ChromeTip label={label}>
     <button
       type="button"
       aria-label={saved ? "Saved" : "Save dashboard"}
-      title={saved ? "Saved" : "Save"}
       disabled={state === "saving"}
       onClick={() => {
         void onClick();
@@ -467,6 +476,7 @@ function SaveDashboardButton() {
     >
       {saved ? <Check className="size-4" aria-hidden /> : <Save className="size-4" aria-hidden />}
     </button>
+    </ChromeTip>
   );
 }
 
@@ -487,10 +497,10 @@ function PreviewDashboardButton() {
   };
 
   return (
+    <ChromeTip label="Preview this dashboard">
     <button
       type="button"
       aria-label="Preview dashboard"
-      title="Preview"
       disabled={busy}
       onClick={() => {
         void onClick();
@@ -499,27 +509,43 @@ function PreviewDashboardButton() {
     >
       <Eye className="size-4" aria-hidden />
     </button>
+    </ChromeTip>
   );
 }
 
 const CHROME_ICON =
   "inline-flex size-7 items-center justify-center rounded-md text-neutral-700 hover:bg-black/[0.05] disabled:opacity-60 dark:text-neutral-200 dark:hover:bg-white/10";
 
+function ChromeTip({ label, children }) {
+  if (!label) return children;
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <span className="inline-flex">{children}</span>
+      </TooltipTrigger>
+      <TooltipContent side="bottom" sideOffset={8} className="!z-[520] text-xs">
+        {label}
+      </TooltipContent>
+    </Tooltip>
+  );
+}
+
 function ReplayTabButton() {
   const canvas = useWorkspaceCanvas();
   const replaying = canvas?.runFeed?.status === "running" && canvas?.runFeed?.title === "Replay queries";
   const busy = canvas?.runFeed?.status === "running";
   return (
+    <ChromeTip label="Rerun every query on this tab">
     <button
       type="button"
       aria-label="Replay all queries in tab"
-      title="Replay all queries in tab"
       disabled={busy || !canvas?.replayTab}
       onClick={() => canvas?.replayTab?.()}
       className={CHROME_ICON}
     >
       <RotateCcw className={cn("size-4", replaying && "animate-spin")} aria-hidden />
     </button>
+    </ChromeTip>
   );
 }
 
@@ -544,13 +570,13 @@ function RealtimeModeButton() {
   const idle = tabs.filter((tab) => !tab.on && tab.canStart);
 
   const idleHint = !on && !current?.canStart ? "no live markets in your current tab" : "";
+  const playLabel = on ? "Stop live data on this tab" : idleHint || "Start live data on this tab";
   return (
     <div className="flex items-center">
-      <span className="inline-flex" title={idleHint || undefined}>
+      <ChromeTip label={playLabel}>
       <button
         type="button"
         aria-label={on ? "Stop realtime mode" : idleHint || "Realtime mode"}
-        title={on ? "Stop realtime mode" : idleHint || "Realtime mode"}
         aria-pressed={on}
         disabled={!on && !current?.canStart}
         onClick={() => {
@@ -561,11 +587,12 @@ function RealtimeModeButton() {
       >
         {on ? <Square className="size-3.5" aria-hidden /> : <Play className="size-4" aria-hidden />}
       </button>
-      </span>
+      </ChromeTip>
       {menu ? (
+        <ChromeTip label="Start or stop realtime on other tabs">
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <button type="button" aria-label="Realtime mode on other tabs" title="Realtime tabs" className={cn(CHROME_ICON, "w-5")}>
+            <button type="button" aria-label="Realtime mode on other tabs" className={cn(CHROME_ICON, "w-5")}>
               <ChevronDown className="size-3.5" aria-hidden />
             </button>
           </DropdownMenuTrigger>
@@ -583,6 +610,7 @@ function RealtimeModeButton() {
             ))}
           </DropdownMenuContent>
         </DropdownMenu>
+        </ChromeTip>
       ) : null}
     </div>
   );
@@ -593,10 +621,12 @@ function RightChromeControls({ onLogout, expanded }) {
   const router = useRouter();
 
   return (
+    <TooltipProvider delayDuration={300}>
     <div className={cn("flex items-center gap-0.5", expanded && "min-w-0 flex-wrap")}>
       {user ? (
         <AccountMenu onLogout={onLogout} />
       ) : (
+        <ChromeTip label="Sign in">
         <Button
           variant="default"
           size="sm"
@@ -605,21 +635,30 @@ function RightChromeControls({ onLogout, expanded }) {
         >
           Log In
         </Button>
+        </ChromeTip>
       )}
       <SaveDashboardButton />
-      <ProvenanceMapButton />
+      <ChromeTip label="See where this dashboard's data came from">
+        <ProvenanceMapButton />
+      </ChromeTip>
       <PreviewDashboardButton />
       <ReplayTabButton />
       <RealtimeModeButton />
-      <AnimatedThemeToggler className="inline-flex size-7 items-center justify-center rounded-md text-neutral-700 hover:bg-black/[0.05] dark:text-neutral-200 dark:hover:bg-white/10 [&_svg]:size-4" />
+      <ChromeTip label="Switch between light and dark">
+        <AnimatedThemeToggler className="inline-flex size-7 items-center justify-center rounded-md text-neutral-700 hover:bg-black/[0.05] dark:text-neutral-200 dark:hover:bg-white/10 [&_svg]:size-4" />
+      </ChromeTip>
       <LiveTransportControls />
+      <ChromeTip label="Share this dashboard">
       <button
         type="button"
+        aria-label="Share this dashboard"
         className="ml-1 inline-flex h-7 items-center rounded-md bg-[#0d99ff] px-3 text-[13px] font-medium text-white hover:bg-[#0b87e0]"
       >
         Share
       </button>
+      </ChromeTip>
     </div>
+    </TooltipProvider>
   );
 }
 

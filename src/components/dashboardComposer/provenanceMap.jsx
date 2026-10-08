@@ -31,7 +31,6 @@ export function ProvenanceMapButton() {
       <button
         type="button"
         aria-label="Provenance"
-        title="Provenance"
         onClick={() => setOpen(true)}
         className="inline-flex size-7 items-center justify-center rounded-md text-neutral-700 hover:bg-black/[0.05] dark:text-neutral-200 dark:hover:bg-white/10"
       >

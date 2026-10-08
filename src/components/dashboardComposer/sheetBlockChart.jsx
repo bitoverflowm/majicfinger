@@ -5,7 +5,10 @@ import { Bar, BarChart, CartesianGrid, Line, LineChart, ResponsiveContainer, Too
 import { useReadyTradeSheet, tradeTickerFromBlock, usesHistoricalTradeSheet } from "@/components/dashboardComposer/fullTradeSheet";
 import { isOrderBookSheet, rowsToOrderBook } from "@/components/dashboardComposer/orderBookLadder";
 import { ohlcRowsToCandles, rangesForCandles, tradesToCandles } from "@/components/dashboardComposer/tradeMarketCandles";
+import { isPriceHistorySheet, priceHistoryPoints } from "@/components/dashboardComposer/priceHistorySeries";
+import { IndicatorChart } from "@/components/spectrumui/charts/indicator-chart";
 import { MarketChart } from "@/components/spectrumui/charts/market-chart";
+import { DepthChart } from "@/components/spectrumui/charts/depth-chart";
 import { OrderBookChart } from "@/components/spectrumui/charts/order-book-chart";
 
 function parseChartNumber(value) {
@@ -209,15 +212,54 @@ function OrderBookSheetChart({ sheet, rows, live, snapshot, onSnapshot }) {
   );
 }
 
-export function SheetBlockChart({ sheet, snapshot, onSnapshot, live = false }) {
+function DepthSheetChart({ sheet, rows, live }) {
+  const book = useMemo(() => rowsToOrderBook(sheet?.columns, rows), [rows, sheet?.columns]);
+  const name = String(sheet?.pull?.marketTitle || sheet?.title || "Depth").trim();
+  const symbol = String(sheet?.pull?.side || "").trim();
+  return (
+    <DepthChart
+      book={book}
+      symbol={symbol}
+      name={name}
+      live={live}
+      status={book.bids.length || book.asks.length ? "ready" : "empty"}
+    />
+  );
+}
+
+function PriceHistorySheetChart({ sheet, live }) {
+  const points = useMemo(() => priceHistoryPoints(sheet), [sheet]);
+  const ranges = useMemo(
+    () => rangesForCandles(points.map((point) => ({ t: point.t }))),
+    [points],
+  );
+  const name = String(sheet?.pull?.marketTitle || sheet?.title || "Price").trim();
+  const symbol = String(sheet?.pull?.side || "").trim();
+  return (
+    <IndicatorChart
+      points={points}
+      indicators={[]}
+      symbol={symbol}
+      name={name}
+      ranges={ranges}
+      defaultRange="All"
+      live={live}
+      status={points.length ? "ready" : "empty"}
+      emptyLabel="This price history has no points to chart yet."
+    />
+  );
+}
+
+export function SheetBlockChart({ sheet, snapshot, onSnapshot, live = false, view = "" }) {
   const storedSheet = useReadyTradeSheet(sheet?.id);
   const fullSheet = usesHistoricalTradeSheet(sheet) ? storedSheet : null;
-  const orderBook = isOrderBookSheet(sheet) || snapshot?.kind === "order-book";
-  const candle = !orderBook && (isCandleSheet(sheet) || snapshot?.mode === "ohlc");
-  const trade = !orderBook && !candle && (isTradeSheet(sheet) || snapshot?.kind === "trade-market" || snapshot?.kind === "trade-price");
+  const priceHistory = isPriceHistorySheet(sheet);
+  const orderBook = !priceHistory && (isOrderBookSheet(sheet) || snapshot?.kind === "order-book");
+  const candle = !priceHistory && !orderBook && (isCandleSheet(sheet) || snapshot?.mode === "ohlc");
+  const trade = !priceHistory && !orderBook && !candle && (isTradeSheet(sheet) || snapshot?.kind === "trade-market" || snapshot?.kind === "trade-price");
   const series = useMemo(
-    () => (trade || candle || orderBook ? null : chartSeriesFromSheet(sheet)),
-    [candle, orderBook, sheet, trade],
+    () => (priceHistory || trade || candle || orderBook ? null : chartSeriesFromSheet(sheet)),
+    [candle, orderBook, priceHistory, sheet, trade],
   );
   const seriesKey = series ? `${series.kind}|${series.data.length}|${series.data[0]?.label}|${series.data[series.data.length - 1]?.value}` : "";
   useEffect(() => {
@@ -231,11 +273,17 @@ export function SheetBlockChart({ sheet, snapshot, onSnapshot, live = false }) {
     });
   }, [onSnapshot, series, seriesKey]);
 
+  if (priceHistory) {
+    return <PriceHistorySheetChart sheet={sheet} live={live} />;
+  }
+
   if (orderBook) {
+    const rows = matrixFromCells(sheet);
+    if (view === "depth") return <DepthSheetChart sheet={sheet} rows={rows} live={live} />;
     return (
       <OrderBookSheetChart
         sheet={sheet}
-        rows={matrixFromCells(sheet)}
+        rows={rows}
         live={live}
         snapshot={snapshot}
         onSnapshot={onSnapshot}

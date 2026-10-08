@@ -213,6 +213,7 @@ function cleanBlock(block) {
     type,
     ...(block.source ? { source: cleanText(block.source, 40) } : {}),
     ...(block.sourceSheetId ? { sourceSheetId: cleanText(block.sourceSheetId, 80) } : {}),
+    ...(block.chartView === "depth" || block.chartView === "order-book" ? { chartView: block.chartView } : {}),
     x: num(block.x),
     y: num(block.y),
     w: Math.max(120, num(block.w, 320)),

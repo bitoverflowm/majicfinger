@@ -695,21 +695,19 @@ async function resolveMarket(pick) {
   };
 }
 
-/** Title, outcome side, and trading window for one Polymarket token. */
-export async function polymarketMarketMeta(tokenId) {
-  const token = String(tokenId || "").trim();
-  if (!token) return null;
-  const data = await polymarketGet("listMarkets", { clob_token_ids: token, limit: "1" });
-  const row = objectRows(data)[0];
+function metaFromGammaRow(row, token = "") {
   if (!row) return null;
   const life = marketLifeFromRow(row);
   const tokenIds = parseTokenIdList(row.clobTokenIds || row.clob_token_ids);
   const outcomes = parseOutcomeList(row.outcomes);
-  const index = tokenIds.findIndex((id) => id === token);
+  const wanted = String(token || "").trim();
+  const index = wanted ? tokenIds.findIndex((id) => id === wanted) : -1;
   const side = index >= 0 ? String(outcomes[index] || "").trim() : "";
   const closed = marketIsClosed(row);
+  const marketTitle = String(row.question || row.groupItemTitle || "").trim();
+  if (!marketTitle) return null;
   return {
-    marketTitle: String(row.question || row.groupItemTitle || "").trim(),
+    marketTitle,
     ticker: String(row.slug || row.id || "").trim(),
     side: side && !side.startsWith("[") ? side : "",
     openAt: life.startedAt ? life.startedAt * 1000 : 0,
@@ -718,6 +716,36 @@ export async function polymarketMarketMeta(tokenId) {
     outcome: closed ? life.outcome : "",
     status: closed ? "closed" : "active",
   };
+}
+
+/** Title, outcome side, and trading window for one Polymarket token. */
+export async function polymarketMarketMeta(tokenId) {
+  const token = String(tokenId || "").trim();
+  if (!token) return null;
+  const data = await polymarketGet("listMarkets", { clob_token_ids: token, limit: "1" });
+  return metaFromGammaRow(objectRows(data)[0], token);
+}
+
+/**
+ * The same market line, from a token, a slug, or a condition id.
+ * Closed markets are retried with the closed catalog when the open lookup is empty.
+ */
+export async function polymarketMarketMetaLookup({ token = "", slug = "", conditionId = "" } = {}) {
+  const tokenId = String(token || "").trim();
+  if (tokenId) {
+    const fromToken = await polymarketMarketMeta(tokenId);
+    if (fromToken?.marketTitle) return fromToken;
+  }
+  const slugText = String(slug || "").trim();
+  if (slugText) {
+    const fromSlug = metaFromGammaRow(objectRows(await polymarketGet("listMarkets", { slug: slugText, limit: "1" }))[0], tokenId);
+    if (fromSlug?.marketTitle) return fromSlug;
+  }
+  const condition = String(conditionId || "").trim();
+  if (!condition) return null;
+  let row = objectRows(await polymarketGet("listMarkets", { condition_ids: condition, limit: "1" }))[0];
+  if (!row) row = objectRows(await polymarketGet("listMarkets", { condition_ids: condition, limit: "1", closed: "true" }))[0];
+  return metaFromGammaRow(row, tokenId);
 }
 
 function stampMarket(row, market) {

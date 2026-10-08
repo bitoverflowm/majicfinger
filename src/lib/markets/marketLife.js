@@ -195,9 +195,38 @@ export function formatLifeDay(ms) {
 }
 
 function genericMarketLabel(value) {
-  return /^(price history|token price history|trade history|order book|orderbook|tick size|open interest|top holders|market price|midpoint|spreads|last trade|data sheet)$/i.test(
+  return /^(price history|token price history|trade history|order book|orderbook|orderbook\(s\)|tick size|open interest|get open interest|top holders|market price|midpoint|midpoint prices|spreads|last trade|last trade prices|data sheet|markets|series|events|trades|candlesticks|parent market)$/i.test(
     String(value || "").trim(),
   );
+}
+
+/**
+ * One shared value from these columns. Empty when the rows disagree, so a list of
+ * markets is not captioned as whichever row happens to be first.
+ * @param {object | null | undefined} block
+ * @param {string[]} ids
+ * @param {number} [limit]
+ */
+export function uniformColumnValue(block, ids, limit = 40) {
+  const columns = Array.isArray(block?.columns) ? block.columns : [];
+  const indexes = new Set(
+    columns
+      .map((column, index) => (ids.includes(String(column?.id || "")) ? index : -1))
+      .filter((index) => index >= 0),
+  );
+  if (!indexes.size) return "";
+  let found = "";
+  let seen = 0;
+  for (const [key, value] of Object.entries(block?.cells || {})) {
+    if (!indexes.has(Number(String(key).split(",")[0]))) continue;
+    const text = String(value || "").trim();
+    if (!text) continue;
+    if (!found) found = text;
+    else if (text !== found) return "";
+    seen += 1;
+    if (seen >= limit) break;
+  }
+  return found;
 }
 
 /**
@@ -207,7 +236,7 @@ function genericMarketLabel(value) {
 export function sheetMarketName(block) {
   const saved = String(block?.pull?.marketTitle || "").trim();
   if (saved && !genericMarketLabel(saved)) return saved;
-  const fromCell = firstCell(block, ["market_title", "question", "yes_sub_title"]);
+  const fromCell = uniformColumnValue(block, ["market_title", "question", "yes_sub_title", "event_title", "title"]);
   const sheetTitle = String(block?.title || "").trim();
   if (fromCell && fromCell !== sheetTitle && !genericMarketLabel(fromCell)) return fromCell;
   const ticker = String(block?.pull?.ticker || "").trim();
@@ -224,7 +253,7 @@ export function sheetMarketName(block) {
 export function sheetMarketSide(block) {
   const saved = formatMarketOutcome(block?.pull?.side);
   if (saved) return saved;
-  return formatMarketOutcome(firstCell(block, ["outcome"]));
+  return formatMarketOutcome(uniformColumnValue(block, ["outcome", "yes_sub_title"]));
 }
 
 /**
@@ -277,31 +306,15 @@ export function lifePull(source) {
 
 /**
  * @param {object | null | undefined} block
- * @param {string[]} ids
- */
-function firstCell(block, ids) {
-  const columns = Array.isArray(block?.columns) ? block.columns : [];
-  const index = columns.findIndex((column) => ids.includes(String(column?.id || "")));
-  if (index < 0) return "";
-  for (const [key, value] of Object.entries(block?.cells || {})) {
-    if (Number(String(key).split(",")[0]) !== index) continue;
-    const text = String(value || "").trim();
-    if (text) return text;
-  }
-  return "";
-}
-
-/**
- * @param {object | null | undefined} block
  */
 export function sheetLife(block) {
   const pull = block?.pull && typeof block.pull === "object" ? block.pull : null;
   const fromPull = lifeOfMarket(pull);
   if (fromPull && (fromPull.openMs || fromPull.closeMs || fromPull.stopped)) return fromPull;
   return lifeOfMarket({
-    openAt: firstCell(block, ["open_time", "open_ts", "start_date", "startDate"]),
-    closeAt: firstCell(block, ["close_time", "close_ts", "end_date", "endDate", "closedTime"]),
-    status: firstCell(block, ["status"]),
-    outcome: firstCell(block, ["result", "outcome"]),
+    openAt: uniformColumnValue(block, ["open_time", "open_ts", "start_date", "startDate"]),
+    closeAt: uniformColumnValue(block, ["close_time", "close_ts", "end_date", "endDate", "closedTime"]),
+    status: uniformColumnValue(block, ["status"]),
+    outcome: uniformColumnValue(block, ["result"]),
   });
 }

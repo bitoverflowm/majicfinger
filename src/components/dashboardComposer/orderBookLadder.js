@@ -24,6 +24,18 @@ function dollars(value) {
   return Math.round(value * 10000) / 10000;
 }
 
+function preferredBookOutcome(rows, outcomeIndex) {
+  if (outcomeIndex < 0) return "";
+  const counts = new Map();
+  for (const row of rows || []) {
+    const value = String(row?.[outcomeIndex] ?? "").trim();
+    if (!value) continue;
+    counts.set(value, (counts.get(value) || 0) + 1);
+  }
+  if (counts.size < 2) return "";
+  return [...counts.keys()].find((value) => value.toLowerCase() === "yes") || [...counts.keys()][0];
+}
+
 function accumulate(levels) {
   let total = 0;
   return levels.map((level) => {
@@ -36,14 +48,15 @@ function accumulate(levels) {
  * @param {object | null | undefined} sheet
  */
 export function isOrderBookSheet(sheet) {
-  if (!sheet) return false;
-  if (String(sheet.table || "") === "orderbook") return true;
-  if (/^order book\s·/i.test(String(sheet.title || ""))) return true;
+  if (!sheet || sheet.type === "chart") return false;
+  const table = String(sheet.table || "");
+  if (table === "orderbook" || table === "getOrderbooks") return true;
+  if (/^order\s*books?/i.test(String(sheet.title || ""))) return true;
   const ids = new Set((sheet.columns || []).map((column) => String(column?.id || "").toLowerCase()));
   const titles = new Set((sheet.columns || []).map((column) => String(column?.title || "").trim().toLowerCase()));
   const side = ids.has("side") || titles.has("side");
-  const price = ids.has("price_dollars") || titles.has("price dollars");
-  const qty = ids.has("quantity_fp") || titles.has("quantity fp");
+  const price = ids.has("price") || ids.has("price_dollars") || titles.has("price") || titles.has("price dollars");
+  const qty = ids.has("size") || ids.has("quantity_fp") || titles.has("size") || titles.has("quantity fp");
   return side && price && qty;
 }
 
@@ -55,12 +68,14 @@ export function rowsToOrderBook(columns, rows) {
   const sideIndex = findColumn(columns, (title, id) => id === "side" || title === "side");
   const priceIndex = findColumn(
     columns,
-    (title, id) => id === "price_dollars" || title === "price dollars" || title === "price",
+    (title, id) => id === "price" || id === "price_dollars" || title === "price" || title === "price dollars",
   );
   const sizeIndex = findColumn(
     columns,
-    (title, id) => id === "quantity_fp" || title === "quantity fp" || title.includes("quantity"),
+    (title, id) => id === "quantity_fp" || id === "size" || title === "quantity fp" || title === "size" || title.includes("quantity"),
   );
+  const outcomeIndex = findColumn(columns, (title, id) => id === "outcome" || title === "outcome");
+  const preferredOutcome = preferredBookOutcome(rows, outcomeIndex);
   /** @type {Map<number, number>} */
   const bids = new Map();
   /** @type {Map<number, number>} */
@@ -70,11 +85,15 @@ export function rowsToOrderBook(columns, rows) {
   }
 
   for (const row of rows || []) {
+    if (preferredOutcome) {
+      const outcome = String(row?.[outcomeIndex] ?? "").trim();
+      if (outcome && outcome !== preferredOutcome) continue;
+    }
     const side = String(row?.[sideIndex] ?? "").trim().toLowerCase();
     const price = parseChartNumber(row?.[priceIndex]);
     const size = parseChartNumber(row?.[sizeIndex]);
     if (price == null || size == null || size <= 0) continue;
-    if (side === "yes" || side === "bid") {
+    if (side === "yes" || side === "bid" || side === "buy") {
       const level = dollars(price);
       bids.set(level, (bids.get(level) || 0) + size);
       continue;
@@ -85,7 +104,7 @@ export function rowsToOrderBook(columns, rows) {
       asks.set(ask, (asks.get(ask) || 0) + size);
       continue;
     }
-    if (side === "ask") {
+    if (side === "ask" || side === "sell") {
       const level = dollars(price);
       if (level <= 0) continue;
       asks.set(level, (asks.get(level) || 0) + size);

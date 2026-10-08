@@ -29,7 +29,29 @@ const compact = rowsToOrderBook(columns, [["MKT", "yes", "0.14", "22.8K"]]);
 assert.equal(compact.bids[0].size, 22800);
 
 assert.equal(isOrderBookSheet({ table: "orderbook" }), true);
+assert.equal(isOrderBookSheet({ table: "getOrderbooks" }), true);
 assert.equal(isOrderBookSheet({ title: "Order book · AST", columns: [] }), true);
+assert.equal(isOrderBookSheet({ title: "Orderbook(s) · WTI", columns: [] }), true);
 assert.equal(isOrderBookSheet({ title: "Trades · AST", columns: [] }), false);
+
+const polymarket = rowsToOrderBook(
+  [
+    { id: "outcome" },
+    { id: "side" },
+    { id: "price" },
+    { id: "size" },
+  ],
+  [
+    ["Yes", "BUY", "0.47", "100"],
+    ["Yes", "SELL", "0.49", "40"],
+    ["No", "BUY", "0.51", "999"],
+    ["No", "SELL", "0.53", "999"],
+  ],
+);
+assert.equal(polymarket.bids[0].price, 0.47);
+assert.equal(polymarket.bids[0].size, 100);
+assert.equal(polymarket.asks[0].price, 0.49);
+assert.equal(polymarket.asks[0].size, 40);
+assert.equal(polymarket.mid, 0.48);
 
 console.log("order book ladder ok");

@@ -20,7 +20,7 @@ const KEYFRAMES = `
 function formatBookPrice(value) {
   if (!Number.isFinite(value)) return "—";
   const abs = Math.abs(value);
-  const digits = abs >= 100 ? 2 : abs >= 1 ? 3 : 2;
+  const digits = abs >= 100 ? 2 : abs >= 1 ? 3 : abs >= 0.01 ? 2 : 4;
   return new Intl.NumberFormat("en-US", {
     style: "currency",
     currency: "USD",
