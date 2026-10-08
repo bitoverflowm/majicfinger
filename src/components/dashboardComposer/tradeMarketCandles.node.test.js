@@ -58,4 +58,32 @@ assert.equal(ohlc.candles[0].volume, 120);
 assert.equal(ohlc.candles[1].close, 0.57);
 assert.equal(ohlc.candles[1].volume, 90);
 
+const poly = tradesToCandles(
+  [
+    { id: "observed_at", title: "Observed At" },
+    { id: "outcome", title: "Outcome" },
+    { id: "side", title: "Side" },
+    { id: "price", title: "Price" },
+    { id: "size", title: "Size" },
+  ],
+  [
+    ["10/8/2026, 8:58:04 PM", "No", "BUY", "0.995", "10"],
+    ["10/8/2026, 8:55:00 PM", "Yes", "SELL", "0.005", "20"],
+    ["10/8/2026, 8:50:00 PM", "Yes", "BUY", "0.004", "5"],
+  ],
+);
+assert.equal(poly.units, "probability");
+assert.equal(poly.outcome, "Yes");
+assert.equal(poly.volumeLabel, "Volume");
+assert.ok(poly.candles.length >= 1);
+assert.ok(poly.candles.every((candle) => candle.close < 0.1));
+assert.equal(
+  poly.candles.reduce((sum, candle) => sum + candle.volume, 0),
+  25,
+);
+assert.equal(
+  poly.candles.reduce((sum, candle) => sum + candle.count, 0),
+  2,
+);
+
 console.log("tradeMarketCandles ok");

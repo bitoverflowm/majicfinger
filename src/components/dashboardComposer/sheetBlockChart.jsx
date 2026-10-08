@@ -5,7 +5,10 @@ import { Bar, BarChart, CartesianGrid, Line, LineChart, ResponsiveContainer, Too
 import { useReadyTradeSheet, tradeTickerFromBlock, usesHistoricalTradeSheet } from "@/components/dashboardComposer/fullTradeSheet";
 import { isOrderBookSheet, rowsToOrderBook } from "@/components/dashboardComposer/orderBookLadder";
 import { ohlcRowsToCandles, rangesForCandles, tradesToCandles } from "@/components/dashboardComposer/tradeMarketCandles";
-import { isPriceHistorySheet, priceHistoryPoints } from "@/components/dashboardComposer/priceHistorySeries";
+import { isPriceHistorySheet, priceHistoryOutcome, priceHistoryPoints } from "@/components/dashboardComposer/priceHistorySeries";
+import { DatasetSummary, EventLinesChart } from "@/components/dashboardComposer/datasetChart";
+import { countObservations, describeSheet } from "@/lib/visualizations/datasetDescriptor";
+import { resolveVisualization } from "@/lib/visualizations/presetRegistry";
 import { IndicatorChart } from "@/components/spectrumui/charts/indicator-chart";
 import { MarketChart } from "@/components/spectrumui/charts/market-chart";
 import { DepthChart } from "@/components/spectrumui/charts/depth-chart";
@@ -97,10 +100,14 @@ function sheetSymbol(sheet) {
 }
 
 function isTradeSheet(sheet) {
-  if (!sheet) return false;
+  if (!sheet || sheet.type === "chart") return false;
+  const table = String(sheet.table || "");
+  if (table === "trades" || table === "getTradesByMarket") return true;
+  const title = String(sheet.title || "");
+  if (/^trade history\b/i.test(title) || /^trades\s·/i.test(title)) return true;
   if (tradeTickerFromBlock(sheet)) return true;
   const titles = (sheet.columns || []).map((column) => String(column?.title || "").trim().toLowerCase());
-  return titles.includes("yes price") && titles.some((title) => title.includes("created"));
+  return titles.includes("yes price") && titles.some((entry) => entry.includes("created"));
 }
 
 function matrixFromCells(sheet) {
@@ -150,7 +157,8 @@ function TradeMarketChart({ sheet, rows, live, snapshot, onSnapshot, mode = "tra
   const candles = live || built.candles.length ? built.candles : preset?.candles || [];
   const volumeLabel = built.volumeLabel || preset?.volumeLabel || (mode === "ohlc" ? "Volume fp" : "Count fp");
   const ranges = useMemo(() => rangesForCandles(candles), [candles]);
-  const symbol = sheetSymbol(sheet) || preset?.symbol || "";
+  const symbol = built.outcome || sheetSymbol(sheet) || preset?.symbol || "";
+  const units = built.units || "currency";
   const candleKey = candles.length
     ? `${candles.length}|${candles[candles.length - 1].t}|${candles[candles.length - 1].close}|${candles[candles.length - 1].volume}`
     : "";
@@ -172,7 +180,8 @@ function TradeMarketChart({ sheet, rows, live, snapshot, onSnapshot, mode = "tra
       data={candles}
       symbol={symbol}
       variant={mode === "ohlc" ? "candles" : "area"}
-      name={mode === "ohlc" ? "Price" : "Yes"}
+      name={mode === "ohlc" ? "Price" : units === "probability" ? "Last traded price" : "Yes"}
+      units={units}
       volumeLabel={volumeLabel || (mode === "ohlc" ? "Volume fp" : "Count fp")}
       ranges={ranges}
       defaultRange="All"
@@ -234,7 +243,7 @@ function PriceHistorySheetChart({ sheet, live }) {
     [points],
   );
   const name = String(sheet?.pull?.marketTitle || sheet?.title || "Price").trim();
-  const symbol = String(sheet?.pull?.side || "").trim();
+  const symbol = String(sheet?.pull?.side || priceHistoryOutcome(sheet) || "").trim();
   return (
     <IndicatorChart
       points={points}
@@ -246,11 +255,15 @@ function PriceHistorySheetChart({ sheet, live }) {
       live={live}
       status={points.length ? "ready" : "empty"}
       emptyLabel="This price history has no points to chart yet."
+      units="probability"
+      curve="linear"
     />
   );
 }
 
-export function SheetBlockChart({ sheet, snapshot, onSnapshot, live = false, view = "" }) {
+const SUMMARY_VIEWS = new Set(["metric", "spec", "overview", "bars", "diverging", "quote", "quote-table"]);
+
+export function SheetBlockChart({ sheet, snapshot, onSnapshot, live = false, view = "", onViewChange }) {
   const storedSheet = useReadyTradeSheet(sheet?.id);
   const fullSheet = usesHistoricalTradeSheet(sheet) ? storedSheet : null;
   const priceHistory = isPriceHistorySheet(sheet);
@@ -273,21 +286,85 @@ export function SheetBlockChart({ sheet, snapshot, onSnapshot, live = false, vie
     });
   }, [onSnapshot, series, seriesKey]);
 
+  const dataset = describeSheet(sheet);
+  const columnIds = (sheet?.columns || []).map((column) => column?.id || column?.name).filter(Boolean);
+  const resolved = dataset
+    ? resolveVisualization(dataset, {
+        userView: view,
+        custom: Boolean(view),
+        columnIds,
+        observations: countObservations(sheet, dataset),
+      })
+    : null;
+
+  if (resolved?.view === "price") {
+    return <PriceHistorySheetChart sheet={sheet} live={live} />;
+  }
+  if (resolved?.view === "event-lines") {
+    return <EventLinesChart sheet={sheet} dataset={dataset} />;
+  }
+  if (resolved?.view === "trade-volume") {
+    return (
+      <DatasetSummary
+        sheet={sheet}
+        dataset={{ ...dataset, fields: { ...dataset.fields, value: dataset.fields.size, label: dataset.fields.market } }}
+        view={{ ...resolved, label: "Volume by market", noun: "markets" }}
+      />
+    );
+  }
+  if (resolved && SUMMARY_VIEWS.has(resolved.view)) {
+    return <DatasetSummary sheet={sheet} dataset={dataset} view={resolved} limit={resolved.limit || 10} />;
+  }
+  if (resolved?.view === "table" || resolved?.view === "activity" || resolved?.view === "scatter") {
+    return (
+      <p className="px-3 text-[12px] text-muted-foreground">
+        {resolved.view === "table"
+          ? "This dataset stays in the table."
+          : "These trades stay in the table. A time bucket is drawn once the sheet has one market and a price."}
+      </p>
+    );
+  }
+
   if (priceHistory) {
     return <PriceHistorySheetChart sheet={sheet} live={live} />;
   }
 
-  if (orderBook) {
-    const rows = matrixFromCells(sheet);
-    if (view === "depth") return <DepthSheetChart sheet={sheet} rows={rows} live={live} />;
+  if (resolved?.view === "trade-price" || trade) {
+    const liveRows = matrixFromCells(sheet);
+    const rows = live && liveRows.length ? liveRows : fullSheet?.rows?.length ? fullSheet.rows : liveRows;
     return (
-      <OrderBookSheetChart
+      <TradeMarketChart
         sheet={sheet}
         rows={rows}
-        live={live}
+        live={live && liveRows.length > 0}
         snapshot={snapshot}
         onSnapshot={onSnapshot}
+        mode="trades"
       />
+    );
+  }
+
+  if ((orderBook || resolved?.view === "order-book" || resolved?.view === "depth") && dataset?.datasetType !== "trades") {
+    const rows = matrixFromCells(sheet);
+    const depth = view === "depth" || resolved?.view === "depth";
+    return (
+      <div className="flex min-h-0 flex-1 flex-col">
+        {dataset?.datasetType === "orderbook" ? (
+          <div className="flex gap-1 px-2 pt-1">
+            <button type="button" aria-pressed={!depth} onClick={() => onViewChange?.("order-book")} className="rounded-md px-2 py-0.5 text-[11px] text-muted-foreground">
+              Ladder
+            </button>
+            <button type="button" aria-pressed={depth} onClick={() => onViewChange?.("depth")} className="rounded-md px-2 py-0.5 text-[11px] text-muted-foreground">
+              Depth
+            </button>
+          </div>
+        ) : null}
+        {depth ? (
+          <DepthSheetChart sheet={sheet} rows={rows} live={live} />
+        ) : (
+          <OrderBookSheetChart sheet={sheet} rows={rows} live={live} snapshot={snapshot} onSnapshot={onSnapshot} />
+        )}
+      </div>
     );
   }
 

@@ -77,6 +77,21 @@ function formatPrice(value) {
   }).format(value);
 }
 
+function formatProbability(value) {
+  const n = Number(value);
+  if (!Number.isFinite(n)) return "—";
+  const pct = n * 100;
+  const digits = Math.abs(pct) < 1 ? 2 : 1;
+  return `${pct.toFixed(digits)}%`;
+}
+
+function formatPoints(value) {
+  const n = Number(value);
+  if (!Number.isFinite(n)) return "—";
+  const sign = n > 0 ? "+" : n < 0 ? "−" : "";
+  return `${sign}${Math.abs(n).toFixed(2)} pp`;
+}
+
 export function formatCountFp(value) {
   if (!Number.isFinite(value)) return "—";
   if (Math.abs(value) >= 1000) {
@@ -191,6 +206,7 @@ export function MarketChart({
   variant = "candles",
   volumeLabel = "Vol",
   formatVolume = formatCountFp,
+  units = "currency",
   ranges = [],
   defaultRange = "All",
   live = false,
@@ -275,7 +291,14 @@ export function MarketChart({
     variant === "area" && linePath && areaPoints.length
       ? `${linePath}L${areaPoints[areaPoints.length - 1].x},${baselineY}L${areaPoints[0].x},${baselineY}Z`
       : "";
-  const delta = baseline ? (((shown?.close ?? 0) - baseline) / baseline) * 100 : 0;
+  const showPrice = units === "probability" ? formatProbability : formatPrice;
+  const delta =
+    units === "probability"
+      ? ((shown?.close ?? 0) - baseline) * 100
+      : baseline
+        ? (((shown?.close ?? 0) - baseline) / baseline) * 100
+        : 0;
+  const showDelta = units === "probability" ? formatPoints(delta) : formatSignedPct(delta);
   const up = delta >= 0;
   const dirColor = up ? "var(--spectrum-chart-up)" : "var(--spectrum-chart-down)";
   const lastUp = last ? last.close >= last.open : true;
@@ -337,7 +360,7 @@ export function MarketChart({
           </div>
           <div className="mt-1 flex items-end gap-2">
             <p className="font-mono text-[22px] font-medium leading-none tabular-nums text-neutral-950 dark:text-white">
-              {shown ? formatPrice(shown.close) : "—"}
+              {shown ? showPrice(shown.close) : "—"}
             </p>
             <span
               className="mb-0.5 rounded-md px-1.5 py-0.5 font-mono text-[12px] tabular-nums"
@@ -346,13 +369,14 @@ export function MarketChart({
                 background: flash ? `color-mix(in srgb, ${dirColor} 16%, transparent)` : "transparent",
               }}
             >
-              {formatSignedPct(delta)}
+              {showDelta}
             </span>
           </div>
           <p className="mt-1 font-mono text-[11px] tabular-nums text-neutral-500">
             {volumeLabel}{" "}
             <span className="font-medium text-neutral-950 dark:text-white">
               {shown ? formatVolume(shown.volume) : "—"}
+              {shown?.count ? ` · ${shown.count} ${shown.count === 1 ? "trade" : "trades"}` : ""}
             </span>
           </p>
           <p
@@ -363,15 +387,15 @@ export function MarketChart({
             {active ? (
               variant === "area" ? (
                 <>
-                  <span style={{ color: dirColor }}>{formatPrice(active.close)}</span>
+                  <span style={{ color: dirColor }}>{showPrice(active.close)}</span>
                   <span className="text-neutral-400">{formatWhen(active.t)}</span>
                 </>
               ) : (
                 <>
-                  <span>O {formatPrice(active.open)}</span>
-                  <span>H {formatPrice(active.high)}</span>
-                  <span>L {formatPrice(active.low)}</span>
-                  <span style={{ color: dirColor }}>C {formatPrice(active.close)}</span>
+                  <span>O {showPrice(active.open)}</span>
+                  <span>H {showPrice(active.high)}</span>
+                  <span>L {showPrice(active.low)}</span>
+                  <span style={{ color: dirColor }}>C {showPrice(active.close)}</span>
                   <span className="text-neutral-400">{formatWhen(active.t)}</span>
                 </>
               )
@@ -396,7 +420,7 @@ export function MarketChart({
             viewBox={`0 0 ${w} ${h}`}
             className="block h-full w-full touch-pan-y select-none"
             role="img"
-            aria-label={`${symbol || "Market"} yes price and ${volumeLabel}. ${formatPrice(last?.close ?? 0)}, ${formatSignedPct(delta)}.`}
+            aria-label={`${symbol || "Market"} ${name} and ${volumeLabel}. ${showPrice(last?.close ?? 0)}, ${showDelta}.`}
             onPointerMove={(event) => pointerToIndex(event.clientX)}
             onPointerLeave={() => setHoverIndex(null)}
           >
@@ -407,7 +431,7 @@ export function MarketChart({
                 <g key={tick}>
                   <line x1={plotX0} x2={plotX1} y1={y} y2={y} stroke="currentColor" strokeOpacity={0.13} strokeDasharray="2 4" />
                   <text x={plotX1 + 8} y={y} dominantBaseline="middle" fontSize={10} fill="currentColor" className="tabular-nums">
-                    {formatPrice(tick)}
+                    {showPrice(tick)}
                   </text>
                 </g>
               );

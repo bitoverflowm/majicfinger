@@ -43,6 +43,18 @@ function parseTime(value) {
   return Number.isFinite(parsed) ? parsed : NaN;
 }
 
+function outcomeChoice(rows, outcomeIndex) {
+  if (outcomeIndex < 0) return { label: "", filter: false };
+  const seen = [];
+  for (const row of rows || []) {
+    const value = String(row?.[outcomeIndex] ?? "").trim();
+    if (value && !seen.includes(value)) seen.push(value);
+  }
+  if (!seen.length) return { label: "", filter: false };
+  if (seen.length === 1) return { label: seen[0], filter: false };
+  return { label: seen.find((value) => value.toLowerCase() === "yes") || seen[0], filter: true };
+}
+
 /**
  * @param {Array<{ title?: string, id?: string, scale?: string }>} columns
  * @param {unknown[][]} rows
@@ -50,9 +62,15 @@ function parseTime(value) {
 export function tradesToCandles(columns, rows) {
   const timeIndex = findColumn(
     columns,
-    (title, id) => title.includes("created") || id.includes("created") || id === "timestamp" || title === "timestamp",
+    (title, id) =>
+      title.includes("created") ||
+      id.includes("created") ||
+      id === "observed_at" ||
+      title === "observed at" ||
+      id === "timestamp" ||
+      title === "timestamp",
   );
-  const priceIndex = findColumn(
+  const yesPriceIndex = findColumn(
     columns,
     (title, id) =>
       id === "yes_price_dollars" ||
@@ -62,6 +80,13 @@ export function tradesToCandles(columns, rows) {
       title === "yes price dollars" ||
       title.includes("yes price"),
   );
+  const priceIndex =
+    yesPriceIndex >= 0
+      ? yesPriceIndex
+      : findColumn(columns, (title, id) => id === "price" || title === "price");
+  const outcomeIndex = findColumn(columns, (title, id) => id === "outcome" || title === "outcome");
+  const chosen = yesPriceIndex >= 0 ? { label: "", filter: false } : outcomeChoice(rows, outcomeIndex);
+  const outcome = chosen.label;
   const sizeIndex = findColumn(
     columns,
     (title, id) =>
@@ -86,6 +111,10 @@ export function tradesToCandles(columns, rows) {
 
   const samples = [];
   for (const row of rows || []) {
+    if (chosen.filter) {
+      const rowOutcome = String(row?.[outcomeIndex] ?? "").trim();
+      if (rowOutcome && rowOutcome !== outcome) continue;
+    }
     const time = parseTime(row?.[timeIndex]);
     const rawPrice = row?.[priceIndex];
     const price = parseChartNumber(rawPrice);
@@ -99,7 +128,8 @@ export function tradesToCandles(columns, rows) {
     });
   }
   samples.sort((a, b) => a.time - b.time);
-  if (!samples.length) return { candles: [], volumeLabel };
+  const units = yesPriceIndex >= 0 ? "currency" : priceIndex >= 0 ? "probability" : "currency";
+  if (!samples.length) return { candles: [], volumeLabel, units, outcome };
 
   const span = Math.max(0, samples[samples.length - 1].time - samples[0].time);
   const bucket = Math.max(1000, Math.ceil((span || 1000) / TARGET_CANDLES));
@@ -115,6 +145,7 @@ export function tradesToCandles(columns, rows) {
         low: sample.price,
         close: sample.price,
         volume: sample.size,
+        count: 1,
       });
       continue;
     }
@@ -122,8 +153,9 @@ export function tradesToCandles(columns, rows) {
     group.low = Math.min(group.low, sample.price);
     group.close = sample.price;
     group.volume += sample.size;
+    group.count += 1;
   }
-  return { candles: [...groups.values()], volumeLabel };
+  return { candles: [...groups.values()], volumeLabel, units, outcome };
 }
 
 /**

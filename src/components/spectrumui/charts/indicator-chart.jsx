@@ -55,6 +55,25 @@ function formatPrice(value) {
   return value.toLocaleString("en", { minimumFractionDigits: digits, maximumFractionDigits: digits });
 }
 
+function formatProbability(value) {
+  if (!Number.isFinite(value)) return "—";
+  const percent = value * 100;
+  const abs = Math.abs(percent);
+  const digits = abs > 0 && abs < 1 ? 2 : 1;
+  return `${percent.toFixed(digits)}%`;
+}
+
+function formatPoints(value) {
+  if (!Number.isFinite(value)) return "—";
+  const sign = value > 0 ? "+" : value < 0 ? "−" : "";
+  return `${sign}${Math.abs(value).toFixed(2)} pp`;
+}
+
+function linearPath(points) {
+  if (!points.length) return "";
+  return points.map((point, index) => `${index ? "L" : "M"}${point.x.toFixed(2)},${point.y.toFixed(2)}`).join(" ");
+}
+
 function formatSignedPct(value) {
   if (!Number.isFinite(value)) return "—";
   const sign = value > 0 ? "+" : value < 0 ? "−" : "";
@@ -166,6 +185,8 @@ export function IndicatorChart({
   live = false,
   status = "ready",
   emptyLabel = "This price history has no points to chart yet.",
+  units = "number",
+  curve = "monotone",
 }) {
   const reduce = usePrefersReducedMotion();
   const [plotRef, box] = useBox();
@@ -226,10 +247,10 @@ export function IndicatorChart({
     (value) => priceBottom - ((value - domain[0]) / (domain[1] - domain[0] || 1)) * (priceBottom - priceTop),
     [domain, priceBottom, priceTop],
   );
-  const closeLine = React.useMemo(
-    () => monotonePath(view.map((point) => ({ x: xAt(point.t), y: priceY(point.price) }))),
-    [priceY, view, xAt],
-  );
+  const closeLine = React.useMemo(() => {
+    const plotted = view.map((point) => ({ x: xAt(point.t), y: priceY(point.price) }));
+    return curve === "linear" ? linearPath(plotted) : monotonePath(plotted);
+  }, [curve, priceY, view, xAt]);
   const priceTicks = React.useMemo(() => niceTicks(domain[0], domain[1], 4), [domain]);
   const timeTicks = React.useMemo(() => {
     if (n < 2) return view.map((point) => point.t);
@@ -244,7 +265,14 @@ export function IndicatorChart({
 
   const active = hoverIndex != null ? view[hoverIndex] : last;
   const base = first?.price || 0;
-  const delta = base ? (((active?.price ?? 0) - base) / base) * 100 : 0;
+  const probability = units === "probability";
+  const showPrice = probability ? formatProbability : formatPrice;
+  const delta = probability
+    ? ((active?.price ?? 0) - base) * 100
+    : base
+      ? (((active?.price ?? 0) - base) / base) * 100
+      : 0;
+  const showDelta = probability ? formatPoints : formatSignedPct;
   const dirColor = delta >= 0 ? UP : DOWN;
 
   const paneFrames = panes.map((indicator, index) => {
@@ -292,10 +320,10 @@ export function IndicatorChart({
           </div>
           <div className="mt-1 flex flex-wrap items-end gap-x-2 gap-y-1">
             <p className="font-mono text-[22px] font-medium leading-none tabular-nums text-neutral-950 dark:text-white">
-              {status === "ready" && active ? formatPrice(active.price) : "—"}
+              {status === "ready" && active ? showPrice(active.price) : "—"}
             </p>
             <span className="mb-0.5 font-mono text-[12px] tabular-nums" style={{ color: dirColor }}>
-              {status === "ready" && active ? formatSignedPct(delta) : ""}
+              {status === "ready" && active ? showDelta(delta) : ""}
             </span>
             {active ? <span className="mb-0.5 font-mono text-[11px] text-neutral-500">{formatWhen(active.t, span)}</span> : null}
             {paneFrames.map((pane) => {
@@ -325,7 +353,7 @@ export function IndicatorChart({
               viewBox={`0 0 ${w} ${h}`}
               className="block h-full w-full touch-pan-y select-none"
               role="img"
-              aria-label={`${name} price. ${formatPrice(last?.price ?? 0)}, ${formatSignedPct(delta)}.`}
+              aria-label={`${name} price. ${showPrice(last?.price ?? 0)}, ${showDelta(delta)}.`}
               onPointerMove={(event) => onMove(event.clientX)}
               onPointerLeave={() => setHoverIndex(null)}
             >
@@ -342,7 +370,7 @@ export function IndicatorChart({
                   <g key={tick}>
                     <line x1={x0} x2={x1} y1={y} y2={y} stroke="currentColor" strokeOpacity="0.12" strokeDasharray="2 4" />
                     <text x={x1 + 8} y={y} dominantBaseline="middle" fontSize="10.5" fill="currentColor" className="tabular-nums">
-                      {formatPrice(tick)}
+                      {showPrice(tick)}
                     </text>
                   </g>
                 );

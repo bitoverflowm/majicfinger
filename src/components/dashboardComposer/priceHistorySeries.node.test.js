@@ -31,4 +31,31 @@ assert.equal(points[1].price, 0.0035);
 assert.ok(points[0].t < points[1].t);
 assert.equal(points[1].t, Date.parse("10/8/2026, 3:32:24 PM"));
 
+const tokenHistory = {
+  type: "sheet",
+  table: "getTokenPriceHistory",
+  columns: [
+    { id: "market_title" },
+    { id: "outcome" },
+    { id: "observed_at" },
+    { id: "price" },
+    { id: "timestamp" },
+  ],
+  cells: {
+    "2,0": "10/8/2026, 8:58:04 PM",
+    "3,0": "0.005",
+    "4,0": "1791453484",
+    "2,1": "10/8/2026, 8:55:00 PM",
+    "3,1": "0.005",
+    "4,1": "1791453300",
+  },
+};
+
+assert.equal(isPriceHistorySheet(tokenHistory), true);
+const tokenPoints = priceHistoryPoints(tokenHistory);
+assert.equal(tokenPoints.length, 2);
+assert.equal(tokenPoints[0].price, 0.005);
+assert.equal(tokenPoints[0].t, Date.parse("10/8/2026, 8:55:00 PM"));
+assert.ok(tokenPoints[0].t < tokenPoints[1].t);
+
 console.log("price history series ok");

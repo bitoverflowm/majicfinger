@@ -15,6 +15,8 @@ import { useMyStateV2 } from "@/context/stateContextV2";
 import { duplicateTabName, saveWorkspaceStartTabs } from "@/lib/workspaceStartTabs";
 import { DashboardSheetGrid } from "@/components/dashboardComposer/dashboardSheetGrid";
 import { isOrderBookSheet } from "@/components/dashboardComposer/orderBookLadder";
+import { countObservations, describeSheet } from "@/lib/visualizations/datasetDescriptor";
+import { resolveVisualization } from "@/lib/visualizations/presetRegistry";
 import { isPriceHistorySheet } from "@/components/dashboardComposer/priceHistorySeries";
 import { SheetBlockChart } from "@/components/dashboardComposer/sheetBlockChart";
 import { layoutRunSheets } from "@/components/dashboardComposer/integrationRunSheets";
@@ -519,20 +521,19 @@ export function WorkspaceCanvasProvider({ pageId, readOnly = false, children }) 
     (id) => {
       const sheet = blocks.find((block) => block.id === id && block.type === "sheet");
       if (!sheet) return;
-      const orderBook = isOrderBookSheet(sheet);
+      const dataset = describeSheet(sheet);
+      const resolved = resolveVisualization(dataset, {
+        columnIds: (sheet.columns || []).map((column) => column?.id || column?.name).filter(Boolean),
+        observations: dataset ? countObservations(sheet, dataset) : undefined,
+      });
       const base = String(sheet.title || "Sheet").replace(/\s+chart$/, "").trim();
-      const specs = orderBook
-        ? [
-            {
-              chartView: "order-book",
-              title: /^order\s*books?/i.test(base) ? base : `${base} order book`,
-            },
-            {
-              chartView: "depth",
-              title: /^order\s*books?/i.test(base) ? base.replace(/^order\s*books?(\(s\))?/i, "Depth") : `${base} depth`,
-            },
-          ]
-        : [{ chartView: "", title: `${base} chart` }];
+      const chartView = resolved.view === "table" ? "" : resolved.view;
+      const specs = [
+        {
+          chartView,
+          title: chartView === "order-book" && /^order\s*books?/i.test(base) ? base : `${base} chart`,
+        },
+      ];
       const chartId = newId();
       setBlocksByPage((prev) => {
         const list = prev[pageId] || [];
@@ -1159,6 +1160,7 @@ function ChartBlockBody({ block, onChange, booting }) {
           sheet={chartSheet}
           live={!!sourceSession?.running}
           view={block.chartView || ""}
+          onViewChange={(chartView) => onChange({ chartView, vizCustom: true })}
           snapshot={block.chart}
           onSnapshot={(chart) => {
             if (canvas?.readOnly) return;

@@ -1,4 +1,6 @@
 import { ATHENA_SUBSCRIBER_QUERY_ROW_LIMIT } from "@/config/dataLakeParquetSamples";
+import { DATASET_TYPES } from "@/lib/visualizations/datasetDescriptor";
+import { isSavedChartView } from "@/lib/visualizations/presetRegistry";
 
 /** Shape of the dashboard project the editor saves. Tabs share one document. */
 
@@ -180,6 +182,36 @@ function cleanProvenance(value) {
   };
 }
 
+function cleanDataset(value) {
+  if (!value || typeof value !== "object") return null;
+  const datasetType = cleanText(value.datasetType, 40);
+  if (!DATASET_TYPES.includes(datasetType)) return null;
+  const fields = {};
+  for (const [key, field] of Object.entries(value.fields || {}).slice(0, 16)) {
+    const name = cleanText(key, 20);
+    const column = cleanText(field, 40);
+    if (name && column) fields[name] = column;
+  }
+  return {
+    datasetType,
+    shape: cleanText(value.shape, 20),
+    scope: cleanText(value.scope, 20),
+    priceBasis: cleanText(value.priceBasis, 20),
+    delivery: cleanText(value.delivery, 20),
+    coverage: cleanText(value.coverage, 20),
+    sourceTable: cleanText(value.sourceTable, 80),
+    seriesKeys: Array.isArray(value.seriesKeys) ? value.seriesKeys.slice(0, 8).map((key) => cleanText(key, 40)).filter(Boolean) : [],
+    required: Array.isArray(value.required) ? value.required.slice(0, 12).map((key) => cleanText(key, 40)).filter(Boolean) : [],
+    fields,
+    units: {
+      price: cleanText(value.units?.price, 30),
+      quantity: cleanText(value.units?.quantity, 30),
+      currency: cleanText(value.units?.currency, 10),
+      metric: cleanText(value.units?.metric, 30),
+    },
+  };
+}
+
 function cleanBlock(block) {
   if (!block || typeof block !== "object") return null;
   const id = cleanText(block.id, 80);
@@ -208,12 +240,14 @@ function cleanBlock(block) {
     ? cleanPull(block.pull) || (ticker ? { lake: provenance?.lake || "kalshi", table: provenance?.table || "trades", ticker } : null)
     : null;
   const rowCount = Math.floor(num(block.rowCount, 0));
+  const dataset = type === "sheet" ? cleanDataset(block.dataset) : null;
   return {
     id,
     type,
     ...(block.source ? { source: cleanText(block.source, 40) } : {}),
     ...(block.sourceSheetId ? { sourceSheetId: cleanText(block.sourceSheetId, 80) } : {}),
-    ...(block.chartView === "depth" || block.chartView === "order-book" ? { chartView: block.chartView } : {}),
+    ...(isSavedChartView(block.chartView) ? { chartView: block.chartView } : {}),
+    ...(block.vizCustom ? { vizCustom: true } : {}),
     x: num(block.x),
     y: num(block.y),
     w: Math.max(120, num(block.w, 320)),
@@ -225,6 +259,7 @@ function cleanBlock(block) {
     ...(rowCount > 0 ? { rowCount } : {}),
     ...(integrationId ? { integrationId } : {}),
     ...(table ? { table } : {}),
+    ...(dataset ? { dataset } : {}),
     ...(pull ? { pull } : {}),
     ...(provenance ? { provenance } : {}),
     ...(chart ? { chart } : {}),

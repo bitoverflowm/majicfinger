@@ -3,6 +3,7 @@
 import * as React from "react";
 import { cn } from "@/lib/utils";
 import { DOWN, EASE, UP, marketVarsClassName, usePrefersReducedMotion } from "@/components/spectrumui/charts/chart-engine";
+import { centsDigits } from "@/lib/visualizations/datasetDescriptor";
 
 const EMPTY_LEVELS = [];
 
@@ -17,15 +18,14 @@ const KEYFRAMES = `
 }
 `;
 
-function formatBookPrice(value) {
+function formatBookPrice(value, digits = 1) {
   if (!Number.isFinite(value)) return "—";
-  const abs = Math.abs(value);
-  const digits = abs >= 100 ? 2 : abs >= 1 ? 3 : abs >= 0.01 ? 2 : 4;
+  if (Math.abs(value) <= 1.5) return `${(value * 100).toFixed(digits)}¢`;
   return new Intl.NumberFormat("en-US", {
     style: "currency",
     currency: "USD",
-    minimumFractionDigits: digits,
-    maximumFractionDigits: digits,
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
   }).format(value);
 }
 
@@ -43,7 +43,7 @@ function compactSize(value) {
   }).format(n);
 }
 
-function BookRow({ row, maxTotal, highlighted, flashed, reduce, onEnter }) {
+function BookRow({ row, maxTotal, highlighted, flashed, reduce, onEnter, digits }) {
   const color = row.side === "bid" ? UP : DOWN;
   const depth = Math.max(0.02, row.total / maxTotal);
 
@@ -71,7 +71,7 @@ function BookRow({ row, maxTotal, highlighted, flashed, reduce, onEnter }) {
         />
       ) : null}
       <span className="relative z-10 w-[38%] text-left" style={{ color }}>
-        {formatBookPrice(row.price)}
+        {formatBookPrice(row.price, digits)}
       </span>
       <span className="relative z-10 w-[31%] text-right text-neutral-700 dark:text-neutral-300">
         {compactSize(row.size)}
@@ -103,6 +103,7 @@ export function OrderBookChart({
   const bids = book?.bids || EMPTY_LEVELS;
   const asks = book?.asks || EMPTY_LEVELS;
   const mid = Number(book?.mid) || 0;
+  const [fullBook, setFullBook] = React.useState(false);
   const [hovered, setHovered] = React.useState(null);
   const [flashed, setFlashed] = React.useState(() => new Set());
   const previous = React.useRef(new Map());
@@ -135,13 +136,17 @@ export function OrderBookChart({
     scroller.scrollTop = Math.max(0, top);
   }, [asks.length, bids.length]);
 
-  const maxTotal = Math.max(bids[bids.length - 1]?.total ?? 1, asks[asks.length - 1]?.total ?? 1, 1);
+  const clipped = bids.length > 20 || asks.length > 20;
+  const bidView = fullBook ? bids : bids.slice(0, 20);
+  const askView = fullBook ? asks : asks.slice(0, 20);
+  const digits = centsDigits([...bidView, ...askView].map((level) => level.price));
+  const maxTotal = Math.max(bidView[bidView.length - 1]?.total ?? 1, askView[askView.length - 1]?.total ?? 1, 1);
   const bestBid = bids[0]?.price ?? mid;
   const bestAsk = asks[0]?.price ?? mid;
   const spread = Math.max(0, bestAsk - bestBid);
   const spreadPct = mid ? (spread / mid) * 100 : 0;
-  const askRows = asks.map((level, index) => ({ ...level, side: "ask", index })).reverse();
-  const bidRows = bids.map((level, index) => ({ ...level, side: "bid", index }));
+  const askRows = askView.map((level, index) => ({ ...level, side: "ask", index })).reverse();
+  const bidRows = bidView.map((level, index) => ({ ...level, side: "bid", index }));
   const empty = status === "empty" || (!bids.length && !asks.length);
   const isHighlighted = (row) => hovered != null && hovered.side === row.side && row.index <= hovered.index;
 
@@ -157,6 +162,11 @@ export function OrderBookChart({
           {symbol ? `${symbol} ` : ""}
           <span className="text-neutral-400">Order book</span>
         </span>
+        {clipped ? (
+          <button type="button" onClick={() => setFullBook((on) => !on)} className="font-mono text-[10px] text-neutral-500">
+            {fullBook ? "Nearest 20" : "Full book"}
+          </button>
+        ) : null}
         {live ? (
           <span className="inline-flex shrink-0 items-center gap-1 font-mono text-[9px] uppercase tracking-widest text-neutral-500 dark:text-neutral-400">
             <span
@@ -189,6 +199,7 @@ export function OrderBookChart({
                 flashed={flashed.has(`ask-${row.index}`)}
                 reduce={reduce}
                 onEnter={() => setHovered({ side: "ask", index: row.index })}
+                digits={digits}
               />
             ))}
           </ul>
@@ -196,9 +207,9 @@ export function OrderBookChart({
             ref={spreadRef}
             className="my-1 flex items-center justify-between border-y border-black/6 bg-black/[0.02] px-2 py-1.5 font-mono text-[11px] tabular-nums dark:border-white/8 dark:bg-white/[0.03]"
           >
-            <span className="font-medium text-neutral-950 dark:text-white">{formatBookPrice(mid)}</span>
+            <span className="font-medium text-neutral-950 dark:text-white">{formatBookPrice(mid, digits)}</span>
             <span className="text-[10px] text-neutral-400 dark:text-neutral-500">
-              spread {formatBookPrice(spread)} · {spreadPct.toFixed(3)}%
+              spread {formatBookPrice(spread, Math.max(digits, 1))} · {spreadPct.toFixed(2)}%
             </span>
           </div>
           <ul className="pb-1">
@@ -211,6 +222,7 @@ export function OrderBookChart({
                 flashed={flashed.has(`bid-${row.index}`)}
                 reduce={reduce}
                 onEnter={() => setHovered({ side: "bid", index: row.index })}
+                digits={digits}
               />
             ))}
           </ul>

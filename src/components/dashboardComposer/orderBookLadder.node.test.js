@@ -33,6 +33,21 @@ assert.equal(isOrderBookSheet({ table: "getOrderbooks" }), true);
 assert.equal(isOrderBookSheet({ title: "Order book · AST", columns: [] }), true);
 assert.equal(isOrderBookSheet({ title: "Orderbook(s) · WTI", columns: [] }), true);
 assert.equal(isOrderBookSheet({ title: "Trades · AST", columns: [] }), false);
+assert.equal(
+  isOrderBookSheet({
+    table: "getTradesByMarket",
+    title: "Trade History · WTI",
+    columns: [{ id: "side" }, { id: "price" }, { id: "size" }],
+  }),
+  false,
+);
+assert.equal(
+  isOrderBookSheet({
+    title: "Trade History · WTI",
+    columns: [{ id: "outcome" }, { id: "side" }, { id: "price" }, { id: "size" }],
+  }),
+  false,
+);
 
 const polymarket = rowsToOrderBook(
   [

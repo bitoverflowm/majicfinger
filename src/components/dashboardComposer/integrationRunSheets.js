@@ -1,3 +1,5 @@
+import { stampDataset } from "@/lib/visualizations/datasetDescriptor";
+
 function asDate(value) {
   if (value == null || value === "") return null;
   const n = Number(value);
@@ -95,6 +97,7 @@ export function layoutRunSheets(sheets, { originY = 88 } = {}) {
       y += halfH + gap;
       col = 0;
     }
+    const described = stampDataset({ ...sheet, type: "sheet" });
     const block = {
       id: sheet.id || newId("run"),
       type: "sheet",
@@ -109,6 +112,7 @@ export function layoutRunSheets(sheets, { originY = 88 } = {}) {
       ...(rowCount ? { rowCount } : {}),
       ...(sheet.integrationId ? { integrationId: sheet.integrationId } : {}),
       ...(sheet.table ? { table: sheet.table } : {}),
+      ...(described.dataset ? { dataset: described.dataset } : {}),
       ...(sheet.pull ? { pull: sheet.pull } : {}),
       ...(sheet.provenance ? { provenance: sheet.provenance } : {}),
       pulledAt: Number(sheet.pulledAt) || Date.now(),

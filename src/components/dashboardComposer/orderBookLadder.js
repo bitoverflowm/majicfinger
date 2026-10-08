@@ -51,7 +51,17 @@ export function isOrderBookSheet(sheet) {
   if (!sheet || sheet.type === "chart") return false;
   const table = String(sheet.table || "");
   if (table === "orderbook" || table === "getOrderbooks") return true;
-  if (/^order\s*books?/i.test(String(sheet.title || ""))) return true;
+  if (
+    table === "trades" ||
+    table === "getTradesByMarket" ||
+    table === "trades_by_holder" ||
+    table === "getHolderTrades"
+  ) {
+    return false;
+  }
+  const title = String(sheet.title || "");
+  if (/^order\s*books?/i.test(title)) return true;
+  if (/^trade history\b/i.test(title) || /^trades\s·/i.test(title)) return false;
   const ids = new Set((sheet.columns || []).map((column) => String(column?.id || "").toLowerCase()));
   const titles = new Set((sheet.columns || []).map((column) => String(column?.title || "").trim().toLowerCase()));
   const side = ids.has("side") || titles.has("side");
