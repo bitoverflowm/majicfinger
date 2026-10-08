@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { BarChart3, Check, ChevronDown, ChevronRight, Database, Eye, Play, Radio, RotateCcw, RotateCw, Save, Square, Table2, Type } from "lucide-react";
+import { DashboardShareDialog } from "@/components/dashboardComposer/DashboardShareDialog";
 import { ProvenanceMapButton } from "@/components/dashboardComposer/provenanceMap";
 
 import { Button } from "@/components/ui/button";
@@ -619,6 +620,7 @@ function RealtimeModeButton() {
 function RightChromeControls({ onLogout, expanded }) {
   const user = useUser();
   const router = useRouter();
+  const [shareOpen, setShareOpen] = useState(false);
 
   return (
     <TooltipProvider delayDuration={300}>
@@ -652,11 +654,13 @@ function RightChromeControls({ onLogout, expanded }) {
       <button
         type="button"
         aria-label="Share this dashboard"
+        onClick={() => setShareOpen(true)}
         className="ml-1 inline-flex h-7 items-center rounded-md bg-[#0d99ff] px-3 text-[13px] font-medium text-white hover:bg-[#0b87e0]"
       >
         Share
       </button>
       </ChromeTip>
+      <DashboardShareDialog open={shareOpen} onOpenChange={setShareOpen} />
     </div>
     </TooltipProvider>
   );
