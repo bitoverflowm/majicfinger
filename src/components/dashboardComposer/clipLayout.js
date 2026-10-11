@@ -18,11 +18,17 @@ const DEFAULT_CANVAS_WIDTH = 1142;
 let canvasWidth = DEFAULT_CANVAS_WIDTH;
 
 const guideListeners = new Set();
+let guideState = { active: false, preview: null };
 
-/** Show or hide the snap guide. Listeners update the canvas without rewriting every block. */
-export function setLayoutGuide(active) {
-  const on = !!active;
-  guideListeners.forEach((listener) => listener(on));
+/** Show or hide the snap guide. `preview` is the grid cell the block will adopt on release. */
+export function setLayoutGuide(active, preview) {
+  guideState = {
+    active: !!active,
+    preview: preview
+      ? { x: preview.x, y: preview.y, w: preview.w, h: preview.h }
+      : guideState.preview,
+  };
+  guideListeners.forEach((listener) => listener(guideState));
 }
 
 export function subscribeLayoutGuide(listener) {
@@ -138,21 +144,61 @@ export function snapMove(block, others) {
   return { x, y, w, h };
 }
 
+function boundaryCol(px) {
+  const { unit, x0, cols } = metrics();
+  return clamp(Math.round((px - x0) / unit), 0, cols);
+}
+
+function boundaryRow(px) {
+  const { unit, originY } = metrics();
+  return Math.max(0, Math.round((px - originY) / unit));
+}
+
 /**
- * Snap a bottom-right resize. The top-left column and row stay fixed,
- * and the pointer's size rounds to the nearest span.
+ * Snap a resize from any edge. Fixed edges stay on their column or row.
+ * Moving edges round to the nearest grid line.
+ * @param {{ id?: string, x: number, y: number, w: number, h: number }} origin
+ * @param {{ x: number, y: number, w: number, h: number }} raw
+ * @param {{ left?: boolean, right?: boolean, top?: boolean, bottom?: boolean }} edges
  */
-export function snapResize(block, rawWidth, rawHeight, others) {
+export function snapResizeEdges(origin, raw, edges, others) {
   const { cols } = metrics();
-  const startCol = colForX(block.x, 1);
-  const startRow = rowForY(block.y);
-  const span = clamp(spanOf({ w: rawWidth }), 1, cols - startCol);
-  const rows = rowsOf({ h: rawHeight });
-  const w = widthForSpan(span);
-  const h = heightForRows(rows);
-  const x = xForCol(startCol);
-  const y = nudgeDown(block, x, yForRow(startRow), w, h, others);
-  return { x, y, w, h };
+  const startCol = colForX(origin.x, 1);
+  const startRow = rowForY(origin.y);
+  let col0 = startCol;
+  let col1 = startCol + spanOf(origin);
+  let row0 = startRow;
+  let row1 = startRow + rowsOf(origin);
+  if (edges?.left) col0 = boundaryCol(raw.x);
+  if (edges?.right) col1 = boundaryCol(raw.x + raw.w);
+  if (edges?.top) row0 = boundaryRow(raw.y);
+  if (edges?.bottom) row1 = boundaryRow(raw.y + raw.h);
+  if (col1 <= col0) {
+    if (edges?.left && !edges?.right) col0 = col1 - 1;
+    else col1 = col0 + 1;
+  }
+  if (row1 - row0 < CLIP.minRows) {
+    if (edges?.top && !edges?.bottom) row0 = Math.max(0, row1 - CLIP.minRows);
+    else row1 = row0 + CLIP.minRows;
+  }
+  col0 = clamp(col0, 0, cols - 1);
+  col1 = clamp(col1, col0 + 1, cols);
+  row0 = Math.max(0, row0);
+  const x = xForCol(col0);
+  const y = yForRow(row0);
+  const w = widthForSpan(col1 - col0);
+  const h = heightForRows(row1 - row0);
+  return { x, y: nudgeDown({ id: origin.id }, x, y, w, h, others), w, h };
+}
+
+/** Snap a bottom-right resize. The top-left column and row stay fixed. */
+export function snapResize(block, rawWidth, rawHeight, others) {
+  return snapResizeEdges(
+    block,
+    { x: block.x, y: block.y, w: rawWidth, h: rawHeight },
+    { right: true, bottom: true },
+    others,
+  );
 }
 
 /** Snap one block onto the grid after a free drag. */

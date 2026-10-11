@@ -8,6 +8,7 @@ import {
   setCanvasGridWidth,
   snapMove,
   snapResize,
+  snapResizeEdges,
   spanOf,
   widthForSpan,
   xForCol,
@@ -41,6 +42,17 @@ const resized = snapResize(block, widthForSpan(12) + grid.unit * 0.7, heightForR
 assert.equal(resized.x, xForCol(0));
 assert.equal(resized.w, widthForSpan(13));
 assert.equal(resized.h, heightForRows(9));
+
+const anchored = { id: "anchored", x: xForCol(4), y: yForRow(2), w: widthForSpan(6), h: heightForRows(4) };
+const pulledWest = snapResizeEdges(
+  anchored,
+  { x: anchored.x - grid.unit * 1.6, y: anchored.y, w: anchored.w + grid.unit * 1.6, h: anchored.h },
+  { left: true },
+  [],
+);
+assert.equal(pulledWest.x, xForCol(2));
+assert.equal(pulledWest.w, widthForSpan(8));
+assert.equal(pulledWest.y, yForRow(2));
 
 const neighbor = { id: "other", x: xForCol(0), y: yForRow(1), w: widthForSpan(12), h: heightForRows(8) };
 const nudged = snapMove({ ...block, x: xForCol(0), y: yForRow(1) }, [neighbor]);

@@ -12,13 +12,40 @@ import { useWorkspaceCanvas } from "@/components/dashboardComposer/workspaceCanv
 import { useIntegrationConnect } from "@/components/dashboardComposer/integrationConnectDialog";
 
 const TOOLS = [
-  { id: "select", label: "Selection tool", icon: MousePointer2, action: "select" },
+  { id: "select", label: "Selection tool", icon: MousePointer2, action: "tool", tool: "select" },
+  { id: "hand", label: "Hand tool", action: "tool", tool: "hand" },
   { id: "sheet", label: "Add data sheet", icon: Table2, action: "add" },
   { id: "source", label: "Add data source", icon: Database, action: "add" },
   { id: "chart", label: "Add chart", icon: BarChart3, action: "add" },
   { id: "text", label: "Add text", icon: Type, action: "add" },
   { id: "export", label: "Export", icon: Upload, action: "export" },
 ];
+
+function HandToolIcon({ closed }) {
+  const curl = (degrees) => ({
+    transformBox: "fill-box",
+    transformOrigin: "50% 100%",
+    transform: closed ? `translateY(1.5px) rotate(${degrees}deg) scaleY(0.72)` : "none",
+    transition: "transform 150ms cubic-bezier(0.22, 1, 0.36, 1)",
+  });
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      className={cn("size-[18px] origin-center transition-transform duration-150 ease-out", closed && "scale-[0.9]")}
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.75"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden
+    >
+      <path d="M8.2 11.4V7a1.35 1.35 0 0 1 2.7 0v4.4" style={curl(18)} />
+      <path d="M10.9 10.8V4.8a1.35 1.35 0 0 1 2.7 0V11" style={curl(6)} />
+      <path d="M13.6 11V6.2a1.35 1.35 0 0 1 2.7 0V11.3" style={curl(-8)} />
+      <path d="M16.3 12.2V8.4a1.3 1.3 0 0 1 2.6 0v3.8c0 3.6-2.1 6.6-5.8 6.6h-1.4c-2.2 0-3.5-.8-4.7-2.2L5.2 14.2a1.45 1.45 0 0 1 2.15-1.95L9.2 14" />
+    </svg>
+  );
+}
 
 export function WorkspaceDock() {
   const canvas = useWorkspaceCanvas();
@@ -38,7 +65,7 @@ export function WorkspaceDock() {
         >
           {TOOLS.map((item) => {
             const Icon = item.icon;
-            const selected = item.action === "select" && tool === "select";
+            const selected = item.action === "tool" && tool === item.tool;
             return (
               <div key={item.id} className="flex items-center">
                 {item.id === "export" ? (
@@ -49,9 +76,9 @@ export function WorkspaceDock() {
                     <button
                       type="button"
                       aria-label={item.label}
-                      aria-pressed={item.action === "select" ? selected : undefined}
+                      aria-pressed={item.action === "tool" ? selected : undefined}
                       onClick={() => {
-                        if (item.action === "select") canvas?.setTool?.("select");
+                        if (item.action === "tool") canvas?.setTool?.(item.tool);
                         else if (item.id === "source") connect?.open?.();
                         else if (item.action === "add") canvas?.addBlock?.(item.id);
                         else canvas?.setTool?.("select");
@@ -63,7 +90,11 @@ export function WorkspaceDock() {
                           : "hover:bg-black/[0.05] dark:hover:bg-white/10",
                       )}
                     >
-                      <Icon className="size-[18px]" strokeWidth={1.75} aria-hidden />
+                      {item.id === "hand" ? (
+                        <HandToolIcon closed={selected && !!canvas?.handDown} />
+                      ) : (
+                        <Icon className="size-[18px]" strokeWidth={1.75} aria-hidden />
+                      )}
                     </button>
                   </TooltipTrigger>
                   <TooltipContent side="top" sideOffset={8} className="!z-[520] text-xs">

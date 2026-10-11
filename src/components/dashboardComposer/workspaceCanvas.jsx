@@ -28,7 +28,7 @@ import {
   setCanvasGridWidth,
   setLayoutGuide,
   snapMove,
-  snapResize,
+  snapResizeEdges,
   subscribeLayoutGuide,
   widthForSpan,
   spanOf,
@@ -173,6 +173,7 @@ export function WorkspaceCanvasProvider({ pageId, readOnly = false, children }) 
   const owner = user === undefined ? "" : user?.userId || "local";
   const storageKey = owner ? canvasStorageKey(owner, pageId) : "";
   const [tool, setTool] = useState("select");
+  const [handDown, setHandDown] = useState(false);
   const [blocksByPage, setBlocksByPage] = useState({});
   const [tables, setTables] = useState([]);
   const [ready, setReady] = useState(false);
@@ -804,6 +805,8 @@ export function WorkspaceCanvasProvider({ pageId, readOnly = false, children }) 
     () => ({
       tool,
       setTool,
+      handDown,
+      setHandDown,
       dashboardName,
       renameDashboard,
       saveNow,
@@ -847,7 +850,7 @@ export function WorkspaceCanvasProvider({ pageId, readOnly = false, children }) 
       removeBlock,
       createChartFromBlock,
     }),
-    [addBlock, armReplay, blocks, blocksByPage, createChartFromBlock, dashboardName, dismissRun, duplicateBlock, focusBlock, leavePrompt, pageId, placeIntegrationSheets, previewActiveId, previewTabs, readOnly, ready, realtimeById, realtimeModeByPage, registerTables, removeBlock, renameDashboard, renameId, replayReady, replayRun, replayTab, reportRun, requestTab, resolveLeave, revealBlock, revealNonce, runFeed, saveNow, selectedId, spotlightId, startRealtimeMode, startSheetRealtime, stopRealtimeMode, stopSheetRealtime, tables, tool, updateBlock],
+    [addBlock, armReplay, blocks, blocksByPage, createChartFromBlock, dashboardName, dismissRun, duplicateBlock, focusBlock, handDown, leavePrompt, pageId, placeIntegrationSheets, previewActiveId, previewTabs, readOnly, ready, realtimeById, realtimeModeByPage, registerTables, removeBlock, renameDashboard, renameId, replayReady, replayRun, replayTab, reportRun, requestTab, resolveLeave, revealBlock, revealNonce, runFeed, saveNow, selectedId, spotlightId, startRealtimeMode, startSheetRealtime, stopRealtimeMode, stopSheetRealtime, tables, tool, updateBlock],
   );
 
   return (
@@ -1345,6 +1348,17 @@ function RealtimeToggle({ block }) {
   );
 }
 
+const RESIZE_EDGES = [
+  { edge: "n", edges: { top: true }, cursor: "ns-resize", className: "inset-x-3 top-0 h-2" },
+  { edge: "s", edges: { bottom: true }, cursor: "ns-resize", className: "inset-x-3 bottom-0 h-2" },
+  { edge: "e", edges: { right: true }, cursor: "ew-resize", className: "inset-y-3 right-0 w-2" },
+  { edge: "w", edges: { left: true }, cursor: "ew-resize", className: "inset-y-3 left-0 w-2" },
+  { edge: "nw", edges: { top: true, left: true }, cursor: "nwse-resize", className: "left-0 top-0 z-20 size-3" },
+  { edge: "ne", edges: { top: true, right: true }, cursor: "nesw-resize", className: "right-0 top-0 z-20 size-3" },
+  { edge: "sw", edges: { bottom: true, left: true }, cursor: "nesw-resize", className: "bottom-0 left-0 z-20 size-3" },
+  { edge: "se", edges: { bottom: true, right: true }, cursor: "nwse-resize", className: "bottom-0 right-0 z-20 size-3" },
+];
+
 function CanvasBlock({ block, selected, spotlight = false, onSelect, onChange, booting = false }) {
   const canvas = useWorkspaceCanvas();
   const readOnly = !!canvas?.readOnly;
@@ -1359,8 +1373,8 @@ function CanvasBlock({ block, selected, spotlight = false, onSelect, onChange, b
   const [resizing, setResizing] = useState(false);
 
   useLayoutEffect(() => {
-    const snapped = dragRef.current?.snapped;
-    if (snapped) paintSnap(snapped);
+    const live = dragRef.current?.live;
+    if (live) paintSnap(live);
   });
 
   useEffect(() => {
@@ -1395,8 +1409,10 @@ function CanvasBlock({ block, selected, spotlight = false, onSelect, onChange, b
     window.removeEventListener("pointerup", drag.onEnd);
     window.removeEventListener("pointercancel", drag.onEnd);
     window.removeEventListener("blur", drag.onEnd);
+    canvas?.setHandDown?.(false);
     setLayoutGuide(false);
     if (commit && drag.moved && drag.snapped) {
+      paintSnap(drag.snapped);
       onChangeRef.current(drag.snapped);
       window.requestAnimationFrame(() => {
         window.requestAnimationFrame(() => setResizing(false));
@@ -1410,7 +1426,34 @@ function CanvasBlock({ block, selected, spotlight = false, onSelect, onChange, b
     }
   };
 
-  const beginGesture = (event, mode) => {
+  const resizeLive = (drag, dx, dy) => {
+    const edges = drag.edges || {};
+    let x = drag.origX;
+    let y = drag.origY;
+    let w = drag.origW;
+    let h = drag.origH;
+    if (edges.right) w = drag.origW + dx;
+    if (edges.left) {
+      x = drag.origX + dx;
+      w = drag.origW - dx;
+    }
+    if (edges.bottom) h = drag.origH + dy;
+    if (edges.top) {
+      y = drag.origY + dy;
+      h = drag.origH - dy;
+    }
+    if (w < 32) {
+      if (edges.left) x = drag.origX + drag.origW - 32;
+      w = 32;
+    }
+    if (h < 32) {
+      if (edges.top) y = drag.origY + drag.origH - 32;
+      h = 32;
+    }
+    return { x, y: Math.max(0, y), w, h };
+  };
+
+  const beginGesture = (event, mode, edges) => {
     if (dragRef.current) endGesture(true);
     const pointerId = event.pointerId;
     const origin = blockRef.current;
@@ -1425,6 +1468,7 @@ function CanvasBlock({ block, selected, spotlight = false, onSelect, onChange, b
       origH: origin.h,
       moved: false,
       snapped: null,
+      edges: edges || null,
       fromText: mode === "move" && event.target instanceof Element && !!event.target.closest("[data-editable]"),
       onMove: null,
       onEnd: null,
@@ -1438,7 +1482,7 @@ function CanvasBlock({ block, selected, spotlight = false, onSelect, onChange, b
       if (!active.moved) {
         active.moved = true;
         setResizing(true);
-        setLayoutGuide(true);
+        setLayoutGuide(true, null);
         if (active.fromText) {
           const focused = document.activeElement;
           if (focused instanceof HTMLElement) focused.blur();
@@ -1446,17 +1490,35 @@ function CanvasBlock({ block, selected, spotlight = false, onSelect, onChange, b
       }
       const current = blockRef.current;
       const others = canvas?.blocks || [];
-      const snapped = active.mode === "resize"
-        ? snapResize({ ...current, id: current.id, x: active.origX, y: active.origY }, active.origW + dx, active.origH + dy, others)
-        : snapMove({ ...current, id: current.id, x: active.origX + dx, y: active.origY + dy, w: active.origW, h: active.origH }, others);
+      let live;
+      let snapped;
+      if (active.mode === "resize") {
+        live = resizeLive(active, dx, dy);
+        snapped = snapResizeEdges(
+          { id: current.id, x: active.origX, y: active.origY, w: active.origW, h: active.origH },
+          live,
+          active.edges,
+          others,
+        );
+      } else {
+        live = { x: active.origX + dx, y: Math.max(0, active.origY + dy), w: active.origW, h: active.origH };
+        snapped = snapMove({ ...current, id: current.id, x: live.x, y: live.y, w: live.w, h: live.h }, others);
+      }
+      active.live = live;
       active.snapped = snapped;
-      paintSnap(snapped);
+      paintSnap(live);
+      const key = `${snapped.x}|${snapped.y}|${snapped.w}|${snapped.h}`;
+      if (key !== active.previewKey) {
+        active.previewKey = key;
+        setLayoutGuide(true, snapped);
+      }
     };
     drag.onEnd = (endEvent) => {
       if (endEvent?.pointerId != null && endEvent.pointerId !== pointerId) return;
       endGesture(true);
     };
     dragRef.current = drag;
+    canvas?.setHandDown?.(true);
     window.addEventListener("pointermove", drag.onMove);
     window.addEventListener("pointerup", drag.onEnd);
     window.addEventListener("pointercancel", drag.onEnd);
@@ -1477,23 +1539,30 @@ function CanvasBlock({ block, selected, spotlight = false, onSelect, onChange, b
 
   const onPointerDown = (e) => {
     if (readOnly || e.button !== 0) return;
+    const hand = canvas?.tool === "hand";
     if (
       e.target instanceof Element &&
       e.target.closest(
-        "[data-sheet-fullscreen],[data-sheet-grid],[data-visual-table],[data-sheet-chart],[data-resize],[data-block-menu],[data-realtime-toggle],[role='menu'],[role='menuitem'],.gdg-style,.gdg-unstyle,textarea,input",
+        hand
+          ? "[data-sheet-fullscreen],[data-resize],[data-block-menu],[data-realtime-toggle],[role='menu'],[role='menuitem']"
+          : "[data-sheet-fullscreen],[data-sheet-grid],[data-visual-table],[data-sheet-chart],[data-resize],[data-block-menu],[data-realtime-toggle],[role='menu'],[role='menuitem'],.gdg-style,.gdg-unstyle,textarea,input",
       )
     ) {
+      return;
+    }
+    if (!hand) {
+      onSelect(block.id);
       return;
     }
     e.preventDefault();
     beginGesture(e, "move");
   };
 
-  const onResizeDown = (e) => {
-    if (e.button !== 0) return;
+  const onResizeDown = (edge) => (e) => {
+    if (canvas?.tool !== "hand" || e.button !== 0) return;
     e.preventDefault();
     e.stopPropagation();
-    beginGesture(e, "resize");
+    beginGesture(e, "resize", edge);
   };
 
   return (
@@ -1517,6 +1586,7 @@ function CanvasBlock({ block, selected, spotlight = false, onSelect, onChange, b
         top: block.y,
         width: block.w,
         height: block.h,
+        cursor: canvas?.tool === "hand" && !readOnly ? "grab" : undefined,
         transition: resizing ? "none" : "width 480ms cubic-bezier(0.22, 1, 0.36, 1), height 480ms cubic-bezier(0.22, 1, 0.36, 1)",
       }}
     >
@@ -1639,14 +1709,19 @@ function CanvasBlock({ block, selected, spotlight = false, onSelect, onChange, b
       ) : (
         <BlockBody block={block} onChange={onChange} booting={booting} />
       )}
-      {readOnly ? null : (
-      <div
-        data-resize=""
-        aria-hidden="true"
-        onPointerDown={onResizeDown}
-        className="absolute bottom-0 right-0 z-10 size-4"
-        style={{ cursor: "nwse-resize" }}
-      />
+      {readOnly || canvas?.tool !== "hand" ? null : (
+        <>
+          {RESIZE_EDGES.map((handle) => (
+            <div
+              key={handle.edge}
+              data-resize=""
+              aria-hidden="true"
+              onPointerDown={onResizeDown(handle.edges)}
+              className={cn("absolute z-10", handle.className)}
+              style={{ cursor: handle.cursor }}
+            />
+          ))}
+        </>
       )}
     </div>
   );
@@ -1665,10 +1740,39 @@ export function WorkspaceCanvas() {
   blocksRef.current = blocks;
   const [bootingIds, setBootingIds] = useState(() => new Set());
   const [layoutGuide, setGuideVisible] = useState(false);
+  const [snapPreview, setSnapPreview] = useState(null);
   const [gridMetrics, setGridMetrics] = useState(() => canvasGridMetrics());
   const skipNearestScrollRef = useRef(false);
 
-  useEffect(() => subscribeLayoutGuide(setGuideVisible), []);
+  useEffect(() => subscribeLayoutGuide((state) => {
+    setGuideVisible(!!state?.active);
+    if (state?.preview) setSnapPreview(state.preview);
+  }), []);
+
+  useEffect(() => {
+    if (canvas?.tool === "hand") return undefined;
+    canvas?.setHandDown?.(false);
+    return undefined;
+  }, [canvas?.setHandDown, canvas?.tool]);
+
+  useEffect(() => {
+    if (canvas?.tool !== "hand") return undefined;
+    const setDown = canvas.setHandDown;
+    const down = (event) => {
+      if (event.button !== 0) return;
+      if (event.target instanceof Element && event.target.closest("[role='toolbar']")) return;
+      setDown?.(true);
+    };
+    const up = () => setDown?.(false);
+    window.addEventListener("pointerdown", down);
+    window.addEventListener("pointerup", up);
+    window.addEventListener("pointercancel", up);
+    return () => {
+      window.removeEventListener("pointerdown", down);
+      window.removeEventListener("pointerup", up);
+      window.removeEventListener("pointercancel", up);
+    };
+  }, [canvas?.setHandDown, canvas?.tool]);
 
   useLayoutEffect(() => {
     const scroller = scrollerRef.current;
@@ -1816,7 +1920,11 @@ export function WorkspaceCanvas() {
 
   return (
     <>
-    <div ref={scrollerRef} className="pointer-events-auto absolute inset-0 z-20 overflow-auto">
+    <div
+      ref={scrollerRef}
+      className="pointer-events-auto absolute inset-0 z-20 overflow-auto"
+      style={canvas?.tool === "hand" ? { cursor: canvas.handDown ? "grabbing" : "grab" } : undefined}
+    >
       <div
         className="relative min-h-full min-w-full"
         style={{
@@ -1863,6 +1971,17 @@ export function WorkspaceCanvas() {
           onChange={(patch) => canvas.updateBlock(block.id, patch)}
         />
       ))}
+      {snapPreview ? (
+        <div
+          aria-hidden="true"
+          data-snap-outline=""
+          className={cn(
+            "pointer-events-none absolute z-30 rounded-xl border border-[#0d99ff]/80 shadow-[0_0_0_1px_rgba(13,153,255,0.35),0_0_18px_rgba(13,153,255,0.35)] transition-[left,top,width,height,opacity] duration-150 ease-out dark:border-[#7cc4ff]/90 dark:shadow-[0_0_0_1px_rgba(124,196,255,0.45),0_0_22px_rgba(124,196,255,0.4)]",
+            layoutGuide ? "opacity-100" : "opacity-0",
+          )}
+          style={{ left: snapPreview.x, top: snapPreview.y, width: snapPreview.w, height: snapPreview.h }}
+        />
+      ) : null}
       </div>
     </div>
     {progress}
