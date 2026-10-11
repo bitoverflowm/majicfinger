@@ -22,7 +22,17 @@ import { isStatsDataset, resolveVisualization } from "@/lib/visualizations/prese
 import { isPriceHistorySheet } from "@/components/dashboardComposer/priceHistorySeries";
 import { SheetBlockChart } from "@/components/dashboardComposer/sheetBlockChart";
 import { layoutRunSheets } from "@/components/dashboardComposer/integrationRunSheets";
-import { CLIP, packClippedBlocks, snapBlockPosition } from "@/components/dashboardComposer/clipLayout";
+import {
+  canvasGridMetrics,
+  packClippedBlocks,
+  setCanvasGridWidth,
+  setLayoutGuide,
+  snapMove,
+  snapResize,
+  subscribeLayoutGuide,
+  widthForSpan,
+  spanOf,
+} from "@/components/dashboardComposer/clipLayout";
 import { useUser } from "@/lib/hooks";
 import { getHistoricalPullRowLimit } from "@/lib/athenaEntitlement";
 import {
@@ -1340,9 +1350,18 @@ function CanvasBlock({ block, selected, spotlight = false, onSelect, onChange, b
   const readOnly = !!canvas?.readOnly;
   const dragRef = useRef(null);
   const rootRef = useRef(null);
+  const blockRef = useRef(block);
+  const onChangeRef = useRef(onChange);
+  blockRef.current = block;
+  onChangeRef.current = onChange;
   const [menuOpen, setMenuOpen] = useState(false);
   const [fullscreen, setFullscreen] = useState(false);
   const [resizing, setResizing] = useState(false);
+
+  useLayoutEffect(() => {
+    const snapped = dragRef.current?.snapped;
+    if (snapped) paintSnap(snapped);
+  });
 
   useEffect(() => {
     if (canvas?.renameId !== block.id) return;
@@ -1358,6 +1377,104 @@ function CanvasBlock({ block, selected, spotlight = false, onSelect, onChange, b
     canvas?.setRenameId?.(null);
   }, [block.id, canvas?.renameId, canvas?.setRenameId]);
 
+  const paintSnap = (snapped) => {
+    const el = rootRef.current;
+    if (!el || !snapped) return;
+    el.style.transition = "none";
+    el.style.left = `${snapped.x}px`;
+    el.style.top = `${snapped.y}px`;
+    el.style.width = `${snapped.w}px`;
+    el.style.height = `${snapped.h}px`;
+  };
+
+  const endGesture = (commit) => {
+    const drag = dragRef.current;
+    if (!drag) return;
+    dragRef.current = null;
+    window.removeEventListener("pointermove", drag.onMove);
+    window.removeEventListener("pointerup", drag.onEnd);
+    window.removeEventListener("pointercancel", drag.onEnd);
+    window.removeEventListener("blur", drag.onEnd);
+    setLayoutGuide(false);
+    if (commit && drag.moved && drag.snapped) {
+      onChangeRef.current(drag.snapped);
+      window.requestAnimationFrame(() => {
+        window.requestAnimationFrame(() => setResizing(false));
+      });
+      return;
+    }
+    setResizing(false);
+    if (drag.moved) {
+      const current = blockRef.current;
+      paintSnap({ x: current.x, y: current.y, w: current.w, h: current.h });
+    }
+  };
+
+  const beginGesture = (event, mode) => {
+    if (dragRef.current) endGesture(true);
+    const pointerId = event.pointerId;
+    const origin = blockRef.current;
+    const drag = {
+      mode,
+      pointerId,
+      x: event.clientX,
+      y: event.clientY,
+      origX: origin.x,
+      origY: origin.y,
+      origW: origin.w,
+      origH: origin.h,
+      moved: false,
+      snapped: null,
+      fromText: mode === "move" && event.target instanceof Element && !!event.target.closest("[data-editable]"),
+      onMove: null,
+      onEnd: null,
+    };
+    drag.onMove = (moveEvent) => {
+      const active = dragRef.current;
+      if (!active || moveEvent.pointerId !== active.pointerId) return;
+      const dx = moveEvent.clientX - active.x;
+      const dy = moveEvent.clientY - active.y;
+      if (!active.moved && Math.hypot(dx, dy) < 4) return;
+      if (!active.moved) {
+        active.moved = true;
+        setResizing(true);
+        setLayoutGuide(true);
+        if (active.fromText) {
+          const focused = document.activeElement;
+          if (focused instanceof HTMLElement) focused.blur();
+        }
+      }
+      const current = blockRef.current;
+      const others = canvas?.blocks || [];
+      const snapped = active.mode === "resize"
+        ? snapResize({ ...current, id: current.id, x: active.origX, y: active.origY }, active.origW + dx, active.origH + dy, others)
+        : snapMove({ ...current, id: current.id, x: active.origX + dx, y: active.origY + dy, w: active.origW, h: active.origH }, others);
+      active.snapped = snapped;
+      paintSnap(snapped);
+    };
+    drag.onEnd = (endEvent) => {
+      if (endEvent?.pointerId != null && endEvent.pointerId !== pointerId) return;
+      endGesture(true);
+    };
+    dragRef.current = drag;
+    window.addEventListener("pointermove", drag.onMove);
+    window.addEventListener("pointerup", drag.onEnd);
+    window.addEventListener("pointercancel", drag.onEnd);
+    window.addEventListener("blur", drag.onEnd);
+    onSelect(block.id);
+  };
+
+  useEffect(() => () => {
+    const drag = dragRef.current;
+    if (!drag) return;
+    window.removeEventListener("pointermove", drag.onMove);
+    window.removeEventListener("pointerup", drag.onEnd);
+    window.removeEventListener("pointercancel", drag.onEnd);
+    window.removeEventListener("blur", drag.onEnd);
+    dragRef.current = null;
+    setLayoutGuide(false);
+  }, []);
+
   const onPointerDown = (e) => {
     if (readOnly || e.button !== 0) return;
     if (
@@ -1368,77 +1485,15 @@ function CanvasBlock({ block, selected, spotlight = false, onSelect, onChange, b
     ) {
       return;
     }
-    e.currentTarget.setPointerCapture(e.pointerId);
-    dragRef.current = {
-      mode: "move",
-      x: e.clientX,
-      y: e.clientY,
-      origX: block.x,
-      origY: block.y,
-      moved: false,
-      fromText: !!e.target.closest("[data-editable]"),
-    };
-    onSelect(block.id);
+    e.preventDefault();
+    beginGesture(e, "move");
   };
 
   const onResizeDown = (e) => {
     if (e.button !== 0) return;
     e.preventDefault();
     e.stopPropagation();
-    setResizing(true);
-    e.currentTarget.setPointerCapture(e.pointerId);
-    dragRef.current = {
-      mode: "resize",
-      x: e.clientX,
-      y: e.clientY,
-      origW: block.w,
-      origH: block.h,
-    };
-    onSelect(block.id);
-  };
-
-  const onPointerMove = (e) => {
-    const drag = dragRef.current;
-    if (!drag) return;
-    if (drag.mode === "move") {
-      const dx = e.clientX - drag.x;
-      const dy = e.clientY - drag.y;
-      if (!drag.moved && Math.hypot(dx, dy) < 4) return;
-      if (!drag.moved && drag.fromText) {
-        const active = document.activeElement;
-        if (active instanceof HTMLElement && e.currentTarget.contains(active)) active.blur();
-      }
-      drag.moved = true;
-      drag.nextX = Math.max(0, drag.origX + dx);
-      drag.nextY = Math.max(CLIP.originY, drag.origY + dy);
-      onChange({
-        x: drag.nextX,
-        y: drag.nextY,
-      });
-      return;
-    }
-    const w = Math.max(160, drag.origW + (e.clientX - drag.x));
-    const h = Math.max(72, drag.origH + (e.clientY - drag.y));
-    if (!drag.moved && Math.hypot(e.clientX - drag.x, e.clientY - drag.y) < 4) return;
-    drag.moved = true;
-    drag.nextW = w;
-    drag.nextH = h;
-    onChange({ w, h });
-  };
-
-  const onPointerUp = () => {
-    const drag = dragRef.current;
-    dragRef.current = null;
-    setResizing(false);
-    if (!drag?.moved) return;
-    const others = canvas?.blocks || [];
-    if (drag.mode === "move") {
-      onChange(snapBlockPosition({ ...block, x: drag.nextX ?? block.x, y: drag.nextY ?? block.y }, others));
-      return;
-    }
-    if (drag.mode === "resize") {
-      onChange(snapBlockPosition({ ...block, w: drag.nextW ?? block.w, h: drag.nextH ?? block.h }, others));
-    }
+    beginGesture(e, "resize");
   };
 
   return (
@@ -1448,8 +1503,6 @@ function CanvasBlock({ block, selected, spotlight = false, onSelect, onChange, b
       data-block-id={block.id}
       aria-label={block.title || block.body || block.type}
       onPointerDown={readOnly ? undefined : onPointerDown}
-      onPointerMove={readOnly ? undefined : onPointerMove}
-      onPointerUp={readOnly ? undefined : onPointerUp}
       className={cn(
         "pointer-events-auto absolute flex flex-col overflow-hidden rounded-xl border bg-background shadow-sm",
         readOnly ? "border-border/70" : "group/block",
@@ -1527,13 +1580,13 @@ function CanvasBlock({ block, selected, spotlight = false, onSelect, onChange, b
                             presentation: "visual",
                             visualReady: true,
                             sheetW: block.sheetW || block.w,
-                            w: VISUAL_TABLE_WIDTH,
+                            w: widthForSpan(spanOf({ w: VISUAL_TABLE_WIDTH })),
                           });
                           return;
                         }
                         onChange({
                           presentation: "sheet",
-                          w: block.sheetW || block.w,
+                          w: widthForSpan(spanOf({ w: block.sheetW || block.w })),
                         });
                       }}
                       onClick={(event) => event.stopPropagation()}
@@ -1548,7 +1601,7 @@ function CanvasBlock({ block, selected, spotlight = false, onSelect, onChange, b
                         presentation: "visual",
                         visualReady: true,
                         sheetW: block.w,
-                        w: VISUAL_TABLE_WIDTH,
+                        w: widthForSpan(spanOf({ w: VISUAL_TABLE_WIDTH })),
                       })
                     }
                   >
@@ -1591,8 +1644,6 @@ function CanvasBlock({ block, selected, spotlight = false, onSelect, onChange, b
         data-resize=""
         aria-hidden="true"
         onPointerDown={onResizeDown}
-        onPointerMove={onPointerMove}
-        onPointerUp={onPointerUp}
         className="absolute bottom-0 right-0 z-10 size-4"
         style={{ cursor: "nwse-resize" }}
       />
@@ -1613,7 +1664,24 @@ export function WorkspaceCanvas() {
   const blocksRef = useRef(blocks);
   blocksRef.current = blocks;
   const [bootingIds, setBootingIds] = useState(() => new Set());
+  const [layoutGuide, setGuideVisible] = useState(false);
+  const [gridMetrics, setGridMetrics] = useState(() => canvasGridMetrics());
   const skipNearestScrollRef = useRef(false);
+
+  useEffect(() => subscribeLayoutGuide(setGuideVisible), []);
+
+  useLayoutEffect(() => {
+    const scroller = scrollerRef.current;
+    if (!scroller) return undefined;
+    const apply = () => {
+      setCanvasGridWidth(scroller.clientWidth);
+      setGridMetrics(canvasGridMetrics());
+    };
+    apply();
+    const observer = new ResizeObserver(apply);
+    observer.observe(scroller);
+    return () => observer.disconnect();
+  }, [canvas?.ready, blocks.length]);
 
   useLayoutEffect(() => {
     if (!canvas?.ready) return undefined;
@@ -1753,9 +1821,37 @@ export function WorkspaceCanvas() {
         className="relative min-h-full min-w-full"
         style={{
           height: blocks.reduce((max, block) => Math.max(max, (block.y || 0) + (block.h || 0) + 120), 0),
-          width: blocks.reduce((max, block) => Math.max(max, (block.x || 0) + (block.w || 0) + 32), 0),
+          width: Math.max(
+            gridMetrics.width,
+            blocks.reduce((max, block) => Math.max(max, (block.x || 0) + (block.w || 0) + 32), 0),
+          ),
         }}
       >
+      <div
+        aria-hidden="true"
+        data-layout-guide=""
+        className={cn(
+          "pointer-events-none absolute inset-0 z-0 transition-opacity duration-300 ease-out",
+          layoutGuide ? "opacity-100" : "opacity-0",
+        )}
+      >
+        <div
+          className="absolute inset-0 dark:hidden"
+          style={{
+            backgroundImage: "radial-gradient(circle, rgba(23, 23, 23, 0.28) 1px, transparent 1.2px)",
+            backgroundSize: `${gridMetrics.unit}px ${gridMetrics.unit}px`,
+            backgroundPosition: `${gridMetrics.x0}px ${gridMetrics.originY}px`,
+          }}
+        />
+        <div
+          className="absolute inset-0 hidden dark:block"
+          style={{
+            backgroundImage: "radial-gradient(circle, rgba(255, 255, 255, 0.3) 1px, transparent 1.2px)",
+            backgroundSize: `${gridMetrics.unit}px ${gridMetrics.unit}px`,
+            backgroundPosition: `${gridMetrics.x0}px ${gridMetrics.originY}px`,
+          }}
+        />
+      </div>
       {blocks.map((block) => (
         <CanvasBlock
           key={block.id}

@@ -1,103 +1,185 @@
 /**
- * Twelve-column clip grid. Half width is 6 columns and full width is 12,
- * and a block can also lock to any span from a quarter (3) up to full.
+ * Twenty-four-column canvas grid. Rows continue as far as the tab needs.
+ * A block's width is a column span (1–24) and its height is a row span.
+ * Move and resize snap to that grid.
  */
 
 export const CLIP = {
   x0: 28,
-  gap: 16,
-  cols: 12,
-  minSpan: 3,
-  fullW: 540 * 2 + 16,
-  colW: 540,
-  rowH: 360,
+  gap: 8,
+  cols: 24,
+  minSpan: 1,
+  minRows: 2,
   originY: 88,
 };
 
-function trackWidth() {
-  return (CLIP.fullW - CLIP.gap * (CLIP.cols - 1)) / CLIP.cols;
+const DEFAULT_CANVAS_WIDTH = 1142;
+
+let canvasWidth = DEFAULT_CANVAS_WIDTH;
+
+const guideListeners = new Set();
+
+/** Show or hide the snap guide. Listeners update the canvas without rewriting every block. */
+export function setLayoutGuide(active) {
+  const on = !!active;
+  guideListeners.forEach((listener) => listener(on));
 }
 
-function unit() {
-  return trackWidth() + CLIP.gap;
+export function subscribeLayoutGuide(listener) {
+  guideListeners.add(listener);
+  return () => guideListeners.delete(listener);
 }
 
-/** How many columns a width occupies, from a quarter of the row up to the full row. */
+export function setCanvasGridWidth(width) {
+  const next = Number(width);
+  if (!Number.isFinite(next) || next < 320) return;
+  canvasWidth = next;
+}
+
+export function canvasGridMetrics() {
+  const width = canvasWidth;
+  const inner = Math.max(CLIP.cols, width - CLIP.x0 * 2);
+  const track = (inner - CLIP.gap * (CLIP.cols - 1)) / CLIP.cols;
+  const unit = track + CLIP.gap;
+  return { width, inner, track, unit, x0: CLIP.x0, originY: CLIP.originY, gap: CLIP.gap, cols: CLIP.cols };
+}
+
+function metrics() {
+  return canvasGridMetrics();
+}
+
+function clamp(value, min, max) {
+  return Math.min(max, Math.max(min, value));
+}
+
+export function xForCol(col) {
+  const { unit, x0 } = metrics();
+  return Math.round(x0 + col * unit);
+}
+
+export function widthForSpan(span) {
+  const { track, gap } = metrics();
+  const used = clamp(span, 1, CLIP.cols);
+  return Math.round(used * track + (used - 1) * gap);
+}
+
+export function heightForRows(rows) {
+  const { track, gap } = metrics();
+  const used = Math.max(1, rows);
+  return Math.round(used * track + (used - 1) * gap);
+}
+
+export function yForRow(row) {
+  const { unit, originY } = metrics();
+  return Math.round(originY + Math.max(0, row) * unit);
+}
+
+/** How many columns a width occupies, from one column up to the full row. */
 export function spanOf(block) {
-  const width = block?.w || CLIP.colW;
-  const span = Math.round((width + CLIP.gap) / unit());
-  return Math.min(CLIP.cols, Math.max(CLIP.minSpan, span));
+  const { unit, gap } = metrics();
+  const width = block?.w || widthForSpan(12);
+  const span = Math.round((width + gap) / unit);
+  return clamp(span, CLIP.minSpan, CLIP.cols);
 }
 
-function xForCol(col) {
-  return Math.round(CLIP.x0 + col * unit());
-}
-
-function widthForSpan(span) {
-  return Math.round(span * trackWidth() + (span - 1) * CLIP.gap);
+export function rowsOf(block) {
+  const { unit, gap } = metrics();
+  const height = block?.h || heightForRows(CLIP.minRows);
+  const rows = Math.round((height + gap) / unit);
+  return Math.max(CLIP.minRows, rows);
 }
 
 function colForX(x, span) {
-  const col = Math.round(((x || CLIP.x0) - CLIP.x0) / unit());
-  return Math.max(0, Math.min(CLIP.cols - span, col));
+  const { unit, x0, cols } = metrics();
+  const col = Math.round(((x || x0) - x0) / unit);
+  return clamp(col, 0, cols - span);
 }
 
-function snapRowHeight(height) {
-  const step = CLIP.rowH + CLIP.gap;
-  const rows = Math.max(1, Math.round(((height || CLIP.rowH) + CLIP.gap) / step));
-  return rows * CLIP.rowH + (rows - 1) * CLIP.gap;
+function rowForY(y) {
+  const { unit, originY } = metrics();
+  return Math.max(0, Math.round(((y || originY) - originY) / unit));
 }
 
 export function isWideBlock(block) {
   return spanOf(block) >= CLIP.cols;
 }
 
+function overlaps(block, x, y, w, h, others) {
+  const right = x + w;
+  const bottom = y + h;
+  return (others || []).some((other) => {
+    if (!other || other.id === block.id) return false;
+    const ox = other.x || 0;
+    const oy = other.y || 0;
+    return x < ox + (other.w || 0) - 1 && right > ox + 1 && y < oy + (other.h || 0) - 1 && bottom > oy + 1;
+  });
+}
+
+function nudgeDown(block, x, y, w, h, others) {
+  const { unit } = metrics();
+  let next = y;
+  let guard = 0;
+  while (overlaps(block, x, next, w, h, others) && guard < 40) {
+    next += unit;
+    guard += 1;
+  }
+  return Math.round(next);
+}
+
+/** Snap a moved block onto the nearest column and row. Its span stays put. */
+export function snapMove(block, others) {
+  const span = spanOf(block);
+  const rows = rowsOf(block);
+  const w = widthForSpan(span);
+  const h = heightForRows(rows);
+  const col = colForX(block.x, span);
+  const x = xForCol(col);
+  const y = nudgeDown(block, x, yForRow(rowForY(block.y)), w, h, others);
+  return { x, y, w, h };
+}
+
+/**
+ * Snap a bottom-right resize. The top-left column and row stay fixed,
+ * and the pointer's size rounds to the nearest span.
+ */
+export function snapResize(block, rawWidth, rawHeight, others) {
+  const { cols } = metrics();
+  const startCol = colForX(block.x, 1);
+  const startRow = rowForY(block.y);
+  const span = clamp(spanOf({ w: rawWidth }), 1, cols - startCol);
+  const rows = rowsOf({ h: rawHeight });
+  const w = widthForSpan(span);
+  const h = heightForRows(rows);
+  const x = xForCol(startCol);
+  const y = nudgeDown(block, x, yForRow(startRow), w, h, others);
+  return { x, y, w, h };
+}
+
+/** Snap one block onto the grid after a free drag. */
+export function snapBlockPosition(block, others) {
+  return snapMove(block, others);
+}
+
 function placeChartRow(placed, charts, y) {
+  const half = CLIP.cols / 2;
   let col = 0;
   let rowHeight = 0;
   let rowY = y;
+  const { gap } = metrics();
   for (const chart of charts) {
-    const span = 6;
+    const span = half;
     if (col > 0 && col + span > CLIP.cols) {
-      y = rowY + rowHeight + CLIP.gap;
+      y = rowY + rowHeight + gap;
       col = 0;
       rowHeight = 0;
       rowY = y;
     }
-    const height = chart.h || CLIP.rowH;
-    placed.push({ ...chart, x: xForCol(col), y: rowY, w: widthForSpan(span), h: height });
+    const height = chart.h || heightForRows(8);
+    placed.push({ ...chart, x: xForCol(col), y: Math.round(rowY), w: widthForSpan(span), h: height });
     col += span;
     rowHeight = Math.max(rowHeight, height);
   }
-  return col > 0 ? rowY + rowHeight + CLIP.gap : y;
-}
-
-function overlaps(block, x, y, w, h, others) {
-  const right = x + w;
-  const bottom = y + h;
-  return others.some((other) => {
-    if (other.id === block.id) return false;
-    const ox = other.x || 0;
-    const oy = other.y || 0;
-    return x < ox + (other.w || 0) && right > ox && y < oy + (other.h || 0) && bottom > oy;
-  });
-}
-
-/** Snap one block onto the clip grid after a drag. */
-export function snapBlockPosition(block, others) {
-  const span = spanOf(block);
-  const wide = span >= CLIP.cols;
-  const w = widthForSpan(span);
-  const h = wide ? block.h || CLIP.rowH : snapRowHeight(block.h);
-  const col = wide ? 0 : colForX(block.x, span);
-  const x = xForCol(col);
-  let y = CLIP.originY + Math.max(0, Math.round(((block.y || 0) - CLIP.originY) / (CLIP.rowH + CLIP.gap))) * (CLIP.rowH + CLIP.gap);
-  let guard = 0;
-  while (overlaps(block, x, y, w, h, others) && guard < 24) {
-    y += CLIP.rowH + CLIP.gap;
-    guard += 1;
-  }
-  return { x, y, w, h };
+  return col > 0 ? rowY + rowHeight + gap : y;
 }
 
 /**
@@ -124,17 +206,19 @@ export function packClippedBlocks(blocks) {
   }
 
   const placed = [];
+  const { gap } = metrics();
   let y = CLIP.originY;
 
   for (const sheet of wideSheets) {
-    const height = sheet.h || 420;
-    placed.push({ ...sheet, x: CLIP.x0, y, w: widthForSpan(CLIP.cols), h: height });
-    y += height + CLIP.gap;
+    const height = sheet.h || heightForRows(9);
+    placed.push({ ...sheet, x: xForCol(0), y, w: widthForSpan(CLIP.cols), h: height });
+    y += height + gap;
     const attached = charts.get(sheet.id) || [];
     charts.delete(sheet.id);
     if (attached.length === 1) {
-      placed.push({ ...attached[0], x: CLIP.x0, y, w: widthForSpan(CLIP.cols), h: 320 });
-      y += 320 + CLIP.gap;
+      const chartH = heightForRows(rowsOf({ h: attached[0].h || 320 }));
+      placed.push({ ...attached[0], x: xForCol(0), y, w: widthForSpan(CLIP.cols), h: chartH });
+      y += chartH + gap;
     } else if (attached.length > 1) {
       y = placeChartRow(placed, attached, y);
     }
@@ -158,17 +242,17 @@ export function packClippedBlocks(blocks) {
   for (const item of flow) {
     const span = Math.min(spanOf(item), CLIP.cols);
     if (col > 0 && col + span > CLIP.cols) {
-      y = rowY + rowHeight + CLIP.gap;
+      y = rowY + rowHeight + gap;
       col = 0;
       rowHeight = 0;
       rowY = y;
     }
-    const height = span >= CLIP.cols ? item.h || CLIP.rowH : snapRowHeight(item.h);
-    placed.push({ ...item, x: xForCol(col), y: rowY, w: widthForSpan(span), h: height });
+    const height = heightForRows(rowsOf(item));
+    placed.push({ ...item, x: xForCol(col), y: Math.round(rowY), w: widthForSpan(span), h: height });
     col += span;
     rowHeight = Math.max(rowHeight, height);
     if (col >= CLIP.cols) {
-      y = rowY + rowHeight + CLIP.gap;
+      y = rowY + rowHeight + gap;
       col = 0;
       rowHeight = 0;
       rowY = y;
