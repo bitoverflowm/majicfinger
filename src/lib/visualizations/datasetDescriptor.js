@@ -301,9 +301,9 @@ const ENDPOINTS = {
   "polymarket:getTraderLeaderboard": spec({
     datasetType: "leaderboard",
     shape: "ranking",
-    seriesKeys: ["proxyWallet"],
-    units: { metric: "rank_metric" },
-    fields: { label: "userName", wallet: "proxyWallet", value: "pnl", rank: "rank" },
+    seriesKeys: ["user_id"],
+    units: { metric: "usdc" },
+    fields: { label: "user_name", wallet: "user_id", value: "pnl", rank: "rank" },
     required: ["pnl"],
   }),
   "polymarket:getCurrentPositions": spec({

@@ -29,6 +29,13 @@ import {
   TRADE_COLUMNS,
 } from "@/lib/polymarketLive/polymarketQuoteQuery";
 import { flattenSamplingMarket, samplingMarketSheetColumns } from "@/lib/polymarketLive/polymarketSamplingScan";
+import {
+  leaderboardSheetRow,
+  polymarketLeaderboardPage,
+  polymarketLeaderboardQuery,
+  polymarketLeaderboardTarget,
+  POLYMARKET_TRADER_LEADERBOARD_COLUMNS,
+} from "@/lib/polymarketLive/traderLeaderboardCompose";
 
 export const POLYMARKET_LIVE_BUILD_CATEGORIES = [
   { id: "markets", label: "Markets" },
@@ -517,6 +524,16 @@ function sheetColumns(endpointId, entries) {
 }
 
 export function polymarketLiveBuildColumns(endpointId) {
+  if (endpointId === "getTraderLeaderboard") {
+    const defaults = new Set(["rank", "user_name", "pnl", "volume", "time_period", "category", "sort_by"]);
+    return POLYMARKET_TRADER_LEADERBOARD_COLUMNS.map((entry) => ({
+      id: entry.name,
+      title: titleFor(entry.name),
+      type: columnType(entry.type),
+      description: entry.description || "",
+      defaultOn: defaults.has(entry.name),
+    }));
+  }
   if (endpointId === "getTickSize") return sheetColumns(endpointId, TICK_SIZE_COLUMNS);
   if (endpointId === "getTokenPriceHistory") return sheetColumns(endpointId, TOKEN_PRICE_HISTORY_COLUMNS);
   if (endpointId === "getTradesByMarket") return sheetColumns(endpointId, TRADE_COLUMNS);
@@ -1188,6 +1205,40 @@ async function pagedObjects(query, params, target) {
   return rows;
 }
 
+async function leaderboardRows(filters, options = {}) {
+  const query = polymarketLeaderboardQuery(filters);
+  const target = polymarketLeaderboardTarget(filters, options);
+  if (query.user) {
+    const page = polymarketLeaderboardPage(await polymarketGet("getTraderLeaderboard", {
+      time_period: query.time_period,
+      category: query.category,
+      user: query.user,
+    }));
+    return page.rows.slice(0, 1).map((row) => leaderboardSheetRow(row, query));
+  }
+  const rows = [];
+  let cursor = "";
+  for (let page = 0; rows.length < target && page < 200; page += 1) {
+    const params = cursor
+      ? { cursor }
+      : {
+          time_period: query.time_period,
+          category: query.category,
+          sort_by: query.sort_by,
+          limit: String(Math.min(1000, target - rows.length)),
+        };
+    const next = polymarketLeaderboardPage(await polymarketGet("getTraderLeaderboard", params));
+    if (!next.rows.length) break;
+    for (const row of next.rows) {
+      rows.push(leaderboardSheetRow(row, query));
+      if (rows.length >= target) break;
+    }
+    if (!next.cursor || next.cursor === cursor) break;
+    cursor = next.cursor;
+  }
+  return rows;
+}
+
 async function discoveryRows(endpointId, options = {}) {
   const target = pullSize(options, 50);
   if (endpointId === "getMarkets") {
@@ -1208,16 +1259,7 @@ async function discoveryRows(endpointId, options = {}) {
   if (endpointId === "series") {
     return pagedObjects("listSeries", { closed: "false" }, target);
   }
-  if (endpointId === "getTraderLeaderboard") {
-    return objectRows(
-      await polymarketGet("getTraderLeaderboard", {
-        category: "OVERALL",
-        timePeriod: "DAY",
-        orderBy: "PNL",
-        limit: String(Math.min(50, target)),
-      }),
-    );
-  }
+  if (endpointId === "getTraderLeaderboard") return leaderboardRows(options.filters || {}, options);
   return [];
 }
 
@@ -1245,16 +1287,11 @@ async function directedRows(endpointId, picks, options = {}) {
     const markets = Array.isArray(event?.markets) ? event.markets : objectRows(event);
     return markets.map((market) => ({ ...market, event_id: pick.entityId, event_title: pick.title }));
   }
-  if (endpointId === "getTraderLeaderboard" && pick.address) {
-    return objectRows(
-      await polymarketGet("getTraderLeaderboard", {
-        category: "OVERALL",
-        timePeriod: "DAY",
-        orderBy: "PNL",
-        limit: String(Math.min(50, pullSize(options, 50))),
-        user: pick.address,
-      }),
-    );
+  if (endpointId === "getTraderLeaderboard") {
+    const filters = { ...(options.filters || {}) };
+    const typed = String(filters.user?.value || "").trim();
+    if (!typed && pick.address) filters.user = { value: pick.address };
+    return leaderboardRows(filters, options);
   }
   if (ADDRESS_QUERIES[endpointId]) {
     if (!/^0x[a-fA-F0-9]{40}$/.test(pick.address || "")) throw new Error("Search for a trader wallet.");

@@ -1837,45 +1837,46 @@ export default async function handler(req, res) {
         break;
       }
       case "getTraderLeaderboard": {
-        const category = String(req.query.category || "OVERALL").trim().toUpperCase();
-        const timePeriod = String(req.query.timePeriod || "DAY").trim().toUpperCase();
-        const orderBy = String(req.query.orderBy || "PNL").trim().toUpperCase();
-        const limit = Number.parseInt(String(req.query.limit || "25"), 10);
-        const offset = Number.parseInt(String(req.query.offset || "0"), 10);
+        const timePeriod = String(req.query.time_period || req.query.timePeriod || "day").trim().toLowerCase();
+        const category = String(req.query.category || "overall").trim().toLowerCase().replace(/[\s_]+/g, "-");
+        const sortRaw = String(req.query.sort_by || req.query.orderBy || "PNL").trim().toUpperCase();
+        const sortBy = sortRaw === "VOL" || sortRaw === "VOLUME" ? "VOLUME" : "PNL";
         const user = String(req.query.user || "").trim();
-        const userName = String(req.query.userName || "").trim();
-        const categories = new Set([
-          "OVERALL", "POLITICS", "SPORTS", "ESPORTS", "CRYPTO", "CULTURE",
-          "MENTIONS", "WEATHER", "ECONOMICS", "TECH", "FINANCE",
-        ]);
-        if (!categories.has(category)) {
-          return res.status(400).json({ message: "Invalid leaderboard category" });
-        }
-        if (!["DAY", "WEEK", "MONTH", "ALL"].includes(timePeriod)) {
+        const cursor = String(req.query.cursor || "").trim();
+        const limitText = String(req.query.limit ?? "").trim();
+        if (!["day", "week", "month", "all"].includes(timePeriod)) {
           return res.status(400).json({ message: "Invalid leaderboard time period" });
         }
-        if (!["PNL", "VOL"].includes(orderBy)) {
-          return res.status(400).json({ message: "Invalid leaderboard order" });
+        if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(category) || category.length > 64) {
+          return res.status(400).json({ message: "Invalid leaderboard category" });
         }
-        if (!Number.isInteger(limit) || limit < 1 || limit > 50) {
-          return res.status(400).json({ message: "limit must be between 1 and 50" });
+        if (sortRaw && sortRaw !== "PNL" && sortRaw !== "VOL" && sortRaw !== "VOLUME") {
+          return res.status(400).json({ message: "Invalid leaderboard sort" });
         }
-        if (!Number.isInteger(offset) || offset < 0 || offset > 1000) {
-          return res.status(400).json({ message: "offset must be between 0 and 1000" });
+        let limit = null;
+        if (limitText) {
+          limit = Number.parseInt(limitText, 10);
+          if (!Number.isInteger(limit) || limit < 0 || limit > 1000) {
+            return res.status(400).json({ message: "limit must be between 0 and 1000" });
+          }
         }
         if (user && !/^0x[a-fA-F0-9]{40}$/.test(user)) {
           return res.status(400).json({ message: "Invalid user wallet address" });
         }
-        const params = new URLSearchParams({
-          category,
-          timePeriod,
-          orderBy,
-          limit: String(limit),
-          offset: String(offset),
-        });
-        if (user) params.set("user", user);
-        if (userName) params.set("userName", userName);
-        data = await fetchJson(`${DATA_API_BASE}/v1/leaderboard?${params.toString()}`);
+        const params = new URLSearchParams();
+        if (user) {
+          params.set("user", user);
+          params.set("time_period", timePeriod);
+          params.set("category", category);
+        } else if (cursor) {
+          params.set("cursor", cursor);
+        } else {
+          params.set("time_period", timePeriod);
+          params.set("category", category);
+          params.set("sort_by", sortBy);
+          if (limit != null) params.set("limit", String(limit));
+        }
+        data = await fetchJson(`${DATA_API_BASE}/v2/leaderboard?${params.toString()}`);
         break;
       }
       case "getOpenInterest": {

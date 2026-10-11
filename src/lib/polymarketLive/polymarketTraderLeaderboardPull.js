@@ -8,6 +8,7 @@ import {
   buildPolymarketTraderLeaderboardQueryValues,
   normalizePolymarketTraderLeaderboardComposeState,
   POLYMARKET_TRADER_LEADERBOARD_ENDPOINT_ID,
+  polymarketLeaderboardPage,
   projectPolymarketTraderLeaderboardEntry,
 } from "@/lib/polymarketLive/traderLeaderboardCompose";
 import { attachPolymarketLiveRequestMetadata } from "@/lib/polymarketLive/polymarketLiveRequestHistory";
@@ -36,8 +37,14 @@ export async function fetchPolymarketTraderLeaderboardRows(compose, opts = {}) {
     );
   }
 
-  const rows = (Array.isArray(data) ? data : []).map((entry) =>
-    projectPolymarketTraderLeaderboardEntry(entry, opts.selectedColumns || []),
+  const page = polymarketLeaderboardPage(data);
+  const rows = page.rows.map((entry) =>
+    projectPolymarketTraderLeaderboardEntry(entry, opts.selectedColumns || [], {
+      time_period: state.time_period,
+      category: state.category,
+      sort_by: state.sort_by,
+      user: state.user,
+    }),
   );
   return { rows, requestParams };
 }

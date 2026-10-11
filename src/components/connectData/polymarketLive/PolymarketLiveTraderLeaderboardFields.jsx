@@ -15,31 +15,14 @@ import { useMyStateV2 } from "@/context/stateContextV2";
 import {
   emptyPolymarketTraderLeaderboardComposeState,
   normalizePolymarketTraderLeaderboardComposeState,
-  POLYMARKET_TRADER_LEADERBOARD_CATEGORY_OPTIONS,
+  polymarketLeaderboardCategoryOptions,
   POLYMARKET_TRADER_LEADERBOARD_ORDER_OPTIONS,
   POLYMARKET_TRADER_LEADERBOARD_TIME_PERIOD_OPTIONS,
 } from "@/lib/polymarketLive/traderLeaderboardCompose";
 import { cn } from "@/lib/utils";
 
-const LABELS = {
-  OVERALL: "Overall",
-  POLITICS: "Politics",
-  SPORTS: "Sports",
-  ESPORTS: "Esports",
-  CRYPTO: "Crypto",
-  CULTURE: "Culture",
-  MENTIONS: "Mentions",
-  WEATHER: "Weather",
-  ECONOMICS: "Economics",
-  TECH: "Tech",
-  FINANCE: "Finance",
-  DAY: "Daily",
-  WEEK: "Weekly",
-  MONTH: "Monthly",
-  ALL: "All time",
-  PNL: "Profit and loss",
-  VOL: "Volume",
-};
+const PERIOD_LABELS = { day: "Day", week: "Week", month: "Month", all: "All" };
+const SORT_LABELS = { PNL: "PnL", VOLUME: "Volume" };
 
 export function PolymarketLiveTraderLeaderboardFields({ className, disabled = false }) {
   const ctx = useMyStateV2() ?? {};
@@ -79,23 +62,23 @@ export function PolymarketLiveTraderLeaderboardFields({ className, disabled = fa
         <SelectField
           label="Category"
           value={state.category}
-          options={POLYMARKET_TRADER_LEADERBOARD_CATEGORY_OPTIONS}
+          options={polymarketLeaderboardCategoryOptions()}
           disabled={disabled}
           onValueChange={(value) => patch({ category: value })}
         />
         <SelectField
           label="Time period"
-          value={state.timePeriod}
-          options={POLYMARKET_TRADER_LEADERBOARD_TIME_PERIOD_OPTIONS}
+          value={state.time_period}
+          options={POLYMARKET_TRADER_LEADERBOARD_TIME_PERIOD_OPTIONS.map((value) => [value, PERIOD_LABELS[value] || value])}
           disabled={disabled}
-          onValueChange={(value) => patch({ timePeriod: value })}
+          onValueChange={(value) => patch({ time_period: value })}
         />
         <SelectField
-          label="Rank by"
-          value={state.orderBy}
-          options={POLYMARKET_TRADER_LEADERBOARD_ORDER_OPTIONS}
+          label="Sort by"
+          value={state.sort_by}
+          options={POLYMARKET_TRADER_LEADERBOARD_ORDER_OPTIONS.map((value) => [value, SORT_LABELS[value] || value])}
           disabled={disabled}
-          onValueChange={(value) => patch({ orderBy: value })}
+          onValueChange={(value) => patch({ sort_by: value })}
         />
       </div>
 
@@ -105,24 +88,11 @@ export function PolymarketLiveTraderLeaderboardFields({ className, disabled = fa
           label="Limit"
           type="number"
           min={1}
-          max={50}
+          max={1000}
           value={state.limit}
           disabled={disabled}
           onChange={(value) => patch({ limit: value })}
         />
-        <InputField
-          id="polymarket-leaderboard-offset"
-          label="Offset"
-          type="number"
-          min={0}
-          max={1000}
-          value={state.offset}
-          disabled={disabled}
-          onChange={(value) => patch({ offset: value })}
-        />
-      </div>
-
-      <div className="grid gap-3 sm:grid-cols-2">
         <InputField
           id="polymarket-leaderboard-user"
           label="User wallet (optional)"
@@ -131,14 +101,6 @@ export function PolymarketLiveTraderLeaderboardFields({ className, disabled = fa
           value={state.user}
           disabled={disabled}
           onChange={(value) => patch({ user: value })}
-        />
-        <InputField
-          id="polymarket-leaderboard-username"
-          label="Username (optional)"
-          placeholder="Trader username"
-          value={state.userName}
-          disabled={disabled}
-          onChange={(value) => patch({ userName: value })}
         />
       </div>
     </div>
@@ -154,9 +116,9 @@ function SelectField({ label, value, options, disabled, onValueChange }) {
           <SelectValue />
         </SelectTrigger>
         <SelectContent>
-          {options.map((option) => (
+          {options.map(([option, optionLabel]) => (
             <SelectItem key={option} value={option} className="text-xs">
-              {LABELS[option] || option}
+              {optionLabel || option}
             </SelectItem>
           ))}
         </SelectContent>

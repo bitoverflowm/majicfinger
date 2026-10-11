@@ -267,10 +267,8 @@ async function enrichHolder(
   });
   const leaderboardParams = new URLSearchParams({
     query: "getTraderLeaderboard",
-    category: "OVERALL",
-    timePeriod: "ALL",
-    orderBy: "PNL",
-    limit: "1",
+    category: "overall",
+    time_period: "all",
     user: holder.proxyWallet,
     skipFlatten: "true",
   });
@@ -304,18 +302,19 @@ async function enrichHolder(
   }
 
   if (leaderboardResult.status === "fulfilled") {
-    const rows = Array.isArray(leaderboardResult.value) ? leaderboardResult.value : [];
-    const row = rows.find((item) => item && typeof item === "object") as
-      | Record<string, unknown>
-      | undefined;
-    if (row) {
-      enrichment.leaderboardRank =
-        row.rank != null && String(row.rank).trim() ? String(row.rank) : null;
+    const body = leaderboardResult.value;
+    const data = body && typeof body === "object" && !Array.isArray(body)
+      ? (body as { data?: unknown }).data
+      : body;
+    const row = (Array.isArray(data) ? data[0] : data) as Record<string, unknown> | undefined;
+    if (row && typeof row === "object") {
+      const rank = row.rank ?? row.rank_pnl;
+      enrichment.leaderboardRank = rank != null && String(rank).trim() ? String(rank) : null;
       const pnl = Number(row.pnl);
-      const vol = Number(row.vol);
+      const vol = Number(row.volume ?? row.vol);
       enrichment.leaderboardPnl = Number.isFinite(pnl) ? pnl : null;
       enrichment.leaderboardVol = Number.isFinite(vol) ? vol : null;
-      const image = String(row.profileImage || "").trim();
+      const image = String(row.profile_image || row.profileImage || "").trim();
       if (image) enrichment.profileImage = image;
     }
   }

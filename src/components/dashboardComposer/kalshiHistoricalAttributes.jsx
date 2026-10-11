@@ -74,6 +74,7 @@ export function kalshiHistoricalAttributeSpec(column) {
   if (column?.control === "query-range") return { kind: "query-range" };
   if (column?.control === "query-instant") return { kind: "query-instant" };
   if (column?.control === "query-number") return { kind: "query-number" };
+  if (column?.control === "query-text") return { kind: "query-text" };
   if (column?.control === "period") return { kind: "period", options: column.enumOptions || [] };
   if (column?.control === "depth") return { kind: "depth" };
   if (column?.control === "updated-after") return { kind: "updated-after" };
@@ -130,7 +131,9 @@ function isActive(spec, filter) {
   if (spec.kind === "updated-after") return Number(filter.minUpdatedTs) > 0;
   if (spec.kind === "query-range" || spec.kind === "date") return Boolean(filter.from) || Boolean(filter.to);
   if (spec.kind === "query-instant") return Boolean(String(filter.value || "").trim());
-  if (spec.kind === "period" || spec.kind === "depth" || spec.kind === "query-number") return String(filter.value ?? "").trim() !== "";
+  if (spec.kind === "period" || spec.kind === "depth" || spec.kind === "query-number" || spec.kind === "query-text") {
+    return String(filter.value ?? "").trim() !== "";
+  }
   if (spec.kind === "tag-picker") return Array.isArray(filter.selectedTags) && filter.selectedTags.length > 0;
   return textTerms(filter.containsTags, filter.contains).length > 0 || textTerms(filter.excludesTags, filter.excludes).length > 0;
 }
@@ -219,7 +222,7 @@ export function attributeSummary(column, filters) {
   } else if (spec.kind === "period") {
     const label = spec.options.find((option) => option[0] === String(filter.value))?.[1] || filter.value;
     if (label) parts.push(String(label));
-  } else if (spec.kind === "depth" || spec.kind === "query-number") {
+  } else if (spec.kind === "depth" || spec.kind === "query-number" || spec.kind === "query-text") {
     if (String(filter.value ?? "").trim() !== "") parts.push(String(filter.value));
   } else if (spec.kind === "tag-picker") {
     const labels = (Array.isArray(filter.selectedTags) ? filter.selectedTags : [])
@@ -936,6 +939,18 @@ function AttributeFields({ column, filters, onChange }) {
         inputMode="numeric"
         placeholder="Depth"
         onChange={(event) => onChange(patchFilter(filters, column, { value: event.target.value.replace(/[^\d]/g, "") }))}
+        className="h-9"
+      />
+    );
+  }
+  if (spec.kind === "query-text") {
+    const label = column.ariaLabel || column.title || "Value";
+    return (
+      <Input
+        aria-label={label}
+        value={filter.value ?? ""}
+        placeholder={column.placeholder || ""}
+        onChange={(event) => onChange(patchFilter(filters, column, { value: event.target.value }))}
         className="h-9"
       />
     );

@@ -277,17 +277,16 @@ import { integrationLabelFromLake } from "@/lib/connectHomeRequestQuery.js";
     endpointId: "getTraderLeaderboard",
     mode: "search",
     requestParams: {
-      category: "SPORTS",
-      timePeriod: "WEEK",
-      orderBy: "VOL",
+      category: "sports",
+      time_period: "week",
+      sort_by: "VOLUME",
       limit: "25",
-      offset: "0",
     },
-    selectedColumns: ["rank", "proxyWallet", "vol"],
+    selectedColumns: ["rank", "user_id", "volume"],
   });
   assert.equal(meta.categoryLabel, "Leaderboard");
   assert.equal(meta.endpointTitle, "Trader Leaderboard Rankings");
-  assert.ok(meta.queryParams.some((p) => p.key === "category" && p.value === "SPORTS"));
-  assert.ok(meta.queryParams.some((p) => p.key === "orderBy" && p.value === "VOL"));
+  assert.ok(meta.queryParams.some((p) => p.key === "category" && p.value === "sports"));
+  assert.ok(meta.queryParams.some((p) => p.key === "sort_by" && p.value === "VOLUME"));
   console.log("ok polymarket live trader leaderboard query meta");
 }

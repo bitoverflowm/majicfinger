@@ -57,6 +57,14 @@ assert.ok(ids.includes("getTraderLeaderboard"));
 assert.equal(endpoints.find((endpoint) => endpoint.id === "getOrderbooks")?.category, "markets");
 assert.equal(endpoints.find((endpoint) => endpoint.id === "getMarketsByEvents")?.category, "events");
 assert.equal(endpoints.find((endpoint) => endpoint.id === "getTraderLeaderboard")?.category, "holders");
+const leaderboardColumns = polymarketLiveBuildColumns("getTraderLeaderboard");
+assert.deepEqual(
+  leaderboardColumns.map((column) => column.id),
+  ["time_period", "category", "sort_by", "user", "rank", "user_id", "user_name", "pnl", "volume", "verified", "profile_image", "x_username"],
+);
+assert.equal(leaderboardColumns.find((column) => column.id === "pnl")?.type, "number");
+assert.equal(leaderboardColumns.find((column) => column.id === "verified")?.type, "boolean");
+assert.equal(leaderboardColumns.find((column) => column.id === "rank")?.defaultOn, true);
 assert.equal(endpoints.find((endpoint) => endpoint.id === "getOrderbooks")?.realtime, true);
 assert.equal(endpoints.find((endpoint) => endpoint.id === "getEvents")?.realtime, false);
 assert.ok(polymarketLiveRealtimeEndpointIds().includes("getBatchPricesHistory"));
