@@ -60,7 +60,7 @@ assert.equal(endpoints.find((endpoint) => endpoint.id === "getTraderLeaderboard"
 const leaderboardColumns = polymarketLiveBuildColumns("getTraderLeaderboard");
 assert.deepEqual(
   leaderboardColumns.map((column) => column.id),
-  ["time_period", "category", "sort_by", "user", "rank", "user_id", "user_name", "pnl", "volume", "verified", "profile_image", "x_username"],
+  ["rank", "user_id", "user_name", "pnl", "volume", "verified", "profile_image", "x_username", "user", "time_period", "category", "sort_by"],
 );
 assert.equal(leaderboardColumns.find((column) => column.id === "pnl")?.type, "number");
 assert.equal(leaderboardColumns.find((column) => column.id === "verified")?.type, "boolean");

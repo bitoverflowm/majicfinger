@@ -47,10 +47,6 @@ export const POLYMARKET_TRADER_LEADERBOARD_TIME_PERIOD_OPTIONS = PERIODS.map(([v
 export const POLYMARKET_TRADER_LEADERBOARD_ORDER_OPTIONS = SORTS.map(([value]) => value);
 
 export const POLYMARKET_TRADER_LEADERBOARD_COLUMNS = [
-  { name: "time_period", type: "string", description: "Window this row was ranked in: day, week, month, or all." },
-  { name: "category", type: "string", description: "Category this row was ranked in." },
-  { name: "sort_by", type: "string", description: "Board this row was ranked on: PNL or VOLUME." },
-  { name: "user", type: "string", description: "Wallet looked up, when the pull asked for one standing instead of the board." },
   { name: "rank", type: "number", description: "Rank on the requested board. Ties share a rank and the next rank skips. A wallet lookup uses that board's rank; 0 means unranked." },
   { name: "user_id", type: "string", description: "The ranked wallet." },
   { name: "user_name", type: "string", description: "Profile display name of the wallet." },
@@ -59,6 +55,10 @@ export const POLYMARKET_TRADER_LEADERBOARD_COLUMNS = [
   { name: "verified", type: "boolean", description: "Profile verification badge." },
   { name: "profile_image", type: "string", description: "Profile image URL." },
   { name: "x_username", type: "string", description: "Linked X handle, when one exists." },
+  { name: "user", type: "string", description: "Wallet looked up, when the pull asked for one standing instead of the board." },
+  { name: "time_period", type: "string", description: "Window this row was ranked in: day, week, month, or all." },
+  { name: "category", type: "string", description: "Category this row was ranked in." },
+  { name: "sort_by", type: "string", description: "Board this row was ranked on: PNL or VOLUME." },
 ];
 
 export const POLYMARKET_TRADER_LEADERBOARD_DEFAULT_COLUMNS = [
