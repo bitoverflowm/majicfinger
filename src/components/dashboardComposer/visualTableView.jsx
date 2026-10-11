@@ -1,10 +1,10 @@
 "use client";
 
-import { useState } from "react";
-import { Check, EyeOff, MoreVertical } from "lucide-react";
+import { Check, MoreVertical } from "lucide-react";
 
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { DestructiveConfirmMenuItem } from "@/components/ui/destructive-confirm-menu-item";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { sheetRecords } from "@/lib/visualizations/datasetDescriptor";
 import {
   buildVisualTable,
@@ -23,36 +23,6 @@ function Meter({ share, tone }) {
         style={{ width: `${Math.max(0, Math.min(1, share)) * 100}%`, background: tone }}
       />
     </span>
-  );
-}
-
-function HideColumnItem({ onConfirm }) {
-  const [confirming, setConfirming] = useState(false);
-  if (confirming) {
-    return (
-      <DropdownMenuItem
-        className="gap-2.5 rounded-md bg-muted px-2 py-2 text-[13px] focus:bg-muted"
-        onSelect={(event) => {
-          event.preventDefault();
-          onConfirm?.();
-        }}
-      >
-        <Check className="size-4 shrink-0" aria-hidden />
-        Confirm
-      </DropdownMenuItem>
-    );
-  }
-  return (
-    <DropdownMenuItem
-      className="gap-2.5 rounded-md px-2 py-2 text-[13px]"
-      onSelect={(event) => {
-        event.preventDefault();
-        setConfirming(true);
-      }}
-    >
-      <EyeOff className="size-4 shrink-0" aria-hidden />
-      Hide column
-    </DropdownMenuItem>
   );
 }
 
@@ -75,7 +45,7 @@ function ColumnHead({ column, align, readOnly, onHide }) {
               </button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="z-[560] w-40 rounded-xl p-1 shadow-lg" onPointerDown={(event) => event.stopPropagation()}>
-              <HideColumnItem onConfirm={() => onHide?.(column.id)} />
+              <DestructiveConfirmMenuItem deleteLabel="Hide column" onConfirm={() => onHide?.(column.id)} />
             </DropdownMenuContent>
           </DropdownMenu>
         )}

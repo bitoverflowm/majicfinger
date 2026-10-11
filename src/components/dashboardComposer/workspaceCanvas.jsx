@@ -1304,6 +1304,7 @@ function CanvasBlock({ block, selected, spotlight = false, onSelect, onChange, b
   const rootRef = useRef(null);
   const [menuOpen, setMenuOpen] = useState(false);
   const [fullscreen, setFullscreen] = useState(false);
+  const [resizing, setResizing] = useState(false);
 
   useEffect(() => {
     if (canvas?.renameId !== block.id) return;
@@ -1346,6 +1347,7 @@ function CanvasBlock({ block, selected, spotlight = false, onSelect, onChange, b
     if (e.button !== 0) return;
     e.preventDefault();
     e.stopPropagation();
+    setResizing(true);
     e.currentTarget.setPointerCapture(e.pointerId);
     dragRef.current = {
       mode: "resize",
@@ -1389,6 +1391,7 @@ function CanvasBlock({ block, selected, spotlight = false, onSelect, onChange, b
   const onPointerUp = () => {
     const drag = dragRef.current;
     dragRef.current = null;
+    setResizing(false);
     if (!drag?.moved) return;
     const others = canvas?.blocks || [];
     if (drag.mode === "move") {
@@ -1418,7 +1421,13 @@ function CanvasBlock({ block, selected, spotlight = false, onSelect, onChange, b
             ? "border-[#0d99ff] ring-2 ring-[#0d99ff]/25"
             : !readOnly && "border-border/70 hover:border-[#0d99ff]",
       )}
-      style={{ left: block.x, top: block.y, width: block.w, height: block.h }}
+      style={{
+        left: block.x,
+        top: block.y,
+        width: block.w,
+        height: block.h,
+        transition: resizing ? "none" : "width 480ms cubic-bezier(0.22, 1, 0.36, 1), height 480ms cubic-bezier(0.22, 1, 0.36, 1)",
+      }}
     >
       {readOnly ? null : <RealtimeToggle block={block} />}
       {readOnly ? null : (
