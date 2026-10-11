@@ -59,6 +59,49 @@ assert.equal(endpoints.find((endpoint) => endpoint.id === "getMarketsByEvents")?
 assert.equal(endpoints.find((endpoint) => endpoint.id === "getTraderLeaderboard")?.category, "holders");
 assert.ok(ids.includes("getBiggestWinners"));
 assert.equal(endpoints.find((endpoint) => endpoint.id === "getBiggestWinners")?.category, "holders");
+assert.deepEqual(
+  Object.fromEntries(endpoints.filter((endpoint) => endpoint.category === "holders").map((endpoint) => [endpoint.id, endpoint.api])),
+  {
+    getHoldersByMarkets: "v2",
+    getTraderLeaderboard: "v2",
+    getBiggestWinners: "v2",
+    getCurrentPositions: "v1",
+    getClosedPositions: "v1",
+    getUserActivity: "v1",
+    getHolderPositionValue: "v1",
+    getHolderTrades: "v1",
+    getHolderTradedMarkets: "v1",
+    getPublicProfiles: "gamma",
+    getTraderByAddress: "v2",
+    getTraderPositions: "v2",
+  },
+);
+assert.equal(endpoints.find((endpoint) => endpoint.id === "getTraderPositions")?.title, "Get trader's positions");
+assert.equal(polymarketLiveBuildRequirement("getTraderPositions")?.prompt, "Wallet address required");
+assert.equal(polymarketMarketFanout("getTraderPositions"), true);
+const positionColumns = polymarketLiveBuildColumns("getTraderPositions");
+assert.equal(positionColumns.some((column) => column.id === "sort_by"), false);
+assert.equal(positionColumns.find((column) => column.id === "last_event_at")?.dateEpoch, "unix");
+assert.equal(positionColumns.find((column) => column.id === "title")?.defaultOn, true);
+assert.equal(positionColumns.find((column) => column.id === "user")?.defaultOn, false);
+assert.equal(endpoints.find((endpoint) => endpoint.id === "getTraderByAddress")?.title, "Get trader's profile and stats");
+assert.equal(
+  endpoints.find((endpoint) => endpoint.id === "getTraderByAddress")?.description,
+  "Name, markets traded, biggest win, profile views, all-time PnL, and volume.",
+);
+assert.equal(polymarketLiveBuildSearch("getTraderByAddress")?.acceptAddress, true);
+assert.deepEqual(polymarketLiveBuildSearch("getTraderByAddress")?.entities, ["profile"]);
+assert.equal(polymarketLiveBuildSearch("getPublicProfiles")?.acceptAddress, undefined);
+const traderColumns = polymarketLiveBuildColumns("getTraderByAddress");
+assert.equal(traderColumns[0]?.id, "address");
+assert.equal(traderColumns.find((column) => column.id === "createdAt")?.dateEpoch, "iso");
+assert.equal(traderColumns.find((column) => column.id === "join_date")?.dateEpoch, "unix");
+assert.equal(traderColumns.find((column) => column.id === "timestamp")?.dateEpoch, "unix");
+assert.equal(traderColumns.find((column) => column.id === "trades")?.exact, true);
+assert.equal(traderColumns.find((column) => column.id === "name")?.defaultOn, true);
+assert.equal(traderColumns.find((column) => column.id === "fees")?.defaultOn, false);
+assert.ok(traderColumns.some((column) => column.id === "yield_income"));
+assert.ok(traderColumns.some((column) => column.id === "users_creator"));
 assert.equal(endpoints.find((endpoint) => endpoint.id === "getBiggestWinners")?.title, "Biggest Wins");
 const biggestWinnerColumns = polymarketLiveBuildColumns("getBiggestWinners");
 assert.deepEqual(

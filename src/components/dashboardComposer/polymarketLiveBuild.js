@@ -44,6 +44,25 @@ import {
   polymarketLeaderboardTarget,
   POLYMARKET_TRADER_LEADERBOARD_COLUMNS,
 } from "@/lib/polymarketLive/traderLeaderboardCompose";
+import {
+  mergeTraderByAddress,
+  traderAddressesFromPicks,
+  TRADER_BY_ADDRESS_COLUMNS,
+  TRADER_BY_ADDRESS_DEFAULT_COLUMNS,
+  TRADER_BY_ADDRESS_ENDPOINT_ID,
+} from "@/lib/polymarketLive/traderByAddressCompose";
+import {
+  mergePolymarketPositionCohorts,
+  polymarketPositionPage,
+  polymarketPositionPageParams,
+  polymarketPositionQuery,
+  polymarketPositionTarget,
+  polymarketPositionWalks,
+  positionSheetRow,
+  TRADER_POSITIONS_COLUMNS,
+  TRADER_POSITIONS_DEFAULT_COLUMNS,
+  TRADER_POSITIONS_ENDPOINT_ID,
+} from "@/lib/polymarketLive/traderPositionsCompose";
 
 export const POLYMARKET_LIVE_BUILD_CATEGORIES = [
   { id: "markets", label: "Markets" },
@@ -78,6 +97,22 @@ const BUILD_GROUP = {
   getHolderTradedMarkets: "holders",
   getTraderLeaderboard: "holders",
   getBiggestWinners: "holders",
+};
+
+/** Data API path the Traders menu actually calls. Gamma is a separate host. */
+const API_VERSION = {
+  getHoldersByMarkets: "v2",
+  getTraderLeaderboard: "v2",
+  getBiggestWinners: "v2",
+  getCurrentPositions: "v1",
+  getClosedPositions: "v1",
+  getUserActivity: "v1",
+  getHolderPositionValue: "v1",
+  getHolderTrades: "v1",
+  getHolderTradedMarkets: "v1",
+  getPublicProfiles: "gamma",
+  [TRADER_BY_ADDRESS_ENDPOINT_ID]: "v2",
+  [TRADER_POSITIONS_ENDPOINT_ID]: "v2",
 };
 
 /**
@@ -118,6 +153,8 @@ const REQUIREMENTS = {
   getHolderPositionValue: { kind: "address", prompt: "Wallet address required" },
   getHolderTrades: { kind: "address", prompt: "Wallet address required" },
   getHolderTradedMarkets: { kind: "address", prompt: "Wallet address required" },
+  [TRADER_BY_ADDRESS_ENDPOINT_ID]: { kind: "address", prompt: "Wallet address required" },
+  [TRADER_POSITIONS_ENDPOINT_ID]: { kind: "address", prompt: "Wallet address required" },
 };
 
 const PREFERRED_COLUMNS = [
@@ -207,6 +244,14 @@ const BUILD_COPY = {
     title: "Biggest Wins",
     description: "The biggest winning positions, including combo wins. A combo row keeps its joined title and has no event link.",
   },
+  [TRADER_BY_ADDRESS_ENDPOINT_ID]: {
+    title: "Get trader's profile and stats",
+    description: "Name, markets traded, biggest win, profile views, all-time PnL, and volume.",
+  },
+  [TRADER_POSITIONS_ENDPOINT_ID]: {
+    title: "Get trader's positions",
+    description: "A trader's open, redeemable, and closed positions, with size, price, and PnL.",
+  },
 };
 
 const ADDRESS_QUERIES = {
@@ -231,6 +276,7 @@ export function polymarketLiveBuildEndpoints() {
       ...(BUILD_COPY[endpoint.id] || {}),
       category: BUILD_GROUP[endpoint.id],
       realtime: REALTIME_ENDPOINTS.has(endpoint.id),
+      ...(API_VERSION[endpoint.id] ? { api: API_VERSION[endpoint.id] } : {}),
     }))
     .sort((a, b) => {
       const group = groupOrder[a.category] - groupOrder[b.category];
@@ -263,6 +309,26 @@ export function polymarketLiveBuildEndpoints() {
       realtime: false,
     });
   }
+  if (!endpoints.some((endpoint) => endpoint.id === TRADER_BY_ADDRESS_ENDPOINT_ID)) {
+    const afterWins = endpoints.findIndex((endpoint) => endpoint.id === "getBiggestWinners");
+    endpoints.splice(afterWins >= 0 ? afterWins + 1 : endpoints.length, 0, {
+      id: TRADER_BY_ADDRESS_ENDPOINT_ID,
+      ...(BUILD_COPY[TRADER_BY_ADDRESS_ENDPOINT_ID] || {}),
+      category: "holders",
+      realtime: false,
+      api: "v2",
+    });
+  }
+  if (!endpoints.some((endpoint) => endpoint.id === TRADER_POSITIONS_ENDPOINT_ID)) {
+    const afterProfile = endpoints.findIndex((endpoint) => endpoint.id === TRADER_BY_ADDRESS_ENDPOINT_ID);
+    endpoints.splice(afterProfile >= 0 ? afterProfile + 1 : endpoints.length, 0, {
+      id: TRADER_POSITIONS_ENDPOINT_ID,
+      ...(BUILD_COPY[TRADER_POSITIONS_ENDPOINT_ID] || {}),
+      category: "holders",
+      realtime: false,
+      api: "v2",
+    });
+  }
   return endpoints;
 }
 
@@ -284,7 +350,13 @@ export function polymarketLiveBuildSearch(tableId) {
     return { entities: ["event"], placeholder: "Search for an event", prompt: requirement.prompt };
   }
   if (requirement?.kind === "address") {
-    return { entities: ["profile"], placeholder: "Search for a trader", prompt: requirement.prompt };
+    const byAddress = tableId === TRADER_BY_ADDRESS_ENDPOINT_ID;
+    return {
+      entities: ["profile"],
+      placeholder: byAddress ? "Search a username or paste an address" : "Search for a trader",
+      prompt: requirement.prompt,
+      ...(byAddress ? { acceptAddress: true } : {}),
+    };
   }
   if (requirement?.kind === "token") {
     return { entities: ["market"], placeholder: "Search for a market", prompt: requirement.prompt };
@@ -331,7 +403,7 @@ export const POLYMARKET_CLOSED_ORDERBOOK_MESSAGE =
 
 /** Price, trade, and other market pulls. Each selected market is its own sheet. */
 export function polymarketMarketFanout(tableId) {
-  return isPolymarketQuoteTable(tableId) || tableId === "getHoldersByMarkets";
+  return isPolymarketQuoteTable(tableId) || tableId === "getHoldersByMarkets" || tableId === TRADER_POSITIONS_ENDPOINT_ID;
 }
 
 /** Downstream market sources a pull can join. Order matches the Markets menu. */
@@ -414,6 +486,13 @@ export function polymarketJoinPickFromRow(row) {
 
 export function polymarketPickMatchesRow(pick, row) {
   if (!pick || !row || typeof row !== "object") return false;
+  if (pick.kind === "profile") {
+    const wallet = String(pick.address || "").trim().toLowerCase();
+    if (!wallet) return false;
+    const held = String(row.proxy_wallet || "").trim().toLowerCase();
+    const asked = String(row.user || "").trim().toLowerCase();
+    return wallet === held || wallet === asked;
+  }
   const title = String(row.market_title || "").trim();
   const id = String(row.market_id || "").trim();
   const slug = String(row.market_slug || "").trim();
@@ -561,6 +640,36 @@ export function polymarketLiveBuildColumns(endpointId) {
         column.type = "date";
         column.dateEpoch = "unix";
       }
+      return column;
+    });
+  }
+  if (endpointId === TRADER_POSITIONS_ENDPOINT_ID) {
+    const defaults = new Set(TRADER_POSITIONS_DEFAULT_COLUMNS);
+    return TRADER_POSITIONS_COLUMNS.map((entry) => {
+      const column = {
+        id: entry.name,
+        title: entry.title || titleFor(entry.name),
+        type: columnType(entry.type),
+        description: entry.description || "",
+        defaultOn: defaults.has(entry.name),
+      };
+      if (entry.dateEpoch) column.dateEpoch = entry.dateEpoch;
+      if (entry.exact) column.exact = true;
+      return column;
+    });
+  }
+  if (endpointId === TRADER_BY_ADDRESS_ENDPOINT_ID) {
+    const defaults = new Set(TRADER_BY_ADDRESS_DEFAULT_COLUMNS);
+    return TRADER_BY_ADDRESS_COLUMNS.map((entry) => {
+      const column = {
+        id: entry.name,
+        title: entry.title || titleFor(entry.name),
+        type: columnType(entry.type),
+        description: entry.description || "",
+        defaultOn: defaults.has(entry.name),
+      };
+      if (entry.dateEpoch) column.dateEpoch = entry.dateEpoch;
+      if (entry.exact) column.exact = true;
       return column;
     });
   }
@@ -1356,6 +1465,96 @@ async function discoveryRows(endpointId, options = {}) {
   return [];
 }
 
+function missingTraderRecord(error) {
+  const message = String(error instanceof Error ? error.message : error || "");
+  return /not found|404|unknown user|no profile/i.test(message);
+}
+
+async function readPublicProfile(address) {
+  try {
+    const data = await polymarketGet("getPublicProfile", { address });
+    const row = Array.isArray(data) ? data[0] : data;
+    return row && typeof row === "object" ? row : null;
+  } catch (error) {
+    if (missingTraderRecord(error)) return null;
+    throw error;
+  }
+}
+
+async function readUserStats(address) {
+  try {
+    const data = await polymarketGet("getUserStats", { user: address });
+    const row = Array.isArray(data) ? data[0] : data;
+    if (!row || typeof row !== "object") return null;
+    if ("data" in row) return row.data && typeof row.data === "object" ? row.data : null;
+    return row;
+  } catch (error) {
+    if (missingTraderRecord(error)) return null;
+    throw error;
+  }
+}
+
+/** One sheet's worth of positions per wallet. Statuses and market batches are separate calls, then merged. */
+async function traderPositionRows(picks, options = {}) {
+  const addresses = traderAddressesFromPicks(picks);
+  if (!addresses.length) throw new Error("Search for a trader wallet.");
+  const query = polymarketPositionQuery(options.filters || {}, options.sorts || []);
+  const walks = polymarketPositionWalks(query);
+  const target = polymarketPositionTarget(options);
+  const rows = [];
+  for (const address of addresses) {
+    const cohorts = [];
+    for (const walk of walks) {
+      const cohort = [];
+      let cursor = "";
+      let got = 0;
+      for (let page = 0; got < target && page < 500; page += 1) {
+        const params = polymarketPositionPageParams(address, walk, cursor, Math.min(1000, target - got));
+        const next = polymarketPositionPage(await polymarketGet("getTraderPositions", params));
+        for (const raw of next.rows) {
+          cohort.push(positionSheetRow(raw, address));
+          got += 1;
+          if (got >= target) break;
+        }
+        if (!next.rows.length || !next.cursor || next.cursor === cursor) break;
+        cursor = next.cursor;
+      }
+      cohorts.push(cohort);
+    }
+    rows.push(...mergePolymarketPositionCohorts(cohorts, target));
+  }
+  return rows;
+}
+
+/** One merged row per submitted wallet. Profile and stats share that row. */
+async function traderByAddressRows(picks) {
+  const addresses = traderAddressesFromPicks(picks);
+  if (!addresses.length) throw new Error("Search for a trader wallet.");
+  const rows = [];
+  let firstError = null;
+  for (const address of addresses) {
+    const [profileResult, statsResult] = await Promise.allSettled([
+      readPublicProfile(address),
+      readUserStats(address),
+    ]);
+    const profileFailed = profileResult.status === "rejected";
+    const statsFailed = statsResult.status === "rejected";
+    if (profileFailed && statsFailed) {
+      firstError = firstError || profileResult.reason;
+      continue;
+    }
+    rows.push(mergeTraderByAddress(
+      address,
+      profileFailed ? null : profileResult.value,
+      statsFailed ? null : statsResult.value,
+    ));
+  }
+  if (!rows.length && firstError) {
+    throw firstError instanceof Error ? firstError : new Error("Pull failed");
+  }
+  return rows;
+}
+
 async function directedRows(endpointId, picks, options = {}) {
   const pick = picks[0];
   if (!pick) return discoveryRows(endpointId, options);
@@ -1387,6 +1586,8 @@ async function directedRows(endpointId, picks, options = {}) {
     return leaderboardRows(filters, options);
   }
   if (endpointId === "getBiggestWinners") return biggestWinnersRows(options.filters || {}, options);
+  if (endpointId === TRADER_POSITIONS_ENDPOINT_ID) return traderPositionRows(picks, options);
+  if (endpointId === TRADER_BY_ADDRESS_ENDPOINT_ID) return traderByAddressRows(picks);
   if (ADDRESS_QUERIES[endpointId]) {
     if (!/^0x[a-fA-F0-9]{40}$/.test(pick.address || "")) throw new Error("Search for a trader wallet.");
     const data = await polymarketGet(ADDRESS_QUERIES[endpointId], {

@@ -21,6 +21,7 @@ export const DATASET_TYPES = [
   "biggest_wins",
   "positions_open",
   "positions_closed",
+  "trader_positions",
   "holder_trades",
 ];
 
@@ -336,6 +337,20 @@ const ENDPOINTS = {
       resolved: "resolved_at",
     },
     required: ["pnl"],
+  }),
+  "polymarket:getTraderPositions": spec({
+    datasetType: "trader_positions",
+    category: "portfolio",
+    shape: "ranking",
+    seriesKeys: ["condition_id", "outcome"],
+    units: { metric: "usdc" },
+    fields: {
+      label: "title",
+      outcome: "outcome",
+      value: "current_value",
+      pnl: "unrealized_pnl",
+    },
+    required: ["current_value", "unrealized_pnl"],
   }),
   "polymarket:getCurrentPositions": spec({
     datasetType: "positions_open",

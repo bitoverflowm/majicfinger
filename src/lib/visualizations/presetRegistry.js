@@ -27,6 +27,7 @@ const PRESETS = {
   biggest_wins: { view: "bars", label: "Wins", limit: 10, noun: "wins" },
   positions_open: { view: "bars", label: "Position value", limit: 10, noun: "positions" },
   positions_closed: { view: "diverging", label: "Realized PnL", limit: 10, noun: "positions" },
+  trader_positions: { view: "treemap", label: "Portfolio", noun: "positions" },
   holder_trades: { view: "activity", label: "Buy / sell", curve: "linear" },
 };
 
@@ -45,6 +46,7 @@ const FIELD_NEEDS = {
   overview: ["label"],
   bars: ["value", "label"],
   diverging: ["value"],
+  treemap: ["value", "label"],
   activity: ["side", "price", "size"],
   scatter: ["price", "time"],
   table: [],
@@ -88,6 +90,7 @@ function fallbackFor(view, dataset, columnIds) {
     overview: ["table"],
     bars: ["table"],
     diverging: ["table"],
+    treemap: ["bars", "table"],
     activity: ["scatter", "table"],
     scatter: ["table"],
     "visual-table": ["bars", "table"],
@@ -158,6 +161,7 @@ const SAVED_VIEWS = new Set([
   "metric",
   "bars",
   "diverging",
+  "treemap",
   "quote",
   "quote-table",
   "spec",

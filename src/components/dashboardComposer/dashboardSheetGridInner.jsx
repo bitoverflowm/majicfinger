@@ -1,10 +1,11 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { DataEditor, GridCellKind } from "@glideapps/glide-data-grid";
+import { CompactSelection, DataEditor, GridCellKind } from "@glideapps/glide-data-grid";
 import "@glideapps/glide-data-grid/dist/index.css";
 import { useHtmlDarkClass } from "@/hooks/use-html-dark-class";
 import { useReadyTradeSheet, usesHistoricalTradeSheet } from "@/components/dashboardComposer/fullTradeSheet";
+import { useWorkspaceCanvas } from "@/components/dashboardComposer/workspaceCanvas";
 
 const ROW_COUNT = 24;
 
@@ -106,9 +107,19 @@ function themeFor(dark, fontFamily) {
   };
 }
 
+function emptySelection() {
+  return {
+    columns: CompactSelection.empty(),
+    rows: CompactSelection.empty(),
+  };
+}
+
 export default function DashboardSheetGridInner({ block, onChange, readOnly = false }) {
+  const canvas = useWorkspaceCanvas();
   const dark = useHtmlDarkClass();
   const frameRef = useRef(null);
+  const editorRef = useRef(null);
+  const [gridSelection, setGridSelection] = useState(emptySelection);
   const [size, setSize] = useState({ width: 0, height: 0 });
   const [fontFamily, setFontFamily] = useState("ui-sans-serif, system-ui, sans-serif");
   const columns = useMemo(() => columnsOf(block), [block?.columns]);
@@ -170,6 +181,24 @@ export default function DashboardSheetGridInner({ block, onChange, readOnly = fa
     [cells, fullSheet, onChange],
   );
 
+  useEffect(() => {
+    const focus = canvas?.sheetRowFocus;
+    if (!focus || focus.sheetId !== block?.id || !Number.isFinite(focus.row)) return;
+    if (size.width <= 0) return;
+    const row = focus.row;
+    const width = Math.max(1, columns.length);
+    setGridSelection({
+      current: {
+        cell: [0, row],
+        range: { x: 0, y: row, width, height: 1 },
+        rangeStack: [],
+      },
+      columns: CompactSelection.empty(),
+      rows: CompactSelection.fromSingleSelection(row),
+    });
+    editorRef.current?.scrollTo(0, row, "both", 0, 0, { vAlign: "center" });
+  }, [block?.id, canvas?.sheetRowFocus, columns.length, size.width]);
+
   const onColumnResize = useCallback(
     (_column, newSize, colIndex) => {
       onChange?.({
@@ -185,8 +214,11 @@ export default function DashboardSheetGridInner({ block, onChange, readOnly = fa
     <div ref={frameRef} data-sheet-grid="" className="min-h-0 flex-1 overflow-hidden">
       {size.width > 0 && size.height > 0 ? (
         <DataEditor
+          ref={editorRef}
           width={size.width}
           height={size.height}
+          gridSelection={gridSelection}
+          onGridSelectionChange={setGridSelection}
           initialSize={[size.width, size.height]}
           columns={columns}
           rows={rows}

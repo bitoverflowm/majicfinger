@@ -181,6 +181,7 @@ export function WorkspaceCanvasProvider({ pageId, readOnly = false, children }) 
   const [previewTabs, setPreviewTabs] = useState([]);
   const [previewActiveId, setPreviewActiveId] = useState("");
   const [selectedId, setSelectedId] = useState(null);
+  const [sheetRowFocus, setSheetRowFocus] = useState(null);
   const [renameId, setRenameId] = useState(null);
   const [runFeed, setRunFeed] = useState(null);
   const [replayReady, setReplayReady] = useState(false);
@@ -741,6 +742,14 @@ export function WorkspaceCanvasProvider({ pageId, readOnly = false, children }) 
     setRevealNonce((nonce) => nonce + 1);
   }, [requestTab]);
 
+  const focusSheetRow = useCallback((sheetId, row) => {
+    const id = String(sheetId || "");
+    const index = Number(row);
+    if (!id || !Number.isFinite(index)) return;
+    setSheetRowFocus({ sheetId: id, row: index, nonce: Date.now() });
+    revealBlock(id);
+  }, [revealBlock]);
+
   useEffect(() => {
     const id = pendingRevealRef.current;
     if (!id) return undefined;
@@ -822,6 +831,8 @@ export function WorkspaceCanvasProvider({ pageId, readOnly = false, children }) 
       setSelectedId,
       focusBlock,
       revealBlock,
+      focusSheetRow,
+      sheetRowFocus,
       spotlightId,
       revealNonce,
       realtimeById,
@@ -850,7 +861,7 @@ export function WorkspaceCanvasProvider({ pageId, readOnly = false, children }) 
       removeBlock,
       createChartFromBlock,
     }),
-    [addBlock, armReplay, blocks, blocksByPage, createChartFromBlock, dashboardName, dismissRun, duplicateBlock, focusBlock, handDown, leavePrompt, pageId, placeIntegrationSheets, previewActiveId, previewTabs, readOnly, ready, realtimeById, realtimeModeByPage, registerTables, removeBlock, renameDashboard, renameId, replayReady, replayRun, replayTab, reportRun, requestTab, resolveLeave, revealBlock, revealNonce, runFeed, saveNow, selectedId, spotlightId, startRealtimeMode, startSheetRealtime, stopRealtimeMode, stopSheetRealtime, tables, tool, updateBlock],
+    [addBlock, armReplay, blocks, blocksByPage, createChartFromBlock, dashboardName, dismissRun, duplicateBlock, focusBlock, focusSheetRow, handDown, leavePrompt, pageId, placeIntegrationSheets, previewActiveId, previewTabs, readOnly, ready, realtimeById, realtimeModeByPage, registerTables, removeBlock, renameDashboard, renameId, replayReady, replayRun, replayTab, reportRun, requestTab, resolveLeave, revealBlock, revealNonce, runFeed, saveNow, selectedId, sheetRowFocus, spotlightId, startRealtimeMode, startSheetRealtime, stopRealtimeMode, stopSheetRealtime, tables, tool, updateBlock],
   );
 
   return (
@@ -1236,6 +1247,9 @@ function ChartBlockBody({ block, onChange, booting }) {
           live={!!sourceSession?.running}
           view={block.chartView || ""}
           onViewChange={(chartView) => onChange({ chartView, vizCustom: true })}
+          onOpenRow={(row) => {
+            if (source?.id) canvas?.focusSheetRow?.(source.id, row);
+          }}
           snapshot={block.chart}
           onSnapshot={(chart) => {
             if (canvas?.readOnly) return;

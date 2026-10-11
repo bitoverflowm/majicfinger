@@ -57,6 +57,7 @@ function polymarketLiveSource() {
       description: endpoint.description,
       group: endpoint.category,
       realtime: realtime.has(endpoint.id),
+      ...(endpoint.api ? { api: endpoint.api } : {}),
     };
   }
   return {

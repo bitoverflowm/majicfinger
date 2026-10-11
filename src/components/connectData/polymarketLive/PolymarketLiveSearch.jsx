@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { Check, Loader2, Search } from "lucide-react";
 
+import { isPolymarketWalletAddress } from "@/lib/polymarketLive/publicProfilesCompose";
 import {
   formatPolymarketVolume,
   isPolymarketPublicSearchEligible,
@@ -184,6 +185,7 @@ async function fetchExactPolymarketSuggestions(ref, signal) {
  *   collectMode?: boolean;
  *   dismissAfterSelect?: boolean;
  *   selectedItems?: Array<Record<string, unknown>>;
+ *   acceptAddress?: boolean;
  *   limitPerType?: number;
  *   layout?: "dropdown" | "panel";
  *   resultsClassName?: string;
@@ -203,6 +205,7 @@ export function PolymarketLiveSearch({
   collectMode = false,
   dismissAfterSelect = false,
   selectedItems,
+  acceptAddress = false,
   limitPerType = 12,
   layout = "dropdown",
   resultsClassName,
@@ -550,7 +553,9 @@ export function PolymarketLiveSearch({
             : "absolute left-0 right-0 top-full z-50 mt-1 rounded-lg border border-border bg-popover px-3 py-2 text-xs text-muted-foreground shadow-md"
         }
       >
-        No matches for &ldquo;{q.trim()}&rdquo;
+        {acceptAddress && isPolymarketWalletAddress(q)
+          ? "Press Enter to add this address."
+          : `No matches for “${q.trim()}”`}
       </motion.p>
     ) : null;
 
@@ -605,6 +610,17 @@ export function PolymarketLiveSearch({
           onKeyDown={(e) => {
             if (e.key === "Enter") {
               e.preventDefault();
+              const wallet = String(e.currentTarget.value || q).trim();
+              if (acceptAddress && isPolymarketWalletAddress(wallet)) {
+                setQ("");
+                void handleSelect({
+                  entity: "profile",
+                  id: wallet,
+                  title: wallet,
+                  proxyWallet: wallet,
+                });
+                return;
+              }
               if (eligible && suggestions.length > 0) {
                 void handleSubmitAll();
               }

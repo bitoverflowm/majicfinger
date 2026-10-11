@@ -1571,6 +1571,53 @@ export default async function handler(req, res) {
         );
         break;
       }
+      case "getUserStats": {
+        const user = String(req.query.user || "").trim();
+        if (!/^0x[a-fA-F0-9]{40}$/.test(user)) {
+          return res.status(400).json({ message: "A valid user wallet address is required" });
+        }
+        data = await fetchJson(`${DATA_API_BASE}/v2/user-stats?user=${encodeURIComponent(user)}`);
+        break;
+      }
+      case "getTraderPositions": {
+        const user = String(req.query.user || "").trim();
+        if (!/^0x[a-fA-F0-9]{40}$/.test(user)) {
+          return res.status(400).json({ message: "A valid user wallet address is required" });
+        }
+        const condition = String(req.query.condition || "").trim();
+        if (
+          condition &&
+          condition
+            .split(",")
+            .map((value) => value.trim())
+            .filter(Boolean)
+            .some((value) => !/^0x[a-fA-F0-9]{64}$/.test(value))
+        ) {
+          return res.status(400).json({ message: "Invalid market condition ID" });
+        }
+        const params = new URLSearchParams({ user });
+        const allowed = [
+          "condition",
+          "limit",
+          "cursor",
+          "status",
+          "event_id",
+          "title",
+          "filter_type",
+          "filter_amount",
+          "include_archived",
+          "sort_by",
+          "start",
+          "end",
+          "sort_direction",
+        ];
+        for (const key of allowed) {
+          const value = req.query[key];
+          if (value != null && String(value).trim() !== "") params.set(key, String(value).trim());
+        }
+        data = await fetchJson(`${DATA_API_BASE}/v2/positions?${params.toString()}`);
+        break;
+      }
       case "getCurrentPositions": {
         const user = String(req.query.user || "").trim();
         if (!/^0x[a-fA-F0-9]{40}$/.test(user)) {

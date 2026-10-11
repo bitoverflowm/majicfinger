@@ -7,6 +7,7 @@ import { isOrderBookSheet, rowsToOrderBook } from "@/components/dashboardCompose
 import { ohlcRowsToCandles, rangesForCandles, tradesToCandles } from "@/components/dashboardComposer/tradeMarketCandles";
 import { isPriceHistorySheet, priceHistoryOutcome, priceHistoryPoints } from "@/components/dashboardComposer/priceHistorySeries";
 import { DatasetSummary, EventLinesChart } from "@/components/dashboardComposer/datasetChart";
+import { PortfolioTreemap } from "@/components/dashboardComposer/portfolioTreemapChart";
 import { columnKey, countObservations, describeSheet } from "@/lib/visualizations/datasetDescriptor";
 import { resolveVisualization } from "@/lib/visualizations/presetRegistry";
 import { IndicatorChart } from "@/components/spectrumui/charts/indicator-chart";
@@ -263,7 +264,7 @@ function PriceHistorySheetChart({ sheet, live }) {
 
 const SUMMARY_VIEWS = new Set(["metric", "spec", "overview", "bars", "diverging", "quote", "quote-table"]);
 
-export function SheetBlockChart({ sheet, snapshot, onSnapshot, live = false, view = "", onViewChange }) {
+export function SheetBlockChart({ sheet, snapshot, onSnapshot, live = false, view = "", onViewChange, onOpenRow }) {
   const storedSheet = useReadyTradeSheet(sheet?.id);
   const fullSheet = usesHistoricalTradeSheet(sheet) ? storedSheet : null;
   const priceHistory = isPriceHistorySheet(sheet);
@@ -296,6 +297,9 @@ export function SheetBlockChart({ sheet, snapshot, onSnapshot, live = false, vie
         observations: countObservations(sheet, dataset),
       })
     : null;
+  if (resolved?.view === "treemap") {
+    return <PortfolioTreemap sheet={sheet} dataset={dataset} onOpenRow={onOpenRow} />;
+  }
   if (resolved?.view === "price") {
     return <PriceHistorySheetChart sheet={sheet} live={live} />;
   }

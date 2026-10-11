@@ -15,6 +15,7 @@ export function PolymarketLiveBuildSearch({
   entities = ["market"],
   placeholder = "Search for a market",
   required = false,
+  acceptAddress = false,
 }) {
   return (
     <div className="space-y-2">
@@ -31,6 +32,7 @@ export function PolymarketLiveBuildSearch({
           searchProfiles={entities.includes("profile")}
           keepClosedMarkets
           dismissAfterSelect
+          acceptAddress={acceptAddress}
           selectedItems={picks}
           onSelect={(suggestion) => onAdd?.(suggestion)}
         />

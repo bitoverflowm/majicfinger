@@ -76,6 +76,7 @@ export function kalshiHistoricalAttributeSpec(column) {
   if (column?.control === "query-number") return { kind: "query-number" };
   if (column?.control === "query-text") return { kind: "query-text" };
   if (column?.control === "period") return { kind: "period", options: column.enumOptions || [] };
+  if (column?.control === "multi-add" || column?.control === "market-multi") return { kind: "multi-add", options: column.enumOptions || [] };
   if (column?.control === "depth") return { kind: "depth" };
   if (column?.control === "updated-after") return { kind: "updated-after" };
   if (column?.control === "category") {
@@ -134,6 +135,7 @@ function isActive(spec, filter) {
   if (spec.kind === "period" || spec.kind === "depth" || spec.kind === "query-number" || spec.kind === "query-text") {
     return String(filter.value ?? "").trim() !== "";
   }
+  if (spec.kind === "multi-add") return selectedAddValues(filter).length > 0;
   if (spec.kind === "tag-picker") return Array.isArray(filter.selectedTags) && filter.selectedTags.length > 0;
   return textTerms(filter.containsTags, filter.contains).length > 0 || textTerms(filter.excludesTags, filter.excludes).length > 0;
 }
@@ -219,6 +221,9 @@ export function attributeSummary(column, filters) {
     if (filter.from && filter.to) parts.push(preset ? `${preset.short} · ${formatAttributeRange(filter.from, filter.to)}` : formatAttributeRange(filter.from, filter.to));
     else if (filter.from) parts.push(`From ${formatAttributeDate(filter.from)}`);
     else if (filter.to) parts.push(`Until ${formatAttributeDate(filter.to)}`);
+  } else if (spec.kind === "multi-add") {
+    const labels = selectedAddValues(filter).map((id) => addChoiceLabel(spec.options, id));
+    if (labels.length) parts.push(labels.join(", "));
   } else if (spec.kind === "period") {
     const label = spec.options.find((option) => option[0] === String(filter.value))?.[1] || filter.value;
     if (label) parts.push(String(label));
@@ -520,6 +525,83 @@ function KeywordField({ label, placeholder, tags, draft, onChange }) {
           Create &quot;{trimmed}&quot;
         </button>
       ) : null}
+    </div>
+  );
+}
+
+function selectedAddValues(filter) {
+  const listed = Array.isArray(filter?.values)
+    ? filter.values
+    : String(filter?.value ?? "").split(",");
+  const ids = [];
+  const seen = new Set();
+  for (const part of listed) {
+    const value = String(part || "").trim();
+    if (!value) continue;
+    const key = value.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    ids.push(value);
+  }
+  return ids;
+}
+
+function addChoiceLabel(options, id) {
+  const label = options.find((option) => String(option[0]).toLowerCase() === String(id).toLowerCase())?.[1] || id;
+  const title = String(label).split(" · ")[0].trim();
+  return title || id;
+}
+
+function MultiAddField({ options, filter, onChange, addLabel }) {
+  const selected = selectedAddValues(filter);
+  const taken = new Set(selected.map((id) => id.toLowerCase()));
+  const remaining = options.filter(([value]) => value && !taken.has(String(value).toLowerCase()));
+  return (
+    <div className="space-y-2">
+      {selected.length ? (
+        <div className="flex flex-wrap gap-1">
+          {selected.map((id) => {
+            const label = addChoiceLabel(options, id);
+            const full = options.find((option) => String(option[0]).toLowerCase() === id.toLowerCase())?.[1] || id;
+            return (
+              <span
+                key={id}
+                title={full}
+                className="inline-flex max-w-full items-center gap-0.5 rounded-full border border-border/70 bg-background py-0.5 pl-2 pr-1 text-[12px] text-foreground"
+              >
+                <span className="max-w-[14rem] truncate">{label}</span>
+                <button
+                  type="button"
+                  aria-label={`Remove ${label}`}
+                  onMouseDown={(event) => event.preventDefault()}
+                  onClick={() => onChange({ values: selected.filter((item) => item.toLowerCase() !== id.toLowerCase()), value: "" })}
+                  className="rounded-full p-0.5 text-muted-foreground hover:bg-muted hover:text-foreground"
+                >
+                  <X className="size-3" />
+                </button>
+              </span>
+            );
+          })}
+        </div>
+      ) : null}
+      <select
+        aria-label={addLabel}
+        value=""
+        disabled={!remaining.length}
+        onChange={(event) => {
+          const next = event.target.value;
+          if (!next) return;
+          onChange({ values: [...selected, next], value: "" });
+        }}
+        className="h-9 w-full rounded-lg border border-border/70 bg-background px-2 text-[13px] disabled:opacity-60"
+      >
+        <option value="">{addLabel}</option>
+        {remaining.map(([value, label]) => (
+          <option key={value} value={value}>
+            {label}
+          </option>
+        ))}
+      </select>
     </div>
   );
 }
@@ -909,6 +991,16 @@ function AttributeFields({ column, filters, onChange }) {
         anchor={column.rangeAnchor}
         bounds={column.rangeBounds}
         onChange={({ from, to, preset }) => onChange(patchFilter(filters, column, { from, to, preset: preset || "" }))}
+      />
+    );
+  }
+  if (spec.kind === "multi-add") {
+    return (
+      <MultiAddField
+        options={spec.options}
+        filter={filter}
+        addLabel={column.ariaLabel || `Add ${column.title || "value"}`}
+        onChange={(next) => onChange(patchFilter(filters, column, next))}
       />
     );
   }

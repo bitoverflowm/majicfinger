@@ -81,6 +81,12 @@ import {
   polymarketLeaderboardAttributeColumns,
   polymarketLeaderboardRequestKey,
 } from "@/lib/polymarketLive/traderLeaderboardCompose";
+import {
+  defaultPolymarketPositionFilters,
+  mergePolymarketPositionMarkets,
+  polymarketPositionAttributeColumns,
+  polymarketPositionRequestKey,
+} from "@/lib/polymarketLive/traderPositionsCompose";
 import { defaultLifeRange, lifeOfMarket, lifePull } from "@/lib/markets/marketLife";
 import { Accordion, AccordionContent, AccordionItem } from "@/components/ui/accordion";
 import * as AccordionPrimitive from "@radix-ui/react-accordion";
@@ -475,6 +481,25 @@ function functionChoices({ joinActive, previewTicker, sheetTitle }) {
     { id: "all", title: "All tables", detail: "Add the column on markets and every trades sheet." },
     created,
   ];
+}
+
+const API_MENU = [
+  ["v2", "v2"],
+  ["v1", "v1"],
+  ["gamma", "Gamma"],
+];
+
+function endpointMenuSections(ids, tables) {
+  const tagged = ids.some((id) => tables[id]?.api);
+  if (!tagged) return [{ api: "", label: "", ids }];
+  const sections = API_MENU.map(([api, label]) => ({
+    api,
+    label,
+    ids: ids.filter((id) => tables[id]?.api === api),
+  })).filter((section) => section.ids.length);
+  const rest = ids.filter((id) => !API_MENU.some(([api]) => tables[id]?.api === api));
+  if (rest.length) sections.push({ api: "rest", label: "", ids: rest });
+  return sections;
 }
 
 function EndpointLiveTag() {
@@ -2272,6 +2297,23 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
   const polymarketBiggestWinnersFilterKey = tableId === "getBiggestWinners"
     ? columnFilterKey(polymarketBiggestWinnersColumns, attributeFilters)
     : "";
+  const positionWalletKey = tableId === "getTraderPositions"
+    ? livePicks.map((pick) => String(pick.address || "").trim().toLowerCase()).filter(Boolean).join(",")
+    : "";
+  const [positionMarkets, setPositionMarkets] = useState([]);
+  useEffect(() => {
+    setPositionMarkets([]);
+  }, [positionWalletKey]);
+  useEffect(() => {
+    if (tableId !== "getTraderPositions" || polymarketDirected.status !== "ready") return;
+    const addresses = positionWalletKey ? positionWalletKey.split(",") : [];
+    setPositionMarkets((current) => mergePolymarketPositionMarkets(current, polymarketDirected.rows, addresses));
+  }, [polymarketDirected.rows, polymarketDirected.status, positionWalletKey, tableId]);
+  const polymarketPositionColumns = useMemo(() => {
+    if (!polymarketLive || tableId !== "getTraderPositions") return [];
+    return polymarketPositionAttributeColumns(pull?.columns || [], positionMarkets);
+  }, [polymarketLive, positionMarkets, pull?.columns, tableId]);
+  const polymarketPositionKey = tableId === "getTraderPositions" ? polymarketPositionRequestKey(attributeFilters, sortKeys) : "";
   const polymarketSamplingLimit = Number(rowLimit);
   const polymarketExplore =
     polymarketLive &&
@@ -2332,6 +2374,8 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
           ? defaultPolymarketLeaderboardFilters()
           : integrationId === "polymarket" && tableId === "getBiggestWinners"
             ? defaultPolymarketBiggestWinnersFilters()
+            : integrationId === "polymarket" && tableId === "getTraderPositions"
+              ? defaultPolymarketPositionFilters()
             : defaultDirectAttributeFilters(tableId),
     );
     setSortKeys([]);
@@ -2411,6 +2455,7 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
     if (!polymarketLive) return undefined;
     const leaderboard = tableId === "getTraderLeaderboard";
     const biggestWinners = tableId === "getBiggestWinners";
+    const traderPositions = tableId === "getTraderPositions";
     if (!livePicks.length && !leaderboard && !biggestWinners) {
       setPolymarketDirected({ status: "idle", rows: [], error: "" });
       return undefined;
@@ -2434,7 +2479,8 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
         filters: attributeFilters,
         rowLimit: leaderboard ? PREVIEW_ROW_CAP : rowLimit,
         planLimit,
-        preview: leaderboard || (biggestWinners && !(Number(rowLimit) > 0)),
+        sorts: sortKeys,
+        preview: leaderboard || ((biggestWinners || traderPositions) && !(Number(rowLimit) > 0)),
         match: biggestWinners && polymarketBiggestWinnersFilterKey
           ? (row) => rowMatchesAttributes(row, polymarketBiggestWinnersColumns, attributeFilters)
           : undefined,
@@ -2488,7 +2534,7 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
       cancel = true;
       window.clearTimeout(timer);
     };
-  }, [attributeFilters, livePicks, planLimit, polymarketBiggestWinnersColumns, polymarketBiggestWinnersFilterKey, polymarketBiggestWinnersKey, polymarketLeaderboardKey, polymarketLive, polymarketQuoteKey, rowLimit, tableId]);
+  }, [attributeFilters, livePicks, planLimit, polymarketBiggestWinnersColumns, polymarketBiggestWinnersFilterKey, polymarketBiggestWinnersKey, polymarketLeaderboardKey, polymarketLive, polymarketPositionKey, polymarketQuoteKey, rowLimit, tableId]);
 
   useEffect(() => {
     if (!previewSheet.startsWith("polymarket:")) return;
@@ -3373,10 +3419,12 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
         ? tableId === "getSamplingMarkets"
           ? polymarketSamplingColumns
           : polymarketMarketColumns
-        : polymarketBiggestWinnersColumns.length
+          : polymarketBiggestWinnersColumns.length
           ? polymarketBiggestWinnersColumns
           : polymarketLeaderboardColumns.length
             ? polymarketLeaderboardColumns
+            : polymarketPositionColumns.length
+              ? polymarketPositionColumns
             : polymarketQuoteColumns.length
               ? polymarketQuoteColumns
               : pull?.columns || [];
@@ -3420,7 +3468,7 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
     const query = filterValue.trim().toLowerCase();
     const matched = !query || !filterColumn ? rows : rows.filter((row) => String(row[filterColumn] ?? "").toLowerCase().includes(query));
     return capPreview(matched);
-  }, [directPreview.rows, directPreview.status, directRowColumns, forecastRowColumns, pull, visibleCount, filterColumn, filterValue, guidedFilters, attributeFilters, sortKeys, rowLimit, integrationId, tableId, settledPreviewKey, previewSearchError, livePreviewRows, liveMarketSearch, liveDirect, liveEventCandles, liveForecast, liveMarketFanout, liveMultivariate, liveNarrowing, multivariateRowColumns, seriesAttributeColumns, listImportRows, idleAttributeRows, polymarketLive, polymarketDirected, polymarketRequirement, polymarketScan, polymarketMarketColumns, polymarketSamplingColumns, polymarketBiggestWinnersColumns, polymarketLeaderboardColumns, polymarketQuoteColumns, polymarketSheetSource]);
+  }, [directPreview.rows, directPreview.status, directRowColumns, forecastRowColumns, pull, visibleCount, filterColumn, filterValue, guidedFilters, attributeFilters, sortKeys, rowLimit, integrationId, tableId, settledPreviewKey, previewSearchError, livePreviewRows, liveMarketSearch, liveDirect, liveEventCandles, liveForecast, liveMarketFanout, liveMultivariate, liveNarrowing, multivariateRowColumns, seriesAttributeColumns, listImportRows, idleAttributeRows, polymarketLive, polymarketDirected, polymarketRequirement, polymarketScan, polymarketMarketColumns, polymarketSamplingColumns, polymarketBiggestWinnersColumns, polymarketLeaderboardColumns, polymarketPositionColumns, polymarketQuoteColumns, polymarketSheetSource]);
 
   const queriedMarkets = useMemo(() => {
     if (!guidedFilters) return [];
@@ -3877,7 +3925,9 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
           !/^(public|visible)$/i.test(directPreview.visibility)
         ? " These trades are private."
         : polymarketFanoutOn && polymarketDirected.status === "ready"
-          ? " Each market gets its own sheet."
+          ? tableId === "getTraderPositions"
+            ? " Each trader gets its own sheet."
+            : " Each market gets its own sheet."
         : "";
 
   useEffect(() => {
@@ -5694,6 +5744,7 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
           if (tableId === "getMarkets") return polymarketMarketColumns;
           if (polymarketBiggestWinnersColumns.length) return polymarketBiggestWinnersColumns;
           if (polymarketLeaderboardColumns.length) return polymarketLeaderboardColumns;
+          if (polymarketPositionColumns.length) return polymarketPositionColumns;
           if (polymarketQuoteColumns.length) return polymarketQuoteColumns;
           return pull?.columns || [];
         };
@@ -5718,6 +5769,7 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
         } else {
           const result = await loadPolymarketLiveTable(tableId, livePicks, {
             filters: attributeFilters,
+            sorts: sortKeys,
             rowLimit: importLimit,
             planLimit: sheetCap,
             match: tableId === "getBiggestWinners" && polymarketBiggestWinnersFilterKey
@@ -5735,7 +5787,9 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
           });
           const columns = columnsFor(result.rows);
           const matched = (result.rows || []).filter((row) => rowMatchesAttributes(row, columns, attributeFilters));
-          pulled = sortAttributeRows(matched, columns, sortKeys);
+          const ranked = sortAttributeRows(matched, columns, sortKeys);
+          // Each trader already walked to this ceiling. A shared slice would cut the later sheets.
+          pulled = tableId === "getTraderPositions" && livePicks.length > 1 ? ranked : ranked.slice(0, importLimit);
         }
         marketRows = pulled;
         reporter.succeed("source", {
@@ -7905,17 +7959,21 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
                 </button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="start" className="z-[580] max-h-[var(--radix-dropdown-menu-content-available-height)] w-[300px] overflow-y-auto">
-                {visibleTableIds.map((id) => (
-                  <DropdownMenuItem key={id} onSelect={() => setTableId(id)}>
-                    <span className="min-w-0">
-                      <span className="flex flex-wrap items-center gap-1.5">
-                        <span className="text-[13px] font-medium">{tables[id].label}</span>
-                        {tables[id].realtime ? <EndpointLiveTag /> : null}
+                {endpointMenuSections(visibleTableIds, tables).flatMap((section, index) => [
+                  section.label && index > 0 ? <DropdownMenuSeparator key={`${section.api}-sep`} /> : null,
+                  section.label ? <DropdownMenuLabel key={`${section.api}-label`}>{section.label}</DropdownMenuLabel> : null,
+                  ...section.ids.map((id) => (
+                    <DropdownMenuItem key={id} onSelect={() => setTableId(id)}>
+                      <span className="min-w-0">
+                        <span className="flex flex-wrap items-center gap-1.5">
+                          <span className="text-[13px] font-medium">{tables[id].label}</span>
+                          {tables[id].realtime ? <EndpointLiveTag /> : null}
+                        </span>
+                        <span className="block text-[11px] text-muted-foreground">{tables[id].description}</span>
                       </span>
-                      <span className="block text-[11px] text-muted-foreground">{tables[id].description}</span>
-                    </span>
-                  </DropdownMenuItem>
-                ))}
+                    </DropdownMenuItem>
+                  )),
+                ])}
               </DropdownMenuContent>
             </DropdownMenu>
             ) : null}
@@ -7984,6 +8042,7 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
               onRemove={removeLivePick}
               entities={polymarketSearch.entities}
               placeholder={polymarketSearch.placeholder}
+              acceptAddress={Boolean(polymarketSearch.acceptAddress)}
             />
           ) : null}
 
@@ -8069,6 +8128,8 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
                                   ? polymarketBiggestWinnersColumns
                                   : polymarketLeaderboardColumns.length
                                     ? polymarketLeaderboardColumns
+                                    : polymarketPositionColumns.length
+                                      ? polymarketPositionColumns
                                   : polymarketQuoteColumns.length
                                     ? polymarketQuoteColumns
                                     : pull?.columns || []
@@ -8106,7 +8167,11 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
                           ? "Orderbook attributes"
                           : tableId === "blocks"
                             ? "Block attributes"
-                            : polymarketLive
+                            : tableId === "getTraderByAddress"
+                            ? "Trader attributes"
+                            : tableId === "getTraderPositions"
+                              ? "Position attributes"
+                          : polymarketLive
                               ? "Attributes"
                             : "Market attributes"
                 }
@@ -8742,6 +8807,7 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
                     onRemove={removeLivePick}
                     entities={polymarketSearch?.entities || ["market"]}
                     placeholder={polymarketSearch?.placeholder || "Search for a market"}
+                    acceptAddress={Boolean(polymarketSearch?.acceptAddress)}
                     required
                   />
                 </div>
