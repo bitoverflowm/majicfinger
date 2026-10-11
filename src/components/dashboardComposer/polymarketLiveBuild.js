@@ -401,7 +401,7 @@ export function polymarketPickFromSuggestion(suggestion) {
   if (!suggestion || suggestion.entity === "tag") return null;
   const ref = orderbooksMarketRefFromSuggestion(suggestion);
   const kind = suggestion.entity === "profile" ? "profile" : suggestion.entity === "event" ? "event" : "market";
-  const address = String(suggestion.proxyWallet || "").trim();
+  const address = String(suggestion.proxyWallet || suggestion.raw?.proxyWallet || "").trim();
   const id = String(suggestion.id || suggestion.slug || address || suggestion.title || "").trim();
   if (!id && !address) return null;
   const label = String(suggestion.title || suggestion.pseudonym || suggestion.slug || address || id).trim();

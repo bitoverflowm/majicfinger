@@ -39,6 +39,33 @@ export function isPolymarketPublicSearchEligible(raw) {
 }
 
 /**
+ * Profiles go first, so a handle search still returns wallets when the same
+ * words also match markets. Exact name or pseudonym matches lead the list.
+ * @param {Array<Record<string, unknown>>} rows
+ * @param {string} [query]
+ * @param {number} [max]
+ */
+export function orderProfileSuggestions(rows, query, max) {
+  const list = Array.isArray(rows) ? rows : [];
+  const needle = String(query || "").trim().replace(/^@+/, "").toLowerCase();
+  const score = (row) => {
+    const name = String(row?.title || "").trim().toLowerCase();
+    const pseudo = String(row?.pseudonym || "").trim().toLowerCase();
+    if (!needle) return 1;
+    if (name === needle || pseudo === needle) return 0;
+    if (name.startsWith(needle) || pseudo.startsWith(needle)) return 1;
+    if (name.includes(needle) || pseudo.includes(needle)) return 2;
+    return 3;
+  };
+  const profiles = list.filter((row) => row?.entity === "profile").sort((a, b) => score(a) - score(b));
+  const others = list.filter((row) => row?.entity !== "profile");
+  const ordered = [...profiles, ...others];
+  const cap = Number(max);
+  if (!Number.isFinite(cap) || cap <= 0) return ordered;
+  return ordered.slice(0, cap);
+}
+
+/**
  * @param {unknown} value
  * @returns {string | null}
  */

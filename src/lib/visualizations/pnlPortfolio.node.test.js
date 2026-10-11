@@ -45,6 +45,23 @@ assert.equal(points[1].value, 30);
 assert.equal(points[1].basis, 20);
 assert.equal(pnlPortfolioPoints({ columns: [{ id: "timestamp" }, { id: "position_pnl" }], cells: { "0,0": "5", "1,0": "8" } })[0].value, 8);
 
+const displayed = pnlPortfolioPoints({
+  columns: [{ id: "timestamp" }, { id: "economic_pnl" }, { id: "realized_pnl" }],
+  cells: {
+    "0,0": "10/10/2026, 10:45:00 PM",
+    "1,0": "-54.4K",
+    "2,0": "-54.4K",
+    "0,1": "10/11/2026, 10:45:00 AM",
+    "1,1": "-44.5K",
+    "2,1": "-44.5K",
+  },
+});
+assert.equal(displayed.length, 2);
+assert.equal(displayed[0].value, -54400);
+assert.equal(displayed[0].basis, -54400);
+assert.equal(displayed[1].value, -44500);
+assert.equal(displayed[0].t, Date.parse("10/10/2026, 10:45:00 PM"));
+
 const rising = portfolioDrawdowns([10, 12, 9]);
 assert.equal(rising[0], 0);
 assert.equal(rising[1], 0);

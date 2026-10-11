@@ -210,6 +210,14 @@ const columns = polymarketLiveBuildColumns("getOrderbooks");
 assert.ok(columns.some((column) => column.id === "price" && column.defaultOn));
 assert.ok(columns.some((column) => column.id === "side"));
 
+const handlePick = polymarketPickFromSuggestion({
+  entity: "profile",
+  title: "Zoomify",
+  pseudonym: "Yellow-Revival",
+  raw: { proxyWallet: "0x39125313116835eb6a55688350813921c9360246" },
+});
+assert.equal(handlePick?.kind, "profile");
+assert.equal(handlePick?.address, "0x39125313116835eb6a55688350813921c9360246");
 const pick = polymarketPickFromSuggestion({
   entity: "market",
   id: "1",

@@ -7,9 +7,15 @@ import { sheetRecords } from "@/lib/visualizations/datasetDescriptor";
 
 const DAY_MS = 86_400_000;
 
+const COMPACT_SCALE = { k: 1e3, m: 1e6, b: 1e9, t: 1e12 };
+
+/** Sheet cells keep the grid's compact labels, such as "-54.4K". */
 function num(value) {
   if (value == null || value === "") return null;
-  const n = Number(String(value).trim().replace(/,/g, ""));
+  const text = String(value).trim().replace(/[$,\s]/g, "").replace(/\u2212/g, "-");
+  if (!text) return null;
+  const compact = text.match(/^(-?\d+(?:\.\d+)?)([kmbt])$/i);
+  const n = compact ? Number(compact[1]) * COMPACT_SCALE[compact[2].toLowerCase()] : Number(text);
   return Number.isFinite(n) ? n : null;
 }
 

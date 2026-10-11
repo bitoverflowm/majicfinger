@@ -4,6 +4,8 @@
  * After cutover, production stays https://clob.polymarket.com (per Polymarket migration guide).
  * This integration only uses public GETs (Gamma, Data API, CLOB read); no order signing / legacy clob-client.
  */
+import { orderProfileSuggestions } from "@/lib/polymarketLive/polymarketPublicSearch";
+
 function polymarketApiBase(envVar, fallback) {
   const v = process.env[envVar];
   if (typeof v !== "string" || !v.trim()) return fallback;
@@ -762,17 +764,19 @@ function flattenPublicSearchToSuggestions(searchPayload, max = 28, opts = {}) {
       if (!p) continue;
       const pid = p.id != null ? String(p.id) : "";
       const wallet = p.proxyWallet ? String(p.proxyWallet) : "";
-      const name = String(p.name || p.pseudonym || "").trim();
+      const pseudonym = p.pseudonym ? String(p.pseudonym).trim() : "";
+      const name = String(p.name || pseudonym || "").trim();
       if (!pid && !wallet && !name) continue;
+      const handle = pseudonym && pseudonym.toLowerCase() !== name.toLowerCase() ? pseudonym : "";
       add({
         entity: "profile",
         id: pid,
         slug: undefined,
         ticker: wallet ? `${wallet.slice(0, 6)}…${wallet.slice(-4)}` : undefined,
         title: name || wallet || "Profile",
-        subtitle: p.bio ? String(p.bio).slice(0, 180) : wallet || undefined,
+        subtitle: [handle, p.bio ? String(p.bio).slice(0, 140) : ""].filter(Boolean).join(" · ") || wallet || undefined,
         proxyWallet: wallet || undefined,
-        pseudonym: p.pseudonym ? String(p.pseudonym) : undefined,
+        pseudonym: pseudonym || undefined,
         volume: null,
         volume24hr: null,
         active: null,
@@ -811,7 +815,7 @@ function flattenPublicSearchToSuggestions(searchPayload, max = 28, opts = {}) {
     }
   }
 
-  return out.slice(0, max);
+  return orderProfileSuggestions(out, opts.query, max);
 }
 
 async function runMetadataSuggestions(rawQ, limitPerType, opts = {}) {
@@ -841,14 +845,14 @@ async function runMetadataSuggestions(rawQ, limitPerType, opts = {}) {
     return fetchJson(`${GAMMA_BASE}/public-search?${ps.toString()}`);
   };
   const openSearch = await loadSearch({ keep_closed_markets: "0", events_status: "active" });
-  const openSuggestions = flattenPublicSearchToSuggestions(openSearch, max, { excludeClosed: true });
+  const openSuggestions = flattenPublicSearchToSuggestions(openSearch, max, { excludeClosed: true, query: trimmed });
   const closedExtra = [];
   if (keepClosed) {
     const closedSearch = await loadSearch({ keep_closed_markets: "1" });
-    const seen = new Set(openSuggestions.map((row) => `${row.entity}:${row.id || ""}:${row.slug || ""}`));
-    for (const row of flattenPublicSearchToSuggestions(closedSearch, max)) {
+    const seen = new Set(openSuggestions.map((row) => `${row.entity}:${row.id || ""}:${row.slug || ""}:${row.proxyWallet || ""}`));
+    for (const row of flattenPublicSearchToSuggestions(closedSearch, max, { query: trimmed })) {
       if (!isSearchRowClosed(row.closed)) continue;
-      const key = `${row.entity}:${row.id || ""}:${row.slug || ""}`;
+      const key = `${row.entity}:${row.id || ""}:${row.slug || ""}:${row.proxyWallet || ""}`;
       if (seen.has(key)) continue;
       seen.add(key);
       closedExtra.push(row);
