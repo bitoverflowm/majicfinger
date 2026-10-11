@@ -26,10 +26,13 @@ export function MarketScanSteps({
   request = "GET /markets",
   serverFilters = [],
   requirements = [],
+  noun = "market",
 }) {
   if (!startedAt || status === "idle") return null;
 
   const sourceName = source || "the source";
+  const itemNoun = noun || "market";
+  const itemsNoun = itemNoun === "market" ? "markets" : `${itemNoun}s`;
   const done = status === "ready" || status === "error";
   const stamp = done ? { startedAt, completedAt: completedAt || undefined } : { startedAt };
   const requirementsLabel = requirements.filter(Boolean);
@@ -41,11 +44,11 @@ export function MarketScanSteps({
     : status === "error" && error
       ? error
       : scanned
-        ? `Queried markets directly from ${sourceName}. Parsed ${scanned.toLocaleString()} markets.`
-        : `Querying markets directly from ${sourceName}.`;
+        ? `Queried ${itemsNoun} directly from ${sourceName}. Parsed ${scanned.toLocaleString()} ${itemsNoun}.`
+        : `Querying ${itemsNoun} directly from ${sourceName}.`;
   const parsedLabel = scanned
-    ? `${scanned.toLocaleString()} ${scanned === 1 ? "market" : "markets"} parsed`
-    : "Parsing markets";
+    ? `${scanned.toLocaleString()} ${scanned === 1 ? itemNoun : itemsNoun} parsed`
+    : `Parsing ${itemsNoun}`;
   calls.push({
     id: "query",
     name: parsedLabel,
@@ -68,8 +71,8 @@ export function MarketScanSteps({
       ...(scanned && done ? stamp : scanned ? { startedAt } : {}),
       args: requirementsLabel.length ? { requirements: requirementsLabel.join(", ") } : undefined,
       result: requirementsLabel.length
-        ? `Filtering through the markets to match your requirements: ${requirementsLabel.join(", ")}.`
-        : "Filtering through the markets to match your requirements.",
+        ? `Filtering through the ${itemsNoun} to match your requirements: ${requirementsLabel.join(", ")}.`
+        : `Filtering through the ${itemsNoun} to match your requirements.`,
     });
   }
 

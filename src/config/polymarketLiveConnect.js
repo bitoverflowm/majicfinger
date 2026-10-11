@@ -90,6 +90,10 @@ import {
   POLYMARKET_HOLDER_TRADED_MARKETS_ENDPOINT_ID,
 } from "@/lib/polymarketLive/holderTradedMarketsCompose";
 import {
+  POLYMARKET_BIGGEST_WINNERS_COLUMNS,
+  POLYMARKET_BIGGEST_WINNERS_ENDPOINT_ID,
+} from "@/lib/polymarketLive/biggestWinnersCompose";
+import {
   POLYMARKET_TRADER_LEADERBOARD_COLUMNS,
   POLYMARKET_TRADER_LEADERBOARD_ENDPOINT_ID,
 } from "@/lib/polymarketLive/traderLeaderboardCompose";
@@ -341,6 +345,13 @@ export const POLYMARKET_LIVE_CONNECT_ENDPOINTS = [
       "Rank traders by profit and loss or volume, filtered by category and time period.",
   },
   {
+    id: POLYMARKET_BIGGEST_WINNERS_ENDPOINT_ID,
+    category: "holders",
+    title: "Biggest Wins",
+    description:
+      "The biggest winning positions, including combo wins. Combo rows keep their joined title and do not link to an event.",
+  },
+  {
     id: POLYMARKET_OPEN_INTEREST_COMPOSE_ENDPOINT_ID,
     category: "markets",
     title: "Get Open Interest",
@@ -443,6 +454,9 @@ export function getPolymarketLiveColumnsForEndpoint(endpointQuery) {
   }
   if (id === POLYMARKET_TRADER_LEADERBOARD_ENDPOINT_ID) {
     return POLYMARKET_TRADER_LEADERBOARD_COLUMNS;
+  }
+  if (id === POLYMARKET_BIGGEST_WINNERS_ENDPOINT_ID) {
+    return POLYMARKET_BIGGEST_WINNERS_COLUMNS;
   }
   const ep = ENDPOINTS.find((e) => e.query === id);
   if (ep?.responseFields?.length) {

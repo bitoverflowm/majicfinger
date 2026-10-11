@@ -463,8 +463,16 @@ export function WorkspaceCanvasProvider({ pageId, readOnly = false, children }) 
         const placed = layoutRunSheets(incoming, { originY: kept.length ? originY : 88 });
         return { ...prev, [targetId]: [...kept, ...placed] };
       });
-      setSelectedId(incoming[0]?.id || null);
+      const firstId = incoming[0]?.id || "";
+      setSelectedId(firstId || null);
       setTool("select");
+      if (!firstId) return;
+      if (targetId !== pageId) {
+        pendingRevealRef.current = firstId;
+        return;
+      }
+      setSpotlightId(firstId);
+      setRevealNonce((nonce) => nonce + 1);
     },
     [pageId],
   );
@@ -1613,8 +1621,18 @@ export function WorkspaceCanvas() {
     const scroller = scrollerRef.current;
     if (!canvas?.revealNonce || !id || !scroller) return;
     skipNearestScrollRef.current = true;
-    const el = scroller.querySelector(`[data-block-id="${CSS.escape(id)}"]`);
-    if (el instanceof HTMLElement) el.scrollIntoView({ behavior: "smooth", block: "center" });
+    const scrollToBlock = () => {
+      const el = scroller.querySelector(`[data-block-id="${CSS.escape(id)}"]`);
+      if (!(el instanceof HTMLElement)) return false;
+      const top = scroller.scrollTop + el.getBoundingClientRect().top - scroller.getBoundingClientRect().top - 24;
+      scroller.scrollTo({ top: Math.max(0, top), behavior: "smooth" });
+      return true;
+    };
+    if (scrollToBlock()) return undefined;
+    const frame = window.requestAnimationFrame(() => {
+      scrollToBlock();
+    });
+    return () => window.cancelAnimationFrame(frame);
   }, [canvas?.revealNonce, canvas?.spotlightId, canvas?.pageId]);
 
   useEffect(() => {
@@ -1633,6 +1651,25 @@ export function WorkspaceCanvas() {
     const scroller = scrollerRef.current;
     if (!scroller) return undefined;
     const onWheel = (event) => {
+      const visual = event.target instanceof Element ? event.target.closest("[data-visual-scroll]") : null;
+      if (visual instanceof HTMLElement) {
+        const vertical = Math.abs(event.deltaY) >= Math.abs(event.deltaX);
+        const maxTop = visual.scrollHeight - visual.clientHeight;
+        const maxLeft = visual.scrollWidth - visual.clientWidth;
+        const canY =
+          vertical &&
+          ((event.deltaY > 0 && visual.scrollTop < maxTop - 1) || (event.deltaY < 0 && visual.scrollTop > 0));
+        const canX =
+          !vertical &&
+          ((event.deltaX > 0 && visual.scrollLeft < maxLeft - 1) || (event.deltaX < 0 && visual.scrollLeft > 0));
+        if (canY || canX) {
+          event.preventDefault();
+          event.stopPropagation();
+          if (canY) visual.scrollTop += event.deltaY;
+          else visual.scrollLeft += event.deltaX;
+          return;
+        }
+      }
       const grid = event.target instanceof Element ? event.target.closest("[data-sheet-grid]") : null;
       if (grid) {
         const inner = grid.querySelector(".dvn-scroller");

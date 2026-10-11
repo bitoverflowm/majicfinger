@@ -30,6 +30,14 @@ import {
 } from "@/lib/polymarketLive/polymarketQuoteQuery";
 import { flattenSamplingMarket, samplingMarketSheetColumns } from "@/lib/polymarketLive/polymarketSamplingScan";
 import {
+  biggestWinnerSheetRow,
+  polymarketBiggestWinnersPage,
+  polymarketBiggestWinnersQuery,
+  polymarketBiggestWinnersTarget,
+  POLYMARKET_BIGGEST_WINNERS_COLUMNS,
+  POLYMARKET_BIGGEST_WINNERS_DEFAULT_COLUMNS,
+} from "@/lib/polymarketLive/biggestWinnersCompose";
+import {
   leaderboardSheetRow,
   polymarketLeaderboardPage,
   polymarketLeaderboardQuery,
@@ -69,6 +77,7 @@ const BUILD_GROUP = {
   getHolderTrades: "holders",
   getHolderTradedMarkets: "holders",
   getTraderLeaderboard: "holders",
+  getBiggestWinners: "holders",
 };
 
 /**
@@ -193,6 +202,10 @@ const BUILD_COPY = {
   },
   getTraderLeaderboard: {
     description: "Traders ranked by profit or by trading volume.",
+  },
+  getBiggestWinners: {
+    title: "Biggest Wins",
+    description: "The biggest winning positions, including combo wins. A combo row keeps its joined title and has no event link.",
   },
 };
 
@@ -533,6 +546,23 @@ export function polymarketLiveBuildColumns(endpointId) {
       description: entry.description || "",
       defaultOn: defaults.has(entry.name),
     }));
+  }
+  if (endpointId === "getBiggestWinners") {
+    const defaults = new Set(POLYMARKET_BIGGEST_WINNERS_DEFAULT_COLUMNS);
+    return POLYMARKET_BIGGEST_WINNERS_COLUMNS.map((entry) => {
+      const column = {
+        id: entry.name,
+        title: titleFor(entry.name),
+        type: columnType(entry.type),
+        description: entry.description || "",
+        defaultOn: defaults.has(entry.name),
+      };
+      if (entry.name === "resolved_at") {
+        column.type = "date";
+        column.dateEpoch = "unix";
+      }
+      return column;
+    });
   }
   if (endpointId === "getTickSize") return sheetColumns(endpointId, TICK_SIZE_COLUMNS);
   if (endpointId === "getTokenPriceHistory") return sheetColumns(endpointId, TOKEN_PRICE_HISTORY_COLUMNS);
@@ -1205,6 +1235,68 @@ async function pagedObjects(query, params, target) {
   return rows;
 }
 
+async function biggestWinnersRows(filters, options = {}) {
+  const query = polymarketBiggestWinnersQuery(filters);
+  const target = polymarketBiggestWinnersTarget(options);
+  const match = typeof options.match === "function" ? options.match : null;
+  const explain = typeof options.explain === "function" ? options.explain : null;
+  const rows = [];
+  const removed = [];
+  let scanned = 0;
+  let removedCount = 0;
+  let cursor = "";
+  let exhausted = false;
+  const report = () => {
+    options.onProgress?.({
+      scanned,
+      rows: rows.slice(),
+      removed: removed.slice(),
+      removedCount,
+      exhausted,
+    });
+  };
+  for (let page = 0; rows.length < target && page < 500; page += 1) {
+    const pageLimit = match ? 1000 : Math.min(1000, target - rows.length);
+    const params = cursor
+      ? { cursor }
+      : {
+          time_period: query.time_period,
+          category: query.category,
+          limit: String(pageLimit),
+        };
+    const next = polymarketBiggestWinnersPage(await polymarketGet("getBiggestWinners", params));
+    if (!next.rows.length) {
+      exhausted = true;
+      break;
+    }
+    for (const raw of next.rows) {
+      const row = biggestWinnerSheetRow(raw, query);
+      scanned += 1;
+      if (!match || match(row)) {
+        rows.push(row);
+        if (rows.length >= target) break;
+      } else {
+        removedCount += 1;
+        if (removed.length < 8) {
+          removed.push({
+            label: row.user_name || row.event_title || row.user_id || "Win",
+            reason: explain ? explain(row) : "",
+          });
+        }
+      }
+    }
+    report();
+    if (rows.length >= target) break;
+    if (!next.cursor || next.cursor === cursor) {
+      exhausted = true;
+      break;
+    }
+    cursor = next.cursor;
+  }
+  report();
+  return rows;
+}
+
 async function leaderboardRows(filters, options = {}) {
   const query = polymarketLeaderboardQuery(filters);
   const target = polymarketLeaderboardTarget(filters, options);
@@ -1260,6 +1352,7 @@ async function discoveryRows(endpointId, options = {}) {
     return pagedObjects("listSeries", { closed: "false" }, target);
   }
   if (endpointId === "getTraderLeaderboard") return leaderboardRows(options.filters || {}, options);
+  if (endpointId === "getBiggestWinners") return biggestWinnersRows(options.filters || {}, options);
   return [];
 }
 
@@ -1293,6 +1386,7 @@ async function directedRows(endpointId, picks, options = {}) {
     if (!typed && pick.address) filters.user = { value: pick.address };
     return leaderboardRows(filters, options);
   }
+  if (endpointId === "getBiggestWinners") return biggestWinnersRows(options.filters || {}, options);
   if (ADDRESS_QUERIES[endpointId]) {
     if (!/^0x[a-fA-F0-9]{40}$/.test(pick.address || "")) throw new Error("Search for a trader wallet.");
     const data = await polymarketGet(ADDRESS_QUERIES[endpointId], {

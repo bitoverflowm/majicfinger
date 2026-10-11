@@ -57,6 +57,17 @@ assert.ok(ids.includes("getTraderLeaderboard"));
 assert.equal(endpoints.find((endpoint) => endpoint.id === "getOrderbooks")?.category, "markets");
 assert.equal(endpoints.find((endpoint) => endpoint.id === "getMarketsByEvents")?.category, "events");
 assert.equal(endpoints.find((endpoint) => endpoint.id === "getTraderLeaderboard")?.category, "holders");
+assert.ok(ids.includes("getBiggestWinners"));
+assert.equal(endpoints.find((endpoint) => endpoint.id === "getBiggestWinners")?.category, "holders");
+assert.equal(endpoints.find((endpoint) => endpoint.id === "getBiggestWinners")?.title, "Biggest Wins");
+const biggestWinnerColumns = polymarketLiveBuildColumns("getBiggestWinners");
+assert.deepEqual(
+  biggestWinnerColumns.map((column) => column.id),
+  ["win_rank", "kind", "user_name", "user_id", "pnl", "initial_value", "final_value", "resolved_at", "event_title", "event_link", "condition_id", "position_id", "event_id", "event_slug", "profile_image", "time_period", "category"],
+);
+assert.equal(biggestWinnerColumns.find((column) => column.id === "resolved_at")?.dateEpoch, "unix");
+assert.equal(biggestWinnerColumns.find((column) => column.id === "event_link")?.defaultOn, false);
+assert.equal(biggestWinnerColumns.find((column) => column.id === "kind")?.defaultOn, true);
 const leaderboardColumns = polymarketLiveBuildColumns("getTraderLeaderboard");
 assert.deepEqual(
   leaderboardColumns.map((column) => column.id),

@@ -69,7 +69,7 @@ export function VisualTableView({ sheet, dataset, hidden = [], readOnly = false,
       {model.caption.length ? (
         <p className="px-0.5 pb-2 pt-2 text-[11px] uppercase tracking-[0.14em] text-muted-foreground">{model.caption.join(" · ")}</p>
       ) : null}
-      <div className="min-h-0 flex-1 overflow-auto">
+      <div data-visual-scroll="" className="min-h-0 flex-1 overflow-auto overscroll-contain">
         <table className="w-max border-collapse text-left text-[13px]">
           <thead className="sticky top-0 z-[1] bg-background text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
             <tr>

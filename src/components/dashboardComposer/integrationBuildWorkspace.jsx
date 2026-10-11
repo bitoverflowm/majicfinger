@@ -72,6 +72,11 @@ import {
   polymarketQuoteRequestKey,
 } from "@/lib/polymarketLive/polymarketQuoteQuery";
 import {
+  defaultPolymarketBiggestWinnersFilters,
+  polymarketBiggestWinnersAttributeColumns,
+  polymarketBiggestWinnersRequestKey,
+} from "@/lib/polymarketLive/biggestWinnersCompose";
+import {
   defaultPolymarketLeaderboardFilters,
   polymarketLeaderboardAttributeColumns,
   polymarketLeaderboardRequestKey,
@@ -2259,6 +2264,14 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
     return polymarketLeaderboardAttributeColumns(pull?.columns || []);
   }, [polymarketLive, pull?.columns, tableId]);
   const polymarketLeaderboardKey = tableId === "getTraderLeaderboard" ? polymarketLeaderboardRequestKey(attributeFilters) : "";
+  const polymarketBiggestWinnersColumns = useMemo(() => {
+    if (!polymarketLive || tableId !== "getBiggestWinners") return [];
+    return polymarketBiggestWinnersAttributeColumns(pull?.columns || []);
+  }, [polymarketLive, pull?.columns, tableId]);
+  const polymarketBiggestWinnersKey = tableId === "getBiggestWinners" ? polymarketBiggestWinnersRequestKey(attributeFilters) : "";
+  const polymarketBiggestWinnersFilterKey = tableId === "getBiggestWinners"
+    ? columnFilterKey(polymarketBiggestWinnersColumns, attributeFilters)
+    : "";
   const polymarketSamplingLimit = Number(rowLimit);
   const polymarketExplore =
     polymarketLive &&
@@ -2317,7 +2330,9 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
         ? defaultPolymarketQuoteFilters(tableId)
         : integrationId === "polymarket" && tableId === "getTraderLeaderboard"
           ? defaultPolymarketLeaderboardFilters()
-          : defaultDirectAttributeFilters(tableId),
+          : integrationId === "polymarket" && tableId === "getBiggestWinners"
+            ? defaultPolymarketBiggestWinnersFilters()
+            : defaultDirectAttributeFilters(tableId),
     );
     setSortKeys([]);
     setRowLimit("");
@@ -2395,22 +2410,70 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
   useEffect(() => {
     if (!polymarketLive) return undefined;
     const leaderboard = tableId === "getTraderLeaderboard";
-    if (!livePicks.length && !leaderboard) {
+    const biggestWinners = tableId === "getBiggestWinners";
+    if (!livePicks.length && !leaderboard && !biggestWinners) {
       setPolymarketDirected({ status: "idle", rows: [], error: "" });
       return undefined;
     }
     let cancel = false;
+    const startedAt = Date.now();
+    let progress = { scanned: 0, removedCount: 0, removed: [], exhausted: false };
     const timer = window.setTimeout(() => {
-      setPolymarketDirected({ status: "loading", rows: [], error: "" });
+      setPolymarketDirected({
+        status: "loading",
+        rows: [],
+        error: "",
+        scanned: 0,
+        removedCount: 0,
+        removed: [],
+        startedAt: biggestWinners && polymarketBiggestWinnersFilterKey ? startedAt : 0,
+        completedAt: 0,
+        request: "GET /v2/biggest-winners",
+      });
       loadPolymarketLiveTable(tableId, livePicks, {
         filters: attributeFilters,
         rowLimit: leaderboard ? PREVIEW_ROW_CAP : rowLimit,
         planLimit,
-        preview: leaderboard,
+        preview: leaderboard || (biggestWinners && !(Number(rowLimit) > 0)),
+        match: biggestWinners && polymarketBiggestWinnersFilterKey
+          ? (row) => rowMatchesAttributes(row, polymarketBiggestWinnersColumns, attributeFilters)
+          : undefined,
+        explain: biggestWinners && polymarketBiggestWinnersFilterKey
+          ? (row) => attributeMismatchReason(row, polymarketBiggestWinnersColumns, attributeFilters)
+          : undefined,
+        onProgress: biggestWinners && polymarketBiggestWinnersFilterKey
+          ? (info) => {
+              if (cancel) return;
+              progress = info;
+              setPolymarketDirected({
+                status: "loading",
+                rows: info.rows || [],
+                error: "",
+                scanned: info.scanned || 0,
+                removedCount: info.removedCount || 0,
+                removed: info.removed || [],
+                exhausted: Boolean(info.exhausted),
+                startedAt,
+                completedAt: 0,
+                request: "GET /v2/biggest-winners",
+              });
+            }
+          : undefined,
       })
         .then((result) => {
           if (cancel) return;
-          setPolymarketDirected({ status: "ready", rows: result.rows || [], error: "" });
+          setPolymarketDirected({
+            status: "ready",
+            rows: result.rows || [],
+            error: "",
+            scanned: progress.scanned || (result.rows || []).length,
+            removedCount: progress.removedCount || 0,
+            removed: progress.removed || [],
+            exhausted: Boolean(progress.exhausted),
+            startedAt: biggestWinners && polymarketBiggestWinnersFilterKey ? startedAt : 0,
+            completedAt: Date.now(),
+            request: "GET /v2/biggest-winners",
+          });
         })
         .catch((err) => {
           if (cancel) return;
@@ -2425,7 +2488,7 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
       cancel = true;
       window.clearTimeout(timer);
     };
-  }, [livePicks, polymarketLeaderboardKey, polymarketLive, polymarketQuoteKey, tableId]);
+  }, [attributeFilters, livePicks, planLimit, polymarketBiggestWinnersColumns, polymarketBiggestWinnersFilterKey, polymarketBiggestWinnersKey, polymarketLeaderboardKey, polymarketLive, polymarketQuoteKey, rowLimit, tableId]);
 
   useEffect(() => {
     if (!previewSheet.startsWith("polymarket:")) return;
@@ -3299,20 +3362,24 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
       const waiting = polymarketDirected.status === "loading" || (polymarketRequirement && polymarketDirected.status === "idle");
       const source = scanning
         ? polymarketScan.rows || []
-        : polymarketDirected.status === "ready"
-          ? polymarketSheetSource || []
-          : waiting
-            ? []
-            : pull?.rows || [];
+        : tableId === "getBiggestWinners" && polymarketDirected.status === "loading"
+          ? polymarketDirected.rows || []
+          : polymarketDirected.status === "ready"
+            ? polymarketSheetSource || []
+            : waiting
+              ? []
+              : pull?.rows || [];
       const columns = scanning
         ? tableId === "getSamplingMarkets"
           ? polymarketSamplingColumns
           : polymarketMarketColumns
-        : polymarketLeaderboardColumns.length
-          ? polymarketLeaderboardColumns
-          : polymarketQuoteColumns.length
-            ? polymarketQuoteColumns
-            : pull?.columns || [];
+        : polymarketBiggestWinnersColumns.length
+          ? polymarketBiggestWinnersColumns
+          : polymarketLeaderboardColumns.length
+            ? polymarketLeaderboardColumns
+            : polymarketQuoteColumns.length
+              ? polymarketQuoteColumns
+              : pull?.columns || [];
       const matched = scanning ? source : source.filter((row) => rowMatchesAttributes(row, columns, attributeFilters));
       const sorted = sortAttributeRows(matched, columns, sortKeys);
       return capPreview(sorted.slice(0, PREVIEW_ROW_CAP));
@@ -3353,7 +3420,7 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
     const query = filterValue.trim().toLowerCase();
     const matched = !query || !filterColumn ? rows : rows.filter((row) => String(row[filterColumn] ?? "").toLowerCase().includes(query));
     return capPreview(matched);
-  }, [directPreview.rows, directPreview.status, directRowColumns, forecastRowColumns, pull, visibleCount, filterColumn, filterValue, guidedFilters, attributeFilters, sortKeys, rowLimit, integrationId, tableId, settledPreviewKey, previewSearchError, livePreviewRows, liveMarketSearch, liveDirect, liveEventCandles, liveForecast, liveMarketFanout, liveMultivariate, liveNarrowing, multivariateRowColumns, seriesAttributeColumns, listImportRows, idleAttributeRows, polymarketLive, polymarketDirected, polymarketRequirement, polymarketScan, polymarketMarketColumns, polymarketSamplingColumns, polymarketLeaderboardColumns, polymarketQuoteColumns, polymarketSheetSource]);
+  }, [directPreview.rows, directPreview.status, directRowColumns, forecastRowColumns, pull, visibleCount, filterColumn, filterValue, guidedFilters, attributeFilters, sortKeys, rowLimit, integrationId, tableId, settledPreviewKey, previewSearchError, livePreviewRows, liveMarketSearch, liveDirect, liveEventCandles, liveForecast, liveMarketFanout, liveMultivariate, liveNarrowing, multivariateRowColumns, seriesAttributeColumns, listImportRows, idleAttributeRows, polymarketLive, polymarketDirected, polymarketRequirement, polymarketScan, polymarketMarketColumns, polymarketSamplingColumns, polymarketBiggestWinnersColumns, polymarketLeaderboardColumns, polymarketQuoteColumns, polymarketSheetSource]);
 
   const queriedMarkets = useMemo(() => {
     if (!guidedFilters) return [];
@@ -3967,6 +4034,24 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
       request={polymarketScan.request || "GET /markets/keyset"}
       serverFilters={polymarketScan.serverFilters || []}
       requirements={polymarketScan.requirements || []}
+    />
+  ) : null;
+  const biggestWinnersTape = tableId === "getBiggestWinners" && polymarketBiggestWinnersFilterKey && polymarketDirected.startedAt ? (
+    <MarketScanSteps
+      source="Polymarket"
+      noun="win"
+      status={polymarketDirected.status === "ready" || polymarketDirected.status === "error" ? polymarketDirected.status : "loading"}
+      scanned={polymarketDirected.scanned || 0}
+      kept={Array.isArray(polymarketDirected.rows) ? polymarketDirected.rows.length : 0}
+      removedCount={polymarketDirected.removedCount || 0}
+      removed={polymarketDirected.removed || []}
+      error={polymarketDirected.error || ""}
+      startedAt={polymarketDirected.startedAt}
+      completedAt={polymarketDirected.completedAt || 0}
+      request={polymarketDirected.request || "GET /v2/biggest-winners"}
+      requirements={polymarketBiggestWinnersColumns
+        .filter((column) => !column.queryOnly && attributeSummary(column, attributeFilters))
+        .map((column) => column.title || column.id)}
     />
   ) : null;
   const liveRemovalTape = liveMarketSearch ? (
@@ -5607,6 +5692,7 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
         const columnsFor = (rows) => {
           if (tableId === "getSamplingMarkets") return polymarketSamplingColumns;
           if (tableId === "getMarkets") return polymarketMarketColumns;
+          if (polymarketBiggestWinnersColumns.length) return polymarketBiggestWinnersColumns;
           if (polymarketLeaderboardColumns.length) return polymarketLeaderboardColumns;
           if (polymarketQuoteColumns.length) return polymarketQuoteColumns;
           return pull?.columns || [];
@@ -5634,6 +5720,18 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
             filters: attributeFilters,
             rowLimit: importLimit,
             planLimit: sheetCap,
+            match: tableId === "getBiggestWinners" && polymarketBiggestWinnersFilterKey
+              ? (row) => rowMatchesAttributes(row, polymarketBiggestWinnersColumns, attributeFilters)
+              : undefined,
+            explain: tableId === "getBiggestWinners" && polymarketBiggestWinnersFilterKey
+              ? (row) => attributeMismatchReason(row, polymarketBiggestWinnersColumns, attributeFilters)
+              : undefined,
+            onProgress: tableId === "getBiggestWinners"
+              ? (info) => {
+                  const kept = Array.isArray(info?.rows) ? info.rows.length : 0;
+                  reporter.note("source", `Read ${Number(info?.scanned || 0).toLocaleString()} · kept ${kept.toLocaleString()}`);
+                }
+              : undefined,
           });
           const columns = columnsFor(result.rows);
           const matched = (result.rows || []).filter((row) => rowMatchesAttributes(row, columns, attributeFilters));
@@ -7967,8 +8065,10 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
                               ? polymarketMarketColumns
                               : tableId === "getSamplingMarkets" && polymarketSamplingColumns.length
                                 ? polymarketSamplingColumns
-                                : polymarketLeaderboardColumns.length
-                                  ? polymarketLeaderboardColumns
+                                : polymarketBiggestWinnersColumns.length
+                                  ? polymarketBiggestWinnersColumns
+                                  : polymarketLeaderboardColumns.length
+                                    ? polymarketLeaderboardColumns
                                   : polymarketQuoteColumns.length
                                     ? polymarketQuoteColumns
                                     : pull?.columns || []
@@ -8669,7 +8769,7 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
                 Refresh
               </Button>
             </div>
-          ) : loading || emptyRefresh || livePickAwaitingRows || liveScanWaiting || polymarketScanWaiting || directLoading || polymarketDirected.status === "loading" ? (
+          ) : loading || emptyRefresh || livePickAwaitingRows || liveScanWaiting || polymarketScanWaiting || directLoading || (polymarketDirected.status === "loading" && !(tableId === "getBiggestWinners" && (polymarketDirected.rows || []).length)) ? (
             <div className="flex h-full flex-col gap-3">
               {integrationId === "chainlink" || integrationId === "binance" ? <WaitingToConnectTag /> : null}
               {livePickAwaitingRows ? (
@@ -8679,6 +8779,7 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
               ) : null}
               {liveRemovalTape}
               {polymarketRemovalTape}
+              {biggestWinnersTape}
               <div className="min-h-0 flex-1">
                 <SkeletonRows />
               </div>
@@ -8687,6 +8788,7 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
             <div className="flex h-full flex-col">
               {liveRemovalTape}
               {polymarketRemovalTape}
+              {biggestWinnersTape}
               <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-3 rounded-xl border border-border/70 bg-background px-6 text-center shadow-sm">
                 <p className="max-w-md text-[13px] leading-relaxed text-muted-foreground">{liveEmptyLine}</p>
                 {tickerPrompt || polymarketClosedSheet ? null : (
@@ -8700,6 +8802,7 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
             <div className="flex h-full min-h-0 flex-col">
               {liveRemovalTape}
               {polymarketRemovalTape}
+              {biggestWinnersTape}
               <div className="min-h-0 flex-1">
             <IntegrationBuildGrid
               columns={marketsGrid.columns}

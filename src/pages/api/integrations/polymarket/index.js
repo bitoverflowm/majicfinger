@@ -1879,6 +1879,35 @@ export default async function handler(req, res) {
         data = await fetchJson(`${DATA_API_BASE}/v2/leaderboard?${params.toString()}`);
         break;
       }
+      case "getBiggestWinners": {
+        const timePeriod = String(req.query.time_period || req.query.timePeriod || "day").trim().toLowerCase();
+        const category = String(req.query.category || "overall").trim().toLowerCase().replace(/[\s_]+/g, "-");
+        const cursor = String(req.query.cursor || "").trim();
+        const limitText = String(req.query.limit ?? "").trim();
+        if (!["day", "week", "month", "all"].includes(timePeriod)) {
+          return res.status(400).json({ message: "Invalid biggest wins time period" });
+        }
+        if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(category) || category.length > 64) {
+          return res.status(400).json({ message: "Invalid biggest wins category" });
+        }
+        let limit = null;
+        if (limitText) {
+          limit = Number.parseInt(limitText, 10);
+          if (!Number.isInteger(limit) || limit < 0 || limit > 1000) {
+            return res.status(400).json({ message: "limit must be between 0 and 1000" });
+          }
+        }
+        const params = new URLSearchParams();
+        if (cursor) {
+          params.set("cursor", cursor);
+        } else {
+          params.set("time_period", timePeriod);
+          params.set("category", category);
+          if (limit != null) params.set("limit", String(limit));
+        }
+        data = await fetchJson(`${DATA_API_BASE}/v2/biggest-winners?${params.toString()}`);
+        break;
+      }
       case "getOpenInterest": {
         const raw = String(
           req.query.condition || req.query.condition_id || req.query.conditionId || req.query.market || "",

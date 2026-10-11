@@ -37,6 +37,7 @@ const ENDPOINT_TITLE_FALLBACKS = {
   getHolderTrades: "Holder Trades",
   getHolderTradedMarkets: "Total Markets Traded",
   getTraderLeaderboard: "Trader Leaderboard Rankings",
+  getBiggestWinners: "Biggest Wins",
 };
 
 export function genPolymarketLiveRequestCardId() {

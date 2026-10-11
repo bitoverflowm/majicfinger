@@ -2,6 +2,7 @@ import { displayCell } from "@/components/dashboardComposer/integrationRunSheets
 import { loadKalshiLiveDirect, loadKalshiLiveEventMarkets, loadKalshiLiveMarketByTicker, loadKalshiLiveMarketsForScope } from "@/components/dashboardComposer/integrationBuildCatalog";
 import { loadPolymarketLiveTable } from "@/components/dashboardComposer/polymarketLiveBuild";
 import { defaultPolymarketQuoteFilters } from "@/lib/polymarketLive/polymarketQuoteQuery";
+import { defaultPolymarketBiggestWinnersFilters } from "@/lib/polymarketLive/biggestWinnersCompose";
 import { defaultPolymarketLeaderboardFilters } from "@/lib/polymarketLive/traderLeaderboardCompose";
 import { sheetAssetIds } from "@/lib/realtime/sheetRealtime";
 import { rehydrateSheetFromProvenance } from "@/lib/rehydrateSheetFromProvenance";
@@ -75,7 +76,11 @@ async function replayPolymarket(block, planLimit) {
   const packed = await loadPolymarketLiveTable(table, pick ? [pick] : [], {
     rowLimit: planLimit,
     planLimit,
-    filters: table === "getTraderLeaderboard" ? defaultPolymarketLeaderboardFilters() : defaultPolymarketQuoteFilters(table),
+    filters: table === "getTraderLeaderboard"
+      ? defaultPolymarketLeaderboardFilters()
+      : table === "getBiggestWinners"
+        ? defaultPolymarketBiggestWinnersFilters()
+        : defaultPolymarketQuoteFilters(table),
   });
   return packed?.rows || [];
 }
