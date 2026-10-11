@@ -296,7 +296,6 @@ export function SheetBlockChart({ sheet, snapshot, onSnapshot, live = false, vie
         observations: countObservations(sheet, dataset),
       })
     : null;
-
   if (resolved?.view === "price") {
     return <PriceHistorySheetChart sheet={sheet} live={live} />;
   }

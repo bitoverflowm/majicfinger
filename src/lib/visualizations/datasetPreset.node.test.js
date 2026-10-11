@@ -12,7 +12,8 @@ import {
   stampDataset,
   toProbability,
 } from "./datasetDescriptor.js";
-import { resolveVisualization } from "./presetRegistry.js";
+import { isStatsDataset, resolveVisualization, visualizationChoices } from "./presetRegistry.js";
+import { buildVisualTable, formatSignedUsd, shortWallet } from "./visualTable.js";
 
 const holders = describeSheet({
   type: "sheet",
@@ -140,5 +141,44 @@ assert.equal(partialCaption({ coverage: "sampled" }, { shown: 1, loaded: 1, noun
 const stamped = stampDataset({ type: "sheet", integrationId: "polymarket", table: "getTickSize" });
 assert.equal(stamped.dataset.datasetType, "tick_size");
 assert.equal(stamped.dataset.seriesCount, undefined);
+
+const leaderboard = describeSheet({
+  type: "sheet",
+  integrationId: "polymarket",
+  table: "getTraderLeaderboard",
+  columns: [{ id: "user_name" }, { id: "pnl" }, { id: "rank" }],
+});
+assert.equal(leaderboard.datasetType, "leaderboard");
+assert.equal(leaderboard.category, "stats");
+assert.equal(isStatsDataset(leaderboard), true);
+assert.deepEqual(
+  visualizationChoices(leaderboard, ["user_name", "pnl", "rank"]).map((choice) => choice.label),
+  ["Rank", "Visual Table"],
+);
+assert.equal(
+  resolveVisualization(leaderboard, { custom: true, userView: "visual-table", columnIds: ["user_name", "pnl", "rank"] }).view,
+  "visual-table",
+);
+assert.equal(describeSheet({ type: "sheet", integrationId: "kalshiLive", table: "leaderboard" }).category, "stats");
+
+const table = buildVisualTable(
+  [
+    { rank: 2, user_name: "nigiri99", user_id: "0x1111111111111111111111111111111111111111", pnl: 1200, volume: 50000, verified: false, time_period: "day", category: "overall", sort_by: "PNL" },
+    { rank: 1, user_name: "HomeRunHazard", user_id: "0x5268527977f700f9bf9b6d5cd843859e4e70135d", pnl: "207.8K", volume: "1.2M", profile_image: "https://example.com/a.png", x_username: "homer", verified: "Yes", time_period: "day", category: "overall", sort_by: "PNL" },
+  ],
+  leaderboard,
+);
+assert.equal(table.rows[0].name, "HomeRunHazard");
+assert.equal(table.rows[0].avatar, "https://example.com/a.png");
+assert.equal(table.rows[0].handle, "homer");
+assert.equal(table.rows[0].pnl, 207800);
+assert.equal(table.rows[0].volume, 1200000);
+assert.equal(table.rows[0].verified, true);
+assert.equal(table.rows[1].verified, false);
+assert.deepEqual(table.caption, ["day", "overall", "PNL"]);
+assert.deepEqual(table.columns.map((column) => column.id), ["rank", "trader", "pnl", "volume", "verified", "handle"]);
+assert.equal(shortWallet(table.rows[0].wallet), "0x5268…135d");
+assert.equal(formatSignedUsd(207776).startsWith("+"), true);
+assert.equal(formatSignedUsd(-12).startsWith("−"), true);
 
 console.log("datasetPreset.node.test.js ok");

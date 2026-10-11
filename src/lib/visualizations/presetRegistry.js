@@ -37,6 +37,7 @@ const FIELD_NEEDS = {
   price: ["price"],
   "order-book": ["price", "size", "side"],
   depth: ["price", "size", "side"],
+  "visual-table": ["label"],
   metric: ["value"],
   quote: ["bid"],
   spec: ["value"],
@@ -88,6 +89,7 @@ function fallbackFor(view, dataset, columnIds) {
     diverging: ["table"],
     activity: ["scatter", "table"],
     scatter: ["table"],
+    "visual-table": ["bars", "table"],
   };
   for (const next of chain[view] || ["table"]) {
     if (next === "table" || viewValid(next, dataset, columnIds)) {
@@ -161,11 +163,37 @@ const SAVED_VIEWS = new Set([
   "overview",
   "activity",
   "scatter",
+  "visual-table",
   "table",
 ]);
 
 export function isSavedChartView(view) {
   return SAVED_VIEWS.has(view);
+}
+
+/** Leaderboard is the specific type. Stats is the broader family that shares Visual Table. */
+export function isStatsDataset(dataset) {
+  return dataset?.category === "stats" || dataset?.datasetType === "leaderboard";
+}
+
+/**
+ * Views offered for a pull. Visual Table is available on leaderboard and on stats.
+ * @param {object | null | undefined} dataset
+ * @param {Iterable<string>} [columnIds]
+ */
+export function visualizationChoices(dataset, columnIds) {
+  if (!isStatsDataset(dataset)) return [];
+  const ids = columnIds ? new Set(columnIds) : null;
+  const key = presetKey(dataset);
+  const preset = PRESETS[key] || PRESETS[dataset.datasetType];
+  const choices = [];
+  if (preset && viewValid(preset.view, dataset, ids)) {
+    choices.push({ view: preset.view, label: preset.label });
+  }
+  if (viewValid("visual-table", dataset, ids)) {
+    choices.push({ view: "visual-table", label: "Visual Table" });
+  }
+  return choices;
 }
 
 export function presetViews() {

@@ -14,9 +14,11 @@ import { DestructiveConfirmMenuItem } from "@/components/ui/destructive-confirm-
 import { useMyStateV2 } from "@/context/stateContextV2";
 import { duplicateTabName, saveWorkspaceStartTabs } from "@/lib/workspaceStartTabs";
 import { DashboardSheetGrid } from "@/components/dashboardComposer/dashboardSheetGrid";
+import { VisualTableView } from "@/components/dashboardComposer/visualTableView";
+import { Switch } from "@/components/ui/switch";
 import { isOrderBookSheet } from "@/components/dashboardComposer/orderBookLadder";
 import { countObservations, describeSheet } from "@/lib/visualizations/datasetDescriptor";
-import { resolveVisualization } from "@/lib/visualizations/presetRegistry";
+import { isStatsDataset, resolveVisualization } from "@/lib/visualizations/presetRegistry";
 import { isPriceHistorySheet } from "@/components/dashboardComposer/priceHistorySeries";
 import { SheetBlockChart } from "@/components/dashboardComposer/sheetBlockChart";
 import { layoutRunSheets } from "@/components/dashboardComposer/integrationRunSheets";
@@ -51,6 +53,8 @@ const WorkspaceCanvasContext = createContext(null);
 export function useWorkspaceCanvas() {
   return useContext(WorkspaceCanvasContext);
 }
+
+const VISUAL_TABLE_WIDTH = 660;
 
 const BLOCK_SIZE = {
   sheet: { w: 560, h: 360 },
@@ -518,7 +522,7 @@ export function WorkspaceCanvasProvider({ pageId, readOnly = false, children }) 
   );
 
   const createChartFromBlock = useCallback(
-    (id) => {
+    (id, forcedView) => {
       const sheet = blocks.find((block) => block.id === id && block.type === "sheet");
       if (!sheet) return;
       const dataset = describeSheet(sheet);
@@ -527,7 +531,8 @@ export function WorkspaceCanvasProvider({ pageId, readOnly = false, children }) 
         observations: dataset ? countObservations(sheet, dataset) : undefined,
       });
       const base = String(sheet.title || "Sheet").replace(/\s+chart$/, "").trim();
-      const chartView = resolved.view === "table" ? "" : resolved.view;
+      const requested = String(forcedView || "").trim();
+      const chartView = requested || (resolved.view === "table" ? "" : resolved.view);
       const specs = [
         {
           chartView,
@@ -1007,6 +1012,8 @@ function SheetBlockBody({ block, onChange, booting }) {
   const pulled = formatPulledAt(block.pulledAt);
   const shownCount = Math.max(filledRowCount(view.cells), Number(block.rowCount) || 0);
   const label = useTradeSheetLabel(usesHistoricalTradeSheet(block) ? block.id : "", shownCount);
+  const dataset = describeSheet(view);
+  const visual = block.presentation === "visual" && isStatsDataset(dataset);
   return (
     <div className="flex min-h-0 flex-1 flex-col">
       <div className="flex items-center gap-2 border-b border-border/70 px-3 py-2">
@@ -1030,7 +1037,8 @@ function SheetBlockBody({ block, onChange, booting }) {
           )}
         >
           <span>{booting ? "Loading…" : label}</span>
-          {pulled ? (
+          {pulled && visual ? <span className="whitespace-nowrap pl-2">Pulled {pulled}</span> : null}
+          {pulled && !visual ? (
             <span
               className={cn(
                 "grid grid-cols-[0fr] opacity-0 transition-[grid-template-columns,opacity] duration-200 ease-out",
@@ -1046,7 +1054,23 @@ function SheetBlockBody({ block, onChange, booting }) {
         </span>
       </div>
       <MarketLifeBar sheet={block} session={liveSession(canvas, block.id)} enabled={hasRealtime} />
-      {booting ? <SheetSkeleton /> : <DashboardSheetGrid block={view} onChange={onChange} readOnly={!!canvas?.readOnly} />}
+      {booting ? (
+        <SheetSkeleton />
+      ) : visual ? (
+        <VisualTableView
+          sheet={view}
+          dataset={dataset}
+          hidden={block.visualHidden}
+          readOnly={!!canvas?.readOnly}
+          onHideColumn={(id) => {
+            const next = new Set(Array.isArray(block.visualHidden) ? block.visualHidden : []);
+            next.add(id);
+            onChange({ visualHidden: [...next] });
+          }}
+        />
+      ) : (
+        <DashboardSheetGrid block={view} onChange={onChange} readOnly={!!canvas?.readOnly} />
+      )}
     </div>
   );
 }
@@ -1195,6 +1219,9 @@ function SheetFullscreen({ block, onChange, onClose }) {
   const view = liveBlock(block, canvas);
   const shownCount = Math.max(filledRowCount(view.cells), Number(block.rowCount) || 0);
   const label = useTradeSheetLabel(usesHistoricalTradeSheet(block) ? block.id : "", shownCount);
+  const dataset = describeSheet(view);
+  const visual = block.presentation === "visual" && isStatsDataset(dataset);
+  const pulled = formatPulledAt(block.pulledAt);
   return createPortal(
     <div
       data-sheet-fullscreen=""
@@ -1205,7 +1232,10 @@ function SheetFullscreen({ block, onChange, onClose }) {
         <Table2 className="size-4 text-muted-foreground" aria-hidden />
         <span className="w-fit max-w-[40%] shrink-0 truncate text-[15px] font-semibold">{block.title || "Data sheet"}</span>
         <SheetMarketCaption block={block} />
-        <span className="text-[12px] tabular-nums text-muted-foreground">{label}</span>
+        <span className="text-[12px] tabular-nums text-muted-foreground">
+          {label}
+          {pulled ? ` · Pulled ${pulled}` : ""}
+        </span>
         <button
           type="button"
           onPointerDown={(event) => event.stopPropagation()}
@@ -1225,7 +1255,11 @@ function SheetFullscreen({ block, onChange, onClose }) {
         enabled={!!realtimeSheetForBlock(block, canvas?.blocks || [])}
       />
       <div className="flex min-h-0 flex-1 flex-col p-4">
-        <DashboardSheetGrid block={view} onChange={onChange} />
+        {visual ? (
+          <VisualTableView sheet={view} dataset={dataset} hidden={block.visualHidden} readOnly />
+        ) : (
+          <DashboardSheetGrid block={view} onChange={onChange} />
+        )}
       </div>
     </div>,
     document.body,
@@ -1290,7 +1324,7 @@ function CanvasBlock({ block, selected, spotlight = false, onSelect, onChange, b
     if (
       e.target instanceof Element &&
       e.target.closest(
-        "[data-sheet-fullscreen],[data-sheet-grid],[data-sheet-chart],[data-resize],[data-block-menu],[data-realtime-toggle],[role='menu'],[role='menuitem'],.gdg-style,.gdg-unstyle,textarea,input",
+        "[data-sheet-fullscreen],[data-sheet-grid],[data-visual-table],[data-sheet-chart],[data-resize],[data-block-menu],[data-realtime-toggle],[role='menu'],[role='menuitem'],.gdg-style,.gdg-unstyle,textarea,input",
       )
     ) {
       return;
@@ -1430,6 +1464,51 @@ function CanvasBlock({ block, selected, spotlight = false, onSelect, onChange, b
                 <BarChart3 className="size-4 text-muted-foreground" />
                 Create chart
               </DropdownMenuItem>
+              {isStatsDataset(describeSheet(block)) ? (
+                block.visualReady ? (
+                  <div
+                    className="flex items-center justify-between gap-3 rounded-md px-2 py-2 text-[13px]"
+                    onPointerDown={(event) => event.stopPropagation()}
+                  >
+                    <span>Visual table</span>
+                    <Switch
+                      checked={block.presentation === "visual"}
+                      aria-label="Visual table"
+                      onCheckedChange={(on) => {
+                        if (on) {
+                          onChange({
+                            presentation: "visual",
+                            visualReady: true,
+                            sheetW: block.sheetW || block.w,
+                            w: VISUAL_TABLE_WIDTH,
+                          });
+                          return;
+                        }
+                        onChange({
+                          presentation: "sheet",
+                          w: block.sheetW || block.w,
+                        });
+                      }}
+                      onClick={(event) => event.stopPropagation()}
+                    />
+                  </div>
+                ) : (
+                  <DropdownMenuItem
+                    className="gap-2.5 rounded-md px-2 py-2 text-[13px]"
+                    onSelect={() =>
+                      onChange({
+                        presentation: "visual",
+                        visualReady: true,
+                        sheetW: block.w,
+                        w: VISUAL_TABLE_WIDTH,
+                      })
+                    }
+                  >
+                    <Table2 className="size-4 text-muted-foreground" />
+                    Visual Table
+                  </DropdownMenuItem>
+                )
+              ) : null}
               <DropdownMenuSeparator />
             </>
           ) : null}

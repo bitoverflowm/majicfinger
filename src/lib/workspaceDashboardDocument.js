@@ -202,6 +202,7 @@ function cleanDataset(value) {
     sourceTable: cleanText(value.sourceTable, 80),
     seriesKeys: Array.isArray(value.seriesKeys) ? value.seriesKeys.slice(0, 8).map((key) => cleanText(key, 40)).filter(Boolean) : [],
     required: Array.isArray(value.required) ? value.required.slice(0, 12).map((key) => cleanText(key, 40)).filter(Boolean) : [],
+    ...(value.category === "stats" ? { category: "stats" } : {}),
     fields,
     units: {
       price: cleanText(value.units?.price, 30),
@@ -263,6 +264,13 @@ function cleanBlock(block) {
     ...(pull ? { pull } : {}),
     ...(provenance ? { provenance } : {}),
     ...(chart ? { chart } : {}),
+    ...(block.presentation === "visual" || block.presentation === "sheet" ? { presentation: block.presentation } : {}),
+    ...(block.visualReady ? { visualReady: true } : {}),
+    ...(Array.isArray(block.visualHidden) && block.visualHidden.length
+      ? { visualHidden: block.visualHidden.slice(0, 12).map((id) => cleanText(id, 40)).filter(Boolean) }
+      : {}),
+    ...(num(block.sheetW) > 0 ? { sheetW: num(block.sheetW) } : {}),
+    ...(num(block.pulledAt) > 0 ? { pulledAt: Math.floor(num(block.pulledAt)) } : {}),
   };
 }
 

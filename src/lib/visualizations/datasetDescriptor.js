@@ -126,6 +126,7 @@ const ENDPOINTS = {
   }),
   "kalshi:leaderboard": spec({
     datasetType: "leaderboard",
+    category: "stats",
     shape: "ranking",
     seriesKeys: ["nickname"],
     units: { metric: "rank_metric" },
@@ -300,10 +301,20 @@ const ENDPOINTS = {
   }),
   "polymarket:getTraderLeaderboard": spec({
     datasetType: "leaderboard",
+    category: "stats",
     shape: "ranking",
     seriesKeys: ["user_id"],
     units: { metric: "usdc" },
-    fields: { label: "user_name", wallet: "user_id", value: "pnl", rank: "rank" },
+    fields: {
+      label: "user_name",
+      wallet: "user_id",
+      value: "pnl",
+      rank: "rank",
+      volume: "volume",
+      avatar: "profile_image",
+      handle: "x_username",
+      verified: "verified",
+    },
     required: ["pnl"],
   }),
   "polymarket:getCurrentPositions": spec({
