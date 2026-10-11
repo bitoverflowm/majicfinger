@@ -2,7 +2,8 @@ import assert from "node:assert/strict";
 
 import { SPECTRUM_HEAT_DEFAULTS } from "@/components/spectrumui/charts/heatmapColors.js";
 import { describeSheet } from "./datasetDescriptor.js";
-import { isStatsDataset, resolveVisualization } from "./presetRegistry.js";
+import { hasVisualTable, isStatsDataset, resolveVisualization, visualizationChoices } from "./presetRegistry.js";
+import { buildVisualTable, formatPositionUsd, marketMonogram } from "./visualTable.js";
 import { formatPnl4, pnlColorCap, pnlFill, positionTreemapModel, zeroValueSummary } from "./portfolioTreemap.js";
 
 const sheet = {
@@ -35,6 +36,11 @@ const dataset = describeSheet(sheet);
 assert.equal(dataset.datasetType, "trader_positions");
 assert.equal(dataset.category, "portfolio");
 assert.equal(isStatsDataset(dataset), false);
+assert.equal(hasVisualTable(dataset), true);
+assert.deepEqual(
+  visualizationChoices(dataset, ["title", "outcome", "current_value", "unrealized_pnl"]).map((choice) => choice.label),
+  ["Portfolio", "Visual Table"],
+);
 assert.equal(
   resolveVisualization(dataset, {
     columnIds: ["title", "outcome", "current_value", "unrealized_pnl"],
@@ -83,5 +89,43 @@ assert.equal(
   ]),
   "2 zero-value positions · −10.7049 USDC unrealized P&L",
 );
+
+const log = buildVisualTable(
+  [
+    {
+      title: "Highest temperature in London",
+      outcome: "Yes",
+      status: "OPEN",
+      icon: "https://images.example/london.png",
+      current_size: 1.8835,
+      current_value: 1.5,
+      unrealized_pnl: -0.0051,
+      name: "Zoomify",
+    },
+    {
+      title: "Over $8M committed to the P2P Protocol public sale?",
+      outcome: "Yes",
+      status: "REDEEMABLE",
+      current_size: 13.7699,
+      current_value: 0,
+      unrealized_pnl: -10.6999,
+      name: "Zoomify",
+    },
+  ],
+  dataset,
+);
+assert.deepEqual(log.columns.map((column) => column.id), ["position", "status", "size", "value", "unrealized"]);
+assert.deepEqual(log.caption, ["Zoomify"]);
+assert.equal(log.rows[0].market, "Highest temperature in London");
+assert.equal(log.rows[0].outcome, "Yes");
+assert.equal(log.rows[0].status, "Open");
+assert.equal(log.rows[0].icon, "https://images.example/london.png");
+assert.equal(log.rows[1].status, "Redeemable");
+assert.equal(log.rows[1].value, 0);
+assert.equal(log.rows[1].pnl, -10.6999);
+assert.equal(marketMonogram("Will the highest temperature in Madrid be 30°C on October 12?"), "MA");
+assert.equal(marketMonogram("Over $8M committed to the P2P Protocol public sale?"), "P2");
+assert.equal(formatPositionUsd(-0.0051), "−$0.0051");
+assert.equal(formatPositionUsd(-10.6999), "−$10.70");
 
 console.log("portfolioTreemap.node.test.js ok");

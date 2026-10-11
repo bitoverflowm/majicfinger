@@ -54,6 +54,7 @@ export const TRADER_POSITIONS_DEFAULT_COLUMNS = [
   "unrealized_pnl",
   "total_pnl",
   "name",
+  "icon",
 ];
 
 /** @type {Array<{ name: string, type: string, description: string, title?: string, dateEpoch?: "iso" | "unix", exact?: boolean }>} */

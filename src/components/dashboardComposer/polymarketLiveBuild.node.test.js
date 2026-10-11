@@ -83,6 +83,7 @@ const positionColumns = polymarketLiveBuildColumns("getTraderPositions");
 assert.equal(positionColumns.some((column) => column.id === "sort_by"), false);
 assert.equal(positionColumns.find((column) => column.id === "last_event_at")?.dateEpoch, "unix");
 assert.equal(positionColumns.find((column) => column.id === "title")?.defaultOn, true);
+assert.equal(positionColumns.find((column) => column.id === "icon")?.defaultOn, true);
 assert.equal(positionColumns.find((column) => column.id === "user")?.defaultOn, false);
 assert.equal(endpoints.find((endpoint) => endpoint.id === "getTraderByAddress")?.title, "Get trader's profile and stats");
 assert.equal(

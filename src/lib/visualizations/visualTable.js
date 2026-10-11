@@ -43,6 +43,25 @@ export function shortWallet(value) {
   return `${wallet.slice(0, 6)}…${wallet.slice(-4)}`;
 }
 
+const MARKET_SKIP = new Set(["will", "the", "be", "a", "an", "of", "to", "for", "by", "on", "in", "and", "or", "over"]);
+
+/** Two-letter stand-in when a market has no icon yet. */
+export function marketMonogram(title) {
+  const raw = String(title || "");
+  const place = raw.match(/\bin\s+([A-Za-z][\w-]*)/);
+  if (place) return place[1].slice(0, 2).toUpperCase();
+  const tokens = raw.match(/\b[A-Za-z]*\d+[A-Za-z0-9]*\b/g) || [];
+  const named = tokens.find((token) => /^[A-Za-z]/.test(token));
+  if (named) return named.slice(0, 2).toUpperCase();
+  const words = raw.split(/\s+/).filter(Boolean);
+  const picked = words.filter((word) => {
+    const clean = word.replace(/[^a-z0-9]/gi, "");
+    return clean && !MARKET_SKIP.has(word.toLowerCase()) && !/^\d/.test(clean);
+  });
+  const clean = (picked[0] || words[0] || "?").replace(/[^a-z0-9]/gi, "");
+  return (clean.slice(0, 2) || "?").toUpperCase();
+}
+
 export function traderInitials(name, wallet) {
   const words = String(name || "")
     .trim()
@@ -71,6 +90,87 @@ export function formatUsd(value) {
 export function formatShares(value) {
   if (!Number.isFinite(value)) return "—";
   return COUNT.format(value);
+}
+
+const POSITION_STATUS = {
+  OPEN: "Open",
+  CLOSED: "Closed",
+  REDEEMABLE: "Redeemable",
+  REDEEMABLE_LOST: "Redeemable lost",
+  MERGEABLE: "Mergeable",
+};
+
+/** Position money. Sub-dollar amounts keep four places so −0.0051 stays readable. */
+export function formatPositionUsd(value) {
+  if (!Number.isFinite(value)) return "—";
+  const abs = Math.abs(value);
+  const digits = abs !== 0 && abs < 1 ? 4 : 2;
+  const body = new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency: "USD",
+    minimumFractionDigits: digits,
+    maximumFractionDigits: digits,
+  }).format(abs);
+  if (value < 0) return `−${body}`;
+  if (value > 0) return `+${body}`;
+  return body;
+}
+
+export function formatPositionSize(value) {
+  if (!Number.isFinite(value)) return "—";
+  return new Intl.NumberFormat("en-US", { maximumFractionDigits: 4 }).format(value);
+}
+
+function statusLabel(value) {
+  const raw = String(value || "").trim();
+  if (!raw) return "";
+  return POSITION_STATUS[raw.toUpperCase()] || raw;
+}
+
+/**
+ * Position log. Sheet order is kept, including rows whose current value is zero.
+ * @param {Array<Record<string, unknown>>} records
+ * @param {{ fields?: Record<string, string> }} [dataset]
+ */
+function buildPositionLog(records, dataset) {
+  const fields = dataset?.fields || {};
+  const rows = (records || [])
+    .map((record) => {
+      const title = text(record, fields.label, "title");
+      const outcome = text(record, fields.outcome, "outcome");
+      const icon = text(record, fields.icon, "icon");
+      const trader = text(record, "name");
+      return {
+        market: title || outcome || "Position",
+        outcome: title && outcome && outcome.toLowerCase() !== title.toLowerCase() ? outcome : "",
+        trader,
+        status: statusLabel(text(record, fields.status, "status")),
+        icon: /^https?:\/\//i.test(icon) ? icon : "",
+        size: number(record, fields.size, "current_size"),
+        value: number(record, fields.value, "current_value"),
+        pnl: number(record, fields.pnl, "unrealized_pnl"),
+      };
+    })
+    .filter((row) => row.market || row.status || row.value != null || row.pnl != null);
+
+  const maxValue = Math.max(1, ...rows.map((row) => Math.abs(row.value || 0)));
+  const maxPnl = Math.max(1, ...rows.map((row) => Math.abs(row.pnl || 0)));
+  const names = [...new Set(rows.map((row) => row.trader).filter(Boolean))];
+  return {
+    caption: names.length === 1 ? [names[0]] : [],
+    columns: [
+      { id: "position", label: "Position" },
+      rows.some((row) => row.status) ? { id: "status", label: "Status" } : null,
+      rows.some((row) => row.size != null) ? { id: "size", label: "Size" } : null,
+      rows.some((row) => row.value != null) ? { id: "value", label: "Value" } : null,
+      rows.some((row) => row.pnl != null) ? { id: "unrealized", label: "Unrealized" } : null,
+    ].filter(Boolean),
+    rows: rows.map((row) => ({
+      ...row,
+      valueShare: row.value == null ? 0 : Math.abs(row.value) / maxValue,
+      pnlShare: row.pnl == null ? 0 : Math.abs(row.pnl) / maxPnl,
+    })),
+  };
 }
 
 /** Top traders for the horizontal rank chart, in leaderboard order. */
@@ -186,6 +286,7 @@ function buildBiggestWinsTable(source, dataset) {
  */
 export function buildVisualTable(records, dataset) {
   const source = Array.isArray(records) ? records : [];
+  if (dataset?.datasetType === "trader_positions") return buildPositionLog(source, dataset);
   if (dataset?.datasetType === "biggest_wins") return buildBiggestWinsTable(source, dataset);
   const fields = dataset?.fields || {};
   const hasColumn = (key) => source.some((row) => row && Object.prototype.hasOwnProperty.call(row, key));

@@ -8,9 +8,12 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger } from "@/compon
 import { sheetRecords } from "@/lib/visualizations/datasetDescriptor";
 import {
   buildVisualTable,
+  formatPositionSize,
+  formatPositionUsd,
   formatShares,
   formatSignedUsd,
   formatUsd,
+  marketMonogram,
   shortWallet,
   traderInitials,
 } from "@/lib/visualizations/visualTable";
@@ -25,6 +28,12 @@ function Meter({ share, tone }) {
       />
     </span>
   );
+}
+
+function columnAlign(id) {
+  if (id === "pnl" || id === "volume" || id === "stake" || id === "size" || id === "value" || id === "unrealized") return "right";
+  if (id === "verified") return "center";
+  return "left";
 }
 
 function ColumnHead({ column, align, readOnly, onHide }) {
@@ -62,7 +71,9 @@ export function VisualTableView({ sheet, dataset, hidden = [], readOnly = false,
   if (!model.rows.length) {
     const empty = dataset?.datasetType === "biggest_wins"
       ? "This board has no wins to show yet."
-      : "This leaderboard has no traders to show yet.";
+      : dataset?.datasetType === "trader_positions"
+        ? "This log has no positions to show yet."
+        : "This leaderboard has no traders to show yet.";
     return <p className="px-3 text-[12px] text-muted-foreground">{empty}</p>;
   }
   if (!columns.length) {
@@ -81,7 +92,7 @@ export function VisualTableView({ sheet, dataset, hidden = [], readOnly = false,
                 <ColumnHead
                   key={column.id}
                   column={column}
-                  align={column.id === "pnl" || column.id === "volume" || column.id === "stake" ? "right" : column.id === "verified" ? "center" : "left"}
+                  align={columnAlign(column.id)}
                   readOnly={readOnly}
                   onHide={onHideColumn}
                 />
@@ -98,6 +109,61 @@ export function VisualTableView({ sheet, dataset, hidden = [], readOnly = false,
                       return (
                         <td key={column.id} className="px-2 py-1.5 font-mono text-[12px] tabular-nums text-muted-foreground">
                           {row.rank != null && row.rank > 0 ? row.rank : ""}
+                        </td>
+                      );
+                    }
+                    if (column.id === "position") {
+                      return (
+                        <td key={column.id} className="px-2 py-1.5">
+                          <div className="flex min-w-0 items-center gap-2">
+                            <Avatar className="size-6">
+                              {row.icon ? <AvatarImage src={row.icon} alt="" /> : null}
+                              <AvatarFallback className="text-[9px] font-medium">{marketMonogram(row.market)}</AvatarFallback>
+                            </Avatar>
+                            <div className="min-w-0">
+                              <p className="max-w-[16rem] truncate font-medium leading-tight" title={row.market}>{row.market}</p>
+                              {row.outcome ? <p className="max-w-[16rem] truncate text-[11px] text-muted-foreground">{row.outcome}</p> : null}
+                            </div>
+                          </div>
+                        </td>
+                      );
+                    }
+                    if (column.id === "status") {
+                      return (
+                        <td key={column.id} className="px-2 py-1.5">
+                          {row.status ? (
+                            <span className="inline-flex rounded-md bg-muted px-1.5 py-0.5 text-[11px] text-muted-foreground">{row.status}</span>
+                          ) : null}
+                        </td>
+                      );
+                    }
+                    if (column.id === "size") {
+                      return (
+                        <td key={column.id} className="px-2 py-1.5 text-right font-mono text-[12px] tabular-nums">
+                          {formatPositionSize(row.size)}
+                        </td>
+                      );
+                    }
+                    if (column.id === "value") {
+                      return (
+                        <td key={column.id} className="px-2 py-1.5">
+                          <div className="flex items-center justify-end gap-1.5">
+                            <Meter share={row.valueShare} tone="#94a3b8" />
+                            <span className="font-mono text-[12px] tabular-nums">{formatPositionUsd(row.value).replace(/^\+/, "")}</span>
+                          </div>
+                        </td>
+                      );
+                    }
+                    if (column.id === "unrealized") {
+                      const tone = row.pnl != null && row.pnl < 0 ? "#fb7185" : "#28CC95";
+                      return (
+                        <td key={column.id} className="px-2 py-1.5">
+                          <div className="flex items-center justify-end gap-1.5">
+                            <Meter share={row.pnlShare} tone={row.pnl ? tone : "#94a3b8"} />
+                            <span className="font-mono text-[12px] tabular-nums" style={{ color: row.pnl ? tone : undefined }}>
+                              {formatPositionUsd(row.pnl)}
+                            </span>
+                          </div>
                         </td>
                       );
                     }

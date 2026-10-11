@@ -18,7 +18,7 @@ import { VisualTableView } from "@/components/dashboardComposer/visualTableView"
 import { Switch } from "@/components/ui/switch";
 import { isOrderBookSheet } from "@/components/dashboardComposer/orderBookLadder";
 import { columnKey, countObservations, describeSheet } from "@/lib/visualizations/datasetDescriptor";
-import { isStatsDataset, resolveVisualization } from "@/lib/visualizations/presetRegistry";
+import { hasVisualTable, resolveVisualization } from "@/lib/visualizations/presetRegistry";
 import { isPriceHistorySheet } from "@/components/dashboardComposer/priceHistorySeries";
 import { SheetBlockChart } from "@/components/dashboardComposer/sheetBlockChart";
 import { layoutRunSheets } from "@/components/dashboardComposer/integrationRunSheets";
@@ -1075,7 +1075,7 @@ function SheetBlockBody({ block, onChange, booting }) {
   const shownCount = Math.max(filledRowCount(view.cells), Number(block.rowCount) || 0);
   const label = useTradeSheetLabel(usesHistoricalTradeSheet(block) ? block.id : "", shownCount);
   const dataset = describeSheet(view);
-  const visual = block.presentation === "visual" && isStatsDataset(dataset);
+  const visual = block.presentation === "visual" && hasVisualTable(dataset);
   return (
     <div className="flex min-h-0 flex-1 flex-col">
       <div className="flex items-center gap-2 border-b border-border/70 px-3 py-2">
@@ -1285,7 +1285,7 @@ function SheetFullscreen({ block, onChange, onClose }) {
   const shownCount = Math.max(filledRowCount(view.cells), Number(block.rowCount) || 0);
   const label = useTradeSheetLabel(usesHistoricalTradeSheet(block) ? block.id : "", shownCount);
   const dataset = describeSheet(view);
-  const visual = block.presentation === "visual" && isStatsDataset(dataset);
+  const visual = block.presentation === "visual" && hasVisualTable(dataset);
   const pulled = formatPulledAt(block.pulledAt);
   return createPortal(
     <div
@@ -1648,7 +1648,7 @@ function CanvasBlock({ block, selected, spotlight = false, onSelect, onChange, b
                 <BarChart3 className="size-4 text-muted-foreground" />
                 Create chart
               </DropdownMenuItem>
-              {isStatsDataset(describeSheet(block)) ? (
+              {hasVisualTable(describeSheet(block)) ? (
                 block.visualReady ? (
                   <div
                     className="flex items-center gap-2.5 rounded-md px-2 py-2 text-[13px]"

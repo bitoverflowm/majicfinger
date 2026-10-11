@@ -347,6 +347,9 @@ const ENDPOINTS = {
     fields: {
       label: "title",
       outcome: "outcome",
+      status: "status",
+      icon: "icon",
+      size: "current_size",
       value: "current_value",
       pnl: "unrealized_pnl",
     },

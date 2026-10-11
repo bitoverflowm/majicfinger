@@ -181,13 +181,18 @@ export function isStatsDataset(dataset) {
   return dataset?.category === "stats" || dataset?.datasetType === "leaderboard" || dataset?.datasetType === "biggest_wins";
 }
 
+/** Sheets that can switch into the visual table. Positions keep their own log. */
+export function hasVisualTable(dataset) {
+  return isStatsDataset(dataset) || dataset?.datasetType === "trader_positions";
+}
+
 /**
  * Views offered for a pull. Visual Table is available on every stats dataset.
  * @param {object | null | undefined} dataset
  * @param {Iterable<string>} [columnIds]
  */
 export function visualizationChoices(dataset, columnIds) {
-  if (!isStatsDataset(dataset)) return [];
+  if (!hasVisualTable(dataset)) return [];
   const ids = columnIds ? new Set(columnIds) : null;
   const key = presetKey(dataset);
   const preset = PRESETS[key] || PRESETS[dataset.datasetType];
