@@ -197,4 +197,70 @@ assert.equal(shortWallet(table.rows[0].wallet), "0x5268…135d");
 assert.equal(formatSignedUsd(207776).startsWith("+"), true);
 assert.equal(formatSignedUsd(-12).startsWith("−"), true);
 
+const biggestWins = describeSheet({
+  type: "sheet",
+  integrationId: "polymarket",
+  table: "getBiggestWinners",
+  columns: [{ id: "user_name" }, { id: "pnl" }, { id: "win_rank" }, { id: "event_title" }],
+});
+assert.equal(biggestWins.datasetType, "biggest_wins");
+assert.equal(biggestWins.category, "stats");
+assert.equal(isStatsDataset(biggestWins), true);
+assert.deepEqual(
+  visualizationChoices(biggestWins, ["user_name", "pnl", "win_rank", "event_title"]).map((choice) => choice.label),
+  ["Wins", "Visual Table"],
+);
+assert.equal(resolveVisualization(biggestWins, { columnIds: ["user_name", "pnl", "event_title"] }).view, "bars");
+
+const winTable = buildVisualTable(
+  [
+    {
+      win_rank: 2,
+      kind: "market",
+      user_name: "Sassy-Bucket",
+      user_id: "0x1111111111111111111111111111111111111111",
+      pnl: "9.1K",
+      initial_value: 400,
+      event_title: "Georgia vs Alabama",
+      resolved_at: "Oct 11, 2026, 1:00:00 AM",
+      time_period: "day",
+      category: "overall",
+    },
+    {
+      win_rank: 1,
+      kind: "combo",
+      user_name: "HomeRunHazard",
+      pnl: "20.4K",
+      initial_value: "1.2K",
+      event_title: "Cleveland Guardians vs. Chicago White Sox: O/U 8.5 / Jacksonville State vs. Kennesaw State: O/U 47.5",
+      event_id: 0,
+      time_period: "day",
+      category: "overall",
+    },
+  ],
+  biggestWins,
+);
+assert.equal(winTable.rows[0].name, "HomeRunHazard");
+assert.equal(winTable.rows[0].kind, "Combo");
+assert.equal(winTable.rows[0].event.includes(" / "), true);
+assert.equal(winTable.rows[0].stake, 1200);
+assert.equal(winTable.rows[1].kind, "Market");
+assert.equal(winTable.rows[1].when.includes("Oct"), true);
+assert.deepEqual(winTable.caption, ["day", "overall"]);
+assert.deepEqual(winTable.columns.map((column) => column.id), ["rank", "trader", "win", "pnl"]);
+
+const winBars = leaderboardBarRows(
+  [
+    { win_rank: "2", user_name: "Sassy-Bucket", pnl: "9.1K", event_title: "Georgia vs Alabama" },
+    { win_rank: "1", user_name: "HomeRunHazard", pnl: "20.4K", event_title: "Cleveland Guardians vs. Chicago White Sox: O/U 8.5" },
+  ],
+  biggestWins,
+  10,
+);
+assert.equal(winBars[0].name.startsWith("HomeRunHazard · "), true);
+assert.equal(winBars[0].name.includes("Cleveland"), true);
+assert.equal(winBars[0].short, "HomeRunHazard");
+assert.equal(winBars[0].value, 20400);
+assert.equal(winBars[1].short, "Sassy-Bucket");
+
 console.log("datasetPreset.node.test.js ok");

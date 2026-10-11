@@ -10,6 +10,7 @@ import {
   buildVisualTable,
   formatShares,
   formatSignedUsd,
+  formatUsd,
   shortWallet,
   traderInitials,
 } from "@/lib/visualizations/visualTable";
@@ -59,7 +60,10 @@ export function VisualTableView({ sheet, dataset, hidden = [], readOnly = false,
   const model = buildVisualTable(sheetRecords(sheet), dataset);
   const columns = model.columns.filter((column) => !hiddenIds.has(column.id));
   if (!model.rows.length) {
-    return <p className="px-3 text-[12px] text-muted-foreground">This leaderboard has no traders to show yet.</p>;
+    const empty = dataset?.datasetType === "biggest_wins"
+      ? "This board has no wins to show yet."
+      : "This leaderboard has no traders to show yet.";
+    return <p className="px-3 text-[12px] text-muted-foreground">{empty}</p>;
   }
   if (!columns.length) {
     return <p className="px-3 text-[12px] text-muted-foreground">Every column is hidden on this visual. The sheet still has the data.</p>;
@@ -77,7 +81,7 @@ export function VisualTableView({ sheet, dataset, hidden = [], readOnly = false,
                 <ColumnHead
                   key={column.id}
                   column={column}
-                  align={column.id === "pnl" || column.id === "volume" ? "right" : column.id === "verified" ? "center" : "left"}
+                  align={column.id === "pnl" || column.id === "volume" || column.id === "stake" ? "right" : column.id === "verified" ? "center" : "left"}
                   readOnly={readOnly}
                   onHide={onHideColumn}
                 />
@@ -121,6 +125,25 @@ export function VisualTableView({ sheet, dataset, hidden = [], readOnly = false,
                             <span className="font-mono text-[12px] tabular-nums" style={{ color: row.pnl == null ? undefined : pnlTone }}>
                               {formatSignedUsd(row.pnl)}
                             </span>
+                          </div>
+                        </td>
+                      );
+                    }
+                    if (column.id === "win") {
+                      const detail = [row.kind, row.when].filter(Boolean).join(" · ");
+                      return (
+                        <td key={column.id} className="px-2 py-1.5">
+                          <p className="max-w-[14rem] truncate font-medium leading-tight" title={row.event}>{row.event || "—"}</p>
+                          {detail ? <p className="max-w-[14rem] truncate text-[11px] text-muted-foreground">{detail}</p> : null}
+                        </td>
+                      );
+                    }
+                    if (column.id === "stake") {
+                      return (
+                        <td key={column.id} className="px-2 py-1.5">
+                          <div className="flex items-center justify-end gap-1.5">
+                            <Meter share={row.stakeShare} tone="#94a3b8" />
+                            <span className="font-mono text-[12px] tabular-nums">{formatUsd(row.stake)}</span>
                           </div>
                         </td>
                       );

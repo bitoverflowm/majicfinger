@@ -24,6 +24,7 @@ const PRESETS = {
   series: { view: "overview", label: "Series" },
   holders: { view: "bars", label: "Shares", limit: 10, noun: "holders" },
   leaderboard: { view: "bars", label: "Rank", limit: 10, noun: "traders" },
+  biggest_wins: { view: "bars", label: "Wins", limit: 10, noun: "wins" },
   positions_open: { view: "bars", label: "Position value", limit: 10, noun: "positions" },
   positions_closed: { view: "diverging", label: "Realized PnL", limit: 10, noun: "positions" },
   holder_trades: { view: "activity", label: "Buy / sell", curve: "linear" },
@@ -171,13 +172,13 @@ export function isSavedChartView(view) {
   return SAVED_VIEWS.has(view);
 }
 
-/** Leaderboard is the specific type. Stats is the broader family that shares Visual Table. */
+/** Leaderboard and biggest wins are the specific types. Stats is the family that shares Visual Table. */
 export function isStatsDataset(dataset) {
-  return dataset?.category === "stats" || dataset?.datasetType === "leaderboard";
+  return dataset?.category === "stats" || dataset?.datasetType === "leaderboard" || dataset?.datasetType === "biggest_wins";
 }
 
 /**
- * Views offered for a pull. Visual Table is available on leaderboard and on stats.
+ * Views offered for a pull. Visual Table is available on every stats dataset.
  * @param {object | null | undefined} dataset
  * @param {Iterable<string>} [columnIds]
  */

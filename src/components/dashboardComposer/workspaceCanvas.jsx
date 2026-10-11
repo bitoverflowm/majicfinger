@@ -74,6 +74,21 @@ function newId() {
   return `block-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`;
 }
 
+function assignUniqueIds(blocks, reserved = []) {
+  const seen = new Set((reserved || []).map((block) => block?.id).filter(Boolean));
+  return (blocks || []).map((block) => {
+    const id = block?.id || "";
+    if (!id || !seen.has(id)) {
+      if (id) seen.add(id);
+      return block;
+    }
+    let unique = `${id}-${newId()}`;
+    while (seen.has(unique)) unique = `${id}-${newId()}`;
+    seen.add(unique);
+    return { ...block, id: unique };
+  });
+}
+
 function canvasStorageKey(userId, pageId) {
   return `lycheeWorkspaceCanvas:v1:${userId || "local"}:${pageId || "workspace"}`;
 }
@@ -165,6 +180,7 @@ export function WorkspaceCanvasProvider({ pageId, readOnly = false, children }) 
   const draftRef = useRef(null);
   const pendingSelectRef = useRef("");
   const pendingRevealRef = useRef("");
+  const placedSheetIdRef = useRef("");
   const ctxRef = useRef(ctx);
   ctxRef.current = ctx;
   const blocksByPageRef = useRef(blocksByPage);
@@ -460,10 +476,11 @@ export function WorkspaceCanvasProvider({ pageId, readOnly = false, children }) 
         const existing = prev[targetId] || [];
         const kept = append ? existing : existing.filter((block) => block.source !== "integration-run");
         const originY = kept.reduce((max, block) => Math.max(max, (block.y || 0) + (block.h || 0) + 24), 88);
-        const placed = layoutRunSheets(incoming, { originY: kept.length ? originY : 88 });
+        const placed = assignUniqueIds(layoutRunSheets(incoming, { originY: kept.length ? originY : 88 }), kept);
+        placedSheetIdRef.current = placed[0]?.id || "";
         return { ...prev, [targetId]: [...kept, ...placed] };
       });
-      const firstId = incoming[0]?.id || "";
+      const firstId = placedSheetIdRef.current || incoming[0]?.id || "";
       setSelectedId(firstId || null);
       setTool("select");
       if (!firstId) return;
@@ -759,6 +776,19 @@ export function WorkspaceCanvasProvider({ pageId, readOnly = false, children }) 
     if (saved.ok) lastPayloadRef.current = payload;
     return { ok: !!saved.ok };
   }, [blocksByPage, dashboardName, owner, tables, tabs, activeTabId, welcomeRemoved]);
+
+  useEffect(() => {
+    setBlocksByPage((prev) => {
+      let changed = false;
+      const next = {};
+      for (const [page, list] of Object.entries(prev || {})) {
+        const unique = assignUniqueIds(list);
+        if (unique.some((block, index) => block !== (list || [])[index])) changed = true;
+        next[page] = unique;
+      }
+      return changed ? next : prev;
+    });
+  }, [blocks.length, pageId, ready]);
 
   const value = useMemo(
     () => ({

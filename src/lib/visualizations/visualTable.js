@@ -62,6 +62,12 @@ export function formatSignedUsd(value) {
   return body;
 }
 
+export function formatUsd(value) {
+  if (!Number.isFinite(value)) return "—";
+  if (value < 0) return formatSignedUsd(value);
+  return MONEY.format(value);
+}
+
 export function formatShares(value) {
   if (!Number.isFinite(value)) return "—";
   return COUNT.format(value);
@@ -78,9 +84,10 @@ export function leaderboardBarRows(records, dataset, limit = 10) {
     const name = text(record, fields.label, "user_name", "nickname", "name")
       || shortWallet(text(record, fields.wallet, "user_id", "proxy_wallet", "social_id"))
       || "Trader";
+    const eventTitle = text(record, fields.event);
     const rank = number(record, fields.rank, "rank");
     rows.push({
-      name,
+      name: eventTitle ? `${name} · ${eventTitle}` : name,
       short: name.length > 18 ? `${name.slice(0, 17)}…` : name,
       value,
       display: money ? formatSignedUsd(value) : formatShares(value),
@@ -96,13 +103,90 @@ export function leaderboardBarRows(records, dataset, limit = 10) {
   return rows.slice(0, limit || 10);
 }
 
+function queryCaption(source, keys) {
+  const first = source[0] || {};
+  return keys
+    .filter((key) => present(source, key) && source.every((row) => text(row, key) === text(first, key)))
+    .map((key) => text(first, key));
+}
+
+function whenLabel(value) {
+  const raw = String(value || "").trim();
+  if (!raw) return "";
+  const numeric = Number(raw);
+  const date = Number.isFinite(numeric) && numeric > 1e9
+    ? new Date(numeric < 1e12 ? numeric * 1000 : numeric)
+    : new Date(raw);
+  if (Number.isNaN(date.getTime())) return raw.split(",")[0];
+  return date.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+}
+
+function kindLabel(value) {
+  const kind = String(value || "").trim().toLowerCase();
+  if (kind === "combo") return "Combo";
+  if (kind === "market") return "Market";
+  return kind;
+}
+
+/**
+ * Biggest-win rows. The event stays one title, including a combo's joined legs.
+ */
+function buildBiggestWinsTable(source, dataset) {
+  const fields = dataset?.fields || {};
+  const rows = source
+    .map((record) => {
+      const name = text(record, fields.label, "user_name", "name");
+      const wallet = text(record, fields.wallet, "user_id");
+      const avatar = text(record, fields.avatar, "profile_image");
+      const event = text(record, fields.event, "event_title");
+      const kind = kindLabel(text(record, fields.kind, "kind"));
+      const when = whenLabel(text(record, fields.resolved, "resolved_at"));
+      return {
+        name: name || shortWallet(wallet) || "Trader",
+        wallet,
+        avatar: /^https?:\/\//i.test(avatar) ? avatar : "",
+        rank: number(record, fields.rank, "win_rank"),
+        pnl: number(record, fields.value, "pnl"),
+        stake: number(record, fields.stake, "initial_value"),
+        event,
+        kind,
+        when,
+      };
+    })
+    .filter((row) => row.name || row.event || row.rank != null);
+
+  rows.sort((a, b) => {
+    const aRank = a.rank != null && a.rank > 0 ? a.rank : Number.POSITIVE_INFINITY;
+    const bRank = b.rank != null && b.rank > 0 ? b.rank : Number.POSITIVE_INFINITY;
+    if (aRank !== bRank) return aRank - bRank;
+    return (b.pnl ?? 0) - (a.pnl ?? 0);
+  });
+
+  const maxPnl = Math.max(1, ...rows.map((row) => Math.abs(row.pnl || 0)));
+  const showRank = rows.some((row) => row.rank != null && row.rank > 0);
+  return {
+    caption: queryCaption(source, ["time_period", "category"]),
+    columns: [
+      showRank ? { id: "rank", label: "Rank" } : null,
+      { id: "trader", label: "Trader" },
+      { id: "win", label: "Win" },
+      { id: "pnl", label: "PnL" },
+    ].filter(Boolean),
+    rows: rows.map((row) => ({
+      ...row,
+      pnlShare: row.pnl == null ? 0 : Math.abs(row.pnl) / maxPnl,
+    })),
+  };
+}
+
 /**
  * Rows for the stats Visual Table. Missing columns are omitted.
  * @param {Array<Record<string, unknown>>} records
- * @param {{ fields?: Record<string, string> }} [dataset]
+ * @param {{ fields?: Record<string, string>, datasetType?: string }} [dataset]
  */
 export function buildVisualTable(records, dataset) {
   const source = Array.isArray(records) ? records : [];
+  if (dataset?.datasetType === "biggest_wins") return buildBiggestWinsTable(source, dataset);
   const fields = dataset?.fields || {};
   const hasColumn = (key) => source.some((row) => row && Object.prototype.hasOwnProperty.call(row, key));
   const showRank = present(source, fields.rank || "rank") || hasColumn(fields.rank || "rank");
@@ -142,10 +226,7 @@ export function buildVisualTable(records, dataset) {
 
   const maxPnl = Math.max(1, ...rows.map((row) => Math.abs(row.pnl || 0)));
   const maxVolume = Math.max(1, ...rows.map((row) => Math.abs(row.volume || 0)));
-  const first = source[0] || {};
-  const caption = ["time_period", "category", "sort_by"]
-    .filter((key) => present(source, key) && source.every((row) => text(row, key) === text(first, key)))
-    .map((key) => text(first, key));
+  const caption = queryCaption(source, ["time_period", "category", "sort_by"]);
 
   const columns = [
     showRank ? { id: "rank", label: "Rank" } : null,

@@ -6531,7 +6531,7 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
       });
     } else if (runMarkets.columns.length && keepParentDataset) {
       sheets.push({
-        id: tableId === "trades" ? "run-trades" : "run-markets",
+        id: tableId === "trades" ? "run-trades" : tableId && tableId !== "markets" ? `run-${tableId}` : "run-markets",
         title: sheetTitle,
         columns: runMarkets.columns,
         rows: runMarkets.rows,

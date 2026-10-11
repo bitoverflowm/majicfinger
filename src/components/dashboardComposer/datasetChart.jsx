@@ -50,7 +50,10 @@ function LeaderboardBarChart({ sheet, dataset, limit = 10 }) {
     [dataset],
   );
   if (!rows.length) {
-    return <p className="px-3 text-[12px] text-muted-foreground">This leaderboard has no traders to chart yet.</p>;
+    const empty = dataset?.datasetType === "biggest_wins"
+      ? "This board has no wins to chart yet."
+      : "This leaderboard has no traders to chart yet.";
+    return <p className="px-3 text-[12px] text-muted-foreground">{empty}</p>;
   }
   return (
     <div className="flex h-full min-h-0 flex-1 flex-col px-2 py-2">
@@ -134,7 +137,7 @@ export function DatasetSummary({ sheet, dataset, view, limit = 10 }) {
     );
   }
 
-  if (dataset?.datasetType === "leaderboard" && view?.view === "bars") {
+  if ((dataset?.datasetType === "leaderboard" || dataset?.datasetType === "biggest_wins") && view?.view === "bars") {
     return <LeaderboardBarChart sheet={sheet} dataset={dataset} limit={limit} />;
   }
 
