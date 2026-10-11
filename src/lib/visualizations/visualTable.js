@@ -67,6 +67,35 @@ export function formatShares(value) {
   return COUNT.format(value);
 }
 
+/** Top traders for the horizontal rank chart, in leaderboard order. */
+export function leaderboardBarRows(records, dataset, limit = 10) {
+  const fields = dataset?.fields || {};
+  const money = dataset?.units?.metric === "usdc";
+  const rows = [];
+  for (const record of records || []) {
+    const value = number(record, fields.value, "pnl", "value");
+    if (value == null) continue;
+    const name = text(record, fields.label, "user_name", "nickname", "name")
+      || shortWallet(text(record, fields.wallet, "user_id", "proxy_wallet", "social_id"))
+      || "Trader";
+    const rank = number(record, fields.rank, "rank");
+    rows.push({
+      name,
+      short: name.length > 18 ? `${name.slice(0, 17)}…` : name,
+      value,
+      display: money ? formatSignedUsd(value) : formatShares(value),
+      rank: rank != null && rank > 0 ? rank : null,
+    });
+  }
+  rows.sort((a, b) => {
+    if (a.rank != null && b.rank != null) return a.rank - b.rank;
+    if (a.rank != null) return -1;
+    if (b.rank != null) return 1;
+    return b.value - a.value;
+  });
+  return rows.slice(0, limit || 10);
+}
+
 /**
  * Rows for the stats Visual Table. Missing columns are omitted.
  * @param {Array<Record<string, unknown>>} records

@@ -1,8 +1,9 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { Bar, BarChart, CartesianGrid, Cell, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
+import { Bar, BarChart, CartesianGrid, Cell, LabelList, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 
+import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart";
 import {
   eventCloseSeries,
   formatProbability,
@@ -10,6 +11,10 @@ import {
   partialCaption,
   sheetRecords,
 } from "@/lib/visualizations/datasetDescriptor";
+import { leaderboardBarRows } from "@/lib/visualizations/visualTable";
+
+/** Lychee red. Chart color stays here until traders can pick their own. */
+const LYCHEE_RED = "#E63946";
 
 function num(value) {
   const n = Number(String(value ?? "").trim().replace(/,/g, ""));
@@ -33,6 +38,36 @@ function rankedRows(dataset, records, limit) {
   const diverging = dataset.datasetType === "positions_closed";
   rows.sort((a, b) => (diverging ? Math.abs(b.value) - Math.abs(a.value) : b.value - a.value));
   return rows.slice(0, limit || 10);
+}
+
+function LeaderboardBarChart({ sheet, dataset, limit = 10 }) {
+  const rows = useMemo(() => leaderboardBarRows(sheetRecords(sheet), dataset, limit), [dataset, limit, sheet]);
+  const config = useMemo(
+    () => ({
+      value: { label: dataset?.units?.metric === "usdc" ? "PnL" : "Value", color: LYCHEE_RED },
+      label: { color: "var(--background)" },
+    }),
+    [dataset],
+  );
+  if (!rows.length) {
+    return <p className="px-3 text-[12px] text-muted-foreground">This leaderboard has no traders to chart yet.</p>;
+  }
+  return (
+    <div className="flex h-full min-h-0 flex-1 flex-col px-2 py-2">
+      <ChartContainer config={config} className="aspect-auto h-full w-full min-h-0">
+        <BarChart accessibilityLayer data={rows} layout="vertical" margin={{ top: 4, right: 72, left: 4, bottom: 4 }}>
+          <CartesianGrid horizontal={false} />
+          <YAxis dataKey="name" type="category" tickLine={false} axisLine={false} hide />
+          <XAxis dataKey="value" type="number" hide />
+          <ChartTooltip cursor={false} content={<ChartTooltipContent indicator="line" />} />
+          <Bar dataKey="value" fill="var(--color-value)" radius={4}>
+            <LabelList dataKey="short" position="insideLeft" offset={8} className="fill-[var(--color-label)]" fontSize={12} />
+            <LabelList dataKey="display" position="right" offset={8} className="fill-foreground" fontSize={12} />
+          </Bar>
+        </BarChart>
+      </ChartContainer>
+    </div>
+  );
 }
 
 export function DatasetSummary({ sheet, dataset, view, limit = 10 }) {
@@ -97,6 +132,10 @@ export function DatasetSummary({ sheet, dataset, view, limit = 10 }) {
         {note ? <p className="text-[11px] text-muted-foreground">{note}</p> : null}
       </div>
     );
+  }
+
+  if (dataset?.datasetType === "leaderboard" && view?.view === "bars") {
+    return <LeaderboardBarChart sheet={sheet} dataset={dataset} limit={limit} />;
   }
 
   if (!rows.length) {

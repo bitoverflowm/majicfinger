@@ -37,7 +37,7 @@ function ColumnHead({ column, align, readOnly, onHide }) {
               <button
                 type="button"
                 aria-label={`Actions for ${column.label}`}
-                className="inline-flex size-4 items-center justify-center rounded-sm text-muted-foreground opacity-0 transition-opacity group-hover/col:opacity-100 data-[state=open]:opacity-100"
+                className="inline-flex h-4 w-0 items-center justify-center overflow-hidden rounded-sm text-muted-foreground opacity-0 pointer-events-none transition-[opacity,width] group-hover/col:w-4 group-hover/col:opacity-100 group-hover/col:pointer-events-auto data-[state=open]:w-4 data-[state=open]:opacity-100 data-[state=open]:pointer-events-auto"
                 onPointerDown={(event) => event.stopPropagation()}
                 onClick={(event) => event.stopPropagation()}
               >
@@ -67,7 +67,7 @@ export function VisualTableView({ sheet, dataset, hidden = [], readOnly = false,
   return (
     <div data-visual-table="" className="flex min-h-0 flex-1 flex-col px-3 pb-3">
       {model.caption.length ? (
-        <p className="px-0.5 pb-2 text-[11px] uppercase tracking-[0.14em] text-muted-foreground">{model.caption.join(" · ")}</p>
+        <p className="px-0.5 pb-2 pt-2 text-[11px] uppercase tracking-[0.14em] text-muted-foreground">{model.caption.join(" · ")}</p>
       ) : null}
       <div className="min-h-0 flex-1 overflow-auto">
         <table className="w-max border-collapse text-left text-[13px]">

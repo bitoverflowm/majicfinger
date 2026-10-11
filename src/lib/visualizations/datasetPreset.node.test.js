@@ -13,7 +13,7 @@ import {
   toProbability,
 } from "./datasetDescriptor.js";
 import { isStatsDataset, resolveVisualization, visualizationChoices } from "./presetRegistry.js";
-import { buildVisualTable, formatSignedUsd, shortWallet } from "./visualTable.js";
+import { buildVisualTable, formatSignedUsd, leaderboardBarRows, shortWallet } from "./visualTable.js";
 
 const holders = describeSheet({
   type: "sheet",
@@ -177,6 +177,22 @@ assert.equal(table.rows[0].verified, true);
 assert.equal(table.rows[1].verified, false);
 assert.deepEqual(table.caption, ["day", "overall", "PNL"]);
 assert.deepEqual(table.columns.map((column) => column.id), ["rank", "trader", "pnl", "volume", "verified", "handle"]);
+
+const bars = leaderboardBarRows(
+  [
+    { rank: "2", user_name: "nigiri99", pnl: "1.2K" },
+    { rank: "1", user_name: "HomeRunHazard", pnl: "207.8K" },
+    { rank: "3", user_name: "AVeryLongTraderNameThatWillNotFit", pnl: "-40" },
+  ],
+  leaderboard,
+  10,
+);
+assert.equal(bars[0].name, "HomeRunHazard");
+assert.equal(bars[0].value, 207800);
+assert.equal(bars[0].display.startsWith("+"), true);
+assert.equal(bars[1].name, "nigiri99");
+assert.equal(bars[2].value, -40);
+assert.equal(bars[2].short.endsWith("…"), true);
 assert.equal(shortWallet(table.rows[0].wallet), "0x5268…135d");
 assert.equal(formatSignedUsd(207776).startsWith("+"), true);
 assert.equal(formatSignedUsd(-12).startsWith("−"), true);

@@ -1476,11 +1476,11 @@ function CanvasBlock({ block, selected, spotlight = false, onSelect, onChange, b
               {isStatsDataset(describeSheet(block)) ? (
                 block.visualReady ? (
                   <div
-                    className="flex items-center justify-between gap-3 rounded-md px-2 py-2 text-[13px]"
+                    className="flex items-center gap-2.5 rounded-md px-2 py-2 text-[13px]"
                     onPointerDown={(event) => event.stopPropagation()}
                   >
-                    <span>Visual table</span>
                     <Switch
+                      size="sm"
                       checked={block.presentation === "visual"}
                       aria-label="Visual table"
                       onCheckedChange={(on) => {
@@ -1500,6 +1500,7 @@ function CanvasBlock({ block, selected, spotlight = false, onSelect, onChange, b
                       }}
                       onClick={(event) => event.stopPropagation()}
                     />
+                    <span>Visual table</span>
                   </div>
                 ) : (
                   <DropdownMenuItem
