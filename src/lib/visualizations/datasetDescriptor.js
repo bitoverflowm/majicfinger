@@ -404,8 +404,20 @@ export function templateForEndpoint(table, integrationId) {
   };
 }
 
+/**
+ * Field id for a sheet column. A resized grid can persist the title without the id;
+ * the title is the same words as the field, so it still maps back.
+ */
+export function columnKey(column) {
+  const id = String(column?.id || column?.name || "").trim();
+  if (id) return id;
+  const title = String(column?.title || "").trim();
+  if (!title) return "";
+  return title.toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_+|_+$/g, "");
+}
+
 function columnIds(sheet) {
-  return new Set((sheet?.columns || []).map((column) => String(column?.id || column?.name || "")).filter(Boolean));
+  return new Set((sheet?.columns || []).map((column) => columnKey(column)).filter(Boolean));
 }
 
 /**
@@ -420,7 +432,7 @@ export function countSeries(sheet, keys) {
   const ids = columnIds(sheet);
   const present = wanted.filter((key) => ids.has(key));
   if (!present.length) return 1;
-  const indexes = present.map((key) => (sheet.columns || []).findIndex((column) => (column?.id || column?.name) === key));
+  const indexes = present.map((key) => (sheet.columns || []).findIndex((column) => columnKey(column) === key));
   const cells = sheet?.cells || {};
   const rows = new Set();
   for (const key of Object.keys(cells)) {
@@ -470,7 +482,7 @@ export function sheetRecords(sheet) {
   return [...rowIndexes].sort((a, b) => a - b).map((row) => {
     const record = {};
     columns.forEach((column, index) => {
-      const id = column?.id || column?.name;
+      const id = columnKey(column);
       if (id) record[id] = cells[`${index},${row}`];
     });
     return record;

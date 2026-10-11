@@ -17,7 +17,7 @@ import { DashboardSheetGrid } from "@/components/dashboardComposer/dashboardShee
 import { VisualTableView } from "@/components/dashboardComposer/visualTableView";
 import { Switch } from "@/components/ui/switch";
 import { isOrderBookSheet } from "@/components/dashboardComposer/orderBookLadder";
-import { countObservations, describeSheet } from "@/lib/visualizations/datasetDescriptor";
+import { columnKey, countObservations, describeSheet } from "@/lib/visualizations/datasetDescriptor";
 import { isStatsDataset, resolveVisualization } from "@/lib/visualizations/presetRegistry";
 import { isPriceHistorySheet } from "@/components/dashboardComposer/priceHistorySeries";
 import { SheetBlockChart } from "@/components/dashboardComposer/sheetBlockChart";
@@ -563,7 +563,7 @@ export function WorkspaceCanvasProvider({ pageId, readOnly = false, children }) 
       if (!sheet) return;
       const dataset = describeSheet(sheet);
       const resolved = resolveVisualization(dataset, {
-        columnIds: (sheet.columns || []).map((column) => column?.id || column?.name).filter(Boolean),
+        columnIds: (sheet.columns || []).map((column) => columnKey(column)).filter(Boolean),
         observations: dataset ? countObservations(sheet, dataset) : undefined,
       });
       const base = String(sheet.title || "Sheet").replace(/\s+chart$/, "").trim();

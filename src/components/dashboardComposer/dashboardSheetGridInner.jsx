@@ -18,10 +18,18 @@ const DEFAULT_COLUMNS = [
 function columnsOf(block) {
   const list = Array.isArray(block?.columns) ? block.columns : [];
   const clean = list
-    .map((column) => ({
-      title: String(column?.title || "").trim() || " ",
-      width: Number(column?.width) > 40 ? Number(column.width) : 110,
-    }))
+    .map((column) => {
+      const id = String(column?.id || column?.name || "").trim();
+      return {
+        ...(id ? { id } : {}),
+        title: String(column?.title || "").trim() || " ",
+        width: Number(column?.width) > 40 ? Number(column.width) : 110,
+        ...(column?.type ? { type: column.type } : {}),
+        ...(column?.exact ? { exact: true } : {}),
+        ...(column?.scale ? { scale: column.scale } : {}),
+        ...(column?.dateEpoch ? { dateEpoch: column.dateEpoch } : {}),
+      };
+    })
     .filter((column) => column.title);
   return clean.length ? clean : DEFAULT_COLUMNS;
 }

@@ -7,7 +7,7 @@ import { isOrderBookSheet, rowsToOrderBook } from "@/components/dashboardCompose
 import { ohlcRowsToCandles, rangesForCandles, tradesToCandles } from "@/components/dashboardComposer/tradeMarketCandles";
 import { isPriceHistorySheet, priceHistoryOutcome, priceHistoryPoints } from "@/components/dashboardComposer/priceHistorySeries";
 import { DatasetSummary, EventLinesChart } from "@/components/dashboardComposer/datasetChart";
-import { countObservations, describeSheet } from "@/lib/visualizations/datasetDescriptor";
+import { columnKey, countObservations, describeSheet } from "@/lib/visualizations/datasetDescriptor";
 import { resolveVisualization } from "@/lib/visualizations/presetRegistry";
 import { IndicatorChart } from "@/components/spectrumui/charts/indicator-chart";
 import { MarketChart } from "@/components/spectrumui/charts/market-chart";
@@ -287,7 +287,7 @@ export function SheetBlockChart({ sheet, snapshot, onSnapshot, live = false, vie
   }, [onSnapshot, series, seriesKey]);
 
   const dataset = describeSheet(sheet);
-  const columnIds = (sheet?.columns || []).map((column) => column?.id || column?.name).filter(Boolean);
+  const columnIds = (sheet?.columns || []).map((column) => columnKey(column)).filter(Boolean);
   const resolved = dataset
     ? resolveVisualization(dataset, {
         userView: view,

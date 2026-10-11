@@ -68,7 +68,7 @@ export function WorkspaceDock() {
             const selected = item.action === "tool" && tool === item.tool;
             return (
               <div key={item.id} className="flex items-center">
-                {item.id === "export" ? (
+                {item.id === "sheet" || item.id === "export" ? (
                   <span className="mx-1 h-5 w-px bg-black/10 dark:bg-white/15" aria-hidden />
                 ) : null}
                 <Tooltip>

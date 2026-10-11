@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 
 import {
   centsDigits,
+  columnKey,
   countObservations,
   describeSheet,
   eventCloseSeries,
@@ -9,6 +10,7 @@ import {
   holderLabel,
   kalshiYesBook,
   partialCaption,
+  sheetRecords,
   stampDataset,
   toProbability,
 } from "./datasetDescriptor.js";
@@ -248,6 +250,39 @@ assert.equal(winTable.rows[1].kind, "Market");
 assert.equal(winTable.rows[1].when.includes("Oct"), true);
 assert.deepEqual(winTable.caption, ["day", "overall"]);
 assert.deepEqual(winTable.columns.map((column) => column.id), ["rank", "trader", "win", "pnl"]);
+
+const titledOnly = {
+  type: "sheet",
+  integrationId: "polymarket",
+  table: "getBiggestWinners",
+  columns: [
+    { title: "Win Rank", width: 128 },
+    { title: "Kind", width: 128 },
+    { title: "User Name", width: 128 },
+    { title: "User Id", width: 128 },
+    { title: "Pnl", width: 128 },
+    { title: "Event Title", width: 128 },
+    { title: "Time Period", width: 128 },
+    { title: "Category", width: 128 },
+  ],
+  cells: {
+    "0,0": "1",
+    "1,0": "market",
+    "2,0": "mjjhgfdsfv",
+    "3,0": "0x7711cbbb219d3eb780634360edc562f1f10cc935",
+    "4,0": "14.3K",
+    "5,0": "Bitcoin Up or Down",
+    "6,0": "day",
+    "7,0": "crypto",
+  },
+};
+assert.equal(columnKey(titledOnly.columns[2]), "user_name");
+const titledTable = buildVisualTable(sheetRecords(titledOnly), describeSheet(titledOnly));
+assert.equal(titledTable.rows[0].name, "mjjhgfdsfv");
+assert.equal(titledTable.rows[0].event, "Bitcoin Up or Down");
+assert.equal(titledTable.rows[0].pnl, 14300);
+assert.equal(titledTable.rows[0].rank, 1);
+assert.deepEqual(titledTable.caption, ["day", "crypto"]);
 
 const winBars = leaderboardBarRows(
   [
