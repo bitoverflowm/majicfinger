@@ -1579,6 +1579,22 @@ export default async function handler(req, res) {
         data = await fetchJson(`${DATA_API_BASE}/v2/user-stats?user=${encodeURIComponent(user)}`);
         break;
       }
+      case "getTraderPnlSeries": {
+        const user = String(req.query.user || req.query.user_address || "").trim();
+        if (!/^0x[a-fA-F0-9]{40}$/.test(user)) {
+          return res.status(400).json({ message: "A valid user wallet address is required" });
+        }
+        const intervals = new Set(["max", "all", "1m", "1w", "1d", "12h", "6h"]);
+        const fidelities = new Set(["1d", "18h", "12h", "3h", "1h"]);
+        const interval = String(req.query.interval || "1d").trim();
+        const fidelity = String(req.query.fidelity || "1h").trim();
+        if (!intervals.has(interval) || !fidelities.has(fidelity)) {
+          return res.status(400).json({ message: "Invalid PnL interval or fidelity" });
+        }
+        const params = new URLSearchParams({ user, interval, fidelity });
+        data = await fetchJson(`${DATA_API_BASE}/v2/user-pnl?${params.toString()}`);
+        break;
+      }
       case "getPortfolioValue": {
         const user = String(req.query.user || "").trim();
         if (!/^0x[a-fA-F0-9]{40}$/.test(user)) {

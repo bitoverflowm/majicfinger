@@ -87,6 +87,11 @@ import {
   polymarketPositionAttributeColumns,
   polymarketPositionRequestKey,
 } from "@/lib/polymarketLive/traderPositionsCompose";
+import {
+  defaultPolymarketPnlFilters,
+  polymarketPnlAttributeColumns,
+  polymarketPnlRequestKey,
+} from "@/lib/polymarketLive/traderPnlCompose";
 import { defaultLifeRange, lifeOfMarket, lifePull } from "@/lib/markets/marketLife";
 import { Accordion, AccordionContent, AccordionItem } from "@/components/ui/accordion";
 import * as AccordionPrimitive from "@radix-ui/react-accordion";
@@ -2314,6 +2319,11 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
     return polymarketPositionAttributeColumns(pull?.columns || [], positionMarkets);
   }, [polymarketLive, positionMarkets, pull?.columns, tableId]);
   const polymarketPositionKey = tableId === "getTraderPositions" ? polymarketPositionRequestKey(attributeFilters, sortKeys) : "";
+  const polymarketPnlColumns = useMemo(() => {
+    if (!polymarketLive || tableId !== "getTraderPnlSeries") return [];
+    return polymarketPnlAttributeColumns(pull?.columns || []);
+  }, [polymarketLive, pull?.columns, tableId]);
+  const polymarketPnlKey = tableId === "getTraderPnlSeries" ? polymarketPnlRequestKey(attributeFilters) : "";
   const polymarketSamplingLimit = Number(rowLimit);
   const polymarketExplore =
     polymarketLive &&
@@ -2376,6 +2386,8 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
             ? defaultPolymarketBiggestWinnersFilters()
             : integrationId === "polymarket" && tableId === "getTraderPositions"
               ? defaultPolymarketPositionFilters()
+            : integrationId === "polymarket" && tableId === "getTraderPnlSeries"
+              ? defaultPolymarketPnlFilters()
             : defaultDirectAttributeFilters(tableId),
     );
     setSortKeys([]);
@@ -2534,7 +2546,7 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
       cancel = true;
       window.clearTimeout(timer);
     };
-  }, [attributeFilters, livePicks, planLimit, polymarketBiggestWinnersColumns, polymarketBiggestWinnersFilterKey, polymarketBiggestWinnersKey, polymarketLeaderboardKey, polymarketLive, polymarketPositionKey, polymarketQuoteKey, rowLimit, tableId]);
+  }, [attributeFilters, livePicks, planLimit, polymarketBiggestWinnersColumns, polymarketBiggestWinnersFilterKey, polymarketBiggestWinnersKey, polymarketLeaderboardKey, polymarketLive, polymarketPnlKey, polymarketPositionKey, polymarketQuoteKey, rowLimit, tableId]);
 
   useEffect(() => {
     if (!previewSheet.startsWith("polymarket:")) return;
@@ -3425,6 +3437,8 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
             ? polymarketLeaderboardColumns
             : polymarketPositionColumns.length
               ? polymarketPositionColumns
+            : polymarketPnlColumns.length
+              ? polymarketPnlColumns
             : polymarketQuoteColumns.length
               ? polymarketQuoteColumns
               : pull?.columns || [];
@@ -3468,7 +3482,7 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
     const query = filterValue.trim().toLowerCase();
     const matched = !query || !filterColumn ? rows : rows.filter((row) => String(row[filterColumn] ?? "").toLowerCase().includes(query));
     return capPreview(matched);
-  }, [directPreview.rows, directPreview.status, directRowColumns, forecastRowColumns, pull, visibleCount, filterColumn, filterValue, guidedFilters, attributeFilters, sortKeys, rowLimit, integrationId, tableId, settledPreviewKey, previewSearchError, livePreviewRows, liveMarketSearch, liveDirect, liveEventCandles, liveForecast, liveMarketFanout, liveMultivariate, liveNarrowing, multivariateRowColumns, seriesAttributeColumns, listImportRows, idleAttributeRows, polymarketLive, polymarketDirected, polymarketRequirement, polymarketScan, polymarketMarketColumns, polymarketSamplingColumns, polymarketBiggestWinnersColumns, polymarketLeaderboardColumns, polymarketPositionColumns, polymarketQuoteColumns, polymarketSheetSource]);
+  }, [directPreview.rows, directPreview.status, directRowColumns, forecastRowColumns, pull, visibleCount, filterColumn, filterValue, guidedFilters, attributeFilters, sortKeys, rowLimit, integrationId, tableId, settledPreviewKey, previewSearchError, livePreviewRows, liveMarketSearch, liveDirect, liveEventCandles, liveForecast, liveMarketFanout, liveMultivariate, liveNarrowing, multivariateRowColumns, seriesAttributeColumns, listImportRows, idleAttributeRows, polymarketLive, polymarketDirected, polymarketRequirement, polymarketScan, polymarketMarketColumns, polymarketSamplingColumns, polymarketBiggestWinnersColumns, polymarketLeaderboardColumns, polymarketPnlColumns, polymarketPositionColumns, polymarketQuoteColumns, polymarketSheetSource]);
 
   const queriedMarkets = useMemo(() => {
     if (!guidedFilters) return [];
@@ -3925,7 +3939,7 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
           !/^(public|visible)$/i.test(directPreview.visibility)
         ? " These trades are private."
         : polymarketFanoutOn && polymarketDirected.status === "ready"
-          ? tableId === "getTraderPositions"
+          ? tableId === "getTraderPositions" || tableId === "getTraderPnlSeries"
             ? " Each trader gets its own sheet."
             : " Each market gets its own sheet."
         : "";
@@ -5745,6 +5759,7 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
           if (polymarketBiggestWinnersColumns.length) return polymarketBiggestWinnersColumns;
           if (polymarketLeaderboardColumns.length) return polymarketLeaderboardColumns;
           if (polymarketPositionColumns.length) return polymarketPositionColumns;
+          if (polymarketPnlColumns.length) return polymarketPnlColumns;
           if (polymarketQuoteColumns.length) return polymarketQuoteColumns;
           return pull?.columns || [];
         };
@@ -5789,7 +5804,7 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
           const matched = (result.rows || []).filter((row) => rowMatchesAttributes(row, columns, attributeFilters));
           const ranked = sortAttributeRows(matched, columns, sortKeys);
           // Each trader already walked to this ceiling. A shared slice would cut the later sheets.
-          pulled = tableId === "getTraderPositions" && livePicks.length > 1 ? ranked : ranked.slice(0, importLimit);
+          pulled = (tableId === "getTraderPositions" || tableId === "getTraderPnlSeries") && livePicks.length > 1 ? ranked : ranked.slice(0, importLimit);
         }
         marketRows = pulled;
         reporter.succeed("source", {
@@ -8130,6 +8145,8 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
                                     ? polymarketLeaderboardColumns
                                     : polymarketPositionColumns.length
                                       ? polymarketPositionColumns
+                                    : polymarketPnlColumns.length
+                                      ? polymarketPnlColumns
                                   : polymarketQuoteColumns.length
                                     ? polymarketQuoteColumns
                                     : pull?.columns || []
@@ -8171,6 +8188,8 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
                             ? "Trader attributes"
                             : tableId === "getTraderPositions"
                               ? "Position attributes"
+                            : tableId === "getTraderPnlSeries"
+                              ? "PnL attributes"
                           : polymarketLive
                               ? "Attributes"
                             : "Market attributes"

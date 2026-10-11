@@ -40,6 +40,7 @@ const ENDPOINT_TITLE_FALLBACKS = {
   getBiggestWinners: "Biggest Wins",
   getTraderByAddress: "Get trader's profile and stats",
   getTraderPositions: "Get trader's positions",
+  getTraderPnlSeries: "Get trader's PnL series",
 };
 
 export function genPolymarketLiveRequestCardId() {

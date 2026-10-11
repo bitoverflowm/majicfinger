@@ -74,11 +74,34 @@ assert.deepEqual(
     getPublicProfiles: "gamma",
     getTraderByAddress: "v2",
     getTraderPositions: "v2",
+    getTraderPnlSeries: "v2",
   },
 );
 assert.equal(endpoints.find((endpoint) => endpoint.id === "getTraderPositions")?.title, "Get trader's positions");
 assert.equal(polymarketLiveBuildRequirement("getTraderPositions")?.prompt, "Wallet address required");
 assert.equal(polymarketMarketFanout("getTraderPositions"), true);
+assert.equal(endpoints.find((endpoint) => endpoint.id === "getTraderPnlSeries")?.title, "Get trader's PnL series");
+assert.equal(
+  endpoints.find((endpoint) => endpoint.id === "getTraderPnlSeries")?.description,
+  "A trader's cumulative PnL, volume, and fees over a chosen window.",
+);
+const positionsAt = ids.indexOf("getTraderPositions");
+const pnlAt = ids.indexOf("getTraderPnlSeries");
+assert.ok(positionsAt >= 0 && pnlAt === positionsAt + 1);
+assert.equal(polymarketLiveBuildRequirement("getTraderPnlSeries")?.prompt, "Wallet address required");
+assert.equal(polymarketMarketFanout("getTraderPnlSeries"), true);
+assert.equal(polymarketLiveBuildSearch("getTraderPnlSeries")?.placeholder, "Search for a trader");
+assert.equal(polymarketLiveBuildSearch("getTraderPnlSeries")?.acceptAddress, undefined);
+const pnlColumns = polymarketLiveBuildColumns("getTraderPnlSeries");
+assert.equal(pnlColumns.find((column) => column.id === "timestamp")?.dateEpoch, "unix");
+assert.equal(pnlColumns.find((column) => column.id === "timestamp")?.defaultOn, true);
+assert.equal(pnlColumns.find((column) => column.id === "trade_count")?.exact, true);
+assert.equal(pnlColumns.find((column) => column.id === "source_block")?.exact, true);
+assert.equal(pnlColumns.find((column) => column.id === "realized_pnl")?.title, "Realized PnL");
+assert.equal(pnlColumns.find((column) => column.id === "economic_pnl")?.defaultOn, true);
+assert.equal(pnlColumns.find((column) => column.id === "fees")?.defaultOn, false);
+assert.equal(pnlColumns.find((column) => column.id === "user")?.defaultOn, false);
+assert.equal(pnlColumns.find((column) => column.id === "deposits")?.defaultOn, false);
 const positionColumns = polymarketLiveBuildColumns("getTraderPositions");
 assert.equal(positionColumns.some((column) => column.id === "sort_by"), false);
 assert.equal(positionColumns.find((column) => column.id === "last_event_at")?.dateEpoch, "unix");

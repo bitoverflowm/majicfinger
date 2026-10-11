@@ -588,8 +588,8 @@ export function WorkspaceCanvasProvider({ pageId, readOnly = false, children }) 
           ...(spec.chartView ? { chartView: spec.chartView } : {}),
           x: current.x,
           y: (current.y || 0) + index,
-          w: 540,
-          h: 360,
+          w: chartView === "portfolio" ? 680 : 540,
+          h: chartView === "portfolio" ? 560 : 360,
           title: spec.title,
           body: "",
         }));

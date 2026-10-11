@@ -8,6 +8,7 @@ import { ohlcRowsToCandles, rangesForCandles, tradesToCandles } from "@/componen
 import { isPriceHistorySheet, priceHistoryOutcome, priceHistoryPoints } from "@/components/dashboardComposer/priceHistorySeries";
 import { DatasetSummary, EventLinesChart } from "@/components/dashboardComposer/datasetChart";
 import { PortfolioTreemap } from "@/components/dashboardComposer/portfolioTreemapChart";
+import { PnlPortfolioChart } from "@/components/dashboardComposer/pnlPortfolioChart";
 import { columnKey, countObservations, describeSheet } from "@/lib/visualizations/datasetDescriptor";
 import { resolveVisualization } from "@/lib/visualizations/presetRegistry";
 import { IndicatorChart } from "@/components/spectrumui/charts/indicator-chart";
@@ -299,6 +300,9 @@ export function SheetBlockChart({ sheet, snapshot, onSnapshot, live = false, vie
     : null;
   if (resolved?.view === "treemap") {
     return <PortfolioTreemap sheet={sheet} dataset={dataset} onOpenRow={onOpenRow} />;
+  }
+  if (resolved?.view === "portfolio") {
+    return <PnlPortfolioChart sheet={sheet} />;
   }
   if (resolved?.view === "price") {
     return <PriceHistorySheetChart sheet={sheet} live={live} />;
