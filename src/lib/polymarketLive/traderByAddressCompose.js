@@ -1,8 +1,8 @@
 /**
  * Get trader's profile and stats.
- * One row per wallet: Gamma public profile and Data API /v2/user-stats,
- * flattened onto the same row. Neither endpoint accepts a list, so each
- * submitted address is its own pair of calls.
+ * One row per wallet: Gamma public profile, Data API /v2/user-stats, and
+ * /v2/value, flattened onto the same row. None of them accept a list, so
+ * each submitted address is its own set of calls.
  */
 import { isPolymarketWalletAddress } from "@/lib/polymarketLive/publicProfilesCompose";
 
@@ -22,6 +22,7 @@ export const TRADER_BY_ADDRESS_DEFAULT_COLUMNS = [
   "join_date",
   "realized_pnl",
   "volume_usdc",
+  "portfolio_value",
 ];
 
 /** @type {Array<{ name: string, type: string, description: string, title?: string, dateEpoch?: "iso" | "unix", exact?: boolean }>} */
@@ -54,6 +55,7 @@ export const TRADER_BY_ADDRESS_COLUMNS = [
   { name: "trade_count", type: "number", exact: true, description: "Cumulative maker-attributed exchange fill count." },
   { name: "volume", type: "number", description: "Cumulative maker-attributed exchange fill shares." },
   { name: "volume_usdc", type: "number", description: "Cumulative maker-attributed exchange fill cash, in USDC." },
+  { name: "portfolio_value", type: "number", title: "Portfolio value", description: "Holdings marked to market plus unresolved combo positions at cost basis, in USDC. Zero when the wallet has no positions." },
   { name: "cashflow_net", type: "number", description: "Deposits minus withdrawals." },
   { name: "deposits", type: "number", description: "Collateral moved into the wallet." },
   { name: "economic_pnl", type: "number", description: "Position PnL plus wallet income." },
@@ -151,11 +153,13 @@ function associatedUsers(profile) {
  * @param {string} address
  * @param {Record<string, unknown> | null | undefined} profile
  * @param {Record<string, unknown> | null | undefined} stats
+ * @param {Record<string, unknown> | null | undefined} portfolio
  */
-export function mergeTraderByAddress(address, profile, stats) {
+export function mergeTraderByAddress(address, profile, stats, portfolio) {
   const card = profile && typeof profile === "object" ? profile : null;
   const lifetime = stats && typeof stats === "object" ? stats : null;
   const pnl = lifetime?.all_time_pnl && typeof lifetime.all_time_pnl === "object" ? lifetime.all_time_pnl : null;
+  const book = portfolio && typeof portfolio === "object" ? portfolio : null;
   const users = associatedUsers(card);
   /** @type {Record<string, unknown>} */
   const row = {
@@ -178,6 +182,7 @@ export function mergeTraderByAddress(address, profile, stats) {
     trades: lifetime ? numberOrBlank(lifetime.trades) : "",
     views: lifetime ? numberOrBlank(lifetime.views) : "",
     join_date: lifetime ? numberOrBlank(lifetime.join_date) : "",
+    portfolio_value: book ? numberOrBlank(book.value) : "",
   };
   for (const field of PNL_FIELDS) {
     if (!pnl) {

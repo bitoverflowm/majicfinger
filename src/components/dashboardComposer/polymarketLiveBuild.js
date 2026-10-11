@@ -246,7 +246,7 @@ const BUILD_COPY = {
   },
   [TRADER_BY_ADDRESS_ENDPOINT_ID]: {
     title: "Get trader's profile and stats",
-    description: "Name, markets traded, biggest win, profile views, all-time PnL, and volume.",
+    description: "Name, markets traded, biggest win, profile views, all-time PnL, volume, and portfolio value.",
   },
   [TRADER_POSITIONS_ENDPOINT_ID]: {
     title: "Get trader's positions",
@@ -1481,6 +1481,19 @@ async function readPublicProfile(address) {
   }
 }
 
+async function readPortfolioValue(address) {
+  try {
+    const data = await polymarketGet("getPortfolioValue", { user: address });
+    const row = Array.isArray(data) ? data[0] : data;
+    if (!row || typeof row !== "object") return null;
+    if ("data" in row) return row.data && typeof row.data === "object" ? row.data : null;
+    return row;
+  } catch (error) {
+    if (missingTraderRecord(error)) return null;
+    throw error;
+  }
+}
+
 async function readUserStats(address) {
   try {
     const data = await polymarketGet("getUserStats", { user: address });
@@ -1526,20 +1539,22 @@ async function traderPositionRows(picks, options = {}) {
   return rows;
 }
 
-/** One merged row per submitted wallet. Profile and stats share that row. */
+/** One merged row per submitted wallet. Profile, stats, and portfolio value share that row. */
 async function traderByAddressRows(picks) {
   const addresses = traderAddressesFromPicks(picks);
   if (!addresses.length) throw new Error("Search for a trader wallet.");
   const rows = [];
   let firstError = null;
   for (const address of addresses) {
-    const [profileResult, statsResult] = await Promise.allSettled([
+    const [profileResult, statsResult, valueResult] = await Promise.allSettled([
       readPublicProfile(address),
       readUserStats(address),
+      readPortfolioValue(address),
     ]);
     const profileFailed = profileResult.status === "rejected";
     const statsFailed = statsResult.status === "rejected";
-    if (profileFailed && statsFailed) {
+    const valueFailed = valueResult.status === "rejected";
+    if (profileFailed && statsFailed && valueFailed) {
       firstError = firstError || profileResult.reason;
       continue;
     }
@@ -1547,6 +1562,7 @@ async function traderByAddressRows(picks) {
       address,
       profileFailed ? null : profileResult.value,
       statsFailed ? null : statsResult.value,
+      valueFailed ? null : valueResult.value,
     ));
   }
   if (!rows.length && firstError) {

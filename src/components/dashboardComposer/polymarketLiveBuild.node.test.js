@@ -88,7 +88,7 @@ assert.equal(positionColumns.find((column) => column.id === "user")?.defaultOn, 
 assert.equal(endpoints.find((endpoint) => endpoint.id === "getTraderByAddress")?.title, "Get trader's profile and stats");
 assert.equal(
   endpoints.find((endpoint) => endpoint.id === "getTraderByAddress")?.description,
-  "Name, markets traded, biggest win, profile views, all-time PnL, and volume.",
+  "Name, markets traded, biggest win, profile views, all-time PnL, volume, and portfolio value.",
 );
 assert.equal(polymarketLiveBuildSearch("getTraderByAddress")?.acceptAddress, true);
 assert.deepEqual(polymarketLiveBuildSearch("getTraderByAddress")?.entities, ["profile"]);
@@ -100,6 +100,8 @@ assert.equal(traderColumns.find((column) => column.id === "join_date")?.dateEpoc
 assert.equal(traderColumns.find((column) => column.id === "timestamp")?.dateEpoch, "unix");
 assert.equal(traderColumns.find((column) => column.id === "trades")?.exact, true);
 assert.equal(traderColumns.find((column) => column.id === "name")?.defaultOn, true);
+assert.equal(traderColumns.find((column) => column.id === "portfolio_value")?.title, "Portfolio value");
+assert.equal(traderColumns.find((column) => column.id === "portfolio_value")?.defaultOn, true);
 assert.equal(traderColumns.find((column) => column.id === "fees")?.defaultOn, false);
 assert.ok(traderColumns.some((column) => column.id === "yield_income"));
 assert.ok(traderColumns.some((column) => column.id === "users_creator"));

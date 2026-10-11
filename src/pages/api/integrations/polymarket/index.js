@@ -1579,6 +1579,14 @@ export default async function handler(req, res) {
         data = await fetchJson(`${DATA_API_BASE}/v2/user-stats?user=${encodeURIComponent(user)}`);
         break;
       }
+      case "getPortfolioValue": {
+        const user = String(req.query.user || "").trim();
+        if (!/^0x[a-fA-F0-9]{40}$/.test(user)) {
+          return res.status(400).json({ message: "A valid user wallet address is required" });
+        }
+        data = await fetchJson(`${DATA_API_BASE}/v2/value?user=${encodeURIComponent(user)}`);
+        break;
+      }
       case "getTraderPositions": {
         const user = String(req.query.user || "").trim();
         if (!/^0x[a-fA-F0-9]{40}$/.test(user)) {

@@ -62,7 +62,7 @@ const stats = {
   },
 };
 
-const row = mergeTraderByAddress(ADDRESS, profile, stats);
+const row = mergeTraderByAddress(ADDRESS, profile, stats, { proxy_wallet: ADDRESS, value: 12.3456 });
 assert.equal(row.address, ADDRESS);
 assert.equal(row.name, "Ada");
 assert.equal(row.pseudonym, "Aqua");
@@ -86,6 +86,7 @@ assert.equal(row.timestamp, 1710000000);
 assert.equal(row.fees_refunded, 0);
 assert.equal(row.economic_pnl, "");
 assert.equal(row.cashflow_net, "");
+assert.equal(row.portfolio_value, 12.3456);
 
 const unknown = mergeTraderByAddress(ADDRESS, profile, null);
 assert.equal(unknown.name, "Ada");
@@ -93,6 +94,11 @@ assert.equal(unknown.biggest_win, "");
 assert.equal(unknown.trades, "");
 assert.equal(unknown.realized_pnl, "");
 assert.equal(unknown.join_date, "");
+assert.equal(unknown.portfolio_value, "");
+
+const emptyBook = mergeTraderByAddress(ADDRESS, null, null, { proxy_wallet: ADDRESS, value: 0 });
+assert.equal(emptyBook.portfolio_value, 0);
+assert.equal(emptyBook.name, "");
 
 const noProfile = mergeTraderByAddress(OTHER, null, { ...stats, all_time_pnl: null, biggest_win: 0, trades: 0, views: 0, join_date: null });
 assert.equal(noProfile.address, OTHER);
@@ -118,6 +124,8 @@ const names = TRADER_BY_ADDRESS_COLUMNS.map((column) => column.name);
 assert.ok(names.includes("createdAt"));
 assert.ok(names.includes("users_mod"));
 assert.ok(names.includes("yield_income"));
+assert.ok(names.includes("portfolio_value"));
+assert.equal(TRADER_BY_ADDRESS_COLUMNS.find((column) => column.name === "portfolio_value")?.title, "Portfolio value");
 assert.equal(names.filter((name, index) => names.indexOf(name) !== index).length, 0);
 assert.equal(TRADER_BY_ADDRESS_COLUMNS.find((column) => column.name === "createdAt")?.dateEpoch, "iso");
 assert.equal(TRADER_BY_ADDRESS_COLUMNS.find((column) => column.name === "join_date")?.dateEpoch, "unix");
