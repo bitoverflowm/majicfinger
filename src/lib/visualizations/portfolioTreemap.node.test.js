@@ -70,6 +70,30 @@ assert.equal(model.zeros.length, 1);
 assert.equal(model.zeros[0].row, 1);
 assert.equal(model.zeros[0].label, "P2P · No");
 assert.equal(model.summary, "1 zero-value position · −10.6999 USDC unrealized P&L");
+
+const compact = positionTreemapModel(
+  {
+    type: "sheet",
+    columns: [{ id: "title" }, { id: "outcome" }, { id: "current_value" }, { id: "unrealized_pnl" }],
+    cells: {
+      "0,0": "Will Manchester City win",
+      "1,0": "No",
+      "2,0": "361.5K",
+      "3,0": "38.7K",
+      "0,1": "2026 Balance of Power",
+      "1,1": "Yes",
+      "2,1": "1.1M",
+      "3,1": "207.6K",
+    },
+  },
+  dataset,
+);
+assert.deepEqual(
+  compact.tiles.map((tile) => tile.value),
+  [1100000, 361500],
+);
+assert.equal(compact.zeros.length, 0);
+assert.equal(compact.tiles[0].pnl, 207600);
 assert.equal(model.cap, 0.02);
 assert.equal(pnlColorCap([{ pnl: -10.6999 }, { pnl: -0.0051 }]), 10.6999);
 

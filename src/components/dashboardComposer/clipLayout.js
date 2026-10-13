@@ -316,6 +316,56 @@ export function packClippedBlocks(blocks) {
   return placed;
 }
 
+function boxesOverlap(x, y, w, h, other) {
+  const ox = other.x || 0;
+  const oy = other.y || 0;
+  const ow = other.w || 0;
+  const oh = other.h || 0;
+  return x < ox + ow - 1 && x + w > ox + 1 && y < oy + oh - 1 && y + h > oy + 1;
+}
+
+/**
+ * Keep every block's size. When two blocks occupy the same space, slide the later
+ * one along the row if it still fits. Otherwise drop it onto the next line and
+ * let the blocks below make room.
+ */
+export function separateOverlaps(blocks) {
+  const ordered = [...(blocks || [])].sort((a, b) => (a.y || 0) - (b.y || 0) || (a.x || 0) - (b.x || 0));
+  const placed = [];
+  const rightEdge = CLIP.x0 + widthForSpan(CLIP.cols);
+  const gap = CLIP.gap;
+  for (const block of ordered) {
+    let x = block.x ?? CLIP.x0;
+    let y = block.y ?? CLIP.originY;
+    const w = block.w || widthForSpan(12);
+    const h = block.h || heightForRows(CLIP.minRows);
+    let guard = 0;
+    while (guard < 80) {
+      const hit = placed.find((other) => boxesOverlap(x, y, w, h, other));
+      const pastEdge = x + w > rightEdge + 1;
+      if (!hit && !pastEdge) break;
+      if (hit) {
+        const beside = (hit.x || 0) + (hit.w || 0) + gap;
+        const besideFits = beside + w <= rightEdge + 1 && !placed.some((other) => boxesOverlap(beside, hit.y || 0, w, h, other));
+        if (besideFits) {
+          x = beside;
+          y = hit.y || 0;
+        } else {
+          x = CLIP.x0;
+          y = (hit.y || 0) + (hit.h || 0) + gap;
+        }
+      } else {
+        x = CLIP.x0;
+        y += h + gap;
+      }
+      guard += 1;
+    }
+    placed.push({ ...block, x: Math.round(x), y: Math.round(y), w, h });
+  }
+  const byId = new Map(placed.map((block) => [block.id, block]));
+  return (blocks || []).map((block) => byId.get(block.id) || block);
+}
+
 /**
  * Close a hole by laying the remaining blocks in reading order.
  * Each block keeps its column span and row span.

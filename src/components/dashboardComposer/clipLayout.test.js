@@ -10,6 +10,7 @@ import {
   snapResize,
   snapResizeEdges,
   packReadingOrder,
+  separateOverlaps,
   spanOf,
   widthForSpan,
   xForCol,
@@ -86,5 +87,23 @@ assert.equal(withoutA[0].x, xForCol(0));
 assert.equal(withoutA[0].y, yForRow(0));
 assert.equal(withoutA[1].x, xForCol(12));
 assert.equal(withoutA[1].y, yForRow(0));
+
+const sideBySide = [
+  blockAt("left", 0, 0, 12, 8),
+  blockAt("right", 12, 0, 12, 8),
+  blockAt("below", 0, 8, 12, 8),
+];
+const grown = { ...sideBySide[0], w: widthForSpan(16) };
+const relieved = separateOverlaps([grown, sideBySide[1], sideBySide[2]]);
+const right = relieved.find((block) => block.id === "right");
+const below = relieved.find((block) => block.id === "below");
+assert.equal(relieved.find((block) => block.id === "left").w, widthForSpan(16));
+assert.ok(right.x >= grown.x + grown.w || right.y >= grown.y + grown.h);
+assert.ok(right.x + right.w <= CLIP.x0 + widthForSpan(24) + 1);
+assert.ok(below.y >= right.y + right.h - 1 || below.x >= right.x + right.w || right.x >= below.x + below.w);
+
+const untouched = separateOverlaps(quad);
+assert.equal(untouched[1].x, quad[1].x);
+assert.equal(untouched[1].y, quad[1].y);
 
 console.log("clipLayout.test.js ok");

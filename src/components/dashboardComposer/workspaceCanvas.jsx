@@ -28,6 +28,7 @@ import {
   canvasGridMetrics,
   packClippedBlocks,
   packReadingOrder,
+  separateOverlaps,
   setCanvasGridWidth,
   setLayoutGuide,
   snapMove,
@@ -446,10 +447,9 @@ export function WorkspaceCanvasProvider({ pageId, readOnly = false, children }) 
     (id, patch) => {
       setBlocksByPage((prev) => {
         const list = prev[pageId] || [];
-        return {
-          ...prev,
-          [pageId]: list.map((block) => (block.id === id ? { ...block, ...patch } : block)),
-        };
+        const next = list.map((block) => (block.id === id ? { ...block, ...patch } : block));
+        const geometry = ["x", "y", "w", "h"].some((key) => Object.prototype.hasOwnProperty.call(patch || {}, key));
+        return { ...prev, [pageId]: geometry ? separateOverlaps(next) : next };
       });
     },
     [pageId],

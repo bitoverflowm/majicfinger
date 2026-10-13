@@ -1683,7 +1683,7 @@ function EnrichStep({
                           ) : null}
                           <p className="text-[11px] leading-relaxed text-muted-foreground">
                             {joinChoices.some((item) => item.anchor === "trader")
-                              ? "Profile columns merge onto this sheet. Positions, PnL, activity, and market sources each get their own sheet. The preview shows the first sheet, 50 rows. The other sheets are viewable when you hit Save and run. Each saved sheet uses your plan row limit unless you set a limit."
+                              ? "Profile columns merge onto this sheet. Positions, PnL, activity, and market sources each get their own sheet. The preview shows the first sheet, 50 rows. The other sheets are viewable when you hit Save and run. A limit on this pull only shortens this sheet. Each joined sheet uses your plan row limit."
                               : queryRowCount
                                 ? `You have ${queryRowCount.toLocaleString()} ${queryRowCount === 1 ? "market" : "markets"} in this pull. Each one gets its own sheet for every source you join. The preview shows the first market.`
                                 : "Pull a market first. Each joined source becomes its own sheet for that market."}
@@ -7160,19 +7160,13 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
           const childId = `${job.target.id}:${job.entity.id || job.entity.ticker}`;
           reporter.patchChild("join-live", childId, { status: "running", result: `Pulling ${job.target.title}` });
           try {
-            const askedLimit = Number(rowLimit);
-            const pulledLimit =
-              Number.isFinite(askedLimit) && askedLimit > 0 && Number.isFinite(sheetCap)
-                ? Math.min(askedLimit, sheetCap)
-                : Number.isFinite(sheetCap)
-                  ? sheetCap
-                  : PREVIEW_ROW_CAP;
+            const childLimit = Number.isFinite(sheetCap) && sheetCap > 0 ? sheetCap : PREVIEW_ROW_CAP;
             const result = job.anchor === "trader"
-              ? await loadPolymarketTraderJoin(job.target.id, job.entity.pick, { rowLimit: pulledLimit, planLimit: pulledLimit })
+              ? await loadPolymarketTraderJoin(job.target.id, job.entity.pick, { rowLimit: childLimit, planLimit: childLimit })
               : await loadPolymarketLiveJoin(
                   job.target.id,
                   job.target.id === "parent-market" ? job.entity.pick : await ensurePolymarketMarketPick(job.entity.pick),
-                  { rowLimit: pulledLimit, planLimit: pulledLimit },
+                  { rowLimit: childLimit, planLimit: childLimit },
                 );
             const rows = result.rows || [];
             reporter.patchChild("join-live", childId, { status: "success", result: `${rows.length.toLocaleString()} rows` });

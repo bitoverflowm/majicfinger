@@ -19,16 +19,23 @@ function text(row, ...keys) {
   return "";
 }
 
+/** Sheet numbers, including `$1,200`, `361.5K`, and `1.1M`. */
+export function parseVisualNumber(value) {
+  if (value == null || String(value).trim() === "") return null;
+  const raw = String(value).trim().replace(/[$,]/g, "");
+  const match = raw.match(/^(-?\d+(?:\.\d+)?)\s*([KMB])?$/i);
+  if (!match) return null;
+  const n = Number(match[1]);
+  if (!Number.isFinite(n)) return null;
+  const scale = { K: 1e3, M: 1e6, B: 1e9 }[(match[2] || "").toUpperCase()] || 1;
+  return n * scale;
+}
+
 function number(row, ...keys) {
   for (const key of keys) {
-    if (!key || row?.[key] == null || String(row[key]).trim() === "") continue;
-    const raw = String(row[key]).trim().replace(/[$,]/g, "");
-    const match = raw.match(/^(-?\d+(?:\.\d+)?)\s*([KMB])?$/i);
-    if (!match) continue;
-    const n = Number(match[1]);
-    if (!Number.isFinite(n)) continue;
-    const scale = { K: 1e3, M: 1e6, B: 1e9 }[(match[2] || "").toUpperCase()] || 1;
-    return n * scale;
+    if (!key) continue;
+    const parsed = parseVisualNumber(row?.[key]);
+    if (parsed != null) return parsed;
   }
   return null;
 }

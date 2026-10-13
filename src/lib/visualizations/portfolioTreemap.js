@@ -1,9 +1,9 @@
 import { changeColor } from "@/components/spectrumui/charts/heatmapColors";
 import { sheetRecords } from "@/lib/visualizations/datasetDescriptor";
+import { parseVisualNumber } from "@/lib/visualizations/visualTable";
 
 function num(value) {
-  const n = Number(String(value ?? "").trim().replace(/,/g, ""));
-  return Number.isFinite(n) ? n : null;
+  return parseVisualNumber(value);
 }
 
 function rowIndexes(sheet) {
