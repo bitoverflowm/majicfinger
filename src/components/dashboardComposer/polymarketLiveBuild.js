@@ -70,6 +70,18 @@ import {
   TRADER_PNL_DEFAULT_COLUMNS,
   TRADER_PNL_ENDPOINT_ID,
 } from "@/lib/polymarketLive/traderPnlCompose";
+import {
+  activitySheetRow,
+  mergePolymarketActivityCohorts,
+  polymarketActivityPage,
+  polymarketActivityPageParams,
+  polymarketActivityQuery,
+  polymarketActivityTarget,
+  polymarketActivityWalks,
+  TRADER_ACTIVITY_COLUMNS,
+  TRADER_ACTIVITY_DEFAULT_COLUMNS,
+  TRADER_ACTIVITY_ENDPOINT_ID,
+} from "@/lib/polymarketLive/traderActivityCompose";
 
 export const POLYMARKET_LIVE_BUILD_CATEGORIES = [
   { id: "markets", label: "Markets" },
@@ -121,6 +133,7 @@ const API_VERSION = {
   [TRADER_BY_ADDRESS_ENDPOINT_ID]: "v2",
   [TRADER_POSITIONS_ENDPOINT_ID]: "v2",
   [TRADER_PNL_ENDPOINT_ID]: "v2",
+  [TRADER_ACTIVITY_ENDPOINT_ID]: "v2",
 };
 
 /**
@@ -164,6 +177,7 @@ const REQUIREMENTS = {
   [TRADER_BY_ADDRESS_ENDPOINT_ID]: { kind: "address", prompt: "Wallet address required" },
   [TRADER_POSITIONS_ENDPOINT_ID]: { kind: "address", prompt: "Wallet address required" },
   [TRADER_PNL_ENDPOINT_ID]: { kind: "address", prompt: "Wallet address required" },
+  [TRADER_ACTIVITY_ENDPOINT_ID]: { kind: "address", prompt: "Wallet address required" },
 };
 
 const PREFERRED_COLUMNS = [
@@ -265,6 +279,10 @@ const BUILD_COPY = {
     title: "Get trader's PnL series",
     description: "A trader's cumulative PnL, volume, and fees over a chosen window.",
   },
+  [TRADER_ACTIVITY_ENDPOINT_ID]: {
+    title: "Get trader's activity",
+    description: "A trader's trades, splits, merges, redeems, and other wallet activity.",
+  },
 };
 
 const ADDRESS_QUERIES = {
@@ -352,6 +370,16 @@ export function polymarketLiveBuildEndpoints() {
       api: "v2",
     });
   }
+  if (!endpoints.some((endpoint) => endpoint.id === TRADER_ACTIVITY_ENDPOINT_ID)) {
+    const afterPnl = endpoints.findIndex((endpoint) => endpoint.id === TRADER_PNL_ENDPOINT_ID);
+    endpoints.splice(afterPnl >= 0 ? afterPnl + 1 : endpoints.length, 0, {
+      id: TRADER_ACTIVITY_ENDPOINT_ID,
+      ...(BUILD_COPY[TRADER_ACTIVITY_ENDPOINT_ID] || {}),
+      category: "holders",
+      realtime: false,
+      api: "v2",
+    });
+  }
   return endpoints;
 }
 
@@ -430,7 +458,8 @@ export function polymarketMarketFanout(tableId) {
     isPolymarketQuoteTable(tableId) ||
     tableId === "getHoldersByMarkets" ||
     tableId === TRADER_POSITIONS_ENDPOINT_ID ||
-    tableId === TRADER_PNL_ENDPOINT_ID
+    tableId === TRADER_PNL_ENDPOINT_ID ||
+    tableId === TRADER_ACTIVITY_ENDPOINT_ID
   );
 }
 
@@ -674,6 +703,21 @@ export function polymarketLiveBuildColumns(endpointId) {
   if (endpointId === TRADER_POSITIONS_ENDPOINT_ID) {
     const defaults = new Set(TRADER_POSITIONS_DEFAULT_COLUMNS);
     return TRADER_POSITIONS_COLUMNS.map((entry) => {
+      const column = {
+        id: entry.name,
+        title: entry.title || titleFor(entry.name),
+        type: columnType(entry.type),
+        description: entry.description || "",
+        defaultOn: defaults.has(entry.name),
+      };
+      if (entry.dateEpoch) column.dateEpoch = entry.dateEpoch;
+      if (entry.exact) column.exact = true;
+      return column;
+    });
+  }
+  if (endpointId === TRADER_ACTIVITY_ENDPOINT_ID) {
+    const defaults = new Set(TRADER_ACTIVITY_DEFAULT_COLUMNS);
+    return TRADER_ACTIVITY_COLUMNS.map((entry) => {
       const column = {
         id: entry.name,
         title: entry.title || titleFor(entry.name),
@@ -1571,6 +1615,39 @@ async function traderPnlRows(picks, options = {}) {
   return rows;
 }
 
+/** One activity feed per wallet. Market batches are separate calls, then merged. */
+async function traderActivityRows(picks, options = {}) {
+  const addresses = traderAddressesFromPicks(picks);
+  if (!addresses.length) throw new Error("Search for a trader wallet.");
+  const query = polymarketActivityQuery(options.filters || {});
+  if (query.conflict) throw new Error("Filter by a market or an event, not both.");
+  const walks = polymarketActivityWalks(query);
+  const target = polymarketActivityTarget(options);
+  const rows = [];
+  for (const address of addresses) {
+    const cohorts = [];
+    for (const walk of walks) {
+      const cohort = [];
+      let cursor = "";
+      let got = 0;
+      for (let page = 0; got < target && page < 500; page += 1) {
+        const params = polymarketActivityPageParams(address, walk, cursor, Math.min(1000, target - got));
+        const next = polymarketActivityPage(await polymarketGet(TRADER_ACTIVITY_ENDPOINT_ID, params));
+        for (const raw of next.rows) {
+          cohort.push(activitySheetRow(raw, address));
+          got += 1;
+          if (got >= target) break;
+        }
+        if (!next.rows.length || !next.cursor || next.cursor === cursor) break;
+        cursor = next.cursor;
+      }
+      cohorts.push(cohort);
+    }
+    rows.push(...mergePolymarketActivityCohorts(cohorts, target));
+  }
+  return rows;
+}
+
 /** One sheet's worth of positions per wallet. Statuses and market batches are separate calls, then merged. */
 async function traderPositionRows(picks, options = {}) {
   const addresses = traderAddressesFromPicks(picks);
@@ -1668,6 +1745,7 @@ async function directedRows(endpointId, picks, options = {}) {
   if (endpointId === "getBiggestWinners") return biggestWinnersRows(options.filters || {}, options);
   if (endpointId === TRADER_POSITIONS_ENDPOINT_ID) return traderPositionRows(picks, options);
   if (endpointId === TRADER_PNL_ENDPOINT_ID) return traderPnlRows(picks, options);
+  if (endpointId === TRADER_ACTIVITY_ENDPOINT_ID) return traderActivityRows(picks, options);
   if (endpointId === TRADER_BY_ADDRESS_ENDPOINT_ID) return traderByAddressRows(picks);
   if (ADDRESS_QUERIES[endpointId]) {
     if (!/^0x[a-fA-F0-9]{40}$/.test(pick.address || "")) throw new Error("Search for a trader wallet.");

@@ -1583,6 +1583,86 @@ export default async function handler(req, res) {
         data = await fetchJson(`${DATA_API_BASE}/v2/user-stats?user=${encodeURIComponent(user)}`);
         break;
       }
+      case "getTraderActivity": {
+        const user = String(req.query.user || "").trim();
+        if (!/^0x[a-fA-F0-9]{40}$/.test(user)) {
+          return res.status(400).json({ message: "A valid user wallet address is required" });
+        }
+        const activityTypes = new Set([
+          "TRADE",
+          "SPLIT",
+          "MERGE",
+          "REDEEM",
+          "REWARD",
+          "CONVERSION",
+          "YIELD",
+          "MAKER_REBATE",
+          "TAKER_REBATE",
+          "REFERRAL_REWARD",
+          "DEPOSIT",
+          "WITHDRAWAL",
+          "TIP",
+        ]);
+        const requestedTypes = String(req.query.type || "")
+          .split(",")
+          .map((value) => value.trim().toUpperCase())
+          .filter(Boolean);
+        if (requestedTypes.some((value) => !activityTypes.has(value))) {
+          return res.status(400).json({ message: "Invalid activity type" });
+        }
+        const condition = String(req.query.condition || "").trim();
+        const conditionIds = condition.split(",").map((value) => value.trim()).filter(Boolean);
+        if (conditionIds.some((value) => !/^0x[a-fA-F0-9]{64}$/.test(value))) {
+          return res.status(400).json({ message: "Invalid market condition ID" });
+        }
+        if (conditionIds.length > 20) {
+          return res.status(400).json({ message: "At most 20 markets can be requested at once" });
+        }
+        const eventId = String(req.query.event_id || "").trim();
+        const eventIds = eventId.split(",").map((value) => value.trim()).filter(Boolean);
+        if (eventIds.some((value) => !/^[1-9]\d*$/.test(value))) {
+          return res.status(400).json({ message: "Invalid event ID" });
+        }
+        if (eventIds.length > 20) {
+          return res.status(400).json({ message: "At most 20 events can be requested at once" });
+        }
+        if (conditionIds.length && eventIds.length) {
+          return res.status(400).json({ message: "Filter by a market or an event, not both" });
+        }
+        const side = String(req.query.side || "").trim().toUpperCase();
+        if (side && side !== "BUY" && side !== "SELL") {
+          return res.status(400).json({ message: "Side must be buy or sell" });
+        }
+        const limitRaw = String(req.query.limit ?? "").trim();
+        if (limitRaw && (!/^\d+$/.test(limitRaw) || Number(limitRaw) > 1000)) {
+          return res.status(400).json({ message: "Limit must be from 0 to 1000" });
+        }
+        for (const key of ["start", "end"]) {
+          const value = String(req.query[key] ?? "").trim();
+          if (value && !/^\d+$/.test(value)) {
+            return res.status(400).json({ message: "Date range must be epoch seconds" });
+          }
+        }
+        const deposits = String(req.query.exclude_deposits_withdrawals ?? "").trim().toLowerCase();
+        if (deposits && deposits !== "true" && deposits !== "false") {
+          return res.status(400).json({ message: "Exclude deposits and withdrawals must be true or false" });
+        }
+        const params = new URLSearchParams({ user });
+        if (requestedTypes.length) params.set("type", requestedTypes.join(","));
+        if (conditionIds.length) params.set("condition", conditionIds.join(","));
+        if (eventIds.length) params.set("event_id", eventIds.join(","));
+        if (side) params.set("side", side);
+        if (limitRaw) params.set("limit", String(Number(limitRaw)));
+        const cursor = String(req.query.cursor || "").trim();
+        if (cursor) params.set("cursor", cursor);
+        const start = String(req.query.start ?? "").trim();
+        const end = String(req.query.end ?? "").trim();
+        if (start) params.set("start", start);
+        if (end) params.set("end", end);
+        if (deposits) params.set("exclude_deposits_withdrawals", deposits);
+        data = await fetchJson(`${DATA_API_BASE}/v2/activity?${params.toString()}`);
+        break;
+      }
       case "getTraderPnlSeries": {
         const user = String(req.query.user || req.query.user_address || "").trim();
         if (!/^0x[a-fA-F0-9]{40}$/.test(user)) {

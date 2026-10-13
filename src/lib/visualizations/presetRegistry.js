@@ -185,9 +185,14 @@ export function isStatsDataset(dataset) {
   return dataset?.category === "stats" || dataset?.datasetType === "leaderboard" || dataset?.datasetType === "biggest_wins";
 }
 
-/** Sheets that can switch into the visual table. Positions keep their own log. */
+/** Sheets that can switch into a rich log. Positions and activity keep their own. */
 export function hasVisualTable(dataset) {
-  return isStatsDataset(dataset) || dataset?.datasetType === "trader_positions";
+  return isStatsDataset(dataset) || dataset?.datasetType === "trader_positions" || dataset?.datasetType === "trader_activity";
+}
+
+/** Menu name for that log. Activity uses the audit-style rich table. */
+export function visualPresentationLabel(dataset) {
+  return dataset?.datasetType === "trader_activity" ? "Rich Table" : "Visual Table";
 }
 
 /**
@@ -204,7 +209,7 @@ export function visualizationChoices(dataset, columnIds) {
   if (preset && viewValid(preset.view, dataset, ids)) {
     choices.push({ view: preset.view, label: preset.label });
   }
-  if (viewValid("visual-table", dataset, ids)) {
+  if (dataset.datasetType !== "trader_activity" && viewValid("visual-table", dataset, ids)) {
     choices.push({ view: "visual-table", label: "Visual Table" });
   }
   return choices;

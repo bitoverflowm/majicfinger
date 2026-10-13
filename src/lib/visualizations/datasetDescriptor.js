@@ -23,6 +23,7 @@ export const DATASET_TYPES = [
   "positions_closed",
   "trader_positions",
   "trader_pnl",
+  "trader_activity",
   "holder_trades",
 ];
 
@@ -347,6 +348,27 @@ const ENDPOINTS = {
     units: { metric: "usdc" },
     fields: { time: "timestamp", value: "economic_pnl", basis: "realized_pnl" },
     required: ["timestamp", "economic_pnl"],
+  }),
+  "polymarket:getTraderActivity": spec({
+    datasetType: "trader_activity",
+    shape: "records",
+    seriesKeys: [],
+    units: { metric: "usdc" },
+    fields: {
+      time: "timestamp",
+      type: "type",
+      label: "title",
+      outcome: "outcome",
+      side: "side",
+      size: "size",
+      value: "usdc_size",
+      price: "price",
+      icon: "icon",
+      name: "name",
+      avatar: "profile_image",
+      combo: "is_combo",
+    },
+    required: ["timestamp", "type"],
   }),
   "polymarket:getTraderPositions": spec({
     datasetType: "trader_positions",

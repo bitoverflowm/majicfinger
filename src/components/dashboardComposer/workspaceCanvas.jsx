@@ -14,11 +14,12 @@ import { DestructiveConfirmMenuItem } from "@/components/ui/destructive-confirm-
 import { useMyStateV2 } from "@/context/stateContextV2";
 import { duplicateTabName, saveWorkspaceStartTabs } from "@/lib/workspaceStartTabs";
 import { DashboardSheetGrid } from "@/components/dashboardComposer/dashboardSheetGrid";
+import { ActivityRichTableView } from "@/components/dashboardComposer/activityRichTableView";
 import { VisualTableView } from "@/components/dashboardComposer/visualTableView";
 import { Switch } from "@/components/ui/switch";
 import { isOrderBookSheet } from "@/components/dashboardComposer/orderBookLadder";
 import { columnKey, countObservations, describeSheet } from "@/lib/visualizations/datasetDescriptor";
-import { hasVisualTable, resolveVisualization } from "@/lib/visualizations/presetRegistry";
+import { hasVisualTable, resolveVisualization, visualPresentationLabel } from "@/lib/visualizations/presetRegistry";
 import { isPriceHistorySheet } from "@/components/dashboardComposer/priceHistorySeries";
 import { SheetBlockChart } from "@/components/dashboardComposer/sheetBlockChart";
 import { layoutRunSheets } from "@/components/dashboardComposer/integrationRunSheets";
@@ -65,6 +66,7 @@ export function useWorkspaceCanvas() {
 }
 
 const VISUAL_TABLE_WIDTH = 660;
+const RICH_TABLE_WIDTH = 780;
 
 const BLOCK_SIZE = {
   sheet: { w: 560, h: 360 },
@@ -1064,6 +1066,21 @@ function SheetMarketCaption({ block }) {
   );
 }
 
+function SheetPresentation({ sheet, dataset, hidden, readOnly, onHideColumn }) {
+  if (dataset?.datasetType === "trader_activity") {
+    return <ActivityRichTableView sheet={sheet} dataset={dataset} />;
+  }
+  return (
+    <VisualTableView
+      sheet={sheet}
+      dataset={dataset}
+      hidden={hidden}
+      readOnly={readOnly}
+      onHideColumn={onHideColumn}
+    />
+  );
+}
+
 function SheetBlockBody({ block, onChange, booting }) {
   const canvas = useWorkspaceCanvas();
   useRememberMarket(block);
@@ -1119,7 +1136,7 @@ function SheetBlockBody({ block, onChange, booting }) {
       {booting ? (
         <SheetSkeleton />
       ) : visual ? (
-        <VisualTableView
+        <SheetPresentation
           sheet={view}
           dataset={dataset}
           hidden={block.visualHidden}
@@ -1321,7 +1338,7 @@ function SheetFullscreen({ block, onChange, onClose }) {
       />
       <div className="flex min-h-0 flex-1 flex-col p-4">
         {visual ? (
-          <VisualTableView sheet={view} dataset={dataset} hidden={block.visualHidden} readOnly />
+          <SheetPresentation sheet={view} dataset={dataset} hidden={block.visualHidden} readOnly />
         ) : (
           <DashboardSheetGrid block={view} onChange={onChange} />
         )}
@@ -1385,6 +1402,9 @@ function CanvasBlock({ block, selected, spotlight = false, onSelect, onChange, b
   const [menuOpen, setMenuOpen] = useState(false);
   const [fullscreen, setFullscreen] = useState(false);
   const [resizing, setResizing] = useState(false);
+  const sheetDataset = block.type === "sheet" ? describeSheet(block) : null;
+  const logLabel = visualPresentationLabel(sheetDataset);
+  const logWidth = sheetDataset?.datasetType === "trader_activity" ? RICH_TABLE_WIDTH : VISUAL_TABLE_WIDTH;
 
   useLayoutEffect(() => {
     const live = dragRef.current?.live;
@@ -1648,7 +1668,7 @@ function CanvasBlock({ block, selected, spotlight = false, onSelect, onChange, b
                 <BarChart3 className="size-4 text-muted-foreground" />
                 Create chart
               </DropdownMenuItem>
-              {hasVisualTable(describeSheet(block)) ? (
+              {hasVisualTable(sheetDataset) ? (
                 block.visualReady ? (
                   <div
                     className="flex items-center gap-2.5 rounded-md px-2 py-2 text-[13px]"
@@ -1657,14 +1677,14 @@ function CanvasBlock({ block, selected, spotlight = false, onSelect, onChange, b
                     <Switch
                       size="sm"
                       checked={block.presentation === "visual"}
-                      aria-label="Visual table"
+                      aria-label={logLabel}
                       onCheckedChange={(on) => {
                         if (on) {
                           onChange({
                             presentation: "visual",
                             visualReady: true,
                             sheetW: block.sheetW || block.w,
-                            w: widthForSpan(spanOf({ w: VISUAL_TABLE_WIDTH })),
+                            w: widthForSpan(spanOf({ w: logWidth })),
                           });
                           return;
                         }
@@ -1675,7 +1695,7 @@ function CanvasBlock({ block, selected, spotlight = false, onSelect, onChange, b
                       }}
                       onClick={(event) => event.stopPropagation()}
                     />
-                    <span>Visual table</span>
+                    <span>{sheetDataset?.datasetType === "trader_activity" ? "Rich table" : "Visual table"}</span>
                   </div>
                 ) : (
                   <DropdownMenuItem
@@ -1685,12 +1705,12 @@ function CanvasBlock({ block, selected, spotlight = false, onSelect, onChange, b
                         presentation: "visual",
                         visualReady: true,
                         sheetW: block.w,
-                        w: widthForSpan(spanOf({ w: VISUAL_TABLE_WIDTH })),
+                        w: widthForSpan(spanOf({ w: logWidth })),
                       })
                     }
                   >
                     <Table2 className="size-4 text-muted-foreground" />
-                    Visual Table
+                    {logLabel}
                   </DropdownMenuItem>
                 )
               ) : null}

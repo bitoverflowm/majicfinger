@@ -75,6 +75,7 @@ assert.deepEqual(
     getTraderByAddress: "v2",
     getTraderPositions: "v2",
     getTraderPnlSeries: "v2",
+    getTraderActivity: "v2",
   },
 );
 assert.equal(endpoints.find((endpoint) => endpoint.id === "getTraderPositions")?.title, "Get trader's positions");
@@ -87,7 +88,26 @@ assert.equal(
 );
 const positionsAt = ids.indexOf("getTraderPositions");
 const pnlAt = ids.indexOf("getTraderPnlSeries");
-assert.ok(positionsAt >= 0 && pnlAt === positionsAt + 1);
+const activityAt = ids.indexOf("getTraderActivity");
+assert.ok(positionsAt >= 0 && pnlAt === positionsAt + 1 && activityAt === pnlAt + 1);
+assert.equal(endpoints.find((endpoint) => endpoint.id === "getTraderActivity")?.title, "Get trader's activity");
+assert.equal(
+  endpoints.find((endpoint) => endpoint.id === "getTraderActivity")?.description,
+  "A trader's trades, splits, merges, redeems, and other wallet activity.",
+);
+assert.equal(polymarketLiveBuildRequirement("getTraderActivity")?.prompt, "Wallet address required");
+assert.equal(polymarketMarketFanout("getTraderActivity"), true);
+assert.equal(polymarketLiveBuildSearch("getTraderActivity")?.placeholder, "Search for a trader");
+assert.equal(polymarketLiveBuildSearch("getTraderActivity")?.acceptAddress, undefined);
+const activityColumns = polymarketLiveBuildColumns("getTraderActivity");
+assert.equal(activityColumns.find((column) => column.id === "timestamp")?.dateEpoch, "unix");
+assert.equal(activityColumns.find((column) => column.id === "timestamp")?.defaultOn, true);
+assert.equal(activityColumns.find((column) => column.id === "type")?.defaultOn, true);
+assert.equal(activityColumns.find((column) => column.id === "usdc_size")?.title, "USDC size");
+assert.equal(activityColumns.find((column) => column.id === "outcome_index")?.exact, true);
+assert.equal(activityColumns.find((column) => column.id === "user")?.defaultOn, false);
+assert.equal(activityColumns.find((column) => column.id === "is_combo")?.defaultOn, false);
+assert.equal(activityColumns.some((column) => column.id === "sort_by"), false);
 assert.equal(polymarketLiveBuildRequirement("getTraderPnlSeries")?.prompt, "Wallet address required");
 assert.equal(polymarketMarketFanout("getTraderPnlSeries"), true);
 assert.equal(polymarketLiveBuildSearch("getTraderPnlSeries")?.placeholder, "Search for a trader");
