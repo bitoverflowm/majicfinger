@@ -508,6 +508,227 @@ export function polymarketJoinChoices(tableId) {
   return [];
 }
 
+const TRADER_PROFILE_JOIN = { id: TRADER_BY_ADDRESS_ENDPOINT_ID, placement: "merge", anchor: "trader" };
+const TRADER_POSITIONS_JOIN = { id: TRADER_POSITIONS_ENDPOINT_ID, placement: "sheet", anchor: "trader" };
+const TRADER_PNL_JOIN = { id: TRADER_PNL_ENDPOINT_ID, placement: "sheet", anchor: "trader" };
+const TRADER_ACTIVITY_JOIN = { id: TRADER_ACTIVITY_ENDPOINT_ID, placement: "sheet", anchor: "trader" };
+const TRADER_PUBLIC_JOIN = { id: "getPublicProfiles", placement: "merge", anchor: "trader" };
+const TRADER_HOLDERS_JOIN = { id: "getHoldersByMarkets", placement: "sheet", anchor: "market" };
+const TRADER_MARKET_META_JOIN = { id: "parent-market", placement: "market-choice", anchor: "market" };
+
+function traderMarketLeaves(exceptId, skip = []) {
+  const hidden = new Set([exceptId, ...skip]);
+  return POLYMARKET_JOIN_IDS.filter((id) => !hidden.has(id)).map((id) => ({
+    id,
+    placement: "sheet",
+    anchor: "market",
+  }));
+}
+
+/** Joins available on each Traders pull. Market leaves stay composable once a row names a market. */
+const TRADER_JOIN_GRAPH = {
+  getTraderLeaderboard: [TRADER_PROFILE_JOIN, TRADER_POSITIONS_JOIN, TRADER_PNL_JOIN, TRADER_ACTIVITY_JOIN],
+  getBiggestWinners: [
+    TRADER_PROFILE_JOIN,
+    TRADER_MARKET_META_JOIN,
+    ...traderMarketLeaves("getBiggestWinners", ["getHoldersByMarkets"]),
+    TRADER_PNL_JOIN,
+    TRADER_ACTIVITY_JOIN,
+    TRADER_HOLDERS_JOIN,
+    TRADER_PUBLIC_JOIN,
+  ],
+  [TRADER_BY_ADDRESS_ENDPOINT_ID]: [TRADER_POSITIONS_JOIN, TRADER_PNL_JOIN, TRADER_ACTIVITY_JOIN, TRADER_PUBLIC_JOIN],
+  [TRADER_POSITIONS_ENDPOINT_ID]: [
+    TRADER_MARKET_META_JOIN,
+    ...traderMarketLeaves(TRADER_POSITIONS_ENDPOINT_ID),
+    TRADER_PROFILE_JOIN,
+    TRADER_PNL_JOIN,
+    TRADER_ACTIVITY_JOIN,
+    TRADER_PUBLIC_JOIN,
+  ],
+  [TRADER_PNL_ENDPOINT_ID]: [TRADER_PROFILE_JOIN, TRADER_POSITIONS_JOIN, TRADER_ACTIVITY_JOIN, TRADER_PUBLIC_JOIN],
+  [TRADER_ACTIVITY_ENDPOINT_ID]: [
+    TRADER_MARKET_META_JOIN,
+    ...traderMarketLeaves(TRADER_ACTIVITY_ENDPOINT_ID),
+    TRADER_PROFILE_JOIN,
+    TRADER_POSITIONS_JOIN,
+    TRADER_PNL_JOIN,
+    TRADER_PUBLIC_JOIN,
+  ],
+  getHoldersByMarkets: [
+    TRADER_MARKET_META_JOIN,
+    ...traderMarketLeaves("getHoldersByMarkets"),
+    TRADER_PROFILE_JOIN,
+    TRADER_POSITIONS_JOIN,
+    TRADER_PNL_JOIN,
+    TRADER_ACTIVITY_JOIN,
+    TRADER_PUBLIC_JOIN,
+  ],
+  getPublicProfiles: [TRADER_PROFILE_JOIN, TRADER_POSITIONS_JOIN, TRADER_PNL_JOIN, TRADER_ACTIVITY_JOIN],
+};
+
+function traderJoinNote(spec) {
+  if (spec.placement === "merge") return "Merged onto this sheet.";
+  if (spec.placement === "market-choice") return "Merge onto this sheet, or one Markets sheet.";
+  if (spec.id === TRADER_PNL_ENDPOINT_ID) return "One sheet per trader. Pulls the max PnL range.";
+  if (spec.anchor === "trader") return "One sheet per trader. The preview shows the first.";
+  return "One sheet per market. The preview shows the first.";
+}
+
+/**
+ * Trader pulls join onward to profiles, positions, PnL, activity, and, when the row names a market, that market's sources.
+ * @param {string} tableId
+ */
+export function polymarketTraderJoinChoices(tableId) {
+  const specs = TRADER_JOIN_GRAPH[tableId];
+  if (!specs) return [];
+  const byId = new Map(polymarketLiveBuildEndpoints().map((endpoint) => [endpoint.id, endpoint]));
+  const markets = new Map(polymarketLiveMarketJoins().map((item) => [item.id, item]));
+  return specs.map((spec) => {
+    if (spec.id === POLYMARKET_PARENT_MARKET_JOIN.id) {
+      return { ...POLYMARKET_PARENT_MARKET_JOIN, ...spec, note: traderJoinNote(spec) };
+    }
+    const endpoint = byId.get(spec.id);
+    const market = markets.get(spec.id);
+    return {
+      id: spec.id,
+      title: endpoint?.title || market?.title || spec.id,
+      detail: endpoint?.description || market?.detail || "",
+      note: traderJoinNote(spec),
+      realtime: Boolean(endpoint?.realtime || market?.realtime),
+      placement: spec.placement,
+      anchor: spec.anchor,
+    };
+  });
+}
+
+/** A market-choice join is a sheet until the user asks for it on the parent. */
+export function polymarketJoinPlacement(item, marketLayout = "sheet") {
+  if (!item) return "sheet";
+  if (item.placement === "market-choice") return marketLayout === "merge" ? "merge" : "sheet";
+  return item.placement || "sheet";
+}
+
+function polymarketWalletText(value) {
+  const text = String(value || "").trim();
+  return /^0x[a-fA-F0-9]{40}$/.test(text) ? text.toLowerCase() : "";
+}
+
+/** Wallet on a leaderboard, win, holder, position, activity, PnL, or profile row. */
+export function polymarketTraderWalletFromRow(row) {
+  if (!row || typeof row !== "object") return "";
+  for (const key of ["user_id", "proxy_wallet", "proxyWallet", "user", "address", "wallet"]) {
+    const wallet = polymarketWalletText(row[key]);
+    if (wallet) return wallet;
+  }
+  return "";
+}
+
+/**
+ * One entry per trader, in row order.
+ * @param {Array<Record<string, unknown>>} rows
+ * @param {number} [cap]
+ */
+export function polymarketTraderEntities(rows, cap = Infinity) {
+  const seen = new Set();
+  const list = [];
+  for (const row of Array.isArray(rows) ? rows : []) {
+    const wallet = polymarketTraderWalletFromRow(row);
+    if (!wallet || seen.has(wallet)) continue;
+    seen.add(wallet);
+    const name = String(row.user_name || row.userName || row.name || row.pseudonym || "").trim();
+    const label = name && !polymarketWalletText(name) ? name : `${wallet.slice(0, 6)}…${wallet.slice(-4)}`;
+    list.push({
+      id: wallet,
+      ticker: wallet,
+      label,
+      title: name || wallet,
+      pick: { id: `profile:${wallet}`, kind: "profile", address: wallet, label, title: name || wallet },
+    });
+    if (list.length >= cap) break;
+  }
+  return list;
+}
+
+/**
+ * One entry per market named on the rows.
+ * @param {Array<Record<string, unknown>>} rows
+ * @param {number} [cap]
+ */
+export function polymarketMarketEntities(rows, cap = Infinity) {
+  const seen = new Set();
+  const list = [];
+  for (const row of Array.isArray(rows) ? rows : []) {
+    const pick = polymarketJoinPickFromRow(row);
+    if (!pick || seen.has(pick.id)) continue;
+    seen.add(pick.id);
+    list.push({
+      ticker: pick.slug || pick.entityId || pick.conditionId || pick.id,
+      label: pick.label,
+      title: pick.title,
+      pick,
+    });
+    if (list.length >= cap) break;
+  }
+  return list;
+}
+
+export function polymarketMarketKeyFromRow(row) {
+  if (!row || typeof row !== "object") return "";
+  return String(row.conditionId || row.condition_id || row.market_slug || row.slug || row.market_id || row.id || "")
+    .trim()
+    .toLowerCase();
+}
+
+/**
+ * Copy joined columns onto the parent rows. Matching wallets or markets share a row.
+ * A column that already exists on the parent is kept and the joined one is prefixed.
+ */
+export function mergePolymarketJoinRows(parentColumns, parentRows, joinColumns, joinRows, { anchor = "trader" } = {}) {
+  const columns = Array.isArray(parentColumns) ? parentColumns : [];
+  const rows = Array.isArray(parentRows) ? parentRows : [];
+  const taken = new Set(columns.map((column) => column.id));
+  const extras = [];
+  for (const column of Array.isArray(joinColumns) ? joinColumns : []) {
+    const sourceId = column?.id;
+    if (!sourceId) continue;
+    let id = sourceId;
+    if (taken.has(id)) id = `joined_${sourceId}`;
+    if (taken.has(id)) continue;
+    taken.add(id);
+    extras.push({ ...column, id, sourceId });
+  }
+  const index = new Map();
+  for (const row of Array.isArray(joinRows) ? joinRows : []) {
+    const key = anchor === "market" ? polymarketMarketKeyFromRow(row) : polymarketTraderWalletFromRow(row);
+    if (key && !index.has(key)) index.set(key, row);
+  }
+  const keyOf = anchor === "market" ? polymarketMarketKeyFromRow : polymarketTraderWalletFromRow;
+  return {
+    columns: [...columns, ...extras.map(({ sourceId, ...column }) => column)],
+    rows: rows.map((row) => {
+      const extra = index.get(keyOf(row));
+      if (!extra) return row;
+      const next = { ...row };
+      for (const column of extras) {
+        const value = extra[column.sourceId];
+        if (value != null && value !== "") next[column.id] = value;
+      }
+      return next;
+    }),
+  };
+}
+
+/** Sheet title for a per-trader join. Activity keeps the "<name>'s activity" rule. */
+export function polymarketTraderJoinSheetTitle(endpointId, label) {
+  const name = String(label || "").trim();
+  if (endpointId === TRADER_ACTIVITY_ENDPOINT_ID) return polymarketActivitySheetTitle(name);
+  if (!name) return "";
+  if (endpointId === TRADER_POSITIONS_ENDPOINT_ID) return `${name}'s positions`;
+  if (endpointId === TRADER_PNL_ENDPOINT_ID) return `${name}'s PnL`;
+  return "";
+}
+
 /**
  * A market row from Find markets or sampling, shaped like a search pick.
  * @param {Record<string, unknown>} row
@@ -1813,4 +2034,56 @@ export async function loadPolymarketLiveJoin(endpointId, pick, options = {}) {
     filters: defaultPolymarketQuoteFilters(endpointId),
   });
   return { columns: shownJoinColumns(packed.columns), rows: packed.rows || [] };
+}
+
+/**
+ * One trader's joined sheet. PnL uses the max window unless the caller passes filters.
+ * Preview passes a 50-row cap. Save and run passes the plan limit.
+ * @param {string} endpointId
+ * @param {{ address?: string }} pick
+ */
+export async function loadPolymarketTraderJoin(endpointId, pick, options = {}) {
+  const address = String(pick?.address || "").trim();
+  if (!/^0x[a-fA-F0-9]{40}$/.test(address)) throw new Error("This join needs a trader wallet.");
+  const limit = Math.max(1, Number(options.rowLimit) || 50);
+  const filters =
+    options.filters ||
+    (endpointId === TRADER_PNL_ENDPOINT_ID ? { interval: { value: "max" }, fidelity: { value: "1d" } } : undefined);
+  const packed = await loadPolymarketLiveTable(endpointId, [{ ...pick, kind: "profile", address }], {
+    rowLimit: limit,
+    planLimit: Number(options.planLimit) || limit,
+    ...(filters ? { filters } : {}),
+  });
+  const wallet = address.toLowerCase();
+  return {
+    columns: shownJoinColumns(packed.columns),
+    rows: (packed.rows || []).map((row) => ({
+      ...row,
+      user_id: row.user_id || wallet,
+      address: row.address || wallet,
+      user: row.user || wallet,
+    })),
+  };
+}
+
+/** Fill token ids from market metadata when a win or a position only has a condition id. */
+export async function ensurePolymarketMarketPick(pick) {
+  if (!pick || (Array.isArray(pick.tokenIds) && pick.tokenIds.length)) return pick;
+  try {
+    const meta = await loadPolymarketLiveJoin(POLYMARKET_PARENT_MARKET_JOIN.id, pick, { rowLimit: 1 });
+    const enriched = meta.rows?.[0] ? polymarketJoinPickFromRow(meta.rows[0]) : null;
+    if (!enriched) return pick;
+    return {
+      ...enriched,
+      ...pick,
+      tokenIds: pick.tokenIds?.length ? pick.tokenIds : enriched.tokenIds,
+      conditionId: pick.conditionId || enriched.conditionId,
+      slug: pick.slug || enriched.slug,
+      entityId: pick.entityId || enriched.entityId,
+      label: pick.label || enriched.label,
+      title: pick.title || enriched.title,
+    };
+  } catch {
+    return pick;
+  }
 }

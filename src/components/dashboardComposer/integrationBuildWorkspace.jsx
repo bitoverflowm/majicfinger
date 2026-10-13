@@ -11,7 +11,7 @@ import { BucketExplainer, BucketExplainerTabs } from "@/components/dashboardComp
 import { SampleExplainer } from "@/components/dashboardComposer/integrationSampleExplainer";
 import { ClosedOrderbookExplainer } from "@/components/dashboardComposer/integrationClosedOrderbook";
 import { BucketEnrichPanel, SampleEnrichPanel } from "@/components/dashboardComposer/integrationEnrichPanels";
-import { FanoutJoinExplainer, FanoutJoinExplainerTabs, JoinExplainer, JoinExplainerTabs, PolymarketFanoutJoinExplainer, PolymarketFanoutJoinExplainerTabs, PolymarketLiveJoinExplainer, PolymarketLiveJoinExplainerTabs, TraderJoinExplainer, TraderJoinExplainerTabs } from "@/components/dashboardComposer/integrationJoinExplainer";
+import { FanoutJoinExplainer, FanoutJoinExplainerTabs, JoinExplainer, JoinExplainerTabs, PolymarketFanoutJoinExplainer, PolymarketFanoutJoinExplainerTabs, PolymarketLiveJoinExplainer, PolymarketLiveJoinExplainerTabs, PolymarketTraderJoinExplainer, PolymarketTraderJoinExplainerTabs, TraderJoinExplainer, TraderJoinExplainerTabs } from "@/components/dashboardComposer/integrationJoinExplainer";
 import { SpectrumLoadingState } from "@/components/ui/spectrum-loading-state";
 import { TaskRows } from "@/components/spectrumui/blocks/ai-assistants/task-rows";
 import {
@@ -38,11 +38,20 @@ import {
   usesExactUniverse,
 } from "@/components/dashboardComposer/integrationBuildCatalog";
 import {
+  ensurePolymarketMarketPick,
   loadPolymarketLiveJoin,
   loadPolymarketLiveTable,
+  loadPolymarketTraderJoin,
+  mergePolymarketJoinRows,
   POLYMARKET_CLOSED_ORDERBOOK_MESSAGE,
+  polymarketLiveBuildEndpoints,
   polymarketJoinChoices,
+  polymarketJoinPlacement,
   polymarketJoinPickFromRow,
+  polymarketMarketEntities,
+  polymarketTraderEntities,
+  polymarketTraderJoinChoices,
+  polymarketTraderJoinSheetTitle,
   polymarketLiveBuildRequirement,
   polymarketLiveMarketJoins,
   polymarketLiveBuildSearch,
@@ -522,7 +531,7 @@ function SheetTabButton({ tab, selected, measure = false, onClick }) {
     <button
       type="button"
       data-tab={measure ? "" : undefined}
-      title={tab.queued ? "Created when you run the pull" : tab.title}
+      title={tab.queued ? "Viewable when you hit Save and run" : tab.title}
       onClick={onClick}
       className={cn(sheetTabClass(selected), tab.live && "inline-flex max-w-[14rem] items-center gap-1.5")}
     >
@@ -666,18 +675,25 @@ function joinSourceTitle(id) {
   const kalshi = KALSHI_LIVE_MARKET_JOINS.find((item) => item.id === id);
   if (kalshi) return kalshi.title;
   if (id === "parent-market") return "Parent market";
-  return polymarketLiveMarketJoins().find((item) => item.id === id)?.title || "this join";
+  return (
+    polymarketLiveMarketJoins().find((item) => item.id === id)?.title ||
+    polymarketLiveBuildEndpoints().find((item) => item.id === id)?.title ||
+    "this join"
+  );
 }
 
-function liveJoinTasks({ targets, preview, ticker, marketCount }) {
+function liveJoinTasks({ targets, preview, ticker, marketCount, noun = "market" }) {
   const count = Number(marketCount) || 0;
+  const plural = noun === "market" ? "markets" : `${noun}s`;
   const tasks = [
     {
       id: "markets",
-      title: count === 1 ? "1 market matched" : `${count.toLocaleString()} markets matched`,
+      title: count === 1 ? `1 ${noun} matched` : `${count.toLocaleString()} ${plural} matched`,
       detail: ticker,
       status: "completed",
-      note: `The preview joins the first market, ${ticker}. The other markets are attached when you run the pull.`,
+      note: noun === "trader"
+        ? `The preview joins the first trader, ${ticker}. The other traders are viewable when you hit Save and run.`
+        : `The preview joins the first market, ${ticker}. The other markets are attached when you run the pull.`,
     },
   ];
   for (const target of targets || []) {
@@ -892,6 +908,7 @@ function PolymarketJoinChoices({ choices, selected, onToggle }) {
           <button key={item.id} type="button" aria-pressed={on} onClick={() => onToggle?.(item.id)} className={choiceClass(on)}>
             <span className="text-[13px] font-semibold text-foreground">{item.title}</span>
             {item.detail ? <span className="text-[11px] font-normal text-muted-foreground">{item.detail}</span> : null}
+            {item.note ? <span className="text-[11px] font-normal text-muted-foreground">{item.note}</span> : null}
           </button>
         );
       })}
@@ -958,6 +975,8 @@ function EnrichStep({
   joinMode = "markets",
   seriesMarketLayout = "sheet",
   onSeriesMarketLayout,
+  traderMarketLayout = "sheet",
+  onTraderMarketLayout,
   marketsDetected = false,
   liveJoinIds,
   liveJoinChoices,
@@ -1635,12 +1654,43 @@ function EnrichStep({
                           {polymarketLiveJoin ? (
                             <PolymarketJoinChoices choices={joinChoices} selected={liveSelected} onToggle={onToggleLiveJoin} />
                           ) : null}
+                          {joinChoices.some((item) => item.placement === "market-choice" && liveSelected.has(item.id)) ? (
+                            <div>
+                              <p className="text-[11px] font-semibold text-foreground">Market metadata</p>
+                              <button
+                                type="button"
+                                aria-pressed={traderMarketLayout === "merge"}
+                                onClick={() => onTraderMarketLayout?.("merge")}
+                                className={cn("mt-1.5", choiceClass(traderMarketLayout === "merge"))}
+                              >
+                                <span className="text-[13px] font-semibold text-foreground">Onto this sheet</span>
+                                <span className="text-[11px] font-normal text-muted-foreground">
+                                  Market columns merge onto the rows in this pull.
+                                </span>
+                              </button>
+                              <button
+                                type="button"
+                                aria-pressed={traderMarketLayout === "sheet"}
+                                onClick={() => onTraderMarketLayout?.("sheet")}
+                                className={cn("mt-1.5", choiceClass(traderMarketLayout === "sheet"))}
+                              >
+                                <span className="text-[13px] font-semibold text-foreground">Separate markets sheet</span>
+                                <span className="text-[11px] font-normal text-muted-foreground">
+                                  One Markets sheet. The preview shows the first market.
+                                </span>
+                              </button>
+                            </div>
+                          ) : null}
                           <p className="text-[11px] leading-relaxed text-muted-foreground">
-                            {queryRowCount
-                              ? `You have ${queryRowCount.toLocaleString()} ${queryRowCount === 1 ? "market" : "markets"} in this pull. Each one gets its own sheet for every source you join. The preview shows the first market.`
-                              : "Pull a market first. Each joined source becomes its own sheet for that market."}
+                            {joinChoices.some((item) => item.anchor === "trader")
+                              ? "Profile columns merge onto this sheet. Positions, PnL, activity, and market sources each get their own sheet. The preview shows the first sheet, 50 rows. The other sheets are viewable when you hit Save and run. Each saved sheet uses your plan row limit unless you set a limit."
+                              : queryRowCount
+                                ? `You have ${queryRowCount.toLocaleString()} ${queryRowCount === 1 ? "market" : "markets"} in this pull. Each one gets its own sheet for every source you join. The preview shows the first market.`
+                                : "Pull a market first. Each joined source becomes its own sheet for that market."}
                             <span className="mt-2 block">
-                              Your plan allows {marketCap.toLocaleString()} sheet pulls at once.
+                              {joinChoices.some((item) => item.anchor === "trader")
+                                ? `Your plan builds ${marketCap.toLocaleString()} of these sheets at once.`
+                                : `Your plan allows ${marketCap.toLocaleString()} sheet pulls at once.`}
                             </span>
                           </p>
                         </div>
@@ -2054,6 +2104,8 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
   const [hoverJoin, setHoverJoin] = useState(false);
   const [joinTarget, setJoinTarget] = useState("");
   const [seriesMarketLayout, setSeriesMarketLayout] = useState("sheet");
+  const [traderMarketLayout, setTraderMarketLayout] = useState("sheet");
+  const [traderMergePreview, setTraderMergePreview] = useState({ status: "idle", parts: [] });
   const [seriesMarketPreview, setSeriesMarketPreview] = useState({ status: "idle", ticker: "", columns: [], rows: [], error: "" });
   const [traderJoinIds, setTraderJoinIds] = useState(() => new Set());
   const [eventExtraJoinIds, setEventExtraJoinIds] = useState(() => new Set());
@@ -2068,6 +2120,7 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
   const seriesMarketVisibleKey = useRef("");
   const liveJoinCacheRef = useRef(new Map());
   const liveJoinVisibleTicker = useRef("");
+  const traderJoinVisible = useRef("");
   const [liveJoinIds, setLiveJoinIds] = useState(() => new Set());
   const [liveJoinPreview, setLiveJoinPreview] = useState({});
   const [fanoutParents, setFanoutParents] = useState(() => new Set());
@@ -4293,13 +4346,20 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
     return list;
   }, [liveForecast, directPreview.events, forecastTargets, marketCap]);
   const seriesJoinKey = seriesJoinTickers.map((item) => item.ticker).join("\0");
-  const polymarketJoinCatalog = useMemo(
-    () => (polymarketLive ? polymarketJoinChoices(tableId) : []),
-    [polymarketLive, tableId],
-  );
+  const polymarketJoinCatalog = useMemo(() => {
+    if (!polymarketLive) return [];
+    const trader = polymarketTraderJoinChoices(tableId);
+    if (trader.length) return trader;
+    return polymarketJoinChoices(tableId);
+  }, [polymarketLive, tableId]);
+  const polymarketTraderCatalog = polymarketJoinCatalog.some((item) => item.anchor === "trader");
   const polymarketJoinFromList = polymarketJoinCatalog.length > 0 && polymarketJoinCatalog[0]?.id !== "parent-market";
   const polymarketJoinMarkets = useMemo(() => {
     if (!polymarketJoinCatalog.length) return [];
+    if (polymarketTraderCatalog) {
+      const source = polymarketScan.status !== "idle" && polymarketScan.rows?.length ? polymarketScan.rows : filteredRows;
+      return polymarketMarketEntities(source, marketCap);
+    }
     if (!polymarketJoinFromList) {
       return livePicks
         .slice(0, marketCap)
@@ -4327,7 +4387,22 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
       if (markets.length >= marketCap) break;
     }
     return markets;
-  }, [polymarketJoinCatalog, polymarketJoinFromList, livePicks, marketCap, polymarketScan, filteredRows]);
+  }, [polymarketJoinCatalog, polymarketTraderCatalog, polymarketJoinFromList, livePicks, marketCap, polymarketScan, filteredRows]);
+  const polymarketTraderPeople = useMemo(() => {
+    if (!polymarketTraderCatalog) return [];
+    const source = polymarketScan.status !== "idle" && polymarketScan.rows?.length ? polymarketScan.rows : filteredRows;
+    return polymarketTraderEntities(source, marketCap);
+  }, [polymarketTraderCatalog, polymarketScan, filteredRows, marketCap]);
+  const polymarketTraderPreviewPeople = useMemo(() => {
+    if (!polymarketTraderCatalog) return [];
+    const source = polymarketScan.status !== "idle" && polymarketScan.rows?.length ? polymarketScan.rows : filteredRows;
+    return polymarketTraderEntities(source, PREVIEW_ROW_CAP);
+  }, [polymarketTraderCatalog, polymarketScan, filteredRows]);
+  const polymarketPreviewMarkets = useMemo(() => {
+    if (!polymarketTraderCatalog) return [];
+    const source = polymarketScan.status !== "idle" && polymarketScan.rows?.length ? polymarketScan.rows : filteredRows;
+    return polymarketMarketEntities(source, PREVIEW_ROW_CAP);
+  }, [polymarketTraderCatalog, polymarketScan, filteredRows]);
   const liveJoinKey = [...liveJoinIds].sort().join(",");
   const liveJoinTargets = (polymarketJoinCatalog.length ? polymarketJoinCatalog : KALSHI_LIVE_MARKET_JOINS).filter((item) => liveJoinIds.has(item.id));
   const polymarketJoinActive = polymarketJoinCatalog.length > 0 && joinOn && liveJoinTargets.length > 0;
@@ -4394,7 +4469,9 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
     forecastJoinIds.has("markets") && forecastMarketPreview?.status === "ready" && (forecastMarketPreview.rows?.length || 0) > 0;
   const forecastDownstreamTicker = forecastMarketsDetected ? String(forecastMarketPreview.rows?.[0]?.ticker || "").trim() : "";
   const joinPreviewTicker = polymarketJoinCatalog.length
-    ? polymarketJoinMarkets[0]?.label || ""
+    ? polymarketJoinCatalog.find((item) => previewSheet === `live:${item.id}`)?.anchor === "trader"
+      ? polymarketTraderPeople[0]?.label || ""
+      : polymarketJoinMarkets[0]?.label || ""
     : liveMarketSearch
       ? livePreviewTicker
       : (marketDownstream && downstreamPreviewTicker) || forecastDownstreamTicker || fanoutTicker;
@@ -4446,17 +4523,25 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
   }, [polymarketLive, step, enrichPicks, liveJoinKey, joinPreviewTicker, liveJoinWindowKey, joinWindows]);
 
   const polymarketJoinPickId = polymarketJoinMarkets[0]?.pick?.id || "";
+  const polymarketSheetJoinIds = (anchor) =>
+    liveJoinKey.split(",").filter((id) => {
+      const spec = polymarketJoinCatalog.find((item) => item.id === id);
+      if (!spec) return anchor === "market";
+      if ((spec.anchor || "market") !== anchor) return false;
+      return polymarketJoinPlacement(spec, traderMarketLayout) === "sheet";
+    });
   useEffect(() => {
     if (!polymarketJoinActive || step !== "enrich" || !polymarketJoinPickId) return undefined;
     const pick = polymarketJoinMarkets[0]?.pick;
     if (!pick) return undefined;
-    const ids = liveJoinKey.split(",").filter(Boolean);
-    const viewToken = `polymarket:${pick.id}|${liveJoinKey}`;
+    const ids = polymarketSheetJoinIds("market");
+    if (!ids.length) return undefined;
+    const viewToken = `polymarket:${pick.id}|${ids.join(",")}|${traderMarketLayout}`;
     liveJoinVisibleTicker.current = viewToken;
     const next = {};
     const missing = [];
     for (const id of ids) {
-      const cacheKey = `polymarket:${pick.id}:${id}`;
+      const cacheKey = `polymarket:${pick.id}:${id}:${traderMarketLayout}`;
       const hit = liveJoinCacheRef.current.get(cacheKey);
       if (hit?.status === "ready" || hit?.status === "loading") {
         next[id] = hit;
@@ -4467,10 +4552,13 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
         missing.push(id);
       }
     }
-    setLiveJoinPreview(next);
+    setLiveJoinPreview((current) => ({ ...current, ...next }));
     missing.forEach((id) => {
-      const cacheKey = `polymarket:${pick.id}:${id}`;
-      loadPolymarketLiveJoin(id, pick, { rowLimit: PREVIEW_ROW_CAP })
+      const cacheKey = `polymarket:${pick.id}:${id}:${traderMarketLayout}`;
+      const load = polymarketTraderCatalog && id !== "parent-market"
+        ? ensurePolymarketMarketPick(pick).then((ready) => loadPolymarketLiveJoin(id, ready, { rowLimit: PREVIEW_ROW_CAP }))
+        : loadPolymarketLiveJoin(id, pick, { rowLimit: PREVIEW_ROW_CAP });
+      load
         .then((result) => {
           const ready = { status: "ready", columns: result.columns || [], rows: result.rows || [], error: "" };
           liveJoinCacheRef.current.set(cacheKey, ready);
@@ -4488,7 +4576,113 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
         });
     });
     return undefined;
-  }, [polymarketJoinActive, step, polymarketJoinPickId, liveJoinKey, polymarketJoinMarkets]);
+  }, [polymarketJoinActive, step, polymarketJoinPickId, liveJoinKey, polymarketJoinMarkets, polymarketJoinCatalog, traderMarketLayout, polymarketTraderCatalog]);
+
+  const polymarketTraderPreviewId = polymarketTraderPeople[0]?.id || "";
+  useEffect(() => {
+    if (!polymarketJoinActive || step !== "enrich" || !polymarketTraderPreviewId) return undefined;
+    const person = polymarketTraderPeople[0];
+    if (!person) return undefined;
+    const ids = polymarketSheetJoinIds("trader");
+    if (!ids.length) return undefined;
+    const viewToken = `polymarket-trader:${person.id}|${ids.join(",")}`;
+    traderJoinVisible.current = viewToken;
+    const next = {};
+    const missing = [];
+    for (const id of ids) {
+      const cacheKey = `polymarket:trader:${person.id}:${id}`;
+      const hit = liveJoinCacheRef.current.get(cacheKey);
+      if (hit?.status === "ready" || hit?.status === "loading") {
+        next[id] = hit;
+      } else {
+        const loading = { status: "loading", columns: [], rows: [], error: "" };
+        liveJoinCacheRef.current.set(cacheKey, loading);
+        next[id] = loading;
+        missing.push(id);
+      }
+    }
+    setLiveJoinPreview((current) => ({ ...current, ...next }));
+    missing.forEach((id) => {
+      const cacheKey = `polymarket:trader:${person.id}:${id}`;
+      loadPolymarketTraderJoin(id, person.pick, { rowLimit: PREVIEW_ROW_CAP })
+        .then((result) => {
+          const ready = { status: "ready", columns: result.columns || [], rows: result.rows || [], error: "" };
+          liveJoinCacheRef.current.set(cacheKey, ready);
+          if (traderJoinVisible.current === viewToken) setLiveJoinPreview((current) => ({ ...current, [id]: ready }));
+        })
+        .catch((err) => {
+          const failed = {
+            status: "error",
+            columns: [],
+            rows: [],
+            error: err instanceof Error ? err.message : "Join preview failed",
+          };
+          liveJoinCacheRef.current.set(cacheKey, failed);
+          if (traderJoinVisible.current === viewToken) setLiveJoinPreview((current) => ({ ...current, [id]: failed }));
+        });
+    });
+    return undefined;
+  }, [polymarketJoinActive, step, polymarketTraderPreviewId, liveJoinKey, polymarketTraderPeople, polymarketJoinCatalog, traderMarketLayout]);
+
+  const polymarketMergeKey = liveJoinTargets
+    .filter((item) => polymarketJoinPlacement(item, traderMarketLayout) === "merge")
+    .map((item) => item.id)
+    .join(",");
+  const polymarketMergePeopleKey = polymarketTraderPreviewPeople.map((item) => item.id).join(",");
+  const polymarketMergeMarketKey = polymarketPreviewMarkets.map((item) => item.ticker).join(",");
+  useEffect(() => {
+    if (!polymarketTraderCatalog || !polymarketJoinActive || step !== "enrich" || !polymarketMergeKey) {
+      setTraderMergePreview({ status: "idle", parts: [] });
+      return undefined;
+    }
+    let cancelled = false;
+    setTraderMergePreview({ status: "loading", parts: [] });
+    const targets = polymarketMergeKey.split(",").filter(Boolean);
+    Promise.all(
+      targets.map(async (id) => {
+        const spec = polymarketJoinCatalog.find((item) => item.id === id);
+        const anchor = spec?.anchor === "market" ? "market" : "trader";
+        const entities = anchor === "market" ? polymarketPreviewMarkets : polymarketTraderPreviewPeople;
+        let columns = [];
+        const rows = [];
+        const pulled = await mapPool(entities, 4, async (entity) => {
+          try {
+            const result = anchor === "market"
+              ? await loadPolymarketLiveJoin(id, entity.pick, { rowLimit: 1 })
+              : await loadPolymarketTraderJoin(id, entity.pick, { rowLimit: 1 });
+            const row = result.rows?.[0];
+            if (!row) return null;
+            return {
+              columns: result.columns || [],
+              row: anchor === "market"
+                ? {
+                    ...row,
+                    condition_id: row.condition_id || entity.pick.conditionId,
+                    conditionId: row.conditionId || entity.pick.conditionId,
+                    slug: row.slug || entity.pick.slug,
+                  }
+                : row,
+            };
+          } catch {
+            return null;
+          }
+        });
+        for (const item of pulled) {
+          if (!item) continue;
+          if (!columns.length && item.columns.length) columns = item.columns;
+          rows.push(item.row);
+        }
+        return { anchor, columns, rows };
+      }),
+    ).then((parts) => {
+      if (!cancelled) setTraderMergePreview({ status: "ready", parts: parts.filter((part) => part.rows.length && part.columns.length) });
+    }).catch(() => {
+      if (!cancelled) setTraderMergePreview({ status: "error", parts: [] });
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [polymarketTraderCatalog, polymarketJoinActive, step, polymarketMergeKey, polymarketMergePeopleKey, polymarketMergeMarketKey, polymarketJoinCatalog, traderMarketLayout]);
 
   useEffect(() => {
     if (!fanoutJoinOn || (!fanoutParents.has("market") && !fanoutParents.has("series")) || !fanoutTicker) {
@@ -5051,9 +5245,22 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
     editSheetId === "trades"
       ? { columns: tradePreview.columns, rows: tradePreview.rows, sheetId: "trades" }
       : { columns: tradeJoinBase.columns, rows: tradeJoinBase.rows, sheetId: editSheetId === "new" ? "new" : "markets" };
+  const traderMergedSource = useMemo(() => {
+    if (!polymarketTraderCatalog || traderMergePreview.status !== "ready" || !traderMergePreview.parts?.length) {
+      return tradeJoinBase;
+    }
+    let columns = tradeJoinBase.columns;
+    let rows = tradeJoinBase.rows;
+    for (const part of traderMergePreview.parts) {
+      const merged = mergePolymarketJoinRows(columns, rows, part.columns, part.rows, { anchor: part.anchor });
+      columns = merged.columns;
+      rows = merged.rows;
+    }
+    return { ...tradeJoinBase, columns, rows };
+  }, [polymarketTraderCatalog, traderMergePreview, tradeJoinBase]);
   const marketsGrid = applyFunctionColumns(
-    tradeJoinBase.columns,
-    tradeJoinBase.rows,
+    traderMergedSource.columns,
+    traderMergedSource.rows,
     functionsForSheet("markets"),
     formulaSheets,
     "markets",
@@ -5226,6 +5433,9 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
       return "Click a column or a cell to drop it into the summary.";
     }
     if (showJoinExplainer) {
+      if (polymarketTraderCatalog) {
+        return `Illustration. From ${sheetTitle}, profile columns merge onto this sheet. The other joins each open their own sheet. The preview shows the first one. The rest are viewable when you hit Save and run.`;
+      }
       if (polymarketJoinCatalog.some((item) => item.id === "parent-market")) {
         return `Illustration. From ${sheetTitle.toLowerCase()}, join the parent market and the other sources on that market. Each one is its own sheet.`;
       }
@@ -5280,7 +5490,15 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
       if (!preview || preview.status === "loading") return `Loading ${title.toLowerCase()} for ${ticker}`;
       if (preview.status === "error") return preview.error;
       const count = preview.rows?.length || 0;
-      return `Previewing ${count.toLocaleString()} ${title.toLowerCase()} ${count === 1 ? "row" : "rows"} for ${ticker}. Save and run joins the markets in this pull.`;
+      const rest = polymarketTraderCatalog
+        ? " The other sheets are viewable when you hit Save and run. Each saved sheet uses your plan row limit."
+        : " Save and run joins the markets in this pull.";
+      return `Previewing ${count.toLocaleString()} ${title.toLowerCase()} ${count === 1 ? "row" : "rows"} for ${ticker}.${rest}`;
+    }
+    if (polymarketTraderCatalog && polymarketJoinActive && previewSheet === "source" && polymarketMergeKey) {
+      if (traderMergePreview.status === "loading") return "Merging the selected columns onto this sheet.";
+      if (traderMergePreview.status === "error") return "Those columns could not be merged onto the preview.";
+      return "These columns merge onto this sheet. Save and run fills them for the imported rows.";
     }
     if ((previewSheet === "trader-join" || previewSheet.startsWith("trader-join:")) && traderJoinOn) {
       if (!traderJoinNames.length) return "This list has no nicknames yet.";
@@ -5736,14 +5954,23 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
         args: { events: forecastJoinEvents.length, targets: forecastJoinKinds.join("+") },
       });
     }
+    if (polymarketTraderCatalog && liveJoinTargets.some((item) => polymarketJoinPlacement(item, traderMarketLayout) === "merge")) {
+      planned.push({ id: "join-merge", name: "merge_join_columns", status: "pending" });
+    }
     if (polymarketJoinActive || liveJoinReady || (marketDownstream && liveJoinTargets.length)) {
+      const sheetTargets = polymarketTraderCatalog
+        ? liveJoinTargets.filter((item) => polymarketJoinPlacement(item, traderMarketLayout) === "sheet")
+        : liveJoinTargets;
       planned.push({
         id: "join-live",
         name: "compose_live_joins",
         status: "pending",
         args: {
-          sheets: (polymarketJoinActive ? polymarketJoinMarkets.length : liveJoinReady ? liveJoinMarkets.length : marketCap) * liveJoinTargets.length,
-          sources: liveJoinTargets.map((item) => item.title).join(", "),
+          sheets: polymarketTraderCatalog
+            ? sheetTargets.filter((item) => item.anchor === "trader").length * polymarketTraderPeople.length +
+              sheetTargets.filter((item) => item.anchor !== "trader").length * polymarketJoinMarkets.length
+            : (polymarketJoinActive ? polymarketJoinMarkets.length : liveJoinReady ? liveJoinMarkets.length : marketCap) * liveJoinTargets.length,
+          sources: sheetTargets.map((item) => item.title).join(", "),
         },
       });
     }
@@ -5914,6 +6141,59 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
           composeRequest: joinedMarketRequest,
           joinMeta: { match: join.match, role: "markets" },
         };
+      }
+    }
+    if (polymarketLive && polymarketTraderCatalog && enrichPicks.has("join")) {
+      const mergeTargets = liveJoinTargets.filter((item) => polymarketJoinPlacement(item, traderMarketLayout) === "merge");
+      if (mergeTargets.length) {
+        reporter.start("join-merge");
+        try {
+          const people = polymarketTraderEntities(marketRows, 500);
+          const markets = polymarketMarketEntities(marketRows, 200);
+          for (const target of mergeTargets) {
+            const anchor = target.anchor === "market" ? "market" : "trader";
+            const entities = anchor === "market" ? markets : people;
+            let columns = [];
+            const rows = [];
+            const pulled = await mapPool(entities, 4, async (entity) => {
+              try {
+                const result = anchor === "market"
+                  ? await loadPolymarketLiveJoin(target.id, entity.pick, { rowLimit: 1, planLimit: 1 })
+                  : await loadPolymarketTraderJoin(target.id, entity.pick, { rowLimit: 1, planLimit: 1 });
+                const row = result.rows?.[0];
+                if (!row) return null;
+                return {
+                  columns: result.columns || [],
+                  row: anchor === "market"
+                    ? {
+                        ...row,
+                        condition_id: row.condition_id || entity.pick.conditionId,
+                        conditionId: row.conditionId || entity.pick.conditionId,
+                        slug: row.slug || entity.pick.slug,
+                      }
+                    : row,
+                };
+              } catch {
+                return null;
+              }
+            });
+            for (const item of pulled) {
+              if (!item) continue;
+              if (!columns.length && item.columns.length) columns = item.columns;
+              rows.push(item.row);
+            }
+            if (columns.length && rows.length) {
+              const merged = mergePolymarketJoinRows(primaryColumns, primaryRows, columns, rows, { anchor });
+              primaryColumns = merged.columns;
+              primaryRows = merged.rows;
+            }
+          }
+          reporter.succeed("join-merge", { result: "Columns merged onto this sheet" });
+        } catch (err) {
+          reporter.succeed("join-merge", {
+            result: err instanceof Error ? err.message : "Merge did not finish",
+          });
+        }
       }
     }
     const runMarkets = applyFunctionColumns(
@@ -6783,7 +7063,7 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
         : marketDownstream
           ? downstreamJoinMarkets
           : fanoutAssociated;
-    if (liveJoinTargets.length && (polymarketJoinActive || liveJoinReady || marketDownstream || fanoutAssociated.length)) {
+    if (!polymarketTraderCatalog && liveJoinTargets.length && (polymarketJoinActive || liveJoinReady || marketDownstream || fanoutAssociated.length)) {
       reporter.start("join-live");
       if (!joinMarketsForRun.length) {
         reporter.succeed("join-live", { result: "0 sheets" });
@@ -6846,6 +7126,92 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
       reporter.succeed("join-live", {
         result: `${liveSheets.toLocaleString()} ${liveSheets === 1 ? "sheet" : "sheets"} · ${liveRows.toLocaleString()} rows`,
       });
+      }
+    }
+    if (polymarketTraderCatalog && polymarketJoinActive) {
+      const sheetTargets = liveJoinTargets.filter((item) => polymarketJoinPlacement(item, traderMarketLayout) === "sheet");
+      const people = polymarketTraderEntities(marketRows, marketCap);
+      const markets = polymarketMarketEntities(marketRows, marketCap);
+      const jobs = [
+        ...sheetTargets
+          .filter((target) => target.anchor === "trader")
+          .flatMap((target) => people.map((entity) => ({ target, entity, anchor: "trader" }))),
+        ...sheetTargets
+          .filter((target) => target.anchor !== "trader")
+          .flatMap((target) => markets.map((entity) => ({ target, entity, anchor: "market" }))),
+      ];
+      reporter.start("join-live");
+      if (!jobs.length) {
+        reporter.succeed("join-live", { result: "0 sheets" });
+      } else {
+        reporter.setChildren(
+          "join-live",
+          jobs.map((job) => ({
+            id: `${job.target.id}:${job.entity.id || job.entity.ticker}`,
+            name: `${job.target.title} · ${job.entity.label || job.entity.ticker}`,
+            status: "pending",
+            parallel: true,
+          })),
+        );
+        const pulled = await mapPool(jobs, 3, async (job) => {
+          const childId = `${job.target.id}:${job.entity.id || job.entity.ticker}`;
+          reporter.patchChild("join-live", childId, { status: "running", result: `Pulling ${job.target.title}` });
+          try {
+            const askedLimit = Number(rowLimit);
+            const pulledLimit =
+              Number.isFinite(askedLimit) && askedLimit > 0 && Number.isFinite(sheetCap)
+                ? Math.min(askedLimit, sheetCap)
+                : Number.isFinite(sheetCap)
+                  ? sheetCap
+                  : PREVIEW_ROW_CAP;
+            const result = job.anchor === "trader"
+              ? await loadPolymarketTraderJoin(job.target.id, job.entity.pick, { rowLimit: pulledLimit, planLimit: pulledLimit })
+              : await loadPolymarketLiveJoin(
+                  job.target.id,
+                  job.target.id === "parent-market" ? job.entity.pick : await ensurePolymarketMarketPick(job.entity.pick),
+                  { rowLimit: pulledLimit, planLimit: pulledLimit },
+                );
+            const rows = result.rows || [];
+            reporter.patchChild("join-live", childId, { status: "success", result: `${rows.length.toLocaleString()} rows` });
+            return { ...job, columns: result.columns || [], rows };
+          } catch (err) {
+            reporter.patchChild("join-live", childId, {
+              status: "error",
+              result: err instanceof Error ? err.message : "Join failed",
+            });
+            return { ...job, columns: [], rows: [] };
+          }
+        });
+        pulled.forEach((item) => {
+          if (!item.columns.length) return;
+          const label = item.entity.label || item.entity.ticker;
+          const named = item.anchor === "trader" ? polymarketTraderJoinSheetTitle(item.target.id, label) : "";
+          const slug = `${item.target.id}-${String(item.entity.id || item.entity.ticker).replace(/[^A-Za-z0-9]+/g, "-")}`;
+          const id = `run-live-${slug}`;
+          const fullRows = item.rows || [];
+          if (fullRows.length > PREVIEW_ROW_CAP) {
+            rememberTradeSheet(id, label, item.columns, displayMatrix(item.columns, fullRows), sheetCap, accountId);
+          }
+          const marketPick = item.entity.pick || {};
+          sheets.push({
+            id,
+            title: named || `${item.target.title} · ${label}`,
+            columns: item.columns,
+            rows: fullRows,
+            rowCount: fullRows.length,
+            span: "half",
+            table: item.target.id,
+            pull: item.anchor === "trader"
+              ? { table: item.target.id, address: marketPick.address, kind: "profile" }
+              : { ticker: item.entity.ticker, table: item.target.id, tokens: marketPick.tokenIds || [], ...lifePull(marketPick) },
+            summary: `Polymarket Live · ${item.target.title} · ${label}`,
+          });
+        });
+        const liveSheets = pulled.filter((item) => item.columns.length).length;
+        const liveRows = pulled.reduce((sum, item) => sum + (item.rows?.length || 0), 0);
+        reporter.succeed("join-live", {
+          result: `${liveSheets.toLocaleString()} ${liveSheets === 1 ? "sheet" : "sheets"} · ${liveRows.toLocaleString()} rows`,
+        });
       }
     }
     const bucketBuilt = [];
@@ -7191,13 +7557,14 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
   function toggleLiveJoin(id) {
     setHoverJoin(false);
     const catalog = polymarketJoinCatalog.length ? polymarketJoinCatalog : KALSHI_LIVE_MARKET_JOINS;
+    const placementOf = (joinId) => polymarketJoinPlacement(catalog.find((item) => item.id === joinId), traderMarketLayout);
     const next = new Set(liveJoinIds);
     if (next.has(id)) next.delete(id);
     else next.add(id);
     setLiveJoinIds(next);
-    if (next.has(id)) setPreviewSheet(`live:${id}`);
+    if (next.has(id)) setPreviewSheet(placementOf(id) === "merge" ? "source" : `live:${id}`);
     else if (previewSheet === `live:${id}`) {
-      const rest = catalog.map((item) => item.id).filter((item) => next.has(item));
+      const rest = catalog.map((item) => item.id).filter((item) => next.has(item) && placementOf(item) !== "merge");
       setPreviewSheet(rest[0] ? `live:${rest[0]}` : "source");
     }
   }
@@ -7389,7 +7756,48 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
       });
     }
   }
-  if (polymarketJoinActive && polymarketJoinMarkets.length) {
+  if (polymarketJoinActive && polymarketTraderCatalog) {
+    const sheetTargets = liveJoinTargets.filter((item) => polymarketJoinPlacement(item, traderMarketLayout) === "sheet");
+    const traderTargets = sheetTargets.filter((item) => item.anchor === "trader");
+    const marketTargets = sheetTargets.filter((item) => item.anchor !== "trader");
+    if (traderTargets.length && polymarketTraderPeople.length) {
+      const [first, ...rest] = polymarketTraderPeople;
+      traderTargets.forEach((item) => {
+        const named = polymarketTraderJoinSheetTitle(item.id, first.label);
+        previewTabs.push({ id: `live:${item.id}`, title: named || `${item.title} · ${first.label}` });
+      });
+      rest.forEach((person) => {
+        traderTargets.forEach((item) => {
+          const named = polymarketTraderJoinSheetTitle(item.id, person.label);
+          previewTabs.push({
+            id: `run:${item.id}:${person.ticker}`,
+            title: named || `${item.title} · ${person.label}`,
+            queued: true,
+          });
+        });
+      });
+    }
+    if (marketTargets.length && polymarketJoinMarkets.length) {
+      const [first, ...rest] = polymarketJoinMarkets;
+      marketTargets.forEach((item) => {
+        previewTabs.push({
+          id: `live:${item.id}`,
+          title: `${item.title} · ${first.label || first.ticker}`,
+          live: Boolean(item.realtime),
+        });
+      });
+      rest.forEach((market) => {
+        marketTargets.forEach((item) => {
+          previewTabs.push({
+            id: `run:${item.id}:${market.ticker}`,
+            title: `${item.title} · ${market.label || market.ticker}`,
+            queued: true,
+            live: Boolean(item.realtime),
+          });
+        });
+      });
+    }
+  } else if (polymarketJoinActive && polymarketJoinMarkets.length) {
     const [first, ...rest] = polymarketJoinMarkets;
     liveJoinTargets.forEach((item) => {
       previewTabs.push({
@@ -7740,7 +8148,9 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
             showJoinBuilder={marketsQuery || tradesQuery || liveMarketSearch || liveSeriesSearch || liveEventSearch || liveMarketFanout || liveTraderList || liveForecast || polymarketJoinCatalog.length > 0}
             showFunctionBuilder
             joinMode={
-              polymarketJoinCatalog.some((item) => item.id === "parent-market")
+              polymarketTraderCatalog
+                ? "polymarket-live"
+                : polymarketJoinCatalog.some((item) => item.id === "parent-market")
                 ? "polymarket-fanout"
                 : polymarketJoinCatalog.length
                   ? "polymarket-live"
@@ -7761,6 +8171,12 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
                                 : "markets"
             }
             seriesMarketLayout={seriesMarketLayout}
+            traderMarketLayout={traderMarketLayout}
+            onTraderMarketLayout={(layout) => {
+              setTraderMarketLayout(layout);
+              if (!liveJoinIds.has("parent-market")) return;
+              setPreviewSheet(layout === "merge" ? "source" : "live:parent-market");
+            }}
             marketsDetected={marketsDetected || forecastMarketsDetected}
             onSeriesMarketLayout={(layout) => {
               setSeriesMarketLayout(layout);
@@ -8307,7 +8723,11 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
             ) : fanoutJoinOn && (previewSheet === "parent-market" || previewSheet === "parent-series" || previewSheet === "fanout-markets" || previewSheet.startsWith("djoin:") || previewSheet.startsWith("live:")) ? (
               <p className="mt-1 text-right text-[11px] text-muted-foreground">Preview only. Save and run creates this sheet.</p>
             ) : polymarketJoinActive && previewSheet.startsWith("live:") ? (
-              <p className="mt-1 text-right text-[11px] text-muted-foreground">Preview only. Each market gets its own sheet when you run the pull.</p>
+              <p className="mt-1 text-right text-[11px] text-muted-foreground">
+                {polymarketTraderCatalog
+                  ? "Preview only. The other sheets are viewable when you hit Save and run."
+                  : "Preview only. Each market gets its own sheet when you run the pull."}
+              </p>
             ) : showJoinSheets && joinTab === previewTicker ? (
               <p className="mt-1 text-right text-[11px] text-muted-foreground">Preview only. This sheet is created when you run the pull.</p>
             ) : previewSheet === "markets-meta" && tradesJoinReady && joinPlacement === "sheet" ? (
@@ -8356,6 +8776,8 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
               <span className={sheetTabClass(true)}>Markets</span>
             </div>
           </div>
+        ) : showJoinExplainer && polymarketTraderCatalog ? (
+          <PolymarketTraderJoinExplainerTabs title={sheetTitle} joins={polymarketJoinCatalog} />
         ) : showJoinExplainer && polymarketJoinCatalog.some((item) => item.id === "parent-market") ? (
           <PolymarketFanoutJoinExplainerTabs title={sheetTitle} />
         ) : showJoinExplainer && polymarketJoinCatalog.length ? (
@@ -8504,6 +8926,8 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
                 ? "Join these events to the markets inside them. Kalshi takes one event ticker per request, so the pull loops the events in this query."
                 : "Join these series to the markets inside them. Kalshi takes one series ticker per request, so the pull loops the series in this query."}
             </div>
+          ) : showJoinExplainer && polymarketTraderCatalog ? (
+            <PolymarketTraderJoinExplainer title={sheetTitle} joins={polymarketJoinCatalog} />
           ) : showJoinExplainer && polymarketJoinCatalog.some((item) => item.id === "parent-market") ? (
             <PolymarketFanoutJoinExplainer title={sheetTitle} />
           ) : showJoinExplainer && polymarketJoinCatalog.length ? (
@@ -8720,9 +9144,14 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
               const preview = liveJoinPreview[kind];
               const label = joinSourceTitle(kind);
               if (!joinPreviewTicker) {
+                const spec = polymarketJoinCatalog.find((item) => item.id === kind);
                 return (
                   <div className="flex h-full items-center justify-center rounded-xl border border-border/70 bg-background px-6 text-center text-[13px] leading-relaxed text-muted-foreground shadow-sm">
-                    {polymarketJoinActive ? "This pull has no markets to join." : "This pull has no market tickers to join."}
+                    {spec?.anchor === "trader"
+                      ? "This pull has no traders to join."
+                      : polymarketJoinActive
+                        ? "This pull has no markets to join."
+                        : "This pull has no market tickers to join."}
                   </div>
                 );
               }
@@ -8734,11 +9163,14 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
                         targets: liveJoinTargets,
                         preview: liveJoinPreview,
                         ticker: joinPreviewTicker,
-                        marketCount: polymarketJoinActive
-                          ? polymarketJoinMarkets.length
-                          : liveMarketSearch
-                            ? liveJoinMarkets.length
-                            : Math.max(seriesMarketView.rows?.length || 0, 1),
+                        noun: polymarketJoinCatalog.find((item) => item.id === kind)?.anchor === "trader" ? "trader" : "market",
+                        marketCount: polymarketJoinCatalog.find((item) => item.id === kind)?.anchor === "trader"
+                          ? polymarketTraderPeople.length
+                          : polymarketJoinActive
+                            ? polymarketJoinMarkets.length
+                            : liveMarketSearch
+                              ? liveJoinMarkets.length
+                              : Math.max(seriesMarketView.rows?.length || 0, 1),
                       })}
                     />
                   </div>

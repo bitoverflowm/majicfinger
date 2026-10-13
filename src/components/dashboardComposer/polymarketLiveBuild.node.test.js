@@ -13,6 +13,13 @@ import {
   POLYMARKET_CLOSED_ORDERBOOK_MESSAGE,
   polymarketJoinChoices,
   polymarketJoinPickFromRow,
+  polymarketTraderJoinChoices,
+  polymarketJoinPlacement,
+  polymarketTraderWalletFromRow,
+  polymarketTraderEntities,
+  polymarketMarketEntities,
+  mergePolymarketJoinRows,
+  polymarketTraderJoinSheetTitle,
   polymarketMarketFanout,
   polymarketRowsForMarket,
 } from "./polymarketLiveBuild.js";
@@ -553,6 +560,91 @@ for (const retired of [
 ]) {
   assert.equal(marketJoins.some((item) => item.id === retired), false);
 }
+
+function traderJoinIds(tableId) {
+  return polymarketTraderJoinChoices(tableId).map((item) => item.id);
+}
+const leaderboardJoins = polymarketTraderJoinChoices("getTraderLeaderboard");
+assert.deepEqual(traderJoinIds("getTraderLeaderboard"), [
+  "getTraderByAddress",
+  "getTraderPositions",
+  "getTraderPnlSeries",
+  "getTraderActivity",
+]);
+assert.equal(leaderboardJoins[0].placement, "merge");
+assert.equal(leaderboardJoins.find((item) => item.id === "getTraderPnlSeries").note.includes("max PnL"), true);
+assert.equal(traderJoinIds("getTraderLeaderboard").includes("getOrderbooks"), false);
+const winJoins = polymarketTraderJoinChoices("getBiggestWinners");
+assert.equal(winJoins.find((item) => item.id === "getTraderByAddress").placement, "merge");
+assert.equal(winJoins.find((item) => item.id === "parent-market").placement, "market-choice");
+assert.equal(winJoins.some((item) => item.id === "getOrderbooks"), true);
+assert.equal(winJoins.some((item) => item.id === "getHoldersByMarkets"), true);
+assert.equal(winJoins.find((item) => item.id === "getPublicProfiles").placement, "merge");
+assert.equal(polymarketJoinPlacement(winJoins.find((item) => item.id === "parent-market"), "merge"), "merge");
+assert.equal(polymarketJoinPlacement(winJoins.find((item) => item.id === "parent-market"), "sheet"), "sheet");
+assert.deepEqual(traderJoinIds("getTraderByAddress"), [
+  "getTraderPositions",
+  "getTraderPnlSeries",
+  "getTraderActivity",
+  "getPublicProfiles",
+]);
+const positionJoins = polymarketTraderJoinChoices("getTraderPositions");
+assert.equal(positionJoins[0].id, "parent-market");
+assert.equal(positionJoins.some((item) => item.id === "getTraderPositions"), false);
+assert.equal(positionJoins.some((item) => item.id === "getTraderByAddress"), true);
+assert.equal(traderJoinIds("getTraderPnlSeries").includes("parent-market"), false);
+assert.equal(traderJoinIds("getTraderPnlSeries").includes("getTraderPositions"), true);
+assert.equal(polymarketTraderJoinChoices("getTraderActivity").some((item) => item.id === "getTradesByMarket"), true);
+const holderTraderJoins = polymarketTraderJoinChoices("getHoldersByMarkets");
+assert.equal(holderTraderJoins[0].id, "parent-market");
+assert.equal(holderTraderJoins.some((item) => item.id === "getHoldersByMarkets"), false);
+assert.equal(holderTraderJoins.some((item) => item.id === "getTraderActivity"), true);
+assert.deepEqual(traderJoinIds("getPublicProfiles"), [
+  "getTraderByAddress",
+  "getTraderPositions",
+  "getTraderPnlSeries",
+  "getTraderActivity",
+]);
+assert.equal(
+  polymarketTraderWalletFromRow({
+    user_id: "0xABCabcabcabcabcabcabcabcabcabcabcabcabca",
+    proxyWallet: "0xdefdefdefdefdefdefdefdefdefdefdefdefdefa",
+  }),
+  "0xabcabcabcabcabcabcabcabcabcabcabcabcabca",
+);
+assert.equal(polymarketTraderWalletFromRow({ proxyWallet: "0x39125313116835eb6a55688350813921c9360246" }).length, 42);
+const people = polymarketTraderEntities(
+  [
+    { user_id: "0xabcabcabcabcabcabcabcabcabcabcabcabcabca", user_name: "Zoomify" },
+    { user_id: "0xabcabcabcabcabcabcabcabcabcabcabcabcabca", user_name: "Zoomify" },
+    { user: "0xdefdefdefdefdefdefdefdefdefdefdefdefdefa" },
+  ],
+  10,
+);
+assert.equal(people.length, 2);
+assert.equal(people[0].label, "Zoomify");
+assert.equal(people[0].pick.address, "0xabcabcabcabcabcabcabcabcabcabcabcabcabca");
+assert.equal(
+  polymarketMarketEntities([{ condition_id: "0xmarket", question: "Will it rain?" }, { condition_id: "0xmarket" }]).length,
+  1,
+);
+const merged = mergePolymarketJoinRows(
+  [{ id: "user_id" }, { id: "pnl" }],
+  [{ user_id: "0xabcabcabcabcabcabcabcabcabcabcabcabcabca", pnl: 3 }],
+  [{ id: "address" }, { id: "pnl" }, { id: "volume" }],
+  [{ address: "0xabcabcabcabcabcabcabcabcabcabcabcabcabca", pnl: 9, volume: 4 }],
+  { anchor: "trader" },
+);
+assert.deepEqual(
+  merged.columns.map((column) => column.id),
+  ["user_id", "pnl", "address", "joined_pnl", "volume"],
+);
+assert.equal(merged.rows[0].volume, 4);
+assert.equal(merged.rows[0].pnl, 3);
+assert.equal(merged.rows[0].joined_pnl, 9);
+assert.equal(polymarketTraderJoinSheetTitle("getTraderActivity", "Zoomify"), "Zoomify's activity");
+assert.equal(polymarketTraderJoinSheetTitle("getTraderPositions", "Zoomify"), "Zoomify's positions");
+assert.equal(polymarketTraderJoinSheetTitle("getTraderPnlSeries", "Zoomify"), "Zoomify's PnL");
 const holders = endpoints.find((endpoint) => endpoint.id === "getHoldersByMarkets");
 assert.equal(holders?.title, "Top Holders");
 assert.equal(holders?.category, "holders");

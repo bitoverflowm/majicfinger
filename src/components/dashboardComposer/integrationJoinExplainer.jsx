@@ -715,6 +715,72 @@ export function TraderJoinExplainerTabs({ title = "Leaderboard" }) {
   );
 }
 
+/** Tabs while Join is hovered on a Polymarket trader pull. */
+export function PolymarketTraderJoinExplainerTabs({ title = "This pull", joins = [] }) {
+  const reduce = useReducedMotion();
+  const labels = [title, ...joins.slice(0, 4).map((item) => item.title), "Save and run"];
+  return (
+    <div className="overflow-hidden px-4 pb-1 pt-4">
+      <div className="flex">
+        {labels.map((label, index) =>
+          index === 0 ? (
+            <span key={label} className={tabClass(false)}>
+              {label}
+            </span>
+          ) : (
+            <motion.span
+              key={`${label}-${index}`}
+              initial={reduce ? false : { clipPath: "inset(0 100% 0 0)", opacity: 0 }}
+              animate={{ clipPath: "inset(0 0% 0 0)", opacity: 1 }}
+              transition={{ duration: 0.4, delay: 0.08 * index, ease: "easeOut" }}
+              className={tabClass(index === labels.length - 1)}
+            >
+              {label}
+            </motion.span>
+          ),
+        )}
+      </div>
+    </div>
+  );
+}
+
+/** Hover illustration for the joins on one Traders endpoint. */
+export function PolymarketTraderJoinExplainer({ title = "This pull", joins = [] }) {
+  const style = venueStyle("polymarket");
+  const shown = joins.slice(0, 5);
+  return (
+    <div className="relative flex h-full min-h-[280px] items-center justify-center overflow-hidden rounded-xl border border-border/70 bg-background shadow-sm">
+      <FlickeringGrid
+        className="absolute inset-0 [mask-image:radial-gradient(ellipse_at_center,black,transparent_75%)]"
+        squareSize={3}
+        gridGap={5}
+        flickerChance={0.16}
+        color={style.flicker}
+        maxOpacity={0.2}
+      />
+      <div className="relative z-10 flex w-full max-w-md flex-col gap-4 px-6 py-6">
+        <p className="text-center text-[13px] leading-relaxed text-muted-foreground">
+          From {title}, profile columns land on this sheet. Positions, PnL, activity, and market sources each open their own sheet. The preview shows the first one. The rest are viewable when you hit Save and run.
+        </p>
+        <div className="flex flex-col gap-2">
+          <RouteChip label={title} hint="Traders in this pull" delay={0.05} accent={style.accent} active />
+          <div className="ml-3 flex flex-col gap-2 border-l border-border/70 pl-3">
+            {shown.map((item, index) => (
+              <RouteChip
+                key={item.id}
+                label={item.title}
+                hint={item.placement === "merge" ? "Merged onto this sheet" : item.note || "Own sheet"}
+                delay={0.16 + index * 0.08}
+                accent={style.accent}
+              />
+            ))}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 /** A nickname list can open each trader's profile and their public trades. */
 export function TraderJoinExplainer({ title = "Leaderboard" }) {
   const style = venueStyle("kalshi");
