@@ -126,6 +126,8 @@ export default function IntegrationBuildGridInner({
   highlightColumnIds = [],
   activeCell = null,
   scrollToken = 0,
+  scrollSmooth = false,
+  scrollAlign = "end",
   referencedColumnIds = [],
   referencedCells = [],
   formulaEditor = null,
@@ -222,7 +224,7 @@ export default function IntegrationBuildGridInner({
   }, [formulaHeader, highlightIndex, placeFormula]);
 
   useEffect(() => {
-    if (highlightIndex < 0 || size.width <= 0) return undefined;
+    if (scrollSmooth || highlightIndex < 0 || size.width <= 0) return undefined;
     let cancelled = false;
     const run = () => {
       if (cancelled) return;
@@ -239,7 +241,34 @@ export default function IntegrationBuildGridInner({
       window.cancelAnimationFrame(frame);
       window.clearTimeout(timer);
     };
-  }, [formulaRow, highlightIndex, scrollToken, size.width, placeFormula]);
+  }, [formulaRow, highlightIndex, placeFormula, scrollSmooth, scrollToken, size.width]);
+
+  useEffect(() => {
+    if (!scrollSmooth || highlightIndex < 0 || size.width <= 0) return undefined;
+    let cancelled = false;
+    let moved = false;
+    const glideToNewColumns = () => {
+      if (cancelled || moved) return;
+      const scroller = gridSlotRef.current?.querySelector(".dvn-scroller");
+      const editor = editorRef.current;
+      if (!scroller || !editor) return;
+      const origin = editor.getBounds(0, 0);
+      const next = editor.getBounds(highlightIndex, 0);
+      if (!origin?.width || !next?.width) return;
+      const span = next.x - origin.x;
+      const target = Math.max(0, scrollAlign === "end" ? span + next.width - scroller.clientWidth : span - 16);
+      if (Math.abs(target - scroller.scrollLeft) < 2) return;
+      moved = true;
+      const behavior = window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth";
+      scroller.scrollTo({ left: target, behavior });
+    };
+    const timers = [];
+    for (let delay = 60; delay <= 1500; delay += 120) timers.push(window.setTimeout(glideToNewColumns, delay));
+    return () => {
+      cancelled = true;
+      timers.forEach((id) => window.clearTimeout(id));
+    };
+  }, [highlightIndex, scrollAlign, scrollSmooth, scrollToken, size.width]);
 
   const referencedKey = referencedCells.map((cell) => `${cell.columnId}:${cell.row}`).join("|");
 

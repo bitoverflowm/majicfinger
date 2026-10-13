@@ -11,6 +11,8 @@ export function IntegrationBuildGrid({
   highlightColumnIds = [],
   activeCell = null,
   scrollToken = 0,
+  scrollSmooth = false,
+  scrollAlign = "end",
   referencedColumnIds = [],
   referencedCells = [],
   formulaEditor = null,
@@ -24,6 +26,8 @@ export function IntegrationBuildGrid({
       highlightColumnIds={highlightColumnIds}
       activeCell={activeCell}
       scrollToken={scrollToken}
+      scrollSmooth={scrollSmooth}
+      scrollAlign={scrollAlign}
       referencedColumnIds={referencedColumnIds}
       referencedCells={referencedCells}
       formulaEditor={formulaEditor}

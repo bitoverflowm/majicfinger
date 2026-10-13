@@ -5247,8 +5247,9 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
       : { columns: tradeJoinBase.columns, rows: tradeJoinBase.rows, sheetId: editSheetId === "new" ? "new" : "markets" };
   const traderMergedSource = useMemo(() => {
     if (!polymarketTraderCatalog || traderMergePreview.status !== "ready" || !traderMergePreview.parts?.length) {
-      return tradeJoinBase;
+      return { ...tradeJoinBase, addedIds: [] };
     }
+    const baseIds = new Set((tradeJoinBase.columns || []).map((column) => column.id));
     let columns = tradeJoinBase.columns;
     let rows = tradeJoinBase.rows;
     for (const part of traderMergePreview.parts) {
@@ -5256,7 +5257,8 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
       columns = merged.columns;
       rows = merged.rows;
     }
-    return { ...tradeJoinBase, columns, rows };
+    const addedIds = columns.filter((column) => column?.id && !baseIds.has(column.id)).map((column) => column.id);
+    return { ...tradeJoinBase, columns, rows, addedIds };
   }, [polymarketTraderCatalog, traderMergePreview, tradeJoinBase]);
   const marketsGrid = applyFunctionColumns(
     traderMergedSource.columns,
@@ -5266,6 +5268,7 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
     "markets",
     activeFunction?.id,
   );
+  const mergeAddedIds = marketsGrid.highlight ? [] : traderMergedSource.addedIds || [];
   const tradesGrid = applyFunctionColumns(
     tradePreview.columns,
     tradePreview.rows,
@@ -9341,20 +9344,24 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
             <IntegrationBuildGrid
               columns={marketsGrid.columns}
               rows={marketsGrid.rows}
-              highlightColumnId={marketsGrid.highlight || (tradesJoinReady && joinPlacement === "merge" ? tradeJoinBase.highlightIds[0] || "" : "")}
+              highlightColumnId={marketsGrid.highlight || mergeAddedIds[0] || (tradesJoinReady && joinPlacement === "merge" ? tradeJoinBase.highlightIds[0] || "" : "")}
               highlightColumnIds={
                 summaryOnSource
                   ? (summaryView.references || []).filter((ref) => ref.sheetId === "markets" && ref.row == null).map((ref) => ref.column.id)
-                  : tradesJoinReady && joinPlacement === "merge"
-                    ? tradeJoinBase.highlightIds
-                    : []
+                  : mergeAddedIds.length
+                    ? mergeAddedIds
+                    : tradesJoinReady && joinPlacement === "merge"
+                      ? tradeJoinBase.highlightIds
+                      : []
               }
               referencedCells={
                 summaryOnSource
                   ? (summaryView.references || []).filter((ref) => ref.sheetId === "markets" && ref.row != null).map((ref) => ({ columnId: ref.column.id, row: ref.row }))
                   : referencesFor("markets").referencedCells
               }
-              scrollToken={functionScrollKey}
+              scrollToken={mergeAddedIds.length ? mergeAddedIds.join(",") : functionScrollKey}
+              scrollSmooth={mergeAddedIds.length > 0}
+              scrollAlign={mergeAddedIds.length ? "start" : "end"}
               {...(summaryOnSource ? {} : referencesFor("markets"))}
               formulaEditor={summarySourceEditor || formulaEditorFor("markets", false) || formulaEditorFor("markets", true)}
               onFormulaPick={(pick) => acceptFormulaPick(pick, "markets")}
