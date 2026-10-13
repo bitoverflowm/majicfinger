@@ -206,6 +206,36 @@ export function snapBlockPosition(block, others) {
   return snapMove(block, others);
 }
 
+/** Lay items left to right, wrapping to the next row when a span does not fit. */
+function flowPlace(items, startY) {
+  const placed = [];
+  const { gap } = metrics();
+  let y = startY;
+  let col = 0;
+  let rowHeight = 0;
+  let rowY = y;
+  for (const item of items) {
+    const span = Math.min(spanOf(item), CLIP.cols);
+    if (col > 0 && col + span > CLIP.cols) {
+      y = rowY + rowHeight + gap;
+      col = 0;
+      rowHeight = 0;
+      rowY = y;
+    }
+    const height = heightForRows(rowsOf(item));
+    placed.push({ ...item, x: xForCol(col), y: Math.round(rowY), w: widthForSpan(span), h: height });
+    col += span;
+    rowHeight = Math.max(rowHeight, height);
+    if (col >= CLIP.cols) {
+      y = rowY + rowHeight + gap;
+      col = 0;
+      rowHeight = 0;
+      rowY = y;
+    }
+  }
+  return placed;
+}
+
 function placeChartRow(placed, charts, y) {
   const half = CLIP.cols / 2;
   let col = 0;
@@ -278,32 +308,19 @@ export function packClippedBlocks(blocks) {
   }
   for (const attached of charts.values()) extras.push(...attached);
 
-  let col = 0;
-  let rowHeight = 0;
-  let rowY = y;
   const flow = [];
   for (const row of rows) flow.push(...row);
   flow.push(...extras);
-
-  for (const item of flow) {
-    const span = Math.min(spanOf(item), CLIP.cols);
-    if (col > 0 && col + span > CLIP.cols) {
-      y = rowY + rowHeight + gap;
-      col = 0;
-      rowHeight = 0;
-      rowY = y;
-    }
-    const height = heightForRows(rowsOf(item));
-    placed.push({ ...item, x: xForCol(col), y: Math.round(rowY), w: widthForSpan(span), h: height });
-    col += span;
-    rowHeight = Math.max(rowHeight, height);
-    if (col >= CLIP.cols) {
-      y = rowY + rowHeight + gap;
-      col = 0;
-      rowHeight = 0;
-      rowY = y;
-    }
-  }
+  placed.push(...flowPlace(flow, y));
 
   return placed;
+}
+
+/**
+ * Close a hole by laying the remaining blocks in reading order.
+ * Each block keeps its column span and row span.
+ */
+export function packReadingOrder(blocks) {
+  const ordered = [...(blocks || [])].sort((a, b) => (a.y || 0) - (b.y || 0) || (a.x || 0) - (b.x || 0));
+  return flowPlace(ordered, CLIP.originY);
 }

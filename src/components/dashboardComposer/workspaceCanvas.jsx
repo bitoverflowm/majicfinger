@@ -26,6 +26,7 @@ import { layoutRunSheets } from "@/components/dashboardComposer/integrationRunSh
 import {
   canvasGridMetrics,
   packClippedBlocks,
+  packReadingOrder,
   setCanvasGridWidth,
   setLayoutGuide,
   snapMove,
@@ -607,7 +608,7 @@ export function WorkspaceCanvasProvider({ pageId, readOnly = false, children }) 
     (id) => {
       setBlocksByPage((prev) => ({
         ...prev,
-        [pageId]: (prev[pageId] || []).filter((block) => block.id !== id),
+        [pageId]: packReadingOrder((prev[pageId] || []).filter((block) => block.id !== id)),
       }));
       setSelectedId((current) => (current === id ? null : current));
     },

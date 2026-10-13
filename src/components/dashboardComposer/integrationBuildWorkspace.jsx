@@ -47,6 +47,8 @@ import {
   polymarketLiveMarketJoins,
   polymarketLiveBuildSearch,
   polymarketMarketFanout,
+  polymarketActivitySheetTitle,
+  polymarketActivityTraderName,
   polymarketPickFromSuggestion,
   polymarketRowsForMarket,
 } from "@/components/dashboardComposer/polymarketLiveBuild";
@@ -492,25 +494,6 @@ function functionChoices({ joinActive, previewTicker, sheetTitle }) {
     { id: "all", title: "All tables", detail: "Add the column on markets and every trades sheet." },
     created,
   ];
-}
-
-const API_MENU = [
-  ["v2", "v2"],
-  ["v1", "v1"],
-  ["gamma", "Gamma"],
-];
-
-function endpointMenuSections(ids, tables) {
-  const tagged = ids.some((id) => tables[id]?.api);
-  if (!tagged) return [{ api: "", label: "", ids }];
-  const sections = API_MENU.map(([api, label]) => ({
-    api,
-    label,
-    ids: ids.filter((id) => tables[id]?.api === api),
-  })).filter((section) => section.ids.length);
-  const rest = ids.filter((id) => !API_MENU.some(([api]) => tables[id]?.api === api));
-  if (rest.length) sections.push({ api: "rest", label: "", ids: rest });
-  return sections;
 }
 
 function EndpointLiveTag() {
@@ -4981,6 +4964,11 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
   const functionOnNew = functionsForSheet("new").length > 0;
   const functionActive = liveFunctions.length > 0;
   const sheetTitle = tableId === "markets" ? "Markets" : tableId === "trades" ? "Trades" : tables[tableId]?.label || "This sheet";
+  const activitySheetTitle = (pick, rows) => {
+    if (tableId !== "getTraderActivity") return "";
+    const scoped = pick ? polymarketRowsForMarket(rows, pick, livePicks) : rows;
+    return polymarketActivitySheetTitle(polymarketActivityTraderName(scoped, pick));
+  };
   const metadataRows = useMemo(() => {
     if (!join) return marketPreview.rows || [];
     const tickers = filteredRows.map((row) => join.marketKey(row)).filter(Boolean);
@@ -6617,7 +6605,7 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
         );
         sheets.push({
           id: `run-polymarket-${tableId}-${safe}`,
-          title: `${sheetTitle} · ${label}`,
+          title: activitySheetTitle(pick, fullRows) || `${sheetTitle} · ${label}`,
           columns: built.columns.length ? built.columns : shownColumns,
           rows: built.rows,
           rowCount: fullRows.length,
@@ -6630,7 +6618,7 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
     } else if (runMarkets.columns.length && keepParentDataset) {
       sheets.push({
         id: tableId === "trades" ? "run-trades" : tableId && tableId !== "markets" ? `run-${tableId}` : "run-markets",
-        title: sheetTitle,
+        title: activitySheetTitle(livePicks[0], runMarkets.rows) || sheetTitle,
         columns: runMarkets.columns,
         rows: runMarkets.rows,
         span: "full",
@@ -7277,15 +7265,15 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
         liveMarketFanout && directMarkets[0]
           ? `${sheetTitle} · ${directMarkets[0].ticker}`
           : polymarketFanoutOn && livePicks[0]
-            ? `${sheetTitle} · ${livePicks[0].label || livePicks[0].title || "Market"}`
-            : sheetTitle,
+            ? activitySheetTitle(livePicks[0], polymarketDirected.rows) || `${sheetTitle} · ${livePicks[0].label || livePicks[0].title || "Market"}`
+            : activitySheetTitle(livePicks[0], polymarketDirected.rows) || sheetTitle,
     },
   ];
   if (polymarketFanoutOn) {
     livePicks.slice(1).forEach((pick) => {
       previewTabs.push({
         id: `polymarket:${pick.id}`,
-        title: `${sheetTitle} · ${pick.label || pick.title || "Market"}`,
+        title: activitySheetTitle(pick, polymarketDirected.rows) || `${sheetTitle} · ${pick.label || pick.title || "Market"}`,
       });
     });
   }
@@ -8003,21 +7991,17 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
                 </button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="start" className="z-[580] max-h-[var(--radix-dropdown-menu-content-available-height)] w-[300px] overflow-y-auto">
-                {endpointMenuSections(visibleTableIds, tables).flatMap((section, index) => [
-                  section.label && index > 0 ? <DropdownMenuSeparator key={`${section.api}-sep`} /> : null,
-                  section.label ? <DropdownMenuLabel key={`${section.api}-label`}>{section.label}</DropdownMenuLabel> : null,
-                  ...section.ids.map((id) => (
-                    <DropdownMenuItem key={id} onSelect={() => setTableId(id)}>
-                      <span className="min-w-0">
-                        <span className="flex flex-wrap items-center gap-1.5">
-                          <span className="text-[13px] font-medium">{tables[id].label}</span>
-                          {tables[id].realtime ? <EndpointLiveTag /> : null}
-                        </span>
-                        <span className="block text-[11px] text-muted-foreground">{tables[id].description}</span>
+                {visibleTableIds.map((id) => (
+                  <DropdownMenuItem key={id} onSelect={() => setTableId(id)}>
+                    <span className="min-w-0">
+                      <span className="flex flex-wrap items-center gap-1.5">
+                        <span className="text-[13px] font-medium">{tables[id].label}</span>
+                        {tables[id].realtime ? <EndpointLiveTag /> : null}
                       </span>
-                    </DropdownMenuItem>
-                  )),
-                ])}
+                      <span className="block text-[11px] text-muted-foreground">{tables[id].description}</span>
+                    </span>
+                  </DropdownMenuItem>
+                ))}
               </DropdownMenuContent>
             </DropdownMenu>
             ) : null}

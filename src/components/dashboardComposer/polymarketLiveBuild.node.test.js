@@ -7,6 +7,8 @@ import {
   polymarketLiveBuildRequirement,
   polymarketLiveBuildSearch,
   polymarketLiveRealtimeEndpointIds,
+  polymarketActivitySheetTitle,
+  polymarketActivityTraderName,
   polymarketPickFromSuggestion,
   POLYMARKET_CLOSED_ORDERBOOK_MESSAGE,
   polymarketJoinChoices,
@@ -103,6 +105,14 @@ assert.equal(polymarketLiveBuildRequirement("getTraderActivity")?.prompt, "Walle
 assert.equal(polymarketMarketFanout("getTraderActivity"), true);
 assert.equal(polymarketLiveBuildSearch("getTraderActivity")?.placeholder, "Search for a trader");
 assert.equal(polymarketLiveBuildSearch("getTraderActivity")?.acceptAddress, undefined);
+assert.equal(polymarketActivityTraderName([{ name: "Zoomify" }, { name: "Zoomify", pseudonym: "other" }]), "Zoomify");
+assert.equal(polymarketActivityTraderName([{ pseudonym: "zoom-handle" }]), "zoom-handle");
+assert.equal(polymarketActivityTraderName([], { label: "Zoomify", title: "Zoomify" }), "Zoomify");
+assert.equal(polymarketActivityTraderName([{ name: "Ada" }, { name: "Bea" }], { label: "Zoomify" }), "Zoomify");
+assert.equal(polymarketActivityTraderName([], { label: "0x39125313116835eb6a55688350813921c9360246" }), "");
+assert.equal(polymarketActivitySheetTitle("Zoomify"), "Zoomify's activity");
+assert.equal(polymarketActivitySheetTitle(""), "");
+assert.equal(polymarketActivitySheetTitle("0x39125313116835eb6a55688350813921c9360246"), "");
 const activityColumns = polymarketLiveBuildColumns("getTraderActivity");
 assert.equal(activityColumns.find((column) => column.id === "timestamp")?.dateEpoch, "unix");
 assert.equal(activityColumns.find((column) => column.id === "timestamp")?.defaultOn, true);

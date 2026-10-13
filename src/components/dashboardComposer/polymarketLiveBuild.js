@@ -413,6 +413,35 @@ export function polymarketPickFromSuggestion(suggestion) {
   };
 }
 
+const ACTIVITY_WALLET = /^0x[a-fA-F0-9]{40}$/;
+
+function uniqueActivityNames(rows, key) {
+  const values = [];
+  for (const row of Array.isArray(rows) ? rows : []) {
+    const value = String(row?.[key] || "").replace(/\s+/g, " ").trim();
+    if (value && !values.includes(value)) values.push(value);
+  }
+  return values;
+}
+
+/** Display name for an activity sheet. Profile name, then pseudonym, then the search label. */
+export function polymarketActivityTraderName(rows, pick) {
+  const names = uniqueActivityNames(rows, "name");
+  if (names.length === 1) return names[0];
+  const pseudonyms = uniqueActivityNames(rows, "pseudonym");
+  if (!names.length && pseudonyms.length === 1) return pseudonyms[0];
+  const label = String(pick?.label || pick?.title || "").replace(/\s+/g, " ").trim();
+  if (label && !ACTIVITY_WALLET.test(label)) return label;
+  return "";
+}
+
+/** "Zoomify's activity". Empty when the trader has no display name yet. */
+export function polymarketActivitySheetTitle(name) {
+  const clean = String(name || "").replace(/\s+/g, " ").trim();
+  if (!clean || ACTIVITY_WALLET.test(clean)) return "";
+  return `${clean}'s activity`;
+}
+
 export const POLYMARKET_CLOSED_ORDERBOOK_MESSAGE =
   "Market is closed so no live orderbook snapshot is available.";
 

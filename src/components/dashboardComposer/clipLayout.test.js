@@ -9,6 +9,7 @@ import {
   snapMove,
   snapResize,
   snapResizeEdges,
+  packReadingOrder,
   spanOf,
   widthForSpan,
   xForCol,
@@ -57,5 +58,33 @@ assert.equal(pulledWest.y, yForRow(2));
 const neighbor = { id: "other", x: xForCol(0), y: yForRow(1), w: widthForSpan(12), h: heightForRows(8) };
 const nudged = snapMove({ ...block, x: xForCol(0), y: yForRow(1) }, [neighbor]);
 assert.ok(nudged.y >= yForRow(1) + heightForRows(8) - 1);
+
+function blockAt(id, col, row, span, rows) {
+  return { id, type: "sheet", x: xForCol(col), y: yForRow(row), w: widthForSpan(span), h: heightForRows(rows) };
+}
+
+const quad = [
+  blockAt("a", 0, 0, 12, 8),
+  blockAt("b", 12, 0, 12, 8),
+  blockAt("c", 0, 8, 12, 8),
+  blockAt("d", 12, 8, 12, 8),
+];
+const withoutB = packReadingOrder(quad.filter((block) => block.id !== "b"));
+assert.deepEqual(withoutB.map((block) => block.id), ["a", "c", "d"]);
+assert.equal(withoutB[0].x, xForCol(0));
+assert.equal(withoutB[0].y, yForRow(0));
+assert.equal(withoutB[1].id, "c");
+assert.equal(withoutB[1].x, xForCol(12));
+assert.equal(withoutB[1].y, yForRow(0));
+assert.equal(withoutB[2].id, "d");
+assert.equal(withoutB[2].x, xForCol(0));
+assert.equal(withoutB[2].y, yForRow(8));
+
+const withoutA = packReadingOrder(quad.filter((block) => block.id !== "a"));
+assert.equal(withoutA[0].id, "b");
+assert.equal(withoutA[0].x, xForCol(0));
+assert.equal(withoutA[0].y, yForRow(0));
+assert.equal(withoutA[1].x, xForCol(12));
+assert.equal(withoutA[1].y, yForRow(0));
 
 console.log("clipLayout.test.js ok");

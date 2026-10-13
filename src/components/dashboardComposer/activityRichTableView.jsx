@@ -73,7 +73,7 @@ export function ActivityRichTableView({ sheet, dataset }) {
         <p className="px-0.5 pb-2 pt-2 text-[11px] uppercase tracking-[0.14em] text-muted-foreground">{model.caption}</p>
       ) : null}
       {model.tags.length > 1 ? (
-        <div className="flex flex-wrap gap-1 px-0.5 pb-2" role="group" aria-label="Activity types">
+        <div className="flex flex-wrap gap-1 px-0.5 pb-2 pt-2" role="group" aria-label="Activity types">
           <button
             type="button"
             aria-pressed={selected === ""}
