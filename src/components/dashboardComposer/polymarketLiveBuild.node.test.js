@@ -65,12 +65,6 @@ assert.deepEqual(
     getHoldersByMarkets: "v2",
     getTraderLeaderboard: "v2",
     getBiggestWinners: "v2",
-    getCurrentPositions: "v1",
-    getClosedPositions: "v1",
-    getUserActivity: "v1",
-    getHolderPositionValue: "v1",
-    getHolderTrades: "v1",
-    getHolderTradedMarkets: "v1",
     getPublicProfiles: "gamma",
     getTraderByAddress: "v2",
     getTraderPositions: "v2",
@@ -78,6 +72,16 @@ assert.deepEqual(
     getTraderActivity: "v2",
   },
 );
+for (const retired of [
+  "getCurrentPositions",
+  "getClosedPositions",
+  "getUserActivity",
+  "getHolderPositionValue",
+  "getHolderTrades",
+  "getHolderTradedMarkets",
+]) {
+  assert.equal(ids.includes(retired), false);
+}
 assert.equal(endpoints.find((endpoint) => endpoint.id === "getTraderPositions")?.title, "Get trader's positions");
 assert.equal(polymarketLiveBuildRequirement("getTraderPositions")?.prompt, "Wallet address required");
 assert.equal(polymarketMarketFanout("getTraderPositions"), true);
@@ -527,6 +531,18 @@ assert.equal(holderJoins[0]?.id, "parent-market");
 assert.equal(holderJoins.some((item) => item.id === "getHoldersByMarkets"), false);
 assert.equal(holderJoins.some((item) => item.id === "getTradesByMarket"), true);
 assert.deepEqual(polymarketJoinChoices("series"), []);
+assert.deepEqual(polymarketJoinChoices("getEvents"), []);
+assert.deepEqual(polymarketJoinChoices("getMarketsByEvents"), []);
+for (const retired of [
+  "getCurrentPositions",
+  "getClosedPositions",
+  "getUserActivity",
+  "getHolderPositionValue",
+  "getHolderTrades",
+  "getHolderTradedMarkets",
+]) {
+  assert.equal(marketJoins.some((item) => item.id === retired), false);
+}
 const holders = endpoints.find((endpoint) => endpoint.id === "getHoldersByMarkets");
 assert.equal(holders?.title, "Top Holders");
 assert.equal(holders?.category, "holders");

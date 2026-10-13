@@ -108,12 +108,6 @@ const BUILD_GROUP = {
   getLiveVolumeForEvent: "events",
   getHoldersByMarkets: "holders",
   getPublicProfiles: "holders",
-  getCurrentPositions: "holders",
-  getClosedPositions: "holders",
-  getUserActivity: "holders",
-  getHolderPositionValue: "holders",
-  getHolderTrades: "holders",
-  getHolderTradedMarkets: "holders",
   getTraderLeaderboard: "holders",
   getBiggestWinners: "holders",
 };
@@ -123,12 +117,6 @@ const API_VERSION = {
   getHoldersByMarkets: "v2",
   getTraderLeaderboard: "v2",
   getBiggestWinners: "v2",
-  getCurrentPositions: "v1",
-  getClosedPositions: "v1",
-  getUserActivity: "v1",
-  getHolderPositionValue: "v1",
-  getHolderTrades: "v1",
-  getHolderTradedMarkets: "v1",
   getPublicProfiles: "gamma",
   [TRADER_BY_ADDRESS_ENDPOINT_ID]: "v2",
   [TRADER_POSITIONS_ENDPOINT_ID]: "v2",
@@ -168,12 +156,6 @@ const REQUIREMENTS = {
   getLiveVolumeForEvent: { kind: "event", prompt: "Event required" },
   getHoldersByMarkets: { kind: "token", prompt: "Market required" },
   getPublicProfiles: { kind: "address", prompt: "Wallet address required" },
-  getCurrentPositions: { kind: "address", prompt: "Wallet address required" },
-  getClosedPositions: { kind: "address", prompt: "Wallet address required" },
-  getUserActivity: { kind: "address", prompt: "Wallet address required" },
-  getHolderPositionValue: { kind: "address", prompt: "Wallet address required" },
-  getHolderTrades: { kind: "address", prompt: "Wallet address required" },
-  getHolderTradedMarkets: { kind: "address", prompt: "Wallet address required" },
   [TRADER_BY_ADDRESS_ENDPOINT_ID]: { kind: "address", prompt: "Wallet address required" },
   [TRADER_POSITIONS_ENDPOINT_ID]: { kind: "address", prompt: "Wallet address required" },
   [TRADER_PNL_ENDPOINT_ID]: { kind: "address", prompt: "Wallet address required" },
@@ -241,24 +223,6 @@ const BUILD_COPY = {
   },
   getPublicProfiles: {
     description: "A trader's public name and profile.",
-  },
-  getCurrentPositions: {
-    description: "Positions a trader still has open.",
-  },
-  getClosedPositions: {
-    description: "Positions a trader has already closed.",
-  },
-  getUserActivity: {
-    description: "A trader's recent trades and other account activity.",
-  },
-  getHolderPositionValue: {
-    description: "The total value of a trader's open positions.",
-  },
-  getHolderTrades: {
-    description: "Trades a trader has made.",
-  },
-  getHolderTradedMarkets: {
-    description: "How many markets a trader has traded.",
   },
   getTraderLeaderboard: {
     description: "Traders ranked by profit or by trading volume.",
