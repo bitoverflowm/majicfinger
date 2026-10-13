@@ -27,13 +27,20 @@ assert.deepEqual(days.map((day) => day.value), [4, 1, 0, 1]);
 assert.equal(days.reduce((sum, day) => sum + day.value, 0), 6);
 
 const stack = activityStackModel(rows);
-assert.deepEqual(stack.data.map((bar) => bar.label), ["Trade", "Split", "Redeem"]);
-assert.deepEqual(stack.data.map((bar) => bar.buy), [3, 0, 0]);
-assert.deepEqual(stack.data.map((bar) => bar.sell), [1, 0, 0]);
-assert.deepEqual(stack.data.map((bar) => bar.none), [0, 1, 1]);
-assert.equal(stack.series[0].id, "buy");
+assert.deepEqual(stack.data.map((bar) => bar.label), ["Oct 12", "Oct 13", "Oct 15"]);
+assert.equal(stack.data[0].tradeBuy, 5001);
+assert.equal(stack.data[0].tradeSell, 20);
+assert.equal(stack.data[0].redeem, 9000);
+assert.equal(stack.data[1].split, 1200);
+assert.equal(stack.data[1].tradeBuy, 0);
+assert.equal(stack.data[2].tradeBuy, 4);
+assert.equal(stack.series[0].id, "tradeBuy");
+assert.equal(stack.series[0].label, "Trade · Buy");
 assert.equal(stack.series[0].color, LYCHEE_RED);
-assert.deepEqual(stack.series.map((series) => series.id), ["buy", "sell", "none"]);
+assert.equal(stack.series.find((series) => series.id === "tradeSell")?.label, "Trade · Sell");
+assert.notEqual(stack.series.find((series) => series.id === "tradeSell")?.color, LYCHEE_RED);
+assert.equal(stack.series.find((series) => series.id === "redeem")?.label, "Redeem");
+assert.deepEqual(stack.series.map((series) => series.id), ["tradeBuy", "tradeSell", "split", "redeem"]);
 
 const empty = activityStackModel([{ ms: null, type: "TRADE", side: "BUY" }]);
 assert.deepEqual(empty.data, []);
@@ -41,7 +48,7 @@ assert.deepEqual(activityDailyCounts([]), []);
 
 const charts = defaultActivityCharts("Zoomify's activity");
 assert.deepEqual(charts.map((chart) => chart.chartView), ["activity-calendar", "activity-stack"]);
-assert.deepEqual(charts.map((chart) => chart.title), ["Zoomify's activity · daily", "Zoomify's activity · by type"]);
+assert.deepEqual(charts.map((chart) => chart.title), ["Zoomify's activity · daily", "Zoomify's activity · dollars"]);
 
 const sheet = {
   type: "sheet",

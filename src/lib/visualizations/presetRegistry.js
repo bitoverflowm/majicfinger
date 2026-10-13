@@ -216,7 +216,7 @@ export function visualizationChoices(dataset, columnIds) {
       choices.push({ view: "activity-calendar", label: "Daily activity" });
     }
     if (viewValid("activity-stack", dataset, ids)) {
-      choices.push({ view: "activity-stack", label: "Activity by type" });
+      choices.push({ view: "activity-stack", label: "Daily dollars" });
     }
     return choices;
   }
