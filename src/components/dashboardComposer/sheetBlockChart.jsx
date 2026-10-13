@@ -9,6 +9,8 @@ import { isPriceHistorySheet, priceHistoryOutcome, priceHistoryPoints } from "@/
 import { DatasetSummary, EventLinesChart } from "@/components/dashboardComposer/datasetChart";
 import { PortfolioTreemap } from "@/components/dashboardComposer/portfolioTreemapChart";
 import { PnlPortfolioChart } from "@/components/dashboardComposer/pnlPortfolioChart";
+import { ActivityCalendarChart } from "@/components/dashboardComposer/activityCalendarChart";
+import { ActivityStackChart } from "@/components/dashboardComposer/activityStackChart";
 import { columnKey, countObservations, describeSheet } from "@/lib/visualizations/datasetDescriptor";
 import { resolveVisualization } from "@/lib/visualizations/presetRegistry";
 import { IndicatorChart } from "@/components/spectrumui/charts/indicator-chart";
@@ -303,6 +305,12 @@ export function SheetBlockChart({ sheet, snapshot, onSnapshot, live = false, vie
   }
   if (resolved?.view === "portfolio") {
     return <PnlPortfolioChart sheet={sheet} />;
+  }
+  if (resolved?.view === "activity-calendar") {
+    return <ActivityCalendarChart sheet={sheet} />;
+  }
+  if (resolved?.view === "activity-stack") {
+    return <ActivityStackChart sheet={sheet} />;
   }
   if (resolved?.view === "price") {
     return <PriceHistorySheetChart sheet={sheet} live={live} />;

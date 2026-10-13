@@ -52,8 +52,11 @@ assert.equal(dataset.datasetType, "trader_activity");
 assert.equal(hasVisualTable(dataset), true);
 assert.equal(visualPresentationLabel(dataset), "Rich Table");
 assert.equal(visualPresentationLabel({ datasetType: "trader_positions" }), "Visual Table");
-assert.deepEqual(visualizationChoices(dataset, ["timestamp", "type", "title"]), []);
-assert.equal(resolveVisualization(dataset, { columnIds: ["timestamp", "type", "title"] }).view, "table");
+assert.deepEqual(
+  visualizationChoices(dataset, ["timestamp", "type", "title"]).map((choice) => choice.view),
+  ["activity-calendar", "activity-stack"],
+);
+assert.equal(resolveVisualization(dataset, { columnIds: ["timestamp", "type", "title"] }).view, "activity-calendar");
 
 const model = buildActivityRichTable(
   [

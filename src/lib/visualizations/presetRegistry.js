@@ -29,6 +29,7 @@ const PRESETS = {
   positions_closed: { view: "diverging", label: "Realized PnL", limit: 10, noun: "positions" },
   trader_positions: { view: "treemap", label: "Portfolio", noun: "positions" },
   trader_pnl: { view: "portfolio", label: "Portfolio", curve: "linear" },
+  trader_activity: { view: "activity-calendar", label: "Daily activity" },
   holder_trades: { view: "activity", label: "Buy / sell", curve: "linear" },
 };
 
@@ -49,6 +50,8 @@ const FIELD_NEEDS = {
   diverging: ["value"],
   treemap: ["value", "label"],
   portfolio: ["time", "value"],
+  "activity-calendar": ["time"],
+  "activity-stack": ["time", "type"],
   activity: ["side", "price", "size"],
   scatter: ["price", "time"],
   table: [],
@@ -94,6 +97,8 @@ function fallbackFor(view, dataset, columnIds) {
     diverging: ["table"],
     treemap: ["bars", "table"],
     portfolio: ["table"],
+    "activity-calendar": ["activity-stack", "table"],
+    "activity-stack": ["table"],
     activity: ["scatter", "table"],
     scatter: ["table"],
     "visual-table": ["bars", "table"],
@@ -166,6 +171,8 @@ const SAVED_VIEWS = new Set([
   "diverging",
   "treemap",
   "portfolio",
+  "activity-calendar",
+  "activity-stack",
   "quote",
   "quote-table",
   "spec",
@@ -203,6 +210,16 @@ export function visualPresentationLabel(dataset) {
 export function visualizationChoices(dataset, columnIds) {
   if (!hasVisualTable(dataset)) return [];
   const ids = columnIds ? new Set(columnIds) : null;
+  if (dataset.datasetType === "trader_activity") {
+    const choices = [];
+    if (viewValid("activity-calendar", dataset, ids)) {
+      choices.push({ view: "activity-calendar", label: "Daily activity" });
+    }
+    if (viewValid("activity-stack", dataset, ids)) {
+      choices.push({ view: "activity-stack", label: "Activity by type" });
+    }
+    return choices;
+  }
   const key = presetKey(dataset);
   const preset = PRESETS[key] || PRESETS[dataset.datasetType];
   const choices = [];

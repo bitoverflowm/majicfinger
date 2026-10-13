@@ -19,6 +19,7 @@ import { VisualTableView } from "@/components/dashboardComposer/visualTableView"
 import { Switch } from "@/components/ui/switch";
 import { isOrderBookSheet } from "@/components/dashboardComposer/orderBookLadder";
 import { columnKey, countObservations, describeSheet } from "@/lib/visualizations/datasetDescriptor";
+import { defaultActivityCharts } from "@/lib/visualizations/activityCharts";
 import { hasVisualTable, resolveVisualization, visualPresentationLabel } from "@/lib/visualizations/presetRegistry";
 import { isPriceHistorySheet } from "@/components/dashboardComposer/priceHistorySeries";
 import { SheetBlockChart } from "@/components/dashboardComposer/sheetBlockChart";
@@ -573,12 +574,16 @@ export function WorkspaceCanvasProvider({ pageId, readOnly = false, children }) 
       const base = String(sheet.title || "Sheet").replace(/\s+chart$/, "").trim();
       const requested = String(forcedView || "").trim();
       const chartView = requested || (resolved.view === "table" ? "" : resolved.view);
-      const specs = [
-        {
-          chartView,
-          title: chartView === "order-book" && /^order\s*books?/i.test(base) ? base : `${base} chart`,
-        },
-      ];
+      const specs = !requested && dataset?.datasetType === "trader_activity"
+        ? defaultActivityCharts(base)
+        : [
+            {
+              chartView,
+              title: chartView === "order-book" && /^order\s*books?/i.test(base) ? base : `${base} chart`,
+              w: chartView === "portfolio" ? 680 : 540,
+              h: chartView === "portfolio" ? 560 : 360,
+            },
+          ];
       const chartId = newId();
       setBlocksByPage((prev) => {
         const list = prev[pageId] || [];
@@ -591,8 +596,8 @@ export function WorkspaceCanvasProvider({ pageId, readOnly = false, children }) 
           ...(spec.chartView ? { chartView: spec.chartView } : {}),
           x: current.x,
           y: (current.y || 0) + index,
-          w: chartView === "portfolio" ? 680 : 540,
-          h: chartView === "portfolio" ? 560 : 360,
+          w: spec.w || 540,
+          h: spec.h || 360,
           title: spec.title,
           body: "",
         }));
