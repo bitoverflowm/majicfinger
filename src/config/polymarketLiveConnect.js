@@ -264,7 +264,7 @@ export const POLYMARKET_LIVE_CONNECT_ENDPOINTS = [
   {
     id: POLYMARKET_EVENTS_COMPOSE_ENDPOINT_ID,
     category: "events",
-    title: "Get Event/Events",
+    title: "Get Events",
     description:
       "Discover event(s), search with natural language, id, slug, or list events that match your criteria by volume, tag, status, etc.",
   },

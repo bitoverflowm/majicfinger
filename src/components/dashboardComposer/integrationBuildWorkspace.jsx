@@ -685,7 +685,13 @@ function joinSourceTitle(id) {
   );
 }
 
-function liveJoinTasks({ targets, preview, ticker, marketCount, noun = "market" }) {
+function liveJoinTaskTicker(target, { ticker, marketTicker, traderTicker }) {
+  if (target?.anchor === "market" && marketTicker) return marketTicker;
+  if (target?.anchor === "trader" && traderTicker) return traderTicker;
+  return ticker;
+}
+
+function liveJoinTasks({ targets, preview, ticker, marketTicker = "", traderTicker = "", marketCount, noun = "market" }) {
   const count = Number(marketCount) || 0;
   const plural = noun === "market" ? "markets" : `${noun}s`;
   const tasks = [
@@ -704,9 +710,10 @@ function liveJoinTasks({ targets, preview, ticker, marketCount, noun = "market" 
     const status = state?.status === "ready" ? "completed" : state?.status === "error" ? "failed" : "running";
     const rows = Array.isArray(state?.rows) ? state.rows.length : 0;
     const live = joinTargetIsLive(target);
+    const rowTicker = liveJoinTaskTicker(target, { ticker, marketTicker, traderTicker });
     tasks.push({
       id: target.id,
-      title: `${target.title} for ${ticker}`,
+      title: `${target.title} for ${rowTicker}`,
       detail: status === "completed" ? `${rows.toLocaleString()} ${rows === 1 ? "row" : "rows"}` : live ? "Live" : "",
       status,
       note: [target.detail, live ? "This endpoint can keep updating on the dashboard after you run the pull. The preview stays a snapshot." : "", state?.error || ""]
@@ -4807,6 +4814,11 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
     let cancelled = false;
     setTraderMergePreview({ status: "loading", parts: [] });
     const targets = polymarketMergeKey.split(",").filter(Boolean);
+    setLiveJoinPreview((current) => {
+      const next = { ...current };
+      for (const id of targets) next[id] = { status: "loading", columns: [], rows: [], error: "" };
+      return next;
+    });
     Promise.all(
       targets.map(async (id) => {
         const spec = polymarketJoinCatalog.find((item) => item.id === id);
@@ -4840,6 +4852,14 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
           if (!item) continue;
           if (!columns.length && item.columns.length) columns = item.columns;
           rows.push(item.row);
+        }
+        if (!cancelled) {
+          setLiveJoinPreview((current) => ({
+            ...current,
+            [id]: columns.length && rows.length
+              ? { status: "ready", columns, rows, error: "" }
+              : { status: "error", columns: [], rows: [], error: "No rows to merge onto this sheet." },
+          }));
         }
         return { anchor, columns, rows };
       }),
@@ -9555,6 +9575,8 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
                         targets: liveJoinTargets,
                         preview: liveJoinPreview,
                         ticker: joinPreviewTicker,
+                        marketTicker: polymarketJoinMarkets[0]?.label || "",
+                        traderTicker: polymarketTraderPeople[0]?.label || "",
                         noun: polymarketJoinCatalog.find((item) => item.id === kind)?.anchor === "trader" ? "trader" : "market",
                         marketCount: polymarketJoinCatalog.find((item) => item.id === kind)?.anchor === "trader"
                           ? polymarketTraderPeople.length

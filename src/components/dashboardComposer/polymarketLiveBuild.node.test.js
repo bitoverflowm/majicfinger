@@ -20,6 +20,7 @@ import {
   polymarketTraderWalletFromRow,
   polymarketTraderEntities,
   polymarketMarketEntities,
+  polymarketMarketLookupAttempts,
   mergePolymarketJoinRows,
   polymarketTraderJoinSheetTitle,
   polymarketMarketFanout,
@@ -600,12 +601,13 @@ for (const id of [
 }
 const winJoins = polymarketTraderJoinChoices("getBiggestWinners");
 assert.equal(winJoins.find((item) => item.id === "getTraderByAddress").placement, "merge");
-assert.equal(winJoins.find((item) => item.id === "parent-market").placement, "market-choice");
+assert.equal(winJoins.find((item) => item.id === "parent-market").placement, "merge");
 assert.equal(winJoins.some((item) => item.id === "getOrderbooks"), true);
 assert.equal(winJoins.some((item) => item.id === "getHoldersByMarkets"), true);
 assert.equal(winJoins.find((item) => item.id === "getPublicProfiles").placement, "merge");
 assert.equal(polymarketJoinPlacement(winJoins.find((item) => item.id === "parent-market"), "merge"), "merge");
-assert.equal(polymarketJoinPlacement(winJoins.find((item) => item.id === "parent-market"), "sheet"), "sheet");
+assert.equal(polymarketJoinPlacement(winJoins.find((item) => item.id === "parent-market"), "sheet"), "merge");
+assert.equal(polymarketTraderJoinChoices("getTraderPositions").find((item) => item.id === "parent-market").placement, "market-choice");
 assert.deepEqual(traderJoinIds("getTraderByAddress"), [
   "getTraderPositions",
   "getTraderPnlSeries",
@@ -647,6 +649,16 @@ const people = polymarketTraderEntities(
 );
 assert.equal(people.length, 2);
 assert.equal(people[0].label, "Zoomify");
+assert.equal(
+  polymarketTraderEntities([
+    {
+      user_id: "0x06b2934b382d4429d50d7239ee375a76167f9f35",
+      user_name: "0x06b2934b382D4429D50d7239eE375a76167f9f35-1723887278819",
+      pseudonym: "Irresponsible-Pop",
+    },
+  ])[0].label,
+  "Irresponsible-Pop",
+);
 assert.equal(people[0].pick.address, "0xabcabcabcabcabcabcabcabcabcabcabcabcabca");
 assert.equal(
   polymarketMarketEntities([{ condition_id: "0xmarket", question: "Will it rain?" }, { condition_id: "0xmarket" }]).length,
@@ -712,6 +724,22 @@ assert.equal(
   polymarketJoinPickFromRow({ condition_id: "0xdef", market_slug: "sample-market", question: "Sample", token_ids: "a, b" }).tokenIds.join(","),
   "a,b",
 );
+const winPick = polymarketJoinPickFromRow({
+  condition_id: "0x17372b5f6e24f064bae15194fabcc6c531d289825ab3ed79d0c2ecc718c269bc",
+  position_id: "99249074278148770317781174674204456239460356068373758399359364986071572681879",
+  event_title: "S&amp;P 500 (SPX) Up or Down on October 13?",
+  event_slug: "spx-up-or-down-on-october-13-2026",
+  user_name: "0x06b2934b382D4429D50d7239eE375a76167f9f35-1723887278819",
+});
+assert.equal(winPick.entityId, "");
+assert.equal(winPick.slug, "");
+assert.equal(winPick.closed, undefined);
+assert.equal(winPick.title, "S&P 500 (SPX) Up or Down on October 13?");
+assert.deepEqual(winPick.tokenIds, ["99249074278148770317781174674204456239460356068373758399359364986071572681879"]);
+const winAttempts = polymarketMarketLookupAttempts(winPick);
+assert.deepEqual(winAttempts[0], { condition_ids: winPick.conditionId, limit: "1" });
+assert.equal(winAttempts.some((item) => item.id || item.slug), false);
+assert.equal(winAttempts.some((item) => item.clob_token_ids === winPick.tokenIds[0]), true);
 
 const wide = new Array(160000);
 for (let index = 0; index < wide.length; index += 1) wide[index] = index;
