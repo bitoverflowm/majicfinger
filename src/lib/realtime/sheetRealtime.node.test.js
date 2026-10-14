@@ -1,8 +1,11 @@
 import assert from "node:assert/strict";
 import {
   appendLiveCells,
+  appendLiveRecords,
   cellsFromRecords,
+  liveRecordsFromRows,
   patchPriceCells,
+  patchPriceRecords,
   priceSymbolsForSheet,
   realtimeAssets,
   realtimeSheetForBlock,
@@ -96,4 +99,21 @@ test("polled rows land on columns by id", () => {
   );
   assert.equal(cells["0,0"], "KX-1");
   assert.equal(cells["1,0"], "0.56");
+  const records = liveRecordsFromRows(
+    [
+      { id: "ticker", title: "Ticker" },
+      { id: "yes_price_dollars", title: "Yes price dollars", type: "number" },
+    ],
+    [{ ticker: "KX-1", yes_price_dollars: 0.56 }],
+  );
+  assert.equal(records[0].yes_price_dollars, 0.56);
+  const priced = patchPriceRecords(
+    [{ id: "symbol" }, { id: "price", type: "number" }],
+    [{ symbol: "btc/usd", price: 1 }],
+    { symbol: "btc/usd", price: 64000, at: 10 },
+  );
+  assert.equal(priced[0].price, 64000);
+  const tailed = appendLiveRecords([{ id: "kept" }], [{ id: "new" }], 1, 0);
+  assert.equal(tailed[0].id, "kept");
+  assert.equal(tailed[1].id, "new");
 });

@@ -12,7 +12,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { DestructiveConfirmMenuItem } from "@/components/ui/destructive-confirm-menu-item";
 import { useMyStateV2 } from "@/context/stateContextV2";
-import { duplicateTabName, saveWorkspaceStartTabs } from "@/lib/workspaceStartTabs";
+import { duplicateTabName, loadWorkspaceStartTabs, saveWorkspaceStartTabs } from "@/lib/workspaceStartTabs";
 import { DashboardSheetGrid } from "@/components/dashboardComposer/dashboardSheetGrid";
 import { ActivityRichTableView } from "@/components/dashboardComposer/activityRichTableView";
 import { VisualTableView } from "@/components/dashboardComposer/visualTableView";
@@ -182,6 +182,7 @@ export function WorkspaceCanvasProvider({ pageId, readOnly = false, children }) 
   const [blocksByPage, setBlocksByPage] = useState({});
   const [tables, setTables] = useState([]);
   const [ready, setReady] = useState(false);
+  const [pendingTabs, setPendingTabs] = useState([]);
   const [dashboardName, setDashboardName] = useState("Untitled");
   const [previewTabs, setPreviewTabs] = useState([]);
   const [previewActiveId, setPreviewActiveId] = useState("");
@@ -230,14 +231,19 @@ export function WorkspaceCanvasProvider({ pageId, readOnly = false, children }) 
   const welcomeRemoved = !!ctx?.welcomeTabRemoved;
 
   function draftFromState(nextBlocks, nextTables) {
+    const tabList = tabs.length ? tabs : [{ id: "welcome", name: "Welcome", blank: false }];
+    const loadedTabs = pendingTabs.length
+      ? tabList.map((tab) => tab.id).filter((id) => !pendingTabs.includes(id))
+      : null;
     return {
       name: String(dashboardName || "").trim().slice(0, 120) || "Untitled",
       active_tab_id: activeTabId,
       welcome_removed: welcomeRemoved,
-      tabs: tabs.length ? tabs : [{ id: "welcome", name: "Welcome", blank: false }],
+      tabs: tabList,
       blocks: blocksForDocument(nextBlocks),
       tables: nextTables,
       charts: [],
+      ...(loadedTabs ? { loaded_tabs: loadedTabs } : {}),
     };
   }
 
@@ -253,7 +259,8 @@ export function WorkspaceCanvasProvider({ pageId, readOnly = false, children }) 
     let cancel = false;
     setReady(false);
     (async () => {
-      const loaded = readOnly ? await loadWorkspaceDashboardPreview() : await loadCurrentWorkspaceDashboard();
+      const landingTab = loadWorkspaceStartTabs(owner).activeId || "welcome";
+      const loaded = readOnly ? await loadWorkspaceDashboardPreview() : await loadCurrentWorkspaceDashboard(landingTab);
       if (cancel) return;
       let doc = loaded.ok ? loaded.data : null;
       if (readOnly) {
@@ -311,17 +318,25 @@ export function WorkspaceCanvasProvider({ pageId, readOnly = false, children }) 
       lastPayloadRef.current = payload;
       docIdRef.current = String(doc._id || "");
       setDashboardName(String(doc.name || "").trim() || "Untitled");
+      const pendingNow = Array.isArray(doc.pending_tabs) ? doc.pending_tabs.filter(Boolean) : [];
+      const previousLocal = readLocalDashboard(owner);
+      const localBlocks = { ...(previousLocal?.blocks || {}), ...(doc.blocks || {}) };
+      for (const tabId of pendingNow) {
+        if (previousLocal?.blocks?.[tabId]) localBlocks[tabId] = previousLocal.blocks[tabId];
+      }
       writeLocalDashboard(owner, {
         name: doc.name,
         active_tab_id: doc.active_tab_id,
         welcome_removed: doc.welcome_removed,
         tabs: doc.tabs,
-        blocks: doc.blocks,
+        blocks: localBlocks,
         tables: nextTables,
         charts: [],
       });
       setTables(nextTables);
       setBlocksByPage((prev) => ({ ...nextBlocks, ...prev }));
+      const pending = pendingNow;
+      setPendingTabs(pending);
       if (Array.isArray(doc.tabs) && doc.tabs.length) {
         ctx?.setWorkspaceStartTabs?.(doc.tabs);
         ctx?.setWelcomeTabRemoved?.(!!doc.welcome_removed);
@@ -333,6 +348,16 @@ export function WorkspaceCanvasProvider({ pageId, readOnly = false, children }) 
         });
       }
       setReady(true);
+      for (const tabId of pending) {
+        if (cancel) return;
+        const part = await loadCurrentWorkspaceDashboard(tabId);
+        if (cancel) return;
+        if (part.ok && part.data) {
+          const more = blocksByPageFromDoc(part.data);
+          setBlocksByPage((prev) => ({ ...prev, ...more }));
+        }
+        setPendingTabs((current) => current.filter((id) => id !== tabId));
+      }
     })();
     return () => {
       cancel = true;
@@ -345,7 +370,14 @@ export function WorkspaceCanvasProvider({ pageId, readOnly = false, children }) 
     if (readOnly || !ready || !owner || owner === "local") return undefined;
     const draft = draftFromState(blocksByPage, tables);
     draftRef.current = draft;
-    writeLocalDashboard(owner, draft);
+    const previousLocal = pendingTabs.length ? readLocalDashboard(owner) : null;
+    const localBlocks = previousLocal?.blocks ? { ...previousLocal.blocks, ...draft.blocks } : draft.blocks;
+    if (previousLocal?.blocks) {
+      for (const tabId of pendingTabs) {
+        if (previousLocal.blocks[tabId]) localBlocks[tabId] = previousLocal.blocks[tabId];
+      }
+    }
+    writeLocalDashboard(owner, { ...draft, blocks: localBlocks });
     const payload = JSON.stringify({
       name: draft.name,
       tabs: draft.tabs,
@@ -374,7 +406,7 @@ export function WorkspaceCanvasProvider({ pageId, readOnly = false, children }) 
         .catch(() => {});
     }, 700);
     return () => window.clearTimeout(timer);
-  }, [activeTabId, blocksByPage, dashboardName, owner, readOnly, ready, tables, tabs, welcomeRemoved]);
+  }, [activeTabId, blocksByPage, dashboardName, owner, pendingTabs, readOnly, ready, tables, tabs, welcomeRemoved]);
 
   useEffect(() => {
     if (readOnly || !ready || !storageKey) return;
@@ -704,12 +736,18 @@ export function WorkspaceCanvasProvider({ pageId, readOnly = false, children }) 
     void replayTabSheets(blocksByPageRef.current[page] || [], {
       planLimit,
       reporter,
-      onSheet(id, cells, rowCount) {
+      onSheet(id, cells, rowCount, records, query) {
         setBlocksByPage((prev) => {
           const list = prev[page] || [];
           const current = list.find((block) => block.id === id);
           if (!current) return prev;
-          const tokens = sheetAssetIds({ ...current, cells });
+          const nextSheet = {
+            ...current,
+            cells,
+            ...(Array.isArray(records) && records.length ? { records } : {}),
+            ...(query && typeof query === "object" ? { query: { ...(current.query || {}), ...query } } : {}),
+          };
+          const tokens = sheetAssetIds(nextSheet);
           const table = current.table || current.pull?.table || "";
           const pull = table
             ? {
@@ -721,7 +759,7 @@ export function WorkspaceCanvasProvider({ pageId, readOnly = false, children }) 
           return {
             ...prev,
             [page]: list.map((block) =>
-              block.id === id ? { ...block, cells, rowCount, pulledAt: Date.now(), ...(pull ? { pull } : {}) } : block,
+              block.id === id ? { ...nextSheet, rowCount, pulledAt: Date.now(), ...(pull ? { pull } : {}) } : block,
             ),
           };
         });
@@ -781,11 +819,19 @@ export function WorkspaceCanvasProvider({ pageId, readOnly = false, children }) 
   const saveNow = useCallback(async () => {
     const draft = draftFromState(blocksByPage, tables);
     draftRef.current = draft;
+    const previousLocal = pendingTabs.length ? readLocalDashboard(owner) : null;
+    const localBlocks = previousLocal?.blocks ? { ...previousLocal.blocks, ...draft.blocks } : draft.blocks;
+    if (previousLocal?.blocks) {
+      for (const tabId of pendingTabs) {
+        if (previousLocal.blocks[tabId]) localBlocks[tabId] = previousLocal.blocks[tabId];
+      }
+    }
+    const localDraft = { ...draft, blocks: localBlocks };
     if (!owner || owner === "local") {
-      writeLocalDashboard(owner || "local", draft);
+      writeLocalDashboard(owner || "local", localDraft);
       return { ok: true };
     }
-    writeLocalDashboard(owner, draft);
+    writeLocalDashboard(owner, localDraft);
     const payload = JSON.stringify({
       name: draft.name,
       tabs: draft.tabs,
@@ -803,7 +849,7 @@ export function WorkspaceCanvasProvider({ pageId, readOnly = false, children }) 
     const saved = await saveWorkspaceDashboard(docIdRef.current, draft);
     if (saved.ok) lastPayloadRef.current = payload;
     return { ok: !!saved.ok };
-  }, [blocksByPage, dashboardName, owner, tables, tabs, activeTabId, welcomeRemoved]);
+  }, [blocksByPage, dashboardName, owner, pendingTabs, tables, tabs, activeTabId, welcomeRemoved]);
 
   useEffect(() => {
     setBlocksByPage((prev) => {
@@ -829,6 +875,7 @@ export function WorkspaceCanvasProvider({ pageId, readOnly = false, children }) 
       saveNow,
       readOnly,
       ready,
+      tabLoading: pendingTabs.includes(tabIdFromPage(pageId)),
       pageId,
       previewTabs,
       previewActiveId,
@@ -869,7 +916,7 @@ export function WorkspaceCanvasProvider({ pageId, readOnly = false, children }) 
       removeBlock,
       createChartFromBlock,
     }),
-    [addBlock, armReplay, blocks, blocksByPage, createChartFromBlock, dashboardName, dismissRun, duplicateBlock, focusBlock, focusSheetRow, handDown, leavePrompt, pageId, placeIntegrationSheets, previewActiveId, previewTabs, readOnly, ready, realtimeById, realtimeModeByPage, registerTables, removeBlock, renameDashboard, renameId, replayReady, replayRun, replayTab, reportRun, requestTab, resolveLeave, revealBlock, revealNonce, runFeed, saveNow, selectedId, sheetRowFocus, spotlightId, startRealtimeMode, startSheetRealtime, stopRealtimeMode, stopSheetRealtime, tables, tool, updateBlock],
+    [addBlock, armReplay, blocks, blocksByPage, createChartFromBlock, dashboardName, dismissRun, duplicateBlock, focusBlock, focusSheetRow, handDown, leavePrompt, pageId, pendingTabs, placeIntegrationSheets, previewActiveId, previewTabs, readOnly, ready, realtimeById, realtimeModeByPage, registerTables, removeBlock, renameDashboard, renameId, replayReady, replayRun, replayTab, reportRun, requestTab, resolveLeave, revealBlock, revealNonce, runFeed, saveNow, selectedId, sheetRowFocus, spotlightId, startRealtimeMode, startSheetRealtime, stopRealtimeMode, stopSheetRealtime, tables, tool, updateBlock],
   );
 
   return (
@@ -969,6 +1016,11 @@ function formatPulledAt(value) {
   });
 }
 
+function shownRowCount(block) {
+  const stored = Array.isArray(block?.records) ? block.records.length : 0;
+  return Math.max(stored, filledRowCount(block?.cells), Number(block?.rowCount) || 0);
+}
+
 function filledRowCount(cells) {
   const rows = new Set();
   for (const key of Object.keys(cells || {})) {
@@ -1018,9 +1070,12 @@ function MarketLifeBar({ sheet, session, enabled }) {
 }
 
 function liveBlock(block, canvas) {
-  const liveCells = liveSession(canvas, block?.id)?.liveCells;
-  if (!liveCells) return block;
-  return { ...block, cells: liveCells };
+  const session = liveSession(canvas, block?.id);
+  if (Array.isArray(session?.liveRecords) && session.liveRecords.length) {
+    return { ...block, records: session.liveRecords };
+  }
+  if (!session?.liveCells) return block;
+  return { ...block, cells: session.liveCells, records: null };
 }
 
 const rememberedMarkets = new Set();
@@ -1095,7 +1150,7 @@ function SheetBlockBody({ block, onChange, booting }) {
   const closed = sheetMarketClosed(block);
   const hasRealtime = !canvas?.readOnly && !closed && !!realtimeSheetForBlock(block, canvas?.blocks || []);
   const pulled = formatPulledAt(block.pulledAt);
-  const shownCount = Math.max(filledRowCount(view.cells), Number(block.rowCount) || 0);
+  const shownCount = shownRowCount(view);
   const label = useTradeSheetLabel(usesHistoricalTradeSheet(block) ? block.id : "", shownCount);
   const dataset = describeSheet(view);
   const visual = block.presentation === "visual" && hasVisualTable(dataset);
@@ -1234,7 +1289,11 @@ function ChartBlockBody({ block, onChange, booting }) {
   const sourceView = source?.type === "sheet" ? liveBlock(source, canvas) : null;
   const chartSheet =
     sourceView && sourceSession?.running && !isOrderBookSheet(sourceView) && !isPriceHistorySheet(sourceView)
-      ? { ...sourceView, cells: tailCells(sourceView.cells, 80) }
+      ? Array.isArray(sourceView.records) && sourceView.records.length > 80
+        ? { ...sourceView, records: sourceView.records.slice(-80) }
+        : sourceView.records?.length
+          ? sourceView
+          : { ...sourceView, cells: tailCells(sourceView.cells, 80), records: null }
       : sourceView;
   return (
     <div className="flex min-h-0 flex-1 flex-col">
@@ -1305,7 +1364,7 @@ function SheetFullscreen({ block, onChange, onClose }) {
   }, [onClose]);
 
   const view = liveBlock(block, canvas);
-  const shownCount = Math.max(filledRowCount(view.cells), Number(block.rowCount) || 0);
+  const shownCount = shownRowCount(view);
   const label = useTradeSheetLabel(usesHistoricalTradeSheet(block) ? block.id : "", shownCount);
   const dataset = describeSheet(view);
   const visual = block.presentation === "visual" && hasVisualTable(dataset);
@@ -1955,6 +2014,14 @@ export function WorkspaceCanvas() {
   const progress = canvas.runFeed ? (
     <RunProgressCard feed={canvas.runFeed} onDismiss={canvas.dismissRun} onReplay={canvas.replayReady ? canvas.replayRun : undefined} />
   ) : null;
+
+  if (!blocks.length && canvas.tabLoading) {
+    return (
+      <div className="pointer-events-none absolute inset-x-0 bottom-0 top-[var(--dashboard-tab-clearance,0px)] z-20 flex items-center justify-center">
+        <SpectrumLoadingState label="Loading dashboard" />
+      </div>
+    );
+  }
 
   if (!blocks.length) return progress;
 

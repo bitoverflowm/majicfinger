@@ -761,6 +761,10 @@ export function PolymarketTraderJoinExplainer({ title = "This pull", joins = [] 
       <div className="relative z-10 flex w-full max-w-md flex-col gap-4 px-6 py-6">
         <p className="text-center text-[13px] leading-relaxed text-muted-foreground">
           From {title}, profile columns land on this sheet. Positions, PnL, activity, and market sources each open their own sheet. The preview shows the first one. The rest are viewable when you hit Save and run.
+          {joins.some((item) => item.id === "getTraderPositions" || item.id === "getTraderActivity") &&
+          !joins.some((item) => item.anchor === "market")
+            ? " Positions and activity name markets, so those rows continue into market metadata, trades, the order book, prices, and top holders."
+            : ""}
         </p>
         <div className="flex flex-col gap-2">
           <RouteChip label={title} hint="Traders in this pull" delay={0.05} accent={style.accent} active />
@@ -774,6 +778,15 @@ export function PolymarketTraderJoinExplainer({ title = "This pull", joins = [] 
                 accent={style.accent}
               />
             ))}
+            {joins.some((item) => item.id === "getTraderPositions" || item.id === "getTraderActivity") &&
+            !joins.some((item) => item.anchor === "market") ? (
+              <RouteChip
+                label="Markets"
+                hint="Metadata, trades, order book, prices, top holders"
+                delay={0.16 + shown.length * 0.08}
+                accent={style.accent}
+              />
+            ) : null}
           </div>
         </div>
       </div>

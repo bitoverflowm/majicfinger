@@ -19,8 +19,10 @@ export async function loadWorkspaceDashboardPreview() {
   return { ok: true, data: json.data || null };
 }
 
-export async function loadCurrentWorkspaceDashboard() {
-  const res = await fetch("/api/workspace-dashboards/current", { credentials: "include" });
+export async function loadCurrentWorkspaceDashboard(tab) {
+  const id = String(tab || "").trim();
+  const query = id ? `?tab=${encodeURIComponent(id)}` : "";
+  const res = await fetch(`/api/workspace-dashboards/current${query}`, { credentials: "include" });
   const json = await readJson(res);
   if (res.status === 401) return { ok: false, unauthorized: true };
   if (!res.ok || !json?.success) {

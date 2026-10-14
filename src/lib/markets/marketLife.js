@@ -215,6 +215,20 @@ export function uniformColumnValue(block, ids, limit = 40) {
       .filter((index) => index >= 0),
   );
   if (!indexes.size) return "";
+  const keys = columns.filter((column) => ids.includes(String(column?.id || ""))).map((column) => String(column.id));
+  if (Array.isArray(block?.records) && block.records.length) {
+    let found = "";
+    let seen = 0;
+    for (const row of block.records) {
+      const text = keys.map((key) => String(row?.[key] || "").trim()).find(Boolean) || "";
+      if (!text) continue;
+      if (!found) found = text;
+      else if (text !== found) return "";
+      seen += 1;
+      if (seen >= limit) break;
+    }
+    if (found) return found;
+  }
   let found = "";
   let seen = 0;
   for (const [key, value] of Object.entries(block?.cells || {})) {

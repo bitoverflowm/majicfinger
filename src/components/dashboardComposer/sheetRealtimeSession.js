@@ -105,6 +105,13 @@ export function useSheetRealtime(blocksByPage, pageId, onLiveCells) {
             return { ...current, [key]: { ...session, liveCells } };
           });
         },
+        onRecords(liveRecords) {
+          setRealtimeById((current) => {
+            const session = current[key];
+            if (!session?.running) return current;
+            return { ...current, [key]: { ...session, liveRecords } };
+          });
+        },
         onFatal(status) {
           stopsRef.current.get(key)?.();
           stopsRef.current.delete(key);

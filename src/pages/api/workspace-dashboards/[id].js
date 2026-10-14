@@ -41,7 +41,20 @@ export default async function handler(req, res) {
 
   if (req.method === "GET") return res.status(200).json({ success: true, data: doc.toObject() });
 
+  const loadedTabs = Array.isArray(req.body?.loaded_tabs)
+    ? req.body.loaded_tabs.map((tabId) => String(tabId || "").trim()).filter(Boolean)
+    : null;
   const next = sanitizeWorkspaceDashboard(req.body || {});
+  if (loadedTabs) {
+    const existing = doc.toObject().blocks || {};
+    const merged = { ...existing };
+    const incoming = next.blocks || {};
+    for (const tabId of loadedTabs) {
+      if (incoming[tabId]) merged[tabId] = incoming[tabId];
+      else delete merged[tabId];
+    }
+    next.blocks = merged;
+  }
   doc.set(next);
   await doc.save();
   return res.status(200).json({ success: true, data: doc.toObject() });

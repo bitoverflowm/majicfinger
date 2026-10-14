@@ -1,5 +1,7 @@
 /** Price History sheets chart `p` against time. Indicator panes can be added later. */
 
+import { sheetRecords } from "@/lib/visualizations/datasetDescriptor";
+
 export function isPriceHistorySheet(sheet) {
   if (!sheet || sheet.type === "chart") return false;
   const table = String(sheet.table || "");
@@ -48,26 +50,19 @@ function pickIndex(columns, ids) {
  */
 export function priceHistoryPoints(sheet) {
   const columns = Array.isArray(sheet?.columns) ? sheet.columns : [];
-  const cells = sheet?.cells || {};
   const tokenHistory = String(sheet?.table || "") === "getTokenPriceHistory";
   const timeIndex = pickIndex(columns, tokenHistory ? ["observed_at", "timestamp"] : ["timestamp", "observed_at"]);
   const unixIndex = pickIndex(columns, tokenHistory ? ["timestamp", "t"] : ["t", "timestamp"]);
   const priceIndex = pickIndex(columns, tokenHistory ? ["price", "p"] : ["p", "price"]);
   if (priceIndex < 0 || (timeIndex < 0 && unixIndex < 0)) return [];
-
-  const rows = new Set();
-  for (const key of Object.keys(cells)) {
-    const row = Number(String(key).split(",")[1]);
-    if (Number.isFinite(row)) rows.add(row);
-  }
+  const timeKey = timeIndex >= 0 ? columns[timeIndex]?.id : "";
+  const unixKey = unixIndex >= 0 ? columns[unixIndex]?.id : "";
+  const priceKey = columns[priceIndex]?.id;
 
   const points = [];
-  for (const row of [...rows].sort((a, b) => a - b)) {
-    const price = parsePrice(cells[`${priceIndex},${row}`]);
-    const t = parseTime(
-      timeIndex >= 0 ? cells[`${timeIndex},${row}`] : "",
-      unixIndex >= 0 ? cells[`${unixIndex},${row}`] : "",
-    );
+  for (const row of sheetRecords(sheet)) {
+    const price = parsePrice(priceKey ? row?.[priceKey] : "");
+    const t = parseTime(timeKey ? row?.[timeKey] : "", unixKey ? row?.[unixKey] : "");
     if (price == null || t == null) continue;
     points.push({ t, price });
   }
@@ -79,11 +74,11 @@ export function priceHistoryPoints(sheet) {
 export function priceHistoryOutcome(sheet) {
   const index = columnIndex(sheet?.columns, "outcome");
   if (index < 0) return "";
-  const cells = sheet?.cells || {};
+  const key = sheet.columns[index]?.id;
+  if (!key) return "";
   let found = "";
-  for (const [key, value] of Object.entries(cells)) {
-    if (Number(String(key).split(",")[0]) !== index) continue;
-    const text = String(value ?? "").trim();
+  for (const row of sheetRecords(sheet)) {
+    const text = String(row?.[key] ?? "").trim();
     if (!text) continue;
     if (!found) found = text;
     else if (found !== text) return "";

@@ -482,16 +482,9 @@ export function countSeries(sheet, keys) {
   const ids = columnIds(sheet);
   const present = wanted.filter((key) => ids.has(key));
   if (!present.length) return 1;
-  const indexes = present.map((key) => (sheet.columns || []).findIndex((column) => columnKey(column) === key));
-  const cells = sheet?.cells || {};
-  const rows = new Set();
-  for (const key of Object.keys(cells)) {
-    const row = Number(String(key).split(",")[1]);
-    if (Number.isFinite(row)) rows.add(row);
-  }
   const seen = new Set();
-  for (const row of rows) {
-    const parts = indexes.map((index) => String(cells[`${index},${row}`] ?? "").trim());
+  for (const row of sheetRecords(sheet)) {
+    const parts = present.map((key) => String(row?.[key] ?? "").trim());
     if (parts.every((part) => !part)) continue;
     seen.add(parts.join("\u0001"));
   }
@@ -520,8 +513,9 @@ export function describeSheet(sheet) {
   return { ...template, seriesCount: countSeries(sheet, template.seriesKeys) };
 }
 
-/** Rows keyed by the sheet's own column ids. */
+/** Rows keyed by the sheet's own column ids. Stored records win over the formatted grid. */
 export function sheetRecords(sheet) {
+  if (Array.isArray(sheet?.records) && sheet.records.length) return sheet.records;
   const columns = Array.isArray(sheet?.columns) ? sheet.columns : [];
   const cells = sheet?.cells && typeof sheet.cells === "object" ? sheet.cells : {};
   const rowIndexes = new Set();

@@ -5,8 +5,11 @@ import { normalizeKalshiLiveOrderbook } from "@/lib/kalshiLive/normalizeOrderboo
 import { normalizeKalshiLiveTradeRow } from "@/lib/kalshiLive/normalizeTradeRow";
 import {
   appendLiveCells,
+  appendLiveRecords,
   cellsFromRecords,
+  liveRecordsFromRows,
   patchPriceCells,
+  patchPriceRecords,
   priceSymbolsForSheet,
   sheetAssetIds,
   sheetField,
@@ -51,6 +54,7 @@ function startPriceSocket(block, def, handlers) {
   }
   let stopped = false;
   let cells = { ...(block.cells || {}) };
+  let priceRecords = Array.isArray(block.records) && block.records.length ? block.records.map((row) => ({ ...row })) : null;
   let ping = 0;
   let emitTimer = 0;
   let primed = false;
@@ -77,12 +81,15 @@ function startPriceSocket(block, def, handlers) {
     if (!primed) {
       primed = true;
       handlers.onCells({ ...cells });
+      if (priceRecords) handlers.onRecords?.(priceRecords);
       return;
     }
     if (emitTimer) return;
     emitTimer = window.setTimeout(() => {
       emitTimer = 0;
-      if (!stopped) handlers.onCells({ ...cells });
+      if (stopped) return;
+      handlers.onCells({ ...cells });
+      if (priceRecords) handlers.onRecords?.(priceRecords);
     }, 200);
   };
 
@@ -110,11 +117,9 @@ function startPriceSocket(block, def, handlers) {
     if (!symbols.includes(symbol)) return;
     const price = Number(point?.value);
     if (!Number.isFinite(price)) return;
-    cells = patchPriceCells(block.columns, cells, {
-      symbol,
-      price,
-      at: Number(point?.timestamp) || Date.now(),
-    });
+    const at = Number(point?.timestamp) || Date.now();
+    cells = patchPriceCells(block.columns, cells, { symbol, price, at });
+    if (priceRecords) priceRecords = patchPriceRecords(block.columns, priceRecords, { symbol, price, at });
     handlers.onStatus("Receiving prices");
     emit();
   };
@@ -159,6 +164,7 @@ function startKalshiPoll(block, def, handlers) {
     try {
       const rows = await fetchKalshiRows(def, { ticker, series, eventTicker }, abort.signal);
       if (stopped) return;
+      handlers.onRecords?.(liveRecordsFromRows(block.columns, rows));
       handlers.onCells(cellsFromRecords(block.columns, rows));
       handlers.onStatus("Receiving data");
     } catch (err) {
@@ -225,6 +231,8 @@ function startPolymarketSocket(block, def, handlers) {
   let stopped = false;
   let cells = { ...(block.cells || {}) };
   const protectedThrough = maxRow(block.cells);
+  let history = Array.isArray(block.records) && block.records.length ? block.records.map((row) => ({ ...row })) : null;
+  const historyFloor = history ? history.length - 1 : -1;
   let ping = 0;
   let wrote = false;
   const ws = new WebSocket(def.socketUrl);
@@ -271,6 +279,10 @@ function startPolymarketSocket(block, def, handlers) {
     }
     wrote = true;
     cells = appendLiveCells(cells, added, 120, protectedThrough);
+    if (history) {
+      history = appendLiveRecords(history, liveRecordsFromRows(block.columns, records), 120, historyFloor);
+      handlers.onRecords?.(history);
+    }
     handlers.onStatus("Receiving data");
     handlers.onCells(cells);
   };

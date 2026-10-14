@@ -116,17 +116,32 @@ export function sheetAssetIds(block) {
     .map((column, index) => ({ column, index }))
     .filter(({ column }) => /asset.?id|token/i.test(`${column?.id || ""} ${column?.title || ""}`))
     .map(({ index }) => index);
-  const fromCells = [];
-  for (const index of indexes) {
-    for (const [key, value] of Object.entries(block?.cells || {})) {
-      if (Number(String(key).split(",")[0]) !== index) continue;
-      const text = String(value || "").trim();
+  const tokenIds = columns
+    .filter((column) => /asset.?id|token/i.test(`${column?.id || ""} ${column?.title || ""}`))
+    .map((column) => String(column?.id || "").trim())
+    .filter(Boolean);
+  const fromRecords = [];
+  for (const row of Array.isArray(block?.records) ? block.records : []) {
+    for (const id of tokenIds) {
+      const text = String(row?.[id] || "").trim();
       if (!text) continue;
-      if (text.includes(",")) fromCells.push(...text.split(",").map((part) => part.trim()).filter(Boolean));
-      else fromCells.push(text);
+      if (text.includes(",")) fromRecords.push(...text.split(",").map((part) => part.trim()).filter(Boolean));
+      else fromRecords.push(text);
     }
   }
-  return [...new Set([...fromPull, ...fromCells])].slice(0, 40);
+  const fromCells = [];
+  if (!fromRecords.length) {
+    for (const index of indexes) {
+      for (const [key, value] of Object.entries(block?.cells || {})) {
+        if (Number(String(key).split(",")[0]) !== index) continue;
+        const text = String(value || "").trim();
+        if (!text) continue;
+        if (text.includes(",")) fromCells.push(...text.split(",").map((part) => part.trim()).filter(Boolean));
+        else fromCells.push(text);
+      }
+    }
+  }
+  return [...new Set([...fromPull, ...fromRecords, ...fromCells])].slice(0, 40);
 }
 
 /**
@@ -140,7 +155,13 @@ export function priceSymbolsForSheet(block, def) {
   const columns = Array.isArray(block?.columns) ? block.columns : [];
   const index = columns.findIndex((column) => column?.id === "symbol" || /^symbol$/i.test(column?.title || ""));
   const found = [];
-  if (index >= 0) {
+  const symbolId = index >= 0 ? String(columns[index]?.id || "").trim() : "";
+  if (symbolId && Array.isArray(block?.records) && block.records.length) {
+    for (const row of block.records) {
+      const symbol = String(row?.[symbolId] || "").trim().toLowerCase();
+      if (allowed.has(symbol)) found.push(symbol);
+    }
+  } else if (index >= 0) {
     for (const [key, value] of Object.entries(block?.cells || {})) {
       if (Number(String(key).split(",")[0]) !== index) continue;
       const symbol = String(value || "").trim().toLowerCase();
@@ -214,6 +235,76 @@ export function patchPriceCells(columns, cells, quote) {
  * @param {Record<string, string>} cells
  * @param {number} [keep]
  */
+function columnId(columns, ids, titlePattern) {
+  const list = columns || [];
+  const found = list.find((column) => {
+    const id = String(column?.id || "");
+    if (id && ids.includes(id)) return true;
+    return titlePattern.test(String(column?.title || "").trim());
+  });
+  return String(found?.id || "").trim();
+}
+
+/** Same quote as patchPriceCells, stored as a number on the raw row. */
+export function patchPriceRecords(columns, records, quote) {
+  const list = (Array.isArray(records) ? records : []).map((row) => ({ ...(row || {}) }));
+  const symbolId = columnId(columns, ["symbol"], /^symbol$/i);
+  const priceId = columnId(columns, ["price"], /^price$/i);
+  const timeId = columnId(columns, ["updated", "timestamp", "time"], /updated|time/i);
+  const nameId = columnId(columns, ["name"], /^name$/i);
+  const wanted = String(quote?.symbol || "").trim().toLowerCase();
+  if (!wanted) return list;
+  let index = symbolId
+    ? list.findIndex((row) => String(row?.[symbolId] || "").trim().toLowerCase() === wanted)
+    : -1;
+  if (index < 0) {
+    const row = {};
+    if (symbolId) row[symbolId] = quote.symbol;
+    if (nameId) row[nameId] = quote.symbol;
+    list.push(row);
+    index = list.length - 1;
+  }
+  const price = Number(quote?.price);
+  if (priceId && Number.isFinite(price)) list[index][priceId] = price;
+  if (timeId && quote?.at) list[index][timeId] = quote.at;
+  return list;
+}
+
+/**
+ * Append raw live rows after the protected history and keep the newest tail.
+ * @param {object[]} existing
+ * @param {object[]} added
+ * @param {number} [cap]
+ * @param {number} [protectThrough]
+ */
+export function appendLiveRecords(existing, added, cap = 120, protectThrough = -1) {
+  const base = Array.isArray(existing) ? existing : [];
+  const floor = Number(protectThrough);
+  const headCount = Number.isFinite(floor) && floor >= 0 ? Math.min(base.length, floor + 1) : 0;
+  const head = base.slice(0, headCount);
+  const tail = base.slice(headCount).concat(Array.isArray(added) ? added : []);
+  const limit = Math.max(0, Math.floor(Number(cap) || 0));
+  return head.concat(tail.length > limit ? tail.slice(tail.length - limit) : tail);
+}
+
+/** Project live rows onto column ids, keeping numbers as numbers. */
+export function liveRecordsFromRows(columns, rows) {
+  return (Array.isArray(rows) ? rows : [])
+    .map((row) => {
+      const record = {};
+      for (const column of columns || []) {
+        const id = String(column?.id || "").trim();
+        if (!id) continue;
+        const value = recordValue(row, column);
+        if (typeof value === "number" && Number.isFinite(value)) record[id] = value;
+        else if (typeof value === "boolean") record[id] = value;
+        else if (typeof value === "string" && value.trim()) record[id] = value;
+      }
+      return record;
+    })
+    .filter((record) => Object.keys(record).length > 0);
+}
+
 export function tailCells(cells, keep = 80) {
   const rows = new Set();
   for (const key of Object.keys(cells || {})) {
@@ -242,6 +333,9 @@ function firstColumnValue(block, ids, titlePattern) {
     return titlePattern.test(String(column?.title || "").trim());
   });
   if (index < 0) return "";
+  const id = String(columns[index]?.id || "").trim();
+  const stored = id && Array.isArray(block?.records) ? block.records.find((row) => row && row[id] != null && row[id] !== "") : null;
+  if (stored) return String(stored[id]).trim();
   return String(block?.cells?.[`${index},0`] || "").trim();
 }
 

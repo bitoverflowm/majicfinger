@@ -39,6 +39,24 @@ export function displayMatrix(columns, rows) {
   return (rows || []).map((row) => (columns || []).map((column) => displayCell(row?.[column.id], column)));
 }
 
+/** Values keyed by column id. Numbers, booleans, and strings stay as returned by the pull. */
+export function recordsFromRows(columns, rows) {
+  const ids = (Array.isArray(columns) ? columns : []).map((column) => String(column?.id || "").trim());
+  return (Array.isArray(rows) ? rows : [])
+    .map((row) => {
+      const record = {};
+      ids.forEach((id) => {
+        if (!id || !row || typeof row !== "object") return;
+        const value = row[id];
+        if (typeof value === "number" && Number.isFinite(value)) record[id] = value;
+        else if (typeof value === "boolean") record[id] = value;
+        else if (typeof value === "string" && value.trim()) record[id] = value;
+      });
+      return record;
+    })
+    .filter((record) => Object.keys(record).length > 0);
+}
+
 export function sheetRecords(columns, rows) {
   return (rows || []).map((row) => {
     const record = {};
@@ -83,15 +101,18 @@ export function layoutRunSheets(sheets, { originY = 88 } = {}) {
       ...(column.type ? { type: column.type } : {}),
       ...(column.scale ? { scale: column.scale } : {}),
     }));
-    const cells = {};
     const previewRows = sheet.keepAllRows ? sheet.rows || [] : (sheet.rows || []).slice(0, 50);
+    const records = recordsFromRows(sheet.columns, previewRows);
+    const cells = {};
     const rowCount = Math.max(previewRows.length, Math.floor(Number(sheet.rowCount) || 0), (sheet.rows || []).length);
-    previewRows.forEach((row, rowIndex) => {
-      (sheet.columns || []).forEach((column, columnIndex) => {
-        const text = displayCell(row?.[column.id], column);
-        if (text) cells[`${columnIndex},${rowIndex}`] = text;
+    if (!records.length) {
+      previewRows.forEach((row, rowIndex) => {
+        (sheet.columns || []).forEach((column, columnIndex) => {
+          const text = displayCell(row?.[column.id], column);
+          if (text) cells[`${columnIndex},${rowIndex}`] = text;
+        });
       });
-    });
+    }
     const full = sheet.span === "full";
     if (full && col) {
       y += halfH + gap;
@@ -109,11 +130,13 @@ export function layoutRunSheets(sheets, { originY = 88 } = {}) {
       title: sheet.title || "Sheet",
       columns,
       cells,
+      ...(records.length ? { records } : {}),
       ...(rowCount ? { rowCount } : {}),
       ...(sheet.integrationId ? { integrationId: sheet.integrationId } : {}),
       ...(sheet.table ? { table: sheet.table } : {}),
       ...(described.dataset ? { dataset: described.dataset } : {}),
       ...(sheet.pull ? { pull: sheet.pull } : {}),
+      ...(sheet.query ? { query: sheet.query } : {}),
       ...(sheet.provenance ? { provenance: sheet.provenance } : {}),
       pulledAt: Number(sheet.pulledAt) || Date.now(),
     };

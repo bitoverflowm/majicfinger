@@ -4,7 +4,9 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { CompactSelection, DataEditor, GridCellKind } from "@glideapps/glide-data-grid";
 import "@glideapps/glide-data-grid/dist/index.css";
 import { useHtmlDarkClass } from "@/hooks/use-html-dark-class";
+import { displayCell } from "@/components/dashboardComposer/integrationRunSheets";
 import { useReadyTradeSheet, usesHistoricalTradeSheet } from "@/components/dashboardComposer/fullTradeSheet";
+import { parseVisualNumber } from "@/lib/visualizations/visualTable";
 import { useWorkspaceCanvas } from "@/components/dashboardComposer/workspaceCanvas";
 
 const ROW_COUNT = 24;
@@ -124,9 +126,14 @@ export default function DashboardSheetGridInner({ block, onChange, readOnly = fa
   const [fontFamily, setFontFamily] = useState("ui-sans-serif, system-ui, sans-serif");
   const columns = useMemo(() => columnsOf(block), [block?.columns]);
   const cells = block?.cells || {};
+  const records = Array.isArray(block?.records) ? block.records : null;
   const storedSheet = useReadyTradeSheet(block?.id);
   const fullSheet = usesHistoricalTradeSheet(block) ? storedSheet : null;
-  const rows = fullSheet ? fullSheet.rows.length : rowCountOf(cells);
+  const rows = fullSheet
+    ? fullSheet.rows.length
+    : records?.length
+      ? Math.max(ROW_COUNT, records.length + 8)
+      : rowCountOf(cells);
 
   useEffect(() => {
     const next = getComputedStyle(document.body).fontFamily;
@@ -150,9 +157,12 @@ export default function DashboardSheetGridInner({ block, onChange, readOnly = fa
 
   const getCellContent = useCallback(
     ([col, row]) => {
+      const column = columns[col];
       const value = fullSheet
         ? String(fullSheet.rows[row]?.[col] ?? "")
-        : String(cells[`${col},${row}`] ?? "");
+        : records
+          ? displayCell(records[row]?.[column?.id], column)
+          : String(cells[`${col},${row}`] ?? "");
       return {
         kind: GridCellKind.Text,
         data: value,
@@ -160,7 +170,7 @@ export default function DashboardSheetGridInner({ block, onChange, readOnly = fa
         allowOverlay: true,
       };
     },
-    [cells, fullSheet],
+    [cells, columns, fullSheet, records],
   );
 
   const onCellEdited = useCallback(
@@ -172,13 +182,30 @@ export default function DashboardSheetGridInner({ block, onChange, readOnly = fa
         if (line) line[col] = value;
         return;
       }
+      if (records) {
+        const column = columns[col];
+        const id = String(column?.id || "").trim();
+        if (!id) return;
+        const next = records.slice();
+        while (next.length <= row) next.push({});
+        const record = { ...(next[row] || {}) };
+        if (!value) delete record[id];
+        else if (column?.type === "number") {
+          const parsed = parseVisualNumber(value);
+          record[id] = parsed == null ? value : parsed;
+        } else if (column?.type === "boolean") record[id] = /^(yes|true)$/i.test(value);
+        else record[id] = value;
+        next[row] = record;
+        onChange?.({ records: next });
+        return;
+      }
       const key = `${col},${row}`;
       const next = { ...cells };
       if (value) next[key] = value;
       else delete next[key];
       onChange?.({ cells: next });
     },
-    [cells, fullSheet, onChange],
+    [cells, columns, fullSheet, onChange, records],
   );
 
   useEffect(() => {

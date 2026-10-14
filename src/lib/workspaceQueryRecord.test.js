@@ -32,10 +32,16 @@ test("query records keep the search and drop row payloads", () => {
     id: "run-1",
     integrationId: "kalshiHistorical",
     label: "Markets search",
+    rowLimit: "2",
+    attributeFilters: { time_period: { value: "day" } },
+    sortKeys: [{ columnId: "pnl", direction: "desc" }],
     sheets: [{ id: "run-markets", title: "Markets", rowCount: 5 }],
     data: [1, 2, 3],
   });
   assert.equal(pull.sheets[0].title, "Markets");
+  assert.equal(pull.rowLimit, "2");
+  assert.equal(pull.attributeFilters.time_period.value, "day");
+  assert.equal(pull.sortKeys[0].columnId, "pnl");
   assert.equal(pull.data, undefined);
 });
 

@@ -33,7 +33,17 @@ export default async function handler(req, res) {
 
   if (req.method === "GET") {
     const doc = await WorkspaceDashboard.findOne({ user_id: userId }).sort({ updatedAt: -1 }).lean();
-    return res.status(200).json({ success: true, data: doc || null });
+    const tab = String(req.query.tab || "").trim();
+    if (!doc || !tab) return res.status(200).json({ success: true, data: doc || null });
+    const all = doc.blocks && typeof doc.blocks === "object" ? doc.blocks : {};
+    return res.status(200).json({
+      success: true,
+      data: {
+        ...doc,
+        blocks: all[tab] ? { [tab]: all[tab] } : {},
+        pending_tabs: Object.keys(all).filter((id) => id !== tab),
+      },
+    });
   }
 
   const existing = await WorkspaceDashboard.findOne({ user_id: userId }).sort({ updatedAt: -1 }).lean();

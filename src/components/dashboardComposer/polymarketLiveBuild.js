@@ -579,6 +579,18 @@ function traderJoinNote(spec) {
  * Trader pulls join onward to profiles, positions, PnL, activity, and, when the row names a market, that market's sources.
  * @param {string} tableId
  */
+const MARKET_BEARING_TRADER_IDS = new Set([TRADER_POSITIONS_ENDPOINT_ID, TRADER_ACTIVITY_ENDPOINT_ID]);
+
+/** Positions and activity rows name markets, so those joins can continue into the market catalog. */
+export function polymarketMarketBearingJoin(id) {
+  return MARKET_BEARING_TRADER_IDS.has(id);
+}
+
+/** Market metadata plus every market source a positions or activity row can join. */
+export function polymarketDownstreamMarketJoins() {
+  return polymarketTraderJoinChoices(TRADER_POSITIONS_ENDPOINT_ID).filter((item) => item.anchor === "market");
+}
+
 export function polymarketTraderJoinChoices(tableId) {
   const specs = TRADER_JOIN_GRAPH[tableId];
   if (!specs) return [];
@@ -1735,6 +1747,7 @@ async function leaderboardRows(filters, options = {}) {
       rows.push(leaderboardSheetRow(row, query));
       if (rows.length >= target) break;
     }
+    if (rows.length >= target) break;
     if (!next.cursor || next.cursor === cursor) break;
     cursor = next.cursor;
   }

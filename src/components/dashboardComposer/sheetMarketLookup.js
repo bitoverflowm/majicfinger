@@ -267,5 +267,33 @@ export function marketMetaPatch(block, meta) {
     ...(meta.status ? { status: meta.status } : {}),
   };
   const cells = titledCells(block, meta.marketTitle);
-  return cells ? { pull, cells } : { pull };
+  const records = titledRecords(block, meta.marketTitle);
+  return {
+    pull,
+    ...(cells ? { cells } : {}),
+    ...(records ? { records } : {}),
+  };
+}
+
+function titledRecords(block, title) {
+  const name = String(title || "").trim();
+  if (!name || !Array.isArray(block?.records) || !block.records.length) return null;
+  const ids = (Array.isArray(block.columns) ? block.columns : [])
+    .map((column) => String(column?.id || ""))
+    .filter((id) => id === "market_title" || id === "question" || id === "yes_sub_title");
+  if (!ids.length) return null;
+  const sheetTitle = String(block?.title || "").trim();
+  let changed = false;
+  const records = block.records.map((row) => {
+    const next = { ...(row || {}) };
+    for (const id of ids) {
+      const value = String(next[id] || "").trim();
+      if (value && value !== sheetTitle && value !== name) continue;
+      if (value === name) continue;
+      next[id] = name;
+      changed = true;
+    }
+    return next;
+  });
+  return changed ? records : null;
 }

@@ -14,6 +14,8 @@ import {
   polymarketJoinChoices,
   polymarketJoinPickFromRow,
   polymarketTraderJoinChoices,
+  polymarketDownstreamMarketJoins,
+  polymarketMarketBearingJoin,
   polymarketJoinPlacement,
   polymarketTraderWalletFromRow,
   polymarketTraderEntities,
@@ -574,6 +576,27 @@ assert.deepEqual(traderJoinIds("getTraderLeaderboard"), [
 assert.equal(leaderboardJoins[0].placement, "merge");
 assert.equal(leaderboardJoins.find((item) => item.id === "getTraderPnlSeries").note.includes("max PnL"), true);
 assert.equal(traderJoinIds("getTraderLeaderboard").includes("getOrderbooks"), false);
+assert.equal(polymarketMarketBearingJoin("getTraderPositions"), true);
+assert.equal(polymarketMarketBearingJoin("getTraderActivity"), true);
+assert.equal(polymarketMarketBearingJoin("getTraderLeaderboard"), false);
+const downstreamMarkets = polymarketDownstreamMarketJoins();
+assert.equal(downstreamMarkets[0]?.id, "parent-market");
+assert.equal(downstreamMarkets[0]?.placement, "market-choice");
+for (const id of [
+  "getOrderbooks",
+  "getMarketPrices",
+  "getMidpointPrices",
+  "getSpreads",
+  "getTickSize",
+  "getLastTradePrices",
+  "getBatchPricesHistory",
+  "getTokenPriceHistory",
+  "getTradesByMarket",
+  "getOpenInterestCompose",
+  "getHoldersByMarkets",
+]) {
+  assert.equal(downstreamMarkets.some((item) => item.id === id), true, id);
+}
 const winJoins = polymarketTraderJoinChoices("getBiggestWinners");
 assert.equal(winJoins.find((item) => item.id === "getTraderByAddress").placement, "merge");
 assert.equal(winJoins.find((item) => item.id === "parent-market").placement, "market-choice");

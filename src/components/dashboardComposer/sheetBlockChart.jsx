@@ -11,7 +11,7 @@ import { PortfolioTreemap } from "@/components/dashboardComposer/portfolioTreema
 import { PnlPortfolioChart } from "@/components/dashboardComposer/pnlPortfolioChart";
 import { ActivityCalendarChart } from "@/components/dashboardComposer/activityCalendarChart";
 import { ActivityStackChart } from "@/components/dashboardComposer/activityStackChart";
-import { columnKey, countObservations, describeSheet } from "@/lib/visualizations/datasetDescriptor";
+import { columnKey, countObservations, describeSheet, sheetRecords } from "@/lib/visualizations/datasetDescriptor";
 import { resolveVisualization } from "@/lib/visualizations/presetRegistry";
 import { IndicatorChart } from "@/components/spectrumui/charts/indicator-chart";
 import { MarketChart } from "@/components/spectrumui/charts/market-chart";
@@ -41,25 +41,20 @@ function looksLikeDates(labels) {
 
 export function chartSeriesFromSheet(block) {
   const columns = Array.isArray(block?.columns) ? block.columns : [];
-  const cells = block?.cells || {};
-  const rowIndexes = new Set();
-  for (const key of Object.keys(cells)) {
-    const row = Number(String(key).split(",")[1]);
-    if (Number.isFinite(row)) rowIndexes.add(row);
-  }
-  const rows = [...rowIndexes].sort((a, b) => a - b);
-  if (!columns.length || !rows.length) return null;
+  const records = sheetRecords(block);
+  if (!columns.length || !records.length) return null;
 
   const stats = columns.map((column, index) => {
+    const id = columnKey(column);
     let numeric = 0;
     let filled = 0;
-    for (const row of rows) {
-      const text = cells[`${index},${row}`];
+    for (const row of records) {
+      const text = id ? row?.[id] : "";
       if (text == null || text === "") continue;
       filled += 1;
       if (parseChartNumber(text) != null) numeric += 1;
     }
-    return { index, title: column.title || `Column ${index + 1}`, numeric, filled };
+    return { index, id, title: column.title || `Column ${index + 1}`, numeric, filled };
   });
   const numeric = stats.filter((column) => column.filled && column.numeric / column.filled >= 0.6);
   const value =
@@ -70,11 +65,11 @@ export function chartSeriesFromSheet(block) {
   const label = stats.find((column) => column.index !== value.index && column.filled && column.numeric / column.filled < 0.6);
 
   const data = [];
-  for (const row of rows) {
-    const n = parseChartNumber(cells[`${value.index},${row}`]);
+  for (const row of records) {
+    const n = parseChartNumber(value.id ? row?.[value.id] : "");
     if (n == null) continue;
     data.push({
-      label: label ? String(cells[`${label.index},${row}`] || row + 1) : String(row + 1),
+      label: label?.id ? String(row?.[label.id] || data.length + 1) : String(data.length + 1),
       value: n,
     });
   }
@@ -116,6 +111,14 @@ function isTradeSheet(sheet) {
 
 function matrixFromCells(sheet) {
   const columns = sheet?.columns || [];
+  if (Array.isArray(sheet?.records) && sheet.records.length) {
+    return sheet.records.map((row) =>
+      columns.map((column) => {
+        const value = column?.id ? row?.[column.id] : "";
+        return value == null ? "" : value;
+      }),
+    );
+  }
   const cells = sheet?.cells || {};
   let max = -1;
   for (const key of Object.keys(cells)) {

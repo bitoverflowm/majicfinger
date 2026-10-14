@@ -18,6 +18,14 @@ function clip(value, max) {
 
 function cellsToRows(block) {
   const columns = Array.isArray(block?.columns) ? block.columns : [];
+  if (Array.isArray(block?.records) && block.records.length) {
+    return block.records.map((row) =>
+      columns.map((column) => {
+        const value = column?.id ? row?.[column.id] : "";
+        return value == null ? "" : value;
+      }),
+    );
+  }
   const cells = block?.cells && typeof block.cells === "object" ? block.cells : {};
   const byRow = new Map();
   for (const [key, value] of Object.entries(cells)) {
@@ -34,6 +42,7 @@ function cellsToRows(block) {
 }
 
 function rowCount(block) {
+  if (Array.isArray(block?.records) && block.records.length) return block.records.length;
   const cells = block?.cells && typeof block.cells === "object" ? block.cells : {};
   const rows = new Set();
   for (const key of Object.keys(cells)) {

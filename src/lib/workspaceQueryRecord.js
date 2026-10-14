@@ -80,6 +80,9 @@ export function sanitizeQueryRecord(kind, input) {
   return fit({
     ...base,
     formula: String(source.formula || "").slice(0, 500),
+    rowLimit: String(source.rowLimit || "").slice(0, 20),
+    attributeFilters: cloneData(source.attributeFilters) || {},
+    sortKeys: cloneData(source.sortKeys) || [],
     sheets: cloneData(source.sheets) || [],
     athena: cloneData(source.athena),
     join: cloneData(source.join),

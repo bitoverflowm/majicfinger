@@ -1,4 +1,4 @@
-import { displayCell } from "@/components/dashboardComposer/integrationRunSheets";
+import { displayCell, recordsFromRows } from "@/components/dashboardComposer/integrationRunSheets";
 import { loadKalshiLiveDirect, loadKalshiLiveEventMarkets, loadKalshiLiveMarketByTicker, loadKalshiLiveMarketsForScope } from "@/components/dashboardComposer/integrationBuildCatalog";
 import { loadPolymarketLiveTable } from "@/components/dashboardComposer/polymarketLiveBuild";
 import { defaultPolymarketQuoteFilters } from "@/lib/polymarketLive/polymarketQuoteQuery";
@@ -70,17 +70,113 @@ function sheetAlreadyHasRows(block) {
   return Object.keys(block?.cells || {}).length > 0;
 }
 
+const TRADER_REPLAY_TABLES = new Set([
+  "getTraderPositions",
+  "getTraderPnlSeries",
+  "getTraderActivity",
+  "getTraderByAddress",
+  "getPublicProfiles",
+]);
+
+function recordAddress(block) {
+  const rows = Array.isArray(block?.records) ? block.records : [];
+  for (const row of rows) {
+    if (!row || typeof row !== "object") continue;
+    for (const key of ["user", "proxy_wallet", "user_id"]) {
+      const value = String(row[key] || "").trim();
+      if (/^0x[a-fA-F0-9]{40}$/.test(value)) return value;
+    }
+  }
+  return "";
+}
+
+function columnCell(block, columnId, row = 0) {
+  const columns = Array.isArray(block?.columns) ? block.columns : [];
+  const index = columns.findIndex((column) => column?.id === columnId);
+  if (index < 0) return "";
+  return String(block?.cells?.[`${index},${row}`] || "").trim();
+}
+
+function fieldValue(block, columnId) {
+  const rows = Array.isArray(block?.records) ? block.records : [];
+  for (const row of rows) {
+    const value = String(row?.[columnId] ?? "").trim();
+    if (value) return value;
+  }
+  return columnCell(block, columnId);
+}
+
+function addressFromSheetId(block) {
+  const match = String(block?.id || "").match(/0x[a-fA-F0-9]{40}/);
+  return match ? match[0] : "";
+}
+
+function countedRows(block) {
+  const stored = Math.floor(Number(block?.rowCount) || 0);
+  if (stored > 0) return stored;
+  let max = -1;
+  for (const key of Object.keys(block?.cells || {})) {
+    const row = Number(String(key).split(",")[1]);
+    if (Number.isFinite(row) && row > max) max = row;
+  }
+  return max >= 0 ? max + 1 : 0;
+}
+
+/**
+ * The request a saved sheet should replay.
+ * A stored query wins. A trader sheet saved before the wallet was kept uses the wallet in its id
+ * and the plan row limit. Other sheets replay the row count already on them.
+ */
+export function sheetReplayRequest(block) {
+  const stored = block?.query && typeof block.query === "object" ? block.query : {};
+  const table = String(block?.table || block?.pull?.table || "");
+  const storedLimit = Math.floor(Number(stored.rowLimit) || 0);
+  const traderSheet = TRADER_REPLAY_TABLES.has(table);
+  const rowLimit = storedLimit > 0 ? storedLimit : traderSheet ? 0 : countedRows(block);
+  let filters = stored.filters && typeof stored.filters === "object" ? stored.filters : null;
+  if (!filters && table === "getTraderLeaderboard") {
+    const inferred = {};
+    for (const id of ["time_period", "category", "sort_by"]) {
+      const value = fieldValue(block, id);
+      if (value) inferred[id] = { value };
+    }
+    if (Object.keys(inferred).length) filters = { ...defaultPolymarketLeaderboardFilters(), ...inferred };
+  }
+  if (!filters && table === "getTraderPnlSeries") {
+    filters = { interval: { value: "max" }, fidelity: { value: "1d" } };
+  }
+  const rawAddress = String(stored.address || block?.pull?.address || "").trim()
+    || (traderSheet
+      ? recordAddress(block) || fieldValue(block, "user") || fieldValue(block, "proxy_wallet") || fieldValue(block, "user_id") || addressFromSheetId(block)
+      : "");
+  return {
+    rowLimit,
+    filters,
+    sortKeys: Array.isArray(stored.sortKeys) ? stored.sortKeys : [],
+    address: /^0x[a-fA-F0-9]{40}$/.test(rawAddress) ? rawAddress : "",
+  };
+}
+
 async function replayPolymarket(block, planLimit) {
   const table = String(block.table || block.pull?.table || "");
+  const request = sheetReplayRequest(block);
   const pick = polymarketReplayPick(block);
-  const packed = await loadPolymarketLiveTable(table, pick ? [pick] : [], {
-    rowLimit: planLimit,
-    planLimit,
-    filters: table === "getTraderLeaderboard"
-      ? defaultPolymarketLeaderboardFilters()
-      : table === "getBiggestWinners"
-        ? defaultPolymarketBiggestWinnersFilters()
-        : defaultPolymarketQuoteFilters(table),
+  const picks = [];
+  if (pick) picks.push(pick);
+  else if (request.address) picks.push({ kind: "profile", address: request.address, id: `profile:${request.address}` });
+  const rowLimit = request.rowLimit > 0 ? Math.min(request.rowLimit, planLimit) : planLimit;
+  const packed = await loadPolymarketLiveTable(table, picks, {
+    rowLimit,
+    planLimit: rowLimit,
+    sorts: request.sortKeys,
+    filters: request.filters
+      || (table === "getTraderLeaderboard"
+        ? defaultPolymarketLeaderboardFilters()
+        : table === "getBiggestWinners"
+          ? defaultPolymarketBiggestWinnersFilters()
+          : table === "getTraderPnlSeries" || table === "getTraderPositions" || table === "getTraderActivity"
+            ? null
+            : defaultPolymarketQuoteFilters(table)),
   });
   return packed?.rows || [];
 }
@@ -88,7 +184,8 @@ async function replayPolymarket(block, planLimit) {
 async function replayKalshi(block, planLimit) {
   const table = String(block.table || block.pull?.table || "");
   const pull = block.pull || {};
-  const limit = planLimit;
+  const asked = sheetReplayRequest(block).rowLimit;
+  const limit = asked > 0 ? Math.min(asked, planLimit) : planLimit;
   if (table === "markets" && pull.eventTicker && !pull.seriesTicker) {
     const result = await loadKalshiLiveEventMarkets(pull.eventTicker, limit);
     return result?.rows || [];
@@ -168,7 +265,15 @@ export async function replayTabSheets(blocks, { planLimit, reporter, onSheet }) 
         continue;
       }
       const cells = cellsFromQueryRows(block.columns, rows);
-      onSheet?.(block.id, cells, rows.length);
+      const records = recordsFromRows(block.columns, rows);
+      const request = sheetReplayRequest(block);
+      const usedLimit = request.rowLimit > 0 ? Math.min(request.rowLimit, limit) : limit;
+      onSheet?.(block.id, cells, rows.length, records, {
+        rowLimit: usedLimit,
+        ...(request.filters ? { filters: request.filters } : {}),
+        ...(request.sortKeys.length ? { sortKeys: request.sortKeys } : {}),
+        ...(request.address ? { address: request.address } : {}),
+      });
       reporter.succeed(block.id, { result: `${rows.length.toLocaleString()} rows` });
     } catch (error) {
       reporter.miss(block.id, error instanceof Error ? error.message : "Replay failed");

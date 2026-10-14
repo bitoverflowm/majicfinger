@@ -1,4 +1,5 @@
 import { ATHENA_SUBSCRIBER_QUERY_ROW_LIMIT } from "@/config/dataLakeParquetSamples";
+import { recordsFromRows } from "@/components/dashboardComposer/integrationRunSheets";
 import { DATASET_TYPES } from "@/lib/visualizations/datasetDescriptor";
 import { isSavedChartView } from "@/lib/visualizations/presetRegistry";
 
@@ -95,6 +96,53 @@ function cleanTime(value) {
   return Number.isFinite(n) && n > 0 ? n : 0;
 }
 
+function cleanFilterMap(value) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+  const out = {};
+  let count = 0;
+  for (const [key, item] of Object.entries(value)) {
+    if (count >= 24) break;
+    const id = cleanText(key, 40).trim();
+    if (!id) continue;
+    const source = item && typeof item === "object" && !Array.isArray(item) ? item : { value: item };
+    const next = {};
+    for (const field of ["value", "min", "max"]) {
+      const text = cleanText(source[field], 80).trim();
+      if (text) next[field] = text;
+    }
+    if (!Object.keys(next).length) continue;
+    out[id] = next;
+    count += 1;
+  }
+  return count ? out : null;
+}
+
+function cleanReplayQuery(value) {
+  if (!value || typeof value !== "object") return null;
+  const rowLimit = Math.floor(num(value.rowLimit, 0));
+  const address = cleanText(value.address, 80).trim();
+  const filters = cleanFilterMap(value.filters);
+  const sortKeys = Array.isArray(value.sortKeys)
+    ? value.sortKeys
+        .slice(0, 8)
+        .map((item) => {
+          if (!item || typeof item !== "object") return null;
+          const columnId = cleanText(item.columnId || item.id, 40).trim();
+          if (!columnId) return null;
+          const direction = item.direction === "asc" ? "asc" : "desc";
+          return { columnId, direction };
+        })
+        .filter(Boolean)
+    : [];
+  if (!(rowLimit > 0) && !address && !filters && !sortKeys.length) return null;
+  return {
+    ...(rowLimit > 0 ? { rowLimit: Math.min(rowLimit, MAX_SAVED_ROWS) } : {}),
+    ...(address ? { address } : {}),
+    ...(filters ? { filters } : {}),
+    ...(sortKeys.length ? { sortKeys } : {}),
+  };
+}
+
 function cleanPull(pull) {
   if (!pull || typeof pull !== "object") return null;
   const lake = cleanText(pull.lake, 40).trim();
@@ -109,9 +157,11 @@ function cleanPull(pull) {
   const side = cleanText(pull.side, 40).trim();
   const outcome = cleanText(pull.outcome, 80).trim();
   const status = cleanText(pull.status, 40).trim();
+  const address = cleanText(pull.address, 80).trim();
+  const wallet = /^0x[a-fA-F0-9]{40}$/.test(address) ? address : "";
   const openAt = cleanTime(pull.openAt);
   const closeAt = cleanTime(pull.closeAt);
-  if (!table || (!lake && !ticker && !tokens.length && !eventTicker && !seriesTicker && !eventTickers.length && !seriesTickers.length)) {
+  if (!table || (!lake && !ticker && !tokens.length && !eventTicker && !seriesTicker && !eventTickers.length && !seriesTickers.length && !wallet)) {
     return null;
   }
   const limit = Math.floor(num(pull.limit, 0));
@@ -130,6 +180,8 @@ function cleanPull(pull) {
     ...(pull.closed === true || pull.closed === false ? { closed: pull.closed === true } : {}),
     ...(outcome ? { outcome } : {}),
     ...(status ? { status } : {}),
+    ...(wallet ? { address: wallet } : {}),
+    ...(wallet && pull.kind === "profile" ? { kind: "profile" } : {}),
     ...(openAt ? { openAt } : {}),
     ...(closeAt ? { closeAt } : {}),
   };
@@ -213,6 +265,39 @@ function cleanDataset(value) {
   };
 }
 
+function cleanRecordValue(value) {
+  if (typeof value === "number" && Number.isFinite(value)) return value;
+  if (typeof value === "boolean") return value;
+  if (typeof value === "string") {
+    const text = value.trim();
+    return text ? text.slice(0, 500) : null;
+  }
+  return null;
+}
+
+/** The pull's own rows. The grid's cells are a view of this list. */
+function cleanRecords(records) {
+  if (!Array.isArray(records)) return null;
+  const out = [];
+  let used = 0;
+  for (const row of records) {
+    if (!row || typeof row !== "object" || Array.isArray(row)) continue;
+    const clean = {};
+    for (const [key, value] of Object.entries(row)) {
+      const id = cleanText(key, 80);
+      if (!id) continue;
+      const kept = cleanRecordValue(value);
+      if (kept == null || kept === "") continue;
+      clean[id] = kept;
+      used += 1;
+      if (used >= MAX_SAVED_CELLS) break;
+    }
+    if (Object.keys(clean).length) out.push(clean);
+    if (used >= MAX_SAVED_CELLS) break;
+  }
+  return out.length ? out : null;
+}
+
 function cleanBlock(block) {
   if (!block || typeof block !== "object") return null;
   const id = cleanText(block.id, 80);
@@ -240,6 +325,8 @@ function cleanBlock(block) {
   const pull = type === "sheet"
     ? cleanPull(block.pull) || (ticker ? { lake: provenance?.lake || "kalshi", table: provenance?.table || "trades", ticker } : null)
     : null;
+  const query = type === "sheet" ? cleanReplayQuery(block.query) : null;
+  const records = type === "sheet" ? cleanRecords(block.records) : null;
   const rowCount = Math.floor(num(block.rowCount, 0));
   const dataset = type === "sheet" ? cleanDataset(block.dataset) : null;
   return {
@@ -256,12 +343,13 @@ function cleanBlock(block) {
     title,
     body: cleanText(block.body, 4000),
     columns,
-    cells: cleanCells(block.cells),
+    ...(records ? { records } : { cells: cleanCells(block.cells) }),
     ...(rowCount > 0 ? { rowCount } : {}),
     ...(integrationId ? { integrationId } : {}),
     ...(table ? { table } : {}),
     ...(dataset ? { dataset } : {}),
     ...(pull ? { pull } : {}),
+    ...(query ? { query } : {}),
     ...(provenance ? { provenance } : {}),
     ...(chart ? { chart } : {}),
     ...(block.presentation === "visual" || block.presentation === "sheet" ? { presentation: block.presentation } : {}),
@@ -379,6 +467,14 @@ export function sanitizeWorkspaceDashboard(input) {
   for (const table of tables) {
     const sheet = sheetsById.get(table.id);
     if (!sheet) continue;
+    if (!sheet.records && table.rows.length) {
+      const lifted = cleanRecords(recordsFromRows(sheet.columns, table.rows));
+      if (lifted) {
+        sheet.records = lifted;
+        delete sheet.cells;
+      }
+    }
+    if (sheet.records) table.rows = [];
     if (sheet.rowCount > (table.rowCount || table.rows.length)) {
       table.rowCount = sheet.rowCount;
       if (table.query) table.query.rowCount = sheet.rowCount;
