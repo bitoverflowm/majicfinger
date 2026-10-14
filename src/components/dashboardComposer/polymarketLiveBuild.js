@@ -1821,6 +1821,16 @@ async function readUserStats(address) {
   }
 }
 
+/**
+ * Append every row. `push(...rows)` puts each row on the call stack and throws
+ * "Maximum call stack size exceeded" once a feed passes about 150,000 rows.
+ */
+export function appendRows(target, extra) {
+  const list = Array.isArray(extra) ? extra : [];
+  for (let index = 0; index < list.length; index += 1) target.push(list[index]);
+  return target;
+}
+
 /** One cumulative series per wallet. A wallet with no points adds no rows. */
 async function traderPnlRows(picks, options = {}) {
   const addresses = traderAddressesFromPicks(picks);
@@ -1832,7 +1842,7 @@ async function traderPnlRows(picks, options = {}) {
   const rows = [];
   const errors = [];
   for (const result of settled) {
-    if (result.status === "fulfilled") rows.push(...result.value);
+    if (result.status === "fulfilled") appendRows(rows, result.value);
     else errors.push(result.reason);
   }
   if (!rows.length && errors.length) {
@@ -1870,7 +1880,7 @@ async function traderActivityRows(picks, options = {}) {
       }
       cohorts.push(cohort);
     }
-    rows.push(...mergePolymarketActivityCohorts(cohorts, target));
+    appendRows(rows, mergePolymarketActivityCohorts(cohorts, target));
   }
   return rows;
 }
@@ -1902,7 +1912,7 @@ async function traderPositionRows(picks, options = {}) {
       }
       cohorts.push(cohort);
     }
-    rows.push(...mergePolymarketPositionCohorts(cohorts, target));
+    appendRows(rows, mergePolymarketPositionCohorts(cohorts, target));
   }
   return rows;
 }

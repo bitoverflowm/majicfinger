@@ -151,6 +151,7 @@ import {
 import { MarketScanSteps } from "@/components/dashboardComposer/liveFilterTape";
 import { integrationProfile } from "@/components/dashboardComposer/integrationSource";
 import { requestCardForSheet, stampRunSheets } from "@/components/dashboardComposer/integrationProvenance";
+import { attachJoinRegistry } from "@/components/dashboardComposer/replayTabQueries";
 import { cn } from "@/lib/utils";
 import { useIntegrationConnect } from "@/components/dashboardComposer/integrationConnectDialog";
 import { sheetRecords } from "@/components/dashboardComposer/integrationRunSheets";
@@ -7667,7 +7668,7 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
     reporter.start("place");
     const placement = placementRef.current;
     const placedSheets = stampRunSheets(
-      sheets.map((sheet) => {
+      attachJoinRegistry(sheets.map((sheet) => {
         const rows = Array.isArray(sheet?.rows) ? sheet.rows : [];
         const rowCount = Math.max(rows.length, Math.floor(Number(sheet?.rowCount) || 0));
         const typed = Number(rowLimit);
@@ -7684,7 +7685,7 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
               ...(pullAddress ? { address: pullAddress } : {}),
             };
         return { ...sheet, rows, rowCount, keepAllRows: true, ...(query ? { query } : {}) };
-      }),
+      }), tableId),
       { integrationId },
     );
     canvas?.placeIntegrationSheets?.(placedSheets, {

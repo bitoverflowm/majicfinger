@@ -24,6 +24,7 @@ import {
   polymarketTraderJoinSheetTitle,
   polymarketMarketFanout,
   polymarketRowsForMarket,
+  appendRows,
 } from "./polymarketLiveBuild.js";
 import {
   flattenPolymarketMarket,
@@ -711,5 +712,12 @@ assert.equal(
   polymarketJoinPickFromRow({ condition_id: "0xdef", market_slug: "sample-market", question: "Sample", token_ids: "a, b" }).tokenIds.join(","),
   "a,b",
 );
+
+const wide = new Array(160000);
+for (let index = 0; index < wide.length; index += 1) wide[index] = index;
+const kept = appendRows([], wide);
+assert.equal(kept.length, 160000);
+assert.equal(kept[159999], 159999);
+assert.throws(() => [].push(...wide), RangeError);
 
 console.log("polymarket live build ok");

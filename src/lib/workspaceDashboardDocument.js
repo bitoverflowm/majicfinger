@@ -117,11 +117,119 @@ function cleanFilterMap(value) {
   return count ? out : null;
 }
 
+function cleanJoins(value) {
+  if (!Array.isArray(value)) return [];
+  const joins = [];
+  for (const item of value.slice(0, 24)) {
+    const table = cleanText(item?.table, 40).trim();
+    if (!table) continue;
+    const filters = cleanFilterMap(item.filters);
+    const rowLimit = Math.floor(num(item?.rowLimit, 0));
+    joins.push({
+      table,
+      anchor: item?.anchor === "market" ? "market" : "trader",
+      ...(filters ? { filters } : {}),
+      ...(rowLimit > 0 ? { rowLimit: Math.min(rowLimit, MAX_SAVED_ROWS) } : {}),
+    });
+  }
+  return joins;
+}
+
+const TRADER_JOIN_SOURCES = new Set([
+  "getTraderLeaderboard",
+  "getBiggestWinners",
+  "getHoldersByMarkets",
+  "getTraderByAddress",
+  "getPublicProfiles",
+]);
+
+const TRADER_JOIN_TABLES = new Set([
+  "getTraderPositions",
+  "getTraderPnlSeries",
+  "getTraderActivity",
+  "getTraderByAddress",
+  "getPublicProfiles",
+]);
+
+function walletText(value) {
+  const text = String(value || "").trim();
+  return /^0x[a-fA-F0-9]{40}$/.test(text) ? text : "";
+}
+
+function sheetWallet(block) {
+  return walletText(block?.query?.address)
+    || walletText(block?.pull?.address)
+    || walletText(String(block?.id || "").match(/0x[a-fA-F0-9]{40}/)?.[0]);
+}
+
+/**
+ * Older pulls left the wallet in the sheet id and never stored query.joins.
+ * Copy both onto the query. Replay then reads that query and the parent rows.
+ */
+export function backfillTraderQueries(blocks) {
+  const sheets = (Array.isArray(blocks) ? blocks : []).filter((block) => block?.type === "sheet" && block.table);
+  for (const sheet of sheets) {
+    if (!TRADER_JOIN_TABLES.has(sheet.table)) continue;
+    const address = sheetWallet(sheet);
+    if (!address) continue;
+    const query = { ...(sheet.query || {}) };
+    if (!walletText(query.address)) query.address = address;
+    sheet.query = query;
+    if (!walletText(sheet.pull?.address)) {
+      sheet.pull = { ...(sheet.pull || {}), table: sheet.table, address, kind: "profile" };
+    }
+  }
+  const claimed = new Set();
+  for (const parent of sheets) {
+    if (!TRADER_JOIN_SOURCES.has(parent.table)) continue;
+    if (walletText(parent.query?.address) || walletText(parent.pull?.address)) continue;
+    const query = { ...(parent.query || {}) };
+    if (!(Number(query.rowLimit) > 0) && Number(parent.rowCount) > 0) query.rowLimit = Math.floor(Number(parent.rowCount));
+    if (parent.table === "getTraderLeaderboard" && !query.filters) {
+      const row = Array.isArray(parent.records) ? parent.records.find((item) => item && typeof item === "object") : null;
+      if (row) {
+        const filters = {};
+        for (const id of ["time_period", "category", "sort_by"]) {
+          const value = cleanText(row[id], 80).trim();
+          if (value) filters[id] = { value };
+        }
+        if (Object.keys(filters).length) query.filters = filters;
+      }
+    }
+    const joins = Array.isArray(query.joins) ? query.joins.slice() : [];
+    const seen = new Set(joins.map((join) => join?.table).filter(Boolean));
+    const children = sheets.filter((sheet) => (
+      sheet.id !== parent.id
+      && !claimed.has(sheet.id)
+      && TRADER_JOIN_TABLES.has(sheet.table)
+      && walletText(sheet.query?.address)
+      && (joins.length ? seen.has(sheet.table) : true)
+    ));
+    for (const sheet of children) {
+      claimed.add(sheet.id);
+      if (!sheet.query.parentSheetId) sheet.query = { ...sheet.query, parentSheetId: parent.id };
+      if (seen.has(sheet.table)) continue;
+      seen.add(sheet.table);
+      const filters = sheet.table === "getTraderPnlSeries"
+        ? (sheet.query.filters && typeof sheet.query.filters === "object" ? sheet.query.filters : { interval: { value: "max" }, fidelity: { value: "1d" } })
+        : (sheet.query.filters && typeof sheet.query.filters === "object" ? sheet.query.filters : null);
+      joins.push({ table: sheet.table, anchor: "trader", ...(filters ? { filters } : {}) });
+    }
+    if (joins.length) query.joins = joins;
+    if (query.rowLimit || query.filters || (query.joins && query.joins.length)) parent.query = query;
+  }
+  return blocks;
+}
+
 function cleanReplayQuery(value) {
   if (!value || typeof value !== "object") return null;
   const rowLimit = Math.floor(num(value.rowLimit, 0));
   const address = cleanText(value.address, 80).trim();
+  const wallet = /^0x[a-fA-F0-9]{40}$/.test(address) ? address : "";
+  const table = cleanText(value.table, 40).trim();
+  const parentSheetId = cleanText(value.parentSheetId, 120).trim();
   const filters = cleanFilterMap(value.filters);
+  const joins = cleanJoins(value.joins);
   const sortKeys = Array.isArray(value.sortKeys)
     ? value.sortKeys
         .slice(0, 8)
@@ -134,12 +242,15 @@ function cleanReplayQuery(value) {
         })
         .filter(Boolean)
     : [];
-  if (!(rowLimit > 0) && !address && !filters && !sortKeys.length) return null;
+  if (!(rowLimit > 0) && !wallet && !filters && !sortKeys.length && !joins.length && !parentSheetId) return null;
   return {
+    ...(table ? { table } : {}),
     ...(rowLimit > 0 ? { rowLimit: Math.min(rowLimit, MAX_SAVED_ROWS) } : {}),
-    ...(address ? { address } : {}),
+    ...(wallet ? { address: wallet } : {}),
+    ...(parentSheetId ? { parentSheetId } : {}),
     ...(filters ? { filters } : {}),
     ...(sortKeys.length ? { sortKeys } : {}),
+    ...(joins.length ? { joins } : {}),
   };
 }
 
@@ -454,7 +565,7 @@ export function sanitizeWorkspaceDashboard(input) {
   for (const [tabId, list] of Object.entries(blocksIn)) {
     const id = cleanText(tabId, 80);
     if (!id || !Array.isArray(list)) continue;
-    blocks[id] = list.map(cleanBlock).filter(Boolean).slice(0, 80);
+    blocks[id] = backfillTraderQueries(list.map(cleanBlock).filter(Boolean).slice(0, 80));
   }
 
   const tables = (Array.isArray(source.tables) ? source.tables : []).map(cleanTable).filter(Boolean).slice(0, 80);

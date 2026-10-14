@@ -736,24 +736,49 @@ export function WorkspaceCanvasProvider({ pageId, readOnly = false, children }) 
     void replayTabSheets(blocksByPageRef.current[page] || [], {
       planLimit,
       reporter,
-      onSheet(id, cells, rowCount, records, query) {
+      onSheet(id, cells, rowCount, records, query, extra) {
         setBlocksByPage((prev) => {
           const list = prev[page] || [];
           const current = list.find((block) => block.id === id);
+          if (!current && extra?.columns?.length) {
+            const originY = list.reduce((max, block) => Math.max(max, (block.y || 0) + (block.h || 0) + 24), 88);
+            const placed = layoutRunSheets(
+              [{
+                id,
+                title: extra.title || "Sheet",
+                columns: extra.columns,
+                rows: extra.rows || [],
+                rowCount,
+                table: extra.table || query?.table,
+                integrationId: extra.integrationId || "polymarket",
+                query,
+                ...(query?.address ? { pull: { table: extra.table || query.table, address: query.address, kind: "profile" } } : {}),
+                keepAllRows: true,
+                span: "half",
+              }],
+              { originY },
+            );
+            return { ...prev, [page]: [...list, ...placed] };
+          }
           if (!current) return prev;
           const nextSheet = {
             ...current,
             cells,
-            ...(Array.isArray(records) && records.length ? { records } : {}),
+            ...(Array.isArray(records) ? { records } : {}),
+            ...(extra?.title ? { title: extra.title } : {}),
+            ...(extra?.columns?.length ? { columns: extra.columns } : {}),
             ...(query && typeof query === "object" ? { query: { ...(current.query || {}), ...query } } : {}),
           };
           const tokens = sheetAssetIds(nextSheet);
           const table = current.table || current.pull?.table || "";
+          const address = String(query?.address || "").trim();
+          const wallet = /^0x[a-fA-F0-9]{40}$/.test(address) ? address : "";
           const pull = table
             ? {
                 ...(current.pull || {}),
                 table,
                 ...(tokens.length ? { tokens } : {}),
+                ...(wallet ? { address: wallet, kind: "profile" } : {}),
               }
             : current.pull;
           return {

@@ -1,10 +1,11 @@
 import { displayCell, recordsFromRows } from "@/components/dashboardComposer/integrationRunSheets";
 import { loadKalshiLiveDirect, loadKalshiLiveEventMarkets, loadKalshiLiveMarketByTicker, loadKalshiLiveMarketsForScope } from "@/components/dashboardComposer/integrationBuildCatalog";
-import { loadPolymarketLiveTable } from "@/components/dashboardComposer/polymarketLiveBuild";
+import { loadPolymarketLiveTable, loadPolymarketTraderJoin, polymarketTraderEntities, polymarketTraderJoinSheetTitle } from "@/components/dashboardComposer/polymarketLiveBuild";
 import { defaultPolymarketQuoteFilters } from "@/lib/polymarketLive/polymarketQuoteQuery";
 import { defaultPolymarketBiggestWinnersFilters } from "@/lib/polymarketLive/biggestWinnersCompose";
 import { defaultPolymarketLeaderboardFilters } from "@/lib/polymarketLive/traderLeaderboardCompose";
 import { sheetAssetIds } from "@/lib/realtime/sheetRealtime";
+import { backfillTraderQueries } from "@/lib/workspaceDashboardDocument";
 import { rehydrateSheetFromProvenance } from "@/lib/rehydrateSheetFromProvenance";
 
 function rowValue(row, column) {
@@ -106,9 +107,67 @@ function fieldValue(block, columnId) {
   return columnCell(block, columnId);
 }
 
-function addressFromSheetId(block) {
-  const match = String(block?.id || "").match(/0x[a-fA-F0-9]{40}/);
-  return match ? match[0] : "";
+function walletText(value) {
+  const text = String(value || "").trim();
+  return /^0x[a-fA-F0-9]{40}$/.test(text) ? text : "";
+}
+
+/** Copy a missing wallet onto the query. The id is only a leftover from sheets saved before queries kept it. */
+export function repairSheetQuery(block) {
+  const query = block?.query && typeof block.query === "object" ? { ...block.query } : {};
+  if (!walletText(query.address)) {
+    const fromPull = walletText(block?.pull?.address);
+    if (fromPull) query.address = fromPull;
+  }
+  if (!walletText(query.address) && TRADER_REPLAY_TABLES.has(String(block?.table || block?.pull?.table || ""))) {
+    const fromId = String(block?.id || "").match(/0x[a-fA-F0-9]{40}/);
+    if (fromId) query.address = fromId[0];
+  }
+  return query;
+}
+
+const TRADER_JOIN_SOURCES = new Set([
+  "getTraderLeaderboard",
+  "getBiggestWinners",
+  "getHoldersByMarkets",
+  "getTraderByAddress",
+  "getPublicProfiles",
+]);
+
+function traderJoinFilters(table) {
+  if (table === "getTraderPnlSeries") return { interval: { value: "max" }, fidelity: { value: "1d" } };
+  return null;
+}
+
+/**
+ * Parent query records which joins were run. Each child query records the wallet and the parent.
+ * @param {object[]} sheets
+ * @param {string} parentTable
+ */
+export function attachJoinRegistry(sheets, parentTable) {
+  const list = (Array.isArray(sheets) ? sheets : []).map((sheet) => ({
+    ...sheet,
+    query: { ...(sheet?.query || {}) },
+  }));
+  const parent = list.find((sheet) => sheet.table === parentTable && !walletText(sheet.pull?.address || sheet.query?.address))
+    || list.find((sheet) => sheet.table === parentTable)
+    || null;
+  if (!parent) return list;
+  const joins = [];
+  const seen = new Set();
+  for (const sheet of list) {
+    if (sheet.id === parent.id) continue;
+    const address = walletText(sheet.pull?.address || sheet.query?.address);
+    if (!TRADER_REPLAY_TABLES.has(sheet.table) || !address) continue;
+    if (!seen.has(sheet.table)) {
+      seen.add(sheet.table);
+      const filters = traderJoinFilters(sheet.table);
+      joins.push({ table: sheet.table, anchor: "trader", ...(filters ? { filters } : {}) });
+    }
+    sheet.query = { ...sheet.query, parentSheetId: parent.id, address };
+  }
+  if (joins.length) parent.query = { ...(parent.query || {}), joins };
+  return list;
 }
 
 function countedRows(block) {
@@ -124,8 +183,8 @@ function countedRows(block) {
 
 /**
  * The request a saved sheet should replay.
- * A stored query wins. A trader sheet saved before the wallet was kept uses the wallet in its id
- * and the plan row limit. Other sheets replay the row count already on them.
+ * The query is the request. A trader sheet with no saved limit uses the plan row limit.
+ * A parent sheet replays the row count already stored on its query.
  */
 export function sheetReplayRequest(block) {
   const stored = block?.query && typeof block.query === "object" ? block.query : {};
@@ -147,7 +206,7 @@ export function sheetReplayRequest(block) {
   }
   const rawAddress = String(stored.address || block?.pull?.address || "").trim()
     || (traderSheet
-      ? recordAddress(block) || fieldValue(block, "user") || fieldValue(block, "proxy_wallet") || fieldValue(block, "user_id") || addressFromSheetId(block)
+      ? recordAddress(block) || fieldValue(block, "user") || fieldValue(block, "proxy_wallet") || fieldValue(block, "user_id")
       : "");
   return {
     rowLimit,
@@ -228,13 +287,43 @@ async function rowsForSheet(block, planLimit, onPhase) {
   return [];
 }
 
+function joinsForSource(source) {
+  return Array.isArray(source?.query?.joins)
+    ? source.query.joins.filter((join) => join?.table && join.anchor !== "market")
+    : [];
+}
+
+function claimChildren(sheets, joins, claimed) {
+  const tables = new Set(joins.map((join) => join.table));
+  for (const sheet of sheets) {
+    if (tables.has(sheet.table)) claimed.add(sheet.id);
+  }
+}
+
+function takeChildSheet(sheets, table, wallet, claimed) {
+  const key = String(wallet || "").toLowerCase();
+  const open = sheets.filter((sheet) => sheet.table === table && !claimed.has(sheet.id));
+  return open.find((sheet) => String(sheet.query?.address || "").toLowerCase() === key) || open[0] || null;
+}
+
 /**
- * Re-run every saved query on this tab and hand the new cells back to the canvas.
+ * Re-run every saved query on this tab.
+ * A parent is replayed from its query. Registered joins then run once per wallet on those rows.
  * @param {object[]} blocks
  * @param {{ planLimit: number, reporter: { plan: Function, start: Function, note: Function, succeed: Function, miss: Function, fail: Function, finish: Function }, onSheet: Function }} options
  */
 export async function replayTabSheets(blocks, { planLimit, reporter, onSheet }) {
-  const sheets = (blocks || []).filter((block) => sheetReplayKind(block));
+  const sheets = backfillTraderQueries(
+    (blocks || []).filter((block) => sheetReplayKind(block)).map((block) => {
+      const query = block.query && typeof block.query === "object" ? { ...block.query } : {};
+      if (Array.isArray(query.joins)) query.joins = query.joins.map((join) => ({ ...join }));
+      return {
+        ...block,
+        query,
+        ...(block.pull && typeof block.pull === "object" ? { pull: { ...block.pull } } : {}),
+      };
+    }),
+  );
   const limit = Math.max(1, Math.floor(Number(planLimit) || 1));
   if (!sheets.length) {
     reporter.plan(
@@ -243,6 +332,12 @@ export async function replayTabSheets(blocks, { planLimit, reporter, onSheet }) 
     );
     reporter.fail("replay", "No queries on this tab");
     return;
+  }
+  const claimed = new Set();
+  const sources = sheets.filter((sheet) => TRADER_JOIN_SOURCES.has(sheet.table));
+  for (const source of sources) {
+    const joins = joinsForSource(source);
+    if (joins.length) claimChildren(sheets, joins, claimed);
   }
   reporter.plan(
     sheets.map((block) => ({
@@ -253,10 +348,96 @@ export async function replayTabSheets(blocks, { planLimit, reporter, onSheet }) 
     })),
     { title: "Replay queries" },
   );
+
+  const publish = (id, columns, rows, query, extra) => {
+    const records = recordsFromRows(columns, rows);
+    const cells = records.length ? {} : cellsFromQueryRows(columns, rows);
+    onSheet?.(id, cells, rows.length, records, query, extra);
+  };
+
+  const usedChildren = new Set();
+  for (const source of sources) {
+    const prepared = { ...source, query: repairSheetQuery(source) };
+    const request = sheetReplayRequest(prepared);
+    const joins = joinsForSource(prepared);
+    reporter.start(source.id);
+    let rows = [];
+    try {
+      rows = await rowsForSheet(prepared, limit, (info) => {
+        const count = Number(info?.rowCount ?? info?.processed);
+        if (Number.isFinite(count)) reporter.note(source.id, `${count.toLocaleString()} rows`);
+      });
+      if (!rows.length && sheetAlreadyHasRows(source)) {
+        reporter.miss(source.id, "This query returned no rows, so the sheet was left unchanged.");
+      } else {
+        const usedLimit = request.rowLimit > 0 ? Math.min(request.rowLimit, limit) : limit;
+        publish(source.id, source.columns, rows, {
+          table: source.table,
+          rowLimit: usedLimit,
+          ...(request.filters ? { filters: request.filters } : {}),
+          ...(request.sortKeys.length ? { sortKeys: request.sortKeys } : {}),
+          ...(joins.length ? { joins } : {}),
+        });
+        reporter.succeed(source.id, { result: `${rows.length.toLocaleString()} rows` });
+      }
+    } catch (error) {
+      reporter.miss(source.id, error instanceof Error ? error.message : "Replay failed");
+    }
+    const people = polymarketTraderEntities(rows);
+    if (!people.length && joins.length) {
+      for (const join of joins) {
+        for (const child of sheets) {
+          if (child.table !== join.table || usedChildren.has(child.id)) continue;
+          usedChildren.add(child.id);
+          reporter.miss(child.id, "The replayed rows have no trader wallet to join.");
+        }
+      }
+    }
+    for (const join of joins) {
+      const filters = join.filters || traderJoinFilters(join.table);
+      for (const person of people) {
+        const wallet = person.pick.address;
+        const child = takeChildSheet(sheets, join.table, wallet, usedChildren);
+        const id = child?.id || `run-live-${join.table}-${wallet}`;
+        if (child) usedChildren.add(child.id);
+        reporter.start(id);
+        try {
+          const result = await loadPolymarketTraderJoin(join.table, person.pick, {
+            rowLimit: limit,
+            planLimit: limit,
+            ...(filters ? { filters } : {}),
+          });
+          const columns = child?.columns?.length ? child.columns : result.columns || [];
+          const title = polymarketTraderJoinSheetTitle(join.table, person.label) || child?.title || "";
+          publish(id, columns, result.rows || [], {
+            table: join.table,
+            rowLimit: limit,
+            address: wallet,
+            parentSheetId: source.id,
+            ...(filters ? { filters } : {}),
+          }, {
+            title,
+            columns,
+            rows: result.rows || [],
+            table: join.table,
+            integrationId: source.integrationId || "polymarket",
+          });
+          reporter.succeed(id, { result: `${(result.rows || []).length.toLocaleString()} rows` });
+        } catch (error) {
+          reporter.miss(id, error instanceof Error ? error.message : "Replay failed");
+        }
+      }
+    }
+  }
+
   for (const block of sheets) {
+    if (sources.some((source) => source.id === block.id) || usedChildren.has(block.id)) continue;
+    if (claimed.has(block.id) && sources.length) continue;
+    const prepared = { ...block, query: repairSheetQuery(block) };
+    const request = sheetReplayRequest(prepared);
     reporter.start(block.id);
     try {
-      const rows = await rowsForSheet(block, limit, (info) => {
+      const rows = await rowsForSheet(prepared, limit, (info) => {
         const count = Number(info?.rowCount ?? info?.processed);
         if (Number.isFinite(count)) reporter.note(block.id, `${count.toLocaleString()} rows`);
       });
@@ -264,15 +445,14 @@ export async function replayTabSheets(blocks, { planLimit, reporter, onSheet }) 
         reporter.miss(block.id, "This query returned no rows, so the sheet was left unchanged.");
         continue;
       }
-      const cells = cellsFromQueryRows(block.columns, rows);
-      const records = recordsFromRows(block.columns, rows);
-      const request = sheetReplayRequest(block);
       const usedLimit = request.rowLimit > 0 ? Math.min(request.rowLimit, limit) : limit;
-      onSheet?.(block.id, cells, rows.length, records, {
+      publish(block.id, block.columns, rows, {
+        ...(block.table ? { table: block.table } : {}),
         rowLimit: usedLimit,
         ...(request.filters ? { filters: request.filters } : {}),
         ...(request.sortKeys.length ? { sortKeys: request.sortKeys } : {}),
         ...(request.address ? { address: request.address } : {}),
+        ...(prepared.query.parentSheetId ? { parentSheetId: prepared.query.parentSheetId } : {}),
       });
       reporter.succeed(block.id, { result: `${rows.length.toLocaleString()} rows` });
     } catch (error) {
