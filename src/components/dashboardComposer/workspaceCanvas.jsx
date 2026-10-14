@@ -1307,8 +1307,7 @@ function BlockBody({ block, onChange, booting }) {
   return <ChartBlockBody block={block} onChange={onChange} booting={booting} />;
 }
 
-function ChartBlockBody({ block, onChange, booting }) {
-  const canvas = useWorkspaceCanvas();
+function chartViewForBlock(block, canvas) {
   const source = block.sourceSheetId ? (canvas?.blocks || []).find((item) => item.id === block.sourceSheetId) : null;
   const sourceSession = source ? liveSession(canvas, source.id) : null;
   const sourceView = source?.type === "sheet" ? liveBlock(source, canvas) : null;
@@ -1320,6 +1319,35 @@ function ChartBlockBody({ block, onChange, booting }) {
           ? sourceView
           : { ...sourceView, cells: tailCells(sourceView.cells, 80), records: null }
       : sourceView;
+  return { source, sourceSession, chartSheet };
+}
+
+function ChartCanvas({ block, onChange, booting, chartSheet, sourceSession }) {
+  const canvas = useWorkspaceCanvas();
+  if (booting) return <ChartSkeleton />;
+  if (!block.sourceSheetId) return <div className="min-h-16 flex-1 rounded-lg bg-muted/40" />;
+  return (
+    <SheetBlockChart
+      sheet={chartSheet}
+      live={!!sourceSession?.running}
+      view={block.chartView || ""}
+      onViewChange={(chartView) => onChange({ chartView, vizCustom: true })}
+      onOpenRow={(row) => {
+        if (block.sourceSheetId) canvas?.focusSheetRow?.(block.sourceSheetId, row);
+      }}
+      snapshot={block.chart}
+      onSnapshot={(chart) => {
+        if (canvas?.readOnly) return;
+        if (chartSnapshotKey(block.chart) === chartSnapshotKey(chart)) return;
+        onChange({ chart });
+      }}
+    />
+  );
+}
+
+function ChartBlockBody({ block, onChange, booting }) {
+  const canvas = useWorkspaceCanvas();
+  const { source, sourceSession, chartSheet } = chartViewForBlock(block, canvas);
   return (
     <div className="flex min-h-0 flex-1 flex-col">
       <div className="flex items-center gap-2 px-3 py-2">
@@ -1346,28 +1374,43 @@ function ChartBlockBody({ block, onChange, booting }) {
         session={sourceSession}
         enabled={!!source && !!realtimeSheetForBlock(source, canvas?.blocks || [])}
       />
-      {booting ? (
-        <ChartSkeleton />
-      ) : block.sourceSheetId ? (
-        <SheetBlockChart
-          sheet={chartSheet}
-          live={!!sourceSession?.running}
-          view={block.chartView || ""}
-          onViewChange={(chartView) => onChange({ chartView, vizCustom: true })}
-          onOpenRow={(row) => {
-            if (source?.id) canvas?.focusSheetRow?.(source.id, row);
-          }}
-          snapshot={block.chart}
-          onSnapshot={(chart) => {
-            if (canvas?.readOnly) return;
-            if (chartSnapshotKey(block.chart) === chartSnapshotKey(chart)) return;
-            onChange({ chart });
-          }}
-        />
-      ) : (
-        <div className="mx-3 mb-3 min-h-16 flex-1 rounded-lg bg-muted/40" />
-      )}
+      <ChartCanvas
+        block={block}
+        onChange={onChange}
+        booting={booting}
+        chartSheet={chartSheet}
+        sourceSession={sourceSession}
+      />
     </div>
+  );
+}
+
+function ChartFullscreen({ block, onChange, onClose, booting }) {
+  const canvas = useWorkspaceCanvas();
+  const { source, sourceSession, chartSheet } = chartViewForBlock(block, canvas);
+  return (
+    <FullscreenFrame
+      icon={<BarChart3 className="size-4 text-muted-foreground" aria-hidden />}
+      title={block.title || "Chart"}
+      caption={source ? <SheetMarketCaption block={source} /> : <span className="min-w-0 flex-1" />}
+      meta={sourceSession?.running ? <span className="text-[12px] font-medium text-emerald-600">Live</span> : null}
+      bar={
+        <MarketLifeBar
+          sheet={source}
+          session={sourceSession}
+          enabled={!!source && !!realtimeSheetForBlock(source, canvas?.blocks || [])}
+        />
+      }
+      onClose={onClose}
+    >
+      <ChartCanvas
+        block={block}
+        onChange={onChange}
+        booting={booting}
+        chartSheet={chartSheet}
+        sourceSession={sourceSession}
+      />
+    </FullscreenFrame>
   );
 }
 
@@ -1375,8 +1418,7 @@ function blockLabel(block) {
   return block.type === "text" ? block.body || "Text" : block.title || "Element";
 }
 
-function SheetFullscreen({ block, onChange, onClose }) {
-  const canvas = useWorkspaceCanvas();
+function FullscreenFrame({ icon, title, caption, meta, bar, onClose, children }) {
   useEffect(() => {
     const onKey = (event) => {
       if (event.key !== "Escape") return;
@@ -1388,12 +1430,6 @@ function SheetFullscreen({ block, onChange, onClose }) {
     return () => window.removeEventListener("keydown", onKey, true);
   }, [onClose]);
 
-  const view = liveBlock(block, canvas);
-  const shownCount = shownRowCount(view);
-  const label = useTradeSheetLabel(usesHistoricalTradeSheet(block) ? block.id : "", shownCount);
-  const dataset = describeSheet(view);
-  const visual = block.presentation === "visual" && hasVisualTable(dataset);
-  const pulled = formatPulledAt(block.pulledAt);
   return createPortal(
     <div
       data-sheet-fullscreen=""
@@ -1401,13 +1437,10 @@ function SheetFullscreen({ block, onChange, onClose }) {
       onPointerDown={(event) => event.stopPropagation()}
     >
       <div className="flex items-center gap-3 border-b border-border/70 px-4 py-3">
-        <Table2 className="size-4 text-muted-foreground" aria-hidden />
-        <span className="w-fit max-w-[40%] shrink-0 truncate text-[15px] font-semibold">{block.title || "Data sheet"}</span>
-        <SheetMarketCaption block={block} />
-        <span className="text-[12px] tabular-nums text-muted-foreground">
-          {label}
-          {pulled ? ` · Pulled ${pulled}` : ""}
-        </span>
+        {icon}
+        <span className="w-fit max-w-[40%] shrink-0 truncate text-[15px] font-semibold">{title}</span>
+        {caption}
+        {meta}
         <button
           type="button"
           onPointerDown={(event) => event.stopPropagation()}
@@ -1421,20 +1454,47 @@ function SheetFullscreen({ block, onChange, onClose }) {
           Close
         </button>
       </div>
-      <MarketLifeBar
-        sheet={block}
-        session={liveSession(canvas, block.id)}
-        enabled={!!realtimeSheetForBlock(block, canvas?.blocks || [])}
-      />
-      <div className="flex min-h-0 flex-1 flex-col p-4">
-        {visual ? (
-          <SheetPresentation sheet={view} dataset={dataset} hidden={block.visualHidden} readOnly />
-        ) : (
-          <DashboardSheetGrid block={view} onChange={onChange} />
-        )}
-      </div>
+      {bar}
+      <div className="flex min-h-0 flex-1 flex-col p-4">{children}</div>
     </div>,
     document.body,
+  );
+}
+
+function SheetFullscreen({ block, onChange, onClose }) {
+  const canvas = useWorkspaceCanvas();
+  const view = liveBlock(block, canvas);
+  const shownCount = shownRowCount(view);
+  const label = useTradeSheetLabel(usesHistoricalTradeSheet(block) ? block.id : "", shownCount);
+  const dataset = describeSheet(view);
+  const visual = block.presentation === "visual" && hasVisualTable(dataset);
+  const pulled = formatPulledAt(block.pulledAt);
+  return (
+    <FullscreenFrame
+      icon={<Table2 className="size-4 text-muted-foreground" aria-hidden />}
+      title={block.title || "Data sheet"}
+      caption={<SheetMarketCaption block={block} />}
+      meta={
+        <span className="text-[12px] tabular-nums text-muted-foreground">
+          {label}
+          {pulled ? ` · Pulled ${pulled}` : ""}
+        </span>
+      }
+      bar={
+        <MarketLifeBar
+          sheet={block}
+          session={liveSession(canvas, block.id)}
+          enabled={!!realtimeSheetForBlock(block, canvas?.blocks || [])}
+        />
+      }
+      onClose={onClose}
+    >
+      {visual ? (
+        <SheetPresentation sheet={view} dataset={dataset} hidden={block.visualHidden} readOnly />
+      ) : (
+        <DashboardSheetGrid block={view} onChange={onChange} />
+      )}
+    </FullscreenFrame>
   );
 }
 
@@ -1742,15 +1802,17 @@ function CanvasBlock({ block, selected, spotlight = false, onSelect, onChange, b
           onPointerDown={(event) => event.stopPropagation()}
           onClick={(event) => event.stopPropagation()}
         >
+          {block.type === "sheet" || block.type === "chart" ? (
+            <DropdownMenuItem
+              className="gap-2.5 rounded-md px-2 py-2 text-[13px]"
+              onSelect={() => setFullscreen(true)}
+            >
+              <Maximize2 className="size-4 text-muted-foreground" />
+              Full screen
+            </DropdownMenuItem>
+          ) : null}
           {block.type === "sheet" ? (
             <>
-              <DropdownMenuItem
-                className="gap-2.5 rounded-md px-2 py-2 text-[13px]"
-                onSelect={() => setFullscreen(true)}
-              >
-                <Maximize2 className="size-4 text-muted-foreground" />
-                Full screen
-              </DropdownMenuItem>
               <DropdownMenuItem
                 className="gap-2.5 rounded-md px-2 py-2 text-[13px]"
                 onSelect={() => canvas?.createChartFromBlock?.(block.id)}
@@ -1806,6 +1868,8 @@ function CanvasBlock({ block, selected, spotlight = false, onSelect, onChange, b
               ) : null}
               <DropdownMenuSeparator />
             </>
+          ) : block.type === "chart" ? (
+            <DropdownMenuSeparator />
           ) : null}
           <DropdownMenuItem
             className="gap-2.5 rounded-md px-2 py-2 text-[13px]"
@@ -1830,6 +1894,8 @@ function CanvasBlock({ block, selected, spotlight = false, onSelect, onChange, b
       )}
       {fullscreen && block.type === "sheet" && !readOnly ? (
         <SheetFullscreen block={block} onChange={onChange} onClose={() => setFullscreen(false)} />
+      ) : fullscreen && block.type === "chart" && !readOnly ? (
+        <ChartFullscreen block={block} onChange={onChange} onClose={() => setFullscreen(false)} booting={booting} />
       ) : (
         <BlockBody block={block} onChange={onChange} booting={booting} />
       )}
