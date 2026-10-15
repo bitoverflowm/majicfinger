@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { isOrderBookSheet, rowsToOrderBook } from "./orderBookLadder.js";
+import { isOrderBookSheet, rowsToOrderBook, rowsToOutcomeBooks } from "./orderBookLadder.js";
 
 const columns = [
   { id: "ticker", title: "Ticker" },
@@ -64,9 +64,50 @@ const polymarket = rowsToOrderBook(
   ],
 );
 assert.equal(polymarket.bids[0].price, 0.47);
-assert.equal(polymarket.bids[0].size, 100);
+assert.equal(polymarket.bids[0].size, 999);
 assert.equal(polymarket.asks[0].price, 0.49);
-assert.equal(polymarket.asks[0].size, 40);
+assert.equal(polymarket.asks[0].size, 999);
 assert.equal(polymarket.mid, 0.48);
+
+const mirrored = rowsToOrderBook(
+  [
+    { id: "outcome" },
+    { id: "side" },
+    { id: "price" },
+    { id: "size" },
+  ],
+  [
+    ["Yes", "SELL", "0.99", "100"],
+    ["No", "BUY", "0.01", "100"],
+  ],
+);
+assert.equal(mirrored.asks.length, 1);
+assert.equal(mirrored.asks[0].price, 0.99);
+assert.equal(mirrored.asks[0].size, 100);
+
+const outcomes = rowsToOutcomeBooks(
+  [
+    { id: "outcome" },
+    { id: "side" },
+    { id: "price" },
+    { id: "size" },
+  ],
+  [
+    ["Yes", "BUY", "0.47", "100"],
+    ["Yes", "SELL", "0.49", "40"],
+    ["No", "BUY", "0.51", "999"],
+    ["No", "SELL", "0.53", "20"],
+  ],
+);
+assert.deepEqual(
+  outcomes.map((book) => book.outcome),
+  ["Yes", "No"],
+);
+assert.equal(outcomes[0].bids[0].price, 0.47);
+assert.equal(outcomes[0].asks[0].price, 0.49);
+assert.equal(outcomes[1].bids[0].price, 0.51);
+assert.equal(outcomes[1].bids[0].size, 999);
+assert.equal(outcomes[1].asks[0].price, 0.53);
+assert.equal(rowsToOutcomeBooks(columns, [["MKT", "yes", "0.47", "100"]]).length, 0);
 
 console.log("order book ladder ok");

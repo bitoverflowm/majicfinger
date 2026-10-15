@@ -24,16 +24,24 @@ function dollars(value) {
   return Math.round(value * 10000) / 10000;
 }
 
-function preferredBookOutcome(rows, outcomeIndex) {
-  if (outcomeIndex < 0) return "";
-  const counts = new Map();
+function outcomeKind(value) {
+  const text = String(value || "").trim().toLowerCase();
+  if (text === "yes") return "yes";
+  if (text === "no") return "no";
+  return "";
+}
+
+function rowsHaveYesAndNo(rows, outcomeIndex) {
+  if (outcomeIndex < 0) return false;
+  let yes = false;
+  let no = false;
   for (const row of rows || []) {
-    const value = String(row?.[outcomeIndex] ?? "").trim();
-    if (!value) continue;
-    counts.set(value, (counts.get(value) || 0) + 1);
+    const kind = outcomeKind(row?.[outcomeIndex]);
+    if (kind === "yes") yes = true;
+    if (kind === "no") no = true;
+    if (yes && no) return true;
   }
-  if (counts.size < 2) return "";
-  return [...counts.keys()].find((value) => value.toLowerCase() === "yes") || [...counts.keys()][0];
+  return false;
 }
 
 function accumulate(levels) {
@@ -70,22 +78,62 @@ export function isOrderBookSheet(sheet) {
   return side && price && qty;
 }
 
+function bookIndexes(columns) {
+  return {
+    sideIndex: findColumn(columns, (title, id) => id === "side" || title === "side"),
+    priceIndex: findColumn(
+      columns,
+      (title, id) => id === "price" || id === "price_dollars" || title === "price" || title === "price dollars",
+    ),
+    sizeIndex: findColumn(
+      columns,
+      (title, id) => id === "quantity_fp" || id === "size" || title === "quantity fp" || title === "size" || title.includes("quantity"),
+    ),
+    outcomeIndex: findColumn(columns, (title, id) => id === "outcome" || title === "outcome"),
+  };
+}
+
+function addLevel(map, price, size) {
+  const level = dollars(price);
+  if (level <= 0) return;
+  map.set(level, (map.get(level) || 0) + size);
+}
+
+/** A mirrored complement is the same order on the other token. Keep the larger size. */
+function raiseLevel(map, price, size) {
+  const level = dollars(price);
+  if (level <= 0) return;
+  const current = map.get(level) || 0;
+  if (size > current) map.set(level, size);
+}
+
+function finishBook(bids, asks) {
+  const bidLevels = accumulate([...bids.entries()].map(([price, size]) => ({ price, size })).sort((a, b) => b.price - a.price));
+  const askLevels = accumulate([...asks.entries()].map(([price, size]) => ({ price, size })).sort((a, b) => a.price - b.price));
+  const bestBid = bidLevels[0]?.price;
+  const bestAsk = askLevels[0]?.price;
+  const mid = bestBid != null && bestAsk != null ? dollars((bestBid + bestAsk) / 2) : bestBid ?? bestAsk ?? 0;
+  return { bids: bidLevels, asks: askLevels, mid };
+}
+
+function readLevel(row, sideIndex, priceIndex, sizeIndex) {
+  const side = String(row?.[sideIndex] ?? "").trim().toLowerCase();
+  const price = parseChartNumber(row?.[priceIndex]);
+  const size = parseChartNumber(row?.[sizeIndex]);
+  if (price == null || size == null || size <= 0) return null;
+  return { side, price, size };
+}
+
 /**
+ * One bid/ask ladder.
+ * Kalshi has no outcome column: a no bid at X is a yes ask at 1−X.
+ * Polymarket Yes and No are the same market on two tokens. No buys land on the
+ * yes ask (and No sells on the yes bid) without stacking a mirrored size twice.
  * @param {Array<{ title?: string, id?: string }>} columns
  * @param {unknown[][]} rows
  */
 export function rowsToOrderBook(columns, rows) {
-  const sideIndex = findColumn(columns, (title, id) => id === "side" || title === "side");
-  const priceIndex = findColumn(
-    columns,
-    (title, id) => id === "price" || id === "price_dollars" || title === "price" || title === "price dollars",
-  );
-  const sizeIndex = findColumn(
-    columns,
-    (title, id) => id === "quantity_fp" || id === "size" || title === "quantity fp" || title === "size" || title.includes("quantity"),
-  );
-  const outcomeIndex = findColumn(columns, (title, id) => id === "outcome" || title === "outcome");
-  const preferredOutcome = preferredBookOutcome(rows, outcomeIndex);
+  const { sideIndex, priceIndex, sizeIndex, outcomeIndex } = bookIndexes(columns);
   /** @type {Map<number, number>} */
   const bids = new Map();
   /** @type {Map<number, number>} */
@@ -93,39 +141,79 @@ export function rowsToOrderBook(columns, rows) {
   if (sideIndex < 0 || priceIndex < 0 || sizeIndex < 0) {
     return { bids: [], asks: [], mid: 0 };
   }
+  const complement = rowsHaveYesAndNo(rows, outcomeIndex);
+  /** @type {unknown[][]} */
+  const noRows = [];
 
   for (const row of rows || []) {
-    if (preferredOutcome) {
-      const outcome = String(row?.[outcomeIndex] ?? "").trim();
-      if (outcome && outcome !== preferredOutcome) continue;
-    }
-    const side = String(row?.[sideIndex] ?? "").trim().toLowerCase();
-    const price = parseChartNumber(row?.[priceIndex]);
-    const size = parseChartNumber(row?.[sizeIndex]);
-    if (price == null || size == null || size <= 0) continue;
-    if (side === "yes" || side === "bid" || side === "buy") {
-      const level = dollars(price);
-      bids.set(level, (bids.get(level) || 0) + size);
+    if (complement && outcomeKind(row?.[outcomeIndex]) === "no") {
+      noRows.push(row);
       continue;
     }
-    if (side === "no") {
-      const ask = dollars(1 - price);
-      if (ask <= 0) continue;
-      asks.set(ask, (asks.get(ask) || 0) + size);
+    const level = readLevel(row, sideIndex, priceIndex, sizeIndex);
+    if (!level) continue;
+    if (level.side === "yes" || level.side === "bid" || level.side === "buy") {
+      addLevel(bids, level.price, level.size);
       continue;
     }
-    if (side === "ask" || side === "sell") {
-      const level = dollars(price);
-      if (level <= 0) continue;
-      asks.set(level, (asks.get(level) || 0) + size);
+    if (level.side === "no") {
+      addLevel(asks, 1 - level.price, level.size);
+      continue;
     }
+    if (level.side === "ask" || level.side === "sell") addLevel(asks, level.price, level.size);
   }
 
-  const bidLevels = accumulate([...bids.entries()].map(([price, size]) => ({ price, size })).sort((a, b) => b.price - a.price));
-  const askLevels = accumulate([...asks.entries()].map(([price, size]) => ({ price, size })).sort((a, b) => a.price - b.price));
-  const bestBid = bidLevels[0]?.price;
-  const bestAsk = askLevels[0]?.price;
-  const mid =
-    bestBid != null && bestAsk != null ? dollars((bestBid + bestAsk) / 2) : bestBid ?? bestAsk ?? 0;
-  return { bids: bidLevels, asks: askLevels, mid };
+  for (const row of noRows) {
+    const level = readLevel(row, sideIndex, priceIndex, sizeIndex);
+    if (!level) continue;
+    if (level.side === "sell" || level.side === "ask") {
+      raiseLevel(bids, 1 - level.price, level.size);
+      continue;
+    }
+    raiseLevel(asks, 1 - level.price, level.size);
+  }
+
+  return finishBook(bids, asks);
+}
+
+/**
+ * One ladder per outcome, on that outcome's own prices.
+ * Used when a market has both Yes and No so neither book is hidden.
+ * @param {Array<{ title?: string, id?: string }>} columns
+ * @param {unknown[][]} rows
+ * @returns {Array<{ outcome: string, bids: Array<{ price: number, size: number, total: number }>, asks: Array<{ price: number, size: number, total: number }>, mid: number }>}
+ */
+export function rowsToOutcomeBooks(columns, rows) {
+  const { outcomeIndex } = bookIndexes(columns);
+  if (outcomeIndex < 0 || !rowsHaveYesAndNo(rows, outcomeIndex)) return [];
+  /** @type {Map<string, unknown[][]>} */
+  const groups = new Map();
+  for (const row of rows || []) {
+    const outcome = String(row?.[outcomeIndex] ?? "").trim();
+    if (!outcome) continue;
+    const list = groups.get(outcome) || [];
+    list.push(row);
+    groups.set(outcome, list);
+  }
+  const rank = (value) => {
+    const kind = outcomeKind(value);
+    if (kind === "yes") return 0;
+    if (kind === "no") return 1;
+    return 2;
+  };
+  return [...groups.keys()]
+    .sort((a, b) => rank(a) - rank(b) || a.localeCompare(b))
+    .map((outcome) => ({ outcome, ...rowsToOrderBook(columns, groups.get(outcome) || []) }));
+}
+
+/**
+ * The two charts an order book sheet opens: ladder and depth, side by side.
+ * @param {string} title
+ */
+export function defaultOrderBookCharts(title) {
+  const base = String(title || "Order book").replace(/\s+chart$/, "").trim() || "Order book";
+  return [
+    { chartView: "order-book", title: `${base} · ladder`, w: 540, h: 420 },
+    { chartView: "depth", title: `${base} · depth`, w: 540, h: 360 },
+  ];
 }

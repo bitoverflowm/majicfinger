@@ -81,6 +81,7 @@ function newId(prefix) {
 /**
  * Markets sit full width. The sheets created with them sit in two columns underneath,
  * the same full-then-split order as the Kalshi vs Polymarket odds board.
+ * Event joins pass `branch`: 1 is that event's markets, 2 is the market tables under them.
  */
 export function layoutRunSheets(sheets, { originY = 88 } = {}) {
   const gap = 16;
@@ -89,9 +90,16 @@ export function layoutRunSheets(sheets, { originY = 88 } = {}) {
   const fullW = halfW * 2 + gap;
   const fullH = 420;
   const halfH = 360;
+  const nest = 36;
   let y = originY;
   let col = 0;
   const blocks = [];
+
+  const flushRow = () => {
+    if (!col) return;
+    y += halfH + gap;
+    col = 0;
+  };
 
   sheets.forEach((sheet, index) => {
     const columns = (sheet.columns || []).map((column) => ({
@@ -113,20 +121,21 @@ export function layoutRunSheets(sheets, { originY = 88 } = {}) {
         });
       });
     }
-    const full = sheet.span === "full";
-    if (full && col) {
-      y += halfH + gap;
-      col = 0;
-    }
+    const branch = sheet.branch === 2 ? 2 : sheet.branch === 1 ? 1 : 0;
+    const full = branch === 0 && sheet.span === "full";
+    const continuesRow = col === 1 && ((branch === 0 && !full) || branch === 2);
+    if (!continuesRow) flushRow();
     const described = stampDataset({ ...sheet, type: "sheet" });
+    const childW = Math.floor((fullW - nest * 2 - gap) / 2);
     const block = {
       id: sheet.id || newId("run"),
       type: "sheet",
       source: "integration-run",
-      x: full ? x0 : x0 + col * (halfW + gap),
+      branch,
+      x: branch === 0 ? (full ? x0 : x0 + col * (halfW + gap)) : branch === 1 ? x0 + nest : x0 + nest * 2 + col * (childW + gap),
       y,
-      w: full ? fullW : halfW,
-      h: full ? fullH : halfH,
+      w: branch === 0 ? (full ? fullW : halfW) : branch === 1 ? fullW - nest : childW,
+      h: branch === 1 || full ? fullH : halfH,
       title: sheet.title || "Sheet",
       columns,
       cells,
@@ -141,7 +150,7 @@ export function layoutRunSheets(sheets, { originY = 88 } = {}) {
       pulledAt: Number(sheet.pulledAt) || Date.now(),
     };
     blocks.push(block);
-    if (full) y += fullH + gap;
+    if (branch === 1 || full) y += fullH + gap;
     else {
       col += 1;
       if (col > 1) {
@@ -153,4 +162,62 @@ export function layoutRunSheets(sheets, { originY = 88 } = {}) {
   });
 
   return blocks;
+}
+
+const CHART_GAP = 16;
+const CHART_X0 = 28;
+const CHART_RIGHT = 28 + 540 * 2 + 16;
+
+/**
+ * Keep each run sheet where `layoutRunSheets` put it, then open its default
+ * charts in a band underneath that row. Later rows move down by the band.
+ * `holdSheetId` leaves that sheet's charts out so the sheet can arrive first.
+ * @param {object[]} sheetBlocks
+ * @param {Map<string, object[]>} chartsBySheetId
+ * @param {{ holdSheetId?: string }} [options]
+ */
+export function layoutRunCharts(sheetBlocks, chartsBySheetId, options = {}) {
+  const holdSheetId = options.holdSheetId || "";
+  const ordered = [...(sheetBlocks || [])].sort((a, b) => (a.y || 0) - (b.y || 0) || (a.x || 0) - (b.x || 0));
+  /** @type {Array<{ y: number, sheets: object[] }>} */
+  const rows = [];
+  for (const sheet of ordered) {
+    const last = rows[rows.length - 1];
+    if (last && Math.abs(last.y - (sheet.y || 0)) < 2) last.sheets.push(sheet);
+    else rows.push({ y: sheet.y || 0, sheets: [sheet] });
+  }
+  let shift = 0;
+  /** @type {object[]} */
+  const sheets = [];
+  /** @type {object[]} */
+  const charts = [];
+  for (const row of rows) {
+    const rowSheets = row.sheets.map((sheet) => ({ ...sheet, y: (sheet.y || 0) + shift }));
+    sheets.push(...rowSheets);
+    const rowBottom = rowSheets.reduce((max, sheet) => Math.max(max, (sheet.y || 0) + (sheet.h || 0)), 0);
+    /** @type {object[]} */
+    const rowCharts = [];
+    for (const sheet of rowSheets) {
+      if (sheet.id === holdSheetId) continue;
+      rowCharts.push(...(chartsBySheetId.get(sheet.id) || []));
+    }
+    if (!rowCharts.length) continue;
+    let x = CHART_X0;
+    let y = rowBottom + CHART_GAP;
+    let rowH = 0;
+    for (const chart of rowCharts) {
+      const w = Math.min(chart.w || 540, 540);
+      const h = chart.h || 360;
+      if (x > CHART_X0 && x + w > CHART_RIGHT + 1) {
+        y += rowH + CHART_GAP;
+        x = CHART_X0;
+        rowH = 0;
+      }
+      charts.push({ ...chart, x, y, w, h });
+      x += w + CHART_GAP;
+      rowH = Math.max(rowH, h);
+    }
+    shift += y + rowH - rowBottom;
+  }
+  return { sheets, charts };
 }

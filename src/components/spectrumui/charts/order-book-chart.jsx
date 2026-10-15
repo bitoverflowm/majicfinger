@@ -103,7 +103,7 @@ export function OrderBookChart({
   const bids = book?.bids || EMPTY_LEVELS;
   const asks = book?.asks || EMPTY_LEVELS;
   const mid = Number(book?.mid) || 0;
-  const [fullBook, setFullBook] = React.useState(false);
+  const [fullBook, setFullBook] = React.useState(true);
   const [hovered, setHovered] = React.useState(null);
   const [flashed, setFlashed] = React.useState(() => new Set());
   const previous = React.useRef(new Map());
@@ -125,7 +125,11 @@ export function OrderBookChart({
     visit("bid", bids);
     visit("ask", asks);
     previous.current = next;
-    setFlashed(changed);
+    const signature = [...changed].sort().join("|");
+    setFlashed((current) => {
+      const previousSignature = [...current].sort().join("|");
+      return previousSignature === signature ? current : changed;
+    });
   }, [asks, bids, live]);
 
   React.useLayoutEffect(() => {

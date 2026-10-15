@@ -139,6 +139,14 @@ function StepRow({ step, last, compact, now }) {
   );
 }
 
+function runSucceeded(feed) {
+  if (feed?.status !== "done") return false;
+  return (feed.steps || []).every((step) => {
+    if (step.status === "error") return false;
+    return !(step.children || []).some((child) => child.status === "error");
+  });
+}
+
 export function RunProgressCard({ feed, onDismiss, onReplay }) {
   const [now, setNow] = useState(() => Date.now());
   const live = feed?.status === "running";
@@ -149,6 +157,7 @@ export function RunProgressCard({ feed, onDismiss, onReplay }) {
   }, [live]);
   if (!feed?.steps?.length) return null;
   const elapsed = formatElapsed((feed.completedAt || now) - (feed.startedAt || now));
+  const succeeded = runSucceeded(feed);
   return (
     <div className="pointer-events-none absolute inset-x-0 bottom-0 top-[var(--dashboard-tab-clearance,0px)] z-30 flex items-center justify-center p-6">
       <section
@@ -157,7 +166,9 @@ export function RunProgressCard({ feed, onDismiss, onReplay }) {
       >
         <header className="flex items-start justify-between gap-3 border-b border-border/70 px-4 py-3">
           <div className="min-w-0">
-            <p className="text-[13px] font-semibold text-foreground">{feed.status === "error" ? "Pull failed" : feed.status === "done" ? "Pull finished" : "Composing this tab"}</p>
+            <p className="text-[13px] font-semibold text-foreground">
+              {feed.status === "error" ? feed.failLabel || "Pull failed" : feed.status === "done" ? feed.doneLabel || "Pull finished" : feed.runningLabel || "Composing this tab"}
+            </p>
             <p className="mt-0.5 truncate text-[12px] text-muted-foreground">{feed.title}</p>
           </div>
           <div className="flex shrink-0 items-center gap-2">
@@ -183,6 +194,19 @@ export function RunProgressCard({ feed, onDismiss, onReplay }) {
         <div className="min-h-0 flex-1 overflow-auto px-4 py-3">
           <AgentSteps steps={feed.steps} now={now} />
         </div>
+        {succeeded ? (
+          <footer className="shrink-0 border-t border-border/70 px-4 py-3">
+            <p className="text-[13px] font-semibold text-foreground">Your dashboard is ready</p>
+            <p className="mt-0.5 text-[12px] leading-relaxed text-muted-foreground">{feed.readyDetail || "The sheets are on the canvas behind this card."}</p>
+            <button
+              type="button"
+              onClick={onDismiss}
+              className="mt-3 inline-flex w-full items-center justify-center rounded-lg bg-foreground px-3 py-2 text-[13px] font-medium text-background hover:opacity-90"
+            >
+              View dashboard
+            </button>
+          </footer>
+        ) : null}
       </section>
     </div>
   );

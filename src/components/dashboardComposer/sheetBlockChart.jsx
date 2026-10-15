@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef } from "react";
 import { Bar, BarChart, CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { useReadyTradeSheet, tradeTickerFromBlock, usesHistoricalTradeSheet } from "@/components/dashboardComposer/fullTradeSheet";
-import { isOrderBookSheet, rowsToOrderBook } from "@/components/dashboardComposer/orderBookLadder";
+import { isOrderBookSheet, rowsToOrderBook, rowsToOutcomeBooks } from "@/components/dashboardComposer/orderBookLadder";
 import { ohlcRowsToCandles, rangesForCandles, tradesToCandles } from "@/components/dashboardComposer/tradeMarketCandles";
 import { isPriceHistorySheet, priceHistoryOutcome, priceHistoryPoints } from "@/components/dashboardComposer/priceHistorySeries";
 import { DatasetSummary, EventLinesChart } from "@/components/dashboardComposer/datasetChart";
@@ -202,6 +202,7 @@ function TradeMarketChart({ sheet, rows, live, snapshot, onSnapshot, mode = "tra
 
 function OrderBookSheetChart({ sheet, rows, live, snapshot, onSnapshot }) {
   const built = useMemo(() => rowsToOrderBook(sheet?.columns, rows), [rows, sheet?.columns]);
+  const outcomeBooks = useMemo(() => rowsToOutcomeBooks(sheet?.columns, rows), [rows, sheet?.columns]);
   const saved = snapshot?.kind === "order-book" ? snapshot : null;
   const book = built.bids.length || built.asks.length ? built : saved || built;
   const symbol = sheetSymbol(sheet) || saved?.symbol || "";
@@ -218,6 +219,23 @@ function OrderBookSheetChart({ sheet, rows, live, snapshot, onSnapshot }) {
       symbol,
     });
   }, [book, bookKey, live, onSnapshot, symbol]);
+
+  if (outcomeBooks.length > 1) {
+    return (
+      <div className="flex h-full min-h-0 min-w-0 flex-1">
+        {outcomeBooks.map((outcomeBook) => (
+          <OrderBookChart
+            key={outcomeBook.outcome}
+            book={outcomeBook}
+            symbol={outcomeBook.outcome}
+            live={live}
+            className="min-w-0 flex-1 border-r border-black/6 last:border-r-0 dark:border-white/8"
+            status={outcomeBook.bids.length || outcomeBook.asks.length ? "ready" : "empty"}
+          />
+        ))}
+      </div>
+    );
+  }
 
   return (
     <OrderBookChart
@@ -371,16 +389,6 @@ export function SheetBlockChart({ sheet, snapshot, onSnapshot, live = false, vie
     const depth = view === "depth" || resolved?.view === "depth";
     return (
       <div className="flex min-h-0 flex-1 flex-col">
-        {dataset?.datasetType === "orderbook" ? (
-          <div className="flex gap-1 px-2 pt-1">
-            <button type="button" aria-pressed={!depth} onClick={() => onViewChange?.("order-book")} className="rounded-md px-2 py-0.5 text-[11px] text-muted-foreground">
-              Ladder
-            </button>
-            <button type="button" aria-pressed={depth} onClick={() => onViewChange?.("depth")} className="rounded-md px-2 py-0.5 text-[11px] text-muted-foreground">
-              Depth
-            </button>
-          </div>
-        ) : null}
         {depth ? (
           <DepthSheetChart sheet={sheet} rows={rows} live={live} />
         ) : (

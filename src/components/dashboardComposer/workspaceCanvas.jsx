@@ -19,12 +19,12 @@ import { CatalogRichTableView } from "@/components/dashboardComposer/catalogRich
 import { VisualTableView } from "@/components/dashboardComposer/visualTableView";
 import { Switch } from "@/components/ui/switch";
 import { isOrderBookSheet } from "@/components/dashboardComposer/orderBookLadder";
-import { columnKey, countObservations, describeSheet } from "@/lib/visualizations/datasetDescriptor";
-import { defaultActivityCharts } from "@/lib/visualizations/activityCharts";
-import { hasVisualTable, resolveVisualization, visualPresentationLabel } from "@/lib/visualizations/presetRegistry";
+import { describeSheet } from "@/lib/visualizations/datasetDescriptor";
+import { chartSpecsForSheet } from "@/lib/visualizations/sheetCharts";
+import { hasVisualTable, visualPresentationLabel } from "@/lib/visualizations/presetRegistry";
 import { isPriceHistorySheet } from "@/components/dashboardComposer/priceHistorySeries";
 import { SheetBlockChart } from "@/components/dashboardComposer/sheetBlockChart";
-import { layoutRunSheets } from "@/components/dashboardComposer/integrationRunSheets";
+import { layoutRunCharts, layoutRunSheets } from "@/components/dashboardComposer/integrationRunSheets";
 import {
   canvasGridMetrics,
   packClippedBlocks,
@@ -68,6 +68,10 @@ const SHEET_ARRIVE_CSS = `
   from { opacity: 0; transform: translateY(18px); }
   to { opacity: 1; transform: none; }
 }
+@keyframes lychee-sheet-branch {
+  from { opacity: 0; transform: translate(-28px, 12px); }
+  to { opacity: 1; transform: none; }
+}
 @keyframes lychee-sheet-fill {
   from { opacity: 0; transform: translateY(8px); }
   to { opacity: 1; transform: none; }
@@ -77,10 +81,11 @@ const SHEET_ARRIVE_CSS = `
   100% { box-shadow: inset 0 0 0 2px rgba(13, 153, 255, 0); }
 }
 .lychee-sheet-arrive { animation: lychee-sheet-arrive 560ms cubic-bezier(0.22, 1, 0.36, 1) both; }
+.lychee-sheet-branch { animation: lychee-sheet-branch 620ms cubic-bezier(0.22, 1, 0.36, 1) both; }
 .lychee-sheet-fill { animation: lychee-sheet-fill 480ms cubic-bezier(0.22, 1, 0.36, 1) both; }
 .lychee-sheet-pulse { animation: lychee-sheet-pulse 720ms ease-out 1; }
 @media (prefers-reduced-motion: reduce) {
-  .lychee-sheet-arrive, .lychee-sheet-fill, .lychee-sheet-pulse { animation: none; }
+  .lychee-sheet-arrive, .lychee-sheet-branch, .lychee-sheet-fill, .lychee-sheet-pulse { animation: none; }
 }
 `;
 
@@ -109,6 +114,86 @@ const BLOCK_COPY = {
 
 function newId() {
   return `block-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`;
+}
+
+/** Drop new charts under the lowest block, two across when they fit. */
+function placeChartsBelow(list, charts) {
+  const gap = 16;
+  const x0 = 28;
+  const right = x0 + widthForSpan(24);
+  let y = (list || []).reduce((max, block) => Math.max(max, (block.y || 0) + (block.h || 0)), 72) + gap;
+  let x = x0;
+  let rowHeight = 0;
+  return (charts || []).map((chart) => {
+    const w = Math.min(chart.w || 540, right - x0);
+    const h = chart.h || 360;
+    if (x > x0 && x + w > right + 1) {
+      y += rowHeight + gap;
+      x = x0;
+      rowHeight = 0;
+    }
+    const placed = { ...chart, x: Math.round(x), y: Math.round(y), w, h };
+    x += w + gap;
+    rowHeight = Math.max(rowHeight, h);
+    return placed;
+  });
+}
+
+/**
+ * An order book that already has a chart gets the missing ladder or depth
+ * chart on the next row, and the rows underneath move down to make room.
+ */
+function withOrderBookChartPairs(list) {
+  const sheets = new Map();
+  for (const block of list || []) {
+    if (block?.type === "sheet") sheets.set(block.id, block);
+  }
+  /** @type {Map<string, object[]>} */
+  const chartsBySource = new Map();
+  for (const block of list || []) {
+    if (block?.type !== "chart" || !block.sourceSheetId) continue;
+    const group = chartsBySource.get(block.sourceSheetId) || [];
+    group.push(block);
+    chartsBySource.set(block.sourceSheetId, group);
+  }
+  let shifted = list || [];
+  const additions = [];
+  const patches = new Map();
+  for (const [sourceId, charts] of chartsBySource) {
+    const sheet = sheets.get(sourceId);
+    if (!sheet || !isOrderBookSheet(sheet)) continue;
+    const base = String(sheet.title || "Order book").replace(/\s+chart$/, "").trim() || "Order book";
+    const ladder = charts.find((chart) => chart.chartView === "order-book" || !chart.chartView) || null;
+    const depth = charts.find((chart) => chart.chartView === "depth") || null;
+    if (ladder && !ladder.chartView) patches.set(ladder.id, { chartView: "order-book" });
+    const host = ladder || depth || charts[0];
+    const gap = 8;
+    const height = host.h || 360;
+    const openRow = (chartView, title) => {
+      const top = (host.y || 0) + (additions.length + 1) * (height + gap);
+      shifted = shifted.map((block) =>
+        (block.y || 0) >= top - 1 ? { ...block, y: Math.round((block.y || 0) + height + gap) } : block,
+      );
+      additions.push({
+        id: newId(),
+        type: "chart",
+        source: "sheet-chart",
+        sourceSheetId: sourceId,
+        chartView,
+        x: host.x || 28,
+        y: top,
+        w: host.w || 540,
+        h: height,
+        title,
+        body: "",
+      });
+    };
+    if (!ladder) openRow("order-book", `${base} · ladder`);
+    if (!depth) openRow("depth", `${base} · depth`);
+  }
+  if (!additions.length && !patches.size) return list;
+  const merged = shifted.map((block) => (patches.has(block.id) ? { ...block, ...patches.get(block.id) } : block));
+  return separateOverlaps([...merged, ...additions]);
 }
 
 function assignUniqueIds(blocks, reserved = []) {
@@ -569,6 +654,8 @@ export function WorkspaceCanvasProvider({ pageId, readOnly = false, children }) 
     if (!incoming.length) return;
     const targetId = options.pageId || pageIdRef.current;
     const append = options.append !== false;
+    const holdChartsFor = String(options.holdChartsFor || "");
+    const spotlightChartsFor = String(options.spotlightChartsFor || "");
     const existing = blocksByPageRef.current[targetId] || [];
     const previousById = new Map(existing.map((block) => [block.id, block]));
     const columnKey = (columns) => (columns || []).map((column) => column?.id || "").join("\0");
@@ -590,35 +677,65 @@ export function WorkspaceCanvasProvider({ pageId, readOnly = false, children }) 
       const laidIds = new Set(incoming.map((sheet) => sheet.id).filter(Boolean));
       const kept = list.filter((block) => {
         if (laidIds.has(block.id)) return false;
+        if (block.type === "chart" && block.source === "sheet-chart" && laidIds.has(block.sourceSheetId)) return false;
         if (!append && block.source === "integration-run") return false;
+        if (!append && block.type === "chart" && block.source === "sheet-chart") return false;
         return true;
       });
       const originY = kept.reduce((max, block) => Math.max(max, (block.y || 0) + (block.h || 0) + 24), 88);
       const placed = layoutRunSheets(incoming, { originY: kept.length ? originY : 88 });
-      const animated = placed.map((block) => {
+      /** @type {Map<string, object[]>} */
+      const chartsBySheet = new Map();
+      for (const block of placed) {
+        const specs = chartSpecsForSheet(block);
+        chartsBySheet.set(
+          block.id,
+          specs.map((spec) => {
+            const chartId = `chart-${block.id}-${spec.chartView || "view"}`;
+            const prior = priorById.get(chartId);
+            return {
+              ...(prior || {}),
+              id: chartId,
+              type: "chart",
+              source: "sheet-chart",
+              sourceSheetId: block.id,
+              ...(spec.chartView ? { chartView: spec.chartView } : {}),
+              title: spec.title,
+              w: spec.w || 540,
+              h: spec.h || 360,
+              body: "",
+              arrive: prior ? prior.arrive : true,
+            };
+          }),
+        );
+      }
+      const laid = layoutRunCharts(placed, chartsBySheet, { holdSheetId: holdChartsFor });
+      const animated = laid.sheets.map((block) => {
         const prior = priorById.get(block.id);
         if (!prior) return { ...block, arrive: true };
         const sameData = columnKey(prior.columns) === columnKey(block.columns) && (prior.rowCount || 0) === (block.rowCount || 0);
-        if (sameData) {
-          return {
-            ...prior,
-            x: block.x,
-            y: block.y,
-            w: block.w,
-            h: block.h,
-            arrive: prior.arrive,
-            ...(block.query ? { query: block.query } : {}),
-            ...(block.provenance ? { provenance: block.provenance } : {}),
-            ...(block.pull ? { pull: block.pull } : {}),
-            ...(block.dataset ? { dataset: block.dataset } : {}),
-            ...(block.integrationId ? { integrationId: block.integrationId } : {}),
-            ...(block.table ? { table: block.table } : {}),
-            ...(block.title ? { title: block.title } : {}),
-          };
-        }
-        return { ...block, arrive: prior.arrive, pulse: Date.now() };
+        return {
+          ...(sameData ? prior : block),
+          x: block.x,
+          y: block.y,
+          w: block.w,
+          h: block.h,
+          arrive: prior.arrive,
+          ...(sameData ? {} : { pulse: Date.now() }),
+          ...(block.query ? { query: block.query } : {}),
+          ...(block.provenance ? { provenance: block.provenance } : {}),
+          ...(block.pull ? { pull: block.pull } : {}),
+          ...(block.dataset ? { dataset: block.dataset } : {}),
+          ...(block.integrationId ? { integrationId: block.integrationId } : {}),
+          ...(block.table ? { table: block.table } : {}),
+          ...(block.title ? { title: block.title } : {}),
+        };
       });
-      return { ...prev, [targetId]: [...kept, ...animated] };
+      if (spotlightChartsFor) {
+        const spotlight = (chartsBySheet.get(spotlightChartsFor) || [])[0];
+        if (spotlight?.id) focusId = spotlight.id;
+      }
+      return { ...prev, [targetId]: [...kept, ...animated, ...laid.charts] };
     });
     if (!focusId) return;
     if (targetId !== pageIdRef.current) {
@@ -685,29 +802,14 @@ export function WorkspaceCanvasProvider({ pageId, readOnly = false, children }) 
     (id, forcedView) => {
       const sheet = blocks.find((block) => block.id === id && block.type === "sheet");
       if (!sheet) return;
-      const dataset = describeSheet(sheet);
-      const resolved = resolveVisualization(dataset, {
-        columnIds: (sheet.columns || []).map((column) => columnKey(column)).filter(Boolean),
-        observations: dataset ? countObservations(sheet, dataset) : undefined,
-      });
-      const base = String(sheet.title || "Sheet").replace(/\s+chart$/, "").trim();
-      const requested = String(forcedView || "").trim();
-      const chartView = requested || (resolved.view === "table" ? "" : resolved.view);
-      const specs = !requested && dataset?.datasetType === "trader_activity"
-        ? defaultActivityCharts(base)
-        : [
-            {
-              chartView,
-              title: chartView === "order-book" && /^order\s*books?/i.test(base) ? base : `${base} chart`,
-              w: chartView === "portfolio" ? 680 : 540,
-              h: chartView === "portfolio" ? 560 : 360,
-            },
-          ];
+      const base = String(sheet.title || "Sheet").replace(/\s+chart$/, "").trim() || "Sheet";
+      const specs = chartSpecsForSheet(sheet, forcedView);
+      const chartsForSheet = specs.length ? specs : [{ chartView: "", title: `${base} chart`, w: 540, h: 360 }];
       const chartId = newId();
       setBlocksByPage((prev) => {
         const list = prev[pageId] || [];
         const current = list.find((block) => block.id === id) || sheet;
-        const charts = specs.map((spec, index) => ({
+        const charts = chartsForSheet.map((spec, index) => ({
           id: index === 0 ? chartId : newId(),
           type: "chart",
           source: "sheet-chart",
@@ -727,6 +829,92 @@ export function WorkspaceCanvasProvider({ pageId, readOnly = false, children }) 
     },
     [blocks, pageId],
   );
+
+  const chartRunLock = useRef(false);
+  const generateChartsForSheets = useCallback(async () => {
+    if (readOnly || chartRunLock.current) return;
+    const page = pageIdRef.current;
+    const sheets = [...(blocksByPageRef.current[page] || [])]
+      .filter((block) => block.type === "sheet")
+      .sort((a, b) => (a.y || 0) - (b.y || 0) || (a.x || 0) - (b.x || 0));
+    if (!sheets.length) return;
+    chartRunLock.current = true;
+    const reporter = createRunReporter((feed) => setRunFeed(feed));
+    reporter.plan(
+      sheets.map((sheet) => ({ id: sheet.id, name: sheet.title || "Sheet", status: "pending" })),
+      {
+        title: `${sheets.length} ${sheets.length === 1 ? "sheet" : "sheets"} on this tab`,
+        runningLabel: "Generating charts",
+        doneLabel: "Charts ready",
+        failLabel: "Chart generation failed",
+        readyDetail: "The charts are on the canvas behind this card.",
+      },
+    );
+    let working = blocksByPageRef.current[page] || [];
+    try {
+      for (const sheet of sheets) {
+        if (pageIdRef.current !== page) break;
+        reporter.start(sheet.id);
+        const specs = chartSpecsForSheet(sheet);
+        const have = new Set(
+          working.filter((block) => block.type === "chart" && block.sourceSheetId === sheet.id).map((block) => block.chartView || ""),
+        );
+        const missing = specs.filter((spec) => !have.has(spec.chartView || ""));
+        if (!missing.length) {
+          reporter.succeed(sheet.id, {
+            result: specs.length ? "Charts already on the canvas." : "This sheet stays in the table.",
+          });
+          continue;
+        }
+        const charts = missing.map((spec) => ({
+          id: newId(),
+          type: "chart",
+          source: "sheet-chart",
+          sourceSheetId: sheet.id,
+          ...(spec.chartView ? { chartView: spec.chartView } : {}),
+          w: spec.w || 540,
+          h: spec.h || 360,
+          title: spec.title,
+          body: "",
+          arrive: true,
+        }));
+        const placed = placeChartsBelow(working, charts);
+        working = [...working, ...placed];
+        setBlocksByPage((prev) => {
+          const current = prev[page] || [];
+          if (current.some((block) => block.id === charts[0].id)) return prev;
+          const known = new Set(current.map((block) => block.id));
+          const incoming = placed.filter((block) => !known.has(block.id));
+          return incoming.length ? { ...prev, [page]: [...current, ...incoming] } : prev;
+        });
+        setSpotlightId(charts[0].id);
+        setRevealNonce((nonce) => nonce + 1);
+        reporter.succeed(sheet.id, {
+          result: charts.length === 1 ? "1 chart on the canvas." : `${charts.length} charts on the canvas.`,
+        });
+        await new Promise((resolve) => window.setTimeout(resolve, 340));
+      }
+      reporter.finish();
+    } catch (error) {
+      reporter.fail(null, error instanceof Error ? error.message : "Could not generate charts");
+    } finally {
+      chartRunLock.current = false;
+    }
+  }, [readOnly]);
+
+  useEffect(() => {
+    if (readOnly) return;
+    setBlocksByPage((prev) => {
+      let changed = false;
+      const next = {};
+      for (const [id, list] of Object.entries(prev)) {
+        const paired = withOrderBookChartPairs(list);
+        if (paired !== list) changed = true;
+        next[id] = paired;
+      }
+      return changed ? next : prev;
+    });
+  }, [blocksByPage, readOnly]);
 
   const removeBlock = useCallback(
     (id) => {
@@ -1028,8 +1216,9 @@ export function WorkspaceCanvasProvider({ pageId, readOnly = false, children }) 
       duplicateBlock,
       removeBlock,
       createChartFromBlock,
+      generateChartsForSheets,
     }),
-    [addBlock, armReplay, blocks, blocksByPage, createChartFromBlock, dashboardName, dismissRun, duplicateBlock, focusBlock, focusSheetRow, handDown, leavePrompt, pageId, pendingTabs, placeIntegrationSheets, previewActiveId, previewTabs, readOnly, ready, realtimeById, realtimeModeByPage, registerTables, removeBlock, renameDashboard, renameId, replayReady, replayRun, replayTab, reportRun, requestTab, resolveLeave, revealBlock, revealNonce, revealRunSheets, runFeed, saveNow, selectedId, sheetRowFocus, spotlightId, startRealtimeMode, startSheetRealtime, stopRealtimeMode, stopSheetRealtime, tables, tool, updateBlock],
+    [addBlock, armReplay, blocks, blocksByPage, createChartFromBlock, dashboardName, dismissRun, duplicateBlock, focusBlock, focusSheetRow, generateChartsForSheets, handDown, leavePrompt, pageId, pendingTabs, placeIntegrationSheets, previewActiveId, previewTabs, readOnly, ready, realtimeById, realtimeModeByPage, registerTables, removeBlock, renameDashboard, renameId, replayReady, replayRun, replayTab, reportRun, requestTab, resolveLeave, revealBlock, revealNonce, revealRunSheets, runFeed, saveNow, selectedId, sheetRowFocus, spotlightId, startRealtimeMode, startSheetRealtime, stopRealtimeMode, stopSheetRealtime, tables, tool, updateBlock],
   );
 
   return (
@@ -1867,7 +2056,7 @@ function CanvasBlock({ block, selected, spotlight = false, onSelect, onChange, b
       onPointerDown={readOnly ? undefined : onPointerDown}
       className={cn(
         "pointer-events-auto absolute flex flex-col overflow-hidden rounded-xl border bg-background shadow-sm",
-        block.arrive && "lychee-sheet-arrive",
+        block.arrive && (block.branch ? "lychee-sheet-branch" : "lychee-sheet-arrive"),
         readOnly ? "border-border/70" : "group/block",
         !readOnly && spotlight
           ? "border-emerald-500 ring-2 ring-emerald-400/80"

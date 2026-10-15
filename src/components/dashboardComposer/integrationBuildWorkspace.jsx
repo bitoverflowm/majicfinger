@@ -4,7 +4,8 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { columnMissingFromRows } from "@/lib/integrations/columnPayload";
 import { ArrowLeft, Check, ChevronDown, History, Info } from "lucide-react";
 import { IntegrationBuildGrid } from "@/components/dashboardComposer/integrationBuildGrid";
-import { displayMatrix } from "@/components/dashboardComposer/integrationRunSheets";
+import { displayMatrix, recordsFromRows } from "@/components/dashboardComposer/integrationRunSheets";
+import { chartSpecsForSheet } from "@/lib/visualizations/sheetCharts";
 import { rememberTradeSheet } from "@/components/dashboardComposer/fullTradeSheet";
 import { FunctionExplainer, FunctionExplainerTabs } from "@/components/dashboardComposer/integrationFunctionExplainer";
 import { SummarizeExplainer, SummarizeExplainerTabs } from "@/components/dashboardComposer/integrationSummarizeExplainer";
@@ -6632,6 +6633,7 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
     const sheets = [];
     const stageSheet = (sheet) => {
       if (!sheet) return Promise.resolve();
+      const isNew = !sheet.id || sheets.every((item) => item.id !== sheet.id);
       if (sheet.id) {
         const index = sheets.findIndex((item) => item.id === sheet.id);
         if (index >= 0) sheets[index] = sheet;
@@ -6639,13 +6641,31 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
       } else {
         sheets.push(sheet);
       }
-      canvas?.revealRunSheets?.(sheets.slice(), {
+      const options = {
         pageId: placementRef.current?.pageId || undefined,
         append: placementRef.current?.append !== false,
-      });
-      return new Promise((resolve) => {
-        requestAnimationFrame(() => requestAnimationFrame(resolve));
-      });
+      };
+      const reveal = (extra) => canvas?.revealRunSheets?.(sheets.slice(), { ...options, ...extra });
+      const opensChart = chartSpecsForSheet({
+        ...sheet,
+        type: "sheet",
+        records: recordsFromRows(sheet.columns, sheet.rows || []),
+      }).length > 0;
+      const paint = () => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+      if (!isNew || !opensChart) {
+        reveal();
+        return paint();
+      }
+      reveal({ holdChartsFor: sheet.id });
+      return paint().then(
+        () =>
+          new Promise((resolve) => {
+            window.setTimeout(() => {
+              reveal({ spotlightChartsFor: sheet.id });
+              window.setTimeout(resolve, 420);
+            }, 420);
+          }),
+      );
     };
     const pushSampleSheet = ({ id, title, columns, rows, parentSheetId, parentQuery, composeRequest, table, span }) => {
       if (!sampling || !sampleConfig || !columns?.length) return;
@@ -7505,7 +7525,7 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
         : marketDownstream
           ? downstreamJoinMarkets
           : fanoutAssociated;
-    const appendHolderTraderSheets = async (holderSheets) => {
+    const appendHolderTraderSheets = async (holderSheets, options = {}) => {
       const hosts = Array.isArray(holderSheets) ? holderSheets.filter((sheet) => sheet?.rows?.length) : [];
       const chosen = holderTraderChoices.filter((item) => holderTraderJoinIds.has(item.id));
       const people = polymarketTraderEntities(hosts.flatMap((sheet) => sheet.rows || []), marketCap);
@@ -7550,6 +7570,7 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
           rows: fullRows,
           rowCount: fullRows.length,
           span: "half",
+          ...(options.branch ? { branch: options.branch } : {}),
           table: item.target.id,
           pull: { table: item.target.id, address: item.entity.pick?.address, kind: "profile" },
           summary: `Polymarket Live · ${item.target.title} · ${label}`,
@@ -7636,32 +7657,48 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
         const pulled = await mapPool(jobs, 3, async (job) => {
           try {
             const result = await loadPolymarketLiveTable(job.target.id, [job.entity.pick], { rowLimit: childLimit, planLimit: childLimit });
-            const item = { ...job, columns: result.columns || [], rows: result.rows || [] };
-            if (item.columns.length) {
-              const label = item.entity.label || item.entity.ticker;
-              const slug = `${item.target.id}-${String(item.entity.id).replace(/[^A-Za-z0-9]+/g, "-")}`;
-              await stageSheet({
-                id: `run-live-${slug}`,
-                title: `Markets · ${label}`,
-                columns: item.columns,
-                rows: item.rows || [],
-                rowCount: (item.rows || []).length,
-                span: "full",
-                table: item.target.id,
-                pull: { table: item.target.id, eventId: item.entity.id },
-                summary: `Polymarket Live · ${item.target.title} · ${label}`,
-              });
-            }
-            return item;
+            return { ...job, columns: result.columns || [], rows: result.rows || [] };
           } catch {
             return { ...job, columns: [], rows: [] };
           }
         });
-        const namedMarkets = polymarketMarketEntities(pulled.flatMap((item) => item.rows || []), marketCap);
-        if (downstreamSheetTargets.length && namedMarkets.length) {
+        const pulledByEvent = new Map();
+        for (const item of pulled) {
+          const id = item.entity?.id;
+          if (!id) continue;
+          const list = pulledByEvent.get(id) || [];
+          list.push(item);
+          pulledByEvent.set(id, list);
+        }
+        let marketBudget = marketCap;
+        for (const event of events) {
+          const eventPulls = pulledByEvent.get(event.id) || [];
+          for (const item of eventPulls) {
+            if (!item.columns.length) continue;
+            const label = item.entity.label || item.entity.ticker;
+            const slug = `${item.target.id}-${String(item.entity.id).replace(/[^A-Za-z0-9]+/g, "-")}`;
+            await stageSheet({
+              id: `run-live-${slug}`,
+              title: `Markets · ${label}`,
+              columns: item.columns,
+              rows: item.rows || [],
+              rowCount: (item.rows || []).length,
+              span: "full",
+              branch: 1,
+              table: item.target.id,
+              pull: { table: item.target.id, eventId: item.entity.id },
+              summary: `Polymarket Live · ${item.target.title} · ${label}`,
+            });
+          }
+          const marketRowsForEvent = eventPulls
+            .filter((item) => item.target.id === "getMarketsByEvents")
+            .flatMap((item) => item.rows || []);
+          const namedMarkets = polymarketMarketEntities(marketRowsForEvent, marketBudget);
+          marketBudget = Math.max(0, marketBudget - namedMarkets.length);
+          if (!downstreamSheetTargets.length || !namedMarkets.length) continue;
           const downJobs = namedMarkets.flatMap((entity) => downstreamSheetTargets.map((target) => ({ target, entity })));
           const holderSheetStart = sheets.length;
-          const downPulled = await mapPool(downJobs, 3, async (job) => {
+          await mapPool(downJobs, 3, async (job) => {
             try {
               const result = await loadPolymarketLiveJoin(
                 job.target.id,
@@ -7679,6 +7716,7 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
                   rows: item.rows || [],
                   rowCount: (item.rows || []).length,
                   span: "half",
+                  branch: 2,
                   table: item.target.id,
                   pull: { ticker: item.entity.ticker, table: item.target.id, tokens: item.entity.pick?.tokenIds || [], ...lifePull(item.entity.pick || {}) },
                   summary: `Polymarket Live · ${item.target.title} · ${label}`,
@@ -7691,6 +7729,7 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
           });
           await appendHolderTraderSheets(
             sheets.slice(holderSheetStart).filter((sheet) => sheet.table === "getHoldersByMarkets"),
+            { branch: 2 },
           );
         }
         reporter.succeed("join-live", {

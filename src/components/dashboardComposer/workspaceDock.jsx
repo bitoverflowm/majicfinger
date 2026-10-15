@@ -2,6 +2,12 @@
 
 import { BarChart3, Database, MousePointer2, Table2, Type, Upload } from "lucide-react";
 import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import {
   Tooltip,
   TooltipContent,
   TooltipProvider,
@@ -51,11 +57,15 @@ export function WorkspaceDock() {
   const canvas = useWorkspaceCanvas();
   const connect = useIntegrationConnect();
   const tool = canvas?.tool || "select";
+  const sheetCount = (canvas?.blocks || []).filter((block) => block.type === "sheet").length;
 
   return (
     <div
       className="pointer-events-auto fixed bottom-6 left-1/2 z-[500] -translate-x-1/2"
-      onMouseDown={(e) => e.preventDefault()}
+      onMouseDown={(e) => {
+        if (e.target instanceof Element && e.target.closest("[aria-haspopup='menu']")) return;
+        e.preventDefault();
+      }}
     >
       <TooltipProvider delayDuration={300}>
         <div
@@ -71,6 +81,9 @@ export function WorkspaceDock() {
                 {item.id === "sheet" || item.id === "export" ? (
                   <span className="mx-1 h-5 w-px bg-black/10 dark:bg-white/15" aria-hidden />
                 ) : null}
+                {item.id === "chart" && sheetCount > 0 ? (
+                  <ChartToolMenu canvas={canvas} />
+                ) : (
                 <Tooltip>
                   <TooltipTrigger asChild>
                     <button
@@ -101,11 +114,41 @@ export function WorkspaceDock() {
                     {item.label}
                   </TooltipContent>
                 </Tooltip>
+                )}
               </div>
             );
           })}
         </div>
       </TooltipProvider>
     </div>
+  );
+}
+
+function ChartToolMenu({ canvas }) {
+  return (
+    <DropdownMenu>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <DropdownMenuTrigger asChild>
+            <button
+              type="button"
+              aria-label="Add chart"
+              className="inline-flex size-8 items-center justify-center rounded-[8px] text-neutral-700 transition-colors hover:bg-black/[0.05] dark:text-neutral-200 dark:hover:bg-white/10"
+            >
+              <BarChart3 className="size-[18px]" strokeWidth={1.75} aria-hidden />
+            </button>
+          </DropdownMenuTrigger>
+        </TooltipTrigger>
+        <TooltipContent side="top" sideOffset={8} className="!z-[520] text-xs">
+          Add chart
+        </TooltipContent>
+      </Tooltip>
+      <DropdownMenuContent side="top" align="center" sideOffset={12} className="z-[520] min-w-64">
+        <DropdownMenuItem onSelect={() => canvas?.addBlock?.("chart")}>Add chart</DropdownMenuItem>
+        <DropdownMenuItem onSelect={() => canvas?.generateChartsForSheets?.()}>
+          Generate charts for all your data
+        </DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 }
