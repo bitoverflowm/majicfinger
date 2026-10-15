@@ -91,6 +91,7 @@ import {
 import {
   defaultPolymarketQuoteFilters,
   exclusivePriceHistoryFilters,
+  exclusiveTokenHistoryFilters,
   isPolymarketQuoteTable,
   polymarketQuoteAttributeColumns,
   polymarketQuoteRequestKey,
@@ -154,6 +155,7 @@ import {
   attributeSummary,
   AttributeFilters,
   PriceHistoryQueryFields,
+  TradeHistoryQueryFields,
   JoinSourceFields,
   buildAttributePredicates,
   rowMatchesAttributes,
@@ -2130,10 +2132,40 @@ function traderJoinSheetParts(previewSheet) {
   return { kind, name, key: `${kind}:${name || "combined"}` };
 }
 
+/** Polymarket pulls whose request controls sit in their own section above Columns. */
+const POLYMARKET_QUERY_SECTIONS = {
+  getBatchPricesHistory: {
+    value: "price-history",
+    title: "Price history",
+    ids: ["quote_outcome", "interval", "time_range", "fidelity"],
+  },
+  getTokenPriceHistory: {
+    value: "token-history",
+    title: "Token price history",
+    ids: ["quote_outcome", "interval", "time_range", "as_of", "bucket_seconds"],
+  },
+  getTradesByMarket: {
+    value: "trade-history",
+    title: "Trade history",
+    ids: ["quote_outcome", "trade_side", "taker_only", "filter_type", "filter_amount"],
+  },
+};
+
+/**
+ * The next request filters for this table. Each history pull keeps one time window.
+ * @param {string} tableId
+ */
+function settlePolymarketQueryFilters(tableId, current, next, market) {
+  if (tableId === "getBatchPricesHistory") return exclusivePriceHistoryFilters(current, next);
+  if (tableId === "getTokenPriceHistory") return exclusiveTokenHistoryFilters(current, next, market);
+  return next;
+}
+
 function priceHistorySummary(columns, filters) {
   const byId = new Map((columns || []).map((column) => [column.id, column]));
   const rangeOn = Boolean(filters?.time_range?.from && filters?.time_range?.to);
-  return ["quote_outcome", rangeOn ? "time_range" : "interval", "fidelity"]
+  const asOfOn = byId.has("as_of") && Boolean(String(filters?.as_of?.value || "").trim());
+  return ["quote_outcome", asOfOn ? "as_of" : rangeOn ? "time_range" : "interval", "fidelity", "bucket_seconds", "trade_side", "filter_amount"]
     .map((id) => {
       const column = byId.get(id);
       return column ? attributeSummary(column, filters) : "";
@@ -2435,21 +2467,22 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
       const range = current?.time_range || {};
       if (range.from === next.from && range.to === next.to && range.preset === next.preset) return current;
       const patched = { ...(current || {}), time_range: next };
-      return tableId === "getBatchPricesHistory" ? exclusivePriceHistoryFilters(current, patched) : patched;
+      return polymarketLive ? settlePolymarketQueryFilters(tableId, current, patched, focusedMarket) : patched;
     });
     return undefined;
   }, [focusedKey, focusedLife, livePicks.length, polymarketLive, tableId]);
   const polymarketQuoteColumns = useMemo(() => {
     if (!polymarketLive || !isPolymarketQuoteTable(tableId)) return [];
-    const columns = polymarketQuoteAttributeColumns(tableId, pull?.columns || [], attributeFilters);
-    const lifeLabel = tableId === "getBatchPricesHistory" ? "Full market history" : "";
+    const columns = polymarketQuoteAttributeColumns(tableId, pull?.columns || [], attributeFilters, focusedMarket);
+    const lifeLabel = tableId === "getBatchPricesHistory" || tableId === "getTokenPriceHistory" ? "Full market history" : "";
     return withMarketLifeBounds(columns, focusedLife, lifeLabel);
-  }, [attributeFilters, focusedLife, polymarketLive, pull?.columns, tableId]);
+  }, [attributeFilters, focusedLife, focusedMarket, polymarketLive, pull?.columns, tableId]);
+  const polymarketQuerySection = polymarketLive ? POLYMARKET_QUERY_SECTIONS[tableId] || null : null;
   const polymarketAttributeColumns = useMemo(() => {
-    if (tableId !== "getBatchPricesHistory") return polymarketQuoteColumns;
-    const skip = new Set(["quote_outcome", "interval", "time_range", "fidelity"]);
+    if (!polymarketQuerySection) return polymarketQuoteColumns;
+    const skip = new Set(polymarketQuerySection.ids);
     return polymarketQuoteColumns.filter((column) => !skip.has(column.id));
-  }, [polymarketQuoteColumns, tableId]);
+  }, [polymarketQuerySection, polymarketQuoteColumns]);
   const polymarketQuoteKey = polymarketQuoteRequestKey(tableId, attributeFilters, rowLimit, planLimit);
   const polymarketLeaderboardColumns = useMemo(() => {
     if (!polymarketLive || tableId !== "getTraderLeaderboard") return [];
@@ -7744,6 +7777,7 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
               rowCount: rows.length,
               span: "half",
               table: item.target.id,
+              ...(result.query ? { query: result.query } : {}),
               pull: { ticker: item.market.ticker, table: item.target.id, tokens: item.market.pick?.tokenIds || [], ...lifePull(item.market.pick || item.market) },
               summary: `${polymarketJoinActive ? "Polymarket Live" : "Kalshi Live"} · ${item.target.title} · ${item.market.label || item.market.ticker}`,
             });
@@ -7894,6 +7928,7 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
                     span: "half",
                     branch: 3,
                     table: item.target.id,
+                    ...(result.query ? { query: result.query } : {}),
                     pull: { ticker: item.entity.ticker, table: item.target.id, tokens: item.entity.pick?.tokenIds || [], ...lifePull(item.entity.pick || {}) },
                     summary: `Polymarket Live · ${item.target.title} · ${label}`,
                   });
@@ -7989,6 +8024,7 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
                   span: "half",
                   branch: 2,
                   table: item.target.id,
+                  ...(result.query ? { query: result.query } : {}),
                   pull: { ticker: item.entity.ticker, table: item.target.id, tokens: item.entity.pick?.tokenIds || [], ...lifePull(item.entity.pick || {}) },
                   summary: `Polymarket Live · ${item.target.title} · ${label}`,
                 });
@@ -8065,6 +8101,7 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
                 rowCount: rows.length,
                 span: "half",
                 table: item.target.id,
+                ...(result.query ? { query: result.query } : {}),
                 pull: item.anchor === "trader"
                   ? { table: item.target.id, address: marketPick.address, kind: "profile" }
                   : { ticker: item.entity.ticker, table: item.target.id, tokens: marketPick.tokenIds || [], ...lifePull(marketPick) },
@@ -8151,6 +8188,7 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
                     rowCount: fullRows.length,
                     span: "half",
                     table: item.target.id,
+                    ...(result.query ? { query: result.query } : {}),
                     pull: {
                       ticker: item.entity.ticker,
                       table: item.target.id,
@@ -9639,17 +9677,17 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
             key={tableId}
             type="single"
             collapsible
-            defaultValue={tableId === "getBatchPricesHistory" ? "price-history" : "columns"}
+            defaultValue={polymarketQuerySection?.value || "columns"}
             className="space-y-2"
           >
-            {tableId === "getBatchPricesHistory" ? (
-              <AccordionItem value="price-history" className="border-0">
+            {polymarketQuerySection ? (
+              <AccordionItem value={polymarketQuerySection.value} className="border-0">
                 <AccordionPrimitive.Header className="flex">
                   <AccordionPrimitive.Trigger
                     className="flex w-full items-center gap-2 rounded-lg bg-zinc-200/80 px-2.5 py-1.5 text-left text-[12px] font-semibold text-foreground dark:bg-zinc-800 [&[data-state=open]>svg]:rotate-180"
-                    aria-label="Price history"
+                    aria-label={polymarketQuerySection.title}
                   >
-                    <span>Price history</span>
+                    <span className="shrink-0">{polymarketQuerySection.title}</span>
                     <span className="ml-auto max-w-[55%] truncate text-[11px] font-normal text-[#0d99ff]">
                       {priceHistorySummary(polymarketQuoteColumns, attributeFilters)}
                     </span>
@@ -9658,11 +9696,21 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
                 </AccordionPrimitive.Header>
                 <AccordionContent className="pb-0 pt-2">
                   <div className="rounded-lg border border-border/70 px-2 py-2">
-                    <PriceHistoryQueryFields
-                      columns={polymarketQuoteColumns}
-                      filters={attributeFilters}
-                      onChange={(next) => setAttributeFilters((current) => exclusivePriceHistoryFilters(current, next))}
-                    />
+                    {tableId === "getTradesByMarket" ? (
+                      <TradeHistoryQueryFields
+                        columns={polymarketQuoteColumns}
+                        filters={attributeFilters}
+                        onChange={setAttributeFilters}
+                      />
+                    ) : (
+                      <PriceHistoryQueryFields
+                        columns={polymarketQuoteColumns}
+                        filters={attributeFilters}
+                        onChange={(next) =>
+                          setAttributeFilters((current) => settlePolymarketQueryFilters(tableId, current, next, focusedMarket))
+                        }
+                      />
+                    )}
                   </div>
                 </AccordionContent>
               </AccordionItem>
@@ -9760,11 +9808,11 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
                 }
                 filters={attributeFilters}
                 onChange={(next) => {
-                  if (tableId !== "getBatchPricesHistory") {
+                  if (!polymarketLive) {
                     setAttributeFilters(next);
                     return;
                   }
-                  setAttributeFilters((current) => exclusivePriceHistoryFilters(current, next));
+                  setAttributeFilters((current) => settlePolymarketQueryFilters(tableId, current, next, focusedMarket));
                 }}
                 sorts={sortKeys}
                 onSorts={setSortKeys}

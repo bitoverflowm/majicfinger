@@ -223,4 +223,47 @@ const lastCards = snapshotStatCards(lastTrade, lastDescribed);
 assert.equal(lastCards[0].format(), "74.0¢");
 assert.equal(lastCards[0].caption, "Yes · BUY");
 
+const priceHistory = chartSpecsForSheet({
+  type: "sheet",
+  title: "Price History",
+  table: "getBatchPricesHistory",
+  integrationId: "polymarket",
+  columns: [{ id: "outcome" }, { id: "t" }, { id: "p" }],
+  records: [
+    { outcome: "Yes", t: 1791452719, p: 0.03 },
+    { outcome: "Yes", t: 1791452844, p: 0.04 },
+  ],
+});
+assert.deepEqual(priceHistory.map((chart) => chart.chartView), ["price"]);
+assert.ok(priceHistory[0].w > 540);
+assert.ok(priceHistory[0].h > 360);
+
+const tokenHistory = chartSpecsForSheet({
+  type: "sheet",
+  title: "Token Price History",
+  table: "getTokenPriceHistory",
+  columns: [{ id: "outcome" }, { id: "observed_at" }, { id: "price" }, { id: "timestamp" }],
+  records: [
+    { outcome: "Yes", observed_at: "2026-10-01T00:00:00.000Z", price: 0.4, timestamp: "1790812800" },
+    { outcome: "No", observed_at: "2026-10-01T00:00:00.000Z", price: 0.6, timestamp: "1790812800" },
+  ],
+});
+assert.deepEqual(tokenHistory.map((chart) => chart.chartView), ["price"]);
+assert.equal(tokenHistory[0].w, priceHistory[0].w);
+assert.equal(tokenHistory[0].h, priceHistory[0].h);
+
+const tradeRecords = Array.from({ length: 12 }, (_, index) => ({
+  observed_at: new Date(Date.UTC(2026, 9, 1, index)).toISOString(),
+  outcome: index % 2 ? "No" : "Yes",
+  side: "BUY",
+  price: 0.5,
+  size: 10,
+  title: "Fed decision",
+}));
+const tradeColumns = ["observed_at", "outcome", "side", "price", "size", "title"].map((id) => ({ id }));
+const polymarketTrades = chartSpecsForSheet({ type: "sheet", title: "Trade History", table: "getTradesByMarket", columns: tradeColumns, records: tradeRecords });
+assert.deepEqual(polymarketTrades.map((chart) => chart.chartView), ["trade-price"]);
+assert.equal(polymarketTrades[0].w, priceHistory[0].w);
+assert.equal(polymarketTrades[0].h, priceHistory[0].h);
+
 console.log("sheet charts ok");

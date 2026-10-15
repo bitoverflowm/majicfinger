@@ -5,7 +5,7 @@
 
 import { pageIdForTab } from "@/lib/workspaceDashboardDocument";
 import { isOrderBookSheet, rowsToOrderBook } from "@/components/dashboardComposer/orderBookLadder";
-import { isPriceHistorySheet, priceHistoryPoints } from "@/components/dashboardComposer/priceHistorySeries";
+import { isPriceHistorySheet, priceHistoryLines } from "@/components/dashboardComposer/priceHistorySeries";
 import { sheetMarketCaption, sheetMarketName, sheetMarketSide } from "@/lib/markets/marketLife";
 
 const STORY_LIMIT = 4;
@@ -95,7 +95,7 @@ function sheetAsset(block, tab) {
   };
 
   if (isPriceHistorySheet(block)) {
-    const full = priceHistoryPoints(block);
+    const full = priceHistoryLines(block)[0]?.points || [];
     if (full.length >= 2) {
       const first = full[0].price;
       const last = full[full.length - 1].price;

@@ -212,6 +212,7 @@ export function MarketChart({
   live = false,
   status = "ready",
   emptyLabel = "This sheet has no price to chart yet.",
+  toolbar = null,
 }) {
   const uid = React.useId().replace(/:/g, "");
   const reduce = usePrefersReducedMotion();
@@ -402,8 +403,13 @@ export function MarketChart({
             ) : null}
           </p>
         </div>
-        {ranges.length > 1 ? (
-          <RangeSelector ranges={ranges} value={range?.label || defaultRange} onChange={setRangeLabel} reduce={reduce} />
+        {toolbar || ranges.length > 1 ? (
+          <div className="flex shrink-0 flex-wrap items-center justify-end gap-2">
+            {toolbar}
+            {ranges.length > 1 ? (
+              <RangeSelector ranges={ranges} value={range?.label || defaultRange} onChange={setRangeLabel} reduce={reduce} />
+            ) : null}
+          </div>
         ) : null}
       </div>
 

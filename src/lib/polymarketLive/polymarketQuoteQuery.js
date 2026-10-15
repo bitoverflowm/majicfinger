@@ -278,21 +278,68 @@ const TOKEN_BUCKET_OPTIONS = [
   ["86400", "1 day"],
 ];
 
+/** Max and all only reach past 30 days at these widths. */
+const WHOLE_LIFE_BUCKETS = new Set(["", "10800", "43200", "86400"]);
+
 /**
+ * How far back each fine width is kept. Coarser widths are kept for good.
+ * These are the documented minimums, in seconds.
+ */
+const TOKEN_BUCKET_RETENTION_SEC = {
+  60: 7 * 86400,
+  300: 60 * 86400,
+  600: 60 * 86400,
+  1800: 90 * 86400,
+};
+
+function tokenBucketReaches(seconds, windowStart) {
+  const kept = TOKEN_BUCKET_RETENTION_SEC[seconds];
+  if (!kept || !(Number(windowStart) > 0)) return true;
+  return Math.floor(Date.now() / 1000) - Number(windowStart) <= kept;
+}
+
+/**
+ * Widths this window can actually serve. A width finer than the data kept
+ * for the window's start comes back empty, so it is not offered.
  * @param {unknown} interval
  * @param {boolean} hasRange
  * @param {boolean} hasAsOf
+ * @param {number} [windowStart] epoch seconds
  */
-export function polymarketTokenBucketOptions(interval, hasRange, hasAsOf) {
+export function polymarketTokenBucketOptions(interval, hasRange, hasAsOf, windowStart) {
   if (hasAsOf) return [["", "Default"]];
+  const value = String(interval || "").trim().toLowerCase();
+  if (!hasRange && (value === "max" || value === "all")) {
+    return TOKEN_BUCKET_OPTIONS.filter((option) => WHOLE_LIFE_BUCKETS.has(option[0]));
+  }
   const floor = polymarketTokenBucketFloor(interval, hasRange);
-  return TOKEN_BUCKET_OPTIONS.filter((option) => !option[0] || Number(option[0]) >= floor);
+  return TOKEN_BUCKET_OPTIONS.filter(
+    (option) => !option[0] || (Number(option[0]) >= floor && tokenBucketReaches(Number(option[0]), windowStart)),
+  );
+}
+
+/**
+ * Where this token-history window starts, in epoch seconds. 0 when unknown or unbounded.
+ * @param {Record<string, any>} [filters]
+ * @param {{ closed?: boolean; endedAt?: number; startedAt?: number } | null} [market]
+ */
+export function polymarketTokenHistoryWindowStart(filters, market) {
+  let params;
+  try {
+    params = polymarketTokenHistoryParams({ ...(filters || {}), bucket_seconds: { value: "" } }, market);
+  } catch {
+    return 0;
+  }
+  if (params.start) return Number(params.start);
+  const span = INTERVAL_SPAN_SEC[params.interval];
+  return span ? Math.floor(Date.now() / 1000) - span : 0;
 }
 
 /**
  * @param {Record<string, any>} [filters]
+ * @param {{ closed?: boolean; endedAt?: number; startedAt?: number } | null} [market]
  */
-function tokenHistoryControls(filters) {
+function tokenHistoryControls(filters, market) {
   const interval = String(filters?.interval?.value || "1d");
   const hasRange = historyHasRange(filters);
   const hasAsOf = Boolean(String(filters?.as_of?.value || "").trim());
@@ -306,7 +353,7 @@ function tokenHistoryControls(filters) {
       control: "period",
       ariaLabel: "Interval",
       enumOptions: INTERVAL_OPTIONS,
-      description: "The window when no dates are set. A closed market uses the last part of its own trading, not today. 1 month and max cover more than 15 days on an open market.",
+      description: "A window looking back from now, or from when a closed market stopped trading. All and max cover the market's whole life. Shorter intervals on a closed market stop at 15 days.",
     },
     {
       id: "time_range",
@@ -315,7 +362,8 @@ function tokenHistoryControls(filters) {
       queryOnly: true,
       control: "query-range",
       rangePresetIds: POLYMARKET_TOKEN_HISTORY_PRESET_IDS,
-      description: "Start and end, at most 15 days. Dates before this market was created stay unavailable. The shortcuts end when a closed market stopped trading, and end today while it is still open. A range replaces the interval.",
+      rangeMaxDays: 15,
+      description: "A start and end date, at most 15 days apart, inside the market's life. Use max for anything longer.",
     },
     {
       id: "bucket_seconds",
@@ -324,8 +372,8 @@ function tokenHistoryControls(filters) {
       queryOnly: true,
       control: "period",
       ariaLabel: "Bucket",
-      enumOptions: polymarketTokenBucketOptions(interval, hasRange, hasAsOf),
-      description: "Seconds in each point. The default follows the window. 1 week needs at least 5 minutes. 1 month, all, and max need at least 10 minutes.",
+      enumOptions: polymarketTokenBucketOptions(interval, hasRange, hasAsOf, polymarketTokenHistoryWindowStart(filters, market)),
+      description: "The width of each point. Default lets Polymarket pick one that fits the window. Fine widths are kept only for recent weeks, so older windows offer coarser ones.",
     },
     {
       id: "as_of",
@@ -333,9 +381,56 @@ function tokenHistoryControls(filters) {
       type: "date",
       queryOnly: true,
       control: "query-instant",
-      description: "The latest price at or before this moment. This replaces the date range and the interval.",
+      description: "One price: the last one at or before the end of this day.",
     },
   ];
+}
+
+/**
+ * A token-history pull uses exactly one window: an interval, a date range, or an as-of day.
+ * The one just changed wins. The bucket has to be one that window can serve.
+ * @param {Record<string, any> | null | undefined} previous
+ * @param {Record<string, any> | null | undefined} next
+ * @param {{ closed?: boolean; endedAt?: number; startedAt?: number } | null} [market]
+ */
+export function exclusiveTokenHistoryFilters(previous, next, market) {
+  const before = previous || {};
+  const incoming = next || {};
+  const range = incoming.time_range || {};
+  const beforeRange = before.time_range || {};
+  const rangeOn = Boolean(range.from && range.to);
+  const asOf = String(incoming.as_of?.value || "").trim();
+  const interval = String(incoming.interval?.value || "").trim();
+  const asOfChanged = Boolean(asOf) && asOf !== String(before.as_of?.value || "").trim();
+  const rangeChanged =
+    rangeOn &&
+    (range.from !== beforeRange.from || range.to !== beforeRange.to || String(range.preset || "") !== String(beforeRange.preset || ""));
+  const intervalChanged = Boolean(interval) && interval !== String(before.interval?.value || "").trim();
+  const winner = asOfChanged
+    ? "as_of"
+    : rangeChanged
+      ? "range"
+      : intervalChanged
+        ? "interval"
+        : asOf
+          ? "as_of"
+          : rangeOn
+            ? "range"
+            : "interval";
+  const noRange = { from: "", to: "", preset: "" };
+  let settled = incoming;
+  if (winner === "as_of") settled = { ...settled, interval: { value: "" }, time_range: noRange };
+  else if (winner === "range") settled = { ...settled, interval: { value: "" }, as_of: { value: "" } };
+  else settled = { ...settled, time_range: noRange, as_of: { value: "" } };
+  const options = polymarketTokenBucketOptions(
+    String(settled.interval?.value || "1d"),
+    historyHasRange(settled),
+    Boolean(String(settled.as_of?.value || "").trim()),
+    polymarketTokenHistoryWindowStart(settled, market),
+  ).map(([value]) => value);
+  const bucket = String(settled.bucket_seconds?.value || "");
+  if (options.includes(bucket)) return settled;
+  return { ...settled, bucket_seconds: { value: "" } };
 }
 
 export const TOKEN_PRICE_HISTORY_COLUMNS = [
@@ -481,8 +576,10 @@ function tradeControls() {
 /**
  * @param {string} tableId
  * @param {Array<Record<string, unknown>>} columns
+ * @param {Record<string, any>} [filters]
+ * @param {{ closed?: boolean; endedAt?: number; startedAt?: number } | null} [market]
  */
-export function polymarketQuoteAttributeColumns(tableId, columns, filters) {
+export function polymarketQuoteAttributeColumns(tableId, columns, filters, market) {
   if (!isPolymarketQuoteTable(tableId)) return columns || [];
   const shaped = (columns || []).map((column) => {
     const mapped = polymarketQuoteColumnType(column.id);
@@ -516,10 +613,27 @@ export function polymarketQuoteAttributeColumns(tableId, columns, filters) {
     return [outcomeControl("Yes, No, or both outcomes."), ...shaped];
   }
   if (tableId === "getBatchPricesHistory") return [...historyControls(filters), ...shaped];
-  if (tableId === "getTokenPriceHistory") return [...tokenHistoryControls(filters), ...shaped];
+  if (tableId === "getTokenPriceHistory") return [...tokenHistoryControls(filters, market), ...shaped];
   if (tableId === "getTradesByMarket") return [...tradeControls(), ...shaped];
   if (tableId === "getHoldersByMarkets") return [...holderControls(), ...shaped];
   return shaped;
+}
+
+/**
+ * Filters for a sheet joined onto a market from another pull.
+ * Price history covers the market's whole life, one point per day.
+ * Token price history covers the whole life of both outcomes.
+ * @param {string} tableId
+ */
+export function polymarketJoinQuoteFilters(tableId) {
+  const filters = defaultPolymarketQuoteFilters(tableId);
+  if (tableId === "getBatchPricesHistory") {
+    return { ...filters, interval: { value: "max" }, fidelity: { value: "1440" } };
+  }
+  if (tableId === "getTokenPriceHistory") {
+    return { ...filters, quote_outcome: { value: "both" }, interval: { value: "max" } };
+  }
+  return filters;
 }
 
 /**
@@ -793,6 +907,8 @@ export function polymarketHistoryBody(filters, market) {
 /**
  * One window per request: as_of, or start with an optional end, or interval.
  * A closed market's interval ends when that market stopped trading.
+ * All and max already serve the market's whole life, open or closed.
+ * A bucket finer than the data kept for this window is left to the server.
  * @param {Record<string, any>} filters
  * @param {{ closed?: boolean; endedAt?: number; startedAt?: number } | null} [market]
  * @returns {Record<string, string>}
@@ -824,6 +940,8 @@ export function polymarketTokenHistoryParams(filters, market) {
     }
     params.start = String(start);
     if (end && end > start) params.end = String(end);
+  } else if (interval === "max" || interval === "all") {
+    params.interval = interval;
   } else {
     const life = marketLifeWindow(market, interval, POLYMARKET_PRICES_HISTORY_MAX_SPAN_SEC);
     if (life) {
@@ -837,8 +955,11 @@ export function polymarketTokenHistoryParams(filters, market) {
   const floor = polymarketTokenBucketFloor(interval, Boolean(params.start) && !derived);
   const asked = Number(filters?.bucket_seconds?.value);
   if (Number.isFinite(asked) && asked > 0) {
-    const bucket = Math.max(60, Math.min(86400, Math.floor(asked)));
-    params.bucket_seconds = String(Math.max(bucket, floor));
+    const bucket = Math.max(60, floor, Math.min(86400, Math.floor(asked)));
+    const windowStart = params.start ? Number(params.start) : INTERVAL_SPAN_SEC[params.interval] ? now - INTERVAL_SPAN_SEC[params.interval] : 0;
+    const wholeLife = Boolean(params.interval) && (params.interval === "max" || params.interval === "all");
+    const served = wholeLife ? WHOLE_LIFE_BUCKETS.has(String(bucket)) : tokenBucketReaches(bucket, windowStart);
+    if (served) params.bucket_seconds = String(bucket);
   }
   return params;
 }

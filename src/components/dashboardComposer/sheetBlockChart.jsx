@@ -5,8 +5,8 @@ import { Bar, BarChart, CartesianGrid, Line, LineChart, ResponsiveContainer, Too
 import { useReadyTradeSheet, tradeTickerFromBlock, usesHistoricalTradeSheet } from "@/components/dashboardComposer/fullTradeSheet";
 import { isOrderBookSheet, orderBookBlockHeight, rowsToFramedBooks, rowsToOrderBook } from "@/components/dashboardComposer/orderBookLadder";
 import { cn } from "@/lib/utils";
-import { ohlcRowsToCandles, rangesForCandles, tradesToCandles } from "@/components/dashboardComposer/tradeMarketCandles";
-import { isPriceHistorySheet, priceHistoryOutcome, priceHistoryPoints } from "@/components/dashboardComposer/priceHistorySeries";
+import { ohlcRowsToCandles, rangesForCandles, tradeOutcomes, tradesToCandles } from "@/components/dashboardComposer/tradeMarketCandles";
+import { isPriceHistorySheet, priceHistoryLines, priceHistoryOutcome } from "@/components/dashboardComposer/priceHistorySeries";
 import { DatasetSummary, EventLinesChart } from "@/components/dashboardComposer/datasetChart";
 import { PortfolioTreemap } from "@/components/dashboardComposer/portfolioTreemapChart";
 import { VolumeTreemap } from "@/components/dashboardComposer/volumeTreemapChart";
@@ -18,6 +18,7 @@ import { snapshotStatCards, statCardBlockHeight } from "@/lib/visualizations/mar
 import { resolveVisualization, usesStatCards } from "@/lib/visualizations/presetRegistry";
 import { StatCards } from "@/components/spectrumui/charts/stat-cards";
 import { IndicatorChart } from "@/components/spectrumui/charts/indicator-chart";
+import { seriesVarsClassName } from "@/components/spectrumui/charts/chart-engine";
 import { MarketChart } from "@/components/spectrumui/charts/market-chart";
 import { DepthChart } from "@/components/spectrumui/charts/depth-chart";
 import { OrderBookChart } from "@/components/spectrumui/charts/order-book-chart";
@@ -186,19 +187,53 @@ function TradeMarketChart({ sheet, rows, live, snapshot, onSnapshot, mode = "tra
     });
   }, [built.candles, candleKey, live, mode, onSnapshot, symbol, volumeLabel]);
 
+  const outcomes = useMemo(() => (mode === "trades" ? tradeOutcomes(sheet?.columns, rows) : []), [mode, rows, sheet?.columns]);
+  const split = outcomes.length > 1;
+  const [picked, setPicked] = useState(BOTH_OUTCOMES);
+  const choice = picked === BOTH_OUTCOMES || outcomes.includes(picked) ? picked : BOTH_OUTCOMES;
+  const both = split && choice === BOTH_OUTCOMES;
+  const lines = useMemo(
+    () =>
+      both
+        ? outcomes.map((outcome) => ({
+            outcome,
+            points: tradesToCandles(sheet?.columns, rows, { outcome }).candles.map((candle) => ({ t: candle.t, price: candle.close })),
+          }))
+        : [],
+    [both, outcomes, rows, sheet?.columns],
+  );
+  const oneOutcome = useMemo(
+    () => (split && !both ? tradesToCandles(sheet?.columns, rows, { outcome: choice }) : null),
+    [both, choice, rows, sheet?.columns, split],
+  );
+  const name = mode === "ohlc" ? "Price" : units === "probability" ? "Last traded price" : "Yes";
+  if (both) {
+    return (
+      <OutcomeLinesChart
+        lines={lines.filter((line) => line.points.length)}
+        picked={choice}
+        onPick={setPicked}
+        name={name}
+        live={live}
+        emptyLabel="This trades sheet has no price to chart yet."
+      />
+    );
+  }
+  const shownCandles = oneOutcome ? oneOutcome.candles : candles;
   return (
     <MarketChart
-      data={candles}
-      symbol={symbol}
+      data={shownCandles}
+      symbol={oneOutcome ? choice : symbol}
       variant={mode === "ohlc" ? "candles" : "area"}
-      name={mode === "ohlc" ? "Price" : units === "probability" ? "Last traded price" : "Yes"}
+      name={name}
       units={units}
       volumeLabel={volumeLabel || (mode === "ohlc" ? "Volume fp" : "Count fp")}
-      ranges={ranges}
+      ranges={oneOutcome ? rangesForCandles(shownCandles) : ranges}
       defaultRange="All"
       live={live}
-      status={candles.length ? "ready" : "empty"}
+      status={shownCandles.length ? "ready" : "empty"}
       emptyLabel={mode === "ohlc" ? "This candlestick sheet has no price bars yet." : "This trades sheet has no yes price to chart yet."}
+      toolbar={split ? <OutcomeToggle outcomes={outcomes} value={choice} onChange={setPicked} /> : null}
     />
   );
 }
@@ -310,27 +345,96 @@ function DepthSheetChart({ sheet, rows, live }) {
   );
 }
 
-function PriceHistorySheetChart({ sheet, live }) {
-  const points = useMemo(() => priceHistoryPoints(sheet), [sheet]);
-  const ranges = useMemo(
-    () => rangesForCandles(points.map((point) => ({ t: point.t }))),
-    [points],
-  );
-  const name = String(sheet?.pull?.marketTitle || sheet?.title || "Price").trim();
-  const symbol = String(sheet?.pull?.side || priceHistoryOutcome(sheet) || "").trim();
+const OUTCOME_LINE_COLORS = ["var(--spectrum-series-3)", "var(--spectrum-series-4)"];
+const BOTH_OUTCOMES = "__both";
+
+function OutcomeToggle({ outcomes, value, onChange }) {
+  const options = [...outcomes, BOTH_OUTCOMES];
   return (
-    <IndicatorChart
-      points={points}
-      indicators={[]}
-      symbol={symbol}
-      name={name}
-      ranges={ranges}
-      defaultRange="All"
+    <div role="group" aria-label="Outcomes to plot" className="inline-flex items-center rounded-full bg-black/[0.045] p-0.5 dark:bg-white/[0.07]">
+      {options.map((option) => {
+        const active = option === value;
+        return (
+          <button
+            key={option}
+            type="button"
+            aria-pressed={active}
+            onClick={() => onChange(option)}
+            className={cn(
+              "rounded-full px-2.5 py-1 font-mono text-[11px] leading-none tracking-wide transition-colors duration-200",
+              active
+                ? "bg-white text-neutral-950 shadow-sm ring-1 ring-black/[0.06] dark:bg-white/10 dark:text-white dark:ring-white/10"
+                : "text-neutral-500 hover:text-neutral-800 dark:text-neutral-400",
+            )}
+          >
+            {option === BOTH_OUTCOMES ? "Both" : option}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+/**
+ * One line per outcome. With more than one outcome the toggle picks Yes, No, or both,
+ * and both draws each outcome as its own line.
+ */
+function OutcomeLinesChart({ lines, picked, onPick, name, fallbackSymbol = "", live, emptyLabel }) {
+  const split = lines.length > 1;
+  const choice = picked === BOTH_OUTCOMES || lines.some((line) => line.outcome === picked) ? picked : BOTH_OUTCOMES;
+  const shown = useMemo(
+    () =>
+      lines
+        .map((line, index) => ({ ...line, color: OUTCOME_LINE_COLORS[index % OUTCOME_LINE_COLORS.length] }))
+        .filter((line) => !split || choice === BOTH_OUTCOMES || line.outcome === choice),
+    [choice, lines, split],
+  );
+  const main = shown[0] || null;
+  const points = main?.points || [];
+  const overlays = useMemo(
+    () => (split ? shown.slice(1).map((line) => ({ id: line.outcome, label: line.outcome, points: line.points, color: line.color })) : []),
+    [shown, split],
+  );
+  const ranges = useMemo(
+    () => rangesForCandles(lines.flatMap((line) => line.points).map((point) => ({ t: point.t })).sort((a, b) => a.t - b.t)),
+    [lines],
+  );
+  const symbol = split ? (choice === BOTH_OUTCOMES ? "" : choice) : fallbackSymbol;
+  return (
+    <div className={cn("flex h-full min-h-0 min-w-0 flex-1 flex-col", seriesVarsClassName)}>
+      <IndicatorChart
+        points={points}
+        overlays={overlays}
+        indicators={[]}
+        symbol={symbol}
+        name={name}
+        lineLabel={split && choice === BOTH_OUTCOMES ? main?.outcome || "" : ""}
+        color={split && main ? main.color : ""}
+        toolbar={split ? <OutcomeToggle outcomes={lines.map((line) => line.outcome)} value={choice} onChange={onPick} /> : null}
+        ranges={ranges}
+        defaultRange="All"
+        live={live}
+        status={points.length ? "ready" : "empty"}
+        emptyLabel={emptyLabel}
+        units="probability"
+        curve="linear"
+      />
+    </div>
+  );
+}
+
+function PriceHistorySheetChart({ sheet, live }) {
+  const lines = useMemo(() => priceHistoryLines(sheet).filter((line) => line.points.length), [sheet]);
+  const [picked, setPicked] = useState(BOTH_OUTCOMES);
+  return (
+    <OutcomeLinesChart
+      lines={lines}
+      picked={picked}
+      onPick={setPicked}
+      name={String(sheet?.pull?.marketTitle || sheet?.title || "Price").trim()}
+      fallbackSymbol={String(sheet?.pull?.side || priceHistoryOutcome(sheet) || "").trim()}
       live={live}
-      status={points.length ? "ready" : "empty"}
       emptyLabel="This price history has no points to chart yet."
-      units="probability"
-      curve="linear"
     />
   );
 }

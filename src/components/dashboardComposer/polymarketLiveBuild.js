@@ -12,13 +12,13 @@ import { expandOrderBookSummaryToRows, orderbooksMarketRefFromSuggestion, parseO
 import { POLYMARKET_MARKETS_COMPOSE_DEFAULT_COLUMNS } from "@/lib/polymarketLive/marketsCompose";
 import { flattenPolymarketMarket, polymarketMarketExtraColumns } from "@/lib/polymarketLive/polymarketMarketScan";
 import {
-  defaultPolymarketQuoteFilters,
   HOLDER_COLUMNS,
   isPolymarketQuoteTable,
   polymarketBookSide,
   polymarketHistoryBody,
   polymarketHolderLimit,
   polymarketHolderQuery,
+  polymarketJoinQuoteFilters,
   polymarketQuoteColumnType,
   polymarketQuoteDefaultColumns,
   polymarketQuoteOutcome,
@@ -2289,7 +2289,8 @@ function parentMarketJoinColumns() {
 
 /**
  * One joined sheet for one market. Parent market is the market record.
- * Every other source uses the same pull as opening that endpoint, with its default filters.
+ * Every other source uses the same pull as opening that endpoint, with its join filters
+ * (price history spans the market's whole life at daily points).
  * @param {string} endpointId
  * @param {Record<string, unknown>} pick
  */
@@ -2322,12 +2323,13 @@ export async function loadPolymarketLiveJoin(endpointId, pick, options = {}) {
     return { columns, rows: projectRows([row], columns, true, 1) };
   }
   const limit = Math.max(1, Number(options.rowLimit) || 50);
+  const filters = polymarketJoinQuoteFilters(endpointId);
   const packed = await loadPolymarketLiveTable(endpointId, [pick], {
     rowLimit: limit,
     planLimit: Number(options.planLimit) || limit,
-    filters: defaultPolymarketQuoteFilters(endpointId),
+    filters,
   });
-  return { columns: shownJoinColumns(packed.columns), rows: packed.rows || [] };
+  return { columns: shownJoinColumns(packed.columns), rows: packed.rows || [], query: { filters } };
 }
 
 /**

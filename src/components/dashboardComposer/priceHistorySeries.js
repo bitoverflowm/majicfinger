@@ -49,6 +49,10 @@ function pickIndex(columns, ids) {
  * @returns {{ t: number, price: number }[]}
  */
 export function priceHistoryPoints(sheet) {
+  return readPoints(sheet).map(({ t, price }) => ({ t, price }));
+}
+
+function readPoints(sheet) {
   const columns = Array.isArray(sheet?.columns) ? sheet.columns : [];
   const tokenHistory = String(sheet?.table || "") === "getTokenPriceHistory";
   const timeIndex = pickIndex(columns, tokenHistory ? ["observed_at", "timestamp"] : ["timestamp", "observed_at"]);
@@ -58,16 +62,44 @@ export function priceHistoryPoints(sheet) {
   const timeKey = timeIndex >= 0 ? columns[timeIndex]?.id : "";
   const unixKey = unixIndex >= 0 ? columns[unixIndex]?.id : "";
   const priceKey = columns[priceIndex]?.id;
+  const outcomeIndex = columnIndex(columns, "outcome");
+  const outcomeKey = outcomeIndex >= 0 ? columns[outcomeIndex]?.id : "";
 
   const points = [];
   for (const row of sheetRecords(sheet)) {
     const price = parsePrice(priceKey ? row?.[priceKey] : "");
     const t = parseTime(timeKey ? row?.[timeKey] : "", unixKey ? row?.[unixKey] : "");
     if (price == null || t == null) continue;
-    points.push({ t, price });
+    points.push({ t, price, outcome: outcomeKey ? String(row?.[outcomeKey] ?? "").trim() : "" });
   }
   points.sort((a, b) => a.t - b.t);
   return points;
+}
+
+function outcomeRank(outcome) {
+  const key = outcome.toLowerCase();
+  if (key === "yes") return 0;
+  if (key === "no") return 1;
+  return 2;
+}
+
+/**
+ * One line per outcome, Yes first and No second.
+ * A sheet without an outcome column is one unnamed line.
+ * @param {object | null | undefined} sheet
+ * @returns {{ outcome: string, points: { t: number, price: number }[] }[]}
+ */
+export function priceHistoryLines(sheet) {
+  const byOutcome = new Map();
+  for (const point of readPoints(sheet)) {
+    const list = byOutcome.get(point.outcome);
+    const entry = { t: point.t, price: point.price };
+    if (list) list.push(entry);
+    else byOutcome.set(point.outcome, [entry]);
+  }
+  return [...byOutcome.entries()]
+    .map(([outcome, points]) => ({ outcome, points }))
+    .sort((a, b) => outcomeRank(a.outcome) - outcomeRank(b.outcome));
 }
 
 /** The outcome label when every price row shares one. */

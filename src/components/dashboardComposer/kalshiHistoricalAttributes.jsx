@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { format } from "date-fns";
 import { Calendar as CalendarIcon, ChevronDown, X } from "lucide-react";
 import * as AccordionPrimitive from "@radix-ui/react-accordion";
@@ -14,7 +14,7 @@ import { KalshiLiveTimestampPicker } from "@/components/connectData/kalshiLive/K
 import { PolymarketTagPicker } from "@/components/connectData/polymarketLive/PolymarketTagPicker";
 import { cellMatchesTextTerm, columnUsesWholeTerm } from "@/lib/textTermMatch";
 import { DATE_RANGE_PRESETS, activeDateRangePreset, dateRangePreset } from "@/components/dashboardComposer/dateRangePresets";
-import { clampLifeRange, presetWithinLife } from "@/lib/markets/marketLife";
+import { clampLifeRange, defaultLifeRange, presetWithinLife } from "@/lib/markets/marketLife";
 import { KALSHI_LIVE_CANDLESTICK_PERIOD_OPTIONS } from "@/lib/kalshiLive/candlesticksColumns";
 import { KALSHI_LIVE_EVENT_FORECAST_PERIOD_OPTIONS } from "@/lib/kalshiLive/eventForecastColumns";
 import { cn } from "@/lib/utils";
@@ -667,19 +667,29 @@ function calendarLimit(bounds) {
   return { disabled, fromDate: before, toDate: after };
 }
 
-function DateRangeField({ from, to, presetId, onChange, presetIds, anchor, bounds }) {
+function lifeWindow(bounds, maxDays) {
+  if (!(bounds?.lifeLabel || bounds?.stopped) || !bounds.earliest || !bounds.latest) return null;
+  if (!maxDays) return { from: bounds.earliest, to: bounds.latest, preset: "market-life" };
+  const capped = defaultLifeRange({ ...bounds, stopped: true }, { maxDays });
+  if (!capped) return null;
+  return capped.from === bounds.earliest ? { ...capped, preset: "market-life" } : capped;
+}
+
+function DateRangeField({ from, to, presetId, onChange, presetIds, anchor, bounds, maxDays }) {
   const start = dateFromIso(from);
   const end = dateFromIso(to);
   const selected = start || end ? { from: start, to: end } : undefined;
   const bounded = Boolean(bounds?.earliest || bounds?.latest);
   const anchorDate = anchor ? new Date(`${anchor}T12:00:00`) : new Date();
   const now = Number.isNaN(anchorDate.getTime()) ? new Date() : anchorDate;
+  const life = lifeWindow(bounds, maxDays);
+  const lifeCapped = Boolean(life && life.preset !== "market-life");
   const lifePreset = {
-    id: "market-life",
-    short: bounds?.lifeLabel ? "Full" : "Life",
-    label: bounds?.lifeLabel || "Full trading life",
+    id: life?.preset || "market-life",
+    short: lifeCapped ? `${maxDays}d` : bounds?.lifeLabel ? "Full" : "Life",
+    label: lifeCapped ? `Last ${maxDays} days of trading` : bounds?.lifeLabel || "Full trading life",
   };
-  const preset = presetId === "market-life" ? lifePreset : activeDateRangePreset(from, to, presetId, now);
+  const preset = life && presetId === life.preset ? lifePreset : activeDateRangePreset(from, to, presetId, now);
   const emptyLabel = bounds?.stopped && bounds.earliest && bounds.latest
     ? formatAttributeRange(bounds.earliest, bounds.latest)
     : anchor
@@ -731,16 +741,16 @@ function DateRangeField({ from, to, presetId, onChange, presetIds, anchor, bound
               </button>
             );
           })}
-          {(bounds?.lifeLabel || bounds?.stopped) && bounds.earliest && bounds.latest ? (
+          {life ? (
             <button
               type="button"
               className={cn(
                 "rounded-full border px-2 py-1 text-[11px]",
-                preset?.id === "market-life"
+                preset?.id === life.preset
                   ? "border-foreground bg-foreground text-background"
                   : "border-border/70 bg-background text-foreground hover:bg-muted",
               )}
-              onClick={() => onChange({ from: bounds.earliest, to: bounds.latest, preset: "market-life" })}
+              onClick={() => onChange(life)}
             >
               {lifePreset.label}
             </button>
@@ -763,11 +773,15 @@ function DateRangeField({ from, to, presetId, onChange, presetIds, anchor, bound
           disabled={limit.disabled}
           fromDate={limit.fromDate}
           toDate={limit.toDate}
+          max={maxDays || undefined}
           onSelect={(range) => {
             const next = clampLifeRange(isoFromDate(range?.from), isoFromDate(range?.to), bounds);
             onChange({ ...next, preset: "" });
           }}
         />
+        {maxDays ? (
+          <p className="px-3 pb-2 text-[11px] text-muted-foreground">At most {maxDays} days.</p>
+        ) : null}
         {selected ? (
           <div className="border-t border-border/70 p-2">
             <Button
@@ -775,8 +789,8 @@ function DateRangeField({ from, to, presetId, onChange, presetIds, anchor, bound
               variant="ghost"
               className="h-7 w-full text-[11px]"
               onClick={() => {
-                if ((bounds?.lifeLabel || bounds?.stopped) && bounds.earliest && bounds.latest) {
-                  onChange({ from: bounds.earliest, to: bounds.latest, preset: "market-life" });
+                if (life) {
+                  onChange(life);
                   return;
                 }
                 if (bounded) {
@@ -790,6 +804,48 @@ function DateRangeField({ from, to, presetId, onChange, presetIds, anchor, bound
               }}
             >
               {bounded ? "Reset dates" : "Clear dates"}
+            </Button>
+          </div>
+        ) : null}
+      </PopoverContent>
+    </Popover>
+  );
+}
+
+/** One day, kept inside the market's life. */
+function QueryInstantField({ value, bounds, onChange, ariaLabel = "Pick a moment" }) {
+  const selected = dateFromIso(value);
+  const limit = calendarLimit(bounds);
+  return (
+    <Popover>
+      <PopoverTrigger asChild>
+        <Button
+          type="button"
+          variant="outline"
+          aria-label={ariaLabel}
+          className={cn(
+            "h-9 w-full justify-start rounded-lg px-2.5 text-left text-[13px] font-normal",
+            !selected && "text-muted-foreground",
+          )}
+        >
+          <CalendarIcon className="size-3.5 shrink-0 opacity-70" />
+          <span className="min-w-0 flex-1 truncate">{selected ? formatAttributeDate(value) : "Pick a moment"}</span>
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent align="start" className="z-[620] w-auto p-0">
+        <Calendar
+          mode="single"
+          selected={selected}
+          defaultMonth={selected || limit.toDate}
+          disabled={limit.disabled}
+          fromDate={limit.fromDate}
+          toDate={limit.toDate}
+          onSelect={(date) => onChange(isoFromDate(date))}
+        />
+        {selected ? (
+          <div className="border-t border-border/70 p-2">
+            <Button type="button" variant="ghost" className="h-7 w-full text-[11px]" onClick={() => onChange("")}>
+              Clear moment
             </Button>
           </div>
         ) : null}
@@ -942,46 +998,12 @@ function AttributeFields({ column, filters, onChange }) {
     );
   }
   if (spec.kind === "query-instant") {
-    const selected = dateFromIso(filter.value);
     return (
-      <Popover>
-        <PopoverTrigger asChild>
-          <Button
-            type="button"
-            variant="outline"
-            className={cn(
-              "h-9 w-full justify-start rounded-lg px-2.5 text-left text-[13px] font-normal",
-              !selected && "text-muted-foreground",
-            )}
-          >
-            <CalendarIcon className="size-3.5 shrink-0 opacity-70" />
-            <span className="min-w-0 flex-1 truncate">{selected ? formatAttributeDate(filter.value) : "Pick a moment"}</span>
-          </Button>
-        </PopoverTrigger>
-        <PopoverContent align="start" className="z-[620] w-auto p-0">
-          <Calendar
-            mode="single"
-            selected={selected}
-            defaultMonth={selected}
-            disabled={calendarLimit(column.rangeBounds).disabled}
-            fromDate={calendarLimit(column.rangeBounds).fromDate}
-            toDate={calendarLimit(column.rangeBounds).toDate}
-            onSelect={(date) => onChange(patchFilter(filters, column, { value: isoFromDate(date) }))}
-          />
-          {selected ? (
-            <div className="border-t border-border/70 p-2">
-              <Button
-                type="button"
-                variant="ghost"
-                className="h-7 w-full text-[11px]"
-                onClick={() => onChange(patchFilter(filters, column, { value: "" }))}
-              >
-                Clear moment
-              </Button>
-            </div>
-          ) : null}
-        </PopoverContent>
-      </Popover>
+      <QueryInstantField
+        value={filter.value || ""}
+        bounds={column.rangeBounds}
+        onChange={(value) => onChange(patchFilter(filters, column, { value }))}
+      />
     );
   }
   if (spec.kind === "query-range") {
@@ -993,6 +1015,7 @@ function AttributeFields({ column, filters, onChange }) {
         presetIds={column.rangePresetIds}
         anchor={column.rangeAnchor}
         bounds={column.rangeBounds}
+        maxDays={column.rangeMaxDays}
         onChange={({ from, to, preset }) => onChange(patchFilter(filters, column, { from, to, preset: preset || "" }))}
       />
     );
@@ -1305,19 +1328,90 @@ function QueryChoice({ title, description, children }) {
   );
 }
 
-/** Outcome, interval, date range, and fidelity for a price-history pull. */
+const NO_RANGE = { from: "", to: "", preset: "" };
+
+function QuerySelect({ column, value, onChange }) {
+  return (
+    <QueryChoice title={column.title} description={column.description}>
+      <select
+        aria-label={column.ariaLabel || column.title}
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+        className={querySelectClass}
+      >
+        {(column.enumOptions || []).map(([optionValue, label]) => (
+          <option key={optionValue || "default"} value={optionValue}>
+            {label}
+          </option>
+        ))}
+      </select>
+    </QueryChoice>
+  );
+}
+
+/**
+ * Outcome, the time window, and point spacing for a price-history pull.
+ * The window is one of an interval, a date range, or (token history) one as-of day.
+ */
 export function PriceHistoryQueryFields({ columns, filters, onChange }) {
   const byId = new Map((columns || []).map((column) => [column.id, column]));
   const outcome = byId.get("quote_outcome");
   const interval = byId.get("interval");
   const range = byId.get("time_range");
   const fidelity = byId.get("fidelity");
+  const bucket = byId.get("bucket_seconds");
+  const asOf = byId.get("as_of");
   const rangeOn = Boolean(filters?.time_range?.from && filters?.time_range?.to);
+  const asOfValue = String(filters?.as_of?.value || "").trim();
+  const asOfOn = Boolean(asOf && asOfValue);
   const intervalValue = String(filters?.interval?.value || "");
+  const rememberedInterval = useRef(intervalValue || "1d");
+  if (intervalValue) rememberedInterval.current = intervalValue;
+  const rememberedRange = useRef(rangeOn ? filters.time_range : null);
+  if (rangeOn) rememberedRange.current = filters.time_range;
+  const rememberedAsOf = useRef(asOfValue);
+  if (asOfValue) rememberedAsOf.current = asOfValue;
+  const [mode, setMode] = useState(asOfOn ? "as_of" : rangeOn ? "range" : "interval");
+  useEffect(() => {
+    if (asOfOn) setMode("as_of");
+    else if (rangeOn) setMode("range");
+  }, [asOfOn, rangeOn]);
   const fidelityOptions = fidelity?.enumOptions || [];
   const fidelityValue = String(filters?.fidelity?.value || "");
   const fidelitySelected = fidelityOptions.some(([value]) => value === fidelityValue) ? fidelityValue : fidelityOptions[0]?.[0] || "";
   const minuteAvailable = fidelityOptions.some(([value]) => value === "1");
+  const bucketOptions = bucket?.enumOptions || [];
+  const bucketValue = String(filters?.bucket_seconds?.value || "");
+  const bucketSelected = bucketOptions.some(([value]) => value === bucketValue) ? bucketValue : "";
+  const modes = [
+    ["interval", "Interval"],
+    ["range", "Date range"],
+    ...(asOf ? [["as_of", "As of"]] : []),
+  ];
+  function withoutAsOf(next) {
+    return asOf ? { ...next, as_of: { value: "" } } : next;
+  }
+  function showInterval() {
+    setMode("interval");
+    if (!interval) return;
+    const next = patchFilter(filters, interval, { value: rememberedInterval.current || "1d" });
+    onChange(withoutAsOf(asOf ? { ...next, time_range: NO_RANGE } : next));
+  }
+  function showRange() {
+    setMode("range");
+    if (!interval) return;
+    if (!asOf) {
+      if (intervalValue) onChange(patchFilter(filters, interval, { value: "" }));
+      return;
+    }
+    onChange(withoutAsOf({ ...filters, interval: { value: "" }, time_range: rememberedRange.current || NO_RANGE }));
+  }
+  function showAsOf() {
+    setMode("as_of");
+    const day = rememberedAsOf.current || asOf?.rangeBounds?.latest || format(new Date(), "yyyy-MM-dd");
+    onChange({ ...filters, interval: { value: "" }, time_range: NO_RANGE, as_of: { value: day } });
+  }
+  const showMode = { interval: showInterval, range: showRange, as_of: showAsOf };
   return (
     <div className="space-y-3">
       {outcome ? (
@@ -1336,16 +1430,34 @@ export function PriceHistoryQueryFields({ columns, filters, onChange }) {
           </select>
         </QueryChoice>
       ) : null}
-      <p className="text-[11px] leading-relaxed text-muted-foreground">Choose an interval or a date range.</p>
-      {interval ? (
+      <div
+        className={cn("grid gap-1 rounded-lg border border-border/70 bg-muted/40 p-0.5", modes.length > 2 ? "grid-cols-3" : "grid-cols-2")}
+        role="group"
+        aria-label={asOf ? "Choose an interval, a date range, or an as-of day" : "Choose an interval or a date range"}
+      >
+        {modes.map(([id, label]) => (
+          <button
+            key={id}
+            type="button"
+            aria-pressed={mode === id}
+            onClick={showMode[id]}
+            className={cn(
+              "h-8 rounded-md text-[12px] font-medium",
+              mode === id ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground",
+            )}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+      {mode === "interval" && interval ? (
         <QueryChoice title="Interval" description={interval.description}>
           <select
             aria-label="Interval"
-            value={rangeOn ? "" : intervalValue || "1d"}
+            value={intervalValue || rememberedInterval.current || "1d"}
             onChange={(event) => onChange(patchFilter(filters, interval, { value: event.target.value }))}
             className={querySelectClass}
           >
-            {rangeOn ? <option value="">Date range is selected</option> : null}
             {(interval.enumOptions || []).map(([value, label]) => (
               <option key={value} value={value}>
                 {label}
@@ -1354,7 +1466,7 @@ export function PriceHistoryQueryFields({ columns, filters, onChange }) {
           </select>
         </QueryChoice>
       ) : null}
-      {range ? (
+      {mode === "range" && range ? (
         <QueryChoice title="Date range" description={range.description}>
           <DateRangeField
             from={filters?.time_range?.from || ""}
@@ -1363,9 +1475,23 @@ export function PriceHistoryQueryFields({ columns, filters, onChange }) {
             presetIds={range.rangePresetIds}
             anchor={range.rangeAnchor}
             bounds={range.rangeBounds}
+            maxDays={range.rangeMaxDays}
             onChange={({ from, to, preset }) => onChange(patchFilter(filters, range, { from, to, preset: preset || "" }))}
           />
         </QueryChoice>
+      ) : null}
+      {mode === "as_of" && asOf ? (
+        <QueryChoice title="As of" description={asOf.description}>
+          <QueryInstantField
+            value={asOfValue}
+            bounds={asOf.rangeBounds}
+            ariaLabel="As of"
+            onChange={(value) => onChange(patchFilter(filters, asOf, { value }))}
+          />
+        </QueryChoice>
+      ) : null}
+      {bucket && mode !== "as_of" ? (
+        <QuerySelect column={bucket} value={bucketSelected} onChange={(value) => onChange(patchFilter(filters, bucket, { value }))} />
       ) : null}
       {fidelity ? (
         <QueryChoice
@@ -1388,6 +1514,61 @@ export function PriceHistoryQueryFields({ columns, filters, onChange }) {
               </option>
             ))}
           </select>
+        </QueryChoice>
+      ) : null}
+    </div>
+  );
+}
+
+/** Outcome, side, and the size floor for a market's trade history. */
+export function TradeHistoryQueryFields({ columns, filters, onChange }) {
+  const byId = new Map((columns || []).map((column) => [column.id, column]));
+  const outcome = byId.get("quote_outcome");
+  const side = byId.get("trade_side");
+  const taker = byId.get("taker_only");
+  const unit = byId.get("filter_type");
+  const amount = byId.get("filter_amount");
+  const takerOn = (filters?.taker_only?.include || ["true"])[0] !== "false";
+  return (
+    <div className="space-y-3">
+      {outcome ? (
+        <QuerySelect
+          column={outcome}
+          value={String(filters?.quote_outcome?.value || "both")}
+          onChange={(value) => onChange(patchFilter(filters, outcome, { value }))}
+        />
+      ) : null}
+      {side ? (
+        <QuerySelect
+          column={side}
+          value={String(filters?.trade_side?.value || "")}
+          onChange={(value) => onChange(patchFilter(filters, side, { value }))}
+        />
+      ) : null}
+      {taker ? (
+        <QuerySelect
+          column={{ ...taker, ariaLabel: "Taker only" }}
+          value={takerOn ? "true" : "false"}
+          onChange={(value) => onChange(patchFilter(filters, taker, { include: [value] }))}
+        />
+      ) : null}
+      {unit ? (
+        <QuerySelect
+          column={unit}
+          value={String(filters?.filter_type?.value || "TOKENS")}
+          onChange={(value) => onChange(patchFilter(filters, unit, { value }))}
+        />
+      ) : null}
+      {amount ? (
+        <QueryChoice title={amount.title} description={amount.description}>
+          <Input
+            aria-label={amount.ariaLabel || amount.title}
+            value={String(filters?.filter_amount?.value ?? "")}
+            inputMode="decimal"
+            placeholder="0.01"
+            onChange={(event) => onChange(patchFilter(filters, amount, { value: event.target.value.replace(/[^\d.]/g, "") }))}
+            className="h-9"
+          />
         </QueryChoice>
       ) : null}
     </div>

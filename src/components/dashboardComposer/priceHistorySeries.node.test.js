@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 
-import { isPriceHistorySheet, priceHistoryPoints } from "./priceHistorySeries.js";
+import { isPriceHistorySheet, priceHistoryLines, priceHistoryPoints } from "./priceHistorySeries.js";
 
 const sheet = {
   type: "sheet",
@@ -57,5 +57,23 @@ assert.equal(tokenPoints.length, 2);
 assert.equal(tokenPoints[0].price, 0.005);
 assert.equal(tokenPoints[0].t, Date.parse("10/8/2026, 8:55:00 PM"));
 assert.ok(tokenPoints[0].t < tokenPoints[1].t);
+
+const bothOutcomes = {
+  type: "sheet",
+  table: "getBatchPricesHistory",
+  columns: [{ id: "outcome" }, { id: "t" }, { id: "p" }],
+  records: [
+    { outcome: "No", t: "1791452719", p: "0.97" },
+    { outcome: "Yes", t: "1791452719", p: "0.03" },
+    { outcome: "No", t: "1791452844", p: "0.96" },
+    { outcome: "Yes", t: "1791452844", p: "0.04" },
+  ],
+};
+const lines = priceHistoryLines(bothOutcomes);
+assert.deepEqual(lines.map((line) => line.outcome), ["Yes", "No"]);
+assert.deepEqual(lines[0].points.map((point) => point.price), [0.03, 0.04]);
+assert.deepEqual(lines[1].points.map((point) => point.price), [0.97, 0.96]);
+assert.deepEqual(priceHistoryLines(sheet).map((line) => line.outcome), [""]);
+assert.equal(priceHistoryLines(sheet)[0].points.length, 2);
 
 console.log("price history series ok");

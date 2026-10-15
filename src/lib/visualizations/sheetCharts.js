@@ -28,6 +28,7 @@ export function chartSpecsForSheet(sheet, forcedView) {
   const chartView = requested || (resolved.view === "table" ? "" : resolved.view);
   if (!requested && SHEET_ONLY.has(chartView)) return [];
   const statCards = chartView === "stat-cards";
+  const outcomeLines = chartView === "price" || (chartView === "trade-price" && String(sheet?.table || "") === "getTradesByMarket");
   return [
     {
       chartView,
@@ -36,8 +37,8 @@ export function chartSpecsForSheet(sheet, forcedView) {
         : chartView === "order-book" && /^order\s*books?/i.test(base)
           ? base
           : `${base} chart`,
-      w: chartView === "portfolio" ? 680 : 540,
-      h: chartView === "portfolio" ? 560 : statCards ? statCardBlockHeight(sheetRecords(sheet).length) : 360,
+      w: chartView === "portfolio" ? 680 : outcomeLines ? 820 : 540,
+      h: chartView === "portfolio" ? 560 : outcomeLines ? 500 : statCards ? statCardBlockHeight(sheetRecords(sheet).length) : 360,
     },
   ];
 }

@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { ohlcRowsToCandles, rangesForCandles, tradesToCandles } from "./tradeMarketCandles.js";
+import { ohlcRowsToCandles, rangesForCandles, tradeOutcomes, tradesToCandles } from "./tradeMarketCandles.js";
 
 const columns = [
   { id: "created_time", title: "Created time", type: "date" },
@@ -85,5 +85,24 @@ assert.equal(
   poly.candles.reduce((sum, candle) => sum + candle.count, 0),
   2,
 );
+
+const polyColumns = [
+  { id: "observed_at", title: "Observed At" },
+  { id: "outcome", title: "Outcome" },
+  { id: "side", title: "Side" },
+  { id: "price", title: "Price" },
+  { id: "size", title: "Size" },
+];
+const polyRows = [
+  ["10/8/2026, 8:58:04 PM", "No", "BUY", "0.995", "10"],
+  ["10/8/2026, 8:55:00 PM", "Yes", "SELL", "0.005", "20"],
+  ["10/8/2026, 8:50:00 PM", "Yes", "BUY", "0.004", "5"],
+];
+assert.deepEqual(tradeOutcomes(polyColumns, polyRows), ["Yes", "No"]);
+assert.deepEqual(tradeOutcomes(columns, rows), []);
+const noSide = tradesToCandles(polyColumns, polyRows, { outcome: "No" });
+assert.equal(noSide.outcome, "No");
+assert.ok(noSide.candles.every((candle) => candle.close > 0.9));
+assert.equal(noSide.candles.reduce((sum, candle) => sum + candle.volume, 0), 10);
 
 console.log("tradeMarketCandles ok");

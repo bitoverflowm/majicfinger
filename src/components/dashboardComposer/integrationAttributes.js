@@ -5,6 +5,7 @@ export {
   JoinSourceFields,
   KalshiHistoricalAttributeFilters as AttributeFilters,
   PriceHistoryQueryFields,
+  TradeHistoryQueryFields,
   kalshiHistoricalAttributeSpec as attributeSpec,
   rowMatchesKalshiHistoricalFilters as rowMatchesAttributes,
   sortKalshiHistoricalRows as sortAttributeRows,

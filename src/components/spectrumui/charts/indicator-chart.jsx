@@ -86,7 +86,18 @@ function formatWhen(time, span) {
   if (span < 36 * 60 * 60 * 1000) {
     return date.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
   }
+  if (span < 5 * 24 * 60 * 60 * 1000) {
+    return date.toLocaleString(undefined, { month: "short", day: "numeric", hour: "numeric" });
+  }
   return date.toLocaleDateString(undefined, { month: "short", day: "numeric" });
+}
+
+/** Enough decimals that neighbouring ticks never read the same. */
+function tickDigits(ticks, scale) {
+  if (ticks.length < 2) return null;
+  const step = Math.abs(ticks[1] - ticks[0]) * scale;
+  if (!Number.isFinite(step) || step <= 0) return null;
+  return Math.min(4, Math.max(0, Math.ceil(-Math.log10(step))));
 }
 
 function niceTicks(lo, hi, target = 4) {
@@ -170,16 +181,28 @@ function nearestIndex(points, time) {
   return best;
 }
 
+function sliceToRange(points, range, end) {
+  if (!points.length) return [];
+  if (!range || range.ms == null) return points;
+  const sliced = points.filter((point) => point.t >= end - range.ms);
+  return sliced.length ? sliced : points.slice(-1);
+}
+
 /**
  * @param {{ t: number, price: number }[]} points
  * @param {{ id: string, label: string, values?: (number|null)[], color?: string, min?: number, max?: number, format?: (value: number) => string }[]} [indicators]
+ * @param {{ id: string, label: string, points: { t: number, price: number }[], color: string }[]} [overlays] More price lines on the price pane, each with its own color.
  */
 export function IndicatorChart({
   className,
   points = [],
   indicators = [],
+  overlays = [],
   symbol = "",
   name = "Price",
+  lineLabel = "",
+  color = "",
+  toolbar = null,
   ranges = [],
   defaultRange = "All",
   live = false,
@@ -196,13 +219,22 @@ export function IndicatorChart({
   const uid = React.useId().replace(/:/g, "");
 
   const range = ranges.find((item) => item.label === rangeLabel) || ranges[ranges.length - 1];
-  const view = React.useMemo(() => {
-    if (!points.length) return [];
-    if (!range || range.ms == null) return points;
-    const end = points[points.length - 1].t;
-    const sliced = points.filter((point) => point.t >= end - range.ms);
-    return sliced.length ? sliced : points.slice(-1);
-  }, [points, range]);
+  const end = React.useMemo(() => {
+    let max = points.length ? points[points.length - 1].t : -Infinity;
+    for (const overlay of overlays || []) {
+      const list = overlay?.points;
+      if (list?.length) max = Math.max(max, list[list.length - 1].t);
+    }
+    return max;
+  }, [overlays, points]);
+  const view = React.useMemo(() => sliceToRange(points, range, end), [end, points, range]);
+  const overlayViews = React.useMemo(
+    () =>
+      (overlays || [])
+        .filter((overlay) => overlay?.points?.length)
+        .map((overlay) => ({ ...overlay, view: sliceToRange(overlay.points, range, end) })),
+    [end, overlays, range],
+  );
 
   const start = points.length && view.length ? points.length - view.length : 0;
   const panes = (indicators || []).filter((indicator) => indicator && Array.isArray(indicator.values));
@@ -221,19 +253,27 @@ export function IndicatorChart({
   const priceBottom = priceTop + usable * priceShare;
   const first = view[0];
   const last = view[n - 1];
-  const span = first && last ? Math.max(1, last.t - first.t) : 1;
+  let tStart = first?.t ?? 0;
+  let tEnd = last?.t ?? 0;
+  for (const overlay of overlayViews) {
+    tStart = Math.min(tStart, overlay.view[0].t);
+    tEnd = Math.max(tEnd, overlay.view[overlay.view.length - 1].t);
+  }
+  const span = first && last ? Math.max(1, tEnd - tStart) : 1;
   const xAt = React.useCallback(
-    (time) => x0 + ((time - (first?.t || 0)) / span) * plotW,
-    [first?.t, plotW, span, x0],
+    (time) => x0 + ((time - tStart) / span) * plotW,
+    [plotW, span, tStart, x0],
   );
 
   const domain = React.useMemo(() => {
     if (!n) return [0, 1];
     let lo = Infinity;
     let hi = -Infinity;
-    for (const point of view) {
-      if (point.price < lo) lo = point.price;
-      if (point.price > hi) hi = point.price;
+    for (const list of [view, ...overlayViews.map((overlay) => overlay.view)]) {
+      for (const point of list) {
+        if (point.price < lo) lo = point.price;
+        if (point.price > hi) hi = point.price;
+      }
     }
     if (lo === hi) {
       const pad = Math.abs(lo) * 0.08 || 0.01;
@@ -241,39 +281,67 @@ export function IndicatorChart({
     }
     const pad = (hi - lo) * 0.12;
     return [lo - pad, hi + pad];
-  }, [n, view]);
+  }, [n, overlayViews, view]);
 
   const priceY = React.useCallback(
     (value) => priceBottom - ((value - domain[0]) / (domain[1] - domain[0] || 1)) * (priceBottom - priceTop),
     [domain, priceBottom, priceTop],
   );
-  const closeLine = React.useMemo(() => {
-    const plotted = view.map((point) => ({ x: xAt(point.t), y: priceY(point.price) }));
-    return curve === "linear" ? linearPath(plotted) : monotonePath(plotted);
-  }, [curve, priceY, view, xAt]);
+  const pathFor = React.useCallback(
+    (list) => {
+      const plotted = list.map((point) => ({ x: xAt(point.t), y: priceY(point.price) }));
+      return curve === "linear" ? linearPath(plotted) : monotonePath(plotted);
+    },
+    [curve, priceY, xAt],
+  );
+  const closeLine = React.useMemo(() => pathFor(view), [pathFor, view]);
+  const overlayLines = React.useMemo(
+    () => overlayViews.map((overlay) => ({ ...overlay, path: pathFor(overlay.view) })),
+    [overlayViews, pathFor],
+  );
   const priceTicks = React.useMemo(() => niceTicks(domain[0], domain[1], 4), [domain]);
   const timeTicks = React.useMemo(() => {
-    if (n < 2) return view.map((point) => point.t);
+    if (n < 2 && !overlayViews.length) return view.map((point) => point.t);
     const want = Math.max(2, Math.min(5, Math.floor(plotW / 90)));
     const out = [];
     for (let i = 0; i < want; i += 1) {
+      if (overlayViews.length) {
+        out.push(Math.round(tStart + (i / (want - 1)) * (tEnd - tStart)));
+        continue;
+      }
       const at = Math.round((i / (want - 1)) * (n - 1));
       out.push(view[at].t);
     }
     return out;
-  }, [n, plotW, view]);
+  }, [n, overlayViews.length, plotW, tEnd, tStart, view]);
 
   const active = hoverIndex != null ? view[hoverIndex] : last;
   const base = first?.price || 0;
   const probability = units === "probability";
   const showPrice = probability ? formatProbability : formatPrice;
-  const delta = probability
-    ? ((active?.price ?? 0) - base) * 100
-    : base
-      ? (((active?.price ?? 0) - base) / base) * 100
-      : 0;
+  const tickPlaces = tickDigits(priceTicks, probability ? 100 : 1);
+  const showTick = (value) => {
+    if (tickPlaces == null) return showPrice(value);
+    if (probability) return `${(value * 100).toFixed(Math.max(1, tickPlaces))}%`;
+    const places = Math.max(tickPlaces, Math.abs(value) < 1 ? 3 : 2);
+    return value.toLocaleString("en", { minimumFractionDigits: places, maximumFractionDigits: places });
+  };
+  const changeFrom = (from, to) =>
+    probability ? ((to ?? 0) - from) * 100 : from ? (((to ?? 0) - from) / from) * 100 : 0;
+  const delta = changeFrom(base, active?.price);
   const showDelta = probability ? formatPoints : formatSignedPct;
   const dirColor = delta >= 0 ? UP : DOWN;
+  const lineColor = color || dirColor;
+  const readouts = overlayLines.length
+    ? [
+        { id: "__main", label: lineLabel, color: lineColor, point: active, delta },
+        ...overlayLines.map((overlay) => {
+          const point =
+            hoverIndex != null && active ? overlay.view[nearestIndex(overlay.view, active.t)] : overlay.view[overlay.view.length - 1];
+          return { id: overlay.id, label: overlay.label, color: overlay.color, point, delta: changeFrom(overlay.view[0].price, point?.price) };
+        }),
+      ]
+    : [];
 
   const paneFrames = panes.map((indicator, index) => {
     const top = priceBottom + GAP * (index + 1) + usable * indicatorShare * index;
@@ -298,7 +366,7 @@ export function IndicatorChart({
     if (!svg || !n || !first) return;
     const rect = svg.getBoundingClientRect();
     const x = ((clientX - rect.left) / rect.width) * w;
-    const time = first.t + ((x - x0) / plotW) * span;
+    const time = tStart + ((x - x0) / plotW) * span;
     setHoverIndex(nearestIndex(view, time));
   };
 
@@ -319,12 +387,29 @@ export function IndicatorChart({
             <span className="truncate text-[12px] text-neutral-500">{name}</span>
           </div>
           <div className="mt-1 flex flex-wrap items-end gap-x-2 gap-y-1">
-            <p className="font-mono text-[22px] font-medium leading-none tabular-nums text-neutral-950 dark:text-white">
-              {status === "ready" && active ? showPrice(active.price) : "—"}
-            </p>
-            <span className="mb-0.5 font-mono text-[12px] tabular-nums" style={{ color: dirColor }}>
-              {status === "ready" && active ? showDelta(delta) : ""}
-            </span>
+            {readouts.length ? (
+              readouts.map((readout) => (
+                <span key={readout.id} className="mr-2 inline-flex items-end gap-1.5">
+                  <span aria-hidden className="mb-[5px] size-2 shrink-0 rounded-full" style={{ backgroundColor: readout.color }} />
+                  {readout.label ? <span className="mb-0.5 font-mono text-[11px] text-neutral-500">{readout.label}</span> : null}
+                  <span className="font-mono text-[20px] font-medium leading-none tabular-nums text-neutral-950 dark:text-white">
+                    {status === "ready" && readout.point ? showPrice(readout.point.price) : "—"}
+                  </span>
+                  <span className="mb-0.5 font-mono text-[12px] tabular-nums" style={{ color: readout.delta >= 0 ? UP : DOWN }}>
+                    {status === "ready" && readout.point ? showDelta(readout.delta) : ""}
+                  </span>
+                </span>
+              ))
+            ) : (
+              <>
+                <p className="font-mono text-[22px] font-medium leading-none tabular-nums text-neutral-950 dark:text-white">
+                  {status === "ready" && active ? showPrice(active.price) : "—"}
+                </p>
+                <span className="mb-0.5 font-mono text-[12px] tabular-nums" style={{ color: dirColor }}>
+                  {status === "ready" && active ? showDelta(delta) : ""}
+                </span>
+              </>
+            )}
             {active ? <span className="mb-0.5 font-mono text-[11px] text-neutral-500">{formatWhen(active.t, span)}</span> : null}
             {paneFrames.map((pane) => {
               const value = hoverIndex != null ? pane.slice[hoverIndex] : pane.slice[pane.slice.length - 1];
@@ -337,8 +422,13 @@ export function IndicatorChart({
             })}
           </div>
         </div>
-        {ranges.length > 1 ? (
-          <RangeSelector ranges={ranges} value={range?.label || defaultRange} onChange={setRangeLabel} reduce={reduce} />
+        {toolbar || ranges.length > 1 ? (
+          <div className="flex shrink-0 flex-wrap items-center justify-end gap-2">
+            {toolbar}
+            {ranges.length > 1 ? (
+              <RangeSelector ranges={ranges} value={range?.label || defaultRange} onChange={setRangeLabel} reduce={reduce} />
+            ) : null}
+          </div>
         ) : null}
       </div>
       {status !== "ready" || !n ? (
@@ -359,8 +449,8 @@ export function IndicatorChart({
             >
               <defs>
                 <linearGradient id={`${uid}-price`} x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor={dirColor} stopOpacity="0.22" />
-                  <stop offset="100%" stopColor={dirColor} stopOpacity="0" />
+                  <stop offset="0%" stopColor={lineColor} stopOpacity="0.22" />
+                  <stop offset="100%" stopColor={lineColor} stopOpacity="0" />
                 </linearGradient>
               </defs>
               {priceTicks.map((tick) => {
@@ -370,22 +460,38 @@ export function IndicatorChart({
                   <g key={tick}>
                     <line x1={x0} x2={x1} y1={y} y2={y} stroke="currentColor" strokeOpacity="0.12" strokeDasharray="2 4" />
                     <text x={x1 + 8} y={y} dominantBaseline="middle" fontSize="10.5" fill="currentColor" className="tabular-nums">
-                      {showPrice(tick)}
+                      {showTick(tick)}
                     </text>
                   </g>
                 );
               })}
-              <path d={`${closeLine} L${xAt(last.t)},${priceBottom} L${xAt(first.t)},${priceBottom} Z`} fill={`url(#${uid}-price)`} />
+              {overlayLines.length ? null : (
+                <path d={`${closeLine} L${xAt(last.t)},${priceBottom} L${xAt(first.t)},${priceBottom} Z`} fill={`url(#${uid}-price)`} />
+              )}
               <path
+                key={`main-${lineColor}`}
                 d={closeLine}
                 fill="none"
-                stroke={dirColor}
+                stroke={lineColor}
                 strokeWidth="2"
                 strokeLinejoin="round"
                 strokeLinecap="round"
                 pathLength="1"
                 style={reduce ? undefined : { strokeDasharray: 1, animation: `spectrum-mc-draw 880ms ${EASE} both` }}
               />
+              {overlayLines.map((overlay) => (
+                <path
+                  key={overlay.id}
+                  d={overlay.path}
+                  fill="none"
+                  stroke={overlay.color}
+                  strokeWidth="2"
+                  strokeLinejoin="round"
+                  strokeLinecap="round"
+                  pathLength="1"
+                  style={reduce ? undefined : { strokeDasharray: 1, animation: `spectrum-mc-draw 880ms ${EASE} both` }}
+                />
+              ))}
               {paneFrames.map((pane) => (
                 <g key={pane.indicator.id}>
                   <text x={x0 + 2} y={pane.top - 2} fontSize="9.5" fontWeight="600" fill="currentColor" opacity="0.55" className="font-mono uppercase tracking-wider">
@@ -394,19 +500,22 @@ export function IndicatorChart({
                   <path d={pane.line} fill="none" stroke={pane.color} strokeWidth="1.6" strokeLinejoin="round" strokeLinecap="round" />
                 </g>
               ))}
-              {timeTicks.map((time) => (
-                <text
-                  key={time}
-                  x={Math.max(x0 + 18, Math.min(x1 - 18, xAt(time)))}
-                  y={innerBottom + 14}
-                  textAnchor="middle"
-                  fontSize="10.5"
-                  fill="currentColor"
-                  className="tabular-nums"
-                >
-                  {formatWhen(time, span)}
-                </text>
-              ))}
+              {timeTicks.map((time, index) => {
+                const edge = timeTicks.length < 2 ? "" : index === 0 ? "start" : index === timeTicks.length - 1 ? "end" : "";
+                return (
+                  <text
+                    key={time}
+                    x={edge === "start" ? x0 : edge === "end" ? x1 : Math.max(x0 + 18, Math.min(x1 - 18, xAt(time)))}
+                    y={innerBottom + 14}
+                    textAnchor={edge || "middle"}
+                    fontSize="10.5"
+                    fill="currentColor"
+                    className="tabular-nums"
+                  >
+                    {formatWhen(time, span)}
+                  </text>
+                );
+              })}
               {hoverIndex != null && view[hoverIndex] ? (
                 <g>
                   <line
@@ -418,7 +527,12 @@ export function IndicatorChart({
                     strokeOpacity="0.42"
                     strokeDasharray="3 3"
                   />
-                  <circle cx={xAt(view[hoverIndex].t)} cy={priceY(view[hoverIndex].price)} r="4" fill="var(--spectrum-chart-surface, #fff)" stroke={dirColor} strokeWidth="2" />
+                  <circle cx={xAt(view[hoverIndex].t)} cy={priceY(view[hoverIndex].price)} r="4" fill="var(--spectrum-chart-surface, #fff)" stroke={lineColor} strokeWidth="2" />
+                  {overlayLines.map((overlay) => {
+                    const point = overlay.view[nearestIndex(overlay.view, view[hoverIndex].t)];
+                    if (!point) return null;
+                    return <circle key={overlay.id} cx={xAt(point.t)} cy={priceY(point.price)} r="4" fill="var(--spectrum-chart-surface, #fff)" stroke={overlay.color} strokeWidth="2" />;
+                  })}
                   {paneFrames.map((pane) => {
                     const value = pane.slice[hoverIndex];
                     if (!Number.isFinite(value)) return null;
@@ -427,7 +541,7 @@ export function IndicatorChart({
                 </g>
               ) : null}
               {live && last ? (
-                <circle cx={xAt(last.t)} cy={priceY(last.price)} r="3.5" fill={dirColor}>
+                <circle cx={xAt(last.t)} cy={priceY(last.price)} r="3.5" fill={lineColor}>
                   {reduce ? null : <animate attributeName="opacity" values="1;0.45;1" dur="1.4s" repeatCount="indefinite" />}
                 </circle>
               ) : null}

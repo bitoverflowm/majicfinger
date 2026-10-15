@@ -55,11 +55,39 @@ function outcomeChoice(rows, outcomeIndex) {
   return { label: seen.find((value) => value.toLowerCase() === "yes") || seen[0], filter: true };
 }
 
+function outcomeRank(outcome) {
+  const key = outcome.toLowerCase();
+  if (key === "yes") return 0;
+  if (key === "no") return 1;
+  return 2;
+}
+
+/**
+ * Outcomes a per-outcome trade sheet holds, Yes first and No second.
+ * Sheets priced in Yes terms, such as Kalshi trades, have one series and return none.
+ * @param {Array<{ title?: string, id?: string }>} columns
+ * @param {unknown[][]} rows
+ * @returns {string[]}
+ */
+export function tradeOutcomes(columns, rows) {
+  const yesPriced = findColumn(columns, (title, id) => id === "yes_price_dollars" || id === "yes_price" || id === "price_dollars" || title.includes("yes price"));
+  if (yesPriced >= 0) return [];
+  const outcomeIndex = findColumn(columns, (title, id) => id === "outcome" || title === "outcome");
+  if (outcomeIndex < 0) return [];
+  const seen = [];
+  for (const row of rows || []) {
+    const value = String(row?.[outcomeIndex] ?? "").trim();
+    if (value && !seen.includes(value)) seen.push(value);
+  }
+  return seen.sort((a, b) => outcomeRank(a) - outcomeRank(b));
+}
+
 /**
  * @param {Array<{ title?: string, id?: string, scale?: string }>} columns
  * @param {unknown[][]} rows
+ * @param {{ outcome?: string }} [options] one outcome to keep. Default keeps Yes when outcomes are mixed.
  */
-export function tradesToCandles(columns, rows) {
+export function tradesToCandles(columns, rows, options = {}) {
   const timeIndex = findColumn(
     columns,
     (title, id) =>
@@ -85,7 +113,13 @@ export function tradesToCandles(columns, rows) {
       ? yesPriceIndex
       : findColumn(columns, (title, id) => id === "price" || title === "price");
   const outcomeIndex = findColumn(columns, (title, id) => id === "outcome" || title === "outcome");
-  const chosen = yesPriceIndex >= 0 ? { label: "", filter: false } : outcomeChoice(rows, outcomeIndex);
+  const wanted = String(options.outcome || "").trim();
+  const chosen =
+    yesPriceIndex >= 0
+      ? { label: "", filter: false }
+      : wanted && outcomeIndex >= 0
+        ? { label: wanted, filter: true }
+        : outcomeChoice(rows, outcomeIndex);
   const outcome = chosen.label;
   const sizeIndex = findColumn(
     columns,

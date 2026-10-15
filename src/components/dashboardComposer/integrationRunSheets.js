@@ -232,7 +232,7 @@ export function layoutRunCharts(sheetBlocks, chartsBySheetId, options = {}) {
     let y = rowBottom + CHART_GAP;
     let rowH = 0;
     for (const chart of rowCharts) {
-      const w = Math.min(chart.w || 540, 540);
+      const w = Math.min(chart.w || 540, CHART_RIGHT - CHART_X0);
       const h = chart.h || 360;
       if (x > CHART_X0 && x + w > CHART_RIGHT + 1) {
         y += rowH + CHART_GAP;
