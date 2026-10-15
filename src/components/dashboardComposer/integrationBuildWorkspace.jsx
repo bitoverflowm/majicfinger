@@ -6527,6 +6527,23 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
       activeFunction?.id,
     );
     const sheets = [];
+    const stageSheet = (sheet) => {
+      if (!sheet) return Promise.resolve();
+      if (sheet.id) {
+        const index = sheets.findIndex((item) => item.id === sheet.id);
+        if (index >= 0) sheets[index] = sheet;
+        else sheets.push(sheet);
+      } else {
+        sheets.push(sheet);
+      }
+      canvas?.revealRunSheets?.(sheets.slice(), {
+        pageId: placementRef.current?.pageId || undefined,
+        append: placementRef.current?.append !== false,
+      });
+      return new Promise((resolve) => {
+        requestAnimationFrame(() => requestAnimationFrame(resolve));
+      });
+    };
     const pushSampleSheet = ({ id, title, columns, rows, parentSheetId, parentQuery, composeRequest, table, span }) => {
       if (!sampling || !sampleConfig || !columns?.length) return;
       const drawn = Array.isArray(rows) ? rows : [];
@@ -7187,7 +7204,7 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
           : pull?.columns || [];
       const requested = Number(rowLimit);
       const limit = Number.isFinite(sheetCap) ? sheetCap : PREVIEW_ROW_CAP;
-      livePicks.forEach((pick) => {
+      for (const pick of livePicks) {
         const matched = polymarketRowsForMarket(marketRows, pick, livePicks).filter((row) =>
           rowMatchesAttributes(row, matchColumns, attributeFilters),
         );
@@ -7205,7 +7222,7 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
           "markets",
           activeFunction?.id,
         );
-        sheets.push({
+        await stageSheet({
           id: `run-polymarket-${tableId}-${safe}`,
           title: activitySheetTitle(pick, fullRows) || `${sheetTitle} · ${label}`,
           columns: built.columns.length ? built.columns : shownColumns,
@@ -7216,9 +7233,9 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
           pull: { table: tableId, ticker: pick.slug || pick.entityId || "", tokens: pick.tokenIds || [], ...lifePull(pick) },
           summary: `Polymarket Live · ${sheetTitle} · ${label}`,
         });
-      });
+      }
     } else if (runMarkets.columns.length && keepParentDataset) {
-      sheets.push({
+      await stageSheet({
         id: tableId === "trades" ? "run-trades" : tableId && tableId !== "markets" ? `run-${tableId}` : "run-markets",
         title: activitySheetTitle(livePicks[0], runMarkets.rows) || sheetTitle,
         columns: runMarkets.columns,
@@ -7403,6 +7420,7 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
         }
       });
       for (const sheet of hosts) {
+        let changed = false;
         for (const target of mergeTargets) {
           const parts = traderPulled.filter((item) => item.target.id === target.id && item.columns.length);
           const columns = parts.find((item) => item.columns.length)?.columns || [];
@@ -7412,15 +7430,17 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
           sheet.columns = merged.columns;
           sheet.rows = merged.rows;
           sheet.rowCount = merged.rows.length;
+          changed = true;
         }
+        if (changed) await stageSheet(sheet);
       }
-      traderPulled.forEach((item) => {
-        if (!sheetTargets.some((target) => target.id === item.target.id) || !item.columns.length) return;
+      for (const item of traderPulled) {
+        if (!sheetTargets.some((target) => target.id === item.target.id) || !item.columns.length) continue;
         const label = item.entity.label || item.entity.ticker;
         const named = polymarketTraderJoinSheetTitle(item.target.id, label);
         const slug = `${item.target.id}-${String(item.entity.id || item.entity.ticker).replace(/[^A-Za-z0-9]+/g, "-")}`;
         const fullRows = item.rows || [];
-        sheets.push({
+        await stageSheet({
           id: `run-live-${slug}`,
           title: named || `${item.target.title} · ${label}`,
           columns: item.columns,
@@ -7431,7 +7451,7 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
           pull: { table: item.target.id, address: item.entity.pick?.address, kind: "profile" },
           summary: `Polymarket Live · ${item.target.title} · ${label}`,
         });
-      });
+      }
     };
     if (!polymarketTraderCatalog && !polymarketEventCatalog && liveJoinTargets.length && (polymarketJoinActive || liveJoinReady || marketDownstream || fanoutAssociated.length)) {
       reporter.start("join-live");
@@ -7448,6 +7468,7 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
           parallel: true,
         })),
       );
+      const holderSheetStart = sheets.length;
       const pulled = await mapPool(jobs, 3, async (job) => {
         const childId = `${job.target.id}:${job.market.ticker}`;
         reporter.patchChild("join-live", childId, { status: "running", result: `Pulling ${job.target.title}` });
@@ -7462,7 +7483,26 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
               );
           const rows = result.rows || [];
           reporter.patchChild("join-live", childId, { status: "success", result: `${rows.length.toLocaleString()} rows` });
-          return { ...job, columns: result.columns || [], rows };
+          const item = { ...job, columns: result.columns || [], rows };
+          if (item.columns.length) {
+            const slug = `${item.target.id}-${String(item.market.ticker).replace(/[^A-Za-z0-9]+/g, "-")}`;
+            const id = `run-live-${slug}`;
+            if (rows.length > PREVIEW_ROW_CAP) {
+              rememberTradeSheet(id, item.market.ticker, item.columns, displayMatrix(item.columns, rows), sheetCap, accountId);
+            }
+            await stageSheet({
+              id,
+              title: `${item.target.title} · ${item.market.label || item.market.ticker}`,
+              columns: item.columns,
+              rows,
+              rowCount: rows.length,
+              span: "half",
+              table: item.target.id,
+              pull: { ticker: item.market.ticker, table: item.target.id, tokens: item.market.pick?.tokenIds || [], ...lifePull(item.market.pick || item.market) },
+              summary: `${polymarketJoinActive ? "Polymarket Live" : "Kalshi Live"} · ${item.target.title} · ${item.market.label || item.market.ticker}`,
+            });
+          }
+          return item;
         } catch (err) {
           reporter.patchChild("join-live", childId, {
             status: "error",
@@ -7470,27 +7510,6 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
           });
           return { ...job, columns: [], rows: [] };
         }
-      });
-      const holderSheetStart = sheets.length;
-      pulled.forEach((item) => {
-        if (!item.columns.length) return;
-        const slug = `${item.target.id}-${String(item.market.ticker).replace(/[^A-Za-z0-9]+/g, "-")}`;
-        const id = `run-live-${slug}`;
-        const fullRows = item.rows || [];
-        if (fullRows.length > PREVIEW_ROW_CAP) {
-          rememberTradeSheet(id, item.market.ticker, item.columns, displayMatrix(item.columns, fullRows), sheetCap, accountId);
-        }
-        sheets.push({
-          id,
-          title: `${item.target.title} · ${item.market.label || item.market.ticker}`,
-          columns: item.columns,
-          rows: fullRows,
-          rowCount: fullRows.length,
-          span: "half",
-          table: item.target.id,
-          pull: { ticker: item.market.ticker, table: item.target.id, tokens: item.market.pick?.tokenIds || [], ...lifePull(item.market.pick || item.market) },
-          summary: `${polymarketJoinActive ? "Polymarket Live" : "Kalshi Live"} · ${item.target.title} · ${item.market.label || item.market.ticker}`,
-        });
       });
       await appendHolderTraderSheets(
         sheets.slice(holderSheetStart).filter((sheet) => sheet.table === "getHoldersByMarkets"),
@@ -7514,30 +7533,31 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
         const pulled = await mapPool(jobs, 3, async (job) => {
           try {
             const result = await loadPolymarketLiveTable(job.target.id, [job.entity.pick], { rowLimit: childLimit, planLimit: childLimit });
-            return { ...job, columns: result.columns || [], rows: result.rows || [] };
+            const item = { ...job, columns: result.columns || [], rows: result.rows || [] };
+            if (item.columns.length) {
+              const label = item.entity.label || item.entity.ticker;
+              const slug = `${item.target.id}-${String(item.entity.id).replace(/[^A-Za-z0-9]+/g, "-")}`;
+              await stageSheet({
+                id: `run-live-${slug}`,
+                title: `Markets · ${label}`,
+                columns: item.columns,
+                rows: item.rows || [],
+                rowCount: (item.rows || []).length,
+                span: "full",
+                table: item.target.id,
+                pull: { table: item.target.id, eventId: item.entity.id },
+                summary: `Polymarket Live · ${item.target.title} · ${label}`,
+              });
+            }
+            return item;
           } catch {
             return { ...job, columns: [], rows: [] };
           }
         });
-        pulled.forEach((item) => {
-          if (!item.columns.length) return;
-          const label = item.entity.label || item.entity.ticker;
-          const slug = `${item.target.id}-${String(item.entity.id).replace(/[^A-Za-z0-9]+/g, "-")}`;
-          sheets.push({
-            id: `run-live-${slug}`,
-            title: `Markets · ${label}`,
-            columns: item.columns,
-            rows: item.rows || [],
-            rowCount: (item.rows || []).length,
-            span: "full",
-            table: item.target.id,
-            pull: { table: item.target.id, eventId: item.entity.id },
-            summary: `Polymarket Live · ${item.target.title} · ${label}`,
-          });
-        });
         const namedMarkets = polymarketMarketEntities(pulled.flatMap((item) => item.rows || []), marketCap);
         if (downstreamSheetTargets.length && namedMarkets.length) {
           const downJobs = namedMarkets.flatMap((entity) => downstreamSheetTargets.map((target) => ({ target, entity })));
+          const holderSheetStart = sheets.length;
           const downPulled = await mapPool(downJobs, 3, async (job) => {
             try {
               const result = await loadPolymarketLiveJoin(
@@ -7545,27 +7565,26 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
                 job.target.id === "parent-market" ? job.entity.pick : await ensurePolymarketMarketPick(job.entity.pick),
                 { rowLimit: childLimit, planLimit: childLimit },
               );
-              return { ...job, columns: result.columns || [], rows: result.rows || [] };
+              const item = { ...job, columns: result.columns || [], rows: result.rows || [] };
+              if (item.columns.length) {
+                const label = item.entity.label || item.entity.ticker;
+                const slug = `${item.target.id}-${String(item.entity.ticker).replace(/[^A-Za-z0-9]+/g, "-")}`;
+                await stageSheet({
+                  id: `run-mjoin-${slug}`,
+                  title: `${item.target.title} · ${label}`,
+                  columns: item.columns,
+                  rows: item.rows || [],
+                  rowCount: (item.rows || []).length,
+                  span: "half",
+                  table: item.target.id,
+                  pull: { ticker: item.entity.ticker, table: item.target.id, tokens: item.entity.pick?.tokenIds || [], ...lifePull(item.entity.pick || {}) },
+                  summary: `Polymarket Live · ${item.target.title} · ${label}`,
+                });
+              }
+              return item;
             } catch {
               return { ...job, columns: [], rows: [] };
             }
-          });
-          const holderSheetStart = sheets.length;
-          downPulled.forEach((item) => {
-            if (!item.columns.length) return;
-            const label = item.entity.label || item.entity.ticker;
-            const slug = `${item.target.id}-${String(item.entity.ticker).replace(/[^A-Za-z0-9]+/g, "-")}`;
-            sheets.push({
-              id: `run-mjoin-${slug}`,
-              title: `${item.target.title} · ${label}`,
-              columns: item.columns,
-              rows: item.rows || [],
-              rowCount: (item.rows || []).length,
-              span: "half",
-              table: item.target.id,
-              pull: { ticker: item.entity.ticker, table: item.target.id, tokens: item.entity.pick?.tokenIds || [], ...lifePull(item.entity.pick || {}) },
-              summary: `Polymarket Live · ${item.target.title} · ${label}`,
-            });
           });
           await appendHolderTraderSheets(
             sheets.slice(holderSheetStart).filter((sheet) => sheet.table === "getHoldersByMarkets"),
@@ -7615,7 +7634,31 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
                 );
             const rows = result.rows || [];
             reporter.patchChild("join-live", childId, { status: "success", result: `${rows.length.toLocaleString()} rows` });
-            return { ...job, columns: result.columns || [], rows };
+            const item = { ...job, columns: result.columns || [], rows };
+            if (item.columns.length) {
+              const label = item.entity.label || item.entity.ticker;
+              const named = item.anchor === "trader" ? polymarketTraderJoinSheetTitle(item.target.id, label) : "";
+              const slug = `${item.target.id}-${String(item.entity.id || item.entity.ticker).replace(/[^A-Za-z0-9]+/g, "-")}`;
+              const id = `run-live-${slug}`;
+              if (rows.length > PREVIEW_ROW_CAP) {
+                rememberTradeSheet(id, label, item.columns, displayMatrix(item.columns, rows), sheetCap, accountId);
+              }
+              const marketPick = item.entity.pick || {};
+              await stageSheet({
+                id,
+                title: named || `${item.target.title} · ${label}`,
+                columns: item.columns,
+                rows,
+                rowCount: rows.length,
+                span: "half",
+                table: item.target.id,
+                pull: item.anchor === "trader"
+                  ? { table: item.target.id, address: marketPick.address, kind: "profile" }
+                  : { ticker: item.entity.ticker, table: item.target.id, tokens: marketPick.tokenIds || [], ...lifePull(marketPick) },
+                summary: `Polymarket Live · ${item.target.title} · ${label}`,
+              });
+            }
+            return item;
           } catch (err) {
             reporter.patchChild("join-live", childId, {
               status: "error",
@@ -7623,31 +7666,6 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
             });
             return { ...job, columns: [], rows: [] };
           }
-        });
-        pulled.forEach((item) => {
-          if (!item.columns.length) return;
-          const label = item.entity.label || item.entity.ticker;
-          const named = item.anchor === "trader" ? polymarketTraderJoinSheetTitle(item.target.id, label) : "";
-          const slug = `${item.target.id}-${String(item.entity.id || item.entity.ticker).replace(/[^A-Za-z0-9]+/g, "-")}`;
-          const id = `run-live-${slug}`;
-          const fullRows = item.rows || [];
-          if (fullRows.length > PREVIEW_ROW_CAP) {
-            rememberTradeSheet(id, label, item.columns, displayMatrix(item.columns, fullRows), sheetCap, accountId);
-          }
-          const marketPick = item.entity.pick || {};
-          sheets.push({
-            id,
-            title: named || `${item.target.title} · ${label}`,
-            columns: item.columns,
-            rows: fullRows,
-            rowCount: fullRows.length,
-            span: "half",
-            table: item.target.id,
-            pull: item.anchor === "trader"
-              ? { table: item.target.id, address: marketPick.address, kind: "profile" }
-              : { ticker: item.entity.ticker, table: item.target.id, tokens: marketPick.tokenIds || [], ...lifePull(marketPick) },
-            summary: `Polymarket Live · ${item.target.title} · ${label}`,
-          });
         });
         if (downstreamFromPositions && (downstreamSheetTargets.length || downstreamMergeOn)) {
           const bearingRows = pulled
@@ -7688,11 +7706,13 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
                 sheet.columns = merged.columns;
                 sheet.rows = merged.rows;
                 sheet.rowCount = merged.rows.length;
+                await stageSheet(sheet);
               }
             }
           }
           if (downstreamSheetTargets.length && namedMarkets.length) {
             const downJobs = namedMarkets.flatMap((entity) => downstreamSheetTargets.map((target) => ({ target, entity })));
+            const holderSheetStart = sheets.length;
             const downPulled = await mapPool(downJobs, 3, async (job) => {
               try {
                 const result = await loadPolymarketLiveJoin(
@@ -7700,38 +7720,37 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
                   job.target.id === "parent-market" ? job.entity.pick : await ensurePolymarketMarketPick(job.entity.pick),
                   { rowLimit: childLimit, planLimit: childLimit },
                 );
-                return { ...job, columns: result.columns || [], rows: result.rows || [] };
+                const item = { ...job, columns: result.columns || [], rows: result.rows || [] };
+                if (item.columns.length) {
+                  const label = item.entity.label || item.entity.ticker;
+                  const slug = `${item.target.id}-${String(item.entity.ticker).replace(/[^A-Za-z0-9]+/g, "-")}`;
+                  const id = `run-mjoin-${slug}`;
+                  const fullRows = item.rows || [];
+                  if (fullRows.length > PREVIEW_ROW_CAP) {
+                    rememberTradeSheet(id, label, item.columns, displayMatrix(item.columns, fullRows), sheetCap, accountId);
+                  }
+                  const marketPick = item.entity.pick || {};
+                  await stageSheet({
+                    id,
+                    title: `${item.target.title} · ${label}`,
+                    columns: item.columns,
+                    rows: fullRows,
+                    rowCount: fullRows.length,
+                    span: "half",
+                    table: item.target.id,
+                    pull: {
+                      ticker: item.entity.ticker,
+                      table: item.target.id,
+                      tokens: marketPick.tokenIds || [],
+                      ...lifePull(marketPick),
+                    },
+                    summary: `Polymarket Live · ${item.target.title} · ${label}`,
+                  });
+                }
+                return item;
               } catch {
                 return { ...job, columns: [], rows: [] };
               }
-            });
-            const holderSheetStart = sheets.length;
-            downPulled.forEach((item) => {
-              if (!item.columns.length) return;
-              const label = item.entity.label || item.entity.ticker;
-              const slug = `${item.target.id}-${String(item.entity.ticker).replace(/[^A-Za-z0-9]+/g, "-")}`;
-              const id = `run-mjoin-${slug}`;
-              const fullRows = item.rows || [];
-              if (fullRows.length > PREVIEW_ROW_CAP) {
-                rememberTradeSheet(id, label, item.columns, displayMatrix(item.columns, fullRows), sheetCap, accountId);
-              }
-              const marketPick = item.entity.pick || {};
-              sheets.push({
-                id,
-                title: `${item.target.title} · ${label}`,
-                columns: item.columns,
-                rows: fullRows,
-                rowCount: fullRows.length,
-                span: "half",
-                table: item.target.id,
-                pull: {
-                  ticker: item.entity.ticker,
-                  table: item.target.id,
-                  tokens: marketPick.tokenIds || [],
-                  ...lifePull(marketPick),
-                },
-                summary: `Polymarket Live · ${item.target.title} · ${label}`,
-              });
             });
             await appendHolderTraderSheets(
               sheets.slice(holderSheetStart).filter((sheet) => sheet.table === "getHoldersByMarkets"),
@@ -7951,9 +7970,9 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
       }), tableId),
       { integrationId },
     );
-    canvas?.placeIntegrationSheets?.(placedSheets, {
+    canvas?.revealRunSheets?.(placedSheets, {
       pageId: placement.pageId || undefined,
-      append: placement.append,
+      append: placement.append !== false,
     });
     const joinRecord = joinCommitted
       ? {

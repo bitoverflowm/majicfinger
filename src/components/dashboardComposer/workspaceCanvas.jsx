@@ -63,6 +63,27 @@ import { SpectrumLoadingState } from "@/components/ui/spectrum-loading-state";
 import { RunProgressCard } from "@/components/dashboardComposer/integrationRunProgress";
 import { cn } from "@/lib/utils";
 
+const SHEET_ARRIVE_CSS = `
+@keyframes lychee-sheet-arrive {
+  from { opacity: 0; transform: translateY(18px); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes lychee-sheet-fill {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes lychee-sheet-pulse {
+  0% { box-shadow: inset 0 0 0 2px rgba(13, 153, 255, 0.72); }
+  100% { box-shadow: inset 0 0 0 2px rgba(13, 153, 255, 0); }
+}
+.lychee-sheet-arrive { animation: lychee-sheet-arrive 560ms cubic-bezier(0.22, 1, 0.36, 1) both; }
+.lychee-sheet-fill { animation: lychee-sheet-fill 480ms cubic-bezier(0.22, 1, 0.36, 1) both; }
+.lychee-sheet-pulse { animation: lychee-sheet-pulse 720ms ease-out 1; }
+@media (prefers-reduced-motion: reduce) {
+  .lychee-sheet-arrive, .lychee-sheet-fill, .lychee-sheet-pulse { animation: none; }
+}
+`;
+
 const WorkspaceCanvasContext = createContext(null);
 
 export function useWorkspaceCanvas() {
@@ -543,6 +564,71 @@ export function WorkspaceCanvasProvider({ pageId, readOnly = false, children }) 
     [pageId],
   );
 
+  const revealRunSheets = useCallback((sheets, options = {}) => {
+    const incoming = (Array.isArray(sheets) ? sheets : []).filter((sheet) => sheet && (sheet.columns?.length || sheet.title));
+    if (!incoming.length) return;
+    const targetId = options.pageId || pageIdRef.current;
+    const append = options.append !== false;
+    const existing = blocksByPageRef.current[targetId] || [];
+    const previousById = new Map(existing.map((block) => [block.id, block]));
+    const columnKey = (columns) => (columns || []).map((column) => column?.id || "").join("\0");
+    const rowKey = (sheet) => Math.max(Array.isArray(sheet?.rows) ? sheet.rows.length : 0, Math.floor(Number(sheet?.rowCount) || 0));
+    let focusId = "";
+    for (const sheet of incoming) {
+      const id = sheet.id;
+      if (!id) continue;
+      const prior = previousById.get(id);
+      if (!prior) {
+        focusId = id;
+        continue;
+      }
+      if (columnKey(prior.columns) !== columnKey(sheet.columns) || (prior.rowCount || 0) !== rowKey(sheet)) focusId = id;
+    }
+    setBlocksByPage((prev) => {
+      const list = prev[targetId] || [];
+      const priorById = new Map(list.map((block) => [block.id, block]));
+      const laidIds = new Set(incoming.map((sheet) => sheet.id).filter(Boolean));
+      const kept = list.filter((block) => {
+        if (laidIds.has(block.id)) return false;
+        if (!append && block.source === "integration-run") return false;
+        return true;
+      });
+      const originY = kept.reduce((max, block) => Math.max(max, (block.y || 0) + (block.h || 0) + 24), 88);
+      const placed = layoutRunSheets(incoming, { originY: kept.length ? originY : 88 });
+      const animated = placed.map((block) => {
+        const prior = priorById.get(block.id);
+        if (!prior) return { ...block, arrive: true };
+        const sameData = columnKey(prior.columns) === columnKey(block.columns) && (prior.rowCount || 0) === (block.rowCount || 0);
+        if (sameData) {
+          return {
+            ...prior,
+            x: block.x,
+            y: block.y,
+            w: block.w,
+            h: block.h,
+            arrive: prior.arrive,
+            ...(block.query ? { query: block.query } : {}),
+            ...(block.provenance ? { provenance: block.provenance } : {}),
+            ...(block.pull ? { pull: block.pull } : {}),
+            ...(block.dataset ? { dataset: block.dataset } : {}),
+            ...(block.integrationId ? { integrationId: block.integrationId } : {}),
+            ...(block.table ? { table: block.table } : {}),
+            ...(block.title ? { title: block.title } : {}),
+          };
+        }
+        return { ...block, arrive: prior.arrive, pulse: Date.now() };
+      });
+      return { ...prev, [targetId]: [...kept, ...animated] };
+    });
+    if (!focusId) return;
+    if (targetId !== pageIdRef.current) {
+      pendingRevealRef.current = focusId;
+      return;
+    }
+    setSpotlightId(focusId);
+    setRevealNonce((nonce) => nonce + 1);
+  }, []);
+
   const addBlock = useCallback(
     (type) => {
       const size = BLOCK_SIZE[type] || BLOCK_SIZE.text;
@@ -930,6 +1016,7 @@ export function WorkspaceCanvasProvider({ pageId, readOnly = false, children }) 
       setRenameId,
       addBlock,
       placeIntegrationSheets,
+      revealRunSheets,
       registerTables,
       runFeed,
       reportRun,
@@ -942,11 +1029,12 @@ export function WorkspaceCanvasProvider({ pageId, readOnly = false, children }) 
       removeBlock,
       createChartFromBlock,
     }),
-    [addBlock, armReplay, blocks, blocksByPage, createChartFromBlock, dashboardName, dismissRun, duplicateBlock, focusBlock, focusSheetRow, handDown, leavePrompt, pageId, pendingTabs, placeIntegrationSheets, previewActiveId, previewTabs, readOnly, ready, realtimeById, realtimeModeByPage, registerTables, removeBlock, renameDashboard, renameId, replayReady, replayRun, replayTab, reportRun, requestTab, resolveLeave, revealBlock, revealNonce, runFeed, saveNow, selectedId, sheetRowFocus, spotlightId, startRealtimeMode, startSheetRealtime, stopRealtimeMode, stopSheetRealtime, tables, tool, updateBlock],
+    [addBlock, armReplay, blocks, blocksByPage, createChartFromBlock, dashboardName, dismissRun, duplicateBlock, focusBlock, focusSheetRow, handDown, leavePrompt, pageId, pendingTabs, placeIntegrationSheets, previewActiveId, previewTabs, readOnly, ready, realtimeById, realtimeModeByPage, registerTables, removeBlock, renameDashboard, renameId, replayReady, replayRun, replayTab, reportRun, requestTab, resolveLeave, revealBlock, revealNonce, revealRunSheets, runFeed, saveNow, selectedId, sheetRowFocus, spotlightId, startRealtimeMode, startSheetRealtime, stopRealtimeMode, stopSheetRealtime, tables, tool, updateBlock],
   );
 
   return (
     <WorkspaceCanvasContext.Provider value={value}>
+      <style>{SHEET_ARRIVE_CSS}</style>
       {children}
       {leavePrompt ? (
         <div className="fixed inset-0 z-[700] flex items-center justify-center bg-black/40 p-6">
@@ -1564,6 +1652,13 @@ function CanvasBlock({ block, selected, spotlight = false, onSelect, onChange, b
   const [menuOpen, setMenuOpen] = useState(false);
   const [fullscreen, setFullscreen] = useState(false);
   const [resizing, setResizing] = useState(false);
+  const arriveRef = useRef(!!block.arrive);
+  const [dataReady, setDataReady] = useState(!block.arrive);
+  useEffect(() => {
+    if (dataReady) return undefined;
+    const timer = window.setTimeout(() => setDataReady(true), 280);
+    return () => window.clearTimeout(timer);
+  }, [dataReady]);
   const sheetDataset = block.type === "sheet" ? describeSheet(block) : null;
   const logLabel = visualPresentationLabel(sheetDataset);
   const logWidth = sheetDataset?.datasetType === "trader_activity" || sheetDataset?.datasetType === "markets" || sheetDataset?.datasetType === "events"
@@ -1772,6 +1867,7 @@ function CanvasBlock({ block, selected, spotlight = false, onSelect, onChange, b
       onPointerDown={readOnly ? undefined : onPointerDown}
       className={cn(
         "pointer-events-auto absolute flex flex-col overflow-hidden rounded-xl border bg-background shadow-sm",
+        block.arrive && "lychee-sheet-arrive",
         readOnly ? "border-border/70" : "group/block",
         !readOnly && spotlight
           ? "border-emerald-500 ring-2 ring-emerald-400/80"
@@ -1785,7 +1881,7 @@ function CanvasBlock({ block, selected, spotlight = false, onSelect, onChange, b
         width: block.w,
         height: block.h,
         cursor: canvas?.tool === "hand" && !readOnly ? "grab" : undefined,
-        transition: resizing ? "none" : "width 480ms cubic-bezier(0.22, 1, 0.36, 1), height 480ms cubic-bezier(0.22, 1, 0.36, 1)",
+        transition: resizing ? "none" : "left 480ms cubic-bezier(0.22, 1, 0.36, 1), top 480ms cubic-bezier(0.22, 1, 0.36, 1), width 480ms cubic-bezier(0.22, 1, 0.36, 1), height 480ms cubic-bezier(0.22, 1, 0.36, 1)",
       }}
     >
       {readOnly ? null : <RealtimeToggle block={block} />}
@@ -1911,8 +2007,11 @@ function CanvasBlock({ block, selected, spotlight = false, onSelect, onChange, b
       ) : fullscreen && block.type === "chart" && !readOnly ? (
         <ChartFullscreen block={block} onChange={onChange} onClose={() => setFullscreen(false)} booting={booting} />
       ) : (
-        <BlockBody block={block} onChange={onChange} booting={booting} />
+        <div className={cn("flex min-h-0 min-w-0 flex-1 flex-col", arriveRef.current && dataReady && "lychee-sheet-fill")}>
+          <BlockBody block={block} onChange={onChange} booting={booting || !dataReady} />
+        </div>
       )}
+      {block.pulse ? <span key={block.pulse} aria-hidden className="lychee-sheet-pulse pointer-events-none absolute inset-0 z-20 rounded-xl" /> : null}
       {readOnly || canvas?.tool !== "hand" ? null : (
         <>
           {RESIZE_EDGES.map((handle) => (
