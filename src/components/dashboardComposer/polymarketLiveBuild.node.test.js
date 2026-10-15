@@ -12,6 +12,9 @@ import {
   polymarketPickFromSuggestion,
   POLYMARKET_CLOSED_ORDERBOOK_MESSAGE,
   polymarketJoinChoices,
+  polymarketEventJoinChoices,
+  polymarketHolderTraderJoins,
+  polymarketEventEntities,
   polymarketJoinPickFromRow,
   polymarketTraderJoinChoices,
   polymarketDownstreamMarketJoins,
@@ -553,7 +556,41 @@ assert.equal(holderJoins.some((item) => item.id === "getHoldersByMarkets"), fals
 assert.equal(holderJoins.some((item) => item.id === "getTradesByMarket"), true);
 assert.deepEqual(polymarketJoinChoices("series"), []);
 assert.deepEqual(polymarketJoinChoices("getEvents"), []);
-assert.deepEqual(polymarketJoinChoices("getMarketsByEvents"), []);
+assert.deepEqual(
+  polymarketJoinChoices("getMarketsByEvents").map((item) => item.id),
+  joinIds,
+);
+const eventJoins = polymarketEventJoinChoices("getEvents");
+assert.deepEqual(
+  eventJoins.map((item) => ({ id: item.id, placement: item.placement, anchor: item.anchor })),
+  [
+    { id: "getMarketsByEvents", placement: "sheet", anchor: "event" },
+    { id: "getLiveVolumeForEvent", placement: "merge", anchor: "event" },
+  ],
+);
+assert.equal(polymarketEventJoinChoices("getMarketsByEvents").length, 0);
+const holderContinuation = polymarketHolderTraderJoins();
+assert.ok(holderContinuation.some((item) => item.id === "getTraderPositions" && item.anchor === "trader" && item.placement === "sheet"));
+assert.ok(holderContinuation.some((item) => item.anchor === "trader" && item.placement === "merge"));
+assert.equal(holderContinuation.some((item) => item.anchor === "market"), false);
+const eventEntities = polymarketEventEntities([
+  { id: "12", title: "Election night", slug: "election-night" },
+  { id: "0xabc", title: "Not an event id" },
+  { id: "12", title: "Duplicate" },
+]);
+assert.equal(eventEntities.length, 1);
+assert.equal(eventEntities[0].pick.entityId, "12");
+assert.equal(eventEntities[0].pick.kind, "event");
+const eventMerged = mergePolymarketJoinRows(
+  [{ id: "id", title: "Id" }, { id: "title", title: "Title" }],
+  [{ id: "12", title: "Election night" }, { id: "13", title: "Other" }],
+  [{ id: "live_total", title: "Live Volume" }],
+  [{ id: "12", live_total: 40 }],
+  { anchor: "event" },
+);
+assert.deepEqual(eventMerged.columns.map((column) => column.id), ["id", "title", "live_total"]);
+assert.equal(eventMerged.rows[0].live_total, 40);
+assert.equal(eventMerged.rows[1].live_total, undefined);
 for (const retired of [
   "getCurrentPositions",
   "getClosedPositions",

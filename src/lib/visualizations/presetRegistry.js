@@ -18,9 +18,9 @@ const PRESETS = {
   tick_size: { view: "spec", label: "Tick size" },
   open_interest: { view: "metric", label: "Open interest" },
   "markets:one": { view: "overview", label: "Market" },
-  markets: { view: "bars", label: "Volume", limit: 10, noun: "markets" },
-  "events:one": { view: "bars", label: "Market prices", limit: 10, noun: "markets" },
-  events: { view: "bars", label: "Event volume", limit: 10, noun: "events" },
+  markets: { view: "treemap", label: "24h volume", noun: "markets" },
+  "events:one": { view: "overview", label: "Event" },
+  events: { view: "treemap", label: "24h volume", noun: "events" },
   series: { view: "overview", label: "Series" },
   holders: { view: "bars", label: "Shares", limit: 10, noun: "holders" },
   leaderboard: { view: "bars", label: "Rank", limit: 10, noun: "traders" },
@@ -194,12 +194,20 @@ export function isStatsDataset(dataset) {
 
 /** Sheets that can switch into a rich log. Positions and activity keep their own. */
 export function hasVisualTable(dataset) {
-  return isStatsDataset(dataset) || dataset?.datasetType === "trader_positions" || dataset?.datasetType === "trader_activity";
+  return (
+    isStatsDataset(dataset) ||
+    dataset?.datasetType === "trader_positions" ||
+    dataset?.datasetType === "trader_activity" ||
+    dataset?.datasetType === "markets" ||
+    dataset?.datasetType === "events"
+  );
 }
 
-/** Menu name for that log. Activity uses the audit-style rich table. */
+/** Menu name for that log. Catalogs and activity use the rich table. */
 export function visualPresentationLabel(dataset) {
-  return dataset?.datasetType === "trader_activity" ? "Rich Table" : "Visual Table";
+  const type = dataset?.datasetType;
+  if (type === "trader_activity" || type === "markets" || type === "events") return "Rich Table";
+  return "Visual Table";
 }
 
 /**

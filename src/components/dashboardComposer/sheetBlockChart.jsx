@@ -8,6 +8,7 @@ import { ohlcRowsToCandles, rangesForCandles, tradesToCandles } from "@/componen
 import { isPriceHistorySheet, priceHistoryOutcome, priceHistoryPoints } from "@/components/dashboardComposer/priceHistorySeries";
 import { DatasetSummary, EventLinesChart } from "@/components/dashboardComposer/datasetChart";
 import { PortfolioTreemap } from "@/components/dashboardComposer/portfolioTreemapChart";
+import { VolumeTreemap } from "@/components/dashboardComposer/volumeTreemapChart";
 import { PnlPortfolioChart } from "@/components/dashboardComposer/pnlPortfolioChart";
 import { ActivityCalendarChart } from "@/components/dashboardComposer/activityCalendarChart";
 import { ActivityStackChart } from "@/components/dashboardComposer/activityStackChart";
@@ -304,6 +305,9 @@ export function SheetBlockChart({ sheet, snapshot, onSnapshot, live = false, vie
       })
     : null;
   if (resolved?.view === "treemap") {
+    if (dataset?.datasetType === "markets" || dataset?.datasetType === "events") {
+      return <VolumeTreemap sheet={sheet} dataset={dataset} onOpenRow={onOpenRow} />;
+    }
     return <PortfolioTreemap sheet={sheet} dataset={dataset} onOpenRow={onOpenRow} />;
   }
   if (resolved?.view === "portfolio") {

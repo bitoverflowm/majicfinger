@@ -15,6 +15,7 @@ import { useMyStateV2 } from "@/context/stateContextV2";
 import { duplicateTabName, loadWorkspaceStartTabs, saveWorkspaceStartTabs } from "@/lib/workspaceStartTabs";
 import { DashboardSheetGrid } from "@/components/dashboardComposer/dashboardSheetGrid";
 import { ActivityRichTableView } from "@/components/dashboardComposer/activityRichTableView";
+import { CatalogRichTableView } from "@/components/dashboardComposer/catalogRichTableView";
 import { VisualTableView } from "@/components/dashboardComposer/visualTableView";
 import { Switch } from "@/components/ui/switch";
 import { isOrderBookSheet } from "@/components/dashboardComposer/orderBookLadder";
@@ -1156,6 +1157,17 @@ function SheetPresentation({ sheet, dataset, hidden, readOnly, onHideColumn }) {
   if (dataset?.datasetType === "trader_activity") {
     return <ActivityRichTableView sheet={sheet} dataset={dataset} />;
   }
+  if (dataset?.datasetType === "markets" || dataset?.datasetType === "events") {
+    return (
+      <CatalogRichTableView
+        sheet={sheet}
+        dataset={dataset}
+        hidden={hidden}
+        readOnly={readOnly}
+        onHideColumn={onHideColumn}
+      />
+    );
+  }
   return (
     <VisualTableView
       sheet={sheet}
@@ -1554,7 +1566,9 @@ function CanvasBlock({ block, selected, spotlight = false, onSelect, onChange, b
   const [resizing, setResizing] = useState(false);
   const sheetDataset = block.type === "sheet" ? describeSheet(block) : null;
   const logLabel = visualPresentationLabel(sheetDataset);
-  const logWidth = sheetDataset?.datasetType === "trader_activity" ? RICH_TABLE_WIDTH : VISUAL_TABLE_WIDTH;
+  const logWidth = sheetDataset?.datasetType === "trader_activity" || sheetDataset?.datasetType === "markets" || sheetDataset?.datasetType === "events"
+    ? RICH_TABLE_WIDTH
+    : VISUAL_TABLE_WIDTH;
 
   useLayoutEffect(() => {
     const live = dragRef.current?.live;
@@ -1847,7 +1861,7 @@ function CanvasBlock({ block, selected, spotlight = false, onSelect, onChange, b
                       }}
                       onClick={(event) => event.stopPropagation()}
                     />
-                    <span>{sheetDataset?.datasetType === "trader_activity" ? "Rich table" : "Visual table"}</span>
+                    <span>{logLabel}</span>
                   </div>
                 ) : (
                   <DropdownMenuItem

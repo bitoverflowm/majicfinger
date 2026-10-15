@@ -255,8 +255,8 @@ const ENDPOINTS = {
   "polymarket:getMarkets": spec({
     datasetType: "markets",
     shape: "records",
-    seriesKeys: ["condition_id"],
-    fields: { market: "condition_id", label: "question", value: "volume", status: "closed" },
+    seriesKeys: ["conditionId", "question"],
+    fields: { market: "conditionId", label: "question", value: "volume24hr", icon: "image", status: "closed" },
     required: ["question"],
   }),
   "polymarket:getSamplingMarkets": spec({
@@ -264,7 +264,14 @@ const ENDPOINTS = {
     shape: "records",
     seriesKeys: ["condition_id"],
     coverage: "sampled",
-    fields: { market: "condition_id", label: "question", value: "volume" },
+    fields: { market: "condition_id", label: "question", value: "volume24hr", icon: "image" },
+    required: ["question"],
+  }),
+  "polymarket:getMarketsByEvents": spec({
+    datasetType: "markets",
+    shape: "records",
+    seriesKeys: ["conditionId"],
+    fields: { market: "conditionId", label: "question", value: "volume24hr", icon: "image", status: "closed" },
     required: ["question"],
   }),
   "polymarket:markets": spec({
@@ -272,21 +279,21 @@ const ENDPOINTS = {
     shape: "records",
     seriesKeys: ["condition_id"],
     delivery: "historical",
-    fields: { market: "condition_id", label: "question", value: "volume" },
+    fields: { market: "condition_id", label: "question", value: "volume24hr", icon: "image" },
     required: ["question"],
   }),
   "polymarket:getEvents": spec({
     datasetType: "events",
     shape: "records",
     seriesKeys: ["id"],
-    fields: { market: "id", label: "title", value: "volume" },
+    fields: { market: "id", label: "title", value: "volume24hr", icon: "image", status: "closed" },
     required: ["title"],
   }),
   "polymarket:events": spec({
     datasetType: "events",
     shape: "records",
     seriesKeys: ["id"],
-    fields: { market: "id", label: "title", value: "volume" },
+    fields: { market: "id", label: "title", value: "volume24hr", icon: "image" },
     required: ["title"],
   }),
   "polymarket:series": spec({

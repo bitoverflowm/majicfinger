@@ -504,7 +504,7 @@ export function polymarketLiveMarketJoins() {
  */
 export function polymarketJoinChoices(tableId) {
   const joins = polymarketLiveMarketJoins().filter((item) => item.id !== tableId);
-  if (tableId === "getMarkets" || tableId === "getSamplingMarkets") return joins;
+  if (tableId === "getMarkets" || tableId === "getSamplingMarkets" || tableId === "getMarketsByEvents") return joins;
   if (isPolymarketQuoteTable(tableId)) return [POLYMARKET_PARENT_MARKET_JOIN, ...joins];
   return [];
 }
@@ -592,6 +592,45 @@ export function polymarketMarketBearingJoin(id) {
 /** Market metadata plus every market source a positions or activity row can join. */
 export function polymarketDownstreamMarketJoins() {
   return polymarketTraderJoinChoices(TRADER_POSITIONS_ENDPOINT_ID).filter((item) => item.anchor === "market");
+}
+
+const EVENT_JOIN_GRAPH = {
+  getEvents: [
+    { id: "getMarketsByEvents", placement: "sheet", anchor: "event" },
+    { id: "getLiveVolumeForEvent", placement: "merge", anchor: "event" },
+  ],
+};
+
+function eventJoinNote(spec) {
+  if (spec.placement === "merge") return "Live volume is merged onto this sheet.";
+  return "One sheet of markets per event. The preview shows the first.";
+}
+
+/**
+ * Get Events joins onward to each event's markets, and can fold live volume onto the event sheet.
+ * @param {string} tableId
+ */
+export function polymarketEventJoinChoices(tableId) {
+  const specs = EVENT_JOIN_GRAPH[tableId];
+  if (!specs) return [];
+  const byId = new Map(polymarketLiveBuildEndpoints().map((endpoint) => [endpoint.id, endpoint]));
+  return specs.map((spec) => {
+    const endpoint = byId.get(spec.id);
+    return {
+      id: spec.id,
+      title: endpoint?.title || spec.id,
+      detail: endpoint?.description || "",
+      note: eventJoinNote(spec),
+      realtime: Boolean(endpoint?.realtime),
+      placement: spec.placement,
+      anchor: spec.anchor,
+    };
+  });
+}
+
+/** Trader pulls that start from the wallets on a holders sheet. */
+export function polymarketHolderTraderJoins() {
+  return polymarketTraderJoinChoices("getHoldersByMarkets").filter((item) => item.anchor === "trader");
 }
 
 export function polymarketTraderJoinChoices(tableId) {
@@ -708,6 +747,40 @@ export function polymarketMarketKeyFromRow(row) {
     .toLowerCase();
 }
 
+/** Event id on an event row. Numeric Gamma ids only, so a condition hash is not treated as an event. */
+export function polymarketEventKeyFromRow(row) {
+  if (!row || typeof row !== "object") return "";
+  const id = String(row.id || row.event_id || row.eventId || "").trim();
+  return /^\d+$/.test(id) ? id : "";
+}
+
+/**
+ * One entry per event, in row order.
+ * @param {Array<Record<string, unknown>>} rows
+ * @param {number} [cap]
+ */
+export function polymarketEventEntities(rows, cap = Infinity) {
+  const seen = new Set();
+  const list = [];
+  for (const row of Array.isArray(rows) ? rows : []) {
+    const entityId = polymarketEventKeyFromRow(row);
+    if (!entityId || seen.has(entityId)) continue;
+    seen.add(entityId);
+    const title = decodeMarketTitle(row.title || row.event_title || row.question || entityId);
+    const slug = String(row.slug || row.event_slug || "").trim();
+    const label = title.slice(0, 80);
+    list.push({
+      id: entityId,
+      ticker: slug || entityId,
+      label,
+      title,
+      pick: { id: `event:${entityId}`, kind: "event", entityId, slug, title, label },
+    });
+    if (list.length >= cap) break;
+  }
+  return list;
+}
+
 /**
  * Copy joined columns onto the parent rows. Matching wallets or markets share a row.
  * A column that already exists on the parent is kept and the joined one is prefixed.
@@ -726,12 +799,16 @@ export function mergePolymarketJoinRows(parentColumns, parentRows, joinColumns, 
     taken.add(id);
     extras.push({ ...column, id, sourceId });
   }
+  const keyOf = anchor === "market"
+    ? polymarketMarketKeyFromRow
+    : anchor === "event"
+      ? polymarketEventKeyFromRow
+      : polymarketTraderWalletFromRow;
   const index = new Map();
   for (const row of Array.isArray(joinRows) ? joinRows : []) {
-    const key = anchor === "market" ? polymarketMarketKeyFromRow(row) : polymarketTraderWalletFromRow(row);
+    const key = keyOf(row);
     if (key && !index.has(key)) index.set(key, row);
   }
-  const keyOf = anchor === "market" ? polymarketMarketKeyFromRow : polymarketTraderWalletFromRow;
   return {
     columns: [...columns, ...extras.map(({ sourceId, ...column }) => column)],
     rows: rows.map((row) => {
@@ -2020,8 +2097,17 @@ async function directedRows(endpointId, picks, options = {}) {
     if (endpointId === "getLiveVolumeForEvent") {
       return objectRows(await polymarketGet("getLiveVolume", { id: pick.entityId }));
     }
-    const event = await polymarketGet("getEvent", { id: pick.entityId });
-    const markets = Array.isArray(event?.markets) ? event.markets : objectRows(event);
+    const payload = await polymarketGet("getEvent", { id: pick.entityId });
+    const event = Array.isArray(payload) ? payload.find((item) => item && typeof item === "object") : payload;
+    let markets = event?.markets;
+    if (typeof markets === "string") {
+      try {
+        markets = JSON.parse(markets);
+      } catch {
+        markets = [];
+      }
+    }
+    if (!Array.isArray(markets)) markets = [];
     return markets.map((market) => ({ ...market, event_id: pick.entityId, event_title: pick.title }));
   }
   if (endpointId === "getTraderLeaderboard") {
@@ -2150,6 +2236,20 @@ export async function loadPolymarketTraderJoin(endpointId, pick, options = {}) {
       address: row.address || wallet,
       user: row.user || wallet,
     })),
+  };
+}
+
+/** One live-volume total for an event, matched back onto that event row. */
+export async function loadPolymarketEventVolumeJoin(pick) {
+  const id = String(pick?.entityId || "").trim();
+  if (!/^\d+$/.test(id)) throw new Error("This join needs an event id.");
+  const data = await polymarketGet("getLiveVolume", { id });
+  const first = Array.isArray(data) ? data.find((item) => item && typeof item === "object") : data;
+  const total = first && typeof first === "object" ? first.total ?? first.live_total ?? "" : "";
+  const value = total === "" || total == null ? "" : Number(total);
+  return {
+    columns: [{ id: "live_total", title: "Live Volume", type: "number", defaultOn: true }],
+    rows: [{ id, live_total: Number.isFinite(value) ? value : total }],
   };
 }
 
