@@ -145,6 +145,16 @@ const marketPrices = {
   },
 };
 const priced = describeSheet(marketPrices);
+const barePrices = {
+  type: "sheet",
+  title: "Market Price",
+  table: "getMarketPrices",
+  columns: marketPrices.columns,
+  records: marketPrices.records,
+};
+assert.equal(describeSheet(barePrices).priceBasis, "market");
+assert.deepEqual(chartSpecsForSheet(barePrices).map((chart) => chart.chartView), ["stat-cards"]);
+
 assert.equal(priced.priceBasis, "market");
 assert.equal(priced.fields.value, "buy_price");
 assert.equal(resolveVisualization(priced, { columnIds: marketPrices.columns.map((column) => column.id) }).view, "stat-cards");

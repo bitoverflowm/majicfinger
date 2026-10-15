@@ -42,6 +42,7 @@ import {
   polymarketMatchEstimate,
 } from "../../lib/polymarketLive/polymarketMarketScan.js";
 import {
+  attachSamplingMarketStats,
   flattenSamplingMarket,
   samplingMarketAttributeColumns,
   samplingMarketFiltersActive,
@@ -359,6 +360,9 @@ assert.equal(formatPolymarketMatchEstimate(polymarketMatchEstimate({ scanned: 80
 
 const samplingColumns = polymarketLiveBuildColumns("getSamplingMarkets");
 assert.equal(samplingColumns.find((column) => column.id === "question")?.defaultOn, true);
+assert.equal(samplingColumns.find((column) => column.id === "volume24hr")?.defaultOn, true);
+assert.equal(samplingColumns.find((column) => column.id === "volume")?.defaultOn, true);
+assert.equal(samplingColumns.find((column) => column.id === "liquidity")?.defaultOn, true);
 assert.equal(samplingColumns.some((column) => column.id === "yes_price"), true);
 const samplingOrdered = samplingMarketAttributeColumns(samplingColumns);
 assert.ok(samplingOrdered.findIndex((column) => column.id === "question") < samplingOrdered.findIndex((column) => column.id === "description"));
@@ -378,6 +382,16 @@ assert.equal(samplingFlat.tags, "Weather, Daily");
 assert.equal(samplingFlat.tokens, "Yes 0.42, No 0.58");
 assert.equal(samplingFlat.yes_price, 0.42);
 assert.equal(samplingFlat.rewards_min_size, 20);
+const stamped = await attachSamplingMarketStats(
+  [{ condition_id: "0xabc", question: "Rain" }, { condition_id: "0xmissing", question: "No match" }],
+  {
+    lookup: async () => [{ conditionId: "0xABC", volume: "12.5", volume24hr: 3, liquidity: "9" }],
+  },
+);
+assert.equal(stamped[0].volume, 12.5);
+assert.equal(stamped[0].volume24hr, 3);
+assert.equal(stamped[0].liquidity, 9);
+assert.equal(stamped[1].volume, undefined);
 assert.equal(samplingMarketFiltersActive(samplingOrdered, { question: { containsTags: ["rain"] } }), true);
 assert.equal(samplingMarketFiltersActive(samplingOrdered, {}), false);
 
@@ -584,6 +598,10 @@ assert.equal(seriesColumns.find((column) => column.id === "series:volume")?.defa
 const eventColumns = polymarketLiveBuildColumns("getEvents");
 assert.equal(eventColumns.find((column) => column.id === "volume24hr")?.defaultOn, true);
 assert.equal(eventColumns.find((column) => column.id === "volume")?.defaultOn, true);
+const marketColumnsForDefaults = polymarketLiveBuildColumns("getMarkets");
+assert.equal(marketColumnsForDefaults.find((column) => column.id === "volume24hr")?.defaultOn, true);
+assert.equal(marketColumnsForDefaults.find((column) => column.id === "volume")?.defaultOn, true);
+assert.equal(marketColumnsForDefaults.find((column) => column.id === "liquidity")?.defaultOn, true);
 const seriesEntities = polymarketSeriesEntities([
   { "series:id": "42", "series:title": "Election cycle", "series:slug": "election-cycle" },
   { "series:id": "42", "series:title": "Duplicate" },

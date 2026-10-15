@@ -30,7 +30,7 @@ import {
   TOKEN_PRICE_HISTORY_COLUMNS,
   TRADE_COLUMNS,
 } from "@/lib/polymarketLive/polymarketQuoteQuery";
-import { flattenSamplingMarket, samplingMarketSheetColumns } from "@/lib/polymarketLive/polymarketSamplingScan";
+import { attachSamplingMarketStats, flattenSamplingMarket, samplingMarketSheetColumns } from "@/lib/polymarketLive/polymarketSamplingScan";
 import {
   biggestWinnerSheetRow,
   polymarketBiggestWinnersPage,
@@ -1219,6 +1219,11 @@ export function polymarketLiveBuildColumns(endpointId) {
     defaults.add("volume24hr");
     defaults.add("volume");
   }
+  if (endpointId === "getMarkets") {
+    defaults.add("volume24hr");
+    defaults.add("volume");
+    defaults.add("liquidity");
+  }
   const columns = meta.map((entry) => ({
     id: entry.name,
     title: titleFor(entry.name),
@@ -1243,7 +1248,17 @@ export function polymarketLiveBuildColumns(endpointId) {
     });
   }
   if (String(endpointId) === "getSamplingMarkets") {
-    const defaults = new Set(["question", "market_slug", "condition_id", "accepting_orders", "end_date_iso", "tags"]);
+    const defaults = new Set([
+      "question",
+      "volume24hr",
+      "volume",
+      "liquidity",
+      "market_slug",
+      "condition_id",
+      "accepting_orders",
+      "end_date_iso",
+      "tags",
+    ]);
     return samplingMarketSheetColumns(columns).map((column) => ({ ...column, defaultOn: defaults.has(column.id) }));
   }
   if (String(endpointId) !== "getMarkets") return columns;
@@ -1996,7 +2011,9 @@ async function discoveryRows(endpointId, options = {}) {
   if (endpointId === "getSamplingMarkets") {
     const page = await polymarketGet("getSamplingMarkets");
     const body = Array.isArray(page) ? page[0] : page;
-    return objectRows(body?.data || body).slice(0, target);
+    const rows = objectRows(body?.data || body).slice(0, target);
+    await attachSamplingMarketStats(rows);
+    return rows;
   }
   if (endpointId === "getEvents") {
     return pagedObjects("listEvents", { closed: "false", order: "volume", ascending: "false" }, target);

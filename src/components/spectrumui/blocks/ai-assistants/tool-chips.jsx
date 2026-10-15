@@ -62,7 +62,7 @@ export function ToolChips({ calls, variant = "Row", className }) {
       </div>
 
       <div
-        className="grid transition-[grid-template-rows] duration-[240ms] ease-[cubic-bezier(0.32,0.72,0,1)]"
+        className="grid transition-[grid-template-rows] [transition-duration:240ms] [transition-timing-function:cubic-bezier(0.32,0.72,0,1)]"
         style={{ gridTemplateRows: open?.result ? "1fr" : "0fr" }}
       >
         <div className="overflow-hidden">

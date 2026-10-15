@@ -1,6 +1,7 @@
 "use client";
 
 import dynamic from "next/dynamic";
+import "@glideapps/glide-data-grid/dist/index.css";
 
 const IntegrationBuildGridInner = dynamic(() => import("./integrationBuildGridInner"), { ssr: false });
 

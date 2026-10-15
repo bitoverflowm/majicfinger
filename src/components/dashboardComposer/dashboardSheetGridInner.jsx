@@ -2,7 +2,6 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { CompactSelection, DataEditor, GridCellKind } from "@glideapps/glide-data-grid";
-import "@glideapps/glide-data-grid/dist/index.css";
 import { useHtmlDarkClass } from "@/hooks/use-html-dark-class";
 import { displayCell } from "@/components/dashboardComposer/integrationRunSheets";
 import { useReadyTradeSheet, usesHistoricalTradeSheet } from "@/components/dashboardComposer/fullTradeSheet";

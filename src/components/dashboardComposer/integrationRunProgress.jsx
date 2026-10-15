@@ -92,7 +92,7 @@ function StepRow({ step, last, compact, now }) {
             {expandable ? (
               <ChevronDown
                 className={cn(
-                  "size-3 text-neutral-400 transition-transform duration-200 ease-[cubic-bezier(0.23,1,0.32,1)]",
+                  "size-3 text-neutral-400 transition-transform duration-200 [transition-timing-function:cubic-bezier(0.23,1,0.32,1)]",
                   open && "rotate-180",
                 )}
               />
@@ -106,7 +106,7 @@ function StepRow({ step, last, compact, now }) {
 
         {expandable ? (
           <div
-            className="grid transition-[grid-template-rows] duration-[240ms] ease-[cubic-bezier(0.32,0.72,0,1)]"
+            className="grid transition-[grid-template-rows] [transition-duration:240ms] [transition-timing-function:cubic-bezier(0.32,0.72,0,1)]"
             style={{ gridTemplateRows: open ? "1fr" : "0fr" }}
           >
             <div className="overflow-hidden">

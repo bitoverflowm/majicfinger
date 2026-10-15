@@ -2,7 +2,6 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { DataEditor, GridCellKind } from "@glideapps/glide-data-grid";
-import "@glideapps/glide-data-grid/dist/index.css";
 import { FormulaHeaderEditor } from "@/components/dashboardComposer/integrationFormulaEditor";
 import { useHtmlDarkClass } from "@/hooks/use-html-dark-class";
 

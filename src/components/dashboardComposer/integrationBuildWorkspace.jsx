@@ -6732,6 +6732,7 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
     const claimRunSheetId = (id) => claimSheetId(id, occupiedSheetIds, claimedSheetIds);
     const stageSheet = (sheet) => {
       if (!sheet) return Promise.resolve();
+      if (!sheet.integrationId && integrationId) sheet = { ...sheet, integrationId };
       const isNew = !sheet.id || sheets.every((item) => item.id !== sheet.id);
       if (sheet.id) {
         const index = sheets.findIndex((item) => item.id === sheet.id);

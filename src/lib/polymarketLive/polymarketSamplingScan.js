@@ -20,6 +20,9 @@ const EXTRA_FIELDS = [
 
 const FRONT = [
   "question",
+  "volume24hr",
+  "volume",
+  "liquidity",
   "market_slug",
   "condition_id",
   "question_id",
@@ -49,6 +52,9 @@ const FRONT = [
 
 const DATE_IDS = new Set(["end_date_iso", "game_start_time", "accepting_order_timestamp"]);
 const NUMBER_IDS = new Set([
+  "volume24hr",
+  "volume",
+  "liquidity",
   "minimum_order_size",
   "minimum_tick_size",
   "seconds_delay",
@@ -98,6 +104,73 @@ function outcomePrice(tokens, name) {
   const token = tokens.find((item) => String(item.outcome || "").trim().toLowerCase() === name);
   const price = Number(token?.price);
   return Number.isFinite(price) ? price : "";
+}
+
+const STAT_BATCH = 80;
+
+function marketStat(value) {
+  if (value == null || value === "") return "";
+  const n = Number(value);
+  return Number.isFinite(n) ? n : value;
+}
+
+async function lookupSamplingStats(ids, signal) {
+  const search = new URLSearchParams({
+    query: "listMarkets",
+    skipFlatten: "true",
+    limit: String(ids.length),
+    condition_ids: ids.join(","),
+  });
+  const res = await fetch(`/api/integrations/polymarket?${search.toString()}`, {
+    credentials: "same-origin",
+    signal,
+  });
+  const json = await res.json().catch(() => []);
+  if (res.status === 429) {
+    const error = new Error(json.message || json.error || "Rate limited");
+    error.rateLimited = true;
+    throw error;
+  }
+  if (!res.ok) throw new Error(json.message || json.error || "Market stats failed");
+  return Array.isArray(json) ? json : [];
+}
+
+/** Copy Gamma volume and liquidity onto CLOB sampling rows. The feed itself does not include them. */
+export async function attachSamplingMarketStats(rows, { signal, lookup = lookupSamplingStats } = {}) {
+  const list = Array.isArray(rows) ? rows : [];
+  const ids = [...new Set(list.map((row) => String(row?.condition_id || "").trim()).filter(Boolean))];
+  const byId = new Map();
+  for (let index = 0; index < ids.length; index += STAT_BATCH) {
+    if (index > 0) await sleep(PAGE_GAP_MS, signal);
+    const batch = ids.slice(index, index + STAT_BATCH);
+    let found = [];
+    for (let attempt = 0; attempt < 4; attempt += 1) {
+      try {
+        found = await lookup(batch, signal);
+        break;
+      } catch (error) {
+        if (error?.name === "AbortError") throw error;
+        if (error?.rateLimited && attempt < 3) {
+          await sleep(1500 * (attempt + 1), signal);
+          continue;
+        }
+        found = [];
+        break;
+      }
+    }
+    for (const market of found) {
+      const id = String(market?.conditionId || market?.condition_id || "").trim().toLowerCase();
+      if (id) byId.set(id, market);
+    }
+  }
+  for (const row of list) {
+    const market = byId.get(String(row?.condition_id || "").trim().toLowerCase());
+    if (!market) continue;
+    row.volume24hr = marketStat(market.volume24hr);
+    row.volume = marketStat(market.volume);
+    row.liquidity = marketStat(market.liquidity);
+  }
+  return list;
 }
 
 /** Flatten a CLOB sampling market onto the sheet column ids. */
@@ -274,6 +347,7 @@ export async function scanSamplingMarkets(spec) {
       }
       throw error;
     }
+    await attachSamplingMarketStats(page.data, { signal: spec.signal });
     for (const market of page.data) {
       const flat = flattenSamplingMarket(market);
       const id = String(flat.condition_id || flat.question_id || flat.market_slug || "").trim();

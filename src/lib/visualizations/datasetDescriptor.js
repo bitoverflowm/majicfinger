@@ -461,7 +461,10 @@ export function templateForEndpoint(table, integrationId) {
   if (!id) return null;
   const family = familyOf(integrationId);
   const qualified = family ? ENDPOINTS[`${family}:${id}`] : null;
-  const template = qualified || ENDPOINTS[id] || null;
+  const unique = !family
+    ? Object.keys(ENDPOINTS).filter((key) => key.endsWith(`:${id}`))
+    : [];
+  const template = qualified || ENDPOINTS[id] || (unique.length === 1 ? ENDPOINTS[unique[0]] : null);
   if (!template || !TYPE_SET.has(template.datasetType)) return null;
   return {
     ...template,

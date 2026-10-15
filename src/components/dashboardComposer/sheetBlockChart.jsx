@@ -346,6 +346,8 @@ export function SheetBlockChart({ sheet, snapshot, onSnapshot, live = false, vie
   const seriesKey = series ? `${series.kind}|${series.data.length}|${series.data[0]?.label}|${series.data[series.data.length - 1]?.value}` : "";
   useEffect(() => {
     if (!series) return;
+    const described = describeSheet(sheet);
+    if (described?.datasetType === "quote" && described?.priceBasis === "market") return;
     onSnapshot?.({
       kind: "sheet-series",
       seriesKind: series.kind,
@@ -353,7 +355,7 @@ export function SheetBlockChart({ sheet, snapshot, onSnapshot, live = false, vie
       labelTitle: series.labelTitle,
       points: series.data,
     });
-  }, [onSnapshot, series, seriesKey]);
+  }, [onSnapshot, series, seriesKey, sheet]);
 
   const dataset = describeSheet(sheet);
   const columnIds = (sheet?.columns || []).map((column) => columnKey(column)).filter(Boolean);
