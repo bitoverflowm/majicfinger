@@ -96,6 +96,21 @@ const HIGHLIGHT_THEME = {
   },
 };
 
+const LYCHEE_FLASH = {
+  light: {
+    bgCell: "rgba(230, 57, 70, 0.22)",
+    bgHeader: "rgba(230, 57, 70, 0.38)",
+    bgHeaderHovered: "rgba(230, 57, 70, 0.48)",
+    textHeader: "#7f1d1d",
+  },
+  dark: {
+    bgCell: "rgba(230, 57, 70, 0.28)",
+    bgHeader: "rgba(230, 57, 70, 0.5)",
+    bgHeaderHovered: "rgba(230, 57, 70, 0.62)",
+    textHeader: "#fff1f2",
+  },
+};
+
 const REF_THEME = {
   light: {
     bgCell: "#fff6d8",
@@ -111,7 +126,8 @@ const REF_THEME = {
   },
 };
 
-function columnTheme(columnId, highlightColumnId, highlightColumnIds, referencedColumnIds, dark) {
+function columnTheme(columnId, highlightColumnId, highlightColumnIds, referencedColumnIds, flashColumnIds, dark) {
+  if (columnId && flashColumnIds?.includes(columnId)) return LYCHEE_FLASH[dark ? "dark" : "light"];
   if (columnId && (columnId === highlightColumnId || highlightColumnIds?.includes(columnId))) {
     return HIGHLIGHT_THEME[dark ? "dark" : "light"];
   }
@@ -124,6 +140,7 @@ export default function IntegrationBuildGridInner({
   rows,
   highlightColumnId = "",
   highlightColumnIds = [],
+  flashColumnIds = [],
   activeCell = null,
   scrollToken = 0,
   scrollSmooth = false,
@@ -154,9 +171,9 @@ export default function IntegrationBuildGridInner({
               : column.type === "date"
                 ? 188
                 : 140),
-        themeOverride: columnTheme(column.id, highlightColumnId, highlightColumnIds, referencedColumnIds, dark),
+        themeOverride: columnTheme(column.id, highlightColumnId, highlightColumnIds, referencedColumnIds, flashColumnIds, dark),
       })),
-    [columnWidths, columns, dark, highlightColumnId, highlightColumnIds, referencedColumnIds, formulaEditor?.value],
+    [columnWidths, columns, dark, flashColumnIds, highlightColumnId, highlightColumnIds, referencedColumnIds, formulaEditor?.value],
   );
 
   const onColumnResize = useCallback((column, newSize) => {
@@ -279,11 +296,14 @@ export default function IntegrationBuildGridInner({
       const display = displayFor(raw, column);
       const active = activeCell?.columnId === column?.id && activeCell?.row === row;
       const referenced = referencedCells.some((cell) => cell.columnId === column?.id && cell.row === row + 1);
-      const themeOverride = active
-        ? HIGHLIGHT_THEME[dark ? "dark" : "light"]
-        : referenced
-          ? REF_THEME[dark ? "dark" : "light"]
-          : undefined;
+      const flashed = flashColumnIds?.includes(column?.id);
+      const themeOverride = flashed
+        ? LYCHEE_FLASH[dark ? "dark" : "light"]
+        : active
+          ? HIGHLIGHT_THEME[dark ? "dark" : "light"]
+          : referenced
+            ? REF_THEME[dark ? "dark" : "light"]
+            : undefined;
       if (column?.type === "number" && raw != null && raw !== "") {
         const parsed = Number(raw);
         const n = column.scale === "cents" && Number.isFinite(parsed) ? parsed / 100 : parsed;
@@ -309,7 +329,7 @@ export default function IntegrationBuildGridInner({
         themeOverride,
       };
     },
-    [activeCell, columns, rows, dark, referencedKey],
+    [activeCell, columns, dark, flashColumnIds, referencedKey, rows],
   );
 
   const reportPick = useCallback(

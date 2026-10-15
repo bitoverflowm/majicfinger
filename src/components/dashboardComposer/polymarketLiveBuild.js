@@ -5,6 +5,7 @@
  * badged on the HTTP endpoints that seed them.
  */
 import { getPolymarketLiveColumnsForEndpoint, POLYMARKET_LIVE_CONNECT_ENDPOINTS } from "@/config/polymarketLiveConnect";
+import { readColumnValue } from "@/lib/integrations/columnPayload";
 import { flattenLastTradePricesRows } from "@/lib/polymarketLive/lastTradePricesCompose";
 import { openInterestRowsFromPayload } from "@/lib/polymarketLive/openInterestCompose";
 import { expandOrderBookSummaryToRows, orderbooksMarketRefFromSuggestion, parseOutcomeList, parseTokenIdList } from "@/lib/polymarketLive/orderbooksCompose";
@@ -1143,12 +1144,6 @@ export function polymarketLiveBuildColumns(endpointId) {
   return [...columns, ...polymarketMarketExtraColumns(columns.map((column) => column.id)).filter((column) => !column.queryOnly)];
 }
 
-function cellValue(value) {
-  if (value == null) return "";
-  if (typeof value === "object") return JSON.stringify(value);
-  return value;
-}
-
 function projectRows(rows, columns, flatten, limit = 50) {
   return (Array.isArray(rows) ? rows : []).slice(0, limit).map((row) => {
     const source = flatten === "sampling"
@@ -1161,8 +1156,9 @@ function projectRows(rows, columns, flatten, limit = 50) {
     /** @type {Record<string, unknown>} */
     const out = {};
     for (const column of columns) {
-      const bare = column.id.includes(":") ? column.id.split(":").pop() : column.id;
-      out[column.id] = cellValue(source[column.id] ?? source[bare]);
+      const read = readColumnValue(source, column.id);
+      if (!read.present) continue;
+      out[column.id] = read.value;
     }
     return out;
   });

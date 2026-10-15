@@ -3,6 +3,7 @@
  * One table is loaded at a time, capped at 50 rows. Types are a first pass.
  */
 import { fetchAthenaLakeSample } from "@/lib/dataLake/fetchAthenaSample";
+import { projectAllColumns } from "@/lib/integrations/columnPayload";
 import { getColumnMetaForLakeTable, isDateLikeColumnName } from "@/lib/dataLake/lakeTableColumns";
 import { flattenKalshiHistoricalV2CandlestickGroups } from "@/lib/kalshiHistoricalV2/normalizeHistoricalCandlestickRow";
 import { KALSHI_HISTORICAL_V2_TRADES_COLUMNS } from "@/lib/kalshiHistoricalV2/historicalTradesColumns";
@@ -412,18 +413,8 @@ export function polymarketTokenIds(value) {
   return ids;
 }
 
-function cellValue(value) {
-  if (value == null) return "";
-  if (typeof value === "object") return JSON.stringify(value);
-  return value;
-}
-
 function projectRows(columns, records) {
-  return records.slice(0, PREVIEW_ROW_CAP).map((record) => {
-    const row = {};
-    for (const entry of columns) row[entry.id] = cellValue(record?.[entry.id]);
-    return row;
-  });
+  return projectAllColumns((records || []).slice(0, PREVIEW_ROW_CAP), columns).rows;
 }
 
 const POLYMARKET_LIVE_NUMBER = /volume|liquidity|fee|price|spread|score|bound|size|tick|delay|liveness|change|line|reward|bond/i;
@@ -586,16 +577,13 @@ async function kalshiHistoricalMarkets() {
 
 /**
  * The compose body Next and Save search lock in.
- * Preview fetches stay capped at PREVIEW_ROW_CAP; this request uses the import limit
- * and the columns the user left visible (plus any column used to sort).
+ * Preview fetches stay capped at PREVIEW_ROW_CAP. The saved pull asks for every
+ * catalog column. Which columns the sheet shows is a view choice, not a query choice.
  */
 function finishHistoricalRequest({ columns, request, sortKeys, columnIds, limit }) {
-  const wanted = new Set(Array.isArray(columnIds) ? columnIds : []);
-  for (const sort of Array.isArray(sortKeys) ? sortKeys : []) {
-    if (sort?.columnId) wanted.add(sort.columnId);
-  }
-  const selectColumns = wanted.size ? columns.filter((column) => wanted.has(column.id)) : columns;
-  const select = (selectColumns.length ? selectColumns : columns).map((entry) => ({
+  void sortKeys;
+  void columnIds;
+  const select = columns.map((entry) => ({
     column: entry.id,
     alias: entry.id,
   }));
@@ -1341,19 +1329,12 @@ export const KALSHI_LIVE_MARKET_JOINS = [
   },
 ];
 
-function liveJoinColumns(endpointId, options) {
-  const columns = kalshiLiveColumns(endpointId);
-  if (options?.allColumns) return columns;
-  const selected = columns.filter((column) => column.defaultOn);
-  return selected.length ? selected : columns;
+function liveJoinColumns(endpointId) {
+  return kalshiLiveColumns(endpointId);
 }
 
 function projectLiveJoinRows(columns, records, limit) {
-  return (records || []).slice(0, limit).map((record) => {
-    const row = {};
-    for (const entry of columns) row[entry.id] = cellValue(record?.[entry.id]);
-    return row;
-  });
+  return projectAllColumns((records || []).slice(0, limit), columns).rows;
 }
 
 async function getJsonRetry(url) {

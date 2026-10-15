@@ -141,7 +141,20 @@ import {
       ["rank", "pnl"],
       { sort_by: "PNL" },
     ),
-    { rank: 1, pnl: 123 },
+    {
+      rank: 1,
+      user_id: "0x1",
+      user_name: "",
+      pnl: 123,
+      volume: 456,
+      verified: "",
+      profile_image: "",
+      x_username: "",
+      user: "",
+      time_period: "day",
+      category: "overall",
+      sort_by: "PNL",
+    },
   );
   console.log("ok trader leaderboard selected columns");
 }

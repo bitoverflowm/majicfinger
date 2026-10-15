@@ -452,19 +452,7 @@ export function expandOrderBookSummaryToRows(book, opts = {}) {
     }
   }
 
-  const selected = Array.isArray(opts.selectedColumns)
-    ? opts.selectedColumns.map((c) => String(c || "").trim()).filter(Boolean)
-    : [];
-  const selectedSet = selected.length ? new Set(selected) : null;
+  void opts.selectedColumns;
 
-  return levels.map((level) => {
-    const row = { ...stamp, ...level };
-    if (!selectedSet) return row;
-    /** @type {Record<string, unknown>} */
-    const out = {};
-    for (const k of Object.keys(row)) {
-      if (selectedSet.has(k)) out[k] = row[k];
-    }
-    return out;
-  });
+  return levels.map((level) => ({ ...stamp, ...level }));
 }

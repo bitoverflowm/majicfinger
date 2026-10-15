@@ -1,6 +1,7 @@
 /**
  * Polymarket Live — public profiles (Gamma GET /public-profile).
  */
+import { projectCatalogRow } from "@/lib/integrations/columnPayload";
 
 /** @typedef {{ addresses: string }} PolymarketPublicProfilesComposeState */
 
@@ -70,29 +71,10 @@ export function isPolymarketWalletAddress(address) {
  * @param {string[]} selectedColumns
  */
 export function projectPolymarketPublicProfile(profile, selectedColumns) {
+  void selectedColumns;
   const source =
     profile && typeof profile === "object"
       ? /** @type {Record<string, unknown>} */ (profile)
       : {};
-  const selected = new Set(
-    Array.isArray(selectedColumns) && selectedColumns.length
-      ? selectedColumns
-      : POLYMARKET_PUBLIC_PROFILES_DEFAULT_COLUMNS,
-  );
-  const row = {};
-  for (const { name } of POLYMARKET_PUBLIC_PROFILES_COLUMNS) {
-    if (!selected.has(name)) continue;
-    const value = source[name];
-    row[name] =
-      name === "users"
-        ? Array.isArray(value)
-          ? JSON.stringify(value)
-          : value == null
-            ? ""
-            : String(value)
-        : value == null
-          ? ""
-          : value;
-  }
-  return row;
+  return projectCatalogRow(source, POLYMARKET_PUBLIC_PROFILES_COLUMNS);
 }

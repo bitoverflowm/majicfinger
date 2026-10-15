@@ -90,5 +90,8 @@ test("market prices project selected columns", () => {
     [{ id: "1", tokenIds: ["token"] }],
     ["market_id", "buy_price", "sell_price"],
   );
-  assert.deepEqual(rows, [{ market_id: "1", buy_price: 0.2, sell_price: 0.3 }]);
+  assert.equal(rows[0].market_id, "1");
+  assert.equal(rows[0].buy_price, 0.2);
+  assert.equal(rows[0].sell_price, 0.3);
+  assert.equal(rows[0].token_id, "token");
 });

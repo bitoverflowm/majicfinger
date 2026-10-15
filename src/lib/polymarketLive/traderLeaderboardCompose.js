@@ -1,3 +1,4 @@
+import { projectCatalogRow } from "@/lib/integrations/columnPayload";
 import { POLYMARKET_MARKET_CATEGORIES } from "@/lib/polymarketLive/polymarketMarketScan";
 
 export const POLYMARKET_TRADER_LEADERBOARD_ENDPOINT_ID = "getTraderLeaderboard";
@@ -204,17 +205,8 @@ export function polymarketLeaderboardPage(payload) {
  * @param {{ time_period?: string, category?: string, sort_by?: string, user?: string }} [query]
  */
 export function projectPolymarketTraderLeaderboardEntry(payload, selectedColumns, query) {
-  const source = leaderboardSheetRow(payload, query);
-  const selected = new Set(
-    Array.isArray(selectedColumns) && selectedColumns.length
-      ? selectedColumns
-      : POLYMARKET_TRADER_LEADERBOARD_DEFAULT_COLUMNS,
-  );
-  const row = {};
-  for (const { name } of POLYMARKET_TRADER_LEADERBOARD_COLUMNS) {
-    if (selected.has(name)) row[name] = source[name] == null ? "" : source[name];
-  }
-  return row;
+  void selectedColumns;
+  return projectCatalogRow(leaderboardSheetRow(payload, query), POLYMARKET_TRADER_LEADERBOARD_COLUMNS);
 }
 
 export function defaultPolymarketLeaderboardFilters() {

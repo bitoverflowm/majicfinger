@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { columnMissingFromRows } from "@/lib/integrations/columnPayload";
 import { ArrowLeft, Check, ChevronDown, History, Info } from "lucide-react";
 import { IntegrationBuildGrid } from "@/components/dashboardComposer/integrationBuildGrid";
 import { displayMatrix } from "@/components/dashboardComposer/integrationRunSheets";
@@ -2158,6 +2159,12 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
   const [error, setError] = useState("");
   const [priceWaiting, setPriceWaiting] = useState(false);
   const [hidden, setHidden] = useState(() => new Set());
+  const [flashColumns, setFlashColumns] = useState([]);
+  const [flashToken, setFlashToken] = useState(0);
+  const [columnRefillNonce, setColumnRefillNonce] = useState(0);
+  const knownAbsentRef = useRef(new Set());
+  const refillLockRef = useRef(false);
+  const flashTimerRef = useRef(0);
   const [filterColumn, setFilterColumn] = useState("");
   const [filterValue, setFilterValue] = useState("");
   const [attributeFilters, setAttributeFilters] = useState({});
@@ -2513,6 +2520,8 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
 
   useEffect(() => {
     let cancel = false;
+    knownAbsentRef.current = new Set();
+    setFlashColumns([]);
     setLoading(true);
     setError("");
     setPriceWaiting(false);
@@ -2580,6 +2589,10 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
             ? new Set(pending.hidden || [])
             : new Set(result.columns.filter((column) => column.defaultOn === false).map((column) => column.id)),
         );
+        const absentKey = `${integrationId}:${tableId}:`;
+        for (const column of result.columns || []) {
+          if (columnMissingFromRows(result.rows, column.id)) knownAbsentRef.current.add(absentKey + column.id);
+        }
         setFilterColumn((restoring && pending.filterColumn) || result.columns[0]?.id || "");
         if (restoring) {
           setFilterValue(pending.filterValue || "");
@@ -2666,11 +2679,16 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
       })
         .then((result) => {
           if (cancel) return;
+          const rows = result.rows || [];
+          const absentKey = `${integrationId}:${tableId}:`;
+          for (const column of result.columns || pull?.columns || []) {
+            if (columnMissingFromRows(rows, column.id)) knownAbsentRef.current.add(absentKey + column.id);
+          }
           setPolymarketDirected({
             status: "ready",
-            rows: result.rows || [],
+            rows,
             error: "",
-            scanned: progress.scanned || (result.rows || []).length,
+            scanned: progress.scanned || rows.length,
             removedCount: progress.removedCount || 0,
             removed: progress.removed || [],
             exhausted: Boolean(progress.exhausted),
@@ -3477,6 +3495,10 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
         .then((result) => {
           if (cancel) return;
           const rows = result?.rows || [];
+          const absentKey = `${integrationId}:${tableId}:`;
+          for (const column of result?.columns || []) {
+            if (columnMissingFromRows(rows, column.id)) knownAbsentRef.current.add(absentKey + column.id);
+          }
           setDirectPreview({
             status: "ready",
             rows,
@@ -3502,7 +3524,7 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
       cancel = true;
       window.clearTimeout(timer);
     };
-  }, [directEvents, directMarkets, directSeries, directWindow.depth, directWindow.maxTs, directWindow.minTs, directWindow.period, eventAttributeColumns, eventCandleEvents, eventColumnFilterKey, eventIncludeMarkets, eventIncludeMilestones, eventMinCloseTs, eventSeriesKey, eventStatusKey, forecastPercentileKey, forecastTargets, holderEventTicker, holderMinAmount, holderNicknameKey, holderSeriesTicker, liveDirect, multivariateCollection, multivariateColumnFilterKey, multivariateRowColumns, multivariateSeries, planLimit, rowLimit, sampleMarketTicker, seriesAttributeColumns, seriesCategoryKey, seriesColumnFilterKey, seriesMinUpdatedTs, seriesProductMetadata, tableId, traderCategoryKey, traderHoldingsOn, traderMetric, traderMetricsOn, traderPeriod, traderProfileKey, traderQuery]);
+  }, [columnRefillNonce, directEvents, directMarkets, directSeries, directWindow.depth, directWindow.maxTs, directWindow.minTs, directWindow.period, eventAttributeColumns, eventCandleEvents, eventColumnFilterKey, eventIncludeMarkets, eventIncludeMilestones, eventMinCloseTs, eventSeriesKey, eventStatusKey, forecastPercentileKey, forecastTargets, holderEventTicker, holderMinAmount, holderNicknameKey, holderSeriesTicker, liveDirect, multivariateCollection, multivariateColumnFilterKey, multivariateRowColumns, multivariateSeries, planLimit, rowLimit, sampleMarketTicker, seriesAttributeColumns, seriesCategoryKey, seriesColumnFilterKey, seriesMinUpdatedTs, seriesProductMetadata, tableId, traderCategoryKey, traderHoldingsOn, traderMetric, traderMetricsOn, traderPeriod, traderProfileKey, traderQuery]);
 
   const seriesImportRows = useMemo(() => {
     if (!(liveDirect && tableId === "series" && directPreview.status === "ready")) return null;
@@ -3865,17 +3887,98 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
   const savedForSource = saved.filter((item) => item.integrationId === integrationId);
   const pullsForSource = pulls.filter((item) => item.integrationId === integrationId);
 
+  function payloadRowsNow() {
+    if (polymarketLive && polymarketDirected.status === "ready") return polymarketDirected.rows || [];
+    if (
+      polymarketLive &&
+      (tableId === "getMarkets" || tableId === "getSamplingMarkets") &&
+      polymarketScan.status !== "idle"
+    ) {
+      return polymarketScan.rows || [];
+    }
+    if (liveDirect && directPreview.status !== "idle") return directPreview.rows || [];
+    return pull?.rows || [];
+  }
+
+  function rememberAbsentColumns(rows, columns) {
+    const prefix = `${integrationId}:${tableId}:`;
+    for (const column of columns || []) {
+      const key = prefix + column.id;
+      if (columnMissingFromRows(rows, column.id)) knownAbsentRef.current.add(key);
+      else knownAbsentRef.current.delete(key);
+    }
+  }
+
+  function revealColumns(ids) {
+    const list = [...new Set((ids || []).filter(Boolean))];
+    if (!list.length) return;
+    setFlashColumns(list);
+    setFlashToken((token) => token + 1);
+    window.clearTimeout(flashTimerRef.current);
+    flashTimerRef.current = window.setTimeout(() => setFlashColumns([]), 900);
+    const rows = payloadRowsNow();
+    const prefix = `${integrationId}:${tableId}:`;
+    const missing = list.filter((id) => columnMissingFromRows(rows, id) && !knownAbsentRef.current.has(prefix + id));
+    if (missing.length) void refillPayload();
+  }
+
+  async function refillPayload() {
+    if (refillLockRef.current) return;
+    refillLockRef.current = true;
+    try {
+      let rows = [];
+      let columns = pull?.columns || [];
+      if (polymarketLive && polymarketDirected.status === "ready") {
+        const leaderboard = tableId === "getTraderLeaderboard";
+        const biggestWinners = tableId === "getBiggestWinners";
+        const traderPositions = tableId === "getTraderPositions";
+        const traderActivity = tableId === "getTraderActivity";
+        const result = await loadPolymarketLiveTable(tableId, livePicks, {
+          filters: attributeFilters,
+          rowLimit: leaderboard ? PREVIEW_ROW_CAP : rowLimit,
+          planLimit,
+          sorts: sortKeys,
+          preview: leaderboard || ((biggestWinners || traderPositions || traderActivity) && !(Number(rowLimit) > 0)),
+          match: biggestWinners && polymarketBiggestWinnersFilterKey
+            ? (row) => rowMatchesAttributes(row, polymarketBiggestWinnersColumns, attributeFilters)
+            : undefined,
+        });
+        rows = result.rows || [];
+        if (result.columns?.length) columns = result.columns;
+        setPolymarketDirected((current) => ({ ...current, rows }));
+      } else if (liveDirect && directPreview.status !== "idle") {
+        setColumnRefillNonce((nonce) => nonce + 1);
+        return;
+      } else {
+        const result = await loadBuildPreview(integrationId, tableId, { fresh: true });
+        rows = result.rows || [];
+        if (result.columns?.length) columns = result.columns;
+        baseRowsRef.current = rows;
+        setPull((current) => (current ? { ...current, rows, columns } : result));
+      }
+      rememberAbsentColumns(rows, columns);
+    } catch {
+      // Keep the rows already on screen. A failed refill must not clear the sheet.
+    } finally {
+      refillLockRef.current = false;
+    }
+  }
+
   function toggleColumn(id) {
+    const showing = hidden.has(id);
     setHidden((current) => {
       const next = new Set(current);
       if (next.has(id)) next.delete(id);
       else next.add(id);
       return next;
     });
+    if (showing) revealColumns([id]);
   }
 
   function selectAllColumns() {
+    const ids = (pull?.columns || []).filter((column) => hidden.has(column.id)).map((column) => column.id);
     setHidden(new Set());
+    revealColumns(ids);
   }
 
   function deselectAllColumns() {
@@ -10094,7 +10197,8 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
             <IntegrationBuildGrid
               columns={marketsGrid.columns}
               rows={marketsGrid.rows}
-              highlightColumnId={marketsGrid.highlight || mergeAddedIds[0] || (tradesJoinReady && joinPlacement === "merge" ? tradeJoinBase.highlightIds[0] || "" : "")}
+              flashColumnIds={flashColumns}
+              highlightColumnId={flashColumns[0] || marketsGrid.highlight || mergeAddedIds[0] || (tradesJoinReady && joinPlacement === "merge" ? tradeJoinBase.highlightIds[0] || "" : "")}
               highlightColumnIds={
                 summaryOnSource
                   ? (summaryView.references || []).filter((ref) => ref.sheetId === "markets" && ref.row == null).map((ref) => ref.column.id)
@@ -10109,9 +10213,9 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
                   ? (summaryView.references || []).filter((ref) => ref.sheetId === "markets" && ref.row != null).map((ref) => ({ columnId: ref.column.id, row: ref.row }))
                   : referencesFor("markets").referencedCells
               }
-              scrollToken={mergeAddedIds.length ? mergeAddedIds.join(",") : functionScrollKey}
-              scrollSmooth={mergeAddedIds.length > 0}
-              scrollAlign={mergeAddedIds.length ? "start" : "end"}
+              scrollToken={flashColumns.length ? `flash-${flashToken}` : mergeAddedIds.length ? mergeAddedIds.join(",") : functionScrollKey}
+              scrollSmooth={flashColumns.length > 0 || mergeAddedIds.length > 0}
+              scrollAlign={flashColumns.length || mergeAddedIds.length ? "start" : "end"}
               {...(summaryOnSource ? {} : referencesFor("markets"))}
               formulaEditor={summarySourceEditor || formulaEditorFor("markets", false) || formulaEditorFor("markets", true)}
               onFormulaPick={(pick) => acceptFormulaPick(pick, "markets")}

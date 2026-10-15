@@ -1,5 +1,3 @@
-import { KALSHI_LIVE_HOLDER_PROFILE_COLUMNS } from "@/lib/kalshiLive/holderProfileColumns";
-
 /**
  * Flatten GET /v1/social/profile payload into one sheet row.
  *
@@ -56,19 +54,10 @@ export function normalizeKalshiLiveHolderProfileRow(payload) {
  * @param {string[]} [selectedColumns]
  */
 export function projectKalshiLiveHolderProfileRows(payload, selectedColumns) {
-  const cols =
-    Array.isArray(selectedColumns) && selectedColumns.length
-      ? selectedColumns
-      : KALSHI_LIVE_HOLDER_PROFILE_COLUMNS.map((c) => c.name);
-
-  const full = normalizeKalshiLiveHolderProfileRow(
-    /** @type {Record<string, unknown>} */ (payload && typeof payload === "object" ? payload : {}),
-  );
-
-  /** @type {Record<string, unknown>} */
-  const out = {};
-  for (const name of cols) {
-    out[name] = full[name] ?? null;
-  }
-  return [out];
+  void selectedColumns;
+  return [
+    normalizeKalshiLiveHolderProfileRow(
+      /** @type {Record<string, unknown>} */ (payload && typeof payload === "object" ? payload : {}),
+    ),
+  ];
 }

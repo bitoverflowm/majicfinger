@@ -64,7 +64,9 @@ test("midpoint prices project selected columns", () => {
     [{ id: "1", tokenIds: ["token"] }],
     ["market_id", "midpoint_price"],
   );
-  assert.deepEqual(rows, [{ market_id: "1", midpoint_price: 0.25 }]);
+  assert.equal(rows[0].market_id, "1");
+  assert.equal(rows[0].midpoint_price, 0.25);
+  assert.equal(rows[0].token_id, "token");
   const fromLiveField = flattenMidpointPricesRows(
     { token: { mid: "0.9995" } },
     [{ id: "2", tokenIds: ["token"] }],

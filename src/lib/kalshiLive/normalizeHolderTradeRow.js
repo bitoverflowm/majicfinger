@@ -1,5 +1,3 @@
-import { KALSHI_LIVE_HOLDER_TRADES_COLUMNS } from "@/lib/kalshiLive/holderTradesColumns";
-
 /**
  * @param {Record<string, unknown>} row
  */
@@ -34,21 +32,11 @@ export function normalizeKalshiLiveHolderTradeRow(row) {
  * @param {string[]} [selectedColumns]
  */
 export function projectKalshiLiveHolderTradeRows(trades, selectedColumns) {
+  void selectedColumns;
   const list = Array.isArray(trades) ? trades : [];
-  const cols =
-    Array.isArray(selectedColumns) && selectedColumns.length
-      ? selectedColumns
-      : KALSHI_LIVE_HOLDER_TRADES_COLUMNS.map((c) => c.name);
-
-  return list.map((raw) => {
-    const full = normalizeKalshiLiveHolderTradeRow(
+  return list.map((raw) =>
+    normalizeKalshiLiveHolderTradeRow(
       /** @type {Record<string, unknown>} */ (raw && typeof raw === "object" ? raw : {}),
-    );
-    /** @type {Record<string, unknown>} */
-    const out = {};
-    for (const name of cols) {
-      out[name] = full[name] ?? null;
-    }
-    return out;
-  });
+    ),
+  );
 }

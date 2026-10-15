@@ -213,22 +213,10 @@ export function extractMarketsFromEventsPayload(eventsPayload, opts = {}) {
   const sheetLayout = normalizePolymarketMarketsByEventsSheetLayout(opts.sheetLayout);
   const includeEventMeta =
     sheetLayout === POLYMARKET_MARKETS_BY_EVENTS_SHEET_LAYOUT_WITH_EVENT_META;
-  const selected = Array.isArray(opts.selectedColumns)
-    ? opts.selectedColumns.map((c) => String(c || "").trim()).filter(Boolean)
-    : [];
-  const selectedSet = selected.length ? new Set(selected) : null;
+  void opts.selectedColumns;
 
   /** @param {Record<string, unknown>} row */
-  const project = (row) => {
-    if (!selectedSet) return row;
-    /** @type {Record<string, unknown>} */
-    const out = {};
-    for (const key of selectedSet) {
-      if (Object.prototype.hasOwnProperty.call(row, key)) out[key] = row[key];
-      else out[key] = "";
-    }
-    return out;
-  };
+  const project = (row) => row;
 
   const events = Array.isArray(eventsPayload)
     ? eventsPayload

@@ -87,5 +87,8 @@ test("expand orderbook filters by side and stamps outcome", () => {
     selectedColumns: ["side", "price", "size"],
   });
   assert.equal(sell.length, 1);
-  assert.deepEqual(Object.keys(sell[0]).sort(), ["price", "side", "size"]);
+  assert.equal(sell[0].side, "SELL");
+  assert.ok("price" in sell[0]);
+  assert.ok("size" in sell[0]);
+  assert.equal(sell[0].market_title, "Will it rain?");
 });

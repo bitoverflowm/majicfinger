@@ -51,7 +51,7 @@ import {
       { proxyWallet: "0x1", title: "Market", realizedPnl: 12 },
       ["proxyWallet", "realizedPnl"],
     ),
-    { proxyWallet: "0x1", realizedPnl: 12 },
+    { proxyWallet: "0x1", title: "Market", realizedPnl: 12 },
   );
   console.log("ok closed positions selected columns");
 }

@@ -23,7 +23,7 @@ import {
   );
   assert.deepEqual(
     projectPolymarketHolderTradedMarkets({ user: "0xabc", traded: 42 }, "0xabc", ["traded"]),
-    { traded: 42 },
+    { user: "0xabc", traded: 42 },
   );
   console.log("ok traded markets selected columns");
 }
@@ -35,7 +35,6 @@ import {
   });
   assert.deepEqual(projectPolymarketHolderTradedMarkets(null, "0xdef", []), {
     user: "0xdef",
-    traded: "",
   });
   console.log("ok traded markets fallbacks");
 }

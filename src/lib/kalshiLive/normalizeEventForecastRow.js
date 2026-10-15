@@ -1,7 +1,4 @@
-import {
-  forecastApiPercentileToPct,
-  KALSHI_LIVE_EVENT_FORECAST_COLUMNS,
-} from "@/lib/kalshiLive/eventForecastColumns";
+import { forecastApiPercentileToPct } from "@/lib/kalshiLive/eventForecastColumns";
 
 /**
  * Flatten one forecast history point into sheet rows (1 row per percentile point).
@@ -55,17 +52,6 @@ export function projectKalshiLiveEventForecastRows(history, selectedColumns) {
     );
   }
 
-  const cols =
-    Array.isArray(selectedColumns) && selectedColumns.length
-      ? selectedColumns
-      : KALSHI_LIVE_EVENT_FORECAST_COLUMNS.map((c) => c.name);
-
-  return expanded.map((row) => {
-    /** @type {Record<string, unknown>} */
-    const out = {};
-    for (const name of cols) {
-      out[name] = row[name] ?? null;
-    }
-    return out;
-  });
+  void selectedColumns;
+  return expanded.map((row) => ({ ...row }));
 }

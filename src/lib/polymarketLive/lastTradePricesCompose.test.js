@@ -164,7 +164,8 @@ test("last trade prices project selected columns", () => {
     [{ id: "1", tokenIds: ["token"] }],
     ["market_id", "last_trade_price", "last_trade_side"],
   );
-  assert.deepEqual(rows, [
-    { market_id: "1", last_trade_price: 0.7, last_trade_side: "BUY" },
-  ]);
+  assert.equal(rows[0].market_id, "1");
+  assert.equal(rows[0].last_trade_price, 0.7);
+  assert.equal(rows[0].last_trade_side, "BUY");
+  assert.equal(rows[0].token_id, "token");
 });

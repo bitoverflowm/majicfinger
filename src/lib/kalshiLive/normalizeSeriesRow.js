@@ -53,18 +53,8 @@ export function normalizeKalshiLiveSeriesRow(raw) {
  * @param {string[]} selectedColumns
  */
 export function projectKalshiLiveSeriesRows(seriesList, selectedColumns) {
-  const cols =
-    Array.isArray(selectedColumns) && selectedColumns.length ? selectedColumns : null;
-  return (Array.isArray(seriesList) ? seriesList : []).map((raw) => {
-    const row = normalizeKalshiLiveSeriesRow(
-      /** @type {Record<string, unknown>} */ (raw),
-    );
-    if (!cols) return row;
-    /** @type {Record<string, unknown>} */
-    const out = {};
-    for (const c of cols) {
-      if (Object.prototype.hasOwnProperty.call(row, c)) out[c] = row[c];
-    }
-    return out;
-  });
+  void selectedColumns;
+  return (Array.isArray(seriesList) ? seriesList : []).map((raw) =>
+    normalizeKalshiLiveSeriesRow(/** @type {Record<string, unknown>} */ (raw)),
+  );
 }

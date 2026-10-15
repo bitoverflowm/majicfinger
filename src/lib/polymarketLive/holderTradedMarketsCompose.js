@@ -1,6 +1,7 @@
 /**
  * Polymarket Live — total markets a holder has traded (Data API GET /traded).
  */
+import { projectCatalogRow } from "@/lib/integrations/columnPayload";
 
 export const POLYMARKET_HOLDER_TRADED_MARKETS_ENDPOINT_ID = "getHolderTradedMarkets";
 
@@ -33,17 +34,13 @@ export function normalizePolymarketHolderTradedMarketsComposeState(raw) {
  * @param {string[]} selectedColumns
  */
 export function projectPolymarketHolderTradedMarkets(payload, address, selectedColumns) {
+  void selectedColumns;
   const source =
     payload && typeof payload === "object"
       ? /** @type {Record<string, unknown>} */ (payload)
       : {};
-  const selected = new Set(
-    Array.isArray(selectedColumns) && selectedColumns.length
-      ? selectedColumns
-      : POLYMARKET_HOLDER_TRADED_MARKETS_DEFAULT_COLUMNS,
+  return projectCatalogRow(
+    { ...source, user: source.user || address || "" },
+    POLYMARKET_HOLDER_TRADED_MARKETS_COLUMNS,
   );
-  const row = {};
-  if (selected.has("user")) row.user = String(source.user || address || "");
-  if (selected.has("traded")) row.traded = source.traded == null ? "" : source.traded;
-  return row;
 }

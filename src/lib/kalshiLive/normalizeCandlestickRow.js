@@ -105,33 +105,13 @@ export function flattenKalshiLiveCandlestickGroups(marketGroups) {
   return rows;
 }
 
-/** @param {string} columnName */
-function defaultCandlestickCell(columnName) {
-  const kind = getKalshiLiveCandlestickFieldType(columnName);
-  if (kind === "nullable_number" || kind === "timestamp" || kind === "number") return null;
-  return "";
-}
-
 /**
  * @param {Record<string, unknown>[]} rows
  * @param {string[] | undefined} selectedColumns
  */
 export function projectKalshiLiveCandlestickRows(rows, selectedColumns) {
-  const cols = Array.isArray(selectedColumns) ? selectedColumns : [];
-  const list = Array.isArray(rows) ? rows : [];
-  if (!cols.length) return [];
-  return list.map((raw) => {
-    /** @type {Record<string, unknown>} */
-    const out = {};
-    for (const name of cols) {
-      if (Object.prototype.hasOwnProperty.call(raw, name)) {
-        out[name] = raw[name];
-      } else {
-        out[name] = defaultCandlestickCell(name);
-      }
-    }
-    return out;
-  });
+  void selectedColumns;
+  return (Array.isArray(rows) ? rows : []).map((raw) => ({ ...raw }));
 }
 
 /** All normalized column names (for tests / ingest). */

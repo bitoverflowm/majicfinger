@@ -168,5 +168,8 @@ test("prices history projects selected columns", () => {
     [{ tokenId: "tok", outcome: "Yes" }],
     ["market_id", "p", "t"],
   );
-  assert.deepEqual(rows, [{ market_id: "9", p: 0.5, t: 1 }]);
+  assert.equal(rows[0].market_id, "9");
+  assert.equal(rows[0].p, 0.5);
+  assert.equal(rows[0].t, 1);
+  assert.equal(rows[0].market_title, "Q");
 });

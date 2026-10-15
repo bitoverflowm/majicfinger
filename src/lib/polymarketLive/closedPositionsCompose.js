@@ -1,6 +1,7 @@
 /**
  * Polymarket Live — closed holder positions (Data API GET /closed-positions).
  */
+import { projectCatalogRow } from "@/lib/integrations/columnPayload";
 
 /**
  * @typedef {{
@@ -115,18 +116,10 @@ export function buildPolymarketClosedPositionsQueryValues(raw) {
 
 /** @param {unknown} position @param {string[]} selectedColumns */
 export function projectPolymarketClosedPosition(position, selectedColumns) {
+  void selectedColumns;
   const source =
     position && typeof position === "object"
       ? /** @type {Record<string, unknown>} */ (position)
       : {};
-  const selected = new Set(
-    Array.isArray(selectedColumns) && selectedColumns.length
-      ? selectedColumns
-      : POLYMARKET_CLOSED_POSITIONS_DEFAULT_COLUMNS,
-  );
-  const row = {};
-  for (const { name } of POLYMARKET_CLOSED_POSITIONS_COLUMNS) {
-    if (selected.has(name)) row[name] = source[name] == null ? "" : source[name];
-  }
-  return row;
+  return projectCatalogRow(source, POLYMARKET_CLOSED_POSITIONS_COLUMNS);
 }

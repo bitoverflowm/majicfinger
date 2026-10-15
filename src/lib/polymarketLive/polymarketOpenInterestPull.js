@@ -21,10 +21,7 @@ import { resolveHoldersMarketConditionIds } from "@/lib/polymarketLive/polymarke
  */
 export function flattenPolymarketOpenInterestPayloadToRows(payload, opts = {}) {
   const arr = Array.isArray(payload) ? payload : payload != null ? [payload] : [];
-  const selected = Array.isArray(opts.selectedColumns)
-    ? opts.selectedColumns.map((c) => String(c || "").trim()).filter(Boolean)
-    : [];
-  const selectedSet = selected.length ? new Set(selected) : null;
+  void opts.selectedColumns;
   const metaByCid = opts.marketMetaByConditionId || {};
   const metaByLower = new Map(
     Object.entries(metaByCid).map(([key, value]) => [key.toLowerCase(), value]),
@@ -52,16 +49,7 @@ export function flattenPolymarketOpenInterestPayloadToRows(payload, opts = {}) {
             market_title: rowIn.market_title || "",
           }),
     };
-    if (selectedSet) {
-      /** @type {Record<string, unknown>} */
-      const out = {};
-      for (const k of Object.keys(row)) {
-        if (selectedSet.has(k)) out[k] = row[k];
-      }
-      rows.push(out);
-    } else {
-      rows.push(row);
-    }
+    rows.push(row);
   }
   return rows;
 }
@@ -97,13 +85,6 @@ export async function fetchPolymarketOpenInterestRows(compose, opts = {}) {
 
   const params = new URLSearchParams({ query: "getOpenInterest" });
   if (conditionIds.length) params.set("condition", conditionIds.join(","));
-  const selected = Array.isArray(opts.selectedColumns) ? opts.selectedColumns : [];
-  if (selected.length) {
-    const fields = new Set(selected);
-    fields.add("market");
-    fields.add("value");
-    params.set("fields", [...fields].join(","));
-  }
 
   const res = await fetch(`/api/integrations/polymarket?${params.toString()}`, {
     method: "GET",
@@ -116,7 +97,6 @@ export async function fetchPolymarketOpenInterestRows(compose, opts = {}) {
   }
 
   const rows = flattenPolymarketOpenInterestPayloadToRows(data, {
-    selectedColumns: selected,
     marketMetaByConditionId,
   });
   return { rows, market: conditionIds.join(",") };

@@ -9,6 +9,7 @@ export function IntegrationBuildGrid({
   rows,
   highlightColumnId = "",
   highlightColumnIds = [],
+  flashColumnIds = [],
   activeCell = null,
   scrollToken = 0,
   scrollSmooth = false,
@@ -24,6 +25,7 @@ export function IntegrationBuildGrid({
       rows={rows}
       highlightColumnId={highlightColumnId}
       highlightColumnIds={highlightColumnIds}
+      flashColumnIds={flashColumnIds}
       activeCell={activeCell}
       scrollToken={scrollToken}
       scrollSmooth={scrollSmooth}

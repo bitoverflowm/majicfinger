@@ -105,20 +105,8 @@ export function normalizeKalshiLiveMarketRow(raw) {
  * @param {string[]} selectedColumns
  */
 export function projectKalshiLiveMarketRows(markets, selectedColumns) {
-  const cols =
-    Array.isArray(selectedColumns) && selectedColumns.length
-      ? selectedColumns
-      : null;
-  return (Array.isArray(markets) ? markets : []).map((raw) => {
-    const row = normalizeKalshiLiveMarketRow(
-      /** @type {Record<string, unknown>} */ (raw),
-    );
-    if (!cols) return row;
-    /** @type {Record<string, unknown>} */
-    const out = {};
-    for (const c of cols) {
-      if (Object.prototype.hasOwnProperty.call(row, c)) out[c] = row[c];
-    }
-    return out;
-  });
+  void selectedColumns;
+  return (Array.isArray(markets) ? markets : []).map((raw) =>
+    normalizeKalshiLiveMarketRow(/** @type {Record<string, unknown>} */ (raw)),
+  );
 }

@@ -58,7 +58,7 @@ import {
       { proxyWallet: "0x1", side: "BUY", price: 0.5 },
       ["proxyWallet", "price"],
     ),
-    { proxyWallet: "0x1", price: 0.5 },
+    { proxyWallet: "0x1", side: "BUY", price: 0.5 },
   );
   console.log("ok holder trades selected columns");
 }

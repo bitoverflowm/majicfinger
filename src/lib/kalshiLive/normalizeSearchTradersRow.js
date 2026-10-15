@@ -1,5 +1,3 @@
-import { getKalshiLiveSearchTradersColumns } from "@/lib/kalshiLive/searchTradersColumns";
-
 /**
  * @param {Record<string, unknown> | null | undefined} profile
  * @param {Record<string, unknown> | null | undefined} [metricsPayload]
@@ -163,14 +161,7 @@ export function flattenKalshiLiveSearchTraderHoldings(payload, opts = {}) {
  * @param {{ includeMetrics?: boolean; includeHoldings?: boolean; closedPositions?: boolean }} [opts]
  */
 export function projectKalshiLiveSearchTradersRows(items, selectedColumns, opts = {}) {
-  const colDefs = getKalshiLiveSearchTradersColumns({
-    includeMetrics: !!opts.includeMetrics,
-    includeHoldings: !!opts.includeHoldings,
-  });
-  const cols =
-    Array.isArray(selectedColumns) && selectedColumns.length
-      ? selectedColumns
-      : colDefs.map((c) => c.name);
+  void selectedColumns;
 
   /** @type {Record<string, unknown>[]} */
   const rows = [];
@@ -185,18 +176,10 @@ export function projectKalshiLiveSearchTradersRows(items, selectedColumns, opts 
         closedPositions: !!opts.closedPositions,
       });
       for (const h of holdings) {
-        const full = normalizeKalshiLiveSearchTradersRow(profile, metrics, h, opts);
-        /** @type {Record<string, unknown>} */
-        const out = {};
-        for (const name of cols) out[name] = full[name] ?? null;
-        rows.push(out);
+        rows.push(normalizeKalshiLiveSearchTradersRow(profile, metrics, h, opts));
       }
     } else {
-      const full = normalizeKalshiLiveSearchTradersRow(profile, metrics, null, opts);
-      /** @type {Record<string, unknown>} */
-      const out = {};
-      for (const name of cols) out[name] = full[name] ?? null;
-      rows.push(out);
+      rows.push(normalizeKalshiLiveSearchTradersRow(profile, metrics, null, opts));
     }
   }
 

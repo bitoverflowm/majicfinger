@@ -1,5 +1,3 @@
-import { KALSHI_LIVE_LEADERBOARD_COLUMNS } from "@/lib/kalshiLive/leaderboardColumns";
-
 /**
  * @param {Record<string, unknown>} row
  * @param {{ metricName?: string; timePeriod?: string; category?: string }} ctx
@@ -32,22 +30,12 @@ export function normalizeKalshiLiveLeaderboardRow(row, ctx = {}) {
  * @param {{ metricName?: string; timePeriod?: string; category?: string }} [ctx]
  */
 export function projectKalshiLiveLeaderboardRows(rankList, selectedColumns, ctx = {}) {
+  void selectedColumns;
   const list = Array.isArray(rankList) ? rankList : [];
-  const cols =
-    Array.isArray(selectedColumns) && selectedColumns.length
-      ? selectedColumns
-      : KALSHI_LIVE_LEADERBOARD_COLUMNS.map((c) => c.name);
-
-  return list.map((raw) => {
-    const full = normalizeKalshiLiveLeaderboardRow(
+  return list.map((raw) =>
+    normalizeKalshiLiveLeaderboardRow(
       /** @type {Record<string, unknown>} */ (raw && typeof raw === "object" ? raw : {}),
       ctx,
-    );
-    /** @type {Record<string, unknown>} */
-    const out = {};
-    for (const name of cols) {
-      out[name] = full[name] ?? null;
-    }
-    return out;
-  });
+    ),
+  );
 }

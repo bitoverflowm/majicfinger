@@ -2384,10 +2384,8 @@ export default async function handler(req, res) {
 
     const outcomeOptimizedFormat = req.query.outcomeOptimizedFormat === "true" || req.query.outcomeOptimizedFormat === "1";
     const skipFlatten = req.query.skipFlatten === "true" || req.query.skipFlatten === "1";
-    const fieldsParam = req.query.fields;
-    const fieldsFilter = fieldsParam
-      ? String(fieldsParam).split(",").map((f) => f.trim()).filter(Boolean)
-      : null;
+    // A column checkbox only hides a field in the sheet. The pull always returns the full payload.
+    const fieldsFilter = null;
 
     if (query === "listMarketsKeyset") {
       return res.status(200).json(data && typeof data === "object" ? data : { markets: [], next_cursor: "" });

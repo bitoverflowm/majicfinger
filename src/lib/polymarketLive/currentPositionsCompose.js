@@ -1,6 +1,7 @@
 /**
  * Polymarket Live — current holder positions (Data API GET /positions).
  */
+import { projectCatalogRow } from "@/lib/integrations/columnPayload";
 
 /**
  * @typedef {{
@@ -146,18 +147,10 @@ export function buildPolymarketCurrentPositionsQueryValues(raw) {
 
 /** @param {unknown} position @param {string[]} selectedColumns */
 export function projectPolymarketCurrentPosition(position, selectedColumns) {
+  void selectedColumns;
   const source =
     position && typeof position === "object"
       ? /** @type {Record<string, unknown>} */ (position)
       : {};
-  const selected = new Set(
-    Array.isArray(selectedColumns) && selectedColumns.length
-      ? selectedColumns
-      : POLYMARKET_CURRENT_POSITIONS_DEFAULT_COLUMNS,
-  );
-  const row = {};
-  for (const { name } of POLYMARKET_CURRENT_POSITIONS_COLUMNS) {
-    if (selected.has(name)) row[name] = source[name] == null ? "" : source[name];
-  }
-  return row;
+  return projectCatalogRow(source, POLYMARKET_CURRENT_POSITIONS_COLUMNS);
 }

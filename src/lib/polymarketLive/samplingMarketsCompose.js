@@ -96,10 +96,7 @@ function samplingMarketCellValue(value) {
  * @returns {Record<string, unknown>[]}
  */
 export function flattenSamplingMarketsRows(markets, selectedColumns = []) {
-  const selected = Array.isArray(selectedColumns)
-    ? selectedColumns.map((c) => String(c || "").trim()).filter(Boolean)
-    : [];
-  const selectedSet = selected.length ? new Set(selected) : null;
+  void selectedColumns;
   const list = Array.isArray(markets) ? markets : [];
   /** @type {Record<string, unknown>[]} */
   const rows = [];
@@ -108,7 +105,7 @@ export function flattenSamplingMarketsRows(markets, selectedColumns = []) {
     const market = /** @type {Record<string, unknown>} */ (item);
     /** @type {Record<string, unknown>} */
     const row = {};
-    const keys = selectedSet ? selected : Object.keys(market);
+    const keys = Object.keys(market);
     for (const key of keys) row[key] = samplingMarketCellValue(market[key]);
     rows.push(row);
   }

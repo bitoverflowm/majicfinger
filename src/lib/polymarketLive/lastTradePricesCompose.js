@@ -138,10 +138,7 @@ export function flattenLastTradePricesRows(
     const tokenId = String(row.token_id || row.tokenId || "").trim();
     if (tokenId) byToken.set(tokenId, row);
   }
-  const selected = Array.isArray(selectedColumns)
-    ? selectedColumns.map((c) => String(c || "").trim()).filter(Boolean)
-    : [];
-  const selectedSet = selected.length ? new Set(selected) : null;
+  void selectedColumns;
 
   return selectLastTradePriceOutcomeTokens(refs, outcomeSelection).map(
     ({ ref, tokenId, outcome }) => {
@@ -156,13 +153,7 @@ export function flattenLastTradePricesRows(
         last_trade_price: lastTradePriceNumber(trade.price),
         last_trade_side: trade.side == null ? "" : String(trade.side),
       };
-      if (!selectedSet) return row;
-      /** @type {Record<string, unknown>} */
-      const projected = {};
-      for (const [key, value] of Object.entries(row)) {
-        if (selectedSet.has(key)) projected[key] = value;
-      }
-      return projected;
+      return row;
     },
   );
 }

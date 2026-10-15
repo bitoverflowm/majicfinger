@@ -1,6 +1,7 @@
 /**
  * Polymarket Live — total value of holder positions (Data API GET /value).
  */
+import { projectCatalogRow } from "@/lib/integrations/columnPayload";
 
 export const POLYMARKET_HOLDER_POSITION_VALUE_ENDPOINT_ID = "getHolderPositionValue";
 
@@ -35,18 +36,10 @@ export function buildPolymarketHolderPositionValueQueryValues(raw) {
 
 /** @param {unknown} value @param {string[]} selectedColumns */
 export function projectPolymarketHolderPositionValue(value, selectedColumns) {
+  void selectedColumns;
   const source =
     value && typeof value === "object"
       ? /** @type {Record<string, unknown>} */ (value)
       : {};
-  const selected = new Set(
-    Array.isArray(selectedColumns) && selectedColumns.length
-      ? selectedColumns
-      : POLYMARKET_HOLDER_POSITION_VALUE_DEFAULT_COLUMNS,
-  );
-  const row = {};
-  for (const { name } of POLYMARKET_HOLDER_POSITION_VALUE_COLUMNS) {
-    if (selected.has(name)) row[name] = source[name] == null ? "" : source[name];
-  }
-  return row;
+  return projectCatalogRow(source, POLYMARKET_HOLDER_POSITION_VALUE_COLUMNS);
 }

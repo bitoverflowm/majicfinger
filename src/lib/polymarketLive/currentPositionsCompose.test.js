@@ -59,6 +59,9 @@ import {
     { proxyWallet: "0x1", title: "Market", size: 5, cashPnl: 2 },
     ["proxyWallet", "size", "cashPnl"],
   );
-  assert.deepEqual(row, { proxyWallet: "0x1", size: 5, cashPnl: 2 });
+  assert.equal(row.proxyWallet, "0x1");
+  assert.equal(row.size, 5);
+  assert.equal(row.cashPnl, 2);
+  assert.equal(row.title, "Market");
   console.log("ok current positions selected columns");
 }

@@ -1,5 +1,4 @@
 import { parseKalshiFixedPointCount } from "@/lib/kalshiLive/kalshiFixedPoint";
-import { KALSHI_LIVE_TRADES_COLUMNS } from "@/lib/kalshiLive/tradesColumns";
 
 /** @param {unknown} v */
 function coerceDollars(v) {
@@ -68,22 +67,6 @@ export function normalizeKalshiLiveTrades(trades) {
  * @param {string[] | undefined} selectedColumns
  */
 export function projectKalshiLiveTradeRows(rows, selectedColumns) {
-  const cols = Array.isArray(selectedColumns) ? selectedColumns : [];
-  const list = Array.isArray(rows) ? rows : [];
-  if (!cols.length) return [];
-  return list.map((raw) => {
-    /** @type {Record<string, unknown>} */
-    const out = {};
-    for (const name of cols) {
-      if (Object.prototype.hasOwnProperty.call(raw, name)) {
-        out[name] = raw[name];
-      } else {
-        const col = KALSHI_LIVE_TRADES_COLUMNS.find((c) => c.name === name);
-        const kind = col?.type;
-        out[name] =
-          kind === "number" || kind === "timestamp" || kind === "boolean" ? null : "";
-      }
-    }
-    return out;
-  });
+  void selectedColumns;
+  return (Array.isArray(rows) ? rows : []).map((raw) => ({ ...raw }));
 }

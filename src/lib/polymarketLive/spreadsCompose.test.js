@@ -58,11 +58,13 @@ test("spreads flatten to one row per market", () => {
   assert.equal(rows[1].spread, 0.015);
 });
 
-test("spreads project selected columns", () => {
+test("spreads keep fields the selection omitted", () => {
   const rows = flattenSpreadsRows(
     { token: "0.04" },
     [{ id: "1", tokenIds: ["token"] }],
     ["market_id", "spread"],
   );
-  assert.deepEqual(rows, [{ market_id: "1", spread: 0.04 }]);
+  assert.equal(rows[0].market_id, "1");
+  assert.equal(rows[0].spread, 0.04);
+  assert.equal(rows[0].token_id, "token");
 });

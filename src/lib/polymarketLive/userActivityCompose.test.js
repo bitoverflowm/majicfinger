@@ -60,7 +60,7 @@ import {
       { proxyWallet: "0x1", type: "TRADE", usdcSize: 10 },
       ["proxyWallet", "type"],
     ),
-    { proxyWallet: "0x1", type: "TRADE" },
+    { proxyWallet: "0x1", type: "TRADE", usdcSize: 10 },
   );
   console.log("ok user activity selected columns");
 }

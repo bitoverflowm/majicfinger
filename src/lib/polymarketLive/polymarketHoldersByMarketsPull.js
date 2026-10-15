@@ -56,10 +56,7 @@ function sheetNameForMarket(meta, index) {
  */
 export function flattenPolymarketHoldersPayloadToRows(payload, opts = {}) {
   const arr = Array.isArray(payload) ? payload : payload != null ? [payload] : [];
-  const selected = Array.isArray(opts.selectedColumns)
-    ? opts.selectedColumns.map((c) => String(c || "").trim()).filter(Boolean)
-    : [];
-  const selectedSet = selected.length ? new Set(selected) : null;
+  void opts.selectedColumns;
   const metaByCid = opts.marketMetaByConditionId || {};
 
   /** @type {Record<string, unknown>[]} */
@@ -86,37 +83,24 @@ export function flattenPolymarketHoldersPayloadToRows(payload, opts = {}) {
             }
           : {}),
       };
-      rows.push(selectedSet ? pickColumns(row, selectedSet) : row);
+      rows.push(row);
       continue;
     }
     const token = meta.token != null ? String(meta.token) : "";
     const holders = Array.isArray(meta.holders) ? meta.holders : [];
     if (!holders.length) {
       const row = { token };
-      rows.push(selectedSet ? pickColumns(row, selectedSet) : row);
+      rows.push(row);
       continue;
     }
     for (const h of holders) {
       if (!h || typeof h !== "object") continue;
       const holder = /** @type {Record<string, unknown>} */ (h);
       const row = { token, ...holder };
-      rows.push(selectedSet ? pickColumns(row, selectedSet) : row);
+      rows.push(row);
     }
   }
   return rows;
-}
-
-/**
- * @param {Record<string, unknown>} row
- * @param {Set<string>} selectedSet
- */
-function pickColumns(row, selectedSet) {
-  /** @type {Record<string, unknown>} */
-  const out = {};
-  for (const k of Object.keys(row)) {
-    if (selectedSet.has(k)) out[k] = row[k];
-  }
-  return out;
 }
 
 /**
@@ -274,7 +258,6 @@ export async function fetchPolymarketHoldersByMarketsRows(compose, opts = {}) {
     };
   }
 
-  const selected = Array.isArray(opts.selectedColumns) ? opts.selectedColumns : [];
   const limit = String(normalized.limit);
   const minBalance = String(normalized.minBalance);
 
@@ -292,14 +275,6 @@ export async function fetchPolymarketHoldersByMarketsRows(compose, opts = {}) {
       limit,
       minBalance,
     });
-    if (selected.length) {
-      const fields = new Set(selected);
-      fields.add("token");
-      fields.add("proxyWallet");
-      fields.add("amount");
-      params.set("fields", [...fields].join(","));
-    }
-
     const res = await fetch(`/api/integrations/polymarket?${params.toString()}`, {
       method: "GET",
       headers: { Accept: "application/json" },
@@ -322,16 +297,7 @@ export async function fetchPolymarketHoldersByMarketsRows(compose, opts = {}) {
       market_title: meta.title || row.market_title || "",
     }));
 
-    const rows = selected.length
-      ? rowsRaw.map((row) => {
-          /** @type {Record<string, unknown>} */
-          const out = {};
-          for (const k of selected) {
-            if (k in row) out[k] = row[k];
-          }
-          return out;
-        })
-      : rowsRaw;
+    const rows = rowsRaw;
 
     byMarket.push({
       conditionId: cid,

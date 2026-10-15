@@ -161,10 +161,9 @@ export function expandKalshiLiveEventToMarketRows(
  * }} [opts]
  */
 export function projectKalshiLiveEventPayloads(payloads, selectedColumns, opts = {}) {
+  void selectedColumns;
   const includeMarkets = !!opts.includeMarkets;
   const rowMode = normalizeKalshiLiveEventsRowMode(opts.rowMode);
-  const cols =
-    Array.isArray(selectedColumns) && selectedColumns.length ? selectedColumns : null;
 
   /** @type {Record<string, unknown>[]} */
   const out = [];
@@ -176,27 +175,19 @@ export function projectKalshiLiveEventPayloads(payloads, selectedColumns, opts =
 
     if (includeMarkets && rowMode === KALSHI_LIVE_EVENTS_ROW_MODE_PER_MARKET) {
       out.push(
-        ...expandKalshiLiveEventToMarketRows(event, markets, selectedColumns || [], {
+        ...expandKalshiLiveEventToMarketRows(event, markets, [], {
           milestones,
         }),
       );
       continue;
     }
 
-    const row = normalizeKalshiLiveEventRow(event, {
-      markets: includeMarkets ? markets : [],
-      milestones,
-    });
-    if (!cols) {
-      out.push(row);
-      continue;
-    }
-    /** @type {Record<string, unknown>} */
-    const projected = {};
-    for (const c of cols) {
-      if (Object.prototype.hasOwnProperty.call(row, c)) projected[c] = row[c];
-    }
-    out.push(projected);
+    out.push(
+      normalizeKalshiLiveEventRow(event, {
+        markets: includeMarkets ? markets : [],
+        milestones,
+      }),
+    );
   }
 
   return out;

@@ -333,10 +333,7 @@ export function flattenPricesHistoryRowsForMarket(
 ) {
   const history =
     historyByToken && typeof historyByToken === "object" ? historyByToken : {};
-  const selected = Array.isArray(selectedColumns)
-    ? selectedColumns.map((c) => String(c || "").trim()).filter(Boolean)
-    : [];
-  const selectedSet = selected.length ? new Set(selected) : null;
+  void selectedColumns;
 
   /** @type {Record<string, unknown>[]} */
   const rows = [];
@@ -361,16 +358,7 @@ export function flattenPricesHistoryRowsForMarket(
           Number.isFinite(tNum) && tNum > 0 ? new Date(tNum * 1000).toISOString() : "",
         p: pRaw ?? "",
       };
-      if (!selectedSet) {
-        rows.push(row);
-        continue;
-      }
-      /** @type {Record<string, unknown>} */
-      const projected = {};
-      for (const [key, value] of Object.entries(row)) {
-        if (selectedSet.has(key)) projected[key] = value;
-      }
-      rows.push(projected);
+      rows.push(row);
     }
   }
 

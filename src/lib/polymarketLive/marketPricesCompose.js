@@ -139,10 +139,7 @@ export function flattenMarketPricesRows(payload, refs, selectedColumns) {
     payload && typeof payload === "object"
       ? /** @type {Record<string, unknown>} */ (payload)
       : {};
-  const selected = Array.isArray(selectedColumns)
-    ? selectedColumns.map((c) => String(c || "").trim()).filter(Boolean)
-    : [];
-  const selectedSet = selected.length ? new Set(selected) : null;
+  void selectedColumns;
 
   return (Array.isArray(refs) ? refs : []).flatMap((ref) => {
     const tokenId = parseTokenIdList(ref.tokenIds)[0] || "";
@@ -161,12 +158,6 @@ export function flattenMarketPricesRows(payload, refs, selectedColumns) {
       buy_price: marketPriceNumber(tokenPrices.BUY ?? tokenPrices.buy),
       sell_price: marketPriceNumber(tokenPrices.SELL ?? tokenPrices.sell),
     };
-    if (!selectedSet) return [row];
-    /** @type {Record<string, unknown>} */
-    const projected = {};
-    for (const [key, value] of Object.entries(row)) {
-      if (selectedSet.has(key)) projected[key] = value;
-    }
-    return [projected];
+    return [row];
   });
 }

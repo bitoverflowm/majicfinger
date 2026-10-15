@@ -1,6 +1,7 @@
 /**
  * Polymarket Live — holder trades (Data API GET /trades).
  */
+import { projectCatalogRow } from "@/lib/integrations/columnPayload";
 
 export const POLYMARKET_HOLDER_TRADES_ENDPOINT_ID = "getHolderTrades";
 
@@ -121,18 +122,10 @@ export function buildPolymarketHolderTradesQueryValues(raw) {
 
 /** @param {unknown} trade @param {string[]} selectedColumns */
 export function projectPolymarketHolderTrade(trade, selectedColumns) {
+  void selectedColumns;
   const source =
     trade && typeof trade === "object"
       ? /** @type {Record<string, unknown>} */ (trade)
       : {};
-  const selected = new Set(
-    Array.isArray(selectedColumns) && selectedColumns.length
-      ? selectedColumns
-      : POLYMARKET_HOLDER_TRADES_DEFAULT_COLUMNS,
-  );
-  const row = {};
-  for (const { name } of POLYMARKET_HOLDER_TRADES_COLUMNS) {
-    if (selected.has(name)) row[name] = source[name] == null ? "" : source[name];
-  }
-  return row;
+  return projectCatalogRow(source, POLYMARKET_HOLDER_TRADES_COLUMNS);
 }
