@@ -24,17 +24,17 @@ function flag(value) {
 function catalogRows(records, dataset) {
   const fields = dataset?.fields || {};
   const rows = (records || []).map((record) => {
-    const title = text(record, fields.label, "question", "title", "slug") || "Untitled";
-    const icon = text(record, fields.icon, "image", "icon", "imageOptimized");
-    const closed = flag(record.closed ?? record.event_closed);
+    const title = text(record, fields.label, "question", "title", "series:title", "slug") || "Untitled";
+    const icon = text(record, fields.icon, "image", "icon", "series:image", "series:icon", "imageOptimized");
+    const closed = flag(record[fields.status] ?? record.closed ?? record["series:closed"] ?? record.event_closed);
     const live = flag(record.live ?? record.event_live);
     return {
       title,
       icon: /^https?:\/\//i.test(icon) ? icon : "",
       status: closed ? "Closed" : live ? "Live" : "Open",
-      volume24hr: parseVisualNumber(record[fields.value]) ?? parseVisualNumber(record.volume24hr),
-      volume: parseVisualNumber(record.volume) ?? parseVisualNumber(record.volumeNum),
-      liquidity: parseVisualNumber(record.liquidity) ?? parseVisualNumber(record.liquidityNum),
+      volume24hr: parseVisualNumber(record[fields.value]) ?? parseVisualNumber(record.volume24hr) ?? parseVisualNumber(record["series:volume24hr"]),
+      volume: parseVisualNumber(record.volume) ?? parseVisualNumber(record["series:volume"]) ?? parseVisualNumber(record.volumeNum),
+      liquidity: parseVisualNumber(record.liquidity) ?? parseVisualNumber(record["series:liquidity"]) ?? parseVisualNumber(record.liquidityNum),
     };
   }).filter((row) => row.title);
   const max = Math.max(1, ...rows.map((row) => Math.abs(row.volume24hr || 0)));
@@ -71,7 +71,7 @@ function ColumnHead({ label, align, readOnly, onHide, id }) {
 
 export function CatalogRichTableView({ sheet, dataset, hidden = [], readOnly = false, onHideColumn }) {
   const hiddenIds = new Set(hidden || []);
-  const noun = dataset?.datasetType === "events" ? "Event" : "Market";
+  const noun = dataset?.datasetType === "events" ? "Event" : dataset?.datasetType === "series" ? "Series" : "Market";
   const rows = catalogRows(sheetRecords(sheet), dataset);
   const columns = [
     { id: "title", label: noun, align: "left" },

@@ -45,6 +45,19 @@ const MARKETS_KEYSET_PARAMS = [
   "uma_resolution_status", "game_id", "sports_market_types", "include_tag", "locale",
 ];
 
+const EVENTS_KEYSET_PARAMS = [
+  "limit",
+  "order",
+  "ascending",
+  "after_cursor",
+  "id",
+  "slug",
+  "closed",
+  "live",
+  "featured",
+  "series_id",
+];
+
 const SERIES_PARAMS = [
   "limit",
   "offset",
@@ -1394,6 +1407,20 @@ export default async function handler(req, res) {
         data = await fetchJson(`${GAMMA_BASE}/markets?${sp}`);
         break;
       }
+      case "listEventsKeyset": {
+        const sp = buildSearchParams(EVENTS_KEYSET_PARAMS, req.query);
+        for (const key of ["id", "slug", "series_id"]) {
+          const raw = req.query[key];
+          if (typeof raw === "string" && raw.includes(",")) {
+            sp.delete(key);
+            for (const part of raw.split(",").map((s) => s.trim()).filter(Boolean)) {
+              sp.append(key, part);
+            }
+          }
+        }
+        data = await fetchJson(`${GAMMA_BASE}/events/keyset?${sp}`);
+        break;
+      }
       case "listMarketsKeyset": {
         const sp = buildSearchParams(MARKETS_KEYSET_PARAMS, req.query);
         for (const key of ["id", "slug", "clob_token_ids", "condition_ids", "question_ids", "sports_market_types", "tag_id"]) {
@@ -2389,6 +2416,9 @@ export default async function handler(req, res) {
 
     if (query === "listMarketsKeyset") {
       return res.status(200).json(data && typeof data === "object" ? data : { markets: [], next_cursor: "" });
+    }
+    if (query === "listEventsKeyset") {
+      return res.status(200).json(data && typeof data === "object" ? data : { events: [], next_cursor: "" });
     }
 
     let result;

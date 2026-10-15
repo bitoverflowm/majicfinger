@@ -26,7 +26,7 @@ export function VolumeTreemap({ sheet, dataset, onOpenRow }) {
   const [box, setBox] = useState({ width: 0, height: 0 });
   const [hover, setHover] = useState(null);
   const model = useMemo(() => volumeTreemapModel(sheet, dataset), [dataset, sheet]);
-  const noun = dataset?.datasetType === "events" ? "events" : "markets";
+  const noun = dataset?.datasetType === "events" ? "events" : dataset?.datasetType === "series" ? "series" : "markets";
 
   useEffect(() => {
     const node = frameRef.current;

@@ -299,9 +299,15 @@ const ENDPOINTS = {
   "polymarket:series": spec({
     datasetType: "series",
     shape: "records",
-    seriesKeys: ["id"],
-    fields: { market: "id", label: "title", category: "category" },
-    required: ["title"],
+    seriesKeys: ["series:id"],
+    fields: {
+      market: "series:id",
+      label: "series:title",
+      value: "series:volume24hr",
+      icon: "series:image",
+      status: "series:closed",
+    },
+    required: ["series:title"],
   }),
   "polymarket:getHoldersByMarkets": spec({
     datasetType: "holders",
@@ -477,6 +483,18 @@ function columnIds(sheet) {
   return new Set((sheet?.columns || []).map((column) => columnKey(column)).filter(Boolean));
 }
 
+/** A saved descriptor still fits when its label, value, and series keys are columns on the sheet. */
+function descriptorFitsSheet(sheet, dataset) {
+  const ids = columnIds(sheet);
+  if (!ids.size) return true;
+  const fields = dataset?.fields || {};
+  if (fields.label && !ids.has(fields.label)) return false;
+  if (fields.value && !ids.has(fields.value)) return false;
+  const keys = (dataset?.seriesKeys || []).filter(Boolean);
+  if (keys.length && keys.every((key) => !ids.has(key))) return false;
+  return true;
+}
+
 /**
  * Distinct combinations of the descriptor's own series keys.
  * An empty key list means the endpoint is already one subject.
@@ -503,8 +521,10 @@ export function countSeries(sheet, keys) {
  */
 export function describeSheet(sheet) {
   if (!sheet || sheet.type === "chart") return null;
+  const table = String(sheet.table || sheet.pull?.table || "").trim();
+  const template = templateForEndpoint(table, sheet.integrationId || sheet.provenance?.integrationId);
   const stamped = sheet.dataset;
-  if (stamped && TYPE_SET.has(stamped.datasetType) && stamped.sourceTable) {
+  if (stamped && TYPE_SET.has(stamped.datasetType) && stamped.sourceTable && descriptorFitsSheet(sheet, stamped)) {
     return {
       ...stamped,
       units: { ...PROBABILITY, ...(stamped.units || {}) },
@@ -514,8 +534,6 @@ export function describeSheet(sheet) {
       seriesCount: countSeries(sheet, stamped.seriesKeys),
     };
   }
-  const table = String(sheet.table || sheet.pull?.table || "").trim();
-  const template = templateForEndpoint(table, sheet.integrationId || sheet.provenance?.integrationId);
   if (!template) return null;
   return { ...template, seriesCount: countSeries(sheet, template.seriesKeys) };
 }

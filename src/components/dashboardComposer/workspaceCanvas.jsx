@@ -626,10 +626,9 @@ export function WorkspaceCanvasProvider({ pageId, readOnly = false, children }) 
     (sheets, options) => {
       const incoming = Array.isArray(sheets) ? sheets : [];
       const targetId = options?.pageId || pageId;
-      const append = options?.append === true;
       setBlocksByPage((prev) => {
         const existing = prev[targetId] || [];
-        const kept = append ? existing : existing.filter((block) => block.source !== "integration-run");
+        const kept = existing;
         const originY = kept.reduce((max, block) => Math.max(max, (block.y || 0) + (block.h || 0) + 24), 88);
         const placed = assignUniqueIds(layoutRunSheets(incoming, { originY: kept.length ? originY : 88 }), kept);
         placedSheetIdRef.current = placed[0]?.id || "";
@@ -650,12 +649,17 @@ export function WorkspaceCanvasProvider({ pageId, readOnly = false, children }) 
   );
 
   const revealRunSheets = useCallback((sheets, options = {}) => {
-    const incoming = (Array.isArray(sheets) ? sheets : []).filter((sheet) => sheet && (sheet.columns?.length || sheet.title));
+    const rewriteId = typeof options.rewriteId === "function" ? options.rewriteId : (id) => id;
+    const incoming = (Array.isArray(sheets) ? sheets : [])
+      .filter((sheet) => sheet && (sheet.columns?.length || sheet.title))
+      .map((sheet) => {
+        const id = rewriteId(sheet.id) || sheet.id;
+        return id && id !== sheet.id ? { ...sheet, id } : sheet;
+      });
     if (!incoming.length) return;
     const targetId = options.pageId || pageIdRef.current;
-    const append = options.append !== false;
-    const holdChartsFor = String(options.holdChartsFor || "");
-    const spotlightChartsFor = String(options.spotlightChartsFor || "");
+    const holdChartsFor = rewriteId(String(options.holdChartsFor || "")) || "";
+    const spotlightChartsFor = rewriteId(String(options.spotlightChartsFor || "")) || "";
     const existing = blocksByPageRef.current[targetId] || [];
     const previousById = new Map(existing.map((block) => [block.id, block]));
     const columnKey = (columns) => (columns || []).map((column) => column?.id || "").join("\0");
@@ -678,8 +682,6 @@ export function WorkspaceCanvasProvider({ pageId, readOnly = false, children }) 
       const kept = list.filter((block) => {
         if (laidIds.has(block.id)) return false;
         if (block.type === "chart" && block.source === "sheet-chart" && laidIds.has(block.sourceSheetId)) return false;
-        if (!append && block.source === "integration-run") return false;
-        if (!append && block.type === "chart" && block.source === "sheet-chart") return false;
         return true;
       });
       const originY = kept.reduce((max, block) => Math.max(max, (block.y || 0) + (block.h || 0) + 24), 88);
@@ -1434,7 +1436,7 @@ function SheetPresentation({ sheet, dataset, hidden, readOnly, onHideColumn }) {
   if (dataset?.datasetType === "trader_activity") {
     return <ActivityRichTableView sheet={sheet} dataset={dataset} />;
   }
-  if (dataset?.datasetType === "markets" || dataset?.datasetType === "events") {
+  if (dataset?.datasetType === "markets" || dataset?.datasetType === "events" || dataset?.datasetType === "series") {
     return (
       <CatalogRichTableView
         sheet={sheet}
@@ -1862,7 +1864,7 @@ function CanvasBlock({ block, selected, spotlight = false, onSelect, onChange, b
   }, [dataReady]);
   const sheetDataset = block.type === "sheet" ? describeSheet(block) : null;
   const logLabel = visualPresentationLabel(sheetDataset);
-  const logWidth = sheetDataset?.datasetType === "trader_activity" || sheetDataset?.datasetType === "markets" || sheetDataset?.datasetType === "events"
+  const logWidth = sheetDataset?.datasetType === "trader_activity" || sheetDataset?.datasetType === "markets" || sheetDataset?.datasetType === "events" || sheetDataset?.datasetType === "series"
     ? RICH_TABLE_WIDTH
     : VISUAL_TABLE_WIDTH;
 

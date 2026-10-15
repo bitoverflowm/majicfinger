@@ -4,7 +4,7 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { columnMissingFromRows } from "@/lib/integrations/columnPayload";
 import { ArrowLeft, Check, ChevronDown, History, Info } from "lucide-react";
 import { IntegrationBuildGrid } from "@/components/dashboardComposer/integrationBuildGrid";
-import { displayMatrix, recordsFromRows } from "@/components/dashboardComposer/integrationRunSheets";
+import { claimSheetId, displayMatrix, recordsFromRows } from "@/components/dashboardComposer/integrationRunSheets";
 import { chartSpecsForSheet } from "@/lib/visualizations/sheetCharts";
 import { rememberTradeSheet } from "@/components/dashboardComposer/fullTradeSheet";
 import { FunctionExplainer, FunctionExplainerTabs } from "@/components/dashboardComposer/integrationFunctionExplainer";
@@ -50,6 +50,9 @@ import {
   polymarketLiveBuildEndpoints,
   polymarketEventEntities,
   polymarketEventJoinChoices,
+  polymarketSeriesEntities,
+  polymarketSeriesJoinChoices,
+  loadPolymarketSeriesEventsJoin,
   polymarketHolderTraderJoins,
   polymarketJoinChoices,
   polymarketJoinPlacement,
@@ -1761,8 +1764,10 @@ function EnrichStep({
                             </div>
                           ) : null}
                           <p className="text-[11px] leading-relaxed text-muted-foreground">
-                            {joinChoices.some((item) => item.anchor === "trader")
+                              {joinChoices.some((item) => item.anchor === "trader")
                               ? "Profile columns merge onto this sheet. Positions, PnL, activity, and market sources each get their own sheet. The preview shows the first sheet, 50 rows. The other sheets are viewable when you hit Save and run. A limit on this pull only shortens this sheet. Each joined sheet uses your plan row limit."
+                              : joinChoices.some((item) => item.anchor === "series")
+                                ? "Each series gets its own events sheet. Those events can join onward to their markets and live volume, and those markets can join to trades, prices, and holders. The preview shows the first series."
                               : joinChoices.some((item) => item.anchor === "event")
                                 ? "Live volume merges onto this sheet. Each event’s markets get their own sheet, and those markets can join onward to trades, prices, holders, and trader pulls. The preview shows the first event."
                               : queryRowCount
@@ -4538,6 +4543,8 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
   const seriesJoinKey = seriesJoinTickers.map((item) => item.ticker).join("\0");
   const polymarketJoinCatalog = useMemo(() => {
     if (!polymarketLive) return [];
+    const series = polymarketSeriesJoinChoices(tableId);
+    if (series.length) return [...series, ...polymarketEventJoinChoices("getEvents")];
     const events = polymarketEventJoinChoices(tableId);
     if (events.length) return events;
     const trader = polymarketTraderJoinChoices(tableId);
@@ -4545,11 +4552,12 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
     return polymarketJoinChoices(tableId);
   }, [polymarketLive, tableId]);
   const polymarketTraderCatalog = polymarketJoinCatalog.some((item) => item.anchor === "trader");
-  const polymarketEventCatalog = polymarketJoinCatalog.some((item) => item.anchor === "event");
+  const polymarketSeriesCatalog = polymarketJoinCatalog.some((item) => item.anchor === "series");
+  const polymarketEventCatalog = !polymarketSeriesCatalog && polymarketJoinCatalog.some((item) => item.anchor === "event");
   const holderTraderChoices = useMemo(() => (polymarketLive ? polymarketHolderTraderJoins() : []), [polymarketLive]);
   const polymarketJoinFromList = polymarketJoinCatalog.length > 0 && polymarketJoinCatalog[0]?.id !== "parent-market";
   const polymarketJoinMarkets = useMemo(() => {
-    if (!polymarketJoinCatalog.length) return [];
+    if (!polymarketJoinCatalog.length || polymarketSeriesCatalog) return [];
     if (polymarketTraderCatalog) {
       const source = polymarketScan.status !== "idle" && polymarketScan.rows?.length ? polymarketScan.rows : filteredRows;
       return polymarketMarketEntities(source, marketCap);
@@ -4581,7 +4589,7 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
       if (markets.length >= marketCap) break;
     }
     return markets;
-  }, [polymarketJoinCatalog, polymarketTraderCatalog, polymarketJoinFromList, livePicks, marketCap, polymarketScan, filteredRows]);
+  }, [polymarketJoinCatalog, polymarketSeriesCatalog, polymarketTraderCatalog, polymarketJoinFromList, livePicks, marketCap, polymarketScan, filteredRows]);
   const polymarketTraderPeople = useMemo(() => {
     if (!polymarketTraderCatalog) return [];
     const source = polymarketScan.status !== "idle" && polymarketScan.rows?.length ? polymarketScan.rows : filteredRows;
@@ -4597,6 +4605,11 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
     const source = polymarketScan.status !== "idle" && polymarketScan.rows?.length ? polymarketScan.rows : filteredRows;
     return polymarketMarketEntities(source, PREVIEW_ROW_CAP);
   }, [polymarketTraderCatalog, polymarketScan, filteredRows]);
+  const polymarketSeriesPeople = useMemo(() => {
+    if (!polymarketSeriesCatalog) return [];
+    const source = polymarketScan.status !== "idle" && polymarketScan.rows?.length ? polymarketScan.rows : filteredRows;
+    return polymarketSeriesEntities(source, marketCap);
+  }, [polymarketSeriesCatalog, polymarketScan, filteredRows, marketCap]);
   const polymarketEventPeople = useMemo(() => {
     if (!polymarketEventCatalog) return [];
     const source = polymarketScan.status !== "idle" && polymarketScan.rows?.length ? polymarketScan.rows : filteredRows;
@@ -4619,7 +4632,7 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
     polymarketJoinActive &&
     !polymarketJoinCatalog.some((item) => item.anchor === "market") &&
     liveJoinTargets.some((item) => polymarketMarketBearingJoin(item.id));
-  const downstreamFromEvents = polymarketEventCatalog && polymarketJoinActive && liveJoinIds.has("getMarketsByEvents");
+  const downstreamFromEvents = (polymarketEventCatalog || polymarketSeriesCatalog) && polymarketJoinActive && liveJoinIds.has("getMarketsByEvents");
   const downstreamTargets = downstreamFromPositions || downstreamFromEvents
     ? downstreamMarketChoices.filter((item) => downstreamJoinIds.has(item.id))
     : [];
@@ -4904,6 +4917,80 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
     });
     return undefined;
   }, [polymarketEventCatalog, polymarketJoinActive, step, polymarketEventPreviewId, liveJoinKey, polymarketEventPeople, polymarketJoinCatalog, traderMarketLayout]);
+
+  const polymarketSeriesPreviewId = polymarketSeriesPeople[0]?.id || "";
+  useEffect(() => {
+    if (!polymarketSeriesCatalog || !polymarketJoinActive || step !== "enrich" || !polymarketSeriesPreviewId) return undefined;
+    if (!liveJoinKey.split(",").includes("getEventsBySeries") && !liveJoinKey.split(",").some((id) => polymarketJoinCatalog.find((item) => item.id === id)?.anchor === "event")) {
+      return undefined;
+    }
+    const series = polymarketSeriesPeople[0];
+    if (!series) return undefined;
+    const viewToken = `polymarket-series:${series.id}|${liveJoinKey}`;
+    liveJoinVisibleTicker.current = viewToken;
+    const cacheKey = `polymarket:series:${series.id}:events`;
+    const hit = liveJoinCacheRef.current.get(cacheKey);
+    if (hit?.status === "ready" || hit?.status === "loading") {
+      setLiveJoinPreview((current) => ({ ...current, getEventsBySeries: hit }));
+    } else {
+      const loading = { status: "loading", columns: [], rows: [], error: "" };
+      liveJoinCacheRef.current.set(cacheKey, loading);
+      setLiveJoinPreview((current) => ({ ...current, getEventsBySeries: loading }));
+      loadPolymarketSeriesEventsJoin(series, { rowLimit: PREVIEW_ROW_CAP })
+        .then((result) => {
+          const ready = { status: "ready", columns: result.columns || [], rows: result.rows || [], error: "" };
+          liveJoinCacheRef.current.set(cacheKey, ready);
+          if (liveJoinVisibleTicker.current === viewToken) setLiveJoinPreview((current) => ({ ...current, getEventsBySeries: ready }));
+        })
+        .catch((err) => {
+          const failed = {
+            status: "error",
+            columns: [],
+            rows: [],
+            error: err instanceof Error ? err.message : "Join preview failed",
+          };
+          liveJoinCacheRef.current.set(cacheKey, failed);
+          if (liveJoinVisibleTicker.current === viewToken) setLiveJoinPreview((current) => ({ ...current, getEventsBySeries: failed }));
+        });
+    }
+    return undefined;
+  }, [polymarketSeriesCatalog, polymarketJoinActive, step, polymarketSeriesPreviewId, liveJoinKey, polymarketSeriesPeople, polymarketJoinCatalog]);
+
+  const polymarketSeriesEventPreviewId = polymarketSeriesCatalog ? polymarketEventEntities(liveJoinPreview.getEventsBySeries?.rows || [], 1)[0]?.id || "" : "";
+  useEffect(() => {
+    if (!polymarketSeriesCatalog || !polymarketJoinActive || step !== "enrich" || !polymarketSeriesEventPreviewId) return undefined;
+    if (!liveJoinKey.split(",").includes("getMarketsByEvents")) return undefined;
+    const event = polymarketEventEntities(liveJoinPreview.getEventsBySeries?.rows || [], 1)[0];
+    if (!event) return undefined;
+    const viewToken = `polymarket-series-markets:${event.id}|${liveJoinKey}`;
+    liveJoinVisibleTicker.current = viewToken;
+    const cacheKey = `polymarket:event:${event.id}:getMarketsByEvents`;
+    const hit = liveJoinCacheRef.current.get(cacheKey);
+    if (hit?.status === "ready" || hit?.status === "loading") {
+      setLiveJoinPreview((current) => ({ ...current, getMarketsByEvents: hit }));
+      return undefined;
+    }
+    const loading = { status: "loading", columns: [], rows: [], error: "" };
+    liveJoinCacheRef.current.set(cacheKey, loading);
+    setLiveJoinPreview((current) => ({ ...current, getMarketsByEvents: loading }));
+    loadPolymarketLiveTable("getMarketsByEvents", [event.pick], { rowLimit: PREVIEW_ROW_CAP })
+      .then((result) => {
+        const ready = { status: "ready", columns: result.columns || [], rows: result.rows || [], error: "" };
+        liveJoinCacheRef.current.set(cacheKey, ready);
+        if (liveJoinVisibleTicker.current === viewToken) setLiveJoinPreview((current) => ({ ...current, getMarketsByEvents: ready }));
+      })
+      .catch((err) => {
+        const failed = {
+          status: "error",
+          columns: [],
+          rows: [],
+          error: err instanceof Error ? err.message : "Join preview failed",
+        };
+        liveJoinCacheRef.current.set(cacheKey, failed);
+        if (liveJoinVisibleTicker.current === viewToken) setLiveJoinPreview((current) => ({ ...current, getMarketsByEvents: failed }));
+      });
+    return undefined;
+  }, [polymarketSeriesCatalog, polymarketJoinActive, step, polymarketSeriesEventPreviewId, liveJoinKey, liveJoinPreview.getEventsBySeries]);
 
   const downstreamPreviewPickId = downstreamPreviewMarkets[0]?.pick?.id || "";
   useEffect(() => {
@@ -6388,11 +6475,13 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
         name: "compose_live_joins",
         status: "pending",
         args: {
-          sheets: polymarketEventCatalog
-            ? eventSheets
-            : polymarketTraderCatalog
-              ? traderSheets + marketSheets
-              : (polymarketJoinActive ? polymarketJoinMarkets.length : liveJoinReady ? liveJoinMarkets.length : marketCap) * liveJoinTargets.length,
+          sheets: polymarketSeriesCatalog
+            ? polymarketSeriesPeople.length
+            : polymarketEventCatalog
+              ? eventSheets
+              : polymarketTraderCatalog
+                ? traderSheets + marketSheets
+                : (polymarketJoinActive ? polymarketJoinMarkets.length : liveJoinReady ? liveJoinMarkets.length : marketCap) * liveJoinTargets.length,
           sources: sheetTargets.map((item) => item.title).join(", "),
         },
       });
@@ -6631,6 +6720,12 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
       activeFunction?.id,
     );
     const sheets = [];
+    const targetPage = placementRef.current?.pageId || canvas?.pageId || "";
+    const occupiedSheetIds = new Set(
+      ((canvas?.blocksByPage || {})[targetPage] || []).map((block) => block?.id).filter(Boolean),
+    );
+    const claimedSheetIds = new Map();
+    const claimRunSheetId = (id) => claimSheetId(id, occupiedSheetIds, claimedSheetIds);
     const stageSheet = (sheet) => {
       if (!sheet) return Promise.resolve();
       const isNew = !sheet.id || sheets.every((item) => item.id !== sheet.id);
@@ -6645,7 +6740,7 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
         pageId: placementRef.current?.pageId || undefined,
         append: placementRef.current?.append !== false,
       };
-      const reveal = (extra) => canvas?.revealRunSheets?.(sheets.slice(), { ...options, ...extra });
+      const reveal = (extra) => canvas?.revealRunSheets?.(sheets.slice(), { ...options, ...extra, rewriteId: claimRunSheetId });
       const opensChart = chartSpecsForSheet({
         ...sheet,
         type: "sheet",
@@ -7645,6 +7740,146 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
       });
       }
     }
+    if (polymarketSeriesCatalog && polymarketJoinActive) {
+      const seriesList = polymarketSeriesEntities(marketRows, marketCap);
+      const childLimit = Number.isFinite(sheetCap) && sheetCap > 0 ? sheetCap : PREVIEW_ROW_CAP;
+      const eventSheetTargets = liveJoinTargets.filter((item) => item.anchor === "event" && polymarketJoinPlacement(item, traderMarketLayout) === "sheet");
+      const volumeOn = liveJoinTargets.some((item) => item.id === "getLiveVolumeForEvent");
+      reporter.start("join-live");
+      if (!seriesList.length) {
+        reporter.succeed("join-live", { result: "0 series" });
+      } else {
+        let eventSheets = 0;
+        let marketBudget = marketCap;
+        for (const series of seriesList) {
+          let columns = [];
+          let rows = [];
+          try {
+            const pulled = await loadPolymarketSeriesEventsJoin(series, { rowLimit: childLimit, planLimit: childLimit });
+            columns = pulled.columns || [];
+            rows = pulled.rows || [];
+          } catch {
+            columns = [];
+            rows = [];
+          }
+          if (volumeOn && rows.length) {
+            const named = polymarketEventEntities(rows, marketCap);
+            const volumes = await mapPool(named, 4, async (event) => {
+              try {
+                return await loadPolymarketEventVolumeJoin(event.pick);
+              } catch {
+                return null;
+              }
+            });
+            const volumeRows = [];
+            let volumeColumns = [];
+            for (const part of volumes) {
+              if (!part?.columns?.length || !part.rows?.length) continue;
+              if (!volumeColumns.length) volumeColumns = part.columns;
+              volumeRows.push(...part.rows);
+            }
+            if (volumeColumns.length && volumeRows.length) {
+              const merged = mergePolymarketJoinRows(columns, rows, volumeColumns, volumeRows, { anchor: "event" });
+              columns = merged.columns;
+              rows = merged.rows;
+            }
+          }
+          if (columns.length) {
+            const label = series.label || series.ticker;
+            await stageSheet({
+              id: `run-live-getEventsBySeries-${series.id}`,
+              title: `Events · ${label}`,
+              columns,
+              rows,
+              rowCount: rows.length,
+              span: "full",
+              branch: 1,
+              table: "getEvents",
+              pull: { table: "getEvents", seriesId: series.id, kind: "event" },
+              summary: `Polymarket Live · Events · ${label}`,
+            });
+            eventSheets += 1;
+          }
+          const namedEvents = polymarketEventEntities(rows, marketBudget);
+          if (!namedEvents.length || (!eventSheetTargets.length && !downstreamSheetTargets.length)) continue;
+          marketBudget = Math.max(0, marketBudget - namedEvents.length);
+          for (const event of namedEvents) {
+            const marketPulls = [];
+            if (eventSheetTargets.length) {
+              const pulledMarkets = await mapPool(eventSheetTargets, 3, async (target) => {
+                try {
+                  const result = await loadPolymarketLiveTable(target.id, [event.pick], { rowLimit: childLimit, planLimit: childLimit });
+                  return { target, columns: result.columns || [], rows: result.rows || [] };
+                } catch {
+                  return { target, columns: [], rows: [] };
+                }
+              });
+              for (const item of pulledMarkets) {
+                if (!item.columns.length) continue;
+                marketPulls.push(item);
+                const label = event.label || event.ticker;
+                const slug = `${item.target.id}-${String(event.id).replace(/[^A-Za-z0-9]+/g, "-")}`;
+                await stageSheet({
+                  id: `run-live-${slug}`,
+                  title: `Markets · ${label}`,
+                  columns: item.columns,
+                  rows: item.rows || [],
+                  rowCount: (item.rows || []).length,
+                  span: "full",
+                  branch: 2,
+                  table: item.target.id,
+                  pull: { table: item.target.id, eventId: event.id, seriesId: series.id },
+                  summary: `Polymarket Live · ${item.target.title} · ${label}`,
+                });
+              }
+            }
+            const marketRowsForEvent = marketPulls
+              .filter((item) => item.target.id === "getMarketsByEvents")
+              .flatMap((item) => item.rows || []);
+            const namedMarkets = polymarketMarketEntities(marketRowsForEvent, marketCap);
+            if (!downstreamSheetTargets.length || !namedMarkets.length) continue;
+            const downJobs = namedMarkets.flatMap((entity) => downstreamSheetTargets.map((target) => ({ target, entity })));
+            const holderSheetStart = sheets.length;
+            await mapPool(downJobs, 3, async (job) => {
+              try {
+                const result = await loadPolymarketLiveJoin(
+                  job.target.id,
+                  job.target.id === "parent-market" ? job.entity.pick : await ensurePolymarketMarketPick(job.entity.pick),
+                  { rowLimit: childLimit, planLimit: childLimit },
+                );
+                const item = { ...job, columns: result.columns || [], rows: result.rows || [] };
+                if (item.columns.length) {
+                  const label = item.entity.label || item.entity.ticker;
+                  const slug = `${item.target.id}-${String(item.entity.ticker).replace(/[^A-Za-z0-9]+/g, "-")}`;
+                  await stageSheet({
+                    id: `run-mjoin-${slug}`,
+                    title: `${item.target.title} · ${label}`,
+                    columns: item.columns,
+                    rows: item.rows || [],
+                    rowCount: (item.rows || []).length,
+                    span: "half",
+                    branch: 3,
+                    table: item.target.id,
+                    pull: { ticker: item.entity.ticker, table: item.target.id, tokens: item.entity.pick?.tokenIds || [], ...lifePull(item.entity.pick || {}) },
+                    summary: `Polymarket Live · ${item.target.title} · ${label}`,
+                  });
+                }
+                return item;
+              } catch {
+                return { ...job, columns: [], rows: [] };
+              }
+            });
+            await appendHolderTraderSheets(
+              sheets.slice(holderSheetStart).filter((sheet) => sheet.table === "getHoldersByMarkets"),
+              { branch: 3 },
+            );
+          }
+        }
+        reporter.succeed("join-live", {
+          result: `${eventSheets.toLocaleString()} event ${eventSheets === 1 ? "sheet" : "sheets"}`,
+        });
+      }
+    }
     if (polymarketEventCatalog && polymarketJoinActive) {
       const events = polymarketEventEntities(marketRows, marketCap);
       const sheetTargets = liveJoinTargets.filter((item) => polymarketJoinPlacement(item, traderMarketLayout) === "sheet");
@@ -8115,6 +8350,7 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
     canvas?.revealRunSheets?.(placedSheets, {
       pageId: placement.pageId || undefined,
       append: placement.append !== false,
+      rewriteId: claimRunSheetId,
     });
     const joinRecord = joinCommitted
       ? {
@@ -8557,6 +8793,45 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
             live: Boolean(item.realtime),
           });
         });
+      });
+    }
+    if (downstreamSheetTargets.length && downstreamPreviewMarkets.length) {
+      const [firstMarket, ...restMarkets] = downstreamPreviewMarkets;
+      downstreamSheetTargets.forEach((item) => {
+        previewTabs.push({
+          id: `mjoin:${item.id}`,
+          title: `${item.title} · ${firstMarket.label || firstMarket.ticker}`,
+          live: Boolean(item.realtime),
+        });
+      });
+      restMarkets.forEach((market) => {
+        downstreamSheetTargets.forEach((item) => {
+          previewTabs.push({
+            id: `run:mjoin:${item.id}:${market.ticker}`,
+            title: `${item.title} · ${market.label || market.ticker}`,
+            queued: true,
+            live: Boolean(item.realtime),
+          });
+        });
+      });
+    }
+  } else if (polymarketJoinActive && polymarketSeriesCatalog && polymarketSeriesPeople.length) {
+    const [first, ...rest] = polymarketSeriesPeople;
+    if (liveJoinTargets.some((item) => item.id === "getEventsBySeries" || item.anchor === "event")) {
+      previewTabs.push({ id: "live:getEventsBySeries", title: `Events · ${first.label || first.ticker}` });
+      rest.forEach((series) => {
+        previewTabs.push({
+          id: `run:getEventsBySeries:${series.ticker}`,
+          title: `Events · ${series.label || series.ticker}`,
+          queued: true,
+        });
+      });
+    }
+    const eventSheets = liveJoinTargets.filter((item) => item.anchor === "event" && polymarketJoinPlacement(item, traderMarketLayout) === "sheet");
+    const firstEvent = polymarketEventEntities(liveJoinPreview.getEventsBySeries?.rows || [], 1)[0];
+    if (eventSheets.length && firstEvent) {
+      eventSheets.forEach((item) => {
+        previewTabs.push({ id: `live:${item.id}`, title: `Markets · ${firstEvent.label || firstEvent.ticker}` });
       });
     }
     if (downstreamSheetTargets.length && downstreamPreviewMarkets.length) {

@@ -168,6 +168,8 @@ const PREFERRED_COLUMNS = [
   "question",
   "title",
   "series:title",
+  "series:volume24hr",
+  "series:volume",
   "market_title",
   "userName",
   "outcome",
@@ -627,6 +629,69 @@ export function polymarketEventJoinChoices(tableId) {
       anchor: spec.anchor,
     };
   });
+}
+
+/** The first series join: every event in that series, one sheet per series. */
+export const POLYMARKET_SERIES_EVENTS_JOIN = {
+  id: "getEventsBySeries",
+  title: "Get Events",
+  detail: "Every event in a series, looked up by that series id.",
+  note: "One sheet of events per series. The preview shows the first.",
+  realtime: false,
+  placement: "sheet",
+  anchor: "series",
+};
+
+/**
+ * A series pull joins to its events. Those events then use the event joins.
+ * @param {string} tableId
+ */
+export function polymarketSeriesJoinChoices(tableId) {
+  if (tableId !== "series") return [];
+  return [POLYMARKET_SERIES_EVENTS_JOIN];
+}
+
+/** Series id on a series row. Numeric Gamma ids only. */
+export function polymarketSeriesKeyFromRow(row) {
+  if (!row || typeof row !== "object") return "";
+  const prefixed = String(row["series:id"] || row.series_id || row.seriesId || "").trim();
+  const bare = prefixed || (row["series:title"] || row["series:slug"] ? String(row.id || "").trim() : "");
+  return /^\d+$/.test(bare) ? bare : "";
+}
+
+/**
+ * One entry per series, in row order.
+ * @param {Array<Record<string, unknown>>} rows
+ * @param {number} [cap]
+ */
+export function polymarketSeriesEntities(rows, cap = Infinity) {
+  const seen = new Set();
+  const list = [];
+  for (const row of Array.isArray(rows) ? rows : []) {
+    const entityId = polymarketSeriesKeyFromRow(row);
+    if (!entityId || seen.has(entityId)) continue;
+    seen.add(entityId);
+    const title = decodeMarketTitle(row["series:title"] || row.title || row["series:slug"] || row.slug || entityId);
+    const slug = String(row["series:slug"] || row.slug || "").trim();
+    const label = title.slice(0, 80);
+    list.push({
+      id: entityId,
+      ticker: slug || entityId,
+      label,
+      title,
+      pick: { id: `series:${entityId}`, kind: "series", entityId, slug, title, label },
+    });
+    if (list.length >= cap) break;
+  }
+  return list;
+}
+
+/** One page of GET /events/keyset. */
+export function polymarketEventsKeysetPage(payload) {
+  const root = payload && typeof payload === "object" && !Array.isArray(payload) ? payload : {};
+  const events = Array.isArray(root.events) ? root.events.filter((item) => item && typeof item === "object") : [];
+  const cursor = root.next_cursor ? String(root.next_cursor) : "";
+  return { events, cursor };
 }
 
 /** Trader pulls that start from the wallets on a holders sheet. */
@@ -1113,6 +1178,14 @@ export function polymarketLiveBuildColumns(endpointId) {
   const names = meta.map((entry) => entry.name);
   const preferred = PREFERRED_COLUMNS.filter((name) => names.includes(name));
   const defaults = new Set([...preferred, ...names.filter((name) => !preferred.includes(name))].slice(0, 6));
+  if (endpointId === "series") {
+    defaults.add("series:volume24hr");
+    defaults.add("series:volume");
+  }
+  if (endpointId === "getEvents") {
+    defaults.add("volume24hr");
+    defaults.add("volume");
+  }
   const columns = meta.map((entry) => ({
     id: entry.name,
     title: titleFor(entry.name),
@@ -2232,6 +2305,44 @@ export async function loadPolymarketTraderJoin(endpointId, pick, options = {}) {
       address: row.address || wallet,
       user: row.user || wallet,
     })),
+  };
+}
+
+/**
+ * Every event in one series, paged with the events keyset cursor.
+ * The sheet uses the Get Events columns so event joins can continue from it.
+ * @param {{ id?: string, entityId?: string }} series
+ */
+export async function loadPolymarketSeriesEventsJoin(series, options = {}) {
+  const id = String(series?.id || series?.entityId || "").trim();
+  if (!/^\d+$/.test(id)) throw new Error("This join needs a series id.");
+  const target = Math.max(1, Number(options.rowLimit) || Number(options.planLimit) || 50);
+  const rows = [];
+  let cursor = "";
+  for (let page = 0; rows.length < target && page < 500; page += 1) {
+    const next = polymarketEventsKeysetPage(
+      await polymarketGet("listEventsKeyset", {
+        series_id: id,
+        limit: String(Math.min(100, target - rows.length)),
+        order: "id",
+        ascending: "true",
+        ...(cursor ? { after_cursor: cursor } : {}),
+      }),
+    );
+    for (const event of next.events) {
+      rows.push(event);
+      if (rows.length >= target) break;
+    }
+    if (!next.events.length || !next.cursor || next.cursor === cursor) break;
+    cursor = next.cursor;
+  }
+  const packed = pack("getEvents", rows);
+  const columns = packed.columns.some((column) => column.id === "series_id")
+    ? packed.columns
+    : [...packed.columns, { id: "series_id", title: "Series", type: "string", defaultOn: true }];
+  return {
+    columns,
+    rows: (packed.rows || []).map((row) => ({ ...row, series_id: id })),
   };
 }
 

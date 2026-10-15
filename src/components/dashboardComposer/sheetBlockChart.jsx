@@ -342,7 +342,7 @@ export function SheetBlockChart({ sheet, snapshot, onSnapshot, live = false, vie
       })
     : null;
   if (resolved?.view === "treemap") {
-    if (dataset?.datasetType === "markets" || dataset?.datasetType === "events") {
+    if (dataset?.datasetType === "markets" || dataset?.datasetType === "events" || dataset?.datasetType === "series") {
       return <VolumeTreemap sheet={sheet} dataset={dataset} onOpenRow={onOpenRow} />;
     }
     return <PortfolioTreemap sheet={sheet} dataset={dataset} onOpenRow={onOpenRow} />;

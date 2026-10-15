@@ -21,6 +21,8 @@ const PRESETS = {
   markets: { view: "treemap", label: "24h volume", noun: "markets" },
   "events:one": { view: "overview", label: "Event" },
   events: { view: "treemap", label: "24h volume", noun: "events" },
+  "series:one": { view: "overview", label: "Series" },
+  "series:list": { view: "treemap", label: "24h volume", noun: "series" },
   series: { view: "overview", label: "Series" },
   holders: { view: "bars", label: "Shares", limit: 10, noun: "holders" },
   leaderboard: { view: "bars", label: "Rank", limit: 10, noun: "traders" },
@@ -66,6 +68,9 @@ function presetKey(dataset) {
   if (dataset.datasetType === "quote" && dataset.priceBasis === "trade") return "quote:trade";
   if (dataset.datasetType === "markets") return dataset.shape === "snapshot" || dataset.seriesCount <= 1 ? "markets:one" : "markets";
   if (dataset.datasetType === "events") return dataset.seriesCount <= 1 ? "events:one" : "events";
+  if (dataset.datasetType === "series" && dataset.fields?.value) {
+    return dataset.seriesCount <= 1 ? "series:one" : "series:list";
+  }
   return dataset.datasetType;
 }
 
@@ -199,14 +204,15 @@ export function hasVisualTable(dataset) {
     dataset?.datasetType === "trader_positions" ||
     dataset?.datasetType === "trader_activity" ||
     dataset?.datasetType === "markets" ||
-    dataset?.datasetType === "events"
+    dataset?.datasetType === "events" ||
+    (dataset?.datasetType === "series" && Boolean(dataset?.fields?.value))
   );
 }
 
 /** Menu name for that log. Catalogs and activity use the rich table. */
 export function visualPresentationLabel(dataset) {
   const type = dataset?.datasetType;
-  if (type === "trader_activity" || type === "markets" || type === "events") return "Rich Table";
+  if (type === "trader_activity" || type === "markets" || type === "events" || (type === "series" && dataset?.fields?.value)) return "Rich Table";
   return "Visual Table";
 }
 

@@ -20,9 +20,13 @@ export function volumeTreemapModel(sheet, dataset) {
   const records = sheetRecords(sheet);
   const tiles = [];
   records.forEach((record, index) => {
-    const volume = parseVisualNumber(record?.[fields.value]) ?? parseVisualNumber(record?.volume24hr) ?? parseVisualNumber(record?.volume);
+    const volume = parseVisualNumber(record?.[fields.value])
+      ?? parseVisualNumber(record?.volume24hr)
+      ?? parseVisualNumber(record?.["series:volume24hr"])
+      ?? parseVisualNumber(record?.volume)
+      ?? parseVisualNumber(record?.["series:volume"]);
     if (volume == null || volume <= 0) return;
-    const label = text(record, fields.label, "question", "title", "slug") || "Market";
+    const label = text(record, fields.label, "question", "title", "series:title", "slug") || "Market";
     tiles.push({ row: index, label, value: volume });
   });
   tiles.sort((a, b) => b.value - a.value);

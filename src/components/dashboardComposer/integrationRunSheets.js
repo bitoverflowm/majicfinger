@@ -79,6 +79,29 @@ function newId(prefix) {
 }
 
 /**
+ * A pull keeps every sheet already on the tab. When this run asks for an id
+ * that is already there, the new sheet gets the next free suffix. Later
+ * updates in the same run keep the suffix they were given.
+ * @param {string} id
+ * @param {Set<string>} occupied ids on the tab before this run
+ * @param {Map<string, string>} claimed ids assigned during this run
+ */
+export function claimSheetId(id, occupied, claimed) {
+  const raw = String(id || "").trim();
+  if (!raw) return raw;
+  if (claimed.has(raw)) return claimed.get(raw);
+  const used = (value) => occupied.has(value) || [...claimed.values()].includes(value);
+  let next = raw;
+  if (used(next)) {
+    let n = 2;
+    while (used(`${raw}-${n}`)) n += 1;
+    next = `${raw}-${n}`;
+  }
+  claimed.set(raw, next);
+  return next;
+}
+
+/**
  * Markets sit full width. The sheets created with them sit in two columns underneath,
  * the same full-then-split order as the Kalshi vs Polymarket odds board.
  * Event joins pass `branch`: 1 is that event's markets, 2 is the market tables under them.
@@ -121,18 +144,21 @@ export function layoutRunSheets(sheets, { originY = 88 } = {}) {
         });
       });
     }
-    const branch = sheet.branch === 2 ? 2 : sheet.branch === 1 ? 1 : 0;
+    const branch = sheet.branch === 3 ? 3 : sheet.branch === 2 ? 2 : sheet.branch === 1 ? 1 : 0;
     const full = branch === 0 && sheet.span === "full";
-    const continuesRow = col === 1 && ((branch === 0 && !full) || branch === 2);
+    const previousBranch = blocks[blocks.length - 1]?.branch;
+    const continuesRow = col === 1 && previousBranch === branch && ((branch === 0 && !full) || branch === 2 || branch === 3);
     if (!continuesRow) flushRow();
     const described = stampDataset({ ...sheet, type: "sheet" });
-    const childW = Math.floor((fullW - nest * 2 - gap) / 2);
+    const depth = branch === 3 ? 3 : branch === 2 ? 2 : branch === 1 ? 1 : 0;
+    const inset = nest * depth;
+    const childW = Math.max(280, Math.floor((fullW - inset - gap) / 2));
     const block = {
       id: sheet.id || newId("run"),
       type: "sheet",
       source: "integration-run",
       branch,
-      x: branch === 0 ? (full ? x0 : x0 + col * (halfW + gap)) : branch === 1 ? x0 + nest : x0 + nest * 2 + col * (childW + gap),
+      x: branch === 0 ? (full ? x0 : x0 + col * (halfW + gap)) : branch === 1 ? x0 + nest : x0 + inset + col * (childW + gap),
       y,
       w: branch === 0 ? (full ? fullW : halfW) : branch === 1 ? fullW - nest : childW,
       h: branch === 1 || full ? fullH : halfH,

@@ -13,6 +13,9 @@ import {
   POLYMARKET_CLOSED_ORDERBOOK_MESSAGE,
   polymarketJoinChoices,
   polymarketEventJoinChoices,
+  polymarketEventsKeysetPage,
+  polymarketSeriesEntities,
+  polymarketSeriesJoinChoices,
   polymarketHolderTraderJoins,
   polymarketEventEntities,
   polymarketJoinPickFromRow,
@@ -569,6 +572,34 @@ assert.deepEqual(
   ],
 );
 assert.equal(polymarketEventJoinChoices("getMarketsByEvents").length, 0);
+assert.deepEqual(
+  polymarketSeriesJoinChoices("series").map((item) => ({ id: item.id, placement: item.placement, anchor: item.anchor })),
+  [{ id: "getEventsBySeries", placement: "sheet", anchor: "series" }],
+);
+assert.equal(polymarketSeriesJoinChoices("getEvents").length, 0);
+const seriesColumns = polymarketLiveBuildColumns("series");
+assert.equal(seriesColumns.find((column) => column.id === "series:volume24hr")?.defaultOn, true);
+assert.equal(seriesColumns.find((column) => column.id === "series:volume")?.defaultOn, true);
+const eventColumns = polymarketLiveBuildColumns("getEvents");
+assert.equal(eventColumns.find((column) => column.id === "volume24hr")?.defaultOn, true);
+assert.equal(eventColumns.find((column) => column.id === "volume")?.defaultOn, true);
+const seriesEntities = polymarketSeriesEntities([
+  { "series:id": "42", "series:title": "Election cycle", "series:slug": "election-cycle" },
+  { "series:id": "42", "series:title": "Duplicate" },
+  { id: "not-a-series" },
+]);
+assert.equal(seriesEntities.length, 1);
+assert.equal(seriesEntities[0].id, "42");
+assert.equal(seriesEntities[0].pick.kind, "series");
+assert.equal(seriesEntities[0].label, "Election cycle");
+const keyset = polymarketEventsKeysetPage({
+  events: [{ id: "9", title: "Night" }, null],
+  next_cursor: "cursor-2",
+});
+assert.equal(keyset.events.length, 1);
+assert.equal(keyset.events[0].id, "9");
+assert.equal(keyset.cursor, "cursor-2");
+assert.deepEqual(polymarketEventsKeysetPage([]), { events: [], cursor: "" });
 const holderContinuation = polymarketHolderTraderJoins();
 assert.ok(holderContinuation.some((item) => item.id === "getTraderPositions" && item.anchor === "trader" && item.placement === "sheet"));
 assert.ok(holderContinuation.some((item) => item.anchor === "trader" && item.placement === "merge"));

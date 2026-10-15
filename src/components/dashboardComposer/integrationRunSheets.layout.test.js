@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { layoutRunCharts, layoutRunSheets } from "./integrationRunSheets.js";
+import { claimSheetId, layoutRunCharts, layoutRunSheets } from "./integrationRunSheets.js";
 
 const sheets = layoutRunSheets(
   [
@@ -20,5 +20,14 @@ assert.equal(shown.charts.length, 1);
 assert.equal(shown.charts[0].x, 28);
 assert.equal(shown.charts[0].y, 88 + 420 + 16);
 assert.ok(shown.sheets[1].y > shown.charts[0].y);
+
+const occupied = new Set(["run-series", "chart-run-series-treemap"]);
+const claimed = new Map();
+assert.equal(claimSheetId("run-series", occupied, claimed), "run-series-2");
+assert.equal(claimSheetId("run-series", occupied, claimed), "run-series-2");
+assert.equal(claimSheetId("run-events", occupied, claimed), "run-events");
+occupied.add("run-series-2");
+const again = new Map();
+assert.equal(claimSheetId("run-series", occupied, again), "run-series-3");
 
 console.log("run chart layout ok");

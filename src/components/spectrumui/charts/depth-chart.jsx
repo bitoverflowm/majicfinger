@@ -39,6 +39,30 @@ function niceTicks(lo, hi, target = 4) {
   return out;
 }
 
+/**
+ * Bids fill the left half and asks the right half, each stretched across its
+ * own prices. A symmetric price axis leaves the shorter wing in a sliver.
+ */
+function depthX(price, mid, low, high, x0, midX, x1) {
+  if (price <= mid) {
+    const span = Math.max(mid - low, 1e-6);
+    const t = Math.min(1, (mid - price) / span);
+    return midX - t * (midX - x0);
+  }
+  const span = Math.max(high - mid, 1e-6);
+  const t = Math.min(1, (price - mid) / span);
+  return midX + t * (x1 - midX);
+}
+
+function depthPrice(x, mid, low, high, x0, midX, x1) {
+  if (x <= midX) {
+    const t = (midX - x) / (midX - x0 || 1);
+    return mid - t * (mid - low);
+  }
+  const t = (x - midX) / (x1 - midX || 1);
+  return mid + t * (high - mid);
+}
+
 function stepPath(levels, xOf, yOf, midX, baseY) {
   if (!levels.length) return "";
   let d = `M${midX.toFixed(2)},${baseY.toFixed(2)}`;
@@ -101,28 +125,26 @@ export function DepthChart({
   const x1 = Math.max(x0 + 1, w - PAD.right);
   const y0 = PAD.top;
   const y1 = Math.max(y0 + 1, h - PAD.bottom);
-  const lowPrice = bids[bids.length - 1]?.price ?? mid;
-  const highPrice = asks[asks.length - 1]?.price ?? mid;
-  const halfSpan = Math.max(mid - lowPrice, highPrice - mid, Math.abs(mid) * 0.02, 0.01);
-  const domainLo = mid - halfSpan;
-  const domainHi = mid + halfSpan;
+  const lowPrice = bids.length ? bids[bids.length - 1].price : mid;
+  const highPrice = asks.length ? asks[asks.length - 1].price : mid;
   const maxTotal = Math.max(bids[bids.length - 1]?.total ?? 0, asks[asks.length - 1]?.total ?? 0, 1);
+  const midX = (x0 + x1) / 2;
   const xOf = React.useCallback(
-    (price) => x0 + ((price - domainLo) / (domainHi - domainLo || 1)) * (x1 - x0),
-    [domainHi, domainLo, x0, x1],
+    (price) => depthX(price, mid, lowPrice, highPrice, x0, midX, x1),
+    [highPrice, lowPrice, mid, midX, x0, x1],
   );
   const yOf = React.useCallback((total) => y1 - (total / maxTotal) * (y1 - y0), [maxTotal, y0, y1]);
   const priceAt = React.useCallback(
-    (x) => domainLo + ((x - x0) / (x1 - x0 || 1)) * (domainHi - domainLo),
-    [domainHi, domainLo, x0, x1],
+    (x) => depthPrice(x, mid, lowPrice, highPrice, x0, midX, x1),
+    [highPrice, lowPrice, mid, midX, x0, x1],
   );
-  const midX = xOf(mid);
   const bidPath = stepPath(bids, xOf, yOf, midX, y1);
   const askPath = stepPath(asks, xOf, yOf, midX, y1);
-  const priceTicks = React.useMemo(
-    () => niceTicks(domainLo, domainHi, 4).filter((tick) => Math.abs(xOf(tick) - midX) > 28),
-    [domainHi, domainLo, midX, xOf],
-  );
+  const priceTicks = React.useMemo(() => {
+    const bidTicks = bids.length ? niceTicks(lowPrice, bids[0].price, 2) : [];
+    const askTicks = asks.length ? niceTicks(asks[0].price, highPrice, 2) : [];
+    return [...bidTicks, ...askTicks].filter((tick) => Math.abs(xOf(tick) - midX) > 28);
+  }, [asks, bids, highPrice, lowPrice, midX, xOf]);
   const sizeTicks = React.useMemo(() => niceTicks(0, maxTotal, 3), [maxTotal]);
   const bestBid = bids[0]?.price ?? mid;
   const bestAsk = asks[0]?.price ?? mid;
