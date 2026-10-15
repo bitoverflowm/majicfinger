@@ -19,9 +19,9 @@ import { CatalogRichTableView } from "@/components/dashboardComposer/catalogRich
 import { VisualTableView } from "@/components/dashboardComposer/visualTableView";
 import { Switch } from "@/components/ui/switch";
 import { isOrderBookSheet } from "@/components/dashboardComposer/orderBookLadder";
-import { describeSheet } from "@/lib/visualizations/datasetDescriptor";
+import { columnKey, describeSheet } from "@/lib/visualizations/datasetDescriptor";
 import { chartSpecsForSheet } from "@/lib/visualizations/sheetCharts";
-import { hasVisualTable, visualPresentationLabel } from "@/lib/visualizations/presetRegistry";
+import { hasVisualTable, resolveVisualization, visualPresentationLabel } from "@/lib/visualizations/presetRegistry";
 import { isPriceHistorySheet } from "@/components/dashboardComposer/priceHistorySeries";
 import { SheetBlockChart } from "@/components/dashboardComposer/sheetBlockChart";
 import { layoutRunCharts, layoutRunSheets } from "@/components/dashboardComposer/integrationRunSheets";
@@ -1633,6 +1633,7 @@ function ChartCanvas({ block, onChange, booting, chartSheet, sourceSession }) {
       sheet={chartSheet}
       live={!!sourceSession?.running}
       view={block.chartView || ""}
+      vizCustom={Boolean(block.vizCustom)}
       onViewChange={(chartView) => onChange({ chartView, vizCustom: true })}
       onOpenRow={(row) => {
         if (block.sourceSheetId) canvas?.focusSheetRow?.(block.sourceSheetId, row);
@@ -1863,6 +1864,13 @@ function CanvasBlock({ block, selected, spotlight = false, onSelect, onChange, b
     return () => window.clearTimeout(timer);
   }, [dataReady]);
   const sheetDataset = block.type === "sheet" ? describeSheet(block) : null;
+  const createLabel =
+    sheetDataset &&
+    resolveVisualization(sheetDataset, {
+      columnIds: (block.columns || []).map((column) => columnKey(column)).filter(Boolean),
+    }).view === "stat-cards"
+      ? "Create stats card"
+      : "Create chart";
   const logLabel = visualPresentationLabel(sheetDataset);
   const logWidth = sheetDataset?.datasetType === "trader_activity" || sheetDataset?.datasetType === "markets" || sheetDataset?.datasetType === "events" || sheetDataset?.datasetType === "series"
     ? RICH_TABLE_WIDTH
@@ -2131,7 +2139,7 @@ function CanvasBlock({ block, selected, spotlight = false, onSelect, onChange, b
                 onSelect={() => canvas?.createChartFromBlock?.(block.id)}
               >
                 <BarChart3 className="size-4 text-muted-foreground" />
-                Create chart
+                {createLabel}
               </DropdownMenuItem>
               {hasVisualTable(sheetDataset) ? (
                 block.visualReady ? (

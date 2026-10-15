@@ -31,7 +31,11 @@ export function chartSpecsForSheet(sheet, forcedView) {
   return [
     {
       chartView,
-      title: chartView === "order-book" && /^order\s*books?/i.test(base) ? base : `${base} chart`,
+      title: statCards
+        ? `${base} stats card`
+        : chartView === "order-book" && /^order\s*books?/i.test(base)
+          ? base
+          : `${base} chart`,
       w: chartView === "portfolio" ? 680 : 540,
       h: chartView === "portfolio" ? 560 : statCards ? statCardBlockHeight(sheetRecords(sheet).length) : 360,
     },

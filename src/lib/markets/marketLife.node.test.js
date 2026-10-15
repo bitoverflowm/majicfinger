@@ -48,6 +48,17 @@ const now = Date.parse("2026-10-08T12:00:00Z");
 }
 
 {
+  const life = lifeOfMarket(
+    { closed: true, startedAt: "2026-01-15T00:00:00Z", closesAt: "2026-12-01T00:00:00Z" },
+    now,
+  );
+  assert.equal(life.stopped, true);
+  assert.equal(life.latest, "2026-10-08");
+  assert.ok(life.earliest < life.latest);
+  console.log("ok a future close on a stopped market ends today");
+}
+
+{
   const life = lifeOfMarket({ closed: true, closeTime: "2022-03-16T11:14:35Z", openTime: "2022-01-01T00:00:00Z" }, now);
   const capped = defaultLifeRange(life, { maxDays: 15 });
   assert.equal(capped.to, life.latest);

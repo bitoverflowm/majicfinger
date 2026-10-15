@@ -90,9 +90,8 @@ export function lifeOfMarket(source, now = Date.now()) {
     (source.closed === false || status === "open" || status === "active" || Number.isFinite(closeMs) || Number.isFinite(openMs));
   if (!Number.isFinite(openMs) && !Number.isFinite(closeMs) && !stopped && !trading) return null;
   const earliest = Number.isFinite(openMs) ? localDayKey(openMs) : "";
-  const latest = stopped
-    ? (Number.isFinite(closeMs) ? localDayKey(closeMs) : earliest)
-    : localDayKey(now);
+  const closeDay = Number.isFinite(closeMs) ? localDayKey(Math.min(closeMs, now)) : "";
+  const latest = stopped ? (closeDay || earliest) : localDayKey(now);
   return {
     openMs: Number.isFinite(openMs) ? openMs : null,
     closeMs: Number.isFinite(closeMs) ? closeMs : null,

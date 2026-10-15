@@ -6,6 +6,13 @@ function priceOf(row, field) {
   return Number.isFinite(n) ? n : null;
 }
 
+function rowTitle(row, fields) {
+  const titled = String(row?.market_title ?? "").trim();
+  if (titled) return titled;
+  const labelled = fields?.label ? String(row?.[fields.label] ?? "").trim() : "";
+  return labelled;
+}
+
 /**
  * One stat card per market-price row. The headline is the buy price.
  * The caption carries the outcome, the sell price, and the spread.
@@ -19,7 +26,7 @@ export function marketPriceCards(sheet, dataset) {
   const titleField = fields.label || "market_title";
   const outcomeField = fields.outcome || "outcome";
   return sheetRecords(sheet).map((row) => {
-    const title = String(row?.[titleField] ?? "").trim();
+    const title = rowTitle(row, fields) || String(row?.[titleField] ?? "").trim();
     const outcome = String(row?.[outcomeField] ?? "").trim();
     const buy = priceOf(row, buyField);
     const sell = priceOf(row, sellField);
@@ -36,6 +43,33 @@ export function marketPriceCards(sheet, dataset) {
       value: headline != null ? headline : 0,
       format: () => (headline != null ? formatCents(headline) : "—"),
       caption: caption || (headline != null ? "" : "No price"),
+    };
+  });
+}
+
+/**
+ * One stat card per snapshot row. Market price keeps buy, sell, and spread.
+ * Midpoint, spread, tick size, and last trade use the same card with their own headline.
+ * @param {object | null | undefined} sheet
+ * @param {object | null | undefined} dataset
+ */
+export function snapshotStatCards(sheet, dataset) {
+  if (dataset?.priceBasis === "market" || dataset?.fields?.bid) return marketPriceCards(sheet, dataset);
+  const fields = dataset?.fields || {};
+  const valueField = fields.value || "";
+  const outcomeField = fields.outcome || "outcome";
+  const sideField = fields.side || "";
+  return sheetRecords(sheet).map((row) => {
+    const title = rowTitle(row, fields);
+    const outcome = String(row?.[outcomeField] ?? "").trim();
+    const side = sideField ? String(row?.[sideField] ?? "").trim() : "";
+    const value = priceOf(row, valueField);
+    const caption = [title && outcome ? outcome : "", side].filter(Boolean).join(" · ");
+    return {
+      label: title || outcome || "Market",
+      value: value != null ? value : 0,
+      format: () => (value != null ? formatCents(value) : "—"),
+      caption,
     };
   });
 }

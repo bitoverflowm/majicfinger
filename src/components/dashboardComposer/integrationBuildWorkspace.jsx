@@ -90,6 +90,7 @@ import {
 } from "@/lib/polymarketLive/polymarketSamplingScan";
 import {
   defaultPolymarketQuoteFilters,
+  exclusivePriceHistoryFilters,
   isPolymarketQuoteTable,
   polymarketQuoteAttributeColumns,
   polymarketQuoteRequestKey,
@@ -152,6 +153,7 @@ import {
   attributeMismatchReason,
   attributeSummary,
   AttributeFilters,
+  PriceHistoryQueryFields,
   JoinSourceFields,
   buildAttributePredicates,
   rowMatchesAttributes,
@@ -2128,6 +2130,18 @@ function traderJoinSheetParts(previewSheet) {
   return { kind, name, key: `${kind}:${name || "combined"}` };
 }
 
+function priceHistorySummary(columns, filters) {
+  const byId = new Map((columns || []).map((column) => [column.id, column]));
+  const rangeOn = Boolean(filters?.time_range?.from && filters?.time_range?.to);
+  return ["quote_outcome", rangeOn ? "time_range" : "interval", "fidelity"]
+    .map((id) => {
+      const column = byId.get(id);
+      return column ? attributeSummary(column, filters) : "";
+    })
+    .filter(Boolean)
+    .join(" · ");
+}
+
 /** Column attributes that narrow rows already in hand. Query controls are a separate request. */
 function columnFilterKey(columns, filters, skipIds = []) {
   const skip = new Set(skipIds);
@@ -2137,11 +2151,12 @@ function columnFilterKey(columns, filters, skipIds = []) {
     .join("\n");
 }
 
-function withMarketLifeBounds(columns, life) {
+function withMarketLifeBounds(columns, life, lifeLabel = "") {
   if (!life || (!life.earliest && !life.latest)) return columns;
+  const rangeBounds = lifeLabel ? { ...life, lifeLabel } : life;
   return columns.map((column) =>
     column?.id === "time_range" || column?.control === "query-range" || column?.control === "query-instant"
-      ? { ...column, rangeAnchor: life.stopped ? life.latest : "", rangeBounds: life }
+      ? { ...column, rangeAnchor: life.stopped ? life.latest : "", rangeBounds }
       : column,
   );
 }
@@ -2419,15 +2434,22 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
     setAttributeFilters((current) => {
       const range = current?.time_range || {};
       if (range.from === next.from && range.to === next.to && range.preset === next.preset) return current;
-      return { ...(current || {}), time_range: next };
+      const patched = { ...(current || {}), time_range: next };
+      return tableId === "getBatchPricesHistory" ? exclusivePriceHistoryFilters(current, patched) : patched;
     });
     return undefined;
   }, [focusedKey, focusedLife, livePicks.length, polymarketLive, tableId]);
   const polymarketQuoteColumns = useMemo(() => {
     if (!polymarketLive || !isPolymarketQuoteTable(tableId)) return [];
     const columns = polymarketQuoteAttributeColumns(tableId, pull?.columns || [], attributeFilters);
-    return withMarketLifeBounds(columns, focusedLife);
+    const lifeLabel = tableId === "getBatchPricesHistory" ? "Full market history" : "";
+    return withMarketLifeBounds(columns, focusedLife, lifeLabel);
   }, [attributeFilters, focusedLife, polymarketLive, pull?.columns, tableId]);
+  const polymarketAttributeColumns = useMemo(() => {
+    if (tableId !== "getBatchPricesHistory") return polymarketQuoteColumns;
+    const skip = new Set(["quote_outcome", "interval", "time_range", "fidelity"]);
+    return polymarketQuoteColumns.filter((column) => !skip.has(column.id));
+  }, [polymarketQuoteColumns, tableId]);
   const polymarketQuoteKey = polymarketQuoteRequestKey(tableId, attributeFilters, rowLimit, planLimit);
   const polymarketLeaderboardColumns = useMemo(() => {
     if (!polymarketLive || tableId !== "getTraderLeaderboard") return [];
@@ -9613,7 +9635,38 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
             />
           ) : null}
 
-          <Accordion type="single" collapsible defaultValue="columns" className="space-y-2">
+          <Accordion
+            key={tableId}
+            type="single"
+            collapsible
+            defaultValue={tableId === "getBatchPricesHistory" ? "price-history" : "columns"}
+            className="space-y-2"
+          >
+            {tableId === "getBatchPricesHistory" ? (
+              <AccordionItem value="price-history" className="border-0">
+                <AccordionPrimitive.Header className="flex">
+                  <AccordionPrimitive.Trigger
+                    className="flex w-full items-center gap-2 rounded-lg bg-zinc-200/80 px-2.5 py-1.5 text-left text-[12px] font-semibold text-foreground dark:bg-zinc-800 [&[data-state=open]>svg]:rotate-180"
+                    aria-label="Price history"
+                  >
+                    <span>Price history</span>
+                    <span className="ml-auto max-w-[55%] truncate text-[11px] font-normal text-[#0d99ff]">
+                      {priceHistorySummary(polymarketQuoteColumns, attributeFilters)}
+                    </span>
+                    <ChevronDown className="size-4 shrink-0 transition-transform duration-200" />
+                  </AccordionPrimitive.Trigger>
+                </AccordionPrimitive.Header>
+                <AccordionContent className="pb-0 pt-2">
+                  <div className="rounded-lg border border-border/70 px-2 py-2">
+                    <PriceHistoryQueryFields
+                      columns={polymarketQuoteColumns}
+                      filters={attributeFilters}
+                      onChange={(next) => setAttributeFilters((current) => exclusivePriceHistoryFilters(current, next))}
+                    />
+                  </div>
+                </AccordionContent>
+              </AccordionItem>
+            ) : null}
             <AccordionItem value="columns" className="border-0">
               <AccordionPrimitive.Header className="flex">
                 <AccordionPrimitive.Trigger
@@ -9701,12 +9754,18 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
                                       ? polymarketPnlColumns
                                     : polymarketActivityColumns.length
                                       ? polymarketActivityColumns
-                                  : polymarketQuoteColumns.length
-                                    ? polymarketQuoteColumns
+                                  : polymarketAttributeColumns.length
+                                    ? polymarketAttributeColumns
                                     : pull?.columns || []
                 }
                 filters={attributeFilters}
-                onChange={setAttributeFilters}
+                onChange={(next) => {
+                  if (tableId !== "getBatchPricesHistory") {
+                    setAttributeFilters(next);
+                    return;
+                  }
+                  setAttributeFilters((current) => exclusivePriceHistoryFilters(current, next));
+                }}
                 sorts={sortKeys}
                 onSorts={setSortKeys}
                 rowLimit={rowLimit}

@@ -11,12 +11,12 @@ const PRESETS = {
   price_history: { view: "price", curve: "linear", units: "probability", label: "Price" },
   "price_history:token": { view: "price", curve: "linear", units: "probability", label: "Outcome price" },
   orderbook: { view: "order-book", label: "Order book", depth: 20 },
-  "quote:midpoint": { view: "metric", label: "Midpoint" },
-  "quote:trade": { view: "metric", label: "Last traded price" },
+  "quote:midpoint": { view: "stat-cards", label: "Midpoint", noun: "outcomes" },
+  "quote:trade": { view: "stat-cards", label: "Last traded price", noun: "outcomes" },
   quote: { view: "quote", label: "Bid / ask" },
   "quote:market": { view: "stat-cards", label: "Market price", noun: "outcomes" },
-  spread: { view: "metric", label: "Spread" },
-  tick_size: { view: "spec", label: "Tick size" },
+  spread: { view: "stat-cards", label: "Spread", noun: "markets" },
+  tick_size: { view: "stat-cards", label: "Tick size", noun: "outcomes" },
   open_interest: { view: "metric", label: "Open interest" },
   "markets:one": { view: "overview", label: "Market" },
   markets: { view: "treemap", label: "24h volume", noun: "markets" },
@@ -154,12 +154,6 @@ export function resolveVisualization(dataset, options = {}) {
   if (dataset.datasetType === "open_interest" && dataset.seriesCount > 1 && chosen.view === "metric") {
     return { ...PRESETS.markets, view: "bars", source: "preset", label: "Open interest", noun: "markets" };
   }
-  if (dataset.datasetType === "spread" && dataset.seriesCount > 1 && chosen.view === "metric") {
-    return { view: "bars", source: "preset", label: "Spread", limit: 10, noun: "markets" };
-  }
-  if (dataset.datasetType === "quote" && dataset.priceBasis === "midpoint" && dataset.seriesCount > 1) {
-    return { view: "bars", source: "preset", label: "Midpoint", limit: 10, noun: "outcomes" };
-  }
   if (dataset.datasetType === "quote" && !dataset.priceBasis && dataset.seriesCount > 1) {
     return { view: "quote-table", source: "preset", label: "Quotes" };
   }
@@ -194,6 +188,16 @@ const SAVED_VIEWS = new Set([
 
 export function isSavedChartView(view) {
   return SAVED_VIEWS.has(view);
+}
+
+/** Market price, midpoint, spread, tick size, and last trade open as stat cards. */
+export function usesStatCards(dataset) {
+  if (!dataset) return false;
+  if (dataset.datasetType === "spread" || dataset.datasetType === "tick_size") return true;
+  return (
+    dataset.datasetType === "quote" &&
+    (dataset.priceBasis === "market" || dataset.priceBasis === "midpoint" || dataset.priceBasis === "trade")
+  );
 }
 
 /** Leaderboard and biggest wins are the specific types. Stats is the family that shares Visual Table. */

@@ -50,6 +50,7 @@ import {
 import { openInterestRowsFromPayload } from "../../lib/polymarketLive/openInterestCompose.js";
 import {
   defaultPolymarketQuoteFilters,
+  exclusivePriceHistoryFilters,
   polymarketHistoryBody,
   polymarketHistoryFidelityOptions,
   polymarketMarketAnchorDate,
@@ -491,6 +492,21 @@ const oilPick = polymarketPickFromSuggestion({
 });
 assert.equal(oilPick.endedAt, closedMarket.endedAt);
 assert.equal(oilPick.startedAt, closedMarket.startedAt);
+const createdPick = polymarketPickFromSuggestion({
+  entity: "market",
+  id: "559651",
+  slug: "xi-jinping-out-before-2027",
+  title: "Xi Jinping out before 2027?",
+  closed: false,
+  raw: {
+    createdAt: "2025-07-03T20:25:56.889606Z",
+    startDate: "2025-07-03T20:37:00.228Z",
+    endDate: "2027-01-01T04:59:00Z",
+    closed: false,
+  },
+});
+assert.equal(createdPick.startedAt, Math.floor(Date.parse("2025-07-03T20:25:56.889606Z") / 1000));
+assert.equal(createdPick.closed, false);
 const tokenDay = polymarketTokenHistoryParams({ interval: { value: "1d" } }, closedMarket);
 assert.equal(tokenDay.interval, undefined);
 assert.equal(Number(tokenDay.end), closedMarket.endedAt);
@@ -503,9 +519,24 @@ assert.equal(Number(tokenMax.end), closedMarket.endedAt);
 const longClosed = { closed: true, endedAt: closedMarket.endedAt, startedAt: closedMarket.endedAt - 40 * 86400 };
 const tokenLong = polymarketTokenHistoryParams({ interval: { value: "max" } }, longClosed);
 assert.equal(Number(tokenLong.end) - Number(tokenLong.start), 15 * 86400);
-assert.deepEqual(polymarketHistoryFidelityOptions("1w", false).map((option) => option[0]), ["5", "15", "60", "240", "1440"]);
-assert.equal(polymarketHistoryFidelityOptions("1m", false).some((option) => option[0] === "1" || option[0] === "5"), false);
+assert.deepEqual(polymarketHistoryFidelityOptions("1w", false).map((option) => option[0]), ["60", "1440"]);
+assert.deepEqual(polymarketHistoryFidelityOptions("1d", false).map((option) => option[1]), ["Minute", "Hourly", "Daily"]);
+assert.equal(polymarketHistoryFidelityOptions("1m", false).some((option) => option[0] === "1"), false);
 assert.equal(polymarketHistoryFidelityOptions("1d", true).some((option) => option[0] === "1"), true);
+const historyDefaults = defaultPolymarketQuoteFilters("getBatchPricesHistory");
+const rangedHistory = exclusivePriceHistoryFilters(historyDefaults, {
+  ...historyDefaults,
+  time_range: { from: "2026-10-01", to: "2026-10-07", preset: "" },
+});
+assert.equal(rangedHistory.interval.value, "");
+assert.equal(rangedHistory.fidelity.value, "1");
+const intervalHistory = exclusivePriceHistoryFilters(rangedHistory, {
+  ...rangedHistory,
+  interval: { value: "max" },
+});
+assert.equal(intervalHistory.time_range.from, "");
+assert.equal(intervalHistory.time_range.to, "");
+assert.equal(intervalHistory.fidelity.value, "60");
 assert.equal(polymarketMarketFanout("getTokenPriceHistory"), true);
 assert.equal(polymarketMarketFanout("getTickSize"), true);
 assert.equal(polymarketLiveBuildRequirement("getTickSize")?.kind, "token");

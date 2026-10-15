@@ -14,8 +14,8 @@ import { PnlPortfolioChart } from "@/components/dashboardComposer/pnlPortfolioCh
 import { ActivityCalendarChart } from "@/components/dashboardComposer/activityCalendarChart";
 import { ActivityStackChart } from "@/components/dashboardComposer/activityStackChart";
 import { columnKey, countObservations, describeSheet, sheetRecords } from "@/lib/visualizations/datasetDescriptor";
-import { marketPriceCards, statCardBlockHeight } from "@/lib/visualizations/marketPriceCards";
-import { resolveVisualization } from "@/lib/visualizations/presetRegistry";
+import { snapshotStatCards, statCardBlockHeight } from "@/lib/visualizations/marketPriceCards";
+import { resolveVisualization, usesStatCards } from "@/lib/visualizations/presetRegistry";
 import { StatCards } from "@/components/spectrumui/charts/stat-cards";
 import { IndicatorChart } from "@/components/spectrumui/charts/indicator-chart";
 import { MarketChart } from "@/components/spectrumui/charts/market-chart";
@@ -268,8 +268,16 @@ function OrderBookSheetChart({ sheet, rows, live, snapshot, onSnapshot, onFitHei
   );
 }
 
+function statCardEmpty(dataset) {
+  if (dataset?.datasetType === "spread") return { title: "No spreads", description: "This pull has no spreads yet." };
+  if (dataset?.datasetType === "tick_size") return { title: "No tick size", description: "This pull has no tick size yet." };
+  if (dataset?.priceBasis === "midpoint") return { title: "No midpoint", description: "This pull has no midpoint yet." };
+  if (dataset?.priceBasis === "trade") return { title: "No last trade", description: "This pull has no last trade yet." };
+  return { title: "No market prices", description: "This pull has no priced outcomes yet." };
+}
+
 function MarketPriceStatCards({ sheet, dataset, onFitHeight }) {
-  const cards = useMemo(() => marketPriceCards(sheet, dataset), [dataset, sheet]);
+  const cards = useMemo(() => snapshotStatCards(sheet, dataset), [dataset, sheet]);
   useEffect(() => {
     if (!onFitHeight || !cards.length) return;
     onFitHeight(statCardBlockHeight(cards.length));
@@ -281,10 +289,7 @@ function MarketPriceStatCards({ sheet, dataset, onFitHeight }) {
         columns={1}
         status={cards.length ? "ready" : "empty"}
         className="px-3 py-3"
-        empty={{
-          title: "No market prices",
-          description: "This pull has no priced outcomes yet.",
-        }}
+        empty={statCardEmpty(dataset)}
       />
     </div>
   );
@@ -332,7 +337,7 @@ function PriceHistorySheetChart({ sheet, live }) {
 
 const SUMMARY_VIEWS = new Set(["metric", "spec", "overview", "bars", "diverging", "quote", "quote-table"]);
 
-export function SheetBlockChart({ sheet, snapshot, onSnapshot, live = false, view = "", onViewChange, onOpenRow, onFitHeight }) {
+export function SheetBlockChart({ sheet, snapshot, onSnapshot, live = false, view = "", vizCustom = false, onViewChange, onOpenRow, onFitHeight }) {
   const storedSheet = useReadyTradeSheet(sheet?.id);
   const fullSheet = usesHistoricalTradeSheet(sheet) ? storedSheet : null;
   const priceHistory = isPriceHistorySheet(sheet);
@@ -347,7 +352,7 @@ export function SheetBlockChart({ sheet, snapshot, onSnapshot, live = false, vie
   useEffect(() => {
     if (!series) return;
     const described = describeSheet(sheet);
-    if (described?.datasetType === "quote" && described?.priceBasis === "market") return;
+    if (usesStatCards(described)) return;
     onSnapshot?.({
       kind: "sheet-series",
       seriesKind: series.kind,
@@ -362,7 +367,7 @@ export function SheetBlockChart({ sheet, snapshot, onSnapshot, live = false, vie
   const resolved = dataset
     ? resolveVisualization(dataset, {
         userView: view,
-        custom: Boolean(view),
+        custom: Boolean(view) && !(usesStatCards(dataset) && !vizCustom),
         columnIds,
         observations: countObservations(sheet, dataset),
       })

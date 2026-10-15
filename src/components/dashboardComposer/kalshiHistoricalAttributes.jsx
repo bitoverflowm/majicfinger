@@ -674,9 +674,12 @@ function DateRangeField({ from, to, presetId, onChange, presetIds, anchor, bound
   const bounded = Boolean(bounds?.earliest || bounds?.latest);
   const anchorDate = anchor ? new Date(`${anchor}T12:00:00`) : new Date();
   const now = Number.isNaN(anchorDate.getTime()) ? new Date() : anchorDate;
-  const preset = presetId === "market-life"
-    ? { id: "market-life", short: "Life", label: "Full trading life" }
-    : activeDateRangePreset(from, to, presetId, now);
+  const lifePreset = {
+    id: "market-life",
+    short: bounds?.lifeLabel ? "Full" : "Life",
+    label: bounds?.lifeLabel || "Full trading life",
+  };
+  const preset = presetId === "market-life" ? lifePreset : activeDateRangePreset(from, to, presetId, now);
   const emptyLabel = bounds?.stopped && bounds.earliest && bounds.latest
     ? formatAttributeRange(bounds.earliest, bounds.latest)
     : anchor
@@ -728,7 +731,7 @@ function DateRangeField({ from, to, presetId, onChange, presetIds, anchor, bound
               </button>
             );
           })}
-          {bounds?.stopped && bounds.earliest && bounds.latest ? (
+          {(bounds?.lifeLabel || bounds?.stopped) && bounds.earliest && bounds.latest ? (
             <button
               type="button"
               className={cn(
@@ -739,7 +742,7 @@ function DateRangeField({ from, to, presetId, onChange, presetIds, anchor, bound
               )}
               onClick={() => onChange({ from: bounds.earliest, to: bounds.latest, preset: "market-life" })}
             >
-              Full trading life
+              {lifePreset.label}
             </button>
           ) : null}
           </div>
@@ -772,7 +775,7 @@ function DateRangeField({ from, to, presetId, onChange, presetIds, anchor, bound
               variant="ghost"
               className="h-7 w-full text-[11px]"
               onClick={() => {
-                if (bounds?.stopped && bounds.earliest && bounds.latest) {
+                if ((bounds?.lifeLabel || bounds?.stopped) && bounds.earliest && bounds.latest) {
                   onChange({ from: bounds.earliest, to: bounds.latest, preset: "market-life" });
                   return;
                 }
@@ -1288,6 +1291,107 @@ function attributePanels(columns) {
     });
   }
   return panels;
+}
+
+const querySelectClass = "h-9 w-full rounded-lg border border-border/70 bg-background px-2 text-[13px]";
+
+function QueryChoice({ title, description, children }) {
+  return (
+    <div>
+      <p className="text-[12px] font-medium text-foreground">{title}</p>
+      {description ? <p className="mb-1.5 text-[11px] leading-relaxed text-muted-foreground">{description}</p> : null}
+      {children}
+    </div>
+  );
+}
+
+/** Outcome, interval, date range, and fidelity for a price-history pull. */
+export function PriceHistoryQueryFields({ columns, filters, onChange }) {
+  const byId = new Map((columns || []).map((column) => [column.id, column]));
+  const outcome = byId.get("quote_outcome");
+  const interval = byId.get("interval");
+  const range = byId.get("time_range");
+  const fidelity = byId.get("fidelity");
+  const rangeOn = Boolean(filters?.time_range?.from && filters?.time_range?.to);
+  const intervalValue = String(filters?.interval?.value || "");
+  const fidelityOptions = fidelity?.enumOptions || [];
+  const fidelityValue = String(filters?.fidelity?.value || "");
+  const fidelitySelected = fidelityOptions.some(([value]) => value === fidelityValue) ? fidelityValue : fidelityOptions[0]?.[0] || "";
+  const minuteAvailable = fidelityOptions.some(([value]) => value === "1");
+  return (
+    <div className="space-y-3">
+      {outcome ? (
+        <QueryChoice title="Outcome" description={outcome.description}>
+          <select
+            aria-label={outcome.ariaLabel || "Outcome"}
+            value={String(filters?.quote_outcome?.value || "yes")}
+            onChange={(event) => onChange(patchFilter(filters, outcome, { value: event.target.value }))}
+            className={querySelectClass}
+          >
+            {(outcome.enumOptions || []).map(([value, label]) => (
+              <option key={value} value={value}>
+                {label}
+              </option>
+            ))}
+          </select>
+        </QueryChoice>
+      ) : null}
+      <p className="text-[11px] leading-relaxed text-muted-foreground">Choose an interval or a date range.</p>
+      {interval ? (
+        <QueryChoice title="Interval" description={interval.description}>
+          <select
+            aria-label="Interval"
+            value={rangeOn ? "" : intervalValue || "1d"}
+            onChange={(event) => onChange(patchFilter(filters, interval, { value: event.target.value }))}
+            className={querySelectClass}
+          >
+            {rangeOn ? <option value="">Date range is selected</option> : null}
+            {(interval.enumOptions || []).map(([value, label]) => (
+              <option key={value} value={value}>
+                {label}
+              </option>
+            ))}
+          </select>
+        </QueryChoice>
+      ) : null}
+      {range ? (
+        <QueryChoice title="Date range" description={range.description}>
+          <DateRangeField
+            from={filters?.time_range?.from || ""}
+            to={filters?.time_range?.to || ""}
+            presetId={filters?.time_range?.preset || ""}
+            presetIds={range.rangePresetIds}
+            anchor={range.rangeAnchor}
+            bounds={range.rangeBounds}
+            onChange={({ from, to, preset }) => onChange(patchFilter(filters, range, { from, to, preset: preset || "" }))}
+          />
+        </QueryChoice>
+      ) : null}
+      {fidelity ? (
+        <QueryChoice
+          title="Fidelity"
+          description={
+            minuteAvailable
+              ? fidelity.description
+              : `${fidelity.description} This window starts at hourly.`
+          }
+        >
+          <select
+            aria-label="Fidelity"
+            value={fidelitySelected}
+            onChange={(event) => onChange(patchFilter(filters, fidelity, { value: event.target.value }))}
+            className={querySelectClass}
+          >
+            {fidelityOptions.map(([value, label]) => (
+              <option key={value || "default"} value={value}>
+                {label}
+              </option>
+            ))}
+          </select>
+        </QueryChoice>
+      ) : null}
+    </div>
+  );
 }
 
 export function KalshiHistoricalAttributeFilters({

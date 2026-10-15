@@ -44,13 +44,9 @@ const INTERVAL_OPTIONS = [
 ];
 
 const FIDELITY_OPTIONS = [
-  ["", "Default"],
-  ["1", "1 minute"],
-  ["5", "5 minutes"],
-  ["15", "15 minutes"],
-  ["60", "1 hour"],
-  ["240", "4 hours"],
-  ["1440", "1 day"],
+  ["1", "Minute"],
+  ["60", "Hourly"],
+  ["1440", "Daily"],
 ];
 
 const TRADE_SIDE_OPTIONS = [
@@ -173,10 +169,42 @@ export function polymarketHistoryFidelityFloor(interval, hasRange) {
  */
 export function polymarketHistoryFidelityOptions(interval, hasRange) {
   const floor = polymarketHistoryFidelityFloor(interval, hasRange);
-  return FIDELITY_OPTIONS.filter((option) => {
-    if (!option[0]) return floor <= 1;
-    return Number(option[0]) >= floor;
-  });
+  return FIDELITY_OPTIONS.filter((option) => Number(option[0]) >= floor);
+}
+
+/**
+ * A price-history pull uses an interval or a start and end, and the fidelity
+ * has to be one this window can actually serve.
+ * @param {Record<string, any> | null | undefined} previous
+ * @param {Record<string, any> | null | undefined} next
+ */
+export function exclusivePriceHistoryFilters(previous, next) {
+  const before = previous || {};
+  const incoming = next || {};
+  const beforeRange = before.time_range || {};
+  const incomingRange = incoming.time_range || {};
+  const rangeOn = Boolean(incomingRange.from && incomingRange.to);
+  const rangeChanged =
+    rangeOn &&
+    (incomingRange.from !== beforeRange.from ||
+      incomingRange.to !== beforeRange.to ||
+      String(incomingRange.preset || "") !== String(beforeRange.preset || ""));
+  const intervalChanged =
+    String(incoming.interval?.value || "") !== String(before.interval?.value || "") &&
+    String(incoming.interval?.value || "") !== "";
+  let settled = incoming;
+  if (intervalChanged && !rangeChanged) {
+    settled = { ...settled, time_range: { from: "", to: "", preset: "" } };
+  } else if (rangeOn) {
+    settled = { ...settled, interval: { value: "" } };
+  }
+  const hasRange = Boolean(settled.time_range?.from && settled.time_range?.to);
+  const options = polymarketHistoryFidelityOptions(String(settled.interval?.value || "1d"), hasRange)
+    .map(([value]) => value)
+    .filter(Boolean);
+  const fidelity = String(settled.fidelity?.value || "");
+  if (options.includes(fidelity)) return settled;
+  return { ...settled, fidelity: { ...(settled.fidelity || {}), value: options[0] || "1440" } };
 }
 
 /**
@@ -201,7 +229,7 @@ function historyControls(filters) {
       control: "period",
       ariaLabel: "Interval",
       enumOptions: INTERVAL_OPTIONS,
-      description: "The window when no dates are set. A closed market uses the last part of its own trading, not today.",
+      description: "A preset time range looking backward from now. 1 day is the last 24 hours, 1 week is the last week, and max is all available history.",
     },
     {
       id: "time_range",
@@ -209,7 +237,7 @@ function historyControls(filters) {
       type: "date",
       queryOnly: true,
       control: "query-range",
-      description: "Start and end. The shortcuts are the last 24 hours, 3 days, or 7 days before a closed market ended, and before today while it is still open. A range replaces the interval.",
+      description: "A specific start and end datetime, supplied as Unix timestamps in seconds. Dates before this market was created stay unavailable.",
     },
     {
       id: "fidelity",
@@ -219,7 +247,7 @@ function historyControls(filters) {
       control: "period",
       ariaLabel: "Fidelity",
       enumOptions: polymarketHistoryFidelityOptions(interval, historyHasRange(filters)),
-      description: "Minutes between prices. 1 week needs at least 5. 1 month, all, and max need at least 10.",
+      description: "The spacing of each price point: minute, hourly, or daily.",
     },
   ];
 }
@@ -287,7 +315,7 @@ function tokenHistoryControls(filters) {
       queryOnly: true,
       control: "query-range",
       rangePresetIds: POLYMARKET_TOKEN_HISTORY_PRESET_IDS,
-      description: "Start and end, at most 15 days. The shortcuts end when a closed market stopped trading, and end today while it is still open. A range replaces the interval.",
+      description: "Start and end, at most 15 days. Dates before this market was created stay unavailable. The shortcuts end when a closed market stopped trading, and end today while it is still open. A range replaces the interval.",
     },
     {
       id: "bucket_seconds",
@@ -511,7 +539,7 @@ export function defaultPolymarketQuoteFilters(tableId) {
     return {
       quote_outcome: { value: "yes" },
       interval: { value: "1d" },
-      fidelity: { value: "" },
+      fidelity: { value: "1" },
       time_range: { from: "", to: "", preset: "" },
     };
   }

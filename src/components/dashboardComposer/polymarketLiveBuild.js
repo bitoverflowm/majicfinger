@@ -1064,7 +1064,9 @@ function marketLifeFromRow(row) {
   const source = row && typeof row === "object" ? row : {};
   const raw = source.raw && typeof source.raw === "object" ? source.raw : source;
   const closesAt = lifeSeconds(raw.closedTime || raw.closed_time || raw.endDate || raw.end_date || raw.endDateIso || source.closesAt || source.endedAt);
-  const startedAt = lifeSeconds(raw.startDate || raw.start_date || source.startedAt);
+  const startedAt = lifeSeconds(
+    raw.createdAt || raw.created_at || raw.startDate || raw.start_date || raw.acceptingOrdersTimestamp || source.startedAt,
+  );
   const outcome = String(raw.result || raw.outcome || source.outcome || "").trim();
   return {
     endedAt: closesAt && closesAt * 1000 <= Date.now() ? closesAt : null,

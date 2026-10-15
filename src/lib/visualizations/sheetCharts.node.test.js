@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { describeSheet } from "./datasetDescriptor.js";
 import { hasVisualTable, resolveVisualization, visualPresentationLabel } from "./presetRegistry.js";
 import { chartSpecsForSheet } from "./sheetCharts.js";
-import { marketPriceCards, statCardBlockHeight } from "./marketPriceCards.js";
+import { marketPriceCards, snapshotStatCards, statCardBlockHeight } from "./marketPriceCards.js";
 import { layoutVolumeTiles, volumeTreemapModel } from "./volumeTreemap.js";
 
 const orderBook = chartSpecsForSheet({
@@ -167,5 +167,60 @@ assert.equal(cards[0].label, "FOMC hike");
 assert.equal(cards[0].format(), "62.0¢");
 assert.equal(cards[0].caption, "Yes · Sell 64.0¢ · Spread 2.0¢");
 assert.equal(cards[1].caption, "No · Sell 38.0¢ · Spread 2.0¢");
+assert.equal(priceCharts[0].title, "Market Price stats card");
+
+function snapshotSheet(table, columns, records) {
+  return {
+    type: "sheet",
+    title: table,
+    table,
+    integrationId: "polymarket",
+    columns: columns.map((id) => ({ id })),
+    records,
+  };
+}
+
+const midpoint = snapshotSheet(
+  "getMidpointPrices",
+  ["market_title", "outcome", "midpoint_price", "token_id"],
+  [{ market_title: "Fed decision", outcome: "Yes", midpoint_price: 0.735, token_id: "yes" }],
+);
+const midpointDescribed = describeSheet(midpoint);
+assert.equal(midpointDescribed.fields.value, "midpoint_price");
+assert.equal(resolveVisualization(midpointDescribed, { columnIds: midpoint.columns.map((column) => column.id) }).view, "stat-cards");
+assert.deepEqual(chartSpecsForSheet(midpoint).map((chart) => chart.chartView), ["stat-cards"]);
+assert.equal(chartSpecsForSheet(midpoint)[0].title, "getMidpointPrices stats card");
+assert.equal(snapshotStatCards(midpoint, midpointDescribed)[0].format(), "73.5¢");
+assert.equal(snapshotStatCards(midpoint, midpointDescribed)[0].caption, "Yes");
+
+const spreads = snapshotSheet(
+  "getSpreads",
+  ["market_title", "outcome", "spread", "token_id"],
+  [{ market_title: "Fed decision", outcome: "Yes", spread: 0.01, token_id: "yes" }],
+);
+assert.equal(resolveVisualization(describeSheet(spreads), { columnIds: ["market_title", "outcome", "spread", "token_id"] }).view, "stat-cards");
+assert.equal(snapshotStatCards(spreads, describeSheet(spreads))[0].format(), "1.0¢");
+
+const ticks = snapshotSheet(
+  "getTickSize",
+  ["market_title", "outcome", "minimum_tick_size", "token_id"],
+  [{ market_title: "Fed decision", outcome: "No", minimum_tick_size: 0.001, token_id: "no" }],
+);
+assert.equal(resolveVisualization(describeSheet(ticks), { columnIds: ["market_title", "outcome", "minimum_tick_size", "token_id"] }).view, "stat-cards");
+assert.equal(snapshotStatCards(ticks, describeSheet(ticks))[0].format(), "0.1¢");
+assert.equal(snapshotStatCards(ticks, describeSheet(ticks))[0].label, "Fed decision");
+
+const lastTrade = snapshotSheet(
+  "getLastTradePrices",
+  ["market_title", "outcome", "last_trade_price", "last_trade_side", "token_id"],
+  [{ market_title: "Fed decision", outcome: "Yes", last_trade_price: 0.74, last_trade_side: "BUY", token_id: "yes" }],
+);
+const lastDescribed = describeSheet(lastTrade);
+assert.equal(lastDescribed.priceBasis, "trade");
+assert.equal(resolveVisualization(lastDescribed, { columnIds: lastTrade.columns.map((column) => column.id) }).view, "stat-cards");
+assert.deepEqual(chartSpecsForSheet(lastTrade).map((chart) => chart.chartView), ["stat-cards"]);
+const lastCards = snapshotStatCards(lastTrade, lastDescribed);
+assert.equal(lastCards[0].format(), "74.0¢");
+assert.equal(lastCards[0].caption, "Yes · BUY");
 
 console.log("sheet charts ok");
