@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { describeSheet } from "./datasetDescriptor.js";
 import { hasVisualTable, resolveVisualization, visualPresentationLabel } from "./presetRegistry.js";
 import { chartSpecsForSheet } from "./sheetCharts.js";
+import { marketPriceCards, statCardBlockHeight } from "./marketPriceCards.js";
 import { layoutVolumeTiles, volumeTreemapModel } from "./volumeTreemap.js";
 
 const orderBook = chartSpecsForSheet({
@@ -117,5 +118,44 @@ const kalshiSeries = describeSheet({
 });
 assert.equal(hasVisualTable(kalshiSeries), false);
 assert.equal(resolveVisualization(kalshiSeries, { columnIds: ["ticker", "title"] }).view, "overview");
+
+const marketPrices = {
+  type: "sheet",
+  title: "Market Price",
+  table: "getMarketPrices",
+  integrationId: "polymarket",
+  columns: [
+    { id: "market_title" },
+    { id: "outcome" },
+    { id: "buy_price" },
+    { id: "sell_price" },
+    { id: "token_id" },
+  ],
+  records: [
+    { market_title: "FOMC hike", outcome: "Yes", buy_price: 0.62, sell_price: 0.64, token_id: "yes" },
+    { market_title: "FOMC hike", outcome: "No", buy_price: 0.36, sell_price: 0.38, token_id: "no" },
+  ],
+  dataset: {
+    datasetType: "quote",
+    sourceTable: "getMarketPrices",
+    priceBasis: "source",
+    fields: { market: "token_id", outcome: "outcome", bid: "bid", ask: "ask" },
+    seriesKeys: ["token_id"],
+    required: ["token_id"],
+  },
+};
+const priced = describeSheet(marketPrices);
+assert.equal(priced.priceBasis, "market");
+assert.equal(priced.fields.value, "buy_price");
+assert.equal(resolveVisualization(priced, { columnIds: marketPrices.columns.map((column) => column.id) }).view, "stat-cards");
+const priceCharts = chartSpecsForSheet(marketPrices);
+assert.deepEqual(priceCharts.map((chart) => chart.chartView), ["stat-cards"]);
+assert.equal(priceCharts[0].h, statCardBlockHeight(2));
+const cards = marketPriceCards(marketPrices, priced);
+assert.equal(cards.length, 2);
+assert.equal(cards[0].label, "FOMC hike");
+assert.equal(cards[0].format(), "62.0¢");
+assert.equal(cards[0].caption, "Yes · Sell 64.0¢ · Spread 2.0¢");
+assert.equal(cards[1].caption, "No · Sell 38.0¢ · Spread 2.0¢");
 
 console.log("sheet charts ok");

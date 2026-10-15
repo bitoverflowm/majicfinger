@@ -116,6 +116,11 @@ function emptySelection() {
   };
 }
 
+function bodyFontFamily() {
+  if (typeof document === "undefined") return "ui-sans-serif, system-ui, sans-serif";
+  return getComputedStyle(document.body).fontFamily || "ui-sans-serif, system-ui, sans-serif";
+}
+
 export default function DashboardSheetGridInner({ block, onChange, readOnly = false }) {
   const canvas = useWorkspaceCanvas();
   const dark = useHtmlDarkClass();
@@ -123,9 +128,10 @@ export default function DashboardSheetGridInner({ block, onChange, readOnly = fa
   const editorRef = useRef(null);
   const [gridSelection, setGridSelection] = useState(emptySelection);
   const [size, setSize] = useState({ width: 0, height: 0 });
-  const [fontFamily, setFontFamily] = useState("ui-sans-serif, system-ui, sans-serif");
+  const [fontFamily] = useState(bodyFontFamily);
   const columns = useMemo(() => columnsOf(block), [block?.columns]);
-  const cells = block?.cells || {};
+  const theme = useMemo(() => themeFor(dark, fontFamily), [dark, fontFamily]);
+  const cells = block?.cells;
   const records = Array.isArray(block?.records) ? block.records : null;
   const storedSheet = useReadyTradeSheet(block?.id);
   const fullSheet = usesHistoricalTradeSheet(block) ? storedSheet : null;
@@ -136,17 +142,13 @@ export default function DashboardSheetGridInner({ block, onChange, readOnly = fa
       : rowCountOf(cells);
 
   useEffect(() => {
-    const next = getComputedStyle(document.body).fontFamily;
-    if (next) setFontFamily(next);
-  }, []);
-
-  useEffect(() => {
     const el = frameRef.current;
     if (!el) return undefined;
     const measure = () => {
       const rect = el.getBoundingClientRect();
       const width = Math.floor(rect.width);
       const height = Math.floor(rect.height);
+      if (width <= 0 || height <= 0) return;
       setSize((prev) => (prev.width === width && prev.height === height ? prev : { width, height }));
     };
     measure();
@@ -162,7 +164,7 @@ export default function DashboardSheetGridInner({ block, onChange, readOnly = fa
         ? String(fullSheet.rows[row]?.[col] ?? "")
         : records
           ? displayCell(records[row]?.[column?.id], column)
-          : String(cells[`${col},${row}`] ?? "");
+          : String(cells?.[`${col},${row}`] ?? "");
       return {
         kind: GridCellKind.Text,
         data: value,
@@ -208,10 +210,14 @@ export default function DashboardSheetGridInner({ block, onChange, readOnly = fa
     [cells, columns, fullSheet, onChange, records],
   );
 
+  const focusedRowRef = useRef("");
   useEffect(() => {
     const focus = canvas?.sheetRowFocus;
     if (!focus || focus.sheetId !== block?.id || !Number.isFinite(focus.row)) return;
     if (size.width <= 0) return;
+    const token = `${focus.sheetId}:${focus.row}:${focus.nonce ?? ""}`;
+    if (focusedRowRef.current === token) return;
+    focusedRowRef.current = token;
     const row = focus.row;
     const width = Math.max(1, columns.length);
     setGridSelection({
@@ -257,7 +263,7 @@ export default function DashboardSheetGridInner({ block, onChange, readOnly = fa
           rowMarkers="number"
           headerHeight={32}
           rowHeight={28}
-          theme={themeFor(dark, fontFamily)}
+          theme={theme}
           smoothScrollX
           smoothScrollY
           getCellsForSelection

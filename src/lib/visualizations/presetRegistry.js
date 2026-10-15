@@ -14,6 +14,7 @@ const PRESETS = {
   "quote:midpoint": { view: "metric", label: "Midpoint" },
   "quote:trade": { view: "metric", label: "Last traded price" },
   quote: { view: "quote", label: "Bid / ask" },
+  "quote:market": { view: "stat-cards", label: "Market price", noun: "outcomes" },
   spread: { view: "metric", label: "Spread" },
   tick_size: { view: "spec", label: "Tick size" },
   open_interest: { view: "metric", label: "Open interest" },
@@ -46,6 +47,7 @@ const FIELD_NEEDS = {
   "visual-table": ["label"],
   metric: ["value"],
   quote: ["bid"],
+  "stat-cards": ["value"],
   spec: ["value"],
   overview: ["label"],
   bars: ["value", "label"],
@@ -66,6 +68,7 @@ function presetKey(dataset) {
   if (dataset.datasetType === "price_history" && dataset.scope === "token") return "price_history:token";
   if (dataset.datasetType === "quote" && dataset.priceBasis === "midpoint") return "quote:midpoint";
   if (dataset.datasetType === "quote" && dataset.priceBasis === "trade") return "quote:trade";
+  if (dataset.datasetType === "quote" && dataset.priceBasis === "market") return "quote:market";
   if (dataset.datasetType === "markets") return dataset.shape === "snapshot" || dataset.seriesCount <= 1 ? "markets:one" : "markets";
   if (dataset.datasetType === "events") return dataset.seriesCount <= 1 ? "events:one" : "events";
   if (dataset.datasetType === "series" && dataset.fields?.value) {
@@ -180,6 +183,7 @@ const SAVED_VIEWS = new Set([
   "activity-stack",
   "quote",
   "quote-table",
+  "stat-cards",
   "spec",
   "overview",
   "activity",

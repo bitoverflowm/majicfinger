@@ -205,10 +205,17 @@ const ENDPOINTS = {
     datasetType: "quote",
     shape: "snapshot",
     seriesKeys: ["token_id"],
-    priceBasis: "source",
+    priceBasis: "market",
     delivery: "streaming",
-    fields: { market: "token_id", outcome: "outcome", bid: "bid", ask: "ask" },
-    required: ["token_id"],
+    fields: {
+      market: "token_id",
+      label: "market_title",
+      outcome: "outcome",
+      bid: "buy_price",
+      ask: "sell_price",
+      value: "buy_price",
+    },
+    required: ["buy_price"],
   }),
   "polymarket:getMidpointPrices": spec({
     datasetType: "quote",
@@ -490,6 +497,8 @@ function descriptorFitsSheet(sheet, dataset) {
   const fields = dataset?.fields || {};
   if (fields.label && !ids.has(fields.label)) return false;
   if (fields.value && !ids.has(fields.value)) return false;
+  if (fields.bid && !ids.has(fields.bid)) return false;
+  if (fields.ask && !ids.has(fields.ask)) return false;
   const keys = (dataset?.seriesKeys || []).filter(Boolean);
   if (keys.length && keys.every((key) => !ids.has(key))) return false;
   return true;

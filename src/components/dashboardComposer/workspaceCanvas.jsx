@@ -2284,8 +2284,14 @@ export function WorkspaceCanvas() {
     const scroller = scrollerRef.current;
     if (!scroller) return undefined;
     const apply = () => {
-      setCanvasGridWidth(scroller.clientWidth);
-      setGridMetrics(canvasGridMetrics());
+      const width = Math.floor(scroller.clientWidth);
+      if (!Number.isFinite(width) || width < 320) return;
+      setCanvasGridWidth(width);
+      setGridMetrics((prev) => {
+        const next = canvasGridMetrics();
+        if (prev.width === next.width && prev.unit === next.unit && prev.track === next.track && prev.inner === next.inner) return prev;
+        return next;
+      });
     };
     apply();
     const observer = new ResizeObserver(apply);

@@ -1,5 +1,6 @@
 import { defaultOrderBookCharts, isOrderBookSheet } from "@/components/dashboardComposer/orderBookLadder";
-import { columnKey, countObservations, describeSheet } from "@/lib/visualizations/datasetDescriptor";
+import { columnKey, countObservations, describeSheet, sheetRecords } from "@/lib/visualizations/datasetDescriptor";
+import { statCardBlockHeight } from "@/lib/visualizations/marketPriceCards";
 import { defaultActivityCharts } from "@/lib/visualizations/activityCharts";
 import { resolveVisualization } from "@/lib/visualizations/presetRegistry";
 
@@ -26,12 +27,13 @@ export function chartSpecsForSheet(sheet, forcedView) {
   if (orderBook) return defaultOrderBookCharts(base);
   const chartView = requested || (resolved.view === "table" ? "" : resolved.view);
   if (!requested && SHEET_ONLY.has(chartView)) return [];
+  const statCards = chartView === "stat-cards";
   return [
     {
       chartView,
       title: chartView === "order-book" && /^order\s*books?/i.test(base) ? base : `${base} chart`,
       w: chartView === "portfolio" ? 680 : 540,
-      h: chartView === "portfolio" ? 560 : 360,
+      h: chartView === "portfolio" ? 560 : statCards ? statCardBlockHeight(sheetRecords(sheet).length) : 360,
     },
   ];
 }

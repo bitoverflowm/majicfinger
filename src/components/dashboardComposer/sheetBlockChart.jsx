@@ -14,7 +14,9 @@ import { PnlPortfolioChart } from "@/components/dashboardComposer/pnlPortfolioCh
 import { ActivityCalendarChart } from "@/components/dashboardComposer/activityCalendarChart";
 import { ActivityStackChart } from "@/components/dashboardComposer/activityStackChart";
 import { columnKey, countObservations, describeSheet, sheetRecords } from "@/lib/visualizations/datasetDescriptor";
+import { marketPriceCards, statCardBlockHeight } from "@/lib/visualizations/marketPriceCards";
 import { resolveVisualization } from "@/lib/visualizations/presetRegistry";
+import { StatCards } from "@/components/spectrumui/charts/stat-cards";
 import { IndicatorChart } from "@/components/spectrumui/charts/indicator-chart";
 import { MarketChart } from "@/components/spectrumui/charts/market-chart";
 import { DepthChart } from "@/components/spectrumui/charts/depth-chart";
@@ -266,6 +268,28 @@ function OrderBookSheetChart({ sheet, rows, live, snapshot, onSnapshot, onFitHei
   );
 }
 
+function MarketPriceStatCards({ sheet, dataset, onFitHeight }) {
+  const cards = useMemo(() => marketPriceCards(sheet, dataset), [dataset, sheet]);
+  useEffect(() => {
+    if (!onFitHeight || !cards.length) return;
+    onFitHeight(statCardBlockHeight(cards.length));
+  }, [cards.length, onFitHeight]);
+  return (
+    <div className="min-h-0 flex-1 overflow-auto">
+      <StatCards
+        cards={cards}
+        columns={1}
+        status={cards.length ? "ready" : "empty"}
+        className="px-3 py-3"
+        empty={{
+          title: "No market prices",
+          description: "This pull has no priced outcomes yet.",
+        }}
+      />
+    </div>
+  );
+}
+
 function DepthSheetChart({ sheet, rows, live }) {
   const book = useMemo(() => rowsToOrderBook(sheet?.columns, rows), [rows, sheet?.columns]);
   const name = String(sheet?.pull?.marketTitle || sheet?.title || "Depth").trim();
@@ -341,6 +365,9 @@ export function SheetBlockChart({ sheet, snapshot, onSnapshot, live = false, vie
         observations: countObservations(sheet, dataset),
       })
     : null;
+  if (resolved?.view === "stat-cards") {
+    return <MarketPriceStatCards sheet={sheet} dataset={dataset} onFitHeight={onFitHeight} />;
+  }
   if (resolved?.view === "treemap") {
     if (dataset?.datasetType === "markets" || dataset?.datasetType === "events" || dataset?.datasetType === "series") {
       return <VolumeTreemap sheet={sheet} dataset={dataset} onOpenRow={onOpenRow} />;
