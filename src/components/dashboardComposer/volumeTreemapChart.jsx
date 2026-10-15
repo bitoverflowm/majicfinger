@@ -2,9 +2,8 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 
-import { squarify } from "@/components/spectrumui/charts/chart-engine";
 import { formatUsd } from "@/lib/visualizations/visualTable";
-import { volumeTreemapModel } from "@/lib/visualizations/volumeTreemap";
+import { layoutVolumeTiles, volumeTreemapModel } from "@/lib/visualizations/volumeTreemap";
 
 const LYCHEE_RED = "#E63946";
 
@@ -45,7 +44,7 @@ export function VolumeTreemap({ sheet, dataset, onOpenRow }) {
 
   const tiles = useMemo(() => {
     const items = model.tiles.map((tile) => ({ ...tile, weight: tile.value, name: tile.label }));
-    return squarify(items, Math.max(0, box.width), Math.max(0, box.height));
+    return layoutVolumeTiles(items, Math.max(0, box.width), Math.max(0, box.height));
   }, [box.height, box.width, model.tiles]);
 
   if (!model.tiles.length) {

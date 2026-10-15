@@ -825,6 +825,39 @@ export function polymarketEventKeyFromRow(row) {
  * @param {Array<Record<string, unknown>>} rows
  * @param {number} [cap]
  */
+function parseSeriesEventsValue(value) {
+  if (Array.isArray(value)) return value;
+  if (value && typeof value === "object") return [value];
+  if (typeof value !== "string") return [];
+  const text = value.trim();
+  if (!text) return [];
+  try {
+    const parsed = JSON.parse(text);
+    if (Array.isArray(parsed)) return parsed;
+    return parsed && typeof parsed === "object" ? [parsed] : [];
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * Events already stored on a series pull, in the events column.
+ * @param {Array<Record<string, unknown>>} rows
+ * @param {number} [cap]
+ */
+export function polymarketEventsFromSeriesRows(rows, cap = Infinity) {
+  const events = [];
+  for (const row of Array.isArray(rows) ? rows : []) {
+    const raw = row?.["series:events"] ?? row?.events;
+    for (const event of parseSeriesEventsValue(raw)) {
+      if (!event || typeof event !== "object") continue;
+      events.push(event);
+      if (events.length >= cap) return polymarketEventEntities(events, cap);
+    }
+  }
+  return polymarketEventEntities(events, cap);
+}
+
 export function polymarketEventEntities(rows, cap = Infinity) {
   const seen = new Set();
   const list = [];

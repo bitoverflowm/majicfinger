@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { describeSheet } from "./datasetDescriptor.js";
 import { hasVisualTable, resolveVisualization, visualPresentationLabel } from "./presetRegistry.js";
 import { chartSpecsForSheet } from "./sheetCharts.js";
-import { volumeTreemapModel } from "./volumeTreemap.js";
+import { layoutVolumeTiles, volumeTreemapModel } from "./volumeTreemap.js";
 
 const orderBook = chartSpecsForSheet({
   type: "sheet",
@@ -64,6 +64,20 @@ assert.deepEqual(
   volumeTreemapModel(series, seriesDataset).tiles.map((tile) => tile.label),
   ["NFL", "NBA"],
 );
+const laid = layoutVolumeTiles(
+  [
+    { label: "FOMC", weight: 6020587, value: 6020587 },
+    { label: "MLB", weight: 3431369, value: 3431369 },
+    { label: "UFC", weight: 27575, value: 27575 },
+    { label: "NFL", weight: 7944, value: 7944 },
+    { label: "EPL", weight: 250, value: 250 },
+    { label: "NBA", weight: 11, value: 11 },
+  ],
+  526,
+  275,
+);
+assert.equal(laid.length, 6);
+assert.ok(laid.every((tile) => tile.w >= 72 && tile.h >= 28));
 
 const oneSeries = { ...series, records: [series.records[0]] };
 assert.equal(

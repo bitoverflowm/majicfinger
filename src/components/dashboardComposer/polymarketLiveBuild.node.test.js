@@ -18,6 +18,7 @@ import {
   polymarketSeriesJoinChoices,
   polymarketHolderTraderJoins,
   polymarketEventEntities,
+  polymarketEventsFromSeriesRows,
   polymarketJoinPickFromRow,
   polymarketTraderJoinChoices,
   polymarketDownstreamMarketJoins,
@@ -604,6 +605,25 @@ const holderContinuation = polymarketHolderTraderJoins();
 assert.ok(holderContinuation.some((item) => item.id === "getTraderPositions" && item.anchor === "trader" && item.placement === "sheet"));
 assert.ok(holderContinuation.some((item) => item.anchor === "trader" && item.placement === "merge"));
 assert.equal(holderContinuation.some((item) => item.anchor === "market"), false);
+const embeddedEvents = polymarketEventsFromSeriesRows([
+  {
+    "series:id": "1",
+    "series:title": "NFL",
+    "series:events": JSON.stringify([
+      { id: "2891", title: "Super Bowl", slug: "super-bowl" },
+      { id: "2892", title: "AFC Championship", slug: "afc" },
+      { id: "not-numeric", title: "Skip" },
+    ]),
+  },
+  {
+    "series:id": "2",
+    "series:events": [{ id: 3000, title: "NBA Finals", slug: "nba-finals" }],
+  },
+]);
+assert.deepEqual(embeddedEvents.map((event) => event.id), ["2891", "2892", "3000"]);
+assert.equal(embeddedEvents[0].pick.kind, "event");
+assert.equal(embeddedEvents[0].label, "Super Bowl");
+assert.equal(polymarketEventsFromSeriesRows([{ "series:events": "not json" }]).length, 0);
 const eventEntities = polymarketEventEntities([
   { id: "12", title: "Election night", slug: "election-night" },
   { id: "0xabc", title: "Not an event id" },
