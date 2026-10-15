@@ -1613,6 +1613,17 @@ function chartViewForBlock(block, canvas) {
 
 function ChartCanvas({ block, onChange, booting, chartSheet, sourceSession }) {
   const canvas = useWorkspaceCanvas();
+  const fitted = useRef(0);
+  const fitLadder = useCallback(
+    (height) => {
+      const next = Math.round(Number(height) || 0);
+      if (!next || fitted.current === next) return;
+      fitted.current = next;
+      if ((block.h || 0) >= next - 2) return;
+      onChange({ h: next });
+    },
+    [block.h, onChange],
+  );
   if (booting) return <ChartSkeleton />;
   if (!block.sourceSheetId) return <div className="min-h-16 flex-1 rounded-lg bg-muted/40" />;
   return (
@@ -1624,6 +1635,7 @@ function ChartCanvas({ block, onChange, booting, chartSheet, sourceSession }) {
       onOpenRow={(row) => {
         if (block.sourceSheetId) canvas?.focusSheetRow?.(block.sourceSheetId, row);
       }}
+      onFitHeight={block.chartView === "depth" ? undefined : fitLadder}
       snapshot={block.chart}
       onSnapshot={(chart) => {
         if (canvas?.readOnly) return;

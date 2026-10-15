@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { isOrderBookSheet, rowsToOrderBook, rowsToOutcomeBooks } from "./orderBookLadder.js";
+import { isOrderBookSheet, orderBookBlockHeight, rowsToFramedBooks, rowsToOrderBook, rowsToOutcomeBooks } from "./orderBookLadder.js";
 
 const columns = [
   { id: "ticker", title: "Ticker" },
@@ -109,5 +109,33 @@ assert.equal(outcomes[1].bids[0].price, 0.51);
 assert.equal(outcomes[1].bids[0].size, 999);
 assert.equal(outcomes[1].asks[0].price, 0.53);
 assert.equal(rowsToOutcomeBooks(columns, [["MKT", "yes", "0.47", "100"]]).length, 0);
+
+const framed = rowsToFramedBooks(
+  [
+    { id: "outcome" },
+    { id: "side" },
+    { id: "price" },
+    { id: "size" },
+  ],
+  [
+    ["Yes", "BUY", "0.47", "100"],
+    ["Yes", "SELL", "0.49", "40"],
+    ["No", "BUY", "0.51", "999"],
+    ["No", "SELL", "0.53", "20"],
+  ],
+);
+assert.deepEqual(
+  framed.map((book) => book.outcome),
+  ["Yes", "No"],
+);
+assert.equal(framed[0].bids[0].price, 0.47);
+assert.equal(framed[0].bids[0].size, 100);
+assert.equal(framed[0].asks[0].price, 0.49);
+assert.equal(framed[0].asks[0].size, 999);
+assert.equal(framed[1].bids[0].price, 0.51);
+assert.equal(framed[1].bids[0].size, 999);
+assert.equal(framed[1].asks[0].price, 0.53);
+assert.equal(framed[1].asks[0].size, 100);
+assert.equal(orderBookBlockHeight(42, { tabs: true }) > orderBookBlockHeight(12), true);
 
 console.log("order book ladder ok");

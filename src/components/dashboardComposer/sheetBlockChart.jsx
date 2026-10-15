@@ -1,9 +1,10 @@
 "use client";
 
-import { useEffect, useMemo, useRef } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Bar, BarChart, CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { useReadyTradeSheet, tradeTickerFromBlock, usesHistoricalTradeSheet } from "@/components/dashboardComposer/fullTradeSheet";
-import { isOrderBookSheet, rowsToOrderBook, rowsToOutcomeBooks } from "@/components/dashboardComposer/orderBookLadder";
+import { isOrderBookSheet, orderBookBlockHeight, rowsToFramedBooks, rowsToOrderBook } from "@/components/dashboardComposer/orderBookLadder";
+import { cn } from "@/lib/utils";
 import { ohlcRowsToCandles, rangesForCandles, tradesToCandles } from "@/components/dashboardComposer/tradeMarketCandles";
 import { isPriceHistorySheet, priceHistoryOutcome, priceHistoryPoints } from "@/components/dashboardComposer/priceHistorySeries";
 import { DatasetSummary, EventLinesChart } from "@/components/dashboardComposer/datasetChart";
@@ -200,14 +201,25 @@ function TradeMarketChart({ sheet, rows, live, snapshot, onSnapshot, mode = "tra
   );
 }
 
-function OrderBookSheetChart({ sheet, rows, live, snapshot, onSnapshot }) {
+function OrderBookSheetChart({ sheet, rows, live, snapshot, onSnapshot, onFitHeight }) {
   const built = useMemo(() => rowsToOrderBook(sheet?.columns, rows), [rows, sheet?.columns]);
-  const outcomeBooks = useMemo(() => rowsToOutcomeBooks(sheet?.columns, rows), [rows, sheet?.columns]);
+  const frames = useMemo(() => rowsToFramedBooks(sheet?.columns, rows), [rows, sheet?.columns]);
+  const [outcome, setOutcome] = useState("");
+  const active = frames.find((frame) => frame.outcome === outcome) || frames[0] || null;
   const saved = snapshot?.kind === "order-book" ? snapshot : null;
-  const book = built.bids.length || built.asks.length ? built : saved || built;
-  const symbol = sheetSymbol(sheet) || saved?.symbol || "";
+  const book = active || (built.bids.length || built.asks.length ? built : saved || built);
+  const symbol = active?.outcome || sheetSymbol(sheet) || saved?.symbol || "";
+  const levelCount = Math.max(
+    built.bids.length + built.asks.length,
+    ...frames.map((frame) => frame.bids.length + frame.asks.length),
+    0,
+  );
   const bookKey = `${book.bids.length}|${book.asks.length}|${book.bids[0]?.price}|${book.bids[0]?.size}|${book.asks[0]?.price}|${book.asks[0]?.size}|${book.bids[book.bids.length - 1]?.total ?? 0}|${book.asks[book.asks.length - 1]?.total ?? 0}`;
   const sentKey = useRef("");
+  useEffect(() => {
+    if (!levelCount || !onFitHeight) return;
+    onFitHeight(orderBookBlockHeight(levelCount, { tabs: frames.length > 1 }));
+  }, [frames.length, levelCount, onFitHeight]);
   useEffect(() => {
     if (live || (!book.bids.length && !book.asks.length) || sentKey.current === bookKey) return;
     sentKey.current = bookKey;
@@ -220,30 +232,37 @@ function OrderBookSheetChart({ sheet, rows, live, snapshot, onSnapshot }) {
     });
   }, [book, bookKey, live, onSnapshot, symbol]);
 
-  if (outcomeBooks.length > 1) {
-    return (
-      <div className="flex h-full min-h-0 min-w-0 flex-1">
-        {outcomeBooks.map((outcomeBook) => (
-          <OrderBookChart
-            key={outcomeBook.outcome}
-            book={outcomeBook}
-            symbol={outcomeBook.outcome}
-            live={live}
-            className="min-w-0 flex-1 border-r border-black/6 last:border-r-0 dark:border-white/8"
-            status={outcomeBook.bids.length || outcomeBook.asks.length ? "ready" : "empty"}
-          />
-        ))}
-      </div>
-    );
-  }
-
   return (
-    <OrderBookChart
-      book={book}
-      symbol={symbol}
-      live={live}
-      status={book.bids.length || book.asks.length ? "ready" : "empty"}
-    />
+    <div className="flex h-full min-h-0 min-w-0 flex-1 flex-col">
+      {frames.length > 1 ? (
+        <div className="flex shrink-0 items-center gap-1 px-2.5 pt-2">
+          {frames.map((frame) => {
+            const selected = frame.outcome === (active?.outcome || "");
+            return (
+              <button
+                key={frame.outcome}
+                type="button"
+                onClick={() => setOutcome(frame.outcome)}
+                className={cn(
+                  "rounded-md px-2 py-0.5 font-mono text-[10px]",
+                  selected
+                    ? "bg-neutral-950 text-white dark:bg-white dark:text-neutral-950"
+                    : "text-neutral-500 hover:bg-black/5 dark:hover:bg-white/8",
+                )}
+              >
+                {frame.outcome}
+              </button>
+            );
+          })}
+        </div>
+      ) : null}
+      <OrderBookChart
+        book={book}
+        symbol={symbol}
+        live={live}
+        status={book.bids.length || book.asks.length ? "ready" : "empty"}
+      />
+    </div>
   );
 }
 
@@ -289,7 +308,7 @@ function PriceHistorySheetChart({ sheet, live }) {
 
 const SUMMARY_VIEWS = new Set(["metric", "spec", "overview", "bars", "diverging", "quote", "quote-table"]);
 
-export function SheetBlockChart({ sheet, snapshot, onSnapshot, live = false, view = "", onViewChange, onOpenRow }) {
+export function SheetBlockChart({ sheet, snapshot, onSnapshot, live = false, view = "", onViewChange, onOpenRow, onFitHeight }) {
   const storedSheet = useReadyTradeSheet(sheet?.id);
   const fullSheet = usesHistoricalTradeSheet(sheet) ? storedSheet : null;
   const priceHistory = isPriceHistorySheet(sheet);
@@ -392,7 +411,14 @@ export function SheetBlockChart({ sheet, snapshot, onSnapshot, live = false, vie
         {depth ? (
           <DepthSheetChart sheet={sheet} rows={rows} live={live} />
         ) : (
-          <OrderBookSheetChart sheet={sheet} rows={rows} live={live} snapshot={snapshot} onSnapshot={onSnapshot} />
+          <OrderBookSheetChart
+            sheet={sheet}
+            rows={rows}
+            live={live}
+            snapshot={snapshot}
+            onSnapshot={onSnapshot}
+            onFitHeight={onFitHeight}
+          />
         )}
       </div>
     );

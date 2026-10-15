@@ -207,6 +207,72 @@ export function rowsToOutcomeBooks(columns, rows) {
 }
 
 /**
+ * One complete bid/ask ladder priced in a single outcome.
+ * The other outcome's orders fill the opposite side at 1−price, keeping the
+ * larger size where the same order already exists on both tokens.
+ * @param {Array<{ title?: string, id?: string }>} columns
+ * @param {unknown[][]} rows
+ */
+export function rowsToFramedBooks(columns, rows) {
+  const { sideIndex, priceIndex, sizeIndex, outcomeIndex } = bookIndexes(columns);
+  if (outcomeIndex < 0 || !rowsHaveYesAndNo(rows, outcomeIndex)) return [];
+  /** @type {string[]} */
+  const names = [];
+  const seen = new Set();
+  for (const row of rows || []) {
+    const outcome = String(row?.[outcomeIndex] ?? "").trim();
+    if (!outcome || seen.has(outcome)) continue;
+    seen.add(outcome);
+    names.push(outcome);
+  }
+  const rank = (value) => {
+    const kind = outcomeKind(value);
+    if (kind === "yes") return 0;
+    if (kind === "no") return 1;
+    return 2;
+  };
+  return names.sort((a, b) => rank(a) - rank(b) || a.localeCompare(b)).map((outcome) => {
+    /** @type {Map<number, number>} */
+    const bids = new Map();
+    /** @type {Map<number, number>} */
+    const asks = new Map();
+    const want = outcomeKind(outcome) || outcome.trim().toLowerCase();
+    /** @type {unknown[][]} */
+    const otherRows = [];
+    for (const row of rows || []) {
+      const level = readLevel(row, sideIndex, priceIndex, sizeIndex);
+      if (!level) continue;
+      const kind = outcomeKind(row?.[outcomeIndex]);
+      const label = String(row?.[outcomeIndex] ?? "").trim().toLowerCase();
+      const own = (kind && kind === want) || label === want;
+      if (!own) {
+        if (kind === "yes" || kind === "no") otherRows.push(row);
+        continue;
+      }
+      const buy = level.side === "yes" || level.side === "bid" || level.side === "buy";
+      const sell = level.side === "ask" || level.side === "sell";
+      if (buy) addLevel(bids, level.price, level.size);
+      else if (sell) addLevel(asks, level.price, level.size);
+    }
+    for (const row of otherRows) {
+      const level = readLevel(row, sideIndex, priceIndex, sizeIndex);
+      if (!level) continue;
+      const buy = level.side === "yes" || level.side === "bid" || level.side === "buy";
+      const sell = level.side === "ask" || level.side === "sell";
+      if (sell) raiseLevel(bids, 1 - level.price, level.size);
+      else if (buy) raiseLevel(asks, 1 - level.price, level.size);
+    }
+    return { outcome, ...finishBook(bids, asks) };
+  });
+}
+
+/** Canvas height that fits every bid and ask, plus the outcome tabs when present. */
+export function orderBookBlockHeight(levelCount, options = {}) {
+  const levels = Math.max(0, Math.floor(Number(levelCount) || 0));
+  return 200 + (options.tabs ? 36 : 0) + levels * 22;
+}
+
+/**
  * The two charts an order book sheet opens: ladder and depth, side by side.
  * @param {string} title
  */
