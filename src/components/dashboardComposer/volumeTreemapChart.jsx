@@ -5,7 +5,12 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { formatUsd } from "@/lib/visualizations/visualTable";
 import { layoutVolumeTiles, volumeTreemapModel } from "@/lib/visualizations/volumeTreemap";
 
-const LYCHEE_RED = "#E63946";
+/** shadcn teal-500 → violet-500 → fuchsia-500, in OKLCH so the mix stays saturated. */
+const VOLUME_STOPS = [
+  { l: 0.704, c: 0.123, h: 182.5 },
+  { l: 0.606, c: 0.219, h: 292.7 },
+  { l: 0.667, c: 0.259, h: 322.1 },
+];
 
 function shortLabel(label, width) {
   const text = String(label || "");
@@ -15,9 +20,17 @@ function shortLabel(label, width) {
 }
 
 function tileFill(value, max) {
-  const share = max > 0 ? value / max : 0;
-  const alpha = 0.28 + share * 0.72;
-  return `color-mix(in srgb, ${LYCHEE_RED} ${Math.round(alpha * 100)}%, white)`;
+  const share = max > 0 ? Math.max(0, Math.min(1, value / max)) : 0;
+  const scaled = share * (VOLUME_STOPS.length - 1);
+  const index = Math.min(VOLUME_STOPS.length - 2, Math.floor(scaled));
+  const t = scaled - index;
+  const from = VOLUME_STOPS[index];
+  const to = VOLUME_STOPS[index + 1];
+  const l = from.l + (to.l - from.l) * t;
+  const c = from.c + (to.c - from.c) * t;
+  const h = from.h + (to.h - from.h) * t;
+  const weight = Math.round((0.7 + share * 0.3) * 100);
+  return `color-mix(in srgb, oklch(${l.toFixed(3)} ${c.toFixed(3)} ${h.toFixed(1)}) ${weight}%, white)`;
 }
 
 export function VolumeTreemap({ sheet, dataset, onOpenRow }) {
