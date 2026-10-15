@@ -209,6 +209,8 @@ export function MarketChart({
   units = "currency",
   ranges = [],
   defaultRange = "All",
+  rangeValue,
+  onRangeChange,
   live = false,
   status = "ready",
   emptyLabel = "This sheet has no price to chart yet.",
@@ -217,7 +219,9 @@ export function MarketChart({
   const uid = React.useId().replace(/:/g, "");
   const reduce = usePrefersReducedMotion();
   const [plotRef, box] = useBox();
-  const [rangeLabel, setRangeLabel] = React.useState(defaultRange);
+  const [ownRangeLabel, setOwnRangeLabel] = React.useState(defaultRange);
+  const rangeLabel = rangeValue ?? ownRangeLabel;
+  const setRangeLabel = onRangeChange || setOwnRangeLabel;
   const [hoverIndex, setHoverIndex] = React.useState(null);
   const [flash, setFlash] = React.useState(null);
   const lastCloseRef = React.useRef(null);

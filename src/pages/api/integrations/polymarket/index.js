@@ -2291,6 +2291,14 @@ export default async function handler(req, res) {
         if (filterAmount !== "" && Number.isFinite(Number(filterAmount)) && Number(filterAmount) >= 0) {
           tradesParams.set("filter_amount", filterAmount);
         }
+        const tradeUser = String(req.query.user || "").trim();
+        if (/^0x[0-9a-fA-F]{40}$/.test(tradeUser)) tradesParams.set("user", tradeUser);
+        const eventIds = String(req.query.event_id || req.query.eventId || "").trim();
+        if (eventIds) tradesParams.set("event_id", eventIds.split(",").map((id) => id.trim()).filter(Boolean).slice(0, 20).join(","));
+        for (const bound of ["start", "end"]) {
+          const seconds = Number(req.query[bound]);
+          if (Number.isFinite(seconds) && seconds > 0) tradesParams.set(bound, String(Math.floor(seconds)));
+        }
         let body;
         try {
           body = await fetchJson(`${DATA_API_BASE}/v2/trades?${tradesParams.toString()}`);

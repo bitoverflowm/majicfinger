@@ -93,8 +93,10 @@ import {
   exclusivePriceHistoryFilters,
   exclusiveTokenHistoryFilters,
   isPolymarketQuoteTable,
+  POLYMARKET_MARKET_TRADES_MAX_AGE_SEC,
   polymarketQuoteAttributeColumns,
   polymarketQuoteRequestKey,
+  polymarketTradeUser,
 } from "@/lib/polymarketLive/polymarketQuoteQuery";
 import {
   defaultPolymarketBiggestWinnersFilters,
@@ -123,7 +125,7 @@ import {
   polymarketActivityAttributeColumns,
   polymarketActivityRequestKey,
 } from "@/lib/polymarketLive/traderActivityCompose";
-import { defaultLifeRange, lifeOfMarket, lifePull } from "@/lib/markets/marketLife";
+import { defaultLifeRange, lifeOfMarket, lifePull, localDayKey } from "@/lib/markets/marketLife";
 import { Accordion, AccordionContent, AccordionItem } from "@/components/ui/accordion";
 import * as AccordionPrimitive from "@radix-ui/react-accordion";
 import { Button } from "@/components/ui/button";
@@ -2147,9 +2149,22 @@ const POLYMARKET_QUERY_SECTIONS = {
   getTradesByMarket: {
     value: "trade-history",
     title: "Trade history",
-    ids: ["quote_outcome", "trade_side", "taker_only", "filter_type", "filter_amount"],
+    ids: ["quote_outcome", "time_range", "trade_user", "trade_side", "taker_only", "filter_type", "filter_amount"],
   },
 };
+
+/**
+ * Days a market's trade feed can serve. Without a wallet it reaches back three years.
+ * @param {ReturnType<typeof lifeOfMarket>} life
+ * @param {Record<string, any>} filters
+ */
+function tradeFeedLife(life, filters) {
+  if (!life || polymarketTradeUser(filters)) return life;
+  const floor = localDayKey(Date.now() - POLYMARKET_MARKET_TRADES_MAX_AGE_SEC * 1000);
+  if (life.earliest && life.earliest >= floor) return life;
+  if (life.latest && life.latest < floor) return life;
+  return { ...life, earliest: floor };
+}
 
 /**
  * The next request filters for this table. Each history pull keeps one time window.
@@ -2165,7 +2180,7 @@ function priceHistorySummary(columns, filters) {
   const byId = new Map((columns || []).map((column) => [column.id, column]));
   const rangeOn = Boolean(filters?.time_range?.from && filters?.time_range?.to);
   const asOfOn = byId.has("as_of") && Boolean(String(filters?.as_of?.value || "").trim());
-  return ["quote_outcome", asOfOn ? "as_of" : rangeOn ? "time_range" : "interval", "fidelity", "bucket_seconds", "trade_side", "filter_amount"]
+  return ["quote_outcome", asOfOn ? "as_of" : rangeOn ? "time_range" : "interval", "trade_user", "fidelity", "bucket_seconds", "trade_side", "filter_amount"]
     .map((id) => {
       const column = byId.get(id);
       return column ? attributeSummary(column, filters) : "";
@@ -2474,8 +2489,9 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
   const polymarketQuoteColumns = useMemo(() => {
     if (!polymarketLive || !isPolymarketQuoteTable(tableId)) return [];
     const columns = polymarketQuoteAttributeColumns(tableId, pull?.columns || [], attributeFilters, focusedMarket);
-    const lifeLabel = tableId === "getBatchPricesHistory" || tableId === "getTokenPriceHistory" ? "Full market history" : "";
-    return withMarketLifeBounds(columns, focusedLife, lifeLabel);
+    const trades = tableId === "getTradesByMarket";
+    const lifeLabel = tableId === "getBatchPricesHistory" || tableId === "getTokenPriceHistory" || trades ? "Full market history" : "";
+    return withMarketLifeBounds(columns, trades ? tradeFeedLife(focusedLife, attributeFilters) : focusedLife, lifeLabel);
   }, [attributeFilters, focusedLife, focusedMarket, polymarketLive, pull?.columns, tableId]);
   const polymarketQuerySection = polymarketLive ? POLYMARKET_QUERY_SECTIONS[tableId] || null : null;
   const polymarketAttributeColumns = useMemo(() => {

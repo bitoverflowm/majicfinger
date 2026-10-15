@@ -17,6 +17,7 @@ import { DATE_RANGE_PRESETS, activeDateRangePreset, dateRangePreset } from "@/co
 import { clampLifeRange, defaultLifeRange, presetWithinLife } from "@/lib/markets/marketLife";
 import { KALSHI_LIVE_CANDLESTICK_PERIOD_OPTIONS } from "@/lib/kalshiLive/candlesticksColumns";
 import { KALSHI_LIVE_EVENT_FORECAST_PERIOD_OPTIONS } from "@/lib/kalshiLive/eventForecastColumns";
+import { polymarketTradeUser } from "@/lib/polymarketLive/polymarketQuoteQuery";
 import { cn } from "@/lib/utils";
 
 /**
@@ -675,7 +676,7 @@ function lifeWindow(bounds, maxDays) {
   return capped.from === bounds.earliest ? { ...capped, preset: "market-life" } : capped;
 }
 
-function DateRangeField({ from, to, presetId, onChange, presetIds, anchor, bounds, maxDays }) {
+function DateRangeField({ from, to, presetId, onChange, presetIds, anchor, bounds, maxDays, emptyLabel: blankLabel }) {
   const start = dateFromIso(from);
   const end = dateFromIso(to);
   const selected = start || end ? { from: start, to: end } : undefined;
@@ -690,7 +691,9 @@ function DateRangeField({ from, to, presetId, onChange, presetIds, anchor, bound
     label: lifeCapped ? `Last ${maxDays} days of trading` : bounds?.lifeLabel || "Full trading life",
   };
   const preset = life && presetId === life.preset ? lifePreset : activeDateRangePreset(from, to, presetId, now);
-  const emptyLabel = bounds?.stopped && bounds.earliest && bounds.latest
+  const emptyLabel = blankLabel
+    ? blankLabel
+    : bounds?.stopped && bounds.earliest && bounds.latest
     ? formatAttributeRange(bounds.earliest, bounds.latest)
     : anchor
       ? `Ends ${formatAttributeDate(anchor)}`
@@ -1520,15 +1523,19 @@ export function PriceHistoryQueryFields({ columns, filters, onChange }) {
   );
 }
 
-/** Outcome, side, and the size floor for a market's trade history. */
+/** Outcome, dates, wallet, side, and the size floor for a market's trade history. */
 export function TradeHistoryQueryFields({ columns, filters, onChange }) {
   const byId = new Map((columns || []).map((column) => [column.id, column]));
   const outcome = byId.get("quote_outcome");
+  const range = byId.get("time_range");
+  const user = byId.get("trade_user");
   const side = byId.get("trade_side");
   const taker = byId.get("taker_only");
   const unit = byId.get("filter_type");
   const amount = byId.get("filter_amount");
   const takerOn = (filters?.taker_only?.include || ["true"])[0] !== "false";
+  const wallet = String(filters?.trade_user?.value || "");
+  const walletInvalid = wallet.trim() !== "" && !polymarketTradeUser(filters);
   return (
     <div className="space-y-3">
       {outcome ? (
@@ -1537,6 +1544,31 @@ export function TradeHistoryQueryFields({ columns, filters, onChange }) {
           value={String(filters?.quote_outcome?.value || "both")}
           onChange={(value) => onChange(patchFilter(filters, outcome, { value }))}
         />
+      ) : null}
+      {range ? (
+        <QueryChoice title="Date range" description={range.description}>
+          <DateRangeField
+            from={filters?.time_range?.from || ""}
+            to={filters?.time_range?.to || ""}
+            presetId={filters?.time_range?.preset || ""}
+            anchor={range.rangeAnchor}
+            bounds={range.rangeBounds}
+            emptyLabel="All trades"
+            onChange={({ from, to, preset }) => onChange(patchFilter(filters, range, { from, to, preset: preset || "" }))}
+          />
+        </QueryChoice>
+      ) : null}
+      {user ? (
+        <QueryChoice title={user.title} description={walletInvalid ? "Not a wallet address yet. It is left out of the pull." : user.description}>
+          <Input
+            aria-label={user.ariaLabel || user.title}
+            value={wallet}
+            placeholder="0x…"
+            spellCheck={false}
+            onChange={(event) => onChange(patchFilter(filters, user, { value: event.target.value.trim() }))}
+            className={cn("h-9 font-mono text-[12px]", walletInvalid && "border-destructive")}
+          />
+        </QueryChoice>
       ) : null}
       {side ? (
         <QuerySelect

@@ -82,12 +82,7 @@ export function tradeOutcomes(columns, rows) {
   return seen.sort((a, b) => outcomeRank(a) - outcomeRank(b));
 }
 
-/**
- * @param {Array<{ title?: string, id?: string, scale?: string }>} columns
- * @param {unknown[][]} rows
- * @param {{ outcome?: string }} [options] one outcome to keep. Default keeps Yes when outcomes are mixed.
- */
-export function tradesToCandles(columns, rows, options = {}) {
+function tradeSamples(columns, rows, options = {}) {
   const timeIndex = findColumn(
     columns,
     (title, id) =>
@@ -115,7 +110,7 @@ export function tradesToCandles(columns, rows, options = {}) {
   const outcomeIndex = findColumn(columns, (title, id) => id === "outcome" || title === "outcome");
   const wanted = String(options.outcome || "").trim();
   const chosen =
-    yesPriceIndex >= 0
+    yesPriceIndex >= 0 || options.everyOutcome
       ? { label: "", filter: false }
       : wanted && outcomeIndex >= 0
         ? { label: wanted, filter: true }
@@ -163,13 +158,41 @@ export function tradesToCandles(columns, rows, options = {}) {
   }
   samples.sort((a, b) => a.time - b.time);
   const units = yesPriceIndex >= 0 ? "currency" : priceIndex >= 0 ? "probability" : "currency";
+  return { samples, volumeLabel, units, outcome };
+}
+
+/**
+ * Times of every priced trade, oldest first, across all outcomes unless one is named.
+ * @param {Array<{ title?: string, id?: string, scale?: string }>} columns
+ * @param {unknown[][]} rows
+ * @param {string} [outcome]
+ * @returns {number[]}
+ */
+export function tradeTimes(columns, rows, outcome = "") {
+  const wanted = String(outcome || "").trim();
+  const { samples } = tradeSamples(columns, rows, wanted ? { outcome: wanted } : { everyOutcome: true });
+  return samples.map((sample) => sample.time);
+}
+
+/**
+ * @param {Array<{ title?: string, id?: string, scale?: string }>} columns
+ * @param {unknown[][]} rows
+ * @param {{ outcome?: string, since?: number }} [options] one outcome to keep. Default keeps Yes when outcomes are mixed.
+ * `since` keeps trades at or after that time and spreads the candles over that window alone.
+ */
+export function tradesToCandles(columns, rows, options = {}) {
+  const parsed = tradeSamples(columns, rows, options);
+  const { volumeLabel, units, outcome } = parsed;
+  const since = Number.isFinite(options.since) ? options.since : null;
+  const samples = since == null ? parsed.samples : parsed.samples.filter((sample) => sample.time >= since);
   if (!samples.length) return { candles: [], volumeLabel, units, outcome };
 
-  const span = Math.max(0, samples[samples.length - 1].time - samples[0].time);
+  const origin = since ?? 0;
+  const span = Math.max(0, samples[samples.length - 1].time - (since ?? samples[0].time));
   const bucket = Math.max(1000, Math.ceil((span || 1000) / TARGET_CANDLES));
   const groups = new Map();
   for (const sample of samples) {
-    const key = Math.floor(sample.time / bucket) * bucket;
+    const key = origin + Math.floor((sample.time - origin) / bucket) * bucket;
     const group = groups.get(key);
     if (!group) {
       groups.set(key, {
@@ -232,17 +255,45 @@ export function ohlcRowsToCandles(columns, rows) {
   return { candles: [...byTime.values()].sort((a, b) => a.t - b.t), volumeLabel: "Volume fp" };
 }
 
-export function rangesForCandles(candles) {
+const DAY_MS = 24 * 60 * 60 * 1000;
+const RANGE_OPTIONS = [
+  { label: "1m", ms: 60 * 1000 },
+  { label: "5m", ms: 5 * 60 * 1000 },
+  { label: "15m", ms: 15 * 60 * 1000 },
+  { label: "1H", ms: 60 * 60 * 1000 },
+  { label: "6H", ms: 6 * 60 * 60 * 1000 },
+  { label: "1D", ms: DAY_MS },
+  { label: "1W", ms: 7 * DAY_MS },
+  { label: "1M", ms: 30 * DAY_MS },
+  { label: "3M", ms: 91 * DAY_MS },
+  { label: "1Y", ms: 365 * DAY_MS },
+];
+const MIN_RANGE_POINTS = 3;
+
+/**
+ * The four widest windows that still hold a few points and are clearly shorter than the
+ * whole series, then All.
+ * @param {Array<{ t: number } | number>} points oldest first: candles, chart points, or bare times
+ */
+export function rangesForCandles(points) {
   const all = { label: "All", ms: null };
-  if (!candles?.length) return [all];
-  const span = candles[candles.length - 1].t - candles[0].t;
-  const options = [
-    { label: "1m", ms: 60 * 1000 },
-    { label: "5m", ms: 5 * 60 * 1000 },
-    { label: "15m", ms: 15 * 60 * 1000 },
-    { label: "1H", ms: 60 * 60 * 1000 },
-    { label: "1D", ms: 24 * 60 * 60 * 1000 },
-  ];
-  const useful = options.filter((range) => span > range.ms * 0.6);
-  return [...useful.slice(-3), all];
+  if (!points?.length) return [all];
+  const at = (index) => {
+    const point = points[index];
+    return typeof point === "number" ? point : point.t;
+  };
+  const end = at(points.length - 1);
+  const span = end - at(0);
+  const countSince = (cut) => {
+    let lo = 0;
+    let hi = points.length;
+    while (lo < hi) {
+      const mid = (lo + hi) >> 1;
+      if (at(mid) < cut) lo = mid + 1;
+      else hi = mid;
+    }
+    return points.length - lo;
+  };
+  const useful = RANGE_OPTIONS.filter((range) => range.ms < span * 0.85 && countSince(end - range.ms) >= MIN_RANGE_POINTS);
+  return [...useful.slice(-4), all];
 }

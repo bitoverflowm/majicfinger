@@ -205,6 +205,8 @@ export function IndicatorChart({
   toolbar = null,
   ranges = [],
   defaultRange = "All",
+  rangeValue,
+  onRangeChange,
   live = false,
   status = "ready",
   emptyLabel = "This price history has no points to chart yet.",
@@ -214,7 +216,9 @@ export function IndicatorChart({
   const reduce = usePrefersReducedMotion();
   const [plotRef, box] = useBox();
   const svgRef = React.useRef(null);
-  const [rangeLabel, setRangeLabel] = React.useState(defaultRange);
+  const [ownRangeLabel, setOwnRangeLabel] = React.useState(defaultRange);
+  const rangeLabel = rangeValue ?? ownRangeLabel;
+  const setRangeLabel = onRangeChange || setOwnRangeLabel;
   const [hoverIndex, setHoverIndex] = React.useState(null);
   const uid = React.useId().replace(/:/g, "");
 

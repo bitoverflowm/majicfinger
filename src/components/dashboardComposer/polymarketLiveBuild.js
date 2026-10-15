@@ -26,6 +26,7 @@ import {
   polymarketQuoteTokens,
   polymarketTokenHistoryParams,
   polymarketTradeQuery,
+  polymarketTradeWindow,
   TICK_SIZE_COLUMNS,
   TOKEN_PRICE_HISTORY_COLUMNS,
   TRADE_COLUMNS,
@@ -1340,6 +1341,60 @@ function tradePage(payload) {
   return { rows, cursor };
 }
 
+const TRADE_PAGE_CAP = 1000;
+/** Extra pages a dated pull may spend walking past trades newer than its window. */
+const TRADE_SKIP_PAGES = 200;
+
+/**
+ * Pages one market's trade feed (newest first) until the target is met.
+ * Rows newer than the window are skipped, and paging stops once a page reaches back past its start.
+ * @param {{
+ *   fetchPage: (query: Record<string, string>) => Promise<unknown>;
+ *   params: Record<string, string>;
+ *   target: number;
+ *   window: { start: number; end: number } | null;
+ *   keep?: (row: Record<string, any>) => boolean;
+ *   fullPages?: boolean;
+ * }} options
+ * @returns {Promise<{ rows: Array<Record<string, any>>; unreached: boolean }>}
+ */
+export async function pageMarketTrades({ fetchPage, params, target, window, keep = () => true, fullPages = false }) {
+  const filtered = Boolean(window) || fullPages;
+  const maxPages = Math.max(20, Math.ceil(target / TRADE_PAGE_CAP)) + (window ? TRADE_SKIP_PAGES : 0);
+  const rows = [];
+  let cursor = "";
+  let reached = !window;
+  for (let page = 0; page < maxPages && rows.length < target; page += 1) {
+    const data = await fetchPage({
+      limit: String(filtered ? TRADE_PAGE_CAP : Math.min(TRADE_PAGE_CAP, target - rows.length)),
+      ...(cursor ? { cursor } : {}),
+      ...params,
+    });
+    const unpacked = tradePage(data);
+    let passedStart = false;
+    for (const row of unpacked.rows) {
+      const seconds = Number(row.timestamp);
+      if (window && Number.isFinite(seconds)) {
+        if (seconds > window.end) continue;
+        reached = true;
+        if (seconds < window.start) {
+          passedStart = true;
+          continue;
+        }
+      }
+      if (!keep(row)) continue;
+      rows.push(row);
+      if (rows.length >= target) break;
+    }
+    if (passedStart || !unpacked.cursor || !unpacked.rows.length) {
+      reached = true;
+      break;
+    }
+    cursor = unpacked.cursor;
+  }
+  return { rows, unreached: !reached };
+}
+
 function tradeSheetRow(row, market) {
   const seconds = Number(row.timestamp);
   const index = row.outcome_index ?? row.outcomeIndex;
@@ -1817,30 +1872,26 @@ async function quoteRows(endpointId, picks, options = {}) {
   if (endpointId === "getTradesByMarket") {
     const tradable = markets.filter((market) => market.conditionId);
     if (!tradable.length) throw new Error("This market has no condition id.");
-    const params = polymarketTradeQuery(filters);
     const target = polymarketQuoteTarget(options.rowLimit, options.planLimit, 50, quotePullCap(options.planLimit, 10000));
     const tokenIds = new Set(pairs.map((pair) => String(pair.tokenId)));
     const narrow = polymarketQuoteOutcome(filters) !== "both";
-    const pageCap = 1000;
-    const maxPages = Math.max(20, Math.ceil(target / pageCap));
     const collected = [];
+    let unreached = false;
     for (const market of tradable) {
-      let cursor = "";
-      let got = 0;
-      for (let page = 0; page < maxPages && got < target; page += 1) {
-        const data = await polymarketGet("getTradesByMarket", {
-          condition: market.conditionId,
-          limit: String(narrow ? pageCap : Math.min(pageCap, target - got)),
-          ...(cursor ? { cursor } : {}),
-          ...params,
-        });
-        const unpacked = tradePage(data);
-        const matched = unpacked.rows.filter((row) => tokenIds.has(String(row.token_id || row.asset || "")));
-        collected.push(...matched.map((row) => tradeSheetRow(row, market)));
-        got += matched.length;
-        if (!unpacked.cursor || !unpacked.rows.length) break;
-        cursor = unpacked.cursor;
-      }
+      const window = polymarketTradeWindow(filters, market);
+      const result = await pageMarketTrades({
+        fetchPage: (query) => polymarketGet("getTradesByMarket", { condition: market.conditionId, ...query }),
+        params: polymarketTradeQuery(filters, market),
+        target,
+        window,
+        keep: (row) => tokenIds.has(String(row.token_id || row.asset || "")),
+        fullPages: narrow,
+      });
+      collected.push(...result.rows.map((row) => tradeSheetRow(row, market)));
+      if (result.unreached) unreached = true;
+    }
+    if (!collected.length && unreached) {
+      throw new Error("These dates are too far behind this market's latest trades to reach. Pick later dates, or set a wallet.");
     }
     return collected;
   }

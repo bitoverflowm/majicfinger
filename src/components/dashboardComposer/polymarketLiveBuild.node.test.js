@@ -33,6 +33,7 @@ import {
   polymarketMarketFanout,
   polymarketRowsForMarket,
   appendRows,
+  pageMarketTrades,
 } from "./polymarketLiveBuild.js";
 import {
   flattenPolymarketMarket,
@@ -66,6 +67,8 @@ import {
   polymarketTokenHistoryParams,
   polymarketTokenHistoryWindowStart,
   polymarketTradeQuery,
+  polymarketTradeUser,
+  polymarketTradeWindow,
 } from "../../lib/polymarketLive/polymarketQuoteQuery.js";
 
 const endpoints = polymarketLiveBuildEndpoints();
@@ -417,10 +420,49 @@ assert.equal(defaultPolymarketQuoteFilters("getTradesByMarket").taker_only.inclu
 assert.equal(defaultPolymarketQuoteFilters("getTradesByMarket").quote_outcome.value, "both");
 assert.equal(defaultPolymarketQuoteFilters("getTradesByMarket").filter_type.value, "TOKENS");
 assert.deepEqual(
-  polymarketQuoteAttributeColumns("getTradesByMarket", polymarketLiveBuildColumns("getTradesByMarket")).slice(0, 5).map((column) => column.id),
-  ["quote_outcome", "trade_side", "taker_only", "filter_type", "filter_amount"],
+  polymarketQuoteAttributeColumns("getTradesByMarket", polymarketLiveBuildColumns("getTradesByMarket")).slice(0, 7).map((column) => column.id),
+  ["quote_outcome", "time_range", "trade_user", "trade_side", "taker_only", "filter_type", "filter_amount"],
 );
-assert.equal(polymarketQuoteAttributeColumns("getTradesByMarket", []).some((column) => column.id === "time_range"), false);
+const tradeRange = polymarketQuoteAttributeColumns("getTradesByMarket", []).find((column) => column.id === "time_range");
+assert.equal(tradeRange?.control, "query-range");
+assert.equal(tradeRange?.rangeMaxDays, undefined);
+assert.equal(polymarketQuoteAttributeColumns("getTradesByMarket", []).some((column) => column.id === "interval"), false);
+assert.deepEqual(defaultPolymarketQuoteFilters("getTradesByMarket").time_range, { from: "", to: "", preset: "" });
+const tradeKeyAll = polymarketQuoteRequestKey("getTradesByMarket", defaultPolymarketQuoteFilters("getTradesByMarket"), "", 500000);
+const tradeKeyDated = polymarketQuoteRequestKey(
+  "getTradesByMarket",
+  { ...defaultPolymarketQuoteFilters("getTradesByMarket"), time_range: { from: "2026-10-01", to: "2026-10-07", preset: "" } },
+  "",
+  500000,
+);
+assert.notEqual(tradeKeyAll, tradeKeyDated);
+const tradeWallet = "0x1DD312FF892107B021F4007E1CFDE9AC7AE44B22";
+assert.notEqual(
+  tradeKeyAll,
+  polymarketQuoteRequestKey("getTradesByMarket", { ...defaultPolymarketQuoteFilters("getTradesByMarket"), trade_user: { value: tradeWallet } }, "", 500000),
+);
+assert.equal(polymarketTradeUser({ trade_user: { value: tradeWallet } }), tradeWallet.toLowerCase());
+assert.equal(polymarketTradeUser({ trade_user: { value: "0x123" } }), "");
+assert.equal(polymarketTradeWindow({}), null);
+assert.equal(polymarketTradeWindow({ time_range: { from: "2026-10-01", to: "2026-10-07", preset: "market-life" } }), null);
+const datedWindow = polymarketTradeWindow({ time_range: { from: "2026-10-01", to: "2026-10-07", preset: "" } });
+assert.equal(datedWindow.start, Math.floor(new Date(2026, 9, 1, 0, 0, 0).getTime() / 1000));
+assert.equal(datedWindow.end, Math.floor(new Date(2026, 9, 7, 23, 59, 59).getTime() / 1000));
+assert.deepEqual(
+  polymarketTradeWindow({ time_range: { from: "2026-10-14", to: "2026-10-15", preset: "past-24h" } }, null, 1_800_000_000),
+  { start: 1_800_000_000 - 86400, end: 1_800_000_000 },
+);
+const closedTradeMarket = { closed: true, endedAt: 1_700_000_000 };
+assert.deepEqual(
+  polymarketTradeWindow({ time_range: { from: "x", to: "y", preset: "past-7d" } }, closedTradeMarket, 1_800_000_000),
+  { start: 1_700_000_000 - 7 * 86400, end: 1_700_000_000 },
+);
+const joinTradeFilters = polymarketJoinQuoteFilters("getTradesByMarket");
+assert.equal(joinTradeFilters.quote_outcome.value, "both");
+assert.deepEqual(joinTradeFilters.time_range, { from: "", to: "", preset: "" });
+assert.equal(joinTradeFilters.filter_amount.value, "0");
+assert.equal(polymarketTradeWindow(joinTradeFilters), null);
+assert.equal(polymarketQuoteTarget(500000, 500000, 50, 500000), 500000);
 assert.equal(polymarketLiveBuildColumns("getTradesByMarket").find((column) => column.id === "timestamp")?.type, "text");
 assert.equal(polymarketLiveBuildColumns("getTradesByMarket").find((column) => column.id === "observed_at")?.defaultOn, true);
 assert.deepEqual(polymarketTradeQuery({ trade_side: { value: "BUY" }, taker_only: { include: ["false"] }, filter_type: { value: "CASH" }, filter_amount: { value: "1.5" } }), {
@@ -430,6 +472,43 @@ assert.deepEqual(polymarketTradeQuery({ trade_side: { value: "BUY" }, taker_only
   filter_amount: "1.5",
 });
 assert.equal("start" in polymarketTradeQuery({ time_range: { from: "2026-10-01", to: "2026-10-07" } }), false);
+assert.deepEqual(polymarketTradeQuery({ trade_user: { value: tradeWallet } }), { user: tradeWallet.toLowerCase(), start: "1" });
+assert.deepEqual(polymarketTradeQuery({ trade_user: { value: tradeWallet }, time_range: { from: "2026-10-01", to: "2026-10-07" } }), {
+  user: tradeWallet.toLowerCase(),
+  start: String(datedWindow.start),
+  end: String(datedWindow.end),
+});
+assert.equal("user" in polymarketTradeQuery({ trade_user: { value: "0xnope" } }), false);
+
+function fakeTradeFeed(times, pageSize) {
+  const calls = [];
+  const fetchPage = async (query) => {
+    calls.push(query);
+    const offset = Number(query.cursor || 0);
+    const rows = times.slice(offset, offset + pageSize).map((timestamp) => ({ timestamp, token_id: "yes" }));
+    const next = offset + pageSize < times.length ? String(offset + pageSize) : null;
+    return { data: rows, pagination: { next_cursor: next } };
+  };
+  return { calls, fetchPage };
+}
+const feedTimes = Array.from({ length: 5000 }, (_, index) => 100000 - index);
+const allFeed = fakeTradeFeed(feedTimes, 1000);
+const allPaged = await pageMarketTrades({ fetchPage: allFeed.fetchPage, params: {}, target: 1500, window: null });
+assert.equal(allPaged.rows.length, 1500);
+assert.equal(allPaged.rows[0].timestamp, 100000);
+assert.equal(allFeed.calls[1].limit, "500");
+const windowFeed = fakeTradeFeed(feedTimes, 1000);
+const windowPaged = await pageMarketTrades({ fetchPage: windowFeed.fetchPage, params: {}, target: 100000, window: { start: 96500, end: 97999 } });
+assert.equal(windowPaged.rows.length, 1500);
+assert.equal(windowPaged.rows[0].timestamp, 97999);
+assert.equal(windowPaged.rows.at(-1).timestamp, 96500);
+assert.equal(windowPaged.unreached, false);
+assert.equal(windowFeed.calls.length, 4);
+assert.ok(windowFeed.calls.every((call) => call.limit === "1000"));
+const farFeed = fakeTradeFeed(Array.from({ length: 300000 }, (_, index) => 10_000_000 - index), 1000);
+const farPaged = await pageMarketTrades({ fetchPage: farFeed.fetchPage, params: {}, target: 50, window: { start: 1, end: 100 } });
+assert.equal(farPaged.rows.length, 0);
+assert.equal(farPaged.unreached, true);
 assert.equal(polymarketQuoteAttributeColumns("getOpenInterestCompose", [{ id: "value", type: "string", title: "Value" }])[0].type, "number");
 assert.equal(
   endpoints.find((endpoint) => endpoint.id === "getOpenInterestCompose")?.description,

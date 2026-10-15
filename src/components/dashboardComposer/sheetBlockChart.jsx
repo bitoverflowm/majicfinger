@@ -5,7 +5,7 @@ import { Bar, BarChart, CartesianGrid, Line, LineChart, ResponsiveContainer, Too
 import { useReadyTradeSheet, tradeTickerFromBlock, usesHistoricalTradeSheet } from "@/components/dashboardComposer/fullTradeSheet";
 import { isOrderBookSheet, orderBookBlockHeight, rowsToFramedBooks, rowsToOrderBook } from "@/components/dashboardComposer/orderBookLadder";
 import { cn } from "@/lib/utils";
-import { ohlcRowsToCandles, rangesForCandles, tradeOutcomes, tradesToCandles } from "@/components/dashboardComposer/tradeMarketCandles";
+import { ohlcRowsToCandles, rangesForCandles, tradeOutcomes, tradeTimes, tradesToCandles } from "@/components/dashboardComposer/tradeMarketCandles";
 import { isPriceHistorySheet, priceHistoryLines, priceHistoryOutcome } from "@/components/dashboardComposer/priceHistorySeries";
 import { DatasetSummary, EventLinesChart } from "@/components/dashboardComposer/datasetChart";
 import { PortfolioTreemap } from "@/components/dashboardComposer/portfolioTreemapChart";
@@ -192,20 +192,29 @@ function TradeMarketChart({ sheet, rows, live, snapshot, onSnapshot, mode = "tra
   const [picked, setPicked] = useState(BOTH_OUTCOMES);
   const choice = picked === BOTH_OUTCOMES || outcomes.includes(picked) ? picked : BOTH_OUTCOMES;
   const both = split && choice === BOTH_OUTCOMES;
+  const times = useMemo(
+    () => (mode === "trades" ? tradeTimes(sheet?.columns, rows, split && !both ? choice : "") : []),
+    [both, choice, mode, rows, sheet?.columns, split],
+  );
+  const shownRanges = useMemo(() => (times.length ? rangesForCandles(times) : ranges), [ranges, times]);
+  const [rangeLabel, setRangeLabel] = useState("All");
+  const range = shownRanges.find((item) => item.label === rangeLabel) || shownRanges[shownRanges.length - 1];
+  const since = times.length && range?.ms != null ? times[times.length - 1] - range.ms : null;
   const lines = useMemo(
     () =>
       both
         ? outcomes.map((outcome) => ({
             outcome,
-            points: tradesToCandles(sheet?.columns, rows, { outcome }).candles.map((candle) => ({ t: candle.t, price: candle.close })),
+            points: tradesToCandles(sheet?.columns, rows, { outcome, since }).candles.map((candle) => ({ t: candle.t, price: candle.close })),
           }))
         : [],
-    [both, outcomes, rows, sheet?.columns],
+    [both, outcomes, rows, sheet?.columns, since],
   );
-  const oneOutcome = useMemo(
-    () => (split && !both ? tradesToCandles(sheet?.columns, rows, { outcome: choice }) : null),
-    [both, choice, rows, sheet?.columns, split],
-  );
+  const windowed = useMemo(() => {
+    if (both) return null;
+    if (split) return tradesToCandles(sheet?.columns, rows, { outcome: choice, since });
+    return since != null ? tradesToCandles(sheet?.columns, rows, { since }) : null;
+  }, [both, choice, rows, sheet?.columns, since, split]);
   const name = mode === "ohlc" ? "Price" : units === "probability" ? "Last traded price" : "Yes";
   if (both) {
     return (
@@ -216,20 +225,25 @@ function TradeMarketChart({ sheet, rows, live, snapshot, onSnapshot, mode = "tra
         name={name}
         live={live}
         emptyLabel="This trades sheet has no price to chart yet."
+        ranges={shownRanges}
+        rangeValue={range?.label}
+        onRangeChange={setRangeLabel}
       />
     );
   }
-  const shownCandles = oneOutcome ? oneOutcome.candles : candles;
+  const shownCandles = windowed ? windowed.candles : candles;
   return (
     <MarketChart
       data={shownCandles}
-      symbol={oneOutcome ? choice : symbol}
+      symbol={split ? choice : symbol}
       variant={mode === "ohlc" ? "candles" : "area"}
       name={name}
       units={units}
       volumeLabel={volumeLabel || (mode === "ohlc" ? "Volume fp" : "Count fp")}
-      ranges={oneOutcome ? rangesForCandles(shownCandles) : ranges}
+      ranges={shownRanges}
       defaultRange="All"
+      rangeValue={range?.label}
+      onRangeChange={setRangeLabel}
       live={live}
       status={shownCandles.length ? "ready" : "empty"}
       emptyLabel={mode === "ohlc" ? "This candlestick sheet has no price bars yet." : "This trades sheet has no yes price to chart yet."}
@@ -379,7 +393,7 @@ function OutcomeToggle({ outcomes, value, onChange }) {
  * One line per outcome. With more than one outcome the toggle picks Yes, No, or both,
  * and both draws each outcome as its own line.
  */
-function OutcomeLinesChart({ lines, picked, onPick, name, fallbackSymbol = "", live, emptyLabel }) {
+function OutcomeLinesChart({ lines, picked, onPick, name, fallbackSymbol = "", live, emptyLabel, ranges: fixedRanges, rangeValue, onRangeChange }) {
   const split = lines.length > 1;
   const choice = picked === BOTH_OUTCOMES || lines.some((line) => line.outcome === picked) ? picked : BOTH_OUTCOMES;
   const shown = useMemo(
@@ -396,8 +410,8 @@ function OutcomeLinesChart({ lines, picked, onPick, name, fallbackSymbol = "", l
     [shown, split],
   );
   const ranges = useMemo(
-    () => rangesForCandles(lines.flatMap((line) => line.points).map((point) => ({ t: point.t })).sort((a, b) => a.t - b.t)),
-    [lines],
+    () => fixedRanges || rangesForCandles([...new Set(lines.flatMap((line) => line.points.map((point) => point.t)))].sort((a, b) => a - b)),
+    [fixedRanges, lines],
   );
   const symbol = split ? (choice === BOTH_OUTCOMES ? "" : choice) : fallbackSymbol;
   return (
@@ -413,6 +427,8 @@ function OutcomeLinesChart({ lines, picked, onPick, name, fallbackSymbol = "", l
         toolbar={split ? <OutcomeToggle outcomes={lines.map((line) => line.outcome)} value={choice} onChange={onPick} /> : null}
         ranges={ranges}
         defaultRange="All"
+        rangeValue={rangeValue}
+        onRangeChange={onRangeChange}
         live={live}
         status={points.length ? "ready" : "empty"}
         emptyLabel={emptyLabel}

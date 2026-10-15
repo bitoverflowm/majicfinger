@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { ohlcRowsToCandles, rangesForCandles, tradeOutcomes, tradesToCandles } from "./tradeMarketCandles.js";
+import { ohlcRowsToCandles, rangesForCandles, tradeOutcomes, tradeTimes, tradesToCandles } from "./tradeMarketCandles.js";
 
 const columns = [
   { id: "created_time", title: "Created time", type: "date" },
@@ -28,12 +28,17 @@ const cents = tradesToCandles(
 assert.equal(cents.candles[0].close, 0.53);
 assert.equal(cents.candles[0].volume, 4);
 
-const ranges = rangesForCandles([
-  { t: start, close: 0.5 },
-  { t: start + 2 * 60 * 60 * 1000, close: 0.6 },
-]);
-assert.equal(ranges[ranges.length - 1].label, "All");
-assert.ok(ranges.some((range) => range.label === "1H"));
+const labels = (points) => rangesForCandles(points).map((range) => range.label);
+const HOUR = 60 * 60 * 1000;
+assert.deepEqual(labels([{ t: start, close: 0.5 }, { t: start + 2 * HOUR, close: 0.6 }]), ["All"]);
+const minutes = Array.from({ length: 2 * 24 * 60 }, (_, i) => ({ t: start + i * 60_000 }));
+assert.deepEqual(labels(minutes), ["15m", "1H", "6H", "1D", "All"]);
+const hours = Array.from({ length: 44 }, (_, i) => ({ t: start + i * HOUR }));
+assert.deepEqual(labels(hours), ["6H", "1D", "All"]);
+const halfDays = Array.from({ length: 600 }, (_, i) => start + i * 12 * HOUR);
+assert.deepEqual(labels(halfDays), ["1D", "1W", "1M", "3M", "All"]);
+const monthOfDays = Array.from({ length: 60 }, (_, i) => ({ t: start + i * 24 * HOUR }));
+assert.deepEqual(labels(monthOfDays), ["1W", "1M", "All"]);
 
 const ohlcColumns = [
   { id: "end_period_ts", title: "End Period Ts", type: "date" },
@@ -104,5 +109,17 @@ const noSide = tradesToCandles(polyColumns, polyRows, { outcome: "No" });
 assert.equal(noSide.outcome, "No");
 assert.ok(noSide.candles.every((candle) => candle.close > 0.9));
 assert.equal(noSide.candles.reduce((sum, candle) => sum + candle.volume, 0), 10);
+
+assert.equal(tradeTimes(polyColumns, polyRows).length, 3);
+assert.equal(tradeTimes(polyColumns, polyRows, "Yes").length, 2);
+
+const spread = Array.from({ length: 1000 }, (_, i) => [new Date(start + i * HOUR).toISOString(), 0.5, 1]);
+const fullSpread = tradesToCandles(columns, spread);
+const lastTime = start + 999 * HOUR;
+const since = lastTime - 24 * HOUR;
+const lastDay = tradesToCandles(columns, spread, { since });
+assert.ok(lastDay.candles.every((candle) => candle.t >= since));
+assert.equal(lastDay.candles.reduce((sum, candle) => sum + candle.volume, 0), 25);
+assert.ok(lastDay.candles.length > fullSpread.candles.filter((candle) => candle.t >= since).length);
 
 console.log("tradeMarketCandles ok");

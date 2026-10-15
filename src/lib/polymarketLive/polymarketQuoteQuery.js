@@ -531,6 +531,24 @@ function tradeControls() {
   return [
     outcomeControl("Yes, No, or both outcomes."),
     {
+      id: "time_range",
+      title: "Date range",
+      type: "date",
+      queryOnly: true,
+      control: "query-range",
+      description:
+        "Trades settled from the start of the first day through the end of the last. Blank is every trade, newest first. A market's feed reaches back three years. With a wallet set it reaches the whole history.",
+    },
+    {
+      id: "trade_user",
+      title: "Wallet",
+      type: "text",
+      queryOnly: true,
+      control: "query-text",
+      ariaLabel: "Trader wallet",
+      description: "Only this wallet's trades in the market. A 0x address of 40 hex characters.",
+    },
+    {
       id: "trade_side",
       title: "Side",
       type: "text",
@@ -623,6 +641,7 @@ export function polymarketQuoteAttributeColumns(tableId, columns, filters, marke
  * Filters for a sheet joined onto a market from another pull.
  * Price history covers the market's whole life, one point per day.
  * Token price history covers the whole life of both outcomes.
+ * Trade history is every trade on both outcomes, with no date window and no size floor.
  * @param {string} tableId
  */
 export function polymarketJoinQuoteFilters(tableId) {
@@ -632,6 +651,9 @@ export function polymarketJoinQuoteFilters(tableId) {
   }
   if (tableId === "getTokenPriceHistory") {
     return { ...filters, quote_outcome: { value: "both" }, interval: { value: "max" } };
+  }
+  if (tableId === "getTradesByMarket") {
+    return { ...filters, quote_outcome: { value: "both" }, filter_amount: { value: "0" } };
   }
   return filters;
 }
@@ -669,6 +691,8 @@ export function defaultPolymarketQuoteFilters(tableId) {
   if (tableId === "getTradesByMarket") {
     return {
       quote_outcome: { value: "both" },
+      time_range: { from: "", to: "", preset: "" },
+      trade_user: { value: "" },
       trade_side: { value: "" },
       taker_only: { include: ["true"] },
       filter_type: { value: "TOKENS" },
@@ -733,6 +757,10 @@ export function polymarketQuoteRequestKey(tableId, filters, rowLimit, planLimit)
     parts.taker = Array.isArray(source.taker_only?.include) ? source.taker_only.include.join(",") : "";
     parts.unit = String(source.filter_type?.value || "");
     parts.min = String(source.filter_amount?.value || "");
+    parts.from = String(source.time_range?.from || "");
+    parts.to = String(source.time_range?.to || "");
+    parts.preset = String(source.time_range?.preset || "");
+    parts.user = polymarketTradeUser(source);
     parts.limit = polymarketQuoteTarget(rowLimit, planLimit, 50, 10000);
   }
   if (tableId === "getHoldersByMarkets") {
@@ -964,20 +992,67 @@ export function polymarketTokenHistoryParams(filters, market) {
   return params;
 }
 
+/** A market's trade feed serves this far back. With a wallet set, it serves the whole history. */
+export const POLYMARKET_MARKET_TRADES_MAX_AGE_SEC = 3 * 365 * 86400;
+
 /**
- * @param {Record<string, any>} filters
+ * @param {Record<string, any> | null | undefined} filters
+ * @returns {string}
  */
-export function polymarketTradeQuery(filters) {
+export function polymarketTradeUser(filters) {
+  const value = String(filters?.trade_user?.value || "").trim();
+  return /^0x[0-9a-fA-F]{40}$/.test(value) ? value.toLowerCase() : "";
+}
+
+/**
+ * The trade window in epoch seconds, or null for every trade.
+ * A preset is an exact span ending now, or when a closed market stopped trading.
+ * The full-history chip is the same as no window.
+ * @param {Record<string, any> | null | undefined} filters
+ * @param {{ closed?: boolean; endedAt?: number } | null} [market]
+ * @param {number} [nowSec]
+ * @returns {{ start: number; end: number } | null}
+ */
+export function polymarketTradeWindow(filters, market, nowSec = Math.floor(Date.now() / 1000)) {
+  const range = filters?.time_range || {};
+  const preset = String(range.preset || "");
+  if (preset === "market-life") return null;
+  const presetSpan = PRESET_SPAN_SEC[preset];
+  if (presetSpan) {
+    const end = polymarketMarketEndedAt(market) || nowSec;
+    return { start: Math.max(1, end - presetSpan), end };
+  }
+  const start = dayUnix(range.from, "start");
+  const end = dayUnix(range.to, "end");
+  if (!start || !end || end < start) return null;
+  return { start, end };
+}
+
+/**
+ * Request parameters for one market's trades.
+ * Polymarket only honors start and end alongside a wallet. Without one, the loader
+ * applies the window while paging (the feed is newest first).
+ * @param {Record<string, any>} filters
+ * @param {{ closed?: boolean; endedAt?: number } | null} [market]
+ */
+export function polymarketTradeQuery(filters, market) {
   const side = String(filters?.trade_side?.value || "").trim().toUpperCase();
   const include = Array.isArray(filters?.taker_only?.include) ? filters.taker_only.include : [];
   const unit = String(filters?.filter_type?.value || "").trim().toUpperCase();
   const amount = String(filters?.filter_amount?.value ?? "").trim();
+  const user = polymarketTradeUser(filters);
   /** @type {Record<string, string>} */
   const params = {};
   if (side === "BUY" || side === "SELL") params.side = side;
   if (include.length === 1) params.taker_only = include[0] === "true" ? "true" : "false";
   if (unit === "CASH" || unit === "TOKENS") params.filter_type = unit;
   if (amount !== "" && Number.isFinite(Number(amount)) && Number(amount) >= 0) params.filter_amount = amount;
+  if (user) {
+    const window = polymarketTradeWindow(filters, market);
+    params.user = user;
+    params.start = String(window ? window.start : 1);
+    if (window) params.end = String(window.end);
+  }
   return params;
 }
 
