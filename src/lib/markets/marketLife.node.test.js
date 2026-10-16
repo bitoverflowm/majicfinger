@@ -100,3 +100,19 @@ const now = Date.parse("2026-10-08T12:00:00Z");
   assert.equal(sheetMarketClosed(ended), true);
   console.log("ok sheet caption names the market and its window");
 }
+
+{
+  const now = Date.parse("2026-10-16T08:00:00Z");
+  const source = { closed: false, acceptingOrders: true, openTime: "2025-09-18T20:07:59Z", closeTime: "2026-10-05T03:59:00Z" };
+  const life = lifeOfMarket(source, now);
+  assert.equal(life.stopped, false);
+  assert.equal(life.trading, true);
+  assert.equal(life.latest, "2026-10-16");
+  assert.equal(lifeCountdown(life, now), "");
+  const sheet = { title: "Trade History", pull: { closed: false, acceptingOrders: true, openAt: Date.parse(source.openTime), closeAt: Date.parse(source.closeTime) } };
+  assert.equal(sheetMarketClosed(sheet), false);
+  assert.equal(lifeOfMarket({ ...source, acceptingOrders: false }, now).stopped, true);
+  assert.equal(lifeOfMarket({ ...source, closed: true }, now).stopped, true);
+  assert.equal(lifeOfMarket({ closeTime: source.closeTime }, now).stopped, true);
+  console.log("ok a market still taking orders past its end date keeps trading");
+}

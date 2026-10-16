@@ -59,9 +59,10 @@ export function polymarketReplayPick(block) {
     ...(outcome ? { outcomes: [outcome] } : {}),
     title,
     closed: pull.closed === true,
+    ...(typeof pull.acceptingOrders === "boolean" ? { acceptingOrders: pull.acceptingOrders } : {}),
     outcome,
     startedAt: pull.openAt || null,
-    endedAt: pull.closeAt || null,
+    endedAt: pull.acceptingOrders === true ? null : pull.closeAt || null,
     closesAt: pull.closeAt || null,
   };
 }

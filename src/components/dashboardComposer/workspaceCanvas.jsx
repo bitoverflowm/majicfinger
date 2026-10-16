@@ -53,6 +53,12 @@ import {
   saveWorkspaceDashboard,
 } from "@/lib/workspaceDashboardClient";
 import { pageIdForTab, tabIdFromPage } from "@/lib/workspaceDashboardDocument";
+import {
+  rememberSheetRecords,
+  restoreSheetRecords,
+  savedBlocksByPage,
+  savedTables,
+} from "@/components/dashboardComposer/sheetRecordCache";
 import { useSheetRealtime } from "@/components/dashboardComposer/sheetRealtimeSession";
 import { realtimeSessionKey, realtimeSheetForBlock, realtimeTargetForBlock, sheetAssetIds, tailCells } from "@/lib/realtime/sheetRealtime";
 import { replayTabSheets } from "@/components/dashboardComposer/replayTabQueries";
@@ -342,13 +348,15 @@ export function WorkspaceCanvasProvider({ pageId, readOnly = false, children }) 
     const loadedTabs = pendingTabs.length
       ? tabList.map((tab) => tab.id).filter((id) => !pendingTabs.includes(id))
       : null;
+    const saved = savedBlocksByPage(nextBlocks);
+    rememberSheetRecords(owner, saved.trimmed);
     return {
       name: String(dashboardName || "").trim().slice(0, 120) || "Untitled",
       active_tab_id: activeTabId,
       welcome_removed: welcomeRemoved,
       tabs: tabList,
-      blocks: blocksForDocument(nextBlocks),
-      tables: nextTables,
+      blocks: blocksForDocument(saved.blocksByPage),
+      tables: savedTables(nextTables, nextBlocks),
       charts: [],
       ...(loadedTabs ? { loaded_tabs: loadedTabs } : {}),
     };
@@ -517,12 +525,43 @@ export function WorkspaceCanvasProvider({ pageId, readOnly = false, children }) 
 
   useEffect(() => {
     if (readOnly || !ready || !storageKey) return;
+    const saved = savedBlocksByPage({ [pageId]: blocks });
+    rememberSheetRecords(owner, saved.trimmed);
     try {
-      localStorage.setItem(storageKey, JSON.stringify(blocks));
+      localStorage.setItem(storageKey, JSON.stringify(saved.blocksByPage[pageId] || []));
     } catch {
       // The full dashboard document is the copy that survives a reload.
     }
-  }, [blocks, readOnly, ready, storageKey]);
+  }, [blocks, owner, pageId, readOnly, ready, storageKey]);
+
+  const restoredRef = useRef(new Set());
+  useEffect(() => {
+    if (!ready || !owner) return;
+    for (const [page, list] of Object.entries(blocksByPage)) {
+      for (const block of Array.isArray(list) ? list : []) {
+        if (block?.type !== "sheet" || !Array.isArray(block.records)) continue;
+        if (!(Number(block.rowCount) > block.records.length)) continue;
+        const mark = `${page}:${block.id}:${block.pulledAt || 0}`;
+        if (restoredRef.current.has(mark)) continue;
+        restoredRef.current.add(mark);
+        void restoreSheetRecords(owner, page, block).then((records) => {
+          if (!records) return;
+          setBlocksByPage((prev) => {
+            const current = prev[page];
+            if (!Array.isArray(current)) return prev;
+            let hit = false;
+            const next = current.map((item) => {
+              if (item.id !== block.id || (item.pulledAt || 0) !== (block.pulledAt || 0)) return item;
+              if (!Array.isArray(item.records) || item.records.length >= records.length) return item;
+              hit = true;
+              return { ...item, records };
+            });
+            return hit ? { ...prev, [page]: next } : prev;
+          });
+        });
+      }
+    }
+  }, [blocksByPage, owner, ready]);
 
   useEffect(() => {
     if (!ready) return;
@@ -716,8 +755,10 @@ export function WorkspaceCanvasProvider({ pageId, readOnly = false, children }) 
         const prior = priorById.get(block.id);
         if (!prior) return { ...block, arrive: true };
         const sameData = columnKey(prior.columns) === columnKey(block.columns) && (prior.rowCount || 0) === (block.rowCount || 0);
+        const filled = sameData && (block.records?.length || 0) > (prior.records?.length || 0);
         return {
           ...(sameData ? prior : block),
+          ...(filled ? { records: block.records, cells: block.cells } : {}),
           x: block.x,
           y: block.y,
           w: block.w,

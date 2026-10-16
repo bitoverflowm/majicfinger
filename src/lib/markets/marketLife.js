@@ -65,6 +65,7 @@ export function formatMarketOutcome(outcome) {
  *   openAt?: unknown;
  *   closeAt?: unknown;
  *   closed?: boolean;
+ *   acceptingOrders?: boolean;
  *   status?: string;
  *   outcome?: string;
  *   result?: string;
@@ -83,7 +84,9 @@ export function lifeOfMarket(source, now = Date.now()) {
   const closeMs = instantMs(source.closesAt ?? source.endedAt ?? source.closeAt ?? source.closeTime);
   const status = String(source.marketStatus || source.status || "").trim().toLowerCase();
   const pastClose = Number.isFinite(closeMs) && closeMs <= now;
-  const stopped = source.closed === true || CLOSED_STATUS.has(status) || pastClose;
+  // Polymarket's end date is a schedule. A market keeps filling orders past it until it resolves.
+  const takingOrders = source.acceptingOrders === true && source.closed !== true;
+  const stopped = source.closed === true || CLOSED_STATUS.has(status) || (pastClose && !takingOrders);
   const trading =
     !stopped &&
     !(Number.isFinite(openMs) && openMs > now) &&
@@ -314,6 +317,7 @@ export function lifePull(source) {
     closed: life.stopped,
     outcome: life.outcome,
     status: life.status,
+    ...(typeof source.acceptingOrders === "boolean" ? { acceptingOrders: source.acceptingOrders } : {}),
   };
 }
 

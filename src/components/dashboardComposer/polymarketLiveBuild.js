@@ -981,8 +981,17 @@ export function polymarketJoinPickFromRow(row) {
     ...(row.closed === true || row.closed === "true" || row.closed === false || row.closed === "false"
       ? { closed: row.closed === true || row.closed === "true" }
       : {}),
+    ...marketOrdersFromRow(row),
     ...marketLifeFromRow(row),
   };
+}
+
+function marketOrdersFromRow(row) {
+  const raw = row.raw && typeof row.raw === "object" ? row.raw : row;
+  const value = row.accepting_orders ?? row.acceptingOrders ?? raw.accepting_orders ?? raw.acceptingOrders;
+  if (value === true || value === "true") return { acceptingOrders: true };
+  if (value === false || value === "false") return { acceptingOrders: false };
+  return {};
 }
 
 export function polymarketPickMatchesRow(pick, row) {
@@ -1064,13 +1073,14 @@ function lifeSeconds(value) {
 function marketLifeFromRow(row) {
   const source = row && typeof row === "object" ? row : {};
   const raw = source.raw && typeof source.raw === "object" ? source.raw : source;
-  const closesAt = lifeSeconds(raw.closedTime || raw.closed_time || raw.endDate || raw.end_date || raw.endDateIso || source.closesAt || source.endedAt);
+  const closesAt = lifeSeconds(raw.closedTime || raw.closed_time || raw.endDate || raw.end_date || raw.endDateIso || raw.end_date_iso || source.closesAt || source.endedAt);
   const startedAt = lifeSeconds(
     raw.createdAt || raw.created_at || raw.startDate || raw.start_date || raw.acceptingOrdersTimestamp || source.startedAt,
   );
   const outcome = String(raw.result || raw.outcome || source.outcome || "").trim();
+  const takingOrders = marketOrdersFromRow(source).acceptingOrders === true && !marketIsClosed(raw);
   return {
-    endedAt: closesAt && closesAt * 1000 <= Date.now() ? closesAt : null,
+    endedAt: closesAt && closesAt * 1000 <= Date.now() && !takingOrders ? closesAt : null,
     closesAt: closesAt || null,
     startedAt: startedAt || null,
     outcome: outcome && !outcome.startsWith("[") ? outcome : "",
@@ -1465,7 +1475,8 @@ async function resolveMarket(pick) {
     tokenIds,
     outcomes: parseOutcomeList(row.outcomes),
     closed: marketIsClosed(row) || pick.closed === true,
-    endedAt: marketLifeFromRow(row).endedAt || pick.endedAt || null,
+    ...marketOrdersFromRow(row),
+    endedAt: marketLifeFromRow(row).endedAt || (marketOrdersFromRow(row).acceptingOrders === true ? null : pick.endedAt) || null,
     closesAt: marketLifeFromRow(row).closesAt || pick.closesAt || null,
     startedAt: marketLifeFromRow(row).startedAt || pick.startedAt || null,
     outcome: marketLifeFromRow(row).outcome || pick.outcome || "",

@@ -289,6 +289,7 @@ function cleanPull(pull) {
     ...(seriesTickers.length ? { seriesTickers } : {}),
     ...(limit > 0 ? { limit: Math.min(limit, MAX_SAVED_ROWS) } : {}),
     ...(pull.closed === true || pull.closed === false ? { closed: pull.closed === true } : {}),
+    ...(pull.acceptingOrders === true || pull.acceptingOrders === false ? { acceptingOrders: pull.acceptingOrders } : {}),
     ...(outcome ? { outcome } : {}),
     ...(status ? { status } : {}),
     ...(wallet ? { address: wallet } : {}),

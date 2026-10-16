@@ -1022,4 +1022,20 @@ assert.equal(kept.length, 160000);
 assert.equal(kept[159999], 159999);
 assert.throws(() => [].push(...wide), RangeError);
 
+const pastEndRow = {
+  condition_id: "0xlula",
+  market_slug: "will-lula-win",
+  question: "Will Lula win?",
+  closed: false,
+  accepting_orders: true,
+  end_date_iso: "2026-10-05T03:59:00Z",
+};
+const pastEndPick = polymarketJoinPickFromRow(pastEndRow);
+assert.equal(pastEndPick.acceptingOrders, true);
+assert.equal(pastEndPick.endedAt, null);
+assert.ok(pastEndPick.closesAt > 0);
+const stoppedPick = polymarketJoinPickFromRow({ ...pastEndRow, accepting_orders: false });
+assert.equal(stoppedPick.acceptingOrders, false);
+assert.equal(stoppedPick.endedAt, stoppedPick.closesAt);
+
 console.log("polymarket live build ok");
