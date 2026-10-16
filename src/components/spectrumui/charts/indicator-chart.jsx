@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import { cn } from "@/lib/utils";
-import { EASE, UP, DOWN, marketVarsClassName, usePrefersReducedMotion } from "@/components/spectrumui/charts/chart-engine";
+import { EASE, UP, DOWN, marketVarsClassName, useMorph, usePrefersReducedMotion } from "@/components/spectrumui/charts/chart-engine";
 
 /**
  * Spectrum indicator chart.
@@ -291,18 +291,16 @@ export function IndicatorChart({
     (value) => priceBottom - ((value - domain[0]) / (domain[1] - domain[0] || 1)) * (priceBottom - priceTop),
     [domain, priceBottom, priceTop],
   );
-  const pathFor = React.useCallback(
-    (list) => {
-      const plotted = list.map((point) => ({ x: xAt(point.t), y: priceY(point.price) }));
-      return curve === "linear" ? linearPath(plotted) : monotonePath(plotted);
-    },
-    [curve, priceY, xAt],
+  const plotted = React.useMemo(
+    () => [view, ...overlayViews.map((overlay) => overlay.view)].map((list) => list.map((point) => ({ x: xAt(point.t), y: priceY(point.price) }))),
+    [overlayViews, priceY, view, xAt],
   );
-  const closeLine = React.useMemo(() => pathFor(view), [pathFor, view]);
-  const overlayLines = React.useMemo(
-    () => overlayViews.map((overlay) => ({ ...overlay, path: pathFor(overlay.view) })),
-    [overlayViews, pathFor],
-  );
+  const morphKey = `${range?.label || ""}|${symbol}|${lineLabel}|${overlayViews.map((overlay) => overlay.id).join(",")}`;
+  const drawn = useMorph(plotted, morphKey, { enabled: !reduce });
+  const pathOf = (list) => (curve === "linear" ? linearPath(list) : monotonePath(list));
+  const drawnMain = drawn[0] || [];
+  const closeLine = pathOf(drawnMain);
+  const overlayLines = overlayViews.map((overlay, index) => ({ ...overlay, path: pathOf(drawn[index + 1] || []) }));
   const priceTicks = React.useMemo(() => niceTicks(domain[0], domain[1], 4), [domain]);
   const timeTicks = React.useMemo(() => {
     if (n < 2 && !overlayViews.length) return view.map((point) => point.t);
@@ -469,11 +467,13 @@ export function IndicatorChart({
                   </g>
                 );
               })}
-              {overlayLines.length ? null : (
-                <path d={`${closeLine} L${xAt(last.t)},${priceBottom} L${xAt(first.t)},${priceBottom} Z`} fill={`url(#${uid}-price)`} />
+              {overlayLines.length || !drawnMain.length ? null : (
+                <path
+                  d={`${closeLine} L${drawnMain[drawnMain.length - 1].x},${priceBottom} L${drawnMain[0].x},${priceBottom} Z`}
+                  fill={`url(#${uid}-price)`}
+                />
               )}
               <path
-                key={`main-${lineColor}`}
                 d={closeLine}
                 fill="none"
                 stroke={lineColor}
@@ -481,7 +481,7 @@ export function IndicatorChart({
                 strokeLinejoin="round"
                 strokeLinecap="round"
                 pathLength="1"
-                style={reduce ? undefined : { strokeDasharray: 1, animation: `spectrum-mc-draw 880ms ${EASE} both` }}
+                style={reduce ? undefined : { strokeDasharray: 1, animation: `spectrum-mc-draw 880ms ${EASE} both`, transition: `stroke 320ms ${EASE}` }}
               />
               {overlayLines.map((overlay) => (
                 <path

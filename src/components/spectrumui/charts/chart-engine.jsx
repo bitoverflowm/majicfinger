@@ -289,6 +289,66 @@ export function useTweenNumber(target, options) {
   return useTween(vec, options)[0];
 }
 
+/**
+ * Plotted shapes glide from their last frame to the new one when `morphKey` changes,
+ * the way the shadcn (recharts) charts animate a new time frame.
+ * `groups` holds one list per series, and each item is a record of plotted numbers.
+ * Lists can change length, so each new item starts from the old item at the same share of its series.
+ * A series that was not on screen grows out of the first one that was.
+ */
+export function useMorph(groups, morphKey, { duration = 620, enabled = true } = {}) {
+  const [frame, setFrame] = React.useState(null);
+  const shownRef = React.useRef(groups);
+  const keyRef = React.useRef(morphKey);
+  const rafRef = React.useRef(0);
+
+  React.useLayoutEffect(() => {
+    if (keyRef.current === morphKey) return;
+    keyRef.current = morphKey;
+    cancelAnimationFrame(rafRef.current);
+    const from = shownRef.current || [];
+    const fallback = from.find((list) => list?.length);
+    if (!enabled || !fallback || !groups.some((list) => list?.length)) {
+      setFrame(null);
+      return;
+    }
+    const pairs = groups.map((to, index) => {
+      const source = from[index]?.length ? from[index] : fallback;
+      return (to || []).map((item, i) => [source[Math.min(source.length - 1, Math.floor((i * source.length) / to.length))], item]);
+    });
+    const at = (e) =>
+      pairs.map((list) =>
+        list.map(([a, b]) => {
+          const out = { ...b };
+          for (const key in b) {
+            if (typeof b[key] === 'number' && typeof a?.[key] === 'number') out[key] = a[key] + (b[key] - a[key]) * e;
+          }
+          return out;
+        }),
+      );
+    const start = performance.now();
+    setFrame(at(0));
+    const tick = (now) => {
+      const p = Math.min(1, (now - start) / duration);
+      if (p >= 1) {
+        setFrame(null);
+        return;
+      }
+      setFrame(at(easeOutCubic(p)));
+      rafRef.current = requestAnimationFrame(tick);
+    };
+    rafRef.current = requestAnimationFrame(tick);
+  }, [duration, enabled, groups, morphKey]);
+
+  React.useEffect(() => () => cancelAnimationFrame(rafRef.current), []);
+
+  const shown = frame && frame.length === groups.length ? frame : groups;
+  React.useLayoutEffect(() => {
+    shownRef.current = shown;
+  });
+  return shown;
+}
+
 export const KEYFRAMES = `
 @keyframes spectrum-mc-rise {
   from { transform: scaleY(0); opacity: 0; }

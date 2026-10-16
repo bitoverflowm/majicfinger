@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import { cn } from "@/lib/utils";
-import { marketVarsClassName, usePrefersReducedMotion } from "@/components/spectrumui/charts/chart-engine";
+import { marketVarsClassName, useMorph, usePrefersReducedMotion } from "@/components/spectrumui/charts/chart-engine";
 
 const PAD = { top: 12, right: 64, bottom: 22, left: 8 };
 const VOLUME_SHARE = 0.22;
@@ -284,14 +284,34 @@ export function MarketChart({
   }, [n, variant, view]);
   const [domLo, domHi] = domain;
   const priceY = (v) => priceY1 - ((v - domLo) / (domHi - domLo || 1)) * priceH;
-  const maxVolume = view.reduce((max, candle) => Math.max(max, candle.volume), 1);
   const first = view[0];
   const active = hoverIndex != null ? view[hoverIndex] : null;
   const shown = active || last;
   const baseline = first?.close ?? 0;
-  const areaPoints = view.map((candle, i) => ({ x: cx(i), y: priceY(candle.close) }));
+  const maxVolume = view.reduce((max, candle) => Math.max(max, candle.volume), 1);
+  const shapes =
+    variant === "area"
+      ? view.map((candle, i) => ({ x: cx(i), y: priceY(candle.close) }))
+      : view.map((candle, i) => ({
+          x: cx(i),
+          high: priceY(candle.high),
+          low: priceY(candle.low),
+          top: Math.min(priceY(candle.open), priceY(candle.close)),
+          bodyH: Math.max(1.25, Math.abs(priceY(candle.close) - priceY(candle.open))),
+          w: bodyW,
+          up: candle.close >= candle.open,
+        }));
+  const bars = showVolume
+    ? view.map((candle, i) => ({ x: cx(i), h: Math.max(1, (candle.volume / maxVolume) * (volH - 12)), w: bodyW, up: candle.close >= candle.open }))
+    : [];
+  const [drawnShapes, [drawnBase], drawnBars] = useMorph(
+    [shapes, [{ y: priceY(baseline) }], bars],
+    `${range?.label || ""}|${symbol}|${variant}`,
+    { enabled: !reduce },
+  );
+  const areaPoints = variant === "area" ? drawnShapes : [];
   const linePath = variant === "area" ? monotonePath(areaPoints) : "";
-  const baselineY = priceY(baseline);
+  const baselineY = drawnBase?.y ?? priceY(baseline);
   const areaPath =
     variant === "area" && linePath && areaPoints.length
       ? `${linePath}L${areaPoints[areaPoints.length - 1].x},${baselineY}L${areaPoints[0].x},${baselineY}Z`
@@ -448,7 +468,7 @@ export function MarketChart({
             })}
 
             {variant === "area" ? (
-              <g key={range?.label || "all"}>
+              <g>
                 <defs>
                   <linearGradient id={`${uid}-up`} x1="0" y1="0" x2="0" y2="1">
                     <stop offset="0%" stopColor="var(--spectrum-chart-up)" stopOpacity={0.28} />
@@ -508,36 +528,30 @@ export function MarketChart({
                 />
               </g>
             ) : (
-              view.map((candle, i) => {
-                const isUp = candle.close >= candle.open;
-                const color = isUp ? "var(--spectrum-chart-up)" : "var(--spectrum-chart-down)";
-                const x = cx(i);
-                const top = Math.min(priceY(candle.open), priceY(candle.close));
-                const bodyH = Math.max(1.25, Math.abs(priceY(candle.close) - priceY(candle.open)));
+              drawnShapes.map((shape, i) => {
+                const color = shape.up ? "var(--spectrum-chart-up)" : "var(--spectrum-chart-down)";
                 const dim = hoverIndex != null && hoverIndex !== i;
                 return (
-                  <g key={candle.t} style={{ opacity: dim ? 0.35 : 1 }}>
-                    <line x1={x} x2={x} y1={priceY(candle.high)} y2={priceY(candle.low)} stroke={color} strokeWidth={1} />
-                    <rect x={x - bodyW / 2} y={top} width={bodyW} height={bodyH} rx={1} fill={color} />
+                  <g key={i} style={{ opacity: dim ? 0.35 : 1 }}>
+                    <line x1={shape.x} x2={shape.x} y1={shape.high} y2={shape.low} stroke={color} strokeWidth={1} />
+                    <rect x={shape.x - shape.w / 2} y={shape.top} width={shape.w} height={shape.bodyH} rx={1} fill={color} />
                   </g>
                 );
               })
             )}
 
             {showVolume
-              ? view.map((candle, i) => {
-                  const isUp = candle.close >= candle.open;
-                  const barH = Math.max(1, (candle.volume / maxVolume) * (volH - 12));
+              ? drawnBars.map((bar, i) => {
                   const dim = hoverIndex != null && hoverIndex !== i;
                   return (
                     <rect
-                      key={`v-${candle.t}`}
-                      x={cx(i) - bodyW / 2}
-                      y={volY1 - barH}
-                      width={bodyW}
-                      height={barH}
+                      key={`v-${i}`}
+                      x={bar.x - bar.w / 2}
+                      y={volY1 - bar.h}
+                      width={bar.w}
+                      height={bar.h}
                       rx={1}
-                      fill={isUp ? "var(--spectrum-chart-up)" : "var(--spectrum-chart-down)"}
+                      fill={bar.up ? "var(--spectrum-chart-up)" : "var(--spectrum-chart-down)"}
                       opacity={dim ? 0.18 : 0.45}
                     />
                   );

@@ -25,6 +25,7 @@ import {
   useElementWidth,
   useHoverIndexKeys,
   usePrefersReducedMotion,
+  useMorph,
   useTween,
   useTweenNumber,
 } from './chart-engine';
@@ -129,19 +130,21 @@ export function PortfolioChart({
     [ddTop, ddH, maxDrawdown],
   );
 
-  const valuePath = React.useMemo(
-    () => monotonePath(view.map((p, i) => ({ x: cx(i), y: valueY(p.value) }))),
-    [view, cx, valueY],
-  );
-  const basisPath = React.useMemo(
-    () => monotonePath(view.map((p, i) => ({ x: cx(i), y: valueY(p.basis) }))),
-    [view, cx, valueY],
-  );
-  const ddPath = React.useMemo(() => {
-    if (!showDrawdown || !n) return '';
-    const line = monotonePath(drawdowns.map((v, i) => ({ x: cx(i), y: ddY(v) })));
-    return `${line}L${cx(n - 1)},${ddTop}L${cx(0)},${ddTop}Z`;
-  }, [showDrawdown, drawdowns, cx, ddY, ddTop, n]);
+  const lines = React.useMemo(() => {
+    const finalY = (v) => valueBottom - ((v - rawDomain[0]) / (rawDomain[1] - rawDomain[0] || 1)) * (valueBottom - valueTop);
+    return [
+      view.map((p, i) => ({ x: cx(i), y: finalY(p.value) })),
+      view.map((p, i) => ({ x: cx(i), y: finalY(p.basis) })),
+      showDrawdown ? drawdowns.map((v, i) => ({ x: cx(i), y: ddY(v) })) : [],
+    ];
+  }, [cx, ddY, drawdowns, rawDomain, showDrawdown, valueBottom, valueTop, view]);
+  const [valueLine, basisLine, ddLine] = useMorph(lines, rangeLabel, { enabled: !reduce });
+  const valuePath = monotonePath(valueLine);
+  const basisPath = monotonePath(basisLine);
+  const ddPath =
+    showDrawdown && ddLine.length
+      ? `${monotonePath(ddLine)}L${ddLine[ddLine.length - 1].x},${ddTop}L${ddLine[0].x},${ddTop}Z`
+      : '';
 
   const valueTicks = React.useMemo(() => niceTicks(dLo, dHi, 4), [dLo, dHi]);
   const timeTicks = React.useMemo(() => {
@@ -184,7 +187,6 @@ export function PortfolioChart({
 
   const uid = React.useId().replace(/:/g, '');
   const ready = width > 0;
-  const introKey = rangeLabel;
 
   return (
     <div
@@ -319,12 +321,14 @@ export function PortfolioChart({
               })}
             </g>
 
-            <g key={`${introKey}-value`}>
-              <path
-                d={`${valuePath}L${cx(n - 1)},${valueBottom}L${cx(0)},${valueBottom}Z`}
-                fill={`url(#${uid}-value)`}
-                style={reduce ? undefined : { animation: 'spectrum-mc-fade 560ms ease-out both' }}
-              />
+            <g>
+              {valueLine.length ? (
+                <path
+                  d={`${valuePath}L${valueLine[valueLine.length - 1].x},${valueBottom}L${valueLine[0].x},${valueBottom}Z`}
+                  fill={`url(#${uid}-value)`}
+                  style={reduce ? undefined : { animation: 'spectrum-mc-fade 560ms ease-out both' }}
+                />
+              ) : null}
               <path
                 d={basisPath}
                 fill="none"
@@ -350,7 +354,7 @@ export function PortfolioChart({
             </g>
 
             {showDrawdown ? (
-              <g key={`${introKey}-dd`}>
+              <g>
                 <line
                   x1={x0}
                   x2={x1}
