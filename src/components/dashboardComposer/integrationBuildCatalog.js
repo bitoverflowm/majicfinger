@@ -45,6 +45,12 @@ import {
   POLYMARKET_MARKETS_CONNECT_COLUMNS,
   POLYMARKET_TRADES_CONNECT_COLUMNS,
 } from "@/lib/polymarketConnectColumns";
+import {
+  marketOutcomes,
+  POLYMARKET_FILL_AMOUNTS,
+  POLYMARKET_FILL_COLUMNS,
+  priceFill,
+} from "@/components/dashboardComposer/polymarketTradeFills";
 
 export const PREVIEW_ROW_CAP = 50;
 
@@ -752,16 +758,46 @@ function loadLakeHistoricalPreview(compose) {
   });
 }
 
+/**
+ * The trades table leaves timestamp empty. It is filled from polymarket.blocks by block_number.
+ */
+const POLYMARKET_TRADE_TIME = {
+  id: "timestamp",
+  title: "Timestamp",
+  type: "date",
+  dateEpoch: "iso",
+  description: "Block time of the fill, from polymarket.blocks",
+};
+
+/**
+ * Every match also logs one fill for the taker's order with the exchange contract as taker.
+ * It repeats the maker fills, so it is left out.
+ */
+const POLYMARKET_EXCHANGES = ["0x4bFb41d5B3570DeFd03C39a9A4D8dE6Bd8B8982E", "0xC5d563A36AE78145C45a50134d48A1215220f80a"];
+
+/** Every lake column, with the priced fill columns after the time. */
 function polymarketTradeColumns() {
-  return polymarketHistoricalColumns("trades").filter((column) => column.defaultOn);
+  const lake = polymarketHistoricalColumns("trades").map((column) =>
+    column.id === "timestamp"
+      ? { ...column, ...POLYMARKET_TRADE_TIME }
+      : POLYMARKET_FILL_AMOUNTS.has(column.id)
+        ? { ...column, type: "number", description: String(column.description || "").replace(/\s*\(6 decimals\)/i, "") }
+        : column,
+  );
+  return [
+    ...lake.filter((column) => column.id === "timestamp"),
+    ...POLYMARKET_FILL_COLUMNS.map((column) => ({ ...column, defaultOn: true })),
+    ...lake.filter((column) => column.id !== "timestamp"),
+  ];
 }
 
 /**
  * Trades for one Polymarket market. A fill matches when the maker or taker asset
- * is one of that market's outcome token ids.
+ * is one of that market's outcome token ids. `options.outcomes` labels the tokens in order.
  */
 export function loadPolymarketHistoricalTradesForTokens(tokens, limit = PREVIEW_ROW_CAP, options = {}) {
   const columns = polymarketTradeColumns();
+  const lakeIds = new Set(polymarketHistoricalColumns("trades").map((column) => column.id));
   const unique = [];
   const seen = new Set();
   for (const raw of tokens || []) {
@@ -783,17 +819,28 @@ export function loadPolymarketHistoricalTradesForTokens(tokens, limit = PREVIEW_
     queryType: "compose",
     limit: rowLimit,
     caseSensitive: false,
-    filters: { and: [], or },
+    filters: {
+      and: [{ column: "taker", kind: "string", op: "not_in", value: POLYMARKET_EXCHANGES.map((address) => `"${address}"`).join(", ") }],
+      or,
+    },
     compose: {
-      select: columns.map((entry) => ({ column: entry.id, alias: entry.id })),
+      select: columns
+        .filter((entry) => lakeIds.has(entry.id))
+        .map((entry) =>
+          entry.id === "timestamp"
+            ? { column: "timestamp", alias: "timestamp", sourceTable: "blocks" }
+            : { column: entry.id, alias: entry.id },
+        ),
+      joins: [{ table: "blocks", joinType: "left", on: { leftColumn: "block_number", rightColumn: "block_number" } }],
       groupByAliases: [],
-      orderBy: [{ alias: "timestamp", direction: "desc" }],
+      orderBy: [{ alias: "block_number", direction: "desc" }],
     },
   };
+  const outcomes = marketOutcomes(options.outcomes);
   const maxWaitMs = rowLimit > PREVIEW_ROW_CAP ? 600000 : 180000;
   return fetchAthenaLakeSample(request, { maxWaitMs, pollIntervalMs: 800, onPhase: options.onPhase }).then((result) => ({
     columns,
-    rows: rowsFromAthenaCells(result, rowLimit),
+    rows: rowsFromAthenaCells(result, rowLimit).map((row) => priceFill(row, unique, outcomes)),
     request,
   }));
 }

@@ -165,6 +165,7 @@ import {
   sortSummary,
 } from "@/components/dashboardComposer/integrationAttributes";
 import { MarketScanSteps } from "@/components/dashboardComposer/liveFilterTape";
+import { JoinTradeSteps } from "@/components/dashboardComposer/joinTradeSteps";
 import { integrationProfile } from "@/components/dashboardComposer/integrationSource";
 import { requestCardForSheet, stampRunSheets } from "@/components/dashboardComposer/integrationProvenance";
 import { attachJoinRegistry } from "@/components/dashboardComposer/replayTabQueries";
@@ -3787,17 +3788,42 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
   const previewTicker = joinedMarkets[0]?.ticker || "";
   const previewLabel = joinedMarkets[0]?.label || previewTicker;
   const previewTokenKey = (joinedMarkets[0]?.tokens || []).join("|");
+  const previewOutcomeKey = (joinedMarkets[0]?.outcomes || []).join("|");
 
   useEffect(() => {
     if (joinTarget !== joinTradesTarget || !previewTicker) {
       if (!previewTicker) setTradePreview({ status: "idle", ticker: "", columns: [], rows: [], error: "" });
       return undefined;
     }
-    const load = join?.loadTrades({ ticker: previewTicker, tokens: previewTokenKey ? previewTokenKey.split("|") : [] });
-    if (!load) return undefined;
     let cancel = false;
+    const startedAt = Date.now();
+    const onPhase = (info) => {
+      if (cancel) return;
+      setTradePreview((current) => {
+        if (current.status !== "loading" || current.ticker !== previewTicker) return current;
+        const progress = { ...(current.progress || {}) };
+        if (info?.dataScannedBytes != null) progress.scannedBytes = info.dataScannedBytes;
+        if (info?.phase === "athena_succeeded") progress.queryDoneAt = progress.queryDoneAt || Date.now();
+        if (info?.phase === "downloading" || info?.phase === "downloading_page") {
+          progress.queryDoneAt = progress.queryDoneAt || Date.now();
+          progress.downloadAt = progress.downloadAt || Date.now();
+          if (Number.isFinite(info?.processed)) progress.processed = info.processed;
+        }
+        return { ...current, progress };
+      });
+    };
+    const load = join?.loadTrades(
+      {
+        ticker: previewTicker,
+        tokens: previewTokenKey ? previewTokenKey.split("|") : [],
+        outcomes: previewOutcomeKey ? previewOutcomeKey.split("|") : [],
+      },
+      undefined,
+      { onPhase },
+    );
+    if (!load) return undefined;
     setJoinTab(previewTicker);
-    setTradePreview({ status: "loading", ticker: previewTicker, columns: [], rows: [], error: "" });
+    setTradePreview({ status: "loading", ticker: previewTicker, columns: [], rows: [], error: "", progress: { startedAt } });
     load
       .then((result) => {
         if (cancel) return;
@@ -3805,18 +3831,19 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
       })
       .catch((err) => {
         if (cancel) return;
-        setTradePreview({
+        setTradePreview((current) => ({
           status: "error",
           ticker: previewTicker,
           columns: [],
           rows: [],
           error: err instanceof Error ? err.message : "Trades preview failed",
-        });
+          progress: { ...(current.progress || {}), startedAt, failedAt: Date.now() },
+        }));
       });
     return () => {
       cancel = true;
     };
-  }, [join, joinTarget, joinTradesTarget, previewTicker, previewTokenKey]);
+  }, [join, joinTarget, joinTradesTarget, previewOutcomeKey, previewTicker, previewTokenKey]);
 
   useEffect(() => {
     if (!tradesQuery || joinTarget !== joinMarketsTarget) {
@@ -4259,10 +4286,11 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
     settledRowCount === 0 &&
     shownColumns.length > 0;
   const previewSampleEmpty = noMatchingRows || unfilteredEmpty;
+  // A changed filter hides the old rows until the archive answers, so it loads like an empty sheet.
   const emptyRefresh =
     !loading &&
     shownColumns.length > 0 &&
-    settledRowCount === 0 &&
+    (settledRowCount === 0 || (Boolean(guidedFilters) && searchingPreview && !previewSearchError)) &&
     (searchingPreview || reloadingUnfiltered || previewRefreshing);
 
   function refreshPreview() {
@@ -10533,12 +10561,16 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
             <div className="flex h-full items-center justify-center rounded-xl border border-border/70 bg-background px-6 text-center text-[13px] leading-relaxed text-muted-foreground shadow-sm">
               {PREVIEW_TRADE_LOCK}
             </div>
-          ) : showJoinSheets && joinTab === previewTicker && tradePreview.status === "loading" ? (
+          ) : showJoinSheets && joinTab === previewTicker && (tradePreview.status === "loading" || tradePreview.status === "error") ? (
             <div className="flex h-full items-center justify-center">
-              <SpectrumLoadingState label="Loading trades" />
+              <JoinTradeSteps
+                preview={tradePreview}
+                markets={joinedMarkets}
+                matchNoun={join?.matchNoun || "ticker"}
+                table={`${lakeId}.trades`}
+                priced={polymarketHistorical}
+              />
             </div>
-          ) : showJoinSheets && joinTab === previewTicker && tradePreview.status === "error" ? (
-            <p className="text-[13px] text-muted-foreground">{tradePreview.error}</p>
           ) : showJoinSheets && joinTab === previewTicker && tradesGrid.columns.length ? (
             <IntegrationBuildGrid
               columns={tradesGrid.columns}
@@ -10652,7 +10684,7 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
               </div>
             </div>
           ) : marketsGrid.columns.length ? (
-            <div className="flex h-full min-h-0 flex-col">
+            <div className="flex h-full min-h-0 flex-col animate-in fade-in duration-300 ease-out motion-reduce:animate-none">
               {liveRemovalTape}
               {polymarketRemovalTape}
               {biggestWinnersTape}

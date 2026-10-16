@@ -300,4 +300,18 @@ assert.equal(migratedPositions.pull.kind, "profile");
 assert.equal(migratedPositions.query.rowLimit, undefined);
 assert.equal(migratedPnl.query.address, "0xf0318c32136c2db7fec88b84869aee6a1106c80c");
 
+const bookSheetId = "run-live-getOrderbooks-will-luiz-incio-lula-da-silva-win-the-2026-brazilian-presidential-election";
+const bookCharts = sanitizeWorkspaceDashboard({
+  tabs: [{ id: "welcome", name: "Welcome" }],
+  blocks: {
+    welcome: [
+      { id: `chart-${bookSheetId}-order-book`, type: "chart", sourceSheetId: bookSheetId, chartView: "order-book", h: 1300 },
+      { id: `chart-${bookSheetId}-depth`, type: "chart", sourceSheetId: bookSheetId, chartView: "depth", h: 360 },
+    ],
+  },
+}).blocks.welcome;
+assert.notEqual(bookCharts[0].id, bookCharts[1].id);
+assert.equal(bookCharts[1].sourceSheetId, bookSheetId);
+assert.equal(bookCharts[1].h, 360);
+
 console.log("realtime mode ok");

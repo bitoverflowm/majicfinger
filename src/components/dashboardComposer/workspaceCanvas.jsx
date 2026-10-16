@@ -18,7 +18,7 @@ import { ActivityRichTableView } from "@/components/dashboardComposer/activityRi
 import { CatalogRichTableView } from "@/components/dashboardComposer/catalogRichTableView";
 import { VisualTableView } from "@/components/dashboardComposer/visualTableView";
 import { Switch } from "@/components/ui/switch";
-import { isOrderBookSheet } from "@/components/dashboardComposer/orderBookLadder";
+import { defaultOrderBookCharts, isOrderBookSheet } from "@/components/dashboardComposer/orderBookLadder";
 import { columnKey, describeSheet } from "@/lib/visualizations/datasetDescriptor";
 import { chartSpecsForSheet } from "@/lib/visualizations/sheetCharts";
 import { hasVisualTable, resolveVisualization, visualPresentationLabel } from "@/lib/visualizations/presetRegistry";
@@ -42,6 +42,7 @@ import { useUser } from "@/lib/hooks";
 import { getHistoricalPullRowLimit } from "@/lib/athenaEntitlement";
 import {
   ensureFullTradeSheet,
+  repullsTradeSheet,
   tradeTickerFromBlock,
   usesHistoricalTradeSheet,
   useTradeSheetLabel,
@@ -174,9 +175,10 @@ function withOrderBookChartPairs(list) {
     if (ladder && !ladder.chartView) patches.set(ladder.id, { chartView: "order-book" });
     const host = ladder || depth || charts[0];
     const gap = 8;
-    const height = host.h || 360;
+    const sizes = new Map(defaultOrderBookCharts(base).map((spec) => [spec.chartView, spec.h]));
+    let top = (host.y || 0) + (host.h || 360) + gap;
     const openRow = (chartView, title) => {
-      const top = (host.y || 0) + (additions.length + 1) * (height + gap);
+      const height = sizes.get(chartView) || 360;
       shifted = shifted.map((block) =>
         (block.y || 0) >= top - 1 ? { ...block, y: Math.round((block.y || 0) + height + gap) } : block,
       );
@@ -193,6 +195,7 @@ function withOrderBookChartPairs(list) {
         title,
         body: "",
       });
+      top += height + gap;
     };
     if (!ladder) openRow("order-book", `${base} · ladder`);
     if (!depth) openRow("depth", `${base} · depth`);
@@ -588,7 +591,7 @@ export function WorkspaceCanvasProvider({ pageId, readOnly = false, children }) 
     if (!ready || user === undefined) return undefined;
     const cap = getHistoricalPullRowLimit(user);
     for (const block of blocks) {
-      if (!usesHistoricalTradeSheet(block) || !block.columns?.length) continue;
+      if (!repullsTradeSheet(block) || !block.columns?.length) continue;
       const ticker = tradeTickerFromBlock(block);
       const limit = block.pull?.limit || cap;
       ensureFullTradeSheet(block.id, ticker, block.columns, limit, owner).then((sheet) => {

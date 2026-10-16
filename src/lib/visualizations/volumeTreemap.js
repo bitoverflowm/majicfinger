@@ -70,6 +70,15 @@ function text(record, ...keys) {
 }
 
 /**
+ * Name of the volume a list is sized by. Lake markets only carry lifetime volume.
+ * @param {object | null | undefined} dataset
+ */
+export function volumeLabel(dataset) {
+  const field = String(dataset?.fields?.value || "volume24hr");
+  return /24h|24hr|_24/i.test(field) ? "24h volume" : "Volume";
+}
+
+/**
  * Tiles for a list of markets or events. Area is 24h volume, then total volume.
  * @param {object | null | undefined} sheet
  * @param {object | null | undefined} dataset

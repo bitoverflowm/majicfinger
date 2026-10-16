@@ -15,6 +15,7 @@ import {
   polymarketHistoricalColumnList,
   polymarketTokenIds,
 } from "@/components/dashboardComposer/integrationBuildCatalog";
+import { marketOutcomes } from "@/components/dashboardComposer/polymarketTradeFills";
 
 function orderByKeys(rows, keys, keyOf) {
   const byKey = new Map();
@@ -158,7 +159,7 @@ const polymarketJoin = {
   venue: "polymarket",
   tradesTarget: "polymarketHistoricalTrades",
   marketsTarget: "polymarketHistoricalMarkets",
-  ensureColumns: ["condition_id", "clob_token_ids"],
+  ensureColumns: ["condition_id", "clob_token_ids", "outcomes"],
   marketKey: polymarketMarketKey,
   marketLabel: polymarketMarketLabel,
   tradeKeys: polymarketTradeTokens,
@@ -179,13 +180,14 @@ const polymarketJoin = {
         title: String(row?.question || polymarketMarketLabel(row)),
         label: polymarketMarketLabel(row),
         tokens,
+        outcomes: marketOutcomes(row?.outcomes),
       });
       if (markets.length >= cap) break;
     }
     return markets;
   },
   loadTrades(market, limit, options) {
-    return loadPolymarketHistoricalTradesForTokens(market?.tokens, limit, options);
+    return loadPolymarketHistoricalTradesForTokens(market?.tokens, limit, { ...options, outcomes: market?.outcomes });
   },
   loadMarkets(rows, options) {
     const tokens = [];

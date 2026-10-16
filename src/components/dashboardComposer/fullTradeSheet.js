@@ -45,6 +45,12 @@ export function usesHistoricalTradeSheet(block) {
   return lake === "kalshi" || lake === "polymarket";
 }
 
+/** Only Kalshi trades re-pull by ticker. Polymarket fills need the market's tokens and keep their stored rows. */
+export function repullsTradeSheet(block) {
+  if (!usesHistoricalTradeSheet(block)) return false;
+  return block.integrationId !== "polymarketHistorical" && String(block.pull?.lake || "") !== "polymarket";
+}
+
 export function useReadyTradeSheet(blockId) {
   return useSyncExternalStore(
     subscribe,

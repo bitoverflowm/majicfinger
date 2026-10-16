@@ -297,9 +297,9 @@ const ENDPOINTS = {
   "polymarket:markets": spec({
     datasetType: "markets",
     shape: "records",
-    seriesKeys: ["condition_id"],
+    seriesKeys: ["condition_id", "question"],
     delivery: "historical",
-    fields: { market: "condition_id", label: "question", value: "volume24hr", icon: "image" },
+    fields: { market: "condition_id", label: "question", value: "volume", status: "closed" },
     required: ["question"],
   }),
   "polymarket:getEvents": spec({

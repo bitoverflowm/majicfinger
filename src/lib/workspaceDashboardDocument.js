@@ -7,6 +7,8 @@ import { isSavedChartView } from "@/lib/visualizations/presetRegistry";
 
 const MAX_SAVED_ROWS = ATHENA_SUBSCRIBER_QUERY_ROW_LIMIT;
 const MAX_SAVED_CELLS = ATHENA_SUBSCRIBER_QUERY_ROW_LIMIT * 32;
+/** Run sheet ids carry the market title and chart ids add a view suffix, so a short cap makes two charts share an id. */
+const MAX_BLOCK_ID = 200;
 
 export function emptyWorkspaceDashboard() {
   return {
@@ -227,7 +229,7 @@ function cleanReplayQuery(value) {
   const address = cleanText(value.address, 80).trim();
   const wallet = /^0x[a-fA-F0-9]{40}$/.test(address) ? address : "";
   const table = cleanText(value.table, 40).trim();
-  const parentSheetId = cleanText(value.parentSheetId, 120).trim();
+  const parentSheetId = cleanText(value.parentSheetId, MAX_BLOCK_ID).trim();
   const filters = cleanFilterMap(value.filters);
   const joins = cleanJoins(value.joins);
   const sortKeys = Array.isArray(value.sortKeys)
@@ -313,7 +315,7 @@ function cleanProvenance(value) {
   const summary = cleanText(value.summary, 300);
   const integrationId = cleanText(value.integrationId, 80);
   const operation = cleanText(value.operation, 40);
-  const parentSheetId = cleanText(value.parentSheetId, 80);
+  const parentSheetId = cleanText(value.parentSheetId, MAX_BLOCK_ID);
   const sortLine = cleanText(value.sortLine, 200);
   const limit = Math.floor(num(value.composeAthenaRowLimit, 0));
   const attributeLines = Array.isArray(value.attributeLines)
@@ -412,7 +414,7 @@ function cleanRecords(records) {
 
 function cleanBlock(block) {
   if (!block || typeof block !== "object") return null;
-  const id = cleanText(block.id, 80);
+  const id = cleanText(block.id, MAX_BLOCK_ID);
   if (!id) return null;
   const columns = Array.isArray(block.columns)
     ? block.columns.slice(0, 80).map((column) => {
@@ -445,7 +447,7 @@ function cleanBlock(block) {
     id,
     type,
     ...(block.source ? { source: cleanText(block.source, 40) } : {}),
-    ...(block.sourceSheetId ? { sourceSheetId: cleanText(block.sourceSheetId, 80) } : {}),
+    ...(block.sourceSheetId ? { sourceSheetId: cleanText(block.sourceSheetId, MAX_BLOCK_ID) } : {}),
     ...(isSavedChartView(block.chartView) ? { chartView: block.chartView } : {}),
     ...(block.vizCustom ? { vizCustom: true } : {}),
     x: num(block.x),
@@ -476,7 +478,7 @@ function cleanBlock(block) {
 
 function cleanTable(table) {
   if (!table || typeof table !== "object") return null;
-  const id = cleanText(table.id, 80);
+  const id = cleanText(table.id, MAX_BLOCK_ID);
   if (!id) return null;
   const columns = Array.isArray(table.columns)
     ? table.columns.slice(0, 80).map((column) => ({

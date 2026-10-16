@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 
 import { formatUsd } from "@/lib/visualizations/visualTable";
-import { layoutVolumeTiles, volumeTreemapModel } from "@/lib/visualizations/volumeTreemap";
+import { layoutVolumeTiles, volumeLabel, volumeTreemapModel } from "@/lib/visualizations/volumeTreemap";
 
 /** shadcn teal-500 → violet-500 → fuchsia-500, in OKLCH so the mix stays saturated. */
 const VOLUME_STOPS = [
@@ -39,6 +39,8 @@ export function VolumeTreemap({ sheet, dataset, onOpenRow }) {
   const [hover, setHover] = useState(null);
   const model = useMemo(() => volumeTreemapModel(sheet, dataset), [dataset, sheet]);
   const noun = dataset?.datasetType === "events" ? "events" : dataset?.datasetType === "series" ? "series" : "markets";
+  const measure = volumeLabel(dataset);
+  const daily = measure === "24h volume";
 
   useEffect(() => {
     const node = frameRef.current;
@@ -61,15 +63,15 @@ export function VolumeTreemap({ sheet, dataset, onOpenRow }) {
   }, [box.height, box.width, model.tiles]);
 
   if (!model.tiles.length) {
-    return <p className="px-3 text-[12px] text-muted-foreground">This list has no 24h volume to chart yet.</p>;
+    return <p className="px-3 text-[12px] text-muted-foreground">This list has no {measure.toLowerCase()} to chart yet.</p>;
   }
 
   return (
     <div className="flex h-full min-h-0 flex-1 flex-col px-2 pb-2">
-      <p className="px-1 pb-1 text-[11px] text-muted-foreground">24h volume · {model.tiles.length.toLocaleString()} {noun}</p>
+      <p className="px-1 pb-1 text-[11px] text-muted-foreground">{measure} · {model.tiles.length.toLocaleString()} {noun}</p>
       <div ref={frameRef} className="relative min-h-0 min-w-0 flex-1" onMouseLeave={() => setHover(null)}>
         {tiles.length ? (
-          <svg width={box.width} height={box.height} className="block" role="img" aria-label="24h volume treemap">
+          <svg width={box.width} height={box.height} className="block" role="img" aria-label={`${measure} treemap`}>
             {tiles.map((tile) => {
               const fill = tileFill(tile.value, model.max);
               const show = tile.w > 48 && tile.h > 28;
@@ -109,7 +111,7 @@ export function VolumeTreemap({ sheet, dataset, onOpenRow }) {
             style={{ left: Math.min(hover.x + 8, Math.max(0, box.width - 180)), top: Math.max(0, hover.y - 36) }}
           >
             <p className="max-w-[220px] truncate font-medium">{hover.tile.label}</p>
-            <p className="font-mono tabular-nums text-muted-foreground">{formatUsd(hover.tile.value)} 24h</p>
+            <p className="font-mono tabular-nums text-muted-foreground">{formatUsd(hover.tile.value)}{daily ? " 24h" : ""}</p>
           </div>
         ) : null}
       </div>

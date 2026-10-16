@@ -7,6 +7,7 @@ import { DestructiveConfirmMenuItem } from "@/components/ui/destructive-confirm-
 import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { sheetRecords } from "@/lib/visualizations/datasetDescriptor";
 import { formatUsd, marketMonogram, parseVisualNumber } from "@/lib/visualizations/visualTable";
+import { volumeLabel } from "@/lib/visualizations/volumeTreemap";
 import { cn } from "@/lib/utils";
 
 function text(record, ...keys) {
@@ -21,9 +22,10 @@ function flag(value) {
   return value === true || value === "true" || value === "True";
 }
 
-function catalogRows(records, dataset) {
+function catalogRows(records, dataset, daily) {
   const fields = dataset?.fields || {};
   const rows = (records || []).map((record) => {
+    const volume = parseVisualNumber(record.volume) ?? parseVisualNumber(record["series:volume"]) ?? parseVisualNumber(record.volumeNum);
     const title = text(record, fields.label, "question", "title", "series:title", "slug") || "Untitled";
     const icon = text(record, fields.icon, "image", "icon", "series:image", "series:icon", "imageOptimized");
     const closed = flag(record[fields.status] ?? record.closed ?? record["series:closed"] ?? record.event_closed);
@@ -32,13 +34,16 @@ function catalogRows(records, dataset) {
       title,
       icon: /^https?:\/\//i.test(icon) ? icon : "",
       status: closed ? "Closed" : live ? "Live" : "Open",
-      volume24hr: parseVisualNumber(record[fields.value]) ?? parseVisualNumber(record.volume24hr) ?? parseVisualNumber(record["series:volume24hr"]),
-      volume: parseVisualNumber(record.volume) ?? parseVisualNumber(record["series:volume"]) ?? parseVisualNumber(record.volumeNum),
+      volume24hr: daily
+        ? parseVisualNumber(record[fields.value]) ?? parseVisualNumber(record.volume24hr) ?? parseVisualNumber(record["series:volume24hr"])
+        : null,
+      volume: daily ? volume : parseVisualNumber(record[fields.value]) ?? volume,
       liquidity: parseVisualNumber(record.liquidity) ?? parseVisualNumber(record["series:liquidity"]) ?? parseVisualNumber(record.liquidityNum),
     };
   }).filter((row) => row.title);
-  const max = Math.max(1, ...rows.map((row) => Math.abs(row.volume24hr || 0)));
-  return rows.map((row) => ({ ...row, share: row.volume24hr == null ? 0 : Math.abs(row.volume24hr) / max }));
+  const ranked = daily ? "volume24hr" : "volume";
+  const max = Math.max(1, ...rows.map((row) => Math.abs(row[ranked] || 0)));
+  return rows.map((row) => ({ ...row, share: row[ranked] == null ? 0 : Math.abs(row[ranked]) / max }));
 }
 
 function ColumnHead({ label, align, readOnly, onHide, id }) {
@@ -72,11 +77,13 @@ function ColumnHead({ label, align, readOnly, onHide, id }) {
 export function CatalogRichTableView({ sheet, dataset, hidden = [], readOnly = false, onHideColumn }) {
   const hiddenIds = new Set(hidden || []);
   const noun = dataset?.datasetType === "events" ? "Event" : dataset?.datasetType === "series" ? "Series" : "Market";
-  const rows = catalogRows(sheetRecords(sheet), dataset);
+  const daily = volumeLabel(dataset) === "24h volume";
+  const ranked = daily ? "volume24hr" : "volume";
+  const rows = catalogRows(sheetRecords(sheet), dataset, daily);
   const columns = [
     { id: "title", label: noun, align: "left" },
     { id: "status", label: "Status", align: "left" },
-    { id: "volume24hr", label: "24h volume", align: "right" },
+    ...(daily ? [{ id: "volume24hr", label: "24h volume", align: "right" }] : []),
     { id: "volume", label: "Volume", align: "right" },
     { id: "liquidity", label: "Liquidity", align: "right" },
   ].filter((column) => !hiddenIds.has(column.id));
@@ -114,14 +121,14 @@ export function CatalogRichTableView({ sheet, dataset, hidden = [], readOnly = f
                   if (column.id === "status") {
                     return <td key={column.id} className="px-2 py-1.5 text-muted-foreground">{row.status}</td>;
                   }
-                  if (column.id === "volume24hr") {
+                  if (column.id === ranked) {
                     return (
                       <td key={column.id} className="px-2 py-1.5 text-right font-mono tabular-nums">
                         <span className="inline-flex items-center gap-2">
                           <span className="h-1.5 w-8 overflow-hidden rounded-full bg-muted" aria-hidden>
                             <span className="block h-full rounded-full bg-[#E63946]" style={{ width: `${row.share * 100}%` }} />
                           </span>
-                          {formatUsd(row.volume24hr)}
+                          {formatUsd(row[ranked])}
                         </span>
                       </td>
                     );

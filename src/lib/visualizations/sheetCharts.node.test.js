@@ -3,7 +3,7 @@ import { describeSheet } from "./datasetDescriptor.js";
 import { hasVisualTable, resolveVisualization, visualPresentationLabel } from "./presetRegistry.js";
 import { chartSpecsForSheet } from "./sheetCharts.js";
 import { marketPriceCards, snapshotStatCards, statCardBlockHeight } from "./marketPriceCards.js";
-import { layoutVolumeTiles, volumeTreemapModel } from "./volumeTreemap.js";
+import { layoutVolumeTiles, volumeLabel, volumeTreemapModel } from "./volumeTreemap.js";
 
 const orderBook = chartSpecsForSheet({
   type: "sheet",
@@ -265,5 +265,38 @@ const polymarketTrades = chartSpecsForSheet({ type: "sheet", title: "Trade Histo
 assert.deepEqual(polymarketTrades.map((chart) => chart.chartView), ["trade-price"]);
 assert.equal(polymarketTrades[0].w, priceHistory[0].w);
 assert.equal(polymarketTrades[0].h, priceHistory[0].h);
+
+const lakeFills = {
+  type: "sheet",
+  title: "Trades · will-lula-win",
+  table: "trades",
+  integrationId: "polymarketHistorical",
+  pull: { lake: "polymarket", table: "trades", ticker: "0xabc" },
+  columns: ["timestamp", "outcome", "side", "price", "size", "usdc_amount", "maker_amount", "taker_amount", "fee"].map((id) => ({ id })),
+  records: tradeRecords.map((row, index) => ({ timestamp: 1790812800 + index, outcome: row.outcome, side: "BUY", price: 0.5, size: 10, usdc_amount: 5 })),
+};
+const lakeTradeCharts = chartSpecsForSheet(lakeFills);
+assert.deepEqual(lakeTradeCharts.map((chart) => chart.chartView), ["trade-price"]);
+assert.equal(lakeTradeCharts[0].w, priceHistory[0].w);
+
+const lakeMarkets = {
+  type: "sheet",
+  title: "Polymarket markets",
+  table: "markets",
+  integrationId: "polymarketHistorical",
+  columns: ["question", "volume", "liquidity", "closed"].map((id) => ({ id })),
+  records: [
+    { question: "Will Lula win?", volume: 14900000, liquidity: 570900, closed: false },
+    { question: "Will Xi leave?", volume: 2100000, liquidity: 80000, closed: true },
+  ],
+};
+const lakeMarketsDataset = describeSheet(lakeMarkets);
+assert.equal(lakeMarketsDataset.fields.value, "volume");
+assert.equal(lakeMarketsDataset.seriesCount, 2);
+assert.equal(volumeLabel(lakeMarketsDataset), "Volume");
+assert.equal(visualPresentationLabel(lakeMarketsDataset), "Rich Table");
+assert.deepEqual(chartSpecsForSheet(lakeMarkets).map((chart) => chart.chartView), ["treemap"]);
+assert.deepEqual(volumeTreemapModel(lakeMarkets, lakeMarketsDataset).tiles.map((tile) => tile.value), [14900000, 2100000]);
+assert.equal(volumeLabel(seriesDataset), "24h volume");
 
 console.log("sheet charts ok");
