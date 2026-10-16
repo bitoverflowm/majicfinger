@@ -2198,6 +2198,25 @@ function columnFilterKey(columns, filters, skipIds = []) {
     .join("\n");
 }
 
+/** Downstream join markets, in the order of the market rows they come from. */
+function polymarketListJoinMarkets(rows, cap) {
+  const seen = new Set();
+  const markets = [];
+  for (const row of rows || []) {
+    const pick = polymarketJoinPickFromRow(row);
+    if (!pick || seen.has(pick.id)) continue;
+    seen.add(pick.id);
+    markets.push({
+      ticker: pick.slug || pick.entityId || pick.id,
+      label: pick.label,
+      title: pick.title,
+      pick,
+    });
+    if (markets.length >= cap) break;
+  }
+  return markets;
+}
+
 function withMarketLifeBounds(columns, life, lifeLabel = "") {
   if (!life || (!life.earliest && !life.latest)) return columns;
   const rangeBounds = lifeLabel ? { ...life, lifeLabel } : life;
@@ -4646,21 +4665,7 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
         .filter((market) => market.ticker && market.pick);
     }
     const source = polymarketScan.status !== "idle" && polymarketScan.rows?.length ? polymarketScan.rows : filteredRows;
-    const seen = new Set();
-    const markets = [];
-    for (const row of source || []) {
-      const pick = polymarketJoinPickFromRow(row);
-      if (!pick || seen.has(pick.id)) continue;
-      seen.add(pick.id);
-      markets.push({
-        ticker: pick.slug || pick.entityId || pick.id,
-        label: pick.label,
-        title: pick.title,
-        pick,
-      });
-      if (markets.length >= marketCap) break;
-    }
-    return markets;
+    return polymarketListJoinMarkets(source, marketCap);
   }, [polymarketJoinCatalog, polymarketSeriesCatalog, polymarketTraderCatalog, polymarketJoinFromList, livePicks, marketCap, polymarketScan, filteredRows]);
   const polymarketTraderPeople = useMemo(() => {
     if (!polymarketTraderCatalog) return [];
@@ -6595,7 +6600,10 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
           return pull?.columns || [];
         };
         let pulled = [];
-        if ((tableId === "getMarkets" || tableId === "getSamplingMarkets") && !livePicks.length) {
+        const marketList = (tableId === "getMarkets" || tableId === "getSamplingMarkets") && !livePicks.length;
+        // The preview sorted its first page. A limit inside that page is ranked from the same page, not from the first rows of a scan.
+        const previewPool = marketList && !polymarketExplore && hasRowLimit ? Math.max(importLimit, pull?.rows?.length || PREVIEW_ROW_CAP) : 0;
+        if (marketList && !previewPool) {
           const samplingTable = tableId === "getSamplingMarkets";
           const columns = samplingTable ? polymarketSamplingColumns : polymarketMarketColumns;
           const scanCap = samplingTable ? POLYMARKET_SAMPLING_SCAN_CAP : POLYMARKET_MARKET_SCAN_CAP;
@@ -6616,7 +6624,7 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
           const result = await loadPolymarketLiveTable(tableId, livePicks, {
             filters: attributeFilters,
             sorts: sortKeys,
-            rowLimit: importLimit,
+            rowLimit: previewPool || importLimit,
             planLimit: sheetCap,
             match: tableId === "getBiggestWinners" && polymarketBiggestWinnersFilterKey
               ? (row) => rowMatchesAttributes(row, polymarketBiggestWinnersColumns, attributeFilters)
@@ -7690,7 +7698,9 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
     }
     const fanoutAssociated = fanoutRunMarkets.length && liveJoinTargets.length ? fanoutRunMarkets : [];
     const joinMarketsForRun = polymarketJoinActive
-      ? polymarketJoinMarkets
+      ? polymarketJoinFromList && !polymarketSeriesCatalog && !polymarketTraderCatalog
+        ? polymarketListJoinMarkets(marketRows, marketCap)
+        : polymarketJoinMarkets
       : liveJoinReady
         ? liveJoinMarkets
         : marketDownstream
