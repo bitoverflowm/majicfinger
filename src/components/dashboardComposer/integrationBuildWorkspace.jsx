@@ -181,6 +181,7 @@ import { kalshiSourceCutoffCaption, useKalshiHistoricalCutoffDisplay } from "@/h
 import { isRealtimeEnabled } from "@/lib/realtime/endpointRegistry";
 import { Skeleton } from "@/components/ui/skeleton";
 import { createRunReporter, describeComposePhase } from "@/components/dashboardComposer/integrationRunFeed";
+import { createRunSheetStage } from "@/components/dashboardComposer/runSheetStage";
 import { KalshiLiveMarketPicker, kalshiLiveMarketAttributeColumns } from "@/components/dashboardComposer/kalshiLiveMarketPicker";
 import { KalshiLiveDirectQuery } from "@/components/dashboardComposer/kalshiLiveDirectQuery";
 import {
@@ -320,6 +321,8 @@ const PREVIEW_TRADE_LOCK =
   "You can only view 1 market trade in preview mode; execute the query to run the full pipeline.";
 
 const FUNCTION_COLUMN_ID = "__function";
+/** Rows read to decide whether a staged sheet opens a chart. Full trade sheets can be 500,000 rows. */
+const CHART_PROBE_ROWS = 200;
 
 function createBucketItem() {
   return {
@@ -6830,54 +6833,37 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
       "markets",
       activeFunction?.id,
     );
-    const sheets = [];
     const targetPage = placementRef.current?.pageId || canvas?.pageId || "";
     const occupiedSheetIds = new Set(
       ((canvas?.blocksByPage || {})[targetPage] || []).map((block) => block?.id).filter(Boolean),
     );
     const claimedSheetIds = new Map();
     const claimRunSheetId = (id) => claimSheetId(id, occupiedSheetIds, claimedSheetIds);
+    const stage = createRunSheetStage({
+      reveal: (list, extra) =>
+        canvas?.revealRunSheets?.(list, {
+          pageId: placementRef.current?.pageId || undefined,
+          append: placementRef.current?.append !== false,
+          ...extra,
+          rewriteId: claimRunSheetId,
+        }),
+      opensChart: (sheet) =>
+        chartSpecsForSheet({
+          ...sheet,
+          type: "sheet",
+          records: recordsFromRows(sheet.columns, (sheet.rows || []).slice(0, CHART_PROBE_ROWS)),
+        }).length > 0,
+    });
+    const sheets = stage.sheets;
+    /** Every Save and run sheet goes through here, so it lands on the tab as soon as its rows are in. */
     const stageSheet = (sheet) => {
-      if (!sheet) return Promise.resolve();
-      if (!sheet.integrationId && integrationId) sheet = { ...sheet, integrationId };
-      const isNew = !sheet.id || sheets.every((item) => item.id !== sheet.id);
-      if (sheet.id) {
-        const index = sheets.findIndex((item) => item.id === sheet.id);
-        if (index >= 0) sheets[index] = sheet;
-        else sheets.push(sheet);
-      } else {
-        sheets.push(sheet);
-      }
-      const options = {
-        pageId: placementRef.current?.pageId || undefined,
-        append: placementRef.current?.append !== false,
-      };
-      const reveal = (extra) => canvas?.revealRunSheets?.(sheets.slice(), { ...options, ...extra, rewriteId: claimRunSheetId });
-      const opensChart = chartSpecsForSheet({
-        ...sheet,
-        type: "sheet",
-        records: recordsFromRows(sheet.columns, sheet.rows || []),
-      }).length > 0;
-      const paint = () => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
-      if (!isNew || !opensChart) {
-        reveal();
-        return paint();
-      }
-      reveal({ holdChartsFor: sheet.id });
-      return paint().then(
-        () =>
-          new Promise((resolve) => {
-            window.setTimeout(() => {
-              reveal({ spotlightChartsFor: sheet.id });
-              window.setTimeout(resolve, 420);
-            }, 420);
-          }),
-      );
+      if (sheet && !sheet.integrationId && integrationId) sheet.integrationId = integrationId;
+      return stage.put(sheet);
     };
     const pushSampleSheet = ({ id, title, columns, rows, parentSheetId, parentQuery, composeRequest, table, span }) => {
       if (!sampling || !sampleConfig || !columns?.length) return;
       const drawn = Array.isArray(rows) ? rows : [];
-      sheets.push({
+      stageSheet({
         id,
         title,
         columns,
@@ -7238,7 +7224,7 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
           : `${directParents.length.toLocaleString()} ${directParents.length === 1 ? "sheet" : "sheets"} · ${directRows.toLocaleString()} rows`,
       });
       if (keepParentDataset) {
-        sheets.push(...directParents.map(({ sourceRows, ...sheet }) => sheet));
+        directParents.forEach(({ sourceRows, ...sheet }) => stageSheet(sheet));
       }
       directSamples.forEach((sheet) => pushSampleSheet(sheet));
       if ((tableId === "series" || tableId === "events") && enrichPicks.has("join") && joinTarget === scopeJoinId && seriesJoinTickers.length) {
@@ -7273,7 +7259,7 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
               rememberTradeSheet(id, unique.join(","), columns, displayMatrix(columns, fullRows), marketLimit, accountId);
             }
             if (columns.length) {
-              sheets.push({
+              stageSheet({
                 id,
                 title: "Markets",
                 columns,
@@ -7297,7 +7283,7 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
               if (fullRows.length > PREVIEW_ROW_CAP) {
                 rememberTradeSheet(id, item.ticker, item.columns, displayMatrix(item.columns, fullRows), marketLimit, accountId);
               }
-              sheets.push({
+              stageSheet({
                 id,
                 title: `Markets · ${item.ticker}`,
                 columns: item.columns,
@@ -7359,7 +7345,7 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
               }
               const fullRows = rows.slice(0, marketLimit);
               if (columns.length) {
-                sheets.push({
+                stageSheet({
                   id: `run-event-${kind}`,
                   title,
                   columns,
@@ -7376,7 +7362,7 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
                 if (!result.columns?.length) continue;
                 const fullRows = result.rows || [];
                 const safe = String(item.ticker).replace(/[^A-Za-z0-9]+/g, "-");
-                sheets.push({
+                stageSheet({
                   id: `run-event-${kind}-${safe}`,
                   title: `${title} · ${item.ticker}`,
                   columns: result.columns,
@@ -7429,7 +7415,7 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
               }
               const fullRows = rows.slice(0, marketLimit);
               if (columns.length) {
-                sheets.push({
+                stageSheet({
                   id: `run-forecast-${kind}`,
                   title,
                   columns,
@@ -7446,7 +7432,7 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
                 if (!result.columns?.length) continue;
                 const fullRows = result.rows || [];
                 const safe = String(item.ticker).replace(/[^A-Za-z0-9]+/g, "-");
-                sheets.push({
+                stageSheet({
                   id: `run-forecast-${kind}-${safe}`,
                   title: `${title} · ${item.ticker}`,
                   columns: result.columns,
@@ -7482,7 +7468,7 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
                   : await loadKalshiLiveHolderProfiles(names);
                 const fullRows = loaded.rows || [];
                 if (loaded.columns?.length) {
-                  sheets.push({
+                  stageSheet({
                     id: tradesJoin ? "run-trader-trades" : "run-trader-profiles",
                     title: label,
                     columns: loaded.columns,
@@ -7504,7 +7490,7 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
                   if (!item.columns?.length) continue;
                   const safe = String(item.nickname).replace(/[^A-Za-z0-9]+/g, "-");
                   const fullRows = item.rows || [];
-                  sheets.push({
+                  stageSheet({
                     id: `run-trader-${kind}-${safe}`,
                     title: `${label} · ${item.nickname}`,
                     columns: item.columns,
@@ -7603,7 +7589,7 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
         table: tableId || "markets",
       });
     }
-    if (metadataSheet?.columns?.length) sheets.push(metadataSheet);
+    if (metadataSheet?.columns?.length) stageSheet(metadataSheet);
     const fanoutRunMarkets =
       liveMarketFanout && enrichPicks.has("join")
         ? directMarkets.length
@@ -7625,7 +7611,7 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
           contexts.forEach((item) => {
             if (!item.market) return;
             const slug = String(item.market.ticker || item.ticker).replace(/[^A-Za-z0-9]+/g, "-");
-            sheets.push({
+            stageSheet({
               id: `run-parent-market-${slug}`,
               title: `Market · ${item.market.ticker || item.ticker}`,
               columns: item.marketColumns || [],
@@ -7643,7 +7629,7 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
             const seriesTicker = String(item.seriesTicker || "").trim();
             if (!seriesTicker || seen.has(seriesTicker) || !item.series) return;
             seen.add(seriesTicker);
-            sheets.push({
+            stageSheet({
               id: `run-parent-series-${seriesTicker.replace(/[^A-Za-z0-9]+/g, "-")}`,
               title: `Series · ${seriesTicker}`,
               columns: item.seriesColumns || [],
@@ -7665,7 +7651,7 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
               if (fullRows.length > PREVIEW_ROW_CAP) {
                 rememberTradeSheet(id, seriesTicker, result.columns, displayMatrix(result.columns, fullRows), sheetCap, accountId);
               }
-              sheets.push({
+              stageSheet({
                 id,
                 title: `Markets · ${seriesTicker}`,
                 columns: result.columns,
@@ -7703,7 +7689,7 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
                 if (rows.length > PREVIEW_ROW_CAP) {
                   rememberTradeSheet(id, item.market.ticker, item.columns, displayMatrix(item.columns, rows), sheetCap, accountId);
                 }
-                sheets.push({
+                stageSheet({
                   id,
                   title: `${item.target.title} · ${item.market.label || item.market.ticker}`,
                   columns: item.columns,
@@ -8288,7 +8274,7 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
         if (!built.ready) return;
         const title = bucketSheetTitle(item, runMarkets.columns, index, bucketItems.length);
         bucketBuilt.push({ id: item.id, title, built });
-        sheets.push({
+        stageSheet({
           id: `run-buckets-${item.id}`,
           title,
           columns: built.columns,
@@ -8339,7 +8325,7 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
         sheets: runFormulaSheets,
         focus: summaryFocus,
       });
-      sheets.push({
+      stageSheet({
         id: "run-summary",
         title: "Summary",
         columns: built.columns,
@@ -8368,31 +8354,7 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
         })),
       );
       reporter.note("join-trades", `Composing ${list.length.toLocaleString()} ${tradeTable} ${list.length === 1 ? "sheet" : "sheets"}`);
-      const pulled = await mapPool(list, 4, async (market) => {
-        const childName = market.label || market.ticker;
-        reporter.patchChild("join-trades", market.ticker, { status: "running", result: `Composing ${tradeTable}` });
-        try {
-          const onPhase = (info) =>
-            reporter.patchChild("join-trades", market.ticker, {
-              status: "running",
-              result: describeComposePhase(info, { table: `${tradeTable} · ${childName}`, limit: sheetCap }),
-            });
-          const result = await join.loadTrades(market, sheetCap, { onPhase });
-          const rows = result.rows || [];
-          reporter.patchChild("join-trades", market.ticker, {
-            status: "success",
-            result: `${rows.length.toLocaleString()} rows`,
-          });
-          return { ...market, columns: result.columns?.length ? result.columns : tradePreview.columns, rows, request: result.request };
-        } catch (err) {
-          reporter.patchChild("join-trades", market.ticker, {
-            status: "error",
-            result: err instanceof Error ? err.message : "Trades compose failed",
-          });
-          return { ...market, columns: tradePreview.columns, rows: [] };
-        }
-      });
-      pulled.forEach((item) => {
+      const stageTrades = (item) => {
         const own = item.ticker === previewTicker;
         const tradeFunctions = functionsForSheet("trades", own);
         const shaped = tradeFunctions.length
@@ -8405,7 +8367,7 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
         if (fullRows.length > 50) {
           rememberTradeSheet(id, item.ticker, shaped.columns, displayMatrix(shaped.columns, fullRows), sheetCap, accountId);
         }
-        sheets.push({
+        stageSheet({
           id,
           title: `Trades · ${item.label || item.ticker}`,
           columns: shaped.columns,
@@ -8417,6 +8379,33 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
           summary: `${venueLabel} · trades · ${item.label || item.ticker}`,
           composeRequest: item.request,
         });
+      };
+      const pulled = await mapPool(list, 4, async (market) => {
+        const childName = market.label || market.ticker;
+        reporter.patchChild("join-trades", market.ticker, { status: "running", result: `Composing ${tradeTable}` });
+        let item;
+        try {
+          const onPhase = (info) =>
+            reporter.patchChild("join-trades", market.ticker, {
+              status: "running",
+              result: describeComposePhase(info, { table: `${tradeTable} · ${childName}`, limit: sheetCap }),
+            });
+          const result = await join.loadTrades(market, sheetCap, { onPhase });
+          const rows = result.rows || [];
+          reporter.patchChild("join-trades", market.ticker, {
+            status: "success",
+            result: `${rows.length.toLocaleString()} rows`,
+          });
+          item = { ...market, columns: result.columns?.length ? result.columns : tradePreview.columns, rows, request: result.request };
+        } catch (err) {
+          reporter.patchChild("join-trades", market.ticker, {
+            status: "error",
+            result: err instanceof Error ? err.message : "Trades compose failed",
+          });
+          item = { ...market, columns: tradePreview.columns, rows: [] };
+        }
+        stageTrades(item);
+        return item;
       });
       const tradeSheets = sheets.filter((sheet) => sheet.table === "trades").length;
       const tradeRows = pulled.reduce((sum, item) => sum + (item.rows?.length || 0), 0);
@@ -8429,7 +8418,7 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
     if (enrichPicks.has("function")) reporter.start("functions");
     runColumns.forEach((entry) => {
       if (!entry.built.columns.length) return;
-      sheets.push({
+      stageSheet({
         id: `run-column-${entry.item.id}`,
         title: entry.item.columnTitle,
         columns: entry.built.columns,
@@ -8453,6 +8442,7 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
     }
 
     reporter.start("place");
+    await stage.settle();
     const placement = placementRef.current;
     const placedSheets = stampRunSheets(
       attachJoinRegistry(sheets.map((sheet) => {

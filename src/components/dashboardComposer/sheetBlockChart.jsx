@@ -22,20 +22,7 @@ import { seriesVarsClassName } from "@/components/spectrumui/charts/chart-engine
 import { MarketChart } from "@/components/spectrumui/charts/market-chart";
 import { DepthChart } from "@/components/spectrumui/charts/depth-chart";
 import { OrderBookChart } from "@/components/spectrumui/charts/order-book-chart";
-
-function parseChartNumber(value) {
-  const raw = String(value ?? "")
-    .trim()
-    .replace(/¢$/, "")
-    .replace(/,/g, "");
-  if (!raw) return null;
-  const match = raw.match(/^(-?\d+(?:\.\d+)?)\s*([KMB])?$/i);
-  if (!match) return null;
-  const n = Number(match[1]);
-  if (!Number.isFinite(n)) return null;
-  const scale = { K: 1e3, M: 1e6, B: 1e9 }[(match[2] || "").toUpperCase()] || 1;
-  return n * scale;
-}
+import { parseVisualNumber as parseChartNumber } from "@/lib/visualizations/visualTable";
 
 function looksLikeDates(labels) {
   const sample = labels.filter(Boolean).slice(0, 8);

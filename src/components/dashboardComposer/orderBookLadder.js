@@ -1,18 +1,6 @@
 /** Turn a Kalshi order-book sheet into a bid/ask ladder. A no bid at X is a yes ask at 1−X. */
 
-function parseChartNumber(value) {
-  const raw = String(value ?? "")
-    .trim()
-    .replace(/[$¢]/g, "")
-    .replace(/,/g, "");
-  if (!raw) return null;
-  const match = raw.match(/^(-?\d+(?:\.\d+)?)\s*([KMB])?$/i);
-  if (!match) return null;
-  const n = Number(match[1]);
-  if (!Number.isFinite(n)) return null;
-  const scale = { K: 1e3, M: 1e6, B: 1e9 }[(match[2] || "").toUpperCase()] || 1;
-  return n * scale;
-}
+import { parseVisualNumber as parseChartNumber } from "@/lib/visualizations/visualTable";
 
 function findColumn(columns, test) {
   return (columns || []).findIndex((column) =>

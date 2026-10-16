@@ -19,16 +19,21 @@ function text(row, ...keys) {
   return "";
 }
 
-/** Sheet numbers, including `$1,200`, `361.5K`, and `1.1M`. */
+const NUMBER_SCALE = { K: 1e3, M: 1e6, B: 1e9, T: 1e12 };
+
+/**
+ * Sheet and record numbers, including `$1,200`, `361.5K`, `1.1M`, `55¢`, and Athena's
+ * scientific-notation strings such as `2.35065166637259E8` (DOUBLE values of 1e7 and up).
+ */
 export function parseVisualNumber(value) {
-  if (value == null || String(value).trim() === "") return null;
-  const raw = String(value).trim().replace(/[$,]/g, "");
-  const match = raw.match(/^(-?\d+(?:\.\d+)?)\s*([KMB])?$/i);
+  if (typeof value === "number") return Number.isFinite(value) ? value : null;
+  if (value == null) return null;
+  const raw = String(value).trim().replace(/[$¢,\s]/g, "").replace(/\u2212/g, "-");
+  if (!raw) return null;
+  const match = raw.match(/^(-?(?:\d+(?:\.\d*)?|\.\d+)(?:e[+-]?\d+)?)([KMBT])?$/i);
   if (!match) return null;
-  const n = Number(match[1]);
-  if (!Number.isFinite(n)) return null;
-  const scale = { K: 1e3, M: 1e6, B: 1e9 }[(match[2] || "").toUpperCase()] || 1;
-  return n * scale;
+  const n = Number(match[1]) * (NUMBER_SCALE[(match[2] || "").toUpperCase()] || 1);
+  return Number.isFinite(n) ? n : null;
 }
 
 function number(row, ...keys) {

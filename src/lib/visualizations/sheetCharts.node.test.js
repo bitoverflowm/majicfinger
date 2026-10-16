@@ -4,6 +4,18 @@ import { hasVisualTable, resolveVisualization, visualPresentationLabel } from ".
 import { chartSpecsForSheet } from "./sheetCharts.js";
 import { marketPriceCards, snapshotStatCards, statCardBlockHeight } from "./marketPriceCards.js";
 import { layoutVolumeTiles, volumeLabel, volumeTreemapModel } from "./volumeTreemap.js";
+import { parseVisualNumber } from "./visualTable.js";
+
+assert.equal(parseVisualNumber("2.35065166637259E8"), 235065166.637259);
+assert.equal(parseVisualNumber("1.5e-3"), 0.0015);
+assert.equal(parseVisualNumber("$1,200"), 1200);
+assert.equal(parseVisualNumber("361.5K"), 361500);
+assert.equal(parseVisualNumber("55¢"), 55);
+assert.equal(parseVisualNumber("\u22124.2M"), -4200000);
+assert.equal(parseVisualNumber(42), 42);
+assert.equal(parseVisualNumber("0x4bFb41d5"), null);
+assert.equal(parseVisualNumber(""), null);
+assert.equal(parseVisualNumber(Number.NaN), null);
 
 const orderBook = chartSpecsForSheet({
   type: "sheet",
@@ -297,6 +309,18 @@ assert.equal(volumeLabel(lakeMarketsDataset), "Volume");
 assert.equal(visualPresentationLabel(lakeMarketsDataset), "Rich Table");
 assert.deepEqual(chartSpecsForSheet(lakeMarkets).map((chart) => chart.chartView), ["treemap"]);
 assert.deepEqual(volumeTreemapModel(lakeMarkets, lakeMarketsDataset).tiles.map((tile) => tile.value), [14900000, 2100000]);
+
+const athenaMarkets = {
+  ...lakeMarkets,
+  records: [
+    { question: "Fed cuts in December?", volume: "2.35065166637259E8", liquidity: "1.2E6", closed: false },
+    { question: "Fed holds in December?", volume: "8812345.5", liquidity: "64000", closed: false },
+  ],
+};
+const athenaDataset = describeSheet(athenaMarkets);
+assert.equal(athenaDataset.fields.value, "volume");
+assert.deepEqual(chartSpecsForSheet(athenaMarkets).map((chart) => chart.chartView), ["treemap"]);
+assert.deepEqual(volumeTreemapModel(athenaMarkets, athenaDataset).tiles.map((tile) => tile.value), [235065166.637259, 8812345.5]);
 assert.equal(volumeLabel(seriesDataset), "24h volume");
 
 console.log("sheet charts ok");

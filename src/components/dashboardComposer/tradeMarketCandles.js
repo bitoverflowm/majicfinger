@@ -1,20 +1,8 @@
 /** Turn a Kalshi trades sheet into market candles. Volume is Count fp. */
 
-const TARGET_CANDLES = 48;
+import { parseVisualNumber as parseChartNumber } from "@/lib/visualizations/visualTable";
 
-function parseChartNumber(value) {
-  const raw = String(value ?? "")
-    .trim()
-    .replace(/[$¢]/g, "")
-    .replace(/,/g, "");
-  if (!raw) return null;
-  const match = raw.match(/^(-?\d+(?:\.\d+)?)\s*([KMB])?$/i);
-  if (!match) return null;
-  const n = Number(match[1]);
-  if (!Number.isFinite(n)) return null;
-  const scale = { K: 1e3, M: 1e6, B: 1e9 }[(match[2] || "").toUpperCase()] || 1;
-  return n * scale;
-}
+const TARGET_CANDLES = 48;
 
 function findColumn(columns, test) {
   return (columns || []).findIndex((column) =>
