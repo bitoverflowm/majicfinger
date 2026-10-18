@@ -375,6 +375,7 @@ function cleanDataset(value) {
       quantity: cleanText(value.units?.quantity, 30),
       currency: cleanText(value.units?.currency, 10),
       metric: cleanText(value.units?.metric, 30),
+      ...(cleanText(value.units?.volume, 20) ? { volume: cleanText(value.units.volume, 20) } : {}),
     },
   };
 }

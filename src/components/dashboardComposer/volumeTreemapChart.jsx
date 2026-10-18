@@ -2,8 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 
-import { formatUsd } from "@/lib/visualizations/visualTable";
-import { layoutVolumeTiles, volumeLabel, volumeTreemapModel } from "@/lib/visualizations/volumeTreemap";
+import { formatVolume, layoutVolumeTiles, volumeInContracts, volumeLabel, volumeTreemapModel } from "@/lib/visualizations/volumeTreemap";
 
 /** shadcn teal-500 → violet-500 → fuchsia-500, in OKLCH so the mix stays saturated. */
 const VOLUME_STOPS = [
@@ -97,7 +96,7 @@ export function VolumeTreemap({ sheet, dataset, onOpenRow }) {
                   ) : null}
                   {show && tile.h > 36 ? (
                     <text x={tile.x + 6} y={tile.y + 32} fontSize={11} fill="#1f2937">
-                      {formatUsd(tile.value)}
+                      {formatVolume(tile.value, dataset)}
                     </text>
                   ) : null}
                 </g>
@@ -111,7 +110,7 @@ export function VolumeTreemap({ sheet, dataset, onOpenRow }) {
             style={{ left: Math.min(hover.x + 8, Math.max(0, box.width - 180)), top: Math.max(0, hover.y - 36) }}
           >
             <p className="max-w-[220px] truncate font-medium">{hover.tile.label}</p>
-            <p className="font-mono tabular-nums text-muted-foreground">{formatUsd(hover.tile.value)}{daily ? " 24h" : ""}</p>
+            <p className="font-mono tabular-nums text-muted-foreground">{formatVolume(hover.tile.value, dataset)}{volumeInContracts(dataset) ? " contracts" : ""}{daily ? " 24h" : ""}</p>
           </div>
         ) : null}
       </div>

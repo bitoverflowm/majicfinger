@@ -202,7 +202,7 @@ function TradeMarketChart({ sheet, rows, live, snapshot, onSnapshot, mode = "tra
     if (split) return tradesToCandles(sheet?.columns, rows, { outcome: choice, since });
     return since != null ? tradesToCandles(sheet?.columns, rows, { since }) : null;
   }, [both, choice, rows, sheet?.columns, since, split]);
-  const name = mode === "ohlc" ? "Price" : units === "probability" ? "Last traded price" : "Yes";
+  const name = mode === "ohlc" ? "Price" : units === "probability" || split ? "Last traded price" : "Yes";
   if (both) {
     return (
       <OutcomeLinesChart

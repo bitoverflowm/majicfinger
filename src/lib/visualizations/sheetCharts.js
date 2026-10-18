@@ -28,7 +28,8 @@ export function chartSpecsForSheet(sheet, forcedView) {
   const chartView = requested || (resolved.view === "table" ? "" : resolved.view);
   if (!requested && SHEET_ONLY.has(chartView)) return [];
   const statCards = chartView === "stat-cards";
-  const outcomeTrades = (sheet?.columns || []).some((column) => columnKey(column) === "outcome");
+  const columnIds = new Set((sheet?.columns || []).map((column) => columnKey(column)));
+  const outcomeTrades = columnIds.has("outcome") || (columnIds.has("yes_price") && columnIds.has("no_price"));
   const outcomeLines = chartView === "price" || (chartView === "trade-price" && (String(sheet?.table || "") === "getTradesByMarket" || outcomeTrades));
   return [
     {

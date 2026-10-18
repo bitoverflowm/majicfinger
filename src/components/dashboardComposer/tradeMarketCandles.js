@@ -23,10 +23,15 @@ function volumeLabelFor(title, id) {
   return "";
 }
 
+/** Epoch seconds, milliseconds, microseconds, or nanoseconds. Kalshi lake times are nanoseconds. */
 function parseTime(value) {
   if (value == null || value === "") return NaN;
   const n = Number(value);
-  if (Number.isFinite(n) && n > 1e9) return n > 1e12 ? n : n * 1000;
+  if (Number.isFinite(n) && n > 1e9) {
+    if (n > 1e17) return n / 1e6;
+    if (n > 1e14) return n / 1e3;
+    return n > 1e12 ? n : n * 1000;
+  }
   const parsed = Date.parse(String(value));
   return Number.isFinite(parsed) ? parsed : NaN;
 }
@@ -51,13 +56,25 @@ function outcomeRank(outcome) {
 }
 
 /**
+ * Kalshi Historical fills carry both `yes_price` and `no_price`, so each fill prices both outcomes.
+ * Live Kalshi trades use the `_dollars` columns and stay one Yes series.
+ * @returns {{ yes: number, no: number } | null}
+ */
+function pairedPrices(columns) {
+  const yes = findColumn(columns, (_title, id) => id === "yes_price");
+  const no = findColumn(columns, (_title, id) => id === "no_price");
+  return yes >= 0 && no >= 0 ? { yes, no } : null;
+}
+
+/**
  * Outcomes a per-outcome trade sheet holds, Yes first and No second.
- * Sheets priced in Yes terms, such as Kalshi trades, have one series and return none.
+ * Sheets priced in Yes terms alone, such as live Kalshi trades, have one series and return none.
  * @param {Array<{ title?: string, id?: string }>} columns
  * @param {unknown[][]} rows
  * @returns {string[]}
  */
 export function tradeOutcomes(columns, rows) {
+  if (pairedPrices(columns)) return ["Yes", "No"];
   const yesPriced = findColumn(columns, (title, id) => id === "yes_price_dollars" || id === "yes_price" || id === "price_dollars" || title.includes("yes price"));
   if (yesPriced >= 0) return [];
   const outcomeIndex = findColumn(columns, (title, id) => id === "outcome" || title === "outcome");
@@ -91,14 +108,19 @@ function tradeSamples(columns, rows, options = {}) {
       title === "yes price dollars" ||
       title.includes("yes price"),
   );
-  const priceIndex =
-    yesPriceIndex >= 0
-      ? yesPriceIndex
-      : findColumn(columns, (title, id) => id === "price" || title === "price");
-  const outcomeIndex = findColumn(columns, (title, id) => id === "outcome" || title === "outcome");
   const wanted = String(options.outcome || "").trim();
-  const chosen =
-    yesPriceIndex >= 0 || options.everyOutcome
+  const paired = pairedPrices(columns);
+  const pairedOutcome = paired && !options.everyOutcome ? (wanted.toLowerCase() === "no" ? "No" : "Yes") : "";
+  const priceIndex =
+    pairedOutcome === "No"
+      ? paired.no
+      : yesPriceIndex >= 0
+        ? yesPriceIndex
+        : findColumn(columns, (title, id) => id === "price" || title === "price");
+  const outcomeIndex = findColumn(columns, (title, id) => id === "outcome" || title === "outcome");
+  const chosen = pairedOutcome
+    ? { label: pairedOutcome, filter: false }
+    : yesPriceIndex >= 0 || options.everyOutcome
       ? { label: "", filter: false }
       : wanted && outcomeIndex >= 0
         ? { label: wanted, filter: true }

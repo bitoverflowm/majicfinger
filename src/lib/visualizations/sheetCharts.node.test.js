@@ -3,7 +3,7 @@ import { describeSheet } from "./datasetDescriptor.js";
 import { hasVisualTable, resolveVisualization, visualPresentationLabel } from "./presetRegistry.js";
 import { chartSpecsForSheet } from "./sheetCharts.js";
 import { marketPriceCards, snapshotStatCards, statCardBlockHeight } from "./marketPriceCards.js";
-import { layoutVolumeTiles, volumeLabel, volumeTreemapModel } from "./volumeTreemap.js";
+import { formatVolume, layoutVolumeTiles, volumeLabel, volumeTreemapModel } from "./volumeTreemap.js";
 import { parseVisualNumber } from "./visualTable.js";
 
 assert.equal(parseVisualNumber("2.35065166637259E8"), 235065166.637259);
@@ -321,6 +321,54 @@ const athenaDataset = describeSheet(athenaMarkets);
 assert.equal(athenaDataset.fields.value, "volume");
 assert.deepEqual(chartSpecsForSheet(athenaMarkets).map((chart) => chart.chartView), ["treemap"]);
 assert.deepEqual(volumeTreemapModel(athenaMarkets, athenaDataset).tiles.map((tile) => tile.value), [235065166.637259, 8812345.5]);
+
+const kalshiLakeMarkets = {
+  type: "sheet",
+  title: "Kalshi markets",
+  table: "markets",
+  integrationId: "kalshiHistorical",
+  columns: ["ticker", "title", "status", "last_price", "yes_bid", "volume", "close_time"].map((id) => ({ id })),
+  records: [
+    { ticker: "KXFED-26DEC-T4.00", title: "Fed above 4.00%?", status: "finalized", volume: "18234012", open_interest: "120400" },
+    { ticker: "KXFED-26DEC-T3.75", title: "Fed above 3.75%?", status: "active", volume: "2210400", open_interest: "56000" },
+  ],
+};
+const kalshiLakeDataset = describeSheet(kalshiLakeMarkets);
+assert.equal(kalshiLakeDataset.datasetType, "markets");
+assert.equal(kalshiLakeDataset.fields.value, "volume");
+assert.equal(kalshiLakeDataset.units.volume, "contracts");
+assert.equal(volumeLabel(kalshiLakeDataset), "Volume");
+assert.equal(formatVolume(18234012, kalshiLakeDataset), "18.2M");
+assert.equal(formatVolume(18234012, lakeMarketsDataset), "$18.2M");
+assert.equal(hasVisualTable(kalshiLakeDataset), true);
+assert.equal(visualPresentationLabel(kalshiLakeDataset), "Rich Table");
+assert.deepEqual(chartSpecsForSheet(kalshiLakeMarkets).map((chart) => chart.chartView), ["treemap"]);
+assert.deepEqual(volumeTreemapModel(kalshiLakeMarkets, kalshiLakeDataset).tiles.map((tile) => tile.label), ["Fed above 4.00%?", "Fed above 3.75%?"]);
+const savedBeforeUnits = {
+  ...kalshiLakeMarkets,
+  dataset: { ...kalshiLakeDataset, units: { price: "probability", quantity: "contracts", currency: "USD", metric: "probability" } },
+};
+assert.equal(describeSheet(savedBeforeUnits).units.volume, "contracts");
+const kalshiLiveMarkets = describeSheet({ ...kalshiLakeMarkets, integrationId: "kalshiLive" });
+assert.equal(kalshiLiveMarkets.fields.value, "volume_fp");
+
+const kalshiLakeTrades = {
+  type: "sheet",
+  title: "Trades · KXFED-26DEC-T4.00",
+  table: "trades",
+  integrationId: "kalshiHistorical",
+  pull: { lake: "kalshi", table: "trades", ticker: "KXFED-26DEC-T4.00" },
+  columns: ["created_time", "ticker", "taker_side", "yes_price", "no_price", "count", "trade_id", "_fetched_at"].map((id) => ({ id })),
+  records: [
+    { created_time: "1790812800000000000", ticker: "KXFED-26DEC-T4.00", taker_side: "yes", yes_price: 62, no_price: 38, count: 5 },
+    { created_time: "1790812860000000000", ticker: "KXFED-26DEC-T4.00", taker_side: "no", yes_price: 60, no_price: 40, count: 3 },
+  ],
+};
+const kalshiTradeDataset = describeSheet(kalshiLakeTrades);
+assert.equal(kalshiTradeDataset.fields.size, "count");
+const kalshiTradeCharts = chartSpecsForSheet(kalshiLakeTrades);
+assert.deepEqual(kalshiTradeCharts.map((chart) => chart.chartView), ["trade-price"]);
+assert.equal(kalshiTradeCharts[0].w, lakeTradeCharts[0].w);
 assert.equal(volumeLabel(seriesDataset), "24h volume");
 
 console.log("sheet charts ok");

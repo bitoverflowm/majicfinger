@@ -11,6 +11,8 @@ const FIELD_BY_TITLE = {
   "yes price": { id: "yes_price", type: "number", scale: "cents" },
   "no price": { id: "no_price", type: "number", scale: "cents" },
   size: { id: "count", type: "number" },
+  "trade id": { id: "trade_id", type: "string" },
+  "fetched at": { id: "_fetched_at", type: "date" },
 };
 
 const memory = new Map();

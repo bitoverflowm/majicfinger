@@ -137,6 +137,37 @@ export const DATE_FULL = new Intl.DateTimeFormat('en-US', {
   timeZone: 'UTC',
 });
 
+const HOUR_MS = 60 * 60 * 1000;
+
+function chartDay(date) {
+  const options = { month: 'short', day: 'numeric' };
+  if (date.getFullYear() !== new Date().getFullYear()) options.year = 'numeric';
+  return date.toLocaleDateString(undefined, options);
+}
+
+function chartClock(date) {
+  return date.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
+}
+
+/**
+ * Time axis label in the viewer's zone. Intraday spans show the clock, and `dated` adds the day,
+ * so a one-session market from years back does not read as last night.
+ */
+export function formatChartTick(time, span, { dated = false } = {}) {
+  const date = new Date(time);
+  if (Number.isNaN(date.getTime())) return '';
+  if (span < 36 * HOUR_MS) return dated ? `${chartDay(date)}, ${chartClock(date)}` : chartClock(date);
+  if (span < 5 * 24 * HOUR_MS) return date.toLocaleString(undefined, { month: 'short', day: 'numeric', hour: 'numeric' });
+  return chartDay(date);
+}
+
+/** Hover readout: always the day and the clock. */
+export function formatChartMoment(time) {
+  const date = new Date(time);
+  if (Number.isNaN(date.getTime())) return '';
+  return `${chartDay(date)}, ${chartClock(date)}`;
+}
+
 export function formatAxisPrice(value) {
   if (Math.abs(value) >= 10_000) return formatMoney(value, true);
   return formatMoney(value, false);

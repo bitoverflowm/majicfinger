@@ -442,6 +442,25 @@ const ENDPOINTS = {
     fields: { market: "conditionId", outcome: "outcome", time: "timestamp", price: "price", size: "size", side: "side" },
     required: ["price", "size", "side"],
   }),
+  "kalshiHistorical:markets": spec({
+    datasetType: "markets",
+    shape: "records",
+    seriesKeys: ["ticker"],
+    delivery: "historical",
+    units: { quantity: "contracts", volume: "contracts" },
+    fields: { market: "ticker", label: "title", value: "volume", status: "status", close: "close_time", depth: "open_interest" },
+    required: ["ticker"],
+  }),
+  "kalshiHistorical:trades": spec({
+    datasetType: "trades",
+    shape: "time_series",
+    seriesKeys: ["ticker"],
+    priceBasis: "trade",
+    units: { quantity: "contracts" },
+    delivery: "historical",
+    fields: { market: "ticker", time: "created_time", price: "yes_price", size: "count", side: "taker_side" },
+    required: ["ticker", "yes_price"],
+  }),
   "polymarket:parent-market": spec({
     datasetType: "markets",
     shape: "snapshot",
@@ -473,7 +492,7 @@ export function templateForEndpoint(table, integrationId) {
   const id = String(table || "").trim();
   if (!id) return null;
   const family = familyOf(integrationId);
-  const qualified = family ? ENDPOINTS[`${family}:${id}`] : null;
+  const qualified = ENDPOINTS[`${String(integrationId || "").trim()}:${id}`] || (family ? ENDPOINTS[`${family}:${id}`] : null);
   const unique = !family
     ? Object.keys(ENDPOINTS).filter((key) => key.endsWith(`:${id}`))
     : [];
@@ -552,7 +571,7 @@ export function describeSheet(sheet) {
   if (stamped && TYPE_SET.has(stamped.datasetType) && stamped.sourceTable && descriptorFitsSheet(sheet, stamped)) {
     return {
       ...stamped,
-      units: { ...PROBABILITY, ...(stamped.units || {}) },
+      units: { ...PROBABILITY, ...(template?.units || {}), ...(stamped.units || {}) },
       fields: { ...(stamped.fields || {}) },
       seriesKeys: [...(stamped.seriesKeys || [])],
       required: [...(stamped.required || [])],

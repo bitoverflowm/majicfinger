@@ -336,7 +336,6 @@ function kalshiHistoricalColumns(table) {
   return table === "trades" ? kalshiHistoricalTradeColumns() : kalshiHistoricalMarketColumns();
 }
 
-const LAKE_COMPUTED = new Set(["kalshi_event_ticker_category", "kalshi_taxonomy_category"]);
 const LAKE_CENTS = new Set(["last_price", "yes_bid", "yes_ask", "no_bid", "no_ask", "yes_price", "no_price"]);
 
 function uiType(rawType, name) {
@@ -349,20 +348,6 @@ function uiType(rawType, name) {
   }
   if (type === "bigint" || type === "int" || type === "double" || type === "number") return "number";
   return "text";
-}
-
-function catalogColumns(meta, defaults, { cents = false } = {}) {
-  const on = new Set(defaults);
-  return meta.map((entry) => {
-    const id = entry.name;
-    const scale = cents && LAKE_CENTS.has(id) ? "cents" : undefined;
-    return column(id, uiType(entry.type, id), scale, on.has(id));
-  });
-}
-
-function lakeColumns(lake, table, defaults) {
-  const meta = getColumnMetaForLakeTable(lake, table).filter((entry) => !LAKE_COMPUTED.has(entry.name));
-  return catalogColumns(meta, defaults, { cents: lake === "kalshi" });
 }
 
 const POLYMARKET_CONNECT_COLUMNS = {
@@ -614,7 +599,17 @@ export function buildPolymarketHistoricalRequest({ table = "markets", predicates
   return finishHistoricalRequest({ columns, request, sortKeys, columnIds, limit });
 }
 
-const KALSHI_TRADE_PREVIEW_FIELDS = ["created_time", "ticker", "taker_side", "yes_price", "no_price", "count"];
+/** Joined trades bring every lake column, time and prices first so the chart columns lead. */
+const KALSHI_JOIN_TRADE_ORDER = ["created_time", "ticker", "taker_side", "yes_price", "no_price", "count", "trade_id", "_fetched_at"];
+
+function kalshiJoinTradeColumns() {
+  const catalog = kalshiHistoricalTradeColumns();
+  const rank = (id) => {
+    const index = KALSHI_JOIN_TRADE_ORDER.indexOf(id);
+    return index < 0 ? KALSHI_JOIN_TRADE_ORDER.length : index;
+  };
+  return [...catalog].sort((a, b) => rank(a.id) - rank(b.id)).map((entry) => ({ ...entry, defaultOn: true }));
+}
 
 function rowsFromAthenaCells(result, limit) {
   const names = result?.columns || [];
@@ -634,8 +629,7 @@ function rowsFromAthenaCells(result, limit) {
  * stop at their sheet cap.
  */
 export function loadKalshiHistoricalTradesForTicker(ticker, limit = PREVIEW_ROW_CAP, options = {}) {
-  const catalog = lakeColumns("kalshi", "trades", KALSHI_TRADE_PREVIEW_FIELDS);
-  const columns = KALSHI_TRADE_PREVIEW_FIELDS.map((id) => catalog.find((entry) => entry.id === id)).filter(Boolean);
+  const columns = kalshiJoinTradeColumns();
   const rowLimit = Math.max(1, Math.floor(Number(limit) || PREVIEW_ROW_CAP));
   const request = {
     lake: "kalshi",

@@ -2,7 +2,16 @@
 
 import * as React from "react";
 import { cn } from "@/lib/utils";
-import { EASE, UP, DOWN, marketVarsClassName, useMorph, usePrefersReducedMotion } from "@/components/spectrumui/charts/chart-engine";
+import {
+  EASE,
+  UP,
+  DOWN,
+  formatChartMoment,
+  formatChartTick,
+  marketVarsClassName,
+  useMorph,
+  usePrefersReducedMotion,
+} from "@/components/spectrumui/charts/chart-engine";
 
 /**
  * Spectrum indicator chart.
@@ -78,18 +87,6 @@ function formatSignedPct(value) {
   if (!Number.isFinite(value)) return "—";
   const sign = value > 0 ? "+" : value < 0 ? "−" : "";
   return `${sign}${Math.abs(value).toFixed(2)}%`;
-}
-
-function formatWhen(time, span) {
-  const date = new Date(time);
-  if (Number.isNaN(date.getTime())) return "";
-  if (span < 36 * 60 * 60 * 1000) {
-    return date.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
-  }
-  if (span < 5 * 24 * 60 * 60 * 1000) {
-    return date.toLocaleString(undefined, { month: "short", day: "numeric", hour: "numeric" });
-  }
-  return date.toLocaleDateString(undefined, { month: "short", day: "numeric" });
 }
 
 /** Enough decimals that neighbouring ticks never read the same. */
@@ -412,7 +409,7 @@ export function IndicatorChart({
                 </span>
               </>
             )}
-            {active ? <span className="mb-0.5 font-mono text-[11px] text-neutral-500">{formatWhen(active.t, span)}</span> : null}
+            {active ? <span className="mb-0.5 font-mono text-[11px] text-neutral-500">{formatChartMoment(active.t)}</span> : null}
             {paneFrames.map((pane) => {
               const value = hoverIndex != null ? pane.slice[hoverIndex] : pane.slice[pane.slice.length - 1];
               const text = Number.isFinite(value) ? (pane.indicator.format ? pane.indicator.format(value) : formatPrice(value)) : "—";
@@ -516,7 +513,7 @@ export function IndicatorChart({
                     fill="currentColor"
                     className="tabular-nums"
                   >
-                    {formatWhen(time, span)}
+                    {formatChartTick(time, span, { dated: index === 0 })}
                   </text>
                 );
               })}

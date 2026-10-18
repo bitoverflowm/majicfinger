@@ -122,4 +122,35 @@ assert.ok(lastDay.candles.every((candle) => candle.t >= since));
 assert.equal(lastDay.candles.reduce((sum, candle) => sum + candle.volume, 0), 25);
 assert.ok(lastDay.candles.length > fullSpread.candles.filter((candle) => candle.t >= since).length);
 
+const kalshiLakeColumns = [
+  { id: "created_time", title: "Created time", type: "date" },
+  { id: "ticker", title: "Ticker" },
+  { id: "taker_side", title: "Side" },
+  { id: "yes_price", title: "Yes price", scale: "cents" },
+  { id: "no_price", title: "No price", scale: "cents" },
+  { id: "count", title: "Size" },
+];
+const nanos = (ms) => String(BigInt(ms) * 1_000_000n);
+const kalshiLakeRows = [
+  [nanos(start + 2000), "KXFED-26DEC", "yes", "62¢", "38¢", "5"],
+  [nanos(start + 1000), "KXFED-26DEC", "no", "60¢", "40¢", "3"],
+  [nanos(start), "KXFED-26DEC", "yes", "58", "42", "2"],
+];
+assert.deepEqual(tradeOutcomes(kalshiLakeColumns, kalshiLakeRows), ["Yes", "No"]);
+const kalshiYes = tradesToCandles(kalshiLakeColumns, kalshiLakeRows, { outcome: "Yes" });
+assert.equal(kalshiYes.outcome, "Yes");
+assert.equal(kalshiYes.candles[0].t, start);
+assert.equal(kalshiYes.candles[0].open, 0.58);
+assert.equal(kalshiYes.candles[kalshiYes.candles.length - 1].close, 0.62);
+assert.equal(kalshiYes.candles.reduce((sum, candle) => sum + candle.volume, 0), 10);
+const kalshiNo = tradesToCandles(kalshiLakeColumns, kalshiLakeRows, { outcome: "No" });
+assert.equal(kalshiNo.outcome, "No");
+assert.equal(kalshiNo.candles[0].open, 0.42);
+assert.equal(kalshiNo.candles[kalshiNo.candles.length - 1].close, 0.38);
+assert.deepEqual(tradeTimes(kalshiLakeColumns, kalshiLakeRows), [start, start + 1000, start + 2000]);
+const athenaNanos = [["1.737390680081725E18", "PRES-2024-KH", "yes", "1.0", "99.0", "6.0"]];
+assert.deepEqual(tradeTimes(kalshiLakeColumns, athenaNanos).map(Math.round), [Date.parse("2025-01-20T16:31:20.082Z")]);
+const liveKalshiColumns = [...columns, { id: "no_price_dollars", title: "No Price Dollars", type: "number" }];
+assert.deepEqual(tradeOutcomes(liveKalshiColumns, rows), []);
+
 console.log("tradeMarketCandles ok");

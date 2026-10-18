@@ -6,8 +6,8 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { DestructiveConfirmMenuItem } from "@/components/ui/destructive-confirm-menu-item";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { sheetRecords } from "@/lib/visualizations/datasetDescriptor";
-import { formatUsd, marketMonogram, parseVisualNumber } from "@/lib/visualizations/visualTable";
-import { volumeLabel } from "@/lib/visualizations/volumeTreemap";
+import { formatShares, formatUsd, marketMonogram, parseVisualNumber } from "@/lib/visualizations/visualTable";
+import { formatVolume, volumeInContracts, volumeLabel } from "@/lib/visualizations/volumeTreemap";
 import { cn } from "@/lib/utils";
 
 function text(record, ...keys) {
@@ -22,23 +22,34 @@ function flag(value) {
   return value === true || value === "true" || value === "True";
 }
 
+/** Kalshi markets carry a lifecycle word instead of a closed flag. */
+const CLOSED_STATUS = new Set(["closed", "settled", "finalized", "determined", "resolved", "expired"]);
+
+function catalogStatus(record, fields) {
+  const raw = record[fields.status] ?? record.closed ?? record["series:closed"] ?? record.event_closed;
+  const word = String(raw ?? "").trim().toLowerCase();
+  if (flag(raw) || CLOSED_STATUS.has(word)) return "Closed";
+  if (flag(record.live ?? record.event_live)) return "Live";
+  return "Open";
+}
+
 function catalogRows(records, dataset, daily) {
   const fields = dataset?.fields || {};
   const rows = (records || []).map((record) => {
     const volume = parseVisualNumber(record.volume) ?? parseVisualNumber(record["series:volume"]) ?? parseVisualNumber(record.volumeNum);
     const title = text(record, fields.label, "question", "title", "series:title", "slug") || "Untitled";
     const icon = text(record, fields.icon, "image", "icon", "series:image", "series:icon", "imageOptimized");
-    const closed = flag(record[fields.status] ?? record.closed ?? record["series:closed"] ?? record.event_closed);
-    const live = flag(record.live ?? record.event_live);
     return {
       title,
       icon: /^https?:\/\//i.test(icon) ? icon : "",
-      status: closed ? "Closed" : live ? "Live" : "Open",
+      status: catalogStatus(record, fields),
       volume24hr: daily
         ? parseVisualNumber(record[fields.value]) ?? parseVisualNumber(record.volume24hr) ?? parseVisualNumber(record["series:volume24hr"])
         : null,
       volume: daily ? volume : parseVisualNumber(record[fields.value]) ?? volume,
-      liquidity: parseVisualNumber(record.liquidity) ?? parseVisualNumber(record["series:liquidity"]) ?? parseVisualNumber(record.liquidityNum),
+      liquidity: fields.depth
+        ? parseVisualNumber(record[fields.depth])
+        : parseVisualNumber(record.liquidity) ?? parseVisualNumber(record["series:liquidity"]) ?? parseVisualNumber(record.liquidityNum),
     };
   }).filter((row) => row.title);
   const ranked = daily ? "volume24hr" : "volume";
@@ -80,12 +91,14 @@ export function CatalogRichTableView({ sheet, dataset, hidden = [], readOnly = f
   const daily = volumeLabel(dataset) === "24h volume";
   const ranked = daily ? "volume24hr" : "volume";
   const rows = catalogRows(sheetRecords(sheet), dataset, daily);
+  const openInterest = dataset?.fields?.depth === "open_interest";
+  const contracts = volumeInContracts(dataset);
   const columns = [
     { id: "title", label: noun, align: "left" },
     { id: "status", label: "Status", align: "left" },
     ...(daily ? [{ id: "volume24hr", label: "24h volume", align: "right" }] : []),
-    { id: "volume", label: "Volume", align: "right" },
-    { id: "liquidity", label: "Liquidity", align: "right" },
+    { id: "volume", label: contracts ? "Contracts" : "Volume", align: "right" },
+    { id: "liquidity", label: openInterest ? "Open interest" : "Liquidity", align: "right" },
   ].filter((column) => !hiddenIds.has(column.id));
   if (!rows.length) {
     return <p className="px-3 text-[12px] text-muted-foreground">This list has nothing to show yet.</p>;
@@ -128,7 +141,7 @@ export function CatalogRichTableView({ sheet, dataset, hidden = [], readOnly = f
                           <span className="h-1.5 w-8 overflow-hidden rounded-full bg-muted" aria-hidden>
                             <span className="block h-full rounded-full bg-[#E63946]" style={{ width: `${row.share * 100}%` }} />
                           </span>
-                          {formatUsd(row[ranked])}
+                          {formatVolume(row[ranked], dataset)}
                         </span>
                       </td>
                     );
@@ -136,7 +149,7 @@ export function CatalogRichTableView({ sheet, dataset, hidden = [], readOnly = f
                   const value = column.id === "volume" ? row.volume : row.liquidity;
                   return (
                     <td key={column.id} className="px-2 py-1.5 text-right font-mono tabular-nums">
-                      {formatUsd(value)}
+                      {column.id === "volume" ? formatVolume(value, dataset) : openInterest ? formatShares(value) : formatUsd(value)}
                     </td>
                   );
                 })}

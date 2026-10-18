@@ -1,5 +1,18 @@
 import { sheetRecords } from "@/lib/visualizations/datasetDescriptor";
-import { parseVisualNumber } from "@/lib/visualizations/visualTable";
+import { formatShares, formatUsd, parseVisualNumber } from "@/lib/visualizations/visualTable";
+
+/** Kalshi lake volume counts contracts. Every other catalog volume is dollars. */
+export function volumeInContracts(dataset) {
+  return dataset?.units?.volume === "contracts";
+}
+
+/**
+ * @param {number} value
+ * @param {object | null | undefined} dataset
+ */
+export function formatVolume(value, dataset) {
+  return volumeInContracts(dataset) ? formatShares(value) : formatUsd(value);
+}
 
 function squarify(items, width, height) {
   const sorted = [...items].filter((item) => item.weight > 0).sort((a, b) => b.weight - a.weight);

@@ -2,7 +2,13 @@
 
 import * as React from "react";
 import { cn } from "@/lib/utils";
-import { marketVarsClassName, useMorph, usePrefersReducedMotion } from "@/components/spectrumui/charts/chart-engine";
+import {
+  formatChartMoment,
+  formatChartTick,
+  marketVarsClassName,
+  useMorph,
+  usePrefersReducedMotion,
+} from "@/components/spectrumui/charts/chart-engine";
 
 const PAD = { top: 12, right: 64, bottom: 22, left: 8 };
 const VOLUME_SHARE = 0.22;
@@ -171,26 +177,6 @@ function RangeSelector({ ranges, value, onChange, reduce }) {
       })}
     </div>
   );
-}
-
-function formatTick(time, span) {
-  const date = new Date(time);
-  if (Number.isNaN(date.getTime())) return "";
-  if (span < 36 * 60 * 60 * 1000) {
-    return date.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
-  }
-  return date.toLocaleDateString(undefined, { month: "short", day: "numeric" });
-}
-
-function formatWhen(time) {
-  const date = new Date(time);
-  if (Number.isNaN(date.getTime())) return "";
-  return date.toLocaleString(undefined, {
-    month: "short",
-    day: "numeric",
-    hour: "numeric",
-    minute: "2-digit",
-  });
 }
 
 /**
@@ -413,7 +399,7 @@ export function MarketChart({
               variant === "area" ? (
                 <>
                   <span style={{ color: dirColor }}>{showPrice(active.close)}</span>
-                  <span className="text-neutral-400">{formatWhen(active.t)}</span>
+                  <span className="text-neutral-400">{formatChartMoment(active.t)}</span>
                 </>
               ) : (
                 <>
@@ -421,7 +407,7 @@ export function MarketChart({
                   <span>H {showPrice(active.high)}</span>
                   <span>L {showPrice(active.low)}</span>
                   <span style={{ color: dirColor }}>C {showPrice(active.close)}</span>
-                  <span className="text-neutral-400">{formatWhen(active.t)}</span>
+                  <span className="text-neutral-400">{formatChartMoment(active.t)}</span>
                 </>
               )
             ) : null}
@@ -615,10 +601,11 @@ export function MarketChart({
             {timeTicks.map((i) => {
               const candle = view[i];
               if (!candle) return null;
-              const x = Math.max(plotX0 + 18, Math.min(plotX1 - 18, cx(i)));
+              const first = i === timeTicks[0];
+              const x = first ? Math.max(plotX0, cx(i)) : Math.max(plotX0 + 18, Math.min(plotX1 - 18, cx(i)));
               return (
-                <text key={`t-${i}`} x={x} y={h - 6} textAnchor="middle" fontSize={10} fill="currentColor" className="tabular-nums">
-                  {formatTick(candle.t, span)}
+                <text key={`t-${i}`} x={x} y={h - 6} textAnchor={first ? "start" : "middle"} fontSize={10} fill="currentColor" className="tabular-nums">
+                  {formatChartTick(candle.t, span, { dated: first })}
                 </text>
               );
             })}
