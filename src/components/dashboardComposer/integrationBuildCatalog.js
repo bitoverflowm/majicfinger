@@ -41,6 +41,7 @@ import {
 } from "@/lib/kalshiLive/normalizeSearchTradersRow";
 import { getKalshiLiveSearchTradersColumns } from "@/lib/kalshiLive/searchTradersColumns";
 import { MARKETS_RESPONSE_FIELDS } from "@/components/integrationsView/integrationPlayground/integrations/polymarket/config";
+import { CHAINLINK_FEEDS, chainlinkFeed } from "@/lib/chainlinkFeeds";
 import {
   loadPolymarketLiveTable,
   POLYMARKET_LIVE_BUILD_CATEGORIES,
@@ -176,13 +177,8 @@ export const BUILD_SOURCES = {
   polymarket: polymarketLiveSource(),
   chainlink: {
     name: "Chainlink",
-    defaultTable: "prices",
-    tables: {
-      prices: {
-        label: "Live prices",
-        description: "Latest Chainlink oracle answer for each pair.",
-      },
-    },
+    defaultTable: "twap_60",
+    tables: Object.fromEntries(CHAINLINK_FEEDS.map((feed) => [feed.id, { label: feed.label, description: feed.description }])),
   },
   binance: {
     name: "Binance",
@@ -1253,39 +1249,16 @@ async function polymarketLiveMarkets() {
 }
 
 const QUOTE_PAIRS = [
-  { name: "Bitcoin", binance: "btcusdt", chainlink: "btc/usd" },
-  { name: "Ethereum", binance: "ethusdt", chainlink: "eth/usd" },
-  { name: "Solana", binance: "solusdt", chainlink: "sol/usd" },
-  { name: "XRP", binance: "xrpusdt", chainlink: "xrp/usd" },
+  { name: "Bitcoin", binance: "btcusdt" },
+  { name: "Ethereum", binance: "ethusdt" },
+  { name: "Solana", binance: "solusdt" },
+  { name: "XRP", binance: "xrpusdt" },
 ];
 
-function listenQuotes(feed) {
-  if (feed === "chainlink") {
-    return Promise.all(
-      QUOTE_PAIRS.map((pair) =>
-        collectQuotes({
-          feed,
-          subscriptions: [
-            {
-              topic: "crypto_prices_chainlink",
-              type: "*",
-              filters: JSON.stringify({ symbol: pair.chainlink }),
-            },
-          ],
-          stopWhen: (quotes) => quotes.size >= 1,
-        }).catch(() => new Map()),
-      ),
-    ).then((maps) => {
-      const merged = new Map();
-      for (const map of maps) {
-        for (const [name, quote] of map) merged.set(name, quote);
-      }
-      if (!merged.size) throw new Error("No live prices came through");
-      return merged;
-    });
-  }
+function listenQuotes() {
   return collectQuotes({
-    feed,
+    topic: "crypto_prices",
+    pairs: QUOTE_PAIRS.map((pair) => ({ name: pair.name, symbol: pair.binance })),
     subscriptions: QUOTE_PAIRS.map((pair) => ({
       topic: "crypto_prices",
       type: "update",
@@ -1295,7 +1268,7 @@ function listenQuotes(feed) {
   });
 }
 
-function collectQuotes({ feed, subscriptions, stopWhen }) {
+function collectQuotes({ topic, pairs, subscriptions, stopWhen }) {
   return new Promise((resolve, reject) => {
     if (typeof WebSocket === "undefined") {
       reject(new Error("Live prices are only available in the browser"));
@@ -1335,38 +1308,47 @@ function collectQuotes({ feed, subscriptions, stopWhen }) {
       } catch {
         return;
       }
-      const topicFeed = msg.topic === "crypto_prices" ? "binance" : msg.topic === "crypto_prices_chainlink" ? "chainlink" : null;
-      if (topicFeed !== feed || !msg.payload) return;
+      if (msg.topic !== topic || !msg.payload) return;
       const symbol = String(msg.payload.symbol || "").toLowerCase();
-      const pair = QUOTE_PAIRS.find((item) => item.binance === symbol || item.chainlink === symbol);
+      const pair = pairs.find((item) => item.symbol === symbol);
       if (!pair) return;
       const history = Array.isArray(msg.payload.data) ? msg.payload.data : null;
       const point = history?.length ? history[history.length - 1] : msg.payload;
       const price = num(point?.value);
       if (price == null) return;
-      quotes.set(pair.name, {
-        price,
-        at: num(point?.timestamp) || Date.now(),
-        symbol: feed === "binance" ? pair.binance.toUpperCase() : pair.chainlink.toUpperCase(),
-      });
+      quotes.set(pair.name, { price, at: num(point?.timestamp) || Date.now(), symbol: pair.symbol.toUpperCase() });
       if (stopWhen(quotes)) finish();
     };
     ws.onerror = () => finish();
   });
 }
 
-async function livePrices(feed) {
-  const quotes = await listenQuotes(feed);
-  const rows = QUOTE_PAIRS.map((pair) => quotes.get(pair.name))
-    .filter(Boolean)
-    .map((quote) => ({
-      name: QUOTE_PAIRS.find((pair) => (feed === "binance" ? pair.binance.toUpperCase() : pair.chainlink.toUpperCase()) === quote.symbol)?.name || quote.symbol,
-      symbol: quote.symbol,
-      price: quote.price,
-      updated: quote.at,
-    }));
+/** Columns of one Chainlink pair sheet. Each pair streams into its own sheet, newest row first. */
+export function chainlinkStreamColumns(feedId) {
+  const windowSeconds = chainlinkFeed(feedId)?.windowSeconds || null;
+  return [
+    column("time", "date"),
+    column("symbol", "text"),
+    column("price", "number"),
+    ...(windowSeconds ? [column("window_seconds", "number")] : []),
+  ];
+}
+
+async function livePrices() {
+  const quotes = await listenQuotes();
+  const rows = QUOTE_PAIRS.map((pair) => pair.name)
+    .filter((name) => quotes.has(name))
+    .map((name) => {
+      const quote = quotes.get(name);
+      return { name, symbol: quote.symbol, price: quote.price, updated: quote.at };
+    });
   return {
-    columns: [column("name", "text"), column("symbol", "text"), column("price", "number"), column("updated", "date")],
+    columns: [
+      column("name", "text"),
+      column("symbol", "text"),
+      column("price", "number"),
+      column("updated", "date"),
+    ],
     rows,
     capped: false,
   };
@@ -2144,8 +2126,13 @@ const LOADERS = {
       () => loadPolymarketLiveTable(endpoint.id, []),
     ]),
   ),
-  "chainlink:prices": () => livePrices("chainlink"),
-  "binance:prices": () => livePrices("binance"),
+  ...Object.fromEntries(
+    CHAINLINK_FEEDS.map((feed) => [
+      `chainlink:${feed.id}`,
+      async () => ({ columns: chainlinkStreamColumns(feed.id), rows: [], capped: false }),
+    ]),
+  ),
+  "binance:prices": () => livePrices(),
 };
 
 function universeCountKey(integrationId, tableId, filter) {

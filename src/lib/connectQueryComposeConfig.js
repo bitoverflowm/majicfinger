@@ -9,6 +9,7 @@ import {
   POLYMARKET_CONNECT_DATA_SOURCES,
 } from "@/config/dataLakeParquetSamples";
 import { ENDPOINTS, POLYMARKET_GROUPS } from "@/components/integrationsView/integrationPlayground/integrations/polymarket/config";
+import { CHAINLINK_LIVE_SOURCES } from "@/lib/chainlinkFeeds";
 import {
   getKalshiColumnDisplayLabel,
   getKalshiConnectColumnsForSample,
@@ -82,12 +83,7 @@ export const LIVE_STREAM_CONNECT_COLUMNS = [
   { name: "receivedAt", type: "int", description: "When the row was received in Lychee" },
 ];
 
-export const CHAINLINK_LIVE_SOURCES = [
-  { id: "btc/usd", title: "BTC / USD", description: "Bitcoin priced in US dollars (Chainlink)." },
-  { id: "eth/usd", title: "ETH / USD", description: "Ethereum priced in US dollars (Chainlink)." },
-  { id: "sol/usd", title: "SOL / USD", description: "Solana priced in US dollars (Chainlink)." },
-  { id: "xrp/usd", title: "XRP / USD", description: "XRP priced in US dollars (Chainlink)." },
-];
+export { CHAINLINK_LIVE_SOURCES };
 
 export const BINANCE_LIVE_SOURCES = [
   { id: "btcusdt", title: "BTCUSDT", description: "Bitcoin to USDT (Binance RTDS)." },

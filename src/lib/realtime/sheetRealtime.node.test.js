@@ -26,6 +26,14 @@ function test(name, fn) {
 
 test("chainlink and kalshi live sheets qualify, historical trades do not", () => {
   assert.equal(realtimeTargetForBlock({ type: "sheet", integrationId: "chainlink", table: "prices" })?.endpoint, "prices");
+  assert.equal(realtimeTargetForBlock({ type: "sheet", integrationId: "chainlink", table: "twap_60" })?.topic, "crypto_prices_twap_sixty");
+  assert.deepEqual(
+    priceSymbolsForSheet(
+      { columns: [{ id: "symbol" }], records: [{ symbol: "DOGE/USD" }, { symbol: "BTC/USD" }] },
+      realtimeTargetForBlock({ type: "sheet", integrationId: "chainlink", table: "twap_60" }),
+    ),
+    ["doge/usd", "btc/usd"],
+  );
   assert.equal(realtimeTargetForBlock({ type: "sheet", integrationId: "kalshiLive", table: "trades" })?.livePath, "api_poll");
   assert.equal(
     realtimeTargetForBlock({ type: "sheet", provenance: { lake: "kalshi", table: "trades", integrationId: "kalshiHistorical" } }),

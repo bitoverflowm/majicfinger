@@ -17,10 +17,8 @@
 
 import { KALSHI_LIVE_CONNECT_ENDPOINTS } from "@/config/kalshiLiveConnect";
 import { POLYMARKET_LIVE_CONNECT_ENDPOINTS } from "@/config/polymarketLiveConnect";
-import {
-  BINANCE_LIVE_SOURCES,
-  CHAINLINK_LIVE_SOURCES,
-} from "@/lib/connectQueryComposeConfig";
+import { BINANCE_LIVE_SOURCES } from "@/lib/connectQueryComposeConfig";
+import { CHAINLINK_FEEDS, CHAINLINK_LIVE_SOURCES } from "@/lib/chainlinkFeeds";
 import { LIVE_FEED_REGISTRY } from "@/lib/liveFeeds/registry";
 import { POLYMARKET_REALTIME_FEED_OPTIONS } from "@/lib/polymarketLive/polymarketRealtimeCompose";
 
@@ -256,13 +254,14 @@ function registerPolymarket() {
  * @param {string} title
  * @param {string} topic
  * @param {{ id: string; title: string }[]} sources
+ * @param {{ endpoint?: string, symbolAliases?: boolean }} [options]
  */
-function registerDirectPriceStream(integration, title, topic, sources) {
+function registerDirectPriceStream(integration, title, topic, sources, { endpoint = "prices", symbolAliases = true } = {}) {
   const symbols = sources.map((source) => String(source.id || "").trim()).filter(Boolean);
   registerEndpoint(
     {
       integration,
-      endpoint: "prices",
+      endpoint,
       title,
       transport: "websocket",
       enabled: true,
@@ -272,18 +271,18 @@ function registerDirectPriceStream(integration, title, topic, sources) {
       symbols,
       note: "Browser subscribes on the Polymarket real-time data socket. There is no Lychee API on the live path.",
     },
-    symbols,
+    symbolAliases ? symbols : [],
   );
 }
 
 registerKalshi();
 registerPolymarket();
-registerDirectPriceStream(
-  "chainlink",
-  "Live prices",
-  "crypto_prices_chainlink",
-  CHAINLINK_LIVE_SOURCES,
-);
+for (const feed of CHAINLINK_FEEDS) {
+  registerDirectPriceStream("chainlink", feed.label, feed.topic, CHAINLINK_LIVE_SOURCES, {
+    endpoint: feed.id,
+    symbolAliases: feed.id === "prices",
+  });
+}
 registerDirectPriceStream("binance", "Live prices", "crypto_prices", BINANCE_LIVE_SOURCES);
 
 /** Canonical entries only. Symbol and playground aliases resolve through the lookup helpers. */

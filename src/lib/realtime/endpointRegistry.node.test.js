@@ -68,6 +68,11 @@ test("chainlink and binance prices resolve by table id and by symbol", () => {
   assert.equal(isRealtimeEnabled("chainlink", "prices"), true);
   assert.equal(getRealtimeEndpoint("chainlink", "btc/usd")?.endpoint, "prices");
   assert.equal(getRealtimeEndpoint("chainlink", "btc/usd")?.topic, "crypto_prices_chainlink");
+  assert.equal(getRealtimeEndpoint("chainlink", "twap_60")?.topic, "crypto_prices_twap_sixty");
+  assert.equal(getRealtimeEndpoint("chainlink", "twap_30")?.topic, "crypto_prices_twap_thirty");
+  assert.equal(getRealtimeEndpoint("chainlink", "twap_60")?.livePath, "client_websocket");
+  assert.ok(getRealtimeEndpoint("chainlink", "twap_60")?.symbols.includes("zec/usd"));
+  assert.equal(getRealtimeEndpoint("chainlink", "hype/usd")?.endpoint, "prices");
   assert.equal(isRealtimeEnabled("binance", "prices"), true);
   assert.equal(getRealtimeEndpoint("binance", "btcusdt")?.endpoint, "prices");
   assert.equal(getRealtimeEndpoint("binance", "ethusdt")?.topic, "crypto_prices");

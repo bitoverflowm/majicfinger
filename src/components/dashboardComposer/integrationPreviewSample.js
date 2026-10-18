@@ -6,8 +6,9 @@
  */
 
 import { toast } from "sonner";
+import { CHAINLINK_LIVE_SOURCES, chainlinkFeed } from "@/lib/chainlinkFeeds";
 
-const CACHE_KEY = "lycheeIntegrationPreviewSamples:v3";
+const CACHE_KEY = "lycheeIntegrationPreviewSamples:v4";
 const SAMPLE_IDS = [
   "kalshiHistorical",
   "kalshiHistoricalV2",
@@ -471,12 +472,19 @@ async function loadPolymarketLive() {
 }
 
 const RTDS_URL = "wss://ws-live-data.polymarket.com";
-const QUOTE_PAIRS = [
-  { id: "btc", title: "Bitcoin", tile: "BT", binance: "btcusdt", chainlink: "btc/usd" },
-  { id: "eth", title: "Ethereum", tile: "ET", binance: "ethusdt", chainlink: "eth/usd" },
-  { id: "sol", title: "Solana", tile: "SO", binance: "solusdt", chainlink: "sol/usd" },
-  { id: "xrp", title: "XRP", tile: "XR", binance: "xrpusdt", chainlink: "xrp/usd" },
+const BINANCE_PAIRS = [
+  { id: "btc", title: "Bitcoin", tile: "BT", symbol: "btcusdt" },
+  { id: "eth", title: "Ethereum", tile: "ET", symbol: "ethusdt" },
+  { id: "sol", title: "Solana", tile: "SO", symbol: "solusdt" },
+  { id: "xrp", title: "XRP", tile: "XR", symbol: "xrpusdt" },
 ];
+const CHAINLINK_PAIRS = CHAINLINK_LIVE_SOURCES.map((pair) => ({
+  id: pair.id,
+  title: pair.name,
+  tile: pair.id.slice(0, 2).toUpperCase(),
+  symbol: pair.id,
+}));
+const CHAINLINK_SAMPLE_TOPIC = chainlinkFeed("twap_60").topic;
 
 export function formatUsd(value) {
   const n = num(value);
@@ -496,13 +504,15 @@ let chainlinkQuoteTask = null;
 function sampleBinanceQuotes() {
   if (!binanceQuoteTask) {
     binanceQuoteTask = collectQuoteFeed({
-      feed: "binance",
-      subscriptions: QUOTE_PAIRS.map((pair) => ({
+      topic: "crypto_prices",
+      pairs: BINANCE_PAIRS,
+      subscriptions: BINANCE_PAIRS.map((pair) => ({
         topic: "crypto_prices",
         type: "update",
-        filters: JSON.stringify([pair.binance]),
+        filters: JSON.stringify([pair.symbol]),
       })),
-      stopAt: QUOTE_PAIRS.length,
+      stopAt: BINANCE_PAIRS.length,
+      countPairs: true,
       timeoutMs: 5000,
     }).catch((error) => {
       binanceQuoteTask = null;
@@ -515,16 +525,11 @@ function sampleBinanceQuotes() {
 function sampleChainlinkQuotes() {
   if (!chainlinkQuoteTask) {
     chainlinkQuoteTask = Promise.all(
-      QUOTE_PAIRS.map((pair) =>
+      CHAINLINK_PAIRS.map((pair) =>
         collectQuoteFeed({
-          feed: "chainlink",
-          subscriptions: [
-            {
-              topic: "crypto_prices_chainlink",
-              type: "*",
-              filters: JSON.stringify({ symbol: pair.chainlink }),
-            },
-          ],
+          topic: CHAINLINK_SAMPLE_TOPIC,
+          pairs: [pair],
+          subscriptions: [{ topic: CHAINLINK_SAMPLE_TOPIC, type: "*", filters: JSON.stringify({ symbol: pair.symbol }) }],
           stopAt: 3,
           timeoutMs: 5000,
         }).catch(() => new Map()),
@@ -546,7 +551,7 @@ function sampleChainlinkQuotes() {
   return chainlinkQuoteTask;
 }
 
-function collectQuoteFeed({ feed, subscriptions, stopAt, timeoutMs }) {
+function collectQuoteFeed({ topic, pairs, subscriptions, stopAt, countPairs = false, timeoutMs }) {
   return new Promise((resolve, reject) => {
     if (typeof WebSocket === "undefined") {
       reject(new Error("Live prices are only available in the browser"));
@@ -592,11 +597,9 @@ function collectQuoteFeed({ feed, subscriptions, stopAt, timeoutMs }) {
       } catch {
         return;
       }
-      if (!msg?.payload) return;
-      const topicFeed = msg.topic === "crypto_prices" ? "binance" : msg.topic === "crypto_prices_chainlink" ? "chainlink" : null;
-      if (topicFeed !== feed) return;
+      if (!msg?.payload || msg.topic !== topic) return;
       const symbol = String(msg.payload.symbol || "").toLowerCase();
-      const pair = QUOTE_PAIRS.find((item) => item.binance === symbol || item.chainlink === symbol);
+      const pair = pairs.find((item) => item.symbol === symbol);
       if (!pair) return;
       const history = Array.isArray(msg.payload.data) ? msg.payload.data : null;
       if (history?.length) {
@@ -613,7 +616,7 @@ function collectQuoteFeed({ feed, subscriptions, stopAt, timeoutMs }) {
         quotes.set(pair.id, { price, at: num(msg.payload.timestamp) || Date.now(), series });
       }
       const ticks = quotes.get(pair.id)?.series.length || 0;
-      const enough = feed === "binance" ? quotes.size >= stopAt : ticks >= stopAt;
+      const enough = countPairs ? quotes.size >= stopAt : ticks >= stopAt;
       if (enough) finish();
     };
     ws.onerror = () => {
@@ -643,13 +646,14 @@ function quoteMove(series) {
 
 function quotesPreview(feed, byFeed) {
   const key = feed === "binance" ? "binance" : "chainlink";
-  const rows = QUOTE_PAIRS.map((pair) => {
+  const pairs = feed === "binance" ? BINANCE_PAIRS : CHAINLINK_PAIRS;
+  const rows = pairs.map((pair) => {
     const hit = byFeed[key].get(pair.id);
     if (!hit) return null;
     return {
       tile: pair.tile,
       title: pair.title,
-      subtitle: feed === "binance" ? pair.binance.toUpperCase() : pair.chainlink.toUpperCase(),
+      subtitle: pair.symbol.toUpperCase(),
       price: hit.price,
       updatedAt: hit.at,
       series: hit.series,
@@ -669,7 +673,7 @@ function quotesPreview(feed, byFeed) {
   cards.push({
     label: "Feeds",
     value: String(rows.length),
-    sentence: feed === "binance" ? "spot pairs in this sample" : "oracle pairs in this sample",
+    sentence: feed === "binance" ? "spot pairs in this sample" : "coins in this sample",
     tone: "flat",
     series: [],
   });
@@ -677,11 +681,11 @@ function quotesPreview(feed, byFeed) {
     tables: [
       {
         kind: "quotes",
-        title: feed === "binance" ? "Spot markets" : "Oracle feeds",
+        title: feed === "binance" ? "Spot markets" : "Up/Down settlement prices",
         caption:
           feed === "binance"
             ? "Latest Binance prices on the live feed"
-            : "Latest Chainlink answers on the live feed",
+            : "Latest 60-second Chainlink TWAPs, the price Polymarket settles Up/Down markets on",
         rows,
       },
     ],

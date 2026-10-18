@@ -176,7 +176,8 @@ export const integrations_list = [
     ),
     clickHandler: "chainlink",
     name: "Chainlink",
-    description: "Access decentralized oracle data feeds for smart contracts and blockchain apps. Retrieve real-world data, integrate secure external inputs, and monitor live on-chain information.",
+    description:
+      "Chainlink-computed crypto TWAPs with a fixed 60-second window, streamed through Polymarket. This is the price Polymarket uses to set the price to beat and settle its crypto Up/Down markets. Chainlink spot prices and the legacy 30-second TWAP are also available, for BTC, ETH, SOL, XRP, DOGE, HYPE, BNB and ZEC.",
     playgroundDescription: "Select a trading pair to start pulling live prices",
     guide: {
       href: "/guides/polymarket-live-prices",

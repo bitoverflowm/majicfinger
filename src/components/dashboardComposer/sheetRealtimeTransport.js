@@ -1,5 +1,6 @@
 "use client";
 
+import { CHAINLINK_STREAM_CAP, chainlinkFeed, chainlinkRowsFromPoints, openChainlinkStream } from "@/lib/chainlinkFeeds";
 import { flattenKalshiLiveCandlestickGroups } from "@/lib/kalshiLive/normalizeCandlestickRow";
 import { normalizeKalshiLiveOrderbook } from "@/lib/kalshiLive/normalizeOrderbookRow";
 import { normalizeKalshiLiveTradeRow } from "@/lib/kalshiLive/normalizeTradeRow";
@@ -33,6 +34,10 @@ const POLL_MS = {
  * @returns {{ stop: () => void }}
  */
 export function startSheetRealtimeTransport(block, def, handlers) {
+  const streamSymbol = def.integration === "chainlink" ? chainlinkStreamSymbol(block) : "";
+  if (def.livePath === "client_websocket" && streamSymbol) {
+    return startChainlinkPairStream(block, def, handlers, streamSymbol);
+  }
   if (def.livePath === "client_websocket" && (def.integration === "chainlink" || def.integration === "binance")) {
     return startPriceSocket(block, def, handlers);
   }
@@ -58,21 +63,24 @@ function startPriceSocket(block, def, handlers) {
   let ping = 0;
   let emitTimer = 0;
   let primed = false;
-  const ws = new WebSocket(def.socketUrl);
-  const subscriptions =
+  // Chainlink topics only stream live updates for one symbol per connection.
+  const groups =
     def.integration === "binance"
-      ? symbols.map((symbol) => ({ topic: def.topic, type: "update", filters: JSON.stringify([symbol]) }))
-      : symbols.map((symbol) => ({ topic: def.topic, type: "*", filters: JSON.stringify({ symbol }) }));
+      ? [symbols.map((symbol) => ({ topic: def.topic, type: "update", filters: JSON.stringify([symbol]) }))]
+      : symbols.map((symbol) => [{ topic: def.topic, type: "*", filters: JSON.stringify({ symbol }) }]);
+  const sockets = groups.map(() => new WebSocket(def.socketUrl));
 
   const stop = () => {
     if (stopped) return;
     stopped = true;
     window.clearInterval(ping);
     window.clearTimeout(emitTimer);
-    try {
-      ws.close();
-    } catch {
-      /* ignore */
+    for (const ws of sockets) {
+      try {
+        ws.close();
+      } catch {
+        /* ignore */
+      }
     }
   };
 
@@ -93,15 +101,7 @@ function startPriceSocket(block, def, handlers) {
     }, 200);
   };
 
-  ws.onopen = () => {
-    if (stopped) return;
-    ws.send(JSON.stringify({ action: "subscribe", subscriptions }));
-    handlers.onStatus("Connected, waiting for prices");
-    ping = window.setInterval(() => {
-      if (ws.readyState === WebSocket.OPEN) ws.send("PING");
-    }, 4000);
-  };
-  ws.onmessage = (event) => {
+  const onMessage = (event) => {
     if (stopped || event.data === "PONG") return;
     let msg;
     try {
@@ -123,13 +123,100 @@ function startPriceSocket(block, def, handlers) {
     handlers.onStatus("Receiving prices");
     emit();
   };
-  ws.onerror = () => {
-    if (!stopped) handlers.onStatus("Reconnecting");
-  };
-  ws.onclose = () => {
-    if (!stopped) handlers.onFatal("The price stream closed.");
-  };
+  sockets.forEach((ws, index) => {
+    ws.onopen = () => {
+      if (stopped) return;
+      ws.send(JSON.stringify({ action: "subscribe", subscriptions: groups[index] }));
+      handlers.onStatus("Connected, waiting for prices");
+    };
+    ws.onmessage = onMessage;
+    ws.onerror = () => {
+      if (!stopped) handlers.onStatus("Reconnecting");
+    };
+    ws.onclose = () => {
+      if (stopped) return;
+      stop();
+      handlers.onFatal("The price stream closed.");
+    };
+  });
+  ping = window.setInterval(() => {
+    for (const ws of sockets) {
+      if (ws.readyState === WebSocket.OPEN) ws.send("PING");
+    }
+  }, 4000);
 
+  return { stop };
+}
+
+/** The pair a Chainlink pair sheet streams. Older Chainlink sheets hold one row per coin and return "". */
+function chainlinkStreamSymbol(block) {
+  if (block?.pull?.mode === "stream" && block.pull.symbol) return String(block.pull.symbol).toLowerCase();
+  const columns = Array.isArray(block?.columns) ? block.columns : [];
+  if (!columns.some((column) => column?.id === "time") || columns.some((column) => column?.id === "updated")) return "";
+  const first = Array.isArray(block?.records) ? block.records.find((row) => row?.symbol) : null;
+  return first ? String(first.symbol).toLowerCase() : "";
+}
+
+function latestStreamTime(block) {
+  const records = Array.isArray(block?.records) ? block.records : [];
+  let last = -Infinity;
+  for (const row of records) {
+    const time = Number(row?.time);
+    if (Number.isFinite(time) && time > last) last = time;
+  }
+  if (records.length || !Object.keys(block?.cells || {}).length) return last;
+  return Date.now();
+}
+
+/** Appends each new tick to the bottom of a pair sheet. Stops at the stream cap rather than dropping old rows. */
+function startChainlinkPairStream(block, def, handlers, symbol) {
+  let stopped = false;
+  let cells = { ...(block.cells || {}) };
+  let records = Array.isArray(block.records) ? block.records.map((row) => ({ ...row })) : null;
+  let nextRow = maxRow(cells) + 1;
+  let last = latestStreamTime(block);
+  const windowSeconds = chainlinkFeed(def.endpoint)?.windowSeconds || null;
+  let close = () => {};
+  const stop = () => {
+    if (stopped) return;
+    stopped = true;
+    close();
+  };
+  close = openChainlinkStream({
+    topic: def.topic,
+    symbol,
+    onStatus(status) {
+      if (stopped) return;
+      if (status === "connecting") handlers.onStatus("Connected, waiting for prices");
+      if (status === "closed") {
+        stop();
+        handlers.onFatal(typeof WebSocket === "undefined" ? "Live prices need a browser connection." : "The price stream closed.");
+      }
+    },
+    onPoints(points) {
+      if (stopped) return;
+      const added = chainlinkRowsFromPoints(points, { symbol, windowSeconds, after: last });
+      if (!added.length) return;
+      if (nextRow + added.length > CHAINLINK_STREAM_CAP) {
+        stop();
+        handlers.onFatal(`This sheet reached ${CHAINLINK_STREAM_CAP.toLocaleString()} rows, so streaming stopped.`);
+        return;
+      }
+      last = added[added.length - 1].time;
+      cells = { ...cells };
+      for (const [key, value] of Object.entries(cellsFromRecords(block.columns, added))) {
+        const [col, row] = key.split(",");
+        cells[`${col},${nextRow + Number(row)}`] = value;
+      }
+      nextRow += added.length;
+      if (records) {
+        records = records.concat(liveRecordsFromRows(block.columns, added));
+        handlers.onRecords?.(records);
+      }
+      handlers.onStatus("Receiving prices");
+      handlers.onCells(cells);
+    },
+  });
   return { stop };
 }
 

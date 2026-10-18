@@ -274,7 +274,8 @@ function cleanPull(pull) {
   const wallet = /^0x[a-fA-F0-9]{40}$/.test(address) ? address : "";
   const openAt = cleanTime(pull.openAt);
   const closeAt = cleanTime(pull.closeAt);
-  if (!table || (!lake && !ticker && !tokens.length && !eventTicker && !seriesTicker && !eventTickers.length && !seriesTickers.length && !wallet)) {
+  const streamSymbol = pull.mode === "stream" ? cleanText(pull.symbol, 40).trim().toLowerCase() : "";
+  if (!table || (!lake && !ticker && !tokens.length && !eventTicker && !seriesTicker && !eventTickers.length && !seriesTickers.length && !wallet && !streamSymbol)) {
     return null;
   }
   const limit = Math.floor(num(pull.limit, 0));
@@ -298,6 +299,7 @@ function cleanPull(pull) {
     ...(wallet && pull.kind === "profile" ? { kind: "profile" } : {}),
     ...(openAt ? { openAt } : {}),
     ...(closeAt ? { closeAt } : {}),
+    ...(streamSymbol ? { symbol: streamSymbol, mode: "stream" } : {}),
   };
 }
 
