@@ -257,6 +257,7 @@ function PosterRow({ title, description, items }) {
 
 function StartTabChip({ tab, selected, userId, onSelect }) {
   const context = useMyStateV2();
+  const canvas = useWorkspaceCanvas();
   const [menuOpen, setMenuOpen] = useState(false);
   const [renaming, setRenaming] = useState(false);
   const [draftName, setDraftName] = useState(tab.name);
@@ -323,6 +324,7 @@ function StartTabChip({ tab, selected, userId, onSelect }) {
     const activeId =
       state.activeId === tab.id ? neighbor?.id || null : state.activeId;
     persist({ welcomeRemoved, tabs, activeId });
+    canvas?.deleteTab?.(tab.id);
     setMenuOpen(false);
     if (state.activeId === tab.id) {
       if (neighbor) onSelect?.(neighbor.id);

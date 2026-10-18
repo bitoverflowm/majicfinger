@@ -19,9 +19,10 @@ export async function loadWorkspaceDashboardPreview() {
   return { ok: true, data: json.data || null };
 }
 
-export async function loadCurrentWorkspaceDashboard(tab) {
+/** `blocksOnly` skips the tables list, for tabs fetched after the first one. */
+export async function loadCurrentWorkspaceDashboard(tab, { blocksOnly = false } = {}) {
   const id = String(tab || "").trim();
-  const query = id ? `?tab=${encodeURIComponent(id)}` : "";
+  const query = id ? `?tab=${encodeURIComponent(id)}${blocksOnly ? "&part=1" : ""}` : "";
   const res = await fetch(`/api/workspace-dashboards/current${query}`, { credentials: "include" });
   const json = await readJson(res);
   if (res.status === 401) return { ok: false, unauthorized: true };
@@ -41,6 +42,26 @@ export async function createWorkspaceDashboard(draft) {
   const json = await readJson(res);
   if (!res.ok || !json?.success || !json.data) {
     return { ok: false, message: json?.message || "Could not create the dashboard." };
+  }
+  return { ok: true, data: json.data };
+}
+
+/**
+ * Saves only what changed.
+ * @param {string} id
+ * @param {{ meta?: object, blocks?: Record<string, object[]>, remove_tabs?: string[], tables?: { upsert?: object[], remove?: string[] } }} patch
+ */
+export async function patchWorkspaceDashboard(id, patch, { keepalive = false } = {}) {
+  const res = await fetch(`/api/workspace-dashboards/${id}`, {
+    method: "PATCH",
+    credentials: "include",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(patch || {}),
+    keepalive,
+  });
+  const json = await readJson(res);
+  if (!res.ok || !json?.success) {
+    return { ok: false, message: json?.message || "Could not save the dashboard." };
   }
   return { ok: true, data: json.data };
 }

@@ -170,6 +170,8 @@ const DashBody = ({ user }) => {
     useLayoutEffect(() => {
         const userId = user?.userId || "local";
         if (startTabsUserRef.current === userId) return;
+        // A user refetch blanks the user for a moment; the signed-out tab list would replace theirs.
+        if (userId === "local" && startTabsUserRef.current) return;
         startTabsUserRef.current = userId;
         const stored = loadWorkspaceStartTabs(user?.userId);
         contextStateV2?.setWorkspaceStartTabs?.(stored.tabs);

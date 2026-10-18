@@ -51,8 +51,16 @@ import {
   createWorkspaceDashboard,
   loadCurrentWorkspaceDashboard,
   loadWorkspaceDashboardPreview,
-  saveWorkspaceDashboard,
+  patchWorkspaceDashboard,
 } from "@/lib/workspaceDashboardClient";
+import {
+  buildSavePatch,
+  createSaveBaseline,
+  rememberLoadedTabs,
+  rememberMeta,
+  rememberServerTabs,
+  rememberTables,
+} from "@/components/dashboardComposer/dashboardSaveDiff";
 import { pageIdForTab, tabIdFromPage } from "@/lib/workspaceDashboardDocument";
 import {
   rememberSheetRecords,
@@ -256,6 +264,50 @@ function blocksByPageFromDoc(doc) {
   return map;
 }
 
+function metaFromLive(live) {
+  return {
+    name: String(live.dashboardName || "").trim().slice(0, 120) || "Untitled",
+    active_tab_id: live.activeTabId,
+    welcome_removed: live.welcomeRemoved,
+    tabs: live.tabs.length ? live.tabs : [{ id: "welcome", name: "Welcome", blank: false }],
+  };
+}
+
+/** The whole dashboard, for a first create and the local backup. Tabs still loading keep their last local copy. */
+function draftFromLive(live) {
+  const saved = savedBlocksByPage(live.blocksByPage);
+  const blocks = blocksForDocument(saved.blocksByPage);
+  if (live.pendingTabs?.length) {
+    const previous = readLocalDashboard(live.owner);
+    for (const tabId of live.pendingTabs) {
+      if (previous?.blocks?.[tabId]) blocks[tabId] = previous.blocks[tabId];
+    }
+  }
+  return { ...metaFromLive(live), blocks, tables: savedTables(live.tables, live.blocksByPage), charts: [] };
+}
+
+/** Server blocks for freshly loaded tabs. Blocks added to a tab while it was loading stay on it. */
+function mergeLoadedTabs(prev, loaded) {
+  const next = { ...prev };
+  for (const [page, list] of Object.entries(loaded || {})) {
+    const ids = new Set(list.map((block) => block?.id));
+    const added = (prev?.[page] || []).filter((block) => !ids.has(block?.id));
+    next[page] = added.length ? [...list, ...added] : list;
+  }
+  return next;
+}
+
+/** Runs work when the browser is idle, so background tab loads never compete with the tab on screen. */
+function whenIdle(work, timeout = 1500) {
+  if (typeof window === "undefined") return undefined;
+  if (typeof window.requestIdleCallback === "function") {
+    const handle = window.requestIdleCallback(work, { timeout });
+    return () => window.cancelIdleCallback(handle);
+  }
+  const timer = window.setTimeout(work, 200);
+  return () => window.clearTimeout(timer);
+}
+
 function blocksForDocument(blocksByPage) {
   const blocks = {};
   for (const [page, list] of Object.entries(blocksByPage || {})) {
@@ -302,6 +354,11 @@ export function WorkspaceCanvasProvider({ pageId, readOnly = false, children }) 
   const [tables, setTables] = useState([]);
   const [ready, setReady] = useState(false);
   const [pendingTabs, setPendingTabs] = useState([]);
+  const [prefetchOn, setPrefetchOn] = useState(false);
+  const [tabRetryNonce, setTabRetryNonce] = useState(0);
+  const loadEpochRef = useRef(0);
+  const tabFetchRef = useRef(new Map());
+  const tabFailuresRef = useRef(new Map());
   const [dashboardName, setDashboardName] = useState("Untitled");
   const [previewTabs, setPreviewTabs] = useState([]);
   const [previewActiveId, setPreviewActiveId] = useState("");
@@ -313,8 +370,11 @@ export function WorkspaceCanvasProvider({ pageId, readOnly = false, children }) 
   const replayRunRef = useRef(null);
   const blocks = blocksByPage[pageId] || [];
   const docIdRef = useRef("");
-  const lastPayloadRef = useRef("");
-  const draftRef = useRef(null);
+  const saveBaseRef = useRef(createSaveBaseline());
+  const removedTabsRef = useRef(new Set());
+  const savingRef = useRef(null);
+  const resaveRef = useRef(false);
+  const [saveNonce, setSaveNonce] = useState(0);
   const pendingSelectRef = useRef("");
   const pendingRevealRef = useRef("");
   const placedSheetIdRef = useRef("");
@@ -349,25 +409,6 @@ export function WorkspaceCanvasProvider({ pageId, readOnly = false, children }) 
   const activeTabId = ctx?.activeWorkspaceStartTabId || "welcome";
   const welcomeRemoved = !!ctx?.welcomeTabRemoved;
 
-  function draftFromState(nextBlocks, nextTables) {
-    const tabList = tabs.length ? tabs : [{ id: "welcome", name: "Welcome", blank: false }];
-    const loadedTabs = pendingTabs.length
-      ? tabList.map((tab) => tab.id).filter((id) => !pendingTabs.includes(id))
-      : null;
-    const saved = savedBlocksByPage(nextBlocks);
-    rememberSheetRecords(owner, saved.trimmed);
-    return {
-      name: String(dashboardName || "").trim().slice(0, 120) || "Untitled",
-      active_tab_id: activeTabId,
-      welcome_removed: welcomeRemoved,
-      tabs: tabList,
-      blocks: blocksForDocument(saved.blocksByPage),
-      tables: savedTables(nextTables, nextBlocks),
-      charts: [],
-      ...(loadedTabs ? { loaded_tabs: loadedTabs } : {}),
-    };
-  }
-
   useEffect(() => {
     if (!owner) return undefined;
     if (owner === "local") {
@@ -390,7 +431,6 @@ export function WorkspaceCanvasProvider({ pageId, readOnly = false, children }) 
           return;
         }
         const nextBlocks = blocksByPageFromDoc(doc);
-        lastPayloadRef.current = JSON.stringify({ name: doc.name, blocks: doc.blocks });
         docIdRef.current = String(doc._id || "");
         setDashboardName(String(doc.name || "").trim() || "Untitled");
         setPreviewTabs(Array.isArray(doc.tabs) ? doc.tabs : []);
@@ -429,22 +469,37 @@ export function WorkspaceCanvasProvider({ pageId, readOnly = false, children }) 
       }
       const nextBlocks = blocksByPageFromDoc(doc);
       const nextTables = Array.isArray(doc.tables) ? doc.tables : [];
-      const payload = JSON.stringify({
-        name: doc.name,
-        tabs: doc.tabs,
-        active_tab_id: doc.active_tab_id,
-        blocks: doc.blocks,
-        tables: nextTables,
-      });
-      lastPayloadRef.current = payload;
       docIdRef.current = String(doc._id || "");
       setDashboardName(String(doc.name || "").trim() || "Untitled");
-      const pendingNow = Array.isArray(doc.pending_tabs) ? doc.pending_tabs.filter(Boolean) : [];
+      const serverPending = Array.isArray(doc.pending_tabs) ? doc.pending_tabs.filter(Boolean) : [];
+      const listedTabs = new Set((Array.isArray(doc.tabs) ? doc.tabs : []).map((tab) => tab?.id).filter(Boolean));
+      const savedTabIds = [...new Set([...Object.keys(doc.blocks || {}), ...serverPending])];
+      // Blocks under a tab id the tab bar no longer lists belong to a deleted tab.
+      // A lone default tab beside many saved ones looks like a lost tab list, so nothing is removed then.
+      const lostTabList = listedTabs.size <= 1 && savedTabIds.length > 1;
+      const orphanTabs = lostTabList ? [] : savedTabIds.filter((id) => !listedTabs.has(id));
+      const pendingNow = serverPending.filter((id) => !orphanTabs.includes(id));
+      const base = createSaveBaseline();
+      if (doc._id) {
+        rememberMeta(base, {
+          name: String(doc.name || "").trim().slice(0, 120) || "Untitled",
+          active_tab_id: doc.active_tab_id,
+          welcome_removed: !!doc.welcome_removed,
+          tabs: doc.tabs,
+        });
+        rememberLoadedTabs(base, nextBlocks, savedBlocksByPage(nextBlocks).blocksByPage);
+        rememberServerTabs(base, serverPending);
+        rememberTables(base, nextTables);
+      }
+      saveBaseRef.current = base;
+      removedTabsRef.current = new Set(orphanTabs);
+      for (const id of orphanTabs) delete nextBlocks[pageIdForTab(id)];
       const previousLocal = readLocalDashboard(owner);
       const localBlocks = { ...(previousLocal?.blocks || {}), ...(doc.blocks || {}) };
       for (const tabId of pendingNow) {
         if (previousLocal?.blocks?.[tabId]) localBlocks[tabId] = previousLocal.blocks[tabId];
       }
+      for (const tabId of orphanTabs) delete localBlocks[tabId];
       writeLocalDashboard(owner, {
         name: doc.name,
         active_tab_id: doc.active_tab_id,
@@ -457,8 +512,9 @@ export function WorkspaceCanvasProvider({ pageId, readOnly = false, children }) 
       setTables(nextTables);
       setBlocksByPage((prev) => {
         const merged = { ...nextBlocks };
+        const orphanPages = new Set(orphanTabs.map(pageIdForTab));
         for (const [page, list] of Object.entries(prev || {})) {
-          if ((list || []).length) merged[page] = list;
+          if ((list || []).length && !orphanPages.has(page)) merged[page] = list;
         }
         return merged;
       });
@@ -475,65 +531,171 @@ export function WorkspaceCanvasProvider({ pageId, readOnly = false, children }) 
         });
       }
       setReady(true);
-      for (const tabId of pending) {
-        if (cancel) return;
-        const part = await loadCurrentWorkspaceDashboard(tabId);
-        if (cancel) return;
-        if (part.ok && part.data) {
-          const more = blocksByPageFromDoc(part.data);
-          setBlocksByPage((prev) => ({ ...prev, ...more }));
-        }
-        setPendingTabs((current) => current.filter((id) => id !== tabId));
-      }
     })();
     return () => {
       cancel = true;
+      loadEpochRef.current += 1;
+      tabFetchRef.current.clear();
+      tabFailuresRef.current.clear();
+      setPrefetchOn(false);
     };
     // Load once per signed-in user. Tab edits after that are saved by the effect below.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [owner]);
 
+  // A tab stays pending until its blocks arrive. Saving treats every non-pending tab as loaded,
+  // so marking a failed tab as loaded would erase it on the server.
+  const fetchPendingTab = useCallback((tabId) => {
+    const inflight = tabFetchRef.current;
+    if (!tabId || inflight.has(tabId)) return;
+    const epoch = loadEpochRef.current;
+    const run = loadCurrentWorkspaceDashboard(tabId, { blocksOnly: true })
+      .catch(() => ({ ok: false }))
+      .then((part) => {
+        if (epoch !== loadEpochRef.current) return;
+        if (!part.ok || !part.data) {
+          const failures = (tabFailuresRef.current.get(tabId) || 0) + 1;
+          tabFailuresRef.current.set(tabId, failures);
+          window.setTimeout(() => setTabRetryNonce((n) => n + 1), Math.min(30000, 1500 * 2 ** failures));
+          return;
+        }
+        tabFailuresRef.current.delete(tabId);
+        if (!removedTabsRef.current.has(tabId)) {
+          const loadedPages = blocksByPageFromDoc(part.data);
+          rememberLoadedTabs(saveBaseRef.current, loadedPages, savedBlocksByPage(loadedPages).blocksByPage);
+          setBlocksByPage((prev) => mergeLoadedTabs(prev, loadedPages));
+        }
+        setPendingTabs((current) => current.filter((id) => id !== tabId));
+      })
+      .finally(() => {
+        if (tabFetchRef.current.get(tabId) === run) tabFetchRef.current.delete(tabId);
+      });
+    inflight.set(tabId, run);
+  }, []);
+
+  const viewedTabId = tabIdFromPage(pageId);
+  useEffect(() => {
+    if (readOnly || !ready || !pendingTabs.includes(viewedTabId)) return;
+    fetchPendingTab(viewedTabId);
+  }, [fetchPendingTab, pendingTabs, readOnly, ready, tabRetryNonce, viewedTabId]);
+
+  const pageIdRef = useRef(pageId);
+  pageIdRef.current = pageId;
+  const markTabSettled = useCallback((settledPageId) => {
+    if (settledPageId === pageIdRef.current) setPrefetchOn(true);
+  }, []);
+
+  const viewedEmpty = !(blocksByPage[pageId] || []).length && !pendingTabs.includes(viewedTabId);
+  useEffect(() => {
+    if (readOnly || !ready || prefetchOn) return undefined;
+    if (viewedEmpty) {
+      setPrefetchOn(true);
+      return undefined;
+    }
+    const timer = window.setTimeout(() => setPrefetchOn(true), 6000);
+    return () => window.clearTimeout(timer);
+  }, [prefetchOn, readOnly, ready, viewedEmpty]);
+
+  useEffect(() => {
+    if (readOnly || !ready || !prefetchOn || !pendingTabs.length) return undefined;
+    if (pendingTabs.includes(viewedTabId)) return undefined;
+    if (pendingTabs.some((id) => tabFetchRef.current.has(id))) return undefined;
+    const order = tabs.map((tab) => tab.id);
+    const rank = (id) => (order.includes(id) ? order.indexOf(id) : order.length);
+    const next = pendingTabs
+      .filter((id) => !tabFailuresRef.current.has(id))
+      .sort((a, b) => rank(a) - rank(b))[0] || pendingTabs.find((id) => tabFailuresRef.current.has(id));
+    if (!next) return undefined;
+    return whenIdle(() => fetchPendingTab(next));
+  }, [fetchPendingTab, pendingTabs, prefetchOn, readOnly, ready, tabRetryNonce, tabs, viewedTabId]);
+
+  const liveRef = useRef(null);
+  liveRef.current = { readOnly, ready, owner, tabs, activeTabId, welcomeRemoved, dashboardName, blocksByPage, tables, pendingTabs };
+  const backupAtRef = useRef(0);
+
+  /** One save at a time. Edits made while a save is out go in the next one. */
+  const flushSave = useCallback(({ keepalive = false } = {}) => {
+    const live = liveRef.current;
+    if (!live || live.readOnly || !live.ready || !live.owner || live.owner === "local" || !live.tabs.length) {
+      return Promise.resolve({ ok: true });
+    }
+    if (savingRef.current) {
+      resaveRef.current = true;
+      return savingRef.current;
+    }
+    const finish = (result) => {
+      savingRef.current = null;
+      if (!result.ok) window.setTimeout(() => setSaveNonce((n) => n + 1), 5000);
+      else if (resaveRef.current) {
+        resaveRef.current = false;
+        setSaveNonce((n) => n + 1);
+      }
+      return result;
+    };
+    if (!docIdRef.current) {
+      const run = createWorkspaceDashboard(draftFromLive(live))
+        .then((created) => {
+          if (!created.ok || !created.data?._id) return { ok: false };
+          docIdRef.current = String(created.data._id);
+          saveBaseRef.current = createSaveBaseline();
+          resaveRef.current = true;
+          return { ok: true };
+        })
+        .catch(() => ({ ok: false }))
+        .then(finish);
+      savingRef.current = run;
+      return run;
+    }
+    const saved = savedBlocksByPage(live.blocksByPage);
+    rememberSheetRecords(live.owner, saved.trimmed);
+    const base = saveBaseRef.current;
+    const result = buildSavePatch(base, {
+      meta: metaFromLive(live),
+      tabIds: live.tabs.map((tab) => tab.id),
+      blocksByPage: live.blocksByPage,
+      savedBlocks: saved.blocksByPage,
+      tables: live.tables,
+      savedTableList: savedTables(live.tables, live.blocksByPage),
+      pendingTabs: live.pendingTabs,
+      removedTabs: removedTabsRef.current,
+    });
+    if (!result.patch) {
+      for (const id of result.removedTabs) removedTabsRef.current.delete(id);
+      return Promise.resolve({ ok: true });
+    }
+    const small = keepalive && JSON.stringify(result.patch).length < 60000;
+    const run = patchWorkspaceDashboard(docIdRef.current, result.patch, { keepalive: small })
+      .then((response) => {
+        if (!response.ok) return { ok: false };
+        if (saveBaseRef.current === base) result.commit();
+        for (const id of result.removedTabs) removedTabsRef.current.delete(id);
+        const dropped = new Set(response.data?.removed_tables || []);
+        if (dropped.size) {
+          for (const id of dropped) {
+            base.tables.delete(id);
+            base.tableSigs.delete(id);
+          }
+          setTables((prev) => prev.filter((table) => !dropped.has(table.id)));
+        }
+        if (Date.now() - backupAtRef.current > 30000) {
+          backupAtRef.current = Date.now();
+          whenIdle(() => writeLocalDashboard(live.owner, draftFromLive(liveRef.current)), 5000);
+        }
+        return { ok: true };
+      })
+      .catch(() => ({ ok: false }))
+      .then(finish);
+    savingRef.current = run;
+    return run;
+  }, []);
+
   useEffect(() => {
     if (readOnly || !ready || !owner || owner === "local") return undefined;
-    const draft = draftFromState(blocksByPage, tables);
-    draftRef.current = draft;
-    const previousLocal = pendingTabs.length ? readLocalDashboard(owner) : null;
-    const localBlocks = previousLocal?.blocks ? { ...previousLocal.blocks, ...draft.blocks } : draft.blocks;
-    if (previousLocal?.blocks) {
-      for (const tabId of pendingTabs) {
-        if (previousLocal.blocks[tabId]) localBlocks[tabId] = previousLocal.blocks[tabId];
-      }
-    }
-    writeLocalDashboard(owner, { ...draft, blocks: localBlocks });
-    const payload = JSON.stringify({
-      name: draft.name,
-      tabs: draft.tabs,
-      active_tab_id: draft.active_tab_id,
-      blocks: draft.blocks,
-      tables: draft.tables,
-    });
-    if (payload === lastPayloadRef.current) return undefined;
     const timer = window.setTimeout(() => {
-      const finish = (id) => {
-        docIdRef.current = id;
-        lastPayloadRef.current = payload;
-      };
-      if (!docIdRef.current) {
-        createWorkspaceDashboard(draft)
-          .then((result) => {
-            if (result.ok && result.data?._id) finish(String(result.data._id));
-          })
-          .catch(() => {});
-        return;
-      }
-      saveWorkspaceDashboard(docIdRef.current, draft)
-        .then((result) => {
-          if (result.ok) lastPayloadRef.current = payload;
-        })
-        .catch(() => {});
+      void flushSave();
     }, 700);
     return () => window.clearTimeout(timer);
-  }, [activeTabId, blocksByPage, dashboardName, owner, pendingTabs, readOnly, ready, tables, tabs, welcomeRemoved]);
+  }, [activeTabId, blocksByPage, dashboardName, flushSave, owner, readOnly, ready, saveNonce, tables, tabs, welcomeRemoved]);
 
   useEffect(() => {
     if (readOnly || !ready || !storageKey) return;
@@ -624,14 +786,12 @@ export function WorkspaceCanvasProvider({ pageId, readOnly = false, children }) 
   useEffect(() => {
     if (readOnly) return undefined;
     const flush = () => {
-      const id = docIdRef.current;
-      const draft = draftRef.current;
-      if (!id || !draft || owner === "local") return;
-      saveWorkspaceDashboard(id, draft, { keepalive: true }).catch(() => {});
+      if (!docIdRef.current) return;
+      void flushSave({ keepalive: true });
     };
     window.addEventListener("pagehide", flush);
     return () => window.removeEventListener("pagehide", flush);
-  }, [owner, readOnly]);
+  }, [flushSave, readOnly]);
 
   const updateBlock = useCallback(
     (id, patch) => {
@@ -991,9 +1151,6 @@ export function WorkspaceCanvasProvider({ pageId, readOnly = false, children }) 
     setSelectedId(null);
   }, [pageId]);
 
-  const pageIdRef = useRef(pageId);
-  pageIdRef.current = pageId;
-
   const focusBlock = useCallback((id, nextPageId) => {
     if (nextPageId && nextPageId !== pageIdRef.current) pendingSelectRef.current = id || "";
     setSelectedId(id || null);
@@ -1047,6 +1204,44 @@ export function WorkspaceCanvasProvider({ pageId, readOnly = false, children }) 
     });
     stopPageRealtime(page);
   }, [stopPageRealtime]);
+
+  /** Drops a tab's blocks and tables here, and from the saved dashboard on the next save. */
+  const deleteTab = useCallback((tabId) => {
+    if (!tabId || readOnly) return;
+    const page = pageIdForTab(tabId);
+    removedTabsRef.current.add(tabId);
+    tabFetchRef.current.delete(tabId);
+    tabFailuresRef.current.delete(tabId);
+    stopPageRealtime(page);
+    setRealtimeModeByPage((prev) => {
+      if (!prev[page]) return prev;
+      const next = { ...prev };
+      delete next[page];
+      return next;
+    });
+    const current = blocksByPageRef.current;
+    const goneIds = new Set((current[page] || []).map((block) => block?.id).filter(Boolean));
+    for (const [otherPage, list] of Object.entries(current)) {
+      if (otherPage === page) continue;
+      for (const block of Array.isArray(list) ? list : []) goneIds.delete(block?.id);
+    }
+    setBlocksByPage((prev) => {
+      if (!(page in prev)) return prev;
+      const next = { ...prev };
+      delete next[page];
+      return next;
+    });
+    if (goneIds.size) setTables((prev) => prev.filter((table) => !goneIds.has(table.id)));
+    setPendingTabs((prev) => (prev.includes(tabId) ? prev.filter((id) => id !== tabId) : prev));
+    const localOwner = liveRef.current?.owner;
+    if (localOwner) {
+      try {
+        window.localStorage.removeItem(canvasStorageKey(localOwner, page));
+      } catch {
+        /* storage unavailable */
+      }
+    }
+  }, [readOnly, stopPageRealtime]);
 
   const resolveLeave = useCallback((choice) => {
     const prompt = leavePromptRef.current;
@@ -1172,39 +1367,13 @@ export function WorkspaceCanvasProvider({ pageId, readOnly = false, children }) 
   }, []);
 
   const saveNow = useCallback(async () => {
-    const draft = draftFromState(blocksByPage, tables);
-    draftRef.current = draft;
-    const previousLocal = pendingTabs.length ? readLocalDashboard(owner) : null;
-    const localBlocks = previousLocal?.blocks ? { ...previousLocal.blocks, ...draft.blocks } : draft.blocks;
-    if (previousLocal?.blocks) {
-      for (const tabId of pendingTabs) {
-        if (previousLocal.blocks[tabId]) localBlocks[tabId] = previousLocal.blocks[tabId];
-      }
-    }
-    const localDraft = { ...draft, blocks: localBlocks };
-    if (!owner || owner === "local") {
-      writeLocalDashboard(owner || "local", localDraft);
-      return { ok: true };
-    }
-    writeLocalDashboard(owner, localDraft);
-    const payload = JSON.stringify({
-      name: draft.name,
-      tabs: draft.tabs,
-      active_tab_id: draft.active_tab_id,
-      blocks: draft.blocks,
-      tables: draft.tables,
-    });
-    if (!docIdRef.current) {
-      const created = await createWorkspaceDashboard(draft);
-      if (!created.ok || !created.data?._id) return { ok: false };
-      docIdRef.current = String(created.data._id);
-      lastPayloadRef.current = payload;
-      return { ok: true };
-    }
-    const saved = await saveWorkspaceDashboard(docIdRef.current, draft);
-    if (saved.ok) lastPayloadRef.current = payload;
-    return { ok: !!saved.ok };
-  }, [blocksByPage, dashboardName, owner, pendingTabs, tables, tabs, activeTabId, welcomeRemoved]);
+    const live = liveRef.current;
+    const localOwner = live.owner || "local";
+    writeLocalDashboard(localOwner, draftFromLive(live));
+    if (localOwner === "local") return { ok: true };
+    while (savingRef.current) await savingRef.current;
+    return flushSave();
+  }, [flushSave]);
 
   useEffect(() => {
     setBlocksByPage((prev) => {
@@ -1228,9 +1397,11 @@ export function WorkspaceCanvasProvider({ pageId, readOnly = false, children }) 
       dashboardName,
       renameDashboard,
       saveNow,
+      deleteTab,
       readOnly,
       ready,
       tabLoading: pendingTabs.includes(tabIdFromPage(pageId)),
+      markTabSettled,
       pageId,
       previewTabs,
       previewActiveId,
@@ -1273,7 +1444,7 @@ export function WorkspaceCanvasProvider({ pageId, readOnly = false, children }) 
       createChartFromBlock,
       generateChartsForSheets,
     }),
-    [addBlock, armReplay, blocks, blocksByPage, createChartFromBlock, dashboardName, dismissRun, duplicateBlock, focusBlock, focusSheetRow, generateChartsForSheets, handDown, leavePrompt, pageId, pendingTabs, placeIntegrationSheets, previewActiveId, previewTabs, readOnly, ready, realtimeById, realtimeModeByPage, registerTables, removeBlock, renameDashboard, renameId, replayReady, replayRun, replayTab, reportRun, requestTab, resolveLeave, revealBlock, revealNonce, revealRunSheets, runFeed, saveNow, selectedId, sheetRowFocus, spotlightId, startRealtimeMode, startSheetRealtime, stopRealtimeMode, stopSheetRealtime, tables, tool, updateBlock],
+    [addBlock, armReplay, blocks, blocksByPage, createChartFromBlock, dashboardName, deleteTab, dismissRun, duplicateBlock, focusBlock, focusSheetRow, generateChartsForSheets, handDown, leavePrompt, markTabSettled, pageId, pendingTabs, placeIntegrationSheets, previewActiveId, previewTabs, readOnly, ready, realtimeById, realtimeModeByPage, registerTables, removeBlock, renameDashboard, renameId, replayReady, replayRun, replayTab, reportRun, requestTab, resolveLeave, revealBlock, revealNonce, revealRunSheets, runFeed, saveNow, selectedId, sheetRowFocus, spotlightId, startRealtimeMode, startSheetRealtime, stopRealtimeMode, stopSheetRealtime, tables, tool, updateBlock],
   );
 
   return (
@@ -2360,28 +2531,64 @@ export function WorkspaceCanvas() {
     return () => observer.disconnect();
   }, [canvas?.ready, blocks.length]);
 
+  const hasBlocks = blocks.length > 0;
+  const bootedPageRef = useRef("");
+  const markTabSettled = canvas?.markTabSettled;
   useLayoutEffect(() => {
-    if (!canvas?.ready) return undefined;
-    const ids = blocksTopToBottom(blocksRef.current).map((block) => block.id);
-    if (!ids.length) {
-      setBootingIds(new Set());
-      return undefined;
-    }
-    setBootingIds(new Set(ids));
-    const timers = ids.map((id, index) =>
-      window.setTimeout(() => {
-        setBootingIds((current) => {
-          if (!current.has(id)) return current;
-          const next = new Set(current);
-          next.delete(id);
-          return next;
-        });
-      }, 320 + index * 460),
-    );
-    return () => {
-      for (const timer of timers) window.clearTimeout(timer);
+    const pageId = canvas?.pageId || "";
+    if (!canvas?.ready || !hasBlocks || bootedPageRef.current === pageId) return undefined;
+    bootedPageRef.current = pageId;
+    const scroller = scrollerRef.current;
+    const top = scroller?.scrollTop || 0;
+    const bottom = top + (scroller?.clientHeight || window.innerHeight) + 160;
+    const ordered = blocksTopToBottom(blocksRef.current);
+    const inView = (block) => (block.y || 0) < bottom && (block.y || 0) + (block.h || 0) > top;
+    const visible = ordered.filter(inView).map((block) => block.id);
+    const below = ordered.filter((block) => !inView(block)).map((block) => block.id);
+    setBootingIds(new Set([...visible, ...below]));
+    const release = (ids) =>
+      setBootingIds((current) => {
+        if (!ids.some((id) => current.has(id))) return current;
+        const next = new Set(current);
+        for (const id of ids) next.delete(id);
+        return next;
+      });
+    let stopped = false;
+    let cancelIdle = null;
+    const timers = visible.map((id, index) => window.setTimeout(() => release([id]), 60 + index * 90));
+    const drainBelow = () => {
+      if (stopped) return;
+      const id = below.shift();
+      if (!id) return;
+      release([id]);
+      cancelIdle = whenIdle(drainBelow, 800);
     };
-  }, [canvas?.ready, canvas?.pageId]);
+    timers.push(
+      window.setTimeout(() => {
+        markTabSettled?.(pageId);
+        cancelIdle = whenIdle(drainBelow, 800);
+      }, 60 + visible.length * 90 + 120),
+    );
+    const onScroll = () => {
+      const view = scrollerRef.current;
+      if (!view) return;
+      const from = view.scrollTop - 160;
+      const to = view.scrollTop + view.clientHeight + 320;
+      const near = blocksRef.current
+        .filter((block) => (block.y || 0) < to && (block.y || 0) + (block.h || 0) > from)
+        .map((block) => block.id);
+      release(near);
+    };
+    scroller?.addEventListener("scroll", onScroll, { passive: true });
+    return () => {
+      stopped = true;
+      for (const timer of timers) window.clearTimeout(timer);
+      cancelIdle?.();
+      scroller?.removeEventListener("scroll", onScroll);
+      bootedPageRef.current = "";
+      setBootingIds(new Set());
+    };
+  }, [canvas?.ready, canvas?.pageId, hasBlocks, markTabSettled]);
 
   useEffect(() => {
     const onKey = (e) => {

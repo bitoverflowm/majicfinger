@@ -12,6 +12,9 @@ async function sessionUserId(req) {
   }
 }
 
+/** Tab ids go into a Mongo field path, so dots and dollars must never reach it. */
+const TAB_ID = /^[A-Za-z0-9_-]{1,80}$/;
+
 export const config = {
   api: { bodyParser: { sizeLimit: "16mb" } },
 };
@@ -32,8 +35,33 @@ export default async function handler(req, res) {
   }
 
   if (req.method === "GET") {
-    const doc = await WorkspaceDashboard.findOne({ user_id: userId }).sort({ updatedAt: -1 }).lean();
     const tab = String(req.query.tab || "").trim();
+    if (TAB_ID.test(tab)) {
+      const blocksOnly = req.query.part === "1";
+      const head = await WorkspaceDashboard.findOne({ user_id: userId })
+        .sort({ updatedAt: -1 })
+        .select(blocksOnly ? { blocks: 0, tables: 0, charts: 0 } : { blocks: 0 })
+        .lean();
+      if (!head) return res.status(200).json({ success: true, data: null });
+      const [part] = await WorkspaceDashboard.aggregate([
+        { $match: { _id: head._id } },
+        {
+          $project: {
+            list: `$blocks.${tab}`,
+            keys: { $map: { input: { $objectToArray: { $ifNull: ["$blocks", {}] } }, as: "entry", in: "$$entry.k" } },
+          },
+        },
+      ]);
+      return res.status(200).json({
+        success: true,
+        data: {
+          ...head,
+          blocks: Array.isArray(part?.list) ? { [tab]: part.list } : {},
+          pending_tabs: (part?.keys || []).filter((id) => id !== tab),
+        },
+      });
+    }
+    const doc = await WorkspaceDashboard.findOne({ user_id: userId }).sort({ updatedAt: -1 }).lean();
     if (!doc || !tab) return res.status(200).json({ success: true, data: doc || null });
     const all = doc.blocks && typeof doc.blocks === "object" ? doc.blocks : {};
     return res.status(200).json({
