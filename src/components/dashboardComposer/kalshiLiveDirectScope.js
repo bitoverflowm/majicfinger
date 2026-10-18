@@ -517,13 +517,20 @@ export function defaultDirectAttributeFilters(tableId, now = new Date()) {
   if (tableId === "orderbook") return { depth: { value: "20" } };
   const range = dateRangePreset("past-24h", now);
   const filters = {
-    time_range: { from: range?.from || "", to: range?.to || "", preset: "past-24h" },
+    time_range: { from: range?.from || "", to: range?.to || "", preset: "life-last-day" },
   };
   if (tableId === "candlesticks") {
     filters.period_interval = { value: "60" };
     filters.include_latest_before_start = { value: "true" };
   }
   return filters;
+}
+
+/** A join covers many markets, so trades and candles start on each market's whole life. */
+export function defaultJoinWindowFilters(tableId) {
+  const filters = defaultDirectAttributeFilters(tableId);
+  if (tableId !== "trades" && tableId !== "candlesticks") return filters;
+  return { ...filters, time_range: { from: "", to: "", preset: "market-life" } };
 }
 
 /** Request controls that sit above Columns for a market candlestick pull. */
@@ -708,6 +715,7 @@ export function kalshiLiveDirectAttributeColumns(tableId, columns) {
             type: "date",
             queryOnly: true,
             control: "query-range",
+            ...(tableId === "trades" || tableId === "candlesticks" ? { lifeWindows: true } : {}),
             description: tableId === "trades" ? "Start and end of trade data" : "Start and end of candlestick data",
           },
         ];

@@ -1405,6 +1405,7 @@ async function getJsonRetry(url) {
  */
 export async function loadKalshiLiveTradesForTicker(ticker, limit = PREVIEW_ROW_CAP, range = {}, options) {
   const columns = liveJoinColumns("trades", options);
+  if (range?.empty) return { columns, rows: [], truncated: false };
   const rowLimit = Math.max(1, Math.floor(Number(limit) || PREVIEW_ROW_CAP));
   const rows = [];
   let cursor = "";
@@ -1441,6 +1442,7 @@ export async function loadKalshiLiveOrderbookForTicker(ticker, depth = 100, opti
  */
 export async function loadKalshiLiveCandlesticksForTicker(ticker, limit = PREVIEW_ROW_CAP, window = {}, options) {
   const columns = liveJoinColumns("candlesticks", options);
+  if (window?.empty) return { columns, rows: [] };
   const period = [1, 60, 1440].includes(Number(window.period)) ? Number(window.period) : 1;
   const rowLimit = Math.max(1, Math.min(KALSHI_CANDLESTICK_MAX_CANDLES, Math.floor(Number(limit) || PREVIEW_ROW_CAP)));
   const end = Math.floor(Number(window.maxTs) || Date.now() / 1000);

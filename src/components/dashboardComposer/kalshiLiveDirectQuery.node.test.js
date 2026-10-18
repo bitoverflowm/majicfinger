@@ -5,6 +5,7 @@ import {
   fitCandleRange,
   inclusiveDays,
   defaultDirectAttributeFilters,
+  defaultJoinWindowFilters,
   defaultKalshiLiveDirectQuery,
   directEventTickers,
   directMarketTickers,
@@ -150,7 +151,12 @@ assert.equal(bookAttributes[0].control, "depth");
 assert.deepEqual(defaultDirectAttributeFilters("orderbook"), { depth: { value: "20" } });
 
 const seeded = defaultDirectAttributeFilters("candlesticks", new Date("2026-10-05T15:00:00Z"));
-assert.equal(seeded.time_range.preset, "past-24h");
+assert.equal(seeded.time_range.preset, "life-last-day");
+assert.equal(defaultJoinWindowFilters("trades").time_range.preset, "market-life");
+assert.equal(defaultJoinWindowFilters("candlesticks").period_interval.value, "60");
+assert.deepEqual(defaultJoinWindowFilters("orderbook"), { depth: { value: "20" } });
+assert.equal(kalshiLiveDirectAttributeColumns("trades", [])[0].lifeWindows, true);
+assert.equal(kalshiLiveDirectAttributeColumns("event_candlesticks", [])[0].lifeWindows, undefined);
 assert.equal(seeded.period_interval.value, "60");
 const windowed = directPullWindow("candlesticks", seeded, query);
 assert.equal(windowed.period, 60);

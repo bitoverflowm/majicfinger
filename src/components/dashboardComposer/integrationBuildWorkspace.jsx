@@ -13,7 +13,7 @@ import { BucketExplainer, BucketExplainerTabs } from "@/components/dashboardComp
 import { SampleExplainer } from "@/components/dashboardComposer/integrationSampleExplainer";
 import { ClosedOrderbookExplainer } from "@/components/dashboardComposer/integrationClosedOrderbook";
 import { BucketEnrichPanel, SampleEnrichPanel } from "@/components/dashboardComposer/integrationEnrichPanels";
-import { FanoutJoinExplainer, FanoutJoinExplainerTabs, JoinExplainer, JoinExplainerTabs, PolymarketFanoutJoinExplainer, PolymarketFanoutJoinExplainerTabs, PolymarketLiveJoinExplainer, PolymarketLiveJoinExplainerTabs, PolymarketTraderJoinExplainer, PolymarketTraderJoinExplainerTabs, TraderJoinExplainer, TraderJoinExplainerTabs } from "@/components/dashboardComposer/integrationJoinExplainer";
+import { FanoutJoinExplainer, FanoutJoinExplainerTabs, JoinExplainer, JoinExplainerTabs, LiveScopeJoinExplainer, LiveScopeJoinExplainerTabs, PolymarketFanoutJoinExplainer, PolymarketFanoutJoinExplainerTabs, PolymarketLiveJoinExplainer, PolymarketLiveJoinExplainerTabs, PolymarketTraderJoinExplainer, PolymarketTraderJoinExplainerTabs, TraderJoinExplainer, TraderJoinExplainerTabs } from "@/components/dashboardComposer/integrationJoinExplainer";
 import { SpectrumLoadingState } from "@/components/ui/spectrum-loading-state";
 import { TaskRows } from "@/components/spectrumui/blocks/ai-assistants/task-rows";
 import {
@@ -126,6 +126,7 @@ import {
   polymarketActivityRequestKey,
 } from "@/lib/polymarketLive/traderActivityCompose";
 import { defaultLifeRange, lifeOfMarket, lifePull, localDayKey } from "@/lib/markets/marketLife";
+import { kalshiMarketLife, lifePullWindow, lifeWindowDays, mergeLives } from "@/lib/markets/lifeWindow";
 import { Accordion, AccordionContent, AccordionItem } from "@/components/ui/accordion";
 import * as AccordionPrimitive from "@radix-ui/react-accordion";
 import { Button } from "@/components/ui/button";
@@ -193,6 +194,7 @@ import {
   isKalshiLiveDirectTable,
   kalshiLiveDirectScopeError,
   defaultDirectAttributeFilters,
+  defaultJoinWindowFilters,
   directPullWindow,
   KALSHI_LIVE_CANDLE_QUERY_IDS,
   candleRangeMaxDays,
@@ -927,13 +929,29 @@ function choiceClass(on) {
   );
 }
 
-function joinPullWindow(id, filters) {
-  return directPullWindow(id, filters || defaultDirectAttributeFilters(id), {});
+/** Window for one joined market. Life choices are cut from that market's own open and close. */
+function joinPullWindow(id, filters, market) {
+  const chosen = filters || defaultJoinWindowFilters(id);
+  return lifePullWindow(directPullWindow(id, chosen, {}), chosen.time_range, kalshiMarketLife(market));
 }
 
 function joinWindowSignature(id, filters) {
-  const spec = joinPullWindow(id, filters);
-  return [spec.minTs ?? "", spec.maxTs ?? "", spec.period ?? "", spec.depth ?? ""].join(":");
+  const chosen = filters || defaultJoinWindowFilters(id);
+  const spec = directPullWindow(id, chosen, {});
+  return [chosen.time_range?.preset ?? "", spec.minTs ?? "", spec.maxTs ?? "", spec.period ?? "", spec.depth ?? ""].join(":");
+}
+
+/** Ticker, title, and the open, close, and status that place a market's life. */
+function kalshiJoinMarket(row) {
+  const ticker = String(row?.ticker || "").trim();
+  return {
+    ticker,
+    label: ticker,
+    title: String(row?.yes_sub_title || ticker),
+    openTime: row?.open_time,
+    closeTime: row?.close_time,
+    status: row?.status,
+  };
 }
 
 function PolymarketJoinChoices({ choices, selected, onToggle }) {
@@ -953,12 +971,12 @@ function PolymarketJoinChoices({ choices, selected, onToggle }) {
   );
 }
 
-function LiveJoinList({ choices, selected, onToggle, windows, onWindow }) {
+function LiveJoinList({ choices, selected, onToggle, windows, onWindow, life = null, perMarket = true }) {
   return (
     <div className="space-y-1.5">
       {choices.map((item) => {
         const on = selected.has(item.id);
-        const filters = windows?.[item.id] || defaultDirectAttributeFilters(item.id);
+        const filters = windows?.[item.id] || defaultJoinWindowFilters(item.id);
         return (
           <div key={item.id}>
             <button type="button" aria-pressed={on} onClick={() => onToggle?.(item.id)} className={choiceClass(on)}>
@@ -967,7 +985,13 @@ function LiveJoinList({ choices, selected, onToggle, windows, onWindow }) {
             </button>
             {on ? (
               <div className="mt-1.5 rounded-lg border border-border/70 px-2 py-2">
-                <JoinSourceFields tableId={item.id} filters={filters} onChange={(next) => onWindow?.(item.id, next)} />
+                <JoinSourceFields
+                  tableId={item.id}
+                  filters={filters}
+                  bounds={life}
+                  perMarket={perMarket}
+                  onChange={(next) => onWindow?.(item.id, next)}
+                />
               </div>
             ) : null}
           </div>
@@ -1039,6 +1063,8 @@ function EnrichStep({
   onToggleDetectedJoin,
   joinWindows,
   onJoinWindow,
+  joinLife = null,
+  joinPerMarket = true,
   joinLake = "kalshi",
   joinPlacement = "",
   onJoinPlacement,
@@ -1343,6 +1369,8 @@ function EnrichStep({
                                   onToggle={onToggleDetectedJoin}
                                   windows={joinWindows}
                                   onWindow={onJoinWindow}
+                                  life={joinLife}
+                                  perMarket={joinPerMarket}
                                 />
                               </div>
                             </div>
@@ -1357,6 +1385,8 @@ function EnrichStep({
                                   onToggle={onToggleLiveJoin}
                                   windows={joinWindows}
                                   onWindow={onJoinWindow}
+                                  life={joinLife}
+                                  perMarket={joinPerMarket}
                                 />
                               </div>
                             </div>
@@ -1514,6 +1544,8 @@ function EnrichStep({
                                       onToggle={onToggleLiveJoin}
                                       windows={joinWindows}
                                       onWindow={onJoinWindow}
+                                  life={joinLife}
+                                  perMarket={joinPerMarket}
                                     />
                                   </div>
                                 </div>
@@ -1657,6 +1689,8 @@ function EnrichStep({
                                     onToggle={onToggleLiveJoin}
                                     windows={joinWindows}
                                     onWindow={onJoinWindow}
+                                  life={joinLife}
+                                  perMarket={joinPerMarket}
                                   />
                                 </div>
                               </div>
@@ -1812,6 +1846,8 @@ function EnrichStep({
                             onToggle={onToggleLiveJoin}
                             windows={joinWindows}
                             onWindow={onJoinWindow}
+                                  life={joinLife}
+                                  perMarket={joinPerMarket}
                           />
                           <p className="pt-1 text-[11px] leading-relaxed text-muted-foreground">
                             You have {queryRowCount.toLocaleString()} {queryRowCount === 1 ? "market" : "markets"} in this pull. Your plan joins{" "}
@@ -2559,6 +2595,17 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
         !(integrationId === "kalshiLive" && tableId === "orderbook"));
     if (!datesFollowMarket || !windowLife) return undefined;
     if (!liveWindowed && livePicks.length !== 1) return undefined;
+    if (liveWindowed) {
+      const preset = windowLife.stopped ? "market-life" : "life-last-day";
+      const days = lifeWindowDays(preset, windowLife);
+      setAttributeFilters((current) => {
+        const range = current?.time_range || {};
+        const next = { from: days?.from || "", to: days?.to || "", preset };
+        if (range.from === next.from && range.to === next.to && range.preset === next.preset) return current;
+        return { ...(current || {}), time_range: next };
+      });
+      return undefined;
+    }
     setAttributeFilters((current) => {
       const maxDays =
         tableId === "getTokenPriceHistory"
@@ -3066,15 +3113,15 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
     () => (liveMarketSearch ? kalshiLiveMarketAttributeColumns(pull?.columns || []) : []),
     [liveMarketSearch, pull?.columns, KALSHI_LIVE_QUERY_ATTRIBUTE_COLUMNS, kalshiLiveMarketAttributeColumns],
   );
-  const directAttributeColumns = useMemo(
-    () =>
-      withMarketLifeBounds(
-        (liveMarketFanout || liveEventCandles) ? kalshiLiveDirectAttributeColumns(tableId, pull?.columns || []) : [],
-        windowLife,
-        liveWindowed ? "Full market history" : "",
-      ),
-    [windowLife, liveWindowed, liveEventCandles, liveMarketFanout, tableId, pull?.columns],
-  );
+  const pickedMarketCount = livePicks.filter((pick) => pick?.kind === "market").length;
+  const directAttributeColumns = useMemo(() => {
+    const columns = withMarketLifeBounds(
+      (liveMarketFanout || liveEventCandles) ? kalshiLiveDirectAttributeColumns(tableId, pull?.columns || []) : [],
+      windowLife,
+      liveWindowed ? "Full market history" : "",
+    );
+    return columns.map((column) => (column.lifeWindows ? { ...column, perMarket: pickedMarketCount > 1 } : column));
+  }, [windowLife, liveWindowed, liveEventCandles, liveMarketFanout, tableId, pull?.columns, pickedMarketCount]);
   const kalshiQuerySection = integrationId === "kalshiLive" ? KALSHI_LIVE_QUERY_SECTIONS[tableId] || null : null;
   const directListColumns = useMemo(() => {
     if (!kalshiQuerySection) return directAttributeColumns;
@@ -3097,6 +3144,18 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
     () => directPullWindow(tableId, attributeFilters, directQuery),
     [tableId, attributeFilters, directQuery],
   );
+  const directRangePreset = String(attributeFilters?.time_range?.preset || "");
+  /** Trades and candles cut the window from each picked market's own life. */
+  const marketDirectWindow = (market) => {
+    const base = {
+      minTs: directWindow.minTs,
+      maxTs: directWindow.maxTs,
+      period: directWindow.period,
+      depth: directWindow.depth,
+      includeLatest: directWindow.includeLatest,
+    };
+    return liveWindowed ? lifePullWindow(base, attributeFilters?.time_range, kalshiMarketLife(market)) : base;
+  };
   const seriesAttributeColumns = useMemo(
     () =>
       liveSeriesSearch
@@ -3657,11 +3716,7 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
                           }
                         : {
                       ticker,
-                      minTs: directWindow.minTs,
-                      maxTs: directWindow.maxTs,
-                      period: directWindow.period,
-                      depth: directWindow.depth,
-                      includeLatest: directWindow.includeLatest,
+                      ...marketDirectWindow(directMarkets.find((market) => market.ticker === ticker)),
                       limit: tableId === "candlesticks" ? KALSHI_CANDLESTICK_MAX_CANDLES : PREVIEW_ROW_CAP,
                     };
     const pause = seriesMatch || eventMatch ? 280 : 0;
@@ -3705,7 +3760,7 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
       cancel = true;
       window.clearTimeout(timer);
     };
-  }, [columnRefillNonce, directEvents, directMarkets, directSeries, directWindow.depth, directWindow.includeLatest, directWindow.maxTs, directWindow.minTs, directWindow.period, eventAttributeColumns, eventCandleEvents, eventColumnFilterKey, eventIncludeMarkets, eventIncludeMilestones, eventMinCloseTs, eventSeriesKey, eventStatusKey, forecastPercentileKey, forecastTargets, holderEventTicker, holderMinAmount, holderNicknameKey, holderSeriesTicker, liveDirect, multivariateCollection, multivariateColumnFilterKey, multivariateRowColumns, multivariateSeries, planLimit, rowLimit, sampleMarketTicker, seriesAttributeColumns, seriesCategoryKey, seriesColumnFilterKey, seriesMinUpdatedTs, seriesProductMetadata, tableId, traderCategoryKey, traderHoldingsOn, traderMetric, traderMetricsOn, traderPeriod, traderProfileKey, traderQuery]);
+  }, [columnRefillNonce, directEvents, directMarkets, directRangePreset, directSeries, directWindow.depth, directWindow.includeLatest, directWindow.maxTs, directWindow.minTs, directWindow.period, eventAttributeColumns, eventCandleEvents, eventColumnFilterKey, eventIncludeMarkets, eventIncludeMilestones, eventMinCloseTs, eventSeriesKey, eventStatusKey, forecastPercentileKey, forecastTargets, holderEventTicker, holderMinAmount, holderNicknameKey, holderSeriesTicker, liveDirect, multivariateCollection, multivariateColumnFilterKey, multivariateRowColumns, multivariateSeries, planLimit, rowLimit, sampleMarketTicker, seriesAttributeColumns, seriesCategoryKey, seriesColumnFilterKey, seriesMinUpdatedTs, seriesProductMetadata, tableId, traderCategoryKey, traderHoldingsOn, traderMetric, traderMetricsOn, traderPeriod, traderProfileKey, traderQuery]);
 
   const seriesImportRows = useMemo(() => {
     if (!(liveDirect && tableId === "series" && directPreview.status === "ready")) return null;
@@ -4689,11 +4744,7 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
       const ticker = String(row?.ticker || "").trim();
       if (!ticker || seen.has(ticker)) continue;
       seen.add(ticker);
-      markets.push({
-        ticker,
-        label: ticker,
-        title: String(row?.yes_sub_title || ticker),
-      });
+      markets.push(kalshiJoinMarket(row));
     }
     return markets;
   }, [liveMarketSearch, liveMatchedRows, filteredRows]);
@@ -4920,17 +4971,38 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
   const fanoutMarketsDetected =
     fanoutJoinOn && fanoutSeriesMarkets && fanoutSeriesMarketPreview.status === "ready" && (fanoutSeriesMarketPreview.rows?.length || 0) > 0;
   const detectedPreviewTicker = String(fanoutSeriesMarketPreview.rows?.[0]?.ticker || "").trim();
+  const knownJoinMarkets = useMemo(() => {
+    const byTicker = new Map();
+    const add = (market) => {
+      if (market?.ticker && !byTicker.has(market.ticker) && kalshiMarketLife(market)) byTicker.set(market.ticker, market);
+    };
+    liveJoinList.forEach(add);
+    (seriesMarketView.rows || []).forEach((row) => add(kalshiJoinMarket(row)));
+    (fanoutSeriesMarketPreview.rows || []).forEach((row) => add(kalshiJoinMarket(row)));
+    (forecastMarketPreview?.rows || []).forEach((row) => add(kalshiJoinMarket(row)));
+    directMarkets.forEach(add);
+    return byTicker;
+  }, [liveJoinList, seriesMarketView.rows, fanoutSeriesMarketPreview.rows, forecastMarketPreview?.rows, directMarkets]);
+  const joinMarketLives = useMemo(() => {
+    const lives = [...knownJoinMarkets.values()].map((market) => kalshiMarketLife(market));
+    return { life: mergeLives(lives), perMarket: lives.length !== 1 };
+  }, [knownJoinMarkets]);
+  const joinMarketFor = (market) => (kalshiMarketLife(market) ? market : knownJoinMarkets.get(market?.ticker) || market);
+  const marketLifeKey = (market) => (market ? [market.openTime, market.closeTime, market.status].join("|") : "");
+  const joinPreviewLifeKey = marketLifeKey(knownJoinMarkets.get(joinPreviewTicker));
+  const detectedPreviewLifeKey = marketLifeKey(knownJoinMarkets.get(detectedPreviewTicker));
 
   useEffect(() => {
     if (polymarketLive || step !== "enrich" || !enrichPicks.has("join") || !liveJoinKey || !joinPreviewTicker) return undefined;
     const ids = liveJoinKey.split(",");
     const ticker = joinPreviewTicker;
-    const viewToken = `${ticker}|${liveJoinWindowKey}`;
+    const previewMarket = knownJoinMarkets.get(ticker);
+    const viewToken = `${ticker}|${liveJoinWindowKey}|${joinPreviewLifeKey}`;
     liveJoinVisibleTicker.current = viewToken;
     const next = {};
     const missing = [];
     for (const id of ids) {
-      const cacheKey = `${ticker}:${id}:${joinWindowSignature(id, joinWindows[id])}`;
+      const cacheKey = `${ticker}:${id}:${joinWindowSignature(id, joinWindows[id])}:${joinPreviewLifeKey}`;
       const hit = liveJoinCacheRef.current.get(cacheKey);
       if (hit?.status === "ready" || hit?.status === "error" || hit?.status === "loading") {
         next[id] = hit;
@@ -4943,8 +5015,8 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
     }
     setLiveJoinPreview(next);
     missing.forEach((id) => {
-      const cacheKey = `${ticker}:${id}:${joinWindowSignature(id, joinWindows[id])}`;
-      loadKalshiLiveMarketJoin(id, ticker, PREVIEW_ROW_CAP, joinPullWindow(id, joinWindows[id]))
+      const cacheKey = `${ticker}:${id}:${joinWindowSignature(id, joinWindows[id])}:${joinPreviewLifeKey}`;
+      loadKalshiLiveMarketJoin(id, ticker, PREVIEW_ROW_CAP, joinPullWindow(id, joinWindows[id], previewMarket))
         .then((result) => {
           const ready = { status: "ready", columns: result.columns || [], rows: result.rows || [], error: "" };
           liveJoinCacheRef.current.set(cacheKey, ready);
@@ -4962,7 +5034,7 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
         });
     });
     return undefined;
-  }, [polymarketLive, step, enrichPicks, liveJoinKey, joinPreviewTicker, liveJoinWindowKey, joinWindows]);
+  }, [polymarketLive, step, enrichPicks, liveJoinKey, joinPreviewTicker, liveJoinWindowKey, joinWindows, joinPreviewLifeKey]);
 
   const polymarketJoinPickId = polymarketJoinMarkets[0]?.pick?.id || "";
   const polymarketSheetJoinIds = (anchor) =>
@@ -5447,10 +5519,11 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
     let cancelled = false;
     const ids = detectedJoinKey.split(",");
     const ticker = detectedPreviewTicker;
+    const previewMarket = knownJoinMarkets.get(ticker);
     const next = {};
     const missing = [];
     for (const id of ids) {
-      const cacheKey = `${ticker}:${id}:${joinWindowSignature(id, joinWindows[id])}`;
+      const cacheKey = `${ticker}:${id}:${joinWindowSignature(id, joinWindows[id])}:${detectedPreviewLifeKey}`;
       const hit = liveJoinCacheRef.current.get(cacheKey);
       if (hit?.status === "ready" || hit?.status === "error" || hit?.status === "loading") next[id] = hit;
       else {
@@ -5462,8 +5535,8 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
     }
     setDetectedJoinPreview(next);
     missing.forEach((id) => {
-      const cacheKey = `${ticker}:${id}:${joinWindowSignature(id, joinWindows[id])}`;
-      loadKalshiLiveMarketJoin(id, ticker, PREVIEW_ROW_CAP, joinPullWindow(id, joinWindows[id]))
+      const cacheKey = `${ticker}:${id}:${joinWindowSignature(id, joinWindows[id])}:${detectedPreviewLifeKey}`;
+      loadKalshiLiveMarketJoin(id, ticker, PREVIEW_ROW_CAP, joinPullWindow(id, joinWindows[id], previewMarket))
         .then((result) => {
           if (cancelled) return;
           const ready = { status: "ready", columns: result.columns || [], rows: result.rows || [], error: "" };
@@ -5485,7 +5558,7 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
     return () => {
       cancelled = true;
     };
-  }, [fanoutMarketsDetected, detectedJoinKey, detectedPreviewTicker, detectedWindowKey, joinWindows]);
+  }, [fanoutMarketsDetected, detectedJoinKey, detectedPreviewTicker, detectedWindowKey, joinWindows, detectedPreviewLifeKey]);
 
   useEffect(() => {
     if (!seriesJoinOn || !seriesJoinTickers.length) return;
@@ -7255,11 +7328,7 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
           loadKalshiLiveDirect(tableId, {
             ticker: market.ticker,
             limit,
-            minTs: directWindow.minTs,
-            maxTs: directWindow.maxTs,
-            period: directWindow.period,
-            depth: directWindow.depth,
-            includeLatest: directWindow.includeLatest,
+            ...marketDirectWindow(market),
           }).then((result) => ({ market, ...shape(result) })),
         );
         built = pulled
@@ -7338,7 +7407,7 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
           for (const row of rows || []) {
             const ticker = String(row?.ticker || "").trim();
             if (!ticker || seenMarkets.some((item) => item.ticker === ticker)) continue;
-            seenMarkets.push({ ticker, label: ticker, title: String(row?.yes_sub_title || ticker) });
+            seenMarkets.push(kalshiJoinMarket(row));
             if (seenMarkets.length >= marketCap) return;
           }
         };
@@ -7768,7 +7837,7 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
               for (const row of fullRows) {
                 const ticker = String(row?.ticker || "").trim();
                 if (!ticker || scopeMarkets.some((item) => item.ticker === ticker)) continue;
-                scopeMarkets.push({ ticker, label: ticker, title: String(row?.yes_sub_title || ticker) });
+                scopeMarkets.push(kalshiJoinMarket(row));
                 if (scopeMarkets.length >= marketCap) break;
               }
               const jobs = scopeMarkets.flatMap((market) => detectedTargets.map((target) => ({ market, target })));
@@ -7777,7 +7846,7 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
                   job.target.id,
                   job.market.ticker,
                   sheetCap,
-                  joinPullWindow(job.target.id, joinWindows[job.target.id]),
+                  joinPullWindow(job.target.id, joinWindows[job.target.id], joinMarketFor(job.market)),
                 );
                 return { ...job, columns: resultJoin.columns || [], rows: resultJoin.rows || [] };
               });
@@ -7898,7 +7967,7 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
                 job.target.id,
                 job.market.ticker,
                 sheetCap,
-                joinPullWindow(job.target.id, joinWindows[job.target.id]),
+                joinPullWindow(job.target.id, joinWindows[job.target.id], joinMarketFor(job.market)),
               );
           const rows = result.rows || [];
           reporter.patchChild("join-live", childId, { status: "success", result: `${rows.length.toLocaleString()} rows` });
@@ -9551,6 +9620,8 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
             onToggleDetectedJoin={toggleDetectedJoin}
             joinWindows={joinWindows}
             onJoinWindow={(id, filters) => setJoinWindows((current) => ({ ...current, [id]: filters }))}
+            joinLife={joinMarketLives.life}
+            joinPerMarket={joinMarketLives.perMarket}
             joinLake={polymarketHistorical ? "polymarket" : "kalshi"}
             joinPlacement={joinPlacement}
             onJoinPlacement={(placement) => {
@@ -10169,12 +10240,7 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
             </div>
           </div>
         ) : showJoinExplainer && (liveSeriesSearch || liveEventSearch) ? (
-          <div className="overflow-hidden px-4 pb-1 pt-4">
-            <div className="flex">
-              <span className={sheetTabClass(false)}>{liveEventSearch ? "Events" : "Series"}</span>
-              <span className={sheetTabClass(true)}>Markets</span>
-            </div>
-          </div>
+          <LiveScopeJoinExplainerTabs source={liveEventSearch ? "events" : "series"} />
         ) : showJoinExplainer && polymarketTraderCatalog ? (
           <PolymarketTraderJoinExplainerTabs title={sheetTitle} joins={polymarketJoinCatalog} />
         ) : showJoinExplainer && polymarketJoinCatalog.some((item) => item.id === "parent-market") ? (
@@ -10320,11 +10386,7 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
               Join the selected events to their event record, candlesticks, or markets. Each join uses that event ticker.
             </div>
           ) : showJoinExplainer && (liveSeriesSearch || liveEventSearch) ? (
-            <div className="flex h-full items-center justify-center rounded-xl border border-border/70 bg-background px-6 text-center text-[13px] leading-relaxed text-muted-foreground shadow-sm">
-              {liveEventSearch
-                ? "Join these events to the markets inside them. Kalshi takes one event ticker per request, so the pull loops the events in this query."
-                : "Join these series to the markets inside them. Kalshi takes one series ticker per request, so the pull loops the series in this query."}
-            </div>
+            <LiveScopeJoinExplainer source={liveEventSearch ? "events" : "series"} />
           ) : showJoinExplainer && polymarketTraderCatalog ? (
             <PolymarketTraderJoinExplainer title={sheetTitle} joins={polymarketJoinCatalog} />
           ) : showJoinExplainer && polymarketJoinCatalog.some((item) => item.id === "parent-market") ? (

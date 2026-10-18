@@ -365,6 +365,129 @@ export function LiveMarketsJoinExplainer() {
   );
 }
 
+const SCOPE_SAMPLE = {
+  series: { noun: "Series", ticker: "KXFED", title: "Fed rate decision" },
+  events: { noun: "Event", ticker: "KXFED-26DEC", title: "Fed decision in December" },
+};
+
+const SCOPE_MARKETS = [
+  ["KXFED-26DEC-T4.00", "Above 4.00%"],
+  ["KXFED-26DEC-T3.75", "Above 3.75%"],
+  ["KXFED-26DEC-T3.50", "Above 3.50%"],
+];
+
+/** Tabs while Join is hovered on a series or event list. */
+export function LiveScopeJoinExplainerTabs({ source = "series" }) {
+  const reduce = useReducedMotion();
+  const tabs = [source === "events" ? "Events" : "Series", "Markets", ...LIVE_DESTINATIONS];
+  return (
+    <div className="overflow-hidden px-4 pb-1 pt-4">
+      <div className="flex">
+        {tabs.map((title, index) =>
+          index === 0 ? (
+            <span key={title} className={tabClass(false)}>
+              {title}
+            </span>
+          ) : (
+            <motion.span
+              key={title}
+              initial={reduce ? false : { clipPath: "inset(0 100% 0 0)", opacity: 0 }}
+              animate={{ clipPath: "inset(0 0% 0 0)", opacity: 1 }}
+              transition={{ duration: 0.4, delay: 0.12 * index, ease: "easeOut" }}
+              className={tabClass(index === 1)}
+            >
+              {title}
+            </motion.span>
+          ),
+        )}
+      </div>
+    </div>
+  );
+}
+
+function GrowLine({ delay, accent }) {
+  const reduce = useReducedMotion();
+  return (
+    <div className="relative h-px overflow-hidden bg-border">
+      <motion.span
+        className="absolute inset-y-0 left-0"
+        style={{ backgroundColor: accent }}
+        initial={reduce ? false : { width: "0%" }}
+        animate={{ width: "100%" }}
+        transition={{ delay, duration: 0.35 }}
+      />
+    </div>
+  );
+}
+
+/** A series or event opens every market inside it, and those markets open their live sheets. */
+export function LiveScopeJoinExplainer({ source = "series" }) {
+  const reduce = useReducedMotion();
+  const style = venueStyle("kalshi");
+  const scope = SCOPE_SAMPLE[source === "events" ? "events" : "series"];
+  const plural = source === "events" ? "events" : "series";
+  return (
+    <div className="relative flex h-full min-h-[280px] items-center justify-center overflow-hidden rounded-xl border border-border/70 bg-background shadow-sm">
+      <FlickeringGrid
+        className="absolute inset-0 [mask-image:radial-gradient(ellipse_at_center,black,transparent_75%)]"
+        squareSize={3}
+        gridGap={5}
+        flickerChance={0.16}
+        color={style.flicker}
+        maxOpacity={0.2}
+      />
+      <div className="relative z-10 flex w-full max-w-2xl flex-col items-center gap-5 px-6 py-8">
+        <p className="max-w-md text-center text-[13px] leading-relaxed text-muted-foreground">
+          Join pulls every market in these {plural}. From those markets, add trades, the order book, or candlesticks, each on its own sheet.
+        </p>
+        <div className="grid w-full grid-cols-[minmax(0,0.8fr)_2rem_minmax(0,1.1fr)_2rem_minmax(0,0.9fr)] items-center gap-x-2">
+          <motion.div
+            className="relative overflow-hidden rounded-xl border px-3 py-3 shadow-sm backdrop-blur-md"
+            style={{ borderColor: `${style.accent}80`, backgroundColor: `${style.accent}1a` }}
+            initial={reduce ? false : { opacity: 0, y: 6 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.3 }}
+          >
+            <BorderBeam size={60} duration={8} borderWidth={1.2} colorFrom={style.accent} colorTo="#0d99ff" />
+            <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">{scope.noun}</p>
+            <p className="mt-1 truncate font-mono text-[11px] text-foreground">{scope.ticker}</p>
+            <p className="truncate text-[10px] text-muted-foreground">{scope.title}</p>
+          </motion.div>
+          <GrowLine delay={0.2} accent={style.accent} />
+          <div className="flex flex-col gap-1.5">
+            {SCOPE_MARKETS.map(([ticker, title], index) => (
+              <motion.div
+                key={ticker}
+                className="rounded-lg border border-border/70 bg-background/90 px-2.5 py-1.5 shadow-sm backdrop-blur-md"
+                initial={reduce ? false : { opacity: 0, x: -10 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ delay: 0.35 + index * 0.1, duration: 0.3 }}
+              >
+                <p className="truncate font-mono text-[10px] text-foreground">{ticker}</p>
+                <p className="truncate text-[10px] text-muted-foreground">{title}</p>
+              </motion.div>
+            ))}
+          </div>
+          <GrowLine delay={0.7} accent={style.accent} />
+          <div className="flex flex-col gap-1.5">
+            {LIVE_DESTINATIONS.map((title, index) => (
+              <RouteChip key={title} label={title} hint="Per market" delay={0.85 + index * 0.1} accent={style.accent} active />
+            ))}
+          </div>
+        </div>
+        <motion.p
+          className="max-w-md text-center text-[11px] leading-relaxed text-muted-foreground"
+          initial={reduce ? false : { opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ delay: 1.2, duration: 0.3 }}
+        >
+          Trades and candlesticks follow each market&apos;s own life, so you can ask for its whole life, its first half, or its last week of trading.
+        </motion.p>
+      </div>
+    </div>
+  );
+}
+
 const FANOUT_HERE = {
   candlesticks: "Candlesticks",
   trades: "Trades",

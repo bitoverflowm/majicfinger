@@ -15,6 +15,14 @@ import { PolymarketTagPicker } from "@/components/connectData/polymarketLive/Pol
 import { cellMatchesTextTerm, columnUsesWholeTerm } from "@/lib/textTermMatch";
 import { DATE_RANGE_PRESETS, activeDateRangePreset, dateRangePreset } from "@/components/dashboardComposer/dateRangePresets";
 import { clampLifeRange, defaultLifeRange, presetWithinLife } from "@/lib/markets/marketLife";
+import {
+  LIFE_WINDOW_PRESETS,
+  isLifeWindowPreset,
+  lifeSpanMs,
+  lifeWindowDays,
+  lifeWindowMs,
+  lifeWindowPreset,
+} from "@/lib/markets/lifeWindow";
 import { KALSHI_LIVE_CANDLESTICK_PERIOD_OPTIONS } from "@/lib/kalshiLive/candlesticksColumns";
 import { KALSHI_LIVE_EVENT_FORECAST_PERIOD_OPTIONS } from "@/lib/kalshiLive/eventForecastColumns";
 import { candleRangeMaxDays, fitCandleRange, inclusiveDays } from "@/components/dashboardComposer/kalshiLiveDirectScope";
@@ -132,6 +140,7 @@ function isActive(spec, filter) {
   if (spec.kind === "enum" || spec.kind === "boolean") return Array.isArray(filter.include) && filter.include.length > 0;
   if (spec.kind === "number") return String(filter.min || "").trim() !== "" || String(filter.max || "").trim() !== "";
   if (spec.kind === "updated-after") return Number(filter.minUpdatedTs) > 0;
+  if (spec.kind === "query-range" && isLifeWindowPreset(filter.preset)) return true;
   if (spec.kind === "query-range" || spec.kind === "date") return Boolean(filter.from) || Boolean(filter.to);
   if (spec.kind === "query-instant") return Boolean(String(filter.value || "").trim());
   if (spec.kind === "period" || spec.kind === "depth" || spec.kind === "query-number" || spec.kind === "query-text") {
@@ -218,6 +227,9 @@ export function attributeSummary(column, filters) {
     if (Number.isFinite(seconds) && seconds > 0) parts.push(format(new Date(seconds * 1000), "LLL dd, y h:mm a"));
   } else if (spec.kind === "query-instant") {
     if (filter.value) parts.push(formatAttributeDate(filter.value));
+  } else if (spec.kind === "query-range" && column.lifeWindows && lifeWindowPreset(filter.preset)) {
+    const label = lifeWindowPreset(filter.preset).label;
+    parts.push(column.perMarket || !filter.from || !filter.to ? label : `${label} · ${formatAttributeRange(filter.from, filter.to)}`);
   } else if (spec.kind === "query-range" || spec.kind === "date") {
     const preset =
       filter.from && filter.to
@@ -821,6 +833,142 @@ function DateRangeField({ from, to, presetId, onChange, presetIds, anchor, bound
   );
 }
 
+function lifeBarSpan(range, bounds) {
+  const preset = lifeWindowPreset(range?.preset);
+  const span = lifeSpanMs(bounds);
+  if (preset && preset.span == null) return { from: preset.from, to: preset.to };
+  if (!span) return null;
+  const length = span.endMs - span.startMs;
+  const window = preset
+    ? lifeWindowMs(preset.id, bounds)
+    : range?.from && range?.to
+      ? { startMs: dayBounds(range.from)?.start, endMs: dayBounds(range.to)?.end }
+      : null;
+  if (!window || !Number.isFinite(window.startMs) || !Number.isFinite(window.endMs)) return null;
+  const from = Math.max(0, Math.min(1, (window.startMs - span.startMs) / length));
+  const to = Math.max(from, Math.min(1, (window.endMs - span.startMs) / length));
+  return { from, to };
+}
+
+/**
+ * Trades and candlestick window for Kalshi Live markets.
+ * Choices are parts of each market's own life. Picked dates stay inside the days the markets traded.
+ */
+export function LifeWindowField({ range, onChange, bounds, perMarket = false, maxDays }) {
+  const current = range || {};
+  const preset = lifeWindowPreset(current.preset);
+  const start = dateFromIso(current.from);
+  const end = dateFromIso(current.to);
+  const selected = !preset && (start || end) ? { from: start, to: end } : undefined;
+  const span = lifeSpanMs(bounds);
+  const limit = span ? calendarLimit(bounds) : { disabled: { after: new Date() }, toDate: new Date() };
+  const bar = lifeBarSpan(current, bounds);
+  const datesFor = (id) => (span ? lifeWindowDays(id, bounds) : null);
+  const shownDates = preset ? (perMarket ? null : datesFor(preset.id)) : current.from || current.to ? current : null;
+  const priorMonth = limit.toDate ? new Date(limit.toDate.getFullYear(), limit.toDate.getMonth() - 1, 1) : undefined;
+  const openingMonth = limit.fromDate && priorMonth && priorMonth < limit.fromDate ? limit.fromDate : priorMonth;
+  const pickedMonth = start || end;
+  const shownMonth = pickedMonth && (!openingMonth || pickedMonth < openingMonth) ? pickedMonth : openingMonth;
+  const openLabel = span ? formatAttributeDate(bounds.earliest) : "";
+  const closeLabel = span ? (bounds.stopped ? formatAttributeDate(bounds.latest) : "Now") : "";
+  return (
+    <Popover>
+      <PopoverTrigger asChild>
+        <Button
+          type="button"
+          variant="outline"
+          className={cn(
+            "h-9 w-full justify-start rounded-lg px-2.5 text-left text-[13px] font-normal",
+            !preset && !selected && "text-muted-foreground",
+          )}
+        >
+          <CalendarIcon className="size-3.5 shrink-0 opacity-70" />
+          <span className="min-w-0 flex-1 truncate">
+            {preset ? preset.label : selected ? formatAttributeRange(current.from, current.to) : "Pick a window"}
+          </span>
+          <span className="shrink-0 text-[11px] font-medium text-muted-foreground">
+            {preset ? (perMarket ? "Each market" : shownDates ? formatAttributeRange(shownDates.from, shownDates.to) : "") : selected ? "Dates" : ""}
+          </span>
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent align="start" className="z-[620] w-[34rem] max-w-[calc(100vw-2rem)] p-0">
+        <div className="flex items-start justify-between gap-2 border-b border-border/70 px-3 pb-2 pt-2.5">
+          <div className="min-w-0 flex-1">
+            <p className="text-[12px] font-semibold text-foreground">{perMarket ? "Part of each market's life" : "Part of the market's life"}</p>
+            <div className="mt-2 h-2 overflow-hidden rounded-full bg-muted" aria-hidden>
+              {bar ? (
+                <div
+                  className="h-full rounded-full bg-[#0d99ff] transition-[margin,width] duration-200"
+                  style={{ marginLeft: `${bar.from * 100}%`, width: `${Math.max(2, (bar.to - bar.from) * 100)}%` }}
+                />
+              ) : null}
+            </div>
+            <div className="mt-1 flex justify-between text-[10px] text-muted-foreground">
+              <span>{perMarket ? "Open" : openLabel || "Open"}</span>
+              <span>{perMarket ? "Close or now" : closeLabel || "Close"}</span>
+            </div>
+          </div>
+          <PopoverClose
+            type="button"
+            aria-label="Close"
+            className="inline-flex size-6 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+          >
+            <X className="size-3.5" />
+          </PopoverClose>
+        </div>
+        <div className="grid grid-cols-2 gap-1.5 border-b border-border/70 p-2">
+          {LIFE_WINDOW_PRESETS.map((item) => {
+            const active = preset?.id === item.id;
+            const days = perMarket ? null : datesFor(item.id);
+            return (
+              <button
+                key={item.id}
+                type="button"
+                aria-pressed={active}
+                className={cn(
+                  "flex flex-col rounded-lg border px-2.5 py-1.5 text-left",
+                  active ? "border-[#0d99ff]/40 bg-[#0d99ff]/10" : "border-border/70 bg-background hover:bg-muted/50",
+                )}
+                onClick={() => {
+                  const window = datesFor(item.id);
+                  onChange({ from: window?.from || "", to: window?.to || "", preset: item.id });
+                }}
+              >
+                <span className="text-[12px] font-medium text-foreground">{item.label}</span>
+                {days ? <span className="text-[10px] text-muted-foreground">{formatAttributeRange(days.from, days.to)}</span> : null}
+              </button>
+            );
+          })}
+        </div>
+        <p className="px-3 pt-2 text-[11px] font-medium text-foreground">Or pick dates</p>
+        <Calendar
+          key={`${current.from || ""}|${current.to || ""}|${current.preset || ""}`}
+          mode="range"
+          numberOfMonths={2}
+          selected={selected}
+          defaultMonth={shownMonth}
+          disabled={limit.disabled}
+          fromDate={limit.fromDate}
+          toDate={limit.toDate}
+          max={maxDays || undefined}
+          onSelect={(next) => {
+            const clamped = clampLifeRange(isoFromDate(next?.from), isoFromDate(next?.to), span ? bounds : null);
+            onChange({ ...clamped, preset: "" });
+          }}
+        />
+        <p className="px-3 pb-2.5 text-[11px] leading-relaxed text-muted-foreground">
+          {span
+            ? perMarket
+              ? "Days no market traded are disabled. Each market only pulls the days it was trading."
+              : "Days outside this market's life are disabled."
+            : "Each market uses its own open and close."}
+          {maxDays ? ` At most ${maxDays} days per market.` : ""}
+        </p>
+      </PopoverContent>
+    </Popover>
+  );
+}
+
 /** One day, kept inside the market's life. */
 function QueryInstantField({ value, bounds, onChange, ariaLabel = "Pick a moment" }) {
   const selected = dateFromIso(value);
@@ -864,7 +1012,7 @@ function QueryInstantField({ value, bounds, onChange, ariaLabel = "Pick a moment
 }
 
 /** Date range, period, and depth for a trades, order book, or candlestick join. */
-export function JoinSourceFields({ tableId, filters, onChange }) {
+export function JoinSourceFields({ tableId, filters, onChange, bounds = null, perMarket = true }) {
   const current = filters || {};
   const range = current.time_range || {};
   const setRange = ({ from, to, preset }) => onChange({ ...current, time_range: { from, to, preset: preset || "" } });
@@ -944,7 +1092,13 @@ export function JoinSourceFields({ tableId, filters, onChange }) {
     <div className="space-y-2">
       <div>
         <p className="mb-1 text-[11px] text-muted-foreground">Date range</p>
-        <DateRangeField from={range.from || ""} to={range.to || ""} presetId={range.preset || ""} onChange={setRange} />
+        <LifeWindowField
+          range={range}
+          bounds={bounds}
+          perMarket={perMarket}
+          maxDays={tableId === "candlesticks" ? candleRangeMaxDays(current.period_interval?.value ?? "60") : undefined}
+          onChange={setRange}
+        />
       </div>
       {tableId === "candlesticks" ? (
         <label className="block text-[11px] text-muted-foreground">
@@ -1012,6 +1166,17 @@ function AttributeFields({ column, filters, onChange }) {
         value={filter.value || ""}
         bounds={column.rangeBounds}
         onChange={(value) => onChange(patchFilter(filters, column, { value }))}
+      />
+    );
+  }
+  if (spec.kind === "query-range" && column.lifeWindows) {
+    return (
+      <LifeWindowField
+        range={filter}
+        bounds={column.rangeBounds}
+        perMarket={column.perMarket}
+        maxDays={column.rangeMaxDays}
+        onChange={({ from, to, preset }) => onChange(patchFilter(filters, column, { from, to, preset: preset || "" }))}
       />
     );
   }
@@ -1555,6 +1720,23 @@ export function MarketWindowQueryFields({ columns, filters, onChange }) {
     <div className="space-y-3">
       {range ? (
         <QueryChoice title="Date range" description={[range.description, rangeNote].filter(Boolean).join(". ")}>
+          {range.lifeWindows ? (
+            <LifeWindowField
+              range={filters?.time_range}
+              bounds={range.rangeBounds}
+              perMarket={range.perMarket}
+              maxDays={maxDays}
+              onChange={({ from, to, preset }) =>
+                onChange(
+                  patchFilter(
+                    filters,
+                    range,
+                    isLifeWindowPreset(preset) ? { from, to, preset } : fitCandleRange({ from, to, preset: "" }, maxDays),
+                  ),
+                )
+              }
+            />
+          ) : (
           <DateRangeField
             from={filters?.time_range?.from || ""}
             to={filters?.time_range?.to || ""}
@@ -1567,6 +1749,7 @@ export function MarketWindowQueryFields({ columns, filters, onChange }) {
               onChange(patchFilter(filters, range, fitCandleRange({ from, to, preset: preset || "" }, maxDays)))
             }
           />
+          )}
         </QueryChoice>
       ) : null}
       {period ? (
@@ -1576,7 +1759,9 @@ export function MarketWindowQueryFields({ columns, filters, onChange }) {
             value={periodValue}
             onChange={(event) => {
               const next = patchFilter(filters, period, { value: event.target.value });
-              const fitted = fitCandleRange(next.time_range, candleRangeMaxDays(event.target.value));
+              const fitted = isLifeWindowPreset(next.time_range?.preset)
+                ? next.time_range
+                : fitCandleRange(next.time_range, candleRangeMaxDays(event.target.value));
               onChange(range && fitted !== next.time_range ? patchFilter(next, range, fitted) : next);
             }}
             className={querySelectClass}
