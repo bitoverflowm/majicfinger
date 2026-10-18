@@ -1,6 +1,6 @@
 "use client";
 
-import { CHAINLINK_STREAM_CAP, chainlinkFeed, chainlinkRowsFromPoints, openChainlinkStream } from "@/lib/chainlinkFeeds";
+import { CHAINLINK_STREAM_CAP, chainlinkFeed, chainlinkRowsFromPoints, chainlinkStreamSymbol, openChainlinkStream } from "@/lib/chainlinkFeeds";
 import { flattenKalshiLiveCandlestickGroups } from "@/lib/kalshiLive/normalizeCandlestickRow";
 import { normalizeKalshiLiveOrderbook } from "@/lib/kalshiLive/normalizeOrderbookRow";
 import { normalizeKalshiLiveTradeRow } from "@/lib/kalshiLive/normalizeTradeRow";
@@ -148,15 +148,6 @@ function startPriceSocket(block, def, handlers) {
   return { stop };
 }
 
-/** The pair a Chainlink pair sheet streams. Older Chainlink sheets hold one row per coin and return "". */
-function chainlinkStreamSymbol(block) {
-  if (block?.pull?.mode === "stream" && block.pull.symbol) return String(block.pull.symbol).toLowerCase();
-  const columns = Array.isArray(block?.columns) ? block.columns : [];
-  if (!columns.some((column) => column?.id === "time") || columns.some((column) => column?.id === "updated")) return "";
-  const first = Array.isArray(block?.records) ? block.records.find((row) => row?.symbol) : null;
-  return first ? String(first.symbol).toLowerCase() : "";
-}
-
 function latestStreamTime(block) {
   const records = Array.isArray(block?.records) ? block.records : [];
   let last = -Infinity;
@@ -172,8 +163,10 @@ function latestStreamTime(block) {
 function startChainlinkPairStream(block, def, handlers, symbol) {
   let stopped = false;
   let cells = { ...(block.cells || {}) };
-  let records = Array.isArray(block.records) ? block.records.map((row) => ({ ...row })) : null;
-  let nextRow = maxRow(cells) + 1;
+  const emptySheet = !Object.keys(cells).length;
+  let records = Array.isArray(block.records) ? block.records.slice() : emptySheet ? [] : null;
+  // Run sheets keep their rows in records and leave cells empty, so new cells line up after the records.
+  let nextRow = Math.max(maxRow(cells) + 1, records ? records.length : 0);
   let last = latestStreamTime(block);
   const windowSeconds = chainlinkFeed(def.endpoint)?.windowSeconds || null;
   let close = () => {};
@@ -211,7 +204,7 @@ function startChainlinkPairStream(block, def, handlers, symbol) {
       nextRow += added.length;
       if (records) {
         records = records.concat(liveRecordsFromRows(block.columns, added));
-        handlers.onRecords?.(records);
+        handlers.onRecords?.(records, { commit: true });
       }
       handlers.onStatus("Receiving prices");
       handlers.onCells(cells);

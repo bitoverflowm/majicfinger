@@ -4,9 +4,11 @@ import {
   chainlinkMessagePoints,
   chainlinkPairTitle,
   chainlinkRowsFromPoints,
+  chainlinkStreamSymbol,
   mergeChainlinkRows,
 } from "@/lib/chainlinkFeeds.js";
 import { sanitizeWorkspaceDashboard } from "@/lib/workspaceDashboardDocument.js";
+import { chartSpecsForSheet } from "@/lib/visualizations/sheetCharts.js";
 
 function test(name, fn) {
   try {
@@ -61,6 +63,27 @@ test("merging a snapshot then updates keeps order and drops overlap", () => {
 test("pair titles come from the coin list", () => {
   assert.equal(chainlinkPairTitle("zec/usd"), "ZEC / USD");
   assert.equal(chainlinkPairTitle("abc/usd"), "ABC/USD");
+});
+
+const pairColumns = [
+  { id: "time", title: "Time", type: "date" },
+  { id: "symbol", title: "Symbol", type: "text" },
+  { id: "price", title: "Price", type: "number" },
+];
+
+test("pair sheets are told apart from the old one-row-per-coin price sheets", () => {
+  assert.equal(chainlinkStreamSymbol({ integrationId: "chainlink", columns: pairColumns, pull: { mode: "stream", symbol: "ETH/USD" } }), "eth/usd");
+  assert.equal(chainlinkStreamSymbol({ integrationId: "chainlink", columns: pairColumns, records: [{ time: 1, symbol: "SOL/USD", price: 2 }] }), "sol/usd");
+  const oldSheet = { integrationId: "chainlink", columns: [{ id: "name" }, { id: "symbol" }, { id: "price" }, { id: "updated" }], records: [{ symbol: "BTC/USD" }] };
+  assert.equal(chainlinkStreamSymbol(oldSheet), "");
+  assert.equal(chainlinkStreamSymbol({ integrationId: "binance", columns: pairColumns, pull: { mode: "stream", symbol: "btc/usd" } }), "");
+});
+
+test("a pair sheet opens a Liveline chart, even before it has rows", () => {
+  const sheet = { type: "sheet", title: "BTC / USD · Up/Down settlement price", integrationId: "chainlink", table: "twap_60", columns: pairColumns, pull: { table: "twap_60", symbol: "btc/usd", mode: "stream" } };
+  const specs = chartSpecsForSheet(sheet);
+  assert.deepEqual(specs.map((spec) => spec.chartView), ["liveline"]);
+  assert.equal(specs[0].title, "BTC / USD · Up/Down settlement price chart");
 });
 
 test("saved pair sheets keep the pair they stream", () => {

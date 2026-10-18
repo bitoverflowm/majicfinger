@@ -161,6 +161,7 @@ export function resolveVisualization(dataset, options = {}) {
 }
 
 const SAVED_VIEWS = new Set([
+  "liveline",
   "depth",
   "order-book",
   "price",

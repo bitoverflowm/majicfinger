@@ -89,6 +89,7 @@ export function useSheetRealtime(blocksByPage, pageId, onLiveCells) {
         [key]: { running: true, status: "Starting", liveCells: null, closesAt: life?.closeMs || null, closed: false, notice: "" },
       }));
       let watch = 0;
+      let committedRecords = null;
       const handle = startSheetRealtimeTransport(sheet, def, {
         onStatus(status) {
           setRealtimeById((current) => {
@@ -98,14 +99,16 @@ export function useSheetRealtime(blocksByPage, pageId, onLiveCells) {
           });
         },
         onCells(liveCells) {
-          onLiveCellsRef.current?.(page, sheet.id, liveCells);
+          onLiveCellsRef.current?.(page, sheet.id, liveCells, committedRecords);
           setRealtimeById((current) => {
             const session = current[key];
             if (!session?.running) return current;
             return { ...current, [key]: { ...session, liveCells } };
           });
         },
-        onRecords(liveRecords) {
+        onRecords(liveRecords, options) {
+          // Feeds that collect rows write them onto the sheet, so stopping keeps every row.
+          if (options?.commit) committedRecords = liveRecords;
           setRealtimeById((current) => {
             const session = current[key];
             if (!session?.running) return current;

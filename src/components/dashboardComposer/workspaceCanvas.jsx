@@ -70,6 +70,8 @@ import {
 } from "@/components/dashboardComposer/sheetRecordCache";
 import { useSheetRealtime } from "@/components/dashboardComposer/sheetRealtimeSession";
 import { realtimeSessionKey, realtimeSheetForBlock, realtimeTargetForBlock, sheetAssetIds, tailCells } from "@/lib/realtime/sheetRealtime";
+import { isChainlinkStreamSheet } from "@/lib/chainlinkFeeds";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { replayTabSheets } from "@/components/dashboardComposer/replayTabQueries";
 import { createRunReporter } from "@/components/dashboardComposer/integrationRunFeed";
 import { closedLifeMessage, lifeCountdown, sheetLife, sheetMarketCaption, sheetMarketClosed } from "@/lib/markets/marketLife";
@@ -99,8 +101,15 @@ const SHEET_ARRIVE_CSS = `
 .lychee-sheet-branch { animation: lychee-sheet-branch 620ms cubic-bezier(0.22, 1, 0.36, 1) both; }
 .lychee-sheet-fill { animation: lychee-sheet-fill 480ms cubic-bezier(0.22, 1, 0.36, 1) both; }
 .lychee-sheet-pulse { animation: lychee-sheet-pulse 720ms ease-out 1; }
+@keyframes lychee-play-nudge {
+  0%, 55%, 100% { transform: translateY(0); }
+  20% { transform: translateY(-3px); }
+  35% { transform: translateY(0); }
+  45% { transform: translateY(-1.5px); }
+}
+.lychee-play-nudge { animation: lychee-play-nudge 1.4s ease-in-out infinite; }
 @media (prefers-reduced-motion: reduce) {
-  .lychee-sheet-arrive, .lychee-sheet-branch, .lychee-sheet-fill, .lychee-sheet-pulse { animation: none; }
+  .lychee-sheet-arrive, .lychee-sheet-branch, .lychee-sheet-fill, .lychee-sheet-pulse, .lychee-play-nudge { animation: none; }
 }
 `;
 
@@ -382,16 +391,17 @@ export function WorkspaceCanvasProvider({ pageId, readOnly = false, children }) 
   ctxRef.current = ctx;
   const blocksByPageRef = useRef(blocksByPage);
   blocksByPageRef.current = blocksByPage;
-  const commitLiveCells = useCallback((targetPageId, sheetId, cells) => {
+  const commitLiveCells = useCallback((targetPageId, sheetId, cells, records) => {
     if (!targetPageId || !sheetId || !cells) return;
-    const rowCount = filledRowCount(cells);
+    const kept = Array.isArray(records) ? records : null;
+    const rowCount = kept ? Math.max(kept.length, filledRowCount(cells)) : filledRowCount(cells);
     setBlocksByPage((prev) => {
       const list = prev[targetPageId] || [];
       const current = list.find((block) => block.id === sheetId);
       if (!current || current.type !== "sheet") return prev;
       return {
         ...prev,
-        [targetPageId]: list.map((block) => (block.id === sheetId ? { ...block, cells, rowCount } : block)),
+        [targetPageId]: list.map((block) => (block.id === sheetId ? { ...block, cells, rowCount, ...(kept ? { records: kept } : {}) } : block)),
       };
     });
   }, []);
@@ -1827,7 +1837,7 @@ function chartViewForBlock(block, canvas) {
   const sourceSession = source ? liveSession(canvas, source.id) : null;
   const sourceView = source?.type === "sheet" ? liveBlock(source, canvas) : null;
   const chartSheet =
-    sourceView && sourceSession?.running && !isOrderBookSheet(sourceView) && !isPriceHistorySheet(sourceView)
+    sourceView && sourceSession?.running && !isOrderBookSheet(sourceView) && !isPriceHistorySheet(sourceView) && !isChainlinkStreamSheet(sourceView)
       ? Array.isArray(sourceView.records) && sourceView.records.length > 80
         ? { ...sourceView, records: sourceView.records.slice(-80) }
         : sourceView.records?.length
@@ -2026,34 +2036,69 @@ function SheetFullscreen({ block, onChange, onClose }) {
   );
 }
 
+/** Feed charts that already showed the play tip, and feeds started once, this session. */
+const feedTipsShown = new Set();
+const feedsStarted = new Set();
+const FEED_TIP_MS = 6000;
+
 function RealtimeToggle({ block }) {
   const canvas = useWorkspaceCanvas();
   const match = realtimeSheetForBlock(block, canvas?.blocks || []);
   const session = match ? liveSession(canvas, match.sheet.id) : null;
   const running = !!session?.running;
+  const feedChart = block.type === "chart" && block.chartView === "liveline" && !!match && isChainlinkStreamSheet(match.sheet);
+  const feedId = feedChart ? match.sheet.id : "";
+  const [tip, setTip] = useState(() => feedChart && !!block.arrive && !feedTipsShown.has(block.id));
+  // The run card sits over the canvas, so the tip waits until it is dismissed.
+  const runCard = Boolean(canvas?.runFeed);
+  useEffect(() => {
+    if (!tip || runCard) return undefined;
+    feedTipsShown.add(block.id);
+    const timer = window.setTimeout(() => setTip(false), FEED_TIP_MS);
+    return () => window.clearTimeout(timer);
+  }, [tip, runCard, block.id]);
+  useEffect(() => {
+    if (running && feedId) feedsStarted.add(feedId);
+  }, [feedId, running]);
   if (!match || canvas?.readOnly || (sheetMarketClosed(match.sheet) && !running)) return null;
-  return (
+  const nudge = Boolean(feedId) && !running && !feedsStarted.has(feedId);
+  const showTip = tip && !running && !runCard;
+  const button = (
     <button
       type="button"
       data-realtime-toggle=""
-      title={running ? "Stop realtime" : session?.status || "Start realtime"}
-      aria-label={running ? "Stop realtime" : "Start realtime"}
+      title={showTip ? undefined : running ? "Stop realtime" : session?.status || "Start realtime"}
+      aria-label={running ? "Stop realtime" : feedId ? "Start feed" : "Start realtime"}
       aria-pressed={running}
       className={cn(
         "absolute right-8 top-1.5 z-10 inline-flex size-5 items-center justify-center rounded-sm bg-background/80 transition-opacity duration-200",
         running
           ? "text-emerald-600 opacity-100"
-          : "pointer-events-none text-muted-foreground opacity-0 group-hover/block:pointer-events-auto group-hover/block:opacity-100 group-focus-within/block:pointer-events-auto group-focus-within/block:opacity-100",
+          : nudge || showTip
+            ? "lychee-play-nudge text-[#0d99ff] opacity-100"
+            : "pointer-events-none text-muted-foreground opacity-0 group-hover/block:pointer-events-auto group-hover/block:opacity-100 group-focus-within/block:pointer-events-auto group-focus-within/block:opacity-100",
       )}
       onPointerDown={(event) => event.stopPropagation()}
       onClick={(event) => {
         event.stopPropagation();
+        setTip(false);
         if (running) canvas?.stopSheetRealtime?.(match.sheet.id);
         else canvas?.startSheetRealtime?.(match.sheet.id);
       }}
     >
       {running ? <Square className="size-3" /> : <Play className="size-3" />}
     </button>
+  );
+  if (!feedId) return button;
+  return (
+    <TooltipProvider>
+      <Tooltip open={showTip}>
+        <TooltipTrigger asChild>{button}</TooltipTrigger>
+        <TooltipContent side="top" sideOffset={8} className="!z-[520] text-xs">
+          Hit play to start your feed
+        </TooltipContent>
+      </Tooltip>
+    </TooltipProvider>
   );
 }
 

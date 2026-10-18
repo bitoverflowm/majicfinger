@@ -48,6 +48,25 @@ export const CHAINLINK_SOCKET_URL = "wss://ws-live-data.polymarket.com";
 /** Rows one pair sheet keeps while it streams. */
 export const CHAINLINK_STREAM_CAP = 10000;
 
+/**
+ * The pair a Chainlink pair sheet streams, or "" for any other sheet.
+ * Older Chainlink sheets hold one row per coin and have an "updated" column instead of "time".
+ * @param {any} sheet
+ */
+export function chainlinkStreamSymbol(sheet) {
+  if (!sheet || sheet.integrationId !== "chainlink") return "";
+  if (sheet.pull?.mode === "stream" && sheet.pull.symbol) return String(sheet.pull.symbol).toLowerCase();
+  const columns = Array.isArray(sheet.columns) ? sheet.columns : [];
+  if (!columns.some((column) => column?.id === "time") || columns.some((column) => column?.id === "updated")) return "";
+  const first = Array.isArray(sheet.records) ? sheet.records.find((row) => row?.symbol) : null;
+  return first ? String(first.symbol).toLowerCase() : "";
+}
+
+/** @param {any} sheet */
+export function isChainlinkStreamSheet(sheet) {
+  return Boolean(chainlinkStreamSymbol(sheet));
+}
+
 /** @param {string} symbol */
 export function chainlinkPairTitle(symbol) {
   const wanted = String(symbol || "").toLowerCase();
