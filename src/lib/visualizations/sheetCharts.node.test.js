@@ -349,8 +349,46 @@ const savedBeforeUnits = {
   dataset: { ...kalshiLakeDataset, units: { price: "probability", quantity: "contracts", currency: "USD", metric: "probability" } },
 };
 assert.equal(describeSheet(savedBeforeUnits).units.volume, "contracts");
-const kalshiLiveMarkets = describeSheet({ ...kalshiLakeMarkets, integrationId: "kalshiLive" });
-assert.equal(kalshiLiveMarkets.fields.value, "volume_fp");
+const kalshiLiveSheet = {
+  type: "sheet",
+  title: "Kalshi Live markets",
+  table: "markets",
+  integrationId: "kalshiLive",
+  columns: ["ticker", "yes_sub_title", "status", "volume_fp", "volume_24h_fp", "open_interest_fp"].map((id) => ({ id })),
+  records: [
+    { ticker: "KXHIGHNY-26OCT17-B70", yes_sub_title: "70° to 71°", status: "initialized", volume_fp: "0.00", volume_24h_fp: "0.00", open_interest_fp: "0.00" },
+    { ticker: "KXHIGHNY-26OCT17-B72", yes_sub_title: "72° to 73°", status: "initialized", volume_fp: "0.00", volume_24h_fp: "0.00", open_interest_fp: "0.00" },
+    { ticker: "KXHIGHNY-26OCT17-T74", yes_sub_title: "", status: "initialized", volume_fp: "0.00", volume_24h_fp: "0.00", open_interest_fp: "0.00" },
+  ],
+};
+const kalshiLiveMarkets = describeSheet(kalshiLiveSheet);
+assert.equal(kalshiLiveMarkets.fields.value, "volume_24h_fp");
+assert.equal(kalshiLiveMarkets.units.volume, "contracts");
+assert.equal(volumeLabel(kalshiLiveMarkets), "24h volume");
+assert.deepEqual(chartSpecsForSheet(kalshiLiveSheet).map((chart) => chart.chartView), ["treemap"]);
+const kalshiLiveModel = volumeTreemapModel(kalshiLiveSheet, kalshiLiveMarkets);
+assert.deepEqual(kalshiLiveModel.tiles.map((tile) => tile.label), ["70° to 71°", "72° to 73°", "KXHIGHNY-26OCT17-T74"]);
+assert.deepEqual(kalshiLiveModel.tiles.map((tile) => tile.value), [0, 0, 0]);
+assert.equal(kalshiLiveModel.tiles[0].detail, "KXHIGHNY-26OCT17-B70");
+assert.equal(kalshiLiveModel.tiles[2].detail, undefined);
+const staleLive = { ...kalshiLiveSheet, dataset: { ...kalshiLiveMarkets, fields: { market: "ticker", label: "title", value: "volume_fp" } } };
+assert.deepEqual(chartSpecsForSheet(staleLive).map((chart) => chart.chartView), ["treemap"]);
+
+const quiet = layoutVolumeTiles(kalshiLiveModel.tiles.map((tile) => ({ ...tile, weight: tile.value })), 300, 200);
+assert.equal(quiet.length, 3);
+assert.ok(quiet.every((tile) => Math.abs(tile.w * tile.h - 20000) < 1));
+const mixed = layoutVolumeTiles(
+  [
+    { label: "Busy", weight: 900, value: 900 },
+    { label: "Some", weight: 100, value: 100 },
+    { label: "New A", weight: 0, value: 0 },
+    { label: "New B", weight: 0, value: 0 },
+  ],
+  526,
+  275,
+);
+assert.deepEqual(mixed.map((tile) => tile.label).sort(), ["Busy", "New A", "New B", "Some"]);
+assert.ok(mixed.every((tile) => tile.w > 0 && tile.h > 0));
 
 const kalshiLakeTrades = {
   type: "sheet",

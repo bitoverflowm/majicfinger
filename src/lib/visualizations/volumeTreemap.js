@@ -92,7 +92,17 @@ export function volumeLabel(dataset) {
 }
 
 /**
+ * Readable name for a catalog row. `fields.name` is preferred when the label is an id, as Kalshi tickers are.
+ * @param {Record<string, unknown>} record
+ * @param {Record<string, string>} fields
+ */
+export function catalogRowName(record, fields = {}) {
+  return text(record, fields.name, fields.label, "question", "title", "series:title", "slug");
+}
+
+/**
  * Tiles for a list of markets or events. Area is 24h volume, then total volume.
+ * Markets with no volume yet stay in the list, so a fresh pull still shows every market.
  * @param {object | null | undefined} sheet
  * @param {object | null | undefined} dataset
  */
@@ -106,9 +116,10 @@ export function volumeTreemapModel(sheet, dataset) {
       ?? parseVisualNumber(record?.["series:volume24hr"])
       ?? parseVisualNumber(record?.volume)
       ?? parseVisualNumber(record?.["series:volume"]);
-    if (volume == null || volume <= 0) return;
-    const label = text(record, fields.label, "question", "title", "series:title", "slug") || "Market";
-    tiles.push({ row: index, label, value: volume });
+    if (volume == null || volume < 0) return;
+    const label = catalogRowName(record, fields) || "Market";
+    const id = text(record, fields.label);
+    tiles.push({ row: index, label, value: volume, ...(id && id !== label ? { detail: id } : {}) });
   });
   tiles.sort((a, b) => b.value - a.value);
   const max = tiles[0]?.value || 1;
@@ -116,17 +127,22 @@ export function volumeTreemapModel(sheet, dataset) {
 }
 
 /**
- * Area still follows 24h volume. A series that would shrink to an empty strip
- * is parked in a labeled row under the large tiles.
+ * Area still follows 24h volume. A series that would shrink to an empty strip,
+ * or has no volume yet, is parked in a labeled row under the large tiles.
+ * When nothing has traded, every item gets an equal tile.
  * @param {Array<{ weight: number, value?: number, label?: string }>} items
  * @param {number} width
  * @param {number} height
  */
 export function layoutVolumeTiles(items, width, height) {
-  const sorted = [...(items || [])].filter((item) => item.weight > 0).sort((a, b) => b.weight - a.weight);
-  const total = sorted.reduce((sum, item) => sum + item.weight, 0);
+  const listed = [...(items || [])].filter((item) => Number.isFinite(item.weight) && item.weight >= 0);
   const area = width * height;
-  if (!sorted.length || total <= 0 || area <= 0) return [];
+  if (!listed.length || area <= 0) return [];
+  if (listed.every((item) => item.weight === 0)) {
+    return squarify(listed.map((item) => ({ ...item, weight: 1 })), width, height);
+  }
+  const sorted = listed.sort((a, b) => b.weight - a.weight);
+  const total = sorted.reduce((sum, item) => sum + item.weight, 0);
   const labelArea = 64 * 32;
   const head = [];
   const tail = [];
@@ -134,12 +150,13 @@ export function layoutVolumeTiles(items, width, height) {
     if ((item.weight / total) * area >= labelArea) head.push(item);
     else tail.push(item);
   }
-  if (!tail.length || !head.length) return squarify(sorted, width, height);
+  const floored = sorted.map((item) => (item.weight > 0 ? item : { ...item, weight: total * 0.002 }));
+  if (!tail.length || !head.length) return squarify(floored, width, height);
   const columns = Math.max(1, Math.min(tail.length, Math.floor(width / 72) || 1));
   const rows = Math.ceil(tail.length / columns);
   const tailHeight = Math.min(height * 0.45, rows * 44);
   const headHeight = height - tailHeight - 2;
-  if (headHeight < 48) return squarify(sorted, width, height);
+  if (headHeight < 48) return squarify(floored, width, height);
   const headTiles = squarify(head, width, headHeight);
   const rowH = tailHeight / rows;
   const tailTiles = tail.map((item, index) => {

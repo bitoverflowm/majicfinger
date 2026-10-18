@@ -7,7 +7,7 @@ import { DestructiveConfirmMenuItem } from "@/components/ui/destructive-confirm-
 import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { sheetRecords } from "@/lib/visualizations/datasetDescriptor";
 import { formatShares, formatUsd, marketMonogram, parseVisualNumber } from "@/lib/visualizations/visualTable";
-import { formatVolume, volumeInContracts, volumeLabel } from "@/lib/visualizations/volumeTreemap";
+import { catalogRowName, formatVolume, volumeInContracts, volumeLabel } from "@/lib/visualizations/volumeTreemap";
 import { cn } from "@/lib/utils";
 
 function text(record, ...keys) {
@@ -36,8 +36,11 @@ function catalogStatus(record, fields) {
 function catalogRows(records, dataset, daily) {
   const fields = dataset?.fields || {};
   const rows = (records || []).map((record) => {
-    const volume = parseVisualNumber(record.volume) ?? parseVisualNumber(record["series:volume"]) ?? parseVisualNumber(record.volumeNum);
-    const title = text(record, fields.label, "question", "title", "series:title", "slug") || "Untitled";
+    const volume = parseVisualNumber(record[fields.total])
+      ?? parseVisualNumber(record.volume)
+      ?? parseVisualNumber(record["series:volume"])
+      ?? parseVisualNumber(record.volumeNum);
+    const title = catalogRowName(record, fields) || "Untitled";
     const icon = text(record, fields.icon, "image", "icon", "series:image", "series:icon", "imageOptimized");
     return {
       title,
@@ -91,7 +94,7 @@ export function CatalogRichTableView({ sheet, dataset, hidden = [], readOnly = f
   const daily = volumeLabel(dataset) === "24h volume";
   const ranked = daily ? "volume24hr" : "volume";
   const rows = catalogRows(sheetRecords(sheet), dataset, daily);
-  const openInterest = dataset?.fields?.depth === "open_interest";
+  const openInterest = /^open_interest/.test(String(dataset?.fields?.depth || ""));
   const contracts = volumeInContracts(dataset);
   const columns = [
     { id: "title", label: noun, align: "left" },

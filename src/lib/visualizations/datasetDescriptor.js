@@ -111,7 +111,17 @@ const ENDPOINTS = {
     datasetType: "markets",
     shape: "records",
     seriesKeys: ["ticker"],
-    fields: { market: "ticker", label: "title", value: "volume_fp", status: "status", close: "close_time" },
+    units: { quantity: "contracts", volume: "contracts" },
+    fields: {
+      market: "ticker",
+      label: "ticker",
+      name: "yes_sub_title",
+      value: "volume_24h_fp",
+      total: "volume_fp",
+      status: "status",
+      close: "close_time",
+      depth: "open_interest_fp",
+    },
     required: ["ticker"],
   }),
   "kalshi:events": spec({

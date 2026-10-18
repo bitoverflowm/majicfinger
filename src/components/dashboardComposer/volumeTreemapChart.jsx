@@ -110,6 +110,7 @@ export function VolumeTreemap({ sheet, dataset, onOpenRow }) {
             style={{ left: Math.min(hover.x + 8, Math.max(0, box.width - 180)), top: Math.max(0, hover.y - 36) }}
           >
             <p className="max-w-[220px] truncate font-medium">{hover.tile.label}</p>
+            {hover.tile.detail ? <p className="max-w-[220px] truncate font-mono text-[11px] text-muted-foreground">{hover.tile.detail}</p> : null}
             <p className="font-mono tabular-nums text-muted-foreground">{formatVolume(hover.tile.value, dataset)}{volumeInContracts(dataset) ? " contracts" : ""}{daily ? " 24h" : ""}</p>
           </div>
         ) : null}
