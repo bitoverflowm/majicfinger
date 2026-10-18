@@ -231,6 +231,7 @@ import {
 import { allowsMarketDownstreamJoin, pullKindFlags, withJoinFlags } from "@/components/dashboardComposer/pullKindFlags";
 import { kalshiLiveEndpointHasRealtimeFeed } from "@/config/kalshiLiveConnect";
 import { KALSHI_CANDLESTICK_MAX_CANDLES } from "@/lib/kalshiLive/candlestickCompose";
+import { KALSHI_LIVE_EVENT_MARKET_ROLLUPS } from "@/lib/kalshiLive/eventsColumns";
 import { fetchKalshiLiveTagsByCategories } from "@/lib/kalshiLive/seriesDiscovery";
 import {
   describeKalshiLiveServerFilters,
@@ -930,6 +931,11 @@ function choiceClass(on) {
 }
 
 /** Window for one joined market. Life choices are cut from that market's own open and close. */
+/** Event volume, status, and life are summed from the markets, so they need the markets too. */
+function eventsNeedMarkets(hidden) {
+  return !hidden.has("markets") || KALSHI_LIVE_EVENT_MARKET_ROLLUPS.some((name) => !hidden.has(name));
+}
+
 function joinPullWindow(id, filters, market) {
   const chosen = filters || defaultJoinWindowFilters(id);
   return lifePullWindow(directPullWindow(id, chosen, {}), chosen.time_range, kalshiMarketLife(market));
@@ -3201,7 +3207,7 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
   const eventSeries = eventSeriesTicker(attributeFilters);
   const eventSeriesKey = eventSeriesTickers(attributeFilters).join("\0");
   const eventMinCloseTs = eventClosesAfter(attributeFilters);
-  const eventIncludeMarkets = (liveEventSearch || liveMultivariate) && !hidden.has("markets");
+  const eventIncludeMarkets = (liveEventSearch || liveMultivariate) && eventsNeedMarkets(hidden);
   const eventIncludeMilestones = liveEventSearch && !hidden.has("milestones");
   const eventColumnFilterKey = columnFilterKey(eventAttributeColumns, attributeFilters, ["series_ticker", "last_updated_ts"]);
   const multivariateCollection = multivariateCollectionTicker(attributeFilters);
@@ -7129,7 +7135,7 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
             ? {
                 mode: "tickers",
                 tickers,
-                includeMarkets: !hidden.has("markets"),
+                includeMarkets: eventsNeedMarkets(hidden),
                 includeMilestones: !hidden.has("milestones"),
                 limit,
               }
@@ -7139,7 +7145,7 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
                 seriesTickers: eventSeriesTickers(attributeFilters),
                 minCloseTs: eventClosesAfter(attributeFilters),
                 minUpdatedTs: seriesUpdatedAfter(attributeFilters),
-                includeMarkets: !hidden.has("markets"),
+                includeMarkets: eventsNeedMarkets(hidden),
                 includeMilestones: !hidden.has("milestones"),
                 limit,
               },

@@ -10,6 +10,33 @@ export const KALSHI_LIVE_EVENTS_COLUMNS = [
   { name: "sub_title", type: "string", description: "Shortened event title" },
   { name: "title", type: "string", description: "Full event title" },
   {
+    name: "event_status",
+    type: "string",
+    label: "Status",
+    description: "Open while any market trades, closed once trading stops, settled when every market has paid out.",
+  },
+  { name: "market_count", type: "int", label: "Markets", description: "Markets in this event." },
+  {
+    name: "volume_fp",
+    type: "number",
+    label: "Volume",
+    description: "Total contracts traded across every market in this event.",
+  },
+  {
+    name: "volume_24h_fp",
+    type: "number",
+    label: "24h volume",
+    description: "Contracts traded across this event's markets in the last 24 hours.",
+  },
+  {
+    name: "open_interest_fp",
+    type: "number",
+    label: "Open interest",
+    description: "Contracts currently held across this event's markets.",
+  },
+  { name: "open_time", type: "timestamp", label: "Opens", description: "When the first market in this event opened." },
+  { name: "close_time", type: "timestamp", label: "Closes", description: "When the last market in this event closes." },
+  {
     name: "collateral_return_type",
     type: "string",
     description: "How collateral is returned when markets settle",
@@ -94,6 +121,17 @@ export function getKalshiLiveMultivariateEventColumnLabel(col) {
 
 /** Discovery status filter for GET /events. */
 export const KALSHI_LIVE_EVENT_STATUS_OPTIONS = ["unopened", "open", "closed", "settled"];
+
+/** Event columns summed or derived from the event's markets. They need with_nested_markets. */
+export const KALSHI_LIVE_EVENT_MARKET_ROLLUPS = [
+  "event_status",
+  "market_count",
+  "volume_fp",
+  "volume_24h_fp",
+  "open_interest_fp",
+  "open_time",
+  "close_time",
+];
 
 /** True when selected columns require with_milestones on Get Events. */
 export function kalshiLiveEventsWantsMilestones(selectedColumns) {

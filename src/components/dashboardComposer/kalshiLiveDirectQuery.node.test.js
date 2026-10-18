@@ -31,6 +31,29 @@ import {
   kalshiLiveMultivariateAttributeColumns,
   multivariateCollectionTicker,
 } from "./kalshiLiveDirectScope.js";
+import { normalizeKalshiLiveEventRow } from "@/lib/kalshiLive/normalizeEventRow";
+
+const rolledEvent = normalizeKalshiLiveEventRow({
+  event_ticker: "KXFED-26DEC",
+  title: "Fed decision",
+  markets: [
+    { status: "active", volume_fp: "1200.50", volume_24h_fp: "10.00", open_interest_fp: "300.00", open_time: "2026-07-29T14:00:00Z", close_time: "2026-12-10T19:00:00Z" },
+    { status: "closed", volume_fp: "800.00", volume_24h_fp: "0.00", open_interest_fp: "0.00", open_time: "2026-07-30T14:00:00Z", close_time: "2026-12-11T19:00:00Z" },
+  ],
+});
+assert.equal(rolledEvent.event_status, "open");
+assert.equal(rolledEvent.market_count, 2);
+assert.equal(rolledEvent.volume_fp, 2000.5);
+assert.equal(rolledEvent.volume_24h_fp, 10);
+assert.equal(rolledEvent.open_interest_fp, 300);
+assert.equal(rolledEvent.open_time, "2026-07-29T14:00:00.000Z");
+assert.equal(rolledEvent.close_time, "2026-12-11T19:00:00.000Z");
+assert.equal(normalizeKalshiLiveEventRow({ markets: [{ status: "finalized", volume_fp: "5" }, { status: "settled" }] }).event_status, "settled");
+assert.equal(normalizeKalshiLiveEventRow({ markets: [{ status: "initialized" }] }).event_status, "unopened");
+const bareEvent = normalizeKalshiLiveEventRow({ event_ticker: "KXNEW-27" });
+assert.equal(bareEvent.volume_fp, null);
+assert.equal(bareEvent.event_status, "");
+assert.equal(kalshiLiveEventAttributeColumns([{ id: "event_status" }, { id: "volume_fp" }]).filter((column) => column.id === "status").length, 1);
 
 assert.equal(isKalshiLiveDirectTable("trades"), true);
 assert.equal(isKalshiLiveDirectTable("events"), true);

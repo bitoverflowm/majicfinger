@@ -1,8 +1,9 @@
-import { KALSHI_LIVE_EVENTS_COLUMNS } from "@/lib/kalshiLive/eventsColumns";
+import { KALSHI_LIVE_EVENT_MARKET_ROLLUPS, KALSHI_LIVE_EVENTS_COLUMNS } from "@/lib/kalshiLive/eventsColumns";
 import {
   KALSHI_LIVE_EVENTS_ROW_MODE_PER_MARKET,
   normalizeKalshiLiveEventsRowMode,
 } from "@/lib/kalshiLive/eventCompose";
+import { parseKalshiFixedPointCount } from "@/lib/kalshiLive/kalshiFixedPoint";
 import { normalizeKalshiLiveMarketRow } from "@/lib/kalshiLive/normalizeMarketRow";
 
 function jsonCell(value) {
@@ -13,6 +14,62 @@ function jsonCell(value) {
   } catch {
     return String(value);
   }
+}
+
+function marketList(value) {
+  if (Array.isArray(value)) return value;
+  if (typeof value !== "string" || !value.trim().startsWith("[")) return [];
+  try {
+    const parsed = JSON.parse(value);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
+function sumOf(markets, ...keys) {
+  let total = null;
+  for (const market of markets) {
+    const value = keys.map((key) => parseKalshiFixedPointCount(market?.[key])).find((n) => n != null);
+    if (value != null) total = (total ?? 0) + value;
+  }
+  return total;
+}
+
+function edgeTime(markets, key, pick) {
+  const times = markets.map((market) => Date.parse(String(market?.[key] || ""))).filter(Number.isFinite);
+  return times.length ? new Date(pick(...times)).toISOString() : "";
+}
+
+/** Kalshi has no event status, so it follows the markets: any trading is open, all paid out is settled. */
+function eventStatus(markets) {
+  const words = markets.map((market) => String(market?.status || "").trim().toLowerCase()).filter(Boolean);
+  if (!words.length) return "";
+  if (words.some((word) => word === "active" || word === "open")) return "open";
+  if (words.every((word) => word === "initialized" || word === "unopened")) return "unopened";
+  if (words.every((word) => word === "finalized" || word === "settled")) return "settled";
+  return "closed";
+}
+
+/**
+ * Volume, open interest, status, and life of an event, from its markets.
+ * Empty when the markets were not requested.
+ * @param {unknown} markets
+ */
+export function kalshiLiveEventMarketRollups(markets) {
+  const list = marketList(markets).filter((market) => market && typeof market === "object");
+  if (!list.length) {
+    return Object.fromEntries(KALSHI_LIVE_EVENT_MARKET_ROLLUPS.map((name) => [name, name === "event_status" || name.endsWith("_time") ? "" : null]));
+  }
+  return {
+    event_status: eventStatus(list),
+    market_count: list.length,
+    volume_fp: sumOf(list, "volume_fp", "volume"),
+    volume_24h_fp: sumOf(list, "volume_24h_fp", "volume_24h"),
+    open_interest_fp: sumOf(list, "open_interest_fp", "open_interest"),
+    open_time: edgeTime(list, "open_time", Math.min),
+    close_time: edgeTime(list, "close_time", Math.max),
+  };
 }
 
 /**
@@ -67,6 +124,7 @@ export function normalizeKalshiLiveEventRow(raw, opts = {}) {
     series_ticker: str("series_ticker"),
     sub_title: str("sub_title"),
     title: str("title"),
+    ...kalshiLiveEventMarketRollups(nestedMarkets),
     collateral_return_type: str("collateral_return_type"),
     mutually_exclusive: bool("mutually_exclusive"),
     available_on_brokers: bool("available_on_brokers"),
@@ -96,7 +154,7 @@ export function resolveKalshiLiveEventMarkets(event, topLevelMarkets) {
 }
 
 const EVENT_FIELD_NAMES = KALSHI_LIVE_EVENTS_COLUMNS.map((c) => c.name).filter(
-  (n) => n !== "markets" && n !== "milestones",
+  (n) => n !== "markets" && n !== "milestones" && !KALSHI_LIVE_EVENT_MARKET_ROLLUPS.includes(n),
 );
 
 /**

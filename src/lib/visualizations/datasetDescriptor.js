@@ -129,7 +129,8 @@ const ENDPOINTS = {
     datasetType: "events",
     shape: "records",
     seriesKeys: ["event_ticker"],
-    fields: { market: "event_ticker", label: "title", value: "volume_fp" },
+    units: { quantity: "contracts", volume: "contracts" },
+    fields: { market: "event_ticker", label: "title", value: "volume_fp", status: "event_status", depth: "open_interest_fp" },
     required: ["event_ticker"],
   }),
   "kalshi:series": spec({
@@ -582,8 +583,9 @@ export function describeSheet(sheet) {
   const integrationId = sheet.integrationId || sheet.provenance?.integrationId;
   const template = templateForEndpoint(table, integrationId);
   const ids = columnIds(sheet);
-  // A Kalshi series list without its volume column has nothing to size tiles or rank rows by.
-  if (template?.datasetType === "series" && familyOf(integrationId) === "kalshi" && ids.size && !ids.has(template.fields.value)) {
+  // A Kalshi series or event list without its volume column has nothing to size tiles or rank rows by.
+  const catalog = template?.datasetType === "series" || template?.datasetType === "events";
+  if (catalog && familyOf(integrationId) === "kalshi" && ids.size && !ids.has(template.fields.value)) {
     delete template.fields.value;
   }
   const stamped = sheet.dataset;

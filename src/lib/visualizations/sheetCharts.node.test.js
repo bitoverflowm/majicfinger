@@ -164,6 +164,43 @@ assert.deepEqual(chartSpecsForSheet(savedKalshiSeries).map((chart) => chart.char
 const oneKalshiSeries = { ...kalshiLiveSeriesSheet, records: [kalshiLiveSeriesSheet.records[0]] };
 assert.equal(resolveVisualization(describeSheet(oneKalshiSeries), { columnIds: ["ticker", "title", "volume_fp"] }).view, "overview");
 
+const kalshiLiveEventsSheet = {
+  type: "sheet",
+  title: "Events",
+  table: "events",
+  integrationId: "kalshiLive",
+  columns: ["event_ticker", "series_ticker", "title", "event_status", "volume_fp", "volume_24h_fp", "open_interest_fp"].map((id) => ({ id })),
+  records: [
+    { event_ticker: "KXFED-26DEC", series_ticker: "KXFED", title: "Fed decision in December", event_status: "open", volume_fp: 4200000, volume_24h_fp: 12000, open_interest_fp: 800000 },
+    { event_ticker: "KXMLB-26OCT18", series_ticker: "KXMLB", title: "Yankees vs Dodgers", event_status: "closed", volume_fp: 950000, volume_24h_fp: 0, open_interest_fp: 0 },
+    { event_ticker: "KXNEW-27", series_ticker: "KXNEW", title: "New event", event_status: "unopened", volume_fp: 0, volume_24h_fp: 0, open_interest_fp: 0 },
+  ],
+};
+const kalshiLiveEvents = describeSheet(kalshiLiveEventsSheet);
+assert.equal(kalshiLiveEvents.fields.value, "volume_fp");
+assert.equal(kalshiLiveEvents.fields.status, "event_status");
+assert.equal(kalshiLiveEvents.units.volume, "contracts");
+assert.equal(volumeLabel(kalshiLiveEvents), "Volume");
+assert.equal(formatVolume(4200000, kalshiLiveEvents), "4.2M");
+assert.equal(hasVisualTable(kalshiLiveEvents), true);
+assert.equal(visualPresentationLabel(kalshiLiveEvents), "Rich Table");
+assert.deepEqual(chartSpecsForSheet(kalshiLiveEventsSheet).map((chart) => chart.chartView), ["treemap"]);
+assert.deepEqual(
+  volumeTreemapModel(kalshiLiveEventsSheet, kalshiLiveEvents).tiles.map((tile) => [tile.label, tile.value]),
+  [["Fed decision in December", 4200000], ["Yankees vs Dodgers", 950000], ["New event", 0]],
+);
+const oneKalshiEvent = { ...kalshiLiveEventsSheet, records: [kalshiLiveEventsSheet.records[0]] };
+assert.equal(resolveVisualization(describeSheet(oneKalshiEvent), { columnIds: kalshiLiveEventsSheet.columns.map((column) => column.id) }).view, "overview");
+const oldKalshiEventsSheet = {
+  ...kalshiLiveEventsSheet,
+  columns: ["event_ticker", "series_ticker", "title", "sub_title"].map((id) => ({ id })),
+  dataset: { datasetType: "events", sourceTable: "events", fields: { market: "event_ticker", label: "title", value: "volume_fp" }, seriesKeys: ["event_ticker"], required: ["event_ticker"] },
+};
+const oldKalshiEvents = describeSheet(oldKalshiEventsSheet);
+assert.equal(oldKalshiEvents.fields.value, undefined);
+assert.equal(hasVisualTable(oldKalshiEvents), true);
+assert.equal(chartSpecsForSheet(oldKalshiEventsSheet).length, 0);
+
 const marketPrices = {
   type: "sheet",
   title: "Market Price",

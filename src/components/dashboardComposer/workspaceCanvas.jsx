@@ -291,7 +291,10 @@ function writeLocalDashboard(userId, draft) {
 export function WorkspaceCanvasProvider({ pageId, readOnly = false, children }) {
   const user = useUser();
   const ctx = useMyStateV2();
-  const owner = user === undefined ? "" : user?.userId || "local";
+  const signedInRef = useRef("");
+  if (user?.userId) signedInRef.current = String(user.userId);
+  // A failed /api/user refresh reads as signed out. Switching to local storage then would blank every tab.
+  const owner = user === undefined ? "" : user?.userId || signedInRef.current || "local";
   const storageKey = owner ? canvasStorageKey(owner, pageId) : "";
   const [tool, setTool] = useState("select");
   const [handDown, setHandDown] = useState(false);
@@ -452,7 +455,13 @@ export function WorkspaceCanvasProvider({ pageId, readOnly = false, children }) 
         charts: [],
       });
       setTables(nextTables);
-      setBlocksByPage((prev) => ({ ...nextBlocks, ...prev }));
+      setBlocksByPage((prev) => {
+        const merged = { ...nextBlocks };
+        for (const [page, list] of Object.entries(prev || {})) {
+          if ((list || []).length) merged[page] = list;
+        }
+        return merged;
+      });
       const pending = pendingNow;
       setPendingTabs(pending);
       if (Array.isArray(doc.tabs) && doc.tabs.length) {

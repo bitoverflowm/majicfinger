@@ -29,6 +29,7 @@ function catalogStatus(record, fields) {
   const raw = record[fields.status] ?? record.closed ?? record["series:closed"] ?? record.event_closed;
   const word = String(raw ?? "").trim().toLowerCase();
   if (flag(raw) || CLOSED_STATUS.has(word)) return "Closed";
+  if (word === "unopened" || word === "initialized") return "Upcoming";
   if (flag(record.live ?? record.event_live)) return "Live";
   return "Open";
 }
