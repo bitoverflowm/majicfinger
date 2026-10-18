@@ -1250,6 +1250,53 @@ function EnrichStep({
   const listPlural = joinMode === "events" ? "events" : "series";
   const scopeJoinId = joinMode === "events" ? "kalshiLiveEventMarkets" : "kalshiLiveSeriesMarkets";
   const seriesMarketsOn = seriesJoin && joinTarget === scopeJoinId;
+  const eventCandlesOn = joinMode === "events" && eventExtra.has("candlesticks");
+  const eventForecastOn = joinMode === "events" && eventExtra.has("forecast");
+  // Kalshi returns one candle series per market, so candles always land one tab per market.
+  const layoutCombinable = seriesMarketsOn || eventForecastOn;
+  const layoutSheetOn = seriesMarketLayout === "sheet" || !layoutCombinable;
+  const layoutChoices =
+    seriesMarketsOn || eventExtraOn ? (
+      <>
+        <button
+          type="button"
+          aria-pressed={layoutSheetOn}
+          onClick={() => onSeriesMarketLayout?.("sheet")}
+          className={choiceClass(layoutSheetOn)}
+        >
+          <span className="text-[13px] font-semibold text-foreground">
+            {eventCandlesOn ? "Sheet per market" : `Sheet per ${listNoun}`}
+          </span>
+          <span className="text-[11px] font-normal text-muted-foreground">
+            {eventCandlesOn
+              ? `Each market gets its own Candlesticks tab${seriesMarketsOn ? ", after its event's Markets tab" : ""}.${
+                  eventForecastOn ? " Each event gets its own forecast tab." : ""
+                }`
+              : eventExtraOn && !seriesMarketsOn
+                ? `Each ${listNoun} gets its own tab.`
+                : `Each ${listNoun} gets its own Markets tab.`}
+          </span>
+        </button>
+        {layoutCombinable ? (
+          <button
+            type="button"
+            aria-pressed={seriesMarketLayout === "combined"}
+            onClick={() => onSeriesMarketLayout?.("combined")}
+            className={choiceClass(seriesMarketLayout === "combined")}
+          >
+            <span className="text-[13px] font-semibold text-foreground">One sheet</span>
+            <span className="text-[11px] font-normal text-muted-foreground">
+              {seriesMarketsOn && eventForecastOn
+                ? `Markets and forecasts from every ${listNoun} land on one tab each.`
+                : seriesMarketsOn
+                  ? `Markets from every ${listNoun} land on one tab.`
+                  : `Every ${listNoun} lands on one tab.`}
+              {eventCandlesOn ? " Candles stay one tab per market." : ""}
+            </span>
+          </button>
+        ) : null}
+      </>
+    ) : null;
   const liveSelected = liveJoinIds instanceof Set ? liveJoinIds : new Set();
   const downstreamSelected = downstreamJoinIds instanceof Set ? downstreamJoinIds : new Set();
   const holderTraderSelected = holderTraderJoinIds instanceof Set ? holderTraderJoinIds : new Set();
@@ -1757,6 +1804,7 @@ function EnrichStep({
                                   />
                                 </div>
                               ) : null}
+                              {eventCandlesOn ? layoutChoices : null}
                               <button
                                 type="button"
                                 aria-pressed={eventExtra.has("forecast")}
@@ -1782,46 +1830,7 @@ function EnrichStep({
                           ) : null}
                           {seriesMarketsOn || eventExtraOn ? (
                             <>
-                              {seriesMarketsOn || eventExtra.has("forecast") ? (
-                              <>
-                              <button
-                                type="button"
-                                aria-pressed={seriesMarketLayout === "sheet"}
-                                onClick={() => onSeriesMarketLayout?.("sheet")}
-                                className={cn(
-                                  "flex w-full flex-col rounded-lg border px-2.5 py-2 text-left transition-colors",
-                                  seriesMarketLayout === "sheet"
-                                    ? "border-[#0d99ff]/40 bg-[#0d99ff]/10"
-                                    : "border-border/70 bg-background hover:bg-muted/50",
-                                )}
-                              >
-                                <span className="text-[13px] font-semibold text-foreground">Sheet per {listNoun}</span>
-                                <span className="text-[11px] font-normal text-muted-foreground">
-                                  {eventExtraOn && !seriesMarketsOn
-                                    ? `Each ${listNoun} gets its own tab.`
-                                    : `Each ${listNoun} gets its own Markets tab.`}
-                                </span>
-                              </button>
-                              <button
-                                type="button"
-                                aria-pressed={seriesMarketLayout === "combined"}
-                                onClick={() => onSeriesMarketLayout?.("combined")}
-                                className={cn(
-                                  "flex w-full flex-col rounded-lg border px-2.5 py-2 text-left transition-colors",
-                                  seriesMarketLayout === "combined"
-                                    ? "border-[#0d99ff]/40 bg-[#0d99ff]/10"
-                                    : "border-border/70 bg-background hover:bg-muted/50",
-                                )}
-                              >
-                                <span className="text-[13px] font-semibold text-foreground">One sheet</span>
-                                <span className="text-[11px] font-normal text-muted-foreground">
-                                  {seriesMarketsOn
-                                    ? `Markets from every ${listNoun} land on one tab.`
-                                    : `Every ${listNoun} lands on one tab.`}
-                                </span>
-                              </button>
-                              </>
-                              ) : null}
+                              {eventCandlesOn ? null : layoutChoices}
                               <p className="text-[11px] leading-relaxed text-muted-foreground">
                                 {queryRowCount.toLocaleString()} {queryRowCount === 1 ? listNoun : listPlural} in this pull.
                                 {seriesMarketLayout === "combined" && (seriesMarketsOn || eventExtra.has("forecast"))
@@ -1831,7 +1840,6 @@ function EnrichStep({
                                   : seriesMarketsOn
                                     ? ` ${sheetCount.toLocaleString()} Markets ${sheetCount === 1 ? "sheet" : "sheets"}.`
                                     : " The preview shows the first event."}
-                                {eventExtra.has("candlesticks") ? " Event candlesticks always give each market its own sheet, after that event's markets." : ""}
                                 {eventExtra.has("forecast") ? " Events Kalshi has no forecast for are skipped." : ""}
                               </p>
                               {marketsDetected ? (
@@ -2742,7 +2750,7 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
   const tradesQuery = historicalLake && tableId === "trades";
   const joinTradesTarget = join?.tradesTarget || "";
   const joinMarketsTarget = join?.marketsTarget || "";
-  const venueLabel = profile.historical ? profile.label : "Historical";
+  const venueLabel = profile.label || "Historical";
   const lakeId = profile.lakeId || "";
   const guidedFilters = profile.guidedTables.includes(tableId);
   const liveMarketSearch = integrationId === "kalshiLive" && tableId === "markets";
@@ -3797,6 +3805,8 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
     () => (liveDirect && tableId === "events" ? directEventTickers(livePicks) : []),
     [liveDirect, livePicks, tableId],
   );
+  const eventsBrowsing =
+    liveEventSearch && !directEvents.length && !eventStatuses.length && !eventSeries && !eventMinCloseTs && !seriesMinUpdatedTs;
   const multivariateSeries = useMemo(
     () => (liveMultivariate ? directSeriesTickers(livePicks) : []),
     [liveMultivariate, livePicks],
@@ -7401,7 +7411,8 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
     let runTickers = [];
     let downstreamJoinMarkets = [];
     if (liveDirect) {
-      const scopeError = kalshiLiveDirectScopeError(tableId, livePicks, directQuery, attributeFilters);
+      const browsedEvents = eventsBrowsing ? (Array.isArray(eventImportRows) ? eventImportRows : pull?.rows || []) : null;
+      const scopeError = browsedEvents?.length ? "" : kalshiLiveDirectScopeError(tableId, livePicks, directQuery, attributeFilters);
       if (scopeError) {
         reporter.fail("source", scopeError);
         return;
@@ -7468,27 +7479,29 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
         const tickers = directEventTickers(livePicks);
         const statuses = eventDiscoveryStatuses(attributeFilters);
         const seriesTicker = eventSeriesTicker(attributeFilters);
-        const loaded = await loadKalshiLiveDirect(
-          "events",
-          tickers.length
-            ? {
-                mode: "tickers",
-                tickers,
-                includeMarkets: eventsNeedMarkets(hidden),
-                includeMilestones: !hidden.has("milestones"),
-                limit,
-              }
-            : {
-                mode: "discover",
-                statuses,
-                seriesTickers: eventSeriesTickers(attributeFilters),
-                minCloseTs: eventClosesAfter(attributeFilters),
-                minUpdatedTs: seriesUpdatedAfter(attributeFilters),
-                includeMarkets: eventsNeedMarkets(hidden),
-                includeMilestones: !hidden.has("milestones"),
-                limit,
-              },
-        );
+        const loaded = browsedEvents
+          ? { columns: pull?.columns || [], rows: browsedEvents }
+          : await loadKalshiLiveDirect(
+              "events",
+              tickers.length
+                ? {
+                    mode: "tickers",
+                    tickers,
+                    includeMarkets: eventsNeedMarkets(hidden),
+                    includeMilestones: !hidden.has("milestones"),
+                    limit,
+                  }
+                : {
+                    mode: "discover",
+                    statuses,
+                    seriesTickers: eventSeriesTickers(attributeFilters),
+                    minCloseTs: eventClosesAfter(attributeFilters),
+                    minUpdatedTs: seriesUpdatedAfter(attributeFilters),
+                    includeMarkets: eventsNeedMarkets(hidden),
+                    includeMilestones: !hidden.has("milestones"),
+                    limit,
+                  },
+            );
         const shaped = shape(loaded);
         const matched = shaped.rows.filter((row) => rowMatchesAttributes(row, eventAttributeColumns, attributeFilters));
         const sorted = sortAttributeRows(matched, eventAttributeColumns, sortKeys);
@@ -7508,10 +7521,23 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
             table: "events",
             summary: tickers.length
               ? `Kalshi Live · Events · ${tickers.join(", ")}`
-              : `Kalshi Live · Events · ${[...statuses, seriesTicker].filter(Boolean).join(", ") || "discovery"}`,
+              : browsedEvents
+                ? `Kalshi Live · Events · ${rows.length.toLocaleString()} events`
+                : `Kalshi Live · Events · ${[...statuses, seriesTicker].filter(Boolean).join(", ") || "discovery"}`,
             attributeLines,
             sortLine: sortSummary(eventAttributeColumns, sortKeys),
             sourceRows: rows,
+            ...(browsedEvents
+              ? {
+                  pull: {
+                    table: "events",
+                    mode: "tickers",
+                    tickers: [...new Set(rows.map((row) => String(row?.event_ticker || "").trim()).filter(Boolean))],
+                    includeMarkets: eventsNeedMarkets(hidden),
+                    includeMilestones: !hidden.has("milestones"),
+                  },
+                }
+              : {}),
           },
         ];
       } else if (isKalshiLiveTraderTable(tableId)) {

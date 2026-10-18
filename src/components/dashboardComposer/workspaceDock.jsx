@@ -22,8 +22,8 @@ const TOOLS = [
   { id: "hand", label: "Hand tool", action: "tool", tool: "hand" },
   { id: "sheet", label: "Add data sheet", icon: Table2, action: "add" },
   { id: "source", label: "Add data source", icon: Database, action: "add" },
-  { id: "chart", label: "Add chart", icon: BarChart3, action: "add" },
-  { id: "text", label: "Add text", icon: Type, action: "add" },
+  { id: "chart", label: "Add chart", icon: BarChart3, action: "add", comingSoon: true },
+  { id: "text", label: "Add text", icon: Type, action: "add", comingSoon: true },
   { id: "export", label: "Export", icon: Upload, action: "export" },
 ];
 
@@ -81,7 +81,7 @@ export function WorkspaceDock() {
                 {item.id === "sheet" || item.id === "export" ? (
                   <span className="mx-1 h-5 w-px bg-black/10 dark:bg-white/15" aria-hidden />
                 ) : null}
-                {item.id === "chart" && sheetCount > 0 ? (
+                {item.id === "chart" && sheetCount > 0 && !item.comingSoon ? (
                   <ChartToolMenu canvas={canvas} />
                 ) : (
                 <Tooltip>
@@ -89,8 +89,10 @@ export function WorkspaceDock() {
                     <button
                       type="button"
                       aria-label={item.label}
+                      aria-disabled={item.comingSoon || undefined}
                       aria-pressed={item.action === "tool" ? selected : undefined}
                       onClick={() => {
+                        if (item.comingSoon) return;
                         if (item.action === "tool") canvas?.setTool?.(item.tool);
                         else if (item.id === "source") connect?.open?.();
                         else if (item.action === "add") canvas?.addBlock?.(item.id);
@@ -100,7 +102,9 @@ export function WorkspaceDock() {
                         "inline-flex size-8 items-center justify-center rounded-[8px] text-neutral-700 transition-colors dark:text-neutral-200",
                         selected
                           ? "bg-[#0d99ff] text-white hover:bg-[#0b87e0] dark:text-white"
-                          : "hover:bg-black/[0.05] dark:hover:bg-white/10",
+                          : item.comingSoon
+                            ? "cursor-not-allowed opacity-40"
+                            : "hover:bg-black/[0.05] dark:hover:bg-white/10",
                       )}
                     >
                       {item.id === "hand" ? (
@@ -111,7 +115,7 @@ export function WorkspaceDock() {
                     </button>
                   </TooltipTrigger>
                   <TooltipContent side="top" sideOffset={8} className="!z-[520] text-xs">
-                    {item.label}
+                    {item.comingSoon ? "Coming soon" : item.label}
                   </TooltipContent>
                 </Tooltip>
                 )}
