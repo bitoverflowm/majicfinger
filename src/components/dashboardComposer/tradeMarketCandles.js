@@ -56,19 +56,22 @@ function outcomeRank(outcome) {
 }
 
 /**
- * Kalshi Historical fills carry both `yes_price` and `no_price`, so each fill prices both outcomes.
- * Live Kalshi trades use the `_dollars` columns and stay one Yes series.
+ * Kalshi fills carry a Yes and a No price, so each fill prices both outcomes.
+ * The lake names them `yes_price` and `no_price` in cents. The API names them `_dollars`.
  * @returns {{ yes: number, no: number } | null}
  */
 function pairedPrices(columns) {
-  const yes = findColumn(columns, (_title, id) => id === "yes_price");
-  const no = findColumn(columns, (_title, id) => id === "no_price");
-  return yes >= 0 && no >= 0 ? { yes, no } : null;
+  for (const [yesId, noId] of [["yes_price", "no_price"], ["yes_price_dollars", "no_price_dollars"]]) {
+    const yes = findColumn(columns, (_title, id) => id === yesId);
+    const no = findColumn(columns, (_title, id) => id === noId);
+    if (yes >= 0 && no >= 0) return { yes, no };
+  }
+  return null;
 }
 
 /**
  * Outcomes a per-outcome trade sheet holds, Yes first and No second.
- * Sheets priced in Yes terms alone, such as live Kalshi trades, have one series and return none.
+ * Sheets priced in Yes terms alone have one series and return none.
  * @param {Array<{ title?: string, id?: string }>} columns
  * @param {unknown[][]} rows
  * @returns {string[]}

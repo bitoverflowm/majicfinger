@@ -1063,7 +1063,7 @@ const KALSHI_LIVE_DEFAULTS = {
     "volume_fp",
     "open_interest_fp",
   ],
-  trades: ["created_time", "ticker", "taker_outcome_side", "yes_price_dollars", "count_fp"],
+  trades: ["created_time", "ticker", "taker_outcome_side", "yes_price_dollars", "no_price_dollars", "count_fp"],
   orderbook: ["ticker", "side", "price_dollars", "quantity_fp", "level_index"],
   events: ["event_ticker", "series_ticker", "title", "sub_title", "mutually_exclusive"],
   event_candlesticks: ["market_ticker", "end_period_ts", "price_open_dollars", "price_high_dollars", "price_low_dollars", "price_close_dollars", "volume_fp"],

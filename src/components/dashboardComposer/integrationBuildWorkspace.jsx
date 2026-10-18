@@ -156,7 +156,7 @@ import {
   attributeMismatchReason,
   attributeSummary,
   AttributeFilters,
-  CandlestickQueryFields,
+  MarketWindowQueryFields,
   PriceHistoryQueryFields,
   TradeHistoryQueryFields,
   JoinSourceFields,
@@ -2168,6 +2168,11 @@ const KALSHI_LIVE_QUERY_SECTIONS = {
     title: "Candlesticks",
     ids: KALSHI_LIVE_CANDLE_QUERY_IDS,
   },
+  trades: {
+    value: "trade-window",
+    title: "Trade history",
+    ids: ["time_range"],
+  },
 };
 
 /**
@@ -2542,14 +2547,15 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
   const focusedLife = useMemo(() => lifeOfMarket(focusedMarket), [focusedMarket]);
   const focusedKey = focusedMarket?.id || focusedMarket?.ticker || "";
   const liveCandles = integrationId === "kalshiLive" && tableId === "candlesticks";
-  const candleLife = useMemo(() => (liveCandles ? kalshiPicksLife(livePicks) : null), [liveCandles, livePicks]);
-  const windowLife = liveCandles ? candleLife : focusedLife;
+  const liveWindowed = integrationId === "kalshiLive" && (tableId === "candlesticks" || tableId === "trades");
+  const picksLife = useMemo(() => (liveWindowed ? kalshiPicksLife(livePicks) : null), [liveWindowed, livePicks]);
+  const windowLife = liveWindowed ? picksLife : focusedLife;
   useEffect(() => {
     const datesFollowMarket =
       (polymarketLive && (tableId === "getBatchPricesHistory" || tableId === "getTokenPriceHistory")) ||
       (!polymarketLive && ["trades", "candlesticks", "orderbook", "event_candlesticks", "event_forecast"].includes(tableId));
     if (!datesFollowMarket || !windowLife) return undefined;
-    if (!liveCandles && livePicks.length !== 1) return undefined;
+    if (!liveWindowed && livePicks.length !== 1) return undefined;
     setAttributeFilters((current) => {
       const maxDays =
         tableId === "getTokenPriceHistory"
@@ -2566,7 +2572,7 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
       return polymarketLive ? settlePolymarketQueryFilters(tableId, current, patched, focusedMarket) : patched;
     });
     return undefined;
-  }, [focusedKey, windowLife, liveCandles, livePicks.length, polymarketLive, tableId]);
+  }, [focusedKey, windowLife, liveCandles, liveWindowed, livePicks.length, polymarketLive, tableId]);
   const polymarketQuoteColumns = useMemo(() => {
     if (!polymarketLive || !isPolymarketQuoteTable(tableId)) return [];
     const columns = polymarketQuoteAttributeColumns(tableId, pull?.columns || [], attributeFilters, focusedMarket);
@@ -3062,9 +3068,9 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
       withMarketLifeBounds(
         (liveMarketFanout || liveEventCandles) ? kalshiLiveDirectAttributeColumns(tableId, pull?.columns || []) : [],
         windowLife,
-        liveCandles ? "Full market history" : "",
+        liveWindowed ? "Full market history" : "",
       ),
-    [windowLife, liveCandles, liveEventCandles, liveMarketFanout, tableId, pull?.columns],
+    [windowLife, liveWindowed, liveEventCandles, liveMarketFanout, tableId, pull?.columns],
   );
   const kalshiQuerySection = integrationId === "kalshiLive" ? KALSHI_LIVE_QUERY_SECTIONS[tableId] || null : null;
   const directListColumns = useMemo(() => {
@@ -9815,7 +9821,7 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
                 </AccordionPrimitive.Header>
                 <AccordionContent className="pb-0 pt-2">
                   <div className="rounded-lg border border-border/70 px-2 py-2">
-                    <CandlestickQueryFields columns={directAttributeColumns} filters={attributeFilters} onChange={setAttributeFilters} />
+                    <MarketWindowQueryFields columns={directAttributeColumns} filters={attributeFilters} onChange={setAttributeFilters} />
                   </div>
                 </AccordionContent>
               </AccordionItem>

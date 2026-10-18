@@ -219,7 +219,12 @@ export function attributeSummary(column, filters) {
   } else if (spec.kind === "query-instant") {
     if (filter.value) parts.push(formatAttributeDate(filter.value));
   } else if (spec.kind === "query-range" || spec.kind === "date") {
-    const preset = filter.from && filter.to ? activeDateRangePreset(filter.from, filter.to, filter.preset) : null;
+    const preset =
+      filter.from && filter.to
+        ? filter.preset === "market-life"
+          ? { short: "Full" }
+          : activeDateRangePreset(filter.from, filter.to, filter.preset)
+        : null;
     if (filter.from && filter.to) parts.push(preset ? `${preset.short} · ${formatAttributeRange(filter.from, filter.to)}` : formatAttributeRange(filter.from, filter.to));
     else if (filter.from) parts.push(`From ${formatAttributeDate(filter.from)}`);
     else if (filter.to) parts.push(`Until ${formatAttributeDate(filter.to)}`);
@@ -1525,10 +1530,10 @@ export function PriceHistoryQueryFields({ columns, filters, onChange }) {
 }
 
 /**
- * Date range and candle period for a Kalshi Live market candlestick pull.
- * Dates stay inside the market's life, and the range never asks Kalshi for more candles than one request returns.
+ * Date range, and the candle period when there is one, for a Kalshi Live market pull.
+ * Dates stay inside the market's life. Candles never ask Kalshi for more than one request returns.
  */
-export function CandlestickQueryFields({ columns, filters, onChange }) {
+export function MarketWindowQueryFields({ columns, filters, onChange }) {
   const byId = new Map((columns || []).map((column) => [column.id, column]));
   const range = byId.get("time_range");
   const period = byId.get("period_interval");
@@ -1536,7 +1541,7 @@ export function CandlestickQueryFields({ columns, filters, onChange }) {
   const periodValue = periodOptions.some(([value]) => value === String(filters?.period_interval?.value ?? ""))
     ? String(filters.period_interval.value)
     : "60";
-  const maxDays = candleRangeMaxDays(periodValue);
+  const maxDays = period ? candleRangeMaxDays(periodValue) : undefined;
   const presetIds = DATE_RANGE_PRESETS.filter((item) => {
     if (!maxDays) return true;
     const window = dateRangePreset(item.id);

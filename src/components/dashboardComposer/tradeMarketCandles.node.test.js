@@ -180,7 +180,28 @@ assert.equal(kalshiNo.candles[kalshiNo.candles.length - 1].close, 0.38);
 assert.deepEqual(tradeTimes(kalshiLakeColumns, kalshiLakeRows), [start, start + 1000, start + 2000]);
 const athenaNanos = [["1.737390680081725E18", "PRES-2024-KH", "yes", "1.0", "99.0", "6.0"]];
 assert.deepEqual(tradeTimes(kalshiLakeColumns, athenaNanos).map(Math.round), [Date.parse("2025-01-20T16:31:20.082Z")]);
-const liveKalshiColumns = [...columns, { id: "no_price_dollars", title: "No Price Dollars", type: "number" }];
-assert.deepEqual(tradeOutcomes(liveKalshiColumns, rows), []);
+const liveKalshiColumns = [
+  { id: "created_time", title: "Created Time", type: "date" },
+  { id: "ticker", title: "Ticker" },
+  { id: "taker_outcome_side", title: "Taker Outcome Side" },
+  { id: "yes_price_dollars", title: "Yes Price Dollars", type: "number" },
+  { id: "no_price_dollars", title: "No Price Dollars", type: "number" },
+  { id: "count_fp", title: "Count Fp", type: "number" },
+];
+const liveKalshiRows = [
+  [new Date(start + 2000).toISOString(), "KXFED-26DEC", "yes", "0.6100", "0.3900", "4.00"],
+  [new Date(start + 1000).toISOString(), "KXFED-26DEC", "no", "0.6000", "0.4000", "3.00"],
+  [new Date(start).toISOString(), "KXFED-26DEC", "yes", "0.5800", "0.4200", "2.00"],
+];
+assert.deepEqual(tradeOutcomes(liveKalshiColumns, liveKalshiRows), ["Yes", "No"]);
+const liveYes = tradesToCandles(liveKalshiColumns, liveKalshiRows, { outcome: "Yes" });
+assert.equal(liveYes.outcome, "Yes");
+assert.equal(liveYes.candles[0].open, 0.58);
+assert.equal(liveYes.candles.at(-1).close, 0.61);
+const liveNo = tradesToCandles(liveKalshiColumns, liveKalshiRows, { outcome: "No" });
+assert.equal(liveNo.outcome, "No");
+assert.equal(liveNo.candles[0].open, 0.42);
+assert.equal(liveNo.candles.at(-1).close, 0.39);
+assert.equal(liveNo.candles.reduce((sum, candle) => sum + candle.volume, 0), 9);
 
 console.log("tradeMarketCandles ok");

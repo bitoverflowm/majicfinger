@@ -409,4 +409,29 @@ assert.deepEqual(kalshiTradeCharts.map((chart) => chart.chartView), ["trade-pric
 assert.equal(kalshiTradeCharts[0].w, lakeTradeCharts[0].w);
 assert.equal(volumeLabel(seriesDataset), "24h volume");
 
+const kalshiLiveTrades = {
+  type: "sheet",
+  title: "Trades · KXFED-26DEC-T4.00",
+  table: "trades",
+  integrationId: "kalshiLive",
+  columns: ["created_time", "ticker", "taker_outcome_side", "yes_price_dollars", "no_price_dollars", "count_fp"].map((id) => ({ id })),
+  records: [
+    { created_time: "2026-10-04T15:00:00Z", ticker: "KXFED-26DEC-T4.00", taker_outcome_side: "yes", yes_price_dollars: "0.6200", no_price_dollars: "0.3800", count_fp: "5.00" },
+    { created_time: "2026-10-04T15:01:00Z", ticker: "KXFED-26DEC-T4.00", taker_outcome_side: "no", yes_price_dollars: "0.6000", no_price_dollars: "0.4000", count_fp: "3.00" },
+  ],
+};
+const kalshiLiveDataset = describeSheet(kalshiLiveTrades);
+assert.equal(kalshiLiveDataset.fields.price, "yes_price_dollars");
+assert.equal(kalshiLiveDataset.fields.size, "count_fp");
+const kalshiLiveTradeCharts = chartSpecsForSheet(kalshiLiveTrades);
+assert.deepEqual(kalshiLiveTradeCharts.map((chart) => chart.chartView), ["trade-price"]);
+assert.equal(kalshiLiveTradeCharts[0].w, lakeTradeCharts[0].w);
+assert.equal(kalshiLiveTradeCharts[0].h, lakeTradeCharts[0].h);
+const staleLiveTrades = {
+  ...kalshiLiveTrades,
+  dataset: { ...kalshiLiveDataset, fields: { ...kalshiLiveDataset.fields, price: "yes_price", size: "count" } },
+};
+assert.equal(describeSheet(staleLiveTrades).fields.price, "yes_price_dollars");
+assert.deepEqual(chartSpecsForSheet(staleLiveTrades).map((chart) => chart.chartView), ["trade-price"]);
+
 console.log("sheet charts ok");

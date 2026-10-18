@@ -95,8 +95,8 @@ const ENDPOINTS = {
     priceBasis: "trade",
     units: { quantity: "contracts" },
     delivery: "streaming",
-    fields: { market: "ticker", time: "created_time", price: "yes_price", size: "count_fp", side: "taker_side" },
-    required: ["ticker", "yes_price"],
+    fields: { market: "ticker", time: "created_time", price: "yes_price_dollars", size: "count_fp", side: "taker_outcome_side" },
+    required: ["ticker", "yes_price_dollars"],
   }),
   "kalshi:orderbook": spec({
     datasetType: "orderbook",
@@ -536,13 +536,14 @@ function columnIds(sheet) {
   return new Set((sheet?.columns || []).map((column) => columnKey(column)).filter(Boolean));
 }
 
-/** A saved descriptor still fits when its label, value, and series keys are columns on the sheet. */
+/** A saved descriptor still fits when its label, value, price, and series keys are columns on the sheet. */
 function descriptorFitsSheet(sheet, dataset) {
   const ids = columnIds(sheet);
   if (!ids.size) return true;
   const fields = dataset?.fields || {};
   if (fields.label && !ids.has(fields.label)) return false;
   if (fields.value && !ids.has(fields.value)) return false;
+  if (fields.price && !ids.has(fields.price)) return false;
   if (fields.bid && !ids.has(fields.bid)) return false;
   if (fields.ask && !ids.has(fields.ask)) return false;
   const keys = (dataset?.seriesKeys || []).filter(Boolean);
