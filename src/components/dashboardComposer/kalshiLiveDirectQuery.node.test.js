@@ -71,7 +71,7 @@ assert.deepEqual(directSeriesTickers(picks), ["SER-1"]);
 assert.equal(kalshiLiveDirectScopeError("trades", [], query), "Add at least one market ticker.");
 assert.equal(kalshiLiveDirectScopeError("trades", [{ status: "loading", kind: "market", ticker: "MKT-1", rows: [] }], query), "");
 assert.equal(kalshiLiveDirectScopeError("series", picks, query, {}), "");
-assert.equal(kalshiLiveDirectScopeError("series", [], query, {}), "Search for a series or select a category.");
+assert.equal(kalshiLiveDirectScopeError("series", [], query, {}), "");
 assert.equal(kalshiLiveDirectScopeError("series", [], query, { category: { include: ["Sports"] } }), "");
 assert.deepEqual(seriesDiscoveryCategories({ category: { include: ["", "Crypto", "Sports", "Crypto"] } }), ["Crypto", "Sports"]);
 assert.equal(kalshiLiveDirectScopeError("series", [], query, { category: { include: ["Sports", "Business"] } }), "");
@@ -144,9 +144,10 @@ const bookAttributes = kalshiLiveDirectAttributeColumns("orderbook", [
 ]);
 assert.deepEqual(
   bookAttributes.map((column) => column.id),
-  ["time_range", "depth", "side", "price_dollars"],
+  ["depth", "side", "price_dollars"],
 );
-assert.equal(bookAttributes[1].control, "depth");
+assert.equal(bookAttributes[0].control, "depth");
+assert.deepEqual(defaultDirectAttributeFilters("orderbook"), { depth: { value: "20" } });
 
 const seeded = defaultDirectAttributeFilters("candlesticks", new Date("2026-10-05T15:00:00Z"));
 assert.equal(seeded.time_range.preset, "past-24h");

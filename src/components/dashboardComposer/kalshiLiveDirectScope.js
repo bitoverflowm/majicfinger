@@ -514,6 +514,7 @@ export function defaultDirectAttributeFilters(tableId, now = new Date()) {
     };
   }
   if (!DIRECT_MARKET_TABLES.includes(tableId)) return {};
+  if (tableId === "orderbook") return { depth: { value: "20" } };
   const range = dateRangePreset("past-24h", now);
   const filters = {
     time_range: { from: range?.from || "", to: range?.to || "", preset: "past-24h" },
@@ -522,7 +523,6 @@ export function defaultDirectAttributeFilters(tableId, now = new Date()) {
     filters.period_interval = { value: "60" };
     filters.include_latest_before_start = { value: "true" };
   }
-  if (tableId === "orderbook") filters.depth = { value: "20" };
   return filters;
 }
 
@@ -698,21 +698,19 @@ export function kalshiLiveDirectAttributeColumns(tableId, columns) {
     }
     return column;
   });
-  const query = [
-    {
-      id: "time_range",
-      title: "Date range",
-      type: "date",
-      queryOnly: true,
-      control: "query-range",
-      description:
-        tableId === "trades"
-          ? "Start and end of trade data"
-          : tableId === "orderbook"
-            ? "Start and end of order book data"
-            : "Start and end of candlestick data",
-    },
-  ];
+  const query =
+    tableId === "orderbook"
+      ? []
+      : [
+          {
+            id: "time_range",
+            title: "Date range",
+            type: "date",
+            queryOnly: true,
+            control: "query-range",
+            description: tableId === "trades" ? "Start and end of trade data" : "Start and end of candlestick data",
+          },
+        ];
   if (tableId === "candlesticks" || tableId === "event_candlesticks") {
     query.push({
       id: "period_interval",
@@ -776,12 +774,12 @@ export function directPullWindow(tableId, filters, fallback = {}) {
 
 /**
  * Empty when the pull can run. A loading pick is not an error yet.
- * Series runs from tickers, or from a category when no tickers are selected.
+ * Series runs from tickers, a category, or the series already on screen when neither is chosen.
  * @returns {string}
  */
 export function kalshiLiveDirectScopeError(tableId, picks, _query, filters) {
   const loading = (picks || []).some((pick) => pick?.status === "loading");
-  if (tableId === "leaderboard" || tableId === "trades_by_holder") return "";
+  if (tableId === "leaderboard" || tableId === "trades_by_holder" || tableId === "series") return "";
   if (tableId === "search_traders") {
     if (traderSearchQuery(filters).length >= 2) return "";
     return "Search for a trader.";
@@ -789,11 +787,6 @@ export function kalshiLiveDirectScopeError(tableId, picks, _query, filters) {
   if (tableId === "holder_profile") {
     if (traderProfileNicknames(filters).length) return "";
     return loading ? "" : "Add a trader nickname.";
-  }
-  if (tableId === "series") {
-    if (directSeriesTickers(picks).length) return "";
-    if (seriesDiscoveryCategories(filters).length) return "";
-    return loading ? "" : "Search for a series or select a category.";
   }
   if (tableId === "events") {
     if (directEventTickers(picks).length) return "";

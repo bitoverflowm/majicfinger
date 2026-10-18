@@ -2389,6 +2389,7 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
   const [tradePreview, setTradePreview] = useState({ status: "idle", ticker: "", columns: [], rows: [], error: "" });
   const [running, setRunning] = useState(false);
   const [placementPrompt, setPlacementPrompt] = useState(false);
+  const [seriesBrowsePrompt, setSeriesBrowsePrompt] = useState(false);
   const [sampleSavePrompt, setSampleSavePrompt] = useState(false);
   const placementRef = useRef({ pageId: "", append: false });
   const sampleKeepRef = useRef("both");
@@ -2553,7 +2554,9 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
   useEffect(() => {
     const datesFollowMarket =
       (polymarketLive && (tableId === "getBatchPricesHistory" || tableId === "getTokenPriceHistory")) ||
-      (!polymarketLive && ["trades", "candlesticks", "orderbook", "event_candlesticks", "event_forecast"].includes(tableId));
+      (!polymarketLive &&
+        ["trades", "candlesticks", "orderbook", "event_candlesticks", "event_forecast"].includes(tableId) &&
+        !(integrationId === "kalshiLive" && tableId === "orderbook"));
     if (!datesFollowMarket || !windowLife) return undefined;
     if (!liveWindowed && livePicks.length !== 1) return undefined;
     setAttributeFilters((current) => {
@@ -2572,7 +2575,7 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
       return polymarketLive ? settlePolymarketQueryFilters(tableId, current, patched, focusedMarket) : patched;
     });
     return undefined;
-  }, [focusedKey, windowLife, liveCandles, liveWindowed, livePicks.length, polymarketLive, tableId]);
+  }, [focusedKey, windowLife, liveCandles, liveWindowed, livePicks.length, polymarketLive, integrationId, tableId]);
   const polymarketQuoteColumns = useMemo(() => {
     if (!polymarketLive || !isPolymarketQuoteTable(tableId)) return [];
     const columns = polymarketQuoteAttributeColumns(tableId, pull?.columns || [], attributeFilters, focusedMarket);
@@ -3472,6 +3475,7 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
     () => (liveDirect && tableId === "series" ? directSeriesTickers(livePicks) : []),
     [liveDirect, livePicks, tableId],
   );
+  const seriesBrowsing = liveSeriesSearch && !directSeries.length && !seriesDiscoveryCategories(attributeFilters).length;
   const directEvents = useMemo(
     () => (liveDirect && tableId === "events" ? directEventTickers(livePicks) : []),
     [liveDirect, livePicks, tableId],
@@ -6529,6 +6533,19 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
 
   function requestSaveAndRun() {
     if (running) return;
+    if (seriesBrowsing && seriesJoinOn && seriesJoinTickers.length) {
+      setSeriesBrowsePrompt(true);
+      return;
+    }
+    continueSaveAndRun();
+  }
+
+  function confirmSeriesBrowse() {
+    setSeriesBrowsePrompt(false);
+    continueSaveAndRun();
+  }
+
+  function continueSaveAndRun() {
     if (enrichPicks.has("sample") && sampleSizeNumber > 0 && !sampleSizeError) {
       setSampleSavePrompt(true);
       return;
@@ -6988,18 +7005,20 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
       if (tableId === "series") {
         const tickers = directSeriesTickers(livePicks);
         const categories = seriesDiscoveryCategories(attributeFilters);
-        const loaded = await loadKalshiLiveDirect(
-          "series",
-          tickers.length
-            ? { mode: "tickers", tickers, limit }
-            : {
-                mode: "discover",
-                categories,
-                includeProductMetadata: !hidden.has("product_metadata"),
-                minUpdatedTs: seriesUpdatedAfter(attributeFilters),
-                limit,
-              },
-        );
+        const loaded = seriesBrowsing
+          ? { columns: pull?.columns || [], rows: pull?.rows || [] }
+          : await loadKalshiLiveDirect(
+              "series",
+              tickers.length
+                ? { mode: "tickers", tickers, limit }
+                : {
+                    mode: "discover",
+                    categories,
+                    includeProductMetadata: !hidden.has("product_metadata"),
+                    minUpdatedTs: seriesUpdatedAfter(attributeFilters),
+                    limit,
+                  },
+            );
         const shaped = shape(loaded);
         const matched = shaped.rows.filter((row) => rowMatchesAttributes(row, seriesAttributeColumns, attributeFilters));
         const sorted = sortAttributeRows(matched, seriesAttributeColumns, sortKeys);
@@ -7017,7 +7036,11 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
             rows,
             span: "full",
             table: "series",
-            summary: tickers.length ? `Kalshi Live · Series · ${tickers.join(", ")}` : `Kalshi Live · Series · ${categories.join(", ")}`,
+            summary: tickers.length
+              ? `Kalshi Live · Series · ${tickers.join(", ")}`
+              : categories.length
+                ? `Kalshi Live · Series · ${categories.join(", ")}`
+                : `Kalshi Live · Series · ${rows.length.toLocaleString()} series`,
             attributeLines,
             sortLine: sortSummary(seriesAttributeColumns, sortKeys),
             sourceRows: rows,
@@ -10816,6 +10839,31 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
           )}
         </div>
       </section>
+      {seriesBrowsePrompt ? (
+        <div className="absolute inset-0 z-30 flex items-center justify-center bg-black/40 p-6">
+          <div
+            role="dialog"
+            aria-labelledby="series-browse-title"
+            className="w-full max-w-md rounded-xl border border-border/70 bg-background p-6 shadow-sm"
+          >
+            <h2 id="series-browse-title" className="text-[15px] font-semibold text-foreground">
+              Join markets for every series?
+            </h2>
+            <p className="mt-2 text-[13px] leading-relaxed text-muted-foreground">
+              You haven&apos;t selected a specific series yet. Would you like to join markets for all series in your sheet? Your plan
+              limit allows for {marketCap.toLocaleString()} sheet joins at once.
+            </p>
+            <div className="mt-5 flex items-center justify-end gap-2">
+              <Button type="button" variant="outline" onClick={() => setSeriesBrowsePrompt(false)}>
+                Cancel
+              </Button>
+              <Button type="button" className="bg-[#0d99ff] text-white hover:bg-[#0d99ff]/90" onClick={confirmSeriesBrowse}>
+                Join all series
+              </Button>
+            </div>
+          </div>
+        </div>
+      ) : null}
       {sampleSavePrompt ? (
         <div className="absolute inset-0 z-30 flex items-center justify-center bg-black/40 p-6">
           <div

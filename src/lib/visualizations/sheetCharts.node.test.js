@@ -131,6 +131,39 @@ const kalshiSeries = describeSheet({
 assert.equal(hasVisualTable(kalshiSeries), false);
 assert.equal(resolveVisualization(kalshiSeries, { columnIds: ["ticker", "title"] }).view, "overview");
 
+const kalshiLiveSeriesSheet = {
+  type: "sheet",
+  title: "Series",
+  table: "series",
+  integrationId: "kalshiLive",
+  columns: ["ticker", "title", "category", "frequency", "volume_fp"].map((id) => ({ id })),
+  records: [
+    { ticker: "KXFED", title: "Fed rate", category: "Economics", frequency: "custom", volume_fp: 6020587 },
+    { ticker: "KXMLB", title: "MLB game", category: "Sports", frequency: "daily", volume_fp: 3431369 },
+    { ticker: "KXNEW", title: "New series", category: "Politics", frequency: "one_off", volume_fp: 0 },
+  ],
+};
+const kalshiLiveSeries = describeSheet(kalshiLiveSeriesSheet);
+assert.equal(kalshiLiveSeries.fields.value, "volume_fp");
+assert.equal(kalshiLiveSeries.units.volume, "contracts");
+assert.equal(volumeLabel(kalshiLiveSeries), "Volume");
+assert.equal(formatVolume(6020587, kalshiLiveSeries), "6M");
+assert.equal(hasVisualTable(kalshiLiveSeries), true);
+assert.equal(visualPresentationLabel(kalshiLiveSeries), "Rich Table");
+assert.deepEqual(chartSpecsForSheet(kalshiLiveSeriesSheet).map((chart) => chart.chartView), ["treemap"]);
+assert.deepEqual(
+  volumeTreemapModel(kalshiLiveSeriesSheet, kalshiLiveSeries).tiles.map((tile) => [tile.label, tile.value]),
+  [["Fed rate", 6020587], ["MLB game", 3431369], ["New series", 0]],
+);
+const savedKalshiSeries = {
+  ...kalshiLiveSeriesSheet,
+  dataset: { datasetType: "series", sourceTable: "series", fields: { market: "ticker", label: "title", category: "category" }, seriesKeys: ["ticker"], required: ["ticker"] },
+};
+assert.equal(describeSheet(savedKalshiSeries).fields.value, "volume_fp");
+assert.deepEqual(chartSpecsForSheet(savedKalshiSeries).map((chart) => chart.chartView), ["treemap"]);
+const oneKalshiSeries = { ...kalshiLiveSeriesSheet, records: [kalshiLiveSeriesSheet.records[0]] };
+assert.equal(resolveVisualization(describeSheet(oneKalshiSeries), { columnIds: ["ticker", "title", "volume_fp"] }).view, "overview");
+
 const marketPrices = {
   type: "sheet",
   title: "Market Price",

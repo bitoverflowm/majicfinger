@@ -136,7 +136,8 @@ const ENDPOINTS = {
     datasetType: "series",
     shape: "records",
     seriesKeys: ["ticker"],
-    fields: { market: "ticker", label: "title", category: "category" },
+    units: { quantity: "contracts", volume: "contracts" },
+    fields: { market: "ticker", label: "title", category: "category", value: "volume_fp" },
     required: ["ticker"],
   }),
   "kalshi:leaderboard": spec({
@@ -578,9 +579,16 @@ export function countSeries(sheet, keys) {
 export function describeSheet(sheet) {
   if (!sheet || sheet.type === "chart") return null;
   const table = String(sheet.table || sheet.pull?.table || "").trim();
-  const template = templateForEndpoint(table, sheet.integrationId || sheet.provenance?.integrationId);
+  const integrationId = sheet.integrationId || sheet.provenance?.integrationId;
+  const template = templateForEndpoint(table, integrationId);
+  const ids = columnIds(sheet);
+  // A Kalshi series list without its volume column has nothing to size tiles or rank rows by.
+  if (template?.datasetType === "series" && familyOf(integrationId) === "kalshi" && ids.size && !ids.has(template.fields.value)) {
+    delete template.fields.value;
+  }
   const stamped = sheet.dataset;
-  if (stamped && TYPE_SET.has(stamped.datasetType) && stamped.sourceTable && descriptorFitsSheet(sheet, stamped)) {
+  const outdated = Boolean(template?.fields.value && !stamped?.fields?.value && stamped?.datasetType === template.datasetType);
+  if (stamped && TYPE_SET.has(stamped.datasetType) && stamped.sourceTable && !outdated && descriptorFitsSheet(sheet, stamped)) {
     return {
       ...stamped,
       units: { ...PROBABILITY, ...(template?.units || {}), ...(stamped.units || {}) },

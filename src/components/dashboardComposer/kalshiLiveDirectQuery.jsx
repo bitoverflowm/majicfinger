@@ -7,7 +7,7 @@ import { isKalshiLiveTraderTable } from "@/components/dashboardComposer/kalshiLi
  * Query controls for a Kalshi Live market endpoint pulled on its own.
  * The markets join stays on the Markets endpoint.
  * Series is one search: tickers hit the series endpoint, and a category with no tickers discovers.
- * Trades, candlesticks, and the order book keep their date range, period, and depth in attributes.
+ * Trades and candlesticks take a date range (and candles a period). The order book is a live snapshot with only a depth.
  */
 export function KalshiLiveDirectQuery({ tableId, picks, onAdd, onRemove, required = false }) {
   if (isKalshiLiveTraderTable(tableId)) return null;

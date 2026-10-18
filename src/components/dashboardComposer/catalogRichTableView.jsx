@@ -45,7 +45,7 @@ function catalogRows(records, dataset, daily) {
     return {
       title,
       icon: /^https?:\/\//i.test(icon) ? icon : "",
-      status: catalogStatus(record, fields),
+      status: fields.category && !fields.status ? text(record, fields.category) : catalogStatus(record, fields),
       volume24hr: daily
         ? parseVisualNumber(record[fields.value]) ?? parseVisualNumber(record.volume24hr) ?? parseVisualNumber(record["series:volume24hr"])
         : null,
@@ -96,12 +96,15 @@ export function CatalogRichTableView({ sheet, dataset, hidden = [], readOnly = f
   const rows = catalogRows(sheetRecords(sheet), dataset, daily);
   const openInterest = /^open_interest/.test(String(dataset?.fields?.depth || ""));
   const contracts = volumeInContracts(dataset);
+  const byCategory = Boolean(dataset?.fields?.category && !dataset?.fields?.status);
   const columns = [
     { id: "title", label: noun, align: "left" },
-    { id: "status", label: "Status", align: "left" },
+    { id: "status", label: byCategory ? "Category" : "Status", align: "left" },
     ...(daily ? [{ id: "volume24hr", label: "24h volume", align: "right" }] : []),
     { id: "volume", label: contracts ? "Contracts" : "Volume", align: "right" },
-    { id: "liquidity", label: openInterest ? "Open interest" : "Liquidity", align: "right" },
+    ...(rows.some((row) => row.liquidity != null)
+      ? [{ id: "liquidity", label: openInterest ? "Open interest" : "Liquidity", align: "right" }]
+      : []),
   ].filter((column) => !hiddenIds.has(column.id));
   if (!rows.length) {
     return <p className="px-3 text-[12px] text-muted-foreground">This list has nothing to show yet.</p>;

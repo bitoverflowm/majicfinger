@@ -226,6 +226,18 @@ function marketHitFromSuggestion(item) {
   };
 }
 
+/** The series a market search hit belongs to. Short words never reach the embedding search, so this is how they find a series. */
+function seriesHitFromMarketSuggestion(item) {
+  const ticker = inferSeriesTickerFromEvent(String(item?.eventTicker || item?.ticker || ""));
+  if (!ticker) return null;
+  return {
+    kind: "series",
+    ticker,
+    title: String(item?.title || ticker).trim() || ticker,
+    markets: [],
+  };
+}
+
 const inputClassName =
   "flex h-9 w-full rounded-md border border-input bg-background py-2 pl-9 pr-3 text-xs text-foreground shadow-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2";
 
@@ -375,6 +387,8 @@ export function KalshiLiveMarketPicker({ picks, onAdd, onRemove, intent = "marke
       try {
         const marketHits = [];
         const seriesHits = [];
+        const marketSeriesHits = [];
+        const wantsSeries = intent === "series" || intent === "forecast";
         let nextCursor = "";
         let hasMore = false;
         const tasks = [
@@ -389,6 +403,8 @@ export function KalshiLiveMarketPicker({ picks, onAdd, onRemove, intent = "marke
             for (const item of list) {
               const hit = marketHitFromSuggestion(item);
               if (hit) marketHits.push(hit);
+              const series = wantsSeries ? seriesHitFromMarketSuggestion(item) : null;
+              if (series) marketSeriesHits.push(series);
             }
             nextCursor = String(data?.cursor || "").trim();
             hasMore = !!data?.hasMore && !!nextCursor;
@@ -441,7 +457,7 @@ export function KalshiLiveMarketPicker({ picks, onAdd, onRemove, intent = "marke
         await Promise.allSettled(tasks);
         if (mySeq !== seq.current || ac.signal.aborted) return;
         pageRef.current = { term, cursor: nextCursor, hasMore, loading: false };
-        setSuggestions(mergeSearchSuggestions(marketHits, seriesHits, term));
+        setSuggestions(mergeSearchSuggestions(marketHits, [...seriesHits, ...marketSeriesHits], term));
       } catch (err) {
         if (err instanceof DOMException && err.name === "AbortError") return;
         if (mySeq !== seq.current) return;
@@ -455,7 +471,7 @@ export function KalshiLiveMarketPicker({ picks, onAdd, onRemove, intent = "marke
       window.clearTimeout(timer);
       ac.abort();
     };
-  }, [query]);
+  }, [query, intent]);
 
   const loadMoreMarkets = useCallback(async () => {
     const page = pageRef.current;
