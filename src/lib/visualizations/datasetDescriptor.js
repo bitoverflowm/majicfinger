@@ -151,12 +151,48 @@ const ENDPOINTS = {
     required: ["nickname", "value"],
   }),
   "kalshi:trades_by_holder": spec({
-    datasetType: "holder_trades",
+    datasetType: "trader_activity",
     shape: "records",
-    seriesKeys: ["ticker"],
-    priceBasis: "trade",
-    fields: { market: "ticker", label: "nickname", time: "created_time", price: "yes_price", size: "count_fp", side: "taker_side" },
-    required: ["yes_price"],
+    seriesKeys: [],
+    units: { metric: "usdc", quantity: "contracts" },
+    fields: {
+      time: "create_date",
+      type: "activity_type",
+      label: "ticker",
+      outcome: "trader_side",
+      side: "trader_action",
+      size: "count_fp",
+      value: "notional",
+      price: "trader_price",
+      name: "trader_nickname",
+    },
+    required: ["create_date", "activity_type"],
+  }),
+  "kalshi:holder_positions": spec({
+    datasetType: "trader_positions",
+    category: "portfolio",
+    shape: "ranking",
+    seriesKeys: ["market_ticker", "side"],
+    units: { metric: "usd", quantity: "contracts", value: "contracts" },
+    fields: {
+      label: "market_ticker",
+      outcome: "side",
+      status: "status",
+      size: "position",
+      value: "position",
+      pnl: "pnl",
+      name: "nickname",
+    },
+    required: ["market_ticker", "position"],
+  }),
+  "kalshi:holder_profile": spec({
+    datasetType: "leaderboard",
+    category: "stats",
+    shape: "ranking",
+    seriesKeys: ["nickname"],
+    units: { metric: "usdc" },
+    fields: { label: "nickname", wallet: "social_id", value: "pnl", volume: "dollars_traded" },
+    required: ["nickname"],
   }),
   "polymarket:getBatchPricesHistory": spec({
     datasetType: "price_history",
@@ -587,6 +623,11 @@ export function describeSheet(sheet) {
   const catalog = template?.datasetType === "series" || template?.datasetType === "events";
   if (catalog && familyOf(integrationId) === "kalshi" && ids.size && !ids.has(template.fields.value)) {
     delete template.fields.value;
+  }
+  // Kalshi ranks PnL and dollars traded in dollars; volume and markets traded are counts.
+  if (template?.units?.metric === "rank_metric") {
+    const metric = String(sheet.pull?.metric || sheetRecords(sheet)[0]?.metric_name || "").trim();
+    if (metric === "projected_pnl" || metric === "dollars_traded") template.units.metric = "usdc";
   }
   const stamped = sheet.dataset;
   const outdated = Boolean(template?.fields.value && !stamped?.fields?.value && stamped?.datasetType === template.datasetType);

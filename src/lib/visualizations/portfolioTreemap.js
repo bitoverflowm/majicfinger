@@ -60,12 +60,18 @@ export function pnlFill(pnl, cap, palette) {
 /**
  * @param {{ pnl: number | null }[]} zeros
  */
-export function zeroValueSummary(zeros) {
+export function zeroValueSummary(zeros, { contracts = false } = {}) {
   const list = zeros || [];
   if (!list.length) return "";
   const sum = list.reduce((total, item) => total + (Number.isFinite(item.pnl) ? item.pnl : 0), 0);
   const noun = list.length === 1 ? "position" : "positions";
+  if (contracts) return `${list.length} ${noun} with no contracts · ${formatPnl4(sum)} USD P&L`;
   return `${list.length} zero-value ${noun} · ${formatPnl4(sum)} USDC unrealized P&L`;
+}
+
+/** Kalshi holdings size tiles by contracts held; they carry no current dollar value. */
+export function positionsSizedByContracts(dataset) {
+  return dataset?.units?.value === "contracts";
 }
 
 /**
@@ -99,6 +105,6 @@ export function positionTreemapModel(sheet, dataset) {
     tiles,
     zeros,
     cap: pnlColorCap(tiles),
-    summary: zeroValueSummary(zeros),
+    summary: zeroValueSummary(zeros, { contracts: positionsSizedByContracts(dataset) }),
   };
 }

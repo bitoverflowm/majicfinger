@@ -810,9 +810,14 @@ export function PolymarketFanoutJoinExplainer({ title = "This pull" }) {
 }
 
 /** Hover illustration for a leaderboard or trader search. */
-export function TraderJoinExplainerTabs({ title = "Leaderboard" }) {
+const DEFAULT_TRADER_JOINS = [
+  { id: "profile", title: "Profile", detail: "Public profile for each trader" },
+  { id: "trades", title: "Trades", detail: "Public trades for each trader" },
+];
+
+export function TraderJoinExplainerTabs({ title = "Leaderboard", joins = DEFAULT_TRADER_JOINS }) {
   const reduce = useReducedMotion();
-  const tabs = [title, "Profile", "Trades"];
+  const tabs = [title, ...joins.map((item) => item.title)];
   return (
     <div className="overflow-hidden px-4 pb-1 pt-4">
       <div className="flex">
@@ -918,7 +923,9 @@ export function PolymarketTraderJoinExplainer({ title = "This pull", joins = [] 
 }
 
 /** A nickname list can open each trader's profile and their public trades. */
-export function TraderJoinExplainer({ title = "Leaderboard" }) {
+export function TraderJoinExplainer({ title = "Leaderboard", joins = DEFAULT_TRADER_JOINS }) {
+  const names = joins.map((item) => item.title.toLowerCase());
+  const phrase = names.length > 1 ? `${names.slice(0, -1).join(", ")} or ${names[names.length - 1]}` : names[0] || "profile";
   const style = venueStyle("kalshi");
   return (
     <div className="relative flex h-full min-h-[280px] items-center justify-center overflow-hidden rounded-xl border border-border/70 bg-background shadow-sm">
@@ -932,13 +939,14 @@ export function TraderJoinExplainer({ title = "Leaderboard" }) {
       />
       <div className="relative z-10 flex w-full max-w-md flex-col gap-4 px-6 py-6">
         <p className="text-center text-[13px] leading-relaxed text-muted-foreground">
-          From this {title.toLowerCase()}, open each trader&apos;s profile or their public trades.
+          From this {title.toLowerCase()}, open each trader&apos;s {phrase}.
         </p>
         <div className="flex flex-col gap-2">
           <RouteChip label={title} hint="Traders in this list" delay={0.05} accent={style.accent} active />
           <div className="ml-3 flex flex-col gap-2 border-l border-border/70 pl-3">
-            <RouteChip label="Profile" hint="Public profile for each trader" delay={0.2} accent={style.accent} />
-            <RouteChip label="Trades" hint="Public trades for each trader" delay={0.34} accent={style.accent} />
+            {joins.map((item, index) => (
+              <RouteChip key={item.id} label={item.title} hint={item.detail} delay={0.2 + index * 0.14} accent={style.accent} />
+            ))}
           </div>
         </div>
       </div>

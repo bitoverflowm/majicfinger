@@ -151,7 +151,7 @@ function buildPositionLog(records, dataset) {
       const title = text(record, fields.label, "title");
       const outcome = text(record, fields.outcome, "outcome");
       const icon = text(record, fields.icon, "icon");
-      const trader = text(record, "name");
+      const trader = text(record, fields.name, "name");
       return {
         market: title || outcome || "Position",
         outcome: title && outcome && outcome.toLowerCase() !== title.toLowerCase() ? outcome : "",
@@ -168,14 +168,15 @@ function buildPositionLog(records, dataset) {
   const maxValue = Math.max(1, ...rows.map((row) => Math.abs(row.value || 0)));
   const maxPnl = Math.max(1, ...rows.map((row) => Math.abs(row.pnl || 0)));
   const names = [...new Set(rows.map((row) => row.trader).filter(Boolean))];
+  const contracts = dataset?.units?.value === "contracts";
   return {
     caption: names.length === 1 ? [names[0]] : [],
     columns: [
       { id: "position", label: "Position" },
       rows.some((row) => row.status) ? { id: "status", label: "Status" } : null,
-      rows.some((row) => row.size != null) ? { id: "size", label: "Size" } : null,
-      rows.some((row) => row.value != null) ? { id: "value", label: "Value" } : null,
-      rows.some((row) => row.pnl != null) ? { id: "unrealized", label: "Unrealized" } : null,
+      rows.some((row) => row.size != null) ? { id: "size", label: contracts ? "Contracts" : "Size" } : null,
+      !contracts && rows.some((row) => row.value != null) ? { id: "value", label: "Value" } : null,
+      rows.some((row) => row.pnl != null) ? { id: "unrealized", label: contracts ? "P&L" : "Unrealized" } : null,
     ].filter(Boolean),
     rows: rows.map((row) => ({
       ...row,

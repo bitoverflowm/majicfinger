@@ -16,6 +16,7 @@ export const PULL_KIND_FLAGS = {
   orderbook: { orderbook: true },
   leaderboard: { traders: true },
   holder_profile: { traders: true },
+  holder_positions: { traders: true },
   trades_by_holder: { traders: true },
   search_traders: { traders: true },
 };

@@ -11,8 +11,11 @@ import {
   directMarketTickers,
   directPullWindow,
   directSeriesTickers,
+  eventCandleSheetMarkets,
   eventClosesAfter,
   eventDiscoveryStatuses,
+  eventForecastable,
+  fitForecastWindow,
   eventSeriesTickers,
   isKalshiLiveDirectTable,
   kalshiLiveDirectAttributeColumns,
@@ -23,6 +26,13 @@ import {
   leaderboardMetric,
   traderNicknamesFromRows,
   traderSearchQuery,
+  holderPositionStatus,
+  kalshiTraderJoinChoices,
+  kalshiTraderJoinPullSpec,
+  kalshiTraderJoinSheetTitle,
+  kalshiTraderPullSpec,
+  kalshiTraderTableNamesMarkets,
+  traderMarketTickersFromRows,
   seriesDiscoveryCategories,
   seriesUpdatedAfter,
   forecastPercentileValues,
@@ -66,6 +76,55 @@ assert.equal(kalshiLiveDirectScopeError("holder_profile", [], {}, {}), "Add a tr
 assert.equal(leaderboardMetric({}), "projected_pnl");
 assert.equal(traderSearchQuery({ nickname_query: { containsTags: ["ada"] } }), "ada");
 assert.deepEqual(traderNicknamesFromRows([{ nickname: "Ada" }, { nickname: "ada" }, { nickname: "Bea" }], 2), ["Ada", "Bea"]);
+assert.deepEqual(
+  traderNicknamesFromRows([{ trader_nickname: "Cy" }, { taker_nickname: "", maker_nickname: "Di" }, { taker_nickname: "" }]),
+  ["Cy", "Di"],
+);
+assert.equal(isKalshiLiveDirectTable("holder_positions"), true);
+assert.equal(kalshiLiveDirectScopeError("holder_positions", [], {}, {}), "Add a trader nickname.");
+assert.equal(kalshiLiveDirectScopeError("holder_positions", [], {}, { nicknames: { containsTags: ["Ada"] } }), "");
+assert.deepEqual(kalshiTraderJoinChoices("leaderboard").map((item) => item.id), ["profile", "positions", "trades"]);
+assert.deepEqual(kalshiTraderJoinChoices("holder_profile").map((item) => item.id), ["positions", "trades"]);
+assert.deepEqual(kalshiTraderJoinChoices("holder_positions").map((item) => item.id), ["profile", "trades"]);
+assert.deepEqual(kalshiTraderJoinChoices("trades_by_holder").map((item) => item.id), ["profile", "positions"]);
+assert.deepEqual(kalshiTraderJoinChoices("markets"), []);
+assert.equal(kalshiTraderTableNamesMarkets("holder_positions"), true);
+assert.equal(kalshiTraderTableNamesMarkets("leaderboard"), false);
+assert.deepEqual(
+  traderMarketTickersFromRows([{ market_ticker: "A" }, { ticker: "B" }, { market_ticker: "A" }, { market_ticker: "" }, { ticker: "C" }], 2),
+  ["A", "B"],
+);
+assert.equal(kalshiTraderJoinSheetTitle("positions", "Ada"), "Ada's positions");
+assert.equal(kalshiTraderJoinSheetTitle("trades", "Ada"), "Ada's trades");
+assert.equal(holderPositionStatus({}), "open");
+assert.equal(holderPositionStatus({ position_status: { value: "all" } }), "all");
+assert.deepEqual(kalshiTraderJoinPullSpec("positions", "Ada"), { table: "holder_positions", nicknames: ["Ada"], status: "open" });
+assert.deepEqual(
+  kalshiTraderPullSpec("trades_by_holder", {
+    nickname: { containsTags: ["Ada"] },
+    series_ticker: { containsTags: ["kxfed", "KXCPI"] },
+    market_ticker: { containsTags: ["kxfed-26dec-t4.00"] },
+    min_amount: { min: "10" },
+  }),
+  {
+    table: "trades_by_holder",
+    nicknames: ["Ada"],
+    seriesTickers: ["KXFED", "KXCPI"],
+    eventTickers: [],
+    marketTickers: ["KXFED-26DEC-T4.00"],
+    minAmount: 10,
+  },
+);
+assert.deepEqual(kalshiTraderPullSpec("holder_profile", { nicknames: { containsTags: ["Ada"] }, time_period: { value: "yearly" } }), {
+  table: "holder_profile",
+  nicknames: ["Ada"],
+  timePeriod: "yearly",
+});
+assert.deepEqual(
+  kalshiLiveTraderAttributeColumns("holder_positions", [{ id: "nickname" }, { id: "status" }, { id: "pnl" }]).map((column) => column.id),
+  ["nicknames", "position_status", "pnl"],
+);
+assert.ok(kalshiLiveTraderAttributeColumns("trades_by_holder", []).some((column) => column.id === "market_ticker"));
 const boardAttributes = kalshiLiveTraderAttributeColumns("leaderboard", [
   { id: "rank", type: "number", title: "Rank" },
   { id: "metric_name", type: "text", title: "Rank order" },
@@ -179,7 +238,7 @@ assert.equal(defaultJoinWindowFilters("trades").time_range.preset, "market-life"
 assert.equal(defaultJoinWindowFilters("candlesticks").period_interval.value, "60");
 assert.deepEqual(defaultJoinWindowFilters("orderbook"), { depth: { value: "20" } });
 assert.equal(kalshiLiveDirectAttributeColumns("trades", [])[0].lifeWindows, true);
-assert.equal(kalshiLiveDirectAttributeColumns("event_candlesticks", [])[0].lifeWindows, undefined);
+assert.equal(kalshiLiveDirectAttributeColumns("event_candlesticks", [])[0].lifeWindows, true);
 assert.equal(seeded.period_interval.value, "60");
 const windowed = directPullWindow("candlesticks", seeded, query);
 assert.equal(windowed.period, 60);
@@ -261,6 +320,39 @@ const eventCandleAttributes = kalshiLiveDirectAttributeColumns("event_candlestic
 ]);
 assert.deepEqual(eventCandleAttributes.slice(0, 2).map((column) => column.id), ["time_range", "period_interval"]);
 assert.equal(eventCandleAttributes[1].queryOnly, true);
+assert.equal(defaultDirectAttributeFilters("event_candlesticks", new Date("2026-10-06T12:00:00Z")).time_range.preset, "life-last-day");
+assert.deepEqual(
+  eventCandleSheetMarkets(
+    [
+      { ticker: "EV-C", rows: [{ end_period_ts: 1 }] },
+      { ticker: "EV-EMPTY", rows: [] },
+      { ticker: "EV-EXTRA", rows: [{ end_period_ts: 1 }] },
+      { ticker: "EV-A", rows: [{ end_period_ts: 1 }] },
+    ],
+    [{ ticker: "EV-A" }, { ticker: "EV-B" }, { ticker: "EV-C" }, { ticker: "EV-EMPTY" }],
+  ).map((market) => market.ticker),
+  ["EV-A", "EV-C", "EV-EXTRA"],
+);
+assert.deepEqual(eventCandleSheetMarkets(null, null), []);
+
+assert.equal(defaultJoinWindowFilters("event_forecast").time_range.preset, "life-last-week");
+assert.equal(defaultJoinWindowFilters("event_forecast").period_interval.value, "60");
+assert.equal(eventForecastable([{ strike_type: "less", cap_strike: 72 }]), true);
+assert.equal(eventForecastable([{ strike_type: "greater", floor_strike: 0 }]), true);
+assert.equal(eventForecastable([{ strike_type: "structured", floor_strike: null, cap_strike: "" }]), false);
+assert.equal(eventForecastable([{ strike_type: "" }]), false);
+assert.equal(eventForecastable([]), true);
+const forecastNow = Date.UTC(2026, 9, 18, 12) / 1000;
+assert.deepEqual(fitForecastWindow({ minTs: forecastNow - 3600 * 10, maxTs: forecastNow + 86400, period: 60 }, forecastNow * 1000), {
+  minTs: forecastNow - 3600 * 10,
+  maxTs: forecastNow,
+  period: 60,
+});
+assert.equal(fitForecastWindow({ minTs: 0, maxTs: forecastNow, period: 60 }, forecastNow * 1000).minTs, forecastNow - 3600 * 4999);
+assert.equal(fitForecastWindow({ minTs: 0, maxTs: forecastNow, period: 0 }, forecastNow * 1000).minTs, forecastNow - 5 * 4999);
+assert.equal(fitForecastWindow({ maxTs: forecastNow, period: 1440 }, forecastNow * 1000).minTs, forecastNow - 86400);
+assert.equal(fitForecastWindow({ minTs: forecastNow + 10, maxTs: forecastNow + 20, period: 60 }, forecastNow * 1000).empty, true);
+assert.deepEqual(fitForecastWindow({ empty: true }), { empty: true });
 
 const multivariateAttributes = kalshiLiveMultivariateAttributeColumns([
   { id: "event_ticker", title: "Event ticker" },

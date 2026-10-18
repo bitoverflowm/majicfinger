@@ -38,7 +38,7 @@ export function VolumeTreemap({ sheet, dataset, onOpenRow }) {
   const [hover, setHover] = useState(null);
   const model = useMemo(() => volumeTreemapModel(sheet, dataset), [dataset, sheet]);
   const noun = dataset?.datasetType === "events" ? "events" : dataset?.datasetType === "series" ? "series" : "markets";
-  const measure = volumeLabel(dataset);
+  const measure = model.basis === "total" ? "Volume" : volumeLabel(dataset);
   const daily = measure === "24h volume";
 
   useEffect(() => {

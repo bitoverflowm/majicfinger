@@ -47,7 +47,51 @@ export const KALSHI_LIVE_HOLDER_PROFILE_COLUMNS = [
     description: "Viewer relationship to the profile's inner circle",
     label: "inner circle status",
   },
+  { name: "pnl", type: "number", description: "Shared profit and loss, in dollars", label: "pnl" },
+  { name: "dollars_traded", type: "number", description: "Shared dollar volume traded", label: "dollars traded" },
+  { name: "volume", type: "number", description: "Contracts traded" },
+  { name: "open_interest", type: "number", description: "Contracts currently held", label: "open interest" },
+  { name: "num_markets_traded", type: "int", description: "Number of markets traded", label: "markets traded" },
+  { name: "metrics_period", type: "string", description: "Period the metrics cover (all_time / yearly)", label: "metrics period" },
+  {
+    name: "positions_visibility",
+    type: "string",
+    description: "Whether this trader shares their positions (visible / hidden)",
+    label: "positions visibility",
+  },
 ];
+
+/** Kalshi metrics report pnl and dollars traded in ten-thousandths of a dollar. */
+export const KALSHI_LIVE_METRIC_DOLLAR_SCALE = 10000;
+
+/** Periods the profile metrics endpoint answers. Shorter periods come back as zeros. */
+export const KALSHI_LIVE_PROFILE_METRIC_PERIODS = ["all_time", "yearly"];
+
+/**
+ * @param {Record<string, unknown> | null | undefined} payload GET /social/profile/metrics
+ * @param {string} [period]
+ */
+export function kalshiLiveProfileMetricFields(payload, period = "all_time") {
+  const metrics = payload?.metrics && typeof payload.metrics === "object" ? payload.metrics : {};
+  const num = (v) => {
+    if (v == null || v === "") return null;
+    const n = Number(v);
+    return Number.isFinite(n) ? n : null;
+  };
+  const dollars = (v) => {
+    const n = num(v);
+    return n == null ? null : Math.round((n / KALSHI_LIVE_METRIC_DOLLAR_SCALE) * 100) / 100;
+  };
+  const markets = num(metrics.num_markets_traded);
+  return {
+    pnl: dollars(metrics.pnl),
+    dollars_traded: dollars(metrics.dollars_traded),
+    volume: num(metrics.volume_fp) ?? num(metrics.volume),
+    open_interest: num(metrics.open_interest_fp) ?? num(metrics.open_interest),
+    num_markets_traded: markets == null ? null : Math.floor(markets),
+    metrics_period: payload ? String(period || "all_time") : "",
+  };
+}
 
 /** @param {KalshiLiveHolderProfileColumn | string} col */
 export function getKalshiLiveHolderProfileColumnLabel(col) {

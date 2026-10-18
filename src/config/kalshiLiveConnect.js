@@ -18,6 +18,7 @@ import {
   getKalshiLiveHolderTradesColumnLabel,
   KALSHI_LIVE_HOLDER_TRADES_COLUMNS,
 } from "@/lib/kalshiLive/holderTradesColumns";
+import { KALSHI_LIVE_HOLDER_POSITIONS_COLUMNS } from "@/lib/kalshiLive/holderPositionsColumns";
 import {
   getKalshiLiveSearchTradersColumnLabel,
   getKalshiLiveSearchTradersColumns,
@@ -171,7 +172,16 @@ export const KALSHI_LIVE_CONNECT_ENDPOINTS = [
     title: "Trader Profile",
     selectedTitle: "Get Trader Profile",
     description:
-      "Public social profile for a Kalshi nickname — followers, bio, join date, and categories.",
+      "Public social profile for a Kalshi nickname — followers, bio, join date, PnL, dollars traded, and markets traded.",
+  },
+  {
+    id: "holder_positions",
+    category: "holders",
+    title: "Trader Positions",
+    selectedTitle: "Get Trader Positions",
+    composerOnly: true,
+    description:
+      "Open or closed positions for one or more nicknames — market, side, contracts, and PnL. Most Kalshi traders keep positions hidden.",
   },
   {
     id: "trades_by_holder",
@@ -179,14 +189,14 @@ export const KALSHI_LIVE_CONNECT_ENDPOINTS = [
     title: "Trades by Trader",
     selectedTitle: "Get Trades by Trader",
     description:
-      "Public social trade activity — optionally filter by nickname, series, event, or minimum amount.",
+      "Public social trade activity — optionally filter by nickname, series, event, market, or minimum amount.",
   },
 ];
 
 /** @param {string} categoryId */
 export function getKalshiLiveEndpointsForCategory(categoryId) {
   const cat = String(categoryId || KALSHI_LIVE_DEFAULT_ENDPOINT_CATEGORY).trim();
-  return KALSHI_LIVE_CONNECT_ENDPOINTS.filter((ep) => (ep.category || "markets") === cat);
+  return KALSHI_LIVE_CONNECT_ENDPOINTS.filter((ep) => !ep.composerOnly && (ep.category || "markets") === cat);
 }
 
 /** Endpoint ids that are visible but not selectable yet. */
@@ -212,6 +222,7 @@ export function getKalshiLiveColumnsForEndpoint(endpointId, opts = {}) {
   if (endpointId === "leaderboard") return KALSHI_LIVE_LEADERBOARD_COLUMNS;
   if (endpointId === "holder_profile") return KALSHI_LIVE_HOLDER_PROFILE_COLUMNS;
   if (endpointId === "trades_by_holder") return KALSHI_LIVE_HOLDER_TRADES_COLUMNS;
+  if (endpointId === "holder_positions") return KALSHI_LIVE_HOLDER_POSITIONS_COLUMNS;
   if (endpointId === "search_traders") {
     return getKalshiLiveSearchTradersColumns({
       includeMetrics: !!opts.includeMetrics,
@@ -255,6 +266,7 @@ export function getKalshiLiveColumnDisplayLabelForEndpoint(endpointId, col, opts
   if (endpointId === "leaderboard") return getKalshiLiveLeaderboardColumnLabel(col);
   if (endpointId === "holder_profile") return getKalshiLiveHolderProfileColumnLabel(col);
   if (endpointId === "trades_by_holder") return getKalshiLiveHolderTradesColumnLabel(col);
+  if (endpointId === "holder_positions") return getKalshiLiveHolderTradesColumnLabel(col);
   if (endpointId === "search_traders") return getKalshiLiveSearchTradersColumnLabel(col);
   if (endpointId === "trades") return getKalshiLiveTradeColumnLabel(col);
   if (endpointId === "orderbook") return getKalshiLiveOrderbookColumnLabel(col);

@@ -13,7 +13,7 @@ import {
   normalizeForecastApiPercentiles,
 } from "@/lib/kalshiLive/eventForecastColumns";
 
-export const KALSHI_LIVE_TRADER_TABLES = ["leaderboard", "holder_profile", "trades_by_holder", "search_traders"];
+export const KALSHI_LIVE_TRADER_TABLES = ["leaderboard", "holder_profile", "holder_positions", "trades_by_holder", "search_traders"];
 
 export const KALSHI_LIVE_DIRECT_TABLES = ["series", "events", "event_forecast", "event_candlesticks", "multivariate_events", "candlesticks", "trades", "orderbook", ...KALSHI_LIVE_TRADER_TABLES];
 
@@ -331,11 +331,117 @@ export function holderTradeNicknames(filters) {
 }
 
 export function holderTradeSeries(filters) {
-  return exactTerms(filters?.series_ticker, { upper: true })[0] || "";
+  return exactTerms(filters?.series_ticker, { upper: true });
 }
 
-export function holderTradeEvent(filters) {
-  return exactTerms(filters?.event_ticker, { upper: true })[0] || "";
+export function holderTradeEvents(filters) {
+  return exactTerms(filters?.event_ticker, { upper: true });
+}
+
+export function holderTradeMarkets(filters) {
+  return exactTerms(filters?.market_ticker, { upper: true });
+}
+
+/** all_time or yearly. Kalshi answers shorter periods with zeros. */
+export function traderMetricPeriod(filters) {
+  return String(filters?.time_period?.value || "") === "yearly" ? "yearly" : "all_time";
+}
+
+export function holderPositionNicknames(filters) {
+  return exactTerms(filters?.nicknames);
+}
+
+export function holderPositionStatus(filters) {
+  const value = String(filters?.position_status?.value || "").trim();
+  return ["open", "closed", "all"].includes(value) ? value : "open";
+}
+
+/**
+ * What a Kalshi trader sheet can join to, in Polymarket's order: profile, positions, trades.
+ * Kalshi shares no PnL history or activity feed, so those joins have no Kalshi version.
+ */
+export const KALSHI_TRADER_JOIN_KINDS = [
+  { id: "profile", title: "Profile", table: "holder_profile", detail: "Followers, join date, PnL, dollars traded, and markets traded for each trader." },
+  { id: "positions", title: "Positions", table: "holder_positions", detail: "Open positions for each trader, one row per market. Most Kalshi traders keep positions hidden." },
+  { id: "trades", title: "Trades", table: "trades_by_holder", detail: "Public trades for each trader, read from their side. Some traders keep trades private." },
+];
+
+const KALSHI_TRADER_JOIN_GRAPH = {
+  leaderboard: ["profile", "positions", "trades"],
+  search_traders: ["profile", "positions", "trades"],
+  holder_profile: ["positions", "trades"],
+  holder_positions: ["profile", "trades"],
+  trades_by_holder: ["profile", "positions"],
+};
+
+export function kalshiTraderJoinChoices(tableId) {
+  const ids = KALSHI_TRADER_JOIN_GRAPH[tableId] || [];
+  return KALSHI_TRADER_JOIN_KINDS.filter((kind) => ids.includes(kind.id));
+}
+
+/** Rows on these sheets name markets, so markets joins can follow. */
+export function kalshiTraderTableNamesMarkets(tableId) {
+  return tableId === "holder_positions" || tableId === "trades_by_holder";
+}
+
+/** Markets named on trader position or trade rows, first seen first. */
+export function traderMarketTickersFromRows(rows, cap = Infinity) {
+  const seen = new Set();
+  const tickers = [];
+  for (const row of rows || []) {
+    const ticker = String(row?.market_ticker || row?.ticker || "").trim();
+    if (!ticker || seen.has(ticker)) continue;
+    seen.add(ticker);
+    tickers.push(ticker);
+    if (tickers.length >= cap) break;
+  }
+  return tickers;
+}
+
+/**
+ * The request a trader sheet makes, without its row limit.
+ * Saved as the sheet's pull so a replay keeps the same filters.
+ */
+export function kalshiTraderPullSpec(tableId, filters) {
+  if (tableId === "leaderboard") {
+    return { table: tableId, metric: leaderboardMetric(filters), timePeriod: leaderboardTimePeriod(filters), categories: leaderboardCategories(filters) };
+  }
+  if (tableId === "search_traders") {
+    return { table: tableId, query: traderSearchQuery(filters), includeMetrics: traderIncludeMetrics(filters), includeHoldings: traderIncludeHoldings(filters) };
+  }
+  if (tableId === "holder_profile") {
+    return { table: tableId, nicknames: traderProfileNicknames(filters), timePeriod: traderMetricPeriod(filters) };
+  }
+  if (tableId === "holder_positions") {
+    return { table: tableId, nicknames: holderPositionNicknames(filters), status: holderPositionStatus(filters) };
+  }
+  if (tableId === "trades_by_holder") {
+    return {
+      table: tableId,
+      nicknames: holderTradeNicknames(filters),
+      seriesTickers: holderTradeSeries(filters),
+      eventTickers: holderTradeEvents(filters),
+      marketTickers: holderTradeMarkets(filters),
+      minAmount: holderTradesMinAmount(filters),
+    };
+  }
+  return { table: tableId };
+}
+
+/** The request one joined trader sheet makes for one nickname. */
+export function kalshiTraderJoinPullSpec(kind, nickname) {
+  const nicknames = [String(nickname || "").trim()].filter(Boolean);
+  if (kind === "profile") return { table: "holder_profile", nicknames, timePeriod: "all_time" };
+  if (kind === "positions") return { table: "holder_positions", nicknames, status: "open" };
+  return { table: "trades_by_holder", nicknames };
+}
+
+/** Polymarket-style sheet title for one trader's joined sheet. */
+export function kalshiTraderJoinSheetTitle(kind, nickname) {
+  const name = String(nickname || "").trim() || "Trader";
+  if (kind === "profile") return `${name}'s profile`;
+  if (kind === "positions") return `${name}'s positions`;
+  return `${name}'s trades`;
 }
 
 export function holderTradesMinAmount(filters) {
@@ -345,12 +451,12 @@ export function holderTradesMinAmount(filters) {
   return Number.isFinite(amount) && amount >= 0 ? amount : null;
 }
 
-/** Nicknames already on a leaderboard or search sheet. */
+/** Nicknames on a trader sheet. Trade rows name the trader, else the public taker or maker. */
 export function traderNicknamesFromRows(rows, cap = Infinity) {
   const seen = new Set();
   const names = [];
   for (const row of rows || []) {
-    const name = String(row?.nickname || "").trim();
+    const name = String(row?.nickname || row?.trader_nickname || row?.taker_nickname || row?.maker_nickname || "").trim();
     const key = name.toLowerCase();
     if (!name || seen.has(key)) continue;
     seen.add(key);
@@ -363,6 +469,17 @@ export function traderNicknamesFromRows(rows, cap = Infinity) {
 const YES_NO = [
   ["true", "Yes"],
   ["false", "No"],
+];
+
+const TRADER_METRIC_PERIODS = [
+  ["all_time", "All time"],
+  ["yearly", "Past year"],
+];
+
+const POSITION_STATUSES = [
+  ["open", "Open"],
+  ["closed", "Closed"],
+  ["all", "Open and closed"],
 ];
 
 /** Query controls first. Rank order, window, and category are the leaderboard. They stay off the attribute filter of the sheet columns. */
@@ -442,7 +559,41 @@ export function kalshiLiveTraderAttributeColumns(tableId, columns) {
         placeholder: "Add a nickname",
         description: "Public display name.",
       },
-      ...list.filter((column) => column.id !== "nickname"),
+      {
+        id: "time_period",
+        title: "Metrics period",
+        type: "text",
+        queryOnly: true,
+        control: "period",
+        ariaLabel: "Metrics period",
+        enumOptions: TRADER_METRIC_PERIODS,
+        description: "Window for PnL, dollars traded, and markets traded. Kalshi shares these for all time and the past year.",
+      },
+      ...list.filter((column) => column.id !== "nickname" && column.id !== "metrics_period"),
+    ];
+  }
+  if (tableId === "holder_positions") {
+    return [
+      {
+        id: "nicknames",
+        title: "Nickname",
+        type: "text",
+        queryOnly: true,
+        exactTickers: true,
+        placeholder: "Add a nickname",
+        description: "Public display name. Most Kalshi traders keep positions hidden.",
+      },
+      {
+        id: "position_status",
+        title: "Positions",
+        type: "text",
+        queryOnly: true,
+        control: "period",
+        ariaLabel: "Positions",
+        enumOptions: POSITION_STATUSES,
+        description: "Open positions, closed ones, or both.",
+      },
+      ...list.filter((column) => column.id !== "nickname" && column.id !== "status"),
     ];
   }
   if (tableId === "trades_by_holder") {
@@ -475,6 +626,15 @@ export function kalshiLiveTraderAttributeColumns(tableId, columns) {
         description: "Trades in this event.",
       },
       {
+        id: "market_ticker",
+        title: "Market ticker",
+        type: "text",
+        queryOnly: true,
+        exactTickers: true,
+        placeholder: "Add a market ticker",
+        description: "Trades in this market.",
+      },
+      {
         id: "min_amount",
         title: "Minimum size",
         type: "number",
@@ -498,6 +658,8 @@ export function defaultDirectAttributeFilters(tableId, now = new Date()) {
   if (tableId === "search_traders") {
     return { include_metrics: { include: ["true"] } };
   }
+  if (tableId === "holder_profile") return { time_period: { value: "all_time" } };
+  if (tableId === "holder_positions") return { position_status: { value: "open" } };
   if (tableId === "event_forecast") {
     const range = dateRangePreset("past-24h", now);
     return {
@@ -509,7 +671,7 @@ export function defaultDirectAttributeFilters(tableId, now = new Date()) {
   if (tableId === "event_candlesticks") {
     const range = dateRangePreset("past-24h", now);
     return {
-      time_range: { from: range?.from || "", to: range?.to || "", preset: "past-24h" },
+      time_range: { from: range?.from || "", to: range?.to || "", preset: "life-last-day" },
       period_interval: { value: "60" },
     };
   }
@@ -529,8 +691,43 @@ export function defaultDirectAttributeFilters(tableId, now = new Date()) {
 /** A join covers many markets, so trades and candles start on each market's whole life. */
 export function defaultJoinWindowFilters(tableId) {
   const filters = defaultDirectAttributeFilters(tableId);
+  if (tableId === "event_forecast") return { ...filters, time_range: { from: "", to: "", preset: "life-last-week" } };
   if (tableId !== "trades" && tableId !== "candlesticks") return filters;
   return { ...filters, time_range: { from: "", to: "", preset: "market-life" } };
+}
+
+const FORECAST_MAX_PERIODS = 5000;
+
+function hasStrike(value) {
+  return value !== null && value !== undefined && value !== "" && Number.isFinite(Number(value));
+}
+
+/**
+ * Kalshi only forecasts events with a numeric outcome, such as a temperature or a rate,
+ * so at least one market needs a floor or cap strike. Unknown markets are left to Kalshi.
+ * @param {Array<Record<string, unknown>>} marketRows
+ */
+export function eventForecastable(marketRows) {
+  const rows = Array.isArray(marketRows) ? marketRows : [];
+  if (!rows.length) return true;
+  return rows.some((row) => hasStrike(row?.floor_strike) || hasStrike(row?.cap_strike));
+}
+
+/**
+ * Kalshi rejects a forecast window longer than 5,000 periods or one that ends in the future,
+ * so the window ends by now and keeps its latest 5,000 periods.
+ * @param {{ minTs?: number, maxTs?: number, period?: number, empty?: boolean } & Record<string, unknown>} window
+ * @param {number} [now]
+ */
+export function fitForecastWindow(window, now = Date.now()) {
+  if (!window || window.empty) return window;
+  const period = Number(window.period);
+  const step = period === 0 ? 5 : (Number.isFinite(period) && period > 0 ? period : 60) * 60;
+  const nowTs = Math.floor(now / 1000);
+  const maxTs = Math.min(Number.isFinite(Number(window.maxTs)) ? Number(window.maxTs) : nowTs, nowTs);
+  const asked = Number.isFinite(Number(window.minTs)) ? Number(window.minTs) : maxTs - 24 * 3600;
+  const minTs = Math.max(asked, maxTs - step * (FORECAST_MAX_PERIODS - 1));
+  return minTs < maxTs ? { ...window, minTs, maxTs } : { ...window, minTs, maxTs, empty: true };
 }
 
 /** Request controls that sit above Columns for a market candlestick pull. */
@@ -715,7 +912,7 @@ export function kalshiLiveDirectAttributeColumns(tableId, columns) {
             type: "date",
             queryOnly: true,
             control: "query-range",
-            ...(tableId === "trades" || tableId === "candlesticks" ? { lifeWindows: true } : {}),
+            ...(tableId === "trades" || tableId === "candlesticks" || tableId === "event_candlesticks" ? { lifeWindows: true } : {}),
             description: tableId === "trades" ? "Start and end of trade data" : "Start and end of candlestick data",
           },
         ];
@@ -757,6 +954,25 @@ export function kalshiLiveDirectAttributeColumns(tableId, columns) {
   return [...query, ...shaped];
 }
 
+/**
+ * One candlestick sheet per market in an event, in the order of the event's market list.
+ * Markets with no candles in the range are left out. Markets Kalshi sent that the list lacks go last.
+ * @param {Array<{ ticker: string, rows: object[] }>} byMarket
+ * @param {Array<Record<string, any>>} [marketRows]
+ */
+export function eventCandleSheetMarkets(byMarket, marketRows = []) {
+  const order = new Map();
+  (marketRows || []).forEach((row, index) => {
+    const ticker = String(row?.ticker || "").trim();
+    if (ticker && !order.has(ticker)) order.set(ticker, index);
+  });
+  return (byMarket || [])
+    .filter((market) => market?.ticker && Array.isArray(market.rows) && market.rows.length)
+    .map((market, index) => ({ market, rank: order.has(market.ticker) ? order.get(market.ticker) : order.size + index }))
+    .sort((a, b) => a.rank - b.rank)
+    .map(({ market }) => market);
+}
+
 /** Unix window, candle period, and book depth read from the attribute filters. */
 export function directPullWindow(tableId, filters, fallback = {}) {
   const range = filters?.time_range || {};
@@ -794,6 +1010,10 @@ export function kalshiLiveDirectScopeError(tableId, picks, _query, filters) {
   }
   if (tableId === "holder_profile") {
     if (traderProfileNicknames(filters).length) return "";
+    return loading ? "" : "Add a trader nickname.";
+  }
+  if (tableId === "holder_positions") {
+    if (holderPositionNicknames(filters).length) return "";
     return loading ? "" : "Add a trader nickname.";
   }
   if (tableId === "events") {

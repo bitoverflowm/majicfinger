@@ -222,6 +222,12 @@ export default async function handler(req, res) {
     }
 
     if (first.retryAfter) res.setHeader("Retry-After", first.retryAfter);
+    if (first.body?.error?.code === "UNSUPPORTED_FORECAST") {
+      return res.status(400).json({
+        code: "UNSUPPORTED_FORECAST",
+        error: "Kalshi has no forecast for this event. Forecasts cover events with a numeric outcome, such as a temperature or a rate.",
+      });
+    }
     const detail = upstreamErrorMessage(first.body);
     return res.status(first.status >= 400 ? first.status : 502).json({
       error: detail || "Kalshi event forecast request failed",

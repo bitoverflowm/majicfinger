@@ -103,27 +103,43 @@ export function catalogRowName(record, fields = {}) {
 /**
  * Tiles for a list of markets or events. Area is 24h volume, then total volume.
  * Markets with no volume yet stay in the list, so a fresh pull still shows every market.
+ * A list with no 24h volume at all, like a closed event, is sized by total volume instead (`basis: "total"`).
  * @param {object | null | undefined} sheet
  * @param {object | null | undefined} dataset
  */
 export function volumeTreemapModel(sheet, dataset) {
   const fields = dataset?.fields || {};
   const records = sheetRecords(sheet);
-  const tiles = [];
-  records.forEach((record, index) => {
-    const volume = parseVisualNumber(record?.[fields.value])
+  const build = (valueOf) => {
+    const tiles = [];
+    records.forEach((record, index) => {
+      const volume = valueOf(record);
+      if (volume == null || volume < 0) return;
+      const label = catalogRowName(record, fields) || "Market";
+      const id = text(record, fields.label);
+      tiles.push({ row: index, label, value: volume, ...(id && id !== label ? { detail: id } : {}) });
+    });
+    tiles.sort((a, b) => b.value - a.value);
+    return tiles;
+  };
+  let tiles = build(
+    (record) =>
+      parseVisualNumber(record?.[fields.value])
       ?? parseVisualNumber(record?.volume24hr)
       ?? parseVisualNumber(record?.["series:volume24hr"])
       ?? parseVisualNumber(record?.volume)
-      ?? parseVisualNumber(record?.["series:volume"]);
-    if (volume == null || volume < 0) return;
-    const label = catalogRowName(record, fields) || "Market";
-    const id = text(record, fields.label);
-    tiles.push({ row: index, label, value: volume, ...(id && id !== label ? { detail: id } : {}) });
-  });
-  tiles.sort((a, b) => b.value - a.value);
+      ?? parseVisualNumber(record?.["series:volume"]),
+  );
+  let basis = "";
+  if (fields.total && fields.total !== fields.value && tiles.length && !tiles.some((tile) => tile.value > 0)) {
+    const totals = build((record) => parseVisualNumber(record?.[fields.total]));
+    if (totals.some((tile) => tile.value > 0)) {
+      tiles = totals;
+      basis = "total";
+    }
+  }
   const max = tiles[0]?.value || 1;
-  return { tiles, max };
+  return { tiles, max, ...(basis ? { basis } : {}) };
 }
 
 /**

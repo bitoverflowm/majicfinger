@@ -441,6 +441,17 @@ assert.deepEqual(kalshiLiveModel.tiles.map((tile) => tile.label), ["70° to 71°
 assert.deepEqual(kalshiLiveModel.tiles.map((tile) => tile.value), [0, 0, 0]);
 assert.equal(kalshiLiveModel.tiles[0].detail, "KXHIGHNY-26OCT17-B70");
 assert.equal(kalshiLiveModel.tiles[2].detail, undefined);
+assert.equal(kalshiLiveModel.basis, undefined);
+const closedEventSheet = {
+  ...kalshiLiveSheet,
+  records: [
+    { ticker: "KXFED-26SEP-T4.00", yes_sub_title: "Above 4.00%", status: "finalized", volume_fp: "1200.00", volume_24h_fp: "0.00" },
+    { ticker: "KXFED-26SEP-T3.75", yes_sub_title: "Above 3.75%", status: "finalized", volume_fp: "4800.00", volume_24h_fp: "0.00" },
+  ],
+};
+const closedEventModel = volumeTreemapModel(closedEventSheet, describeSheet(closedEventSheet));
+assert.equal(closedEventModel.basis, "total");
+assert.deepEqual(closedEventModel.tiles.map((tile) => [tile.label, tile.value]), [["Above 3.75%", 4800], ["Above 4.00%", 1200]]);
 const staleLive = { ...kalshiLiveSheet, dataset: { ...kalshiLiveMarkets, fields: { market: "ticker", label: "title", value: "volume_fp" } } };
 assert.deepEqual(chartSpecsForSheet(staleLive).map((chart) => chart.chartView), ["treemap"]);
 

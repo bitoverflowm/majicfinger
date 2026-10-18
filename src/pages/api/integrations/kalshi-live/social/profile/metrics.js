@@ -21,6 +21,8 @@ export default async function handler(req, res) {
   }
 
   const qs = new URLSearchParams({ nickname });
+  const timePeriod = queryParam(req, "time_period");
+  if (/^(daily|weekly|monthly|yearly|all_time)$/.test(timePeriod)) qs.set("time_period", timePeriod);
   const url = `${kalshiLiveSocialUrl("social/profile/metrics")}?${qs.toString()}`;
 
   try {

@@ -23,6 +23,7 @@ export default async function handler(req, res) {
   const nickname = queryParam(req, "nickname");
   const seriesTicker = queryParam(req, "series_ticker");
   const eventTicker = queryParam(req, "event_ticker");
+  const marketTicker = queryParam(req, "market_ticker");
   const cursor = queryParam(req, "cursor");
   const minAmount = normalizeKalshiLiveHolderTradesMinAmount(queryParam(req, "min_amount"));
   const pageSizeRaw = queryParam(req, "page_size") || queryParam(req, "limit");
@@ -35,6 +36,7 @@ export default async function handler(req, res) {
   if (nickname) qs.set("nickname", nickname);
   if (seriesTicker) qs.set("series_ticker", seriesTicker);
   if (eventTicker) qs.set("event_ticker", eventTicker);
+  if (marketTicker) qs.set("market_ticker", marketTicker);
   if (minAmount != null) qs.set("min_amount", String(minAmount));
   if (cursor) qs.set("cursor", cursor);
 

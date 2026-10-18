@@ -1012,7 +1012,7 @@ function QueryInstantField({ value, bounds, onChange, ariaLabel = "Pick a moment
 }
 
 /** Date range, period, and depth for a trades, order book, or candlestick join. */
-export function JoinSourceFields({ tableId, filters, onChange, bounds = null, perMarket = true }) {
+export function JoinSourceFields({ tableId, filters, onChange, bounds = null, perMarket = true, lifeWindows = false }) {
   const current = filters || {};
   const range = current.time_range || {};
   const setRange = ({ from, to, preset }) => onChange({ ...current, time_range: { from, to, preset: preset || "" } });
@@ -1031,11 +1031,8 @@ export function JoinSourceFields({ tableId, filters, onChange, bounds = null, pe
       </label>
     );
   }
-  if (tableId === "event_candlesticks" || tableId === "event_forecast") {
-    const periodOptions =
-      tableId === "event_forecast"
-        ? KALSHI_LIVE_EVENT_FORECAST_PERIOD_OPTIONS.map((option) => [String(option.value), option.label])
-        : KALSHI_LIVE_CANDLESTICK_PERIOD_OPTIONS.map((option) => [String(option.value), option.label]);
+  if (tableId === "event_forecast") {
+    const periodOptions = KALSHI_LIVE_EVENT_FORECAST_PERIOD_OPTIONS.map((option) => [String(option.value), option.label]);
     const percentileTags = Array.isArray(current.percentiles?.containsTags) ? current.percentiles.containsTags : [];
     const percentileDraft = String(current.percentiles?.contains || "");
     const percentileText = percentileTags.length
@@ -1045,7 +1042,11 @@ export function JoinSourceFields({ tableId, filters, onChange, bounds = null, pe
       <div className="space-y-2">
         <div>
           <p className="mb-1 text-[11px] text-muted-foreground">Date range</p>
-          <DateRangeField from={range.from || ""} to={range.to || ""} presetId={range.preset || ""} onChange={setRange} />
+          {lifeWindows ? (
+            <LifeWindowField range={range} bounds={bounds} perMarket={perMarket} onChange={setRange} />
+          ) : (
+            <DateRangeField from={range.from || ""} to={range.to || ""} presetId={range.preset || ""} onChange={setRange} />
+          )}
         </div>
         <label className="block text-[11px] text-muted-foreground">
           Period
@@ -1087,7 +1088,9 @@ export function JoinSourceFields({ tableId, filters, onChange, bounds = null, pe
       </div>
     );
   }
-  if (tableId !== "trades" && tableId !== "candlesticks") return null;
+  const candles = tableId === "candlesticks" || tableId === "event_candlesticks";
+  if (tableId !== "trades" && !candles) return null;
+  const maxDays = candles ? candleRangeMaxDays(current.period_interval?.value ?? "60") : undefined;
   return (
     <div className="space-y-2">
       <div>
@@ -1096,17 +1099,21 @@ export function JoinSourceFields({ tableId, filters, onChange, bounds = null, pe
           range={range}
           bounds={bounds}
           perMarket={perMarket}
-          maxDays={tableId === "candlesticks" ? candleRangeMaxDays(current.period_interval?.value ?? "60") : undefined}
-          onChange={setRange}
+          maxDays={maxDays}
+          onChange={(next) => setRange(candles && !isLifeWindowPreset(next.preset) ? fitCandleRange({ ...next, preset: "" }, maxDays) : next)}
         />
       </div>
-      {tableId === "candlesticks" ? (
+      {candles ? (
         <label className="block text-[11px] text-muted-foreground">
           Period
           <select
             aria-label="Period"
             value={String(current.period_interval?.value ?? "60")}
-            onChange={(event) => onChange({ ...current, period_interval: { value: event.target.value } })}
+            onChange={(event) => {
+              const value = event.target.value;
+              const fitted = isLifeWindowPreset(range.preset) ? range : fitCandleRange(range, candleRangeMaxDays(value));
+              onChange({ ...current, period_interval: { value }, ...(fitted !== range ? { time_range: fitted } : {}) });
+            }}
             className="mt-1 h-9 w-full rounded-lg border border-border/70 bg-background px-2 text-[13px] text-foreground"
           >
             {KALSHI_LIVE_CANDLESTICK_PERIOD_OPTIONS.map((option) => (

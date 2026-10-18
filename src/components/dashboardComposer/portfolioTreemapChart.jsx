@@ -5,7 +5,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { squarify } from "@/components/spectrumui/charts/chart-engine";
 import { SPECTRUM_HEAT_DEFAULTS, parseHexColor } from "@/components/spectrumui/charts/heatmapColors";
 import { useHtmlDarkClass } from "@/hooks/use-html-dark-class";
-import { formatPnl4, pnlFill, positionTreemapModel } from "@/lib/visualizations/portfolioTreemap";
+import { formatPnl4, pnlFill, positionTreemapModel, positionsSizedByContracts } from "@/lib/visualizations/portfolioTreemap";
 
 function textOn(fill) {
   const rgb = parseHexColor(fill);
@@ -27,6 +27,7 @@ export function PortfolioTreemap({ sheet, dataset, onOpenRow }) {
   const [box, setBox] = useState({ width: 0, height: 0 });
   const [hover, setHover] = useState(null);
   const model = useMemo(() => positionTreemapModel(sheet, dataset), [dataset, sheet]);
+  const contracts = positionsSizedByContracts(dataset);
   const palette = dark ? SPECTRUM_HEAT_DEFAULTS.dark : SPECTRUM_HEAT_DEFAULTS.light;
 
   useEffect(() => {
@@ -103,7 +104,7 @@ export function PortfolioTreemap({ sheet, dataset, onOpenRow }) {
             })}
           </svg>
         ) : (
-          <p className="px-1 pt-2 text-[12px] text-muted-foreground">No current value to size yet.</p>
+          <p className="px-1 pt-2 text-[12px] text-muted-foreground">{contracts ? "No contracts held to size yet." : "No current value to size yet."}</p>
         )}
         {hover ? (
           <div
@@ -114,8 +115,17 @@ export function PortfolioTreemap({ sheet, dataset, onOpenRow }) {
             }}
           >
             <p className="font-medium">{hover.tile.label}</p>
-            <p className="mt-0.5 font-mono tabular-nums">Current value {formatPnl4(hover.tile.value).replace(/^\+/, "")}</p>
-            <p className="font-mono tabular-nums">Unrealized P&L {formatPnl4(hover.tile.pnl)}</p>
+            {contracts ? (
+              <>
+                <p className="mt-0.5 font-mono tabular-nums">Contracts {Number(hover.tile.value).toLocaleString()}</p>
+                <p className="font-mono tabular-nums">P&L {formatPnl4(hover.tile.pnl)} USD</p>
+              </>
+            ) : (
+              <>
+                <p className="mt-0.5 font-mono tabular-nums">Current value {formatPnl4(hover.tile.value).replace(/^\+/, "")}</p>
+                <p className="font-mono tabular-nums">Unrealized P&L {formatPnl4(hover.tile.pnl)}</p>
+              </>
+            )}
           </div>
         ) : null}
       </div>

@@ -28,6 +28,13 @@ export const KALSHI_LIVE_HOLDER_TRADES_COLUMNS = [
   { name: "taker_nickname", type: "string", description: "Taker nickname when public" },
   { name: "maker_social_id", type: "string", description: "Maker social id when present" },
   { name: "taker_social_id", type: "string", description: "Taker social id when present" },
+  { name: "trader_nickname", type: "string", description: "The public trader on this trade (taker first, else maker)", label: "trader" },
+  { name: "trader_role", type: "string", description: "Whether the trader was the taker or the maker", label: "role" },
+  { name: "trader_side", type: "string", description: "Outcome the trader took (YES / NO)", label: "side" },
+  { name: "trader_action", type: "string", description: "BUY or SELL", label: "action" },
+  { name: "trader_price", type: "number", description: "Price the trader paid for their side, in dollars", label: "trader price" },
+  { name: "notional", type: "number", description: "Contracts × trader price, in dollars", label: "notional" },
+  { name: "activity_type", type: "string", description: "Always TRADE; Kalshi shares no other activity", label: "type" },
 ];
 
 /** @param {KalshiLiveHolderTradesColumn | string} col */
