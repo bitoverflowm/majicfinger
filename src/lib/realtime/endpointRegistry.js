@@ -17,8 +17,7 @@
 
 import { KALSHI_LIVE_CONNECT_ENDPOINTS } from "@/config/kalshiLiveConnect";
 import { POLYMARKET_LIVE_CONNECT_ENDPOINTS } from "@/config/polymarketLiveConnect";
-import { BINANCE_LIVE_SOURCES } from "@/lib/connectQueryComposeConfig";
-import { CHAINLINK_FEEDS, CHAINLINK_LIVE_SOURCES } from "@/lib/chainlinkFeeds";
+import { BINANCE_FEEDS, BINANCE_LIVE_SOURCES, CHAINLINK_FEEDS, CHAINLINK_LIVE_SOURCES } from "@/lib/priceStreams";
 import { LIVE_FEED_REGISTRY } from "@/lib/liveFeeds/registry";
 import { POLYMARKET_REALTIME_FEED_OPTIONS } from "@/lib/polymarketLive/polymarketRealtimeCompose";
 
@@ -283,7 +282,9 @@ for (const feed of CHAINLINK_FEEDS) {
     symbolAliases: feed.id === "prices",
   });
 }
-registerDirectPriceStream("binance", "Live prices", "crypto_prices", BINANCE_LIVE_SOURCES);
+for (const feed of BINANCE_FEEDS) {
+  registerDirectPriceStream("binance", feed.label, feed.topic, BINANCE_LIVE_SOURCES, { endpoint: feed.id });
+}
 
 /** Canonical entries only. Symbol and playground aliases resolve through the lookup helpers. */
 export const REALTIME_ENDPOINT_REGISTRY = Object.fromEntries(byCanonicalKey);

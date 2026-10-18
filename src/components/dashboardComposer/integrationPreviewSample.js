@@ -6,7 +6,7 @@
  */
 
 import { toast } from "sonner";
-import { CHAINLINK_LIVE_SOURCES, chainlinkFeed } from "@/lib/chainlinkFeeds";
+import { BINANCE_LIVE_SOURCES, CHAINLINK_LIVE_SOURCES, priceStreamFeed, priceStreamSubscription } from "@/lib/priceStreams";
 
 const CACHE_KEY = "lycheeIntegrationPreviewSamples:v4";
 const SAMPLE_IDS = [
@@ -472,19 +472,17 @@ async function loadPolymarketLive() {
 }
 
 const RTDS_URL = "wss://ws-live-data.polymarket.com";
-const BINANCE_PAIRS = [
-  { id: "btc", title: "Bitcoin", tile: "BT", symbol: "btcusdt" },
-  { id: "eth", title: "Ethereum", tile: "ET", symbol: "ethusdt" },
-  { id: "sol", title: "Solana", tile: "SO", symbol: "solusdt" },
-  { id: "xrp", title: "XRP", tile: "XR", symbol: "xrpusdt" },
-];
-const CHAINLINK_PAIRS = CHAINLINK_LIVE_SOURCES.map((pair) => ({
-  id: pair.id,
-  title: pair.name,
-  tile: pair.id.slice(0, 2).toUpperCase(),
-  symbol: pair.id,
-}));
-const CHAINLINK_SAMPLE_TOPIC = chainlinkFeed("twap_60").topic;
+const samplePairs = (sources) =>
+  sources.map((pair) => ({
+    id: pair.id,
+    title: pair.name,
+    tile: pair.id.slice(0, 2).toUpperCase(),
+    symbol: pair.id,
+  }));
+const BINANCE_PAIRS = samplePairs(BINANCE_LIVE_SOURCES);
+const CHAINLINK_PAIRS = samplePairs(CHAINLINK_LIVE_SOURCES);
+const BINANCE_SAMPLE_TOPIC = priceStreamFeed("binance", "prices").topic;
+const CHAINLINK_SAMPLE_TOPIC = priceStreamFeed("chainlink", "twap_60").topic;
 
 export function formatUsd(value) {
   const n = num(value);
@@ -501,20 +499,31 @@ export function formatUsd(value) {
 let binanceQuoteTask = null;
 let chainlinkQuoteTask = null;
 
+/** One socket per pair: the topics only stream live updates for one symbol per connection. */
+function samplePairQuotes(topic, pairs) {
+  return Promise.all(
+    pairs.map((pair) =>
+      collectQuoteFeed({
+        topic,
+        pairs: [pair],
+        subscriptions: [priceStreamSubscription(topic, pair.symbol)],
+        stopAt: 3,
+        timeoutMs: 5000,
+      }).catch(() => new Map()),
+    ),
+  ).then((maps) => {
+    const merged = new Map();
+    for (const map of maps) {
+      for (const [id, quote] of map) merged.set(id, quote);
+    }
+    if (!merged.size) throw new Error("No live prices came through");
+    return merged;
+  });
+}
+
 function sampleBinanceQuotes() {
   if (!binanceQuoteTask) {
-    binanceQuoteTask = collectQuoteFeed({
-      topic: "crypto_prices",
-      pairs: BINANCE_PAIRS,
-      subscriptions: BINANCE_PAIRS.map((pair) => ({
-        topic: "crypto_prices",
-        type: "update",
-        filters: JSON.stringify([pair.symbol]),
-      })),
-      stopAt: BINANCE_PAIRS.length,
-      countPairs: true,
-      timeoutMs: 5000,
-    }).catch((error) => {
+    binanceQuoteTask = samplePairQuotes(BINANCE_SAMPLE_TOPIC, BINANCE_PAIRS).catch((error) => {
       binanceQuoteTask = null;
       throw error;
     });
@@ -524,34 +533,15 @@ function sampleBinanceQuotes() {
 
 function sampleChainlinkQuotes() {
   if (!chainlinkQuoteTask) {
-    chainlinkQuoteTask = Promise.all(
-      CHAINLINK_PAIRS.map((pair) =>
-        collectQuoteFeed({
-          topic: CHAINLINK_SAMPLE_TOPIC,
-          pairs: [pair],
-          subscriptions: [{ topic: CHAINLINK_SAMPLE_TOPIC, type: "*", filters: JSON.stringify({ symbol: pair.symbol }) }],
-          stopAt: 3,
-          timeoutMs: 5000,
-        }).catch(() => new Map()),
-      ),
-    )
-      .then((maps) => {
-        const merged = new Map();
-        for (const map of maps) {
-          for (const [id, quote] of map) merged.set(id, quote);
-        }
-        if (!merged.size) throw new Error("No live prices came through");
-        return merged;
-      })
-      .catch((error) => {
-        chainlinkQuoteTask = null;
-        throw error;
-      });
+    chainlinkQuoteTask = samplePairQuotes(CHAINLINK_SAMPLE_TOPIC, CHAINLINK_PAIRS).catch((error) => {
+      chainlinkQuoteTask = null;
+      throw error;
+    });
   }
   return chainlinkQuoteTask;
 }
 
-function collectQuoteFeed({ topic, pairs, subscriptions, stopAt, countPairs = false, timeoutMs }) {
+function collectQuoteFeed({ topic, pairs, subscriptions, stopAt, timeoutMs }) {
   return new Promise((resolve, reject) => {
     if (typeof WebSocket === "undefined") {
       reject(new Error("Live prices are only available in the browser"));
@@ -615,9 +605,7 @@ function collectQuoteFeed({ topic, pairs, subscriptions, stopAt, countPairs = fa
         const series = [...(prev?.series || []), price].slice(-16);
         quotes.set(pair.id, { price, at: num(msg.payload.timestamp) || Date.now(), series });
       }
-      const ticks = quotes.get(pair.id)?.series.length || 0;
-      const enough = countPairs ? quotes.size >= stopAt : ticks >= stopAt;
-      if (enough) finish();
+      if ((quotes.get(pair.id)?.series.length || 0) >= stopAt) finish();
     };
     ws.onerror = () => {
       if (!settled && !quotes.size) {

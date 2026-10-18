@@ -41,7 +41,7 @@ import {
 } from "@/lib/kalshiLive/normalizeSearchTradersRow";
 import { getKalshiLiveSearchTradersColumns } from "@/lib/kalshiLive/searchTradersColumns";
 import { MARKETS_RESPONSE_FIELDS } from "@/components/integrationsView/integrationPlayground/integrations/polymarket/config";
-import { CHAINLINK_FEEDS, chainlinkFeed } from "@/lib/chainlinkFeeds";
+import { BINANCE_FEEDS, CHAINLINK_FEEDS, priceStreamFeed } from "@/lib/priceStreams";
 import {
   loadPolymarketLiveTable,
   POLYMARKET_LIVE_BUILD_CATEGORIES,
@@ -183,12 +183,7 @@ export const BUILD_SOURCES = {
   binance: {
     name: "Binance",
     defaultTable: "prices",
-    tables: {
-      prices: {
-        label: "Live prices",
-        description: "Latest Binance price for each pair on the live feed.",
-      },
-    },
+    tables: Object.fromEntries(BINANCE_FEEDS.map((feed) => [feed.id, { label: feed.label, description: feed.description }])),
   },
 };
 
@@ -464,13 +459,6 @@ export const APPROXIMATE_UNIVERSE = 1_000_000;
 
 export function usesExactUniverse(integrationId) {
   return Boolean(EXACT_UNIVERSE[integrationId]);
-}
-
-function num(raw) {
-  if (typeof raw === "number" && Number.isFinite(raw)) return raw;
-  if (raw == null || raw === "") return null;
-  const n = Number(raw);
-  return Number.isFinite(n) ? n : null;
 }
 
 async function getJson(url) {
@@ -1248,110 +1236,15 @@ async function polymarketLiveMarkets() {
   };
 }
 
-const QUOTE_PAIRS = [
-  { name: "Bitcoin", binance: "btcusdt" },
-  { name: "Ethereum", binance: "ethusdt" },
-  { name: "Solana", binance: "solusdt" },
-  { name: "XRP", binance: "xrpusdt" },
-];
-
-function listenQuotes() {
-  return collectQuotes({
-    topic: "crypto_prices",
-    pairs: QUOTE_PAIRS.map((pair) => ({ name: pair.name, symbol: pair.binance })),
-    subscriptions: QUOTE_PAIRS.map((pair) => ({
-      topic: "crypto_prices",
-      type: "update",
-      filters: JSON.stringify([pair.binance]),
-    })),
-    stopWhen: (quotes) => quotes.size >= QUOTE_PAIRS.length,
-  });
-}
-
-function collectQuotes({ topic, pairs, subscriptions, stopWhen }) {
-  return new Promise((resolve, reject) => {
-    if (typeof WebSocket === "undefined") {
-      reject(new Error("Live prices are only available in the browser"));
-      return;
-    }
-    const quotes = new Map();
-    const ws = new WebSocket("wss://ws-live-data.polymarket.com");
-    let ping;
-    let settled = false;
-    const finish = () => {
-      if (settled) return;
-      settled = true;
-      window.clearTimeout(timer);
-      if (ping) window.clearInterval(ping);
-      try {
-        ws.close();
-      } catch {
-        /* ignore */
-      }
-      if (!quotes.size) {
-        reject(new Error("No live prices came through"));
-        return;
-      }
-      resolve(quotes);
-    };
-    const timer = window.setTimeout(finish, 5000);
-    ws.onopen = () => {
-      ws.send(JSON.stringify({ action: "subscribe", subscriptions }));
-      ping = window.setInterval(() => {
-        if (ws.readyState === WebSocket.OPEN) ws.send("PING");
-      }, 4000);
-    };
-    ws.onmessage = (event) => {
-      let msg;
-      try {
-        msg = JSON.parse(event.data);
-      } catch {
-        return;
-      }
-      if (msg.topic !== topic || !msg.payload) return;
-      const symbol = String(msg.payload.symbol || "").toLowerCase();
-      const pair = pairs.find((item) => item.symbol === symbol);
-      if (!pair) return;
-      const history = Array.isArray(msg.payload.data) ? msg.payload.data : null;
-      const point = history?.length ? history[history.length - 1] : msg.payload;
-      const price = num(point?.value);
-      if (price == null) return;
-      quotes.set(pair.name, { price, at: num(point?.timestamp) || Date.now(), symbol: pair.symbol.toUpperCase() });
-      if (stopWhen(quotes)) finish();
-    };
-    ws.onerror = () => finish();
-  });
-}
-
-/** Columns of one Chainlink pair sheet. Each pair streams into its own sheet, newest row first. */
-export function chainlinkStreamColumns(feedId) {
-  const windowSeconds = chainlinkFeed(feedId)?.windowSeconds || null;
+/** Columns of one Chainlink or Binance pair sheet. Each pair streams into its own sheet. */
+export function priceStreamColumns(integrationId, feedId) {
+  const windowSeconds = priceStreamFeed(integrationId, feedId)?.windowSeconds || null;
   return [
     column("time", "date"),
     column("symbol", "text"),
     { ...column("price", "number"), exact: true },
     ...(windowSeconds ? [column("window_seconds", "number")] : []),
   ];
-}
-
-async function livePrices() {
-  const quotes = await listenQuotes();
-  const rows = QUOTE_PAIRS.map((pair) => pair.name)
-    .filter((name) => quotes.has(name))
-    .map((name) => {
-      const quote = quotes.get(name);
-      return { name, symbol: quote.symbol, price: quote.price, updated: quote.at };
-    });
-  return {
-    columns: [
-      column("name", "text"),
-      column("symbol", "text"),
-      column("price", "number"),
-      column("updated", "date"),
-    ],
-    rows,
-    capped: false,
-  };
 }
 
 export const KALSHI_LIVE_MARKET_JOINS = [
@@ -2127,12 +2020,14 @@ const LOADERS = {
     ]),
   ),
   ...Object.fromEntries(
-    CHAINLINK_FEEDS.map((feed) => [
-      `chainlink:${feed.id}`,
-      async () => ({ columns: chainlinkStreamColumns(feed.id), rows: [], capped: false }),
+    [
+      ...CHAINLINK_FEEDS.map((feed) => ["chainlink", feed]),
+      ...BINANCE_FEEDS.map((feed) => ["binance", feed]),
+    ].map(([integrationId, feed]) => [
+      `${integrationId}:${feed.id}`,
+      async () => ({ columns: priceStreamColumns(integrationId, feed.id), rows: [], capped: false }),
     ]),
   ),
-  "binance:prices": () => livePrices(),
 };
 
 function universeCountKey(integrationId, tableId, filter) {

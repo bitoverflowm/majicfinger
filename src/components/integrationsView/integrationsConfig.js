@@ -157,7 +157,8 @@ export const integrations_list = [
     ),
     clickHandler: "binance",
     name: "Binance",
-    description: "Pull real-time and historical market data from Binance.",
+    description:
+      "Live Binance spot prices, about one tick a second, streamed through Polymarket. Each pair streams into its own sheet, for BTC, ETH, SOL, XRP, BNB and DOGE priced in USDT.",
     tags: ["crypto", "finance", "trading"],
     live: true,
   },

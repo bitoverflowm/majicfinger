@@ -6,7 +6,16 @@ import { ArrowLeft, Check, ChevronDown, History, Info } from "lucide-react";
 import { IntegrationBuildGrid } from "@/components/dashboardComposer/integrationBuildGrid";
 import { claimSheetId, displayMatrix, recordsFromRows } from "@/components/dashboardComposer/integrationRunSheets";
 import { chartSpecsForSheet } from "@/lib/visualizations/sheetCharts";
-import { CHAINLINK_LIVE_SOURCES, CHAINLINK_STREAM_CAP, chainlinkFeed, chainlinkPairTitle, mergeChainlinkRows, openChainlinkStream } from "@/lib/chainlinkFeeds";
+import {
+  PRICE_STREAM_CAP,
+  isPriceStreamIntegration,
+  mergePriceRows,
+  openPriceStream,
+  priceStreamFeed,
+  priceStreamPairTitle,
+  priceStreamPairs,
+  priceStreamProviderName,
+} from "@/lib/priceStreams";
 import { rememberTradeSheet } from "@/components/dashboardComposer/fullTradeSheet";
 import { FunctionExplainer, FunctionExplainerTabs } from "@/components/dashboardComposer/integrationFunctionExplainer";
 import { SummarizeExplainer, SummarizeExplainerTabs } from "@/components/dashboardComposer/integrationSummarizeExplainer";
@@ -2773,17 +2782,19 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
   const polymarketActivePick = polymarketFanoutOn
     ? livePicks.find((pick) => previewSheet === `polymarket:${pick.id}`) || livePicks[0]
     : null;
-  const chainlinkOn = integrationId === "chainlink";
-  const chainlinkFeedDef = chainlinkOn ? chainlinkFeed(tableId) : null;
-  const chainlinkTopic = chainlinkFeedDef?.topic || "";
-  const [chainlinkPairs, setChainlinkPairs] = useState([]);
-  const [chainlinkStreams, setChainlinkStreams] = useState({});
-  const chainlinkSocketsRef = useRef(new Map());
-  const chainlinkPendingRef = useRef(new Map());
-  const chainlinkActivePair = chainlinkOn
-    ? chainlinkPairs.find((symbol) => previewSheet === `chainlink:${symbol}`) || chainlinkPairs[0] || ""
+  const pairStreamOn = isPriceStreamIntegration(integrationId);
+  const streamFeed = pairStreamOn ? priceStreamFeed(integrationId, tableId) : null;
+  const streamProvider = priceStreamProviderName(integrationId);
+  const streamPairTitle = (symbol) => priceStreamPairTitle(integrationId, symbol);
+  const streamTopic = streamFeed?.topic || "";
+  const [streamPairs, setStreamPairs] = useState([]);
+  const [pairStreams, setPairStreams] = useState({});
+  const pairSocketsRef = useRef(new Map());
+  const pairPendingRef = useRef(new Map());
+  const activeStreamPair = pairStreamOn
+    ? streamPairs.find((symbol) => previewSheet === `stream:${symbol}`) || streamPairs[0] || ""
     : "";
-  const chainlinkSheetTitle = (symbol) => `${chainlinkPairTitle(symbol)} · ${chainlinkFeedDef?.label || "Chainlink"}`;
+  const pairSheetTitle = (symbol) => `${streamPairTitle(symbol)} · ${streamFeed?.label || streamProvider}`;
   const polymarketMarketColumns = useMemo(
     () => (polymarketLive && tableId === "getMarkets" ? polymarketMarketAttributeColumns(pull?.columns || []) : []),
     [polymarketLive, tableId, pull?.columns],
@@ -3087,8 +3098,7 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
       .catch((err) => {
         if (cancel) return;
         const message = err instanceof Error ? err.message : "Pull failed";
-        const priceFeed = integrationId === "chainlink" || integrationId === "binance";
-        if (priceFeed && /live price/i.test(message)) {
+        if (isPriceStreamIntegration(integrationId) && /live price/i.test(message)) {
           setPriceWaiting(true);
           return;
         }
@@ -3202,46 +3212,46 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
   }, [livePicks, previewSheet]);
 
   useEffect(() => {
-    if (!previewSheet.startsWith("chainlink:")) return;
-    const symbol = previewSheet.slice("chainlink:".length);
-    if (chainlinkPairs.indexOf(symbol) < 1) setPreviewSheet("source");
-  }, [chainlinkPairs, previewSheet]);
+    if (!previewSheet.startsWith("stream:")) return;
+    const symbol = previewSheet.slice("stream:".length);
+    if (streamPairs.indexOf(symbol) < 1) setPreviewSheet("source");
+  }, [streamPairs, previewSheet]);
 
   // A feed change closes every pair socket. The pairs stay picked and reopen on the new feed.
   useEffect(() => {
-    const sockets = chainlinkSocketsRef.current;
-    const pending = chainlinkPendingRef.current;
+    const sockets = pairSocketsRef.current;
+    const pending = pairPendingRef.current;
     return () => {
       for (const stop of sockets.values()) stop();
       sockets.clear();
       pending.clear();
-      setChainlinkStreams({});
+      setPairStreams({});
     };
-  }, [chainlinkTopic]);
+  }, [streamTopic]);
 
   useEffect(() => {
-    const sockets = chainlinkSocketsRef.current;
-    const wanted = new Set(chainlinkTopic ? chainlinkPairs : []);
+    const sockets = pairSocketsRef.current;
+    const wanted = new Set(streamTopic ? streamPairs : []);
     for (const [symbol, stop] of sockets) {
       if (wanted.has(symbol)) continue;
       stop();
       sockets.delete(symbol);
-      chainlinkPendingRef.current.delete(symbol);
-      setChainlinkStreams((current) => {
+      pairPendingRef.current.delete(symbol);
+      setPairStreams((current) => {
         if (!(symbol in current)) return current;
         const next = { ...current };
         delete next[symbol];
         return next;
       });
     }
-    const pending = chainlinkPendingRef.current;
+    const pending = pairPendingRef.current;
     for (const symbol of wanted) {
       if (sockets.has(symbol)) continue;
-      const stop = openChainlinkStream({
-        topic: chainlinkTopic,
+      const stop = openPriceStream({
+        topic: streamTopic,
         symbol,
         onStatus: (status) =>
-          setChainlinkStreams((current) => ({
+          setPairStreams((current) => ({
             ...current,
             [symbol]: { rows: current[symbol]?.rows || [], status },
           })),
@@ -3249,23 +3259,23 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
       });
       sockets.set(symbol, stop);
     }
-  }, [chainlinkPairs, chainlinkTopic]);
+  }, [streamPairs, streamTopic]);
 
   // Points land once a second, so several pairs streaming at once re-render the builder once.
   useEffect(() => {
-    if (!chainlinkTopic || !chainlinkPairs.length) return undefined;
-    const pending = chainlinkPendingRef.current;
-    const windowSeconds = chainlinkFeedDef?.windowSeconds || null;
+    if (!streamTopic || !streamPairs.length) return undefined;
+    const pending = pairPendingRef.current;
+    const windowSeconds = streamFeed?.windowSeconds || null;
     const flush = () => {
       if (!pending.size) return;
       const batch = new Map(pending);
       pending.clear();
-      setChainlinkStreams((current) => {
+      setPairStreams((current) => {
         const next = { ...current };
         for (const [symbol, points] of batch) {
-          if (!chainlinkSocketsRef.current.has(symbol)) continue;
+          if (!pairSocketsRef.current.has(symbol)) continue;
           const before = current[symbol]?.rows || [];
-          const rows = mergeChainlinkRows(before, points, { symbol, windowSeconds });
+          const rows = mergePriceRows(before, points, { symbol, windowSeconds });
           if (rows === before) continue;
           const lastBefore = before.length ? before[before.length - 1].time : null;
           const fresh = lastBefore == null ? [] : rows.filter((row) => row.time > lastBefore).map((row) => row.time);
@@ -3276,10 +3286,14 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
     };
     const timer = window.setInterval(flush, 1000);
     return () => window.clearInterval(timer);
-  }, [chainlinkPairs.length, chainlinkTopic, chainlinkFeedDef?.windowSeconds]);
+  }, [streamPairs.length, streamTopic, streamFeed?.windowSeconds]);
 
-  function toggleChainlinkPair(symbol) {
-    setChainlinkPairs((current) => (current.includes(symbol) ? current.filter((item) => item !== symbol) : [...current, symbol]));
+  useEffect(() => {
+    setStreamPairs([]);
+  }, [integrationId]);
+
+  function toggleStreamPair(symbol) {
+    setStreamPairs((current) => (current.includes(symbol) ? current.filter((item) => item !== symbol) : [...current, symbol]));
   }
 
   useEffect(() => {
@@ -4157,7 +4171,7 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
       const limited = Number.isFinite(requested) && requested > 0 ? rows.slice(0, requested) : rows;
       return limited;
     };
-    if (chainlinkOn) return capPreview((chainlinkStreams[chainlinkActivePair]?.rows || []).slice(-PREVIEW_ROW_CAP).reverse());
+    if (pairStreamOn) return capPreview((pairStreams[activeStreamPair]?.rows || []).slice(-PREVIEW_ROW_CAP).reverse());
     if (polymarketLive) {
       const scanning = (tableId === "getMarkets" || tableId === "getSamplingMarkets") && polymarketScan.status !== "idle";
       const waiting = polymarketDirected.status === "loading" || (polymarketRequirement && polymarketDirected.status === "idle");
@@ -4227,7 +4241,7 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
     const query = filterValue.trim().toLowerCase();
     const matched = !query || !filterColumn ? rows : rows.filter((row) => String(row[filterColumn] ?? "").toLowerCase().includes(query));
     return capPreview(matched);
-  }, [chainlinkOn, chainlinkStreams, chainlinkActivePair, directPreview.rows, directPreview.status, directRowColumns, forecastRowColumns, pull, visibleCount, filterColumn, filterValue, guidedFilters, attributeFilters, sortKeys, rowLimit, integrationId, tableId, settledPreviewKey, previewSearchError, livePreviewRows, liveMarketSearch, liveDirect, liveEventCandles, liveForecast, liveMarketFanout, liveMultivariate, liveNarrowing, multivariateRowColumns, seriesAttributeColumns, listImportRows, idleAttributeRows, polymarketLive, polymarketDirected, polymarketRequirement, polymarketScan, polymarketMarketColumns, polymarketSamplingColumns, polymarketBiggestWinnersColumns, polymarketLeaderboardColumns, polymarketActivityColumns, polymarketPnlColumns, polymarketPositionColumns, polymarketQuoteColumns, polymarketSheetSource]);
+  }, [pairStreamOn, pairStreams, activeStreamPair, directPreview.rows, directPreview.status, directRowColumns, forecastRowColumns, pull, visibleCount, filterColumn, filterValue, guidedFilters, attributeFilters, sortKeys, rowLimit, integrationId, tableId, settledPreviewKey, previewSearchError, livePreviewRows, liveMarketSearch, liveDirect, liveEventCandles, liveForecast, liveMarketFanout, liveMultivariate, liveNarrowing, multivariateRowColumns, seriesAttributeColumns, listImportRows, idleAttributeRows, polymarketLive, polymarketDirected, polymarketRequirement, polymarketScan, polymarketMarketColumns, polymarketSamplingColumns, polymarketBiggestWinnersColumns, polymarketLeaderboardColumns, polymarketActivityColumns, polymarketPnlColumns, polymarketPositionColumns, polymarketQuoteColumns, polymarketSheetSource]);
 
   const queriedMarkets = useMemo(() => {
     if (!guidedFilters) return [];
@@ -4833,8 +4847,8 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
     !previewRefreshing &&
     liveScan.status !== "error";
   const directedShown = liveDirect && directPreview.status === "ready" && shown > 0;
-  const previewIsEmpty = !chainlinkOn && !directedShown && (previewSampleEmpty || liveSettledEmpty);
-  const chainlinkRowTotal = chainlinkPairs.reduce((sum, symbol) => sum + (chainlinkStreams[symbol]?.rows?.length || 0), 0);
+  const previewIsEmpty = !pairStreamOn && !directedShown && (previewSampleEmpty || liveSettledEmpty);
+  const streamRowTotal = streamPairs.reduce((sum, symbol) => sum + (pairStreams[symbol]?.rows?.length || 0), 0);
   // The grid never shows more than 50. The import count is the known size of this pull
   // (the rows in hand, a counted match, or a historical universe), then capped by the plan and row limit.
   const previewShown = Math.min(shown, PREVIEW_ROW_CAP);
@@ -4863,8 +4877,8 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
     Boolean(directPreview.truncated) &&
     (Boolean(eventColumnFilterKey) || Boolean(seriesColumnFilterKey) || Boolean(multivariateColumnFilterKey)) &&
     !(Number(rowLimit) > 0);
-  const pullTotal = chainlinkOn
-    ? chainlinkRowTotal
+  const pullTotal = pairStreamOn
+    ? streamRowTotal
     : previewIsEmpty
     ? 0
     : Array.isArray(listImportRows)
@@ -6582,14 +6596,14 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
     [summaryCells, summarySourceColumns, summarySourceRows, enrichmentSheets, summaryFocus],
   );
   const paneLine = (() => {
-    if (chainlinkOn && (previewSheet === "source" || previewSheet.startsWith("chainlink:"))) {
-      if (!chainlinkPairs.length) return "Pick a pair to start streaming. Each pair gets its own sheet.";
-      const stream = chainlinkStreams[chainlinkActivePair];
-      const title = chainlinkPairTitle(chainlinkActivePair);
+    if (pairStreamOn && (previewSheet === "source" || previewSheet.startsWith("stream:"))) {
+      if (!streamPairs.length) return "Pick a pair to start streaming. Each pair gets its own sheet.";
+      const stream = pairStreams[activeStreamPair];
+      const title = streamPairTitle(activeStreamPair);
       if (stream?.status === "closed") return `The ${title} stream closed. Pick the pair again to reconnect.`;
       const count = stream?.rows?.length || 0;
       if (!count) return `Connecting to ${title}`;
-      const kept = count >= CHAINLINK_STREAM_CAP ? ` Keeping the latest ${CHAINLINK_STREAM_CAP.toLocaleString()}.` : "";
+      const kept = count >= PRICE_STREAM_CAP ? ` Keeping the latest ${PRICE_STREAM_CAP.toLocaleString()}.` : "";
       return `Streaming ${title}. ${count.toLocaleString()} ${count === 1 ? "row" : "rows"} so far, newest shown first.${kept} Save and run places one sheet per pair, oldest row first.`;
     }
     if (polymarketClosedBook) return "Illustration. This market is closed, so there is no live orderbook.";
@@ -7342,14 +7356,14 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
           result: `${(sampledRows || marketRows).length.toLocaleString()} rows already on screen. ${err instanceof Error ? err.message : "The compose did not finish."}`,
         });
       }
-    } else if (chainlinkOn) {
-      if (!chainlinkPairs.length) {
+    } else if (pairStreamOn) {
+      if (!streamPairs.length) {
         reporter.fail("source", "Pick at least one pair to stream.");
         return;
       }
-      const streamed = chainlinkPairs.reduce((sum, symbol) => sum + (chainlinkStreams[symbol]?.rows?.length || 0), 0);
+      const streamed = streamPairs.reduce((sum, symbol) => sum + (pairStreams[symbol]?.rows?.length || 0), 0);
       reporter.succeed("source", {
-        result: `${chainlinkPairs.length.toLocaleString()} ${chainlinkPairs.length === 1 ? "pair" : "pairs"} · ${streamed.toLocaleString()} rows streamed`,
+        result: `${streamPairs.length.toLocaleString()} ${streamPairs.length === 1 ? "pair" : "pairs"} · ${streamed.toLocaleString()} rows streamed`,
       });
     } else if (!liveDirect) {
       if (sampling) sampledRows = drawSample(marketRows);
@@ -8291,21 +8305,21 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
           summary: `Polymarket Live · ${sheetTitle} · ${label}`,
         });
       }
-    } else if (chainlinkOn) {
-      for (const symbol of chainlinkPairs) {
-        const streamed = chainlinkStreams[symbol]?.rows || [];
+    } else if (pairStreamOn) {
+      for (const symbol of streamPairs) {
+        const streamed = pairStreams[symbol]?.rows || [];
         const rows = Number.isFinite(sheetCap) && streamed.length > sheetCap ? streamed.slice(streamed.length - sheetCap) : streamed;
         await stageSheet({
-          id: `run-chainlink-${tableId}-${symbol.replace(/[^A-Za-z0-9]+/g, "-")}`,
-          title: chainlinkSheetTitle(symbol),
+          id: `run-${integrationId}-${tableId}-${symbol.replace(/[^A-Za-z0-9]+/g, "-")}`,
+          title: pairSheetTitle(symbol),
           columns: shownColumns,
           rows,
           rowCount: rows.length,
           keepAllRows: true,
-          span: chainlinkPairs.length > 1 ? "half" : "full",
+          span: streamPairs.length > 1 ? "half" : "full",
           table: tableId,
           pull: { table: tableId, symbol, mode: "stream" },
-          summary: `Chainlink · ${chainlinkFeedDef?.label || tableId} · ${chainlinkPairTitle(symbol)}`,
+          summary: `${streamProvider} · ${streamFeed?.label || tableId} · ${streamPairTitle(symbol)}`,
         });
       }
     } else if (runMarkets.columns.length && keepParentDataset) {
@@ -9495,7 +9509,7 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
       setJoinTab("markets");
       if (tradesQuery && joinPlacement === "sheet") setMetadataTab("trades");
     } else if (id === "markets-meta") setMetadataTab("markets");
-    else if (!id.startsWith("bucket:") && !id.startsWith("column:") && !id.startsWith("polymarket:") && !id.startsWith("chainlink:") && id !== "summary") setJoinTab(id);
+    else if (!id.startsWith("bucket:") && !id.startsWith("column:") && !id.startsWith("polymarket:") && !id.startsWith("stream:") && id !== "summary") setJoinTab(id);
     setFunctionScrollKey((key) => key + 1);
   }
 
@@ -9503,8 +9517,8 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
     {
       id: "source",
       title:
-        chainlinkOn && chainlinkPairs[0]
-          ? chainlinkSheetTitle(chainlinkPairs[0])
+        pairStreamOn && streamPairs[0]
+          ? pairSheetTitle(streamPairs[0])
           : liveMarketFanout && directMarkets[0]
           ? `${sheetTitle} · ${directMarkets[0].ticker}`
           : liveEventCandles && directPreview.candleMarkets?.[0]
@@ -9514,9 +9528,9 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
             : activitySheetTitle(livePicks[0], polymarketDirected.rows) || sheetTitle,
     },
   ];
-  if (chainlinkOn) {
-    chainlinkPairs.slice(1).forEach((symbol) => {
-      previewTabs.push({ id: `chainlink:${symbol}`, title: chainlinkSheetTitle(symbol) });
+  if (pairStreamOn) {
+    streamPairs.slice(1).forEach((symbol) => {
+      previewTabs.push({ id: `stream:${symbol}`, title: pairSheetTitle(symbol) });
     });
   }
   if (polymarketFanoutOn) {
@@ -10458,23 +10472,23 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
               </DropdownMenuContent>
             </DropdownMenu>
             ) : null}
-            {chainlinkOn ? (
+            {pairStreamOn ? (
               <div className="mt-3">
                 <p className="text-[12px] font-medium text-foreground">Pairs</p>
                 <p className="mt-0.5 text-[11px] leading-relaxed text-muted-foreground">
                   Each pair streams into its own sheet. Pick as many as you want.
                 </p>
-                <div className="mt-2 grid grid-cols-2 gap-1.5" role="group" aria-label="Chainlink pairs">
-                  {CHAINLINK_LIVE_SOURCES.map((pair) => {
-                    const selected = chainlinkPairs.includes(pair.id);
-                    const status = chainlinkStreams[pair.id]?.status;
+                <div className="mt-2 grid grid-cols-2 gap-1.5" role="group" aria-label={`${streamProvider} pairs`}>
+                  {priceStreamPairs(integrationId).map((pair) => {
+                    const selected = streamPairs.includes(pair.id);
+                    const status = pairStreams[pair.id]?.status;
                     return (
                       <button
                         key={pair.id}
                         type="button"
                         aria-pressed={selected}
                         title={pair.name}
-                        onClick={() => toggleChainlinkPair(pair.id)}
+                        onClick={() => toggleStreamPair(pair.id)}
                         className={cn(
                           "flex items-center justify-between gap-1.5 rounded-lg border px-2.5 py-1.5 text-left text-[12px] font-medium transition-colors",
                           selected
@@ -10824,7 +10838,7 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
         <div className="flex items-start justify-between gap-3 px-5 pb-2 pr-12 pt-5">
           <div className="min-w-0 pt-0.5">
             <h2 className="text-[15px] font-semibold text-foreground">Preview</h2>
-            {chainlinkOn ? (
+            {pairStreamOn ? (
               <p className="mt-1 max-w-md text-[12px] leading-relaxed text-muted-foreground">
                 This preview streams live. After you run it, start realtime from the sheet on the dashboard to keep each pair streaming.
               </p>
@@ -11528,11 +11542,11 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
                 Choose at least one market column.
               </div>
             )
-          ) : chainlinkOn && !chainlinkPairs.length ? (
+          ) : pairStreamOn && !streamPairs.length ? (
             <div className="flex h-full items-center justify-center rounded-xl border border-border/70 bg-background px-6 text-center text-[13px] leading-relaxed text-muted-foreground shadow-sm">
               Pick a pair on the left to start streaming. Each pair gets its own sheet.
             </div>
-          ) : chainlinkOn && !filteredRows.length ? (
+          ) : pairStreamOn && !filteredRows.length ? (
             <div className="flex h-full flex-col gap-3">
               <WaitingToConnectTag />
               <div className="min-h-0 flex-1">
@@ -11588,7 +11602,7 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
             </div>
           ) : loading || emptyRefresh || livePickAwaitingRows || liveScanWaiting || polymarketScanWaiting || directLoading || (polymarketDirected.status === "loading" && !(tableId === "getBiggestWinners" && (polymarketDirected.rows || []).length)) ? (
             <div className="flex h-full flex-col gap-3">
-              {integrationId === "chainlink" || integrationId === "binance" ? <WaitingToConnectTag /> : null}
+              {isPriceStreamIntegration(integrationId) ? <WaitingToConnectTag /> : null}
               {livePickAwaitingRows ? (
                 <p className="text-[13px] text-muted-foreground">Loading data</p>
               ) : emptyRefresh ? (
@@ -11625,8 +11639,8 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
               columns={marketsGrid.columns}
               rows={marketsGrid.rows}
               flashColumnIds={flashColumns}
-              flashRowKey={chainlinkOn ? "time" : ""}
-              flashRowValues={chainlinkOn ? chainlinkStreams[chainlinkActivePair]?.fresh || null : null}
+              flashRowKey={pairStreamOn ? "time" : ""}
+              flashRowValues={pairStreamOn ? pairStreams[activeStreamPair]?.fresh || null : null}
               highlightColumnId={flashColumns[0] || marketsGrid.highlight || mergeAddedIds[0] || (tradesJoinReady && joinPlacement === "merge" ? tradeJoinBase.highlightIds[0] || "" : "")}
               highlightColumnIds={
                 summaryOnSource

@@ -9,6 +9,16 @@ export const CHAINLINK_LIVE_SOURCES = [
   { id: "zec/usd", name: "Zcash", title: "ZEC / USD", description: "Zcash priced in US dollars (Chainlink)." },
 ];
 
+/** Every pair the socket carries on the Binance topic. */
+export const BINANCE_LIVE_SOURCES = [
+  { id: "btcusdt", name: "Bitcoin", title: "BTC / USDT", description: "Bitcoin priced in Tether on Binance." },
+  { id: "ethusdt", name: "Ethereum", title: "ETH / USDT", description: "Ethereum priced in Tether on Binance." },
+  { id: "solusdt", name: "Solana", title: "SOL / USDT", description: "Solana priced in Tether on Binance." },
+  { id: "xrpusdt", name: "XRP", title: "XRP / USDT", description: "XRP priced in Tether on Binance." },
+  { id: "bnbusdt", name: "BNB", title: "BNB / USDT", description: "BNB priced in Tether on Binance." },
+  { id: "dogeusdt", name: "Dogecoin", title: "DOGE / USDT", description: "Dogecoin priced in Tether on Binance." },
+];
+
 /**
  * Chainlink streams on the Polymarket real-time data socket. One subscription per coin per connection:
  * the socket only sends live updates for one symbol of a topic on each connection.
@@ -38,23 +48,67 @@ export const CHAINLINK_FEEDS = [
   },
 ];
 
-/** @param {string} id */
-export function chainlinkFeed(id) {
-  return CHAINLINK_FEEDS.find((feed) => feed.id === id) || null;
+/** Binance trades relayed on the same socket, with the same one-symbol-per-connection rule. */
+export const BINANCE_FEEDS = [
+  {
+    id: "prices",
+    topic: "crypto_prices",
+    label: "Spot price",
+    windowSeconds: null,
+    description: "Latest Binance spot price for each pair, about once a second.",
+  },
+];
+
+const PROVIDERS = {
+  chainlink: { name: "Chainlink", feeds: CHAINLINK_FEEDS, pairs: CHAINLINK_LIVE_SOURCES },
+  binance: { name: "Binance", feeds: BINANCE_FEEDS, pairs: BINANCE_LIVE_SOURCES },
+};
+
+/** @param {string} integrationId */
+export function isPriceStreamIntegration(integrationId) {
+  return Object.hasOwn(PROVIDERS, String(integrationId || ""));
 }
 
-export const CHAINLINK_SOCKET_URL = "wss://ws-live-data.polymarket.com";
+/** @param {string} integrationId */
+export function priceStreamProviderName(integrationId) {
+  return PROVIDERS[integrationId]?.name || "";
+}
 
-/** Rows one pair sheet keeps while it streams. */
-export const CHAINLINK_STREAM_CAP = 10000;
+/** @param {string} integrationId */
+export function priceStreamFeeds(integrationId) {
+  return PROVIDERS[integrationId]?.feeds || [];
+}
+
+/** @param {string} integrationId */
+export function priceStreamPairs(integrationId) {
+  return PROVIDERS[integrationId]?.pairs || [];
+}
 
 /**
- * The pair a Chainlink pair sheet streams, or "" for any other sheet.
- * Older Chainlink sheets hold one row per coin and have an "updated" column instead of "time".
+ * @param {string} integrationId
+ * @param {string} id
+ */
+export function priceStreamFeed(integrationId, id) {
+  return priceStreamFeeds(integrationId).find((feed) => feed.id === id) || null;
+}
+
+/** @param {string} id */
+export function chainlinkFeed(id) {
+  return priceStreamFeed("chainlink", id);
+}
+
+export const PRICE_STREAM_SOCKET_URL = "wss://ws-live-data.polymarket.com";
+
+/** Rows one pair sheet keeps while it streams. */
+export const PRICE_STREAM_CAP = 10000;
+
+/**
+ * The pair a price pair sheet streams, or "" for any other sheet.
+ * Older Chainlink and Binance sheets hold one row per coin and have an "updated" column instead of "time".
  * @param {any} sheet
  */
-export function chainlinkStreamSymbol(sheet) {
-  if (!sheet || sheet.integrationId !== "chainlink") return "";
+export function priceStreamSymbol(sheet) {
+  if (!sheet || !isPriceStreamIntegration(sheet.integrationId)) return "";
   if (sheet.pull?.mode === "stream" && sheet.pull.symbol) return String(sheet.pull.symbol).toLowerCase();
   const columns = Array.isArray(sheet.columns) ? sheet.columns : [];
   if (!columns.some((column) => column?.id === "time") || columns.some((column) => column?.id === "updated")) return "";
@@ -63,24 +117,27 @@ export function chainlinkStreamSymbol(sheet) {
 }
 
 /** @param {any} sheet */
-export function isChainlinkStreamSheet(sheet) {
-  return Boolean(chainlinkStreamSymbol(sheet));
+export function isPriceStreamSheet(sheet) {
+  return Boolean(priceStreamSymbol(sheet));
 }
 
-/** @param {string} symbol */
-export function chainlinkPairTitle(symbol) {
+/**
+ * @param {string} integrationId
+ * @param {string} symbol
+ */
+export function priceStreamPairTitle(integrationId, symbol) {
   const wanted = String(symbol || "").toLowerCase();
-  return CHAINLINK_LIVE_SOURCES.find((pair) => pair.id === wanted)?.title || wanted.toUpperCase();
+  return priceStreamPairs(integrationId).find((pair) => pair.id === wanted)?.title || wanted.toUpperCase();
 }
 
 /**
  * Price points in one socket message for one pair. The first message is a snapshot of recent points.
- * The spot snapshot arrives labelled `crypto_prices`, so the topic is not checked here.
+ * The Chainlink spot snapshot arrives labelled `crypto_prices`, so the topic is not checked here.
  * @param {any} msg
  * @param {string} symbol
  * @returns {{ timestamp: number, value: number }[]}
  */
-export function chainlinkMessagePoints(msg, symbol) {
+export function priceMessagePoints(msg, symbol) {
   const payload = msg?.payload;
   if (!payload || typeof payload !== "object") return [];
   const wanted = String(symbol || "").toLowerCase();
@@ -102,7 +159,7 @@ export function chainlinkMessagePoints(msg, symbol) {
  * @param {{ timestamp: number, value: number }[]} points
  * @param {{ symbol: string, windowSeconds?: number | null, after?: number }} options
  */
-export function chainlinkRowsFromPoints(points, { symbol, windowSeconds = null, after = -Infinity }) {
+export function priceRowsFromPoints(points, { symbol, windowSeconds = null, after = -Infinity }) {
   const label = String(symbol || "").toUpperCase();
   const seen = new Set();
   const rows = [];
@@ -125,10 +182,10 @@ export function chainlinkRowsFromPoints(points, { symbol, windowSeconds = null, 
  * @param {{ timestamp: number, value: number }[]} points
  * @param {{ symbol: string, windowSeconds?: number | null, cap?: number }} options
  */
-export function mergeChainlinkRows(rows, points, { symbol, windowSeconds = null, cap = CHAINLINK_STREAM_CAP }) {
+export function mergePriceRows(rows, points, { symbol, windowSeconds = null, cap = PRICE_STREAM_CAP }) {
   const base = Array.isArray(rows) ? rows : [];
   const seen = new Set(base.map((row) => row.time));
-  const added = chainlinkRowsFromPoints(points, { symbol, windowSeconds }).filter((row) => !seen.has(row.time));
+  const added = priceRowsFromPoints(points, { symbol, windowSeconds }).filter((row) => !seen.has(row.time));
   if (!added.length) return base;
   const last = base.length ? base[base.length - 1].time : -Infinity;
   const merged = added[0].time > last ? base.concat(added) : base.concat(added).sort((a, b) => a.time - b.time);
@@ -136,17 +193,27 @@ export function mergeChainlinkRows(rows, points, { symbol, windowSeconds = null,
 }
 
 /**
- * Stream one pair on one Chainlink topic. Returns a function that closes the socket.
+ * The subscription for one pair. Both topics only answer a `{ symbol }` filter with type "*";
+ * a list filter such as `["btcusdt"]` subscribes without error and never sends a price.
+ * @param {string} topic
+ * @param {string} symbol
+ */
+export function priceStreamSubscription(topic, symbol) {
+  return { topic, type: "*", filters: JSON.stringify({ symbol: String(symbol).toLowerCase() }) };
+}
+
+/**
+ * Stream one pair on one topic. Returns a function that closes the socket.
  * @param {{ topic: string, symbol: string, onPoints: (points: { timestamp: number, value: number }[]) => void, onStatus?: (status: "connecting" | "live" | "closed") => void }} options
  */
-export function openChainlinkStream({ topic, symbol, onPoints, onStatus }) {
+export function openPriceStream({ topic, symbol, onPoints, onStatus }) {
   if (typeof WebSocket === "undefined") {
     onStatus?.("closed");
     return () => {};
   }
   let stopped = false;
   let live = false;
-  const ws = new WebSocket(CHAINLINK_SOCKET_URL);
+  const ws = new WebSocket(PRICE_STREAM_SOCKET_URL);
   const ping = setInterval(() => {
     if (ws.readyState === WebSocket.OPEN) ws.send("PING");
   }, 5000);
@@ -163,12 +230,7 @@ export function openChainlinkStream({ topic, symbol, onPoints, onStatus }) {
   onStatus?.("connecting");
   ws.onopen = () => {
     if (stopped) return;
-    ws.send(
-      JSON.stringify({
-        action: "subscribe",
-        subscriptions: [{ topic, type: "*", filters: JSON.stringify({ symbol: String(symbol).toLowerCase() }) }],
-      }),
-    );
+    ws.send(JSON.stringify({ action: "subscribe", subscriptions: [priceStreamSubscription(topic, symbol)] }));
   };
   ws.onmessage = (event) => {
     if (stopped || event.data === "PONG") return;
@@ -178,7 +240,7 @@ export function openChainlinkStream({ topic, symbol, onPoints, onStatus }) {
     } catch {
       return;
     }
-    const points = chainlinkMessagePoints(msg, symbol);
+    const points = priceMessagePoints(msg, symbol);
     if (!points.length) return;
     if (!live) {
       live = true;

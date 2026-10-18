@@ -14,6 +14,7 @@ import {
 import { useMyStateV2 } from "@/context/stateContextV2";
 import { runConnectHomeLiveStreamPull } from "@/lib/connectHomePullDestination";
 import { trackDataPullComplete, trackDataPullStart } from "@/lib/analytics/trackDataPull";
+import { priceStreamSubscription } from "@/lib/priceStreams";
 
 const RTDS_WS_URL = "wss://ws-live-data.polymarket.com";
 const PING_INTERVAL_MS = 5000;
@@ -56,13 +57,7 @@ const Binance = ({ setConnectedData, connectHomePullBridge = false }) => {
   const subscriptionMsg = useMemo(() => {
     return {
       action: "subscribe",
-      subscriptions: [
-        {
-          topic: "crypto_prices",
-          type: "update",
-          filters: JSON.stringify([symbol]),
-        },
-      ],
+      subscriptions: [priceStreamSubscription("crypto_prices", symbol)],
     };
   }, [symbol]);
 

@@ -70,7 +70,7 @@ import {
 } from "@/components/dashboardComposer/sheetRecordCache";
 import { useSheetRealtime } from "@/components/dashboardComposer/sheetRealtimeSession";
 import { realtimeSessionKey, realtimeSheetForBlock, realtimeTargetForBlock, sheetAssetIds, tailCells } from "@/lib/realtime/sheetRealtime";
-import { isChainlinkStreamSheet } from "@/lib/chainlinkFeeds";
+import { isPriceStreamSheet } from "@/lib/priceStreams";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { replayTabSheets } from "@/components/dashboardComposer/replayTabQueries";
 import { createRunReporter } from "@/components/dashboardComposer/integrationRunFeed";
@@ -1837,7 +1837,7 @@ function chartViewForBlock(block, canvas) {
   const sourceSession = source ? liveSession(canvas, source.id) : null;
   const sourceView = source?.type === "sheet" ? liveBlock(source, canvas) : null;
   const chartSheet =
-    sourceView && sourceSession?.running && !isOrderBookSheet(sourceView) && !isPriceHistorySheet(sourceView) && !isChainlinkStreamSheet(sourceView)
+    sourceView && sourceSession?.running && !isOrderBookSheet(sourceView) && !isPriceHistorySheet(sourceView) && !isPriceStreamSheet(sourceView)
       ? Array.isArray(sourceView.records) && sourceView.records.length > 80
         ? { ...sourceView, records: sourceView.records.slice(-80) }
         : sourceView.records?.length
@@ -2046,7 +2046,7 @@ function RealtimeToggle({ block }) {
   const match = realtimeSheetForBlock(block, canvas?.blocks || []);
   const session = match ? liveSession(canvas, match.sheet.id) : null;
   const running = !!session?.running;
-  const feedChart = block.type === "chart" && block.chartView === "liveline" && !!match && isChainlinkStreamSheet(match.sheet);
+  const feedChart = block.type === "chart" && block.chartView === "liveline" && !!match && isPriceStreamSheet(match.sheet);
   const feedId = feedChart ? match.sheet.id : "";
   const [tip, setTip] = useState(() => feedChart && !!block.arrive && !feedTipsShown.has(block.id));
   // The run card sits over the canvas, so the tip waits until it is dismissed.

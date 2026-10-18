@@ -1,6 +1,14 @@
 "use client";
 
-import { CHAINLINK_STREAM_CAP, chainlinkFeed, chainlinkRowsFromPoints, chainlinkStreamSymbol, openChainlinkStream } from "@/lib/chainlinkFeeds";
+import {
+  PRICE_STREAM_CAP,
+  isPriceStreamIntegration,
+  openPriceStream,
+  priceRowsFromPoints,
+  priceStreamFeed,
+  priceStreamSubscription,
+  priceStreamSymbol,
+} from "@/lib/priceStreams";
 import { flattenKalshiLiveCandlestickGroups } from "@/lib/kalshiLive/normalizeCandlestickRow";
 import { normalizeKalshiLiveOrderbook } from "@/lib/kalshiLive/normalizeOrderbookRow";
 import { normalizeKalshiLiveTradeRow } from "@/lib/kalshiLive/normalizeTradeRow";
@@ -34,11 +42,12 @@ const POLL_MS = {
  * @returns {{ stop: () => void }}
  */
 export function startSheetRealtimeTransport(block, def, handlers) {
-  const streamSymbol = def.integration === "chainlink" ? chainlinkStreamSymbol(block) : "";
-  if (def.livePath === "client_websocket" && streamSymbol) {
-    return startChainlinkPairStream(block, def, handlers, streamSymbol);
+  const priceStream = def.livePath === "client_websocket" && isPriceStreamIntegration(def.integration);
+  const streamSymbol = priceStream ? priceStreamSymbol(block) : "";
+  if (streamSymbol) {
+    return startPricePairStream(block, def, handlers, streamSymbol);
   }
-  if (def.livePath === "client_websocket" && (def.integration === "chainlink" || def.integration === "binance")) {
+  if (priceStream) {
     return startPriceSocket(block, def, handlers);
   }
   if (def.livePath === "api_poll") {
@@ -63,11 +72,8 @@ function startPriceSocket(block, def, handlers) {
   let ping = 0;
   let emitTimer = 0;
   let primed = false;
-  // Chainlink topics only stream live updates for one symbol per connection.
-  const groups =
-    def.integration === "binance"
-      ? [symbols.map((symbol) => ({ topic: def.topic, type: "update", filters: JSON.stringify([symbol]) }))]
-      : symbols.map((symbol) => [{ topic: def.topic, type: "*", filters: JSON.stringify({ symbol }) }]);
+  // Each topic only streams live updates for one symbol per connection.
+  const groups = symbols.map((symbol) => [priceStreamSubscription(def.topic, symbol)]);
   const sockets = groups.map(() => new WebSocket(def.socketUrl));
 
   const stop = () => {
@@ -160,7 +166,7 @@ function latestStreamTime(block) {
 }
 
 /** Appends each new tick to the bottom of a pair sheet. Stops at the stream cap rather than dropping old rows. */
-function startChainlinkPairStream(block, def, handlers, symbol) {
+function startPricePairStream(block, def, handlers, symbol) {
   let stopped = false;
   let cells = { ...(block.cells || {}) };
   const emptySheet = !Object.keys(cells).length;
@@ -168,14 +174,14 @@ function startChainlinkPairStream(block, def, handlers, symbol) {
   // Run sheets keep their rows in records and leave cells empty, so new cells line up after the records.
   let nextRow = Math.max(maxRow(cells) + 1, records ? records.length : 0);
   let last = latestStreamTime(block);
-  const windowSeconds = chainlinkFeed(def.endpoint)?.windowSeconds || null;
+  const windowSeconds = priceStreamFeed(def.integration, def.endpoint)?.windowSeconds || null;
   let close = () => {};
   const stop = () => {
     if (stopped) return;
     stopped = true;
     close();
   };
-  close = openChainlinkStream({
+  close = openPriceStream({
     topic: def.topic,
     symbol,
     onStatus(status) {
@@ -188,11 +194,11 @@ function startChainlinkPairStream(block, def, handlers, symbol) {
     },
     onPoints(points) {
       if (stopped) return;
-      const added = chainlinkRowsFromPoints(points, { symbol, windowSeconds, after: last });
+      const added = priceRowsFromPoints(points, { symbol, windowSeconds, after: last });
       if (!added.length) return;
-      if (nextRow + added.length > CHAINLINK_STREAM_CAP) {
+      if (nextRow + added.length > PRICE_STREAM_CAP) {
         stop();
-        handlers.onFatal(`This sheet reached ${CHAINLINK_STREAM_CAP.toLocaleString()} rows, so streaming stopped.`);
+        handlers.onFatal(`This sheet reached ${PRICE_STREAM_CAP.toLocaleString()} rows, so streaming stopped.`);
         return;
       }
       last = added[added.length - 1].time;

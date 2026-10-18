@@ -37,9 +37,10 @@ const PRIMARY_ORDER = [
   "kalshiLive",
   "polymarketHistorical",
   "polymarket",
+  "chainlink",
 ];
 
-const BETA_ORDER = ["chainlink", "binance"];
+const BETA_ORDER = ["binance"];
 
 const LOGO_BG = {
   kalshiHistorical: "bg-[#28CC95]",

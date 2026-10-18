@@ -23,8 +23,8 @@ import { MarketChart } from "@/components/spectrumui/charts/market-chart";
 import { DepthChart } from "@/components/spectrumui/charts/depth-chart";
 import { OrderBookChart } from "@/components/spectrumui/charts/order-book-chart";
 import { parseVisualNumber as parseChartNumber } from "@/lib/visualizations/visualTable";
-import { isChainlinkStreamSheet } from "@/lib/chainlinkFeeds";
-import { ChainlinkLivelineChart } from "@/components/dashboardComposer/chainlinkLivelineChart";
+import { isPriceStreamSheet } from "@/lib/priceStreams";
+import { PriceLivelineChart } from "@/components/dashboardComposer/priceLivelineChart";
 
 function looksLikeDates(labels) {
   const sample = labels.filter(Boolean).slice(0, 8);
@@ -449,7 +449,7 @@ const SUMMARY_VIEWS = new Set(["metric", "spec", "overview", "bars", "diverging"
 export function SheetBlockChart({ sheet, snapshot, onSnapshot, live = false, view = "", vizCustom = false, onViewChange, onOpenRow, onFitHeight }) {
   const storedSheet = useReadyTradeSheet(sheet?.id);
   const fullSheet = usesHistoricalTradeSheet(sheet) ? storedSheet : null;
-  const liveline = view === "liveline" || (!view && isChainlinkStreamSheet(sheet));
+  const liveline = view === "liveline" || (!view && isPriceStreamSheet(sheet));
   const priceHistory = !liveline && isPriceHistorySheet(sheet);
   const orderBook = !priceHistory && (isOrderBookSheet(sheet) || snapshot?.kind === "order-book");
   const candle = !priceHistory && !orderBook && (isCandleSheet(sheet) || snapshot?.mode === "ohlc");
@@ -472,7 +472,7 @@ export function SheetBlockChart({ sheet, snapshot, onSnapshot, live = false, vie
     });
   }, [onSnapshot, series, seriesKey, sheet]);
 
-  if (liveline) return <ChainlinkLivelineChart sheet={sheet} live={live} />;
+  if (liveline) return <PriceLivelineChart sheet={sheet} live={live} />;
   const dataset = describeSheet(sheet);
   const columnIds = (sheet?.columns || []).map((column) => columnKey(column)).filter(Boolean);
   const resolved = dataset

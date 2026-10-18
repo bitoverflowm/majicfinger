@@ -9,7 +9,7 @@ import {
   POLYMARKET_CONNECT_DATA_SOURCES,
 } from "@/config/dataLakeParquetSamples";
 import { ENDPOINTS, POLYMARKET_GROUPS } from "@/components/integrationsView/integrationPlayground/integrations/polymarket/config";
-import { CHAINLINK_LIVE_SOURCES } from "@/lib/chainlinkFeeds";
+import { BINANCE_LIVE_SOURCES, CHAINLINK_LIVE_SOURCES } from "@/lib/priceStreams";
 import {
   getKalshiColumnDisplayLabel,
   getKalshiConnectColumnsForSample,
@@ -83,14 +83,7 @@ export const LIVE_STREAM_CONNECT_COLUMNS = [
   { name: "receivedAt", type: "int", description: "When the row was received in Lychee" },
 ];
 
-export { CHAINLINK_LIVE_SOURCES };
-
-export const BINANCE_LIVE_SOURCES = [
-  { id: "btcusdt", title: "BTCUSDT", description: "Bitcoin to USDT (Binance RTDS)." },
-  { id: "ethusdt", title: "ETHUSDT", description: "Ethereum to USDT (Binance RTDS)." },
-  { id: "solusdt", title: "SOLUSDT", description: "Solana to USDT (Binance RTDS)." },
-  { id: "xrpusdt", title: "XRPUSDT", description: "XRP to USDT (Binance RTDS)." },
-];
+export { BINANCE_LIVE_SOURCES, CHAINLINK_LIVE_SOURCES };
 
 /** @param {string} integrationId */
 export function getConnectLiveStreamConfig(integrationId) {

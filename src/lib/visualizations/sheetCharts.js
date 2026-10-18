@@ -3,7 +3,7 @@ import { columnKey, countObservations, describeSheet, sheetRecords } from "@/lib
 import { statCardBlockHeight } from "@/lib/visualizations/marketPriceCards";
 import { defaultActivityCharts } from "@/lib/visualizations/activityCharts";
 import { resolveVisualization } from "@/lib/visualizations/presetRegistry";
-import { isChainlinkStreamSheet } from "@/lib/chainlinkFeeds";
+import { isPriceStreamSheet } from "@/lib/priceStreams";
 
 /** Views that stay on the sheet. They are not spawned as chart blocks. */
 const SHEET_ONLY = new Set(["", "table", "activity", "scatter", "visual-table"]);
@@ -23,7 +23,7 @@ export function chartSpecsForSheet(sheet, forcedView) {
   });
   const base = String(sheet?.title || "Sheet").replace(/\s+chart$/, "").trim() || "Sheet";
   const requested = String(forcedView || "").trim();
-  if ((!requested && isChainlinkStreamSheet(sheet)) || requested === "liveline") {
+  if ((!requested && isPriceStreamSheet(sheet)) || requested === "liveline") {
     return [{ chartView: "liveline", title: `${base} chart`, w: 680, h: 440 }];
   }
   const orderBook = !requested && (dataset?.datasetType === "orderbook" || isOrderBookSheet(sheet));

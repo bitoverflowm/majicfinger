@@ -6,7 +6,7 @@ import { IndicatorChart } from "@/components/spectrumui/charts/indicator-chart";
 import { seriesVarsClassName } from "@/components/spectrumui/charts/chart-engine";
 import { rangesForCandles } from "@/components/dashboardComposer/tradeMarketCandles";
 import { useHtmlDarkClass } from "@/hooks/use-html-dark-class";
-import { chainlinkPairTitle, chainlinkStreamSymbol } from "@/lib/chainlinkFeeds";
+import { priceStreamPairTitle, priceStreamSymbol } from "@/lib/priceStreams";
 import { parseVisualNumber } from "@/lib/visualizations/visualTable";
 import { cn } from "@/lib/utils";
 
@@ -26,7 +26,7 @@ function timeMs(value) {
 }
 
 /** Price points of a pair sheet, oldest first. Run sheets keep records; older sheets only have cells. */
-export function chainlinkSheetPoints(sheet) {
+export function priceSheetPoints(sheet) {
   const columns = Array.isArray(sheet?.columns) ? sheet.columns : [];
   const timeIndex = columns.findIndex((column) => column?.id === "time");
   const priceIndex = columns.findIndex((column) => column?.id === "price");
@@ -60,11 +60,11 @@ function formatPrice(value) {
  * Liveline while the feed streams. A stopped feed shows every price the sheet has collected,
  * not Liveline's paused view.
  */
-export function ChainlinkLivelineChart({ sheet, live = false }) {
+export function PriceLivelineChart({ sheet, live = false }) {
   const dark = useHtmlDarkClass();
-  const points = useMemo(() => chainlinkSheetPoints(sheet), [sheet]);
-  const symbol = chainlinkStreamSymbol(sheet);
-  const pair = symbol ? chainlinkPairTitle(symbol) : "";
+  const points = useMemo(() => priceSheetPoints(sheet), [sheet]);
+  const symbol = priceStreamSymbol(sheet);
+  const pair = symbol ? priceStreamPairTitle(sheet.integrationId, symbol) : "";
   const liveData = useMemo(() => (live ? points.map((point) => ({ time: point.t / 1000, value: point.price })) : []), [live, points]);
   const ranges = useMemo(() => rangesForCandles(points), [points]);
 
