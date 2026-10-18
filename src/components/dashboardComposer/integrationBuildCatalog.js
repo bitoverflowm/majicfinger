@@ -1329,7 +1329,7 @@ export function chainlinkStreamColumns(feedId) {
   return [
     column("time", "date"),
     column("symbol", "text"),
-    column("price", "number"),
+    { ...column("price", "number"), exact: true },
     ...(windowSeconds ? [column("window_seconds", "number")] : []),
   ];
 }

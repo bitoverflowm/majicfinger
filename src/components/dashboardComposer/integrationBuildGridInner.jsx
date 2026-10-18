@@ -125,6 +125,15 @@ const REF_THEME = {
   },
 };
 
+/** New rows fade from this tint to the plain cell. */
+const FRESH_ROW = { light: [139, 92, 246, 0.24], dark: [167, 139, 250, 0.3] };
+const FRESH_ROW_MS = 1100;
+
+function freshRowTheme(level, dark) {
+  const [r, g, b, peak] = FRESH_ROW[dark ? "dark" : "light"];
+  return { bgCell: `rgba(${r}, ${g}, ${b}, ${(peak * level).toFixed(3)})` };
+}
+
 function columnTheme(columnId, highlightColumnId, highlightColumnIds, referencedColumnIds, flashColumnIds, dark) {
   if (columnId && flashColumnIds?.includes(columnId)) return LYCHEE_FLASH[dark ? "dark" : "light"];
   if (columnId && (columnId === highlightColumnId || highlightColumnIds?.includes(columnId))) {
@@ -148,8 +157,26 @@ export default function IntegrationBuildGridInner({
   referencedCells = [],
   formulaEditor = null,
   onFormulaPick,
+  flashRowKey = "",
+  flashRowValues = null,
 }) {
   const dark = useHtmlDarkClass();
+  const freshRows = useMemo(() => new Set(flashRowValues || []), [flashRowValues]);
+  const [freshLevel, setFreshLevel] = useState(0);
+  useEffect(() => {
+    if (!freshRows.size) {
+      setFreshLevel(0);
+      return undefined;
+    }
+    const start = Date.now();
+    setFreshLevel(1);
+    const timer = window.setInterval(() => {
+      const level = Math.max(0, 1 - (Date.now() - start) / FRESH_ROW_MS);
+      setFreshLevel(level);
+      if (!level) window.clearInterval(timer);
+    }, 80);
+    return () => window.clearInterval(timer);
+  }, [freshRows]);
   const frameRef = useRef(null);
   const editorRef = useRef(null);
   const gridSlotRef = useRef(null);
@@ -296,13 +323,16 @@ export default function IntegrationBuildGridInner({
       const active = activeCell?.columnId === column?.id && activeCell?.row === row;
       const referenced = referencedCells.some((cell) => cell.columnId === column?.id && cell.row === row + 1);
       const flashed = flashColumnIds?.includes(column?.id);
+      const fresh = freshLevel > 0 && flashRowKey && freshRows.has(rows[row]?.[flashRowKey]);
       const themeOverride = flashed
         ? LYCHEE_FLASH[dark ? "dark" : "light"]
         : active
           ? HIGHLIGHT_THEME[dark ? "dark" : "light"]
           : referenced
             ? REF_THEME[dark ? "dark" : "light"]
-            : undefined;
+            : fresh
+              ? freshRowTheme(freshLevel, dark)
+              : undefined;
       if (column?.type === "number" && raw != null && raw !== "") {
         const parsed = Number(raw);
         const n = column.scale === "cents" && Number.isFinite(parsed) ? parsed / 100 : parsed;
@@ -328,7 +358,7 @@ export default function IntegrationBuildGridInner({
         themeOverride,
       };
     },
-    [activeCell, columns, dark, flashColumnIds, referencedKey, rows],
+    [activeCell, columns, dark, flashColumnIds, flashRowKey, freshLevel, freshRows, referencedKey, rows],
   );
 
   const reportPick = useCallback(

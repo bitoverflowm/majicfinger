@@ -19,6 +19,8 @@ export function IntegrationBuildGrid({
   referencedCells = [],
   formulaEditor = null,
   onFormulaPick,
+  flashRowKey = "",
+  flashRowValues = null,
 }) {
   return (
     <IntegrationBuildGridInner
@@ -35,6 +37,8 @@ export function IntegrationBuildGrid({
       referencedCells={referencedCells}
       formulaEditor={formulaEditor}
       onFormulaPick={onFormulaPick}
+      flashRowKey={flashRowKey}
+      flashRowValues={flashRowValues}
     />
   );
 }

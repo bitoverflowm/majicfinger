@@ -3264,7 +3264,12 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
         const next = { ...current };
         for (const [symbol, points] of batch) {
           if (!chainlinkSocketsRef.current.has(symbol)) continue;
-          next[symbol] = { status: "live", rows: mergeChainlinkRows(current[symbol]?.rows, points, { symbol, windowSeconds }) };
+          const before = current[symbol]?.rows || [];
+          const rows = mergeChainlinkRows(before, points, { symbol, windowSeconds });
+          if (rows === before) continue;
+          const lastBefore = before.length ? before[before.length - 1].time : null;
+          const fresh = lastBefore == null ? [] : rows.filter((row) => row.time > lastBefore).map((row) => row.time);
+          next[symbol] = { status: "live", rows, fresh };
         }
         return next;
       });
@@ -4828,7 +4833,8 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
     !previewRefreshing &&
     liveScan.status !== "error";
   const directedShown = liveDirect && directPreview.status === "ready" && shown > 0;
-  const previewIsEmpty = !directedShown && (previewSampleEmpty || liveSettledEmpty);
+  const previewIsEmpty = !chainlinkOn && !directedShown && (previewSampleEmpty || liveSettledEmpty);
+  const chainlinkRowTotal = chainlinkPairs.reduce((sum, symbol) => sum + (chainlinkStreams[symbol]?.rows?.length || 0), 0);
   // The grid never shows more than 50. The import count is the known size of this pull
   // (the rows in hand, a counted match, or a historical universe), then capped by the plan and row limit.
   const previewShown = Math.min(shown, PREVIEW_ROW_CAP);
@@ -4857,7 +4863,9 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
     Boolean(directPreview.truncated) &&
     (Boolean(eventColumnFilterKey) || Boolean(seriesColumnFilterKey) || Boolean(multivariateColumnFilterKey)) &&
     !(Number(rowLimit) > 0);
-  const pullTotal = previewIsEmpty
+  const pullTotal = chainlinkOn
+    ? chainlinkRowTotal
+    : previewIsEmpty
     ? 0
     : Array.isArray(listImportRows)
       ? (liveTrader &&
@@ -10816,7 +10824,11 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
         <div className="flex items-start justify-between gap-3 px-5 pb-2 pr-12 pt-5">
           <div className="min-w-0 pt-0.5">
             <h2 className="text-[15px] font-semibold text-foreground">Preview</h2>
-            {isRealtimeEnabled(integrationId, previewSheet.startsWith("live:") ? previewSheet.slice("live:".length) : tableId) ? (
+            {chainlinkOn ? (
+              <p className="mt-1 max-w-md text-[12px] leading-relaxed text-muted-foreground">
+                This preview streams live. After you run it, start realtime from the sheet on the dashboard to keep each pair streaming.
+              </p>
+            ) : isRealtimeEnabled(integrationId, previewSheet.startsWith("live:") ? previewSheet.slice("live:".length) : tableId) ? (
               <p className="mt-1 max-w-md text-[12px] leading-relaxed text-muted-foreground">
                 This endpoint qualifies for a realtime pull. Preview stays a snapshot. After you run it, start realtime from the sheet on the dashboard.
               </p>
@@ -11613,6 +11625,8 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
               columns={marketsGrid.columns}
               rows={marketsGrid.rows}
               flashColumnIds={flashColumns}
+              flashRowKey={chainlinkOn ? "time" : ""}
+              flashRowValues={chainlinkOn ? chainlinkStreams[chainlinkActivePair]?.fresh || null : null}
               highlightColumnId={flashColumns[0] || marketsGrid.highlight || mergeAddedIds[0] || (tradesJoinReady && joinPlacement === "merge" ? tradeJoinBase.highlightIds[0] || "" : "")}
               highlightColumnIds={
                 summaryOnSource
