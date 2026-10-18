@@ -65,6 +65,7 @@ const ENDPOINTS = {
       high: "price_high_dollars",
       low: "price_low_dollars",
       close: "price_close_dollars",
+      previous: "price_previous_dollars",
       volume: "volume_fp",
     },
     required: ["market_ticker", "end_period_ts", "price_open_dollars", "price_close_dollars"],
@@ -617,7 +618,9 @@ export function countObservations(sheet, dataset) {
   const field = dataset?.fields?.price || dataset?.fields?.close || dataset?.fields?.value;
   const records = sheetRecords(sheet);
   if (!field) return records.length;
-  return records.filter((row) => String(row?.[field] ?? "").trim() !== "").length;
+  const fallback = dataset?.fields?.close ? dataset.fields.previous : "";
+  const filled = (row, key) => Boolean(key) && String(row?.[key] ?? "").trim() !== "";
+  return records.filter((row) => filled(row, field) || filled(row, fallback)).length;
 }
 
 /** Attach the endpoint descriptor onto a sheet that is about to be saved. */

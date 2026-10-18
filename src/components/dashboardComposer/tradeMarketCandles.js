@@ -243,13 +243,35 @@ export function ohlcRowsToCandles(columns, rows) {
     columns,
     (title, id) => id === "volume_fp" || title === "volume fp" || title.includes("volume fp"),
   );
+  const previousIndex = findColumn(columns, (title, id) => id === "price_previous_dollars" || title === "price previous dollars");
+  const marketIndex = findColumn(columns, (title, id) => id === "market_ticker" || title === "market ticker");
   if (closeIndex < 0 || timeIndex < 0) return { candles: [], volumeLabel: "Volume fp" };
 
+  const timed = (rows || [])
+    .map((row) => ({ row, time: parseTime(row?.[timeIndex]) }))
+    .filter((entry) => Number.isFinite(entry.time))
+    .sort((a, b) => a.time - b.time);
+  const lastClose = new Map();
   const byTime = new Map();
-  for (const row of rows || []) {
-    const time = parseTime(row?.[timeIndex]);
-    const close = parseChartNumber(row?.[closeIndex]);
-    if (!Number.isFinite(time) || close == null) continue;
+  for (const { row, time } of timed) {
+    const market = marketIndex >= 0 ? String(row?.[marketIndex] ?? "") : "";
+    const traded = parseChartNumber(row?.[closeIndex]);
+    // A period with no trade has no OHLC. It holds the last price, so the chart does not skip it.
+    const close = traded ?? parseChartNumber(row?.[previousIndex]) ?? lastClose.get(market) ?? null;
+    if (close == null) continue;
+    lastClose.set(market, close);
+    if (traded == null) {
+      if (byTime.has(time)) continue;
+      byTime.set(time, {
+        t: time,
+        open: close,
+        high: close,
+        low: close,
+        close,
+        volume: sizeIndex >= 0 ? parseChartNumber(row?.[sizeIndex]) || 0 : 0,
+      });
+      continue;
+    }
     const open = parseChartNumber(row?.[openIndex]) ?? close;
     const high = parseChartNumber(row?.[highIndex]) ?? Math.max(open, close);
     const low = parseChartNumber(row?.[lowIndex]) ?? Math.min(open, close);

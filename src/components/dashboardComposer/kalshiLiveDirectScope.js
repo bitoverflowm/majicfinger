@@ -1,5 +1,6 @@
 /** One-off Kalshi Live market endpoints. These are not the markets join. */
 
+import { maxKalshiCandlestickInclusiveDays } from "@/lib/kalshiLive/candlestickCompose";
 import { KALSHI_LIVE_CANDLESTICK_PERIOD_OPTIONS } from "@/lib/kalshiLive/candlesticksColumns";
 import { KALSHI_LIVE_SERIES_CATEGORY_OPTIONS } from "@/lib/kalshiLive/kalshiLiveCategories";
 import {
@@ -517,9 +518,63 @@ export function defaultDirectAttributeFilters(tableId, now = new Date()) {
   const filters = {
     time_range: { from: range?.from || "", to: range?.to || "", preset: "past-24h" },
   };
-  if (tableId === "candlesticks") filters.period_interval = { value: "60" };
+  if (tableId === "candlesticks") {
+    filters.period_interval = { value: "60" };
+    filters.include_latest_before_start = { value: "true" };
+  }
   if (tableId === "orderbook") filters.depth = { value: "20" };
   return filters;
+}
+
+/** Request controls that sit above Columns for a market candlestick pull. */
+export const KALSHI_LIVE_CANDLE_QUERY_IDS = ["time_range", "period_interval"];
+
+/**
+ * Whole days one candlestick request can cover at this period. Kalshi sends at most 5,000 candles,
+ * so 1 minute covers 3 days and 1 hour covers 208. Daily candles have no practical cap.
+ * @param {string | number} period
+ * @returns {number | undefined}
+ */
+export function candleRangeMaxDays(period) {
+  const minutes = Number(period);
+  if (minutes === 1440) return undefined;
+  const days = maxKalshiCandlestickInclusiveDays(minutes);
+  return Number.isFinite(days) ? days : undefined;
+}
+
+function dayOffset(iso, days) {
+  const [year, month, day] = String(iso || "").split("-").map(Number);
+  if (!year || !month || !day) return "";
+  const date = new Date(year, month - 1, day + days);
+  const mm = String(date.getMonth() + 1).padStart(2, "0");
+  const dd = String(date.getDate()).padStart(2, "0");
+  return `${date.getFullYear()}-${mm}-${dd}`;
+}
+
+/** Inclusive days between two yyyy-mm-dd dates. */
+export function inclusiveDays(from, to) {
+  const start = dateKeyMs(from);
+  const end = dateKeyMs(to);
+  if (start == null || end == null) return 0;
+  return Math.round((end - start) / (DAY * 1000)) + 1;
+}
+
+function dateKeyMs(iso) {
+  const [year, month, day] = String(iso || "").split("-").map(Number);
+  if (!year || !month || !day) return null;
+  return new Date(year, month - 1, day).getTime();
+}
+
+/**
+ * Keep the end of the range and pull the start in until the range fits the period's cap.
+ * @param {{ from?: string, to?: string, preset?: string } | null | undefined} range
+ * @param {number | undefined} maxDays
+ */
+export function fitCandleRange(range, maxDays) {
+  const from = String(range?.from || "");
+  const to = String(range?.to || "");
+  if (!maxDays || !from || !to || inclusiveDays(from, to) <= maxDays) return range;
+  return { from: dayOffset(to, -(maxDays - 1)), to, preset: "" };
 }
 
 /**
@@ -666,7 +721,21 @@ export function kalshiLiveDirectAttributeColumns(tableId, columns) {
       queryOnly: true,
       control: "period",
       enumOptions: KALSHI_LIVE_CANDLESTICK_PERIOD_OPTIONS.map((option) => [String(option.value), option.label]),
-      description: "Candle Size",
+      description: "How much time each candle covers.",
+    });
+  }
+  if (tableId === "candlesticks") {
+    query.push({
+      id: "include_latest_before_start",
+      title: "Include latest before start",
+      type: "text",
+      queryOnly: true,
+      control: "period",
+      enumOptions: [
+        ["true", "On"],
+        ["false", "Off"],
+      ],
+      description: "Starts the chart from the last price before the range, so the first candle is not blank.",
     });
   }
   if (tableId === "orderbook") {
@@ -699,6 +768,9 @@ export function directPullWindow(tableId, filters, fallback = {}) {
         ? periodRaw
         : fallback.period,
     depth: Number.isFinite(depth) ? depth : Number(fallback.depth),
+    ...(tableId === "candlesticks"
+      ? { includeLatest: String(filters?.include_latest_before_start?.value ?? "true") !== "false" }
+      : {}),
   };
 }
 

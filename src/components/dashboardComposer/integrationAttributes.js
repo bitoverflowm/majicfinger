@@ -4,6 +4,7 @@ export {
   buildKalshiHistoricalFilterPredicates as buildAttributePredicates,
   JoinSourceFields,
   KalshiHistoricalAttributeFilters as AttributeFilters,
+  CandlestickQueryFields,
   PriceHistoryQueryFields,
   TradeHistoryQueryFields,
   kalshiHistoricalAttributeSpec as attributeSpec,

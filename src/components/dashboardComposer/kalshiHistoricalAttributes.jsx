@@ -17,6 +17,7 @@ import { DATE_RANGE_PRESETS, activeDateRangePreset, dateRangePreset } from "@/co
 import { clampLifeRange, defaultLifeRange, presetWithinLife } from "@/lib/markets/marketLife";
 import { KALSHI_LIVE_CANDLESTICK_PERIOD_OPTIONS } from "@/lib/kalshiLive/candlesticksColumns";
 import { KALSHI_LIVE_EVENT_FORECAST_PERIOD_OPTIONS } from "@/lib/kalshiLive/eventForecastColumns";
+import { candleRangeMaxDays, fitCandleRange, inclusiveDays } from "@/components/dashboardComposer/kalshiLiveDirectScope";
 import { polymarketTradeUser } from "@/lib/polymarketLive/polymarketQuoteQuery";
 import { cn } from "@/lib/utils";
 
@@ -1513,6 +1514,70 @@ export function PriceHistoryQueryFields({ columns, filters, onChange }) {
           >
             {fidelityOptions.map(([value, label]) => (
               <option key={value || "default"} value={value}>
+                {label}
+              </option>
+            ))}
+          </select>
+        </QueryChoice>
+      ) : null}
+    </div>
+  );
+}
+
+/**
+ * Date range and candle period for a Kalshi Live market candlestick pull.
+ * Dates stay inside the market's life, and the range never asks Kalshi for more candles than one request returns.
+ */
+export function CandlestickQueryFields({ columns, filters, onChange }) {
+  const byId = new Map((columns || []).map((column) => [column.id, column]));
+  const range = byId.get("time_range");
+  const period = byId.get("period_interval");
+  const periodOptions = period?.enumOptions || [];
+  const periodValue = periodOptions.some(([value]) => value === String(filters?.period_interval?.value ?? ""))
+    ? String(filters.period_interval.value)
+    : "60";
+  const maxDays = candleRangeMaxDays(periodValue);
+  const presetIds = DATE_RANGE_PRESETS.filter((item) => {
+    if (!maxDays) return true;
+    const window = dateRangePreset(item.id);
+    return window ? inclusiveDays(window.from, window.to) <= maxDays : false;
+  }).map((item) => item.id);
+  const periodLabel = periodOptions.find(([value]) => value === periodValue)?.[1] || "";
+  const rangeNote = maxDays
+    ? `Kalshi sends up to 5,000 candles per market, which is ${maxDays.toLocaleString()} ${maxDays === 1 ? "day" : "days"} at ${periodLabel.toLowerCase()}.`
+    : "";
+  return (
+    <div className="space-y-3">
+      {range ? (
+        <QueryChoice title="Date range" description={[range.description, rangeNote].filter(Boolean).join(". ")}>
+          <DateRangeField
+            from={filters?.time_range?.from || ""}
+            to={filters?.time_range?.to || ""}
+            presetId={filters?.time_range?.preset || ""}
+            presetIds={presetIds}
+            anchor={range.rangeAnchor}
+            bounds={range.rangeBounds}
+            maxDays={maxDays}
+            onChange={({ from, to, preset }) =>
+              onChange(patchFilter(filters, range, fitCandleRange({ from, to, preset: preset || "" }, maxDays)))
+            }
+          />
+        </QueryChoice>
+      ) : null}
+      {period ? (
+        <QueryChoice title="Period" description={period.description}>
+          <select
+            aria-label="Period"
+            value={periodValue}
+            onChange={(event) => {
+              const next = patchFilter(filters, period, { value: event.target.value });
+              const fitted = fitCandleRange(next.time_range, candleRangeMaxDays(event.target.value));
+              onChange(range && fitted !== next.time_range ? patchFilter(next, range, fitted) : next);
+            }}
+            className={querySelectClass}
+          >
+            {periodOptions.map(([value, label]) => (
+              <option key={value} value={value}>
                 {label}
               </option>
             ))}

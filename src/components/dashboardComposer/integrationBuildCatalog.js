@@ -1052,7 +1052,17 @@ async function kalshiV2Candlesticks() {
 const KALSHI_LIVE_DEFAULTS = {
   markets: ["ticker", "yes_sub_title", "status", "last_price_dollars", "yes_bid_dollars", "yes_ask_dollars", "volume_fp"],
   series: ["ticker", "title", "category", "frequency", "volume_fp"],
-  candlesticks: ["market_ticker", "end_period_ts", "price_open_dollars", "price_high_dollars", "price_low_dollars", "price_close_dollars", "volume_fp"],
+  candlesticks: [
+    "market_ticker",
+    "end_period_ts",
+    "price_open_dollars",
+    "price_high_dollars",
+    "price_low_dollars",
+    "price_close_dollars",
+    "price_previous_dollars",
+    "volume_fp",
+    "open_interest_fp",
+  ],
   trades: ["created_time", "ticker", "taker_outcome_side", "yes_price_dollars", "count_fp"],
   orderbook: ["ticker", "side", "price_dollars", "quantity_fp", "level_index"],
   events: ["event_ticker", "series_ticker", "title", "sub_title", "mutually_exclusive"],
@@ -1443,6 +1453,7 @@ export async function loadKalshiLiveCandlesticksForTicker(ticker, limit = PREVIE
     period_interval: String(period),
     per_ticker: "1",
   });
+  if (window.includeLatest !== false) params.set("include_latest_before_start", "true");
   const json = await getJsonRetry(`/api/integrations/kalshi-live/markets/candlesticks?${params}`);
   const rows = flattenKalshiLiveCandlestickGroups(json.markets);
   return { columns, rows: projectLiveJoinRows(columns, rows, rowLimit) };

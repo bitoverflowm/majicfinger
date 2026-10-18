@@ -156,6 +156,7 @@ import {
   attributeMismatchReason,
   attributeSummary,
   AttributeFilters,
+  CandlestickQueryFields,
   PriceHistoryQueryFields,
   TradeHistoryQueryFields,
   JoinSourceFields,
@@ -193,6 +194,9 @@ import {
   kalshiLiveDirectScopeError,
   defaultDirectAttributeFilters,
   directPullWindow,
+  KALSHI_LIVE_CANDLE_QUERY_IDS,
+  candleRangeMaxDays,
+  fitCandleRange,
   kalshiLiveDirectAttributeColumns,
   kalshiLiveSeriesAttributeColumns,
   kalshiLiveEventAttributeColumns,
@@ -2157,6 +2161,50 @@ const POLYMARKET_QUERY_SECTIONS = {
   },
 };
 
+/** Kalshi Live pulls whose request controls sit in their own section above Columns. */
+const KALSHI_LIVE_QUERY_SECTIONS = {
+  candlesticks: {
+    value: "candle-window",
+    title: "Candlesticks",
+    ids: KALSHI_LIVE_CANDLE_QUERY_IDS,
+  },
+};
+
+/**
+ * One trading window across the picked Kalshi markets: the earliest open through the latest close.
+ * A pasted ticker has no open or close yet, so its loaded market row fills them in.
+ * @param {Array<Record<string, any>>} picks
+ */
+function kalshiPicksLife(picks) {
+  const lives = (picks || [])
+    .filter((pick) => pick?.kind === "market")
+    .map((pick) => {
+      const row = Array.isArray(pick.rows) ? pick.rows[0] : null;
+      return lifeOfMarket({
+        openTime: pick.openTime || row?.open_time,
+        closeTime: pick.closeTime || row?.close_time,
+        marketStatus: pick.marketStatus || row?.status,
+      });
+    })
+    .filter(Boolean);
+  if (!lives.length) return null;
+  if (lives.length === 1) return lives[0];
+  const days = (key) => lives.map((life) => life[key]).filter(Boolean).sort();
+  const opens = lives.map((life) => life.openMs).filter(Number.isFinite);
+  const closes = lives.map((life) => life.closeMs).filter(Number.isFinite);
+  const stopped = lives.every((life) => life.stopped);
+  return {
+    openMs: opens.length ? Math.min(...opens) : null,
+    closeMs: closes.length ? Math.max(...closes) : null,
+    stopped,
+    trading: lives.some((life) => life.trading),
+    earliest: days("earliest")[0] || "",
+    latest: days("latest").pop() || "",
+    outcome: "",
+    status: stopped ? lives[0].status : "",
+  };
+}
+
 /**
  * Days a market's trade feed can serve. Without a wallet it reaches back three years.
  * @param {ReturnType<typeof lifeOfMarket>} life
@@ -2493,22 +2541,32 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
       : null;
   const focusedLife = useMemo(() => lifeOfMarket(focusedMarket), [focusedMarket]);
   const focusedKey = focusedMarket?.id || focusedMarket?.ticker || "";
+  const liveCandles = integrationId === "kalshiLive" && tableId === "candlesticks";
+  const candleLife = useMemo(() => (liveCandles ? kalshiPicksLife(livePicks) : null), [liveCandles, livePicks]);
+  const windowLife = liveCandles ? candleLife : focusedLife;
   useEffect(() => {
     const datesFollowMarket =
       (polymarketLive && (tableId === "getBatchPricesHistory" || tableId === "getTokenPriceHistory")) ||
       (!polymarketLive && ["trades", "candlesticks", "orderbook", "event_candlesticks", "event_forecast"].includes(tableId));
-    if (!datesFollowMarket || livePicks.length !== 1 || !focusedLife) return undefined;
-    const maxDays = tableId === "getTokenPriceHistory" ? 15 : undefined;
-    const next = defaultLifeRange(focusedLife, { maxDays });
-    if (!next?.from || !next.to) return undefined;
+    if (!datesFollowMarket || !windowLife) return undefined;
+    if (!liveCandles && livePicks.length !== 1) return undefined;
     setAttributeFilters((current) => {
+      const maxDays =
+        tableId === "getTokenPriceHistory"
+          ? 15
+          : liveCandles
+            ? candleRangeMaxDays(current?.period_interval?.value ?? "60")
+            : undefined;
+      const capped = defaultLifeRange(windowLife, { maxDays });
+      const next = capped?.preset === "past-window" && capped.from === windowLife.earliest ? { ...capped, preset: "market-life" } : capped;
+      if (!next?.from || !next.to) return current;
       const range = current?.time_range || {};
       if (range.from === next.from && range.to === next.to && range.preset === next.preset) return current;
       const patched = { ...(current || {}), time_range: next };
       return polymarketLive ? settlePolymarketQueryFilters(tableId, current, patched, focusedMarket) : patched;
     });
     return undefined;
-  }, [focusedKey, focusedLife, livePicks.length, polymarketLive, tableId]);
+  }, [focusedKey, windowLife, liveCandles, livePicks.length, polymarketLive, tableId]);
   const polymarketQuoteColumns = useMemo(() => {
     if (!polymarketLive || !isPolymarketQuoteTable(tableId)) return [];
     const columns = polymarketQuoteAttributeColumns(tableId, pull?.columns || [], attributeFilters, focusedMarket);
@@ -3000,9 +3058,20 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
     [liveMarketSearch, pull?.columns, KALSHI_LIVE_QUERY_ATTRIBUTE_COLUMNS, kalshiLiveMarketAttributeColumns],
   );
   const directAttributeColumns = useMemo(
-    () => withMarketLifeBounds((liveMarketFanout || liveEventCandles) ? kalshiLiveDirectAttributeColumns(tableId, pull?.columns || []) : [], focusedLife),
-    [focusedLife, liveEventCandles, liveMarketFanout, tableId, pull?.columns],
+    () =>
+      withMarketLifeBounds(
+        (liveMarketFanout || liveEventCandles) ? kalshiLiveDirectAttributeColumns(tableId, pull?.columns || []) : [],
+        windowLife,
+        liveCandles ? "Full market history" : "",
+      ),
+    [windowLife, liveCandles, liveEventCandles, liveMarketFanout, tableId, pull?.columns],
   );
+  const kalshiQuerySection = integrationId === "kalshiLive" ? KALSHI_LIVE_QUERY_SECTIONS[tableId] || null : null;
+  const directListColumns = useMemo(() => {
+    if (!kalshiQuerySection) return directAttributeColumns;
+    const skip = new Set(kalshiQuerySection.ids);
+    return directAttributeColumns.filter((column) => !skip.has(column.id));
+  }, [directAttributeColumns, kalshiQuerySection]);
   const forecastAttributeColumns = useMemo(
     () => withMarketLifeBounds(liveForecast ? kalshiLiveEventForecastAttributeColumns(pull?.columns || []) : [], focusedLife),
     [focusedLife, liveForecast, pull?.columns],
@@ -3582,6 +3651,7 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
                       maxTs: directWindow.maxTs,
                       period: directWindow.period,
                       depth: directWindow.depth,
+                      includeLatest: directWindow.includeLatest,
                       limit: tableId === "candlesticks" ? KALSHI_CANDLESTICK_MAX_CANDLES : PREVIEW_ROW_CAP,
                     };
     const pause = seriesMatch || eventMatch ? 280 : 0;
@@ -3625,7 +3695,7 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
       cancel = true;
       window.clearTimeout(timer);
     };
-  }, [columnRefillNonce, directEvents, directMarkets, directSeries, directWindow.depth, directWindow.maxTs, directWindow.minTs, directWindow.period, eventAttributeColumns, eventCandleEvents, eventColumnFilterKey, eventIncludeMarkets, eventIncludeMilestones, eventMinCloseTs, eventSeriesKey, eventStatusKey, forecastPercentileKey, forecastTargets, holderEventTicker, holderMinAmount, holderNicknameKey, holderSeriesTicker, liveDirect, multivariateCollection, multivariateColumnFilterKey, multivariateRowColumns, multivariateSeries, planLimit, rowLimit, sampleMarketTicker, seriesAttributeColumns, seriesCategoryKey, seriesColumnFilterKey, seriesMinUpdatedTs, seriesProductMetadata, tableId, traderCategoryKey, traderHoldingsOn, traderMetric, traderMetricsOn, traderPeriod, traderProfileKey, traderQuery]);
+  }, [columnRefillNonce, directEvents, directMarkets, directSeries, directWindow.depth, directWindow.includeLatest, directWindow.maxTs, directWindow.minTs, directWindow.period, eventAttributeColumns, eventCandleEvents, eventColumnFilterKey, eventIncludeMarkets, eventIncludeMilestones, eventMinCloseTs, eventSeriesKey, eventStatusKey, forecastPercentileKey, forecastTargets, holderEventTicker, holderMinAmount, holderNicknameKey, holderSeriesTicker, liveDirect, multivariateCollection, multivariateColumnFilterKey, multivariateRowColumns, multivariateSeries, planLimit, rowLimit, sampleMarketTicker, seriesAttributeColumns, seriesCategoryKey, seriesColumnFilterKey, seriesMinUpdatedTs, seriesProductMetadata, tableId, traderCategoryKey, traderHoldingsOn, traderMetric, traderMetricsOn, traderPeriod, traderProfileKey, traderQuery]);
 
   const seriesImportRows = useMemo(() => {
     if (!(liveDirect && tableId === "series" && directPreview.status === "ready")) return null;
@@ -7160,6 +7230,7 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
             maxTs: directWindow.maxTs,
             period: directWindow.period,
             depth: directWindow.depth,
+            includeLatest: directWindow.includeLatest,
           }).then((result) => ({ market, ...shape(result) })),
         );
         built = pulled
@@ -9721,9 +9792,34 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
             key={tableId}
             type="single"
             collapsible
-            defaultValue={polymarketQuerySection?.value || "columns"}
+            defaultValue={polymarketQuerySection?.value || kalshiQuerySection?.value || "columns"}
             className="space-y-2"
           >
+            {kalshiQuerySection ? (
+              <AccordionItem value={kalshiQuerySection.value} className="border-0">
+                <AccordionPrimitive.Header className="flex">
+                  <AccordionPrimitive.Trigger
+                    className="flex w-full items-center gap-2 rounded-lg bg-zinc-200/80 px-2.5 py-1.5 text-left text-[12px] font-semibold text-foreground dark:bg-zinc-800 [&[data-state=open]>svg]:rotate-180"
+                    aria-label={kalshiQuerySection.title}
+                  >
+                    <span className="shrink-0">{kalshiQuerySection.title}</span>
+                    <span className="ml-auto max-w-[55%] truncate text-[11px] font-normal text-[#0d99ff]">
+                      {directAttributeColumns
+                        .filter((column) => kalshiQuerySection.ids.includes(column.id))
+                        .map((column) => attributeSummary(column, attributeFilters))
+                        .filter(Boolean)
+                        .join(" · ")}
+                    </span>
+                    <ChevronDown className="size-4 shrink-0 transition-transform duration-200" />
+                  </AccordionPrimitive.Trigger>
+                </AccordionPrimitive.Header>
+                <AccordionContent className="pb-0 pt-2">
+                  <div className="rounded-lg border border-border/70 px-2 py-2">
+                    <CandlestickQueryFields columns={directAttributeColumns} filters={attributeFilters} onChange={setAttributeFilters} />
+                  </div>
+                </AccordionContent>
+              </AccordionItem>
+            ) : null}
             {polymarketQuerySection ? (
               <AccordionItem value={polymarketQuerySection.value} className="border-0">
                 <AccordionPrimitive.Header className="flex">
@@ -9831,7 +9927,7 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
                           : liveMarketSearch
                           ? liveAttributeColumns
                           : liveMarketFanout || liveEventCandles
-                            ? directAttributeColumns
+                            ? directListColumns
                             : tableId === "getMarkets" && polymarketMarketColumns.length
                               ? polymarketMarketColumns
                               : tableId === "getSamplingMarkets" && polymarketSamplingColumns.length
@@ -10623,7 +10719,7 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
               </div>
             </div>
           ) : centerSearch ? (
-            <div className="flex h-full flex-col items-center justify-center rounded-xl border border-border/70 bg-background px-6 shadow-sm">
+            <div data-search-frame="" className="flex h-full flex-col items-center justify-center rounded-xl border border-border/70 bg-background px-6 shadow-sm">
               <div className="flex w-full max-w-lg flex-col items-center gap-4 text-center">
                 <p className="text-[15px] font-medium text-foreground">{tickerPrompt}</p>
                 <div className="w-full text-left">

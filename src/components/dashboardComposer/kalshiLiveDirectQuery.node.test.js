@@ -1,5 +1,9 @@
 import assert from "node:assert/strict";
 import {
+  KALSHI_LIVE_CANDLE_QUERY_IDS,
+  candleRangeMaxDays,
+  fitCandleRange,
+  inclusiveDays,
   defaultDirectAttributeFilters,
   defaultKalshiLiveDirectQuery,
   directEventTickers,
@@ -102,11 +106,26 @@ const candleColumns = [
 const candleAttributes = kalshiLiveDirectAttributeColumns("candlesticks", candleColumns);
 assert.deepEqual(
   candleAttributes.map((column) => column.id),
-  ["time_range", "period_interval", "end_period_ts", "volume_fp", "market_ticker"],
+  ["time_range", "period_interval", "include_latest_before_start", "end_period_ts", "volume_fp", "market_ticker"],
 );
 assert.equal(candleAttributes[0].queryOnly, true);
 assert.equal(candleAttributes[1].control, "period");
-assert.equal(candleAttributes[2].dateEpoch, "unix");
+assert.deepEqual(candleAttributes[1].enumOptions.map(([, label]) => label), ["1 minute", "1 hour", "1 day"]);
+assert.equal(candleAttributes[2].queryOnly, true);
+assert.equal(candleAttributes[3].dateEpoch, "unix");
+assert.deepEqual(KALSHI_LIVE_CANDLE_QUERY_IDS, ["time_range", "period_interval"]);
+assert.equal(candleRangeMaxDays("1"), 3);
+assert.equal(candleRangeMaxDays("60"), 208);
+assert.equal(candleRangeMaxDays("1440"), undefined);
+assert.equal(inclusiveDays("2026-10-01", "2026-10-03"), 3);
+assert.deepEqual(fitCandleRange({ from: "2026-09-01", to: "2026-10-05", preset: "market-life" }, 3), {
+  from: "2026-10-03",
+  to: "2026-10-05",
+  preset: "",
+});
+const shortRange = { from: "2026-10-04", to: "2026-10-05", preset: "past-24h" };
+assert.equal(fitCandleRange(shortRange, 3), shortRange);
+assert.equal(fitCandleRange(shortRange, undefined), shortRange);
 
 const tradeAttributes = kalshiLiveDirectAttributeColumns("trades", [
   { id: "created_time", type: "date", title: "Created time" },
@@ -135,6 +154,11 @@ assert.equal(seeded.period_interval.value, "60");
 const windowed = directPullWindow("candlesticks", seeded, query);
 assert.equal(windowed.period, 60);
 assert.ok(windowed.maxTs > windowed.minTs);
+assert.equal(seeded.include_latest_before_start.value, "true");
+assert.equal(windowed.includeLatest, true);
+assert.equal(directPullWindow("candlesticks", { ...seeded, include_latest_before_start: { value: "false" } }, query).includeLatest, false);
+assert.equal(directPullWindow("candlesticks", { time_range: seeded.time_range }, query).includeLatest, true);
+assert.equal("includeLatest" in directPullWindow("trades", seeded, query), false);
 const bookWindow = directPullWindow("orderbook", { depth: { value: "5" }, time_range: seeded.time_range }, query);
 assert.equal(bookWindow.depth, 5);
 assert.equal(bookWindow.minTs, query.minTs);

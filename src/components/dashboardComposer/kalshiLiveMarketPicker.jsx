@@ -263,11 +263,20 @@ export function KalshiLiveMarketPicker({ picks, onAdd, onRemove, intent = "marke
     if (!el) return;
     const rect = el.getBoundingClientRect();
     const dialog = el.closest("[role='dialog']");
-    const limitRight = dialog ? dialog.getBoundingClientRect().right - 20 : window.innerWidth - 20;
-    const width = Math.min(720, Math.max(rect.width, limitRight - rect.left));
     const dialogBottom = dialog ? dialog.getBoundingClientRect().bottom : window.innerHeight;
     const listTop = rect.bottom + 4;
     const listMax = Math.max(180, Math.min(dialogBottom, window.innerHeight) - listTop - 16);
+    const frame = el.closest("[data-search-frame]")?.getBoundingClientRect();
+    if (frame) {
+      const inset = 24;
+      const width = Math.max(rect.width, Math.min(720, frame.width - inset * 2));
+      const centered = rect.left + rect.width / 2 - width / 2;
+      const left = Math.max(frame.left + inset, Math.min(centered, frame.right - inset - width));
+      setBox({ top: rect.top, left, width, listMax });
+      return;
+    }
+    const limitRight = dialog ? dialog.getBoundingClientRect().right - 20 : window.innerWidth - 20;
+    const width = Math.min(720, Math.max(rect.width, limitRight - rect.left));
     setBox({ top: rect.top, left: rect.left, width, listMax });
   }, []);
 

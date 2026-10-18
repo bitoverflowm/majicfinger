@@ -63,6 +63,36 @@ assert.equal(ohlc.candles[0].volume, 120);
 assert.equal(ohlc.candles[1].close, 0.57);
 assert.equal(ohlc.candles[1].volume, 90);
 
+const liveCandleColumns = [
+  { id: "market_ticker", title: "Market Ticker" },
+  { id: "end_period_ts", title: "End Period Ts", type: "date" },
+  { id: "price_open_dollars", title: "Price Open Dollars" },
+  { id: "price_high_dollars", title: "Price High Dollars" },
+  { id: "price_low_dollars", title: "Price Low Dollars" },
+  { id: "price_close_dollars", title: "Price Close Dollars" },
+  { id: "price_previous_dollars", title: "Price Previous Dollars" },
+  { id: "volume_fp", title: "Volume Fp" },
+];
+const unix = (ms) => String(Math.floor(ms / 1000));
+const gapped = ohlcRowsToCandles(liveCandleColumns, [
+  ["KX-A", unix(start + 2 * HOUR), "", "", "", "", "0.44", "0"],
+  ["KX-A", unix(start), "", "", "", "", "0.41", "0"],
+  ["KX-A", unix(start + HOUR), "0.42", "0.46", "0.40", "0.44", "0.41", "15"],
+  ["KX-A", unix(start + 3 * HOUR), "", "", "", "", "", "0"],
+]);
+assert.deepEqual(gapped.candles.map((candle) => candle.close), [0.41, 0.44, 0.44, 0.44]);
+assert.deepEqual(gapped.candles.map((candle) => candle.volume), [0, 15, 0, 0]);
+assert.equal(gapped.candles[0].high, 0.41);
+assert.equal(gapped.candles[1].high, 0.46);
+const unpriced = ohlcRowsToCandles(liveCandleColumns, [["KX-B", unix(start), "", "", "", "", "", "0"]]);
+assert.equal(unpriced.candles.length, 0);
+const twoMarkets = ohlcRowsToCandles(liveCandleColumns, [
+  ["KX-A", unix(start), "0.30", "0.30", "0.30", "0.30", "", "1"],
+  ["KX-B", unix(start), "", "", "", "", "0.90", "0"],
+]);
+assert.equal(twoMarkets.candles.length, 1);
+assert.equal(twoMarkets.candles[0].close, 0.3);
+
 const poly = tradesToCandles(
   [
     { id: "observed_at", title: "Observed At" },
