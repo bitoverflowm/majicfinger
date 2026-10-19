@@ -7315,7 +7315,7 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
     if (enrichPicks.has("summarize")) planned.push({ id: "summary", name: "summarize", status: "pending" });
     if (enrichPicks.has("function")) planned.push({ id: "functions", name: "function_columns", status: "pending" });
     planned.push({ id: "place", name: "place_sheets", status: "pending", args: { tab: sheetTitle } });
-    reporter.plan(planned, { title: `${venueLabel} · ${sheetTitle}` });
+    reporter.plan(planned, { title: `${venueLabel} · ${sheetTitle}`, firstPull: !pulls.length });
     connect?.close?.();
     let marketRows = liveMatchedRows
       ? liveMatchedRows

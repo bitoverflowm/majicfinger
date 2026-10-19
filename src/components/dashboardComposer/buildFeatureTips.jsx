@@ -1,10 +1,11 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import confetti from "canvas-confetti";
 import { motion } from "framer-motion";
-import { Check, Filter, Lock, Search, Sheet } from "lucide-react";
+import { Check, Filter, LayoutDashboard, Lock, PartyPopper, Search, Sheet, Sparkles } from "lucide-react";
 
-import { FeatureTip, usePrefersReducedMotion } from "@/components/ui/feature-tip";
+import { FeatureTip, useFeatureTipDismissal, usePrefersReducedMotion } from "@/components/ui/feature-tip";
 import { cn } from "@/lib/utils";
 
 /**
@@ -705,6 +706,136 @@ export function SaveRunFeatureTip({ anchorRef, open = true }) {
       sideOffset={14}
       title="Start your pull"
       description="Hit this to start your full data pulls."
+      action={{ label: "Ok" }}
+      closeOnAction
+    />
+  );
+}
+
+/* ---------- First pull ---------- */
+
+export const FIRST_PULL_TIP_ID = "integration-build-first-pull";
+
+const CONFETTI_COLORS = ["#0d99ff", "#5cb8ff", "#0b6fc2", "#b3defe", "#ffc83d", "#ffffff"];
+
+function burstConfetti() {
+  const base = { colors: CONFETTI_COLORS, startVelocity: 44, gravity: 0.9, ticks: 240, zIndex: 590, disableForReducedMotion: true };
+  confetti({ ...base, particleCount: 120, spread: 80, origin: { y: 0.6 } });
+  window.setTimeout(() => confetti({ ...base, particleCount: 55, angle: 60, spread: 58, origin: { x: 0, y: 0.72 } }), 160);
+  window.setTimeout(() => confetti({ ...base, particleCount: 55, angle: 120, spread: 58, origin: { x: 1, y: 0.72 } }), 280);
+}
+
+const MEDIA_CONFETTI_COLORS = ["#0d99ff", "#5cb8ff", "#0b6fc2", "#ffc83d", "#ff8a65"];
+// Falling pieces in the tip's media box: left %, delay s, fall time s, color index, spin deg, round.
+const MEDIA_CONFETTI = [
+  [6, 0, 2.8, 0, 260, false],
+  [14, 1.1, 3.2, 4, -200, true],
+  [22, 0.5, 2.6, 1, 220, false],
+  [31, 1.8, 3, 3, -280, false],
+  [39, 0.2, 3.4, 2, 180, true],
+  [48, 1.4, 2.7, 0, -240, false],
+  [57, 0.8, 3.1, 4, 300, false],
+  [65, 2, 2.9, 1, -180, true],
+  [73, 0.3, 3.3, 3, 240, false],
+  [81, 1.6, 2.6, 0, -300, false],
+  [89, 0.9, 3, 2, 200, true],
+  [95, 2.3, 3.2, 4, -220, false],
+];
+const DASHBOARD_BARS = [38, 62, 46, 80, 58, 92];
+// Blank, bars rise, badge pops and holds, fade.
+const FIRST_PULL_STEPS = [350, 900, 3200, 500];
+
+function FirstPullTipAnimation() {
+  const { step, reduced } = useLoopStep(FIRST_PULL_STEPS);
+  const rising = step >= 1;
+  const done = step >= 2;
+  const fading = step === FIRST_PULL_STEPS.length - 1 && !reduced;
+
+  return (
+    <div aria-hidden className="absolute inset-0">
+      {MEDIA_CONFETTI.map(([left, delay, fall, color, spin, round], index) => (
+        <motion.span
+          key={index}
+          className={cn("absolute top-0", round ? "size-[6px] rounded-full" : "h-[9px] w-[4px] rounded-[1px]")}
+          style={{ left: `${left}%`, backgroundColor: MEDIA_CONFETTI_COLORS[color] }}
+          initial={reduced ? false : { y: -16, rotate: 0, opacity: 0 }}
+          animate={reduced ? { y: 18 + ((index * 37) % 110), rotate: spin / 4, opacity: 0.85 } : { y: [-16, 160], rotate: [0, spin], opacity: [0, 1, 1, 0] }}
+          transition={reduced ? { duration: 0 } : { duration: fall, delay, repeat: Infinity, ease: "linear" }}
+        />
+      ))}
+
+      <div className={cn("absolute inset-0 flex items-center justify-center transition-opacity duration-500", fading ? "opacity-0" : "opacity-100")}>
+        <div className="relative w-[156px] rounded-lg bg-white p-2.5 shadow-sm dark:bg-neutral-900">
+          <div className="flex items-center gap-1.5">
+            <LayoutDashboard className="size-3 text-[#0d99ff]" />
+            <span className="text-[9px] font-semibold text-neutral-700 dark:text-neutral-200">Your dashboard</span>
+          </div>
+          <div className="mt-2 flex h-[46px] items-end gap-1.5 border-b border-neutral-200 pb-px dark:border-neutral-700">
+            {DASHBOARD_BARS.map((height, index) => (
+              <span
+                key={index}
+                className="flex-1 origin-bottom rounded-t-[2px] bg-gradient-to-t from-[#0d99ff] to-[#5cb8ff]"
+                style={{
+                  height: `${height}%`,
+                  transform: rising ? "scaleY(1)" : "scaleY(0)",
+                  transition: reduced ? "none" : `transform 520ms cubic-bezier(0.23,1,0.32,1) ${index * 70}ms`,
+                }}
+              />
+            ))}
+          </div>
+          <div className="mt-2 space-y-1">
+            <span className="block h-1 w-[78%] rounded-full bg-neutral-200 dark:bg-neutral-700" />
+            <span className="block h-1 w-[52%] rounded-full bg-neutral-200 dark:bg-neutral-700" />
+          </div>
+
+          {done ? (
+            <motion.span
+              className="absolute -right-3 -top-3 grid size-8 place-items-center rounded-full bg-[#0d99ff] text-white shadow-[0_0_0_3px_#fff] dark:shadow-[0_0_0_3px_#171717]"
+              initial={reduced ? false : { scale: 0, rotate: -30 }}
+              animate={{ scale: 1, rotate: 0 }}
+              transition={{ type: "spring", stiffness: 420, damping: 16 }}
+            >
+              {!reduced ? <span className="absolute inset-0 animate-ping rounded-full bg-[#0d99ff]/40 [animation-iteration-count:2]" /> : null}
+              <PartyPopper className="relative size-4" strokeWidth={2.25} />
+            </motion.span>
+          ) : null}
+          {done ? (
+            <>
+              <Sparkles className={cn("absolute -left-4 top-1 size-3.5 text-[#ffc83d]", !reduced && "animate-in fade-in-0 zoom-in-50 duration-500")} />
+              <Sparkles className={cn("absolute -bottom-3 -right-1 size-3 text-[#5cb8ff]", !reduced && "animate-in fade-in-0 zoom-in-50 delay-150 duration-500")} />
+            </>
+          ) : null}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * After the first pull that finishes, next to View dashboard. Bursts confetti when it opens.
+ * Clicking View dashboard (or closing the run card) counts as seeing it.
+ */
+export function FirstPullFeatureTip({ anchorRef, runId, open = true }) {
+  const { dismissed } = useFeatureTipDismissal(FIRST_PULL_TIP_ID);
+  const celebratedRef = useRef(null);
+  useEffect(() => {
+    if (!open || dismissed !== false || !runId || celebratedRef.current === runId) return;
+    celebratedRef.current = runId;
+    burstConfetti();
+  }, [open, dismissed, runId]);
+
+  return (
+    <FeatureTip
+      id={FIRST_PULL_TIP_ID}
+      anchorRef={anchorRef}
+      open={open}
+      side="right"
+      align="center"
+      sideOffset={14}
+      className="w-[288px]"
+      media={<FirstPullTipAnimation />}
+      title="Hooray, you ran your 1st pull!"
+      description="Congratulations, you ran your first pull. Click here to take a look at your Lychee dashboard."
       action={{ label: "Ok" }}
       closeOnAction
     />

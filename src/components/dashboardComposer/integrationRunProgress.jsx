@@ -1,8 +1,10 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Check, ChevronDown, CircleDashed, X } from "lucide-react";
 import { composeFailureMessage } from "@/components/dashboardComposer/integrationRunFeed";
+import { FIRST_PULL_TIP_ID, FirstPullFeatureTip } from "@/components/dashboardComposer/buildFeatureTips";
+import { dismissFeatureTip } from "@/components/ui/feature-tip";
 import { cn } from "@/lib/utils";
 
 const KEYFRAMES = `
@@ -149,6 +151,7 @@ function runSucceeded(feed) {
 
 export function RunProgressCard({ feed, onDismiss, onReplay }) {
   const [now, setNow] = useState(() => Date.now());
+  const viewButtonRef = useRef(null);
   const live = feed?.status === "running";
   useEffect(() => {
     if (!live) return undefined;
@@ -158,6 +161,10 @@ export function RunProgressCard({ feed, onDismiss, onReplay }) {
   if (!feed?.steps?.length) return null;
   const elapsed = formatElapsed((feed.completedAt || now) - (feed.startedAt || now));
   const succeeded = runSucceeded(feed);
+  const close = () => {
+    if (succeeded && feed.firstPull) dismissFeatureTip(FIRST_PULL_TIP_ID);
+    onDismiss?.();
+  };
   return (
     <div className="pointer-events-none absolute inset-x-0 bottom-0 top-[var(--dashboard-tab-clearance,0px)] z-30 flex items-center justify-center p-6">
       <section
@@ -184,7 +191,7 @@ export function RunProgressCard({ feed, onDismiss, onReplay }) {
                     Replay
                   </button>
                 ) : null}
-                <button type="button" onClick={onDismiss} className="rounded-md px-1.5 py-0.5 text-[12px] font-medium text-muted-foreground hover:bg-muted/60 hover:text-foreground">
+                <button type="button" onClick={close} className="rounded-md px-1.5 py-0.5 text-[12px] font-medium text-muted-foreground hover:bg-muted/60 hover:text-foreground">
                   Close
                 </button>
               </>
@@ -199,12 +206,14 @@ export function RunProgressCard({ feed, onDismiss, onReplay }) {
             <p className="text-[13px] font-semibold text-foreground">Your dashboard is ready</p>
             <p className="mt-0.5 text-[12px] leading-relaxed text-muted-foreground">{feed.readyDetail || "The sheets are on the canvas behind this card."}</p>
             <button
+              ref={viewButtonRef}
               type="button"
-              onClick={onDismiss}
+              onClick={close}
               className="mt-3 inline-flex w-full items-center justify-center rounded-lg bg-foreground px-3 py-2 text-[13px] font-medium text-background hover:opacity-90"
             >
               View dashboard
             </button>
+            {feed.firstPull ? <FirstPullFeatureTip anchorRef={viewButtonRef} runId={feed.id} /> : null}
           </footer>
         ) : null}
       </section>
