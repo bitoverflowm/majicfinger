@@ -151,7 +151,13 @@ export function FeatureTipCard({
         </div>
       ) : null}
       {description ? (
-        <p id={descriptionId} className="px-4 pt-3 text-[13px] leading-[1.45] text-neutral-800 dark:text-neutral-200">
+        <p
+          id={descriptionId}
+          className={cn(
+            "px-4 text-[13px] leading-[1.45] text-neutral-800 dark:text-neutral-200",
+            media || !(title || onClose) ? "pt-3" : "pt-0",
+          )}
+        >
           {description}
         </p>
       ) : null}

@@ -3,6 +3,7 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { columnMissingFromRows } from "@/lib/integrations/columnPayload";
 import { LandingDemoMembersOnlyDialog } from "@/components/dashboardComposer/landingDemoMembersOnly";
+import { FeatureTip } from "@/components/ui/feature-tip";
 import { ArrowLeft, Check, ChevronDown, History, Info } from "lucide-react";
 import { IntegrationBuildGrid } from "@/components/dashboardComposer/integrationBuildGrid";
 import { claimSheetId, displayMatrix, recordsFromRows } from "@/components/dashboardComposer/integrationRunSheets";
@@ -2678,6 +2679,7 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
   const [universe, setUniverse] = useState(null);
   const [counting, setCounting] = useState(false);
   const formulaCaretRef = useRef(0);
+  const dataTypePickerRef = useRef(null);
   const blurToken = useRef(0);
   const activeBucket = bucketItems.find((item) => item.id === activeBucketId) || bucketItems[0];
   const bucketColumnId = activeBucket?.columnId || "";
@@ -10433,6 +10435,7 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
         </div>
         <div className="min-h-0 flex-1 space-y-5 overflow-y-auto px-4 pb-4">
           <div>
+            <div ref={dataTypePickerRef}>
             {groups ? (
               <div className="mb-2 flex flex-wrap gap-1.5" role="tablist" aria-label={source?.name || "Integration"}>
                 {groups.map((group) => {
@@ -10488,6 +10491,20 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
                 ))}
               </DropdownMenuContent>
             </DropdownMenu>
+            ) : null}
+            </div>
+            {groups || visibleTableIds.length > 1 ? (
+              <FeatureTip
+                id="integration-build-data-type"
+                anchorRef={dataTypePickerRef}
+                side="right"
+                align="start"
+                sideOffset={14}
+                title="Select a Data Type"
+                description="Start by selecting any tag option or pick from the dropdown, depending on what you are interested in, to start constructing your data. As you make selections the preview panel will update immediately."
+                action={{ label: "Ok" }}
+                closeOnAction
+              />
             ) : null}
             {pairStreamOn ? (
               <div className="mt-3">
