@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useState } from "react";
 import * as PopoverPrimitive from "@radix-ui/react-popover";
 import { X } from "lucide-react";
 
@@ -73,6 +73,32 @@ export function useFeatureTipDismissal(id, { persist } = {}) {
   return { dismissed, dismiss, reset };
 }
 
+const useIsomorphicLayoutEffect = typeof window === "undefined" ? useEffect : useLayoutEffect;
+
+/** Tips that are on screen, or about to be. Lets a tip wait for another (`after`) across components. */
+const pendingTips = new Map();
+const pendingListeners = new Set();
+
+function setTipPending(id, on) {
+  const count = (pendingTips.get(id) || 0) + (on ? 1 : -1);
+  if (count > 0) pendingTips.set(id, count);
+  else pendingTips.delete(id);
+  pendingListeners.forEach((listener) => listener());
+}
+
+function useAnyTipPending(ids) {
+  const list = (Array.isArray(ids) ? ids : ids ? [ids] : []).join("|");
+  const check = useCallback(() => !!list && list.split("|").some((id) => pendingTips.has(id)), [list]);
+  const [pending, setPending] = useState(check);
+  useIsomorphicLayoutEffect(() => {
+    const update = () => setPending(check());
+    update();
+    pendingListeners.add(update);
+    return () => pendingListeners.delete(update);
+  }, [check]);
+  return pending;
+}
+
 const CARD_SURFACE = "bg-white text-neutral-800 dark:bg-[#2c2c2c] dark:text-neutral-100";
 const CARD_SHADOW =
   "[filter:drop-shadow(0_0_0.5px_rgba(0,0,0,0.18))_drop-shadow(0_1px_3px_rgba(0,0,0,0.1))_drop-shadow(0_5px_12px_rgba(0,0,0,0.13))] dark:[filter:drop-shadow(0_0_1px_rgba(255,255,255,0.12))_drop-shadow(0_5px_12px_rgba(0,0,0,0.45))]";
@@ -99,6 +125,7 @@ function TipAction({ action, primary }) {
 
 /**
  * The tip box. `media` takes any node: an image, an illustration or an animation.
+ * `description` is a string/node, or an array of them for separate paragraphs.
  * `action` / `secondaryAction` take `{ label, onClick, icon? }` or a custom node.
  * `step` (`{ current, total }`) shows "2 of 4" for multi-tip tours.
  */
@@ -151,15 +178,17 @@ export function FeatureTipCard({
         </div>
       ) : null}
       {description ? (
-        <p
+        <div
           id={descriptionId}
           className={cn(
-            "px-4 text-[13px] leading-[1.45] text-neutral-800 dark:text-neutral-200",
+            "space-y-2 px-4 text-[13px] leading-[1.45] text-neutral-800 dark:text-neutral-200",
             media || !(title || onClose) ? "pt-3" : "pt-0",
           )}
         >
-          {description}
-        </p>
+          {(Array.isArray(description) ? description : [description]).map((line, index) => (
+            <p key={index}>{line}</p>
+          ))}
+        </div>
       ) : null}
       {children ? <div className="px-4 pt-3">{children}</div> : null}
       {hasFooter ? (
@@ -189,6 +218,7 @@ export function FeatureTipCard({
  * flips automatically when there isn't room.
  *
  * Visibility is `open` (controlled) or automatic: shown unless the user closed it before.
+ * `after` (tip id or ids) holds this tip back while those tips are still showing.
  * Closing (X or Escape) calls `onDismiss` and is remembered under `id`.
  */
 export function FeatureTip({
@@ -205,12 +235,21 @@ export function FeatureTip({
   portalContainer,
   contentClassName,
   closeOnAction = false,
+  after,
   action,
   secondaryAction,
   ...cardProps
 }) {
   const { dismissed, dismiss } = useFeatureTipDismissal(id, { persist });
-  const shown = dismissed === false && (open ?? true);
+  const wanted = dismissed !== true && (open ?? true);
+  const waiting = useAnyTipPending(after);
+  const shown = dismissed === false && wanted && !waiting;
+
+  useIsomorphicLayoutEffect(() => {
+    if (!id || !wanted) return;
+    setTipPending(id, true);
+    return () => setTipPending(id, false);
+  }, [id, wanted]);
   const titleId = id ? `feature-tip-${id}-title` : undefined;
   const descriptionId = id ? `feature-tip-${id}-description` : undefined;
 

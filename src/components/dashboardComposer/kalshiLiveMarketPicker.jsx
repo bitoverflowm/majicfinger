@@ -27,6 +27,7 @@ import {
 import { KALSHI_LIVE_QUERY_ATTRIBUTE_COLUMNS } from "@/lib/kalshiLive/liveMarketAttributeQuery";
 import { inferSeriesTickerFromEvent } from "@/lib/kalshiLive/eventCandlesticksCompose";
 import { cn } from "@/lib/utils";
+import { SearchFeatureTip } from "@/components/dashboardComposer/searchFeatureTip";
 
 const STATUS_OPTIONS = [
   ["initialized", "Initialized"],
@@ -245,7 +246,7 @@ const inputClassName =
  * Kalshi Live market search. Focusing the field expands it over the preview so
  * suggestions match the legacy ticker search. A series opens the market picker.
  */
-export function KalshiLiveMarketPicker({ picks, onAdd, onRemove, intent = "markets", required = false }) {
+export function KalshiLiveMarketPicker({ picks, onAdd, onRemove, intent = "markets", required = false, tipSide = "right" }) {
   const [query, setQuery] = useState("");
   const [suggestions, setSuggestions] = useState([]);
   const [expanded, setExpanded] = useState(false);
@@ -826,6 +827,13 @@ export function KalshiLiveMarketPicker({ picks, onAdd, onRemove, intent = "marke
         <div ref={anchorRef} className={cn(expanded && "invisible")}>
           {searchField(false)}
         </div>
+        <SearchFeatureTip
+          anchorRef={anchorRef}
+          kind={intent === "events" ? "event" : intent === "series" ? "series" : intent === "forecast" ? "forecast" : "market"}
+          required={intent === "forecast" || required}
+          side={tipSide}
+          open={!expanded}
+        />
         {expanded && box && typeof document !== "undefined"
           ? createPortal(
               <>

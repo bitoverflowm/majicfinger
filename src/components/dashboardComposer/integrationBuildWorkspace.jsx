@@ -11608,6 +11608,7 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
                     placeholder={polymarketSearch?.placeholder || "Search for a market"}
                     acceptAddress={Boolean(polymarketSearch?.acceptAddress)}
                     required
+                    tipSide="bottom"
                   />
                 </div>
               </div>
@@ -11623,6 +11624,7 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
                     onAdd={addDirectPick}
                     onRemove={removeLivePick}
                     required={needsTickerSearch}
+                    tipSide="bottom"
                   />
                 </div>
               </div>

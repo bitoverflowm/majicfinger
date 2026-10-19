@@ -1,7 +1,9 @@
 "use client";
 
+import { useRef, useState } from "react";
 import { X } from "lucide-react";
 import { PolymarketLiveSearch } from "@/components/connectData/polymarketLive/PolymarketLiveSearch";
+import { SearchFeatureTip } from "@/components/dashboardComposer/searchFeatureTip";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
 /**
@@ -16,10 +18,21 @@ export function PolymarketLiveBuildSearch({
   placeholder = "Search for a market",
   required = false,
   acceptAddress = false,
+  tipSide = "right",
 }) {
+  const searchRef = useRef(null);
+  const [searching, setSearching] = useState(false);
+  const tipKind = entities.includes("market") ? "market" : entities.includes("event") ? "event" : null;
   return (
     <div className="space-y-2">
-      <div className="relative">
+      <div
+        ref={searchRef}
+        className="relative"
+        onFocusCapture={() => setSearching(true)}
+        onBlurCapture={(event) => {
+          if (!event.currentTarget.contains(event.relatedTarget)) setSearching(false);
+        }}
+      >
         {required ? (
           <span className="pointer-events-none absolute right-3 top-2.5 z-10 text-[13px] font-medium text-destructive" aria-hidden>
             *
@@ -37,6 +50,9 @@ export function PolymarketLiveBuildSearch({
           onSelect={(suggestion) => onAdd?.(suggestion)}
         />
       </div>
+      {tipKind ? (
+        <SearchFeatureTip anchorRef={searchRef} kind={tipKind} required={required} side={tipSide} open={!searching} />
+      ) : null}
       {picks.length ? (
         <TooltipProvider>
           <div className="flex flex-wrap gap-1 pt-0.5">
