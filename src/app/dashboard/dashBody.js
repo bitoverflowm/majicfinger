@@ -28,6 +28,7 @@ import { membershipTierLabel } from "@/lib/membershipLabel";
 import { WorkspaceComposerDockProvider } from "@/components/dashboardComposer/workspaceComposerDock";
 import { WorkspaceCanvas } from "@/components/dashboardComposer/workspaceCanvas";
 import { WorkspaceWelcomeLayer } from "@/components/dashboardComposer/blankDashboardEmpty";
+import { IntegrationConnectInline } from "@/components/dashboardComposer/integrationConnectDialog";
 import { cn } from "@/lib/utils";
 
 import { debounce } from "@/lib/debounce";
@@ -436,6 +437,12 @@ const DashBody = ({ user }) => {
                       />
                     }
                     connectHome={
+                      contextStateV2?.landingDemo ? (
+                        <IntegrationConnectInline
+                          className={contextStateV2?.landingDemoActive ? "pb-16" : undefined}
+                          onSelectIntegration={() => contextStateV2?.activateLandingDemo?.()}
+                        />
+                      ) : (
                       <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
                         <ConnectHomeShell
                           user={user}
@@ -444,6 +451,7 @@ const DashBody = ({ user }) => {
                           setStartNew={setStartNew}
                         />
                       </div>
+                      )
                     }
                   />
                 )}

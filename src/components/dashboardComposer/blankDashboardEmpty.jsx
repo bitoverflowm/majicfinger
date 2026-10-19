@@ -105,9 +105,14 @@ export function BlankDashboardEmpty() {
  */
 export function WorkspaceWelcomeLayer({ viewing, navChromeExpanded, checkout, connectHome }) {
   const canvas = useWorkspaceCanvas();
+  const connect = useIntegrationConnect();
   const ctx = useMyStateV2();
+  const landingDemo = !!ctx?.landingDemo;
   const active = (ctx?.workspaceStartTabs || []).find((tab) => tab.id === ctx?.activeWorkspaceStartTabId);
-  const blankTab = viewing === "welcome" && !!active?.blank;
+  // Landing demo: once the inline connect flow closes, its home view is the canvas.
+  const landingConnect = landingDemo && viewing === "connectDataHome" && !!connect?.inlineOpen;
+  const landingCanvas = landingDemo && viewing === "connectDataHome" && !connect?.inlineOpen;
+  const blankTab = (viewing === "welcome" && !!active?.blank) || landingCanvas;
   const showEmpty = blankTab && !!canvas?.ready && !(canvas?.blocks || []).length && !canvas?.runFeed;
   const cover = !blankTab;
 
@@ -116,13 +121,18 @@ export function WorkspaceWelcomeLayer({ viewing, navChromeExpanded, checkout, co
       className={cn(
         "flex min-h-0 -my-1 flex-col",
         cover
-          ? cn("bg-background", navChromeExpanded ? "h-svh" : "h-[calc(100svh-3.5rem)]")
+          ? cn(
+              "bg-background",
+              landingDemo ? "flex-1" : navChromeExpanded ? "h-svh" : "h-[calc(100svh-3.5rem)]",
+            )
           : "pointer-events-none absolute inset-0 z-30",
       )}
     >
-      <div className={cover ? undefined : "pointer-events-auto"}>
-        <WorkspaceStartTabs welcomeActive={viewing === "welcome"} onOpenWelcome={() => ctx?.setViewing?.("welcome")} />
-      </div>
+      {landingConnect ? null : (
+        <div className={cover ? undefined : "pointer-events-auto"}>
+          <WorkspaceStartTabs welcomeActive={viewing === "welcome"} onOpenWelcome={() => ctx?.setViewing?.("welcome")} />
+        </div>
+      )}
       {blankTab ? showEmpty ? <BlankDashboardEmpty /> : null : viewing === "welcome" ? checkout : connectHome}
     </div>
   );

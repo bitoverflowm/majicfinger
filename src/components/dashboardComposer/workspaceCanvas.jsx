@@ -355,7 +355,10 @@ export function WorkspaceCanvasProvider({ pageId, readOnly = false, children }) 
   const signedInRef = useRef("");
   if (user?.userId) signedInRef.current = String(user.userId);
   // A failed /api/user refresh reads as signed out. Switching to local storage then would blank every tab.
-  const owner = user === undefined ? "" : user?.userId || signedInRef.current || "local";
+  // The landing demo never reads or writes a signed-in visitor's saved dashboard.
+  const owner = ctx?.landingDemo
+    ? "local"
+    : user === undefined ? "" : user?.userId || signedInRef.current || "local";
   const storageKey = owner ? canvasStorageKey(owner, pageId) : "";
   const [tool, setTool] = useState("select");
   const [handDown, setHandDown] = useState(false);

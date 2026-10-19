@@ -328,7 +328,8 @@ function IntegrationOption({ row, active, hovered, onSelect, onHover, cutoffLabe
   );
 }
 
-export function IntegrationConnectDialog({ open, onOpenChange }) {
+/** Picker, then the build workspace. Shared by the dialog and the inline landing demo. */
+function IntegrationConnectFlow({ inline = false, onCancel, onPhaseChange, onSelectIntegration }) {
   const rows = useMemo(() => buildIntegrationPickerRows(), []);
   const primary = rowsInOrder(rows, PRIMARY_ORDER);
   const beta = rowsInOrder(rows, BETA_ORDER);
@@ -342,43 +343,43 @@ export function IntegrationConnectDialog({ open, onOpenChange }) {
   const hovered = rows.find((row) => row.id === hoveredId) || null;
   const shown = hovered || selected || primary[0] || null;
   const { cutoffLabel, loading: cutoffLoading } = useKalshiHistoricalCutoffDisplay();
+  // Radix titles throw outside a Dialog, so the inline flow uses plain headings.
+  const Title = inline ? "h2" : DialogTitle;
+  const Description = inline ? "p" : DialogDescription;
 
   useEffect(() => {
-    if (open) {
-      prefetchIntegrationPreviews();
-      return;
-    }
-    setSelectedId(null);
-    setHoveredId(null);
-    setPhase("pick");
-  }, [open]);
+    prefetchIntegrationPreviews();
+  }, []);
+
+  const changePhase = (next) => {
+    setPhase(next);
+    onPhaseChange?.(next);
+  };
+
+  const select = (id) => {
+    setSelectedId(id);
+    onSelectIntegration?.(id);
+  };
+
+  if (phase === "build" && selected) {
+    return (
+      <>
+        <Title className="sr-only">{selected.name} preview</Title>
+        <IntegrationBuildWorkspace integrationId={selected.id} onBack={() => changePhase("pick")} />
+      </>
+    );
+  }
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent
-        overlayClassName="z-[560] bg-black/40"
-        className={cn(
-          "z-[560] flex max-w-none flex-col gap-0 overflow-hidden border-border/70 p-0 shadow-xl sm:rounded-2xl",
-          phase === "build"
-            ? "h-[min(900px,94vh)] w-[min(1180px,calc(100vw-1.5rem))]"
-            : "max-h-[min(880px,92vh)] w-[min(980px,calc(100vw-2rem))]",
-        )}
-      >
-        {phase === "build" && selected ? (
-          <>
-            <DialogTitle className="sr-only">{selected.name} preview</DialogTitle>
-            <IntegrationBuildWorkspace integrationId={selected.id} onBack={() => setPhase("pick")} />
-          </>
-        ) : (
         <div className="grid min-h-0 flex-1 md:grid-cols-[minmax(0,1.05fr)_minmax(0,0.95fr)]">
           <div className="flex min-h-0 flex-col bg-background">
-            <div className="px-6 pb-3 pt-6 pr-12">
-              <DialogTitle className="text-xl font-semibold tracking-tight text-foreground">
+            <div className={cn("px-6 pb-3 pt-6", !inline && "pr-12")}>
+              <Title className="text-xl font-semibold tracking-tight text-foreground">
                 Which integration should feed this dashboard?
-              </DialogTitle>
-              <DialogDescription className="mt-1.5 text-sm leading-relaxed text-muted-foreground">
+              </Title>
+              <Description className="mt-1.5 text-sm leading-relaxed text-muted-foreground">
                 Pick a source. You’ll shape the pull in the next step.
-              </DialogDescription>
+              </Description>
             </div>
             <div className="min-h-0 flex-1 space-y-2 overflow-y-auto px-6 pb-4">
               <div role="listbox" aria-label="Integrations" className="space-y-2">
@@ -388,7 +389,7 @@ export function IntegrationConnectDialog({ open, onOpenChange }) {
                     row={row}
                     active={row.id === selected?.id}
                     hovered={row.id === hoveredId && row.id !== selected?.id}
-                    onSelect={setSelectedId}
+                    onSelect={select}
                     onHover={setHoveredId}
                     cutoffLabel={cutoffLabel}
                     cutoffLoading={cutoffLoading}
@@ -407,7 +408,7 @@ export function IntegrationConnectDialog({ open, onOpenChange }) {
                         row={row}
                         active={row.id === selected?.id}
                         hovered={row.id === hoveredId && row.id !== selected?.id}
-                        onSelect={setSelectedId}
+                        onSelect={select}
                         onHover={setHoveredId}
                         cutoffLabel={cutoffLabel}
                         cutoffLoading={cutoffLoading}
@@ -453,13 +454,15 @@ export function IntegrationConnectDialog({ open, onOpenChange }) {
             </div>
             {selected ? (
               <div className="flex shrink-0 items-center justify-end gap-2 px-6 py-4">
-                <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
-                  Previous
-                </Button>
+                {onCancel ? (
+                  <Button type="button" variant="outline" onClick={onCancel}>
+                    Previous
+                  </Button>
+                ) : null}
                 <Button
                   type="button"
                   className="bg-[#2f6fed] text-white hover:bg-[#2f6fed]/90"
-                  onClick={() => setPhase("build")}
+                  onClick={() => changePhase("build")}
                 >
                   Start building
                   <ArrowRight />
@@ -471,15 +474,62 @@ export function IntegrationConnectDialog({ open, onOpenChange }) {
             <PreviewPane row={shown} description={hovered?.description || ""} />
           ) : null}
         </div>
+  );
+}
+
+export function IntegrationConnectDialog({ open, onOpenChange }) {
+  const [phase, setPhase] = useState("pick");
+
+  useEffect(() => {
+    if (!open) setPhase("pick");
+  }, [open]);
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent
+        overlayClassName="z-[560] bg-black/40"
+        className={cn(
+          "z-[560] flex max-w-none flex-col gap-0 overflow-hidden border-border/70 p-0 shadow-xl sm:rounded-2xl",
+          phase === "build"
+            ? "h-[min(900px,94vh)] w-[min(1180px,calc(100vw-1.5rem))]"
+            : "max-h-[min(880px,92vh)] w-[min(980px,calc(100vw-2rem))]",
         )}
+      >
+        {open ? (
+          <IntegrationConnectFlow onCancel={() => onOpenChange(false)} onPhaseChange={setPhase} />
+        ) : null}
       </DialogContent>
     </Dialog>
   );
 }
 
-export function IntegrationConnectProvider({ children }) {
+/** The same picker and build flow, laid out in the page instead of a dialog. */
+export function IntegrationConnectInline({ className, onSelectIntegration }) {
+  return (
+    <div className={cn("flex min-h-0 flex-1 flex-col overflow-hidden bg-background", className)}>
+      <IntegrationConnectFlow inline onSelectIntegration={onSelectIntegration} />
+    </div>
+  );
+}
+
+/**
+ * `inlineStart` opens the inline flow on mount. `close()` dismisses both the
+ * dialog and the inline flow, which is how a finished run reveals the canvas.
+ */
+export function IntegrationConnectProvider({ children, inlineStart = false }) {
   const [open, setOpen] = useState(false);
-  const value = useMemo(() => ({ open: () => setOpen(true), close: () => setOpen(false) }), []);
+  const [inlineOpen, setInlineOpen] = useState(inlineStart);
+  const value = useMemo(
+    () => ({
+      open: () => setOpen(true),
+      close: () => {
+        setOpen(false);
+        setInlineOpen(false);
+      },
+      inlineOpen,
+    }),
+    [inlineOpen],
+  );
   return (
     <IntegrationConnectContext.Provider value={value}>
       {children}

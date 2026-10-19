@@ -192,7 +192,7 @@ export function WorkspaceComposerDockProvider({ children }) {
   return (
     <DockInsetContext.Provider value={setInset}>
       <WorkspaceCanvasProvider pageId={pageId}>
-        <IntegrationConnectProvider>
+        <IntegrationConnectProvider inlineStart={!!ctx?.landingDemo}>
           {children}
           <WorkspaceDock />
         </IntegrationConnectProvider>

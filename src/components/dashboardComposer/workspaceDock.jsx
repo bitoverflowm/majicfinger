@@ -64,7 +64,11 @@ export function WorkspaceDock() {
 
   return (
     <div
-      className="pointer-events-auto fixed bottom-6 left-1/2 z-[500] -translate-x-1/2"
+      className={cn(
+        "pointer-events-auto bottom-6 left-1/2 z-[500] -translate-x-1/2",
+        // The landing demo is a frame inside a scrolling page, so the dock sits in that frame.
+        ctx?.landingDemo ? "absolute" : "fixed",
+      )}
       onMouseDown={(e) => {
         if (e.target instanceof Element && e.target.closest("[aria-haspopup='menu']")) return;
         e.preventDefault();
