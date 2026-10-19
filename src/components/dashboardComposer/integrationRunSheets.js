@@ -1,6 +1,6 @@
 import { stampDataset } from "@/lib/visualizations/datasetDescriptor";
 
-function asDate(value) {
+export function asDate(value) {
   if (value == null || value === "") return null;
   const n = Number(value);
   if (Number.isFinite(n) && n > 1e9) {

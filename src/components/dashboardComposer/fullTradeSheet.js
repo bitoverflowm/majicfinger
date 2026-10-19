@@ -64,6 +64,12 @@ export function useReadyTradeSheet(blockId) {
   );
 }
 
+/** The full trade rows for a sheet, if they finished loading. Rows are display strings in column order. */
+export function readyTradeSheet(blockId) {
+  const sheet = memory.get(blockId);
+  return sheet?.status === "ready" ? sheet : null;
+}
+
 export function useTradeSheetLabel(blockId, fallbackCount) {
   const status = useSyncExternalStore(
     subscribe,

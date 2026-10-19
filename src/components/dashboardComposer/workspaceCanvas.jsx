@@ -2,14 +2,20 @@
 
 import { createContext, useCallback, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { BarChart3, Copy, Database, Maximize2, MoreVertical, Pencil, Play, Square, Table2, X } from "lucide-react";
+import { BarChart3, Copy, Database, Download, Maximize2, MoreVertical, Pencil, Play, Square, Table2, X } from "lucide-react";
+import { toast } from "sonner";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuPortal,
   DropdownMenuSeparator,
+  DropdownMenuSub,
+  DropdownMenuSubContent,
+  DropdownMenuSubTrigger,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { exportNodeImage, exportSheet, IMAGE_EXPORT_FORMATS, SHEET_EXPORT_FORMATS } from "@/components/dashboardComposer/blockExport";
 import { DestructiveConfirmMenuItem } from "@/components/ui/destructive-confirm-menu-item";
 import { useMyStateV2 } from "@/context/stateContextV2";
 import { duplicateTabName, loadWorkspaceStartTabs, saveWorkspaceStartTabs } from "@/lib/workspaceStartTabs";
@@ -2147,6 +2153,23 @@ function CanvasBlock({ block, selected, spotlight = false, onSelect, onChange, b
   const logWidth = sheetDataset?.datasetType === "trader_activity" || sheetDataset?.datasetType === "markets" || sheetDataset?.datasetType === "events" || sheetDataset?.datasetType === "series"
     ? RICH_TABLE_WIDTH
     : VISUAL_TABLE_WIDTH;
+  const bodyRef = useRef(null);
+  const richTable = block.type === "sheet" && block.presentation === "visual" && hasVisualTable(sheetDataset);
+  const exportFormats =
+    block.type === "sheet" ? (richTable ? IMAGE_EXPORT_FORMATS : SHEET_EXPORT_FORMATS) : block.type === "chart" ? IMAGE_EXPORT_FORMATS : null;
+  const runExport = async (format) => {
+    try {
+      if (block.type === "sheet" && !richTable) {
+        await exportSheet(liveBlock(block, canvas), format);
+        return;
+      }
+      await exportNodeImage(bodyRef.current, format, block.title || (block.type === "chart" ? "chart" : "table"), {
+        background: rootRef.current ? getComputedStyle(rootRef.current).backgroundColor : undefined,
+      });
+    } catch {
+      toast.error("That export didn't work. Try again.");
+    }
+  };
 
   useLayoutEffect(() => {
     const live = dragRef.current?.live;
@@ -2464,6 +2487,32 @@ function CanvasBlock({ block, selected, spotlight = false, onSelect, onChange, b
           ) : block.type === "chart" ? (
             <DropdownMenuSeparator />
           ) : null}
+          {exportFormats ? (
+            <DropdownMenuSub>
+              <DropdownMenuSubTrigger className="gap-2.5 rounded-md px-2 py-2 text-[13px] focus:bg-accent data-[state=open]:bg-accent dark:focus:bg-accent dark:data-[state=open]:bg-accent [&>svg:last-child]:size-3.5 [&>svg:last-child]:text-muted-foreground">
+                <Download className="size-4 text-muted-foreground" />
+                Export
+              </DropdownMenuSubTrigger>
+              <DropdownMenuPortal>
+                <DropdownMenuSubContent
+                  sideOffset={6}
+                  className="z-[521] w-40 rounded-xl p-1 shadow-lg"
+                  onPointerDown={(event) => event.stopPropagation()}
+                  onClick={(event) => event.stopPropagation()}
+                >
+                  {exportFormats.map((format) => (
+                    <DropdownMenuItem
+                      key={format.id}
+                      className="rounded-md px-2 py-2 text-[13px]"
+                      onSelect={() => void runExport(format.id)}
+                    >
+                      {format.label}
+                    </DropdownMenuItem>
+                  ))}
+                </DropdownMenuSubContent>
+              </DropdownMenuPortal>
+            </DropdownMenuSub>
+          ) : null}
           <DropdownMenuItem
             className="gap-2.5 rounded-md px-2 py-2 text-[13px]"
             onSelect={() => canvas?.duplicateBlock?.(block.id)}
@@ -2490,7 +2539,7 @@ function CanvasBlock({ block, selected, spotlight = false, onSelect, onChange, b
       ) : fullscreen && block.type === "chart" && !readOnly ? (
         <ChartFullscreen block={block} onChange={onChange} onClose={() => setFullscreen(false)} booting={booting} />
       ) : (
-        <div className={cn("flex min-h-0 min-w-0 flex-1 flex-col", arriveRef.current && dataReady && "lychee-sheet-fill")}>
+        <div ref={bodyRef} className={cn("flex min-h-0 min-w-0 flex-1 flex-col", arriveRef.current && dataReady && "lychee-sheet-fill")}>
           <BlockBody block={block} onChange={onChange} booting={booting || !dataReady} />
         </div>
       )}
