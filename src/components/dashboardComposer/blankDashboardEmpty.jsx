@@ -123,7 +123,7 @@ export function WorkspaceWelcomeLayer({ viewing, navChromeExpanded, checkout, co
         cover
           ? cn(
               "bg-background",
-              landingDemo ? "flex-1" : navChromeExpanded ? "h-svh" : "h-[calc(100svh-3.5rem)]",
+              landingDemo ? "relative z-30 flex-1" : navChromeExpanded ? "h-svh" : "h-[calc(100svh-3.5rem)]",
             )
           : "pointer-events-none absolute inset-0 z-30",
       )}

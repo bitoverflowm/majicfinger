@@ -70,6 +70,7 @@ function LandingDemoStage({ children }: { children: ReactNode }) {
   const ctx = useMyStateV2();
   const active = !!ctx?.landingDemoActive;
   const deactivate = ctx?.deactivateLandingDemo;
+  const activate = ctx?.activateLandingDemo;
 
   const slotRef = useRef<HTMLDivElement>(null);
   const phaseRef = useRef<StagePhase>("inline");
@@ -77,6 +78,7 @@ function LandingDemoStage({ children }: { children: ReactNode }) {
   const [rect, setRect] = useState<StageRect | null>(null);
   const [slotHeight, setSlotHeight] = useState<number | null>(null);
   const [hintVisible, setHintVisible] = useState(false);
+  const [resumePrompt, setResumePrompt] = useState(false);
 
   const setPhase = (next: StagePhase) => {
     phaseRef.current = next;
@@ -140,11 +142,22 @@ function LandingDemoStage({ children }: { children: ReactNode }) {
       if (event.key !== "Escape" || event.defaultPrevented) return;
       if (document.querySelector(OPEN_OVERLAY_SELECTOR)) return;
       clearLandingDemoActivateRequest();
+      setResumePrompt(true);
       if (typeof deactivate === "function") deactivate();
     };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [active, deactivate]);
+
+  useEffect(() => {
+    if (active) setResumePrompt(false);
+  }, [active]);
+
+  const showResumePrompt = resumePrompt && !active && phase === "inline";
+  const resumeDemo = () => {
+    setResumePrompt(false);
+    if (typeof activate === "function") activate();
+  };
 
   return (
     <section
@@ -181,6 +194,23 @@ function LandingDemoStage({ children }: { children: ReactNode }) {
               <span>to exit the demo</span>
             </div>
           </div>
+          {resumePrompt ? (
+            <button
+              type="button"
+              aria-label="Click anywhere in the window to activate your demo"
+              aria-hidden={!showResumePrompt}
+              tabIndex={showResumePrompt ? 0 : -1}
+              onClick={resumeDemo}
+              className={cn(
+                "absolute inset-0 z-[650] flex cursor-pointer items-center justify-center bg-white/30 backdrop-blur-[1.5px] transition-opacity duration-300 dark:bg-black/30",
+                showResumePrompt ? "opacity-100" : "pointer-events-none opacity-0",
+              )}
+            >
+              <span className="rounded-full bg-zinc-900/85 px-4 py-2 text-sm font-medium text-white shadow-lg backdrop-blur">
+                Click anywhere in the window to activate your demo
+              </span>
+            </button>
+          ) : null}
         </DemoWindowMockup>
       </div>
     </section>
