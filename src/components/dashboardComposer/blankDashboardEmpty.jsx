@@ -15,6 +15,7 @@ import { useIntegrationConnect } from "@/components/dashboardComposer/integratio
 import { WorkspaceStartTabs } from "@/components/checkout/CheckoutWelcome";
 
 const CHART_LOCKED_TIP = "Upload or connect data before adding a chart.";
+const TEXT_COMING_SOON_TIP = "Coming soon";
 
 function ActionButton({ icon: Icon, label, onClick, filled, disabled, tip }) {
   const button = (
@@ -83,6 +84,8 @@ export function BlankDashboardEmpty() {
             <ActionButton
               icon={Type}
               label="Text"
+              disabled
+              tip={TEXT_COMING_SOON_TIP}
               onClick={() => canvas?.addBlock?.("text")}
             />
             <ActionButton

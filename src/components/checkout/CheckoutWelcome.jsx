@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import Image from "next/image";
 import confetti from "canvas-confetti";
 import { Copy, MoreVertical, Pencil } from "lucide-react";
@@ -35,6 +35,7 @@ import {
 } from "@/components/ui/carousel";
 import { useMyStateV2 } from "@/context/stateContextV2";
 import { useWorkspaceCanvas } from "@/components/dashboardComposer/workspaceCanvas";
+import { LandingDemoMembersOnlyPortal } from "@/components/dashboardComposer/landingDemoMembersOnly";
 import { useUser } from "@/lib/hooks";
 import { KALSHI_GUIDED_WEATHER_WORKFLOW_ID } from "@/lib/guidedWorkflows/kalshiHistorical/stepIds";
 import { requestKalshiHistoricalGuidedWorkflow } from "@/lib/guidedWorkflows/pendingLaunch";
@@ -434,7 +435,14 @@ export function WorkspaceStartTabs({ welcomeActive, onOpenWelcome }) {
     onOpenWelcome?.();
   };
 
+  const [membersOnlyOpen, setMembersOnlyOpen] = useState(false);
+  const closeMembersOnly = useCallback(() => setMembersOnlyOpen(false), []);
+
   const addBlankTab = () => {
+    if (context?.landingDemo) {
+      setMembersOnlyOpen(true);
+      return;
+    }
     const state = {
       welcomeRemoved: !!context?.welcomeTabRemoved,
       tabs,
@@ -489,6 +497,9 @@ export function WorkspaceStartTabs({ welcomeActive, onOpenWelcome }) {
           </TooltipContent>
         </Tooltip>
       </TooltipProvider>
+      {context?.landingDemo ? (
+        <LandingDemoMembersOnlyPortal open={membersOnlyOpen} onClose={closeMembersOnly} />
+      ) : null}
     </div>
   );
 }

@@ -21,6 +21,7 @@ import { AnimatedThemeToggler } from "@/components/ui/animated-theme-toggler";
 import { UserAvatar } from "@/components/ui/user-avatar";
 import { useUser } from "@/lib/hooks";
 import { useMyStateV2 } from "@/context/stateContextV2";
+import { exitLandingDemoToSection } from "@/lib/landingDemoSession";
 import { useWorkspaceCanvas } from "@/components/dashboardComposer/workspaceCanvas";
 import { pageIdForTab } from "@/lib/workspaceDashboardDocument";
 import { realtimeAssets } from "@/lib/realtime/sheetRealtime";
@@ -620,6 +621,7 @@ function RealtimeModeButton() {
 function RightChromeControls({ onLogout, expanded }) {
   const user = useUser();
   const router = useRouter();
+  const landingDemo = !!useMyStateV2()?.landingDemo;
   const [shareOpen, setShareOpen] = useState(false);
 
   return (
@@ -627,6 +629,17 @@ function RightChromeControls({ onLogout, expanded }) {
     <div className={cn("flex items-center gap-0.5", expanded && "min-w-0 flex-wrap")}>
       {user ? (
         <AccountMenu onLogout={onLogout} />
+      ) : landingDemo ? (
+        <ChromeTip label="See plans">
+        <Button
+          variant="default"
+          size="sm"
+          className="h-7 px-2.5 text-xs"
+          onClick={() => exitLandingDemoToSection("pricing")}
+        >
+          Sign Up
+        </Button>
+        </ChromeTip>
       ) : (
         <ChromeTip label="Sign in">
         <Button
