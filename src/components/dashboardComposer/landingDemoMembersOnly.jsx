@@ -8,7 +8,7 @@ import { exitLandingDemoToSection } from "@/lib/landingDemoSession";
 import { cn } from "@/lib/utils";
 
 /** Landing demo upsell for pro-only actions (e.g. New tab). Escape goes back instead of exiting the demo. */
-export function LandingDemoMembersOnlyDialog({ onBack, onUpgrade, className }) {
+export function LandingDemoMembersOnlyDialog({ feature = "New tab", onBack, onUpgrade, className }) {
   useEffect(() => {
     const onKeyDown = (event) => {
       if (event.key !== "Escape" || event.defaultPrevented) return;
@@ -35,7 +35,7 @@ export function LandingDemoMembersOnlyDialog({ onBack, onUpgrade, className }) {
           Members only
         </h2>
         <p className="mt-2 text-[13px] leading-relaxed text-muted-foreground">
-          New tab is a pro feature. Would you like to upgrade now?
+          {feature} is a pro feature. Would you like to upgrade now?
         </p>
         <div className="mt-5 flex items-center justify-end gap-2">
           <Button type="button" variant="outline" onClick={onBack}>
@@ -51,11 +51,14 @@ export function LandingDemoMembersOnlyDialog({ onBack, onUpgrade, className }) {
 }
 
 /** Renders the upsell over the whole demo window, above the nav pills and dock. */
-export function LandingDemoMembersOnlyPortal({ open, onClose }) {
+export function LandingDemoMembersOnlyPortal({ open, feature, onClose }) {
   const [host, setHost] = useState(null);
   useEffect(() => {
     setHost(document.getElementById("demo-mockup"));
   }, []);
   if (!open || !host) return null;
-  return createPortal(<LandingDemoMembersOnlyDialog onBack={onClose} onUpgrade={onClose} className="z-[550]" />, host);
+  return createPortal(
+    <LandingDemoMembersOnlyDialog feature={feature} onBack={onClose} onUpgrade={onClose} className="z-[550]" />,
+    host,
+  );
 }

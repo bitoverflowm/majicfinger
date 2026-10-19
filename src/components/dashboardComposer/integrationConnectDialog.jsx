@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, useContext, useEffect, useMemo, useRef, useState } from "react";
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { ArrowRight, Check, Database, X } from "lucide-react";
 import {
   Dialog,
@@ -22,6 +22,7 @@ import {
   isLivePreviewId,
   prefetchIntegrationPreviews,
 } from "@/components/dashboardComposer/integrationPreviewSample";
+import { LandingDemoMembersOnlyPortal } from "@/components/dashboardComposer/landingDemoMembersOnly";
 import { buildIntegrationPickerRows } from "@/lib/connectIntegrationPickerRows";
 import { cn } from "@/lib/utils";
 
@@ -41,6 +42,8 @@ const PRIMARY_ORDER = [
 ];
 
 const BETA_ORDER = ["binance"];
+
+const LANDING_DEMO_LOCKED_INTEGRATIONS = ["kalshiHistoricalV2"];
 
 const LOGO_BG = {
   kalshiHistorical: "bg-[#28CC95]",
@@ -336,6 +339,8 @@ function IntegrationConnectFlow({
   onCancel,
   onPhaseChange,
   onSelectIntegration,
+  lockedIds,
+  onLockedSelect,
 }) {
   const rows = useMemo(() => buildIntegrationPickerRows(), []);
   const primary = rowsInOrder(rows, PRIMARY_ORDER);
@@ -364,6 +369,10 @@ function IntegrationConnectFlow({
   };
 
   const select = (id) => {
+    if (lockedIds?.includes(id)) {
+      onLockedSelect?.(rows.find((row) => row.id === id) || { id });
+      return;
+    }
     setSelectedId(id);
     onSelectIntegration?.(id);
   };
@@ -516,6 +525,8 @@ export function IntegrationConnectDialog({ open, onOpenChange }) {
 export function IntegrationConnectLandingDemo({ active = false, onSelectIntegration }) {
   const connect = useIntegrationConnect();
   const [phase, setPhase] = useState("pick");
+  const [lockedFeature, setLockedFeature] = useState(null);
+  const closeLocked = useCallback(() => setLockedFeature(null), []);
 
   useEffect(() => {
     if (!connect?.inlineOpen) setPhase("pick");
@@ -561,8 +572,11 @@ export function IntegrationConnectLandingDemo({ active = false, onSelectIntegrat
           title="What is the first venue you want to research with Lychee?"
           onPhaseChange={setPhase}
           onSelectIntegration={onSelectIntegration}
+          lockedIds={LANDING_DEMO_LOCKED_INTEGRATIONS}
+          onLockedSelect={(row) => setLockedFeature(row.name || "This integration")}
         />
       </div>
+      <LandingDemoMembersOnlyPortal open={!!lockedFeature} feature={lockedFeature} onClose={closeLocked} />
     </div>
   );
 }
