@@ -5,7 +5,8 @@
 import dbConnect from "@/lib/dbConnect";
 import Chart from "@/models/Charts";
 import DataSet from "@/models/DataSets";
-import { assertDocumentOwner, requireLoginSession } from "@/lib/resourceOwnership";
+import { assertDocumentOwner } from "@/lib/resourceOwnership";
+import { requirePaidMember } from "@/lib/requirePaidMember";
 import { materializeChartBundle } from "@/lib/server/materializeChartBundle";
 import { MATERIALIZATION_MODE_LIVE_LAKE } from "@/lib/publishedChartBundleConfig";
 import mongoose from "mongoose";
@@ -27,7 +28,7 @@ export default async function handler(req, res) {
   }
 
   try {
-    const session = await requireLoginSession(req, res);
+    const session = await requirePaidMember(req, res);
     if (!session) return;
 
     await dbConnect();

@@ -14,6 +14,7 @@ import {
     userCanUseAdvancedDataStorage,
 } from "@/lib/projectStorageEntitlements";
 import { parseJsonBodyMaybeGzip } from "@/lib/parseJsonBodyMaybeGzip";
+import { requirePaidMember } from "@/lib/requirePaidMember";
 
 /** Accept gzip-compressed JSON bodies (see `gzipJsonTransport.js`). */
 export const config = {
@@ -50,7 +51,7 @@ export default async function handler(req, res) {
             break;
         case "POST":
             try {
-                const session = await requireLoginSession(req, res);
+                const session = await requirePaidMember(req, res);
                 if (!session) return;
                 let body;
                 try {

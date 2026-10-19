@@ -12,6 +12,7 @@ import {
     userCanUseAdvancedDataStorage,
 } from "@/lib/projectStorageEntitlements";
 import { parseJsonBodyMaybeGzip } from "@/lib/parseJsonBodyMaybeGzip";
+import { requirePaidMember } from "@/lib/requirePaidMember";
 
 /**
  * Disabled so we can accept gzip-compressed JSON (`Content-Encoding: gzip`),
@@ -54,7 +55,7 @@ export default async function handler(req, res) {
             break;
         case "PUT":
             try {
-                const session = await requireLoginSession(req, res);
+                const session = await requirePaidMember(req, res, { allowFreeRun: true, freeRunDataSetId: id });
                 if (!session) return;
                 const owned = await DataSet.findById(id).select("user_id").lean();
                 if (!assertDocumentOwner(owned, session, res)) return;
@@ -122,7 +123,7 @@ export default async function handler(req, res) {
             break;
         case "PATCH":
             try {
-                const session = await requireLoginSession(req, res);
+                const session = await requirePaidMember(req, res, { allowFreeRun: true, freeRunDataSetId: id });
                 if (!session) return;
                 let body;
                 try {

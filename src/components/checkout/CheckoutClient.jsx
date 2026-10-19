@@ -54,6 +54,10 @@ export default function CheckoutClient({ plan, cycle, referral }) {
         });
         const data = await res.json().catch(() => ({}));
         if (cancelled) return;
+        if (data.code === "ALREADY_MEMBER" && data.redirect) {
+          window.location.assign(data.redirect);
+          return;
+        }
         if (data.fallbackUrl) {
           window.location.assign(data.fallbackUrl);
           return;

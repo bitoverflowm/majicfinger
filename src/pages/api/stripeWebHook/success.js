@@ -604,7 +604,11 @@ async function handleInvoicePaymentNeedsAction(invoice, statusValue) {
 
 async function handleInvoicePaymentSucceeded(invoice) {
   if (invoice?.subscription) {
-    const syntheticSub = buildSubscriptionFromInvoice(invoice);
+    // Plan-change invoices carry proration lines priced at the old plan.
+    const hasProration =
+      invoice.billing_reason === "subscription_update" ||
+      (invoice?.lines?.data || []).some((line) => line?.proration);
+    const syntheticSub = hasProration ? null : buildSubscriptionFromInvoice(invoice);
     if (syntheticSub) {
       await handleSubscriptionChange(syntheticSub, "customer.subscription.updated");
       return;

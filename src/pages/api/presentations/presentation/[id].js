@@ -1,5 +1,7 @@
 import dbConnect from "@/lib/dbConnect";
 import Presentation from "@/models/Presentations";
+import { assertDocumentOwner, requireLoginSession } from "@/lib/resourceOwnership";
+import { requirePaidMember } from "@/lib/requirePaidMember";
 
 export default async function handler(req, res){
     const {
@@ -12,10 +14,10 @@ export default async function handler(req, res){
     switch (method) {
         case "GET":
             try {
+                const session = await requireLoginSession(req, res);
+                if (!session) return;
                 const presentation = await Presentation.findById(id);
-                if (!presentation) {
-                    return res.status(400).json({ success: false, message: `No presentation found for id: ${id}` });
-                }
+                if (!assertDocumentOwner(presentation, session, res)) return;
                 res.status(200).json({ success: true, data: presentation });
             } catch (error) {
                 res.status(400).json({ success: false });
@@ -23,6 +25,10 @@ export default async function handler(req, res){
             break;
         case "PUT":
             try {
+                const session = await requirePaidMember(req, res);
+                if (!session) return;
+                const owned = await Presentation.findById(id).select("user_id").lean();
+                if (!assertDocumentOwner(owned, session, res)) return;
                 const update = {
                     $set: {
                         project_name: req.body.project_name,
@@ -37,7 +43,7 @@ export default async function handler(req, res){
                         last_saved_date: new Date(),
                     },
                 };
-                const updatedPresentation = await Presentation.findByIdAndUpdate(id, update, {
+                const updatedPresentation = await Presentation.findOneAndUpdate({ _id: id, user_id: session.userId }, update, {
                     new: true,
                     runValidators: true,
                 });
@@ -51,9 +57,11 @@ export default async function handler(req, res){
             break;
         case "DELETE":
             try {
-                const deletedPresentation = await Presentation.findByIdAndDelete(id);
+                const session = await requireLoginSession(req, res);
+                if (!session) return;
+                const deletedPresentation = await Presentation.findOneAndDelete({ _id: id, user_id: session.userId });
                 if (!deletedPresentation) {
-                    return res.status(400).json({ success: false, message: `No Presentation found for id: ${id}` });
+                    return res.status(404).json({ success: false, message: "Not found" });
                 }
                 res.status(200).json({ success: true, message: `Presentation with id ${id} deleted successfully` });
             } catch (error) {

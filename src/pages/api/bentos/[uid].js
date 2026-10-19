@@ -1,5 +1,6 @@
 import dbConnect from "@/lib/dbConnect";
 import Bento from "@/models/Bentos";
+import { assertQueryUserMatchesSession, requireLoginSession } from "@/lib/resourceOwnership";
 
 export default async function handler(req, res) {
     const {
@@ -12,6 +13,9 @@ export default async function handler(req, res) {
     switch (method) {
         case "GET":
             try {
+                const session = await requireLoginSession(req, res);
+                if (!session) return;
+                if (!assertQueryUserMatchesSession(uid, session, res)) return;
                 const savedBentos = await Bento.find({user_id: uid})
                                                 .select('project_name created_date last_edited_date user_id') 
                                                 .exec();

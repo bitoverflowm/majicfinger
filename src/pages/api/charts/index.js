@@ -3,6 +3,7 @@ import Chart from "@/models/Charts";
 import DataSet from "@/models/DataSets";
 import mongoose from 'mongoose'; // Ensure mongoose is imported for ObjectId
 import { assertQueryUserMatchesSession, requireLoginSession } from "@/lib/resourceOwnership";
+import { requirePaidMember } from "@/lib/requirePaidMember";
 
 export default async function handler(req, res) {
     const {
@@ -36,7 +37,7 @@ export default async function handler(req, res) {
             break;
         case "POST":
             try {
-                const session = await requireLoginSession(req, res);
+                const session = await requirePaidMember(req, res, { allowFreeRun: true });
                 if (!session) return;
                 if (!mongoose.Types.ObjectId.isValid(data_set_id)) {
                     return res.status(400).json({ success: false, message: "Invalid data_set_id" });

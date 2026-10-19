@@ -3,6 +3,7 @@ import ChartDashboard from "@/models/ChartDashboards";
 import DataSet from "@/models/DataSets";
 import mongoose from "mongoose";
 import { getLoginSession } from "@/lib/auth";
+import { requirePaidMember } from "@/lib/requirePaidMember";
 import { createEmptyDashboardLayout } from "@/lib/dashboardLayoutDefaults";
 import {
   resolveDatasetLiveBacked,
@@ -58,6 +59,7 @@ export default async function handler(req, res) {
         if (!session?.userId) {
           return res.status(401).json({ success: false, message: "Unauthorized" });
         }
+        if (!(await requirePaidMember(req, res, { allowFreeRun: true }))) return;
         const {
           dashboard_name,
           seo_title,

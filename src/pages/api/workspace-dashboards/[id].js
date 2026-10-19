@@ -1,6 +1,7 @@
 import mongoose from "mongoose";
 import dbConnect from "@/lib/dbConnect";
 import { getLoginSession } from "@/lib/auth";
+import { requirePaidMember } from "@/lib/requirePaidMember";
 import WorkspaceDashboard from "@/models/WorkspaceDashboards";
 import { sanitizeWorkspaceDashboard } from "@/lib/workspaceDashboardDocument";
 
@@ -124,6 +125,7 @@ export default async function handler(req, res) {
 
   const userId = await sessionUserId(req);
   if (!userId) return res.status(401).json({ success: false, message: "Unauthorized" });
+  if (req.method !== "GET" && !(await requirePaidMember(req, res, { allowFreeRun: true }))) return;
 
   const id = String(req.query.id || "");
   if (!mongoose.Types.ObjectId.isValid(id)) {

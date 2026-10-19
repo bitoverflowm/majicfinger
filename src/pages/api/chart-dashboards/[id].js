@@ -4,6 +4,7 @@ import Chart from "@/models/Charts";
 import DataSet from "@/models/DataSets";
 import mongoose from "mongoose";
 import { getLoginSession } from "@/lib/auth";
+import { requirePaidMember } from "@/lib/requirePaidMember";
 import { isValidChartEmbedSlug, normalizeChartEmbedSlug } from "@/lib/chartEmbedSlug";
 import { validateDashboardPublishSeo } from "@/lib/dashboardPublishSeo";
 import {
@@ -80,6 +81,7 @@ export default async function handler(req, res) {
         if (String(dash.user_id) !== String(session.userId)) {
           return res.status(403).json({ success: false, message: "Forbidden" });
         }
+        if (!(await requirePaidMember(req, res, { allowFreeRun: true }))) return;
 
         const wantsEmbed =
           Object.prototype.hasOwnProperty.call(req.body, "public_slug") ||

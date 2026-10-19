@@ -1,3 +1,4 @@
+import { requirePaidMember } from "@/lib/requirePaidMember";
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
@@ -14,6 +15,7 @@ const openai = new OpenAI({
 })
 
 export default async (req, res) => {
+    if (!(await requirePaidMember(req, res, { allowFreeRun: true }))) return;
     try {
         if (!req.body.data && !req.body.thread_id) {
             return res.status(400).json({ error: "No data provided" });

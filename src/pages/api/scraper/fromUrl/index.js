@@ -1,4 +1,6 @@
+import { requirePaidMember } from "@/lib/requirePaidMember";
 export default async (req, res) => {
+    if (!(await requirePaidMember(req, res, { allowFreeRun: true }))) return;
     console.log("starting scrape");
     const { target } = req.query;
     const url = 'https://api.microlink.io';

@@ -1,6 +1,7 @@
 import dbConnect from "@/lib/dbConnect";
 import Bento from "@/models/Bentos";
 import mongoose from 'mongoose'; // Ensure mongoose is imported for ObjectId
+import { requirePaidMember } from "@/lib/requirePaidMember";
 
 export default async function handler(req, res) {
     const {
@@ -13,9 +14,10 @@ export default async function handler(req, res) {
     switch (method) {
         case "POST":
             try {
-                // Validate user_id or assume it's already validated and is being sent in correct format
-                if (!mongoose.Types.ObjectId.isValid(user_id)) {
-                    return res.status(400).json({ success: false, message: "Invalid user_id" });
+                const session = await requirePaidMember(req, res);
+                if (!session) return;
+                if (!mongoose.Types.ObjectId.isValid(user_id) || String(user_id) !== String(session.userId)) {
+                    return res.status(403).json({ success: false, message: "Forbidden" });
                 }
 
                 const newBento = await Bento.create({

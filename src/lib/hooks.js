@@ -28,6 +28,4 @@ export function useUser({ redirectTo, redirectIfFound, redirectIfNotFound } = {}
   return error ? null : user;
 }
 
-export const mutateUser = () => {
-  mutate("/api/user");
-};
+export const mutateUser = () => mutate("/api/user");

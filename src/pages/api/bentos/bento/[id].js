@@ -1,6 +1,8 @@
 import dbConnect from "@/lib/dbConnect";
 import Bento from "@/models/Bentos";
 import { getLoginSession } from "@/lib/auth";
+import { requireLoginSession } from "@/lib/resourceOwnership";
+import { requirePaidMember } from "@/lib/requirePaidMember";
 import { isValidChartEmbedSlug, normalizeChartEmbedSlug } from "@/lib/chartEmbedSlug";
 
 export default async function handler(req, res) {
@@ -25,10 +27,14 @@ export default async function handler(req, res) {
             break;
         case "PUT":
             try {
+                const member = await requirePaidMember(req, res);
+                if (!member) return;
                 const bento = await Bento.findById(id);
-                if (!bento) {
-                    return res.status(400).json({ success: false, message: `No bentos found for id: ${id}` });
+                if (!bento || String(bento.user_id) !== String(member.userId)) {
+                    return res.status(404).json({ success: false, message: `No bentos found for id: ${id}` });
                 }
+                delete req.body.user_id;
+                delete req.body._id;
 
                 const wantsEmbed =
                     Object.prototype.hasOwnProperty.call(req.body, "public_slug") ||
@@ -98,7 +104,9 @@ export default async function handler(req, res) {
             break;
         case "DELETE":
             try {
-                const deletedBento = await Bento.findByIdAndDelete(id);
+                const owner = await requireLoginSession(req, res);
+                if (!owner) return;
+                const deletedBento = await Bento.findOneAndDelete({ _id: id, user_id: owner.userId });
                 if (!deletedBento) {
                     return res.status(400).json({ success: false, message: `No bentos found for id: ${id}` });
                 }

@@ -8,6 +8,7 @@ import useSWR from "swr";
 import { WorkspaceCanvas, WorkspaceCanvasProvider, useWorkspaceCanvas } from "@/components/dashboardComposer/workspaceCanvas";
 import { SpectrumLoadingState } from "@/components/ui/spectrum-loading-state";
 import { userSwrFetcher } from "@/lib/hooks";
+import { userHasDashboardAccess } from "@/lib/membershipAccess";
 import { pageIdForTab } from "@/lib/workspaceDashboardDocument";
 import { cn } from "@/lib/utils";
 
@@ -106,12 +107,15 @@ export default function DashboardPreviewPage() {
   const router = useRouter();
   const { data: user, isLoading } = useSWR("/api/user", userSwrFetcher);
 
+  const hasAccess = userHasDashboardAccess(user);
+
   useEffect(() => {
     if (isLoading) return;
     if (!user) router.replace("/login");
-  }, [isLoading, router, user]);
+    else if (!hasAccess) router.replace("/dashboard");
+  }, [hasAccess, isLoading, router, user]);
 
-  if (isLoading || !user) {
+  if (isLoading || !user || !hasAccess) {
     return (
       <div className="flex min-h-svh items-center justify-center bg-background">
         <SpectrumLoadingState label="Loading" />

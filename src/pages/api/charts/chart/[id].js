@@ -1,6 +1,7 @@
 import dbConnect from "@/lib/dbConnect";
 import Chart from "@/models/Charts";
 import { assertDocumentOwner, requireLoginSession } from "@/lib/resourceOwnership";
+import { requirePaidMember } from "@/lib/requirePaidMember";
 import { isValidChartEmbedSlug, normalizeChartEmbedSlug } from "@/lib/chartEmbedSlug";
 import {
   liveBackedChartFields,
@@ -29,7 +30,7 @@ export default async function handler(req, res) {
             break;
         case "PUT":
             try {
-                const session = await requireLoginSession(req, res);
+                const session = await requirePaidMember(req, res, { allowFreeRun: true });
                 if (!session) return;
                 const chart = await Chart.findById(id);
                 if (!assertDocumentOwner(chart, session, res)) return;

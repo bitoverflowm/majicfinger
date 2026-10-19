@@ -8,7 +8,7 @@ import {
 
 function subscriptionStatusAllowsPaidFeatures(statusRaw) {
   const s = String(statusRaw || "").toLowerCase();
-  return s === "active" || s === "trialing" || s === "past_due";
+  return s === "active" || s === "trialing";
 }
 
 /**

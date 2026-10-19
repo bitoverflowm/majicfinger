@@ -10,6 +10,10 @@ import {
 } from "@/lib/stripe/catalog";
 import { attemptCookieHeader } from "@/lib/stripe/checkoutCookies";
 import { notifyCheckoutAlert } from "@/lib/telegram/checkoutAlert";
+import { loadSessionMember } from "@/lib/requirePaidMember";
+
+/** A second Checkout would start a second subscription; these members change plans in billing. */
+const ALREADY_BILLED_REASONS = new Set(["active", "legacy", "lifetime"]);
 
 function brandingForTheme(theme) {
   if (theme === "dark") {
@@ -51,6 +55,20 @@ export default async function handler(req, res) {
       fields: { Plan: req.body?.plan, Cycle: req.body?.cycle },
     });
     return res.status(400).json({ error: "Unknown plan" });
+  }
+
+  try {
+    const { session: login, user, state } = await loadSessionMember(req);
+    const renewalFailing = ["past_due", "unpaid"].includes(String(user?.subscriptionStatus || "").toLowerCase());
+    if (login && (ALREADY_BILLED_REASONS.has(state.reason) || renewalFailing)) {
+      return res.status(409).json({
+        code: "ALREADY_MEMBER",
+        reason: state.reason,
+        redirect: "/dashboard?view=billing",
+      });
+    }
+  } catch {
+    // Account lookup is best-effort here; logged-out checkout must keep working.
   }
 
   const fallbackUrl = plan.href || "";

@@ -1,3 +1,4 @@
+import { requirePaidMember } from "@/lib/requirePaidMember";
 import OpenAI from "openai"
 import { pollRunStatus } from "./aiUtils";
 
@@ -6,6 +7,7 @@ const openai = new OpenAI({
 })
 
 export default async (req, res) => {
+    if (!(await requirePaidMember(req, res, { allowFreeRun: true }))) return;
     try{
         //create assistant
         const assistant = await openai.beta.assistants.create({

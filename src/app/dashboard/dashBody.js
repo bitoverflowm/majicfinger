@@ -1,5 +1,4 @@
 import { useEffect, useState, useCallback, useRef, useLayoutEffect } from "react";
-import Link from "next/link";
 
 import { useMyStateV2  } from '@/context/stateContextV2'
 
@@ -17,7 +16,6 @@ import { toast } from "sonner"
 import AiView from "@/components/aiView";
 import ScraperView from "@/components/scraperView";
 import ComingSoon from "./components/comingSoon";
-import { PricingSection } from "@/components/sections/pricing-section";
 import EasyLychee from "@/components/easyLychee";
 import { Separator } from "@/components/ui/separator";
 import { ProfilePictureUploader } from "@/components/profile/ProfilePictureUploader";
@@ -34,12 +32,22 @@ import { cn } from "@/lib/utils";
 
 import { debounce } from "@/lib/debounce";
 import { isReservedUserHandle, reservedUserHandleMessage } from "@/lib/reservedUserHandles";
-import { isDevLoginBypassUser } from "@/lib/devLoginBypass";
-import { isOwnerFullAccessUser } from "@/lib/ownerFullAccess";
+import { userHasDashboardAccess } from "@/lib/membershipAccess";
 import {
   userRunYourselfInteractiveUnlocked,
 } from "@/lib/runYourself/hasPaidAccess";
 import { consumeRunYourselfInteractiveSession } from "@/lib/runYourself/consumeInteractiveSession";
+import BillingView from "@/components/billing/BillingView";
+import { MembershipGate } from "./membershipGate";
+import { OPEN_BILLING_EVENT } from "@/lib/scrollToPricing";
+
+/** Views that show the billing screen (plans, current tier, upgrade/downgrade). */
+const BILLING_VIEWS = new Set(["manageAccount", "pricing"]);
+
+function freeRunRequestedInUrl() {
+  if (typeof window === "undefined") return false;
+  return new URLSearchParams(window.location.search).get("runYourselfSession") === "1";
+}
 
 const DashBody = ({ user }) => {
     const contextStateV2 = useMyStateV2()
@@ -83,8 +91,6 @@ const DashBody = ({ user }) => {
     const [usernameExists, setUsernameExists] = useState(false);
     const [isCheckingHandle, setIsCheckingHandle] = useState(false);
     const [subscriptionTier, setSubscriptionTier] = useState(null);
-    const [accountEmail, setAccountEmail] = useState("");
-    const [billingEmail, setBillingEmail] = useState("");
     const [billingCycle, setBillingCycle] = useState(null);
     const [subscriptionStatus, setSubscriptionStatus] = useState(null);
     const [subscribedAt, setSubscribedAt] = useState(null);
@@ -99,22 +105,7 @@ const DashBody = ({ user }) => {
       user.userId !== "dev-bypass-no-db" &&
       /^[a-f0-9]{24}$/i.test(user.userId);
 
-    const normalizedSubscriptionStatus = String(
-      subscriptionStatus || user?.subscriptionStatus || "",
-    ).toLowerCase();
-    const tierForAccess = subscriptionTier ?? user?.subscriptionTier ?? null;
-    const lifetimeForAccess = Boolean(isLifeTimeMember || user?.lifetimeMember);
-    const hasPaidAccess =
-      !!isDemo ||
-      isDevLoginBypassUser(user) ||
-      isOwnerFullAccessUser(user) ||
-      (!!user && (
-        lifetimeForAccess ||
-        normalizedSubscriptionStatus === "active" ||
-        normalizedSubscriptionStatus === "trialing" ||
-        // Backward-compatible: some historical users have tier/cycle populated without status.
-        (!!tierForAccess && !normalizedSubscriptionStatus)
-      ));
+    const hasPaidAccess = !!isDemo || userHasDashboardAccess(user);
     const isLocked = !hasPaidAccess;
     const runYourselfLocked = !!contextStateV2?.runYourselfLocked;
     const runYourselfSessionActive = !!contextStateV2?.runYourselfSessionActive;
@@ -132,7 +123,37 @@ const DashBody = ({ user }) => {
     const dashboardAccessLocked = isLocked && !runYourselfInteractiveUnlocked;
     const workspaceWriteLocked =
       !isDemo && !!user && (dashboardAccessLocked || runYourselfLocked);
+    // The run-yourself loader flips the session flag after mount; don't flash the gate first.
+    const [freeRunStarting, setFreeRunStarting] = useState(
+      () => userRunYourselfInteractiveUnlocked(user) && freeRunRequestedInUrl(),
+    );
+    useEffect(() => {
+      if (!freeRunStarting) return undefined;
+      if (runYourselfSessionActive) {
+        setFreeRunStarting(false);
+        return undefined;
+      }
+      const timer = window.setTimeout(() => setFreeRunStarting(false), 8000);
+      return () => window.clearTimeout(timer);
+    }, [freeRunStarting, runYourselfSessionActive]);
+    const membershipLocked = !isDemo && !!user && dashboardAccessLocked && !freeRunStarting;
     const wasOnForkProjectRef = useRef(false);
+
+    useEffect(() => {
+      if (isDemo || typeof window === "undefined") return;
+      const url = new URL(window.location.href);
+      if (url.searchParams.get("view") !== "billing") return;
+      setViewing?.("manageAccount");
+      url.searchParams.delete("view");
+      window.history.replaceState(window.history.state, "", `${url.pathname}${url.search}${url.hash}`);
+    }, [isDemo, setViewing]);
+
+    useEffect(() => {
+      if (isDemo) return undefined;
+      const open = () => setViewing?.("manageAccount");
+      window.addEventListener(OPEN_BILLING_EVENT, open);
+      return () => window.removeEventListener(OPEN_BILLING_EVENT, open);
+    }, [isDemo, setViewing]);
 
     useEffect(() => {
       contextStateV2?.setWorkspaceWriteLocked?.(workspaceWriteLocked);
@@ -307,8 +328,6 @@ const DashBody = ({ user }) => {
                 if (data.success) {
                     setUserHandle(data.data.user_name);
                     setProfilePic?.(data.data.profile_pic);
-                    setAccountEmail(data.data.email || "");
-                    setBillingEmail(data.data.billing_email || data.data.email || "");
                     setIsLifeTimeMember(data.data.lifetimeMember);
                     setSubscriptionTier(data.data.subscriptionTier || null);
                     setBillingCycle(data.data.billingCycle || null);
@@ -473,7 +492,11 @@ const DashBody = ({ user }) => {
                 {!isDemo && viewing === 'generate' && <div className="py-20"><ComingSoon /></div> }
                 {!isDemo && viewing === 'presentation' && <div className="py-20"><EasyLychee /></div> }
                 {!isDemo && viewing === 'scrape' && <ScraperView />}
-                {!isDemo && viewing === 'pricing' && <div className="py-10"><PricingSection /></div>}
+                {!isDemo && BILLING_VIEWS.has(viewing) && (
+                  <div className="absolute inset-0 z-30 overflow-y-auto bg-[#f5f5f5] dark:bg-[#1e1e1e]">
+                    <BillingView user={user} onBack={() => setViewing?.("welcome")} />
+                  </div>
+                )}
                 {!isDemo && viewing === 'profilePage' && <div className="p-56 text-black">
                     <div className="">
                         <div className="mb-4 max-w-xl">
@@ -535,40 +558,6 @@ const DashBody = ({ user }) => {
                         
                     </div>
                 </div>}
-                { viewing === 'manageAccount' && <div className="p-56 text-black">
-                    <div className="mb-6 rounded-lg border border-border bg-background p-4 text-sm text-foreground">
-                        <div className="font-semibold">Current subscription</div>
-                        <div className="mt-2 text-muted-foreground">
-                          {isLifeTimeMember
-                            ? "Lifetime access"
-                            : (subscriptionTier
-                                ? `${subscriptionTier}${billingCycle ? ` (${billingCycle})` : ""} - ${subscriptionStatus || "unknown"}`
-                                : "No active paid tier on file")}
-                        </div>
-                        <div className="text-muted-foreground">
-                          Subscribed on: {subscribedAt ? new Date(subscribedAt).toLocaleDateString() : "N/A"}
-                        </div>
-                    </div>
-                    <div className="mb-6 max-w-xl space-y-4 rounded-lg border border-border bg-background p-4 text-sm text-foreground">
-                        <div>
-                            <div className="text-muted-foreground">Login email</div>
-                            <div className="mt-1 font-medium">{accountEmail || user?.email || "—"}</div>
-                        </div>
-                        <div className="flex flex-wrap items-center justify-between gap-3">
-                            <div>
-                                <div className="text-muted-foreground">Your billing email</div>
-                                <div className="mt-1 font-medium">{billingEmail || accountEmail || user?.email || "—"}</div>
-                            </div>
-                            <a
-                                className="inline-flex h-9 shrink-0 items-center rounded-md bg-primary px-3 text-sm font-medium text-primary-foreground"
-                                href="https://billing.stripe.com/p/login/14k6sm3PU1cTd44fYY"
-                            >
-                                Change subscription
-                            </a>
-                        </div>
-                    </div>
-                    <div>Hi, I am working on making this page more useful</div>
-                </div>}
         </div>
         {contextStateV2?.landingDemo && (
           <IntegrationConnectLandingDemo
@@ -579,33 +568,9 @@ const DashBody = ({ user }) => {
       </WorkspaceComposerDockProvider>
     );
 
-    const paywallOverlay =
-      !isDemo && (dashboardAccessLocked || runYourselfLocked) && user ? (
-        <div className="pointer-events-auto fixed bottom-5 left-1/2 z-[999] w-[min(94vw,42rem)] -translate-x-1/2 rounded-xl border-2 border-primary/50 bg-card p-5 shadow-2xl ring-4 ring-primary/15">
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <div>
-              <div className="text-base font-semibold text-foreground">
-                {runYourselfLocked && !isLocked
-                  ? "Upgrade to run unlimited analyses"
-                  : "Choose a plan to unlock the dashboard"}
-              </div>
-              <div className="mt-1 text-sm leading-snug text-muted-foreground">
-                {runYourselfLocked && !isLocked
-                  ? "You've used your free interactive run. View your chart and data below, then upgrade to Pro to edit, save, and run more analyses."
-                  : "You can browse projects, sheets, and dashboards. Saving, data pulls, uploads, and integrations require an active paid plan (or lifetime access)."}
-              </div>
-            </div>
-            <div className="flex shrink-0 items-center gap-2">
-              <Link
-                href="/#pricing"
-                className="inline-flex h-10 items-center justify-center rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground shadow-md hover:opacity-90"
-              >
-                View plans
-              </Link>
-            </div>
-          </div>
-        </div>
-      ) : null;
+    if (membershipLocked) {
+      return <MembershipGate user={user} />;
+    }
 
     return isDemo ? (
       <div className="flex h-full min-h-0 min-w-0 flex-1 flex-col">{content}</div>
@@ -619,7 +584,6 @@ const DashBody = ({ user }) => {
         >
           {content}
         </div>
-        {paywallOverlay}
       </div>
     );
 }

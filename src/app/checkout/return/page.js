@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import CheckoutAccountStep from "@/components/checkout/CheckoutAccountStep";
 import { rememberCheckoutWelcome } from "@/components/checkout/CheckoutWelcome";
 import { membershipTierLabel } from "@/lib/membershipLabel";
+import { mutateUser } from "@/lib/hooks";
 
 export default function CheckoutReturnPage() {
   const router = useRouter();
@@ -27,6 +28,7 @@ export default function CheckoutReturnPage() {
       }
     }
     rememberCheckoutWelcome(membershipTierLabel({ planKey: key, subscriptionTier: tier }));
+    await mutateUser();
     router.push("/dashboard");
   }, [router]);
 

@@ -1,3 +1,4 @@
+import { requirePaidMember } from "@/lib/requirePaidMember";
 import OpenAI from "openai"
 
 const openai = new OpenAI({
@@ -5,6 +6,7 @@ const openai = new OpenAI({
 })
 
 export default async (req, res) => {
+    if (!(await requirePaidMember(req, res, { allowFreeRun: true }))) return;
     try{
         //create assistant
         const thread_id = req.query.threadId

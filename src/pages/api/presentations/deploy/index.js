@@ -2,6 +2,7 @@
 import dbConnect from "@/lib/dbConnect";
 import Presentation from "@/models/Presentations";
 import Publication from "@/models/Publications";
+import { requirePaidMember } from "@/lib/requirePaidMember";
 
 export default async function handler(req, res) {
     const { presentationId } = req.body;
@@ -9,9 +10,11 @@ export default async function handler(req, res) {
     await dbConnect();
 
     try {
+        const session = await requirePaidMember(req, res);
+        if (!session) return;
         const presentation = await Presentation.findById(presentationId);
 
-        if (!presentation) {
+        if (!presentation || String(presentation.user_id) !== String(session.userId)) {
             return res.status(404).json({ success: false, message: "Presentation not found" });
         }
 

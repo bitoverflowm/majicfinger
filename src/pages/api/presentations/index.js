@@ -1,12 +1,14 @@
 import dbConnect from "@/lib/dbConnect";
 import Presentation from "@/models/Presentations";
 import mongoose from 'mongoose'; // Ensure mongoose is imported for ObjectId
+import { assertQueryUserMatchesSession, requireLoginSession } from "@/lib/resourceOwnership";
+import { requirePaidMember } from "@/lib/requirePaidMember";
 
 export default async function handler(req, res) {
     const {
         query: { uid },
         method,
-        body: { project_name, presentation_name, template, main_title, sub_title, display_map, data_meta, data_snap_shot, palette, user_id }, // Destructure these from req.body
+        body: { project_name, presentation_name, template, main_title, sub_title, display_map, data_meta, data_snap_shot, palette }, // Destructure these from req.body
     } = req;
 
     await dbConnect();
@@ -14,7 +16,10 @@ export default async function handler(req, res) {
     switch (method) {
         case "GET":
             try {
-                const presentations = await Presentation.find({ user_id: uid })
+                const session = await requireLoginSession(req, res);
+                if (!session) return;
+                if (!assertQueryUserMatchesSession(uid, session, res)) return;
+                const presentations = await Presentation.find({ user_id: session.userId })
                     .select('project_name presentation_name last_saved_date')
                     .exec();
 
@@ -29,8 +34,9 @@ export default async function handler(req, res) {
             break;
         case "POST":
             try {
-                // Validate user_id or assume it's already validated and is being sent in correct format
-                if (!mongoose.Types.ObjectId.isValid(user_id)) {
+                const session = await requirePaidMember(req, res);
+                if (!session) return;
+                if (!mongoose.Types.ObjectId.isValid(String(session.userId))) {
                     return res.status(400).json({ success: false, message: "Invalid user_id" });
                 }
                 const newPresentation = await Presentation.create({
@@ -45,7 +51,7 @@ export default async function handler(req, res) {
                     palette,
                     created_date: new Date(),
                     last_saved_date: new Date(),
-                    user_id: new mongoose.Types.ObjectId(user_id)  // Convert user_id string to ObjectId
+                    user_id: new mongoose.Types.ObjectId(String(session.userId)),
                 });
                 res.status(201).json({ success: true, data: newPresentation });
             } catch (error) {

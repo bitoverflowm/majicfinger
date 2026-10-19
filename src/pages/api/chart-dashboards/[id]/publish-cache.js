@@ -1,6 +1,7 @@
 import dbConnect from "@/lib/dbConnect";
 import ChartDashboard from "@/models/ChartDashboards";
 import { getLoginSession } from "@/lib/auth";
+import { requirePaidMember } from "@/lib/requirePaidMember";
 import mongoose from "mongoose";
 import {
   collectChartIdsFromLayout,
@@ -43,6 +44,7 @@ export default async function handler(req, res) {
     if (String(dash.user_id) !== String(session.userId)) {
       return res.status(403).json({ success: false, message: "Forbidden" });
     }
+    if (!(await requirePaidMember(req, res))) return;
     if (!dash.is_public) {
       return res.status(400).json({ success: false, message: "Dashboard is not public" });
     }

@@ -6,7 +6,24 @@ import { cn } from "@/lib/utils";
 import { motion } from "framer-motion";
 import { useMemo, useState } from "react";
 
-type BillingCycle = "weekly" | "monthly" | "annual";
+export type BillingCycle = "weekly" | "monthly" | "annual";
+
+export type PricingTierAction = {
+  label: string;
+  href?: string;
+  onClick?: () => void;
+  disabled?: boolean;
+  busy?: boolean;
+  hint?: string;
+};
+
+export type PricingTierActionArgs = {
+  tier: string;
+  cycle: BillingCycle;
+  href: string;
+  isCurrentTier: boolean;
+  isCurrent: boolean;
+};
 
 /** Re-enable when promoting lifetime / pay-once on the marketing page again. */
 const SHOW_LIFETIME_ACCESS = false;
@@ -99,11 +116,27 @@ type LifetimeAccess = {
 export function PricingSection({
   title: titleOverride,
   description: descriptionOverride,
+  id = "pricing",
+  showHeader = true,
+  defaultCycle = "monthly",
+  currentPlan = null,
+  getAction,
+  className,
 }: {
   title?: string;
   description?: string;
+  id?: string;
+  showHeader?: boolean;
+  defaultCycle?: BillingCycle;
+  /** Highlights the member's tier; `cycle` marks the exact plan as current. */
+  currentPlan?: { tier?: string | null; cycle?: string | null } | null;
+  /** Replaces the default checkout link for each tier. */
+  getAction?: (args: PricingTierActionArgs) => PricingTierAction | null;
+  className?: string;
 } = {}) {
-  const [billingCycle, setBillingCycle] = useState<BillingCycle>("monthly");
+  const [billingCycle, setBillingCycle] = useState<BillingCycle>(defaultCycle);
+  const currentTier = String(currentPlan?.tier || "").toLowerCase();
+  const currentCycle = String(currentPlan?.cycle || "").toLowerCase();
   const { title: defaultTitle, description: defaultDescription, pricingItems } =
     siteConfig.pricingSection;
   const title = titleOverride?.trim() || defaultTitle;
@@ -178,17 +211,19 @@ export function PricingSection({
 
   return (
     <section
-      id="pricing"
-      className="flex flex-col items-center justify-center gap-10 pb-10 w-full relative"
+      id={id}
+      className={cn("flex flex-col items-center justify-center gap-10 pb-10 w-full relative", className)}
     >
-      <SectionHeader>
-        <h2 className="text-3xl md:text-4xl font-medium tracking-tighter text-center text-balance">
-          {title}
-        </h2>
-        <p className="text-muted-foreground text-center text-balance font-medium">
-          {description}
-        </p>
-      </SectionHeader>
+      {showHeader && (
+        <SectionHeader>
+          <h2 className="text-3xl md:text-4xl font-medium tracking-tighter text-center text-balance">
+            {title}
+          </h2>
+          <p className="text-muted-foreground text-center text-balance font-medium">
+            {description}
+          </p>
+        </SectionHeader>
+      )}
 
       <div className="relative w-full h-full">
         <div className="absolute -top-14 left-1/2 -translate-x-1/2">
@@ -218,7 +253,22 @@ export function PricingSection({
         ) : null}
 
         <div className="grid min-[650px]:grid-cols-2 min-[1100px]:grid-cols-3 gap-4 w-full max-w-7xl mx-auto px-6">
-          {computedTiers.map((tier) => (
+          {computedTiers.map((tier) => {
+            const tierSlug = tier.name.toLowerCase();
+            const isCurrentTier = !!currentTier && currentTier === tierSlug;
+            const isCurrent = isCurrentTier && currentCycle === billingCycle;
+            const action = getAction
+              ? getAction({ tier: tierSlug, cycle: billingCycle, href: tier.display.href, isCurrentTier, isCurrent })
+              : null;
+            const buttonClass = cn(
+              "h-10 w-full flex items-center justify-center text-sm font-normal tracking-wide rounded-full px-4 cursor-pointer transition-all ease-out active:scale-95 disabled:cursor-default disabled:active:scale-100",
+              action?.disabled
+                ? "bg-muted text-muted-foreground border border-border shadow-none"
+                : tier.isPopular
+                  ? "bg-secondary text-white shadow-[inset_0_1px_2px_rgba(255,255,255,0.25),0_3px_3px_-1.5px_rgba(16,24,40,0.06),0_1px_1px_rgba(16,24,40,0.08)]"
+                  : "bg-primary text-primary-foreground shadow-[0px_1px_2px_0px_rgba(255,255,255,0.16)_inset,0px_3px_3px_-1.5px_rgba(16,24,40,0.24),0px_1px_1px_-0.5px_rgba(16,24,40,0.20)]",
+            );
+            return (
             <div
               key={tier.name}
               className={cn(
@@ -226,16 +276,21 @@ export function PricingSection({
                 tier.isPopular
                   ? "md:shadow-[0px_61px_24px_-10px_rgba(0,0,0,0.01),0px_34px_20px_-8px_rgba(0,0,0,0.05),0px_15px_15px_-6px_rgba(0,0,0,0.09),0px_4px_8px_-2px_rgba(0,0,0,0.10),0px_0px_0px_1px_rgba(0,0,0,0.08)] bg-accent ring-1 ring-secondary/25 md:-translate-y-0.5"
                   : "bg-[#F3F4F6] dark:bg-[#F9FAFB]/[0.02] border border-border",
+                isCurrentTier && "ring-2 ring-[#0d99ff]",
               )}
             >
               <div className="flex flex-col gap-2 p-4">
                 <p className="text-sm">
                   {tier.name}
-                  {tier.isPopular && (
+                  {isCurrentTier ? (
+                    <span className="bg-[#0d99ff] text-white h-6 inline-flex w-fit items-center justify-center px-2 rounded-full text-xs font-medium tracking-wide ml-2">
+                      Your plan
+                    </span>
+                  ) : tier.isPopular ? (
                     <span className="bg-secondary text-white h-6 inline-flex w-fit items-center justify-center px-2 rounded-full text-xs font-medium tracking-wide ml-2">
                       {tier.badgeLabel ?? "Popular"}
                     </span>
-                  )}
+                  ) : null}
                 </p>
 
                 <div className="flex items-baseline">
@@ -249,17 +304,28 @@ export function PricingSection({
               </div>
 
               <div className="flex flex-col gap-2 p-4">
-                <a
-                  href={tier.display.href}
-                  className={cn(
-                    "h-10 w-full flex items-center justify-center text-sm font-normal tracking-wide rounded-full px-4 cursor-pointer transition-all ease-out active:scale-95",
-                    tier.isPopular
-                      ? "bg-secondary text-white shadow-[inset_0_1px_2px_rgba(255,255,255,0.25),0_3px_3px_-1.5px_rgba(16,24,40,0.06),0_1px_1px_rgba(16,24,40,0.08)]"
-                      : "bg-primary text-primary-foreground shadow-[0px_1px_2px_0px_rgba(255,255,255,0.16)_inset,0px_3px_3px_-1.5px_rgba(16,24,40,0.24),0px_1px_1px_-0.5px_rgba(16,24,40,0.20)]",
-                  )}
-                >
-                  {tier.buttonText}
-                </a>
+                {!action ? (
+                  <a href={tier.display.href} className={buttonClass}>
+                    {tier.buttonText}
+                  </a>
+                ) : action.href && !action.disabled ? (
+                  <a href={action.href} className={buttonClass}>
+                    {action.label}
+                  </a>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={action.onClick}
+                    disabled={action.disabled || action.busy}
+                    aria-busy={action.busy || undefined}
+                    className={buttonClass}
+                  >
+                    {action.busy ? "One moment…" : action.label}
+                  </button>
+                )}
+                {action?.hint ? (
+                  <p className="text-center text-xs text-muted-foreground">{action.hint}</p>
+                ) : null}
               </div>
 
               <div className="flex min-h-0 flex-col justify-start">
@@ -318,7 +384,8 @@ export function PricingSection({
                 </div>
               </div>
             </div>
-          ))}
+            );
+          })}
         </div>
 
         {SHOW_LIFETIME_ACCESS && lifetimeAccess && (
