@@ -2570,7 +2570,7 @@ function blocksTopToBottom(blocks) {
   return (blocks || []).slice().sort((a, b) => (a.y || 0) - (b.y || 0) || (a.x || 0) - (b.x || 0));
 }
 
-const DEMO_OPEN_SHEETS = 2;
+const DEMO_OPEN_SHEETS = 3;
 
 /** Landing demo: the first sheets stay open with their charts; everything else is behind the upgrade. */
 function demoLockedIds(blocks) {

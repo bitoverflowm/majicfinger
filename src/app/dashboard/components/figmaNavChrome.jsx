@@ -22,6 +22,7 @@ import { UserAvatar } from "@/components/ui/user-avatar";
 import { useUser } from "@/lib/hooks";
 import { useMyStateV2 } from "@/context/stateContextV2";
 import { exitLandingDemoToSection } from "@/lib/landingDemoSession";
+import { LandingDemoMembersOnlyPortal } from "@/components/dashboardComposer/landingDemoMembersOnly";
 import { useWorkspaceCanvas } from "@/components/dashboardComposer/workspaceCanvas";
 import { pageIdForTab } from "@/lib/workspaceDashboardDocument";
 import { realtimeAssets } from "@/lib/realtime/sheetRealtime";
@@ -451,11 +452,12 @@ function AccountMenu({ onLogout }) {
   );
 }
 
-function SaveDashboardButton() {
+function SaveDashboardButton({ onLocked }) {
   const canvas = useWorkspaceCanvas();
   const [state, setState] = useState("idle");
 
   const onClick = async () => {
+    if (onLocked) return onLocked();
     if (state === "saving") return;
     setState("saving");
     const result = await canvas?.saveNow?.();
@@ -482,12 +484,13 @@ function SaveDashboardButton() {
   );
 }
 
-function PreviewDashboardButton() {
+function PreviewDashboardButton({ onLocked }) {
   const canvas = useWorkspaceCanvas();
   const router = useRouter();
   const [busy, setBusy] = useState(false);
 
   const onClick = async () => {
+    if (onLocked) return onLocked();
     if (busy) return;
     setBusy(true);
     try {
@@ -532,7 +535,7 @@ function ChromeTip({ label, children }) {
   );
 }
 
-function ReplayTabButton() {
+function ReplayTabButton({ onLocked }) {
   const canvas = useWorkspaceCanvas();
   const replaying = canvas?.runFeed?.status === "running" && canvas?.runFeed?.title === "Replay queries";
   const busy = canvas?.runFeed?.status === "running";
@@ -541,8 +544,8 @@ function ReplayTabButton() {
     <button
       type="button"
       aria-label="Replay all queries in tab"
-      disabled={busy || !canvas?.replayTab}
-      onClick={() => canvas?.replayTab?.()}
+      disabled={!onLocked && (busy || !canvas?.replayTab)}
+      onClick={() => (onLocked ? onLocked() : canvas?.replayTab?.())}
       className={CHROME_ICON}
     >
       <RotateCcw className={cn("size-4", replaying && "animate-spin")} aria-hidden />
@@ -551,7 +554,7 @@ function ReplayTabButton() {
   );
 }
 
-function RealtimeModeButton() {
+function RealtimeModeButton({ onLocked }) {
   const canvas = useWorkspaceCanvas();
   const ctx = useMyStateV2();
   const tabs = (Array.isArray(ctx?.workspaceStartTabs) ? ctx.workspaceStartTabs : []).map((tab) => {
@@ -567,11 +570,11 @@ function RealtimeModeButton() {
   });
   const current = tabs.find((tab) => tab.current);
   const on = !!current?.on;
-  const menu = showRealtimeMenu(tabs);
+  const menu = !onLocked && showRealtimeMenu(tabs);
   const runningElsewhere = tabs.filter((tab) => tab.on);
   const idle = tabs.filter((tab) => !tab.on && tab.canStart);
 
-  const idleHint = !on && !current?.canStart ? "no live markets in your current tab" : "";
+  const idleHint = !on && !current?.canStart && !onLocked ? "no live markets in your current tab" : "";
   const playLabel = on ? "Stop live data on this tab" : idleHint || "Start live data on this tab";
   return (
     <div className="flex items-center">
@@ -580,9 +583,10 @@ function RealtimeModeButton() {
         type="button"
         aria-label={on ? "Stop realtime mode" : idleHint || "Realtime mode"}
         aria-pressed={on}
-        disabled={!on && !current?.canStart}
+        disabled={!onLocked && !on && !current?.canStart}
         onClick={() => {
-          if (on) canvas?.stopRealtimeMode?.(canvas.pageId);
+          if (onLocked) onLocked();
+          else if (on) canvas?.stopRealtimeMode?.(canvas.pageId);
           else canvas?.startRealtimeMode?.(canvas?.pageId);
         }}
         className={cn(CHROME_ICON, on && "text-emerald-600 dark:text-emerald-400")}
@@ -623,6 +627,8 @@ function RightChromeControls({ onLogout, expanded }) {
   const router = useRouter();
   const landingDemo = !!useMyStateV2()?.landingDemo;
   const [shareOpen, setShareOpen] = useState(false);
+  const [membersOnly, setMembersOnly] = useState("");
+  const lockedAs = (feature) => (landingDemo ? () => setMembersOnly(feature) : undefined);
 
   return (
     <TooltipProvider delayDuration={300}>
@@ -652,13 +658,13 @@ function RightChromeControls({ onLogout, expanded }) {
         </Button>
         </ChromeTip>
       )}
-      <SaveDashboardButton />
+      <SaveDashboardButton onLocked={lockedAs("Saving dashboards")} />
       <ChromeTip label="See where this dashboard's data came from">
         <ProvenanceMapButton />
       </ChromeTip>
-      <PreviewDashboardButton />
-      <ReplayTabButton />
-      <RealtimeModeButton />
+      <PreviewDashboardButton onLocked={lockedAs("Dashboard preview")} />
+      <ReplayTabButton onLocked={lockedAs("Replaying queries")} />
+      <RealtimeModeButton onLocked={lockedAs("Realtime data")} />
       <ChromeTip label="Switch between light and dark">
         <AnimatedThemeToggler className="inline-flex size-7 items-center justify-center rounded-md text-neutral-700 hover:bg-black/[0.05] dark:text-neutral-200 dark:hover:bg-white/10 [&_svg]:size-4" />
       </ChromeTip>
@@ -667,13 +673,14 @@ function RightChromeControls({ onLogout, expanded }) {
       <button
         type="button"
         aria-label="Share this dashboard"
-        onClick={() => setShareOpen(true)}
+        onClick={() => (landingDemo ? setMembersOnly("Sharing dashboards") : setShareOpen(true))}
         className="ml-1 inline-flex h-7 items-center rounded-md bg-[#0d99ff] px-3 text-[13px] font-medium text-white hover:bg-[#0b87e0]"
       >
         Share
       </button>
       </ChromeTip>
       <DashboardShareDialog open={shareOpen} onOpenChange={setShareOpen} />
+      <LandingDemoMembersOnlyPortal open={!!membersOnly} feature={membersOnly} onClose={() => setMembersOnly("")} />
     </div>
     </TooltipProvider>
   );
