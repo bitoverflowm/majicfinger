@@ -86,4 +86,24 @@ function recorder(opensChart = () => false) {
   assert.deepEqual(calls, [["a", "b"]], "a failed reveal does not stop the next sheet");
 }
 
+{
+  const calls = [];
+  const stage = createRunSheetStage({
+    reveal: (sheets) => calls.push(sheets.map((sheet) => sheet.id)),
+    frame: instant,
+    wait: instant,
+    limit: 2,
+  });
+  stage.put({ id: "a" });
+  stage.put({ id: "b" });
+  assert.equal(stage.room(), 0);
+  stage.put({ id: "c" });
+  stage.put({ id: "a", rows: [1] });
+  await stage.settle();
+  assert.deepEqual(stage.sheets.map((sheet) => sheet.id), ["a", "b"], "sheets past the limit are not placed");
+  assert.deepEqual(stage.sheets[0].rows, [1], "a sheet already placed can still be replaced at the limit");
+  assert.equal(stage.dropped(), 1);
+  assert.ok(calls.every((ids) => !ids.includes("c")), "a dropped sheet is never revealed");
+}
+
 console.log("runSheetStage tests passed");

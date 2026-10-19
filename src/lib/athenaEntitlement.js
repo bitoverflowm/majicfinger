@@ -57,11 +57,15 @@ export function userHasBasicHistoricalAccess(userLike) {
   return normalizedSubscriptionTier(userLike) === "basic";
 }
 
+/** Landing demo: most sheets one Save and run may place, counting every sheet (charts follow their sheets). */
+export const DEMO_RUN_SHEET_LIMIT = 12;
+
 /**
  * How many markets may each get their own trades sheet in one pull.
- * Basic is 5, Pro is 10, Elite is 50. More than 50 is an enterprise pull.
+ * Demo is 11 (plus the parent sheet makes its 12), Basic is 5, Pro is 10, Elite is 50. More than 50 is an enterprise pull.
  */
-export function getJoinMarketCap(userLike) {
+export function getJoinMarketCap(userLike, { isDemo = false } = {}) {
+  if (isDemo) return DEMO_RUN_SHEET_LIMIT - 1;
   if (!userLike || typeof userLike !== "object") return 5;
   if (String(userLike.userId || "") === "dev-bypass-no-db") return 50;
   if (isOwnerFullAccessUser(userLike) || userLike.lifetimeMember) return 50;

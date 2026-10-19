@@ -24,19 +24,26 @@ function sleep(ms) {
  *   opensChart?: (sheet: object) => boolean,
  *   frame?: () => Promise<void>,
  *   wait?: (ms: number) => Promise<void>,
+ *   limit?: number,
  * }} options
+ * `limit` caps how many sheets one run places. Sheets past it are dropped, so their charts never open.
  */
-export function createRunSheetStage({ reveal, opensChart = () => false, frame = nextFrame, wait = sleep }) {
+export function createRunSheetStage({ reveal, opensChart = () => false, frame = nextFrame, wait = sleep, limit = Infinity }) {
   /** @type {object[]} */
   const sheets = [];
   let queue = Promise.resolve();
   let waiting = 0;
+  let dropped = 0;
 
   /** Add or replace a sheet by id, then place it. Resolves once it is on the canvas. */
   function put(sheet) {
     if (!sheet) return queue;
     const index = sheet.id ? sheets.findIndex((item) => item.id === sheet.id) : -1;
     const isNew = index < 0;
+    if (isNew && sheets.length >= limit) {
+      dropped += 1;
+      return queue;
+    }
     if (isNew) sheets.push(sheet);
     else sheets[index] = sheet;
     const snapshot = sheets.slice();
@@ -65,6 +72,10 @@ export function createRunSheetStage({ reveal, opensChart = () => false, frame = 
   return {
     sheets,
     put,
+    /** How many more new sheets fit under `limit`. */
+    room: () => Math.max(0, limit - sheets.length),
+    /** New sheets turned away by `limit`. */
+    dropped: () => dropped,
     /** Resolves after every sheet added so far is on the canvas. */
     settle: () => queue,
   };

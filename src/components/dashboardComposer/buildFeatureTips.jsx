@@ -583,17 +583,30 @@ export function EnrichmentsFeatureTip({ anchorRef }) {
 
 /* ---------- Sheet limit ---------- */
 
-const DEMO_SHEET_CAP = 5;
-const SHEET_TABS = ["PRES-28", "SENATE-26", "FED-DEC", "NYC-25", "RAIN-NY"];
-const LOCKED_TABS = ["BTC-100K", "OSCARS", "ELON-200"];
+// Markets plus these fill the demo's sheets for one pull; the locked ones are what's left out.
+const SHEET_TABS = [
+  "PRES-28",
+  "SENATE-26",
+  "FED-DEC",
+  "NYC-25",
+  "RAIN-NY",
+  "BTC-100K",
+  "NBA-25",
+  "OSCARS",
+  "CPI-JUN",
+  "GDP-Q3",
+  "ELON-200",
+];
+const LOCKED_TABS = ["TSLA-Q4", "WC-26", "SPX-6K"];
+const ANIMATION_SHEET_CAP = SHEET_TABS.length + 1;
 // Blank, one step per allowed sheet, one per locked sheet, hold, fade.
-const SHEET_LIMIT_STEPS = [600, ...SHEET_TABS.map(() => 380), ...LOCKED_TABS.map(() => 320), 2200, 500];
+const SHEET_LIMIT_STEPS = [600, ...SHEET_TABS.map(() => 220), ...LOCKED_TABS.map(() => 320), 2200, 500];
 
 function SheetChip({ label, state, animate }) {
   return (
     <span
       className={cn(
-        "inline-flex h-[22px] min-w-0 items-center gap-1 rounded-md px-1.5 text-[9px] font-semibold",
+        "inline-flex h-[19px] min-w-0 items-center gap-1 rounded-md px-1.5 text-[8.5px] font-semibold",
         state === "parent" && "bg-white text-neutral-500 shadow-sm dark:bg-neutral-900",
         state === "new" && "bg-white text-[#0b6fc2] shadow-sm ring-1 ring-[#0d99ff]/40 dark:bg-neutral-900 dark:text-[#5cb8ff]",
         state === "locked" && "border border-dashed border-neutral-400/70 text-neutral-400 dark:border-neutral-600",
@@ -612,21 +625,22 @@ function SheetLimitTipAnimation() {
   const locked = Math.max(0, Math.min(step - SHEET_TABS.length, LOCKED_TABS.length));
   const fading = step === SHEET_LIMIT_STEPS.length - 1 && !reduced;
   const full = made === SHEET_TABS.length;
+  const placed = made + 1;
 
   return (
     <div aria-hidden className={cn("w-full px-4 transition-opacity duration-500", fading ? "opacity-0" : "opacity-100")}>
       <div className="flex items-center justify-between">
-        <span className="text-[10px] font-semibold uppercase tracking-wide text-neutral-500">New sheets</span>
+        <span className="text-[10px] font-semibold uppercase tracking-wide text-neutral-500">Sheets this pull</span>
         <span
           className={cn(
             "rounded-full px-1.5 py-0.5 text-[9px] font-semibold tabular-nums transition-colors duration-300",
             full ? "bg-[#0d99ff] text-white" : "bg-white text-neutral-600 dark:bg-neutral-900 dark:text-neutral-300",
           )}
         >
-          {made} / {DEMO_SHEET_CAP} demo limit
+          {placed} / {ANIMATION_SHEET_CAP} demo limit
         </span>
       </div>
-      <div className="mt-2 grid grid-cols-3 gap-1">
+      <div className="mt-2 grid grid-cols-4 gap-1">
         <SheetChip label="Markets" state="parent" />
         {SHEET_TABS.slice(0, made).map((label) => (
           <SheetChip key={label} label={label} state="new" animate={!reduced} />
@@ -638,16 +652,20 @@ function SheetLimitTipAnimation() {
       <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-white shadow-inner dark:bg-neutral-900">
         <div
           className="h-full rounded-full bg-gradient-to-r from-[#0d99ff] to-[#5cb8ff] transition-[width] duration-300"
-          style={{ width: `${(made / DEMO_SHEET_CAP) * 100}%` }}
+          style={{ width: `${(placed / ANIMATION_SHEET_CAP) * 100}%` }}
         />
       </div>
     </div>
   );
 }
 
-/** Demo only: next to the sheet tabs an enrichment generates. */
-export function SheetLimitFeatureTip({ anchorRef, sheets, cap, open = true, onUpgrade }) {
+/**
+ * Demo only: next to the sheet tabs an enrichment generates.
+ * `sheets` is the new sheets; `total` also counts the sheet they come from, which is what `cap` limits.
+ */
+export function SheetLimitFeatureTip({ anchorRef, sheets, total, cap, open = true, onUpgrade }) {
   const noun = sheets === 1 ? "sheet" : "sheets";
+  const over = total > cap;
   return (
     <FeatureTip
       id={BUILD_TIP_IDS.sheetLimit}
@@ -659,10 +677,12 @@ export function SheetLimitFeatureTip({ anchorRef, sheets, cap, open = true, onUp
       sideOffset={6}
       alignOffset={16}
       className="w-[296px]"
-      mediaClassName="items-start pt-4"
+      mediaClassName="h-[160px] items-start pt-4"
       media={<SheetLimitTipAnimation />}
       title="Sheet limits"
-      description={`Your enrichment generates ${sheets.toLocaleString()} new ${noun}. Since you're on demo, you can pull a maximum of ${cap.toLocaleString()} sheets at once. To get more sheets and more tabs, upgrade.`}
+      description={`Your enrichment generates ${sheets.toLocaleString()} new ${noun}. Since you're on demo, you can pull a maximum of ${cap.toLocaleString()} sheets at once${
+        over ? `, so only the first ${cap.toLocaleString()} will be pulled` : ""
+      }. To get more sheets and more tabs, upgrade.`}
       secondaryAction={{ label: "Continue" }}
       action={{ label: "Upgrade", onClick: onUpgrade }}
       closeOnAction

@@ -165,7 +165,7 @@ import { Input } from "@/components/ui/input";
 import { useMyStateV2 } from "@/context/stateContextV2";
 import { pageIdForTab } from "@/lib/workspaceDashboardDocument";
 import { newBlankTabName, newStartTabId, saveWorkspaceStartTabs } from "@/lib/workspaceStartTabs";
-import { getHistoricalPullRowLimit, getJoinMarketCap } from "@/lib/athenaEntitlement";
+import { DEMO_RUN_SHEET_LIMIT, getHistoricalPullRowLimit, getJoinMarketCap } from "@/lib/athenaEntitlement";
 import { evaluateColumnFormula, FORMULA_FUNCTIONS, FORMULA_REFERENCE_NOTES, formulaSuggestions } from "@/lib/columnFormula";
 import { useUser } from "@/lib/hooks";
 import {
@@ -1162,6 +1162,7 @@ function EnrichStep({
   onToggleForecastJoin,
   onClear,
   marketCap,
+  demoSheetLimit = null,
   queryRows,
   sheetCount,
   onHoverJoin,
@@ -1351,6 +1352,9 @@ function EnrichStep({
   const hiddenMarketColumns = marketColumnHidden || new Set();
   const selectedMarketCount = marketColumns.filter((column) => !hiddenMarketColumns.has(column.id)).length;
   const queryRowCount = typeof queryRows === "number" ? queryRows : sheetCount;
+  const sheetLimitLine = demoSheetLimit
+    ? `The demo allows ${demoSheetLimit.toLocaleString()} sheets per pull.`
+    : `Your plan allows ${marketCap.toLocaleString()} sheet pulls at once.`;
   return (
     <>
       <div ref={headerRef} className="px-4 pb-3 pt-4 pr-12">
@@ -1650,9 +1654,7 @@ function EnrichStep({
                                       : `Each trader gets a ${traderKindTitles[0]} sheet.`
                                 } The preview shows the first trader.`
                               : `${listPhrase(traderChoices.map((item) => item.title))} can be joined together. Each one is its own sheet. Kalshi shares no PnL history or activity feed.`}
-                            <span className="mt-2 block">
-                              Your plan allows {marketCap.toLocaleString()} sheet pulls at once.
-                            </span>
+                            <span className="mt-2 block">{sheetLimitLine}</span>
                           </p>
                           {marketsDetected ? (
                             <div className="border-t border-border/70 pt-3">
@@ -2035,9 +2037,9 @@ function EnrichStep({
                                 ? `You have ${queryRowCount.toLocaleString()} ${queryRowCount === 1 ? "market" : "markets"} in this pull. Each one gets its own sheet for every source you join. The preview shows the first market.`
                                 : "Pull a market first. Each joined source becomes its own sheet for that market."}
                             <span className="mt-2 block">
-                              {joinChoices.some((item) => item.anchor === "trader")
+                              {joinChoices.some((item) => item.anchor === "trader") && !demoSheetLimit
                                 ? `Your plan builds ${marketCap.toLocaleString()} of these sheets at once.`
-                                : `Your plan allows ${marketCap.toLocaleString()} sheet pulls at once.`}
+                                : sheetLimitLine}
                             </span>
                           </p>
                         </div>
@@ -2064,6 +2066,7 @@ function EnrichStep({
                           <p className="pt-1 text-[11px] leading-relaxed text-muted-foreground">
                             You have {queryRowCount.toLocaleString()} {queryRowCount === 1 ? "market" : "markets"} in this pull. Your plan joins{" "}
                             {marketCap.toLocaleString()} at a time, and each one gets its own sheet for every source you pick. The preview shows the first market.
+                            {demoSheetLimit ? <span className="mt-2 block">{sheetLimitLine}</span> : null}
                             <span className="mt-2 block">Candlesticks stop at Kalshi&apos;s 5,000 one-minute candles per market.</span>
                           </p>
                         </div>
@@ -2183,9 +2186,7 @@ function EnrichStep({
                         <p className="mt-2 text-[11px] leading-relaxed text-muted-foreground">
                           You have {queryRowCount.toLocaleString()} {queryRowCount === 1 ? "row" : "rows"} in your markets query. So{" "}
                           {sheetCount.toLocaleString()} trade {sheetCount === 1 ? "sheet" : "sheets"} will be created for each market.
-                          <span className="mt-2 block">
-                            Your plan allows {marketCap.toLocaleString()} sheet pulls at once.
-                          </span>
+                          <span className="mt-2 block">{sheetLimitLine}</span>
                           <a href="/checkout" className="mt-2 block font-medium text-[#0d99ff] underline-offset-2 hover:underline">
                             Upgrade to increase your limit.
                           </a>
@@ -4312,7 +4313,8 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
     return join ? join.marketsFromRows(capped, Number.MAX_SAFE_INTEGER) : [];
   }, [guidedFilters, pull, attributeFilters, sortKeys, rowLimit, join, integrationId, tableId, settledPreviewKey, previewSearchError]);
 
-  const marketCap = getJoinMarketCap(user);
+  const marketCap = getJoinMarketCap(user, { isDemo: !!ctx?.landingDemo });
+  const runSheetLimit = ctx?.landingDemo ? DEMO_RUN_SHEET_LIMIT : Infinity;
   const traderJoinNames = useMemo(() => {
     if (!liveTraderList) return [];
     const source = Array.isArray(traderImportRows) ? traderImportRows : filteredRows;
@@ -7574,8 +7576,17 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
           type: "sheet",
           records: recordsFromRows(sheet.columns, (sheet.rows || []).slice(0, CHART_PROBE_ROWS)),
         }).length > 0,
+      limit: runSheetLimit,
     });
     const sheets = stage.sheets;
+    /** Trims a list of one-sheet-each fetches to the sheets still allowed, so capped runs don't fetch sheets they can't place. */
+    let skippedSheets = 0;
+    const fitJobs = (list) => {
+      if (!Number.isFinite(runSheetLimit)) return list;
+      const kept = list.slice(0, stage.room());
+      skippedSheets += list.length - kept.length;
+      return kept;
+    };
     /** Every Save and run sheet goes through here, so it lands on the tab as soon as its rows are in. */
     const stageSheet = (sheet) => {
       if (sheet && !sheet.integrationId && integrationId) sheet.integrationId = integrationId;
@@ -7921,7 +7932,7 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
           },
         ];
       } else {
-        const markets = directMarketTickers(livePicks);
+        const markets = fitJobs(directMarketTickers(livePicks));
         const pulled = await mapPool(markets, 3, (market) =>
           loadKalshiLiveDirect(tableId, {
             ticker: market.ticker,
@@ -8046,7 +8057,7 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
               });
             }
           } else {
-            const pulled = await mapPool(unique, 2, (ticker) =>
+            const pulled = await mapPool(fitJobs(unique), 2, (ticker) =>
               loadScopeMarkets(ticker, marketLimit).then((result) => ({ ticker, ...result })),
             );
             for (const item of pulled) {
@@ -8297,7 +8308,7 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
                 }
               }
             } else {
-              const jobs = traderJoinKinds.flatMap((kind) => names.map((nickname) => ({ nickname, kind })));
+              const jobs = fitJobs(traderJoinKinds.flatMap((kind) => names.map((nickname) => ({ nickname, kind }))));
               const pulled = await mapPool(jobs, 3, (job) =>
                 loadKalshiTraderJoin(job.kind, [job.nickname], marketLimit)
                   .then((result) => ({ ...job, ...result }))
@@ -8513,7 +8524,7 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
                 scopeMarkets.push(kalshiJoinMarket(row));
                 if (scopeMarkets.length >= marketCap) break;
               }
-              const jobs = scopeMarkets.flatMap((market) => detectedTargets.map((target) => ({ market, target })));
+              const jobs = fitJobs(scopeMarkets.flatMap((market) => detectedTargets.map((target) => ({ market, target }))));
               const pulled = await mapPool(jobs, 3, async (job) => {
                 const resultJoin = await loadKalshiLiveMarketJoin(
                   job.target.id,
@@ -8570,7 +8581,10 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
       const childLimit = Number.isFinite(sheetCap) && sheetCap > 0 ? sheetCap : PREVIEW_ROW_CAP;
       const mergeTargets = chosen.filter((item) => polymarketJoinPlacement(item, "sheet") === "merge");
       const sheetTargets = chosen.filter((item) => polymarketJoinPlacement(item, "sheet") !== "merge");
-      const jobs = chosen.flatMap((target) => people.map((entity) => ({ target, entity })));
+      const jobs = [
+        ...mergeTargets.flatMap((target) => people.map((entity) => ({ target, entity }))),
+        ...fitJobs(sheetTargets.flatMap((target) => people.map((entity) => ({ target, entity })))),
+      ];
       const traderPulled = await mapPool(jobs, 3, async (job) => {
         try {
           const result = await loadPolymarketTraderJoin(job.target.id, job.entity.pick, { rowLimit: childLimit, planLimit: childLimit });
@@ -8619,7 +8633,7 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
       if (!joinMarketsForRun.length) {
         reporter.succeed("join-live", { result: "0 sheets" });
       } else {
-      const jobs = joinMarketsForRun.flatMap((market) => liveJoinTargets.map((target) => ({ market, target })));
+      const jobs = fitJobs(joinMarketsForRun.flatMap((market) => liveJoinTargets.map((target) => ({ market, target }))));
       reporter.setChildren(
         "join-live",
         jobs.map((job) => ({
@@ -8788,7 +8802,7 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
               .flatMap((item) => item.rows || []);
             const namedMarkets = polymarketMarketEntities(marketRowsForEvent, marketCap);
             if (!downstreamSheetTargets.length || !namedMarkets.length) continue;
-            const downJobs = namedMarkets.flatMap((entity) => downstreamSheetTargets.map((target) => ({ target, entity })));
+            const downJobs = fitJobs(namedMarkets.flatMap((entity) => downstreamSheetTargets.map((target) => ({ target, entity }))));
             const holderSheetStart = sheets.length;
             await mapPool(downJobs, 3, async (job) => {
               try {
@@ -8838,7 +8852,7 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
       const sheetTargets = liveJoinTargets.filter((item) => polymarketJoinPlacement(item, traderMarketLayout) === "sheet");
       const childLimit = Number.isFinite(sheetCap) && sheetCap > 0 ? sheetCap : PREVIEW_ROW_CAP;
       reporter.start("join-live");
-      const jobs = sheetTargets.flatMap((target) => events.map((entity) => ({ target, entity })));
+      const jobs = fitJobs(sheetTargets.flatMap((target) => events.map((entity) => ({ target, entity }))));
       if (!jobs.length) {
         reporter.succeed("join-live", { result: "0 sheets" });
       } else {
@@ -8884,7 +8898,7 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
           const namedMarkets = polymarketMarketEntities(marketRowsForEvent, marketBudget);
           marketBudget = Math.max(0, marketBudget - namedMarkets.length);
           if (!downstreamSheetTargets.length || !namedMarkets.length) continue;
-          const downJobs = namedMarkets.flatMap((entity) => downstreamSheetTargets.map((target) => ({ target, entity })));
+          const downJobs = fitJobs(namedMarkets.flatMap((entity) => downstreamSheetTargets.map((target) => ({ target, entity }))));
           const holderSheetStart = sheets.length;
           await mapPool(downJobs, 3, async (job) => {
             try {
@@ -8930,14 +8944,14 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
       const sheetTargets = liveJoinTargets.filter((item) => polymarketJoinPlacement(item, traderMarketLayout) === "sheet");
       const people = polymarketTraderEntities(marketRows, marketCap);
       const markets = polymarketMarketEntities(marketRows, marketCap);
-      const jobs = [
+      const jobs = fitJobs([
         ...sheetTargets
           .filter((target) => target.anchor === "trader")
           .flatMap((target) => people.map((entity) => ({ target, entity, anchor: "trader" }))),
         ...sheetTargets
           .filter((target) => target.anchor !== "trader")
           .flatMap((target) => markets.map((entity) => ({ target, entity, anchor: "market" }))),
-      ];
+      ]);
       reporter.start("join-live");
       if (!jobs.length) {
         reporter.succeed("join-live", { result: "0 sheets" });
@@ -9043,7 +9057,7 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
             }
           }
           if (downstreamSheetTargets.length && namedMarkets.length) {
-            const downJobs = namedMarkets.flatMap((entity) => downstreamSheetTargets.map((target) => ({ target, entity })));
+            const downJobs = fitJobs(namedMarkets.flatMap((entity) => downstreamSheetTargets.map((target) => ({ target, entity }))));
             const holderSheetStart = sheets.length;
             const downPulled = await mapPool(downJobs, 3, async (job) => {
               try {
@@ -9182,7 +9196,7 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
     if (joinCommitted && tradePreview.columns.length) {
       reporter.start("join-trades");
       const fromRun = joinMarketsFromRows(marketRows, marketCap);
-      const list = fromRun.length ? fromRun : joinedMarkets.slice(0, marketCap);
+      const list = fitJobs(fromRun.length ? fromRun : joinedMarkets.slice(0, marketCap));
       runTickers = list.map((market) => market.ticker);
       const tradeTable = `${lakeId}.trades`;
       reporter.setChildren(
@@ -9407,12 +9421,14 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
       }
       return next;
     });
+    const capNote =
+      skippedSheets + stage.dropped() > 0 ? ` · Demo pulls stop at ${runSheetLimit.toLocaleString()} sheets. Upgrade for more.` : "";
     reporter.succeed("place", {
-      result: placement.pageId
+      result: (placement.pageId
         ? `${placedSheets.length.toLocaleString()} ${placedSheets.length === 1 ? "sheet" : "sheets"} on a new tab`
         : placement.append
           ? `${placedSheets.length.toLocaleString()} ${placedSheets.length === 1 ? "sheet" : "sheets"} added on this tab`
-          : `${placedSheets.length.toLocaleString()} ${placedSheets.length === 1 ? "sheet" : "sheets"} on this tab`,
+          : `${placedSheets.length.toLocaleString()} ${placedSheets.length === 1 ? "sheet" : "sheets"} on this tab`) + capNote,
     });
     reporter.finish();
     } catch (err) {
@@ -10202,6 +10218,7 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
               );
             }}
             marketCap={marketCap}
+            demoSheetLimit={Number.isFinite(runSheetLimit) ? runSheetLimit : null}
             queryRows={
               polymarketJoinCatalog.length
                 ? polymarketJoinMarkets.length
@@ -11078,7 +11095,8 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
           <SheetLimitFeatureTip
             anchorRef={sheetTabsRef}
             sheets={sheetTabs.count - 1}
-            cap={marketCap}
+            total={sheetTabs.count}
+            cap={runSheetLimit}
             onUpgrade={() => exitLandingDemoToSection("pricing")}
           />
         ) : null}
