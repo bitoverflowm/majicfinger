@@ -54,7 +54,7 @@ export function DataTypeFeatureTip({ anchorRef }) {
       align="start"
       sideOffset={14}
       title="Select a Data Type"
-      description="Start by selecting any tag option or pick from the dropdown, depending on what you are interested in, to start constructing your data. As you make selections the preview panel will update immediately."
+      description="Start by selecting a tag or an option from the dropdown. As you progress, your preview panel will reflect your changes immediately."
       action={{ label: "Ok" }}
       closeOnAction
     />
