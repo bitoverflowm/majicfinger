@@ -2,7 +2,8 @@
 
 import { createContext, useCallback, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { BarChart3, Copy, Database, Download, Maximize2, MoreVertical, Pencil, Play, Square, Table2, X } from "lucide-react";
+import { BarChart3, Copy, Database, Download, Lock, Maximize2, MoreVertical, Pencil, Play, Square, Table2, X } from "lucide-react";
+import { exitLandingDemoToSection } from "@/lib/landingDemoSession";
 import { toast } from "sonner";
 import {
   DropdownMenu,
@@ -2122,9 +2123,9 @@ const RESIZE_EDGES = [
   { edge: "se", edges: { bottom: true, right: true }, cursor: "nwse-resize", className: "bottom-0 right-0 z-20 size-3" },
 ];
 
-function CanvasBlock({ block, selected, spotlight = false, onSelect, onChange, booting = false }) {
+function CanvasBlock({ block, selected, spotlight = false, onSelect, onChange, booting = false, locked = false }) {
   const canvas = useWorkspaceCanvas();
-  const readOnly = !!canvas?.readOnly;
+  const readOnly = !!canvas?.readOnly || locked;
   const dragRef = useRef(null);
   const rootRef = useRef(null);
   const blockRef = useRef(block);
@@ -2370,9 +2371,12 @@ function CanvasBlock({ block, selected, spotlight = false, onSelect, onChange, b
       role="group"
       data-block-id={block.id}
       aria-label={block.title || block.body || block.type}
+      aria-hidden={locked || undefined}
+      inert={locked ? "" : undefined}
       onPointerDown={readOnly ? undefined : onPointerDown}
       className={cn(
-        "pointer-events-auto absolute flex flex-col overflow-hidden rounded-xl border bg-background shadow-sm",
+        "absolute flex flex-col overflow-hidden rounded-xl border bg-background shadow-sm",
+        locked ? "pointer-events-none select-none blur-[6px] saturate-[0.85]" : "pointer-events-auto",
         block.arrive && (block.branch ? "lychee-sheet-branch" : "lychee-sheet-arrive"),
         readOnly ? "border-border/70" : "group/block",
         !readOnly && spotlight
@@ -2566,10 +2570,80 @@ function blocksTopToBottom(blocks) {
   return (blocks || []).slice().sort((a, b) => (a.y || 0) - (b.y || 0) || (a.x || 0) - (b.x || 0));
 }
 
+const DEMO_OPEN_SHEETS = 2;
+
+/** Landing demo: the first sheets stay open with their charts; everything else is behind the upgrade. */
+function demoLockedIds(blocks) {
+  const ordered = blocksTopToBottom(blocks);
+  const open = new Set(ordered.filter((block) => block.type === "sheet").slice(0, DEMO_OPEN_SHEETS).map((block) => block.id));
+  if (!open.size) return new Set();
+  return new Set(
+    ordered.filter((block) => !open.has(block.id) && !(block.type === "chart" && open.has(block.sourceSheetId))).map((block) => block.id),
+  );
+}
+
+/** Where the paywall starts: under the last open block, so the card never covers what the demo shows. */
+function paywallTop(blocks, lockedIds) {
+  const bottom = (block) => (block.y || 0) + (block.h || 0);
+  const locked = blocks.filter((block) => lockedIds.has(block.id));
+  const open = blocks.filter((block) => !lockedIds.has(block.id));
+  const firstLocked = Math.min(...locked.map((block) => block.y || 0));
+  const openBottom = open.length ? Math.max(...open.map(bottom)) + 16 : 0;
+  const lastLocked = Math.max(...locked.map(bottom));
+  return Math.max(0, Math.min(Math.max(firstLocked - 8, openBottom), lastLocked - 260));
+}
+
+function lockedSummary(blocks) {
+  const sheets = blocks.filter((block) => block.type === "sheet").length;
+  const charts = blocks.filter((block) => block.type === "chart").length;
+  const parts = [];
+  if (sheets) parts.push(`${sheets} more ${sheets === 1 ? "sheet" : "sheets"}`);
+  if (charts) parts.push(`${charts}${sheets ? "" : " more"} ${charts === 1 ? "chart" : "charts"}`);
+  if (!parts.length) return "More of your dashboard is waiting.";
+  return `${parts.join(" and ")} ${sheets + charts === 1 ? "is" : "are"} waiting.`;
+}
+
+function DemoPaywall({ top, locked }) {
+  return (
+    <div className="pointer-events-none absolute inset-x-0 bottom-0 z-40 px-6" style={{ top }}>
+      <div className="sticky top-24 mx-auto mt-16 w-full max-w-[420px]">
+        <div
+          role="dialog"
+          aria-labelledby="demo-paywall-title"
+          className="pointer-events-auto rounded-xl border border-border/70 bg-background p-6 text-center shadow-lg"
+        >
+          <span className="mx-auto grid size-10 place-items-center rounded-full bg-[#e5f4ff] text-[#0d99ff] dark:bg-[#1f3347]">
+            <Lock className="size-4" strokeWidth={2.25} aria-hidden />
+          </span>
+          <h2 id="demo-paywall-title" className="mt-3 text-[15px] font-semibold text-foreground">
+            Unlock your full dashboard
+          </h2>
+          <p className="mt-1.5 text-[13px] leading-relaxed text-muted-foreground">
+            {lockedSummary(locked)} Continue your work by upgrading.
+          </p>
+          <button
+            type="button"
+            onClick={() => exitLandingDemoToSection("pricing")}
+            className="mt-5 inline-flex h-9 w-full items-center justify-center rounded-lg bg-[#0d99ff] px-4 text-[13px] font-medium text-white transition-colors hover:bg-[#0b87e0] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0d99ff]/40"
+          >
+            Upgrade
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 /** Freeform blocks for the dashboard currently on screen. */
 export function WorkspaceCanvas() {
   const canvas = useWorkspaceCanvas();
+  const ctx = useMyStateV2();
   const blocks = canvas?.blocks || [];
+  const lockedIds = useMemo(
+    () => (ctx?.landingDemo && !canvas?.runFeed ? demoLockedIds(blocks) : new Set()),
+    [blocks, canvas?.runFeed, ctx?.landingDemo],
+  );
+  const lockedBlocks = blocks.filter((block) => lockedIds.has(block.id));
   const scrollerRef = useRef(null);
   const blocksRef = useRef(blocks);
   blocksRef.current = blocks;
@@ -2850,12 +2924,14 @@ export function WorkspaceCanvas() {
           key={block.id}
           block={block}
           booting={bootingIds.has(block.id)}
+          locked={lockedIds.has(block.id)}
           selected={canvas.selectedId === block.id}
           spotlight={canvas.spotlightId === block.id}
           onSelect={canvas.setSelectedId}
           onChange={(patch) => canvas.updateBlock(block.id, patch)}
         />
       ))}
+      {lockedBlocks.length ? <DemoPaywall top={paywallTop(blocks, lockedIds)} locked={lockedBlocks} /> : null}
       {snapPreview ? (
         <div
           aria-hidden="true"
