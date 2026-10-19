@@ -776,8 +776,14 @@ export default function ConnectDataStep1({
     }
   };
 
+  const noteLandingDemoSelection = useCallback(() => {
+    if (!context?.landingDemo) return;
+    context.activateLandingDemo?.();
+  }, [context]);
+
   const onIntegrationRowClick = (row) => {
     if (!isConnectHubIntegrationAvailable(row)) return;
+    noteLandingDemoSelection();
     if (row.warmConnect) {
       if (row.warmConnect.busy) return;
       row.warmConnect.start();
@@ -992,7 +998,10 @@ export default function ConnectDataStep1({
                 icon={<ArrowUpFromLine className={hubGlyphClass} strokeWidth={iconStroke} />}
                 label="CSV / XLSX"
                 title="Upload a spreadsheet to start analyzing."
-                onClick={() => activate?.(CONNECT_WORKSPACE.UPLOAD)}
+                onClick={() => {
+                  noteLandingDemoSelection();
+                  activate?.(CONNECT_WORKSPACE.UPLOAD);
+                }}
                 className={embeddedDemo ? undefined : connectHubPillScaleExtra}
                 iconSlotClassName={embeddedDemo ? undefined : connectHubIconSlotResponsive}
                 labelClassName={embeddedDemo ? undefined : connectHubPillLabelScale}
@@ -1017,7 +1026,10 @@ export default function ConnectDataStep1({
                 icon={<FilePlus2 className={hubGlyphClass} strokeWidth={iconStroke} />}
                 label="Start from blank"
                 title="Empty sheet — build from scratch."
-                onClick={() => activate?.(CONNECT_WORKSPACE.BLANK)}
+                onClick={() => {
+                  noteLandingDemoSelection();
+                  activate?.(CONNECT_WORKSPACE.BLANK);
+                }}
                 className={embeddedDemo ? undefined : connectHubPillScaleExtra}
                 iconSlotClassName={embeddedDemo ? undefined : connectHubIconSlotResponsive}
                 labelClassName={embeddedDemo ? undefined : connectHubPillLabelScale}

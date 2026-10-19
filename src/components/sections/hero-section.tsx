@@ -70,6 +70,7 @@ export function HeroSection() {
           <div className="flex flex-wrap items-center justify-center gap-2.5">
           <DemoScrollLink
             href={hero.cta.primary.href}
+            activateLandingDemo
             className="flex h-9 w-32 items-center justify-center rounded-full border border-white/[0.12] bg-secondary px-4 text-sm font-normal tracking-wide text-primary-foreground shadow-[inset_0_1px_2px_rgba(255,255,255,0.25),0_3px_3px_-1.5px_rgba(16,24,40,0.06),0_1px_1px_rgba(16,24,40,0.08)] transition-all ease-out hover:bg-secondary/80 active:scale-95 dark:text-secondary-foreground"
           >
             {hero.cta.primary.text}

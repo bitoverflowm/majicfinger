@@ -14,6 +14,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
+import { useMyStateV2 } from "@/context/stateContextV2";
 import { useWorkspaceCanvas } from "@/components/dashboardComposer/workspaceCanvas";
 import { useIntegrationConnect } from "@/components/dashboardComposer/integrationConnectDialog";
 
@@ -54,9 +55,11 @@ function HandToolIcon({ closed }) {
 }
 
 export function WorkspaceDock() {
+  const ctx = useMyStateV2();
   const canvas = useWorkspaceCanvas();
   const connect = useIntegrationConnect();
   const tool = canvas?.tool || "select";
+  if (ctx?.landingDemo && !ctx?.landingDemoActive) return null;
   const sheetCount = (canvas?.blocks || []).filter((block) => block.type === "sheet").length;
 
   return (

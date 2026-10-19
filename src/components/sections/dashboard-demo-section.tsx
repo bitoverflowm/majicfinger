@@ -1,13 +1,31 @@
 /* eslint-disable react/no-unescaped-entities */
 "use client";
 
+import { useEffect } from "react";
+
 import { StateProvider } from "@/context/stateContext";
-import { StateProviderV2 } from "@/context/stateContextV2";
+import { StateProviderV2, useMyStateV2 } from "@/context/stateContextV2";
+import {
+  isLandingDemoActivateRequested,
+  subscribeLandingDemoActivate,
+} from "@/lib/landingDemoSession";
 
 import DashBody from "@/app/dashboard/dashBody";
 import LiveStreamManager from "@/app/dashboard/components/liveStreamManager";
 import RestLiveFeedManager from "@/app/dashboard/components/restLiveFeedManager";
 import { DemoWindowMockup } from "@/components/sections/demo-window-mockup";
+
+function LandingDemoActivateListener() {
+  const activateLandingDemo = useMyStateV2()?.activateLandingDemo;
+  useEffect(() => {
+    const activate = () => {
+      if (typeof activateLandingDemo === "function") activateLandingDemo();
+    };
+    if (isLandingDemoActivateRequested()) activate();
+    return subscribeLandingDemoActivate(activate);
+  }, [activateLandingDemo]);
+  return null;
+}
 
 export function DashboardDemoSection() {
   return (
@@ -24,12 +42,14 @@ export function DashboardDemoSection() {
           <StateProviderV2
             initialSettings={{
               demo: true,
+              landingDemo: true,
               viewing: "connectDataHome",
               rightPanelOpen: false,
               rightPanelTab: "integrations",
               integrationSidebar: null,
             }}
           >
+            <LandingDemoActivateListener />
             <LiveStreamManager />
             <RestLiveFeedManager />
             <div className="flex h-full min-h-0 w-full flex-col overflow-hidden">

@@ -420,7 +420,9 @@ export function WorkspaceStartTabs({ welcomeActive, onOpenWelcome }) {
   const context = useMyStateV2();
   const canvas = useWorkspaceCanvas();
   const sessionUser = useUser();
-  const tabs = Array.isArray(context?.workspaceStartTabs) ? context.workspaceStartTabs : [];
+  const tabs = (Array.isArray(context?.workspaceStartTabs) ? context.workspaceStartTabs : []).filter(
+    (tab) => !(context?.landingDemo && tab?.id === WELCOME_START_TAB_ID),
+  );
   const activeId = context?.activeWorkspaceStartTabId;
 
   const selectTab = (id) => {
