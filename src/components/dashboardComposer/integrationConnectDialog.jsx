@@ -1,7 +1,7 @@
 "use client";
 
 import { createContext, useContext, useEffect, useMemo, useRef, useState } from "react";
-import { ArrowRight, Check, Database } from "lucide-react";
+import { ArrowRight, Check, Database, X } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -329,7 +329,7 @@ function IntegrationOption({ row, active, hovered, onSelect, onHover, cutoffLabe
 }
 
 /** Picker, then the build workspace. Shared by the dialog and the inline landing demo. */
-function IntegrationConnectFlow({ inline = false, onCancel, onPhaseChange, onSelectIntegration }) {
+function IntegrationConnectFlow({ inline = false, withClose = !inline, onCancel, onPhaseChange, onSelectIntegration }) {
   const rows = useMemo(() => buildIntegrationPickerRows(), []);
   const primary = rowsInOrder(rows, PRIMARY_ORDER);
   const beta = rowsInOrder(rows, BETA_ORDER);
@@ -373,7 +373,7 @@ function IntegrationConnectFlow({ inline = false, onCancel, onPhaseChange, onSel
   return (
         <div className="grid min-h-0 flex-1 md:grid-cols-[minmax(0,1.05fr)_minmax(0,0.95fr)]">
           <div className="flex min-h-0 flex-col bg-background">
-            <div className={cn("px-6 pb-3 pt-6", !inline && "pr-12")}>
+            <div className={cn("px-6 pb-3 pt-6", withClose && "pr-12")}>
               <Title className="text-xl font-semibold tracking-tight text-foreground">
                 Which integration should feed this dashboard?
               </Title>
@@ -503,11 +503,60 @@ export function IntegrationConnectDialog({ open, onOpenChange }) {
   );
 }
 
-/** The same picker and build flow, laid out in the page instead of a dialog. */
-export function IntegrationConnectInline({ className, onSelectIntegration }) {
+/**
+ * Landing demo picker. On the landing page it fills the demo card; once the demo is
+ * active it floats over the demo dashboard like the dialog does. One element in both
+ * layouts so a selection made in the card carries into the modal.
+ */
+export function IntegrationConnectLandingDemo({ active = false, onSelectIntegration }) {
+  const connect = useIntegrationConnect();
+  const [phase, setPhase] = useState("pick");
+
+  useEffect(() => {
+    if (!connect?.inlineOpen) setPhase("pick");
+  }, [connect?.inlineOpen]);
+
+  if (!connect?.inlineOpen) return null;
+
   return (
-    <div className={cn("flex min-h-0 flex-1 flex-col overflow-hidden bg-background", className)}>
-      <IntegrationConnectFlow inline onSelectIntegration={onSelectIntegration} />
+    <div
+      className={cn(
+        "absolute inset-0 z-[45] flex",
+        active
+          ? "items-center justify-center bg-black/40 p-4 animate-in fade-in-0 duration-200"
+          : "flex-col bg-background",
+      )}
+    >
+      <div
+        className={cn(
+          "relative flex min-h-0 flex-col overflow-hidden bg-background",
+          active
+            ? cn(
+                "rounded-2xl border border-border/70 shadow-xl animate-in fade-in-0 zoom-in-95 duration-200",
+                phase === "build"
+                  ? "h-[min(900px,94%)] w-[min(1180px,calc(100%-1.5rem))]"
+                  : "max-h-[min(880px,92%)] w-[min(980px,calc(100%-2rem))]",
+              )
+            : "flex-1",
+        )}
+      >
+        {active ? (
+          <button
+            type="button"
+            aria-label="Close"
+            onClick={() => connect.close()}
+            className="absolute right-4 top-4 z-10 rounded-sm opacity-70 transition-opacity hover:opacity-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          >
+            <X className="size-4" />
+          </button>
+        ) : null}
+        <IntegrationConnectFlow
+          inline
+          withClose={active}
+          onPhaseChange={setPhase}
+          onSelectIntegration={onSelectIntegration}
+        />
+      </div>
     </div>
   );
 }
@@ -515,20 +564,21 @@ export function IntegrationConnectInline({ className, onSelectIntegration }) {
 /**
  * `inlineStart` opens the inline flow on mount. `close()` dismisses both the
  * dialog and the inline flow, which is how a finished run reveals the canvas.
+ * `inlineOnly` routes `open()` to the inline flow instead of the dialog.
  */
-export function IntegrationConnectProvider({ children, inlineStart = false }) {
+export function IntegrationConnectProvider({ children, inlineStart = false, inlineOnly = false }) {
   const [open, setOpen] = useState(false);
   const [inlineOpen, setInlineOpen] = useState(inlineStart);
   const value = useMemo(
     () => ({
-      open: () => setOpen(true),
+      open: () => (inlineOnly ? setInlineOpen(true) : setOpen(true)),
       close: () => {
         setOpen(false);
         setInlineOpen(false);
       },
       inlineOpen,
     }),
-    [inlineOpen],
+    [inlineOnly, inlineOpen],
   );
   return (
     <IntegrationConnectContext.Provider value={value}>

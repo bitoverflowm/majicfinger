@@ -28,7 +28,8 @@ import { membershipTierLabel } from "@/lib/membershipLabel";
 import { WorkspaceComposerDockProvider } from "@/components/dashboardComposer/workspaceComposerDock";
 import { WorkspaceCanvas } from "@/components/dashboardComposer/workspaceCanvas";
 import { WorkspaceWelcomeLayer } from "@/components/dashboardComposer/blankDashboardEmpty";
-import { IntegrationConnectInline } from "@/components/dashboardComposer/integrationConnectDialog";
+import { IntegrationConnectLandingDemo } from "@/components/dashboardComposer/integrationConnectDialog";
+import FigmaNavChrome from "./components/figmaNavChrome";
 import { cn } from "@/lib/utils";
 
 import { debounce } from "@/lib/debounce";
@@ -414,6 +415,12 @@ const DashBody = ({ user }) => {
             )}
           </>
         )}
+        {contextStateV2?.landingDemoActive && (
+          <>
+            <FigmaNavChrome dashboardName="Demo Dashboard" />
+            <div className="h-14 shrink-0" aria-hidden />
+          </>
+        )}
         {rightPanelOpen && <Separator className="shrink-0" />}
         <div className="relative z-0 flex min-h-0 min-w-0 flex-1 flex-col py-1 [--dashboard-tab-clearance:2.75rem]">
                 <WorkspaceCanvas />
@@ -437,11 +444,7 @@ const DashBody = ({ user }) => {
                       />
                     }
                     connectHome={
-                      contextStateV2?.landingDemo ? (
-                        <IntegrationConnectInline
-                          onSelectIntegration={() => contextStateV2?.activateLandingDemo?.()}
-                        />
-                      ) : (
+                      contextStateV2?.landingDemo ? null : (
                       <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
                         <ConnectHomeShell
                           user={user}
@@ -567,6 +570,12 @@ const DashBody = ({ user }) => {
                     <div>Hi, I am working on making this page more useful</div>
                 </div>}
         </div>
+        {contextStateV2?.landingDemo && (
+          <IntegrationConnectLandingDemo
+            active={!!contextStateV2?.landingDemoActive}
+            onSelectIntegration={() => contextStateV2?.activateLandingDemo?.()}
+          />
+        )}
       </WorkspaceComposerDockProvider>
     );
 

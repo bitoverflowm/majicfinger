@@ -716,7 +716,11 @@ function LeftChromeHeader({ dashboardName, expanded, onToggle, onRename }) {
       <span className="mr-1 flex size-[22px] shrink-0 overflow-hidden rounded-full">
         <Image src="/logo.png" width={22} height={22} alt="Lychee" className="size-full object-cover" />
       </span>
-      <DashboardNameField name={dashboardName} onCommit={onRename} />
+      {onRename ? (
+        <DashboardNameField name={dashboardName} onCommit={onRename} />
+      ) : (
+        <span className="min-w-0 flex-1 truncate px-1 py-0.5 text-[13px] font-medium tracking-[-0.01em]">{dashboardName}</span>
+      )}
       <button
         type="button"
         onClick={onToggle}
@@ -730,12 +734,13 @@ function LeftChromeHeader({ dashboardName, expanded, onToggle, onRename }) {
   );
 }
 
-export default function FigmaNavChrome({ onLogout }) {
+/** `dashboardName` pins a read-only name (landing demo); otherwise the canvas name is editable. */
+export default function FigmaNavChrome({ onLogout, dashboardName: fixedName }) {
   const ctx = useMyStateV2();
   const canvas = useWorkspaceCanvas();
   const expanded = !!ctx?.navChromeExpanded;
   const setExpanded = ctx?.setNavChromeExpanded;
-  const dashboardName = canvas?.dashboardName || "Untitled";
+  const dashboardName = fixedName || canvas?.dashboardName || "Untitled";
 
   const toggle = () => setExpanded?.(!expanded);
 
@@ -761,7 +766,7 @@ export default function FigmaNavChrome({ onLogout }) {
           dashboardName={dashboardName}
           expanded={expanded}
           onToggle={toggle}
-          onRename={(next) => canvas?.renameDashboard?.(next)}
+          onRename={fixedName ? undefined : (next) => canvas?.renameDashboard?.(next)}
         />
         {expanded ? <DashboardLayerTree /> : null}
       </aside>

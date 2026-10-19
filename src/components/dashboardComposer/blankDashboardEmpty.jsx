@@ -109,11 +109,12 @@ export function WorkspaceWelcomeLayer({ viewing, navChromeExpanded, checkout, co
   const ctx = useMyStateV2();
   const landingDemo = !!ctx?.landingDemo;
   const active = (ctx?.workspaceStartTabs || []).find((tab) => tab.id === ctx?.activeWorkspaceStartTabId);
-  // Landing demo: once the inline connect flow closes, its home view is the canvas.
-  const landingConnect = landingDemo && viewing === "connectDataHome" && !!connect?.inlineOpen;
-  const landingCanvas = landingDemo && viewing === "connectDataHome" && !connect?.inlineOpen;
+  // Landing demo: the canvas is always the home view; the picker floats over it from dashBody.
+  const landingCanvas = landingDemo && viewing === "connectDataHome";
+  const landingConnect = landingCanvas && !!connect?.inlineOpen;
   const blankTab = (viewing === "welcome" && !!active?.blank) || landingCanvas;
-  const showEmpty = blankTab && !!canvas?.ready && !(canvas?.blocks || []).length && !canvas?.runFeed;
+  const showEmpty =
+    blankTab && !landingConnect && !!canvas?.ready && !(canvas?.blocks || []).length && !canvas?.runFeed;
   const cover = !blankTab;
 
   return (
@@ -123,7 +124,7 @@ export function WorkspaceWelcomeLayer({ viewing, navChromeExpanded, checkout, co
         cover
           ? cn(
               "bg-background",
-              landingDemo ? "relative z-30 flex-1" : navChromeExpanded ? "h-svh" : "h-[calc(100svh-3.5rem)]",
+              landingDemo ? "flex-1" : navChromeExpanded ? "h-svh" : "h-[calc(100svh-3.5rem)]",
             )
           : "pointer-events-none absolute inset-0 z-30",
       )}

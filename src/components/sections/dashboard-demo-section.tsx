@@ -161,7 +161,7 @@ function LandingDemoStage({ children }: { children: ReactNode }) {
       id="demo"
       className={cn(
         "relative mx-auto mb-0 w-full max-w-[min(100%,84rem)] mt-14 px-6 pb-6 pt-0 sm:mt-12 sm:px-8 md:mt-8 lg:mt-6 lg:px-10",
-        staged ? "z-[100]" : "z-30",
+        staged ? "z-50" : "z-30",
       )}
     >
       <div ref={slotRef} style={slotHeight != null ? { height: slotHeight } : undefined}>
@@ -169,7 +169,10 @@ function LandingDemoStage({ children }: { children: ReactNode }) {
           id="demo-mockup"
           data-demo-mockup
           style={stageStyle(phase, rect)}
-          className={cn(phase === "full" && "border-transparent shadow-none ring-0")}
+          className={cn(
+            "[transform:translateZ(0)]",
+            phase === "full" && "border-transparent shadow-none ring-0",
+          )}
           contentClassName={cn(
             "overflow-hidden",
             staged ? "h-full min-h-0" : "h-[min(90vh,920px)] min-h-[720px]",
