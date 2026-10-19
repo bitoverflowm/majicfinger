@@ -19,17 +19,20 @@ import RestLiveFeedManager from "@/app/dashboard/components/restLiveFeedManager"
 import { DemoWindowMockup } from "@/components/sections/demo-window-mockup";
 
 /**
- * inline: card on the page. entering: fixed full-viewport but invisible while the demo lays out.
- * full: visible full-viewport demo. exiting: fading out with content untouched.
+ * inline: card on the page. entering: fixed full-viewport, clipped back to the card's rect while the demo lays out.
+ * full: clip opens to the whole viewport. exiting: fading out with content untouched.
  * returning: back in the card slot, invisible while the content swaps back, then fades in.
  */
 type StagePhase = "inline" | "entering" | "full" | "exiting" | "returning";
+type StageClip = { top: number; right: number; bottom: number; left: number };
 
-const ENTER_MS = 320;
+const ENTER_MS = 650;
+const ENTER_EASE = "cubic-bezier(0.32, 0.72, 0, 1)";
 const EXIT_MS = 220;
 const RETURN_MS = 240;
-const STAGE_EASE = "cubic-bezier(0.22, 1, 0.36, 1)";
+const CARD_RADIUS = 16;
 const STAGE_SCALE = "scale(0.97)";
+const FULL_CLIP = "inset(0px round 0px)";
 const ESC_HINT_MS = 2800;
 
 const OPEN_OVERLAY_SELECTOR = [
@@ -56,8 +59,18 @@ function isStaged(phase: StagePhase) {
   return phase === "entering" || phase === "full" || phase === "exiting";
 }
 
-/** Only opacity and transform animate, so the transition stays smooth while the dashboard re-lays out. */
-function stageStyle(phase: StagePhase): CSSProperties {
+function cardClip(el: HTMLElement): StageClip {
+  const r = el.getBoundingClientRect();
+  return {
+    top: Math.max(0, r.top),
+    right: Math.max(0, window.innerWidth - r.right),
+    bottom: Math.max(0, window.innerHeight - r.bottom),
+    left: Math.max(0, r.left),
+  };
+}
+
+/** Layout never animates: the frame is laid out full-size up front and only clip-path, opacity and transform change. */
+function stageStyle(phase: StagePhase, clip: StageClip | null): CSSProperties {
   if (phase === "returning") return { opacity: 0 };
   if (phase === "inline") return { opacity: 1, transition: `opacity ${RETURN_MS}ms ease-out` };
   const base: CSSProperties = {
@@ -69,22 +82,50 @@ function stageStyle(phase: StagePhase): CSSProperties {
     height: "100%",
     margin: 0,
     borderRadius: 0,
+    transform: "scale(1)",
   };
-  if (phase === "entering") return { ...base, opacity: 0, transform: STAGE_SCALE };
-  if (phase === "full") {
+  if (phase === "entering") {
+    const c = clip ?? { top: 0, right: 0, bottom: 0, left: 0 };
     return {
       ...base,
-      opacity: 1,
-      transform: "scale(1)",
-      transition: `opacity ${ENTER_MS}ms ease-out, transform ${ENTER_MS}ms ${STAGE_EASE}`,
+      clipPath: `inset(${c.top}px ${c.right}px ${c.bottom}px ${c.left}px round ${CARD_RADIUS}px)`,
     };
+  }
+  if (phase === "full") {
+    return { ...base, clipPath: FULL_CLIP, transition: `clip-path ${ENTER_MS}ms ${ENTER_EASE}` };
   }
   return {
     ...base,
+    clipPath: FULL_CLIP,
     opacity: 0,
     transform: STAGE_SCALE,
     transition: `opacity ${EXIT_MS}ms ease-in, transform ${EXIT_MS}ms ease-in`,
   };
+}
+
+/** Waits for the full-size layout to paint and the dashboard to settle before the clip starts opening. */
+function useSettledFrame(run: boolean, callback: () => void) {
+  const callbackRef = useRef(callback);
+  callbackRef.current = callback;
+  useEffect(() => {
+    if (!run) return;
+    let raf2 = 0;
+    let idle = 0;
+    let timer = 0;
+    const done = () => callbackRef.current();
+    const raf1 = window.requestAnimationFrame(() => {
+      raf2 = window.requestAnimationFrame(() => {
+        if (typeof window.requestIdleCallback === "function") idle = window.requestIdleCallback(done, { timeout: 250 });
+        else timer = window.setTimeout(done, 60);
+      });
+    });
+    return () => {
+      window.cancelAnimationFrame(raf1);
+      window.cancelAnimationFrame(raf2);
+      if (idle && typeof window.cancelIdleCallback === "function") window.cancelIdleCallback(idle);
+      window.clearTimeout(timer);
+    };
+  }, [run]);
 }
 
 function useDoubleFrame(run: boolean, callback: () => void) {
@@ -114,6 +155,7 @@ function LandingDemoStage({ children }: { children: ReactNode }) {
   const phaseRef = useRef<StagePhase>("inline");
   const [phase, setPhaseState] = useState<StagePhase>("inline");
   const [slotHeight, setSlotHeight] = useState<number | null>(null);
+  const [clip, setClip] = useState<StageClip | null>(null);
   const [hintVisible, setHintVisible] = useState(false);
 
   const setPhase = useCallback((next: StagePhase) => {
@@ -126,7 +168,12 @@ function LandingDemoStage({ children }: { children: ReactNode }) {
     if (active) {
       if (current === "entering" || current === "full") return;
       const slot = slotRef.current;
-      if (slot && current !== "exiting") setSlotHeight(slot.getBoundingClientRect().height);
+      if (slot && current !== "exiting") {
+        setSlotHeight(slot.getBoundingClientRect().height);
+        setClip(cardClip(slot));
+      } else {
+        setClip(null);
+      }
       setPhase("entering");
       return;
     }
@@ -136,7 +183,7 @@ function LandingDemoStage({ children }: { children: ReactNode }) {
     }
   }, [active, setPhase]);
 
-  useDoubleFrame(phase === "entering", () => setPhase("full"));
+  useSettledFrame(phase === "entering", () => setPhase("full"));
   useDoubleFrame(phase === "returning", () => setPhase("inline"));
 
   useEffect(() => {
@@ -174,9 +221,12 @@ function LandingDemoStage({ children }: { children: ReactNode }) {
       setHintVisible(false);
       return;
     }
-    setHintVisible(true);
-    const timer = window.setTimeout(() => setHintVisible(false), ESC_HINT_MS);
-    return () => window.clearTimeout(timer);
+    const showTimer = window.setTimeout(() => setHintVisible(true), ENTER_MS);
+    const hideTimer = window.setTimeout(() => setHintVisible(false), ENTER_MS + ESC_HINT_MS);
+    return () => {
+      window.clearTimeout(showTimer);
+      window.clearTimeout(hideTimer);
+    };
   }, [phase]);
 
   useEffect(() => {
@@ -208,9 +258,9 @@ function LandingDemoStage({ children }: { children: ReactNode }) {
         <DemoWindowMockup
           id="demo-mockup"
           data-demo-mockup
-          style={stageStyle(phase)}
+          style={stageStyle(phase, clip)}
           className={cn(
-            "[transform:translateZ(0)] will-change-[opacity,transform]",
+            "[transform:translateZ(0)] will-change-[opacity,transform,clip-path]",
             staged && "border-transparent shadow-none ring-0",
           )}
           contentClassName={cn(
