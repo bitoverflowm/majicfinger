@@ -14,6 +14,21 @@ export function clearLandingDemoActivateRequest() {
   requested = false;
 }
 
+/** Leaves the full-viewport demo, then scrolls the landing page to a section once the demo is back in place. */
+export function exitLandingDemoToSection(deactivate, sectionId) {
+  clearLandingDemoActivateRequest();
+  if (typeof deactivate === "function") deactivate();
+  if (typeof window === "undefined") return;
+  window.setTimeout(() => {
+    const section = document.getElementById(sectionId);
+    if (!section) return;
+    const navClearance = 96;
+    const top = window.scrollY + section.getBoundingClientRect().top - navClearance;
+    window.scrollTo({ top: Math.max(0, top), behavior: "smooth" });
+    if (history.replaceState) history.replaceState(null, "", `${window.location.pathname}#${sectionId}`);
+  }, 500);
+}
+
 /** Try For Free scrolls to the demo first; the demo expands once the page stops moving. */
 export function requestLandingDemoActivateAfterScroll() {
   if (typeof window === "undefined") return;

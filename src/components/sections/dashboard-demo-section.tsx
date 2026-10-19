@@ -28,8 +28,8 @@ const STAGE_TRANSITION = ["top", "left", "width", "height", "border-radius"]
 const ESC_HINT_MS = 2800;
 
 const OPEN_OVERLAY_SELECTOR = [
-  '[role="dialog"][data-state="open"]',
-  '[role="alertdialog"][data-state="open"]',
+  '[role="dialog"]:not([data-state="closed"])',
+  '[role="alertdialog"]:not([data-state="closed"])',
   '[role="menu"][data-state="open"]',
   '[role="listbox"][data-state="open"]',
   "[data-radix-popper-content-wrapper]",
@@ -90,6 +90,7 @@ function LandingDemoStage({ children }: { children: ReactNode }) {
     if (!slot) return;
 
     if (active) {
+      setResumePrompt(false);
       const r = toStageRect(slot);
       setSlotHeight(r.height);
       setRect(r);
@@ -105,6 +106,7 @@ function LandingDemoStage({ children }: { children: ReactNode }) {
     }
 
     if (phaseRef.current === "inline") return;
+    setResumePrompt(true);
     setRect(toStageRect(slot));
     setPhase("collapsing");
     const timer = window.setTimeout(() => {
@@ -142,16 +144,11 @@ function LandingDemoStage({ children }: { children: ReactNode }) {
       if (event.key !== "Escape" || event.defaultPrevented) return;
       if (document.querySelector(OPEN_OVERLAY_SELECTOR)) return;
       clearLandingDemoActivateRequest();
-      setResumePrompt(true);
       if (typeof deactivate === "function") deactivate();
     };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [active, deactivate]);
-
-  useEffect(() => {
-    if (active) setResumePrompt(false);
-  }, [active]);
 
   const showResumePrompt = resumePrompt && !active && phase === "inline";
   const resumeDemo = () => {

@@ -2,6 +2,7 @@
 
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { columnMissingFromRows } from "@/lib/integrations/columnPayload";
+import { exitLandingDemoToSection } from "@/lib/landingDemoSession";
 import { ArrowLeft, Check, ChevronDown, History, Info } from "lucide-react";
 import { IntegrationBuildGrid } from "@/components/dashboardComposer/integrationBuildGrid";
 import { claimSheetId, displayMatrix, recordsFromRows } from "@/components/dashboardComposer/integrationRunSheets";
@@ -7110,6 +7111,19 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
     beginPlacement();
   }
 
+  function choosePlacement(choice) {
+    if (choice === "new" && ctx?.landingDemo) {
+      setPlacementPrompt("members");
+      return;
+    }
+    confirmPlacement(choice);
+  }
+
+  function upgradeFromLandingDemo() {
+    setPlacementPrompt(false);
+    exitLandingDemoToSection(ctx?.deactivateLandingDemo, "pricing");
+  }
+
   function confirmPlacement(choice) {
     setPlacementPrompt(false);
     if (choice === "new") {
@@ -11724,7 +11738,30 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
           </div>
         </div>
       ) : null}
-      {placementPrompt ? (
+      {placementPrompt === "members" ? (
+        <div className="absolute inset-0 z-30 flex items-center justify-center bg-black/40 p-6">
+          <div
+            role="dialog"
+            aria-labelledby="pull-members-only-title"
+            className="w-full max-w-md rounded-xl border border-border/70 bg-background p-6 shadow-sm"
+          >
+            <h2 id="pull-members-only-title" className="text-[15px] font-semibold text-foreground">
+              Members only
+            </h2>
+            <p className="mt-2 text-[13px] leading-relaxed text-muted-foreground">
+              New tab is a pro feature. Would you like to upgrade now?
+            </p>
+            <div className="mt-5 flex items-center justify-end gap-2">
+              <Button type="button" variant="outline" onClick={() => setPlacementPrompt(true)}>
+                Go back and keep exploring
+              </Button>
+              <Button type="button" className="bg-[#0d99ff] text-white hover:bg-[#0d99ff]/90" onClick={upgradeFromLandingDemo}>
+                Upgrade
+              </Button>
+            </div>
+          </div>
+        </div>
+      ) : placementPrompt ? (
         <div className="absolute inset-0 z-30 flex items-center justify-center bg-black/40 p-6">
           <div
             role="dialog"
@@ -11741,10 +11778,10 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
               <Button type="button" variant="outline" onClick={() => setPlacementPrompt(false)}>
                 Cancel
               </Button>
-              <Button type="button" variant="outline" onClick={() => confirmPlacement("same")}>
+              <Button type="button" variant="outline" onClick={() => choosePlacement("same")}>
                 Same tab
               </Button>
-              <Button type="button" className="bg-[#0d99ff] text-white hover:bg-[#0d99ff]/90" onClick={() => confirmPlacement("new")}>
+              <Button type="button" className="bg-[#0d99ff] text-white hover:bg-[#0d99ff]/90" onClick={() => choosePlacement("new")}>
                 New tab
               </Button>
             </div>
