@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { requestLandingDemoActivate } from "@/lib/landingDemoSession";
+import { requestLandingDemoActivateAfterScroll } from "@/lib/landingDemoSession";
 import { scrollToDemoSection } from "@/lib/scrollToDemo";
 import type { ComponentProps } from "react";
 
@@ -21,7 +21,7 @@ export function DemoScrollLink({
       href={href}
       {...props}
       onClick={(e) => {
-        if (activateLandingDemo) requestLandingDemoActivate();
+        if (activateLandingDemo) requestLandingDemoActivateAfterScroll();
         onClick?.(e);
         if (e.defaultPrevented) return;
         e.preventDefault();

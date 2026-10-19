@@ -439,7 +439,6 @@ const DashBody = ({ user }) => {
                     connectHome={
                       contextStateV2?.landingDemo ? (
                         <IntegrationConnectInline
-                          className={contextStateV2?.landingDemoActive ? "pb-16" : undefined}
                           onSelectIntegration={() => contextStateV2?.activateLandingDemo?.()}
                         />
                       ) : (

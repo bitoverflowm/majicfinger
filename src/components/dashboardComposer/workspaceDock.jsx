@@ -59,7 +59,7 @@ export function WorkspaceDock() {
   const canvas = useWorkspaceCanvas();
   const connect = useIntegrationConnect();
   const tool = canvas?.tool || "select";
-  if (ctx?.landingDemo && !ctx?.landingDemoActive) return null;
+  if (ctx?.landingDemo && (!ctx?.landingDemoActive || connect?.inlineOpen)) return null;
   const sheetCount = (canvas?.blocks || []).filter((block) => block.type === "sheet").length;
 
   return (

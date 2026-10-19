@@ -10,6 +10,30 @@ export function requestLandingDemoActivate() {
   window.dispatchEvent(new Event(LANDING_DEMO_ACTIVATE_EVENT));
 }
 
+export function clearLandingDemoActivateRequest() {
+  requested = false;
+}
+
+/** Try For Free scrolls to the demo first; the demo expands once the page stops moving. */
+export function requestLandingDemoActivateAfterScroll() {
+  if (typeof window === "undefined") return;
+  const started = performance.now();
+  let last = window.scrollY;
+  let stillFrames = 0;
+  const tick = () => {
+    const y = window.scrollY;
+    stillFrames = y === last ? stillFrames + 1 : 0;
+    last = y;
+    const elapsed = performance.now() - started;
+    if ((elapsed > 150 && stillFrames >= 6) || elapsed > 1500) {
+      requestLandingDemoActivate();
+      return;
+    }
+    window.requestAnimationFrame(tick);
+  };
+  window.requestAnimationFrame(tick);
+}
+
 export function isLandingDemoActivateRequested() {
   return requested;
 }

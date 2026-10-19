@@ -1,6 +1,6 @@
 "use client";
 
-import type { ReactNode } from "react";
+import type { CSSProperties, ReactNode } from "react";
 
 import { cn } from "@/lib/utils";
 
@@ -9,6 +9,7 @@ type DemoWindowMockupProps = {
   className?: string;
   contentClassName?: string;
   id?: string;
+  style?: CSSProperties;
   "data-demo-mockup"?: boolean;
 };
 
@@ -21,11 +22,13 @@ export function DemoWindowMockup({
   className,
   contentClassName,
   id,
+  style,
   "data-demo-mockup": dataDemoMockup,
 }: DemoWindowMockupProps) {
   return (
     <div
       id={id}
+      style={style}
       data-demo-mockup={dataDemoMockup}
       className={cn(
         "relative isolate w-full overflow-hidden overscroll-none rounded-2xl border border-border bg-background shadow-xl ring-1 ring-border/60",
