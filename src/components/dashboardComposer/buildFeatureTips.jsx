@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
-import { Check, Filter, Search } from "lucide-react";
+import { Check, Filter, Lock, Search, Sheet } from "lucide-react";
 
 import { FeatureTip, usePrefersReducedMotion } from "@/components/ui/feature-tip";
 import { cn } from "@/lib/utils";
@@ -18,6 +18,10 @@ export const BUILD_TIP_IDS = {
   columns: "integration-build-columns",
   attributes: "integration-build-attributes",
   dataLimits: "integration-build-data-limits",
+  continueStep: "integration-build-continue",
+  enrichments: "integration-build-enrichments",
+  sheetLimit: "integration-build-sheet-limit",
+  saveRun: "integration-build-save-run",
 };
 
 const BUILD_TIP_ORDER = Object.values(BUILD_TIP_IDS);
@@ -403,6 +407,285 @@ export function DataLimitsFeatureTip({ anchorRef, onUpgrade }) {
       description="Preview window only shows 50 rows for speed and convenience. Since you are in demo mode, you can only pull 100 rows at a time. Upgrade to pull 500,000 or more rows at once, to really supercharge your research."
       secondaryAction={{ label: "Continue" }}
       action={{ label: "Upgrade", onClick: onUpgrade }}
+      closeOnAction
+    />
+  );
+}
+
+/* ---------- Continue ---------- */
+
+/** On the button that leaves the compose step for enrichments. Clicking that button closes it too. */
+export function ContinueFeatureTip({ anchorRef }) {
+  return (
+    <FeatureTip
+      id={BUILD_TIP_IDS.continueStep}
+      after={tipsBefore(BUILD_TIP_IDS.continueStep)}
+      anchorRef={anchorRef}
+      side="right"
+      align="center"
+      sideOffset={14}
+      description="Click this button to continue to the next step."
+      action={{ label: "Ok" }}
+      closeOnAction
+    />
+  );
+}
+
+/* ---------- Enrichments ---------- */
+
+const ENRICHMENT_GUIDE = [
+  { id: "join", title: "Join", blurb: "pull related data, like the trades behind every market, into new sheets." },
+  { id: "summarize", title: "Summarize", blurb: "totals, averages and counts on a summary sheet." },
+  { id: "sample", title: "Random sample", blurb: "a random set of rows to study." },
+  { id: "bucket", title: "Bucketing", blurb: "group rows by category, number range or time." },
+  { id: "function", title: "Function", blurb: "add your own calculated columns." },
+];
+
+// What each enrichment adds to the mini sheet, in ENRICHMENT_GUIDE order.
+const ENRICHMENT_ADDS = [
+  { chip: "Join", tab: "Trades" },
+  { chip: "Summarize", tab: "Summary" },
+  { chip: "Sample", tab: "Sample" },
+  { chip: "Bucketing", tab: "Buckets" },
+  { chip: "Function", column: "ƒ Edge" },
+];
+// Blank, one step per enrichment, hold, fade.
+const ENRICHMENT_STEPS = [600, ...ENRICHMENT_ADDS.map(() => 1000), 1800, 500];
+
+function EnrichmentsTipAnimation() {
+  const { step, reduced } = useLoopStep(ENRICHMENT_STEPS);
+  const added = Math.min(step, ENRICHMENT_ADDS.length);
+  const fading = step === ENRICHMENT_STEPS.length - 1 && !reduced;
+  const tabs = ["Markets", ...ENRICHMENT_ADDS.slice(0, added).filter((item) => item.tab).map((item) => item.tab)];
+  const functionOn = added === ENRICHMENT_ADDS.length;
+
+  return (
+    <div aria-hidden className={cn("w-full px-4 transition-opacity duration-500", fading ? "opacity-0" : "opacity-100")}>
+      <div className="flex flex-wrap gap-1">
+        {ENRICHMENT_ADDS.map((item, index) => {
+          const on = index < added;
+          const current = index === added - 1 && !reduced;
+          return (
+            <span
+              key={item.chip}
+              className={cn(
+                "inline-flex items-center gap-1 rounded-md px-1.5 py-[3px] text-[10px] font-semibold transition-all duration-300",
+                on
+                  ? "bg-[#0d99ff] text-white"
+                  : "bg-white text-neutral-600 shadow-sm dark:bg-neutral-900 dark:text-neutral-300",
+                current && "scale-105",
+              )}
+            >
+              <span
+                className={cn(
+                  "flex size-2.5 items-center justify-center rounded-[2px] border",
+                  on ? "border-white bg-white text-[#0d99ff]" : "border-neutral-300 dark:border-neutral-600",
+                )}
+              >
+                {on ? <Check className="size-2" strokeWidth={3.5} /> : null}
+              </span>
+              {item.chip}
+            </span>
+          );
+        })}
+      </div>
+      <div className="mt-2.5 overflow-hidden rounded-lg bg-white shadow-sm dark:bg-neutral-900">
+        <div className="flex border-b border-neutral-200 dark:border-neutral-700">
+          {tabs.map((tab, index) => (
+            <span
+              key={tab}
+              className={cn(
+                "border-r border-neutral-200 px-1.5 py-1 text-[9px] font-medium dark:border-neutral-700",
+                index === tabs.length - 1 && index > 0
+                  ? "bg-[#0d99ff]/10 text-[#0b6fc2] dark:text-[#5cb8ff]"
+                  : "text-neutral-500",
+                index > 0 && !reduced && "animate-in fade-in-0 slide-in-from-left-1 duration-300",
+              )}
+            >
+              {tab}
+            </span>
+          ))}
+        </div>
+        <div className="flex border-b border-neutral-100 text-[9px] font-semibold text-neutral-600 dark:border-neutral-800 dark:text-neutral-300">
+          <span className="w-[38%] px-1.5 py-1">Title</span>
+          <span className="w-[22%] px-1.5 py-1">Volume</span>
+          <span className="w-[20%] px-1.5 py-1">Price</span>
+          {functionOn ? (
+            <span
+              className={cn(
+                "w-[20%] bg-[#0d99ff]/10 px-1.5 py-1 text-[#0b6fc2] dark:text-[#5cb8ff]",
+                !reduced && "animate-in fade-in-0 duration-300",
+              )}
+            >
+              {ENRICHMENT_ADDS[ENRICHMENT_ADDS.length - 1].column}
+            </span>
+          ) : null}
+        </div>
+        {[0, 1].map((row) => (
+          <div key={row} className="flex h-5 items-center border-b border-neutral-100 last:border-0 dark:border-neutral-800">
+            <span className="w-[38%] px-1.5">
+              <span className="block h-1.5 w-14 rounded-full bg-neutral-200 dark:bg-neutral-700" />
+            </span>
+            <span className="w-[22%] px-1.5">
+              <span className="block h-1.5 w-8 rounded-full bg-neutral-200 dark:bg-neutral-700" />
+            </span>
+            <span className="w-[20%] px-1.5">
+              <span className="block h-1.5 w-6 rounded-full bg-neutral-200 dark:bg-neutral-700" />
+            </span>
+            {functionOn ? (
+              <span className="w-[20%] px-1.5">
+                <span className="block h-1.5 w-6 rounded-full bg-[#0d99ff]/35" />
+              </span>
+            ) : null}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+export function EnrichmentsFeatureTip({ anchorRef }) {
+  return (
+    <FeatureTip
+      id={BUILD_TIP_IDS.enrichments}
+      after={tipsBefore(BUILD_TIP_IDS.enrichments)}
+      anchorRef={anchorRef}
+      side="right"
+      align="start"
+      sideOffset={14}
+      className="w-[312px]"
+      mediaClassName="h-[156px] items-start pt-4"
+      media={<EnrichmentsTipAnimation />}
+      title="Take your research further"
+      description="This is the enrichment step. Lychee makes it easy to do things with your data you've never been able to do before, with no code."
+      body={
+        <>
+          <ul className="space-y-1 text-[12px] leading-[1.4] text-neutral-700 dark:text-neutral-300">
+            {ENRICHMENT_GUIDE.map((item) => (
+              <li key={item.id} className="flex gap-1.5">
+                <span className="mt-[7px] size-1 shrink-0 rounded-full bg-[#0d99ff]" />
+                <span>
+                  <span className="font-semibold text-neutral-900 dark:text-white">{item.title}</span>: {item.blurb}
+                </span>
+              </li>
+            ))}
+          </ul>
+          <p className="mt-2.5 text-[13px] leading-[1.45] text-neutral-800 dark:text-neutral-200">
+            Hover over each enrichment to see more details.
+          </p>
+        </>
+      }
+      action={{ label: "Ok" }}
+      closeOnAction
+    />
+  );
+}
+
+/* ---------- Sheet limit ---------- */
+
+const DEMO_SHEET_CAP = 5;
+const SHEET_TABS = ["PRES-28", "SENATE-26", "FED-DEC", "NYC-25", "RAIN-NY"];
+const LOCKED_TABS = ["BTC-100K", "OSCARS", "ELON-200"];
+// Blank, one step per allowed sheet, one per locked sheet, hold, fade.
+const SHEET_LIMIT_STEPS = [600, ...SHEET_TABS.map(() => 380), ...LOCKED_TABS.map(() => 320), 2200, 500];
+
+function SheetChip({ label, state, animate }) {
+  return (
+    <span
+      className={cn(
+        "inline-flex h-[22px] min-w-0 items-center gap-1 rounded-md px-1.5 text-[9px] font-semibold",
+        state === "parent" && "bg-white text-neutral-500 shadow-sm dark:bg-neutral-900",
+        state === "new" && "bg-white text-[#0b6fc2] shadow-sm ring-1 ring-[#0d99ff]/40 dark:bg-neutral-900 dark:text-[#5cb8ff]",
+        state === "locked" && "border border-dashed border-neutral-400/70 text-neutral-400 dark:border-neutral-600",
+        animate && "animate-in fade-in-0 zoom-in-90 duration-300",
+      )}
+    >
+      {state === "locked" ? <Lock className="size-2.5 shrink-0" /> : <Sheet className="size-2.5 shrink-0" />}
+      <span className="truncate">{label}</span>
+    </span>
+  );
+}
+
+function SheetLimitTipAnimation() {
+  const { step, reduced } = useLoopStep(SHEET_LIMIT_STEPS);
+  const made = Math.min(step, SHEET_TABS.length);
+  const locked = Math.max(0, Math.min(step - SHEET_TABS.length, LOCKED_TABS.length));
+  const fading = step === SHEET_LIMIT_STEPS.length - 1 && !reduced;
+  const full = made === SHEET_TABS.length;
+
+  return (
+    <div aria-hidden className={cn("w-full px-4 transition-opacity duration-500", fading ? "opacity-0" : "opacity-100")}>
+      <div className="flex items-center justify-between">
+        <span className="text-[10px] font-semibold uppercase tracking-wide text-neutral-500">New sheets</span>
+        <span
+          className={cn(
+            "rounded-full px-1.5 py-0.5 text-[9px] font-semibold tabular-nums transition-colors duration-300",
+            full ? "bg-[#0d99ff] text-white" : "bg-white text-neutral-600 dark:bg-neutral-900 dark:text-neutral-300",
+          )}
+        >
+          {made} / {DEMO_SHEET_CAP} demo limit
+        </span>
+      </div>
+      <div className="mt-2 grid grid-cols-3 gap-1">
+        <SheetChip label="Markets" state="parent" />
+        {SHEET_TABS.slice(0, made).map((label) => (
+          <SheetChip key={label} label={label} state="new" animate={!reduced} />
+        ))}
+        {LOCKED_TABS.slice(0, locked).map((label) => (
+          <SheetChip key={label} label={label} state="locked" animate={!reduced} />
+        ))}
+      </div>
+      <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-white shadow-inner dark:bg-neutral-900">
+        <div
+          className="h-full rounded-full bg-gradient-to-r from-[#0d99ff] to-[#5cb8ff] transition-[width] duration-300"
+          style={{ width: `${(made / DEMO_SHEET_CAP) * 100}%` }}
+        />
+      </div>
+    </div>
+  );
+}
+
+/** Demo only: next to the sheet tabs an enrichment generates. */
+export function SheetLimitFeatureTip({ anchorRef, sheets, cap, open = true, onUpgrade }) {
+  const noun = sheets === 1 ? "sheet" : "sheets";
+  return (
+    <FeatureTip
+      id={BUILD_TIP_IDS.sheetLimit}
+      after={tipsBefore(BUILD_TIP_IDS.sheetLimit)}
+      anchorRef={anchorRef}
+      open={open}
+      side="bottom"
+      align="start"
+      sideOffset={6}
+      alignOffset={16}
+      className="w-[296px]"
+      mediaClassName="items-start pt-4"
+      media={<SheetLimitTipAnimation />}
+      title="Sheet limits"
+      description={`Your enrichment generates ${sheets.toLocaleString()} new ${noun}. Since you're on demo, you can pull a maximum of ${cap.toLocaleString()} sheets at once. To get more sheets and more tabs, upgrade.`}
+      secondaryAction={{ label: "Continue" }}
+      action={{ label: "Upgrade", onClick: onUpgrade }}
+      closeOnAction
+    />
+  );
+}
+
+/* ---------- Save and run ---------- */
+
+/** On Save and run. Clicking that button closes it too. */
+export function SaveRunFeatureTip({ anchorRef, open = true }) {
+  return (
+    <FeatureTip
+      id={BUILD_TIP_IDS.saveRun}
+      after={tipsBefore(BUILD_TIP_IDS.saveRun)}
+      anchorRef={anchorRef}
+      open={open}
+      side="right"
+      align="end"
+      sideOffset={14}
+      title="Start your pull"
+      description="Hit this to start your full data pulls."
+      action={{ label: "Ok" }}
       closeOnAction
     />
   );

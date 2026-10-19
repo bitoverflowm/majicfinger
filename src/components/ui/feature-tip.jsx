@@ -94,6 +94,13 @@ export function usePrefersReducedMotion() {
   return reduced;
 }
 
+/** Mounted tips by id, so the feature itself can close its tip (e.g. clicking the button the tip points at). */
+const dismissers = new Map();
+
+export function dismissFeatureTip(id) {
+  dismissers.get(id)?.forEach((dismiss) => dismiss());
+}
+
 /** Tips that are on screen, or about to be. Lets a tip wait for another (`after`) across components. */
 const pendingTips = new Map();
 const pendingListeners = new Set();
@@ -239,6 +246,7 @@ export function FeatureTipCard({
  * Visibility is `open` (controlled) or automatic: shown unless the user closed it before.
  * `after` (tip id or ids) holds this tip back while those tips are still showing.
  * Closing (X or Escape) calls `onDismiss` and is remembered under `id`.
+ * `body` goes under the description, for content that isn't paragraphs (e.g. a list).
  */
 export function FeatureTip({
   id,
@@ -246,6 +254,7 @@ export function FeatureTip({
   onDismiss,
   persist,
   children,
+  body,
   anchorRef,
   side = "bottom",
   align = "center",
@@ -270,6 +279,16 @@ export function FeatureTip({
     setTipPending(id, true);
     return () => setTipPending(id, false);
   }, [id, pending]);
+  useEffect(() => {
+    if (!id) return undefined;
+    const set = dismissers.get(id) || new Set();
+    set.add(dismiss);
+    dismissers.set(id, set);
+    return () => {
+      set.delete(dismiss);
+      if (!set.size) dismissers.delete(id);
+    };
+  }, [id, dismiss]);
   const titleId = id ? `feature-tip-${id}-title` : undefined;
   const descriptionId = id ? `feature-tip-${id}-description` : undefined;
 
@@ -324,7 +343,9 @@ export function FeatureTip({
             onClose={close}
             action={wrapAction(action)}
             secondaryAction={wrapAction(secondaryAction)}
-          />
+          >
+            {body}
+          </FeatureTipCard>
           <PopoverPrimitive.Arrow width={18} height={9} className="fill-white dark:fill-[#2c2c2c]" />
         </PopoverPrimitive.Content>
       </PopoverPrimitive.Portal>

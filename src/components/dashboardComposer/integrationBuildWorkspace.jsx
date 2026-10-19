@@ -1,14 +1,20 @@
 "use client";
 
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { createContext, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { columnMissingFromRows } from "@/lib/integrations/columnPayload";
 import { LandingDemoMembersOnlyDialog } from "@/components/dashboardComposer/landingDemoMembersOnly";
 import {
   AttributesFeatureTip,
+  BUILD_TIP_IDS,
   ColumnsFeatureTip,
+  ContinueFeatureTip,
   DataLimitsFeatureTip,
   DataTypeFeatureTip,
+  EnrichmentsFeatureTip,
+  SaveRunFeatureTip,
+  SheetLimitFeatureTip,
 } from "@/components/dashboardComposer/buildFeatureTips";
+import { dismissFeatureTip } from "@/components/ui/feature-tip";
 import { exitLandingDemoToSection } from "@/lib/landingDemoSession";
 import { ArrowLeft, Check, ChevronDown, History, Info } from "lucide-react";
 import { IntegrationBuildGrid } from "@/components/dashboardComposer/integrationBuildGrid";
@@ -598,8 +604,12 @@ function SheetTabButton({ tab, selected, measure = false, onClick }) {
   );
 }
 
+/** Receives `{ el, count }` for the sheet tab bar on screen, or null. Lets a tip point at the tabs. */
+const SheetTabsReportContext = createContext(null);
+
 /** Tabs that fit, then +n. The rest open as a list. Queued tabs are sheets built on run, not previewed. */
 function SheetTabBar({ tabs, active, onSelect }) {
+  const reportTabs = useContext(SheetTabsReportContext);
   const frameRef = useRef(null);
   const measureRef = useRef(null);
   const [open, setOpen] = useState(false);
@@ -651,8 +661,14 @@ function SheetTabBar({ tabs, active, onSelect }) {
     document.addEventListener("pointerdown", close);
     return () => document.removeEventListener("pointerdown", close);
   }, [open]);
+  const barShown = preview.length >= 2 || queued.length > 0;
+  useLayoutEffect(() => {
+    if (!reportTabs || !barShown || !frameRef.current) return undefined;
+    reportTabs({ el: frameRef.current, count: tabs.length });
+    return () => reportTabs(null);
+  }, [reportTabs, barShown, tabs.length]);
 
-  if (preview.length < 2 && !queued.length) return null;
+  if (!barShown) return null;
 
   return (
     <div ref={frameRef} className="relative px-4 pb-1 pt-4">
@@ -1239,6 +1255,8 @@ function EnrichStep({
   onFocusFunction,
   summaryLines = [],
 }) {
+  const headerRef = useRef(null);
+  const saveRunRef = useRef(null);
   const chosen = picked instanceof Set ? picked : new Set(picked ? [picked] : []);
   const foldedIds = folded instanceof Set ? folded : new Set();
   const joinOpen = showJoinBuilder && chosen.has("join") && !foldedIds.has("join");
@@ -1335,12 +1353,13 @@ function EnrichStep({
   const queryRowCount = typeof queryRows === "number" ? queryRows : sheetCount;
   return (
     <>
-      <div className="px-4 pb-3 pt-4 pr-12">
+      <div ref={headerRef} className="px-4 pb-3 pt-4 pr-12">
         <h2 className="text-[15px] font-semibold text-foreground">Enrich your data</h2>
         <p className="mt-1 text-[13px] leading-relaxed text-muted-foreground">
           Add steps on top of this pull. You can combine them. The preview stays on the rows you queried.
         </p>
       </div>
+      <EnrichmentsFeatureTip anchorRef={headerRef} />
       <fieldset className="min-h-0 flex-1 space-y-2 overflow-y-auto px-4 pb-4">
         <legend className="sr-only">Enrichment</legend>
         {ENRICH_OPTIONS.map((option) => {
@@ -2318,13 +2337,18 @@ function EnrichStep({
           Previous
         </Button>
         <Button
+          ref={saveRunRef}
           type="button"
           disabled={running}
-          onClick={onSaveAndRun}
+          onClick={() => {
+            dismissFeatureTip(BUILD_TIP_IDS.saveRun);
+            onSaveAndRun();
+          }}
           className="bg-[#0d99ff] text-white hover:bg-[#0d99ff]/90 disabled:opacity-60"
         >
           {running ? "Running…" : "Save and run"}
         </Button>
+        <SaveRunFeatureTip anchorRef={saveRunRef} open={chosen.size > 0 && !running} />
       </div>
     </>
   );
@@ -2688,6 +2712,10 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
   const dataTypePickerRef = useRef(null);
   const columnsSectionRef = useRef(null);
   const previewCountRef = useRef(null);
+  const continueButtonRef = useRef(null);
+  const [sheetTabs, setSheetTabs] = useState(null);
+  const sheetTabsRef = useRef(null);
+  sheetTabsRef.current = sheetTabs?.el || null;
   const [openQuerySection, setOpenQuerySection] = useState(null);
   const attributesSectionRef = useMemo(() => {
     let cached = null;
@@ -4730,6 +4758,7 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
   }
 
   function onNext() {
+    dismissFeatureTip(BUILD_TIP_IDS.continueStep);
     setLockedQuery({ ...querySnapshot(), lockedAt: Date.now() });
     setEnrichPicks(new Set());
     setPreviewSheet("source");
@@ -10890,9 +10919,10 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
           <Button type="button" variant="outline" onClick={onSave} disabled={!canProceed}>
             {justSaved ? "Saved" : "Save search"}
           </Button>
-          <Button type="button" onClick={onNext} disabled={!canProceed}>
+          <Button ref={continueButtonRef} type="button" onClick={onNext} disabled={!canProceed}>
             Next
           </Button>
+          <ContinueFeatureTip anchorRef={continueButtonRef} />
         </div>
         </>
         )}
@@ -10992,6 +11022,7 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
             style={{ width: `${Math.min(100, progress)}%` }}
           />
         </div>
+        <SheetTabsReportContext.Provider value={setSheetTabs}>
         {showSummarizeExplainer ? (
           <SummarizeExplainerTabs sheetTitle={sheetTitle} />
         ) : showBucketExplainer ? (
@@ -11042,6 +11073,15 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
         ) : (
           <ResultSheetTabs tabs={previewTabs} active={previewSheet} onSelect={showPreview} />
         )}
+        </SheetTabsReportContext.Provider>
+        {ctx?.landingDemo && step === "enrich" && enrichPicks.has("join") && sheetTabs?.count > 1 ? (
+          <SheetLimitFeatureTip
+            anchorRef={sheetTabsRef}
+            sheets={sheetTabs.count - 1}
+            cap={marketCap}
+            onUpgrade={() => exitLandingDemoToSection("pricing")}
+          />
+        ) : null}
         <div className="min-h-0 flex-1 p-4">
           {showSummarizeExplainer ? (
             <SummarizeExplainer measure={summaryMeasure} />
