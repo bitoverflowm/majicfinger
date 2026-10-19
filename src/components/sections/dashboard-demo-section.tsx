@@ -1,7 +1,7 @@
 /* eslint-disable react/no-unescaped-entities */
 "use client";
 
-import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from "react";
+import { useCallback, useEffect, useRef, useState, type CSSProperties, type ReactNode } from "react";
 
 import { StateProvider } from "@/context/stateContext";
 import { StateProviderV2, useMyStateV2 } from "@/context/stateContextV2";
@@ -9,6 +9,7 @@ import {
   clearLandingDemoActivateRequest,
   isLandingDemoActivateRequested,
   subscribeLandingDemoActivate,
+  subscribeLandingDemoExit,
 } from "@/lib/landingDemoSession";
 import { cn } from "@/lib/utils";
 
@@ -17,14 +18,18 @@ import LiveStreamManager from "@/app/dashboard/components/liveStreamManager";
 import RestLiveFeedManager from "@/app/dashboard/components/restLiveFeedManager";
 import { DemoWindowMockup } from "@/components/sections/demo-window-mockup";
 
-type StagePhase = "inline" | "expanding" | "full" | "collapsing";
-type StageRect = { top: number; left: number; width: number; height: number };
+/**
+ * inline: card on the page. entering: fixed full-viewport but invisible while the demo lays out.
+ * full: visible full-viewport demo. exiting: fading out with content untouched.
+ * returning: back in the card slot, invisible while the content swaps back, then fades in.
+ */
+type StagePhase = "inline" | "entering" | "full" | "exiting" | "returning";
 
-const STAGE_MS = 420;
+const ENTER_MS = 320;
+const EXIT_MS = 220;
+const RETURN_MS = 240;
 const STAGE_EASE = "cubic-bezier(0.22, 1, 0.36, 1)";
-const STAGE_TRANSITION = ["top", "left", "width", "height", "border-radius"]
-  .map((prop) => `${prop} ${STAGE_MS}ms ${STAGE_EASE}`)
-  .join(", ");
+const STAGE_SCALE = "scale(0.97)";
 const ESC_HINT_MS = 2800;
 
 const OPEN_OVERLAY_SELECTOR = [
@@ -47,22 +52,55 @@ function LandingDemoActivateListener() {
   return null;
 }
 
-function toStageRect(el: HTMLElement): StageRect {
-  const r = el.getBoundingClientRect();
-  return { top: r.top, left: r.left, width: r.width, height: r.height };
+function isStaged(phase: StagePhase) {
+  return phase === "entering" || phase === "full" || phase === "exiting";
 }
 
-function stageStyle(phase: StagePhase, rect: StageRect | null): CSSProperties | undefined {
-  if (phase === "inline" || !rect) return undefined;
-  const base: CSSProperties = { position: "fixed", zIndex: 100, margin: 0 };
+/** Only opacity and transform animate, so the transition stays smooth while the dashboard re-lays out. */
+function stageStyle(phase: StagePhase): CSSProperties {
+  if (phase === "returning") return { opacity: 0 };
+  if (phase === "inline") return { opacity: 1, transition: `opacity ${RETURN_MS}ms ease-out` };
+  const base: CSSProperties = {
+    position: "fixed",
+    zIndex: 100,
+    top: 0,
+    left: 0,
+    width: "100%",
+    height: "100%",
+    margin: 0,
+    borderRadius: 0,
+  };
+  if (phase === "entering") return { ...base, opacity: 0, transform: STAGE_SCALE };
   if (phase === "full") {
-    return { ...base, top: 0, left: 0, width: "100%", height: "100%", borderRadius: 0, transition: STAGE_TRANSITION };
+    return {
+      ...base,
+      opacity: 1,
+      transform: "scale(1)",
+      transition: `opacity ${ENTER_MS}ms ease-out, transform ${ENTER_MS}ms ${STAGE_EASE}`,
+    };
   }
   return {
     ...base,
-    ...rect,
-    transition: phase === "collapsing" ? STAGE_TRANSITION : undefined,
+    opacity: 0,
+    transform: STAGE_SCALE,
+    transition: `opacity ${EXIT_MS}ms ease-in, transform ${EXIT_MS}ms ease-in`,
   };
+}
+
+function useDoubleFrame(run: boolean, callback: () => void) {
+  const callbackRef = useRef(callback);
+  callbackRef.current = callback;
+  useEffect(() => {
+    if (!run) return;
+    let raf2 = 0;
+    const raf1 = window.requestAnimationFrame(() => {
+      raf2 = window.requestAnimationFrame(() => callbackRef.current());
+    });
+    return () => {
+      window.cancelAnimationFrame(raf1);
+      window.cancelAnimationFrame(raf2);
+    };
+  }, [run]);
 }
 
 /** Active landing demo fills the browser viewport (not the Fullscreen API); Escape returns it to the page. */
@@ -75,48 +113,51 @@ function LandingDemoStage({ children }: { children: ReactNode }) {
   const slotRef = useRef<HTMLDivElement>(null);
   const phaseRef = useRef<StagePhase>("inline");
   const [phase, setPhaseState] = useState<StagePhase>("inline");
-  const [rect, setRect] = useState<StageRect | null>(null);
   const [slotHeight, setSlotHeight] = useState<number | null>(null);
   const [hintVisible, setHintVisible] = useState(false);
-  const [resumePrompt, setResumePrompt] = useState(false);
 
-  const setPhase = (next: StagePhase) => {
+  const setPhase = useCallback((next: StagePhase) => {
     phaseRef.current = next;
     setPhaseState(next);
-  };
+  }, []);
 
   useEffect(() => {
-    const slot = slotRef.current;
-    if (!slot) return;
-
+    const current = phaseRef.current;
     if (active) {
-      setResumePrompt(false);
-      const r = toStageRect(slot);
-      setSlotHeight(r.height);
-      setRect(r);
-      setPhase("expanding");
-      let raf2 = 0;
-      const raf1 = window.requestAnimationFrame(() => {
-        raf2 = window.requestAnimationFrame(() => setPhase("full"));
-      });
-      return () => {
-        window.cancelAnimationFrame(raf1);
-        window.cancelAnimationFrame(raf2);
-      };
+      if (current === "entering" || current === "full") return;
+      const slot = slotRef.current;
+      if (slot && current !== "exiting") setSlotHeight(slot.getBoundingClientRect().height);
+      setPhase("entering");
+      return;
     }
-
-    if (phaseRef.current === "inline") return;
-    setResumePrompt(true);
-    setRect(toStageRect(slot));
-    setPhase("collapsing");
-    const timer = window.setTimeout(() => {
-      setPhase("inline");
+    if (isStaged(current)) {
       setSlotHeight(null);
-    }, STAGE_MS);
-    return () => window.clearTimeout(timer);
-  }, [active]);
+      setPhase("returning");
+    }
+  }, [active, setPhase]);
 
-  const staged = phase !== "inline";
+  useDoubleFrame(phase === "entering", () => setPhase("full"));
+  useDoubleFrame(phase === "returning", () => setPhase("inline"));
+
+  useEffect(() => {
+    if (phase !== "exiting") return;
+    const timer = window.setTimeout(() => {
+      setSlotHeight(null);
+      setPhase("returning");
+      if (typeof deactivate === "function") deactivate();
+    }, EXIT_MS);
+    return () => window.clearTimeout(timer);
+  }, [phase, deactivate, setPhase]);
+
+  const beginExit = useCallback(() => {
+    clearLandingDemoActivateRequest();
+    const current = phaseRef.current;
+    if (current === "entering" || current === "full") setPhase("exiting");
+  }, [setPhase]);
+
+  useEffect(() => subscribeLandingDemoExit(beginExit), [beginExit]);
+
+  const staged = isStaged(phase);
 
   useEffect(() => {
     if (!staged) return;
@@ -143,16 +184,15 @@ function LandingDemoStage({ children }: { children: ReactNode }) {
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key !== "Escape" || event.defaultPrevented) return;
       if (document.querySelector(OPEN_OVERLAY_SELECTOR)) return;
-      clearLandingDemoActivateRequest();
-      if (typeof deactivate === "function") deactivate();
+      event.preventDefault();
+      beginExit();
     };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [active, deactivate]);
+  }, [active, beginExit]);
 
-  const showResumePrompt = resumePrompt && !active && phase === "inline";
-  const resumeDemo = () => {
-    setResumePrompt(false);
+  const showStartPrompt = !active && !staged;
+  const startDemo = () => {
     if (typeof activate === "function") activate();
   };
 
@@ -168,10 +208,10 @@ function LandingDemoStage({ children }: { children: ReactNode }) {
         <DemoWindowMockup
           id="demo-mockup"
           data-demo-mockup
-          style={stageStyle(phase, rect)}
+          style={stageStyle(phase)}
           className={cn(
-            "[transform:translateZ(0)]",
-            phase === "full" && "border-transparent shadow-none ring-0",
+            "[transform:translateZ(0)] will-change-[opacity,transform]",
+            staged && "border-transparent shadow-none ring-0",
           )}
           contentClassName={cn(
             "overflow-hidden",
@@ -194,23 +234,21 @@ function LandingDemoStage({ children }: { children: ReactNode }) {
               <span>to exit the demo</span>
             </div>
           </div>
-          {resumePrompt ? (
-            <button
-              type="button"
-              aria-label="Click anywhere in the window to activate your demo"
-              aria-hidden={!showResumePrompt}
-              tabIndex={showResumePrompt ? 0 : -1}
-              onClick={resumeDemo}
-              className={cn(
-                "absolute inset-0 z-[650] flex cursor-pointer items-center justify-center bg-white/30 backdrop-blur-[1.5px] transition-opacity duration-300 dark:bg-black/30",
-                showResumePrompt ? "opacity-100" : "pointer-events-none opacity-0",
-              )}
-            >
-              <span className="rounded-full bg-zinc-900/85 px-4 py-2 text-sm font-medium text-white shadow-lg backdrop-blur">
-                Click anywhere in the window to activate your demo
-              </span>
-            </button>
-          ) : null}
+          <button
+            type="button"
+            aria-label="Click anywhere to begin"
+            aria-hidden={!showStartPrompt}
+            tabIndex={showStartPrompt ? 0 : -1}
+            onClick={startDemo}
+            className={cn(
+              "absolute inset-0 z-[650] flex cursor-pointer items-center justify-center bg-white/30 backdrop-blur-[1.5px] transition-opacity duration-300 dark:bg-black/30",
+              showStartPrompt ? "opacity-100" : "pointer-events-none opacity-0",
+            )}
+          >
+            <span className="rounded-full bg-zinc-900/85 px-4 py-2 text-sm font-medium text-white shadow-lg backdrop-blur">
+              Click anywhere to begin
+            </span>
+          </button>
         </DemoWindowMockup>
       </div>
     </section>

@@ -1,6 +1,7 @@
 /** Homepage demo becomes active only after Try For Free or a picker selection. */
 
 export const LANDING_DEMO_ACTIVATE_EVENT = "lychee:landing-demo-activate";
+export const LANDING_DEMO_EXIT_EVENT = "lychee:landing-demo-exit";
 
 let requested = false;
 
@@ -14,10 +15,22 @@ export function clearLandingDemoActivateRequest() {
   requested = false;
 }
 
-/** Leaves the full-viewport demo, then scrolls the landing page to a section once the demo is back in place. */
-export function exitLandingDemoToSection(deactivate, sectionId) {
+/** Asks the demo stage to play its exit animation and return the demo to the landing page. */
+export function requestLandingDemoExit() {
   clearLandingDemoActivateRequest();
-  if (typeof deactivate === "function") deactivate();
+  if (typeof window === "undefined") return;
+  window.dispatchEvent(new Event(LANDING_DEMO_EXIT_EVENT));
+}
+
+export function subscribeLandingDemoExit(listener) {
+  if (typeof window === "undefined") return () => {};
+  window.addEventListener(LANDING_DEMO_EXIT_EVENT, listener);
+  return () => window.removeEventListener(LANDING_DEMO_EXIT_EVENT, listener);
+}
+
+/** Leaves the full-viewport demo, then scrolls the landing page to a section once the demo is back in place. */
+export function exitLandingDemoToSection(sectionId) {
+  requestLandingDemoExit();
   if (typeof window === "undefined") return;
   window.setTimeout(() => {
     const section = document.getElementById(sectionId);

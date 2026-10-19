@@ -82,12 +82,6 @@ export function HeroSection() {
             {hero.cta.secondary.text}
           </Link>
           </div>
-          <Link
-            href="/kalshi-vs-polymarket-odds"
-            className="text-sm font-medium text-foreground underline-offset-4 hover:underline"
-          >
-            Compare Kalshi vs Polymarket odds
-          </Link>
         </div>
 
         <ResearchQuestionRotator />

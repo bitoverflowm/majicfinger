@@ -7121,7 +7121,7 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
 
   function upgradeFromLandingDemo() {
     setPlacementPrompt(false);
-    exitLandingDemoToSection(ctx?.deactivateLandingDemo, "pricing");
+    exitLandingDemoToSection("pricing");
   }
 
   function confirmPlacement(choice) {

@@ -329,7 +329,14 @@ function IntegrationOption({ row, active, hovered, onSelect, onHover, cutoffLabe
 }
 
 /** Picker, then the build workspace. Shared by the dialog and the inline landing demo. */
-function IntegrationConnectFlow({ inline = false, withClose = !inline, onCancel, onPhaseChange, onSelectIntegration }) {
+function IntegrationConnectFlow({
+  inline = false,
+  withClose = !inline,
+  title = "Which integration should feed this dashboard?",
+  onCancel,
+  onPhaseChange,
+  onSelectIntegration,
+}) {
   const rows = useMemo(() => buildIntegrationPickerRows(), []);
   const primary = rowsInOrder(rows, PRIMARY_ORDER);
   const beta = rowsInOrder(rows, BETA_ORDER);
@@ -374,9 +381,7 @@ function IntegrationConnectFlow({ inline = false, withClose = !inline, onCancel,
         <div className="grid min-h-0 flex-1 md:grid-cols-[minmax(0,1.05fr)_minmax(0,0.95fr)]">
           <div className="flex min-h-0 flex-col bg-background">
             <div className={cn("px-6 pb-3 pt-6", withClose && "pr-12")}>
-              <Title className="text-xl font-semibold tracking-tight text-foreground">
-                Which integration should feed this dashboard?
-              </Title>
+              <Title className="text-xl font-semibold tracking-tight text-foreground">{title}</Title>
               <Description className="mt-1.5 text-sm leading-relaxed text-muted-foreground">
                 Pick a source. You’ll shape the pull in the next step.
               </Description>
@@ -553,6 +558,7 @@ export function IntegrationConnectLandingDemo({ active = false, onSelectIntegrat
         <IntegrationConnectFlow
           inline
           withClose={active}
+          title="What is the first venue you want to research with Lychee?"
           onPhaseChange={setPhase}
           onSelectIntegration={onSelectIntegration}
         />
