@@ -31,27 +31,32 @@ function readDismissed(key) {
   }
 }
 
+/** Tips closed during this page load. Covers tips that aren't stored (landing demo) across remounts. */
+const sessionDismissed = new Set();
+
 /**
  * `dismissed` is null until storage has been read, so callers can avoid flashing a tip
- * the user already closed. `persist` defaults to on everywhere except the landing demo.
+ * the user already closed. `persist` defaults to on everywhere except the landing demo,
+ * where a closed tip only stays closed until the page reloads.
  */
 export function useFeatureTipDismissal(id, { persist } = {}) {
   const user = useUser();
   const landingDemo = !!useMyStateV2()?.landingDemo;
   const remember = !!id && (persist ?? !landingDemo);
   const key = id ? storageKey(id, user?.userId) : null;
-  const [dismissed, setDismissed] = useState(remember ? null : false);
+  const [dismissed, setDismissed] = useState(() => (remember ? null : !!key && sessionDismissed.has(key)));
 
   useEffect(() => {
-    if (!remember || !key) {
+    if (!key) {
       setDismissed(false);
       return;
     }
-    setDismissed(readDismissed(key));
+    setDismissed(sessionDismissed.has(key) || (remember && readDismissed(key)));
   }, [remember, key]);
 
   const dismiss = useCallback(() => {
     setDismissed(true);
+    if (key) sessionDismissed.add(key);
     if (!remember || !key) return;
     try {
       window.localStorage.setItem(key, "1");
@@ -63,6 +68,7 @@ export function useFeatureTipDismissal(id, { persist } = {}) {
   const reset = useCallback(() => {
     setDismissed(false);
     if (!key) return;
+    sessionDismissed.delete(key);
     try {
       window.localStorage.removeItem(key);
     } catch {
@@ -74,6 +80,19 @@ export function useFeatureTipDismissal(id, { persist } = {}) {
 }
 
 const useIsomorphicLayoutEffect = typeof window === "undefined" ? useEffect : useLayoutEffect;
+
+/** For tip animations: show a still frame when the user asks for reduced motion. */
+export function usePrefersReducedMotion() {
+  const [reduced, setReduced] = useState(false);
+  useEffect(() => {
+    const query = window.matchMedia("(prefers-reduced-motion: reduce)");
+    const update = () => setReduced(query.matches);
+    update();
+    query.addEventListener("change", update);
+    return () => query.removeEventListener("change", update);
+  }, []);
+  return reduced;
+}
 
 /** Tips that are on screen, or about to be. Lets a tip wait for another (`after`) across components. */
 const pendingTips = new Map();
@@ -241,15 +260,16 @@ export function FeatureTip({
   ...cardProps
 }) {
   const { dismissed, dismiss } = useFeatureTipDismissal(id, { persist });
-  const wanted = dismissed !== true && (open ?? true);
+  const pending = dismissed !== true;
   const waiting = useAnyTipPending(after);
-  const shown = dismissed === false && wanted && !waiting;
+  const shown = dismissed === false && (open ?? true) && !waiting;
 
+  // A tip hidden for a moment (`open` false) still holds back the tips queued after it.
   useIsomorphicLayoutEffect(() => {
-    if (!id || !wanted) return;
+    if (!id || !pending) return;
     setTipPending(id, true);
     return () => setTipPending(id, false);
-  }, [id, wanted]);
+  }, [id, pending]);
   const titleId = id ? `feature-tip-${id}-title` : undefined;
   const descriptionId = id ? `feature-tip-${id}-description` : undefined;
 

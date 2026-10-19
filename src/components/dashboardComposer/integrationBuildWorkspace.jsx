@@ -3,7 +3,13 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { columnMissingFromRows } from "@/lib/integrations/columnPayload";
 import { LandingDemoMembersOnlyDialog } from "@/components/dashboardComposer/landingDemoMembersOnly";
-import { FeatureTip } from "@/components/ui/feature-tip";
+import {
+  AttributesFeatureTip,
+  ColumnsFeatureTip,
+  DataLimitsFeatureTip,
+  DataTypeFeatureTip,
+} from "@/components/dashboardComposer/buildFeatureTips";
+import { exitLandingDemoToSection } from "@/lib/landingDemoSession";
 import { ArrowLeft, Check, ChevronDown, History, Info } from "lucide-react";
 import { IntegrationBuildGrid } from "@/components/dashboardComposer/integrationBuildGrid";
 import { claimSheetId, displayMatrix, recordsFromRows } from "@/components/dashboardComposer/integrationRunSheets";
@@ -2680,6 +2686,22 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
   const [counting, setCounting] = useState(false);
   const formulaCaretRef = useRef(0);
   const dataTypePickerRef = useRef(null);
+  const columnsSectionRef = useRef(null);
+  const previewCountRef = useRef(null);
+  const [openQuerySection, setOpenQuerySection] = useState(null);
+  const attributesSectionRef = useMemo(() => {
+    let cached = null;
+    return {
+      get current() {
+        const el = columnsSectionRef.current?.parentElement?.querySelector('[data-section="attributes"]') || null;
+        if (!el) return null;
+        if (cached?.contextElement !== el) {
+          cached = { getBoundingClientRect: () => el.getBoundingClientRect(), contextElement: el };
+        }
+        return cached;
+      },
+    };
+  }, []);
   const blurToken = useRef(0);
   const activeBucket = bucketItems.find((item) => item.id === activeBucketId) || bucketItems[0];
   const bucketColumnId = activeBucket?.columnId || "";
@@ -9929,6 +9951,19 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
 
   if (!source) return null;
 
+  const hasAttributeSection = Boolean(guidedFilters || liveMarketSearch || liveDirect || polymarketLive);
+
+  function revealAttributes() {
+    setOpenQuerySection({ tableId, value: "attributes" });
+    window.setTimeout(() => {
+      const section = attributesSectionRef.current?.contextElement;
+      const scroller = section?.closest(".overflow-y-auto");
+      if (!section || !scroller) return;
+      const top = scroller.scrollTop + section.getBoundingClientRect().top - scroller.getBoundingClientRect().top - 8;
+      scroller.scrollTo({ top: Math.max(0, top), behavior: "smooth" });
+    }, 260);
+  }
+
   return (
     <div className="relative flex min-h-0 flex-1 bg-background">
       {functionHelp ? (
@@ -10493,19 +10528,7 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
             </DropdownMenu>
             ) : null}
             </div>
-            {groups || visibleTableIds.length > 1 ? (
-              <FeatureTip
-                id="integration-build-data-type"
-                anchorRef={dataTypePickerRef}
-                side="right"
-                align="start"
-                sideOffset={14}
-                title="Select a Data Type"
-                description="Start by selecting any tag option or pick from the dropdown, depending on what you are interested in, to start constructing your data. As you make selections the preview panel will update immediately."
-                action={{ label: "Ok" }}
-                closeOnAction
-              />
-            ) : null}
+            {groups || visibleTableIds.length > 1 ? <DataTypeFeatureTip anchorRef={dataTypePickerRef} /> : null}
             {pairStreamOn ? (
               <div className="mt-3">
                 <p className="text-[12px] font-medium text-foreground">Pairs</p>
@@ -10619,7 +10642,12 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
             key={tableId}
             type="single"
             collapsible
-            defaultValue={polymarketQuerySection?.value || kalshiQuerySection?.value || "columns"}
+            value={
+              openQuerySection?.tableId === tableId
+                ? openQuerySection.value
+                : polymarketQuerySection?.value || kalshiQuerySection?.value || "columns"
+            }
+            onValueChange={(value) => setOpenQuerySection({ tableId, value })}
             className="space-y-2"
           >
             {kalshiQuerySection ? (
@@ -10682,7 +10710,7 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
                 </AccordionContent>
               </AccordionItem>
             ) : null}
-            <AccordionItem value="columns" className="border-0">
+            <AccordionItem ref={columnsSectionRef} value="columns" className="border-0">
               <AccordionPrimitive.Header className="flex">
                 <AccordionPrimitive.Trigger
                   className="flex w-full items-center gap-2 rounded-lg bg-zinc-200/80 px-2.5 py-1.5 text-left text-[12px] font-semibold text-foreground dark:bg-zinc-800 [&[data-state=open]>svg]:rotate-180"
@@ -10738,7 +10766,7 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
                 </div>
               </AccordionContent>
             </AccordionItem>
-            {guidedFilters || liveMarketSearch || liveDirect || polymarketLive ? (
+            {hasAttributeSection ? (
               <AttributeFilters
                 columns={
                   liveSeriesSearch
@@ -10827,6 +10855,8 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
               />
             ) : null}
           </Accordion>
+          <ColumnsFeatureTip anchorRef={columnsSectionRef} onDone={hasAttributeSection ? revealAttributes : undefined} />
+          {hasAttributeSection ? <AttributesFeatureTip anchorRef={attributesSectionRef} /> : null}
 
           {guidedFilters || liveMarketSearch || liveDirect || polymarketLive ? null : (
             <section>
@@ -10882,8 +10912,11 @@ export function IntegrationBuildWorkspace({ integrationId, onBack }) {
               </p>
             ) : null}
           </div>
-          <div className="flex min-w-0 flex-col items-end">
+          <div ref={previewCountRef} className="flex min-w-0 flex-col items-end">
             <p className="text-right text-[12px] text-muted-foreground">{paneLine}</p>
+            {ctx?.landingDemo ? (
+              <DataLimitsFeatureTip anchorRef={previewCountRef} onUpgrade={() => exitLandingDemoToSection("pricing")} />
+            ) : null}
             {typeof planLimit === "number" &&
             !(showJoinSheets && joinTab !== "markets") &&
             !showSummarizeExplainer &&

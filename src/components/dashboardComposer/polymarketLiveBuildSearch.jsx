@@ -3,7 +3,7 @@
 import { useRef, useState } from "react";
 import { X } from "lucide-react";
 import { PolymarketLiveSearch } from "@/components/connectData/polymarketLive/PolymarketLiveSearch";
-import { SearchFeatureTip } from "@/components/dashboardComposer/searchFeatureTip";
+import { SearchFeatureTip } from "@/components/dashboardComposer/buildFeatureTips";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
 /**

@@ -27,7 +27,7 @@ import {
 import { KALSHI_LIVE_QUERY_ATTRIBUTE_COLUMNS } from "@/lib/kalshiLive/liveMarketAttributeQuery";
 import { inferSeriesTickerFromEvent } from "@/lib/kalshiLive/eventCandlesticksCompose";
 import { cn } from "@/lib/utils";
-import { SearchFeatureTip } from "@/components/dashboardComposer/searchFeatureTip";
+import { SearchFeatureTip } from "@/components/dashboardComposer/buildFeatureTips";
 
 const STATUS_OPTIONS = [
   ["initialized", "Initialized"],

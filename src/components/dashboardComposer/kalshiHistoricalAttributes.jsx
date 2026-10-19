@@ -1367,7 +1367,7 @@ const parentTriggerClass =
 
 function ParentSection({ value, title, summary, children }) {
   return (
-    <AccordionItem value={value} className="border-0">
+    <AccordionItem value={value} data-section={value} className="border-0">
       <AccordionPrimitive.Header className="flex">
         <AccordionPrimitive.Trigger className={parentTriggerClass}>
           <span className="min-w-0 truncate">{title}</span>
