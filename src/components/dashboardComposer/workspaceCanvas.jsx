@@ -17,6 +17,8 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { exportNodeImage, exportSheet, IMAGE_EXPORT_FORMATS, SHEET_EXPORT_FORMATS } from "@/components/dashboardComposer/blockExport";
+import { EXPORT_TIP_ID, ExportFeatureTip, FIRST_PULL_TIP_ID } from "@/components/dashboardComposer/buildFeatureTips";
+import { useFeatureTipDismissal } from "@/components/ui/feature-tip";
 import { DestructiveConfirmMenuItem } from "@/components/ui/destructive-confirm-menu-item";
 import { useMyStateV2 } from "@/context/stateContextV2";
 import { duplicateTabName, loadWorkspaceStartTabs, saveWorkspaceStartTabs } from "@/lib/workspaceStartTabs";
@@ -2123,7 +2125,7 @@ const RESIZE_EDGES = [
   { edge: "se", edges: { bottom: true, right: true }, cursor: "nwse-resize", className: "bottom-0 right-0 z-20 size-3" },
 ];
 
-function CanvasBlock({ block, selected, spotlight = false, onSelect, onChange, booting = false, locked = false }) {
+function CanvasBlock({ block, selected, spotlight = false, onSelect, onChange, booting = false, locked = false, exportTour = false, onExportTourDone }) {
   const canvas = useWorkspaceCanvas();
   const readOnly = !!canvas?.readOnly || locked;
   const dragRef = useRef(null);
@@ -2170,6 +2172,27 @@ function CanvasBlock({ block, selected, spotlight = false, onSelect, onChange, b
     } catch {
       toast.error("That export didn't work. Try again.");
     }
+  };
+
+  const touring = exportTour && !!exportFormats && !readOnly;
+  const [exportItem, setExportItem] = useState(null);
+  const exportItemRef = useMemo(() => ({ current: exportItem }), [exportItem]);
+  const [exportTipReady, setExportTipReady] = useState(false);
+  useEffect(() => {
+    setMenuOpen(touring);
+  }, [touring]);
+  useEffect(() => {
+    if (!touring || !menuOpen || !exportItem) {
+      setExportTipReady(false);
+      return undefined;
+    }
+    // Let the menu finish its open animation so the tip lines up with the settled item.
+    const timer = window.setTimeout(() => setExportTipReady(true), 220);
+    return () => window.clearTimeout(timer);
+  }, [touring, menuOpen, exportItem]);
+  const endExportTour = () => {
+    setMenuOpen(false);
+    onExportTourDone?.();
   };
 
   useLayoutEffect(() => {
@@ -2396,7 +2419,14 @@ function CanvasBlock({ block, selected, spotlight = false, onSelect, onChange, b
     >
       {readOnly ? null : <RealtimeToggle block={block} />}
       {readOnly ? null : (
-      <DropdownMenu open={menuOpen} onOpenChange={setMenuOpen}>
+      <DropdownMenu
+        open={menuOpen}
+        modal={!touring}
+        onOpenChange={(open) => {
+          setMenuOpen(open);
+          if (!open && touring) onExportTourDone?.();
+        }}
+      >
         <DropdownMenuTrigger asChild>
           <button
             type="button"
@@ -2421,6 +2451,7 @@ function CanvasBlock({ block, selected, spotlight = false, onSelect, onChange, b
           className="z-[520] w-48 rounded-xl p-1 shadow-lg"
           onPointerDown={(event) => event.stopPropagation()}
           onClick={(event) => event.stopPropagation()}
+          onInteractOutside={touring ? (event) => event.preventDefault() : undefined}
         >
           {block.type === "sheet" || block.type === "chart" ? (
             <DropdownMenuItem
@@ -2493,8 +2524,14 @@ function CanvasBlock({ block, selected, spotlight = false, onSelect, onChange, b
           ) : null}
           {exportFormats ? (
             <DropdownMenuSub>
-              <DropdownMenuSubTrigger className="gap-2.5 rounded-md px-2 py-2 text-[13px] focus:bg-accent data-[state=open]:bg-accent dark:focus:bg-accent dark:data-[state=open]:bg-accent [&>svg:last-child]:size-3.5 [&>svg:last-child]:text-muted-foreground">
-                <Download className="size-4 text-muted-foreground" />
+              <DropdownMenuSubTrigger
+                ref={touring ? setExportItem : undefined}
+                className={cn(
+                  "gap-2.5 rounded-md px-2 py-2 text-[13px] focus:bg-accent data-[state=open]:bg-accent dark:focus:bg-accent dark:data-[state=open]:bg-accent [&>svg:last-child]:size-3.5 [&>svg:last-child]:text-muted-foreground",
+                  touring && "bg-[#0d99ff]/10 text-[#0b6fc2] ring-1 ring-[#0d99ff]/40 dark:text-[#5cb8ff]",
+                )}
+              >
+                <Download className={cn("size-4 text-muted-foreground", touring && "text-[#0d99ff]")} />
                 Export
               </DropdownMenuSubTrigger>
               <DropdownMenuPortal>
@@ -2538,6 +2575,7 @@ function CanvasBlock({ block, selected, spotlight = false, onSelect, onChange, b
         </DropdownMenuContent>
       </DropdownMenu>
       )}
+      {touring && exportItem ? <ExportFeatureTip anchorRef={exportItemRef} open={exportTipReady} onDone={endExportTour} /> : null}
       {fullscreen && block.type === "sheet" && !readOnly ? (
         <SheetFullscreen block={block} onChange={onChange} onClose={() => setFullscreen(false)} />
       ) : fullscreen && block.type === "chart" && !readOnly ? (
@@ -2647,6 +2685,51 @@ export function WorkspaceCanvas() {
   const scrollerRef = useRef(null);
   const blocksRef = useRef(blocks);
   blocksRef.current = blocks;
+
+  const firstPullTip = useFeatureTipDismissal(FIRST_PULL_TIP_ID);
+  const exportTip = useFeatureTipDismissal(EXPORT_TIP_ID);
+  const dismissExportTip = exportTip.dismiss;
+  const [exportTourId, setExportTourId] = useState("");
+  const exportTargetId = useMemo(
+    () =>
+      blocksTopToBottom(blocks).find((block) => (block.type === "sheet" || block.type === "chart") && !lockedIds.has(block.id))?.id ||
+      "",
+    [blocks, lockedIds],
+  );
+  const exportTourDue =
+    !!exportTargetId &&
+    !!canvas?.ready &&
+    !canvas?.runFeed &&
+    !canvas?.readOnly &&
+    firstPullTip.dismissed === true &&
+    exportTip.dismissed === false;
+
+  useEffect(() => {
+    if (!exportTourDue) {
+      setExportTourId("");
+      return undefined;
+    }
+    if (exportTourId) return undefined;
+    const timers = [];
+    // After the run card closes: let the dashboard settle, scroll up to the block, then open its menu.
+    timers.push(
+      window.setTimeout(() => {
+        const scroller = scrollerRef.current;
+        const el = scroller?.querySelector(`[data-block-id="${CSS.escape(exportTargetId)}"]`);
+        if (scroller && el instanceof HTMLElement) {
+          const top = scroller.scrollTop + el.getBoundingClientRect().top - scroller.getBoundingClientRect().top - 24;
+          scroller.scrollTo({ top: Math.max(0, top), behavior: "smooth" });
+        }
+        timers.push(window.setTimeout(() => setExportTourId(exportTargetId), 650));
+      }, 900),
+    );
+    return () => timers.forEach((timer) => window.clearTimeout(timer));
+  }, [exportTourDue, exportTourId, exportTargetId]);
+
+  const endExportTour = useCallback(() => {
+    dismissExportTip();
+    setExportTourId("");
+  }, [dismissExportTip]);
   const [bootingIds, setBootingIds] = useState(() => new Set());
   const [layoutGuide, setGuideVisible] = useState(false);
   const [snapPreview, setSnapPreview] = useState(null);
@@ -2925,6 +3008,8 @@ export function WorkspaceCanvas() {
           block={block}
           booting={bootingIds.has(block.id)}
           locked={lockedIds.has(block.id)}
+          exportTour={exportTourId === block.id}
+          onExportTourDone={endExportTour}
           selected={canvas.selectedId === block.id}
           spotlight={canvas.spotlightId === block.id}
           onSelect={canvas.setSelectedId}

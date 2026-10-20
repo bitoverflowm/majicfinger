@@ -34,6 +34,13 @@ function readDismissed(key) {
 /** Tips closed during this page load. Covers tips that aren't stored (landing demo) across remounts. */
 const sessionDismissed = new Set();
 
+/** Every mounted `useFeatureTipDismissal` by key, so closing a tip updates the others watching it. */
+const dismissalWatchers = new Map();
+
+function broadcastDismissed(key, value) {
+  dismissalWatchers.get(key)?.forEach((update) => update(value));
+}
+
 /**
  * `dismissed` is null until storage has been read, so callers can avoid flashing a tip
  * the user already closed. `persist` defaults to on everywhere except the landing demo,
@@ -52,12 +59,21 @@ export function useFeatureTipDismissal(id, { persist } = {}) {
       return;
     }
     setDismissed(sessionDismissed.has(key) || (remember && readDismissed(key)));
+    const watchers = dismissalWatchers.get(key) || new Set();
+    watchers.add(setDismissed);
+    dismissalWatchers.set(key, watchers);
+    return () => {
+      watchers.delete(setDismissed);
+      if (!watchers.size) dismissalWatchers.delete(key);
+    };
   }, [remember, key]);
 
   const dismiss = useCallback(() => {
     setDismissed(true);
-    if (key) sessionDismissed.add(key);
-    if (!remember || !key) return;
+    if (!key) return;
+    sessionDismissed.add(key);
+    broadcastDismissed(key, true);
+    if (!remember) return;
     try {
       window.localStorage.setItem(key, "1");
     } catch {
@@ -69,6 +85,7 @@ export function useFeatureTipDismissal(id, { persist } = {}) {
     setDismissed(false);
     if (!key) return;
     sessionDismissed.delete(key);
+    broadcastDismissed(key, false);
     try {
       window.localStorage.removeItem(key);
     } catch {

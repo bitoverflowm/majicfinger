@@ -3,7 +3,20 @@
 import { useEffect, useRef, useState } from "react";
 import confetti from "canvas-confetti";
 import { motion } from "framer-motion";
-import { Check, Filter, LayoutDashboard, Lock, PartyPopper, Search, Sheet, Sparkles } from "lucide-react";
+import {
+  Check,
+  ChevronRight,
+  Download,
+  Filter,
+  LayoutDashboard,
+  Lock,
+  MoreVertical,
+  MousePointer2,
+  PartyPopper,
+  Search,
+  Sheet,
+  Sparkles,
+} from "lucide-react";
 
 import { FeatureTip, useFeatureTipDismissal, usePrefersReducedMotion } from "@/components/ui/feature-tip";
 import { cn } from "@/lib/utils";
@@ -837,6 +850,148 @@ export function FirstPullFeatureTip({ anchorRef, runId, open = true }) {
       title="Hooray, you ran your 1st pull!"
       description="Congratulations, you ran your first pull. Click here to take a look at your Lychee dashboard."
       action={{ label: "Ok" }}
+      closeOnAction
+    />
+  );
+}
+
+/* ---------- Export ---------- */
+
+export const EXPORT_TIP_ID = "dashboard-export";
+
+const EXPORT_BARS = [42, 70, 54, 88, 64];
+const EXPORT_FORMATS = ["PNG", "JPG", "SVG"];
+// Rest, cursor to the menu, menu open, cursor on Export, PNG picked and downloaded, fade.
+const EXPORT_STEPS = [700, 650, 650, 800, 2000, 500];
+// Cursor tip per step, in px inside the media box.
+const EXPORT_CURSOR = [
+  { x: 246, y: 120 },
+  { x: 161, y: 29 },
+  { x: 161, y: 29 },
+  { x: 150, y: 71 },
+  { x: 214, y: 70 },
+  { x: 214, y: 70 },
+];
+
+function ExportTipAnimation() {
+  const { step, reduced } = useLoopStep(EXPORT_STEPS);
+  const menuOpen = step >= 2;
+  const subOpen = step >= 3;
+  const picked = step >= 4;
+  const fading = step === EXPORT_STEPS.length - 1 && !reduced;
+  const cursor = EXPORT_CURSOR[step];
+
+  return (
+    <div aria-hidden className={cn("absolute inset-0 transition-opacity duration-500", fading ? "opacity-0" : "opacity-100")}>
+      <div className="absolute left-4 top-4 h-[112px] w-[160px] rounded-lg bg-white p-2.5 shadow-sm dark:bg-neutral-900">
+        <span className="block text-[9px] font-semibold text-neutral-700 dark:text-neutral-200">Volume</span>
+        <span
+          className={cn(
+            "absolute right-1.5 top-1.5 grid size-4 place-items-center rounded-sm text-neutral-500 transition-colors duration-200",
+            step >= 1 && "bg-neutral-100 text-neutral-900 dark:bg-neutral-800 dark:text-white",
+          )}
+        >
+          <MoreVertical className="size-3" />
+        </span>
+        <div className="mt-2 flex h-[64px] items-end gap-1.5 border-b border-neutral-200 pb-px dark:border-neutral-700">
+          {EXPORT_BARS.map((height, index) => (
+            <span key={index} className="flex-1 rounded-t-[2px] bg-gradient-to-t from-[#0d99ff] to-[#5cb8ff]" style={{ height: `${height}%` }} />
+          ))}
+        </div>
+        <span className="mt-1.5 block h-1 w-[60%] rounded-full bg-neutral-200 dark:bg-neutral-700" />
+      </div>
+
+      {menuOpen ? (
+        <div
+          className={cn(
+            "absolute left-[104px] top-[42px] w-[84px] rounded-md bg-white p-[3px] shadow-md ring-1 ring-black/5 dark:bg-neutral-900 dark:ring-white/10",
+            !reduced && "animate-in fade-in-0 zoom-in-95 duration-150",
+          )}
+        >
+          <span className="flex h-[18px] items-center px-1.5">
+            <span className="h-1 w-10 rounded-full bg-neutral-200 dark:bg-neutral-700" />
+          </span>
+          <span
+            className={cn(
+              "flex h-[18px] items-center gap-1 rounded-[4px] px-1.5 text-[9px] font-semibold text-neutral-700 transition-colors duration-200 dark:text-neutral-200",
+              subOpen && "bg-[#0d99ff]/10 text-[#0b6fc2] dark:text-[#5cb8ff]",
+            )}
+          >
+            <Download className="size-2.5" />
+            Export
+            <ChevronRight className="ml-auto size-2.5" />
+          </span>
+          <span className="flex h-[18px] items-center px-1.5">
+            <span className="h-1 w-8 rounded-full bg-neutral-200 dark:bg-neutral-700" />
+          </span>
+          <span className="flex h-[18px] items-center px-1.5">
+            <span className="h-1 w-9 rounded-full bg-neutral-200 dark:bg-neutral-700" />
+          </span>
+        </div>
+      ) : null}
+
+      {subOpen ? (
+        <div
+          className={cn(
+            "absolute left-[192px] top-[60px] w-[60px] rounded-md bg-white p-[3px] shadow-md ring-1 ring-black/5 dark:bg-neutral-900 dark:ring-white/10",
+            !reduced && "animate-in fade-in-0 slide-in-from-left-1 duration-150",
+          )}
+        >
+          {EXPORT_FORMATS.map((format, index) => (
+            <span
+              key={format}
+              className={cn(
+                "flex h-4 items-center rounded-[4px] px-1.5 text-[9px] font-medium text-neutral-700 transition-colors duration-200 dark:text-neutral-200",
+                picked && index === 0 && "bg-[#0d99ff] text-white dark:text-white",
+              )}
+            >
+              {format}
+            </span>
+          ))}
+        </div>
+      ) : null}
+
+      {picked ? (
+        <span
+          className={cn(
+            "absolute bottom-2.5 right-3 inline-flex h-5 items-center gap-1 rounded-full bg-[#0d99ff] pl-1.5 pr-2 text-[9px] font-semibold text-white shadow-sm",
+            !reduced && "animate-in fade-in-0 slide-in-from-bottom-2 delay-200 duration-300 [animation-fill-mode:both]",
+          )}
+        >
+          <Download className="size-2.5" strokeWidth={2.5} />
+          volume.png
+        </span>
+      ) : null}
+
+      <MousePointer2
+        className="absolute size-4 fill-neutral-900 text-white drop-shadow-sm dark:fill-white dark:text-neutral-900"
+        strokeWidth={1.5}
+        style={{
+          left: cursor.x - 3,
+          top: cursor.y - 2,
+          transition: reduced ? "none" : "left 520ms cubic-bezier(0.23,1,0.32,1), top 520ms cubic-bezier(0.23,1,0.32,1)",
+        }}
+      />
+    </div>
+  );
+}
+
+/** On the dashboard, after the first-pull tip: points at Export in a block's open ⋯ menu. */
+export function ExportFeatureTip({ anchorRef, open = true, onDone }) {
+  return (
+    <FeatureTip
+      id={EXPORT_TIP_ID}
+      anchorRef={anchorRef}
+      open={open}
+      side="left"
+      align="center"
+      sideOffset={16}
+      className="w-[288px]"
+      media={<ExportTipAnimation />}
+      title="Export any component on your dashboard"
+      description="Open the ⋯ menu on any sheet, chart, rich table or stats card and choose Export. Sheets download as CSV, JSON or Excel. Charts, rich tables and stats cards download as PNG, JPG or SVG."
+      action={{ label: "Got it", onClick: onDone }}
+      onDismiss={onDone}
       closeOnAction
     />
   );
