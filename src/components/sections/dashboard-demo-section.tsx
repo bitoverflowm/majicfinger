@@ -17,6 +17,7 @@ import DashBody from "@/app/dashboard/dashBody";
 import LiveStreamManager from "@/app/dashboard/components/liveStreamManager";
 import RestLiveFeedManager from "@/app/dashboard/components/restLiveFeedManager";
 import { DemoWindowMockup } from "@/components/sections/demo-window-mockup";
+import { DEMO_CONTENT_HEIGHT_CLASS, HOMEPAGE_DEMO_SECTION_CLASS } from "@/components/sections/dashboard-demo-layout";
 
 /**
  * inline: card on the page. entering: fixed full-viewport, clipped back to the card's rect while the demo lays out.
@@ -145,7 +146,15 @@ function useDoubleFrame(run: boolean, callback: () => void) {
 }
 
 /** Active landing demo fills the browser viewport (not the Fullscreen API); Escape returns it to the page. */
-function LandingDemoStage({ children }: { children: ReactNode }) {
+function LandingDemoStage({
+  children,
+  sectionId,
+  className,
+}: {
+  children: ReactNode;
+  sectionId: string;
+  className: string;
+}) {
   const ctx = useMyStateV2();
   const active = !!ctx?.landingDemoActive;
   const deactivate = ctx?.deactivateLandingDemo;
@@ -216,6 +225,24 @@ function LandingDemoStage({ children }: { children: ReactNode }) {
     };
   }, [staged]);
 
+  // Hub and guide sections sit in low z-index layers; lift them to the stage's level so the
+  // full-viewport demo isn't painted under the sticky site nav.
+  useEffect(() => {
+    if (!staged) return;
+    const lifted: Array<[HTMLElement, string]> = [];
+    let el = slotRef.current?.parentElement?.parentElement ?? null;
+    while (el && el !== document.body) {
+      if (getComputedStyle(el).zIndex !== "auto") {
+        lifted.push([el, el.style.zIndex]);
+        el.style.zIndex = "50";
+      }
+      el = el.parentElement;
+    }
+    return () => {
+      for (const [node, value] of lifted) node.style.zIndex = value;
+    };
+  }, [staged]);
+
   useEffect(() => {
     if (phase !== "full") {
       setHintVisible(false);
@@ -247,13 +274,7 @@ function LandingDemoStage({ children }: { children: ReactNode }) {
   };
 
   return (
-    <section
-      id="demo"
-      className={cn(
-        "relative mx-auto mb-0 w-full max-w-[min(100%,84rem)] mt-14 px-6 pb-6 pt-0 sm:mt-12 sm:px-8 md:mt-8 lg:mt-6 lg:px-10",
-        staged ? "z-50" : "z-30",
-      )}
-    >
+    <section id={sectionId} className={cn(className, staged ? "z-50" : "z-30")}>
       <div ref={slotRef} style={slotHeight != null ? { height: slotHeight } : undefined}>
         <DemoWindowMockup
           id="demo-mockup"
@@ -265,7 +286,7 @@ function LandingDemoStage({ children }: { children: ReactNode }) {
           )}
           contentClassName={cn(
             "overflow-hidden",
-            staged ? "h-full min-h-0" : "h-[min(90vh,920px)] min-h-[720px]",
+            staged ? "h-full min-h-0" : DEMO_CONTENT_HEIGHT_CLASS,
           )}
         >
           {children}
@@ -305,21 +326,35 @@ function LandingDemoStage({ children }: { children: ReactNode }) {
   );
 }
 
-export function DashboardDemoSection() {
+export type DashboardDemoSectionProps = {
+  /** Picker id (e.g. `kalshiHistorical`, `polymarket`). Opens that source's build step instead of the picker. */
+  integrationId?: string;
+  sectionId?: string;
+  className?: string;
+};
+
+/** The homepage demo. Guide and hub pages pass `integrationId` so the demo starts on their source. */
+export function DashboardDemoSection({
+  integrationId,
+  sectionId = "demo",
+  className = HOMEPAGE_DEMO_SECTION_CLASS,
+}: DashboardDemoSectionProps = {}) {
   return (
     <StateProvider>
       <StateProviderV2
         initialSettings={{
           demo: true,
           landingDemo: true,
+          landingDemoIntegration: integrationId || null,
           viewing: "connectDataHome",
           rightPanelOpen: false,
           rightPanelTab: "integrations",
           integrationSidebar: null,
         }}
       >
-        <LandingDemoStage>
-          <LandingDemoActivateListener />
+        <LandingDemoStage sectionId={sectionId} className={className}>
+          {/* Try For Free only targets the homepage demo. */}
+          {integrationId ? null : <LandingDemoActivateListener />}
           <LiveStreamManager />
           <RestLiveFeedManager />
           <div className="flex h-full min-h-0 w-full flex-col overflow-hidden">

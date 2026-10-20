@@ -1,4 +1,3 @@
-import dynamic from "next/dynamic";
 import {
   ARTICLE_PAGE_BREAK_INNER_CLASS,
   markArticlePageBreakComponent,
@@ -8,16 +7,8 @@ import {
   type KalshiDemoReadingKind,
 } from "./KalshiExplorerDemoChrome";
 import { HubPolymarketExplorerBranding } from "@/components/hubs/HubPolymarketExplorerBranding";
-import { HubKalshiQueryMockup } from "@/components/hubs/kalshiQuery/HubKalshiQueryMockup";
+import { IntegrationDemoEmbed } from "@/components/sections/integration-demo-embed";
 import { POLYMARKET_HISTORICAL_EXPLORE_SECTION } from "@/config/hubs/polymarketHistorical";
-
-const HubPolymarketQueryBuilder = dynamic(
-  () =>
-    import("@/components/hubs/polymarketQuery/HubPolymarketQueryBuilder").then(
-      (m) => m.HubPolymarketQueryBuilder,
-    ),
-  { ssr: false, loading: () => <div className="h-48 w-full animate-pulse bg-muted/40" /> },
-);
 
 export type PolymarketHistoricalDataQueryProps = {
   /** Section heading — defaults to the hub explore-data title. */
@@ -36,7 +27,7 @@ export type PolymarketHistoricalDataQueryProps = {
 };
 
 /**
- * MDX: embed the Polymarket historical data query builder (same as the hub page).
+ * MDX: embed the Lychee demo, opened on Polymarket Historical (same as the hub page).
  *
  * @example
  * ```mdx
@@ -69,9 +60,7 @@ export function PolymarketHistoricalDataQuery({
         </div>
 
         <div className="relative z-20 mx-auto mt-12 w-full max-w-6xl px-2 sm:px-4">
-          <HubKalshiQueryMockup>
-            <HubPolymarketQueryBuilder embedded mockup />
-          </HubKalshiQueryMockup>
+          <IntegrationDemoEmbed integrationId="polymarketHistorical" sectionId={`${id}-demo`} />
         </div>
       </div>
     </section>

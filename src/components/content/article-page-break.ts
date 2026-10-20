@@ -25,13 +25,18 @@ export function isArticlePageBreakElement(child: ReactNode): child is ReactEleme
 /**
  * Grey strip between white article blocks — matches LycheeContentShell.
  * Outsets into GuideLayout horizontal padding so the demo reads wider than the white page.
+ * Centered with a negative margin rather than a transform: a transform would trap the
+ * demo's full-viewport (position: fixed) stage inside this strip.
  */
 export const ARTICLE_PAGE_BREAK_SHELL_CLASS = cn(
-  "relative left-1/2 -translate-x-1/2 bg-[#F5F5F5]/20 dark:bg-background",
+  "relative left-1/2 bg-[#F5F5F5]/20 dark:bg-background",
   "py-6 md:py-8",
-  "w-[calc((100%+2.5rem)*0.97)] sm:w-[calc((100%+4rem)*0.97)]",
-  "md:w-[calc((100%+5rem)*0.97)] lg:w-[calc((100%+6rem)*0.97)]",
-  "xl:w-[calc((100%+5rem)*0.97)] 2xl:w-[calc((100%+6rem)*0.97)]",
+  "w-[calc((100%+2.5rem)*0.97)] ml-[calc((100%+2.5rem)*-0.485)]",
+  "sm:w-[calc((100%+4rem)*0.97)] sm:ml-[calc((100%+4rem)*-0.485)]",
+  "md:w-[calc((100%+5rem)*0.97)] md:ml-[calc((100%+5rem)*-0.485)]",
+  "lg:w-[calc((100%+6rem)*0.97)] lg:ml-[calc((100%+6rem)*-0.485)]",
+  "xl:w-[calc((100%+5rem)*0.97)] xl:ml-[calc((100%+5rem)*-0.485)]",
+  "2xl:w-[calc((100%+6rem)*0.97)] 2xl:ml-[calc((100%+6rem)*-0.485)]",
 );
 
 /** Inner width for page-break demos (query builder, etc.). */

@@ -562,6 +562,7 @@ const DashBody = ({ user }) => {
         {contextStateV2?.landingDemo && (
           <IntegrationConnectLandingDemo
             active={!!contextStateV2?.landingDemoActive}
+            initialIntegrationId={contextStateV2?.landingDemoIntegration}
             onSelectIntegration={() => contextStateV2?.activateLandingDemo?.()}
           />
         )}

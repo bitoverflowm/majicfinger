@@ -1,4 +1,3 @@
-import dynamic from "next/dynamic";
 import {
   ARTICLE_PAGE_BREAK_INNER_CLASS,
   markArticlePageBreakComponent,
@@ -8,16 +7,8 @@ import {
   type KalshiDemoReadingKind,
 } from "./KalshiExplorerDemoChrome";
 import { HubKalshiExplorerBranding } from "@/components/hubs/HubKalshiExplorerBranding";
-import { HubKalshiQueryMockup } from "@/components/hubs/kalshiQuery/HubKalshiQueryMockup";
+import { IntegrationDemoEmbed } from "@/components/sections/integration-demo-embed";
 import { KALSHI_HISTORICAL_EXPLORE_SECTION } from "@/config/hubs/kalshiHistorical";
-
-const HubKalshiQueryBuilder = dynamic(
-  () =>
-    import("@/components/hubs/kalshiQuery/HubKalshiQueryBuilder").then(
-      (m) => m.HubKalshiQueryBuilder,
-    ),
-  { ssr: false, loading: () => <div className="h-48 w-full animate-pulse bg-muted/40" /> },
-);
 
 export type KalshiHistoricalDataQueryProps = {
   /** Section heading — defaults to the hub explore-data title. */
@@ -36,7 +27,7 @@ export type KalshiHistoricalDataQueryProps = {
 };
 
 /**
- * MDX: embed the Kalshi historical data query builder (same as the hub page).
+ * MDX: embed the Lychee demo, opened on Kalshi Historical (same as the hub page).
  *
  * @example
  * ```mdx
@@ -69,9 +60,7 @@ export function KalshiHistoricalDataQuery({
         </div>
 
         <div className="relative z-20 mx-auto mt-12 w-full max-w-6xl px-2 sm:px-4">
-          <HubKalshiQueryMockup>
-            <HubKalshiQueryBuilder embedded mockup />
-          </HubKalshiQueryMockup>
+          <IntegrationDemoEmbed integrationId="kalshiHistorical" sectionId={`${id}-demo`} />
         </div>
       </div>
     </section>

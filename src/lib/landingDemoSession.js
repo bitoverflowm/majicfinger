@@ -28,17 +28,30 @@ export function subscribeLandingDemoExit(listener) {
   return () => window.removeEventListener(LANDING_DEMO_EXIT_EVENT, listener);
 }
 
-/** Leaves the full-viewport demo, then scrolls the landing page to a section once the demo is back in place. */
+/** Hub pages name their pricing section per hub (e.g. `kalshi-live-pricing`). */
+function findPageSection(sectionId) {
+  const exact = document.getElementById(sectionId);
+  if (exact) return exact;
+  return document.querySelector(`[id$="-${CSS.escape(sectionId)}"]`);
+}
+
+/**
+ * Leaves the full-viewport demo, then scrolls the page to a section once the demo is back in place.
+ * Pages without that section (guides) go to the homepage's copy instead.
+ */
 export function exitLandingDemoToSection(sectionId) {
   requestLandingDemoExit();
   if (typeof window === "undefined") return;
   window.setTimeout(() => {
-    const section = document.getElementById(sectionId);
-    if (!section) return;
+    const section = findPageSection(sectionId);
+    if (!section) {
+      window.location.assign(`/#${sectionId}`);
+      return;
+    }
     const navClearance = 96;
     const top = window.scrollY + section.getBoundingClientRect().top - navClearance;
     window.scrollTo({ top: Math.max(0, top), behavior: "smooth" });
-    if (history.replaceState) history.replaceState(null, "", `${window.location.pathname}#${sectionId}`);
+    if (history.replaceState) history.replaceState(null, "", `${window.location.pathname}#${section.id}`);
   }, 500);
 }
 

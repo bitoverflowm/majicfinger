@@ -29,9 +29,8 @@ import { HubHeroBody } from "@/components/hubs/HubHeroBody";
 import { HubHeroCapabilityPills } from "@/components/hubs/HubHeroCapabilityPills";
 import { HubKalshiExplorerBranding } from "@/components/hubs/HubKalshiExplorerBranding";
 import { HubPolymarketExplorerBranding } from "@/components/hubs/HubPolymarketExplorerBranding";
-import { HubKalshiLiveDemoLoadingShell } from "@/components/hubs/kalshiLiveDemo/HubKalshiLiveDemoLoadingShell";
-import { HubKalshiQueryMockup } from "@/components/hubs/kalshiQuery/HubKalshiQueryMockup";
 import { HubLazyWhenVisible } from "@/components/hubs/HubLazyWhenVisible";
+import { IntegrationDemoEmbed } from "@/components/sections/integration-demo-embed";
 import { HubProofMetrics } from "@/components/hubs/HubProofMetrics";
 import { HubVideoInstructionsCarousel } from "@/components/hubs/HubVideoInstructionsCarousel";
 import { HubDemoModule } from "@/components/hubs/polymarketLiveDemo/HubDemoModule";
@@ -42,33 +41,6 @@ import {
   HubChartEmbedSkeleton,
   HubHeroChartEmbedSkeleton,
 } from "@/components/publicEmbed/ChartEmbedSkeleton";
-
-const HubKalshiQueryBuilder = dynamic(
-  () =>
-    import("@/components/hubs/kalshiQuery/HubKalshiQueryBuilder").then(
-      (m) => m.HubKalshiQueryBuilder,
-    ),
-  { ssr: false, loading: () => <div className="h-48 w-full animate-pulse bg-muted/40" /> },
-);
-
-const HubPolymarketQueryBuilder = dynamic(
-  () =>
-    import("@/components/hubs/polymarketQuery/HubPolymarketQueryBuilder").then(
-      (m) => m.HubPolymarketQueryBuilder,
-    ),
-  { ssr: false, loading: () => <div className="h-48 w-full animate-pulse bg-muted/40" /> },
-);
-
-const HubKalshiLiveDemo = dynamic(
-  () =>
-    import("@/components/hubs/kalshiLiveDemo/HubKalshiLiveDemo").then(
-      (m) => m.HubKalshiLiveDemo,
-    ),
-  {
-    ssr: false,
-    loading: () => <HubKalshiLiveDemoLoadingShell />,
-  },
-);
 
 const HubKalshiLiveBonusFeatures = dynamic(
   () =>
@@ -158,8 +130,9 @@ function HubHeroBadge({
   badgeIcon?: "dot";
   className?: string;
 }) {
+  // Long badges wrap: grow in height and soften to a rounded box instead of overflowing a fixed pill.
   const badgeClassName = cn(
-    "border border-border bg-accent rounded-full text-sm h-8 px-3 inline-flex items-center gap-2 max-w-full text-center text-foreground",
+    "border border-border bg-accent rounded-[1.25rem] text-[13px] sm:text-sm min-h-8 py-1.5 pl-3 pr-3.5 inline-flex items-center gap-2.5 max-w-full text-left text-foreground",
     className,
   );
   const leadingIcon =
@@ -180,7 +153,7 @@ function HubHeroBadge({
         )}
       >
         {leadingIcon}
-        <span className="leading-tight">{badge}</span>
+        <span className="leading-snug text-pretty">{badge}</span>
         <ArrowRightIcon
           className="h-3.5 w-3.5 shrink-0 text-muted-foreground"
           aria-hidden
@@ -454,19 +427,10 @@ function HubQuery({ section }: { section: HubQuerySection }) {
         </div>
 
         <div className="relative z-20 mx-auto mt-12 w-full max-w-6xl px-2 sm:px-4">
-          <HubLazyWhenVisible
-            fallback={
-              <div className="h-48 w-full animate-pulse rounded-2xl bg-muted/40 ring-1 ring-border/60" />
-            }
-          >
-            <HubKalshiQueryMockup>
-              {isPolymarket ? (
-                <HubPolymarketQueryBuilder mockup />
-              ) : (
-                <HubKalshiQueryBuilder mockup />
-              )}
-            </HubKalshiQueryMockup>
-          </HubLazyWhenVisible>
+          <IntegrationDemoEmbed
+            integrationId={isPolymarket ? "polymarketHistorical" : "kalshiHistorical"}
+            sectionId={`${section.anchorId || "hub-query"}-demo`}
+          />
         </div>
 
         {section.cta ? (
@@ -1028,11 +992,7 @@ function HubKalshiLiveDemoSectionView({
           hasHeader ? "mt-10 sm:mt-12" : "mt-0",
         )}
       >
-        <HubLazyWhenVisible
-          fallback={<HubKalshiLiveDemoLoadingShell />}
-        >
-          <HubKalshiLiveDemo />
-        </HubLazyWhenVisible>
+        <IntegrationDemoEmbed integrationId="kalshiLive" sectionId={`${section.anchorId || "kalshi-live"}-demo`} />
       </div>
     </section>
   );

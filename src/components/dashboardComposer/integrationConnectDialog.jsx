@@ -341,6 +341,7 @@ function IntegrationConnectFlow({
   onSelectIntegration,
   lockedIds,
   onLockedSelect,
+  startIntegrationId = null,
 }) {
   const rows = useMemo(() => buildIntegrationPickerRows(), []);
   const primary = rowsInOrder(rows, PRIMARY_ORDER);
@@ -348,9 +349,10 @@ function IntegrationConnectFlow({
   const listed = new Set([...PRIMARY_ORDER, ...BETA_ORDER]);
   const comingSoon = rows.filter((row) => !listed.has(row.id));
   const selectable = [...primary, ...beta];
-  const [selectedId, setSelectedId] = useState(null);
+  const startable = !!startIntegrationId && selectable.some((row) => row.id === startIntegrationId);
+  const [selectedId, setSelectedId] = useState(startable ? startIntegrationId : null);
   const [hoveredId, setHoveredId] = useState(null);
-  const [phase, setPhase] = useState("pick");
+  const [phase, setPhase] = useState(startable ? "build" : "pick");
   const selected = selectable.find((row) => row.id === selectedId) || null;
   const hovered = rows.find((row) => row.id === hoveredId) || null;
   const shown = hovered || selected || primary[0] || null;
@@ -522,14 +524,18 @@ export function IntegrationConnectDialog({ open, onOpenChange }) {
  * active it floats over the demo dashboard like the dialog does. One element in both
  * layouts so a selection made in the card carries into the modal.
  */
-export function IntegrationConnectLandingDemo({ active = false, onSelectIntegration }) {
+export function IntegrationConnectLandingDemo({ active = false, onSelectIntegration, initialIntegrationId = null }) {
   const connect = useIntegrationConnect();
-  const [phase, setPhase] = useState("pick");
+  // Only the first open skips the picker; adding data later starts from the full list.
+  const [startId, setStartId] = useState(initialIntegrationId);
+  const [phase, setPhase] = useState(initialIntegrationId ? "build" : "pick");
   const [lockedFeature, setLockedFeature] = useState(null);
   const closeLocked = useCallback(() => setLockedFeature(null), []);
 
   useEffect(() => {
-    if (!connect?.inlineOpen) setPhase("pick");
+    if (connect?.inlineOpen) return;
+    setPhase("pick");
+    setStartId(null);
   }, [connect?.inlineOpen]);
 
   if (!connect?.inlineOpen) return null;
@@ -574,6 +580,7 @@ export function IntegrationConnectLandingDemo({ active = false, onSelectIntegrat
           onSelectIntegration={onSelectIntegration}
           lockedIds={LANDING_DEMO_LOCKED_INTEGRATIONS}
           onLockedSelect={(row) => setLockedFeature(row.name || "This integration")}
+          startIntegrationId={startId}
         />
       </div>
       <LandingDemoMembersOnlyPortal open={!!lockedFeature} feature={lockedFeature} onClose={closeLocked} />

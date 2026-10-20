@@ -288,9 +288,12 @@ export function FeatureTip({
   ...cardProps
 }) {
   const { dismissed, dismiss } = useFeatureTipDismissal(id, { persist });
+  const demoCtx = useMyStateV2();
+  // An embedded demo waits behind "Click anywhere to begin" until the visitor starts it.
+  const demoIdle = !!demoCtx?.landingDemo && !demoCtx?.landingDemoActive;
   const pending = dismissed !== true;
   const waiting = useAnyTipPending(after);
-  const shown = dismissed === false && (open ?? true) && !waiting;
+  const shown = dismissed === false && (open ?? true) && !waiting && !demoIdle;
 
   // A tip hidden for a moment (`open` false) still holds back the tips queued after it.
   useIsomorphicLayoutEffect(() => {

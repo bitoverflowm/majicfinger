@@ -31,11 +31,11 @@ export function inferQuerySurface(ctx = {}) {
 
   if (ctx.hubQueryHandoff || ctx.sourceHubPath) return "hub_query_handoff";
   if (ctx.isDemo && (pathname === "/" || href.includes("#demo"))) return "homepage_demo";
-  if (ctx.isDemo) return "dashboard_demo";
   if (pathname.startsWith("/guides")) return "guide_page";
 
   const hub = resolveHubAnalyticsFromPath(pathname);
   if (hub) return "marketing_hub";
+  if (ctx.isDemo) return "dashboard_demo";
 
   if (pathname.startsWith("/dashboard")) {
     return ctx.isLoggedIn || ctx.userId ? "dashboard_logged_in" : "dashboard_anonymous";
