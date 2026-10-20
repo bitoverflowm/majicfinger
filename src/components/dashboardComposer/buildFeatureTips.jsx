@@ -12,12 +12,15 @@ import {
   Lock,
   MoreVertical,
   MousePointer2,
+  MoveDiagonal2,
+  MoveHorizontal,
   PartyPopper,
   Search,
   Sheet,
   Sparkles,
 } from "lucide-react";
 
+import { HandToolIcon } from "@/components/dashboardComposer/handToolIcon";
 import { FeatureTip, useFeatureTipDismissal, usePrefersReducedMotion } from "@/components/ui/feature-tip";
 import { cn } from "@/lib/utils";
 
@@ -992,6 +995,255 @@ export function ExportFeatureTip({ anchorRef, open = true, onDone }) {
       description="Open the ⋯ menu on any sheet, chart, rich table or stats card and choose Export. Sheets download as CSV, JSON or Excel. Charts, rich tables and stats cards download as PNG, JPG or SVG."
       action={{ label: "Got it", onClick: onDone }}
       onDismiss={onDone}
+      closeOnAction
+    />
+  );
+}
+
+/* ---------- Editing with the hand tool ---------- */
+
+// Shown one after another: the hand in the dock, then (in hand mode) resizing, then moving.
+export const HAND_TIP_ID = "dashboard-hand-tool";
+export const RESIZE_TIP_ID = "dashboard-resize";
+export const MOVE_TIP_ID = "dashboard-move";
+
+const EASE_OUT = "cubic-bezier(0.23,1,0.32,1)";
+
+function MiniCard({ title = "Volume", bars = EXPORT_BARS, className, style }) {
+  return (
+    <div className={cn("absolute flex flex-col rounded-lg bg-white p-2 shadow-sm dark:bg-neutral-900", className)} style={style}>
+      <span className="text-[8px] font-semibold text-neutral-700 dark:text-neutral-200">{title}</span>
+      <div className="mt-1 flex min-h-0 flex-1 items-end gap-1 border-b border-neutral-200 pb-px dark:border-neutral-700">
+        {bars.map((height, index) => (
+          <span key={index} className="flex-1 rounded-t-[2px] bg-gradient-to-t from-[#0d99ff] to-[#5cb8ff]" style={{ height: `${height}%` }} />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+/** Cursor glyph whose hotspot sits on (x, y). */
+function TipCursor({ x, y, kind = "pointer", closed = false, reduced }) {
+  const transition = reduced ? "none" : `left 700ms ${EASE_OUT}, top 700ms ${EASE_OUT}`;
+  if (kind === "pointer") {
+    return (
+      <MousePointer2
+        className="absolute z-20 size-4 fill-neutral-900 text-white drop-shadow-sm dark:fill-white dark:text-neutral-900"
+        strokeWidth={1.5}
+        style={{ left: x - 3, top: y - 2, transition }}
+      />
+    );
+  }
+  const Icon = kind === "ew" ? MoveHorizontal : kind === "diagonal" ? MoveDiagonal2 : null;
+  return (
+    <span
+      className="absolute z-20 grid size-[22px] place-items-center rounded-full bg-white text-neutral-900 shadow-sm ring-1 ring-black/10 dark:bg-neutral-800 dark:text-white dark:ring-white/15"
+      style={{ left: x - 11, top: y - 11, transition }}
+    >
+      {Icon ? <Icon className="size-3" strokeWidth={2.25} /> : <HandToolIcon closed={closed} className="size-[14px]" />}
+    </span>
+  );
+}
+
+const HAND_STEPS = [700, 800, 700, 1000, 500, 1500, 500];
+// Cursor per step: to the dock's hand, onto the left card, grab, drag it right, let go, hold, fade.
+const HAND_CURSOR = [
+  { x: 214, y: 132 },
+  { x: 144, y: 127 },
+  { x: 80, y: 54 },
+  { x: 208, y: 54 },
+  { x: 208, y: 54 },
+  { x: 208, y: 54 },
+  { x: 208, y: 54 },
+];
+
+function HandTipAnimation() {
+  const { step, reduced } = useLoopStep(HAND_STEPS);
+  const handOn = step >= 1;
+  const swapped = step >= 3;
+  const grabbing = step === 2 || step === 3;
+  const fading = step === HAND_STEPS.length - 1 && !reduced;
+  const cursor = HAND_CURSOR[step];
+  const slide = reduced ? "none" : `left 900ms ${EASE_OUT}, box-shadow 200ms ease-out`;
+
+  return (
+    <div aria-hidden className={cn("absolute inset-0 transition-opacity duration-500", fading ? "opacity-0" : "opacity-100")}>
+      <MiniCard
+        title="Volume"
+        className={cn("top-[14px] h-[84px] w-[120px]", grabbing && "z-10 shadow-lg ring-1 ring-[#0d99ff]/50")}
+        style={{ left: swapped ? 148 : 20, transition: slide }}
+      />
+      <MiniCard
+        title="Price"
+        bars={[60, 44, 72, 50, 82]}
+        className="top-[14px] h-[84px] w-[120px]"
+        style={{ left: swapped ? 20 : 148, transition: slide }}
+      />
+
+      <div className="absolute left-[107px] top-[114px] flex h-[26px] items-center gap-0.5 rounded-[8px] bg-white px-1 shadow-sm dark:bg-neutral-900">
+        <span className="grid size-[20px] place-items-center text-neutral-500">
+          <MousePointer2 className="size-3" strokeWidth={1.75} />
+        </span>
+        <span
+          className={cn(
+            "grid size-[20px] place-items-center rounded-[5px] transition-colors duration-200",
+            handOn ? "bg-[#0d99ff] text-white" : "text-neutral-500",
+          )}
+        >
+          <HandToolIcon closed={grabbing} className="size-3" />
+        </span>
+        <span className="grid size-[20px] place-items-center text-neutral-500">
+          <Sheet className="size-3" strokeWidth={1.75} />
+        </span>
+      </div>
+
+      <TipCursor x={cursor.x} y={cursor.y} kind={step >= 2 ? "hand" : "pointer"} closed={grabbing} reduced={reduced} />
+    </div>
+  );
+}
+
+/** On the hand tool in the dock. Picking the hand closes it and moves on to resizing. */
+export function HandToolFeatureTip({ anchorRef, open = true }) {
+  return (
+    <FeatureTip
+      id={HAND_TIP_ID}
+      anchorRef={anchorRef}
+      open={open}
+      side="top"
+      align="center"
+      sideOffset={14}
+      className="w-[288px]"
+      media={<HandTipAnimation />}
+      title="Select the hand tool to customize your dashboard even further"
+      description="Select the hand tool to start editing your dashboard and layouts."
+      action={{ label: "Ok" }}
+      closeOnAction
+    />
+  );
+}
+
+const RESIZE_STEPS = [700, 700, 1100, 600, 1100, 1500, 500];
+// Card size and cursor per step: to the right edge, drag it wider, to the corner, drag it taller, hold, fade.
+const RESIZE_FRAMES = [
+  { w: 130, h: 64, cursor: { x: 236, y: 128 }, kind: "ew" },
+  { w: 130, h: 64, cursor: { x: 154, y: 50 }, kind: "ew", edge: true },
+  { w: 220, h: 64, cursor: { x: 244, y: 50 }, kind: "ew", edge: true },
+  { w: 220, h: 64, cursor: { x: 244, y: 82 }, kind: "diagonal", corner: true },
+  { w: 220, h: 112, cursor: { x: 244, y: 130 }, kind: "diagonal", corner: true },
+  { w: 220, h: 112, cursor: { x: 244, y: 130 }, kind: "diagonal" },
+  { w: 220, h: 112, cursor: { x: 244, y: 130 }, kind: "diagonal" },
+];
+
+function ResizeTipAnimation() {
+  const { step, reduced } = useLoopStep(RESIZE_STEPS);
+  const frame = RESIZE_FRAMES[step];
+  const fading = step === RESIZE_STEPS.length - 1 && !reduced;
+  const grow = reduced ? "none" : `width 1000ms ${EASE_OUT}, height 1000ms ${EASE_OUT}`;
+
+  return (
+    <div aria-hidden className={cn("absolute inset-0 transition-opacity duration-500", fading ? "opacity-0" : "opacity-100")}>
+      <div className="absolute left-6 top-[18px]" style={{ width: frame.w, height: frame.h, transition: grow }}>
+        <MiniCard className={cn("inset-0", (frame.edge || frame.corner) && "ring-1 ring-[#0d99ff]/60")} />
+        <span
+          className={cn(
+            "absolute -right-[2px] top-2 bottom-2 w-1 rounded-full bg-[#0d99ff] transition-opacity duration-200",
+            frame.edge ? "opacity-100" : "opacity-0",
+          )}
+        />
+        <span
+          className={cn(
+            "absolute -bottom-[3px] -right-[3px] size-2 rounded-[2px] border-2 border-[#0d99ff] bg-white transition-opacity duration-200",
+            frame.corner ? "opacity-100" : "opacity-0",
+          )}
+        />
+      </div>
+      <TipCursor x={frame.cursor.x} y={frame.cursor.y} kind={frame.kind} reduced={reduced} />
+    </div>
+  );
+}
+
+/** In hand mode, on the right edge of a component. Resizing one closes it and moves on to the layout tip. */
+export function ResizeFeatureTip({ anchorRef, open = true }) {
+  return (
+    <FeatureTip
+      id={RESIZE_TIP_ID}
+      anchorRef={anchorRef}
+      open={open}
+      updatePositionStrategy="always"
+      side="right"
+      align="center"
+      sideOffset={14}
+      className="w-[288px]"
+      media={<ResizeTipAnimation />}
+      title="Adjust the size of your components"
+      description="When you're in edit mode, click and drag the edge of a component to resize it to your liking."
+      action={{ label: "Ok" }}
+      closeOnAction
+    />
+  );
+}
+
+const MOVE_STEPS = [700, 700, 400, 1100, 500, 1500, 500];
+// Cursor per step: onto the right card, grab, drag it below, drop, hold, fade.
+const MOVE_CURSOR = [
+  { x: 236, y: 132 },
+  { x: 210, y: 43 },
+  { x: 210, y: 43 },
+  { x: 144, y: 107 },
+  { x: 144, y: 107 },
+  { x: 144, y: 107 },
+  { x: 144, y: 107 },
+];
+
+function MoveTipAnimation() {
+  const { step, reduced } = useLoopStep(MOVE_STEPS);
+  const lifted = step === 2 || step === 3;
+  const moved = step >= 3;
+  const fading = step === MOVE_STEPS.length - 1 && !reduced;
+  const cursor = MOVE_CURSOR[step];
+  const glide = reduced ? "none" : `left 1000ms ${EASE_OUT}, top 1000ms ${EASE_OUT}, transform 200ms ease-out, box-shadow 200ms ease-out`;
+
+  return (
+    <div aria-hidden className={cn("absolute inset-0 transition-opacity duration-500", fading ? "opacity-0" : "opacity-100")}>
+      <div
+        className={cn("absolute inset-0 transition-opacity duration-300", lifted ? "opacity-100" : "opacity-0")}
+        style={{ backgroundImage: "radial-gradient(circle, rgba(13,153,255,0.45) 1px, transparent 1.2px)", backgroundSize: "12px 12px" }}
+      />
+      <span
+        className={cn(
+          "absolute left-[82px] top-[80px] h-[58px] w-[124px] rounded-lg border border-dashed border-[#0d99ff] transition-opacity duration-200",
+          lifted ? "opacity-100" : "opacity-0",
+        )}
+      />
+      <MiniCard title="Volume" className="left-4 top-[14px] h-[58px] w-[124px]" />
+      <MiniCard
+        title="Price"
+        bars={[60, 44, 72, 50, 82]}
+        className={cn("h-[58px] w-[124px]", lifted && "z-10 scale-[1.03] shadow-lg ring-1 ring-[#0d99ff]/50")}
+        style={{ left: moved ? 82 : 148, top: moved ? 80 : 14, transition: glide }}
+      />
+      <TipCursor x={cursor.x} y={cursor.y} kind="hand" closed={lifted} reduced={reduced} />
+    </div>
+  );
+}
+
+/** In hand mode, on a component's header. Moving one closes it. */
+export function MoveFeatureTip({ anchorRef, open = true }) {
+  return (
+    <FeatureTip
+      id={MOVE_TIP_ID}
+      anchorRef={anchorRef}
+      open={open}
+      updatePositionStrategy="always"
+      side="bottom"
+      align="start"
+      sideOffset={10}
+      alignOffset={16}
+      className="w-[288px]"
+      media={<MoveTipAnimation />}
+      title="Adjust your layout"
+      description="Arrange your dashboard however you want. Click and drag any component to place it anywhere on your dashboard."
+      action={{ label: "Ok" }}
       closeOnAction
     />
   );

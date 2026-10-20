@@ -264,6 +264,7 @@ export function FeatureTipCard({
  * `after` (tip id or ids) holds this tip back while those tips are still showing.
  * Closing (X or Escape) calls `onDismiss` and is remembered under `id`.
  * `body` goes under the description, for content that isn't paragraphs (e.g. a list).
+ * `updatePositionStrategy="always"` re-measures every frame, for anchors that animate or reflow.
  */
 export function FeatureTip({
   id,
@@ -277,6 +278,7 @@ export function FeatureTip({
   align = "center",
   sideOffset = 8,
   alignOffset = 0,
+  updatePositionStrategy,
   portalContainer,
   contentClassName,
   closeOnAction = false,
@@ -339,6 +341,7 @@ export function FeatureTip({
           align={align}
           sideOffset={sideOffset}
           alignOffset={alignOffset}
+          updatePositionStrategy={updatePositionStrategy}
           collisionPadding={12}
           arrowPadding={14}
           aria-labelledby={titleId}

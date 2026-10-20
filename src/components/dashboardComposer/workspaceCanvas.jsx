@@ -17,8 +17,18 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { exportNodeImage, exportSheet, IMAGE_EXPORT_FORMATS, SHEET_EXPORT_FORMATS } from "@/components/dashboardComposer/blockExport";
-import { EXPORT_TIP_ID, ExportFeatureTip, FIRST_PULL_TIP_ID } from "@/components/dashboardComposer/buildFeatureTips";
+import {
+  EXPORT_TIP_ID,
+  ExportFeatureTip,
+  FIRST_PULL_TIP_ID,
+  HAND_TIP_ID,
+  MOVE_TIP_ID,
+  MoveFeatureTip,
+  RESIZE_TIP_ID,
+  ResizeFeatureTip,
+} from "@/components/dashboardComposer/buildFeatureTips";
 import { useFeatureTipDismissal } from "@/components/ui/feature-tip";
+import { LandingDemoMembersOnlyPortal } from "@/components/dashboardComposer/landingDemoMembersOnly";
 import { DestructiveConfirmMenuItem } from "@/components/ui/destructive-confirm-menu-item";
 import { useMyStateV2 } from "@/context/stateContextV2";
 import { duplicateTabName, loadWorkspaceStartTabs, saveWorkspaceStartTabs } from "@/lib/workspaceStartTabs";
@@ -2174,6 +2184,8 @@ function CanvasBlock({ block, selected, spotlight = false, onSelect, onChange, b
     }
   };
 
+  const landingDemo = !!useMyStateV2()?.landingDemo;
+  const [exportLocked, setExportLocked] = useState(false);
   const touring = exportTour && !!exportFormats && !readOnly;
   const [exportItem, setExportItem] = useState(null);
   const exportItemRef = useMemo(() => ({ current: exportItem }), [exportItem]);
@@ -2237,6 +2249,7 @@ function CanvasBlock({ block, selected, spotlight = false, onSelect, onChange, b
     if (commit && drag.moved && drag.snapped) {
       paintSnap(drag.snapped);
       onChangeRef.current(drag.snapped);
+      notifyBlockGesture(drag.mode);
       window.requestAnimationFrame(() => {
         window.requestAnimationFrame(() => setResizing(false));
       });
@@ -2522,7 +2535,19 @@ function CanvasBlock({ block, selected, spotlight = false, onSelect, onChange, b
           ) : block.type === "chart" ? (
             <DropdownMenuSeparator />
           ) : null}
-          {exportFormats ? (
+          {exportFormats && landingDemo ? (
+            <DropdownMenuItem
+              ref={touring ? setExportItem : undefined}
+              className={cn(
+                "gap-2.5 rounded-md px-2 py-2 text-[13px]",
+                touring && "bg-[#0d99ff]/10 text-[#0b6fc2] ring-1 ring-[#0d99ff]/40 dark:text-[#5cb8ff]",
+              )}
+              onSelect={() => setExportLocked(true)}
+            >
+              <Download className={cn("size-4 text-muted-foreground", touring && "text-[#0d99ff]")} />
+              Export
+            </DropdownMenuItem>
+          ) : exportFormats ? (
             <DropdownMenuSub>
               <DropdownMenuSubTrigger
                 ref={touring ? setExportItem : undefined}
@@ -2576,6 +2601,7 @@ function CanvasBlock({ block, selected, spotlight = false, onSelect, onChange, b
       </DropdownMenu>
       )}
       {touring && exportItem ? <ExportFeatureTip anchorRef={exportItemRef} open={exportTipReady} onDone={endExportTour} /> : null}
+      {landingDemo ? <LandingDemoMembersOnlyPortal open={exportLocked} feature="Exporting" onClose={() => setExportLocked(false)} /> : null}
       {fullscreen && block.type === "sheet" && !readOnly ? (
         <SheetFullscreen block={block} onChange={onChange} onClose={() => setFullscreen(false)} />
       ) : fullscreen && block.type === "chart" && !readOnly ? (
@@ -2602,6 +2628,18 @@ function CanvasBlock({ block, selected, spotlight = false, onSelect, onChange, b
       )}
     </div>
   );
+}
+
+/** Finished moves and resizes ("move" | "resize"), for tips that wait on the user doing one. */
+const blockGestureListeners = new Set();
+
+function notifyBlockGesture(mode) {
+  blockGestureListeners.forEach((listener) => listener(mode));
+}
+
+function subscribeBlockGesture(listener) {
+  blockGestureListeners.add(listener);
+  return () => blockGestureListeners.delete(listener);
 }
 
 function blocksTopToBottom(blocks) {
@@ -2690,14 +2728,14 @@ export function WorkspaceCanvas() {
   const exportTip = useFeatureTipDismissal(EXPORT_TIP_ID);
   const dismissExportTip = exportTip.dismiss;
   const [exportTourId, setExportTourId] = useState("");
-  const exportTargetId = useMemo(
+  const tipBlockId = useMemo(
     () =>
       blocksTopToBottom(blocks).find((block) => (block.type === "sheet" || block.type === "chart") && !lockedIds.has(block.id))?.id ||
       "",
     [blocks, lockedIds],
   );
   const exportTourDue =
-    !!exportTargetId &&
+    !!tipBlockId &&
     !!canvas?.ready &&
     !canvas?.runFeed &&
     !canvas?.readOnly &&
@@ -2715,21 +2753,81 @@ export function WorkspaceCanvas() {
     timers.push(
       window.setTimeout(() => {
         const scroller = scrollerRef.current;
-        const el = scroller?.querySelector(`[data-block-id="${CSS.escape(exportTargetId)}"]`);
+        const el = scroller?.querySelector(`[data-block-id="${CSS.escape(tipBlockId)}"]`);
         if (scroller && el instanceof HTMLElement) {
           const top = scroller.scrollTop + el.getBoundingClientRect().top - scroller.getBoundingClientRect().top - 24;
           scroller.scrollTo({ top: Math.max(0, top), behavior: "smooth" });
         }
-        timers.push(window.setTimeout(() => setExportTourId(exportTargetId), 650));
+        timers.push(window.setTimeout(() => setExportTourId(tipBlockId), 650));
       }, 900),
     );
     return () => timers.forEach((timer) => window.clearTimeout(timer));
-  }, [exportTourDue, exportTourId, exportTargetId]);
+  }, [exportTourDue, exportTourId, tipBlockId]);
 
   const endExportTour = useCallback(() => {
     dismissExportTip();
     setExportTourId("");
   }, [dismissExportTip]);
+
+  const handTip = useFeatureTipDismissal(HAND_TIP_ID);
+  const resizeTip = useFeatureTipDismissal(RESIZE_TIP_ID);
+  const moveTip = useFeatureTipDismissal(MOVE_TIP_ID);
+  const dismissResizeTip = resizeTip.dismiss;
+  const dismissMoveTip = moveTip.dismiss;
+  const editTipsOn =
+    !!tipBlockId && !!canvas?.ready && !canvas?.runFeed && !canvas?.readOnly && canvas?.tool === "hand" && handTip.dismissed === true;
+  const editTip = !editTipsOn
+    ? null
+    : resizeTip.dismissed === false
+      ? "resize"
+      : resizeTip.dismissed === true && moveTip.dismissed === false
+        ? "move"
+        : null;
+  const tipBlock = editTip ? blocks.find((block) => block.id === tipBlockId) : null;
+
+  useEffect(() => {
+    if (!editTip) return undefined;
+    // After any reflow settles (blocks glide for 480ms), bring the block's top into view if it's off screen.
+    const timer = window.setTimeout(() => {
+      const scroller = scrollerRef.current;
+      const el = scroller?.querySelector(`[data-block-id="${CSS.escape(tipBlockId)}"]`);
+      if (!scroller || !(el instanceof HTMLElement)) return;
+      const view = scroller.getBoundingClientRect();
+      const rect = el.getBoundingClientRect();
+      if (rect.top >= view.top && rect.top + 120 <= view.bottom) return;
+      scroller.scrollTo({ top: Math.max(0, scroller.scrollTop + rect.top - view.top - 24), behavior: "smooth" });
+    }, 520);
+    return () => window.clearTimeout(timer);
+  }, [editTip, tipBlockId]);
+
+  useEffect(() => {
+    if (!editTip) return undefined;
+    return subscribeBlockGesture((mode) => {
+      if (editTip === "resize" && mode === "resize") dismissResizeTip();
+      if (editTip === "move" && mode === "move") dismissMoveTip();
+    });
+  }, [editTip, dismissResizeTip, dismissMoveTip]);
+
+  const editTipAnchorRef = useMemo(() => {
+    const element = () => scrollerRef.current?.querySelector(`[data-block-id="${CSS.escape(tipBlockId)}"]`) || null;
+    return {
+      current: {
+        get contextElement() {
+          return element() || undefined;
+        },
+        getBoundingClientRect() {
+          const rect = element()?.getBoundingClientRect();
+          if (!rect) return new DOMRect();
+          if (editTip === "move") return new DOMRect(rect.left, rect.top, rect.width, Math.min(44, rect.height));
+          // The right edge, trimmed to what's on screen so the tip points at a visible spot.
+          const top = Math.max(rect.top, 0);
+          const bottom = Math.min(rect.bottom, window.innerHeight);
+          return bottom > top ? new DOMRect(rect.right - 1, top, 2, bottom - top) : new DOMRect(rect.right - 1, rect.top, 2, rect.height);
+        },
+      },
+    };
+  }, [editTip, tipBlockId]);
+
   const [bootingIds, setBootingIds] = useState(() => new Set());
   const [layoutGuide, setGuideVisible] = useState(false);
   const [snapPreview, setSnapPreview] = useState(null);
@@ -3017,6 +3115,22 @@ export function WorkspaceCanvas() {
         />
       ))}
       {lockedBlocks.length ? <DemoPaywall top={paywallTop(blocks, lockedIds)} locked={lockedBlocks} /> : null}
+      {editTip === "resize" && tipBlock ? (
+        <div
+          aria-hidden="true"
+          className="pointer-events-none absolute z-30 w-1 rounded-full bg-[#0d99ff] motion-safe:animate-pulse"
+          style={{ left: tipBlock.x + tipBlock.w - 2, top: tipBlock.y + 16, height: Math.max(24, tipBlock.h - 32) }}
+        />
+      ) : null}
+      {editTip === "move" && tipBlock ? (
+        <div
+          aria-hidden="true"
+          className="pointer-events-none absolute z-30 rounded-xl ring-2 ring-[#0d99ff]/70 motion-safe:animate-pulse"
+          style={{ left: tipBlock.x, top: tipBlock.y, width: tipBlock.w, height: tipBlock.h }}
+        />
+      ) : null}
+      {editTip === "resize" ? <ResizeFeatureTip anchorRef={editTipAnchorRef} /> : null}
+      {editTip === "move" ? <MoveFeatureTip anchorRef={editTipAnchorRef} /> : null}
       {snapPreview ? (
         <div
           aria-hidden="true"
