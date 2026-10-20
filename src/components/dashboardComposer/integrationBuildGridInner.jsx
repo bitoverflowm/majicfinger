@@ -95,18 +95,18 @@ const HIGHLIGHT_THEME = {
   },
 };
 
-const LYCHEE_FLASH = {
+const NEW_COLUMN_FLASH = {
   light: {
-    bgCell: "rgba(230, 57, 70, 0.22)",
-    bgHeader: "rgba(230, 57, 70, 0.38)",
-    bgHeaderHovered: "rgba(230, 57, 70, 0.48)",
-    textHeader: "#7f1d1d",
+    bgCell: "rgba(16, 185, 129, 0.14)",
+    bgHeader: "rgba(16, 185, 129, 0.26)",
+    bgHeaderHovered: "rgba(16, 185, 129, 0.34)",
+    textHeader: "#065f46",
   },
   dark: {
-    bgCell: "rgba(230, 57, 70, 0.28)",
-    bgHeader: "rgba(230, 57, 70, 0.5)",
-    bgHeaderHovered: "rgba(230, 57, 70, 0.62)",
-    textHeader: "#fff1f2",
+    bgCell: "rgba(52, 211, 153, 0.16)",
+    bgHeader: "rgba(52, 211, 153, 0.3)",
+    bgHeaderHovered: "rgba(52, 211, 153, 0.4)",
+    textHeader: "#d1fae5",
   },
 };
 
@@ -135,7 +135,7 @@ function freshRowTheme(level, dark) {
 }
 
 function columnTheme(columnId, highlightColumnId, highlightColumnIds, referencedColumnIds, flashColumnIds, dark) {
-  if (columnId && flashColumnIds?.includes(columnId)) return LYCHEE_FLASH[dark ? "dark" : "light"];
+  if (columnId && flashColumnIds?.includes(columnId)) return NEW_COLUMN_FLASH[dark ? "dark" : "light"];
   if (columnId && (columnId === highlightColumnId || highlightColumnIds?.includes(columnId))) {
     return HIGHLIGHT_THEME[dark ? "dark" : "light"];
   }
@@ -325,7 +325,7 @@ export default function IntegrationBuildGridInner({
       const flashed = flashColumnIds?.includes(column?.id);
       const fresh = freshLevel > 0 && flashRowKey && freshRows.has(rows[row]?.[flashRowKey]);
       const themeOverride = flashed
-        ? LYCHEE_FLASH[dark ? "dark" : "light"]
+        ? NEW_COLUMN_FLASH[dark ? "dark" : "light"]
         : active
           ? HIGHLIGHT_THEME[dark ? "dark" : "light"]
           : referenced

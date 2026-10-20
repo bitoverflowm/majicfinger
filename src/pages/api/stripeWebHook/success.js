@@ -34,6 +34,9 @@ const PLAN_MAP = {
   "3199:month": { tier: "premium", cycle: "monthly" },
   "38388:year": { tier: "premium", cycle: "annual" },
   "38390:year": { tier: "premium", cycle: "annual" },
+  // 2024 "Lychee Monthly" ($9.99) and "EasySushi" ($11.99) subscribers, grandfathered into Pro.
+  "999:month": { tier: "pro", cycle: "monthly" },
+  "1199:month": { tier: "pro", cycle: "monthly" },
 
   // Lifetime Payment Link ($199.99 one-time): Elite-tier entitlements + lifetimeMember in DB
   "19999:one-time": { tier: "elite", cycle: "lifetime", lifetimeMember: true },

@@ -57,6 +57,8 @@ const PLAN_MAP = {
   "3199:month": { tier: "premium", cycle: "monthly" },
   "38388:year": { tier: "premium", cycle: "annual" },
   "38390:year": { tier: "premium", cycle: "annual" },
+  "999:month": { tier: "pro", cycle: "monthly" },
+  "1199:month": { tier: "pro", cycle: "monthly" },
 
   // Lifetime Payment Link ($199.99 one-time): aligned with stripeWebHook/success.js
   "19999:one-time": { tier: "elite", cycle: "lifetime", lifetimeMember: true },
