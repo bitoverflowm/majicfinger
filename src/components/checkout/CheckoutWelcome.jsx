@@ -421,8 +421,9 @@ export function WorkspaceStartTabs({ welcomeActive, onOpenWelcome }) {
   const context = useMyStateV2();
   const canvas = useWorkspaceCanvas();
   const sessionUser = useUser();
+  // The Welcome tab is hidden for everyone for now.
   const tabs = (Array.isArray(context?.workspaceStartTabs) ? context.workspaceStartTabs : []).filter(
-    (tab) => !(context?.landingDemo && tab?.id === WELCOME_START_TAB_ID),
+    (tab) => tab?.id !== WELCOME_START_TAB_ID,
   );
   const activeId = context?.activeWorkspaceStartTabId;
 

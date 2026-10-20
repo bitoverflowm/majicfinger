@@ -25,6 +25,7 @@ import { exitLandingDemoToSection } from "@/lib/landingDemoSession";
 import { LandingDemoMembersOnlyPortal } from "@/components/dashboardComposer/landingDemoMembersOnly";
 import { useWorkspaceCanvas } from "@/components/dashboardComposer/workspaceCanvas";
 import { pageIdForTab } from "@/lib/workspaceDashboardDocument";
+import { WELCOME_START_TAB_ID } from "@/lib/workspaceStartTabs";
 import { realtimeAssets } from "@/lib/realtime/sheetRealtime";
 import { showRealtimeMenu, tabHasLiveMarket } from "@/components/dashboardComposer/realtimeMode";
 import { DASHBOARD_FREE_TEXT_PLACEHOLDER } from "@/lib/dashboardFreeTextTheme";
@@ -90,7 +91,7 @@ function useDashboardTabTree() {
 
   return useMemo(() => {
     if (Array.isArray(startTabs) && startTabs.length && blocksByPage) {
-      return startTabs.map((tab) => ({
+      return startTabs.filter((tab) => tab?.id !== WELCOME_START_TAB_ID).map((tab) => ({
         id: tab.id,
         name: String(tab.name || "").trim() || "Tab",
         pageId: pageIdForTab(tab.id),
