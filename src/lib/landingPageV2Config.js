@@ -86,14 +86,81 @@ export const landingPageV2Config = {
     buttonText: "Request trial",
     href: "mailto:kash@lycheedata.com?subject=Lychee%20Enterprise%20trial",
   },
-  /** Data sources shown on the Free plan: a logo (`src`) or a letter `mark` on a brand-colored tile. */
+  /**
+   * Data sources shown on the Free plan: a logo (`src`) or a letter `mark` on a brand-colored tile.
+   * Hovering a tile shows `description`, the integrations it `includes`, and `links` (hub pages first).
+   */
   pricingVenues: [
-    { name: "Kalshi", mark: "K", tileClass: "bg-[#28CC95] text-white" },
-    { name: "Polymarket", src: "/polymarket.png", tileClass: "bg-[#2E5CFF]" },
-    { name: "Chainlink", src: "/chainlink.png", tileClass: "bg-[#375BD2] p-[3px]" },
-    { name: "Binance", src: "/binance.jpeg", tileClass: "bg-black" },
-    { name: "X", src: "/x.png", tileClass: "bg-white p-[3px] ring-1 ring-inset ring-border" },
-    { name: "Reddit", src: "/reddit.png", tileClass: "bg-[#FF4500] p-[2px]" },
+    {
+      name: "Kalshi",
+      mark: "K",
+      tileClass: "bg-[#28CC95] text-white",
+      description: "The CFTC-regulated US prediction market exchange.",
+      includes: [
+        { name: "Kalshi Historical", detail: "Every market and trade since the July 2021 launch" },
+        { name: "Kalshi Historical v2", detail: "Recent history up to the live cutoff" },
+        { name: "Kalshi Live", detail: "Real-time prices, orderbooks, trades, and candlesticks" },
+      ],
+      links: [
+        { label: "Kalshi Historical hub", href: "/kalshi-historical-data" },
+        { label: "Kalshi Live hub", href: "/kalshi-live-data" },
+      ],
+    },
+    {
+      name: "Polymarket",
+      src: "/polymarket.png",
+      tileClass: "bg-[#2E5CFF]",
+      description: "The crypto-native prediction market.",
+      includes: [
+        { name: "Polymarket Historical", detail: "Markets, prices, and trades for backtesting" },
+        { name: "Polymarket Live", detail: "Real-time events, markets, and price streams" },
+      ],
+      links: [
+        { label: "Polymarket Historical hub", href: "/polymarket-historical-data" },
+        { label: "Polymarket Live hub", href: "/polymarket-live-data" },
+      ],
+    },
+    {
+      name: "Chainlink",
+      src: "/chainlink.png",
+      tileClass: "bg-[#375BD2] p-[3px]",
+      description: "The oracle prices Polymarket uses to set and settle its crypto Up/Down markets.",
+      includes: [
+        { name: "60-second TWAP", detail: "The settlement price, streamed through Polymarket" },
+        { name: "Spot + legacy 30-second TWAP", detail: "BTC, ETH, SOL, XRP, DOGE, HYPE, BNB, ZEC" },
+      ],
+      links: [
+        { label: "Live prices guide", href: "/guides/polymarket-live-prices" },
+        { label: "Try it in the demo", href: "/#demo" },
+      ],
+    },
+    {
+      name: "Binance",
+      src: "/binance.jpeg",
+      tileClass: "bg-black",
+      badge: "Beta",
+      description: "Live Binance spot prices, about one tick a second, streamed through Polymarket.",
+      includes: [{ name: "Spot prices in USDT", detail: "BTC, ETH, SOL, XRP, BNB, and DOGE, one sheet per pair" }],
+      links: [{ label: "Try it in the demo", href: "/#demo" }],
+    },
+    {
+      name: "X",
+      src: "/x.png",
+      tileClass: "bg-white p-[3px] ring-1 ring-inset ring-border",
+      badge: "Coming soon",
+      description: "Social signals from X to line up against market moves.",
+      includes: [{ name: "Posts and accounts", detail: "Mentions, hashtags, trends, and engagement" }],
+      links: [],
+    },
+    {
+      name: "Reddit",
+      src: "/reddit.png",
+      tileClass: "bg-[#FF4500] p-[2px]",
+      badge: "Coming soon",
+      description: "Crowd sentiment from trading communities like r/wallstreetbets.",
+      includes: [{ name: "Posts and comments", detail: "Mentions, discussions, and sentiment" }],
+      links: [],
+    },
   ],
   /**
    * Previous Basic / Pro / Elite plans. No longer on the pricing page, but
