@@ -1,6 +1,8 @@
 "use client";
 
 import { SectionHeader } from "@/components/section-header";
+import { requestLandingDemoActivateAfterScroll } from "@/lib/landingDemoSession";
+import { scrollToDemoSection } from "@/lib/scrollToDemo";
 import { siteConfig } from "@/lib/config";
 import { cn } from "@/lib/utils";
 import * as SwitchPrimitives from "@radix-ui/react-switch";
@@ -26,7 +28,7 @@ import {
   Sigma,
   type LucideIcon,
 } from "lucide-react";
-import { useState } from "react";
+import { useState, type MouseEvent } from "react";
 
 export type BillingCycle = "weekly" | "monthly" | "annual";
 
@@ -235,18 +237,28 @@ function AnimatedPrice({ value }: { value: string }) {
   );
 }
 
+/** On the homepage, scroll to the demo and start it (same as the hero's Try For Free); elsewhere follow the link. */
+function startHomepageDemo(event: MouseEvent<HTMLAnchorElement>) {
+  if (!document.getElementById("demo")) return;
+  event.preventDefault();
+  requestLandingDemoActivateAfterScroll();
+  scrollToDemoSection();
+}
+
 function PlanButton({
   action,
   href,
   label,
   isCurrent,
   variant,
+  onClick,
 }: {
   action: PricingTierAction | null;
   href: string;
   label: string;
   isCurrent: boolean;
   variant: "primary" | "subtle";
+  onClick?: (event: MouseEvent<HTMLAnchorElement>) => void;
 }) {
   const disabled = !!action?.disabled || (!action && isCurrent);
   const className = cn(
@@ -271,7 +283,7 @@ function PlanButton({
         {content}
       </button>
     ) : (
-      <a href={href} className={className}>
+      <a href={href} onClick={onClick} className={className}>
         {content}
       </a>
     );
@@ -465,9 +477,10 @@ export function PricingSection({
                       action={action}
                       href={href}
                       label={plan.buttonText}
-                      isCurrent={isCurrent}
-                      variant={isFree ? "subtle" : "primary"}
-                    />
+                    isCurrent={isCurrent}
+                    variant={isFree ? "subtle" : "primary"}
+                    onClick={isFree ? startHomepageDemo : undefined}
+                  />
                     {action?.hint ? <p className="text-center text-xs text-muted-foreground">{action.hint}</p> : null}
                   </div>
                 </div>
