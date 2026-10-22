@@ -27,43 +27,12 @@ export const siteConfig = {
   },
   bentoSection,
   pricingSection: {
-    title: "Choose the scale of prediction market research you need",
+    title: "Choose your plan",
     description:
-      "Start weekly, upgrade anytime, or save with annual billing. Every paid plan includes Kalshi and Polymarket historical and live data.",
-    includedInPaidPlans: {
-      label: "Included in every paid plan",
-      items: [
-        "Kalshi + Polymarket data",
-        "Live + historical access",
-        "No-code charts",
-        "Dashboards",
-        "CSV/XLSX/JSON exports",
-        "No-code quant analysis",
-        "In browser data sheet",
-        "Math operations",
-      ],
-    },
-    pricingItems: (landingPageV2Config.pricing as any[]).map((plan: any) => ({
-      name: plan.name,
-      description: plan.description,
-      features: plan.features,
-      isPopular: Boolean(plan.isPopular),
-      badgeLabel: plan.badgeLabel ?? null,
-      buttonText: plan.buttonText,
-      hrefWeekly:
-        plan.period === "one-time"
-          ? plan.href
-          : ("hrefWeekly" in plan && plan.hrefWeekly ? plan.hrefWeekly : plan.hrefMonthly),
-      hrefMonthly: plan.period === "one-time" ? plan.href : plan.hrefMonthly,
-      hrefAnnual: plan.period === "one-time" ? plan.href : plan.hrefYearly,
-      period: plan.period,
-      priceWeekly: plan.priceWeekly ?? null,
-      priceMonthly: plan.priceMonthly ?? null,
-      priceAnnual: plan.priceAnnual ?? null,
-      yearlyNote: plan.yearlyNote ?? null,
-      trial: plan.trial ?? null,
-    })),
-    lifetimeAccess: landingPageV2Config.lifetimeAccess,
+      "Every plan includes all integrations: Kalshi and Polymarket historical and live, Chainlink spot, Binance, /sheets, /charts, and more.",
+    plans: landingPageV2Config.plans,
+    enterprise: landingPageV2Config.enterprisePlan,
+    venues: landingPageV2Config.pricingVenues,
   },
   featureSection: {
     title: "Everything You Need to Move Fast",

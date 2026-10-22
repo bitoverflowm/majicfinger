@@ -1,4 +1,5 @@
 import { isOwnerFullAccessUser } from "@/lib/ownerFullAccess";
+import { EXPANDED_DATA_TIERS, TOP_DATA_TIERS } from "@/lib/membershipAccess";
 import {
   ATHENA_BASIC_QUERY_ROW_LIMIT,
   ATHENA_DEMO_ROW_LIMIT,
@@ -34,7 +35,7 @@ export function userHasPaidSubscription(userLike) {
 }
 
 /**
- * Pro / Elite / lifetime: full historical row budgets (not Basic 12.5k, not free sample).
+ * Researcher / Quant / legacy Pro + Elite / lifetime: full historical row budgets (not Basic 12.5k, not free sample).
  */
 export function userHasExpandedAthenaAccess(userLike) {
   if (!userLike || typeof userLike !== "object") return false;
@@ -43,8 +44,7 @@ export function userHasExpandedAthenaAccess(userLike) {
   const tier = normalizedSubscriptionTier(userLike);
   const paid = userHasPaidSubscription(userLike);
   if (!paid) return false;
-  if (tier === "pro" || tier === "elite" || tier === "premium") return true;
-  return false;
+  return EXPANDED_DATA_TIERS.has(tier);
 }
 
 /**
@@ -62,7 +62,7 @@ export const DEMO_RUN_SHEET_LIMIT = 12;
 
 /**
  * How many markets may each get their own trades sheet in one pull.
- * Demo is 11 (plus the parent sheet makes its 12), Basic is 5, Pro is 10, Elite is 50. More than 50 is an enterprise pull.
+ * Demo is 11 (plus the parent sheet makes its 12), Basic is 5, Pro / Researcher is 10, Elite / Quant is 50. More than 50 is an enterprise pull.
  */
 export function getJoinMarketCap(userLike, { isDemo = false } = {}) {
   if (isDemo) return DEMO_RUN_SHEET_LIMIT - 1;
@@ -70,8 +70,8 @@ export function getJoinMarketCap(userLike, { isDemo = false } = {}) {
   if (String(userLike.userId || "") === "dev-bypass-no-db") return 50;
   if (isOwnerFullAccessUser(userLike) || userLike.lifetimeMember) return 50;
   const tier = normalizedSubscriptionTier(userLike);
-  if (tier === "elite" || tier === "premium") return 50;
-  if (tier === "pro") return 10;
+  if (TOP_DATA_TIERS.has(tier)) return 50;
+  if (EXPANDED_DATA_TIERS.has(tier)) return 10;
   return 5;
 }
 
@@ -80,6 +80,8 @@ export function joinTierLabel(userLike) {
   if (String(userLike.userId || "") === "dev-bypass-no-db") return "Elite";
   if (isOwnerFullAccessUser(userLike) || userLike.lifetimeMember) return "Elite";
   const tier = normalizedSubscriptionTier(userLike);
+  if (tier === "quant") return "Quant";
+  if (tier === "researcher") return "Researcher";
   if (tier === "elite" || tier === "premium") return "Elite";
   if (tier === "pro") return "Pro";
   return "Basic";

@@ -1,5 +1,6 @@
 import { PROJECT_PREVIEW_ROW_LIMIT } from "@/lib/projectPersistence";
 import { isOwnerFullAccessUser } from "@/lib/ownerFullAccess";
+import { LARGE_STORAGE_TIERS } from "@/lib/membershipAccess";
 
 export const ADVANCED_DATA_STORAGE_ROW_LIMIT = PROJECT_PREVIEW_ROW_LIMIT;
 
@@ -67,7 +68,7 @@ export function userCanUseAdvancedDataStorage(userLike) {
   if (userLike.lifetimeMember) return true;
   const tier = String(userLike.subscriptionTier || "").toLowerCase();
   const status = String(userLike.subscriptionStatus || "").toLowerCase();
-  // Elite recurring must look “paid” in Stripe-shaped status; missing status → treat as not entitled
+  // Recurring tiers must look “paid” in Stripe-shaped status; missing status → treat as not entitled
   // (manual DB tier-only edits without webhook may fail here — reconcile via Stripe or scripts/reconcile-stripe-entitlements.cjs)
-  return tier === "elite" && subscriptionStatusAllowsEliteDataTier(status);
+  return LARGE_STORAGE_TIERS.has(tier) && subscriptionStatusAllowsEliteDataTier(status);
 }

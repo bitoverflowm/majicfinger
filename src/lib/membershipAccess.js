@@ -1,8 +1,15 @@
 import { isDevLoginBypassUser } from "@/lib/devLoginBypass";
 import { isOwnerFullAccessUser } from "@/lib/ownerFullAccess";
 
-/** Paid tiers in upgrade order. */
-export const MEMBERSHIP_TIERS = ["basic", "pro", "elite"];
+/** Paid tiers in upgrade order. Basic / Pro / Elite are legacy plans still billed for existing subscribers. */
+export const MEMBERSHIP_TIERS = ["basic", "pro", "researcher", "elite", "quant"];
+
+/** Tiers with full historical row budgets (500k per pull). */
+export const EXPANDED_DATA_TIERS = new Set(["pro", "premium", "researcher", "elite", "quant"]);
+/** Tiers with large saved-workspace storage (advanced data storage + quota meter). */
+export const LARGE_STORAGE_TIERS = new Set(["researcher", "elite", "quant"]);
+/** Tiers with the highest per-pull market join cap. */
+export const TOP_DATA_TIERS = new Set(["elite", "premium", "quant"]);
 export const MEMBERSHIP_CYCLES = ["weekly", "monthly", "annual"];
 
 const ACTIVE_STATUSES = new Set(["active", "trialing"]);

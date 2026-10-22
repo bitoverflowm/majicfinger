@@ -14,6 +14,91 @@ export const landingPageV2Config = {
   header: [
     { href: "/#guides", label: "Guides" },
   ],
+  /**
+   * Plans on the pricing page. Dollar amounts must match CHECKOUT_PLANS in
+   * src/lib/stripe/catalog.js and PLAN_MAP in the Stripe webhook.
+   * `icon` keys map to icons in src/components/sections/pricing-section.tsx.
+   */
+  plans: [
+    {
+      tier: "free",
+      name: "Free",
+      description: "Explore Lychee before committing. No account or credit card required to try.",
+      price: 0,
+      note: "Free for everyone",
+      buttonText: "Try for free",
+      href: "/#demo",
+      venuesLabel: "All your venues",
+      features: [
+        { icon: "rows", text: "Pull up to **100 rows per data sheet**" },
+        { icon: "chart", text: "Try the full filtering, analysis, and charting workflow" },
+        { icon: "dashboard", text: "**1 dashboard, 1 tab, and up to 12 data sheets**" },
+      ],
+    },
+    {
+      tier: "researcher",
+      name: "Researcher",
+      description: "A complete workspace for traders, analysts, journalists, and researchers.",
+      priceAnnual: 199,
+      note: "Annual billing only",
+      buttonText: "Get Researcher",
+      isPopular: true,
+      includesLabel: "All features in Free +",
+      features: [
+        { icon: "plug", text: "All available integrations, including historical and live data" },
+        { icon: "rows", text: "Pull up to **500,000 rows per data sheet**" },
+        { icon: "download", text: "Unlimited **CSV, Excel, and JSON exports** within your data limits" },
+        {
+          icon: "sigma",
+          text: "Full no-code analysis: formulas, related datasets, summaries, bucketing, and seeded random sampling",
+        },
+        { icon: "dashboard", text: "**Unlimited charts, dashboards, tabs, and presentations**" },
+        { icon: "fork", text: "Save, fork, and rerun research workflows" },
+        { icon: "live", text: "**10 simultaneous live feeds**" },
+        { icon: "alert", text: "**500 custom alerts**" },
+        { icon: "storage", text: "**10 GB saved workspace storage**" },
+        { icon: "publish", text: "Publish charts and dashboards without Lychee branding" },
+        { icon: "mail", text: "Email support" },
+      ],
+    },
+    {
+      tier: "quant",
+      name: "Quant",
+      description: "Everything in Researcher, with more capacity and flexible billing.",
+      priceMonthly: 99,
+      priceAnnual: 999,
+      buttonText: "Get Quant",
+      includesLabel: "All features in Researcher +",
+      features: [
+        { icon: "rows", text: "Pull **1 million+ rows per data sheet**" },
+        { icon: "bulk", text: "**Bulk exports** for larger datasets" },
+        { icon: "live", text: "**100 simultaneous live feeds**" },
+        { icon: "alert", text: "**1,000 custom alerts**" },
+        { icon: "storage", text: "**25 GB saved workspace storage**" },
+        { icon: "support", text: "**Priority support**" },
+      ],
+    },
+  ],
+  enterprisePlan: {
+    name: "Enterprise",
+    description:
+      "For companies and teams that need custom limits, teams, roles, permissions, comments and Slack notifications, collaborative dashboards, priority support, and an enterprise-grade security review.",
+    buttonText: "Request trial",
+    href: "mailto:kash@lycheedata.com?subject=Lychee%20Enterprise%20trial",
+  },
+  /** Data sources shown on the Free plan: a logo (`src`) or a letter `mark` on a brand-colored tile. */
+  pricingVenues: [
+    { name: "Kalshi", mark: "K", tileClass: "bg-[#28CC95] text-white" },
+    { name: "Polymarket", src: "/polymarket.png", tileClass: "bg-[#2E5CFF]" },
+    { name: "Chainlink", src: "/chainlink.png", tileClass: "bg-[#375BD2] p-[3px]" },
+    { name: "Binance", src: "/binance.jpeg", tileClass: "bg-black" },
+    { name: "X", src: "/x.png", tileClass: "bg-white p-[3px] ring-1 ring-inset ring-border" },
+    { name: "Reddit", src: "/reddit.png", tileClass: "bg-[#FF4500] p-[2px]" },
+  ],
+  /**
+   * Previous Basic / Pro / Elite plans. No longer on the pricing page, but
+   * existing subscribers are still billed on them.
+   */
   pricing: [
     {
       name: "Basic",

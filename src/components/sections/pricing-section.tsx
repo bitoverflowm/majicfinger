@@ -3,8 +3,28 @@
 import { SectionHeader } from "@/components/section-header";
 import { siteConfig } from "@/lib/config";
 import { cn } from "@/lib/utils";
+import * as SwitchPrimitives from "@radix-ui/react-switch";
 import { motion } from "framer-motion";
-import { useMemo, useState } from "react";
+import {
+  ArrowRight,
+  Bell,
+  Check,
+  Download,
+  GitFork,
+  Globe,
+  HardDrive,
+  LayoutDashboard,
+  LifeBuoy,
+  LineChart,
+  Mail,
+  Package,
+  Plug,
+  Radio,
+  Rows3,
+  Sigma,
+  type LucideIcon,
+} from "lucide-react";
+import { useState } from "react";
 
 export type BillingCycle = "weekly" | "monthly" | "annual";
 
@@ -25,99 +45,150 @@ export type PricingTierActionArgs = {
   isCurrent: boolean;
 };
 
-/** Re-enable when promoting lifetime / pay-once on the marketing page again. */
-const SHOW_LIFETIME_ACCESS = false;
+type PlanFeature = { icon: string; text: string };
 
-/** Show annual plan as monthly equivalent; "billed annually" carries billing context. */
-function annualPriceAsMonthlyDisplay(annualPrice: string): string {
-  const match = annualPrice.replace(/,/g, "").match(/\$?\s*([\d.]+)/);
-  if (!match) return annualPrice;
-  const monthly = parseFloat(match[1]) / 12;
-  if (!Number.isFinite(monthly)) return annualPrice;
-  const hasCents = Math.round(monthly * 100) % 100 !== 0;
-  const formatted = hasCents ? monthly.toFixed(2) : String(Math.round(monthly));
-  return `$${formatted}`;
+type Plan = {
+  tier: string;
+  name: string;
+  description: string;
+  price?: number;
+  priceMonthly?: number;
+  priceAnnual?: number;
+  note?: string;
+  buttonText: string;
+  href?: string;
+  isPopular?: boolean;
+  includesLabel?: string;
+  venuesLabel?: string;
+  features: readonly PlanFeature[];
+};
+
+type EnterprisePlan = { name: string; description: string; buttonText: string; href: string };
+type Venue = { name: string; src?: string; mark?: string; tileClass?: string };
+
+const FEATURE_ICONS: Record<string, LucideIcon> = {
+  rows: Rows3,
+  chart: LineChart,
+  dashboard: LayoutDashboard,
+  plug: Plug,
+  download: Download,
+  sigma: Sigma,
+  fork: GitFork,
+  live: Radio,
+  alert: Bell,
+  storage: HardDrive,
+  publish: Globe,
+  mail: Mail,
+  bulk: Package,
+  support: LifeBuoy,
+};
+
+function formatUsd(amount: number): string {
+  const rounded = Math.round(amount * 100) / 100;
+  return `$${Number.isInteger(rounded) ? rounded.toLocaleString("en-US") : rounded.toFixed(2)}`;
 }
 
-interface TabsProps {
-  activeTab: BillingCycle;
-  setActiveTab: (tab: BillingCycle) => void;
-  className?: string;
-}
-
-function PricingTabs({ activeTab, setActiveTab, className }: TabsProps) {
-  const tabs: BillingCycle[] = ["weekly", "monthly", "annual"];
-  const discounts: Partial<Record<BillingCycle, string>> = {
-    monthly: "-10%",
-    annual: "-25%",
-  };
-
+/** `**bold**` segments in feature copy. */
+function RichText({ text }: { text: string }) {
   return (
-    <div
-      className={cn(
-        "relative flex w-fit items-center rounded-full border p-0.5 backdrop-blur-sm cursor-pointer h-9 flex-row bg-muted",
-        className,
-      )}
-    >
-      {tabs.map((tab) => (
-        <button
-          key={tab}
-          type="button"
-          onClick={() => setActiveTab(tab)}
-          className={cn(
-            "relative z-[1] px-2 h-8 flex items-center justify-center cursor-pointer",
-            { "z-0": activeTab === tab },
-          )}
-        >
-          {activeTab === tab && (
-            <motion.div
-              layoutId="active-tab"
-              className="absolute inset-0 rounded-full bg-white dark:bg-[#3F3F46] shadow-md border border-border"
-              transition={{
-                duration: 0.2,
-                type: "spring",
-                stiffness: 300,
-                damping: 25,
-                velocity: 2,
-              }}
-            />
-          )}
-          <span
-            className={cn(
-              "relative block text-sm font-medium duration-200 shrink-0",
-              activeTab === tab ? "text-primary" : "text-muted-foreground",
-            )}
-          >
-            {tab.charAt(0).toUpperCase() + tab.slice(1)}
-            {discounts[tab] && (
-              <span className="ml-2 text-xs font-semibold text-secondary bg-secondary/40 py-0.5 w-[calc(100%+1rem)] px-1 rounded-full">
-                {discounts[tab]}
-              </span>
-            )}
-          </span>
-        </button>
-      ))}
-    </div>
+    <>
+      {text
+        .split(/(\*\*[^*]+\*\*)/g)
+        .filter(Boolean)
+        .map((part, index) =>
+          part.startsWith("**") && part.endsWith("**") ? (
+            <span key={index} className="font-medium text-foreground">
+              {part.slice(2, -2)}
+            </span>
+          ) : (
+            <span key={index}>{part}</span>
+          ),
+        )}
+    </>
   );
 }
 
-type LifetimeAccess = {
+function AnimatedPrice({ value }: { value: string }) {
+  return (
+    <motion.span
+      key={value}
+      className="text-3xl font-semibold tracking-tight text-foreground"
+      initial={{ opacity: 0, y: 4, filter: "blur(4px)" }}
+      animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
+      transition={{ duration: 0.2, ease: [0.4, 0, 0.2, 1] }}
+    >
+      {value}
+    </motion.span>
+  );
+}
+
+function PlanButton({
+  action,
+  href,
+  label,
+  isCurrent,
+  variant,
+}: {
+  action: PricingTierAction | null;
   href: string;
-  title: string;
-  badge: string;
-  price: string;
-  priceNote: string;
-  headline: string;
-  description: string;
-  buttonText: string;
-  features: string[];
-};
+  label: string;
+  isCurrent: boolean;
+  variant: "primary" | "subtle";
+}) {
+  const disabled = !!action?.disabled || (!action && isCurrent);
+  const className = cn(
+    "flex h-10 w-full items-center justify-center gap-2 rounded-full px-4 text-sm font-medium tracking-wide transition-all ease-out active:scale-[0.98] disabled:cursor-default disabled:active:scale-100",
+    disabled
+      ? "border border-border bg-muted text-muted-foreground"
+      : variant === "primary"
+        ? "bg-gradient-to-r from-secondary to-violet-500 text-white shadow-[inset_0_1px_1px_rgba(255,255,255,0.25),0_4px_10px_-4px_rgba(59,91,219,0.55)] hover:brightness-110"
+        : "border border-border bg-muted text-foreground hover:bg-muted/70",
+  );
+  const text = action?.label ?? (isCurrent ? "Your plan" : label);
+  const content = (
+    <>
+      {isCurrent ? <Check className="size-4" aria-hidden /> : null}
+      {action?.busy ? "One moment…" : text}
+    </>
+  );
+
+  if (!action) {
+    return isCurrent ? (
+      <button type="button" disabled className={className}>
+        {content}
+      </button>
+    ) : (
+      <a href={href} className={className}>
+        {content}
+      </a>
+    );
+  }
+  if (action.href && !action.disabled) {
+    return (
+      <a href={action.href} className={className}>
+        {content}
+      </a>
+    );
+  }
+  return (
+    <button
+      type="button"
+      onClick={action.onClick}
+      disabled={action.disabled || action.busy}
+      aria-busy={action.busy || undefined}
+      className={className}
+    >
+      {content}
+    </button>
+  );
+}
 
 export function PricingSection({
   title: titleOverride,
   description: descriptionOverride,
   id = "pricing",
   showHeader = true,
+  includeFree = true,
   defaultCycle = "monthly",
   currentPlan = null,
   getAction,
@@ -127,319 +198,199 @@ export function PricingSection({
   description?: string;
   id?: string;
   showHeader?: boolean;
+  /** The Free column links to the demo; hide it where there's no free plan to pick (billing). */
+  includeFree?: boolean;
+  /** Starting position of the monthly / yearly toggle. */
   defaultCycle?: BillingCycle;
   /** Highlights the member's tier; `cycle` marks the exact plan as current. */
   currentPlan?: { tier?: string | null; cycle?: string | null } | null;
-  /** Replaces the default checkout link for each tier. */
+  /** Replaces the default checkout link for each paid tier. */
   getAction?: (args: PricingTierActionArgs) => PricingTierAction | null;
   className?: string;
 } = {}) {
-  const [billingCycle, setBillingCycle] = useState<BillingCycle>(defaultCycle);
+  const [toggleCycle, setToggleCycle] = useState<"monthly" | "annual">(
+    defaultCycle === "annual" ? "annual" : "monthly",
+  );
   const currentTier = String(currentPlan?.tier || "").toLowerCase();
   const currentCycle = String(currentPlan?.cycle || "").toLowerCase();
-  const { title: defaultTitle, description: defaultDescription, pricingItems } =
-    siteConfig.pricingSection;
-  const title = titleOverride?.trim() || defaultTitle;
-  const description = descriptionOverride?.trim() || defaultDescription;
-  const includedInPaidPlans = (
-    siteConfig.pricingSection as {
-      includedInPaidPlans?: { label: string; items: readonly string[] };
-    }
-  ).includedInPaidPlans;
-  const lifetimeAccess = (siteConfig.pricingSection as { lifetimeAccess?: LifetimeAccess }).lifetimeAccess;
 
-  const computedTiers = useMemo(() => {
-    return pricingItems.map((tier) => {
-      if (tier.period === "one-time") {
-        return {
-          ...tier,
-          display: {
-            price: tier.priceMonthly ?? "",
-            suffix: "one-time",
-            note: null as string | null,
-            href: `/checkout?plan=${encodeURIComponent(tier.name.toLowerCase())}`,
-          },
-        };
-      }
-
-      const planSlug = encodeURIComponent(tier.name.toLowerCase());
-      const display =
-        billingCycle === "weekly"
-          ? {
-              price: tier.priceWeekly ?? tier.priceMonthly ?? "",
-              suffix: "week",
-              note: "billed weekly",
-              href: `/checkout?plan=${planSlug}&cycle=weekly`,
-            }
-          : billingCycle === "monthly"
-            ? {
-                price: tier.priceMonthly ?? "",
-                suffix: "month",
-                note: "billed monthly",
-                href: `/checkout?plan=${planSlug}&cycle=monthly`,
-              }
-            : {
-                price: annualPriceAsMonthlyDisplay(tier.priceAnnual ?? ""),
-                suffix: "month",
-                note: tier.priceAnnual
-                  ? `billed annually at ${tier.priceAnnual}/year`
-                  : "billed annually",
-                href: `/checkout?plan=${encodeURIComponent(tier.name.toLowerCase())}&cycle=annual`,
-              };
-
-      return { ...tier, display };
-    });
-  }, [billingCycle, pricingItems]);
-
-  const PriceDisplay = ({ price }: { price: string }) => {
-    return (
-      <motion.span
-        key={`${billingCycle}:${price}`}
-        className="text-4xl font-semibold"
-        initial={{
-          opacity: 0,
-          x: billingCycle === "annual" ? -10 : 10,
-          filter: "blur(5px)",
-        }}
-        animate={{ opacity: 1, x: 0, filter: "blur(0px)" }}
-        transition={{ duration: 0.25, ease: [0.4, 0, 0.2, 1] }}
-      >
-        {price}
-      </motion.span>
-    );
+  const config = siteConfig.pricingSection as unknown as {
+    title: string;
+    description: string;
+    plans: readonly Plan[];
+    enterprise: EnterprisePlan;
+    venues: readonly Venue[];
   };
+  const title = titleOverride?.trim() || config.title;
+  const description = descriptionOverride?.trim() || config.description;
+  const plans = config.plans.filter((plan) => includeFree || plan.tier !== "free");
+  const { enterprise, venues } = config;
 
   return (
     <section
       id={id}
-      className={cn("flex flex-col items-center justify-center gap-10 pb-10 w-full relative", className)}
+      className={cn("relative flex w-full flex-col items-center justify-center gap-10 px-6 pb-10", className)}
     >
       {showHeader && (
         <SectionHeader>
-          <h2 className="text-3xl md:text-4xl font-medium tracking-tighter text-center text-balance">
-            {title}
-          </h2>
-          <p className="text-muted-foreground text-center text-balance font-medium">
-            {description}
-          </p>
+          <h2 className="text-balance text-center text-3xl font-medium tracking-tighter md:text-4xl">{title}</h2>
+          <p className="text-balance text-center font-medium text-muted-foreground">{description}</p>
         </SectionHeader>
       )}
 
-      <div className="relative w-full h-full">
-        <div className="absolute -top-14 left-1/2 -translate-x-1/2">
-          <PricingTabs
-            activeTab={billingCycle}
-            setActiveTab={setBillingCycle}
-            className="mx-auto"
-          />
-        </div>
+      <div className={cn("mx-auto flex w-full flex-col gap-4", plans.length > 2 ? "max-w-6xl" : "max-w-4xl")}>
+        <div className={cn("grid gap-4", plans.length > 2 ? "md:grid-cols-3" : "md:grid-cols-2")}>
+          {plans.map((plan) => {
+            const isFree = plan.tier === "free";
+            const hasToggle = typeof plan.priceMonthly === "number" && typeof plan.priceAnnual === "number";
+            const cycle: BillingCycle = hasToggle ? toggleCycle : typeof plan.priceAnnual === "number" ? "annual" : "monthly";
+            const href = isFree
+              ? plan.href || "/#demo"
+              : `/checkout?plan=${encodeURIComponent(plan.tier)}&cycle=${cycle}`;
+            const isCurrentTier = !!currentTier && currentTier === plan.tier;
+            const isCurrent = isCurrentTier && currentCycle === cycle;
+            const action = !isFree && getAction ? getAction({ tier: plan.tier, cycle, href, isCurrentTier, isCurrent }) : null;
 
-        {includedInPaidPlans ? (
-          <div className="mx-auto mb-4 flex w-full max-w-3xl flex-col items-center gap-2 pb-2">
-            <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground/80 sm:text-xs">
-              {includedInPaidPlans.label}
-            </p>
-            <ul className="flex flex-wrap items-center justify-center gap-1.5">
-              {includedInPaidPlans.items.map((item) => (
-                <li
-                  key={item}
-                  className="inline-flex items-center rounded-full border border-border/35 bg-background/50 px-2 py-0.5 text-[10px] leading-tight text-muted-foreground/75 sm:px-2.5 sm:text-[11px]"
-                >
-                  {item}
-                </li>
-              ))}
-            </ul>
-          </div>
-        ) : null}
+            const monthly =
+              isFree
+                ? plan.price ?? 0
+                : cycle === "annual" && typeof plan.priceAnnual === "number"
+                  ? plan.priceAnnual / 12
+                  : plan.priceMonthly ?? 0;
+            const savings =
+              hasToggle && plan.priceMonthly && plan.priceAnnual
+                ? Math.round((1 - plan.priceAnnual / (plan.priceMonthly * 12)) * 100)
+                : 0;
 
-        <div className="grid min-[650px]:grid-cols-2 min-[1100px]:grid-cols-3 gap-4 w-full max-w-7xl mx-auto px-6">
-          {computedTiers.map((tier) => {
-            const tierSlug = tier.name.toLowerCase();
-            const isCurrentTier = !!currentTier && currentTier === tierSlug;
-            const isCurrent = isCurrentTier && currentCycle === billingCycle;
-            const action = getAction
-              ? getAction({ tier: tierSlug, cycle: billingCycle, href: tier.display.href, isCurrentTier, isCurrent })
-              : null;
-            const buttonClass = cn(
-              "h-10 w-full flex items-center justify-center text-sm font-normal tracking-wide rounded-full px-4 cursor-pointer transition-all ease-out active:scale-95 disabled:cursor-default disabled:active:scale-100",
-              action?.disabled
-                ? "bg-muted text-muted-foreground border border-border shadow-none"
-                : tier.isPopular
-                  ? "bg-secondary text-white shadow-[inset_0_1px_2px_rgba(255,255,255,0.25),0_3px_3px_-1.5px_rgba(16,24,40,0.06),0_1px_1px_rgba(16,24,40,0.08)]"
-                  : "bg-primary text-primary-foreground shadow-[0px_1px_2px_0px_rgba(255,255,255,0.16)_inset,0px_3px_3px_-1.5px_rgba(16,24,40,0.24),0px_1px_1px_-0.5px_rgba(16,24,40,0.20)]",
-            );
             return (
-            <div
-              key={tier.name}
-              className={cn(
-                "rounded-xl grid grid-rows-[auto_auto_1fr] relative h-fit min-[650px]:h-full min-[900px]:h-fit",
-                tier.isPopular
-                  ? "md:shadow-[0px_61px_24px_-10px_rgba(0,0,0,0.01),0px_34px_20px_-8px_rgba(0,0,0,0.05),0px_15px_15px_-6px_rgba(0,0,0,0.09),0px_4px_8px_-2px_rgba(0,0,0,0.10),0px_0px_0px_1px_rgba(0,0,0,0.08)] bg-accent ring-1 ring-secondary/25 md:-translate-y-0.5"
-                  : "bg-[#F3F4F6] dark:bg-[#F9FAFB]/[0.02] border border-border",
-                isCurrentTier && "ring-2 ring-[#0d99ff]",
-              )}
-            >
-              <div className="flex flex-col gap-2 p-4">
-                <p className="text-sm">
-                  {tier.name}
+              <div
+                key={plan.tier}
+                className={cn(
+                  "flex flex-col rounded-2xl border p-6",
+                  plan.isPopular
+                    ? "border-secondary/30 bg-gradient-to-b from-secondary/[0.07] to-secondary/[0.02] shadow-[0_12px_32px_-16px_rgba(59,91,219,0.35)] dark:from-secondary/[0.14] dark:to-secondary/[0.04]"
+                    : "border-border bg-background",
+                  isCurrentTier && "ring-2 ring-[#0d99ff]",
+                )}
+              >
+                <div className="flex items-center gap-2">
+                  <h3 className="text-lg font-semibold tracking-tight text-foreground">{plan.name}</h3>
                   {isCurrentTier ? (
-                    <span className="bg-[#0d99ff] text-white h-6 inline-flex w-fit items-center justify-center px-2 rounded-full text-xs font-medium tracking-wide ml-2">
+                    <span className="inline-flex h-5 items-center rounded-full bg-[#0d99ff] px-2 text-[11px] font-medium text-white">
                       Your plan
                     </span>
-                  ) : tier.isPopular ? (
-                    <span className="bg-secondary text-white h-6 inline-flex w-fit items-center justify-center px-2 rounded-full text-xs font-medium tracking-wide ml-2">
-                      {tier.badgeLabel ?? "Popular"}
-                    </span>
                   ) : null}
-                </p>
+                </div>
+                <p className="mt-1.5 text-sm leading-5 text-muted-foreground md:min-h-[3.75rem]">{plan.description}</p>
 
-                <div className="flex items-baseline">
-                  <PriceDisplay price={tier.display.price} />
-                  <span className="ml-2">/{tier.display.suffix}</span>
+                <div className="mt-5 flex items-baseline gap-1.5">
+                  <AnimatedPrice value={formatUsd(monthly)} />
+                  {!isFree ? <span className="text-sm text-muted-foreground">/ month</span> : null}
                 </div>
 
-                <p className="text-xs text-muted-foreground">{tier.display.note}</p>
-
-                <p className="text-sm leading-snug">{tier.description}</p>
-              </div>
-
-              <div className="flex flex-col gap-2 p-4">
-                {!action ? (
-                  <a href={tier.display.href} className={buttonClass}>
-                    {tier.buttonText}
-                  </a>
-                ) : action.href && !action.disabled ? (
-                  <a href={action.href} className={buttonClass}>
-                    {action.label}
-                  </a>
-                ) : (
-                  <button
-                    type="button"
-                    onClick={action.onClick}
-                    disabled={action.disabled || action.busy}
-                    aria-busy={action.busy || undefined}
-                    className={buttonClass}
-                  >
-                    {action.busy ? "One moment…" : action.label}
-                  </button>
-                )}
-                {action?.hint ? (
-                  <p className="text-center text-xs text-muted-foreground">{action.hint}</p>
-                ) : null}
-              </div>
-
-              <div className="flex min-h-0 flex-col justify-start">
-                <hr className="border-border dark:border-white/20" />
-
-                <div className="p-4">
-                <ul className="space-y-2.5">
-                  {tier.features.map((feature) => (
-                    <li key={feature} className="flex items-center gap-2">
-                      <div
-                        className={cn(
-                          "size-5 rounded-full border border-primary/20 flex items-center justify-center",
-                          tier.isPopular && "bg-muted-foreground/40 border-border",
-                        )}
+                <div className="mt-2 flex min-h-6 items-center text-sm text-muted-foreground">
+                  {hasToggle ? (
+                    <label className="flex cursor-pointer items-center gap-2">
+                      <SwitchPrimitives.Root
+                        checked={toggleCycle === "annual"}
+                        onCheckedChange={(on) => setToggleCycle(on ? "annual" : "monthly")}
+                        aria-label="Billed yearly"
+                        className="inline-flex h-4 w-7 shrink-0 cursor-pointer items-center rounded-full border border-transparent transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-secondary/40 data-[state=checked]:bg-secondary data-[state=unchecked]:bg-muted-foreground/30"
                       >
-                        <div className="size-3 flex items-center justify-center">
-                          <svg
-                            width="8"
-                            height="7"
-                            viewBox="0 0 8 7"
-                            fill="none"
-                            xmlns="http://www.w3.org/2000/svg"
-                            className="block dark:hidden"
-                          >
-                            <path
-                              d="M1.5 3.48828L3.375 5.36328L6.5 0.988281"
-                              stroke="#101828"
-                              strokeWidth="1.5"
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                            />
-                          </svg>
+                        <SwitchPrimitives.Thumb className="pointer-events-none block size-3 rounded-full bg-white shadow transition-transform data-[state=checked]:translate-x-[13px] data-[state=unchecked]:translate-x-px" />
+                      </SwitchPrimitives.Root>
+                      <span>
+                        Billed yearly
+                        {toggleCycle === "annual" && plan.priceAnnual ? ` · ${formatUsd(plan.priceAnnual)}/year` : ""}
+                      </span>
+                      {savings > 0 ? (
+                        <span className="rounded-full bg-emerald-500/10 px-1.5 py-0.5 text-[11px] font-medium text-emerald-700 dark:text-emerald-400">
+                          Save {savings}%
+                        </span>
+                      ) : null}
+                    </label>
+                  ) : isFree ? (
+                    <span>{plan.note}</span>
+                  ) : (
+                    <span>
+                      {plan.priceAnnual ? `${formatUsd(plan.priceAnnual)} billed yearly · ` : ""}
+                      {plan.note}
+                    </span>
+                  )}
+                </div>
 
-                          <svg
-                            width="8"
-                            height="7"
-                            viewBox="0 0 8 7"
-                            fill="none"
-                            xmlns="http://www.w3.org/2000/svg"
-                            className="hidden dark:block"
+                <div className="mt-6 flex flex-col gap-3">
+                  {plan.venuesLabel ? (
+                    <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1.5 text-sm text-muted-foreground">
+                      <span>{plan.venuesLabel}</span>
+                      <span className="flex items-center gap-1.5">
+                        {venues.map((venue) => (
+                          <span
+                            key={venue.name}
+                            title={venue.name}
+                            className={cn(
+                              "flex size-[18px] items-center justify-center overflow-hidden rounded-[5px] text-[10px] font-bold leading-none",
+                              venue.tileClass,
+                            )}
                           >
-                            <path
-                              d="M1.5 3.48828L3.375 5.36328L6.5 0.988281"
-                              stroke="#FAFAFA"
-                              strokeWidth="1.5"
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                            />
-                          </svg>
-                        </div>
-                      </div>
-                      <span className="text-sm">{feature}</span>
-                    </li>
-                  ))}
-                </ul>
+                            {venue.src ? (
+                              // eslint-disable-next-line @next/next/no-img-element
+                              <img src={venue.src} alt={venue.name} className="size-full object-contain" />
+                            ) : (
+                              <span aria-label={venue.name}>{venue.mark}</span>
+                            )}
+                          </span>
+                        ))}
+                      </span>
+                    </div>
+                  ) : null}
+                  {plan.includesLabel ? <p className="text-sm text-muted-foreground">{plan.includesLabel}</p> : null}
+                  <ul className="flex flex-col gap-2.5">
+                    {plan.features.map((feature) => {
+                      const Icon = FEATURE_ICONS[feature.icon] ?? Check;
+                      return (
+                        <li key={feature.text} className="flex gap-2.5 text-sm leading-5 text-foreground/80">
+                          <Icon className="mt-0.5 size-4 shrink-0 text-secondary" strokeWidth={1.75} aria-hidden />
+                          <span>
+                            <RichText text={feature.text} />
+                          </span>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                </div>
+
+                <div className="mt-auto flex flex-col gap-2 pt-8">
+                  <PlanButton
+                    action={action}
+                    href={href}
+                    label={plan.buttonText}
+                    isCurrent={isCurrent}
+                    variant={isFree ? "subtle" : "primary"}
+                  />
+                  {action?.hint ? <p className="text-center text-xs text-muted-foreground">{action.hint}</p> : null}
                 </div>
               </div>
-            </div>
             );
           })}
         </div>
 
-        {SHOW_LIFETIME_ACCESS && lifetimeAccess && (
-          <div className="mt-14 w-full border-y border-border bg-gradient-to-br from-accent via-accent/80 to-muted/30 dark:from-accent/30 dark:via-background dark:to-muted/20 py-10 md:py-12 shadow-[inset_0_1px_0_0_rgba(255,255,255,0.06)]">
-            <div className="mx-auto flex w-full max-w-6xl flex-col gap-8 px-6 lg:flex-row lg:items-stretch lg:justify-between lg:gap-12">
-              <div className="flex min-w-0 flex-1 flex-col gap-3 text-left">
-                <div className="flex flex-wrap items-center gap-2">
-                  <span className="inline-flex items-center rounded-full border border-border bg-background/80 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                    {lifetimeAccess.badge}
-                  </span>
-                  <span className="text-sm font-medium text-muted-foreground">{lifetimeAccess.title}</span>
-                </div>
-                <h3 className="text-balance text-2xl font-medium tracking-tighter text-foreground md:text-3xl">
-                  {lifetimeAccess.headline}
-                </h3>
-                <p className="max-w-2xl text-sm font-medium leading-relaxed text-muted-foreground md:text-base">
-                  {lifetimeAccess.description}
-                </p>
-                <ul className="mt-2 space-y-2">
-                  {lifetimeAccess.features.map((feature) => (
-                    <li key={feature} className="flex items-start gap-2 text-sm text-foreground/90">
-                      <span
-                        className="mt-1.5 size-1.5 shrink-0 rounded-full bg-secondary"
-                        aria-hidden
-                      />
-                      <span>{feature}</span>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-
-              <div className="flex w-full shrink-0 flex-col justify-center gap-4 rounded-xl border border-border bg-background/90 p-6 shadow-sm backdrop-blur-sm dark:bg-background/60 lg:max-w-sm">
-                <div>
-                  <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">One-time</p>
-                  <div className="mt-1 flex items-baseline gap-2">
-                    <span className="text-4xl font-semibold tracking-tight">{lifetimeAccess.price}</span>
-                    <span className="text-sm text-muted-foreground">/{lifetimeAccess.priceNote}</span>
-                  </div>
-                </div>
-                <a
-                  href="/checkout?plan=lifetime"
-                  className="flex h-11 w-full items-center justify-center rounded-full bg-secondary px-4 text-sm font-medium tracking-wide text-white shadow-[inset_0_1px_2px_rgba(255,255,255,0.25),0_3px_3px_-1.5px_rgba(16,24,40,0.24)] transition-all ease-out hover:opacity-95 active:scale-[0.98]"
-                >
-                  {lifetimeAccess.buttonText}
-                </a>
-                <p className="text-center text-xs text-muted-foreground">
-                  Elite-level product access for life. Large or dedicated datasets may be quoted separately.
-                </p>
-              </div>
+        {enterprise ? (
+          <div className="flex flex-col gap-4 rounded-2xl border border-border bg-background p-6 sm:flex-row sm:items-center sm:justify-between sm:gap-8">
+            <div className="flex flex-col gap-1.5">
+              <h3 className="text-lg font-semibold tracking-tight text-foreground">{enterprise.name}</h3>
+              <p className="max-w-3xl text-sm leading-5 text-muted-foreground">{enterprise.description}</p>
             </div>
+            <a
+              href={enterprise.href}
+              className="inline-flex h-9 w-fit shrink-0 items-center gap-1.5 rounded-full border border-border bg-background px-4 text-sm font-medium text-foreground shadow-sm transition-colors hover:bg-muted"
+            >
+              {enterprise.buttonText}
+              <ArrowRight className="size-4" aria-hidden />
+            </a>
           </div>
-        )}
+        ) : null}
       </div>
     </section>
   );
 }
-

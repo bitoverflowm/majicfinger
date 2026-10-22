@@ -47,20 +47,18 @@ export function LandingJsonLd() {
     : null;
 
   /** Subscription tiers — schema-friendly Offer list under one SoftwareApplication entity. */
-  const offers = (siteConfig.pricingSection?.pricingItems || [])
-    .map((tier) => {
-      const priceStr = tier.priceMonthly || tier.priceWeekly || tier.priceAnnual;
-      if (!priceStr) return null;
-      const numeric = Number(String(priceStr).replace(/[^0-9.]/g, ""));
-      if (!Number.isFinite(numeric)) return null;
+  const offers = (siteConfig.pricingSection?.plans || [])
+    .map((plan: { name: string; description: string; price?: number; priceMonthly?: number; priceAnnual?: number }) => {
+      const price = plan.price ?? plan.priceMonthly ?? plan.priceAnnual;
+      if (typeof price !== "number") return null;
       return {
         "@type": "Offer",
-        name: tier.name,
-        description: tier.description,
-        price: numeric,
+        name: plan.name,
+        description: plan.description,
+        price,
         priceCurrency: "USD",
-        url: tier.hrefMonthly || tier.hrefWeekly || tier.hrefAnnual || url,
-        category: "subscription",
+        url: `${url}/#pricing`,
+        category: price === 0 ? "free" : "subscription",
       };
     })
     .filter(Boolean);

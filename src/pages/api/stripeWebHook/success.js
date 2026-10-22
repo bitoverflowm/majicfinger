@@ -15,6 +15,11 @@ export const config = {
 // Keep legacy plans so existing subscribers are not downgraded.
 const PLAN_MAP = {
   // Current plans
+  "19900:year": { tier: "researcher", cycle: "annual" },
+  "9900:month": { tier: "quant", cycle: "monthly" },
+  "99900:year": { tier: "quant", cycle: "annual" },
+
+  // Basic / Pro / Elite: off the pricing page, still billed for existing subscribers
   "499:week": { tier: "basic", cycle: "weekly" },
   "1999:month": { tier: "basic", cycle: "monthly" },
   "19999:year": { tier: "basic", cycle: "annual" },

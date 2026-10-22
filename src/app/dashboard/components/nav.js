@@ -224,7 +224,7 @@ function ProjectDataUsageIndicator({ summary }) {
         <span className="h-3 w-3 rounded-full bg-background" />
       </span>
       <span className={`text-[10px] font-medium ${isEliteConsumption ? "text-red-500" : "text-muted-foreground"}`}>
-        {isEliteConsumption ? "elite data tier consumption" : `${formatCompactNumber(rows)} rows`}
+        {isEliteConsumption ? "large data tier consumption" : `${formatCompactNumber(rows)} rows`}
       </span>
     </div>
   );
@@ -2198,10 +2198,10 @@ const Nav = () => {
     <AlertDialog open={largeProjectUpgradeOpen} onOpenChange={setLargeProjectUpgradeOpen}>
       <AlertDialogContent>
         <AlertDialogHeader>
-          <AlertDialogTitle>Elite data tier required</AlertDialogTitle>
+          <AlertDialogTitle>Researcher plan required</AlertDialogTitle>
           <AlertDialogDescription className="space-y-3">
             <span className="block">
-              Hey, upgrade your tier to Elite because you are working with extremely large data
+              Hey, upgrade to Researcher or Quant because you are working with extremely large data
               ({upgradeSizeLabel} estimated), or use aggregations and operations to reduce data size.
             </span>
             {upgradeLargestSheet && (

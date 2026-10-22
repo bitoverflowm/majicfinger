@@ -301,10 +301,10 @@ export default function BillingView({ user, locked = false, onBack, className })
     [canChangePlan, fullAccessWithoutPlan, isLoading, locked, membership.tier, renewalFailing, subscription],
   );
 
-  const defaultCycle = useMemo(() => {
-    const c = normalizeMembershipCycle(membership.cycle);
-    return c === "weekly" || c === "annual" ? c : "monthly";
-  }, [membership.cycle]);
+  const defaultCycle = useMemo(
+    () => (normalizeMembershipCycle(membership.cycle) === "annual" ? "annual" : "monthly"),
+    [membership.cycle],
+  );
 
   return (
     <div className={cn("mx-auto flex w-full max-w-7xl flex-col items-center px-4 pb-16 pt-10 text-foreground", className)}>
@@ -366,10 +366,11 @@ export default function BillingView({ user, locked = false, onBack, className })
         key={defaultCycle}
         id="billing-plans"
         showHeader={false}
+        includeFree={false}
         defaultCycle={defaultCycle}
         currentPlan={currentPlan}
         getAction={getAction}
-        className="mt-20"
+        className="mt-10"
       />
 
       <PlanChangeDialog

@@ -1,5 +1,15 @@
-/** Included workspace storage for Elite + Lifetime (display + quota enforcement hooks). */
+import { LARGE_STORAGE_TIERS } from "@/lib/membershipAccess";
+
+/** Included workspace storage for Researcher, Elite + Lifetime (display + quota enforcement hooks). */
 export const ELITE_WORKSPACE_CAP_BYTES = 10 * 1024 * 1024 * 1024;
+export const QUANT_WORKSPACE_CAP_BYTES = 25 * 1024 * 1024 * 1024;
+
+/** @param {object | null | undefined} userLike */
+export function workspaceCapBytesForUser(userLike) {
+  return String(userLike?.subscriptionTier || "").toLowerCase() === "quant"
+    ? QUANT_WORKSPACE_CAP_BYTES
+    : ELITE_WORKSPACE_CAP_BYTES;
+}
 
 /** Planning assumption for “~rows” copy (tabular JSON ≈ 0.5–2 KB/row). */
 export const WORKSPACE_ASSUMED_BYTES_PER_ROW = 1024;
@@ -66,7 +76,7 @@ export function workspaceHasDisplayableData({ connectedData, dataSheets, chartDa
 export function userGetsWorkspaceQuotaMeter(userLike) {
   if (!userLike || typeof userLike !== "object") return false;
   if (userLike.lifetimeMember) return true;
-  return String(userLike.subscriptionTier || "").toLowerCase() === "elite";
+  return LARGE_STORAGE_TIERS.has(String(userLike.subscriptionTier || "").toLowerCase());
 }
 
 /**

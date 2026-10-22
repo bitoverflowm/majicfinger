@@ -68,8 +68,8 @@ export default async function handler(req, res) {
                         return res.status(403).json({
                             success: false,
                             code: "ADVANCED_DATA_STORAGE_REQUIRED",
-                            message: "Elite or lifetime access is required to save projects with sheets above the advanced data storage row limit.",
-                            requiredTier: "elite",
+                            message: "A Researcher or Quant plan is required to save projects with sheets above the advanced data storage row limit.",
+                            requiredTier: "researcher",
                             storageSummary,
                         });
                     }

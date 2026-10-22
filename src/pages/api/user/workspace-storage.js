@@ -5,9 +5,9 @@ import User from "@/models/Users";
 import DataSet from "@/models/DataSets";
 import { isOwnerFullAccessUser } from "@/lib/ownerFullAccess";
 import {
-  ELITE_WORKSPACE_CAP_BYTES,
   WORKSPACE_ASSUMED_BYTES_PER_ROW,
   userGetsWorkspaceQuotaMeter,
+  workspaceCapBytesForUser,
 } from "@/lib/workspaceStorageQuota";
 
 function escapeRegex(s) {
@@ -82,7 +82,7 @@ export default async function handler(req, res) {
   return res.status(200).json({
     eligible: true,
     usedBytes,
-    capBytes: ELITE_WORKSPACE_CAP_BYTES,
+    capBytes: workspaceCapBytesForUser(payload),
     assumedBytesPerRow: WORKSPACE_ASSUMED_BYTES_PER_ROW,
   });
 }

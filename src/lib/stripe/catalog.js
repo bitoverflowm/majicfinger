@@ -13,11 +13,17 @@ function planHref(name, cycle) {
 }
 
 /**
- * Amounts match PLAN_MAP in the Stripe webhook. Live charges use the existing
- * Payment Link price when the secret key can see it. Test keys create a
- * matching test price so 4242… works without live Payment Links.
+ * Amounts match PLAN_MAP in the Stripe webhook. Live charges use `priceId`,
+ * then a live price with lookup key `lychee_<key>`, then the Payment Link
+ * price. Test keys create a matching test price so 4242… works without live
+ * Payment Links.
  */
 export const CHECKOUT_PLANS = [
+  { key: "researcher_annual", tier: "researcher", cycle: "annual", mode: "subscription", amount: 19900, interval: "year", label: "Researcher annual", href: "", priceId: "" },
+  { key: "quant_monthly", tier: "quant", cycle: "monthly", mode: "subscription", amount: 9900, interval: "month", label: "Quant monthly", href: "", priceId: "" },
+  { key: "quant_annual", tier: "quant", cycle: "annual", mode: "subscription", amount: 99900, interval: "year", label: "Quant annual", href: "", priceId: "" },
+
+  // Legacy plans: no longer on the pricing page; existing subscribers can still switch between them.
   { key: "basic_weekly", tier: "basic", cycle: "weekly", mode: "subscription", amount: 499, interval: "week", label: "Basic weekly", href: planHref("basic", "weekly"), priceId: "price_1TKZCwILjX7EMe6xchbsFVX4" },
   { key: "basic_monthly", tier: "basic", cycle: "monthly", mode: "subscription", amount: 1999, interval: "month", label: "Basic monthly", href: planHref("basic", "monthly"), priceId: "price_1TKZOTILjX7EMe6xzf0YXusA" },
   { key: "basic_annual", tier: "basic", cycle: "annual", mode: "subscription", amount: 19999, interval: "year", label: "Basic annual", href: planHref("basic", "annual"), priceId: "price_1TKZSNILjX7EMe6xls8YOG7H" },
@@ -113,8 +119,37 @@ async function priceFromPaymentLink(stripe, href) {
   return null;
 }
 
+function planLookupKey(plan) {
+  return `lychee_${plan.key}`;
+}
+
+/** Live price tagged with the plan's lookup key, only if its amount and interval match the plan. */
+async function priceFromLookupKey(stripe, plan) {
+  const cache = linkCache();
+  const cacheKey = `lookup:${planLookupKey(plan)}`;
+  if (cache.has(cacheKey)) return cache.get(cacheKey);
+  const res = await stripe.prices.list({ lookup_keys: [planLookupKey(plan)], active: true, limit: 1 });
+  const price = res.data?.[0];
+  if (!price) return null;
+  const interval = price.recurring?.interval || null;
+  if (price.unit_amount !== plan.amount || interval !== plan.interval) {
+    await notifyCheckoutAlert({
+      title: "Stripe price doesn't match plan",
+      fields: {
+        Plan: plan.key,
+        Price: price.id,
+        Expected: `${plan.amount}:${plan.interval}`,
+        Found: `${price.unit_amount}:${interval}`,
+      },
+    });
+    return null;
+  }
+  cache.set(cacheKey, price.id);
+  return price.id;
+}
+
 async function ensureTestPrice(stripe, plan) {
-  const lookupKey = `lychee_${plan.key}`;
+  const lookupKey = planLookupKey(plan);
   const existing = await stripe.prices.list({ lookup_keys: [lookupKey], limit: 1 });
   if (existing.data?.[0]?.id) return existing.data[0].id;
 
@@ -156,6 +191,10 @@ export async function resolveCheckoutPrice(plan) {
     // Resolving them here avoids a Payment Link list call on every checkout.
     if (plan.priceId) {
       return { priceId: plan.priceId, extras: {}, fallbackUrl };
+    }
+    const fromLookup = await priceFromLookupKey(stripe, plan);
+    if (fromLookup) {
+      return { priceId: fromLookup, extras: { allow_promotion_codes: true }, fallbackUrl };
     }
     if (plan.href) {
       const fromLink = await priceFromPaymentLink(stripe, plan.href);
