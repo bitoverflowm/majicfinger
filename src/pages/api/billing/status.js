@@ -1,6 +1,6 @@
 import { loadSessionMember } from "@/lib/requirePaidMember";
 import { membershipState, normalizeMembershipCycle, normalizeMembershipTier } from "@/lib/membershipAccess";
-import { getStripe } from "@/lib/stripe/client";
+import { getStripe, stripeSecretKey } from "@/lib/stripe/client";
 import { findMemberSubscription, summarizeSubscription, syncUserFromSubscription } from "@/lib/stripe/membership";
 
 const CHANGEABLE_STATUSES = new Set(["active", "trialing"]);
@@ -30,7 +30,7 @@ export default async function handler(req, res) {
   let subscription = null;
   let stripeError = null;
 
-  if (dbUser && process.env.STRIPE_SECRET_KEY) {
+  if (dbUser && stripeSecretKey()) {
     try {
       const stripe = getStripe();
       const sub = await findMemberSubscription(stripe, dbUser, {

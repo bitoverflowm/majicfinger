@@ -54,6 +54,19 @@ export function planFromQuery(plan, cycle) {
   return CHECKOUT_PLANS.find((item) => item.tier === name && item.cycle === normalizedCycle) || null;
 }
 
+/** Safe to send to the browser; the checkout page renders its order summary from this. */
+export function checkoutPlanSummary(plan) {
+  return {
+    key: plan.key,
+    tier: plan.tier,
+    cycle: plan.cycle,
+    mode: plan.mode,
+    amount: plan.amount,
+    interval: plan.interval,
+    label: plan.label,
+  };
+}
+
 function envPriceId(planKey) {
   const specific = process.env[`STRIPE_PRICE_${planKey.toUpperCase()}`];
   if (specific) return String(specific).trim();
@@ -119,7 +132,7 @@ async function priceFromPaymentLink(stripe, href) {
   return null;
 }
 
-function planLookupKey(plan) {
+export function planLookupKey(plan) {
   return `lychee_${plan.key}`;
 }
 

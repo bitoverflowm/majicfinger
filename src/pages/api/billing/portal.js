@@ -1,5 +1,5 @@
 import { loadSessionMember } from "@/lib/requirePaidMember";
-import { getStripe } from "@/lib/stripe/client";
+import { getStripe, stripeSecretKey } from "@/lib/stripe/client";
 import { requestOrigin } from "@/lib/stripe/catalog";
 import { STRIPE_PORTAL_LOGIN_URL, findMemberSubscription, summarizeSubscription } from "@/lib/stripe/membership";
 
@@ -18,7 +18,7 @@ export default async function handler(req, res) {
   }
   if (!member.session) return res.status(401).json({ success: false, message: "Unauthorized" });
 
-  if (!process.env.STRIPE_SECRET_KEY || !member.dbUser) {
+  if (!stripeSecretKey() || !member.dbUser) {
     return res.status(200).json({ success: true, url: STRIPE_PORTAL_LOGIN_URL });
   }
 
@@ -31,9 +31,11 @@ export default async function handler(req, res) {
     }
     if (!customer) return res.status(200).json({ success: true, url: STRIPE_PORTAL_LOGIN_URL });
 
+    const configuration = String(process.env.STRIPE_PORTAL_CONFIGURATION || "").trim();
     const portal = await stripe.billingPortal.sessions.create({
       customer,
       return_url: `${requestOrigin(req)}/dashboard?view=billing`,
+      ...(configuration ? { configuration } : {}),
     });
     return res.status(200).json({ success: true, url: portal.url });
   } catch (err) {

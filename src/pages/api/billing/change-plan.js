@@ -1,5 +1,5 @@
 import { loadSessionMember } from "@/lib/requirePaidMember";
-import { getStripe } from "@/lib/stripe/client";
+import { getStripe, stripeSecretKey } from "@/lib/stripe/client";
 import { planFromQuery, resolveCheckoutPrice } from "@/lib/stripe/catalog";
 import {
   findMemberSubscription,
@@ -20,7 +20,7 @@ export default async function handler(req, res) {
     res.setHeader("Allow", "POST");
     return res.status(405).json({ success: false });
   }
-  if (!process.env.STRIPE_SECRET_KEY) {
+  if (!stripeSecretKey()) {
     return res.status(503).json({ success: false, message: "Billing is not configured." });
   }
 

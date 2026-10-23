@@ -38,7 +38,7 @@ async function availableHandle(except) {
   return randomUserHandle();
 }
 
-export default function CheckoutAccountStep({ onComplete }) {
+export default function CheckoutAccountStep({ onComplete, initialEmail = "", initialName = "", notice = null }) {
   const { data: user, isLoading } = useSWR("/api/user", userSwrFetcher);
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
@@ -61,11 +61,14 @@ export default function CheckoutAccountStep({ onComplete }) {
   }, [previewUrl]);
 
   useEffect(() => {
-    if (isDev) {
+    if (initialEmail) {
+      setEmail(initialEmail);
+      if (initialName) setName(initialName);
+    } else if (isDev) {
       setEmail(DEV_LOGIN_BYPASS_EMAIL);
       setName(DEV_LOGIN_BYPASS_NAME);
     }
-  }, []);
+  }, [initialEmail, initialName]);
 
   useEffect(() => {
     let cancelled = false;
@@ -244,6 +247,7 @@ export default function CheckoutAccountStep({ onComplete }) {
               Then pick the handle and avatar people will see on Lychee.
             </p>
           </div>
+          {notice}
           {isLoading || (signedIn && user?.user_name) || loading ? (
             <div className="space-y-3">
               <p className="text-center text-sm text-muted-foreground">

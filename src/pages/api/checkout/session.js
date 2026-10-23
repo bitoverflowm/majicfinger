@@ -1,12 +1,13 @@
 import crypto from "crypto";
 import dbConnect from "@/lib/dbConnect";
 import CheckoutAttempt from "@/models/CheckoutAttempt";
-import { getStripe } from "@/lib/stripe/client";
+import { getCheckoutStripe, stripePublishableKey, stripeSecretKey } from "@/lib/stripe/client";
 import {
   planFromQuery,
   resolveCheckoutPrice,
   requestOrigin,
   cleanReferral,
+  checkoutPlanSummary,
 } from "@/lib/stripe/catalog";
 import { attemptCookieHeader } from "@/lib/stripe/checkoutCookies";
 import { notifyCheckoutAlert } from "@/lib/telegram/checkoutAlert";
@@ -15,35 +16,8 @@ import { loadSessionMember } from "@/lib/requirePaidMember";
 /** A second Checkout would start a second subscription; these members change plans in billing. */
 const ALREADY_BILLED_REASONS = new Set(["active", "legacy", "lifetime"]);
 
-function brandingForTheme(theme) {
-  if (theme === "dark") {
-    return {
-      background_color: "#1c1c1e",
-      button_color: "#f4f4f5",
-      border_style: "rounded",
-      font_family: "inter",
-    };
-  }
-  return {
-    background_color: "#ffffff",
-    button_color: "#171717",
-    border_style: "rounded",
-    font_family: "inter",
-  };
-}
-
-async function createThemedCheckoutSession(stripe, params, theme) {
-  try {
-    return await stripe.checkout.sessions.create({
-      ...params,
-      branding_settings: brandingForTheme(theme),
-    });
-  } catch (err) {
-    const msg = `${err?.message || ""} ${err?.param || ""}`.toLowerCase();
-    if (!msg.includes("branding")) throw err;
-    return stripe.checkout.sessions.create(params);
-  }
-}
+/** Groups these sessions in the Stripe Dashboard. */
+const INTEGRATION_IDENTIFIER = "lychee-inapp-checkout-qmzrtkwe";
 
 export default async function handler(req, res) {
   if (req.method !== "POST") return res.status(405).end();
@@ -57,6 +31,7 @@ export default async function handler(req, res) {
     return res.status(400).json({ error: "Unknown plan" });
   }
 
+  let loginEmail = "";
   try {
     const { session: login, user, state } = await loadSessionMember(req);
     const renewalFailing = ["past_due", "unpaid"].includes(String(user?.subscriptionStatus || "").toLowerCase());
@@ -67,52 +42,47 @@ export default async function handler(req, res) {
         redirect: "/dashboard?view=billing",
       });
     }
+    loginEmail = String(login?.email || user?.email || "").trim().toLowerCase();
   } catch {
     // Account lookup is best-effort here; logged-out checkout must keep working.
   }
 
-  const fallbackUrl = plan.href || "";
-  if (!process.env.STRIPE_SECRET_KEY) {
+  if (!stripeSecretKey() || !stripePublishableKey()) {
     await notifyCheckoutAlert({
-      title: "Embedded checkout is missing Stripe keys",
-      fields: {
-        Plan: plan.key,
-        "Secret key": "missing",
-        Fallback: fallbackUrl ? "payment link" : "none",
-      },
+      title: "Checkout is missing Stripe keys",
+      fields: { Plan: plan.key, "Secret key": "missing" },
     });
-    if (fallbackUrl) return res.status(200).json({ fallbackUrl, reason: "missing_secret_key" });
     return res.status(500).json({ error: "Checkout is not configured" });
   }
 
   try {
     const resolved = await resolveCheckoutPrice(plan);
     if (!resolved?.priceId) {
-      if (fallbackUrl) return res.status(200).json({ fallbackUrl, reason: "missing_price" });
       return res.status(500).json({ error: "Could not start checkout" });
     }
 
     const attemptId = crypto.randomBytes(16).toString("hex");
     const referral = cleanReferral(req.body?.referral);
     const origin = requestOrigin(req);
-    const stripe = getStripe();
-    const theme = req.body?.theme === "dark" ? "dark" : "light";
-    const sessionParams = {
-      ui_mode: "embedded",
+    const stripe = getCheckoutStripe();
+    const metadata = {
+      checkoutAttemptId: attemptId,
+      planKey: plan.key,
+      ...(referral ? { referral } : {}),
+    };
+    const session = await stripe.checkout.sessions.create({
+      ui_mode: "elements",
+      integration_identifier: INTEGRATION_IDENTIFIER,
       mode: plan.mode,
       line_items: [{ price: resolved.priceId, quantity: 1 }],
       return_url: `${origin}/checkout/return?session_id={CHECKOUT_SESSION_ID}`,
-      redirect_on_completion: "always",
       client_reference_id: referral || attemptId,
-      metadata: {
-        checkoutAttemptId: attemptId,
-        planKey: plan.key,
-        ...(referral ? { referral } : {}),
-      },
-      ...(plan.mode === "payment" ? { customer_creation: "always" } : {}),
-      ...resolved.extras,
-    };
-    const session = await createThemedCheckoutSession(stripe, sessionParams, theme);
+      metadata,
+      ...(plan.mode === "subscription"
+        ? { subscription_data: { metadata: { planKey: plan.key, checkoutAttemptId: attemptId } } }
+        : { customer_creation: "always" }),
+      ...(resolved.extras?.allow_promotion_codes ? { allow_promotion_codes: true } : {}),
+    });
 
     if (!session?.client_secret) {
       throw new Error("Stripe did not return a client secret");
@@ -142,18 +112,21 @@ export default async function handler(req, res) {
         },
       });
     }
-    return res.status(200).json({ clientSecret: session.client_secret });
+    return res.status(200).json({
+      clientSecret: session.client_secret,
+      publishableKey: stripePublishableKey(),
+      plan: checkoutPlanSummary(plan),
+      email: loginEmail || null,
+      promoCodes: !!resolved.extras?.allow_promotion_codes,
+    });
   } catch (err) {
-    const message = err?.message || String(err);
     await notifyCheckoutAlert({
-      title: "Could not create embedded checkout",
+      title: "Could not create checkout session",
       fields: {
         Plan: plan.key,
-        Error: message,
-        Fallback: fallbackUrl ? "payment link" : "none",
+        Error: err?.message || String(err),
       },
     });
-    if (fallbackUrl) return res.status(200).json({ fallbackUrl, reason: message });
     return res.status(500).json({ error: "Could not start checkout" });
   }
 }

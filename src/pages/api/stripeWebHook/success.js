@@ -1,8 +1,11 @@
 import dbConnect from "@/lib/dbConnect";
 import User from "@/models/Users";
 import CheckoutAttempt from "@/models/CheckoutAttempt";
+import StripeWebhookEvent from "@/models/StripeWebhookEvent";
 import { notifySignup } from "@/lib/telegram/trackEvent";
 import { notifyCheckoutAlert } from "@/lib/telegram/checkoutAlert";
+import { notifyBillingEvent } from "@/lib/telegram/billingAlert";
+import { stripeSecretKey } from "@/lib/stripe/client";
 import { buffer } from "micro";
 
 export const config = {
@@ -51,6 +54,121 @@ function resolvePlan({ amount, interval, mode }) {
   if (typeof amount !== "number" || !Number.isFinite(amount)) return null;
   const key = `${amount}:${mode === "payment" ? "one-time" : interval || "unknown"}`;
   return PLAN_MAP[key] || null;
+}
+
+const CURRENT_TIERS = new Set(["researcher", "quant"]);
+
+function planLabel(mapping) {
+  if (!mapping) return "Unknown plan";
+  const name = `${mapping.tier.charAt(0).toUpperCase()}${mapping.tier.slice(1)} ${mapping.cycle}`;
+  return CURRENT_TIERS.has(mapping.tier) ? name : `${name} (legacy)`;
+}
+
+// The webhook endpoint and this SDK's default API version return the older
+// object shapes; newer versions moved these fields. Read both.
+function subscriptionIdOf(invoice) {
+  const direct = invoice?.subscription;
+  if (direct) return typeof direct === "string" ? direct : direct.id || "";
+  const nested = invoice?.parent?.subscription_details?.subscription;
+  if (nested) return typeof nested === "string" ? nested : nested.id || "";
+  return "";
+}
+
+function periodEndOf(subscription) {
+  if (subscription?.current_period_end) return subscription.current_period_end;
+  const ends = (subscription?.items?.data || [])
+    .map((item) => item?.current_period_end)
+    .filter((value) => Number.isFinite(value));
+  return ends.length ? Math.max(...ends) : null;
+}
+
+function nextPaymentDateOf(subscription) {
+  const end = periodEndOf(subscription);
+  return end ? new Date(end * 1000) : null;
+}
+
+function invoiceIsPaid(invoice) {
+  return invoice?.paid === true || invoice?.status === "paid";
+}
+
+function customerIdOf(obj) {
+  if (!obj?.customer) return "";
+  return typeof obj.customer === "string" ? obj.customer : obj.customer.id || "";
+}
+
+const EVENT_RETENTION_MS = 30 * 24 * 60 * 60 * 1000;
+const STALE_PROCESSING_MS = 5 * 60 * 1000;
+
+/**
+ * Record the event before handling it. Returns "claimed" (handle it),
+ * "processed" (already done), "busy" (another delivery is mid-flight), or
+ * "unchecked" when the store is unavailable; payments still get handled then.
+ */
+async function claimEvent(event) {
+  try {
+    await dbConnect();
+    await StripeWebhookEvent.create({
+      eventId: event.id,
+      type: event.type,
+      objectId: event.data?.object?.id,
+      expiresAt: new Date(Date.now() + EVENT_RETENTION_MS),
+    });
+    return "claimed";
+  } catch (err) {
+    if (err?.code !== 11000) {
+      console.error("[Stripe Webhook] event dedupe unavailable:", err?.message || err);
+      return "unchecked";
+    }
+  }
+  try {
+    const existing = await StripeWebhookEvent.findOne({ eventId: event.id }).lean();
+    if (existing?.status === "processed") return "processed";
+    const takeover = await StripeWebhookEvent.findOneAndUpdate(
+      { eventId: event.id, status: "processing", updatedAt: { $lt: new Date(Date.now() - STALE_PROCESSING_MS) } },
+      { $set: { status: "processing" } },
+      { new: true },
+    );
+    return takeover ? "claimed" : "busy";
+  } catch (err) {
+    console.error("[Stripe Webhook] event dedupe lookup failed:", err?.message || err);
+    return "unchecked";
+  }
+}
+
+async function finishEvent(eventId) {
+  try {
+    await StripeWebhookEvent.updateOne(
+      { eventId },
+      { $set: { status: "processed", processedAt: new Date() } },
+    );
+  } catch (err) {
+    console.error("[Stripe Webhook] could not mark event processed:", err?.message || err);
+  }
+}
+
+async function releaseEvent(eventId) {
+  try {
+    await StripeWebhookEvent.deleteOne({ eventId, status: "processing" });
+  } catch (err) {
+    console.error("[Stripe Webhook] could not release event:", err?.message || err);
+  }
+}
+
+/** One Telegram message per key, even when Stripe sends several events for it. */
+async function notifyOnce(key, send) {
+  try {
+    await StripeWebhookEvent.create({
+      eventId: key,
+      type: "notification",
+      status: "processed",
+      processedAt: new Date(),
+      expiresAt: new Date(Date.now() + EVENT_RETENTION_MS),
+    });
+  } catch (err) {
+    if (err?.code === 11000) return;
+    console.error("[Stripe Webhook] notification dedupe unavailable:", err?.message || err);
+  }
+  await send();
 }
 
 function mappingGrantsLifetime(mapping) {
@@ -111,7 +229,7 @@ export default async function handler(req, res) {
   if (req.method !== "POST") return res.status(405).end();
 
   const endpointSecret = process.env.STRIPE_WEBHOOK_SECRET;
-  const stripe = require("stripe")(process.env.STRIPE_SECRET_KEY);
+  const stripe = require("stripe")(stripeSecretKey());
 
   let event;
   try {
@@ -128,6 +246,10 @@ export default async function handler(req, res) {
   }
 
   const data = event.data.object;
+
+  const claim = await claimEvent(event);
+  if (claim === "processed") return res.status(200).json({ received: true, duplicate: true });
+  if (claim === "busy") return res.status(409).json({ error: "Event is already being processed" });
 
   try {
     switch (event.type) {
@@ -169,9 +291,14 @@ export default async function handler(req, res) {
       case "customer.subscription.paused":
       case "customer.subscription.resumed":
       case "customer.subscription.pending_update_applied":
-      case "customer.subscription.pending_update_expired":
-        await handleSubscriptionChange(data, event.type);
+      case "customer.subscription.pending_update_expired": {
+        // Events can arrive out of order; apply Stripe's current state, not the event snapshot.
+        const latest =
+          event.type === "customer.subscription.deleted" ? data : await latestSubscription(stripe, data);
+        await handleSubscriptionChange(latest, event.type);
+        await notifySubscriptionLifecycle(stripe, event);
         break;
+      }
 
       // Invoice payment outcomes
       case "invoice.payment_failed":
@@ -179,6 +306,9 @@ export default async function handler(req, res) {
         break;
       case "invoice.payment_succeeded":
       case "invoice.paid":
+        await handleInvoicePaymentSucceeded(data);
+        await notifyRenewal(stripe, data);
+        break;
       case "invoice_payment.paid":
         await handleInvoicePaymentSucceeded(data);
         break;
@@ -194,6 +324,7 @@ export default async function handler(req, res) {
     }
   } catch (err) {
     console.error("Webhook handler error:", err);
+    if (claim === "claimed") await releaseEvent(event.id);
     await notifyCheckoutAlert({
       title: "Stripe webhook failed",
       fields: {
@@ -206,7 +337,139 @@ export default async function handler(req, res) {
     return res.status(500).json({ error: err.message });
   }
 
+  if (claim === "claimed") await finishEvent(event.id);
   res.status(200).json({ received: true });
+}
+
+async function latestSubscription(stripe, subscription) {
+  if (!subscription?.id) return subscription;
+  try {
+    return await stripe.subscriptions.retrieve(subscription.id);
+  } catch (err) {
+    console.error(`[Stripe Webhook] could not refetch ${subscription.id}, using event payload:`, err?.message || err);
+    return subscription;
+  }
+}
+
+function mappingForPrice(price, plan) {
+  const amount = price?.unit_amount ?? plan?.amount;
+  const interval = price?.recurring?.interval ?? plan?.interval;
+  return resolvePlan({ amount, interval, mode: "subscription" });
+}
+
+async function subscriberEmail(stripe, subscription) {
+  const customerId = customerIdOf(subscription);
+  try {
+    await dbConnect();
+    const user =
+      (subscription?.id && (await User.findOne({ stripeSubscriptionId: String(subscription.id) }).lean())) ||
+      (customerId && (await User.findOne({ stripeCustomerId: customerId }).lean()));
+    if (user?.email) return normalizeEmail(user.email);
+  } catch {
+    // Fall through to Stripe.
+  }
+  if (!customerId) return "";
+  try {
+    const customer = await stripe.customers.retrieve(customerId);
+    return normalizeEmail(customer?.email);
+  } catch {
+    return "";
+  }
+}
+
+function formatUsdCents(cents) {
+  if (typeof cents !== "number" || !Number.isFinite(cents)) return undefined;
+  return `$${(cents / 100).toFixed(2)}`;
+}
+
+function formatUnixDate(seconds) {
+  return seconds ? new Date(seconds * 1000).toISOString().slice(0, 10) : undefined;
+}
+
+/** Telegram for plan changes and cancellations. Activations already notify through signup. */
+async function notifySubscriptionLifecycle(stripe, event) {
+  try {
+    const sub = event.data.object;
+    const previous = event.data.previous_attributes || {};
+    const item = sub?.items?.data?.[0];
+    const mapping = mappingForPrice(item?.price, item?.plan);
+    const base = {
+      Plan: planLabel(mapping),
+      "Stripe subscription": sub?.id,
+      "Stripe customer": customerIdOf(sub),
+    };
+
+    if (event.type === "customer.subscription.deleted") {
+      await notifyBillingEvent({
+        title: "Subscription ended",
+        fields: { Email: await subscriberEmail(stripe, sub), ...base, Reason: sub?.cancellation_details?.reason },
+      });
+      return;
+    }
+    if (event.type !== "customer.subscription.updated") return;
+
+    const previousItem = previous.items?.data?.[0];
+    const previousMapping = previousItem ? mappingForPrice(previousItem.price, previousItem.plan) : null;
+    const previousPriceId = previousItem?.price?.id || previousItem?.plan?.id;
+    if (previousPriceId && previousPriceId !== item?.price?.id) {
+      await notifyBillingEvent({
+        title: "Plan changed",
+        fields: {
+          Email: await subscriberEmail(stripe, sub),
+          From: planLabel(previousMapping),
+          To: planLabel(mapping),
+          "Stripe subscription": sub?.id,
+          "Stripe customer": customerIdOf(sub),
+        },
+      });
+    }
+
+    const cancelChanged = "cancel_at_period_end" in previous || "cancel_at" in previous;
+    if (cancelChanged) {
+      const cancelling = !!(sub?.cancel_at_period_end || sub?.cancel_at);
+      await notifyBillingEvent({
+        title: cancelling ? "Cancellation scheduled" : "Cancellation undone",
+        fields: {
+          Email: await subscriberEmail(stripe, sub),
+          ...base,
+          ...(cancelling ? { "Access ends": formatUnixDate(sub?.cancel_at || periodEndOf(sub)) } : {}),
+          Feedback: cancelling ? sub?.cancellation_details?.feedback : undefined,
+          Comment: cancelling ? sub?.cancellation_details?.comment : undefined,
+        },
+      });
+    }
+  } catch (err) {
+    console.error("[Stripe Webhook] subscription notification failed:", err?.message || err);
+  }
+}
+
+/** Telegram for a paid renewal. `invoice.paid` and `invoice.payment_succeeded` both fire; send once per invoice. */
+async function notifyRenewal(stripe, invoice) {
+  try {
+    if (invoice?.billing_reason !== "subscription_cycle" || !invoiceIsPaid(invoice) || !invoice?.id) return;
+    await notifyOnce(`renewal:${invoice.id}`, async () => {
+      const line =
+        (invoice.lines?.data || []).find((entry) => entry?.type === "subscription") || invoice.lines?.data?.[0];
+      const mapping = mappingForPrice(line?.price, line?.plan);
+      const email = normalizeEmail(invoice.customer_email) || (await subscriberEmail(stripe, {
+        id: subscriptionIdOf(invoice),
+        customer: invoice.customer,
+      }));
+      await notifyBillingEvent({
+        title: "Subscription renewed",
+        fields: {
+          Email: email,
+          Plan: planLabel(mapping),
+          Amount: formatUsdCents(invoice.amount_paid),
+          "Next renewal": formatUnixDate(line?.period?.end),
+          "Stripe subscription": subscriptionIdOf(invoice),
+          Invoice: invoice.id,
+        },
+      });
+    });
+  } catch (err) {
+    console.error("[Stripe Webhook] renewal notification failed:", err?.message || err);
+  }
 }
 
 function checkoutBillingEmail(session) {
@@ -340,7 +603,7 @@ async function handleCheckoutCompleted(session) {
     });
     return { ok: true };
   } else if (session.mode === "subscription" && session.subscription) {
-    const stripe = require("stripe")(process.env.STRIPE_SECRET_KEY);
+    const stripe = require("stripe")(stripeSecretKey());
     const sub = await resolveSubscriptionFromCheckoutSession(session, stripe);
     const email = session.customer_details?.email;
     if (!sub) {
@@ -383,7 +646,7 @@ async function handleCheckoutCompleted(session) {
         stripeCustomerId: sub.customer || session.customer || null,
         stripeSubscriptionId: sub.id || null,
         stripePriceId: sub.items?.data?.[0]?.price?.id || null,
-        nextPaymentDate: sub.current_period_end ? new Date(sub.current_period_end * 1000) : null,
+        nextPaymentDate: nextPaymentDateOf(sub),
         subscriptionStartedAt: sub.start_date ? new Date(sub.start_date * 1000) : new Date(),
       });
       if (!mapping) return { ok: false, reason: "unrecognized_amount" };
@@ -413,7 +676,7 @@ async function handleSubscriptionChange(subscription, eventType) {
   let customerEmail = subscription.customer_email;
   if (!customerEmail && subscription.customer) {
     try {
-      const stripe = require("stripe")(process.env.STRIPE_SECRET_KEY);
+      const stripe = require("stripe")(stripeSecretKey());
       const customer = await stripe.customers.retrieve(subscription.customer);
       customerEmail = customer.email;
     } catch (err) {
@@ -430,9 +693,7 @@ async function handleSubscriptionChange(subscription, eventType) {
       stripeCustomerId: subscription.customer || null,
       stripeSubscriptionId: subscription.id || null,
       stripePriceId: subscription.items?.data?.[0]?.price?.id || null,
-      nextPaymentDate: subscription.current_period_end
-        ? new Date(subscription.current_period_end * 1000)
-        : null,
+      nextPaymentDate: nextPaymentDateOf(subscription),
     });
   }
 }
@@ -480,7 +741,7 @@ function mapSubscriptionToTier(subscription) {
 
 function buildSubscriptionFromInvoice(invoice) {
   if (!invoice) return null;
-  const subscriptionId = typeof invoice.subscription === "string" ? invoice.subscription : invoice.subscription?.id;
+  const subscriptionId = subscriptionIdOf(invoice);
   if (!subscriptionId) return null;
 
   const lineItems = invoice?.lines?.data || [];
@@ -496,7 +757,7 @@ function buildSubscriptionFromInvoice(invoice) {
     id: subscriptionId,
     customer: typeof invoice.customer === "string" ? invoice.customer : invoice.customer?.id,
     customer_email: invoice.customer_email || invoice?.customer_details?.email || null,
-    status: invoice.paid ? "active" : "incomplete",
+    status: invoiceIsPaid(invoice) ? "active" : "incomplete",
     current_period_end: subscriptionLine?.period?.end || null,
     start_date: subscriptionLine?.period?.start || null,
     items: {
@@ -558,7 +819,7 @@ async function handleCheckoutPaymentFailed(session) {
   // Best-effort tier/cycle mapping; we do not grant access on failure.
   try {
     if (session.mode === "subscription" && session.subscription) {
-      const stripe = require("stripe")(process.env.STRIPE_SECRET_KEY);
+      const stripe = require("stripe")(stripeSecretKey());
       const sub = await stripe.subscriptions.retrieve(session.subscription);
       const mapping = mapSubscriptionToTier(sub);
       await updateUserSubscriptionStatus(email, {
@@ -568,7 +829,7 @@ async function handleCheckoutPaymentFailed(session) {
         stripeCustomerId: sub.customer || session.customer || null,
         stripeSubscriptionId: sub.id || null,
         stripePriceId: sub.items?.data?.[0]?.price?.id || null,
-        nextPaymentDate: sub.current_period_end ? new Date(sub.current_period_end * 1000) : null,
+        nextPaymentDate: nextPaymentDateOf(sub),
       });
       return;
     }
@@ -611,21 +872,22 @@ async function handleInvoicePaymentNeedsAction(invoice, statusValue) {
 }
 
 async function handleInvoicePaymentSucceeded(invoice) {
-  if (invoice?.subscription) {
+  const subscriptionId = subscriptionIdOf(invoice);
+  if (subscriptionId) {
     // Plan-change invoices carry proration lines priced at the old plan.
     const hasProration =
       invoice.billing_reason === "subscription_update" ||
       (invoice?.lines?.data || []).some((line) => line?.proration);
     const syntheticSub = hasProration ? null : buildSubscriptionFromInvoice(invoice);
-    if (syntheticSub) {
+    if (syntheticSub && syntheticSub.items.data[0].price.unit_amount != null) {
       await handleSubscriptionChange(syntheticSub, "customer.subscription.updated");
       return;
     }
 
-    // Rare fallback when invoice payload lacks enough line item details.
+    // Invoice lines without a price amount, or a plan change: read the subscription itself.
     try {
-      const stripe = require("stripe")(process.env.STRIPE_SECRET_KEY);
-      const sub = await stripe.subscriptions.retrieve(invoice.subscription);
+      const stripe = require("stripe")(stripeSecretKey());
+      const sub = await stripe.subscriptions.retrieve(subscriptionId);
       await handleSubscriptionChange(sub, "customer.subscription.updated");
       return;
     } catch (err) {
@@ -897,7 +1159,7 @@ async function getEmailFromStripeObject(obj) {
   // Fallback: if we only have a stripe customer id, fetch it.
   if (obj.customer) {
     try {
-      const stripe = require("stripe")(process.env.STRIPE_SECRET_KEY);
+      const stripe = require("stripe")(stripeSecretKey());
       const customer = await stripe.customers.retrieve(obj.customer);
       return customer?.email || null;
     } catch (err) {
