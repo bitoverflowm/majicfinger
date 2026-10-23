@@ -12,9 +12,12 @@
  * billing is untouched.
  *
  *   node scripts/stripe-setup.cjs                         # test, dry run
- *   node scripts/stripe-setup.cjs --apply                 # test, write
+ *   node scripts/stripe-setup.cjs --apply --account acct_…               # test, write
  *   node scripts/stripe-setup.cjs --live                  # live, dry run
- *   node scripts/stripe-setup.cjs --live --apply --yes-live
+ *   node scripts/stripe-setup.cjs --live --apply --yes-live --account acct_…
+ *
+ * Writes need --account set to the id the dry run prints, so a key for the
+ * wrong Stripe account can never be changed by mistake.
  *
  * Options:
  *   --domain lycheedata.com     register a payment method domain (Apple Pay, Google Pay, Link)
@@ -325,7 +328,13 @@ async function ensureWebhook(url) {
 }
 
 (async () => {
+  const account = await stripe("GET", "account");
+  const accountName = account.settings?.dashboard?.display_name || account.business_profile?.name || "";
   console.log(`Stripe setup: ${LIVE ? "LIVE" : "test"} mode, ${APPLY ? "applying changes" : "dry run"}`);
+  console.log(`Account: ${account.id}${accountName ? ` (${accountName})` : ""}`);
+  if (APPLY && option("--account") !== account.id) {
+    throw new Error(`Writes need --account ${account.id} to confirm this is the right Stripe account.`);
+  }
   const priceIdsByProduct = await ensurePrices();
   await ensurePaymentMethods();
   await ensureDomain(option("--domain"));
