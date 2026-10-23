@@ -49,6 +49,9 @@ VisitorSessionSchema.index({ ended_at: -1 });
 VisitorSessionSchema.index({ client_ip: 1, start_telegram_sent: 1, start_notified_at: -1 });
 VisitorSessionSchema.index({ visitor_id: 1, start_telegram_sent: 1, start_notified_at: -1 });
 VisitorSessionSchema.index({ start_dedupe_key: 1, start_telegram_sent: 1, start_notified_at: -1 });
+/** Returning-visitor tallies at session end / checkout open. */
+VisitorSessionSchema.index({ session_kind: 1, client_ip: 1, started_at: -1 });
+VisitorSessionSchema.index({ session_kind: 1, visitor_id: 1, started_at: -1 });
 
 export default mongoose.models.VisitorSession ||
   mongoose.model("VisitorSession", VisitorSessionSchema);
