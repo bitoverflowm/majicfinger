@@ -33,9 +33,19 @@ export function VisitorJourneyInit() {
       endVisitorSession(identityRef.current);
     };
 
+    // Flush queued steps when the tab backgrounds so a later kill still has them saved.
+    // Do not end the session here — switching tabs briefly would cut the journey short.
+    const onVisibilityChange = () => {
+      if (document.visibilityState === "hidden") {
+        flushJourneyQueue(false, identityRef.current);
+      }
+    };
+
     window.addEventListener("pagehide", onPageHide);
+    document.addEventListener("visibilitychange", onVisibilityChange);
     return () => {
       window.removeEventListener("pagehide", onPageHide);
+      document.removeEventListener("visibilitychange", onVisibilityChange);
       flushJourneyQueue(false);
     };
   }, []);

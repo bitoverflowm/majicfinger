@@ -13,7 +13,7 @@ import { buildDataPullTelegramMessage } from "@/lib/analytics/formatDataPullTele
 import { extractClientMeta, geoFieldsFromMeta } from "@/lib/analytics/requestClientMeta";
 import { landingFieldsFromMeta } from "@/lib/analytics/sessionFieldsFromMeta";
 import {
-  hasMeaningfulVisitorOutcome,
+  hasNoteworthyVisitorActivity,
   wasVisitorStartDeferredToSummary,
   wasVisitorStartTelegramSuppressed,
 } from "@/lib/analytics/sessionOutcome";
@@ -21,6 +21,10 @@ import {
   buildVisitorStartDedupeKey,
   hasRecentVisitorStartTelegram,
 } from "@/lib/analytics/visitorDedupe";
+import {
+  formatReturningVisitorLine,
+  lookupReturningVisitor,
+} from "@/lib/analytics/returningVisitor";
 import { TELEGRAM_COUNTER_KEYS } from "@/lib/telegram/geoFormat";
 import { isProdAnalyticsEnabled } from "@/lib/analytics/isProdAnalyticsEnabled";
 import VisitorSession from "@/models/VisitorSession";
@@ -331,11 +335,13 @@ async function recordSessionEnd(sessionId, meta = {}, sessionKind = "visitor") {
     .limit(auth ? 150 : 100)
     .lean();
 
+  // Only silence empty bounce revisits within the dedupe window. Any real browsing
+  // (page views, clicks, content) still gets one journey summary.
   if (
     !auth &&
     existing &&
     wasVisitorStartTelegramSuppressed(existing.start_telegram_skip_reason) &&
-    !hasMeaningfulVisitorOutcome(events)
+    !hasNoteworthyVisitorActivity(events)
   ) {
     await VisitorSession.updateOne(
       { session_id: sessionId },
@@ -344,7 +350,7 @@ async function recordSessionEnd(sessionId, meta = {}, sessionKind = "visitor") {
           ended_at: now,
           last_seen_at: now,
           summary_sent_at: now,
-          summary_skip_reason: "start_dedupe_no_intent",
+          summary_skip_reason: "start_dedupe_no_activity",
           ...geo,
           ...landing,
           ...(meta.email ? { email: meta.email } : {}),
@@ -353,26 +359,42 @@ async function recordSessionEnd(sessionId, meta = {}, sessionKind = "visitor") {
         },
       },
     );
-    return { ok: true, suppressed: true, reason: "start_dedupe_no_intent" };
+    return { ok: true, suppressed: true, reason: "start_dedupe_no_activity" };
   }
 
+  const endFields = {
+    ended_at: now,
+    last_seen_at: now,
+    summary_delivery_claimed_at: now,
+    ...geo,
+    ...landing,
+    ...(meta.email ? { email: meta.email } : {}),
+    ...(meta.userId ? { user_id: String(meta.userId) } : {}),
+    ...(meta.isLoggedIn != null ? { is_logged_in: !!meta.isLoggedIn } : {}),
+  };
+
   let session = await VisitorSession.findOneAndUpdate(
-    { session_id: sessionId, summary_sent_at: { $exists: false } },
     {
-      $set: {
-        ended_at: now,
-        last_seen_at: now,
-        summary_sent_at: now,
-        summary_skip_reason: null,
-        ...geo,
-        ...landing,
-        ...(meta.email ? { email: meta.email } : {}),
-        ...(meta.userId ? { user_id: String(meta.userId) } : {}),
-        ...(meta.isLoggedIn != null ? { is_logged_in: !!meta.isLoggedIn } : {}),
-      },
+      session_id: sessionId,
+      summary_sent_at: { $exists: false },
+      summary_delivery_claimed_at: { $exists: false },
     },
+    { $set: endFields },
     { new: true },
   );
+
+  // Reclaim if a prior send attempt died after claiming (e.g. Telegram timeout).
+  if (!session) {
+    session = await VisitorSession.findOneAndUpdate(
+      {
+        session_id: sessionId,
+        summary_sent_at: { $exists: false },
+        summary_delivery_claimed_at: { $lt: new Date(now.getTime() - 60_000) },
+      },
+      { $set: endFields },
+      { new: true },
+    );
+  }
 
   if (!session) {
     return { ok: true, deduped: true };
@@ -397,6 +419,22 @@ async function recordSessionEnd(sessionId, meta = {}, sessionKind = "visitor") {
   const { count, monthCount } = await incrementTelegramEventCounter(counterKey);
 
   const sessionContext = sessionContextFromDoc(session);
+
+  let returningVisitor = null;
+  let returningVisitorLine = "";
+  if (!auth) {
+    try {
+      returningVisitor = await lookupReturningVisitor(VisitorSession, {
+        sessionId,
+        clientIp: session.client_ip || sessionContext.client_ip,
+        visitorId: session.visitor_id || sessionContext.visitor_id,
+        now,
+      });
+      returningVisitorLine = formatReturningVisitorLine(returningVisitor, now);
+    } catch (err) {
+      console.warn("[journey] returning visitor lookup failed:", err?.message || err);
+    }
+  }
 
   const text = auth
     ? buildAuthSessionEndTelegramMessage({
@@ -424,9 +462,37 @@ async function recordSessionEnd(sessionId, meta = {}, sessionKind = "visitor") {
         events,
         sessionCount: count,
         monthSessionCount: monthCount,
+        returningVisitor,
+        returningVisitorLine,
       });
 
-  await sendTelegramMessage(text);
+  const sent = await sendTelegramMessage(text);
+  if (!sent?.ok) {
+    // Allow a later pagehide/retry to try again instead of silently dropping the journey.
+    await VisitorSession.updateOne(
+      { session_id: sessionId },
+      {
+        $unset: { summary_delivery_claimed_at: "", ended_at: "" },
+        $set: {
+          summary_skip_reason: sent?.skipped ? "telegram_not_configured" : "telegram_send_failed",
+        },
+      },
+    );
+    console.error("[journey] session end telegram failed:", sent?.error || sent);
+    return { ok: false, error: sent?.error || "telegram_failed" };
+  }
+
+  await VisitorSession.updateOne(
+    { session_id: sessionId },
+    {
+      $set: {
+        summary_sent_at: now,
+        summary_skip_reason: null,
+        ended_at: now,
+      },
+      $unset: { summary_delivery_claimed_at: "" },
+    },
+  );
   return { ok: true };
 }
 

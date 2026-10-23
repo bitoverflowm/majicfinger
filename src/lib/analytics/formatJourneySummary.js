@@ -177,6 +177,8 @@ export function inferAuthSessionOutcome(events) {
  *   session: { session_id: string; started_at: Date; ended_at?: Date; entry_path?: string; email?: string; is_logged_in?: boolean };
  *   events: Array<{ type: string; path?: string; label?: string; meta?: Record<string, unknown>; ts?: Date }>;
  *   sessionCount?: number;
+ *   returningVisitor?: { isReturning?: boolean; visitNumber?: number; priorVisits?: number; priorByIp?: number; priorByVisitorId?: number; matchedBy?: string | null; firstSeenAt?: Date | null; lastPriorAt?: Date | null; lastPriorEntryPath?: string } | null;
+ *   returningVisitorLine?: string;
  * }} opts
  */
 export function buildSessionEndTelegramMessage({
@@ -184,6 +186,8 @@ export function buildSessionEndTelegramMessage({
   events,
   sessionCount,
   monthSessionCount,
+  returningVisitor = null,
+  returningVisitorLine = "",
 }) {
   const startedAt = session.started_at ? new Date(session.started_at).getTime() : Date.now();
   const endedAt = session.ended_at ? new Date(session.ended_at).getTime() : Date.now();
@@ -211,6 +215,20 @@ export function buildSessionEndTelegramMessage({
 
   if (session.email) {
     lines.push(`<b>Email:</b> ${escapeHtml(session.email)}`);
+  }
+
+  if (returningVisitorLine) {
+    lines.push(`<b>Visitor:</b> ${escapeHtml(returningVisitorLine)}`);
+  } else if (returningVisitor?.isReturning) {
+    lines.push(
+      `<b>Visitor:</b> returning · visit #${escapeHtml(String(returningVisitor.visitNumber || "?"))}`,
+    );
+  }
+
+  if (returningVisitor?.isReturning && returningVisitor.lastPriorEntryPath) {
+    lines.push(
+      `<b>Last visit entry:</b> ${escapeHtml(String(returningVisitor.lastPriorEntryPath))}`,
+    );
   }
 
   appendSessionLandingLines(lines, session);
