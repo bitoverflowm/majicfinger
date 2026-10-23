@@ -31,26 +31,35 @@ function postJourney(body, { keepalive = false, preferBeacon = false } = {}) {
   if (!isProdAnalyticsEnabled()) return Promise.resolve();
 
   const payload = JSON.stringify({ sessionKind: "visitor", ...body });
-  try {
-    if (
-      (keepalive || preferBeacon) &&
-      typeof navigator !== "undefined" &&
-      navigator.sendBeacon
-    ) {
-      const blob = new Blob([payload], { type: "application/json" });
-      navigator.sendBeacon(JOURNEY_ENDPOINT, blob);
-      return Promise.resolve();
-    }
-  } catch {
-    /* fall through */
+  const useKeepalive = keepalive || preferBeacon;
+
+  // Prefer fetch+keepalive over sendBeacon: Next.js API routes parse JSON fetch
+  // bodies reliably; beacon deliveries were a common cause of missing journey summaries.
+  if (typeof fetch !== "undefined") {
+    return fetch(JOURNEY_ENDPOINT, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: payload,
+      keepalive: useKeepalive,
+    }).catch(() => {
+      try {
+        if (typeof navigator !== "undefined" && navigator.sendBeacon) {
+          navigator.sendBeacon(JOURNEY_ENDPOINT, new Blob([payload], { type: "application/json" }));
+        }
+      } catch {
+        /* ignore */
+      }
+    });
   }
 
-  return fetch(JOURNEY_ENDPOINT, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: payload,
-    keepalive: keepalive || preferBeacon,
-  }).catch(() => {});
+  try {
+    if (typeof navigator !== "undefined" && navigator.sendBeacon) {
+      navigator.sendBeacon(JOURNEY_ENDPOINT, new Blob([payload], { type: "application/json" }));
+    }
+  } catch {
+    /* ignore */
+  }
+  return Promise.resolve();
 }
 
 /**

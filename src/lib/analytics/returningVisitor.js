@@ -26,7 +26,7 @@ export function formatRelativeVisitAge(value, now = new Date()) {
   const minutes = Math.round(deltaMs / 60_000);
   if (minutes < 60) return minutes <= 1 ? "just now" : `${minutes}m ago`;
   const hours = Math.round(minutes / 60);
-  if (hours < 48) return hours === 1 ? "1h ago" : `${hours}h ago`;
+  if (hours < 24) return hours === 1 ? "1h ago" : `${hours}h ago`;
   const days = Math.round(hours / 24);
   if (days < 60) return days === 1 ? "yesterday" : `${days}d ago`;
   const months = Math.round(days / 30);

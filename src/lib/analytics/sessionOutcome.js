@@ -49,6 +49,21 @@ export function hasMeaningfulVisitorOutcome(events = []) {
   });
 }
 
+/**
+ * Whether a deduped revisit still did enough to deserve the end-of-journey Telegram.
+ * With journey-summary-only alerts, any real browsing should notify — not only CTAs.
+ * @param {Array<{ type?: string }>} events
+ */
+export function hasNoteworthyVisitorActivity(events = []) {
+  if (!events.length) return false;
+  if (hasMeaningfulVisitorOutcome(events)) return true;
+  return events.some((event) =>
+    ["page_view", "page_click", "content_view", "content_leave", "fork_click", "hero_cta_click"].includes(
+      event?.type,
+    ),
+  );
+}
+
 /** @param {string | undefined | null} reason */
 export function wasVisitorStartTelegramSuppressed(reason) {
   return (
