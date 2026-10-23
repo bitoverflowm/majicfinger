@@ -261,7 +261,19 @@ export default async function handler(req, res) {
         break;
       case "checkout.session.async_payment_failed":
         await handleCheckoutPaymentFailed(data);
-        await recordCheckoutStep({ attemptId: data?.metadata?.checkoutAttemptId, step: "async_payment_failed" });
+        await recordCheckoutStep({
+          attemptId: data?.metadata?.checkoutAttemptId,
+          sessionId: data?.id,
+          step: "async_payment_failed",
+          data: {
+            email: data?.customer_details?.email || data?.customer_email || undefined,
+          },
+          enrich: {
+            email: data?.customer_details?.email || data?.customer_email || undefined,
+            planKey: data?.metadata?.planKey || undefined,
+            amount: data?.amount_total,
+          },
+        });
         await notifyCheckoutAlert({
           title: "Checkout payment failed",
           fields: {
@@ -274,7 +286,22 @@ export default async function handler(req, res) {
         break;
       case "checkout.session.expired":
         await handleCheckoutExpired(data);
-        await recordCheckoutStep({ attemptId: data?.metadata?.checkoutAttemptId, step: "expired" });
+        await recordCheckoutStep({
+          attemptId: data?.metadata?.checkoutAttemptId,
+          sessionId: data?.id,
+          step: "expired",
+          data: {
+            email: data?.customer_details?.email || data?.customer_email || undefined,
+            paymentStatus: data?.payment_status || undefined,
+          },
+          set: { status: "expired" },
+          enrich: {
+            email: data?.customer_details?.email || data?.customer_email || undefined,
+            planKey: data?.metadata?.planKey || undefined,
+            amount: data?.amount_total,
+            status: "expired",
+          },
+        });
         break;
 
       // Customer lifecycle events (mainly to ensure user record exists)

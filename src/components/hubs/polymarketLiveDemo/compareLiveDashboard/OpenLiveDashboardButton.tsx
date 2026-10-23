@@ -7,7 +7,6 @@ import { trackJourneyEvent } from "@/lib/analytics/journeyClient";
 import { getOrCreateVisitorSessionId } from "@/lib/analytics/visitorSession";
 import { useUser } from "@/lib/hooks";
 import { userHasPaidAccess } from "@/lib/runYourself/hasPaidAccess";
-import { sendTelegramAnalyticsEvent } from "@/lib/telegram/client";
 import { cn } from "@/lib/utils";
 
 import { useCompareLiveDashboardOptional } from "./CompareLiveDashboardContext";
@@ -59,7 +58,6 @@ export function OpenLiveDashboardButton({
       label: OPEN_DASHBOARD_CTA.eventLabel,
       meta,
     });
-    sendTelegramAnalyticsEvent("hero_cta_click", meta, { sessionId });
   }, [label, user]);
 
   const handleClick = useCallback(

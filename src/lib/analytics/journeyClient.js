@@ -27,8 +27,8 @@ function scheduleFlush() {
 }
 
 function postJourney(body, { keepalive = false, preferBeacon = false } = {}) {
-  if (typeof window === "undefined") return;
-  if (!isProdAnalyticsEnabled()) return;
+  if (typeof window === "undefined") return Promise.resolve();
+  if (!isProdAnalyticsEnabled()) return Promise.resolve();
 
   const payload = JSON.stringify({ sessionKind: "visitor", ...body });
   try {
@@ -39,13 +39,13 @@ function postJourney(body, { keepalive = false, preferBeacon = false } = {}) {
     ) {
       const blob = new Blob([payload], { type: "application/json" });
       navigator.sendBeacon(JOURNEY_ENDPOINT, blob);
-      return;
+      return Promise.resolve();
     }
   } catch {
     /* fall through */
   }
 
-  fetch(JOURNEY_ENDPOINT, {
+  return fetch(JOURNEY_ENDPOINT, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: payload,
@@ -79,12 +79,17 @@ export function trackJourneyEvent(type, payload = {}) {
   scheduleFlush();
 }
 
-/** @param {{ isLoggedIn?: boolean; email?: string; userId?: string }} [identity] */
+/**
+ * Flush queued journey events to the server.
+ * @param {boolean} [endSession]
+ * @param {{ isLoggedIn?: boolean; email?: string; userId?: string }} [identity]
+ * @returns {Promise<void>}
+ */
 export function flushJourneyQueue(endSession = false, identity = {}) {
-  if (typeof window === "undefined") return;
+  if (typeof window === "undefined") return Promise.resolve();
 
   const sessionId = getVisitorSessionId() || getOrCreateVisitorSessionId();
-  if (!sessionId) return;
+  if (!sessionId) return Promise.resolve();
 
   const events = queue.splice(0, queue.length);
   if (flushTimer) {
@@ -96,7 +101,7 @@ export function flushJourneyQueue(endSession = false, identity = {}) {
     if (endSession && !ending && !hasVisitorSessionEnded()) {
       ending = true;
       markVisitorSessionEnded();
-      postJourney(
+      return postJourney(
         {
           action: "session_end",
           sessionId,
@@ -110,13 +115,13 @@ export function flushJourneyQueue(endSession = false, identity = {}) {
         },
         { keepalive: true },
       );
-      return;
     }
 
     if (events.length > 0) {
-      postJourney({ action: "batch", sessionId, events }, { keepalive: endSession });
+      return postJourney({ action: "batch", sessionId, events }, { keepalive: endSession });
     }
   }
+  return Promise.resolve();
 }
 
 export function startVisitorSessionIfNeeded(identity = {}) {

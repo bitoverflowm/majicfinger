@@ -1,5 +1,7 @@
 import dbConnect from "@/lib/dbConnect";
 import CheckoutAttempt from "@/models/CheckoutAttempt";
+import { formatVisitorContextTelegramLines } from "@/lib/analytics/checkoutVisitorContext";
+import { planByKey } from "@/lib/stripe/catalog";
 import { editTelegramMessage, isTelegramConfigured, sendTelegramMessage } from "@/lib/telegram/notify";
 import { escapeHtml } from "@/lib/telegram/format";
 import { countryCodeToFlag, countryDisplayName } from "@/lib/telegram/geoFormat";
@@ -178,10 +180,15 @@ function journeyEmail(attempt, steps) {
 }
 
 function planLine(attempt) {
-  const label = attempt.planLabel || attempt.planKey || "Unknown plan";
-  const amount = money(attempt.amount);
+  const catalog = planByKey(attempt.planKey);
+  const label = attempt.planLabel || catalog?.label || attempt.planKey || "Unknown plan";
+  const amountCents = Number.isFinite(Number(attempt.amount))
+    ? Number(attempt.amount)
+    : catalog?.amount;
+  const interval = attempt.interval || catalog?.interval;
+  const amount = money(amountCents);
   if (!amount) return label;
-  return attempt.interval ? `${label} · ${amount}/${attempt.interval}` : `${label} · ${amount}`;
+  return interval ? `${label} · ${amount}/${interval}` : `${label} · ${amount}`;
 }
 
 function journeyStatus(steps) {
@@ -274,6 +281,11 @@ function stepDetail(step, steps, index) {
     case "account_created":
       if (data.existing) parts.push("already had an account");
       break;
+    case "expired":
+      if (data.email) parts.push(data.email);
+      if (data.reason) parts.push(data.reason);
+      if (data.hadClientActivity === false) parts.push("never interacted with the form");
+      break;
     default:
       if (data.message) parts.push(data.message);
   }
@@ -283,9 +295,18 @@ function stepDetail(step, steps, index) {
   return parts.filter(Boolean).join(" · ");
 }
 
-function stepTimes(steps) {
-  const start = steps.length ? new Date(steps[0].at).getTime() : 0;
-  const end = steps.length ? new Date(steps[steps.length - 1].at).getTime() : 0;
+function attemptStartMs(attempt, steps) {
+  const created = attempt?.createdAt ? new Date(attempt.createdAt).getTime() : null;
+  const firstStep = steps.length ? new Date(steps[0].at).getTime() : null;
+  // Prefer the earlier of createdAt vs first step so expire-only docs (no `opened`
+  // step) still show real time-in-checkout instead of 0.0s.
+  if (created != null && firstStep != null) return Math.min(created, firstStep);
+  return created ?? firstStep ?? Date.now();
+}
+
+function stepTimes(attempt, steps) {
+  const start = attemptStartMs(attempt, steps);
+  const end = steps.length ? new Date(steps[steps.length - 1].at).getTime() : start;
   const lines = [];
   const ready = steps.find((s) => s.step === "form_ready");
   if (ready?.data?.ms != null) lines.push(`Page load: ${formatDuration(ready.data.ms)}`);
@@ -303,6 +324,11 @@ function stepTimes(steps) {
   if (accountStart && accountDone) lines.push(`Account setup: ${formatDuration(accountDone - accountStart)}`);
   else if (accountStart) lines.push(`Account setup: ${formatDuration(end - accountStart)} so far`);
 
+  const clientSteps = steps.filter((s) => s.step !== "opened" && s.step !== "expired");
+  if (!clientSteps.length && steps.some((s) => s.step === "expired")) {
+    lines.push("Form activity: none (session expired without checkout interaction)");
+  }
+
   if (start) lines.push(`Total: ${formatDuration((accountDone || end) - start)}`);
   return lines;
 }
@@ -315,14 +341,23 @@ function sourceLine(source = {}) {
 
 /** @returns {string} Telegram HTML for the live checkout message. */
 export function renderCheckoutJourney(attempt) {
-  const steps = sortedSteps(attempt);
+  let steps = sortedSteps(attempt);
+  // Display-only backfill when `opened` was never persisted (legacy / thin docs).
+  if (!steps.some((s) => s.step === "opened") && attempt?.createdAt) {
+    const from = attempt.source?.from;
+    steps = [
+      { step: "opened", at: new Date(attempt.createdAt), data: from ? { from } : {} },
+      ...steps,
+    ];
+  }
   const status = journeyStatus(steps);
   const last = steps[steps.length - 1];
-  const start = steps.length ? new Date(steps[0].at).getTime() : Date.now();
+  const start = attemptStartMs(attempt, steps);
   const end = last ? new Date(last.at).getTime() : start;
   const email = journeyEmail(attempt, steps);
   const method = lastMethod(steps);
   const promo = [...steps].reverse().find((s) => s.step === "promo_applied")?.data?.promo;
+  const visitorLines = formatVisitorContextTelegramLines(attempt.visitorContext, escapeHtml);
 
   const field = (label, value) => (value ? `<b>${escapeHtml(label)}:</b> ${escapeHtml(value)}` : "");
   const header = [
@@ -334,6 +369,9 @@ export function renderCheckoutJourney(attempt) {
     field("Payment method", methodName(method)),
     field("Promo", promo),
     field("From", sourceLine(attempt.source)),
+    attempt.visitorSessionId
+      ? field("Visitor session", String(attempt.visitorSessionId).slice(0, 8))
+      : "",
   ].filter(Boolean);
 
   let timeline = steps.map((step, index) => {
@@ -347,11 +385,14 @@ export function renderCheckoutJourney(attempt) {
     timeline = [...timeline.slice(0, 4), `<i>… ${hidden} more steps …</i>`, ...timeline.slice(-(MAX_TIMELINE_LINES - 5))];
   }
 
-  const times = stepTimes(steps);
+  const times = stepTimes(attempt, steps);
   const text = [
     header.join("\n"),
+    visitorLines.length ? visitorLines.join("\n") : "",
     times.length ? `<b>Time per step</b>\n${times.map(escapeHtml).join("\n")}` : "",
-    `<b>Timeline</b>\n${timeline.join("\n")}`,
+    timeline.length
+      ? `<b>Timeline</b>\n${timeline.join("\n")}`
+      : "<b>Timeline</b>\n<i>No checkout steps recorded yet.</i>",
     `<i>${escapeHtml(attempt.stripeSessionId || attempt.attemptId || "")}</i>`,
   ]
     .filter(Boolean)
@@ -459,26 +500,154 @@ async function syncTelegram(attempt, step, data) {
 }
 
 /**
+ * Publish or refresh the live checkout Telegram for an attempt that already has steps.
+ * Used right after CheckoutAttempt.create so abandoned checkouts aren't silent until expiry.
+ * @param {string} attemptId
+ */
+export async function publishCheckoutTelegram(attemptId) {
+  if (!attemptId) return null;
+  try {
+    await dbConnect();
+    const attempt = await CheckoutAttempt.findOne({ attemptId });
+    if (!attempt) return null;
+    const steps = sortedSteps(attempt);
+    const last = steps[steps.length - 1];
+    await syncTelegram(attempt, last?.step || "opened", last?.data || {});
+    return attempt;
+  } catch (err) {
+    console.error("[checkout journey] publish telegram failed:", err?.message || err);
+    return null;
+  }
+}
+
+/**
+ * Older/thin attempts may lack an `opened` step (pre-journey schema). Without it,
+ * expire-only timelines show 0.0s and look empty. Backfill from createdAt.
+ * @param {import("mongoose").Document} attempt
+ */
+async function ensureOpenedStep(attempt) {
+  const steps = attempt.steps || [];
+  if (steps.some((s) => s.step === "opened")) return attempt;
+  const openedAt = attempt.createdAt ? new Date(attempt.createdAt) : new Date(Date.now() - 1000);
+  const from = attempt.source?.from;
+  attempt.steps = [{ step: "opened", at: openedAt, data: from ? { from } : {} }, ...steps];
+  await CheckoutAttempt.updateOne(
+    { _id: attempt._id, "steps.step": { $ne: "opened" } },
+    {
+      $push: {
+        steps: {
+          $each: [{ step: "opened", at: openedAt, data: from ? { from } : {} }],
+          $position: 0,
+        },
+      },
+    },
+  );
+  return attempt;
+}
+
+/**
+ * Fill missing plan/email fields on legacy attempts using Stripe webhook payload + catalog.
+ * @param {import("mongoose").Document} attempt
+ * @param {Record<string, unknown>} [enrich]
+ */
+async function enrichThinAttempt(attempt, enrich = {}) {
+  /** @type {Record<string, unknown>} */
+  const set = {};
+  const catalog = planByKey(attempt.planKey || enrich.planKey);
+
+  if (!attempt.planLabel && (catalog?.label || enrich.planLabel)) {
+    set.planLabel = catalog?.label || enrich.planLabel;
+  }
+  if (!Number.isFinite(Number(attempt.amount)) && Number.isFinite(Number(enrich.amount ?? catalog?.amount))) {
+    set.amount = Number(enrich.amount ?? catalog?.amount);
+  }
+  if (!attempt.interval && (catalog?.interval || enrich.interval)) {
+    set.interval = catalog?.interval || enrich.interval;
+  }
+  if (!attempt.planKey && enrich.planKey) set.planKey = enrich.planKey;
+
+  const email = String(enrich.email || "").trim().toLowerCase();
+  if (email && !attempt.contactEmail && !attempt.billingEmail && !attempt.prefillEmail) {
+    set.contactEmail = email;
+  }
+  if (enrich.status) set.status = enrich.status;
+
+  if (!Object.keys(set).length) return attempt;
+  Object.assign(attempt, set);
+  await CheckoutAttempt.updateOne({ _id: attempt._id }, { $set: set });
+  return attempt;
+}
+
+/**
  * Append a step to a checkout attempt and refresh its Telegram message.
  * Never throws: tracking must not break checkout, login, or webhooks.
- * @param {{ attemptId?: string; sessionId?: string; step: string; data?: Record<string, unknown>; at?: Date; set?: Record<string, unknown> }} opts
+ * @param {{
+ *   attemptId?: string;
+ *   sessionId?: string;
+ *   step: string;
+ *   data?: Record<string, unknown>;
+ *   at?: Date;
+ *   set?: Record<string, unknown>;
+ *   enrich?: Record<string, unknown>;
+ * }} opts
  */
-export async function recordCheckoutStep({ attemptId, sessionId, step, data = {}, at = new Date(), set = {} }) {
+export async function recordCheckoutStep({
+  attemptId,
+  sessionId,
+  step,
+  data = {},
+  at = new Date(),
+  set = {},
+  enrich = {},
+}) {
   const def = CHECKOUT_STEPS[step];
   if (!def || (!attemptId && !sessionId)) return null;
   try {
     await dbConnect();
-    const filter = attemptId ? { attemptId } : { stripeSessionId: sessionId };
+
+    let attempt = null;
+    if (attemptId) {
+      attempt = await CheckoutAttempt.findOne({ attemptId });
+    }
+    if (!attempt && sessionId) {
+      attempt = await CheckoutAttempt.findOne({ stripeSessionId: sessionId });
+    }
+    if (!attempt) return null;
+
+    if (step === "expired" || Object.keys(enrich).length) {
+      attempt = await enrichThinAttempt(attempt, {
+        ...enrich,
+        planKey: enrich.planKey || attempt.planKey,
+        email: enrich.email || data.email,
+      });
+    }
+    attempt = await ensureOpenedStep(attempt);
+
+    const filter = { _id: attempt._id };
     filter[`steps.${MAX_STEPS - 1}`] = { $exists: false };
     if (def.once) filter["steps.step"] = { $ne: step };
-    const attempt = await CheckoutAttempt.findOneAndUpdate(
+
+    const clientActivity = sortedSteps(attempt).some(
+      (s) => s.step !== "opened" && s.step !== "expired",
+    );
+    const stepData =
+      step === "expired"
+        ? { ...data, hadClientActivity: clientActivity }
+        : data;
+
+    const updated = await CheckoutAttempt.findOneAndUpdate(
       filter,
-      { $push: { steps: { step, at, data } }, ...(Object.keys(set).length ? { $set: set } : {}) },
+      { $push: { steps: { step, at, data: stepData } }, ...(Object.keys(set).length ? { $set: set } : {}) },
       { new: true },
     );
-    if (!attempt) return null;
-    await syncTelegram(attempt, step, data);
-    return attempt;
+    if (!updated) {
+      // once-step already recorded (or capped); still refresh Telegram with latest doc
+      const latest = await CheckoutAttempt.findById(attempt._id);
+      if (latest) await syncTelegram(latest, step, stepData);
+      return latest;
+    }
+    await syncTelegram(updated, step, stepData);
+    return updated;
   } catch (err) {
     console.error(`[checkout journey] could not record ${step}:`, err?.message || err);
     return null;

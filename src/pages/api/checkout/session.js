@@ -11,7 +11,9 @@ import {
   checkoutPlanSummary,
 } from "@/lib/stripe/catalog";
 import { attemptCookieHeader } from "@/lib/stripe/checkoutCookies";
+import { buildCheckoutVisitorContext } from "@/lib/analytics/checkoutVisitorContext";
 import { notifyCheckoutAlert } from "@/lib/telegram/checkoutAlert";
+import { publishCheckoutTelegram } from "@/lib/telegram/checkoutJourney";
 import { loadSessionMember } from "@/lib/requirePaidMember";
 
 /** A second Checkout would start a second subscription; these members change plans in billing. */
@@ -104,6 +106,10 @@ export default async function handler(req, res) {
     res.setHeader("Set-Cookie", attemptCookieHeader(attemptId));
     try {
       await dbConnect();
+      const visitorSessionId = String(req.body?.visitorSessionId || "").trim().slice(0, 80) || undefined;
+      const visitorContext = visitorSessionId
+        ? await buildCheckoutVisitorContext(visitorSessionId)
+        : null;
       await CheckoutAttempt.create({
         attemptId,
         stripeSessionId: session.id,
@@ -120,8 +126,12 @@ export default async function handler(req, res) {
         testMode: isStripeTestKey(),
         prefillEmail: loginEmail || undefined,
         source: checkoutSource(req),
+        visitorSessionId,
+        visitorContext: visitorContext || undefined,
         steps: [{ step: "opened", at: new Date(), data: { from: String(req.body?.from || "").slice(0, 160) || undefined } }],
       });
+      // Open the live Telegram immediately so expire/abandon alerts aren't a blank slate.
+      await publishCheckoutTelegram(attemptId);
     } catch (err) {
       await notifyCheckoutAlert({
         title: "Checkout session created but was not saved",
