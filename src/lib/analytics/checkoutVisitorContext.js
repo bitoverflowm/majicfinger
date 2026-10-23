@@ -1,6 +1,10 @@
 import VisitorEvent from "@/models/VisitorEvent";
 import VisitorSession from "@/models/VisitorSession";
 import { formatJourneyStep } from "@/lib/analytics/formatJourneySummary";
+import {
+  formatReturningVisitorLine,
+  lookupReturningVisitor,
+} from "@/lib/analytics/returningVisitor";
 
 const PRICING_NEEDLES = ["pricing", "checkout", "access now", "subscribe", "upgrade", "#pricing"];
 
@@ -47,6 +51,19 @@ export async function buildCheckoutVisitorContext(visitorSessionId) {
     const pricingEvents = events.filter(eventTouchesPricing);
     const steps = events.slice(0, 20).map((event, i) => formatJourneyStep(event, i + 1));
 
+    let returningVisitorLine = "";
+    let returningVisitor = null;
+    try {
+      returningVisitor = await lookupReturningVisitor(VisitorSession, {
+        sessionId,
+        clientIp: session?.client_ip,
+        visitorId: session?.visitor_id,
+      });
+      returningVisitorLine = formatReturningVisitorLine(returningVisitor) || "";
+    } catch {
+      /* best-effort */
+    }
+
     return {
       visitorSessionId: sessionId,
       entryPath: session?.entry_path || "",
@@ -72,6 +89,10 @@ export async function buildCheckoutVisitorContext(visitorSessionId) {
       }),
       steps,
       eventCount: events.length,
+      returningVisitorLine,
+      isReturning: !!returningVisitor?.isReturning,
+      visitNumber: returningVisitor?.visitNumber || 1,
+      priorVisitsByIp: returningVisitor?.priorByIp || 0,
       capturedAt: new Date().toISOString(),
     };
   } catch (err) {
@@ -98,6 +119,7 @@ export function formatVisitorContextTelegramLines(context, escapeHtml) {
   field("Referrer", context.referrer);
   field("Visitor email", context.email);
   if (context.isLoggedIn || context.email) field("Logged in", "yes");
+  field("Visitor", context.returningVisitorLine);
   if (context.utmSource || context.utmMedium || context.utmCampaign) {
     field(
       "UTM",

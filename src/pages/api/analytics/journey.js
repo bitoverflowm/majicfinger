@@ -21,6 +21,10 @@ import {
   buildVisitorStartDedupeKey,
   hasRecentVisitorStartTelegram,
 } from "@/lib/analytics/visitorDedupe";
+import {
+  formatReturningVisitorLine,
+  lookupReturningVisitor,
+} from "@/lib/analytics/returningVisitor";
 import { TELEGRAM_COUNTER_KEYS } from "@/lib/telegram/geoFormat";
 import { isProdAnalyticsEnabled } from "@/lib/analytics/isProdAnalyticsEnabled";
 import VisitorSession from "@/models/VisitorSession";
@@ -398,6 +402,22 @@ async function recordSessionEnd(sessionId, meta = {}, sessionKind = "visitor") {
 
   const sessionContext = sessionContextFromDoc(session);
 
+  let returningVisitor = null;
+  let returningVisitorLine = "";
+  if (!auth) {
+    try {
+      returningVisitor = await lookupReturningVisitor(VisitorSession, {
+        sessionId,
+        clientIp: session.client_ip || sessionContext.client_ip,
+        visitorId: session.visitor_id || sessionContext.visitor_id,
+        now,
+      });
+      returningVisitorLine = formatReturningVisitorLine(returningVisitor, now);
+    } catch (err) {
+      console.warn("[journey] returning visitor lookup failed:", err?.message || err);
+    }
+  }
+
   const text = auth
     ? buildAuthSessionEndTelegramMessage({
         session: {
@@ -424,6 +444,8 @@ async function recordSessionEnd(sessionId, meta = {}, sessionKind = "visitor") {
         events,
         sessionCount: count,
         monthSessionCount: monthCount,
+        returningVisitor,
+        returningVisitorLine,
       });
 
   await sendTelegramMessage(text);
