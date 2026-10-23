@@ -1,7 +1,13 @@
 import crypto from "crypto";
 import dbConnect from "@/lib/dbConnect";
 import CheckoutAttempt from "@/models/CheckoutAttempt";
-import { getCheckoutStripe, isStripeTestKey, stripePublishableKey, stripeSecretKey } from "@/lib/stripe/client";
+import {
+  getCheckoutStripe,
+  isStripeTestKey,
+  stripeKeysMismatch,
+  stripePublishableKey,
+  stripeSecretKey,
+} from "@/lib/stripe/client";
 import { extractClientMeta } from "@/lib/analytics/requestClientMeta";
 import {
   planFromQuery,
@@ -68,6 +74,18 @@ export default async function handler(req, res) {
       fields: { Plan: plan.key, "Secret key": "missing" },
     });
     return res.status(500).json({ error: "Checkout is not configured" });
+  }
+
+  const keyProblem = stripeKeysMismatch();
+  if (keyProblem && !global.__stripeKeyMismatchAlerted) {
+    global.__stripeKeyMismatchAlerted = true;
+    await notifyCheckoutAlert({
+      title: "Stripe keys don't match: the payment form will fail to load",
+      fields: {
+        Problem: keyProblem,
+        Fix: "Set NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY to the same account as STRIPE_SECRET_KEY, then redeploy",
+      },
+    });
   }
 
   try {

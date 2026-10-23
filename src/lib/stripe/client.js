@@ -59,3 +59,23 @@ export function getCheckoutStripe() {
 export function isStripeTestKey(key = stripeSecretKey()) {
   return /^[sr]k_test_/.test(String(key || ""));
 }
+
+function keyAccount(key) {
+  return String(key || "").replace(/^(sk|rk|pk)_(live|test)_/, "").slice(0, 16);
+}
+
+/**
+ * Stripe keys embed their account after the prefix. When the secret and
+ * publishable keys come from different accounts, Stripe.js can't find the
+ * sessions the server creates ("No such checkout.session").
+ */
+export function stripeKeysMismatch() {
+  const secret = stripeSecretKey();
+  const publishable = stripePublishableKey();
+  if (!secret || !publishable) return null;
+  const secretMode = isStripeTestKey(secret) ? "test" : "live";
+  const publishableMode = /^pk_test_/.test(publishable) ? "test" : "live";
+  if (secretMode !== publishableMode) return `secret key is ${secretMode}, publishable key is ${publishableMode}`;
+  if (keyAccount(secret) !== keyAccount(publishable)) return "secret and publishable keys are from different Stripe accounts";
+  return null;
+}
