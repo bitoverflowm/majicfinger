@@ -16,6 +16,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
 import { landingPageV2Config } from "@/lib/landingPageV2Config";
+import { flushJourneyQueue } from "@/lib/analytics/journeyClient";
+import { getOrCreateVisitorSessionId } from "@/lib/analytics/visitorSession";
 import { checkoutEntryPage, msSinceCheckoutClick, trackCheckoutStep } from "@/lib/checkout/trackCheckoutStep";
 
 const stripePromises = new Map();
@@ -199,11 +201,14 @@ export default function CheckoutClient({ plan, cycle, referral }) {
     let cancelled = false;
     (async () => {
       try {
+        // Flush marketing journey events so the checkout Telegram can include pricing path.
+        await flushJourneyQueue(false);
         const res = await requestCheckoutSession({
           plan,
           cycle,
           referral: referralFromWindow(referral),
           from: checkoutEntryPage(),
+          visitorSessionId: getOrCreateVisitorSessionId() || undefined,
         });
         const data = res.data || {};
         if (cancelled) return;

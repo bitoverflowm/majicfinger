@@ -54,6 +54,13 @@ export function planFromQuery(plan, cycle) {
   return CHECKOUT_PLANS.find((item) => item.tier === name && item.cycle === normalizedCycle) || null;
 }
 
+/** @param {string | undefined | null} planKey */
+export function planByKey(planKey) {
+  const key = String(planKey || "").trim();
+  if (!key) return null;
+  return CHECKOUT_PLANS.find((item) => item.key === key) || null;
+}
+
 /** Safe to send to the browser; the checkout page renders its order summary from this. */
 export function checkoutPlanSummary(plan) {
   return {

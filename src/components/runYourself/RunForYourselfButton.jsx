@@ -19,7 +19,6 @@ import {
 } from "@/lib/runYourself/runSourceContext";
 import { RunForYourselfAuthModal } from "@/components/runYourself/RunForYourselfAuthModal";
 import { trackJourneyEvent } from "@/lib/analytics/journeyClient";
-import { sendTelegramAnalyticsEvent } from "@/lib/telegram/client";
 import { cn } from "@/lib/utils";
 
 const FORK_PROMO_TITLE = "Fork this analysis";
@@ -140,17 +139,6 @@ export function RunForYourselfButton({
         isLoggedIn: !!user,
         userEmail: user?.email,
       },
-    });
-
-    sendTelegramAnalyticsEvent("fork_click", {
-      kind: ctx.kind,
-      displayName,
-      ownerHandle: handle,
-      chartSlug,
-      dashboardSlug,
-      genericAnalysisFallback: useGenericAnalysisFallback,
-      isLoggedIn: !!user,
-      userEmail: user?.email,
     });
 
     if (user && userRunYourselfQuotaExceeded(user) && !userHasPaidAccess(user)) {

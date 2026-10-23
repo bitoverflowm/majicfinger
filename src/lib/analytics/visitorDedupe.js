@@ -42,8 +42,14 @@ export async function hasRecentVisitorStartTelegram(VisitorSession, sessionId, d
   /** @type {Record<string, unknown>} */
   const query = {
     session_id: { $ne: sessionId },
-    start_telegram_sent: true,
     start_notified_at: { $gte: dedupeSince },
+    // Match sessions that already claimed a visitor alert slot: delivered start,
+    // deferred to the end-of-journey summary, or already summarized.
+    $or: [
+      { start_telegram_sent: true },
+      { start_telegram_skip_reason: "deferred_to_summary" },
+      { summary_sent_at: { $exists: true, $ne: null } },
+    ],
   };
 
   if (dedupe.strategy === "visitor_id") {

@@ -7,7 +7,6 @@ import { scrollToHashSection } from "@/lib/scrollToHashSection";
 import { getOrCreateVisitorSessionId } from "@/lib/analytics/visitorSession";
 import { useUser } from "@/lib/hooks";
 import { userHasPaidAccess } from "@/lib/runYourself/hasPaidAccess";
-import { sendTelegramAnalyticsEvent } from "@/lib/telegram/client";
 import type { HubCta } from "@/types/hub";
 
 type HubCtaButtonProps = {
@@ -65,8 +64,6 @@ export function HubCtaButton({ cta, variant = "primary" }: HubCtaButtonProps) {
         label: cta.eventLabel,
         meta,
       });
-
-      sendTelegramAnalyticsEvent("hero_cta_click", meta, { sessionId });
     },
     [cta, user],
   );

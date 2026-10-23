@@ -2,11 +2,10 @@
 
 import { useEffect, useRef } from "react";
 import { trackJourneyEvent } from "@/lib/analytics/journeyClient";
-import { sendTelegramAnalyticsEvent } from "@/lib/telegram/client";
 
 /**
  * Track when someone opens and leaves a chart, dashboard, or article.
- * Events are batched into the visitor session journey (summary sent at session end).
+ * Events are batched into the visitor session journey (one Telegram summary at session end).
  * @param {{
  *   contentType: 'chart' | 'dashboard' | 'article';
  *   name?: string | null;
@@ -42,12 +41,6 @@ export function useTelegramContentTracker({
           ownerHandle,
         },
       });
-      sendTelegramAnalyticsEvent("content_view", {
-        contentType,
-        name,
-        path: viewPath,
-        ownerHandle,
-      });
     }
 
     const sendLeave = () => {
@@ -65,17 +58,6 @@ export function useTelegramContentTracker({
           durationSeconds,
         },
       });
-      sendTelegramAnalyticsEvent(
-        "content_leave",
-        {
-          contentType,
-          name,
-          path: path || (typeof window !== "undefined" ? window.location.pathname : undefined),
-          ownerHandle,
-          durationSeconds,
-        },
-        { keepalive: true },
-      );
     };
 
     const onVisibilityChange = () => {

@@ -57,3 +57,8 @@ export function wasVisitorStartTelegramSuppressed(reason) {
     reason === "notifications_disabled"
   );
 }
+
+/** Visitor start was intentionally skipped so the end-of-journey summary is the only alert. */
+export function wasVisitorStartDeferredToSummary(reason) {
+  return reason === "deferred_to_summary";
+}

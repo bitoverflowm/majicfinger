@@ -36,6 +36,10 @@ const CheckoutAttemptSchema = new mongoose.Schema(
     prefillEmail: { type: String },
     contactEmail: { type: String },
     source: { type: mongoose.Schema.Types.Mixed },
+    /** Visitor journey session that opened this checkout (for Telegram context). */
+    visitorSessionId: { type: String, index: true },
+    /** Snapshot of the visitor path before checkout (entry, pricing, clicks). */
+    visitorContext: { type: mongoose.Schema.Types.Mixed },
     steps: { type: [CheckoutStepSchema], default: undefined },
     telegramMessageId: { type: Number },
     telegramClaimed: { type: Boolean },

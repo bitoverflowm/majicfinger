@@ -8,13 +8,13 @@ import {
   buildAuthSessionErrorTelegramMessage,
   buildAuthSessionStartTelegramMessage,
   buildSessionEndTelegramMessage,
-  buildSessionStartTelegramMessage,
 } from "@/lib/analytics/formatJourneySummary";
 import { buildDataPullTelegramMessage } from "@/lib/analytics/formatDataPullTelegram";
 import { extractClientMeta, geoFieldsFromMeta } from "@/lib/analytics/requestClientMeta";
 import { landingFieldsFromMeta } from "@/lib/analytics/sessionFieldsFromMeta";
 import {
   hasMeaningfulVisitorOutcome,
+  wasVisitorStartDeferredToSummary,
   wasVisitorStartTelegramSuppressed,
 } from "@/lib/analytics/sessionOutcome";
 import {
@@ -24,6 +24,9 @@ import {
 import { TELEGRAM_COUNTER_KEYS } from "@/lib/telegram/geoFormat";
 import { isProdAnalyticsEnabled } from "@/lib/analytics/isProdAnalyticsEnabled";
 import VisitorSession from "@/models/VisitorSession";
+
+/** Skip the visitor session-start ping; one Telegram at session end covers the full journey. */
+const VISITOR_START_DEFER_REASON = "deferred_to_summary";
 
 function isAuthSession(sessionKind) {
   return sessionKind === "auth";
@@ -73,7 +76,9 @@ async function incrementCounterSafe(eventKey) {
 }
 
 /**
- * Send the session-start Telegram if not already sent or skipped.
+ * Claim the session-start notification slot.
+ * Visitors are deferred to the end-of-journey summary (one Telegram per visit).
+ * Auth sessions still get an immediate start alert.
  * @param {{ session_id: string; session_kind?: string }} doc
  * @param {boolean} auth
  * @param {Date} now
@@ -133,33 +138,38 @@ async function deliverSessionStartTelegram(doc, auth, now, opts = {}) {
     return { delivered: false, deduped: true };
   }
 
-  let rawCount;
-  let rawMonthCount;
   if (opts.countRaw) {
     const rawCounterKey = auth
       ? TELEGRAM_COUNTER_KEYS.rawAuthSession
       : TELEGRAM_COUNTER_KEYS.rawVisitorSession;
-    ({ count: rawCount, monthCount: rawMonthCount } = await incrementCounterSafe(rawCounterKey));
+    await incrementCounterSafe(rawCounterKey);
   }
 
-  const telegramCounterKey = auth
-    ? TELEGRAM_COUNTER_KEYS.authSessionStart
-    : TELEGRAM_COUNTER_KEYS.visitorSessionStart;
-  const { count, monthCount } = await incrementCounterSafe(telegramCounterKey);
+  // Visitor journeys: one Telegram at session end with entry → exit. No start ping.
+  if (!auth) {
+    await VisitorSession.updateOne(
+      { session_id: doc.session_id },
+      {
+        $set: {
+          start_telegram_sent: false,
+          start_telegram_skip_reason: VISITOR_START_DEFER_REASON,
+          ...(dedupeKey && dedupeKey.strategy !== "visitor_id"
+            ? { start_dedupe_key: dedupeKey.key }
+            : {}),
+        },
+        $unset: { start_delivery_claimed_at: "" },
+      },
+    );
+    return { delivered: false, deferred: true };
+  }
 
-  const text = auth
-    ? buildAuthSessionStartTelegramMessage({
-        session: sessionContext,
-        sessionCount: count,
-        monthSessionCount: monthCount,
-      })
-    : buildSessionStartTelegramMessage({
-        session: sessionContext,
-        sessionCount: count,
-        monthSessionCount: monthCount,
-        rawSessionCount: rawCount,
-        rawMonthSessionCount: rawMonthCount,
-      });
+  const { count, monthCount } = await incrementCounterSafe(TELEGRAM_COUNTER_KEYS.authSessionStart);
+
+  const text = buildAuthSessionStartTelegramMessage({
+    session: sessionContext,
+    sessionCount: count,
+    monthSessionCount: monthCount,
+  });
 
   const result = await sendTelegramMessage(text);
   if (!result.ok) {
@@ -177,9 +187,6 @@ async function deliverSessionStartTelegram(doc, auth, now, opts = {}) {
       $set: {
         start_telegram_sent: true,
         start_telegram_skip_reason: null,
-        ...(dedupeKey && dedupeKey.strategy !== "visitor_id"
-          ? { start_dedupe_key: dedupeKey.key }
-          : {}),
       },
       $unset: { start_delivery_claimed_at: "" },
     },
@@ -371,10 +378,13 @@ async function recordSessionEnd(sessionId, meta = {}, sessionKind = "visitor") {
     return { ok: true, deduped: true };
   }
 
+  // Auth only: backfill a missed start alert. Visitors defer start entirely
+  // (deferred_to_summary) so the end summary is the single journey message.
   if (
-    !auth &&
+    auth &&
     !session.start_telegram_sent &&
-    !wasVisitorStartTelegramSuppressed(session.start_telegram_skip_reason)
+    !wasVisitorStartTelegramSuppressed(session.start_telegram_skip_reason) &&
+    !wasVisitorStartDeferredToSummary(session.start_telegram_skip_reason)
   ) {
     await deliverSessionStartTelegram(session, auth, now, { countRaw: false });
     const refreshed = await VisitorSession.findOne({ session_id: sessionId });
