@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useCallback, useEffect, useState } from "react";
+import { Suspense, useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { CheckCircle2, Clock, Loader2 } from "lucide-react";
@@ -8,6 +8,7 @@ import CheckoutAccountStep from "@/components/checkout/CheckoutAccountStep";
 import { rememberCheckoutWelcome } from "@/components/checkout/CheckoutWelcome";
 import { membershipTierLabel } from "@/lib/membershipLabel";
 import { mutateUser } from "@/lib/hooks";
+import { trackCheckoutStep } from "@/lib/checkout/trackCheckoutStep";
 
 function PaymentNotice({ checkout }) {
   if (!checkout?.found) return null;
@@ -45,6 +46,12 @@ function CheckoutReturn() {
   const searchParams = useSearchParams();
   const sessionId = searchParams?.get("session_id") || "";
   const [checkout, setCheckout] = useState(sessionId ? null : { found: false });
+  const done = useRef(false);
+
+  const onStep = useCallback(
+    (step, data, opts) => trackCheckoutStep(sessionId, step, data, opts),
+    [sessionId],
+  );
 
   useEffect(() => {
     if (!sessionId) return undefined;
@@ -53,14 +60,29 @@ function CheckoutReturn() {
       .then((res) => res.json())
       .catch(() => ({ found: false }))
       .then((data) => {
-        if (!cancelled) setCheckout(data || { found: false });
+        if (cancelled) return;
+        setCheckout(data || { found: false });
+        if (!data?.found) return;
+        if (data.status === "open") onStep("return_unpaid", {}, { once: true });
+        else onStep("account_step", { paymentStatus: data.paymentStatus }, { once: true });
       });
     return () => {
       cancelled = true;
     };
-  }, [sessionId]);
+  }, [sessionId, onStep]);
 
-  const finish = useCallback(async ({ planKey, subscriptionTier } = {}) => {
+  useEffect(() => {
+    if (!checkout?.found || checkout.status === "open") return undefined;
+    const onHide = () => {
+      if (!done.current) onStep("left_account_step", { via: "closed or reloaded the tab" }, { keepalive: true });
+    };
+    window.addEventListener("pagehide", onHide);
+    return () => window.removeEventListener("pagehide", onHide);
+  }, [checkout?.found, checkout?.status, onStep]);
+
+  const finish = useCallback(async ({ planKey, subscriptionTier, existing } = {}) => {
+    done.current = true;
+    onStep("account_created", { existing: !!existing }, { once: true });
     let key = planKey || "";
     let tier = subscriptionTier || "";
     try {
@@ -80,7 +102,7 @@ function CheckoutReturn() {
     rememberCheckoutWelcome(membershipTierLabel({ planKey: key, subscriptionTier: tier }));
     await mutateUser();
     router.push("/dashboard");
-  }, [router]);
+  }, [router, onStep]);
 
   if (!checkout) {
     return (
@@ -117,6 +139,7 @@ function CheckoutReturn() {
     <div className="flex min-h-screen w-screen">
       <CheckoutAccountStep
         onComplete={finish}
+        onStep={checkout.found ? onStep : undefined}
         initialEmail={checkout.email || ""}
         initialName={checkout.name || ""}
         notice={<PaymentNotice checkout={checkout} />}

@@ -38,7 +38,13 @@ async function availableHandle(except) {
   return randomUserHandle();
 }
 
-export default function CheckoutAccountStep({ onComplete, initialEmail = "", initialName = "", notice = null }) {
+export default function CheckoutAccountStep({
+  onComplete,
+  onStep,
+  initialEmail = "",
+  initialName = "",
+  notice = null,
+}) {
   const { data: user, isLoading } = useSWR("/api/user", userSwrFetcher);
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
@@ -96,6 +102,7 @@ export default function CheckoutAccountStep({ onComplete, initialEmail = "", ini
     onComplete?.({
       planKey: "",
       subscriptionTier: user.subscriptionTier || "",
+      existing: true,
     });
   }, [isLoading, onComplete, user]);
 
@@ -142,13 +149,13 @@ export default function CheckoutAccountStep({ onComplete, initialEmail = "", ini
     }
   };
 
-  const finish = async ({ userId, planKey, subscriptionTier }) => {
+  const finish = async ({ userId, planKey, subscriptionTier, existing = false }) => {
     if (finished.current) return;
     finished.current = true;
     try {
       await persistProfile(userId);
       mutateUser();
-      await onComplete?.({ planKey, subscriptionTier });
+      await onComplete?.({ planKey, subscriptionTier, existing });
     } catch (err) {
       finished.current = false;
       throw err;
@@ -171,6 +178,7 @@ export default function CheckoutAccountStep({ onComplete, initialEmail = "", ini
           userId: user.userId,
           planKey: "",
           subscriptionTier: user.subscriptionTier || "",
+          existing: true,
         });
         return;
       }
@@ -180,14 +188,17 @@ export default function CheckoutAccountStep({ onComplete, initialEmail = "", ini
       let res;
       if (isDevBypass) {
         body.devBypass = true;
+        onStep?.("email_verified", { via: "dev bypass" });
         res = await fetch("/api/login", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(body),
         });
       } else {
+        onStep?.("email_verify_started", { email });
         const magic = new Magic(process.env.NEXT_PUBLIC_MAGIC_PUBLISHABLE_KEY);
         const didToken = await magic.auth.loginWithMagicLink({ email });
+        onStep?.("email_verified");
         res = await fetch("/api/login", {
           method: "POST",
           headers: { "Content-Type": "application/json", Authorization: "Bearer " + didToken },
@@ -214,6 +225,7 @@ export default function CheckoutAccountStep({ onComplete, initialEmail = "", ini
       });
     } catch (err) {
       setError(err?.message || "Could not finish your account.");
+      onStep?.("account_failed", { message: err?.message || "Could not finish your account." });
       setLoading(false);
     } finally {
       clearInterval(timer);

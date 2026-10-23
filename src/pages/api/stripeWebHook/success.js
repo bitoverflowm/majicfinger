@@ -5,6 +5,7 @@ import StripeWebhookEvent from "@/models/StripeWebhookEvent";
 import { notifySignup } from "@/lib/telegram/trackEvent";
 import { notifyCheckoutAlert } from "@/lib/telegram/checkoutAlert";
 import { notifyBillingEvent } from "@/lib/telegram/billingAlert";
+import { recordCheckoutStep } from "@/lib/telegram/checkoutJourney";
 import { stripeSecretKey } from "@/lib/stripe/client";
 import { buffer } from "micro";
 
@@ -260,6 +261,7 @@ export default async function handler(req, res) {
         break;
       case "checkout.session.async_payment_failed":
         await handleCheckoutPaymentFailed(data);
+        await recordCheckoutStep({ attemptId: data?.metadata?.checkoutAttemptId, step: "async_payment_failed" });
         await notifyCheckoutAlert({
           title: "Checkout payment failed",
           fields: {
@@ -272,6 +274,7 @@ export default async function handler(req, res) {
         break;
       case "checkout.session.expired":
         await handleCheckoutExpired(data);
+        await recordCheckoutStep({ attemptId: data?.metadata?.checkoutAttemptId, step: "expired" });
         break;
 
       // Customer lifecycle events (mainly to ensure user record exists)
@@ -499,7 +502,7 @@ async function reconcileEmbeddedCheckout(session) {
  * previous webhook behavior. Embedded attempts are claimed so login and the
  * webhook cannot both add netPay.
  */
-export async function grantEmbeddedCheckoutSession(session) {
+export async function grantEmbeddedCheckoutSession(session, via = "Stripe webhook") {
   const attemptId = session?.metadata?.checkoutAttemptId || "";
   if (attemptId && !sessionIsPaid(session)) return { ok: false, reason: "unpaid" };
 
@@ -537,8 +540,10 @@ export async function grantEmbeddedCheckoutSession(session) {
         { attemptId },
         { $set: { lastError: result.reason || "grant_failed", grantFinished: true } },
       );
+      await recordCheckoutStep({ attemptId, step: "grant_failed", data: { message: result.reason || "grant_failed", via } });
     } else if (attemptId) {
       await CheckoutAttempt.updateOne({ attemptId }, { $set: { grantFinished: true } });
+      await recordCheckoutStep({ attemptId, step: "access_granted", data: { via } });
     }
     return result || { ok: true };
   } catch (err) {
@@ -547,6 +552,7 @@ export async function grantEmbeddedCheckoutSession(session) {
         { attemptId },
         { $set: { granted: false, grantFinished: true, lastError: err?.message || "grant_threw" } },
       );
+      await recordCheckoutStep({ attemptId, step: "grant_failed", data: { message: err?.message || "grant_threw", via } });
     }
     throw err;
   }

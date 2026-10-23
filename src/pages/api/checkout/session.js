@@ -1,7 +1,8 @@
 import crypto from "crypto";
 import dbConnect from "@/lib/dbConnect";
 import CheckoutAttempt from "@/models/CheckoutAttempt";
-import { getCheckoutStripe, stripePublishableKey, stripeSecretKey } from "@/lib/stripe/client";
+import { getCheckoutStripe, isStripeTestKey, stripePublishableKey, stripeSecretKey } from "@/lib/stripe/client";
+import { extractClientMeta } from "@/lib/analytics/requestClientMeta";
 import {
   planFromQuery,
   resolveCheckoutPrice,
@@ -18,6 +19,18 @@ const ALREADY_BILLED_REASONS = new Set(["active", "legacy", "lifetime"]);
 
 /** Groups these sessions in the Stripe Dashboard. */
 const INTEGRATION_IDENTIFIER = "lychee-inapp-checkout-qmzrtkwe";
+
+function checkoutSource(req) {
+  const meta = extractClientMeta(req);
+  return {
+    from: String(req.body?.from || "").slice(0, 160) || undefined,
+    country: meta.country || undefined,
+    region: meta.region || undefined,
+    city: meta.city || undefined,
+    userAgent: meta.user_agent ? meta.user_agent.slice(0, 300) : undefined,
+    language: meta.accept_language || undefined,
+  };
+}
 
 export default async function handler(req, res) {
   if (req.method !== "POST") return res.status(405).end();
@@ -101,6 +114,13 @@ export default async function handler(req, res) {
         status: "open",
         granted: false,
         expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+        planLabel: plan.label,
+        amount: plan.amount,
+        interval: plan.mode === "subscription" ? plan.interval : undefined,
+        testMode: isStripeTestKey(),
+        prefillEmail: loginEmail || undefined,
+        source: checkoutSource(req),
+        steps: [{ step: "opened", at: new Date(), data: { from: String(req.body?.from || "").slice(0, 160) || undefined } }],
       });
     } catch (err) {
       await notifyCheckoutAlert({

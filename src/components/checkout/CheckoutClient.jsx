@@ -1,6 +1,6 @@
 "use client";
 
-import { Fragment, useEffect, useMemo, useState } from "react";
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useTheme } from "next-themes";
@@ -16,6 +16,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
 import { landingPageV2Config } from "@/lib/landingPageV2Config";
+import { checkoutEntryPage, msSinceCheckoutClick, trackCheckoutStep } from "@/lib/checkout/trackCheckoutStep";
 
 const stripePromises = new Map();
 
@@ -192,12 +193,18 @@ export default function CheckoutClient({ plan, cycle, referral }) {
     promoCodes: false,
   });
   const [error, setError] = useState("");
+  const mountedAt = useRef(typeof performance !== "undefined" ? performance.now() : 0);
 
   useEffect(() => {
     let cancelled = false;
     (async () => {
       try {
-        const res = await requestCheckoutSession({ plan, cycle, referral: referralFromWindow(referral) });
+        const res = await requestCheckoutSession({
+          plan,
+          cycle,
+          referral: referralFromWindow(referral),
+          from: checkoutEntryPage(),
+        });
         const data = res.data || {};
         if (cancelled) return;
         if (data.code === "ALREADY_MEMBER" && data.redirect) {
@@ -271,14 +278,58 @@ export default function CheckoutClient({ plan, cycle, referral }) {
 
   return (
     <CheckoutElementsProvider stripe={stripePromise} options={options}>
-      <ConnectedCheckout summary={state.summary} promoCodes={state.promoCodes} theme={theme} />
+      <ConnectedCheckout
+        summary={state.summary}
+        promoCodes={state.promoCodes}
+        theme={theme}
+        sessionId={sessionIdFromSecret(state.clientSecret)}
+        mountedAt={mountedAt.current}
+      />
     </CheckoutElementsProvider>
   );
 }
 
-function ConnectedCheckout({ summary, promoCodes, theme }) {
+function sessionIdFromSecret(clientSecret) {
+  return String(clientSecret || "").split("_secret_")[0];
+}
+
+function ConnectedCheckout({ summary, promoCodes, theme, sessionId, mountedAt }) {
   const result = useCheckoutElements();
   const checkout = result.type === "success" ? result.checkout : null;
+  const journey = useRef({ submitted: false, paid: false, left: false, method: "", email: "" });
+  if (checkout?.status?.type === "complete") journey.current.paid = true;
+
+  const track = useCallback(
+    (step, data, opts) => trackCheckoutStep(sessionId, step, { method: journey.current.method || undefined, ...data }, opts),
+    [sessionId],
+  );
+
+  const leave = useCallback(
+    (via, pageUnloading = false) => {
+      const j = journey.current;
+      if (j.paid || j.left) return;
+      j.left = true;
+      track("left_page", { via, afterSubmit: pageUnloading && j.submitted }, { keepalive: true });
+    },
+    [track],
+  );
+
+  useEffect(() => {
+    const onHide = () => leave("closed, reloaded, or navigated the tab away", true);
+    const onShow = (event) => {
+      if (event.persisted) journey.current.left = false;
+    };
+    window.addEventListener("pagehide", onHide);
+    window.addEventListener("pageshow", onShow);
+    return () => {
+      window.removeEventListener("pagehide", onHide);
+      window.removeEventListener("pageshow", onShow);
+    };
+  }, [leave]);
+
+  useEffect(() => {
+    if (result.type === "error") track("form_load_failed", { message: result.error?.message }, { once: true });
+  }, [result.type, result.error?.message, track]);
 
   useEffect(() => {
     checkout?.changeAppearance?.(appearanceFor(theme));
@@ -287,14 +338,21 @@ function ConnectedCheckout({ summary, promoCodes, theme }) {
   }, [theme, Boolean(checkout)]);
 
   return (
-    <CheckoutLayout summary={summary} checkout={checkout}>
+    <CheckoutLayout summary={summary} checkout={checkout} onLeave={leave}>
       {result.type === "error" ? (
         <div className="rounded-xl border border-border bg-card p-6 text-sm">
           <p className="font-medium text-foreground">We couldn&apos;t load the payment form.</p>
           <p className="mt-1 text-muted-foreground">{result.error?.message || "Refresh the page to try again."}</p>
         </div>
       ) : checkout ? (
-        <PaymentForm checkout={checkout} summary={summary} promoCodes={promoCodes} />
+        <PaymentForm
+          checkout={checkout}
+          summary={summary}
+          promoCodes={promoCodes}
+          journey={journey}
+          track={track}
+          mountedAt={mountedAt}
+        />
       ) : (
         <PaymentSkeleton />
       )}
@@ -302,7 +360,7 @@ function ConnectedCheckout({ summary, promoCodes, theme }) {
   );
 }
 
-function CheckoutLayout({ summary, checkout = null, children }) {
+function CheckoutLayout({ summary, checkout = null, onLeave, children }) {
   return (
     <div className="min-h-dvh w-full bg-background">
       <div className="mx-auto grid min-h-dvh w-full max-w-6xl lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
@@ -311,12 +369,17 @@ function CheckoutLayout({ summary, checkout = null, children }) {
             <div className="flex items-center justify-between">
               <Link
                 href="/#pricing"
+                onClick={() => onLeave?.("clicked back to Pricing")}
                 className="group inline-flex items-center gap-1.5 text-sm text-muted-foreground transition-colors hover:text-foreground"
               >
                 <ArrowLeft className="h-4 w-4 transition-transform group-hover:-translate-x-0.5" />
                 Pricing
               </Link>
-              <Link href="/" className="flex items-center gap-2 text-sm font-semibold tracking-tight text-foreground">
+              <Link
+                href="/"
+                onClick={() => onLeave?.("clicked the Lychee logo")}
+                className="flex items-center gap-2 text-sm font-semibold tracking-tight text-foreground"
+              >
                 <img src="/fruit.png" alt="" className="h-6 w-[18px] dark:brightness-0 dark:invert" />
                 Lychee
               </Link>
@@ -433,7 +496,7 @@ function PaymentSkeleton() {
   );
 }
 
-function PromoCode({ checkout }) {
+function PromoCode({ checkout, track }) {
   const [open, setOpen] = useState(false);
   const [code, setCode] = useState("");
   const [busy, setBusy] = useState(false);
@@ -484,8 +547,13 @@ function PromoCode({ checkout }) {
     setError("");
     const result = await checkout.applyPromotionCode(value);
     setBusy(false);
-    if (result.type === "error") setError(result.error?.message || "That code didn't work.");
-    else setCode("");
+    if (result.type === "error") {
+      setError(result.error?.message || "That code didn't work.");
+      track("promo_failed", { promo: value, message: result.error?.message });
+    } else {
+      setCode("");
+      track("promo_applied", { promo: value });
+    }
   };
 
   return (
@@ -519,7 +587,7 @@ function PromoCode({ checkout }) {
   );
 }
 
-function PaymentForm({ checkout, summary, promoCodes }) {
+function PaymentForm({ checkout, summary, promoCodes, journey, track, mountedAt }) {
   const router = useRouter();
   const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
@@ -546,16 +614,33 @@ function PaymentForm({ checkout, summary, promoCodes }) {
     if (submitting || paid) return;
     setError("");
     setSubmitting(true);
+    journey.current.submitted = true;
+    track("submit", { email: journey.current.email || undefined });
+    const started = Date.now();
     try {
       const result = await checkout.confirm({ redirect: "if_required" });
       if (result.type === "error") {
-        setError(result.error?.message || "Your payment didn't go through. Try another method.");
+        const message = result.error?.message || "Your payment didn't go through. Try another method.";
+        setError(message);
+        journey.current.submitted = false;
+        track("payment_failed", {
+          kind: result.error?.code === "paymentFailed" ? "declined" : "error",
+          message,
+          declineCode: result.error?.paymentFailed?.declineCode || undefined,
+        });
         return;
       }
+      journey.current.paid = true;
+      track("payment_confirmed", {
+        ms: Date.now() - started,
+        paymentStatus: result.session?.status?.paymentStatus,
+      });
       setPaid(true);
       goToAccount();
     } catch (err) {
       setError(err?.message || "Your payment didn't go through. Try again.");
+      journey.current.submitted = false;
+      track("payment_failed", { kind: "error", message: err?.message || "confirm threw" });
     } finally {
       setSubmitting(false);
     }
@@ -612,14 +697,31 @@ function PaymentForm({ checkout, summary, promoCodes }) {
         </p>
       </div>
 
-      <ContactDetailsElement />
+      <ContactDetailsElement
+        onFocus={() => track("contact_started", {}, { once: true })}
+        onChange={(event) => {
+          journey.current.email = event?.value?.email || "";
+        }}
+      />
 
       <div className="space-y-2">
         <Label>Payment method</Label>
-        <PaymentElement options={{ layout: { type: "tabs" }, terms: { card: "never" } }} />
+        <PaymentElement
+          options={{ layout: { type: "tabs" }, terms: { card: "never" } }}
+          onReady={() => track("form_ready", { ms: msSinceCheckoutClick(mountedAt) }, { once: true })}
+          onLoadError={(event) => track("form_load_failed", { message: event?.error?.message }, { once: true })}
+          onFocus={() => track("payment_started", {}, { once: true })}
+          onChange={(event) => {
+            const type = event?.value?.type || "";
+            const previous = journey.current.method;
+            journey.current.method = type || previous;
+            if (type && previous && type !== previous) track("method_changed", { method: type });
+            if (event?.complete) track("details_complete", {}, { once: true });
+          }}
+        />
       </div>
 
-      {promoCodes ? <PromoCode checkout={checkout} /> : null}
+      {promoCodes ? <PromoCode checkout={checkout} track={track} /> : null}
 
       {error ? (
         <p role="alert" className="rounded-lg border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm text-destructive">

@@ -19,37 +19,49 @@ export function isTelegramConfigured() {
   return !!(getBotToken() && getChatId());
 }
 
+async function callTelegram(method, payload, retried = false) {
+  const res = await fetch(`https://api.telegram.org/bot${getBotToken()}/${method}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ chat_id: getChatId(), ...payload }),
+    signal: AbortSignal.timeout(8000),
+  });
+  const body = await res.json().catch(() => ({}));
+  const retryAfter = Number(body?.parameters?.retry_after);
+  if (res.status === 429 && !retried && retryAfter > 0 && retryAfter <= 5) {
+    await new Promise((resolve) => setTimeout(resolve, retryAfter * 1000));
+    return callTelegram(method, payload, true);
+  }
+  if (!res.ok || body?.ok === false) {
+    return { ok: false, error: body?.description || `HTTP ${res.status}` };
+  }
+  return { ok: true, result: body.result };
+}
+
 /**
  * Fire-and-forget Telegram message. Never throws to callers.
  * @param {string} text
+ * @param {{ replyTo?: number }} [opts]
  */
-export async function sendTelegramMessage(text) {
+export async function sendTelegramMessage(text, opts = {}) {
   if (!isTelegramConfigured()) {
     return { ok: false, skipped: true };
   }
 
-  const token = getBotToken();
-  const chatId = getChatId();
-
   try {
-    const res = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        chat_id: chatId,
-        text,
-        parse_mode: "HTML",
-        disable_web_page_preview: true,
-      }),
-      signal: AbortSignal.timeout(8000),
+    const sent = await callTelegram("sendMessage", {
+      text,
+      parse_mode: "HTML",
+      disable_web_page_preview: true,
+      ...(opts.replyTo
+        ? { reply_parameters: { message_id: opts.replyTo, allow_sending_without_reply: true } }
+        : {}),
     });
-
-    const body = await res.json().catch(() => ({}));
-    if (!res.ok || body?.ok === false) {
-      console.error("[telegram] sendMessage failed:", body?.description || res.status);
-      return { ok: false, error: body?.description || `HTTP ${res.status}` };
+    if (!sent.ok) {
+      console.error("[telegram] sendMessage failed:", sent.error);
+      return { ok: false, error: sent.error };
     }
-    return { ok: true };
+    return { ok: true, messageId: sent.result?.message_id };
   } catch (err) {
     const error = formatFetchError(err);
     console.error("[telegram] sendMessage error:", error);
@@ -64,5 +76,33 @@ export async function sendTelegramMessage(text) {
           }
         : {}),
     };
+  }
+}
+
+/**
+ * Replace the text of a message this bot sent. Never throws to callers.
+ * @param {number} messageId
+ * @param {string} text
+ */
+export async function editTelegramMessage(messageId, text) {
+  if (!isTelegramConfigured() || !messageId) {
+    return { ok: false, skipped: true };
+  }
+  try {
+    const edited = await callTelegram("editMessageText", {
+      message_id: messageId,
+      text,
+      parse_mode: "HTML",
+      disable_web_page_preview: true,
+    });
+    if (!edited.ok && !/message is not modified/i.test(edited.error || "")) {
+      console.error("[telegram] editMessageText failed:", edited.error);
+      return { ok: false, error: edited.error };
+    }
+    return { ok: true };
+  } catch (err) {
+    const error = formatFetchError(err);
+    console.error("[telegram] editMessageText error:", error);
+    return { ok: false, error };
   }
 }

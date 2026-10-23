@@ -252,7 +252,7 @@ export async function attachCheckoutToEmail(req, loginEmail) {
     }
 
     const { grantEmbeddedCheckoutSession } = await import("@/pages/api/stripeWebHook/success");
-    await grantEmbeddedCheckoutSession(session);
+    await grantEmbeddedCheckoutSession(session, "login");
     const user = await reconcileCheckoutIdentity(attemptId, login);
     const fresh = await CheckoutAttempt.findOne({ attemptId });
     return {
