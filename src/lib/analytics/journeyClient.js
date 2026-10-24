@@ -8,6 +8,12 @@ import {
 } from "@/lib/analytics/visitorSession";
 import { buildSessionStartMeta } from "@/lib/analytics/sessionStartMeta";
 import { isProdAnalyticsEnabled } from "@/lib/analytics/isProdAnalyticsEnabled";
+import {
+  clearJourneyIdleTimer,
+  getJourneyExitSnapshot,
+  noteJourneyActivity,
+  setJourneyIdleEndHandler,
+} from "@/lib/analytics/journeyActivity";
 
 const FLUSH_INTERVAL_MS = 8000;
 const MAX_QUEUE_SIZE = 80;
@@ -17,6 +23,7 @@ const JOURNEY_ENDPOINT = "/api/analytics/journey";
 let queue = [];
 let flushTimer = null;
 let ending = false;
+let idleWatchArmed = false;
 
 function scheduleFlush() {
   if (flushTimer || typeof window === "undefined") return;
@@ -73,11 +80,20 @@ export function trackJourneyEvent(type, payload = {}) {
   const sessionId = getOrCreateVisitorSessionId();
   if (!sessionId) return;
 
+  const path = payload.path || window.location.pathname;
+  const meta = payload.meta || {};
+  noteJourneyActivity({
+    path,
+    label: payload.label || meta.label || meta.pageName || "",
+    contentType: meta.contentType,
+    contentName: meta.name || meta.displayName,
+  });
+
   queue.push({
     type,
-    path: payload.path || window.location.pathname,
+    path,
     label: payload.label,
-    meta: payload.meta || {},
+    meta,
     ts: Date.now(),
   });
 
@@ -91,7 +107,7 @@ export function trackJourneyEvent(type, payload = {}) {
 /**
  * Flush queued journey events to the server.
  * @param {boolean} [endSession]
- * @param {{ isLoggedIn?: boolean; email?: string; userId?: string }} [identity]
+ * @param {{ isLoggedIn?: boolean; email?: string; userId?: string; exitReason?: string }} [identity]
  * @returns {Promise<void>}
  */
 export function flushJourneyQueue(endSession = false, identity = {}) {
@@ -110,6 +126,22 @@ export function flushJourneyQueue(endSession = false, identity = {}) {
     if (endSession && !ending && !hasVisitorSessionEnded()) {
       ending = true;
       markVisitorSessionEnded();
+      clearJourneyIdleTimer();
+      const exit = getJourneyExitSnapshot(identity.exitReason || "pagehide");
+      if (exit.exitReason === "idle") {
+        events.push({
+          type: "idle_leave",
+          path: exit.lastPath,
+          label: exit.lastLabel || exit.lastContentName || exit.lastPath,
+          meta: {
+            label: exit.lastLabel || exit.lastContentName || exit.lastPath,
+            name: exit.lastContentName,
+            contentType: exit.lastContentType,
+            idleSeconds: exit.idleSeconds,
+          },
+          ts: Date.now(),
+        });
+      }
       return postJourney(
         {
           action: "session_end",
@@ -120,6 +152,7 @@ export function flushJourneyQueue(endSession = false, identity = {}) {
             isLoggedIn: !!identity.isLoggedIn,
             email: identity.email,
             userId: identity.userId,
+            ...exit,
           },
         },
         { keepalive: true },
@@ -133,6 +166,15 @@ export function flushJourneyQueue(endSession = false, identity = {}) {
   return Promise.resolve();
 }
 
+function armIdleWatch(identity = {}) {
+  if (idleWatchArmed || typeof window === "undefined") return;
+  idleWatchArmed = true;
+  setJourneyIdleEndHandler(() => {
+    endVisitorSession({ ...identity, exitReason: "idle" });
+  });
+  noteJourneyActivity({ path: window.location.pathname });
+}
+
 export function startVisitorSessionIfNeeded(identity = {}) {
   if (typeof window === "undefined") return;
   if (!isProdAnalyticsEnabled()) return;
@@ -140,6 +182,7 @@ export function startVisitorSessionIfNeeded(identity = {}) {
 
   const sessionId = getOrCreateVisitorSessionId();
   markVisitorSessionStarted();
+  armIdleWatch(identity);
 
   const meta = buildSessionStartMeta(identity);
   const body = {
@@ -179,6 +222,7 @@ export function linkVisitorIdentity(identity) {
   });
 }
 
+/** @param {{ isLoggedIn?: boolean; email?: string; userId?: string; exitReason?: string }} [identity] */
 export function endVisitorSession(identity = {}) {
   flushJourneyQueue(true, identity);
 }

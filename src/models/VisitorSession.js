@@ -17,6 +17,8 @@ const VisitorSessionSchema = new Schema(
     page_type: { type: String },
     page_name: { type: String },
     referrer: { type: String, default: "" },
+    /** IANA timezone from the browser, e.g. America/New_York */
+    time_zone: { type: String },
     visitor_id: { type: String, index: true },
     start_dedupe_key: { type: String, index: true },
     utm_source: { type: String },

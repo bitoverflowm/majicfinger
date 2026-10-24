@@ -53,6 +53,7 @@ function sessionContextFromDoc(doc) {
     page_type: doc.page_type,
     page_name: doc.page_name,
     referrer: doc.referrer,
+    time_zone: doc.time_zone,
     visitor_id: doc.visitor_id,
     utm_source: doc.utm_source,
     utm_medium: doc.utm_medium,
@@ -67,6 +68,20 @@ function sessionContextFromDoc(doc) {
     accept_language: doc.accept_language,
     email: doc.email,
     is_logged_in: doc.is_logged_in,
+  };
+}
+
+/** @param {Record<string, unknown>} meta */
+function exitContextFromMeta(meta = {}) {
+  const idleSeconds = Number(meta.idleSeconds);
+  return {
+    exitReason: typeof meta.exitReason === "string" ? meta.exitReason : "",
+    idleSeconds: Number.isFinite(idleSeconds) ? idleSeconds : undefined,
+    lastPath: typeof meta.lastPath === "string" ? meta.lastPath : "",
+    lastLabel: typeof meta.lastLabel === "string" ? meta.lastLabel : "",
+    lastContentType: typeof meta.lastContentType === "string" ? meta.lastContentType : "",
+    lastContentName: typeof meta.lastContentName === "string" ? meta.lastContentName : "",
+    timeZone: typeof meta.timeZone === "string" ? meta.timeZone : "",
   };
 }
 
@@ -458,12 +473,14 @@ async function recordSessionEnd(sessionId, meta = {}, sessionKind = "visitor") {
           ended_at: now,
           email: session.email || meta.email,
           is_logged_in: session.is_logged_in || !!meta.isLoggedIn,
+          time_zone: meta.timeZone || session.time_zone || sessionContext.time_zone,
         },
         events,
         sessionCount: count,
         monthSessionCount: monthCount,
         returningVisitor,
         returningVisitorLine,
+        exit: exitContextFromMeta(meta),
       });
 
   const sent = await sendTelegramMessage(text);
