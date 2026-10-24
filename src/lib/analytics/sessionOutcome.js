@@ -58,9 +58,15 @@ export function hasNoteworthyVisitorActivity(events = []) {
   if (!events.length) return false;
   if (hasMeaningfulVisitorOutcome(events)) return true;
   return events.some((event) =>
-    ["page_view", "page_click", "content_view", "content_leave", "fork_click", "hero_cta_click"].includes(
-      event?.type,
-    ),
+    [
+      "page_view",
+      "page_click",
+      "content_view",
+      "content_leave",
+      "fork_click",
+      "hero_cta_click",
+      "idle_leave",
+    ].includes(event?.type),
   );
 }
 

@@ -56,6 +56,13 @@ export function buildSessionStartMeta(identity = {}) {
   const entryPath = pathname || "/";
   const utm = extractUtmParams(search);
 
+  let timeZone = "";
+  try {
+    timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone || "";
+  } catch {
+    timeZone = "";
+  }
+
   return {
     entryPath,
     entryUrl: href || entryPath,
@@ -64,6 +71,7 @@ export function buildSessionStartMeta(identity = {}) {
     pageType: inferPageTypeFromPath(entryPath),
     pageName: inferPageNameFromPath(entryPath),
     visitorId: getOrCreateVisitorId(),
+    timeZone,
     ...utm,
     isLoggedIn: !!identity.isLoggedIn,
     email: identity.email,

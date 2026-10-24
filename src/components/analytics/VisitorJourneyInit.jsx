@@ -30,7 +30,7 @@ export function VisitorJourneyInit() {
     startVisitorSessionIfNeeded(identityRef.current);
 
     const onPageHide = () => {
-      endVisitorSession(identityRef.current);
+      endVisitorSession({ ...identityRef.current, exitReason: "pagehide" });
     };
 
     // Flush queued steps when the tab backgrounds so a later kill still has them saved.

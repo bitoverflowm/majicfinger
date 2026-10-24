@@ -4,8 +4,15 @@ import {
   countryCodeToFlag,
   currentUtcMonthKey,
   formatDualRankHeadline,
+  formatGeoLocationLabel,
 } from "@/lib/telegram/geoFormat";
-import { buildLandingTelegramFields } from "@/lib/analytics/sessionFieldsFromMeta";
+import { buildLandingTelegramFields, buildUtmTelegramFields } from "@/lib/analytics/sessionFieldsFromMeta";
+import {
+  TELEGRAM_HOME_TIMEZONE,
+  formatReferrerLabel,
+  formatZonedDateTime,
+  shortenUserAgent,
+} from "@/lib/analytics/telegramTime";
 
 /** @param {Array<string>} lines */
 function appendTelegramAlertCountLines(
@@ -114,12 +121,70 @@ export function formatJourneyStep(event, index) {
       }`;
     case "workspace_dwell":
       return `${index}. Spent ${meta.durationSeconds || "?"}s in ${meta.workspace || meta.integrationId || "workspace"}`;
+    case "idle_leave":
+      return `${index}. Went idle on ${meta.label || meta.name || path || "page"}${
+        meta.idleSeconds != null ? ` (${formatDuration(Number(meta.idleSeconds) * 1000)})` : ""
+      }`;
     case "error":
       return `${index}. Error: ${meta.message || event.label || "unknown"}${
         meta.source ? ` (${meta.source})` : ""
       }`;
     default:
       return `${index}. ${event.type}${path ? ` (${path})` : ""}`;
+  }
+}
+
+/**
+ * @param {Array<{ type: string; path?: string; label?: string; meta?: Record<string, unknown> }>} events
+ * @param {{ lastPath?: string; lastLabel?: string; lastContentType?: string; lastContentName?: string }} [exit]
+ */
+export function inferLastPlace(events = [], exit = {}) {
+  if (exit.lastLabel || exit.lastContentName || exit.lastPath) {
+    const label =
+      exit.lastLabel ||
+      (exit.lastContentType && exit.lastContentName
+        ? `${exit.lastContentType}: ${exit.lastContentName}`
+        : exit.lastContentName) ||
+      exit.lastPath;
+    return { label: String(label || ""), path: String(exit.lastPath || "") };
+  }
+
+  for (let i = events.length - 1; i >= 0; i -= 1) {
+    const event = events[i];
+    const meta = event.meta && typeof event.meta === "object" ? event.meta : {};
+    if (event.type === "content_view" || event.type === "content_leave") {
+      return {
+        label: `${meta.contentType || "content"}: ${meta.name || event.path || ""}`,
+        path: String(event.path || meta.path || ""),
+      };
+    }
+    if (event.type === "page_view") {
+      return {
+        label: String(meta.pageName || event.path || "page"),
+        path: String(event.path || meta.path || ""),
+      };
+    }
+    if (event.type === "page_click") {
+      return {
+        label: String(meta.label || event.label || event.path || "page"),
+        path: String(event.path || meta.path || ""),
+      };
+    }
+  }
+  return null;
+}
+
+/** @param {string | undefined | null} reason */
+function formatExitReason(reason) {
+  switch (String(reason || "")) {
+    case "idle":
+      return "idle on open tab";
+    case "hidden":
+      return "tab backgrounded";
+    case "pagehide":
+      return "closed / left site";
+    default:
+      return reason ? String(reason) : "";
   }
 }
 
@@ -143,7 +208,8 @@ function hasHighIntentPageClickMeta(event) {
 /**
  * @param {Array<{ type: string; meta?: Record<string, unknown> }>} events
  */
-export function inferSessionOutcome(events) {
+export function inferSessionOutcome(events, exit = {}) {
+  if (exit.exitReason === "idle") return "Went idle on page";
   const types = events.map((e) => e.type);
   if (types.includes("signup")) return "Signed up";
   if (types.includes("hero_cta_click")) return "Clicked hero CTA";
@@ -174,11 +240,38 @@ export function inferAuthSessionOutcome(events) {
 
 /**
  * @param {{
- *   session: { session_id: string; started_at: Date; ended_at?: Date; entry_path?: string; email?: string; is_logged_in?: boolean };
+ *   session: {
+ *     session_id: string;
+ *     started_at: Date;
+ *     ended_at?: Date;
+ *     entry_path?: string;
+ *     referrer?: string;
+ *     email?: string;
+ *     is_logged_in?: boolean;
+ *     time_zone?: string;
+ *     country?: string;
+ *     region?: string;
+ *     city?: string;
+ *     client_ip?: string;
+ *     user_agent?: string;
+ *     utm_source?: string;
+ *     utm_medium?: string;
+ *     utm_campaign?: string;
+ *   };
  *   events: Array<{ type: string; path?: string; label?: string; meta?: Record<string, unknown>; ts?: Date }>;
  *   sessionCount?: number;
+ *   monthSessionCount?: number;
  *   returningVisitor?: { isReturning?: boolean; visitNumber?: number; priorVisits?: number; priorByIp?: number; priorByVisitorId?: number; matchedBy?: string | null; firstSeenAt?: Date | null; lastPriorAt?: Date | null; lastPriorEntryPath?: string } | null;
  *   returningVisitorLine?: string;
+ *   exit?: {
+ *     exitReason?: string;
+ *     idleSeconds?: number;
+ *     lastPath?: string;
+ *     lastLabel?: string;
+ *     lastContentType?: string;
+ *     lastContentName?: string;
+ *     timeZone?: string;
+ *   };
  * }} opts
  */
 export function buildSessionEndTelegramMessage({
@@ -188,10 +281,12 @@ export function buildSessionEndTelegramMessage({
   monthSessionCount,
   returningVisitor = null,
   returningVisitorLine = "",
+  exit = {},
 }) {
   const startedAt = session.started_at ? new Date(session.started_at).getTime() : Date.now();
   const endedAt = session.ended_at ? new Date(session.ended_at).getTime() : Date.now();
-  const duration = formatDuration(Math.max(0, endedAt - startedAt));
+  const durationMs = Math.max(0, endedAt - startedAt);
+  const duration = formatDuration(durationMs);
   const shortId = String(session.session_id || "").slice(0, 8);
   const flag = countryCodeToFlag(session.country);
   const headline = formatDualRankHeadline({
@@ -201,38 +296,82 @@ export function buildSessionEndTelegramMessage({
     flag,
   });
 
+  const visitorTz = String(exit.timeZone || session.time_zone || "").trim();
+  const homeTime = formatZonedDateTime(endedAt, TELEGRAM_HOME_TIMEZONE);
+  const visitorTime = visitorTz
+    ? formatZonedDateTime(endedAt, visitorTz)
+    : formatZonedDateTime(endedAt, "UTC");
+
+  const lastPlace = inferLastPlace(events, exit);
+  const idleSeconds = Number(exit.idleSeconds);
+  const idleSignificant = Number.isFinite(idleSeconds) && idleSeconds >= 60;
+  const exitReason = formatExitReason(exit.exitReason);
+
   const steps = events.slice(0, 25).map((event, i) => formatJourneyStep(event, i + 1));
   const more = events.length > 25 ? `\n… and ${events.length - 25} more steps` : "";
 
-  const lines = [`<b>📋 ${escapeHtml(headline)}</b>`, ""];
-  appendTelegramAlertCountLines(lines, sessionCount, monthSessionCount);
-  lines.push(
-    "",
-    `<b>Session:</b> ${escapeHtml(shortId)}`,
-    `<b>Duration:</b> ${escapeHtml(duration)}`,
-    `<b>Logged in:</b> ${session.is_logged_in || session.email ? "yes" : "no"}`,
-  );
+  const lines = [`<b>${escapeHtml(headline)}</b>`, ""];
+  const field = (label, value) => {
+    if (value == null || value === "") return;
+    lines.push(`<b>${escapeHtml(label)}:</b> ${escapeHtml(String(value))}`);
+  };
 
-  if (session.email) {
-    lines.push(`<b>Email:</b> ${escapeHtml(session.email)}`);
-  }
+  // Same label twice: ours (NPT / home) then the visitor's local zone.
+  field("Date and time", homeTime);
+  field(
+    "Date and time",
+    visitorTz ? visitorTime : `${visitorTime} (visitor tz unknown · UTC)`,
+  );
+  lines.push("");
+  field("Session", shortId);
+  field("Duration", duration);
+  field("Logged in", session.is_logged_in || session.email ? "yes" : "no");
+
+  if (session.email) field("Email", session.email);
 
   if (returningVisitorLine) {
-    lines.push(`<b>Visitor:</b> ${escapeHtml(returningVisitorLine)}`);
+    field("Visitor", returningVisitorLine);
   } else if (returningVisitor?.isReturning) {
-    lines.push(
-      `<b>Visitor:</b> returning · visit #${escapeHtml(String(returningVisitor.visitNumber || "?"))}`,
-    );
+    field("Visitor", `returning · visit #${returningVisitor.visitNumber || "?"}`);
+  } else {
+    field("Visitor", "first visit from this IP");
   }
 
   if (returningVisitor?.isReturning && returningVisitor.lastPriorEntryPath) {
-    lines.push(
-      `<b>Last visit entry:</b> ${escapeHtml(String(returningVisitor.lastPriorEntryPath))}`,
-    );
+    field("Last visit entry", returningVisitor.lastPriorEntryPath);
   }
 
-  appendSessionLandingLines(lines, session);
-  appendSessionGeoLines(lines, session);
+  field("Path", session.entry_path || "/");
+  field("Referrer", formatReferrerLabel(session.referrer, session.entry_path));
+
+  const utm = buildUtmTelegramFields(session);
+  for (const [key, value] of Object.entries(utm)) {
+    field(key, value);
+  }
+
+  const location = formatGeoLocationLabel({
+    country: session.country,
+    region: session.region,
+    city: session.city,
+    client_ip: session.client_ip,
+    maskIp: true,
+  });
+  field("Location", location);
+  field("User agent", shortenUserAgent(session.user_agent));
+
+  if (lastPlace?.label || lastPlace?.path) {
+    const leftAt =
+      lastPlace.label && lastPlace.path && !String(lastPlace.label).includes(lastPlace.path)
+        ? `${lastPlace.label} (${lastPlace.path})`
+        : lastPlace.label || lastPlace.path;
+    field("Left at", leftAt);
+  }
+  if (idleSignificant) {
+    field("Idle before leave", formatDuration(idleSeconds * 1000));
+  }
+  if (exitReason) {
+    field("Exit", exitReason);
+  }
 
   lines.push("", "<b>Journey:</b>");
   if (steps.length) {
@@ -242,7 +381,7 @@ export function buildSessionEndTelegramMessage({
     lines.push("No tracked steps recorded.");
   }
 
-  lines.push("", `<b>Outcome:</b> ${escapeHtml(inferSessionOutcome(events))}`);
+  lines.push("", `<b>Outcome:</b> ${escapeHtml(inferSessionOutcome(events, exit))}`);
 
   return lines.join("\n");
 }
