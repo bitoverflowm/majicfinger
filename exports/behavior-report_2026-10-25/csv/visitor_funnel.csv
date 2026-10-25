@@ -1,0 +1,6 @@
+Step,Sessions,% of sessions,% of previous step
+Landed,11052,100.0%,—
+Engaged (clicked / opened content),8589,77.7%,77.7%
+"High-intent action (CTA, fork, pricing/signup click)",1797,16.3%,20.9%
+Clicked pricing / checkout,1252,11.3%,69.7%
+Signed up / logged in,787,7.1%,62.9%

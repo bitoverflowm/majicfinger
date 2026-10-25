@@ -268,14 +268,18 @@ function LandingDemoStage({
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [active, beginExit]);
 
-  const showStartPrompt = !active && !staged;
-  const startDemo = () => {
+  const activateOnClick = () => {
+    if (active || phaseRef.current !== "inline") return;
     if (typeof activate === "function") activate();
   };
 
   return (
     <section id={sectionId} className={cn(className, staged ? "z-50" : "z-30")}>
-      <div ref={slotRef} style={slotHeight != null ? { height: slotHeight } : undefined}>
+      <div
+        ref={slotRef}
+        style={slotHeight != null ? { height: slotHeight } : undefined}
+        onClickCapture={activateOnClick}
+      >
         <DemoWindowMockup
           id="demo-mockup"
           data-demo-mockup
@@ -305,21 +309,6 @@ function LandingDemoStage({
               <span>to exit the demo</span>
             </div>
           </div>
-          <button
-            type="button"
-            aria-label="Click anywhere to begin"
-            aria-hidden={!showStartPrompt}
-            tabIndex={showStartPrompt ? 0 : -1}
-            onClick={startDemo}
-            className={cn(
-              "absolute inset-0 z-[650] flex cursor-pointer items-center justify-center bg-white/30 backdrop-blur-[1.5px] transition-opacity duration-300 dark:bg-black/30",
-              showStartPrompt ? "opacity-100" : "pointer-events-none opacity-0",
-            )}
-          >
-            <span className="rounded-full bg-zinc-900/85 px-4 py-2 text-sm font-medium text-white shadow-lg backdrop-blur">
-              Click anywhere to begin
-            </span>
-          </button>
         </DemoWindowMockup>
       </div>
     </section>

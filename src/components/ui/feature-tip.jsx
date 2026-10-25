@@ -289,7 +289,7 @@ export function FeatureTip({
 }) {
   const { dismissed, dismiss } = useFeatureTipDismissal(id, { persist });
   const demoCtx = useMyStateV2();
-  // An embedded demo waits behind "Click anywhere to begin" until the visitor starts it.
+  // An embedded demo holds its tips until the visitor opens it to the full viewport.
   const demoIdle = !!demoCtx?.landingDemo && !demoCtx?.landingDemoActive;
   const pending = dismissed !== true;
   const waiting = useAnyTipPending(after);

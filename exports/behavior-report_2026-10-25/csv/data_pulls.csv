@@ -1,0 +1,13 @@
+Integration,Endpoint / table,Attempts,Raw start events,Rows returned,Zero rows,Errors,Median rows,Median time
+kalshi,Markets,511,512,215,112,45,1760,6s
+kalshi,Trades,342,342,214,17,14,1725,4s
+polymarket,Markets,136,137,46,46,18,100,4s
+kalshiLive,markets,73,14451,27,2,209,68,1s
+kalshiLive,orderbook,34,10993,3,4,35,56,0s
+kalshiLive,candlesticks,22,3211,5,1,23,104,1s
+kalshiLive,trades,13,16,10,0,0,8336.5,3s
+polymarket,Trades,12,12,5,0,0,88,12s
+kalshiLive,event_forecast,9,1801,0,0,1,,—
+kalshiLive,event_candlesticks,4,4,4,0,0,5675,14s
+polymarket,Blocks,3,3,1,0,0,5,—
+kalshiLive,series,1,1,1,0,0,1,0s

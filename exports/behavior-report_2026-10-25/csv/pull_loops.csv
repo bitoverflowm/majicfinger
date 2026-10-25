@@ -1,0 +1,22 @@
+User,Day,Integration / endpoint,Raw start events,Attempts,Rows returned,Burst length
+mark@markducote.com,2026-08-01,kalshiLive/markets,8950,12,0,11m 59s
+zumigol@gmail.com,2026-09-15,kalshiLive/orderbook,4313,4,0,9m 6s
+franck.kengne@gmail.com,2026-07-16,kalshiLive/markets,2472,17,0,1h 10m
+colinlove18@icloud.com,2026-07-13,kalshiLive/markets,2142,4,0,3m 22s
+zumigol@gmail.com,2026-09-15,"kalshiLive/trades, kalshiLive/orderbook",1784,10,3,53m 44s
+jeffgus@gmail.com,2026-07-03,kalshiLive/candlesticks,1585,9,0,9m 1s
+rikesh@bitoverflow.org,2026-10-06,kalshiLive/event_forecast,1320,7,0,3m 21s
+jjkrabill@yahoo.com,2026-08-31,kalshiLive/orderbook,1126,7,0,4m 17s
+eonuma22@gmail.com,2026-08-07,kalshiLive/candlesticks,841,4,0,3m 1s
+eonuma22@gmail.com,2026-08-07,kalshiLive/orderbook,815,4,0,5m 34s
+zumigol@gmail.com,2026-09-15,kalshiLive/orderbook,795,3,0,2m 38s
+esportnov@mail.ltcc.edu,2026-08-23,kalshiLive/candlesticks,778,3,0,1m 5s
+zumigol@gmail.com,2026-09-25,kalshiLive/markets,672,3,0,5m 18s
+jjkrabill@yahoo.com,2026-08-31,kalshiLive/orderbook,600,3,0,57s
+max.s.maeder@gmail.com,2026-08-24,kalshiLive/orderbook,570,2,0,54s
+jjkrabill@yahoo.com,2026-08-31,kalshiLive/orderbook,537,3,1,1m 45s
+rikesh@bitoverflow.org,2026-08-04,kalshiLive/event_forecast,481,2,0,58s
+max.s.maeder@gmail.com,2026-08-24,kalshiLive/orderbook,340,1,0,12s
+colinlove18@icloud.com,2026-07-13,kalshiLive/markets,168,3,0,1m 19s
+max.s.maeder@gmail.com,2026-08-24,kalshiLive/orderbook,120,1,0,2s
+steve@konetski.net,2026-06-18,kalshi/trades,53,53,48,1h 2m

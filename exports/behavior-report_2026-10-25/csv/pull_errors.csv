@@ -1,0 +1,22 @@
+Error,Integration,Count
+Failed to fetch,kalshiLive,266
+"Strings in IN lists must be wrapped in double quotes (e.g. ""yes"", ""no"")",kalshi,21
+Query finished but no rows were loaded into the sheet.,kalshi,10
+[ErrorCode: INTERNAL_ERROR_QUERY_ENGINE] Amazon Athena experienced an internal error while executing this query. Please contact AWS support ,kalshi,9
+Failed to fetch,kalshi,9
+"Strings in IN lists must be wrapped in double quotes (e.g. ""yes"", ""no"")",polymarket,7
+"Failed to read Athena result JSON (504): Unexpected token 'A', ""An error o""... is not valid JSON",kalshi,4
+if/else requires a valid ELSE column,polymarket,4
+TYPE_MISMATCH: line 1:226: Cannot apply operator: boolean = varchar(3),polymarket,2
+TYPE_MISMATCH: line 1:346: Cannot apply operator: boolean = varchar(4),polymarket,2
+Timed out waiting for Athena,kalshi,1
+"Numbers in IN lists must not be wrapped in quotes (e.g. 1, 2, 3)",kalshi,1
+Query finished but no rows were loaded into the sheet.,polymarket,1
+"EXPRESSION_NOT_AGGREGATE: line 518:217: '(""volume"" > 100000)' must be an aggregate expression or appear in GROUP BY clause",kalshi,1
+Failed to read Athena page JSON (200): Load failed,kalshi,1
+Load failed,kalshi,1
+No forecast percentile history in this range. Kalshi often returns a generic bad request when end_ts is past available forecast data (or the,kalshiLive,1
+KXBABELMANDEBWEEKLY-26AUG02-T200: too many requests,kalshiLive,1
+TYPE_MISMATCH: line 1:346: Cannot apply operator: boolean = varchar(3),polymarket,1
+Failed to read Athena page JSON (200): Failed to fetch,polymarket,1
+Failed to read Athena page JSON (200): Failed to fetch,kalshi,1

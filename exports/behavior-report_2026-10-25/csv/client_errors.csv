@@ -1,0 +1,33 @@
+Error,Source,Count
+Failed to fetch,kalshiLive.runPull,325
+"Strings in IN lists must be wrapped in double quotes (e.g. ""yes"", ""no"")",DataLakeParquetPanel.executeIngestReplace,44
+Query finished but no rows were loaded into the sheet.,DataLakeParquetPanel.executeIngestNewSheet,21
+[ErrorCode: INTERNAL_ERROR_QUERY_ENGINE] Amazon Athena experienced an internal error while executing this query. Please contact AWS support ,DataLakeParquetPanel.executeIngestReplace,18
+ResizeObserver loop completed with undelivered notifications.,https://lycheedata.com/dashboard:0,16
+Failed to fetch,DataLakeParquetPanel.executeIngestReplace,15
+"Strings in IN lists must be wrapped in double quotes (e.g. ""yes"", ""no"")",DataLakeParquetPanel.executeIngestNewSheet,10
+ResizeObserver loop completed with undelivered notifications.,http://localhost:3000/dashboard:0,8
+"Failed to read Athena result JSON (504): Unexpected token 'A', ""An error o""... is not valid JSON",DataLakeParquetPanel.executeIngestNewSheet,8
+if/else requires a valid ELSE column,DataLakeParquetPanel.executeIngestReplace,8
+TYPE_MISMATCH: line 1:226: Cannot apply operator: boolean = varchar(3),DataLakeParquetPanel.executeIngestReplace,4
+TYPE_MISMATCH: line 1:346: Cannot apply operator: boolean = varchar(4),DataLakeParquetPanel.executeIngestReplace,4
+Failed to read Athena page JSON (200): Failed to fetch,DataLakeParquetPanel.executeIngestReplace,4
+Uncaught ReferenceError: outerBoxColor is not defined,webpack-internal:///(app-pages-browser)/./src/components/chartView/index.js:1734,2
+Uncaught ReferenceError: valuesNormalized is not defined,webpack-internal:///(app-pages-browser)/./src/components/chartView/index.js:2292,2
+Uncaught TypeError: Cannot read properties of undefined (reading 'length'),https://lycheedata.com/_next/static/chunks/1082-7b60b56ea0fd2828.js:1,2
+Error: Minified React error #327; visit https://react.dev/errors/327 for the full message or use the non-minified dev environment for full e,https://lycheedata.com/_next/static/chunks/fd9d1056-c5aef439a2be8d6c.js:1,2
+Uncaught ReferenceError: processLargePullAfterDownload is not defined,webpack-internal:///(app-pages-browser)/./src/components/integrationsView/integr,2
+Uncaught Error: Element type is invalid: expected a string (for built-in components) or a class/function (for composite components) but got:,webpack-internal:///(app-pages-browser)/./node_modules/next/dist/compiled/react-,2
+Timed out waiting for Athena,DataLakeParquetPanel.executeIngestNewSheet,2
+Uncaught ReferenceError: setTooltipShowYValue is not defined,webpack-internal:///(app-pages-browser)/./node_modules/next/dist/compiled/react-,2
+"Numbers in IN lists must not be wrapped in quotes (e.g. 1, 2, 3)",DataLakeParquetPanel.executeIngestNewSheet,2
+Failed to fetch,unhandledrejection,2
+"EXPRESSION_NOT_AGGREGATE: line 518:217: '(""volume"" > 100000)' must be an aggregate expression or appear in GROUP BY clause",DataLakeParquetPanel.executeIngestReplace,2
+Load failed,DataLakeParquetPanel.executeIngestReplace,2
+No forecast percentile history in this range. Kalshi often returns a generic bad request when end_ts is past available forecast data (or the,kalshiLive.runPull,2
+KXBABELMANDEBWEEKLY-26AUG02-T200: too many requests,kalshiLive.runPull,2
+TYPE_MISMATCH: line 1:346: Cannot apply operator: boolean = varchar(3),DataLakeParquetPanel.executeIngestReplace,2
+Uncaught RangeError: Invalid string length,https://lycheedata.com/_next/static/chunks/fd9d1056-c5aef439a2be8d6c.js:1,2
+Uncaught RangeError: Maximum call stack size exceeded,webpack-internal:///(app-pages-browser)/./node_modules/next/dist/compiled/react-,1
+Uncaught ReferenceError: needsCurveYHeadroom is not defined,webpack-internal:///(app-pages-browser)/./src/components/chartView/index.js:2712,1
+Failed to read Athena page JSON (200): Load failed,DataLakeParquetPanel.executeIngestReplace,1

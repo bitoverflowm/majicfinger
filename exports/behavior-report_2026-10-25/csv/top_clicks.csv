@@ -1,0 +1,1942 @@
+Element,Page,Section,Clicks,Sessions
+Explore Kalshi Historical Data for free,Kalshi Historical,—,435,372
+Run pull,Lychee homepage,connect-home-workspace,344,215
+Try For Free,Lychee homepage,hero,341,290
+Pricing,Lychee homepage,—,286,262
+Pricing,Kalshi Historical,—,285,266
+Try For Free,Lychee homepage,—,284,217
+Kalshi Historical,Lychee homepage,connect-home-scroll,276,207
+View pricing,Lychee homepage,hero,274,269
+Access Kalshi Historical Data now,Kalshi Historical,—,265,250
+Go,Polymarket Metadata Lookup,—,256,135
+MarketsEach row represents a prediction market contract.,Lychee homepage,connect-home-workspace,252,172
+WhereFilter your data before pulling. (eg: category = Weather; volume > 10000).,Lychee homepage,connect-home-workspace,223,134
+MarketsEach row represents a prediction market contract.,Kalshi Historical,explore-data,211,174
+Weekly,Lychee homepage,pricing,210,185
+Select all,Lychee homepage,connect-home-workspace,205,138
+Dashboard,Lychee homepage,—,202,103
+Kalshi Historical,Lychee homepage,—,201,184
+Log in,Lychee homepage,—,185,174
+button,Lychee homepage,connect-home-workspace,184,86
+Go back,Lychee homepage,connect-home-workspace,156,118
+Open dashboard,Lychee homepage,—,148,73
+Try For Free,Kalshi Historical,—,138,114
+Open menu,Lychee homepage,—,121,86
+Monthly-10%,Lychee homepage,pricing,114,104
+Kalshi Historical,Kalshi Historical,—,113,100
+What is Lychee?,Lychee homepage,faq,111,108
+Lychee,Lychee homepage,—,108,101
+Research,Lychee homepage,—,106,99
+Kalshi HistoricalDeep historical data: Kalshi Launch - Dec 2025,Lychee homepage,connect-home-scroll,105,94
+Polymarket Historical,Lychee homepage,connect-home-scroll,103,80
+Products,Lychee homepage,—,100,92
+What data sources does Lychee include?,Lychee homepage,faq,97,93
+Run for Free,Kalshi Historical,explore-data,96,84
+MarketsEach row is a Polymarket prediction market.,Lychee homepage,connect-home-workspace,87,57
+TradesEach row represents a single trade execution.,Lychee homepage,connect-home-workspace,82,69
+"tickerstringUnique market identifier (e.g., PRES-2024-DJT)",Kalshi Historical,explore-data,82,66
+Does Lychee include Kalshi and Polymarket historical data?,Lychee homepage,faq,81,78
+CSV / XLSX,Lychee homepage,connect-home-scroll,79,78
+Run query,Kalshi Historical,explore-data,77,65
+Guides,Lychee homepage,—,76,63
+Can I use Lychee for backtesting and research?,Lychee homepage,faq,76,75
+Select all,Kalshi Historical,explore-data,71,68
+"tickerstringUnique market identifier (e.g., PRES-2024-DJT)",Lychee homepage,connect-home-workspace,70,59
+Can I download or export Kalshi and Polymarket data?,Lychee homepage,faq,67,67
+Annual-25%,Lychee homepage,pricing,65,61
+TradesEach row represents a single trade execution.,Kalshi Historical,explore-data,61,55
+Choose Pro,Lychee homepage,pricing,58,50
+Continue,Kalshi Historical,—,58,11
+"Why use Lychee instead of APIs, CSVs, or Python scripts?",Lychee homepage,faq,57,57
+Toggle theme,Lychee homepage,—,55,53
+What is included in the free demo?,Lychee homepage,faq,54,54
+SortOrder results. Numerical: ascending or descending; text: alphabetical or rev,Lychee homepage,connect-home-workspace,53,37
+Kalshi Live Data Feed,Lychee homepage,connect-home-scroll,53,45
+Dashboards,Lychee homepage,—,50,44
+WhereFilter your data before pulling. (eg: category = Weather; volume > 10000).,Kalshi Historical,explore-data,50,37
+Start from blank,Lychee homepage,connect-home-scroll,49,48
+Do I need to know how to code?,Lychee homepage,faq,49,49
+limitTruncate how many rows of data do you want (e.g. 1000 rows).,Lychee homepage,connect-home-workspace,49,35
+Continue with Email,Kalshi Historical,—,49,45
+"CategorystringMarket category bucket (Sports, Weather, Politics, Crypto, …).",Kalshi Historical,explore-data,48,40
+Go to Lychee pricing,Kalshi Historical,—,48,47
+"MarketsHistorical market metadata, prices, and status for settled markets before",Lychee homepage,connect-home-workspace,48,42
+Does Lychee support live Kalshi and Polymarket data?,Lychee homepage,faq,47,46
+Choose Basic,Lychee homepage,pricing,46,41
+Open menu,Kalshi Historical,—,46,40
+Cancel,Lychee homepage,connect-home-workspace,45,35
+"yes_bidint (nullable)Best bid price for Yes contracts (cents, 1-99)",Kalshi Historical,explore-data,45,41
+Weekly,Kalshi Historical,pricing,42,40
+Products,Kalshi Historical,—,41,39
+"Every Kalshi + Polymarket trade, market, and order book since launch",Lychee homepage,hero,41,40
+Integration,Lychee homepage,connect-home-analyze,40,16
+Start free query,CSV Exports,—,40,33
+Take me to the data,Kalshi Historical,—,39,33
+Close,Kalshi Historical,—,39,36
+Close,Lychee homepage,—,38,28
+Cancel,Kalshi Historical,explore-data,38,31
+CSV exportsDownload historical and live data as CSV.,Kalshi Historical,—,37,35
+Pricing,Polymarket Historical,—,35,32
+Try free,Lychee homepage,pricing,34,30
+here,Kalshi Historical,explore-data,34,29
+Live Market Feeds,Lychee homepage,features,33,30
+Lychee,Kalshi Historical,—,33,32
+volumeintTotal contracts traded,Kalshi Historical,explore-data,33,32
+"Get top 10 weather markets, all time by volumeFind and rank the highest-volume w",Kalshi Historical,explore-data,33,23
+WhereFilter your data before pulling. (eg: category = Weather; volume > 10000; v,Kalshi Historical,explore-data,33,21
+Polymarket Historical,Lychee homepage,—,32,31
+Log in,Kalshi Historical,—,32,31
+Research,Kalshi Historical,—,32,32
+Ok,Lychee homepage,—,32,12
+Add filter,Kalshi Historical,explore-data,31,20
+SortOrder results. Numerical: ascending or descending; text: alphabetical or rev,Kalshi Historical,explore-data,31,24
+Explore Polymarket Historical Data,Polymarket Historical,—,31,31
+Sign up to get the full data set,Lychee homepage,connect-home-analyze,29,28
+Guides,Lychee homepage,guides,29,27
+Sort & filter,Lychee homepage,connect-home-analyze,29,20
+Add sort,Lychee homepage,connect-home-workspace,28,21
+Polymarket Live Data Feed,Lychee homepage,connect-home-scroll,28,26
+titlestringHuman-readable market title,Kalshi Historical,explore-data,28,23
+Metadata lookup,Polymarket Historical,—,28,25
+Kalshi Live,Lychee homepage,—,27,27
+Choose Elite,Lychee homepage,pricing,26,21
+Who is Lychee for?,Lychee homepage,faq,26,25
+"CategorystringMarket category bucket (Sports, Weather, Politics, Crypto, …).",Lychee homepage,connect-home-workspace,26,23
+"yes_sub_titlestringLabel for the ""Yes"" outcome",Kalshi Historical,explore-data,26,22
+NYC high temp,Kalshi Historical,explore-data,26,24
+Explore Historical Data,Kalshi Historical,prediction-market-data,26,25
+Set row limit,Lychee homepage,connect-home-workspace,25,15
+created_timedatetimeWhen the market was created,Kalshi Historical,explore-data,25,18
+When do political prediction markets become accurate?,Lychee homepage,hero,25,24
+Clear,Kalshi Historical,explore-data,25,21
+open_timedatetime (nullable)When trading opened,Kalshi Historical,explore-data,24,20
+Home,Lychee homepage,—,23,23
+What data sources does Lychee support?,Lychee homepage,faq,23,22
+"MarketsLive market metadata, prices, and status from the Kalshi trade API.",Lychee homepage,connect-home-workspace,23,14
+Table,Lychee homepage,connect-home-analyze,23,18
+SummarizeSum or count values. Use Bucket → Unique values on a column to group ro,Lychee homepage,connect-home-workspace,23,22
+limitTruncate how many rows of data do you want (e.g. 1000 rows).,Kalshi Historical,explore-data,23,17
+"May 6, 2026Kalshi Trading Volume DashboardTrack historical Kalshi trading volume",Lychee homepage,guides,22,21
+Take me to the data,Kalshi Historical Data,—,22,18
+Not now,Lychee homepage,—,22,21
+"June 17, 2026When Do Prediction Markets Become Accurate? A Kalshi Political Mark",Lychee homepage,guides,22,16
+"resultstringMarket outcome: yes, no, or empty if unresolved",Kalshi Historical,explore-data,22,21
+"last_priceint (nullable)Last traded price (cents, 1-99)",Kalshi Historical,explore-data,22,18
+Remove filter,Lychee homepage,connect-home-workspace,21,17
+"June 7, 2026Kalshi Historical Weather Data (2021–2025)Explore historical Kalshi ",Lychee homepage,guides,21,21
+close_timedatetime (nullable)When trading closed,Kalshi Historical,explore-data,21,20
+"yes_bidint (nullable)Best bid price for Yes contracts (cents, 1-99)",Lychee homepage,connect-home-workspace,20,18
+Export,Lychee homepage,connect-home-analyze,20,18
+"event_tickerstringParent event identifier, used for categorization",Lychee homepage,connect-home-workspace,20,16
+Help,Lychee homepage,—,20,19
+Kalshi Live,Kalshi Historical,—,20,20
+Copy JSON to clipboard,Polymarket Metadata Lookup,—,20,16
+Polymarket Live,Lychee homepage,connect-home-scroll,20,15
+Reference Data & Signals,Lychee homepage,features,19,18
+Dashboards,Lychee homepage,guides,19,19
+Remove filter,Kalshi Historical,explore-data,19,15
+Toggle theme,Kalshi Historical,—,19,16
+36GB of every Kalshi & Polymarket trade ever,Lychee homepage,hero,18,16
+Kalshi Historical Data,Lychee homepage,—,18,18
+Refine query,Lychee homepage,connect-home-analyze,18,15
+TradesEach row is an OrderFilled event from the Polygon blockchain (CTF Exchange,Lychee homepage,connect-home-workspace,18,16
+"yes_askint (nullable)Best ask price for Yes contracts (cents, 1-99)",Kalshi Historical,explore-data,18,17
+Got it,Kalshi Historical,—,18,12
+"Looking for Live Kalshi Data, Orderbooks, Trades, Candlesticks and Predictions?",Kalshi Historical,—,18,18
+5m,Lychee homepage,features,17,17
+titlestringHuman-readable market title,Lychee homepage,connect-home-workspace,17,15
+"statusstringMarket status: open, closed, finalized",Kalshi Historical,explore-data,17,14
+Go to previous month,Lychee homepage,—,17,8
+Start free Kalshi query,Kalshi Historical,—,17,16
+Sheet 1,Lychee homepage,connect-home-analyze,16,14
+MarketsEach row represents a prediction market contract.,Kalshi Historical Data,explore-data,16,15
+"April 4, 2026How to Get Kalshi Historical Data (CSV, EXCEL, No-Code Guide)Learn ",Lychee homepage,guides,16,16
+JoinCombine data pull with another table using a pivot (join markets and trades ,Lychee homepage,connect-home-workspace,16,16
+"event_tickerstringParent event identifier, used for categorization",Kalshi Historical,explore-data,16,14
+Explore this Event,Polymarket Metadata Lookup,—,16,16
+"no_askint (nullable)Best ask price for No contracts (cents, 1-99)",Kalshi Historical,explore-data,16,16
+Try for Free,Kalshi Live,—,16,12
+MarketsEach row is a Polymarket prediction market.,Polymarket Historical,explore-data,16,15
+Monthly-10%,Kalshi Historical,pricing,16,16
+Annual-25%,Kalshi Historical,pricing,16,16
+Close tip,Lychee homepage,—,16,9
+HavingFilter after grouping (e.g. only group categories where volume > 10000.),Lychee homepage,connect-home-workspace,15,12
+What makes Lychee different from other data tools?,Lychee homepage,faq,15,15
+Next Page,Lychee homepage,connect-home-analyze,15,13
+Explore this Market,Polymarket Metadata Lookup,—,15,14
+Quant AnalysisRun quantitative workflows on market and reference data.,Kalshi Historical,—,15,14
+Try it now →,Kalshi Historical,example-workflows,15,15
+Continue,Lychee homepage,—,15,9
+Scroll to the live Kalshi and Polymarket comparison,Kalshi vs Polymarket,—,15,11
+How do I get started?,Lychee homepage,faq,14,14
+volumeintTotal contracts traded,Lychee homepage,connect-home-workspace,14,13
+ChartsBuild and publish interactive charts on prediction market data.,Kalshi Historical,—,14,12
+Charts,Lychee homepage,—,14,13
+Follow Lychee on X (Twitter),Lychee homepage,—,14,14
+Done,Kalshi Historical,—,14,12
+WhereFilter your data before pulling. (eg: category = Weather; volume > 10000; v,Lychee homepage,connect-home-workspace,14,14
+Pricing,Kalshi Historical Data,—,13,11
+idstringUnique market identifier (Gamma API),Lychee homepage,connect-home-workspace,13,13
+slugstringURL-friendly market slug,Lychee homepage,connect-home-workspace,13,8
+Access and analyze Kalshi historical data — download order book and trade histor,Lychee homepage,connect-home-workspace,13,7
+market_typestringMarket type (typically binary),Lychee homepage,connect-home-workspace,13,12
+View sheet as JSON,Lychee homepage,connect-home-analyze,13,9
+Dashboard,Kalshi Historical,—,13,9
+"no_bidint (nullable)Best bid price for No contracts (cents, 1-99)",Kalshi Historical,explore-data,13,13
+How do you get historical Kalshi data?,Lychee homepage,hero,13,13
+market_typestringMarket type (typically binary),Kalshi Historical,explore-data,13,13
+event ticker simplifiedstringSimplified ticker parsed from event_ticker.,Kalshi Historical,explore-data,13,12
+"yes_priceintYes contract price (cents, 1-99)",Kalshi Historical,explore-data,13,12
+How accurate are Kalshi weather prediction markets?,Lychee homepage,hero,13,13
+tickerstringMarket ticker this trade belongs to,Kalshi Historical,explore-data,13,11
+Open menu,Polymarket Historical,—,13,11
+What's New,Lychee homepage,—,13,13
+"yes_sub_titlestringLabel for the ""Yes"" outcome",Lychee homepage,connect-home-workspace,12,12
+countintNumber of contracts traded,Lychee homepage,connect-home-workspace,12,12
+Cancel,Lychee homepage,—,12,9
+Keep all rows,Lychee homepage,—,12,11
+trade_idstringUnique trade identifier,Kalshi Historical,explore-data,12,12
+Polymarket Live,Lychee homepage,—,12,12
+tickerstringUnique market ticker,Lychee homepage,connect-home-workspace,12,10
+_fetched_atdatetimeWhen this record was fetched,Kalshi Historical,explore-data,12,11
+Kalshi Historical,Kalshi Live,—,12,12
+"MarketsLive market(s) metadata, prices, status, etc. Search by ticker or find ma",Lychee homepage,connect-home-workspace,12,10
+"August 4, 2026Michigan Democratic Senate nominee?In 2026 · KXSENATEMID · 9 marke",Lychee homepage,guides,12,12
++ Chart,Lychee homepage,connect-home-analyze,11,10
+Binance,Lychee homepage,connect-home-scroll,11,10
+"resultstringMarket outcome: yes, no, or empty if unresolved",Lychee homepage,connect-home-workspace,11,9
+Run,Lychee homepage,—,11,7
+volume_24hintContracts traded in last 24 hours,Lychee homepage,connect-home-workspace,11,10
+Browse guides,CSV Exports,—,11,11
+open_interestintOutstanding contracts,Kalshi Historical,explore-data,11,9
+Start free query,Quant Analysis,—,11,9
+NYC high temp,Lychee homepage,connect-home-workspace,11,9
+TradesHistorical trade history for markets up to the live/historical cutoff.,Lychee homepage,connect-home-workspace,11,10
+Trades,Kalshi Live,live-demo,11,8
+Close,Kalshi vs Polymarket,—,11,5
+Go to previous month,Polymarket Historical,—,11,1
+tickerstringMarket ticker this trade belongs to,Lychee homepage,connect-home-workspace,10,10
+_fetched_atdatetimeWhen this record was fetched,Lychee homepage,connect-home-workspace,10,10
+Try For Free,Polymarket Historical,—,10,10
+What does volume mean on Kalshi?,Lychee homepage,hero,10,10
+Pricing,Kalshi Live,—,10,10
+Terms,Lychee homepage,—,10,10
+CandlesticksHistorical OHLC candlestick data for markets before the live cutoff.,Lychee homepage,connect-home-workspace,10,9
+Orderbook,Kalshi Live,live-demo,10,5
+Choose Basic,Kalshi Historical,pricing,10,8
+仪表盘,Lychee homepage,—,10,5
+Add 1 market,Kalshi Live,—,10,2
+Start building,Lychee homepage,demo,10,9
+Add join,Lychee homepage,connect-home-workspace,9,7
+CSV,Lychee homepage,connect-home-workspace,9,9
+New Features,Lychee homepage,guides,9,9
+Try For Free,Polymarket Metadata Lookup,—,9,8
+Start free query,Data Sheet,—,9,8
+Add sort,Kalshi Historical,explore-data,9,8
+Events,Lychee homepage,connect-home-workspace,9,8
+1,Lychee homepage,—,9,7
+"August 3, 2026Oil Price (WTI) on Aug 3, 2026?Aug 3, 2026 · KXWTI · 30 markets · ",Lychee homepage,guides,9,9
+Chart,Kalshi Live,live-demo,9,5
+Natural-language search,Kalshi Live,live-demo,9,3
+Get Access Now,Kalshi Live,—,9,9
+Continue to live prices for the selected market,Polymarket Live,find-polymarket-markets,9,8
+Next,Lychee homepage,demo,9,7
+Click anywhere to begin,Lychee homepage,demo,9,8
+Remove those rows,Lychee homepage,—,8,8
+Start Over,Lychee homepage,connect-home-workspace,8,8
+trade_idstringUnique trade identifier,Lychee homepage,connect-home-workspace,8,7
+outcome_pricesstringJSON-encoded outcome prices (0–1 probability per outcome),Lychee homepage,connect-home-workspace,8,8
+CSV exportsDownload historical and live data as CSV.,Lychee homepage,—,8,8
+volume_24hintContracts traded in last 24 hours,Kalshi Historical,explore-data,8,8
+Polymarket Historical,Kalshi Historical,—,8,8
+Debug,Polymarket Metadata Lookup,—,8,7
+Kalshi Historical,Platform,—,8,8
+Open dashboard,Kalshi Historical,—,8,7
+Begin,Kalshi Historical,—,8,8
+Kalshi Live Data Feed,Lychee homepage,connect-home-workspace,8,6
+TradesEach row is an OrderFilled event from the Polygon blockchain (CTF Exchange,Polymarket Historical,explore-data,8,7
+Kalshi HistoricalDeep historical data: Kalshi Launch - Dec 2025,Kalshi Historical,connect-home-scroll,8,5
+All,Kalshi vs Polymarket,—,8,5
+TradesEach row represents a single trade execution.,Kalshi Historical Data,explore-data,7,5
+Run for Free,Kalshi Historical Data,explore-data,7,6
+Twitter,Lychee homepage,—,7,6
+Chainlink,Lychee homepage,connect-home-scroll,7,7
+1m,Lychee homepage,features,7,7
+Drag and drop CSV or XLSX hereor click to browse.csv and .xlsx only,Lychee homepage,connect-home-workspace,7,7
+Dashboard,Lychee homepage,connect-home-analyze,7,7
+"Market CandlesticksOHLC price, bid/ask, and volume for one or many markets. Ente",Lychee homepage,connect-home-workspace,7,6
+Charts,Lychee homepage,connect-home-workspace,7,7
+Deselect all,Lychee homepage,connect-home-workspace,7,7
+created_timedatetimeWhen the market was created,Lychee homepage,connect-home-workspace,7,7
+"no_bidint (nullable)Best bid price for No contracts (cents, 1-99)",Lychee homepage,connect-home-workspace,7,7
+created_timedatetimeWhen the trade occurred,Lychee homepage,connect-home-workspace,7,6
+outcomesstringJSON-encoded outcome labels,Lychee homepage,connect-home-workspace,7,6
+Try the demo,Lychee homepage,pricing,7,7
+Open Lychee,Polymarket Metadata Lookup,—,7,7
+"yes_priceintYes contract price (cents, 1-99)",Lychee homepage,connect-home-workspace,7,7
+closedboolTrue if the market is closed,Lychee homepage,connect-home-workspace,7,6
+Open menu,Polymarket Metadata Lookup,—,7,5
+"no_askint (nullable)Best ask price for No contracts (cents, 1-99)",Lychee homepage,connect-home-workspace,7,7
+Export,Kalshi Historical,connect-home-analyze,7,6
+"no_priceintNo contract price (cents, 1-99), always 100 - yes_price",Kalshi Historical,explore-data,7,7
+taker_sidestringWhich side the taker bought: yes or no,Kalshi Historical,explore-data,7,5
+Set row limit,Kalshi Historical,explore-data,7,7
+"Get top 10 weather markets, all time by volumeFind and rank the highest-volume w",Lychee homepage,connect-home-workspace,7,6
+Market OrderbookCurrent yes/no bid levels for one market. Enter a ticker; each p,Lychee homepage,connect-home-workspace,7,6
+Lychee,Kalshi Live,—,7,7
+Cancel,Kalshi Historical,—,7,7
+Go to next month,Lychee homepage,—,7,5
+Choose Pro,Kalshi Historical,pricing,7,5
+Detroit Tigers vs. Minnesota Twinsevent · id 909715 · mlb-det-min-2026-08-31In t,Polymarket Metadata Lookup,—,7,3
+"Kalshi LiveMonitor current Kalshi markets, prices, trades, order books, candlest",Kalshi Historical,prediction-market-data,7,3
+Fed rate,Kalshi Historical,explore-data,7,7
+(n)Random Sample,Kalshi Historical,explore-data,7,5
+Start over,Kalshi vs Polymarket,—,7,4
+Share,Kalshi vs Polymarket,—,7,4
+Close,Lychee homepage,demo,7,7
+close_timedatetime (nullable)When trading closed,Lychee homepage,connect-home-workspace,6,6
+"Get event by IDEventsGet a single event by ID. Use List events to get IDs, or pu",Lychee homepage,connect-home-workspace,6,4
+"May 9, 2026Kalshi Weather Prediction Markets Explained: How They Work, How Price",Lychee homepage,guides,6,6
+Combine Sheets,Lychee homepage,connect-home-analyze,6,5
+Save,Lychee homepage,—,6,3
+Open API panel,Lychee homepage,connect-home-workspace,6,5
+If / else,Lychee homepage,connect-home-analyze,6,5
+Gain Your Edge Now,Lychee homepage,cta,6,6
+Features,Lychee homepage,—,6,6
+questionstringMarket question text,Lychee homepage,connect-home-workspace,6,6
+volumefloatTotal traded volume,Lychee homepage,connect-home-workspace,6,6
+"statusstringMarket status: open, closed, finalized",Lychee homepage,connect-home-workspace,6,6
+open_timedatetime (nullable)When trading opened,Lychee homepage,connect-home-workspace,6,6
+"How to Get Kalshi Historical Data (CSV, EXCEL, No-Code Guide)",Kalshi Historical,guides,6,6
+Data sheetSpreadsheet-style exploration for connected datasets.,Kalshi Historical,—,6,6
+"no_sub_titlestringLabel for the ""No"" outcome",Kalshi Historical,explore-data,6,6
+Quant AnalysisRun quantitative workflows on market and reference data.,Lychee homepage,—,6,6
+"last_priceint (nullable)Last traded price (cents, 1-99)",Lychee homepage,connect-home-workspace,6,6
+"Real-time Kalshi market data, prices, and order flow for live dashboards and ale",Lychee homepage,connect-home-workspace,6,4
+DashboardsBrowse published dashboards and narrative data stories.,Lychee homepage,—,6,6
+View pricing,Kalshi Historical,—,6,6
+How do you chart Polymarket odds over time?,Lychee homepage,hero,6,6
+走,Polymarket Metadata Lookup,—,6,3
+Browse guides,Kalshi Live,—,6,5
+"How to Get Kalshi Historical Data:Access, query, export, and backtest Kalshi his",Kalshi Historical,guides,6,6
+Browse guides,Quant Analysis,—,6,6
+Products,Kalshi Live,—,6,6
+How to guide,Kalshi Historical,—,6,6
+CSV exports,Lychee homepage,—,6,5
+Exit guide,Kalshi Historical,—,6,6
+created_timedatetimeWhen the trade occurred,Kalshi Historical,explore-data,6,5
+Pick start and end dates,Lychee homepage,connect-home-workspace,6,4
+"Kalshi Historical v2most recent historical data until: Jun 1, 2026",Lychee homepage,connect-home-scroll,6,6
+"Market CandlesticksOHLC price, bid/ask, and volume for one or many markets.",Lychee homepage,connect-home-workspace,6,5
+Got it,Lychee homepage,—,6,6
+Which party will win the Senate in 2026?event · id 32224 · which-party-will-win-,Polymarket Metadata Lookup,—,6,5
+Live,Kalshi Live,live-demo,6,4
+Candlesticks,Kalshi Live,live-demo,6,5
+"August 3, 2026S&P price range on Aug 3, 2026 at 4pm EDT?On Aug 3, 2026 at 4pm ED",Lychee homepage,guides,6,6
+See How It Works,Polymarket Live,—,6,6
+Full Price History,Polymarket Live,live-polymarket-prices,6,6
+Yes,Polymarket Live,polymarket-holders-positions,6,4
+Search Kalshi manually,Polymarket Live,expand-polymarket-research,6,4
+Cancel,Polymarket Historical,explore-data,6,5
+What's New,Kalshi Historical,—,6,4
+Download,Kalshi vs Polymarket,—,6,4
+Go back and keep exploring,Lychee homepage,demo,6,5
+Save and run,Lychee homepage,demo,6,5
+"yes_askint (nullable)Best ask price for Yes contracts (cents, 1-99)",Lychee homepage,connect-home-workspace,5,5
+Amal KhanProduct HuntLearn more,Lychee homepage,quote,5,5
+"May 27, 2026How to Build a Probability Calibration Chart Using Kalshi Weather Ma",Lychee homepage,guides,5,5
+Select all,Kalshi Historical Data,explore-data,5,5
+Data use,Lychee homepage,—,5,5
+"no_priceintNo contract price (cents, 1-99), always 100 - yes_price",Lychee homepage,connect-home-workspace,5,5
+Expand panel,Lychee homepage,connect-home-workspace,5,5
+Dashboard,Lychee homepage,connect-home-workspace,5,5
+BTC / USDBitcoin priced in US dollars (Chainlink).,Lychee homepage,connect-home-workspace,5,4
+Get event by slugEventsGet a single event by URL slug (e.g. from event page URL),Lychee homepage,connect-home-workspace,5,5
+tickerstring,Lychee homepage,connect-home-workspace,5,5
+Rename display label for ticker,Lychee homepage,connect-home-workspace,5,3
+BTCUSDTBitcoin to USDT (Binance RTDS).,Lychee homepage,connect-home-workspace,5,4
+Remove duplicates,Lychee homepage,connect-home-analyze,5,4
+Refine query,Lychee homepage,connect-home-workspace,5,4
+Mathematics Operations,Lychee homepage,connect-home-analyze,5,5
+Integration,Lychee homepage,connect-home-workspace,5,5
+15m,Lychee homepage,features,5,5
+Lychee,Polymarket Metadata Lookup,—,5,5
+Browse guides,Polymarket Historical,—,5,5
+Lychee,Polymarket Historical,—,5,4
+volume_24h_fpnumber24h volume (contracts),Lychee homepage,connect-home-workspace,5,5
+ChartsBuild and publish interactive charts on prediction market data.,Lychee homepage,—,5,5
+Get trades by userTradesGet trades for a user (wallet address). Enter a 0x-prefi,Lychee homepage,connect-home-workspace,5,3
+Follow Lychee on X (Twitter),Kalshi Historical,—,5,5
+Privacy,Lychee homepage,—,5,5
+1w,Kalshi Historical,get-inspired,5,5
+here,Lychee homepage,connect-home-workspace,5,5
+Markets,Lychee homepage,connect-home-workspace,5,4
+SeriesSearch a specific series or discover series based on series characteristic,Lychee homepage,connect-home-workspace,5,4
+"June 7, 2026Kalshi Historical Weather Data (2021–2025)Explore historical Kalshi ",Dashboards Gallery,dashboards,5,5
+KXLLM1,Kalshi Historical,explore-data,5,5
+Select all,Lychee homepage,—,5,3
+Polymarket Historical,Polymarket Historical,—,5,5
+Lychee,Platform,—,5,5
+Connect live feeds,Lychee homepage,connect-home-workspace,5,2
+No,Polymarket Live,polymarket-holders-positions,5,4
+Liquidity,Polymarket Live,polymarket-spread-liquidity,5,4
+Choose Elite,Kalshi Historical,pricing,5,5
+Select all,Polymarket Historical,explore-data,5,5
+Run query,Polymarket Historical,explore-data,5,5
+Sign up to get the full data set,Kalshi Historical,connect-home-analyze,5,5
+Table,Kalshi Historical,connect-home-analyze,5,5
+"September 21, 2026How to Compare Kalshi and Polymarket Odds LiveLearn how to com",Lychee homepage,guides,5,5
+KHKalshi HistoricalDeep historical data: Kalshi Launch - Dec 2025,Lychee homepage,demo,5,5
+View dashboard,Lychee homepage,demo,5,4
+"PPolymarket LiveReal-TimeAll real-time decentralized polymarket, prediction mark",Lychee homepage,demo,5,4
+Bucket,Lychee homepage,connect-home-workspace,4,3
+Run query,Kalshi Historical Data,explore-data,4,4
+taker_sidestringWhich side the taker bought: yes or no,Lychee homepage,connect-home-workspace,4,4
+"June 4, 2026How to Build a Kalshi Weather Volatility Chart (Step-by-Step Guide)S",Lychee homepage,guides,4,4
+New sheet,Lychee homepage,—,4,4
+"June 8, 2026Political Prediction Markets: What Historical Data Reveals About Ele",Lychee homepage,guides,4,4
+"List eventsEventsFetch events with optional filters (limit, offset, active, clos",Lychee homepage,connect-home-workspace,4,4
+Price historyPricesRetrieve historical prices for one or more CLOB asset IDs. Se,Lychee homepage,connect-home-workspace,4,4
+Category,Lychee homepage,connect-home-workspace,4,1
+Column,Lychee homepage,connect-home-analyze,4,2
+Request history,Lychee homepage,connect-home-workspace,4,4
+liquidityfloatAvailable market liquidity,Lychee homepage,connect-home-workspace,4,4
+"June 16, 2026When Do Prediction Markets Become Accurate? A Kalshi Political Mark",Lychee homepage,guides,4,4
+Browse guides,Data Sheet,—,4,4
+Polymarket Historical,Polymarket Metadata Lookup,—,4,4
+Products,Polymarket Metadata Lookup,—,4,3
+1d,Kalshi Historical,get-inspired,4,4
+Fork this analysis →,Kalshi Historical,get-inspired,4,4
+Short Squeeze Scanner,Lychee homepage,—,4,4
+CSV exportsDownload historical and live data as CSV.,Polymarket Historical,—,4,4
+Get started,Kalshi Live,—,4,4
+built by misterrpink,Polymarket Metadata Lookup,—,4,4
+Data guides,Dashboards Gallery,—,4,4
+BlocksPolygon block numbers mapped to ISO 8601 timestamps.,Lychee homepage,connect-home-workspace,4,3
+Pricing,CSV Exports,—,4,4
+SEC EDGAR,Lychee homepage,—,4,4
+Open menu,Platform,—,4,3
+"All real-time decentralized polymarket, prediction market API.",Lychee homepage,connect-home-workspace,4,2
+"TradesCompleted transactions for one market — price, size, and direction. Enter ",Lychee homepage,connect-home-workspace,4,3
+Lychee,CSV Exports,—,4,4
+tickerstringMarket ticker,Lychee homepage,connect-home-workspace,4,3
+Full dataset (Athena),Lychee homepage,—,4,3
+If / elseConditional values per row (CASE) or conditional SUM when grouping.,Kalshi Historical,explore-data,4,3
+Try For Free,Polymarket Live,—,4,4
+Try For Free,Kalshi Live,—,4,4
+countintNumber of contracts traded,Kalshi Historical,explore-data,4,4
+"Kalshi Weather Prediction Markets Analysis:Research on weather market behavior, ",Kalshi Historical,guides,4,4
+event ticker simplifiedstringSimplified ticker parsed from event_ticker.,Lychee homepage,connect-home-workspace,4,4
+SummarizeSum or count values. Use Bucket → Unique values on a column to group ro,Kalshi Historical,explore-data,4,4
+1h,Kalshi Historical,get-inspired,4,4
+CSV,Kalshi Historical,connect-home-workspace,4,4
+Previous Page,Lychee homepage,connect-home-analyze,4,4
+Add 2 markets,Lychee homepage,—,4,1
+Done,Lychee homepage,—,4,4
+Optional — pick start and end dates,Lychee homepage,connect-home-workspace,4,3
+Chainlink,Lychee homepage,—,4,3
+"Kalshi Historical v2most recent historical data until: Jun 13, 2026",Lychee homepage,connect-home-scroll,4,2
+Data sheet,Lychee homepage,—,4,4
+Continue to the live spread for the selected market,Polymarket Live,live-polymarket-prices,4,3
+"TradesCompleted transactions for one or more markets — price, size, and directio",Lychee homepage,connect-home-workspace,4,4
+Get access now — view Polymarket Live pricing,Polymarket Live,—,4,4
+Yes,Polymarket Live,live-polymarket-prices,4,2
+Best Ask,Polymarket Live,polymarket-spread-liquidity,4,4
+Close,Polymarket Live,—,4,3
+Open menu,Kalshi Live,—,4,3
+Weekly,Polymarket Historical,pricing,4,4
+Upgrade now to get full access — view pricing,Polymarket Historical,explore-data,4,4
+Bucketing,Kalshi Historical,explore-data,4,4
+Explore Kalshi Live,Kalshi Historical,prediction-market-data,4,4
+Fed Decision in September?event · id 481717 · fed-decision-in-september-762The F,Polymarket Metadata Lookup,—,4,3
+Open menu,Polymarket Live,—,4,3
+View sheet as JSON,Kalshi Historical,connect-home-analyze,4,3
+Remove Where,Kalshi Historical,explore-data,4,4
+Which party will gain most seats in Russian Parliamentary Election?event · id 14,Polymarket Metadata Lookup,—,4,1
+(n)Random Sample,Lychee homepage,connect-home-workspace,4,4
+Looking for Kalshi Historical Data?,Kalshi Live,—,4,3
+Merge charts into one chart,Kalshi vs Polymarket,—,4,3
+Open my live dashboard,Kalshi vs Polymarket,—,4,4
+Lychee,Kalshi vs Polymarket,—,4,4
+"Kalshi Liverecent and live kalshi data Jul 28, 2026 - now",Lychee homepage,connect-home-scroll,4,4
+"Kalshi Historical v2most recent historical data until: Jul 28, 2026",Lychee homepage,connect-home-scroll,4,1
+"Kalshi Historical v2most recent historical data until: Aug 11, 2026",Lychee homepage,connect-home-scroll,4,3
+Columns,Lychee homepage,demo,4,4
+Market attributes,Lychee homepage,attributes,4,3
+New tab,Lychee homepage,demo,4,4
+Question,Lychee homepage,attributes,4,3
+Attributes,Lychee homepage,attributes,4,3
+Lychee,Kalshi Historical Data,—,3,3
+Get Inspired,Kalshi Historical Data,—,3,3
+Try For Free,Kalshi Historical Data,—,3,3
+Dashboards,Kalshi Historical Data,—,3,3
+Guides,Kalshi Historical Data,—,3,3
+Continue with Email,Kalshi Historical Data,—,3,3
+Data,Lychee homepage,connect-home-workspace,3,2
+Copy sheet JSON,Lychee homepage,—,3,2
+Save project,Lychee homepage,connect-home-workspace,3,3
+Close panel,Lychee homepage,connect-home-workspace,3,3
+Get event tagsEventsGet tags for an event. Requires event ID (from List events o,Lychee homepage,connect-home-workspace,3,3
+Connect,Lychee homepage,connect-home-workspace,3,3
+marketstringmarket,Lychee homepage,connect-home-workspace,3,3
++ Chart,Lychee homepage,connect-home-workspace,3,3
+ticker,Lychee homepage,connect-home-workspace,3,1
+Save changes,Lychee homepage,—,3,3
+=,Lychee homepage,—,3,2
+If / elseConditional values per row (CASE) or conditional SUM when grouping.,Lychee homepage,connect-home-workspace,3,3
+clear sheet,Lychee homepage,connect-home-analyze,3,2
+SeriesTemplate for recurring events (e.g. weekly jobs report). Pull one series b,Lychee homepage,connect-home-workspace,3,3
+Export,Lychee homepage,connect-home-workspace,3,3
+Sheet 1,Lychee homepage,connect-home-workspace,3,2
+New,Lychee homepage,connect-home-workspace,3,3
+Home,Platform,—,3,3
+Visual Exploration,Lychee homepage,features,3,3
+Quant Analysis,Lychee homepage,—,3,3
+Browse guides,Polymarket Live,—,3,3
+"April 4, 2026How to Get Kalshi Historical Data (CSV, EXCEL, No-Code Guide)Learn ",Platform,guides,3,3
+"Live Market FeedsAccess Polymarket and Kalshi endpoints for real-time prices, ev",Lychee homepage,features,3,3
+1y,Kalshi Historical,get-inspired,3,3
+Toggle theme,Polymarket Historical,—,3,3
+Data sheetSpreadsheet-style exploration for connected datasets.,Lychee homepage,—,3,3
+XLSX,Lychee homepage,connect-home-workspace,3,3
+Close,Polymarket Historical,—,3,3
+Kalshi Historical Data,Kalshi Historical,—,3,3
+调试,Polymarket Metadata Lookup,—,3,2
+Pricing,Platform,—,3,3
+World Cup Winner event · id 30615 · world-cup-winnerThis market will resolve acc,Polymarket Metadata Lookup,—,3,3
+Log in,Kalshi Live,—,3,3
+end_dateintMarket end time (Unix timestamp),Lychee homepage,connect-home-workspace,3,2
+Products,Polymarket Historical,—,3,3
+Research,CSV Exports,—,3,3
+Help,Kalshi Historical,—,3,3
+Apply to sheet,Lychee homepage,—,3,2
+Presidential Election 2024,Kalshi Historical,explore-data,3,3
+Kalshi Historical,Data Sheet,—,3,3
+查看价格,Lychee homepage,hero,3,3
+免费试用,Lychee homepage,hero,3,3
+Polymarket Historical,Polymarket Live,—,3,3
+DashboardsBrowse published dashboards and narrative data stories.,Kalshi Historical,—,3,3
+Kalshi Historical,Polymarket Historical,—,3,3
+General pull without ticker,Lychee homepage,connect-home-workspace,3,2
+30,Lychee homepage,—,3,3
+"Kalshi Historical v2most recent historical data until: Jun 2, 2026",Lychee homepage,connect-home-scroll,3,2
+"Kalshi Historical v2most recent historical data until: Jun 5, 2026",Lychee homepage,connect-home-scroll,3,3
+研究,Lychee homepage,—,3,2
+"Kalshi Historical v2most recent historical data until: Jun 10, 2026",Lychee homepage,connect-home-scroll,3,3
+月度-10%,Lychee homepage,pricing,3,1
+每周,Lychee homepage,pricing,3,1
+选择专业版,Lychee homepage,pricing,3,1
+Close,Kalshi Live,—,3,2
+Hacker News,Lychee homepage,—,3,3
+定价,Kalshi Historical,—,3,3
+"Kalshi Historical v2most recent historical data until: Jun 19, 2026",Lychee homepage,connect-home-scroll,3,3
+Start stream,Lychee homepage,connect-home-workspace,3,3
+event_tickerstringParent event ticker,Lychee homepage,connect-home-workspace,3,3
+"Kalshi Historical v2most recent historical data until: Jun 23, 2026",Lychee homepage,connect-home-scroll,3,2
+Minute,Polymarket Live,live-polymarket-trades,3,3
+Hour,Polymarket Live,polymarket-candlestick-charts,3,3
+No,Polymarket Live,polymarket-candlestick-charts,3,3
+1h,Polymarket Live,expand-polymarket-research,3,2
+Which company has the best AI model end of September?event · id 727186 · which-c,Polymarket Metadata Lookup,—,3,3
+Next Page,Kalshi Historical,connect-home-analyze,3,3
+Weekly,Kalshi Live,pricing,3,3
+Select all,Kalshi Live,—,3,3
+"Kalshi Historical v2most recent historical data until: Jun 30, 2026",Lychee homepage,connect-home-scroll,3,2
+Open the Polymarket Historical Data explorer,Polymarket Historical,dataset-contents,3,3
+Show different featured live markets,Kalshi Historical,prediction-market-data,3,3
+"September 4, 2026Why Random Sampling Matters in Data Analysis: A Polymarket Case",Lychee homepage,guides,3,3
+Sort & filter,Kalshi Historical,connect-home-analyze,3,3
+See what is included in Polymarket Historical Data,Polymarket Historical,—,3,3
+Florida A&M vs. Miami (FL)event · id 944333 · cfb-flam-mia-2026-09-10In the upco,Polymarket Metadata Lookup,—,3,1
+Copy sheet JSON,Kalshi Historical,—,3,3
+Remove Bucketing,Lychee homepage,connect-home-workspace,3,3
+Bucketing,Lychee homepage,connect-home-workspace,3,3
+Bab el-Mandeb Strait effectively closed by...?event · id 276527 · bab-el-mandeb-,Polymarket Metadata Lookup,—,3,2
+Remove Where,Lychee homepage,connect-home-workspace,3,3
+United Russia seats in the next Russian legislative election?event · id 147974 ·,Polymarket Metadata Lookup,—,3,2
+"""Resident Evil"" Opening Weekend Box Officeevent · id 956520 · resident-evil-open",Polymarket Metadata Lookup,—,3,1
+Highest temperature in Miami on September 20?event · id 1041823 · highest-temper,Polymarket Metadata Lookup,—,3,1
+Use this market,Kalshi vs Polymarket,—,3,3
+Order books,Kalshi vs Polymarket,—,3,2
+Market stats,Kalshi vs Polymarket,—,3,2
+Close helper,Lychee homepage,—,3,2
+floor_strikenumberMinimum expiration value that leads to a YES settlement,Lychee homepage,connect-home-workspace,3,1
+strike_typestringgreater | greater_or_equal | less | less_or_equal | between | f,Lychee homepage,connect-home-workspace,3,2
+open_timetimestampISO 8601 open time,Lychee homepage,connect-home-workspace,3,2
+Try For Free,Kalshi vs Polymarket,—,3,2
+Ticker,Lychee homepage,attributes,3,1
+Past 24 hours,Polymarket Historical,—,3,1
+Join,Lychee homepage,demo,3,3
+Get Researcher,Lychee homepage,pricing,3,3
+"May 10, 2026Kalshi Weather Prediction Markets Explained: How They Work, How Pric",Lychee homepage,guides,2,2
+titlestringMarket title,Lychee homepage,connect-home-workspace,2,2
+"event_tickerstringParent event identifier, used for categorization",Kalshi Historical Data,explore-data,2,2
+Run for yourself,Kalshi Historical Data,get-inspired,2,1
+clob_token_idsstringCLOB token IDs for tradable outcomes,Lychee homepage,connect-home-workspace,2,2
+activeboolTrue if the market is open for trading,Lychee homepage,connect-home-workspace,2,2
+"yes_askint (nullable)Best ask price for Yes contracts (cents, 1-99)",Kalshi Historical Data,explore-data,2,2
+Kalshi Weather Prediction Markets Analysis,Kalshi Historical Data,—,2,2
+Open dashboard,Kalshi Historical Data,—,2,2
+Twitter / X,Lychee homepage,—,2,2
+"no_sub_titlestringLabel for the ""No"" outcome",Lychee homepage,connect-home-workspace,2,2
+Add filter,Kalshi Historical Data,explore-data,2,2
+Close,Kalshi Historical Data,—,2,2
+View pricing,Lychee homepage,—,2,2
+"tickerstringUnique market identifier (e.g., PRES-2024-DJT)",Kalshi Historical Data,explore-data,2,2
+Design,Lychee homepage,connect-home-workspace,2,1
+DEMO: sign up for full access,Lychee homepage,connect-home-workspace,2,2
+"June 7, 2026Political Prediction Markets: What Historical Data Reveals About Ele",Lychee homepage,guides,2,2
+Polymarket metadata,Lychee homepage,—,2,2
+Los Angeles D wins by over 2.5 runs?markets · KXMLBSPREAD-25OCT31LADTOR-LAD2 · K,Lychee homepage,connect-home-workspace,2,1
+Polymarket metadata,Kalshi Historical Data,—,2,2
+Get market by slugMarketsGet a single market by URL slug.,Lychee homepage,connect-home-workspace,2,2
+"June 12, 2026Kalshi Historical Data Analysis: Are Political Prediction Markets A",Lychee homepage,guides,2,2
+Clear limit,Lychee homepage,connect-home-workspace,2,2
+timestampintUnix timestamp (if enriched),Lychee homepage,connect-home-workspace,2,2
+_contractstringContract name (CTF Exchange or Neg Risk),Lychee homepage,connect-home-workspace,2,2
+maker_amountintAmount maker gave (6 decimals),Lychee homepage,connect-home-workspace,2,2
+Remove duplicates,Lychee homepage,connect-home-workspace,2,2
+Mathematics Operations,Lychee homepage,connect-home-workspace,2,2
+title,Lychee homepage,connect-home-workspace,2,1
+Start Free Query,Kalshi Historical Data,—,2,2
+Narrow panel,Lychee homepage,connect-home-workspace,2,2
+"April 14, 2026How to Embed Interactive Charts With Live Data (Step-by-Step)Learn",Lychee homepage,guides,2,2
+"April 15, 2026How to Track Polymarket Odds Over Time (Visualize Probability Chan",Lychee homepage,guides,2,2
+Next slide,Kalshi Historical,video-instructions,2,2
+Start Free Query,Kalshi Historical,—,2,2
+Features,Kalshi Historical,—,2,2
+Upgrade to Pro now,Kalshi Historical,—,2,2
+"Bitcoin Up or Down - April 2, 9:50PM-9:55PM ETevent · id 334272 · btc-updown-5m-",Polymarket Metadata Lookup,—,2,2
+"June 22, 2026Polymarket Gamma API Events Slug: How to Query Events by SlugLearn ",Platform,guides,2,2
+Log in,Polymarket Metadata Lookup,—,2,2
+Rename display label for question,Lychee homepage,connect-home-workspace,2,1
+ChartsBuild and publish interactive charts on prediction market data.,Quant Analysis,—,2,2
+Replay,Lychee homepage,connect-home-workspace,2,2
+Kalshi · Markets · Query,Lychee homepage,connect-home-analyze,2,2
+"June 11, 2026Are 90% Prediction Markets Reliable? A Kalshi Political Calibration",Lychee homepage,guides,2,2
+Products,Dashboards Gallery,—,2,2
+Products,Platform,—,2,2
+How to Track Polymarket Odds Over Time (Visualize Probability Changes),Polymarket Live,guides,2,2
+从空白开始,Lychee homepage,connect-home-scroll,2,2
+Switzerland vs. Algeriaevent · id 643884 · fifwc-che-alg-2026-07-02This event is,Polymarket Metadata Lookup,—,2,1
+What is Polymarket metadata?,Polymarket Metadata Lookup,faq,2,2
+Lychee,Quant Analysis,—,2,2
+Metadata Lookup,Polymarket Historical,—,2,2
+Product Hunt,Lychee homepage,—,2,2
+proxyWalletstring,Lychee homepage,connect-home-workspace,2,1
+"June 12, 2026Are 90% Prediction Markets Reliable? A Kalshi Political Calibration",Lychee homepage,guides,2,2
+"April 28, 2026How to Build Kalshi Volume Charts Using Historical Data (Step-by-S",Lychee homepage,guides,2,2
+open_interest_fpnumberOpen interest (contracts),Lychee homepage,connect-home-workspace,2,2
+CSV exportsDownload historical and live data as CSV.,Quant Analysis,—,2,2
+Products,Integration: usTreasuries,—,2,2
+CoinGecko,Integration: geckoDex,—,2,2
+Guides,Kalshi Historical,—,2,2
+Get started,Polymarket Live,—,2,2
+JoinCombine data pull with another table using a pivot (join markets and trades ,Kalshi Historical,explore-data,2,2
+created_atintWhen the market was created (Unix timestamp),Lychee homepage,connect-home-workspace,2,1
+Jeju SK FC vs. Pohang Steelers FCevent · id 667391 · kor-jej-poh-2026-07-18This ,Polymarket Metadata Lookup,—,2,1
+Open menu,CSV Exports,—,2,2
+open_interestintOutstanding contracts,Lychee homepage,connect-home-workspace,2,2
+Remove sort,Kalshi Historical,explore-data,2,2
+"June 20, 2026What Does Volume Mean on Kalshi? Trading Volume ExplainedLearn what",Platform,guides,2,2
+RCD Espanyol de Barcelona vs. Athletic Clubevent · id 433475 · lal-esp-bil-2026-,Polymarket Metadata Lookup,—,2,1
+Power moves,Lychee homepage,connect-home-workspace,2,2
+免费试用,Lychee homepage,—,2,1
+FC Barcelona vs. Levante UDevent · id 203105 · lal-bar-lev-2026-02-22This event ,Polymarket Metadata Lookup,—,2,1
+Binance,Lychee homepage,—,2,2
+Are 90% Prediction Markets Reliable?:Kalshi political market calibration study —,Kalshi Historical,guides,2,2
+Lychee,Integration: chainlink,—,2,2
+Chainlink,Polymarket Historical,—,2,2
+"Kalshi Historical v2most recent historical data until: May 30, 2026",Lychee homepage,connect-home-scroll,2,2
+"Kalshi Historical v2most recent historical data until: May 31, 2026",Lychee homepage,connect-home-scroll,2,1
+Pick date & time,Lychee homepage,connect-home-workspace,2,1
+29,Lychee homepage,—,2,2
+titlestringSeries title (use with event titles for full context),Lychee homepage,connect-home-workspace,2,1
+Kalshi's more recent historical market data up to the live/historical cutoff.,Lychee homepage,connect-home-workspace,2,2
+League of Legends GameT1 vs. Gen.G · Sports · KXLOLGAME-26JUL310400T1GENSeries ·,Lychee homepage,connect-home-workspace,2,1
+Pick a date,Lychee homepage,connect-home-workspace,2,2
+"June 21, 2026Polymarket CLOB WebSocket Market Channel: Asset IDs, Prices & Trade",Platform,guides,2,2
+Kalshi Historical,Polymarket Live,—,2,2
+Product Hunt,Kalshi Historical,—,2,2
+Start free query,Integration: productHunt,—,2,2
+31,Lychee homepage,—,2,2
+"Jan 1, 2026, 12:00 AM – Feb 1, 2026, 11:59 PM",Lychee homepage,connect-home-workspace,2,1
+"Kalshi Historical v2most recent historical data until: Jun 3, 2026",Lychee homepage,connect-home-scroll,2,2
+Kalshi Historical Weather Dashboard:Shareable dashboard for historical Kalshi we,Kalshi Historical,guides,2,2
+Kalshi Historical Data,Kalshi Live,—,2,2
+"Target Price: $64,846.15SettledAug 5, 2026 – Aug 5, 2026KXBTC15M-26AUG051530-30",Lychee homepage,—,2,1
+Fed rate,Lychee homepage,connect-home-workspace,2,2
+Polymarket Historical,Kalshi Live,—,2,2
+Browse guides,Integration: binance,—,2,2
+Gimnastic de Tarragona vs. SD Huescaevent · id 802360 · clf-gim-hue-2026-08-13Th,Polymarket Metadata Lookup,—,2,2
+Research,Polymarket Historical,—,2,2
+Remove filter kalshi_event_ticker_category,Lychee homepage,connect-home-analyze,2,1
+Event forecast,Kalshi Live,live-demo,2,2
+Batch Candlesticks,Kalshi Live,bonus-features,2,2
+"August 4, 2026Michigan Democratic Senate nominee?In 2026 · KXSENATEMID · 9 marke",Dashboards Gallery,dashboards,2,2
+SOLUSDTSolana to USDT (Binance RTDS).,Lychee homepage,connect-home-workspace,2,2
+CoinGecko,Kalshi Historical,—,2,2
+Will Phil Weiser be the Democratic nominee for Governor in Colorado?Phil WeiserM,Lychee homepage,connect-home-workspace,2,1
+"Jun 12, 2026, 7:00 PM – Jun 13, 2026, 7:00 PM",Lychee homepage,connect-home-workspace,2,1
+4,Lychee homepage,—,2,1
+RCD Espanyol de Barcelona vs. Levante UDevent · id 789369 · lal-esp-lev-2026-08-,Polymarket Metadata Lookup,—,2,1
+浏览指南,Polymarket Historical,—,2,2
+免费试用,Polymarket Historical,—,2,1
+我可以用 Lychee 进行回测和研究吗？,Lychee homepage,faq,2,1
+年利率-25%,Lychee homepage,pricing,2,1
+开放仪表盘,Lychee homepage,—,2,2
+90%的卡尔希政治市场真的准确吗？,Lychee homepage,hero,2,1
+仪表盘,Dashboards Gallery,—,2,1
+2026年3月1日如何提取和分析多元市场事件数据（无代码）了解如何连接Polymarket的活动列表端点，过滤和分析结构化事件数据，并导出数据集，从世界任何地方,Platform,guides,2,2
+自上线以来，每一个Kalshi + Polymarket的交易、市场和订单簿,Lychee homepage,hero,2,2
+Polymarket 实时数据流,Lychee homepage,connect-home-scroll,2,1
+"Kalshi Historical v2most recent historical data until: Jun 17, 2026",Lychee homepage,connect-home-scroll,2,2
+Binance,Kalshi Historical,—,2,2
+CSV exportsDownload historical and live data as CSV.,Platform,—,2,2
+"June 21, 2026Polymarket Gamma API Events Slug: How to Query Events by SlugLearn ",Lychee homepage,guides,2,2
+Polymarket Live,Polymarket Metadata Lookup,—,2,2
+Start a new real-time connectionThen pick exactly what you want a live Polymarke,Lychee homepage,connect-home-workspace,2,2
+Kalshi Historical,Integration: binance,—,2,1
+Start free query,Integration: chainlink,—,2,1
+Continue to the live order book for the selected market,Polymarket Live,polymarket-spread-liquidity,2,2
+Continue to holders and positions for the selected market,Polymarket Live,polymarket-candlestick-charts,2,2
+Continue to live candlesticks for the selected market,Polymarket Live,live-polymarket-trades,2,2
+Continue to a live dashboard for the selected market,Polymarket Live,polymarket-holders-positions,2,2
+yes_price_dollarsnumberYes price for this trade (dollars),Lychee homepage,connect-home-workspace,2,2
+Will Alexandria Ocasio-Cortez win the 2028 Democratic presidential nomination?Li,Polymarket Live,find-polymarket-markets,2,1
+1W,Polymarket Live,live-polymarket-prices,2,2
+1M,Polymarket Live,live-polymarket-prices,2,2
+Spread,Polymarket Live,polymarket-spread-liquidity,2,2
+No,Polymarket Live,polymarket-order-book,2,2
+Yes,Polymarket Live,polymarket-order-book,2,2
+Continue to live trades for the selected market,Polymarket Live,polymarket-order-book,2,2
+Minute,Polymarket Live,polymarket-candlestick-charts,2,2
+Day,Polymarket Live,polymarket-candlestick-charts,2,2
+All,Polymarket Live,expand-polymarket-research,2,2
+6h,Polymarket Live,expand-polymarket-research,2,2
+Order book snapshot,Polymarket Live,polymarket-spread-liquidity,2,2
+All,Polymarket Live,polymarket-holders-positions,2,2
+Add 1 market,Lychee homepage,—,2,2
+"Kalshi Historical v2most recent historical data until: Jun 25, 2026",Lychee homepage,connect-home-scroll,2,2
+View Polymarket Historical Data pricing,Polymarket Historical,—,2,2
+Access and analyze Polymarket historical data — download time-series market data,Lychee homepage,connect-home-workspace,2,2
+15m,Kalshi Historical,get-inspired,2,2
+WTA Tennis MatchGarland vs Romero Gormaz · Sports · KXWTAMATCH-26AUG24GARROMSeri,Kalshi Live,live-demo,2,2
+"Joanna GarlandSettledAug 23, 2026 – Aug 25, 2026KXWTAMATCH-26AUG24GARROM-GAR",Kalshi Live,—,2,2
+Sign up,Kalshi Live,live-demo,2,2
+OrderbookInspect the live order book for the selected market.,Kalshi Live,live-demo,2,2
+"Kalshi Historical v2most recent historical data until: Jun 27, 2026",Lychee homepage,connect-home-scroll,2,2
+Kalshi Liverecent and live kalshi data 27 juin 2026 - now,Lychee homepage,connect-home-scroll,2,1
+Research,Dashboards Gallery,—,2,2
+"Kalshi Historical v2most recent historical data until: Jun 29, 2026",Lychee homepage,connect-home-scroll,2,1
+Log in,Polymarket Historical,—,2,2
+Monthly-10%,Polymarket Historical,pricing,2,2
+outcomesstringJSON-encoded outcome labels,Polymarket Historical,explore-data,2,2
+Will the Fed increase interest rates by 25 bps after the September 2026 meeting?,Kalshi Historical,prediction-market-data,2,2
+"SummarizeSum, min, max, or count values. Add the same column more than once for ",Kalshi Historical,explore-data,2,2
+Batch Candlesticks,Kalshi Live,live-demo,2,2
+Polymarket Live,Polymarket Historical,—,2,2
+TENNIS-GOD0xc3e4910a31b916e51bed626adf17435a01d8fc1fprofile0xc3e4…fc1f,Polymarket Live,find-polymarket-markets,2,1
+"Get Market/MarketsDiscover market(s) with natural language, id, slug, or token —",Lychee homepage,connect-home-workspace,2,2
+Oscars 2027: Best Picture Winnerevent · id 759150 · oscars-2027-best-picture-win,Polymarket Metadata Lookup,—,2,1
+"Kalshi Liverecent and live kalshi data Jul 8, 2026 - now",Lychee homepage,connect-home-scroll,2,2
+Mathematics Operations,Kalshi Historical,connect-home-analyze,2,2
+Try For Free,Dashboards Gallery,—,2,1
+condition_idstringOn-chain condition ID for the market,Lychee homepage,connect-home-workspace,2,2
+8,Lychee homepage,—,2,2
+"Kalshi Historical v2most recent historical data until: Jul 11, 2026",Lychee homepage,connect-home-scroll,2,1
+"Will China invade Taiwan by December 31, 2027?event · id 281145 · will-china-inv",Polymarket Metadata Lookup,—,2,2
+ECB Interest Rates: October 2026event · id 743554 · ecb-interest-rates-october-2,Polymarket Metadata Lookup,—,2,2
+Bank of England decision in November?event · id 778706 · bank-of-england-decisio,Polymarket Metadata Lookup,—,2,2
+"Need current prices, live trades, order books, holders, or positions? Explore Po",Polymarket Historical,—,2,2
+Close helper,Kalshi Historical,—,2,2
+Bab el-Mandeb Strait effectively closed by September 30?market · id 2170255 · ba,Polymarket Metadata Lookup,—,2,1
+"Kalshi Liverecent and live kalshi data Jul 16, 2026 - now",Lychee homepage,connect-home-scroll,2,2
+resultstringyes | no | scalar | (empty),Lychee homepage,connect-home-workspace,2,2
+Select a market above,Polymarket Live,live-polymarket-prices,2,2
+Brazil Presidential Electionevent · id 45915 · brazil-presidential-electionA pre,Polymarket Metadata Lookup,—,2,2
+sourcestringData source identifier,Lychee homepage,connect-home-workspace,2,2
+Bank of England decision in September?event · id 627651 · bank-of-england-decisi,Polymarket Metadata Lookup,—,2,1
+Compare to Kalshi,Polymarket Metadata Lookup,—,2,2
+Remove Random Sample,Lychee homepage,connect-home-workspace,2,2
+"Kalshi Historical v2most recent historical data until: Jul 19, 2026",Lychee homepage,connect-home-scroll,2,1
+Mecklenburg-Vorpommern Parliamentary Election: AfD Vote Share?event · id 881781 ,Polymarket Metadata Lookup,—,2,1
+The Game Awards: Best Game DirectionThe Game Awards are presented annually to ho,Kalshi vs Polymarket,—,2,1
+Will Grand Theft Auto VI win Best Game Direction at the 2026 Game Awards?YES = Y,Kalshi vs Polymarket,—,2,1
+Game Awards: Best Game Direction76% matchClose matchGrand Theft Auto VIKXGAMEAWA,Kalshi vs Polymarket,—,2,1
+Split charts into side by side,Kalshi vs Polymarket,—,2,2
+Poly,Kalshi vs Polymarket,—,2,2
+Dashboard layout,Kalshi vs Polymarket,—,2,2
+Ohio Governor Election WinnerThis market will resolve according to the winner of,Kalshi vs Polymarket,—,2,2
+Will there be a blue tsunami?Blue tsunami this year? · Elections · KXBLUETSUNAMI,Kalshi vs Polymarket,—,2,1
+a,Lychee homepage,—,2,1
+Toggle theme,Dashboards Gallery,—,2,2
+"Zcash 15minZEC 15 min · $1,408.6879 target · Crypto · KXZEC15M-26SEP300030Series",Kalshi Live,live-demo,2,1
+Will Luiz Inácio Lula da Silva win the 2026 Brazilian presidential election?Feat,Kalshi vs Polymarket,—,2,2
+"Kalshi Liverecent and live kalshi data Jul 31, 2026 - now",Lychee homepage,connect-home-scroll,2,1
+Show different Polymarket markets,Kalshi vs Polymarket,—,2,2
+button,Kalshi vs Polymarket,—,2,1
+Are 90% Kalshi political markets actually accurate?,Lychee homepage,hero,2,2
+"Kalshi Liverecent and live kalshi data Aug 17, 2026 - now",Lychee homepage,connect-home-scroll,2,2
+Data sheet,Polymarket Metadata Lookup,—,2,1
+Yes bid,Lychee homepage,attributes,2,1
+Title,Lychee homepage,attributes,2,2
+"KKalshi LiveReal-Timerecent and live kalshi data Aug 21, 2026 - now",Lychee homepage,demo,2,2
+Series,Lychee homepage,demo,2,2
+Provenance,Lychee homepage,demo,2,2
+Show details,Lychee homepage,—,2,2
+Add data source,Lychee homepage,demo,2,2
+Pricing,Kalshi vs Polymarket,—,2,2
+Columns,Polymarket Historical,explore-data-demo,2,1
+Sort,Polymarket Historical,sort,2,1
+4,Polymarket Historical,—,2,1
+29,Polymarket Historical,—,2,1
+8,Polymarket Historical,—,2,1
+PHPolymarket HistoricalAccess and analyze Polymarket historical data,Lychee homepage,demo,2,2
+Click anywhere to begin,Kalshi Historical,explore-data-demo,2,2
+Try for free,Lychee homepage,pricing,2,2
+"KHKalshi Historical v2most recent historical data until: Aug 24, 2026",Lychee homepage,demo,2,2
+"KKalshi LiveReal-Timerecent and live kalshi data Aug 24, 2026 - now",Lychee homepage,demo,2,2
+Actions for BTC / USD · Up/Down settlement price,Lychee homepage,demo,2,1
+Select all,Lychee homepage,demo,2,2
+Sign Up,Lychee homepage,demo,2,2
+Next slide,Lychee homepage,hero,1,1
+Manchester United vs Brighton Winner?markets · KXEPLGAME-25OCT25MUNBRI-MUN · KXE,Lychee homepage,connect-home-workspace,1,1
+"Get market by IDMarketsGet a single market by ID. Use List markets to get IDs, o",Lychee homepage,connect-home-workspace,1,1
+featuredstringfeatured,Lychee homepage,connect-home-workspace,1,1
+"Bitcoin price range on Feb 27, 2025?markets · KXBTC-25FEB2700-B94125 · KXBTC-25F",Lychee homepage,connect-home-workspace,1,1
+1d,Kalshi Historical Data,get-inspired,1,1
+1m,Kalshi Historical Data,get-inspired,1,1
+15m,Kalshi Historical Data,get-inspired,1,1
+"May 19, 2026How to Build a Probability Convergence Chart Using Kalshi Historical",Lychee homepage,guides,1,1
+_fetched_atintWhen this record was fetched,Lychee homepage,connect-home-workspace,1,1
+Kalshi Weather Probability Calibration Chart,Kalshi Historical Data,—,1,1
+"no_askint (nullable)Best ask price for No contracts (cents, 1-99)",Kalshi Historical Data,explore-data,1,1
+Twitter / X,Kalshi Historical Data,—,1,1
+"Will the **high temp in Austin** be >101° on Jun 18, 2025?trades · All trades · ",Lychee homepage,connect-home-workspace,1,1
+Kalshi Weather Volatility Chart:Calculate and visualize rolling volatility in Ka,Kalshi Historical Data,—,1,1
+Next slide,Kalshi Historical Data,video-instructions,1,1
+Remove summarize for created_time,Lychee homepage,connect-home-workspace,1,1
+"Bitcoin price range on May 7, 2025?markets · KXBTC-25MAY0700-B98875 · KXBTC-25MA",Lychee homepage,connect-home-workspace,1,1
+First Page,Lychee homepage,connect-home-analyze,1,1
+"no_bidint (nullable)Best bid price for No contracts (cents, 1-99)",Kalshi Historical Data,explore-data,1,1
+volumeintTotal contracts traded,Kalshi Historical Data,explore-data,1,1
+GitHub,Lychee homepage,—,1,1
+Will the President's approval rating be between 47.6 and 48.0 according to RealC,Lychee homepage,connect-home-workspace,1,1
+"Will the high temp in Chicago, Denver, Miami, New York and Philadelphia be Chica",Lychee homepage,connect-home-workspace,1,1
+Chart TypeArea,Lychee homepage,connect-home-workspace,1,1
+Advanced,Lychee homepage,connect-home-workspace,1,1
+Chart TypeLine,Lychee homepage,connect-home-workspace,1,1
+Sheet1,Lychee homepage,connect-home-workspace,1,1
+Will the Paris Saint-Germain win the Champions League?markets · KXUEFACL-25-PSG ,Lychee homepage,connect-home-workspace,1,1
+row limit,Lychee homepage,connect-home-workspace,1,1
+Select column you want to filter,Lychee homepage,connect-home-workspace,1,1
+Detroit wins by over 1.5 runs?markets · KXMLBSPREAD-25OCT08SEADET-DET1 · KXMLBSP,Kalshi Historical Data,explore-data,1,1
+slugstringslug,Lychee homepage,connect-home-workspace,1,1
+market_typestring,Lychee homepage,connect-home-workspace,1,1
+Sheet1,Lychee homepage,connect-home-analyze,1,1
+Rename display label for taker_side,Lychee homepage,connect-home-workspace,1,1
+GitHub,Kalshi Historical Data,—,1,1
+iconOptimized_idstringicon Optimized_id,Lychee homepage,connect-home-workspace,1,1
+List marketsMarketsFetch markets with optional filters. All query params support,Lychee homepage,connect-home-workspace,1,1
+"kalshi Historical Weather Data, Prices, Volume & Markets Dashboard",Kalshi Historical Data,—,1,1
+Log in,Kalshi Historical Data,—,1,1
+Rename display label for Category,Lychee homepage,connect-home-workspace,1,1
+Price,Lychee homepage,—,1,1
+Combine Sheets,Lychee homepage,connect-home-workspace,1,1
+View sheet as JSON,Lychee homepage,connect-home-workspace,1,1
+Remove duplicates,Lychee homepage,—,1,1
+Table,Lychee homepage,connect-home-workspace,1,1
+IN,Lychee homepage,connect-home-workspace,1,1
+event_ticker,Lychee homepage,connect-home-workspace,1,1
+"Jun 16, 2026, 2:18 PM",Lychee homepage,connect-home-workspace,1,1
+PGA 3-BallSports · customSeries · KXPGA3BALL,Lychee homepage,connect-home-workspace,1,1
+Sheet undefined,Lychee homepage,connect-home-workspace,1,1
+Get Full Access,Kalshi Historical Data,—,1,1
+"""Very nice project @misterrpink 👍love the concept.Btw, love the launch video👌P",Lychee homepage,testimonials,1,1
+"""The design of this thing isout of this world.I can imagine this totally blowing",Lychee homepage,testimonials,1,1
+"Kalshi Volume Dashboard:Quarterly volume trends, category activity, and shareabl",Kalshi Historical Data,—,1,1
+titlestringHuman-readable market title,Kalshi Historical Data,explore-data,1,1
+"CategorystringMarket category bucket (Sports, Weather, Politics, Crypto, …).",Kalshi Historical Data,explore-data,1,1
+"yes: Al Michaels and/or Kirk Herbstreit says Facemask / Face Mask,yes: Al Michae",Lychee homepage,connect-home-workspace,1,1
+Get trades by marketTradesGet trades for one or more markets (condition IDs). Us,Lychee homepage,connect-home-workspace,1,1
+"last_priceint (nullable)Last traded price (cents, 1-99)",Kalshi Historical Data,explore-data,1,1
+"No imageMarch 29, 2026Every SQL query you ever needCompose powerful analytics wi",Lychee homepage,guides,1,1
+Open menu,Kalshi Historical Data,—,1,1
+"February 28, 2026How to Pull and Analyze Polymarket Event Data (No-Code)Learn ho",Lychee homepage,guides,1,1
+"March 11, 2026How to Stream Live Polymarket Prices and Build Real-Time Charts (N",Lychee homepage,guides,1,1
+Home,Polymarket Live,—,1,1
+Guides,Polymarket Live,—,1,1
+Product Hunt,Platform,—,1,1
+"June 21, 2026What Does Volume Mean on Kalshi? Trading Volume ExplainedLearn what",Lychee homepage,guides,1,1
+Are 90% Prediction Markets Reliable?:Kalshi political market calibration study —,Kalshi Historical,—,1,1
+Polymarket Gamma API Events Slug: How to Query Events by Slug,Polymarket Live,guides,1,1
+"June 22, 2026Polymarket CLOB WebSocket Market Channel: Asset IDs, Prices & Trade",Lychee homepage,guides,1,1
+Rename display label for count,Lychee homepage,connect-home-workspace,1,1
+Rename display label for created_time,Lychee homepage,connect-home-workspace,1,1
+Kalshi Historical→,Kalshi Historical,—,1,1
+trade_id,Kalshi Historical,explore-data,1,1
+"Reference Data & SignalsLayer in Chainlink feeds, social signals, and other cont",Lychee homepage,features,1,1
+ChartsBuild and publish interactive charts on prediction market data.,CSV Exports,—,1,1
+Dashboards,CSV Exports,—,1,1
+"Bitcoin Up or Down - June 14, 6:00AM-6:05AM ETevent · id 590333 · btc-updown-5m-",Polymarket Metadata Lookup,—,1,1
+"Bitcoin Up or Down - June 14, 6:05AM-6:10AM ETevent · id 590339 · btc-updown-5m-",Polymarket Metadata Lookup,—,1,1
+What price will Ethereum hit in June?event · id 548275 · what-price-will-ethereu,Polymarket Metadata Lookup,—,1,1
+Will Donald Trump or another Republican win the Presidency?markets · PRES-2024-D,Lychee homepage,connect-home-workspace,1,1
+Next UK Chancellor of the Exchequer in 2026?event · id 619832 · next-uk-chancell,Polymarket Metadata Lookup,—,1,1
+Columns to keep,Lychee homepage,—,1,1
+Dashboard,Polymarket Historical,—,1,1
+Quant AnalysisRun quantitative workflows on market and reference data.,Polymarket Metadata Lookup,—,1,1
+What Iranian demands will Trump agree to by June 30?event · id 509893 · what-ira,Polymarket Metadata Lookup,—,1,1
+"Ethereum Up or Down - February 23, 12:15PM-12:30PM ETmarket · id 1415215 · eth-u",Polymarket Metadata Lookup,—,1,1
+South Africa vs. Canadaevent · id 632707 · fifwc-rsa-can-2026-06-28This event is,Polymarket Metadata Lookup,—,1,1
+World Cup: Nation To Reach Round of 16event · id 550029 · world-cup-nation-to-re,Polymarket Metadata Lookup,—,1,1
+Panama vs. Englandevent · id 351781 · fifwc-pan-eng-2026-06-27This event is for ,Polymarket Metadata Lookup,—,1,1
+Croatia vs. Ghanaevent · id 351782 · fifwc-hrv-gha-2026-06-27This event is for t,Polymarket Metadata Lookup,—,1,1
+ChartsBuild and publish interactive charts on prediction market data.,Polymarket Historical,—,1,1
+Home,Polymarket Historical,—,1,1
+What will NVIDIA Corporation say during their next earnings call?trades · All tr,Kalshi Historical,explore-data,1,1
+Pricing,Integration: shortSqueeze,—,1,1
+"Will Bitcoin dip to $60,000 in June?market · id 2410574 · will-bitcoin-dip-to-60",Polymarket Metadata Lookup,—,1,1
+Which Polymarket markets are moving fastest right now?,Lychee homepage,hero,1,1
+Short Squeeze Scanner,Kalshi Historical,—,1,1
+Start free query,Integration: shortSqueeze,—,1,1
+"Will the **high temp in LA** be 62-63° on Feb 1, 2025?markets · KXHIGHLAX-25FEB0",Lychee homepage,connect-home-workspace,1,1
+Fork this analysis →,Kalshi Live,published-charts,1,1
+Get Full Access,Kalshi Live,—,1,1
+Will the Germany win the IIHF World Championship?markets · KXIIHFCHAMP-25-DE · K,Lychee homepage,connect-home-workspace,1,1
+Access Now,Kalshi Historical,—,1,1
+Dashboards,Kalshi Historical,—,1,1
+Dashboards,Dashboards Gallery,—,1,1
+Polymarket Live,Data Sheet,—,1,1
+Short Squeeze Scanner,Data Sheet,—,1,1
+Kalshi Live,Data Sheet,—,1,1
+Home,Data Sheet,—,1,1
+Run query,Lychee homepage,—,1,1
+"yes_bid_dollarsstringBest yes bid (dollars, fixed-point string)",Lychee homepage,connect-home-workspace,1,1
+last_price_dollarsstring,Lychee homepage,connect-home-workspace,1,1
+Polymarket Live,Polymarket Live,—,1,1
+"April 16, 2026How to Track Polymarket Odds Over Time (Visualize Probability Chan",Platform,guides,1,1
+"May 20, 2026How to Build a Probability Convergence Chart Using Kalshi Historical",Lychee homepage,guides,1,1
+Движение в Ормузском проливе вернется в норму к 31 июля?рынок · id 2176262 · тра,Polymarket Metadata Lookup,—,1,1
+Открытый личи,Polymarket Metadata Lookup,—,1,1
+Попробуйте демо,Lychee homepage,pricing,1,1
+"SCOTUS accepts sports event contract case by December 31, 2026?market · id 12318",Polymarket Metadata Lookup,—,1,1
+"SAVE Act becomes law by April 30, 2026?market · id 1553247 · save-act-becomes-la",Polymarket Metadata Lookup,—,1,1
+Strait of Hormuz traffic returns to normal by July 31?event · id 455867 · strait,Polymarket Metadata Lookup,—,1,1
+Polymarket Live,Platform,—,1,1
+Kalshi Live,Polymarket Live,—,1,1
+CoinGecko,Kalshi Live,—,1,1
+Lychee,Integration: coinGecko,—,1,1
+Fork this analysis →,Polymarket Historical,published-charts,1,1
+1h,Polymarket Historical,published-charts,1,1
+1d,Polymarket Historical,published-charts,1,1
+yes_sub_titlestring,Lychee homepage,connect-home-workspace,1,1
+Kalshi天气预报市场的准确性如何？,Lychee homepage,hero,1,1
+EWC最后一支CN队伍事件·同上652096·最后一个CN-队伍站立-EWC-20260630170158774该市场将根据2026年7月2日（Ju）举行的EW,Polymarket Metadata Lookup,—,1,1
+结果（JSON）,Polymarket Metadata Lookup,—,1,1
+Essai gratuit,Polymarket Metadata Lookup,—,1,1
+Litchi,Polymarket Metadata Lookup,—,1,1
+See how this is done,Kalshi Historical,—,1,1
+Search,Lychee homepage,—,1,1
+ChartsBuild and publish interactive charts on prediction market data.,Polymarket Metadata Lookup,—,1,1
+Kalshi Historical,Polymarket Metadata Lookup,—,1,1
+Wall Street Bets,Lychee homepage,—,1,1
+Bitcoin above ___ on July 5?event · id 644717 · bitcoin-above-on-july-5-2026This,Polymarket Metadata Lookup,—,1,1
+Replace Test,Lychee homepage,connect-home-workspace,1,1
+"April 15, 2026How to Embed Interactive Charts With Live Data (Step-by-Step)Learn",Lychee homepage,guides,1,1
+"April 16, 2026How to Track Polymarket Odds Over Time (Visualize Probability Chan",Lychee homepage,guides,1,1
+How to Stream Live Polymarket Prices and Build Real-Time Charts (No-Code),Polymarket Live,guides,1,1
+svg,Lychee homepage,—,1,1
+no_price_dollarsnumberNo price for this trade (dollars),Lychee homepage,connect-home-workspace,1,1
+last_price_dollarsstringLast trade price (dollars),Lychee homepage,connect-home-workspace,1,1
+created_timedatetime,Lychee homepage,connect-home-workspace,1,1
+What will S&P 500 (SPY) hit Week of July 6 2026?event · id 663976 · will-spy-hit,Polymarket Metadata Lookup,—,1,1
+NYC high temp tomorrow,Kalshi Historical,explore-data,1,1
+Presidential Election 2024 Winner,Kalshi Historical,explore-data,1,1
+KXUS-2024-12345,Kalshi Historical,explore-data,1,1
+Best AI in May 2026?markets · KXLLM1-26MAY31-GOOG · KXLLM1-26MAY31,Kalshi Historical,explore-data,1,1
+Will the highest temperature in Seoul be 8°C or below on April 17?market · id 19,Polymarket Metadata Lookup,—,1,1
+Henry HabibProduct HuntNice!Visualizing data made simple. Great help for anyone ,Lychee homepage,testimonials,1,1
+open_interest_fpnumberOpen interest at end of period (contracts),Lychee homepage,connect-home-workspace,1,1
+View pricing,Dashboards Gallery,—,1,1
+last_priceint (nullable),Lychee homepage,connect-home-workspace,1,1
+"Will the **high temp in LA** be 65-66° on Feb 23, 2025?markets · KXHIGHLAX-25FEB",Lychee homepage,connect-home-workspace,1,1
+"Will the **high temp in LA** be 65-66° on Feb 23, 2025?trades · All trades · KXH",Lychee homepage,connect-home-workspace,1,1
+"Top Song on Daily Top Songs Canada on Jun 17, 2025?markets · KXSPOTIFYCANADAD-25",Kalshi Historical,explore-data,1,1
+timestampstringISO 8601 timestamp (e.g. 2024-01-15T12:30:00Z),Lychee homepage,connect-home-workspace,1,1
+"May 27, 2026How to Build a Probability Calibration Chart Using Kalshi Weather Ma",Platform,guides,1,1
+Will JD Vance win the 2028 US Presidential Election?market · id 561229 · will-jd,Polymarket Metadata Lookup,—,1,1
+"Will the **high temp in NYC** be 71-72° on Sep 8, 2024?trades · All trades · HIG",Kalshi Historical,explore-data,1,1
+"April 15, 2026How to Track Polymarket Odds Over Time (Visualize Probability Chan",Platform,guides,1,1
+"June 11, 2026Are 90% Prediction Markets Reliable? A Kalshi Political Calibration",Platform,guides,1,1
+Argentina vs. Egyptevent · id 665652 · fifwc-arg-egy-2026-07-07This event is for,Polymarket Metadata Lookup,—,1,1
+"Bitcoin Up or Down - April 2, 9:50PM-9:55PM ETmarket · id 1822773 · btc-updown-5",Polymarket Metadata Lookup,—,1,1
+ChartsBuild and publish interactive charts on prediction market data.,Polymarket Live,—,1,1
+Short Squeeze Scanner,Integration: wallStreetBets,—,1,1
+Wall Street Bets,Integration: shortSqueeze,—,1,1
+Census.gov,Integration: wallStreetBets,—,1,1
+Hacker News,Integration: censusGov,—,1,1
+Research,Integration: usTreasuries,—,1,1
+"April 20, 2026How to Find a Polymarket Market ID, Token ID, Asset ID & Condition",Lychee homepage,guides,1,1
+How do I find a Polymarket event ID?,Polymarket Metadata Lookup,faq,1,1
+"Will Drake's ""Certified Lover Boy"" sell over 500,000 album units in its opening ",Kalshi Historical,explore-data,1,1
+"Will Drake's ""Certified Lover Boy"" sell over 250,000 album units this week?marke",Kalshi Historical,explore-data,1,1
+"Will the **high temp in NYC** be <64° on Sep 29, 2024?markets · HIGHNY-24SEP29-T",Kalshi Historical,explore-data,1,1
+Tampa Bay at Seattle Winner?markets · KXNFLGAME-25OCT05TBSEA-TB · KXNFLGAME-25OC,Kalshi Historical,explore-data,1,1
+Data sheetSpreadsheet-style exploration for connected datasets.,Polymarket Historical,—,1,1
+GeckoTerminal,Kalshi Historical,—,1,1
+Polymarket Live,Integration: binance,—,1,1
+"Bitcoin price range on Aug 30, 2024?markets · BTC-24AUG3017-T68999.99 · BTC-24AU",Lychee homepage,connect-home-workspace,1,1
+Product Hunt,Polymarket Historical,—,1,1
+Quant Analysis,Kalshi Historical,—,1,1
+Minnesota at Detroit Winner?markets · KXNFLGAME-25NOV02MINDET-DET · KXNFLGAME-25,Kalshi Historical,explore-data,1,1
+Miami at Buffalo Winner?trades · All trades · KXNFLGAME-25SEP18MIABUF-MIA · KXNF,Kalshi Historical,explore-data,1,1
+Will France win on 2026-07-14?market · id 2879968 · fifwc-fra-esp-2026-07-14-fra,Polymarket Metadata Lookup,—,1,1
+"Will the **high temp in NYC** be >77° on May 12, 2025?markets · KXHIGHNY-25MAY12",Kalshi Historical,explore-data,1,1
+Kalshi Live,Kalshi Live,—,1,1
+Features,Kalshi Live,—,1,1
+Quant AnalysisRun quantitative workflows on market and reference data.,Kalshi Live,—,1,1
+"Will the WTI front-month settle oil price be Between 68 and 68.99 on Mar 27, 202",Kalshi Historical,explore-data,1,1
+Will the Federal Reserve Hike rates by 25bps at their January 2024 meeting?marke,Kalshi Historical,explore-data,1,1
+"Will the **high temp in NYC** be >67° on Nov 5, 2025?trades · All trades · KXHIG",Kalshi Historical,explore-data,1,1
+England vs. Argentinaevent · id 694581 · fifwc-eng-arg-2026-07-15This event is f,Polymarket Metadata Lookup,—,1,1
+"Bitcoin price range on Jan 8, 2025?markets · KXBTC-25JAN0815-B108625 · KXBTC-25J",Lychee homepage,connect-home-workspace,1,1
+"Will the **high temp in NYC** be 73-74° on Jun 27, 2025?markets · KXHIGHNY-25JUN",Lychee homepage,connect-home-workspace,1,1
+Will Spain win the 2026 FIFA World Cup?market · id 558934 · will-spain-win-the-2,Polymarket Metadata Lookup,—,1,1
+"Will the **high temp in NYC** be 30-31° on Feb 12, 2025?markets · KXHIGHNY-25FEB",Lychee homepage,connect-home-workspace,1,1
+Orlando vs New York K Winner?markets · KXNBAGAME-25NOV12ORLNYK-NYK · KXNBAGAME-2,Lychee homepage,connect-home-workspace,1,1
+Indiana vs New York Winner?markets · KXNBAGAME-25MAY21INDNYK-NYK · KXNBAGAME-25M,Lychee homepage,connect-home-workspace,1,1
+"Bitcoin price range on Apr 10, 2025?markets · KXBTC-25APR1000-B76125 · KXBTC-25A",Lychee homepage,connect-home-workspace,1,1
+activebool,Lychee homepage,connect-home-workspace,1,1
+Rename display label for active,Lychee homepage,connect-home-workspace,1,1
+Gangwon FC vs. Gimcheon Sangmu FCevent · id 667387 · kor-gwo-san-2026-07-18This ,Polymarket Metadata Lookup,—,1,1
+IK Start vs. Rosenborg BKevent · id 667169 · nor-ik-rbk-2026-07-18This event is ,Polymarket Metadata Lookup,—,1,1
+Philadelphia vs Miami Winner?trades · All trades · KXMLBGAME-25JUN16PHIMIA-MIA ·,Kalshi Historical,explore-data,1,1
+Quant AnalysisRun quantitative workflows on market and reference data.,Polymarket Historical,—,1,1
+Denver vs Indianapolis Winner?markets · KXNFLGAME-25SEP14DENIND-IND · KXNFLGAME-,Lychee homepage,connect-home-workspace,1,1
+Cincinnati vs Los Angeles D (Game 1) Winner?markets · KXMLBGAME-25SEP30CINLAD-CI,Lychee homepage,connect-home-workspace,1,1
+Los Angeles D vs Philadelphia (Game 2) Total Runs?markets · KXMLBTOTAL-25OCT06LA,Kalshi Historical,explore-data,1,1
+Exit guide,Lychee homepage,—,1,1
+"Bitcoin price range on Jun 29, 2025?markets · KXBTC-25JUN2911-B115875 · KXBTC-25",Kalshi Historical,explore-data,1,1
+"Will the **high temp in NYC** be 85-86° on Aug 22, 2025?markets · KXHIGHNY-25AUG",Kalshi Historical,explore-data,1,1
+Will tariffs on any sectors come into effect before Mar 2025?markets · KXTARIFFP,Kalshi Historical,explore-data,1,1
+Add join,Kalshi Historical,explore-data,1,1
+trades,Lychee homepage,connect-home-workspace,1,1
+"Will the **high temp in NYC** be >42° on Dec 15, 2024?trades · All trades · KXHI",Kalshi Historical,explore-data,1,1
+"Will the **high temp in NYC** be 85-86° on Oct 4, 2025?markets · KXHIGHNY-25OCT0",Kalshi Historical,explore-data,1,1
+NBA: LeBron James Next Teamevent · id 362004 · nba-lebron-james-next-teamThis ma,Polymarket Metadata Lookup,—,1,1
+"yes Travis Etienne Jr.,yes Zach Charbonnet,yes Sam Darnold: 225+,yes Travis Hunt",Lychee homepage,connect-home-workspace,1,1
+"Ethereum price at Aug 13, 2025 at 10pm EDT?markets · KXETHD-25AUG1322-T4439.99 ·",Lychee homepage,connect-home-workspace,1,1
+France vs Ukraine Winner?markets · KXFIFAGAME-25NOV13FRAUKR-UKR · KXFIFAGAME-25N,Kalshi Historical,explore-data,1,1
+"Bitcoin price up downBTC 15 min · $64,752.63 target · Crypto · KXBTC15M-26JUL231",Lychee homepage,connect-home-workspace,1,1
+Coinbase volume in Q3 2024?markets · CBVOLUME-Q3-24-350 · CBVOLUME-Q3-24,Lychee homepage,connect-home-workspace,1,1
+Will FC UTA Arad win on 2026-07-25?market · id 2883812 · rou1-fua-aog-2026-07-25,Polymarket Metadata Lookup,—,1,1
+Seattle vs Toronto (Game 7) Total Runs?markets · KXMLBTOTAL-25OCT20SEATOR-5 · KX,Kalshi Historical,explore-data,1,1
+Kalshi Historical,CSV Exports,—,1,1
+"Will the SP500 value reach 6144.15 by Oct 1, 2025?markets · KXINXHIGH-25-OCT01-6",Lychee homepage,connect-home-workspace,1,1
+Counter-Strike: HOTU vs Astralis (BO3) - BLAST Bounty Qualifierevent · id 745491,Polymarket Metadata Lookup,—,1,1
+"Will Elon Musk post 280-299 tweets from July 28 to August 4, 2026?market · id 30",Polymarket Metadata Lookup,—,1,1
+Will Amora Robinson be eliminated from Love Island USA this week?market · id 269,Polymarket Metadata Lookup,—,1,1
+"""The Odyssey"" 2nd Weekend Box Officeevent · id 726189 · the-odyssey-2nd-weekend-",Polymarket Metadata Lookup,—,1,1
+"UFC Fight Night: Mike Davis vs. Nurullo Aliev (Lightweight, Prelims)event · id 6",Polymarket Metadata Lookup,—,1,1
+Dallas vs Utah Winner?markets · KXNBAGAME-25OCT13DALUTA-DAL · KXNBAGAME-25OCT13D,Lychee homepage,connect-home-workspace,1,1
+Valencia CF vs. RCD Espanyol de Barcelona - More Marketsevent · id 156828 · lal-,Polymarket Metadata Lookup,—,1,1
+Polymarket API guide,Polymarket Metadata Lookup,—,1,1
+Highest temperature in Wellington on July 27?event · id 746385 · highest-tempera,Polymarket Metadata Lookup,—,1,1
+BK Hacken vs. AIKevent · id 727885 · swe-hac-aik-2026-07-27This event is for the,Polymarket Metadata Lookup,—,1,1
+"Wimbledon, Qualification ATP: Juan Carlos Prado vs Daniel Evansevent · id 619245",Polymarket Metadata Lookup,—,1,1
+San Marino: Daniel Rincon vs Juan Carlos Pradoevent · id 750712 · atp-rincon-pra,Polymarket Metadata Lookup,—,1,1
+What will be the top US Netflix movie this week?event · id 735569 · what-will-be,Polymarket Metadata Lookup,—,1,1
+"Will the **high temp in NYC** be 74-75° on Sep 5, 2024?markets · HIGHNY-24SEP05-",Kalshi Historical,explore-data,1,1
+Crunchbase,Integration: secEdgar,—,1,1
+Twitter,Integration: crunchbase,—,1,1
+1y,Kalshi Live,published-charts,1,1
+1h,Kalshi Live,published-charts,1,1
+Toggle theme,Kalshi Live,—,1,1
+RCD Espanyol de Barcelona vs. Levante UDevent · id 377414 · lal-esp-lev-2026-04-,Polymarket Metadata Lookup,—,1,1
+Chainlink,Integration: binance,—,1,1
+Product Hunt,Integration: chainlink,—,1,1
+Kalshi Historical,Integration: productHunt,—,1,1
+"June 16, 2026When Do Prediction Markets Become Accurate? A Kalshi Political Mark",Polymarket Metadata Lookup,guides,1,1
+"June 11, 2026Are 90% Prediction Markets Reliable? A Kalshi Political Calibration",Polymarket Metadata Lookup,guides,1,1
+Quant AnalysisRun quantitative workflows on market and reference data.,Data Sheet,—,1,1
+Kalshi Historical,Dashboards Gallery,—,1,1
+Will the White House Press Secretary say Healthcare at her next press briefing?m,Lychee homepage,connect-home-workspace,1,1
+What will Donald Trump say during Remarks at America’s Navy 250?markets · KXTRUM,Kalshi Historical,explore-data,1,1
+What data parameters are you interested in pulling for your Markets,Kalshi Historical,explore-data,1,1
+Expand panel,Kalshi Historical,connect-home-workspace,1,1
+Tottenham Hotspur vs. Sydney FCevent · id 757774 · clf-tot-syd-2026-07-29This ev,Polymarket Metadata Lookup,—,1,1
+"Will the **high temp in NYC** be <51° on Apr 7, 2024?markets · HIGHNY-24APR07-T5",Kalshi Historical,explore-data,1,1
+Census.gov,Lychee homepage,—,1,1
+FC Rottach-Egern vs. Bayern Munichevent · id 757791 · clf-fcre-bmu-2026-07-30Thi,Polymarket Metadata Lookup,—,1,1
+Sydney Olympic FC vs. Brisbane Roar FCevent · id 711288 · auc-sof-bri-2026-07-30,Polymarket Metadata Lookup,—,1,1
+Clear,Lychee homepage,connect-home-workspace,1,1
+Will FC Rottach-Egern win on 2026-07-30?market · id 3135758 · clf-fcre-bmu-2026-,Polymarket Metadata Lookup,—,1,1
+Tobyl FK vs. FK Panevėžysevent · id 718420 · col-tob-pan-2026-07-30This event is,Polymarket Metadata Lookup,—,1,1
+Next Google Gemini Pro Model released by...?event · id 549546 · next-google-gemi,Polymarket Metadata Lookup,—,1,1
+CSV exports,Polymarket Metadata Lookup,—,1,1
+event_ticker,Kalshi Historical,explore-data,1,1
+market_type,Kalshi Historical,explore-data,1,1
+CA Central Córdoba vs. CA Tucumánevent · id 714382 · arg-cac-cat-2026-07-30This ,Polymarket Metadata Lookup,—,1,1
+"Bitcoin price up downBTC 15 min · $64,226.93 target · Crypto · KXBTC15M-26JUL302",Lychee homepage,connect-home-workspace,1,1
+"Target Price: $64,226.93LiveJul 30, 2026 – Jul 30, 2026KXBTC15M-26JUL302315-15",Lychee homepage,—,1,1
+Remove KXBTC15M-26JUL302315-15,Lychee homepage,connect-home-workspace,1,1
+tagsstringJSON array of subject tags,Lychee homepage,connect-home-workspace,1,1
+Will Bilibili Gaming win the LoL: Bilibili Gaming vs. Fnatic?markets · KXLOLGAME,Lychee homepage,connect-home-workspace,1,1
+Remove KXLOLGAME,Lychee homepage,connect-home-workspace,1,1
+Sheet 3,Lychee homepage,connect-home-analyze,1,1
+Remove KXLOLGAME-26JUL310400T1GEN-GEN,Lychee homepage,connect-home-workspace,1,1
+Remove KXLOLGAME-26JUL310400T1GEN-T1,Lychee homepage,connect-home-workspace,1,1
+Will T1 win the LoL Worlds: MKOI vs. T1?markets · KXLOLGAMES-MKOIT125-T1 · KXLOL,Lychee homepage,connect-home-workspace,1,1
+Henan FC vs. Dalian Yingbo FCevent · id 714983 · chi-hen-ygb-2026-07-31This even,Polymarket Metadata Lookup,—,1,1
+ESTAC Troyes vs. FC Goalevent · id 769357 · clf-est-goa-2026-07-31This event is ,Polymarket Metadata Lookup,—,1,1
+Will Vålerenga Fotball win on 2026-07-31?market · id 2963180 · nor-vif-ham-2026-,Polymarket Metadata Lookup,—,1,1
+College Football GameToledo at Kentucky · Sports · KXNCAAFGAME-25AUG30TOLUKSerie,Lychee homepage,connect-home-workspace,1,1
+Chicago Cubs vs. St. Louis Cardinalsevent · id 743153 · mlb-chc-stl-2026-07-30In,Polymarket Metadata Lookup,—,1,1
+Cubs vs. Yankeesevent · id 32244 · mlb-chc-nyy-2025-07-13In the upcoming MLB gam,Polymarket Metadata Lookup,—,1,1
+Club Puebla vs. CD Guadalajaraevent · id 722193 · mex-pue-gua-2026-07-31This eve,Polymarket Metadata Lookup,—,1,1
+League of Legends GameTop Esports vs. LGD Gaming · Sports · KXLOLGAME-26AUG01050,Lychee homepage,connect-home-workspace,1,1
+"Top EsportsLiveJul 28, 2026 – Aug 3, 2026KXLOLGAME-26AUG010500TESLGD-TES",Lychee homepage,—,1,1
+"LGD GamingLiveJul 28, 2026 – Aug 3, 2026KXLOLGAME-26AUG010500TESLGD-LGD",Lychee homepage,—,1,1
+Remove KXLOLGAME-26AUG010500TESLGD-TES,Lychee homepage,connect-home-workspace,1,1
+League of LegendsMSI 2026 Champion · Sports · KXLOL-MSI26Series · KXLOL · 11 mar,Lychee homepage,connect-home-workspace,1,1
+Remove KXLOL-MSI26-KC,Lychee homepage,connect-home-workspace,1,1
+Remove KXLOL-MSI26-FUR,Lychee homepage,connect-home-workspace,1,1
+Remove KXLOL-MSI26-BLG,Lychee homepage,connect-home-workspace,1,1
+Remove KXLOL-MSI26-TES,Lychee homepage,connect-home-workspace,1,1
+Replace Sheet 1,Lychee homepage,connect-home-workspace,1,1
+KXLOLGAME-26AUG010700BLGJDG-JDG,Lychee homepage,connect-home-analyze,1,1
+League of Legends GameBilibili Gaming vs. JD Gaming · Sports · KXLOLGAME-26AUG01,Lychee homepage,connect-home-workspace,1,1
+"Jul 31, 2026, 6:57 AM – Aug 1, 2026, 6:57 AM",Lychee homepage,connect-home-workspace,1,1
+Quant Analysis,Integration: secEdgar,—,1,1
+FK Metalist 1925 Kharkiv vs. RNK Veres Rivneevent · id 724715 · ukr1-met-ver-202,Polymarket Metadata Lookup,—,1,1
+Professional Baseball GameSt. Louis vs Toronto · Sports · KXMLBGAME-26AUG011507S,Lychee homepage,connect-home-workspace,1,1
+"TorontoLiveJul 29, 2026 – Aug 4, 2026KXMLBGAME-26AUG011507STLTOR-TOR",Lychee homepage,—,1,1
+Click here,Lychee homepage,connect-home-workspace,1,1
+market_typestringbinary | scalar,Lychee homepage,connect-home-workspace,1,1
+Data sheetSpreadsheet-style exploration for connected datasets.,Quant Analysis,—,1,1
+Series,Lychee homepage,connect-home-workspace,1,1
+market_type,Lychee homepage,connect-home-workspace,1,1
+Polymarket Live,Dashboards Gallery,—,1,1
+"May 31, 2026 at 7:00 PM – Jun 1, 2026 at 7:00 PM",Lychee homepage,connect-home-workspace,1,1
+Lychee,Integration: productHunt,—,1,1
+Highest temperature in Los AngelesHighest temperature in LA today? · Climate and,Lychee homepage,connect-home-workspace,1,1
+"Events CandlesticksOHLC price, bid/ask, and volume for every market in a single ",Lychee homepage,connect-home-workspace,1,1
+Highest temperature in LA today?Highest temperature in Los Angeles · KXHIGHLAXEv,Lychee homepage,connect-home-workspace,1,1
+"Aug 1, 2026, 1:16 PM – Aug 2, 2026, 1:16 PM",Lychee homepage,connect-home-workspace,1,1
+KXHIGHLAX-26AUG02-T78,Lychee homepage,connect-home-analyze,1,1
+KXHIGHLAX-26AUG02-B78.5,Lychee homepage,connect-home-analyze,1,1
+Integrations,Lychee homepage,connect-home-workspace,1,1
+"Bitcoin price range on Jul 28, 2025?markets · KXBTC-25JUL2820-B122625 · KXBTC-25",Kalshi Historical,explore-data,1,1
+Bitcoin price Above/belowBTC price today at 2am EDT? · Crypto · KXBTCD-26AUG0302,Lychee homepage,connect-home-workspace,1,1
+"Jan 1, 2026, 12:00 AM – Jun 1, 2026, 11:59 PM",Lychee homepage,connect-home-workspace,1,1
+2,Lychee homepage,—,1,1
+all,Lychee homepage,connect-home-analyze,1,1
+notional_value_dollarsstringTotal value of a single contract at settlement (doll,Lychee homepage,connect-home-workspace,1,1
+Dallas vs Philadelphia Winner?markets · KXNFLGAME-25SEP04DALPHI-PHI · KXNFLGAME-,Lychee homepage,connect-home-workspace,1,1
+San Francisco at Los Angeles R Winner?markets · KXNFLGAME-25OCT02SFLA-SF · KXNFL,Lychee homepage,connect-home-workspace,1,1
+"yes_sub_titlestringShortened title for the ""Yes"" side",Lychee homepage,connect-home-workspace,1,1
+yes_bid_size_fpnumberContract size at best YES bid (fixed-point count),Lychee homepage,connect-home-workspace,1,1
+DashboardsBrowse published dashboards and narrative data stories.,Kalshi Live,—,1,1
+"May 6, 2026Kalshi Trading Volume DashboardTrack historical Kalshi trading volume",Dashboards Gallery,dashboards,1,1
+Will Democrats win the Senate?markets · CONTROLS-2024-D · CONTROLS-2024,Lychee homepage,connect-home-workspace,1,1
+Begin,Lychee homepage,—,1,1
+Descending,Lychee homepage,connect-home-analyze,1,1
+Remove sort,Lychee homepage,connect-home-analyze,1,1
+Brentford vs Manchester City Winner?markets · KXEPLGAME-25OCT05BREMCI-MCI · KXEP,Kalshi Historical,explore-data,1,1
+"Bitcoin price $57,000 or above on Apr 17, 2024 at 5pm EDT?markets · BTCD-24APR17",Kalshi Historical,explore-data,1,1
+"Will the **high temp in NYC** be 62-63° on Apr 17, 2025?markets · KXHIGHNY-25APR",Lychee homepage,connect-home-workspace,1,1
+"Kalshi Historical v2most recent historical data until: Jun 4, 2026",Lychee homepage,connect-home-scroll,1,1
+Crunchbase,Integration: crunchbase,—,1,1
+Pricing,Integration: crunchbase,—,1,1
+US Treasuries,Integration: usTreasuries,—,1,1
+Hacker News,Integration: usTreasuries,—,1,1
+定价,Lychee homepage,—,1,1
+卡尔希历史,Lychee homepage,—,1,1
+Toronto Blue Jays vs. Houston Astrosevent · id 767919 · mlb-tor-hou-2026-08-04In,Polymarket Metadata Lookup,—,1,1
+"Bitcoin price up downBTC 15 min · $64,846.15 target · Crypto · KXBTC15M-26AUG051",Lychee homepage,connect-home-workspace,1,1
+Will the highest temperature in San Francisco be 81°F or below on July 21?market,Polymarket Metadata Lookup,—,1,1
+"Will the **high temp in NYC** be 73-74° on Aug 21, 2025?markets · KXHIGHNY-25AUG",Kalshi Historical,explore-data,1,1
+Produtos,Polymarket Historical,—,1,1
+Pesquisa de metadados,Polymarket Historical,—,1,1
+Polymarket Histórico,Polymarket Metadata Lookup,—,1,1
+Folha de dadosExploração no estilo planilha para conjuntos de dados conectados.,Polymarket Historical,—,1,1
+Iniciar consulta gratuita,Data Sheet,—,1,1
+Polymarket Live Feed de dados,Lychee homepage,connect-home-scroll,1,1
+Obtenha volume ao vivo para um eventoMercadosVolume ao vivo para um evento. Requ,Lychee homepage,connect-home-workspace,1,1
+Polymarket Histórico,Lychee homepage,—,1,1
+Preços,Polymarket Historical,—,1,1
+Highest temperature in London on August 6?event · id 794517 · highest-temperatur,Polymarket Metadata Lookup,—,1,1
+Toggle theme,Polymarket Metadata Lookup,—,1,1
+"Will the **high temp in NYC** be 35-36° on Dec 20, 2024?markets · KXHIGHNY-24DEC",Kalshi Historical,explore-data,1,1
+CF Cruz Azul vs. Philadelphia Unionevent · id 743919 · lec-caz-phi-2026-08-06Thi,Polymarket Metadata Lookup,—,1,1
+Dashboard,Dashboards Gallery,—,1,1
+"Will the **high temp in NYC** be >60° on Apr 13, 2025?markets · KXHIGHNY-25APR13",Kalshi Historical,explore-data,1,1
+"Will the **high temp in NYC** be 41-42° on Feb 1, 2025?markets · KXHIGHNY-25FEB0",Lychee homepage,connect-home-workspace,1,1
+"Will the high temp in Chicago be 54-55° on Nov 8, 2025?markets · KXHIGHCHI-25NOV",Kalshi Historical,explore-data,1,1
+Will the rate of core CPI inflation be above 3.5% for the year ending in June 20,Kalshi Historical,explore-data,1,1
+Will Liverpool beat Aston Villa?market · id 252148 · will-liverpool-beat-aston-v,Polymarket Metadata Lookup,—,1,1
+Will Newcastle beat Liverpool?market · id 252097 · will-newcastle-beat-liverpool,Polymarket Metadata Lookup,—,1,1
+Binance,Polymarket Live,—,1,1
+Kalshi Live,Integration: chainlink,—,1,1
+Binance,Integration: twitter,—,1,1
+"Kalshi Historical v2most recent historical data until: Jun 9, 2026",Lychee homepage,connect-home-scroll,1,1
+ticker,Kalshi Historical,explore-data,1,1
+open_time,Kalshi Historical,explore-data,1,1
+"Kalshi Historical v2most recent historical data until: Jun 6, 2026",Lychee homepage,connect-home-scroll,1,1
+Remove summarize for volume,Kalshi Historical,explore-data,1,1
+Polymarket CLOB WebSocket Market Channel:Subscribe with asset IDs for live order,Polymarket Historical,tools,1,1
+Boston vs Toronto Winner?LiveKXMLBGAME-26AUG111907BOSTOR-BOSLast 44¢24h vol 194.,Kalshi Live,live-demo,1,1
+BTC price up in next 15 mins?LiveKXBTC15M-26AUG111145-45Last 3¢24h vol 24.6KOI 4,Kalshi Live,live-demo,1,1
+"Change color for Target Price: $63,811.15",Kalshi Live,live-demo,1,1
+Professional,Kalshi Live,live-demo,1,1
+Leaderboards,Kalshi Live,bonus-features,1,1
+Elections,Kalshi Live,bonus-features,1,1
+Browse Live Dashboards,Kalshi Live,—,1,1
+Dota 2: Amaru Gaming vs Team Jenz - Game 1 Winnermarket · id 3123175 · dota2-ama,Polymarket Metadata Lookup,—,1,1
+Dota 2: Execration vs Amaru Gaming (BO3) - Games of the Future Group Aevent · id,Polymarket Metadata Lookup,—,1,1
+Dota 2: Amaru Gaming vs Team Jenz (BO3) - EPL Masters Group Amarket · id 3123183,Polymarket Metadata Lookup,—,1,1
+Dota 2: Team Nemesis vs Amaru Gaming (BO3) - The International South America Clo,Polymarket Metadata Lookup,—,1,1
+Watford FC vs Bristol City Winner?markets · KXEFLCHAMPIONSHIPGAME-25NOV07WATBRC-,Kalshi Historical,explore-data,1,1
+Oklahoma City vs Denver Winner?markets · KXNBAGAME-25MAY09OKCDEN-DEN · KXNBAGAME,Kalshi Historical,explore-data,1,1
+Will it **rain** in New York City on Thursday?markets · KXRAINNYC-25MAR06-T0 · K,Kalshi Historical,explore-data,1,1
+NikitaProduct HuntThe design of this thing isout of this world.I can imagine thi,Lychee homepage,testimonials,1,1
+"Kalshi Historical v2most recent historical data until: Jun 12, 2026",Lychee homepage,connect-home-scroll,1,1
+"Kalshi Historical v2most recent historical data until: Jun 14, 2026",Lychee homepage,connect-home-scroll,1,1
+Los Angeles L vs Minnesota Winner?trades · All trades · KXNBAGAME-25OCT29LALMIN-,Kalshi Historical,explore-data,1,1
+Choose Elite,Kalshi Live,pricing,1,1
+Chainlink,Integration: coinGecko,—,1,1
+CSV exportsDownload historical and live data as CSV.,Integration: chainlink,—,1,1
+Polymarket Historical,Data Sheet,—,1,1
+Data sheetSpreadsheet-style exploration for connected datasets.,Integration: chainlink,—,1,1
+Browse guides,Integration: chainlink,—,1,1
+11,Lychee homepage,—,1,1
+"Dec 4, 2025, 12:00 AM – Jun 13, 2026, 11:59 PM",Lychee homepage,connect-home-workspace,1,1
+13,Lychee homepage,—,1,1
+"Bitcoin price on Mar 23, 2025?markets · KXBTCD-25MAR2310-T77749.99 · KXBTCD-25MA",Lychee homepage,connect-home-workspace,1,1
+Will Flavio Cobolli win the Kecmanovic vs Cobolli: Round Of 64 match?LiveKXATPMA,Kalshi Live,live-demo,1,1
+Browse guides,Integration: productHunt,—,1,1
+"Kalshi Historical v2most recent historical data until: Jun 15, 2026",Lychee homepage,connect-home-scroll,1,1
+GeckoTerminal,Integration: productHunt,—,1,1
+Binance,Integration: chainlink,—,1,1
+打开菜单,Polymarket Historical,—,1,1
+荔枝是什么？,Lychee homepage,faq,1,1
+Lychee包含了哪些数据来源？,Lychee homepage,faq,1,1
+Lychee是否包含Kalshi和Polymarket的历史数据？,Lychee homepage,faq,1,1
+Lychee是否支持Kalshi和Polymarket的实时数据？,Lychee homepage,faq,1,1
+我需要懂编程吗？,Lychee homepage,faq,1,1
+免费试用版包含哪些内容？,Lychee homepage,faq,1,1
+为什么使用 Lychee 而不是 API、CSV 或 Python 脚本？,Lychee homepage,faq,1,1
+我可以下载或导出Kalshi和Polymarket的数据吗？,Lychee homepage,faq,1,1
+"2026年6月17日预测市场何时才能准确？卡尔希政治市场生命周期分析预测市场准确吗？我们分析了 3,195 个已解决的 Kalshi 政治预测市场，涵盖 25,",Lychee homepage,guides,1,1
+打开菜单,Lychee homepage,—,1,1
+Rename display label for _contract,Lychee homepage,connect-home-workspace,1,1
+Mirassol FC vs. CR Flamengoevent · id 792404 · bra-mir-fla-2026-08-16This event ,Polymarket Metadata Lookup,—,1,1
+2026年5月20日如何利用Kalshi历史天气数据构建概率收敛图（VWPA指南）利用历史交易、VWPA和时间桶分析，逐步构建Kalshi天气市场概率收敛图表的,Lychee homepage,guides,1,1
+2026年3月1日如何提取和分析多元市场事件数据（无代码）了解如何连接Polymarket的活动列表端点，过滤和分析结构化事件数据，并导出数据集，从世界任何地方,Lychee homepage,guides,1,1
+向导,Lychee homepage,guides,1,1
+2026年6月22日Polymarket Gamma API 事件 Slug：如何通过 Slug 查询事件学习如何使用Polymarket Gamma API事,Lychee homepage,guides,1,1
+推特,Lychee homepage,—,1,1
+开始免费查询,Integration: twitter,—,1,1
+产品,Lychee homepage,—,1,1
+排行榜构建并发布关于预测市场数据的互动图表。,Lychee homepage,—,1,1
+元数据查找,Polymarket Historical,—,1,1
+由 Misterrpink 建造,Polymarket Metadata Lookup,—,1,1
+荔枝,Polymarket Metadata Lookup,—,1,1
+卡尔希的音量是什么意思？,Lychee homepage,hero,1,1
+2026年6月4日如何构建Kalshi天气波动率图表（逐步指南）利用历史交易数据和无代码分析在Lychee中计算和可视化Kalshi天气市场波动性的逐步指南。,Platform,guides,1,1
+LoL: Vivo Keyd Stars vs LOS (BO3) - CBLOL Regular Seasonevent · id 350884 · lol-,Polymarket Metadata Lookup,—,1,1
+LoL: KT Rolster Challengers vs Dplus KIA Challengers (BO5) - Asia Masters Playof,Polymarket Metadata Lookup,—,1,1
+2026年4月21日如何查找多元市场市场ID、代币ID、资产ID和条件ID了解如何查找Polymarket市场ID、代币ID、资产ID、条件ID、slug和cl,Platform,guides,1,1
+探索此活动,Polymarket Metadata Lookup,—,1,1
+研究,Platform,—,1,1
+2026年8月3日2026年8月3日下午4点（东部时间）的S&P价格区间？2026年8月3日下午4点（美东时间）KXINX ·28个市场 ·1米蜡烛·第17.1,Lychee homepage,guides,1,1
+立即访问卡尔希历史数据,Kalshi Historical,—,1,1
+全部选择,Lychee homepage,connect-home-workspace,1,1
+List markets市场Fetch markets with optional filters. All query params supported.,Lychee homepage,connect-home-workspace,1,1
+顺拉,Lychee homepage,connect-home-workspace,1,1
+Oil Price (WTI) today?WTI oil on day · KXWTIEvent · KXWTI-26AUG1714 · KXWTI,Kalshi Live,bonus-features,1,1
+Open dashboard,Kalshi Live,bonus-features,1,1
+"Will the WTI front-month settle oil price be Between 69 and 69.99 on Jan 9, 2025",Lychee homepage,connect-home-workspace,1,1
+"Will the WTI front-month settle oil price be Between 65 and 65.99 on May 8, 2025",Lychee homepage,connect-home-workspace,1,1
+Kalshi Historical v2most recent historical data until: 17 jun 2026,Lychee homepage,connect-home-scroll,1,1
+early_close_conditionstringCondition under which the market can close early,Lychee homepage,connect-home-workspace,1,1
+early_close_conditionstring,Lychee homepage,connect-home-workspace,1,1
+Pisa SC vs. Empoli FCevent · id 796140 · itc-pis-emp-2026-08-17This event is for,Polymarket Metadata Lookup,—,1,1
+¿Qué fuentes de datos incluye Lychee?,Lychee homepage,faq,1,1
+¿Necesito saber cómo codificar?,Lychee homepage,faq,1,1
+¿Qué incluye la demostración gratuita?,Lychee homepage,faq,1,1
+¿Lychee incluye datos históricos de Kalshi y Polymarket?,Lychee homepage,faq,1,1
+Semanal,Lychee homepage,pricing,1,1
+3 de agosto de 2026¿Rango de precios de S&P el 3 de agosto de 2026 a las 4 p. m.,Lychee homepage,guides,1,1
+"Jun 16, 2026, 5:00 PM – Jun 17, 2026, 5:00 PM",Lychee homepage,connect-home-workspace,1,1
+H.R. 22 (SAVE Act) signed into law in 2026?event · id 197892 · save-act-signed-i,Polymarket Metadata Lookup,—,1,1
+Will the highest temperature in Panama City be 31°C on August 17?market · id 362,Polymarket Metadata Lookup,—,1,1
+CA Vélez Sarsfield vs. CSyD Defensa y Justiciaevent · id 797095 · arg-vel-def-20,Polymarket Metadata Lookup,—,1,1
+Lychee,Dashboards Gallery,—,1,1
+CSD Macara vs. CD Universidad Catolica del Ecuadorevent · id 831819 · ecu1-mac-u,Polymarket Metadata Lookup,—,1,1
+Pricing,Polymarket Live,—,1,1
+Sion: Tommaso Compagnucci vs Max Dahlinevent · id 856307 · atp-compagn-dahlin-20,Polymarket Metadata Lookup,—,1,1
+SD Raiders FC vs. Sydney FCevent · id 845460 · auc-sdr-syd-2026-08-18This event ,Polymarket Metadata Lookup,—,1,1
+Thailand vs. Singaporeevent · id 855000 · asean-tha-sin-2026-08-18This event is ,Polymarket Metadata Lookup,—,1,1
+CoinGecko,Lychee homepage,—,1,1
+1. FC Heidenheim vs. Bayern Munichevent · id 865255 · clf-fch-bmu-2026-08-18This,Polymarket Metadata Lookup,—,1,1
+GeckoTerminal,Integration: binance,—,1,1
+Lychee,Integration: geckoDex,—,1,1
+"Kalshi Historical v2most recent historical data until: Jun 18, 2026",Lychee homepage,connect-home-scroll,1,1
+Explore Kalshi Live,Kalshi Live,—,1,1
+"Kalshi Liverecent and live kalshi data Jun 19, 2026 - now",Lychee homepage,connect-home-scroll,1,1
+"ETH 15M price up downETH 15 min · $1,918.52 target · Crypto · KXETH15M-26AUG1904",Lychee homepage,connect-home-workspace,1,1
+MLB Games: March 31event · id 21882 · mlb-games-march-31This market will resolve,Polymarket Metadata Lookup,—,1,1
+Van Spor FK vs. Istanbulspor ASThis event is for the upcoming Turkey 1. Lig game,Lychee homepage,connect-home-workspace,1,1
+Add selected markets,Lychee homepage,—,1,1
+button,Lychee homepage,—,1,1
+Golden State vs Las Vegas Winner?markets · KXWNBAGAME-25JUL12GSLV-LV · KXWNBAGAM,Kalshi Historical,explore-data,1,1
+Binance,Integration: secEdgar,—,1,1
+SEC EDGAR,Integration: shortSqueeze,—,1,1
+Hacker News,Integration: secEdgar,—,1,1
+Twitter,Integration: hackerNews,—,1,1
+CSyD Macará vs. Santos FCevent · id 811685 · sud-mac-san-2026-08-20This event is,Polymarket Metadata Lookup,—,1,1
+Split chart,Lychee homepage,connect-home-analyze,1,1
+Log in,Platform,—,1,1
+Stretch suggestion: perfect time for a sip of water ☕92%,Lychee homepage,connect-home-scroll,1,1
+"Kalshi Liverecent and live kalshi data Jun 21, 2026 - now",Lychee homepage,connect-home-scroll,1,1
+"Kalshi Historical v2most recent historical data until: Jun 21, 2026",Lychee homepage,connect-home-scroll,1,1
+Highest temperature in MiamiHighest temperature in Miami today? · Climate and We,Lychee homepage,connect-home-workspace,1,1
+"Will Bitcoin reach $100,000 in August?Event: What price will Bitcoin hit in Augu",Polymarket Live,find-polymarket-markets,1,1
+Espanyol Barcelona B vs. Gimnastic de Tarragonaevent · id 870674 · clf-ebb-gim-2,Polymarket Metadata Lookup,—,1,1
+Everton FC vs. Crystal Palace FCevent · id 818984 · epl-eve-cry-2026-08-22This e,Polymarket Metadata Lookup,—,1,1
+"Kalshi Historical v2most recent historical data until: Jun 22, 2026",Lychee homepage,connect-home-scroll,1,1
+count_fpnumberContracts bought or sold in this trade,Lychee homepage,connect-home-workspace,1,1
+taker_outcome_sidestringOutcome side the taker is positioned for (yes | no),Lychee homepage,connect-home-workspace,1,1
+created_timetimestamp,Lychee homepage,connect-home-workspace,1,1
+"Aug 22, 2026, 2:17 AM",Lychee homepage,connect-home-workspace,1,1
+"Aug 23, 2026, 2:19 AM",Lychee homepage,connect-home-workspace,1,1
+Clear,Lychee homepage,—,1,1
+"Aug 23, 2026, 2:17 AM",Lychee homepage,connect-home-workspace,1,1
+"ClaudeLiveAug 17, 2026 – Aug 24, 2026KXLLM1-26AUG24-ANTH",Lychee homepage,—,1,1
+"DolaLiveAug 17, 2026 – Aug 24, 2026KXLLM1-26AUG24-BYTE",Lychee homepage,—,1,1
+Year-end top LLMBest AI this week · Science and Technology · KXLLM1-26AUG24Serie,Lychee homepage,connect-home-workspace,1,1
+"KimiLiveAug 17, 2026 – Aug 24, 2026KXLLM1-26AUG24-MOON",Lychee homepage,—,1,1
+Add 9 markets,Lychee homepage,—,1,1
+"Wild Horse NineLiveMar 20, 2026 – Dec 31, 2027KXOSCARPIC-27-WIL",Lychee homepage,—,1,1
+Oscar for Best PictureOscar Winner: Best Picture · Entertainment · KXOSCARPIC-27,Lychee homepage,connect-home-workspace,1,1
+"Dune: Part ThreeLiveMar 20, 2026 – Dec 31, 2027KXOSCARPIC-27-DUN",Lychee homepage,—,1,1
+"The OdysseyLiveMar 20, 2026 – Dec 31, 2027KXOSCARPIC-27-ODY",Lychee homepage,—,1,1
+"Club KidLiveJul 30, 2026 – Dec 31, 2027KXOSCARPIC-27-CLU",Lychee homepage,—,1,1
+"The DebutLiveJun 22, 2026 – Dec 31, 2027KXOSCARPIC-27-DEB",Lychee homepage,—,1,1
+"The Adventures of Cliff BoothLiveMar 20, 2026 – Dec 31, 2027KXOSCARPIC-27-ADV",Lychee homepage,—,1,1
+"All of a SuddenLiveMar 20, 2026 – Dec 31, 2027KXOSCARPIC-27-ALL",Lychee homepage,—,1,1
+"Avengers: DoomsdayLiveMar 20, 2026 – Dec 31, 2027KXOSCARPIC-27-AVEN",Lychee homepage,—,1,1
+"HopeLiveMay 11, 2026 – Dec 31, 2027KXOSCARPIC-27-HOP",Lychee homepage,—,1,1
+"The DramaLiveMar 20, 2026 – Dec 31, 2027KXOSCARPIC-27-DRA",Lychee homepage,—,1,1
+"ObsessionLiveJun 17, 2026 – Dec 31, 2027KXOSCARPIC-27-OBS",Lychee homepage,—,1,1
+"The InviteLiveJul 30, 2026 – Dec 31, 2027KXOSCARPIC-27-INV",Lychee homepage,—,1,1
+"JosephineLiveMar 20, 2026 – Dec 31, 2027KXOSCARPIC-27-JOS",Lychee homepage,—,1,1
+"Paper TigerLiveMay 11, 2026 – Dec 31, 2027KXOSCARPIC-27-PAP",Lychee homepage,—,1,1
+Add 38 markets,Lychee homepage,—,1,1
+Every 1 minute,Lychee homepage,connect-home-workspace,1,1
+22,Lychee homepage,—,1,1
+"Jun 22, 2026, 12:00 AM – Jun 30, 2026, 11:59 PM",Lychee homepage,connect-home-workspace,1,1
+Last Page,Lychee homepage,connect-home-analyze,1,1
+JSON,Lychee homepage,connect-home-workspace,1,1
+No,Polymarket Live,live-polymarket-prices,1,1
+6H,Polymarket Live,live-polymarket-prices,1,1
+ALL,Polymarket Live,live-polymarket-prices,1,1
+Best Bid,Polymarket Live,polymarket-spread-liquidity,1,1
+Live order book,Polymarket Live,polymarket-order-book,1,1
+All trades,Polymarket Live,live-polymarket-trades,1,1
+Day,Polymarket Live,live-polymarket-trades,1,1
+Hour,Polymarket Live,live-polymarket-trades,1,1
+Professional,Polymarket Live,polymarket-candlestick-charts,1,1
+Yes,Polymarket Live,polymarket-candlestick-charts,1,1
+0xa5ef…2966,Polymarket Live,polymarket-holders-positions,1,1
+Generate a dashboard now for this market,Polymarket Live,polymarket-live-dashboard,1,1
+Continue to live analysis examples,Polymarket Live,polymarket-live-dashboard,1,1
+Continue to live vs historical Polymarket data,Polymarket Live,analyze-polymarket-live-data,1,1
+Continue to cross-platform research integrations,Polymarket Live,live-vs-historical-polymarket-data,1,1
+Alexandria Ocasio-CortezRelated marketKX2028DRUN-28-AOC · 66.0% YES,Polymarket Live,expand-polymarket-research,1,1
+Alexandria Ocasio-CortezRelated marketKXPRESNOMD-28-AOC · 23.0% YES,Polymarket Live,expand-polymarket-research,1,1
+15m,Polymarket Live,expand-polymarket-research,1,1
+1d,Polymarket Live,expand-polymarket-research,1,1
+"Will Bitcoin reach $80,000 in August?LiveWhat price will Bitcoin hit in August?F",Polymarket Live,find-polymarket-markets,1,1
+"Lagos, Nigeria Governor Election WinnerGubernatorial elections are currently sch",Polymarket Live,find-polymarket-markets,1,1
+Will Obafemi Hamzat win the 2027 Lagos State gubernatorial election?Yes · No,Polymarket Live,—,1,1
+Add selected markets,Polymarket Live,—,1,1
+Change color for Yes,Polymarket Live,live-polymarket-prices,1,1
+Change color for No,Polymarket Live,live-polymarket-prices,1,1
+"Bitcoin price on Aug 4, 2025?markets · KXBTCD-25AUG0411-T107499.99 · KXBTCD-25AU",Lychee homepage,connect-home-workspace,1,1
+Kalshi Historical v2most recent historical data until: 24 июн. 2026 г.,Lychee homepage,connect-home-scroll,1,1
+Create new sheet,Lychee homepage,—,1,1
+Back,Lychee homepage,—,1,1
+"Target Price: $77,304.71LiveAug 23, 2026 – Aug 23, 2026KXBTC15M-26AUG231530-30",Lychee homepage,—,1,1
+"Bitcoin price up downBTC 15 min · $77,304.71 target · Crypto · KXBTC15M-26AUG231",Lychee homepage,connect-home-workspace,1,1
+23,Lychee homepage,—,1,1
+Remove KXBTC15M-26AUG231530-30,Lychee homepage,connect-home-workspace,1,1
+Deselect all,Lychee homepage,—,1,1
+Run for Free,Polymarket Historical,explore-data,1,1
+"Will Bitcoin reach $90,000 in August?LiveWhat price will Bitcoin hit in August?F",Polymarket Historical,prediction-market-data,1,1
+"Above $90,000.00Related marketKXBTCMAXMON-BTC-26AUG31-9000000 · 10.0% YES",Polymarket Historical,prediction-market-data,1,1
+All,Polymarket Historical,prediction-market-data,1,1
+6h,Polymarket Historical,prediction-market-data,1,1
+15m,Polymarket Historical,prediction-market-data,1,1
+1d,Polymarket Historical,prediction-market-data,1,1
+1h,Polymarket Historical,prediction-market-data,1,1
+CA Tigre vs. CA Central Córdobaevent · id 834035 · arg-tig-cac-2026-08-24This ev,Polymarket Metadata Lookup,—,1,1
+Privacy,Polymarket Historical,—,1,1
+"Kalshi Liverecent and live kalshi data Jun 24, 2026 - now",Lychee homepage,connect-home-scroll,1,1
+"Atlanta winsAtlantaMarket · KXWNBAGAME-26AUG24ATLLA-ATLLiveAug 21, 2026 – Aug 26",Lychee homepage,connect-home-workspace,1,1
+"US bank failure by December 31, 2026?This market will resolve to ""Yes"" if any US",Polymarket Live,find-polymarket-markets,1,1
+button,Polymarket Live,—,1,1
+Switch to data sheet,Polymarket Live,live-polymarket-trades,1,1
+No,Polymarket Live,polymarket-spread-liquidity,1,1
+Yes,Polymarket Live,polymarket-spread-liquidity,1,1
+vinii,Polymarket Live,polymarket-holders-positions,1,1
+"Bitcoin price $69,250 or above on Jun 7, 2024 at 5pm EDT?markets · BTCD-24JUN07-",Kalshi Historical,explore-data,1,1
+Which company has best AI model end of August?event · id 712295 · which-company-,Polymarket Metadata Lookup,—,1,1
+"Market PriceDiscover one or many markets, then return one row per market with BU",Lychee homepage,connect-home-workspace,1,1
+Search,Lychee homepage,connect-home-workspace,1,1
+Will Club León FC win on 2026-08-25?Event: Club León FC vs. Real Salt Lakemarket,Lychee homepage,connect-home-workspace,1,1
+Leyre Romero Gormaz,Kalshi Live,live-demo,1,1
+Monthly-10%,Kalshi Live,pricing,1,1
+BlocksPolygon block numbers mapped to ISO 8601 timestamps.,Polymarket Historical,explore-data,1,1
+"Kalshi Historical v2most recent historical data until: Jun 26, 2026",Lychee homepage,connect-home-scroll,1,1
+Remove sort,Lychee homepage,connect-home-workspace,1,1
+"Aug 26, 2026, 8:23 AM",Lychee homepage,connect-home-workspace,1,1
+ChartsBuild and publish interactive charts on prediction market data.,Kalshi Live,—,1,1
+Will a human land on Mars before California starts high-speed rail?Before 2050Ma,Lychee homepage,connect-home-workspace,1,1
+Explore Kalshi Historical,Kalshi Live,prediction-market-data,1,1
+Who will be the next Chicago Bears coach?markets · KXNEWCOACHCHIBEARS-26-BJ · KX,Kalshi Historical,explore-data,1,1
+Las Vegas vs New England Winner?markets · KXNFLGAME-25SEP07LVNE-LV · KXNFLGAME-2,Kalshi Historical,explore-data,1,1
+Philadelphia vs Dallas: Total Pointsmarkets · KXNHLTOTAL-25NOV15PHIDAL-5 · KXNHL,Kalshi Historical,explore-data,1,1
+Barcelona vs Bilbao Winner?markets · KXLALIGAGAME-25NOV22BARATH-ATH · KXLALIGAGA,Kalshi Historical,explore-data,1,1
+Barcelona vs Bilbao Winner?markets · KXLALIGAGAME-25NOV22BARATH-TIE · KXLALIGAGA,Kalshi Historical,explore-data,1,1
+"Kalshi Liverecent and live kalshi data Jun 27, 2026 - now",Kalshi Historical,connect-home-scroll,1,1
+"Kalshi Historical v2most recent historical data until: Jun 27, 2026",Kalshi Historical,connect-home-scroll,1,1
+Clarity Act (H.R.3633) signed into law in 2026?LiveClarity Act (H.R.3633) signed,Polymarket Live,find-polymarket-markets,1,1
+Remove Clarity Act (H.R.3633) signed into law in 2026?,Polymarket Live,find-polymarket-markets,1,1
+"Will Bitcoin reach $85,000 in August?LiveWhat price will Bitcoin hit in August?F",Polymarket Live,find-polymarket-markets,1,1
+Help,Polymarket Live,—,1,1
+What price will Bitcoin hit August 24-30?event · id 899510 · what-price-will-bit,Polymarket Metadata Lookup,—,1,1
+Kalshi Historical v2most recent historical data until: 2026年6月30日,Lychee homepage,connect-home-scroll,1,1
+Dashboard,Platform,—,1,1
+"Kalshi Liverecent and live kalshi data Jun 29, 2026 - now",Lychee homepage,connect-home-scroll,1,1
+Where will it rain dailyWhere will it rain today? · Climate and Weather · KXRAIN,Kalshi Live,live-demo,1,1
+Add 2 markets,Kalshi Live,—,1,1
+limitlimit how many markets you would like to pull (e.g. 1000 rows),Lychee homepage,connect-home-workspace,1,1
+1m,Kalshi Historical,get-inspired,1,1
+Open dashboard,Kalshi Live,—,1,1
+Annual-25%,Polymarket Historical,pricing,1,1
+"Kalshi Liverecent and live kalshi data Jun 30, 2026 - now",Lychee homepage,connect-home-scroll,1,1
+Full Game: over 195.5 points?Over 195.5 points scoredMarket · KXWNBATOTAL-26AUG2,Lychee homepage,connect-home-workspace,1,1
+slugstringURL-friendly market slug,Polymarket Historical,explore-data,1,1
+makerstringAddress of limit order placer,Polymarket Historical,explore-data,1,1
+SortOrder results. Numerical: ascending or descending; text: alphabetical or rev,Polymarket Historical,explore-data,1,1
+takerstringAddress that filled the order,Polymarket Historical,explore-data,1,1
+If / elseConditional values per row (CASE) or conditional SUM when grouping.,Polymarket Historical,explore-data,1,1
+Ballon d'Or Top 3 Finish 2026event · id 811117 · ballon-dor-top-3-finish-2026Thi,Polymarket Metadata Lookup,—,1,1
+Ballon d'Or Top 5 Finish 2026event · id 811116 · ballon-dor-top-5-finish-2026Thi,Polymarket Metadata Lookup,—,1,1
+Will Harry Kane finish in the top 3 of the 2026 Ballon d'Or?market · id 3399933 ,Polymarket Metadata Lookup,—,1,1
+PricingPricing 价格,Lychee homepage,—,1,1
+Try For FreeTry For Free 免费试用,Lychee homepage,—,1,1
+Kalshi LiveKalshi Live Kalshi 实时数据recent and live kalshi data 2026年7月3日 - nowrec,Lychee homepage,connect-home-scroll,1,1
+MarketsMarkets 市场,Lychee homepage,connect-home-workspace,1,1
+"TradesTrades 交易Completed transactions for one or more markets — price, size, and",Lychee homepage,connect-home-workspace,1,1
+Polymarket LivePolymarket Live Polymarket 实时数据,Lychee homepage,connect-home-scroll,1,1
+Start a new real-time connectionStart a new real-time connection 建立一个新的实时连接Then ,Lychee homepage,connect-home-workspace,1,1
+Search Kalshi manually,Kalshi Historical,prediction-market-data,1,1
+"Kalshi HistoricalExplore Kalshi markets, trades, outcomes, historical order book",Kalshi Live,prediction-market-data,1,1
+Sheet name (optional),Lychee homepage,connect-home-workspace,1,1
+Who will IPO before 2027?markets · KXIPO-26-DATABRICKS · KXIPO-26,Kalshi Historical,explore-data,1,1
+Explore Kalshi Live,Kalshi Live,prediction-market-data,1,1
+Professional Baseball GameSeattle vs Boston · Sports · KXMLBGAME-26SEP011845SEAB,Kalshi Live,live-demo,1,1
+Cancel,Kalshi Live,—,1,1
+US Open ATP: Andrea Guerrieri vs Alex de Minaurevent · id 928118 · atp-guerrie-m,Polymarket Metadata Lookup,—,1,1
+"Kalshi Liverecent and live kalshi data Jul 3, 2026 - now",Lychee homepage,connect-home-scroll,1,1
+Binance,Integration: coinGecko,—,1,1
+Products,Integration: coinGecko,—,1,1
+Products,Integration: binance,—,1,1
+US Treasuries,Kalshi Live,—,1,1
+Wall Street Bets,Integration: usTreasuries,—,1,1
+Research,Integration: wallStreetBets,—,1,1
+Dane Sweeny winsLiveKXATPMATCH-26SEP02SWEMUS-SWELast 7¢24h vol 289.6KOI 281.4K,Kalshi Live,live-demo,1,1
+Will the upper bound of the federal funds rate be above 1.50% following the Fed',Kalshi Historical,explore-data,1,1
+Bitcoin vs. Gold vs. S&P 500 in 2026event · id 106981 · bitcoin-vs-gold-vs-sp-50,Polymarket Metadata Lookup,—,1,1
+Kalshi Historical,Quant Analysis,—,1,1
+Will the Illinois win the March Madness?markets · KXMARMAD-25-IL · KXMARMAD-25,Kalshi Historical,explore-data,1,1
+Alex de Minaur winsLiveKXATPMATCH-26SEP03VANDE-DELast 4¢24h vol 4MOI 1.9M,Kalshi Live,live-demo,1,1
+Remove KXATPMATCH-26SEP03VANDE-DE,Kalshi Live,live-demo,1,1
+Valorant game winnerHIMMERS vs. Axolotl · Sports · KXVALORANTGAME-26SEP031930HIM,Kalshi Live,live-demo,1,1
+HIMMERSLive3 Sept 2026 – 5 Sept 2026KXVALORANTGAME-26SEP031930HIMAXO-HIM,Kalshi Live,—,1,1
+Remove KXVALORANTGAME-26SEP031930HIMAXO-HIM,Kalshi Live,live-demo,1,1
+HIMMERS wins map 1HIMMERSMarket · KXVALORANTMAP-26SEP031930HIMAXO-1-HIMSettled3 ,Kalshi Live,live-demo,1,1
+Remove KXVALORANTGAME-26SEP031930HIMAXO-AXO,Kalshi Live,live-demo,1,1
+Axolotl wins map 1AxolotlMarket · KXVALORANTMAP-26SEP031930HIMAXO-1-AXOSettled3 ,Kalshi Live,live-demo,1,1
+"Natural-language searchFind markets, events and series by describing what you wa",Kalshi Live,live-demo,1,1
+Change color for HIMMERS,Kalshi Live,live-demo,1,1
+Upgrade now to get full access — view pricing,Polymarket Historical,guides-research,1,1
+"Kalshi Historical v2most recent historical data until: Jul 4, 2026",Lychee homepage,connect-home-scroll,1,1
+price_dollarsnumberPrice level in dollars (e.g. 0.15 = 15¢),Lychee homepage,connect-home-workspace,1,1
+Continue to Polymarket Live pricing,Polymarket Live,guides,1,1
+Will there be no change in Fed interest rates after the September 2026 meeting?L,Kalshi Historical,prediction-market-data,1,1
+"Kalshi Liverecent and live kalshi data Jul 5, 2026 - now",Lychee homepage,connect-home-scroll,1,1
+Research,Kalshi Live,—,1,1
+"Kalshi Volume Dashboard:Quarterly volume trends, category activity, and shareabl",Kalshi Historical,guides,1,1
+"Will the **high temp in NYC** be 16-17° on Jan 22, 2025?markets · KXHIGHNY-25JAN",Kalshi Historical,explore-data,1,1
+"Kalshi Historical v2most recent historical data until: Jul 6, 2026",Lychee homepage,connect-home-scroll,1,1
+Kalshi Liverecent and live kalshi data 7 juli 2026 - now,Lychee homepage,connect-home-scroll,1,1
+"Will the **high temp in NYC** be 36-37° on Jan 27, 2025?markets · KXHIGHNY-25JAN",Kalshi Historical,explore-data,1,1
+Golden State vs Dallas Winner?markets · KXWNBAGAME-25AUG24GSDAL-GS · KXWNBAGAME-,Kalshi Historical,explore-data,1,1
+"yes CeeDee Lamb,yes Jake Ferguson,yes Dak Prescott: 300+markets · KXMVENFLSINGLE",Kalshi Historical,explore-data,1,1
+"Will the price of Bitcoin be above $68,000 on September 6?market · id 4003936 · ",Polymarket Metadata Lookup,—,1,1
+"Kalshi Liverecent and live kalshi data Jul 7, 2026 - now",Lychee homepage,connect-home-scroll,1,1
+Real-Time,Lychee homepage,connect-home-workspace,1,1
+Traders,Lychee homepage,connect-home-workspace,1,1
+2026 Men’s US Open Winner (Tennis)event · id 139236 · 2026-mens-us-open-winner-t,Polymarket Metadata Lookup,—,1,1
+Polymarket Historical Data,Kalshi Historical,—,1,1
+CSV exportsDownload historical and live data as CSV.,Dashboards Gallery,—,1,1
+Will Silver (XAGUSD) hit (HIGH) $94 in May?market · id 2235918 · will-silver-xag,Polymarket Metadata Lookup,—,1,1
+"Kalshi Historical v2most recent historical data until: Jul 8, 2026",Lychee homepage,connect-home-scroll,1,1
+What will Gold (XAUUSD) hit in September 2026?event · id 907964 · what-price-wil,Polymarket Metadata Lookup,—,1,1
+"Will Gold (XAUUSD) hit (HIGH) $5,300 in September?market · id 3866480 · will-xau",Polymarket Metadata Lookup,—,1,1
+What will WTI Crude Oil (WTI) hit in September 2026?event · id 907966 · what-pri,Polymarket Metadata Lookup,—,1,1
+How high will 10-year Treasury yield go before 2027?event · id 79104 · how-high-,Polymarket Metadata Lookup,—,1,1
+How high will 10-year Treasury yield go in September?event · id 956927 · how-hig,Polymarket Metadata Lookup,—,1,1
+Dashboards,Data Sheet,—,1,1
+"Will US crude oil reserves fall to 280M by September 25, 2026?market · id 391457",Polymarket Metadata Lookup,—,1,1
+"Grady Emerson: Debut DateBefore Nov 1, 2029Market · KXMLBDEBUT-GEMERSON-29NOV01L",Lychee homepage,connect-home-workspace,1,1
+Which company has the best AI model end of October?event · id 841230 · which-com,Polymarket Metadata Lookup,—,1,1
+Which company has best AI model end of 2026?event · id 556382 · which-company-ha,Polymarket Metadata Lookup,—,1,1
+Explore Polymarket Live →,Polymarket Historical,dataset-contents,1,1
+$LAPTOP FDV above ___ one day after launch?event · id 983493 · laptop-fdv-above-,Polymarket Metadata Lookup,—,1,1
+What data parameters are you interested in pulling for your Markets,Polymarket Historical,explore-data,1,1
+Get access to Polymarket Historical Data,Polymarket Historical,compare-providers,1,1
+Kalshi Liverecent and live kalshi data 10 июля 2026 г. - now,Lychee homepage,connect-home-scroll,1,1
+Will 538 correctly call 46 states in the 2024 U.S. presidential election?markets,Kalshi Historical,explore-data,1,1
+Will the upper bound of the federal funds rate be above 4.50% following the Fed',Kalshi Historical,explore-data,1,1
+Close panel,Kalshi Historical,connect-home-workspace,1,1
+Help,Polymarket Historical,—,1,1
+Kalshi Historical Data,Polymarket Historical,—,1,1
+Polymarket Live Data,Lychee homepage,—,1,1
+Chicago Fire FC vs. Inter Miami CFevent · id 921477 · mls-chi-mia-2026-09-09This,Polymarket Metadata Lookup,—,1,1
+market_maker_addressstringMarket maker wallet address,Lychee homepage,connect-home-workspace,1,1
+Prime Minister of Israel after the next election?event · id 81557 · who-will-be-,Polymarket Metadata Lookup,—,1,1
+Florida A&M Rushing Touchdowns: O/U 0.5market · id 4259551 · cfb-flam-mia-2026-0,Polymarket Metadata Lookup,—,1,1
+Will the Federal Reserve Hike rates by 0bps at their July 2026 meeting?markets ·,Kalshi Historical,explore-data,1,1
+Kalshi Liverecent and live kalshi data 12 Jul 2026 - now,Lychee homepage,connect-home-scroll,1,1
+World SeriesPro Baseball Champion · Sports · KXMLB-26Series · KXMLB,Lychee homepage,connect-home-workspace,1,1
+12,Lychee homepage,—,1,1
+20,Lychee homepage,—,1,1
+Kalshi Historical v2most recent historical data until: 12 Jul 2026,Lychee homepage,connect-home-scroll,1,1
+limitMax trades to pull (per market when tickers are set). Default paginates unt,Lychee homepage,connect-home-workspace,1,1
+Bab el-Mandeb Strait effectively closed by September 30?LiveBab el-Mandeb Strait,Kalshi Historical,prediction-market-data,1,1
+Data sheetSpreadsheet-style exploration for connected datasets.,Dashboards Gallery,—,1,1
+Download sheet JSON,Kalshi Historical,—,1,1
+Kalshi Historical v2most recent historical data until: 13 July 2026,Lychee homepage,connect-home-scroll,1,1
+Include all markets in event,Lychee homepage,connect-home-workspace,1,1
+titlestringFull event title,Lychee homepage,connect-home-workspace,1,1
+event_tickerstringUnique event ticker,Lychee homepage,connect-home-workspace,1,1
+Advanced search,Lychee homepage,connect-home-workspace,1,1
+Will the Democratic Party control the Senate after the 2026 Midterm elections?Ev,Lychee homepage,connect-home-workspace,1,1
+Which party will win the House in 2026?This market will resolve according to the,Lychee homepage,connect-home-workspace,1,1
+Balance of Power: 2026 Midtermsevent · id 32228 · balance-of-power-2026-midterms,Polymarket Metadata Lookup,—,1,1
+Democratic Presidential Nominee 2028event · id 30829 · democratic-presidential-n,Polymarket Metadata Lookup,—,1,1
+Republican Presidential Nominee 2028event · id 31875 · republican-presidential-n,Polymarket Metadata Lookup,—,1,1
+Friedrich Merz out as Chancellor of Germany before 2027?event · id 73223 · fried,Polymarket Metadata Lookup,—,1,1
+Next French Presidential Electionevent · id 79987 · next-french-presidential-ele,Polymarket Metadata Lookup,—,1,1
+Xi Jinping out before 2027?event · id 30828 · xi-jinping-out-before-2027This mar,Polymarket Metadata Lookup,—,1,1
+Putin out as President of Russia by...?event · id 31195 · putin-out-before-2027T,Polymarket Metadata Lookup,—,1,1
+What will Fed Rate hit before 2027?event · id 84803 · what-will-fed-rate-hit-bef,Polymarket Metadata Lookup,—,1,1
+Crude Oil all time high by...?event · id 435099 · crude-oil-all-time-high-byThis,Polymarket Metadata Lookup,—,1,1
+market_type,Kalshi Historical,—,1,1
+Will the U.S. invade Iran before 2027?LiveWill the U.S. invade Iran before 2027?,Kalshi Historical,prediction-market-data,1,1
+Maine Senate Election Winnerevent · id 57650 · maine-senate-election-winnerThis ,Polymarket Metadata Lookup,—,1,1
+Sheet,Kalshi Historical,connect-home-analyze,1,1
+"Will the S&P 500 be above 6899.9999 on Aug 15, 2025 at 4pm EDT?markets · KXINXU-",Kalshi Historical,explore-data,1,1
+Will the S&P 500 be higher or lower after Trump speaks during Press Conference w,Kalshi Historical,explore-data,1,1
+"Kalshi Historical v2most recent historical data until: Jul 13, 2026",Lychee homepage,connect-home-scroll,1,1
+Fed rate hike in 2026?LiveYes 87¢24h vol $193.1K,Kalshi Historical,prediction-market-data,1,1
+Ballon d'Or Winner 2026event · id 48361 · ballon-dor-winner-2026This market will,Polymarket Metadata Lookup,—,1,1
+Product Hunt,Kalshi Live,—,1,1
+Kalshi Live,Integration: productHunt,—,1,1
+Previous Page,Kalshi Historical,connect-home-analyze,1,1
+Why Random Sampling Matters in Data Analysis: A Polymarket Case StudySeptember 4,Quant Analysis,—,1,1
+Log in,Quant Analysis,—,1,1
+Remove limit,Kalshi Historical,explore-data,1,1
+Bifurca este análisis →,Kalshi Historical,get-inspired,1,1
+Explora los datos históricos de Kalshi gratis.,Kalshi Historical,—,1,1
+Acceso,Kalshi Historical,—,1,1
+"Kalshi Liverecent and live kalshi data Jul 13, 2026 - now",Lychee homepage,connect-home-scroll,1,1
+Will the Fed increase interest rates by 25 bps after the September 2026 meeting?,Polymarket Live,expand-polymarket-research,1,1
+Will New York Knicks win the 2027 NBA Finals?LiveNBA: 2027 ChampionFeaturedNBA F,Polymarket Live,expand-polymarket-research,1,1
+2027 NBA ChampionPro Basketball Champion · KXNBAEvent · KXNBA-27 · KXNBA,Polymarket Live,expand-polymarket-research,1,1
+Will Marco Rubio win the 2028 US Presidential Election?LivePresidential Election,Polymarket Live,expand-polymarket-research,1,1
+2028 Presidential race: exact outcome2028 Presidential election: exact outcome ·,Polymarket Live,expand-polymarket-research,1,1
+Marco Rubio defeats AOCRelated marketKXPRESOUTCOME-28NOV07-AOCMRUBR · 6.0% YES,Polymarket Live,expand-polymarket-research,1,1
+Gavin Newsom defeats Marco RubioRelated marketKXPRESOUTCOME-28NOV07-GNEWMRUBD · ,Polymarket Live,expand-polymarket-research,1,1
+block_numberintPolygon block number,Polymarket Historical,explore-data,1,1
+Ravens vs. Coltsevent · id 795815 · nfl-bal-ind-2026-09-13In the upcoming NFL ga,Polymarket Metadata Lookup,—,1,1
+"Kalshi Historical v2most recent historical data until: Jul 14, 2026",Lychee homepage,connect-home-scroll,1,1
+"Kalshi Liverecent and live kalshi data Jul 14, 2026 - now",Lychee homepage,connect-home-scroll,1,1
+"Bitcoin price up downBTC 15 min · $76,747.72 target · Crypto · KXBTC15M-26SEP132",Lychee homepage,connect-home-workspace,1,1
+"Target Price: $76,747.72LiveSep 13, 2026 – Sep 13, 2026KXBTC15M-26SEP132100-00",Lychee homepage,—,1,1
+研究,Kalshi Historical,—,1,1
+"Will the **high temp in NYC** be 54-55° on Mar 24, 2025?markets · KXHIGHNY-25MAR",Kalshi Historical,explore-data,1,1
+Switch to sheet view,Polymarket Live,find-polymarket-markets,1,1
+Lindsay Clancy convicted of manslaughter in 2026?Event: Lindsay Clancy convicted,Polymarket Live,find-polymarket-markets,1,1
+Basic,Polymarket Live,polymarket-candlestick-charts,1,1
+Clarity Act (H.R.3633) signed into law in 2026?Event: Clarity Act (H.R.3633) sig,Polymarket Live,find-polymarket-markets,1,1
+1D,Polymarket Live,live-polymarket-prices,1,1
+Will CPI rise more than 0.3% in March 2024?trades · All trades · CPI-24MAR-T0.3 ,Kalshi Historical,explore-data,1,1
+created_timetimestampISO 8601 created time,Lychee homepage,connect-home-workspace,1,1
+previous_yes_ask_dollarsstringBest YES ask one day ago (dollars),Lychee homepage,connect-home-workspace,1,1
+Next Prime Minister of Swedenevent · id 166435 · next-prime-minister-of-swedenPa,Polymarket Metadata Lookup,—,1,1
+Berlin State Election Winnerevent · id 95248 · berlin-state-election-winnerParli,Polymarket Metadata Lookup,—,1,1
+Weather Market Calibration Curve:Implied probability vs resolution rate across h,Kalshi Historical,guides,1,1
+Broncos,Polymarket Live,—,1,1
+Broncos vs. ChiefsLiveBroncos vs. ChiefsFeaturedSportsNFLGamesNFL GamedayBroncos,Polymarket Live,find-polymarket-markets,1,1
+Remove Broncos vs. Chiefs,Polymarket Live,find-polymarket-markets,1,1
+Show different featured live markets,Polymarket Live,find-polymarket-markets,1,1
+Products,Polymarket Live,—,1,1
+Spread: Chiefs (-2.5)LiveBroncos vs. ChiefsFeaturedSportsNFLGamesNFL GamedayChie,Polymarket Live,find-polymarket-markets,1,1
+Broncos vs. Chiefs: O/U 43.5LiveBroncos vs. ChiefsFeaturedSportsNFLGamesNFL Game,Kalshi Live,prediction-market-data,1,1
+Largest Company end of December 2026?event · id 79041 · largest-company-end-of-d,Polymarket Metadata Lookup,—,1,1
+Kalshi Historical v2most recent historical data until: 2026年7月16日,Lychee homepage,connect-home-scroll,1,1
+Kalshi Historical v2most recent historical data until: 16/07/2026,Lychee homepage,connect-home-scroll,1,1
+"Will the **high temp in NYC** be 56-57° on Oct 26, 2025?markets · KXHIGHNY-25OCT",Lychee homepage,connect-home-workspace,1,1
+"Will the **high temp in NYC** be >34° on Jan 24, 2025?markets · KXHIGHNY-25JAN24",Lychee homepage,connect-home-workspace,1,1
+Mexico Annual Inflation 2026event · id 201624 · mexico-annual-inflation-2026This,Polymarket Metadata Lookup,—,1,1
+"Will the Treasury purchase Bitcoin?Before Jan 1, 2027Market · KXTREASBUYBTC-26AU",Lychee homepage,connect-home-workspace,1,1
+last_price_dollarsstringLast traded YES price (dollars),Lychee homepage,connect-home-workspace,1,1
+ETH / USDEthereum priced in US dollars (Chainlink).,Lychee homepage,connect-home-workspace,1,1
+symbolstringTrading pair or symbol,Lychee homepage,connect-home-workspace,1,1
+timeintEvent timestamp (ms),Lychee homepage,connect-home-workspace,1,1
+BTC price up in next 15 mins?LiveKXBTC15M-26SEP151845-45Last 100¢24h vol 1.6MOI ,Kalshi Live,live-demo,1,1
+"White House # posts September 11 - September 18, 2026?event · id 986494 · white-",Polymarket Metadata Lookup,—,1,1
+Highest temperature in NYC on September 16?event · id 1021463 · highest-temperat,Polymarket Metadata Lookup,—,1,1
+Fed Decision in October?event · id 606422 · fed-decision-in-october-202606171903,Polymarket Metadata Lookup,—,1,1
+Fed Decision in December?event · id 770450 · fed-decision-in-december-2026072923,Polymarket Metadata Lookup,—,1,1
+Inter Miami CF vs. CF Cruz Azulevent · id 952942 · ccup-mia-cra-2026-09-16This e,Polymarket Metadata Lookup,—,1,1
+"Kalshi Historical v2most recent historical data until: Jul 17, 2026",Lychee homepage,connect-home-scroll,1,1
+How many Fed rate cuts in 2026?event · id 51456 · how-many-fed-rate-cuts-in-2026,Polymarket Metadata Lookup,—,1,1
+Highest temperature in Miami on September 17?event · id 1026907 · highest-temper,Polymarket Metadata Lookup,—,1,1
+First to list tokenized stocks in the US?event · id 1040179 · first-to-list-toke,Polymarket Metadata Lookup,—,1,1
+Where will the next next round of US-Iran peace talks be...?event · id 624242 · ,Polymarket Metadata Lookup,—,1,1
+Next Premier of Quebecevent · id 438568 · next-premier-of-quebec-594The 2026 Que,Polymarket Metadata Lookup,—,1,1
+Mecklenburg-Vorpommern Parliamentary Election: SPD Vote Share?event · id 881782 ,Polymarket Metadata Lookup,—,1,1
+"Kalshi vs PolymarketCompare live Kalshi and Polymarket odds, charts, and trading",Kalshi Historical,—,1,1
+Ceará Governor Election Winnerevent · id 421398 · cear-governor-election-winnerT,Polymarket Metadata Lookup,—,1,1
+"First to hit $1B FDV: ANSEM, CASHCAT, AI, or NET?event · id 956597 · first-to-hi",Polymarket Metadata Lookup,—,1,1
+Brentford vs Chelsea Winner?markets · KXEPLGAME-25SEP13BRECHE-CHE · KXEPLGAME-25,Kalshi Historical,explore-data,1,1
+open_interest,Lychee homepage,—,1,1
+no_ask,Lychee homepage,—,1,1
+ticker,Lychee homepage,—,1,1
+result,Lychee homepage,—,1,1
+yes_bid_dollarsstringBest YES bid (dollars),Lychee homepage,connect-home-workspace,1,1
+no_bid_dollarsstringBest NO bid (dollars),Lychee homepage,connect-home-workspace,1,1
+no_ask_dollarsstringBest NO ask (dollars),Lychee homepage,connect-home-workspace,1,1
+BucketingConfigure bucketing,Lychee homepage,connect-home-workspace,1,1
+JSON,Kalshi Historical,connect-home-workspace,1,1
+Not now,Kalshi Historical,—,1,1
+Kalshi Historical v2most recent historical data until: 18 July 2026,Lychee homepage,connect-home-scroll,1,1
+Pro Football: NFC South Championevent · id 232642 · pro-football-nfc-south-champ,Polymarket Metadata Lookup,—,1,1
+Clear,Polymarket Historical,explore-data,1,1
+Browse guides,Integration: wallStreetBets,—,1,1
+Wall Street Bets,Kalshi Historical,—,1,1
+What's New,Platform,—,1,1
+Will Gavin Newsom win the 2028 Democratic presidential nomination?Event: Democra,Lychee homepage,connect-home-workspace,1,1
+Will Alexandria Ocasio-Cortez win the 2028 Democratic presidential nomination?Ev,Lychee homepage,connect-home-workspace,1,1
+Democratic Presidential Nominee 2028eventActivedemocratic-presidential-nominee-2,Lychee homepage,connect-home-workspace,1,1
+Will the Federal Reserve Hike rates by 0bps at their September 2025 meeting?mark,Kalshi Historical,explore-data,1,1
+Will the Federal Reserve Hike rates by 0bps at their December 2025 meeting?marke,Kalshi Historical,explore-data,1,1
+Kalshi vs Polymarket,Polymarket Historical,—,1,1
+Last Page,Kalshi Historical,connect-home-analyze,1,1
+Research,Kalshi vs Polymarket,—,1,1
+"Will US crude oil reserves fall to 260M by September 25, 2026?Event: Will US cru",Kalshi vs Polymarket,—,1,1
+"Brent crude oil price on September 30, 2026 at 5:00 PM EDT?48% matchRelated mark",Kalshi vs Polymarket,—,1,1
+"Polymarket LiveFollow active Polymarket prices, trades, spreads, order books, ca",Kalshi Historical,prediction-market-data,1,1
+Next Prime Minister of Romania?This market will resolve to the next individual w,Kalshi vs Polymarket,—,1,1
+Will the next Prime Minister of Romania be a member of PNL?YES = Yes · NO = No,Kalshi vs Polymarket,—,1,1
+Party of Next Prime Minister of Romania?This market will resolve to the politica,Kalshi vs Polymarket,—,1,1
+Who will be the next Romanian PM?Who will be the next new Prime Minister of Roma,Kalshi vs Polymarket,—,1,1
+Share details,Kalshi vs Polymarket,—,1,1
+Kalshi,Kalshi vs Polymarket,—,1,1
+Price overlay,Kalshi vs Polymarket,—,1,1
+Depth,Kalshi vs Polymarket,—,1,1
+Andy Burnham out as UK PM by...?event · id 726855 · andy-burnham-out-as-uk-pm-by,Polymarket Metadata Lookup,—,1,1
+Next Prime Minister of Spain?event · id 637442 · next-prime-minister-of-spain-20,Polymarket Metadata Lookup,—,1,1
+Next Prime Minister of Italy?event · id 403557 · next-prime-minister-of-italyThi,Polymarket Metadata Lookup,—,1,1
+Will the U.S. invade Iran before 2027?event · id 73130 · will-the-us-invade-iran,Polymarket Metadata Lookup,—,1,1
+Saudi Oil Pipeline (East-West) restarts by...?event · id 1007040 · saudi-oil-pip,Polymarket Metadata Lookup,—,1,1
+Strait of Hormuz traffic returns to normal by December 31?event · id 455875 · st,Polymarket Metadata Lookup,—,1,1
+Will the Democrats win the Ohio governor race in 2026?Event: Ohio Governor Elect,Kalshi vs Polymarket,—,1,1
+Ohio GovernorOhio Governor winner? · Elections · GOVPARTYOH-26Series · GOVPARTYO,Kalshi vs Polymarket,—,1,1
+"Amy ActonLiveJan 26, 2025 – Nov 3, 2027GOVPARTYOH-26-D",Kalshi vs Polymarket,—,1,1
+Trump x Greenland deal signed by...?event · id 179546 · trump-x-greenland-deal-s,Polymarket Metadata Lookup,—,1,1
+Что такое личи?,Lychee homepage,faq,1,1
+"Will the **high temp in NYC** be >79° on Jun 2, 2025?markets · KXHIGHNY-25JUN02-",Kalshi Historical,explore-data,1,1
+"Will the **high temp in NYC** be 40-41° on Jan 12, 2025?markets · KXHIGHNY-25JAN",Kalshi Historical,explore-data,1,1
+Highest temperature in Hong Kong on September 23?event · id 1057040 · highest-te,Polymarket Metadata Lookup,—,1,1
+Leaderboards,Kalshi Live,live-demo,1,1
+Philadelphia winsLiveKXNFLGAME-26SEP28PHICHI-PHILast 69¢24h vol 342.7KOI 383.9K,Kalshi Live,live-demo,1,1
+Will the US announce a diesel export ban by September 30?Event: US Announces Die,Kalshi vs Polymarket,—,1,1
+US Diesel Export BanWill the US ban diesel exports before Election Day? · Politi,Kalshi vs Polymarket,—,1,1
+"YesLiveSep 21, 2026 – Nov 3, 2026KXDIESELEXPORTBAN-26",Kalshi vs Polymarket,—,1,1
+"2026 Balance of Power: R Senate, R HouseFeaturedUnited StatesRewards 20, 4.5, 50",Kalshi vs Polymarket,—,1,1
+Will the same party control the U.S. House and Senate?Elections · KXSAMEPARTYCON,Kalshi vs Polymarket,—,1,1
+House winnerWhich party will win the U.S. House? · Elections · CONTROLH-2026Seri,Kalshi vs Polymarket,—,1,1
+Will Democrats hold 235 or more seats in the House AND hold 51 or more seats in ,Kalshi vs Polymarket,—,1,1
+Blue tsunami in 2026?This market will resolve to “Yes” if both of the following ,Kalshi vs Polymarket,—,1,1
+Add 1 market,Kalshi vs Polymarket,—,1,1
+Ver precios,Lychee homepage,hero,1,1
+"Bitcoin price up downBTC 15 min · $84,349.74 target · Crypto · KXBTC15M-26SEP232",Kalshi Live,live-demo,1,1
+"Bitcoin price range on May 10, 2025?markets · KXBTC-25MAY1014-B96125 · KXBTC-25M",Kalshi Historical,explore-data,1,1
+What's New,Kalshi vs Polymarket,—,1,1
+How do I find the same event on Kalshi and Polymarket?,Kalshi vs Polymarket,faq,1,1
+Will Gadi Eizenkot be the next Prime Minister of Israel?FeaturedMain ElectionIsr,Kalshi vs Polymarket,—,1,1
+US x China tariff agreement by September 30?Event: US x China tariff agreement b,Kalshi vs Polymarket,—,1,1
+When will the US and China reach a tariff agreement?54% matchRelated marketBefor,Kalshi vs Polymarket,—,1,1
+6h,Kalshi vs Polymarket,—,1,1
+1h,Kalshi vs Polymarket,—,1,1
+Xdxd123,Kalshi vs Polymarket,—,1,1
+JAMJAMJAM4,Kalshi vs Polymarket,—,1,1
+tinman2,Kalshi vs Polymarket,—,1,1
+Terms,Kalshi Historical,—,1,1
+"US-Iran Final Nuclear Deal by December 31, 2026?FeaturedIranUS-IranYes 10¢vol $1",Kalshi vs Polymarket,—,1,1
+Dolzhenkov vs Nordquist — Dmitry Dolzhenkov winsSportsTennisYes 4¢vol $453.5k,Kalshi vs Polymarket,—,1,1
+close_timetimestampISO 8601 close time,Lychee homepage,connect-home-workspace,1,1
+"Will the **high temp in NYC** be 62-63° on Apr 27, 2025?markets · KXHIGHNY-25APR",Kalshi Historical,explore-data,1,1
+"May 28, 2026How to Build a Probability Calibration Chart Using Kalshi Weather Ma",Lychee homepage,guides,1,1
+"US-Iran Final Nuclear Deal by December 31, 2026?FeaturedIranUS-IranYes 12¢vol $5",Kalshi Historical,prediction-market-data,1,1
+Kansas City winsLiveKXNFLGAME-26SEP27KCMIA-KCLast 86¢24h vol 291.3KOI 1.2M,Kalshi Live,live-demo,1,1
+Market metadata,Kalshi Live,live-demo,1,1
+TradesPull recent trades for the selected market.,Kalshi Live,live-demo,1,1
+Terms,Kalshi vs Polymarket,—,1,1
+Which party will win the Senate in 2026?This market will resolve according to th,Polymarket Live,find-polymarket-markets,1,1
+Compare Kalshi vs Polymarket odds,Lychee homepage,cta,1,1
+Ethereum rangeETH price range today at 3pm EDT? · Crypto · KXETH-26SEP2815Series,Kalshi Live,live-demo,1,1
+"$2,690 to 2,694.99LiveSep 28, 2026 – Sep 28, 2026KXETH-26SEP2815-B2692",Kalshi Live,—,1,1
+Will Thieves win the Call of Duty League Toronto Ultra Championship Weekend 2025,Kalshi Historical,explore-data,1,1
+Will the Erika Andreeva win the Wimbledon Women's Tennis?markets · KXWWOMENSINGL,Kalshi Historical,explore-data,1,1
+Will the Federal Reserve Cut rates by >25bps at their November 2024 meeting?mark,Kalshi Historical,explore-data,1,1
+Compare Kalshi vs Polymarket odds,Lychee homepage,hero,1,1
+Highest temperature in Los Angeles on September 29?This market will resolve to t,Kalshi vs Polymarket,—,1,1
+Highest temperature in Los Angeles today?59% matchClose match79° or belowKXHIGHL,Kalshi vs Polymarket,—,1,1
+Kalshi Historical,Kalshi vs Polymarket,—,1,1
+"BTC 15 min · $83,335.03 target — BTC price up in next 15 mins?CryptoBTCYes 61¢vo",Kalshi Historical,prediction-market-data,1,1
+All,Kalshi Historical,prediction-market-data,1,1
+"ETH 15M price up downETH 15 min · $2,673.82 target · Crypto · KXETH15M-26SEP3000",Kalshi Live,live-demo,1,1
+"Target Price: $2,673.82LiveSep 29, 2026 – Sep 29, 2026KXETH15M-26SEP300030-30",Kalshi Live,—,1,1
+"Bitcoin price up downBTC 15 min · $83,335.03 target · Crypto · KXBTC15M-26SEP300",Kalshi Live,live-demo,1,1
+XRP 15 MinuteXRP 15 min · $1.4955 target · Crypto · KXXRP15M-26SEP300030Series ·,Kalshi Live,live-demo,1,1
+Solana 15 minutesSOL 15 min · $119.3907 target · Crypto · KXSOL15M-26SEP300030Se,Kalshi Live,live-demo,1,1
+Hype 15 minHYPE 15 min · $85.9162 target · Crypto · KXHYPE15M-26SEP300030Series ,Kalshi Live,live-demo,1,1
+Dogecoin 15 MinuteDOGE 15 min · $0.0935909 target · Crypto · KXDOGE15M-26SEP3000,Kalshi Live,live-demo,1,1
+BNB 15 MinuteBNB 15 min · $762.49 target · Crypto · KXBNB15M-26SEP300030Series ·,Kalshi Live,live-demo,1,1
+Remove KXDOGE15M-26SEP300030-30,Kalshi Live,live-demo,1,1
+Remove KXBNB15M-26SEP300030-30,Kalshi Live,live-demo,1,1
+NEAR 15mNEAR 15 min · $4.9699 target · Crypto · KXNEAR15M-26SEP300030Series · KX,Kalshi Live,live-demo,1,1
+1d,Kalshi vs Polymarket,—,1,1
+"Kalshi vs PolymarketCompare live Kalshi and Polymarket odds, charts, and trading",Lychee homepage,—,1,1
+Will Oklahoma City Thunder win the 2027 NBA Finals?FeaturedNBA FinalsNBAYes 19¢v,Kalshi vs Polymarket,—,1,1
+NBA Western Conference Finals Qualifiers53% matchRelated marketOKC ThunderKXNBAW,Kalshi vs Polymarket,—,1,1
+Strait of Hormuz traffic returns to normal by December 31?FeaturedPoliticsshipsY,Kalshi vs Polymarket,—,1,1
+When will traffic at the Strait of Hormuz return to normal?54% matchRelated mark,Kalshi vs Polymarket,—,1,1
+Trump out as President before 2027?This market will resolve to “Yes” if Donald T,Kalshi vs Polymarket,—,1,1
+Create your Dashboard,Kalshi vs Polymarket,demo,1,1
+Jingshan: Wushuang Zheng vs Sara Sorribes Tormo21% matchRelated marketYES = Wush,Kalshi vs Polymarket,—,1,1
+Log in,Polymarket Live,—,1,1
+Open dashboard,Polymarket Live,—,1,1
+Kalshi vs Polymarket,Kalshi vs Polymarket,—,1,1
+Guides,Kalshi vs Polymarket,—,1,1
+"September 20, 2026How to Compare Kalshi and Polymarket Odds LiveLearn how to com",Platform,guides,1,1
+"Kalshi HistoricalExplore Kalshi markets, trades, outcomes, historical order book",Polymarket Historical,prediction-market-data,1,1
+HavingFilter after grouping (e.g. only group categories where volume > 10000.),Kalshi Historical,explore-data,1,1
+Remove Having,Kalshi Historical,explore-data,1,1
+CSV / XLSX,Kalshi Historical,connect-home-scroll,1,1
+Chainlink,Kalshi Historical,connect-home-scroll,1,1
+Kalshi vs Polymarket Compare,Kalshi Historical,connect-home-scroll,1,1
+Remove duplicates,Kalshi Historical,connect-home-analyze,1,1
+Remove duplicates,Kalshi Historical,—,1,1
+Keep all rows,Kalshi Historical,—,1,1
+"Kalshi Historical v2most recent historical data until: Jul 31, 2026",Lychee homepage,connect-home-scroll,1,1
+Remove If / else,Kalshi Historical,explore-data,1,1
+Which company has the best AI model end of November?event · id 1040632 · which-c,Polymarket Metadata Lookup,—,1,1
+Will WTI Crude Oil (WTI) hit (HIGH) $100 in October?market · id 4936103 · will-w,Polymarket Metadata Lookup,—,1,1
+Dallas vs Minnesota Winner?markets · KXNBAGAME-25NOV17DALMIN-MIN · KXNBAGAME-25N,Kalshi Historical,explore-data,1,1
+NBA Offseason26 eventstagnba-free-agency · id 105450,Kalshi Historical,prediction-market-data,1,1
+Rockets vs. Lakers: O/U 223.5Event: Rockets vs. LakersmarketInactivenba-hou-lal-,Kalshi Historical,prediction-market-data,1,1
+"NY KnicksLiveAug 20, 2026 – Oct 22, 2026KXNBAGAME-26OCT20PHINYK-NYK",Kalshi Historical,—,1,1
+NBA GamePHI 76ers vs NY Knicks · Sports · KXNBAGAME-26OCT20PHINYKSeries · KXNBAG,Kalshi Historical,prediction-market-data,1,1
+Add 1 market,Kalshi Historical,—,1,1
+clear sheet,Kalshi Historical,connect-home-analyze,1,1
+Start from blank,Kalshi Historical,connect-home-scroll,1,1
+Sheet 1,Kalshi Historical,connect-home-analyze,1,1
+Upgrade to Pro,Kalshi Historical,—,1,1
+Open menu,Kalshi vs Polymarket,—,1,1
+"Will the **high temp in NYC** be <87° on Jul 20, 2025?markets · KXHIGHNY-25JUL20",Lychee homepage,connect-home-workspace,1,1
+Kalshi vs Polymarket,Data Sheet,—,1,1
+Data sheet,Data Sheet,—,1,1
+"Kalshi Historical v2most recent historical data until: Aug 3, 2026",Lychee homepage,connect-home-scroll,1,1
+BTC price up in next 15 mins?LiveKXBTC15M-26OCT051845-45Last 36¢24h vol 263KOI 2,Kalshi Live,live-demo,1,1
+Show different Kalshi markets,Kalshi Historical,prediction-market-data,1,1
+Hacker News,Kalshi Live,—,1,1
+"June 3, 2026How to Build a Kalshi Weather Volatility Chart (Step-by-Step Guide)S",Lychee homepage,guides,1,1
+"Kalshi Liverecent and live kalshi data Aug 7, 2026 - now",Lychee homepage,connect-home-scroll,1,1
+무료로 사용해 보세요,Lychee homepage,hero,1,1
+Open the historical explorer →,Polymarket Historical,from-raw-data,1,1
+Dashboards,Polymarket Live,—,1,1
+Try For Free,Data Sheet,—,1,1
+Log in,Data Sheet,—,1,1
+Raw,Lychee homepage,—,1,1
+Analyze Historical Data →,Polymarket Historical,find-markets,1,1
+"2026 Balance of Power: R Senate, R HouseLiveBalance of Power: 2026 MidtermsFeatu",Polymarket Live,find-polymarket-markets,1,1
+"Kalshi Historical v2most recent historical data until: Aug 10, 2026",Lychee homepage,connect-home-scroll,1,1
+"Aug 9, 2026, 8:00 PM – Aug 10, 2026, 8:00 PM",Lychee homepage,connect-home-workspace,1,1
+9,Lychee homepage,—,1,1
+Remove KXTREASBUYBTC-26AUG-27JAN01,Lychee homepage,connect-home-workspace,1,1
+Toggle theme,Kalshi vs Polymarket,—,1,1
+What will WTI Crude Oil (WTI) hit in October 2026?What will WTI Crude Oil (WTI) ,Kalshi vs Polymarket,—,1,1
+Will WTI Crude Oil (WTI) hit (LOW) $40 in October?YES = Yes · NO = No,Kalshi vs Polymarket,—,1,1
+"How low will WTI oil get by Oct 30, 2026?46% matchRelated market84.49 or belowKX",Kalshi vs Polymarket,—,1,1
+Try For Free,CSV Exports,—,1,1
+"US announces end of Iranian blockade by October 31, 2026?FeaturedIranTrumpYes 14",Kalshi vs Polymarket,—,1,1
+"US-Iran nuclear deal?52% matchRelated marketBefore Nov 1, 2026KXUSAIRANAGREEMENT",Kalshi vs Polymarket,—,1,1
+Will Harry Kane win the 2026 Ballon d'Or?FeaturedSoccerSportsYes 63¢vol $70.8K,Kalshi vs Polymarket,—,1,1
+Kalshi Live,Dashboards Gallery,—,1,1
+"Kalshi Historical v2most recent historical data until: Aug 13, 2026",Lychee homepage,connect-home-scroll,1,1
+yes_ask_dollarsstringBest YES ask (dollars),Lychee homepage,connect-home-workspace,1,1
+Why Random Sampling Matters in Data Analysis: A Polymarket Case Study,Polymarket Historical,guides,1,1
+Show different Polymarket markets,Kalshi Historical,prediction-market-data,1,1
+"Polymarket metadataLook up Polymarket market IDs, event IDs, slugs, and token id",Kalshi Historical,—,1,1
+Binance,Polymarket Metadata Lookup,—,1,1
+Start free query,Integration: binance,—,1,1
+What price will Ethereum hit in 2026?What price will Ethereum hit before 2027?ev,Polymarket Live,find-polymarket-markets,1,1
+"Ethereum price on October 16?This market will resolve according to the final ""Cl",Polymarket Live,find-polymarket-markets,1,1
+"Will the price of Ethereum be less than $2,000 on October 16?Yes · No",Polymarket Live,—,1,1
+"Polymarket metadataLook up Polymarket market IDs, event IDs, slugs, and token id",Polymarket Live,—,1,1
+"Kalshi vs PolymarketCompare live Kalshi and Polymarket odds, charts, and trading",Polymarket Metadata Lookup,—,1,1
+taker_amountintAmount taker gave (6 decimals),Polymarket Historical,explore-data,1,1
+Kalshi Historical v2most recent historical data until: 17 Aug 2026,Lychee homepage,connect-home-scroll,1,1
+"Will the **high temp in NYC** be 41-42° on Feb 1, 2025?markets · KXHIGHNY-25FEB0",Kalshi Historical,explore-data,1,1
+Polymarket metadata,Polymarket Metadata Lookup,—,1,1
+Remove limit,Lychee homepage,connect-home-workspace,1,1
+"August 3, 2026S&P price range on Aug 3, 2026 at 4pm EDT?On Aug 3, 2026 at 4pm ED",Dashboards Gallery,dashboards,1,1
+Open menu,Dashboards Gallery,—,1,1
+Polymarket metadata,Dashboards Gallery,—,1,1
+Quant Analysis,Polymarket Metadata Lookup,—,1,1
+Open menu,Integration: hackerNews,—,1,1
+"Kalshi Liverecent and live kalshi data Aug 18, 2026 - now",Lychee homepage,connect-home-scroll,1,1
+Export,Kalshi Historical,connect-home-workspace,1,1
+XLSX,Kalshi Historical,connect-home-workspace,1,1
+什么是荔枝？,Lychee homepage,faq,1,1
+Lychee包含哪些数据源？,Lychee homepage,faq,1,1
+Open menu,Data Sheet,—,1,1
+"SummarizeSum, min, max, or count values. Add the same column more than once for ",Lychee homepage,connect-home-workspace,1,1
+makerstringAddress of limit order placer,Lychee homepage,connect-home-workspace,1,1
+order_hashstringUnique order identifier,Lychee homepage,connect-home-workspace,1,1
+Lychee,Polymarket Live,—,1,1
+track Polymarket odds over time,Polymarket Historical,—,1,1
+Will Flávio Bolsonaro win the 2026 Brazilian presidential election?FeaturedPolit,Kalshi vs Polymarket,—,1,1
+"Kalshi vs PolymarketCompare live Kalshi and Polymarket odds, charts, and trading",Kalshi vs Polymarket,—,1,1
+Will Harry Kane win the 2026 Ballon d'Or?FeaturedSoccerSportsYes 68¢vol $94.0K,Kalshi vs Polymarket,—,1,1
+"Agamenone vs Houkes — Franco Agamenone winsSportsTennisYes 28¢vol $847,6 тыс.",Kalshi vs Polymarket,—,1,1
+"Kalshi Historical v2most recent historical data until: Aug 19, 2026",Lychee homepage,connect-home-scroll,1,1
+"KKalshi LiveReal-Timerecent and live kalshi data Aug 20, 2026 - now",Lychee homepage,demo,1,1
+KHKalshi Historical v2most recent historical data until: 21 Aug 2026,Lychee homepage,demo,1,1
+Remove KXF1RETIRE-30VERSTAPPEN-2027,Lychee homepage,demo,1,1
+Highest temperature in London on October 20?This market will resolve to the temp,Kalshi vs Polymarket,—,1,1
+Will the highest temperature in London be 7°C or below on October 20?YES = Yes ·,Kalshi vs Polymarket,—,1,1
+Event ticker,Lychee homepage,attributes,1,1
+Yes ask,Lychee homepage,attributes,1,1
+Will there be no change in Fed interest rates after the October 2026 meeting?Fea,Kalshi vs Polymarket,—,1,1
+Series attributes,Lychee homepage,attributes,1,1
+Category,Lychee homepage,attributes,1,1
+Climate and Weather,Lychee homepage,attributes,1,1
+Remove Series · KXNFLENDSTREAK,Lychee homepage,demo,1,1
+Highest temperature in NYCHighest temperature in New York City today? · Climate ,Lychee homepage,—,1,1
+Actions for Series,Lychee homepage,demo,1,1
+Close,Kalshi Historical,explore-data-demo,1,1
+Market type,Lychee homepage,attributes,1,1
+Export,Lychee homepage,demo,1,1
+Actions for Markets,Lychee homepage,demo,1,1
+Expand navigation,Lychee homepage,demo,1,1
+Click anywhere to begin,Kalshi Live,live-demo-demo,1,1
+Ok,Kalshi Live,—,1,1
+Continue,Kalshi Live,—,1,1
+US gas prices tomorrowKXAAAGASD · US gas prices tomorrow · Economics · KXAAAGASD,Kalshi Live,—,1,1
+Close,Kalshi Live,live-demo-demo,1,1
+"Will Bitcoin reach $95,000 by December 31, 2026?Event: What price will Bitcoin h",Lychee homepage,demo,1,1
+Same tab,Lychee homepage,demo,1,1
+Click anywhere to begin,Polymarket Historical,explore-data-demo,1,1
+Ok,Polymarket Historical,—,1,1
+Close tip,Polymarket Historical,—,1,1
+End date,Polymarket Historical,attributes,1,1
+"Oct 04, 2022 – Oct 22, 2026",Polymarket Historical,attributes,1,1
+30,Polymarket Historical,—,1,1
+"End dateNov 30, 2022 – Oct 22, 2026",Polymarket Historical,attributes,1,1
+"Nov 30, 2022 – Oct 22, 2026",Polymarket Historical,attributes,1,1
+28,Polymarket Historical,—,1,1
+5,Polymarket Historical,—,1,1
+Exclude null,Polymarket Historical,attributes,1,1
+"Nov 05, 2022 – Sep 08, 2025",Polymarket Historical,attributes,1,1
+Save search,Polymarket Historical,explore-data-demo,1,1
+button,Polymarket Historical,explore-data-demo,1,1
+Market attributes,Polymarket Historical,attributes,1,1
+Close,Polymarket Historical,explore-data-demo,1,1
+"Create ""saudi""",Lychee homepage,attributes,1,1
+"Create ""houthi""",Lychee homepage,attributes,1,1
+Outcomes,Lychee homepage,attributes,1,1
+Sort,Lychee homepage,sort,1,1
+Limit,Lychee homepage,limit,1,1
+Question“houthi”,Lychee homepage,attributes,1,1
+Clear all,Lychee homepage,attributes,1,1
+"Orderbook(s)The buy and sell prices, and the size available at each price.",Lychee homepage,demo,1,1
+Market PriceThe best price to buy and the best price to sell.,Lychee homepage,demo,1,1
+Remove Houthi military action against Saudi Arabia on October 2?,Lychee homepage,demo,1,1
+Add data sheet,Lychee homepage,demo,1,1
+Condition id,Lychee homepage,attributes,1,1
+Closed,Lychee homepage,attributes,1,1
+Liquidity,Lychee homepage,attributes,1,1
+Any,Lychee homepage,attributes,1,1
+Yes,Lychee homepage,attributes,1,1
+Refresh,Lychee homepage,demo,1,1
+Close tip,Kalshi Historical,—,1,1
+Ok,Kalshi Historical,—,1,1
+Upgrade,Kalshi Historical,—,1,1
+Get Quant,Kalshi Historical,pricing,1,1
+Get Quant,Lychee homepage,pricing,1,1
+BTC / USD,Lychee homepage,demo,1,1
+Start feed,Lychee homepage,demo,1,1
+Stop realtime,Lychee homepage,demo,1,1
+"Create ""Fed""",Lychee homepage,attributes,1,1
+"Trade HistoryEach executed trade, with its price, size, side, and time.",Lychee homepage,demo,1,1
+Yes,Lychee homepage,demo,1,1
+No,Lychee homepage,demo,1,1
+6H,Lychee homepage,demo,1,1
+All,Lychee homepage,demo,1,1
+Actions for Find markets,Lychee homepage,demo,1,1
+Save dashboard,Lychee homepage,demo,1,1
+ChartBTC / USD · Up/Down settlement price chartChart,Lychee homepage,—,1,1
+TabWelcomeEmpty tab,Lychee homepage,—,1,1
+Close provenance,Lychee homepage,—,1,1
+Hand tool,Lychee homepage,demo,1,1
+Preview dashboard,Lychee homepage,demo,1,1
+Replay all queries in tab,Lychee homepage,demo,1,1
+Realtime mode,Lychee homepage,demo,1,1
+Toggle theme,Lychee homepage,demo,1,1
+Actions for Find markets chart,Lychee homepage,demo,1,1
+Will Harry Kane win the 2026 Ballon d'Or?FeaturedSoccerSportsYes 77¢vol $286.4K,Kalshi vs Polymarket,—,1,1
+Back to integrations,Lychee homepage,demo,1,1
+Functions we support,Lychee homepage,demo,1,1
+Billed yearly,Lychee homepage,pricing,1,1
+Price HistoryHow a market's price has moved over time.,Lychee homepage,demo,1,1
+Horvit vs Wuerth — Mia Horvit winsSportsTennisYes 53¢vol $188K,Kalshi Live,prediction-market-data,1,1
+Will Luiz Inácio Lula da Silva win the 2026 Brazilian presidential election?Feat,Kalshi Live,prediction-market-data,1,1
+Brazil presidential runoff: vote abroad winnerBrazil presidential runoff: who wi,Kalshi Live,prediction-market-data,1,1
+"Flávio BolsonaroLiveOct 6, 2026 – Oct 25, 2027KXBRRUNOFFABROAD-26OCT25-1-FBOL",Kalshi Live,—,1,1
+All,Kalshi Live,prediction-market-data,1,1
+Upgrade,Lychee homepage,demo,1,1
+立即获取访问权限,Kalshi Live,—,1,1
+排行榜,Kalshi Live,bonus-features,1,1

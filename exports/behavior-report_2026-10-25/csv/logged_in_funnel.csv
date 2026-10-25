@@ -1,0 +1,6 @@
+Step,Sessions,% of sessions
+Logged-in session,1593,100.0%
+Browsed integrations / data sources,1155,72.5%
+Started a data pull,761,47.8%
+Got rows back,333,20.9%
+Hit zero rows or an error,186,11.7%
