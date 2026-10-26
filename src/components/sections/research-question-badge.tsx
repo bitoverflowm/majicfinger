@@ -138,6 +138,8 @@ type BadgeConfig = {
 };
 
 const BADGE_CONFIG: Record<string, BadgeConfig> = {
+  Kalshi: { theme: "emerald", icon: "kalshi" },
+  Polymarket: { theme: "indigo", icon: "polymarket" },
   "Kalshi Historical": { theme: "emerald", icon: "kalshi" },
   "Polymarket Historical": { theme: "indigo", icon: "polymarket" },
   "Polymarket Live": { theme: "sky", icon: "radio" },
@@ -236,6 +238,11 @@ function BadgeIcon({ icon, className }: { icon: IconKind; className: string }) {
 
 function getBadgeConfig(label: string): BadgeConfig {
   return BADGE_CONFIG[label] ?? { theme: "slate", icon: "dot" };
+}
+
+export function ResearchQuestionBadgeIcon({ label }: { label: string }) {
+  const config = getBadgeConfig(label);
+  return <BadgeIcon icon={config.icon} className={THEMES[config.theme].iconClassName} />;
 }
 
 type ResearchQuestionBadgeProps = {

@@ -6,7 +6,7 @@ import { CompanyShowcase } from "./company-showcase";
 import { DashboardDemoSectionLazy } from "./dashboard-demo-section-lazy";
 import { DemoScrollLink } from "./demo-scroll-link";
 import { LandingDemoScrollManager } from "./landing-demo-scroll";
-import { ResearchQuestionRotator } from "./research-question-rotator";
+import { ResearchHighlights } from "./research-highlights";
 
 export function HeroSection() {
   const { hero } = siteConfig;
@@ -76,9 +76,7 @@ export function HeroSection() {
         </div>
       </div>
 
-      <div className="relative z-10 mx-auto w-full max-w-[65rem] px-6 pb-4 md:pb-6 lg:pb-8">
-        <ResearchQuestionRotator />
-      </div>
+      <ResearchHighlights />
 
       <DashboardDemoSectionLazy />
       <CompanyShowcase />
