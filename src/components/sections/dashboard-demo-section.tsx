@@ -16,8 +16,13 @@ import { cn } from "@/lib/utils";
 import DashBody from "@/app/dashboard/dashBody";
 import LiveStreamManager from "@/app/dashboard/components/liveStreamManager";
 import RestLiveFeedManager from "@/app/dashboard/components/restLiveFeedManager";
+import { DemoBackdrop } from "@/components/sections/demo-backdrop";
 import { DemoWindowMockup } from "@/components/sections/demo-window-mockup";
-import { DEMO_CONTENT_HEIGHT_CLASS, HOMEPAGE_DEMO_SECTION_CLASS } from "@/components/sections/dashboard-demo-layout";
+import {
+  DEMO_BROWSER_URL,
+  DEMO_CONTENT_HEIGHT_CLASS,
+  HOMEPAGE_DEMO_SECTION_CLASS,
+} from "@/components/sections/dashboard-demo-layout";
 
 /**
  * inline: card on the page. entering: fixed full-viewport, clipped back to the card's rect while the demo lays out.
@@ -150,10 +155,12 @@ function LandingDemoStage({
   children,
   sectionId,
   className,
+  framed,
 }: {
   children: ReactNode;
   sectionId: string;
   className: string;
+  framed: boolean;
 }) {
   const ctx = useMyStateV2();
   const active = !!ctx?.landingDemoActive;
@@ -273,44 +280,56 @@ function LandingDemoStage({
     if (typeof activate === "function") activate();
   };
 
-  return (
-    <section id={sectionId} className={cn(className, staged ? "z-50" : "z-30")}>
-      <div
-        ref={slotRef}
-        style={slotHeight != null ? { height: slotHeight } : undefined}
-        onClickCapture={activateOnClick}
+  const slot = (
+    <div
+      ref={slotRef}
+      className="relative"
+      style={slotHeight != null ? { height: slotHeight } : undefined}
+      onClickCapture={framed ? undefined : activateOnClick}
+    >
+      <DemoWindowMockup
+        id="demo-mockup"
+        data-demo-mockup
+        browserUrl={framed && !staged ? DEMO_BROWSER_URL : undefined}
+        style={stageStyle(phase, clip)}
+        className={cn(
+          "[transform:translateZ(0)] will-change-[opacity,transform,clip-path]",
+          staged && "border-transparent shadow-none ring-0",
+        )}
+        contentClassName={cn(
+          "overflow-hidden",
+          staged ? "h-full min-h-0" : DEMO_CONTENT_HEIGHT_CLASS,
+        )}
       >
-        <DemoWindowMockup
-          id="demo-mockup"
-          data-demo-mockup
-          style={stageStyle(phase, clip)}
+        {children}
+        <div
+          aria-live="polite"
           className={cn(
-            "[transform:translateZ(0)] will-change-[opacity,transform,clip-path]",
-            staged && "border-transparent shadow-none ring-0",
-          )}
-          contentClassName={cn(
-            "overflow-hidden",
-            staged ? "h-full min-h-0" : DEMO_CONTENT_HEIGHT_CLASS,
+            "pointer-events-none absolute left-1/2 top-3 z-[600] -translate-x-1/2 transition-all duration-300",
+            hintVisible ? "translate-y-0 opacity-100" : "-translate-y-2 opacity-0",
           )}
         >
-          {children}
-          <div
-            aria-live="polite"
-            className={cn(
-              "pointer-events-none absolute left-1/2 top-3 z-[600] -translate-x-1/2 transition-all duration-300",
-              hintVisible ? "translate-y-0 opacity-100" : "-translate-y-2 opacity-0",
-            )}
-          >
-            <div className="flex items-center gap-1.5 rounded-full bg-zinc-900/85 px-3 py-1.5 text-xs font-medium text-white shadow-lg backdrop-blur">
-              <span>Press</span>
-              <kbd className="rounded border border-white/30 px-1.5 py-px font-sans text-[11px] leading-none">
-                Esc
-              </kbd>
-              <span>to exit the demo</span>
-            </div>
+          <div className="flex items-center gap-1.5 rounded-full bg-zinc-900/85 px-3 py-1.5 text-xs font-medium text-white shadow-lg backdrop-blur">
+            <span>Press</span>
+            <kbd className="rounded border border-white/30 px-1.5 py-px font-sans text-[11px] leading-none">
+              Esc
+            </kbd>
+            <span>to exit the demo</span>
           </div>
-        </DemoWindowMockup>
-      </div>
+        </div>
+      </DemoWindowMockup>
+    </div>
+  );
+
+  return (
+    <section id={sectionId} className={cn(className, staged ? "z-50" : "z-30")}>
+      {framed ? (
+        <DemoBackdrop className={cn(!staged && "cursor-pointer")} onClickCapture={activateOnClick}>
+          {slot}
+        </DemoBackdrop>
+      ) : (
+        slot
+      )}
     </section>
   );
 }
@@ -320,6 +339,8 @@ export type DashboardDemoSectionProps = {
   integrationId?: string;
   sectionId?: string;
   className?: string;
+  /** Sits the demo in a browser window on the painted homepage backdrop. */
+  framed?: boolean;
 };
 
 /** The homepage demo. Guide and hub pages pass `integrationId` so the demo starts on their source. */
@@ -327,6 +348,7 @@ export function DashboardDemoSection({
   integrationId,
   sectionId = "demo",
   className = HOMEPAGE_DEMO_SECTION_CLASS,
+  framed = false,
 }: DashboardDemoSectionProps = {}) {
   return (
     <StateProvider>
@@ -341,7 +363,7 @@ export function DashboardDemoSection({
           integrationSidebar: null,
         }}
       >
-        <LandingDemoStage sectionId={sectionId} className={className}>
+        <LandingDemoStage sectionId={sectionId} className={className} framed={framed}>
           {/* Try For Free only targets the homepage demo. */}
           {integrationId ? null : <LandingDemoActivateListener />}
           <LiveStreamManager />

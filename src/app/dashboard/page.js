@@ -9,7 +9,7 @@ import useSWR from "swr"
 import { StateProvider } from '@/context/stateContext'
 import { StateProviderV2 } from '@/context/stateContextV2';
 
-import DashBody from './dashBody';
+import DashBody, { preloadDashboardViews } from './dashBody';
 import LiveStreamManager from './components/liveStreamManager';
 import RestLiveFeedManager from './components/restLiveFeedManager';
 import { RunYourselfLoaderGate } from './RunYourselfLoaderGate';
@@ -20,6 +20,8 @@ import { SpectrumLoadingState } from "@/components/ui/spectrum-loading-state"
 
 import { userSwrFetcher } from "@/lib/hooks"
 import { AuthenticatedJourneyInit } from "@/components/analytics/AuthenticatedJourneyInit"
+
+if (typeof window !== "undefined") preloadDashboardViews()
 
 function DashboardLoading() {
     return (

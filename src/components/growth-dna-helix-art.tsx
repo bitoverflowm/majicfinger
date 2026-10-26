@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useInView } from "framer-motion";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 import { cn } from "@/lib/utils";
 
@@ -38,12 +39,16 @@ function buildHelixRow(r: number, frame: number, width: number): Cell[] {
 
 /** DNA double helix in ASCII: phase-advances each frame to read as rotation; highlighted pairs use theme blue (`secondary` — `--primary` is neutral in this design). */
 export function GrowthDnaHelixArt() {
+  const ref = useRef<HTMLDivElement>(null);
+  const inView = useInView(ref);
   const [frame, setFrame] = useState(0);
 
+  // Off-screen ticks re-render the page every 70ms, which starves the lazy homepage demo's Suspense retry.
   useEffect(() => {
+    if (!inView) return;
     const id = window.setInterval(() => setFrame((f) => f + 1), 70);
     return () => window.clearInterval(id);
-  }, []);
+  }, [inView]);
 
   const width = 34;
   const rows = 18;
@@ -54,7 +59,7 @@ export function GrowthDnaHelixArt() {
   );
 
   return (
-    <div className="relative flex aspect-square w-full max-w-full min-w-0 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-border/60 bg-muted/25 px-4 py-6 dark:bg-muted/15">
+    <div ref={ref} className="relative flex aspect-square w-full max-w-full min-w-0 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-border/60 bg-muted/25 px-4 py-6 dark:bg-muted/15">
       <pre
         className={cn(
           "relative z-10 mx-auto w-max max-w-full overflow-hidden text-left font-mono text-[7px] leading-[1.1] sm:text-[8px] md:text-[9px]",

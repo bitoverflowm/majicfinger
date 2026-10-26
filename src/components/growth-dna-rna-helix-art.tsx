@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useInView } from "framer-motion";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 import { cn } from "@/lib/utils";
 
@@ -78,12 +79,16 @@ function buildRow(r: number, frame: number, width: number, split: number): Cell[
 }
 
 export function GrowthDnaRnaHelixArt() {
+  const ref = useRef<HTMLDivElement>(null);
+  const inView = useInView(ref);
   const [frame, setFrame] = useState(0);
 
+  // Off-screen ticks re-render the page every 70ms, which starves the lazy homepage demo's Suspense retry.
   useEffect(() => {
+    if (!inView) return;
     const id = window.setInterval(() => setFrame((f) => f + 1), 70);
     return () => window.clearInterval(id);
-  }, []);
+  }, [inView]);
 
   const width = 34;
   const rows = 18;
@@ -106,7 +111,7 @@ export function GrowthDnaRnaHelixArt() {
   );
 
   return (
-    <div className="relative mt-2 flex aspect-square w-full max-w-full min-w-0 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-border/60 bg-muted/25 px-4 py-6 dark:bg-muted/15">
+    <div ref={ref} className="relative mt-2 flex aspect-square w-full max-w-full min-w-0 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-border/60 bg-muted/25 px-4 py-6 dark:bg-muted/15">
       <pre className="relative z-10 mx-auto w-max max-w-full overflow-hidden text-left font-mono text-[7px] leading-[1.1] sm:text-[8px] md:text-[9px]">
         {grid.map((line, r) => (
           <span key={r} className="block whitespace-pre">

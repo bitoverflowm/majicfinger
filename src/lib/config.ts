@@ -3,6 +3,14 @@ import { bentoSection } from "@/lib/bento-section";
 import { growthSection } from "@/lib/growth-section";
 import { landingPageV2Config } from "@/lib/landingPageV2Config";
 import { socialProofTestimonials } from "@/lib/testimonials-scroll-data";
+import type { Venue } from "@/components/sections/venue-mark";
+import type { TermColor } from "@/components/sections/hero-description";
+
+function pricingVenue(name: string): Venue {
+  const venue = landingPageV2Config.pricingVenues.find((item: Venue) => item.name === name);
+  if (!venue) throw new Error(`Unknown pricing venue: ${name}`);
+  return venue;
+}
 
 export const siteConfig = {
   ...coreSiteConfig,
@@ -103,7 +111,48 @@ export const siteConfig = {
     title: "Analyze live and historical prediction market data.",
     subtitle: "No code. No setup.",
     description:
-      "Access all the data from your favorite prediction markets. Turn any question into a query, chart, backtest, export, or live dashboard in seconds. For traders, quants, researchers, and analysts.",
+      "Lychee is your data edge: prediction markets, market data, and real-world signals—all in one place. Query, chart, backtest, and export. Build and share custom live terminals in seconds. For traders, quants, researchers, and analysts.",
+    /** Phrases in `description` that show their data sources on hover. */
+    descriptionTerms: [
+      { text: "prediction markets", color: "green", sources: [pricingVenue("Kalshi"), pricingVenue("Polymarket")] },
+      {
+        text: "market data",
+        color: "blue",
+        sources: [
+          pricingVenue("Chainlink"),
+          pricingVenue("Binance"),
+          {
+            name: "SEC EDGAR",
+            src: "/sec.png",
+            tileClass: "bg-white p-[2px] ring-1 ring-inset ring-border",
+            badge: "Coming soon",
+            description: "Company filings, financial statements, and disclosures.",
+          },
+        ],
+      },
+      {
+        text: "real-world signals",
+        color: "fuchsia",
+        sources: [
+          { ...pricingVenue("X"), name: "X (Twitter)" },
+          {
+            name: "Real-time News",
+            icon: "news",
+            tileClass: "bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900",
+            badge: "Coming soon",
+            description: "Breaking headlines to line up against market moves.",
+          },
+          pricingVenue("Reddit"),
+          {
+            name: "Product Hunt",
+            mark: "P",
+            tileClass: "bg-[#DA552F] text-white",
+            badge: "Coming soon",
+            description: "Product launches, upvotes, and trending startups.",
+          },
+        ],
+      },
+    ] satisfies { text: string; color: TermColor; sources: Venue[] }[],
     cta: {
       primary: {
         href: "#demo",
@@ -111,7 +160,7 @@ export const siteConfig = {
       },
       secondary: {
         href: "/#pricing",
-        text: "View pricing",
+        text: "Access Now",
       },
     },
   },

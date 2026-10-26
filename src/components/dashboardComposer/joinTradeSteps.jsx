@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { AgentSteps } from "@/components/dashboardComposer/integrationRunProgress";
+import { AgentSteps } from "@/components/dashboardComposer/agentSteps";
 
 const LISTED_MARKETS = 6;
 

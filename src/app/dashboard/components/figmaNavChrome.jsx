@@ -1,11 +1,15 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import dynamic from "next/dynamic";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { BarChart3, Check, ChevronDown, ChevronRight, Database, Eye, Play, Radio, RotateCcw, RotateCw, Save, Square, Table2, Type } from "lucide-react";
-import { DashboardShareDialog } from "@/components/dashboardComposer/DashboardShareDialog";
 import { ProvenanceMapButton } from "@/components/dashboardComposer/provenanceMap";
+
+const DashboardShareDialog = dynamic(() =>
+  import("@/components/dashboardComposer/DashboardShareDialog").then((m) => m.DashboardShareDialog),
+);
 
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
@@ -628,7 +632,12 @@ function RightChromeControls({ onLogout, expanded }) {
   const router = useRouter();
   const landingDemo = !!useMyStateV2()?.landingDemo;
   const [shareOpen, setShareOpen] = useState(false);
+  const [shareMounted, setShareMounted] = useState(false);
   const [membersOnly, setMembersOnly] = useState("");
+  const openShare = () => {
+    setShareMounted(true);
+    setShareOpen(true);
+  };
   const lockedAs = (feature) => (landingDemo ? () => setMembersOnly(feature) : undefined);
 
   return (
@@ -674,13 +683,13 @@ function RightChromeControls({ onLogout, expanded }) {
       <button
         type="button"
         aria-label="Share this dashboard"
-        onClick={() => (landingDemo ? setMembersOnly("Sharing dashboards") : setShareOpen(true))}
+        onClick={() => (landingDemo ? setMembersOnly("Sharing dashboards") : openShare())}
         className="ml-1 inline-flex h-7 items-center rounded-md bg-[#0d99ff] px-3 text-[13px] font-medium text-white hover:bg-[#0b87e0]"
       >
         Share
       </button>
       </ChromeTip>
-      <DashboardShareDialog open={shareOpen} onOpenChange={setShareOpen} />
+      {shareMounted && <DashboardShareDialog open={shareOpen} onOpenChange={setShareOpen} />}
       <LandingDemoMembersOnlyPortal open={!!membersOnly} feature={membersOnly} onClose={() => setMembersOnly("")} />
     </div>
     </TooltipProvider>

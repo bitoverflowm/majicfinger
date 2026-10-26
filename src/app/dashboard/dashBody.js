@@ -1,11 +1,8 @@
 import { useEffect, useState, useCallback, useRef, useLayoutEffect } from "react";
+import dynamic from "next/dynamic";
 
 import { useMyStateV2  } from '@/context/stateContextV2'
 
-import Nav from './components/nav'
-import DataSheetWithIntegration from "@/components/dataView/dataSheetWithIntegration";
-import IntegrationsView from "@/components/integrationsView";
-import ConnectHomeShell from "@/components/connectData/ConnectHomeShell";
 import { CONNECT_WORKSPACE } from "@/lib/connectHomeWorkspace";
 
 import { Label } from "@/components/ui/label";
@@ -13,12 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button"
 import { toast } from "sonner"
 
-import AiView from "@/components/aiView";
-import ScraperView from "@/components/scraperView";
-import ComingSoon from "./components/comingSoon";
-import EasyLychee from "@/components/easyLychee";
 import { Separator } from "@/components/ui/separator";
-import { ProfilePictureUploader } from "@/components/profile/ProfilePictureUploader";
 import CheckoutWelcome, { takeCheckoutWelcome, workspaceWelcomePending } from "@/components/checkout/CheckoutWelcome";
 import { loadWorkspaceStartTabs } from "@/lib/workspaceStartTabs";
 import { membershipTierLabel } from "@/lib/membershipLabel";
@@ -37,9 +29,31 @@ import {
   userRunYourselfInteractiveUnlocked,
 } from "@/lib/runYourself/hasPaidAccess";
 import { consumeRunYourselfInteractiveSession } from "@/lib/runYourself/consumeInteractiveSession";
-import BillingView from "@/components/billing/BillingView";
-import { MembershipGate } from "./membershipGate";
 import { OPEN_BILLING_EVENT } from "@/lib/scrollToPricing";
+
+// The homepage demo renders DashBody but none of these views up front. They carry AG Grid, xlsx,
+// BlockNote, moment-timezone and the candlestick charts, so they must stay out of DashBody's chunk.
+const Nav = dynamic(() => import("./components/nav"));
+const DataSheetWithIntegration = dynamic(() => import("@/components/dataView/dataSheetWithIntegration"));
+const IntegrationsView = dynamic(() => import("@/components/integrationsView"));
+const ConnectHomeShell = dynamic(() => import("@/components/connectData/ConnectHomeShell"));
+const AiView = dynamic(() => import("@/components/aiView"));
+const ScraperView = dynamic(() => import("@/components/scraperView"));
+const ComingSoon = dynamic(() => import("./components/comingSoon"));
+const EasyLychee = dynamic(() => import("@/components/easyLychee"));
+const ProfilePictureUploader = dynamic(() =>
+  import("@/components/profile/ProfilePictureUploader").then((m) => m.ProfilePictureUploader),
+);
+const BillingView = dynamic(() => import("@/components/billing/BillingView"));
+const MembershipGate = dynamic(() => import("./membershipGate").then((m) => m.MembershipGate));
+
+/** Starts downloading the signed-in views so the dashboard never waits on them after `/api/user`. */
+export function preloadDashboardViews() {
+  void import("./components/nav");
+  void import("@/components/connectData/ConnectHomeShell");
+  void import("@/components/dataView/dataSheetWithIntegration");
+  void import("./membershipGate");
+}
 
 /** Views that show the billing screen (plans, current tier, upgrade/downgrade). */
 const BILLING_VIEWS = new Set(["manageAccount", "pricing"]);

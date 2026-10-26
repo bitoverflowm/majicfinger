@@ -1,6 +1,7 @@
 "use client";
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
+import dynamic from "next/dynamic";
 import { ArrowRight, Check, Database, X } from "lucide-react";
 import {
   Dialog,
@@ -16,7 +17,7 @@ import {
   kalshiLiveCaption,
   useKalshiHistoricalCutoffDisplay,
 } from "@/hooks/useKalshiHistoricalCutoffDisplay";
-import { IntegrationBuildWorkspace } from "@/components/dashboardComposer/integrationBuildWorkspace";
+import { SpectrumLoadingState } from "@/components/ui/spectrum-loading-state";
 import { IntegrationSamplePreview } from "@/components/dashboardComposer/integrationPreviewView";
 import {
   isLivePreviewId,
@@ -25,6 +26,29 @@ import {
 import { LandingDemoMembersOnlyPortal } from "@/components/dashboardComposer/landingDemoMembersOnly";
 import { buildIntegrationPickerRows } from "@/lib/connectIntegrationPickerRows";
 import { cn } from "@/lib/utils";
+
+const loadBuildWorkspace = () => import("@/components/dashboardComposer/integrationBuildWorkspace");
+
+// The build workspace is the largest module behind the picker; the homepage demo opens on the picker.
+const IntegrationBuildWorkspace = dynamic(
+  () => import("@/components/dashboardComposer/integrationBuildWorkspace").then((m) => m.IntegrationBuildWorkspace),
+  {
+    loading: () => (
+      <div className="flex min-h-0 flex-1 items-center justify-center">
+        <SpectrumLoadingState label="Loading" />
+      </div>
+    ),
+  },
+);
+
+function whenIdle(work) {
+  if (typeof window.requestIdleCallback === "function") {
+    const handle = window.requestIdleCallback(work, { timeout: 2000 });
+    return () => window.cancelIdleCallback(handle);
+  }
+  const timer = window.setTimeout(work, 300);
+  return () => window.clearTimeout(timer);
+}
 
 const IntegrationConnectContext = createContext(null);
 
@@ -363,6 +387,7 @@ function IntegrationConnectFlow({
 
   useEffect(() => {
     prefetchIntegrationPreviews();
+    return whenIdle(() => void loadBuildWorkspace());
   }, []);
 
   const changePhase = (next) => {

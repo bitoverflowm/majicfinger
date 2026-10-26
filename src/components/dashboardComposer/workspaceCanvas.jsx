@@ -2,6 +2,7 @@
 
 import { createContext, useCallback, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
+import dynamic from "next/dynamic";
 import { BarChart3, Copy, Database, Download, Lock, Maximize2, MoreVertical, Pencil, Play, Square, Table2, X } from "lucide-react";
 import { exitLandingDemoToSection } from "@/lib/landingDemoSession";
 import { toast } from "sonner";
@@ -42,7 +43,6 @@ import { columnKey, describeSheet } from "@/lib/visualizations/datasetDescriptor
 import { chartSpecsForSheet } from "@/lib/visualizations/sheetCharts";
 import { hasVisualTable, resolveVisualization, visualPresentationLabel } from "@/lib/visualizations/presetRegistry";
 import { isPriceHistorySheet } from "@/components/dashboardComposer/priceHistorySeries";
-import { SheetBlockChart } from "@/components/dashboardComposer/sheetBlockChart";
 import { layoutRunCharts, layoutRunSheets } from "@/components/dashboardComposer/integrationRunSheets";
 import {
   canvasGridMetrics,
@@ -98,6 +98,12 @@ import { enqueueMarketLookup, lookupSheetMarket, marketMetaComplete, marketMetaP
 import { SpectrumLoadingState } from "@/components/ui/spectrum-loading-state";
 import { RunProgressCard } from "@/components/dashboardComposer/integrationRunProgress";
 import { cn } from "@/lib/utils";
+
+// Charts pull in recharts, liveline and the spectrum chart engine; an empty canvas doesn't need them.
+const SheetBlockChart = dynamic(
+  () => import("@/components/dashboardComposer/sheetBlockChart").then((m) => m.SheetBlockChart),
+  { loading: () => <ChartSkeleton /> },
+);
 
 const SHEET_ARRIVE_CSS = `
 @keyframes lychee-sheet-arrive {

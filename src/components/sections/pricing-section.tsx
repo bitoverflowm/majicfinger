@@ -29,6 +29,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { useState, type MouseEvent } from "react";
+import { VenueMark, type Venue } from "./venue-mark";
 
 export type BillingCycle = "weekly" | "monthly" | "annual";
 
@@ -68,35 +69,6 @@ type Plan = {
 };
 
 type EnterprisePlan = { name: string; description: string; buttonText: string; href: string };
-type Venue = {
-  name: string;
-  src?: string;
-  mark?: string;
-  tileClass?: string;
-  badge?: string;
-  description?: string;
-  includes?: readonly { name: string; detail: string }[];
-  links?: readonly { label: string; href: string }[];
-};
-
-function VenueMark({ venue, className }: { venue: Venue; className?: string }) {
-  return (
-    <span
-      className={cn(
-        "flex shrink-0 items-center justify-center overflow-hidden font-bold leading-none",
-        venue.tileClass,
-        className,
-      )}
-    >
-      {venue.src ? (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img src={venue.src} alt="" className="size-full object-contain" />
-      ) : (
-        venue.mark
-      )}
-    </span>
-  );
-}
 
 function VenueTile({ venue }: { venue: Venue }) {
   const includes = venue.includes ?? [];

@@ -3,47 +3,53 @@
 import dynamic from "next/dynamic";
 
 import {
+  DEMO_BROWSER_URL,
   DEMO_CONTENT_HEIGHT_CLASS,
   HOMEPAGE_DEMO_SECTION_CLASS,
 } from "@/components/sections/dashboard-demo-layout";
+import { DemoBackdrop } from "@/components/sections/demo-backdrop";
+import { DemoLoadingCard } from "@/components/sections/demo-loading-card";
+import { DemoWindowMockup } from "@/components/sections/demo-window-mockup";
 import { cn } from "@/lib/utils";
 import type { DashboardDemoSectionProps } from "./dashboard-demo-section";
 
 /**
- * Demo bundles the full dashboard app (AG Grid, chart libs, integrations) — heavy.
- * Crawlers and first-paint visitors don’t need this JS up front; we render a
- * placeholder server-side and lazy-load the real demo only on the client.
+ * The demo runs the real dashboard, so it stays client-only behind a server-rendered placeholder.
+ * The download starts when this module evaluates rather than when hydration first renders the
+ * placeholder, which is seconds earlier on a cold load.
  */
+if (typeof window !== "undefined") void import("./dashboard-demo-section");
+
 const DashboardDemoSection = dynamic<DashboardDemoSectionProps>(
-  () =>
-    import("./dashboard-demo-section").then((m) => ({
-      default: m.DashboardDemoSection,
-    })),
-  {
-    ssr: false,
-    loading: () => <DashboardDemoSkeleton />,
-  },
+  () => import("./dashboard-demo-section").then((m) => ({ default: m.DashboardDemoSection })),
+  { ssr: false, loading: () => <DashboardDemoSkeleton /> },
+);
+
+const FramedDashboardDemoSection = dynamic<DashboardDemoSectionProps>(
+  () => import("./dashboard-demo-section").then((m) => ({ default: m.DashboardDemoSection })),
+  { ssr: false, loading: () => <DashboardDemoSkeleton framed /> },
 );
 
 export function DashboardDemoSkeleton({
   sectionId = "demo",
   className = HOMEPAGE_DEMO_SECTION_CLASS,
-}: Pick<DashboardDemoSectionProps, "sectionId" | "className">) {
+  framed = false,
+}: Pick<DashboardDemoSectionProps, "sectionId" | "className" | "framed">) {
+  const mockup = (
+    <DemoWindowMockup
+      browserUrl={framed ? DEMO_BROWSER_URL : undefined}
+      contentClassName={cn("overflow-hidden", DEMO_CONTENT_HEIGHT_CLASS)}
+    >
+      <DemoLoadingCard />
+    </DemoWindowMockup>
+  );
   return (
-    <section id={sectionId} aria-hidden className={cn(className, "z-30")}>
-      <div className="relative isolate size-full overflow-hidden rounded-2xl border border-border bg-background shadow-xl ring-1 ring-border/60">
-        <div className={cn("flex w-full animate-pulse flex-col gap-4 p-6", DEMO_CONTENT_HEIGHT_CLASS)}>
-          <div className="h-10 w-1/3 rounded-md bg-muted" />
-          <div className="grid flex-1 grid-cols-1 gap-4 md:grid-cols-[18rem_minmax(0,1fr)]">
-            <div className="rounded-lg bg-muted/70" />
-            <div className="rounded-lg bg-muted/40" />
-          </div>
-        </div>
-      </div>
+    <section id={sectionId} className={cn(className, "z-30")}>
+      {framed ? <DemoBackdrop>{mockup}</DemoBackdrop> : mockup}
     </section>
   );
 }
 
 export function DashboardDemoSectionLazy(props: DashboardDemoSectionProps) {
-  return <DashboardDemoSection {...props} />;
+  return props.framed ? <FramedDashboardDemoSection {...props} /> : <DashboardDemoSection {...props} />;
 }
