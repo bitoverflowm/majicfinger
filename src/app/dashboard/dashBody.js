@@ -578,6 +578,7 @@ const DashBody = ({ user }) => {
             active={!!contextStateV2?.landingDemoActive}
             initialIntegrationId={contextStateV2?.landingDemoIntegration}
             onSelectIntegration={() => contextStateV2?.activateLandingDemo?.()}
+            onOpenRecipe={() => contextStateV2?.activateLandingDemo?.()}
           />
         )}
       </WorkspaceComposerDockProvider>

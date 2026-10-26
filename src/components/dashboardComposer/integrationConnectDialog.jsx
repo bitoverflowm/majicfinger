@@ -24,7 +24,7 @@ import {
   prefetchIntegrationPreviews,
 } from "@/components/dashboardComposer/integrationPreviewSample";
 import { LandingDemoMembersOnlyPortal } from "@/components/dashboardComposer/landingDemoMembersOnly";
-import { RecipesSidebar } from "@/components/dashboardComposer/recipes/recipesSidebar";
+import { RecipePreviewPanel, RecipesSidebar } from "@/components/dashboardComposer/recipes/recipesSidebar";
 import { buildIntegrationPickerRows } from "@/lib/connectIntegrationPickerRows";
 import { cn } from "@/lib/utils";
 
@@ -379,6 +379,7 @@ function IntegrationConnectFlow({
   onCancel,
   onPhaseChange,
   onSelectIntegration,
+  onOpenRecipe,
   lockedIds,
   onLockedSelect,
   startIntegrationId = null,
@@ -394,6 +395,8 @@ function IntegrationConnectFlow({
   const [hoveredId, setHoveredId] = useState(null);
   const [phase, setPhase] = useState(startable ? "build" : "pick");
   const [recipeId, setRecipeId] = useState(null);
+  const [previewRecipeId, setPreviewRecipeId] = useState(null);
+  const previewTimer = useRef(0);
   const selected = selectable.find((row) => row.id === selectedId) || null;
   const hovered = rows.find((row) => row.id === hoveredId) || null;
   const shown = hovered || selected || primary[0] || null;
@@ -410,6 +413,15 @@ function IntegrationConnectFlow({
     });
   }, []);
 
+  useEffect(() => () => window.clearTimeout(previewTimer.current), []);
+
+  // A short grace period lets the pointer cross from the recipe row onto its preview panel.
+  const previewRecipe = (id) => {
+    window.clearTimeout(previewTimer.current);
+    if (id) setPreviewRecipeId(id);
+    else previewTimer.current = window.setTimeout(() => setPreviewRecipeId(null), 150);
+  };
+
   const changePhase = (next) => {
     setPhase(next);
     onPhaseChange?.(next);
@@ -425,8 +437,11 @@ function IntegrationConnectFlow({
   };
 
   const openRecipe = (id) => {
+    window.clearTimeout(previewTimer.current);
+    setPreviewRecipeId(null);
     setRecipeId(id);
     changePhase("recipe");
+    onOpenRecipe?.(id);
   };
 
   if (phase === "build" && selected) {
@@ -441,16 +456,22 @@ function IntegrationConnectFlow({
   const Recipe = phase === "recipe" ? RECIPE_VIEWS[recipeId] : null;
   if (Recipe) {
     return (
-      <>
-        <Title className="sr-only">Recipe</Title>
-        <Recipe onBack={() => changePhase("pick")} withClose={withClose} />
-      </>
+      <div className="relative isolate flex min-h-0 flex-1">
+        <RecipesSidebar activeId={recipeId} onOpen={openRecipe} className="hidden w-1/4 shrink-0 md:flex" />
+        <Recipe onBack={() => changePhase("pick")} Title={Title} Description={Description} />
+      </div>
     );
   }
 
   return (
-      <div className="flex min-h-0 flex-1">
-        <RecipesSidebar onOpen={openRecipe} className="hidden w-1/4 shrink-0 md:flex" />
+      <div className="relative isolate flex min-h-0 flex-1">
+        <RecipesSidebar
+          onOpen={openRecipe}
+          onHover={previewRecipe}
+          expanded={Boolean(previewRecipeId)}
+          className="hidden w-1/4 shrink-0 md:flex"
+        />
+        <RecipePreviewPanel recipeId={previewRecipeId} onOpen={openRecipe} onHover={previewRecipe} />
         <div className="grid min-h-0 min-w-0 flex-1 md:grid-cols-[minmax(0,1.05fr)_minmax(0,0.95fr)]">
           <div className="flex min-h-0 flex-col bg-background">
             <div className={cn("px-6 pb-3 pt-6", withClose && "pr-12")}>
@@ -569,9 +590,9 @@ export function IntegrationConnectDialog({ open, onOpenChange }) {
         overlayClassName="z-[560] bg-black/40"
         className={cn(
           "z-[560] flex max-w-none flex-col gap-0 overflow-hidden border-border/70 p-0 shadow-xl sm:rounded-2xl",
-          phase === "build" || phase === "recipe"
+          phase === "build"
             ? "h-[min(900px,94vh)] w-[min(1180px,calc(100vw-1.5rem))]"
-            : "max-h-[min(880px,92vh)] w-[min(1180px,calc(100vw-2rem))]",
+            : "h-[min(880px,92vh)] w-[min(1180px,calc(100vw-2rem))]",
         )}
       >
         {open ? (
@@ -587,7 +608,12 @@ export function IntegrationConnectDialog({ open, onOpenChange }) {
  * active it floats over the demo dashboard like the dialog does. One element in both
  * layouts so a selection made in the card carries into the modal.
  */
-export function IntegrationConnectLandingDemo({ active = false, onSelectIntegration, initialIntegrationId = null }) {
+export function IntegrationConnectLandingDemo({
+  active = false,
+  onSelectIntegration,
+  onOpenRecipe,
+  initialIntegrationId = null,
+}) {
   const connect = useIntegrationConnect();
   // Only the first open skips the picker; adding data later starts from the full list.
   const [startId, setStartId] = useState(initialIntegrationId);
@@ -603,8 +629,7 @@ export function IntegrationConnectLandingDemo({ active = false, onSelectIntegrat
 
   if (!connect?.inlineOpen) return null;
 
-  // Recipes take over the whole demo window instead of floating over the dashboard.
-  const modal = active && phase !== "recipe";
+  const modal = active;
 
   return (
     <div
@@ -623,9 +648,9 @@ export function IntegrationConnectLandingDemo({ active = false, onSelectIntegrat
                 "rounded-2xl border border-border/70 shadow-xl animate-in fade-in-0 zoom-in-95 duration-200",
                 phase === "build"
                   ? "h-[min(900px,94%)] w-[min(1180px,calc(100%-1.5rem))]"
-                  : "max-h-[min(880px,92%)] w-[min(1180px,calc(100%-2rem))]",
+                  : "h-[min(880px,92%)] w-[min(1180px,calc(100%-2rem))]",
               )
-            : cn("flex-1", phase === "recipe" && "animate-in fade-in-0 duration-300"),
+            : "flex-1",
         )}
       >
         {active ? (
@@ -644,6 +669,7 @@ export function IntegrationConnectLandingDemo({ active = false, onSelectIntegrat
           title="What is the first venue you want to research with Lychee?"
           onPhaseChange={setPhase}
           onSelectIntegration={onSelectIntegration}
+          onOpenRecipe={onOpenRecipe}
           lockedIds={LANDING_DEMO_LOCKED_INTEGRATIONS}
           onLockedSelect={(row) => setLockedFeature(row.name || "This integration")}
           startIntegrationId={startId}
