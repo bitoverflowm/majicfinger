@@ -26,6 +26,7 @@ import {
 import { collectKalshiMarketsMaterializedVirtuals } from "./composeWherePredicateSql";
 import { ATHENA_DEMO_ROW_LIMIT, ATHENA_SAMPLE_ROW_LIMIT } from "@/config/dataLakeParquetSamples";
 import { validateAndNormalizeEquation } from "./composeEquationAst";
+import { recipeLakeAccess } from "./recipeLakeAccess";
 import {
   resolveComposeGroupByAliases,
   selectRowsForAggregatedCompose,
@@ -80,7 +81,7 @@ export function validateAthenaLakeQueryBody(body, access) {
     throw new AthenaLakeRequestError("Invalid JSON body");
   }
 
-  const accessOpts = access && typeof access === "object" ? access : {};
+  const accessOpts = recipeLakeAccess(body, access && typeof access === "object" ? access : {});
   const unlimitedComposeRows = accessOpts.unlimitedComposeRows === true;
   const maxSelectRows =
     typeof accessOpts.maxSelectRows === "number" && Number.isFinite(accessOpts.maxSelectRows)

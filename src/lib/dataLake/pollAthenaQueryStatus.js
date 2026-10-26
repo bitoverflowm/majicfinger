@@ -5,12 +5,12 @@
 
 import { yieldToUi } from "@/lib/dataLake/largeAthenaPull";
 
-async function fetchPageWithRetry(url, signal) {
+async function fetchPageWithRetry(url, signal, timeoutMs = 20000) {
   let lastError = null;
   for (let attempt = 0; attempt < 4; attempt += 1) {
     if (signal?.aborted) throw new DOMException("Aborted", "AbortError");
     const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), 20000);
+    const timer = setTimeout(() => controller.abort(), timeoutMs);
     const onAbort = () => controller.abort();
     signal?.addEventListener("abort", onAbort, { once: true });
     try {
@@ -53,6 +53,7 @@ function sleep(ms, signal) {
  *   signal?: AbortSignal;
  *   pollIntervalMs?: number;
  *   maxWaitMs?: number;
+ *   pageTimeoutMs?: number;
  *   onPhase?: (info: {
  *     phase: AthenaPollPhase;
  *     rowLimit?: number | null;
@@ -66,7 +67,7 @@ function sleep(ms, signal) {
  * }} [opts]
  */
 export async function pollAthenaQueryUntilDone(queryExecutionId, rowLimit, opts = {}) {
-  const { signal, pollIntervalMs = 900, maxWaitMs = 600000, onPhase } = opts;
+  const { signal, pollIntervalMs = 900, maxWaitMs = 600000, pageTimeoutMs, onPhase } = opts;
   const qeid = String(queryExecutionId || "").trim();
   if (!qeid) throw new Error("Missing queryExecutionId");
 
@@ -156,6 +157,7 @@ export async function pollAthenaQueryUntilDone(queryExecutionId, rowLimit, opts 
     const pageRes = await fetchPageWithRetry(
       `/api/data-lake/athena-query/status?${pageQ.toString()}`,
       signal,
+      pageTimeoutMs,
     );
 
     let pageJson = {};

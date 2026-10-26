@@ -640,9 +640,15 @@ export function loadKalshiHistoricalTradesForTicker(ticker, limit = PREVIEW_ROW_
       groupByAliases: [],
       orderBy: [{ alias: "created_time", direction: "desc" }],
     },
+    ...(options.recipe ? { recipe: options.recipe } : {}),
   };
   const maxWaitMs = rowLimit > PREVIEW_ROW_CAP ? 600000 : 180000;
-  return fetchAthenaLakeSample(request, { maxWaitMs, pollIntervalMs: 800, onPhase: options.onPhase }).then((result) => ({
+  return fetchAthenaLakeSample(request, {
+    maxWaitMs,
+    pollIntervalMs: 800,
+    pageTimeoutMs: options.pageTimeoutMs,
+    onPhase: options.onPhase,
+  }).then((result) => ({
     columns,
     rows: rowsFromAthenaCells(result, rowLimit),
     request,

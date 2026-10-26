@@ -6,7 +6,6 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useIntegrationConnect } from "@/components/dashboardComposer/integrationConnectDialog";
 import { useWorkspaceCanvas } from "@/components/dashboardComposer/workspaceCanvas";
-import { getHistoricalPullRowLimit } from "@/lib/athenaEntitlement";
 import { useUser } from "@/lib/hooks";
 import { cn } from "@/lib/utils";
 import {
@@ -132,7 +131,7 @@ function MarketStatsCard({ meta }) {
   );
 }
 
-function SourceCard({ plan, limit }) {
+function SourceCard({ plan }) {
   const route = describePlan(plan);
   return (
     <section className="rounded-xl border border-border/70 bg-background p-4 shadow-sm animate-in fade-in slide-in-from-bottom-2 duration-300 [animation-delay:80ms] fill-mode-both">
@@ -154,7 +153,7 @@ function SourceCard({ plan, limit }) {
       </div>
       <p className="mt-2 text-[12px] leading-relaxed text-muted-foreground">{route.detail}</p>
       <p className="mt-2 text-[12px] leading-relaxed text-muted-foreground">
-        Both yes and no prices land on every row. Your plan pulls up to {Number(limit).toLocaleString()} rows.
+        Pulls the market&apos;s full trade history, with both yes and no prices on every row.
       </p>
     </section>
   );
@@ -182,7 +181,7 @@ function SourceLegend({ cutoffs }) {
   );
 }
 
-function MarketPane({ selected, meta, metaStatus, metaError, plan, limit, cutoffs }) {
+function MarketPane({ selected, meta, metaStatus, metaError, plan, cutoffs }) {
   return (
     <div className="flex min-h-0 flex-1 flex-col overflow-y-auto bg-[#e6edf3] px-6 pb-6 pt-12 dark:bg-[#1c232b]">
       <div className="flex items-center gap-2 text-[13px] font-semibold text-foreground">
@@ -216,7 +215,7 @@ function MarketPane({ selected, meta, metaStatus, metaError, plan, limit, cutoff
       ) : (
         <div key={meta.ticker} className="mt-4 space-y-3">
           <MarketStatsCard meta={meta} />
-          {plan ? <SourceCard plan={plan} limit={limit} /> : null}
+          {plan ? <SourceCard plan={plan} /> : null}
         </div>
       )}
     </div>
@@ -227,7 +226,6 @@ export function KalshiTradeHistoryRecipe({ onBack, Title = "h2", Description = "
   const connect = useIntegrationConnect();
   const canvas = useWorkspaceCanvas();
   const user = useUser();
-  const limit = getHistoricalPullRowLimit(user || null);
   const [query, setQuery] = useState("");
   const [results, setResults] = useState([]);
   const [searching, setSearching] = useState(false);
@@ -332,7 +330,6 @@ export function KalshiTradeHistoryRecipe({ onBack, Title = "h2", Description = "
       plan,
       canvas,
       close: () => connect?.close?.(),
-      limit,
       accountId: user?.userId || "",
     });
   };
@@ -441,7 +438,6 @@ export function KalshiTradeHistoryRecipe({ onBack, Title = "h2", Description = "
         metaStatus={metaStatus}
         metaError={metaError}
         plan={plan}
-        limit={limit}
         cutoffs={cutoffs}
       />
     </div>

@@ -4,6 +4,7 @@ import { stampRunSheets } from "@/components/dashboardComposer/integrationProven
 import { claimSheetId, displayMatrix, recordsFromRows } from "@/components/dashboardComposer/integrationRunSheets";
 import { createRunSheetStage } from "@/components/dashboardComposer/runSheetStage";
 import { lifePull } from "@/lib/markets/marketLife";
+import { RECIPE_TRADE_HISTORY, RECIPE_TRADE_ROW_LIMIT } from "@/lib/dataLake/recipeLakeAccess";
 import { chartSpecsForSheet } from "@/lib/visualizations/sheetCharts";
 import { describePlan, pullKalshiTradeHistory } from "./kalshiTradeHistorySource";
 
@@ -14,15 +15,16 @@ const PREVIEW_ROWS = 50;
  * Save and Go: closes the picker, then pulls the market's trades onto the open tab with the
  * progress card on top. The sheet and its default charts land as soon as the rows are in.
  */
-export async function runKalshiTradeHistory({ meta, plan, canvas, close, limit, accountId }) {
+export async function runKalshiTradeHistory({ meta, plan, canvas, close, accountId }) {
   const reporter = createRunReporter((feed) => canvas?.reportRun?.(feed));
   const route = describePlan(plan);
-  canvas?.armReplay?.(() => runKalshiTradeHistory({ meta, plan, canvas, close: null, limit, accountId }));
+  const limit = RECIPE_TRADE_ROW_LIMIT;
+  canvas?.armReplay?.(() => runKalshiTradeHistory({ meta, plan, canvas, close: null, accountId }));
   reporter.plan(
     [
       { id: "find", name: "find_market", status: "pending", args: { ticker: meta.ticker } },
       { id: "route", name: "route_source", status: "pending", args: { source: route.label } },
-      { id: "pull", name: "pull_trades", status: "pending", args: { ticker: meta.ticker, limit } },
+      { id: "pull", name: "pull_trades", status: "pending", args: { ticker: meta.ticker, history: "full" } },
       { id: "place", name: "place_sheets", status: "pending", args: { charts: "default" } },
     ],
     {
@@ -43,7 +45,7 @@ export async function runKalshiTradeHistory({ meta, plan, canvas, close, limit, 
   reporter.start("pull");
   let pulled;
   try {
-    pulled = await pullKalshiTradeHistory(meta, plan, { limit, onProgress: (text) => reporter.note("pull", text) });
+    pulled = await pullKalshiTradeHistory(meta, plan, { onProgress: (text) => reporter.note("pull", text) });
   } catch (err) {
     reporter.fail("pull", err instanceof Error ? err.message : "The pull did not finish.");
     return;
@@ -56,7 +58,7 @@ export async function runKalshiTradeHistory({ meta, plan, canvas, close, limit, 
   const noun = candles ? "candlesticks" : "trades";
   reporter.succeed("pull", {
     name: candles ? "pull_candlesticks" : "pull_trades",
-    result: `${pulled.rows.length.toLocaleString()} ${noun} from ${pulled.label}${pulled.truncated ? ` · stopped at your plan's ${Number(limit).toLocaleString()} rows` : ""}`,
+    result: `${pulled.rows.length.toLocaleString()} ${noun} from ${pulled.label}${pulled.truncated ? ` · stopped at ${limit.toLocaleString()} rows, the most one sheet holds` : ""}`,
   });
 
   reporter.start("place");
@@ -82,6 +84,8 @@ export async function runKalshiTradeHistory({ meta, plan, canvas, close, limit, 
         pull: {
           ticker: meta.ticker,
           table: pulled.table,
+          limit,
+          recipe: RECIPE_TRADE_HISTORY,
           marketTitle: meta.title,
           ...(meta.subtitle ? { side: meta.subtitle } : {}),
           ...(meta.eventTicker ? { eventTicker: meta.eventTicker } : {}),

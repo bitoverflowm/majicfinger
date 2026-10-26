@@ -37,10 +37,11 @@ export async function fetchAthenaLakeSample(
     filters = null,
     caseSensitive = false,
     demo = false,
+    recipe = "",
   },
   pollOpts = {},
 ) {
-  const { signal, pollIntervalMs = 900, maxWaitMs = 180000, onPhase: userOnPhase } = pollOpts;
+  const { signal, pollIntervalMs = 900, maxWaitMs = 180000, pageTimeoutMs, onPhase: userOnPhase } = pollOpts;
   const cacheBody = {
     lake,
     table,
@@ -85,6 +86,7 @@ export async function fetchAthenaLakeSample(
       filters,
       caseSensitive,
       demo: demo === true,
+      ...(recipe ? { recipe } : {}),
     }),
   });
 
@@ -115,6 +117,7 @@ export async function fetchAthenaLakeSample(
     signal,
     pollIntervalMs,
     maxWaitMs,
+    pageTimeoutMs,
     onPhase: (info) => {
       userOnPhase?.({
         ...info,

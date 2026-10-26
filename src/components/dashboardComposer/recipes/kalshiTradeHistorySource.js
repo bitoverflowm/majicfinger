@@ -12,6 +12,7 @@ import { fetchKalshiHistoricalV2TradesPull } from "@/lib/kalshiHistoricalV2/fetc
 import { clampCandlestickWindowToKalshiCap, KALSHI_CANDLESTICK_MAX_CANDLES } from "@/lib/kalshiLive/candlestickCompose";
 import { normalizeKalshiLiveMarketRow } from "@/lib/kalshiLive/normalizeMarketRow";
 import { normalizeKalshiLiveTradeRow } from "@/lib/kalshiLive/normalizeTradeRow";
+import { RECIPE_TRADE_HISTORY, RECIPE_TRADE_ROW_LIMIT } from "@/lib/dataLake/recipeLakeAccess";
 
 /** Kalshi Historical v1 is the lake: Kalshi launch through Dec 2025. */
 export const KALSHI_V1_END_MS = Date.UTC(2026, 0, 1);
@@ -52,12 +53,14 @@ function wait(ms, signal) {
   });
 }
 
-async function getJson(url, signal) {
+async function getJson(url, signal, { retries = 3, onWait } = {}) {
   for (let attempt = 0; ; attempt += 1) {
     const res = await fetch(url, { signal, credentials: "same-origin", headers: { Accept: "application/json" } });
-    if (res.status === 429 && attempt < 3) {
+    if (res.status === 429 && attempt < retries) {
       const retryAfter = Number(res.headers.get("Retry-After"));
-      await wait(Math.min(10, Number.isFinite(retryAfter) && retryAfter > 0 ? retryAfter : 2 ** attempt) * 1000, signal);
+      const seconds = Math.min(60, Number.isFinite(retryAfter) && retryAfter > 0 ? retryAfter : 2 ** Math.min(attempt, 5));
+      onWait?.(seconds);
+      await wait(seconds * 1000, signal);
       continue;
     }
     const body = await res.json().catch(() => ({}));
@@ -345,7 +348,11 @@ async function liveTrades(ticker, limit, onProgress) {
   while (rows.length < limit) {
     const params = new URLSearchParams({ ticker, limit: String(Math.min(LIVE_PAGE_SIZE, limit - rows.length)) });
     if (cursor) params.set("cursor", cursor);
-    const body = await getJson(`/api/integrations/kalshi-live/markets/trades?${params}`);
+    // The trades route allows 30 pages a minute, so a long history waits out the limit instead of failing.
+    const body = await getJson(`/api/integrations/kalshi-live/markets/trades?${params}`, undefined, {
+      retries: 20,
+      onWait: (seconds) => onProgress?.(`Read ${rows.length.toLocaleString()} trades from Kalshi Live · pausing ${seconds}s for the rate limit`),
+    });
     const page = Array.isArray(body?.trades) ? body.trades : [];
     rows.push(...page.map((trade) => normalizeKalshiLiveTradeRow(trade)));
     onProgress?.(`Read ${rows.length.toLocaleString()} trades from Kalshi Live`);
@@ -397,10 +404,11 @@ function dedupeTrades(rows) {
 
 /**
  * Every trade for one market, yes and no prices on each row, from the source the plan picked.
- * Falls through v1 → v2 trades → v2 candlesticks when a source comes back empty.
+ * Falls through v1 → v2 trades → v2 candlesticks when a source comes back empty. Recipes skip
+ * the plan's row cap and stop only at `RECIPE_TRADE_ROW_LIMIT`.
  */
-export async function pullKalshiTradeHistory(meta, plan, { limit, onProgress } = {}) {
-  const cap = Math.max(1, Math.floor(Number(limit) || 100));
+export async function pullKalshiTradeHistory(meta, plan, { onProgress } = {}) {
+  const cap = RECIPE_TRADE_ROW_LIMIT;
   const ticker = meta.ticker;
   const { columns: tradeColumns } = await loadKalshiLiveTradesForTicker(ticker, 1, { empty: true });
   const asTrades = (integrationId, pulled, label = SOURCE_LABELS[integrationId]) => ({
@@ -422,6 +430,9 @@ export async function pullKalshiTradeHistory(meta, plan, { limit, onProgress } =
 
   if (plan.kind === "v1") {
     const lake = await loadKalshiHistoricalTradesForTicker(ticker, cap, {
+      recipe: RECIPE_TRADE_HISTORY,
+      // A full history downloads 1,000 rows per page, and a slow link can take over 20s for one.
+      pageTimeoutMs: 90000,
       onPhase: (info) => onProgress?.(describeComposePhase(info, { table: "kalshi.trades", limit: cap })),
     });
     if (lake.rows.length) {

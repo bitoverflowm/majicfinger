@@ -803,13 +803,14 @@ export function WorkspaceCanvasProvider({ pageId, readOnly = false, children }) 
       if (!repullsTradeSheet(block) || !block.columns?.length) continue;
       const ticker = tradeTickerFromBlock(block);
       const limit = block.pull?.limit || cap;
-      ensureFullTradeSheet(block.id, ticker, block.columns, limit, owner).then((sheet) => {
+      const recipe = block.pull?.recipe || "";
+      ensureFullTradeSheet(block.id, ticker, block.columns, limit, owner, { recipe }).then((sheet) => {
         if (sheet?.status !== "ready") return;
         setBlocksByPage((prev) => {
           const list = prev[pageId] || [];
           const current = list.find((item) => item.id === block.id);
           if (!current) return prev;
-          const pull = { lake: "kalshi", table: "trades", ticker, limit };
+          const pull = { lake: "kalshi", table: "trades", ticker, limit, ...(recipe ? { recipe } : {}) };
           if (current.rowCount === sheet.rowCount && current.pull?.ticker === ticker && current.pull?.limit === limit) return prev;
           return {
             ...prev,

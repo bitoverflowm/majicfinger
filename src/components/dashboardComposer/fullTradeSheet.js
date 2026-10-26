@@ -208,7 +208,7 @@ export function rememberTradeSheet(blockId, ticker, columns, rows, limit, userId
   return ready;
 }
 
-export function ensureFullTradeSheet(blockId, ticker, columns, limit, userId) {
+export function ensureFullTradeSheet(blockId, ticker, columns, limit, userId, { recipe = "" } = {}) {
   const owner = userId || "";
   const current = memory.get(blockId);
   if (current?.status === "ready" && current.ticker === ticker && current.userId === owner) {
@@ -217,12 +217,12 @@ export function ensureFullTradeSheet(blockId, ticker, columns, limit, userId) {
   if (current?.status === "error" && current.userId === owner) return Promise.resolve(current);
   const flightKey = `${owner}:${blockId}`;
   if (inflight.has(flightKey)) return inflight.get(flightKey);
-  const job = pullTradeSheet(blockId, ticker, columns, limit, owner).finally(() => inflight.delete(flightKey));
+  const job = pullTradeSheet(blockId, ticker, columns, limit, owner, recipe).finally(() => inflight.delete(flightKey));
   inflight.set(flightKey, job);
   return job;
 }
 
-async function pullTradeSheet(blockId, ticker, columns, limit, userId) {
+async function pullTradeSheet(blockId, ticker, columns, limit, userId, recipe) {
   const key = `${titlesKey(columns)}:${limit}`;
   const cached = await readCached(userId, ticker, key);
   if (cached) {
@@ -251,10 +251,12 @@ async function pullTradeSheet(blockId, ticker, columns, limit, userId) {
             groupByAliases: [],
             orderBy: [{ alias: "created_time", direction: "desc" }],
           },
+          recipe,
         },
         {
           maxWaitMs: 600000,
           pollIntervalMs: 800,
+          ...(recipe ? { pageTimeoutMs: 90000 } : {}),
           onPhase: (info) => {
             if (info.phase !== "downloading_page") return;
             const loaded = info.processed || 0;
