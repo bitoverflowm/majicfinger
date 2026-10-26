@@ -597,16 +597,29 @@ export function IntegrationConnectLandingDemo({ active = false, onSelectIntegrat
             <X className="size-4" />
           </button>
         ) : null}
-        <IntegrationConnectFlow
-          inline
-          withClose={active}
-          title="What is the first venue you want to research with Lychee?"
-          onPhaseChange={setPhase}
-          onSelectIntegration={onSelectIntegration}
-          lockedIds={LANDING_DEMO_LOCKED_INTEGRATIONS}
-          onLockedSelect={(row) => setLockedFeature(row.name || "This integration")}
-          startIntegrationId={startId}
-        />
+        {/* The sidebar hides rather than unmounts when the demo activates, so the flow keeps its selection. */}
+        <div className="flex min-h-0 flex-1">
+          <aside
+            className={cn(
+              "hidden w-1/4 shrink-0 flex-col border-r border-border bg-muted/30 px-5 pt-6",
+              !active && "md:flex",
+            )}
+          >
+            <h2 className="text-sm font-semibold tracking-tight text-foreground">Recipes</h2>
+          </aside>
+          <div className="flex min-h-0 min-w-0 flex-1 flex-col">
+            <IntegrationConnectFlow
+              inline
+              withClose={active}
+              title="What is the first venue you want to research with Lychee?"
+              onPhaseChange={setPhase}
+              onSelectIntegration={onSelectIntegration}
+              lockedIds={LANDING_DEMO_LOCKED_INTEGRATIONS}
+              onLockedSelect={(row) => setLockedFeature(row.name || "This integration")}
+              startIntegrationId={startId}
+            />
+          </div>
+        </div>
       </div>
       <LandingDemoMembersOnlyPortal open={!!lockedFeature} feature={lockedFeature} onClose={closeLocked} />
     </div>
