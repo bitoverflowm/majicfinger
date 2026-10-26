@@ -5,7 +5,7 @@ import { HeroSection } from "@/components/sections/hero-section";
 import GuidesSection from "@/components/sections/guides-section";
 import { CTASection } from "@/components/sections/cta-section";
 import { FooterSection } from "@/components/sections/footer-section";
-import { BentoSection } from "@/components/sections/bento-section";
+import { FeatureShowcaseSection } from "@/components/sections/features/feature-showcase-section";
 import { QuoteSection } from "@/components/sections/quote-section";
 import { FeatureSection } from "@/components/sections/feature-section";
 import { GrowthSection } from "@/components/sections/growth-section";
@@ -93,7 +93,7 @@ export default async function Home() {
         <LandingJsonLd />
         <main className="flex flex-col items-center justify-center divide-y divide-border min-h-screen w-full theme-landing min-h-screen bg-background antialiased w-full mx-auto scroll-smooth font-sans">
           <HeroSection />
-          <BentoSection />
+          <FeatureShowcaseSection />
           <QuoteSection />
           <FeatureSection />
           <GrowthSection />

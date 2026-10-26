@@ -393,7 +393,7 @@ export function PricingSection({
                           checked={toggleCycle === "annual"}
                           onCheckedChange={(on) => setToggleCycle(on ? "annual" : "monthly")}
                           aria-label="Billed yearly"
-                          className="inline-flex h-4 w-7 shrink-0 cursor-pointer items-center rounded-full border border-transparent transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-secondary/40 data-[state=checked]:bg-secondary data-[state=unchecked]:bg-muted-foreground/30 dark:data-[state=unchecked]:bg-white/25"
+                          className="inline-flex h-4 w-7 shrink-0 cursor-pointer items-center rounded-full border border-transparent transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-secondary/40 data-[state=checked]:bg-secondary data-[state=unchecked]:bg-black/25 dark:data-[state=unchecked]:bg-white/25"
                         >
                           <SwitchPrimitives.Thumb className="pointer-events-none block size-3 rounded-full bg-white shadow transition-transform data-[state=checked]:translate-x-[13px] data-[state=unchecked]:translate-x-px" />
                         </SwitchPrimitives.Root>

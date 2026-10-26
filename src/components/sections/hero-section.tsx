@@ -59,6 +59,7 @@ export function HeroSection() {
       </div>
 
       <DashboardDemoSectionLazy framed />
+      <CompanyShowcase />
       <div className="relative z-10 mx-auto w-full max-w-[min(100%,84rem)] px-6 pt-10 sm:px-8 lg:px-10">
         {hero.badgeHref ? (
           <Link
@@ -80,7 +81,6 @@ export function HeroSection() {
         )}
       </div>
       <ResearchHighlights />
-      <CompanyShowcase />
     </section>
   );
 }
