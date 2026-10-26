@@ -21,18 +21,13 @@ export function HeroSection() {
     );
 
   const badgeClassName =
-    "border border-border bg-accent rounded-full text-sm h-8 px-3 inline-flex items-center gap-2 max-w-full text-center";
+    "border border-border bg-accent rounded-full text-sm h-8 px-3 inline-flex items-center gap-2 max-w-full text-left";
 
   return (
     <section id="hero" className="relative w-full overflow-visible">
       <LandingDemoScrollManager />
-      {/* Background only — must stay below copy (z-10) and demo (z-30). */}
-      <div
-        aria-hidden
-        className="hero-aura-gradient pointer-events-none absolute inset-x-0 top-0 z-0 mx-auto h-[46rem] w-full max-w-[min(100%,84rem)] rounded-b-2xl sm:h-[50rem] md:h-[54rem] lg:h-[58rem]"
-      />
 
-      <div className="relative z-10 mx-auto flex w-full max-w-[65rem] flex-col items-center gap-10 px-6 pb-4 pt-32 md:pb-6 md:pt-32 lg:pb-8">
+      <div className="relative z-10 mx-auto flex w-full max-w-[min(100%,84rem)] flex-col items-start gap-6 px-6 pb-10 pt-28 sm:px-8 md:pt-32 lg:px-10">
         {hero.badgeHref ? (
           <Link
             href={hero.badgeHref}
@@ -51,23 +46,19 @@ export function HeroSection() {
             {hero.badge}
           </p>
         )}
-        <div className="flex w-full max-w-[65rem] flex-col items-center justify-center gap-5 px-1 sm:px-0">
-          <div className="flex w-full flex-col items-center gap-2 text-center sm:gap-2.5">
-            <h1 className="w-full max-w-full text-balance text-[clamp(1.125rem,2.15vw+0.625rem,2.625rem)] font-medium leading-[1.1] tracking-tighter text-primary md:whitespace-nowrap">
-              {hero.title}
-            </h1>
+        <div className="flex w-full max-w-[34rem] flex-col gap-3 text-left">
+          <h1 className="text-balance text-[1.5rem] font-normal leading-[1.25] tracking-tight text-primary sm:text-[1.625rem]">
+            {hero.title}
             {hero.subtitle ? (
-              <p className="w-full max-w-full text-balance text-[clamp(1.125rem,2.15vw+0.625rem,2.625rem)] font-medium leading-[1.1] tracking-tighter text-primary md:whitespace-nowrap">
-                {hero.subtitle}
-              </p>
+              <span className="block text-muted-foreground">{hero.subtitle}</span>
             ) : null}
-          </div>
-          <p className="text-balance text-center text-base font-medium leading-relaxed tracking-tight text-muted-foreground md:text-lg">
+          </h1>
+          <p className="text-sm leading-relaxed text-muted-foreground sm:text-[0.9375rem]">
             {hero.description}
           </p>
         </div>
-        <div className="flex flex-col items-center gap-3">
-          <div className="flex flex-wrap items-center justify-center gap-2.5">
+        <div className="flex flex-col items-start gap-3">
+          <div className="flex flex-wrap items-center gap-2.5">
           <DemoScrollLink
             href={hero.cta.primary.href}
             activateLandingDemo
@@ -83,7 +74,9 @@ export function HeroSection() {
           </Link>
           </div>
         </div>
+      </div>
 
+      <div className="relative z-10 mx-auto w-full max-w-[65rem] px-6 pb-4 md:pb-6 lg:pb-8">
         <ResearchQuestionRotator />
       </div>
 
