@@ -76,9 +76,8 @@ export function HeroSection() {
         </div>
       </div>
 
-      <ResearchHighlights />
-
       <DashboardDemoSectionLazy />
+      <ResearchHighlights />
       <CompanyShowcase />
     </section>
   );
