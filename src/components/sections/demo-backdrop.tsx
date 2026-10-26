@@ -18,7 +18,7 @@ export function DemoBackdrop({ className, children, ...props }: HTMLAttributes<H
         fill
         priority
         placeholder="blur"
-        sizes="(min-width: 1344px) 1344px, 100vw"
+        sizes="(min-width: 1696px) 1664px, 100vw"
         className="pointer-events-none select-none object-cover"
       />
       {children}
