@@ -1,11 +1,11 @@
 "use client";
 
-import { useEffect, useState, type MouseEvent } from "react";
+import { useEffect, useRef, useState, type MouseEvent } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { usePathname, useRouter } from "next/navigation";
 import { Menu, X } from "lucide-react";
-import { AnimatePresence, motion, useScroll } from "framer-motion";
+import { AnimatePresence, motion, useMotionValue, useScroll } from "framer-motion";
 
 import { NavMenu } from "@/components/nav-menu";
 import { ProductsNavDropdown } from "@/components/nav/products-nav-dropdown";
@@ -61,6 +61,8 @@ const drawerMenuVariants = {
 
 export function Navbar({ productsNav }: { productsNav: ProductsNavData }) {
   const { scrollY } = useScroll();
+  const headerRef = useRef<HTMLElement>(null);
+  const navOffset = useMotionValue(0);
   const [hasScrolled, setHasScrolled] = useState(false);
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const [activeSection, setActiveSection] = useState<string | null>(null);
@@ -122,6 +124,36 @@ export function Navbar({ productsNav }: { productsNav: ProductsNavData }) {
     });
   }, [scrollY]);
 
+  // The demo's top edge pushes the bar up as it arrives, and its bottom edge lets the bar back
+  // down as it leaves, so the bar tracks the scroll in both directions.
+  useEffect(() => {
+    let frame = 0;
+    const update = () => {
+      frame = 0;
+      const header = headerRef.current;
+      const demo = document.querySelector<HTMLElement>("[data-hides-nav]");
+      if (!header || !demo) {
+        navOffset.set(0);
+        return;
+      }
+      const navBottom = header.getBoundingClientRect().bottom;
+      const { top, bottom } = demo.getBoundingClientRect();
+      const tucked = Math.min(navBottom - top, bottom);
+      navOffset.set(-Math.min(navBottom + 8, Math.max(0, tucked)));
+    };
+    const schedule = () => {
+      if (!frame) frame = requestAnimationFrame(update);
+    };
+    window.addEventListener("scroll", schedule, { passive: true });
+    window.addEventListener("resize", schedule);
+    schedule();
+    return () => {
+      window.removeEventListener("scroll", schedule);
+      window.removeEventListener("resize", schedule);
+      cancelAnimationFrame(frame);
+    };
+  }, [navOffset, pathname]);
+
   const toggleDrawer = () => setIsDrawerOpen((prev) => !prev);
   const handleOverlayClick = () => setIsDrawerOpen(false);
   const handleLogout = async () => {
@@ -147,6 +179,7 @@ export function Navbar({ productsNav }: { productsNav: ProductsNavData }) {
 
   return (
     <header
+      ref={headerRef}
       className={cn(
         "sticky z-50 mx-4 flex justify-center transition-all duration-300 md:mx-0",
         hasScrolled ? "top-6" : "top-4 mx-0",
@@ -154,6 +187,7 @@ export function Navbar({ productsNav }: { productsNav: ProductsNavData }) {
     >
       <motion.div
         className="max-w-full"
+        style={{ y: navOffset }}
         initial={{ width: INITIAL_WIDTH }}
         animate={{ width: hasScrolled ? MAX_WIDTH : INITIAL_WIDTH }}
         transition={{ duration: 0.3, ease: [0.25, 0.1, 0.25, 1] }}
