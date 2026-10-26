@@ -24,6 +24,7 @@ import {
   prefetchIntegrationPreviews,
 } from "@/components/dashboardComposer/integrationPreviewSample";
 import { LandingDemoMembersOnlyPortal } from "@/components/dashboardComposer/landingDemoMembersOnly";
+import { RecipesSidebar } from "@/components/dashboardComposer/recipes/recipesSidebar";
 import { buildIntegrationPickerRows } from "@/lib/connectIntegrationPickerRows";
 import { cn } from "@/lib/utils";
 
@@ -40,6 +41,21 @@ const IntegrationBuildWorkspace = dynamic(
     ),
   },
 );
+
+const loadTradeHistoryRecipe = () => import("@/components/dashboardComposer/recipes/kalshiTradeHistoryRecipe");
+
+const KalshiTradeHistoryRecipe = dynamic(
+  () => import("@/components/dashboardComposer/recipes/kalshiTradeHistoryRecipe").then((m) => m.KalshiTradeHistoryRecipe),
+  {
+    loading: () => (
+      <div className="flex min-h-0 flex-1 items-center justify-center">
+        <SpectrumLoadingState label="Loading" />
+      </div>
+    ),
+  },
+);
+
+const RECIPE_VIEWS = { kalshiTradeHistory: KalshiTradeHistoryRecipe };
 
 function whenIdle(work) {
   if (typeof window.requestIdleCallback === "function") {
@@ -377,6 +393,7 @@ function IntegrationConnectFlow({
   const [selectedId, setSelectedId] = useState(startable ? startIntegrationId : null);
   const [hoveredId, setHoveredId] = useState(null);
   const [phase, setPhase] = useState(startable ? "build" : "pick");
+  const [recipeId, setRecipeId] = useState(null);
   const selected = selectable.find((row) => row.id === selectedId) || null;
   const hovered = rows.find((row) => row.id === hoveredId) || null;
   const shown = hovered || selected || primary[0] || null;
@@ -387,7 +404,10 @@ function IntegrationConnectFlow({
 
   useEffect(() => {
     prefetchIntegrationPreviews();
-    return whenIdle(() => void loadBuildWorkspace());
+    return whenIdle(() => {
+      void loadBuildWorkspace();
+      void loadTradeHistoryRecipe();
+    });
   }, []);
 
   const changePhase = (next) => {
@@ -404,6 +424,11 @@ function IntegrationConnectFlow({
     onSelectIntegration?.(id);
   };
 
+  const openRecipe = (id) => {
+    setRecipeId(id);
+    changePhase("recipe");
+  };
+
   if (phase === "build" && selected) {
     return (
       <>
@@ -413,8 +438,20 @@ function IntegrationConnectFlow({
     );
   }
 
+  const Recipe = phase === "recipe" ? RECIPE_VIEWS[recipeId] : null;
+  if (Recipe) {
+    return (
+      <>
+        <Title className="sr-only">Recipe</Title>
+        <Recipe onBack={() => changePhase("pick")} withClose={withClose} />
+      </>
+    );
+  }
+
   return (
-        <div className="grid min-h-0 flex-1 md:grid-cols-[minmax(0,1.05fr)_minmax(0,0.95fr)]">
+      <div className="flex min-h-0 flex-1">
+        <RecipesSidebar onOpen={openRecipe} className="hidden w-1/4 shrink-0 md:flex" />
+        <div className="grid min-h-0 min-w-0 flex-1 md:grid-cols-[minmax(0,1.05fr)_minmax(0,0.95fr)]">
           <div className="flex min-h-0 flex-col bg-background">
             <div className={cn("px-6 pb-3 pt-6", withClose && "pr-12")}>
               <Title className="text-xl font-semibold tracking-tight text-foreground">{title}</Title>
@@ -515,6 +552,7 @@ function IntegrationConnectFlow({
             <PreviewPane row={shown} description={hovered?.description || ""} />
           ) : null}
         </div>
+      </div>
   );
 }
 
@@ -531,9 +569,9 @@ export function IntegrationConnectDialog({ open, onOpenChange }) {
         overlayClassName="z-[560] bg-black/40"
         className={cn(
           "z-[560] flex max-w-none flex-col gap-0 overflow-hidden border-border/70 p-0 shadow-xl sm:rounded-2xl",
-          phase === "build"
+          phase === "build" || phase === "recipe"
             ? "h-[min(900px,94vh)] w-[min(1180px,calc(100vw-1.5rem))]"
-            : "max-h-[min(880px,92vh)] w-[min(980px,calc(100vw-2rem))]",
+            : "max-h-[min(880px,92vh)] w-[min(1180px,calc(100vw-2rem))]",
         )}
       >
         {open ? (
@@ -565,11 +603,14 @@ export function IntegrationConnectLandingDemo({ active = false, onSelectIntegrat
 
   if (!connect?.inlineOpen) return null;
 
+  // Recipes take over the whole demo window instead of floating over the dashboard.
+  const modal = active && phase !== "recipe";
+
   return (
     <div
       className={cn(
         "absolute inset-0 z-[45] flex",
-        active
+        modal
           ? "items-center justify-center bg-black/40 p-4 animate-in fade-in-0 duration-200"
           : "flex-col bg-background",
       )}
@@ -577,14 +618,14 @@ export function IntegrationConnectLandingDemo({ active = false, onSelectIntegrat
       <div
         className={cn(
           "relative flex min-h-0 flex-col overflow-hidden bg-background",
-          active
+          modal
             ? cn(
                 "rounded-2xl border border-border/70 shadow-xl animate-in fade-in-0 zoom-in-95 duration-200",
                 phase === "build"
                   ? "h-[min(900px,94%)] w-[min(1180px,calc(100%-1.5rem))]"
-                  : "max-h-[min(880px,92%)] w-[min(980px,calc(100%-2rem))]",
+                  : "max-h-[min(880px,92%)] w-[min(1180px,calc(100%-2rem))]",
               )
-            : "flex-1",
+            : cn("flex-1", phase === "recipe" && "animate-in fade-in-0 duration-300"),
         )}
       >
         {active ? (
@@ -597,29 +638,16 @@ export function IntegrationConnectLandingDemo({ active = false, onSelectIntegrat
             <X className="size-4" />
           </button>
         ) : null}
-        {/* The sidebar hides rather than unmounts when the demo activates, so the flow keeps its selection. */}
-        <div className="flex min-h-0 flex-1">
-          <aside
-            className={cn(
-              "hidden w-1/4 shrink-0 flex-col border-r border-border bg-muted/30 px-5 pt-6",
-              !active && "md:flex",
-            )}
-          >
-            <h2 className="text-sm font-semibold tracking-tight text-foreground">Recipes</h2>
-          </aside>
-          <div className="flex min-h-0 min-w-0 flex-1 flex-col">
-            <IntegrationConnectFlow
-              inline
-              withClose={active}
-              title="What is the first venue you want to research with Lychee?"
-              onPhaseChange={setPhase}
-              onSelectIntegration={onSelectIntegration}
-              lockedIds={LANDING_DEMO_LOCKED_INTEGRATIONS}
-              onLockedSelect={(row) => setLockedFeature(row.name || "This integration")}
-              startIntegrationId={startId}
-            />
-          </div>
-        </div>
+        <IntegrationConnectFlow
+          inline
+          withClose={active}
+          title="What is the first venue you want to research with Lychee?"
+          onPhaseChange={setPhase}
+          onSelectIntegration={onSelectIntegration}
+          lockedIds={LANDING_DEMO_LOCKED_INTEGRATIONS}
+          onLockedSelect={(row) => setLockedFeature(row.name || "This integration")}
+          startIntegrationId={startId}
+        />
       </div>
       <LandingDemoMembersOnlyPortal open={!!lockedFeature} feature={lockedFeature} onClose={closeLocked} />
     </div>
