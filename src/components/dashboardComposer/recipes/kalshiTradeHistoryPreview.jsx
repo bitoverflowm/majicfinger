@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { ArrowRight, ArrowUp, Check, Download, Share2, Sparkles } from "lucide-react";
+import { ArrowUp, Check, Download, Share2, Sparkles } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const CSS = `
@@ -18,7 +18,6 @@ const CSS = `
 @keyframes rp-draw { from { clip-path: inset(0 100% 0 0) } to { clip-path: inset(0 0 0 0) } }
 @keyframes rp-ping { 0% { transform: scale(1); opacity: 0.7 } 100% { transform: scale(3.2); opacity: 0 } }
 @keyframes rp-sheen { 0% { transform: translateX(-160%) skewX(-20deg) } 55%, 100% { transform: translateX(260%) skewX(-20deg) } }
-@keyframes rp-nudge { 0%, 100% { transform: translateX(0) } 50% { transform: translateX(3px) } }
 @keyframes rp-orb { 0%, 100% { transform: scale(0.85); filter: hue-rotate(0deg) } 50% { transform: scale(1.15); filter: hue-rotate(70deg) } }
 .rp-shimmer-text {
   background-image: linear-gradient(90deg, var(--rp-dim) 0%, var(--rp-dim) 40%, var(--rp-ink) 50%, var(--rp-dim) 60%, var(--rp-dim) 100%);
@@ -516,16 +515,10 @@ export function KalshiTradeHistoryPreview() {
   return (
     <div className="flex h-full min-h-0 flex-col">
       <style dangerouslySetInnerHTML={{ __html: CSS }} />
-      <div className="flex items-end justify-between gap-6">
-        <div className="min-w-0">
-          <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Recipe</p>
-          <h3 className="mt-1 text-lg font-semibold tracking-tight text-foreground">Download Kalshi Trade History</h3>
-          <p className="mt-0.5 text-[13px] text-muted-foreground">Ask about any market. Lychee does the rest.</p>
-        </div>
-        <span className="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-[#2f6fed] px-3.5 py-1.5 text-[12px] font-medium text-white shadow-[0_6px_20px_-6px_rgba(47,111,237,0.7)]">
-          Click to start
-          <ArrowRight className="size-3.5" style={{ animation: "rp-nudge 1.2s ease-in-out infinite" }} aria-hidden />
-        </span>
+      <div className="min-w-0">
+        <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Recipe</p>
+        <h3 className="mt-1 text-lg font-semibold tracking-tight text-foreground">Download Kalshi Trade History</h3>
+        <p className="mt-0.5 text-[13px] text-muted-foreground">Ask about any market. Lychee does the rest.</p>
       </div>
       <div className="rp-stage relative mt-5 min-h-0 flex-1 overflow-hidden rounded-2xl bg-[#e6edf3] dark:bg-[#161c23]">
         <Backdrop />
