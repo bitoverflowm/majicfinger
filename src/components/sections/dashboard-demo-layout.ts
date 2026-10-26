@@ -11,4 +11,4 @@ export const EMBEDDED_DEMO_SECTION_CLASS = "relative mx-auto w-full";
 
 export const DEMO_CONTENT_HEIGHT_CLASS = "h-[min(90vh,920px)] min-h-[720px]";
 
-export const DEMO_BROWSER_URL = "lycheedata.com/dashboard";
+export const DEMO_WINDOW_TITLE = "Lychee Terminal";

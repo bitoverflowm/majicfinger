@@ -19,7 +19,7 @@ import RestLiveFeedManager from "@/app/dashboard/components/restLiveFeedManager"
 import { DemoBackdrop } from "@/components/sections/demo-backdrop";
 import { DemoWindowMockup } from "@/components/sections/demo-window-mockup";
 import {
-  DEMO_BROWSER_URL,
+  DEMO_WINDOW_TITLE,
   DEMO_CONTENT_HEIGHT_CLASS,
   HOMEPAGE_DEMO_SECTION_CLASS,
 } from "@/components/sections/dashboard-demo-layout";
@@ -290,7 +290,7 @@ function LandingDemoStage({
       <DemoWindowMockup
         id="demo-mockup"
         data-demo-mockup
-        browserUrl={framed && !staged ? DEMO_BROWSER_URL : undefined}
+        title={framed && !staged ? DEMO_WINDOW_TITLE : undefined}
         style={stageStyle(phase, clip)}
         className={cn(
           "[transform:translateZ(0)] will-change-[opacity,transform,clip-path]",

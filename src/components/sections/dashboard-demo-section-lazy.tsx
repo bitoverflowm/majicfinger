@@ -3,7 +3,7 @@
 import dynamic from "next/dynamic";
 
 import {
-  DEMO_BROWSER_URL,
+  DEMO_WINDOW_TITLE,
   DEMO_CONTENT_HEIGHT_CLASS,
   HOMEPAGE_DEMO_SECTION_CLASS,
 } from "@/components/sections/dashboard-demo-layout";
@@ -37,7 +37,7 @@ export function DashboardDemoSkeleton({
 }: Pick<DashboardDemoSectionProps, "sectionId" | "className" | "framed">) {
   const mockup = (
     <DemoWindowMockup
-      browserUrl={framed ? DEMO_BROWSER_URL : undefined}
+      title={framed ? DEMO_WINDOW_TITLE : undefined}
       contentClassName={cn("overflow-hidden", DEMO_CONTENT_HEIGHT_CLASS)}
     >
       <DemoLoadingCard />
