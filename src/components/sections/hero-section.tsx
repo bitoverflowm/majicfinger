@@ -7,8 +7,6 @@ import { DashboardDemoSectionLazy } from "./dashboard-demo-section-lazy";
 import { DemoScrollLink } from "./demo-scroll-link";
 import { HeroDescription } from "./hero-description";
 import { LandingDemoScrollManager } from "./landing-demo-scroll";
-import { ResearchHighlights } from "./research-highlights";
-
 export function HeroSection() {
   const { hero } = siteConfig;
   const badgeIcon =
@@ -60,7 +58,7 @@ export function HeroSection() {
 
       <DashboardDemoSectionLazy framed />
       <CompanyShowcase />
-      <div className="relative z-10 mx-auto w-full max-w-[min(100%,84rem)] px-6 pt-10 sm:px-8 lg:px-10">
+      <div className="relative z-10 mx-auto w-full max-w-[min(100%,84rem)] px-6 pb-12 pt-10 sm:px-8 lg:px-10">
         {hero.badgeHref ? (
           <Link
             href={hero.badgeHref}
@@ -80,7 +78,6 @@ export function HeroSection() {
           </p>
         )}
       </div>
-      <ResearchHighlights />
     </section>
   );
 }

@@ -1,5 +1,5 @@
-import { GrowthDnaHelixArt } from "@/components/growth-dna-helix-art";
-import { GrowthDnaRnaHelixArt } from "@/components/growth-dna-rna-helix-art";
+import { GrowthBacktestDemo } from "@/components/sections/features/growth-backtest-demo";
+import { GrowthTrendsDemo } from "@/components/sections/features/growth-trends-demo";
 
 export const growthSection = {
   title: "Test prediction market ideas before you trade",
@@ -8,14 +8,14 @@ export const growthSection = {
   items: [
     {
       id: 1,
-      content: <GrowthDnaHelixArt />,
+      content: <GrowthTrendsDemo />,
       title: "Spot Trends Instantly",
       description:
         "From markets to social sentiment, see patterns emerge in real time. Make informed moves before others even notice the shift.",
     },
     {
       id: 2,
-      content: <GrowthDnaRnaHelixArt />,
+      content: <GrowthBacktestDemo />,
       title: "Test Ideas Quickly",
       description:
         "Run what-if scenarios, backtest strategies, or explore historical data — all without writing a line of code. Validate your decisions fast.",

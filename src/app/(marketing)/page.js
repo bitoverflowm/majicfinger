@@ -2,7 +2,7 @@ import Script from "next/script";
 
 import { StateProvider } from "@/context/stateContext";
 import { HeroSection } from "@/components/sections/hero-section";
-import GuidesSection from "@/components/sections/guides-section";
+import { LibrarySection } from "@/components/sections/library-section";
 import { CTASection } from "@/components/sections/cta-section";
 import { FooterSection } from "@/components/sections/footer-section";
 import { FeatureShowcaseSection } from "@/components/sections/features/feature-showcase-section";
@@ -12,6 +12,8 @@ import { GrowthSection } from "@/components/sections/growth-section";
 import { PricingSection } from "@/components/sections/pricing-section";
 import { FAQSection } from "@/components/sections/faq-section";
 import { TestimonialSection } from "@/components/sections/testimonial-section";
+import { ResearchHighlights } from "@/components/sections/research-highlights";
+import { ChangelogHighlights } from "@/components/sections/changelog-highlights";
 import { getPublishedDashboardsForLanding } from "@/lib/landing/publishedDashboards";
 import { LandingJsonLd } from "@/components/seo/landing-json-ld";
 import { getAllContent } from "@/lib/content";
@@ -96,16 +98,17 @@ export default async function Home() {
           <FeatureShowcaseSection />
           <QuoteSection />
           <FeatureSection />
+          <section id="changelog" className="w-full">
+            <ChangelogHighlights />
+          </section>
           <GrowthSection />
           <TestimonialSection />
+          <section id="research" className="w-full">
+            <ResearchHighlights />
+          </section>
           <PricingSection />
           <FAQSection />
-          <GuidesSection
-            articles={articles}
-            dashboards={dashboards}
-            profilePic={profilePic}
-            combinedWithDashboards
-          />
+          <LibrarySection articles={articles} dashboards={dashboards} profilePic={profilePic} />
           <CTASection />
           <FooterSection />
         </main>

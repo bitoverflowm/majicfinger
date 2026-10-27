@@ -1,30 +1,30 @@
-import { SectionHeader } from "@/components/section-header";
-import { Feature as FeatureComponent } from "@/components/ui/feature-slideshow";
 import { siteConfig } from "@/lib/config";
+import { FeatureCardMedia } from "./feature-card-media";
 
 export function FeatureSection() {
   const { title, description, items } = siteConfig.featureSection;
 
   return (
-    <section
-      id="features"
-      className="flex flex-col items-center justify-center gap-5 w-full relative"
-    >
-      <SectionHeader>
-        <h2 className="text-3xl md:text-4xl font-medium tracking-tighter text-center text-balance">
-          {title}
-        </h2>
-        <p className="text-muted-foreground text-center text-balance font-medium">
-          {description}
-        </p>
-      </SectionHeader>
-      <div className="w-full h-full lg:h-[450px] flex items-center justify-center">
-        <FeatureComponent
-          collapseDelay={5000}
-          linePosition="bottom"
-          featureItems={items}
-          lineColor="bg-secondary"
-        />
+    <section id="features" className="relative w-full scroll-mt-28">
+      <div className="mx-auto w-full max-w-[min(100%,84rem)] px-6 py-12 sm:px-8 md:py-16 lg:px-10">
+        <div className="max-w-2xl">
+          <h2 className="text-xl font-normal tracking-tight text-primary sm:text-2xl">{title}</h2>
+          <p className="mt-1 text-muted-foreground">{description}</p>
+        </div>
+
+        <div className="mt-6 grid grid-cols-1 gap-4 md:mt-8 lg:grid-cols-3">
+          {items.map((item) => (
+            <article key={item.id} className="flex flex-col rounded-xl bg-muted p-2 sm:p-3">
+              <div className="px-3 pb-6 pt-3 text-[1.0625rem] leading-snug tracking-tight sm:px-4 sm:pt-4">
+                <h3 className="font-normal text-primary">{item.title}</h3>
+                <p className="text-muted-foreground">{item.content}</p>
+              </div>
+              <div className="mt-auto">
+                {item.liveMedia ? <FeatureCardMedia media={item.liveMedia} /> : null}
+              </div>
+            </article>
+          ))}
+        </div>
       </div>
     </section>
   );

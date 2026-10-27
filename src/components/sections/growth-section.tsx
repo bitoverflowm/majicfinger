@@ -1,54 +1,43 @@
 import Link from "next/link";
 
-import { SectionHeader } from "@/components/section-header";
 import { siteConfig } from "@/lib/config";
 
 export function GrowthSection() {
   const { title, description, items } = siteConfig.growthSection;
 
   return (
-    <section
-      id="growth"
-      className="flex flex-col items-center justify-center w-full relative px-5 md:px-10"
-    >
-      <div className="border-x mx-5 md:mx-10 relative">
-        <div className="absolute top-0 -left-4 md:-left-14 h-full w-4 md:w-14 text-primary opacity-5 bg-[size:10px_10px] [background-image:repeating-linear-gradient(315deg,currentColor_0_1px,#0000_0_50%)]" />
-        <div className="absolute top-0 -right-4 md:-right-14 h-full w-4 md:w-14 text-primary opacity-5 bg-[size:10px_10px] [background-image:repeating-linear-gradient(315deg,currentColor_0_1px,#0000_0_50%)]" />
-
-        <SectionHeader>
-          <h2 className="text-3xl md:text-4xl font-medium tracking-tighter text-center text-balance">
-            {title}
-          </h2>
-          <p className="text-muted-foreground text-center text-balance font-medium">
+    <section id="growth" className="relative w-full scroll-mt-28">
+      <div className="mx-auto w-full max-w-[min(100%,84rem)] px-6 py-12 sm:px-8 md:py-16 lg:px-10">
+        <div className="mx-auto max-w-2xl text-center">
+          <h2 className="text-balance text-2xl font-normal tracking-tight text-primary sm:text-3xl">{title}</h2>
+          <p className="mt-2 text-balance text-muted-foreground">
             {description}{" "}
             <Link
               href="/kalshi-vs-polymarket-odds"
-              className="font-medium text-foreground underline-offset-4 hover:underline"
+              className="text-primary underline-offset-4 hover:underline"
             >
               Compare Kalshi vs Polymarket live odds
             </Link>
             .
           </p>
-        </SectionHeader>
+        </div>
 
-        <div className="grid grid-cols-1 items-stretch divide-y md:grid-cols-2 md:divide-x md:divide-y-0">
+        <div className="mt-8 grid grid-cols-1 gap-4 md:mt-10 md:grid-cols-2">
           {items.map((item) => (
-            <div
-              key={item.id}
-              className="flex w-full min-w-0 flex-col items-center justify-end gap-4 p-6"
-            >
-              <div className="flex w-full flex-1 flex-col items-center justify-center">
-                {item.content}
+            <article key={item.id} className="flex flex-col rounded-xl bg-muted p-2 sm:p-3">
+              <div className="px-3 pb-6 pt-3 text-[1.0625rem] leading-snug tracking-tight sm:px-4 sm:pt-4">
+                <h3 className="font-normal text-primary">{item.title}</h3>
+                <p className="max-w-xl text-muted-foreground">{item.description}</p>
               </div>
-              <h3 className="w-full text-lg tracking-tighter font-semibold">
-                {item.title}
-              </h3>
-              <p className="w-full text-muted-foreground">{item.description}</p>
-            </div>
+              <div className="relative mt-auto h-[28rem] overflow-hidden rounded-lg bg-black/[0.04] dark:bg-white/[0.04]">
+                <div className="absolute inset-x-5 -bottom-px top-6 sm:inset-x-8 sm:top-8 [&>div>div]:rounded-b-none">
+                  {item.content}
+                </div>
+              </div>
+            </article>
           ))}
         </div>
       </div>
     </section>
   );
 }
-
