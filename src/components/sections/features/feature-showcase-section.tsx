@@ -8,19 +8,47 @@ import { cn } from "@/lib/utils";
 import automateBackdrop from "../../../../public/landing/feature-automate.jpg";
 import connectBackdrop from "../../../../public/landing/feature-connect.jpg";
 import dashboardsBackdrop from "../../../../public/landing/feature-dashboards.jpg";
+import exploreBackdrop from "../../../../public/landing/feature-explore.jpg";
 import insightsBackdrop from "../../../../public/landing/feature-insights.jpg";
 import { AutomateDemo } from "./automate-demo";
 import { ConnectDemo } from "./connect-demo";
 import { DashboardDemo } from "./dashboard-demo";
+import { DemoRecipeLink } from "./demo-recipe-link";
 import { InsightsDemo } from "./insights-demo";
+import { TradeHistoryDemo } from "./trade-history-demo";
+
+type Showcase = {
+  demo: ReactNode;
+  backdrop: StaticImageData;
+  cta: string;
+  href?: string;
+  /** Opens this recipe in the homepage demo instead of following `href`. */
+  recipeId?: string;
+};
 
 /** Demo, backdrop and link for each `siteConfig.bentoSection` item, keyed by item id. */
-const SHOWCASE: Record<string, { demo: ReactNode; backdrop: StaticImageData; href: string; cta: string }> = {
+const SHOWCASE: Record<string, Showcase> = {
   "1": { demo: <ConnectDemo />, backdrop: connectBackdrop, href: "/integrations", cta: "Explore integrations" },
   "2": { demo: <DashboardDemo />, backdrop: dashboardsBackdrop, href: "/dashboards-gallery", cta: "Browse dashboards" },
   "3": { demo: <InsightsDemo />, backdrop: insightsBackdrop, href: "/quant-analysis", cta: "See quant analysis" },
   "4": { demo: <AutomateDemo />, backdrop: automateBackdrop, href: "/kalshi-live-data", cta: "Explore live data" },
 };
+
+/** Homepage-only row, kept out of `bentoSection` so pages reusing that config are unchanged. */
+const EXPLORE_ROW: { id: string; title: string; description: string; showcase: Showcase } = {
+  id: "explore",
+  title: "From a market question to data you can explore.",
+  description:
+    "Find a market by name, ticker, or a plain-English search. Preview the results, add related data, and turn your selection into a chart or spreadsheet. See your query take shape as you build it.",
+  showcase: {
+    demo: <TradeHistoryDemo />,
+    backdrop: exploreBackdrop,
+    cta: "Explore Kalshi trade history",
+    recipeId: "kalshiTradeHistory",
+  },
+};
+
+const CTA_CLASS = "w-fit text-sm text-secondary transition-colors hover:text-primary";
 
 const KEYFRAMES = `
 @keyframes fx-rise { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
@@ -44,6 +72,12 @@ const KEYFRAMES = `
 
 export function FeatureShowcaseSection() {
   const { title, description, items } = siteConfig.bentoSection;
+  const rows = items.flatMap((item) => {
+    const showcase = SHOWCASE[item.id];
+    if (!showcase) return [];
+    const row = { id: item.id, title: item.title, description: item.description, showcase };
+    return item.id === "1" ? [row, EXPLORE_ROW] : [row];
+  });
 
   return (
     <section id="bento" className="relative w-full scroll-mt-28">
@@ -57,9 +91,8 @@ export function FeatureShowcaseSection() {
         id="features-showcase"
         className="mx-auto flex w-full max-w-[min(100%,84rem)] flex-col gap-6 px-6 py-10 sm:px-8 md:py-14 lg:gap-8 lg:px-10"
       >
-        {items.map((item, index) => {
-          const showcase = SHOWCASE[item.id];
-          if (!showcase) return null;
+        {rows.map((item, index) => {
+          const { showcase } = item;
           const flip = index % 2 === 1;
           return (
             <article key={item.id} className="grid overflow-hidden rounded-xl bg-muted lg:grid-cols-3">
@@ -73,12 +106,15 @@ export function FeatureShowcaseSection() {
                   <h3 className="font-normal text-primary">{item.title}</h3>
                   <p className="text-muted-foreground">{item.description}</p>
                 </div>
-                <Link
-                  href={showcase.href}
-                  className="w-fit text-sm text-secondary transition-colors hover:text-primary"
-                >
-                  {showcase.cta} →
-                </Link>
+                {showcase.recipeId ? (
+                  <DemoRecipeLink recipeId={showcase.recipeId} className={CTA_CLASS}>
+                    {showcase.cta} →
+                  </DemoRecipeLink>
+                ) : (
+                  <Link href={showcase.href ?? "/"} className={CTA_CLASS}>
+                    {showcase.cta} →
+                  </Link>
+                )}
               </div>
               <div className={cn("p-2 sm:p-3 lg:col-span-2", flip && "lg:order-1")}>
                 <div className="relative h-[26rem] overflow-hidden rounded-lg sm:h-[30rem] lg:h-[34rem]">

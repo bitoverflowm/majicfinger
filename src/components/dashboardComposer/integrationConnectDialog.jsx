@@ -26,6 +26,11 @@ import {
 import { LandingDemoMembersOnlyPortal } from "@/components/dashboardComposer/landingDemoMembersOnly";
 import { RecipePreviewPanel, RecipesSidebar } from "@/components/dashboardComposer/recipes/recipesSidebar";
 import { buildIntegrationPickerRows } from "@/lib/connectIntegrationPickerRows";
+import {
+  hasLandingDemoRecipeRequest,
+  subscribeLandingDemoRecipe,
+  takeLandingDemoRecipeRequest,
+} from "@/lib/landingDemoSession";
 import { retryImport } from "@/lib/retryImport";
 import { cn } from "@/lib/utils";
 
@@ -390,6 +395,7 @@ function IntegrationConnectFlow({
   lockedIds,
   onLockedSelect,
   startIntegrationId = null,
+  takeRecipeRequests = false,
 }) {
   const rows = useMemo(() => buildIntegrationPickerRows(), []);
   const primary = rowsInOrder(rows, PRIMARY_ORDER);
@@ -450,6 +456,18 @@ function IntegrationConnectFlow({
     changePhase("recipe");
     onOpenRecipe?.(id);
   };
+  const openRecipeRef = useRef(openRecipe);
+  openRecipeRef.current = openRecipe;
+
+  useEffect(() => {
+    if (!takeRecipeRequests) return undefined;
+    const take = () => {
+      const id = takeLandingDemoRecipeRequest();
+      if (id && RECIPE_VIEWS[id]) openRecipeRef.current(id);
+    };
+    take();
+    return subscribeLandingDemoRecipe(take);
+  }, [takeRecipeRequests]);
 
   if (phase === "build" && selected) {
     return (
@@ -634,6 +652,14 @@ export function IntegrationConnectLandingDemo({
     setStartId(null);
   }, [connect?.inlineOpen]);
 
+  useEffect(() => {
+    const reopen = () => {
+      if (!connect?.inlineOpen && hasLandingDemoRecipeRequest()) connect?.open();
+    };
+    reopen();
+    return subscribeLandingDemoRecipe(reopen);
+  }, [connect]);
+
   if (!connect?.inlineOpen) return null;
 
   const modal = active;
@@ -680,6 +706,7 @@ export function IntegrationConnectLandingDemo({
           lockedIds={LANDING_DEMO_LOCKED_INTEGRATIONS}
           onLockedSelect={(row) => setLockedFeature(row.name || "This integration")}
           startIntegrationId={startId}
+          takeRecipeRequests
         />
       </div>
       <LandingDemoMembersOnlyPortal open={!!lockedFeature} feature={lockedFeature} onClose={closeLocked} />

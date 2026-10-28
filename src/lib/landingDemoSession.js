@@ -55,8 +55,8 @@ export function exitLandingDemoToSection(sectionId) {
   }, 500);
 }
 
-/** Try For Free scrolls to the demo first; the demo expands once the page stops moving. */
-export function requestLandingDemoActivateAfterScroll() {
+/** Runs `callback` once a smooth scroll has stopped moving the page (or after 1.5s). */
+function whenScrollSettles(callback) {
   if (typeof window === "undefined") return;
   const started = performance.now();
   let last = window.scrollY;
@@ -67,12 +67,51 @@ export function requestLandingDemoActivateAfterScroll() {
     last = y;
     const elapsed = performance.now() - started;
     if ((elapsed > 150 && stillFrames >= 6) || elapsed > 1500) {
-      requestLandingDemoActivate();
+      callback();
       return;
     }
     window.requestAnimationFrame(tick);
   };
   window.requestAnimationFrame(tick);
+}
+
+/** Try For Free scrolls to the demo first; the demo expands once the page stops moving. */
+export function requestLandingDemoActivateAfterScroll() {
+  whenScrollSettles(requestLandingDemoActivate);
+}
+
+export const LANDING_DEMO_RECIPE_EVENT = "lychee:landing-demo-recipe";
+
+let pendingRecipeId = null;
+
+/**
+ * Asks the demo picker to open a recipe (which also expands the demo). Held until the picker
+ * takes it, since the demo may still be loading when the request is made.
+ */
+export function requestLandingDemoRecipe(recipeId) {
+  pendingRecipeId = recipeId;
+  if (typeof window === "undefined") return;
+  window.dispatchEvent(new Event(LANDING_DEMO_RECIPE_EVENT));
+}
+
+export function requestLandingDemoRecipeAfterScroll(recipeId) {
+  whenScrollSettles(() => requestLandingDemoRecipe(recipeId));
+}
+
+export function takeLandingDemoRecipeRequest() {
+  const recipeId = pendingRecipeId;
+  pendingRecipeId = null;
+  return recipeId;
+}
+
+export function hasLandingDemoRecipeRequest() {
+  return pendingRecipeId !== null;
+}
+
+export function subscribeLandingDemoRecipe(listener) {
+  if (typeof window === "undefined") return () => {};
+  window.addEventListener(LANDING_DEMO_RECIPE_EVENT, listener);
+  return () => window.removeEventListener(LANDING_DEMO_RECIPE_EVENT, listener);
 }
 
 export function isLandingDemoActivateRequested() {
