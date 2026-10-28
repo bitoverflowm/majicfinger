@@ -2,12 +2,11 @@
 
 import * as DialogPrimitive from "@radix-ui/react-dialog";
 import { Check, Gift, X } from "lucide-react";
-import Image from "next/image";
 import { usePathname } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 
 import { markNewsletterPopupDismissed, useNewsletterState } from "@/lib/newsletter/client";
-import popupArt from "../../../public/newsletter/popup-art.jpg";
+import { NewsletterPreview } from "./newsletter-preview";
 import { NEWSLETTER_SUCCESS, NewsletterField } from "./newsletter-signup";
 
 /** Visible (foreground-tab) time on the site before the popup appears. Carries across pages in a session. */
@@ -93,17 +92,7 @@ export function NewsletterPopup() {
           onOpenAutoFocus={(e) => e.preventDefault()}
           className="fixed inset-0 z-[80] m-auto grid h-fit max-h-[calc(100dvh-2rem)] w-[calc(100%-2rem)] max-w-[50rem] overflow-y-auto rounded-2xl border border-border bg-background font-sans text-foreground shadow-2xl outline-none data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:zoom-in-[0.97] data-[state=open]:duration-300 sm:grid-cols-[minmax(0,0.85fr)_minmax(0,1fr)]"
         >
-          <div className="relative h-36 overflow-hidden sm:h-auto sm:min-h-[30rem]">
-            <Image
-              src={popupArt}
-              alt=""
-              fill
-              sizes="(min-width: 640px) 360px, 100vw"
-              placeholder="blur"
-              className="object-cover object-[50%_70%]"
-              priority
-            />
-          </div>
+          <NewsletterPreview className="hidden sm:flex sm:min-h-[30rem] sm:border-r" />
 
           <div className="relative flex flex-col p-6 sm:p-8">
             <DialogPrimitive.Close
