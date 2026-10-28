@@ -13,7 +13,6 @@ import { GrowthSection } from "@/components/sections/growth-section";
 import { PricingSection } from "@/components/sections/pricing-section";
 import { FAQSection } from "@/components/sections/faq-section";
 import { TestimonialSection } from "@/components/sections/testimonial-section";
-import { ResearchHighlights } from "@/components/sections/research-highlights";
 import { ChangelogHighlights } from "@/components/sections/changelog-highlights";
 import { getPublishedDashboardsForLanding } from "@/lib/landing/publishedDashboards";
 import { LandingJsonLd } from "@/components/seo/landing-json-ld";
@@ -104,9 +103,6 @@ export default async function Home() {
           </section>
           <GrowthSection />
           <TestimonialSection />
-          <section id="research" className="w-full">
-            <ResearchHighlights />
-          </section>
           <PricingSection />
           <FAQSection />
           <LibrarySection articles={articles} dashboards={dashboards} profilePic={profilePic} />

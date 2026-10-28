@@ -1,24 +1,27 @@
-import { GrowthBacktestDemo } from "@/components/sections/features/growth-backtest-demo";
-import { GrowthTrendsDemo } from "@/components/sections/features/growth-trends-demo";
+import { HistoricalResearchDemo } from "@/components/sections/features/historical-research-demo";
+import { SaveShareDemo } from "@/components/sections/features/save-share-demo";
 
 export const growthSection = {
-  title: "Test prediction market ideas before you trade",
-  description:
-    "Compare Kalshi, Polymarket, historical prices, live feeds, and external signals to backtest hypotheses and find patterns without code.",
+  title: "Research past markets. Build on what you learn.",
   items: [
     {
       id: 1,
-      content: <GrowthTrendsDemo />,
-      title: "Spot Trends Instantly",
+      content: <HistoricalResearchDemo />,
+      title: "Investigate what happened before a market resolved.",
       description:
-        "From markets to social sentiment, see patterns emerge in real time. Make informed moves before others even notice the shift.",
+        "Explore historical Kalshi and Polymarket prices, trades, and outcomes. Compare similar markets, group activity into time intervals, and examine how prices and volume changed as resolution approached.",
+      ctas: [
+        { label: "Explore Kalshi historical data", href: "/kalshi-historical-data" },
+        { label: "Explore Polymarket historical data", href: "/polymarket-historical-data" },
+      ],
     },
     {
       id: 2,
-      content: <GrowthBacktestDemo />,
-      title: "Test Ideas Quickly",
+      content: <SaveShareDemo />,
+      title: "Save your work. Share the analysis.",
       description:
-        "Run what-if scenarios, backtest strategies, or explore historical data — all without writing a line of code. Validate your decisions fast.",
+        "Save queries, sheets, charts, and terminals so you can build on your research. Export results as CSV, Excel, or JSON, or publish interactive charts and dashboards for others to explore.",
+      ctas: [],
     },
   ],
 } as const;

@@ -5,7 +5,7 @@ import * as TooltipPrimitive from "@radix-ui/react-tooltip";
 import { Fragment, type ReactNode } from "react";
 import { VenueMark, type Venue } from "./venue-mark";
 
-export type TermColor = "green" | "blue" | "fuchsia";
+export type TermColor = "green" | "blue" | "fuchsia" | "orange";
 
 type Term = { text: string; color: TermColor; sources: readonly Venue[] };
 
@@ -13,6 +13,7 @@ const UNDERLINE_COLORS: Record<TermColor, string> = {
   green: "decoration-emerald-500",
   blue: "decoration-blue-500",
   fuchsia: "decoration-fuchsia-500",
+  orange: "decoration-orange-500",
 };
 
 function SourceRow({ source }: { source: Venue }) {

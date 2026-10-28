@@ -42,34 +42,6 @@ export const siteConfig = {
     enterprise: landingPageV2Config.enterprisePlan,
     venues: landingPageV2Config.pricingVenues,
   },
-  featureSection: {
-    title: "Everything You Need to Move Fast",
-    description:
-      "Connect data sources, explore trends visually, and export insights — all from a single workspace.",
-    items: [
-      {
-        id: 1,
-        title: "Visual Exploration",
-        content:
-          "Create charts and tables from prediction-market and on-chain data instantly — no queries required.",
-        liveMedia: "chainlinkBtc",
-      },
-      {
-        id: 2,
-        title: "Live Market Feeds",
-        content:
-          "Access Polymarket and Kalshi endpoints for real-time prices, events, and historical data — curated for speed.",
-        liveMedia: "explorationTable",
-      },
-      {
-        id: 3,
-        title: "Reference Data & Signals",
-        content:
-          "Layer in Chainlink feeds, social signals, and other contextual data to see the full picture quickly.",
-        liveMedia: "signalsTerminal",
-      },
-    ],
-  },
   growthSection,
   testimonials: socialProofTestimonials,
   testimonialSection: {
@@ -114,7 +86,7 @@ export const siteConfig = {
       "Research Kalshi and Polymarket, market data, and real-world signals. Explore trades, investigate wallets, build custom charts and live terminals—all in one workspace.",
     /** Phrases in `description` that show their data sources on hover. */
     descriptionTerms: [
-      { text: "Kalshi and Polymarket", color: "green", sources: [pricingVenue("Kalshi"), pricingVenue("Polymarket")] },
+      { text: "Kalshi and Polymarket", color: "orange", sources: [pricingVenue("Kalshi"), pricingVenue("Polymarket")] },
       {
         text: "market data",
         color: "blue",

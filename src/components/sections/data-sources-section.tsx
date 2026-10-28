@@ -220,8 +220,8 @@ export function DataSourcesSection() {
             Live and historical prediction market data, connected.
           </h2>
           <p className="mt-1 text-muted-foreground">
-            Research Kalshi and Polymarket alongside Binance prices and Chainlink feeds. Bring the data you need
-            into the same analysis, with coverage and update methods explained for each source.
+            Research Kalshi and Polymarket alongside Binance prices and Chainlink feeds. Bring market odds, trading
+            activity, and underlying crypto prices into the same workspace.
           </p>
         </div>
 

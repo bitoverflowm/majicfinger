@@ -117,12 +117,14 @@ export function LibrarySection({ articles = [], dashboards = [], profilePic = nu
 
   const rows = [
     {
-      title: "Research",
+      id: "library-research",
+      title: "Research Highlights",
       cards: research.slice(0, PER_ROW).map((item) => articleCard(item, "Research", profilePic)),
       href: "/guides",
       cta: "View all research",
     },
     {
+      id: "library-dashboards",
       title: "Dashboards",
       cards: dashboards.slice(0, PER_ROW).map((d) => dashboardCard(d, profilePic)),
       href: "/dashboards-gallery",
@@ -150,7 +152,7 @@ export function LibrarySection({ articles = [], dashboards = [], profilePic = nu
 
         <div className="mt-10 flex flex-col gap-12">
           {rows.map((row, rowIndex) => (
-            <div key={row.title}>
+            <div key={row.title} id={"id" in row ? row.id : undefined} className="scroll-mt-28">
               <h3 className="mb-4 text-lg font-normal tracking-tight text-primary">{row.title}</h3>
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
                 {row.cards.map((card, i) => (

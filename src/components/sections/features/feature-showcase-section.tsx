@@ -11,12 +11,12 @@ import connectBackdrop from "../../../../public/landing/feature-connect.jpg";
 import dashboardsBackdrop from "../../../../public/landing/feature-dashboards.jpg";
 import exploreBackdrop from "../../../../public/landing/feature-explore.jpg";
 import insightsBackdrop from "../../../../public/landing/feature-insights.jpg";
-import { AutomateDemo } from "./automate-demo";
 import { ConnectDemo } from "./connect-demo";
 import { DashboardDemo } from "./dashboard-demo";
 import { DemoRecipeLink } from "./demo-recipe-link";
-import { InsightsDemo } from "./insights-demo";
+import { LiveTerminalDemo } from "./live-terminal-demo";
 import { TradeHistoryDemo } from "./trade-history-demo";
+import { TransformDemo } from "./transform-demo";
 
 type Showcase = {
   demo: ReactNode;
@@ -27,6 +27,10 @@ type Showcase = {
   recipeId?: string;
   /** Smooth-scrolls to this section id when it is on the page. */
   sectionId?: string;
+  /** Homepage copy that replaces the shared `bentoSection` text. */
+  title?: string;
+  /** One string per paragraph. */
+  description?: string | readonly string[];
 };
 
 /** Demo, backdrop and link for each `siteConfig.bentoSection` item, keyed by item id. */
@@ -36,11 +40,31 @@ const SHOWCASE: Record<string, Showcase> = {
     backdrop: connectBackdrop,
     href: "/#data-sources",
     sectionId: "data-sources",
-    cta: "Explore integrations",
+    cta: "Explore our data sources",
   },
   "2": { demo: <DashboardDemo />, backdrop: dashboardsBackdrop, href: "/dashboards-gallery", cta: "Browse dashboards" },
-  "3": { demo: <InsightsDemo />, backdrop: insightsBackdrop, href: "/quant-analysis", cta: "See quant analysis" },
-  "4": { demo: <AutomateDemo />, backdrop: automateBackdrop, href: "/kalshi-live-data", cta: "Explore live data" },
+  "3": {
+    demo: <TransformDemo />,
+    backdrop: insightsBackdrop,
+    href: "/guides",
+    sectionId: "library-research",
+    cta: "Read up on the published research",
+    title: "Turn market data into your own analysis.",
+    description:
+      "Join markets with their trades, calculate new columns with familiar spreadsheet formulas, and group activity into useful time intervals. Compare volume, calculate average trade sizes, and summarize results—all without code.",
+  },
+  "4": {
+    demo: <LiveTerminalDemo />,
+    backdrop: automateBackdrop,
+    href: "/dashboards-gallery",
+    sectionId: "library-dashboards",
+    cta: "Explore custom live terminals",
+    title: "Follow your markets in one live research terminal.",
+    description: [
+      "Bring Kalshi and Polymarket prices, trades, and order books into your own layout. Arrange charts and tables across tabs, add supporting price feeds, and keep the markets you follow in view.",
+      "Save your terminal and return to the same research setup.",
+    ],
+  },
 };
 
 /** Homepage-only row, kept out of `bentoSection` so pages reusing that config are unchanged. */
@@ -48,7 +72,7 @@ const EXPLORE_ROW: { id: string; title: string; description: string; showcase: S
   id: "explore",
   title: "From a market question to data you can explore.",
   description:
-    "Find a market by name, ticker, or a plain-English search. Preview the results, add related data, and turn your selection into a chart or spreadsheet. See your query take shape as you build it.",
+    "Find a Kalshi or Polymarket market by name, ticker, or slug, then inspect its trades, order book, and holders, and download a CSV. Start with a ready-made recipe, then explore the data further with filters, calculations, and charts.",
   showcase: {
     demo: <TradeHistoryDemo />,
     backdrop: exploreBackdrop,
@@ -79,7 +103,7 @@ const KEYFRAMES = `
 }
 `;
 
-type ShowcaseRow = { id: string; title: string; description: string; showcase: Showcase };
+type ShowcaseRow = { id: string; title: string; description: string | readonly string[]; showcase: Showcase };
 
 /** `afterConnect` renders between the "Connect" row and the rest of the showcase. */
 export function FeatureShowcaseSection({ afterConnect }: { afterConnect?: ReactNode }) {
@@ -87,7 +111,12 @@ export function FeatureShowcaseSection({ afterConnect }: { afterConnect?: ReactN
   const rows: ShowcaseRow[] = items.flatMap((item) => {
     const showcase = SHOWCASE[item.id];
     if (!showcase) return [];
-    const row = { id: item.id, title: item.title, description: item.description, showcase };
+    const row = {
+      id: item.id,
+      title: showcase.title ?? item.title,
+      description: showcase.description ?? item.description,
+      showcase,
+    };
     return item.id === "1" ? [EXPLORE_ROW, row] : [row];
   });
   const split = afterConnect ? rows.findIndex((row) => row.id === "1") + 1 : 0;
@@ -130,7 +159,11 @@ function ShowcaseRows({ rows, offset = 0, className }: { rows: ShowcaseRow[]; of
             >
               <div className="max-w-md text-xl leading-snug tracking-tight sm:text-[1.3rem]">
                 <h3 className="font-normal text-primary">{item.title}</h3>
-                <p className="text-muted-foreground">{item.description}</p>
+                {(typeof item.description === "string" ? [item.description] : item.description).map((paragraph, i) => (
+                  <p key={i} className={cn("text-muted-foreground", i > 0 && "mt-3")}>
+                    {paragraph}
+                  </p>
+                ))}
               </div>
               {showcase.recipeId ? (
                 <DemoRecipeLink recipeId={showcase.recipeId} className={CTA_CLASS}>
