@@ -10,6 +10,7 @@ import {
 import { DemoBackdrop } from "@/components/sections/demo-backdrop";
 import { DemoLoadingCard } from "@/components/sections/demo-loading-card";
 import { DemoWindowMockup } from "@/components/sections/demo-window-mockup";
+import { retryImport } from "@/lib/retryImport";
 import { cn } from "@/lib/utils";
 import type { DashboardDemoSectionProps } from "./dashboard-demo-section";
 
@@ -18,15 +19,17 @@ import type { DashboardDemoSectionProps } from "./dashboard-demo-section";
  * The download starts when this module evaluates rather than when hydration first renders the
  * placeholder, which is seconds earlier on a cold load.
  */
-if (typeof window !== "undefined") void import("./dashboard-demo-section");
+if (typeof window !== "undefined") import("./dashboard-demo-section").catch(() => {});
 
 const DashboardDemoSection = dynamic<DashboardDemoSectionProps>(
-  () => import("./dashboard-demo-section").then((m) => ({ default: m.DashboardDemoSection })),
+  () =>
+    retryImport(() => import("./dashboard-demo-section")).then((m) => ({ default: m.DashboardDemoSection })),
   { ssr: false, loading: () => <DashboardDemoSkeleton /> },
 );
 
 const FramedDashboardDemoSection = dynamic<DashboardDemoSectionProps>(
-  () => import("./dashboard-demo-section").then((m) => ({ default: m.DashboardDemoSection })),
+  () =>
+    retryImport(() => import("./dashboard-demo-section")).then((m) => ({ default: m.DashboardDemoSection })),
   { ssr: false, loading: () => <DashboardDemoSkeleton framed /> },
 );
 

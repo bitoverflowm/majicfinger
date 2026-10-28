@@ -1,5 +1,4 @@
 import { cn } from "@/lib/utils";
-import { GuideArticleThemeToggle } from "./GuideArticleThemeToggle";
 import { GuideTakeawayCta } from "./GuideTakeawayCta";
 import { ArticleMetaBar } from "./ArticleMetaBar";
 import { RelatedContentSection } from "./RelatedContentSection";
@@ -63,9 +62,6 @@ export async function GuideLayout({
               : "max-w-[56rem] 2xl:max-w-[58rem]",
           )}
         >
-          <div className="mb-2 flex justify-end sm:mb-3">
-            <GuideArticleThemeToggle />
-          </div>
           <article id="main-article" className="relative w-full min-w-0 overflow-x-visible">
             <ArticleChartLoadProvider plan={chartLoadPlan}>
               <ArticleBodySegments

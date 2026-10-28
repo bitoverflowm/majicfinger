@@ -2,8 +2,9 @@
 
 import dynamic from "next/dynamic";
 import "@glideapps/glide-data-grid/dist/index.css";
+import { retryImport } from "@/lib/retryImport";
 
-const DashboardSheetGridInner = dynamic(() => import("./dashboardSheetGridInner"), {
+const DashboardSheetGridInner = dynamic(() => retryImport(() => import("./dashboardSheetGridInner")), {
   ssr: false,
 });
 

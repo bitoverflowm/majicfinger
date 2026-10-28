@@ -1,5 +1,6 @@
 "use client";
 
+import { ThemeSwitcher } from "@/components/theme-switcher";
 import { FlickeringGrid } from "@/components/ui/flickering-grid";
 import { useMediaQuery } from "@/hooks/use-media-query";
 import { siteConfig } from "@/lib/config";
@@ -103,18 +104,21 @@ export function FooterSection() {
             {siteConfig.name}
           </Link>
         </span>
-        <ul className="flex flex-wrap gap-x-6 gap-y-2">
-          <li>
-            <Link href="/privacy" className="hover:text-foreground hover:underline">
-              Privacy
-            </Link>
-          </li>
-          <li>
-            <Link href="/terms" className="hover:text-foreground hover:underline">
-              Terms
-            </Link>
-          </li>
-        </ul>
+        <div className="flex flex-wrap items-center gap-x-6 gap-y-3">
+          <ul className="flex flex-wrap gap-x-6 gap-y-2">
+            <li>
+              <Link href="/privacy" className="hover:text-foreground hover:underline">
+                Privacy
+              </Link>
+            </li>
+            <li>
+              <Link href="/terms" className="hover:text-foreground hover:underline">
+                Terms
+              </Link>
+            </li>
+          </ul>
+          <ThemeSwitcher />
+        </div>
       </div>
     </footer>
   );

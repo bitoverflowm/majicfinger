@@ -5,6 +5,7 @@ import { createPortal } from "react-dom";
 import dynamic from "next/dynamic";
 import { BarChart3, Copy, Database, Download, Lock, Maximize2, MoreVertical, Pencil, Play, Square, Table2, X } from "lucide-react";
 import { exitLandingDemoToSection } from "@/lib/landingDemoSession";
+import { retryImport } from "@/lib/retryImport";
 import { toast } from "sonner";
 import {
   DropdownMenu,
@@ -101,7 +102,7 @@ import { cn } from "@/lib/utils";
 
 // Charts pull in recharts, liveline and the spectrum chart engine; an empty canvas doesn't need them.
 const SheetBlockChart = dynamic(
-  () => import("@/components/dashboardComposer/sheetBlockChart").then((m) => m.SheetBlockChart),
+  () => retryImport(() => import("@/components/dashboardComposer/sheetBlockChart")).then((m) => m.SheetBlockChart),
   { loading: () => <ChartSkeleton /> },
 );
 

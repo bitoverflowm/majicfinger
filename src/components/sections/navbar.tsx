@@ -10,7 +10,6 @@ import { AnimatePresence, motion, useMotionValue, useScroll } from "framer-motio
 import { NavMenu } from "@/components/nav-menu";
 import { ProductsNavDropdown } from "@/components/nav/products-nav-dropdown";
 import { DemoScrollLink } from "@/components/sections/demo-scroll-link";
-import { ThemeToggle } from "@/components/theme-toggle";
 import { siteConfig } from "@/lib/config";
 import { getNavLinksForPathname, isAbsoluteHomeHashHref, navHrefIsInPageScrollSpy, navHrefToSectionId, normalizeMarketingPathname } from "@/lib/nav-hrefs";
 import type { ProductsNavData } from "@/lib/nav/products-nav";
@@ -255,7 +254,6 @@ export function Navbar({ productsNav }: { productsNav: ProductsNavData }) {
                   </>
                 )}
               </div>
-              <ThemeToggle />
               <button
                 className="md:hidden border border-border size-8 rounded-md cursor-pointer flex items-center justify-center"
                 onClick={toggleDrawer}

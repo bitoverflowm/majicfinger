@@ -2,8 +2,11 @@
 
 import dynamic from "next/dynamic";
 import "@glideapps/glide-data-grid/dist/index.css";
+import { retryImport } from "@/lib/retryImport";
 
-const IntegrationBuildGridInner = dynamic(() => import("./integrationBuildGridInner"), { ssr: false });
+const IntegrationBuildGridInner = dynamic(() => retryImport(() => import("./integrationBuildGridInner")), {
+  ssr: false,
+});
 
 export function IntegrationBuildGrid({
   columns,

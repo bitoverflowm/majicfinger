@@ -26,13 +26,17 @@ import {
 import { LandingDemoMembersOnlyPortal } from "@/components/dashboardComposer/landingDemoMembersOnly";
 import { RecipePreviewPanel, RecipesSidebar } from "@/components/dashboardComposer/recipes/recipesSidebar";
 import { buildIntegrationPickerRows } from "@/lib/connectIntegrationPickerRows";
+import { retryImport } from "@/lib/retryImport";
 import { cn } from "@/lib/utils";
 
 const loadBuildWorkspace = () => import("@/components/dashboardComposer/integrationBuildWorkspace");
 
 // The build workspace is the largest module behind the picker; the homepage demo opens on the picker.
 const IntegrationBuildWorkspace = dynamic(
-  () => import("@/components/dashboardComposer/integrationBuildWorkspace").then((m) => m.IntegrationBuildWorkspace),
+  () =>
+    retryImport(() => import("@/components/dashboardComposer/integrationBuildWorkspace")).then(
+      (m) => m.IntegrationBuildWorkspace,
+    ),
   {
     loading: () => (
       <div className="flex min-h-0 flex-1 items-center justify-center">
@@ -45,7 +49,10 @@ const IntegrationBuildWorkspace = dynamic(
 const loadTradeHistoryRecipe = () => import("@/components/dashboardComposer/recipes/kalshiTradeHistoryRecipe");
 
 const KalshiTradeHistoryRecipe = dynamic(
-  () => import("@/components/dashboardComposer/recipes/kalshiTradeHistoryRecipe").then((m) => m.KalshiTradeHistoryRecipe),
+  () =>
+    retryImport(() => import("@/components/dashboardComposer/recipes/kalshiTradeHistoryRecipe")).then(
+      (m) => m.KalshiTradeHistoryRecipe,
+    ),
   {
     loading: () => (
       <div className="flex min-h-0 flex-1 items-center justify-center">
@@ -408,8 +415,8 @@ function IntegrationConnectFlow({
   useEffect(() => {
     prefetchIntegrationPreviews();
     return whenIdle(() => {
-      void loadBuildWorkspace();
-      void loadTradeHistoryRecipe();
+      loadBuildWorkspace().catch(() => {});
+      loadTradeHistoryRecipe().catch(() => {});
     });
   }, []);
 
