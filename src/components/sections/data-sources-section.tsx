@@ -6,7 +6,7 @@ import { DemoScrollLink } from "./demo-scroll-link";
 import { EconomicReportsDemo, HyperliquidDemo, PollsDemo, SatelliteDemo } from "./data-sources/data-demos";
 import { BinanceFeedDemo, ChainlinkFeedDemo } from "./data-sources/feed-demos";
 import { KalshiDataDemo } from "./data-sources/kalshi-data-demo";
-import { MysteryBoxDemo } from "./data-sources/mystery-box-demo";
+import { RequestSourceDemo } from "./data-sources/request-source-demo";
 import { PolymarketDataDemo } from "./data-sources/polymarket-data-demo";
 import { NewsDemo, ProductHuntDemo, RedditDemo, XDemo } from "./data-sources/signal-demos";
 import { VenueVoteDemo } from "./data-sources/venue-vote-demo";
@@ -179,11 +179,11 @@ const ROWS: readonly SourceRow[] = [
         demo: <EconomicReportsDemo />,
       },
       {
-        id: "mystery",
-        title: "Mystery box",
+        id: "request",
+        title: "Request a data source",
         description:
           "Have a dataset in mind? Vote on the ideas we're weighing or suggest your own. The integrations with the most votes get built first.",
-        demo: <MysteryBoxDemo />,
+        demo: <RequestSourceDemo />,
       },
     ],
   },

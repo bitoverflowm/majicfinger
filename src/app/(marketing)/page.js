@@ -96,8 +96,7 @@ export default async function Home() {
         <LandingJsonLd />
         <main className="flex flex-col items-center justify-center divide-y divide-border min-h-screen w-full theme-landing min-h-screen bg-background antialiased w-full mx-auto scroll-smooth font-sans">
           <HeroSection />
-          <FeatureShowcaseSection />
-          <DataSourcesSection />
+          <FeatureShowcaseSection afterConnect={<DataSourcesSection />} />
           <QuoteSection />
           <FeatureSection />
           <section id="changelog" className="w-full">

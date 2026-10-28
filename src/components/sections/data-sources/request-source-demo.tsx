@@ -16,13 +16,13 @@ const IDEAS = [
 
 const SHUFFLE = [...IDEAS.map((idea) => idea.name), "Your idea?"];
 
-export function MysteryBoxDemo() {
+export function RequestSourceDemo() {
   const { ref, running } = useDemoVisibility();
   const tick = useTick(1100, running);
   const label = SHUFFLE[tick % SHUFFLE.length];
 
   return (
-    <DataCardFrame title="Mystery box" frameRef={ref} compact>
+    <DataCardFrame title="Data requests" frameRef={ref} compact>
       <div className="flex shrink-0 items-center gap-3 border-b border-border px-3.5 py-2.5">
         <span className="relative flex size-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-[#a855f7] to-[#2f6fed] text-white shadow-sm">
           <Gift className="size-5" />
