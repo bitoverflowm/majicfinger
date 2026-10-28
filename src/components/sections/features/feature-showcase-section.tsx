@@ -5,6 +5,7 @@ import type { ReactNode } from "react";
 import { SectionHeader } from "@/components/section-header";
 import { siteConfig } from "@/lib/config";
 import { cn } from "@/lib/utils";
+import { SectionScrollLink } from "../section-scroll-link";
 import automateBackdrop from "../../../../public/landing/feature-automate.jpg";
 import connectBackdrop from "../../../../public/landing/feature-connect.jpg";
 import dashboardsBackdrop from "../../../../public/landing/feature-dashboards.jpg";
@@ -24,11 +25,19 @@ type Showcase = {
   href?: string;
   /** Opens this recipe in the homepage demo instead of following `href`. */
   recipeId?: string;
+  /** Smooth-scrolls to this section id when it is on the page. */
+  sectionId?: string;
 };
 
 /** Demo, backdrop and link for each `siteConfig.bentoSection` item, keyed by item id. */
 const SHOWCASE: Record<string, Showcase> = {
-  "1": { demo: <ConnectDemo />, backdrop: connectBackdrop, href: "/integrations", cta: "Explore integrations" },
+  "1": {
+    demo: <ConnectDemo />,
+    backdrop: connectBackdrop,
+    href: "/#data-sources",
+    sectionId: "data-sources",
+    cta: "Explore integrations",
+  },
   "2": { demo: <DashboardDemo />, backdrop: dashboardsBackdrop, href: "/dashboards-gallery", cta: "Browse dashboards" },
   "3": { demo: <InsightsDemo />, backdrop: insightsBackdrop, href: "/quant-analysis", cta: "See quant analysis" },
   "4": { demo: <AutomateDemo />, backdrop: automateBackdrop, href: "/kalshi-live-data", cta: "Explore live data" },
@@ -110,6 +119,14 @@ export function FeatureShowcaseSection() {
                   <DemoRecipeLink recipeId={showcase.recipeId} className={CTA_CLASS}>
                     {showcase.cta} →
                   </DemoRecipeLink>
+                ) : showcase.sectionId ? (
+                  <SectionScrollLink
+                    href={showcase.href ?? "/"}
+                    sectionId={showcase.sectionId}
+                    className={CTA_CLASS}
+                  >
+                    {showcase.cta} →
+                  </SectionScrollLink>
                 ) : (
                   <Link href={showcase.href ?? "/"} className={CTA_CLASS}>
                     {showcase.cta} →

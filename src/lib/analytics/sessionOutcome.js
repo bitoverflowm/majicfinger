@@ -65,6 +65,7 @@ export function hasNoteworthyVisitorActivity(events = []) {
       "content_leave",
       "fork_click",
       "hero_cta_click",
+      "venue_vote",
       "idle_leave",
     ].includes(event?.type),
   );

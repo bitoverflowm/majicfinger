@@ -6,6 +6,7 @@ import { LibrarySection } from "@/components/sections/library-section";
 import { CTASection } from "@/components/sections/cta-section";
 import { FooterSection } from "@/components/sections/footer-section";
 import { FeatureShowcaseSection } from "@/components/sections/features/feature-showcase-section";
+import { DataSourcesSection } from "@/components/sections/data-sources-section";
 import { QuoteSection } from "@/components/sections/quote-section";
 import { FeatureSection } from "@/components/sections/feature-section";
 import { GrowthSection } from "@/components/sections/growth-section";
@@ -96,6 +97,7 @@ export default async function Home() {
         <main className="flex flex-col items-center justify-center divide-y divide-border min-h-screen w-full theme-landing min-h-screen bg-background antialiased w-full mx-auto scroll-smooth font-sans">
           <HeroSection />
           <FeatureShowcaseSection />
+          <DataSourcesSection />
           <QuoteSection />
           <FeatureSection />
           <section id="changelog" className="w-full">

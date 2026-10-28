@@ -96,6 +96,10 @@ export function formatJourneyStep(event, index) {
       return `${index}. Hero CTA "${meta.buttonText || event.label || "button"}" → ${
         meta.destination || meta.href || ""
       } (${meta.eventLabel || "unlabeled"})`;
+    case "venue_vote":
+      return `${index}. ${
+        meta.suggested ? "Suggested integration" : meta.voted === false ? "Removed vote for" : "Voted to integrate"
+      }: ${meta.name || event.label || "unknown"}`;
     case "signup":
       return `${index}. Signed up (${meta.method || "unknown"}) — ${meta.email || "email unknown"}`;
     case "identity_linked":
@@ -214,6 +218,7 @@ export function inferSessionOutcome(events, exit = {}) {
   if (types.includes("signup")) return "Signed up";
   if (types.includes("hero_cta_click")) return "Clicked hero CTA";
   if (types.includes("fork_click")) return "Clicked Run for yourself";
+  if (types.includes("venue_vote")) return "Voted on integrations";
   if (events.some((e) => e.type === "page_click" && hasHighIntentPageClickMeta(e))) {
     return "Clicked high-intent CTA";
   }
