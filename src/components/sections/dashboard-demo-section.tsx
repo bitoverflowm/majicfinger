@@ -10,6 +10,7 @@ import {
   isLandingDemoActivateRequested,
   subscribeLandingDemoActivate,
   subscribeLandingDemoExit,
+  takeLandingDemoReturnPosition,
 } from "@/lib/landingDemoSession";
 import { cn } from "@/lib/utils";
 
@@ -200,7 +201,11 @@ function LandingDemoStage({
   }, [active, setPhase]);
 
   useSettledFrame(phase === "entering", () => setPhase("full"));
-  useDoubleFrame(phase === "returning", () => setPhase("inline"));
+  useDoubleFrame(phase === "returning", () => {
+    setPhase("inline");
+    const returnY = takeLandingDemoReturnPosition();
+    if (returnY != null) window.scrollTo({ top: returnY, behavior: "instant" });
+  });
 
   useEffect(() => {
     if (phase !== "exiting") return;

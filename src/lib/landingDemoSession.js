@@ -40,6 +40,7 @@ function findPageSection(sectionId) {
  * Pages without that section (guides) go to the homepage's copy instead.
  */
 export function exitLandingDemoToSection(sectionId) {
+  returnScrollY = null;
   requestLandingDemoExit();
   if (typeof window === "undefined") return;
   window.setTimeout(() => {
@@ -75,8 +76,23 @@ function whenScrollSettles(callback) {
   window.requestAnimationFrame(tick);
 }
 
+let returnScrollY = null;
+
+/** Remembers where the visitor was before a link scrolled them up to the demo. */
+function rememberReturnPosition() {
+  if (typeof window !== "undefined") returnScrollY = window.scrollY;
+}
+
+/** Where to put the page back once the demo closes, if a link brought the visitor to it. */
+export function takeLandingDemoReturnPosition() {
+  const y = returnScrollY;
+  returnScrollY = null;
+  return y;
+}
+
 /** Try For Free scrolls to the demo first; the demo expands once the page stops moving. */
 export function requestLandingDemoActivateAfterScroll() {
+  rememberReturnPosition();
   whenScrollSettles(requestLandingDemoActivate);
 }
 
@@ -95,6 +111,7 @@ export function requestLandingDemoRecipe(recipeId) {
 }
 
 export function requestLandingDemoRecipeAfterScroll(recipeId) {
+  rememberReturnPosition();
   whenScrollSettles(() => requestLandingDemoRecipe(recipeId));
 }
 

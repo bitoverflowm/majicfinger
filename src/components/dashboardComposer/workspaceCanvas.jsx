@@ -2692,7 +2692,7 @@ function DemoPaywall({ top, locked }) {
     <div className="pointer-events-none absolute inset-x-0 bottom-0 z-40 px-6" style={{ top }}>
       <div className="sticky top-24 mx-auto mt-16 w-full max-w-[420px]">
         <div
-          role="dialog"
+          role="region"
           aria-labelledby="demo-paywall-title"
           className="pointer-events-auto rounded-xl border border-border/70 bg-background p-6 text-center shadow-lg"
         >
