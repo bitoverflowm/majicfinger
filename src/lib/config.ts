@@ -160,7 +160,7 @@ export const siteConfig = {
       },
       secondary: {
         href: "/#pricing",
-        text: "Access Now",
+        text: "View Plans",
       },
     },
   },
