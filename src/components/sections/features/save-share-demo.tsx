@@ -61,10 +61,10 @@ export function SaveShareDemo() {
   const [views, setViews] = useState(126);
 
   useEffect(() => {
-    if (phase !== 2 || reduced) return;
+    if (phase !== 2 || reduced || !inView) return;
     const id = window.setInterval(() => setViews((v) => v + 1 + Math.floor(Math.random() * 3)), 900);
     return () => window.clearInterval(id);
-  }, [phase, reduced]);
+  }, [phase, reduced, inView]);
 
   const pick = (next: number) => {
     setManual(true);

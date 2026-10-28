@@ -8,7 +8,7 @@ type BentoSectionProps = {
   eyebrow?: string;
   title?: string;
   description?: string;
-  items?: readonly BentoItem[];
+  items: readonly BentoItem[];
   compact?: boolean;
 };
 
@@ -19,11 +19,10 @@ export function BentoSection({
   description,
   items,
   compact = false,
-}: BentoSectionProps = {}) {
+}: BentoSectionProps) {
   const defaults = siteConfig.bentoSection;
   const resolvedTitle = title ?? defaults.title;
   const resolvedDescription = description ?? defaults.description;
-  const resolvedItems = items ?? defaults.items;
 
   return (
     <section
@@ -54,7 +53,7 @@ export function BentoSection({
         </SectionHeader>
 
         <div className="grid grid-cols-1 md:grid-cols-2 overflow-hidden">
-          {resolvedItems.map((item) => (
+          {items.map((item) => (
             <div
               key={item.id}
               className={cn(

@@ -23,7 +23,7 @@ const QUESTION_POOL = [
 ];
 
 const VENUES = [
-  { name: "Kalshi", logo: "/kalshi.png", tile: "bg-[#28CC95]" },
+  { name: "Kalshi", logo: "/landing/logos/kalshi.png", tile: "bg-[#28CC95]" },
   { name: "Polymarket", logo: "/polymarket.png", tile: "bg-[#2E5CFF]" },
 ] as const;
 

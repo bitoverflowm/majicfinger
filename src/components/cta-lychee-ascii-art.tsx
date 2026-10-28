@@ -33,23 +33,46 @@ type CtaLycheeAsciiArtProps = {
 };
 
 export function CtaLycheeAsciiArt({ className }: CtaLycheeAsciiArtProps) {
+  const rootRef = useRef<HTMLDivElement>(null);
   const pathRef = useRef<SVGPathElement>(null);
 
   useEffect(() => {
+    const root = rootRef.current;
     const path = pathRef.current;
-    if (!path) return;
+    if (!root || !path) return;
+    path.setAttribute("d", buildPath(0));
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+
     let raf = 0;
+    let inView = false;
     const loop = (time: number) => {
       path.setAttribute("d", buildPath(time * 0.00055));
       raf = requestAnimationFrame(loop);
     };
-    path.setAttribute("d", buildPath(0));
-    raf = requestAnimationFrame(loop);
-    return () => cancelAnimationFrame(raf);
+    const sync = () => {
+      const shouldRun = inView && !document.hidden;
+      if (shouldRun && !raf) raf = requestAnimationFrame(loop);
+      if (!shouldRun && raf) {
+        cancelAnimationFrame(raf);
+        raf = 0;
+      }
+    };
+    const observer = new IntersectionObserver(([entry]) => {
+      inView = entry.isIntersecting;
+      sync();
+    });
+    observer.observe(root);
+    document.addEventListener("visibilitychange", sync);
+    return () => {
+      observer.disconnect();
+      document.removeEventListener("visibilitychange", sync);
+      cancelAnimationFrame(raf);
+    };
   }, []);
 
   return (
     <div
+      ref={rootRef}
       aria-hidden
       className={cn(
         "pointer-events-none flex w-full select-none items-center justify-center overflow-hidden text-secondary",

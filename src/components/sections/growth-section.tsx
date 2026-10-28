@@ -1,6 +1,14 @@
 import Link from "next/link";
+import type { ReactNode } from "react";
 
 import { siteConfig } from "@/lib/config";
+import { HistoricalResearchDemo } from "./features/historical-research-demo";
+import { SaveShareDemo } from "./features/save-share-demo";
+
+const DEMOS: Record<number, ReactNode> = {
+  1: <HistoricalResearchDemo />,
+  2: <SaveShareDemo />,
+};
 
 const LINK_CLASS = "w-fit text-sm text-secondary transition-colors hover:text-primary";
 
@@ -35,7 +43,7 @@ export function GrowthSection() {
               </div>
               <div className="relative mt-auto h-[28rem] overflow-hidden rounded-lg bg-black/[0.04] dark:bg-white/[0.04]">
                 <div className="absolute inset-x-5 -bottom-px top-6 sm:inset-x-8 sm:top-8 [&>div>div]:rounded-b-none">
-                  {item.content}
+                  {DEMOS[item.id]}
                 </div>
               </div>
             </article>

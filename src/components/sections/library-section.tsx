@@ -151,12 +151,12 @@ export function LibrarySection({ articles = [], dashboards = [], profilePic = nu
         </div>
 
         <div className="mt-10 flex flex-col gap-12">
-          {rows.map((row, rowIndex) => (
+          {rows.map((row) => (
             <div key={row.title} id={"id" in row ? row.id : undefined} className="scroll-mt-28">
               <h3 className="mb-4 text-lg font-normal tracking-tight text-primary">{row.title}</h3>
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
-                {row.cards.map((card, i) => (
-                  <LibraryCard key={card.key} card={card} priority={rowIndex === 0 && i < 2} />
+                {row.cards.map((card) => (
+                  <LibraryCard key={card.key} card={card} />
                 ))}
               </div>
               <Link
@@ -173,7 +173,7 @@ export function LibrarySection({ articles = [], dashboards = [], profilePic = nu
   );
 }
 
-function LibraryCard({ card, priority }: { card: Card; priority: boolean }) {
+function LibraryCard({ card }: { card: Card }) {
   return (
     <Link
       href={card.href}
@@ -187,7 +187,6 @@ function LibraryCard({ card, priority }: { card: Card; priority: boolean }) {
             alt={card.title}
             fill
             sizes="(min-width: 1024px) 25vw, (min-width: 640px) 50vw, 100vw"
-            priority={priority}
             className="object-cover transition-transform duration-500 ease-landing-smooth group-hover:scale-[1.02]"
           />
         ) : (

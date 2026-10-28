@@ -24,7 +24,7 @@ const SOURCES: readonly Source[] = [
     id: "kalshi",
     name: "Kalshi",
     detail: "Markets, trades, order books",
-    logo: "/kalshi.png",
+    logo: "/landing/logos/kalshi.png",
     tile: "bg-[#28CC95]",
     column: "kalshi_yes",
     color: "#28CC95",
@@ -79,7 +79,7 @@ const SOURCES: readonly Source[] = [
     id: "x",
     name: "X",
     detail: "Social mentions",
-    logo: "/x.png",
+    logo: "/landing/logos/x.png",
     tile: "bg-black",
     column: "x_mentions",
     color: "#64748b",
@@ -148,6 +148,8 @@ export function ConnectDemo() {
       timers.current = [];
     };
   }, [inView, manual, reduced]);
+
+  useEffect(() => () => timers.current.forEach(window.clearTimeout), []);
 
   const toggle = (id: string) => {
     if (!manual) {

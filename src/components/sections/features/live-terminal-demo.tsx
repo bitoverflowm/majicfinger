@@ -145,7 +145,7 @@ export function LiveTerminalDemo() {
               <Plus className="size-3.5" />
             </span>
             <span className="ml-auto hidden items-center gap-1.5 text-[10px] text-muted-foreground sm:flex">
-              <span className="size-1.5 animate-pulse rounded-full bg-[#10b981]" />
+              <span className="size-1.5 rounded-full bg-[#10b981] motion-safe:animate-pulse" />
               Live
             </span>
             <button

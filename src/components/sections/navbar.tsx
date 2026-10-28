@@ -93,7 +93,9 @@ export function Navbar({ productsNav }: { productsNav: ProductsNavData }) {
   };
 
   useEffect(() => {
-    const handleScroll = () => {
+    let frame = 0;
+    const updateActiveSection = () => {
+      frame = 0;
       const sections = getNavLinksForPathname(pathname)
         .filter((item) => navHrefIsInPageScrollSpy(item.href, pathname))
         .map((item) => navHrefToSectionId(item.href))
@@ -111,10 +113,16 @@ export function Navbar({ productsNav }: { productsNav: ProductsNavData }) {
       }
       setActiveSection(next);
     };
+    const handleScroll = () => {
+      if (!frame) frame = requestAnimationFrame(updateActiveSection);
+    };
 
-    window.addEventListener("scroll", handleScroll);
-    handleScroll();
-    return () => window.removeEventListener("scroll", handleScroll);
+    window.addEventListener("scroll", handleScroll, { passive: true });
+    updateActiveSection();
+    return () => {
+      window.removeEventListener("scroll", handleScroll);
+      cancelAnimationFrame(frame);
+    };
   }, [pathname]);
 
   useEffect(() => {

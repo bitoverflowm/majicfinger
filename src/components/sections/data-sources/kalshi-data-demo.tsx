@@ -117,7 +117,7 @@ export function KalshiDataDemo() {
       <div className="flex items-center justify-between gap-3 border-b border-border px-3.5 py-2.5">
         <div className="flex min-w-0 items-center gap-2.5">
           <span className="flex size-7 shrink-0 items-center justify-center rounded-md bg-[#28CC95] p-1">
-            <img src="/kalshi.png" alt="" className="size-full rounded-sm object-contain" />
+            <img src="/landing/logos/kalshi.png" alt="" className="size-full rounded-sm object-contain" />
           </span>
           <div className="min-w-0">
             <p className="truncate text-xs font-medium text-primary">Fed cuts rates in December?</p>
@@ -145,7 +145,7 @@ export function KalshiDataDemo() {
           </Chip>
         ))}
         <span className="ml-auto inline-flex items-center gap-1 pr-1 text-[10px] font-medium text-[#0f9f6e]">
-          <span className="size-1.5 animate-pulse rounded-full bg-[#10b981]" />
+          <span className="size-1.5 rounded-full bg-[#10b981] motion-safe:animate-pulse" />
           Live
         </span>
       </div>

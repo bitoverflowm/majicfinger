@@ -93,7 +93,7 @@ const KEYFRAMES = `
 @keyframes fx-slide-in { from { opacity: 0; transform: translateY(-8px); } to { opacity: 1; transform: none; } }
 @keyframes fx-flash { from { box-shadow: 0 0 0 0 rgba(47,111,237,.45); border-color: #2f6fed; } to { box-shadow: 0 0 0 7px rgba(47,111,237,0); } }
 @keyframes fx-shimmer { from { background-position: 200% 0; } to { background-position: -200% 0; } }
-.fx-skeleton { background: linear-gradient(90deg, var(--muted) 25%, var(--border) 50%, var(--muted) 75%); background-size: 200% 100%; animation: fx-shimmer 1.2s linear infinite; }
+.fx-skeleton { background: linear-gradient(90deg, var(--muted) 25%, var(--border) 50%, var(--muted) 75%); background-size: 200% 100%; animation: fx-shimmer 1.2s linear 1; }
 .fx-shimmer-text { background: linear-gradient(90deg, var(--muted-foreground) 0%, var(--primary) 50%, var(--muted-foreground) 100%); background-size: 200% 100%; -webkit-background-clip: text; background-clip: text; color: transparent; animation: fx-shimmer 1.8s linear infinite; }
 .fx-morph { transition: d .6s cubic-bezier(.165,.84,.44,1); }
 .fx-bar { transition: y .6s cubic-bezier(.165,.84,.44,1), height .6s cubic-bezier(.165,.84,.44,1); }

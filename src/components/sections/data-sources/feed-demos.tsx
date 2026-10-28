@@ -11,7 +11,7 @@ import { formatNumber, seriesPath, seriesPoint, useDemoVisibility, useInterval }
 const CHART_W = 320;
 
 function LiveDot({ color }: { color: string }) {
-  return <span className="size-1.5 shrink-0 animate-pulse rounded-full" style={{ backgroundColor: color }} />;
+  return <span className="size-1.5 shrink-0 rounded-full motion-safe:animate-pulse" style={{ backgroundColor: color }} />;
 }
 
 function EndDot({ x, y, w, h, color }: { x: number; y: number; w: number; h: number; color: string }) {

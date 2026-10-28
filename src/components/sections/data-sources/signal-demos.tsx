@@ -170,7 +170,7 @@ function SignalCard({
   return (
     <div
       className={cn(
-        "ds-row-in absolute top-0 w-[72%] max-w-[15rem] rounded-lg border border-border bg-background/95 p-2 text-[10.5px] leading-snug shadow-[0_8px_24px_-12px_rgba(15,23,42,0.45)] backdrop-blur",
+        "ds-row-in absolute top-0 w-[72%] max-w-[15rem] rounded-lg border border-border bg-background p-2 text-[10.5px] leading-snug shadow-[0_8px_24px_-12px_rgba(15,23,42,0.45)]",
         markerOnRight ? "left-0" : "right-0",
       )}
     >
@@ -239,7 +239,7 @@ export function XDemo() {
         <>
           <div className="flex items-center gap-1.5">
             <span className="flex size-4 items-center justify-center rounded-full bg-black p-[3px]">
-              <img src="/x.png" alt="" className="size-full object-contain invert" />
+              <img src="/landing/logos/x.png" alt="" className="size-full object-contain invert" />
             </span>
             <span className="font-medium text-primary">{e.handle}</span>
             <span className="text-muted-foreground">· {e.time}</span>
@@ -369,7 +369,7 @@ export function ProductHuntDemo() {
       </div>
       <div className="flex items-center justify-between gap-2 px-3.5 py-2.5 text-[10px]">
         <span className="flex min-w-0 items-center gap-1.5 text-muted-foreground">
-          <img src="/productHunt.png" alt="" className="size-3.5 shrink-0 rounded-sm object-contain" />
+          <img src="/landing/logos/product-hunt.png" alt="" className="size-3.5 shrink-0 rounded-sm object-contain" />
           <span className="truncate">Fieldwork AI is #1 Product of the Day?</span>
         </span>
         <span className="shrink-0 font-mono tabular-nums text-primary">Yes {odds}¢</span>

@@ -46,7 +46,7 @@ export function FeatureSignalsTerminal({ className }: FeatureSignalsTerminalProp
     <div ref={ref} className={cn("flex h-full min-h-0 w-full flex-col", className)}>
       <div className="flex items-center gap-2 border-b border-border px-3 py-2 text-[10.5px]">
         <span className="flex size-4 items-center justify-center overflow-hidden rounded bg-black p-0.5">
-          <img src="/x.png" alt="X" className="size-full object-contain" />
+          <img src="/landing/logos/x.png" alt="X" className="size-full object-contain" />
         </span>
         <span className="font-medium text-primary">Signals from X</span>
         <span

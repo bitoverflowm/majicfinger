@@ -58,7 +58,7 @@ export function SatelliteDemo() {
             strokeDashoffset={1 - progress}
             className="transition-[stroke-dashoffset] duration-200 ease-linear"
           />
-          <circle cx={storm.x} cy={storm.y} r="13" fill="#f59e0b" fillOpacity="0.15" className="animate-pulse" />
+          <circle cx={storm.x} cy={storm.y} r="13" fill="#f59e0b" fillOpacity="0.15" className="motion-safe:animate-pulse" />
           <circle cx={storm.x} cy={storm.y} r="5" fill="#f59e0b" />
         </svg>
 
@@ -69,7 +69,7 @@ export function SatelliteDemo() {
           </p>
         </div>
 
-        <div className="absolute bottom-2.5 left-3 right-3 flex items-center justify-between gap-2 rounded-lg bg-white/10 px-2.5 py-1.5 text-[10.5px] text-white backdrop-blur">
+        <div className="absolute bottom-2.5 left-3 right-3 flex items-center justify-between gap-2 rounded-lg bg-[#1e293b]/90 px-2.5 py-1.5 text-[10.5px] text-white ring-1 ring-white/10">
           <span className="min-w-0 truncate">Hurricane makes landfall in Florida?</span>
           <span className="shrink-0 font-mono tabular-nums">Yes {odds}¢</span>
         </div>

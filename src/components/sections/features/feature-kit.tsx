@@ -21,9 +21,10 @@ export function mulberry32(seed: number) {
   };
 }
 
-/** True while the element is on screen, so demos only animate when someone can see them. */
+/** True while the element is on screen in a visible tab, so demos only animate when someone can see them. */
 export function useInView(ref: RefObject<Element | null>, threshold = 0.3) {
   const [inView, setInView] = useState(false);
+  const pageVisible = usePageVisible();
   useEffect(() => {
     const el = ref.current;
     if (!el) return;
@@ -31,7 +32,18 @@ export function useInView(ref: RefObject<Element | null>, threshold = 0.3) {
     observer.observe(el);
     return () => observer.disconnect();
   }, [ref, threshold]);
-  return inView;
+  return inView && pageVisible;
+}
+
+export function usePageVisible() {
+  const [visible, setVisible] = useState(true);
+  useEffect(() => {
+    const onChange = () => setVisible(!document.hidden);
+    onChange();
+    document.addEventListener("visibilitychange", onChange);
+    return () => document.removeEventListener("visibilitychange", onChange);
+  }, []);
+  return visible;
 }
 
 export function useReducedMotion() {
