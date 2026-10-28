@@ -194,10 +194,9 @@ export function TraderNicknameSearch({
           )}
         />
         {suggestLoading ? (
-          <Loader2
-            className="absolute right-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 animate-spin text-muted-foreground"
-            aria-hidden
-          />
+          <span className="absolute right-2.5 top-1/2 -translate-y-1/2" aria-hidden>
+            <Loader2 className="h-3.5 w-3.5 animate-spin text-muted-foreground" />
+          </span>
         ) : null}
       </div>
 

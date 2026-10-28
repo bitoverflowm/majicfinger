@@ -368,7 +368,9 @@ export function KalshiTradeHistoryRecipe({ onBack, Title = "h2", Description = "
               className="h-11 w-full rounded-xl border border-border bg-background pl-9 pr-9 text-sm text-foreground outline-none placeholder:text-muted-foreground focus:border-neutral-400 focus:ring-2 focus:ring-black/5 dark:focus:border-neutral-500 dark:focus:ring-white/10"
             />
             {searching ? (
-              <Loader2 className="absolute right-3 top-1/2 size-4 -translate-y-1/2 animate-spin text-muted-foreground" aria-hidden />
+              <span className="absolute right-3 top-1/2 -translate-y-1/2" aria-hidden>
+                <Loader2 className="size-4 animate-spin text-muted-foreground" />
+              </span>
             ) : null}
           </div>
         </div>
