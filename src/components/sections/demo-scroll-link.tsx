@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { requestLandingDemoActivateAfterScroll } from "@/lib/landingDemoSession";
-import { scrollToDemoSection } from "@/lib/scrollToDemo";
+import { resolveDemoMockupEl, resolveDemoSectionEl, scrollToDemoSection } from "@/lib/scrollToDemo";
 import type { ComponentProps } from "react";
 
 type DemoScrollLinkProps = ComponentProps<typeof Link> & {
@@ -21,9 +21,10 @@ export function DemoScrollLink({
       href={href}
       {...props}
       onClick={(e) => {
-        if (activateLandingDemo) requestLandingDemoActivateAfterScroll();
         onClick?.(e);
         if (e.defaultPrevented) return;
+        if (!resolveDemoSectionEl() && !resolveDemoMockupEl()) return;
+        if (activateLandingDemo) requestLandingDemoActivateAfterScroll();
         e.preventDefault();
         scrollToDemoSection();
       }}

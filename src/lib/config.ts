@@ -133,7 +133,7 @@ export const siteConfig = {
     },
   },
   ctaSection: {
-    title: "Go from raw markets to charts in seconds—no code, no CSVs.",
+    title: "Try Lychee now.",
     guideTitle:
       "Go from raw markets to charts and dashboards in seconds—no code, no CSVs.",
     subtext: "Free to explore here · Polymarket, Kalshi, Chainlink & more",

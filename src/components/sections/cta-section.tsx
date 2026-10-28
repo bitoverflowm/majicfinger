@@ -3,8 +3,10 @@ import Link from "next/link";
 import { CtaLycheeAsciiArt } from "@/components/cta-lychee-ascii-art";
 import { siteConfig } from "@/lib/config";
 
+import { DemoScrollLink } from "./demo-scroll-link";
+
 export function CTASection() {
-  const { ctaSection } = siteConfig;
+  const { ctaSection, hero } = siteConfig;
 
   return (
     <section
@@ -27,22 +29,26 @@ export function CTASection() {
               <CtaLycheeAsciiArt className="w-full" />
             </div>
 
-            <div className="flex shrink-0 flex-col items-center gap-2">
-              <Link
-                href={ctaSection.button.href}
-                className="flex h-10 w-fit items-center justify-center rounded-full bg-primary px-6 text-sm font-semibold text-primary-foreground shadow-md transition-opacity hover:opacity-95"
-              >
-                {ctaSection.button.text}
-              </Link>
+            <div className="flex shrink-0 flex-col items-center gap-3">
+              <div className="flex flex-wrap items-center justify-center gap-3">
+                <DemoScrollLink
+                  href={`/${hero.cta.primary.href}`}
+                  activateLandingDemo
+                  className="flex h-12 items-center justify-center rounded-full border border-white/[0.12] bg-secondary px-6 text-base font-normal text-primary-foreground shadow-[inset_0_1px_2px_rgba(255,255,255,0.25),0_3px_3px_-1.5px_rgba(16,24,40,0.06),0_1px_1px_rgba(16,24,40,0.08)] transition-all ease-out hover:bg-secondary/80 active:scale-95 dark:text-secondary-foreground"
+                >
+                  {hero.cta.primary.text}
+                </DemoScrollLink>
+                <Link
+                  href={hero.cta.secondary.href}
+                  className="flex h-12 items-center justify-center gap-1.5 rounded-full border border-border bg-muted px-6 text-base font-normal text-primary transition-all ease-out hover:bg-muted/70 active:scale-95"
+                >
+                  {hero.cta.secondary.text}
+                  <span aria-hidden>→</span>
+                </Link>
+              </div>
               <span className="max-w-md text-center text-sm text-muted-foreground dark:text-white/90">
                 {ctaSection.subtext}
               </span>
-              <Link
-                href="/kalshi-vs-polymarket-odds"
-                className="text-sm font-medium text-foreground underline-offset-4 hover:underline dark:text-white"
-              >
-                Compare Kalshi vs Polymarket odds
-              </Link>
             </div>
           </div>
         </div>
