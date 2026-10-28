@@ -1,5 +1,6 @@
 "use client";
 
+import { NewsletterFooterSignup } from "@/components/newsletter/newsletter-signup";
 import { ThemeSwitcher } from "@/components/theme-switcher";
 import { FlickeringGrid } from "@/components/ui/flickering-grid";
 import { useMediaQuery } from "@/hooks/use-media-query";
@@ -27,6 +28,7 @@ export function FooterSection() {
           <p className="tracking-tight text-muted-foreground font-medium text-sm leading-relaxed">
             {siteConfig.hero.description}
           </p>
+          <NewsletterFooterSignup className="mt-3" />
         </div>
         <div className="pt-0 md:pt-0 md:flex-1 md:max-w-2xl">
           <div className="flex flex-col items-start justify-start md:flex-row md:items-start md:justify-between gap-y-8 lg:pl-6 flex-wrap">

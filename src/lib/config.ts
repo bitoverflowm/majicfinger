@@ -133,7 +133,7 @@ export const siteConfig = {
     },
   },
   ctaSection: {
-    title: "Try Lychee now.",
+    title: "Get started with Lychee.",
     guideTitle:
       "Go from raw markets to charts and dashboards in seconds—no code, no CSVs.",
     subtext: "Free to explore here · Polymarket, Kalshi, Chainlink & more",

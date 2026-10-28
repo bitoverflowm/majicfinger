@@ -1,6 +1,7 @@
 import GuidesSection from "@/components/sections/guides-section";
 import { CTASection } from "@/components/sections/cta-section";
 import { FooterSection } from "@/components/sections/footer-section";
+import { NewsletterInline } from "@/components/newsletter/newsletter-signup";
 import { getAllContent } from "@/lib/content";
 import { canonicalUrl } from "@/lib/site";
 import type { ContentItem } from "@/lib/content/types";
@@ -30,6 +31,7 @@ export default function GuidesIndexPage() {
   return (
     <main className="flex min-h-screen w-full flex-col items-center justify-center divide-y divide-border bg-background font-sans antialiased theme-landing scroll-smooth">
       <GuidesSection articles={articles} />
+      <NewsletterInline band />
       <CTASection />
       <FooterSection />
     </main>

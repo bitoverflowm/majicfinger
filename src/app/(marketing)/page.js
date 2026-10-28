@@ -14,6 +14,7 @@ import { PricingSection } from "@/components/sections/pricing-section";
 import { FAQSection } from "@/components/sections/faq-section";
 import { TestimonialSection } from "@/components/sections/testimonial-section";
 import { ChangelogHighlights } from "@/components/sections/changelog-highlights";
+import { NewsletterInline } from "@/components/newsletter/newsletter-signup";
 import { getPublishedDashboardsForLanding } from "@/lib/landing/publishedDashboards";
 import { LandingJsonLd } from "@/components/seo/landing-json-ld";
 import { getAllContent } from "@/lib/content";
@@ -101,6 +102,7 @@ export default async function Home() {
           <section id="changelog" className="w-full">
             <ChangelogHighlights />
           </section>
+          <NewsletterInline band />
           <GrowthSection />
           <TestimonialSection />
           <PricingSection />

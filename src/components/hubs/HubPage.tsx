@@ -1,4 +1,5 @@
-import { Suspense } from "react";
+import { Fragment, Suspense } from "react";
+import { NewsletterInline } from "@/components/newsletter/newsletter-signup";
 import { FooterSection } from "@/components/sections/footer-section";
 import { HubAssetSection } from "@/components/hubs/HubAssetSection";
 import { HubAssetSectionSkeleton } from "@/components/hubs/HubAssetSectionSkeleton";
@@ -26,27 +27,23 @@ function isHubAssetSection(section: HubSection): section is HubAssetSectionType 
 }
 
 function HubPageSections({ config, slug }: HubPageProps) {
+  const newsletterAfter = Math.max(0, Math.floor(config.sections.length / 2) - 1);
   return (
     <>
       {config.sections.map((section, index) => {
-        if (isHubAssetSection(section)) {
-          return (
-            <Suspense
-              key={`${section.type}-${index}`}
-              fallback={<HubAssetSectionSkeleton section={section} />}
-            >
-              <HubAssetSection slug={slug} section={section} index={index} />
-            </Suspense>
-          );
-        }
+        const rendered = isHubAssetSection(section) ? (
+          <Suspense fallback={<HubAssetSectionSkeleton section={section} />}>
+            <HubAssetSection slug={slug} section={section} index={index} />
+          </Suspense>
+        ) : (
+          <HubSectionRenderer section={section} assets={EMPTY_HUB_ASSETS} index={index} />
+        );
 
         return (
-          <HubSectionRenderer
-            key={`${section.type}-${index}`}
-            section={section}
-            assets={EMPTY_HUB_ASSETS}
-            index={index}
-          />
+          <Fragment key={`${section.type}-${index}`}>
+            {rendered}
+            {index === newsletterAfter ? <NewsletterInline band /> : null}
+          </Fragment>
         );
       })}
     </>

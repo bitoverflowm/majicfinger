@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { CTASection } from "@/components/sections/cta-section";
 import { FooterSection } from "@/components/sections/footer-section";
+import { NewsletterInline } from "@/components/newsletter/newsletter-signup";
 import { TweetCard } from "@/components/content/TweetCard";
 import { CHANGELOG_ENTRY_EXTRAS } from "@/lib/content/changelogEntryExtras";
 import { getFeatureReleaseContent } from "@/lib/content/featureReleases";
@@ -152,6 +153,7 @@ export default function ChangelogPage() {
           .
         </p>
       </section>
+      <NewsletterInline band />
       <CTASection />
       <FooterSection />
     </main>

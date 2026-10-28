@@ -1,4 +1,5 @@
 import { cn } from "@/lib/utils";
+import { NewsletterInline } from "@/components/newsletter/newsletter-signup";
 import { GuideTakeawayCta } from "./GuideTakeawayCta";
 import { ArticleMetaBar } from "./ArticleMetaBar";
 import { RelatedContentSection } from "./RelatedContentSection";
@@ -86,6 +87,7 @@ export async function GuideLayout({
                 }
                 footer={
                   <div className={ARTICLE_TEXT_COLUMN_CLASS}>
+                    <NewsletterInline layout="stacked" className="mt-10 sm:mt-14" />
                     <div className="mt-10 w-full min-w-0 font-sans sm:mt-14">
                       <GuideTakeawayCta />
                     </div>

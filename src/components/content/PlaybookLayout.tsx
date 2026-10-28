@@ -11,6 +11,7 @@ import {
   Muted,
   KnowledgeCard,
 } from "@/components/ui";
+import { NewsletterInline } from "@/components/newsletter/newsletter-signup";
 import { getRelatedContent } from "@/lib/content/related";
 import type { TocItem } from "@/lib/content/extract-mdx-headings";
 import type { BaseContent, ContentType } from "@/lib/content/types";
@@ -109,6 +110,7 @@ export function PlaybookLayout({
           </Section>
         )}
 
+        <NewsletterInline layout="stacked" className="my-10" />
         <CTASection />
       </ContentWrapper>
     </Container>

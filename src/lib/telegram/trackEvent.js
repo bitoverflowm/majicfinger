@@ -6,7 +6,7 @@ import { buildGeoTelegramFields, countryCodeToFlag, currentUtcMonthKey } from "@
 
 /** @typedef {ReturnType<import("@/lib/analytics/requestClientMeta").extractClientMeta>} TelegramGeoContext */
 
-/** @typedef {'fork_click' | 'signup' | 'content_view' | 'content_leave' | 'page_view' | 'page_click' | 'hero_cta_click' | 'telegram_visitor_session_start' | 'telegram_visitor_session_end' | 'telegram_auth_session_start' | 'telegram_auth_session_end' | 'raw_visitor_session' | 'raw_auth_session' | 'test_ping'} TelegramEventKey */
+/** @typedef {'fork_click' | 'signup' | 'content_view' | 'content_leave' | 'page_view' | 'page_click' | 'hero_cta_click' | 'telegram_visitor_session_start' | 'telegram_visitor_session_end' | 'telegram_auth_session_start' | 'telegram_auth_session_end' | 'raw_visitor_session' | 'raw_auth_session' | 'newsletter_signup' | 'test_ping'} TelegramEventKey */
 
 const COUNTER_TIMEOUT_MS = 5000;
 
@@ -222,6 +222,33 @@ export async function notifySignup(payload) {
       Tier: data.tier,
       Cycle: data.cycle,
       Status: data.status,
+    },
+  });
+}
+
+/**
+ * @param {{
+ *   email: string;
+ *   source: 'popup' | 'inline' | 'footer';
+ *   path?: string;
+ *   resubscribed?: boolean;
+ *   geo?: TelegramGeoContext;
+ * }} payload
+ */
+export async function notifyNewsletterSignup(payload) {
+  const { geo, ...data } = payload;
+  const sourceLabel =
+    data.source === "popup" ? "Popup" : data.source === "footer" ? "Footer form" : "Inline form";
+  return trackAndNotifyTelegramEvent({
+    eventKey: "newsletter_signup",
+    headline: data.resubscribed
+      ? `📬 Newsletter resubscribe ({rank} signup)`
+      : `📬 {rank} newsletter subscriber`,
+    geo,
+    fields: {
+      Email: data.email,
+      Source: sourceLabel,
+      Page: data.path,
     },
   });
 }

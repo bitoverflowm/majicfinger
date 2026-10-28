@@ -9,6 +9,7 @@ import { ArticleTable } from "./ArticleTable";
 import { KalshiHistoricalDataQuery } from "./KalshiHistoricalDataQuery";
 import { PolymarketHistoricalDataQuery } from "./PolymarketHistoricalDataQuery";
 import { PublicChart } from "./PublicChart";
+import { NewsletterSignup } from "@/components/newsletter/newsletter-signup";
 
 // MDX may pass legacy `ref` (string refs); use loose props to avoid @types/react version skew (e.g. @hello-pangea/dnd).
 function MdxCode({ children, className, ...props }: any) {
@@ -76,6 +77,7 @@ function MdxHr() {
  * - PublicChart: `<PublicChart username="..." slug="..." />`
  * - KalshiHistoricalDataQuery: `<KalshiHistoricalDataQuery />` — Kalshi markets/trades query builder
  * - PolymarketHistoricalDataQuery: `<PolymarketHistoricalDataQuery />` — Polymarket markets/trades query builder
+ * - NewsletterSignup: `<NewsletterSignup />` — inline newsletter capture (hidden for logged-in users and subscribers)
  * - GIFs: Use standard markdown ![alt](/path/to.gif) or ContentImage
  */
 export function useMDXComponents(components?: MDXComponents): MDXComponents {
@@ -112,6 +114,7 @@ export function useMDXComponents(components?: MDXComponents): MDXComponents {
     PublicChart,
     KalshiHistoricalDataQuery,
     PolymarketHistoricalDataQuery,
+    NewsletterSignup,
     ...components,
   };
 }
