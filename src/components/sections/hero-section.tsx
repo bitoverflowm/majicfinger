@@ -1,6 +1,4 @@
 import { siteConfig } from "@/lib/config";
-import { cn } from "@/lib/utils";
-import { ArrowRightIcon } from "@radix-ui/react-icons";
 import Link from "next/link";
 import { CompanyShowcase } from "./company-showcase";
 import { DashboardDemoSectionLazy } from "./dashboard-demo-section-lazy";
@@ -9,18 +7,6 @@ import { HeroDescription } from "./hero-description";
 import { LandingDemoScrollManager } from "./landing-demo-scroll";
 export function HeroSection() {
   const { hero } = siteConfig;
-  const badgeIcon =
-    hero.badgeIcon === "dot" ? (
-      <span className="relative flex h-2.5 w-2.5">
-        <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-500/60" />
-        <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-emerald-500" />
-      </span>
-    ) : (
-      hero.badgeIcon
-    );
-
-  const badgeClassName =
-    "border border-border bg-accent rounded-full text-sm h-8 px-3 inline-flex items-center gap-2 max-w-full text-left";
 
   return (
     <section id="hero" className="relative w-full overflow-visible">
@@ -58,26 +44,6 @@ export function HeroSection() {
 
       <DashboardDemoSectionLazy framed />
       <CompanyShowcase />
-      <div className="relative z-10 mx-auto w-full max-w-[min(100%,84rem)] px-6 pb-12 pt-10 sm:px-8 lg:px-10">
-        {hero.badgeHref ? (
-          <Link
-            href={hero.badgeHref}
-            className={cn(
-              badgeClassName,
-              "text-foreground transition-colors hover:bg-accent/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
-            )}
-          >
-            {badgeIcon}
-            <span className="leading-tight">{hero.badge}</span>
-            <ArrowRightIcon className="h-3.5 w-3.5 shrink-0 text-muted-foreground" aria-hidden />
-          </Link>
-        ) : (
-          <p className={cn(badgeClassName, "text-foreground")}>
-            {badgeIcon}
-            {hero.badge}
-          </p>
-        )}
-      </div>
     </section>
   );
 }

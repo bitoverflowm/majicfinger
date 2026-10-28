@@ -37,7 +37,7 @@ export const siteConfig = {
   pricingSection: {
     title: "Choose your plan",
     description:
-      "Every plan includes all integrations: Kalshi and Polymarket historical and live, Chainlink spot, Binance, /sheets, /charts, and more.",
+      "Every plan includes access to available data integrations, spreadsheet analysis, and charting. Choose the data capacity and workspace limits that fit your research.",
     plans: landingPageV2Config.plans,
     enterprise: landingPageV2Config.enterprisePlan,
     venues: landingPageV2Config.pricingVenues,
@@ -76,10 +76,6 @@ export const siteConfig = {
     },
   },
   hero: {
-    badgeIcon: "dot",
-    badge: "Every Kalshi + Polymarket trade, market, and order book since launch",
-    /** Guides / blog post (MDX slug) */
-    badgeHref: "/kalshi-historical-data",
     title: "Analyze live and historical prediction market data.",
     subtitle: "No code. No setup.",
     description:

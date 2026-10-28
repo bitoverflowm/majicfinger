@@ -285,6 +285,16 @@ export const landingPageV2Config = {
         "Yes. Lychee supports live Kalshi and Polymarket data for current market analysis, live dashboards, alerts, and monitoring workflows. You can combine live data with historical data to compare current odds against past market behavior.",
     },
     {
+      question: "Can I research Polymarket holders and wallets?",
+      answer:
+        "Yes. For any Polymarket market, you can see who holds the largest Yes and No positions and how much of the supply the top holders control. From there, open a wallet to explore its other positions and trading activity, and see how a position fits into that wallet's broader portfolio.",
+    },
+    {
+      question: "Can I combine Kalshi and Polymarket in the same terminal?",
+      answer:
+        "Yes. A Lychee terminal can show Kalshi and Polymarket prices, trades, and order books side by side, alongside Binance spot prices and Chainlink feeds. Arrange charts and tables across tabs, compare corresponding contracts on both platforms, then save the terminal so you can return to the same setup.",
+    },
+    {
       question: "Can I download or export Kalshi and Polymarket data?",
       answer:
         "Yes. Lychee supports CSV, XLSX, and JSON exports. Export access depends on your plan limits, so Basic is useful for smaller pulls, Pro supports larger research exports, and Elite is designed for high-volume workflows and bulk datasets.",

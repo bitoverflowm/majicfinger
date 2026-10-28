@@ -124,7 +124,7 @@ export function FeatureShowcaseSection({ afterConnect }: { afterConnect?: ReactN
   const rest = rows.slice(split);
 
   return (
-    <section id="bento" className="relative w-full scroll-mt-28">
+    <section id="bento" className="relative w-full scroll-mt-28 !border-t-0">
       <style dangerouslySetInnerHTML={{ __html: KEYFRAMES }} />
       <SectionHeader>
         <h2 className="text-balance pb-1 text-center text-3xl font-medium tracking-tighter md:text-4xl">{title}</h2>
