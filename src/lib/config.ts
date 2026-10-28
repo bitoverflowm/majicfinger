@@ -111,10 +111,10 @@ export const siteConfig = {
     title: "Analyze live and historical prediction market data.",
     subtitle: "No code. No setup.",
     description:
-      "Research prediction markets, market data, and real-world signals. Explore trades, investigate wallets, build custom charts and live terminals—all in one workspace.",
+      "Research Kalshi and Polymarket, market data, and real-world signals. Explore trades, investigate wallets, build custom charts and live terminals—all in one workspace.",
     /** Phrases in `description` that show their data sources on hover. */
     descriptionTerms: [
-      { text: "prediction markets", color: "green", sources: [pricingVenue("Kalshi"), pricingVenue("Polymarket")] },
+      { text: "Kalshi and Polymarket", color: "green", sources: [pricingVenue("Kalshi"), pricingVenue("Polymarket")] },
       {
         text: "market data",
         color: "blue",
