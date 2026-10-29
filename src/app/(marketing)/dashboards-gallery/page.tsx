@@ -28,13 +28,13 @@ export const metadata: Metadata = {
     url: `${SITE}/dashboards-gallery`,
     siteName: "Lychee",
     type: "website",
-    images: [{ url: `${SITE}/ogImage2.png`, width: 1200, height: 630, alt: "Lychee Dashboards Gallery" }],
+    images: [{ url: `${SITE}/og/lychee-research-terminal.png`, width: 1200, height: 630, alt: "Lychee Dashboards Gallery" }],
   },
   twitter: {
     card: "summary_large_image",
     title: "Published Dashboards Gallery · Lychee Data",
     description: "Browse live, shareable data dashboards built with Lychee.",
-    images: [`${SITE}/ogImage2.png`],
+    images: [`${SITE}/og/lychee-research-terminal.png`],
   },
   keywords: [
     "dashboards",

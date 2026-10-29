@@ -48,7 +48,7 @@ export const polymarketLiveHub: HubPageConfig = {
   ],
   // Do not set `keywords` — hubs intentionally omit meta keywords tags.
   integration: ["Polymarket", "Lychee"],
-  ogImage: "https://lycheedata.com/ogImage2.png",
+  ogImage: "https://lycheedata.com/og/lychee-research-terminal.png",
   ogImageAlt:
     "Live Polymarket data dashboard showing YES and NO prices, trades, and charts in Lychee",
   featured: true,

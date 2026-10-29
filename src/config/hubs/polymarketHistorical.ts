@@ -45,7 +45,7 @@ export const polymarketHistoricalHub: HubPageConfig = {
     "backtesting",
   ],
   integration: ["Polymarket", "Lychee"],
-  ogImage: "https://lycheedata.com/ogImage2.png",
+  ogImage: "https://lycheedata.com/og/lychee-research-terminal.png",
   ogImageAlt: "Polymarket Historical Data — 404M+ trades · every market since launch",
   featured: true,
   readingTime: "10 min",

@@ -22,7 +22,7 @@ export async function generateMetadata({
     ? `${SITE}${dynamicOgImagePath}`
     : meta?.og_image_url
       ? `${SITE}${meta.og_image_url.startsWith("/") ? meta.og_image_url : `/${meta.og_image_url}`}`
-      : `${SITE}/ogImage2.png`;
+      : `${SITE}/og/lychee-research-terminal.png`;
   return {
     title,
     description,
@@ -84,7 +84,7 @@ export default async function PublicChartPage({
     ? `${SITE}${dynamicOgImagePath}`
     : meta?.og_image_url
       ? `${SITE}${meta.og_image_url.startsWith("/") ? meta.og_image_url : `/${meta.og_image_url}`}`
-      : `${SITE}/ogImage2.png`;
+      : `${SITE}/og/lychee-research-terminal.png`;
   const chartJsonLd = {
     "@context": "https://schema.org",
     "@type": "Dataset",

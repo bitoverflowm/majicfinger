@@ -23,7 +23,7 @@ export const kalshiLiveHub: HubPageConfig = {
     "streaming",
   ],
   integration: ["Kalshi", "Lychee"],
-  ogImage: "https://lycheedata.com/ogImage2.png",
+  ogImage: "https://lycheedata.com/og/lychee-research-terminal.png",
   ogImageAlt:
     "Live Kalshi market data dashboard showing prices, trades and candlestick charts in Lychee",
   featured: true,

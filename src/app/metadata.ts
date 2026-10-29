@@ -8,7 +8,7 @@ export const defaultTitle = `Prediction Market Data Platform for Kalshi & Polyma
 /** Long-form marketing description for search + social cards. */
 export const defaultDescription = "Analyze live and historical prediction market data from Kalshi and Polymarket. Build charts, dashboards, exports, and backtests without code or setup."
 
-const ogImagePath = "/ogImage2.png";
+const ogImagePath = "/og/lychee-research-terminal.png";
 
 export const metadata: Metadata = {
   metadataBase: new URL(siteConfig.url),
@@ -62,7 +62,7 @@ export const metadata: Metadata = {
         url: ogImagePath,
         width: 1200,
         height: 630,
-        alt: `${siteConfig.name} — OG image`,
+        alt: "Lychee, the research terminal for prediction markets. Kalshi. Polymarket. Every signal.",
       },
     ],
   },

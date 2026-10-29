@@ -49,7 +49,7 @@ export function buildContentMetadata(
   const ogImage =
     frontmatter.ogImage ||
     frontmatter.coverImage ||
-    `${SITE_URL}/ogImage2.png`;
+    `${SITE_URL}/og/lychee-research-terminal.png`;
   const ogImageUrl = ogImage.startsWith("http") ? ogImage : `${SITE_URL}${ogImage}`;
   const twitterCard = frontmatter.twitterCard ?? "summary_large_image";
 
@@ -117,7 +117,7 @@ export function buildArticleJsonLd(
   const ogImage =
     frontmatter.ogImage ||
     frontmatter.coverImage ||
-    `${SITE_URL}/ogImage2.png`;
+    `${SITE_URL}/og/lychee-research-terminal.png`;
   const imageUrl = ogImage.startsWith("http") ? ogImage : `${SITE_URL}${ogImage}`;
   const timeRequired = readingTimeToIsoDuration(frontmatter.readingTime);
   const keywords =

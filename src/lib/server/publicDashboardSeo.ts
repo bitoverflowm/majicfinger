@@ -114,7 +114,7 @@ export function buildDashboardMetadata(
   const path = `/${encodeURIComponent(username)}/dashboards/${encodeURIComponent(slug)}`;
   const canonical = `${SITE}${path}`;
   const dynamicOgImagePath = `/api/public/dashboards/${encodeURIComponent(username)}/${encodeURIComponent(slug)}/og-image`;
-  const ogImage = meta.has_og_image_data ? `${SITE}${dynamicOgImagePath}` : `${SITE}/ogImage2.png`;
+  const ogImage = meta.has_og_image_data ? `${SITE}${dynamicOgImagePath}` : `${SITE}/og/lychee-research-terminal.png`;
   const publishedTime = toIsoDate(meta.published_at);
   const modifiedTime = toIsoDate(meta.last_edited_date || meta.published_at);
 
@@ -183,7 +183,7 @@ export function buildDashboardJsonLd(args: {
     meta.description?.trim().slice(0, 500) ||
     `Interactive data dashboard with ${summary.chartCount || "multiple"} visualizations.`;
   const dynamicOgImagePath = `/api/public/dashboards/${encodeURIComponent(username)}/${encodeURIComponent(slug)}/og-image`;
-  const ogImage = meta.has_og_image_data ? `${SITE}${dynamicOgImagePath}` : `${SITE}/ogImage2.png`;
+  const ogImage = meta.has_og_image_data ? `${SITE}${dynamicOgImagePath}` : `${SITE}/og/lychee-research-terminal.png`;
   const publishedTime = toIsoDate(meta.published_at);
   const modifiedTime = toIsoDate(meta.last_edited_date || meta.published_at);
   const keywords = [...meta.tags, ...meta.keywords].filter(Boolean).join(", ");

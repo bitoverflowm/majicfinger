@@ -11,7 +11,7 @@ function readingTimeToIsoDuration(readingTime: string | undefined): string | und
 }
 
 function resolveImageUrl(config: HubPageConfig): string {
-  const image = config.ogImage || config.coverImage || `${SITE_URL}/ogImage2.png`;
+  const image = config.ogImage || config.coverImage || `${SITE_URL}/og/lychee-research-terminal.png`;
   return image.startsWith("http") ? image : `${SITE_URL}${image}`;
 }
 

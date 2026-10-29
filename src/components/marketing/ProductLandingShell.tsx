@@ -31,7 +31,7 @@ export function buildProductLandingMetadata({
       type: "website",
       images: [
         {
-          url: `${SITE}/ogImage2.png`,
+          url: `${SITE}/og/lychee-research-terminal.png`,
           width: 1200,
           height: 630,
           alt: title,
@@ -42,7 +42,7 @@ export function buildProductLandingMetadata({
       card: "summary_large_image",
       title: `${title} · Lychee Data`,
       description,
-      images: [`${SITE}/ogImage2.png`],
+      images: [`${SITE}/og/lychee-research-terminal.png`],
     },
   };
 }
