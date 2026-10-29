@@ -76,7 +76,7 @@ export function useNewsletterState(): NewsletterState {
   return { ready: true, eligible: !user && !flags.subscribed, popupDismissed: flags.dismissed, preview: false };
 }
 
-type SubmitStatus = "idle" | "submitting" | "success" | "error";
+export type SubmitStatus = "idle" | "submitting" | "success" | "error";
 
 const ERROR_COPY: Record<string, string> = {
   invalid_email: "Enter a valid email address.",
@@ -85,8 +85,15 @@ const ERROR_COPY: Record<string, string> = {
   default: "Something went wrong. Please try again.",
 };
 
-export function useNewsletterSubmit(source: NewsletterSource) {
+export type EmailCapture = ReturnType<typeof useEmailCapture>;
+
+/** Posts an email to one of the capture endpoints (which share validation, honeypot and timing checks). */
+export function useEmailCapture(endpoint: string, extra: Record<string, string>, onSaved?: (email: string) => void) {
   const startedAt = useRef(0);
+  const extraRef = useRef(extra);
+  extraRef.current = extra;
+  const onSavedRef = useRef(onSaved);
+  onSavedRef.current = onSaved;
   const [status, setStatus] = useState<SubmitStatus>("idle");
   const [error, setError] = useState<string | null>(null);
 
@@ -106,13 +113,13 @@ export function useNewsletterSubmit(source: NewsletterSource) {
       setStatus("submitting");
       setError(null);
       try {
-        const res = await fetch("/api/newsletter/subscribe", {
+        const res = await fetch(endpoint, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           credentials: "same-origin",
           body: JSON.stringify({
+            ...extraRef.current,
             email,
-            source,
             path: window.location.pathname,
             website: honeypot,
             elapsedMs: Date.now() - startedAt.current,
@@ -125,13 +132,13 @@ export function useNewsletterSubmit(source: NewsletterSource) {
           return;
         }
         setStatus("success");
-        markNewsletterSubscribed();
+        onSavedRef.current?.(email);
       } catch {
         setStatus("error");
         setError(ERROR_COPY.network);
       }
     },
-    [source, status],
+    [endpoint, status],
   );
 
   const clearError = useCallback(() => {
@@ -142,4 +149,8 @@ export function useNewsletterSubmit(source: NewsletterSource) {
   }, [status]);
 
   return { status, error, submit, clearError };
+}
+
+export function useNewsletterSubmit(source: NewsletterSource) {
+  return useEmailCapture("/api/newsletter/subscribe", { source }, markNewsletterSubscribed);
 }

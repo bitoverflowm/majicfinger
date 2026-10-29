@@ -8,6 +8,7 @@ import { ThemeProvider } from '@/components/theme-provider'
 import { Toaster } from '@/components/ui/toaster'
 import { VisitorJourneyInit } from '@/components/analytics/VisitorJourneyInit'
 import { NewsletterPopup } from '@/components/newsletter/newsletter-popup'
+import { DesktopOnlyDialog } from '@/components/desktop-only/desktop-only-dialog'
 
 export { metadata } from './metadata'
 
@@ -41,6 +42,7 @@ export default function RootLayout({ children }) {
           <VisitorJourneyInit />
           {children}
           <NewsletterPopup />
+          <DesktopOnlyDialog />
           <Toaster />
         </ThemeProvider>
       </body>

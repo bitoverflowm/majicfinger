@@ -3,7 +3,12 @@
 import { ArrowRight, Check, Loader2 } from "lucide-react";
 import { useCallback, useEffect, useId, useState, type FormEvent } from "react";
 
-import { useNewsletterState, useNewsletterSubmit, type NewsletterSource } from "@/lib/newsletter/client";
+import {
+  useNewsletterState,
+  useNewsletterSubmit,
+  type EmailCapture,
+  type NewsletterSource,
+} from "@/lib/newsletter/client";
 import { MAX_EMAIL_LENGTH } from "@/lib/newsletter/validate";
 import { cn } from "@/lib/utils";
 
@@ -32,7 +37,6 @@ function Honeypot({ value, onChange }: { value: string; onChange: (v: string) =>
 }
 
 type FieldProps = {
-  source: NewsletterSource;
   placeholder?: string;
   buttonLabel?: string;
   /** "embedded": Subscribe sits inside the field. "stacked": label, field, full-width button. */
@@ -41,18 +45,22 @@ type FieldProps = {
   onSuccess?: () => void;
 };
 
-export function NewsletterField({
-  source,
+export function NewsletterField({ source, ...props }: FieldProps & { source: NewsletterSource }) {
+  return <EmailCaptureField capture={useNewsletterSubmit(source)} {...props} />;
+}
+
+export function EmailCaptureField({
+  capture,
   placeholder = "Your email address",
   buttonLabel = "Subscribe",
   layout = "embedded",
   label = "Email address",
   onSuccess,
-}: FieldProps) {
+}: FieldProps & { capture: EmailCapture }) {
   const id = useId();
   const [email, setEmail] = useState("");
   const [website, setWebsite] = useState("");
-  const { status, error, submit, clearError } = useNewsletterSubmit(source);
+  const { status, error, submit, clearError } = capture;
   const submitting = status === "submitting";
   const errorId = `${id}-error`;
 

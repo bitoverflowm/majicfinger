@@ -16,6 +16,7 @@ import type { ProductsNavData } from "@/lib/nav/products-nav";
 import { cn } from "@/lib/utils";
 import { useUser } from "@/lib/hooks";
 import { endAuthenticatedSession } from "@/lib/analytics/authJourneyClient";
+import { interceptOnCompactScreen } from "@/lib/desktopOnly";
 import { requestLandingDemoActivateAfterScroll } from "@/lib/landingDemoSession";
 import { scrollToHashSection } from "@/lib/scrollToHashSection";
 
@@ -85,6 +86,10 @@ export function Navbar({ productsNav }: { productsNav: ProductsNavData }) {
       ? Link
       : DemoScrollLink;
   const handleTryForFreeClick = (event: MouseEvent<HTMLAnchorElement>) => {
+    if (interceptOnCompactScreen(event)) {
+      setIsDrawerOpen(false);
+      return;
+    }
     if (pathname === "/") requestLandingDemoActivateAfterScroll();
     if (TryForFreeLink !== Link || !tryForFreeHref.startsWith("#")) return;
     event.preventDefault();

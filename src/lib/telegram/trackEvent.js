@@ -6,7 +6,7 @@ import { buildGeoTelegramFields, countryCodeToFlag, currentUtcMonthKey } from "@
 
 /** @typedef {ReturnType<import("@/lib/analytics/requestClientMeta").extractClientMeta>} TelegramGeoContext */
 
-/** @typedef {'fork_click' | 'signup' | 'content_view' | 'content_leave' | 'page_view' | 'page_click' | 'hero_cta_click' | 'telegram_visitor_session_start' | 'telegram_visitor_session_end' | 'telegram_auth_session_start' | 'telegram_auth_session_end' | 'raw_visitor_session' | 'raw_auth_session' | 'newsletter_signup' | 'test_ping'} TelegramEventKey */
+/** @typedef {'fork_click' | 'signup' | 'content_view' | 'content_leave' | 'page_view' | 'page_click' | 'hero_cta_click' | 'telegram_visitor_session_start' | 'telegram_visitor_session_end' | 'telegram_auth_session_start' | 'telegram_auth_session_end' | 'raw_visitor_session' | 'raw_auth_session' | 'newsletter_signup' | 'desktop_link_request' | 'test_ping'} TelegramEventKey */
 
 const COUNTER_TIMEOUT_MS = 5000;
 
@@ -248,6 +248,22 @@ export async function notifyNewsletterSignup(payload) {
     fields: {
       Email: data.email,
       Source: sourceLabel,
+      Page: data.path,
+    },
+  });
+}
+
+/**
+ * @param {{ email: string; path?: string; geo?: TelegramGeoContext }} payload
+ */
+export async function notifyDesktopLinkRequest(payload) {
+  const { geo, ...data } = payload;
+  return trackAndNotifyTelegramEvent({
+    eventKey: "desktop_link_request",
+    headline: `📱 {rank} mobile visitor asked for a desktop link`,
+    geo,
+    fields: {
+      Email: data.email,
       Page: data.path,
     },
   });

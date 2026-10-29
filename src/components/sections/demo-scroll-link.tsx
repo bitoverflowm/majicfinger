@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { interceptOnCompactScreen } from "@/lib/desktopOnly";
 import { requestLandingDemoActivateAfterScroll } from "@/lib/landingDemoSession";
 import { resolveDemoMockupEl, resolveDemoSectionEl, scrollToDemoSection } from "@/lib/scrollToDemo";
 import type { ComponentProps } from "react";
@@ -23,6 +24,7 @@ export function DemoScrollLink({
       onClick={(e) => {
         onClick?.(e);
         if (e.defaultPrevented) return;
+        if (activateLandingDemo && interceptOnCompactScreen(e)) return;
         if (!resolveDemoSectionEl() && !resolveDemoMockupEl()) return;
         if (activateLandingDemo) requestLandingDemoActivateAfterScroll();
         e.preventDefault();

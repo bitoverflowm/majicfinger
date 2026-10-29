@@ -1,6 +1,7 @@
 "use client";
 
 import { SectionHeader } from "@/components/section-header";
+import { interceptOnCompactScreen } from "@/lib/desktopOnly";
 import { requestLandingDemoActivateAfterScroll } from "@/lib/landingDemoSession";
 import { scrollToDemoSection } from "@/lib/scrollToDemo";
 import { siteConfig } from "@/lib/config";
@@ -211,6 +212,7 @@ function AnimatedPrice({ value }: { value: string }) {
 
 /** On the homepage, scroll to the demo and start it (same as the hero's Try For Free); elsewhere follow the link. */
 function startHomepageDemo(event: MouseEvent<HTMLAnchorElement>) {
+  if (interceptOnCompactScreen(event)) return;
   if (!document.getElementById("demo")) return;
   event.preventDefault();
   requestLandingDemoActivateAfterScroll();
