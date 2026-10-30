@@ -19,9 +19,10 @@ function planHref(name, cycle) {
  * Payment Links.
  */
 export const CHECKOUT_PLANS = [
-  { key: "researcher_annual", tier: "researcher", cycle: "annual", mode: "subscription", amount: 19900, interval: "year", label: "Researcher annual", href: "", priceId: "" },
+  { key: "researcher_monthly", tier: "researcher", cycle: "monthly", mode: "subscription", amount: 4900, interval: "month", label: "Researcher monthly", href: "", priceId: "" },
+  { key: "researcher_annual", tier: "researcher", cycle: "annual", mode: "subscription", amount: 49000, interval: "year", label: "Researcher annual", href: "", priceId: "" },
   { key: "quant_monthly", tier: "quant", cycle: "monthly", mode: "subscription", amount: 9900, interval: "month", label: "Quant monthly", href: "", priceId: "" },
-  { key: "quant_annual", tier: "quant", cycle: "annual", mode: "subscription", amount: 99900, interval: "year", label: "Quant annual", href: "", priceId: "" },
+  { key: "quant_annual", tier: "quant", cycle: "annual", mode: "subscription", amount: 99000, interval: "year", label: "Quant annual", href: "", priceId: "" },
 
   // Legacy plans: no longer on the pricing page; existing subscribers can still switch between them.
   { key: "basic_weekly", tier: "basic", cycle: "weekly", mode: "subscription", amount: 499, interval: "week", label: "Basic weekly", href: planHref("basic", "weekly"), priceId: "price_1TKZCwILjX7EMe6xchbsFVX4" },
@@ -170,8 +171,13 @@ async function priceFromLookupKey(stripe, plan) {
 
 async function ensureTestPrice(stripe, plan) {
   const lookupKey = planLookupKey(plan);
-  const existing = await stripe.prices.list({ lookup_keys: [lookupKey], limit: 1 });
-  if (existing.data?.[0]?.id) return existing.data[0].id;
+  const existing = (await stripe.prices.list({ lookup_keys: [lookupKey], limit: 1 })).data?.[0];
+  const matches =
+    existing &&
+    existing.active &&
+    existing.unit_amount === plan.amount &&
+    (existing.recurring?.interval || null) === plan.interval;
+  if (matches) return existing.id;
 
   const product = await stripe.products.create({
     name: `Lychee ${plan.label} (test)`,
@@ -182,6 +188,7 @@ async function ensureTestPrice(stripe, plan) {
     currency: "usd",
     unit_amount: plan.amount,
     lookup_key: lookupKey,
+    ...(existing ? { transfer_lookup_key: true } : {}),
     ...(plan.mode === "subscription" ? { recurring: { interval: plan.interval } } : {}),
   });
   return price.id;

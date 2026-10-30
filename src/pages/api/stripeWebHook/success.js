@@ -19,8 +19,12 @@ export const config = {
 // Keep legacy plans so existing subscribers are not downgraded.
 const PLAN_MAP = {
   // Current plans
-  "19900:year": { tier: "researcher", cycle: "annual" },
+  "4900:month": { tier: "researcher", cycle: "monthly" },
+  "49000:year": { tier: "researcher", cycle: "annual" },
   "9900:month": { tier: "quant", cycle: "monthly" },
+  "99000:year": { tier: "quant", cycle: "annual" },
+  // Launch prices for Researcher ($199/yr) and Quant ($999/yr)
+  "19900:year": { tier: "researcher", cycle: "annual" },
   "99900:year": { tier: "quant", cycle: "annual" },
 
   // Basic / Pro / Elite: off the pricing page, still billed for existing subscribers

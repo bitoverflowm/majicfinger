@@ -6,7 +6,6 @@ import { requestLandingDemoActivateAfterScroll } from "@/lib/landingDemoSession"
 import { scrollToDemoSection } from "@/lib/scrollToDemo";
 import { siteConfig } from "@/lib/config";
 import { cn } from "@/lib/utils";
-import * as SwitchPrimitives from "@radix-ui/react-switch";
 import * as TooltipPrimitive from "@radix-ui/react-tooltip";
 import { motion } from "framer-motion";
 import {
@@ -210,6 +209,73 @@ function AnimatedPrice({ value }: { value: string }) {
   );
 }
 
+function hasBothCycles(plan: Plan) {
+  return typeof plan.priceMonthly === "number" && typeof plan.priceAnnual === "number";
+}
+
+/** Whole months saved by paying yearly, e.g. $490/yr against $49/mo is 2. */
+function monthsFree(plan: Plan) {
+  if (!hasBothCycles(plan) || !plan.priceMonthly) return 0;
+  return Math.max(0, Math.round(12 - (plan.priceAnnual as number) / plan.priceMonthly));
+}
+
+function monthsFreeLabel(months: number) {
+  return `${months} ${months === 1 ? "month" : "months"} free`;
+}
+
+function CycleToggle({
+  cycle,
+  onChange,
+  freeMonths,
+}: {
+  cycle: "monthly" | "annual";
+  onChange: (cycle: "monthly" | "annual") => void;
+  freeMonths: number;
+}) {
+  const options = [
+    { value: "monthly" as const, label: "Monthly" },
+    { value: "annual" as const, label: "Annual" },
+  ];
+  return (
+    <div
+      role="radiogroup"
+      aria-label="Billing period"
+      className="mx-auto inline-flex items-center gap-1 rounded-full border border-border bg-muted/60 p-1"
+    >
+      {options.map((option) => {
+        const active = cycle === option.value;
+        return (
+          <button
+            key={option.value}
+            type="button"
+            role="radio"
+            aria-checked={active}
+            onClick={() => onChange(option.value)}
+            className={cn(
+              "relative flex h-8 items-center gap-2 rounded-full px-4 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-secondary/40",
+              active ? "text-foreground" : "text-muted-foreground hover:text-foreground",
+            )}
+          >
+            {active ? (
+              <motion.span
+                layoutId="pricing-cycle-pill"
+                className="absolute inset-0 rounded-full bg-background shadow-sm ring-1 ring-border"
+                transition={{ type: "spring", stiffness: 500, damping: 38 }}
+              />
+            ) : null}
+            <span className="relative">{option.label}</span>
+            {option.value === "annual" && freeMonths > 0 ? (
+              <span className="relative rounded-full bg-emerald-500/10 px-1.5 py-0.5 text-[11px] font-medium text-emerald-700 dark:text-emerald-400">
+                {monthsFreeLabel(freeMonths)}
+              </span>
+            ) : null}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
 /** On the homepage, scroll to the demo and start it (same as the hero's Try For Free); elsewhere follow the link. */
 function startHomepageDemo(event: MouseEvent<HTMLAnchorElement>) {
   if (interceptOnCompactScreen(event)) return;
@@ -324,6 +390,8 @@ export function PricingSection({
   const description = descriptionOverride?.trim() || config.description;
   const plans = config.plans.filter((plan) => includeFree || plan.tier !== "free");
   const { enterprise, venues } = config;
+  const showCycleToggle = plans.some(hasBothCycles);
+  const toggleFreeMonths = Math.max(0, ...plans.map(monthsFree));
 
   return (
     <TooltipPrimitive.Provider delayDuration={120} skipDelayDuration={400}>
@@ -339,10 +407,15 @@ export function PricingSection({
         )}
 
         <div className={cn("mx-auto flex w-full flex-col gap-4", plans.length > 2 ? "max-w-6xl" : "max-w-4xl")}>
+          {showCycleToggle ? (
+            <div className="mb-2 flex justify-center">
+              <CycleToggle cycle={toggleCycle} onChange={setToggleCycle} freeMonths={toggleFreeMonths} />
+            </div>
+          ) : null}
           <div className={cn("grid gap-4", plans.length > 2 ? "md:grid-cols-3" : "md:grid-cols-2")}>
             {plans.map((plan) => {
               const isFree = plan.tier === "free";
-              const hasToggle = typeof plan.priceMonthly === "number" && typeof plan.priceAnnual === "number";
+              const hasToggle = hasBothCycles(plan);
               const cycle: BillingCycle = hasToggle ? toggleCycle : typeof plan.priceAnnual === "number" ? "annual" : "monthly";
               const href = isFree
                 ? plan.href || "/#demo"
@@ -357,10 +430,7 @@ export function PricingSection({
                   : cycle === "annual" && typeof plan.priceAnnual === "number"
                     ? plan.priceAnnual / 12
                     : plan.priceMonthly ?? 0;
-              const savings =
-                hasToggle && plan.priceMonthly && plan.priceAnnual
-                  ? Math.round((1 - plan.priceAnnual / (plan.priceMonthly * 12)) * 100)
-                  : 0;
+              const freeMonths = cycle === "annual" ? monthsFree(plan) : 0;
 
               return (
                 <div
@@ -386,36 +456,22 @@ export function PricingSection({
                   <div className="mt-5 flex items-baseline gap-1.5">
                     <AnimatedPrice value={formatUsd(monthly)} />
                     {!isFree ? <span className="text-sm text-muted-foreground">/ month</span> : null}
+                    {freeMonths > 0 ? (
+                      <span className="ml-1 self-center rounded-full bg-emerald-500/10 px-1.5 py-0.5 text-[11px] font-medium text-emerald-700 dark:text-emerald-400">
+                        {monthsFreeLabel(freeMonths)}
+                      </span>
+                    ) : null}
                   </div>
 
                   <div className="mt-2 flex min-h-6 items-center text-sm text-muted-foreground">
-                    {hasToggle ? (
-                      <label className="flex cursor-pointer items-center gap-2">
-                        <SwitchPrimitives.Root
-                          checked={toggleCycle === "annual"}
-                          onCheckedChange={(on) => setToggleCycle(on ? "annual" : "monthly")}
-                          aria-label="Billed yearly"
-                          className="inline-flex h-4 w-7 shrink-0 cursor-pointer items-center rounded-full border border-transparent transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-secondary/40 data-[state=checked]:bg-secondary data-[state=unchecked]:bg-black/25 dark:data-[state=unchecked]:bg-white/25"
-                        >
-                          <SwitchPrimitives.Thumb className="pointer-events-none block size-3 rounded-full bg-white shadow transition-transform data-[state=checked]:translate-x-[13px] data-[state=unchecked]:translate-x-px" />
-                        </SwitchPrimitives.Root>
-                        <span>
-                          Billed yearly
-                          {toggleCycle === "annual" && plan.priceAnnual ? ` · ${formatUsd(plan.priceAnnual)}/year` : ""}
-                        </span>
-                        {savings > 0 ? (
-                          <span className="rounded-full bg-emerald-500/10 px-1.5 py-0.5 text-[11px] font-medium text-emerald-700 dark:text-emerald-400">
-                            Save {savings}%
-                          </span>
-                        ) : null}
-                      </label>
-                    ) : isFree ? (
+                    {isFree ? (
                       <span>{plan.note}</span>
-                    ) : (
+                    ) : cycle === "annual" && typeof plan.priceAnnual === "number" ? (
                       <span>
-                        {plan.priceAnnual ? `${formatUsd(plan.priceAnnual)} billed yearly · ` : ""}
-                        {plan.note}
+                        Billed annually · You&apos;ll be charged {formatUsd(plan.priceAnnual)} per year
                       </span>
+                    ) : (
+                      <span>Billed monthly{plan.note ? ` · ${plan.note}` : ""}</span>
                     )}
                   </div>
 

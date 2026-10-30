@@ -7,9 +7,12 @@
  * (STRIPE_SECRET_DEV_KEY). Live needs --live, and writes need --apply plus
  * --yes-live.
  *
- * It only ever creates or enables things. It never edits, archives or deletes
- * prices, products or subscriptions, so legacy Basic/Pro/Elite/Lifetime
- * billing is untouched.
+ * It only creates or enables things. When a plan's amount changes it creates a
+ * replacement price and moves the lychee_* lookup key onto it; the old price
+ * stays active so existing subscribers keep it. It points the in-app portal
+ * configuration at the current prices. It never archives or deletes prices,
+ * products or subscriptions, so legacy Basic/Pro/Elite/Lifetime billing is
+ * untouched.
  *
  *   node scripts/stripe-setup.cjs                         # test, dry run
  *   node scripts/stripe-setup.cjs --apply --account acct_…               # test, write
@@ -61,7 +64,10 @@ const PRODUCTS = [
     tier: "researcher",
     name: "Lychee Researcher",
     description: "A complete workspace for traders, analysts, journalists, and researchers.",
-    prices: [{ key: "researcher_annual", amount: 19900, interval: "year", nickname: "Researcher annual" }],
+    prices: [
+      { key: "researcher_monthly", amount: 4900, interval: "month", nickname: "Researcher monthly" },
+      { key: "researcher_annual", amount: 49000, interval: "year", nickname: "Researcher annual" },
+    ],
   },
   {
     tier: "quant",
@@ -69,7 +75,7 @@ const PRODUCTS = [
     description: "Everything in Researcher, with more capacity and flexible billing.",
     prices: [
       { key: "quant_monthly", amount: 9900, interval: "month", nickname: "Quant monthly" },
-      { key: "quant_annual", amount: 99900, interval: "year", nickname: "Quant annual" },
+      { key: "quant_annual", amount: 99000, interval: "year", nickname: "Quant annual" },
     ],
   },
 ];
@@ -173,14 +179,28 @@ async function ensurePrices() {
       const lookupKey = `lychee_${price.key}`;
       const found = (await stripe("GET", "prices", { lookup_keys: [lookupKey], active: true, limit: 1 })).data[0];
       if (found) {
+        const foundProduct = typeof found.product === "string" ? found.product : found.product?.id;
         const interval = found.recurring?.interval || null;
-        if (found.unit_amount !== price.amount || interval !== price.interval || found.currency !== "usd") {
-          throw new Error(
-            `${lookupKey} is ${found.id} at ${found.unit_amount} ${found.currency}/${interval}, expected ${price.amount} usd/${price.interval}. Fix it by hand; this script never edits prices.`,
-          );
+        if (found.unit_amount === price.amount && interval === price.interval && found.currency === "usd") {
+          console.log(`  ok:    ${lookupKey} -> ${found.id}`);
+          addPrice(foundProduct, found.id);
+          continue;
         }
-        console.log(`  ok:    ${lookupKey} -> ${found.id}`);
-        addPrice(typeof found.product === "string" ? found.product : found.product?.id, found.id);
+        const replaced = await change(
+          `replace ${lookupKey} ${found.id} ($${found.unit_amount / 100} ${found.currency}/${interval}) with $${price.amount / 100}/${price.interval}; ${found.id} stays active for existing subscribers`,
+          () =>
+            stripe("POST", "prices", {
+              product: foundProduct,
+              currency: "usd",
+              unit_amount: price.amount,
+              recurring: { interval: price.interval },
+              lookup_key: lookupKey,
+              transfer_lookup_key: true,
+              nickname: price.nickname,
+              metadata: { lychee_plan: price.key },
+            }),
+        );
+        addPrice(foundProduct, replaced ? replaced.id : `(new ${lookupKey})`);
         continue;
       }
 
@@ -204,7 +224,7 @@ async function ensurePrices() {
           metadata: { lychee_plan: price.key },
         }),
       );
-      if (created) addPrice(product.id, created.id);
+      addPrice(product.id, created ? created.id : `(new ${lookupKey})`);
     }
   }
   return priceIdsByProduct;
@@ -257,10 +277,27 @@ async function ensurePortal(priceIdsByProduct) {
   console.log("\nCustomer portal configuration");
   const products = Object.entries(priceIdsByProduct)
     .filter(([, prices]) => prices.length)
-    .map(([product, prices]) => ({ product, prices }));
-  const configs = await listAll("billing_portal/configurations", { active: true });
+    .map(([product, prices]) => ({ product, prices, adjustable_quantity: { enabled: false } }));
+  const configs = await listAll("billing_portal/configurations", {
+    active: true,
+    expand: ["data.features.subscription_update.products"],
+  });
   const existing = configs.find((item) => item.metadata?.lychee === "inapp_v1");
   if (existing) {
+    const signature = (list) =>
+      (list || [])
+        .map((item) => `${item.product}:${[...(item.prices || [])].sort().join(",")}:${Boolean(item.adjustable_quantity?.enabled)}`)
+        .sort()
+        .join("|");
+    const current = existing.features?.subscription_update?.products || [];
+    if (products.length && signature(current) !== signature(products)) {
+      const summary = products.map((item) => `${item.product} [${item.prices.join(", ")}]`).join("; ");
+      await change(`point ${existing.id} plan switching at ${summary}`, () =>
+        stripe("POST", `billing_portal/configurations/${existing.id}`, {
+          features: { subscription_update: { enabled: true, products } },
+        }),
+      );
+    }
     console.log(`  ok:    ${existing.id}  (set STRIPE_PORTAL_CONFIGURATION=${existing.id})`);
     return;
   }
