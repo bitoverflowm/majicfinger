@@ -9,6 +9,18 @@ import { ArticleTable } from "./ArticleTable";
 import { KalshiHistoricalDataQuery } from "./KalshiHistoricalDataQuery";
 import { PolymarketHistoricalDataQuery } from "./PolymarketHistoricalDataQuery";
 import { PublicChart } from "./PublicChart";
+import { KalshiTradeHistoryRecipeDemo } from "./KalshiTradeHistoryRecipeDemo";
+import {
+  RecipeExportAnimation,
+  RecipeFindMarketAnimation,
+  RecipeMarketDetailsAnimation,
+  RecipeRunAnimation,
+} from "./guide-animations/kalshi-trade-history-recipe-steps";
+import {
+  TradeRowAnatomy,
+  TradeSourceRoutingDiagram,
+  TradesVsCandlesChart,
+} from "./guide-animations/kalshi-trade-history-diagrams";
 import { NewsletterSignup } from "@/components/newsletter/newsletter-signup";
 
 // MDX may pass legacy `ref` (string refs); use loose props to avoid @types/react version skew (e.g. @hello-pangea/dnd).
@@ -78,6 +90,9 @@ function MdxHr() {
  * - KalshiHistoricalDataQuery: `<KalshiHistoricalDataQuery />` — Kalshi markets/trades query builder
  * - PolymarketHistoricalDataQuery: `<PolymarketHistoricalDataQuery />` — Polymarket markets/trades query builder
  * - NewsletterSignup: `<NewsletterSignup />` — inline newsletter capture (hidden for logged-in users and subscribers)
+ * - KalshiTradeHistoryRecipeDemo: `<KalshiTradeHistoryRecipeDemo />` — recipe preview + link into the live demo
+ * - Recipe step animations: `<RecipeFindMarketAnimation />`, `<RecipeMarketDetailsAnimation />`, `<RecipeRunAnimation />`, `<RecipeExportAnimation />`
+ * - Trade history diagrams: `<TradeSourceRoutingDiagram />`, `<TradesVsCandlesChart />`, `<TradeRowAnatomy />`
  * - GIFs: Use standard markdown ![alt](/path/to.gif) or ContentImage
  */
 export function useMDXComponents(components?: MDXComponents): MDXComponents {
@@ -114,6 +129,14 @@ export function useMDXComponents(components?: MDXComponents): MDXComponents {
     PublicChart,
     KalshiHistoricalDataQuery,
     PolymarketHistoricalDataQuery,
+    KalshiTradeHistoryRecipeDemo,
+    RecipeFindMarketAnimation,
+    RecipeMarketDetailsAnimation,
+    RecipeRunAnimation,
+    RecipeExportAnimation,
+    TradeSourceRoutingDiagram,
+    TradesVsCandlesChart,
+    TradeRowAnatomy,
     NewsletterSignup,
     ...components,
   };

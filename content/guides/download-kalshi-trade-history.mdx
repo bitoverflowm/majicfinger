@@ -1,0 +1,167 @@
+---
+title: "Download Kalshi Market Trade History: CSV, Excel & JSON"
+description: "Download the full trade history for a Kalshi market without coding. Search for the market, check its details, load every trade, and export CSV, Excel (XLSX), or JSON."
+publishedAt: "2026-10-31"
+author: "misterrpink"
+topics: ["kalshi", "kalshi historical", "data download", "prediction markets", "historical data", "trade history", "data exports"]
+tags: ["kalshi", "kalshi historical", "data download"]
+integration: ["Kalshi", "Lychee", "Kalshi_Historical"]
+section: "feature-releases"
+contentType: "Recipe"
+cluster: "Data download"
+intent: "How-to"
+difficulty: "Beginner"
+coverImage: "/images/guides/download-kalshi-trade-history/main.png"
+ogImage: "https://lycheedata.com/images/guides/download-kalshi-trade-history/main.png"
+featured: false
+slug: "/download-kalshi-trade-history"
+readingTime: "6 min"
+keywords: [
+  "kalshi trade history",
+  "kalshi trade data",
+  "kalshi data download",
+  "kalshi historical trade data",
+  "kalshi trade history csv",
+  "download kalshi trades"
+]
+canonical: "https://lycheedata.com/guides/download-kalshi-trade-history"
+seoTitle: "Download Kalshi Trade History: CSV, Excel & JSON"
+twitterCard: "summary_large_image"
+---
+
+To download a Kalshi market's historical trade data in Lychee, open the **Download Kalshi Trade History** recipe, find the market by name or ticker, check its details, then click **Save and Go**. Lychee loads every trade into a sheet, which you can export as **CSV, Excel (XLSX), or JSON**. No coding required.
+
+This recipe covers public trades for a selected market. For your personal transactions or account statements, use [Kalshi's account export instructions](https://help.kalshi.com/en/articles/13823848-trading-history).
+
+[Try the recipe in the live demo →](/?recipe=kalshiTradeHistory#demo)
+
+## How to download Kalshi trade history
+
+### 1. Open the recipe and find your market
+
+Open Lychee and pick **Download Kalshi Trade History** from the **Recipes** list on the left of the data picker. Search in plain English, type a market name, or paste a market ticker, event ticker, or Kalshi link.
+
+<RecipeFindMarketAnimation />
+
+Recurring markets return lots of near-identical results. A search for "Bitcoin price" lists one contract per strike and per hour, so read the strike and the close time on each card before you pick one.
+
+### 2. Check the market details
+
+When you select a market, the **Market details** panel fills in. Use it to confirm you have the right contract before you load anything:
+
+- **Question, strike, and ticker** tell you exactly which outcome you picked.
+- **Status** shows whether the market is open, closed, or settled.
+- **Last price, bid/ask, volume, and open interest** give you a quick sense of how active it is.
+- **Opened and closes** show the market's lifetime, which is the window its trades will cover.
+
+Below the stats, **Trade history source** shows which Kalshi dataset the trades will come from. You don't need to choose a source yourself.
+
+<RecipeMarketDetailsAnimation />
+
+There's no date picker. The recipe always pulls the market's full trade history, from its first trade up to the moment you run it. If you only need part of that history, see [narrowing to a date range](#need-only-part-of-the-history) below.
+
+### 3. Click Save and Go, then review the trades
+
+Click **Save and Go**. A progress card works through four steps: finding the market, routing it to a source, pulling the trades, and placing the sheet. When it reads **Trade history ready**, click **View dashboard**.
+
+<RecipeRunAnimation />
+
+You get a sheet titled **Trades · TICKER**, with one row per trade, plus a default chart of the last traded yes and no prices. Before you use the data, check that the first and last timestamps cover the period you care about.
+
+Read the price columns carefully. Kalshi reports prices in dollars, so a **Yes Price Dollars** value of 0.39 means 39¢. Check the time zone of **Created Time** too, and keep both consistent when you compare the trades with another dataset.
+
+<TradeRowAnatomy />
+
+### 4. Export as CSV, Excel, or JSON
+
+Hover over the trade sheet, open its **⋮** menu, and choose **Export**. Then pick a format:
+
+| Format | Use it for |
+| --- | --- |
+| CSV | Importing trade data into spreadsheets, Python, R, or other analysis tools |
+| Excel (XLSX) | Working with the downloaded table in Excel |
+| JSON | Processing records in scripts or applications |
+
+<RecipeExportAnimation />
+
+The file is named after the sheet, for example `trades-kxbtcd-26oct3108-t77299-99.csv`. Check its row count against the sheet before you start your analysis.
+
+Anyone can run the recipe and view the trades in the free demo. Exporting is included in every paid Lychee plan, within that plan's export limits.
+
+<KalshiTradeHistoryRecipeDemo />
+
+## Where do the trades come from?
+
+Kalshi's trade history is split across several datasets, depending on when a market traded. The recipe checks the market's dates and routes it for you:
+
+- **Kalshi Live** for markets still trading, or settled after the live cutoff.
+- **Kalshi Historical v1** for markets that closed between Kalshi's launch and December 2025.
+- **Kalshi Historical v2** for everything else up to the live cutoff.
+
+A market that opened before the cutoff and is still trading gets both: recent trades from Kalshi Live and older trades from Historical v2, in one sheet.
+
+<TradeSourceRoutingDiagram />
+
+If a settled market has no trade tape in Historical v2, the recipe loads its candlesticks instead, and the sheet is titled **Candlesticks · TICKER**. Candlesticks summarize prices per interval rather than listing individual trades, so check the sheet title before you treat the rows as executions.
+
+## Need only part of the history?
+
+The recipe always loads the full history, so narrow it after loading. Sort the export by **Created Time** and keep the rows inside your window. For example, keep the hour around an announcement, or the final day before the market closed. Write the window you used into your research notes.
+
+One sheet holds up to 500,000 rows. If a market has more trades than that, the progress card says the pull stopped at the limit, so check the earliest timestamp before you treat the sheet as the market's complete history.
+
+<NewsletterSignup />
+
+## What can you analyze with the downloaded trades?
+
+Start with a specific question about the selected market:
+
+- How did executed prices change around an announcement?
+- When was trading activity concentrated?
+- Were larger trades clustered at particular times or prices?
+
+Trade history records executions. On its own, it doesn't show every resting order, and it doesn't prove that your own order would have filled at a historical price. Keep that distinction in mind if you use the export for backtesting.
+
+<TradesVsCandlesChart />
+
+For broader dataset access and research workflows, see the [Kalshi historical-data guide](/guides/kalshi-historical-data). To understand volume before aggregating your results, read [what volume means on Kalshi](/guides/what-does-volume-mean-on-kalshi).
+
+## Frequently asked questions
+
+### Can you export Kalshi market data without coding?
+
+Yes. The recipe lets you find a market, load its full trade history, and export it from the sheet's menu, without writing a script.
+
+### Can I download Kalshi trades as CSV or Excel?
+
+Yes. Open the trade sheet's **⋮** menu, choose **Export**, and pick CSV or Excel (.xlsx). JSON is also available. Exporting needs a paid Lychee plan.
+
+### Is the recipe free?
+
+You can search for a market and load its trades in the free demo without an account. Exporting the file is included in every paid plan, within that plan's export limits.
+
+### Do I need to know the market ticker?
+
+No. You can search by market name or in plain English. If you already have a ticker, event ticker, or Kalshi link, paste it to jump straight to the contract.
+
+### Can I filter the trade history by date?
+
+Not inside the recipe. It loads the market's full history, and you trim the rows to your research window by their **Created Time** after loading.
+
+### How many trades can I download?
+
+Up to 500,000 rows per sheet. The progress card tells you if a pull stops at the limit.
+
+### Is trade history the same as price history?
+
+No. Trade history contains individual executions. A price-history dataset instead contains sampled prices or candles that summarize each interval. Use trades when you need to inspect individual executions, and check the source and granularity when you compare them with a chart.
+
+### Does this download my personal Kalshi transactions?
+
+No. This recipe downloads public market trades. Your own transactions, fees, and account statements are a separate export available through your Kalshi account.
+
+## Download your market's trades
+
+Find the market, check its details, load the trades, and export the format you need.
+
+[Open the Download Kalshi Trade History recipe →](/?recipe=kalshiTradeHistory#demo)

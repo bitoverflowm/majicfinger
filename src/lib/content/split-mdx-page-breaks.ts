@@ -5,6 +5,7 @@ import { renderMDXBody } from "@/lib/content/mdx";
 export const MDX_PAGE_BREAK_TAG_NAMES = [
   "KalshiHistoricalDataQuery",
   "PolymarketHistoricalDataQuery",
+  "KalshiTradeHistoryRecipeDemo",
 ] as const;
 
 export type MdxSourceSegment =

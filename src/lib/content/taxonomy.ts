@@ -2,6 +2,8 @@ export type ContentClass =
   | "research"
   | "explainer"
   | "guide"
+  /** Step-by-step walkthrough of one Lychee recipe. A kind of guide, shown in its own bucket. */
+  | "recipe"
   | "changelog"
   | "dashboard";
 
@@ -14,6 +16,7 @@ export type IntegrationHub =
 
 export type IntegrationTopic =
   | "overview"
+  | "data-download"
   | "volume"
   | "politics"
   | "weather"
@@ -29,6 +32,7 @@ export const CONTENT_CLASS_LABELS: Record<ContentClass, string> = {
   research: "Research",
   explainer: "Explainers",
   guide: "Guides",
+  recipe: "Recipes",
   changelog: "Changelog",
 };
 
@@ -38,6 +42,7 @@ export const CONTENT_CLASS_ORDER: ContentClass[] = [
   "research",
   "explainer",
   "guide",
+  "recipe",
 ];
 
 export const INTEGRATION_HUB_ORDER: IntegrationHub[] = [
@@ -59,9 +64,10 @@ export const INTEGRATION_HUBS: Record<IntegrationHub, IntegrationHubMeta> = {
   "kalshi-historical": {
     label: "Kalshi Historical",
     href: "/kalshi-historical-data",
-    topicOrder: ["overview", "volume", "politics", "weather"],
+    topicOrder: ["overview", "data-download", "volume", "politics", "weather"],
     topicLabels: {
       overview: "Overview",
+      "data-download": "Data download",
       volume: "Volume",
       politics: "Politics",
       weather: "Weather",

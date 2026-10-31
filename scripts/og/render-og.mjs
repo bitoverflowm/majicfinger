@@ -206,10 +206,73 @@ const wordmark = () =>
       h("div", { fontSize: 26, fontWeight: 900, color: "#fff", letterSpacing: -0.5 }, "EVERY SIGNAL.")),
   );
 
+function RecipePeek({ left = 640, top = 92 }) {
+  const BLUE = "#2f6fed";
+  const label = { fontSize: 11, color: "#71717a" };
+  const rows = [
+    ["16:49:41", "300", "0.39", "0.61", "yes"],
+    ["16:49:58", "22.38", "0.39", "0.61", "yes"],
+    ["16:50:03", "6.29", "0.38", "0.62", "no"],
+    ["16:50:07", "13.63", "0.37", "0.63", "no"],
+  ];
+  const cell = (text, width, color = "#3f3f46") => h("div", { width, ...mono, fontSize: 12, color }, text);
+  return h(
+    "div",
+    { position: "absolute", left, top, width: 760, height: 600, display: "flex", flexDirection: "column", backgroundColor: "#fff", borderRadius: 16, border: "1px solid #e4e4e7", boxShadow: "0 24px 60px rgba(24,24,27,0.10)", overflow: "hidden" },
+    h("div", { display: "flex", alignItems: "center", gap: 8, height: 38, paddingLeft: 16, borderBottom: "1px solid #f0f0f2" },
+      ...["#ef4444", "#f59e0b", "#22c55e"].map((c) => h("div", { width: 10, height: 10, borderRadius: 9999, backgroundColor: c, opacity: 0.55 })),
+      h("div", { marginLeft: 12, fontSize: 12, color: "#71717a" }, "Lychee Terminal")),
+    h("div", { display: "flex", flexDirection: "column", padding: "18px 22px", gap: 12 },
+      h("div", { ...mono, fontSize: 10, letterSpacing: 1.4, color: "#a1a1aa" }, "RECIPE"),
+      h("div", { fontSize: 22, fontWeight: 600, letterSpacing: -0.5, color: "#18181b" }, "Download Kalshi Trade History"),
+      h("div", { display: "flex", alignItems: "center", height: 40, padding: "0 14px", border: "1px solid #d4d4d8", borderRadius: 12, fontSize: 14, color: "#18181b" }, "Bitcoin price"),
+      h("div", { display: "flex", flexDirection: "column", gap: 3, padding: "10px 14px", border: `1.5px solid ${BLUE}`, borderRadius: 12, backgroundColor: "#e7f0ff", width: 380 },
+        h("div", { fontSize: 13, fontWeight: 600, color: "#18181b" }, "Bitcoin price Above/below"),
+        h("div", { fontSize: 12, color: "#71717a" }, "$77,300 or above"),
+        h("div", { ...mono, fontSize: 10.5, color: "#71717a" }, "KXBTCD-26OCT3108-T77299.99")),
+      h("div", { display: "flex", flexDirection: "column", border: "1px solid #ececef", borderRadius: 12, overflow: "hidden", marginTop: 4 },
+        h("div", { display: "flex", alignItems: "center", gap: 8, padding: "8px 12px", borderBottom: "1px solid #ececef" },
+          h("div", { fontSize: 12, fontWeight: 600, color: "#18181b" }, "Trades · KXBTCD-26OCT3108-T77299.99"),
+          h("div", { ...label, marginLeft: "auto" }, "187 rows")),
+        h("div", { display: "flex", backgroundColor: "#fafafa", borderBottom: "1px solid #ececef", padding: "7px 12px", ...mono, fontSize: 10.5, color: "#71717a" },
+          ...[["time", 110], ["count", 90], ["yes $", 90], ["no $", 90], ["taker", 90]].map(([c, w]) => h("div", { width: w }, c))),
+        ...rows.map((row) =>
+          h("div", { display: "flex", padding: "7px 12px", borderBottom: "1px solid #f4f4f5" },
+            cell(row[0], 110, "#71717a"), cell(row[1], 90), cell(row[2], 90), cell(row[3], 90), cell(row[4], 90, row[4] === "yes" ? "#0f9f6e" : "#e5484d"))))),
+  );
+}
+
+/* Cover + OG image for the Download Kalshi Trade History recipe guide. */
+const tradeHistoryRecipe = () =>
+  Frame(
+    { backgroundColor: PAPER },
+    h("div", { position: "absolute", left: 80, top: 70, display: "flex" }, BrandRow({})),
+    h("div", { position: "absolute", left: 80, top: 176, display: "flex", flexDirection: "column" },
+      h("div", { ...mono, fontSize: 15, letterSpacing: 2.4, color: "#71717a", marginBottom: 14 }, "RECIPE GUIDE"),
+      h("div", productLine, "Download"),
+      h("div", productLine, KalshiTile(52), "trade"),
+      h("div", productLine, "history")),
+    h("div", { position: "absolute", left: 80, bottom: 78, display: "flex", alignItems: "center", gap: 12, ...mono, fontSize: 17, letterSpacing: 2, color: "#27272a" }, "CSV · EXCEL · JSON · NO CODE"),
+    RecipePeek({}),
+    Sticker(
+      { left: 610, top: 515, transform: "rotate(-7deg)", backgroundColor: KALSHI_GREEN, borderRadius: 10, padding: "10px 16px", flexDirection: "column", gap: 2, border: "2px dashed rgba(255,255,255,0.7)" },
+      h("div", { ...mono, fontSize: 11, letterSpacing: 1.8, color: "rgba(255,255,255,0.9)" }, "FULL HISTORY"),
+      h("div", { fontSize: 28, fontWeight: 900, color: "#fff", letterSpacing: -0.8 }, "187 TRADES")),
+    Sticker(
+      { right: 44, top: 60, transform: "rotate(7deg)", backgroundColor: SIGNAL_PINK, borderRadius: 9999, padding: "12px 24px", alignItems: "center", gap: 10 },
+      h("div", { width: 9, height: 9, borderRadius: 9999, backgroundColor: "#fff" }),
+      h("div", { fontSize: 22, fontWeight: 900, color: "#fff", letterSpacing: -0.4 }, "EXPORT .CSV")),
+  );
+
 const IMAGES = {
   "lychee-research-terminal": researchTerminal,
   "lychee-research-terminal-stickers": researchTerminalStickers,
   "lychee-wordmark": wordmark,
+};
+
+/** Guide covers, written to public/images/guides/<slug>/main.png (the path guides use for coverImage/ogImage). */
+const GUIDE_IMAGES = {
+  "download-kalshi-trade-history": tradeHistoryRecipe,
 };
 
 const FONTS = [
@@ -222,10 +285,15 @@ const FONTS = [
 const names = process.argv.slice(2);
 const outDir = path.join(root, "public/og");
 
-for (const [name, render] of Object.entries(IMAGES)) {
+const targets = [
+  ...Object.entries(IMAGES).map(([name, render]) => [name, render, path.join(outDir, `${name}.png`)]),
+  ...Object.entries(GUIDE_IMAGES).map(([slug, render]) => [slug, render, path.join(root, "public/images/guides", slug, "main.png")]),
+];
+
+for (const [name, render, out] of targets) {
   if (names.length && !names.includes(name)) continue;
   const res = new ImageResponse(render(), { width: W, height: H, fonts: FONTS });
-  const out = path.join(outDir, `${name}.png`);
+  fs.mkdirSync(path.dirname(out), { recursive: true });
   fs.writeFileSync(out, Buffer.from(await res.arrayBuffer()));
   console.log(`wrote ${path.relative(root, out)}`);
 }

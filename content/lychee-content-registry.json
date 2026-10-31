@@ -8,6 +8,12 @@
       "integrationTopic": "overview"
     },
     {
+      "slug": "download-kalshi-trade-history",
+      "contentClass": "recipe",
+      "integrationHub": "kalshi-historical",
+      "integrationTopic": "data-download"
+    },
+    {
       "href": "/misterrpink/dashboards/kalshi-volume-dashboard",
       "title": "Kalshi Volume Dashboard",
       "contentClass": "dashboard",
@@ -134,6 +140,13 @@
       "contentClass": "guide",
       "integrationHub": "platform",
       "integrationTopic": "general"
+    },
+    {
+      "slug": "download-kalshi-trade-history",
+      "contentClass": "changelog",
+      "integrationHub": "platform",
+      "integrationTopic": "general",
+      "publishedAt": "2026-10-31"
     },
     {
       "slug": "compare-kalshi-polymarket-odds",
