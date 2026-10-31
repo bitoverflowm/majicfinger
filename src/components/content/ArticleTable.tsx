@@ -13,9 +13,10 @@ export const ARTICLE_TABLE_CLASS = cn(
   "[&_th]:text-center [&_th]:font-bold [&_th]:text-[#4d6575] dark:[&_th]:text-foreground",
   "[&_td]:border [&_td]:border-[#d4e3ed] dark:[&_td]:border-border",
   "[&_td]:px-2 [&_td]:py-2 sm:[&_td]:px-4 sm:[&_td]:py-2.5",
-  "[&_td]:text-center dark:[&_td]:text-foreground/90",
+  "[&_td]:text-center dark:[&_td]:text-foreground",
   "[&_tbody_tr:nth-child(odd)]:bg-white dark:[&_tbody_tr:nth-child(odd)]:bg-card",
-  "[&_tbody_tr:nth-child(even)]:bg-[#eef4f8] dark:[&_tbody_tr:nth-child(even)]:bg-muted/40",
+  // Theme colors are plain CSS vars, so Tailwind opacity modifiers (e.g. bg-muted/40) emit nothing; use white/black alpha.
+  "[&_tbody_tr:nth-child(even)]:bg-[#eef4f8] dark:[&_tbody_tr:nth-child(even)]:bg-white/[0.04]",
 );
 
 /** Centered mono caption below tables (optional MDX sibling). */

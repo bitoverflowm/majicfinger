@@ -10,10 +10,10 @@ export const LYCHEE_CONTENT_TYPE = {
   lead: "mx-auto mt-3 max-w-2xl text-balance text-center font-article text-xs leading-relaxed text-muted-foreground text-pretty sm:mt-4 sm:text-sm",
   body: "text-[13px] leading-[1.65] tracking-normal sm:text-sm",
   sectionH2:
-    "mt-8 scroll-mt-28 font-article text-[13px] font-bold text-pretty text-gray-700 leading-snug tracking-normal sm:mt-10 sm:text-sm",
+    "mt-8 scroll-mt-28 font-article text-[15px] font-bold text-pretty text-gray-700 dark:text-gray-300 leading-snug tracking-normal sm:mt-10 sm:text-base",
   proseH2:
-    "prose-h2:text-[13px] prose-h2:font-bold prose-h2:text-pretty prose-h2:text-gray-700 prose-h2:leading-snug prose-h2:tracking-normal sm:prose-h2:text-sm",
-  /** Same size as h2; hierarchy comes from weight (h2 bold, h3 semibold, h4 medium) and spacing. */
+    "prose-h2:text-[15px] prose-h2:font-bold prose-h2:text-pretty prose-h2:text-gray-700 dark:prose-h2:text-gray-300 prose-h2:leading-snug prose-h2:tracking-normal sm:prose-h2:text-base",
+  /** Body size, one step below h2; h3 semibold, h4 medium. */
   proseH3: "prose-h3:text-[13px] prose-h3:font-semibold prose-h3:leading-snug sm:prose-h3:text-sm",
   proseH4: "prose-h4:text-[13px] prose-h4:font-medium prose-h4:leading-snug sm:prose-h4:text-sm",
 } as const;
