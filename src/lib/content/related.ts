@@ -3,6 +3,8 @@ import {
   getAllContentForSearch,
   getContentBySlug,
 } from "./index";
+import { getLycheeContentRegistry } from "./lychee-content-registry";
+import type { ContentClass } from "./taxonomy";
 import type { BaseContent, ContentItem, ContentType } from "./types";
 
 export type RelatedItem = {
@@ -11,8 +13,31 @@ export type RelatedItem = {
   title: string;
   description: string;
   publishedAt?: string;
+  /** e.g. "Guide", "Research", "Recipe". */
+  category?: string;
+  author?: string;
+  readingTime?: string;
   relevanceScore: number;
 };
+
+const CONTENT_CLASS_SINGULAR: Record<ContentClass, string> = {
+  dashboard: "Dashboard",
+  research: "Research",
+  explainer: "Explainer",
+  guide: "Guide",
+  changelog: "Changelog",
+};
+
+/** Slug → category label from the registry, preferring a non-changelog designation. */
+function registryCategoryBySlug(): Map<string, string> {
+  const map = new Map<string, string>();
+  for (const entry of getLycheeContentRegistry()) {
+    if (!entry.slug) continue;
+    if (map.has(entry.slug) && entry.contentClass === "changelog") continue;
+    map.set(entry.slug, CONTENT_CLASS_SINGULAR[entry.contentClass]);
+  }
+  return map;
+}
 
 function computeRelevanceScore(
   current: BaseContent,
@@ -69,12 +94,18 @@ export function getRelatedContent(
     })
     .slice(0, limit);
 
+  const categories = registryCategoryBySlug();
+
   return scored.map((item) => ({
     slug: item.slug,
     contentType: item.contentType,
     title: item.frontmatter.title,
     description: item.frontmatter.description,
     publishedAt: item.frontmatter.publishedAt,
+    category:
+      item.frontmatter.contentType?.trim() || categories.get(item.slug),
+    author: item.frontmatter.author?.trim() || undefined,
+    readingTime: item.frontmatter.readingTime?.trim() || undefined,
     relevanceScore: item.relevanceScore,
   }));
 }

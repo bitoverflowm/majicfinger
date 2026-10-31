@@ -13,8 +13,9 @@ export const LYCHEE_CONTENT_TYPE = {
     "mt-8 scroll-mt-28 font-article text-[13px] font-bold text-pretty text-gray-700 leading-snug tracking-normal sm:mt-10 sm:text-sm",
   proseH2:
     "prose-h2:text-[13px] prose-h2:font-bold prose-h2:text-pretty prose-h2:text-gray-700 prose-h2:leading-snug prose-h2:tracking-normal sm:prose-h2:text-sm",
-  proseH3: "prose-h3:text-[1rem] prose-h3:leading-snug sm:prose-h3:text-[1.0625rem]",
-  proseH4: "prose-h4:text-[0.9rem] prose-h4:leading-snug sm:prose-h4:text-[0.9375rem]",
+  /** Same size as h2; hierarchy comes from weight (h2 bold, h3 semibold, h4 medium) and spacing. */
+  proseH3: "prose-h3:text-[13px] prose-h3:font-semibold prose-h3:leading-snug sm:prose-h3:text-sm",
+  proseH4: "prose-h4:text-[13px] prose-h4:font-medium prose-h4:leading-snug sm:prose-h4:text-sm",
 } as const;
 
 /** Fixed reading measure — card grows; text column never widens. */
@@ -45,14 +46,13 @@ export const ARTICLE_PROSE_CLASS = cn(
   "prose-h1:text-[1.125rem] prose-h1:font-normal prose-h1:leading-snug prose-h1:mt-8 prose-h1:mb-3 sm:prose-h1:text-[1.25rem] sm:prose-h1:mt-12 sm:prose-h1:mb-4",
   "prose-h2:mt-8 prose-h2:mb-3 sm:prose-h2:mt-10 sm:prose-h2:mb-4",
   LYCHEE_CONTENT_TYPE.proseH2,
-  "[&_h2_a.anchor]:font-bold [&_h2_a.anchor]:text-gray-700 [&_h2_a.anchor]:no-underline [&_h2_a.anchor]:decoration-transparent",
-  "prose-h3:mt-6 prose-h3:mb-2 prose-h3:font-normal sm:prose-h3:mt-8 sm:prose-h3:mb-3",
+  "prose-h3:mt-6 prose-h3:mb-2 sm:prose-h3:mt-8 sm:prose-h3:mb-2",
   LYCHEE_CONTENT_TYPE.proseH3,
-  "prose-h4:mt-5 prose-h4:font-normal sm:prose-h4:mt-6",
+  "prose-h4:mt-5 sm:prose-h4:mt-6",
   LYCHEE_CONTENT_TYPE.proseH4,
   "prose-p:mb-4 prose-p:break-words prose-p:text-[13px] prose-p:leading-[1.65] prose-p:tracking-normal sm:prose-p:text-sm",
   "prose-li:my-0.5 prose-li:break-words prose-li:text-[13px] prose-li:leading-[1.65] sm:prose-li:text-sm",
-  "prose-a:font-normal prose-a:text-secondary prose-a:underline prose-a:underline-offset-2 prose-a:decoration-secondary/40 hover:prose-a:decoration-secondary",
+  "prose-a:font-normal prose-a:text-inherit prose-a:underline prose-a:underline-offset-2 prose-a:[text-decoration-color:color-mix(in_srgb,currentColor_45%,transparent)] hover:prose-a:decoration-current",
   "prose-strong:font-semibold",
   "prose-blockquote:border-l-border prose-blockquote:font-normal prose-blockquote:not-italic prose-blockquote:text-muted-foreground",
   "prose-pre:bg-muted prose-pre:text-foreground prose-pre:border prose-pre:border-border prose-pre:rounded-lg prose-pre:font-mono prose-pre:text-[0.8125rem]",
