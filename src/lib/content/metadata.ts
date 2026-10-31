@@ -25,6 +25,11 @@ function resolveCanonicalUrl(
   return `${SITE_URL}/${contentType}/${slug}`;
 }
 
+/** Descriptions may contain line breaks for the on-page lead; meta tags and JSON-LD get one line. */
+function metaDescription(description: string | undefined): string | undefined {
+  return description?.replace(/\s+/g, " ").trim();
+}
+
 /** Parse "8 min", "8 minutes" → ISO 8601 duration for schema.org timeRequired. */
 function readingTimeToIsoDuration(readingTime: string | undefined): string | undefined {
   if (!readingTime?.trim()) return undefined;
@@ -52,10 +57,11 @@ export function buildContentMetadata(
     `${SITE_URL}/og/lychee-research-terminal.png`;
   const ogImageUrl = ogImage.startsWith("http") ? ogImage : `${SITE_URL}${ogImage}`;
   const twitterCard = frontmatter.twitterCard ?? "summary_large_image";
+  const description = metaDescription(frontmatter.description);
 
   return {
     title: displayTitle,
-    description: frontmatter.description,
+    description,
     alternates: { canonical },
     robots: {
       index: true,
@@ -70,7 +76,7 @@ export function buildContentMetadata(
     },
     openGraph: {
       title: displayTitle,
-      description: frontmatter.description,
+      description,
       url: canonical,
       siteName: "Lychee",
       images: [
@@ -89,7 +95,7 @@ export function buildContentMetadata(
     twitter: {
       card: twitterCard,
       title: displayTitle,
-      description: frontmatter.description,
+      description,
       images: [ogImageUrl],
     },
     keywords: frontmatter.keywords,
@@ -127,7 +133,7 @@ export function buildArticleJsonLd(
     "@context": "https://schema.org",
     "@type": "Article",
     headline: displayTitle,
-    description: frontmatter.description,
+    description: metaDescription(frontmatter.description),
     image: imageUrl,
     datePublished: frontmatter.publishedAt,
     dateModified: frontmatter.updatedAt || frontmatter.publishedAt,

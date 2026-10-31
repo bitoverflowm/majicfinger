@@ -93,10 +93,7 @@ export function LycheeContentSidebar({
       </div>
 
       <div className="min-h-0 overflow-y-auto pb-6 pr-1 xl:pb-8 xl:pr-2">
-        <section className="mb-5">
-          <h2 className="mb-2 font-mono text-[10px] font-medium uppercase tracking-[0.14em] text-foreground">
-            Platform
-          </h2>
+        <section className="mb-5" aria-label="Site">
           <NavLinkList items={data.platform} currentPath={currentPath} />
         </section>
 

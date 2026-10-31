@@ -79,7 +79,7 @@ export async function GuideLayout({
                       />
                       <ArticleTitle>{frontmatter.title}</ArticleTitle>
                       {frontmatter.description && (
-                        <ArticleLead>{frontmatter.description}</ArticleLead>
+                        <ArticleLead className="whitespace-pre-line">{frontmatter.description}</ArticleLead>
                       )}
                       <ArticleHeaderRule />
                     </header>

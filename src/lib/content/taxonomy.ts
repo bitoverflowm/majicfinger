@@ -2,8 +2,6 @@ export type ContentClass =
   | "research"
   | "explainer"
   | "guide"
-  /** Step-by-step walkthrough of one Lychee recipe. A kind of guide, shown in its own bucket. */
-  | "recipe"
   | "changelog"
   | "dashboard";
 
@@ -12,18 +10,17 @@ export type IntegrationHub =
   | "kalshi-live"
   | "polymarket-historical"
   | "polymarket-live"
+  | "chainlink"
   | "platform";
 
 export type IntegrationTopic =
   | "overview"
-  | "data-download"
   | "volume"
   | "politics"
   | "weather"
   | "markets"
   | "api"
   | "general"
-  | "chainlink"
   | "sports"
   | "finance";
 
@@ -32,7 +29,6 @@ export const CONTENT_CLASS_LABELS: Record<ContentClass, string> = {
   research: "Research",
   explainer: "Explainers",
   guide: "Guides",
-  recipe: "Recipes",
   changelog: "Changelog",
 };
 
@@ -42,7 +38,7 @@ export const CONTENT_CLASS_ORDER: ContentClass[] = [
   "research",
   "explainer",
   "guide",
-  "recipe",
+  "changelog",
 ];
 
 export const INTEGRATION_HUB_ORDER: IntegrationHub[] = [
@@ -50,6 +46,7 @@ export const INTEGRATION_HUB_ORDER: IntegrationHub[] = [
   "kalshi-live",
   "polymarket-historical",
   "polymarket-live",
+  "chainlink",
   "platform",
 ];
 
@@ -64,10 +61,9 @@ export const INTEGRATION_HUBS: Record<IntegrationHub, IntegrationHubMeta> = {
   "kalshi-historical": {
     label: "Kalshi Historical",
     href: "/kalshi-historical-data",
-    topicOrder: ["overview", "data-download", "volume", "politics", "weather"],
+    topicOrder: ["overview", "volume", "politics", "weather"],
     topicLabels: {
-      overview: "Overview",
-      "data-download": "Data download",
+      overview: "Product",
       volume: "Volume",
       politics: "Politics",
       weather: "Weather",
@@ -78,7 +74,7 @@ export const INTEGRATION_HUBS: Record<IntegrationHub, IntegrationHubMeta> = {
     href: "/kalshi-live-data",
     topicOrder: ["overview", "markets"],
     topicLabels: {
-      overview: "Overview",
+      overview: "Product",
       markets: "Markets",
     },
   },
@@ -87,7 +83,7 @@ export const INTEGRATION_HUBS: Record<IntegrationHub, IntegrationHubMeta> = {
     href: "/polymarket-historical-data",
     topicOrder: ["overview", "markets"],
     topicLabels: {
-      overview: "Overview",
+      overview: "Product",
       markets: "Markets",
     },
   },
@@ -96,18 +92,25 @@ export const INTEGRATION_HUBS: Record<IntegrationHub, IntegrationHubMeta> = {
     href: "/polymarket-live-data",
     topicOrder: ["overview", "api", "markets"],
     topicLabels: {
-      overview: "Overview",
+      overview: "Product",
       api: "API & Metadata",
       markets: "Markets",
+    },
+  },
+  chainlink: {
+    label: "Chainlink",
+    href: "/integrations/chainlink",
+    topicOrder: ["overview"],
+    topicLabels: {
+      overview: "Product",
     },
   },
   platform: {
     label: "Platform",
     href: "/guides",
-    topicOrder: ["general", "chainlink"],
+    topicOrder: ["general"],
     topicLabels: {
       general: "General",
-      chainlink: "Chainlink",
     },
   },
 };

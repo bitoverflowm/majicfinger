@@ -9,9 +9,9 @@
     },
     {
       "slug": "download-kalshi-trade-history",
-      "contentClass": "recipe",
+      "contentClass": "guide",
       "integrationHub": "kalshi-historical",
-      "integrationTopic": "data-download"
+      "integrationTopic": "overview"
     },
     {
       "href": "/misterrpink/dashboards/kalshi-volume-dashboard",
@@ -158,8 +158,8 @@
     {
       "slug": "embed-interactive-charts",
       "contentClass": "changelog",
-      "integrationHub": "platform",
-      "integrationTopic": "chainlink",
+      "integrationHub": "chainlink",
+      "integrationTopic": "overview",
       "publishedAt": "2026-04-15"
     },
     {

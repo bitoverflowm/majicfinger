@@ -36,7 +36,7 @@ export type LycheeContentNavSection = {
   /** Hub landing page — integration sections only. */
   hubHref?: string;
   topics?: LycheeContentNavTopic[];
-  /** Flat list — Build in public changelogs. */
+  /** Flat list of links, used instead of topics. */
   items?: LycheeContentNavLink[];
 };
 
@@ -126,6 +126,11 @@ function buildTopicBuckets(
       (entry) => entry.contentClass === contentClass,
     );
     if (bucketEntries.length === 0) continue;
+    if (contentClass === "changelog") {
+      bucketEntries.sort((a, b) =>
+        (b.publishedAt ?? "").localeCompare(a.publishedAt ?? ""),
+      );
+    }
 
     buckets.push({
       id: contentClass,
@@ -172,8 +177,7 @@ function buildIntegrationSections(
 
   for (const hubId of INTEGRATION_HUB_ORDER) {
     const hubEntries = entries.filter(
-      (entry) =>
-        entry.integrationHub === hubId && entry.contentClass !== "changelog",
+      (entry) => entry.integrationHub === hubId,
     );
     if (hubEntries.length === 0) continue;
 
@@ -226,33 +230,10 @@ function buildIntegrationSections(
   return sections;
 }
 
-function buildBuildInPublicSection(
-  entries: ResolvedRegistryEntry[],
-): LycheeContentNavSection | null {
-  const changelogs = entries
-    .filter((entry) => entry.contentClass === "changelog")
-    .sort((a, b) =>
-      (b.publishedAt ?? "").localeCompare(a.publishedAt ?? ""),
-    );
-
-  if (changelogs.length === 0) return null;
-
-  return {
-    id: "build-in-public",
-    label: "Build in public",
-    items: changelogs.map(toNavLink),
-  };
-}
-
 /** Server-side nav tree for lychee_content reading chrome (sidebar). */
 export function getLycheeContentNavData(): LycheeContentNavData {
   const registry = getLycheeContentRegistry();
   const sections = buildIntegrationSections(registry);
-  const buildInPublic = buildBuildInPublicSection(registry);
-
-  if (buildInPublic) {
-    sections.push(buildInPublic);
-  }
 
   return {
     platform: [

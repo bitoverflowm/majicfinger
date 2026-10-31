@@ -17,7 +17,7 @@ export type RegistryEntry = {
   href?: string;
   /** Display title; resolved from frontmatter when slug is set. */
   title?: string;
-  /** ISO date for changelog ordering in Build in public. */
+  /** ISO date for ordering changelog entries, newest first. */
   publishedAt?: string;
 };
 
