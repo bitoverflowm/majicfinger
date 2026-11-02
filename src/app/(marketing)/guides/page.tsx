@@ -3,6 +3,7 @@ import { CTASection } from "@/components/sections/cta-section";
 import { FooterSection } from "@/components/sections/footer-section";
 import { NewsletterInline } from "@/components/newsletter/newsletter-signup";
 import { getAllContent } from "@/lib/content";
+import { listUniversityLessons } from "@/lib/university/lessons";
 import { canonicalUrl } from "@/lib/site";
 import type { ContentItem } from "@/lib/content/types";
 
@@ -28,9 +29,11 @@ export default function GuidesIndexPage() {
     console.warn("Content could not be loaded:", e);
   }
 
+  const universityLesson = listUniversityLessons()[0] ?? null;
+
   return (
     <main className="flex min-h-screen w-full flex-col items-center justify-center divide-y divide-border bg-background font-sans antialiased theme-landing scroll-smooth">
-      <GuidesSection articles={articles} />
+      <GuidesSection articles={articles} universityLesson={universityLesson} />
       <NewsletterInline band />
       <CTASection />
       <FooterSection />

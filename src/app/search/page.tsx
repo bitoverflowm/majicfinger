@@ -20,6 +20,7 @@ type SearchIndexItem = {
 const CONTENT_TYPES = [
   "guides",
   "blog",
+  "university",
   "integrations",
   "concepts",
   "playbooks",
@@ -114,7 +115,7 @@ export default function SearchPage() {
         <Section>
           <H1>Search</H1>
           <P className="text-muted-foreground">
-            Search across guides, blog posts, integrations, concepts, playbooks, and published dashboards.
+            Search across university lessons, guides, blog posts, integrations, concepts, playbooks, and published dashboards.
           </P>
         </Section>
 

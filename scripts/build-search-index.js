@@ -5,6 +5,7 @@ const CONTENT_DIR = path.join(process.cwd(), "content");
 const CONTENT_TYPES = [
   "guides",
   "blog",
+  "university",
   "integrations",
   "concepts",
   "playbooks",

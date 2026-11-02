@@ -17,6 +17,7 @@ export const siteConfig = {
   nav: {
     links: [
       { id: "guides", name: "Research", href: "/#guides" },
+      { id: "university", name: "University", href: "/university" },
       { id: "changelog", name: "What's New", href: "/changelog" },
       { id: "pricing", name: "Pricing", href: "/#pricing" },
     ],
@@ -151,6 +152,7 @@ export const siteConfig = {
       title: "Company",
       links: [
         { id: 5, title: "Guides", url: "/guides" },
+        { id: 21, title: "University", url: "/university" },
       ],
     },
     {

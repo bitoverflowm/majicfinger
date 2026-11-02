@@ -3,11 +3,13 @@ import { cn } from "@/lib/utils";
 import {
   isLycheeContentNavBucketActive,
   isLycheeContentNavLinkActive,
+  isLycheeContentNavLinkTreeActive,
   isLycheeContentNavSectionActive,
   isLycheeContentNavTopicActive,
   type LycheeContentNavData,
   type LycheeContentNavLink,
 } from "@/lib/content/lychee-content-nav";
+import { UniversitySidebarLinks } from "@/lib/university/progress";
 
 type LycheeContentSidebarProps = {
   data: LycheeContentNavData;
@@ -105,6 +107,59 @@ export function LycheeContentSidebar({
 
           return (
             <section key={section.id} className="mb-5">
+              {section.groups ? (
+                <details open={sectionActive} className="group/section space-y-0">
+                  <summary
+                    className={cn(
+                      summaryClassName,
+                      "font-mono text-[10px] font-medium uppercase tracking-[0.14em] transition-colors hover:text-secondary group-open/section:mb-1.5",
+                      sectionActive ? "text-secondary" : "text-foreground",
+                    )}
+                  >
+                    {section.label}
+                  </summary>
+                  {section.hubHref ? (
+                    <Link
+                      href={section.hubHref}
+                      aria-current={
+                        isLycheeContentNavLinkActive(section.hubHref, currentPath)
+                          ? "page"
+                          : undefined
+                      }
+                      className={cn(
+                        "mb-1 block py-0.5 pl-1.5 font-mono text-[9px] tracking-[0.04em] transition-colors hover:text-secondary xl:pl-2",
+                        isLycheeContentNavLinkActive(section.hubHref, currentPath)
+                          ? "text-secondary"
+                          : "text-muted-foreground",
+                      )}
+                    >
+                      {section.hubHref} →
+                    </Link>
+                  ) : null}
+                  {section.groups.map((group) => {
+                    const groupActive = isLycheeContentNavLinkTreeActive(group.items, currentPath);
+                    return (
+                      <details
+                        key={`${section.id}-${group.id}`}
+                        open={groupActive || sectionActive}
+                        className="group/topic mb-0.5 pl-1.5 open:mb-2 xl:pl-2"
+                      >
+                        <summary
+                          className={cn(
+                            summaryClassName,
+                            "py-0.5 font-mono text-[9px] font-medium uppercase tracking-[0.12em] transition-colors hover:text-secondary group-open/topic:mb-1.5",
+                            groupActive ? "text-secondary" : "text-muted-foreground",
+                          )}
+                        >
+                          {group.label}
+                        </summary>
+                        <UniversitySidebarLinks items={group.items} currentPath={currentPath} />
+                      </details>
+                    );
+                  })}
+                </details>
+              ) : null}
+
               {section.topics ? (
                 <details open={sectionActive} className="group/section space-y-0">
                   <summary

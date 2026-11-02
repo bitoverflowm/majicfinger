@@ -149,6 +149,7 @@ export async function GET() {
     { contentType: "playbooks", prefix: "/playbooks", priority: "0.6", items: [] },
     // Blog posts are served by /guides/[slug] (guide route falls back to blog MDX).
     { contentType: "blog", prefix: "/guides", priority: "0.7", items: [] },
+    { contentType: "university", prefix: "/university", priority: "0.8", items: [] },
   ];
   for (const section of contentSections) {
     section.items = safeGetAllContent(section.contentType);
@@ -156,6 +157,9 @@ export async function GET() {
 
   const articleItems = contentSections
     .filter((s) => s.prefix === "/guides")
+    .flatMap((s) => s.items);
+  const universityItems = contentSections
+    .filter((s) => s.prefix === "/university")
     .flatMap((s) => s.items);
   const allContentItems = contentSections.flatMap((s) => s.items);
 
@@ -219,6 +223,7 @@ export async function GET() {
   }
 
   const articlesLastmod = newestDate(articleItems.map(contentLastmod));
+  const universityLastmod = newestDate(universityItems.map(contentLastmod));
   const changelogLastmod = newestDate(
     articleItems.filter(isFeatureReleaseContent).map(contentLastmod),
   );
@@ -236,6 +241,7 @@ export async function GET() {
   }> = [
     { path: "/", priority: "1.0", changefreq: "weekly", lastmod: "2026-10-28" },
     { path: "/guides", priority: "0.9", changefreq: "weekly", lastmod: articlesLastmod },
+    { path: "/university", priority: "0.9", changefreq: "weekly", lastmod: universityLastmod },
     { path: "/changelog", priority: "0.85", changefreq: "weekly", lastmod: changelogLastmod },
     { path: "/charts", priority: "0.7", changefreq: "weekly", lastmod: chartsLastmod },
     {

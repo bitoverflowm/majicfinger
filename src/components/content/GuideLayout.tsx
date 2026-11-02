@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import { cn } from "@/lib/utils";
 import { NewsletterInline } from "@/components/newsletter/newsletter-signup";
 import { GuideTakeawayCta } from "./GuideTakeawayCta";
@@ -21,9 +22,10 @@ import {
 
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || "https://lycheedata.com";
 
-function resolveShareUrl(slug: string, frontmatter: BaseContent) {
+function resolveShareUrl(slug: string, frontmatter: BaseContent, contentType: ContentType) {
   if (frontmatter.canonicalUrl?.trim()) return frontmatter.canonicalUrl.trim();
-  return `${SITE_URL.replace(/\/$/, "")}/guides/${slug}`;
+  const prefix = contentType === "blog" ? "guides" : contentType;
+  return `${SITE_URL.replace(/\/$/, "")}/${prefix}/${slug}`;
 }
 
 interface GuideLayoutProps {
@@ -33,6 +35,8 @@ interface GuideLayoutProps {
   tocItems?: TocItem[];
   chartLoadPlan?: ArticleChartLoadPlanEntry[];
   mdxSource: string;
+  /** Optional line above the title, used by University lessons. */
+  kicker?: ReactNode;
 }
 
 export async function GuideLayout({
@@ -42,6 +46,7 @@ export async function GuideLayout({
   tocItems = [],
   chartLoadPlan = [],
   mdxSource,
+  kicker,
 }: GuideLayoutProps) {
   const related = getRelatedContent(contentType, slug, frontmatter, 6);
   const hasToc = tocItems.length > 0;
@@ -70,12 +75,13 @@ export async function GuideLayout({
                 header={
                   <div className={ARTICLE_TEXT_COLUMN_CLASS}>
                     <header className="not-prose mb-6 w-full max-w-full overflow-hidden pt-4 sm:mb-8 sm:pt-6 md:pt-8">
+                      {kicker}
                       <ArticleMetaBar
                         author={frontmatter.author}
                         publishedAt={frontmatter.publishedAt}
                         readingTime={frontmatter.readingTime}
                         title={frontmatter.title}
-                        shareUrl={resolveShareUrl(slug, frontmatter)}
+                        shareUrl={resolveShareUrl(slug, frontmatter, contentType)}
                       />
                       <ArticleTitle>{frontmatter.title}</ArticleTitle>
                       {frontmatter.description && (

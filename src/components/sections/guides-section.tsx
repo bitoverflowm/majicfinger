@@ -7,6 +7,7 @@ import { Search } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { ContentItem } from "@/lib/content/types";
 import type { LandingDashboardCard } from "@/lib/landing/publishedDashboards";
+import type { UniversityLesson } from "@/lib/university/types";
 import { LandingDashboardCardItem } from "@/components/sections/landing-dashboard-card";
 import { isFeatureReleaseContent } from "@/lib/content/featureReleaseMatchers";
 
@@ -41,6 +42,8 @@ type GuidesSectionProps = {
   profilePic?: string | null;
   /** Combined home layout: dashboards flow into guides under one heading. */
   combinedWithDashboards?: boolean;
+  /** First University lesson, shown on the guides index. */
+  universityLesson?: UniversityLesson | null;
 };
 
 export default function GuidesSection({
@@ -48,6 +51,7 @@ export default function GuidesSection({
   dashboards = [],
   profilePic = null,
   combinedWithDashboards = false,
+  universityLesson = null,
 }: GuidesSectionProps) {
   const [searchQuery, setSearchQuery] = useState("");
   const [combinedFilter, setCombinedFilter] = useState<CombinedFilter | null>(null);
@@ -195,9 +199,42 @@ export default function GuidesSection({
             <h2 className="mx-auto mt-4 max-w-xs text-3xl font-semibold sm:max-w-none sm:text-4xl md:text-5xl">
               How it works, how-tos, and guides
             </h2>
+            <p className="mx-auto mt-4 max-w-lg text-sm leading-relaxed text-muted-foreground">
+              Prefer a course?{" "}
+              <Link href="/university" className="font-medium text-foreground underline-offset-4 hover:underline">
+                Lychee University
+              </Link>{" "}
+              starts with lesson 1 in the predictions cluster.
+            </p>
           </>
         )}
       </div>
+
+      {!showCombined && universityLesson ? (
+        <Link
+          href={universityLesson.href}
+          className="mx-auto mb-8 grid max-w-3xl items-center gap-4 rounded-xl border border-border bg-background p-4 transition-colors hover:border-foreground/20 sm:grid-cols-[9rem_minmax(0,1fr)]"
+        >
+          {universityLesson.image ? (
+            <div className="relative aspect-[16/10] overflow-hidden rounded-lg bg-muted">
+              <Image
+                src={universityLesson.image}
+                alt=""
+                fill
+                sizes="144px"
+                className="object-cover"
+              />
+            </div>
+          ) : null}
+          <div className="min-w-0 text-left">
+            <p className="font-mono text-[11px] uppercase tracking-[0.14em] text-muted-foreground">
+              University · Lesson {universityLesson.lesson} · {universityLesson.clusterLabel}
+            </p>
+            <p className="mt-1 text-lg font-semibold tracking-tight">{universityLesson.title}</p>
+            <p className="mt-1 line-clamp-2 text-sm text-muted-foreground">{universityLesson.description}</p>
+          </div>
+        </Link>
+      ) : null}
 
       <div className="mx-auto mb-8 max-w-md">
         <div className="relative">

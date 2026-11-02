@@ -8,16 +8,17 @@ import { useTelegramContentTracker } from "@/hooks/useTelegramContentTracker";
 export function ArticleViewTracker({
   title,
   slug,
-  contentType = "guides",
+  path,
 }: {
   title: string;
   slug: string;
-  contentType?: "guides" | "blog";
+  contentType?: string;
+  path?: string;
 }) {
   useTelegramContentTracker({
     contentType: "article",
     name: title,
-    path: `/guides/${slug}`,
+    path: path ?? `/guides/${slug}`,
     enabled: !!title,
   });
   return null;

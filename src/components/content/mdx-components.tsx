@@ -21,6 +21,14 @@ import {
   TradeSourceRoutingDiagram,
   TradesVsCandlesChart,
 } from "./guide-animations/kalshi-trade-history-diagrams";
+import {
+  ChanceBenchmarkAnimation,
+  ForecastScorecardAnimation,
+  HorizonFadeAnimation,
+  MarketQuestionsAnimation,
+  StudyScaleAnimation,
+  ThinkingStyleAnimation,
+} from "@/components/university/lesson-animations";
 import { NewsletterSignup } from "@/components/newsletter/newsletter-signup";
 
 // MDX may pass legacy `ref` (string refs); use loose props to avoid @types/react version skew (e.g. @hello-pangea/dnd).
@@ -138,6 +146,12 @@ export function useMDXComponents(components?: MDXComponents): MDXComponents {
     TradesVsCandlesChart,
     TradeRowAnatomy,
     NewsletterSignup,
+    ChanceBenchmarkAnimation,
+    StudyScaleAnimation,
+    HorizonFadeAnimation,
+    ThinkingStyleAnimation,
+    ForecastScorecardAnimation,
+    MarketQuestionsAnimation,
     ...components,
   };
 }

@@ -42,9 +42,14 @@ export type BaseContent = {
   cluster?: string;
   intent?: string;
   difficulty?: string;
+  /** University lesson number. Lesson 1 is the start of the course. */
+  lesson?: number;
+  /** Optional lesson video. Rendered only when a real URL exists. */
+  videoUrl?: string;
+  videoDuration?: string;
 };
 
-export type ContentType = "guides" | "integrations" | "concepts" | "playbooks" | "blog";
+export type ContentType = "guides" | "integrations" | "concepts" | "playbooks" | "blog" | "university";
 
 export type GuideContent = BaseContent & {
   integration: string[];

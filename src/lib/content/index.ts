@@ -4,7 +4,7 @@ import matter from "gray-matter";
 import type { BaseContent, ContentType, ContentItem } from "./types";
 
 const CONTENT_DIR = path.join(process.cwd(), "content");
-const CONTENT_TYPES: ContentType[] = ["guides", "integrations", "concepts", "playbooks", "blog"];
+const CONTENT_TYPES: ContentType[] = ["guides", "integrations", "concepts", "playbooks", "blog", "university"];
 
 function normalizeFrontmatter(data: Record<string, unknown>): BaseContent {
   const d = data as Record<string, unknown>;
@@ -42,8 +42,11 @@ function normalizeFrontmatter(data: Record<string, unknown>): BaseContent {
     integration,
     topics,
     tags,
+    lesson: lessonRaw,
     ...rest
   } = d;
+
+  const lesson = optionalLessonNumber(lessonRaw);
 
   return {
     ...rest,
@@ -54,7 +57,16 @@ function normalizeFrontmatter(data: Record<string, unknown>): BaseContent {
     ...(canonicalUrl && { canonicalUrl }),
     ...(slug && { slug }),
     ...(twitterCard && { twitterCard }),
+    ...(lesson !== undefined && { lesson }),
   } as BaseContent;
+}
+
+function optionalLessonNumber(value: unknown): number | undefined {
+  if (typeof value === "number" && Number.isFinite(value)) return value;
+  if (typeof value === "string" && value.trim() && Number.isFinite(Number(value))) {
+    return Number(value);
+  }
+  return undefined;
 }
 
 function getContentDir(contentType: ContentType): string {

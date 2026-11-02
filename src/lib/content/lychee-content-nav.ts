@@ -1,6 +1,7 @@
 import { siteConfig } from "@/lib/config";
 import { getLycheeContentRegistry } from "@/lib/content/lychee-content-registry";
 import type { ResolvedRegistryEntry } from "@/lib/content/lychee-content-registry";
+import { listUniversityLessons } from "@/lib/university/lessons";
 import {
   CONTENT_CLASS_LABELS,
   CONTENT_CLASS_ORDER,
@@ -30,12 +31,20 @@ export type LycheeContentNavTopic = {
   buckets: LycheeContentNavBucket[];
 };
 
+export type LycheeContentNavGroup = {
+  id: string;
+  label: string;
+  items: LycheeContentNavLink[];
+};
+
 export type LycheeContentNavSection = {
   id: string;
   label: string;
   /** Hub landing page — integration sections only. */
   hubHref?: string;
   topics?: LycheeContentNavTopic[];
+  /** Cluster lists, used by University. */
+  groups?: LycheeContentNavGroup[];
   /** Flat list of links, used instead of topics. */
   items?: LycheeContentNavLink[];
 };
@@ -96,6 +105,11 @@ export function isLycheeContentNavSectionActive(
   }
   if (section.items) {
     return isLycheeContentNavLinkTreeActive(section.items, currentPath);
+  }
+  if (section.groups?.length) {
+    return section.groups.some((group) =>
+      isLycheeContentNavLinkTreeActive(group.items, currentPath),
+    );
   }
   return (
     section.topics?.some((topic) =>
@@ -159,6 +173,10 @@ export function flattenLycheeContentNavSectionLinks(
 
   if (section.items) {
     add(section.items);
+  }
+
+  for (const group of section.groups ?? []) {
+    add(group.items);
   }
 
   for (const topic of section.topics ?? []) {
@@ -230,14 +248,50 @@ function buildIntegrationSections(
   return sections;
 }
 
+function buildUniversitySection(): LycheeContentNavSection | null {
+  const lessons = listUniversityLessons();
+  if (lessons.length === 0) return null;
+
+  const groups = new Map<string, LycheeContentNavGroup>();
+  for (const lesson of lessons) {
+    const existing = groups.get(lesson.cluster);
+    const item: LycheeContentNavLink = {
+      label: `Lesson ${lesson.lesson} · ${lesson.title}`,
+      href: lesson.href,
+      slug: lesson.slug,
+    };
+    if (existing) {
+      existing.items.push(item);
+    } else {
+      groups.set(lesson.cluster, {
+        id: lesson.cluster,
+        label: lesson.clusterLabel,
+        items: [item],
+      });
+    }
+  }
+
+  return {
+    id: "university",
+    label: "University",
+    hubHref: "/university",
+    groups: [...groups.values()],
+  };
+}
+
 /** Server-side nav tree for lychee_content reading chrome (sidebar). */
 export function getLycheeContentNavData(): LycheeContentNavData {
   const registry = getLycheeContentRegistry();
-  const sections = buildIntegrationSections(registry);
+  const university = buildUniversitySection();
+  const sections = [
+    ...(university ? [university] : []),
+    ...buildIntegrationSections(registry),
+  ];
 
   return {
     platform: [
       { label: "Home", href: "/" },
+      { label: "University", href: "/university" },
       { label: "Pricing", href: "/#pricing" },
       { label: "Guides", href: "/guides" },
       { label: "Dashboards", href: "/#guides" },

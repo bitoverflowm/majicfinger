@@ -14,6 +14,7 @@ const RESERVED = new Set(
     "login",
     "logout",
     "guides",
+    "university",
     "blog",
     "playbooks",
     "integrations",

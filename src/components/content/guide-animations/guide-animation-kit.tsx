@@ -37,6 +37,7 @@ export const EASE = "cubic-bezier(0.32, 0.72, 0, 1)";
  */
 export function GuideAnimationFigure({
   backdrop = "lake",
+  plain = false,
   caption,
   label,
   children,
@@ -44,6 +45,8 @@ export function GuideAnimationFigure({
   rootRef,
 }: {
   backdrop?: GuideBackdrop;
+  /** Flat surface instead of a painted backdrop. Used by University lessons. */
+  plain?: boolean;
   caption?: ReactNode;
   /** Accessible description of what the animation shows. */
   label: string;
@@ -59,15 +62,24 @@ export function GuideAnimationFigure({
       className={cn("guide-animation not-prose mx-auto my-8 w-full max-w-[48rem] font-sans sm:my-10", className)}
     >
       <style dangerouslySetInnerHTML={{ __html: FEATURE_KEYFRAMES }} />
-      <div role="img" aria-label={label} className="relative overflow-hidden rounded-xl bg-muted">
-        <Image
-          src={BACKDROPS[backdrop]}
-          alt=""
-          fill
-          placeholder="blur"
-          sizes="(min-width: 860px) 768px, 100vw"
-          className="pointer-events-none select-none object-cover"
-        />
+      <div
+        role="img"
+        aria-label={label}
+        className={cn(
+          "relative overflow-hidden rounded-xl",
+          plain ? "border border-border bg-muted/50" : "bg-muted",
+        )}
+      >
+        {plain ? null : (
+          <Image
+            src={BACKDROPS[backdrop]}
+            alt=""
+            fill
+            placeholder="blur"
+            sizes="(min-width: 860px) 768px, 100vw"
+            className="pointer-events-none select-none object-cover"
+          />
+        )}
         <div className="relative p-3 sm:p-6 md:p-8">{children}</div>
       </div>
       {caption ? (

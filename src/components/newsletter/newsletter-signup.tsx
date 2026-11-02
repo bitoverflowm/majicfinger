@@ -192,12 +192,22 @@ export function NewsletterInline({
   layout = "row",
   band = false,
   className,
+  title = "Your next research idea starts here.",
+  description = "New research, practical guides, feature releases, and subscriber offers from Lychee.",
+  note = "Psst. You’ll want to be on the list before Black Friday.",
+  plain = false,
 }: {
   /** "row" puts copy and field side by side on wide screens; "stacked" suits narrow article columns. */
   layout?: "row" | "stacked";
   /** Wrap in a full-width page section (for landing / hub pages); renders nothing at all when hidden. */
   band?: boolean;
   className?: string;
+  title?: string;
+  description?: string;
+  /** Extra line under the field. Pass null to hide it. */
+  note?: string | null;
+  /** Drop the card chrome so the row can sit between page dividers. */
+  plain?: boolean;
 }) {
   const { show, done, markDone } = useVisible();
   if (!show) return null;
@@ -205,7 +215,11 @@ export function NewsletterInline({
   const card = (
     <aside
       aria-label="Newsletter signup"
-      className={cn("not-prose w-full rounded-xl border border-border bg-accent p-5 font-sans sm:p-6", className)}
+      className={cn(
+        "not-prose w-full font-sans",
+        plain ? "py-1" : "rounded-xl border border-border bg-accent p-5 sm:p-6",
+        className,
+      )}
     >
       {done ? (
         <NewsletterSuccess />
@@ -217,17 +231,17 @@ export function NewsletterInline({
           )}
         >
           <div className={cn("min-w-0", layout === "row" && "md:max-w-md")}>
-            <p className="text-[15px] font-medium tracking-tight text-primary">Your next research idea starts here.</p>
-            <p className="mt-1 text-sm leading-relaxed text-muted-foreground">
-              New research, practical guides, feature releases, and subscriber offers from Lychee.
-            </p>
+            <p className="text-[15px] font-medium tracking-tight text-primary">{title}</p>
+            <p className="mt-1 text-sm leading-relaxed text-muted-foreground">{description}</p>
           </div>
-          <div className={cn("w-full", layout === "row" && "md:max-w-sm")}>
-            <NewsletterField source="inline" onSuccess={markDone} />
-            <p className="mt-2.5 flex items-center gap-1.5 text-xs text-muted-foreground">
-              <span aria-hidden className="size-1.5 shrink-0 rounded-full bg-orange-500" />
-              Psst. You’ll want to be on the list before Black Friday.
-            </p>
+          <div className={cn("w-full", layout === "row" && "md:max-w-md")}>
+            <NewsletterField source="inline" placeholder="Email address" buttonLabel="Subscribe" onSuccess={markDone} />
+            {note ? (
+              <p className="mt-2.5 flex items-center gap-1.5 text-xs text-muted-foreground">
+                <span aria-hidden className="size-1.5 shrink-0 rounded-full bg-orange-500" />
+                {note}
+              </p>
+            ) : null}
           </div>
         </div>
       )}
