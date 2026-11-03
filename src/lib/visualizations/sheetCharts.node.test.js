@@ -348,6 +348,26 @@ assert.deepEqual(polymarketTrades.map((chart) => chart.chartView), ["trade-price
 assert.equal(polymarketTrades[0].w, priceHistory[0].w);
 assert.equal(polymarketTrades[0].h, priceHistory[0].h);
 
+const oneMarketBothTokens = chartSpecsForSheet({
+  type: "sheet",
+  title: "Trades · fed-decision",
+  table: "getTradesByMarket",
+  integrationId: "polymarket",
+  columns: [...tradeColumns, { id: "condition_id" }, { id: "token_id" }],
+  records: tradeRecords.map((row, index) => ({ ...row, condition_id: "0xabc", token_id: index % 2 ? "222" : "111" })),
+});
+assert.deepEqual(oneMarketBothTokens.map((chart) => chart.chartView), ["trade-price"]);
+
+const twoMarkets = chartSpecsForSheet({
+  type: "sheet",
+  title: "Trades",
+  table: "getTradesByMarket",
+  integrationId: "polymarket",
+  columns: [...tradeColumns, { id: "condition_id" }],
+  records: tradeRecords.map((row, index) => ({ ...row, condition_id: index % 2 ? "0xabc" : "0xdef" })),
+});
+assert.deepEqual(twoMarkets.map((chart) => chart.chartView), ["trade-volume"]);
+
 const lakeFills = {
   type: "sheet",
   title: "Trades · will-lula-win",

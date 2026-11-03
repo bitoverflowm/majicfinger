@@ -32,7 +32,6 @@ const CSS = `
 }
 `;
 
-const QUERY = "will bitcoin close above 100k this year";
 const EASE = "cubic-bezier(0.32, 0.72, 0, 1)";
 
 const PHASES = [
@@ -190,9 +189,9 @@ function Backdrop() {
   );
 }
 
-function PromptBar({ phase }) {
-  const typed = useTyped(QUERY, phase === 0);
-  const sent = typed.length === QUERY.length;
+function PromptBar({ phase, query }) {
+  const typed = useTyped(query, phase === 0);
+  const sent = typed.length === query.length;
   const glowing = phase >= 1 && phase < READY;
   return (
     <div
@@ -508,8 +507,8 @@ function Tiles({ phase }) {
   ));
 }
 
-/** A looping, agent-style teaser for the trade history recipe, shown while its row is hovered. */
-export function KalshiTradeHistoryPreview() {
+/** A looping, agent-style teaser for a trade history recipe, shown while its row is hovered. */
+function TradeHistoryPreview({ title, query }) {
   const reduced = usePrefersReducedMotion();
   const { phase, loop } = useTimeline(reduced);
   return (
@@ -517,13 +516,13 @@ export function KalshiTradeHistoryPreview() {
       <style dangerouslySetInnerHTML={{ __html: CSS }} />
       <div className="min-w-0">
         <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Recipe</p>
-        <h3 className="mt-1 text-lg font-semibold tracking-tight text-foreground">Download Kalshi Trade History</h3>
+        <h3 className="mt-1 text-lg font-semibold tracking-tight text-foreground">{title}</h3>
         <p className="mt-0.5 text-[13px] text-muted-foreground">Ask about any market. Lychee does the rest.</p>
       </div>
       <div className="rp-stage relative mt-5 min-h-0 flex-1 overflow-hidden rounded-2xl bg-[#e6edf3] dark:bg-[#161c23]">
         <Backdrop />
         <div key={loop} className="absolute inset-0 animate-in fade-in duration-500">
-          <PromptBar phase={phase} />
+          <PromptBar phase={phase} query={query} />
           <AgentStatus phase={phase} />
           <Candidates phase={phase} />
           {phase === 3 ? <Particles /> : null}
@@ -534,4 +533,12 @@ export function KalshiTradeHistoryPreview() {
       </div>
     </div>
   );
+}
+
+export function KalshiTradeHistoryPreview() {
+  return <TradeHistoryPreview title="Download Kalshi Trade History" query="will bitcoin close above 100k this year" />;
+}
+
+export function PolymarketTradeHistoryPreview() {
+  return <TradeHistoryPreview title="Download Polymarket Trade History" query="will bitcoin reach 100k this year on polymarket" />;
 }

@@ -10,6 +10,18 @@ export type ChangelogEntryExtras = {
 
 /** Extra media/links shown on `/changelog` under a release, keyed by MDX filename slug. */
 export const CHANGELOG_ENTRY_EXTRAS: Record<string, ChangelogEntryExtras> = {
+  "download-polymarket-trade-history": {
+    links: [
+      {
+        label: "Read the recipe guide",
+        href: "/guides/download-polymarket-trade-history",
+      },
+      {
+        label: "Try the recipe",
+        href: "/?recipe=polymarketTradeHistory#demo",
+      },
+    ],
+  },
   "download-kalshi-trade-history": {
     links: [
       {

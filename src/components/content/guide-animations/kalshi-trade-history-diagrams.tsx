@@ -247,7 +247,7 @@ export function TradesVsCandlesChart() {
     <GuideAnimationFigure
       rootRef={rootRef}
       backdrop="insights"
-      label="Chart: individual Kalshi trades appear as dots over ten minutes, then the same trades are summarised into one-minute candles, showing the difference between trade history and price history."
+      label="Chart: individual trades appear as dots over ten minutes, then the same trades are summarised into one-minute candles, showing the difference between trade history and price history."
       caption="Trade history keeps every execution. Price history compresses them into one candle per interval."
     >
       <div className="overflow-hidden rounded-xl border border-black/10 bg-background shadow-[0_24px_60px_-20px_rgba(15,23,42,0.45)]">

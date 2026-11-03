@@ -10,17 +10,24 @@ import { KalshiHistoricalDataQuery } from "./KalshiHistoricalDataQuery";
 import { PolymarketHistoricalDataQuery } from "./PolymarketHistoricalDataQuery";
 import { PublicChart } from "./PublicChart";
 import { KalshiTradeHistoryRecipeDemo } from "./KalshiTradeHistoryRecipeDemo";
+import { PolymarketTradeHistoryRecipeDemo } from "./PolymarketTradeHistoryRecipeDemo";
 import {
   RecipeExportAnimation,
   RecipeFindMarketAnimation,
   RecipeMarketDetailsAnimation,
   RecipeRunAnimation,
+  RecipeWalkthroughAnimation,
 } from "./guide-animations/kalshi-trade-history-recipe-steps";
 import {
   TradeRowAnatomy,
   TradeSourceRoutingDiagram,
   TradesVsCandlesChart,
 } from "./guide-animations/kalshi-trade-history-diagrams";
+import {
+  PolymarketFillsToTradeRowDiagram,
+  PolymarketSourceTimelineDiagram,
+  PolymarketTradeRowAnatomy,
+} from "./guide-animations/polymarket-trade-history-diagrams";
 import {
   ChanceBenchmarkAnimation,
   ForecastScorecardAnimation,
@@ -99,8 +106,11 @@ function MdxHr() {
  * - PolymarketHistoricalDataQuery: `<PolymarketHistoricalDataQuery />` — Polymarket markets/trades query builder
  * - NewsletterSignup: `<NewsletterSignup />` — inline newsletter capture (hidden for logged-in users and subscribers)
  * - KalshiTradeHistoryRecipeDemo: `<KalshiTradeHistoryRecipeDemo />` — recipe preview + link into the live demo
- * - Recipe step animations: `<RecipeFindMarketAnimation />`, `<RecipeMarketDetailsAnimation />`, `<RecipeRunAnimation />`, `<RecipeExportAnimation />`
+ * - PolymarketTradeHistoryRecipeDemo: `<PolymarketTradeHistoryRecipeDemo />` — full recipe walkthrough + link into the live demo
+ * - Recipe step animations: `<RecipeFindMarketAnimation />`, `<RecipeMarketDetailsAnimation />`, `<RecipeRunAnimation />`, `<RecipeExportAnimation />`,
+ *   `<RecipeWalkthroughAnimation />`. Each takes `venue="kalshi" | "polymarket"` (default kalshi).
  * - Trade history diagrams: `<TradeSourceRoutingDiagram />`, `<TradesVsCandlesChart />`, `<TradeRowAnatomy />`
+ * - Polymarket trade history diagrams: `<PolymarketSourceTimelineDiagram />`, `<PolymarketFillsToTradeRowDiagram />`, `<PolymarketTradeRowAnatomy />`
  * - GIFs: Use standard markdown ![alt](/path/to.gif) or ContentImage
  */
 export function useMDXComponents(components?: MDXComponents): MDXComponents {
@@ -138,13 +148,18 @@ export function useMDXComponents(components?: MDXComponents): MDXComponents {
     KalshiHistoricalDataQuery,
     PolymarketHistoricalDataQuery,
     KalshiTradeHistoryRecipeDemo,
+    PolymarketTradeHistoryRecipeDemo,
     RecipeFindMarketAnimation,
     RecipeMarketDetailsAnimation,
     RecipeRunAnimation,
     RecipeExportAnimation,
+    RecipeWalkthroughAnimation,
     TradeSourceRoutingDiagram,
     TradesVsCandlesChart,
     TradeRowAnatomy,
+    PolymarketSourceTimelineDiagram,
+    PolymarketFillsToTradeRowDiagram,
+    PolymarketTradeRowAnatomy,
     NewsletterSignup,
     ChanceBenchmarkAnimation,
     StudyScaleAnimation,

@@ -6,6 +6,7 @@ export const MDX_PAGE_BREAK_TAG_NAMES = [
   "KalshiHistoricalDataQuery",
   "PolymarketHistoricalDataQuery",
   "KalshiTradeHistoryRecipeDemo",
+  "PolymarketTradeHistoryRecipeDemo",
 ] as const;
 
 export type MdxSourceSegment =

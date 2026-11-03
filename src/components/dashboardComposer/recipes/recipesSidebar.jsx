@@ -2,7 +2,10 @@
 
 import { useEffect, useState } from "react";
 import { CircleArrowDown } from "lucide-react";
-import { KalshiTradeHistoryPreview } from "@/components/dashboardComposer/recipes/kalshiTradeHistoryPreview";
+import {
+  KalshiTradeHistoryPreview,
+  PolymarketTradeHistoryPreview,
+} from "@/components/dashboardComposer/recipes/kalshiTradeHistoryPreview";
 import { cn } from "@/lib/utils";
 
 export const RECIPES = [
@@ -13,6 +16,14 @@ export const RECIPES = [
     tag: "CSV",
     icon: CircleArrowDown,
     preview: KalshiTradeHistoryPreview,
+  },
+  {
+    id: "polymarketTradeHistory",
+    title: "Download Polymarket Trade History",
+    description: "Search a market to view its trades and download a CSV.",
+    tag: "CSV",
+    icon: CircleArrowDown,
+    preview: PolymarketTradeHistoryPreview,
   },
 ];
 

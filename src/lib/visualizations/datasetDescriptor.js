@@ -218,7 +218,7 @@ const ENDPOINTS = {
   "polymarket:getTradesByMarket": spec({
     datasetType: "trades",
     shape: "time_series",
-    seriesKeys: ["condition_id", "token_id"],
+    seriesKeys: ["condition_id"],
     priceBasis: "trade",
     delivery: "streaming",
     fields: {

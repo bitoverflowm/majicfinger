@@ -1,0 +1,183 @@
+---
+title: "Download Polymarket Market Trade History: CSV, Excel & JSON"
+description: "Download historical trades for a Polymarket market without coding. Find a market, load its trade history, and export CSV, Excel (XLSX), or JSON."
+publishedAt: "2026-11-03"
+author: "misterrpink"
+topics: ["polymarket", "historical data", "trade history", "data download", "prediction markets", "data exports"]
+tags: ["polymarket", "historical data", "data download"]
+integration: ["Polymarket", "Lychee"]
+section: "feature-releases"
+contentType: "Recipe"
+cluster: "Data download"
+intent: "How-to"
+difficulty: "Beginner"
+featured: false
+slug: "/download-polymarket-trade-history"
+readingTime: "7 min"
+keywords: ["polymarket historical data download", "polymarket historical trade data", "polymarket trade history", "download polymarket trade history", "polymarket data download", "polymarket trades csv", "polymarket export csv"]
+canonical: "https://lycheedata.com/guides/download-polymarket-trade-history"
+seoTitle: "Download Polymarket Trade History: CSV, Excel & JSON"
+twitterCard: "summary_large_image"
+ogImage: "https://lycheedata.com/og/lychee-research-terminal.png"
+---
+
+To download historical trades for a Polymarket market in Lychee, open **Download Polymarket Trade History**, search for the market or paste its link, confirm the market details, and click **Save and Go**. Lychee loads the available history into a sheet that you can export as **CSV, Excel (XLSX), or JSON**. No coding required.
+
+This recipe downloads public trades for **one selected market**. Personal account statements, wallet P&L, and redemption history are separate workflows.
+
+[Open the Download Polymarket Trade History recipe →](/?recipe=polymarketTradeHistory#demo)
+
+## How to download Polymarket historical trade data
+
+### 1. Open the recipe and find your market
+
+Open Lychee's data picker and choose **Download Polymarket Trade History** from the **Recipes** list. You can search in plain English, type a market name, or paste a Polymarket link, market slug, or condition ID.
+
+<RecipeFindMarketAnimation venue="polymarket" />
+
+Try a topic such as "Fed decision" or "Presidential election 2024." If the results contain several similar questions, read the full question and closing date before selecting one.
+
+A Polymarket event can contain several markets. For example, an election event may have a separate market for each candidate. Pasting an event link helps you find its markets; the recipe still loads trades for the specific market you select. Polymarket's [market-data overview](https://docs.polymarket.com/market-data/overview) explains that event, market, and outcome hierarchy.
+
+You don't need to find token IDs yourself. If you want to understand the identifiers, see [how to find a Polymarket market ID, token ID, and condition ID](/guides/polymarket-market-id).
+
+### 2. Check the market details
+
+Selecting a result fills the **Market details** panel. Before loading the trades, check:
+
+- **Question and slug:** confirm the contract, including any price target or date.
+- **Status and outcomes:** check whether the market is open, closed, or shown as resolved, and confirm which outcomes belong to it.
+- **Outcome prices and bid/ask:** inspect the displayed prices for context.
+- **Volume and liquidity:** get a sense of the market's activity.
+- **Opened and closes:** confirm the market's expected trading window.
+
+Below those details, **Trade history source** shows where Lychee plans to read the trades. Source selection happens automatically.
+
+<RecipeMarketDetailsAnimation venue="polymarket" />
+
+There is no date picker in this recipe. It requests the market's history up to the source's available coverage and the recipe's row limit. If you need a particular day or announcement window, narrow the downloaded rows afterward.
+
+### 3. Load the trade history
+
+Click **Save and Go**. A progress card shows the market lookup, source selection, trade pull, and sheet placement. Wait for **Trade history ready**, then open the resulting dashboard.
+
+<RecipeRunAnimation venue="polymarket" />
+
+The sheet is titled **Trades · market-slug**, using the condition ID when a slug isn't available. Check the loaded row count and timestamps before starting your analysis. The recipe also creates default charts when the returned data supports them.
+
+For an open market, the downloaded history reflects the pull you just ran. Run the recipe again when you need newer trades.
+
+### 4. Export as CSV, Excel, or JSON
+
+Hover over the trade sheet, open its **⋮** menu, choose **Export**, and select your format:
+
+- **CSV:** use the table in a spreadsheet, Python, R, or another analysis tool.
+- **Excel (.xlsx):** open the downloaded table directly in Excel.
+- **JSON:** process the records in an application or script.
+
+<RecipeExportAnimation venue="polymarket" />
+
+Check the exported row count against the loaded sheet. When opening a CSV in Excel, import long token IDs and transaction hashes as text so the spreadsheet preserves them.
+
+The public demo lets you try the recipe and inspect the data. File export requires membership; export access and data limits depend on your [Lychee plan](/#pricing).
+
+<PolymarketTradeHistoryRecipeDemo />
+
+## What is in the downloaded trade data?
+
+The columns depend on whether the recipe uses Polymarket Live, Polymarket Historical, or both. Start with these fields:
+
+- **Outcome:** the outcome whose shares changed hands, such as Yes or No.
+- **Side:** the buy or sell direction recorded for the execution. Historical fill rows calculate this from the taker's perspective.
+- **Price:** the execution price per share. A value of **0.39** means 39 cents per share.
+- **Size:** the number of shares exchanged.
+- **Timestamp:** when the execution occurred. Live-format sheets also include a readable execution-time field.
+- **Transaction hash:** an identifier that helps you trace the on-chain transaction.
+
+Polymarket's [trade-data documentation](https://docs.polymarket.com/market-data/public-analytics) describes trade price in USDC per share and size in shares. For example, 100 shares at 0.39 represent 39 USDC of execution value before fees.
+
+<PolymarketTradeRowAnatomy />
+
+Keep **side** and **outcome** separate. Buying No shares is different from selling Yes shares, even when the two actions express a similar view of the question.
+
+### Historical fills and Live trade rows
+
+Polymarket Historical stores individual exchange fills and includes maker/taker details and amounts. Lychee derives readable outcome, side, price, size, and USDC fields from those records. Fills that cannot be interpreted as a USDC-for-shares exchange can have blank derived fields.
+
+For a market whose history spans both sources, Lychee groups older fills sharing a transaction, taker, outcome, and side into a Live-style row. It calculates the grouped price from the total USDC exchanged divided by the total shares.
+
+<PolymarketFillsToTradeRowDiagram />
+
+That means historical fill counts and combined trade-row counts can differ. A transaction hash can also appear on multiple rows. Check the source and row structure before comparing counts or removing apparent duplicates.
+
+## Where does the historical trade data come from?
+
+The recipe uses a **January 1, 2026 UTC** boundary between its historical archive and newer trade data:
+
+- **Markets opened on or after the boundary:** read from Polymarket Live.
+- **Markets closed before the boundary:** read from Polymarket Historical first, with a Live fallback if the archive returns no rows.
+- **Markets spanning the boundary:** combine newer Live trades with older Historical fills. If there are no usable older fills, the recipe tries Live for the history instead.
+
+Here, **Live** is the source name. A pull from that source can include past executions.
+
+<PolymarketSourceTimelineDiagram />
+
+For broader queries across historical markets, prices, events, and resolutions, use the [Polymarket historical-data workspace](/polymarket-historical-data). This recipe is the shortcut for a single market's trade download.
+
+## Check coverage and narrow your date range
+
+One sheet holds up to **500,000 rows**. A large market can exceed the pull limit, so don't assume a successful run contains its entire lifetime. Compare the earliest and latest execution timestamps with the period you need, and review any limit message on the progress card.
+
+Opening and closing dates are market metadata. They do not prove that trades exist at either endpoint or that every execution between them was returned.
+
+To study a smaller window, export the sheet, sort by execution time, and retain the rows inside your chosen period. For example, keep the hour around a Fed announcement or the final day before an election market closed. Use one time zone consistently and record the window in your research notes.
+
+For combined-source histories, check row granularity as well as dates before aggregating activity across the source boundary.
+
+<NewsletterSignup />
+
+## Trade history, price history, and order books
+
+Trade history records executions. Price history is a series of price observations, and candles summarize activity over intervals. Order books show bids and asks available at a particular moment.
+
+This recipe exports execution data. It does not reconstruct the historical order book or show all the orders that were available before each trade. A historical execution price alone cannot establish whether your own order would have filled at that price.
+
+<TradesVsCandlesChart />
+
+If your goal is to follow a probability path, see [how to track Polymarket odds over time](/guides/polymarket-odds-over-time). If you want the equivalent market-trade download for Kalshi, use [Download Kalshi Trade History](/guides/download-kalshi-trade-history).
+
+## Frequently asked questions
+
+### Can I download Polymarket historical data without coding?
+
+Yes. For a selected market's trade data, open the recipe, find the market, confirm its details, and click **Save and Go**. Export the resulting sheet in the format you need.
+
+### Can I export Polymarket trades as CSV or Excel?
+
+Yes. Open the sheet's **⋮** menu, choose **Export**, then select CSV or Excel (.xlsx). JSON is also available. File export requires membership and is subject to your plan's limits.
+
+### Can I download trades from closed or resolved markets?
+
+The recipe can search closed markets and select a historical source for them. Available rows depend on source coverage and the pull limit. Check the returned timestamps against your research window.
+
+### Do I need a market ID or token ID?
+
+No. Search by name or paste a Polymarket link. If you already have a market slug or condition ID, you can use that instead.
+
+### Can I filter the download by date?
+
+There is no date filter in the recipe. It requests the market history within its coverage and row limit. Filter the exported timestamps afterward for a smaller window.
+
+### Does this export my personal Polymarket transactions?
+
+This recipe selects a market rather than an account. It does not produce your personal account statement, wallet P&L report, or redemption history, and it is not a Polymarket US account-export workflow.
+
+### Does it download every market in an event?
+
+The recipe downloads one selected market. An event link can return several market choices; choose the specific question you want to study.
+
+## Download a market's historical trades
+
+Find your market, check its details, load the trade data, and export CSV, Excel, or JSON for your analysis.
+
+[Open the Download Polymarket Trade History recipe →](/?recipe=polymarketTradeHistory#demo)

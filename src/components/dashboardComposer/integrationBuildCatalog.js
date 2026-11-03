@@ -830,10 +830,16 @@ export function loadPolymarketHistoricalTradesForTokens(tokens, limit = PREVIEW_
       groupByAliases: [],
       orderBy: [{ alias: "block_number", direction: "desc" }],
     },
+    ...(options.recipe ? { recipe: options.recipe } : {}),
   };
   const outcomes = marketOutcomes(options.outcomes);
   const maxWaitMs = rowLimit > PREVIEW_ROW_CAP ? 600000 : 180000;
-  return fetchAthenaLakeSample(request, { maxWaitMs, pollIntervalMs: 800, onPhase: options.onPhase }).then((result) => ({
+  return fetchAthenaLakeSample(request, {
+    maxWaitMs,
+    pollIntervalMs: 800,
+    pageTimeoutMs: options.pageTimeoutMs,
+    onPhase: options.onPhase,
+  }).then((result) => ({
     columns,
     rows: rowsFromAthenaCells(result, rowLimit).map((row) => priceFill(row, unique, outcomes)),
     request,

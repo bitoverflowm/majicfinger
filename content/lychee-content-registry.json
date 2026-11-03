@@ -142,6 +142,13 @@
       "integrationTopic": "general"
     },
     {
+      "slug": "download-polymarket-trade-history",
+      "contentClass": "changelog",
+      "integrationHub": "platform",
+      "integrationTopic": "general",
+      "publishedAt": "2026-11-03"
+    },
+    {
       "slug": "download-kalshi-trade-history",
       "contentClass": "changelog",
       "integrationHub": "platform",
@@ -161,6 +168,12 @@
       "integrationHub": "chainlink",
       "integrationTopic": "overview",
       "publishedAt": "2026-04-15"
+    },
+    {
+      "slug": "download-polymarket-trade-history",
+      "contentClass": "guide",
+      "integrationHub": "polymarket-historical",
+      "integrationTopic": "overview"
     },
     {
       "slug": "random-sampling-data-analysis",

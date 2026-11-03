@@ -61,6 +61,7 @@ import "@/lib/sheetScopedColumn.test.js";
 import "@/lib/dataLake/normalizeQuantAthenaRows.test.js";
 import "@/lib/dataLake/buildQuantAthenaSql.test.js";
 import "@/lib/dataLake/randomSample.test.js";
+import "@/lib/dataLake/recipeLakeAccess.test.js";
 import "@/lib/dataLake/buildComposeAthenaSql.randomSample.test.js";
 import "@/lib/featureHelper.test.js";
 import "@/lib/composeWhereFilterUi.test.js";

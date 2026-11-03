@@ -1405,7 +1405,7 @@ export async function pageMarketTrades({ fetchPage, params, target, window, keep
   return { rows, unreached: !reached };
 }
 
-function tradeSheetRow(row, market) {
+export function tradeSheetRow(row, market) {
   const seconds = Number(row.timestamp);
   const index = row.outcome_index ?? row.outcomeIndex;
   return stampMarket(

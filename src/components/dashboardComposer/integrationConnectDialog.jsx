@@ -67,7 +67,24 @@ const KalshiTradeHistoryRecipe = dynamic(
   },
 );
 
-const RECIPE_VIEWS = { kalshiTradeHistory: KalshiTradeHistoryRecipe };
+const loadPolymarketTradeHistoryRecipe = () =>
+  import("@/components/dashboardComposer/recipes/polymarketTradeHistoryRecipe");
+
+const PolymarketTradeHistoryRecipe = dynamic(
+  () => retryImport(loadPolymarketTradeHistoryRecipe).then((m) => m.PolymarketTradeHistoryRecipe),
+  {
+    loading: () => (
+      <div className="flex min-h-0 flex-1 items-center justify-center">
+        <SpectrumLoadingState label="Loading" />
+      </div>
+    ),
+  },
+);
+
+const RECIPE_VIEWS = {
+  kalshiTradeHistory: KalshiTradeHistoryRecipe,
+  polymarketTradeHistory: PolymarketTradeHistoryRecipe,
+};
 
 function whenIdle(work) {
   if (typeof window.requestIdleCallback === "function") {
@@ -423,6 +440,7 @@ function IntegrationConnectFlow({
     return whenIdle(() => {
       loadBuildWorkspace().catch(() => {});
       loadTradeHistoryRecipe().catch(() => {});
+      loadPolymarketTradeHistoryRecipe().catch(() => {});
     });
   }, []);
 
