@@ -22,7 +22,7 @@ import { pingAthenaLakeConnection } from '@/lib/athenaLakePing';
 import { pingKalshiLiveExchange } from '@/lib/kalshiLive/kalshiLivePing';
 import { KALSHI_LIVE_DEFAULT_LIMIT } from '@/config/kalshiLiveConnect';
 import { connectHomeAnySheetHasData } from '@/lib/connectHomePullDestination';
-import { isLandingDemoActivateRequested } from '@/lib/landingDemoSession';
+import { isLandingDemoActivateRequested, leaveDemoForMemberDashboard } from '@/lib/landingDemoSession';
 
 const stateV2Noop = () => {};
 const defaultLiveStreamActions = {
@@ -65,9 +65,18 @@ export const StateProviderV2 = ({children, initialSettings}) => {
     const [landingDemoActive, setLandingDemoActive] = useState(
       () => !!initialSettings?.landingDemo && isLandingDemoActivateRequested(),
     )
-    const activateLandingDemo = useCallback(() => {
+    const activateLandingDemo = useCallback((intent) => {
+      if (
+        landingDemo &&
+        leaveDemoForMemberDashboard({
+          recipeId: intent?.recipeId,
+          integrationId: intent?.integrationId || landingDemoIntegration,
+        })
+      ) {
+        return
+      }
       setLandingDemoActive(true)
-    }, [])
+    }, [landingDemo, landingDemoIntegration])
     const deactivateLandingDemo = useCallback(() => {
       setLandingDemoActive(false)
     }, [])

@@ -61,7 +61,10 @@ export function RecipesSidebar({ onOpen, onHover, activeId = null, expanded = fa
                   onClick={() => onOpen?.(recipe.id)}
                   onMouseEnter={() => onHover?.(recipe.id)}
                   onMouseLeave={() => onHover?.(null)}
-                  onFocus={() => onHover?.(recipe.id)}
+                  onFocus={(event) => {
+                    // Keyboard focus only: a dialog's open autofocus must not slide the preview out.
+                    if (event.currentTarget.matches(":focus-visible")) onHover?.(recipe.id);
+                  }}
                   onBlur={() => onHover?.(null)}
                   className={cn(
                     "group flex w-full items-start gap-2.5 px-5 py-3 text-left transition-colors hover:bg-black/[0.06] focus-visible:bg-black/[0.06] focus-visible:outline-none dark:hover:bg-white/[0.07] dark:focus-visible:bg-white/[0.07]",

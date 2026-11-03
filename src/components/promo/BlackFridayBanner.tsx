@@ -29,7 +29,6 @@ export function BlackFridayBanner() {
   }, []);
 
   const hiddenHere = embedded || HIDDEN_PREFIXES.some((prefix) => pathname.startsWith(prefix));
-  const show = !dismissed && !hiddenHere;
 
   const dismiss = () => {
     setDismissed(true);
@@ -40,9 +39,12 @@ export function BlackFridayBanner() {
     }
   };
 
+  // Route changes can leave an exiting element mounted, so only the close button animates out.
+  if (hiddenHere) return null;
+
   return (
     <AnimatePresence initial={false}>
-      {show && countdown ? (
+      {!dismissed && countdown ? (
         <motion.aside
           key="black-friday-banner"
           aria-label={BLACK_FRIDAY.name}

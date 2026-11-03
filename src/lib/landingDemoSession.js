@@ -91,9 +91,21 @@ export function takeLandingDemoReturnPosition() {
 }
 
 /** Try For Free scrolls to the demo first; the demo expands once the page stops moving. */
+/** A demo request still waiting on its scroll; a member whose sign-in resolves meanwhile hands off with it. */
+let queuedIntent = null;
+
 export function requestLandingDemoActivateAfterScroll() {
+  if (leaveDemoForMemberDashboard()) return;
   rememberReturnPosition();
-  whenScrollSettles(requestLandingDemoActivate);
+  queuedIntent = {};
+  whenScrollSettles(() => {
+    queuedIntent = null;
+    requestLandingDemoActivate();
+  });
+}
+
+export function hasQueuedLandingDemoRequest() {
+  return queuedIntent !== null || requested || pendingRecipeId !== null;
 }
 
 export const LANDING_DEMO_RECIPE_EVENT = "lychee:landing-demo-recipe";
@@ -111,8 +123,13 @@ export function requestLandingDemoRecipe(recipeId) {
 }
 
 export function requestLandingDemoRecipeAfterScroll(recipeId) {
+  if (leaveDemoForMemberDashboard({ recipeId })) return;
   rememberReturnPosition();
-  whenScrollSettles(() => requestLandingDemoRecipe(recipeId));
+  queuedIntent = { recipeId };
+  whenScrollSettles(() => {
+    queuedIntent = null;
+    requestLandingDemoRecipe(recipeId);
+  });
 }
 
 export function takeLandingDemoRecipeRequest() {
@@ -133,6 +150,46 @@ export function subscribeLandingDemoRecipe(listener) {
 
 export function isLandingDemoActivateRequested() {
   return requested;
+}
+
+let memberDashboardAccess = false;
+let leavingForDashboard = false;
+
+if (typeof window !== "undefined") {
+  // Back from the dashboard restores this page from the bfcache with the flag still set.
+  window.addEventListener("pageshow", () => {
+    leavingForDashboard = false;
+  });
+}
+
+/** Set while the visitor is signed in with dashboard access; the demo then hands off to their dashboard. */
+export function setLandingDemoMemberAccess(hasAccess) {
+  memberDashboardAccess = !!hasAccess;
+}
+
+export function landingDemoHandsOffToDashboard() {
+  return memberDashboardAccess;
+}
+
+/**
+ * Members skip the demo and open their own dashboard, carrying the recipe or source they picked.
+ * Returns true when it navigated away.
+ */
+export function leaveDemoForMemberDashboard({ recipeId = null, integrationId = null } = {}) {
+  if (!memberDashboardAccess || typeof window === "undefined") return false;
+  // The first call carries the most specific intent; later ones must not replace it.
+  if (leavingForDashboard) return true;
+  leavingForDashboard = true;
+  const recipe = recipeId || queuedIntent?.recipeId || pendingRecipeId;
+  requested = false;
+  pendingRecipeId = null;
+  queuedIntent = null;
+  const params = new URLSearchParams();
+  if (recipe) params.set("recipe", recipe);
+  else if (integrationId) params.set("integration", integrationId);
+  const query = params.toString();
+  window.location.assign(`/dashboard${query ? `?${query}` : ""}`);
+  return true;
 }
 
 export function subscribeLandingDemoActivate(listener) {

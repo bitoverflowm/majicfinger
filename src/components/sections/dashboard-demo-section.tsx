@@ -7,11 +7,17 @@ import { StateProvider } from "@/context/stateContext";
 import { StateProviderV2, useMyStateV2 } from "@/context/stateContextV2";
 import {
   clearLandingDemoActivateRequest,
+  hasQueuedLandingDemoRequest,
   isLandingDemoActivateRequested,
+  landingDemoHandsOffToDashboard,
+  leaveDemoForMemberDashboard,
+  setLandingDemoMemberAccess,
   subscribeLandingDemoActivate,
   subscribeLandingDemoExit,
   takeLandingDemoReturnPosition,
 } from "@/lib/landingDemoSession";
+import { useUser } from "@/lib/hooks";
+import { userHasDashboardAccess } from "@/lib/membershipAccess";
 import { cn } from "@/lib/utils";
 
 import DashBody from "@/app/dashboard/dashBody";
@@ -49,6 +55,19 @@ const OPEN_OVERLAY_SELECTOR = [
   '[role="listbox"][data-state="open"]',
   "[data-radix-popper-content-wrapper]",
 ].join(", ");
+
+/** Signed-in members with dashboard access open their own dashboard instead of the demo. */
+function LandingDemoMemberHandoff() {
+  const user = useUser();
+  const hasAccess = userHasDashboardAccess(user);
+  useEffect(() => {
+    setLandingDemoMemberAccess(hasAccess);
+    // A deep link (or a click before sign-in loaded) already asked for the demo.
+    if (hasAccess && hasQueuedLandingDemoRequest()) leaveDemoForMemberDashboard();
+    return () => setLandingDemoMemberAccess(false);
+  }, [hasAccess]);
+  return null;
+}
 
 function LandingDemoActivateListener() {
   const activateLandingDemo = useMyStateV2()?.activateLandingDemo;
@@ -282,7 +301,10 @@ function LandingDemoStage({
 
   const activateOnClick = () => {
     if (active || phaseRef.current !== "inline") return;
-    if (typeof activate === "function") activate();
+    if (typeof activate !== "function") return;
+    // Members: let a click on a source or recipe hand off with that intent first.
+    if (landingDemoHandsOffToDashboard()) window.setTimeout(() => activate(), 0);
+    else activate();
   };
 
   const slot = (
@@ -369,6 +391,7 @@ export function DashboardDemoSection({
         }}
       >
         <LandingDemoStage sectionId={sectionId} className={className} framed={framed}>
+          <LandingDemoMemberHandoff />
           {/* Try For Free only targets the homepage demo. */}
           {integrationId ? null : <LandingDemoActivateListener />}
           <LiveStreamManager />

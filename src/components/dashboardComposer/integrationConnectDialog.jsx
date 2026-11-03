@@ -28,6 +28,7 @@ import { RecipePreviewPanel, RecipesSidebar } from "@/components/dashboardCompos
 import { buildIntegrationPickerRows } from "@/lib/connectIntegrationPickerRows";
 import {
   hasLandingDemoRecipeRequest,
+  requestLandingDemoRecipe,
   subscribeLandingDemoRecipe,
   takeLandingDemoRecipeRequest,
 } from "@/lib/landingDemoSession";
@@ -401,6 +402,8 @@ function IntegrationOption({ row, active, hovered, onSelect, onHover, cutoffLabe
 }
 
 /** Picker, then the build workspace. Shared by the dialog and the inline landing demo. */
+const RECIPE_PREVIEW_INTENT_MS = 280;
+
 function IntegrationConnectFlow({
   inline = false,
   withClose = !inline,
@@ -446,10 +449,13 @@ function IntegrationConnectFlow({
 
   useEffect(() => () => window.clearTimeout(previewTimer.current), []);
 
-  // A short grace period lets the pointer cross from the recipe row onto its preview panel.
+  // Opening waits for the pointer to rest on a recipe, so crossing the sidebar on the way to the
+  // integrations doesn't cover them. Closing has a short grace period so the pointer can cross
+  // from the recipe row onto its preview panel.
   const previewRecipe = (id) => {
     window.clearTimeout(previewTimer.current);
-    if (id) setPreviewRecipeId(id);
+    if (id && previewRecipeId) setPreviewRecipeId(id);
+    else if (id) previewTimer.current = window.setTimeout(() => setPreviewRecipeId(id), RECIPE_PREVIEW_INTENT_MS);
     else previewTimer.current = window.setTimeout(() => setPreviewRecipeId(null), 150);
   };
 
@@ -620,7 +626,7 @@ function IntegrationConnectFlow({
   );
 }
 
-export function IntegrationConnectDialog({ open, onOpenChange }) {
+export function IntegrationConnectDialog({ open, onOpenChange, startIntegrationId = null, takeRecipeRequests = false }) {
   const [phase, setPhase] = useState("pick");
 
   useEffect(() => {
@@ -630,6 +636,11 @@ export function IntegrationConnectDialog({ open, onOpenChange }) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
+        onOpenAutoFocus={(event) => {
+          // The first focusable is a recipe row; focusing it would slide its preview over the picker.
+          event.preventDefault();
+          event.currentTarget?.focus?.();
+        }}
         overlayClassName="z-[560] bg-black/40"
         className={cn(
           "z-[560] flex max-w-none flex-col gap-0 overflow-hidden border-border/70 p-0 shadow-xl sm:rounded-2xl",
@@ -639,7 +650,12 @@ export function IntegrationConnectDialog({ open, onOpenChange }) {
         )}
       >
         {open ? (
-          <IntegrationConnectFlow onCancel={() => onOpenChange(false)} onPhaseChange={setPhase} />
+          <IntegrationConnectFlow
+            onCancel={() => onOpenChange(false)}
+            onPhaseChange={setPhase}
+            startIntegrationId={startIntegrationId}
+            takeRecipeRequests={takeRecipeRequests}
+          />
         ) : null}
       </DialogContent>
     </Dialog>
@@ -740,12 +756,40 @@ export function IntegrationConnectLandingDemo({
 export function IntegrationConnectProvider({ children, inlineStart = false, inlineOnly = false }) {
   const [open, setOpen] = useState(false);
   const [inlineOpen, setInlineOpen] = useState(inlineStart);
+  /** Set from `/dashboard?recipe=` or `?integration=` (members arriving from a site demo); first open only. */
+  const [arrival, setArrival] = useState(null);
+
+  useEffect(() => {
+    if (inlineOnly) return;
+    const url = new URL(window.location.href);
+    const recipeId = url.searchParams.get("recipe");
+    const integrationId = url.searchParams.get("integration");
+    if (!recipeId && !integrationId) return;
+    url.searchParams.delete("recipe");
+    url.searchParams.delete("integration");
+    window.history.replaceState(window.history.state, "", `${url.pathname}${url.search}${url.hash}`);
+    if (recipeId && RECIPE_VIEWS[recipeId]) {
+      requestLandingDemoRecipe(recipeId);
+      setArrival({ recipe: true });
+      setOpen(true);
+    } else if (integrationId) {
+      setArrival({ integrationId });
+      setOpen(true);
+    }
+  }, [inlineOnly]);
+
+  const onDialogOpenChange = useCallback((next) => {
+    setOpen(next);
+    if (!next) setArrival(null);
+  }, []);
+
   const value = useMemo(
     () => ({
       open: () => (inlineOnly ? setInlineOpen(true) : setOpen(true)),
       close: () => {
         setOpen(false);
         setInlineOpen(false);
+        setArrival(null);
       },
       inlineOpen,
     }),
@@ -754,7 +798,12 @@ export function IntegrationConnectProvider({ children, inlineStart = false, inli
   return (
     <IntegrationConnectContext.Provider value={value}>
       {children}
-      <IntegrationConnectDialog open={open} onOpenChange={setOpen} />
+      <IntegrationConnectDialog
+        open={open}
+        onOpenChange={onDialogOpenChange}
+        startIntegrationId={arrival?.integrationId || null}
+        takeRecipeRequests={!!arrival?.recipe}
+      />
     </IntegrationConnectContext.Provider>
   );
 }
