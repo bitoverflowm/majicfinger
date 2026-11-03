@@ -7,6 +7,8 @@ import { notifyCheckoutAlert } from "@/lib/telegram/checkoutAlert";
 import { notifyBillingEvent } from "@/lib/telegram/billingAlert";
 import { recordCheckoutStep } from "@/lib/telegram/checkoutJourney";
 import { stripeSecretKey } from "@/lib/stripe/client";
+import { planByKey } from "@/lib/stripe/catalog";
+import { BLACK_FRIDAY, blackFridayAppliesTo, blackFridayCents } from "@/lib/promo/blackFriday";
 import { buffer } from "micro";
 
 export const config = {
@@ -564,6 +566,8 @@ export async function grantEmbeddedCheckoutSession(session, via = "Stripe webhoo
     }
   }
 
+  await alertIfPromoMissing(session, attemptId);
+
   try {
     const result = await handleCheckoutCompleted(session);
     if (attemptId && result?.ok === false) {
@@ -586,6 +590,31 @@ export async function grantEmbeddedCheckoutSession(session, via = "Stripe webhoo
       await recordCheckoutStep({ attemptId, step: "grant_failed", data: { message: err?.message || "grant_threw", via } });
     }
     throw err;
+  }
+}
+
+/** An annual checkout opened during the Black Friday Special should never be paid at full price. */
+async function alertIfPromoMissing(session, attemptId) {
+  try {
+    const plan = planByKey(session?.metadata?.planKey);
+    const openedAt = (Number(session?.created) || 0) * 1000;
+    const expected = session?.metadata?.promo === BLACK_FRIDAY.id || (plan && blackFridayAppliesTo(plan, openedAt));
+    const discount = session?.total_details?.amount_discount;
+    if (!expected || typeof discount !== "number" || discount > 0) return;
+    await notifyCheckoutAlert({
+      title: `${BLACK_FRIDAY.name}: annual plan paid without the 50% discount`,
+      fields: {
+        Email: checkoutBillingEmail(session) || undefined,
+        Plan: session?.metadata?.planKey,
+        Paid: formatUsdCents(session?.amount_total),
+        "Expected discount": formatUsdCents(plan ? plan.amount - blackFridayCents(plan.amount) : undefined),
+        "Stripe session": session?.id,
+        Attempt: attemptId || undefined,
+        Fix: "Refund the difference in Stripe, or add the coupon to the subscription",
+      },
+    });
+  } catch (err) {
+    console.error("[Stripe Webhook] promo check failed:", err?.message || err);
   }
 }
 

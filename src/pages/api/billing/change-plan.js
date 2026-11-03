@@ -8,6 +8,11 @@ import {
   syncUserFromSubscription,
 } from "@/lib/stripe/membership";
 import { notifyCheckoutAlert } from "@/lib/telegram/checkoutAlert";
+import { BLACK_FRIDAY, blackFridayAppliesTo } from "@/lib/promo/blackFriday";
+
+function usd(cents) {
+  return typeof cents === "number" ? `$${(cents / 100).toFixed(2)}` : undefined;
+}
 
 /**
  * POST /api/billing/change-plan  { plan, cycle, preview?, prorationDate? }
@@ -89,6 +94,15 @@ export default async function handler(req, res) {
     return res.status(400).json({ success: false, message: "You're already on this plan." });
   }
 
+  const discounts = blackFridayAppliesTo(target) ? [{ coupon: BLACK_FRIDAY.couponId }] : undefined;
+  const alertFields = {
+    User: String(member.dbUser._id),
+    Email: member.dbUser.email,
+    From: current.planKey || current.priceId,
+    To: target.key,
+    Promo: discounts ? `${BLACK_FRIDAY.name} (${BLACK_FRIDAY.couponId})` : undefined,
+  };
+
   const requestedDate = Number(req.body?.prorationDate);
   const now = Math.floor(Date.now() / 1000);
   const prorationDate =
@@ -104,6 +118,7 @@ export default async function handler(req, res) {
         subscription_items: [{ id: item.id, price: resolved.priceId }],
         subscription_proration_behavior: "always_invoice",
         subscription_proration_date: prorationDate,
+        ...(discounts ? { discounts } : {}),
       });
       return res.status(200).json({
         success: true,
@@ -117,6 +132,10 @@ export default async function handler(req, res) {
         },
       });
     } catch (err) {
+      await notifyCheckoutAlert({
+        title: "Plan change preview failed",
+        fields: { ...alertFields, Error: err?.raw?.message || err?.message || String(err) },
+      });
       return res.status(200).json({
         success: true,
         preview: { dueNow: null, total: null, currency: "usd", prorationDate, newAmount: target.amount, newCycle: target.cycle },
@@ -133,17 +152,36 @@ export default async function handler(req, res) {
         proration_date: prorationDate,
         payment_behavior: "pending_if_incomplete",
         expand: ["latest_invoice"],
+        ...(discounts ? { discounts } : {}),
       },
-      { idempotencyKey: `plan-change:${sub.id}:${resolved.priceId}:${prorationDate}` },
+      { idempotencyKey: `plan-change:${sub.id}:${resolved.priceId}:${prorationDate}${discounts ? ":bf" : ""}` },
     );
 
+    const invoice = typeof updated.latest_invoice === "object" ? updated.latest_invoice : null;
     if (updated.pending_update) {
-      const invoice = typeof updated.latest_invoice === "object" ? updated.latest_invoice : null;
+      await notifyCheckoutAlert({
+        severity: "notice",
+        title: "Plan change payment failed; member kept their current plan",
+        fields: { ...alertFields, "Amount due": usd(invoice?.amount_due), Invoice: invoice?.hosted_invoice_url },
+      });
       return res.status(402).json({
         success: false,
         code: "PAYMENT_REQUIRED",
         message: "Your card couldn't be charged for the new plan. You're still on your current plan.",
         invoiceUrl: invoice?.hosted_invoice_url || null,
+      });
+    }
+
+    const discounted = (invoice?.total_discount_amounts || []).reduce((sum, d) => sum + (d?.amount || 0), 0);
+    if (discounts && invoice && invoice.subtotal > 0 && discounted === 0) {
+      await notifyCheckoutAlert({
+        title: `${BLACK_FRIDAY.name}: plan change charged without the 50% discount`,
+        fields: {
+          ...alertFields,
+          Paid: usd(invoice.amount_paid),
+          Invoice: invoice.id,
+          Fix: "Refund the difference in Stripe",
+        },
       });
     }
 
@@ -153,12 +191,7 @@ export default async function handler(req, res) {
     const message = err?.raw?.message || err?.message || String(err);
     await notifyCheckoutAlert({
       title: "Plan change failed",
-      fields: {
-        User: String(member.dbUser._id),
-        From: current.planKey || current.priceId,
-        To: target.key,
-        Error: message,
-      },
+      fields: { ...alertFields, Error: message },
     });
     const cardError = err?.type === "StripeCardError";
     return res.status(cardError ? 402 : 502).json({

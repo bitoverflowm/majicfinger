@@ -9,6 +9,7 @@ import { Toaster } from '@/components/ui/toaster'
 import { VisitorJourneyInit } from '@/components/analytics/VisitorJourneyInit'
 import { NewsletterPopup } from '@/components/newsletter/newsletter-popup'
 import { DesktopOnlyDialog } from '@/components/desktop-only/desktop-only-dialog'
+import { BlackFridayBanner } from '@/components/promo/BlackFridayBanner'
 
 export { metadata } from './metadata'
 
@@ -40,6 +41,7 @@ export default function RootLayout({ children }) {
           disableTransitionOnChange
         >
           <VisitorJourneyInit />
+          <BlackFridayBanner />
           {children}
           <NewsletterPopup />
           <DesktopOnlyDialog />

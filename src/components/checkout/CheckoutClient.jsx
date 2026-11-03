@@ -426,16 +426,29 @@ function OrderSummary({ summary, checkout }) {
       ? new Date(recurring.dueNext.billingCycleAnchor * 1000)
       : addInterval(new Date(), summary.interval, recurring?.intervalCount || 1)
     : null;
-  const perMonth = summary.interval === "year" ? formatCents(Math.floor(summary.amount / 12)) : "";
+  const promo = summary.promo;
+  const firstAmount = promo ? promo.amount : summary.amount;
+  const perMonth = summary.interval === "year" ? formatCents(Math.round(firstAmount / 12)) : "";
 
   return (
     <div className="mt-8 lg:mt-14">
       <p className="text-sm font-medium text-muted-foreground">
         {isSubscription ? "Subscribe to" : "Buy"} Lychee {display.name}
       </p>
-      <div className="mt-2 flex items-baseline gap-2">
-        <span className="text-4xl font-semibold tracking-tight text-foreground">{formatCents(summary.amount)}</span>
-        {isSubscription ? <span className="text-sm text-muted-foreground">per {interval}</span> : null}
+      {promo ? (
+        <p className="mt-3 inline-flex items-center gap-1.5 rounded-full border border-secondary/30 bg-secondary/10 px-2.5 py-1 font-mono text-[11px] font-medium uppercase tracking-[0.12em] text-secondary">
+          <span className="size-1.5 rounded-full bg-emerald-500" aria-hidden />
+          {promo.name} · {promo.percentOff}% off applied
+        </p>
+      ) : null}
+      <div className="mt-2 flex flex-wrap items-baseline gap-x-2 gap-y-1">
+        <span className="text-4xl font-semibold tracking-tight text-foreground">{formatCents(firstAmount)}</span>
+        {promo ? (
+          <span className="text-lg text-muted-foreground line-through decoration-1">{formatCents(summary.amount)}</span>
+        ) : null}
+        {isSubscription ? (
+          <span className="text-sm text-muted-foreground">{promo ? `for your first ${interval}` : `per ${interval}`}</span>
+        ) : null}
       </div>
       <p className="mt-1 text-sm text-muted-foreground">
         {CYCLE_COPY[summary.cycle] || ""}
@@ -462,7 +475,7 @@ function OrderSummary({ summary, checkout }) {
         </div>
         {discount ? (
           <div className="flex justify-between gap-4">
-            <dt className="text-muted-foreground">Discount</dt>
+            <dt className="text-muted-foreground">{promo ? `${promo.name} (${promo.percentOff}% off)` : "Discount"}</dt>
             <dd className="tabular-nums text-emerald-600 dark:text-emerald-400">−{discount.amount}</dd>
           </div>
         ) : null}

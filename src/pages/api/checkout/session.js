@@ -21,6 +21,7 @@ import { buildCheckoutVisitorContext } from "@/lib/analytics/checkoutVisitorCont
 import { notifyCheckoutAlert } from "@/lib/telegram/checkoutAlert";
 import { publishCheckoutTelegram } from "@/lib/telegram/checkoutJourney";
 import { loadSessionMember } from "@/lib/requirePaidMember";
+import { BLACK_FRIDAY, blackFridayAppliesTo, blackFridayCents } from "@/lib/promo/blackFriday";
 
 /** A second Checkout would start a second subscription; these members change plans in billing. */
 const ALREADY_BILLED_REASONS = new Set(["active", "legacy", "lifetime"]);
@@ -98,24 +99,49 @@ export default async function handler(req, res) {
     const referral = cleanReferral(req.body?.referral);
     const origin = requestOrigin(req);
     const stripe = getCheckoutStripe();
+    let promo = blackFridayAppliesTo(plan) ? BLACK_FRIDAY : null;
     const metadata = {
       checkoutAttemptId: attemptId,
       planKey: plan.key,
       ...(referral ? { referral } : {}),
     };
-    const session = await stripe.checkout.sessions.create({
-      ui_mode: "elements",
-      integration_identifier: INTEGRATION_IDENTIFIER,
-      mode: plan.mode,
-      line_items: [{ price: resolved.priceId, quantity: 1 }],
-      return_url: `${origin}/checkout/return?session_id={CHECKOUT_SESSION_ID}`,
-      client_reference_id: referral || attemptId,
-      metadata,
-      ...(plan.mode === "subscription"
-        ? { subscription_data: { metadata: { planKey: plan.key, checkoutAttemptId: attemptId } } }
-        : { customer_creation: "always" }),
-      ...(resolved.extras?.allow_promotion_codes ? { allow_promotion_codes: true } : {}),
-    });
+    const createSession = () =>
+      stripe.checkout.sessions.create({
+        ui_mode: "elements",
+        integration_identifier: INTEGRATION_IDENTIFIER,
+        mode: plan.mode,
+        line_items: [{ price: resolved.priceId, quantity: 1 }],
+        return_url: `${origin}/checkout/return?session_id={CHECKOUT_SESSION_ID}`,
+        client_reference_id: referral || attemptId,
+        metadata: promo ? { ...metadata, promo: promo.id } : metadata,
+        ...(plan.mode === "subscription"
+          ? { subscription_data: { metadata: { planKey: plan.key, checkoutAttemptId: attemptId } } }
+          : { customer_creation: "always" }),
+        // Stripe rejects `discounts` together with `allow_promotion_codes`.
+        ...(promo
+          ? { discounts: [{ coupon: promo.couponId }] }
+          : resolved.extras?.allow_promotion_codes
+            ? { allow_promotion_codes: true }
+            : {}),
+      });
+    let session;
+    try {
+      session = await createSession();
+    } catch (err) {
+      if (!promo) throw err;
+      await notifyCheckoutAlert({
+        title: `${promo.name} coupon was rejected; checkout continued at full price`,
+        fields: { Plan: plan.key, Coupon: promo.couponId, Error: err?.message || String(err) },
+      });
+      promo = null;
+      session = await createSession();
+    }
+    if (promo && session?.total_details?.amount_discount === 0) {
+      await notifyCheckoutAlert({
+        title: `${promo.name} coupon attached but Stripe shows no discount`,
+        fields: { Plan: plan.key, Coupon: promo.couponId, "Stripe session": session.id, Total: `$${(session.amount_total / 100).toFixed(2)}` },
+      });
+    }
 
     if (!session?.client_secret) {
       throw new Error("Stripe did not return a client secret");
@@ -138,8 +164,8 @@ export default async function handler(req, res) {
         status: "open",
         granted: false,
         expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
-        planLabel: plan.label,
-        amount: plan.amount,
+        planLabel: promo ? `${plan.label} (${promo.name})` : plan.label,
+        amount: promo ? blackFridayCents(plan.amount) : plan.amount,
         interval: plan.mode === "subscription" ? plan.interval : undefined,
         testMode: isStripeTestKey(),
         prefillEmail: loginEmail || undefined,
@@ -163,15 +189,21 @@ export default async function handler(req, res) {
     return res.status(200).json({
       clientSecret: session.client_secret,
       publishableKey: stripePublishableKey(),
-      plan: checkoutPlanSummary(plan),
+      plan: {
+        ...checkoutPlanSummary(plan),
+        ...(promo
+          ? { promo: { name: promo.name, percentOff: promo.percentOff, amount: blackFridayCents(plan.amount) } }
+          : {}),
+      },
       email: loginEmail || null,
-      promoCodes: !!resolved.extras?.allow_promotion_codes,
+      promoCodes: !promo && !!resolved.extras?.allow_promotion_codes,
     });
   } catch (err) {
     await notifyCheckoutAlert({
       title: "Could not create checkout session",
       fields: {
         Plan: plan.key,
+        Promo: blackFridayAppliesTo(plan) ? BLACK_FRIDAY.name : undefined,
         Error: err?.message || String(err),
       },
     });

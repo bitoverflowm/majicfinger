@@ -28,7 +28,10 @@ import {
   Sigma,
   type LucideIcon,
 } from "lucide-react";
-import { useState, type MouseEvent } from "react";
+import { useRef, useState, type MouseEvent } from "react";
+import { BlackFridayPricingCard } from "@/components/promo/BlackFridayPricingCard";
+import { useBlackFridayActive } from "@/components/promo/useBlackFriday";
+import { BLACK_FRIDAY, blackFridayActive, blackFridayCents } from "@/lib/promo/blackFriday";
 import { VenueMark, type Venue } from "./venue-mark";
 
 export type BillingCycle = "weekly" | "monthly" | "annual";
@@ -209,6 +212,63 @@ function AnimatedPrice({ value }: { value: string }) {
   );
 }
 
+function PlanPrice({
+  plan,
+  isFree,
+  cycle,
+  monthly,
+  freeMonths,
+  promoAnnual,
+}: {
+  plan: Plan;
+  isFree: boolean;
+  cycle: BillingCycle;
+  monthly: number;
+  freeMonths: number;
+  /** First-year annual price while the Black Friday Special runs. */
+  promoAnnual: number | null;
+}) {
+  const pill = "ml-1 self-center rounded-full bg-emerald-500/10 px-1.5 py-0.5 text-[11px] font-medium text-emerald-700 dark:text-emerald-400";
+
+  if (promoAnnual !== null && typeof plan.priceAnnual === "number") {
+    return (
+      <>
+        <div className="mt-5 flex flex-wrap items-baseline gap-x-1.5">
+          <AnimatedPrice value={formatUsd(promoAnnual)} />
+          <span className="text-lg text-muted-foreground line-through decoration-1">{formatUsd(plan.priceAnnual)}</span>
+          <span className="text-sm text-muted-foreground">/ first year</span>
+          <span className={pill}>{BLACK_FRIDAY.percentOff}% off</span>
+        </div>
+        <div className="mt-2 flex min-h-6 items-center text-sm text-muted-foreground">
+          <span>
+            {formatUsd(promoAnnual / 12)}/mo for your first year · then {formatUsd(plan.priceAnnual)}/year
+          </span>
+        </div>
+      </>
+    );
+  }
+
+  return (
+    <>
+      <div className="mt-5 flex items-baseline gap-1.5">
+        <AnimatedPrice value={formatUsd(monthly)} />
+        {!isFree ? <span className="text-sm text-muted-foreground">/ month</span> : null}
+        {freeMonths > 0 ? <span className={pill}>{monthsFreeLabel(freeMonths)}</span> : null}
+      </div>
+
+      <div className="mt-2 flex min-h-6 items-center text-sm text-muted-foreground">
+        {isFree ? (
+          <span>{plan.note}</span>
+        ) : cycle === "annual" && typeof plan.priceAnnual === "number" ? (
+          <span>Billed annually · You&apos;ll be charged {formatUsd(plan.priceAnnual)} per year</span>
+        ) : (
+          <span>Billed monthly{plan.note ? ` · ${plan.note}` : ""}</span>
+        )}
+      </div>
+    </>
+  );
+}
+
 function hasBothCycles(plan: Plan) {
   return typeof plan.priceMonthly === "number" && typeof plan.priceAnnual === "number";
 }
@@ -223,14 +283,20 @@ function monthsFreeLabel(months: number) {
   return `${months} ${months === 1 ? "month" : "months"} free`;
 }
 
+function salePrice(dollars: number) {
+  return blackFridayCents(Math.round(dollars * 100)) / 100;
+}
+
 function CycleToggle({
   cycle,
   onChange,
   freeMonths,
+  promo,
 }: {
   cycle: "monthly" | "annual";
   onChange: (cycle: "monthly" | "annual") => void;
   freeMonths: number;
+  promo: boolean;
 }) {
   const options = [
     { value: "monthly" as const, label: "Monthly" },
@@ -264,7 +330,11 @@ function CycleToggle({
               />
             ) : null}
             <span className="relative">{option.label}</span>
-            {option.value === "annual" && freeMonths > 0 ? (
+            {option.value === "annual" && promo ? (
+              <span className="relative rounded-full bg-gradient-to-r from-secondary to-violet-500 px-1.5 py-0.5 text-[11px] font-medium text-white">
+                {BLACK_FRIDAY.percentOff}% off
+              </span>
+            ) : option.value === "annual" && freeMonths > 0 ? (
               <span className="relative rounded-full bg-emerald-500/10 px-1.5 py-0.5 text-[11px] font-medium text-emerald-700 dark:text-emerald-400">
                 {monthsFreeLabel(freeMonths)}
               </span>
@@ -354,7 +424,7 @@ export function PricingSection({
   id = "pricing",
   showHeader = true,
   includeFree = true,
-  defaultCycle = "monthly",
+  defaultCycle,
   currentPlan = null,
   getAction,
   className,
@@ -365,7 +435,7 @@ export function PricingSection({
   showHeader?: boolean;
   /** The Free column links to the demo; hide it where there's no free plan to pick (billing). */
   includeFree?: boolean;
-  /** Starting position of the monthly / yearly toggle. */
+  /** Starting position of the monthly / yearly toggle. Annual while an annual promo runs, else monthly. */
   defaultCycle?: BillingCycle;
   /** Highlights the member's tier; `cycle` marks the exact plan as current. */
   currentPlan?: { tier?: string | null; cycle?: string | null } | null;
@@ -373,9 +443,11 @@ export function PricingSection({
   getAction?: (args: PricingTierActionArgs) => PricingTierAction | null;
   className?: string;
 } = {}) {
-  const [toggleCycle, setToggleCycle] = useState<"monthly" | "annual">(
-    defaultCycle === "annual" ? "annual" : "monthly",
+  const [toggleCycle, setToggleCycle] = useState<"monthly" | "annual">(() =>
+    (defaultCycle ?? (blackFridayActive() ? "annual" : "monthly")) === "annual" ? "annual" : "monthly",
   );
+  const promoActive = useBlackFridayActive();
+  const plansRef = useRef<HTMLDivElement>(null);
   const currentTier = String(currentPlan?.tier || "").toLowerCase();
   const currentCycle = String(currentPlan?.cycle || "").toLowerCase();
 
@@ -392,6 +464,12 @@ export function PricingSection({
   const { enterprise, venues } = config;
   const showCycleToggle = plans.some(hasBothCycles);
   const toggleFreeMonths = Math.max(0, ...plans.map(monthsFree));
+  const showPromo = promoActive && plans.some((plan) => typeof plan.priceAnnual === "number");
+
+  const seePromoPlans = () => {
+    setToggleCycle("annual");
+    plansRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+  };
 
   return (
     <TooltipPrimitive.Provider delayDuration={120} skipDelayDuration={400}>
@@ -407,12 +485,21 @@ export function PricingSection({
         )}
 
         <div className={cn("mx-auto flex w-full flex-col gap-4", plans.length > 2 ? "max-w-6xl" : "max-w-4xl")}>
+          {showPromo ? <BlackFridayPricingCard onSeePlans={seePromoPlans} /> : null}
           {showCycleToggle ? (
-            <div className="mb-2 flex justify-center">
-              <CycleToggle cycle={toggleCycle} onChange={setToggleCycle} freeMonths={toggleFreeMonths} />
+            <div className={cn("mb-2 flex justify-center", showPromo && "mt-2")}>
+              <CycleToggle
+                cycle={toggleCycle}
+                onChange={setToggleCycle}
+                freeMonths={toggleFreeMonths}
+                promo={showPromo}
+              />
             </div>
           ) : null}
-          <div className={cn("grid gap-4", plans.length > 2 ? "md:grid-cols-3" : "md:grid-cols-2")}>
+          <div
+            ref={plansRef}
+            className={cn("grid scroll-mt-28 gap-4", plans.length > 2 ? "md:grid-cols-3" : "md:grid-cols-2")}
+          >
             {plans.map((plan) => {
               const isFree = plan.tier === "free";
               const hasToggle = hasBothCycles(plan);
@@ -431,18 +518,32 @@ export function PricingSection({
                     ? plan.priceAnnual / 12
                     : plan.priceMonthly ?? 0;
               const freeMonths = cycle === "annual" ? monthsFree(plan) : 0;
+              const promoAnnual =
+                promoActive && !isFree && cycle === "annual" && typeof plan.priceAnnual === "number"
+                  ? salePrice(plan.priceAnnual)
+                  : null;
 
               return (
                 <div
                   key={plan.tier}
                   className={cn(
-                    "flex flex-col rounded-2xl border p-6",
+                    "relative flex flex-col rounded-2xl border p-6",
                     plan.isPopular
                       ? "border-secondary/30 bg-gradient-to-b from-secondary/[0.07] to-secondary/[0.02] shadow-[0_12px_32px_-16px_rgba(59,91,219,0.35)] dark:from-secondary/[0.14] dark:to-secondary/[0.04]"
                       : "border-border bg-background",
                     isCurrentTier && "ring-2 ring-[#0d99ff]",
                   )}
                 >
+                  {promoAnnual !== null ? (
+                    <motion.span
+                      initial={{ opacity: 0, y: 4 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ duration: 0.2 }}
+                      className="absolute -top-2.5 right-5 inline-flex items-center rounded-full bg-gradient-to-r from-secondary to-violet-500 px-2.5 py-1 font-mono text-[10px] font-medium uppercase leading-none tracking-[0.14em] text-white shadow-[0_6px_14px_-6px_rgba(47,111,237,0.7)]"
+                    >
+                      Limited time
+                    </motion.span>
+                  ) : null}
                   <div className="flex items-center gap-2">
                     <h3 className="text-lg font-semibold tracking-tight text-foreground">{plan.name}</h3>
                     {isCurrentTier ? (
@@ -453,27 +554,14 @@ export function PricingSection({
                   </div>
                   <p className="mt-1.5 text-sm leading-5 text-muted-foreground md:min-h-[3.75rem]">{plan.description}</p>
 
-                  <div className="mt-5 flex items-baseline gap-1.5">
-                    <AnimatedPrice value={formatUsd(monthly)} />
-                    {!isFree ? <span className="text-sm text-muted-foreground">/ month</span> : null}
-                    {freeMonths > 0 ? (
-                      <span className="ml-1 self-center rounded-full bg-emerald-500/10 px-1.5 py-0.5 text-[11px] font-medium text-emerald-700 dark:text-emerald-400">
-                        {monthsFreeLabel(freeMonths)}
-                      </span>
-                    ) : null}
-                  </div>
-
-                  <div className="mt-2 flex min-h-6 items-center text-sm text-muted-foreground">
-                    {isFree ? (
-                      <span>{plan.note}</span>
-                    ) : cycle === "annual" && typeof plan.priceAnnual === "number" ? (
-                      <span>
-                        Billed annually · You&apos;ll be charged {formatUsd(plan.priceAnnual)} per year
-                      </span>
-                    ) : (
-                      <span>Billed monthly{plan.note ? ` · ${plan.note}` : ""}</span>
-                    )}
-                  </div>
+                  <PlanPrice
+                    plan={plan}
+                    isFree={isFree}
+                    cycle={cycle}
+                    monthly={monthly}
+                    freeMonths={freeMonths}
+                    promoAnnual={promoAnnual}
+                  />
 
                   <div className="mt-6 flex flex-col gap-3">
                     {plan.venuesLabel ? (
