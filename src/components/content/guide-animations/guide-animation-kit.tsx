@@ -1,6 +1,6 @@
 "use client";
 
-import Image, { type StaticImageData } from "next/image";
+import Image from "next/image";
 import {
   useEffect,
   useLayoutEffect,
@@ -13,21 +13,9 @@ import {
 import { FEATURE_KEYFRAMES } from "@/components/sections/features/feature-keyframes";
 import { usePhases, useInView, useReducedMotion } from "@/components/sections/features/feature-kit";
 import { cn } from "@/lib/utils";
-import automateBackdrop from "../../../../public/landing/feature-automate.jpg";
-import connectBackdrop from "../../../../public/landing/feature-connect-village.jpg";
-import dashboardsBackdrop from "../../../../public/landing/feature-dashboards.jpg";
-import exploreBackdrop from "../../../../public/landing/feature-explore-lake.jpg";
-import insightsBackdrop from "../../../../public/landing/feature-insights.jpg";
+import { GUIDE_BACKDROPS, type GuideBackdrop } from "./guide-backdrops";
 
-const BACKDROPS = {
-  lake: exploreBackdrop,
-  village: connectBackdrop,
-  dashboards: dashboardsBackdrop,
-  insights: insightsBackdrop,
-  automate: automateBackdrop,
-} satisfies Record<string, StaticImageData>;
-
-export type GuideBackdrop = keyof typeof BACKDROPS;
+export type { GuideBackdrop };
 
 export const EASE = "cubic-bezier(0.32, 0.72, 0, 1)";
 
@@ -36,7 +24,7 @@ export const EASE = "cubic-bezier(0.32, 0.72, 0, 1)";
  * floating on top. Bleeds slightly past the reading column.
  */
 export function GuideAnimationFigure({
-  backdrop = "lake",
+  backdrop,
   plain = false,
   caption,
   label,
@@ -44,6 +32,7 @@ export function GuideAnimationFigure({
   className,
   rootRef,
 }: {
+  /** Required unless `plain`. Every figure on the site gets its own painting. */
   backdrop?: GuideBackdrop;
   /** Flat surface instead of a painted backdrop. Used by University lessons. */
   plain?: boolean;
@@ -70,9 +59,9 @@ export function GuideAnimationFigure({
           plain ? "border border-border bg-muted/50" : "bg-muted",
         )}
       >
-        {plain ? null : (
+        {plain || !backdrop ? null : (
           <Image
-            src={BACKDROPS[backdrop]}
+            src={GUIDE_BACKDROPS[backdrop]}
             alt=""
             fill
             placeholder="blur"

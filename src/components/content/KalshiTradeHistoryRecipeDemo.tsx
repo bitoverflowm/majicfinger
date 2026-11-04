@@ -4,8 +4,8 @@ import { ArrowRight } from "lucide-react";
 import { DemoRecipeLink } from "@/components/sections/features/demo-recipe-link";
 import { FEATURE_KEYFRAMES } from "@/components/sections/features/feature-keyframes";
 import { TradeHistoryDemo } from "@/components/sections/features/trade-history-demo";
-import exploreBackdrop from "../../../public/landing/feature-explore-lake.jpg";
 import { ARTICLE_PAGE_BREAK_INNER_CLASS, markArticlePageBreakComponent } from "./article-page-break";
+import { GUIDE_BACKDROPS } from "./guide-animations/guide-backdrops";
 
 export type KalshiTradeHistoryRecipeDemoProps = {
   title?: string;
@@ -40,7 +40,7 @@ export function KalshiTradeHistoryRecipeDemo({
         <div className="relative mx-auto mt-8 w-full max-w-5xl px-2 sm:px-4">
           <div className="relative h-[26rem] overflow-hidden rounded-xl sm:h-[30rem] lg:h-[34rem]">
             <Image
-              src={exploreBackdrop}
+              src={GUIDE_BACKDROPS["kalshi-demo"]}
               alt=""
               fill
               placeholder="blur"

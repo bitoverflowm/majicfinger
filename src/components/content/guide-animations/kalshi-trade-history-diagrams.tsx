@@ -5,7 +5,7 @@ import { useRef } from "react";
 
 import { BLUE, GREEN, mulberry32, RED, VIOLET } from "@/components/sections/features/feature-kit";
 import { cn } from "@/lib/utils";
-import { EASE, GuideAnimationFigure, ScaledStage, useGuidePhases } from "./guide-animation-kit";
+import { EASE, GuideAnimationFigure, type GuideBackdrop, ScaledStage, useGuidePhases } from "./guide-animation-kit";
 
 const DIAGRAM_KEYFRAMES = `
 @keyframes gx-comet { from { stroke-dashoffset: 1.3; } to { stroke-dashoffset: 0; } }
@@ -106,7 +106,7 @@ export function TradeSourceRoutingDiagram() {
   return (
     <GuideAnimationFigure
       rootRef={rootRef}
-      backdrop="village"
+      backdrop="kalshi-routing"
       label="Diagram: Lychee routes a market's trade history to Kalshi Live, Kalshi Historical v1, or Kalshi Historical v2 depending on when it traded, then returns one trade sheet."
       caption="You never pick a data source. The recipe routes each market to the Kalshi dataset that holds its trades."
     >
@@ -232,7 +232,7 @@ const CANDLES = Array.from({ length: 10 }, (_, minute) => {
 
 const CHART_PHASES = [3000, 900, 3000, 1600] as const;
 
-export function TradesVsCandlesChart() {
+export function TradesVsCandlesChart({ backdrop = "kalshi-candles" }: { backdrop?: GuideBackdrop }) {
   const rootRef = useRef<HTMLElement>(null);
   const { phase, loop } = useGuidePhases(CHART_PHASES, rootRef, 2);
   const W = 600;
@@ -246,7 +246,7 @@ export function TradesVsCandlesChart() {
   return (
     <GuideAnimationFigure
       rootRef={rootRef}
-      backdrop="insights"
+      backdrop={backdrop}
       label="Chart: individual trades appear as dots over ten minutes, then the same trades are summarised into one-minute candles, showing the difference between trade history and price history."
       caption="Trade history keeps every execution. Price history compresses them into one candle per interval."
     >
@@ -365,7 +365,7 @@ export function TradeRowAnatomy() {
   return (
     <GuideAnimationFigure
       rootRef={rootRef}
-      backdrop="lake"
+      backdrop="kalshi-row"
       label="Annotated trade row: Created Time, Count Fp, Yes Price Dollars, No Price Dollars and Taker Outcome Side, each explained in turn."
       caption="Every row is one execution. Prices are in dollars, so 0.39 means 39¢."
     >

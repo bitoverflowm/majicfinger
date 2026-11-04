@@ -26,7 +26,7 @@ import { useMemo, useRef, type CSSProperties, type ReactNode, type RefObject } f
 import { FeatureWindow } from "@/components/sections/features/feature-kit";
 import { cn } from "@/lib/utils";
 import { layoutHolderTiles } from "@/lib/visualizations/holderTreemap";
-import { GuideAnimationFigure, GuideCursor, MonoTag, ScaledStage, useGuidePhases, useTypedText } from "./guide-animation-kit";
+import { GuideAnimationFigure, type GuideBackdrop, GuideCursor, MonoTag, ScaledStage, useGuidePhases, useTypedText } from "./guide-animation-kit";
 import { ResultCard, StatusPill, VenuePickerMock } from "./kalshi-trade-history-recipe-steps";
 import {
   HA_MARKET,
@@ -736,7 +736,7 @@ export function HolderFindMarketAnimation() {
   return (
     <GuideAnimationFigure
       rootRef={rootRef}
-      backdrop="lake"
+      backdrop="holder-find"
       label="Animation: opening Polymarket Holder Analysis from the Recipes sidebar, searching Democratic Party control the House 2026, picking the market, and the Holders panel loading Yes and No treemaps and the top 5 traders Lychee will open tabs for."
       caption="Pick the market and the Holders panel previews both sides and the five traders that will get their own tabs."
     >
@@ -1033,7 +1033,7 @@ export function HolderRunAnimation() {
   return (
     <GuideAnimationFigure
       rootRef={rootRef}
-      backdrop="dashboards"
+      backdrop="holder-run"
       label="Animation: after Save and Go, the docked run card pulls 300 Yes and 300 No holders, places both holder sheets with a treemap under each, opens a tab for ndb1, 033033033, elmcap2, plumbis and lfg321, follows each tab as its positions, positions chart and PnL fill in, then returns to the market tab and starts the tour."
       caption="Save and Go fills the market tab, then takes you through each trader's tab as it loads, and ends with a short tour."
     >
@@ -1060,7 +1060,7 @@ export function HolderTablesAnimation() {
   return (
     <GuideAnimationFigure
       rootRef={rootRef}
-      backdrop="insights"
+      backdrop="holder-tables"
       label="Animation: the Yes holders and No holders sheets fill in side by side, then scroll sideways to Holds both sides, New wallet, Age (days) and Wallet created. On the No side, happy7ucker1 (0 days old) and hellothereworld (2 days old) light up as new wallets."
       caption="Both holder tables share the same columns. Scroll right for the both-sides and new-wallet flags."
     >
@@ -1111,8 +1111,9 @@ type TreemapFocus = "concentration" | "both" | "new";
 
 const TREEMAP_PHASES = [500, 1700, 1100, 2600, 2800] as const;
 
-const TREEMAP_COPY: Record<TreemapFocus, { label: string; caption: string; hover: [string | null, string | null]; emphasis: Emphasis }> = {
+const TREEMAP_COPY: Record<TreemapFocus, { backdrop: GuideBackdrop; label: string; caption: string; hover: [string | null, string | null]; emphasis: Emphasis }> = {
   concentration: {
+    backdrop: "holder-treemap-concentration",
     label:
       "Animation: the Yes and No holder treemaps fill in tile by tile. The Yes side is spread across many wallets, with the top 10 holding 43%. On No, two wallets, 0xa5ef…2966 and BreakTheBank, cover almost half the shares and the top 10 hold 82%.",
     caption: "Each tile is one wallet sized by shares. A few huge tiles means a handful of wallets control that side.",
@@ -1120,6 +1121,7 @@ const TREEMAP_COPY: Record<TreemapFocus, { label: string; caption: string; hover
     emphasis: "top",
   },
   both: {
+    backdrop: "holder-treemap-both",
     label:
       "Animation: amber outlines appear on the holder treemaps around wallets that hold both Yes and No, such as YoshiYamamoto on the No side, and the legend reads 6 hold both sides.",
     caption: "An amber outline marks a wallet that also holds the other outcome.",
@@ -1127,6 +1129,7 @@ const TREEMAP_COPY: Record<TreemapFocus, { label: string; caption: string; hover
     emphasis: "both",
   },
   new: {
+    backdrop: "holder-treemap-new",
     label:
       "Animation: violet dots appear on holder tiles for wallets set up in the last 30 days. Hovering happy7ucker1 on the No side shows New wallet · 0 days old, and DavidxDavid on Yes is 12 days old.",
     caption: "A violet dot marks a wallet set up in the last 30 days. Hover it for its exact age.",
@@ -1146,7 +1149,7 @@ export function HolderTreemapAnimation({ focus = "concentration" }: { focus?: Tr
   const hoverSide = phase === 3 && copy.hover[0] ? "Yes" : "No";
   const target = hover ? `tile-${hoverSide}-${hover}` : null;
   return (
-    <GuideAnimationFigure rootRef={rootRef} backdrop={focus === "new" ? "village" : focus === "both" ? "automate" : "insights"} label={copy.label} caption={copy.caption}>
+    <GuideAnimationFigure rootRef={rootRef} backdrop={copy.backdrop} label={copy.label} caption={copy.caption}>
       <Stage stageRef={stageRef} overlay={<GuideCursor stageRef={stageRef} target={target} hidden={!target} revision={`${loop}-${phase}`} />}>
         <CanvasChrome>
           {phase >= 1 ? (
@@ -1576,18 +1579,21 @@ const TRADER_CURSOR: Record<TraderView, (phase: number) => string | null> = {
   pnl: (p) => (p >= 3 ? "pnl-point" : null),
 };
 
-const TRADER_COPY: Record<TraderView, { label: string; caption: string }> = {
+const TRADER_COPY: Record<TraderView, { backdrop: GuideBackdrop; label: string; caption: string }> = {
   positions: {
+    backdrop: "holder-positions",
     label:
       "Animation: plumbis's tab opens with 14 open positions. The positions chart sizes each by value and colors it by unrealized PnL. Hovering the House market shows $447.4K bought at 93.56¢ and now at 99.95¢, up $28.6K; hovering Magdalena Andersson for Sweden shows a $1.8K loss.",
     caption: "Each trader's tab starts with every open position. The House market is most of plumbis's book.",
   },
   activity: {
+    backdrop: "holder-activity",
     label:
       "Animation: plumbis's activity sheet fills with recent trades and redemptions, the daily calendar lights up 9 straight active days with 500 actions, and the dollars chart shows Oct 29 with $252.6K bought and $236.0K sold.",
     caption: "Activity covers trades and redemptions, with a calendar of when they trade and a chart of how much.",
   },
   pnl: {
+    backdrop: "holder-pnl",
     label:
       "Animation: plumbis's PnL line draws from Jul 10 to Nov 4, 2026, ending at $98.1K, $70.1K realized and $28.0K unrealized. Hovering shows a dip to $50.5K in mid-October and the final jump to $98.1K.",
     caption: "PnL through time, with the realized and unrealized split. Switch trader tabs to compare all five.",
@@ -1601,7 +1607,7 @@ export function TraderTabAnimation({ view = "positions" }: { view?: TraderView }
   const target = TRADER_CURSOR[view](phase);
   const copy = TRADER_COPY[view];
   return (
-    <GuideAnimationFigure rootRef={rootRef} backdrop={view === "pnl" ? "insights" : view === "activity" ? "village" : "dashboards"} label={copy.label} caption={copy.caption}>
+    <GuideAnimationFigure rootRef={rootRef} backdrop={copy.backdrop} label={copy.label} caption={copy.caption}>
       <Stage stageRef={stageRef} overlay={<GuideCursor stageRef={stageRef} target={target} hidden={!target} revision={`${loop}-${phase}`} />}>
         <CanvasChrome tabs={TABS.length} active={PLUMBIS_TAB}>
           {phase >= 1 ? (
@@ -1641,7 +1647,7 @@ export function HolderWalkthroughAnimation({ className }: { className?: string }
   return (
     <GuideAnimationFigure
       rootRef={rootRef}
-      backdrop="lake"
+      backdrop="holder-walkthrough"
       label="Animation: the full Polymarket Holder Analysis recipe. Search the House 2026 market, preview its holders and top 5 traders, click Save and Go, watch the holder sheets, treemaps and five trader tabs fill in, then start the tour."
       caption="The whole recipe on a real market: search, preview the holders, Save and Go, then a tab per top trader."
       className={className}

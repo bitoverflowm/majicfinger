@@ -31,6 +31,7 @@ import { FeatureWindow, GREEN, VIOLET } from "@/components/sections/features/fea
 import { cn } from "@/lib/utils";
 import {
   GuideAnimationFigure,
+  type GuideBackdrop,
   GuideCursor,
   MonoTag,
   ScaledStage,
@@ -46,7 +47,7 @@ export type RecipeVenue = "kalshi" | "polymarket";
 export type ResultItem = { title: string; subtitle: string; mono?: string; meta: string; status?: "Open" | "Closed" };
 type SheetColumn = { label: string; width: number };
 type RunStep = { name: string; args: string; result: string; time: string };
-type FigureCopy = { label: string; caption: string };
+type FigureCopy = { label: string; caption: string; backdrop: GuideBackdrop };
 
 type VenueConfig = {
   recipeTitle: string;
@@ -184,22 +185,27 @@ const KALSHI: VenueConfig = {
   exportFile: "trades-kxbtcd-26oct3108-t77299-99",
   copy: {
     find: {
+      backdrop: "kalshi-find",
       label: "Animation: opening the Download Kalshi Trade History recipe from the Recipes sidebar, typing Bitcoin price, and selecting the $77,300 or above market.",
       caption: "Open the recipe from the Recipes list, search in plain English, then pick the exact market.",
     },
     details: {
+      backdrop: "kalshi-details",
       label: "Animation: the Market details panel loading the selected market's status, prices, volume, open interest and close time, then the trade history source, before Save and Go is clicked.",
       caption: "Market details confirms you picked the right contract and shows which Kalshi source the trades will come from.",
     },
     run: {
+      backdrop: "kalshi-run",
       label: "Animation: after Save and Go, a progress card runs find_market, route_source, pull_trades and place_sheets, reports 187 trades from Kalshi Live, then reveals the trade sheet and its price chart on the canvas.",
       caption: "Save and Go pulls the full trade history onto your canvas as a sheet, with a default price chart.",
     },
     export: {
+      backdrop: "kalshi-export",
       label: "Animation: opening the trade sheet's actions menu, choosing Export, and picking CSV, Excel (.xlsx) or JSON to download the trades.",
       caption: "Export lives in the sheet's ⋮ menu: CSV, JSON, or Excel (.xlsx).",
     },
     walkthrough: {
+      backdrop: "kalshi-demo",
       label: "Animation: the full Download Kalshi Trade History recipe, from search to the trade sheet and chart on the canvas.",
       caption: "The whole recipe: search, check the market, Save and Go, then the trades land on your canvas.",
     },
@@ -345,22 +351,27 @@ const POLYMARKET: VenueConfig = {
   exportFile: `trades-${P_SLUG}`,
   copy: {
     find: {
+      backdrop: "polymarket-find",
       label: "Animation: opening the Download Polymarket Trade History recipe from the Recipes sidebar, typing Georgia governor 2026, and selecting Will the Democrats win the Georgia governor race in 2026?",
       caption: "Open the recipe from the Recipes list, search in plain English, then pick the exact market.",
     },
     details: {
+      backdrop: "polymarket-details",
       label: "Animation: the Market details panel loading the selected Polymarket market's outcome prices, bid and ask, volume, liquidity, opened and close dates, then the trade history source, before Save and Go is clicked.",
       caption: "Market details confirms the question and shows that this market reads Polymarket Live, with Polymarket Historical for older trades.",
     },
     run: {
+      backdrop: "polymarket-run",
       label: "Animation: after Save and Go, a progress card runs find_market, route_source, pull_trades and place_sheets, reports 2,304 trades from Polymarket Live + Historical, then reveals the trade sheet and its Yes and No price chart on the canvas.",
       caption: "Save and Go pulls the full trade history onto your canvas as a sheet, with a default Yes and No price chart.",
     },
     export: {
+      backdrop: "polymarket-export",
       label: "Animation: opening the Polymarket trade sheet's actions menu, choosing Export, and picking CSV, Excel (.xlsx) or JSON to download the trades.",
       caption: "Export lives in the sheet's ⋮ menu: CSV, JSON, or Excel (.xlsx).",
     },
     walkthrough: {
+      backdrop: "polymarket-walkthrough",
       label: "Animation: the full Download Polymarket Trade History recipe. Search Georgia governor 2026, pick the market, check its details and source, click Save and Go, and watch 2,304 trades land on the canvas with a price chart.",
       caption: "The whole recipe on a real market: search, check the details, Save and Go, then the trades land on your canvas.",
     },
@@ -766,7 +777,7 @@ export function RecipeFindMarketAnimation({ venue = "kalshi" }: { venue?: Recipe
   const cursorTarget = ["recipe-row", "recipe-row", "recipe-row", "search", "search", "result-0", "result-0"][phase];
 
   return (
-    <GuideAnimationFigure rootRef={rootRef} backdrop="lake" label={v.copy.find.label} caption={v.copy.find.caption}>
+    <GuideAnimationFigure rootRef={rootRef} backdrop={v.copy.find.backdrop} label={v.copy.find.label} caption={v.copy.find.caption}>
       <Stage
         stageRef={stageRef}
         overlay={<GuideCursor stageRef={stageRef} target={cursorTarget} pressed={phase === 2 || phase === 6} revision={`${loop}-${phase}`} />}
@@ -808,7 +819,7 @@ export function RecipeMarketDetailsAnimation({ venue = "kalshi" }: { venue?: Rec
   const details: DetailsState = phase === 0 ? "loading" : phase === 1 ? "stats" : "source";
 
   return (
-    <GuideAnimationFigure rootRef={rootRef} backdrop="insights" label={v.copy.details.label} caption={v.copy.details.caption}>
+    <GuideAnimationFigure rootRef={rootRef} backdrop={v.copy.details.backdrop} label={v.copy.details.label} caption={v.copy.details.caption}>
       <Stage
         stageRef={stageRef}
         overlay={<GuideCursor stageRef={stageRef} target={phase >= 3 ? "save" : "result-0"} pressed={phase === 4} revision={`${loop}-${phase}`} />}
@@ -1133,7 +1144,7 @@ export function RecipeRunAnimation({ venue = "kalshi" }: { venue?: RecipeVenue }
   const { phase, loop } = useGuidePhases(RUN_PHASES, rootRef, 6);
 
   return (
-    <GuideAnimationFigure rootRef={rootRef} backdrop="dashboards" label={v.copy.run.label} caption={v.copy.run.caption}>
+    <GuideAnimationFigure rootRef={rootRef} backdrop={v.copy.run.backdrop} label={v.copy.run.label} caption={v.copy.run.caption}>
       <Stage
         stageRef={stageRef}
         overlay={
@@ -1192,7 +1203,7 @@ export function RecipeExportAnimation({ venue = "kalshi" }: { venue?: RecipeVenu
   const cursorTarget = ["sheet-body", "menu-button", "menu-button", "menu-export", `format-${format.id}`, `format-${format.id}`, `format-${format.id}`][phase];
 
   return (
-    <GuideAnimationFigure rootRef={rootRef} backdrop="automate" label={v.copy.export.label} caption={v.copy.export.caption}>
+    <GuideAnimationFigure rootRef={rootRef} backdrop={v.copy.export.backdrop} label={v.copy.export.label} caption={v.copy.export.caption}>
       <Stage
         stageRef={stageRef}
         overlay={<GuideCursor stageRef={stageRef} target={cursorTarget} pressed={phase === 2 || phase === 5} revision={`${loop}-${phase}`} />}
@@ -1285,7 +1296,7 @@ export function RecipeWalkthroughAnimation({ venue = "kalshi", className }: { ve
   return (
     <GuideAnimationFigure
       rootRef={rootRef}
-      backdrop="lake"
+      backdrop={v.copy.walkthrough.backdrop}
       className={className}
       label={v.copy.walkthrough.label}
       caption={v.copy.walkthrough.caption}

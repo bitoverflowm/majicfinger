@@ -131,7 +131,7 @@ export function PolymarketSourceTimelineDiagram() {
   return (
     <GuideAnimationFigure
       rootRef={rootRef}
-      backdrop="village"
+      backdrop="polymarket-timeline"
       label="Diagram: a timeline from 2024 to 2027 split at January 1, 2026 UTC. Markets that closed before the split read Polymarket Historical, markets that opened after it read Polymarket Live, and markets that span it read both, all into one trade sheet."
       caption="You never pick a data source. The recipe checks the market's dates against the Jan 1, 2026 boundary and reads the trades from the right place."
     >
@@ -314,7 +314,7 @@ export function PolymarketFillsToTradeRowDiagram() {
   return (
     <GuideAnimationFigure
       rootRef={rootRef}
-      backdrop="lake"
+      backdrop="polymarket-fills"
       label="Diagram: four Polymarket Historical fills from one transaction. Three share a taker, outcome and side, so Lychee sums their shares and USDC into one trade row priced at 98.40 USDC divided by 250 shares, 0.3936. The fourth fill has a different taker and becomes its own row."
       caption="For markets that span both sources, older fills are grouped into Live-style rows, priced at total USDC divided by total shares."
     >
@@ -515,7 +515,7 @@ export function PolymarketTradeRowAnatomy() {
   return (
     <GuideAnimationFigure
       rootRef={rootRef}
-      backdrop="lake"
+      backdrop="polymarket-row"
       label="Annotated Polymarket trade row: Observed At, Outcome, Side, Price, Size and Transaction Hash, each explained in turn."
       caption="Every row is one trade. Price is USDC per share, so 0.3 means 30¢."
     >
