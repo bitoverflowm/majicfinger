@@ -140,8 +140,9 @@ function HolderPreview({ holders, holdersStatus, holdersError, traders, outcomes
           ) : null}
           {holders.skipped?.length ? (
             <p className="mt-0.5 text-[12px] text-muted-foreground">
-              Skipped {holders.skipped.length === 1 ? "a Polymarket contract" : `${holders.skipped.length} Polymarket contracts`} (
-              {holders.skipped.map((trader) => trader.label).join(", ")}), which hold shares but don&apos;t trade.
+              {holders.skipped.length === 1
+                ? `Skipped ${holders.skipped[0].label}, a Polymarket contract that holds shares but doesn't trade.`
+                : `Skipped ${holders.skipped.length} Polymarket contracts (${holders.skipped.map((trader) => trader.label).join(", ")}) that hold shares but don't trade.`}
             </p>
           ) : null}
         </header>
@@ -241,6 +242,7 @@ export function PolymarketHolderAnalysisRecipe({ onBack, Title = "h2", Descripti
       meta,
       holders,
       traders,
+      contracts: holders.skipped || [],
       canvas,
       ctx,
       close: () => connect?.close?.(),

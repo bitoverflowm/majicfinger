@@ -29,6 +29,7 @@ import {
   RESIZE_TIP_ID,
   ResizeFeatureTip,
 } from "@/components/dashboardComposer/buildFeatureTips";
+import { RecipeTourLayer } from "@/components/dashboardComposer/recipeTour";
 import { useFeatureTipDismissal } from "@/components/ui/feature-tip";
 import { LandingDemoMembersOnlyPortal } from "@/components/dashboardComposer/landingDemoMembersOnly";
 import { DestructiveConfirmMenuItem } from "@/components/ui/destructive-confirm-menu-item";
@@ -406,6 +407,7 @@ export function WorkspaceCanvasProvider({ pageId, readOnly = false, children }) 
   const [runFeed, setRunFeed] = useState(null);
   const [replayReady, setReplayReady] = useState(false);
   const replayRunRef = useRef(null);
+  const [tour, setTour] = useState(null);
   const blocks = blocksByPage[pageId] || [];
   const docIdRef = useRef("");
   const saveBaseRef = useRef(createSaveBaseline());
@@ -847,7 +849,18 @@ export function WorkspaceCanvasProvider({ pageId, readOnly = false, children }) 
 
   const reportRun = useCallback((next) => {
     setRunFeed((current) => (typeof next === "function" ? next(current) : next));
+    if (next && typeof next === "object" && next.id) setTour((current) => (current && current.runId !== next.id ? null : current));
   }, []);
+  /** A guided tour over blocks a run placed. It shows once the run card is closed. */
+  const startTour = useCallback((next) => {
+    setTour(next?.steps?.length ? { ...next, index: 0, shown: -1 } : null);
+  }, []);
+  /** `shown` is the step whose blocks are scrolled into view, so its tip can open. */
+  const setTourStep = useCallback((index, extra = {}) => {
+    setTour((current) => (current ? { ...current, shown: -1, ...extra, index } : current));
+  }, []);
+  const endTour = useCallback(() => setTour(null), []);
+  const getPageId = useCallback(() => pageIdRef.current, []);
   const armReplay = useCallback((fn) => {
     replayRunRef.current = typeof fn === "function" ? fn : null;
     setReplayReady(Boolean(replayRunRef.current));
@@ -1478,13 +1491,18 @@ export function WorkspaceCanvasProvider({ pageId, readOnly = false, children }) 
       armReplay,
       replayRun,
       dismissRun,
+      tour,
+      startTour,
+      setTourStep,
+      endTour,
+      getPageId,
       updateBlock,
       duplicateBlock,
       removeBlock,
       createChartFromBlock,
       generateChartsForSheets,
     }),
-    [addBlock, armReplay, blocks, blocksByPage, createChartFromBlock, dashboardName, deleteTab, dismissRun, duplicateBlock, focusBlock, focusSheetRow, generateChartsForSheets, handDown, leavePrompt, markTabSettled, pageId, pendingTabs, placeIntegrationSheets, previewActiveId, previewTabs, readOnly, ready, realtimeById, realtimeModeByPage, registerTables, removeBlock, renameDashboard, renameId, replayReady, replayRun, replayTab, reportRun, requestTab, resolveLeave, revealBlock, revealNonce, revealRunSheets, runFeed, saveNow, selectedId, sheetRowFocus, spotlightId, startRealtimeMode, startSheetRealtime, stopRealtimeMode, stopSheetRealtime, tables, tool, updateBlock],
+    [addBlock, armReplay, blocks, blocksByPage, createChartFromBlock, dashboardName, deleteTab, dismissRun, duplicateBlock, endTour, focusBlock, focusSheetRow, generateChartsForSheets, getPageId, handDown, leavePrompt, markTabSettled, pageId, pendingTabs, placeIntegrationSheets, previewActiveId, previewTabs, readOnly, ready, realtimeById, realtimeModeByPage, registerTables, removeBlock, renameDashboard, renameId, replayReady, replayRun, replayTab, reportRun, requestTab, resolveLeave, revealBlock, revealNonce, revealRunSheets, runFeed, saveNow, selectedId, sheetRowFocus, spotlightId, setTourStep, startRealtimeMode, startSheetRealtime, startTour, stopRealtimeMode, stopSheetRealtime, tables, tool, tour, updateBlock],
   );
 
   return (
@@ -2742,10 +2760,12 @@ export function WorkspaceCanvas() {
       "",
     [blocks, lockedIds],
   );
+  const recipeTourOn = !!canvas?.tour && !!canvas?.ready && !canvas?.runFeed && !canvas?.readOnly;
   const exportTourDue =
     !!tipBlockId &&
     !!canvas?.ready &&
     !canvas?.runFeed &&
+    !canvas?.tour &&
     !canvas?.readOnly &&
     firstPullTip.dismissed === true &&
     exportTip.dismissed === false;
@@ -2783,7 +2803,13 @@ export function WorkspaceCanvas() {
   const dismissResizeTip = resizeTip.dismiss;
   const dismissMoveTip = moveTip.dismiss;
   const editTipsOn =
-    !!tipBlockId && !!canvas?.ready && !canvas?.runFeed && !canvas?.readOnly && canvas?.tool === "hand" && handTip.dismissed === true;
+    !!tipBlockId &&
+    !!canvas?.ready &&
+    !canvas?.runFeed &&
+    !canvas?.tour &&
+    !canvas?.readOnly &&
+    canvas?.tool === "hand" &&
+    handTip.dismissed === true;
   const editTip = !editTipsOn
     ? null
     : resizeTip.dismissed === false
@@ -3139,6 +3165,7 @@ export function WorkspaceCanvas() {
       ) : null}
       {editTip === "resize" ? <ResizeFeatureTip anchorRef={editTipAnchorRef} /> : null}
       {editTip === "move" ? <MoveFeatureTip anchorRef={editTipAnchorRef} /> : null}
+      {recipeTourOn ? <RecipeTourLayer canvas={canvas} tour={canvas.tour} scrollerRef={scrollerRef} /> : null}
       {snapPreview ? (
         <div
           aria-hidden="true"

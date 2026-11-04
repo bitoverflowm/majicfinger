@@ -34,6 +34,13 @@ function readDismissed(key) {
 /** Tips closed during this page load. Covers tips that aren't stored (landing demo) across remounts. */
 const sessionDismissed = new Set();
 
+/** Outside React: whether `id` was closed this page load or, for stored tips, before. */
+export function isFeatureTipDismissed(id, userId) {
+  if (!id || typeof window === "undefined") return false;
+  const key = storageKey(id, userId);
+  return sessionDismissed.has(key) || readDismissed(key);
+}
+
 /** Every mounted `useFeatureTipDismissal` by key, so closing a tip updates the others watching it. */
 const dismissalWatchers = new Map();
 

@@ -4,11 +4,13 @@ import { useEffect, useRef, useState } from "react";
 import { AgentSteps, formatElapsed } from "@/components/dashboardComposer/agentSteps";
 import { FIRST_PULL_TIP_ID, FirstPullFeatureTip } from "@/components/dashboardComposer/buildFeatureTips";
 import { dismissFeatureTip } from "@/components/ui/feature-tip";
+import { cn } from "@/lib/utils";
 
 function runSucceeded(feed) {
   if (feed?.status !== "done") return false;
   return (feed.steps || []).every((step) => {
     if (step.status === "error") return false;
+    if (feed.partialOk && step.status === "success") return true;
     return !(step.children || []).some((child) => child.status === "error");
   });
 }
@@ -29,11 +31,22 @@ export function RunProgressCard({ feed, onDismiss, onReplay }) {
     if (succeeded && feed.firstPull) dismissFeatureTip(FIRST_PULL_TIP_ID);
     onDismiss?.();
   };
+  const docked = feed.dock === "side";
   return (
-    <div className="pointer-events-none absolute inset-x-0 bottom-0 top-[var(--dashboard-tab-clearance,0px)] z-30 flex items-center justify-center p-6">
+    <div
+      className={cn(
+        "pointer-events-none absolute inset-x-0 bottom-0 top-[var(--dashboard-tab-clearance,0px)] z-30 flex p-6",
+        docked ? "items-end justify-end pb-20" : "items-center justify-center",
+      )}
+    >
       <section
         data-run-progress=""
-        className="pointer-events-auto flex max-h-[min(72vh,680px)] w-[min(440px,calc(100%-2rem))] flex-col overflow-hidden rounded-xl border border-border/70 bg-background shadow-sm"
+        className={cn(
+          "pointer-events-auto flex flex-col overflow-hidden rounded-xl border border-border/70 bg-background shadow-sm",
+          docked
+            ? "max-h-[min(54vh,520px)] w-[min(360px,calc(100%-2rem))] shadow-lg motion-safe:animate-in motion-safe:fade-in-0 motion-safe:slide-in-from-bottom-2"
+            : "max-h-[min(72vh,680px)] w-[min(440px,calc(100%-2rem))]",
+        )}
       >
         <header className="flex items-start justify-between gap-3 border-b border-border/70 px-4 py-3">
           <div className="min-w-0">
@@ -75,7 +88,7 @@ export function RunProgressCard({ feed, onDismiss, onReplay }) {
               onClick={close}
               className="mt-3 inline-flex w-full items-center justify-center rounded-lg bg-foreground px-3 py-2 text-[13px] font-medium text-background hover:opacity-90"
             >
-              View dashboard
+              {feed.viewLabel || "View dashboard"}
             </button>
             {feed.firstPull ? <FirstPullFeatureTip anchorRef={viewButtonRef} runId={feed.id} /> : null}
           </footer>

@@ -2,6 +2,7 @@ import { createRunReporter } from "@/components/dashboardComposer/integrationRun
 import { claimSheetId, recordsFromRows } from "@/components/dashboardComposer/integrationRunSheets";
 import { polymarketTraderJoinSheetTitle } from "@/components/dashboardComposer/polymarketLiveBuild";
 import { createRunSheetStage } from "@/components/dashboardComposer/runSheetStage";
+import { isFeatureTipDismissed } from "@/components/ui/feature-tip";
 import { lifePull } from "@/lib/markets/marketLife";
 import { TRADER_ACTIVITY_ENDPOINT_ID } from "@/lib/polymarketLive/traderActivityCompose";
 import { TRADER_PNL_ENDPOINT_ID } from "@/lib/polymarketLive/traderPnlCompose";
@@ -12,27 +13,72 @@ import { newStartTabId, saveWorkspaceStartTabs } from "@/lib/workspaceStartTabs"
 import {
   HOLDER_COLUMNS,
   HOLDER_PAGES,
+  PROTOCOL_CONTRACT,
   pullMarketHolders,
   pullTraderBundle,
   RECIPE_POLYMARKET_HOLDER_ANALYSIS,
   TRADER_ROW_LIMIT,
 } from "./polymarketHolderAnalysisSource";
 
+export const HOLDER_TOUR_ID = "recipe-polymarket-holder-analysis-tour";
+
 const CHART_PROBE_ROWS = 200;
 const PNL_FILTERS = { interval: { value: "max" }, fidelity: { value: "1d" } };
 /** Each trader is three pulls, and Polymarket rate-limits bursts across them. */
 const TRADER_CONCURRENCY = 2;
+/** After a tab switch, before its first sheet lands. */
+const TAB_SETTLE_MS = 280;
+/** Between one trader's tab and the next, so each tab is seen filled. */
+const TRADER_PAUSE_MS = 700;
+/** How long a clean run's card stays up before the tour takes over. */
+const HAND_OFF_MS = 1400;
 
-async function mapPool(items, size, work) {
-  let next = 0;
-  const lanes = Array.from({ length: Math.min(size, items.length) }, async () => {
-    while (next < items.length) {
-      const item = items[next];
-      next += 1;
-      await work(item);
-    }
-  });
-  await Promise.all(lanes);
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+/** Runs at most `size` tasks at once, in the order they were queued. */
+function limiter(size) {
+  let active = 0;
+  const waiting = [];
+  const next = () => {
+    if (active >= size || !waiting.length) return;
+    active += 1;
+    const { task, resolve, reject } = waiting.shift();
+    task()
+      .then(resolve, reject)
+      .finally(() => {
+        active -= 1;
+        next();
+      });
+  };
+  return (task) =>
+    new Promise((resolve, reject) => {
+      waiting.push({ task, resolve, reject });
+      next();
+    });
+}
+
+/**
+ * Takes the user to each tab as the run fills it. Stops for good once the user picks a tab of
+ * their own, so the run never pulls them away from where they went.
+ */
+function createFollower(canvas) {
+  const current = () => canvas?.getPageId?.() || "";
+  let following = typeof canvas?.requestTab === "function" && typeof canvas?.getPageId === "function";
+  let at = current();
+  return {
+    async show(pageId) {
+      if (!following || !pageId) return;
+      if (current() !== at) {
+        following = false;
+        return;
+      }
+      if (pageId === at) return;
+      canvas.requestTab(tabIdFromPage(pageId));
+      at = pageId;
+      for (let waited = 0; current() !== pageId && waited < 2000; waited += 50) await sleep(50);
+      await sleep(TAB_SETTLE_MS);
+    },
+  };
 }
 
 function shortTitle(text, max = 34) {
@@ -142,6 +188,9 @@ function partsLine(bundle) {
     ["activity rows", bundle.activity],
     ["PnL points", bundle.pnl],
   ];
+  if (parts.every(([, part]) => PROTOCOL_CONTRACT.test(part.error || ""))) {
+    return "A Polymarket contract, not a trader, so it has no positions, activity, or PnL";
+  }
   return parts
     .map(([noun, part]) => {
       if (!part.error) return `${part.rows.length.toLocaleString()} ${noun}`;
@@ -150,15 +199,112 @@ function partsLine(bundle) {
     .join(" · ");
 }
 
+/** Polymarket's own contracts keep their rows, named so they don't read as a trader. */
+function labelContracts(side, contracts) {
+  const wallets = new Set(contracts.map((trader) => String(trader.wallet || "").toLowerCase()));
+  if (!wallets.size) return side;
+  return {
+    ...side,
+    rows: side.rows.map((row) => (wallets.has(row.proxy_wallet) ? { ...row, name: `Polymarket contract · ${row.name}` } : row)),
+  };
+}
+
+function names(list) {
+  if (list.length <= 1) return list.join("");
+  return `${list.slice(0, -1).join(", ")} and ${list[list.length - 1]}`;
+}
+
+/** The first placed trader from `start` on that has `key`, so tour steps can visit different tabs. */
+function pickTrader(placed, start, key) {
+  for (let step = 0; step < placed.length; step += 1) {
+    const item = placed[(start + step) % placed.length];
+    if (item.ids[key]) return item;
+  }
+  return null;
+}
+
+function holderTour({ runId, marketPageId, sheets, sides, bothCount, traders, placed }) {
+  const [yes, no] = sides;
+  const bothTraders = traders.filter((trader) => trader.both).map((trader) => trader.label);
+  const steps = [
+    {
+      pageId: marketPageId,
+      targets: [{ sheet: sheets[0].id, part: "sheet" }],
+      title: `${yes.outcome} holders`,
+      description: `Everyone holding ${yes.outcome}, largest first, with their shares, share of the listed total, value, average price, and PnL.`,
+    },
+    {
+      pageId: marketPageId,
+      targets: [{ sheet: sheets[1].id, part: "sheet" }],
+      title: `${no.outcome} holders`,
+      description: `The same table for ${no.outcome}, so you can compare who's betting on each side.`,
+    },
+    {
+      pageId: marketPageId,
+      targets: sheets.map((sheet) => ({ sheet: sheet.id, part: "charts" })),
+      title: "How concentrated each side is",
+      description: "Each tile is one holder, sized by shares. A few big tiles means a handful of wallets control that side. Hover a tile for its details.",
+    },
+    {
+      pageId: marketPageId,
+      targets: sheets.map((sheet) => ({ sheet: sheet.id, part: "charts" })),
+      title: "Wallets on both sides",
+      description: bothCount
+        ? [
+            `${bothCount.toLocaleString()} ${bothCount === 1 ? "wallet holds" : "wallets hold"} both ${yes.outcome} and ${no.outcome}. They're outlined in amber here and checked in the Holds both sides column.`,
+            ...(bothTraders.length ? [`Of the top ${traders.length}, ${names(bothTraders)} ${bothTraders.length === 1 ? "does" : "do"} too.`] : []),
+          ]
+        : `No listed wallet holds both ${yes.outcome} and ${no.outcome}. When one does, it's outlined in amber here and checked in the Holds both sides column.`,
+    },
+  ];
+  const positions = pickTrader(placed, 0, "positions");
+  if (positions) {
+    steps.push({
+      pageId: positions.pageId,
+      targets: [{ sheet: positions.ids.positions, part: "all" }],
+      title: `${positions.trader.label}'s tab`,
+      description: [
+        `Each of the top ${placed.length} traders gets a tab. It starts with every open position, and the treemap shows where their money sits.`,
+        "Holds both sides flags markets where they own both outcomes.",
+      ],
+    });
+  }
+  const activity = pickTrader(placed, 1, "activity");
+  if (activity) {
+    steps.push({
+      pageId: activity.pageId,
+      targets: [{ sheet: activity.ids.activity, part: "all" }],
+      title: `${activity.trader.label}'s activity`,
+      description: "Their latest trades, splits, merges, and redemptions, with charts of when and how much they trade.",
+    });
+  }
+  const pnl = pickTrader(placed, 2, "pnl");
+  if (pnl) {
+    steps.push({
+      pageId: pnl.pageId,
+      targets: [{ sheet: pnl.ids.pnl, part: "charts" }],
+      title: `${pnl.trader.label}'s PnL`,
+      description: `Profit and loss over time. Switch between the trader tabs to compare all ${placed.length}.`,
+    });
+  }
+  return { id: HOLDER_TOUR_ID, runId, steps };
+}
+
 /**
  * Save and Go: the market's Yes and No holders land on one tab with a treemap under each, then
- * each top trader gets a tab of their own with positions, activity, and PnL.
+ * each top trader gets a tab of their own with positions, activity, and PnL. The run takes the
+ * user to each tab as it fills, then hands off to a short tour of what's where.
  * A replay refreshes the same tabs instead of opening new ones.
  */
-export async function runPolymarketHolderAnalysis({ meta, holders, traders, canvas, ctx, close, accountId, reuse = null }) {
-  const reporter = createRunReporter((feed) => canvas?.reportRun?.(feed));
+export async function runPolymarketHolderAnalysis({ meta, holders, traders, contracts = [], canvas, ctx, close, accountId, reuse = null }) {
+  let runId = "";
+  const reporter = createRunReporter((feed) => {
+    runId = feed.id;
+    canvas?.reportRun?.(feed);
+  });
   const handle = meta.slug || meta.conditionId;
   const [first = "Yes", second = "No"] = meta.outcomes || [];
+  const tourDue = !reuse && !isFeatureTipDismissed(HOLDER_TOUR_ID, accountId || undefined);
   reporter.plan(
     [
       { id: "find", name: "find_market", status: "pending", args: { market: handle } },
@@ -172,7 +318,12 @@ export async function runPolymarketHolderAnalysis({ meta, holders, traders, canv
       runningLabel: "Analyzing holders",
       doneLabel: "Holder analysis ready",
       failLabel: "Holder analysis failed",
-      readyDetail: "Holders are on this tab. Each top trader has a tab of their own.",
+      readyDetail: tourDue
+        ? "The holders are on the market tab and each top trader has a tab. Take a quick tour of what's where."
+        : "The holders are on the market tab and each top trader has a tab of their own.",
+      viewLabel: tourDue ? "Show me around" : undefined,
+      dock: "side",
+      partialOk: true,
     },
   );
   close?.();
@@ -192,7 +343,7 @@ export async function runPolymarketHolderAnalysis({ meta, holders, traders, canv
       }
     }
   }
-  const [yes, no] = pulled.sides;
+  const [yes, no] = pulled.sides.map((side) => labelContracts(side, contracts));
   if (!yes.rows.length && !no.rows.length) {
     reporter.fail("holders", "Polymarket lists no holders for this market yet.");
     return;
@@ -207,15 +358,16 @@ export async function runPolymarketHolderAnalysis({ meta, holders, traders, canv
   let marketPageId = reuse?.marketPageId || "";
   let traderTabIds = reuse?.traderTabIds || [];
   if (!reuse) {
-    const names = [...(onTab ? [] : [shortTitle(`Holders · ${meta.title}`)]), ...traders.map(traderTabName)];
-    const ids = addTabs(ctx, names, accountId);
+    const tabNames = [...(onTab ? [] : [shortTitle(`Holders · ${meta.title}`)]), ...traders.map(traderTabName)];
+    const ids = addTabs(ctx, tabNames, accountId);
     marketPageId = onTab ? canvas.pageId : pageIdForTab(ids[0]);
     traderTabIds = onTab ? ids : ids.slice(1);
-    if (!onTab) canvas?.requestTab?.(ids[0]);
   }
   canvas?.armReplay?.(() =>
-    runPolymarketHolderAnalysis({ meta, holders: null, traders, canvas, ctx, close: null, accountId, reuse: { marketPageId, traderTabIds } }),
+    runPolymarketHolderAnalysis({ meta, holders: null, traders, contracts, canvas, ctx, close: null, accountId, reuse: { marketPageId, traderTabIds } }),
   );
+  const follower = createFollower(canvas);
+  await follower.show(marketPageId);
 
   reporter.start("place");
   const occupied = new Set(((canvas?.blocksByPage || {})[marketPageId] || []).map((block) => block?.id).filter(Boolean));
@@ -223,8 +375,7 @@ export async function runPolymarketHolderAnalysis({ meta, holders, traders, canv
   const base = `run-recipe-holders-${handle.replace(/[^A-Za-z0-9]+/g, "-").slice(0, 60)}`;
   const holderStage = stageFor(canvas, marketPageId);
   const sheets = [yes, no].map((side, index) => holderSheet(side, index, meta, reuse ? `${base}-${index}` : claimSheetId(`${base}-${index}`, occupied, claimed)));
-  for (const sheet of sheets) holderStage.put(sheet);
-  await holderStage.settle();
+  for (const sheet of sheets) await holderStage.put(sheet);
   reporter.succeed("place", { result: `${sheets.map((sheet) => sheet.title).join(" and ")} with a treemap under each` });
 
   reporter.start("tabs");
@@ -245,34 +396,47 @@ export async function runPolymarketHolderAnalysis({ meta, holders, traders, canv
       args: { sides: trader.sides.map((side) => side.outcome).join("+") },
     })),
   );
-  let failed = 0;
-  await mapPool(
-    live,
-    TRADER_CONCURRENCY,
-    async ({ trader, tabId }) => {
+  const pull = limiter(TRADER_CONCURRENCY);
+  const bundles = live.map(({ trader }) =>
+    pull(async () => {
       reporter.patchChild("traders", trader.wallet, { status: "running", result: "Pulling positions, activity, and PnL" });
       const bundle = await pullTraderBundle(trader, {
         onWait: (seconds) => reporter.patchChild("traders", trader.wallet, { result: `Polymarket is busy · retrying in ${seconds}s` }),
       });
-      if (reuse && !tabStillOpen(ctx, tabId)) return;
-      const pageId = pageIdForTab(tabIdFromPage(tabId));
-      const stage = stageFor(canvas, pageId);
-      const wallet = trader.wallet.toLowerCase();
-      const parts = [
-        [TRADER_POSITIONS_ENDPOINT_ID, bundle.positions, "positions"],
-        [TRADER_ACTIVITY_ENDPOINT_ID, bundle.activity, "activity"],
-        [TRADER_PNL_ENDPOINT_ID, bundle.pnl, "pnl"],
-      ];
-      for (const [endpointId, part, key] of parts) {
-        if (!part.rows.length) continue;
-        stage.put(traderSheet(endpointId, part, trader, `run-recipe-holder-${key}-${wallet}`));
-      }
-      await stage.settle();
-      const empty = parts.every(([, part]) => !part.rows.length);
-      if (empty) failed += 1;
-      reporter.patchChild("traders", trader.wallet, { status: empty ? "error" : "success", result: partsLine(bundle) });
-    },
+      reporter.patchChild("traders", trader.wallet, { result: `${partsLine(bundle)} · placing next` });
+      return bundle;
+    }),
   );
+
+  let failed = 0;
+  const placed = [];
+  for (const [at, { trader, tabId }] of live.entries()) {
+    const bundle = await bundles[at];
+    if (reuse && !tabStillOpen(ctx, tabId)) continue;
+    const pageId = pageIdForTab(tabIdFromPage(tabId));
+    const wallet = trader.wallet.toLowerCase();
+    const parts = [
+      [TRADER_POSITIONS_ENDPOINT_ID, bundle.positions, "positions"],
+      [TRADER_ACTIVITY_ENDPOINT_ID, bundle.activity, "activity"],
+      [TRADER_PNL_ENDPOINT_ID, bundle.pnl, "pnl"],
+    ].filter(([, part]) => part.rows.length);
+    if (!parts.length) {
+      failed += 1;
+      reporter.patchChild("traders", trader.wallet, { status: "error", result: partsLine(bundle) });
+      continue;
+    }
+    reporter.patchChild("traders", trader.wallet, { result: `Placing ${partsLine(bundle)}` });
+    await follower.show(pageId);
+    const stage = stageFor(canvas, pageId);
+    const ids = {};
+    for (const [endpointId, part, key] of parts) {
+      ids[key] = `run-recipe-holder-${key}-${wallet}`;
+      await stage.put(traderSheet(endpointId, part, trader, ids[key]));
+    }
+    placed.push({ trader, pageId, ids });
+    reporter.patchChild("traders", trader.wallet, { status: "success", result: partsLine(bundle) });
+    if (at < live.length - 1) await sleep(TRADER_PAUSE_MS);
+  }
   if (live.length && failed === live.length) {
     reporter.fail("traders", "None of the trader pulls returned rows.");
     return;
@@ -280,5 +444,14 @@ export async function runPolymarketHolderAnalysis({ meta, holders, traders, canv
   reporter.succeed("traders", {
     result: `${(live.length - failed).toLocaleString()} of ${live.length.toLocaleString()} trader tabs filled`,
   });
+  await follower.show(marketPageId);
   reporter.finish();
+
+  if (!tourDue) return;
+  canvas?.startTour?.(
+    holderTour({ runId, marketPageId, sheets, sides: [yes, no], bothCount: pulled.bothCount || 0, traders: live.map((item) => item.trader), placed }),
+  );
+  if (failed) return;
+  await sleep(HAND_OFF_MS);
+  canvas?.reportRun?.((current) => (current?.id === runId ? null : current));
 }

@@ -35,6 +35,14 @@ assert.equal(isOrderBookSheet({ title: "Orderbook(s) · WTI", columns: [] }), tr
 assert.equal(isOrderBookSheet({ title: "Trades · AST", columns: [] }), false);
 assert.equal(
   isOrderBookSheet({
+    table: "getTraderActivity",
+    title: "Spectrum's activity",
+    columns: [{ id: "type" }, { id: "side" }, { id: "price" }, { id: "size" }],
+  }),
+  false,
+);
+assert.equal(
+  isOrderBookSheet({
     table: "getTradesByMarket",
     title: "Trade History · WTI",
     columns: [{ id: "side" }, { id: "price" }, { id: "size" }],

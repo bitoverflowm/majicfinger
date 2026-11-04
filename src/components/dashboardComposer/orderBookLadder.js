@@ -51,7 +51,9 @@ export function isOrderBookSheet(sheet) {
     table === "trades" ||
     table === "getTradesByMarket" ||
     table === "trades_by_holder" ||
-    table === "getHolderTrades"
+    table === "getHolderTrades" ||
+    table === "getTraderActivity" ||
+    table === "getUserActivity"
   ) {
     return false;
   }
