@@ -44,7 +44,7 @@ function wait(ms, signal) {
   });
 }
 
-async function polymarketGet(query, params, signal, { retries = 0, onWait } = {}) {
+export async function polymarketGet(query, params, signal, { retries = 0, onWait } = {}) {
   const search = new URLSearchParams({ query, skipFlatten: "true" });
   for (const [key, value] of Object.entries(params || {})) {
     if (value != null && String(value).trim() !== "") search.set(key, String(value));

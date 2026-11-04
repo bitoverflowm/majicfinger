@@ -1,11 +1,12 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { CircleArrowDown } from "lucide-react";
+import { CircleArrowDown, Users } from "lucide-react";
 import {
   KalshiTradeHistoryPreview,
   PolymarketTradeHistoryPreview,
 } from "@/components/dashboardComposer/recipes/kalshiTradeHistoryPreview";
+import { PolymarketHolderAnalysisPreview } from "@/components/dashboardComposer/recipes/polymarketHolderAnalysisPreview";
 import { cn } from "@/lib/utils";
 
 export const RECIPES = [
@@ -24,6 +25,14 @@ export const RECIPES = [
     tag: "CSV",
     icon: CircleArrowDown,
     preview: PolymarketTradeHistoryPreview,
+  },
+  {
+    id: "polymarketHolderAnalysis",
+    title: "Polymarket Holder Analysis",
+    description: "See who holds each side of a market, then open a tab for each of the top 5 traders.",
+    tag: "Top 5",
+    icon: Users,
+    preview: PolymarketHolderAnalysisPreview,
   },
 ];
 

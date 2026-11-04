@@ -14,7 +14,7 @@ export function formatVolume(value, dataset) {
   return volumeInContracts(dataset) ? formatShares(value) : formatUsd(value);
 }
 
-function squarify(items, width, height) {
+export function squarify(items, width, height) {
   const sorted = [...items].filter((item) => item.weight > 0).sort((a, b) => b.weight - a.weight);
   const totalWeight = sorted.reduce((sum, item) => sum + item.weight, 0);
   if (!sorted.length || totalWeight <= 0 || width <= 0 || height <= 0) return [];

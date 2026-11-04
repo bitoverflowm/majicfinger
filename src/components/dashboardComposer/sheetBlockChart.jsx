@@ -10,6 +10,7 @@ import { isPriceHistorySheet, priceHistoryLines, priceHistoryOutcome } from "@/c
 import { DatasetSummary, EventLinesChart } from "@/components/dashboardComposer/datasetChart";
 import { PortfolioTreemap } from "@/components/dashboardComposer/portfolioTreemapChart";
 import { VolumeTreemap } from "@/components/dashboardComposer/volumeTreemapChart";
+import { HolderTreemap } from "@/components/dashboardComposer/holderTreemapChart";
 import { PnlPortfolioChart } from "@/components/dashboardComposer/pnlPortfolioChart";
 import { ActivityCalendarChart } from "@/components/dashboardComposer/activityCalendarChart";
 import { ActivityStackChart } from "@/components/dashboardComposer/activityStackChart";
@@ -489,6 +490,9 @@ export function SheetBlockChart({ sheet, snapshot, onSnapshot, live = false, vie
   if (resolved?.view === "treemap") {
     if (dataset?.datasetType === "markets" || dataset?.datasetType === "events" || dataset?.datasetType === "series") {
       return <VolumeTreemap sheet={sheet} dataset={dataset} onOpenRow={onOpenRow} />;
+    }
+    if (dataset?.datasetType === "holders") {
+      return <HolderTreemap sheet={sheet} dataset={dataset} onOpenRow={onOpenRow} />;
     }
     return <PortfolioTreemap sheet={sheet} dataset={dataset} onOpenRow={onOpenRow} />;
   }

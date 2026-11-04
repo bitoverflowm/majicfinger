@@ -22,7 +22,7 @@ export function chartSpecsForSheet(sheet, forcedView) {
     observations: dataset ? countObservations(sheet, dataset) : undefined,
   });
   const base = String(sheet?.title || "Sheet").replace(/\s+chart$/, "").trim() || "Sheet";
-  const requested = String(forcedView || "").trim();
+  const requested = String(forcedView || sheet?.pull?.chartView || "").trim();
   if ((!requested && isPriceStreamSheet(sheet)) || requested === "liveline") {
     return [{ chartView: "liveline", title: `${base} chart`, w: 680, h: 440 }];
   }

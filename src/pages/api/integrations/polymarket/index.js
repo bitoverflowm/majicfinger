@@ -370,10 +370,13 @@ function preserveTokenIdsInJson(text) {
   return result;
 }
 
+/** The Data API answers 429 to Node's default user agent on /v2/positions. */
+const REQUEST_HEADERS = { Accept: "application/json", "User-Agent": "Lychee/1.0 (+https://lycheedata.com)" };
+
 async function fetchJson(url, opts = {}) {
   const res = await fetch(url, {
     method: "GET",
-    headers: { Accept: "application/json" },
+    headers: REQUEST_HEADERS,
     signal: AbortSignal.timeout(20000),
     ...opts,
   });

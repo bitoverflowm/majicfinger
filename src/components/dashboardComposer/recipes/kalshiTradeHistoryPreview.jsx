@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { ArrowUp, Check, Download, Share2, Sparkles } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-const CSS = `
+export const CSS = `
 .rp-stage { --rp-dim: rgba(15, 23, 42, 0.38); --rp-ink: #0f172a; }
 .dark .rp-stage { --rp-dim: rgba(255, 255, 255, 0.38); --rp-ink: #ffffff; }
 @keyframes rp-spin { from { transform: translate(-50%, -50%) rotate(0deg) } to { transform: translate(-50%, -50%) rotate(360deg) } }
@@ -32,8 +32,9 @@ const CSS = `
 }
 `;
 
-const EASE = "cubic-bezier(0.32, 0.72, 0, 1)";
+export const EASE = "cubic-bezier(0.32, 0.72, 0, 1)";
 
+/** Every recipe preview runs these six beats, so they share the prompt bar and status line. */
 const PHASES = [
   { id: "prompt", ms: 2600 },
   { id: "scan", ms: 1700 },
@@ -42,7 +43,7 @@ const PHASES = [
   { id: "chart", ms: 2400 },
   { id: "ready", ms: 3000 },
 ];
-const READY = PHASES.length - 1;
+export const READY = PHASES.length - 1;
 const STATUS = ["", "Thinking", "Thinking", "Working", "Composing", "Ready"];
 
 const FAN = [
@@ -74,7 +75,7 @@ const CHART_RECT = [
 const YES_LINE = "M0,64 L12,60 L24,62 L36,53 L48,56 L60,47 L72,50 L84,41 L96,44 L108,36 L120,39 L132,30 L144,33 L156,26 L168,28 L180,21 L200,18";
 const NO_LINE = "M0,36 L12,40 L24,38 L36,47 L48,44 L60,53 L72,50 L84,59 L96,56 L108,64 L120,61 L132,70 L144,67 L156,74 L168,72 L180,79 L200,82";
 
-function rand(seed) {
+export function rand(seed) {
   const x = Math.sin(seed * 12.9898) * 43758.5453;
   return x - Math.floor(x);
 }
@@ -93,7 +94,7 @@ function rectStyle(table, phase) {
   };
 }
 
-function usePrefersReducedMotion() {
+export function usePrefersReducedMotion() {
   const [reduced, setReduced] = useState(false);
   useEffect(() => {
     const query = window.matchMedia("(prefers-reduced-motion: reduce)");
@@ -105,7 +106,7 @@ function usePrefersReducedMotion() {
   return reduced;
 }
 
-function useTimeline(paused) {
+export function useTimeline(paused) {
   const [state, setState] = useState({ phase: 0, loop: 0 });
   useEffect(() => {
     if (paused) return undefined;
@@ -162,7 +163,7 @@ function useCountUp(target, active, ms) {
   return value;
 }
 
-function Backdrop() {
+export function Backdrop() {
   return (
     <>
       <div
@@ -189,7 +190,7 @@ function Backdrop() {
   );
 }
 
-function PromptBar({ phase, query }) {
+export function PromptBar({ phase, query }) {
   const typed = useTyped(query, phase === 0);
   const sent = typed.length === query.length;
   const glowing = phase >= 1 && phase < READY;
@@ -229,7 +230,7 @@ function PromptBar({ phase, query }) {
   );
 }
 
-function AgentStatus({ phase }) {
+export function AgentStatus({ phase }) {
   if (!phase) return null;
   const ready = phase === READY;
   return (

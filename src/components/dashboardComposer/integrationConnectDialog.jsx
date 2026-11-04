@@ -82,9 +82,24 @@ const PolymarketTradeHistoryRecipe = dynamic(
   },
 );
 
+const loadPolymarketHolderAnalysisRecipe = () =>
+  import("@/components/dashboardComposer/recipes/polymarketHolderAnalysisRecipe");
+
+const PolymarketHolderAnalysisRecipe = dynamic(
+  () => retryImport(loadPolymarketHolderAnalysisRecipe).then((m) => m.PolymarketHolderAnalysisRecipe),
+  {
+    loading: () => (
+      <div className="flex min-h-0 flex-1 items-center justify-center">
+        <SpectrumLoadingState label="Loading" />
+      </div>
+    ),
+  },
+);
+
 const RECIPE_VIEWS = {
   kalshiTradeHistory: KalshiTradeHistoryRecipe,
   polymarketTradeHistory: PolymarketTradeHistoryRecipe,
+  polymarketHolderAnalysis: PolymarketHolderAnalysisRecipe,
 };
 
 function whenIdle(work) {
@@ -444,6 +459,7 @@ function IntegrationConnectFlow({
       loadBuildWorkspace().catch(() => {});
       loadTradeHistoryRecipe().catch(() => {});
       loadPolymarketTradeHistoryRecipe().catch(() => {});
+      loadPolymarketHolderAnalysisRecipe().catch(() => {});
     });
   }, []);
 
