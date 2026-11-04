@@ -11,6 +11,7 @@ import { PolymarketHistoricalDataQuery } from "./PolymarketHistoricalDataQuery";
 import { PublicChart } from "./PublicChart";
 import { KalshiTradeHistoryRecipeDemo } from "./KalshiTradeHistoryRecipeDemo";
 import { PolymarketTradeHistoryRecipeDemo } from "./PolymarketTradeHistoryRecipeDemo";
+import { PolymarketHolderAnalysisRecipeDemo } from "./PolymarketHolderAnalysisRecipeDemo";
 import {
   RecipeExportAnimation,
   RecipeFindMarketAnimation,
@@ -28,6 +29,14 @@ import {
   PolymarketSourceTimelineDiagram,
   PolymarketTradeRowAnatomy,
 } from "./guide-animations/polymarket-trade-history-diagrams";
+import {
+  HolderFindMarketAnimation,
+  HolderRunAnimation,
+  HolderTablesAnimation,
+  HolderTreemapAnimation,
+  HolderWalkthroughAnimation,
+  TraderTabAnimation,
+} from "./guide-animations/polymarket-holder-analysis-animations";
 import {
   ChanceBenchmarkAnimation,
   ForecastScorecardAnimation,
@@ -111,6 +120,9 @@ function MdxHr() {
  *   `<RecipeWalkthroughAnimation />`. Each takes `venue="kalshi" | "polymarket"` (default kalshi).
  * - Trade history diagrams: `<TradeSourceRoutingDiagram />`, `<TradesVsCandlesChart />`, `<TradeRowAnatomy />`
  * - Polymarket trade history diagrams: `<PolymarketSourceTimelineDiagram />`, `<PolymarketFillsToTradeRowDiagram />`, `<PolymarketTradeRowAnatomy />`
+ * - PolymarketHolderAnalysisRecipeDemo: `<PolymarketHolderAnalysisRecipeDemo />` — full holder analysis walkthrough + link into the live demo
+ * - Holder analysis animations: `<HolderFindMarketAnimation />`, `<HolderRunAnimation />`, `<HolderTablesAnimation />`,
+ *   `<HolderTreemapAnimation focus="concentration" | "both" | "new" />`, `<TraderTabAnimation view="positions" | "activity" | "pnl" />`, `<HolderWalkthroughAnimation />`
  * - GIFs: Use standard markdown ![alt](/path/to.gif) or ContentImage
  */
 export function useMDXComponents(components?: MDXComponents): MDXComponents {
@@ -160,6 +172,13 @@ export function useMDXComponents(components?: MDXComponents): MDXComponents {
     PolymarketSourceTimelineDiagram,
     PolymarketFillsToTradeRowDiagram,
     PolymarketTradeRowAnatomy,
+    PolymarketHolderAnalysisRecipeDemo,
+    HolderFindMarketAnimation,
+    HolderRunAnimation,
+    HolderTablesAnimation,
+    HolderTreemapAnimation,
+    HolderWalkthroughAnimation,
+    TraderTabAnimation,
     NewsletterSignup,
     ChanceBenchmarkAnimation,
     StudyScaleAnimation,

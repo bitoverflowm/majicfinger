@@ -1,0 +1,192 @@
+---
+title: "Find Polymarket’s Top Holders and Analyze Their Wallets"
+description: "Find a Polymarket market’s top YES and NO holders. Compare holder treemaps, spot new wallets and wallets on both sides, and explore positions, activity, and P&L without coding."
+publishedAt: "2026-11-04"
+author: "misterrpink"
+topics: ["polymarket", "top holders", "wallet analysis", "prediction markets", "market research"]
+tags: ["polymarket", "holders", "wallet analysis"]
+integration: ["Polymarket", "Lychee"]
+section: "feature-releases"
+contentType: "Recipe"
+cluster: "Holder research"
+intent: "How-to"
+difficulty: "Beginner"
+featured: false
+slug: "/polymarket-top-holders"
+readingTime: "6 min"
+keywords: ["polymarket top holders", "polymarket wallet analysis", "polymarket largest holders", "polymarket holder distribution", "polymarket wallet positions", "polymarket wallet activity", "polymarket pnl", "polymarket new wallets"]
+canonical: "https://lycheedata.com/guides/polymarket-top-holders"
+seoTitle: "Polymarket Top Holders: Compare YES/NO & Analyze Wallets"
+ogImage: "https://lycheedata.com/og/lychee-research-terminal.png"
+twitterCard: "summary_large_image"
+---
+
+A Polymarket market is trading at 70% YES. Who is holding that side? Are its largest positions spread across many wallets or concentrated in a few? And what do the traders holding NO look like?
+
+Finding Polymarket’s top holders gives you a starting point. Exploring their wallets adds context: how recently each wallet was set up, whether it holds both outcomes, when it traded, how this position compares with its other holdings, and how its P&L has developed over time.
+
+A $100,000 position looks different when it dominates a wallet’s portfolio than when it sits among dozens of larger positions. A holder appearing on both YES and NO raises different questions from one holding a single outcome. Those are the details you want to investigate before drawing conclusions from a large balance or a screenshot of a winning trade.
+
+Lychee’s **Polymarket Holder Analysis** recipe brings those views together. Search for a market in plain English, select the question, and click **Save and Go**. You get side-by-side YES and NO holder tables and treemaps, new-wallet and both-sides flags, and trader tabs with positions, activity heatmaps, and P&L history—without writing code or assembling the datasets yourself.
+
+[Try Polymarket Holder Analysis →](/?recipe=polymarketHolderAnalysis#demo)
+
+## How to find Polymarket’s top holders
+
+### 1. Search for a market in plain English
+
+Open the data picker and choose **Polymarket Holder Analysis** from **Recipes**. Type the topic or market question you want to investigate, such as “Fed decision” or “Super Bowl.” You can also paste a Polymarket link, market slug, or condition ID. Select the matching market from the results.
+
+<HolderFindMarketAnimation />
+
+Check the full question, outcomes, and dates in the market card. An event can contain several markets, so choose the specific question you want to research. Polymarket’s [market-data overview](https://docs.polymarket.com/market-data/overview) explains the relationship between events, markets, and outcome shares.
+
+Lychee loads a preview of the holders on each side, including distribution treemaps and the leading traders it will explore. You can see the shape of the research before creating the dashboard.
+
+### 2. Click Save and Go
+
+Click **Save and Go** to build the analysis. Lychee pulls the holders, places the YES and NO tables and treemaps on the market tab, and creates individual tabs for the five leading traders.
+
+<HolderRunAnimation />
+
+Lychee moves to each tab as it fills, so you can watch positions, portfolio treemaps, activity, daily activity heatmaps, and P&L history arrive. The progress card shows the work as it happens. When the analysis is ready, a guided tour explains where to find each view.
+
+You start with a market question. Lychee handles the connected data pulls and dashboard setup.
+
+<PolymarketHolderAnalysisRecipeDemo />
+
+## Compare YES and NO holders side by side
+
+The market tab separates holders by outcome, with the largest share holdings first. Each table includes:
+
+- **Trader and wallet:** identify the holder and connect the position to a public address.
+- **Shares:** see how many outcome shares the wallet holds.
+- **% of listed shares:** compare the wallet’s holding with the total returned in that outcome’s table.
+- **Value (USDC):** see the current value of the holding.
+- **Avg price and Total PnL:** inspect the source-reported price and P&L for that holding.
+- **Holds both sides:** identify wallets appearing in both outcome lists.
+- **New wallet, Age (days), and Wallet created:** spot holders whose Polymarket accounts were set up within the past 30 days, with each wallet’s age and creation date shown for context.
+
+<HolderTablesAnimation />
+
+This answers a different question from a platform-wide trader leaderboard. You begin with a particular market and see who holds its outcome shares, then investigate those wallets.
+
+### Read the holder treemaps
+
+Each outcome gets its own treemap. Tiles are sized by the number of shares held, making the distribution easy to compare at a glance.
+
+One large tile beside many small ones shows that the listed holdings are concentrated in a large wallet. Several similarly sized tiles show a more evenly distributed group. Hover over a tile to inspect the holder’s details.
+
+<HolderTreemapAnimation focus="concentration" />
+
+Read the YES and NO maps together. You might find one side dominated by a few listed wallets while the other is spread across more holders. The table’s percentages describe **listed shares**, which is the denominator to use when explaining what the visualization shows.
+
+### Spot wallets holding both sides
+
+A wallet can appear in both outcome tables. Lychee marks those rows with **Holds both sides** and outlines the matching holder tiles in amber.
+
+<HolderTreemapAnimation focus="both" />
+
+That gives you a useful next question: how does this market fit into the wallet’s broader positions and activity? Both-side holdings show overlapping exposure; the position history helps you investigate how it developed.
+
+### Identify recently created wallets
+
+The **New wallet** flag highlights holders whose Polymarket accounts were set up within the past 30 days. In the treemaps, their tiles carry a violet dot. The **Age (days)** and **Wallet created** columns show every listed holder’s age and creation date, so a value such as **12** tells you how recently that holder arrived before you explore the activity behind its current position.
+
+<HolderTreemapAnimation focus="new" />
+
+The age comes from the creation date of the holder’s Polymarket account. It describes when the wallet joined Polymarket, rather than the trader’s experience elsewhere. A recently created wallet is a reason to investigate its history, not evidence of inside information.
+
+## Explore the wallets behind the positions
+
+The recipe opens trader tabs automatically, so you can move from the holder comparison into wallet analysis without rebuilding the query.
+
+The holders tables rank shares within each outcome. The trader selection combines each wallet’s current position value across both outcomes, helping identify the largest traders in the selected market. Polymarket’s own contracts can hold large balances without trading, so Lychee skips them when choosing traders and labels the ones it skips in the holder tables.
+
+### See this market in the trader’s portfolio
+
+Open a trader tab to inspect their positions table and portfolio treemap. The table gives you the individual records; the treemap makes their relative sizes visible.
+
+<TraderTabAnimation view="positions" />
+
+Position tiles are sized by current value, and their colors reflect unrealized P&L. Use tile area to compare exposure and color to explore the performance of those open positions.
+
+Find the market you started with, then compare it with the trader’s other holdings. A position that looks enormous in isolation may be a small part of that wallet’s portfolio. Another wallet might have much more of its displayed position value concentrated in the same question.
+
+The **Holds both sides** flag also appears in the positions data for markets where both outcomes are present. You can investigate overlap across the wallet’s positions as well as in the original market.
+
+### Inspect activity beyond buys and sells
+
+The activity view brings the trader’s actions into one place. Alongside trades, it includes actions such as splits, merges, and redemptions when returned by the source.
+
+Use the records to follow the sequence around a position: purchases, sales, and other actions can tell a more complete story than the current share balance alone. Inspect the activity type before treating a row as a new directional purchase.
+
+The daily activity heatmap shows **recorded actions per day**. It helps you find active periods, quiet stretches, and bursts worth examining in the table. The accompanying activity chart breaks down USDC amounts by action type over time.
+
+<TraderTabAnimation view="activity" />
+
+For example, if you notice a cluster of active days, inspect the records from that period. Were they trading the market you selected, working across several markets, or redeeming positions that had already resolved?
+
+### Follow P&L through time
+
+The P&L chart adds history to the wallet’s current positions. Look for whether the displayed profit accumulated gradually, changed sharply around a particular period, or moved alongside changes in open inventory.
+
+<TraderTabAnimation view="pnl" />
+
+The underlying P&L table includes realized, unrealized, position, and economic P&L fields. Keep those definitions attached to the figures you use: realized P&L and the changing value of open positions answer different questions.
+
+Read the chart alongside activity and positions. A large move becomes more useful to investigate when you can inspect the actions around it and see what the wallet currently holds.
+
+<NewsletterSignup />
+
+## Questions you can investigate with this dashboard
+
+The connected views let you move beyond a ranked list:
+
+- Who holds the largest YES and NO positions in this market?
+- Are the listed shares concentrated in a few wallets?
+- Which listed wallets hold both outcomes?
+- Which large holders set up their Polymarket wallets within the past 30 days?
+- How large is this position relative to a holder’s other positions?
+- When was the wallet active, and what actions did it take?
+- How does its P&L history compare with its current holdings?
+
+These questions reflect the context people ask for when investigating large wallets: transaction history, position sizing, overlapping holdings, and performance through time. A large position is a starting point for that research, rather than a conclusion about the trader’s skill or reasoning.
+
+You can continue exploring through Lychee’s [Polymarket Live workspace](/polymarket-live-data). For execution-level research on the market itself, use [Download Polymarket Trade History](/guides/download-polymarket-trade-history).
+
+## Frequently asked questions
+
+### How do I see top holders on Polymarket?
+
+Open Lychee’s **Polymarket Holder Analysis** recipe, search for a market, and select the question. Click **Save and Go** to create the holder tables, distribution treemaps, and trader research tabs.
+
+### Can I compare YES and NO holders?
+
+Yes. The recipe creates a separate table and treemap for each outcome, so you can compare the leading holders and distribution of listed shares side by side.
+
+### Can I see whether a wallet holds both YES and NO?
+
+Yes. Wallets appearing in both returned outcome lists receive a **Holds both sides** flag and an amber outline in the holder treemaps. Trader positions also flag markets where both outcomes are present.
+
+### What does the New wallet flag mean?
+
+It marks a holder whose Polymarket account was set up within the past 30 days, and adds a violet dot to its treemap tile. The **Age (days)** and **Wallet created** columns show when every listed holder joined. Wallets without an available creation date have a blank age and are not classified as new.
+
+### What does the activity heatmap show?
+
+It counts recorded actions by day. Use it to find active periods, then inspect the activity table for trades, splits, merges, redemptions, and other returned action types.
+
+### Can I analyze a holder’s other positions and P&L?
+
+Yes. Trader tabs bring together positions, a portfolio treemap, activity records and charts, and a P&L history chart. You can see how the original market position fits into the wallet’s broader activity.
+
+### Do I need to write code or connect the datasets myself?
+
+No. The recipe packages the holder and trader research into one workflow. Search for a market and click **Save and Go**; Lychee creates the connected tables, charts, and tabs for you.
+
+## Start with a market and explore its holders
+
+Search in plain English, compare the largest YES and NO holders, and explore the positions, activity, and P&L behind those wallets.
+
+[Open Polymarket Holder Analysis →](/?recipe=polymarketHolderAnalysis#demo)

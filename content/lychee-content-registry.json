@@ -142,6 +142,13 @@
       "integrationTopic": "general"
     },
     {
+      "slug": "polymarket-top-holders",
+      "contentClass": "changelog",
+      "integrationHub": "platform",
+      "integrationTopic": "general",
+      "publishedAt": "2026-11-04"
+    },
+    {
       "slug": "download-polymarket-trade-history",
       "contentClass": "changelog",
       "integrationHub": "platform",
@@ -173,6 +180,12 @@
       "slug": "download-polymarket-trade-history",
       "contentClass": "guide",
       "integrationHub": "polymarket-historical",
+      "integrationTopic": "overview"
+    },
+    {
+      "slug": "polymarket-top-holders",
+      "contentClass": "guide",
+      "integrationHub": "polymarket-live",
       "integrationTopic": "overview"
     },
     {

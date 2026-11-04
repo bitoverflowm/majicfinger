@@ -43,7 +43,7 @@ const STAGE_H = 540;
 
 export type RecipeVenue = "kalshi" | "polymarket";
 
-type ResultItem = { title: string; subtitle: string; mono?: string; meta: string; status?: "Open" | "Closed" };
+export type ResultItem = { title: string; subtitle: string; mono?: string; meta: string; status?: "Open" | "Closed" };
 type SheetColumn = { label: string; width: number };
 type RunStep = { name: string; args: string; result: string; time: string };
 type FigureCopy = { label: string; caption: string };
@@ -435,7 +435,7 @@ const VENUES = [
   { venue: "polymarket", name: "Polymarket Live", detail: "All real-time decentralized polymarket, prediction market API.", live: true },
 ] as const;
 
-function VenuePickerMock() {
+export function VenuePickerMock() {
   return (
     <div className="flex min-w-0 flex-1">
       <div className="flex w-[52.5%] flex-col bg-background px-4 pt-5">
@@ -471,7 +471,7 @@ function VenuePickerMock() {
   );
 }
 
-function StatusPill({ label }: { label: string }) {
+export function StatusPill({ label }: { label: string }) {
   return (
     <span
       className={cn(
@@ -484,7 +484,7 @@ function StatusPill({ label }: { label: string }) {
   );
 }
 
-function ResultCard({ result, index, state }: { result: ResultItem; index: number; state: "idle" | "highlighted" | "active" }) {
+export function ResultCard({ result, index, state }: { result: ResultItem; index: number; state: "idle" | "highlighted" | "active" }) {
   return (
     <div
       data-cursor={`result-${index}`}
