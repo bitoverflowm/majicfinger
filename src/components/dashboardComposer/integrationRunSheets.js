@@ -131,6 +131,8 @@ export function layoutRunSheets(sheets, { originY = 88 } = {}) {
       width: columnWidth(column),
       ...(column.type ? { type: column.type } : {}),
       ...(column.scale ? { scale: column.scale } : {}),
+      ...(column.exact ? { exact: true } : {}),
+      ...(column.dateEpoch ? { dateEpoch: column.dateEpoch } : {}),
     }));
     const previewRows = sheet.keepAllRows ? sheet.rows || [] : (sheet.rows || []).slice(0, 50);
     const records = recordsFromRows(sheet.columns, previewRows);

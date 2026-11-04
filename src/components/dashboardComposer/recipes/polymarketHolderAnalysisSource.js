@@ -21,6 +21,9 @@ export const HOLDER_COLUMNS = [
   { id: "avg_price", title: "Avg price", type: "number" },
   { id: "total_pnl", title: "Total PnL", type: "number" },
   { id: "both_sides", title: "Holds both sides", type: "boolean" },
+  { id: "new_wallet", title: "New wallet", type: "boolean" },
+  { id: "age_days", title: "Age (days)", type: "number", exact: true },
+  { id: "wallet_created", title: "Wallet created", type: "date", dateEpoch: "iso" },
   { id: "proxy_wallet", title: "Wallet", type: "string" },
   { id: "outcome", title: "Outcome", type: "string" },
   { id: "market_title", title: "Market", type: "string" },
@@ -28,6 +31,12 @@ export const HOLDER_COLUMNS = [
 ];
 
 export const BOTH_SIDES_COLUMN = { id: "both_sides", title: "Holds both sides", type: "boolean" };
+
+/** A wallet whose Polymarket profile is younger than this is flagged as new. */
+export const NEW_WALLET_DAYS = 30;
+/** Polymarket's batch profile lookup takes at most 100 addresses. */
+const PROFILE_BATCH = 100;
+const DAY_MS = 86_400_000;
 
 function num(value) {
   if (value == null || value === "") return null;
@@ -63,8 +72,43 @@ function sideIndex(meta, tokenId, outcomeIndex) {
 }
 
 /**
+ * When each wallet's Polymarket profile was set up, in ms. Contracts and wallets without a
+ * profile are left out. A failed batch leaves its wallets blank rather than failing the pull.
+ */
+export async function pullWalletCreated(wallets, { signal } = {}) {
+  const list = [...new Set((wallets || []).filter((wallet) => /^0x[a-f0-9]{40}$/.test(wallet)))];
+  const batches = [];
+  for (let at = 0; at < list.length; at += PROFILE_BATCH) batches.push(list.slice(at, at + PROFILE_BATCH));
+  const results = await Promise.allSettled(
+    batches.map((batch) => polymarketGet("getPublicProfilesBatch", { addresses: batch.join(",") }, signal, { retries: 2 })),
+  );
+  const created = new Map();
+  for (const result of results) {
+    if (result.status === "rejected") {
+      if (result.reason?.name === "AbortError") throw result.reason;
+      continue;
+    }
+    const root = Array.isArray(result.value) ? result.value[0] : result.value;
+    for (const profile of Array.isArray(root?.profiles) ? root.profiles : []) {
+      const ms = Date.parse(String(profile?.createdAt || ""));
+      const wallet = String(profile?.address || profile?.proxyWallet || "").toLowerCase();
+      if (wallet && Number.isFinite(ms)) created.set(wallet, ms);
+    }
+  }
+  return created;
+}
+
+/** Days since the wallet was set up, and whether that's recent enough to flag. */
+export function walletAge(createdMs, now = Date.now()) {
+  if (!Number.isFinite(createdMs)) return { wallet_created: "", age_days: null, new_wallet: false };
+  const days = Math.max(0, Math.floor((now - createdMs) / DAY_MS));
+  return { wallet_created: new Date(createdMs).toISOString(), age_days: days, new_wallet: days < NEW_WALLET_DAYS };
+}
+
+/**
  * The market's largest holders on each outcome, with profit columns. Each page adds up to 100
- * holders per outcome. A wallet listed on both outcomes is flagged on both rows.
+ * holders per outcome. A wallet listed on both outcomes is flagged on both rows, and so is a
+ * wallet set up in the last 30 days.
  */
 export async function pullMarketHolders(meta, { pages = 1, signal, onProgress } = {}) {
   const outcomes = meta.outcomes?.length >= 2 ? meta.outcomes.slice(0, 2) : ["Yes", "No"];
@@ -93,6 +137,10 @@ export async function pullMarketHolders(meta, { pages = 1, signal, onProgress } 
 
   const wallets = buckets.map((list) => new Set(list.map((holder) => String(holder.proxy_wallet || "").toLowerCase())));
   const both = new Set([...wallets[0]].filter((wallet) => wallet && wallets[1].has(wallet)));
+  onProgress?.("Checking when each wallet was set up");
+  const created = await pullWalletCreated([...wallets[0], ...wallets[1]], { signal });
+  const now = Date.now();
+  const fresh = new Set();
   const sides = buckets.map((list, index) => {
     const sorted = [...list].sort((a, b) => (num(b.amount) || 0) - (num(a.amount) || 0));
     const total = sorted.reduce((sum, holder) => sum + (num(holder.amount) || 0), 0);
@@ -102,6 +150,8 @@ export async function pullMarketHolders(meta, { pages = 1, signal, onProgress } 
       rows: sorted.map((holder, at) => {
         const wallet = String(holder.proxy_wallet || "").toLowerCase();
         const amount = num(holder.amount);
+        const age = walletAge(created.get(wallet), now);
+        if (age.new_wallet) fresh.add(wallet);
         return {
           rank: at + 1,
           name: holderLabel(holder),
@@ -117,13 +167,14 @@ export async function pullMarketHolders(meta, { pages = 1, signal, onProgress } 
           current_value: num(holder.current_value),
           total_pnl: num(holder.total_pnl),
           both_sides: both.has(wallet),
+          ...age,
           market_title: meta.title,
           condition_id: meta.conditionId,
         };
       }),
     };
   });
-  return { sides, bothCount: both.size, truncated: more };
+  return { sides, bothCount: both.size, newCount: fresh.size, truncated: more };
 }
 
 /**
@@ -136,7 +187,15 @@ export function topHolderTraders(sides, count = TOP_TRADER_COUNT) {
     for (const row of side.rows || []) {
       const wallet = row.proxy_wallet;
       if (!/^0x[a-f0-9]{40}$/.test(wallet)) continue;
-      const entry = byWallet.get(wallet) || { wallet, label: row.name, hasProfile: row.has_profile !== false, value: 0, sides: [] };
+      const entry = byWallet.get(wallet) || {
+        wallet,
+        label: row.name,
+        hasProfile: row.has_profile !== false,
+        isNew: row.new_wallet === true,
+        ageDays: row.age_days ?? null,
+        value: 0,
+        sides: [],
+      };
       const value = holderValue(row);
       entry.value += value;
       entry.sides.push({ outcome: side.outcome, shares: row.amount || 0, value, rank: row.rank });

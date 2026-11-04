@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { ArrowLeftRight, CircleAlert, Users } from "lucide-react";
+import { ArrowLeftRight, CircleAlert, Sprout, Users } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useIntegrationConnect } from "@/components/dashboardComposer/integrationConnectDialog";
 import { useWorkspaceCanvas } from "@/components/dashboardComposer/workspaceCanvas";
@@ -20,6 +20,7 @@ const NO_TRADERS = [];
 const MAP_W = 240;
 const MAP_H = 132;
 const MAP_TILES = 24;
+const NEW_DOT = "oklch(0.606 0.25 292.717)";
 const SIDE_TONES = [
   { fill: "oklch(0.696 0.17 162.48)", text: "text-emerald-700 dark:text-emerald-300", chip: "bg-emerald-500/10" },
   { fill: "oklch(0.645 0.246 16.439)", text: "text-rose-700 dark:text-rose-300", chip: "bg-rose-500/10" },
@@ -63,11 +64,16 @@ function MiniHolderMap({ side, index }) {
               <title>
                 {tile.rest
                   ? `${(side.rows.length - MAP_TILES).toLocaleString()} more holders`
-                  : `${tile.name} · ${Math.round(tile.amount).toLocaleString()} shares`}
+                  : `${tile.name} · ${Math.round(tile.amount).toLocaleString()} shares${tile.new_wallet ? ` · new wallet, ${tile.age_days}d old` : ""}`}
               </title>
             </rect>
           );
         })}
+        {tiles.map((tile) =>
+          tile.new_wallet && tile.w > 8 && tile.h > 8 ? (
+            <circle key={`new-${tile.proxy_wallet}`} cx={tile.x + tile.w - 5} cy={tile.y + 4.5} r={2.5} fill={NEW_DOT} stroke="white" strokeWidth={0.75} />
+          ) : null,
+        )}
       </svg>
     </figure>
   );
@@ -92,6 +98,12 @@ function TraderRow({ trader, index, outcomes }) {
             <span className="inline-flex items-center gap-1 rounded bg-amber-500/15 px-1.5 py-px text-[10px] font-semibold text-amber-700 dark:text-amber-300">
               <ArrowLeftRight className="size-3" aria-hidden />
               Both sides
+            </span>
+          ) : null}
+          {trader.isNew ? (
+            <span className="inline-flex items-center gap-1 rounded bg-violet-500/15 px-1.5 py-px text-[10px] font-semibold text-violet-700 dark:text-violet-300">
+              <Sprout className="size-3" aria-hidden />
+              New wallet{trader.ageDays != null ? ` · ${trader.ageDays}d` : ""}
             </span>
           ) : null}
         </span>
@@ -136,6 +148,11 @@ function HolderPreview({ holders, holdersStatus, holdersError, traders, outcomes
           {holders.bothCount ? (
             <p className="mt-0.5 text-[12px] text-muted-foreground">
               {holders.bothCount.toLocaleString()} of the listed wallets hold both sides.
+            </p>
+          ) : null}
+          {holders.newCount ? (
+            <p className="mt-0.5 text-[12px] text-muted-foreground">
+              {holders.newCount.toLocaleString()} {holders.newCount === 1 ? "wallet was" : "wallets were"} set up in the last 30 days.
             </p>
           ) : null}
           {holders.skipped?.length ? (

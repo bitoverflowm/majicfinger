@@ -1605,6 +1605,27 @@ export default async function handler(req, res) {
         );
         break;
       }
+      case "getPublicProfilesBatch": {
+        const addresses = [...new Set(
+          String(req.query.addresses || "")
+            .split(",")
+            .map((value) => value.trim().toLowerCase())
+            .filter(Boolean),
+        )];
+        if (!addresses.length) {
+          return res.status(400).json({ message: "Missing required parameter: addresses" });
+        }
+        if (addresses.length > 100) {
+          return res.status(400).json({ message: "A maximum of 100 addresses may be requested per call" });
+        }
+        if (addresses.some((address) => !/^0x[a-f0-9]{40}$/.test(address))) {
+          return res.status(400).json({ message: "Invalid wallet address" });
+        }
+        const sp = new URLSearchParams();
+        for (const address of addresses) sp.append("address", address);
+        data = await fetchJson(`${GAMMA_BASE}/public-profiles?${sp}`);
+        break;
+      }
       case "getUserStats": {
         const user = String(req.query.user || "").trim();
         if (!/^0x[a-fA-F0-9]{40}$/.test(user)) {

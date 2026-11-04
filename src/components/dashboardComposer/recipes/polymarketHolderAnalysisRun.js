@@ -13,6 +13,7 @@ import { newStartTabId, saveWorkspaceStartTabs } from "@/lib/workspaceStartTabs"
 import {
   HOLDER_COLUMNS,
   HOLDER_PAGES,
+  NEW_WALLET_DAYS,
   PROTOCOL_CONTRACT,
   pullMarketHolders,
   pullTraderBundle,
@@ -223,9 +224,10 @@ function pickTrader(placed, start, key) {
   return null;
 }
 
-function holderTour({ runId, marketPageId, sheets, sides, bothCount, traders, placed }) {
+function holderTour({ runId, marketPageId, sheets, sides, bothCount, newCount, traders, placed }) {
   const [yes, no] = sides;
   const bothTraders = traders.filter((trader) => trader.both).map((trader) => trader.label);
+  const newTraders = traders.filter((trader) => trader.isNew).map((trader) => trader.label);
   const steps = [
     {
       pageId: marketPageId,
@@ -255,6 +257,17 @@ function holderTour({ runId, marketPageId, sheets, sides, bothCount, traders, pl
             ...(bothTraders.length ? [`Of the top ${traders.length}, ${names(bothTraders)} ${bothTraders.length === 1 ? "does" : "do"} too.`] : []),
           ]
         : `No listed wallet holds both ${yes.outcome} and ${no.outcome}. When one does, it's outlined in amber here and checked in the Holds both sides column.`,
+    },
+    {
+      pageId: marketPageId,
+      targets: sheets.map((sheet) => ({ sheet: sheet.id, part: "charts" })),
+      title: "New wallets",
+      description: newCount
+        ? [
+            `${newCount.toLocaleString()} ${newCount === 1 ? "wallet was" : "wallets were"} set up in the last ${NEW_WALLET_DAYS} days. Each has a violet dot here, and the tables show New wallet, Age (days), and Wallet created.`,
+            ...(newTraders.length ? [`Of the top ${traders.length}, ${names(newTraders)} ${newTraders.length === 1 ? "is" : "are"} new.`] : []),
+          ]
+        : `No listed wallet is younger than ${NEW_WALLET_DAYS} days. The tables still show each wallet's Age (days) and when it was created.`,
     },
   ];
   const positions = pickTrader(placed, 0, "positions");
@@ -351,7 +364,7 @@ export async function runPolymarketHolderAnalysis({ meta, holders, traders, cont
   reporter.succeed("holders", {
     result: `${yes.rows.length.toLocaleString()} ${yes.outcome} and ${no.rows.length.toLocaleString()} ${no.outcome} holders${
       pulled.bothCount ? ` · ${pulled.bothCount} hold both sides` : ""
-    }`,
+    }${pulled.newCount ? ` · ${pulled.newCount} new ${pulled.newCount === 1 ? "wallet" : "wallets"}` : ""}`,
   });
 
   const onTab = String(canvas?.pageId || "").startsWith("welcome:");
@@ -449,7 +462,16 @@ export async function runPolymarketHolderAnalysis({ meta, holders, traders, cont
 
   if (!tourDue) return;
   canvas?.startTour?.(
-    holderTour({ runId, marketPageId, sheets, sides: [yes, no], bothCount: pulled.bothCount || 0, traders: live.map((item) => item.trader), placed }),
+    holderTour({
+      runId,
+      marketPageId,
+      sheets,
+      sides: [yes, no],
+      bothCount: pulled.bothCount || 0,
+      newCount: pulled.newCount || 0,
+      traders: live.map((item) => item.trader),
+      placed,
+    }),
   );
   if (failed) return;
   await sleep(HAND_OFF_MS);

@@ -13,6 +13,7 @@ const TONES = {
   second: { fill: "oklch(0.645 0.246 16.439)", legend: "bg-rose-500" },
 };
 const BOTH_STROKE = "oklch(0.769 0.188 70.08)";
+const NEW_DOT = "oklch(0.606 0.25 292.717)";
 
 function shortLabel(label, width) {
   const text = String(label || "");
@@ -46,6 +47,8 @@ function holderModel(sheet, dataset) {
         avgPrice: parseVisualNumber(record?.avg_price),
         pnl: parseVisualNumber(record?.total_pnl),
         both: flagged(record?.both_sides),
+        fresh: flagged(record?.new_wallet),
+        ageDays: parseVisualNumber(record?.age_days),
         tone: toneFor(record, sheet),
       };
     })
@@ -70,6 +73,8 @@ function holderModel(sheet, dataset) {
           avgPrice: null,
           pnl: null,
           both: false,
+          fresh: false,
+          ageDays: null,
           tone: rest[0].tone,
           rest: true,
         }
@@ -79,6 +84,7 @@ function holderModel(sheet, dataset) {
     topShare: total > 0 ? topTen / total : 0,
     max: named[0]?.shares || 1,
     bothCount: holders.filter((holder) => holder.both).length,
+    newCount: holders.filter((holder) => holder.fresh).length,
   };
 }
 
@@ -91,7 +97,7 @@ function tileFill(tile, max) {
 
 /**
  * Holders of one market sized by shares. Darker tiles hold more. An amber outline marks a wallet
- * that also holds the other outcome.
+ * that also holds the other outcome, and a violet dot a wallet set up in the last 30 days.
  */
 export function HolderTreemap({ sheet, dataset, onOpenRow }) {
   const frameRef = useRef(null);
@@ -139,6 +145,12 @@ export function HolderTreemap({ sheet, dataset, onOpenRow }) {
             {model.bothCount.toLocaleString()} hold both sides
           </span>
         ) : null}
+        {model.newCount ? (
+          <span className="inline-flex items-center gap-1.5">
+            <span className="size-2 rounded-full" style={{ backgroundColor: NEW_DOT }} aria-hidden />
+            {model.newCount.toLocaleString()} new {model.newCount === 1 ? "wallet" : "wallets"} (under 30 days)
+          </span>
+        ) : null}
       </div>
       <div ref={frameRef} className="relative min-h-0 min-w-0 flex-1" onMouseLeave={() => setHover(null)}>
         {tiles.length ? (
@@ -165,6 +177,9 @@ export function HolderTreemap({ sheet, dataset, onOpenRow }) {
                     fill={tileFill(tile, model.max)}
                     {...(tile.both ? { stroke: BOTH_STROKE, strokeWidth: 2 } : {})}
                   />
+                  {tile.fresh && tile.w > 12 && tile.h > 12 ? (
+                    <circle cx={tile.x + tile.w - 7 - inset} cy={tile.y + 6 + inset} r={3.5} fill={NEW_DOT} stroke="white" strokeWidth={1} />
+                  ) : null}
                   {show ? (
                     <text x={tile.x + 6} y={tile.y + 16} fontSize={11} fill={tile.rest ? "currentColor" : "#1f2937"} className={tile.rest ? "fill-muted-foreground" : undefined}>
                       {shortLabel(tile.label, tile.w)}
@@ -193,6 +208,11 @@ export function HolderTreemap({ sheet, dataset, onOpenRow }) {
             ) : null}
             {hover.tile.pnl != null ? <p className="font-mono tabular-nums text-muted-foreground">PnL {formatSignedUsd(hover.tile.pnl)}</p> : null}
             {hover.tile.both ? <p className="text-amber-600 dark:text-amber-400">Holds both sides</p> : null}
+            {hover.tile.fresh ? (
+              <p className="text-violet-600 dark:text-violet-400">
+                New wallet{hover.tile.ageDays != null ? ` · ${hover.tile.ageDays} ${hover.tile.ageDays === 1 ? "day" : "days"} old` : ""}
+              </p>
+            ) : null}
           </div>
         ) : null}
       </div>
