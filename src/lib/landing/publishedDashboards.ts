@@ -1,6 +1,7 @@
 import dbConnect from "@/lib/dbConnect";
 import User from "@/models/Users";
 import ChartDashboard from "@/models/ChartDashboards";
+import { HAS_OG_IMAGE_EXPR } from "@/lib/server/hasOgImageExpr";
 
 export type LandingDashboardCard = {
   username: string;
@@ -36,23 +37,28 @@ export async function getPublishedDashboardsForLanding(
 
     if (user?._id) {
       profilePic = user.profile_pic ? String(user.profile_pic) : null;
-      const list = (await ChartDashboard.find({
-        user_id: user._id,
-        is_public: true,
-        public_slug: { $type: "string", $gt: "" },
-      })
-        .select(
-          "public_slug page_heading page_subheading published_at last_edited_date og_image_data tags",
-        )
-        .sort({ published_at: -1, last_edited_date: -1 })
-        .limit(Math.max(1, Math.min(120, Number(limit) || 12)))
-        .lean()) as Array<{
+      const list = (await ChartDashboard.aggregate([
+        { $match: { user_id: user._id, is_public: true, public_slug: { $type: "string", $gt: "" } } },
+        { $sort: { published_at: -1, last_edited_date: -1 } },
+        { $limit: Math.max(1, Math.min(120, Number(limit) || 12)) },
+        {
+          $project: {
+            public_slug: 1,
+            page_heading: 1,
+            page_subheading: 1,
+            published_at: 1,
+            last_edited_date: 1,
+            tags: 1,
+            has_og: HAS_OG_IMAGE_EXPR,
+          },
+        },
+      ])) as Array<{
         public_slug?: string;
         page_heading?: string;
         page_subheading?: string;
         published_at?: Date | string;
         last_edited_date?: Date | string;
-        og_image_data?: unknown;
+        has_og?: boolean;
         tags?: string[];
       }>;
 
@@ -74,7 +80,7 @@ export async function getPublishedDashboardsForLanding(
             title,
             description,
             publishedAt,
-            hasOgImage: !!d.og_image_data,
+            hasOgImage: !!d.has_og,
             tags,
           } satisfies LandingDashboardCard;
         })

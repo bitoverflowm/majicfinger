@@ -2,6 +2,7 @@
 import Image from "next/image";
 import Link from "next/link";
 
+import { IntentPrefetchLink } from "@/components/publicEmbed/IntentPrefetchLink";
 import { isFeatureReleaseContent } from "@/lib/content/featureReleaseMatchers";
 import type { ContentItem } from "@/lib/content/types";
 import type { LandingDashboardCard } from "@/lib/landing/publishedDashboards";
@@ -175,9 +176,8 @@ export function LibrarySection({ articles = [], dashboards = [], profilePic = nu
 
 function LibraryCard({ card }: { card: Card }) {
   return (
-    <Link
+    <IntentPrefetchLink
       href={card.href}
-      prefetch={false}
       className="group flex min-w-0 flex-col rounded-lg bg-accent p-2 transition-colors hover:bg-accent/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
     >
       <div className="relative aspect-[40/21] w-full overflow-hidden rounded-md bg-muted">
@@ -212,6 +212,6 @@ function LibraryCard({ card }: { card: Card }) {
           </span>
         </div>
       </div>
-    </Link>
+    </IntentPrefetchLink>
   );
 }

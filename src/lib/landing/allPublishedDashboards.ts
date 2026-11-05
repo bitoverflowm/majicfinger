@@ -2,28 +2,36 @@ import dbConnect from "@/lib/dbConnect";
 import User from "@/models/Users";
 import ChartDashboard from "@/models/ChartDashboards";
 import type { LandingDashboardCard } from "@/lib/landing/publishedDashboards";
+import { HAS_OG_IMAGE_EXPR } from "@/lib/server/hasOgImageExpr";
 
 export async function getAllPublishedDashboards(limit = 120): Promise<LandingDashboardCard[]> {
   const cap = Math.max(1, Math.min(500, Number(limit) || 120));
   try {
     await dbConnect();
-    const dashboards = (await ChartDashboard.find({
-      is_public: true,
-      public_slug: { $type: "string", $gt: "" },
-    })
-      .select(
-        "user_id public_slug page_heading page_subheading published_at last_edited_date og_image_data tags",
-      )
-      .sort({ published_at: -1, last_edited_date: -1 })
-      .limit(cap * 2)
-      .lean()) as Array<{
+    const dashboards = (await ChartDashboard.aggregate([
+      { $match: { is_public: true, public_slug: { $type: "string", $gt: "" } } },
+      { $sort: { published_at: -1, last_edited_date: -1 } },
+      { $limit: cap * 2 },
+      {
+        $project: {
+          user_id: 1,
+          public_slug: 1,
+          page_heading: 1,
+          page_subheading: 1,
+          published_at: 1,
+          last_edited_date: 1,
+          tags: 1,
+          has_og: HAS_OG_IMAGE_EXPR,
+        },
+      },
+    ])) as Array<{
       user_id?: unknown;
       public_slug?: string;
       page_heading?: string;
       page_subheading?: string;
       published_at?: Date | string;
       last_edited_date?: Date | string;
-      og_image_data?: unknown;
+      has_og?: boolean;
       tags?: string[];
     }>;
 
@@ -58,7 +66,7 @@ export async function getAllPublishedDashboards(limit = 120): Promise<LandingDas
         publishedAt: d.published_at || d.last_edited_date
           ? new Date(d.published_at || d.last_edited_date!).toISOString()
           : null,
-        hasOgImage: !!d.og_image_data,
+        hasOgImage: !!d.has_og,
         tags,
       });
     }

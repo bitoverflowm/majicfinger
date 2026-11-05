@@ -1,10 +1,13 @@
+import { Suspense } from "react";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import PublicDashboardEmbedClient from "@/components/publicEmbed/PublicDashboardEmbedClient";
+import { PublicDashboardHeader } from "@/components/publicEmbed/PublicDashboardHeader";
 import { PublicDashboardChartSeoLayer } from "@/components/publicEmbed/PublicDashboardChartSeoLayer";
 import { PublishedDashboardMoreSection } from "@/components/publicEmbed/PublishedDashboardMoreSection";
 import { PublicDashboardSeoNav } from "@/components/publicEmbed/PublicDashboardSeoNav";
 import { getPublicDashboardPageContext } from "@/lib/server/publicDashboardPageContext";
+import { chunkChartIds, layoutChartIds, publicChartChunkUrl } from "@/lib/publicDashboardChartChunks";
 import {
   buildDashboardJsonLd,
   buildDashboardMetadata,
@@ -12,7 +15,7 @@ import {
   resolveClusterForDashboardMeta,
 } from "@/lib/server/publicDashboardSeo";
 
-/** HTML shell only — heavy chart/card data loads client-side via API. */
+/** HTML shell only — chart data loads client-side in CDN-cacheable groups. */
 export const dynamic = "force-dynamic";
 
 export async function generateMetadata({
@@ -28,6 +31,12 @@ export async function generateMetadata({
   return buildDashboardMetadata(ctx.meta, username, slug);
 }
 
+function isoOrNull(value: unknown): string | null {
+  if (!value) return null;
+  const date = new Date(value as string);
+  return Number.isNaN(date.getTime()) ? null : date.toISOString();
+}
+
 export default async function PublicDashboardPage({
   params,
 }: {
@@ -41,13 +50,24 @@ export default async function PublicDashboardPage({
   }
 
   const { shellPayload, meta } = ctx;
+  const data = shellPayload.data;
 
   const summary = extractDashboardSeoSummary(shellPayload);
   const cluster = resolveClusterForDashboardMeta(meta);
   const jsonLd = buildDashboardJsonLd({ meta, username, slug, summary, cluster });
+  const firstChunk = chunkChartIds(layoutChartIds(data?.layout))[0];
+  const title = data?.page_heading?.trim() || data?.dashboard_name?.trim() || slug.replace(/-/g, " ");
 
   return (
     <div className="min-h-screen bg-background">
+      {firstChunk?.length ? (
+        <link
+          rel="preload"
+          as="fetch"
+          href={publicChartChunkUrl(username, slug, firstChunk)}
+          crossOrigin="use-credentials"
+        />
+      ) : null}
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd.webPage) }}
@@ -56,20 +76,30 @@ export default async function PublicDashboardPage({
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd.breadcrumb) }}
       />
-      <PublicDashboardChartSeoLayer layout={shellPayload.data?.layout} />
+      <PublicDashboardChartSeoLayer layout={data?.layout} />
       <PublicDashboardSeoNav
         username={username}
         slug={slug}
         dashboardTitle={meta.project_name}
         cluster={cluster}
       />
-      <PublicDashboardEmbedClient
+      <PublicDashboardHeader
         username={username}
         slug={slug}
-        initialPayload={shellPayload}
-        clusterHref={cluster?.href ?? null}
+        title={title}
+        subheading={data?.page_subheading?.trim() || ""}
+        ownerHandle={data?.owner_handle || username}
+        ownerPic={data?.owner_profile_pic || null}
+        tags={data?.tags || []}
+        liveBacked={!!data?.live_backed}
+        cluster={cluster ? { title: cluster.title, href: cluster.href } : null}
+        updatedAt={isoOrNull(meta.last_edited_date || meta.published_at)}
+        displayName={data?.dashboard_name || title}
       />
-      <PublishedDashboardMoreSection excludeUsername={username} excludeSlug={slug} />
+      <PublicDashboardEmbedClient username={username} slug={slug} initialPayload={shellPayload} />
+      <Suspense fallback={null}>
+        <PublishedDashboardMoreSection excludeUsername={username} excludeSlug={slug} limit={24} />
+      </Suspense>
     </div>
   );
 }

@@ -176,6 +176,13 @@ export const kalshiLiveHub: HubPageConfig = {
         "Extra Kalshi Live capabilities beyond the core market pull—event forecasts, batch event candlesticks, and leaderboards.",
     },
     {
+      type: "published_dashboards",
+      anchorId: "live-dashboards",
+      title: "Live Dashboards",
+      description:
+        "Published dashboards streaming Kalshi Live candlesticks and prices. Open any one to watch it update, or run it for yourself.",
+    },
+    {
       type: "text_block",
       title: "Kalshi Live Data vs. Kalshi Historical Data",
       content:

@@ -57,9 +57,12 @@ function monotonePath(points) {
   return d;
 }
 
+const compact = new Intl.NumberFormat("en", { notation: "compact", maximumFractionDigits: 2 });
+
 function formatPrice(value) {
   if (!Number.isFinite(value)) return "—";
   const abs = Math.abs(value);
+  if (abs >= 1e6) return compact.format(value);
   const digits = abs > 0 && abs < 0.01 ? 4 : abs < 1 ? 3 : 2;
   return value.toLocaleString("en", { minimumFractionDigits: digits, maximumFractionDigits: digits });
 }
@@ -84,7 +87,8 @@ function linearPath(points) {
 }
 
 function formatSignedPct(value) {
-  if (!Number.isFinite(value)) return "—";
+  // From a near-zero base the ratio is noise, not a change worth reading.
+  if (!Number.isFinite(value) || Math.abs(value) >= 1e4) return "—";
   const sign = value > 0 ? "+" : value < 0 ? "−" : "";
   return `${sign}${Math.abs(value).toFixed(2)}%`;
 }
@@ -320,6 +324,8 @@ export function IndicatorChart({
   const showPrice = probability ? formatProbability : formatPrice;
   const tickPlaces = tickDigits(priceTicks, probability ? 100 : 1);
   const showTick = (value) => {
+    if (!probability && Math.abs(value) >= 1e4) return compact.format(value);
+    if (!probability && tickPlaces != null && Math.abs(value) < 10 ** -Math.max(tickPlaces, 3)) return "0";
     if (tickPlaces == null) return showPrice(value);
     if (probability) return `${(value * 100).toFixed(Math.max(1, tickPlaces))}%`;
     const places = Math.max(tickPlaces, Math.abs(value) < 1 ? 3 : 2);

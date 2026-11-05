@@ -33,6 +33,7 @@ export function PublicDashboardChartBlock({
   dashboardSlug,
   dashboardRunnable = false,
   chartTitle,
+  bare = false,
 }) {
   const rows = chartPayload?.rows ?? [];
   const dataSheets = chartPayload?.dataSheets ?? {};
@@ -72,7 +73,7 @@ export function PublicDashboardChartBlock({
       ? chart.chart_properties[0]
       : {};
 
-  const showRunCta = !!(ownerHandle && (chartSlug || (dashboardSlug && chartId)));
+  const showRunCta = !bare && !!(ownerHandle && (chartSlug || (dashboardSlug && chartId)));
 
   const ariaLabel =
     chartTitle ||
@@ -85,7 +86,11 @@ export function PublicDashboardChartBlock({
       <div
         role="img"
         aria-label={ariaLabel}
-        className="relative flex min-h-0 w-full flex-1 flex-col rounded-md border bg-card/50 p-2"
+        className={
+          bare
+            ? "relative flex min-h-0 w-full flex-1 flex-col"
+            : "relative flex min-h-0 w-full flex-1 flex-col rounded-md border bg-card/50 p-2"
+        }
         style={{
           backgroundColor: cp0.bgColor || undefined,
           color: cp0.textColor || undefined,

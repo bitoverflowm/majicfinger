@@ -1,5 +1,5 @@
-import Link from "next/link";
 import Image from "next/image";
+import { IntentPrefetchLink } from "@/components/publicEmbed/IntentPrefetchLink";
 import { Badge } from "@/components/ui/badge";
 import type { LandingDashboardCard } from "@/lib/landing/publishedDashboards";
 
@@ -45,7 +45,7 @@ export function LandingDashboardCardItem({
     : null;
 
   return (
-    <Link href={href} className="block min-w-0 max-w-full" prefetch={false}>
+    <IntentPrefetchLink href={href} className="block min-w-0 max-w-full">
       <div className="mb-4 min-w-0 max-w-full overflow-hidden rounded-xl border border-neutral-200 bg-background p-4 transition-all duration-200 hover:border-primary/30 hover:shadow-md dark:border-neutral-800">
         {ogImage ? (
           <div className="relative mb-4 aspect-[40/21] w-full max-w-full overflow-hidden rounded-lg border">
@@ -107,6 +107,6 @@ export function LandingDashboardCardItem({
           ) : null}
         </div>
       </div>
-    </Link>
+    </IntentPrefetchLink>
   );
 }

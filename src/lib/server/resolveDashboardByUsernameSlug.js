@@ -30,7 +30,7 @@ export async function resolveDashboardByUsernameSlug(username, slug, opts = {}) 
 
   await dbConnect();
 
-  const user = await User.findOne({ user_name: handle }).lean();
+  const user = await User.findOne({ user_name: handle }).select("_id user_name profile_pic").lean();
   if (!user?._id) return null;
 
   const select = opts.select;

@@ -1,4 +1,7 @@
+import { Types } from "mongoose";
 import dbConnectPublicRead, { getPublicReadModel } from "@/lib/dbConnectPublicRead";
+import { hubSlugFromTags } from "@/lib/dashboardHubTags";
+import { HAS_OG_IMAGE_EXPR } from "@/lib/server/hasOgImageExpr";
 import User from "@/models/Users";
 import Chart from "@/models/Charts";
 import ChartDashboard from "@/models/ChartDashboards";
@@ -31,15 +34,71 @@ function assetKey(username: string, slug: string) {
   return `${normalize(username)}::${normalize(slug)}`;
 }
 
-function dataSheetsUseLake(dataSheets: unknown, lake: string): boolean {
-  if (!dataSheets || typeof dataSheets !== "object") return false;
+type LeanChartRow = {
+  user_id?: unknown;
+  public_slug?: string;
+  chart_name?: string;
+  labels?: string[];
+  data_set_id?: unknown;
+  has_og?: boolean;
+};
+
+/** Public charts with `has_og` computed in Mongo so the ~100 KB OG data URLs never leave the DB. */
+async function findPublicCharts(
+  model: PublicModels["Chart"],
+  match: Record<string, unknown>,
+  fields: string[],
+  limit?: number,
+): Promise<LeanChartRow[]> {
+  const $match = { ...match };
+  if (typeof $match.user_id === "string") $match.user_id = new Types.ObjectId($match.user_id);
+  const project: Record<string, unknown> = { has_og: HAS_OG_IMAGE_EXPR };
+  for (const f of fields) project[f] = 1;
+  return (await model
+    .aggregate([
+      { $match },
+      { $sort: { published_at: -1, last_edited_date: -1 } },
+      ...(limit ? [{ $limit: limit }] : []),
+      { $project: project },
+    ])
+    .option({ maxTimeMS: QUERY_MAX_TIME_MS })) as LeanChartRow[];
+}
+
+/** Dataset ids whose sheets pull from `lake`, reading only each sheet's `provenance.lake`. */
+async function dataSetIdsUsingLake(
+  model: PublicModels["DataSet"],
+  ids: string[],
+  lake: string,
+): Promise<Set<string>> {
+  if (!ids.length) return new Set();
+  const rows = (await model
+    .aggregate([
+      { $match: { _id: { $in: ids.map((id) => new Types.ObjectId(id)) } } },
+      {
+        $project: {
+          lakes: {
+            $cond: [
+              { $eq: [{ $type: "$data_sheets" }, "object"] },
+              {
+                $map: {
+                  input: { $objectToArray: "$data_sheets" },
+                  as: "s",
+                  in: "$$s.v.provenance.lake",
+                },
+              },
+              [],
+            ],
+          },
+        },
+      },
+    ])
+    .option({ maxTimeMS: QUERY_MAX_TIME_MS })) as Array<{ _id: unknown; lakes?: unknown[] }>;
   const target = normalize(lake);
-  for (const sheet of Object.values(dataSheets as Record<string, unknown>)) {
-    if (!sheet || typeof sheet !== "object") continue;
-    const prov = (sheet as { provenance?: { lake?: string } }).provenance;
-    if (normalize(prov?.lake || "") === target) return true;
-  }
-  return false;
+  return new Set(
+    rows
+      .filter((r) => (r.lakes || []).some((l) => normalize(String(l ?? "")) === target))
+      .map((r) => String(r._id)),
+  );
 }
 
 function slugToTitle(slug: string) {
@@ -112,18 +171,15 @@ async function fetchPublishedChartsByRefs(
   const slugs = [...new Set(normalizedRefs.map((ref) => ref.slug))];
   if (!userIds.length || !slugs.length) return [];
 
-  const chartDocs = (await models.Chart.find({
-    user_id: { $in: userIds },
-    is_public: true,
-    public_slug: { $in: slugs },
-  })
-    .select("user_id public_slug chart_name og_image_data")
-    .lean()) as Array<{
-    user_id?: unknown;
-    public_slug?: string;
-    chart_name?: string;
-    og_image_data?: string;
-  }>;
+  const chartDocs = await findPublicCharts(
+    models.Chart,
+    {
+      user_id: { $in: userIds.map((id) => new Types.ObjectId(id)) },
+      is_public: true,
+      public_slug: { $in: slugs },
+    },
+    ["user_id", "public_slug", "chart_name"],
+  );
 
   const usernameById = new Map(
     [...userIdByUsername.entries()].map(([username, id]) => [id, username]),
@@ -137,7 +193,7 @@ async function fetchPublishedChartsByRefs(
       username,
       slug,
       title: String(chart.chart_name || slug).trim(),
-      hasOgImage: !!chart.og_image_data,
+      hasOgImage: !!chart.has_og,
     });
   }
 
@@ -165,6 +221,7 @@ const BROAD_DASHBOARD_SCAN_LIMIT = 80;
 
 export async function queryHubPublishedAssets(
   filter?: HubAssetFilter,
+  hubSlug?: string,
 ): Promise<HubPublishedAssets> {
   if (!filter) return { charts: [], dashboards: [] };
 
@@ -215,18 +272,12 @@ export async function queryHubPublishedAssets(
       };
       if (chartOwnerScoped && userId) query.user_id = userId;
 
-      const allCharts = (await ChartModel.find(query)
-        .select("user_id public_slug chart_name og_image_data labels")
-        .sort({ published_at: -1, last_edited_date: -1 })
-        .limit(BROAD_CHART_SCAN_LIMIT)
-        .maxTimeMS(QUERY_MAX_TIME_MS)
-        .lean()) as Array<{
-        user_id?: unknown;
-        public_slug?: string;
-        chart_name?: string;
-        og_image_data?: string;
-        labels?: string[];
-      }>;
+      const allCharts = await findPublicCharts(
+        ChartModel,
+        query,
+        ["user_id", "public_slug", "chart_name", "labels"],
+        BROAD_CHART_SCAN_LIMIT,
+      );
 
       const ownerIds = [...new Set(allCharts.map((c) => String(c.user_id)).filter(Boolean))];
       const owners = ownerIds.length
@@ -255,7 +306,7 @@ export async function queryHubPublishedAssets(
           username: u,
           slug,
           title: String(chart.chart_name || slug).trim(),
-          hasOgImage: !!chart.og_image_data,
+          hasOgImage: !!chart.has_og,
         });
       }
     }
@@ -268,33 +319,21 @@ export async function queryHubPublishedAssets(
       };
       if (chartOwnerScoped && userId) query.user_id = userId;
 
-      const allCharts = (await ChartModel.find(query)
-        .select("user_id public_slug chart_name og_image_data data_set_id")
-        .sort({ published_at: -1, last_edited_date: -1 })
-        .limit(BROAD_CHART_SCAN_LIMIT)
-        .maxTimeMS(QUERY_MAX_TIME_MS)
-        .lean()) as Array<{
-        user_id?: unknown;
-        public_slug?: string;
-        chart_name?: string;
-        og_image_data?: string;
-        data_set_id?: unknown;
-      }>;
+      const allCharts = await findPublicCharts(
+        ChartModel,
+        query,
+        ["user_id", "public_slug", "chart_name", "data_set_id"],
+        BROAD_CHART_SCAN_LIMIT,
+      );
 
       const dataSetIds = [
-        ...new Set(allCharts.map((c) => String(c.data_set_id)).filter(Boolean)),
+        ...new Set(
+          allCharts
+            .map((c) => String(c.data_set_id || ""))
+            .filter((id) => Types.ObjectId.isValid(id)),
+        ),
       ];
-      const dataSets = dataSetIds.length
-        ? ((await DataSetModel.find({ _id: { $in: dataSetIds } })
-            .select("_id data_sheets")
-            .lean()) as Array<{ _id?: unknown; data_sheets?: unknown }>)
-        : [];
-      const lakeByDataSetId = new Map(
-        dataSets.map((ds) => [
-          String(ds._id),
-          dataSheetsUseLake(ds.data_sheets, filter.chartLake!),
-        ]),
-      );
+      const lakeDataSets = await dataSetIdsUsingLake(DataSetModel, dataSetIds, filter.chartLake!);
 
       const ownerIds = [...new Set(allCharts.map((c) => String(c.user_id)).filter(Boolean))];
       const owners = ownerIds.length
@@ -310,7 +349,7 @@ export async function queryHubPublishedAssets(
         const u = usernameById.get(String(chart.user_id)) || "";
         const dsId = String(chart.data_set_id || "");
         if (!slug || !u || !dsId) continue;
-        if (!lakeByDataSetId.get(dsId)) continue;
+        if (!lakeDataSets.has(dsId)) continue;
 
         const key = assetKey(u, slug);
         if (seenCharts.has(key)) continue;
@@ -319,7 +358,7 @@ export async function queryHubPublishedAssets(
           username: u,
           slug,
           title: String(chart.chart_name || slug).trim(),
-          hasOgImage: !!chart.og_image_data,
+          hasOgImage: !!chart.has_og,
         });
       }
     }
@@ -331,17 +370,27 @@ export async function queryHubPublishedAssets(
       };
       if (dashboardOwnerScoped && userId) query.user_id = userId;
 
-      const allDashboards = (await DashboardModel.find(query)
-        .select("user_id public_slug page_heading page_subheading og_image_data tags")
-        .sort({ published_at: -1, last_edited_date: -1 })
-        .limit(BROAD_DASHBOARD_SCAN_LIMIT)
-        .maxTimeMS(QUERY_MAX_TIME_MS)
-        .lean()) as Array<{
+      if (query.user_id) query.user_id = new Types.ObjectId(String(query.user_id));
+      const allDashboards = (await DashboardModel.aggregate([
+        { $match: query },
+        { $sort: { published_at: -1, last_edited_date: -1 } },
+        { $limit: BROAD_DASHBOARD_SCAN_LIMIT },
+        {
+          $project: {
+            user_id: 1,
+            public_slug: 1,
+            page_heading: 1,
+            page_subheading: 1,
+            tags: 1,
+            has_og: HAS_OG_IMAGE_EXPR,
+          },
+        },
+      ]).option({ maxTimeMS: QUERY_MAX_TIME_MS })) as Array<{
         user_id?: unknown;
         public_slug?: string;
         page_heading?: string;
         page_subheading?: string;
-        og_image_data?: string;
+        has_og?: boolean;
         tags?: string[];
       }>;
 
@@ -370,6 +419,8 @@ export async function queryHubPublishedAssets(
           tags.some((dt) => dt.includes(t) || t.includes(dt)),
         );
         if (!matches) continue;
+        const taggedHub = hubSlugFromTags(dash.tags);
+        if (hubSlug && taggedHub && taggedHub !== hubSlug) continue;
 
         const key = assetKey(u, slug);
         if (seenDashboards.has(key)) continue;
@@ -379,7 +430,7 @@ export async function queryHubPublishedAssets(
           slug,
           title,
           description,
-          hasOgImage: !!dash.og_image_data,
+          hasOgImage: !!dash.has_og,
           tags: Array.isArray(dash.tags) ? dash.tags.map(String) : [],
         });
       }

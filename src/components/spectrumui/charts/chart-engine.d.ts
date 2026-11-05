@@ -1,6 +1,7 @@
 import * as React from "react";
 
 export declare const marketVarsClassName: string;
+export declare const seriesVarsClassName: string;
 export declare const UP: string;
 export declare const DOWN: string;
 export declare const EASE: string;

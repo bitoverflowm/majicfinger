@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState, useSyncExternalStore, type CSSProperties } from "react";
 import Link from "next/link";
-import DotPattern from "@/components/magicui/dot-pattern";
+import { ArrowUpRight, BarChart3, CandlestickChart, LineChart } from "lucide-react";
 import {
   CHART_CARDS_GRID_STYLE,
   chartCardResponsiveSpanStyle,
@@ -11,35 +11,19 @@ import {
   DASH_CARDS_GRID_CLASS,
 } from "@/lib/dashboardLayoutDefaults";
 import { cn } from "@/lib/utils";
-import { PublicDashboardChartBlock } from "@/components/dashboardComposer/PublicDashboardChartBlock";
-import { LazyPublicDashboardChart } from "@/components/publicEmbed/LazyPublicDashboardChart";
-import { ChartEmbedSkeleton, CardGridSkeleton } from "@/components/publicEmbed/ChartEmbedSkeleton";
+import { LazyPublicDashboardChart, useLoadedChart } from "@/components/publicEmbed/LazyPublicDashboardChart";
+import { CardGridSkeleton } from "@/components/publicEmbed/ChartEmbedSkeleton";
+import { VIEWER_CARD_CLASS } from "@/components/publicEmbed/PublicDashboardSkeletons";
+import { DashboardLoadingProgress } from "@/components/publicEmbed/DashboardLoadingProgress";
+import { viewerChartKind } from "@/components/publicEmbed/PublicViewerChart";
+import {
+  getPublicChartBatchLoader,
+  type PublicChartBatchLoader,
+} from "@/components/publicEmbed/publicChartBatchLoader";
+import { CHART_CHUNK_SIZE, layoutChartIds } from "@/lib/publicDashboardChartChunks";
 import { clampCardGridRowLimit } from "@/lib/dashboardCardGrid";
-import { Skeleton } from "@/components/ui/skeleton";
-import { Badge } from "@/components/ui/badge";
-import { AnimatedThemeToggler } from "@/components/ui/animated-theme-toggler";
-import { THEME_TOGGLE_BUTTON_CLASS } from "@/components/theme-toggle";
-import {
-  getChartCardHeadingPublicClassName,
-  getChartCardHeadingPublicStyle,
-  getChartCardMicrotextPublicClassName,
-  getChartCardMicrotextPublicStyle,
-  getChartCardSubheadingPublicClassName,
-  getChartCardSubheadingPublicStyle,
-} from "@/lib/chartCardTextTheme";
-import {
-  getPageTextBlockPublicClassName,
-  getPageTextBlockPublicStyle,
-  getPageTitlePublicClassName,
-  getPageTitlePublicStyle,
-} from "@/lib/pageTitleTheme";
-import {
-  getFreeTextRowPublicClassName,
-  getFreeTextRowPublicStyle,
-} from "@/lib/dashboardFreeTextTheme";
 import { publicEmbedOutboundLinkProps } from "@/components/publicEmbed/publicEmbedOutboundLink";
 import { DashboardCardGridSection } from "@/components/dashboardComposer/DashboardCardGridSection";
-import { RunForYourselfButton } from "@/components/runYourself/RunForYourselfButton";
 import { useTelegramContentTracker } from "@/hooks/useTelegramContentTracker";
 import {
   isCompareNarrativeRow,
@@ -50,16 +34,6 @@ import { CompareLiveDashboardSession } from "@/components/hubs/polymarketLiveDem
 
 const SITE = process.env.NEXT_PUBLIC_SITE_URL || "https://lycheedata.com";
 
-type ChartPayload = {
-  chart?: {
-    chart_name?: string;
-    chart_properties?: unknown[];
-    rechartsBuilder?: { v: number };
-  };
-  rows?: unknown[];
-  dataSheets?: Record<string, unknown>;
-};
-
 type Column = {
   id?: string;
   chart_id?: string | null;
@@ -67,13 +41,8 @@ type Column = {
   rowSpan?: number;
   h2?: string;
   caption?: string;
-  chartHeadingTheme?: Record<string, unknown>;
-  chartSubheadingTheme?: Record<string, unknown>;
-  chartMicrotextTheme?: Record<string, unknown>;
   microtext?: string;
   link?: { mode?: string; url?: string };
-  chartPayload?: ChartPayload | null;
-  chartLink?: { mode?: string; slug?: string } | null;
 };
 
 type CardGridRow = {
@@ -88,13 +57,7 @@ type CardGridRow = {
 };
 
 type Row =
-  | {
-      id?: string;
-      type: "text";
-      body?: string;
-      textVariant?: "heading" | "paragraph";
-      textTheme?: Record<string, unknown>;
-    }
+  | { id?: string; type: "text"; body?: string; textVariant?: "heading" | "paragraph" }
   | { id?: string; type: "cards"; columns?: Column[] }
   | CardGridRow;
 
@@ -102,117 +65,181 @@ type Payload = {
   success: boolean;
   data?: {
     page_heading?: string;
-    page_subheading?: string;
     dashboard_name?: string;
-    theme?: { background?: string; background_color?: string };
     layout?: { kind?: string; compare?: { pair?: unknown }; rows?: Row[] };
     owner_handle?: string;
-    owner_profile_pic?: string | null;
-    tags?: string[];
     live_backed?: boolean;
     live_poll_interval_ms?: number | null;
   };
   message?: string;
 };
 
-const TAG_STYLES = [
-  "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border-emerald-500/30",
-  "bg-sky-500/15 text-sky-700 dark:text-sky-300 border-sky-500/30",
-  "bg-violet-500/15 text-violet-700 dark:text-violet-300 border-violet-500/30",
-  "bg-amber-500/15 text-amber-800 dark:text-amber-300 border-amber-500/30",
-  "bg-rose-500/15 text-rose-700 dark:text-rose-300 border-rose-500/30",
-  "bg-lime-500/15 text-lime-800 dark:text-lime-300 border-lime-500/30",
-];
+type LiveTick = {
+  charts: Record<string, { ticker: string; sheetId: string; rows: Record<string, unknown>[] }>;
+  pollIntervalMs: number;
+  periodInterval: number;
+  fetchedAt: number | null;
+};
 
-function resolveCardHref(col: Column, ownerHandle: string | undefined) {
+/** Rows past the first screen skip layout/paint until scrolled near. */
+const OFFSCREEN_ROW_STYLE: CSSProperties = { contentVisibility: "auto", containIntrinsicSize: "auto 480px" };
+
+function resolveCardHref(col: Column, chartSlug: string | undefined, ownerHandle: string) {
   const mode = col.link?.mode || "none";
   if (mode === "custom" && col.link?.url?.trim()) return col.link.url.trim();
-  if (mode === "chart_public" && col.chartLink?.slug && ownerHandle) {
-    return `/${encodeURIComponent(ownerHandle)}/charts/${encodeURIComponent(col.chartLink.slug)}`;
+  if (mode === "chart_public" && chartSlug) {
+    return `/${encodeURIComponent(ownerHandle)}/charts/${encodeURIComponent(chartSlug)}`;
   }
   return null;
 }
 
+const KIND_ICON = { candles: CandlestickChart, line: LineChart, bars: BarChart3, legacy: BarChart3 } as const;
+
+function ViewerChartCard({
+  col,
+  loader,
+  ownerHandle,
+  slug,
+  live,
+  liveOverlay,
+}: {
+  col: Column;
+  loader: PublicChartBatchLoader;
+  ownerHandle: string;
+  slug: string;
+  live: boolean;
+  liveOverlay: { sheetId: string; rows: Record<string, unknown>[]; periodInterval?: number } | null;
+}) {
+  const chartId = col.chart_id ? String(col.chart_id) : "";
+  const entry = useLoadedChart(loader, chartId);
+  const payload = entry?.chartPayload ?? null;
+  const kind = useMemo(() => (payload ? viewerChartKind(payload) : null), [payload]);
+  const Icon = KIND_ICON[kind || "legacy"];
+  const chartName = (payload?.chart as { chart_name?: string } | undefined)?.chart_name;
+  const title = col.h2?.trim() || chartName || "Chart";
+  const href = resolveCardHref(col, entry?.chartLink?.slug, ownerHandle);
+  const caption = col.caption?.trim();
+
+  return (
+    <div className={VIEWER_CARD_CLASS}>
+      <div className="flex items-center gap-2 px-3 pb-1 pt-2">
+        <Icon className="size-3.5 shrink-0 text-muted-foreground" aria-hidden />
+        <h3 className="min-w-0 truncate text-[13px] font-semibold text-foreground" title={title}>
+          {title}
+        </h3>
+        <span className="ml-auto flex shrink-0 items-center gap-2">
+          {live ? <span className="text-[11px] font-medium text-emerald-600 dark:text-emerald-400">Live</span> : null}
+          {href ? (
+            <a
+              href={href}
+              className="rounded p-0.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+              aria-label={`Open ${title}`}
+            >
+              <ArrowUpRight className="size-3.5" aria-hidden />
+            </a>
+          ) : null}
+        </span>
+      </div>
+      {caption ? <p className="line-clamp-2 px-3 pb-1 text-[12px] leading-snug text-muted-foreground">{caption}</p> : null}
+      {chartId ? (
+        <LazyPublicDashboardChart
+          loader={loader}
+          chartId={chartId}
+          liveOverlay={liveOverlay}
+          live={live}
+          legacyProps={{ ownerHandle, layoutColumnKey: col.id, dashboardSlug: slug, chartTitle: title }}
+        />
+      ) : (
+        <div className="mx-3 mb-3 flex min-h-[120px] flex-1 items-center justify-center rounded-lg border border-dashed border-border/70 text-[12px] text-muted-foreground">
+          Chart unavailable
+        </div>
+      )}
+      {col.microtext?.trim() ? (
+        <p className="border-t border-border/60 px-3 py-1.5 text-[11px] leading-snug text-muted-foreground">{col.microtext}</p>
+      ) : null}
+    </div>
+  );
+}
+
+/** Published dashboard body in the workspace card style; the page renders the header. */
 export default function PublicDashboardEmbedClient({
   username,
   slug,
-  initialPayload = null,
-  clusterHref = null,
+  initialPayload,
 }: {
   username: string;
   slug: string;
-  initialPayload?: Payload | null;
-  clusterHref?: string | null;
+  initialPayload: Payload;
 }) {
-  const [payload, setPayload] = useState<Payload | null>(() => initialPayload);
-  const [cardGridLoading, setCardGridLoading] = useState(() => {
-    const rows = initialPayload?.data?.layout?.rows || [];
-    return rows.some(
-      (r) =>
-        r.type === "cardGrid" &&
-        (!Array.isArray((r as CardGridRow).sheetRows) || (r as CardGridRow).sheetRows!.length === 0),
-    );
-  });
-  const [err, setErr] = useState<string | null>(() => (initialPayload && !initialPayload.success ? initialPayload.message || "Not found" : null));
-  const [isEmbedded, setIsEmbedded] = useState(
-    () => typeof window !== "undefined" && window.self !== window.top,
+  const [payload, setPayload] = useState<Payload>(initialPayload);
+  const [cardGridLoading, setCardGridLoading] = useState(() =>
+    (initialPayload?.data?.layout?.rows || []).some(
+      (r) => r.type === "cardGrid" && !(Array.isArray(r.sheetRows) && r.sheetRows.length),
+    ),
   );
-  const [liveTick, setLiveTick] = useState<{
-    charts: Record<string, { ticker: string; sheetId: string; rows: Record<string, unknown>[] }>;
-    pollIntervalMs: number;
-    periodInterval: number;
-    fetchedAt: number | null;
-  }>({ charts: {}, pollIntervalMs: 60_000, periodInterval: 1, fetchedAt: null });
+  const [isEmbedded, setIsEmbedded] = useState(false);
+  const [liveTick, setLiveTick] = useState<LiveTick>({
+    charts: {},
+    pollIntervalMs: 60_000,
+    periodInterval: 1,
+    fetchedAt: null,
+  });
 
-  const dashboardName =
-    payload?.data?.dashboard_name ||
-    payload?.data?.page_heading ||
-    slug;
-  const trackerReady = !!payload?.success && !!payload?.data;
+  const d = payload?.data;
+  const layout = d?.layout;
+  const rows = useMemo(() => (Array.isArray(layout?.rows) ? layout.rows : []), [layout]);
+  const live = !!d?.live_backed;
+  const ownerHandle = d?.owner_handle || username;
+  const dashboardName = d?.dashboard_name || d?.page_heading || slug;
+
+  const chartIds = useMemo(() => layoutChartIds(layout), [layout]);
+  const loader = useMemo(() => getPublicChartBatchLoader(username, slug, chartIds), [username, slug, chartIds]);
+  const subscribe = useCallback((cb: () => void) => loader.subscribe(cb), [loader]);
+  const getProgress = useCallback(() => loader.getProgress(), [loader]);
+  const progress = useSyncExternalStore(subscribe, getProgress, getProgress);
+  const aboveFold = Math.min(progress.total, CHART_CHUNK_SIZE);
+  const showProgress = progress.total > 0 && progress.loaded < aboveFold;
 
   useTelegramContentTracker({
     contentType: "dashboard",
     name: dashboardName,
     path: `/${username}/dashboards/${slug}`,
-    ownerHandle: payload?.data?.owner_handle || username,
-    enabled: trackerReady,
+    ownerHandle,
+    enabled: !!payload?.success,
   });
 
+  useEffect(() => setIsEmbedded(window.self !== window.top), []);
+
+  // Above-the-fold group starts right away (the page preloads its URL), the next group follows it,
+  // and the rest load as cards near the viewport.
   useEffect(() => {
-    if (typeof window === "undefined") return;
-    setIsEmbedded(window.self !== window.top);
-  }, []);
+    if (!chartIds[0]) return;
+    const next = chartIds[CHART_CHUNK_SIZE];
+    void loader.load(chartIds[0]).then(() => {
+      if (next) void loader.load(next);
+    });
+  }, [loader, chartIds]);
 
   useEffect(() => {
     if (!cardGridLoading) return;
     let cancelled = false;
-    fetch(`/api/public/dashboards/${encodeURIComponent(username)}/${encodeURIComponent(slug)}`, {
+    fetch(`/api/public/dashboards/${encodeURIComponent(username)}/${encodeURIComponent(slug)}?part=cardGrids`, {
       credentials: "include",
     })
       .then((r) => r.json())
       .then((j: Payload) => {
         if (cancelled || !j?.success || !j.data?.layout?.rows) return;
+        const fetchedRows = j.data.layout.rows;
         setPayload((prev) => {
-          if (!prev?.data?.layout?.rows) return j;
-          const prevRows = prev.data.layout.rows;
+          const prevRows = prev?.data?.layout?.rows;
+          if (!prev?.data || !prevRows) return prev;
           const nextRows = prevRows.map((row, i) => {
-            if (row.type !== "cardGrid") return row;
-            const fetchedRow = j.data?.layout?.rows?.[i];
-            if (fetchedRow?.type !== "cardGrid") return row;
+            const fetchedRow = fetchedRows[i];
+            if (row.type !== "cardGrid" || fetchedRow?.type !== "cardGrid") return row;
             const sheetRows = Array.isArray(fetchedRow.sheetRows) ? fetchedRow.sheetRows : [];
-            if (!sheetRows.length) return row;
-            return { ...row, sheetRows };
+            return sheetRows.length ? { ...row, sheetRows } : row;
           });
-          return {
-            ...prev,
-            data: {
-              ...prev.data,
-              live_backed: j.data?.live_backed ?? prev.data.live_backed,
-              live_poll_interval_ms:
-                j.data?.live_poll_interval_ms ?? prev.data.live_poll_interval_ms,
-              layout: { ...prev.data.layout, rows: nextRows },
-            },
-          };
+          return { ...prev, data: { ...prev.data, layout: { ...prev.data.layout, rows: nextRows } } };
         });
       })
       .catch(() => {})
@@ -224,14 +251,12 @@ export default function PublicDashboardEmbedClient({
     };
   }, [username, slug, cardGridLoading]);
 
-  // On-demand Kalshi live: one shared Lychee→Kalshi fetch for all charts (server-cached).
+  // One shared Lychee→Kalshi live fetch for all charts (server-cached).
+  const initialPollMs = d?.live_poll_interval_ms;
   useEffect(() => {
-    const live = !!payload?.data?.live_backed;
-    if (!live || !payload?.success) return;
-
+    if (!live) return;
     let cancelled = false;
     let timeoutId: number | null = null;
-
     const tick = () => {
       fetch(`/api/public/dashboards/${encodeURIComponent(username)}/${encodeURIComponent(slug)}/live`, {
         credentials: "include",
@@ -241,9 +266,7 @@ export default function PublicDashboardEmbedClient({
           if (cancelled || !j?.success || !j.data?.charts) return;
           const pollMs = Math.max(
             15_000,
-            Math.floor(Number(j.data.pollIntervalMs)) ||
-              Math.floor(Number(payload.data?.live_poll_interval_ms)) ||
-              60_000,
+            Math.floor(Number(j.data.pollIntervalMs)) || Math.floor(Number(initialPollMs)) || 60_000,
           );
           setLiveTick({
             charts: j.data.charts,
@@ -251,398 +274,130 @@ export default function PublicDashboardEmbedClient({
             periodInterval: Math.floor(Number(j.data.periodInterval)) || 1,
             fetchedAt: Number(j.data.fetchedAt) || Date.now(),
           });
-          if (!cancelled) {
-            timeoutId = window.setTimeout(tick, pollMs);
-          }
+          timeoutId = window.setTimeout(tick, pollMs);
         })
         .catch(() => {
-          if (!cancelled) {
-            timeoutId = window.setTimeout(tick, 60_000);
-          }
+          if (!cancelled) timeoutId = window.setTimeout(tick, 60_000);
         });
     };
-
     tick();
     return () => {
       cancelled = true;
       if (timeoutId != null) window.clearTimeout(timeoutId);
     };
-  }, [
-    username,
-    slug,
-    payload?.success,
-    payload?.data?.live_backed,
-    payload?.data?.live_poll_interval_ms,
-  ]);
+  }, [username, slug, live, initialPollMs]);
 
-  if (err) {
-    return (
-      <div className="flex min-h-[240px] flex-col items-center justify-center gap-2 p-6 text-sm text-muted-foreground">
-        <p>{err}</p>
-        <Link
-          href={SITE}
-          className="text-foreground underline"
-          {...publicEmbedOutboundLinkProps(isEmbedded)}
-        >
-          Lychee Data
-        </Link>
-      </div>
-    );
-  }
+  const liveOverlays = useMemo(() => {
+    const out: Record<string, { sheetId: string; rows: Record<string, unknown>[]; periodInterval: number }> = {};
+    for (const [id, tick] of Object.entries(liveTick.charts)) {
+      out[id] = { sheetId: tick.sheetId, rows: tick.rows, periodInterval: liveTick.periodInterval };
+    }
+    return out;
+  }, [liveTick]);
 
-  if (!payload?.success || !payload.data) {
-    return (
-      <div className="relative w-full px-6 py-10 sm:px-10">
-        <div className="mx-auto max-w-6xl space-y-8">
-          <div className="space-y-3">
-            <Skeleton className="h-9 w-2/3 max-w-lg" />
-            <Skeleton className="h-5 w-full max-w-2xl" />
-            <Skeleton className="h-4 w-1/2 max-w-md" />
-          </div>
-          <div className="grid gap-4" style={CHART_CARDS_GRID_STYLE}>
-            {[0, 1, 2].map((i) => (
-              <div key={i} style={{ gridColumn: "span 12" }}>
-                <ChartEmbedSkeleton className="min-h-[280px]" />
-              </div>
-            ))}
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  const d = payload.data;
-  const rows = Array.isArray(d.layout?.rows) ? d.layout.rows : [];
-  const isCompareLayout = isKalshiPolymarketCompareLayout(d.layout);
-  const comparePair = readComparePairFromLayout(d.layout);
-  const bg = d.theme?.background_color || "";
-  const showDots = d.theme?.background === "dotPattern";
-  const ownerHandle = d.owner_handle || username;
-  const ownerPic = d.owner_profile_pic ? String(d.owner_profile_pic) : "";
-  const tags = Array.isArray(d.tags) ? d.tags : [];
+  const isCompareLayout = isKalshiPolymarketCompareLayout(layout);
+  const comparePair = readComparePairFromLayout(layout);
 
   return (
-    <div className="relative w-full px-6 py-10 sm:px-10">
-      <div className="absolute right-4 top-4 z-20 flex items-center gap-2">
-        <AnimatedThemeToggler className={THEME_TOGGLE_BUTTON_CLASS} />
-      </div>
-      <div
-        className="relative overflow-hidden rounded-lg p-8"
-        style={{ backgroundColor: bg || undefined }}
-      >
-        {showDots ? (
-          <DotPattern
-            className={cn("[mask-image:radial-gradient(500px_circle_at_center,white,transparent)]")}
+    <div className="mx-auto w-full max-w-6xl px-4 pb-14 pt-6 sm:px-6">
+      {showProgress || (live && liveTick.fetchedAt) ? (
+        <div className="mb-4 flex min-h-8 flex-wrap items-center justify-between gap-2">
+          {showProgress ? <DashboardLoadingProgress progress={progress} /> : <span />}
+          {live && liveTick.fetchedAt ? (
+            <span className="text-[11px] text-muted-foreground">
+              Refreshed {new Date(liveTick.fetchedAt).toLocaleTimeString()}
+            </span>
+          ) : null}
+        </div>
+      ) : null}
+
+      <div className="space-y-6">
+        {isCompareLayout ? (
+          <CompareLiveDashboardSession
+            initialPair={comparePair}
+            handleUrl={`${String(SITE).replace(/^https?:\/\//, "").replace(/\/$/, "")}/${username}/dashboards/${slug}`}
+            onUpgrade={() => {}}
+            readOnly
+            className="min-h-[min(72vh,56rem)] rounded-xl border-border/70"
           />
         ) : null}
-        <div className="relative z-[1] mx-auto max-w-6xl space-y-8">
-          <div className="space-y-3">
-            <h1
-              className={getPageTitlePublicClassName(d.theme)}
-              style={getPageTitlePublicStyle(d.theme)}
-            >
-              {d.page_heading?.trim() || d.dashboard_name?.trim() || slug.replace(/-/g, " ")}
-            </h1>
-            {d.live_backed ? (
-              <p className="flex items-center gap-1.5 text-xs text-emerald-600 dark:text-emerald-400">
-                <span className="relative flex h-2 w-2">
-                  <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-60" />
-                  <span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-500" />
-                </span>
-                Live data updating
-                {liveTick.fetchedAt ? (
-                  <span className="text-muted-foreground">
-                    · refreshed {new Date(liveTick.fetchedAt).toLocaleTimeString()}
-                  </span>
-                ) : null}
-              </p>
-            ) : null}
-            {d.page_subheading?.trim() ? (
-              <p
-                className={getPageTextBlockPublicClassName(d.theme, "pageSubheading")}
-                style={getPageTextBlockPublicStyle(d.theme, "pageSubheading")}
-              >
-                {d.page_subheading}
-              </p>
-            ) : null}
 
-            {clusterHref ? (
-              <p className="text-sm text-muted-foreground">
-                Part of{" "}
-                <Link
-                  href={clusterHref}
-                  className="font-medium text-foreground underline underline-offset-2"
-                  {...publicEmbedOutboundLinkProps(isEmbedded)}
-                >
-                  {clusterHref.replace(/^\//, "").replace(/-/g, " ")}
-                </Link>
-                {" · "}
-                <Link
-                  href="/dashboards-gallery"
-                  className="font-medium text-foreground underline underline-offset-2"
-                  {...publicEmbedOutboundLinkProps(isEmbedded)}
-                >
-                  Browse all dashboards
-                </Link>
-              </p>
-            ) : (
-              <p className="text-sm text-muted-foreground">
-                <Link
-                  href="/dashboards-gallery"
-                  className="font-medium text-foreground underline underline-offset-2"
-                  {...publicEmbedOutboundLinkProps(isEmbedded)}
-                >
-                  Browse all dashboards
-                </Link>
-                {" · "}
-                <Link
-                  href="/guides"
-                  className="font-medium text-foreground underline underline-offset-2"
-                  {...publicEmbedOutboundLinkProps(isEmbedded)}
-                >
-                  Data guides
-                </Link>
-              </p>
-            )}
+        {rows.map((row, rowIndex) => {
+          if (isCompareLayout && isCompareNarrativeRow(row)) return null;
+          const rowStyle = rowIndex > 1 ? OFFSCREEN_ROW_STYLE : undefined;
 
-              <div className="flex flex-col gap-2 pt-1">
-                <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-                  {ownerPic ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img
-                      src={ownerPic}
-                      alt={`@${ownerHandle}`}
-                      className="h-6 w-6 rounded-full object-cover ring-1 ring-border"
-                    />
-                  ) : (
-                    <div className="h-6 w-6 rounded-full bg-muted ring-1 ring-border flex items-center justify-center text-[11px] font-semibold text-muted-foreground">
-                      {(String(ownerHandle || "?")[0] || "?").toUpperCase()}
-                    </div>
-                  )}
-                  <span>
-                    Created by <span className="font-medium text-foreground">@{ownerHandle}</span> using{" "}
-                    <Link
-                      href={SITE}
-                      className="font-medium text-foreground underline underline-offset-2"
-                      {...publicEmbedOutboundLinkProps(isEmbedded)}
-                    >
-                      Lychee
-                    </Link>
-                  </span>
+          if (row.type === "cardGrid") {
+            const sheetRows = Array.isArray(row.sheetRows) ? (row.sheetRows as object[]) : [];
+            if (cardGridLoading && !sheetRows.length) {
+              return (
+                <div key={row.id || `cardGrid-${rowIndex}`} className="space-y-3" style={rowStyle}>
+                  {row.h2?.trim() ? (
+                    <h2 className="text-lg font-semibold tracking-tight text-foreground">{row.h2}</h2>
+                  ) : null}
+                  <CardGridSkeleton count={Math.min(clampCardGridRowLimit(row.rowLimit), 4)} />
                 </div>
-
-                <RunForYourselfButton
-                  ownerHandle={username}
-                  dashboardSlug={slug}
-                  kind="dashboard"
-                  variant="dashboard"
-                  presentation="promo"
-                  promoVariant="subtle"
-                  displayName={dashboardName}
-                />
-
-                {tags.length ? (
-                  <div className="flex flex-wrap items-center gap-2">
-                    <span className="text-[11px] text-muted-foreground">Data sources</span>
-                    <div className="flex flex-wrap gap-1.5">
-                      {tags.slice(0, 8).map((t, i) => (
-                        <Badge
-                          key={`dash-tag-${t}-${i}`}
-                          variant="secondary"
-                          className={`border ${TAG_STYLES[i % TAG_STYLES.length]}`}
-                        >
-                          {t}
-                        </Badge>
-                      ))}
-                    </div>
-                  </div>
-                ) : null}
-              </div>
-            </div>
-
-          {isCompareLayout ? (
-            <CompareLiveDashboardSession
-              initialPair={comparePair}
-              handleUrl={`${String(SITE).replace(/^https?:\/\//, "").replace(/\/$/, "")}/${username}/dashboards/${slug}`}
-              onUpgrade={() => {}}
-              readOnly
-              className="min-h-[min(72vh,56rem)] border-border/50"
-            />
-          ) : null}
-
-          {rows.map((row) => {
-            if (isCompareLayout && isCompareNarrativeRow(row)) return null;
-            if (row.type === "cardGrid") {
-              const sheetRows = Array.isArray(row.sheetRows)
-                ? (row.sheetRows as object[])
-                : [];
-              const cardLimit = clampCardGridRowLimit(row.rowLimit);
-              if (cardGridLoading && sheetRows.length === 0) {
-                return (
-                  <div key={row.id || "cardGrid"} className="space-y-4">
-                    {(row.h2?.trim() || row.caption?.trim()) ? (
-                      <div className="space-y-1">
-                        {row.h2?.trim() ? <h2 className="text-xl font-semibold">{row.h2}</h2> : null}
-                        {row.caption?.trim() ? (
-                          <p className="text-sm text-muted-foreground">{row.caption}</p>
-                        ) : null}
-                      </div>
-                    ) : null}
-                    <CardGridSkeleton count={Math.min(cardLimit, 4)} />
-                  </div>
-                );
-              }
-              return (
-                <DashboardCardGridSection
-                  key={row.id || "cardGrid"}
-                  row={row}
-                  dataRows={sheetRows}
-                />
               );
             }
-            if (row.type === "text") {
-              const variant = row.textVariant === "heading" ? "heading" : "paragraph";
-              const body = row.body || "";
-              const rowForTheme = {
-                textVariant: variant,
-                textTheme: row.textTheme,
-              };
-              const key = row.id || `text-${body.slice(0, 8)}`;
-              if (variant === "heading") {
-                return (
-                  <h2
-                    key={key}
-                    className={getFreeTextRowPublicClassName(rowForTheme)}
-                    style={getFreeTextRowPublicStyle(rowForTheme)}
-                  >
-                    {body}
-                  </h2>
-                );
-              }
-              return (
-                <p
-                  key={key}
-                  className={cn("whitespace-pre-wrap", getFreeTextRowPublicClassName(rowForTheme))}
-                  style={getFreeTextRowPublicStyle(rowForTheme)}
-                >
-                  {body}
-                </p>
-              );
-            }
-            if (row.type !== "cards" || !Array.isArray(row.columns)) return null;
             return (
-              <div
-                key={row.id || "cards"}
-                className={cn("grid gap-4", DASH_CARDS_GRID_CLASS)}
-                style={CHART_CARDS_GRID_STYLE}
-              >
-                {row.columns.map((col) => {
-                  const href = resolveCardHref(col, ownerHandle);
-                  const rSpan = clampChartCardRowSpan(col.rowSpan);
-                  const chartId = col.chart_id ? String(col.chart_id) : "";
-                  const liveOverlay =
-                    chartId && liveTick.charts[chartId]
-                      ? {
-                          sheetId: liveTick.charts[chartId].sheetId,
-                          rows: liveTick.charts[chartId].rows,
-                          periodInterval: liveTick.periodInterval,
-                        }
-                      : null;
-                  const inner = (
-                    <div className="flex h-full min-h-0 min-w-0 flex-col gap-2 overflow-y-auto rounded-lg bg-background/80 p-4 backdrop-blur-sm">
-                      {col.h2 ? (
-                        <h2
-                          className={getChartCardHeadingPublicClassName(col)}
-                          style={getChartCardHeadingPublicStyle(col)}
-                        >
-                          {col.h2}
-                        </h2>
-                      ) : null}
-                      {col.caption ? (
-                        <p
-                          className={getChartCardSubheadingPublicClassName(col)}
-                          style={getChartCardSubheadingPublicStyle(col)}
-                        >
-                          {col.caption}
-                        </p>
-                      ) : null}
-                      {col.chart_id ? (
-                        <div className="flex min-h-0 flex-1 flex-col">
-                          <LazyPublicDashboardChart
-                            username={username}
-                            slug={slug}
-                            chartId={String(col.chart_id)}
-                            initialPayload={col.chartPayload}
-                            ownerHandle={ownerHandle}
-                            layoutColumnKey={col.id}
-                            chartSlug={col.chartLink?.slug}
-                            chartTitle={col.h2 || col.chartPayload?.chart?.chart_name}
-                            liveOverlay={liveOverlay}
-                          />
-                        </div>
-                      ) : col.chartPayload ? (
-                        <div className="flex min-h-0 flex-1 flex-col">
-                          <PublicDashboardChartBlock
-                            chartPayload={col.chartPayload}
-                            ownerHandle={ownerHandle}
-                            chartSlug={col.chartLink?.slug}
-                            chartId={col.chart_id ? String(col.chart_id) : undefined}
-                            layoutColumnKey={col.id}
-                            dashboardSlug={slug}
-                            chartTitle={col.h2 || col.chartPayload.chart?.chart_name}
-                          />
-                        </div>
-                      ) : (
-                        <div className="flex min-h-[120px] flex-1 items-center justify-center rounded-md border border-dashed text-xs text-muted-foreground">
-                          Chart unavailable
-                        </div>
-                      )}
-                      {col.microtext ? (
-                        <p
-                          className={getChartCardMicrotextPublicClassName(col)}
-                          style={getChartCardMicrotextPublicStyle(col)}
-                        >
-                          {col.microtext}
-                        </p>
-                      ) : null}
-                    </div>
-                  );
-                  return (
-                    <div
-                      key={col.id || String(col.chart_id)}
-                      style={{
-                        ...chartCardResponsiveSpanStyle(col.colSpan),
-                        gridRow: `span ${rSpan}`,
-                      }}
-                      className={cn(DASH_CARD_CELL_CLASS, "min-h-0 min-w-0 h-full")}
-                    >
-                      {href ? (
-                        <a href={href} className="block h-full min-h-0 rounded-lg no-underline hover:opacity-95">
-                          {inner}
-                        </a>
-                      ) : (
-                        inner
-                      )}
-                    </div>
-                  );
-                })}
+              <div key={row.id || `cardGrid-${rowIndex}`} style={rowStyle}>
+                <DashboardCardGridSection row={row} dataRows={sheetRows} />
               </div>
             );
-          })}
-        </div>
+          }
+
+          if (row.type === "text") {
+            const body = row.body || "";
+            const key = row.id || `text-${rowIndex}`;
+            return row.textVariant === "heading" ? (
+              <h2 key={key} className="pt-2 text-lg font-semibold tracking-tight text-foreground">
+                {body}
+              </h2>
+            ) : (
+              <p key={key} className="max-w-3xl whitespace-pre-wrap text-[15px] leading-relaxed text-muted-foreground">
+                {body}
+              </p>
+            );
+          }
+
+          if (row.type !== "cards" || !Array.isArray(row.columns)) return null;
+          return (
+            <div
+              key={row.id || `cards-${rowIndex}`}
+              className={cn("grid gap-4", DASH_CARDS_GRID_CLASS)}
+              style={{ ...CHART_CARDS_GRID_STYLE, ...rowStyle }}
+            >
+              {row.columns.map((col, colIndex) => {
+                const chartId = col.chart_id ? String(col.chart_id) : "";
+                return (
+                  <div
+                    key={col.id || chartId || colIndex}
+                    style={{
+                      ...chartCardResponsiveSpanStyle(col.colSpan),
+                      gridRow: `span ${clampChartCardRowSpan(col.rowSpan)}`,
+                    }}
+                    className={cn(DASH_CARD_CELL_CLASS, "h-full min-h-0 min-w-0")}
+                  >
+                    <ViewerChartCard
+                      col={col}
+                      loader={loader}
+                      ownerHandle={ownerHandle}
+                      slug={slug}
+                      live={live}
+                      liveOverlay={liveOverlays[chartId] || null}
+                    />
+                  </div>
+                );
+              })}
+            </div>
+          );
+        })}
       </div>
-      <footer className="mt-8 border-t border-border/60 pt-4 text-center text-xs text-muted-foreground">
-        <span>Made with </span>
-        <Link
-          href={SITE}
-          className="font-medium text-foreground underline"
-          {...publicEmbedOutboundLinkProps(isEmbedded)}
-        >
+
+      <footer className="mt-12 flex items-center justify-center gap-1 border-t border-border/60 pt-4 text-[12px] text-muted-foreground">
+        Made with
+        <Link href={SITE} className="font-medium text-foreground hover:underline" {...publicEmbedOutboundLinkProps(isEmbedded)}>
           Lychee
         </Link>
-        {d.dashboard_name ? (
-          <span className="block pt-1 opacity-80">{d.dashboard_name}</span>
-        ) : null}
       </footer>
     </div>
   );

@@ -1,40 +1,13 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
-import dynamic from "next/dynamic";
-import { ChartEmbedSkeleton } from "@/components/publicEmbed/ChartEmbedSkeleton";
+import { useCallback, useEffect, useMemo, useRef, useSyncExternalStore } from "react";
 import { applyLiveCandleOverlay } from "@/lib/liveFeeds/applyLiveCandleOverlay";
 import { applyLiveOverlay } from "@/lib/liveFeeds/applyLiveOverlay";
 import { sheetDataLooksLikeTrades } from "@/lib/liveFeeds/merge/kalshiTradesUpsert";
-
-const PublicDashboardChartBlock = dynamic(
-  () =>
-    import("@/components/dashboardComposer/PublicDashboardChartBlock").then(
-      (m) => m.PublicDashboardChartBlock,
-    ),
-  { loading: () => <ChartEmbedSkeleton className="min-h-[200px]" /> },
-);
-
-type ChartPayload = {
-  chart?: {
-    chart_name?: string;
-    chart_properties?: unknown[];
-    rechartsBuilder?: {
-      v: number;
-      selChartType?: string;
-      candlestickSheetId?: string;
-      candlestickOhlcSetId?: string;
-      titleHidden?: boolean;
-      subTitleHidden?: boolean;
-      selX?: string | null;
-      selY?: string[];
-    };
-  };
-  rows?: unknown[];
-  dataSheets?: Record<string, unknown>;
-};
-
-type ChartLink = { mode?: string; slug?: string } | null;
+import { ChartPaneSkeleton } from "@/components/publicEmbed/PublicDashboardSkeletons";
+import { PublicViewerChart } from "@/components/publicEmbed/PublicViewerChart";
+import type { PublicChartBatchLoader } from "@/components/publicEmbed/publicChartBatchLoader";
+import type { ViewerChartPayload } from "@/lib/publicChartViewerPayload";
 
 type LiveCandleOverlay = {
   sheetId: string;
@@ -42,48 +15,65 @@ type LiveCandleOverlay = {
   periodInterval?: number;
 } | null;
 
-function chartPayloadHasData(chartPayload: ChartPayload | null | undefined): boolean {
+function chartPayloadHasData(chartPayload: ViewerChartPayload | null | undefined): boolean {
   if (!chartPayload) return false;
   if (Array.isArray(chartPayload.rows) && chartPayload.rows.length > 0) return true;
-  return Object.values(chartPayload.dataSheets || {}).some(
-    (s) => Array.isArray((s as { data?: unknown[] })?.data) && (s as { data: unknown[] }).data.length > 0,
-  );
+  return Object.values(chartPayload.dataSheets || {}).some((s) => Array.isArray(s?.data) && s.data.length > 0);
 }
 
-export { applyLiveCandleOverlay };
+export function useLoadedChart(loader: PublicChartBatchLoader, chartId: string) {
+  const subscribe = useCallback((cb: () => void) => loader.subscribe(cb), [loader]);
+  const getEntry = useCallback(() => loader.get(chartId), [loader, chartId]);
+  return useSyncExternalStore(subscribe, getEntry, getEntry);
+}
 
+/**
+ * Chart body for a published dashboard card. Data comes from the shared batch loader:
+ * the request fires when the card nears the viewport (or immediately when the server
+ * already inlined it), and live rows overlay the published snapshot.
+ */
 export function LazyPublicDashboardChart({
-  username,
-  slug,
+  loader,
   chartId,
-  initialPayload,
-  ownerHandle,
-  layoutColumnKey,
-  chartTitle,
-  chartSlug: initialChartSlug,
   liveOverlay = null,
+  live = false,
+  legacyProps,
 }: {
-  username: string;
-  slug: string;
+  loader: PublicChartBatchLoader;
   chartId: string;
-  initialPayload?: ChartPayload | null;
-  ownerHandle?: string;
-  layoutColumnKey?: string;
-  dashboardSlug?: string;
-  chartTitle?: string;
-  chartSlug?: string;
   liveOverlay?: LiveCandleOverlay;
+  live?: boolean;
+  legacyProps: {
+    ownerHandle?: string;
+    layoutColumnKey?: string;
+    dashboardSlug?: string;
+    chartTitle?: string;
+  };
 }) {
-  const [basePayload, setBasePayload] = useState<ChartPayload | null>(() =>
-    initialPayload && chartPayloadHasData(initialPayload) ? initialPayload : null,
-  );
-  const [chartSlug, setChartSlug] = useState<string | undefined>(initialChartSlug);
-  const [failed, setFailed] = useState(false);
+  const entry = useLoadedChart(loader, chartId);
   const containerRef = useRef<HTMLDivElement>(null);
-  const fetchedRef = useRef(!!chartPayloadHasData(initialPayload));
-  const liveOverlayRef = useRef(liveOverlay);
-  liveOverlayRef.current = liveOverlay;
 
+  useEffect(() => {
+    if (entry !== undefined) return;
+    const el = containerRef.current;
+    if (!el || typeof IntersectionObserver === "undefined") {
+      void loader.load(chartId);
+      return;
+    }
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries.some((e) => e.isIntersecting)) {
+          observer.disconnect();
+          void loader.load(chartId);
+        }
+      },
+      { rootMargin: "1200px 0px", threshold: 0 },
+    );
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [entry, loader, chartId]);
+
+  const basePayload = entry?.chartPayload ?? null;
   const payload = useMemo(() => {
     if (!liveOverlay?.sheetId || !Array.isArray(liveOverlay.rows) || !liveOverlay.rows.length) {
       return basePayload;
@@ -96,110 +86,29 @@ export function LazyPublicDashboardChart({
       });
     }
     return applyLiveCandleOverlay(basePayload, liveOverlay);
-  }, [basePayload, liveOverlay]);
+  }, [basePayload, liveOverlay]) as ViewerChartPayload | null;
 
-  useEffect(() => {
-    if (initialPayload && chartPayloadHasData(initialPayload)) {
-      setBasePayload(initialPayload);
-      fetchedRef.current = true;
-    }
-  }, [initialPayload]);
-
-  useEffect(() => {
-    if (initialChartSlug) setChartSlug(initialChartSlug);
-  }, [initialChartSlug]);
-
-  // Live overlay alone is enough to render when progressive fetch is still pending
-  useEffect(() => {
-    if (liveOverlay?.rows?.length) {
-      setFailed(false);
-    }
-  }, [liveOverlay]);
-
-  useEffect(() => {
-    if (fetchedRef.current || !chartId) return;
-    const el = containerRef.current;
-    if (!el) return;
-
-    let cancelled = false;
-
-    const loadChart = () => {
-      if (fetchedRef.current || cancelled) return;
-      fetchedRef.current = true;
-      fetch(
-        `/api/public/dashboards/${encodeURIComponent(username)}/${encodeURIComponent(slug)}/charts/${encodeURIComponent(chartId)}`,
-        { credentials: "include" },
-      )
-        .then((r) => r.json())
-        .then((j) => {
-          if (cancelled) return;
-          if (!j?.success || !j?.data?.chartPayload) {
-            // Live overlay may still render the candles
-            if (!liveOverlayRef.current?.rows?.length) setFailed(true);
-            return;
-          }
-          setBasePayload(j.data.chartPayload);
-          if (j.data.chartLink?.slug) setChartSlug(j.data.chartLink.slug);
-        })
-        .catch(() => {
-          if (!cancelled && !liveOverlayRef.current?.rows?.length) setFailed(true);
-        });
-    };
-
-    if (typeof IntersectionObserver === "undefined") {
-      loadChart();
-      return () => {
-        cancelled = true;
-      };
-    }
-
-    const observer = new IntersectionObserver(
-      (entries) => {
-        if (entries.some((e) => e.isIntersecting)) {
-          observer.disconnect();
-          loadChart();
-        }
-      },
-      { rootMargin: "200px 0px", threshold: 0.01 },
-    );
-    observer.observe(el);
-
-    return () => {
-      cancelled = true;
-      observer.disconnect();
-    };
-  }, [username, slug, chartId]);
-
-  if (failed && !chartPayloadHasData(payload)) {
+  if (entry === null && !chartPayloadHasData(payload)) {
     return (
-      <div className="flex min-h-[120px] flex-1 items-center justify-center rounded-md border border-dashed text-xs text-muted-foreground">
+      <div className="mx-3 mb-3 flex min-h-[120px] flex-1 items-center justify-center rounded-lg border border-dashed border-border/70 text-[12px] text-muted-foreground">
         Chart unavailable
       </div>
     );
   }
 
-  // Prefer rendering as soon as live rows (or base rows) exist — don't wait on structure fetch.
   if (!payload || !chartPayloadHasData(payload)) {
     return (
       <div ref={containerRef} className="flex min-h-0 flex-1 flex-col">
-        <ChartEmbedSkeleton className="min-h-[200px]" />
+        <ChartPaneSkeleton />
       </div>
     );
   }
 
   return (
     <div ref={containerRef} className="flex min-h-0 flex-1 flex-col">
-      <PublicDashboardChartBlock
-        chartPayload={payload}
-        ownerHandle={ownerHandle}
-        chartSlug={chartSlug}
-        chartId={chartId}
-        layoutColumnKey={layoutColumnKey}
-        dashboardSlug={slug}
-        chartTitle={chartTitle}
-      />
+      <PublicViewerChart payload={payload} live={live} legacyProps={{ ...legacyProps, chartId }} />
     </div>
   );
 }
 
-export type { ChartPayload, ChartLink, LiveCandleOverlay };
+export type { LiveCandleOverlay };

@@ -1,4 +1,5 @@
 import Chart from "@/models/Charts";
+import ChartDashboard from "@/models/ChartDashboards";
 import DataSet from "@/models/DataSets";
 import mongoose from "mongoose";
 import { dataSheetsReferencedBySnapshot } from "@/lib/chartSnapshotDataDeps";
@@ -67,7 +68,12 @@ export function hydrateLayoutWithChartBundles(layout, chartBundlesById, dataShee
       return {
         ...col,
         chartPayload: bundle
-          ? { chart: bundle.chart, rows: bundle.rows, dataSheets: bundle.dataSheets }
+          ? {
+              chart: bundle.chart,
+              rows: bundle.rows,
+              dataSheets: bundle.dataSheets,
+              ...(bundle.rowsSheetId ? { rowsSheetId: bundle.rowsSheetId } : {}),
+            }
           : null,
         chartLink:
           meta?.is_public && meta?.public_slug
@@ -265,42 +271,20 @@ export async function resolvePublicDashboardCardGridSheets(dash, userId, { prefe
 }
 
 /**
- * Infer a reasonable client poll interval from live event-candlesticks provenance.
- * @param {object} dash
- * @returns {Promise<number>}
- */
-async function resolveLivePollIntervalMs(dash) {
-  if (!dash?.live_backed || !dash?.data_set_id) return 60_000;
-  try {
-    const { resolvePublicDashboardLiveConfig } = await import("@/lib/liveFeeds/publicLiveConfig");
-    const cfg = await resolvePublicDashboardLiveConfig(dash);
-    return cfg?.pollIntervalMs || 60_000;
-  } catch {
-    return 60_000;
-  }
-}
-
-/**
  * Full public dashboard payload for API (cached bundles when available).
  * Live dashboards still use published chart structure; candle rows refresh via /live.
  */
-export async function buildPublicDashboardResponseData(dash, user) {
-  const chartIds = collectChartIdsFromLayout(dash.layout);
-  // Prefer stored flag; also detect event-candlesticks provenance so older
-  // publishes without cron registration still get on-demand live.
-  let liveBacked = !!dash.live_backed;
-  if (!liveBacked && dash.data_set_id) {
-    try {
-      const { resolveDatasetLiveBacked } = await import("@/lib/liveFeeds/publicLiveConfig");
-      liveBacked = await resolveDatasetLiveBacked(String(dash.data_set_id));
-    } catch {
-      liveBacked = false;
-    }
-  }
+export async function buildPublicDashboardResponseData(dash, user, opts = {}) {
+  const includeCharts = opts.includeCharts !== false;
+  const chartIds = includeCharts ? collectChartIdsFromLayout(dash.layout) : new Set();
+  const liveInfo = await resolvePublicLiveSeedInfo(dash);
+  const { liveBacked } = liveInfo;
   const useCache = publishedBundlesCoverAllCharts(chartIds, dash.published_chart_bundles);
 
   let chartBundlesById;
-  if (useCache) {
+  if (!includeCharts) {
+    chartBundlesById = new Map();
+  } else if (useCache) {
     chartBundlesById = mapFromPublishedBundles(dash.published_chart_bundles, chartIds);
   } else {
     // Prefer frozen publish snapshots for structure even when live_backed —
@@ -309,6 +293,9 @@ export async function buildPublicDashboardResponseData(dash, user) {
       preferPublishedSnapshot: true,
     });
   }
+  for (const [cid, bundle] of chartBundlesById) {
+    chartBundlesById.set(cid, { ...bundle, ...slimChartPayloadForViewer(bundle) });
+  }
 
   const dataSheets = await resolvePublicDashboardCardGridSheets(dash, user._id, {
     preferSnapshots:
@@ -316,7 +303,7 @@ export async function buildPublicDashboardResponseData(dash, user) {
   });
 
   const layoutOut = hydrateLayoutWithChartBundles(dash.layout, chartBundlesById, dataSheets);
-  const livePollIntervalMs = liveBacked ? await resolveLivePollIntervalMs(dash) : null;
+  const livePollIntervalMs = liveBacked ? liveInfo.pollIntervalMs : null;
 
   return {
     page_heading: dash.page_heading || "",
@@ -378,23 +365,52 @@ export function structureOnlyLiveChartPayload(payload, opts = {}) {
   };
 }
 
+const VIEWER_SHEET_KEYS = ["name", "data", "columns", "dataTypes", "storageMode", "rowCount", "fullRowCount"];
+
 /**
- * Single chart bundle for progressive client loading.
- * Always prefer published snapshots for structure; live OHLC overlays via /live.
+ * Wire format for public viewers: drop workbook bookkeeping (provenance, request logs,
+ * operation history) and send `rows` once when it duplicates a sheet's data.
+ * Clients restore `rows` from `rowsSheetId` (see expandViewerChartPayload).
  */
-export async function buildPublicDashboardChartBundle(dash, user, chartId) {
-  const cid = String(chartId || "").trim();
-  if (!cid || !mongoose.Types.ObjectId.isValid(cid)) {
-    return { success: false, message: "Invalid chart id" };
+export function slimChartPayloadForViewer(payload) {
+  if (!payload || typeof payload !== "object") return payload;
+  const rows = Array.isArray(payload.rows) ? payload.rows : [];
+  const rowsJson = rows.length ? JSON.stringify(rows) : null;
+  /** @type {Record<string, object>} */
+  const dataSheets = {};
+  let rowsSheetId = null;
+  for (const [sid, sheet] of Object.entries(payload.dataSheets || {})) {
+    if (!sheet || typeof sheet !== "object") continue;
+    /** @type {Record<string, unknown>} */
+    const out = {};
+    for (const k of VIEWER_SHEET_KEYS) {
+      if (sheet[k] !== undefined) out[k] = sheet[k];
+    }
+    dataSheets[sid] = out;
+    if (
+      !rowsSheetId &&
+      rowsJson &&
+      Array.isArray(sheet.data) &&
+      sheet.data.length === rows.length &&
+      JSON.stringify(sheet.data) === rowsJson
+    ) {
+      rowsSheetId = sid;
+    }
   }
+  return rowsSheetId
+    ? { chart: payload.chart, rows: [], rowsSheetId, dataSheets }
+    : { chart: payload.chart, rows, dataSheets };
+}
 
-  const chartIds = collectChartIdsFromLayout(dash.layout);
-  if (!chartIds.has(cid)) {
-    return { success: false, message: "Chart not on this dashboard" };
-  }
-
-  let liveBacked = !!dash.live_backed;
-  if (!liveBacked && dash.data_set_id) {
+/**
+ * Live flag + seed size for a dashboard, from sheet metadata only (no row data reads).
+ * @param {object} dash lean ChartDashboard
+ */
+export async function resolvePublicLiveSeedInfo(dash) {
+  // Prefer stored flag; also detect event-candlesticks provenance so older
+  // publishes without cron registration still get on-demand live.
+  let liveBacked = !!dash?.live_backed;
+  if (!liveBacked && dash?.data_set_id) {
     try {
       const { resolveDatasetLiveBacked } = await import("@/lib/liveFeeds/publicLiveConfig");
       liveBacked = await resolveDatasetLiveBacked(String(dash.data_set_id));
@@ -402,87 +418,146 @@ export async function buildPublicDashboardChartBundle(dash, user, chartId) {
       liveBacked = false;
     }
   }
-
   let seedRowCap = 360;
+  let pollIntervalMs = null;
   if (liveBacked) {
     try {
       const { resolvePublicDashboardLiveConfig } = await import("@/lib/liveFeeds/publicLiveConfig");
       const { publicLiveSeedRowCap } = await import("@/lib/liveFeeds/publicLiveKalshiCache");
       const cfg = await resolvePublicDashboardLiveConfig(dash);
       seedRowCap = publicLiveSeedRowCap(cfg?.periodInterval);
+      pollIntervalMs = cfg?.pollIntervalMs || 60_000;
     } catch {
       seedRowCap = 360;
     }
   }
+  return { liveBacked, seedRowCap, pollIntervalMs };
+}
 
-  const maybeStripLiveRows = (chartPayload) =>
-    liveBacked ? structureOnlyLiveChartPayload(chartPayload, { seedRowCap }) : chartPayload;
+/** Dashboard fields the chart endpoints need; excludes the multi-MB publish caches. */
+export const PUBLIC_DASHBOARD_LIGHT_SELECT =
+  "user_id layout data_set_id live_backed is_public public_slug last_edited_date published_at";
 
-  const chartDoc = await Chart.findById(cid).lean();
-  if (chartHasPublishedSnapshot(chartDoc)) {
+const CHART_VIEWER_SELECT = "is_public public_slug published_bundle published_bundle_meta";
+
+function isEmptyRow(row) {
+  return !row || typeof row !== "object" || Object.keys(row).length === 0;
+}
+
+/** A sheet saved with rows but no fields (first, middle and last rows all empty) — a bad publish. */
+function bundleHasBlankSheet(bundle) {
+  for (const sheet of Object.values(bundle?.dataSheets || {})) {
+    const data = Array.isArray(sheet?.data) ? sheet.data : [];
+    if (!data.length) continue;
+    if (isEmptyRow(data[0]) && isEmptyRow(data[data.length >> 1]) && isEmptyRow(data[data.length - 1])) return true;
+  }
+  return false;
+}
+
+function chartLinkFrom(isPublic, publicSlug) {
+  return isPublic && publicSlug ? { mode: "chart_public", slug: publicSlug } : null;
+}
+
+/**
+ * Chart bundles for progressive client loading, several charts per request.
+ * Always prefer published snapshots for structure; live OHLC overlays via /live.
+ *
+ * @param {object} dash lean ChartDashboard (light select is enough)
+ * @param {object} user lean owner
+ * @param {string[]} requestedIds
+ * @param {{ liveInfo?: { liveBacked: boolean; seedRowCap: number } }} [opts]
+ * @returns {Promise<Record<string, { chartPayload: object; chartLink: object | null }>>}
+ */
+export async function buildPublicDashboardChartBundles(dash, user, requestedIds, opts = {}) {
+  const onDashboard = collectChartIdsFromLayout(dash.layout);
+  const ids = [...new Set((requestedIds || []).map((id) => String(id || "").trim()))].filter(
+    (id) => id && onDashboard.has(id),
+  );
+  /** @type {Record<string, { chartPayload: object; chartLink: object | null }>} */
+  const out = {};
+  if (!ids.length) return out;
+
+  const { liveBacked, seedRowCap } = opts.liveInfo || (await resolvePublicLiveSeedInfo(dash));
+  const toViewer = (chartPayload) =>
+    slimChartPayloadForViewer(
+      liveBacked ? structureOnlyLiveChartPayload(chartPayload, { seedRowCap }) : chartPayload,
+    );
+
+  /** Snapshots whose sheets were saved as empty rows; rebuilt from the dataset instead. */
+  const blank = new Set();
+  const charts = await Chart.find({ _id: { $in: ids } }).select(CHART_VIEWER_SELECT).lean();
+  for (const chartDoc of charts) {
+    if (!chartHasPublishedSnapshot(chartDoc)) continue;
     const bundle = chartDoc.published_bundle;
-    return {
-      success: true,
-      data: {
-        chart_id: cid,
-        chartPayload: maybeStripLiveRows({
-          chart: bundle.chart,
-          rows: Array.isArray(bundle.rows) ? bundle.rows : [],
-          dataSheets: bundle.dataSheets && typeof bundle.dataSheets === "object" ? bundle.dataSheets : {},
-        }),
-        chartLink:
-          chartDoc.is_public && chartDoc.public_slug
-            ? { mode: "chart_public", slug: chartDoc.public_slug }
-            : null,
-        _cacheHit: true,
-      },
+    if (bundleHasBlankSheet(bundle)) {
+      blank.add(String(chartDoc._id));
+      continue;
+    }
+    out[String(chartDoc._id)] = {
+      chartPayload: toViewer({
+        chart: bundle.chart,
+        rows: Array.isArray(bundle.rows) ? bundle.rows : [],
+        dataSheets: bundle.dataSheets && typeof bundle.dataSheets === "object" ? bundle.dataSheets : {},
+      }),
+      chartLink: chartLinkFrom(chartDoc.is_public, chartDoc.public_slug),
     };
   }
 
-  const cached = dash.published_chart_bundles?.[cid];
-  if (cached?.chart) {
-    return {
-      success: true,
-      data: {
-        chart_id: cid,
-        chartPayload: maybeStripLiveRows({
+  let missing = ids.filter((id) => !out[id] && !blank.has(id));
+  if (missing.length && dash._id) {
+    const cachedDoc = await ChartDashboard.findById(dash._id)
+      .select(missing.map((id) => `published_chart_bundles.${id}`).join(" "))
+      .lean();
+    const cachedBundles = cachedDoc?.published_chart_bundles || {};
+    for (const cid of missing) {
+      const cached = cachedBundles[cid];
+      if (!cached?.chart || bundleHasBlankSheet(cached)) continue;
+      out[cid] = {
+        chartPayload: toViewer({
           chart: cached.chart,
           rows: Array.isArray(cached.rows) ? cached.rows : [],
           dataSheets: cached.dataSheets && typeof cached.dataSheets === "object" ? cached.dataSheets : {},
         }),
-        chartLink:
-          cached.meta?.is_public && cached.meta?.public_slug
-            ? { mode: "chart_public", slug: cached.meta.public_slug }
-            : null,
-        _cacheHit: true,
-      },
-    };
+        chartLink: chartLinkFrom(cached.meta?.is_public, cached.meta?.public_slug),
+      };
+    }
+    missing = ids.filter((id) => !out[id] && !blank.has(id));
   }
 
-  const map = await buildChartBundlesParallel(new Set([cid]), user._id, {
-    preferPublishedSnapshot: true,
-  });
-  const bundle = map.get(cid);
-  if (!bundle) {
-    return { success: false, message: "Chart not found" };
+  const rebuilt = await Promise.all([
+    missing.length
+      ? buildChartBundlesParallel(new Set(missing), user._id, { preferPublishedSnapshot: true })
+      : new Map(),
+    blank.size
+      ? buildChartBundlesParallel(blank, user._id, { preferPublishedSnapshot: false })
+      : new Map(),
+  ]);
+  for (const map of rebuilt) {
+    for (const [cid, bundle] of map) {
+      out[cid] = {
+        chartPayload: toViewer({ chart: bundle.chart, rows: bundle.rows, dataSheets: bundle.dataSheets }),
+        chartLink: chartLinkFrom(bundle.meta?.is_public, bundle.meta?.public_slug),
+      };
+    }
   }
+  return out;
+}
 
-  return {
-    success: true,
-    data: {
-      chart_id: cid,
-      chartPayload: maybeStripLiveRows({
-        chart: bundle.chart,
-        rows: bundle.rows,
-        dataSheets: bundle.dataSheets,
-      }),
-      chartLink:
-        bundle.meta?.is_public && bundle.meta?.public_slug
-          ? { mode: "chart_public", slug: bundle.meta.public_slug }
-          : null,
-      _cacheHit: false,
-    },
-  };
+/**
+ * Single chart bundle for progressive client loading.
+ */
+export async function buildPublicDashboardChartBundle(dash, user, chartId) {
+  const cid = String(chartId || "").trim();
+  if (!cid || !mongoose.Types.ObjectId.isValid(cid)) {
+    return { success: false, message: "Invalid chart id" };
+  }
+  if (!collectChartIdsFromLayout(dash.layout).has(cid)) {
+    return { success: false, message: "Chart not on this dashboard" };
+  }
+  const bundles = await buildPublicDashboardChartBundles(dash, user, [cid]);
+  const hit = bundles[cid];
+  if (!hit) return { success: false, message: "Chart not found" };
+  return { success: true, data: { chart_id: cid, ...hit, _cacheHit: true } };
 }
 
 export function publicDashboardCacheControl(cacheHit, { liveBacked = false } = {}) {

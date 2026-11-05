@@ -1,5 +1,6 @@
 import Link from "next/link";
 import dynamic from "next/dynamic";
+import { IntentPrefetchLink } from "@/components/publicEmbed/IntentPrefetchLink";
 import { ArrowRightIcon } from "@radix-ui/react-icons";
 import { HubComparisonTable } from "@/components/hubs/HubComparisonTable";
 import { HubCtaButton, HubInPageLink } from "@/components/hubs/HubCtaButton";
@@ -835,17 +836,16 @@ function HubPublishedDashboards({
       <ul className="mx-auto mt-10 grid max-w-4xl grid-cols-1 gap-4 px-6 sm:grid-cols-2">
         {dashboards.map((dash) => (
           <li key={`${dash.username}-${dash.slug}`}>
-            <Link
+            <IntentPrefetchLink
               href={`/${encodeURIComponent(dash.username)}/dashboards/${encodeURIComponent(dash.slug)}`}
               className="group block rounded-xl border border-border bg-background p-5 shadow-sm transition hover:border-primary/40 hover:shadow-md"
-              prefetch={false}
             >
               <h3 className="font-semibold text-foreground group-hover:text-primary">{dash.title}</h3>
               {dash.description ? (
                 <p className="mt-1.5 line-clamp-2 text-sm text-muted-foreground">{dash.description}</p>
               ) : null}
               <p className="mt-2 text-xs text-muted-foreground">@{dash.username}</p>
-            </Link>
+            </IntentPrefetchLink>
           </li>
         ))}
       </ul>

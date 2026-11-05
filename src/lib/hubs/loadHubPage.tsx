@@ -18,7 +18,7 @@ async function loadHubAssets(slug: string): Promise<HubPublishedAssets> {
   if (!config?.assetFilter) return EMPTY_HUB_ASSETS;
 
   try {
-    return await queryHubPublishedAssets(config.assetFilter);
+    return await queryHubPublishedAssets(config.assetFilter, slug);
   } catch (err) {
     console.error(`[${slug}] asset query failed:`, err);
     return EMPTY_HUB_ASSETS;

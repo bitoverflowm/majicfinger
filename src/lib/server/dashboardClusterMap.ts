@@ -1,4 +1,6 @@
-import { getAllHubSlugs, getHubBySlug } from "@/config/hubs";
+import { getHubBySlug } from "@/config/hubs";
+import { INTEGRATION_HUBS, type IntegrationHub } from "@/lib/content/taxonomy";
+import { hubSlugFromTags } from "@/lib/dashboardHubTags";
 
 export type DashboardCluster = {
   slug: string;
@@ -6,41 +8,22 @@ export type DashboardCluster = {
   href: string;
 };
 
-const TAG_CLUSTER_RULES: Array<{ match: string[]; hubSlug: string }> = [
-  { match: ["kalshi", "prediction market"], hubSlug: "kalshi-historical-data" },
-  { match: ["polymarket"], hubSlug: "kalshi-historical-data" },
-  { match: ["weather"], hubSlug: "kalshi-historical-data" },
-  { match: ["volume"], hubSlug: "kalshi-historical-data" },
-];
-
-/**
- * Resolve the best-matching content cluster (hub page) for a dashboard's tags.
- */
-export function resolveClusterForTags(tags: string[] | undefined | null): DashboardCluster | null {
-  const normalized = (tags || []).map((t) => String(t || "").trim().toLowerCase()).filter(Boolean);
-  if (!normalized.length) return null;
-
-  for (const rule of TAG_CLUSTER_RULES) {
-    const hit = rule.match.some((keyword) =>
-      normalized.some((tag) => tag.includes(keyword) || keyword.includes(tag)),
-    );
-    if (!hit) continue;
-    const hub = getHubBySlug(rule.hubSlug);
-    if (!hub) continue;
-    return {
-      slug: hub.slug,
-      title: hub.title.split("|")[0]?.trim() || hub.title,
-      href: `/${hub.slug.replace(/^\//, "")}`,
-    };
-  }
-
-  const firstHubSlug = getAllHubSlugs()[0];
-  if (!firstHubSlug) return null;
-  const hub = getHubBySlug(firstHubSlug);
+export function clusterForHubSlug(hubSlug: string | null | undefined): DashboardCluster | null {
+  if (!hubSlug) return null;
+  const hub = getHubBySlug(hubSlug);
   if (!hub) return null;
+  const label = INTEGRATION_HUBS[hub.id as IntegrationHub]?.label;
   return {
     slug: hub.slug,
-    title: hub.title.split("|")[0]?.trim() || hub.title,
+    title: label ? `${label} Data` : hub.title.split("|")[0]?.trim() || hub.title,
     href: `/${hub.slug.replace(/^\//, "")}`,
   };
+}
+
+/**
+ * Content cluster (hub page) from tags alone. Prefer the provenance-based hub
+ * (resolveDashboardSourceHub); tags are only a fallback and may return null.
+ */
+export function resolveClusterForTags(tags: string[] | undefined | null): DashboardCluster | null {
+  return clusterForHubSlug(hubSlugFromTags(tags || []));
 }

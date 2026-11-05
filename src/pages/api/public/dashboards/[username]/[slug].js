@@ -1,5 +1,6 @@
 import {
   buildPublicDashboardResponseData,
+  PUBLIC_DASHBOARD_LIGHT_SELECT,
   publicDashboardCacheControl,
 } from "@/lib/server/publicDashboardHydration";
 import { resolveDashboardByUsernameSlug } from "@/lib/server/resolveDashboardByUsernameSlug";
@@ -12,14 +13,25 @@ export default async function handler(req, res) {
     return res.status(405).end(`Method ${req.method} Not Allowed`);
   }
 
+  // `?part=cardGrids` returns layout + card grid rows only (no chart data); charts load
+  // separately through the batched charts endpoint.
+  const cardGridsOnly = req.query.part === "cardGrids";
+
   try {
-    const resolved = await resolveDashboardByUsernameSlug(username, slug, { req });
+    const resolved = await resolveDashboardByUsernameSlug(username, slug, {
+      req,
+      ...(cardGridsOnly
+        ? {
+            select: `${PUBLIC_DASHBOARD_LIGHT_SELECT} page_heading page_subheading dashboard_name theme tags card_grid_snapshots`,
+          }
+        : {}),
+    });
     if (!resolved) {
       return res.status(404).json({ success: false, message: "Dashboard not found" });
     }
 
     const { user, dash, isPublic } = resolved;
-    const data = await buildPublicDashboardResponseData(dash, user);
+    const data = await buildPublicDashboardResponseData(dash, user, { includeCharts: !cardGridsOnly });
     const cacheHit = !!data._cacheHit;
     const liveBacked = !!data.live_backed;
     delete data._cacheHit;

@@ -1,5 +1,6 @@
 import {
   buildPublicDashboardChartBundle,
+  PUBLIC_DASHBOARD_LIGHT_SELECT,
   publicDashboardCacheControl,
 } from "@/lib/server/publicDashboardHydration";
 import { resolveDashboardByUsernameSlug } from "@/lib/server/resolveDashboardByUsernameSlug";
@@ -13,7 +14,10 @@ export default async function handler(req, res) {
   }
 
   try {
-    const resolved = await resolveDashboardByUsernameSlug(username, slug, { req });
+    const resolved = await resolveDashboardByUsernameSlug(username, slug, {
+      req,
+      select: PUBLIC_DASHBOARD_LIGHT_SELECT,
+    });
     if (!resolved) {
       return res.status(404).json({ success: false, message: "Dashboard not found" });
     }

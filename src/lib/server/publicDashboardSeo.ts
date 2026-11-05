@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import type { PublicDashboardPayload } from "@/lib/server/publicDashboardPayload";
-import { resolveClusterForTags, type DashboardCluster } from "@/lib/server/dashboardClusterMap";
+import { clusterForHubSlug, resolveClusterForTags, type DashboardCluster } from "@/lib/server/dashboardClusterMap";
 
 const SITE = process.env.NEXT_PUBLIC_SITE_URL || "https://lycheedata.com";
 
@@ -15,6 +15,8 @@ export type PublicDashboardMetaRecord = {
   has_og_image_data: boolean;
   is_public?: boolean;
   is_private_published?: boolean;
+  /** Hub slug resolved from the data's provenance (see resolveDashboardSourceHub). */
+  source_hub?: string | null;
 };
 
 export type DashboardSeoSummary = {
@@ -250,5 +252,5 @@ export function buildDashboardJsonLd(args: {
 }
 
 export function resolveClusterForDashboardMeta(meta: PublicDashboardMetaRecord): DashboardCluster | null {
-  return resolveClusterForTags(meta.tags);
+  return clusterForHubSlug(meta.source_hub) || resolveClusterForTags(meta.tags);
 }

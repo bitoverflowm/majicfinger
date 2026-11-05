@@ -5,7 +5,7 @@
 
 import mongoose from "mongoose";
 import Chart from "@/models/Charts";
-import DataSet from "@/models/DataSets";
+import { loadDataSetSheetMeta } from "@/lib/server/dataSetSheetMeta";
 import {
   discoverEventCandlesticksFeedGroup,
   discoverOrderbookFeedGroup,
@@ -64,8 +64,7 @@ export async function resolveDatasetLiveBacked(dataSetId, opts = {}) {
   if (!id || !mongoose.Types.ObjectId.isValid(id)) return false;
   let sheets = opts.dataSheets;
   if (!sheets || typeof sheets !== "object") {
-    const ds = await DataSet.findById(id).select("data_sheets").lean();
-    sheets = ds?.data_sheets && typeof ds.data_sheets === "object" ? ds.data_sheets : null;
+    sheets = await loadDataSetSheetMeta(id);
   }
   return (
     datasetHasEventCandlesticksLiveSource(sheets) || datasetHasTradesLiveSource(sheets)
@@ -120,13 +119,31 @@ function sheetIdsFromChart(chartLean, dataSheets) {
  *   chartMap: Record<string, { ticker: string; sheetId: string }>;
  * } | null>}
  */
-export async function resolvePublicDashboardLiveConfig(dash) {
-  const dataSetId = String(dash?.data_set_id || "").trim();
-  if (!dataSetId || !mongoose.Types.ObjectId.isValid(dataSetId)) return null;
+const LIVE_CONFIG_TTL_MS = 60_000;
+/** @type {Map<string, { at: number; promise: Promise<any> }>} */
+const liveConfigCache = new Map();
 
-  const dataSet = await DataSet.findById(dataSetId).select("data_sheets").lean();
-  const sheets =
-    dataSet?.data_sheets && typeof dataSet.data_sheets === "object" ? dataSet.data_sheets : {};
+export function resolvePublicDashboardLiveConfig(dash) {
+  const dataSetId = String(dash?.data_set_id || "").trim();
+  if (!dataSetId || !mongoose.Types.ObjectId.isValid(dataSetId)) return Promise.resolve(null);
+  const key = `${String(dash?._id || "")}:${dataSetId}:${collectChartIdsFromLayout(dash.layout).size}`;
+  const now = Date.now();
+  const hit = liveConfigCache.get(key);
+  if (hit && now - hit.at < LIVE_CONFIG_TTL_MS) return hit.promise;
+  const promise = resolvePublicDashboardLiveConfigUncached(dash, dataSetId).catch((err) => {
+    liveConfigCache.delete(key);
+    throw err;
+  });
+  if (liveConfigCache.size >= 200) {
+    const oldest = liveConfigCache.keys().next().value;
+    if (oldest) liveConfigCache.delete(oldest);
+  }
+  liveConfigCache.set(key, { at: now, promise });
+  return promise;
+}
+
+async function resolvePublicDashboardLiveConfigUncached(dash, dataSetId) {
+  const sheets = await loadDataSetSheetMeta(dataSetId);
 
   const eventGroup = discoverEventCandlesticksFeedGroup(sheets);
   if (eventGroup) {

@@ -1,6 +1,8 @@
 import dbConnect from "@/lib/dbConnect";
 import { cache } from "react";
 import { clampCardGridRowLimit } from "@/lib/dashboardCardGrid";
+import ChartDashboard from "@/models/ChartDashboards";
+import { resolveDashboardSourceHub } from "@/lib/server/dashboardSourceHub";
 import {
   getAppRouterViewerUserId,
   resolveDashboardByUsernameSlug,
@@ -18,23 +20,6 @@ function buildShellLayout(layout, cardGridSnapshots) {
       const saved = sheetId && Array.isArray(snapshots[sheetId]) ? snapshots[sheetId] : [];
       const sheetRows = saved.slice(0, limit);
       return { ...row, sheetRows };
-    }
-    if (row?.type === "cards" && Array.isArray(row.columns)) {
-      const columns = row.columns.map((col) => {
-        if (!col?.chart_id) {
-          return { ...col, chartPayload: null, chartLink: null };
-        }
-        return {
-          ...col,
-          chartPayload: {
-            chart: { chart_name: String(col.h2 || col.caption || "Chart") },
-            rows: [],
-            dataSheets: {},
-          },
-          chartLink: null,
-        };
-      });
-      return { ...row, columns };
     }
     return row;
   });
@@ -57,21 +42,28 @@ export const getPublicDashboardPageContext = cache(async function getPublicDashb
   const resolved = await resolveDashboardByUsernameSlug(username, slug, {
     viewerUserId,
     select:
-      "user_id page_heading page_subheading dashboard_name seo_title tags keywords theme layout card_grid_snapshots published_at last_edited_date og_image_data live_backed data_set_id is_public public_slug",
+      "user_id page_heading page_subheading dashboard_name seo_title tags keywords theme layout card_grid_snapshots published_at last_edited_date live_backed data_set_id is_public public_slug",
   });
   if (!resolved) return null;
 
   const { user, dash, isPublic, isPrivatePublished } = resolved;
 
-  let liveBacked = !!dash.live_backed;
-  if (!liveBacked && dash.data_set_id) {
-    try {
-      const { resolveDatasetLiveBacked } = await import("@/lib/liveFeeds/publicLiveConfig");
-      liveBacked = await resolveDatasetLiveBacked(String(dash.data_set_id));
-    } catch {
-      liveBacked = false;
-    }
-  }
+  const [liveBacked, sourceHub, hasOgImage] = await Promise.all([
+    (async () => {
+      if (dash.live_backed) return true;
+      if (!dash.data_set_id) return false;
+      try {
+        const { resolveDatasetLiveBacked } = await import("@/lib/liveFeeds/publicLiveConfig");
+        return await resolveDatasetLiveBacked(String(dash.data_set_id));
+      } catch {
+        return false;
+      }
+    })(),
+    resolveDashboardSourceHub(dash).catch(() => null),
+    ChartDashboard.exists({ _id: dash._id, og_image_data: { $exists: true, $nin: [null, ""] } })
+      .then(Boolean)
+      .catch(() => false),
+  ]);
 
   const pageTitle = (dash.page_heading || dash.dashboard_name || "Dashboard").trim();
   const seoTitle = String(dash.seo_title || "").trim() || pageTitle;
@@ -105,9 +97,10 @@ export const getPublicDashboardPageContext = cache(async function getPublicDashb
     keywords,
     published_at: dash.published_at || null,
     last_edited_date: dash.last_edited_date || null,
-    has_og_image_data: !!dash.og_image_data,
+    has_og_image_data: hasOgImage,
     is_public: isPublic,
     is_private_published: isPrivatePublished,
+    source_hub: sourceHub,
   };
 
   return { shellPayload, meta, user, dash };
