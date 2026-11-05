@@ -4,7 +4,11 @@ import type { UniversityLesson } from "@/lib/university/types";
 export function clusterLabel(cluster: string): string {
   const clean = cluster.trim();
   if (!clean) return "General";
-  return clean.charAt(0).toUpperCase() + clean.slice(1);
+  return clean
+    .split(/[-_\s]+/)
+    .filter(Boolean)
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(" ");
 }
 
 /** Lessons in course order: lesson 1, then later lessons. */

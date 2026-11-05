@@ -100,14 +100,17 @@ function SideLessonCard({ lesson }: { lesson: UniversityLesson }) {
     >
       <div className="relative aspect-[16/8] bg-muted">
         <LessonFigure lesson={lesson} />
-        <p className="absolute bottom-3 left-4 text-lg font-semibold tracking-tight text-foreground drop-shadow-sm">
-          Lesson {lesson.lesson}
-        </p>
+        {lesson.image ? null : (
+          <p className="absolute bottom-3 left-4 text-lg font-semibold tracking-tight text-foreground drop-shadow-sm">
+            Lesson {lesson.lesson}
+          </p>
+        )}
       </div>
       <div className="flex flex-1 flex-col p-4">
         <p className="text-xs text-muted-foreground">
           <time dateTime={lesson.publishedAt}>{formatDate(lesson.publishedAt)}</time>
           <span> · {lesson.clusterLabel}</span>
+          <span> · Lesson {lesson.lesson}</span>
         </p>
         <h2 className="mt-1 text-base font-semibold leading-snug tracking-tight text-foreground group-hover:text-secondary">
           {lesson.title}

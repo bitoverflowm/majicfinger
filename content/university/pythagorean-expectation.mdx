@@ -1,0 +1,211 @@
+---
+title: "Pythagorean Expectation: Win Percentage Explained"
+description: "Learn Pythagorean expectation: the formula, a worked example, expected vs. actual wins, and how it informs research on Polymarket and Kalshi."
+publishedAt: "2026-11-05"
+author: "misterrpink"
+topics: ["sports analytics", "prediction models", "expected wins", "prediction markets"]
+integration: []
+coverImage: "/images/university/pythagorean-expectation/main.jpg"
+ogImage: "https://lycheedata.com/images/university/pythagorean-expectation/main.jpg"
+featured: false
+lesson: 2
+cluster: sports-analytics
+slug: "/pythagorean-expectation"
+readingTime: "8 min"
+keywords: ["pythagorean expectation", "pythagorean win percentage", "pythagorean winning percentage", "pythagorean wins", "pythagorean record", "pythagorean expectation formula", "pythagorean theorem of baseball"]
+canonical: "https://lycheedata.com/university/pythagorean-expectation"
+seoTitle: "Pythagorean Expectation: Win Percentage Explained"
+twitterCard: "summary_large_image"
+---
+
+{/* Editorial: Foundation article for the sports analytics cluster. Follow-up opportunities include exponent selection, cross-sport applications, empirical comparisons/backtests, and a UT walkthrough once the required data and workflow exist. Add reciprocal links as those articles are published. No sports-data integration or completed analysis is claimed here. */}
+
+# Pythagorean Expectation: Win Percentage Explained
+
+**Lychee University · Lesson 2**
+
+Two teams have each won six of their last ten games. One has consistently outscored its opponents but lost several close games. The other has scraped through narrow wins and suffered some heavy losses.
+
+Their records are identical. Would you assess their performances the same way?
+
+<SameRecordTwoTeamsAnimation />
+
+**Pythagorean expectation estimates a team's winning percentage from how much it scores and concedes.** Also called **Pythagorean win percentage**, it gives you a way to look beyond the win-loss record and ask what the team's scoring performance suggests.
+
+For someone researching sports markets on Polymarket or Kalshi, that is a useful concept to understand. Before estimating whether a team will win a particular game, you need ways to assess how strong it is.
+
+## What is Pythagorean expectation?
+
+Pythagorean expectation is a model associated with baseball analyst Bill James. It relates runs scored and runs allowed to an estimated winning percentage. James's original version uses squared scoring totals; subsequent versions adjust the exponent. [Luo and Miller describe the model's origins and refinements.](https://arxiv.org/abs/1406.3402)
+
+The intuition is straightforward: winning and losing tell you the result of each game, while scoring totals tell you something about the margins behind those results.
+
+A one-run victory and a ten-run victory each add one win to the standings. Across many games, however, how much a team outscores its opponents provides another lens on its performance.
+
+The model compresses that scoring information into a percentage. It does not retain the sequence of individual games, the opponents, or which players were available.
+
+The ten-game comparison above illustrates the question. A short stretch can be heavily influenced by one unusual result, so it is a starting point for learning the idea, rather than a definitive team assessment.
+
+## The Pythagorean expectation formula
+
+For the simple baseball version:
+
+$$
+\text{Expected win percentage} = \frac{\mathrm{RS}^2}{\mathrm{RS}^2 + \mathrm{RA}^2}
+$$
+
+Here, **RS** means runs scored and **RA** means runs allowed. Use totals covering the same set of games. The calculation returns a decimal; multiply it by 100 to express it as a percentage.
+
+The name comes from the squared terms resembling the Pythagorean theorem. You are relating scoring to wins, rather than calculating distances across a baseball diamond.
+
+### Worked example: 500 runs scored, 400 allowed
+
+Suppose a hypothetical baseball team has played 100 games, scoring **500 runs** and allowing **400**.
+
+1. Square runs scored: $$500^2 = 500 \times 500 = 250{,}000$$.
+2. Square runs allowed: $$400^2 = 400 \times 400 = 160{,}000$$.
+3. Add them: $$250{,}000 + 160{,}000 = 410{,}000$$.
+4. Divide: $$250{,}000 \div 410{,}000 = 0.6098$$, approximately **61%**.
+
+<PythagoreanSquaresAnimation />
+
+Its scoring performance corresponds to an estimated winning percentage of roughly 61% under this version of the model.
+
+That does **not** mean it scored 61% of all runs. Its share of the runs was $$500 \div 900$$, or about 55.6%. The formula transforms the scoring relationship into an estimate of game-winning frequency.
+
+### How to calculate Pythagorean wins and record
+
+$$
+\text{Pythagorean wins} = \text{expected winning percentage} \times \text{games evaluated}
+$$
+
+For these 100 games, $$0.6098 \times 100$$ gives approximately **61 expected wins**. Subtracting that from 100 gives approximately **39 expected losses**: a Pythagorean record of **61–39** after rounding.
+
+Use the number of games represented by your scoring totals when comparing expected and actual records. Multiplying by a full season's length instead produces an extrapolation at that rate, which answers a different question.
+
+If both scoring totals are positive and equal, the formula returns 50%. If runs scored exceed runs allowed, it returns more than 50%. Those are useful checks when doing the calculation yourself.
+
+Try it below. Move the sliders to check those rules, or enter your own team's totals.
+
+<PythagoreanCalculator />
+
+## What does expected versus actual wins tell you?
+
+Suppose our hypothetical team actually went **52–48** in those games.
+
+Its actual winning percentage is **52%**, compared with a Pythagorean estimate of about **61%**. It won roughly nine fewer games than its scoring totals would suggest under the model.
+
+That gap gives you a question to investigate: **why did this scoring performance translate into fewer wins?**
+
+<ExpectedVsActualAnimation />
+
+Perhaps the team accumulated runs in blowouts but lost close games. Perhaps its bullpen struggled in important situations. Scoring patterns, tactical choices, and roster changes can all help you interpret what happened.
+
+The calculation alone does not identify the explanation. Nor does a positive gap automatically establish exceptional skill. FanGraphs explicitly describes its Pythagorean standings as retrospective records based on actual season statistics. [See its Pythagorean and BaseRuns records.](https://www.fangraphs.com/standings/pythagorean-baseruns)
+
+### Is the team owed nine wins?
+
+No. The 52 wins already count, and the 48 losses remain losses.
+
+If you use the estimate as an input to a future projection, forecast the remaining games and add those projected wins to the wins already earned. A gap between expected and actual results creates no obligation for future results to compensate.
+
+For example, if a separate forecast estimated 60% over 20 remaining games, that would imply 12 additional expected wins. Added to the existing 52, the projected total would be 64. It would not replace the actual record or recover the nine-win gap.
+
+<NotOwedWinsAnimation />
+
+## Why are the terms squared, and does every sport use 2?
+
+The exponent controls how strongly a scoring advantage moves the estimate away from 50%. With our 500-to-400 example, an exponent of 1 would give 55.6%; an exponent of 2 gives about 61%.
+
+Written with a general exponent $$k$$:
+
+$$
+\text{Expected win percentage} = \frac{\mathrm{RS}^k}{\mathrm{RS}^k + \mathrm{RA}^k}
+$$
+
+<ExponentCurvesAnimation />
+
+The original baseball formula was an empirical relationship. Later research supplied mathematical explanations under assumptions about how runs scored and allowed are distributed. [Steven J. Miller's derivation explores those assumptions.](https://arxiv.org/abs/math/0509698)
+
+An exponent of **2 is a useful teaching version**, not a universal setting. Baseball refinements have used values near 1.83, and some methods vary the exponent with the scoring environment. [See Luo and Miller's discussion.](https://arxiv.org/abs/1406.3402)
+
+The broader idea has also been applied to basketball, football, and hockey. Differences in scoring levels and margins help explain why the fitted exponents differ across sports. [Kaplan and Rich examine those differences in *Decomposing Pythagoras*.](https://www.degruyterbrill.com/document/doi/10.1515/jqas-2017-0055/html)
+
+Soccer adds another consideration: matches can end in draws, and league points are different from wins. Any adaptation needs to define the outcome it is estimating. Simply replacing baseball runs with goals does not resolve that question.
+
+## How does Pythagorean expectation apply to Polymarket and Kalshi?
+
+A sports contract asks a specific question. For a contract about whether a team wins its next game, keep three numbers separate:
+
+1. **Actual win percentage:** how often the team has won in the games observed.
+2. **Pythagorean win percentage:** the winning percentage estimated from its scoring performance.
+3. **Next-game win probability:** the estimated chance it beats this particular opponent under today's conditions.
+
+<ThreeNumbersAnimation />
+
+The third number matches the contract's question. Pythagorean expectation can contribute to your assessment of team strength, but you still need to consider the opponent, venue, injuries, rest, and—in baseball—the starting pitchers.
+
+A team with a 61% Pythagorean percentage could be an underdog against a substantially stronger opponent. It could also have a very different roster from the one that produced its season-to-date scoring totals.
+
+Check the contract's resolution rules, too. A full-game winner, a first-five-innings result, a spread, and a season-win total are different outcomes. Define what you are forecasting before comparing your estimate with a price.
+
+### A hypothetical probability-versus-price example
+
+Suppose you have completed a separate matchup assessment and estimate a **60%** chance that the team wins. Assume a YES contract costs **55¢**, pays **$1 if the team wins**, and pays **$0 if it loses**, with the position held to settlement.
+
+For a $1 binary payout, 55¢ corresponds to a market-implied probability of approximately 55%, before costs. [Kalshi explains this price-to-probability interpretation.](https://help.kalshi.com/en/articles/13823836-how-are-prices-determined)
+
+At your assumed purchase price:
+
+- A win produces **45¢ profit**: $1 payout minus 55¢ paid.
+- A loss produces a **55¢ loss**.
+
+$$
+\text{Estimated expected profit} = (0.60 \times \$0.45) - (0.40 \times \$0.55) = \$0.05
+$$
+
+That is **$0.05 per contract, before fees.**
+
+<ProbabilityVsPriceAnimation />
+
+The five-cent figure depends on the separate 60% matchup estimate. We did not derive that probability by reading the team's Pythagorean percentage directly.
+
+Use the price available for your intended order size. Polymarket's displayed probability can be the midpoint of bids and asks, or the last trade when the spread is wide. The displayed number may differ from the price you can buy at. [Polymarket explains its displayed prices.](https://help.polymarket.com/en/articles/13364488-how-are-prices-calculated)
+
+This example connects three ideas: estimating team strength, forecasting a defined event, and comparing a probability with a contract price. Each is a separate analytical step.
+
+## Frequently asked questions
+
+### Are Pythagorean expectation and Pythagorean win percentage the same thing?
+
+They commonly refer to the same scoring-based estimate. Pythagorean wins converts that percentage into a win total over a specified number of games, while Pythagorean record expresses expected wins and losses.
+
+### What data do I need to calculate it?
+
+For a fixed-exponent calculation, you need runs or points scored and allowed over the same games. You also need the game count to calculate expected wins, plus actual wins to measure the gap. Fitting or testing your own model requires historical observations beyond a single team's totals.
+
+### Can I calculate it without coding?
+
+Yes. With 500 runs scored and 400 allowed, enter `500^2/(500^2+400^2)` in a spreadsheet or a calculator that supports powers and parentheses. Format the spreadsheet result as a percentage. This is the simple exponent-2 version.
+
+### How is it different from run differential?
+
+Run differential subtracts runs allowed from runs scored. Pythagorean expectation uses both scoring totals and an exponent. A team scoring 500 and allowing 400 has the same +100 differential as one scoring 900 and allowing 800, but the exponent-2 formula returns about 61% for the first and 55.9% for the second.
+
+<SameDifferentialAnimation />
+
+### Does it predict the next game's winner?
+
+It provides a scoring-based view of team performance. A forecast for a particular game also needs to account for the matchup and the conditions relevant to that game.
+
+### Does exceeding the expected record prove a team was lucky?
+
+No. The gap describes a difference between actual results and the model's estimate. Investigate the games and team context before explaining why that difference occurred.
+
+## A foundation for sports analysis
+
+Pythagorean expectation gives you a simple analytical habit: compare a team's results with the scoring performance behind them, then investigate the difference.
+
+To try it, choose one team and one clearly defined period. Record its scoring totals, games played, actual wins, and the exponent you use. Calculate its expected percentage and win total, then write down one question the comparison raises.
+
+That exercise is a foundation for deeper work on model choices, sport-specific adaptations, and historical testing. When you are ready to investigate prediction-market pricing, our guides explain how to [download Polymarket trade history](/guides/download-polymarket-trade-history) and [download Kalshi trade history](/guides/download-kalshi-trade-history). Those supply market executions; evaluating a sports model also requires the corresponding sports results and the information available at the time of each forecast.

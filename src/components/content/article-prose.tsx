@@ -60,6 +60,9 @@ export const ARTICLE_PROSE_CLASS = cn(
   "prose-code:before:content-none prose-code:after:content-none",
   "prose-img:my-8 prose-img:rounded-lg",
   "prose-figcaption:text-center prose-figcaption:text-xs prose-figcaption:text-muted-foreground",
+  "[&_.katex]:text-[1.08em]",
+  "[&_.katex-display]:my-6 [&_.katex-display]:overflow-x-auto [&_.katex-display]:overflow-y-hidden [&_.katex-display]:rounded-lg [&_.katex-display]:border [&_.katex-display]:border-border [&_.katex-display]:bg-[color-mix(in_srgb,var(--muted)_50%,transparent)] [&_.katex-display]:px-4 [&_.katex-display]:py-4",
+  "[&_.katex-display>.katex]:text-[1.25em]",
 );
 
 export function ArticleTitle({

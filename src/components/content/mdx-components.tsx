@@ -45,6 +45,17 @@ import {
   StudyScaleAnimation,
   ThinkingStyleAnimation,
 } from "@/components/university/lesson-animations";
+import {
+  ExpectedVsActualAnimation,
+  ExponentCurvesAnimation,
+  NotOwedWinsAnimation,
+  ProbabilityVsPriceAnimation,
+  PythagoreanCalculator,
+  PythagoreanSquaresAnimation,
+  SameDifferentialAnimation,
+  SameRecordTwoTeamsAnimation,
+  ThreeNumbersAnimation,
+} from "@/components/university/pythagorean-animations";
 import { NewsletterSignup } from "@/components/newsletter/newsletter-signup";
 
 // MDX may pass legacy `ref` (string refs); use loose props to avoid @types/react version skew (e.g. @hello-pangea/dnd).
@@ -123,6 +134,9 @@ function MdxHr() {
  * - PolymarketHolderAnalysisRecipeDemo: `<PolymarketHolderAnalysisRecipeDemo />` — full holder analysis walkthrough + link into the live demo
  * - Holder analysis animations: `<HolderFindMarketAnimation />`, `<HolderRunAnimation />`, `<HolderTablesAnimation />`,
  *   `<HolderTreemapAnimation focus="concentration" | "both" | "new" />`, `<TraderTabAnimation view="positions" | "activity" | "pnl" />`, `<HolderWalkthroughAnimation />`
+ * - Pythagorean expectation lesson: `<SameRecordTwoTeamsAnimation />`, `<PythagoreanSquaresAnimation />`, `<PythagoreanCalculator />`,
+ *   `<ExpectedVsActualAnimation />`, `<NotOwedWinsAnimation />`, `<ExponentCurvesAnimation />`, `<ThreeNumbersAnimation />`,
+ *   `<ProbabilityVsPriceAnimation />`, `<SameDifferentialAnimation />`
  * - GIFs: Use standard markdown ![alt](/path/to.gif) or ContentImage
  */
 export function useMDXComponents(components?: MDXComponents): MDXComponents {
@@ -186,6 +200,15 @@ export function useMDXComponents(components?: MDXComponents): MDXComponents {
     ThinkingStyleAnimation,
     ForecastScorecardAnimation,
     MarketQuestionsAnimation,
+    SameRecordTwoTeamsAnimation,
+    PythagoreanSquaresAnimation,
+    PythagoreanCalculator,
+    ExpectedVsActualAnimation,
+    NotOwedWinsAnimation,
+    ExponentCurvesAnimation,
+    ThreeNumbersAnimation,
+    ProbabilityVsPriceAnimation,
+    SameDifferentialAnimation,
     ...components,
   };
 }

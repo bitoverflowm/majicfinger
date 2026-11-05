@@ -1,5 +1,8 @@
+import "katex/dist/katex.min.css";
+import rehypeKatex from "rehype-katex";
 import rehypeSlug from "rehype-slug";
 import remarkGfm from "remark-gfm";
+import remarkMath from "remark-math";
 import { MDXRemote } from "next-mdx-remote/rsc";
 import { useMDXComponents } from "@/components/content/mdx-components";
 
@@ -11,8 +14,9 @@ export async function renderMDXBody(source: string) {
     components,
     options: {
       mdxOptions: {
-        remarkPlugins: [remarkGfm],
-        rehypePlugins: [rehypeSlug],
+        // Math needs `$$…$$` (inline or on its own lines) so prices like "$0.45" stay plain text.
+        remarkPlugins: [remarkGfm, [remarkMath, { singleDollarTextMath: false }]],
+        rehypePlugins: [rehypeSlug, [rehypeKatex, { strict: false }]],
       },
     },
   });
