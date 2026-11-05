@@ -6,6 +6,7 @@ import { PublicDashboardHeader } from "@/components/publicEmbed/PublicDashboardH
 import { PublicDashboardChartSeoLayer } from "@/components/publicEmbed/PublicDashboardChartSeoLayer";
 import { PublishedDashboardMoreSection } from "@/components/publicEmbed/PublishedDashboardMoreSection";
 import { PublicDashboardSeoNav } from "@/components/publicEmbed/PublicDashboardSeoNav";
+import { FooterSection } from "@/components/sections/footer-section";
 import { getPublicDashboardPageContext } from "@/lib/server/publicDashboardPageContext";
 import { chunkChartIds, layoutChartIds, publicChartChunkUrl } from "@/lib/publicDashboardChartChunks";
 import {
@@ -100,6 +101,9 @@ export default async function PublicDashboardPage({
       <Suspense fallback={null}>
         <PublishedDashboardMoreSection excludeUsername={username} excludeSlug={slug} limit={24} />
       </Suspense>
+      <div className="mt-16 border-t border-border/60">
+        <FooterSection />
+      </div>
     </div>
   );
 }

@@ -3,8 +3,6 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { Check, Database, Link2 } from "lucide-react";
-import { AnimatedThemeToggler } from "@/components/ui/animated-theme-toggler";
-import { THEME_TOGGLE_BUTTON_CLASS } from "@/components/theme-toggle";
 import { RunForYourselfButton } from "@/components/runYourself/RunForYourselfButton";
 import { publicEmbedOutboundLinkProps } from "@/components/publicEmbed/publicEmbedOutboundLink";
 import { cn } from "@/lib/utils";
@@ -134,7 +132,6 @@ export function PublicDashboardHeader({
         </div>
         <div className={cn("flex shrink-0 flex-wrap items-center gap-2")}>
           <ShareLinkButton />
-          <AnimatedThemeToggler className={THEME_TOGGLE_BUTTON_CLASS} />
           <RunForYourselfButton
             ownerHandle={username}
             dashboardSlug={slug}

@@ -1,7 +1,6 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState, useSyncExternalStore, type CSSProperties } from "react";
-import Link from "next/link";
 import { ArrowUpRight, BarChart3, CandlestickChart, LineChart } from "lucide-react";
 import {
   CHART_CARDS_GRID_STYLE,
@@ -22,7 +21,6 @@ import {
 } from "@/components/publicEmbed/publicChartBatchLoader";
 import { CHART_CHUNK_SIZE, layoutChartIds } from "@/lib/publicDashboardChartChunks";
 import { clampCardGridRowLimit } from "@/lib/dashboardCardGrid";
-import { publicEmbedOutboundLinkProps } from "@/components/publicEmbed/publicEmbedOutboundLink";
 import { DashboardCardGridSection } from "@/components/dashboardComposer/DashboardCardGridSection";
 import { useTelegramContentTracker } from "@/hooks/useTelegramContentTracker";
 import {
@@ -177,7 +175,6 @@ export default function PublicDashboardEmbedClient({
       (r) => r.type === "cardGrid" && !(Array.isArray(r.sheetRows) && r.sheetRows.length),
     ),
   );
-  const [isEmbedded, setIsEmbedded] = useState(false);
   const [liveTick, setLiveTick] = useState<LiveTick>({
     charts: {},
     pollIntervalMs: 60_000,
@@ -207,8 +204,6 @@ export default function PublicDashboardEmbedClient({
     ownerHandle,
     enabled: !!payload?.success,
   });
-
-  useEffect(() => setIsEmbedded(window.self !== window.top), []);
 
   // Above-the-fold group starts right away (the page preloads its URL), the next group follows it,
   // and the rest load as cards near the viewport.
@@ -392,13 +387,6 @@ export default function PublicDashboardEmbedClient({
           );
         })}
       </div>
-
-      <footer className="mt-12 flex items-center justify-center gap-1 border-t border-border/60 pt-4 text-[12px] text-muted-foreground">
-        Made with
-        <Link href={SITE} className="font-medium text-foreground hover:underline" {...publicEmbedOutboundLinkProps(isEmbedded)}>
-          Lychee
-        </Link>
-      </footer>
     </div>
   );
 }

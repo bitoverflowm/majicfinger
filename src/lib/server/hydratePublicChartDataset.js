@@ -80,7 +80,11 @@ export async function hydrateDataSetForPublicChartViewer(chartLean, dataSetLean)
       ? cp.rechartsBuilder
       : inferDefaultBuilderSnapshot(rowsForFallback);
   const primaryId = primarySheetIdForChartSnapshot(dataSheets, rechartsBuilderRaw);
-  const colsBySheet = collectChartSnapshotColumnsBySheetId(rechartsBuilderRaw, primaryId, dataSheets);
+  // Without a chart this is a shared dataset-level hydration; projecting to an inferred
+  // builder would strip columns that the dashboard's other charts plot.
+  const colsBySheet = chartLean
+    ? collectChartSnapshotColumnsBySheetId(rechartsBuilderRaw, primaryId, dataSheets)
+    : new Map();
   const chartLineFilters = rechartsBuilderRaw?.chartLineFilters;
 
   const access = await getAthenaAccessForUserId(chartLean?.user_id);
