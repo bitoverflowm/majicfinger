@@ -57,6 +57,39 @@ function appendSessionLandingLines(lines, session) {
   }
 }
 
+const PIPELINE_MAX_PAGES = 12;
+
+/** "/" → "homepage"; anything else is the bare path, e.g. "/university". */
+export function formatPipelinePage(path) {
+  const clean = String(path || "").split(/[?#]/)[0].replace(/\/+$/, "") || "/";
+  return clean === "/" ? "homepage" : clean;
+}
+
+/**
+ * Entry page then every page visited, on one line: "homepage → /university → /charts".
+ * @param {Array<{ type?: string; path?: string; meta?: Record<string, unknown> }>} events
+ * @param {string} [entryPath]
+ */
+export function formatPagePipeline(events = [], entryPath = "") {
+  /** @type {string[]} */
+  const pages = [];
+  const add = (path) => {
+    if (!path) return;
+    const page = formatPipelinePage(path);
+    if (pages[pages.length - 1] !== page) pages.push(page);
+  };
+  add(entryPath);
+  for (const event of events) {
+    const meta = event.meta && typeof event.meta === "object" ? event.meta : {};
+    add(event.path || meta.path);
+  }
+  if (pages.length > PIPELINE_MAX_PAGES) {
+    const hidden = pages.length - (PIPELINE_MAX_PAGES - 1);
+    return [...pages.slice(0, PIPELINE_MAX_PAGES - 2), `… ${hidden} more`, pages[pages.length - 1]].join(" → ");
+  }
+  return pages.join(" → ");
+}
+
 /** @param {number} ms */
 export function formatDuration(ms) {
   const totalSec = Math.max(1, Math.round(ms / 1000));
@@ -346,8 +379,8 @@ export function buildSessionEndTelegramMessage({
     field("Last visit entry", returningVisitor.lastPriorEntryPath);
   }
 
-  field("Path", session.entry_path || "/");
-  field("Referrer", formatReferrerLabel(session.referrer, session.entry_path));
+  field("Pages", formatPagePipeline(events, session.entry_path || "/"));
+  field("Referrer", formatReferrerLabel(session.referrer));
 
   const utm = buildUtmTelegramFields(session);
   for (const [key, value] of Object.entries(utm)) {

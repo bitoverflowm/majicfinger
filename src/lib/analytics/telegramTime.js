@@ -85,21 +85,37 @@ export function shortenUserAgent(ua) {
   return s.slice(0, 90);
 }
 
+const REFERRER_SOURCES = [
+  [/(^|\.)google\./, "Google"],
+  [/(^|\.)bing\.com$/, "Bing"],
+  [/(^|\.)duckduckgo\.com$/, "DuckDuckGo"],
+  [/(^|\.)yahoo\.com$/, "Yahoo"],
+  [/(^|\.)(chatgpt\.com|openai\.com)$/, "ChatGPT"],
+  [/(^|\.)perplexity\.ai$/, "Perplexity"],
+  [/(^|\.)claude\.ai$/, "Claude"],
+  [/(^|\.)(x\.com|twitter\.com|t\.co)$/, "X"],
+  [/(^|\.)linkedin\.com$|^lnkd\.in$/, "LinkedIn"],
+  [/(^|\.)reddit\.com$/, "Reddit"],
+  [/(^|\.)(facebook\.com|fb\.com)$/, "Facebook"],
+  [/(^|\.)instagram\.com$/, "Instagram"],
+  [/(^|\.)(youtube\.com|youtu\.be)$/, "YouTube"],
+  [/(^|\.)news\.ycombinator\.com$/, "Hacker News"],
+  [/(^|\.)github\.com$/, "GitHub"],
+];
+
 /**
- * Pretty-print a referrer for Telegram.
+ * Pretty-print a referrer for Telegram, e.g. "Google (www.google.com)".
  * @param {string | undefined | null} referrer
- * @param {string | undefined | null} entryPath
  */
-export function formatReferrerLabel(referrer, entryPath) {
+export function formatReferrerLabel(referrer) {
   const raw = String(referrer || "").trim();
   if (!raw) return "direct / none";
   try {
     const url = new URL(raw);
     const path = `${url.pathname || ""}${url.search || ""}`.slice(0, 120);
-    if (entryPath && path.startsWith(String(entryPath).split("?")[0])) {
-      return `${url.host}${path}`;
-    }
-    return path && path !== "/" ? `${url.host}${path}` : url.host;
+    const where = path && path !== "/" ? `${url.host}${path}` : url.host;
+    const source = REFERRER_SOURCES.find(([pattern]) => pattern.test(url.host))?.[1];
+    return source ? `${source} (${where})` : where;
   } catch {
     return raw.slice(0, 160);
   }

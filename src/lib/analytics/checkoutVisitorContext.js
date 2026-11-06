@@ -1,6 +1,7 @@
 import VisitorEvent from "@/models/VisitorEvent";
 import VisitorSession from "@/models/VisitorSession";
-import { formatJourneyStep } from "@/lib/analytics/formatJourneySummary";
+import { formatJourneyStep, formatPagePipeline } from "@/lib/analytics/formatJourneySummary";
+import { formatReferrerLabel } from "@/lib/analytics/telegramTime";
 import {
   formatReturningVisitorLine,
   lookupReturningVisitor,
@@ -68,6 +69,7 @@ export async function buildCheckoutVisitorContext(visitorSessionId) {
       visitorSessionId: sessionId,
       entryPath: session?.entry_path || "",
       entryUrl: session?.entry_url || "",
+      pagePipeline: formatPagePipeline(events, session?.entry_path || ""),
       referrer: session?.referrer || "",
       email: session?.email || "",
       isLoggedIn: !!session?.is_logged_in || !!session?.email,
@@ -115,8 +117,12 @@ export function formatVisitorContextTelegramLines(context, escapeHtml) {
     lines.push(`<b>${escapeHtml(label)}:</b> ${escapeHtml(String(value))}`);
   };
 
-  field("Entry", context.entryPath);
-  field("Referrer", context.referrer);
+  if (context.pagePipeline) {
+    field("Pages", context.pagePipeline);
+  } else {
+    field("Entry", context.entryPath);
+  }
+  field("Referrer", context.referrer ? formatReferrerLabel(String(context.referrer)) : "");
   field("Visitor email", context.email);
   if (context.isLoggedIn || context.email) field("Logged in", "yes");
   field("Visitor", context.returningVisitorLine);

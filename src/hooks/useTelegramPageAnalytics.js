@@ -8,7 +8,8 @@ const CLICK_THROTTLE_MS = 2000;
 const CLICK_DEDUPE_MS = 15000;
 
 /**
- * Lightweight page analytics: one view on mount, delegated clicks with throttle/dedupe.
+ * Lightweight page analytics: delegated clicks with throttle/dedupe. Page views are
+ * tracked site-wide by VisitorJourneyInit.
  * Events are batched into the visitor session journey (one Telegram summary at session end).
  * @param {{
  *   pageType: 'homepage' | 'hub';
@@ -25,21 +26,8 @@ export function useTelegramPageAnalytics({
   trackClicks = false,
   enabled = true,
 }) {
-  const viewSentRef = useRef(false);
   const lastClickAtRef = useRef(0);
   const recentClickKeysRef = useRef(new Map());
-
-  useEffect(() => {
-    if (!enabled || !pageName) return;
-
-    if (!viewSentRef.current) {
-      viewSentRef.current = true;
-      trackJourneyEvent("page_view", {
-        path,
-        meta: { pageType, pageName },
-      });
-    }
-  }, [enabled, pageName, pageType, path]);
 
   useEffect(() => {
     if (!enabled || !trackClicks || !pageName) return;

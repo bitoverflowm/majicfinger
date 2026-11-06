@@ -1,13 +1,16 @@
 "use client";
 
 import { useEffect, useRef } from "react";
+import { usePathname } from "next/navigation";
 import { useUser } from "@/lib/hooks";
 import {
   endVisitorSession,
   flushJourneyQueue,
   linkVisitorIdentity,
   startVisitorSessionIfNeeded,
+  trackJourneyEvent,
 } from "@/lib/analytics/journeyClient";
+import { inferPageNameFromPath, inferPageTypeFromPath } from "@/lib/analytics/sessionStartMeta";
 
 /**
  * Initializes cross-site visitor session tracking for the current tab.
@@ -15,6 +18,8 @@ import {
  */
 export function VisitorJourneyInit() {
   const user = useUser();
+  const pathname = usePathname();
+  const lastViewedPathRef = useRef(null);
   const linkedEmailRef = useRef(null);
   const identityRef = useRef({ isLoggedIn: false, email: undefined, userId: undefined });
 
@@ -49,6 +54,19 @@ export function VisitorJourneyInit() {
       flushJourneyQueue(false);
     };
   }, []);
+
+  // One page_view per route so the session summary can show the full page path.
+  useEffect(() => {
+    if (!pathname || lastViewedPathRef.current === pathname) return;
+    lastViewedPathRef.current = pathname;
+    trackJourneyEvent("page_view", {
+      path: pathname,
+      meta: {
+        pageType: inferPageTypeFromPath(pathname),
+        pageName: inferPageNameFromPath(pathname),
+      },
+    });
+  }, [pathname]);
 
   useEffect(() => {
     if (!user?.email) return;

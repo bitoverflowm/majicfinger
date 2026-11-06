@@ -223,47 +223,48 @@ async function recordSessionStart(sessionId, meta = {}, sessionKind = "visitor")
   const entryPath = landing.entry_path || meta.entryPath || (auth ? "/dashboard" : "/");
   const referrer = auth ? "" : landing.referrer || meta.referrer || "";
 
-  const updateResult = await VisitorSession.updateOne(
-    { session_id: sessionId, start_notified_at: { $exists: false } },
-    {
-      $set: {
-        start_notified_at: now,
-        last_seen_at: now,
-        entry_path: entryPath,
-        ...geo,
-        ...landing,
-        ...(!auth ? { referrer } : {}),
-        ...(meta.email ? { email: meta.email } : {}),
-        ...(meta.userId ? { user_id: String(meta.userId) } : {}),
-        is_logged_in: auth || !!meta.isLoggedIn,
+  let updateResult = null;
+  try {
+    updateResult = await VisitorSession.updateOne(
+      { session_id: sessionId, start_notified_at: { $exists: false } },
+      {
+        $set: {
+          start_notified_at: now,
+          last_seen_at: now,
+          entry_path: entryPath,
+          ...geo,
+          ...landing,
+          ...(!auth ? { referrer } : {}),
+          ...(meta.email ? { email: meta.email } : {}),
+          ...(meta.userId ? { user_id: String(meta.userId) } : {}),
+          is_logged_in: auth || !!meta.isLoggedIn,
+        },
+        // MongoDB rejects the whole update if a path appears in both $set and $setOnInsert.
+        $setOnInsert: {
+          session_id: sessionId,
+          session_kind: auth ? "auth" : "visitor",
+          started_at: now,
+        },
       },
-      $setOnInsert: {
-        session_id: sessionId,
-        session_kind: auth ? "auth" : "visitor",
-        started_at: now,
-        entry_path: entryPath,
-        referrer,
-        ...geo,
-        ...landing,
-        ...(meta.email ? { email: meta.email } : {}),
-        ...(meta.userId ? { user_id: String(meta.userId) } : {}),
-        is_logged_in: auth || !!meta.isLoggedIn,
-      },
-    },
-    { upsert: true },
-  );
+      { upsert: true },
+    );
+  } catch (err) {
+    // Retries hit the unique session_id index once the first start already landed.
+    if (err?.code !== 11000) throw err;
+  }
 
   const claimedStartNotify =
-    (updateResult.upsertedCount ?? 0) > 0 || (updateResult.modifiedCount ?? 0) > 0;
+    (updateResult?.upsertedCount ?? 0) > 0 || (updateResult?.modifiedCount ?? 0) > 0;
 
   if (!claimedStartNotify) {
+    const { entry_path: _entryPath, referrer: _referrer, ...laterLanding } = landing;
     await VisitorSession.updateOne(
       { session_id: sessionId },
       {
         $set: {
           last_seen_at: now,
           ...geo,
-          ...landing,
+          ...laterLanding,
           ...(meta.email ? { email: meta.email } : {}),
           ...(meta.userId ? { user_id: String(meta.userId) } : {}),
           is_logged_in: auth || !!meta.isLoggedIn,
