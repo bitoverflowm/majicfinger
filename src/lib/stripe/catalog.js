@@ -19,8 +19,10 @@ function planHref(name, cycle) {
  * Payment Links.
  */
 export const CHECKOUT_PLANS = [
+  { key: "researcher_weekly", tier: "researcher", cycle: "weekly", mode: "subscription", amount: 1900, interval: "week", label: "Researcher weekly", href: "", priceId: "price_1UYkt1ILjX7EMe6x9CY8PqXc" },
   { key: "researcher_monthly", tier: "researcher", cycle: "monthly", mode: "subscription", amount: 4900, interval: "month", label: "Researcher monthly", href: "", priceId: "" },
   { key: "researcher_annual", tier: "researcher", cycle: "annual", mode: "subscription", amount: 49000, interval: "year", label: "Researcher annual", href: "", priceId: "" },
+  { key: "quant_weekly", tier: "quant", cycle: "weekly", mode: "subscription", amount: 3900, interval: "week", label: "Quant weekly", href: "", priceId: "price_1UYkt2ILjX7EMe6x4C8f7RR3" },
   { key: "quant_monthly", tier: "quant", cycle: "monthly", mode: "subscription", amount: 9900, interval: "month", label: "Quant monthly", href: "", priceId: "" },
   { key: "quant_annual", tier: "quant", cycle: "annual", mode: "subscription", amount: 99000, interval: "year", label: "Quant annual", href: "", priceId: "" },
 

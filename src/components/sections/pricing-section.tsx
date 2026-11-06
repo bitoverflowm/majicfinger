@@ -60,6 +60,7 @@ type Plan = {
   name: string;
   description: string;
   price?: number;
+  priceWeekly?: number;
   priceMonthly?: number;
   priceAnnual?: number;
   note?: string;
@@ -216,15 +217,16 @@ function PlanPrice({
   plan,
   isFree,
   cycle,
-  monthly,
-  freeMonths,
+  amount,
+  savings,
   promoAnnual,
 }: {
   plan: Plan;
   isFree: boolean;
   cycle: BillingCycle;
-  monthly: number;
-  freeMonths: number;
+  /** Headline price: per week on weekly, per month otherwise. */
+  amount: number;
+  savings: Savings | null;
   /** First-year annual price while the Black Friday Special runs. */
   promoAnnual: number | null;
 }) {
@@ -250,10 +252,10 @@ function PlanPrice({
 
   return (
     <>
-      <div className="mt-5 flex items-baseline gap-1.5">
-        <AnimatedPrice value={formatUsd(monthly)} />
-        {!isFree ? <span className="text-sm text-muted-foreground">/ month</span> : null}
-        {freeMonths > 0 ? <span className={pill}>{monthsFreeLabel(freeMonths)}</span> : null}
+      <div className="mt-5 flex flex-wrap items-baseline gap-x-1.5 gap-y-1">
+        <AnimatedPrice value={formatUsd(amount)} />
+        {!isFree ? <span className="text-sm text-muted-foreground">/ {cycle === "weekly" ? "week" : "month"}</span> : null}
+        {savings ? <span className={pill}>{savingsLabel(savings)}</span> : null}
       </div>
 
       <div className="mt-2 flex min-h-6 items-center text-sm text-muted-foreground">
@@ -261,6 +263,8 @@ function PlanPrice({
           <span>{plan.note}</span>
         ) : cycle === "annual" && typeof plan.priceAnnual === "number" ? (
           <span>Billed annually · You&apos;ll be charged {formatUsd(plan.priceAnnual)} per year</span>
+        ) : cycle === "weekly" ? (
+          <span>Billed weekly{plan.note ? ` · ${plan.note}` : ""}</span>
         ) : (
           <span>Billed monthly{plan.note ? ` · ${plan.note}` : ""}</span>
         )}
@@ -269,39 +273,66 @@ function PlanPrice({
   );
 }
 
+const WEEKS_PER_YEAR = 52;
+
+type Savings = { monthsFree: number; percentOff: number };
+
 function hasBothCycles(plan: Plan) {
   return typeof plan.priceMonthly === "number" && typeof plan.priceAnnual === "number";
 }
 
-/** Whole months saved by paying yearly, e.g. $490/yr against $49/mo is 2. */
-function monthsFree(plan: Plan) {
-  if (!hasBothCycles(plan) || !plan.priceMonthly) return 0;
-  return Math.max(0, Math.round(12 - (plan.priceAnnual as number) / plan.priceMonthly));
+function offersCycle(plan: Plan, cycle: BillingCycle) {
+  if (cycle === "weekly") return typeof plan.priceWeekly === "number";
+  if (cycle === "monthly") return typeof plan.priceMonthly === "number";
+  return typeof plan.priceAnnual === "number";
 }
 
-function monthsFreeLabel(months: number) {
-  return `${months} ${months === 1 ? "month" : "months"} free`;
+function yearlyCost(plan: Plan, cycle: BillingCycle): number | null {
+  if (!offersCycle(plan, cycle)) return null;
+  if (cycle === "weekly") return (plan.priceWeekly as number) * WEEKS_PER_YEAR;
+  if (cycle === "monthly") return (plan.priceMonthly as number) * 12;
+  return plan.priceAnnual as number;
+}
+
+/**
+ * A year on this cycle against a year of weekly billing, falling back to
+ * monthly when there's no weekly price. $49/mo against $19/wk ($988/yr) is
+ * 5 months free, 40% off.
+ */
+function savingsFor(plan: Plan, cycle: BillingCycle): Savings | null {
+  if (cycle === "weekly") return null;
+  const base = yearlyCost(plan, "weekly") ?? (cycle === "annual" ? yearlyCost(plan, "monthly") : null);
+  const cost = yearlyCost(plan, cycle);
+  if (!base || cost === null || cost >= base) return null;
+  const share = 1 - cost / base;
+  return { monthsFree: Math.round(share * 12), percentOff: Math.round(share * 100) };
+}
+
+function savingsLabel({ monthsFree, percentOff }: Savings) {
+  return `${monthsFree} ${monthsFree === 1 ? "month" : "months"} free · ${percentOff}% off`;
 }
 
 function salePrice(dollars: number) {
   return blackFridayCents(Math.round(dollars * 100)) / 100;
 }
 
+const CYCLE_LABELS: Record<BillingCycle, string> = { weekly: "Weekly", monthly: "Monthly", annual: "Annual" };
+
 function CycleToggle({
+  cycles,
   cycle,
   onChange,
-  freeMonths,
+  percentOff,
   promo,
 }: {
-  cycle: "monthly" | "annual";
-  onChange: (cycle: "monthly" | "annual") => void;
-  freeMonths: number;
+  cycles: readonly BillingCycle[];
+  cycle: BillingCycle;
+  onChange: (cycle: BillingCycle) => void;
+  /** Smallest saving across the plans for each cycle, so the toggle never overstates it. */
+  percentOff: Partial<Record<BillingCycle, number>>;
   promo: boolean;
 }) {
-  const options = [
-    { value: "monthly" as const, label: "Monthly" },
-    { value: "annual" as const, label: "Annual" },
-  ];
+  const options = cycles.map((value) => ({ value, label: CYCLE_LABELS[value] }));
   return (
     <div
       role="radiogroup"
@@ -334,9 +365,9 @@ function CycleToggle({
               <span className="relative rounded-full bg-gradient-to-r from-secondary to-violet-500 px-1.5 py-0.5 text-[11px] font-medium text-white">
                 {BLACK_FRIDAY.percentOff}% off
               </span>
-            ) : option.value === "annual" && freeMonths > 0 ? (
+            ) : percentOff[option.value] ? (
               <span className="relative rounded-full bg-emerald-500/10 px-1.5 py-0.5 text-[11px] font-medium text-emerald-700 dark:text-emerald-400">
-                {monthsFreeLabel(freeMonths)}
+                Save {percentOff[option.value]}%
               </span>
             ) : null}
           </button>
@@ -435,7 +466,7 @@ export function PricingSection({
   showHeader?: boolean;
   /** The Free column links to the demo; hide it where there's no free plan to pick (billing). */
   includeFree?: boolean;
-  /** Starting position of the monthly / yearly toggle. Annual while an annual promo runs, else monthly. */
+  /** Starting position of the weekly / monthly / annual toggle. Annual while an annual promo runs, else monthly. */
   defaultCycle?: BillingCycle;
   /** Highlights the member's tier; `cycle` marks the exact plan as current. */
   currentPlan?: { tier?: string | null; cycle?: string | null } | null;
@@ -443,8 +474,8 @@ export function PricingSection({
   getAction?: (args: PricingTierActionArgs) => PricingTierAction | null;
   className?: string;
 } = {}) {
-  const [toggleCycle, setToggleCycle] = useState<"monthly" | "annual">(() =>
-    (defaultCycle ?? (blackFridayActive() ? "annual" : "monthly")) === "annual" ? "annual" : "monthly",
+  const [toggleCycle, setToggleCycle] = useState<BillingCycle>(
+    () => defaultCycle ?? (blackFridayActive() ? "annual" : "monthly"),
   );
   const promoActive = useBlackFridayActive();
   const plansRef = useRef<HTMLDivElement>(null);
@@ -463,7 +494,16 @@ export function PricingSection({
   const plans = config.plans.filter((plan) => includeFree || plan.tier !== "free");
   const { enterprise, venues } = config;
   const showCycleToggle = plans.some(hasBothCycles);
-  const toggleFreeMonths = Math.max(0, ...plans.map(monthsFree));
+  const toggledPlans = plans.filter(hasBothCycles);
+  const toggleCycles = (["weekly", "monthly", "annual"] as const).filter((value) =>
+    toggledPlans.some((plan) => offersCycle(plan, value)),
+  );
+  const togglePercentOff: Partial<Record<BillingCycle, number>> = {};
+  for (const value of toggleCycles) {
+    const offs = toggledPlans.map((plan) => savingsFor(plan, value)?.percentOff ?? 0);
+    const smallest = offs.length ? Math.min(...offs) : 0;
+    if (smallest > 0) togglePercentOff[value] = smallest;
+  }
   const showPromo = promoActive && plans.some((plan) => typeof plan.priceAnnual === "number");
 
   const seePromoPlans = () => {
@@ -489,9 +529,10 @@ export function PricingSection({
           {showCycleToggle ? (
             <div className={cn("mb-2 flex justify-center", showPromo && "mt-2")}>
               <CycleToggle
+                cycles={toggleCycles}
                 cycle={toggleCycle}
                 onChange={setToggleCycle}
-                freeMonths={toggleFreeMonths}
+                percentOff={togglePercentOff}
                 promo={showPromo}
               />
             </div>
@@ -503,7 +544,14 @@ export function PricingSection({
             {plans.map((plan) => {
               const isFree = plan.tier === "free";
               const hasToggle = hasBothCycles(plan);
-              const cycle: BillingCycle = hasToggle ? toggleCycle : typeof plan.priceAnnual === "number" ? "annual" : "monthly";
+              const cycle: BillingCycle =
+                hasToggle && offersCycle(plan, toggleCycle)
+                  ? toggleCycle
+                  : hasToggle
+                    ? "monthly"
+                    : typeof plan.priceAnnual === "number"
+                      ? "annual"
+                      : "monthly";
               const href = isFree
                 ? plan.href || "/#demo"
                 : `/checkout?plan=${encodeURIComponent(plan.tier)}&cycle=${cycle}`;
@@ -511,13 +559,14 @@ export function PricingSection({
               const isCurrent = isCurrentTier && currentCycle === cycle;
               const action = !isFree && getAction ? getAction({ tier: plan.tier, cycle, href, isCurrentTier, isCurrent }) : null;
 
-              const monthly =
-                isFree
-                  ? plan.price ?? 0
+              const amount = isFree
+                ? plan.price ?? 0
+                : cycle === "weekly"
+                  ? plan.priceWeekly ?? 0
                   : cycle === "annual" && typeof plan.priceAnnual === "number"
                     ? plan.priceAnnual / 12
                     : plan.priceMonthly ?? 0;
-              const freeMonths = cycle === "annual" ? monthsFree(plan) : 0;
+              const savings = isFree ? null : savingsFor(plan, cycle);
               const promoAnnual =
                 promoActive && !isFree && cycle === "annual" && typeof plan.priceAnnual === "number"
                   ? salePrice(plan.priceAnnual)
@@ -558,8 +607,8 @@ export function PricingSection({
                     plan={plan}
                     isFree={isFree}
                     cycle={cycle}
-                    monthly={monthly}
-                    freeMonths={freeMonths}
+                    amount={amount}
+                    savings={savings}
                     promoAnnual={promoAnnual}
                   />
 

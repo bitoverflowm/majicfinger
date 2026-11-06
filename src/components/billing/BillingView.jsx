@@ -302,7 +302,10 @@ export default function BillingView({ user, locked = false, onBack, className })
   );
 
   const defaultCycle = useMemo(
-    () => (normalizeMembershipCycle(membership.cycle) === "annual" ? "annual" : "monthly"),
+    () => {
+      const cycle = normalizeMembershipCycle(membership.cycle);
+      return cycle === "annual" || cycle === "weekly" ? cycle : "monthly";
+    },
     [membership.cycle],
   );
 
