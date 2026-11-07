@@ -6,7 +6,7 @@ import { BLUE, GREEN, RED } from "@/components/sections/features/feature-kit";
 import { EASE, GuideAnimationFigure, ScaledStage, useGuidePhases } from "@/components/content/guide-animations/guide-animation-kit";
 import { cn } from "@/lib/utils";
 
-const AMBER = "#d97706";
+export const AMBER = "#d97706";
 
 const FRAMES = `
 @keyframes pyth-pop {
@@ -26,22 +26,22 @@ const FRAMES = `
 }
 `;
 
-function Frames() {
+export function Frames() {
   return <style dangerouslySetInnerHTML={{ __html: FRAMES }} />;
 }
 
 /** Exponent-k Pythagorean win fraction; 0.5 when there is no scoring at all. */
-function pythagorean(rs: number, ra: number, k = 2) {
+export function pythagorean(rs: number, ra: number, k = 2) {
   const a = Math.max(0, rs) ** k;
   const b = Math.max(0, ra) ** k;
   return a + b > 0 ? a / (a + b) : 0.5;
 }
 
-function pct(value: number, digits = 1) {
+export function pct(value: number, digits = 1) {
   return `${(value * 100).toFixed(digits)}%`;
 }
 
-function Panel({ className, children, style }: { className?: string; children: ReactNode; style?: CSSProperties }) {
+export function Panel({ className, children, style }: { className?: string; children: ReactNode; style?: CSSProperties }) {
   return (
     <div
       className={cn("rounded-xl border border-border bg-background shadow-[0_18px_40px_-24px_rgba(15,23,42,0.45)]", className)}
@@ -52,13 +52,13 @@ function Panel({ className, children, style }: { className?: string; children: R
   );
 }
 
-function Eyebrow({ children, className }: { children: ReactNode; className?: string }) {
+export function Eyebrow({ children, className }: { children: ReactNode; className?: string }) {
   return (
     <p className={cn("font-mono text-[10px] uppercase tracking-[0.14em] text-muted-foreground", className)}>{children}</p>
   );
 }
 
-function Reveal({ show, children, className, style }: { show: boolean; children: ReactNode; className?: string; style?: CSSProperties }) {
+export function Reveal({ show, children, className, style }: { show: boolean; children: ReactNode; className?: string; style?: CSSProperties }) {
   return (
     <div className={cn("transition-opacity duration-500", className)} style={{ ...style, opacity: show ? 1 : 0 }}>
       {children}
@@ -346,7 +346,7 @@ const EXPONENTS = [
   { value: 2, label: "2" },
 ];
 
-function Slider({
+export function Slider({
   label,
   value,
   min,

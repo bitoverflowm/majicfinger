@@ -56,6 +56,17 @@ import {
   SameRecordTwoTeamsAnimation,
   ThreeNumbersAnimation,
 } from "@/components/university/pythagorean-animations";
+import {
+  DrawnNotFittedAnimation,
+  ExpectedWinsAnimation,
+  GapExplorer,
+  LeagueScatterExplorer,
+  MarginBlindAnimation,
+  RunBalanceExplorer,
+  ScatterSetupAnimation,
+  TableToScatterAnimation,
+  WinPercentageGrid,
+} from "@/components/university/expected-wins-animations";
 import { NewsletterSignup } from "@/components/newsletter/newsletter-signup";
 
 // MDX may pass legacy `ref` (string refs); use loose props to avoid @types/react version skew (e.g. @hello-pangea/dnd).
@@ -137,6 +148,9 @@ function MdxHr() {
  * - Pythagorean expectation lesson: `<SameRecordTwoTeamsAnimation />`, `<PythagoreanSquaresAnimation />`, `<PythagoreanCalculator />`,
  *   `<ExpectedVsActualAnimation />`, `<NotOwedWinsAnimation />`, `<ExponentCurvesAnimation />`, `<ThreeNumbersAnimation />`,
  *   `<ProbabilityVsPriceAnimation />`, `<SameDifferentialAnimation />`
+ * - Actual vs expected wins lesson: `<WinPercentageGrid />`, `<MarginBlindAnimation />`, `<ExpectedWinsAnimation />`,
+ *   `<RunBalanceExplorer />`, `<ScatterSetupAnimation />`, `<GapExplorer />`, `<TableToScatterAnimation />`,
+ *   `<LeagueScatterExplorer />`, `<DrawnNotFittedAnimation />`
  * - GIFs: Use standard markdown ![alt](/path/to.gif) or ContentImage
  */
 export function useMDXComponents(components?: MDXComponents): MDXComponents {
@@ -209,6 +223,15 @@ export function useMDXComponents(components?: MDXComponents): MDXComponents {
     ThreeNumbersAnimation,
     ProbabilityVsPriceAnimation,
     SameDifferentialAnimation,
+    WinPercentageGrid,
+    MarginBlindAnimation,
+    ExpectedWinsAnimation,
+    RunBalanceExplorer,
+    ScatterSetupAnimation,
+    GapExplorer,
+    TableToScatterAnimation,
+    LeagueScatterExplorer,
+    DrawnNotFittedAnimation,
     ...components,
   };
 }

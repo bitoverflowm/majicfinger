@@ -58,6 +58,10 @@ export function buildContentMetadata(
   const ogImageUrl = ogImage.startsWith("http") ? ogImage : `${SITE_URL}${ogImage}`;
   const twitterCard = frontmatter.twitterCard ?? "summary_large_image";
   const description = metaDescription(frontmatter.description);
+  const socialTitle = frontmatter.ogTitle?.trim() || displayTitle;
+  const socialDescription = frontmatter.ogDescription?.trim()
+    ? metaDescription(frontmatter.ogDescription)
+    : description;
 
   return {
     title: displayTitle,
@@ -75,8 +79,8 @@ export function buildContentMetadata(
       },
     },
     openGraph: {
-      title: displayTitle,
-      description,
+      title: socialTitle,
+      description: socialDescription,
       url: canonical,
       siteName: "Lychee",
       images: [
@@ -84,7 +88,7 @@ export function buildContentMetadata(
           url: ogImageUrl,
           width: 1200,
           height: 630,
-          alt: displayTitle,
+          alt: socialTitle,
         },
       ],
       type: "article",
@@ -94,8 +98,8 @@ export function buildContentMetadata(
     },
     twitter: {
       card: twitterCard,
-      title: displayTitle,
-      description,
+      title: socialTitle,
+      description: socialDescription,
       images: [ogImageUrl],
     },
     keywords: frontmatter.keywords,

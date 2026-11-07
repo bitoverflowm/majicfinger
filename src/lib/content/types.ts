@@ -27,6 +27,9 @@ export type BaseContent = {
   canonicalUrl?: string;
   /** Shorter or keyword-tuned title for `<title>`, Open Graph, and Twitter. */
   seoTitle?: string;
+  /** Social-card overrides; fall back to the SEO title and description. */
+  ogTitle?: string;
+  ogDescription?: string;
   /** Human-readable e.g. `8 min`; also used for meta + schema.org timeRequired when parsable. */
   readingTime?: string;
   twitterCard?: TwitterCardType;

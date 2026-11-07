@@ -1,0 +1,205 @@
+---
+title: "Actual vs Expected Wins"
+description: "Learn how actual win percentage compares with Pythagorean expectation, then use a scatter plot to compare baseball teams’ actual and expected wins."
+publishedAt: "2026-11-07"
+author: "misterrpink"
+topics: ["sports analytics", "expected wins", "data visualization", "prediction models"]
+integration: []
+coverImage: "/images/university/actual-vs-expected-wins/main.jpg"
+ogImage: "https://lycheedata.com/images/university/actual-vs-expected-wins/main.jpg"
+featured: false
+lesson: 3
+cluster: sports-analytics
+slug: "actual-vs-expected-wins"
+readingTime: "7 min"
+keywords:
+  - actual vs expected wins
+  - Pythagorean expectation
+  - Pythagorean winning percentage
+  - baseball expected wins
+  - actual win percentage
+  - baseball scatter plot
+canonical: "https://lycheedata.com/university/actual-vs-expected-wins"
+ogTitle: "Actual vs Expected Wins"
+ogDescription: "A team’s record tells you how often it won. But does that record match how well it played?"
+twitterCard: "summary_large_image"
+---
+
+# Actual vs Expected Wins
+
+**Lychee University · Lesson 3**
+
+A team’s record tells you how often it won.
+
+But does that record match how well it played?
+
+Let’s compare two numbers using baseball.
+
+## Actual win percentage
+
+First: actual win percentage.
+
+Games won, divided by games played.
+
+$$
+\text{Actual win percentage} = \frac{\text{games won}}{\text{games played}}
+$$
+
+Win sixty out of a hundred games, and that’s sixty percent.
+
+Simple enough.
+
+<WinPercentageGrid />
+
+But the record doesn’t tell you how those wins happened.
+
+Win a game ten to zero, and it counts as one win.
+
+Win one to zero, and it still counts as one win.
+
+The margin changes. The record treats them the same.
+
+<MarginBlindAnimation />
+
+Over a season, a team could win plenty of close games and lose a few by a lot.
+
+Another team could do the opposite.
+
+That’s why we’re adding a second number.
+
+## Pythagorean expectation
+
+[Pythagorean expectation](/university/pythagorean-expectation), developed by baseball analyst Bill James, estimates a team’s win percentage using runs scored and runs allowed.
+
+You’ll also see it called Pythagorean winning percentage.
+
+The classic formula takes runs scored, squared—and divides that by runs scored squared plus runs allowed squared.
+
+$$
+\text{Expected win percentage} = \frac{\text{runs scored}^2}{\text{runs scored}^2 + \text{runs allowed}^2}
+$$
+
+Let’s use a made-up team.
+
+Over a hundred games, it scores five hundred runs and allows four hundred.
+
+Five hundred squared is two hundred fifty thousand.
+
+Four hundred squared is one hundred sixty thousand.
+
+Divide two hundred fifty thousand by their combined total, four hundred ten thousand.
+
+That gives us an expected win percentage of about sixty-one percent.
+
+Across a hundred games, that’s about sixty-one expected wins.
+
+$$
+\text{Expected wins} = \text{expected win percentage} \times \text{games played}
+$$
+
+Use the percentage as a decimal in that calculation: about $$0.61 \times 100$$.
+
+<ExpectedWinsAnimation />
+
+Score more while allowing less, and the estimate rises.
+
+Score and allow the same number of runs, and it lands at fifty percent.
+
+<RunBalanceExplorer />
+
+We’re using the classic squared version here. Other versions adjust the exponent, but the idea stays the same. [Lesson 2 compares the exponents.](/university/pythagorean-expectation#why-are-the-terms-squared-and-does-every-sport-use-2)
+
+## Comparing actual and expected wins
+
+Now we have two numbers.
+
+Our example team actually won sixty percent of its games.
+
+Its scoring-based estimate was about sixty-one percent.
+
+Close—but not identical.
+
+Now calculate both numbers for each team over the same season.
+
+You could put them in a table.
+
+But a scatter plot lets us see how they relate.
+
+Put the Pythagorean estimate on the horizontal axis, and actual win percentage on the vertical axis.
+
+Each dot is one team’s season.
+
+Our example team goes at about sixty-one percent across and sixty percent up.
+
+Move right, and the scoring-based estimate gets higher.
+
+Move up, and the actual win percentage gets higher.
+
+<ScatterSetupAnimation />
+
+## What the gap tells us
+
+Now draw a diagonal line where the two percentages are equal.
+
+Fifty percent across, fifty percent up.
+
+Sixty percent across, sixty percent up.
+
+Use the same scale on both axes so that comparison is easy to see.
+
+A dot on that line means the team’s record matches its scoring-based estimate.
+
+Above it? The team won more than the formula estimated.
+
+Below it? Fewer.
+
+Our example team sits just below the line.
+
+The vertical gap is about one percentage point—or about one win across those hundred games.
+
+<GapExplorer />
+
+A bigger gap gives us more to investigate.
+
+Did the team win a lot of close games?
+
+Did a few blowout losses affect its run totals?
+
+The dot doesn’t tell us the cause.
+
+And the gap isn’t an automatic prediction that the team will improve or decline.
+
+It tells us where the record and the scoring-based estimate differ.
+
+## From a table to a relationship
+
+Now step back and look at all the dots.
+
+Do teams with higher expected win percentages also tend to have higher actual win percentages?
+
+Do the dots stay close to the diagonal, or spread far away?
+
+<TableToScatterAnimation />
+
+We’ve turned a table of numbers into a picture of the relationship.
+
+<LeagueScatterExplorer />
+
+One detail matters here.
+
+We drew that diagonal ourselves. It marks where the two percentages are equal.
+
+We haven’t fitted a line to the data yet.
+
+That comes next.
+
+<DrawnNotFittedAnimation />
+
+Next lesson: linear regression—how we fit a line to quantify that relationship.
+
+---
+
+### Source
+
+The classic formula and its mathematical background:
+[A Derivation of the Pythagorean Won-Loss Formula in Baseball](https://web.williams.edu/Mathematics/sjmiller/public_html/399/handouts/PythagWonLoss_Paper.pdf).
