@@ -8,7 +8,13 @@ import { canonicalUrl } from "@/lib/site";
 
 const PAGE_TITLE = "Lychee University";
 const PAGE_DESCRIPTION =
-  "Lychee University lessons on forecasting and prediction markets. Start with lesson 1: what Tetlock’s expert prediction study actually found.";
+  "Free Lychee University lessons on forecasting, sports analytics and prediction markets. Learn to think in probabilities and read the numbers like an analyst.";
+const OG_IMAGE = {
+  url: canonicalUrl("/images/university/main.jpg"),
+  width: 1280,
+  height: 720,
+  alt: "Lychee University: forecasting, sports analytics and prediction markets",
+};
 
 export const metadata = {
   title: PAGE_TITLE,
@@ -21,11 +27,13 @@ export const metadata = {
     description: PAGE_DESCRIPTION,
     url: canonicalUrl("/university"),
     type: "website",
+    images: [OG_IMAGE],
   },
   twitter: {
     card: "summary_large_image" as const,
     title: PAGE_TITLE,
     description: PAGE_DESCRIPTION,
+    images: [OG_IMAGE.url],
   },
 };
 
