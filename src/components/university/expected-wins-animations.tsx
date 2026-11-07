@@ -49,7 +49,7 @@ function useCountUp(target: number, active: boolean, restartKey: unknown, ms = 9
   return value;
 }
 
-function InteractiveFigure({
+export function InteractiveFigure({
   caption,
   children,
   rootRef,
@@ -66,7 +66,7 @@ function InteractiveFigure({
   );
 }
 
-function PillButton({ onClick, children, active = false }: { onClick: () => void; children: ReactNode; active?: boolean }) {
+export function PillButton({ onClick, children, active = false }: { onClick: () => void; children: ReactNode; active?: boolean }) {
   return (
     <button
       type="button"
@@ -88,10 +88,10 @@ function PillButton({ onClick, children, active = false }: { onClick: () => void
 /* Shared scatter plot pieces (values are percentages, e.g. 61 for 61%)       */
 /* -------------------------------------------------------------------------- */
 
-type Scale = { min: number; max: number; size: number };
+export type Scale = { min: number; max: number; size: number };
 
-const sx = (s: Scale, v: number) => ((v - s.min) / (s.max - s.min)) * s.size;
-const sy = (s: Scale, v: number) => s.size - sx(s, v);
+export const sx = (s: Scale, v: number) => ((v - s.min) / (s.max - s.min)) * s.size;
+export const sy = (s: Scale, v: number) => s.size - sx(s, v);
 
 function ticksFor(s: Scale, step: number) {
   const out: number[] = [];
@@ -182,9 +182,9 @@ function DiagonalLabel({ scale, show = true, fontSize = 10.5 }: { scale: Scale; 
 /* Hypothetical league (162-game season)                                      */
 /* -------------------------------------------------------------------------- */
 
-const SEASON_GAMES = 162;
+export const SEASON_GAMES = 162;
 
-const LEAGUE = [
+export const LEAGUE = [
   { name: "Summit", rs: 820, ra: 640, w: 97 },
   { name: "Bayside", rs: 780, ra: 650, w: 93 },
   { name: "Redrock", rs: 760, ra: 700, w: 88 },
@@ -210,10 +210,10 @@ const LEAGUE = [
   };
 });
 
-type LeagueTeam = (typeof LEAGUE)[number];
+export type LeagueTeam = (typeof LEAGUE)[number];
 
-/** Least-squares line of actual on expected, for the "fitted line" teaser only. */
-const FIT = (() => {
+/** Least-squares line of actual on expected, in percentage points. */
+export const FIT = (() => {
   const n = LEAGUE.length;
   const mx = LEAGUE.reduce((sum, t) => sum + t.exp, 0) / n;
   const my = LEAGUE.reduce((sum, t) => sum + t.act, 0) / n;
@@ -229,7 +229,7 @@ const FIT = (() => {
 
 const gapColor = (gap: number) => (Math.abs(gap) < 0.5 ? "var(--muted-foreground)" : gap > 0 ? GREEN : RED);
 
-function signed(value: number, digits = 1) {
+export function signed(value: number, digits = 1) {
   const fixed = Math.abs(value).toFixed(digits);
   if (Number(fixed) === 0) return (0).toFixed(digits);
   return `${value > 0 ? "+" : "−"}${fixed}`;
@@ -1268,9 +1268,9 @@ export function DrawnNotFittedAnimation() {
               </p>
             </div>
             <Reveal show={phase >= 3} className="mt-auto rounded-lg px-3 py-2.5" style={{ background: `${BLUE}12` }}>
-              <p className="text-[13px] font-medium" style={{ color: BLUE }}>
+              <a href="/university/linear-regression" className="text-[13px] font-medium hover:underline" style={{ color: BLUE }}>
                 Next lesson: linear regression →
-              </p>
+              </a>
             </Reveal>
           </Panel>
         </div>

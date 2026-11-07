@@ -67,6 +67,20 @@ import {
   TableToScatterAnimation,
   WinPercentageGrid,
 } from "@/components/university/expected-wins-animations";
+import {
+  ByEyeLinesAnimation,
+  EquationAnatomyAnimation,
+  InterceptZoomAnimation,
+  LeastSquaresExplorer,
+  NewSeasonAnimation,
+  RegressionLineExplorer,
+  ResidualExplorer,
+  SpreadExplorer,
+  TableScatterLineAnimation,
+  TwoLinesAnimation,
+  TwoLinesExplorer,
+  WhySquareAnimation,
+} from "@/components/university/linear-regression-animations";
 import { NewsletterSignup } from "@/components/newsletter/newsletter-signup";
 
 // MDX may pass legacy `ref` (string refs); use loose props to avoid @types/react version skew (e.g. @hello-pangea/dnd).
@@ -119,6 +133,34 @@ function MdxH2({ children, id, ...props }: any) {
   );
 }
 
+const SITE_HOSTS = new Set(["lycheedata.com", "www.lycheedata.com"]);
+
+function isExternalHref(href: string) {
+  if (!/^https?:\/\//i.test(href)) return false;
+  try {
+    return !SITE_HOSTS.has(new URL(href).hostname.toLowerCase());
+  } catch {
+    return false;
+  }
+}
+
+/** Links to other sites open in a new tab; Lychee links stay in place. */
+function MdxLink({ href = "", children, ...props }: any) {
+  const { ref: _ref, ...rest } = props || {};
+  if (isExternalHref(href)) {
+    return (
+      <a href={href} target="_blank" rel="noopener noreferrer" {...rest}>
+        {children}
+      </a>
+    );
+  }
+  return (
+    <a href={href} {...rest}>
+      {children}
+    </a>
+  );
+}
+
 /** Markdown `---` → Making Software–style mono dash divider. */
 function MdxHr() {
   return <ArticleDivider className="my-10 !mb-0" />;
@@ -151,6 +193,9 @@ function MdxHr() {
  * - Actual vs expected wins lesson: `<WinPercentageGrid />`, `<MarginBlindAnimation />`, `<ExpectedWinsAnimation />`,
  *   `<RunBalanceExplorer />`, `<ScatterSetupAnimation />`, `<GapExplorer />`, `<TableToScatterAnimation />`,
  *   `<LeagueScatterExplorer />`, `<DrawnNotFittedAnimation />`
+ * - Linear regression lesson: `<ByEyeLinesAnimation />`, `<EquationAnatomyAnimation />`, `<RegressionLineExplorer />`,
+ *   `<InterceptZoomAnimation />`, `<ResidualExplorer />`, `<WhySquareAnimation />`, `<LeastSquaresExplorer />`,
+ *   `<TwoLinesAnimation />`, `<TwoLinesExplorer />`, `<SpreadExplorer />`, `<NewSeasonAnimation />`, `<TableScatterLineAnimation />`
  * - GIFs: Use standard markdown ![alt](/path/to.gif) or ContentImage
  */
 export function useMDXComponents(components?: MDXComponents): MDXComponents {
@@ -158,6 +203,7 @@ export function useMDXComponents(components?: MDXComponents): MDXComponents {
     h1: MdxH1,
     h2: MdxH2,
     hr: MdxHr,
+    a: MdxLink,
     code: MdxCode,
     TypographyInlineCode,
     table: ({ children, ...props }: any) => {
@@ -232,6 +278,18 @@ export function useMDXComponents(components?: MDXComponents): MDXComponents {
     TableToScatterAnimation,
     LeagueScatterExplorer,
     DrawnNotFittedAnimation,
+    ByEyeLinesAnimation,
+    EquationAnatomyAnimation,
+    RegressionLineExplorer,
+    InterceptZoomAnimation,
+    ResidualExplorer,
+    WhySquareAnimation,
+    LeastSquaresExplorer,
+    TwoLinesAnimation,
+    TwoLinesExplorer,
+    SpreadExplorer,
+    NewSeasonAnimation,
+    TableScatterLineAnimation,
     ...components,
   };
 }

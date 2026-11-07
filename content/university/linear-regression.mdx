@@ -1,0 +1,217 @@
+---
+title: "Linear Regression"
+description: "Learn how simple linear regression fits a line to data. Use baseball win percentages to understand slope, intercept, least squares, and residuals."
+publishedAt: "2026-11-07"
+author: "misterrpink"
+topics: ["sports analytics", "linear regression", "statistics", "prediction models"]
+integration: []
+coverImage: "/images/university/linear-regression/main.jpg"
+ogImage: "https://lycheedata.com/images/university/linear-regression/main.jpg"
+featured: false
+lesson: 4
+cluster: sports-analytics
+slug: "linear-regression"
+readingTime: "8 min"
+keywords:
+  - linear regression
+  - simple linear regression
+  - line of best fit
+  - least squares regression
+  - regression residuals
+  - linear regression in sports analytics
+canonical: "https://lycheedata.com/university/linear-regression"
+ogTitle: "Linear Regression"
+ogDescription: "The dots show a relationship. How do we fit a line to describe it?"
+twitterCard: "summary_large_image"
+---
+
+# Linear Regression
+
+**Lychee University · Lesson 4**
+
+[Last lesson](/university/actual-vs-expected-wins), we compared two numbers.
+
+A baseball team’s actual win percentage.
+
+And its [Pythagorean expectation](/university/pythagorean-expectation)—the win percentage estimated from runs scored and runs allowed.
+
+We plotted one on the horizontal axis and the other on the vertical axis.
+
+Each dot was one team’s season.
+
+Now we want to describe the relationship between those numbers.
+
+That’s where linear regression comes in.
+
+## From dots to a line
+
+Look at the scatter plot.
+
+As the scoring-based estimate rises, does actual win percentage tend to rise too?
+
+A straight line can help us describe that pattern.
+
+But where should we put it?
+
+We could draw one by eye.
+
+Someone else might draw it a little higher. Or give it a different slope.
+
+Linear regression gives us a consistent way to fit that line using the data.
+
+With one input variable and one outcome, we call it simple linear regression.
+
+Here, the input is Pythagorean expectation.
+
+The outcome is actual win percentage.
+
+<ByEyeLinesAnimation />
+
+## The regression equation
+
+The fitted line has a simple equation:
+
+$$
+\text{Estimated actual win percentage} = \text{intercept} + \text{slope} \times \text{Pythagorean expectation}
+$$
+
+The intercept sets the line’s height.
+
+The slope tells us how much the fitted outcome changes as the input increases.
+
+Let’s use a made-up equation:
+
+$$
+\text{Estimated actual win percentage} = 0.05 + 0.90 \times \text{Pythagorean expectation}
+$$
+
+These numbers are just for illustration. We haven’t fitted them to a real season.
+
+Use decimals for the percentages.
+
+For a team with a Pythagorean expectation of sixty percent:
+
+$$
+0.05 + 0.90 \times 0.60 = 0.59
+$$
+
+The line gives us an estimated actual win percentage of fifty-nine percent.
+
+<EquationAnatomyAnimation />
+
+The slope, 0.90, means a one-percentage-point increase in Pythagorean expectation corresponds to a 0.9-percentage-point increase along this fitted line.
+
+<RegressionLineExplorer />
+
+And the intercept?
+
+It gives the line’s value when the input is zero.
+
+That helps position the line mathematically. It may have little practical meaning when zero is far outside the data we’re studying.
+
+<InterceptZoomAnimation />
+
+## How do we choose the line?
+
+For each team, compare its actual win percentage with the value on the line.
+
+That vertical difference is called a residual.
+
+$$
+\text{Residual} = \text{actual value} - \text{fitted value}
+$$
+
+Suppose our example team actually won sixty-two percent of its games.
+
+The line gave us fifty-nine percent.
+
+Its residual is positive three percentage points.
+
+The dot sits above the fitted line.
+
+If it actually won fifty-six percent, its residual would be negative three percentage points.
+
+Below the line.
+
+<ResidualExplorer />
+
+A common fitting method is ordinary least squares.
+
+It squares each residual, adds those squared values together, and chooses the line with the smallest total.
+
+Squaring keeps positive and negative differences from cancelling out.
+
+It also gives larger differences more weight.
+
+<WhySquareAnimation />
+
+That’s what “best fit” means here: the smallest sum of squared vertical differences.
+
+<LeastSquaresExplorer />
+
+## Two lines, two questions
+
+Remember the diagonal from [lesson 3](/university/actual-vs-expected-wins#what-the-gap-tells-us)?
+
+That line marked where actual win percentage equalled Pythagorean expectation.
+
+Sixty percent across. Sixty percent up.
+
+We chose that line as a reference.
+
+The regression line is fitted from the dots.
+
+The equality line asks:
+
+Did this team’s record match its scoring-based estimate?
+
+The regression line asks:
+
+Where does this team sit compared with the relationship fitted across the teams in our data?
+
+<TwoLinesAnimation />
+
+A team can sit above one line and below the other.
+
+They’re different comparisons.
+
+<TwoLinesExplorer />
+
+## What the fitted line tells us
+
+We now have an equation describing how the two numbers relate in our sample.
+
+But the dots still matter.
+
+Some may sit close to the line.
+
+Others may be much farther away.
+
+A fitted value is an estimate. Individual teams can finish above or below it.
+
+<SpreadExplorer />
+
+And fitting a line to one season doesn’t show how accurately it will predict another.
+
+That takes a separate check using data the model hasn’t already seen.
+
+<NewSeasonAnimation />
+
+For now, we’ve taken the next step.
+
+First, a table.
+
+Then, a scatter plot.
+
+Now, a line fitted to the data.
+
+<TableScatterLineAnimation />
+
+We can describe the relationship with numbers—and measure how far each team sits from that line.
+
+---
+
+### Sources
+
+- [Penn State: Simple Linear Regression](https://online.stat.psu.edu/stat501/Lesson01)
+- [Penn State: Correlation and Simple Linear Regression](https://online.stat.psu.edu/stat200/Lesson12)
