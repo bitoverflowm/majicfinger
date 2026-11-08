@@ -12,6 +12,10 @@ import { scoreTitle } from "./holderHoldersTable";
 import { LiveDot } from "./holderMarketView";
 import { sheetChartBlock, traderSheet } from "./holderTerminalSheets";
 import { SCORE_TIERS, SKILL_SCORE_NAME, loadTraderScore, scoreTier } from "./traderScore";
+import { arrivalKey } from "./holderTradesTable";
+import { FinishedBetsSummary, FinishedBetsTable, finishedBetList, useFinishedBets } from "./traderFinishedBets";
+import { TraderPnlByQuestion } from "./traderPnlByQuestion";
+import { TraderPositionsTable, useTraderPositions } from "./traderPositionsTable";
 import { TradeAlertsToggle, useTraderTradeAlerts } from "./traderTradeAlerts";
 import { TraderTradesTable } from "./traderTradesTable";
 import { useLiveTrader } from "./useLiveTrader";
@@ -227,6 +231,16 @@ function PanelState({ part, empty }) {
 export function HolderTraderView({ subject, onProfileName, onPickMarket }) {
   const { profile, activity, pnl } = useLiveTrader(subject.address);
   const skill = useSkillScore(subject.address);
+  const lastTradeKey = activity.rows[0] ? arrivalKey(activity.rows[0]) : "";
+  const positions = useTraderPositions(subject.address, lastTradeKey);
+  const finishedPart = useFinishedBets(subject.address, lastTradeKey);
+  const finishedBets = useMemo(
+    () => finishedBetList(finishedPart.rows, positions.rows, finishedPart.done),
+    [finishedPart.rows, finishedPart.done, positions.rows],
+  );
+  const positionsUpdated = positions.updatedAt
+    ? new Date(positions.updatedAt).toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit", second: "2-digit" })
+    : "";
   const profileName = chosenName(profile.rows[0]?.name) || String(profile.rows[0]?.pseudonym || "").trim();
   useEffect(() => {
     if (profileName && !subject.title) onProfileName?.(profileName);
@@ -273,7 +287,7 @@ export function HolderTraderView({ subject, onProfileName, onPickMarket }) {
           <h3 className="text-[15px] font-semibold text-foreground">Trades</h3>
           <p className="mt-0.5 text-[13px] text-muted-foreground">
             Every trade this wallet has made, newest first, checked every 10 seconds. New trades slide in at the top and raise an
-            alert while you&apos;re on this tab. Pick a market to open it in the terminal.
+            alert while you&apos;re on this tab. Click a column to sort by it, or pick a market to open it in the terminal.
           </p>
         </div>
         <div className="flex shrink-0 items-center gap-3">
@@ -288,6 +302,60 @@ export function HolderTraderView({ subject, onProfileName, onPickMarket }) {
           <PanelState part={activity} empty="No trades for this wallet yet." />
         )}
       </section>
+
+      <div className="flex items-end justify-between gap-3 pt-4">
+        <div className="max-w-3xl">
+          <h3 className="text-[15px] font-semibold text-foreground">Active positions</h3>
+          <p className="mt-0.5 text-[13px] text-muted-foreground">
+            Everything this wallet holds in markets still trading, biggest first. Prices and PnL refresh every 20 seconds, and
+            again right after each new trade.
+          </p>
+        </div>
+        {positionsUpdated ? <span className="shrink-0 text-[11px] text-muted-foreground">Checked {positionsUpdated}</span> : null}
+      </div>
+      <section aria-label="Active positions" className="flex h-[520px] flex-col overflow-hidden rounded-xl border border-border/70 bg-background shadow-sm">
+        {positions.status === "ready" ? (
+          <TraderPositionsTable part={positions} onPickMarket={onPickMarket} />
+        ) : (
+          <PanelState part={positions} empty="No open positions right now." />
+        )}
+      </section>
+
+      <div className="max-w-3xl pt-4">
+        <h3 className="text-[15px] font-semibold text-foreground">Finished bets</h3>
+        <p className="mt-0.5 text-[13px] text-muted-foreground">
+          Bets this wallet is done with: sold out of, or the market resolved. An amber dot marks resolved winnings not yet
+          redeemed. The PnL above covers every bet loaded below, and older bets load as you scroll.
+        </p>
+      </div>
+      {finishedPart.status === "ready" ? (
+        <>
+          <FinishedBetsSummary bets={finishedBets} done={finishedPart.done} />
+          <section aria-label="Finished bets" className="flex h-[560px] flex-col overflow-hidden rounded-xl border border-border/70 bg-background shadow-sm">
+            <FinishedBetsTable bets={finishedBets} part={finishedPart} onPickMarket={onPickMarket} />
+          </section>
+        </>
+      ) : (
+        <section aria-label="Finished bets" className="flex h-40 flex-col overflow-hidden rounded-xl border border-border/70 bg-background shadow-sm">
+          <PanelState part={finishedPart} empty="No finished bets yet." />
+        </section>
+      )}
+
+      <div className="max-w-3xl pt-4">
+        <h3 className="text-[15px] font-semibold text-foreground">PnL by question</h3>
+        <p className="mt-0.5 text-[13px] text-muted-foreground">
+          Which questions made this wallet its money and which lost it. Each question nets every outcome traded in it, across
+          the finished bets loaded above and the open positions at their current prices. The biggest five get their own slice;
+          the rest share Other. Dots show the outcomes held.
+        </p>
+      </div>
+      {finishedPart.status === "ready" && positions.status === "ready" ? (
+        <TraderPnlByQuestion bets={finishedBets} openRows={positions.rows} onPickMarket={onPickMarket} />
+      ) : (
+        <section aria-label="PnL by question" className="flex h-40 flex-col overflow-hidden rounded-xl border border-border/70 bg-background shadow-sm">
+          <PanelState part={finishedPart.status === "ready" ? positions : finishedPart} empty="No bets yet." />
+        </section>
+      )}
     </div>
   );
 }

@@ -67,12 +67,18 @@ function nextCursor(root) {
   return more && cursor ? String(cursor) : "";
 }
 
-async function walk(params, maxPages, signal) {
+/** One page of `getTraderPositions`, and the cursor for the next ("" at the end). */
+export async function positionsPage(params, cursor, signal, pageSize = PAGE) {
+  const body = await polymarketGet("getTraderPositions", { ...params, limit: String(pageSize), ...(cursor ? { cursor } : {}) }, signal, { retries: 2 });
+  return rowsOf(body);
+}
+
+/** Reads `getTraderPositions` page by page, up to `maxPages`. */
+export async function walkPositions(params, maxPages, signal, pageSize = PAGE) {
   const rows = [];
   let cursor = "";
   for (let page = 0; page < maxPages; page += 1) {
-    const body = await polymarketGet("getTraderPositions", { ...params, limit: String(PAGE), ...(cursor ? { cursor } : {}) }, signal, { retries: 2 });
-    const next = rowsOf(body);
+    const next = await positionsPage(params, cursor, signal, pageSize);
     rows.push(...next.rows);
     if (!next.next) return { rows, truncated: false };
     cursor = next.next;
@@ -94,8 +100,8 @@ function lastEvent(row) {
 export async function finishedPositions(wallet, excludeCondition, signal) {
   const skip = String(excludeCondition || "").toLowerCase();
   const [closed, open] = await Promise.all([
-    walk({ user: wallet, status: "closed", sort_by: "TIMESTAMP", sort_direction: "DESC" }, MAX_CLOSED_PAGES, signal),
-    walk({ user: wallet, status: "open" }, MAX_CLOSED_PAGES, signal),
+    walkPositions({ user: wallet, status: "closed", sort_by: "TIMESTAMP", sort_direction: "DESC" }, MAX_CLOSED_PAGES, signal),
+    walkPositions({ user: wallet, status: "open" }, MAX_CLOSED_PAGES, signal),
   ]);
   const since = closed.truncated ? Math.min(...closed.rows.map(lastEvent).filter((at) => at != null)) : -Infinity;
   const unredeemed = open.rows.filter((row) => String(row?.status || "").toUpperCase() === "REDEEMABLE" && (lastEvent(row) ?? Infinity) >= since);
