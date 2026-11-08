@@ -10,9 +10,11 @@ import {
 import { useMyStateV2 } from "@/context/stateContextV2";
 import { connectHomeAnySheetHasData } from "@/lib/connectHomePullDestination";
 import { cn } from "@/lib/utils";
+import { shownTerminalId } from "@/lib/workspaceTerminals";
 import { useWorkspaceCanvas } from "@/components/dashboardComposer/workspaceCanvas";
 import { useIntegrationConnect } from "@/components/dashboardComposer/integrationConnectDialog";
 import { WorkspaceStartTabs } from "@/components/checkout/CheckoutWelcome";
+import { TerminalSurface } from "@/components/terminals/terminalSurface";
 
 const CHART_LOCKED_TIP = "Upload or connect data before adding a chart.";
 const TEXT_COMING_SOON_TIP = "Coming soon";
@@ -115,10 +117,20 @@ export function WorkspaceWelcomeLayer({ viewing, navChromeExpanded, checkout, co
   // Landing demo: the canvas is always the home view; the picker floats over it from dashBody.
   const landingCanvas = landingDemo && viewing === "connectDataHome";
   const landingConnect = landingCanvas && !!connect?.inlineOpen;
+  const terminalId = landingConnect ? "" : shownTerminalId({ ...ctx, viewing });
   const blankTab = (viewing === "welcome" && !!active?.blank) || landingCanvas;
   const showEmpty =
     blankTab && !landingConnect && !!canvas?.ready && !(canvas?.blocks || []).length && !canvas?.runFeed;
   const cover = !blankTab;
+
+  if (terminalId) {
+    return (
+      <div className="absolute inset-0 z-30 -my-1 flex min-h-0 flex-col bg-background">
+        <WorkspaceStartTabs welcomeActive={viewing === "welcome"} onOpenWelcome={() => ctx?.setViewing?.("welcome")} />
+        <TerminalSurface terminalId={terminalId} tab={active} />
+      </div>
+    );
+  }
 
   return (
     <div

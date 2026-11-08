@@ -26,6 +26,7 @@ import {
   newStartTabId,
   saveWorkspaceStartTabs,
 } from "@/lib/workspaceStartTabs";
+import { terminalTabField } from "@/lib/workspaceTerminals";
 import {
   Carousel,
   CarouselContent,
@@ -293,6 +294,7 @@ function StartTabChip({ tab, selected, userId, onSelect }) {
       id: newStartTabId(),
       name: duplicateTabName(tab.name, state.tabs.map((item) => item.name)),
       blank: !!tab.blank,
+      ...terminalTabField(tab),
     };
     const index = state.tabs.findIndex((item) => item.id === tab.id);
     const at = index < 0 ? state.tabs.length : index + 1;

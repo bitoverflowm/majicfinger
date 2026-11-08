@@ -2,6 +2,7 @@ import { ATHENA_SUBSCRIBER_QUERY_ROW_LIMIT } from "@/config/dataLakeParquetSampl
 import { recordsFromRows } from "@/components/dashboardComposer/integrationRunSheets";
 import { DATASET_TYPES } from "@/lib/visualizations/datasetDescriptor";
 import { isSavedChartView } from "@/lib/visualizations/presetRegistry";
+import { terminalTabField } from "@/lib/workspaceTerminals";
 
 /** Shape of the dashboard project the editor saves. Tabs share one document. */
 
@@ -562,7 +563,7 @@ export function sanitizeWorkspaceDashboard(input) {
     const name = cleanText(tab?.name, 80);
     if (!id || !name || seen.has(id)) continue;
     seen.add(id);
-    tabs.push({ id, name, blank: !!tab.blank });
+    tabs.push({ id, name, blank: !!tab.blank, ...terminalTabField(tab) });
   }
   if (!tabs.length) tabs.push({ id: "welcome", name: "Welcome", blank: false });
 

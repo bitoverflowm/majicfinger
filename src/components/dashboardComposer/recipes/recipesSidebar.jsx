@@ -1,13 +1,14 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { CircleArrowDown, Users } from "lucide-react";
+import { CircleArrowDown, SquareTerminal, Users } from "lucide-react";
 import {
   KalshiTradeHistoryPreview,
   PolymarketTradeHistoryPreview,
 } from "@/components/dashboardComposer/recipes/kalshiTradeHistoryPreview";
 import { PolymarketHolderAnalysisPreview } from "@/components/dashboardComposer/recipes/polymarketHolderAnalysisPreview";
 import { cn } from "@/lib/utils";
+import { TERMINALS } from "@/lib/workspaceTerminals";
 
 export const RECIPES = [
   {
@@ -38,8 +39,62 @@ export const RECIPES = [
 
 const PANEL_MS = 500;
 
-/** Quick actions beside the integration picker. Each one opens a full-window tool. */
-export function RecipesSidebar({ onOpen, onHover, activeId = null, expanded = false, className }) {
+function SectionHeader({ title, count, children, className }) {
+  return (
+    <div className={cn("px-5 pb-3", className)}>
+      <h2 className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+        {title}
+        <span className="tabular-nums">{count}</span>
+      </h2>
+      <p className="mt-1.5 text-[12px] leading-relaxed text-muted-foreground">{children}</p>
+    </div>
+  );
+}
+
+function SidebarRow({ item, icon: Icon, active = false, onClick, hoverProps }) {
+  return (
+    <li>
+      <button
+        type="button"
+        aria-current={active || undefined}
+        onClick={onClick}
+        {...hoverProps}
+        className={cn(
+          "group flex w-full items-start gap-2.5 px-5 py-3 text-left transition-colors hover:bg-black/[0.06] focus-visible:bg-black/[0.06] focus-visible:outline-none dark:hover:bg-white/[0.07] dark:focus-visible:bg-white/[0.07]",
+          active && "bg-black/[0.06] dark:bg-white/[0.07]",
+        )}
+      >
+        <Icon
+          className={cn(
+            "mt-px size-4 shrink-0 text-muted-foreground transition-colors group-hover:text-foreground",
+            active && "text-foreground",
+          )}
+          aria-hidden
+        />
+        <span className="min-w-0 flex-1">
+          <span className="flex items-baseline gap-2">
+            <span
+              className={cn(
+                "min-w-0 flex-1 truncate text-[13px] font-medium text-foreground opacity-80 transition-opacity group-hover:opacity-100",
+                active && "opacity-100",
+              )}
+            >
+              {item.title}
+            </span>
+            {item.tag ? <span className="shrink-0 text-[11px] text-muted-foreground">{item.tag}</span> : null}
+          </span>
+          <span className="mt-0.5 block text-[12px] leading-relaxed text-muted-foreground">{item.description}</span>
+        </span>
+      </button>
+    </li>
+  );
+}
+
+/**
+ * Terminals and quick actions beside the integration picker. A terminal opens as a new tab;
+ * a recipe opens a full-window tool.
+ */
+export function RecipesSidebar({ onOpen, onOpenTerminal, onHover, activeId = null, expanded = false, className }) {
   return (
     <aside
       className={cn(
@@ -48,63 +103,37 @@ export function RecipesSidebar({ onOpen, onHover, activeId = null, expanded = fa
         className,
       )}
     >
-      <div className="flex min-h-0 flex-1 flex-col bg-black/[0.015] dark:bg-white/[0.02]">
-        <div className="px-5 pb-3 pt-6">
-          <h2 className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
-            Recipes
-            <span className="tabular-nums">{RECIPES.length}</span>
-          </h2>
-          <p className="mt-1.5 text-[12px] leading-relaxed text-muted-foreground">
-            A list of quick actions requested by our quants. Click one to get started right away.
-          </p>
-        </div>
-        <ul className="min-h-0 flex-1 overflow-y-auto pb-4">
-          {RECIPES.map((recipe) => {
-            const Icon = recipe.icon;
-            const active = recipe.id === activeId;
-            return (
-              <li key={recipe.id}>
-                <button
-                  type="button"
-                  aria-current={active || undefined}
-                  onClick={() => onOpen?.(recipe.id)}
-                  onMouseEnter={() => onHover?.(recipe.id)}
-                  onMouseLeave={() => onHover?.(null)}
-                  onFocus={(event) => {
-                    // Keyboard focus only: a dialog's open autofocus must not slide the preview out.
-                    if (event.currentTarget.matches(":focus-visible")) onHover?.(recipe.id);
-                  }}
-                  onBlur={() => onHover?.(null)}
-                  className={cn(
-                    "group flex w-full items-start gap-2.5 px-5 py-3 text-left transition-colors hover:bg-black/[0.06] focus-visible:bg-black/[0.06] focus-visible:outline-none dark:hover:bg-white/[0.07] dark:focus-visible:bg-white/[0.07]",
-                    active && "bg-black/[0.06] dark:bg-white/[0.07]",
-                  )}
-                >
-                  <Icon
-                    className={cn(
-                      "mt-px size-4 shrink-0 text-muted-foreground transition-colors group-hover:text-foreground",
-                      active && "text-foreground",
-                    )}
-                    aria-hidden
-                  />
-                  <span className="min-w-0 flex-1">
-                    <span className="flex items-baseline gap-2">
-                      <span
-                        className={cn(
-                          "min-w-0 flex-1 truncate text-[13px] font-medium text-foreground opacity-80 transition-opacity group-hover:opacity-100",
-                          active && "opacity-100",
-                        )}
-                      >
-                        {recipe.title}
-                      </span>
-                      {recipe.tag ? <span className="shrink-0 text-[11px] text-muted-foreground">{recipe.tag}</span> : null}
-                    </span>
-                    <span className="mt-0.5 block text-[12px] leading-relaxed text-muted-foreground">{recipe.description}</span>
-                  </span>
-                </button>
-              </li>
-            );
-          })}
+      <div className="flex min-h-0 flex-1 flex-col overflow-y-auto bg-black/[0.015] pb-4 dark:bg-white/[0.02]">
+        <SectionHeader title="Terminals" count={TERMINALS.length} className="pt-6">
+          Out-of-the-box dashboards. Each one opens in its own tab.
+        </SectionHeader>
+        <ul>
+          {TERMINALS.map((terminal) => (
+            <SidebarRow key={terminal.id} item={terminal} icon={SquareTerminal} onClick={() => onOpenTerminal?.(terminal.id)} />
+          ))}
+        </ul>
+        <SectionHeader title="Recipes" count={RECIPES.length} className="pt-5">
+          A list of quick actions requested by our quants. Click one to get started right away.
+        </SectionHeader>
+        <ul>
+          {RECIPES.map((recipe) => (
+            <SidebarRow
+              key={recipe.id}
+              item={recipe}
+              icon={recipe.icon}
+              active={recipe.id === activeId}
+              onClick={() => onOpen?.(recipe.id)}
+              hoverProps={{
+                onMouseEnter: () => onHover?.(recipe.id),
+                onMouseLeave: () => onHover?.(null),
+                onFocus: (event) => {
+                  // Keyboard focus only: a dialog's open autofocus must not slide the preview out.
+                  if (event.currentTarget.matches(":focus-visible")) onHover?.(recipe.id);
+                },
+                onBlur: () => onHover?.(null),
+              }}
+            />
+          ))}
         </ul>
       </div>
     </aside>

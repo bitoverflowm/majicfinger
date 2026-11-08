@@ -1,5 +1,7 @@
 /** Browser-local start tabs (Welcome and its copies). No backend field. */
 
+import { terminalTabField } from "@/lib/workspaceTerminals";
+
 export const WELCOME_START_TAB_ID = "welcome";
 
 const STORAGE_PREFIX = "lycheeWorkspaceStartTabs:";
@@ -26,7 +28,7 @@ function sanitizeTabs(tabs, welcomeRemoved) {
     if (!id || !name || seen.has(id)) continue;
     if (welcomeRemoved && id === WELCOME_START_TAB_ID) continue;
     seen.add(id);
-    clean.push({ id, name, blank: !!tab.blank });
+    clean.push({ id, name, blank: !!tab.blank, ...terminalTabField(tab) });
   }
   if (!welcomeRemoved && !seen.has(WELCOME_START_TAB_ID)) {
     clean.unshift({ id: WELCOME_START_TAB_ID, name: "Welcome" });

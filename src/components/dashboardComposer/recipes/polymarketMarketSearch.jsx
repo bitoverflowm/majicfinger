@@ -77,7 +77,7 @@ function ResultOption({ market, active, highlighted, onPick, onHover }) {
   );
 }
 
-function Stat({ label, value, detail }) {
+export function Stat({ label, value, detail }) {
   return (
     <div className="rounded-lg bg-black/[0.03] px-3 py-2.5 dark:bg-white/[0.04]">
       <dt className="text-[11px] text-muted-foreground">{label}</dt>

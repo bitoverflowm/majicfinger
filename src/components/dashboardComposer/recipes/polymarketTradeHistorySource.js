@@ -304,15 +304,24 @@ function marketRef(meta) {
 }
 
 /** Newest first. With `since`, paging stops at the first trade older than it. */
-async function liveTrades(meta, limit, onProgress, { since = 0 } = {}) {
+/**
+ * Polymarket's trade feed caches each URL for minutes, so a repeated newest-first request returns an
+ * old page. An `end` bound a little past now makes the URL new each second and the page current.
+ */
+export function freshTradesEnd() {
+  return String(Math.floor(Date.now() / 1000) + 120);
+}
+
+async function liveTrades(meta, limit, onProgress, { since = 0, signal } = {}) {
   const rows = [];
   let cursor = "";
   let reachedSince = false;
+  const end = freshTradesEnd();
   while (rows.length < limit) {
     const body = await polymarketGet(
       "getTradesByMarket",
-      { condition: meta.conditionId, limit: String(LIVE_PAGE_SIZE), ...(cursor ? { cursor } : {}) },
-      undefined,
+      { condition: meta.conditionId, limit: String(LIVE_PAGE_SIZE), end, ...(cursor ? { cursor } : {}) },
+      signal,
       {
         retries: 6,
         onWait: (seconds) => onProgress?.(`Read ${rows.length.toLocaleString()} trades from Polymarket Live · retrying in ${seconds}s`),
@@ -405,8 +414,13 @@ function dedupeTrades(rows) {
  * empty, the other one is tried. Recipes skip the plan's row cap and stop only at
  * `RECIPE_TRADE_ROW_LIMIT`.
  */
-export async function pullPolymarketTradeHistory(meta, plan, { onProgress } = {}) {
+export async function pullPolymarketTradeHistory(meta, plan, { onProgress, signal } = {}) {
   const cap = RECIPE_TRADE_ROW_LIMIT;
+  const abortable = (task) =>
+    task.then((result) => {
+      if (signal?.aborted) throw new DOMException("Aborted", "AbortError");
+      return result;
+    });
   const liveColumns = polymarketLiveBuildColumns("getTradesByMarket");
   const asLive = (pulled, label = SOURCE_LABELS.polymarket) => ({
     integrationId: "polymarket",
@@ -418,7 +432,7 @@ export async function pullPolymarketTradeHistory(meta, plan, { onProgress } = {}
   });
 
   if (plan.kind === "historical") {
-    const lake = await lakeTrades(meta, cap, onProgress);
+    const lake = await abortable(lakeTrades(meta, cap, onProgress));
     if (lake.rows.length) {
       return {
         integrationId: "polymarketHistorical",
@@ -431,18 +445,18 @@ export async function pullPolymarketTradeHistory(meta, plan, { onProgress } = {}
       };
     }
     onProgress?.("No trades in Polymarket Historical. Trying Polymarket Live");
-    return asLive(await liveTrades(meta, cap, onProgress));
+    return asLive(await liveTrades(meta, cap, onProgress, { signal }));
   }
 
-  if (plan.kind === "live") return asLive(await liveTrades(meta, cap, onProgress));
+  if (plan.kind === "live") return asLive(await liveTrades(meta, cap, onProgress, { signal }));
 
-  const live = await liveTrades(meta, cap, onProgress, { since: plan.split });
+  const live = await liveTrades(meta, cap, onProgress, { since: plan.split, signal });
   if (live.rows.length >= cap) return asLive(live);
-  const lake = await lakeTrades(meta, cap, onProgress);
+  const lake = await abortable(lakeTrades(meta, cap, onProgress));
   const older = liveRowsFromFills(lake.rows, meta, plan.split);
   if (!older.length) {
     onProgress?.("No older trades in Polymarket Historical. Reading them from Polymarket Live");
-    return asLive(await liveTrades(meta, cap, onProgress));
+    return asLive(await liveTrades(meta, cap, onProgress, { signal }));
   }
   const rows = dedupeTrades([...live.rows, ...older]).slice(0, cap);
   return asLive({ rows, truncated: rows.length >= cap }, describePlan(plan).label);

@@ -25,6 +25,10 @@ import {
 } from "@/components/dashboardComposer/integrationPreviewSample";
 import { LandingDemoMembersOnlyPortal } from "@/components/dashboardComposer/landingDemoMembersOnly";
 import { RecipePreviewPanel, RecipesSidebar } from "@/components/dashboardComposer/recipes/recipesSidebar";
+import { useWorkspaceCanvas } from "@/components/dashboardComposer/workspaceCanvas";
+import { openTerminalTab } from "@/components/terminals/openTerminalTab";
+import { useMyStateV2 } from "@/context/stateContextV2";
+import { useUser } from "@/lib/hooks";
 import { buildIntegrationPickerRows } from "@/lib/connectIntegrationPickerRows";
 import {
   hasLandingDemoRecipeRequest,
@@ -445,6 +449,10 @@ function IntegrationConnectFlow({
   const [recipeId, setRecipeId] = useState(null);
   const [previewRecipeId, setPreviewRecipeId] = useState(null);
   const previewTimer = useRef(0);
+  const connect = useIntegrationConnect();
+  const canvas = useWorkspaceCanvas();
+  const ctx = useMyStateV2();
+  const user = useUser();
   const selected = selectable.find((row) => row.id === selectedId) || null;
   const hovered = rows.find((row) => row.id === hoveredId) || null;
   const shown = hovered || selected || primary[0] || null;
@@ -499,6 +507,13 @@ function IntegrationConnectFlow({
   const openRecipeRef = useRef(openRecipe);
   openRecipeRef.current = openRecipe;
 
+  const openTerminal = (id) => {
+    window.clearTimeout(previewTimer.current);
+    setPreviewRecipeId(null);
+    connect?.close?.();
+    openTerminalTab({ terminalId: id, ctx, canvas, accountId: user?.userId || "" });
+  };
+
   useEffect(() => {
     if (!takeRecipeRequests) return undefined;
     const take = () => {
@@ -522,7 +537,12 @@ function IntegrationConnectFlow({
   if (Recipe) {
     return (
       <div className="relative isolate flex min-h-0 flex-1">
-        <RecipesSidebar activeId={recipeId} onOpen={openRecipe} className="hidden w-1/4 shrink-0 md:flex" />
+        <RecipesSidebar
+          activeId={recipeId}
+          onOpen={openRecipe}
+          onOpenTerminal={openTerminal}
+          className="hidden w-1/4 shrink-0 md:flex"
+        />
         <Recipe onBack={() => changePhase("pick")} Title={Title} Description={Description} />
       </div>
     );
@@ -532,6 +552,7 @@ function IntegrationConnectFlow({
       <div className="relative isolate flex min-h-0 flex-1">
         <RecipesSidebar
           onOpen={openRecipe}
+          onOpenTerminal={openTerminal}
           onHover={previewRecipe}
           expanded={Boolean(previewRecipeId)}
           className="hidden w-1/4 shrink-0 md:flex"
