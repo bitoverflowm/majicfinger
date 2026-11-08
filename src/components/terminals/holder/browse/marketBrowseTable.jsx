@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { ArrowDown, ArrowUp, Check, Trash2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { cachedStats, closeAt, displayTags, withStats } from "./marketBrowseFeeds";
 
@@ -22,6 +23,93 @@ const DAY = 24 * HOUR;
 
 const GRID = "minmax(300px, 1fr) 100px 56px 76px 76px 76px 128px 76px";
 
+const COLUMNS = [
+  { key: "market", label: "Market", className: "px-3" },
+  { key: "chance", label: "Chance", className: "px-2", right: true },
+  { key: "change", label: "24h", className: "px-2", right: true, title: "Change in the first outcome's price over 24 hours, in points" },
+  { key: "vol24", label: "24h vol", className: "px-2", right: true },
+  { key: "volume", label: "Volume", className: "px-2", right: true },
+  { key: "liquidity", label: "Liquidity", className: "px-2", right: true },
+  { key: "closes", label: "Closes", className: "px-3" },
+  { key: "listed", label: "Listed", className: "pr-3", right: true },
+];
+
+/** The active sort's arrow. Click reverses it; hovering offers to remove the sort, with a confirm step. */
+function SortArrow({ dir, alignRight, onReverse, onClear }) {
+  const [open, setOpen] = useState(false);
+  const [confirming, setConfirming] = useState(false);
+  const Icon = dir === "asc" ? ArrowUp : ArrowDown;
+  return (
+    <span
+      className="relative inline-flex"
+      onMouseEnter={() => setOpen(true)}
+      onMouseLeave={() => {
+        setOpen(false);
+        setConfirming(false);
+      }}
+    >
+      <button
+        type="button"
+        onClick={onReverse}
+        aria-label={dir === "asc" ? "Sorted ascending, click to reverse" : "Sorted descending, click to reverse"}
+        className="inline-flex size-4 items-center justify-center rounded text-foreground hover:bg-muted"
+      >
+        <Icon className="size-3" aria-hidden />
+      </button>
+      {open ? (
+        <span className={cn("absolute top-full z-10 pt-1 font-normal normal-case tracking-normal", alignRight ? "right-0" : "left-0")}>
+          <span className="block w-40 rounded-xl border border-border bg-popover p-1 text-popover-foreground shadow-lg">
+            {confirming ? (
+              <button
+                type="button"
+                onClick={onClear}
+                className="flex w-full items-center gap-2.5 rounded-md bg-muted px-2 py-2 text-[13px] text-red-500"
+              >
+                <Check className="size-4 shrink-0" aria-hidden />
+                Confirm
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={() => setConfirming(true)}
+                className="flex w-full items-center gap-2.5 rounded-md px-2 py-2 text-[13px] text-red-500 hover:bg-red-50 dark:hover:bg-red-950/40"
+              >
+                <Trash2 className="size-4 shrink-0" aria-hidden />
+                Remove sort
+              </button>
+            )}
+          </span>
+        </span>
+      ) : null}
+    </span>
+  );
+}
+
+export function HeaderCell({ column, sort, onSort, onClearSort }) {
+  const active = sort?.key === column.key;
+  return (
+    <div
+      role="columnheader"
+      aria-sort={active ? (sort.dir === "asc" ? "ascending" : "descending") : undefined}
+      title={column.title}
+      className={cn("flex items-center gap-1 py-2", column.right && "justify-end", column.className)}
+    >
+      {onSort ? (
+        <button
+          type="button"
+          onClick={() => onSort(column.key)}
+          className={cn("uppercase tracking-wide transition-colors hover:text-foreground", active && "text-foreground")}
+        >
+          {column.label}
+        </button>
+      ) : (
+        column.label
+      )}
+      {active && onSort ? <SortArrow dir={sort.dir} alignRight={column.right} onReverse={() => onSort(column.key)} onClear={onClearSort} /> : null}
+    </div>
+  );
+}
+
 const USD_WHOLE = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 });
 
 export function usd(value) {
@@ -29,13 +117,13 @@ export function usd(value) {
   return value < 1000 ? USD_WHOLE.format(value) : USD_COMPACT.format(value);
 }
 
-function span(abs) {
+export function span(abs) {
   if (abs < HOUR) return `${Math.max(1, Math.round(abs / MINUTE))}m`;
   if (abs < DAY) return `${Math.round(abs / HOUR)}h`;
   return `${Math.round(abs / DAY)}d`;
 }
 
-function shortDate(ms) {
+export function shortDate(ms) {
   const date = new Date(ms);
   const sameYear = date.getFullYear() === new Date().getFullYear();
   return date.toLocaleDateString(undefined, { month: "short", day: "numeric", ...(sameYear ? {} : { year: "numeric" }) });
@@ -302,7 +390,7 @@ export function useReportVisible(visible, onVisible) {
  * Markets as a rich table, drawn only where the list is scrolled to. Tells the parent which
  * markets are on screen so it can fetch their stats and stream their prices.
  */
-export function MarketBrowseTable({ markets, live, arrivals, resolved, onPick, onVisible, empty, height = 620, resetKey }) {
+export function MarketBrowseTable({ markets, live, arrivals, resolved, onPick, onVisible, empty, height = 620, resetKey, sort, onSort, onClearSort }) {
   const { scrollRef, view, onScroll } = useBrowseScroll({ height, resetKey });
   const now = useBrowseNow(live, markets);
 
@@ -319,14 +407,9 @@ export function MarketBrowseTable({ markets, live, arrivals, resolved, onPick, o
           className="sticky top-0 z-[1] grid border-b border-border/70 bg-background text-[11px] font-medium uppercase tracking-wide text-muted-foreground"
           style={{ gridTemplateColumns: GRID }}
         >
-          <div role="columnheader" className="px-3 py-2">Market</div>
-          <div role="columnheader" className="px-2 py-2 text-right">Chance</div>
-          <div role="columnheader" className="px-2 py-2 text-right" title="Change in the first outcome's price over 24 hours, in points">24h</div>
-          <div role="columnheader" className="px-2 py-2 text-right">24h vol</div>
-          <div role="columnheader" className="px-2 py-2 text-right">Volume</div>
-          <div role="columnheader" className="px-2 py-2 text-right">Liquidity</div>
-          <div role="columnheader" className="px-3 py-2">Closes</div>
-          <div role="columnheader" className="pr-3 py-2 text-right">Listed</div>
+          {COLUMNS.map((column) => (
+            <HeaderCell key={column.key} column={column} sort={sort} onSort={onSort} onClearSort={onClearSort} />
+          ))}
         </div>
         {markets.length ? (
           <div role="rowgroup" className="relative" style={{ height: markets.length * ROW_HEIGHT }}>

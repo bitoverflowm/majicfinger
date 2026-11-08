@@ -8,7 +8,7 @@ import { useUser } from "@/lib/hooks";
 import { siteConfig } from "@/lib/site";
 import { findTerminal } from "@/lib/workspaceTerminals";
 import { exploreFromTerminal, placeTerminalSubjects } from "./openTerminalTab";
-import { HolderMarketBrowser } from "./holder/browse/holderMarketBrowser";
+import { HolderBrowse } from "./holder/browse/holderBrowse";
 import { HolderMarketView } from "./holder/holderMarketView";
 import { HolderTerminalSearch } from "./holder/holderTerminalSearch";
 import { HolderTraderView } from "./holder/holderTraderView";
@@ -150,7 +150,7 @@ function HolderTerminal({ tab }) {
             onProfileName={(title) => pick([{ ...subject, title }])}
           />
         ) : (
-          <HolderMarketBrowser onPick={pick} className="mt-10" />
+          <HolderBrowse onPick={pick} className="mt-10" />
         )}
       </div>
       {tip && movedTip.dismissed === false ? (

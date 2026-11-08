@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { CalendarDays, LayoutGrid, List, Loader2, Pause, Play } from "lucide-react";
+import { ArrowDown, ArrowUp, CalendarDays, LayoutGrid, List, Loader2, Pause, Play } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import {
@@ -12,6 +12,7 @@ import {
   cachedTradable,
   closeAt,
   fetchStats,
+  fetchStatsBulk,
   forgetStats,
   inCategory,
   loadFeed,
@@ -76,7 +77,61 @@ function sortMarkets(markets, sort) {
   return compare ? markets.slice().sort(compare) : markets;
 }
 
-function Chip({ selected, onClick, children, count }) {
+const COLLATOR = new Intl.Collator(undefined, { sensitivity: "base", numeric: true });
+
+const COLUMN_LABELS = {
+  market: "market",
+  chance: "chance",
+  change: "24h change",
+  vol24: "24h volume",
+  volume: "volume",
+  liquidity: "liquidity",
+  closes: "closing time",
+  listed: "listed",
+};
+
+/**
+ * Sorting by a table column. `dir` is where a first click starts: text A to Z, numbers highest
+ * first, closes soonest first, listed newest first. `stats` columns need Gamma's numbers.
+ */
+const COLUMN_SORTS = {
+  market: { dir: "asc", text: true, value: (market) => market.question || market.slug || null },
+  chance: { dir: "desc", value: (market) => market.prices[0] },
+  change: { dir: "desc", stats: true, value: (market) => market.change24h },
+  vol24: { dir: "desc", stats: true, value: (market) => market.volume24h },
+  volume: { dir: "desc", stats: true, value: (market) => market.volume },
+  liquidity: { dir: "desc", stats: true, value: (market) => market.liquidity },
+  closes: {
+    dir: "asc",
+    value: (market, now) => {
+      const at = closeAt(market);
+      if (market.closed || market.closedAt) return at;
+      // Past its end date and waiting on a result: nothing left to count down to.
+      return at && at >= now ? at : null;
+    },
+  },
+  listed: { dir: "desc", value: (market) => market.createdAt },
+};
+
+/** Markets without a value go last whichever way the column is sorted. */
+function sortByColumn(markets, { key, dir }) {
+  const column = COLUMN_SORTS[key];
+  if (!column) return markets;
+  const now = Date.now();
+  const sign = dir === "asc" ? 1 : -1;
+  const keyed = markets.map((market) => {
+    const value = column.value(column.stats ? withStats(market, cachedStats(market.conditionId)) : market, now);
+    const missing = value == null || (!column.text && !Number.isFinite(value));
+    return { market, value, missing };
+  });
+  keyed.sort((a, b) => {
+    if (a.missing || b.missing) return a.missing === b.missing ? 0 : a.missing ? 1 : -1;
+    return sign * (column.text ? COLLATOR.compare(a.value, b.value) : a.value - b.value);
+  });
+  return keyed.map((entry) => entry.market);
+}
+
+export function Chip({ selected, onClick, children, count }) {
   return (
     <button
       type="button"
@@ -98,7 +153,7 @@ function Chip({ selected, onClick, children, count }) {
   );
 }
 
-function CategoryChip({ selected, onClick, children, count }) {
+export function CategoryChip({ selected, onClick, children, count }) {
   return (
     <button
       type="button"
@@ -116,7 +171,7 @@ function CategoryChip({ selected, onClick, children, count }) {
   );
 }
 
-function Segmented({ label, value, options, onChange }) {
+export function Segmented({ label, value, options, onChange }) {
   return (
     <div role="radiogroup" aria-label={label} className="inline-flex rounded-lg bg-muted p-0.5 text-[12px]">
       {options.map((option) => (
@@ -200,9 +255,9 @@ function NewMarketToast({ markets, onPause, onView }) {
  * tradable markets by category, as a live table or a calendar of when they close. Newly created
  * markets stream in at the top and raise an alert.
  *
- * @param {{ onPick: (subjects: object[]) => void, className?: string }} props
+ * @param {{ onPick: (subjects: object[]) => void, heading?: import("react").ReactNode, onReveal?: () => void, className?: string }} props
  */
-export function HolderMarketBrowser({ onPick, className }) {
+export function HolderMarketBrowser({ onPick, heading, onReveal, className }) {
   const [feed, setFeed] = useState("tradable");
   const [view, setView] = useState("list");
   const [sort, setSort] = useState("newest");
@@ -216,7 +271,9 @@ export function HolderMarketBrowser({ onPick, className }) {
   const [arrivals, setArrivals] = useState(() => new Map());
   const [resolved, setResolved] = useState(() => new Map());
   const [visible, setVisible] = useState([]);
-  const [, setStatsVersion] = useState(0);
+  const [statsVersion, setStatsVersion] = useState(0);
+  const [columnSort, setColumnSort] = useState(null);
+  const [statsProgress, setStatsProgress] = useState(null);
   const [paused, setPaused] = useState(false);
   const [retry, setRetry] = useState(0);
   const pausedRef = useRef(false);
@@ -300,7 +357,54 @@ export function HolderMarketBrowser({ onPick, className }) {
     return allTradable;
   }, [allTradable, categoryId, feed, feeds, gammaFeed, liveNew]);
 
-  const markets = useMemo(() => sortMarkets(base, sort), [base, sort]);
+  const statsSort = !!columnSort && !!COLUMN_SORTS[columnSort.key]?.stats;
+  const markets = useMemo(
+    () => (columnSort ? sortByColumn(base, columnSort) : sortMarkets(base, sort)),
+    // Stats sorts redo themselves as more of the list's numbers arrive.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [base, sort, columnSort, statsSort ? statsVersion : 0],
+  );
+
+  const sortByHeader = (key) => {
+    setColumnSort((prev) =>
+      prev?.key === key ? { key, dir: prev.dir === "asc" ? "desc" : "asc" } : { key, dir: COLUMN_SORTS[key]?.dir || "desc" },
+    );
+    setResetKey((value) => value + 1);
+  };
+  const clearColumnSort = () => {
+    setColumnSort(null);
+    setResetKey((value) => value + 1);
+  };
+
+  /* Sorting by a stats column needs every market's numbers, not just the rows on screen. */
+  const baseRef = useRef(base);
+  baseRef.current = base;
+  useEffect(() => {
+    if (!statsSort) return undefined;
+    const ids = baseRef.current.map((market) => market.conditionId).filter((id) => cachedStats(id) === undefined);
+    if (!ids.length) return undefined;
+    const abort = new AbortController();
+    let shownAt = 0;
+    setStatsProgress({ done: 0, total: ids.length });
+    fetchStatsBulk(ids, abort.signal, (done, total) => {
+      if (abort.signal.aborted) return;
+      setStatsProgress({ done, total });
+      if (Date.now() - shownAt > 1500) {
+        shownAt = Date.now();
+        setStatsVersion((value) => value + 1);
+      }
+    })
+      .catch(() => {})
+      .finally(() => {
+        if (abort.signal.aborted) return;
+        setStatsProgress(null);
+        setStatsVersion((value) => value + 1);
+      });
+    return () => {
+      abort.abort();
+      setStatsProgress(null);
+    };
+  }, [statsSort, feed, tradable.done]);
 
   const pickFeed = (next) => {
     setFeed(next);
@@ -364,12 +468,15 @@ export function HolderMarketBrowser({ onPick, className }) {
     }, ENRICH_DELAYS_MS[attempt]);
   }, []);
 
+  const onRevealRef = useRef(onReveal);
+  onRevealRef.current = onReveal;
   const showJustListed = useCallback(() => {
+    onRevealRef.current?.();
     setFeed("new");
     setView((prev) => (prev === "calendar" ? "list" : prev));
     setSort("newest");
     setResetKey((value) => value + 1);
-    sectionRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    window.requestAnimationFrame(() => sectionRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }));
   }, []);
 
   const changePaused = useCallback((next) => {
@@ -470,7 +577,7 @@ export function HolderMarketBrowser({ onPick, className }) {
     <section ref={sectionRef} aria-label="Browse markets" className={cn("scroll-mt-4", className)}>
       <div className="flex flex-wrap items-end justify-between gap-2">
         <div>
-          <h3 className="text-[15px] font-semibold text-foreground">Browse markets</h3>
+          {heading || <h3 className="text-[15px] font-semibold text-foreground">Browse markets</h3>}
           <p className="mt-0.5 text-[13px] text-muted-foreground">Every market you can trade on Polymarket right now, streaming live. Pick one to open it.</p>
         </div>
         <button
@@ -527,9 +634,10 @@ export function HolderMarketBrowser({ onPick, className }) {
         {view !== "calendar" && sortOptions.length > 1 ? (
           <Segmented
             label="Sort"
-            value={sort}
+            value={columnSort ? null : sort}
             onChange={(next) => {
               setSort(next);
+              setColumnSort(null);
               setResetKey((value) => value + 1);
             }}
             options={sortOptions}
@@ -545,6 +653,21 @@ export function HolderMarketBrowser({ onPick, className }) {
             `${selectedLabel} · ${base.length.toLocaleString()}`
           )}
         </span>
+        {statsProgress ? (
+          <span className="inline-flex items-center gap-1.5 text-[12px] tabular-nums text-muted-foreground" title="Sorting needs every market's numbers, not just the ones on screen">
+            <Loader2 className="size-3 animate-spin" aria-hidden />
+            Getting numbers to sort · {Math.round((statsProgress.done / Math.max(1, statsProgress.total)) * 100)}%
+          </span>
+        ) : null}
+        {columnSort && view === "cards" ? (
+          <span className="inline-flex items-center gap-1.5 text-[12px] text-muted-foreground">
+            Sorted by {COLUMN_LABELS[columnSort.key]}
+            {columnSort.dir === "asc" ? <ArrowUp className="size-3 text-foreground" aria-hidden /> : <ArrowDown className="size-3 text-foreground" aria-hidden />}
+            <button type="button" onClick={clearColumnSort} className="rounded px-1 font-medium text-foreground hover:bg-muted">
+              Clear
+            </button>
+          </span>
+        ) : null}
         <span className="ml-auto inline-flex items-center gap-3 text-[12px] text-muted-foreground">
           <span className="inline-flex items-center gap-1.5" title="Prices and trades for the markets on screen">
             <LiveDot status={live.status} />
@@ -572,7 +695,15 @@ export function HolderMarketBrowser({ onPick, className }) {
         ) : view === "cards" ? (
           <MarketBrowseCards {...tableProps} markets={markets} resetKey={`${feed}|${sort}|${resetKey}`} empty={emptyText} />
         ) : (
-          <MarketBrowseTable {...tableProps} markets={markets} resetKey={`${feed}|${sort}|${resetKey}`} empty={emptyText} />
+          <MarketBrowseTable
+            {...tableProps}
+            markets={markets}
+            resetKey={`${feed}|${sort}|${resetKey}`}
+            empty={emptyText}
+            sort={columnSort}
+            onSort={sortByHeader}
+            onClearSort={clearColumnSort}
+          />
         )}
       </div>
     </section>

@@ -320,11 +320,11 @@ export function rememberStats(markets) {
 }
 
 /** Look up Gamma stats for condition ids not yet cached. Resolves with the ids it filled. */
-export async function fetchStats(conditionIds, signal) {
+export async function fetchStats(conditionIds, signal, batchSize = STAT_BATCH) {
   const missing = [...new Set(conditionIds)].filter((id) => id && !statsCache.has(id));
   const filled = [];
-  for (let index = 0; index < missing.length; index += STAT_BATCH) {
-    const batch = missing.slice(index, index + STAT_BATCH);
+  for (let index = 0; index < missing.length; index += batchSize) {
+    const batch = missing.slice(index, index + batchSize);
     const body = await polymarketGet(
       "listMarkets",
       { condition_ids: batch.join(","), limit: String(Math.min(batch.length, GAMMA_PAGE)), include_tag: "true" },
@@ -343,6 +343,32 @@ export async function fetchStats(conditionIds, signal) {
     }
   }
   return filled;
+}
+
+/**
+ * Stats for a whole list (e.g. to sort every tradable market by volume): batches run a few at
+ * a time, and a batch that keeps failing is skipped rather than stopping the rest.
+ */
+export async function fetchStatsBulk(conditionIds, signal, onProgress, concurrency = 10) {
+  const missing = [...new Set(conditionIds)].filter((id) => id && !statsCache.has(id));
+  const batches = [];
+  for (let index = 0; index < missing.length; index += GAMMA_PAGE) batches.push(missing.slice(index, index + GAMMA_PAGE));
+  let next = 0;
+  let done = 0;
+  const worker = async () => {
+    while (next < batches.length) {
+      const batch = batches[next];
+      next += 1;
+      try {
+        await fetchStats(batch, signal, GAMMA_PAGE);
+      } catch (err) {
+        if (signal?.aborted) throw err;
+      }
+      done += batch.length;
+      onProgress?.(done, missing.length);
+    }
+  };
+  await Promise.all(Array.from({ length: Math.min(concurrency, batches.length) }, worker));
 }
 
 /** Gamma indexes a new market a little after the socket announces it, so a miss is retried later. */
