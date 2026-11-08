@@ -34,7 +34,7 @@ const CENTS = new Intl.NumberFormat("en-US", { maximumFractionDigits: 2 });
  * A socket print and REST's copy of the same trade share this key. REST adds the wallet,
  * so the wallet is left out, or the confirmed row would flash a second time.
  */
-function arrivalKey(row) {
+export function arrivalKey(row) {
   const hash = String(row.transaction_hash || "").toLowerCase();
   if (hash) return `${hash}|${row.token_id}|${row.side}`;
   return `${row.timestamp}|${row.token_id}|${row.side}|${row.size}`;
@@ -44,7 +44,7 @@ function arrivalKey(row) {
  * When each trade first showed up, for trades that arrived after the history loaded.
  * History rows set the baseline and never flash.
  */
-function useTradeArrivals(rows, ready) {
+export function useTradeArrivals(rows, ready) {
   const seenRef = useRef(null);
   const arrivedRef = useRef(new Map());
   if (!ready) {

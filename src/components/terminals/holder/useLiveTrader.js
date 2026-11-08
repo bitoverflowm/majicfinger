@@ -67,7 +67,12 @@ function usePolled(key, load, intervalMs, merge) {
 
 function mergeActivity(prev, next) {
   const seen = new Set(prev.map(activityKey));
-  const fresh = next.filter((row) => !seen.has(activityKey(row)));
+  const fresh = next.filter((row) => {
+    const key = activityKey(row);
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
   if (!fresh.length) return prev;
   return fresh.concat(prev).sort((a, b) => stampMs(b.timestamp) - stampMs(a.timestamp));
 }

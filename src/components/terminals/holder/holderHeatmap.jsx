@@ -5,10 +5,12 @@ import { Loader2 } from "lucide-react";
 import { layoutHolderTiles } from "@/lib/visualizations/holderTreemap";
 import { cn } from "@/lib/utils";
 import { HOLDER_FLAGS } from "./holderHoldersTable";
-import { scoreTier } from "./traderScore";
+import { SKILL_SCORE_NAME, scoreTier } from "./traderScore";
 
 /** Past this many holders a side, the rest share one tile so names stay readable. */
 export const HEATMAP_TILES = 60;
+/** Holders whose tile would be smaller than about 32×32 px join the rest, instead of becoming slivers. */
+const MIN_TILE_AREA = 32 * 32;
 
 const OUTCOME_FILL = ["#10b981", "#f43f5e"];
 const OUTCOME_DOT = ["bg-emerald-500", "bg-rose-500"];
@@ -19,7 +21,7 @@ const FLAG_COLOR = { newWallet: "#0ea5e9", firstTrade: "#f59e0b", bothSides: "#d
 export const HEATMAP_MODES = [
   { id: "size", label: "Position size", title: "Darker tiles hold more shares" },
   { id: "pnl", label: "Profit and loss", title: "Green tiles are up, red tiles are down; stronger colour, bigger PnL" },
-  { id: "score", label: "Trader score", title: "Green tiles are proven traders, red tiles poor ones, from their finished markets" },
+  { id: "score", label: SKILL_SCORE_NAME, title: "Green tiles are proven traders, red tiles poor ones, from their finished markets" },
 ];
 
 /** Scores this far from zero get the strongest colour. */
@@ -64,7 +66,7 @@ function scoreText(detail) {
   if (detail === undefined || detail.score === undefined) return "Scoring…";
   if (!detail.score) return "No history";
   const { score } = detail.score;
-  return `Score ${score > 0 ? "+" : ""}${score.toFixed(1)}`;
+  return `${score > 0 ? "+" : ""}${score.toFixed(1)}`;
 }
 
 function pnlOf(holder) {
@@ -154,8 +156,8 @@ function HoverCard({ tile, flags, detail, supply, outcome, box, at }) {
         <dd className="text-right text-foreground">{signedUsd(tile.realized)}</dd>
         <dt className="text-muted-foreground">Unrealized</dt>
         <dd className="text-right text-foreground">{signedUsd(tile.unrealized)}</dd>
-        <dt className="text-muted-foreground">Trader score</dt>
-        <dd className={cn("text-right", scoreTier(detail?.score?.score)?.tone || "text-foreground")}>{scoreText(detail).replace("Score ", "")}</dd>
+        <dt className="text-muted-foreground">{SKILL_SCORE_NAME}</dt>
+        <dd className={cn("text-right", scoreTier(detail?.score?.score)?.tone || "text-foreground")}>{scoreText(detail)}</dd>
       </dl>
       {flags.length ? (
         <div className="mt-1.5 flex flex-wrap gap-1">
@@ -177,7 +179,25 @@ function HeatmapPanel({ side, index, mode, scale, details, enabled, onPickTrader
   const [frameRef, box] = useBox();
   const [hover, setHover] = useState(null);
   const model = useMemo(() => sideModel(side), [side]);
-  const tiles = useMemo(() => layoutHolderTiles(model.named, model.rest, box.width, box.height), [box.height, box.width, model.named, model.rest]);
+  const tiles = useMemo(() => {
+    const area = box.width * box.height;
+    if (!area) return [];
+    const total = model.named.reduce((sum, tile) => sum + tile.weight, 0) + (model.rest?.weight || 0);
+    const shown = [];
+    let foldedShares = 0;
+    let foldedCount = 0;
+    for (const tile of model.named) {
+      if (total > 0 && (tile.weight / total) * area >= MIN_TILE_AREA) shown.push(tile);
+      else {
+        foldedShares += tile.weight;
+        foldedCount += 1;
+      }
+    }
+    const restShares = (model.rest?.weight || 0) + foldedShares;
+    const restCount = (model.rest?.count || 0) + foldedCount;
+    const rest = restShares > 0 && restCount > 0 ? { rest: true, name: "rest", weight: restShares, amount: restShares, count: restCount } : null;
+    return layoutHolderTiles(shown, rest, box.width, box.height);
+  }, [box.height, box.width, model.named, model.rest]);
   const outcome = side?.outcome || (index ? "No" : "Yes");
 
   const fillFor = (tile) => {
@@ -292,7 +312,7 @@ function Legend({ mode, scale, outcomes }) {
         <span>−{SCORE_SPAN}</span>
         <span className="h-2 w-40 rounded-full" style={{ background: `linear-gradient(to right, ${LOSS}, var(--muted), ${PROFIT})` }} aria-hidden />
         <span>+{SCORE_SPAN}</span>
-        <span>trader score</span>
+        <span>{SKILL_SCORE_NAME}</span>
       </div>
     );
   }

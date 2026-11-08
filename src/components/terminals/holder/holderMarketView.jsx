@@ -239,8 +239,8 @@ export function HolderMarketView({ subject, onPickTrader }) {
       <div className="max-w-3xl pt-8">
         <h3 className="text-[15px] font-semibold text-foreground">Holder heatmap</h3>
         <p className="mt-0.5 text-[13px] text-muted-foreground">
-          The largest {HEATMAP_TILES} holders of each outcome as tiles, {outcomes[0]} on the left and {outcomes[1]} on the right.
-          A tile&apos;s area is its share of the supply, and the grey strip is everyone else. Colour by position size to see who
+          Up to the largest {HEATMAP_TILES} holders of each outcome as tiles, {outcomes[0]} on the left and {outcomes[1]} on the
+          right. A tile&apos;s area is its share of the supply, and the grey tile is everyone too small to draw. Colour by position size to see who
           dominates, or by profit and loss to see who is up and who is underwater; both sides share one colour scale. Flags
           outline the tiles they mark, the same flags as the holders table. Tiles re-colour live and a click opens the
           holder&apos;s analysis.
@@ -268,7 +268,7 @@ export function HolderMarketView({ subject, onPickTrader }) {
       <div className="max-w-3xl pt-8">
         <h3 className="text-[15px] font-semibold text-foreground">Are better traders on {outcomes[0]} or {outcomes[1]}?</h3>
         <p className="mt-0.5 text-[13px] text-muted-foreground">
-          Each of the top {HEATMAP_TILES} holders per side gets a Lychee trader score from how they did in markets that have
+          Each of the top {HEATMAP_TILES} holders per side gets a Lychee Skill Score from how they did in markets that have
           finished. The aggregate score weights those by shares held, and the curves show how the scores spread across each
           side&apos;s supply against a typical trader. A side carried by proven traders sits to the right. Weights move live
           with positions.

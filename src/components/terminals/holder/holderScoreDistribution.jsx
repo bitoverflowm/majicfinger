@@ -4,7 +4,7 @@ import { useMemo, useState } from "react";
 import { ChevronDown, Loader2 } from "lucide-react";
 import { Area, CartesianGrid, ComposedChart, Line, ReferenceArea, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { cn } from "@/lib/utils";
-import { SCORE_SHRINK, SCORE_TIERS, scoreTier } from "./traderScore";
+import { SCORE_SHRINK, SCORE_TIERS, SKILL_SCORE_NAME, scoreTier } from "./traderScore";
 
 const OUTCOME_FILL = ["#10b981", "#f43f5e"];
 const OUTCOME_DOT = ["bg-emerald-500", "bg-rose-500"];
@@ -68,7 +68,7 @@ function AggregateCard({ stats, index, outcome, limit }) {
     <div className="min-w-0 rounded-xl border border-border/70 bg-background p-4 shadow-sm">
       <div className="flex items-center gap-2 text-[12px] text-muted-foreground">
         <span className={cn("size-2 rounded-full", OUTCOME_DOT[index])} aria-hidden />
-        <span className="font-medium text-foreground">{outcome}</span> aggregate score
+        <span className="font-medium text-foreground">{outcome}</span> aggregate {SKILL_SCORE_NAME}
         {stats.pending ? (
           <span className="ml-auto flex items-center gap-1">
             <Loader2 className="size-3 animate-spin" aria-hidden />
@@ -115,14 +115,15 @@ function Explainer() {
         onClick={() => setOpen((value) => !value)}
         className="flex w-full items-center justify-between px-4 py-2.5 text-left text-[13px] font-medium text-foreground"
       >
-        How the Lychee trader score works
+        How the {SKILL_SCORE_NAME} works
         <ChevronDown className={cn("size-4 text-muted-foreground transition-transform", open && "rotate-180")} aria-hidden />
       </button>
       {open ? (
         <div className="space-y-3 border-t border-border/70 px-4 py-3 text-[13px] text-muted-foreground">
           <p>
-            Every trader gets one score from their finished positions: markets they closed out of, or that resolved, up to their
-            most recent 2,000. This market never counts, so the score says how good someone was before they took this position.
+            Every trader gets one {SKILL_SCORE_NAME} from their finished positions: markets they closed out of, or that resolved,
+            up to their most recent 2,000. Here this market never counts, so the score says how good someone was before they took
+            this position.
           </p>
           <p>
             Each position is judged against the odds the trader paid. If prices were fair, a position bought at an average price
@@ -147,7 +148,7 @@ function Explainer() {
             ))}
           </ul>
           <p>
-            A side&apos;s <span className="font-medium text-foreground">aggregate score</span> weights each top holder&apos;s score by
+            A side&apos;s <span className="font-medium text-foreground">aggregate {SKILL_SCORE_NAME}</span> weights each top holder&apos;s score by
             the shares they hold, so it reads as the skill behind the average share. Holders with no finished markets are left
             out.
           </p>
@@ -163,7 +164,9 @@ function ChartTooltip({ active, payload, label, outcomes }) {
   const tier = scoreTier(label);
   return (
     <div className="rounded-md border border-border/70 bg-background px-2.5 py-2 text-[12px] shadow-md">
-      <div className="font-medium text-foreground">Score {signed(label, 0)}</div>
+      <div className="font-medium text-foreground">
+        {SKILL_SCORE_NAME} {signed(label, 0)}
+      </div>
       {tier ? <div className="max-w-[220px] text-[11px] text-muted-foreground">{tier.label}</div> : null}
       {[0, 1].map((index) => (
         <div key={index} className="mt-1 flex items-center gap-1.5 tabular-nums text-muted-foreground">
@@ -216,18 +219,18 @@ export function HolderScoreDistribution({ sides, details, outcomes, limit }) {
       {lean != null ? (
         <p className="text-[13px] text-foreground">
           {lean === -1 ? (
-            <>Holders on both sides trade about as well: the aggregate scores are within 2 points.</>
+            <>Holders on both sides trade about as well: the aggregate {SKILL_SCORE_NAME}s are within 2 points.</>
           ) : (
             <>
               Better traders lean <span className={cn("font-semibold", lean ? "text-rose-500" : "text-emerald-500")}>{outcomes[lean]}</span>,
-              by <span className="font-mono tabular-nums">{Math.abs(gap).toFixed(1)}</span> points of aggregate score.
+              by <span className="font-mono tabular-nums">{Math.abs(gap).toFixed(1)}</span> points of aggregate {SKILL_SCORE_NAME}.
             </>
           )}
         </p>
       ) : null}
       <section aria-label="Holder score distribution" className="rounded-xl border border-border/70 bg-background p-4 shadow-sm">
         <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-[12px] text-muted-foreground">
-          <span className="font-medium text-foreground">Top holders&apos; scores, weighted by supply</span>
+          <span className="font-medium text-foreground">Top holders&apos; {SKILL_SCORE_NAME}s, weighted by supply</span>
           {[0, 1].map((index) => (
             <span key={index} className="flex items-center gap-1.5">
               <span className="size-2.5 rounded-sm" style={{ backgroundColor: OUTCOME_FILL[index] }} aria-hidden />

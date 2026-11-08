@@ -1,10 +1,10 @@
 import { polymarketGet } from "@/components/dashboardComposer/recipes/polymarketTradeHistorySource";
 
 /**
- * Lychee trader score: how surprising a trader's results are if every price they paid was fair.
+ * Lychee Skill Score: how surprising a trader's results are if every price they paid was fair.
  *
- * Only finished positions count (closed, or resolved and waiting to be redeemed), never the market
- * being looked at. For each position bought at average price p on n shares, fair odds give an
+ * Only finished positions count (closed, or resolved and waiting to be redeemed), and when scoring a
+ * market's holders, never the market being looked at. For each position bought at average price p on n shares, fair odds give an
  * expected profit of zero with variance n²·p·(1 − p). Summing over positions,
  *
  *   z = Σ pnl / √(Σ n²·p·(1 − p))
@@ -15,6 +15,9 @@ import { polymarketGet } from "@/components/dashboardComposer/recipes/polymarket
  * (Kish: (Σw)² / Σw², with w = n·√(p(1 − p))), and the result is put on a ±100 scale where an
  * average trader has a standard deviation of about 10, so ±20 is a two-sigma outlier.
  */
+
+/** What the score is called everywhere in the product. */
+export const SKILL_SCORE_NAME = "Lychee Skill Score";
 
 export const SCORE_SHRINK = 4;
 const PAGE = 1000;
@@ -144,7 +147,10 @@ export function traderScore(positions) {
 
 const cache = new Map();
 
-/** A wallet's score outside one market, cached for the session. Null when it has no finished positions. */
+/**
+ * A wallet's score, leaving out one market (or none when `excludeCondition` is empty), cached for the
+ * session. Null when it has no finished positions.
+ */
 export function loadTraderScore(wallet, excludeCondition, signal) {
   const key = `${wallet}|${String(excludeCondition || "").toLowerCase()}`;
   if (!cache.has(key)) {

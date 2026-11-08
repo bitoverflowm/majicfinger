@@ -4,7 +4,7 @@ import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { Loader2 } from "lucide-react";
 import { UserAvatar } from "@/components/ui/user-avatar";
 import { cn } from "@/lib/utils";
-import { scoreTier } from "./traderScore";
+import { SKILL_SCORE_NAME, scoreTier } from "./traderScore";
 
 const ROW_HEIGHT = 48;
 const OVERSCAN = 8;
@@ -147,11 +147,22 @@ function Pending() {
   return <span className="inline-block h-2.5 w-8 animate-pulse rounded bg-muted" aria-label="Loading" />;
 }
 
-const GRID = "280px 64px 84px 88px 72px 64px 92px 92px 92px 92px";
+const GRID = "280px 96px 84px 88px 72px 64px 92px 92px 92px 92px";
 
 const COLUMNS = [
   { key: "trader", label: "Leaderboard · Holder", className: "pl-3", title: "All-time PnL rank on the Polymarket leaderboard, then the holder" },
-  { key: "score", label: "Score", right: true, title: "Lychee trader score from finished markets, −100 to 100; ±20 is a two-sigma outlier" },
+  {
+    key: "score",
+    label: (
+      <>
+        Lychee
+        <br />
+        Skill Score
+      </>
+    ),
+    right: true,
+    title: `${SKILL_SCORE_NAME} from finished markets, −100 to 100; ±20 is a two-sigma outlier`,
+  },
   { key: "shares", label: "Shares", right: true, title: "Shares held now" },
   { key: "value", label: "Position", right: true, title: "What the shares are worth at the live price" },
   { key: "supply", label: "Supply", right: true, title: "Share of every outstanding share of this outcome" },
@@ -337,7 +348,7 @@ function HolderList({ side, index, details, onVisible, enabled, outcomes, onPick
       <div role="table" aria-label={`${side?.outcome || ""} holders`} className="min-w-max">
         <div
           role="row"
-          className="sticky top-0 z-[2] grid border-b border-border/70 bg-background text-[11px] font-medium uppercase tracking-wide text-muted-foreground"
+          className="sticky top-0 z-[2] grid items-end border-b border-border/70 bg-background text-[11px] font-medium uppercase leading-tight tracking-wide text-muted-foreground"
           style={{ gridTemplateColumns: GRID }}
         >
           {COLUMNS.map((column) => (

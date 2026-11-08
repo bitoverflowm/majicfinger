@@ -1,16 +1,19 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import dynamic from "next/dynamic";
 import { BadgeCheck, Loader2 } from "lucide-react";
-import { DashboardSheetGrid } from "@/components/dashboardComposer/dashboardSheetGrid";
 import { formatUsd, Stat } from "@/components/dashboardComposer/recipes/polymarketMarketSearch";
 import { Skeleton } from "@/components/ui/skeleton";
 import { retryImport } from "@/lib/retryImport";
-import { TRADER_ACTIVITY_ENDPOINT_ID } from "@/lib/polymarketLive/traderActivityCompose";
 import { TRADER_PNL_ENDPOINT_ID } from "@/lib/polymarketLive/traderPnlCompose";
+import { cn } from "@/lib/utils";
+import { scoreTitle } from "./holderHoldersTable";
 import { LiveDot } from "./holderMarketView";
 import { sheetChartBlock, traderSheet } from "./holderTerminalSheets";
+import { SCORE_TIERS, SKILL_SCORE_NAME, loadTraderScore, scoreTier } from "./traderScore";
+import { TradeAlertsToggle, useTraderTradeAlerts } from "./traderTradeAlerts";
+import { TraderTradesTable } from "./traderTradesTable";
 import { useLiveTrader } from "./useLiveTrader";
 
 const SheetBlockChart = dynamic(
@@ -40,9 +43,119 @@ function shortWallet(address) {
   return `${address.slice(0, 6)}…${address.slice(-4)}`;
 }
 
-function TraderStatsCard({ subject, part }) {
+/** The wallet's Lychee Skill Score across every market it has finished. */
+function useSkillScore(address) {
+  const wallet = String(address || "").toLowerCase();
+  const [state, setState] = useState({ wallet: "", status: "loading", score: null });
+  useEffect(() => {
+    if (!wallet) return undefined;
+    let alive = true;
+    loadTraderScore(wallet, "").then(
+      (score) => alive && setState({ wallet, status: "ready", score }),
+      () => alive && setState({ wallet, status: "error", score: null }),
+    );
+    return () => {
+      alive = false;
+    };
+  }, [wallet]);
+  return state.wallet === wallet ? state : { wallet, status: "loading", score: null };
+}
+
+/** The gauge spans ±GAUGE_SPAN; scores past it pin to the ends. */
+const GAUGE_SPAN = 30;
+const GAUGE_TIERS = [...SCORE_TIERS].reverse();
+
+function SkillScorePanel({ skill }) {
+  const score = skill.score;
+  const tier = score ? scoreTier(score.score) : null;
+  const at = score ? ((Math.max(-GAUGE_SPAN, Math.min(GAUGE_SPAN, score.score)) + GAUGE_SPAN) / (2 * GAUGE_SPAN)) * 100 : null;
+  return (
+    <section aria-label={SKILL_SCORE_NAME} className="border-t border-border/50 px-4 py-3">
+      <div className="flex items-center justify-between gap-2">
+        <p className="text-[12px] font-medium text-muted-foreground" title="How surprising this trader's results are if every price they paid was fair. −100 to 100; ±20 is a two-sigma outlier.">
+          {SKILL_SCORE_NAME}
+        </p>
+        {skill.status === "loading" ? (
+          <span className="flex items-center gap-1 text-[11px] text-muted-foreground">
+            <Loader2 className="size-3 animate-spin" aria-hidden />
+            Scoring
+          </span>
+        ) : null}
+      </div>
+      {skill.status === "loading" ? (
+        <Skeleton className="mt-2 h-[58px] rounded-lg bg-black/[0.06] dark:bg-white/[0.08]" />
+      ) : skill.status === "error" ? (
+        <p className="mt-1 text-[12px] text-muted-foreground">Couldn&apos;t load this wallet&apos;s finished markets to score.</p>
+      ) : !score ? (
+        <p className="mt-1 text-[12px] text-muted-foreground">New: no finished markets yet, so there&apos;s nothing to score.</p>
+      ) : (
+        <>
+          <div className="mt-0.5 flex items-center gap-2.5" title={scoreTitle(score)}>
+            <span className={cn("shrink-0 font-mono text-[26px] font-semibold tabular-nums tracking-tight", tier.tone)}>
+              {score.score > 0 ? "+" : ""}
+              {score.score.toFixed(1)}
+            </span>
+            <span className="min-w-0 text-[12px] leading-snug text-muted-foreground">{tier.label}</span>
+          </div>
+          <div className="relative mt-2">
+            <div className="flex h-1.5 gap-0.5 overflow-hidden rounded-full" aria-hidden>
+              {GAUGE_TIERS.map((band) => (
+                <span key={band.min} className="flex-1 opacity-70" style={{ backgroundColor: band.fill }} />
+              ))}
+            </div>
+            <span
+              className="absolute top-1/2 size-3 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-background shadow"
+              style={{ left: `${at}%`, backgroundColor: tier.fill }}
+              aria-hidden
+            />
+          </div>
+          <div className="mt-1 flex justify-between text-[10.5px] text-muted-foreground" aria-hidden>
+            <span>Poor</span>
+            <span>Typical</span>
+            <span>Proven</span>
+          </div>
+          <p className="mt-1.5 text-[11.5px] text-muted-foreground">
+            {score.positions.toLocaleString()} {score.recentOnly ? "most recent " : ""}finished positions · {Math.round(score.effectiveBets).toLocaleString()} effective bets ·{" "}
+            {Math.round(score.winRate * 100)}% won · {score.edge >= 0 ? "+" : "−"}
+            {Math.abs(score.edge * 100).toFixed(1)}¢ per share
+          </p>
+        </>
+      )}
+    </section>
+  );
+}
+
+/** Polymarket names accounts that never picked a username after their wallet, sometimes with a timestamp. */
+function chosenName(value) {
+  const name = String(value || "").trim();
+  return name && !/^0x[a-fA-F0-9]{40}(-\d+)?$/.test(name) ? name : "";
+}
+
+function TraderHandles({ row, address }) {
+  const username = chosenName(row.name);
+  const x = String(row.xUsername || "").trim().replace(/^@/, "");
+  const link = "font-medium text-foreground hover:underline";
+  return (
+    <p className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[12px] text-muted-foreground">
+      <a href={`https://polymarket.com/profile/${address}`} target="_blank" rel="noopener noreferrer" className={link} title="Open the Polymarket profile">
+        {username ? `@${username}` : "Polymarket profile"}
+      </a>
+      {!username ? <span title="This account never picked a username, so Polymarket shows a generated name">· no username set</span> : null}
+      {x ? (
+        <>
+          <span aria-hidden>·</span>
+          <a href={`https://x.com/${x}`} target="_blank" rel="noopener noreferrer" className={link} title="Open their X profile">
+            @{x} on X
+          </a>
+        </>
+      ) : null}
+    </p>
+  );
+}
+
+function TraderStatsCard({ subject, part, skill }) {
   const row = part.rows[0] || {};
-  const name = row.name || row.pseudonym || subject.title || shortWallet(subject.address);
+  const name = chosenName(row.name) || row.pseudonym || chosenName(subject.title) || shortWallet(subject.address);
   if (part.status === "loading") {
     return (
       <div className="overflow-hidden rounded-xl border border-border/70 bg-background shadow-sm">
@@ -55,6 +168,7 @@ function TraderStatsCard({ subject, part }) {
             <Skeleton key={index} className="h-[66px] rounded-lg bg-black/[0.06] dark:bg-white/[0.08]" />
           ))}
         </div>
+        <SkillScorePanel skill={skill} />
       </div>
     );
   }
@@ -74,9 +188,9 @@ function TraderStatsCard({ subject, part }) {
             <span className="truncate">{name}</span>
             {row.verifiedBadge === true || row.verifiedBadge === "true" ? <BadgeCheck className="size-4 shrink-0 text-sky-500" aria-label="Verified" /> : null}
           </p>
-          <p className="truncate font-mono text-[11px] text-muted-foreground">
+          <TraderHandles row={row} address={subject.address} />
+          <p className="mt-0.5 truncate font-mono text-[11px] text-muted-foreground" title={subject.address}>
             {subject.address}
-            {row.xUsername ? <span className="font-sans"> · @{row.xUsername}</span> : null}
           </p>
         </div>
       </header>
@@ -92,6 +206,7 @@ function TraderStatsCard({ subject, part }) {
           <Stat label="Joined" value={joinedDay(row)} detail={num(row.views) != null ? `${num(row.views).toLocaleString()} profile views` : ""} />
         </dl>
       )}
+      <SkillScorePanel skill={skill} />
     </article>
   );
 }
@@ -105,25 +220,30 @@ function PanelState({ part, empty }) {
   );
 }
 
-/** One trader: live profile stats, PnL over time and their trades as they happen. */
-export function HolderTraderView({ subject, onProfileName }) {
+/**
+ * One trader: live profile stats, PnL over time and their trades as they happen, with an alert
+ * when they place a new one. `onPickMarket(subject)` opens a market from the trades table.
+ */
+export function HolderTraderView({ subject, onProfileName, onPickMarket }) {
   const { profile, activity, pnl } = useLiveTrader(subject.address);
-  const profileName = String(profile.rows[0]?.name || profile.rows[0]?.pseudonym || "").trim();
+  const skill = useSkillScore(subject.address);
+  const profileName = chosenName(profile.rows[0]?.name) || String(profile.rows[0]?.pseudonym || "").trim();
   useEffect(() => {
-    if (profileName && !subject.title && !/^0x[a-fA-F0-9]{40}/.test(profileName)) onProfileName?.(profileName);
+    if (profileName && !subject.title) onProfileName?.(profileName);
   }, [onProfileName, profileName, subject.title]);
-  const [widths, setWidths] = useState({});
   const pnlSheet = useMemo(() => traderSheet(TRADER_PNL_ENDPOINT_ID, pnl, subject), [pnl, subject]);
   const pnlChart = useMemo(() => sheetChartBlock(pnlSheet), [pnlSheet]);
-  const activitySheet = useMemo(() => traderSheet(TRADER_ACTIVITY_ENDPOINT_ID, activity, subject), [activity, subject]);
-  const gridBlock = useMemo(
-    () => ({
-      ...activitySheet,
-      columns: activitySheet.columns.map((column) => (widths[column.id] ? { ...column, width: widths[column.id] } : column)),
-    }),
-    [activitySheet, widths],
-  );
   const updated = activity.updatedAt ? new Date(activity.updatedAt).toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit", second: "2-digit" }) : "";
+  const tradesRef = useRef(null);
+  const displayName = chosenName(subject.title) || profileName || shortWallet(subject.address);
+  const alerts = useTraderTradeAlerts({
+    rows: activity.rows,
+    ready: activity.status === "ready",
+    name: displayName,
+    address: subject.address,
+    viewRef: tradesRef,
+    onView: () => tradesRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }),
+  });
 
   return (
     <div className="mt-8 space-y-4 animate-in fade-in slide-in-from-top-2 duration-300">
@@ -133,38 +253,37 @@ export function HolderTraderView({ subject, onProfileName }) {
             <LiveDot on={activity.status === "ready"} label={activity.status === "ready" ? "Live" : "Connecting"} />
             {updated ? <span className="text-[11px] text-muted-foreground">Checked {updated}</span> : null}
           </div>
-          <TraderStatsCard subject={subject} part={profile} />
+          <TraderStatsCard subject={subject} part={profile} skill={skill} />
         </div>
-        <section
-          aria-label="PnL chart"
-          data-block-type={pnlChart.type}
-          data-source-sheet={pnlChart.sourceSheetId}
-          className="flex h-[420px] min-w-0 flex-col overflow-hidden rounded-xl border border-border/70 bg-background p-3 shadow-sm"
-        >
-          {pnl.rows.length ? <SheetBlockChart sheet={pnlSheet} view={pnlChart.chartView} /> : <PanelState part={pnl} empty="No PnL history for this wallet yet." />}
-        </section>
+        {/* Out of flow on wide screens so the chart takes the stats column's height instead of setting it. */}
+        <div className="relative h-[420px] min-w-0 lg:h-auto lg:min-h-[420px]">
+          <section
+            aria-label="PnL chart"
+            data-block-type={pnlChart.type}
+            data-source-sheet={pnlChart.sourceSheetId}
+            className="absolute inset-0 flex min-w-0 flex-col overflow-hidden rounded-xl border border-border/70 bg-background p-3 shadow-sm"
+          >
+            {pnl.rows.length ? <SheetBlockChart sheet={pnlSheet} view={pnlChart.chartView} /> : <PanelState part={pnl} empty="No PnL history for this wallet yet." />}
+          </section>
+        </div>
       </div>
 
-      <div className="flex items-center justify-between gap-3">
-        <p className="text-[13px] font-semibold text-foreground">Trades</p>
-        <span className="text-[12px] text-muted-foreground">
-          {activity.rows.length ? `${activity.rows.length.toLocaleString()} trades · newest first · checks every 10s` : ""}
-        </span>
+      <div ref={tradesRef} className="flex scroll-mt-4 items-end justify-between gap-3 pt-4">
+        <div className="max-w-3xl">
+          <h3 className="text-[15px] font-semibold text-foreground">Trades</h3>
+          <p className="mt-0.5 text-[13px] text-muted-foreground">
+            Every trade this wallet has made, newest first, checked every 10 seconds. New trades slide in at the top and raise an
+            alert while you&apos;re on this tab. Pick a market to open it in the terminal.
+          </p>
+        </div>
+        <div className="flex shrink-0 items-center gap-3">
+          {activity.rows.length ? <span className="text-[12px] tabular-nums text-muted-foreground">{activity.rows.length.toLocaleString()} trades</span> : null}
+          <TradeAlertsToggle paused={alerts.paused} onChange={alerts.setPaused} />
+        </div>
       </div>
-      <section
-        aria-label="Trader trades"
-        data-block-type={activitySheet.type}
-        className="flex h-[560px] flex-col overflow-hidden rounded-xl border border-border/70 bg-background shadow-sm"
-      >
+      <section aria-label="Trader trades" className="flex h-[560px] flex-col overflow-hidden rounded-xl border border-border/70 bg-background shadow-sm">
         {activity.rows.length ? (
-          <DashboardSheetGrid
-            block={gridBlock}
-            readOnly
-            onChange={(patch) => {
-              if (!patch?.columns) return;
-              setWidths(Object.fromEntries(patch.columns.filter((column) => column.id).map((column) => [column.id, column.width])));
-            }}
-          />
+          <TraderTradesTable rows={activity.rows} ready={activity.status === "ready"} empty="No trades for this wallet yet." onPickMarket={onPickMarket} />
         ) : (
           <PanelState part={activity} empty="No trades for this wallet yet." />
         )}

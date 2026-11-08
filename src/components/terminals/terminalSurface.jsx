@@ -155,6 +155,10 @@ function HolderTerminal({ tab }) {
             key={subject.address}
             subject={subject}
             onProfileName={(title) => pick([{ ...subject, title }])}
+            onPickMarket={(market) => {
+              pick([market]);
+              scrollRef.current?.scrollTo({ top: 0 });
+            }}
           />
         ) : (
           <HolderBrowse onPick={pick} className="mt-10" />
