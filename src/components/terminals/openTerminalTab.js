@@ -54,6 +54,26 @@ export function terminalProjectDraft(terminalId, subject = null) {
 }
 
 /**
+ * Back to the terminal's explore view. The subject `tabId` was showing moves to a new tab
+ * right after it, so that view isn't lost. Returns the new tab's id.
+ */
+export function exploreFromTerminal({ ctx, tabId, accountId }) {
+  const tabs = Array.isArray(ctx?.workspaceStartTabs) ? ctx.workspaceStartTabs : [];
+  const index = tabs.findIndex((tab) => tab.id === tabId);
+  const host = tabs[index];
+  const terminal = findTerminal(host?.terminal);
+  const subject = sanitizeTerminalSubject(host?.terminalSubject);
+  if (!host || !terminal || !subject) return null;
+  const moved = terminalTab(terminal, subject, []);
+  const others = tabs.filter((tab) => tab.id !== tabId).map((tab) => tab.name);
+  const explore = { ...host, name: terminalTabName(terminal.title, [...others, moved.name]) };
+  delete explore.terminalSubject;
+  const nextTabs = [...tabs.slice(0, index), explore, moved, ...tabs.slice(index + 1)];
+  commitTabs(ctx, nextTabs, accountId, tabId);
+  return moved.id;
+}
+
+/**
  * Points `tabId` at the first subject and opens one more terminal tab for each of the rest,
  * all in one update. The open tab stays on screen.
  */

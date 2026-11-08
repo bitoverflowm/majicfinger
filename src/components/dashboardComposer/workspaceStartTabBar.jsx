@@ -133,6 +133,7 @@ function StartTabChip({ tab, selected, userId, onSelect }) {
           type="button"
           role="tab"
           aria-selected={selected}
+          data-start-tab-id={tab.id}
           onClick={() => onSelect?.(tab.id)}
           className={cn(
             "inline-flex h-7 items-center rounded-md border border-border px-2.5 text-xs font-medium shadow-sm transition-[padding-right] duration-200 ease-out",

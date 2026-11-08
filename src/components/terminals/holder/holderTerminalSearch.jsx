@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { Loader2 } from "lucide-react";
+import { Compass, Loader2 } from "lucide-react";
 import { PolymarketLiveSearch } from "@/components/connectData/polymarketLive/PolymarketLiveSearch";
 import { polymarketGet } from "@/components/dashboardComposer/recipes/polymarketTradeHistorySource";
 import { formatUsd } from "@/components/dashboardComposer/recipes/polymarketMarketSearch";
@@ -203,9 +203,10 @@ function EventMarketsDialog({ event, onClose, onConfirm }) {
 /**
  * The integrations' Polymarket search with a market / trader toggle. A market opens straight
  * away. An event or series asks which of its markets to open. A trader is a username or wallet.
- * @param {{ onPick: (subjects: object[]) => void, className?: string }} props
+ * `onExplore`, when given, adds an Explore button that goes back to browsing markets.
+ * @param {{ onPick: (subjects: object[]) => void, onExplore?: () => void, className?: string }} props
  */
-export function HolderTerminalSearch({ onPick, className }) {
+export function HolderTerminalSearch({ onPick, onExplore, className }) {
   const [scope, setScope] = useState("markets");
   const [event, setEvent] = useState(null);
 
@@ -243,22 +244,34 @@ export function HolderTerminalSearch({ onPick, className }) {
   const traders = scope === "traders";
   return (
     <div className={className}>
-      <div role="tablist" aria-label="Search for" className="mb-2 inline-flex rounded-lg bg-muted p-0.5 text-[12px]">
-        {SCOPES.map((option) => (
+      <div className="mb-2 flex items-center gap-2">
+        <div role="tablist" aria-label="Search for" className="inline-flex rounded-lg bg-muted p-0.5 text-[12px]">
+          {SCOPES.map((option) => (
+            <button
+              key={option.id}
+              type="button"
+              role="tab"
+              aria-selected={scope === option.id}
+              onClick={() => setScope(option.id)}
+              className={cn(
+                "rounded-md px-3 py-1 font-medium transition-colors",
+                scope === option.id ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground",
+              )}
+            >
+              {option.label}
+            </button>
+          ))}
+        </div>
+        {onExplore ? (
           <button
-            key={option.id}
             type="button"
-            role="tab"
-            aria-selected={scope === option.id}
-            onClick={() => setScope(option.id)}
-            className={cn(
-              "rounded-md px-3 py-1 font-medium transition-colors",
-              scope === option.id ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground",
-            )}
+            onClick={onExplore}
+            className="inline-flex h-[30px] items-center gap-1.5 rounded-lg bg-muted px-3 text-[12px] font-medium text-muted-foreground transition-colors hover:bg-muted/70 hover:text-foreground"
           >
-            {option.label}
+            <Compass className="size-3.5" aria-hidden />
+            Explore
           </button>
-        ))}
+        ) : null}
       </div>
       <PolymarketLiveSearch
         key={scope}
