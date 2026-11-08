@@ -1711,6 +1711,11 @@ export default async function handler(req, res) {
         if (start) params.set("start", start);
         if (end) params.set("end", end);
         if (deposits) params.set("exclude_deposits_withdrawals", deposits);
+        const direction = String(req.query.sort_direction ?? "").trim().toUpperCase();
+        if (direction && direction !== "ASC" && direction !== "DESC") {
+          return res.status(400).json({ message: "Sort direction must be ASC or DESC" });
+        }
+        if (direction) params.set("sort_direction", direction);
         data = await fetchJson(`${DATA_API_BASE}/v2/activity?${params.toString()}`);
         break;
       }

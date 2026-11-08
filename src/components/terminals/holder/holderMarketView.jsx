@@ -7,7 +7,15 @@ import { MarketCardSkeleton, MarketStatsCard } from "@/components/dashboardCompo
 import { retryImport } from "@/lib/retryImport";
 import { cn } from "@/lib/utils";
 import { marketTradeSheet, sheetChartBlock } from "./holderTerminalSheets";
+import { HolderFlagToggles, HolderHoldersTable, holderFlagCounts, useHolderFlags } from "./holderHoldersTable";
+import { HolderEntryHistogram } from "./holderEntryHistogram";
+import { HEATMAP_TILES, HolderHeatmap } from "./holderHeatmap";
+import { HolderScoreDistribution } from "./holderScoreDistribution";
+import { HolderSupplyPanels } from "./holderSupplyPanels";
 import { HolderTradesTable, MergeOutcomesButton } from "./holderTradesTable";
+import { useHolderDetails } from "./useHolderDetails";
+import { useHolderSupply } from "./useHolderSupply";
+import { useMarketHolders } from "./useMarketHolders";
 import { useFusedMarketTrades } from "./useFusedMarketTrades";
 import { useLiveMarketMeta, useLiveMarketStats } from "./useLiveMarketMeta";
 import { useMarketPriceHistory } from "./useMarketPriceHistory";
@@ -70,6 +78,10 @@ export function HolderMarketView({ subject, onPickTrader }) {
   const stats = useLiveMarketStats(meta, quotes, rows);
   const priceHistory = useMarketPriceHistory(meta, stats?.prices);
   const priceChart = useMemo(() => (priceHistory.sheet ? sheetChartBlock(priceHistory.sheet) : null), [priceHistory.sheet]);
+  const holders = useMarketHolders(meta, rows, stats?.prices);
+  const holderDetails = useHolderDetails(meta?.conditionId || "", meta?.tokenIds);
+  const holderFlags = useHolderFlags();
+  const supply = useHolderSupply(meta, rows, stats?.prices, holders.sides);
   const [merged, setMerged] = useState(false);
   useEffect(() => setMerged(false), [subject.conditionId]);
 
@@ -92,6 +104,7 @@ export function HolderMarketView({ subject, onPickTrader }) {
     );
   }
 
+  const outcomes = [meta.outcomes?.[0] || "Yes", meta.outcomes?.[1] || "No"];
   return (
     <div className="mt-8 space-y-4 animate-in fade-in slide-in-from-top-2 duration-300">
       <div className="flex items-center justify-between gap-3 px-1">
@@ -172,6 +185,96 @@ export function HolderMarketView({ subject, onPickTrader }) {
           <PanelLoading label="Loading the price history" />
         )}
       </section>
+
+      <div className="max-w-3xl pt-8">
+        <h3 className="text-[15px] font-semibold text-foreground">Who holds this market</h3>
+        <p className="mt-0.5 text-[13px] text-muted-foreground">
+          Every wallet holding {outcomes[0]} on the left and {outcomes[1]} on the right, largest position first, with each
+          holder&apos;s all-time leaderboard rank. Positions move live: trades update shares, entry price and realized PnL as they
+          confirm, and the live price re-values every position. Pick a holder to open their holder analysis.
+        </p>
+      </div>
+      <HolderFlagToggles
+        enabled={holderFlags.enabled}
+        onToggle={holderFlags.toggle}
+        counts={holderFlagCounts(holders.sides, holderDetails.details)}
+        outcomes={outcomes}
+      />
+      <HolderHoldersTable
+        sides={holders.sides}
+        outcomes={outcomes}
+        loading={holders.loading}
+        error={holders.error}
+        details={holderDetails.details}
+        onVisible={holderDetails.request}
+        enabled={holderFlags.enabled}
+        hasMore={holders.hasMore}
+        loadingMore={holders.loadingMore}
+        onLoadMore={holders.loadMore}
+        onPickTrader={onPickTrader}
+      />
+
+      <div className="max-w-3xl pt-8">
+        <h3 className="text-[15px] font-semibold text-foreground">Profit, loss and ownership</h3>
+        <p className="mt-0.5 text-[13px] text-muted-foreground">
+          The dollars each outcome&apos;s holders have in positions above and below the price they paid, how many holders are
+          making or losing money, and how much of the supply the single largest holder and the rest of the top 10 own. Average
+          entry is the price paid per share across the whole supply. Everything re-values live with the price.
+        </p>
+      </div>
+      <HolderSupplyPanels sides={supply.sides} outcomes={outcomes} error={supply.error} />
+
+      <div className="max-w-3xl pt-8">
+        <h3 className="text-[15px] font-semibold text-foreground">Where the supply was bought</h3>
+        <p className="mt-0.5 text-[13px] text-muted-foreground">
+          Every holder&apos;s position placed at the average price they paid, in one-cent buckets, with {outcomes[0]} and{" "}
+          {outcomes[1]} stacked on the same axis. Tall bars are price levels where a lot of supply changed hands, and the dashed
+          lines mark where each outcome trades now. An outcome&apos;s bars to the right of its own line paid more than today&apos;s
+          price and are sitting on a loss, so they may sell if the price climbs back to their entry. Switch between shares, their value now, and what was paid. Bars move as holders
+          trade and the lines move with the live price.
+        </p>
+      </div>
+      <HolderEntryHistogram sides={supply.sides} outcomes={outcomes} loading={supply.loading} />
+
+      <div className="max-w-3xl pt-8">
+        <h3 className="text-[15px] font-semibold text-foreground">Holder heatmap</h3>
+        <p className="mt-0.5 text-[13px] text-muted-foreground">
+          The largest {HEATMAP_TILES} holders of each outcome as tiles, {outcomes[0]} on the left and {outcomes[1]} on the right.
+          A tile&apos;s area is its share of the supply, and the grey strip is everyone else. Colour by position size to see who
+          dominates, or by profit and loss to see who is up and who is underwater; both sides share one colour scale. Flags
+          outline the tiles they mark, the same flags as the holders table. Tiles re-colour live and a click opens the
+          holder&apos;s analysis.
+        </p>
+      </div>
+      <HolderFlagToggles
+        enabled={holderFlags.enabled}
+        onToggle={holderFlags.toggle}
+        counts={holderFlagCounts(
+          holders.sides?.map((side) => ({ ...side, rows: side.rows.slice(0, HEATMAP_TILES) })),
+          holderDetails.details,
+        )}
+        outcomes={outcomes}
+      />
+      <HolderHeatmap
+        sides={holders.sides}
+        outcomes={outcomes}
+        loading={holders.loading}
+        details={holderDetails.details}
+        onVisible={holderDetails.request}
+        enabled={holderFlags.enabled}
+        onPickTrader={onPickTrader}
+      />
+
+      <div className="max-w-3xl pt-8">
+        <h3 className="text-[15px] font-semibold text-foreground">Are better traders on {outcomes[0]} or {outcomes[1]}?</h3>
+        <p className="mt-0.5 text-[13px] text-muted-foreground">
+          Each of the top {HEATMAP_TILES} holders per side gets a Lychee trader score from how they did in markets that have
+          finished. The aggregate score weights those by shares held, and the curves show how the scores spread across each
+          side&apos;s supply against a typical trader. A side carried by proven traders sits to the right. Weights move live
+          with positions.
+        </p>
+      </div>
+      <HolderScoreDistribution sides={holders.sides} details={holderDetails.details} outcomes={outcomes} limit={HEATMAP_TILES} />
     </div>
   );
 }
