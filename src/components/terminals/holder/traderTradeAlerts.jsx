@@ -8,6 +8,8 @@ import { arrivalKey } from "./holderTradesTable";
 import { MarketIcon, cents, shares, tradeValue, usd } from "./traderTradesTable";
 
 const PAUSE_KEY = "lychee:holderTerminal:pauseTraderTradeAlerts";
+/** Every open trader view shares one pause setting; this tells the others when it changes. */
+const PAUSE_EVENT = "lychee:trader-trade-alerts-paused";
 const TOAST_MS = 9000;
 
 function TradeLine({ trade }) {
@@ -91,16 +93,29 @@ export function useTraderTradeAlerts({ rows, ready, name, address, viewRef, onVi
     } catch {
       /* storage blocked */
     }
+    const onPause = (event) => setPausedState(!!event.detail);
+    const onStorage = (event) => {
+      if (event.key === PAUSE_KEY) setPausedState(event.newValue === "1");
+    };
+    window.addEventListener(PAUSE_EVENT, onPause);
+    window.addEventListener("storage", onStorage);
+    return () => {
+      window.removeEventListener(PAUSE_EVENT, onPause);
+      window.removeEventListener("storage", onStorage);
+    };
   }, []);
 
+  useEffect(() => {
+    if (paused && toastRef.current) toast.dismiss(toastRef.current.id);
+  }, [paused]);
+
   const setPaused = useCallback((next) => {
-    setPausedState(next);
-    if (next && toastRef.current) toast.dismiss(toastRef.current.id);
     try {
       window.localStorage.setItem(PAUSE_KEY, next ? "1" : "0");
     } catch {
       /* storage blocked */
     }
+    window.dispatchEvent(new CustomEvent(PAUSE_EVENT, { detail: next }));
   }, []);
 
   useEffect(() => {

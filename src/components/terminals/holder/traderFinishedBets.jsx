@@ -1,8 +1,8 @@
 "use client";
 
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
-import { Area, AreaChart, CartesianGrid, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
-import { Loader2 } from "lucide-react";
+import { Area, CartesianGrid, ComposedChart, ReferenceLine, ResponsiveContainer, Scatter, Tooltip, XAxis, YAxis } from "recharts";
+import { Loader2, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { HeaderCell } from "./browse/marketBrowseTable";
 import { DAY, endMs, isResolved, num, pnlTone, positionKey, secondsMs, signedUsd, sortByColumn, when } from "./traderPositionsTable";
@@ -19,6 +19,15 @@ const AFTER_TRADE_MS = 3_000;
 /** Load the next page when the reader is this close to the end. */
 const NEAR_END_ROWS = 40;
 const CHART_POINTS = 500;
+/** How many of the biggest bets get a dot on the running PnL chart. */
+const DOT_CHOICES = [
+  { top: 25, label: "Top 25" },
+  { top: 100, label: "Top 100" },
+  { top: Infinity, label: "All" },
+];
+const MAX_DOTS = 3000;
+const WON_COLOR = "#10b981";
+const LOST_COLOR = "#f43f5e";
 
 const GRID = "minmax(300px, 1fr) 116px 96px 96px 84px 96px 112px 84px 92px 72px 68px";
 
@@ -205,16 +214,137 @@ function summarize(bets) {
   return { pnl, cost, won, lost, winRate: decided ? won / decided : null, roi: cost > 0 ? pnl / cost : null, best, worst };
 }
 
-function series(bets) {
+/**
+ * The running PnL line, thinned to about `CHART_POINTS`, and a dot for each of the `top` bets that
+ * moved it most. The line keeps every dotted bet's point so each dot sits on it.
+ */
+function series(bets, top) {
   const ordered = bets.filter((bet) => bet.finishedAt != null).sort((a, b) => a.finishedAt - b.finishedAt);
+  const marked = new Set(
+    ordered
+      .map((bet, index) => ({ size: Math.abs(bet.pnl), index }))
+      .filter((item) => item.size >= 0.005)
+      .sort((a, b) => b.size - a.size)
+      .slice(0, Math.min(top, MAX_DOTS))
+      .map((item) => item.index),
+  );
   const step = Math.max(1, Math.ceil(ordered.length / CHART_POINTS));
   const points = [];
+  const dots = [];
   let running = 0;
   ordered.forEach((bet, index) => {
     running += bet.pnl;
-    if (index % step === 0 || index === ordered.length - 1) points.push({ t: bet.finishedAt, pnl: running, count: index + 1 });
+    const mark = marked.has(index);
+    if (mark || index % step === 0 || index === ordered.length - 1) points.push({ t: bet.finishedAt, pnl: running, count: index + 1 });
+    if (mark) dots.push({ bet, key: bet.key, t: bet.finishedAt, y: running, count: index + 1 });
   });
-  return points;
+  const biggest = dots.reduce((max, dot) => Math.max(max, Math.abs(dot.bet.pnl)), 0) || 1;
+  for (const dot of dots) dot.r = 3 + 10 * Math.sqrt(Math.abs(dot.bet.pnl) / biggest);
+  dots.sort((a, b) => b.r - a.r);
+  return { points, dots };
+}
+
+function BetDot({ cx, cy, payload, active, onEnter, onLeave, onPick }) {
+  if (!Number.isFinite(cx) || !Number.isFinite(cy) || !payload) return null;
+  const color = payload.bet.pnl >= 0 ? WON_COLOR : LOST_COLOR;
+  return (
+    <g
+      className="cursor-pointer"
+      onMouseEnter={() => onEnter(payload, cx, cy)}
+      onMouseLeave={onLeave}
+      onClick={(event) => {
+        event.stopPropagation();
+        onPick(payload, cx, cy);
+      }}
+    >
+      {active ? <circle cx={cx} cy={cy} r={payload.r + 4} fill="none" stroke={color} strokeOpacity={0.35} strokeWidth={3} /> : null}
+      <circle cx={cx} cy={cy} r={payload.r} fill={color} fillOpacity={0.85} stroke="var(--background)" strokeWidth={1.25} />
+    </g>
+  );
+}
+
+function BetTip({ shown, pinned, box, clock, onClose, onPickMarket }) {
+  const { dot, cx, cy } = shown;
+  const { bet } = dot;
+  const width = 272;
+  const left = cx + 14 + width > box.width ? Math.max(0, cx - 14 - width) : cx + 14;
+  const top = Math.min(Math.max(0, cy - 40), Math.max(0, box.height - 150));
+  const result = RESULT[bet.result];
+  return (
+    <div
+      role="dialog"
+      aria-label="Bet details"
+      style={{ left, top, width }}
+      onClick={(event) => event.stopPropagation()}
+      className={cn(
+        "absolute z-10 rounded-lg border border-border/70 bg-background px-3 py-2.5 text-[12px] shadow-lg",
+        pinned ? "pointer-events-auto" : "pointer-events-none",
+      )}
+    >
+      <div className="flex items-start gap-2">
+        <MarketIcon src={bet.icon} title={bet.title} size={20} />
+        <p className="line-clamp-2 min-w-0 flex-1 font-medium leading-snug text-foreground">{bet.title}</p>
+        {pinned ? (
+          <button type="button" onClick={onClose} className="-mr-1 rounded p-0.5 text-muted-foreground hover:bg-muted hover:text-foreground" aria-label="Close">
+            <X className="size-3.5" aria-hidden />
+          </button>
+        ) : null}
+      </div>
+      <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+        {bet.outcome ? (
+          <span className={cn("rounded px-1.5 py-0.5 text-[11px] font-medium", OUTCOME_TONE[Number(bet.outcome_index) === 1 ? 1 : 0])}>{bet.outcome}</span>
+        ) : null}
+        <span className={cn("rounded px-1.5 py-0.5 text-[11px] font-medium", result.tone)}>{result.label}</span>
+        <span className="text-[11.5px] text-muted-foreground">{(clock ? FULL_TIME : FULL_DAY).format(bet.finishedAt)}</span>
+      </div>
+      <dl className="mt-2 grid grid-cols-[auto_1fr] gap-x-3 gap-y-1">
+        <dt className="text-muted-foreground">PnL</dt>
+        <dd className={cn("text-right font-mono font-semibold tabular-nums", pnlTone(bet.pnl))}>
+          {signedUsd(bet.pnl)}
+          {bet.ret != null ? <span className="ml-1.5 font-normal">{pct(bet.ret)}</span> : null}
+        </dd>
+        <dt className="text-muted-foreground">Cost</dt>
+        <dd className="text-right font-mono tabular-nums">{usd(bet.cost)}</dd>
+        <dt className="text-muted-foreground">Running PnL</dt>
+        <dd className={cn("text-right font-mono tabular-nums", pnlTone(dot.y))}>{signedUsd(dot.y)}</dd>
+      </dl>
+      <p className="mt-0.5 text-right text-[11px] text-muted-foreground">after {dot.count.toLocaleString()} finished bets</p>
+      {onPickMarket ? (
+        pinned ? (
+          <button
+            type="button"
+            onClick={() => onPickMarket({ kind: "market", conditionId: bet.condition_id, title: bet.title, slug: bet.slug })}
+            className="mt-2 rounded-md bg-[#2f6fed] px-2.5 py-1 text-[11.5px] font-medium text-white hover:bg-[#2f6fed]/90"
+          >
+            Open market
+          </button>
+        ) : (
+          <p className="mt-2 text-[11px] text-muted-foreground">Click the dot to pin this and open the market.</p>
+        )
+      ) : null}
+    </div>
+  );
+}
+
+function DotCountToggle({ value, onChange }) {
+  return (
+    <div className="inline-flex rounded-md bg-black/[0.04] p-0.5 dark:bg-white/[0.06]" role="group" aria-label="Bets marked on the chart">
+      {DOT_CHOICES.map((choice) => (
+        <button
+          key={choice.label}
+          type="button"
+          aria-pressed={value === choice.top}
+          onClick={() => onChange(choice.top)}
+          className={cn(
+            "rounded px-2 py-0.5 text-[11.5px] font-medium transition-colors",
+            value === choice.top ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground",
+          )}
+        >
+          {choice.label}
+        </button>
+      ))}
+    </div>
+  );
 }
 
 function pct(value, digits = 1) {
@@ -244,10 +374,20 @@ function ChartTooltip({ active, payload, clock }) {
   );
 }
 
-/** Totals and running PnL across the finished bets loaded so far. */
-export function FinishedBetsSummary({ bets, done }) {
+/**
+ * Totals and running PnL across the finished bets loaded so far, with the bets that moved it most
+ * marked where they finished. `onPickMarket(subject)` opens a pinned bet's market.
+ */
+export function FinishedBetsSummary({ bets, done, onPickMarket }) {
   const stats = useMemo(() => summarize(bets), [bets]);
-  const points = useMemo(() => series(bets), [bets]);
+  const [top, setTop] = useState(DOT_CHOICES[1].top);
+  const { points, dots } = useMemo(() => series(bets, top), [bets, top]);
+  const [hover, setHover] = useState(null);
+  const [pinned, setPinned] = useState(null);
+  const plotRef = useRef(null);
+  useEffect(() => setPinned(null), [top]);
+  const shown = pinned || hover;
+  const box = { width: plotRef.current?.clientWidth || 0, height: plotRef.current?.clientHeight || 0 };
   const clock = points.length > 1 && points[points.length - 1].t - points[0].t < CLOCK_SPAN_MS;
   const color = stats.pnl >= 0 ? "#10b981" : "#f43f5e";
   const scope = done ? `All ${bets.length.toLocaleString()} finished bets` : `${bets.length.toLocaleString()} most recent finished bets`;
@@ -267,10 +407,24 @@ export function FinishedBetsSummary({ bets, done }) {
       </dl>
       {points.length > 1 ? (
         <div>
-          <p className="mb-1 text-[12px] text-muted-foreground">Running PnL as these bets finished</p>
-          <div className="h-[180px]">
+          <div className="mb-1 flex flex-wrap items-center justify-between gap-2">
+            <p className="text-[12px] text-muted-foreground">Running PnL as these bets finished</p>
+            <div className="flex flex-wrap items-center gap-3 text-[11.5px] text-muted-foreground">
+              <span className="inline-flex items-center gap-1.5">
+                <span className="size-2 rounded-full" style={{ backgroundColor: WON_COLOR }} aria-hidden />
+                Won
+              </span>
+              <span className="inline-flex items-center gap-1.5">
+                <span className="size-2 rounded-full" style={{ backgroundColor: LOST_COLOR }} aria-hidden />
+                Lost
+              </span>
+              <span>Bigger dot, bigger PnL</span>
+              <DotCountToggle value={top} onChange={setTop} />
+            </div>
+          </div>
+          <div ref={plotRef} className="relative h-[260px]" onMouseLeave={() => setHover(null)} onClick={() => setPinned(null)}>
             <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={points} margin={{ top: 6, right: 8, bottom: 0, left: 4 }}>
+              <ComposedChart data={points} margin={{ top: 14, right: 14, bottom: 0, left: 4 }}>
                 <defs>
                   <linearGradient id="finished-bets-pnl" x1="0" y1="0" x2="0" y2="1">
                     <stop offset="0%" stopColor={color} stopOpacity={0.28} />
@@ -297,10 +451,29 @@ export function FinishedBetsSummary({ bets, done }) {
                   width={56}
                 />
                 <ReferenceLine y={0} stroke="var(--muted-foreground)" strokeOpacity={0.4} strokeDasharray="3 3" />
-                <Tooltip content={<ChartTooltip clock={clock} />} cursor={{ stroke: "var(--muted-foreground)", strokeOpacity: 0.4 }} />
+                {shown ? null : (
+                  <Tooltip content={<ChartTooltip clock={clock} />} cursor={{ stroke: "var(--muted-foreground)", strokeOpacity: 0.4 }} />
+                )}
                 <Area type="monotone" dataKey="pnl" stroke={color} strokeWidth={2} fill="url(#finished-bets-pnl)" isAnimationActive={false} />
-              </AreaChart>
+                <Scatter
+                  data={dots}
+                  dataKey="y"
+                  isAnimationActive={false}
+                  shape={(props) => (
+                    <BetDot
+                      {...props}
+                      active={shown?.dot.key === props.payload?.key}
+                      onEnter={(dot, cx, cy) => setHover({ dot, cx, cy })}
+                      onLeave={() => setHover(null)}
+                      onPick={(dot, cx, cy) => setPinned((prev) => (prev?.dot.key === dot.key ? null : { dot, cx, cy }))}
+                    />
+                  )}
+                />
+              </ComposedChart>
             </ResponsiveContainer>
+            {shown ? (
+              <BetTip shown={shown} pinned={!!pinned} box={box} clock={clock} onClose={() => setPinned(null)} onPickMarket={onPickMarket} />
+            ) : null}
           </div>
         </div>
       ) : null}

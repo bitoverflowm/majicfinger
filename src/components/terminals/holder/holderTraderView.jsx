@@ -18,7 +18,7 @@ import { TraderMarketFocus } from "./traderMarketFocus";
 import { TraderPnlByQuestion } from "./traderPnlByQuestion";
 import { TraderPositionsTable, useTraderPositions } from "./traderPositionsTable";
 import { TradeAlertsToggle, useTraderTradeAlerts } from "./traderTradeAlerts";
-import { TraderTradesTable } from "./traderTradesTable";
+import { TraderTradesTable, tradeTime } from "./traderTradesTable";
 import { useLiveTrader } from "./useLiveTrader";
 
 const SheetBlockChart = dynamic(
@@ -292,7 +292,12 @@ export function HolderTraderView({ subject, onProfileName, onPickMarket }) {
           </p>
         </div>
         <div className="flex shrink-0 items-center gap-3">
-          {activity.rows.length ? <span className="text-[12px] tabular-nums text-muted-foreground">{activity.rows.length.toLocaleString()} trades</span> : null}
+          {activity.rows.length ? (
+            <span className="text-[12px] tabular-nums text-muted-foreground">
+              {activity.rows.length.toLocaleString()} trades
+              {activity.rows[0]?.timestamp ? ` · last ${tradeTime(activity.rows[0])}` : ""}
+            </span>
+          ) : null}
           <TradeAlertsToggle paused={alerts.paused} onChange={alerts.setPaused} />
         </div>
       </div>
@@ -331,7 +336,7 @@ export function HolderTraderView({ subject, onProfileName, onPickMarket }) {
       </div>
       {finishedPart.status === "ready" ? (
         <>
-          <FinishedBetsSummary bets={finishedBets} done={finishedPart.done} />
+          <FinishedBetsSummary bets={finishedBets} done={finishedPart.done} onPickMarket={onPickMarket} />
           <section aria-label="Finished bets" className="flex h-[560px] flex-col overflow-hidden rounded-xl border border-border/70 bg-background shadow-sm">
             <FinishedBetsTable bets={finishedBets} part={finishedPart} onPickMarket={onPickMarket} />
           </section>
