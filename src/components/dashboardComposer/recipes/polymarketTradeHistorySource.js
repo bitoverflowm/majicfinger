@@ -246,6 +246,7 @@ export async function resolvePolymarketMarket(conditionId, signal) {
     title,
     subtitle: eventTitle && eventTitle !== title ? eventTitle : "",
     eventSlug: String(event.slug || "").trim(),
+    icon: String(raw.icon || raw.image || event.icon || event.image || "").trim(),
     tokenIds,
     outcomes,
     prices: prices.map((price) => num(price)),

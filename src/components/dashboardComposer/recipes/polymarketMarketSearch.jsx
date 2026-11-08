@@ -77,13 +77,28 @@ function ResultOption({ market, active, highlighted, onPick, onHover }) {
   );
 }
 
-export function Stat({ label, value, detail }) {
+export function Stat({ label, value, detail, className }) {
   return (
-    <div className="rounded-lg bg-black/[0.03] px-3 py-2.5 dark:bg-white/[0.04]">
+    <div className={cn("rounded-lg bg-black/[0.03] px-3 py-2.5 dark:bg-white/[0.04]", className)}>
       <dt className="text-[11px] text-muted-foreground">{label}</dt>
       <dd className="mt-0.5 truncate text-[17px] font-semibold tabular-nums tracking-tight text-foreground">{value}</dd>
       {detail ? <dd className="truncate text-[11px] text-muted-foreground">{detail}</dd> : null}
     </div>
+  );
+}
+
+function MarketAvatar({ icon, title }) {
+  const [broken, setBroken] = useState(false);
+  if (!icon || broken) {
+    return (
+      <span className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-muted text-[15px] font-semibold text-muted-foreground" aria-hidden>
+        {(title || "?").trim().charAt(0).toUpperCase()}
+      </span>
+    );
+  }
+  return (
+    // eslint-disable-next-line @next/next/no-img-element
+    <img src={icon} alt="" onError={() => setBroken(true)} className="size-10 shrink-0 rounded-lg bg-muted object-cover" />
   );
 }
 
@@ -93,13 +108,16 @@ export function MarketStatsCard({ meta, compact = false }) {
   const [firstPrice = null, secondPrice = null] = meta.prices;
   return (
     <article className="overflow-hidden rounded-xl border border-border/70 bg-background shadow-sm animate-in fade-in slide-in-from-bottom-2 duration-300">
-      <header className="border-b border-border/50 px-4 py-3">
-        <div className="flex items-start gap-2">
-          <p className="min-w-0 flex-1 text-[15px] font-semibold leading-snug text-foreground">{meta.title}</p>
-          <StatusPill status={meta.status} winner={meta.winner} />
+      <header className="flex items-start gap-3 border-b border-border/50 px-4 py-3">
+        <MarketAvatar key={meta.icon} icon={meta.icon} title={meta.title} />
+        <div className="min-w-0 flex-1">
+          <div className="flex items-start gap-2">
+            <p className="min-w-0 flex-1 text-[15px] font-semibold leading-snug text-foreground">{meta.title}</p>
+            <StatusPill status={meta.status} winner={meta.winner} />
+          </div>
+          {meta.subtitle ? <p className="mt-0.5 text-[12px] text-muted-foreground">{meta.subtitle}</p> : null}
+          <p className="mt-1 truncate font-mono text-[11px] text-muted-foreground">{meta.slug || meta.conditionId}</p>
         </div>
-        {meta.subtitle ? <p className="mt-0.5 text-[12px] text-muted-foreground">{meta.subtitle}</p> : null}
-        <p className="mt-1 truncate font-mono text-[11px] text-muted-foreground">{meta.slug || meta.conditionId}</p>
       </header>
       <dl className="grid grid-cols-2 gap-2 p-3">
         <Stat
@@ -107,11 +125,14 @@ export function MarketStatsCard({ meta, compact = false }) {
           value={meta.winner || formatCents(firstPrice)}
           detail={meta.winner ? `Last traded ${formatCents(meta.lastPrice)}` : `${second} ${formatCents(secondPrice)}`}
         />
-        {compact ? null : <Stat label="Bid / ask" value={`${formatCents(meta.bestBid)} / ${formatCents(meta.bestAsk)}`} detail={first} />}
-        <Stat label="Volume" value={formatUsd(meta.volume)} detail={meta.volume24h ? `${formatUsd(meta.volume24h)} in 24h` : "USDC"} />
-        {compact ? null : (
+        {compact ? (
+          <Stat label="Volume" value={formatUsd(meta.volume)} detail={meta.volume24h ? `${formatUsd(meta.volume24h)} in 24h` : "USDC"} />
+        ) : (
           <>
-            <Stat label="Liquidity" value={formatUsd(meta.liquidity)} detail="USDC on the book" />
+            <Stat label="Bid / ask" value={`${formatCents(meta.bestBid)} / ${formatCents(meta.bestAsk)}`} detail={first} />
+            <Stat label="Total volume" value={formatUsd(meta.volume)} detail="USDC traded since it opened" />
+            <Stat label="24h volume" value={formatUsd(meta.volume24h ?? 0)} detail="USDC traded in the last day" />
+            <Stat label="Liquidity" value={formatUsd(meta.liquidity)} detail="USDC on the book" className="col-span-2" />
             <Stat label="Opened" value={formatDay(meta.openMs) || "—"} detail={formatTime(meta.openMs)} />
             <Stat label={ended ? "Closed" : "Closes"} value={formatDay(meta.closeMs) || "—"} detail={formatTime(meta.closeMs)} />
           </>
@@ -318,13 +339,16 @@ export function MarketSearchColumn({ picker, heading, examples, onBack, Title = 
 export function MarketCardSkeleton({ selected }) {
   return (
     <div className="mt-4 overflow-hidden rounded-xl border border-border/70 bg-background shadow-sm">
-      <div className="border-b border-border/50 px-4 py-3">
-        <p className="text-[15px] font-semibold leading-snug text-foreground">{selected.title}</p>
-        <p className="mt-1 truncate font-mono text-[11px] text-muted-foreground">{selected.slug || selected.conditionId}</p>
+      <div className="flex items-start gap-3 border-b border-border/50 px-4 py-3">
+        <Skeleton className="size-10 shrink-0 rounded-lg bg-black/[0.06] dark:bg-white/[0.08]" />
+        <div className="min-w-0 flex-1">
+          <p className="text-[15px] font-semibold leading-snug text-foreground">{selected.title}</p>
+          <p className="mt-1 truncate font-mono text-[11px] text-muted-foreground">{selected.slug || selected.conditionId}</p>
+        </div>
       </div>
       <div className="grid grid-cols-2 gap-2 p-3">
-        {Array.from({ length: 6 }, (_, index) => (
-          <Skeleton key={index} className="h-[66px] rounded-lg bg-black/[0.06] dark:bg-white/[0.08]" />
+        {Array.from({ length: 7 }, (_, index) => (
+          <Skeleton key={index} className={cn("h-[66px] rounded-lg bg-black/[0.06] dark:bg-white/[0.08]", index === 4 && "col-span-2")} />
         ))}
       </div>
     </div>
