@@ -35,6 +35,7 @@ import "@/lib/chartReferenceEquation.test.js";
 import "@/lib/chartBundle.test.js";
 import "@/lib/chartLineFilters.test.js";
 import "@/lib/chartSnapshotDataDeps.test.js";
+import "@/lib/newsQuery.test.js";
 import "@/components/chartView/buildHeatmapRows.test.js";
 import "@/components/chartView/axisRangeDomain.test.js";
 import "@/components/chartView/scatterOverlay.test.js";

@@ -13,6 +13,7 @@ import { HEATMAP_TILES, HolderHeatmap } from "./holderHeatmap";
 import { HolderScoreDistribution } from "./holderScoreDistribution";
 import { HolderSupplyPanels } from "./holderSupplyPanels";
 import { HolderTradesTable, MergeOutcomesButton } from "./holderTradesTable";
+import { MarketNewsSection } from "./marketNews";
 import { useHolderDetails } from "./useHolderDetails";
 import { useHolderSupply } from "./useHolderSupply";
 import { useMarketHolders } from "./useMarketHolders";
@@ -185,6 +186,17 @@ export function HolderMarketView({ subject, onPickTrader }) {
           <PanelLoading label="Loading the price history" />
         )}
       </section>
+
+      <div className="max-w-3xl pt-8">
+        <h3 className="text-[15px] font-semibold text-foreground">News about this market</h3>
+        <p className="mt-0.5 text-[13px] text-muted-foreground">
+          Headlines that mention every word below, from Google News and GDELT, the open global news index. The words start from
+          the market&apos;s title; remove them, add your own or pick a suggestion, and it remembers your choice for this market.
+          Bars show how many matching articles came out when, so spikes line up with price moves; click one to look closer.
+          {meta.closed ? "" : " New headlines show up within a few minutes."} GDELT only searches the last three months.
+        </p>
+      </div>
+      <MarketNewsSection meta={meta} />
 
       <div className="max-w-3xl pt-8">
         <h3 className="text-[15px] font-semibold text-foreground">Who holds this market</h3>

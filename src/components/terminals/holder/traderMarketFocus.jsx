@@ -6,6 +6,9 @@ import { Area, CartesianGrid, ComposedChart, Line, ReferenceLine, ResponsiveCont
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
 import { LiveDot } from "./holderMarketView";
+import { DAY_MS, DAY_YEAR, FULL_TIME, HOUR, MINUTE, timeTicks } from "./chartTime";
+import { NEWS_COLOR, NewsList, NewsMarkers, NewsNearMove, NewsTermsBar, NewsVolumeBars, newsVolume, useNewsTerms } from "./marketNews";
+import { useMarketNews } from "./useMarketNews";
 import { SummaryTile } from "./traderFinishedBets";
 import { isResolved, num, pnlTone, secondsMs, signedUsd, when } from "./traderPositionsTable";
 import { MarketIcon, cents, shares, tradeValue, usd } from "./traderTradesTable";
@@ -37,14 +40,6 @@ const SIZE_FLOOR_USD = 100;
 const OUTCOME_COLORS = ["#10b981", "#f43f5e"];
 const EMPTY = [];
 
-const MINUTE = 60_000;
-const HOUR = 60 * MINUTE;
-const DAY_MS = 24 * HOUR;
-const TIME_STEPS = [
-  MINUTE, 5 * MINUTE, 15 * MINUTE, 30 * MINUTE, HOUR, 3 * HOUR, 6 * HOUR, 12 * HOUR,
-  DAY_MS, 2 * DAY_MS, 7 * DAY_MS, 14 * DAY_MS, 30 * DAY_MS, 91 * DAY_MS, 182 * DAY_MS, 365 * DAY_MS,
-];
-const TARGET_TICKS = 6;
 const PRICE_STEPS = [0.01, 0.02, 0.05, 0.1, 0.25];
 const MIN_VIEW_MS = 5 * MINUTE;
 /** Wait this long after the view stops moving before fetching finer prices for it. */
@@ -55,19 +50,7 @@ const PLOT_RIGHT = 18;
 const PLOT_TOP = 18;
 const X_AXIS_HEIGHT = 30;
 
-const DAY = new Intl.DateTimeFormat(undefined, { month: "short", day: "numeric" });
-const DAY_HOUR = new Intl.DateTimeFormat(undefined, { month: "short", day: "numeric", hour: "numeric" });
-const CLOCK = new Intl.DateTimeFormat(undefined, { hour: "numeric", minute: "2-digit" });
-const DAY_YEAR = new Intl.DateTimeFormat(undefined, { month: "short", day: "numeric", year: "numeric" });
 const USD_AXIS = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", notation: "compact", maximumFractionDigits: 1 });
-const FULL_TIME = new Intl.DateTimeFormat(undefined, {
-  month: "short",
-  day: "numeric",
-  year: "numeric",
-  hour: "numeric",
-  minute: "2-digit",
-  second: "2-digit",
-});
 
 const STATES = {
   open: { rank: 2, label: "Open position" },
@@ -706,18 +689,6 @@ function resolveView(view, full) {
   return [view.start, view.end];
 }
 
-function timeTicks(start, end) {
-  const span = Math.max(1, end - start);
-  const step = TIME_STEPS.reduce((best, size) =>
-    Math.abs(Math.log(span / size / TARGET_TICKS)) < Math.abs(Math.log(span / best / TARGET_TICKS)) ? size : best,
-  );
-  const offset = new Date(start).getTimezoneOffset() * MINUTE;
-  const ticks = [];
-  for (let t = Math.ceil((start - offset) / step) * step + offset; t <= end && ticks.length < 50; t += step) ticks.push(t);
-  const format = step >= DAY_MS ? DAY : span <= DAY_MS ? CLOCK : DAY_HOUR;
-  return { ticks, format: (t) => format.format(t) };
-}
-
 /** A price axis fitted to what's on screen, in steps of 1¢ up to 25¢. */
 function priceAxis(lines, dots, from, to) {
   let lo = Infinity;
@@ -912,12 +883,12 @@ function MoveDot({ cx, cy, payload, now, active, onEnter, onLeave, onPick }) {
   );
 }
 
-function MoveTip({ shown, pinned, box, outcomes, livePrices, onClose }) {
+function MoveTip({ shown, pinned, box, outcomes, livePrices, news, onClose }) {
   const { move, cx, cy } = shown;
   const buy = move.side === "BUY";
-  const width = 252;
+  const width = 272;
   const left = cx + 16 + width > box.width ? Math.max(0, cx - 16 - width) : cx + 16;
-  const top = Math.min(Math.max(4, cy - 48), Math.max(4, box.height - 210));
+  const top = Math.min(Math.max(4, cy - 48), Math.max(4, box.height - (news.length ? 330 : 210)));
   const priceNow = livePriceList(livePrices)[move.index];
   const edge = Number.isFinite(priceNow) && move.p != null ? (buy ? priceNow - move.p : move.p - priceNow) : null;
   return (
@@ -985,6 +956,7 @@ function MoveTip({ shown, pinned, box, outcomes, livePrices, onClose }) {
           {move.merged.toLocaleString()} moves close together, shown as one dot so the chart stays readable.
         </p>
       ) : null}
+      <NewsNearMove articles={news} t={move.t} />
       {move.hash ? (
         pinned ? (
           <a
@@ -1008,7 +980,7 @@ function MoveTip({ shown, pinned, box, outcomes, livePrices, onClose }) {
  * The price lines and move dots over `domain`. Pinch or ⌘/Ctrl-scroll zooms around the pointer,
  * sideways scroll or a drag pans, double-click zooms in. `onView(start, end)` asks for a new range.
  */
-function MoveChart({ meta, lines, moves, domain, now, livePrices, pinned, setPinned, onView, zoomed }) {
+function MoveChart({ meta, lines, moves, domain, now, livePrices, pinned, setPinned, onView, zoomed, news, newsArrivals, pinnedNews, setPinnedNews }) {
   const [hover, setHover] = useState(null);
   const [dragging, setDragging] = useState(false);
   const wrapRef = useRef(null);
@@ -1112,7 +1084,9 @@ function MoveChart({ meta, lines, moves, domain, now, livePrices, pinned, setPin
       onEnter={(move) => setHover(move)}
       onLeave={() => setHover(null)}
       onPick={(move) => {
-        if (!suppressClick.current) setPinned((prev) => (prev?.key === move.key ? null : move));
+        if (suppressClick.current) return;
+        setPinned((prev) => (prev?.key === move.key ? null : move));
+        setPinnedNews(null);
       }}
     />
   );
@@ -1130,7 +1104,9 @@ function MoveChart({ meta, lines, moves, domain, now, livePrices, pinned, setPin
       }}
       onMouseLeave={() => setHover(null)}
       onClick={() => {
-        if (!suppressClick.current) setPinned(null);
+        if (suppressClick.current) return;
+        setPinned(null);
+        setPinnedNews(null);
       }}
     >
       <ResponsiveContainer width="100%" height="100%">
@@ -1178,8 +1154,23 @@ function MoveChart({ meta, lines, moves, domain, now, livePrices, pinned, setPin
           <Scatter data={visible} dataKey="p" shape={shape} isAnimationActive={false} />
         </ComposedChart>
       </ResponsiveContainer>
+      <NewsMarkers
+        articles={news}
+        domain={domain}
+        box={box}
+        left={PLOT_LEFT}
+        right={PLOT_RIGHT}
+        guideBottom={PLOT_TOP + plot.height}
+        arrivals={newsArrivals}
+        now={now}
+        pinned={pinnedNews}
+        onPin={(key) => {
+          setPinnedNews(key);
+          if (key) setPinned(null);
+        }}
+      />
       {shown ? (
-        <MoveTip shown={shown} pinned={!!pinned} box={box} outcomes={outcomes} livePrices={livePrices} onClose={() => setPinned(null)} />
+        <MoveTip shown={shown} pinned={!!pinned} box={box} outcomes={outcomes} livePrices={livePrices} news={news} onClose={() => setPinned(null)} />
       ) : null}
     </div>
   );
@@ -1310,7 +1301,7 @@ function ZoomControls({ zoomed, onZoom, onReset }) {
   );
 }
 
-function ChartLegend({ outcomes, livePrices, maxUsd }) {
+function ChartLegend({ outcomes, livePrices, maxUsd, news }) {
   const prices = livePriceList(livePrices);
   return (
     <div className="flex flex-wrap items-center gap-x-4 gap-y-1 px-1 pt-2 text-[11.5px] text-muted-foreground">
@@ -1340,6 +1331,22 @@ function ChartLegend({ outcomes, livePrices, maxUsd }) {
         </svg>
         Bigger dot, bigger move{maxUsd > 0 ? ` (largest ${usd(maxUsd)})` : ""}
       </span>
+      {news ? (
+        <>
+          <span className="inline-flex items-center gap-1.5">
+            <span className="inline-block size-2.5 rounded-[3px]" style={{ backgroundColor: NEWS_COLOR }} aria-hidden />
+            Headlines, numbered when several are close together
+          </span>
+          <span className="inline-flex items-center gap-1.5">
+            <svg width="14" height="12" aria-hidden>
+              <rect x="1" y="6" width="3" height="6" fill={NEWS_COLOR} fillOpacity={0.6} />
+              <rect x="5.5" y="2" width="3" height="10" fill={NEWS_COLOR} fillOpacity={0.6} />
+              <rect x="10" y="8" width="3" height="4" fill={NEWS_COLOR} fillOpacity={0.6} />
+            </svg>
+            News volume
+          </span>
+        </>
+      ) : null}
     </div>
   );
 }
@@ -1401,10 +1408,13 @@ export function TraderMarketFocus({ address, fromMarket, trades, positions, bets
 
   const [range, setRange] = useState("moves");
   const [pinned, setPinned] = useState(null);
+  const [pinnedNews, setPinnedNews] = useState(null);
   const [view, setView] = useState(null);
   const [detail, setDetail] = useState(null);
+  const chartRef = useRef(null);
   useEffect(() => {
     setPinned(null);
+    setPinnedNews(null);
     setView(null);
   }, [conditionId, range]);
 
@@ -1463,6 +1473,23 @@ export function TraderMarketFocus({ address, fromMarket, trades, positions, bets
     return () => window.clearTimeout(id);
   }, [detailSig]);
 
+  const newsTerms = useNewsTerms(meta);
+  const newsWin = !full
+    ? null
+    : detail
+      ? { start: detail.start, end: detail.end, live: detail.anchored && full.follow }
+      : { start: full.start, end: full.end, live: full.follow };
+  const news = useMarketNews(newsTerms.terms, newsWin);
+  const newsBars = domain ? newsVolume(news, domain) : null;
+  const showNews = (article) => {
+    if (!full) return;
+    const span = Math.min(6 * HOUR, full.end - full.start);
+    changeView(article.t - span / 2, article.t + span / 2);
+    setPinned(null);
+    setPinnedNews(null);
+    chartRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+  };
+
   if (!choices.length) {
     return (
       <p className="rounded-xl border border-border/70 px-4 py-6 text-[13px] text-muted-foreground">
@@ -1518,7 +1545,18 @@ export function TraderMarketFocus({ address, fromMarket, trades, positions, bets
         />
       </dl>
 
-      <section aria-label="Market price with this trader's moves" className="rounded-xl border border-border/70 bg-background p-3 shadow-sm">
+      {meta ? (
+        <NewsTermsBar
+          news={news}
+          terms={newsTerms.terms}
+          suggestions={newsTerms.suggestions}
+          edited={newsTerms.edited}
+          onChange={newsTerms.setTerms}
+          onReset={newsTerms.reset}
+        />
+      ) : null}
+
+      <section ref={chartRef} aria-label="Market price with this trader's moves" className="rounded-xl border border-border/70 bg-background p-3 shadow-sm">
         <div className="flex flex-wrap items-center justify-between gap-2 px-1 pb-2">
           <div className="flex flex-wrap items-center gap-2">
             <RangeToggle range={range} onChange={setRange} />
@@ -1548,6 +1586,10 @@ export function TraderMarketFocus({ address, fromMarket, trades, positions, bets
               setPinned={setPinned}
               onView={changeView}
               zoomed={!!view}
+              news={news.articles}
+              newsArrivals={news.arrivals}
+              pinnedNews={pinnedNews}
+              setPinnedNews={setPinnedNews}
             />
           ) : prices.error ? (
             <p className="flex h-full items-center justify-center text-[12px] text-muted-foreground">{prices.error}</p>
@@ -1556,7 +1598,11 @@ export function TraderMarketFocus({ address, fromMarket, trades, positions, bets
           )}
         </div>
         {meta && prices.lines && full ? (
-          <div className="pt-2">
+          <div className="pt-1">
+            {newsBars?.volume.length ? (
+              <NewsVolumeBars volume={newsBars.volume} domain={domain} left={PLOT_LEFT} right={PLOT_RIGHT} label={newsBars.counted ? "Found" : "News"} />
+            ) : null}
+            <div className="h-2" />
             <RangeStrip lines={prices.lines} moves={moves} full={full} domain={domain} zoomed={!!view} onView={changeView} />
             <p className="mt-1.5 text-[11px] text-muted-foreground" style={{ marginLeft: PLOT_LEFT }}>
               Pinch, or hold ⌘ or Ctrl and scroll, to zoom. Drag the chart or scroll sideways to move along it. Drag across the
@@ -1564,8 +1610,31 @@ export function TraderMarketFocus({ address, fromMarket, trades, positions, bets
             </p>
           </div>
         ) : null}
-        {meta ? <ChartLegend outcomes={outcomes} livePrices={stats?.prices} maxUsd={maxUsd} /> : null}
+        {meta ? <ChartLegend outcomes={outcomes} livePrices={stats?.prices} maxUsd={maxUsd} news={newsTerms.terms.length > 0} /> : null}
       </section>
+
+      {meta && newsTerms.terms.length ? (
+        <>
+          <div className="max-w-3xl pt-2">
+            <h3 className="text-[14px] font-semibold text-foreground">News in view</h3>
+            <p className="mt-0.5 text-[13px] text-muted-foreground">
+              Headlines that mention every word above, for the stretch on the chart. Each move&apos;s tooltip names the closest
+              headline before and after it, so you can see who traded ahead of the news. Google News gives publish times for
+              recent articles; GDELT gives the time it first saw an article, usually within 15 minutes. New headlines land
+              here within a few minutes while the market is open.
+            </p>
+          </div>
+          <NewsList
+            articles={news.articles}
+            terms={newsTerms.terms}
+            domain={domain}
+            arrivals={news.arrivals}
+            now={now}
+            onShow={showNews}
+            empty={news.loading ? "Searching the news" : "No matching headlines in this stretch. Zoom out, or try fewer or different words."}
+          />
+        </>
+      ) : null}
 
       <div className="max-w-3xl pt-5">
         <h3 className="text-[15px] font-semibold text-foreground">Cumulative realized PnL over time</h3>
