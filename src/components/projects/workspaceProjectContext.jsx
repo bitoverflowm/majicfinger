@@ -22,15 +22,18 @@ export function useWorkspaceProject() {
   return useContext(WorkspaceProjectContext);
 }
 
+/** `?project=` already belongs to run-yourself forks, where it names a data set. */
+export const WORKSPACE_PROJECT_PARAM = "workspace";
+
 export function dashboardUrlForProject(id) {
-  return id ? `/dashboard?project=${encodeURIComponent(id)}` : "/dashboard";
+  return id ? `/dashboard?${WORKSPACE_PROJECT_PARAM}=${encodeURIComponent(id)}` : "/dashboard";
 }
 
 function setProjectInUrl(id) {
   if (typeof window === "undefined") return;
   const url = new URL(window.location.href);
-  if (url.searchParams.get("project") === id) return;
-  url.searchParams.set("project", id);
+  if (url.searchParams.get(WORKSPACE_PROJECT_PARAM) === id) return;
+  url.searchParams.set(WORKSPACE_PROJECT_PARAM, id);
   window.history.replaceState(window.history.state, "", `${url.pathname}${url.search}${url.hash}`);
 }
 
@@ -45,7 +48,7 @@ function fromHead(data) {
 }
 
 /**
- * Works out which project `/dashboard` opens: `?project=`, else the one this browser opened last,
+ * Works out which project `/dashboard` opens: `?workspace=`, else the one this browser opened last,
  * else the one the server says was opened last. A user with no projects gets id "" until the
  * canvas creates their first one and calls `adopt`.
  * `key` changes only when a different project's canvas must mount.

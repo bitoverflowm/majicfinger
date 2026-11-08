@@ -11,13 +11,11 @@ import { Button } from "@/components/ui/button"
 import { toast } from "sonner"
 
 import { Separator } from "@/components/ui/separator";
-import CheckoutWelcome, { takeCheckoutWelcome, workspaceWelcomePending } from "@/components/checkout/CheckoutWelcome";
 import { loadWorkspaceStartTabs } from "@/lib/workspaceStartTabs";
-import { membershipTierLabel } from "@/lib/membershipLabel";
 
 import { WorkspaceComposerDockProvider } from "@/components/dashboardComposer/workspaceComposerDock";
 import { WorkspaceCanvas } from "@/components/dashboardComposer/workspaceCanvas";
-import { WorkspaceWelcomeLayer } from "@/components/dashboardComposer/blankDashboardEmpty";
+import { WorkspaceTabsLayer } from "@/components/dashboardComposer/blankDashboardEmpty";
 import { IntegrationConnectLandingDemo } from "@/components/dashboardComposer/integrationConnectDialog";
 import FigmaNavChrome from "./components/figmaNavChrome";
 import { cn } from "@/lib/utils";
@@ -113,10 +111,6 @@ const DashBody = ({ user }) => {
     const [subscribedAt, setSubscribedAt] = useState(null);
     /** True only after a successful `/api/users/:id` GET — used so Connect hub does not flash handle setup while handle is unknown. */
     const [userProfileFetchOk, setUserProfileFetchOk] = useState(false);
-    const [entryReady, setEntryReady] = useState(false);
-    const [welcomeTier, setWelcomeTier] = useState("");
-    const [celebrateCheckout, setCelebrateCheckout] = useState(false);
-    const welcomedRef = useRef(false);
     const hasDbBackedUserId =
       typeof user?.userId === "string" &&
       user.userId !== "dev-bypass-no-db" &&
@@ -193,18 +187,6 @@ const DashBody = ({ user }) => {
         void consumeRunYourselfInteractiveSession();
       }
     }, [viewingForkProject, user, contextStateV2]);
-
-    useLayoutEffect(() => {
-        if (welcomedRef.current) return;
-        welcomedRef.current = true;
-        const welcome = takeCheckoutWelcome();
-        if (welcome?.tier) setWelcomeTier(welcome.tier);
-        if (welcome?.celebrate) setCelebrateCheckout(true);
-        if (!isDemo && (workspaceWelcomePending() || welcome)) {
-            setViewing?.("welcome");
-        }
-        setEntryReady(true);
-    }, [setViewing, isDemo]);
 
     const startTabsUserRef = useRef(null);
     useLayoutEffect(() => {
@@ -465,25 +447,10 @@ const DashBody = ({ user }) => {
           className="relative z-0 flex min-h-0 min-w-0 flex-1 flex-col py-1 [--dashboard-tab-clearance:2.75rem]"
         >
                 <WorkspaceCanvas />
-                {entryReady && (viewing === "welcome" || viewing === "connectDataHome") && (
-                  <WorkspaceWelcomeLayer
+                {(viewing === "welcome" || viewing === "connectDataHome") && (
+                  <WorkspaceTabsLayer
                     viewing={viewing}
                     navChromeExpanded={navChromeExpanded}
-                    checkout={
-                      <CheckoutWelcome
-                        name={user?.name}
-                        celebrate={celebrateCheckout}
-                        tier={
-                          welcomeTier ||
-                          membershipTierLabel({
-                            subscriptionTier:
-                              isLifeTimeMember || user?.lifetimeMember
-                                ? "lifetime"
-                                : subscriptionTier || user?.subscriptionTier,
-                          })
-                        }
-                      />
-                    }
                     connectHome={
                       contextStateV2?.landingDemo ? null : (
                       <div className="flex min-h-0 flex-1 flex-col overflow-hidden">

@@ -34,7 +34,14 @@ import { useFeatureTipDismissal } from "@/components/ui/feature-tip";
 import { LandingDemoMembersOnlyPortal } from "@/components/dashboardComposer/landingDemoMembersOnly";
 import { DestructiveConfirmMenuItem } from "@/components/ui/destructive-confirm-menu-item";
 import { useMyStateV2 } from "@/context/stateContextV2";
-import { duplicateTabName, loadWorkspaceStartTabs, saveWorkspaceStartTabs } from "@/lib/workspaceStartTabs";
+import {
+  WELCOME_START_TAB_ID,
+  defaultStartTab,
+  duplicateTabName,
+  loadWorkspaceStartTabs,
+  retireWelcomeTab,
+  saveWorkspaceStartTabs,
+} from "@/lib/workspaceStartTabs";
 import { scopedLocalOwner, workspaceProjectScope } from "@/lib/workspaceProjectScope";
 import { useWorkspaceProject } from "@/components/projects/workspaceProjectContext";
 import { DashboardSheetGrid } from "@/components/dashboardComposer/dashboardSheetGrid";
@@ -308,7 +315,7 @@ function metaFromLive(live) {
     name: String(live.dashboardName || "").trim().slice(0, 120) || "Untitled",
     active_tab_id: live.activeTabId,
     welcome_removed: live.welcomeRemoved,
-    tabs: live.tabs.length ? live.tabs : [{ id: "welcome", name: "Welcome", blank: false }],
+    tabs: live.tabs.length ? live.tabs : [defaultStartTab()],
   };
 }
 
@@ -509,7 +516,7 @@ export function WorkspaceCanvasProvider({ pageId, readOnly = false, children }) 
           name: "Untitled",
           active_tab_id: activeTabId,
           welcome_removed: welcomeRemoved,
-          tabs: tabs.length ? tabs : [{ id: "welcome", name: "Welcome", blank: false }],
+          tabs: tabs.length ? tabs : [defaultStartTab()],
           blocks: collectLocalBlocks(store),
           tables: [],
           charts: [],
@@ -568,11 +575,17 @@ export function WorkspaceCanvasProvider({ pageId, readOnly = false, children }) 
         if (previousLocal?.blocks?.[tabId]) localBlocks[tabId] = previousLocal.blocks[tabId];
       }
       for (const tabId of orphanTabs) delete localBlocks[tabId];
+      const shown = retireWelcomeTab({
+        tabs: Array.isArray(doc.tabs) ? doc.tabs : [],
+        activeId: doc.active_tab_id,
+        welcomeRemoved: !!doc.welcome_removed,
+        keepWelcome: !!nextBlocks[pageIdForTab(WELCOME_START_TAB_ID)]?.length || pendingNow.includes(WELCOME_START_TAB_ID),
+      });
       writeLocalDashboard(store, {
         name: doc.name,
-        active_tab_id: doc.active_tab_id,
-        welcome_removed: doc.welcome_removed,
-        tabs: doc.tabs,
+        active_tab_id: shown.activeId,
+        welcome_removed: shown.welcomeRemoved,
+        tabs: shown.tabs,
         blocks: localBlocks,
         tables: nextTables,
         charts: [],
@@ -588,14 +601,15 @@ export function WorkspaceCanvasProvider({ pageId, readOnly = false, children }) 
       });
       const pending = pendingNow;
       setPendingTabs(pending);
-      if (Array.isArray(doc.tabs) && doc.tabs.length) {
-        ctx?.setWorkspaceStartTabs?.(doc.tabs);
-        ctx?.setWelcomeTabRemoved?.(!!doc.welcome_removed);
-        ctx?.setActiveWorkspaceStartTabId?.(doc.active_tab_id || doc.tabs[0].id);
+      if (shown.tabs.length) {
+        const shownActive = shown.tabs.some((tab) => tab.id === shown.activeId) ? shown.activeId : shown.tabs[0].id;
+        ctx?.setWorkspaceStartTabs?.(shown.tabs);
+        ctx?.setWelcomeTabRemoved?.(shown.welcomeRemoved);
+        ctx?.setActiveWorkspaceStartTabId?.(shownActive);
         saveWorkspaceStartTabs(owner, {
-          tabs: doc.tabs,
-          welcomeRemoved: !!doc.welcome_removed,
-          activeId: doc.active_tab_id || doc.tabs[0].id,
+          tabs: shown.tabs,
+          welcomeRemoved: shown.welcomeRemoved,
+          activeId: shownActive,
         });
       }
       setReady(true);

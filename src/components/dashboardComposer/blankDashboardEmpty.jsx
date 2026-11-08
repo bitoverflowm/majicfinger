@@ -13,7 +13,7 @@ import { cn } from "@/lib/utils";
 import { shownTerminalId } from "@/lib/workspaceTerminals";
 import { useWorkspaceCanvas } from "@/components/dashboardComposer/workspaceCanvas";
 import { useIntegrationConnect } from "@/components/dashboardComposer/integrationConnectDialog";
-import { WorkspaceStartTabs } from "@/components/checkout/CheckoutWelcome";
+import { WorkspaceStartTabs } from "@/components/dashboardComposer/workspaceStartTabBar";
 import { TerminalSurface } from "@/components/terminals/terminalSurface";
 
 const CHART_LOCKED_TIP = "Upload or connect data before adding a chart.";
@@ -108,7 +108,7 @@ export function BlankDashboardEmpty() {
  * Tab bar over the canvas. A saved dashboard stays visible while it loads.
  * The empty card appears only after we know this tab has no blocks.
  */
-export function WorkspaceWelcomeLayer({ viewing, navChromeExpanded, checkout, connectHome }) {
+export function WorkspaceTabsLayer({ viewing, navChromeExpanded, connectHome }) {
   const canvas = useWorkspaceCanvas();
   const connect = useIntegrationConnect();
   const ctx = useMyStateV2();
@@ -118,15 +118,16 @@ export function WorkspaceWelcomeLayer({ viewing, navChromeExpanded, checkout, co
   const landingCanvas = landingDemo && viewing === "connectDataHome";
   const landingConnect = landingCanvas && !!connect?.inlineOpen;
   const terminalId = landingConnect ? "" : shownTerminalId({ ...ctx, viewing });
-  const blankTab = (viewing === "welcome" && !!active?.blank) || landingCanvas;
+  const canvasTab = viewing === "welcome" || landingCanvas;
   const showEmpty =
-    blankTab && !landingConnect && !!canvas?.ready && !(canvas?.blocks || []).length && !canvas?.runFeed;
-  const cover = !blankTab;
+    canvasTab && !landingConnect && !!canvas?.ready && !(canvas?.blocks || []).length && !canvas?.runFeed;
+  const cover = !canvasTab;
+  const openTabs = () => ctx?.setViewing?.("welcome");
 
   if (terminalId) {
     return (
       <div className="absolute inset-0 z-30 -my-1 flex min-h-0 flex-col bg-background">
-        <WorkspaceStartTabs welcomeActive={viewing === "welcome"} onOpenWelcome={() => ctx?.setViewing?.("welcome")} />
+        <WorkspaceStartTabs tabsActive={viewing === "welcome"} onOpenTabs={openTabs} />
         <TerminalSurface terminalId={terminalId} tab={active} />
       </div>
     );
@@ -146,10 +147,10 @@ export function WorkspaceWelcomeLayer({ viewing, navChromeExpanded, checkout, co
     >
       {landingConnect ? null : (
         <div className={cover ? undefined : "pointer-events-auto"}>
-          <WorkspaceStartTabs welcomeActive={viewing === "welcome"} onOpenWelcome={() => ctx?.setViewing?.("welcome")} />
+          <WorkspaceStartTabs tabsActive={viewing === "welcome"} onOpenTabs={openTabs} />
         </div>
       )}
-      {blankTab ? showEmpty ? <BlankDashboardEmpty /> : null : viewing === "welcome" ? checkout : connectHome}
+      {canvasTab ? showEmpty ? <BlankDashboardEmpty /> : null : connectHome}
     </div>
   );
 }

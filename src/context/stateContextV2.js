@@ -101,7 +101,7 @@ export const StateProviderV2 = ({children, initialSettings}) => {
     /** Figma-style app nav: collapsed pills by default, both side panels open together. */
     const [navChromeExpanded, setNavChromeExpanded] = useState(false)
     const [workspaceStartTabs, setWorkspaceStartTabs] = useState(() =>
-      initialSettings?.landingDemo ? [] : [{ id: "welcome", name: "Welcome" }],
+      initialSettings?.landingDemo ? [] : [{ id: "welcome", name: "Untitled 1", blank: true }],
     )
     const [welcomeTabRemoved, setWelcomeTabRemoved] = useState(!!initialSettings?.landingDemo)
     const [activeWorkspaceStartTabId, setActiveWorkspaceStartTabId] = useState(

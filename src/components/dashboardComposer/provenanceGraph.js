@@ -142,7 +142,7 @@ function normalizeTabs(tabs, pages) {
     seen.add(id);
     list.push({ id, name: id });
   }
-  if (!list.length) list.push({ id: "welcome", name: "Welcome" });
+  if (!list.length) list.push({ id: "welcome", name: "Untitled 1" });
   return list;
 }
 

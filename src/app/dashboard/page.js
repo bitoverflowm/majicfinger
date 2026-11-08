@@ -17,7 +17,7 @@ import { HubQueryLoaderGate } from './HubQueryLoaderGate';
 
 import { Toaster } from "@/components/ui/sonner"
 import { SpectrumLoadingState } from "@/components/ui/spectrum-loading-state"
-import { WorkspaceProjectProvider } from "@/components/projects/workspaceProjectContext"
+import { WORKSPACE_PROJECT_PARAM, WorkspaceProjectProvider } from "@/components/projects/workspaceProjectContext"
 
 import { userSwrFetcher } from "@/lib/hooks"
 import { AuthenticatedJourneyInit } from "@/components/analytics/AuthenticatedJourneyInit"
@@ -53,7 +53,7 @@ function DashboardInner() {
             <Script src="https://ajax.googleapis.com/ajax/libs/jquery/3.7.1/jquery.min.js" strategy="afterInteractive"/>
             <WorkspaceProjectProvider
                 userId={user.userId}
-                urlProject={searchParams.get("project") || ""}
+                urlProject={searchParams.get(WORKSPACE_PROJECT_PARAM) || ""}
                 loading={<DashboardLoading />}
             >
                 <StateProvider>

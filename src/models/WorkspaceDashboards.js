@@ -23,7 +23,7 @@ const WorkspaceDashboardSchema = new mongoose.Schema(
     thumbnail_at: { type: Date, default: null },
     active_tab_id: { type: String, default: "welcome" },
     welcome_removed: { type: Boolean, default: false },
-    tabs: { type: Schema.Types.Mixed, default: () => [{ id: "welcome", name: "Welcome", blank: false }] },
+    tabs: { type: Schema.Types.Mixed, default: () => [{ id: "welcome", name: "Untitled 1", blank: true }] },
     blocks: { type: Schema.Types.Mixed, default: () => ({}) },
     tables: { type: Schema.Types.Mixed, default: () => [] },
     charts: { type: Schema.Types.Mixed, default: () => [] },

@@ -1,8 +1,9 @@
-/** Browser-local start tabs (Welcome and its copies). No backend field. */
+/** Browser-local copy of the workspace tab bar. The saved dashboard document is the source of truth. */
 
 import { terminalTabField } from "@/lib/workspaceTerminals";
 import { scopedLocalOwner } from "@/lib/workspaceProjectScope";
 
+/** Id of every project's first tab. Saved blocks and page ids are keyed by it, so it never changes. */
 export const WELCOME_START_TAB_ID = "welcome";
 
 const STORAGE_PREFIX = "lycheeWorkspaceStartTabs:";
@@ -12,12 +13,37 @@ function storageKey(userId) {
   return `${STORAGE_PREFIX}${scopedLocalOwner(userId) || "local"}`;
 }
 
+export function defaultStartTab(name = "Untitled 1") {
+  return { id: WELCOME_START_TAB_ID, name, blank: true };
+}
+
 export function defaultWorkspaceStartTabs() {
   return {
     welcomeRemoved: false,
-    tabs: [{ id: WELCOME_START_TAB_ID, name: "Welcome" }],
+    tabs: [defaultStartTab()],
     activeId: WELCOME_START_TAB_ID,
   };
+}
+
+/**
+ * The first tab used to be a hidden "Welcome" page with a letter on it.
+ * It becomes an ordinary blank tab, or is dropped when other tabs exist and nothing was saved on it.
+ */
+export function retireWelcomeTab({ tabs, activeId, welcomeRemoved, keepWelcome = false }) {
+  const list = Array.isArray(tabs) ? tabs : [];
+  const index = list.findIndex((tab) => tab?.id === WELCOME_START_TAB_ID && !tab.blank && !terminalTabField(tab).terminal);
+  if (index < 0) return { tabs: list, activeId, welcomeRemoved };
+  const others = list.filter((_, i) => i !== index);
+  if (others.length && !keepWelcome) {
+    return {
+      tabs: others,
+      activeId: activeId === WELCOME_START_TAB_ID || !activeId ? others[0].id : activeId,
+      welcomeRemoved: true,
+    };
+  }
+  const next = list.slice();
+  next[index] = defaultStartTab(newBlankTabName(others.map((tab) => tab.name)));
+  return { tabs: next, activeId, welcomeRemoved };
 }
 
 function sanitizeTabs(tabs, welcomeRemoved) {
@@ -32,9 +58,6 @@ function sanitizeTabs(tabs, welcomeRemoved) {
     seen.add(id);
     clean.push({ id, name, blank: !!tab.blank, ...terminalTabField(tab) });
   }
-  if (!welcomeRemoved && !seen.has(WELCOME_START_TAB_ID)) {
-    clean.unshift({ id: WELCOME_START_TAB_ID, name: "Welcome" });
-  }
   return clean;
 }
 
@@ -45,9 +68,13 @@ export function loadWorkspaceStartTabs(userId) {
     const raw = localStorage.getItem(storageKey(userId));
     if (!raw) return fallback;
     const parsed = JSON.parse(raw);
-    const welcomeRemoved = !!parsed?.welcomeRemoved;
-    const tabs = sanitizeTabs(parsed?.tabs, welcomeRemoved);
-    const activeId = tabs.some((tab) => tab.id === parsed?.activeId) ? parsed.activeId : tabs[0]?.id || null;
+    const retired = retireWelcomeTab({
+      tabs: sanitizeTabs(parsed?.tabs, !!parsed?.welcomeRemoved),
+      activeId: parsed?.activeId,
+      welcomeRemoved: !!parsed?.welcomeRemoved,
+    });
+    const { tabs, welcomeRemoved } = retired;
+    const activeId = tabs.some((tab) => tab.id === retired.activeId) ? retired.activeId : tabs[0]?.id || null;
     return { welcomeRemoved, tabs, activeId };
   } catch {
     return fallback;

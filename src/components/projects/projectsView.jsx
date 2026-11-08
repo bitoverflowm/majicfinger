@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
+import useSWR from "swr";
 import { toast } from "sonner";
 import {
   Clock,
@@ -299,10 +300,16 @@ function SidebarItem({ active, icon: Icon, label, count, onClick }) {
   );
 }
 
+const fetchProfile = (url) =>
+  fetch(url)
+    .then((response) => response.json())
+    .then((body) => (body?.success ? body.data : null));
+
 /** Figma-style files page: every project the user has, as cards or a list. */
 export default function ProjectsView({ user }) {
   const router = useRouter();
   const userId = String(user?.userId || "");
+  const { data: profile } = useSWR(userId ? `/api/users/${userId}` : null, fetchProfile, { revalidateOnFocus: false });
   const [projects, setProjects] = useState(null);
   const [loadError, setLoadError] = useState("");
   const [section, setSection] = useState("recents");
@@ -437,7 +444,7 @@ export default function ProjectsView({ user }) {
             <Image src="/logo.png" width={24} height={24} alt="Lychee" className="size-full object-cover" />
           </span>
           <span className="min-w-0 flex-1 truncate text-[13px] font-medium">{user?.name || user?.email || "Your files"}</span>
-          <UserAvatar src={user?.profile_pic} name={user?.name} email={user?.email} size={24} />
+          <UserAvatar src={profile?.profile_pic} handle={profile?.user_name} name={user?.name} email={user?.email} size={24} />
         </div>
         <nav className="flex flex-col gap-0.5">
           <SidebarItem active={section === "recents"} icon={Clock} label="Recents" onClick={() => setSection("recents")} />

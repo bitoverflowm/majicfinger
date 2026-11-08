@@ -5,8 +5,6 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { CheckCircle2, Clock, Loader2 } from "lucide-react";
 import CheckoutAccountStep from "@/components/checkout/CheckoutAccountStep";
-import { rememberCheckoutWelcome } from "@/components/checkout/CheckoutWelcome";
-import { membershipTierLabel } from "@/lib/membershipLabel";
 import { mutateUser } from "@/lib/hooks";
 import { trackCheckoutStep } from "@/lib/checkout/trackCheckoutStep";
 
@@ -80,26 +78,14 @@ function CheckoutReturn() {
     return () => window.removeEventListener("pagehide", onHide);
   }, [checkout?.found, checkout?.status, onStep]);
 
-  const finish = useCallback(async ({ planKey, subscriptionTier, existing } = {}) => {
+  const finish = useCallback(async ({ existing } = {}) => {
     done.current = true;
     onStep("account_created", { existing: !!existing }, { once: true });
-    let key = planKey || "";
-    let tier = subscriptionTier || "";
     try {
-      const claim = await fetch("/api/checkout/claim", { method: "POST" }).then((res) => res.json());
-      if (claim?.planKey) key = claim.planKey;
+      await fetch("/api/checkout/claim", { method: "POST" });
     } catch {
       // Login already attaches the payment. Claim is a second chance for an existing session.
     }
-    if (!key && !tier) {
-      try {
-        const me = await fetch("/api/user").then((res) => res.json());
-        tier = me?.user?.subscriptionTier || "";
-      } catch {
-        tier = "";
-      }
-    }
-    rememberCheckoutWelcome(membershipTierLabel({ planKey: key, subscriptionTier: tier }));
     await mutateUser();
     router.push("/dashboard");
   }, [router, onStep]);

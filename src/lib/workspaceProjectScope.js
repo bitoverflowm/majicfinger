@@ -1,6 +1,6 @@
 /**
  * Which project the dashboard has open, for code that keys browser storage by user.
- * Every project has a "welcome" tab, so start tabs and canvas copies are kept per project.
+ * Every project's first tab has the id "welcome", so start tabs and canvas copies are kept per project.
  * Projects from before projects existed use scope "" and keep their old storage keys.
  */
 

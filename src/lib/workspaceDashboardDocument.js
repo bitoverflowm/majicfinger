@@ -3,6 +3,7 @@ import { recordsFromRows } from "@/components/dashboardComposer/integrationRunSh
 import { DATASET_TYPES } from "@/lib/visualizations/datasetDescriptor";
 import { isSavedChartView } from "@/lib/visualizations/presetRegistry";
 import { terminalTabField } from "@/lib/workspaceTerminals";
+import { defaultStartTab } from "@/lib/workspaceStartTabs";
 
 /** Shape of the dashboard project the editor saves. Tabs share one document. */
 
@@ -16,7 +17,7 @@ export function emptyWorkspaceDashboard() {
     name: "Untitled",
     active_tab_id: "welcome",
     welcome_removed: false,
-    tabs: [{ id: "welcome", name: "Welcome", blank: false }],
+    tabs: [defaultStartTab()],
     blocks: {},
     tables: [],
     charts: [],
@@ -565,7 +566,7 @@ export function sanitizeWorkspaceDashboard(input) {
     seen.add(id);
     tabs.push({ id, name, blank: !!tab.blank, ...terminalTabField(tab) });
   }
-  if (!tabs.length) tabs.push({ id: "welcome", name: "Welcome", blank: false });
+  if (!tabs.length) tabs.push(defaultStartTab());
 
   const blocksIn = source.blocks && typeof source.blocks === "object" ? source.blocks : {};
   const blocks = {};
