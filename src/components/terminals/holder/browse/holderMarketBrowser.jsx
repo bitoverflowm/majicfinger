@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Bell, BellOff, CalendarDays, List, Loader2 } from "lucide-react";
+import { CalendarDays, LayoutGrid, List, Loader2, Pause, Play } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import {
@@ -20,15 +20,18 @@ import {
   withStats,
 } from "./marketBrowseFeeds";
 import { MarketBrowseCalendar } from "./marketBrowseCalendar";
+import { MarketBrowseCards } from "./marketBrowseCards";
 import { MarketBrowseTable } from "./marketBrowseTable";
 import { useLiveQuotes, useNewMarketFeed } from "./useMarketBrowseLive";
 
-const MUTE_KEY = "lychee:holderTerminal:muteNewMarkets";
+const PAUSE_KEY = "lychee:holderTerminal:pauseNewMarkets";
 /** The socket takes a few hundred assets comfortably; more than a screenful isn't needed. */
 const MAX_LIVE_ASSETS = 200;
 /** Gamma lists a new market a few seconds after the socket announces it. */
 const ENRICH_DELAYS_MS = [4000, 20_000];
 const TOAST_MS = 9000;
+/** Only Just listed animates arrivals and badges them New. */
+const NO_ARRIVALS = new Map();
 
 const SORTS = {
   newest: { label: "Newest", compare: (a, b) => (b.createdAt ?? 0) - (a.createdAt ?? 0) },
@@ -41,11 +44,14 @@ const SORTS = {
 
 const FEED_SORTS = {
   tradable: ["newest", "closing"],
+  new: ["newest"],
   closed: ["resolved", "volume"],
   volume: ["volume", "newest", "closing"],
   liquidity: ["liquidity", "newest", "closing"],
   trending: ["movers", "volume", "closing"],
 };
+
+const TOP_FEEDS = new Set(["closed", "volume", "liquidity"]);
 
 function sortsFor(feed) {
   return FEED_SORTS[feed] || FEED_SORTS.tradable;
@@ -92,6 +98,24 @@ function Chip({ selected, onClick, children, count }) {
   );
 }
 
+function CategoryChip({ selected, onClick, children, count }) {
+  return (
+    <button
+      type="button"
+      role="tab"
+      aria-selected={selected}
+      onClick={onClick}
+      className={cn(
+        "inline-flex shrink-0 items-center gap-1 rounded-md px-2 py-0.5 text-[12px] transition-colors",
+        selected ? "bg-muted font-medium text-foreground" : "text-muted-foreground hover:bg-muted/60 hover:text-foreground",
+      )}
+    >
+      {children}
+      {count != null ? <span className="tabular-nums text-muted-foreground/70">{count.toLocaleString()}</span> : null}
+    </button>
+  );
+}
+
 function Segmented({ label, value, options, onChange }) {
   return (
     <div role="radiogroup" aria-label={label} className="inline-flex rounded-lg bg-muted p-0.5 text-[12px]">
@@ -127,7 +151,7 @@ function LiveDot({ status }) {
   );
 }
 
-function NewMarketToast({ markets, onOpen, onShowAll }) {
+function NewMarketToast({ markets, onPause, onView }) {
   const [first, ...rest] = markets;
   const more = rest.length;
   return (
@@ -153,12 +177,18 @@ function NewMarketToast({ markets, onOpen, onShowAll }) {
           {more > 2 ? <li>and {more - 2} more</li> : null}
         </ul>
       ) : null}
-      <div className="mt-3 flex justify-end gap-2">
-        <button type="button" onClick={onShowAll} className="rounded-md px-2.5 py-1.5 text-[12px] font-medium text-muted-foreground hover:bg-muted hover:text-foreground">
-          {more ? "See all new" : "See in list"}
+      <div className="mt-3 flex items-center justify-between gap-2">
+        <button
+          type="button"
+          onClick={onPause}
+          title="Stop these alerts. New markets keep collecting under Just listed."
+          className="inline-flex items-center gap-1.5 rounded-md px-2 py-1.5 text-[12px] font-medium text-muted-foreground hover:bg-muted hover:text-foreground"
+        >
+          <Pause className="size-3.5" aria-hidden />
+          Pause
         </button>
-        <button type="button" onClick={() => onOpen(first)} className="rounded-md bg-[#2f6fed] px-2.5 py-1.5 text-[12px] font-medium text-white hover:bg-[#2f6fed]/90">
-          Open market
+        <button type="button" onClick={onView} className="rounded-md bg-[#2f6fed] px-3 py-1.5 text-[12px] font-medium text-white hover:bg-[#2f6fed]/90">
+          View
         </button>
       </div>
     </div>
@@ -187,15 +217,16 @@ export function HolderMarketBrowser({ onPick, className }) {
   const [resolved, setResolved] = useState(() => new Map());
   const [visible, setVisible] = useState([]);
   const [, setStatsVersion] = useState(0);
-  const [muted, setMuted] = useState(false);
+  const [paused, setPaused] = useState(false);
   const [retry, setRetry] = useState(0);
-  const mutedRef = useRef(false);
-  mutedRef.current = muted;
+  const pausedRef = useRef(false);
+  pausedRef.current = paused;
   const toastRef = useRef(null);
+  const sectionRef = useRef(null);
 
   useEffect(() => {
     try {
-      setMuted(window.localStorage.getItem(MUTE_KEY) === "1");
+      setPaused(window.localStorage.getItem(PAUSE_KEY) === "1");
     } catch {
       /* storage blocked */
     }
@@ -221,7 +252,7 @@ export function HolderMarketBrowser({ onPick, className }) {
     return () => abort.abort();
   }, [tradable.done, retry]);
 
-  const gammaFeed = FEED_SORTS[feed] && feed !== "tradable" ? feed : "";
+  const gammaFeed = FEED_SORTS[feed] && feed !== "tradable" && feed !== "new" ? feed : "";
   useEffect(() => {
     if (!gammaFeed) return undefined;
     const cached = cachedFeed(gammaFeed);
@@ -245,10 +276,11 @@ export function HolderMarketBrowser({ onPick, className }) {
     return () => abort.abort();
   }, [gammaFeed, retry]);
 
+  /* New markets join the tradable list unannounced, wherever the sort puts them; Just listed is where they're called out. */
   const allTradable = useMemo(() => {
     if (!liveNew.length) return tradable.markets;
     const known = new Set(tradable.markets.map((market) => market.conditionId));
-    return [...liveNew.filter((market) => !known.has(market.conditionId)), ...tradable.markets];
+    return [...tradable.markets, ...liveNew.filter((market) => !known.has(market.conditionId))];
   }, [liveNew, tradable.markets]);
 
   const categoryCounts = useMemo(() => {
@@ -264,8 +296,9 @@ export function HolderMarketBrowser({ onPick, className }) {
   const base = useMemo(() => {
     if (categoryId) return allTradable.filter((market) => inCategory(market, categoryId));
     if (gammaFeed) return feeds[gammaFeed]?.markets || [];
+    if (feed === "new") return liveNew;
     return allTradable;
-  }, [allTradable, categoryId, feeds, gammaFeed]);
+  }, [allTradable, categoryId, feed, feeds, gammaFeed, liveNew]);
 
   const markets = useMemo(() => sortMarkets(base, sort), [base, sort]);
 
@@ -331,11 +364,22 @@ export function HolderMarketBrowser({ onPick, className }) {
     }, ENRICH_DELAYS_MS[attempt]);
   }, []);
 
-  const showNewest = useCallback(() => {
-    setFeed("tradable");
-    setView("list");
+  const showJustListed = useCallback(() => {
+    setFeed("new");
+    setView((prev) => (prev === "calendar" ? "list" : prev));
     setSort("newest");
     setResetKey((value) => value + 1);
+    sectionRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, []);
+
+  const changePaused = useCallback((next) => {
+    setPaused(next);
+    if (next && toastRef.current) toast.dismiss(toastRef.current.id);
+    try {
+      window.localStorage.setItem(PAUSE_KEY, next ? "1" : "0");
+    } catch {
+      /* storage blocked */
+    }
   }, []);
 
   const onNewMarkets = useCallback(
@@ -351,7 +395,7 @@ export function HolderMarketBrowser({ onPick, className }) {
         return next;
       });
       enrich(batch.map((market) => market.conditionId));
-      if (mutedRef.current) return;
+      if (pausedRef.current) return;
       // While an alert is up, later arrivals join it rather than stacking a second one.
       const shown = toastRef.current;
       const joining = shown && now - shown.at < TOAST_MS;
@@ -362,20 +406,20 @@ export function HolderMarketBrowser({ onPick, className }) {
         (id) => (
           <NewMarketToast
             markets={listed}
-            onOpen={(market) => {
+            onPause={() => {
               toast.dismiss(id);
-              open(market);
+              changePaused(true);
             }}
-            onShowAll={() => {
+            onView={() => {
               toast.dismiss(id);
-              showNewest();
+              showJustListed();
             }}
           />
         ),
         { id: toastId, duration: TOAST_MS, onDismiss: () => (toastRef.current = null), onAutoClose: () => (toastRef.current = null) },
       );
     },
-    [enrich, open, showNewest],
+    [changePaused, enrich, showJustListed],
   );
 
   const onResolved = useCallback((msg) => {
@@ -386,35 +430,44 @@ export function HolderMarketBrowser({ onPick, className }) {
 
   const discoveryStatus = useNewMarketFeed({ assetIds: discoveryAssets, onNewMarkets, onResolved });
 
-  const toggleMute = () => {
-    const next = !muted;
-    setMuted(next);
-    try {
-      window.localStorage.setItem(MUTE_KEY, next ? "1" : "0");
-    } catch {
-      /* storage blocked */
-    }
-  };
-
   const feedState = gammaFeed ? feeds[gammaFeed] : null;
-  const loading = gammaFeed ? !!feedState?.loading || !feedState : !tradable.done;
+  const loading = gammaFeed ? !!feedState?.loading || !feedState : feed !== "new" && !tradable.done;
   const error = gammaFeed ? feedState?.error : tradable.error;
   const selectedLabel = categoryId
     ? `${CATEGORIES.find((category) => category.id === categoryId)?.label} markets`
     : FEEDS.find((item) => item.id === feed)?.label;
   const sortOptions = sortsFor(categoryId ? "tradable" : feed).map((id) => ({ id, label: SORTS[id].label }));
-  const tableProps = { live, arrivals, resolved, onPick: open, onVisible: setVisible };
+  const tableProps = { live, arrivals: feed === "new" ? arrivals : NO_ARRIVALS, resolved, onPick: open, onVisible: setVisible };
+  const feedChip = (item) => (
+    <Chip
+      key={item.id}
+      selected={feed === item.id}
+      onClick={() => pickFeed(item.id)}
+      count={item.id === "tradable" ? allTradable.length || null : item.id === "new" ? liveNew.length || null : feeds[item.id]?.markets?.length || null}
+    >
+      {item.label}
+    </Chip>
+  );
+  const feedGroups = [];
+  for (const item of FEEDS) {
+    const label = TOP_FEEDS.has(item.id) ? "Top markets by" : "";
+    const last = feedGroups[feedGroups.length - 1];
+    if (last && last.label === label) last.feeds.push(item);
+    else feedGroups.push({ label, feeds: [item] });
+  }
   const emptyText = loading ? (
     <>
       <Loader2 className="size-3.5 animate-spin" aria-hidden />
       Loading markets
     </>
+  ) : feed === "new" ? (
+    "Nothing new yet. Markets appear here the moment Polymarket lists them."
   ) : (
     "No markets here right now"
   );
 
   return (
-    <section aria-label="Browse markets" className={className}>
+    <section ref={sectionRef} aria-label="Browse markets" className={cn("scroll-mt-4", className)}>
       <div className="flex flex-wrap items-end justify-between gap-2">
         <div>
           <h3 className="text-[15px] font-semibold text-foreground">Browse markets</h3>
@@ -422,36 +475,41 @@ export function HolderMarketBrowser({ onPick, className }) {
         </div>
         <button
           type="button"
-          onClick={toggleMute}
-          aria-pressed={!muted}
-          className="inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-[12px] text-muted-foreground hover:bg-muted hover:text-foreground"
+          onClick={() => changePaused(!paused)}
+          aria-pressed={paused}
+          title={paused ? "Show an alert again when a market is created." : "Stop the new market alerts. New markets still collect under Just listed."}
+          className={cn(
+            "inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-[12px] hover:bg-muted hover:text-foreground",
+            paused ? "font-medium text-foreground" : "text-muted-foreground",
+          )}
         >
-          {muted ? <BellOff className="size-3.5" aria-hidden /> : <Bell className="size-3.5" aria-hidden />}
-          {muted ? "New market alerts off" : "New market alerts on"}
+          {paused ? <Play className="size-3.5" aria-hidden /> : <Pause className="size-3.5" aria-hidden />}
+          {paused ? "Resume alerts" : "Pause alerts"}
         </button>
       </div>
 
-      <div role="tablist" aria-label="Markets to show" className="-mx-1 mt-3 flex items-center gap-1.5 overflow-x-auto px-1 pb-1">
-        {FEEDS.map((item) => (
-          <Chip
-            key={item.id}
-            selected={feed === item.id}
-            onClick={() => pickFeed(item.id)}
-            count={item.id === "tradable" ? (allTradable.length || null) : feeds[item.id]?.markets?.length || null}
-          >
-            {item.label}
-          </Chip>
-        ))}
-        <span className="mx-1 h-5 w-px shrink-0 bg-border" aria-hidden />
+      <div role="tablist" aria-label="Markets to show" className="-mx-1 mt-3 flex items-end gap-1.5 overflow-x-auto px-1 pb-1">
+        {feedGroups.map((group) =>
+          group.label ? (
+            <div key={group.label} role="group" aria-label={group.label} className="flex shrink-0 flex-col gap-1">
+              <span className="px-1 text-[10.5px] font-medium uppercase tracking-wide text-muted-foreground">{group.label}</span>
+              <div className="flex items-center gap-1.5">{group.feeds.map(feedChip)}</div>
+            </div>
+          ) : (
+            group.feeds.map(feedChip)
+          ),
+        )}
+      </div>
+      <div role="tablist" aria-label="Categories" className="-mx-1 mt-1.5 flex items-center gap-1 overflow-x-auto px-1 pb-1">
         {CATEGORIES.map((category) => (
-          <Chip
+          <CategoryChip
             key={category.id}
             selected={feed === `cat:${category.id}`}
             onClick={() => pickFeed(`cat:${category.id}`)}
             count={tradable.markets.length ? categoryCounts[category.id] : null}
           >
             {category.label}
-          </Chip>
+          </CategoryChip>
         ))}
       </div>
 
@@ -462,10 +520,11 @@ export function HolderMarketBrowser({ onPick, className }) {
           onChange={setView}
           options={[
             { id: "list", label: "List", icon: List, showLabel: true },
+            { id: "cards", label: "Cards", icon: LayoutGrid, showLabel: true },
             { id: "calendar", label: "Calendar", icon: CalendarDays, showLabel: true },
           ]}
         />
-        {view === "list" && sortOptions.length > 1 ? (
+        {view !== "calendar" && sortOptions.length > 1 ? (
           <Segmented
             label="Sort"
             value={sort}
@@ -493,7 +552,7 @@ export function HolderMarketBrowser({ onPick, className }) {
           </span>
           <span className="inline-flex items-center gap-1.5" title="Polymarket announces each new market on this feed">
             <LiveDot status={discoveryStatus} />
-            {discoveryStatus === "open" ? "Watching for new markets" : "Connecting to new markets"}
+            {discoveryStatus !== "open" ? "Connecting to new markets" : paused ? "Watching for new markets · alerts paused" : "Watching for new markets"}
           </span>
         </span>
       </div>
@@ -510,6 +569,8 @@ export function HolderMarketBrowser({ onPick, className }) {
       <div className="mt-3 overflow-hidden rounded-xl border border-border/70 bg-background shadow-sm">
         {view === "calendar" ? (
           <MarketBrowseCalendar {...tableProps} markets={markets} closedFeed={feed === "closed"} />
+        ) : view === "cards" ? (
+          <MarketBrowseCards {...tableProps} markets={markets} resetKey={`${feed}|${sort}|${resetKey}`} empty={emptyText} />
         ) : (
           <MarketBrowseTable {...tableProps} markets={markets} resetKey={`${feed}|${sort}|${resetKey}`} empty={emptyText} />
         )}

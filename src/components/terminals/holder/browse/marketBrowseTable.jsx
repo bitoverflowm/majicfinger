@@ -24,7 +24,7 @@ const GRID = "minmax(300px, 1fr) 100px 56px 76px 76px 76px 128px 76px";
 
 const USD_WHOLE = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 });
 
-function usd(value) {
+export function usd(value) {
   if (!Number.isFinite(value)) return null;
   return value < 1000 ? USD_WHOLE.format(value) : USD_COMPACT.format(value);
 }
@@ -41,7 +41,7 @@ function shortDate(ms) {
   return date.toLocaleDateString(undefined, { month: "short", day: "numeric", ...(sameYear ? {} : { year: "numeric" }) });
 }
 
-function chance(price) {
+export function chance(price) {
   if (!Number.isFinite(price)) return "—";
   const pct = price * 100;
   if (pct > 0 && pct < 1) return "<1%";
@@ -49,23 +49,66 @@ function chance(price) {
   return `${Math.round(pct)}%`;
 }
 
-function MarketIcon({ market }) {
+export function listedAgo(market, now) {
+  if (!market.createdAt) return null;
+  return now - market.createdAt < 30 * DAY ? `${span(Math.max(0, now - market.createdAt))} ago` : shortDate(market.createdAt);
+}
+
+export function MarketIcon({ market, className }) {
   const [broken, setBroken] = useState(false);
   const letter = (market.question || "?").trim().charAt(0).toUpperCase();
   if (!market.icon || broken) {
     return (
-      <span className="flex size-8 shrink-0 items-center justify-center rounded-md bg-muted text-[12px] font-semibold text-muted-foreground" aria-hidden>
+      <span className={cn("flex size-8 shrink-0 items-center justify-center rounded-md bg-muted text-[12px] font-semibold text-muted-foreground", className)} aria-hidden>
         {letter}
       </span>
     );
   }
   return (
     // eslint-disable-next-line @next/next/no-img-element
-    <img src={market.icon} alt="" loading="lazy" onError={() => setBroken(true)} className="size-8 shrink-0 rounded-md bg-muted object-cover" />
+    <img src={market.icon} alt="" loading="lazy" onError={() => setBroken(true)} className={cn("size-8 shrink-0 rounded-md bg-muted object-cover", className)} />
   );
 }
 
-function Closes({ market, now }) {
+/** Everything a row or card shows for one market: cached stats, the live quote and trades, badges. */
+export function marketFigures({ market: base, now, live, arrivedAt, resolvedOutcome }) {
+  const stats = cachedStats(base.conditionId);
+  const market = withStats(base, stats);
+  /** Gamma leaves volume out when a market hasn't traded. */
+  const looked = stats !== undefined || base.volume != null || base.liquidity != null;
+  const firstToken = market.tokenIds[0];
+  const quote = firstToken ? live.quotes.get(firstToken) : null;
+  const price = quote?.price ?? market.prices[0];
+  const traded = market.tokenIds.reduce((sum, token) => sum + (live.traded.get(token) || 0), 0);
+  const elapsed = arrivedAt ? now - arrivedAt : Infinity;
+  return {
+    market,
+    looked,
+    quote,
+    price,
+    ticking: !!(quote && quote.dir && now - quote.at < TICK_MS),
+    traded,
+    volume24h: market.volume24h == null && !looked ? null : (market.volume24h ?? 0) + traded,
+    volume: looked ? (market.volume ?? 0) : market.volume,
+    elapsed,
+    arriving: elapsed < ARRIVE_MS,
+    fresh: elapsed < NEW_BADGE_MS,
+    tags: displayTags(market),
+    firstOutcome: market.outcomes[0] || "Yes",
+    winner: resolvedOutcome || market.winner,
+  };
+}
+
+export function NewBadge() {
+  return (
+    <span className="inline-flex shrink-0 items-center gap-1 rounded bg-[#0d99ff]/10 px-1.5 py-px font-semibold text-[#0b7fd4]">
+      <span className="size-1.5 animate-pulse rounded-full bg-[#0d99ff]" aria-hidden />
+      New
+    </span>
+  );
+}
+
+export function Closes({ market, now }) {
   if (market.closed || market.closedAt) {
     const at = market.closedAt;
     return (
@@ -95,23 +138,13 @@ function Closes({ market, now }) {
 }
 
 function MarketRow({ market: base, top, now, live, arrivedAt, resolvedOutcome, onPick }) {
-  const stats = cachedStats(base.conditionId);
-  const market = withStats(base, stats);
-  /** Gamma leaves volume out when a market hasn't traded. */
-  const looked = stats !== undefined || base.volume != null || base.liquidity != null;
-  const firstToken = market.tokenIds[0];
-  const quote = firstToken ? live.quotes.get(firstToken) : null;
-  const price = quote?.price ?? market.prices[0];
-  const ticking = quote && quote.dir && now - quote.at < TICK_MS;
-  const traded = market.tokenIds.reduce((sum, token) => sum + (live.traded.get(token) || 0), 0);
-  const volume24h = market.volume24h == null && !looked ? null : (market.volume24h ?? 0) + traded;
-  const elapsed = arrivedAt ? now - arrivedAt : Infinity;
-  const arriving = elapsed < ARRIVE_MS;
-  const fresh = elapsed < NEW_BADGE_MS;
-  const tags = displayTags(market);
-  const firstOutcome = market.outcomes[0] || "Yes";
-  const winner = resolvedOutcome || market.winner;
-  const volumeOrZero = (value) => (looked ? (value ?? 0) : value);
+  const { market, looked, quote, price, ticking, traded, volume24h, volume, elapsed, arriving, fresh, tags, firstOutcome, winner } = marketFigures({
+    market: base,
+    now,
+    live,
+    arrivedAt,
+    resolvedOutcome,
+  });
   const open = () => onPick(market);
 
   return (
@@ -139,12 +172,7 @@ function MarketRow({ market: base, top, now, live, arrivedAt, resolvedOutcome, o
             {market.question || market.slug}
           </span>
           <span className="mt-0.5 flex min-w-0 items-center gap-1.5 text-[11px] text-muted-foreground">
-            {fresh ? (
-              <span className="inline-flex shrink-0 items-center gap-1 rounded bg-[#0d99ff]/10 px-1.5 py-px font-semibold text-[#0b7fd4]">
-                <span className="size-1.5 animate-pulse rounded-full bg-[#0d99ff]" aria-hidden />
-                New
-              </span>
-            ) : null}
+            {fresh ? <NewBadge /> : null}
             {market.eventTitle && market.eventTitle !== market.question ? (
               <span className="truncate">{market.eventTitle}</span>
             ) : null}
@@ -200,37 +228,31 @@ function MarketRow({ market: base, top, now, live, arrivedAt, resolvedOutcome, o
       <div role="cell" className={cn("px-2 text-right font-mono text-[12px] tabular-nums", traded > 0 && "text-foreground")}>
         {usd(volume24h) ?? <StatPending looked={looked} />}
       </div>
-      <div role="cell" className="px-2 text-right font-mono text-[12px] tabular-nums">{usd(volumeOrZero(market.volume)) ?? <StatPending looked={looked} />}</div>
+      <div role="cell" className="px-2 text-right font-mono text-[12px] tabular-nums">{usd(volume) ?? <StatPending looked={looked} />}</div>
       <div role="cell" className="px-2 text-right font-mono text-[12px] tabular-nums">{usd(market.liquidity) ?? <StatPending looked={looked} />}</div>
       <div role="cell" className="truncate px-3 text-[12px]">
         <Closes market={market} now={now} />
       </div>
       <div role="cell" className="truncate pr-3 text-right text-[12px] text-muted-foreground">
-        {market.createdAt ? (now - market.createdAt < 30 * DAY ? `${span(Math.max(0, now - market.createdAt))} ago` : shortDate(market.createdAt)) : "—"}
+        {listedAgo(market, now) ?? "—"}
       </div>
     </div>
   );
 }
 
-function StatPending({ looked }) {
+export function StatPending({ looked }) {
   return looked ? <span className="text-muted-foreground/60">—</span> : <span className="inline-block h-2.5 w-10 animate-pulse rounded bg-muted" aria-label="Loading" />;
 }
 
-/**
- * Markets as a rich table, drawn only where the list is scrolled to. Tells the parent which
- * markets are on screen so it can fetch their stats and stream their prices.
- */
-export function MarketBrowseTable({ markets, live, arrivals, resolved, onPick, onVisible, empty, height = 620, resetKey }) {
+/** Where a windowed list is scrolled to and how big it is; back to the top whenever `resetKey` changes. */
+export function useBrowseScroll({ height, resetKey }) {
   const scrollRef = useRef(null);
-  const [view, setView] = useState({ top: 0, height });
-  const [now, setNow] = useState(() => Date.now());
-  const onVisibleRef = useRef(onVisible);
-  onVisibleRef.current = onVisible;
+  const [view, setView] = useState({ top: 0, height, width: 0 });
 
   useLayoutEffect(() => {
     const el = scrollRef.current;
     if (!el) return undefined;
-    const measure = () => setView({ top: el.scrollTop, height: el.clientHeight });
+    const measure = () => setView({ top: el.scrollTop, height: el.clientHeight, width: el.clientWidth });
     measure();
     const observer = new ResizeObserver(measure);
     observer.observe(el);
@@ -244,33 +266,53 @@ export function MarketBrowseTable({ markets, live, arrivals, resolved, onPick, o
     setView((prev) => ({ ...prev, top: 0 }));
   }, [resetKey]);
 
+  const onScroll = (event) => {
+    const el = event.currentTarget;
+    setView({ top: el.scrollTop, height: el.clientHeight, width: el.clientWidth });
+  };
+  return { scrollRef, view, onScroll };
+}
+
+/** The clock relative times and flashes are drawn against: every live update, and every 30s. */
+export function useBrowseNow(live, markets) {
+  const [now, setNow] = useState(() => Date.now());
   useEffect(() => {
     setNow(Date.now());
   }, [live.version, markets]);
-
   useEffect(() => {
     const timer = window.setInterval(() => setNow(Date.now()), 30_000);
     return () => window.clearInterval(timer);
   }, []);
+  return now;
+}
+
+/** Tells the parent which markets are drawn, so it can fetch their stats and stream their prices. */
+export function useReportVisible(visible, onVisible) {
+  const onVisibleRef = useRef(onVisible);
+  onVisibleRef.current = onVisible;
+  const visibleKey = visible.map((market) => market.conditionId).join(",");
+  useEffect(() => {
+    onVisibleRef.current?.(visible);
+    // The id list says everything about which markets are on screen.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [visibleKey]);
+}
+
+/**
+ * Markets as a rich table, drawn only where the list is scrolled to. Tells the parent which
+ * markets are on screen so it can fetch their stats and stream their prices.
+ */
+export function MarketBrowseTable({ markets, live, arrivals, resolved, onPick, onVisible, empty, height = 620, resetKey }) {
+  const { scrollRef, view, onScroll } = useBrowseScroll({ height, resetKey });
+  const now = useBrowseNow(live, markets);
 
   const start = Math.max(0, Math.floor(view.top / ROW_HEIGHT) - OVERSCAN);
   const end = Math.min(markets.length, Math.ceil((view.top + view.height) / ROW_HEIGHT) + OVERSCAN);
   const visible = markets.slice(start, end);
-  const visibleKey = visible.map((market) => market.conditionId).join(",");
-
-  useEffect(() => {
-    onVisibleRef.current?.(visible);
-    // The id list says everything about which rows are on screen.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [visibleKey]);
+  useReportVisible(visible, onVisible);
 
   return (
-    <div
-      ref={scrollRef}
-      onScroll={(event) => setView({ top: event.currentTarget.scrollTop, height: event.currentTarget.clientHeight })}
-      className="overflow-auto overscroll-contain"
-      style={{ height }}
-    >
+    <div ref={scrollRef} onScroll={onScroll} className="overflow-auto overscroll-contain" style={{ height }}>
       <div role="table" aria-rowcount={markets.length} className="min-w-max">
         <div
           role="row"

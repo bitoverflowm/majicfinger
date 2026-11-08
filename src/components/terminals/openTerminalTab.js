@@ -54,8 +54,10 @@ export function terminalProjectDraft(terminalId, subject = null) {
 }
 
 /**
- * Back to the terminal's explore view. The subject `tabId` was showing moves to a new tab
- * right after it, so that view isn't lost. Returns the new tab's id.
+ * Back to the terminal's explore view. A project keeps one explore tab per terminal: if it
+ * already has one, that's where to go and `tabId` stays as it is. Otherwise `tabId` becomes
+ * the explore tab and the subject it was showing moves to a new tab right after it.
+ * Returns `{ exploreId, viewId }`: the explore tab, and the tab now showing the subject.
  */
 export function exploreFromTerminal({ ctx, tabId, accountId }) {
   const tabs = Array.isArray(ctx?.workspaceStartTabs) ? ctx.workspaceStartTabs : [];
@@ -64,13 +66,15 @@ export function exploreFromTerminal({ ctx, tabId, accountId }) {
   const terminal = findTerminal(host?.terminal);
   const subject = sanitizeTerminalSubject(host?.terminalSubject);
   if (!host || !terminal || !subject) return null;
+  const existing = tabs.find((tab) => tab.id !== tabId && tab.terminal === terminal.id && !sanitizeTerminalSubject(tab.terminalSubject));
+  if (existing) return { exploreId: existing.id, viewId: tabId };
   const moved = terminalTab(terminal, subject, []);
   const others = tabs.filter((tab) => tab.id !== tabId).map((tab) => tab.name);
   const explore = { ...host, name: terminalTabName(terminal.title, [...others, moved.name]) };
   delete explore.terminalSubject;
   const nextTabs = [...tabs.slice(0, index), explore, moved, ...tabs.slice(index + 1)];
   commitTabs(ctx, nextTabs, accountId, tabId);
-  return moved.id;
+  return { exploreId: tabId, viewId: moved.id };
 }
 
 /**

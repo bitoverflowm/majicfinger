@@ -38,6 +38,7 @@ const NOISE_TAG = /^(hide from new|recurring|earn \d|hfc|parent for derivative|p
 
 export const FEEDS = [
   { id: "tradable", label: "All tradable markets" },
+  { id: "new", label: "Just listed" },
   { id: "closed", label: "Recently closed" },
   { id: "volume", label: "By volume" },
   { id: "liquidity", label: "By liquidity" },

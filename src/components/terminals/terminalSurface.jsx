@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { useWorkspaceCanvas } from "@/components/dashboardComposer/workspaceCanvas";
-import { FeatureTip } from "@/components/ui/feature-tip";
+import { FeatureTip, useFeatureTipDismissal } from "@/components/ui/feature-tip";
 import { useMyStateV2 } from "@/context/stateContextV2";
 import { useUser } from "@/lib/hooks";
 import { siteConfig } from "@/lib/site";
@@ -13,10 +13,39 @@ import { HolderMarketView } from "./holder/holderMarketView";
 import { HolderTerminalSearch } from "./holder/holderTerminalSearch";
 import { HolderTraderView } from "./holder/holderTraderView";
 
-/** Points at the tab the previous view moved to. The tab bar renders it a frame or two later. */
-function MovedViewTip({ tabId, kind, onOpen, onClose }) {
+/**
+ * The "your previous view is here" tip, shared across tabs: Explore can send the user to a
+ * different tab than the one they clicked it in. `{ hostId, tabId, kind, moved }`.
+ */
+let viewTip = null;
+const viewTipListeners = new Set();
+
+function setViewTip(next) {
+  viewTip = next;
+  viewTipListeners.forEach((listener) => listener());
+}
+
+function subscribeViewTip(listener) {
+  viewTipListeners.add(listener);
+  return () => viewTipListeners.delete(listener);
+}
+
+function useViewTip() {
+  return useSyncExternalStore(subscribeViewTip, () => viewTip, () => null);
+}
+
+/** Points at the tab showing the previous view. The tab bar renders a new tab a frame or two later. */
+function MovedViewTip({ tabId, kind, moved, onOpen, onClose, onSpent }) {
   const anchorRef = useRef(null);
   const [ready, setReady] = useState(false);
+  const onSpentRef = useRef(onSpent);
+  onSpentRef.current = onSpent;
+
+  // Shown once: however the tip goes away after appearing (closed, another pick, leaving the tab), it's spent.
+  useEffect(() => {
+    if (!ready) return undefined;
+    return () => onSpentRef.current?.();
+  }, [ready]);
 
   useEffect(() => {
     let frame = 0;
@@ -42,7 +71,7 @@ function MovedViewTip({ tabId, kind, onOpen, onClose }) {
       anchorRef={anchorRef}
       side="bottom"
       align="start"
-      title="Moved to a new tab"
+      title={moved ? "Moved to a new tab" : "Still open in its tab"}
       description={`Your previous ${kind === "trader" ? "trader" : "market"} view is here.`}
       onDismiss={onClose}
       secondaryAction={{ label: "Got it", onClick: onClose }}
@@ -56,27 +85,38 @@ function HolderTerminal({ tab }) {
   const canvas = useWorkspaceCanvas();
   const user = useUser();
   const subject = tab?.terminalSubject || null;
-  const [moved, setMoved] = useState(null);
+  const sharedTip = useViewTip();
+  const tip = tab?.id && sharedTip?.hostId === tab.id ? sharedTip : null;
+  const movedTip = useFeatureTipDismissal("holder-terminal-moved-tab");
   const scrollRef = useRef(null);
   const accountId = user?.userId || "";
+  const selectTab = (id) => {
+    if (canvas?.requestTab) canvas.requestTab(id);
+    else ctx?.setActiveWorkspaceStartTabId?.(id);
+  };
   const pick = (subjects) => {
     if (!tab?.id) return;
-    setMoved(null);
+    if (tip) setViewTip(null);
     placeTerminalSubjects({ ctx, tabId: tab.id, subjects, accountId });
   };
   const explore = () => {
     if (!tab?.id || !subject) return;
-    const id = exploreFromTerminal({ ctx, tabId: tab.id, accountId });
-    if (!id) return;
-    setMoved({ id, kind: subject.kind });
-    scrollRef.current?.scrollTo({ top: 0 });
+    const result = exploreFromTerminal({ ctx, tabId: tab.id, accountId });
+    if (!result) return;
+    const moved = result.exploreId === tab.id;
+    setViewTip({ hostId: result.exploreId, tabId: result.viewId, kind: subject.kind, moved });
+    if (moved) scrollRef.current?.scrollTo({ top: 0 });
+    else selectTab(result.exploreId);
   };
   const openTab = (id) => {
-    setMoved(null);
-    if (canvas?.requestTab) canvas.requestTab(id);
-    else ctx?.setActiveWorkspaceStartTabId?.(id);
+    setViewTip(null);
+    selectTab(id);
   };
-  const closeTip = useRef(() => setMoved(null)).current;
+  const closeTip = useRef(() => setViewTip(null)).current;
+  const spendTip = () => {
+    movedTip.dismiss();
+    if (viewTip === tip) setViewTip(null);
+  };
 
   return (
     <div ref={scrollRef} className="min-h-0 flex-1 overflow-y-auto">
@@ -113,7 +153,9 @@ function HolderTerminal({ tab }) {
           <HolderMarketBrowser onPick={pick} className="mt-10" />
         )}
       </div>
-      {moved ? <MovedViewTip tabId={moved.id} kind={moved.kind} onOpen={() => openTab(moved.id)} onClose={closeTip} /> : null}
+      {tip && movedTip.dismissed === false ? (
+        <MovedViewTip tabId={tip.tabId} kind={tip.kind} moved={tip.moved} onOpen={() => openTab(tip.tabId)} onClose={closeTip} onSpent={spendTip} />
+      ) : null}
     </div>
   );
 }
