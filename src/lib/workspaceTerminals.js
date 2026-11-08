@@ -34,7 +34,12 @@ export function sanitizeTerminalSubject(subject) {
     };
   }
   if (subject.kind === "trader" && WALLET.test(String(subject.address || ""))) {
-    return { kind: "trader", address: String(subject.address).toLowerCase(), title: clip(subject.title, 120) };
+    const trader = { kind: "trader", address: String(subject.address).toLowerCase(), title: clip(subject.title, 120) };
+    const from = subject.fromMarket;
+    if (from && CONDITION_ID.test(String(from.conditionId || ""))) {
+      trader.fromMarket = { conditionId: String(from.conditionId), title: clip(from.title, 200), slug: clip(from.slug, 200) };
+    }
+    return trader;
   }
   return null;
 }

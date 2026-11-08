@@ -146,7 +146,14 @@ function HolderTerminal({ tab }) {
             key={subject.conditionId}
             subject={subject}
             onPickTrader={({ address, title }) => {
-              pick([{ kind: "trader", address, title }]);
+              pick([
+                {
+                  kind: "trader",
+                  address,
+                  title,
+                  fromMarket: { conditionId: subject.conditionId, title: subject.title, slug: subject.slug },
+                },
+              ]);
               scrollRef.current?.scrollTo({ top: 0 });
             }}
           />

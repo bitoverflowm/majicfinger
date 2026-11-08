@@ -17,12 +17,18 @@ function fidelityFor(spanSec) {
 }
 
 /** Each outcome's history as `{ t, p }` points (t in seconds), from its first day to now or its close. */
-async function fetchHistory(meta, signal) {
-  const tokens = meta.tokenIds.slice(0, 2);
+function fetchHistory(meta, signal) {
   const now = Date.now();
   const endMs = meta.closed && meta.closeMs ? Math.min(meta.closeMs, now) : now;
   const start = Math.floor((meta.openMs || endMs - FALLBACK_SPAN_MS) / 1000);
-  const end = Math.max(Math.floor(endMs / 1000), start + 60);
+  return fetchPriceHistory(meta.tokenIds, start, Math.floor(endMs / 1000), signal);
+}
+
+/** `{ t, p }` points (t in seconds) per token for the first two tokens, between two epoch-second times. */
+export async function fetchPriceHistory(tokenIds, startSec, endSec, signal) {
+  const tokens = tokenIds.slice(0, 2);
+  const start = Math.floor(startSec);
+  const end = Math.max(Math.floor(endSec), start + 60);
   const res = await fetch("/api/integrations/polymarket?query=getBatchPricesHistory", {
     method: "POST",
     headers: { Accept: "application/json", "Content-Type": "application/json" },

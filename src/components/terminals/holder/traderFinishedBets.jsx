@@ -222,7 +222,7 @@ function pct(value, digits = 1) {
   return `${value > 0 ? "+" : value < 0 ? "−" : ""}${Math.abs(value * 100).toFixed(digits)}%`;
 }
 
-function SummaryTile({ label, value, tone, detail, title }) {
+export function SummaryTile({ label, value, tone, detail, title }) {
   return (
     <div className="min-w-0 rounded-lg bg-black/[0.03] px-3 py-2.5 dark:bg-white/[0.04]" title={title}>
       <dt className="text-[12px] text-muted-foreground">{label}</dt>

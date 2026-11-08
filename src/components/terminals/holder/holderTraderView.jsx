@@ -14,6 +14,7 @@ import { sheetChartBlock, traderSheet } from "./holderTerminalSheets";
 import { SCORE_TIERS, SKILL_SCORE_NAME, loadTraderScore, scoreTier } from "./traderScore";
 import { arrivalKey } from "./holderTradesTable";
 import { FinishedBetsSummary, FinishedBetsTable, finishedBetList, useFinishedBets } from "./traderFinishedBets";
+import { TraderMarketFocus } from "./traderMarketFocus";
 import { TraderPnlByQuestion } from "./traderPnlByQuestion";
 import { TraderPositionsTable, useTraderPositions } from "./traderPositionsTable";
 import { TradeAlertsToggle, useTraderTradeAlerts } from "./traderTradeAlerts";
@@ -356,6 +357,25 @@ export function HolderTraderView({ subject, onProfileName, onPickMarket }) {
           <PanelState part={finishedPart.status === "ready" ? positions : finishedPart} empty="No bets yet." />
         </section>
       )}
+
+      <div className="max-w-3xl pt-4">
+        <h3 className="text-[15px] font-semibold text-foreground">Market specific</h3>
+        <p className="mt-0.5 text-[13px] text-muted-foreground">
+          Pick any market this wallet has traded. Its price is charted for both outcomes, with a dot for every move this wallet
+          made there: filled for buys, hollow for sells, bigger for more money. Hover a dot for the details, or click it to pin
+          them. New moves pulse in as they happen and the price follows the market live.
+          {subject.fromMarket ? " It opens on the market you found this trader from." : ""}
+        </p>
+      </div>
+      <TraderMarketFocus
+        address={subject.address}
+        fromMarket={subject.fromMarket}
+        trades={activity.rows}
+        positions={positions.rows}
+        bets={finishedBets}
+        lastTrade={activity.rows[0]}
+        onPickMarket={onPickMarket}
+      />
     </div>
   );
 }
