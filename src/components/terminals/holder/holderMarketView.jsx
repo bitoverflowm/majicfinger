@@ -94,19 +94,17 @@ export function HolderMarketView({ subject, onPickTrader }) {
 
   return (
     <div className="mt-8 space-y-4 animate-in fade-in slide-in-from-top-2 duration-300">
-      <div className="grid gap-4 lg:grid-cols-[minmax(300px,380px)_minmax(0,1fr)]">
-        <div className="space-y-2">
-          <div className="flex items-center justify-between px-1">
-            <LiveDot on={live && !meta.closed} label={meta.closed ? "Market closed" : live ? "Live" : "Connecting"} />
-            {stats.lastTradeSec ? <span className="text-[11px] text-muted-foreground">Last trade {formatClock(stats.lastTradeSec)}</span> : null}
-          </div>
-          <MarketStatsCard meta={stats} />
-        </div>
+      <div className="flex items-center justify-between gap-3 px-1">
+        <LiveDot on={live && !meta.closed} label={meta.closed ? "Market closed" : live ? "Live" : "Connecting"} />
+        {stats.lastTradeSec ? <span className="text-[11px] text-muted-foreground">Last trade {formatClock(stats.lastTradeSec)}</span> : null}
+      </div>
+      <div className="!mt-2 grid gap-4 lg:grid-cols-[minmax(300px,380px)_minmax(0,1fr)]">
+        <MarketStatsCard meta={stats} />
         <section
           aria-label="Last traded price chart"
           data-block-type={chart?.type}
           data-source-sheet={chart?.sourceSheetId}
-          className="flex h-[420px] min-w-0 flex-col overflow-hidden rounded-xl border border-border/70 bg-background p-3 shadow-sm"
+          className="flex h-[480px] min-w-0 flex-col overflow-hidden rounded-xl border border-border/70 bg-background p-3 shadow-sm lg:h-auto lg:min-h-[480px]"
         >
           {rows.length ? (
             <SheetBlockChart sheet={sheet} live={live} view={chart.chartView} />
